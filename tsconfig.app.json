@@ -23,7 +23,7 @@
     },
     "skipLibCheck": true,
     "strict": false,
-    "target": "ES2020",
+    "target": "ES2021",
     "types": [
       "vitest/globals"
     ],
