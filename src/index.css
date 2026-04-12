@@ -220,4 +220,219 @@
     @apply outline-none ring-1;
     ring-color: hsl(var(--ring));
   }
+
+  .cad-settings-select {
+    @apply text-xs px-2 py-1 rounded border w-full;
+    background: hsl(var(--muted));
+    border-color: hsl(var(--border));
+    color: hsl(var(--foreground));
+    appearance: none;
+    -webkit-appearance: none;
+  }
+
+  .cad-settings-select:focus {
+    @apply outline-none ring-1;
+    ring-color: hsl(var(--ring));
+    border-color: hsl(var(--ring));
+  }
+
+  /* ---- ID Panel ---- */
+  .cad-id-panel {
+    max-height: calc(100% - 20px);
+    overflow: hidden;
+    border-radius: 12px;
+    background: hsl(var(--cad-settings-bg) / 0.95);
+    border: 1px solid hsl(var(--cad-hub-border));
+    backdrop-filter: blur(4px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+    transition: width 0.15s ease;
+  }
+
+  .cad-id-panel.collapsed {
+    width: 170px !important;
+  }
+
+  .id-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    padding: 8px 8px 7px 8px;
+    border-bottom: 1px solid hsl(var(--border));
+  }
+
+  .id-title {
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.2px;
+    color: hsl(var(--foreground));
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+
+  .id-head-actions {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  .id-head-btn, .id-icon-btn {
+    height: 22px;
+    border: none;
+    border-radius: 7px;
+    background: hsl(var(--muted));
+    color: hsl(var(--foreground));
+    cursor: pointer;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 7px;
+    min-width: 22px;
+  }
+
+  .id-head-btn.icon-only, .id-icon-btn.icon-only {
+    width: 22px;
+    padding: 0;
+  }
+
+  .id-toggle-chevron {
+    width: 8px;
+    height: 8px;
+    display: block;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: rotate(-135deg);
+    margin-top: 3px;
+    transition: transform 0.15s ease;
+  }
+
+  .cad-id-panel.collapsed .id-toggle-chevron {
+    transform: rotate(45deg);
+    margin-top: -1px;
+  }
+
+  .id-body {
+    padding: 6px;
+    max-height: calc(100vh - 80px);
+    overflow: auto;
+  }
+
+  .id-add-wrap {
+    margin-bottom: 4px;
+  }
+
+  .id-add-btn {
+    width: 100%;
+    justify-content: center;
+    gap: 6px;
+    font-weight: 700;
+    font-size: 12px;
+    height: 26px;
+  }
+
+  .id-list {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    position: relative;
+  }
+
+  .id-drop-indicator {
+    height: 0;
+    position: relative;
+    margin: 0;
+    opacity: 0;
+    pointer-events: none;
+    transition: margin 0.08s ease, opacity 0.08s ease;
+  }
+
+  .id-drop-indicator.active {
+    margin: 3px 0;
+    opacity: 1;
+  }
+
+  .id-drop-indicator::before {
+    content: "";
+    display: block;
+    height: 2px;
+    border-radius: 999px;
+    background: hsl(var(--primary));
+    box-shadow: 0 0 0 1px hsl(var(--primary) / 0.2);
+  }
+
+  .id-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 6px;
+    align-items: center;
+    padding: 6px;
+    border-radius: 10px;
+    background: hsl(var(--muted));
+    border: 1px solid hsl(var(--border));
+    transition: transform 0.08s ease, margin 0.08s ease, opacity 0.12s ease;
+    cursor: grab;
+  }
+
+  .id-row:active {
+    cursor: grabbing;
+  }
+
+  .id-row.active {
+    outline: 2px solid hsl(var(--primary) / 0.24);
+    border-color: hsl(var(--primary) / 0.42);
+  }
+
+  .id-row.dragging {
+    opacity: 0.55;
+  }
+
+  .id-row.faded {
+    opacity: 0.45;
+  }
+
+  .id-main {
+    min-width: 0;
+    cursor: pointer;
+  }
+
+  .id-name {
+    font-size: 12px;
+    color: hsl(var(--foreground));
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.2;
+  }
+
+  .id-count {
+    font-size: 10px;
+    color: hsl(var(--muted-foreground));
+    margin-top: 1px;
+  }
+
+  .id-actions {
+    display: grid;
+    grid-template-columns: repeat(3, 22px);
+    gap: 4px;
+    align-items: center;
+  }
+
+  .eye-btn.slash {
+    position: relative;
+  }
+
+  .eye-btn.slash::after {
+    content: "";
+    position: absolute;
+    width: 14px;
+    height: 2px;
+    background: currentColor;
+    transform: rotate(-35deg);
+    border-radius: 999px;
+  }
 }
