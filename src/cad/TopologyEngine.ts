@@ -2,6 +2,7 @@ import { Defaults, SnapType } from "./constants";
 import { Vec2, v, projectPointToSegment } from "./geometry";
 import { Scene, Segment } from "./Scene";
 import { Camera } from "./Camera";
+import { LabelManager } from "./LabelManager";
 
 export interface Snap {
   type: string;
@@ -19,15 +20,25 @@ export interface Snap {
 export class TopologyEngine {
   scene: Scene;
   camera: Camera;
+  labels: LabelManager;
 
-  constructor(scene: Scene, camera: Camera) {
+  constructor(scene: Scene, camera: Camera, labels: LabelManager) {
     this.scene = scene;
     this.camera = camera;
+    this.labels = labels;
   }
 
   _worldToMousePx(world: Vec2, mouseS: Vec2): number {
     const sp = this.camera.worldToScreen(world.x, world.y);
     return Math.hypot(sp.x - mouseS.x, sp.y - mouseS.y);
+  }
+
+  _segmentsFrontToBack(): Segment[] {
+    const order = this.labels.list();
+    const rank = new Map(order.map((g, i) => [g.id, i]));
+    return [...this.scene.segments]
+      .filter(s => this.labels.isVisible(s.labelId))
+      .sort((a, b) => (rank.get(b.labelId) || 0) - (rank.get(a.labelId) || 0));
   }
 
   findBestSnap(mouseS: Vec2, mouseW: Vec2): Snap | null {
@@ -55,11 +66,12 @@ export class TopologyEngine {
       }
     };
 
-    for (const seg of this.scene.segments) {
+    const segs = this._segmentsFrontToBack();
+    for (const seg of segs) {
       considerPoint(seg.a, seg, 0);
       considerPoint(seg.b, seg, 1);
     }
-    for (const seg of this.scene.segments) {
+    for (const seg of segs) {
       considerLine(seg.a, seg.b, seg);
     }
 
@@ -93,11 +105,12 @@ export class TopologyEngine {
       }
     };
 
-    for (const seg of this.scene.segments) {
+    const segs = this._segmentsFrontToBack();
+    for (const seg of segs) {
       considerPoint(seg.a, seg, 0);
       considerPoint(seg.b, seg, 1);
     }
-    for (const seg of this.scene.segments) {
+    for (const seg of segs) {
       considerLine(seg.a, seg.b, seg);
     }
 
@@ -108,7 +121,7 @@ export class TopologyEngine {
     let best: Snap | null = null;
     let bestPx = Infinity;
 
-    for (const seg of this.scene.segments) {
+    for (const seg of this._segmentsFrontToBack()) {
       const proj = projectPointToSegment(mouseW, seg.a, seg.b);
       const px = this._worldToMousePx(proj.q, mouseS);
       if (px > Defaults.snapPx) continue;
@@ -124,6 +137,8 @@ export class TopologyEngine {
 
   findPointSnapOnSegment(mouseS: Vec2, segment: Segment): Snap | null {
     if (!segment) return null;
+    if (!this.labels.isVisible(segment.labelId)) return null;
+
     let best: Snap | null = null;
     let bestPx = Infinity;
 
