@@ -23,7 +23,7 @@ const CadEditor: React.FC = () => {
   const thicknessInputRef = useRef<HTMLInputElement>(null);
 
   const appRef = useRef<CadApp | null>(null);
-  const [activeTool, setActiveTool] = useState(ToolIds.SELECT);
+  const [activeTool, setActiveTool] = useState<string>(ToolIds.SELECT);
 
   useEffect(() => {
     if (
