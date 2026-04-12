@@ -6,6 +6,8 @@ export const Defaults = {
   lineThicknessM: 0.03,
   lineColor: "#111111",
   geomEps: 1e-9,
+  defaultLabelId: "default-line",
+  defaultLabelName: "Default",
 };
 
 export const ToolIds = {

@@ -18,9 +18,17 @@ const CadEditor: React.FC = () => {
   const pointTranslateBtnRef = useRef<HTMLButtonElement>(null);
   const pointRotateBtnRef = useRef<HTMLButtonElement>(null);
   const settingsRef = useRef<HTMLDivElement>(null);
+  const idSelectRef = useRef<HTMLSelectElement>(null);
   const colorInputRef = useRef<HTMLInputElement>(null);
   const colorPreviewRef = useRef<HTMLDivElement>(null);
   const thicknessInputRef = useRef<HTMLInputElement>(null);
+
+  // IdPanel refs
+  const idPanelRef = useRef<HTMLDivElement>(null);
+  const idBodyRef = useRef<HTMLDivElement>(null);
+  const idListRef = useRef<HTMLDivElement>(null);
+  const idAddBtnRef = useRef<HTMLButtonElement>(null);
+  const idToggleBtnRef = useRef<HTMLButtonElement>(null);
 
   const appRef = useRef<CadApp | null>(null);
   const [activeTool, setActiveTool] = useState<string>(ToolIds.SELECT);
@@ -29,8 +37,10 @@ const CadEditor: React.FC = () => {
     if (
       !canvasRef.current || !hubRef.current || !hubLenRef.current || !hubAngRef.current ||
       !pointEditRef.current || !pointMoveBtnRef.current || !pointTranslateBtnRef.current ||
-      !pointRotateBtnRef.current || !settingsRef.current || !colorInputRef.current ||
-      !colorPreviewRef.current || !thicknessInputRef.current
+      !pointRotateBtnRef.current || !settingsRef.current || !idSelectRef.current ||
+      !colorInputRef.current || !colorPreviewRef.current || !thicknessInputRef.current ||
+      !idPanelRef.current || !idBodyRef.current || !idListRef.current ||
+      !idAddBtnRef.current || !idToggleBtnRef.current
     ) return;
 
     const app = new CadApp(
@@ -45,9 +55,15 @@ const CadEditor: React.FC = () => {
         [PointEditAction.ROTATE]: pointRotateBtnRef.current,
       },
       settingsRef.current,
+      idSelectRef.current,
       colorInputRef.current,
       colorPreviewRef.current,
       thicknessInputRef.current,
+      idPanelRef.current,
+      idBodyRef.current,
+      idListRef.current,
+      idAddBtnRef.current,
+      idToggleBtnRef.current,
     );
 
     app.onToolChange = (id) => setActiveTool(id);
@@ -89,7 +105,11 @@ const CadEditor: React.FC = () => {
       </div>
 
       {/* Line Settings Panel */}
-      <div ref={settingsRef} className="cad-settings-panel absolute top-3 right-3 z-20 hidden w-44">
+      <div ref={settingsRef} className="cad-settings-panel absolute top-3 right-[240px] z-20 hidden w-48">
+        <div>
+          <label>ID</label>
+          <select ref={idSelectRef} className="cad-settings-select w-full" />
+        </div>
         <div>
           <label>Farbe</label>
           <div className="flex items-center gap-2">
@@ -100,6 +120,24 @@ const CadEditor: React.FC = () => {
         <div>
           <label>Stärke (m)</label>
           <input ref={thicknessInputRef} type="text" defaultValue="0.03" />
+        </div>
+      </div>
+
+      {/* ID Panel */}
+      <div ref={idPanelRef} className="cad-id-panel absolute top-3 right-3 z-20 w-[220px]">
+        <div className="id-head">
+          <div className="id-title">Bezeichnungs-ID</div>
+          <div className="id-head-actions">
+            <button ref={idToggleBtnRef} className="id-head-btn icon-only" title="Ein-/Ausklappen">
+              <span className="id-toggle-chevron" />
+            </button>
+          </div>
+        </div>
+        <div ref={idBodyRef} className="id-body">
+          <div className="id-add-wrap">
+            <button ref={idAddBtnRef} className="id-head-btn id-add-btn">+ ID</button>
+          </div>
+          <div ref={idListRef} className="id-list" />
         </div>
       </div>
 

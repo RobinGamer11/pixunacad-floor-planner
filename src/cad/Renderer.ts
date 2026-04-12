@@ -1,6 +1,7 @@
 import { Defaults, SelectionType } from "./constants";
 import { Camera } from "./Camera";
 import { Scene } from "./Scene";
+import { LabelManager } from "./LabelManager";
 
 export interface Selection {
   type: string;
@@ -16,21 +17,33 @@ export class Renderer {
   ctx: CanvasRenderingContext2D;
   camera: Camera;
   scene: Scene;
+  labels: LabelManager;
   vw = 1;
   vh = 1;
   overlay: Overlay | null = null;
   selection: Selection | null = null;
+  selectedLabelId: string | null = null;
   hoverSegmentId: string | null = null;
 
-  constructor(ctx: CanvasRenderingContext2D, camera: Camera, scene: Scene) {
+  constructor(ctx: CanvasRenderingContext2D, camera: Camera, scene: Scene, labels: LabelManager) {
     this.ctx = ctx;
     this.camera = camera;
     this.scene = scene;
+    this.labels = labels;
   }
 
   setViewport(w: number, h: number) { this.vw = w; this.vh = h; }
   setSelection(selection: Selection | null) { this.selection = selection; }
+  setSelectedLabelId(labelId: string | null) { this.selectedLabelId = labelId || null; }
   setHoverSegmentId(id: string | null) { this.hoverSegmentId = id || null; }
+
+  private _segmentsBackToFront() {
+    const order = this.labels.list();
+    const rank = new Map(order.map((g, i) => [g.id, i]));
+    return [...this.scene.segments]
+      .filter(s => this.labels.isVisible(s.labelId))
+      .sort((a, b) => (rank.get(a.labelId) || 0) - (rank.get(b.labelId) || 0));
+  }
 
   render() {
     const ctx = this.ctx;
@@ -95,9 +108,11 @@ export class Renderer {
     const ctx = this.ctx;
     const cam = this.camera;
 
-    for (const seg of this.scene.segments) {
+    for (const seg of this._segmentsBackToFront()) {
       const a = cam.worldToScreen(seg.a.x, seg.a.y);
       const b = cam.worldToScreen(seg.b.x, seg.b.y);
+
+      const isGroupSel = this.selectedLabelId && seg.labelId === this.selectedLabelId;
 
       ctx.save();
       ctx.strokeStyle = seg.color || Defaults.lineColor;
@@ -106,6 +121,16 @@ export class Renderer {
       ctx.moveTo(a.x, a.y);
       ctx.lineTo(b.x, b.y);
       ctx.stroke();
+
+      if (isGroupSel) {
+        ctx.strokeStyle = "rgba(77,163,255,0.95)";
+        ctx.lineWidth = Math.max(4, Math.max(0.5, seg.thicknessM * cam.scale) + 1.4);
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.stroke();
+      }
+
       ctx.restore();
     }
   }
@@ -114,6 +139,7 @@ export class Renderer {
     if (!this.selection) return;
     const seg = this.scene.getSegmentById(this.selection.segmentId);
     if (!seg) return;
+    if (!this.labels.isVisible(seg.labelId)) return;
 
     const ctx = this.ctx;
     const cam = this.camera;
@@ -168,6 +194,7 @@ export class Renderer {
 
     const seg = this.scene.getSegmentById(this.hoverSegmentId);
     if (!seg) return;
+    if (!this.labels.isVisible(seg.labelId)) return;
 
     const ctx = this.ctx;
     const cam = this.camera;

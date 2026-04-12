@@ -160,7 +160,7 @@ export class SelectTool {
       return Math.hypot(sp.x - mouseS.x, sp.y - mouseS.y);
     };
 
-    if (selectedSeg) {
+    if (selectedSeg && this.app.labelManager.isVisible(selectedSeg.labelId)) {
       const pxA = distPxToWorldPoint(selectedSeg.a);
       if (pxA <= Defaults.hitPx) return { type: SelectionType.POINT, segmentId: selectedSeg.id, pointIndex: 0 };
       const pxB = distPxToWorldPoint(selectedSeg.b);
@@ -169,20 +169,15 @@ export class SelectTool {
       const projSel = projectPointToSegment(mouseW, selectedSeg.a, selectedSeg.b);
       const pxSel = distPxToWorldPoint(projSel.q);
       if (pxSel <= Defaults.hitPx) return { type: SelectionType.SEGMENT, segmentId: selectedSeg.id };
-
-      for (const seg of this.app.scene.segments) {
-        if (seg.id === selectedSeg.id) continue;
-        const proj = projectPointToSegment(mouseW, seg.a, seg.b);
-        const px = distPxToWorldPoint(proj.q);
-        if (px <= Defaults.hitPx) return { type: SelectionType.SEGMENT, segmentId: seg.id };
-      }
-      return null;
     }
+
+    const visibleSegs = this.app.topology._segmentsFrontToBack();
 
     let best: any = null;
     let bestScore = Infinity;
 
-    for (const seg of this.app.scene.segments) {
+    for (const seg of visibleSegs) {
+      if (selectedSeg && seg.id === selectedSeg.id) continue;
       const pxA = distPxToWorldPoint(seg.a);
       if (pxA <= Defaults.hitPx && pxA < bestScore) {
         bestScore = pxA;
@@ -195,7 +190,8 @@ export class SelectTool {
       }
     }
 
-    for (const seg of this.app.scene.segments) {
+    for (const seg of visibleSegs) {
+      if (selectedSeg && seg.id === selectedSeg.id) continue;
       const proj = projectPointToSegment(mouseW, seg.a, seg.b);
       const px = distPxToWorldPoint(proj.q);
       if (px <= Defaults.hitPx && px < bestScore) {

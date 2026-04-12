@@ -388,6 +388,7 @@ export class LineTool {
     this.hubLengthM = null;
     this.hubAngleDeg = null;
     this.startReferenceSegmentId = this.snap?.segment?.id || null;
+    this.app.refreshLabelUI();
   }
 
   onTabRequest(): boolean {

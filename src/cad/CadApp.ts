@@ -3,12 +3,14 @@ import { clamp } from "./geometry";
 import { Camera } from "./Camera";
 import { Input } from "./Input";
 import { Scene } from "./Scene";
+import { LabelManager } from "./LabelManager";
 import { TopologyEngine } from "./TopologyEngine";
 import { Renderer, Selection } from "./Renderer";
 import { LineHub } from "./LineHub";
 import { PointEditMenu } from "./PointEditMenu";
 import { SelectTool } from "./SelectTool";
 import { LineTool } from "./LineTool";
+import { IdPanel } from "./IdPanel";
 
 export class CadApp {
   canvas: HTMLCanvasElement;
@@ -18,6 +20,7 @@ export class CadApp {
   pointEditMenu: PointEditMenu;
 
   lineSettingsPanel: HTMLDivElement;
+  lineIdSelect: HTMLSelectElement;
   lineColorInput: HTMLInputElement;
   lineColorPreview: HTMLDivElement;
   lineThicknessInput: HTMLInputElement;
@@ -28,6 +31,7 @@ export class CadApp {
   camera: Camera;
   scene: Scene;
   input: Input;
+  labelManager: LabelManager;
   topology: TopologyEngine;
   renderer: Renderer;
 
@@ -35,7 +39,12 @@ export class CadApp {
   lineTool: LineTool;
   activeTool: SelectTool | LineTool;
 
+  idPanel: IdPanel;
+
   selection: Selection | null = null;
+  selectedLabelId: string | null = null;
+  activeDrawLabelId: string = Defaults.defaultLabelId;
+
   private _btnMap = new Map<string, HTMLButtonElement>();
   private _rafId = 0;
   private _destroyed = false;
@@ -51,9 +60,15 @@ export class CadApp {
     pointEditRoot: HTMLDivElement,
     pointEditButtons: Record<string, HTMLButtonElement>,
     lineSettingsPanel: HTMLDivElement,
+    lineIdSelect: HTMLSelectElement,
     lineColorInput: HTMLInputElement,
     lineColorPreview: HTMLDivElement,
     lineThicknessInput: HTMLInputElement,
+    idPanelRoot: HTMLDivElement,
+    idPanelBody: HTMLDivElement,
+    idPanelList: HTMLDivElement,
+    idPanelAddBtn: HTMLButtonElement,
+    idPanelToggleBtn: HTMLButtonElement,
   ) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d")!;
@@ -62,6 +77,7 @@ export class CadApp {
     this.pointEditMenu = new PointEditMenu(pointEditRoot, pointEditButtons);
 
     this.lineSettingsPanel = lineSettingsPanel;
+    this.lineIdSelect = lineIdSelect;
     this.lineColorInput = lineColorInput;
     this.lineColorPreview = lineColorPreview;
     this.lineThicknessInput = lineThicknessInput;
@@ -69,12 +85,15 @@ export class CadApp {
     this.camera = new Camera();
     this.scene = new Scene();
     this.input = new Input(canvas);
-    this.topology = new TopologyEngine(this.scene, this.camera);
-    this.renderer = new Renderer(this.ctx, this.camera, this.scene);
+    this.labelManager = new LabelManager();
+    this.topology = new TopologyEngine(this.scene, this.camera, this.labelManager);
+    this.renderer = new Renderer(this.ctx, this.camera, this.scene, this.labelManager);
 
     this.selectTool = new SelectTool(this);
     this.lineTool = new LineTool(this);
     this.activeTool = this.selectTool;
+
+    this.idPanel = new IdPanel(this, idPanelRoot, idPanelBody, idPanelList, idPanelAddBtn, idPanelToggleBtn);
 
     this.pointEditMenu.bindActivate((action) => {
       this.selectTool.beginPointEdit(action);
@@ -83,12 +102,15 @@ export class CadApp {
     this._setupSettingsPanel();
     this._setupShortcuts();
 
+    this.refreshLabelUI();
+
     this._resize();
     this.camera.center(canvas.getBoundingClientRect());
 
     this._tick();
   }
 
+  /* ---- Selection ---- */
   setSelection(selection: Selection | null) {
     this.selection = selection;
     this.renderer.setSelection(selection);
@@ -103,12 +125,92 @@ export class CadApp {
     return this.scene.getSegmentById(this.selection.segmentId);
   }
 
+  /* ---- Label Selection ---- */
+  setSelectedLabelId(labelId: string | null) {
+    this.selectedLabelId = labelId || null;
+    this.renderer.setSelectedLabelId(this.selectedLabelId);
+    this.idPanel.render();
+    this._syncSettingsFromContext();
+    this._updateLineSettingsVisibility();
+  }
+
+  selectLabelGroup(labelId: string) {
+    this.clearSelection();
+    this.setSelectedLabelId(labelId);
+    this.showLineSettingsPanel(true);
+  }
+
+  setActiveDrawLabelId(labelId: string) {
+    this.activeDrawLabelId = labelId || Defaults.defaultLabelId;
+    this._syncLabelSelect();
+  }
+
+  refreshLabelUI() {
+    this._syncLabelSelect();
+    this.idPanel.render();
+    this._syncSettingsFromContext();
+  }
+
+  private _syncLabelSelect() {
+    const groups = this.labelManager.list();
+    const currentValue = this.lineIdSelect.value;
+
+    this.lineIdSelect.innerHTML = "";
+    for (const group of groups) {
+      const opt = document.createElement("option");
+      opt.value = group.id;
+      opt.textContent = group.name;
+      this.lineIdSelect.appendChild(opt);
+    }
+
+    const preferred =
+      (this.labelManager.getById(currentValue) ? currentValue : null) ||
+      (this.labelManager.getById(this.activeDrawLabelId) ? this.activeDrawLabelId : Defaults.defaultLabelId);
+
+    this.activeDrawLabelId = preferred;
+    this.lineIdSelect.value = preferred;
+  }
+
+  /* ---- Selected objects ---- */
+  getSelectedObjectIds(): string[] {
+    const selected = this.getSelectedSegment();
+    if (selected) return [selected.id];
+    if (this.selectedLabelId) {
+      return this.scene.getSegmentsByLabelId(this.selectedLabelId).map(s => s.id);
+    }
+    return [];
+  }
+
+  getSelectedGroupSegments() {
+    if (!this.selectedLabelId) return [];
+    return this.scene.getSegmentsByLabelId(this.selectedLabelId);
+  }
+
   getCurrentLineStyle() {
     const selected = this.getSelectedSegment();
     if (selected) {
-      return { color: selected.color || this.defaultLineColor, thicknessM: selected.thicknessM || this.defaultLineThicknessM };
+      return {
+        color: selected.color || this.defaultLineColor,
+        thicknessM: selected.thicknessM || this.defaultLineThicknessM,
+        labelId: selected.labelId || Defaults.defaultLabelId,
+      };
     }
-    return { color: this.defaultLineColor, thicknessM: this.defaultLineThicknessM };
+
+    const groupSegs = this.getSelectedGroupSegments();
+    if (groupSegs.length > 0) {
+      const ref = groupSegs[0];
+      return {
+        color: ref.color || this.defaultLineColor,
+        thicknessM: ref.thicknessM || this.defaultLineThicknessM,
+        labelId: ref.labelId || Defaults.defaultLabelId,
+      };
+    }
+
+    return {
+      color: this.defaultLineColor,
+      thicknessM: this.defaultLineThicknessM,
+      labelId: this.activeDrawLabelId || Defaults.defaultLabelId,
+    };
   }
 
   showLineSettingsPanel(shouldShow: boolean) {
@@ -116,11 +218,24 @@ export class CadApp {
   }
 
   private _updateLineSettingsVisibility() {
-    const shouldShow = (this.activeTool === this.lineTool) || !!(this.selection && this.selection.segmentId);
+    const shouldShow = (this.activeTool === this.lineTool) || !!(this.selection && this.selection.segmentId) || !!this.selectedLabelId;
     this.showLineSettingsPanel(shouldShow);
   }
 
+  /* ---- Settings Panel ---- */
   private _setupSettingsPanel() {
+    this.lineIdSelect.addEventListener("change", () => {
+      const nextId = this.lineIdSelect.value || Defaults.defaultLabelId;
+      const selectedIds = this.getSelectedObjectIds();
+      if (selectedIds.length > 0) {
+        this.scene.assignSegmentsToLabel(selectedIds, nextId);
+        this.setSelectedLabelId(nextId);
+        this.refreshLabelUI();
+        return;
+      }
+      this.setActiveDrawLabelId(nextId);
+    });
+
     this.lineColorInput.addEventListener("input", () => {
       this._applyLineColor(this.lineColorInput.value);
     });
@@ -136,7 +251,15 @@ export class CadApp {
 
   private _applyLineColor(color: string) {
     const selected = this.getSelectedSegment();
-    if (selected) { selected.color = color; } else { this.defaultLineColor = color; }
+    if (selected) { selected.color = color; }
+    else {
+      const groupSegs = this.getSelectedGroupSegments();
+      if (groupSegs.length > 0) {
+        for (const seg of groupSegs) seg.color = color;
+      } else {
+        this.defaultLineColor = color;
+      }
+    }
     this._syncSettingsFromContext();
   }
 
@@ -145,7 +268,13 @@ export class CadApp {
     if (!Number.isFinite(value) || value <= 0) return;
     value = clamp(value, 0.001, 1);
     const selected = this.getSelectedSegment();
-    if (selected) { selected.thicknessM = value; } else { this.defaultLineThicknessM = value; }
+    if (selected) { selected.thicknessM = value; return; }
+    const groupSegs = this.getSelectedGroupSegments();
+    if (groupSegs.length > 0) {
+      for (const seg of groupSegs) seg.thicknessM = value;
+      return;
+    }
+    this.defaultLineThicknessM = value;
   }
 
   private _syncSettingsFromContext() {
@@ -153,6 +282,17 @@ export class CadApp {
     this.lineColorInput.value = this._toHexColor(style.color || Defaults.lineColor);
     this.lineColorPreview.style.background = this.lineColorInput.value;
     this.lineThicknessInput.value = String((style.thicknessM || Defaults.lineThicknessM).toFixed(3).replace(/0+$/, "").replace(/\.$/, ""));
+
+    const labelForDisplay =
+      (this.selectedLabelId && this.labelManager.getById(this.selectedLabelId))
+        ? this.selectedLabelId
+        : (style.labelId || this.activeDrawLabelId || Defaults.defaultLabelId);
+
+    if (this.labelManager.getById(labelForDisplay)) {
+      this.lineIdSelect.value = labelForDisplay;
+    } else {
+      this.lineIdSelect.value = Defaults.defaultLabelId;
+    }
   }
 
   private _toHexColor(color: string): string {
@@ -168,6 +308,7 @@ export class CadApp {
     return `#${r}${g}${b}`;
   }
 
+  /* ---- Shortcuts ---- */
   private _setupShortcuts() {
     this._keydownHandler = (e: KeyboardEvent) => {
       const tag = (document.activeElement?.tagName || "").toLowerCase();
@@ -193,17 +334,20 @@ export class CadApp {
         if (this.activeTool === this.lineTool) {
           this.lineTool.cancel();
           this.clearSelection();
+          this.setSelectedLabelId(null);
           this.setTool(ToolIds.SELECT);
           return;
         }
         if (this.activeTool === this.selectTool) {
           this.selectTool.cancel();
           this.clearSelection();
+          this.setSelectedLabelId(null);
           this.pointEditMenu.hide();
           return;
         }
         this.activeTool.cancel();
         this.clearSelection();
+        this.setSelectedLabelId(null);
       }
 
       if (e.key === "Delete" || e.key === "Backspace") {
@@ -213,7 +357,14 @@ export class CadApp {
             this.scene.removeSegment(seg);
             this.clearSelection();
             this.pointEditMenu.hide();
+            this.refreshLabelUI();
           }
+          return;
+        }
+        if (this.selectedLabelId) {
+          this.scene.removeSegmentsByLabelId(this.selectedLabelId);
+          this.setSelectedLabelId(null);
+          this.refreshLabelUI();
         }
       }
     };
