@@ -1,5 +1,5 @@
 import { Defaults, SnapType, SelectionType, PointEditAction } from "./constants";
-import { Vec2, v, sub, dot, dist, angleDeg, pointFromLengthAngle, projectPointToSegment, orthoSnapFromA } from "./geometry";
+import { Vec2, v, sub, dot, dist, angleDeg, pointFromLengthAngle, projectPointToSegment, orthoSnapFromA, nearestAngleToReference } from "./geometry";
 import type { CadApp } from "./CadApp";
 import type { Snap } from "./TopologyEngine";
 import type { Input } from "./Input";
@@ -239,8 +239,7 @@ export class SelectTool {
           ((base + 90) % 360 + 360) % 360,
           ((base + 270) % 360 + 360) % 360,
         ];
-        const { nearestAngleToReference: nar } = require("./geometry");
-        const snapped = nar(options, currentAngle);
+        const snapped = nearestAngleToReference(options, currentAngle);
         const dir = pointFromLengthAngle(v(0, 0), 1, snapped);
         const rel = sub(rawPoint, basePoint);
         const projectedLen = Math.max(0, dot(rel, dir));
