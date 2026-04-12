@@ -13,12 +13,30 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        mono: ['JetBrains Mono', 'monospace'],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
+        cad: {
+          canvas: "hsl(var(--cad-canvas))",
+          toolbar: "hsl(var(--cad-toolbar))",
+          "toolbar-border": "hsl(var(--cad-toolbar-border))",
+          "toolbar-active": "hsl(var(--cad-toolbar-active))",
+          hub: "hsl(var(--cad-hub))",
+          grid: "hsl(var(--cad-grid))",
+          axis: "hsl(var(--cad-axis))",
+          "snap-point": "hsl(var(--cad-snap-point))",
+          "snap-line": "hsl(var(--cad-snap-line))",
+          "sel-stroke": "hsl(var(--cad-selection-stroke))",
+          "sel-fill": "hsl(var(--cad-selection-fill))",
+          settings: "hsl(var(--cad-settings-bg))",
+        },
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
