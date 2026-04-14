@@ -2,7 +2,7 @@ import { Defaults, ToolIds, PointEditAction, SelectionType } from "./constants";
 import { clamp } from "./geometry";
 import { Camera } from "./Camera";
 import { Input } from "./Input";
-import { Scene } from "./Scene";
+import { Scene, AreaLabel } from "./Scene";
 import { LabelManager } from "./LabelManager";
 import { TopologyEngine } from "./TopologyEngine";
 import { Renderer, Selection } from "./Renderer";
@@ -10,6 +10,7 @@ import { LineHub } from "./LineHub";
 import { PointEditMenu } from "./PointEditMenu";
 import { SelectTool } from "./SelectTool";
 import { LineTool } from "./LineTool";
+import { HatchTool } from "./HatchTool";
 import { IdPanel } from "./IdPanel";
 
 export class CadApp {
@@ -25,8 +26,28 @@ export class CadApp {
   lineColorPreview: HTMLDivElement;
   lineThicknessInput: HTMLInputElement;
 
+  hatchSettingsPanel: HTMLDivElement;
+  hatchFillColorInput: HTMLInputElement;
+  hatchFillColorPreview: HTMLDivElement;
+  hatchStrokeColorInput: HTMLInputElement;
+  hatchStrokeColorPreview: HTMLDivElement;
+  hatchStrokeWidthInput: HTMLInputElement;
+  hatchAlphaInput: HTMLInputElement;
+  areaShowInput: HTMLInputElement;
+  areaSettingsGroup: HTMLDivElement;
+  areaTextColorInput: HTMLInputElement;
+  areaTextColorPreview: HTMLDivElement;
+  areaFontSizeInput: HTMLInputElement;
+  areaBgColorInput: HTMLInputElement;
+  areaBgColorPreview: HTMLDivElement;
+  areaBgAlphaInput: HTMLInputElement;
+
   defaultLineColor = Defaults.lineColor;
   defaultLineThicknessM = Defaults.lineThicknessM;
+  defaultHatchFillColor = Defaults.hatchFillColor;
+  defaultHatchStrokeColor = Defaults.hatchStrokeColor;
+  defaultHatchStrokeWidthPx = Defaults.hatchStrokePx;
+  defaultHatchFillAlphaPct = Defaults.hatchFillAlphaPct;
 
   camera: Camera;
   scene: Scene;
@@ -37,7 +58,8 @@ export class CadApp {
 
   selectTool: SelectTool;
   lineTool: LineTool;
-  activeTool: SelectTool | LineTool;
+  hatchTool: HatchTool;
+  activeTool: SelectTool | LineTool | HatchTool;
 
   idPanel: IdPanel;
 
@@ -54,21 +76,20 @@ export class CadApp {
 
   constructor(
     canvas: HTMLCanvasElement,
-    hubRoot: HTMLDivElement,
-    hubLenInput: HTMLInputElement,
-    hubAngInput: HTMLInputElement,
-    pointEditRoot: HTMLDivElement,
-    pointEditButtons: Record<string, HTMLButtonElement>,
-    lineSettingsPanel: HTMLDivElement,
-    lineIdSelect: HTMLSelectElement,
-    lineColorInput: HTMLInputElement,
-    lineColorPreview: HTMLDivElement,
-    lineThicknessInput: HTMLInputElement,
-    idPanelRoot: HTMLDivElement,
-    idPanelBody: HTMLDivElement,
-    idPanelList: HTMLDivElement,
-    idPanelAddBtn: HTMLButtonElement,
-    idPanelToggleBtn: HTMLButtonElement,
+    hubRoot: HTMLDivElement, hubLenInput: HTMLInputElement, hubAngInput: HTMLInputElement,
+    pointEditRoot: HTMLDivElement, pointEditButtons: Record<string, HTMLButtonElement>,
+    lineSettingsPanel: HTMLDivElement, lineIdSelect: HTMLSelectElement,
+    lineColorInput: HTMLInputElement, lineColorPreview: HTMLDivElement, lineThicknessInput: HTMLInputElement,
+    idPanelRoot: HTMLDivElement, idPanelBody: HTMLDivElement, idPanelList: HTMLDivElement,
+    idPanelAddBtn: HTMLButtonElement, idPanelToggleBtn: HTMLButtonElement,
+    hatchSettingsPanel: HTMLDivElement,
+    hatchFillColorInput: HTMLInputElement, hatchFillColorPreview: HTMLDivElement,
+    hatchStrokeColorInput: HTMLInputElement, hatchStrokeColorPreview: HTMLDivElement,
+    hatchStrokeWidthInput: HTMLInputElement, hatchAlphaInput: HTMLInputElement,
+    areaShowInput: HTMLInputElement, areaSettingsGroup: HTMLDivElement,
+    areaTextColorInput: HTMLInputElement, areaTextColorPreview: HTMLDivElement,
+    areaFontSizeInput: HTMLInputElement,
+    areaBgColorInput: HTMLInputElement, areaBgColorPreview: HTMLDivElement, areaBgAlphaInput: HTMLInputElement,
   ) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d")!;
@@ -82,6 +103,22 @@ export class CadApp {
     this.lineColorPreview = lineColorPreview;
     this.lineThicknessInput = lineThicknessInput;
 
+    this.hatchSettingsPanel = hatchSettingsPanel;
+    this.hatchFillColorInput = hatchFillColorInput;
+    this.hatchFillColorPreview = hatchFillColorPreview;
+    this.hatchStrokeColorInput = hatchStrokeColorInput;
+    this.hatchStrokeColorPreview = hatchStrokeColorPreview;
+    this.hatchStrokeWidthInput = hatchStrokeWidthInput;
+    this.hatchAlphaInput = hatchAlphaInput;
+    this.areaShowInput = areaShowInput;
+    this.areaSettingsGroup = areaSettingsGroup;
+    this.areaTextColorInput = areaTextColorInput;
+    this.areaTextColorPreview = areaTextColorPreview;
+    this.areaFontSizeInput = areaFontSizeInput;
+    this.areaBgColorInput = areaBgColorInput;
+    this.areaBgColorPreview = areaBgColorPreview;
+    this.areaBgAlphaInput = areaBgAlphaInput;
+
     this.camera = new Camera();
     this.scene = new Scene();
     this.input = new Input(canvas);
@@ -91,6 +128,7 @@ export class CadApp {
 
     this.selectTool = new SelectTool(this);
     this.lineTool = new LineTool(this);
+    this.hatchTool = new HatchTool(this);
     this.activeTool = this.selectTool;
 
     this.idPanel = new IdPanel(this, idPanelRoot, idPanelBody, idPanelList, idPanelAddBtn, idPanelToggleBtn);
@@ -99,14 +137,12 @@ export class CadApp {
       this.selectTool.beginPointEdit(action);
     });
 
-    this._setupSettingsPanel();
+    this._setupLineSettingsPanel();
+    this._setupHatchSettingsPanel();
     this._setupShortcuts();
-
     this.refreshLabelUI();
-
     this._resize();
     this.camera.center(canvas.getBoundingClientRect());
-
     this._tick();
   }
 
@@ -114,8 +150,9 @@ export class CadApp {
   setSelection(selection: Selection | null) {
     this.selection = selection;
     this.renderer.setSelection(selection);
-    this._syncSettingsFromContext();
-    this._updateLineSettingsVisibility();
+    this._syncLineSettingsFromContext();
+    this._syncHatchSettingsFromContext();
+    this._updateSettingsVisibility();
   }
 
   clearSelection() { this.setSelection(null); }
@@ -125,13 +162,18 @@ export class CadApp {
     return this.scene.getSegmentById(this.selection.segmentId);
   }
 
+  getSelectedHatch() {
+    if (!this.selection || !this.selection.hatchId) return null;
+    return this.scene.getHatchById(this.selection.hatchId);
+  }
+
   /* ---- Label Selection ---- */
   setSelectedLabelId(labelId: string | null) {
     this.selectedLabelId = labelId || null;
     this.renderer.setSelectedLabelId(this.selectedLabelId);
     this.idPanel.render();
-    this._syncSettingsFromContext();
-    this._updateLineSettingsVisibility();
+    this._syncLineSettingsFromContext();
+    this._updateSettingsVisibility();
   }
 
   selectLabelGroup(labelId: string) {
@@ -148,13 +190,12 @@ export class CadApp {
   refreshLabelUI() {
     this._syncLabelSelect();
     this.idPanel.render();
-    this._syncSettingsFromContext();
+    this._syncLineSettingsFromContext();
   }
 
   private _syncLabelSelect() {
     const groups = this.labelManager.list();
     const currentValue = this.lineIdSelect.value;
-
     this.lineIdSelect.innerHTML = "";
     for (const group of groups) {
       const opt = document.createElement("option");
@@ -162,11 +203,9 @@ export class CadApp {
       opt.textContent = group.name;
       this.lineIdSelect.appendChild(opt);
     }
-
     const preferred =
       (this.labelManager.getById(currentValue) ? currentValue : null) ||
       (this.labelManager.getById(this.activeDrawLabelId) ? this.activeDrawLabelId : Defaults.defaultLabelId);
-
     this.activeDrawLabelId = preferred;
     this.lineIdSelect.value = preferred;
   }
@@ -175,9 +214,7 @@ export class CadApp {
   getSelectedObjectIds(): string[] {
     const selected = this.getSelectedSegment();
     if (selected) return [selected.id];
-    if (this.selectedLabelId) {
-      return this.scene.getSegmentsByLabelId(this.selectedLabelId).map(s => s.id);
-    }
+    if (this.selectedLabelId) return this.scene.getSegmentsByLabelId(this.selectedLabelId).map(s => s.id);
     return [];
   }
 
@@ -189,41 +226,59 @@ export class CadApp {
   getCurrentLineStyle() {
     const selected = this.getSelectedSegment();
     if (selected) {
-      return {
-        color: selected.color || this.defaultLineColor,
-        thicknessM: selected.thicknessM || this.defaultLineThicknessM,
-        labelId: selected.labelId || Defaults.defaultLabelId,
-      };
+      return { color: selected.color || this.defaultLineColor, thicknessM: selected.thicknessM || this.defaultLineThicknessM, labelId: selected.labelId || Defaults.defaultLabelId };
     }
-
     const groupSegs = this.getSelectedGroupSegments();
     if (groupSegs.length > 0) {
       const ref = groupSegs[0];
+      return { color: ref.color || this.defaultLineColor, thicknessM: ref.thicknessM || this.defaultLineThicknessM, labelId: ref.labelId || Defaults.defaultLabelId };
+    }
+    return { color: this.defaultLineColor, thicknessM: this.defaultLineThicknessM, labelId: this.activeDrawLabelId || Defaults.defaultLabelId };
+  }
+
+  getCurrentHatchStyle() {
+    const selected = this.getSelectedHatch();
+    if (selected) {
       return {
-        color: ref.color || this.defaultLineColor,
-        thicknessM: ref.thicknessM || this.defaultLineThicknessM,
-        labelId: ref.labelId || Defaults.defaultLabelId,
+        fillColor: selected.fillColor || this.defaultHatchFillColor,
+        strokeColor: selected.strokeColor || this.defaultHatchStrokeColor,
+        fillAlphaPct: selected.fillAlphaPct ?? this.defaultHatchFillAlphaPct,
+        strokeWidthPx: (typeof selected.strokeWidthPx === "number") ? selected.strokeWidthPx : this.defaultHatchStrokeWidthPx,
+        areaLabel: {
+          show: !!selected.areaLabel?.show,
+          textColor: selected.areaLabel?.textColor || Defaults.areaTextColor,
+          fontSizePx: selected.areaLabel?.fontSizePx ?? Defaults.areaFontSizePx,
+          bgColor: selected.areaLabel?.bgColor || Defaults.areaBgColor,
+          bgAlphaPct: selected.areaLabel?.bgAlphaPct ?? Defaults.areaBgAlphaPct,
+          offsetX: selected.areaLabel?.offsetX || 0,
+          offsetY: selected.areaLabel?.offsetY || 0,
+        } as Partial<AreaLabel>,
       };
     }
-
     return {
-      color: this.defaultLineColor,
-      thicknessM: this.defaultLineThicknessM,
-      labelId: this.activeDrawLabelId || Defaults.defaultLabelId,
+      fillColor: this.defaultHatchFillColor,
+      strokeColor: this.defaultHatchStrokeColor,
+      fillAlphaPct: this.defaultHatchFillAlphaPct,
+      strokeWidthPx: this.defaultHatchStrokeWidthPx,
+      areaLabel: {
+        show: false, textColor: Defaults.areaTextColor, fontSizePx: Defaults.areaFontSizePx,
+        bgColor: Defaults.areaBgColor, bgAlphaPct: Defaults.areaBgAlphaPct, offsetX: 0, offsetY: 0,
+      } as Partial<AreaLabel>,
     };
   }
 
-  showLineSettingsPanel(shouldShow: boolean) {
-    this.lineSettingsPanel.classList.toggle("hidden", !shouldShow);
+  showLineSettingsPanel(shouldShow: boolean) { this.lineSettingsPanel.classList.toggle("hidden", !shouldShow); }
+  showHatchSettingsPanel(shouldShow: boolean) { this.hatchSettingsPanel.classList.toggle("hidden", !shouldShow); }
+
+  private _updateSettingsVisibility() {
+    const showLine = (this.activeTool === this.lineTool) || !!(this.selection && this.selection.segmentId) || !!this.selectedLabelId;
+    const showHatch = (this.activeTool === this.hatchTool) || !!(this.selection && this.selection.hatchId);
+    this.showLineSettingsPanel(showLine);
+    this.showHatchSettingsPanel(showHatch);
   }
 
-  private _updateLineSettingsVisibility() {
-    const shouldShow = (this.activeTool === this.lineTool) || !!(this.selection && this.selection.segmentId) || !!this.selectedLabelId;
-    this.showLineSettingsPanel(shouldShow);
-  }
-
-  /* ---- Settings Panel ---- */
-  private _setupSettingsPanel() {
+  /* ---- Line Settings Panel ---- */
+  private _setupLineSettingsPanel() {
     this.lineIdSelect.addEventListener("change", () => {
       const nextId = this.lineIdSelect.value || Defaults.defaultLabelId;
       const selectedIds = this.getSelectedObjectIds();
@@ -235,18 +290,10 @@ export class CadApp {
       }
       this.setActiveDrawLabelId(nextId);
     });
-
-    this.lineColorInput.addEventListener("input", () => {
-      this._applyLineColor(this.lineColorInput.value);
-    });
-    this.lineThicknessInput.addEventListener("input", () => {
-      this._applyLineThicknessFromInput();
-    });
-    this.lineThicknessInput.addEventListener("blur", () => {
-      this._syncSettingsFromContext();
-    });
-    this._syncSettingsFromContext();
-    this._updateLineSettingsVisibility();
+    this.lineColorInput.addEventListener("input", () => this._applyLineColor(this.lineColorInput.value));
+    this.lineThicknessInput.addEventListener("input", () => this._applyLineThicknessFromInput());
+    this.lineThicknessInput.addEventListener("blur", () => this._syncLineSettingsFromContext());
+    this._syncLineSettingsFromContext();
   }
 
   private _applyLineColor(color: string) {
@@ -254,13 +301,10 @@ export class CadApp {
     if (selected) { selected.color = color; }
     else {
       const groupSegs = this.getSelectedGroupSegments();
-      if (groupSegs.length > 0) {
-        for (const seg of groupSegs) seg.color = color;
-      } else {
-        this.defaultLineColor = color;
-      }
+      if (groupSegs.length > 0) { for (const seg of groupSegs) seg.color = color; }
+      else { this.defaultLineColor = color; }
     }
-    this._syncSettingsFromContext();
+    this._syncLineSettingsFromContext();
   }
 
   private _applyLineThicknessFromInput() {
@@ -270,29 +314,103 @@ export class CadApp {
     const selected = this.getSelectedSegment();
     if (selected) { selected.thicknessM = value; return; }
     const groupSegs = this.getSelectedGroupSegments();
-    if (groupSegs.length > 0) {
-      for (const seg of groupSegs) seg.thicknessM = value;
-      return;
-    }
+    if (groupSegs.length > 0) { for (const seg of groupSegs) seg.thicknessM = value; return; }
     this.defaultLineThicknessM = value;
   }
 
-  private _syncSettingsFromContext() {
+  private _syncLineSettingsFromContext() {
     const style = this.getCurrentLineStyle();
     this.lineColorInput.value = this._toHexColor(style.color || Defaults.lineColor);
     this.lineColorPreview.style.background = this.lineColorInput.value;
     this.lineThicknessInput.value = String((style.thicknessM || Defaults.lineThicknessM).toFixed(3).replace(/0+$/, "").replace(/\.$/, ""));
-
     const labelForDisplay =
-      (this.selectedLabelId && this.labelManager.getById(this.selectedLabelId))
-        ? this.selectedLabelId
+      (this.selectedLabelId && this.labelManager.getById(this.selectedLabelId)) ? this.selectedLabelId
         : (style.labelId || this.activeDrawLabelId || Defaults.defaultLabelId);
+    if (this.labelManager.getById(labelForDisplay)) this.lineIdSelect.value = labelForDisplay;
+    else this.lineIdSelect.value = Defaults.defaultLabelId;
+  }
 
-    if (this.labelManager.getById(labelForDisplay)) {
-      this.lineIdSelect.value = labelForDisplay;
-    } else {
-      this.lineIdSelect.value = Defaults.defaultLabelId;
-    }
+  /* ---- Hatch Settings Panel ---- */
+  private _setupHatchSettingsPanel() {
+    this.hatchFillColorInput.addEventListener("input", () => {
+      const sel = this.getSelectedHatch();
+      if (sel) sel.fillColor = this.hatchFillColorInput.value;
+      else this.defaultHatchFillColor = this.hatchFillColorInput.value;
+      this._syncHatchSettingsFromContext();
+    });
+    this.hatchStrokeColorInput.addEventListener("input", () => {
+      const sel = this.getSelectedHatch();
+      if (sel) sel.strokeColor = this.hatchStrokeColorInput.value;
+      else this.defaultHatchStrokeColor = this.hatchStrokeColorInput.value;
+      this._syncHatchSettingsFromContext();
+    });
+    this.hatchStrokeWidthInput.addEventListener("input", () => {
+      let v = parseFloat((this.hatchStrokeWidthInput.value || "").replace(",", "."));
+      if (!Number.isFinite(v) || v < 0) return;
+      v = clamp(v, 0, 30);
+      const sel = this.getSelectedHatch();
+      if (sel) sel.strokeWidthPx = v; else this.defaultHatchStrokeWidthPx = v;
+    });
+    this.hatchStrokeWidthInput.addEventListener("blur", () => this._syncHatchSettingsFromContext());
+    this.hatchAlphaInput.addEventListener("input", () => {
+      let v = parseFloat((this.hatchAlphaInput.value || "").replace(",", "."));
+      if (!Number.isFinite(v)) return;
+      v = clamp(v, 0, 100);
+      const sel = this.getSelectedHatch();
+      if (sel) sel.fillAlphaPct = v; else this.defaultHatchFillAlphaPct = v;
+    });
+    this.hatchAlphaInput.addEventListener("blur", () => this._syncHatchSettingsFromContext());
+    this.areaShowInput.addEventListener("change", () => {
+      const sel = this.getSelectedHatch();
+      if (sel) sel.areaLabel.show = !!this.areaShowInput.checked;
+      this._syncHatchSettingsFromContext();
+    });
+    this.areaTextColorInput.addEventListener("input", () => {
+      const sel = this.getSelectedHatch();
+      if (sel) sel.areaLabel.textColor = this.areaTextColorInput.value;
+      this._syncHatchSettingsFromContext();
+    });
+    this.areaFontSizeInput.addEventListener("input", () => {
+      let v = parseFloat((this.areaFontSizeInput.value || "").replace(",", "."));
+      if (!Number.isFinite(v) || v <= 0) return;
+      v = clamp(v, 8, 72);
+      const sel = this.getSelectedHatch();
+      if (sel) sel.areaLabel.fontSizePx = v;
+    });
+    this.areaFontSizeInput.addEventListener("blur", () => this._syncHatchSettingsFromContext());
+    this.areaBgColorInput.addEventListener("input", () => {
+      const sel = this.getSelectedHatch();
+      if (sel) sel.areaLabel.bgColor = this.areaBgColorInput.value;
+      this._syncHatchSettingsFromContext();
+    });
+    this.areaBgAlphaInput.addEventListener("input", () => {
+      let v = parseFloat((this.areaBgAlphaInput.value || "").replace(",", "."));
+      if (!Number.isFinite(v)) return;
+      v = clamp(v, 0, 100);
+      const sel = this.getSelectedHatch();
+      if (sel) sel.areaLabel.bgAlphaPct = v;
+    });
+    this.areaBgAlphaInput.addEventListener("blur", () => this._syncHatchSettingsFromContext());
+    this._syncHatchSettingsFromContext();
+  }
+
+  private _syncHatchSettingsFromContext() {
+    const style = this.getCurrentHatchStyle();
+    this.hatchFillColorInput.value = this._toHexColor(style.fillColor);
+    this.hatchFillColorPreview.style.background = `rgba(77,163,255,${(style.fillAlphaPct ?? 35) / 100})`;
+    this.hatchStrokeColorInput.value = this._toHexColor(style.strokeColor);
+    this.hatchStrokeColorPreview.style.background = this.hatchStrokeColorInput.value;
+    this.hatchStrokeWidthInput.value = String((style.strokeWidthPx ?? Defaults.hatchStrokePx).toFixed(1).replace(/\.0$/, ""));
+    this.hatchAlphaInput.value = String(Math.round(style.fillAlphaPct ?? Defaults.hatchFillAlphaPct));
+    const area = style.areaLabel;
+    this.areaShowInput.checked = !!area?.show;
+    this.areaSettingsGroup.classList.toggle("hidden", !this.areaShowInput.checked);
+    this.areaTextColorInput.value = this._toHexColor(area?.textColor || Defaults.areaTextColor);
+    this.areaTextColorPreview.style.background = this.areaTextColorInput.value;
+    this.areaFontSizeInput.value = String(Math.round(area?.fontSizePx ?? Defaults.areaFontSizePx));
+    this.areaBgColorInput.value = this._toHexColor(area?.bgColor || Defaults.areaBgColor);
+    this.areaBgColorPreview.style.background = this.areaBgColorInput.value;
+    this.areaBgAlphaInput.value = String(Math.round(area?.bgAlphaPct ?? Defaults.areaBgAlphaPct));
   }
 
   private _toHexColor(color: string): string {
@@ -321,30 +439,18 @@ export class CadApp {
       }
 
       if (e.key === "Tab") {
-        if (this.activeTool === this.lineTool) {
-          const handled = this.lineTool.onTabRequest();
-          if (handled) { e.preventDefault(); return; }
-        }
+        if (this.activeTool === this.lineTool) { const h = this.lineTool.onTabRequest(); if (h) { e.preventDefault(); return; } }
+        if (this.activeTool === this.hatchTool) { const h = this.hatchTool.onTabRequest(); if (h) { e.preventDefault(); return; } }
       }
 
       if (e.key === "v" || e.key === "V") this.setTool(ToolIds.SELECT);
       if (e.key === "l" || e.key === "L") this.setTool(ToolIds.LINE);
+      if (e.key === "h" || e.key === "H") this.setTool(ToolIds.HATCH);
 
       if (e.key === "Escape") {
-        if (this.activeTool === this.lineTool) {
-          this.lineTool.cancel();
-          this.clearSelection();
-          this.setSelectedLabelId(null);
-          this.setTool(ToolIds.SELECT);
-          return;
-        }
-        if (this.activeTool === this.selectTool) {
-          this.selectTool.cancel();
-          this.clearSelection();
-          this.setSelectedLabelId(null);
-          this.pointEditMenu.hide();
-          return;
-        }
+        if (this.activeTool === this.lineTool) { this.lineTool.cancel(); this.clearSelection(); this.setSelectedLabelId(null); this.setTool(ToolIds.SELECT); return; }
+        if (this.activeTool === this.hatchTool) { this.hatchTool.cancel(); this.clearSelection(); this.setTool(ToolIds.SELECT); return; }
+        if (this.activeTool === this.selectTool) { this.selectTool.cancel(); this.clearSelection(); this.setSelectedLabelId(null); this.pointEditMenu.hide(); return; }
         this.activeTool.cancel();
         this.clearSelection();
         this.setSelectedLabelId(null);
@@ -353,11 +459,20 @@ export class CadApp {
       if (e.key === "Delete" || e.key === "Backspace") {
         if (this.selection && this.selection.segmentId) {
           const seg = this.scene.getSegmentById(this.selection.segmentId);
-          if (seg) {
-            this.scene.removeSegment(seg);
-            this.clearSelection();
-            this.pointEditMenu.hide();
-            this.refreshLabelUI();
+          if (seg) { this.scene.removeSegment(seg); this.clearSelection(); this.pointEditMenu.hide(); this.refreshLabelUI(); }
+          return;
+        }
+        if (this.selection && this.selection.hatchId) {
+          const hatch = this.scene.getHatchById(this.selection.hatchId);
+          if (hatch) {
+            if (this.selection.type === SelectionType.POINT && hatch.points.length > 3) {
+              this.scene.removePointFromHatch(hatch, this.selection.pointIndex!);
+              this.setSelection({ type: SelectionType.HATCH, hatchId: hatch.id, pointIndex: null });
+            } else {
+              this.scene.removeHatch(hatch);
+              this.clearSelection();
+              this.pointEditMenu.hide();
+            }
           }
           return;
         }
@@ -373,17 +488,12 @@ export class CadApp {
 
   setTool(id: string) {
     if (this.activeTool && this.activeTool.cancel) this.activeTool.cancel();
-
-    if (id === ToolIds.SELECT) {
-      this.activeTool = this.selectTool;
-      this.selectTool.activate();
-    } else if (id === ToolIds.LINE) {
-      this.activeTool = this.lineTool;
-      this.lineTool.activate();
-    }
-
-    this._syncSettingsFromContext();
-    this._updateLineSettingsVisibility();
+    if (id === ToolIds.SELECT) { this.activeTool = this.selectTool; this.selectTool.activate(); }
+    else if (id === ToolIds.LINE) { this.activeTool = this.lineTool; this.lineTool.activate(); }
+    else if (id === ToolIds.HATCH) { this.activeTool = this.hatchTool; this.hatchTool.activate(); }
+    this._syncLineSettingsFromContext();
+    this._syncHatchSettingsFromContext();
+    this._updateSettingsVisibility();
     this.onToolChange?.(id);
   }
 
@@ -419,8 +529,6 @@ export class CadApp {
     cancelAnimationFrame(this._rafId);
     this.input.destroy();
     this.hub.destroy();
-    if (this._keydownHandler) {
-      window.removeEventListener("keydown", this._keydownHandler);
-    }
+    if (this._keydownHandler) window.removeEventListener("keydown", this._keydownHandler);
   }
 }
