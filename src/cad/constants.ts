@@ -8,16 +8,32 @@ export const Defaults = {
   geomEps: 1e-9,
   defaultLabelId: "default-line",
   defaultLabelName: "Default",
+
+  // Hatch defaults
+  hatchFillColor: "#4da3ff",
+  hatchStrokeColor: "#111111",
+  hatchStrokePx: 2.2,
+  hatchFillAlphaPct: 35,
+  strokeWidthBaseScale: 80,
+
+  // Area label defaults
+  areaShow: false,
+  areaTextColor: "#000000",
+  areaFontSizePx: 16,
+  areaBgColor: "#ffffff",
+  areaBgAlphaPct: 72,
 };
 
 export const ToolIds = {
   SELECT: "select",
   LINE: "line",
+  HATCH: "hatch",
 } as const;
 
 export const SelectionType = {
   SEGMENT: "segment",
   POINT: "point",
+  HATCH: "hatch",
 } as const;
 
 export const SnapType = {
@@ -31,4 +47,5 @@ export const PointEditAction = {
   MOVE: "move",
   TRANSLATE: "translate",
   ROTATE: "rotate",
+  DELETE: "delete",
 } as const;

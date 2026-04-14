@@ -75,3 +75,82 @@ export function nearestAngleToReference(options: number[], ref: number): number 
   }
   return best;
 }
+
+export function pointInPolygon(p: Vec2, poly: Vec2[]): boolean {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const xi = poly[i].x, yi = poly[i].y;
+    const xj = poly[j].x, yj = poly[j].y;
+    const intersect = ((yi > p.y) !== (yj > p.y)) && (p.x < (xj - xi) * (p.y - yi) / ((yj - yi) || 1e-12) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+export function rgbaFromHex(hex: string, alpha01: number): string {
+  const clean = hex.replace("#", "");
+  const full = (clean.length === 3)
+    ? clean.split("").map(ch => ch + ch).join("")
+    : clean.padEnd(6, "0").slice(0, 6);
+  const r = parseInt(full.slice(0, 2), 16);
+  const g = parseInt(full.slice(2, 4), 16);
+  const b = parseInt(full.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${alpha01})`;
+}
+
+export function rotatePointAround(point: Vec2, pivot: Vec2, angleRad: number): Vec2 {
+  const dx = point.x - pivot.x;
+  const dy = point.y - pivot.y;
+  const c = Math.cos(angleRad);
+  const s = Math.sin(angleRad);
+  return {
+    x: pivot.x + dx * c - dy * s,
+    y: pivot.y + dx * s + dy * c,
+  };
+}
+
+export function centroid(points: Vec2[]): Vec2 {
+  if (!points.length) return v(0, 0);
+  let sx = 0, sy = 0;
+  for (const p of points) { sx += p.x; sy += p.y; }
+  return v(sx / points.length, sy / points.length);
+}
+
+export function polygonSignedArea(poly: Vec2[]): number {
+  if (!poly || poly.length < 3) return 0;
+  let sum = 0;
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i];
+    const b = poly[(i + 1) % poly.length];
+    sum += a.x * b.y - b.x * a.y;
+  }
+  return sum * 0.5;
+}
+
+export function polygonAreaAbs(poly: Vec2[]): number {
+  return Math.abs(polygonSignedArea(poly));
+}
+
+export function polygonCentroid(poly: Vec2[]): Vec2 {
+  if (!poly || poly.length === 0) return v(0, 0);
+  if (poly.length < 3) {
+    let sx = 0, sy = 0;
+    for (const p of poly) { sx += p.x; sy += p.y; }
+    return v(sx / poly.length, sy / poly.length);
+  }
+  const a = polygonSignedArea(poly);
+  if (Math.abs(a) < 1e-12) {
+    let sx = 0, sy = 0;
+    for (const p of poly) { sx += p.x; sy += p.y; }
+    return v(sx / poly.length, sy / poly.length);
+  }
+  let cx = 0, cy = 0;
+  for (let i = 0; i < poly.length; i++) {
+    const p = poly[i];
+    const q = poly[(i + 1) % poly.length];
+    const cr = p.x * q.y - q.x * p.y;
+    cx += (p.x + q.x) * cr;
+    cy += (p.y + q.y) * cr;
+  }
+  return { x: cx / (6 * a), y: cy / (6 * a) };
+}

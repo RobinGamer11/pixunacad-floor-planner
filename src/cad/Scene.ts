@@ -19,29 +19,76 @@ export class Segment {
   }
 }
 
+export interface AreaLabel {
+  show: boolean;
+  textColor: string;
+  fontSizePx: number;
+  bgColor: string;
+  bgAlphaPct: number;
+  offsetX: number;
+  offsetY: number;
+}
+
+export class Hatch {
+  id: string;
+  points: Vec2[];
+  fillColor: string;
+  strokeColor: string;
+  fillAlphaPct: number;
+  strokeWidthPx: number;
+  areaLabel: AreaLabel;
+
+  constructor({ id, points, fillColor, strokeColor, fillAlphaPct, strokeWidthPx, areaLabel }: {
+    id: string; points: Vec2[]; fillColor?: string; strokeColor?: string;
+    fillAlphaPct?: number; strokeWidthPx?: number; areaLabel?: Partial<AreaLabel>;
+  }) {
+    this.id = id;
+    this.points = points.map(p => v(p.x, p.y));
+    this.fillColor = fillColor || Defaults.hatchFillColor;
+    this.strokeColor = strokeColor || Defaults.hatchStrokeColor;
+    this.fillAlphaPct = clamp(fillAlphaPct ?? Defaults.hatchFillAlphaPct, 0, 100);
+    this.strokeWidthPx = (typeof strokeWidthPx === "number" && strokeWidthPx >= 0) ? strokeWidthPx : Defaults.hatchStrokePx;
+    this.areaLabel = {
+      show: !!(areaLabel?.show ?? Defaults.areaShow),
+      textColor: areaLabel?.textColor || Defaults.areaTextColor,
+      fontSizePx: clamp(areaLabel?.fontSizePx ?? Defaults.areaFontSizePx, 8, 72),
+      bgColor: areaLabel?.bgColor || Defaults.areaBgColor,
+      bgAlphaPct: clamp(areaLabel?.bgAlphaPct ?? Defaults.areaBgAlphaPct, 0, 100),
+      offsetX: Number.isFinite(areaLabel?.offsetX) ? areaLabel!.offsetX! : 0,
+      offsetY: Number.isFinite(areaLabel?.offsetY) ? areaLabel!.offsetY! : 0,
+    };
+  }
+}
+
 export class Scene {
   segments: Segment[] = [];
-  private _idMap = new Map<string, Segment>();
+  hatches: Hatch[] = [];
+  private _segIdMap = new Map<string, Segment>();
+  private _hatchIdMap = new Map<string, Hatch>();
 
   private _makeId(): string {
     return (crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now() + Math.random());
   }
 
-  private _rebuildIdMap() {
-    this._idMap.clear();
-    for (const s of this.segments) this._idMap.set(s.id, s);
+  private _rebuildSegIdMap() {
+    this._segIdMap.clear();
+    for (const s of this.segments) this._segIdMap.set(s.id, s);
   }
 
+  private _rebuildHatchIdMap() {
+    this._hatchIdMap.clear();
+    for (const h of this.hatches) this._hatchIdMap.set(h.id, h);
+  }
+
+  // ---- Segments ----
   createSegment(a: Vec2, b: Vec2, style: { color?: string; thicknessM?: number; labelId?: string } = {}) {
     const seg = new Segment({ id: this._makeId(), a, b, color: style.color, thicknessM: style.thicknessM, labelId: style.labelId });
     this.segments.push(seg);
-    this._rebuildIdMap();
+    this._rebuildSegIdMap();
     return seg;
   }
 
-  getSegmentById(id: string): Segment | null {
-    return this._idMap.get(id) || null;
-  }
+  getSegmentById(id: string): Segment | null { return this._segIdMap.get(id) || null; }
 
   getSegmentsByLabelId(labelId: string): Segment[] {
     return this.segments.filter(s => s.labelId === labelId);
@@ -49,18 +96,18 @@ export class Scene {
 
   removeSegment(seg: Segment) {
     this.segments = this.segments.filter(s => s !== seg);
-    this._rebuildIdMap();
+    this._rebuildSegIdMap();
   }
 
   removeSegmentsByIds(ids: string[]) {
     const set = new Set(ids);
     this.segments = this.segments.filter(s => !set.has(s.id));
-    this._rebuildIdMap();
+    this._rebuildSegIdMap();
   }
 
   removeSegmentsByLabelId(labelId: string) {
     this.segments = this.segments.filter(s => s.labelId !== labelId);
-    this._rebuildIdMap();
+    this._rebuildSegIdMap();
   }
 
   reassignSegmentsLabel(oldId: string, newId: string) {
@@ -87,5 +134,62 @@ export class Scene {
     const s1 = this.createSegment(seg.a, p, style);
     const s2 = this.createSegment(p, seg.b, style);
     return { didSplit: true, point: p, newSegments: [s1, s2] };
+  }
+
+  // ---- Hatches ----
+  createHatch(points: Vec2[], style: {
+    fillColor?: string; strokeColor?: string; fillAlphaPct?: number;
+    strokeWidthPx?: number; areaLabel?: Partial<AreaLabel>;
+  } = {}) {
+    const hatch = new Hatch({
+      id: this._makeId(), points,
+      fillColor: style.fillColor, strokeColor: style.strokeColor,
+      fillAlphaPct: style.fillAlphaPct, strokeWidthPx: style.strokeWidthPx,
+      areaLabel: style.areaLabel,
+    });
+    this.hatches.push(hatch);
+    this._rebuildHatchIdMap();
+    return hatch;
+  }
+
+  getHatchById(id: string): Hatch | null { return this._hatchIdMap.get(id) || null; }
+
+  removeHatch(hatch: Hatch) {
+    this.hatches = this.hatches.filter(h => h !== hatch);
+    this._rebuildHatchIdMap();
+  }
+
+  removePointFromHatch(hatch: Hatch, pointIndex: number): boolean {
+    if (!hatch || hatch.points.length <= 3) return false;
+    if (pointIndex < 0 || pointIndex >= hatch.points.length) return false;
+    hatch.points.splice(pointIndex, 1);
+    return true;
+  }
+
+  insertPointIntoHatchEdge(hatch: Hatch, edgeIndex: number, t: number) {
+    if (!hatch || hatch.points.length < 2) {
+      return { didInsert: false, point: v(0, 0) as Vec2, pointIndex: -1 };
+    }
+    const n = hatch.points.length;
+    const a = hatch.points[edgeIndex];
+    const b = hatch.points[(edgeIndex + 1) % n];
+    t = clamp(t, 0, 1);
+    if (t <= Defaults.splitEpsT) return { didInsert: false, point: v(a.x, a.y), pointIndex: edgeIndex };
+    if (t >= 1 - Defaults.splitEpsT) return { didInsert: false, point: v(b.x, b.y), pointIndex: (edgeIndex + 1) % n };
+    const p = lerp(a, b, t);
+    hatch.points.splice(edgeIndex + 1, 0, v(p.x, p.y));
+    return { didInsert: true, point: p, pointIndex: edgeIndex + 1 };
+  }
+
+  getHatchEdges() {
+    const edges: { hatch: Hatch; edgeIndex: number; a: Vec2; b: Vec2 }[] = [];
+    for (const hatch of this.hatches) {
+      const n = hatch.points.length;
+      if (n < 2) continue;
+      for (let i = 0; i < n; i++) {
+        edges.push({ hatch, edgeIndex: i, a: hatch.points[i], b: hatch.points[(i + 1) % n] });
+      }
+    }
+    return edges;
   }
 }
