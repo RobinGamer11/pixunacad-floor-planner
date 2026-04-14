@@ -4,7 +4,7 @@ import { clamp } from "./geometry";
 export class PointEditMenu {
   root: HTMLDivElement;
   buttonsByAction: Record<string, HTMLButtonElement>;
-  actions = [PointEditAction.MOVE, PointEditAction.TRANSLATE, PointEditAction.ROTATE];
+  actions = [PointEditAction.MOVE, PointEditAction.TRANSLATE, PointEditAction.ROTATE, PointEditAction.DELETE];
   index = -1;
   visible = false;
   private _onActivate: ((action: string) => void) | null = null;
@@ -15,6 +15,7 @@ export class PointEditMenu {
 
     for (const action of this.actions) {
       const btn = this.buttonsByAction[action];
+      if (!btn) continue;
       btn.addEventListener("click", () => {
         this.index = this.actions.indexOf(action);
         this._sync();
@@ -33,7 +34,7 @@ export class PointEditMenu {
 
     const pad = 12;
     const vp = this.root.parentElement!.getBoundingClientRect();
-    const boxW = 104;
+    const boxW = 136;
     const boxH = 36;
 
     const left = clamp(sx + pad, 8, vp.width - boxW - 8);
@@ -65,7 +66,8 @@ export class PointEditMenu {
 
   private _sync() {
     for (const action of this.actions) {
-      this.buttonsByAction[action].classList.toggle("active", this.index >= 0 && action === this.actions[this.index]);
+      const btn = this.buttonsByAction[action];
+      if (btn) btn.classList.toggle("active", this.index >= 0 && action === this.actions[this.index]);
     }
   }
 }

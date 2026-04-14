@@ -1,6 +1,6 @@
 import { Defaults, SnapType } from "./constants";
 import { Vec2, v, projectPointToSegment } from "./geometry";
-import { Scene, Segment } from "./Scene";
+import { Scene, Segment, Hatch } from "./Scene";
 import { Camera } from "./Camera";
 import { LabelManager } from "./LabelManager";
 
@@ -8,13 +8,16 @@ export interface Snap {
   type: string;
   world: Vec2;
   segment: Segment | null;
+  hatch?: Hatch | null;
   pointIndex: number | null;
+  edgeIndex?: number | null;
   t: number | null;
   px: number;
   lineA?: Vec2;
   lineB?: Vec2;
   guidePoint?: Vec2;
   guideDir?: Vec2;
+  isDraftStart?: boolean;
 }
 
 export class TopologyEngine {
@@ -45,16 +48,16 @@ export class TopologyEngine {
     let best: Snap | null = null;
     let bestScore = Infinity;
 
-    const considerPoint = (world: Vec2, segment: Segment, pointIndex: number) => {
+    const considerPoint = (world: Vec2, segment: Segment | null, hatch: Hatch | null, pointIndex: number, edgeIndex?: number | null) => {
       const px = this._worldToMousePx(world, mouseS);
       if (px > Defaults.snapPx) return;
       if (px < bestScore) {
         bestScore = px;
-        best = { type: SnapType.POINT, world: v(world.x, world.y), segment, pointIndex, t: pointIndex === 0 ? 0 : 1, px };
+        best = { type: SnapType.POINT, world: v(world.x, world.y), segment, hatch, pointIndex, edgeIndex: edgeIndex ?? null, t: pointIndex === 0 ? 0 : 1, px };
       }
     };
 
-    const considerLine = (a: Vec2, b: Vec2, segment: Segment) => {
+    const considerLine = (a: Vec2, b: Vec2, segment: Segment | null, hatch: Hatch | null, edgeIndex?: number | null) => {
       const proj = projectPointToSegment(mouseW, a, b);
       const px = this._worldToMousePx(proj.q, mouseS);
       if (px > Defaults.snapPx) return;
@@ -62,17 +65,29 @@ export class TopologyEngine {
       const score = 1000 + px;
       if (score < bestScore) {
         bestScore = score;
-        best = { type: SnapType.LINE, world: v(proj.q.x, proj.q.y), segment, pointIndex: null, t: proj.t, px, lineA: a, lineB: b };
+        best = { type: SnapType.LINE, world: v(proj.q.x, proj.q.y), segment, hatch, pointIndex: null, edgeIndex: edgeIndex ?? null, t: proj.t, px, lineA: a, lineB: b };
       }
     };
 
+    // Segment points
     const segs = this._segmentsFrontToBack();
     for (const seg of segs) {
-      considerPoint(seg.a, seg, 0);
-      considerPoint(seg.b, seg, 1);
+      considerPoint(seg.a, seg, null, 0);
+      considerPoint(seg.b, seg, null, 1);
     }
+    // Hatch points
+    for (const hatch of this.scene.hatches) {
+      for (let i = 0; i < hatch.points.length; i++) {
+        considerPoint(hatch.points[i], null, hatch, i);
+      }
+    }
+    // Segment lines
     for (const seg of segs) {
-      considerLine(seg.a, seg.b, seg);
+      considerLine(seg.a, seg.b, seg, null);
+    }
+    // Hatch edges
+    for (const edge of this.scene.getHatchEdges()) {
+      considerLine(edge.a, edge.b, null, edge.hatch, edge.edgeIndex);
     }
 
     return best;
@@ -82,18 +97,18 @@ export class TopologyEngine {
     let best: Snap | null = null;
     let bestScore = Infinity;
 
-    const considerPoint = (world: Vec2, segment: Segment, pointIndex: number) => {
-      if (segment.id === excludedSegmentId) return;
+    const considerPoint = (world: Vec2, segment: Segment | null, hatch: Hatch | null, pointIndex: number) => {
+      if (segment && segment.id === excludedSegmentId) return;
       const px = this._worldToMousePx(world, mouseS);
       if (px > Defaults.snapPx) return;
       if (px < bestScore) {
         bestScore = px;
-        best = { type: SnapType.POINT, world: v(world.x, world.y), segment, pointIndex, t: pointIndex === 0 ? 0 : 1, px };
+        best = { type: SnapType.POINT, world: v(world.x, world.y), segment, hatch, pointIndex, t: pointIndex === 0 ? 0 : 1, px };
       }
     };
 
-    const considerLine = (a: Vec2, b: Vec2, segment: Segment) => {
-      if (segment.id === excludedSegmentId) return;
+    const considerLine = (a: Vec2, b: Vec2, segment: Segment | null, hatch: Hatch | null) => {
+      if (segment && segment.id === excludedSegmentId) return;
       const proj = projectPointToSegment(mouseW, a, b);
       const px = this._worldToMousePx(proj.q, mouseS);
       if (px > Defaults.snapPx) return;
@@ -101,17 +116,74 @@ export class TopologyEngine {
       const score = 1000 + px;
       if (score < bestScore) {
         bestScore = score;
-        best = { type: SnapType.LINE, world: v(proj.q.x, proj.q.y), segment, pointIndex: null, t: proj.t, px, lineA: a, lineB: b };
+        best = { type: SnapType.LINE, world: v(proj.q.x, proj.q.y), segment, hatch, pointIndex: null, t: proj.t, px, lineA: a, lineB: b };
       }
     };
 
     const segs = this._segmentsFrontToBack();
     for (const seg of segs) {
-      considerPoint(seg.a, seg, 0);
-      considerPoint(seg.b, seg, 1);
+      considerPoint(seg.a, seg, null, 0);
+      considerPoint(seg.b, seg, null, 1);
+    }
+    for (const hatch of this.scene.hatches) {
+      for (let i = 0; i < hatch.points.length; i++) {
+        considerPoint(hatch.points[i], null, hatch, i);
+      }
     }
     for (const seg of segs) {
-      considerLine(seg.a, seg.b, seg);
+      considerLine(seg.a, seg.b, seg, null);
+    }
+    for (const edge of this.scene.getHatchEdges()) {
+      considerLine(edge.a, edge.b, null, edge.hatch);
+    }
+
+    return best;
+  }
+
+  findBestSnapExcludingHatch(mouseS: Vec2, mouseW: Vec2, excludedHatchId: string): Snap | null {
+    let best: Snap | null = null;
+    let bestScore = Infinity;
+
+    const considerPoint = (world: Vec2, segment: Segment | null, hatch: Hatch | null, pointIndex: number) => {
+      if (hatch && hatch.id === excludedHatchId) return;
+      const px = this._worldToMousePx(world, mouseS);
+      if (px > Defaults.snapPx) return;
+      if (px < bestScore) {
+        bestScore = px;
+        best = { type: SnapType.POINT, world: v(world.x, world.y), segment, hatch, pointIndex, t: null, px };
+      }
+    };
+
+    const considerLine = (a: Vec2, b: Vec2, segment: Segment | null, hatch: Hatch | null, edgeIndex?: number) => {
+      if (hatch && hatch.id === excludedHatchId) return;
+      const proj = projectPointToSegment(mouseW, a, b);
+      const px = this._worldToMousePx(proj.q, mouseS);
+      if (px > Defaults.snapPx) return;
+      if (proj.t <= Defaults.splitEpsT || proj.t >= 1 - Defaults.splitEpsT) return;
+      const score = 1000 + px;
+      if (score < bestScore) {
+        bestScore = score;
+        best = { type: SnapType.LINE, world: v(proj.q.x, proj.q.y), segment, hatch, pointIndex: null, edgeIndex, t: proj.t, px, lineA: a, lineB: b };
+      }
+    };
+
+    const segs = this._segmentsFrontToBack();
+    for (const seg of segs) {
+      considerPoint(seg.a, seg, null, 0);
+      considerPoint(seg.b, seg, null, 1);
+    }
+    for (const hatch of this.scene.hatches) {
+      if (hatch.id === excludedHatchId) continue;
+      for (let i = 0; i < hatch.points.length; i++) {
+        considerPoint(hatch.points[i], null, hatch, i);
+      }
+    }
+    for (const seg of segs) {
+      considerLine(seg.a, seg.b, seg, null);
+    }
+    for (const edge of this.scene.getHatchEdges()) {
+      if (edge.hatch.id === excludedHatchId) continue;
+      considerLine(edge.a, edge.b, null, edge.hatch, edge.edgeIndex);
     }
 
     return best;
@@ -162,8 +234,15 @@ export class TopologyEngine {
       return v(snap.world.x, snap.world.y);
     }
     if (snap.type === SnapType.LINE) {
-      const res = this.scene.splitSegmentAtT(snap.segment!, snap.t!);
-      return v(res.point.x, res.point.y);
+      if (snap.segment && snap.t != null) {
+        const res = this.scene.splitSegmentAtT(snap.segment, snap.t);
+        return v(res.point.x, res.point.y);
+      }
+      if (snap.hatch && snap.edgeIndex != null && snap.t != null) {
+        const res = this.scene.insertPointIntoHatchEdge(snap.hatch, snap.edgeIndex, snap.t);
+        return v(res.point.x, res.point.y);
+      }
+      return v(snap.world.x, snap.world.y);
     }
     return v(freePoint.x, freePoint.y);
   }
