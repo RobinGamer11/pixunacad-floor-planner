@@ -151,10 +151,29 @@ export class LineTool {
 
     if (this.currentPoint) {
       for (const item of this.parallelGuideSegments) {
-        const seg = this.app.scene.getSegmentById(item.segmentId);
-        if (!seg) continue;
-        const dir = norm(sub(seg.b, seg.a));
-        defs.push({ point: v(this.currentPoint.x, this.currentPoint.y), dir, parallelSourceSegmentId: seg.id });
+        if (item.segmentId) {
+          const seg = this.app.scene.getSegmentById(item.segmentId);
+          if (!seg) continue;
+          const dir = norm(sub(seg.b, seg.a));
+          defs.push({ point: v(this.currentPoint.x, this.currentPoint.y), dir, parallelSourceSegmentId: seg.id });
+        } else if (item.hatchId) {
+          // Use the snap's lineA/lineB stored via the key to recover edge direction
+          // For hatch parallel guides, we stored the edge info in the snap at toggle time
+          // Re-derive from hatch edges
+          const hatch = this.app.scene.getHatchById(item.hatchId);
+          if (!hatch) continue;
+          const edges = this.app.scene.getHatchEdges().filter(e => e.hatch.id === item.hatchId);
+          // Find the edge matching the key
+          const keyMatch = item.key.match(/hatch_.*_(\d+)$/);
+          if (keyMatch) {
+            const edgeIdx = parseInt(keyMatch[1]);
+            const edge = edges.find(e => e.edgeIndex === edgeIdx);
+            if (edge) {
+              const dir = norm(sub(edge.b, edge.a));
+              defs.push({ point: v(this.currentPoint.x, this.currentPoint.y), dir });
+            }
+          }
+        }
       }
     }
 
