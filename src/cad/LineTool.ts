@@ -92,23 +92,37 @@ export class LineTool {
   resetGuides() { this.guideAnchors = []; this.parallelGuideSegments = []; }
   isDrawing() { return this.state === "drawing"; }
 
-  private _makeAnchorKey(segmentId: string, pointIndex: number) { return `${segmentId}__${pointIndex}`; }
-  private _makeParallelKey(segmentId: string) { return `${segmentId}`; }
+  private _makeAnchorKey(id: string, pointIndex: number) { return `${id}__${pointIndex}`; }
+  private _makeParallelKey(id: string) { return `${id}`; }
 
   private _toggleGuideAnchorFromSnap(snap: Snap) {
-    if (!snap || snap.type !== SnapType.POINT || !snap.segment) return;
-    const key = this._makeAnchorKey(snap.segment.id, snap.pointIndex!);
-    const idx = this.guideAnchors.findIndex(a => a.key === key);
-    if (idx >= 0) { this.guideAnchors.splice(idx, 1); return; }
-    this.guideAnchors.push({ key, segmentId: snap.segment.id, pointIndex: snap.pointIndex!, point: v(snap.world.x, snap.world.y) });
+    if (!snap || snap.type !== SnapType.POINT) return;
+    if (snap.segment) {
+      const key = this._makeAnchorKey(snap.segment.id, snap.pointIndex!);
+      const idx = this.guideAnchors.findIndex(a => a.key === key);
+      if (idx >= 0) { this.guideAnchors.splice(idx, 1); return; }
+      this.guideAnchors.push({ key, segmentId: snap.segment.id, pointIndex: snap.pointIndex!, point: v(snap.world.x, snap.world.y) });
+    } else if (snap.hatch) {
+      const key = this._makeAnchorKey(snap.hatch.id, snap.pointIndex!);
+      const idx = this.guideAnchors.findIndex(a => a.key === key);
+      if (idx >= 0) { this.guideAnchors.splice(idx, 1); return; }
+      this.guideAnchors.push({ key, hatchId: snap.hatch.id, pointIndex: snap.pointIndex!, point: v(snap.world.x, snap.world.y) });
+    }
   }
 
   private _toggleParallelGuideFromSnap(snap: Snap) {
-    if (!snap || snap.type !== SnapType.LINE || !snap.segment || !this.currentPoint) return;
-    const key = this._makeParallelKey(snap.segment.id);
-    const idx = this.parallelGuideSegments.findIndex(g => g.key === key);
-    if (idx >= 0) { this.parallelGuideSegments.splice(idx, 1); return; }
-    this.parallelGuideSegments.push({ key, segmentId: snap.segment.id });
+    if (!snap || snap.type !== SnapType.LINE || !this.currentPoint) return;
+    if (snap.segment) {
+      const key = this._makeParallelKey(snap.segment.id);
+      const idx = this.parallelGuideSegments.findIndex(g => g.key === key);
+      if (idx >= 0) { this.parallelGuideSegments.splice(idx, 1); return; }
+      this.parallelGuideSegments.push({ key, segmentId: snap.segment.id });
+    } else if (snap.hatch && snap.edgeIndex != null) {
+      const key = this._makeParallelKey(`hatch_${snap.hatch.id}_${snap.edgeIndex}`);
+      const idx = this.parallelGuideSegments.findIndex(g => g.key === key);
+      if (idx >= 0) { this.parallelGuideSegments.splice(idx, 1); return; }
+      this.parallelGuideSegments.push({ key, hatchId: snap.hatch.id });
+    }
   }
 
   private _getReferenceSegment() {
