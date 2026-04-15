@@ -10,14 +10,16 @@ import type { Input } from "./Input";
 
 interface GuideAnchor {
   key: string;
-  segmentId: string;
+  segmentId?: string;
+  hatchId?: string;
   pointIndex: number;
   point: Vec2;
 }
 
 interface ParallelGuide {
   key: string;
-  segmentId: string;
+  segmentId?: string;
+  hatchId?: string;
 }
 
 interface GuideDef {
@@ -90,23 +92,37 @@ export class LineTool {
   resetGuides() { this.guideAnchors = []; this.parallelGuideSegments = []; }
   isDrawing() { return this.state === "drawing"; }
 
-  private _makeAnchorKey(segmentId: string, pointIndex: number) { return `${segmentId}__${pointIndex}`; }
-  private _makeParallelKey(segmentId: string) { return `${segmentId}`; }
+  private _makeAnchorKey(id: string, pointIndex: number) { return `${id}__${pointIndex}`; }
+  private _makeParallelKey(id: string) { return `${id}`; }
 
   private _toggleGuideAnchorFromSnap(snap: Snap) {
-    if (!snap || snap.type !== SnapType.POINT || !snap.segment) return;
-    const key = this._makeAnchorKey(snap.segment.id, snap.pointIndex!);
-    const idx = this.guideAnchors.findIndex(a => a.key === key);
-    if (idx >= 0) { this.guideAnchors.splice(idx, 1); return; }
-    this.guideAnchors.push({ key, segmentId: snap.segment.id, pointIndex: snap.pointIndex!, point: v(snap.world.x, snap.world.y) });
+    if (!snap || snap.type !== SnapType.POINT) return;
+    if (snap.segment) {
+      const key = this._makeAnchorKey(snap.segment.id, snap.pointIndex!);
+      const idx = this.guideAnchors.findIndex(a => a.key === key);
+      if (idx >= 0) { this.guideAnchors.splice(idx, 1); return; }
+      this.guideAnchors.push({ key, segmentId: snap.segment.id, pointIndex: snap.pointIndex!, point: v(snap.world.x, snap.world.y) });
+    } else if (snap.hatch) {
+      const key = this._makeAnchorKey(snap.hatch.id, snap.pointIndex!);
+      const idx = this.guideAnchors.findIndex(a => a.key === key);
+      if (idx >= 0) { this.guideAnchors.splice(idx, 1); return; }
+      this.guideAnchors.push({ key, hatchId: snap.hatch.id, pointIndex: snap.pointIndex!, point: v(snap.world.x, snap.world.y) });
+    }
   }
 
   private _toggleParallelGuideFromSnap(snap: Snap) {
-    if (!snap || snap.type !== SnapType.LINE || !snap.segment || !this.currentPoint) return;
-    const key = this._makeParallelKey(snap.segment.id);
-    const idx = this.parallelGuideSegments.findIndex(g => g.key === key);
-    if (idx >= 0) { this.parallelGuideSegments.splice(idx, 1); return; }
-    this.parallelGuideSegments.push({ key, segmentId: snap.segment.id });
+    if (!snap || snap.type !== SnapType.LINE || !this.currentPoint) return;
+    if (snap.segment) {
+      const key = this._makeParallelKey(snap.segment.id);
+      const idx = this.parallelGuideSegments.findIndex(g => g.key === key);
+      if (idx >= 0) { this.parallelGuideSegments.splice(idx, 1); return; }
+      this.parallelGuideSegments.push({ key, segmentId: snap.segment.id });
+    } else if (snap.hatch && snap.edgeIndex != null) {
+      const key = this._makeParallelKey(`hatch_${snap.hatch.id}_${snap.edgeIndex}`);
+      const idx = this.parallelGuideSegments.findIndex(g => g.key === key);
+      if (idx >= 0) { this.parallelGuideSegments.splice(idx, 1); return; }
+      this.parallelGuideSegments.push({ key, hatchId: snap.hatch.id });
+    }
   }
 
   private _getReferenceSegment() {
@@ -135,10 +151,29 @@ export class LineTool {
 
     if (this.currentPoint) {
       for (const item of this.parallelGuideSegments) {
-        const seg = this.app.scene.getSegmentById(item.segmentId);
-        if (!seg) continue;
-        const dir = norm(sub(seg.b, seg.a));
-        defs.push({ point: v(this.currentPoint.x, this.currentPoint.y), dir, parallelSourceSegmentId: seg.id });
+        if (item.segmentId) {
+          const seg = this.app.scene.getSegmentById(item.segmentId);
+          if (!seg) continue;
+          const dir = norm(sub(seg.b, seg.a));
+          defs.push({ point: v(this.currentPoint.x, this.currentPoint.y), dir, parallelSourceSegmentId: seg.id });
+        } else if (item.hatchId) {
+          // Use the snap's lineA/lineB stored via the key to recover edge direction
+          // For hatch parallel guides, we stored the edge info in the snap at toggle time
+          // Re-derive from hatch edges
+          const hatch = this.app.scene.getHatchById(item.hatchId);
+          if (!hatch) continue;
+          const edges = this.app.scene.getHatchEdges().filter(e => e.hatch.id === item.hatchId);
+          // Find the edge matching the key
+          const keyMatch = item.key.match(/hatch_.*_(\d+)$/);
+          if (keyMatch) {
+            const edgeIdx = parseInt(keyMatch[1]);
+            const edge = edges.find(e => e.edgeIndex === edgeIdx);
+            if (edge) {
+              const dir = norm(sub(edge.b, edge.a));
+              defs.push({ point: v(this.currentPoint.x, this.currentPoint.y), dir });
+            }
+          }
+        }
       }
     }
 
