@@ -10,14 +10,16 @@ import type { Input } from "./Input";
 
 interface GuideAnchor {
   key: string;
-  segmentId: string;
+  segmentId?: string;
+  hatchId?: string;
   pointIndex: number;
   point: Vec2;
 }
 
 interface ParallelGuide {
   key: string;
-  segmentId: string;
+  segmentId?: string;
+  hatchId?: string;
 }
 
 interface GuideDef {
