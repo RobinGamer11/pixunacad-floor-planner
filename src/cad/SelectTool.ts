@@ -434,6 +434,9 @@ export class SelectTool {
       if (hit && hit.segmentId) {
         this.app.showLineSettingsPanel(true);
       }
+      if (hit && hit.hatchId) {
+        this.app.showHatchSettingsPanel(true);
+      }
     }
 
     const ctx = this._getSelectedPointContext();
