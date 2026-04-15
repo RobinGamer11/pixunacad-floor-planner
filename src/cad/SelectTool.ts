@@ -1,5 +1,5 @@
 import { Defaults, SnapType, SelectionType, PointEditAction } from "./constants";
-import { Vec2, v, sub, dot, dist, angleDeg, pointFromLengthAngle, projectPointToSegment, orthoSnapFromA, nearestAngleToReference } from "./geometry";
+import { Vec2, v, sub, dot, dist, angleDeg, pointFromLengthAngle, projectPointToSegment, orthoSnapFromA, nearestAngleToReference, pointInPolygon } from "./geometry";
 import type { CadApp } from "./CadApp";
 import type { Snap } from "./TopologyEngine";
 import type { Input } from "./Input";
@@ -154,12 +154,25 @@ export class SelectTool {
     const mouseS = v(input.mouse.sx, input.mouse.sy);
     const cam = this.app.camera;
     const selectedSeg = this.app.getSelectedSegment();
+    const selectedHatch = this.app.getSelectedHatch();
 
     const distPxToWorldPoint = (pWorld: Vec2) => {
       const sp = cam.worldToScreen(pWorld.x, pWorld.y);
       return Math.hypot(sp.x - mouseS.x, sp.y - mouseS.y);
     };
 
+    // Priority: selected hatch points
+    if (selectedHatch) {
+      for (let i = 0; i < selectedHatch.points.length; i++) {
+        const px = distPxToWorldPoint(selectedHatch.points[i]);
+        if (px <= Defaults.hitPx) return { type: SelectionType.POINT, hatchId: selectedHatch.id, pointIndex: i };
+      }
+      if (selectedHatch.points.length >= 3 && pointInPolygon(mouseW, selectedHatch.points)) {
+        return { type: SelectionType.HATCH, hatchId: selectedHatch.id, pointIndex: null };
+      }
+    }
+
+    // Priority: selected segment points
     if (selectedSeg && this.app.labelManager.isVisible(selectedSeg.labelId)) {
       const pxA = distPxToWorldPoint(selectedSeg.a);
       if (pxA <= Defaults.hitPx) return { type: SelectionType.POINT, segmentId: selectedSeg.id, pointIndex: 0 };
@@ -176,6 +189,7 @@ export class SelectTool {
     let best: any = null;
     let bestScore = Infinity;
 
+    // Segment points
     for (const seg of visibleSegs) {
       if (selectedSeg && seg.id === selectedSeg.id) continue;
       const pxA = distPxToWorldPoint(seg.a);
@@ -190,6 +204,19 @@ export class SelectTool {
       }
     }
 
+    // Hatch points
+    for (const hatch of this.app.scene.hatches) {
+      if (selectedHatch && hatch.id === selectedHatch.id) continue;
+      for (let i = 0; i < hatch.points.length; i++) {
+        const px = distPxToWorldPoint(hatch.points[i]);
+        if (px <= Defaults.hitPx && px < bestScore) {
+          bestScore = px;
+          best = { type: SelectionType.POINT, hatchId: hatch.id, pointIndex: i };
+        }
+      }
+    }
+
+    // Segment lines
     for (const seg of visibleSegs) {
       if (selectedSeg && seg.id === selectedSeg.id) continue;
       const proj = projectPointToSegment(mouseW, seg.a, seg.b);
@@ -200,7 +227,17 @@ export class SelectTool {
       }
     }
 
-    return best;
+    if (best) return best;
+
+    // Hatch polygon hit (pointInPolygon)
+    for (const hatch of this.app.scene.hatches) {
+      if (selectedHatch && hatch.id === selectedHatch.id) continue;
+      if (hatch.points.length >= 3 && pointInPolygon(mouseW, hatch.points)) {
+        return { type: SelectionType.HATCH, hatchId: hatch.id, pointIndex: null };
+      }
+    }
+
+    return null;
   }
 
   private _findPreviewSnapForEdit(input: Input) {
@@ -396,6 +433,9 @@ export class SelectTool {
       this.app.setSelection(hit);
       if (hit && hit.segmentId) {
         this.app.showLineSettingsPanel(true);
+      }
+      if (hit && hit.hatchId) {
+        this.app.showHatchSettingsPanel(true);
       }
     }
 
