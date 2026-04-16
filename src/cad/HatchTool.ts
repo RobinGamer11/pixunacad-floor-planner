@@ -242,6 +242,27 @@ export class HatchTool {
     };
   }
 
+  private _findDraftPointSnap(input: Input): Snap | null {
+    if (this.state !== "drawing" || this.points.length === 0) return null;
+    const mouseS = v(input.mouse.sx, input.mouse.sy);
+    let best: Snap | null = null;
+    let bestPx = Infinity;
+    for (let i = 0; i < this.points.length; i++) {
+      const p = this.points[i];
+      const sp = this.app.camera.worldToScreen(p.x, p.y);
+      const px = Math.hypot(sp.x - mouseS.x, sp.y - mouseS.y);
+      if (px > Defaults.snapPx) continue;
+      if (px < bestPx) {
+        bestPx = px;
+        best = {
+          type: SnapType.POINT, world: v(p.x, p.y),
+          segment: null, hatch: null, pointIndex: i, edgeIndex: null, t: null, px,
+        } as Snap;
+      }
+    }
+    return best;
+  }
+
   private _findHatchToolSnap(input: Input): Snap | null {
     const draftStartSnap = this._findDraftStartSnap(input);
     if (draftStartSnap) return draftStartSnap;
