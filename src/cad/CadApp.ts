@@ -387,6 +387,17 @@ export class CadApp {
 
   /* ---- Hatch Settings Panel ---- */
   private _setupHatchSettingsPanel() {
+    this.hatchIdSelect.addEventListener("change", () => {
+      const nextId = this.hatchIdSelect.value || Defaults.defaultLabelId;
+      const selectedHatchIds = this.getSelectedHatchObjectIds();
+      if (selectedHatchIds.length > 0) {
+        this.scene.assignHatchesToLabel(selectedHatchIds, nextId);
+        this.setSelectedLabelId(nextId);
+        this.refreshLabelUI();
+        return;
+      }
+      this.setActiveDrawLabelId(nextId);
+    });
     this.hatchFillColorInput.addEventListener("input", () => {
       const sel = this.getSelectedHatch();
       if (sel) sel.fillColor = this.hatchFillColorInput.value;
