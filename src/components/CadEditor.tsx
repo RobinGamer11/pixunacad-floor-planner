@@ -34,6 +34,7 @@ const CadEditor: React.FC = () => {
 
   // Hatch settings refs
   const hatchSettingsRef = useRef<HTMLDivElement>(null);
+  const hatchIdSelectRef = useRef<HTMLSelectElement>(null);
   const hatchFillColorRef = useRef<HTMLInputElement>(null);
   const hatchFillPreviewRef = useRef<HTMLDivElement>(null);
   const hatchStrokeColorRef = useRef<HTMLInputElement>(null);
@@ -60,7 +61,8 @@ const CadEditor: React.FC = () => {
       !colorInputRef.current || !colorPreviewRef.current || !thicknessInputRef.current ||
       !idPanelRef.current || !idBodyRef.current || !idListRef.current ||
       !idAddBtnRef.current || !idToggleBtnRef.current ||
-      !hatchSettingsRef.current || !hatchFillColorRef.current || !hatchFillPreviewRef.current ||
+      !hatchSettingsRef.current || !hatchIdSelectRef.current ||
+      !hatchFillColorRef.current || !hatchFillPreviewRef.current ||
       !hatchStrokeColorRef.current || !hatchStrokePreviewRef.current || !hatchStrokeWidthRef.current ||
       !hatchAlphaRef.current || !areaShowRef.current || !areaSettingsGroupRef.current ||
       !areaTextColorRef.current || !areaTextPreviewRef.current || !areaFontSizeRef.current ||
@@ -82,6 +84,7 @@ const CadEditor: React.FC = () => {
       idPanelRef.current, idBodyRef.current, idListRef.current,
       idAddBtnRef.current, idToggleBtnRef.current,
       hatchSettingsRef.current,
+      hatchIdSelectRef.current,
       hatchFillColorRef.current, hatchFillPreviewRef.current,
       hatchStrokeColorRef.current, hatchStrokePreviewRef.current,
       hatchStrokeWidthRef.current, hatchAlphaRef.current,
@@ -150,6 +153,10 @@ const CadEditor: React.FC = () => {
       {/* Hatch Settings Panel */}
       <div ref={hatchSettingsRef} className="cad-settings-panel absolute top-14 right-[240px] z-20 hidden w-52">
         <div className="text-xs font-semibold mb-2" style={{ color: "hsl(var(--foreground))" }}>Schraffur-Einstellungen</div>
+        <div>
+          <label>ID</label>
+          <select ref={hatchIdSelectRef} className="cad-settings-select w-full" />
+        </div>
         <div>
           <label>Flächenfarbe</label>
           <div className="flex items-center gap-2">
