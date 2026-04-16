@@ -239,9 +239,21 @@ export class CadApp {
     return [];
   }
 
+  getSelectedHatchObjectIds(): string[] {
+    const selected = this.getSelectedHatch();
+    if (selected) return [selected.id];
+    if (this.selectedLabelId) return this.scene.getHatchesByLabelId(this.selectedLabelId).map(h => h.id);
+    return [];
+  }
+
   getSelectedGroupSegments() {
     if (!this.selectedLabelId) return [];
     return this.scene.getSegmentsByLabelId(this.selectedLabelId);
+  }
+
+  getSelectedGroupHatches() {
+    if (!this.selectedLabelId) return [];
+    return this.scene.getHatchesByLabelId(this.selectedLabelId);
   }
 
   getCurrentLineStyle() {
@@ -265,6 +277,7 @@ export class CadApp {
         strokeColor: selected.strokeColor || this.defaultHatchStrokeColor,
         fillAlphaPct: selected.fillAlphaPct ?? this.defaultHatchFillAlphaPct,
         strokeWidthPx: (typeof selected.strokeWidthPx === "number") ? selected.strokeWidthPx : this.defaultHatchStrokeWidthPx,
+        labelId: selected.labelId || Defaults.defaultLabelId,
         areaLabel: {
           show: !!selected.areaLabel?.show,
           textColor: selected.areaLabel?.textColor || Defaults.areaTextColor,
@@ -276,11 +289,32 @@ export class CadApp {
         } as Partial<AreaLabel>,
       };
     }
+    const groupHatches = this.getSelectedGroupHatches();
+    if (groupHatches.length > 0) {
+      const ref = groupHatches[0];
+      return {
+        fillColor: ref.fillColor || this.defaultHatchFillColor,
+        strokeColor: ref.strokeColor || this.defaultHatchStrokeColor,
+        fillAlphaPct: ref.fillAlphaPct ?? this.defaultHatchFillAlphaPct,
+        strokeWidthPx: (typeof ref.strokeWidthPx === "number") ? ref.strokeWidthPx : this.defaultHatchStrokeWidthPx,
+        labelId: ref.labelId || Defaults.defaultLabelId,
+        areaLabel: {
+          show: !!ref.areaLabel?.show,
+          textColor: ref.areaLabel?.textColor || Defaults.areaTextColor,
+          fontSizePx: ref.areaLabel?.fontSizePx ?? Defaults.areaFontSizePx,
+          bgColor: ref.areaLabel?.bgColor || Defaults.areaBgColor,
+          bgAlphaPct: ref.areaLabel?.bgAlphaPct ?? Defaults.areaBgAlphaPct,
+          offsetX: ref.areaLabel?.offsetX || 0,
+          offsetY: ref.areaLabel?.offsetY || 0,
+        } as Partial<AreaLabel>,
+      };
+    }
     return {
       fillColor: this.defaultHatchFillColor,
       strokeColor: this.defaultHatchStrokeColor,
       fillAlphaPct: this.defaultHatchFillAlphaPct,
       strokeWidthPx: this.defaultHatchStrokeWidthPx,
+      labelId: this.activeDrawLabelId || Defaults.defaultLabelId,
       areaLabel: {
         show: false, textColor: Defaults.areaTextColor, fontSizePx: Defaults.areaFontSizePx,
         bgColor: Defaults.areaBgColor, bgAlphaPct: Defaults.areaBgAlphaPct, offsetX: 0, offsetY: 0,
