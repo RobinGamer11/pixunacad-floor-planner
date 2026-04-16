@@ -44,6 +44,14 @@ export class TopologyEngine {
       .sort((a, b) => (rank.get(b.labelId) || 0) - (rank.get(a.labelId) || 0));
   }
 
+  _hatchesFrontToBack(): Hatch[] {
+    const order = this.labels.list();
+    const rank = new Map(order.map((g, i) => [g.id, i]));
+    return [...this.scene.hatches]
+      .filter(h => this.labels.isVisible(h.labelId))
+      .sort((a, b) => (rank.get(b.labelId) || 0) - (rank.get(a.labelId) || 0));
+  }
+
   findBestSnap(mouseS: Vec2, mouseW: Vec2): Snap | null {
     let best: Snap | null = null;
     let bestScore = Infinity;
@@ -76,7 +84,7 @@ export class TopologyEngine {
       considerPoint(seg.b, seg, null, 1);
     }
     // Hatch points
-    for (const hatch of this.scene.hatches) {
+    for (const hatch of this._hatchesFrontToBack()) {
       for (let i = 0; i < hatch.points.length; i++) {
         considerPoint(hatch.points[i], null, hatch, i);
       }
@@ -87,6 +95,7 @@ export class TopologyEngine {
     }
     // Hatch edges
     for (const edge of this.scene.getHatchEdges()) {
+      if (!this.labels.isVisible(edge.hatch.labelId)) continue;
       considerLine(edge.a, edge.b, null, edge.hatch, edge.edgeIndex);
     }
 

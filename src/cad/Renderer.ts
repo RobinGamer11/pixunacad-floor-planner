@@ -58,6 +58,14 @@ export class Renderer {
       .sort((a, b) => (rank.get(a.labelId) || 0) - (rank.get(b.labelId) || 0));
   }
 
+  private _hatchesBackToFront() {
+    const order = this.labels.list();
+    const rank = new Map(order.map((g, i) => [g.id, i]));
+    return [...this.scene.hatches]
+      .filter(h => this.labels.isVisible(h.labelId))
+      .sort((a, b) => (rank.get(a.labelId) || 0) - (rank.get(b.labelId) || 0));
+  }
+
   private _scaledStrokePx(storedWidth: number): number {
     const baseWidth = Math.max(0, storedWidth || 0);
     return baseWidth * (this.camera.scale / Defaults.strokeWidthBaseScale);
@@ -157,7 +165,7 @@ export class Renderer {
     const ctx = this.ctx;
     const cam = this.camera;
 
-    for (const hatch of this.scene.hatches) {
+    for (const hatch of this._hatchesBackToFront()) {
       if (hatch.points.length < 3) continue;
 
       const isHovered = this.hoverHatchId === hatch.id;
