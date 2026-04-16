@@ -274,6 +274,10 @@ export class HatchTool {
     const guideSnap = this._findGuideSnap(mouseS, mouseW);
     if (guideSnap && guideSnap.type === SnapType.GUIDE_POINT) return guideSnap;
 
+    // Draft point snap (currently in-progress polygon points)
+    const draftPointSnap = this._findDraftPointSnap(input);
+    if (draftPointSnap) return draftPointSnap;
+
     const snap = this.app.topology.findBestSnap(mouseS, mouseW);
     if (snap?.hatch) this.activeTargetHatchId = snap.hatch.id;
     if (snap?.segment) this.activeTargetHatchId = null;
