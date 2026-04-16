@@ -27,6 +27,7 @@ export class CadApp {
   lineThicknessInput: HTMLInputElement;
 
   hatchSettingsPanel: HTMLDivElement;
+  hatchIdSelect: HTMLSelectElement;
   hatchFillColorInput: HTMLInputElement;
   hatchFillColorPreview: HTMLDivElement;
   hatchStrokeColorInput: HTMLInputElement;
@@ -83,6 +84,7 @@ export class CadApp {
     idPanelRoot: HTMLDivElement, idPanelBody: HTMLDivElement, idPanelList: HTMLDivElement,
     idPanelAddBtn: HTMLButtonElement, idPanelToggleBtn: HTMLButtonElement,
     hatchSettingsPanel: HTMLDivElement,
+    hatchIdSelect: HTMLSelectElement,
     hatchFillColorInput: HTMLInputElement, hatchFillColorPreview: HTMLDivElement,
     hatchStrokeColorInput: HTMLInputElement, hatchStrokeColorPreview: HTMLDivElement,
     hatchStrokeWidthInput: HTMLInputElement, hatchAlphaInput: HTMLInputElement,
@@ -104,6 +106,7 @@ export class CadApp {
     this.lineThicknessInput = lineThicknessInput;
 
     this.hatchSettingsPanel = hatchSettingsPanel;
+    this.hatchIdSelect = hatchIdSelect;
     this.hatchFillColorInput = hatchFillColorInput;
     this.hatchFillColorPreview = hatchFillColorPreview;
     this.hatchStrokeColorInput = hatchStrokeColorInput;
