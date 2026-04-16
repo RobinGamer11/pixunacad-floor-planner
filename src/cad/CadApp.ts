@@ -327,7 +327,7 @@ export class CadApp {
 
   private _updateSettingsVisibility() {
     const showLine = (this.activeTool === this.lineTool) || !!(this.selection && this.selection.segmentId) || !!this.selectedLabelId;
-    const showHatch = (this.activeTool === this.hatchTool) || !!(this.selection && this.selection.hatchId);
+    const showHatch = (this.activeTool === this.hatchTool) || !!(this.selection && this.selection.hatchId) || !!this.selectedLabelId;
     this.showLineSettingsPanel(showLine);
     this.showHatchSettingsPanel(showHatch);
   }
@@ -477,6 +477,11 @@ export class CadApp {
     this.areaBgColorInput.value = this._toHexColor(area?.bgColor || Defaults.areaBgColor);
     this.areaBgColorPreview.style.background = this.areaBgColorInput.value;
     this.areaBgAlphaInput.value = String(Math.round(area?.bgAlphaPct ?? Defaults.areaBgAlphaPct));
+    const labelForDisplay =
+      (this.selectedLabelId && this.labelManager.getById(this.selectedLabelId)) ? this.selectedLabelId
+        : (style.labelId || this.activeDrawLabelId || Defaults.defaultLabelId);
+    if (this.labelManager.getById(labelForDisplay)) this.hatchIdSelect.value = labelForDisplay;
+    else this.hatchIdSelect.value = Defaults.defaultLabelId;
   }
 
   private _toHexColor(color: string): string {
