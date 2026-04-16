@@ -549,6 +549,7 @@ export class CadApp {
         }
         if (this.selectedLabelId) {
           this.scene.removeSegmentsByLabelId(this.selectedLabelId);
+          this.scene.removeHatchesByLabelId(this.selectedLabelId);
           this.setSelectedLabelId(null);
           this.refreshLabelUI();
         }
