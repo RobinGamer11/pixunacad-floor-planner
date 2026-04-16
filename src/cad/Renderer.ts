@@ -214,8 +214,10 @@ export class Renderer {
 
     const areaM2 = polygonAreaAbs(hatch.points);
     const text = `${areaM2.toFixed(2)} m²`;
-    const fontSizePx = clamp(hatch.areaLabel.fontSizePx ?? Defaults.areaFontSizePx, 8, 72);
-    const padX = 8, padY = 5;
+    const baseFontSize = clamp(hatch.areaLabel.fontSizePx ?? Defaults.areaFontSizePx, 8, 72);
+    const zoomFactor = cam.scale / Defaults.strokeWidthBaseScale;
+    const fontSizePx = Math.max(1, baseFontSize * zoomFactor);
+    const padX = 8 * zoomFactor, padY = 5 * zoomFactor;
 
     ctx.save();
     ctx.font = `${fontSizePx}px system-ui, Arial, sans-serif`;
