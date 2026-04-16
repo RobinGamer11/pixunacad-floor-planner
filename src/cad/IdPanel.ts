@@ -116,7 +116,9 @@ export class IdPanel {
     this.listEl.appendChild(makeIndicator(0));
 
     groups.forEach((group, index) => {
-      const count = this.app.scene.getSegmentsByLabelId(group.id).length;
+      const segCount = this.app.scene.getSegmentsByLabelId(group.id).length;
+      const hatchCount = this.app.scene.getHatchesByLabelId(group.id).length;
+      const count = segCount + hatchCount;
       const row = document.createElement("div");
       row.className = "id-row";
       row.dataset.id = group.id;
@@ -164,6 +166,10 @@ export class IdPanel {
         if (selectedSeg && !this.app.labelManager.isVisible(selectedSeg.labelId)) {
           this.app.clearSelection();
         }
+        const selectedHatch = this.app.getSelectedHatch();
+        if (selectedHatch && !this.app.labelManager.isVisible(selectedHatch.labelId)) {
+          this.app.clearSelection();
+        }
         this.app.refreshLabelUI();
       });
 
@@ -192,6 +198,7 @@ export class IdPanel {
         e.stopPropagation();
         if (group.locked) return;
         this.app.scene.reassignSegmentsLabel(group.id, Defaults.defaultLabelId);
+        this.app.scene.reassignHatchesLabel(group.id, Defaults.defaultLabelId);
         this.app.labelManager.deleteGroup(group.id);
         if (this.app.activeDrawLabelId === group.id) {
           this.app.setActiveDrawLabelId(Defaults.defaultLabelId);
