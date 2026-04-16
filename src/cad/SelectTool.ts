@@ -162,7 +162,7 @@ export class SelectTool {
     };
 
     // Priority: selected hatch points
-    if (selectedHatch) {
+    if (selectedHatch && this.app.labelManager.isVisible(selectedHatch.labelId)) {
       for (let i = 0; i < selectedHatch.points.length; i++) {
         const px = distPxToWorldPoint(selectedHatch.points[i]);
         if (px <= Defaults.hitPx) return { type: SelectionType.POINT, hatchId: selectedHatch.id, pointIndex: i };
@@ -185,6 +185,7 @@ export class SelectTool {
     }
 
     const visibleSegs = this.app.topology._segmentsFrontToBack();
+    const visibleHatches = this.app.topology._hatchesFrontToBack();
 
     let best: any = null;
     let bestScore = Infinity;
@@ -205,7 +206,7 @@ export class SelectTool {
     }
 
     // Hatch points
-    for (const hatch of this.app.scene.hatches) {
+    for (const hatch of visibleHatches) {
       if (selectedHatch && hatch.id === selectedHatch.id) continue;
       for (let i = 0; i < hatch.points.length; i++) {
         const px = distPxToWorldPoint(hatch.points[i]);
@@ -230,7 +231,7 @@ export class SelectTool {
     if (best) return best;
 
     // Hatch polygon hit (pointInPolygon)
-    for (const hatch of this.app.scene.hatches) {
+    for (const hatch of visibleHatches) {
       if (selectedHatch && hatch.id === selectedHatch.id) continue;
       if (hatch.points.length >= 3 && pointInPolygon(mouseW, hatch.points)) {
         return { type: SelectionType.HATCH, hatchId: hatch.id, pointIndex: null };

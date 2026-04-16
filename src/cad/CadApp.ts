@@ -27,6 +27,7 @@ export class CadApp {
   lineThicknessInput: HTMLInputElement;
 
   hatchSettingsPanel: HTMLDivElement;
+  hatchIdSelect: HTMLSelectElement;
   hatchFillColorInput: HTMLInputElement;
   hatchFillColorPreview: HTMLDivElement;
   hatchStrokeColorInput: HTMLInputElement;
@@ -83,6 +84,7 @@ export class CadApp {
     idPanelRoot: HTMLDivElement, idPanelBody: HTMLDivElement, idPanelList: HTMLDivElement,
     idPanelAddBtn: HTMLButtonElement, idPanelToggleBtn: HTMLButtonElement,
     hatchSettingsPanel: HTMLDivElement,
+    hatchIdSelect: HTMLSelectElement,
     hatchFillColorInput: HTMLInputElement, hatchFillColorPreview: HTMLDivElement,
     hatchStrokeColorInput: HTMLInputElement, hatchStrokeColorPreview: HTMLDivElement,
     hatchStrokeWidthInput: HTMLInputElement, hatchAlphaInput: HTMLInputElement,
@@ -104,6 +106,7 @@ export class CadApp {
     this.lineThicknessInput = lineThicknessInput;
 
     this.hatchSettingsPanel = hatchSettingsPanel;
+    this.hatchIdSelect = hatchIdSelect;
     this.hatchFillColorInput = hatchFillColorInput;
     this.hatchFillColorPreview = hatchFillColorPreview;
     this.hatchStrokeColorInput = hatchStrokeColorInput;
@@ -189,8 +192,10 @@ export class CadApp {
 
   refreshLabelUI() {
     this._syncLabelSelect();
+    this._syncHatchLabelSelect();
     this.idPanel.render();
     this._syncLineSettingsFromContext();
+    this._syncHatchSettingsFromContext();
   }
 
   private _syncLabelSelect() {
@@ -210,6 +215,22 @@ export class CadApp {
     this.lineIdSelect.value = preferred;
   }
 
+  private _syncHatchLabelSelect() {
+    const groups = this.labelManager.list();
+    const currentValue = this.hatchIdSelect.value;
+    this.hatchIdSelect.innerHTML = "";
+    for (const group of groups) {
+      const opt = document.createElement("option");
+      opt.value = group.id;
+      opt.textContent = group.name;
+      this.hatchIdSelect.appendChild(opt);
+    }
+    const preferred =
+      (this.labelManager.getById(currentValue) ? currentValue : null) ||
+      (this.labelManager.getById(this.activeDrawLabelId) ? this.activeDrawLabelId : Defaults.defaultLabelId);
+    this.hatchIdSelect.value = preferred;
+  }
+
   /* ---- Selected objects ---- */
   getSelectedObjectIds(): string[] {
     const selected = this.getSelectedSegment();
@@ -218,9 +239,21 @@ export class CadApp {
     return [];
   }
 
+  getSelectedHatchObjectIds(): string[] {
+    const selected = this.getSelectedHatch();
+    if (selected) return [selected.id];
+    if (this.selectedLabelId) return this.scene.getHatchesByLabelId(this.selectedLabelId).map(h => h.id);
+    return [];
+  }
+
   getSelectedGroupSegments() {
     if (!this.selectedLabelId) return [];
     return this.scene.getSegmentsByLabelId(this.selectedLabelId);
+  }
+
+  getSelectedGroupHatches() {
+    if (!this.selectedLabelId) return [];
+    return this.scene.getHatchesByLabelId(this.selectedLabelId);
   }
 
   getCurrentLineStyle() {
@@ -244,6 +277,7 @@ export class CadApp {
         strokeColor: selected.strokeColor || this.defaultHatchStrokeColor,
         fillAlphaPct: selected.fillAlphaPct ?? this.defaultHatchFillAlphaPct,
         strokeWidthPx: (typeof selected.strokeWidthPx === "number") ? selected.strokeWidthPx : this.defaultHatchStrokeWidthPx,
+        labelId: selected.labelId || Defaults.defaultLabelId,
         areaLabel: {
           show: !!selected.areaLabel?.show,
           textColor: selected.areaLabel?.textColor || Defaults.areaTextColor,
@@ -255,11 +289,32 @@ export class CadApp {
         } as Partial<AreaLabel>,
       };
     }
+    const groupHatches = this.getSelectedGroupHatches();
+    if (groupHatches.length > 0) {
+      const ref = groupHatches[0];
+      return {
+        fillColor: ref.fillColor || this.defaultHatchFillColor,
+        strokeColor: ref.strokeColor || this.defaultHatchStrokeColor,
+        fillAlphaPct: ref.fillAlphaPct ?? this.defaultHatchFillAlphaPct,
+        strokeWidthPx: (typeof ref.strokeWidthPx === "number") ? ref.strokeWidthPx : this.defaultHatchStrokeWidthPx,
+        labelId: ref.labelId || Defaults.defaultLabelId,
+        areaLabel: {
+          show: !!ref.areaLabel?.show,
+          textColor: ref.areaLabel?.textColor || Defaults.areaTextColor,
+          fontSizePx: ref.areaLabel?.fontSizePx ?? Defaults.areaFontSizePx,
+          bgColor: ref.areaLabel?.bgColor || Defaults.areaBgColor,
+          bgAlphaPct: ref.areaLabel?.bgAlphaPct ?? Defaults.areaBgAlphaPct,
+          offsetX: ref.areaLabel?.offsetX || 0,
+          offsetY: ref.areaLabel?.offsetY || 0,
+        } as Partial<AreaLabel>,
+      };
+    }
     return {
       fillColor: this.defaultHatchFillColor,
       strokeColor: this.defaultHatchStrokeColor,
       fillAlphaPct: this.defaultHatchFillAlphaPct,
       strokeWidthPx: this.defaultHatchStrokeWidthPx,
+      labelId: this.activeDrawLabelId || Defaults.defaultLabelId,
       areaLabel: {
         show: false, textColor: Defaults.areaTextColor, fontSizePx: Defaults.areaFontSizePx,
         bgColor: Defaults.areaBgColor, bgAlphaPct: Defaults.areaBgAlphaPct, offsetX: 0, offsetY: 0,
@@ -272,7 +327,7 @@ export class CadApp {
 
   private _updateSettingsVisibility() {
     const showLine = (this.activeTool === this.lineTool) || !!(this.selection && this.selection.segmentId) || !!this.selectedLabelId;
-    const showHatch = (this.activeTool === this.hatchTool) || !!(this.selection && this.selection.hatchId);
+    const showHatch = (this.activeTool === this.hatchTool) || !!(this.selection && this.selection.hatchId) || !!this.selectedLabelId;
     this.showLineSettingsPanel(showLine);
     this.showHatchSettingsPanel(showHatch);
   }
@@ -332,6 +387,17 @@ export class CadApp {
 
   /* ---- Hatch Settings Panel ---- */
   private _setupHatchSettingsPanel() {
+    this.hatchIdSelect.addEventListener("change", () => {
+      const nextId = this.hatchIdSelect.value || Defaults.defaultLabelId;
+      const selectedHatchIds = this.getSelectedHatchObjectIds();
+      if (selectedHatchIds.length > 0) {
+        this.scene.assignHatchesToLabel(selectedHatchIds, nextId);
+        this.setSelectedLabelId(nextId);
+        this.refreshLabelUI();
+        return;
+      }
+      this.setActiveDrawLabelId(nextId);
+    });
     this.hatchFillColorInput.addEventListener("input", () => {
       const sel = this.getSelectedHatch();
       if (sel) sel.fillColor = this.hatchFillColorInput.value;
@@ -411,6 +477,11 @@ export class CadApp {
     this.areaBgColorInput.value = this._toHexColor(area?.bgColor || Defaults.areaBgColor);
     this.areaBgColorPreview.style.background = this.areaBgColorInput.value;
     this.areaBgAlphaInput.value = String(Math.round(area?.bgAlphaPct ?? Defaults.areaBgAlphaPct));
+    const labelForDisplay =
+      (this.selectedLabelId && this.labelManager.getById(this.selectedLabelId)) ? this.selectedLabelId
+        : (style.labelId || this.activeDrawLabelId || Defaults.defaultLabelId);
+    if (this.labelManager.getById(labelForDisplay)) this.hatchIdSelect.value = labelForDisplay;
+    else this.hatchIdSelect.value = Defaults.defaultLabelId;
   }
 
   private _toHexColor(color: string): string {
@@ -478,6 +549,7 @@ export class CadApp {
         }
         if (this.selectedLabelId) {
           this.scene.removeSegmentsByLabelId(this.selectedLabelId);
+          this.scene.removeHatchesByLabelId(this.selectedLabelId);
           this.setSelectedLabelId(null);
           this.refreshLabelUI();
         }

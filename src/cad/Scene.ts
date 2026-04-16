@@ -36,11 +36,12 @@ export class Hatch {
   strokeColor: string;
   fillAlphaPct: number;
   strokeWidthPx: number;
+  labelId: string;
   areaLabel: AreaLabel;
 
-  constructor({ id, points, fillColor, strokeColor, fillAlphaPct, strokeWidthPx, areaLabel }: {
+  constructor({ id, points, fillColor, strokeColor, fillAlphaPct, strokeWidthPx, labelId, areaLabel }: {
     id: string; points: Vec2[]; fillColor?: string; strokeColor?: string;
-    fillAlphaPct?: number; strokeWidthPx?: number; areaLabel?: Partial<AreaLabel>;
+    fillAlphaPct?: number; strokeWidthPx?: number; labelId?: string; areaLabel?: Partial<AreaLabel>;
   }) {
     this.id = id;
     this.points = points.map(p => v(p.x, p.y));
@@ -48,6 +49,7 @@ export class Hatch {
     this.strokeColor = strokeColor || Defaults.hatchStrokeColor;
     this.fillAlphaPct = clamp(fillAlphaPct ?? Defaults.hatchFillAlphaPct, 0, 100);
     this.strokeWidthPx = (typeof strokeWidthPx === "number" && strokeWidthPx >= 0) ? strokeWidthPx : Defaults.hatchStrokePx;
+    this.labelId = labelId || Defaults.defaultLabelId;
     this.areaLabel = {
       show: !!(areaLabel?.show ?? Defaults.areaShow),
       textColor: areaLabel?.textColor || Defaults.areaTextColor,
@@ -139,13 +141,13 @@ export class Scene {
   // ---- Hatches ----
   createHatch(points: Vec2[], style: {
     fillColor?: string; strokeColor?: string; fillAlphaPct?: number;
-    strokeWidthPx?: number; areaLabel?: Partial<AreaLabel>;
+    strokeWidthPx?: number; labelId?: string; areaLabel?: Partial<AreaLabel>;
   } = {}) {
     const hatch = new Hatch({
       id: this._makeId(), points,
       fillColor: style.fillColor, strokeColor: style.strokeColor,
       fillAlphaPct: style.fillAlphaPct, strokeWidthPx: style.strokeWidthPx,
-      areaLabel: style.areaLabel,
+      labelId: style.labelId, areaLabel: style.areaLabel,
     });
     this.hatches.push(hatch);
     this._rebuildHatchIdMap();
@@ -154,9 +156,37 @@ export class Scene {
 
   getHatchById(id: string): Hatch | null { return this._hatchIdMap.get(id) || null; }
 
+  getHatchesByLabelId(labelId: string): Hatch[] {
+    return this.hatches.filter(h => h.labelId === labelId);
+  }
+
   removeHatch(hatch: Hatch) {
     this.hatches = this.hatches.filter(h => h !== hatch);
     this._rebuildHatchIdMap();
+  }
+
+  removeHatchesByIds(ids: string[]) {
+    const set = new Set(ids);
+    this.hatches = this.hatches.filter(h => !set.has(h.id));
+    this._rebuildHatchIdMap();
+  }
+
+  removeHatchesByLabelId(labelId: string) {
+    this.hatches = this.hatches.filter(h => h.labelId !== labelId);
+    this._rebuildHatchIdMap();
+  }
+
+  reassignHatchesLabel(oldId: string, newId: string) {
+    for (const h of this.hatches) {
+      if (h.labelId === oldId) h.labelId = newId;
+    }
+  }
+
+  assignHatchesToLabel(ids: string[], newId: string) {
+    const set = new Set(ids);
+    for (const h of this.hatches) {
+      if (set.has(h.id)) h.labelId = newId;
+    }
   }
 
   removePointFromHatch(hatch: Hatch, pointIndex: number): boolean {
