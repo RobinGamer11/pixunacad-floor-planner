@@ -192,8 +192,10 @@ export class CadApp {
 
   refreshLabelUI() {
     this._syncLabelSelect();
+    this._syncHatchLabelSelect();
     this.idPanel.render();
     this._syncLineSettingsFromContext();
+    this._syncHatchSettingsFromContext();
   }
 
   private _syncLabelSelect() {
@@ -211,6 +213,22 @@ export class CadApp {
       (this.labelManager.getById(this.activeDrawLabelId) ? this.activeDrawLabelId : Defaults.defaultLabelId);
     this.activeDrawLabelId = preferred;
     this.lineIdSelect.value = preferred;
+  }
+
+  private _syncHatchLabelSelect() {
+    const groups = this.labelManager.list();
+    const currentValue = this.hatchIdSelect.value;
+    this.hatchIdSelect.innerHTML = "";
+    for (const group of groups) {
+      const opt = document.createElement("option");
+      opt.value = group.id;
+      opt.textContent = group.name;
+      this.hatchIdSelect.appendChild(opt);
+    }
+    const preferred =
+      (this.labelManager.getById(currentValue) ? currentValue : null) ||
+      (this.labelManager.getById(this.activeDrawLabelId) ? this.activeDrawLabelId : Defaults.defaultLabelId);
+    this.hatchIdSelect.value = preferred;
   }
 
   /* ---- Selected objects ---- */
