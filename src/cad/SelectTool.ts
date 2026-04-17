@@ -1,8 +1,12 @@
 import { Defaults, SnapType, SelectionType, PointEditAction } from "./constants";
-import { Vec2, v, sub, dot, dist, angleDeg, pointFromLengthAngle, projectPointToSegment, orthoSnapFromA, nearestAngleToReference, pointInPolygon } from "./geometry";
+import { Vec2, v, sub, dot, dist, angleDeg, pointFromLengthAngle, projectPointToSegment, orthoSnapFromA, nearestAngleToReference, pointInPolygon, polygonCentroid } from "./geometry";
 import type { CadApp } from "./CadApp";
 import type { Snap } from "./TopologyEngine";
 import type { Input } from "./Input";
+
+type EditTarget =
+  | { kind: "segment"; segmentId: string; pointIndex: number }
+  | { kind: "hatch"; hatchId: string; pointIndex: number };
 
 export class SelectTool {
   app: CadApp;
@@ -10,10 +14,14 @@ export class SelectTool {
   snap: Snap | null = null;
 
   activeEditAction: string | null = null;
-  editSegmentId: string | null = null;
-  editPointIndex: number | null = null;
+  editTarget: EditTarget | null = null;
+
+  // For segment edits: fixed = the other endpoint. originalMoving = the moving endpoint.
+  // For hatch edits: fixed = polygon centroid (rotate pivot). originalMoving = original position of edited point.
   fixedPoint: Vec2 | null = null;
   otherPointOriginal: Vec2 | null = null;
+  // Snapshot of all hatch points at edit start (for translate/rotate of full polygon if needed)
+  hatchPointsOriginal: Vec2[] | null = null;
 
   moveHubLocked = false;
   moveHubLengthM: number | null = null;
@@ -58,12 +66,28 @@ export class SelectTool {
     const ctx = this._getSelectedPointContext();
     if (!ctx) return;
 
-    this.activeEditAction = action;
-    this.editSegmentId = ctx.segment.id;
-    this.editPointIndex = ctx.pointIndex;
+    // DELETE handled inline
+    if (action === PointEditAction.DELETE) {
+      this._deleteSelectedPoint();
+      return;
+    }
 
-    this.fixedPoint = (ctx.pointIndex === 0) ? v(ctx.segment.b.x, ctx.segment.b.y) : v(ctx.segment.a.x, ctx.segment.a.y);
-    this.otherPointOriginal = (ctx.pointIndex === 0) ? v(ctx.segment.a.x, ctx.segment.a.y) : v(ctx.segment.b.x, ctx.segment.b.y);
+    this.activeEditAction = action;
+    this.editTarget = ctx.target;
+
+    if (ctx.target.kind === "segment") {
+      const seg = ctx.segment!;
+      this.fixedPoint = (ctx.target.pointIndex === 0) ? v(seg.b.x, seg.b.y) : v(seg.a.x, seg.a.y);
+      this.otherPointOriginal = (ctx.target.pointIndex === 0) ? v(seg.a.x, seg.a.y) : v(seg.b.x, seg.b.y);
+      this.hatchPointsOriginal = null;
+    } else {
+      const hatch = ctx.hatch!;
+      const idx = ctx.target.pointIndex;
+      // For hatch points, pivot for rotate = polygon centroid (excluding moving point gives slightly biased pivot, use centroid of all to feel natural).
+      this.fixedPoint = polygonCentroid(hatch.points);
+      this.otherPointOriginal = v(hatch.points[idx].x, hatch.points[idx].y);
+      this.hatchPointsOriginal = hatch.points.map(p => v(p.x, p.y));
+    }
 
     this.moveHubLocked = false;
     this.moveHubLengthM = null;
@@ -72,16 +96,16 @@ export class SelectTool {
     this.app.pointEditMenu.hide();
 
     if (action === PointEditAction.ROTATE) {
-      const radius = dist(this.fixedPoint, this.otherPointOriginal);
-      const ang = angleDeg(this.fixedPoint, this.otherPointOriginal);
+      const radius = dist(this.fixedPoint!, this.otherPointOriginal!);
+      const ang = angleDeg(this.fixedPoint!, this.otherPointOriginal!);
       this.app.hub.bindCommit((vals) => this._applyRotateHubValues(vals));
       this.app.hub.showAt(this.app.input.mouse.sx, this.app.input.mouse.sy);
       this.app.hub.updateDisplay(radius, ang);
       this.app.hub.setValues(radius, ang);
       this.app.hub.enterEditMode();
     } else if (action === PointEditAction.MOVE) {
-      const radius = dist(this.fixedPoint, this.otherPointOriginal);
-      const ang = angleDeg(this.fixedPoint, this.otherPointOriginal);
+      const radius = dist(this.fixedPoint!, this.otherPointOriginal!);
+      const ang = angleDeg(this.fixedPoint!, this.otherPointOriginal!);
       this.app.hub.bindCommit((vals) => this._applyMoveHubValues(vals));
       this.app.hub.showAt(this.app.input.mouse.sx, this.app.input.mouse.sy);
       this.app.hub.updateDisplay(radius, ang);
@@ -93,24 +117,37 @@ export class SelectTool {
     }
   }
 
+  private _deleteSelectedPoint() {
+    const ctx = this._getSelectedPointContext();
+    if (!ctx) return;
+    if (ctx.target.kind === "segment") {
+      this.app.scene.removeSegment(ctx.segment!);
+      this.app.clearSelection();
+      this.app.pointEditMenu.hide();
+      this.app.refreshLabelUI();
+    } else {
+      const hatch = ctx.hatch!;
+      if (hatch.points.length > 3) {
+        this.app.scene.removePointFromHatch(hatch, ctx.target.pointIndex);
+        this.app.setSelection({ type: SelectionType.HATCH, hatchId: hatch.id, pointIndex: null });
+      } else {
+        this.app.scene.removeHatch(hatch);
+        this.app.clearSelection();
+        this.app.pointEditMenu.hide();
+        this.app.refreshLabelUI();
+      }
+    }
+  }
+
   private _applyRotateHubValues(vals: { lengthM: number | null; angleDeg: number | null }) {
-    if (this.activeEditAction !== PointEditAction.ROTATE) return;
-    const seg = this.app.scene.getSegmentById(this.editSegmentId!);
-    if (!seg) return;
+    if (this.activeEditAction !== PointEditAction.ROTATE || !this.editTarget) return;
 
     const radiusDefault = dist(this.fixedPoint!, this.otherPointOriginal!);
     const nextLen = (vals.lengthM != null) ? Math.max(0, vals.lengthM) : radiusDefault;
     const nextAng = ((vals.angleDeg != null ? vals.angleDeg : angleDeg(this.fixedPoint!, this.otherPointOriginal!)) % 360 + 360) % 360;
 
     const p = pointFromLengthAngle(this.fixedPoint!, nextLen, nextAng);
-
-    if (this.editPointIndex === 0) {
-      seg.a = v(p.x, p.y);
-      seg.b = v(this.fixedPoint!.x, this.fixedPoint!.y);
-    } else {
-      seg.b = v(p.x, p.y);
-      seg.a = v(this.fixedPoint!.x, this.fixedPoint!.y);
-    }
+    this._applyMovingPoint(p, this.fixedPoint!);
 
     this.app.hub.setValues(nextLen, nextAng);
     this.app.hub.updateDisplay(nextLen, nextAng);
@@ -129,20 +166,85 @@ export class SelectTool {
     this.app.hub.updateDisplay(this.moveHubLengthM!, this.moveHubAngleDeg);
   }
 
+  /** Apply the new position for the currently edited moving point. For segments, also keeps the fixed endpoint. */
+  private _applyMovingPoint(newPoint: Vec2, fixedKeep: Vec2) {
+    if (!this.editTarget) return;
+    if (this.editTarget.kind === "segment") {
+      const seg = this.app.scene.getSegmentById(this.editTarget.segmentId);
+      if (!seg) return;
+      if (this.editTarget.pointIndex === 0) {
+        seg.a = v(newPoint.x, newPoint.y);
+        seg.b = v(fixedKeep.x, fixedKeep.y);
+      } else {
+        seg.b = v(newPoint.x, newPoint.y);
+        seg.a = v(fixedKeep.x, fixedKeep.y);
+      }
+    } else {
+      const hatch = this.app.scene.getHatchById(this.editTarget.hatchId);
+      if (!hatch) return;
+      hatch.points[this.editTarget.pointIndex] = v(newPoint.x, newPoint.y);
+    }
+  }
+
+  /** Apply translate delta for the whole object (segment or hatch). */
+  private _applyTranslateDelta(delta: Vec2) {
+    if (!this.editTarget) return;
+    if (this.editTarget.kind === "segment") {
+      const seg = this.app.scene.getSegmentById(this.editTarget.segmentId);
+      if (!seg) return;
+      const movingFinal = { x: this.otherPointOriginal!.x + delta.x, y: this.otherPointOriginal!.y + delta.y };
+      const fixedFinal = { x: this.fixedPoint!.x + delta.x, y: this.fixedPoint!.y + delta.y };
+      if (this.editTarget.pointIndex === 0) {
+        seg.a = v(movingFinal.x, movingFinal.y);
+        seg.b = v(fixedFinal.x, fixedFinal.y);
+      } else {
+        seg.b = v(movingFinal.x, movingFinal.y);
+        seg.a = v(fixedFinal.x, fixedFinal.y);
+      }
+    } else {
+      const hatch = this.app.scene.getHatchById(this.editTarget.hatchId);
+      if (!hatch || !this.hatchPointsOriginal) return;
+      for (let i = 0; i < hatch.points.length; i++) {
+        const orig = this.hatchPointsOriginal[i];
+        hatch.points[i] = v(orig.x + delta.x, orig.y + delta.y);
+      }
+    }
+  }
+
   private _getSelectedPointContext() {
     const sel = this.app.selection;
     if (!sel || sel.type !== SelectionType.POINT) return null;
-    const segment = this.app.scene.getSegmentById(sel.segmentId);
-    if (!segment) return null;
-    return { segment, pointIndex: sel.pointIndex! };
+    if (sel.segmentId) {
+      const segment = this.app.scene.getSegmentById(sel.segmentId);
+      if (!segment) return null;
+      return {
+        target: { kind: "segment" as const, segmentId: sel.segmentId, pointIndex: sel.pointIndex! },
+        segment,
+        hatch: null,
+        point: sel.pointIndex === 0 ? segment.a : segment.b,
+      };
+    }
+    if (sel.hatchId) {
+      const hatch = this.app.scene.getHatchById(sel.hatchId);
+      if (!hatch) return null;
+      const idx = sel.pointIndex!;
+      if (idx < 0 || idx >= hatch.points.length) return null;
+      return {
+        target: { kind: "hatch" as const, hatchId: sel.hatchId, pointIndex: idx },
+        segment: null,
+        hatch,
+        point: hatch.points[idx],
+      };
+    }
+    return null;
   }
 
   _clearEditState() {
     this.activeEditAction = null;
-    this.editSegmentId = null;
-    this.editPointIndex = null;
+    this.editTarget = null;
     this.fixedPoint = null;
     this.otherPointOriginal = null;
+    this.hatchPointsOriginal = null;
     this.moveHubLocked = false;
     this.moveHubLengthM = null;
     this.moveHubAngleDeg = null;
@@ -241,24 +343,57 @@ export class SelectTool {
     return null;
   }
 
+  /** Look for a hatch edge near mouse; return {hatch, edgeIndex, t} or null. */
+  private _hitTestHatchEdge(input: Input) {
+    const mouseW = v(input.mouse.wx, input.mouse.wy);
+    const mouseS = v(input.mouse.sx, input.mouse.sy);
+    const cam = this.app.camera;
+
+    const distPxToWorldPoint = (pWorld: Vec2) => {
+      const sp = cam.worldToScreen(pWorld.x, pWorld.y);
+      return Math.hypot(sp.x - mouseS.x, sp.y - mouseS.y);
+    };
+
+    const visibleHatches = this.app.topology._hatchesFrontToBack();
+    let best: { hatch: any; edgeIndex: number; t: number } | null = null;
+    let bestPx = Infinity;
+
+    for (const hatch of visibleHatches) {
+      const n = hatch.points.length;
+      if (n < 2) continue;
+      for (let i = 0; i < n; i++) {
+        const a = hatch.points[i];
+        const b = hatch.points[(i + 1) % n];
+        const proj = projectPointToSegment(mouseW, a, b);
+        if (proj.t <= Defaults.splitEpsT || proj.t >= 1 - Defaults.splitEpsT) continue;
+        const px = distPxToWorldPoint(proj.q);
+        if (px <= Defaults.hitPx && px < bestPx) {
+          bestPx = px;
+          best = { hatch, edgeIndex: i, t: proj.t };
+        }
+      }
+    }
+    return best;
+  }
+
   private _findPreviewSnapForEdit(input: Input) {
-    const seg = this.app.scene.getSegmentById(this.editSegmentId!);
-    if (!seg) return null;
-    return this.app.topology.findBestSnapExcludingSegment(
+    if (!this.editTarget) return null;
+    if (this.editTarget.kind === "segment") {
+      return this.app.topology.findBestSnapExcludingSegment(
+        v(input.mouse.sx, input.mouse.sy),
+        v(input.mouse.wx, input.mouse.wy),
+        this.editTarget.segmentId
+      );
+    }
+    return this.app.topology.findBestSnapExcludingHatch(
       v(input.mouse.sx, input.mouse.sy),
       v(input.mouse.wx, input.mouse.wy),
-      seg.id
+      this.editTarget.hatchId
     );
   }
 
   private _findRotateAssistSegment(input: Input) {
-    const seg = this.app.scene.getSegmentById(this.editSegmentId!);
-    if (!seg) return null;
-    const snap = this.app.topology.findBestSnapExcludingSegment(
-      v(input.mouse.sx, input.mouse.sy),
-      v(input.mouse.wx, input.mouse.wy),
-      seg.id
-    );
+    const snap = this._findPreviewSnapForEdit(input);
     return snap?.segment || null;
   }
 
@@ -330,20 +465,11 @@ export class SelectTool {
 
   update(input: Input) {
     if (this.isEditing()) {
-      const seg = this.app.scene.getSegmentById(this.editSegmentId!);
-      if (!seg) return;
-
       if (this.activeEditAction === PointEditAction.MOVE) {
         const p = this._previewMovePoint(input);
         const metrics = { lengthM: dist(this.fixedPoint!, p), angleDeg: angleDeg(this.fixedPoint!, p) };
 
-        if (this.editPointIndex === 0) {
-          seg.a = v(p.x, p.y);
-          seg.b = v(this.fixedPoint!.x, this.fixedPoint!.y);
-        } else {
-          seg.b = v(p.x, p.y);
-          seg.a = v(this.fixedPoint!.x, this.fixedPoint!.y);
-        }
+        this._applyMovingPoint(p, this.fixedPoint!);
 
         this.app.renderer.setHoverSegmentId(null);
         this.app.hub.showAt(input.mouse.sx, input.mouse.sy);
@@ -351,13 +477,7 @@ export class SelectTool {
 
         if (input.clicked) {
           const finalP = this._commitMovePoint(input);
-          if (this.editPointIndex === 0) {
-            seg.a = v(finalP.x, finalP.y);
-            seg.b = v(this.fixedPoint!.x, this.fixedPoint!.y);
-          } else {
-            seg.b = v(finalP.x, finalP.y);
-            seg.a = v(this.fixedPoint!.x, this.fixedPoint!.y);
-          }
+          this._applyMovingPoint(finalP, this.fixedPoint!);
           this._clearEditState();
           this.app.hub.hide();
         }
@@ -366,32 +486,14 @@ export class SelectTool {
 
       if (this.activeEditAction === PointEditAction.TRANSLATE) {
         const delta = this._previewTranslateDelta(input);
-        const movingPreview = { x: this.otherPointOriginal!.x + delta.x, y: this.otherPointOriginal!.y + delta.y };
-        const fixedPreview = { x: this.fixedPoint!.x + delta.x, y: this.fixedPoint!.y + delta.y };
-
-        if (this.editPointIndex === 0) {
-          seg.a = v(movingPreview.x, movingPreview.y);
-          seg.b = v(fixedPreview.x, fixedPreview.y);
-        } else {
-          seg.b = v(movingPreview.x, movingPreview.y);
-          seg.a = v(fixedPreview.x, fixedPreview.y);
-        }
+        this._applyTranslateDelta(delta);
 
         this.app.renderer.setHoverSegmentId(null);
         this.app.hub.hide();
 
         if (input.clicked) {
           const finalDelta = this._commitTranslateDelta(input);
-          const movingFinal = { x: this.otherPointOriginal!.x + finalDelta.x, y: this.otherPointOriginal!.y + finalDelta.y };
-          const fixedFinal = { x: this.fixedPoint!.x + finalDelta.x, y: this.fixedPoint!.y + finalDelta.y };
-
-          if (this.editPointIndex === 0) {
-            seg.a = v(movingFinal.x, movingFinal.y);
-            seg.b = v(fixedFinal.x, fixedFinal.y);
-          } else {
-            seg.b = v(movingFinal.x, movingFinal.y);
-            seg.a = v(fixedFinal.x, fixedFinal.y);
-          }
+          this._applyTranslateDelta(finalDelta);
           this._clearEditState();
         }
         return;
@@ -406,13 +508,7 @@ export class SelectTool {
         const p = pointFromLengthAngle(this.fixedPoint!, radius, ang);
 
         if (document.activeElement !== this.app.hub.lenInputEl && document.activeElement !== this.app.hub.angInputEl) {
-          if (this.editPointIndex === 0) {
-            seg.a = v(p.x, p.y);
-            seg.b = v(this.fixedPoint!.x, this.fixedPoint!.y);
-          } else {
-            seg.b = v(p.x, p.y);
-            seg.a = v(this.fixedPoint!.x, this.fixedPoint!.y);
-          }
+          this._applyMovingPoint(p, this.fixedPoint!);
           this.app.hub.showAt(input.mouse.sx, input.mouse.sy);
           this.app.hub.updateDisplay(radius, ang);
         }
@@ -429,6 +525,19 @@ export class SelectTool {
     this.app.renderer.setHoverSegmentId(null);
     this.app.hub.hide();
 
+    // Double-click on hatch edge → insert point
+    if (input.doubleClicked) {
+      const edgeHit = this._hitTestHatchEdge(input);
+      if (edgeHit) {
+        const result = this.app.scene.insertPointIntoHatchEdge(edgeHit.hatch, edgeHit.edgeIndex, edgeHit.t);
+        if (result.didInsert) {
+          this.app.setSelection({ type: SelectionType.POINT, hatchId: edgeHit.hatch.id, pointIndex: result.pointIndex });
+          this.app.showHatchSettingsPanel(true);
+        }
+        return;
+      }
+    }
+
     if (input.clicked) {
       const hit = this._hitTestWithForegroundPriority(input);
       this.app.setSelection(hit);
@@ -442,7 +551,7 @@ export class SelectTool {
 
     const ctx = this._getSelectedPointContext();
     if (ctx) {
-      const p = (ctx.pointIndex === 0) ? ctx.segment.a : ctx.segment.b;
+      const p = ctx.point;
       const sp = this.app.camera.worldToScreen(p.x, p.y);
       this.app.pointEditMenu.showAt(sp.x, sp.y);
     } else {
