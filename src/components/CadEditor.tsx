@@ -593,6 +593,82 @@ const CadEditor: React.FC = () => {
               </div>
             </div>
           </div>
+
+          {/* Sticker Settings */}
+          {!sidebarCollapsed && activeTool === ToolIds.STICKER && (
+            <div className="cad-settings-panel mb-2">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Sticker</div>
+              <div className="space-y-3">
+                <button type="button" onClick={() => {
+                  const name = window.prompt("Name für neuen Sticker:", `Sticker ${appRef.current!.stickers.length + 1}`);
+                  if (!name) return;
+                  const def = appRef.current!.createStickerFromSelection(name);
+                  if (!def) window.alert("Bitte erst ein Objekt oder eine Bezeichnungs-ID-Gruppe auswählen.");
+                }} className="cad-toolbar-btn w-full justify-center h-9" title="Aus aktueller Auswahl oder Bezeichnungs-ID-Gruppe">
+                  <Plus className="h-4 w-4" /> <span className="text-xs">Aus Auswahl</span>
+                </button>
+
+                <div className="flex gap-1">
+                  <button type="button" onClick={() => {
+                    const json = appRef.current!.exportStickers();
+                    const blob = new Blob([json], { type: "application/json" });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url; a.download = "sticker-library.json";
+                    document.body.appendChild(a); a.click(); a.remove();
+                    URL.revokeObjectURL(url);
+                  }} className="cad-toolbar-btn flex-1 justify-center h-8 text-xs" title="Exportieren">
+                    <Download className="h-3.5 w-3.5" /> Export
+                  </button>
+                  <button type="button" onClick={() => stickerImportRef.current?.click()} className="cad-toolbar-btn flex-1 justify-center h-8 text-xs" title="Importieren">
+                    <Upload className="h-3.5 w-3.5" /> Import
+                  </button>
+                  <input ref={stickerImportRef} type="file" accept="application/json" className="hidden" onChange={async (e) => {
+                    const f = e.target.files?.[0]; if (!f) return;
+                    const text = await f.text();
+                    try {
+                      const n = appRef.current!.importStickers(text);
+                      if (n === 0) window.alert("Keine gültigen Sticker in der Datei gefunden.");
+                    } catch { window.alert("Datei konnte nicht gelesen werden."); }
+                    e.target.value = "";
+                  }} />
+                </div>
+
+                <div className="space-y-1 max-h-[300px] overflow-y-auto">
+                  {stickers.length === 0 && (
+                    <div className="text-xs text-center py-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Noch keine Sticker</div>
+                  )}
+                  {stickers.map(s => {
+                    const isActive = appRef.current?.stickerTool.activeDef?.id === s.id;
+                    return (
+                      <div key={s.id} className="flex items-center gap-1">
+                        <button type="button" onClick={() => appRef.current!.beginStickerPlacement(s.id)} className={`cad-toolbar-btn flex-1 justify-start h-8 text-xs ${isActive ? "active" : ""}`} title="Platzieren">
+                          <StickerIcon className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{s.name}</span>
+                        </button>
+                        <button type="button" onClick={() => {
+                          const next = window.prompt("Sticker umbenennen:", s.name);
+                          if (next && next.trim()) appRef.current!.renameSticker(s.id, next);
+                        }} className="cad-toolbar-btn h-8 w-8 justify-center px-0" title="Umbenennen">
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button type="button" onClick={() => {
+                          if (window.confirm(`Sticker "${s.name}" löschen?`)) appRef.current!.removeSticker(s.id);
+                        }} className="cad-toolbar-btn h-8 w-8 justify-center px-0" title="Löschen">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="text-[11px] leading-relaxed pt-2" style={{ color: "hsl(var(--cad-toolbar-muted))", borderTop: "1px solid hsl(var(--border))" }}>
+                  <div>Klick auf Sticker → Platzieren-Modus</div>
+                  <div>1. Klick: Position · Maus: Rotation · 2. Klick: bestätigt</div>
+                  <div>SHIFT: 90°-Snap · ENTER: Winkel eingeben</div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Collapse toggle */}
