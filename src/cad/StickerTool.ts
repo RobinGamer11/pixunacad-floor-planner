@@ -129,6 +129,17 @@ export class StickerTool {
   private _dragOrigin: Vec2 | null = null;
   private _dragMouseStart: Vec2 | null = null;
 
+  /** Hit-Test gegen platzierte Sticker-Instanzen. */
+  private _hitStickerInstance(input: Input) {
+    const mouseW = v(input.mouse.wx, input.mouse.wy);
+    for (let i = this.app.scene.stickerInstances.length - 1; i >= 0; i--) {
+      const inst = this.app.scene.stickerInstances[i];
+      if (!this.app.labelManager.isVisible(inst.labelId)) continue;
+      if (pointInInstance(inst.items as any, inst.position, inst.rotationRad, inst.scale, mouseW)) return inst;
+    }
+    return null;
+  }
+
   update(input: Input) {
     // Aktiver Drag (Verschieben einer ausgewählten Sticker-Instanz)
     if (this._dragStickerId) {
