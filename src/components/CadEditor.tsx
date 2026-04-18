@@ -365,9 +365,9 @@ const CadEditor: React.FC = () => {
     if (!docPickerPages) return;
     const selectedPages = docPickerPages.filter((_, i) => docPickerSelected.has(i));
     if (selectedPages.length === 0) { setDocPickerPages(null); return; }
-    // → Maßstab-Dialog
-    setScaleChoice(selectedPages[0].kind === "pdf-page" ? "100" : "1");
-    setScaleCustom("100");
+    // → Maßstab-Dialog (Default = aktueller Zeichen-Maßstab)
+    setScaleChoice(selectedPages[0].kind === "pdf-page" ? String(drawingScale) : "1");
+    setScaleCustom(String(drawingScale));
     setDocPickerPages(null);
     setDocPickerSelected(new Set());
     setScaleDialogPages(selectedPages);
