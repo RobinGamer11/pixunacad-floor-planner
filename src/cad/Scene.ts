@@ -206,6 +206,56 @@ export class Scene {
     for (const d of this.dimensions) this._dimIdMap.set(d.id, d);
   }
 
+  private _rebuildTextIdMap() {
+    this._textIdMap.clear();
+    for (const t of this.textBoxes) this._textIdMap.set(t.id, t);
+  }
+
+  // ---- TextBoxes ----
+  createTextBox(center: Vec2, widthM: number, heightM: number, style: TextBoxStyle = {}, html: string = "", rotationRad: number = 0) {
+    const box = new TextBox({
+      id: this._makeId(), center, widthM, heightM, rotationRad, html, style, labelId: style.labelId,
+    });
+    this.textBoxes.push(box);
+    this._rebuildTextIdMap();
+    return box;
+  }
+
+  getTextBoxById(id: string): TextBox | null { return this._textIdMap.get(id) || null; }
+
+  getTextBoxesByLabelId(labelId: string): TextBox[] {
+    return this.textBoxes.filter(t => t.labelId === labelId);
+  }
+
+  removeTextBox(box: TextBox) {
+    this.textBoxes = this.textBoxes.filter(t => t !== box);
+    this._rebuildTextIdMap();
+  }
+
+  removeTextBoxesByIds(ids: string[]) {
+    const set = new Set(ids);
+    this.textBoxes = this.textBoxes.filter(t => !set.has(t.id));
+    this._rebuildTextIdMap();
+  }
+
+  removeTextBoxesByLabelId(labelId: string) {
+    this.textBoxes = this.textBoxes.filter(t => t.labelId !== labelId);
+    this._rebuildTextIdMap();
+  }
+
+  reassignTextBoxesLabel(oldId: string, newId: string) {
+    for (const t of this.textBoxes) {
+      if (t.labelId === oldId) t.labelId = newId;
+    }
+  }
+
+  assignTextBoxesToLabel(ids: string[], newId: string) {
+    const set = new Set(ids);
+    for (const t of this.textBoxes) {
+      if (set.has(t.id)) t.labelId = newId;
+    }
+  }
+
   // ---- Dimensions ----
   createDimension(p1: Vec2, p2: Vec2, placementPoint: Vec2, mode: "parallel" | "diagonal", refDir: Vec2 | null, style: DimensionStyle = {}) {
     const dim = new Dimension({ id: this._makeId(), p1, p2, placementPoint, mode, refDir, style, labelId: style.labelId });
