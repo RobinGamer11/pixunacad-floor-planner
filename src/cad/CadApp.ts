@@ -211,6 +211,12 @@ export class CadApp {
 
   onToolChange?: (toolId: string) => void;
 
+  // ---- Sticker Edit Mode ("Ghost Scene") ----
+  /** ID der Sticker-Instanz, die gerade im Edit-Mode ist. null = kein Edit-Mode. */
+  _stickerEditInstanceId: string | null = null;
+  /** Snapshot der Instanz-Daten beim Enter (für inverse Transform beim Exit). */
+  private _stickerEditSnapshot: { name: string; defId: string | null; labelId: string; position: Vec2; rotationRad: number; scale: number } | null = null;
+
   constructor(
     canvas: HTMLCanvasElement,
     hubRoot: HTMLDivElement, hubLenInput: HTMLInputElement, hubAngInput: HTMLInputElement,
@@ -501,6 +507,185 @@ export class CadApp {
   getSelectedStickerInstance() {
     if (!this.selection || this.selection.type !== SelectionType.STICKER_INSTANCE) return null;
     return this.scene.getStickerInstanceById((this.selection as any).stickerInstanceId);
+  }
+
+  /* ===== Sticker Edit Mode ("Ghost Scene") ===== */
+  isStickerEditing(): boolean { return !!this._stickerEditInstanceId; }
+  getStickerEditInstanceId(): string | null { return this._stickerEditInstanceId; }
+  getStickerEditSnapshot() { return this._stickerEditSnapshot; }
+
+  /** Materialisiert die Items einer Sticker-Instanz als echte Scene-Objekte (World-Space) und entfernt die Instanz. */
+  enterStickerEdit(inst: { id: string; name: string; defId: string | null; labelId: string; position: Vec2; rotationRad: number; scale: number; items: any[] }) {
+    if (this._stickerEditInstanceId) return; // schon im Edit
+    const editId = inst.id;
+    this._stickerEditInstanceId = editId;
+    this._stickerEditSnapshot = {
+      name: inst.name, defId: inst.defId, labelId: inst.labelId,
+      position: { x: inst.position.x, y: inst.position.y },
+      rotationRad: inst.rotationRad, scale: inst.scale,
+    };
+
+    // Items in World-Space transformieren und als echte Scene-Objekte materialisieren.
+    const worldItems = transformedInstanceItems(inst.items as any, inst.position, inst.rotationRad, inst.scale);
+    this.scene._currentEditOwnerId = editId;
+    try {
+      for (const it of worldItems) {
+        if (it.kind === "segment") {
+          this.scene.createSegment(it.a, it.b, { color: it.color, thicknessM: it.thicknessM, labelId: it.labelId });
+        } else if (it.kind === "hatch") {
+          this.scene.createHatch(it.points, {
+            fillColor: it.fillColor, strokeColor: it.strokeColor,
+            fillAlphaPct: it.fillAlphaPct, strokeWidthPx: it.strokeWidthPx,
+            labelId: it.labelId, areaLabel: it.areaLabel,
+          });
+        } else if (it.kind === "dimension") {
+          this.scene.createDimension(it.p1, it.p2, it.placementPoint, it.mode, it.refDir, {
+            textColor: it.textColor, textSizePx: it.textSizePx, lineColor: it.lineColor,
+            decimals: it.decimals, tickLengthM: it.tickLengthM, showExtensions: it.showExtensions,
+            useFreeText: it.useFreeText, freeText: it.freeText,
+            textBgEnabled: it.textBgEnabled, textBgColor: it.textBgColor, textBgAlpha: it.textBgAlpha,
+            labelId: it.labelId,
+          });
+        } else if (it.kind === "textbox") {
+          this.scene.createTextBox(it.center, it.widthM, it.heightM, { ...(it.style || {}), labelId: it.labelId }, it.html || "", it.rotationRad || 0);
+        }
+      }
+    } finally {
+      this.scene._currentEditOwnerId = null;
+    }
+
+    // Original-Instanz aus Scene entfernen (sie lebt nun als Ghost-Objekte).
+    const original = this.scene.getStickerInstanceById(editId);
+    if (original) this.scene.removeStickerInstance(original);
+
+    this.clearSelection();
+    this.pointEditMenu.hide();
+    this.refreshLabelUI();
+    // Snapshot direkt nach Enter, damit Undo den Edit-Mode nicht zerschießt.
+    this._lastSnapshot = this._serializeScene();
+  }
+
+  /** Sammelt alle Owner-Objekte, transformiert sie zurück in lokale Items und erzeugt eine neue Sticker-Instanz. */
+  exitStickerEdit() {
+    const editId = this._stickerEditInstanceId;
+    const snap = this._stickerEditSnapshot;
+    if (!editId || !snap) return;
+
+    // Sammle alle Owner-Objekte
+    const ownedSegs = this.scene.segments.filter(s => s._stickerEditOwnerId === editId);
+    const ownedHatches = this.scene.hatches.filter(h => h._stickerEditOwnerId === editId);
+    const ownedDims = this.scene.dimensions.filter(d => d._stickerEditOwnerId === editId);
+    const ownedTexts = this.scene.textBoxes.filter(t => t._stickerEditOwnerId === editId);
+
+    // Wenn alles gelöscht wurde: Edit-Mode beenden, Instanz nicht wiederherstellen.
+    const totalCount = ownedSegs.length + ownedHatches.length + ownedDims.length + ownedTexts.length;
+    if (totalCount === 0) {
+      this._stickerEditInstanceId = null;
+      this._stickerEditSnapshot = null;
+      this._lastSnapshot = this._serializeScene();
+      return;
+    }
+
+    // Berechne neue Center (Centroid der Owner-Objekte in World-Space).
+    let sx = 0, sy = 0, n = 0;
+    for (const s of ownedSegs) { sx += (s.a.x + s.b.x) / 2; sy += (s.a.y + s.b.y) / 2; n++; }
+    for (const h of ownedHatches) {
+      let cx = 0, cy = 0;
+      for (const p of h.points) { cx += p.x; cy += p.y; }
+      sx += cx / h.points.length; sy += cy / h.points.length; n++;
+    }
+    for (const d of ownedDims) { sx += (d.p1.x + d.p2.x) / 2; sy += (d.p1.y + d.p2.y) / 2; n++; }
+    for (const t of ownedTexts) { sx += t.center.x; sy += t.center.y; n++; }
+    const newPos = (n > 0) ? { x: sx / n, y: sy / n } : { x: snap.position.x, y: snap.position.y };
+
+    // Neue Items in lokalen Koordinaten = Translation zurück um newPos (Rotation/Scale = identity, da User die Geometrie direkt bearbeitet hat).
+    const newItems: any[] = [];
+    for (const s of ownedSegs) {
+      newItems.push({
+        kind: "segment",
+        a: { x: s.a.x - newPos.x, y: s.a.y - newPos.y },
+        b: { x: s.b.x - newPos.x, y: s.b.y - newPos.y },
+        color: s.color, thicknessM: s.thicknessM, labelId: s.labelId,
+      });
+    }
+    for (const h of ownedHatches) {
+      newItems.push({
+        kind: "hatch",
+        points: h.points.map(p => ({ x: p.x - newPos.x, y: p.y - newPos.y })),
+        fillColor: h.fillColor, strokeColor: h.strokeColor,
+        fillAlphaPct: h.fillAlphaPct, strokeWidthPx: h.strokeWidthPx,
+        labelId: h.labelId, areaLabel: { ...h.areaLabel },
+      });
+    }
+    for (const d of ownedDims) {
+      newItems.push({
+        kind: "dimension",
+        p1: { x: d.p1.x - newPos.x, y: d.p1.y - newPos.y },
+        p2: { x: d.p2.x - newPos.x, y: d.p2.y - newPos.y },
+        placementPoint: { x: d.placementPoint.x - newPos.x, y: d.placementPoint.y - newPos.y },
+        mode: d.mode, refDir: d.refDir ? { x: d.refDir.x, y: d.refDir.y } : null,
+        textColor: d.textColor, textSizePx: d.textSizePx, lineColor: d.lineColor,
+        decimals: d.decimals, tickLengthM: d.tickLengthM, showExtensions: d.showExtensions,
+        useFreeText: d.useFreeText, freeText: d.freeText,
+        textBgEnabled: d.textBgEnabled, textBgColor: d.textBgColor, textBgAlpha: d.textBgAlpha,
+        labelId: d.labelId,
+      });
+    }
+    for (const t of ownedTexts) {
+      newItems.push({
+        kind: "textbox",
+        center: { x: t.center.x - newPos.x, y: t.center.y - newPos.y },
+        widthM: t.widthM, heightM: t.heightM, rotationRad: t.rotationRad,
+        html: t.html, style: { ...t.style }, labelId: t.labelId,
+      });
+    }
+
+    // Owner-Objekte aus Scene entfernen.
+    this.scene.removeSegmentsByIds(ownedSegs.map(s => s.id));
+    this.scene.removeHatchesByIds(ownedHatches.map(h => h.id));
+    this.scene.removeDimensionsByIds(ownedDims.map(d => d.id));
+    this.scene.removeTextBoxesByIds(ownedTexts.map(t => t.id));
+
+    // Neue Sticker-Instanz mit identischer ID anlegen — wir stellen die alte ID wieder her,
+    // indem wir createStickerInstance aufrufen und die ID anschließend überschreiben.
+    const newInst = this.scene.createStickerInstance({
+      defId: snap.defId, name: snap.name, items: newItems,
+      position: newPos, rotationRad: 0, scale: 1, labelId: snap.labelId,
+    });
+    // Behalte die ursprüngliche Instanz-ID, damit Selektion + Hub konsistent bleiben.
+    (newInst as any).id = editId;
+    (this.scene as any)._rebuildStickerIdMap?.();
+
+    this._stickerEditInstanceId = null;
+    this._stickerEditSnapshot = null;
+    this.refreshLabelUI();
+    this._lastSnapshot = this._serializeScene();
+  }
+
+  /** Liefert die World-Space-AABB der aktuellen Sticker-Edit-Owner-Objekte (oder null). */
+  getStickerEditWorldBounds(): { minX: number; minY: number; maxX: number; maxY: number } | null {
+    const editId = this._stickerEditInstanceId;
+    if (!editId) return null;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    const acc = (x: number, y: number) => { if (x < minX) minX = x; if (y < minY) minY = y; if (x > maxX) maxX = x; if (y > maxY) maxY = y; };
+    for (const s of this.scene.segments) if (s._stickerEditOwnerId === editId) { acc(s.a.x, s.a.y); acc(s.b.x, s.b.y); }
+    for (const h of this.scene.hatches) if (h._stickerEditOwnerId === editId) for (const p of h.points) acc(p.x, p.y);
+    for (const d of this.scene.dimensions) if (d._stickerEditOwnerId === editId) { acc(d.p1.x, d.p1.y); acc(d.p2.x, d.p2.y); }
+    for (const t of this.scene.textBoxes) if (t._stickerEditOwnerId === editId) {
+      const w2 = t.widthM / 2, h2 = t.heightM / 2;
+      acc(t.center.x - w2, t.center.y - h2); acc(t.center.x + w2, t.center.y + h2);
+    }
+    if (!isFinite(minX)) return null;
+    // Etwas Padding (Welt-Einheiten) damit "Klick außerhalb" nicht direkt am Rand triggert.
+    const pad = 0.2;
+    return { minX: minX - pad, minY: minY - pad, maxX: maxX + pad, maxY: maxY + pad };
+  }
+
+  /** Prüft, ob der Mausklick außerhalb der aktuellen Edit-Bounding-Box liegt (zum Verlassen). */
+  isPointOutsideStickerEdit(mouseW: Vec2): boolean {
+    const b = this.getStickerEditWorldBounds();
+    if (!b) return true;
+    return mouseW.x < b.minX || mouseW.x > b.maxX || mouseW.y < b.minY || mouseW.y > b.maxY;
   }
 
   /** Hub für Sticker-Instanz: Länge = Skalierung %, Winkel = Rotation °. */
