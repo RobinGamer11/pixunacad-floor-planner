@@ -131,8 +131,10 @@ export class Dimension {
 export class Scene {
   segments: Segment[] = [];
   hatches: Hatch[] = [];
+  dimensions: Dimension[] = [];
   private _segIdMap = new Map<string, Segment>();
   private _hatchIdMap = new Map<string, Hatch>();
+  private _dimIdMap = new Map<string, Dimension>();
 
   private _makeId(): string {
     return (crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now() + Math.random());
