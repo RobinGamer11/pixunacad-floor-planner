@@ -985,15 +985,15 @@ const CadEditor: React.FC = () => {
 
         {/* Maßstab-Dialog vor Platzierung */}
         <Dialog open={!!scaleDialogPages} onOpenChange={(o) => { if (!o) setScaleDialogPages(null); }}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-sm">
             <DialogHeader>
-              <DialogTitle>Maßstab des Dokuments</DialogTitle>
+              <DialogTitle className="text-base">Maßstab des Dokuments</DialogTitle>
             </DialogHeader>
-            <div className="space-y-3 py-2">
-              <p className="text-xs text-muted-foreground">
-                In welchem Maßstab liegt der Plan vor? Das Dokument wird entsprechend in die Zeichenebene skaliert.
+            <div className="space-y-2 py-1">
+              <p className="text-[11px] text-muted-foreground">
+                In welchem Maßstab liegt der Plan vor?
               </p>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 gap-1.5">
                 {[
                   { v: "50", label: "1 : 50" },
                   { v: "100", label: "1 : 100" },
@@ -1001,37 +1001,42 @@ const CadEditor: React.FC = () => {
                   { v: "500", label: "1 : 500" },
                   { v: "1", label: "1 : 1" },
                   { v: "custom", label: "Frei…" },
-                ].map(opt => (
-                  <button
-                    key={opt.v}
-                    type="button"
-                    onClick={() => setScaleChoice(opt.v)}
-                    className={`cad-toolbar-btn justify-center h-10 text-xs ${scaleChoice === opt.v ? "active" : ""}`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
+                ].map(opt => {
+                  const active = scaleChoice === opt.v;
+                  return (
+                    <button
+                      key={opt.v}
+                      type="button"
+                      onClick={() => setScaleChoice(opt.v)}
+                      className="rounded-md h-9 text-xs font-semibold border transition-colors"
+                      style={{
+                        background: active ? "hsl(var(--primary))" : "hsl(var(--muted))",
+                        color: active ? "hsl(var(--primary-foreground))" : "hsl(var(--foreground))",
+                        borderColor: active ? "hsl(var(--primary))" : "hsl(var(--border))",
+                      }}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
               </div>
               {scaleChoice === "custom" && (
                 <div className="flex items-center gap-2 pt-1">
-                  <span className="text-xs text-muted-foreground">1 :</span>
+                  <span className="text-xs text-foreground">1 :</span>
                   <input
                     type="text"
                     value={scaleCustom}
                     onChange={(e) => setScaleCustom(e.target.value)}
-                    className="cad-settings-select flex-1"
+                    className="cad-settings-select flex-1 h-8 text-xs"
                     placeholder="z. B. 75"
                     autoFocus
                   />
                 </div>
               )}
-              <p className="text-[11px] text-muted-foreground pt-1">
-                Tipp: Du kannst den Maßstab später jederzeit über „Skalieren (2 Punkte)" oder „Skalieren (Maßkette)" feinjustieren.
-              </p>
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setScaleDialogPages(null)}>Abbrechen</Button>
-              <Button onClick={handleScaleConfirm}>Übernehmen & platzieren</Button>
+            <DialogFooter className="gap-2 sm:gap-2">
+              <Button variant="outline" size="sm" onClick={() => setScaleDialogPages(null)}>Abbrechen</Button>
+              <Button size="sm" onClick={handleScaleConfirm}>Übernehmen</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
