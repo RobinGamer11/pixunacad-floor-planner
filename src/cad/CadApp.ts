@@ -638,14 +638,44 @@ export class CadApp {
   showLineSettingsPanel(shouldShow: boolean) { this.lineSettingsPanel.classList.toggle("hidden", !shouldShow); }
   showHatchSettingsPanel(shouldShow: boolean) { this.hatchSettingsPanel.classList.toggle("hidden", !shouldShow); }
   showMeasureSettingsPanel(shouldShow: boolean) { this.measureRefs.panel.classList.toggle("hidden", !shouldShow); }
+  showTextSettingsPanel(shouldShow: boolean) { this.textRefs.panel.classList.toggle("hidden", !shouldShow); }
+
+  getCurrentTextStyle(): TextBoxStyle {
+    const sel = this.getSelectedTextBox();
+    if (sel) {
+      return {
+        textColor: sel.style.textColor, fontSizePx: sel.style.fontSizePx,
+        bgColor: sel.style.bgColor, bgAlphaPct: sel.style.bgAlphaPct,
+        wrap: sel.style.wrap, align: sel.style.align,
+        borderEnabled: sel.style.borderEnabled, borderColor: sel.style.borderColor,
+        borderWidthPx: sel.style.borderWidthPx,
+        labelId: sel.labelId,
+      };
+    }
+    return {
+      textColor: this.defaultTextColor, fontSizePx: this.defaultTextFontSizePx,
+      bgColor: this.defaultTextBgColor, bgAlphaPct: this.defaultTextBgAlphaPct,
+      wrap: this.defaultTextWrap, align: this.defaultTextAlign,
+      borderEnabled: this.defaultTextBorderEnabled, borderColor: this.defaultTextBorderColor,
+      borderWidthPx: this.defaultTextBorderWidthPx,
+      labelId: this.activeDrawLabelId || Defaults.defaultLabelId,
+    };
+  }
+
+  beginTextEdit(box: TextBox) {
+    this.showTextSettingsPanel(true);
+    this.textEditor.beginEdit(box);
+  }
 
   private _updateSettingsVisibility() {
     const isMeasureCtx = this.activeTool === this.measureTool || !!this.getSelectedDimension();
     const isHatchCtx = this.activeTool === this.hatchTool || !!(this.selection && this.selection.hatchId);
     const isLineCtx = this.activeTool === this.lineTool || !!(this.selection && this.selection.segmentId);
-    const showLine = isLineCtx || (!!this.selectedLabelId && !isMeasureCtx);
-    const showHatch = isHatchCtx || (!!this.selectedLabelId && !isMeasureCtx);
+    const isTextCtx = this.activeTool === this.textTool || !!this.getSelectedTextBox();
+    const showLine = isLineCtx || (!!this.selectedLabelId && !isMeasureCtx && !isTextCtx);
+    const showHatch = isHatchCtx || (!!this.selectedLabelId && !isMeasureCtx && !isTextCtx);
     const showMeasure = isMeasureCtx;
+    const showText = isTextCtx;
     this.showLineSettingsPanel(showLine);
     this.showHatchSettingsPanel(showHatch);
     this.showMeasureSettingsPanel(showMeasure);
