@@ -629,6 +629,15 @@ export class SelectTool {
       }
     }
 
+    // Double-click on a sticker instance → enter sticker edit mode
+    if (input.doubleClicked && !this.app.isStickerEditing()) {
+      const stickerHit = this._hitStickerInstance(input);
+      if (stickerHit) {
+        this.app.enterStickerEdit(stickerHit as any);
+        return;
+      }
+    }
+
     // Double-click on hatch edge → insert point
     if (input.doubleClicked) {
       const edgeHit = this._hitTestHatchEdge(input);
@@ -643,15 +652,26 @@ export class SelectTool {
     }
 
     if (input.clicked) {
-      // Sticker-Instanzen haben höchste Priorität (sie liegen visuell oben)
-      const stickerHit = this._hitStickerInstance(input);
-      if (stickerHit) {
-        this.app.setSelection({ type: SelectionType.STICKER_INSTANCE, stickerInstanceId: stickerHit.id });
-        // Drag vorbereiten (verschieben, solange Maustaste gedrückt bleibt)
-        this.dragStickerId = stickerHit.id;
-        this.dragStickerOrigin = { x: stickerHit.position.x, y: stickerHit.position.y };
-        this.dragStickerMouseStart = v(input.mouse.wx, input.mouse.wy);
-        return;
+      // Edit-Mode: Klick außerhalb der Bounding-Box verlässt ihn (vor allen anderen Hits).
+      if (this.app.isStickerEditing()) {
+        const mouseW = v(input.mouse.wx, input.mouse.wy);
+        if (this.app.isPointOutsideStickerEdit(mouseW)) {
+          this.app.exitStickerEdit();
+          this.app.clearSelection();
+          return;
+        }
+        // Innerhalb: ganz normal Innenobjekte selektieren (kein Sticker-Hit-Test, da die Instanz im Edit-Mode nicht existiert).
+      } else {
+        // Sticker-Instanzen haben höchste Priorität (sie liegen visuell oben)
+        const stickerHit = this._hitStickerInstance(input);
+        if (stickerHit) {
+          this.app.setSelection({ type: SelectionType.STICKER_INSTANCE, stickerInstanceId: stickerHit.id });
+          // Drag vorbereiten (verschieben, solange Maustaste gedrückt bleibt)
+          this.dragStickerId = stickerHit.id;
+          this.dragStickerOrigin = { x: stickerHit.position.x, y: stickerHit.position.y };
+          this.dragStickerMouseStart = v(input.mouse.wx, input.mouse.wy);
+          return;
+        }
       }
 
       // Textbox hits take priority — they sit on top visually

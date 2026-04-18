@@ -8,6 +8,8 @@ export class Segment {
   color: string;
   thicknessM: number;
   labelId: string;
+  /** Wenn gesetzt: dieses Objekt gehört zum Edit-Mode der Sticker-Instanz mit dieser ID. */
+  _stickerEditOwnerId?: string | null;
 
   constructor({ id, a, b, color, thicknessM, labelId }: { id: string; a: Vec2; b: Vec2; color?: string; thicknessM?: number; labelId?: string }) {
     this.id = id;
@@ -16,6 +18,7 @@ export class Segment {
     this.color = color || Defaults.lineColor;
     this.thicknessM = (typeof thicknessM === "number" && thicknessM > 0) ? thicknessM : Defaults.lineThicknessM;
     this.labelId = labelId || Defaults.defaultLabelId;
+    this._stickerEditOwnerId = null;
   }
 }
 
@@ -38,6 +41,7 @@ export class Hatch {
   strokeWidthPx: number;
   labelId: string;
   areaLabel: AreaLabel;
+  _stickerEditOwnerId?: string | null;
 
   constructor({ id, points, fillColor, strokeColor, fillAlphaPct, strokeWidthPx, labelId, areaLabel }: {
     id: string; points: Vec2[]; fillColor?: string; strokeColor?: string;
@@ -59,6 +63,7 @@ export class Hatch {
       offsetX: Number.isFinite(areaLabel?.offsetX) ? areaLabel!.offsetX! : 0,
       offsetY: Number.isFinite(areaLabel?.offsetY) ? areaLabel!.offsetY! : 0,
     };
+    this._stickerEditOwnerId = null;
   }
 }
 
@@ -100,6 +105,7 @@ export class Dimension {
   textBgAlpha: number;
 
   labelId: string;
+  _stickerEditOwnerId?: string | null;
 
   constructor({ id, p1, p2, placementPoint, mode, refDir, style, labelId }: {
     id: string; p1: Vec2; p2: Vec2; placementPoint: Vec2;
@@ -125,6 +131,7 @@ export class Dimension {
     this.textBgColor = s.textBgColor || Defaults.measureTextBgColor;
     this.textBgAlpha = (typeof s.textBgAlpha === "number") ? clamp(s.textBgAlpha, 0, 1) : Defaults.measureTextBgAlpha;
     this.labelId = labelId || s.labelId || Defaults.defaultLabelId;
+    this._stickerEditOwnerId = null;
   }
 }
 
@@ -150,6 +157,7 @@ export class TextBox {
   html: string;
   style: Required<Omit<TextBoxStyle, "labelId">>;
   labelId: string;
+  _stickerEditOwnerId?: string | null;
 
   constructor({ id, center, widthM, heightM, rotationRad, html, style, labelId }: {
     id: string; center: Vec2; widthM: number; heightM: number;
@@ -174,6 +182,7 @@ export class TextBox {
       borderWidthPx: clamp(s.borderWidthPx ?? Defaults.textBorderWidthPx, 0, 30),
     };
     this.labelId = labelId || s.labelId || Defaults.defaultLabelId;
+    this._stickerEditOwnerId = null;
   }
 }
 
@@ -215,6 +224,12 @@ export class Scene {
   dimensions: Dimension[] = [];
   textBoxes: TextBox[] = [];
   stickerInstances: StickerInstance[] = [];
+  /**
+   * Wenn !== null: alle danach via create* erzeugten Objekte werden mit dieser
+   * Sticker-Edit-Owner-ID markiert. Wird von CadApp während enterStickerEdit
+   * gesetzt und beim Exit wieder geleert.
+   */
+  _currentEditOwnerId: string | null = null;
   private _segIdMap = new Map<string, Segment>();
   private _hatchIdMap = new Map<string, Hatch>();
   private _dimIdMap = new Map<string, Dimension>();
@@ -292,6 +307,7 @@ export class Scene {
     const box = new TextBox({
       id: this._makeId(), center, widthM, heightM, rotationRad, html, style, labelId: style.labelId,
     });
+    box._stickerEditOwnerId = this._currentEditOwnerId;
     this.textBoxes.push(box);
     this._rebuildTextIdMap();
     return box;
@@ -335,6 +351,7 @@ export class Scene {
   // ---- Dimensions ----
   createDimension(p1: Vec2, p2: Vec2, placementPoint: Vec2, mode: "parallel" | "diagonal", refDir: Vec2 | null, style: DimensionStyle = {}) {
     const dim = new Dimension({ id: this._makeId(), p1, p2, placementPoint, mode, refDir, style, labelId: style.labelId });
+    dim._stickerEditOwnerId = this._currentEditOwnerId;
     this.dimensions.push(dim);
     this._rebuildDimIdMap();
     return dim;
@@ -378,6 +395,7 @@ export class Scene {
   // ---- Segments ----
   createSegment(a: Vec2, b: Vec2, style: { color?: string; thicknessM?: number; labelId?: string } = {}) {
     const seg = new Segment({ id: this._makeId(), a, b, color: style.color, thicknessM: style.thicknessM, labelId: style.labelId });
+    seg._stickerEditOwnerId = this._currentEditOwnerId;
     this.segments.push(seg);
     this._rebuildSegIdMap();
     return seg;
@@ -442,6 +460,7 @@ export class Scene {
       fillAlphaPct: style.fillAlphaPct, strokeWidthPx: style.strokeWidthPx,
       labelId: style.labelId, areaLabel: style.areaLabel,
     });
+    hatch._stickerEditOwnerId = this._currentEditOwnerId;
     this.hatches.push(hatch);
     this._rebuildHatchIdMap();
     return hatch;
