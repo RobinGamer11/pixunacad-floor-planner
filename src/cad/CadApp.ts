@@ -1161,6 +1161,52 @@ export class CadApp {
     this.canvas.style.cursor = "";
   }
 
+  /* ---- Sticker library ---- */
+  createStickerFromSelection(name: string): StickerDefinition | null {
+    const def = buildStickerFromSelection(this, name);
+    if (!def) return null;
+    this.stickers.push(def);
+    this.onStickersChange?.();
+    return def;
+  }
+
+  renameSticker(id: string, name: string): boolean {
+    const s = this.stickers.find(x => x.id === id);
+    if (!s) return false;
+    s.name = name.trim() || s.name;
+    this.onStickersChange?.();
+    return true;
+  }
+
+  removeSticker(id: string): boolean {
+    const before = this.stickers.length;
+    this.stickers = this.stickers.filter(s => s.id !== id);
+    if (this.stickers.length === before) return false;
+    if (this.stickerTool.activeDef?.id === id) this.stickerTool.cancel();
+    this.onStickersChange?.();
+    return true;
+  }
+
+  beginStickerPlacement(id: string) {
+    const def = this.stickers.find(s => s.id === id);
+    if (!def) return;
+    if (this.activeTool !== this.stickerTool) this.setTool(ToolIds.STICKER);
+    this.stickerTool.beginPlacement(def);
+    this.onStickersChange?.();
+  }
+
+  exportStickers(): string {
+    return exportStickersToJson(this.stickers);
+  }
+
+  importStickers(json: string): number {
+    const incoming = importStickersFromJson(json);
+    if (incoming.length === 0) return 0;
+    this.stickers.push(...incoming);
+    this.onStickersChange?.();
+    return incoming.length;
+  }
+
   private _commitPasteAtMouse() {
     if (!this.clipboard) { this.cancelPastePreview(); return; }
     const mw = v(this.input.mouse.wx, this.input.mouse.wy);
