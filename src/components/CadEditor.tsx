@@ -368,12 +368,20 @@ const CadEditor: React.FC = () => {
     setScaleDialogPages(selectedPages);
   }, [docPickerPages, docPickerSelected]);
 
-  /** Maßstab anwenden: skaliert die Welt-Größe mit dem Nenner. Beispiel: 1:100 → ×100. */
+  /**
+   * Maßstab anwenden. Referenz ist 1:100.
+   * 1:50  → ×0.5  (halb so groß wie 1:100, weil weniger Welt pro Papierfläche)
+   * 1:100 → ×1
+   * 1:200 → ×2    (doppelt so groß: ein A4-Blatt zeigt mehr Realität)
+   * 1:500 → ×5
+   * 1:1   → ×0.01 (1 cm Papier = 1 cm Welt)
+   */
   const handleScaleConfirm = useCallback(() => {
     if (!scaleDialogPages) return;
     const app = appRef.current; if (!app) return;
     const denom = scaleChoice === "custom" ? parseFloat(scaleCustom.replace(",", ".")) : parseFloat(scaleChoice);
-    const factor = Number.isFinite(denom) && denom > 0 ? denom : 1;
+    const safeDenom = Number.isFinite(denom) && denom > 0 ? denom : 100;
+    const factor = safeDenom / 100;
     const scaledPages = scaleDialogPages.map(p => ({ ...p, widthM: p.widthM * factor, heightM: p.heightM * factor }));
     const [first, ...rest] = scaledPages;
     app.setTool(ToolIds.DOCUMENT);
