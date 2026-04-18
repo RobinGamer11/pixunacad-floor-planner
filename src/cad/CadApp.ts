@@ -1326,6 +1326,7 @@ export class CadApp {
       if (e.key === "o" || e.key === "O") this.setTool(ToolIds.STICKER);
 
       if (e.key === "Escape") {
+        if (this.isStickerEditing()) { this.exitStickerEdit(); this.clearSelection(); return; }
         if (this.pastePreviewActive) { this.cancelPastePreview(); return; }
         if (this.activeTool === this.lineTool) { this.lineTool.cancel(); this.clearSelection(); this.setSelectedLabelId(null); this.setTool(ToolIds.SELECT); return; }
         if (this.activeTool === this.hatchTool) { this.hatchTool.cancel(); this.clearSelection(); this.setTool(ToolIds.SELECT); return; }
