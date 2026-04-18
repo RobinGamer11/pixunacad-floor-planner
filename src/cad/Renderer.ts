@@ -9,6 +9,7 @@ export interface Selection {
   type: string;
   segmentId?: string;
   hatchId?: string;
+  dimensionId?: string;
   pointIndex?: number | null;
 }
 
