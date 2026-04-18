@@ -49,6 +49,7 @@ export class SelectTool {
     this.app.pointEditMenu.hide();
     this.app.hub.hide();
     this.app.renderer.setHoverSegmentId(null);
+    this.dragDimId = null;
   }
 
   finish() {}
