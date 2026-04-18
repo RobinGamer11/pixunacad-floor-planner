@@ -40,22 +40,23 @@
 
     /* CAD-specific tokens — canvas intentionally untouched */
     --cad-canvas: 0 0% 100%;
-    --cad-toolbar: 222 28% 14%;
-    --cad-toolbar-border: 222 24% 22%;
-    --cad-toolbar-foreground: 220 18% 88%;
+    --cad-toolbar: 222 20% 22%;
+    --cad-toolbar-border: 222 16% 32%;
+    --cad-toolbar-foreground: 220 18% 92%;
     --cad-toolbar-muted: 220 12% 62%;
-    --cad-toolbar-hover: 222 24% 20%;
+    --cad-toolbar-hover: 222 16% 28%;
     --cad-toolbar-active: 230 80% 62%;
     --cad-toolbar-active-foreground: 0 0% 100%;
-    --cad-hub: 222 28% 16%;
-    --cad-hub-border: 222 24% 26%;
+    --cad-hub: 222 18% 28%;
+    --cad-hub-border: 222 14% 38%;
     --cad-grid: 220 10% 92%;
     --cad-axis: 215 80% 65%;
     --cad-snap-point: 215 90% 55%;
     --cad-snap-line: 215 70% 65%;
     --cad-selection-stroke: 215 90% 55%;
     --cad-selection-fill: 215 90% 55%;
-    --cad-settings-bg: 222 28% 16%;
+    --cad-settings-bg: 222 16% 34%;
+    --cad-tools-bg: 222 20% 22%;
 
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
@@ -97,19 +98,20 @@
     --ring: 215 90% 55%;
 
     --cad-canvas: 224 20% 6%;
-    --cad-toolbar: 224 18% 10%;
-    --cad-toolbar-border: 220 14% 18%;
+    --cad-toolbar: 222 16% 18%;
+    --cad-toolbar-border: 222 12% 28%;
     --cad-toolbar-active: 215 90% 55%;
     --cad-toolbar-active-foreground: 0 0% 100%;
-    --cad-hub: 224 18% 12%;
-    --cad-hub-border: 220 14% 22%;
+    --cad-hub: 222 14% 24%;
+    --cad-hub-border: 222 10% 34%;
     --cad-grid: 220 10% 12%;
     --cad-axis: 215 60% 35%;
     --cad-snap-point: 215 90% 55%;
     --cad-snap-line: 215 60% 45%;
     --cad-selection-stroke: 215 90% 55%;
     --cad-selection-fill: 215 90% 55%;
-    --cad-settings-bg: 224 18% 12%;
+    --cad-settings-bg: 222 12% 30%;
+    --cad-tools-bg: 222 16% 18%;
 
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
@@ -208,10 +210,9 @@
   }
 
   .cad-settings-panel {
-    @apply rounded-lg border-0 p-3 space-y-3;
-    background: transparent;
-    border-color: transparent;
-    box-shadow: none;
+    @apply rounded-lg border p-3 space-y-3;
+    background: hsl(var(--cad-settings-bg));
+    border-color: hsl(var(--cad-hub-border));
     color: hsl(var(--cad-toolbar-foreground));
   }
 
