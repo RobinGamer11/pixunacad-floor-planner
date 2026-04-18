@@ -54,6 +54,14 @@ export const Defaults = {
   textBoxHeightM: 0.6,
   textMinBoxSizeM: 0.05,
   textHandlePx: 10,
+
+  // Document import defaults
+  // 96 DPI assumption: 96 px = 1 inch = 0.0254 m -> 1 px = 0.0254/96 m
+  documentMetersPerPx: 0.0254 / 96,
+  // 72 pt = 1 inch -> 1 pt = 0.0254/72 m  (PDF point convention)
+  documentMetersPerPdfPt: 0.0254 / 72,
+  // Render PDF pages at this device-pixel scale for crisper bitmaps
+  documentPdfRenderScale: 2,
 };
 
 export const ToolIds = {
@@ -64,6 +72,7 @@ export const ToolIds = {
   TEXT: "text",
   PIPETTE: "pipette",
   STICKER: "sticker",
+  DOCUMENT: "document",
 } as const;
 
 export const SelectionType = {
@@ -74,6 +83,7 @@ export const SelectionType = {
   TEXTBOX: "textbox",
   TEXTBOX_HANDLE: "textbox_handle",
   STICKER_INSTANCE: "sticker_instance",
+  DOCUMENT: "document",
 } as const;
 
 export const SnapType = {
