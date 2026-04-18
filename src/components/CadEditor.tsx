@@ -280,6 +280,25 @@ const CadEditor: React.FC = () => {
     return () => clearTimeout(t);
   }, [sidebarCollapsed]);
 
+  // Drawing scale → Camera scale (M 1:100 ⇒ 80 px/m). Zoomt um den Viewport-Mittelpunkt.
+  useEffect(() => {
+    const app = appRef.current;
+    if (!app) return;
+    const cam = app.camera;
+    const target = 80 * (100 / Math.max(0.0001, drawingScale));
+    const newScale = Math.max(cam.minScale, Math.min(cam.maxScale, target));
+    if (Math.abs(newScale - cam.scale) < 1e-6) return;
+    const rect = canvasRef.current?.getBoundingClientRect();
+    const pivotSx = rect ? rect.width / 2 : cam.offsetX;
+    const pivotSy = rect ? rect.height / 2 : cam.offsetY;
+    const before = cam.screenToWorld(pivotSx, pivotSy);
+    cam.scale = newScale;
+    const after = cam.screenToWorld(pivotSx, pivotSy);
+    cam.offsetX += (after.x - before.x) * cam.scale;
+    cam.offsetY += (after.y - before.y) * cam.scale;
+  }, [drawingScale]);
+
+
   // Floating Edit-Pencil neben ausgewählter Sticker-Instanz (Polling per RAF).
   useEffect(() => {
     let raf = 0;
