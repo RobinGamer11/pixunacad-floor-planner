@@ -731,8 +731,7 @@ export class HatchTool {
       }
 
       if (input.clicked) this._onClick(input);
-    } else {
-      // rectangle mode
+    } else if (this.drawMode === "rectangle") {
       if (this.rectState !== "idle") {
         const metrics = this._rectPreviewMetrics(input);
         this.app.hub.showAt(input.mouse.sx, input.mouse.sy);
@@ -741,6 +740,25 @@ export class HatchTool {
         this.app.hub.hide();
       }
       if (input.clicked) this._onRectClick(input);
+    } else {
+      // circle mode
+      if (this.circleState === "radius") {
+        const metrics = this._circlePreviewMetrics(input);
+        this.app.hub.showAt(input.mouse.sx, input.mouse.sy);
+        this.app.hub.updateDisplay(metrics.lengthM, metrics.angleDeg);
+      } else if (this.circleState === "arc") {
+        this.circleEndAngleDeg = this._circlePreviewArcEndAngle(input);
+        this.app.hub.showAt(input.mouse.sx, input.mouse.sy);
+        this.app.hub.updateDisplay(this.circleRadiusM, this.circleEndAngleDeg);
+      } else {
+        this.app.hub.hide();
+      }
+
+      if (input.doubleClicked && this.circleState === "arc") {
+        this._finishCircle(true);
+        return;
+      }
+      if (input.clicked) this._onCircleClick(input);
     }
   }
 
