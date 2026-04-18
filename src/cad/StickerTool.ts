@@ -257,6 +257,22 @@ export class StickerTool {
 
     // Im idle-Modus: Klick auf existierende Sticker-Instanz wählt sie aus + startet Drag
     if (this.phase === "idle" && input.clicked) {
+      // Eck-Handle der bereits selektierten Sticker-Instanz? → Rotate+Scale-Drag
+      const cornerHit = this._hitStickerCorner(input);
+      if (cornerHit) {
+        const inst = this.app.scene.getStickerInstanceById(cornerHit.instId);
+        if (inst) {
+          const mouseW0 = v(input.mouse.wx, input.mouse.wy);
+          const dx0 = mouseW0.x - inst.position.x;
+          const dy0 = mouseW0.y - inst.position.y;
+          this._cornerDragStickerId = inst.id;
+          this._cornerDragStartAngle = Math.atan2(dy0, dx0);
+          this._cornerDragStartDist = Math.hypot(dx0, dy0);
+          this._cornerDragInitRot = inst.rotationRad;
+          this._cornerDragInitScale = inst.scale;
+          return;
+        }
+      }
       const hit = this._hitStickerInstance(input);
       if (hit) {
         this.app.setSelection({ type: SelectionType.STICKER_INSTANCE, stickerInstanceId: hit.id });
