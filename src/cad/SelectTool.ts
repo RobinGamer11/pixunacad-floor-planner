@@ -70,6 +70,9 @@ export class SelectTool {
     this.app.renderer.setHoverSegmentId(null);
     this.app.renderer.setHoverTextBoxId(null);
     this.dragDimId = null;
+    this.dragDocId = null;
+    this.dragDocGrabOffset = null;
+    this.dragDocSnap = null;
   }
 
   finish() {}
