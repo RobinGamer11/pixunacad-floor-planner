@@ -339,6 +339,11 @@ export class CadApp {
       })),
       labels: this.labelManager.list().map(l => ({ ...l })),
       stickers: this.stickers.map(s => ({ id: s.id, name: s.name, items: s.items, createdAt: s.createdAt })),
+      stickerInstances: this.scene.stickerInstances.map(si => ({
+        id: si.id, defId: si.defId, name: si.name, items: si.items,
+        position: { x: si.position.x, y: si.position.y },
+        rotationRad: si.rotationRad, scale: si.scale, labelId: si.labelId,
+      })),
     });
   }
 
@@ -354,10 +359,12 @@ export class CadApp {
     this.scene.hatches = [];
     this.scene.dimensions = [];
     this.scene.textBoxes = [];
+    this.scene.stickerInstances = [];
     (this.scene as any)._rebuildSegIdMap?.();
     (this.scene as any)._rebuildHatchIdMap?.();
     (this.scene as any)._rebuildDimIdMap?.();
     (this.scene as any)._rebuildTextIdMap?.();
+    (this.scene as any)._rebuildStickerIdMap?.();
     // Re-add segments
     for (const s of data.segments || []) {
       this.scene.createSegment(s.a, s.b, { color: s.color, thicknessM: s.thicknessM, labelId: s.labelId });
