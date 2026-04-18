@@ -9,9 +9,9 @@ import { documentCenterWorld, documentCornersWorld, scaleDocumentAroundCenter } 
 type Phase =
   | "idle"
   | "placing"          // gerade importiertes Dokument folgt der Maus, Klick setzt es ab
-  | "scale-pick-1"     // Dokument selektiert, wartet auf 1. Skalier-Punkt
-  | "scale-pick-2"     // 1. Punkt gesetzt, wartet auf 2. Punkt
-  | "scale-await-input"; // beide Punkte gesetzt, Hub eingeblendet
+  | "scale-pick-1"     // Dokument selektiert, wartet auf 1. Skalier-Punkt (Start Ist-Strecke)
+  | "scale-pick-2"     // 1. Punkt gesetzt, wartet auf 2. Punkt (Ende Ist-Strecke)
+  | "scale-pick-3";    // Ist-Strecke fixiert, wartet auf 3. Punkt entlang derselben Richtung (= Soll-Länge)
 
 /**
  * DocumentTool: PDF/JPG/PNG-Import & Maßstabs-Skalierung.
