@@ -975,6 +975,59 @@ const CadEditor: React.FC = () => {
           </DialogContent>
         </Dialog>
 
+        {/* Maßstab-Dialog vor Platzierung */}
+        <Dialog open={!!scaleDialogPages} onOpenChange={(o) => { if (!o) setScaleDialogPages(null); }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Maßstab des Dokuments</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 py-2">
+              <p className="text-xs text-muted-foreground">
+                In welchem Maßstab liegt der Plan vor? Das Dokument wird entsprechend in die Zeichenebene skaliert.
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { v: "50", label: "1 : 50" },
+                  { v: "100", label: "1 : 100" },
+                  { v: "200", label: "1 : 200" },
+                  { v: "500", label: "1 : 500" },
+                  { v: "1", label: "1 : 1" },
+                  { v: "custom", label: "Frei…" },
+                ].map(opt => (
+                  <button
+                    key={opt.v}
+                    type="button"
+                    onClick={() => setScaleChoice(opt.v)}
+                    className={`cad-toolbar-btn justify-center h-10 text-xs ${scaleChoice === opt.v ? "active" : ""}`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              {scaleChoice === "custom" && (
+                <div className="flex items-center gap-2 pt-1">
+                  <span className="text-xs text-muted-foreground">1 :</span>
+                  <input
+                    type="text"
+                    value={scaleCustom}
+                    onChange={(e) => setScaleCustom(e.target.value)}
+                    className="cad-settings-select flex-1"
+                    placeholder="z. B. 75"
+                    autoFocus
+                  />
+                </div>
+              )}
+              <p className="text-[11px] text-muted-foreground pt-1">
+                Tipp: Du kannst den Maßstab später jederzeit über „Skalieren (2 Punkte)" oder „Skalieren (Maßkette)" feinjustieren.
+              </p>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setScaleDialogPages(null)}>Abbrechen</Button>
+              <Button onClick={handleScaleConfirm}>Übernehmen & platzieren</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         {/* Collapse toggle */}
         <button
           onClick={() => setSidebarCollapsed((v) => !v)}
