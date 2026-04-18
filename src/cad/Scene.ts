@@ -245,6 +245,48 @@ export class Scene {
     for (const t of this.textBoxes) this._textIdMap.set(t.id, t);
   }
 
+  private _rebuildStickerIdMap() {
+    this._stickerIdMap.clear();
+    for (const s of this.stickerInstances) this._stickerIdMap.set(s.id, s);
+  }
+
+  // ---- Sticker Instances ----
+  createStickerInstance(opts: {
+    defId?: string | null; name?: string;
+    items: StickerInstanceItem[];
+    position: Vec2; rotationRad?: number; scale?: number; labelId?: string;
+  }): StickerInstance {
+    const inst = new StickerInstance({ id: this._makeId(), ...opts });
+    this.stickerInstances.push(inst);
+    this._rebuildStickerIdMap();
+    return inst;
+  }
+
+  getStickerInstanceById(id: string): StickerInstance | null { return this._stickerIdMap.get(id) || null; }
+
+  getStickerInstancesByLabelId(labelId: string): StickerInstance[] {
+    return this.stickerInstances.filter(s => s.labelId === labelId);
+  }
+
+  removeStickerInstance(inst: StickerInstance) {
+    this.stickerInstances = this.stickerInstances.filter(s => s !== inst);
+    this._rebuildStickerIdMap();
+  }
+
+  removeStickerInstancesByLabelId(labelId: string) {
+    this.stickerInstances = this.stickerInstances.filter(s => s.labelId !== labelId);
+    this._rebuildStickerIdMap();
+  }
+
+  reassignStickerInstancesLabel(oldId: string, newId: string) {
+    for (const s of this.stickerInstances) if (s.labelId === oldId) s.labelId = newId;
+  }
+
+  assignStickerInstancesToLabel(ids: string[], newId: string) {
+    const set = new Set(ids);
+    for (const s of this.stickerInstances) if (set.has(s.id)) s.labelId = newId;
+  }
+
   // ---- TextBoxes ----
   createTextBox(center: Vec2, widthM: number, heightM: number, style: TextBoxStyle = {}, html: string = "", rotationRad: number = 0) {
     const box = new TextBox({
