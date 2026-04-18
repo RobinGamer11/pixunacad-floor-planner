@@ -732,20 +732,19 @@ export class SelectTool {
         }
         // Innerhalb: ganz normal Innenobjekte selektieren (kein Sticker-Hit-Test, da die Instanz im Edit-Mode nicht existiert).
       } else {
-        // Eck-Handle der bereits selektierten Sticker-Instanz? → Rotate+Scale-Drag starten
+        // Eck-Handle der bereits selektierten Sticker-Instanz? → Translate-Drag mit Eckpunkt als Greifanker
         const cornerHit = this._hitStickerCorner(input);
         if (cornerHit) {
           const inst = this.app.scene.getStickerInstanceById(cornerHit.instId);
           if (inst) {
-            const mouseW0 = v(input.mouse.wx, input.mouse.wy);
-            const dx0 = mouseW0.x - inst.position.x;
-            const dy0 = mouseW0.y - inst.position.y;
-            this.cornerDragStickerId = inst.id;
-            this.cornerDragCornerIndex = cornerHit.cornerIndex;
-            this.cornerDragStartAngle = Math.atan2(dy0, dx0);
-            this.cornerDragStartDist = Math.hypot(dx0, dy0);
-            this.cornerDragInitRot = inst.rotationRad;
-            this.cornerDragInitScale = inst.scale;
+            const corners = instanceBoundingCornersWorld(inst.items as any, inst.position, inst.rotationRad, inst.scale);
+            const cornerW = corners[cornerHit.cornerIndex];
+            this.dragStickerId = inst.id;
+            this.dragStickerOrigin = { x: inst.position.x, y: inst.position.y };
+            this.dragStickerMouseStart = { x: cornerW.x, y: cornerW.y };
+            // Greifpunkt = Eckpunkt: offset = corner - position
+            this.dragStickerGrabOffset = { x: cornerW.x - inst.position.x, y: cornerW.y - inst.position.y };
+            this.dragStickerSnap = null;
             return;
           }
         }
