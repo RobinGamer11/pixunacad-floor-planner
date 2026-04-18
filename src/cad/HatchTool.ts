@@ -559,12 +559,85 @@ export class HatchTool {
     this.rectState = "idle";
     this.rectPointA = null;
     this.rectPointB = null;
+    this._resetCircleState();
     this.hubLocked = false;
     this.hubLengthM = null;
     this.hubAngleDeg = null;
     this.startReferenceEdge = null;
     this.startPointReference = null;
   }
+
+  /* ---- Circle helpers ---- */
+
+  private _circlePreviewRadiusWorld(input: Input): Vec2 {
+    if (!this.circleCenter) return this._rawPreviewWorld(input);
+    if (this.hubLocked && this.hubLengthM != null && this.hubAngleDeg != null && this.circleState === "radius") {
+      return pointFromLengthAngle(this.circleCenter, this.hubLengthM, this.hubAngleDeg);
+    }
+    let p = this._rawPreviewWorld(input);
+    if (input.keys.shift) p = orthoSnapFromA(this.circleCenter, p);
+    return p;
+  }
+
+  private _circlePreviewMetrics(input: Input) {
+    if (!this.circleCenter) return { lengthM: 0, angleDeg: 0 };
+    if (this.circleState === "radius") {
+      const p = this._circlePreviewRadiusWorld(input);
+      return { lengthM: dist(this.circleCenter, p), angleDeg: angleDeg(this.circleCenter, p) };
+    }
+    if (this.circleState === "arc") {
+      return { lengthM: this.circleRadiusM, angleDeg: this._circlePreviewArcEndAngle(input) };
+    }
+    return { lengthM: 0, angleDeg: 0 };
+  }
+
+  private _circlePreviewArcEndAngle(input: Input): number {
+    if (!this.circleCenter) return 0;
+    if (this.hubLocked && this.hubAngleDeg != null && this.circleState === "arc") {
+      return normalizeDeg(this.hubAngleDeg);
+    }
+    let p = this._rawPreviewWorld(input);
+    if (input.keys.shift) p = orthoSnapFromA(this.circleCenter, p);
+    return normalizeDeg(angleDeg(this.circleCenter, p));
+  }
+
+  private _finishCircle(forceFullCircle: boolean) {
+    if (!this.circleCenter || this.circleRadiusM <= Defaults.minSegLenM) return;
+    const points = forceFullCircle
+      ? buildCircleOrSectorPoints(this.circleCenter, this.circleRadiusM, 0, 360, 96)
+      : buildCircleOrSectorPoints(this.circleCenter, this.circleRadiusM, this.circleStartAngleDeg, this.circleEndAngleDeg, 96);
+    if (!points || points.length < 3) return;
+    this._finishAndCreateHatch(points);
+  }
+
+  private _onCircleClick(input: Input) {
+    if (this.circleState === "idle") {
+      const p = this.app.topology.resolveSnapPoint(this.snap, this._rawPreviewWorld(input));
+      this.circleCenter = v(p.x, p.y);
+      this.circleState = "radius";
+      this.hubLocked = false;
+      this.hubLengthM = null;
+      this.hubAngleDeg = null;
+      return;
+    }
+    if (this.circleState === "radius") {
+      const metrics = this._circlePreviewMetrics(input);
+      this.circleRadiusM = metrics.lengthM;
+      this.circleStartAngleDeg = metrics.angleDeg;
+      this.circleEndAngleDeg = metrics.angleDeg;
+      if (this.circleRadiusM <= Defaults.minSegLenM) return;
+      this.circleState = "arc";
+      this.hubLocked = false;
+      this.hubLengthM = this.circleRadiusM;
+      this.hubAngleDeg = this.circleStartAngleDeg;
+      return;
+    }
+    if (this.circleState === "arc") {
+      this.circleEndAngleDeg = this._circlePreviewArcEndAngle(input);
+      this._finishCircle(false);
+    }
+  }
+
 
   /* ---- Rectangle helpers ---- */
 
