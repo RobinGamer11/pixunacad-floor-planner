@@ -269,6 +269,7 @@ export class CadApp {
     this.hatchTool = new HatchTool(this);
     this.measureTool = new MeasureTool(this);
     this.textTool = new TextTool(this);
+    this.pipetteTool = new PipetteTool(this);
     this.activeTool = this.selectTool;
 
     this.idPanel = new IdPanel(this, idPanelRoot, idPanelBody, idPanelList, idPanelAddBtn, idPanelToggleBtn);
@@ -1088,12 +1089,14 @@ export class CadApp {
   }
 
   setTool(id: string) {
+    if (this.pastePreviewActive) this.cancelPastePreview();
     if (this.activeTool && this.activeTool.cancel) this.activeTool.cancel();
     if (id === ToolIds.SELECT) { this.activeTool = this.selectTool; this.selectTool.activate(); }
     else if (id === ToolIds.LINE) { this.activeTool = this.lineTool; this.lineTool.activate(); }
     else if (id === ToolIds.HATCH) { this.activeTool = this.hatchTool; this.hatchTool.activate(); }
     else if (id === ToolIds.MEASURE) { this.activeTool = this.measureTool; this.measureTool.activate(); }
     else if (id === ToolIds.TEXT) { this.activeTool = this.textTool; this.textTool.activate(); }
+    else if (id === ToolIds.PIPETTE) { this.activeTool = this.pipetteTool; this.pipetteTool.activate(); }
     this._syncLineSettingsFromContext();
     this._syncHatchSettingsFromContext();
     this._syncMeasureSettingsFromContext();
