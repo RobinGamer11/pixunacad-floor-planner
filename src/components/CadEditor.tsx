@@ -425,7 +425,7 @@ const CadEditor: React.FC = () => {
       offX += p.widthM + 0.5;
     }
     setScaleDialogPages(null);
-  }, [scaleDialogPages, scaleChoice, scaleCustom]);
+  }, [scaleDialogPages, scaleChoice, scaleCustom, drawingScale]);
 
   const sidebarWidth = sidebarCollapsed ? 56 : 240;
 
