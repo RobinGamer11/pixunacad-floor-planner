@@ -578,11 +578,20 @@ export class SelectTool {
     if (input.clicked) {
       const hit = this._hitTestWithForegroundPriority(input);
       this.app.setSelection(hit);
-      if (hit && hit.segmentId) {
+      if (hit && (hit as any).segmentId) {
         this.app.showLineSettingsPanel(true);
       }
-      if (hit && hit.hatchId) {
+      if (hit && (hit as any).hatchId) {
         this.app.showHatchSettingsPanel(true);
+      }
+      if (hit && hit.type === SelectionType.DIMENSION) {
+        const dim = this.app.scene.getDimensionById((hit as any).dimensionId);
+        if (dim) {
+          const g = getDimensionGeometry(dim);
+          const mouseW = v(input.mouse.wx, input.mouse.wy);
+          this.dragDimId = dim.id;
+          this.dragDimOffsetAlongNormal = dot(sub(mouseW, dim.p1), g.n) - g.offset;
+        }
       }
     }
 
