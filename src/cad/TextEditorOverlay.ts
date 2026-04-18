@@ -53,6 +53,10 @@ export class TextEditorOverlay {
       if (!this.isActive()) return;
       const t = e.target as Node;
       if (this.el.contains(t) || this.toolbarEl.contains(t)) return;
+      // While the TextTool is active, let the tool handle commit on its own
+      // click — that way the click is consumed only as a "commit + show preview"
+      // step, and a *second* click is needed to place the next box.
+      if (this.app.activeTool === this.app.textTool) return;
       this.commit();
     };
     document.addEventListener("mousedown", this._onDocMouseDown);
