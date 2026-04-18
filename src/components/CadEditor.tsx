@@ -4,6 +4,7 @@ import { ToolIds, PointEditAction } from "@/cad/constants";
 import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Pipette, Sticker as StickerIcon, Pencil, Trash2, Download, Upload, Plus } from "lucide-react";
 import type { HatchDrawMode } from "@/cad/HatchTool";
 import type { StickerDefinition } from "@/cad/StickerManager";
+import { instanceBoundingCornersWorld } from "@/cad/StickerManager";
 
 const CAD_TOOLS = [
   { id: ToolIds.SELECT, label: "Auswahl", key: "V", icon: MousePointer2 },
@@ -117,6 +118,8 @@ const CadEditor: React.FC = () => {
   const [stickerSelCount, setStickerSelCount] = useState(0);
   const [stickerPhase, setStickerPhase] = useState<"idle" | "selecting" | "placing" | "rotating">("idle");
   const stickerImportRef = useRef<HTMLInputElement>(null);
+  // Floating edit-pencil overlay near selected sticker instance
+  const [stickerEditOverlay, setStickerEditOverlay] = useState<{ id: string; x: number; y: number } | null>(null);
 
   useEffect(() => {
     if (
@@ -255,6 +258,30 @@ const CadEditor: React.FC = () => {
     const t = setTimeout(() => appRef.current?.resize(), 180);
     return () => clearTimeout(t);
   }, [sidebarCollapsed]);
+
+  // Floating Edit-Pencil neben ausgewählter Sticker-Instanz (Polling per RAF).
+  useEffect(() => {
+    let raf = 0;
+    const tick = () => {
+      const app = appRef.current;
+      if (app) {
+        const inst = app.getSelectedStickerInstance?.();
+        if (inst && !app.isStickerEditing()) {
+          const corners = instanceBoundingCornersWorld(inst.items as any, inst.position, inst.rotationRad, inst.scale);
+          let maxX = -Infinity, minY = Infinity;
+          for (const c of corners) { if (c.x > maxX) maxX = c.x; if (c.y < minY) minY = c.y; }
+          const sp = app.camera.worldToScreen(maxX, minY);
+          const next = { id: inst.id, x: sp.x, y: sp.y };
+          setStickerEditOverlay(prev => (prev && prev.id === next.id && Math.abs(prev.x - next.x) < 0.5 && Math.abs(prev.y - next.y) < 0.5) ? prev : next);
+        } else {
+          setStickerEditOverlay(prev => prev ? null : prev);
+        }
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, []);
 
   const handleToolClick = useCallback((id: string) => {
     appRef.current?.setTool(id);
@@ -680,6 +707,12 @@ const CadEditor: React.FC = () => {
                           <StickerIcon className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{s.name}</span>
                         </button>
                         <button type="button" onClick={() => {
+                          const ok = appRef.current!.openStickerEditByDefId(s.id);
+                          if (!ok) window.alert("Keine platzierte Instanz dieses Stickers gefunden. Platziere ihn zuerst auf dem Canvas.");
+                        }} className="cad-toolbar-btn h-8 w-8 justify-center px-0" title="Sticker-Inhalt bearbeiten (Edit-Mode)" style={{ color: "hsl(var(--primary))" }}>
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button type="button" onClick={() => {
                           const next = window.prompt("Sticker umbenennen:", s.name);
                           if (next && next.trim()) appRef.current!.renameSticker(s.id, next);
                         }} className="cad-toolbar-btn h-8 w-8 justify-center px-0" title="Umbenennen">
@@ -790,6 +823,28 @@ const CadEditor: React.FC = () => {
 
         {/* Text Editor (contenteditable) */}
         <div ref={textEditorElRef} className="hidden absolute z-40 outline-none" />
+
+        {/* Floating Edit-Pencil bei ausgewählter Sticker-Instanz */}
+        {stickerEditOverlay && (
+          <button
+            type="button"
+            onClick={() => {
+              if (stickerEditOverlay) appRef.current?.openStickerEditByInstanceId(stickerEditOverlay.id);
+            }}
+            className="absolute z-30 flex items-center justify-center rounded-full shadow-lg transition-transform hover:scale-110"
+            style={{
+              left: stickerEditOverlay.x + 6,
+              top: stickerEditOverlay.y - 14,
+              width: 28, height: 28,
+              background: "linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)))",
+              color: "#fff",
+              border: "1px solid hsl(var(--primary) / 0.6)",
+            }}
+            title="Sticker-Inhalt bearbeiten"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
+        )}
 
         {/* Canvas */}
         <canvas ref={canvasRef} className="block w-full h-full" />

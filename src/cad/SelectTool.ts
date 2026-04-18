@@ -39,6 +39,8 @@ export class SelectTool {
   dragStickerId: string | null = null;
   dragStickerOrigin: Vec2 | null = null; // Position der Instanz beim Drag-Start
   dragStickerMouseStart: Vec2 | null = null; // Mausposition (Welt) bei Drag-Start
+  dragStickerGrabOffset: Vec2 | null = null; // mouseStart - instanceOrigin (Greifpunkt-Offset relativ zur Position)
+  dragStickerSnap: Snap | null = null; // letzter aktiver Snap während Drag (für Overlay)
 
   constructor(app: CadApp) {
     this.app = app;
@@ -512,23 +514,35 @@ export class SelectTool {
   }
 
   update(input: Input) {
-    // Active sticker drag
+    // Active sticker drag with point snapping
     if (this.dragStickerId) {
       const inst = this.app.scene.getStickerInstanceById(this.dragStickerId);
-      if (!inst || !this.dragStickerOrigin || !this.dragStickerMouseStart) {
+      if (!inst || !this.dragStickerOrigin || !this.dragStickerMouseStart || !this.dragStickerGrabOffset) {
         this.dragStickerId = null;
         this.dragStickerOrigin = null;
         this.dragStickerMouseStart = null;
+        this.dragStickerGrabOffset = null;
+        this.dragStickerSnap = null;
       } else {
         const mouseW = v(input.mouse.wx, input.mouse.wy);
+        // Snap gegen Scene-Punkte/Linien (Sticker-Instanzen sind dort nicht enthalten).
+        const snap = this.app.topology.findBestSnap(
+          v(input.mouse.sx, input.mouse.sy),
+          mouseW
+        );
+        this.dragStickerSnap = snap;
+        // Wir wollen, dass der ursprünglich gegriffene Punkt der Sticker-Instanz an mouseW (oder snap) landet.
+        const target = (snap && snap.world) ? snap.world : mouseW;
         inst.position = {
-          x: this.dragStickerOrigin.x + (mouseW.x - this.dragStickerMouseStart.x),
-          y: this.dragStickerOrigin.y + (mouseW.y - this.dragStickerMouseStart.y),
+          x: target.x - this.dragStickerGrabOffset.x,
+          y: target.y - this.dragStickerGrabOffset.y,
         };
         if (!input.mouse.left) {
           this.dragStickerId = null;
           this.dragStickerOrigin = null;
           this.dragStickerMouseStart = null;
+          this.dragStickerGrabOffset = null;
+          this.dragStickerSnap = null;
         }
         return;
       }
@@ -667,9 +681,13 @@ export class SelectTool {
         if (stickerHit) {
           this.app.setSelection({ type: SelectionType.STICKER_INSTANCE, stickerInstanceId: stickerHit.id });
           // Drag vorbereiten (verschieben, solange Maustaste gedrückt bleibt)
+          const mouseW0 = v(input.mouse.wx, input.mouse.wy);
           this.dragStickerId = stickerHit.id;
           this.dragStickerOrigin = { x: stickerHit.position.x, y: stickerHit.position.y };
-          this.dragStickerMouseStart = v(input.mouse.wx, input.mouse.wy);
+          this.dragStickerMouseStart = mouseW0;
+          // Greifpunkt-Offset: position + offset = mouse → offset = mouse - position
+          this.dragStickerGrabOffset = { x: mouseW0.x - stickerHit.position.x, y: mouseW0.y - stickerHit.position.y };
+          this.dragStickerSnap = null;
           return;
         }
       }
@@ -716,6 +734,31 @@ export class SelectTool {
   }
 
   _drawOverlay(ctx: CanvasRenderingContext2D, cam: any) {
+    // Sticker-Drag-Snap-Marker
+    if (this.dragStickerId && this.dragStickerSnap) {
+      const sn = this.dragStickerSnap;
+      if ((sn.type === SnapType.LINE || sn.type === SnapType.GUIDE) && sn.lineA && sn.lineB) {
+        const a = cam.worldToScreen(sn.lineA.x, sn.lineA.y);
+        const b = cam.worldToScreen(sn.lineB.x, sn.lineB.y);
+        ctx.save();
+        ctx.strokeStyle = "rgba(77,163,255,0.42)";
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+        ctx.restore();
+      }
+      if (sn.world) {
+        const s = cam.worldToScreen(sn.world.x, sn.world.y);
+        ctx.save();
+        ctx.fillStyle = "rgba(77,163,255,0.95)";
+        ctx.beginPath(); ctx.arc(s.x, s.y, 4.5, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = "rgba(77,163,255,0.45)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(s.x, s.y, 10, 0, Math.PI * 2); ctx.stroke();
+        ctx.restore();
+      }
+      return;
+    }
+
     if (this.isEditing()) {
       if (this.activeEditAction === PointEditAction.MOVE || this.activeEditAction === PointEditAction.TRANSLATE) {
         const snap = this._findPreviewSnapForEdit(this.app.input);

@@ -1478,6 +1478,27 @@ export class CadApp {
     this.onStickersChange?.();
   }
 
+  /** Öffnet Edit-Mode für die erste platzierte Instanz dieses Stickers (oder gibt false zurück). */
+  openStickerEditByDefId(defId: string): boolean {
+    if (this.isStickerEditing()) return false;
+    const inst = this.scene.stickerInstances.find(si => si.defId === defId);
+    if (!inst) return false;
+    this.setTool(ToolIds.SELECT);
+    this.enterStickerEdit(inst as any);
+    return true;
+  }
+
+  /** Öffnet Edit-Mode für eine konkrete Instanz-ID. */
+  openStickerEditByInstanceId(instanceId: string): boolean {
+    if (this.isStickerEditing()) return false;
+    const inst = this.scene.getStickerInstanceById(instanceId);
+    if (!inst) return false;
+    this.setTool(ToolIds.SELECT);
+    this.enterStickerEdit(inst as any);
+    return true;
+  }
+
+
   exportStickers(): string {
     return exportStickersToJson(this.stickers);
   }
