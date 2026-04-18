@@ -98,19 +98,20 @@
     --ring: 215 90% 55%;
 
     --cad-canvas: 224 20% 6%;
-    --cad-toolbar: 224 18% 10%;
-    --cad-toolbar-border: 220 14% 18%;
+    --cad-toolbar: 222 16% 18%;
+    --cad-toolbar-border: 222 12% 28%;
     --cad-toolbar-active: 215 90% 55%;
     --cad-toolbar-active-foreground: 0 0% 100%;
-    --cad-hub: 224 18% 12%;
-    --cad-hub-border: 220 14% 22%;
+    --cad-hub: 222 14% 24%;
+    --cad-hub-border: 222 10% 34%;
     --cad-grid: 220 10% 12%;
     --cad-axis: 215 60% 35%;
     --cad-snap-point: 215 90% 55%;
     --cad-snap-line: 215 60% 45%;
     --cad-selection-stroke: 215 90% 55%;
     --cad-selection-fill: 215 90% 55%;
-    --cad-settings-bg: 224 18% 12%;
+    --cad-settings-bg: 222 12% 30%;
+    --cad-tools-bg: 222 16% 18%;
 
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
