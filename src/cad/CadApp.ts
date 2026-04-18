@@ -1028,6 +1028,8 @@ export class CadApp {
       if (e.key === "Escape") {
         if (this.activeTool === this.lineTool) { this.lineTool.cancel(); this.clearSelection(); this.setSelectedLabelId(null); this.setTool(ToolIds.SELECT); return; }
         if (this.activeTool === this.hatchTool) { this.hatchTool.cancel(); this.clearSelection(); this.setTool(ToolIds.SELECT); return; }
+        if (this.activeTool === this.textTool) { this.textTool.cancel(); this.clearSelection(); this.setSelectedLabelId(null); this.setTool(ToolIds.SELECT); return; }
+        if (this.activeTool === this.measureTool) { this.measureTool.cancel(); this.clearSelection(); this.setTool(ToolIds.SELECT); return; }
         if (this.activeTool === this.selectTool) { this.selectTool.cancel(); this.clearSelection(); this.setSelectedLabelId(null); this.pointEditMenu.hide(); return; }
         this.activeTool.cancel();
         this.clearSelection();
