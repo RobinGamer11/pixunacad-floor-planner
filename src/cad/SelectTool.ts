@@ -785,20 +785,30 @@ export class SelectTool {
       }
 
       const hit = this._hitTestWithForegroundPriority(input);
-      this.app.setSelection(hit);
-      if (hit && (hit as any).segmentId) {
-        this.app.showLineSettingsPanel(true);
-      }
-      if (hit && (hit as any).hatchId) {
-        this.app.showHatchSettingsPanel(true);
-      }
-      if (hit && hit.type === SelectionType.DIMENSION) {
-        const dim = this.app.scene.getDimensionById((hit as any).dimensionId);
-        if (dim) {
-          const g = getDimensionGeometry(dim);
-          const mouseW = v(input.mouse.wx, input.mouse.wy);
-          this.dragDimId = dim.id;
-          this.dragDimOffsetAlongNormal = dot(sub(mouseW, dim.p1), g.n) - g.offset;
+      if (hit) {
+        this.app.setSelection(hit);
+        if ((hit as any).segmentId) this.app.showLineSettingsPanel(true);
+        if ((hit as any).hatchId) this.app.showHatchSettingsPanel(true);
+        if (hit.type === SelectionType.DIMENSION) {
+          const dim = this.app.scene.getDimensionById((hit as any).dimensionId);
+          if (dim) {
+            const g = getDimensionGeometry(dim);
+            const mouseW = v(input.mouse.wx, input.mouse.wy);
+            this.dragDimId = dim.id;
+            this.dragDimOffsetAlongNormal = dot(sub(mouseW, dim.p1), g.n) - g.offset;
+          }
+        }
+      } else {
+        // Kein Vordergrund-Hit → Document-Underlay testen (kann gewählt + gezogen werden)
+        const docHit = this._hitDocument(input);
+        if (docHit) {
+          this.app.setSelection({ type: SelectionType.DOCUMENT, documentId: docHit.id } as any);
+          const mouseW0 = v(input.mouse.wx, input.mouse.wy);
+          this.dragDocId = docHit.id;
+          this.dragDocGrabOffset = { x: mouseW0.x - docHit.position.x, y: mouseW0.y - docHit.position.y };
+          this.dragDocSnap = null;
+        } else {
+          this.app.setSelection(null);
         }
       }
     }
