@@ -342,9 +342,10 @@ const CadEditor: React.FC = () => {
       const pages = await importFile(f);
       if (pages.length === 0) { window.alert("Keine Seiten gefunden."); return; }
       if (pages.length === 1) {
-        // Direkt zum Maßstab-Dialog
-        setScaleChoice(pages[0].kind === "pdf-page" ? "100" : "1");
-        setScaleCustom("100");
+        // Direkt zum Maßstab-Dialog – Default = aktueller Zeichen-Maßstab
+        const def = pages[0].kind === "pdf-page" ? String(drawingScale) : "1";
+        setScaleChoice(def);
+        setScaleCustom(String(drawingScale));
         setScaleDialogPages(pages);
       } else {
         // PDF mit mehreren Seiten → erst Page-Picker
@@ -358,7 +359,7 @@ const CadEditor: React.FC = () => {
     } finally {
       setDocImporting(false);
     }
-  }, []);
+  }, [drawingScale]);
 
   const handleDocPickerConfirm = useCallback(() => {
     if (!docPickerPages) return;
