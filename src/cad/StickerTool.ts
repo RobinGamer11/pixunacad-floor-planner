@@ -3,7 +3,7 @@ import { Defaults, SelectionType } from "./constants";
 import type { CadApp } from "./CadApp";
 import type { Input } from "./Input";
 import type { ClipboardItem } from "./ClipboardManager";
-import { StickerDefinition, transformedStickerItems, commitStickerAt, pointInInstance } from "./StickerManager";
+import { StickerDefinition, transformedStickerItems, commitStickerAt, pointInInstance, instanceBoundingCornersWorld } from "./StickerManager";
 import { getDimensionGeometry } from "./dimensionGeometry";
 
 type Phase = "idle" | "selecting" | "placing" | "rotating";
@@ -131,6 +131,13 @@ export class StickerTool {
   private _dragGrabOffset: Vec2 | null = null;
   private _dragSnap: any = null;
 
+  // Corner-Drag-State (Rotate + Scale um Center)
+  private _cornerDragStickerId: string | null = null;
+  private _cornerDragStartAngle = 0;
+  private _cornerDragStartDist = 0;
+  private _cornerDragInitRot = 0;
+  private _cornerDragInitScale = 1;
+
   /** Hit-Test gegen platzierte Sticker-Instanzen. */
   private _hitStickerInstance(input: Input) {
     const mouseW = v(input.mouse.wx, input.mouse.wy);
@@ -142,7 +149,53 @@ export class StickerTool {
     return null;
   }
 
+  /** Hit-Test gegen Eck-Handles der aktuell selektierten Sticker-Instanz. */
+  private _hitStickerCorner(input: Input): { instId: string; cornerIndex: number } | null {
+    const sel = this.app.selection;
+    if (!sel || sel.type !== SelectionType.STICKER_INSTANCE) return null;
+    const inst = this.app.scene.getStickerInstanceById((sel as any).stickerInstanceId);
+    if (!inst || !this.app.labelManager.isVisible(inst.labelId)) return null;
+    const corners = instanceBoundingCornersWorld(inst.items as any, inst.position, inst.rotationRad, inst.scale);
+    const mouseS = v(input.mouse.sx, input.mouse.sy);
+    for (let i = 0; i < corners.length; i++) {
+      const sp = this.app.camera.worldToScreen(corners[i].x, corners[i].y);
+      if (Math.hypot(sp.x - mouseS.x, sp.y - mouseS.y) <= Defaults.hitPx + 2) {
+        return { instId: inst.id, cornerIndex: i };
+      }
+    }
+    return null;
+  }
+
   update(input: Input) {
+    // Aktiver Corner-Drag (Rotate + Scale)
+    if (this._cornerDragStickerId) {
+      const inst = this.app.scene.getStickerInstanceById(this._cornerDragStickerId);
+      if (!inst) {
+        this._cornerDragStickerId = null;
+      } else {
+        const mouseW = v(input.mouse.wx, input.mouse.wy);
+        const dx = mouseW.x - inst.position.x;
+        const dy = mouseW.y - inst.position.y;
+        const curDist = Math.hypot(dx, dy);
+        const curAng = Math.atan2(dy, dx);
+        let newRot = this._cornerDragInitRot + (curAng - this._cornerDragStartAngle);
+        if (input.keys.shift) {
+          const step = Math.PI / 12;
+          newRot = Math.round(newRot / step) * step;
+        }
+        inst.rotationRad = newRot;
+        if (this._cornerDragStartDist > 1e-6) {
+          const ratio = curDist / this._cornerDragStartDist;
+          inst.scale = Math.max(0.05, this._cornerDragInitScale * ratio);
+        }
+        this.app.syncStickerInstanceHub();
+        if (!input.mouse.left) {
+          this._cornerDragStickerId = null;
+        }
+        return;
+      }
+    }
+
     // Aktiver Drag (Verschieben einer ausgewählten Sticker-Instanz) mit Punkt-Snap
     if (this._dragStickerId) {
       const inst = this.app.scene.getStickerInstanceById(this._dragStickerId);
@@ -204,6 +257,22 @@ export class StickerTool {
 
     // Im idle-Modus: Klick auf existierende Sticker-Instanz wählt sie aus + startet Drag
     if (this.phase === "idle" && input.clicked) {
+      // Eck-Handle der bereits selektierten Sticker-Instanz? → Rotate+Scale-Drag
+      const cornerHit = this._hitStickerCorner(input);
+      if (cornerHit) {
+        const inst = this.app.scene.getStickerInstanceById(cornerHit.instId);
+        if (inst) {
+          const mouseW0 = v(input.mouse.wx, input.mouse.wy);
+          const dx0 = mouseW0.x - inst.position.x;
+          const dy0 = mouseW0.y - inst.position.y;
+          this._cornerDragStickerId = inst.id;
+          this._cornerDragStartAngle = Math.atan2(dy0, dx0);
+          this._cornerDragStartDist = Math.hypot(dx0, dy0);
+          this._cornerDragInitRot = inst.rotationRad;
+          this._cornerDragInitScale = inst.scale;
+          return;
+        }
+      }
       const hit = this._hitStickerInstance(input);
       if (hit) {
         this.app.setSelection({ type: SelectionType.STICKER_INSTANCE, stickerInstanceId: hit.id });
