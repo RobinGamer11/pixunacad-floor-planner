@@ -41,6 +41,7 @@ export class Hatch {
   strokeWidthPx: number;
   labelId: string;
   areaLabel: AreaLabel;
+  _stickerEditOwnerId?: string | null;
 
   constructor({ id, points, fillColor, strokeColor, fillAlphaPct, strokeWidthPx, labelId, areaLabel }: {
     id: string; points: Vec2[]; fillColor?: string; strokeColor?: string;
@@ -62,6 +63,7 @@ export class Hatch {
       offsetX: Number.isFinite(areaLabel?.offsetX) ? areaLabel!.offsetX! : 0,
       offsetY: Number.isFinite(areaLabel?.offsetY) ? areaLabel!.offsetY! : 0,
     };
+    this._stickerEditOwnerId = null;
   }
 }
 
@@ -103,6 +105,7 @@ export class Dimension {
   textBgAlpha: number;
 
   labelId: string;
+  _stickerEditOwnerId?: string | null;
 
   constructor({ id, p1, p2, placementPoint, mode, refDir, style, labelId }: {
     id: string; p1: Vec2; p2: Vec2; placementPoint: Vec2;
@@ -128,6 +131,7 @@ export class Dimension {
     this.textBgColor = s.textBgColor || Defaults.measureTextBgColor;
     this.textBgAlpha = (typeof s.textBgAlpha === "number") ? clamp(s.textBgAlpha, 0, 1) : Defaults.measureTextBgAlpha;
     this.labelId = labelId || s.labelId || Defaults.defaultLabelId;
+    this._stickerEditOwnerId = null;
   }
 }
 
