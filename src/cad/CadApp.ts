@@ -338,6 +338,7 @@ export class CadApp {
         labelId: t.labelId,
       })),
       labels: this.labelManager.list().map(l => ({ ...l })),
+      stickers: this.stickers.map(s => ({ id: s.id, name: s.name, items: s.items, createdAt: s.createdAt })),
     });
   }
 
@@ -382,6 +383,13 @@ export class CadApp {
     // Re-add text boxes
     for (const t of data.textBoxes || []) {
       this.scene.createTextBox(t.center, t.widthM, t.heightM, { ...(t.style || {}), labelId: t.labelId }, t.html || "", t.rotationRad || 0);
+    }
+    // Restore stickers
+    if (Array.isArray(data.stickers)) {
+      this.stickers = data.stickers.map((s: any) => ({
+        id: s.id, name: s.name, items: s.items, createdAt: s.createdAt || Date.now(),
+      }));
+      this.onStickersChange?.();
     }
     this.clearSelection();
     this.setSelectedLabelId(null);
