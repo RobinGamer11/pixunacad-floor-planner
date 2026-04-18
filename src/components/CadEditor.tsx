@@ -136,6 +136,10 @@ const CadEditor: React.FC = () => {
   const [scaleDialogPages, setScaleDialogPages] = useState<ImportedPage[] | null>(null);
   const [scaleChoice, setScaleChoice] = useState<string>("100"); // "50" | "100" | "200" | "500" | "1" | "custom"
   const [scaleCustom, setScaleCustom] = useState<string>("100");
+  // Zeichnen-Maßstab (Default-Vorauswahl beim PDF-Import)
+  const [drawingScale, setDrawingScale] = useState<number>(100);
+  const [drawingScaleOpen, setDrawingScaleOpen] = useState(false);
+  const [drawingScaleCustom, setDrawingScaleCustom] = useState<string>("100");
 
   useEffect(() => {
     if (
