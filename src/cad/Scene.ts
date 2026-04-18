@@ -150,6 +150,54 @@ export class Scene {
     for (const h of this.hatches) this._hatchIdMap.set(h.id, h);
   }
 
+  private _rebuildDimIdMap() {
+    this._dimIdMap.clear();
+    for (const d of this.dimensions) this._dimIdMap.set(d.id, d);
+  }
+
+  // ---- Dimensions ----
+  createDimension(p1: Vec2, p2: Vec2, placementPoint: Vec2, mode: "parallel" | "diagonal", refDir: Vec2 | null, style: DimensionStyle = {}) {
+    const dim = new Dimension({ id: this._makeId(), p1, p2, placementPoint, mode, refDir, style, labelId: style.labelId });
+    this.dimensions.push(dim);
+    this._rebuildDimIdMap();
+    return dim;
+  }
+
+  getDimensionById(id: string): Dimension | null { return this._dimIdMap.get(id) || null; }
+
+  getDimensionsByLabelId(labelId: string): Dimension[] {
+    return this.dimensions.filter(d => d.labelId === labelId);
+  }
+
+  removeDimension(dim: Dimension) {
+    this.dimensions = this.dimensions.filter(d => d !== dim);
+    this._rebuildDimIdMap();
+  }
+
+  removeDimensionsByIds(ids: string[]) {
+    const set = new Set(ids);
+    this.dimensions = this.dimensions.filter(d => !set.has(d.id));
+    this._rebuildDimIdMap();
+  }
+
+  removeDimensionsByLabelId(labelId: string) {
+    this.dimensions = this.dimensions.filter(d => d.labelId !== labelId);
+    this._rebuildDimIdMap();
+  }
+
+  reassignDimensionsLabel(oldId: string, newId: string) {
+    for (const d of this.dimensions) {
+      if (d.labelId === oldId) d.labelId = newId;
+    }
+  }
+
+  assignDimensionsToLabel(ids: string[], newId: string) {
+    const set = new Set(ids);
+    for (const d of this.dimensions) {
+      if (set.has(d.id)) d.labelId = newId;
+    }
+  }
+
   // ---- Segments ----
   createSegment(a: Vec2, b: Vec2, style: { color?: string; thicknessM?: number; labelId?: string } = {}) {
     const seg = new Segment({ id: this._makeId(), a, b, color: style.color, thicknessM: style.thicknessM, labelId: style.labelId });
