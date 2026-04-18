@@ -512,6 +512,28 @@ export class SelectTool {
   }
 
   update(input: Input) {
+    // Active sticker drag
+    if (this.dragStickerId) {
+      const inst = this.app.scene.getStickerInstanceById(this.dragStickerId);
+      if (!inst || !this.dragStickerOrigin || !this.dragStickerMouseStart) {
+        this.dragStickerId = null;
+        this.dragStickerOrigin = null;
+        this.dragStickerMouseStart = null;
+      } else {
+        const mouseW = v(input.mouse.wx, input.mouse.wy);
+        inst.position = {
+          x: this.dragStickerOrigin.x + (mouseW.x - this.dragStickerMouseStart.x),
+          y: this.dragStickerOrigin.y + (mouseW.y - this.dragStickerMouseStart.y),
+        };
+        if (!input.mouse.left) {
+          this.dragStickerId = null;
+          this.dragStickerOrigin = null;
+          this.dragStickerMouseStart = null;
+        }
+        return;
+      }
+    }
+
     // Active dimension parallel-drag
     if (this.dragDimId) {
       const dim = this.app.scene.getDimensionById(this.dragDimId);
