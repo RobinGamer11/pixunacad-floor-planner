@@ -48,12 +48,13 @@ export class DocumentTool {
   }
 
   cancel() {
-    if (this.phase === "scale-await-input" || this.phase === "scale-pick-2") this.app.hub.hide();
+    if (this.phase === "scale-pick-2" || this.phase === "scale-pick-3") this.app.hub.hide();
     this.phase = "idle";
     this.pendingDoc = null;
     this.scaleTargetDocId = null;
     this.scalePoint1 = null;
     this.scalePoint2 = null;
+    this.scalePoint3 = null;
     this.scaleSnap = null;
     this.app.hub.bindCommit(null);
     this.app.hub.angInputEl.readOnly = true;
