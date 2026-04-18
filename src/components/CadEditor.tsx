@@ -707,6 +707,12 @@ const CadEditor: React.FC = () => {
                           <StickerIcon className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{s.name}</span>
                         </button>
                         <button type="button" onClick={() => {
+                          const ok = appRef.current!.openStickerEditByDefId(s.id);
+                          if (!ok) window.alert("Keine platzierte Instanz dieses Stickers gefunden. Platziere ihn zuerst auf dem Canvas.");
+                        }} className="cad-toolbar-btn h-8 w-8 justify-center px-0" title="Bearbeiten (öffnet erste platzierte Instanz)">
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button type="button" onClick={() => {
                           const next = window.prompt("Sticker umbenennen:", s.name);
                           if (next && next.trim()) appRef.current!.renameSticker(s.id, next);
                         }} className="cad-toolbar-btn h-8 w-8 justify-center px-0" title="Umbenennen">
