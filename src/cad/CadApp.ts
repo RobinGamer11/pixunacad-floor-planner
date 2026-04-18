@@ -312,6 +312,14 @@ export class CadApp {
         textBgEnabled: d.textBgEnabled, textBgColor: d.textBgColor, textBgAlpha: d.textBgAlpha,
         labelId: d.labelId,
       })),
+      textBoxes: this.scene.textBoxes.map(t => ({
+        id: t.id,
+        center: { x: t.center.x, y: t.center.y },
+        widthM: t.widthM, heightM: t.heightM,
+        rotationRad: t.rotationRad, html: t.html,
+        style: { ...t.style },
+        labelId: t.labelId,
+      })),
       labels: this.labelManager.list().map(l => ({ ...l })),
     });
   }
@@ -327,9 +335,11 @@ export class CadApp {
     this.scene.segments = [];
     this.scene.hatches = [];
     this.scene.dimensions = [];
+    this.scene.textBoxes = [];
     (this.scene as any)._rebuildSegIdMap?.();
     (this.scene as any)._rebuildHatchIdMap?.();
     (this.scene as any)._rebuildDimIdMap?.();
+    (this.scene as any)._rebuildTextIdMap?.();
     // Re-add segments
     for (const s of data.segments || []) {
       this.scene.createSegment(s.a, s.b, { color: s.color, thicknessM: s.thicknessM, labelId: s.labelId });
@@ -351,6 +361,10 @@ export class CadApp {
         textBgEnabled: d.textBgEnabled, textBgColor: d.textBgColor, textBgAlpha: d.textBgAlpha,
         labelId: d.labelId,
       });
+    }
+    // Re-add text boxes
+    for (const t of data.textBoxes || []) {
+      this.scene.createTextBox(t.center, t.widthM, t.heightM, { ...(t.style || {}), labelId: t.labelId }, t.html || "", t.rotationRad || 0);
     }
     this.clearSelection();
     this.setSelectedLabelId(null);
@@ -412,6 +426,7 @@ export class CadApp {
     this._syncLineSettingsFromContext();
     this._syncHatchSettingsFromContext();
     this._syncMeasureSettingsFromContext();
+    this._syncTextSettingsFromContext();
     this._updateSettingsVisibility();
   }
 
@@ -430,6 +445,14 @@ export class CadApp {
   getSelectedDimension() {
     if (!this.selection || this.selection.type !== SelectionType.DIMENSION) return null;
     return this.scene.getDimensionById((this.selection as any).dimensionId);
+  }
+
+  getSelectedTextBox(): TextBox | null {
+    if (!this.selection) return null;
+    if (this.selection.type !== SelectionType.TEXTBOX && this.selection.type !== SelectionType.TEXTBOX_HANDLE) return null;
+    const id = (this.selection as any).textBoxId;
+    if (!id) return null;
+    return this.scene.getTextBoxById(id);
   }
 
 
@@ -457,10 +480,12 @@ export class CadApp {
     this._syncLabelSelect();
     this._syncHatchLabelSelect();
     this._syncMeasureLabelSelect();
+    this._syncTextLabelSelect();
     this.idPanel.render();
     this._syncLineSettingsFromContext();
     this._syncHatchSettingsFromContext();
     this._syncMeasureSettingsFromContext();
+    this._syncTextSettingsFromContext();
   }
 
   private _syncLabelSelect() {
