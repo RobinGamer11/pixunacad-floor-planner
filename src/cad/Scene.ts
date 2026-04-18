@@ -307,6 +307,7 @@ export class Scene {
     const box = new TextBox({
       id: this._makeId(), center, widthM, heightM, rotationRad, html, style, labelId: style.labelId,
     });
+    box._stickerEditOwnerId = this._currentEditOwnerId;
     this.textBoxes.push(box);
     this._rebuildTextIdMap();
     return box;
@@ -350,6 +351,7 @@ export class Scene {
   // ---- Dimensions ----
   createDimension(p1: Vec2, p2: Vec2, placementPoint: Vec2, mode: "parallel" | "diagonal", refDir: Vec2 | null, style: DimensionStyle = {}) {
     const dim = new Dimension({ id: this._makeId(), p1, p2, placementPoint, mode, refDir, style, labelId: style.labelId });
+    dim._stickerEditOwnerId = this._currentEditOwnerId;
     this.dimensions.push(dim);
     this._rebuildDimIdMap();
     return dim;
@@ -393,6 +395,7 @@ export class Scene {
   // ---- Segments ----
   createSegment(a: Vec2, b: Vec2, style: { color?: string; thicknessM?: number; labelId?: string } = {}) {
     const seg = new Segment({ id: this._makeId(), a, b, color: style.color, thicknessM: style.thicknessM, labelId: style.labelId });
+    seg._stickerEditOwnerId = this._currentEditOwnerId;
     this.segments.push(seg);
     this._rebuildSegIdMap();
     return seg;
@@ -457,6 +460,7 @@ export class Scene {
       fillAlphaPct: style.fillAlphaPct, strokeWidthPx: style.strokeWidthPx,
       labelId: style.labelId, areaLabel: style.areaLabel,
     });
+    hatch._stickerEditOwnerId = this._currentEditOwnerId;
     this.hatches.push(hatch);
     this._rebuildHatchIdMap();
     return hatch;
