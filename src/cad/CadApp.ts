@@ -351,6 +351,7 @@ export class CadApp {
     this.renderer.setSelection(selection);
     this._syncLineSettingsFromContext();
     this._syncHatchSettingsFromContext();
+    this._syncMeasureSettingsFromContext();
     this._updateSettingsVisibility();
   }
 
@@ -365,6 +366,12 @@ export class CadApp {
     if (!this.selection || !this.selection.hatchId) return null;
     return this.scene.getHatchById(this.selection.hatchId);
   }
+
+  getSelectedDimension() {
+    if (!this.selection || this.selection.type !== SelectionType.DIMENSION) return null;
+    return this.scene.getDimensionById((this.selection as any).dimensionId);
+  }
+
 
   /* ---- Label Selection ---- */
   setSelectedLabelId(labelId: string | null) {
