@@ -291,9 +291,13 @@ export class DocumentTool {
 
     // Linie zwischen Punkt 1 und Cursor (oder Punkt 2)
     if (this.scalePoint1 && (this.phase === "scale-pick-2" || this.phase === "scale-await-input")) {
-      const p2 = this.phase === "scale-await-input" && this.scalePoint2
-        ? this.scalePoint2
-        : (this.scaleSnap ? this.scaleSnap.world : v(this.app.input.mouse.wx, this.app.input.mouse.wy));
+      let p2: Vec2;
+      if (this.phase === "scale-await-input" && this.scalePoint2) {
+        p2 = this.scalePoint2;
+      } else {
+        p2 = this.scaleSnap ? this.scaleSnap.world : v(this.app.input.mouse.wx, this.app.input.mouse.wy);
+        if (this.app.input.keys.shift) p2 = orthoSnapFromA(this.scalePoint1, p2);
+      }
       const a = cam.worldToScreen(this.scalePoint1.x, this.scalePoint1.y);
       const b = cam.worldToScreen(p2.x, p2.y);
       ctx.save();
