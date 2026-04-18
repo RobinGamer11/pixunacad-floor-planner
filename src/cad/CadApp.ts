@@ -107,6 +107,7 @@ export class CadApp {
   measureSettings: MeasureSettings = {
     orientation: Defaults.measureOrientation,
     pointCount: Defaults.measurePointCount,
+    editMode: Defaults.measureEditMode,
     textColor: Defaults.measureTextColor,
     textSizePx: Defaults.measureTextSizePx,
     lineColor: Defaults.measureLineColor,
