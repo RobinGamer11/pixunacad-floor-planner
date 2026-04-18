@@ -379,29 +379,33 @@ export class CadApp {
     (this.scene as any)._rebuildStickerIdMap?.();
     // Re-add segments
     for (const s of data.segments || []) {
-      this.scene.createSegment(s.a, s.b, { color: s.color, thicknessM: s.thicknessM, labelId: s.labelId });
+      const seg = this.scene.createSegment(s.a, s.b, { color: s.color, thicknessM: s.thicknessM, labelId: s.labelId });
+      if (s._stickerEditOwnerId) seg._stickerEditOwnerId = s._stickerEditOwnerId;
     }
     // Re-add hatches
     for (const h of data.hatches || []) {
-      this.scene.createHatch(h.points, {
+      const hatch = this.scene.createHatch(h.points, {
         fillColor: h.fillColor, strokeColor: h.strokeColor,
         fillAlphaPct: h.fillAlphaPct, strokeWidthPx: h.strokeWidthPx,
         labelId: h.labelId, areaLabel: h.areaLabel,
       });
+      if (h._stickerEditOwnerId) hatch._stickerEditOwnerId = h._stickerEditOwnerId;
     }
     // Re-add dimensions
     for (const d of data.dimensions || []) {
-      this.scene.createDimension(d.p1, d.p2, d.placementPoint, d.mode, d.refDir, {
+      const dim = this.scene.createDimension(d.p1, d.p2, d.placementPoint, d.mode, d.refDir, {
         textColor: d.textColor, textSizePx: d.textSizePx, lineColor: d.lineColor,
         decimals: d.decimals, tickLengthM: d.tickLengthM, showExtensions: d.showExtensions,
         useFreeText: d.useFreeText, freeText: d.freeText,
         textBgEnabled: d.textBgEnabled, textBgColor: d.textBgColor, textBgAlpha: d.textBgAlpha,
         labelId: d.labelId,
       });
+      if (d._stickerEditOwnerId) dim._stickerEditOwnerId = d._stickerEditOwnerId;
     }
     // Re-add text boxes
     for (const t of data.textBoxes || []) {
-      this.scene.createTextBox(t.center, t.widthM, t.heightM, { ...(t.style || {}), labelId: t.labelId }, t.html || "", t.rotationRad || 0);
+      const box = this.scene.createTextBox(t.center, t.widthM, t.heightM, { ...(t.style || {}), labelId: t.labelId }, t.html || "", t.rotationRad || 0);
+      if (t._stickerEditOwnerId) box._stickerEditOwnerId = t._stickerEditOwnerId;
     }
     // Restore stickers
     if (Array.isArray(data.stickers)) {
@@ -413,13 +417,18 @@ export class CadApp {
     // Restore sticker instances
     if (Array.isArray(data.stickerInstances)) {
       for (const si of data.stickerInstances) {
-        this.scene.createStickerInstance({
+        const inst = this.scene.createStickerInstance({
           defId: si.defId, name: si.name, items: si.items,
           position: si.position, rotationRad: si.rotationRad || 0,
           scale: si.scale || 1, labelId: si.labelId,
         });
+        if (si.id) (inst as any).id = si.id;
       }
+      (this.scene as any)._rebuildStickerIdMap?.();
     }
+    // Restore Sticker-Edit-Mode (so Undo/Redo while editing works correctly)
+    this._stickerEditInstanceId = data._stickerEditInstanceId || null;
+    this._stickerEditSnapshot = data._stickerEditSnapshot || null;
     this.clearSelection();
     this.setSelectedLabelId(null);
     this.pointEditMenu.hide();
