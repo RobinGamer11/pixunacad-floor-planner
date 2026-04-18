@@ -2,8 +2,8 @@ import { clamp } from "./geometry";
 
 export class Camera {
   scale = 80;
-  minScale = 12;
-  maxScale = 600;
+  minScale = 0.5;
+  maxScale = 4000;
   offsetX = 0;
   offsetY = 0;
 
