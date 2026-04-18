@@ -6,6 +6,7 @@ import type { Input } from "./Input";
 import { getDimensionGeometry } from "./dimensionGeometry";
 import { pointInOrientedBox } from "./textGeometry";
 import type { TextBox } from "./Scene";
+import { pointInInstance } from "./StickerManager";
 
 type EditTarget =
   | { kind: "segment"; segmentId: string; pointIndex: number }
@@ -33,6 +34,11 @@ export class SelectTool {
   // Parallel-drag state for dimensions
   dragDimId: string | null = null;
   dragDimOffsetAlongNormal = 0;
+
+  // Sticker-Instanz Drag-State
+  dragStickerId: string | null = null;
+  dragStickerOrigin: Vec2 | null = null; // Position der Instanz beim Drag-Start
+  dragStickerMouseStart: Vec2 | null = null; // Mausposition (Welt) bei Drag-Start
 
   constructor(app: CadApp) {
     this.app = app;
@@ -64,6 +70,17 @@ export class SelectTool {
       const box = this.app.scene.textBoxes[i];
       if (!this.app.labelManager.isVisible(box.labelId)) continue;
       if (pointInOrientedBox(mouseW, box)) return box;
+    }
+    return null;
+  }
+
+  /** Returns the topmost sticker instance under the mouse, or null. */
+  private _hitStickerInstance(input: Input) {
+    const mouseW = v(input.mouse.wx, input.mouse.wy);
+    for (let i = this.app.scene.stickerInstances.length - 1; i >= 0; i--) {
+      const inst = this.app.scene.stickerInstances[i];
+      if (!this.app.labelManager.isVisible(inst.labelId)) continue;
+      if (pointInInstance(inst.items as any, inst.position, inst.rotationRad, inst.scale, mouseW)) return inst;
     }
     return null;
   }
@@ -495,6 +512,28 @@ export class SelectTool {
   }
 
   update(input: Input) {
+    // Active sticker drag
+    if (this.dragStickerId) {
+      const inst = this.app.scene.getStickerInstanceById(this.dragStickerId);
+      if (!inst || !this.dragStickerOrigin || !this.dragStickerMouseStart) {
+        this.dragStickerId = null;
+        this.dragStickerOrigin = null;
+        this.dragStickerMouseStart = null;
+      } else {
+        const mouseW = v(input.mouse.wx, input.mouse.wy);
+        inst.position = {
+          x: this.dragStickerOrigin.x + (mouseW.x - this.dragStickerMouseStart.x),
+          y: this.dragStickerOrigin.y + (mouseW.y - this.dragStickerMouseStart.y),
+        };
+        if (!input.mouse.left) {
+          this.dragStickerId = null;
+          this.dragStickerOrigin = null;
+          this.dragStickerMouseStart = null;
+        }
+        return;
+      }
+    }
+
     // Active dimension parallel-drag
     if (this.dragDimId) {
       const dim = this.app.scene.getDimensionById(this.dragDimId);
@@ -604,6 +643,17 @@ export class SelectTool {
     }
 
     if (input.clicked) {
+      // Sticker-Instanzen haben höchste Priorität (sie liegen visuell oben)
+      const stickerHit = this._hitStickerInstance(input);
+      if (stickerHit) {
+        this.app.setSelection({ type: SelectionType.STICKER_INSTANCE, stickerInstanceId: stickerHit.id });
+        // Drag vorbereiten (verschieben, solange Maustaste gedrückt bleibt)
+        this.dragStickerId = stickerHit.id;
+        this.dragStickerOrigin = { x: stickerHit.position.x, y: stickerHit.position.y };
+        this.dragStickerMouseStart = v(input.mouse.wx, input.mouse.wy);
+        return;
+      }
+
       // Textbox hits take priority — they sit on top visually
       const box = this._hitTextBox(input);
       if (box) {

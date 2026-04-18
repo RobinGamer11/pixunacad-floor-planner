@@ -177,15 +177,49 @@ export class TextBox {
   }
 }
 
+export interface StickerInstanceItem {
+  // Lokale Snapshot-Items (relativ zu (0,0)). Strukturell identisch zu ClipboardItem.
+  // Wir lassen das absichtlich "any" um keine Zirkulärimporte zu erzeugen.
+  [key: string]: any;
+}
+
+export class StickerInstance {
+  id: string;
+  defId: string | null; // optional: Referenz auf Bibliotheks-Definition
+  name: string;
+  items: StickerInstanceItem[]; // lokale Geometrie (Kopie)
+  position: Vec2;
+  rotationRad: number;
+  scale: number;
+  labelId: string;
+
+  constructor({ id, defId, name, items, position, rotationRad, scale, labelId }: {
+    id: string; defId?: string | null; name?: string;
+    items: StickerInstanceItem[];
+    position: Vec2; rotationRad?: number; scale?: number; labelId?: string;
+  }) {
+    this.id = id;
+    this.defId = defId || null;
+    this.name = name || "Sticker";
+    this.items = items;
+    this.position = v(position.x, position.y);
+    this.rotationRad = rotationRad || 0;
+    this.scale = (typeof scale === "number" && scale > 0) ? scale : 1;
+    this.labelId = labelId || Defaults.defaultLabelId;
+  }
+}
+
 export class Scene {
   segments: Segment[] = [];
   hatches: Hatch[] = [];
   dimensions: Dimension[] = [];
   textBoxes: TextBox[] = [];
+  stickerInstances: StickerInstance[] = [];
   private _segIdMap = new Map<string, Segment>();
   private _hatchIdMap = new Map<string, Hatch>();
   private _dimIdMap = new Map<string, Dimension>();
   private _textIdMap = new Map<string, TextBox>();
+  private _stickerIdMap = new Map<string, StickerInstance>();
 
   private _makeId(): string {
     return (crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now() + Math.random());
@@ -209,6 +243,48 @@ export class Scene {
   private _rebuildTextIdMap() {
     this._textIdMap.clear();
     for (const t of this.textBoxes) this._textIdMap.set(t.id, t);
+  }
+
+  private _rebuildStickerIdMap() {
+    this._stickerIdMap.clear();
+    for (const s of this.stickerInstances) this._stickerIdMap.set(s.id, s);
+  }
+
+  // ---- Sticker Instances ----
+  createStickerInstance(opts: {
+    defId?: string | null; name?: string;
+    items: StickerInstanceItem[];
+    position: Vec2; rotationRad?: number; scale?: number; labelId?: string;
+  }): StickerInstance {
+    const inst = new StickerInstance({ id: this._makeId(), ...opts });
+    this.stickerInstances.push(inst);
+    this._rebuildStickerIdMap();
+    return inst;
+  }
+
+  getStickerInstanceById(id: string): StickerInstance | null { return this._stickerIdMap.get(id) || null; }
+
+  getStickerInstancesByLabelId(labelId: string): StickerInstance[] {
+    return this.stickerInstances.filter(s => s.labelId === labelId);
+  }
+
+  removeStickerInstance(inst: StickerInstance) {
+    this.stickerInstances = this.stickerInstances.filter(s => s !== inst);
+    this._rebuildStickerIdMap();
+  }
+
+  removeStickerInstancesByLabelId(labelId: string) {
+    this.stickerInstances = this.stickerInstances.filter(s => s.labelId !== labelId);
+    this._rebuildStickerIdMap();
+  }
+
+  reassignStickerInstancesLabel(oldId: string, newId: string) {
+    for (const s of this.stickerInstances) if (s.labelId === oldId) s.labelId = newId;
+  }
+
+  assignStickerInstancesToLabel(ids: string[], newId: string) {
+    const set = new Set(ids);
+    for (const s of this.stickerInstances) if (set.has(s.id)) s.labelId = newId;
   }
 
   // ---- TextBoxes ----

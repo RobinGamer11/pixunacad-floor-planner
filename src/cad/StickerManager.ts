@@ -169,47 +169,85 @@ function _finalizeSticker(items: ClipboardItem[], name: string): StickerDefiniti
   };
 }
 
-/* ---- Commit (expand into scene) ---- */
-export function commitStickerAt(app: CadApp, def: StickerDefinition, mouseW: Vec2, rotationRad: number): number {
-  let count = 0;
-  for (const localIt of def.items) {
-    const rotated = rotateItem(localIt, rotationRad);
-    const it = translateItem(rotated, mouseW.x, mouseW.y);
-
-    if (it.kind === "segment") {
-      app.scene.createSegment({ x: it.a.x, y: it.a.y }, { x: it.b.x, y: it.b.y },
-        { color: it.color, thicknessM: it.thicknessM, labelId: it.labelId });
-    } else if (it.kind === "hatch") {
-      app.scene.createHatch(it.points.map(p => ({ x: p.x, y: p.y })),
-        { fillColor: it.fillColor, strokeColor: it.strokeColor,
-          fillAlphaPct: it.fillAlphaPct, strokeWidthPx: it.strokeWidthPx,
-          labelId: it.labelId, areaLabel: it.areaLabel });
-    } else if (it.kind === "dimension") {
-      app.scene.createDimension(
-        { x: it.p1.x, y: it.p1.y },
-        { x: it.p2.x, y: it.p2.y },
-        { x: it.placementPoint.x, y: it.placementPoint.y },
-        it.mode, it.refDir,
-        { textColor: it.textColor, textSizePx: it.textSizePx, lineColor: it.lineColor,
-          decimals: it.decimals, tickLengthM: it.tickLengthM, showExtensions: it.showExtensions,
-          useFreeText: it.useFreeText, freeText: it.freeText,
-          textBgEnabled: it.textBgEnabled, textBgColor: it.textBgColor, textBgAlpha: it.textBgAlpha,
-          labelId: it.labelId });
-    } else {
-      app.scene.createTextBox(
-        { x: it.center.x, y: it.center.y },
-        it.widthM, it.heightM,
-        { ...it.style, labelId: it.labelId },
-        it.html, it.rotationRad);
-    }
-    count++;
-  }
-  return count;
+/* ---- Commit als Live-Instanz (NICHT mehr Makro-Expand) ---- */
+export function commitStickerAt(app: CadApp, def: StickerDefinition, mouseW: Vec2, rotationRad: number, scale: number = 1): number {
+  // Items werden tief kopiert, damit die Instanz unabhängig von der Definition lebt.
+  const itemsCopy = def.items.map(it => JSON.parse(JSON.stringify(it)));
+  app.scene.createStickerInstance({
+    defId: def.id, name: def.name,
+    items: itemsCopy,
+    position: { x: mouseW.x, y: mouseW.y },
+    rotationRad, scale,
+    labelId: app.activeDrawLabelId,
+  });
+  return 1;
 }
 
 /* ---- Preview transform: items -> world points for overlay drawing ---- */
-export function transformedStickerItems(def: StickerDefinition, mouseW: Vec2, rotationRad: number): ClipboardItem[] {
-  return def.items.map(it => translateItem(rotateItem(it, rotationRad), mouseW.x, mouseW.y));
+export function transformedStickerItems(def: StickerDefinition, mouseW: Vec2, rotationRad: number, scale: number = 1): ClipboardItem[] {
+  return def.items.map(it => translateItem(rotateItem(scaleItem(it, scale), rotationRad), mouseW.x, mouseW.y));
+}
+
+/** Transform local items of an instance to world coordinates (für Renderer/Hit-Test). */
+export function transformedInstanceItems(items: ClipboardItem[], position: Vec2, rotationRad: number, scale: number = 1): ClipboardItem[] {
+  return items.map(it => translateItem(rotateItem(scaleItem(it, scale), rotationRad), position.x, position.y));
+}
+
+/** Skalierung von lokalen Punkten (Mittelpunkt = (0,0)). Stile (Linienstärke, Textgröße) bleiben fix. */
+function scaleItem(it: ClipboardItem, s: number): ClipboardItem {
+  if (Math.abs(s - 1) < 1e-9) return it;
+  if (it.kind === "segment") return { ...it, a: { x: it.a.x * s, y: it.a.y * s }, b: { x: it.b.x * s, y: it.b.y * s } };
+  if (it.kind === "hatch") return { ...it, points: it.points.map(p => ({ x: p.x * s, y: p.y * s })) };
+  if (it.kind === "dimension") return {
+    ...it,
+    p1: { x: it.p1.x * s, y: it.p1.y * s },
+    p2: { x: it.p2.x * s, y: it.p2.y * s },
+    placementPoint: { x: it.placementPoint.x * s, y: it.placementPoint.y * s },
+  };
+  // textbox: skaliere center + Box-Dimensionen (Textgröße bleibt fix)
+  return { ...it, center: { x: it.center.x * s, y: it.center.y * s }, widthM: it.widthM * s, heightM: it.heightM * s };
+}
+
+/** AABB der lokalen Items (für Bounding-Box-Größe; transformierbar via pos/rot/scale). */
+export function localItemsBounds(items: ClipboardItem[]): { minX: number; minY: number; maxX: number; maxY: number } {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  const acc = (x: number, y: number) => { if (x < minX) minX = x; if (y < minY) minY = y; if (x > maxX) maxX = x; if (y > maxY) maxY = y; };
+  for (const it of items) {
+    if (it.kind === "segment") { acc(it.a.x, it.a.y); acc(it.b.x, it.b.y); }
+    else if (it.kind === "hatch") { for (const p of it.points) acc(p.x, p.y); }
+    else if (it.kind === "dimension") { acc(it.p1.x, it.p1.y); acc(it.p2.x, it.p2.y); }
+    else if (it.kind === "textbox") {
+      const w2 = it.widthM / 2, h2 = it.heightM / 2;
+      acc(it.center.x - w2, it.center.y - h2);
+      acc(it.center.x + w2, it.center.y + h2);
+    }
+  }
+  if (!isFinite(minX)) { minX = 0; minY = 0; maxX = 0; maxY = 0; }
+  return { minX, minY, maxX, maxY };
+}
+
+/** World-space corners (4 Punkte) der Bounding-Box einer Instanz (rotiert + skaliert + verschoben). */
+export function instanceBoundingCornersWorld(items: ClipboardItem[], position: Vec2, rotationRad: number, scale: number): Vec2[] {
+  const b = localItemsBounds(items);
+  const cs = Math.cos(rotationRad), sn = Math.sin(rotationRad);
+  const corners = [
+    { x: b.minX, y: b.minY }, { x: b.maxX, y: b.minY },
+    { x: b.maxX, y: b.maxY }, { x: b.minX, y: b.maxY },
+  ];
+  return corners.map(p => {
+    const sx = p.x * scale, sy = p.y * scale;
+    return { x: position.x + sx * cs - sy * sn, y: position.y + sx * sn + sy * cs };
+  });
+}
+
+/** Ist Maus innerhalb der Instanz-Bounding-Box (rotiert+skaliert)? */
+export function pointInInstance(items: ClipboardItem[], position: Vec2, rotationRad: number, scale: number, mouseWorld: Vec2): boolean {
+  const cs = Math.cos(-rotationRad), sn = Math.sin(-rotationRad);
+  const dx = mouseWorld.x - position.x, dy = mouseWorld.y - position.y;
+  const lx = (dx * cs - dy * sn) / scale;
+  const ly = (dx * sn + dy * cs) / scale;
+  const b = localItemsBounds(items);
+  return lx >= b.minX && lx <= b.maxX && ly >= b.minY && ly <= b.maxY;
 }
 
 /* ---- Export / Import ---- */

@@ -339,6 +339,11 @@ export class CadApp {
       })),
       labels: this.labelManager.list().map(l => ({ ...l })),
       stickers: this.stickers.map(s => ({ id: s.id, name: s.name, items: s.items, createdAt: s.createdAt })),
+      stickerInstances: this.scene.stickerInstances.map(si => ({
+        id: si.id, defId: si.defId, name: si.name, items: si.items,
+        position: { x: si.position.x, y: si.position.y },
+        rotationRad: si.rotationRad, scale: si.scale, labelId: si.labelId,
+      })),
     });
   }
 
@@ -354,10 +359,12 @@ export class CadApp {
     this.scene.hatches = [];
     this.scene.dimensions = [];
     this.scene.textBoxes = [];
+    this.scene.stickerInstances = [];
     (this.scene as any)._rebuildSegIdMap?.();
     (this.scene as any)._rebuildHatchIdMap?.();
     (this.scene as any)._rebuildDimIdMap?.();
     (this.scene as any)._rebuildTextIdMap?.();
+    (this.scene as any)._rebuildStickerIdMap?.();
     // Re-add segments
     for (const s of data.segments || []) {
       this.scene.createSegment(s.a, s.b, { color: s.color, thicknessM: s.thicknessM, labelId: s.labelId });
@@ -390,6 +397,16 @@ export class CadApp {
         id: s.id, name: s.name, items: s.items, createdAt: s.createdAt || Date.now(),
       }));
       this.onStickersChange?.();
+    }
+    // Restore sticker instances
+    if (Array.isArray(data.stickerInstances)) {
+      for (const si of data.stickerInstances) {
+        this.scene.createStickerInstance({
+          defId: si.defId, name: si.name, items: si.items,
+          position: si.position, rotationRad: si.rotationRad || 0,
+          scale: si.scale || 1, labelId: si.labelId,
+        });
+      }
     }
     this.clearSelection();
     this.setSelectedLabelId(null);
@@ -1095,6 +1112,11 @@ export class CadApp {
         if (this.selection && this.selection.type === SelectionType.DIMENSION) {
           const dim = this.getSelectedDimension();
           if (dim) { this.scene.removeDimension(dim); this.clearSelection(); this.refreshLabelUI(); }
+          return;
+        }
+        if (this.selection && this.selection.type === SelectionType.STICKER_INSTANCE) {
+          const inst = this.scene.getStickerInstanceById((this.selection as any).stickerInstanceId);
+          if (inst) { this.scene.removeStickerInstance(inst); this.clearSelection(); }
           return;
         }
         if (this.selection && (this.selection.type === SelectionType.TEXTBOX || this.selection.type === SelectionType.TEXTBOX_HANDLE)) {
