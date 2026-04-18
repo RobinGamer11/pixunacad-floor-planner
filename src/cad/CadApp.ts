@@ -12,7 +12,7 @@ import { SelectTool } from "./SelectTool";
 import { LineTool } from "./LineTool";
 import { HatchTool } from "./HatchTool";
 import { MeasureTool } from "./MeasureTool";
-import { TextTool } from "./TextTool";
+
 import { IdPanel } from "./IdPanel";
 
 export interface MeasureSettings {
