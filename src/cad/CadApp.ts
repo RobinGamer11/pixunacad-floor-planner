@@ -73,6 +73,15 @@ export class CadApp {
   private _destroyed = false;
   private _keydownHandler: ((e: KeyboardEvent) => void) | null = null;
 
+  // History (Undo/Redo)
+  private _history: string[] = [];
+  private _historyIndex = -1;
+  private _historyMax = 100;
+  private _lastSnapshot = "";
+  private _snapshotTimer: number | null = null;
+  private _isRestoring = false;
+  onHistoryChange?: (canUndo: boolean, canRedo: boolean) => void;
+
   onToolChange?: (toolId: string) => void;
 
   constructor(
