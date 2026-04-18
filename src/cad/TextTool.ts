@@ -110,6 +110,12 @@ export class TextTool {
     }
 
     if (input.clicked) {
+      // Block creating a new textbox while another one is being edited.
+      // The user must first click outside (which commits) before placing a new one.
+      if (this.app.textEditor?.isActive()) {
+        return;
+      }
+
       // If the user clicks an existing textbox, select it instead of creating one
       const box = this._hitTextBox(input);
       if (box) {

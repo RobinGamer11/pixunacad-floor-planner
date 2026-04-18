@@ -123,13 +123,33 @@ export class TextEditorOverlay {
     const widthPx = box.widthM * cam.scale;
     const heightPx = box.heightM * cam.scale;
 
+    // Top-left corner in screen px (no rotation: rotation is currently always 0)
+    const leftPx = cs.x - widthPx / 2;
+    const topPx = cs.y - heightPx / 2;
+
     this.el.style.position = "absolute";
-    this.el.style.left = `${cs.x - widthPx / 2}px`;
-    this.el.style.top = `${cs.y - heightPx / 2}px`;
-    this.el.style.width = `${widthPx}px`;
-    this.el.style.height = `${heightPx}px`;
+    this.el.style.left = `${leftPx}px`;
+    this.el.style.top = `${topPx}px`;
+
+    // While editing, the *box* follows the *text* (auto-grow), not the other way around.
+    // - wrap=true:  fixed width, height grows downward
+    // - wrap=false: width and height both grow (single line / explicit \n)
+    if (box.style.wrap) {
+      this.el.style.width = `${widthPx}px`;
+      this.el.style.minWidth = `${widthPx}px`;
+      this.el.style.maxWidth = `${widthPx}px`;
+      this.el.style.height = "auto";
+      this.el.style.minHeight = `${heightPx}px`;
+    } else {
+      this.el.style.width = "auto";
+      this.el.style.minWidth = `${widthPx}px`;
+      this.el.style.maxWidth = "none";
+      this.el.style.height = "auto";
+      this.el.style.minHeight = `${heightPx}px`;
+    }
+
     this.el.style.transform = `rotate(${box.rotationRad}rad)`;
-    this.el.style.transformOrigin = "center center";
+    this.el.style.transformOrigin = "top left";
 
     const fontPx = box.style.fontSizePx * (cam.scale / Defaults.measureReferenceScalePxPerM);
     this.el.style.fontSize = `${fontPx}px`;
@@ -141,7 +161,7 @@ export class TextEditorOverlay {
     this.el.style.overflowWrap = box.style.wrap ? "break-word" : "normal";
     this.el.style.padding = "6px";
     this.el.style.boxSizing = "border-box";
-    this.el.style.overflow = "hidden";
+    this.el.style.overflow = "visible";
     this.el.style.outline = "2px solid rgba(77,163,255,0.45)";
     this.el.style.border = box.style.borderEnabled
       ? `${box.style.borderWidthPx}px solid ${box.style.borderColor}`
@@ -150,7 +170,7 @@ export class TextEditorOverlay {
     // Toolbar: above the box (in screen space)
     this.toolbarEl.style.position = "absolute";
     const tbLeft = Math.max(8, cs.x - 140);
-    const tbTop = Math.max(8, cs.y - heightPx / 2 - 44);
+    const tbTop = Math.max(8, topPx - 44);
     this.toolbarEl.style.left = `${tbLeft}px`;
     this.toolbarEl.style.top = `${tbTop}px`;
   }
@@ -211,7 +231,38 @@ export class TextEditorOverlay {
   commit() {
     if (!this.isActive()) return;
     const box = this.app.scene.getTextBoxById(this.activeBoxId!);
-    if (box) box.html = this.el.innerHTML;
+    if (!box) { this.hide(); return; }
+
+    // 1) Persist HTML
+    const html = this.el.innerHTML;
+    box.html = html;
+
+    // 2) Empty box → auto-delete
+    const plain = (this.el.textContent || "").replace(/\u200B/g, "").trim();
+    const hasContent = plain.length > 0 || /<img|<br\s*\/?>(?!\s*$)/i.test(html);
+    if (!hasContent) {
+      this.app.scene.removeTextBox(box);
+      this.app.clearSelection();
+      this.app.refreshLabelUI();
+      this.hide();
+      return;
+    }
+
+    // 3) Auto-grow box to fit text content (DOM-measured), keeping top-left anchored.
+    const cam = this.app.camera;
+    const rect = this.el.getBoundingClientRect();
+    const measuredWidthPx = rect.width;
+    const measuredHeightPx = rect.height;
+    const newWidthM = Math.max(Defaults.textMinBoxSizeM, measuredWidthPx / cam.scale);
+    const newHeightM = Math.max(Defaults.textMinBoxSizeM, measuredHeightPx / cam.scale);
+
+    // Anchor top-left: tl_world = center - (w/2, h/2). Keep tl_world fixed.
+    const tlX = box.center.x - box.widthM / 2;
+    const tlY = box.center.y - box.heightM / 2;
+    box.widthM = newWidthM;
+    box.heightM = newHeightM;
+    box.center = { x: tlX + newWidthM / 2, y: tlY + newHeightM / 2 } as any;
+
     this.hide();
   }
 
