@@ -63,6 +63,7 @@ export const ToolIds = {
   MEASURE: "measure",
   TEXT: "text",
   PIPETTE: "pipette",
+  STICKER: "sticker",
 } as const;
 
 export const SelectionType = {
