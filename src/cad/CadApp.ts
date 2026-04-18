@@ -398,6 +398,16 @@ export class CadApp {
       }));
       this.onStickersChange?.();
     }
+    // Restore sticker instances
+    if (Array.isArray(data.stickerInstances)) {
+      for (const si of data.stickerInstances) {
+        this.scene.createStickerInstance({
+          defId: si.defId, name: si.name, items: si.items,
+          position: si.position, rotationRad: si.rotationRad || 0,
+          scale: si.scale || 1, labelId: si.labelId,
+        });
+      }
+    }
     this.clearSelection();
     this.setSelectedLabelId(null);
     this.pointEditMenu.hide();
