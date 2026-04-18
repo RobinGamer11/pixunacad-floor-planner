@@ -533,39 +533,6 @@ export class SelectTool {
   }
 
   update(input: Input) {
-    // Active sticker corner drag (Rotate + Scale um Mittelpunkt)
-    if (this.cornerDragStickerId) {
-      const inst = this.app.scene.getStickerInstanceById(this.cornerDragStickerId);
-      if (!inst) {
-        this.cornerDragStickerId = null;
-      } else {
-        const mouseW = v(input.mouse.wx, input.mouse.wy);
-        const dx = mouseW.x - inst.position.x;
-        const dy = mouseW.y - inst.position.y;
-        const curDist = Math.hypot(dx, dy);
-        const curAng = Math.atan2(dy, dx);
-        // Rotation: aktuelle Rotation = init + (curAng - startAng)
-        let newRot = this.cornerDragInitRot + (curAng - this.cornerDragStartAngle);
-        // Shift = 15°-Snap
-        if (input.keys.shift) {
-          const step = Math.PI / 12;
-          newRot = Math.round(newRot / step) * step;
-        }
-        inst.rotationRad = newRot;
-        // Skalierung proportional zum Distanz-Verhältnis
-        if (this.cornerDragStartDist > 1e-6) {
-          const ratio = curDist / this.cornerDragStartDist;
-          const newScale = Math.max(0.05, this.cornerDragInitScale * ratio);
-          inst.scale = newScale;
-        }
-        this.app.syncStickerInstanceHub();
-        if (!input.mouse.left) {
-          this.cornerDragStickerId = null;
-        }
-        return;
-      }
-    }
-
     // Active sticker drag with point snapping
     if (this.dragStickerId) {
       const inst = this.app.scene.getStickerInstanceById(this.dragStickerId);
