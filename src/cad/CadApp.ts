@@ -703,6 +703,9 @@ export class CadApp {
     return mouseW.x < b.minX || mouseW.x > b.maxX || mouseW.y < b.minY || mouseW.y > b.maxY;
   }
 
+  /** Public alias: Tools können den Sticker-Hub nach Live-Updates (Drag) refreshen. */
+  syncStickerInstanceHub() { this._syncStickerInstanceHub(); }
+
   /** Hub für Sticker-Instanz: Länge = Skalierung %, Winkel = Rotation °. */
   private _syncStickerInstanceHub() {
     const inst = this.getSelectedStickerInstance();
