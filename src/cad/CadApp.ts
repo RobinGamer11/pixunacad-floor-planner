@@ -2,7 +2,7 @@ import { Defaults, ToolIds, PointEditAction, SelectionType } from "./constants";
 import { clamp } from "./geometry";
 import { Camera } from "./Camera";
 import { Input } from "./Input";
-import { Scene, AreaLabel, DimensionStyle, TextBoxStyle } from "./Scene";
+import { Scene, AreaLabel, DimensionStyle, TextBoxStyle, TextBox } from "./Scene";
 import { LabelManager } from "./LabelManager";
 import { TopologyEngine } from "./TopologyEngine";
 import { Renderer, Selection } from "./Renderer";
@@ -12,8 +12,40 @@ import { SelectTool } from "./SelectTool";
 import { LineTool } from "./LineTool";
 import { HatchTool } from "./HatchTool";
 import { MeasureTool } from "./MeasureTool";
+import { TextTool } from "./TextTool";
+import { TextEditorOverlay } from "./TextEditorOverlay";
 
 import { IdPanel } from "./IdPanel";
+
+export interface TextSettingsRefs {
+  panel: HTMLDivElement;
+  idSelect: HTMLSelectElement;
+  textColor: HTMLInputElement;
+  textColorPreview: HTMLDivElement;
+  fontSize: HTMLInputElement;
+  alignLeftBtn: HTMLButtonElement;
+  alignCenterBtn: HTMLButtonElement;
+  alignRightBtn: HTMLButtonElement;
+  bgColor: HTMLInputElement;
+  bgColorPreview: HTMLDivElement;
+  bgAlpha: HTMLInputElement;
+  wrapToggle: HTMLInputElement;
+  borderToggle: HTMLInputElement;
+  borderGroup: HTMLDivElement;
+  borderColor: HTMLInputElement;
+  borderColorPreview: HTMLDivElement;
+  borderWidth: HTMLInputElement;
+}
+
+export interface TextEditorRefs {
+  editor: HTMLDivElement;
+  toolbar: HTMLDivElement;
+  boldBtn: HTMLButtonElement;
+  italicBtn: HTMLButtonElement;
+  colorInput: HTMLInputElement;
+  sizeSelect: HTMLSelectElement;
+  symbolSelect: HTMLSelectElement;
+}
 
 export interface MeasureSettings {
   orientation: "parallel" | "diagonal";
