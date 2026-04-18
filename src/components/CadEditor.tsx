@@ -132,6 +132,10 @@ const CadEditor: React.FC = () => {
   const [docImporting, setDocImporting] = useState(false);
   const [docSelected, setDocSelected] = useState<{ id: string; name: string; widthM: number; heightM: number } | null>(null);
   const [docToolPhase, setDocToolPhase] = useState<string>("idle");
+  // Maßstab-Auswahl vor Platzierung
+  const [scaleDialogPages, setScaleDialogPages] = useState<ImportedPage[] | null>(null);
+  const [scaleChoice, setScaleChoice] = useState<string>("100"); // "50" | "100" | "200" | "500" | "1" | "custom"
+  const [scaleCustom, setScaleCustom] = useState<string>("100");
 
   useEffect(() => {
     if (
