@@ -1012,10 +1012,18 @@ export class CadApp {
         }
       }
 
+      // Don't trigger tool shortcuts while text editor is active
+      const isTextEditing = this.textEditor?.isActive();
+      if (isTextEditing) {
+        if (e.key === "Escape") { e.preventDefault(); this.textEditor.commit(); return; }
+        return;
+      }
+
       if (e.key === "v" || e.key === "V") this.setTool(ToolIds.SELECT);
       if (e.key === "l" || e.key === "L") this.setTool(ToolIds.LINE);
       if (e.key === "h" || e.key === "H") this.setTool(ToolIds.HATCH);
       if (e.key === "m" || e.key === "M") this.setTool(ToolIds.MEASURE);
+      if (e.key === "t" || e.key === "T") this.setTool(ToolIds.TEXT);
 
       if (e.key === "Escape") {
         if (this.activeTool === this.lineTool) { this.lineTool.cancel(); this.clearSelection(); this.setSelectedLabelId(null); this.setTool(ToolIds.SELECT); return; }
@@ -1037,6 +1045,11 @@ export class CadApp {
           if (dim) { this.scene.removeDimension(dim); this.clearSelection(); this.refreshLabelUI(); }
           return;
         }
+        if (this.selection && (this.selection.type === SelectionType.TEXTBOX || this.selection.type === SelectionType.TEXTBOX_HANDLE)) {
+          const box = this.getSelectedTextBox();
+          if (box) { this.scene.removeTextBox(box); this.clearSelection(); this.refreshLabelUI(); }
+          return;
+        }
         if (this.selection && this.selection.hatchId) {
           const hatch = this.scene.getHatchById(this.selection.hatchId);
           if (hatch) {
@@ -1055,6 +1068,7 @@ export class CadApp {
           this.scene.removeSegmentsByLabelId(this.selectedLabelId);
           this.scene.removeHatchesByLabelId(this.selectedLabelId);
           this.scene.removeDimensionsByLabelId(this.selectedLabelId);
+          this.scene.removeTextBoxesByLabelId(this.selectedLabelId);
           this.setSelectedLabelId(null);
           this.refreshLabelUI();
         }
@@ -1069,7 +1083,11 @@ export class CadApp {
     else if (id === ToolIds.LINE) { this.activeTool = this.lineTool; this.lineTool.activate(); }
     else if (id === ToolIds.HATCH) { this.activeTool = this.hatchTool; this.hatchTool.activate(); }
     else if (id === ToolIds.MEASURE) { this.activeTool = this.measureTool; this.measureTool.activate(); }
+    else if (id === ToolIds.TEXT) { this.activeTool = this.textTool; this.textTool.activate(); }
     this._syncLineSettingsFromContext();
+    this._syncHatchSettingsFromContext();
+    this._syncMeasureSettingsFromContext();
+    this._syncTextSettingsFromContext();
     this._syncHatchSettingsFromContext();
     this._syncMeasureSettingsFromContext();
     this._updateSettingsVisibility();
@@ -1284,6 +1302,7 @@ export class CadApp {
     if (this._snapshotTimer != null) { clearInterval(this._snapshotTimer); this._snapshotTimer = null; }
     this.input.destroy();
     this.hub.destroy();
+    this.textEditor?.destroy();
     if (this._keydownHandler) window.removeEventListener("keydown", this._keydownHandler);
   }
 }
