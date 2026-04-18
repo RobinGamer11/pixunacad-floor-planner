@@ -218,12 +218,54 @@ export class StickerInstance {
   }
 }
 
+export class DocumentObject {
+  id: string;
+  name: string;
+  /** "image" (jpg/png) oder "pdf-page" (gerendertes PDF). */
+  kind: "image" | "pdf-page";
+  /** Base64 DataURL des gerenderten Bildes (PNG für PDF, original für JPG/PNG). */
+  src: string;
+  /** Bei PDFs: Seitenindex (0-basiert). */
+  pageIndex: number;
+  /** Welt-Position der oberen-linken Ecke (vor Rotation). */
+  position: Vec2;
+  /** Welt-Breite/-Höhe in Metern. */
+  widthM: number;
+  heightM: number;
+  /** Rotation um die Mitte, in Radiant. */
+  rotationRad: number;
+  /** Original-Pixelgröße. */
+  pixelWidth: number;
+  pixelHeight: number;
+  labelId: string;
+
+  constructor({ id, name, kind, src, pageIndex, position, widthM, heightM, rotationRad, pixelWidth, pixelHeight, labelId }: {
+    id: string; name?: string; kind?: "image" | "pdf-page"; src: string;
+    pageIndex?: number; position: Vec2; widthM: number; heightM: number;
+    rotationRad?: number; pixelWidth?: number; pixelHeight?: number; labelId?: string;
+  }) {
+    this.id = id;
+    this.name = name || "Dokument";
+    this.kind = kind || "image";
+    this.src = src;
+    this.pageIndex = pageIndex || 0;
+    this.position = v(position.x, position.y);
+    this.widthM = Math.max(0.001, widthM);
+    this.heightM = Math.max(0.001, heightM);
+    this.rotationRad = rotationRad || 0;
+    this.pixelWidth = pixelWidth || 0;
+    this.pixelHeight = pixelHeight || 0;
+    this.labelId = labelId || Defaults.defaultLabelId;
+  }
+}
+
 export class Scene {
   segments: Segment[] = [];
   hatches: Hatch[] = [];
   dimensions: Dimension[] = [];
   textBoxes: TextBox[] = [];
   stickerInstances: StickerInstance[] = [];
+  documents: DocumentObject[] = [];
   /**
    * Wenn !== null: alle danach via create* erzeugten Objekte werden mit dieser
    * Sticker-Edit-Owner-ID markiert. Wird von CadApp während enterStickerEdit
