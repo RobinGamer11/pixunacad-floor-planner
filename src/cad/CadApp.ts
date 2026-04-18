@@ -1418,8 +1418,16 @@ export class CadApp {
       if (this.input.isPanning) this.camera.panBy(this.input.panDX, this.input.panDY);
       if (this.input.wheelDelta !== 0) this.camera.zoomAt(this.input.wheelDelta, this.input.mouse.sx, this.input.mouse.sy);
       this.input.update(this.camera);
-      this.activeTool.update(this.input);
+
+      if (this.pastePreviewActive) {
+        this.canvas.style.cursor = "copy";
+        if (this.input.clicked) this._commitPasteAtMouse();
+      } else {
+        this.activeTool.update(this.input);
+      }
+
       this.renderer.render();
+      if (this.pastePreviewActive) this._drawPastePreview(this.ctx);
       this.input.endFrame();
     } catch (err) {
       console.error("CAD tick error:", err);
