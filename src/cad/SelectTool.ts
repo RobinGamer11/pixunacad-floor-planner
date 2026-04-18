@@ -584,6 +584,35 @@ export class SelectTool {
       }
     }
 
+    // Active document drag with point snapping
+    if (this.dragDocId) {
+      const doc = this.app.scene.getDocumentById(this.dragDocId);
+      if (!doc || !this.dragDocGrabOffset) {
+        this.dragDocId = null;
+        this.dragDocGrabOffset = null;
+        this.dragDocSnap = null;
+      } else {
+        const mouseW = v(input.mouse.wx, input.mouse.wy);
+        const snap = this.app.topology.findBestSnap(
+          v(input.mouse.sx, input.mouse.sy),
+          mouseW
+        );
+        this.dragDocSnap = snap;
+        const target = (snap && snap.world) ? snap.world : mouseW;
+        // doc.position ist die Top-Left-Ecke; Greifpunkt-Offset bezieht sich darauf.
+        doc.position = {
+          x: target.x - this.dragDocGrabOffset.x,
+          y: target.y - this.dragDocGrabOffset.y,
+        };
+        if (!input.mouse.left) {
+          this.dragDocId = null;
+          this.dragDocGrabOffset = null;
+          this.dragDocSnap = null;
+        }
+        return;
+      }
+    }
+
     // Active dimension parallel-drag
     if (this.dragDimId) {
       const dim = this.app.scene.getDimensionById(this.dragDimId);
