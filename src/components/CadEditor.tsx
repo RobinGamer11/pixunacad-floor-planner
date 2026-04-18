@@ -4,6 +4,7 @@ import { ToolIds, PointEditAction } from "@/cad/constants";
 import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Pipette, Sticker as StickerIcon, Pencil, Trash2, Download, Upload, Plus } from "lucide-react";
 import type { HatchDrawMode } from "@/cad/HatchTool";
 import type { StickerDefinition } from "@/cad/StickerManager";
+import { instanceBoundingCornersWorld } from "@/cad/StickerManager";
 
 const CAD_TOOLS = [
   { id: ToolIds.SELECT, label: "Auswahl", key: "V", icon: MousePointer2 },
