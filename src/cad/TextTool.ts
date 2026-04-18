@@ -110,10 +110,12 @@ export class TextTool {
     }
 
     if (input.clicked) {
-      // Block creating a new textbox while another one is being edited.
-      // The user must first click outside (which commits) before placing a new one.
+      // If an editor is still open at this point (e.g. clicking on canvas
+      // outside the editor), commit it first. The same click then becomes the
+      // placement click for the next textbox — so the user gets immediate
+      // feedback without needing an extra click.
       if (this.app.textEditor?.isActive()) {
-        return;
+        this.app.textEditor.commit();
       }
 
       // If the user clicks an existing textbox, select it instead of creating one
@@ -170,17 +172,22 @@ export class TextTool {
       ctx.restore();
     }
 
-    // Preview rectangle at anchor (top-left = anchor, default size, no rotation)
-    const anchor = this._previewAnchor(this.app.input);
-    const widthPx = Defaults.textBoxWidthM * cam.scale;
-    const heightPx = Defaults.textBoxHeightM * cam.scale;
-    const tl = cam.worldToScreen(anchor.x, anchor.y);
-    ctx.save();
-    ctx.fillStyle = "rgba(77,163,255,0.08)";
-    ctx.strokeStyle = "rgba(77,163,255,0.85)";
-    ctx.lineWidth = 1.8;
-    ctx.fillRect(tl.x, tl.y, widthPx, heightPx);
-    ctx.strokeRect(tl.x, tl.y, widthPx, heightPx);
-    ctx.restore();
+    // Preview rectangle at anchor (top-left = anchor, default size, no rotation).
+    // Hide the preview while an editor is open — the next click will commit
+    // it AND place the new textbox at the same time, so the preview reappears
+    // immediately on the following frame.
+    if (!this.app.textEditor?.isActive()) {
+      const anchor = this._previewAnchor(this.app.input);
+      const widthPx = Defaults.textBoxWidthM * cam.scale;
+      const heightPx = Defaults.textBoxHeightM * cam.scale;
+      const tl = cam.worldToScreen(anchor.x, anchor.y);
+      ctx.save();
+      ctx.fillStyle = "rgba(77,163,255,0.08)";
+      ctx.strokeStyle = "rgba(77,163,255,0.85)";
+      ctx.lineWidth = 1.8;
+      ctx.fillRect(tl.x, tl.y, widthPx, heightPx);
+      ctx.strokeRect(tl.x, tl.y, widthPx, heightPx);
+      ctx.restore();
+    }
   }
 }
