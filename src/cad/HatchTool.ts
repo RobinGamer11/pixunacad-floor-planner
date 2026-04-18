@@ -796,13 +796,63 @@ export class HatchTool {
       ctx.restore();
     }
 
+    const style = this.app.getCurrentHatchStyle();
+    const fillCol = rgbaFromHex(style.fillColor, style.fillAlphaPct / 100);
+    const scaledStrokePx = Math.max(0, style.strokeWidthPx || 0) * (cam.scale / Defaults.strokeWidthBaseScale);
+
+    if (this.drawMode === "rectangle") {
+      if (this.rectState === "firstSide" && this.rectPointA) {
+        const b = this._rectFirstSidePoint(this.app.input);
+        const a0 = cam.worldToScreen(this.rectPointA.x, this.rectPointA.y);
+        const b0 = cam.worldToScreen(b.x, b.y);
+        ctx.save();
+        if (scaledStrokePx > 0) {
+          ctx.strokeStyle = style.strokeColor;
+          ctx.lineWidth = scaledStrokePx;
+          ctx.beginPath();
+          ctx.moveTo(a0.x, a0.y);
+          ctx.lineTo(b0.x, b0.y);
+          ctx.stroke();
+        }
+        ctx.fillStyle = "rgba(77,163,255,0.85)";
+        ctx.beginPath(); ctx.arc(a0.x, a0.y, 4, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(b0.x, b0.y, 4, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      } else if (this.rectState === "secondSide" && this.rectPointA && this.rectPointB) {
+        const rect = this._getRectPreviewPoints(this.app.input);
+        if (!rect) return;
+        ctx.save();
+        ctx.beginPath();
+        const p0 = cam.worldToScreen(rect[0].x, rect[0].y);
+        ctx.moveTo(p0.x, p0.y);
+        for (let i = 1; i < rect.length; i++) {
+          const sp = cam.worldToScreen(rect[i].x, rect[i].y);
+          ctx.lineTo(sp.x, sp.y);
+        }
+        ctx.closePath();
+        ctx.fillStyle = fillCol;
+        ctx.fill();
+        if (scaledStrokePx > 0) {
+          ctx.strokeStyle = style.strokeColor;
+          ctx.lineWidth = scaledStrokePx;
+          ctx.stroke();
+        }
+        ctx.fillStyle = "rgba(77,163,255,0.85)";
+        for (const p of rect) {
+          const sp = cam.worldToScreen(p.x, p.y);
+          ctx.beginPath();
+          ctx.arc(sp.x, sp.y, 4, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+      return;
+    }
+
     if (this.state !== "drawing" || this.points.length === 0) return;
 
     const previewPoint = this._previewWorld(this.app.input);
     const path = [...this.points, previewPoint];
-    const style = this.app.getCurrentHatchStyle();
-    const fillCol = rgbaFromHex(style.fillColor, style.fillAlphaPct / 100);
-    const scaledStrokePx = Math.max(0, style.strokeWidthPx || 0) * (cam.scale / Defaults.strokeWidthBaseScale);
 
     ctx.save();
 
