@@ -2,7 +2,7 @@ import { Defaults, ToolIds, PointEditAction, SelectionType } from "./constants";
 import { clamp } from "./geometry";
 import { Camera } from "./Camera";
 import { Input } from "./Input";
-import { Scene, AreaLabel, DimensionStyle } from "./Scene";
+import { Scene, AreaLabel, DimensionStyle, TextBoxStyle } from "./Scene";
 import { LabelManager } from "./LabelManager";
 import { TopologyEngine } from "./TopologyEngine";
 import { Renderer, Selection } from "./Renderer";
@@ -12,6 +12,7 @@ import { SelectTool } from "./SelectTool";
 import { LineTool } from "./LineTool";
 import { HatchTool } from "./HatchTool";
 import { MeasureTool } from "./MeasureTool";
+import { TextTool } from "./TextTool";
 import { IdPanel } from "./IdPanel";
 
 export interface MeasureSettings {
