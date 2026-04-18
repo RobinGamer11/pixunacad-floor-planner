@@ -767,6 +767,7 @@ export class CadApp {
       if (e.key === "v" || e.key === "V") this.setTool(ToolIds.SELECT);
       if (e.key === "l" || e.key === "L") this.setTool(ToolIds.LINE);
       if (e.key === "h" || e.key === "H") this.setTool(ToolIds.HATCH);
+      if (e.key === "m" || e.key === "M") this.setTool(ToolIds.MEASURE);
 
       if (e.key === "Escape") {
         if (this.activeTool === this.lineTool) { this.lineTool.cancel(); this.clearSelection(); this.setSelectedLabelId(null); this.setTool(ToolIds.SELECT); return; }
@@ -781,6 +782,11 @@ export class CadApp {
         if (this.selection && this.selection.segmentId) {
           const seg = this.scene.getSegmentById(this.selection.segmentId);
           if (seg) { this.scene.removeSegment(seg); this.clearSelection(); this.pointEditMenu.hide(); this.refreshLabelUI(); }
+          return;
+        }
+        if (this.selection && this.selection.type === SelectionType.DIMENSION) {
+          const dim = this.getSelectedDimension();
+          if (dim) { this.scene.removeDimension(dim); this.clearSelection(); this.refreshLabelUI(); }
           return;
         }
         if (this.selection && this.selection.hatchId) {
@@ -800,6 +806,7 @@ export class CadApp {
         if (this.selectedLabelId) {
           this.scene.removeSegmentsByLabelId(this.selectedLabelId);
           this.scene.removeHatchesByLabelId(this.selectedLabelId);
+          this.scene.removeDimensionsByLabelId(this.selectedLabelId);
           this.setSelectedLabelId(null);
           this.refreshLabelUI();
         }
@@ -816,6 +823,7 @@ export class CadApp {
     else if (id === ToolIds.MEASURE) { this.activeTool = this.measureTool; this.measureTool.activate(); }
     this._syncLineSettingsFromContext();
     this._syncHatchSettingsFromContext();
+    this._syncMeasureSettingsFromContext();
     this._updateSettingsVisibility();
     this.onToolChange?.(id);
   }
