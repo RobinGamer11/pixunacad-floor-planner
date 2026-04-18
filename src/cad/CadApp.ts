@@ -2,7 +2,7 @@ import { Defaults, ToolIds, PointEditAction, SelectionType } from "./constants";
 import { clamp } from "./geometry";
 import { Camera } from "./Camera";
 import { Input } from "./Input";
-import { Scene, AreaLabel } from "./Scene";
+import { Scene, AreaLabel, DimensionStyle } from "./Scene";
 import { LabelManager } from "./LabelManager";
 import { TopologyEngine } from "./TopologyEngine";
 import { Renderer, Selection } from "./Renderer";
@@ -11,7 +11,46 @@ import { PointEditMenu } from "./PointEditMenu";
 import { SelectTool } from "./SelectTool";
 import { LineTool } from "./LineTool";
 import { HatchTool } from "./HatchTool";
+import { MeasureTool } from "./MeasureTool";
 import { IdPanel } from "./IdPanel";
+
+export interface MeasureSettings {
+  orientation: "parallel" | "diagonal";
+  pointCount: "two" | "multi";
+  textColor: string;
+  textSizePx: number;
+  lineColor: string;
+  decimals: number;
+  tickLengthM: number;
+  showExtensions: boolean;
+  useFreeText: boolean;
+  freeText: string;
+  textBgEnabled: boolean;
+  textBgColor: string;
+  textBgAlpha: number;
+}
+
+export interface MeasureSettingsRefs {
+  panel: HTMLDivElement;
+  idSelect: HTMLSelectElement;
+  orientation: HTMLSelectElement;
+  pointCount: HTMLSelectElement;
+  extensionsToggle: HTMLInputElement;
+  freeTextToggle: HTMLInputElement;
+  freeTextInput: HTMLInputElement;
+  textColor: HTMLInputElement;
+  textColorPreview: HTMLDivElement;
+  textSize: HTMLInputElement;
+  decimals: HTMLInputElement;
+  textBgToggle: HTMLInputElement;
+  textBgGroup: HTMLDivElement;
+  textBgColor: HTMLInputElement;
+  textBgColorPreview: HTMLDivElement;
+  textBgAlpha: HTMLInputElement;
+  lineColor: HTMLInputElement;
+  lineColorPreview: HTMLDivElement;
+  tickLength: HTMLInputElement;
+}
 
 export class CadApp {
   canvas: HTMLCanvasElement;
