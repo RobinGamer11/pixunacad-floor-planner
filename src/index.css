@@ -197,9 +197,10 @@
   }
 
   .cad-settings-panel {
-    @apply rounded-lg shadow-lg border p-3 space-y-3;
-    background: hsl(var(--cad-settings-bg));
-    border-color: hsl(var(--cad-hub-border));
+    @apply rounded-lg border-0 p-3 space-y-3;
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
   }
 
   .cad-settings-panel label {
