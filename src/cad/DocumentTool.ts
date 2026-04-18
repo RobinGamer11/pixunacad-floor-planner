@@ -34,6 +34,7 @@ export class DocumentTool {
   scaleTargetDocId: string | null = null;
   scalePoint1: Vec2 | null = null;
   scalePoint2: Vec2 | null = null;
+  scalePoint3: Vec2 | null = null;
   scaleSnap: Snap | null = null;
 
   onPhaseChange?: () => void;
