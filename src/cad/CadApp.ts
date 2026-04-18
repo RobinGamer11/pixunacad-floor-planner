@@ -711,6 +711,7 @@ export class CadApp {
   destroy() {
     this._destroyed = true;
     cancelAnimationFrame(this._rafId);
+    if (this._snapshotTimer != null) { clearInterval(this._snapshotTimer); this._snapshotTimer = null; }
     this.input.destroy();
     this.hub.destroy();
     if (this._keydownHandler) window.removeEventListener("keydown", this._keydownHandler);
