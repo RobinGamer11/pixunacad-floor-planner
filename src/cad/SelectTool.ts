@@ -734,6 +734,31 @@ export class SelectTool {
   }
 
   _drawOverlay(ctx: CanvasRenderingContext2D, cam: any) {
+    // Sticker-Drag-Snap-Marker
+    if (this.dragStickerId && this.dragStickerSnap) {
+      const sn = this.dragStickerSnap;
+      if ((sn.type === SnapType.LINE || sn.type === SnapType.GUIDE) && sn.lineA && sn.lineB) {
+        const a = cam.worldToScreen(sn.lineA.x, sn.lineA.y);
+        const b = cam.worldToScreen(sn.lineB.x, sn.lineB.y);
+        ctx.save();
+        ctx.strokeStyle = "rgba(77,163,255,0.42)";
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+        ctx.restore();
+      }
+      if (sn.world) {
+        const s = cam.worldToScreen(sn.world.x, sn.world.y);
+        ctx.save();
+        ctx.fillStyle = "rgba(77,163,255,0.95)";
+        ctx.beginPath(); ctx.arc(s.x, s.y, 4.5, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = "rgba(77,163,255,0.45)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(s.x, s.y, 10, 0, Math.PI * 2); ctx.stroke();
+        ctx.restore();
+      }
+      return;
+    }
+
     if (this.isEditing()) {
       if (this.activeEditAction === PointEditAction.MOVE || this.activeEditAction === PointEditAction.TRANSLATE) {
         const snap = this._findPreviewSnapForEdit(this.app.input);
