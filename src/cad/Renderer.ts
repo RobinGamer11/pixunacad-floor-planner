@@ -42,6 +42,9 @@ export class Renderer {
   selectedLabelId: string | null = null;
   hoverSegmentId: string | null = null;
   hoverHatchId: string | null = null;
+  hoverTextBoxId: string | null = null;
+  /** Box currently being edited inline — skip canvas rendering for it. */
+  editingTextBoxId: string | null = null;
 
   constructor(ctx: CanvasRenderingContext2D, camera: Camera, scene: Scene, labels: LabelManager) {
     this.ctx = ctx;
@@ -55,6 +58,8 @@ export class Renderer {
   setSelectedLabelId(labelId: string | null) { this.selectedLabelId = labelId || null; }
   setHoverSegmentId(id: string | null) { this.hoverSegmentId = id || null; }
   setHoverHatchId(id: string | null) { this.hoverHatchId = id || null; }
+  setHoverTextBoxId(id: string | null) { this.hoverTextBoxId = id || null; }
+  setEditingTextBoxId(id: string | null) { this.editingTextBoxId = id || null; }
 
   private _segmentsBackToFront() {
     const order = this.labels.list();
