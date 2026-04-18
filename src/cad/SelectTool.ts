@@ -338,6 +338,17 @@ export class SelectTool {
 
     if (best) return best;
 
+    // Dimensions (parallel-line hit)
+    for (const dim of this.app.scene.dimensions) {
+      if (!this.app.labelManager.isVisible(dim.labelId)) continue;
+      const g = getDimensionGeometry(dim);
+      const proj = projectPointToSegment(mouseW, g.d1, g.d2);
+      const px = distPxToWorldPoint(proj.q);
+      if (px <= Defaults.hitPx) {
+        return { type: SelectionType.DIMENSION, dimensionId: dim.id } as any;
+      }
+    }
+
     // Hatch polygon hit (pointInPolygon)
     for (const hatch of visibleHatches) {
       if (selectedHatch && hatch.id === selectedHatch.id) continue;
