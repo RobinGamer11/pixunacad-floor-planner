@@ -1,13 +1,14 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import { CadApp } from "@/cad/CadApp";
 import { ToolIds, PointEditAction } from "@/cad/constants";
-import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle } from "lucide-react";
+import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler } from "lucide-react";
 import type { HatchDrawMode } from "@/cad/HatchTool";
 
 const CAD_TOOLS = [
   { id: ToolIds.SELECT, label: "Auswahl", key: "V", icon: MousePointer2 },
   { id: ToolIds.LINE, label: "Linie", key: "L", icon: Minus },
   { id: ToolIds.HATCH, label: "Schraffur", key: "H", icon: Square },
+  { id: ToolIds.MEASURE, label: "Maßkette", key: "M", icon: Ruler },
 ];
 
 const CadEditor: React.FC = () => {
@@ -52,6 +53,28 @@ const CadEditor: React.FC = () => {
   const areaBgPreviewRef = useRef<HTMLDivElement>(null);
   const areaBgAlphaRef = useRef<HTMLInputElement>(null);
 
+  // Measure settings refs
+  const measureSettingsRef = useRef<HTMLDivElement>(null);
+  const measureIdSelectRef = useRef<HTMLSelectElement>(null);
+  const measureOrientationRef = useRef<HTMLSelectElement>(null);
+  const measurePointCountRef = useRef<HTMLSelectElement>(null);
+  const measureEditModeRef = useRef<HTMLSelectElement>(null);
+  const measureExtRef = useRef<HTMLInputElement>(null);
+  const measureFreeTextToggleRef = useRef<HTMLInputElement>(null);
+  const measureFreeTextInputRef = useRef<HTMLInputElement>(null);
+  const measureTextColorRef = useRef<HTMLInputElement>(null);
+  const measureTextColorPreviewRef = useRef<HTMLDivElement>(null);
+  const measureTextSizeRef = useRef<HTMLInputElement>(null);
+  const measureDecimalsRef = useRef<HTMLInputElement>(null);
+  const measureTextBgToggleRef = useRef<HTMLInputElement>(null);
+  const measureTextBgGroupRef = useRef<HTMLDivElement>(null);
+  const measureTextBgColorRef = useRef<HTMLInputElement>(null);
+  const measureTextBgColorPreviewRef = useRef<HTMLDivElement>(null);
+  const measureTextBgAlphaRef = useRef<HTMLInputElement>(null);
+  const measureLineColorRef = useRef<HTMLInputElement>(null);
+  const measureLineColorPreviewRef = useRef<HTMLDivElement>(null);
+  const measureTickLengthRef = useRef<HTMLInputElement>(null);
+
   const appRef = useRef<CadApp | null>(null);
   const [activeTool, setActiveTool] = useState<string>(ToolIds.SELECT);
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
@@ -72,7 +95,14 @@ const CadEditor: React.FC = () => {
       !hatchStrokeColorRef.current || !hatchStrokePreviewRef.current || !hatchStrokeWidthRef.current ||
       !hatchAlphaRef.current || !areaShowRef.current || !areaSettingsGroupRef.current ||
       !areaTextColorRef.current || !areaTextPreviewRef.current || !areaFontSizeRef.current ||
-      !areaBgColorRef.current || !areaBgPreviewRef.current || !areaBgAlphaRef.current
+      !areaBgColorRef.current || !areaBgPreviewRef.current || !areaBgAlphaRef.current ||
+      !measureSettingsRef.current || !measureIdSelectRef.current ||
+      !measureOrientationRef.current || !measurePointCountRef.current || !measureEditModeRef.current ||
+      !measureExtRef.current || !measureFreeTextToggleRef.current || !measureFreeTextInputRef.current ||
+      !measureTextColorRef.current || !measureTextColorPreviewRef.current || !measureTextSizeRef.current ||
+      !measureDecimalsRef.current || !measureTextBgToggleRef.current || !measureTextBgGroupRef.current ||
+      !measureTextBgColorRef.current || !measureTextBgColorPreviewRef.current || !measureTextBgAlphaRef.current ||
+      !measureLineColorRef.current || !measureLineColorPreviewRef.current || !measureTickLengthRef.current
     ) return;
 
     const app = new CadApp(
@@ -97,6 +127,28 @@ const CadEditor: React.FC = () => {
       areaShowRef.current, areaSettingsGroupRef.current,
       areaTextColorRef.current, areaTextPreviewRef.current, areaFontSizeRef.current,
       areaBgColorRef.current, areaBgPreviewRef.current, areaBgAlphaRef.current,
+      {
+        panel: measureSettingsRef.current,
+        idSelect: measureIdSelectRef.current,
+        orientation: measureOrientationRef.current,
+        pointCount: measurePointCountRef.current,
+        editMode: measureEditModeRef.current,
+        extensionsToggle: measureExtRef.current,
+        freeTextToggle: measureFreeTextToggleRef.current,
+        freeTextInput: measureFreeTextInputRef.current,
+        textColor: measureTextColorRef.current,
+        textColorPreview: measureTextColorPreviewRef.current,
+        textSize: measureTextSizeRef.current,
+        decimals: measureDecimalsRef.current,
+        textBgToggle: measureTextBgToggleRef.current,
+        textBgGroup: measureTextBgGroupRef.current,
+        textBgColor: measureTextBgColorRef.current,
+        textBgColorPreview: measureTextBgColorPreviewRef.current,
+        textBgAlpha: measureTextBgAlphaRef.current,
+        lineColor: measureLineColorRef.current,
+        lineColorPreview: measureLineColorPreviewRef.current,
+        tickLength: measureTickLengthRef.current,
+      },
     );
 
     app.onToolChange = (id) => setActiveTool(id);
@@ -197,8 +249,7 @@ const CadEditor: React.FC = () => {
 
         {/* Settings area (scrollable) */}
         <div className="flex-1 min-h-0 overflow-y-auto p-2">
-          {/* Settings hidden when sidebar collapsed */}
-          {/* Line Settings - inline in sidebar; visibility ('hidden' class) is controlled by CadApp */}
+          {/* Line Settings */}
           <div ref={settingsRef} className={`cad-settings-panel hidden mb-2 ${sidebarCollapsed ? "!hidden" : ""}`}>
             <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
               Linie
@@ -222,14 +273,12 @@ const CadEditor: React.FC = () => {
             </div>
           </div>
 
-          {/* Hatch Settings - inline in sidebar; visibility ('hidden' class) is controlled by CadApp */}
-          <div ref={hatchSettingsRef} className={`cad-settings-panel hidden ${sidebarCollapsed ? "!hidden" : ""}`}>
-
+          {/* Hatch Settings */}
+          <div ref={hatchSettingsRef} className={`cad-settings-panel hidden mb-2 ${sidebarCollapsed ? "!hidden" : ""}`}>
             <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
               Schraffur
             </div>
 
-            {/* Draw mode toggle (only relevant while hatch tool is active) */}
             <div className="flex gap-1 mb-3">
               <button
                 type="button"
@@ -314,9 +363,97 @@ const CadEditor: React.FC = () => {
               </div>
             </div>
           </div>
+
+          {/* Measure Settings */}
+          <div ref={measureSettingsRef} className={`cad-settings-panel hidden ${sidebarCollapsed ? "!hidden" : ""}`}>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+              Maßkette
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label>ID</label>
+                <select ref={measureIdSelectRef} className="cad-settings-select w-full" />
+              </div>
+              <div>
+                <label>Richtung</label>
+                <select ref={measureOrientationRef} className="cad-settings-select w-full">
+                  <option value="parallel">Parallel</option>
+                  <option value="diagonal">Schräg</option>
+                </select>
+              </div>
+              <div>
+                <label>Punkte</label>
+                <select ref={measurePointCountRef} className="cad-settings-select w-full">
+                  <option value="two">2 Punkte</option>
+                  <option value="multi">Mehrere Punkte</option>
+                </select>
+              </div>
+              <div>
+                <label>Punktbearbeitung (Auswahl)</label>
+                <select ref={measureEditModeRef} className="cad-settings-select w-full">
+                  <option value="parallel">Parallel verschieben</option>
+                  <option value="endpoints">Endpunkte editieren</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-2">
+                <input ref={measureExtRef} type="checkbox" className="accent-primary" />
+                <label className="!mb-0 cursor-pointer">Verlängerungslinien</label>
+              </div>
+              <div className="flex items-center gap-2">
+                <input ref={measureFreeTextToggleRef} type="checkbox" className="accent-primary" />
+                <label className="!mb-0 cursor-pointer">Freier Text</label>
+              </div>
+              <div>
+                <input ref={measureFreeTextInputRef} type="text" placeholder="Text eingeben" className="hidden" />
+              </div>
+              <div>
+                <label>Textfarbe</label>
+                <div className="flex items-center gap-2">
+                  <div ref={measureTextColorPreviewRef} className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))" }} />
+                  <input ref={measureTextColorRef} type="color" defaultValue="#111111" className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
+                </div>
+              </div>
+              <div>
+                <label>Textgröße (px)</label>
+                <input ref={measureTextSizeRef} type="text" defaultValue="12" />
+              </div>
+              <div>
+                <label>Kommastellen (0–6)</label>
+                <input ref={measureDecimalsRef} type="text" defaultValue="3" />
+              </div>
+              <div className="flex items-center gap-2">
+                <input ref={measureTextBgToggleRef} type="checkbox" className="accent-primary" />
+                <label className="!mb-0 cursor-pointer">Text-Hintergrund</label>
+              </div>
+              <div ref={measureTextBgGroupRef} className="hidden space-y-2 pt-2" style={{ borderTop: "1px solid hsl(var(--border))" }}>
+                <div>
+                  <label>HG-Farbe</label>
+                  <div className="flex items-center gap-2">
+                    <div ref={measureTextBgColorPreviewRef} className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))" }} />
+                    <input ref={measureTextBgColorRef} type="color" defaultValue="#ffffff" className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
+                  </div>
+                </div>
+                <div>
+                  <label>HG-Transparenz (0–1)</label>
+                  <input ref={measureTextBgAlphaRef} type="text" defaultValue="0.8" />
+                </div>
+              </div>
+              <div>
+                <label>Linienfarbe</label>
+                <div className="flex items-center gap-2">
+                  <div ref={measureLineColorPreviewRef} className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))" }} />
+                  <input ref={measureLineColorRef} type="color" defaultValue="#2b2b2b" className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
+                </div>
+              </div>
+              <div>
+                <label>Endstrich-Länge (m)</label>
+                <input ref={measureTickLengthRef} type="text" defaultValue="0.06" />
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Collapse toggle - positioned on the divider between tools and settings */}
+        {/* Collapse toggle */}
         <button
           onClick={() => setSidebarCollapsed((v) => !v)}
           className="absolute -right-3 top-[88px] z-30 flex items-center justify-center w-6 h-6 rounded-full border shadow-md transition-all hover:scale-110"

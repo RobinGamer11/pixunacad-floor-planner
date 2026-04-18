@@ -17,6 +17,7 @@ import { IdPanel } from "./IdPanel";
 export interface MeasureSettings {
   orientation: "parallel" | "diagonal";
   pointCount: "two" | "multi";
+  editMode: "parallel" | "endpoints";
   textColor: string;
   textSizePx: number;
   lineColor: string;
@@ -35,6 +36,7 @@ export interface MeasureSettingsRefs {
   idSelect: HTMLSelectElement;
   orientation: HTMLSelectElement;
   pointCount: HTMLSelectElement;
+  editMode: HTMLSelectElement;
   extensionsToggle: HTMLInputElement;
   freeTextToggle: HTMLInputElement;
   freeTextInput: HTMLInputElement;
@@ -82,6 +84,8 @@ export class CadApp {
   areaBgColorPreview: HTMLDivElement;
   areaBgAlphaInput: HTMLInputElement;
 
+  measureRefs!: MeasureSettingsRefs;
+
   defaultLineColor = Defaults.lineColor;
   defaultLineThicknessM = Defaults.lineThicknessM;
   defaultHatchFillColor = Defaults.hatchFillColor;
@@ -105,6 +109,7 @@ export class CadApp {
   measureSettings: MeasureSettings = {
     orientation: Defaults.measureOrientation,
     pointCount: Defaults.measurePointCount,
+    editMode: Defaults.measureEditMode,
     textColor: Defaults.measureTextColor,
     textSizePx: Defaults.measureTextSizePx,
     lineColor: Defaults.measureLineColor,
@@ -161,6 +166,7 @@ export class CadApp {
     areaTextColorInput: HTMLInputElement, areaTextColorPreview: HTMLDivElement,
     areaFontSizeInput: HTMLInputElement,
     areaBgColorInput: HTMLInputElement, areaBgColorPreview: HTMLDivElement, areaBgAlphaInput: HTMLInputElement,
+    measureRefs: MeasureSettingsRefs,
   ) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d")!;
@@ -190,6 +196,7 @@ export class CadApp {
     this.areaBgColorInput = areaBgColorInput;
     this.areaBgColorPreview = areaBgColorPreview;
     this.areaBgAlphaInput = areaBgAlphaInput;
+    this.measureRefs = measureRefs;
 
     this.camera = new Camera();
     this.scene = new Scene();
@@ -212,6 +219,7 @@ export class CadApp {
 
     this._setupLineSettingsPanel();
     this._setupHatchSettingsPanel();
+    this._setupMeasureSettingsPanel();
     this._setupShortcuts();
     this.refreshLabelUI();
     this._resize();
@@ -343,6 +351,7 @@ export class CadApp {
     this.renderer.setSelection(selection);
     this._syncLineSettingsFromContext();
     this._syncHatchSettingsFromContext();
+    this._syncMeasureSettingsFromContext();
     this._updateSettingsVisibility();
   }
 
@@ -357,6 +366,12 @@ export class CadApp {
     if (!this.selection || !this.selection.hatchId) return null;
     return this.scene.getHatchById(this.selection.hatchId);
   }
+
+  getSelectedDimension() {
+    if (!this.selection || this.selection.type !== SelectionType.DIMENSION) return null;
+    return this.scene.getDimensionById((this.selection as any).dimensionId);
+  }
+
 
   /* ---- Label Selection ---- */
   setSelectedLabelId(labelId: string | null) {
@@ -381,9 +396,11 @@ export class CadApp {
   refreshLabelUI() {
     this._syncLabelSelect();
     this._syncHatchLabelSelect();
+    this._syncMeasureLabelSelect();
     this.idPanel.render();
     this._syncLineSettingsFromContext();
     this._syncHatchSettingsFromContext();
+    this._syncMeasureSettingsFromContext();
   }
 
   private _syncLabelSelect() {
@@ -535,12 +552,18 @@ export class CadApp {
 
   showLineSettingsPanel(shouldShow: boolean) { this.lineSettingsPanel.classList.toggle("hidden", !shouldShow); }
   showHatchSettingsPanel(shouldShow: boolean) { this.hatchSettingsPanel.classList.toggle("hidden", !shouldShow); }
+  showMeasureSettingsPanel(shouldShow: boolean) { this.measureRefs.panel.classList.toggle("hidden", !shouldShow); }
 
   private _updateSettingsVisibility() {
-    const showLine = (this.activeTool === this.lineTool) || !!(this.selection && this.selection.segmentId) || !!this.selectedLabelId;
-    const showHatch = (this.activeTool === this.hatchTool) || !!(this.selection && this.selection.hatchId) || !!this.selectedLabelId;
+    const isMeasureCtx = this.activeTool === this.measureTool || !!this.getSelectedDimension();
+    const isHatchCtx = this.activeTool === this.hatchTool || !!(this.selection && this.selection.hatchId);
+    const isLineCtx = this.activeTool === this.lineTool || !!(this.selection && this.selection.segmentId);
+    const showLine = isLineCtx || (!!this.selectedLabelId && !isMeasureCtx);
+    const showHatch = isHatchCtx || (!!this.selectedLabelId && !isMeasureCtx);
+    const showMeasure = isMeasureCtx;
     this.showLineSettingsPanel(showLine);
     this.showHatchSettingsPanel(showHatch);
+    this.showMeasureSettingsPanel(showMeasure);
   }
 
   /* ---- Line Settings Panel ---- */
@@ -744,6 +767,7 @@ export class CadApp {
       if (e.key === "v" || e.key === "V") this.setTool(ToolIds.SELECT);
       if (e.key === "l" || e.key === "L") this.setTool(ToolIds.LINE);
       if (e.key === "h" || e.key === "H") this.setTool(ToolIds.HATCH);
+      if (e.key === "m" || e.key === "M") this.setTool(ToolIds.MEASURE);
 
       if (e.key === "Escape") {
         if (this.activeTool === this.lineTool) { this.lineTool.cancel(); this.clearSelection(); this.setSelectedLabelId(null); this.setTool(ToolIds.SELECT); return; }
@@ -758,6 +782,11 @@ export class CadApp {
         if (this.selection && this.selection.segmentId) {
           const seg = this.scene.getSegmentById(this.selection.segmentId);
           if (seg) { this.scene.removeSegment(seg); this.clearSelection(); this.pointEditMenu.hide(); this.refreshLabelUI(); }
+          return;
+        }
+        if (this.selection && this.selection.type === SelectionType.DIMENSION) {
+          const dim = this.getSelectedDimension();
+          if (dim) { this.scene.removeDimension(dim); this.clearSelection(); this.refreshLabelUI(); }
           return;
         }
         if (this.selection && this.selection.hatchId) {
@@ -777,6 +806,7 @@ export class CadApp {
         if (this.selectedLabelId) {
           this.scene.removeSegmentsByLabelId(this.selectedLabelId);
           this.scene.removeHatchesByLabelId(this.selectedLabelId);
+          this.scene.removeDimensionsByLabelId(this.selectedLabelId);
           this.setSelectedLabelId(null);
           this.refreshLabelUI();
         }
@@ -793,8 +823,184 @@ export class CadApp {
     else if (id === ToolIds.MEASURE) { this.activeTool = this.measureTool; this.measureTool.activate(); }
     this._syncLineSettingsFromContext();
     this._syncHatchSettingsFromContext();
+    this._syncMeasureSettingsFromContext();
     this._updateSettingsVisibility();
     this.onToolChange?.(id);
+  }
+
+  /* ---- Measure Settings Panel ---- */
+  private _syncMeasureLabelSelect() {
+    if (!this.measureRefs?.idSelect) return;
+    const groups = this.labelManager.list();
+    const cur = this.measureRefs.idSelect.value;
+    this.measureRefs.idSelect.innerHTML = "";
+    for (const g of groups) {
+      const opt = document.createElement("option");
+      opt.value = g.id; opt.textContent = g.name;
+      this.measureRefs.idSelect.appendChild(opt);
+    }
+    const preferred =
+      (this.labelManager.getById(cur) ? cur : null) ||
+      (this.labelManager.getById(this.activeDrawLabelId) ? this.activeDrawLabelId : Defaults.defaultLabelId);
+    this.measureRefs.idSelect.value = preferred;
+  }
+
+  private _setupMeasureSettingsPanel() {
+    const r = this.measureRefs;
+    if (!r) return;
+
+    r.idSelect.addEventListener("change", () => {
+      const nextId = r.idSelect.value || Defaults.defaultLabelId;
+      const sel = this.getSelectedDimension();
+      if (sel) { sel.labelId = nextId; this.setSelectedLabelId(nextId); this.refreshLabelUI(); return; }
+      this.setActiveDrawLabelId(nextId);
+    });
+
+    r.orientation.addEventListener("change", () => {
+      const val = r.orientation.value as "parallel" | "diagonal";
+      this.measureSettings.orientation = val;
+      const sel = this.getSelectedDimension();
+      if (sel) sel.mode = val;
+    });
+
+    r.pointCount.addEventListener("change", () => {
+      this.measureSettings.pointCount = r.pointCount.value as "two" | "multi";
+    });
+
+    r.editMode.addEventListener("change", () => {
+      this.measureSettings.editMode = r.editMode.value as "parallel" | "endpoints";
+    });
+
+    r.extensionsToggle.addEventListener("change", () => {
+      const val = !!r.extensionsToggle.checked;
+      this.measureSettings.showExtensions = val;
+      const sel = this.getSelectedDimension();
+      if (sel) sel.showExtensions = val;
+    });
+
+    r.freeTextToggle.addEventListener("change", () => {
+      const val = !!r.freeTextToggle.checked;
+      this.measureSettings.useFreeText = val;
+      const sel = this.getSelectedDimension();
+      if (sel) sel.useFreeText = val;
+      r.freeTextInput.classList.toggle("hidden", !val);
+    });
+
+    r.freeTextInput.addEventListener("input", () => {
+      const val = r.freeTextInput.value;
+      this.measureSettings.freeText = val;
+      const sel = this.getSelectedDimension();
+      if (sel) sel.freeText = val;
+    });
+
+    r.textColor.addEventListener("input", () => {
+      const val = r.textColor.value;
+      this.measureSettings.textColor = val;
+      const sel = this.getSelectedDimension();
+      if (sel) sel.textColor = val;
+      r.textColorPreview.style.background = val;
+    });
+
+    r.textSize.addEventListener("input", () => {
+      const v = parseFloat((r.textSize.value || "").replace(",", "."));
+      if (!Number.isFinite(v) || v <= 0) return;
+      const c = clamp(v, 1, 200);
+      this.measureSettings.textSizePx = c;
+      const sel = this.getSelectedDimension();
+      if (sel) sel.textSizePx = c;
+    });
+
+    r.decimals.addEventListener("input", () => {
+      const v = parseInt(r.decimals.value || "0", 10);
+      if (!Number.isFinite(v)) return;
+      const c = clamp(v, 0, 6);
+      this.measureSettings.decimals = c;
+      const sel = this.getSelectedDimension();
+      if (sel) sel.decimals = c;
+    });
+
+    r.textBgToggle.addEventListener("change", () => {
+      const val = !!r.textBgToggle.checked;
+      this.measureSettings.textBgEnabled = val;
+      const sel = this.getSelectedDimension();
+      if (sel) sel.textBgEnabled = val;
+      r.textBgGroup.classList.toggle("hidden", !val);
+    });
+
+    r.textBgColor.addEventListener("input", () => {
+      const val = r.textBgColor.value;
+      this.measureSettings.textBgColor = val;
+      const sel = this.getSelectedDimension();
+      if (sel) sel.textBgColor = val;
+      r.textBgColorPreview.style.background = val;
+    });
+
+    r.textBgAlpha.addEventListener("input", () => {
+      const v = parseFloat((r.textBgAlpha.value || "").replace(",", "."));
+      if (!Number.isFinite(v)) return;
+      const c = clamp(v, 0, 1);
+      this.measureSettings.textBgAlpha = c;
+      const sel = this.getSelectedDimension();
+      if (sel) sel.textBgAlpha = c;
+    });
+
+    r.lineColor.addEventListener("input", () => {
+      const val = r.lineColor.value;
+      this.measureSettings.lineColor = val;
+      const sel = this.getSelectedDimension();
+      if (sel) sel.lineColor = val;
+      r.lineColorPreview.style.background = val;
+    });
+
+    r.tickLength.addEventListener("input", () => {
+      const v = parseFloat((r.tickLength.value || "").replace(",", "."));
+      if (!Number.isFinite(v) || v <= 0) return;
+      const c = clamp(v, 0.001, 10);
+      this.measureSettings.tickLengthM = c;
+      const sel = this.getSelectedDimension();
+      if (sel) sel.tickLengthM = c;
+    });
+
+    this._syncMeasureSettingsFromContext();
+  }
+
+  private _syncMeasureSettingsFromContext() {
+    const r = this.measureRefs;
+    if (!r) return;
+    const sel = this.getSelectedDimension();
+    const s = sel ? {
+      orientation: sel.mode, pointCount: this.measureSettings.pointCount,
+      editMode: this.measureSettings.editMode,
+      showExtensions: sel.showExtensions, useFreeText: sel.useFreeText, freeText: sel.freeText,
+      textColor: sel.textColor, textSizePx: sel.textSizePx, decimals: sel.decimals,
+      textBgEnabled: sel.textBgEnabled, textBgColor: sel.textBgColor, textBgAlpha: sel.textBgAlpha,
+      lineColor: sel.lineColor, tickLengthM: sel.tickLengthM, labelId: sel.labelId,
+    } : { ...this.measureSettings, labelId: this.activeDrawLabelId };
+
+    r.orientation.value = s.orientation;
+    r.pointCount.value = s.pointCount;
+    r.editMode.value = s.editMode;
+    r.extensionsToggle.checked = !!s.showExtensions;
+    r.freeTextToggle.checked = !!s.useFreeText;
+    r.freeTextInput.value = s.freeText || "";
+    r.freeTextInput.classList.toggle("hidden", !s.useFreeText);
+    r.textColor.value = this._toHexColor(s.textColor);
+    r.textColorPreview.style.background = r.textColor.value;
+    r.textSize.value = String(s.textSizePx);
+    r.decimals.value = String(s.decimals);
+    r.textBgToggle.checked = !!s.textBgEnabled;
+    r.textBgGroup.classList.toggle("hidden", !s.textBgEnabled);
+    r.textBgColor.value = this._toHexColor(s.textBgColor);
+    r.textBgColorPreview.style.background = r.textBgColor.value;
+    r.textBgAlpha.value = String(s.textBgAlpha);
+    r.lineColor.value = this._toHexColor(s.lineColor);
+    r.lineColorPreview.style.background = r.lineColor.value;
+    r.tickLength.value = String(s.tickLengthM);
+    const labelForDisplay =
+      (this.selectedLabelId && this.labelManager.getById(this.selectedLabelId)) ? this.selectedLabelId
+        : (s.labelId && this.labelManager.getById(s.labelId)) ? s.labelId
+        : (this.labelManager.getById(this.activeDrawLabelId) ? this.activeDrawLabelId : Defaults.defaultLabelId);
+    r.idSelect.value = labelForDisplay;
   }
 
   resize() { this._resize(); }
