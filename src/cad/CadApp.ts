@@ -1,5 +1,5 @@
 import { Defaults, ToolIds, PointEditAction, SelectionType } from "./constants";
-import { clamp } from "./geometry";
+import { clamp, v, Vec2 } from "./geometry";
 import { Camera } from "./Camera";
 import { Input } from "./Input";
 import { Scene, AreaLabel, DimensionStyle, TextBoxStyle, TextBox } from "./Scene";
@@ -14,6 +14,8 @@ import { HatchTool } from "./HatchTool";
 import { MeasureTool } from "./MeasureTool";
 import { TextTool } from "./TextTool";
 import { TextEditorOverlay } from "./TextEditorOverlay";
+import { PipetteTool } from "./PipetteTool";
+import { Clipboard, buildClipboardFromSelection, commitClipboardAt, translatedItems, ClipboardItem } from "./ClipboardManager";
 
 import { IdPanel } from "./IdPanel";
 
@@ -151,7 +153,13 @@ export class CadApp {
   hatchTool: HatchTool;
   measureTool!: MeasureTool;
   textTool!: TextTool;
-  activeTool: SelectTool | LineTool | HatchTool | MeasureTool | TextTool;
+  pipetteTool!: PipetteTool;
+  activeTool: SelectTool | LineTool | HatchTool | MeasureTool | TextTool | PipetteTool;
+
+  // Clipboard + Paste-Vorschau
+  clipboard: Clipboard | null = null;
+  pastePreviewActive = false;
+  private _toolBeforePaste: string | null = null;
 
   measureSettings: MeasureSettings = {
     orientation: Defaults.measureOrientation,
@@ -261,6 +269,7 @@ export class CadApp {
     this.hatchTool = new HatchTool(this);
     this.measureTool = new MeasureTool(this);
     this.textTool = new TextTool(this);
+    this.pipetteTool = new PipetteTool(this);
     this.activeTool = this.selectTool;
 
     this.idPanel = new IdPanel(this, idPanelRoot, idPanelBody, idPanelList, idPanelAddBtn, idPanelToggleBtn);
@@ -994,6 +1003,17 @@ export class CadApp {
 
       if ((tag === "input" || tag === "textarea" || tag === "select") && !isHubInput) return;
 
+      // Copy / Paste (after early-return for inputs)
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
+        const k = e.key.toLowerCase();
+        if (k === "c") {
+          if (this.copySelection()) { e.preventDefault(); return; }
+        }
+        if (k === "v") {
+          if (this.startPastePreview()) { e.preventDefault(); return; }
+        }
+      }
+
       if (this.activeTool === this.selectTool) {
         if (e.key === "Tab" && this.selectTool.hasPointMenu()) { e.preventDefault(); this.selectTool.cyclePointMenu(); return; }
         if (e.key === "Enter" && this.selectTool.hasPointMenu()) { e.preventDefault(); this.selectTool.activatePointMenu(); return; }
@@ -1024,12 +1044,15 @@ export class CadApp {
       if (e.key === "h" || e.key === "H") this.setTool(ToolIds.HATCH);
       if (e.key === "m" || e.key === "M") this.setTool(ToolIds.MEASURE);
       if (e.key === "t" || e.key === "T") this.setTool(ToolIds.TEXT);
+      if (e.key === "p" || e.key === "P") this.setTool(ToolIds.PIPETTE);
 
       if (e.key === "Escape") {
+        if (this.pastePreviewActive) { this.cancelPastePreview(); return; }
         if (this.activeTool === this.lineTool) { this.lineTool.cancel(); this.clearSelection(); this.setSelectedLabelId(null); this.setTool(ToolIds.SELECT); return; }
         if (this.activeTool === this.hatchTool) { this.hatchTool.cancel(); this.clearSelection(); this.setTool(ToolIds.SELECT); return; }
         if (this.activeTool === this.textTool) { this.textTool.cancel(); this.clearSelection(); this.setSelectedLabelId(null); this.setTool(ToolIds.SELECT); return; }
         if (this.activeTool === this.measureTool) { this.measureTool.cancel(); this.clearSelection(); this.setTool(ToolIds.SELECT); return; }
+        if (this.activeTool === this.pipetteTool) { this.pipetteTool.cancel(); this.setTool(ToolIds.SELECT); return; }
         if (this.activeTool === this.selectTool) { this.selectTool.cancel(); this.clearSelection(); this.setSelectedLabelId(null); this.pointEditMenu.hide(); return; }
         this.activeTool.cancel();
         this.clearSelection();
@@ -1079,13 +1102,120 @@ export class CadApp {
     window.addEventListener("keydown", this._keydownHandler);
   }
 
+  /* ---- Copy / Paste ---- */
+  copySelection(): boolean {
+    const clip = buildClipboardFromSelection(this);
+    if (!clip) return false;
+    this.clipboard = clip;
+    return true;
+  }
+
+  startPastePreview(): boolean {
+    if (!this.clipboard || this.clipboard.items.length === 0) return false;
+    if (this.textEditor?.isActive()) return false;
+    // Switch to select tool but stay in a paste-overlay mode
+    if (this.activeTool !== this.selectTool) {
+      this._toolBeforePaste = (this.activeTool as any).id || ToolIds.SELECT;
+      this.setTool(ToolIds.SELECT);
+    } else {
+      this._toolBeforePaste = ToolIds.SELECT;
+    }
+    this.clearSelection();
+    this.setSelectedLabelId(null);
+    this.pointEditMenu.hide();
+    this.pastePreviewActive = true;
+    this.canvas.style.cursor = "copy";
+    return true;
+  }
+
+  cancelPastePreview() {
+    this.pastePreviewActive = false;
+    this._toolBeforePaste = null;
+    this.canvas.style.cursor = "";
+  }
+
+  private _commitPasteAtMouse() {
+    if (!this.clipboard) { this.cancelPastePreview(); return; }
+    const mw = v(this.input.mouse.wx, this.input.mouse.wy);
+    commitClipboardAt(this, this.clipboard, mw);
+    this.pastePreviewActive = false;
+    this.canvas.style.cursor = "";
+    this.refreshLabelUI();
+  }
+
+  private _drawPastePreview(ctx: CanvasRenderingContext2D) {
+    if (!this.pastePreviewActive || !this.clipboard) return;
+    const dx = this.input.mouse.wx - this.clipboard.anchor.x;
+    const dy = this.input.mouse.wy - this.clipboard.anchor.y;
+    const items = translatedItems(this.clipboard.items, dx, dy);
+    const cam = this.camera;
+
+    ctx.save();
+    ctx.globalAlpha = 0.55;
+    let primary = "#4da3ff";
+    try { primary = (getComputedStyle(document.documentElement).getPropertyValue("--primary") || "").trim() || primary; } catch {}
+
+    for (const it of items) {
+      if (it.kind === "segment") {
+        const a = cam.worldToScreen(it.a.x, it.a.y);
+        const b = cam.worldToScreen(it.b.x, it.b.y);
+        ctx.strokeStyle = it.color || primary;
+        ctx.lineWidth = Math.max(1, it.thicknessM * cam.scale);
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      } else if (it.kind === "hatch") {
+        ctx.beginPath();
+        for (let i = 0; i < it.points.length; i++) {
+          const p = cam.worldToScreen(it.points[i].x, it.points[i].y);
+          if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+        }
+        ctx.closePath();
+        ctx.fillStyle = it.fillColor;
+        ctx.globalAlpha = 0.3 * (it.fillAlphaPct / 100 + 0.5);
+        ctx.fill();
+        ctx.globalAlpha = 0.7;
+        ctx.strokeStyle = it.strokeColor;
+        ctx.lineWidth = Math.max(1, it.strokeWidthPx);
+        ctx.stroke();
+        ctx.globalAlpha = 0.55;
+      } else if (it.kind === "textbox") {
+        const cx = it.center.x, cy = it.center.y;
+        const w = it.widthM, h = it.heightM;
+        const rot = it.rotationRad || 0;
+        const cs = Math.cos(rot), sn = Math.sin(rot);
+        const corners = [
+          { x: -w / 2, y: -h / 2 }, { x: w / 2, y: -h / 2 },
+          { x: w / 2, y: h / 2 }, { x: -w / 2, y: h / 2 },
+        ].map(p => cam.worldToScreen(cx + p.x * cs - p.y * sn, cy + p.x * sn + p.y * cs));
+        ctx.strokeStyle = primary;
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([5, 4]);
+        ctx.beginPath();
+        ctx.moveTo(corners[0].x, corners[0].y);
+        for (let i = 1; i < corners.length; i++) ctx.lineTo(corners[i].x, corners[i].y);
+        ctx.closePath(); ctx.stroke();
+        ctx.setLineDash([]);
+      } else if (it.kind === "dimension") {
+        const a = cam.worldToScreen(it.p1.x, it.p1.y);
+        const b = cam.worldToScreen(it.p2.x, it.p2.y);
+        ctx.strokeStyle = it.lineColor || primary;
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([4, 3]);
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+    ctx.restore();
+  }
+
   setTool(id: string) {
+    if (this.pastePreviewActive) this.cancelPastePreview();
     if (this.activeTool && this.activeTool.cancel) this.activeTool.cancel();
     if (id === ToolIds.SELECT) { this.activeTool = this.selectTool; this.selectTool.activate(); }
     else if (id === ToolIds.LINE) { this.activeTool = this.lineTool; this.lineTool.activate(); }
     else if (id === ToolIds.HATCH) { this.activeTool = this.hatchTool; this.hatchTool.activate(); }
     else if (id === ToolIds.MEASURE) { this.activeTool = this.measureTool; this.measureTool.activate(); }
     else if (id === ToolIds.TEXT) { this.activeTool = this.textTool; this.textTool.activate(); }
+    else if (id === ToolIds.PIPETTE) { this.activeTool = this.pipetteTool; this.pipetteTool.activate(); }
     this._syncLineSettingsFromContext();
     this._syncHatchSettingsFromContext();
     this._syncMeasureSettingsFromContext();
@@ -1288,8 +1418,16 @@ export class CadApp {
       if (this.input.isPanning) this.camera.panBy(this.input.panDX, this.input.panDY);
       if (this.input.wheelDelta !== 0) this.camera.zoomAt(this.input.wheelDelta, this.input.mouse.sx, this.input.mouse.sy);
       this.input.update(this.camera);
-      this.activeTool.update(this.input);
+
+      if (this.pastePreviewActive) {
+        this.canvas.style.cursor = "copy";
+        if (this.input.clicked) this._commitPasteAtMouse();
+      } else {
+        this.activeTool.update(this.input);
+      }
+
       this.renderer.render();
+      if (this.pastePreviewActive) this._drawPastePreview(this.ctx);
       this.input.endFrame();
     } catch (err) {
       console.error("CAD tick error:", err);
