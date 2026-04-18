@@ -6,6 +6,7 @@ import type { Input } from "./Input";
 import { getDimensionGeometry } from "./dimensionGeometry";
 import { pointInOrientedBox } from "./textGeometry";
 import type { TextBox } from "./Scene";
+import { pointInInstance } from "./StickerManager";
 
 type EditTarget =
   | { kind: "segment"; segmentId: string; pointIndex: number }
