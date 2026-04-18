@@ -950,9 +950,6 @@ const CadEditor: React.FC = () => {
               </div>
             </div>
           )}
-              </div>
-            </div>
-          )}
         </div>
 
         {/* PDF Page Picker Dialog */}
