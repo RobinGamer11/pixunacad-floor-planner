@@ -258,11 +258,12 @@ const CadEditor: React.FC = () => {
         {/* Collapse toggle - positioned on the divider between tools and settings */}
         <button
           onClick={() => setSidebarCollapsed((v) => !v)}
-          className="absolute -right-3 top-[88px] z-30 flex items-center justify-center w-6 h-6 rounded-full border shadow-sm transition-colors hover:bg-secondary"
+          className="absolute -right-3 top-[88px] z-30 flex items-center justify-center w-6 h-6 rounded-full border shadow-md transition-all hover:scale-110"
           style={{
-            background: "hsl(var(--cad-toolbar))",
-            borderColor: "hsl(var(--cad-toolbar-border))",
-            color: "hsl(var(--foreground))",
+            background: "linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)))",
+            borderColor: "hsl(var(--primary) / 0.6)",
+            color: "#fff",
+            boxShadow: "0 4px 12px -2px hsl(var(--primary) / 0.5)",
           }}
           title={sidebarCollapsed ? "Sidebar ausklappen" : "Sidebar einklappen"}
         >
