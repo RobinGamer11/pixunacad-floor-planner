@@ -1,5 +1,5 @@
 import { Defaults, SelectionType, SnapType } from "./constants";
-import { v, Vec2, dist } from "./geometry";
+import { v, Vec2, dist, orthoSnapFromA } from "./geometry";
 import type { CadApp } from "./CadApp";
 import type { Input } from "./Input";
 import type { Snap } from "./TopologyEngine";
