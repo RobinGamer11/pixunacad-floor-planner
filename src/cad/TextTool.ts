@@ -110,10 +110,12 @@ export class TextTool {
     }
 
     if (input.clicked) {
-      // Block creating a new textbox while another one is being edited.
-      // The user must first click outside (which commits) before placing a new one.
+      // If an editor is still open at this point (e.g. clicking on canvas
+      // outside the editor), commit it first. The same click then becomes the
+      // placement click for the next textbox — so the user gets immediate
+      // feedback without needing an extra click.
       if (this.app.textEditor?.isActive()) {
-        return;
+        this.app.textEditor.commit();
       }
 
       // If the user clicks an existing textbox, select it instead of creating one
