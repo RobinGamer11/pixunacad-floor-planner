@@ -62,6 +62,7 @@ export const ToolIds = {
   HATCH: "hatch",
   MEASURE: "measure",
   TEXT: "text",
+  PIPETTE: "pipette",
 } as const;
 
 export const SelectionType = {
