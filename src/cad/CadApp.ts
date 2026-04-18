@@ -73,6 +73,15 @@ export class CadApp {
   private _destroyed = false;
   private _keydownHandler: ((e: KeyboardEvent) => void) | null = null;
 
+  // History (Undo/Redo)
+  private _history: string[] = [];
+  private _historyIndex = -1;
+  private _historyMax = 100;
+  private _lastSnapshot = "";
+  private _snapshotTimer: number | null = null;
+  private _isRestoring = false;
+  onHistoryChange?: (canUndo: boolean, canRedo: boolean) => void;
+
   onToolChange?: (toolId: string) => void;
 
   constructor(
@@ -147,6 +156,101 @@ export class CadApp {
     this._resize();
     this.camera.center(canvas.getBoundingClientRect());
     this._tick();
+    this._initHistory();
+  }
+
+  /* ---- History (Undo / Redo) ---- */
+  private _serializeScene(): string {
+    return JSON.stringify({
+      segments: this.scene.segments.map(s => ({
+        id: s.id, a: { x: s.a.x, y: s.a.y }, b: { x: s.b.x, y: s.b.y },
+        color: s.color, thicknessM: s.thicknessM, labelId: s.labelId,
+      })),
+      hatches: this.scene.hatches.map(h => ({
+        id: h.id, points: h.points.map(p => ({ x: p.x, y: p.y })),
+        fillColor: h.fillColor, strokeColor: h.strokeColor,
+        fillAlphaPct: h.fillAlphaPct, strokeWidthPx: h.strokeWidthPx,
+        labelId: h.labelId, areaLabel: { ...h.areaLabel },
+      })),
+      labels: this.labelManager.list().map(l => ({ ...l })),
+    });
+  }
+
+  private _restoreScene(snapshot: string) {
+    const data = JSON.parse(snapshot);
+    this._isRestoring = true;
+    // Restore labels first
+    if (Array.isArray(data.labels) && (this.labelManager as any).restore) {
+      try { (this.labelManager as any).restore(data.labels); } catch {}
+    }
+    // Clear scene
+    this.scene.segments = [];
+    this.scene.hatches = [];
+    (this.scene as any)._rebuildSegIdMap?.();
+    (this.scene as any)._rebuildHatchIdMap?.();
+    // Re-add segments
+    for (const s of data.segments || []) {
+      this.scene.createSegment(s.a, s.b, { color: s.color, thicknessM: s.thicknessM, labelId: s.labelId });
+    }
+    // Re-add hatches
+    for (const h of data.hatches || []) {
+      this.scene.createHatch(h.points, {
+        fillColor: h.fillColor, strokeColor: h.strokeColor,
+        fillAlphaPct: h.fillAlphaPct, strokeWidthPx: h.strokeWidthPx,
+        labelId: h.labelId, areaLabel: h.areaLabel,
+      });
+    }
+    this.clearSelection();
+    this.setSelectedLabelId(null);
+    this.pointEditMenu.hide();
+    this.refreshLabelUI();
+    this._lastSnapshot = this._serializeScene();
+    this._isRestoring = false;
+  }
+
+  private _initHistory() {
+    this._lastSnapshot = this._serializeScene();
+    this._history = [this._lastSnapshot];
+    this._historyIndex = 0;
+    this._emitHistoryChange();
+    // Poll for scene changes (cheap: short string compare on JSON)
+    this._snapshotTimer = window.setInterval(() => this._maybeSnapshot(), 250);
+  }
+
+  private _maybeSnapshot() {
+    if (this._isRestoring || this._destroyed) return;
+    // Don't snapshot mid-drag
+    if (this.input.mouse.left || this.input.mouse.mid || this.input.mouse.right || this.input.isPanning) return;
+    const snap = this._serializeScene();
+    if (snap === this._lastSnapshot) return;
+    // Drop redo branch
+    if (this._historyIndex < this._history.length - 1) {
+      this._history = this._history.slice(0, this._historyIndex + 1);
+    }
+    this._history.push(snap);
+    if (this._history.length > this._historyMax) this._history.shift();
+    this._historyIndex = this._history.length - 1;
+    this._lastSnapshot = snap;
+    this._emitHistoryChange();
+  }
+
+  private _emitHistoryChange() {
+    this.onHistoryChange?.(this._historyIndex > 0, this._historyIndex < this._history.length - 1);
+  }
+
+  undo() {
+    this._maybeSnapshot();
+    if (this._historyIndex <= 0) return;
+    this._historyIndex--;
+    this._restoreScene(this._history[this._historyIndex]);
+    this._emitHistoryChange();
+  }
+
+  redo() {
+    if (this._historyIndex >= this._history.length - 1) return;
+    this._historyIndex++;
+    this._restoreScene(this._history[this._historyIndex]);
+    this._emitHistoryChange();
   }
 
   /* ---- Selection ---- */
@@ -502,6 +606,14 @@ export class CadApp {
     this._keydownHandler = (e: KeyboardEvent) => {
       const tag = (document.activeElement?.tagName || "").toLowerCase();
       const isHubInput = document.activeElement === this.hub.lenInputEl || document.activeElement === this.hub.angInputEl;
+
+      // Undo / Redo (also work while inputs focused except hub)
+      if ((e.ctrlKey || e.metaKey) && !e.altKey) {
+        const k = e.key.toLowerCase();
+        if (k === "z" && !e.shiftKey) { e.preventDefault(); this.undo(); return; }
+        if ((k === "z" && e.shiftKey) || k === "y") { e.preventDefault(); this.redo(); return; }
+      }
+
       if ((tag === "input" || tag === "textarea" || tag === "select") && !isHubInput) return;
 
       if (this.activeTool === this.selectTool) {
@@ -599,6 +711,7 @@ export class CadApp {
   destroy() {
     this._destroyed = true;
     cancelAnimationFrame(this._rafId);
+    if (this._snapshotTimer != null) { clearInterval(this._snapshotTimer); this._snapshotTimer = null; }
     this.input.destroy();
     this.hub.destroy();
     if (this._keydownHandler) window.removeEventListener("keydown", this._keydownHandler);

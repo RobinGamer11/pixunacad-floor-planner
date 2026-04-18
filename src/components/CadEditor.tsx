@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import { CadApp } from "@/cad/CadApp";
 import { ToolIds, PointEditAction } from "@/cad/constants";
-import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight } from "lucide-react";
+import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2 } from "lucide-react";
 
 const CAD_TOOLS = [
   { id: ToolIds.SELECT, label: "Auswahl", key: "V", icon: MousePointer2 },
@@ -54,6 +54,8 @@ const CadEditor: React.FC = () => {
   const appRef = useRef<CadApp | null>(null);
   const [activeTool, setActiveTool] = useState<string>(ToolIds.SELECT);
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
 
   useEffect(() => {
     if (
@@ -96,6 +98,7 @@ const CadEditor: React.FC = () => {
     );
 
     app.onToolChange = (id) => setActiveTool(id);
+    app.onHistoryChange = (u, r) => { setCanUndo(u); setCanRedo(r); };
     app.setTool(ToolIds.SELECT);
     appRef.current = app;
 
@@ -134,6 +137,31 @@ const CadEditor: React.FC = () => {
           boxShadow: "1px 0 0 hsl(0 0% 100% / 0.03) inset",
         }}
       >
+        {/* Undo / Redo */}
+        <div className={`flex gap-1 p-2 ${sidebarCollapsed ? "flex-col items-center" : ""}`}>
+          <button
+            onClick={() => appRef.current?.undo()}
+            disabled={!canUndo}
+            title="Rückgängig (Strg+Z)"
+            className={`cad-toolbar-btn ${sidebarCollapsed ? "justify-center px-0 h-9 w-9" : "flex-1 justify-center"} disabled:opacity-40 disabled:cursor-not-allowed`}
+          >
+            <Undo2 className="h-4 w-4 shrink-0" />
+            {!sidebarCollapsed && <span className="text-xs">Undo</span>}
+          </button>
+          <button
+            onClick={() => appRef.current?.redo()}
+            disabled={!canRedo}
+            title="Wiederherstellen (Strg+Y)"
+            className={`cad-toolbar-btn ${sidebarCollapsed ? "justify-center px-0 h-9 w-9" : "flex-1 justify-center"} disabled:opacity-40 disabled:cursor-not-allowed`}
+          >
+            <Redo2 className="h-4 w-4 shrink-0" />
+            {!sidebarCollapsed && <span className="text-xs">Redo</span>}
+          </button>
+        </div>
+
+        {/* Divider */}
+        <div className="mx-3 border-t opacity-60" style={{ borderColor: "hsl(var(--cad-toolbar-border))" }} />
+
         {/* Tool list */}
         <div className="flex flex-col gap-1 p-2">
           {CAD_TOOLS.map((t) => {

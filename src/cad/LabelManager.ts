@@ -71,4 +71,9 @@ export class LabelManager {
     this.groups.splice(clamped, 0, item);
     return true;
   }
+
+  restore(groups: LabelGroup[]) {
+    if (!Array.isArray(groups) || groups.length === 0) return;
+    this.groups = groups.map(g => ({ ...g }));
+  }
 }
