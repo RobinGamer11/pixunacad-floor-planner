@@ -99,7 +99,28 @@ export class CadApp {
   selectTool: SelectTool;
   lineTool: LineTool;
   hatchTool: HatchTool;
-  activeTool: SelectTool | LineTool | HatchTool;
+  measureTool!: MeasureTool;
+  activeTool: SelectTool | LineTool | HatchTool | MeasureTool;
+
+  measureSettings: MeasureSettings = {
+    orientation: Defaults.measureOrientation,
+    pointCount: Defaults.measurePointCount,
+    textColor: Defaults.measureTextColor,
+    textSizePx: Defaults.measureTextSizePx,
+    lineColor: Defaults.measureLineColor,
+    decimals: Defaults.measureDecimals,
+    tickLengthM: Defaults.measureTickLengthM,
+    showExtensions: Defaults.measureShowExtensions,
+    useFreeText: Defaults.measureUseFreeText,
+    freeText: Defaults.measureFreeText,
+    textBgEnabled: Defaults.measureTextBgEnabled,
+    textBgColor: Defaults.measureTextBgColor,
+    textBgAlpha: Defaults.measureTextBgAlpha,
+  };
+
+  // Drag state for parallel-shifting a selected dimension
+  private _dragDimId: string | null = null;
+  private _dragDimOffsetAlongNormal = 0;
 
   idPanel: IdPanel;
 
@@ -180,6 +201,7 @@ export class CadApp {
     this.selectTool = new SelectTool(this);
     this.lineTool = new LineTool(this);
     this.hatchTool = new HatchTool(this);
+    this.measureTool = new MeasureTool(this);
     this.activeTool = this.selectTool;
 
     this.idPanel = new IdPanel(this, idPanelRoot, idPanelBody, idPanelList, idPanelAddBtn, idPanelToggleBtn);
