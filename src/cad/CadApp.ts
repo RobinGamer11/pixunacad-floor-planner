@@ -258,8 +258,10 @@ export class CadApp {
     // Clear scene
     this.scene.segments = [];
     this.scene.hatches = [];
+    this.scene.dimensions = [];
     (this.scene as any)._rebuildSegIdMap?.();
     (this.scene as any)._rebuildHatchIdMap?.();
+    (this.scene as any)._rebuildDimIdMap?.();
     // Re-add segments
     for (const s of data.segments || []) {
       this.scene.createSegment(s.a, s.b, { color: s.color, thicknessM: s.thicknessM, labelId: s.labelId });
@@ -270,6 +272,16 @@ export class CadApp {
         fillColor: h.fillColor, strokeColor: h.strokeColor,
         fillAlphaPct: h.fillAlphaPct, strokeWidthPx: h.strokeWidthPx,
         labelId: h.labelId, areaLabel: h.areaLabel,
+      });
+    }
+    // Re-add dimensions
+    for (const d of data.dimensions || []) {
+      this.scene.createDimension(d.p1, d.p2, d.placementPoint, d.mode, d.refDir, {
+        textColor: d.textColor, textSizePx: d.textSizePx, lineColor: d.lineColor,
+        decimals: d.decimals, tickLengthM: d.tickLengthM, showExtensions: d.showExtensions,
+        useFreeText: d.useFreeText, freeText: d.freeText,
+        textBgEnabled: d.textBgEnabled, textBgColor: d.textBgColor, textBgAlpha: d.textBgAlpha,
+        labelId: d.labelId,
       });
     }
     this.clearSelection();
