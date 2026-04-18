@@ -110,12 +110,11 @@ export class TextTool {
     }
 
     if (input.clicked) {
-      // If an editor is still open at this point (e.g. clicking on canvas
-      // outside the editor), commit it first. The same click then becomes the
-      // placement click for the next textbox — so the user gets immediate
-      // feedback without needing an extra click.
+      // If an editor is still open, this click only commits it.
+      // The preview reappears and the *next* click actually places a new box.
       if (this.app.textEditor?.isActive()) {
         this.app.textEditor.commit();
+        return;
       }
 
       // If the user clicks an existing textbox, select it instead of creating one
