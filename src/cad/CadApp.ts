@@ -118,6 +118,9 @@ export class CadApp {
   areaBgAlphaInput: HTMLInputElement;
 
   measureRefs!: MeasureSettingsRefs;
+  textRefs!: TextSettingsRefs;
+  textEditorRefs!: TextEditorRefs;
+  textEditor!: TextEditorOverlay;
 
   defaultLineColor = Defaults.lineColor;
   defaultLineThicknessM = Defaults.lineThicknessM;
@@ -125,6 +128,16 @@ export class CadApp {
   defaultHatchStrokeColor = Defaults.hatchStrokeColor;
   defaultHatchStrokeWidthPx = Defaults.hatchStrokePx;
   defaultHatchFillAlphaPct = Defaults.hatchFillAlphaPct;
+
+  defaultTextColor = Defaults.textColor;
+  defaultTextFontSizePx = Defaults.textFontSizePx;
+  defaultTextBgColor = Defaults.textBgColor;
+  defaultTextBgAlphaPct = Defaults.textBgAlphaPct;
+  defaultTextWrap = Defaults.textWrap;
+  defaultTextAlign: "left" | "center" | "right" = Defaults.textAlign;
+  defaultTextBorderEnabled = Defaults.textBorderEnabled;
+  defaultTextBorderColor = Defaults.textBorderColor;
+  defaultTextBorderWidthPx = Defaults.textBorderWidthPx;
 
   camera: Camera;
   scene: Scene;
@@ -137,7 +150,8 @@ export class CadApp {
   lineTool: LineTool;
   hatchTool: HatchTool;
   measureTool!: MeasureTool;
-  activeTool: SelectTool | LineTool | HatchTool | MeasureTool;
+  textTool!: TextTool;
+  activeTool: SelectTool | LineTool | HatchTool | MeasureTool | TextTool;
 
   measureSettings: MeasureSettings = {
     orientation: Defaults.measureOrientation,
@@ -200,6 +214,8 @@ export class CadApp {
     areaFontSizeInput: HTMLInputElement,
     areaBgColorInput: HTMLInputElement, areaBgColorPreview: HTMLDivElement, areaBgAlphaInput: HTMLInputElement,
     measureRefs: MeasureSettingsRefs,
+    textRefs: TextSettingsRefs,
+    textEditorRefs: TextEditorRefs,
   ) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d")!;
