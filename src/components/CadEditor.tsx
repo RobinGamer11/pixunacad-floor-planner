@@ -168,8 +168,8 @@ const CadEditor: React.FC = () => {
           {/* Settings hidden when sidebar collapsed */}
           {/* Line Settings - inline in sidebar; visibility ('hidden' class) is controlled by CadApp */}
           <div ref={settingsRef} className={`cad-settings-panel hidden mb-2 ${sidebarCollapsed ? "!hidden" : ""}`}>
-            <div className="text-xs font-semibold mb-2" style={{ color: "hsl(var(--foreground))" }}>
-              Linie-Einstellungen
+            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+              Linie
             </div>
             <div className="space-y-3">
               <div>
