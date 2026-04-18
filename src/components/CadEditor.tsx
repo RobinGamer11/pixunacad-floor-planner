@@ -258,6 +258,33 @@ const CadEditor: React.FC = () => {
     return () => clearTimeout(t);
   }, [sidebarCollapsed]);
 
+  // Floating Edit-Pencil neben ausgewählter Sticker-Instanz (Polling per RAF).
+  useEffect(() => {
+    let raf = 0;
+    const tick = () => {
+      const app = appRef.current;
+      if (app) {
+        const inst = app.getSelectedStickerInstance?.();
+        if (inst && !app.isStickerEditing()) {
+          // Obere rechte Ecke der Bounding-Box
+          // dynamic import vermeiden — nutze Camera direkt
+          const { instanceBoundingCornersWorld } = require("@/cad/StickerManager");
+          const corners = instanceBoundingCornersWorld(inst.items, inst.position, inst.rotationRad, inst.scale);
+          let maxX = -Infinity, minY = Infinity;
+          for (const c of corners) { if (c.x > maxX) maxX = c.x; if (c.y < minY) minY = c.y; }
+          const sp = app.camera.worldToScreen(maxX, minY);
+          const next = { id: inst.id, x: sp.x, y: sp.y };
+          setStickerEditOverlay(prev => (prev && prev.id === next.id && Math.abs(prev.x - next.x) < 0.5 && Math.abs(prev.y - next.y) < 0.5) ? prev : next);
+        } else {
+          setStickerEditOverlay(prev => prev ? null : prev);
+        }
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
   const handleToolClick = useCallback((id: string) => {
     appRef.current?.setTool(id);
     setActiveTool(id);
