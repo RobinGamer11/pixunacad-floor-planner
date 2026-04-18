@@ -369,20 +369,17 @@ const CadEditor: React.FC = () => {
   }, [docPickerPages, docPickerSelected]);
 
   /**
-   * Maßstab anwenden. User-Erwartung: 1:200 ist die Hälfte von 1:100.
-   * Referenz ist 1:100 → Faktor 1.
-   * 1:50  → ×2    (größer als 1:100)
-   * 1:100 → ×1
-   * 1:200 → ×0.5  (Hälfte von 1:100)
-   * 1:500 → ×0.2
-   * 1:1   → ×100  (Originalgröße als 1:1-Vergleich)
+   * Maßstab anwenden. Real-World-Mapping:
+   *   weltMeter = paperMeter × denom_pdf
+   * Beispiel A4 1:100 → 0.21m × 100 = 21m Welt.
+   * Der gewählte Zeichenmaßstab dient nur als Default-Vorauswahl.
    */
   const handleScaleConfirm = useCallback(() => {
     if (!scaleDialogPages) return;
     const app = appRef.current; if (!app) return;
     const denom = scaleChoice === "custom" ? parseFloat(scaleCustom.replace(",", ".")) : parseFloat(scaleChoice);
     const safeDenom = Number.isFinite(denom) && denom > 0 ? denom : 100;
-    const factor = 100 / safeDenom;
+    const factor = safeDenom;
     const scaledPages = scaleDialogPages.map(p => ({ ...p, widthM: p.widthM * factor, heightM: p.heightM * factor }));
     const [first, ...rest] = scaledPages;
     app.setTool(ToolIds.DOCUMENT);
