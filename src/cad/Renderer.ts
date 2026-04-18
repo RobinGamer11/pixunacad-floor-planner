@@ -160,6 +160,7 @@ export class Renderer {
     ctx.textBaseline = "bottom";
     ctx.fillText("Sticker bearbeiten — Esc oder Klick außerhalb", x + 4, y - 4);
     ctx.restore();
+  }
 
   /* ---------- Sticker Instances ---------- */
   private _stickersBackToFront(): StickerInstance[] {
