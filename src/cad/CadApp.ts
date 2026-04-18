@@ -17,7 +17,7 @@ import { TextEditorOverlay } from "./TextEditorOverlay";
 import { PipetteTool } from "./PipetteTool";
 import { Clipboard, buildClipboardFromSelection, commitClipboardAt, translatedItems, ClipboardItem } from "./ClipboardManager";
 import { StickerTool } from "./StickerTool";
-import { StickerDefinition, buildStickerFromSelection, buildStickerFromIds, StickerIdSet, exportStickersToJson, importStickersFromJson } from "./StickerManager";
+import { StickerDefinition, buildStickerFromSelection, buildStickerFromIds, StickerIdSet, exportStickersToJson, importStickersFromJson, instanceBoundingCornersWorld } from "./StickerManager";
 
 import { IdPanel } from "./IdPanel";
 
@@ -470,6 +470,7 @@ export class CadApp {
     this._syncMeasureSettingsFromContext();
     this._syncTextSettingsFromContext();
     this._updateSettingsVisibility();
+    this._syncStickerInstanceHub();
   }
 
   clearSelection() { this.setSelection(null); }
@@ -495,6 +496,46 @@ export class CadApp {
     const id = (this.selection as any).textBoxId;
     if (!id) return null;
     return this.scene.getTextBoxById(id);
+  }
+
+  getSelectedStickerInstance() {
+    if (!this.selection || this.selection.type !== SelectionType.STICKER_INSTANCE) return null;
+    return this.scene.getStickerInstanceById((this.selection as any).stickerInstanceId);
+  }
+
+  /** Hub für Sticker-Instanz: Länge = Skalierung %, Winkel = Rotation °. */
+  private _syncStickerInstanceHub() {
+    const inst = this.getSelectedStickerInstance();
+    if (!inst) {
+      // Hub nur ausblenden, wenn er gerade als Sticker-Hub aktiv war
+      if ((this.hub as any)._stickerMode) {
+        this.hub.hide();
+        this.hub.bindCommit(null);
+        (this.hub as any)._stickerMode = false;
+      }
+      return;
+    }
+    (this.hub as any)._stickerMode = true;
+    const corners = instanceBoundingCornersWorld(inst.items as any, inst.position, inst.rotationRad, inst.scale);
+    let cx = 0, cy = 0;
+    for (const c of corners) { cx += c.x; cy += c.y; }
+    cx /= corners.length; cy /= corners.length;
+    const screen = this.camera.worldToScreen(cx, cy);
+    this.hub.showAt(screen.x, screen.y);
+    const scalePct = inst.scale * 100;
+    const rotDeg = (inst.rotationRad * 180 / Math.PI + 360) % 360;
+    this.hub.lenInputEl.value = `${scalePct.toFixed(1)} %`;
+    this.hub.angInputEl.value = `${rotDeg.toFixed(1)}°`;
+    this.hub.bindCommit((vals) => {
+      const cur = this.getSelectedStickerInstance();
+      if (!cur) return;
+      // lenInput hier als Skalierung in % interpretiert
+      const rawLen = parseFloat(this.hub.lenInputEl.value);
+      const rawAng = parseFloat(this.hub.angInputEl.value);
+      if (Number.isFinite(rawLen) && rawLen > 0) cur.scale = rawLen / 100;
+      if (Number.isFinite(rawAng)) cur.rotationRad = rawAng * Math.PI / 180;
+      this._syncStickerInstanceHub();
+    });
   }
 
 

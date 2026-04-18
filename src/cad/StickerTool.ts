@@ -1,9 +1,9 @@
 import { v, Vec2, projectPointToSegment, pointInPolygon } from "./geometry";
-import { Defaults } from "./constants";
+import { Defaults, SelectionType } from "./constants";
 import type { CadApp } from "./CadApp";
 import type { Input } from "./Input";
 import type { ClipboardItem } from "./ClipboardManager";
-import { StickerDefinition, transformedStickerItems, commitStickerAt } from "./StickerManager";
+import { StickerDefinition, transformedStickerItems, commitStickerAt, pointInInstance } from "./StickerManager";
 import { getDimensionGeometry } from "./dimensionGeometry";
 
 type Phase = "idle" | "selecting" | "placing" | "rotating";
@@ -124,7 +124,41 @@ export class StickerTool {
     this.onSelectionChange?.();
   }
 
+  // Drag-State für Sticker-Instanzen im Sticker-Werkzeug
+  private _dragStickerId: string | null = null;
+  private _dragOrigin: Vec2 | null = null;
+  private _dragMouseStart: Vec2 | null = null;
+
+  /** Hit-Test gegen platzierte Sticker-Instanzen. */
+  private _hitStickerInstance(input: Input) {
+    const mouseW = v(input.mouse.wx, input.mouse.wy);
+    for (let i = this.app.scene.stickerInstances.length - 1; i >= 0; i--) {
+      const inst = this.app.scene.stickerInstances[i];
+      if (!this.app.labelManager.isVisible(inst.labelId)) continue;
+      if (pointInInstance(inst.items as any, inst.position, inst.rotationRad, inst.scale, mouseW)) return inst;
+    }
+    return null;
+  }
+
   update(input: Input) {
+    // Aktiver Drag (Verschieben einer ausgewählten Sticker-Instanz)
+    if (this._dragStickerId) {
+      const inst = this.app.scene.getStickerInstanceById(this._dragStickerId);
+      if (inst && this._dragOrigin && this._dragMouseStart) {
+        const m = v(input.mouse.wx, input.mouse.wy);
+        inst.position = {
+          x: this._dragOrigin.x + (m.x - this._dragMouseStart.x),
+          y: this._dragOrigin.y + (m.y - this._dragMouseStart.y),
+        };
+      }
+      if (!input.mouse.left) {
+        this._dragStickerId = null;
+        this._dragOrigin = null;
+        this._dragMouseStart = null;
+      }
+      return;
+    }
+
     if (this.phase === "selecting") {
       // Doppelklick = sofort speichern (Namens-Prompt via UI/CadApp)
       if (input.doubleClicked) {
@@ -135,6 +169,22 @@ export class StickerTool {
         this._toggleAtMouse(input);
       }
       return;
+    }
+
+    // Im idle-Modus: Klick auf existierende Sticker-Instanz wählt sie aus + startet Drag
+    if (this.phase === "idle" && input.clicked) {
+      const hit = this._hitStickerInstance(input);
+      if (hit) {
+        this.app.setSelection({ type: SelectionType.STICKER_INSTANCE, stickerInstanceId: hit.id });
+        this._dragStickerId = hit.id;
+        this._dragOrigin = { x: hit.position.x, y: hit.position.y };
+        this._dragMouseStart = v(input.mouse.wx, input.mouse.wy);
+        return;
+      }
+      // Klick ins Leere = deselektieren
+      if (this.app.selection?.type === SelectionType.STICKER_INSTANCE) {
+        this.app.clearSelection();
+      }
     }
 
     if (!this.activeDef || this.phase === "idle") return;
