@@ -93,9 +93,11 @@ export class Renderer {
     this._drawHatches();
     this._drawSegments();
     this._drawDimensions();
+    this._drawTextBoxes();
     this._drawHatchSelection();
     this._drawSegmentSelection();
     this._drawDimensionSelection();
+    this._drawTextBoxSelection();
     this._drawHoverSegmentPoints();
 
     if (this.overlay && this.overlay.draw) {
