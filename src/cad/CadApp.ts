@@ -1070,6 +1070,12 @@ export class CadApp {
         if (this.activeTool === this.textTool) { this.textTool.cancel(); this.clearSelection(); this.setSelectedLabelId(null); this.setTool(ToolIds.SELECT); return; }
         if (this.activeTool === this.measureTool) { this.measureTool.cancel(); this.clearSelection(); this.setTool(ToolIds.SELECT); return; }
         if (this.activeTool === this.pipetteTool) { this.pipetteTool.cancel(); this.setTool(ToolIds.SELECT); return; }
+        if (this.activeTool === this.stickerTool) {
+          // Erst aktive Platzierung abbrechen, sonst Tool wechseln
+          if (this.stickerTool.phase !== "idle") { this.stickerTool.cancel(); return; }
+          this.setTool(ToolIds.SELECT);
+          return;
+        }
         if (this.activeTool === this.selectTool) { this.selectTool.cancel(); this.clearSelection(); this.setSelectedLabelId(null); this.pointEditMenu.hide(); return; }
         this.activeTool.cancel();
         this.clearSelection();
