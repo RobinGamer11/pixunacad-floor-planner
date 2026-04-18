@@ -416,7 +416,12 @@ const CadEditor: React.FC = () => {
     const app = appRef.current; if (!app) return;
     const denom = scaleChoice === "custom" ? parseFloat(scaleCustom.replace(",", ".")) : parseFloat(scaleChoice);
     const safeDenom = Number.isFinite(denom) && denom > 0 ? denom : 100;
-    const factor = safeDenom;
+    // Welt-Größe = paperMeter × (pdfDenom / drawingScale).
+    // So gilt: PDF-Maßstab == Zeichenmaßstab → 1m im PDF = 1m Welt.
+    // Spätere Änderungen am Zeichenmaßstab werden über den useEffect-Hook
+    // proportional auf alle Dokumente angewendet.
+    const safeDrawing = Math.max(0.0001, drawingScale);
+    const factor = safeDenom / safeDrawing;
     const scaledPages = scaleDialogPages.map(p => ({ ...p, widthM: p.widthM * factor, heightM: p.heightM * factor }));
     const [first, ...rest] = scaledPages;
     app.setTool(ToolIds.DOCUMENT);
