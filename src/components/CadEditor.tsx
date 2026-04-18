@@ -129,8 +129,9 @@ const CadEditor: React.FC = () => {
         className="relative shrink-0 flex flex-col border-r transition-[width] duration-150 ease-out"
         style={{
           width: sidebarWidth,
-          background: "hsl(var(--cad-toolbar))",
+          background: "linear-gradient(180deg, hsl(222 30% 15%), hsl(222 32% 12%))",
           borderColor: "hsl(var(--cad-toolbar-border))",
+          boxShadow: "1px 0 0 hsl(0 0% 100% / 0.03) inset",
         }}
       >
         {/* Tool list */}
