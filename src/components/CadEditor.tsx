@@ -824,6 +824,28 @@ const CadEditor: React.FC = () => {
         {/* Text Editor (contenteditable) */}
         <div ref={textEditorElRef} className="hidden absolute z-40 outline-none" />
 
+        {/* Floating Edit-Pencil bei ausgewählter Sticker-Instanz */}
+        {stickerEditOverlay && (
+          <button
+            type="button"
+            onClick={() => {
+              if (stickerEditOverlay) appRef.current?.openStickerEditByInstanceId(stickerEditOverlay.id);
+            }}
+            className="absolute z-30 flex items-center justify-center rounded-full shadow-lg transition-transform hover:scale-110"
+            style={{
+              left: stickerEditOverlay.x + 6,
+              top: stickerEditOverlay.y - 14,
+              width: 28, height: 28,
+              background: "linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)))",
+              color: "#fff",
+              border: "1px solid hsl(var(--primary) / 0.6)",
+            }}
+            title="Sticker-Inhalt bearbeiten"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
+        )}
+
         {/* Canvas */}
         <canvas ref={canvasRef} className="block w-full h-full" />
       </div>
