@@ -564,6 +564,20 @@ export class SelectTool {
     this.app.renderer.setHoverSegmentId(null);
     this.app.hub.hide();
 
+    // Hover indicator for textboxes (so user sees they can be clicked)
+    const hoverBox = this._hitTextBox(input);
+    this.app.renderer.setHoverTextBoxId(hoverBox?.id || null);
+
+    // Double-click on a textbox → enter inline editing
+    if (input.doubleClicked) {
+      const box = this._hitTextBox(input);
+      if (box) {
+        this.app.setSelection({ type: SelectionType.TEXTBOX, textBoxId: box.id, handleIndex: null });
+        this.app.beginTextEdit(box);
+        return;
+      }
+    }
+
     // Double-click on hatch edge → insert point
     if (input.doubleClicked) {
       const edgeHit = this._hitTestHatchEdge(input);
@@ -578,6 +592,13 @@ export class SelectTool {
     }
 
     if (input.clicked) {
+      // Textbox hits take priority — they sit on top visually
+      const box = this._hitTextBox(input);
+      if (box) {
+        this.app.setSelection({ type: SelectionType.TEXTBOX, textBoxId: box.id, handleIndex: null });
+        return;
+      }
+
       const hit = this._hitTestWithForegroundPriority(input);
       this.app.setSelection(hit);
       if (hit && (hit as any).segmentId) {
