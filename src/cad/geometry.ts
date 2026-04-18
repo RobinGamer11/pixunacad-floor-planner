@@ -176,6 +176,19 @@ export function polygonAreaAbs(poly: Vec2[]): number {
   return Math.abs(polygonSignedArea(poly));
 }
 
+export function perpLeft(a: Vec2): Vec2 { return { x: -a.y, y: a.x }; }
+
+export function hexToRgba(hex: string, alpha: number): string {
+  const clean = String(hex || "#ffffff").replace("#", "");
+  const normalized = clean.length === 3
+    ? clean.split("").map(c => c + c).join("")
+    : clean.padEnd(6, "f").slice(0, 6);
+  const r = parseInt(normalized.slice(0, 2), 16);
+  const g = parseInt(normalized.slice(2, 4), 16);
+  const b = parseInt(normalized.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${clamp(alpha, 0, 1)})`;
+}
+
 export function polygonCentroid(poly: Vec2[]): Vec2 {
   if (!poly || poly.length === 0) return v(0, 0);
   if (poly.length < 3) {

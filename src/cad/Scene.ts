@@ -62,11 +62,79 @@ export class Hatch {
   }
 }
 
+export interface DimensionStyle {
+  textColor?: string;
+  textSizePx?: number;
+  lineColor?: string;
+  decimals?: number;
+  tickLengthM?: number;
+  showExtensions?: boolean;
+  useFreeText?: boolean;
+  freeText?: string;
+  textBgEnabled?: boolean;
+  textBgColor?: string;
+  textBgAlpha?: number;
+  labelId?: string;
+}
+
+export class Dimension {
+  id: string;
+  p1: Vec2;
+  p2: Vec2;
+  placementPoint: Vec2;
+  mode: "parallel" | "diagonal";
+  refDir: Vec2 | null;
+
+  textColor: string;
+  textSizePx: number;
+  lineColor: string;
+  decimals: number;
+  tickLengthM: number;
+  showExtensions: boolean;
+
+  useFreeText: boolean;
+  freeText: string;
+
+  textBgEnabled: boolean;
+  textBgColor: string;
+  textBgAlpha: number;
+
+  labelId: string;
+
+  constructor({ id, p1, p2, placementPoint, mode, refDir, style, labelId }: {
+    id: string; p1: Vec2; p2: Vec2; placementPoint: Vec2;
+    mode?: "parallel" | "diagonal"; refDir?: Vec2 | null; style?: DimensionStyle; labelId?: string;
+  }) {
+    this.id = id;
+    this.p1 = v(p1.x, p1.y);
+    this.p2 = v(p2.x, p2.y);
+    this.placementPoint = v(placementPoint.x, placementPoint.y);
+    this.mode = mode || (Defaults.measureOrientation as "parallel" | "diagonal");
+    this.refDir = refDir ? v(refDir.x, refDir.y) : null;
+
+    const s = style || {};
+    this.textColor = s.textColor || Defaults.measureTextColor;
+    this.textSizePx = (typeof s.textSizePx === "number" && s.textSizePx > 0) ? s.textSizePx : Defaults.measureTextSizePx;
+    this.lineColor = s.lineColor || Defaults.measureLineColor;
+    this.decimals = Number.isInteger(s.decimals) ? s.decimals! : Defaults.measureDecimals;
+    this.tickLengthM = (typeof s.tickLengthM === "number" && s.tickLengthM > 0) ? s.tickLengthM : Defaults.measureTickLengthM;
+    this.showExtensions = (typeof s.showExtensions === "boolean") ? s.showExtensions : Defaults.measureShowExtensions;
+    this.useFreeText = (typeof s.useFreeText === "boolean") ? s.useFreeText : Defaults.measureUseFreeText;
+    this.freeText = (typeof s.freeText === "string") ? s.freeText : Defaults.measureFreeText;
+    this.textBgEnabled = (typeof s.textBgEnabled === "boolean") ? s.textBgEnabled : Defaults.measureTextBgEnabled;
+    this.textBgColor = s.textBgColor || Defaults.measureTextBgColor;
+    this.textBgAlpha = (typeof s.textBgAlpha === "number") ? clamp(s.textBgAlpha, 0, 1) : Defaults.measureTextBgAlpha;
+    this.labelId = labelId || s.labelId || Defaults.defaultLabelId;
+  }
+}
+
 export class Scene {
   segments: Segment[] = [];
   hatches: Hatch[] = [];
+  dimensions: Dimension[] = [];
   private _segIdMap = new Map<string, Segment>();
   private _hatchIdMap = new Map<string, Hatch>();
+  private _dimIdMap = new Map<string, Dimension>();
 
   private _makeId(): string {
     return (crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now() + Math.random());
@@ -80,6 +148,54 @@ export class Scene {
   private _rebuildHatchIdMap() {
     this._hatchIdMap.clear();
     for (const h of this.hatches) this._hatchIdMap.set(h.id, h);
+  }
+
+  private _rebuildDimIdMap() {
+    this._dimIdMap.clear();
+    for (const d of this.dimensions) this._dimIdMap.set(d.id, d);
+  }
+
+  // ---- Dimensions ----
+  createDimension(p1: Vec2, p2: Vec2, placementPoint: Vec2, mode: "parallel" | "diagonal", refDir: Vec2 | null, style: DimensionStyle = {}) {
+    const dim = new Dimension({ id: this._makeId(), p1, p2, placementPoint, mode, refDir, style, labelId: style.labelId });
+    this.dimensions.push(dim);
+    this._rebuildDimIdMap();
+    return dim;
+  }
+
+  getDimensionById(id: string): Dimension | null { return this._dimIdMap.get(id) || null; }
+
+  getDimensionsByLabelId(labelId: string): Dimension[] {
+    return this.dimensions.filter(d => d.labelId === labelId);
+  }
+
+  removeDimension(dim: Dimension) {
+    this.dimensions = this.dimensions.filter(d => d !== dim);
+    this._rebuildDimIdMap();
+  }
+
+  removeDimensionsByIds(ids: string[]) {
+    const set = new Set(ids);
+    this.dimensions = this.dimensions.filter(d => !set.has(d.id));
+    this._rebuildDimIdMap();
+  }
+
+  removeDimensionsByLabelId(labelId: string) {
+    this.dimensions = this.dimensions.filter(d => d.labelId !== labelId);
+    this._rebuildDimIdMap();
+  }
+
+  reassignDimensionsLabel(oldId: string, newId: string) {
+    for (const d of this.dimensions) {
+      if (d.labelId === oldId) d.labelId = newId;
+    }
+  }
+
+  assignDimensionsToLabel(ids: string[], newId: string) {
+    const set = new Set(ids);
+    for (const d of this.dimensions) {
+      if (set.has(d.id)) d.labelId = newId;
+    }
   }
 
   // ---- Segments ----

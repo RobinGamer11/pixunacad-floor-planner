@@ -1,13 +1,15 @@
 import { Defaults, SelectionType } from "./constants";
-import { Vec2, v, clamp, rgbaFromHex, polygonAreaAbs, polygonCentroid } from "./geometry";
+import { Vec2, v, sub, add, mul, norm, perpLeft, clamp, rgbaFromHex, hexToRgba, polygonAreaAbs, polygonCentroid } from "./geometry";
 import { Camera } from "./Camera";
-import { Scene, Hatch } from "./Scene";
+import { Scene, Hatch, Dimension } from "./Scene";
 import { LabelManager } from "./LabelManager";
+import { getDimensionGeometry, type DimensionLike } from "./dimensionGeometry";
 
 export interface Selection {
   type: string;
   segmentId?: string;
   hatchId?: string;
+  dimensionId?: string;
   pointIndex?: number | null;
 }
 
@@ -81,8 +83,10 @@ export class Renderer {
     this._drawGrid();
     this._drawHatches();
     this._drawSegments();
+    this._drawDimensions();
     this._drawHatchSelection();
     this._drawSegmentSelection();
+    this._drawDimensionSelection();
     this._drawHoverSegmentPoints();
 
     if (this.overlay && this.overlay.draw) {
@@ -402,6 +406,144 @@ export class Renderer {
     ctx.fill();
     ctx.stroke();
 
+    ctx.restore();
+  }
+
+  /* ---------- Dimensions ---------- */
+
+  private _dimensionsBackToFront() {
+    const order = this.labels.list();
+    const rank = new Map(order.map((g, i) => [g.id, i]));
+    return [...this.scene.dimensions]
+      .filter(d => this.labels.isVisible(d.labelId))
+      .sort((a, b) => (rank.get(a.labelId) || 0) - (rank.get(b.labelId) || 0));
+  }
+
+  private _drawDimensions() {
+    for (const dim of this._dimensionsBackToFront()) {
+      this._drawSingleDimension(this.ctx, this.camera, dim, false);
+    }
+  }
+
+  /**
+   * Draws a dimension. Public so MeasureTool can render previews using the same logic.
+   * `isPreview` slightly reduces line widths for the live preview.
+   */
+  _drawSingleDimension(ctx: CanvasRenderingContext2D, cam: Camera, dim: DimensionLike & {
+    textColor?: string; textSizePx?: number; lineColor?: string; tickLengthM?: number;
+    showExtensions?: boolean; useFreeText?: boolean; freeText?: string; decimals?: number;
+    textBgEnabled?: boolean; textBgColor?: string; textBgAlpha?: number;
+  }, isPreview = false) {
+    const g = getDimensionGeometry(dim);
+
+    const p1 = cam.worldToScreen(g.ext1a.x, g.ext1a.y);
+    const p2 = cam.worldToScreen(g.ext1b.x, g.ext1b.y);
+    const p3 = cam.worldToScreen(g.ext2a.x, g.ext2a.y);
+    const p4 = cam.worldToScreen(g.ext2b.x, g.ext2b.y);
+    const d1 = cam.worldToScreen(g.d1.x, g.d1.y);
+    const d2 = cam.worldToScreen(g.d2.x, g.d2.y);
+    const mid = cam.worldToScreen(g.mid.x, g.mid.y);
+
+    ctx.save();
+    ctx.strokeStyle = dim.lineColor || Defaults.measureLineColor;
+    ctx.lineWidth = isPreview ? 1.2 : 1.3;
+
+    ctx.beginPath();
+    if (dim.showExtensions) {
+      ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y);
+      ctx.moveTo(p3.x, p3.y); ctx.lineTo(p4.x, p4.y);
+    }
+    ctx.moveTo(d1.x, d1.y);
+    ctx.lineTo(d2.x, d2.y);
+    ctx.stroke();
+
+    const tickDir = norm(sub(g.d2, g.d1));
+    const tickN = perpLeft(tickDir);
+    const tickLen = dim.tickLengthM || Defaults.measureTickLengthM;
+
+    const t1aP = add(g.d1, mul(tickN, tickLen));
+    const t1bP = sub(g.d1, mul(tickN, tickLen));
+    const t2aP = add(g.d2, mul(tickN, tickLen));
+    const t2bP = sub(g.d2, mul(tickN, tickLen));
+    const t1a = cam.worldToScreen(t1aP.x, t1aP.y);
+    const t1b = cam.worldToScreen(t1bP.x, t1bP.y);
+    const t2a = cam.worldToScreen(t2aP.x, t2aP.y);
+    const t2b = cam.worldToScreen(t2bP.x, t2bP.y);
+
+    ctx.beginPath();
+    ctx.moveTo(t1a.x, t1a.y); ctx.lineTo(t1b.x, t1b.y);
+    ctx.moveTo(t2a.x, t2a.y); ctx.lineTo(t2b.x, t2b.y);
+    ctx.stroke();
+
+    // Text + background — proportional to dimension via reference scale
+    const text = g.text || "";
+    const zoomFactor = cam.scale / Defaults.measureReferenceScalePxPerM;
+    const baseSize = dim.textSizePx || Defaults.measureTextSizePx;
+    const fontPx = Math.max(1, baseSize * zoomFactor);
+
+    const screenAngle = Math.atan2(d2.y - d1.y, d2.x - d1.x);
+    const normalizedAngle = (screenAngle > Math.PI / 2 || screenAngle < -Math.PI / 2)
+      ? screenAngle + Math.PI
+      : screenAngle;
+
+    const tickOffsetPx = (dim.tickLengthM || Defaults.measureTickLengthM) * cam.scale;
+    const textOffsetPx = Math.max(fontPx * 0.95, tickOffsetPx * 0.9 + fontPx * 0.35);
+
+    ctx.translate(mid.x, mid.y);
+    ctx.rotate(normalizedAngle);
+    ctx.font = `${fontPx}px system-ui, Arial, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+
+    const metrics = ctx.measureText(text);
+    const textWidth = metrics.width;
+    const ascent = metrics.actualBoundingBoxAscent || fontPx * 0.7;
+    const descent = metrics.actualBoundingBoxDescent || fontPx * 0.3;
+    const textHeight = ascent + descent;
+    const padX = Math.max(4, fontPx * 0.45);
+    const padY = Math.max(2, fontPx * 0.22);
+    const textY = -textOffsetPx;
+
+    if (dim.textBgEnabled) {
+      ctx.fillStyle = hexToRgba(dim.textBgColor || Defaults.measureTextBgColor, dim.textBgAlpha ?? Defaults.measureTextBgAlpha);
+      ctx.fillRect(-textWidth / 2 - padX, textY - textHeight / 2 - padY, textWidth + padX * 2, textHeight + padY * 2);
+    }
+
+    ctx.fillStyle = dim.textColor || Defaults.measureTextColor;
+    ctx.fillText(text, 0, textY);
+    ctx.restore();
+  }
+
+  private _drawDimensionSelection() {
+    if (!this.selection || this.selection.type !== SelectionType.DIMENSION) return;
+    const dim = this.scene.getDimensionById((this.selection as any).dimensionId);
+    if (!dim) return;
+    if (!this.labels.isVisible(dim.labelId)) return;
+
+    const ctx = this.ctx;
+    const cam = this.camera;
+    const g = getDimensionGeometry(dim);
+    const a = cam.worldToScreen(g.d1.x, g.d1.y);
+    const b = cam.worldToScreen(g.d2.x, g.d2.y);
+
+    ctx.save();
+    ctx.strokeStyle = "rgba(77,163,255,0.95)";
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+
+    // Endpoint handles
+    ctx.fillStyle = "rgba(77,163,255,0.12)";
+    ctx.lineWidth = 2;
+    for (const ep of [g.ext1a, g.ext2a]) {
+      const sp = cam.worldToScreen(ep.x, ep.y);
+      ctx.beginPath();
+      ctx.arc(sp.x, sp.y, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
     ctx.restore();
   }
 }

@@ -2,7 +2,7 @@ import { Defaults, ToolIds, PointEditAction, SelectionType } from "./constants";
 import { clamp } from "./geometry";
 import { Camera } from "./Camera";
 import { Input } from "./Input";
-import { Scene, AreaLabel } from "./Scene";
+import { Scene, AreaLabel, DimensionStyle } from "./Scene";
 import { LabelManager } from "./LabelManager";
 import { TopologyEngine } from "./TopologyEngine";
 import { Renderer, Selection } from "./Renderer";
@@ -11,7 +11,46 @@ import { PointEditMenu } from "./PointEditMenu";
 import { SelectTool } from "./SelectTool";
 import { LineTool } from "./LineTool";
 import { HatchTool } from "./HatchTool";
+import { MeasureTool } from "./MeasureTool";
 import { IdPanel } from "./IdPanel";
+
+export interface MeasureSettings {
+  orientation: "parallel" | "diagonal";
+  pointCount: "two" | "multi";
+  textColor: string;
+  textSizePx: number;
+  lineColor: string;
+  decimals: number;
+  tickLengthM: number;
+  showExtensions: boolean;
+  useFreeText: boolean;
+  freeText: string;
+  textBgEnabled: boolean;
+  textBgColor: string;
+  textBgAlpha: number;
+}
+
+export interface MeasureSettingsRefs {
+  panel: HTMLDivElement;
+  idSelect: HTMLSelectElement;
+  orientation: HTMLSelectElement;
+  pointCount: HTMLSelectElement;
+  extensionsToggle: HTMLInputElement;
+  freeTextToggle: HTMLInputElement;
+  freeTextInput: HTMLInputElement;
+  textColor: HTMLInputElement;
+  textColorPreview: HTMLDivElement;
+  textSize: HTMLInputElement;
+  decimals: HTMLInputElement;
+  textBgToggle: HTMLInputElement;
+  textBgGroup: HTMLDivElement;
+  textBgColor: HTMLInputElement;
+  textBgColorPreview: HTMLDivElement;
+  textBgAlpha: HTMLInputElement;
+  lineColor: HTMLInputElement;
+  lineColorPreview: HTMLDivElement;
+  tickLength: HTMLInputElement;
+}
 
 export class CadApp {
   canvas: HTMLCanvasElement;
@@ -60,7 +99,28 @@ export class CadApp {
   selectTool: SelectTool;
   lineTool: LineTool;
   hatchTool: HatchTool;
-  activeTool: SelectTool | LineTool | HatchTool;
+  measureTool!: MeasureTool;
+  activeTool: SelectTool | LineTool | HatchTool | MeasureTool;
+
+  measureSettings: MeasureSettings = {
+    orientation: Defaults.measureOrientation,
+    pointCount: Defaults.measurePointCount,
+    textColor: Defaults.measureTextColor,
+    textSizePx: Defaults.measureTextSizePx,
+    lineColor: Defaults.measureLineColor,
+    decimals: Defaults.measureDecimals,
+    tickLengthM: Defaults.measureTickLengthM,
+    showExtensions: Defaults.measureShowExtensions,
+    useFreeText: Defaults.measureUseFreeText,
+    freeText: Defaults.measureFreeText,
+    textBgEnabled: Defaults.measureTextBgEnabled,
+    textBgColor: Defaults.measureTextBgColor,
+    textBgAlpha: Defaults.measureTextBgAlpha,
+  };
+
+  // Drag state for parallel-shifting a selected dimension
+  private _dragDimId: string | null = null;
+  private _dragDimOffsetAlongNormal = 0;
 
   idPanel: IdPanel;
 
@@ -141,6 +201,7 @@ export class CadApp {
     this.selectTool = new SelectTool(this);
     this.lineTool = new LineTool(this);
     this.hatchTool = new HatchTool(this);
+    this.measureTool = new MeasureTool(this);
     this.activeTool = this.selectTool;
 
     this.idPanel = new IdPanel(this, idPanelRoot, idPanelBody, idPanelList, idPanelAddBtn, idPanelToggleBtn);
@@ -172,6 +233,17 @@ export class CadApp {
         fillAlphaPct: h.fillAlphaPct, strokeWidthPx: h.strokeWidthPx,
         labelId: h.labelId, areaLabel: { ...h.areaLabel },
       })),
+      dimensions: this.scene.dimensions.map(d => ({
+        id: d.id,
+        p1: { x: d.p1.x, y: d.p1.y }, p2: { x: d.p2.x, y: d.p2.y },
+        placementPoint: { x: d.placementPoint.x, y: d.placementPoint.y },
+        mode: d.mode, refDir: d.refDir ? { x: d.refDir.x, y: d.refDir.y } : null,
+        textColor: d.textColor, textSizePx: d.textSizePx, lineColor: d.lineColor,
+        decimals: d.decimals, tickLengthM: d.tickLengthM, showExtensions: d.showExtensions,
+        useFreeText: d.useFreeText, freeText: d.freeText,
+        textBgEnabled: d.textBgEnabled, textBgColor: d.textBgColor, textBgAlpha: d.textBgAlpha,
+        labelId: d.labelId,
+      })),
       labels: this.labelManager.list().map(l => ({ ...l })),
     });
   }
@@ -186,8 +258,10 @@ export class CadApp {
     // Clear scene
     this.scene.segments = [];
     this.scene.hatches = [];
+    this.scene.dimensions = [];
     (this.scene as any)._rebuildSegIdMap?.();
     (this.scene as any)._rebuildHatchIdMap?.();
+    (this.scene as any)._rebuildDimIdMap?.();
     // Re-add segments
     for (const s of data.segments || []) {
       this.scene.createSegment(s.a, s.b, { color: s.color, thicknessM: s.thicknessM, labelId: s.labelId });
@@ -198,6 +272,16 @@ export class CadApp {
         fillColor: h.fillColor, strokeColor: h.strokeColor,
         fillAlphaPct: h.fillAlphaPct, strokeWidthPx: h.strokeWidthPx,
         labelId: h.labelId, areaLabel: h.areaLabel,
+      });
+    }
+    // Re-add dimensions
+    for (const d of data.dimensions || []) {
+      this.scene.createDimension(d.p1, d.p2, d.placementPoint, d.mode, d.refDir, {
+        textColor: d.textColor, textSizePx: d.textSizePx, lineColor: d.lineColor,
+        decimals: d.decimals, tickLengthM: d.tickLengthM, showExtensions: d.showExtensions,
+        useFreeText: d.useFreeText, freeText: d.freeText,
+        textBgEnabled: d.textBgEnabled, textBgColor: d.textBgColor, textBgAlpha: d.textBgAlpha,
+        labelId: d.labelId,
       });
     }
     this.clearSelection();
@@ -423,6 +507,29 @@ export class CadApp {
         show: false, textColor: Defaults.areaTextColor, fontSizePx: Defaults.areaFontSizePx,
         bgColor: Defaults.areaBgColor, bgAlphaPct: Defaults.areaBgAlphaPct, offsetX: 0, offsetY: 0,
       } as Partial<AreaLabel>,
+    };
+  }
+
+  getCurrentMeasureStyle(): DimensionStyle {
+    const sel = (this.selection && this.selection.type === SelectionType.DIMENSION)
+      ? this.scene.getDimensionById((this.selection as any).dimensionId) : null;
+    if (sel) {
+      return {
+        textColor: sel.textColor, textSizePx: sel.textSizePx, lineColor: sel.lineColor,
+        decimals: sel.decimals, tickLengthM: sel.tickLengthM, showExtensions: sel.showExtensions,
+        useFreeText: sel.useFreeText, freeText: sel.freeText,
+        textBgEnabled: sel.textBgEnabled, textBgColor: sel.textBgColor, textBgAlpha: sel.textBgAlpha,
+        labelId: sel.labelId,
+      };
+    }
+    return {
+      textColor: this.measureSettings.textColor, textSizePx: this.measureSettings.textSizePx,
+      lineColor: this.measureSettings.lineColor, decimals: this.measureSettings.decimals,
+      tickLengthM: this.measureSettings.tickLengthM, showExtensions: this.measureSettings.showExtensions,
+      useFreeText: this.measureSettings.useFreeText, freeText: this.measureSettings.freeText,
+      textBgEnabled: this.measureSettings.textBgEnabled, textBgColor: this.measureSettings.textBgColor,
+      textBgAlpha: this.measureSettings.textBgAlpha,
+      labelId: this.activeDrawLabelId || Defaults.defaultLabelId,
     };
   }
 
@@ -683,6 +790,7 @@ export class CadApp {
     if (id === ToolIds.SELECT) { this.activeTool = this.selectTool; this.selectTool.activate(); }
     else if (id === ToolIds.LINE) { this.activeTool = this.lineTool; this.lineTool.activate(); }
     else if (id === ToolIds.HATCH) { this.activeTool = this.hatchTool; this.hatchTool.activate(); }
+    else if (id === ToolIds.MEASURE) { this.activeTool = this.measureTool; this.measureTool.activate(); }
     this._syncLineSettingsFromContext();
     this._syncHatchSettingsFromContext();
     this._updateSettingsVisibility();

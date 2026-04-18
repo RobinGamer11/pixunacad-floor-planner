@@ -22,18 +22,36 @@ export const Defaults = {
   areaFontSizePx: 16,
   areaBgColor: "#ffffff",
   areaBgAlphaPct: 72,
+
+  // Measure (dimension) defaults
+  measureOrientation: "parallel" as "parallel" | "diagonal",
+  measurePointCount: "two" as "two" | "multi",
+  measureTextColor: "#111111",
+  measureTextSizePx: 12,
+  measureLineColor: "#2b2b2b",
+  measureDecimals: 3,
+  measureTickLengthM: 0.06,
+  measureShowExtensions: false,
+  measureUseFreeText: false,
+  measureFreeText: "",
+  measureTextBgEnabled: false,
+  measureTextBgColor: "#ffffff",
+  measureTextBgAlpha: 0.8,
+  measureReferenceScalePxPerM: 80,
 };
 
 export const ToolIds = {
   SELECT: "select",
   LINE: "line",
   HATCH: "hatch",
+  MEASURE: "measure",
 } as const;
 
 export const SelectionType = {
   SEGMENT: "segment",
   POINT: "point",
   HATCH: "hatch",
+  DIMENSION: "dimension",
 } as const;
 
 export const SnapType = {
