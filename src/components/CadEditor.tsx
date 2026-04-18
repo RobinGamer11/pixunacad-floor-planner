@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import { CadApp } from "@/cad/CadApp";
 import { ToolIds, PointEditAction } from "@/cad/constants";
-import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler } from "lucide-react";
+import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight } from "lucide-react";
 import type { HatchDrawMode } from "@/cad/HatchTool";
 
 const CAD_TOOLS = [
@@ -9,6 +9,7 @@ const CAD_TOOLS = [
   { id: ToolIds.LINE, label: "Linie", key: "L", icon: Minus },
   { id: ToolIds.HATCH, label: "Schraffur", key: "H", icon: Square },
   { id: ToolIds.MEASURE, label: "Maßkette", key: "M", icon: Ruler },
+  { id: ToolIds.TEXT, label: "Text", key: "T", icon: Type },
 ];
 
 const CadEditor: React.FC = () => {
@@ -75,6 +76,34 @@ const CadEditor: React.FC = () => {
   const measureLineColorPreviewRef = useRef<HTMLDivElement>(null);
   const measureTickLengthRef = useRef<HTMLInputElement>(null);
 
+  // Text settings refs
+  const textSettingsRef = useRef<HTMLDivElement>(null);
+  const textIdSelectRef = useRef<HTMLSelectElement>(null);
+  const textColorRef = useRef<HTMLInputElement>(null);
+  const textColorPreviewRef = useRef<HTMLDivElement>(null);
+  const textFontSizeRef = useRef<HTMLInputElement>(null);
+  const textAlignLeftRef = useRef<HTMLButtonElement>(null);
+  const textAlignCenterRef = useRef<HTMLButtonElement>(null);
+  const textAlignRightRef = useRef<HTMLButtonElement>(null);
+  const textBgColorRef = useRef<HTMLInputElement>(null);
+  const textBgColorPreviewRef = useRef<HTMLDivElement>(null);
+  const textBgAlphaRef = useRef<HTMLInputElement>(null);
+  const textWrapRef = useRef<HTMLInputElement>(null);
+  const textBorderToggleRef = useRef<HTMLInputElement>(null);
+  const textBorderGroupRef = useRef<HTMLDivElement>(null);
+  const textBorderColorRef = useRef<HTMLInputElement>(null);
+  const textBorderColorPreviewRef = useRef<HTMLDivElement>(null);
+  const textBorderWidthRef = useRef<HTMLInputElement>(null);
+
+  // Text editor overlay refs
+  const textEditorElRef = useRef<HTMLDivElement>(null);
+  const textEditorToolbarRef = useRef<HTMLDivElement>(null);
+  const textEditorBoldRef = useRef<HTMLButtonElement>(null);
+  const textEditorItalicRef = useRef<HTMLButtonElement>(null);
+  const textEditorColorRef = useRef<HTMLInputElement>(null);
+  const textEditorSizeRef = useRef<HTMLSelectElement>(null);
+  const textEditorSymbolRef = useRef<HTMLSelectElement>(null);
+
   const appRef = useRef<CadApp | null>(null);
   const [activeTool, setActiveTool] = useState<string>(ToolIds.SELECT);
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
@@ -102,7 +131,16 @@ const CadEditor: React.FC = () => {
       !measureTextColorRef.current || !measureTextColorPreviewRef.current || !measureTextSizeRef.current ||
       !measureDecimalsRef.current || !measureTextBgToggleRef.current || !measureTextBgGroupRef.current ||
       !measureTextBgColorRef.current || !measureTextBgColorPreviewRef.current || !measureTextBgAlphaRef.current ||
-      !measureLineColorRef.current || !measureLineColorPreviewRef.current || !measureTickLengthRef.current
+      !measureLineColorRef.current || !measureLineColorPreviewRef.current || !measureTickLengthRef.current ||
+      !textSettingsRef.current || !textIdSelectRef.current ||
+      !textColorRef.current || !textColorPreviewRef.current || !textFontSizeRef.current ||
+      !textAlignLeftRef.current || !textAlignCenterRef.current || !textAlignRightRef.current ||
+      !textBgColorRef.current || !textBgColorPreviewRef.current || !textBgAlphaRef.current ||
+      !textWrapRef.current || !textBorderToggleRef.current || !textBorderGroupRef.current ||
+      !textBorderColorRef.current || !textBorderColorPreviewRef.current || !textBorderWidthRef.current ||
+      !textEditorElRef.current || !textEditorToolbarRef.current ||
+      !textEditorBoldRef.current || !textEditorItalicRef.current ||
+      !textEditorColorRef.current || !textEditorSizeRef.current || !textEditorSymbolRef.current
     ) return;
 
     const app = new CadApp(
@@ -148,6 +186,34 @@ const CadEditor: React.FC = () => {
         lineColor: measureLineColorRef.current,
         lineColorPreview: measureLineColorPreviewRef.current,
         tickLength: measureTickLengthRef.current,
+      },
+      {
+        panel: textSettingsRef.current,
+        idSelect: textIdSelectRef.current,
+        textColor: textColorRef.current,
+        textColorPreview: textColorPreviewRef.current,
+        fontSize: textFontSizeRef.current,
+        alignLeftBtn: textAlignLeftRef.current,
+        alignCenterBtn: textAlignCenterRef.current,
+        alignRightBtn: textAlignRightRef.current,
+        bgColor: textBgColorRef.current,
+        bgColorPreview: textBgColorPreviewRef.current,
+        bgAlpha: textBgAlphaRef.current,
+        wrapToggle: textWrapRef.current,
+        borderToggle: textBorderToggleRef.current,
+        borderGroup: textBorderGroupRef.current,
+        borderColor: textBorderColorRef.current,
+        borderColorPreview: textBorderColorPreviewRef.current,
+        borderWidth: textBorderWidthRef.current,
+      },
+      {
+        editor: textEditorElRef.current,
+        toolbar: textEditorToolbarRef.current,
+        boldBtn: textEditorBoldRef.current,
+        italicBtn: textEditorItalicRef.current,
+        colorInput: textEditorColorRef.current,
+        sizeSelect: textEditorSizeRef.current,
+        symbolSelect: textEditorSymbolRef.current,
       },
     );
 
@@ -451,6 +517,76 @@ const CadEditor: React.FC = () => {
               </div>
             </div>
           </div>
+
+          {/* Text Settings */}
+          <div ref={textSettingsRef} className={`cad-settings-panel hidden ${sidebarCollapsed ? "!hidden" : ""}`}>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+              Text
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label>ID</label>
+                <select ref={textIdSelectRef} className="cad-settings-select w-full" />
+              </div>
+              <div>
+                <label>Textfarbe</label>
+                <div className="flex items-center gap-2">
+                  <div ref={textColorPreviewRef} className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))" }} />
+                  <input ref={textColorRef} type="color" defaultValue="#111111" className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
+                </div>
+              </div>
+              <div>
+                <label>Schriftgröße (px)</label>
+                <input ref={textFontSizeRef} type="text" defaultValue="16" />
+              </div>
+              <div>
+                <label>Ausrichtung</label>
+                <div className="flex gap-1">
+                  <button ref={textAlignLeftRef} type="button" className="cad-toolbar-btn flex-1 justify-center h-9" title="Links">
+                    <AlignLeft className="h-4 w-4" />
+                  </button>
+                  <button ref={textAlignCenterRef} type="button" className="cad-toolbar-btn flex-1 justify-center h-9" title="Mitte">
+                    <AlignCenter className="h-4 w-4" />
+                  </button>
+                  <button ref={textAlignRightRef} type="button" className="cad-toolbar-btn flex-1 justify-center h-9" title="Rechts">
+                    <AlignRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label>Hintergrundfarbe</label>
+                <div className="flex items-center gap-2">
+                  <div ref={textBgColorPreviewRef} className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))" }} />
+                  <input ref={textBgColorRef} type="color" defaultValue="#ffffff" className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
+                </div>
+              </div>
+              <div>
+                <label>HG-Transparenz (0–100%)</label>
+                <input ref={textBgAlphaRef} type="text" defaultValue="0" />
+              </div>
+              <div className="flex items-center gap-2">
+                <input ref={textWrapRef} type="checkbox" className="accent-primary" />
+                <label className="!mb-0 cursor-pointer">Zeilenumbruch</label>
+              </div>
+              <div className="flex items-center gap-2">
+                <input ref={textBorderToggleRef} type="checkbox" className="accent-primary" />
+                <label className="!mb-0 cursor-pointer">Rahmen</label>
+              </div>
+              <div ref={textBorderGroupRef} className="hidden space-y-2 pt-2" style={{ borderTop: "1px solid hsl(var(--border))" }}>
+                <div>
+                  <label>Rahmenfarbe</label>
+                  <div className="flex items-center gap-2">
+                    <div ref={textBorderColorPreviewRef} className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))" }} />
+                    <input ref={textBorderColorRef} type="color" defaultValue="#111111" className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
+                  </div>
+                </div>
+                <div>
+                  <label>Rahmenstärke (px)</label>
+                  <input ref={textBorderWidthRef} type="text" defaultValue="1" />
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Collapse toggle */}
@@ -502,6 +638,41 @@ const CadEditor: React.FC = () => {
           <button ref={pointRotateBtnRef} title="Drehen">⟳</button>
           <button ref={pointDeleteBtnRef} title="Löschen">🗑</button>
         </div>
+
+        {/* Text Editor Toolbar (floating) */}
+        <div ref={textEditorToolbarRef} className="hidden absolute z-40 flex items-center gap-1 px-2 py-1 rounded-md shadow-lg" style={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}>
+          <button ref={textEditorBoldRef} type="button" className="cad-toolbar-btn h-7 w-7 justify-center px-0" title="Fett (Strg+B)">
+            <Bold className="h-3.5 w-3.5" />
+          </button>
+          <button ref={textEditorItalicRef} type="button" className="cad-toolbar-btn h-7 w-7 justify-center px-0" title="Kursiv (Strg+I)">
+            <Italic className="h-3.5 w-3.5" />
+          </button>
+          <input ref={textEditorColorRef} type="color" defaultValue="#111111" className="w-7 h-7 cursor-pointer border-0 p-0 bg-transparent" title="Textfarbe" />
+          <select ref={textEditorSizeRef} className="cad-settings-select h-7 text-xs" title="Schriftgröße">
+            {[10, 12, 14, 16, 18, 20, 24, 28, 32, 40, 48].map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <select ref={textEditorSymbolRef} className="cad-settings-select h-7 text-xs" title="Symbol einfügen" defaultValue="">
+            <option value="">∑ Symbol</option>
+            <option value="²">²</option>
+            <option value="³">³</option>
+            <option value="°">°</option>
+            <option value="±">±</option>
+            <option value="×">×</option>
+            <option value="÷">÷</option>
+            <option value="∅">∅</option>
+            <option value="√">√</option>
+            <option value="≈">≈</option>
+            <option value="≤">≤</option>
+            <option value="≥">≥</option>
+            <option value="→">→</option>
+            <option value="←">←</option>
+            <option value="↑">↑</option>
+            <option value="↓">↓</option>
+          </select>
+        </div>
+
+        {/* Text Editor (contenteditable) */}
+        <div ref={textEditorElRef} className="hidden absolute z-40 outline-none" />
 
         {/* Canvas */}
         <canvas ref={canvasRef} className="block w-full h-full" />
