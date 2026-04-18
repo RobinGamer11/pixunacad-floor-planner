@@ -28,6 +28,10 @@ export class SelectTool {
   moveHubLengthM: number | null = null;
   moveHubAngleDeg: number | null = null;
 
+  // Parallel-drag state for dimensions
+  dragDimId: string | null = null;
+  dragDimOffsetAlongNormal = 0;
+
   constructor(app: CadApp) {
     this.app = app;
   }
