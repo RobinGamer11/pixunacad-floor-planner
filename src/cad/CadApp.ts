@@ -153,7 +153,13 @@ export class CadApp {
   hatchTool: HatchTool;
   measureTool!: MeasureTool;
   textTool!: TextTool;
-  activeTool: SelectTool | LineTool | HatchTool | MeasureTool | TextTool;
+  pipetteTool!: PipetteTool;
+  activeTool: SelectTool | LineTool | HatchTool | MeasureTool | TextTool | PipetteTool;
+
+  // Clipboard + Paste-Vorschau
+  clipboard: Clipboard | null = null;
+  pastePreviewActive = false;
+  private _toolBeforePaste: string | null = null;
 
   measureSettings: MeasureSettings = {
     orientation: Defaults.measureOrientation,
