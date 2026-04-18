@@ -1,7 +1,8 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import { CadApp } from "@/cad/CadApp";
 import { ToolIds, PointEditAction } from "@/cad/constants";
-import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2 } from "lucide-react";
+import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal } from "lucide-react";
+import type { HatchDrawMode } from "@/cad/HatchTool";
 
 const CAD_TOOLS = [
   { id: ToolIds.SELECT, label: "Auswahl", key: "V", icon: MousePointer2 },
@@ -56,6 +57,7 @@ const CadEditor: React.FC = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
+  const [hatchDrawMode, setHatchDrawMode] = useState<HatchDrawMode>("polygon");
 
   useEffect(() => {
     if (
@@ -99,6 +101,8 @@ const CadEditor: React.FC = () => {
 
     app.onToolChange = (id) => setActiveTool(id);
     app.onHistoryChange = (u, r) => { setCanUndo(u); setCanRedo(r); };
+    app.hatchTool.onDrawModeChange = (m) => setHatchDrawMode(m);
+    setHatchDrawMode(app.hatchTool.drawMode);
     app.setTool(ToolIds.SELECT);
     appRef.current = app;
 
@@ -224,6 +228,27 @@ const CadEditor: React.FC = () => {
             <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
               Schraffur
             </div>
+
+            {/* Draw mode toggle (only relevant while hatch tool is active) */}
+            <div className="flex gap-1 mb-3">
+              <button
+                type="button"
+                onClick={() => appRef.current?.hatchTool.setDrawMode("polygon")}
+                title="Polygon zeichnen"
+                className={`cad-toolbar-btn flex-1 justify-center h-9 ${hatchDrawMode === "polygon" ? "active" : ""}`}
+              >
+                <Spline className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => appRef.current?.hatchTool.setDrawMode("rectangle")}
+                title="Rechteck zeichnen"
+                className={`cad-toolbar-btn flex-1 justify-center h-9 ${hatchDrawMode === "rectangle" ? "active" : ""}`}
+              >
+                <RectangleHorizontal className="h-4 w-4" />
+              </button>
+            </div>
+
             <div className="space-y-3">
               <div>
                 <label>ID</label>

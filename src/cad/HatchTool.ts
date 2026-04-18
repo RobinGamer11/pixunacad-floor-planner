@@ -25,12 +25,23 @@ interface GuideDef {
   dir: Vec2;
 }
 
+export type HatchDrawMode = "polygon" | "rectangle";
+
 export class HatchTool {
   app: CadApp;
   id = "hatch";
 
+  drawMode: HatchDrawMode = "polygon";
+
+  // Polygon mode state
   state: "idle" | "drawing" = "idle";
   points: Vec2[] = [];
+
+  // Rectangle mode state ("idle" | "firstSide" | "secondSide")
+  rectState: "idle" | "firstSide" | "secondSide" = "idle";
+  rectPointA: Vec2 | null = null;
+  rectPointB: Vec2 | null = null;
+
   snap: Snap | null = null;
   activeTargetHatchId: string | null = null;
   startReferenceEdge: { hatchId: string; edgeIndex: number } | null = null;
@@ -43,6 +54,15 @@ export class HatchTool {
   guideAnchors: GuideAnchor[] = [];
   parallelGuideSegments: ParallelGuide[] = [];
 
+  onDrawModeChange?: (mode: HatchDrawMode) => void;
+
+  setDrawMode(mode: HatchDrawMode) {
+    if (this.drawMode === mode) return;
+    this.cancel();
+    this.drawMode = mode;
+    this.onDrawModeChange?.(mode);
+  }
+
   constructor(app: CadApp) {
     this.app = app;
     this.app.hub.bindCommit((vals) => this._applyHubValues(vals));
@@ -53,6 +73,9 @@ export class HatchTool {
     this.app.hub.bindCommit((vals) => this._applyHubValues(vals));
     this.state = "idle";
     this.points = [];
+    this.rectState = "idle";
+    this.rectPointA = null;
+    this.rectPointB = null;
     this.snap = null;
     this.activeTargetHatchId = null;
     this.startReferenceEdge = null;
@@ -70,6 +93,9 @@ export class HatchTool {
     this.resetGuides();
     this.state = "idle";
     this.points = [];
+    this.rectState = "idle";
+    this.rectPointA = null;
+    this.rectPointB = null;
     this.snap = null;
     this.activeTargetHatchId = null;
     this.startReferenceEdge = null;
@@ -82,7 +108,7 @@ export class HatchTool {
   }
 
   finish() { this.cancel(); }
-  isDrawing() { return this.state === "drawing"; }
+  isDrawing() { return this.state === "drawing" || this.rectState !== "idle"; }
   resetGuides() { this.guideAnchors = []; this.parallelGuideSegments = []; }
 
   /* ---- Guide system (identical pattern to LineTool) ---- */
@@ -430,19 +456,31 @@ export class HatchTool {
   /* ---- Hub ---- */
 
   private _openHubWithCurrentPreview() {
-    if (this.state !== "drawing" || this.points.length === 0) return;
-    const metrics = this._previewMetrics(this.app.input);
-    this.hubLocked = true;
-    this.hubLengthM = metrics.lengthM;
-    this.hubAngleDeg = metrics.angleDeg;
+    if (this.drawMode === "polygon") {
+      if (this.state !== "drawing" || this.points.length === 0) return;
+      const metrics = this._previewMetrics(this.app.input);
+      this.hubLocked = true;
+      this.hubLengthM = metrics.lengthM;
+      this.hubAngleDeg = metrics.angleDeg;
+    } else {
+      if (this.rectState === "idle") return;
+      const metrics = this._rectPreviewMetrics(this.app.input);
+      this.hubLocked = true;
+      this.hubLengthM = metrics.lengthM;
+      this.hubAngleDeg = metrics.angleDeg;
+    }
     this.app.hub.showAt(this.app.input.mouse.sx, this.app.input.mouse.sy);
-    this.app.hub.updateDisplay(this.hubLengthM, this.hubAngleDeg);
-    this.app.hub.setValues(this.hubLengthM, this.hubAngleDeg);
+    this.app.hub.updateDisplay(this.hubLengthM!, this.hubAngleDeg!);
+    this.app.hub.setValues(this.hubLengthM!, this.hubAngleDeg!);
     this.app.hub.enterEditMode();
   }
 
   private _applyHubValues(vals: { lengthM: number | null; angleDeg: number | null }) {
-    if (this.state !== "drawing" || this.points.length === 0) return;
+    if (this.drawMode === "polygon") {
+      if (this.state !== "drawing" || this.points.length === 0) return;
+    } else {
+      if (this.rectState === "idle") return;
+    }
     const nextLen = (vals.lengthM != null) ? Math.max(0, vals.lengthM) : this.hubLengthM;
     const nextAng = (vals.angleDeg != null) ? vals.angleDeg : this.hubAngleDeg;
     this.hubLengthM = nextLen;
@@ -460,11 +498,75 @@ export class HatchTool {
     this.app.clearSelection();
     this.points = [];
     this.state = "idle";
+    this.rectState = "idle";
+    this.rectPointA = null;
+    this.rectPointB = null;
     this.hubLocked = false;
     this.hubLengthM = null;
     this.hubAngleDeg = null;
     this.startReferenceEdge = null;
     this.startPointReference = null;
+  }
+
+  /* ---- Rectangle helpers ---- */
+
+  private _leftNormalUnit(a: Vec2, b: Vec2): Vec2 {
+    const d = norm(sub(b, a));
+    return v(-d.y, d.x);
+  }
+
+  private _getRectWidthCandidates(): number[] {
+    if (!this.rectPointA || !this.rectPointB) return [0, 180];
+    const base = angleDeg(this.rectPointA, this.rectPointB);
+    return [
+      ((base + 90) % 360 + 360) % 360,
+      ((base + 270) % 360 + 360) % 360,
+    ];
+  }
+
+  private _getRectPreviewWidthPoint(input: Input): Vec2 | null {
+    if (!this.rectPointA || !this.rectPointB) return null;
+    const baseAngle = angleDeg(this.rectPointA, this.rectPointB);
+    const leftN = this._leftNormalUnit(this.rectPointA, this.rectPointB);
+
+    if (this.hubLocked && this.hubLengthM != null && this.hubAngleDeg != null) {
+      const candidates = this._getRectWidthCandidates();
+      const chosen = nearestAngleToReference(candidates, this.hubAngleDeg);
+      const sign = Math.abs((((chosen - (baseAngle + 90)) % 360) + 360) % 360) < 1 ? +1 : -1;
+      return add(this.rectPointB, mul(leftN, sign * this.hubLengthM));
+    }
+
+    const raw = this._rawPreviewWorld(input);
+    const signedWidth = dot(sub(raw, this.rectPointB), leftN);
+    return add(this.rectPointB, mul(leftN, signedWidth));
+  }
+
+  private _getRectPreviewPoints(input: Input): Vec2[] | null {
+    if (!this.rectPointA || !this.rectPointB) return null;
+    const c = this._getRectPreviewWidthPoint(input);
+    if (!c) return null;
+    const offset = sub(c, this.rectPointB);
+    const d = add(this.rectPointA, offset);
+    return [v(this.rectPointA.x, this.rectPointA.y), v(this.rectPointB.x, this.rectPointB.y), v(c.x, c.y), v(d.x, d.y)];
+  }
+
+  private _rectFirstSidePoint(input: Input): Vec2 {
+    const a = this.rectPointA!;
+    let p = this._rawPreviewWorld(input);
+    p = this._applyRelativeConstraint(a, p, input);
+    return this._resolveCommitPointWithConstraint(this.snap, p, input);
+  }
+
+  private _rectPreviewMetrics(input: Input) {
+    if (this.rectState === "firstSide" && this.rectPointA) {
+      const b = this._rectFirstSidePoint(input);
+      return { lengthM: dist(this.rectPointA, b), angleDeg: angleDeg(this.rectPointA, b) };
+    }
+    if (this.rectState === "secondSide" && this.rectPointA && this.rectPointB) {
+      const c = this._getRectPreviewWidthPoint(input)!;
+      return { lengthM: dist(this.rectPointB, c), angleDeg: angleDeg(this.rectPointB, c) };
+    }
+    return { lengthM: 0, angleDeg: 0 };
   }
 
   /* ---- Update ---- */
@@ -479,24 +581,36 @@ export class HatchTool {
       if (this.snap && this.snap.type === SnapType.LINE) { this._toggleParallelGuideFromSnap(this.snap); return; }
     }
 
-    if (this.state === "drawing") {
-      const metrics = this._previewMetrics(input);
-      this.app.hub.showAt(input.mouse.sx, input.mouse.sy);
-      this.app.hub.updateDisplay(metrics.lengthM, metrics.angleDeg);
-    } else {
-      this.app.hub.hide();
-    }
-
-    if (input.doubleClicked) {
-      if (this.state === "drawing" && this.points.length >= 3) {
-        this._finishAndCreateHatch(this.points.slice());
+    if (this.drawMode === "polygon") {
+      if (this.state === "drawing") {
+        const metrics = this._previewMetrics(input);
+        this.app.hub.showAt(input.mouse.sx, input.mouse.sy);
+        this.app.hub.updateDisplay(metrics.lengthM, metrics.angleDeg);
       } else {
-        this.finish();
+        this.app.hub.hide();
       }
-      return;
-    }
 
-    if (input.clicked) this._onClick(input);
+      if (input.doubleClicked) {
+        if (this.state === "drawing" && this.points.length >= 3) {
+          this._finishAndCreateHatch(this.points.slice());
+        } else {
+          this.finish();
+        }
+        return;
+      }
+
+      if (input.clicked) this._onClick(input);
+    } else {
+      // rectangle mode
+      if (this.rectState !== "idle") {
+        const metrics = this._rectPreviewMetrics(input);
+        this.app.hub.showAt(input.mouse.sx, input.mouse.sy);
+        this.app.hub.updateDisplay(metrics.lengthM, metrics.angleDeg);
+      } else {
+        this.app.hub.hide();
+      }
+      if (input.clicked) this._onRectClick(input);
+    }
   }
 
   private _onClick(input: Input) {
@@ -549,8 +663,53 @@ export class HatchTool {
     this.hubAngleDeg = null;
   }
 
+  private _onRectClick(input: Input) {
+    if (this.rectState === "idle") {
+      const p = this._commitPoint(input);
+      this.rectPointA = v(p.x, p.y);
+      this.rectState = "firstSide";
+      this.hubLocked = false;
+      this.hubLengthM = null;
+      this.hubAngleDeg = null;
+      if (this.snap && this.snap.type === SnapType.LINE && this.snap.hatch) {
+        this.startReferenceEdge = { hatchId: this.snap.hatch.id, edgeIndex: this.snap.edgeIndex! };
+        this.startPointReference = null;
+      } else if (this.snap && this.snap.type === SnapType.LINE && this.snap.segment) {
+        this.startReferenceEdge = null;
+        this.startPointReference = { a: v(this.snap.segment.a.x, this.snap.segment.a.y), b: v(this.snap.segment.b.x, this.snap.segment.b.y) };
+      } else {
+        this.startReferenceEdge = null;
+        this.startPointReference = null;
+      }
+      return;
+    }
+
+    if (this.rectState === "firstSide") {
+      const p = this._rectFirstSidePoint(input);
+      if (dist(this.rectPointA!, p) < Defaults.minSegLenM) return;
+      this.rectPointB = v(p.x, p.y);
+      this.rectState = "secondSide";
+      this.hubLocked = false;
+      this.hubLengthM = null;
+      this.hubAngleDeg = null;
+      return;
+    }
+
+    if (this.rectState === "secondSide") {
+      const rect = this._getRectPreviewPoints(input);
+      if (!rect) return;
+      const width = dist(rect[1], rect[2]);
+      if (width < Defaults.minSegLenM) return;
+      this._finishAndCreateHatch(rect);
+    }
+  }
+
   onTabRequest(): boolean {
-    if (this.state !== "drawing") return false;
+    if (this.drawMode === "polygon") {
+      if (this.state !== "drawing") return false;
+    } else {
+      if (this.rectState === "idle") return false;
+    }
     this._openHubWithCurrentPreview();
     return true;
   }
@@ -637,13 +796,63 @@ export class HatchTool {
       ctx.restore();
     }
 
+    const style = this.app.getCurrentHatchStyle();
+    const fillCol = rgbaFromHex(style.fillColor, style.fillAlphaPct / 100);
+    const scaledStrokePx = Math.max(0, style.strokeWidthPx || 0) * (cam.scale / Defaults.strokeWidthBaseScale);
+
+    if (this.drawMode === "rectangle") {
+      if (this.rectState === "firstSide" && this.rectPointA) {
+        const b = this._rectFirstSidePoint(this.app.input);
+        const a0 = cam.worldToScreen(this.rectPointA.x, this.rectPointA.y);
+        const b0 = cam.worldToScreen(b.x, b.y);
+        ctx.save();
+        if (scaledStrokePx > 0) {
+          ctx.strokeStyle = style.strokeColor;
+          ctx.lineWidth = scaledStrokePx;
+          ctx.beginPath();
+          ctx.moveTo(a0.x, a0.y);
+          ctx.lineTo(b0.x, b0.y);
+          ctx.stroke();
+        }
+        ctx.fillStyle = "rgba(77,163,255,0.85)";
+        ctx.beginPath(); ctx.arc(a0.x, a0.y, 4, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(b0.x, b0.y, 4, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      } else if (this.rectState === "secondSide" && this.rectPointA && this.rectPointB) {
+        const rect = this._getRectPreviewPoints(this.app.input);
+        if (!rect) return;
+        ctx.save();
+        ctx.beginPath();
+        const p0 = cam.worldToScreen(rect[0].x, rect[0].y);
+        ctx.moveTo(p0.x, p0.y);
+        for (let i = 1; i < rect.length; i++) {
+          const sp = cam.worldToScreen(rect[i].x, rect[i].y);
+          ctx.lineTo(sp.x, sp.y);
+        }
+        ctx.closePath();
+        ctx.fillStyle = fillCol;
+        ctx.fill();
+        if (scaledStrokePx > 0) {
+          ctx.strokeStyle = style.strokeColor;
+          ctx.lineWidth = scaledStrokePx;
+          ctx.stroke();
+        }
+        ctx.fillStyle = "rgba(77,163,255,0.85)";
+        for (const p of rect) {
+          const sp = cam.worldToScreen(p.x, p.y);
+          ctx.beginPath();
+          ctx.arc(sp.x, sp.y, 4, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+      return;
+    }
+
     if (this.state !== "drawing" || this.points.length === 0) return;
 
     const previewPoint = this._previewWorld(this.app.input);
     const path = [...this.points, previewPoint];
-    const style = this.app.getCurrentHatchStyle();
-    const fillCol = rgbaFromHex(style.fillColor, style.fillAlphaPct / 100);
-    const scaledStrokePx = Math.max(0, style.strokeWidthPx || 0) * (cam.scale / Defaults.strokeWidthBaseScale);
 
     ctx.save();
 
