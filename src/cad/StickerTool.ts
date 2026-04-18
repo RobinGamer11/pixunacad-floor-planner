@@ -371,6 +371,30 @@ export class StickerTool {
   }
 
   private _drawOverlay(ctx: CanvasRenderingContext2D, cam: any) {
+    // Drag-Snap-Marker (während Sticker-Instanz verschoben wird)
+    if (this._dragStickerId && this._dragSnap) {
+      const sn = this._dragSnap;
+      if ((sn.type === "LINE" || sn.type === "GUIDE") && sn.lineA && sn.lineB) {
+        const a = cam.worldToScreen(sn.lineA.x, sn.lineA.y);
+        const b = cam.worldToScreen(sn.lineB.x, sn.lineB.y);
+        ctx.save();
+        ctx.strokeStyle = "rgba(77,163,255,0.42)";
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+        ctx.restore();
+      }
+      if (sn.world) {
+        const s = cam.worldToScreen(sn.world.x, sn.world.y);
+        ctx.save();
+        ctx.fillStyle = "rgba(77,163,255,0.95)";
+        ctx.beginPath(); ctx.arc(s.x, s.y, 4.5, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = "rgba(77,163,255,0.45)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(s.x, s.y, 10, 0, Math.PI * 2); ctx.stroke();
+        ctx.restore();
+      }
+    }
+
     // Selecting-Phase: Hervorhebung aller ausgewählten Objekte
     if (this.phase === "selecting") {
       this._drawSelectionHighlights(ctx, cam);
