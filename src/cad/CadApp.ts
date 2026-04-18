@@ -277,6 +277,7 @@ export class CadApp {
     this.measureTool = new MeasureTool(this);
     this.textTool = new TextTool(this);
     this.pipetteTool = new PipetteTool(this);
+    this.stickerTool = new StickerTool(this);
     this.activeTool = this.selectTool;
 
     this.idPanel = new IdPanel(this, idPanelRoot, idPanelBody, idPanelList, idPanelAddBtn, idPanelToggleBtn);
