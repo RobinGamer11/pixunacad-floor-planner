@@ -250,15 +250,15 @@
     border-color: hsl(var(--ring));
   }
 
-  /* ---- ID Panel ---- */
+  /* ---- ID Panel (sits over white canvas → keep light theme) ---- */
   .cad-id-panel {
     max-height: calc(100% - 20px);
     overflow: hidden;
     border-radius: 12px;
-    background: hsl(var(--cad-settings-bg) / 0.95);
-    border: 1px solid hsl(var(--cad-hub-border));
-    backdrop-filter: blur(4px);
-    box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+    background: hsl(0 0% 100% / 0.92);
+    border: 1px solid hsl(220 16% 86%);
+    backdrop-filter: blur(8px);
+    box-shadow: 0 12px 32px -12px hsl(222 40% 20% / 0.18), 0 2px 6px -2px hsl(222 40% 20% / 0.08);
     transition: width 0.15s ease;
   }
 
