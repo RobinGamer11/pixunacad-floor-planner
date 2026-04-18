@@ -894,7 +894,7 @@ const CadEditor: React.FC = () => {
           )}
 
           {/* Document-Eigenschaften: nur im Auswahl-Tool, wenn Dokument selektiert */}
-          {!sidebarCollapsed && activeTool === ToolIds.SELECT && !!docSelected && (
+          {!sidebarCollapsed && !!docSelected && (activeTool === ToolIds.SELECT || (activeTool === ToolIds.DOCUMENT && (docToolPhase === "scale-pick-1" || docToolPhase === "scale-pick-2" || docToolPhase === "scale-await-input"))) && (
             <div className="cad-settings-panel mb-2">
               <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Dokument-Eigenschaften</div>
               <div className="space-y-3">
