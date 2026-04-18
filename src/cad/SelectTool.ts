@@ -1,8 +1,9 @@
 import { Defaults, SnapType, SelectionType, PointEditAction } from "./constants";
-import { Vec2, v, sub, dot, dist, angleDeg, pointFromLengthAngle, projectPointToSegment, orthoSnapFromA, nearestAngleToReference, pointInPolygon, polygonCentroid } from "./geometry";
+import { Vec2, v, sub, add, mul, dot, dist, angleDeg, pointFromLengthAngle, projectPointToSegment, orthoSnapFromA, nearestAngleToReference, pointInPolygon, polygonCentroid } from "./geometry";
 import type { CadApp } from "./CadApp";
 import type { Snap } from "./TopologyEngine";
 import type { Input } from "./Input";
+import { getDimensionGeometry } from "./dimensionGeometry";
 
 type EditTarget =
   | { kind: "segment"; segmentId: string; pointIndex: number }
@@ -27,6 +28,10 @@ export class SelectTool {
   moveHubLengthM: number | null = null;
   moveHubAngleDeg: number | null = null;
 
+  // Parallel-drag state for dimensions
+  dragDimId: string | null = null;
+  dragDimOffsetAlongNormal = 0;
+
   constructor(app: CadApp) {
     this.app = app;
   }
@@ -44,6 +49,7 @@ export class SelectTool {
     this.app.pointEditMenu.hide();
     this.app.hub.hide();
     this.app.renderer.setHoverSegmentId(null);
+    this.dragDimId = null;
   }
 
   finish() {}
@@ -332,6 +338,17 @@ export class SelectTool {
 
     if (best) return best;
 
+    // Dimensions (parallel-line hit)
+    for (const dim of this.app.scene.dimensions) {
+      if (!this.app.labelManager.isVisible(dim.labelId)) continue;
+      const g = getDimensionGeometry(dim);
+      const proj = projectPointToSegment(mouseW, g.d1, g.d2);
+      const px = distPxToWorldPoint(proj.q);
+      if (px <= Defaults.hitPx) {
+        return { type: SelectionType.DIMENSION, dimensionId: dim.id } as any;
+      }
+    }
+
     // Hatch polygon hit (pointInPolygon)
     for (const hatch of visibleHatches) {
       if (selectedHatch && hatch.id === selectedHatch.id) continue;
@@ -464,6 +481,26 @@ export class SelectTool {
   }
 
   update(input: Input) {
+    // Active dimension parallel-drag
+    if (this.dragDimId) {
+      const dim = this.app.scene.getDimensionById(this.dragDimId);
+      if (!dim) {
+        this.dragDimId = null;
+      } else {
+        const g = getDimensionGeometry(dim);
+        const mouseW = v(input.mouse.wx, input.mouse.wy);
+        const mouseOffset = dot(sub(mouseW, dim.p1), g.n);
+        const newOffset = mouseOffset - this.dragDimOffsetAlongNormal;
+        dim.placementPoint = add(dim.p1, mul(g.n, newOffset));
+        this.app.renderer.setHoverSegmentId(null);
+        this.app.hub.hide();
+        if (!input.mouse.left) {
+          this.dragDimId = null;
+        }
+        return;
+      }
+    }
+
     if (this.isEditing()) {
       if (this.activeEditAction === PointEditAction.MOVE) {
         const p = this._previewMovePoint(input);
@@ -541,11 +578,20 @@ export class SelectTool {
     if (input.clicked) {
       const hit = this._hitTestWithForegroundPriority(input);
       this.app.setSelection(hit);
-      if (hit && hit.segmentId) {
+      if (hit && (hit as any).segmentId) {
         this.app.showLineSettingsPanel(true);
       }
-      if (hit && hit.hatchId) {
+      if (hit && (hit as any).hatchId) {
         this.app.showHatchSettingsPanel(true);
+      }
+      if (hit && hit.type === SelectionType.DIMENSION) {
+        const dim = this.app.scene.getDimensionById((hit as any).dimensionId);
+        if (dim) {
+          const g = getDimensionGeometry(dim);
+          const mouseW = v(input.mouse.wx, input.mouse.wy);
+          this.dragDimId = dim.id;
+          this.dragDimOffsetAlongNormal = dot(sub(mouseW, dim.p1), g.n) - g.offset;
+        }
       }
     }
 

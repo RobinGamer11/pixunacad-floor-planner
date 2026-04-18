@@ -124,10 +124,10 @@ export class MeasureTool {
       }
       if (input.clicked) {
         if (!this.pointSnap) return;
-        // Resolve snap (may split segment / insert hatch point) so the dimension references a real geometric point
-        const resolved = this.app.topology.resolveSnapPoint(this.pointSnap, this.pointSnap.world);
+        // Reference the snapped world position WITHOUT modifying the underlying geometry.
+        // The MeasureTool must never split segments or insert hatch points — that's the LineTool's job.
         const refDir = this._refDirFromSnap(this.pointSnap);
-        this.selectedPoints.push({ world: v(resolved.x, resolved.y), refDir });
+        this.selectedPoints.push({ world: v(this.pointSnap.world.x, this.pointSnap.world.y), refDir });
         if (this.getPointCountMode() === "two" && this.selectedPoints.length === 2) {
           this.state = "place";
         }
