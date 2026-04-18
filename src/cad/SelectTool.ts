@@ -42,13 +42,7 @@ export class SelectTool {
   dragStickerGrabOffset: Vec2 | null = null; // mouseStart - instanceOrigin (Greifpunkt-Offset relativ zur Position)
   dragStickerSnap: Snap | null = null; // letzter aktiver Snap während Drag (für Overlay)
 
-  // Sticker-Corner Drag-State (Rotate + Scale um Center)
-  cornerDragStickerId: string | null = null;
-  cornerDragCornerIndex = 0;
-  cornerDragStartAngle = 0;     // Winkel (rad) Center→Corner zu Drag-Start
-  cornerDragStartDist = 0;      // Distanz Center→Corner zu Drag-Start (Welt)
-  cornerDragInitRot = 0;        // inst.rotationRad zu Drag-Start
-  cornerDragInitScale = 1;      // inst.scale zu Drag-Start
+
 
   constructor(app: CadApp) {
     this.app = app;
