@@ -679,6 +679,139 @@ export class CadApp {
     this.showLineSettingsPanel(showLine);
     this.showHatchSettingsPanel(showHatch);
     this.showMeasureSettingsPanel(showMeasure);
+    this.showTextSettingsPanel(showText);
+  }
+
+  /* ---- Text Settings Panel ---- */
+  private _syncTextLabelSelect() {
+    if (!this.textRefs?.idSelect) return;
+    const groups = this.labelManager.list();
+    const cur = this.textRefs.idSelect.value;
+    this.textRefs.idSelect.innerHTML = "";
+    for (const g of groups) {
+      const opt = document.createElement("option");
+      opt.value = g.id; opt.textContent = g.name;
+      this.textRefs.idSelect.appendChild(opt);
+    }
+    const preferred =
+      (this.labelManager.getById(cur) ? cur : null) ||
+      (this.labelManager.getById(this.activeDrawLabelId) ? this.activeDrawLabelId : Defaults.defaultLabelId);
+    this.textRefs.idSelect.value = preferred;
+  }
+
+  private _setupTextSettingsPanel() {
+    const r = this.textRefs;
+    if (!r) return;
+
+    r.idSelect.addEventListener("change", () => {
+      const nextId = r.idSelect.value || Defaults.defaultLabelId;
+      const sel = this.getSelectedTextBox();
+      if (sel) { sel.labelId = nextId; this.setSelectedLabelId(nextId); this.refreshLabelUI(); return; }
+      this.setActiveDrawLabelId(nextId);
+    });
+
+    r.textColor.addEventListener("input", () => {
+      const sel = this.getSelectedTextBox();
+      if (sel) sel.style.textColor = r.textColor.value;
+      else this.defaultTextColor = r.textColor.value;
+      r.textColorPreview.style.background = r.textColor.value;
+    });
+
+    r.fontSize.addEventListener("input", () => {
+      let v = parseFloat((r.fontSize.value || "").replace(",", "."));
+      if (!Number.isFinite(v) || v <= 0) return;
+      v = clamp(v, 6, 200);
+      const sel = this.getSelectedTextBox();
+      if (sel) sel.style.fontSizePx = v;
+      else this.defaultTextFontSizePx = v;
+    });
+    r.fontSize.addEventListener("blur", () => this._syncTextSettingsFromContext());
+
+    const setAlign = (a: "left" | "center" | "right") => {
+      const sel = this.getSelectedTextBox();
+      if (sel) sel.style.align = a;
+      else this.defaultTextAlign = a;
+      this._syncTextSettingsFromContext();
+    };
+    r.alignLeftBtn.addEventListener("click", () => setAlign("left"));
+    r.alignCenterBtn.addEventListener("click", () => setAlign("center"));
+    r.alignRightBtn.addEventListener("click", () => setAlign("right"));
+
+    r.bgColor.addEventListener("input", () => {
+      const sel = this.getSelectedTextBox();
+      if (sel) sel.style.bgColor = r.bgColor.value;
+      else this.defaultTextBgColor = r.bgColor.value;
+      this._syncTextSettingsFromContext();
+    });
+
+    r.bgAlpha.addEventListener("input", () => {
+      let v = parseFloat((r.bgAlpha.value || "").replace(",", "."));
+      if (!Number.isFinite(v)) return;
+      v = clamp(v, 0, 100);
+      const sel = this.getSelectedTextBox();
+      if (sel) sel.style.bgAlphaPct = v;
+      else this.defaultTextBgAlphaPct = v;
+      this._syncTextSettingsFromContext();
+    });
+
+    r.wrapToggle.addEventListener("change", () => {
+      const sel = this.getSelectedTextBox();
+      if (sel) sel.style.wrap = !!r.wrapToggle.checked;
+      else this.defaultTextWrap = !!r.wrapToggle.checked;
+    });
+
+    r.borderToggle.addEventListener("change", () => {
+      const v = !!r.borderToggle.checked;
+      const sel = this.getSelectedTextBox();
+      if (sel) sel.style.borderEnabled = v;
+      else this.defaultTextBorderEnabled = v;
+      r.borderGroup.classList.toggle("hidden", !v);
+    });
+
+    r.borderColor.addEventListener("input", () => {
+      const sel = this.getSelectedTextBox();
+      if (sel) sel.style.borderColor = r.borderColor.value;
+      else this.defaultTextBorderColor = r.borderColor.value;
+      r.borderColorPreview.style.background = r.borderColor.value;
+    });
+
+    r.borderWidth.addEventListener("input", () => {
+      let v = parseFloat((r.borderWidth.value || "").replace(",", "."));
+      if (!Number.isFinite(v) || v < 0) return;
+      v = clamp(v, 0, 30);
+      const sel = this.getSelectedTextBox();
+      if (sel) sel.style.borderWidthPx = v;
+      else this.defaultTextBorderWidthPx = v;
+    });
+    r.borderWidth.addEventListener("blur", () => this._syncTextSettingsFromContext());
+
+    this._syncTextSettingsFromContext();
+  }
+
+  private _syncTextSettingsFromContext() {
+    const r = this.textRefs;
+    if (!r) return;
+    const s = this.getCurrentTextStyle();
+    r.textColor.value = this._toHexColor(s.textColor || Defaults.textColor);
+    r.textColorPreview.style.background = r.textColor.value;
+    r.fontSize.value = String(Math.round(s.fontSizePx ?? Defaults.textFontSizePx));
+    r.bgColor.value = this._toHexColor(s.bgColor || Defaults.textBgColor);
+    r.bgColorPreview.style.background = `${r.bgColor.value}`;
+    r.bgAlpha.value = String(Math.round(s.bgAlphaPct ?? Defaults.textBgAlphaPct));
+    r.wrapToggle.checked = !!s.wrap;
+    r.alignLeftBtn.classList.toggle("active", s.align === "left");
+    r.alignCenterBtn.classList.toggle("active", s.align === "center");
+    r.alignRightBtn.classList.toggle("active", s.align === "right");
+    r.borderToggle.checked = !!s.borderEnabled;
+    r.borderGroup.classList.toggle("hidden", !s.borderEnabled);
+    r.borderColor.value = this._toHexColor(s.borderColor || Defaults.textBorderColor);
+    r.borderColorPreview.style.background = r.borderColor.value;
+    r.borderWidth.value = String((s.borderWidthPx ?? Defaults.textBorderWidthPx).toFixed(1).replace(/\.0$/, ""));
+    const labelForDisplay =
+      (this.selectedLabelId && this.labelManager.getById(this.selectedLabelId)) ? this.selectedLabelId
+        : (s.labelId && this.labelManager.getById(s.labelId)) ? s.labelId
+        : (this.labelManager.getById(this.activeDrawLabelId) ? this.activeDrawLabelId : Defaults.defaultLabelId);
+    r.idSelect.value = labelForDisplay;
   }
 
   /* ---- Line Settings Panel ---- */
