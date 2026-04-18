@@ -1361,6 +1361,11 @@ export class CadApp {
           this.setTool(ToolIds.SELECT);
           return;
         }
+        if (this.activeTool === this.documentTool) {
+          if (this.documentTool.phase !== "idle") { this.documentTool.cancel(); return; }
+          this.setTool(ToolIds.SELECT);
+          return;
+        }
         if (this.activeTool === this.selectTool) { this.selectTool.cancel(); this.clearSelection(); this.setSelectedLabelId(null); this.pointEditMenu.hide(); return; }
         this.activeTool.cancel();
         this.clearSelection();
