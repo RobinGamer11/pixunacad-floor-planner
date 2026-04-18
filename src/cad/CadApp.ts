@@ -1345,6 +1345,7 @@ export class CadApp {
       if (e.key === "t" || e.key === "T") this.setTool(ToolIds.TEXT);
       if (e.key === "p" || e.key === "P") this.setTool(ToolIds.PIPETTE);
       if (e.key === "o" || e.key === "O") this.setTool(ToolIds.STICKER);
+      if (e.key === "d" || e.key === "D") this.setTool(ToolIds.DOCUMENT);
 
       if (e.key === "Escape") {
         if (this.isStickerEditing()) { this.exitStickerEdit(); this.clearSelection(); return; }
@@ -1380,6 +1381,11 @@ export class CadApp {
         if (this.selection && this.selection.type === SelectionType.STICKER_INSTANCE) {
           const inst = this.scene.getStickerInstanceById((this.selection as any).stickerInstanceId);
           if (inst) { this.scene.removeStickerInstance(inst); this.clearSelection(); }
+          return;
+        }
+        if (this.selection && this.selection.type === SelectionType.DOCUMENT) {
+          const doc = this.scene.getDocumentById((this.selection as any).documentId);
+          if (doc) { this.scene.removeDocument(doc); this.clearSelection(); this.refreshLabelUI(); }
           return;
         }
         if (this.selection && (this.selection.type === SelectionType.TEXTBOX || this.selection.type === SelectionType.TEXTBOX_HANDLE)) {
