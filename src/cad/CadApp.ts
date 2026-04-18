@@ -487,6 +487,29 @@ export class CadApp {
     };
   }
 
+  getCurrentMeasureStyle(): DimensionStyle {
+    const sel = (this.selection && this.selection.type === SelectionType.DIMENSION)
+      ? this.scene.getDimensionById((this.selection as any).dimensionId) : null;
+    if (sel) {
+      return {
+        textColor: sel.textColor, textSizePx: sel.textSizePx, lineColor: sel.lineColor,
+        decimals: sel.decimals, tickLengthM: sel.tickLengthM, showExtensions: sel.showExtensions,
+        useFreeText: sel.useFreeText, freeText: sel.freeText,
+        textBgEnabled: sel.textBgEnabled, textBgColor: sel.textBgColor, textBgAlpha: sel.textBgAlpha,
+        labelId: sel.labelId,
+      };
+    }
+    return {
+      textColor: this.measureSettings.textColor, textSizePx: this.measureSettings.textSizePx,
+      lineColor: this.measureSettings.lineColor, decimals: this.measureSettings.decimals,
+      tickLengthM: this.measureSettings.tickLengthM, showExtensions: this.measureSettings.showExtensions,
+      useFreeText: this.measureSettings.useFreeText, freeText: this.measureSettings.freeText,
+      textBgEnabled: this.measureSettings.textBgEnabled, textBgColor: this.measureSettings.textBgColor,
+      textBgAlpha: this.measureSettings.textBgAlpha,
+      labelId: this.activeDrawLabelId || Defaults.defaultLabelId,
+    };
+  }
+
   showLineSettingsPanel(shouldShow: boolean) { this.lineSettingsPanel.classList.toggle("hidden", !shouldShow); }
   showHatchSettingsPanel(shouldShow: boolean) { this.hatchSettingsPanel.classList.toggle("hidden", !shouldShow); }
 
@@ -744,6 +767,7 @@ export class CadApp {
     if (id === ToolIds.SELECT) { this.activeTool = this.selectTool; this.selectTool.activate(); }
     else if (id === ToolIds.LINE) { this.activeTool = this.lineTool; this.lineTool.activate(); }
     else if (id === ToolIds.HATCH) { this.activeTool = this.hatchTool; this.hatchTool.activate(); }
+    else if (id === ToolIds.MEASURE) { this.activeTool = this.measureTool; this.measureTool.activate(); }
     this._syncLineSettingsFromContext();
     this._syncHatchSettingsFromContext();
     this._updateSettingsVisibility();
