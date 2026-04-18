@@ -16,6 +16,8 @@ import { TextTool } from "./TextTool";
 import { TextEditorOverlay } from "./TextEditorOverlay";
 import { PipetteTool } from "./PipetteTool";
 import { Clipboard, buildClipboardFromSelection, commitClipboardAt, translatedItems, ClipboardItem } from "./ClipboardManager";
+import { StickerTool } from "./StickerTool";
+import { StickerDefinition, buildStickerFromSelection, exportStickersToJson, importStickersFromJson } from "./StickerManager";
 
 import { IdPanel } from "./IdPanel";
 
@@ -154,12 +156,17 @@ export class CadApp {
   measureTool!: MeasureTool;
   textTool!: TextTool;
   pipetteTool!: PipetteTool;
-  activeTool: SelectTool | LineTool | HatchTool | MeasureTool | TextTool | PipetteTool;
+  stickerTool!: StickerTool;
+  activeTool: SelectTool | LineTool | HatchTool | MeasureTool | TextTool | PipetteTool | StickerTool;
 
   // Clipboard + Paste-Vorschau
   clipboard: Clipboard | null = null;
   pastePreviewActive = false;
   private _toolBeforePaste: string | null = null;
+
+  // Sticker library (per project, included in undo/redo)
+  stickers: StickerDefinition[] = [];
+  onStickersChange?: () => void;
 
   measureSettings: MeasureSettings = {
     orientation: Defaults.measureOrientation,
