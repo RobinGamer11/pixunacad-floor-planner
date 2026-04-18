@@ -606,6 +606,14 @@ export class CadApp {
     this._keydownHandler = (e: KeyboardEvent) => {
       const tag = (document.activeElement?.tagName || "").toLowerCase();
       const isHubInput = document.activeElement === this.hub.lenInputEl || document.activeElement === this.hub.angInputEl;
+
+      // Undo / Redo (also work while inputs focused except hub)
+      if ((e.ctrlKey || e.metaKey) && !e.altKey) {
+        const k = e.key.toLowerCase();
+        if (k === "z" && !e.shiftKey) { e.preventDefault(); this.undo(); return; }
+        if ((k === "z" && e.shiftKey) || k === "y") { e.preventDefault(); this.redo(); return; }
+      }
+
       if ((tag === "input" || tag === "textarea" || tag === "select") && !isHubInput) return;
 
       if (this.activeTool === this.selectTool) {
