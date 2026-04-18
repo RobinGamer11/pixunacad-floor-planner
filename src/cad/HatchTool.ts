@@ -2,7 +2,8 @@ import { Defaults, SnapType } from "./constants";
 import {
   Vec2, v, add, sub, mul, norm, dot, dist, angleDeg, pointFromLengthAngle,
   orthoSnapFromA, nearestAngleToReference, rgbaFromHex,
-  lineLineIntersectionInfinite, projectPointToInfiniteLine
+  lineLineIntersectionInfinite, projectPointToInfiniteLine,
+  normalizeDeg, buildCircleOrSectorPoints
 } from "./geometry";
 import type { CadApp } from "./CadApp";
 import type { Snap } from "./TopologyEngine";
@@ -25,7 +26,7 @@ interface GuideDef {
   dir: Vec2;
 }
 
-export type HatchDrawMode = "polygon" | "rectangle";
+export type HatchDrawMode = "polygon" | "rectangle" | "circle";
 
 export class HatchTool {
   app: CadApp;
@@ -37,10 +38,17 @@ export class HatchTool {
   state: "idle" | "drawing" = "idle";
   points: Vec2[] = [];
 
-  // Rectangle mode state ("idle" | "firstSide" | "secondSide")
+  // Rectangle mode state
   rectState: "idle" | "firstSide" | "secondSide" = "idle";
   rectPointA: Vec2 | null = null;
   rectPointB: Vec2 | null = null;
+
+  // Circle mode state ("idle" | "radius" | "arc")
+  circleState: "idle" | "radius" | "arc" = "idle";
+  circleCenter: Vec2 | null = null;
+  circleRadiusM = 0;
+  circleStartAngleDeg = 0;
+  circleEndAngleDeg = 0;
 
   snap: Snap | null = null;
   activeTargetHatchId: string | null = null;
@@ -76,6 +84,7 @@ export class HatchTool {
     this.rectState = "idle";
     this.rectPointA = null;
     this.rectPointB = null;
+    this._resetCircleState();
     this.snap = null;
     this.activeTargetHatchId = null;
     this.startReferenceEdge = null;
@@ -96,6 +105,7 @@ export class HatchTool {
     this.rectState = "idle";
     this.rectPointA = null;
     this.rectPointB = null;
+    this._resetCircleState();
     this.snap = null;
     this.activeTargetHatchId = null;
     this.startReferenceEdge = null;
@@ -108,8 +118,16 @@ export class HatchTool {
   }
 
   finish() { this.cancel(); }
-  isDrawing() { return this.state === "drawing" || this.rectState !== "idle"; }
+  isDrawing() { return this.state === "drawing" || this.rectState !== "idle" || this.circleState !== "idle"; }
   resetGuides() { this.guideAnchors = []; this.parallelGuideSegments = []; }
+
+  private _resetCircleState() {
+    this.circleState = "idle";
+    this.circleCenter = null;
+    this.circleRadiusM = 0;
+    this.circleStartAngleDeg = 0;
+    this.circleEndAngleDeg = 0;
+  }
 
   /* ---- Guide system (identical pattern to LineTool) ---- */
 
@@ -462,9 +480,16 @@ export class HatchTool {
       this.hubLocked = true;
       this.hubLengthM = metrics.lengthM;
       this.hubAngleDeg = metrics.angleDeg;
-    } else {
+    } else if (this.drawMode === "rectangle") {
       if (this.rectState === "idle") return;
       const metrics = this._rectPreviewMetrics(this.app.input);
+      this.hubLocked = true;
+      this.hubLengthM = metrics.lengthM;
+      this.hubAngleDeg = metrics.angleDeg;
+    } else {
+      // circle
+      if (this.circleState === "idle") return;
+      const metrics = this._circlePreviewMetrics(this.app.input);
       this.hubLocked = true;
       this.hubLengthM = metrics.lengthM;
       this.hubAngleDeg = metrics.angleDeg;
@@ -478,8 +503,13 @@ export class HatchTool {
   private _applyHubValues(vals: { lengthM: number | null; angleDeg: number | null }) {
     if (this.drawMode === "polygon") {
       if (this.state !== "drawing" || this.points.length === 0) return;
-    } else {
+    } else if (this.drawMode === "rectangle") {
       if (this.rectState === "idle") return;
+    } else {
+      // circle
+      if (this.circleState === "idle") return;
+      this._applyCircleHubValues(vals);
+      return;
     }
     const nextLen = (vals.lengthM != null) ? Math.max(0, vals.lengthM) : this.hubLengthM;
     const nextAng = (vals.angleDeg != null) ? vals.angleDeg : this.hubAngleDeg;
@@ -488,6 +518,34 @@ export class HatchTool {
     this.hubLocked = true;
     this.app.hub.setValues(this.hubLengthM!, this.hubAngleDeg);
     this.app.hub.updateDisplay(this.hubLengthM!, this.hubAngleDeg);
+  }
+
+  private _applyCircleHubValues(vals: { lengthM: number | null; angleDeg: number | null }) {
+    if (this.circleState === "radius") {
+      const nextLen = (vals.lengthM != null) ? Math.max(0, vals.lengthM) : (this.hubLengthM ?? 0);
+      const nextAng = normalizeDeg(vals.angleDeg ?? this.hubAngleDeg ?? 0);
+      this.hubLengthM = nextLen;
+      this.hubAngleDeg = nextAng;
+      this.hubLocked = true;
+
+      this.circleRadiusM = nextLen;
+      this.circleStartAngleDeg = nextAng;
+      this.circleEndAngleDeg = nextAng;
+      this.circleState = "arc";
+
+      this.app.hub.setValues(this.circleRadiusM, this.circleEndAngleDeg);
+      this.app.hub.updateDisplay(this.circleRadiusM, this.circleEndAngleDeg);
+      this.app.hub.enterEditMode();
+      return;
+    }
+
+    if (this.circleState === "arc") {
+      const nextAng = normalizeDeg(vals.angleDeg ?? this.circleEndAngleDeg);
+      this.hubAngleDeg = nextAng;
+      this.hubLocked = true;
+      this.circleEndAngleDeg = nextAng;
+      this._finishCircle(true);
+    }
   }
 
   /* ---- Finish ---- */
@@ -501,12 +559,85 @@ export class HatchTool {
     this.rectState = "idle";
     this.rectPointA = null;
     this.rectPointB = null;
+    this._resetCircleState();
     this.hubLocked = false;
     this.hubLengthM = null;
     this.hubAngleDeg = null;
     this.startReferenceEdge = null;
     this.startPointReference = null;
   }
+
+  /* ---- Circle helpers ---- */
+
+  private _circlePreviewRadiusWorld(input: Input): Vec2 {
+    if (!this.circleCenter) return this._rawPreviewWorld(input);
+    if (this.hubLocked && this.hubLengthM != null && this.hubAngleDeg != null && this.circleState === "radius") {
+      return pointFromLengthAngle(this.circleCenter, this.hubLengthM, this.hubAngleDeg);
+    }
+    let p = this._rawPreviewWorld(input);
+    if (input.keys.shift) p = orthoSnapFromA(this.circleCenter, p);
+    return p;
+  }
+
+  private _circlePreviewMetrics(input: Input) {
+    if (!this.circleCenter) return { lengthM: 0, angleDeg: 0 };
+    if (this.circleState === "radius") {
+      const p = this._circlePreviewRadiusWorld(input);
+      return { lengthM: dist(this.circleCenter, p), angleDeg: angleDeg(this.circleCenter, p) };
+    }
+    if (this.circleState === "arc") {
+      return { lengthM: this.circleRadiusM, angleDeg: this._circlePreviewArcEndAngle(input) };
+    }
+    return { lengthM: 0, angleDeg: 0 };
+  }
+
+  private _circlePreviewArcEndAngle(input: Input): number {
+    if (!this.circleCenter) return 0;
+    if (this.hubLocked && this.hubAngleDeg != null && this.circleState === "arc") {
+      return normalizeDeg(this.hubAngleDeg);
+    }
+    let p = this._rawPreviewWorld(input);
+    if (input.keys.shift) p = orthoSnapFromA(this.circleCenter, p);
+    return normalizeDeg(angleDeg(this.circleCenter, p));
+  }
+
+  private _finishCircle(forceFullCircle: boolean) {
+    if (!this.circleCenter || this.circleRadiusM <= Defaults.minSegLenM) return;
+    const points = forceFullCircle
+      ? buildCircleOrSectorPoints(this.circleCenter, this.circleRadiusM, 0, 360, 96)
+      : buildCircleOrSectorPoints(this.circleCenter, this.circleRadiusM, this.circleStartAngleDeg, this.circleEndAngleDeg, 96);
+    if (!points || points.length < 3) return;
+    this._finishAndCreateHatch(points);
+  }
+
+  private _onCircleClick(input: Input) {
+    if (this.circleState === "idle") {
+      const p = this.app.topology.resolveSnapPoint(this.snap, this._rawPreviewWorld(input));
+      this.circleCenter = v(p.x, p.y);
+      this.circleState = "radius";
+      this.hubLocked = false;
+      this.hubLengthM = null;
+      this.hubAngleDeg = null;
+      return;
+    }
+    if (this.circleState === "radius") {
+      const metrics = this._circlePreviewMetrics(input);
+      this.circleRadiusM = metrics.lengthM;
+      this.circleStartAngleDeg = metrics.angleDeg;
+      this.circleEndAngleDeg = metrics.angleDeg;
+      if (this.circleRadiusM <= Defaults.minSegLenM) return;
+      this.circleState = "arc";
+      this.hubLocked = false;
+      this.hubLengthM = this.circleRadiusM;
+      this.hubAngleDeg = this.circleStartAngleDeg;
+      return;
+    }
+    if (this.circleState === "arc") {
+      this.circleEndAngleDeg = this._circlePreviewArcEndAngle(input);
+      this._finishCircle(false);
+    }
+  }
+
 
   /* ---- Rectangle helpers ---- */
 
@@ -600,8 +731,7 @@ export class HatchTool {
       }
 
       if (input.clicked) this._onClick(input);
-    } else {
-      // rectangle mode
+    } else if (this.drawMode === "rectangle") {
       if (this.rectState !== "idle") {
         const metrics = this._rectPreviewMetrics(input);
         this.app.hub.showAt(input.mouse.sx, input.mouse.sy);
@@ -610,6 +740,25 @@ export class HatchTool {
         this.app.hub.hide();
       }
       if (input.clicked) this._onRectClick(input);
+    } else {
+      // circle mode
+      if (this.circleState === "radius") {
+        const metrics = this._circlePreviewMetrics(input);
+        this.app.hub.showAt(input.mouse.sx, input.mouse.sy);
+        this.app.hub.updateDisplay(metrics.lengthM, metrics.angleDeg);
+      } else if (this.circleState === "arc") {
+        this.circleEndAngleDeg = this._circlePreviewArcEndAngle(input);
+        this.app.hub.showAt(input.mouse.sx, input.mouse.sy);
+        this.app.hub.updateDisplay(this.circleRadiusM, this.circleEndAngleDeg);
+      } else {
+        this.app.hub.hide();
+      }
+
+      if (input.doubleClicked && this.circleState === "arc") {
+        this._finishCircle(true);
+        return;
+      }
+      if (input.clicked) this._onCircleClick(input);
     }
   }
 
@@ -707,11 +856,20 @@ export class HatchTool {
   onTabRequest(): boolean {
     if (this.drawMode === "polygon") {
       if (this.state !== "drawing") return false;
-    } else {
+    } else if (this.drawMode === "rectangle") {
       if (this.rectState === "idle") return false;
+    } else {
+      if (this.circleState === "idle") return false;
     }
     this._openHubWithCurrentPreview();
     return true;
+  }
+
+  /** Called by CadApp on Enter key while in arc state to commit a full circle. */
+  finishCircleFromKey() {
+    if (this.drawMode === "circle" && this.circleState === "arc") {
+      this._finishCircle(true);
+    }
   }
 
   /* ---- Overlay Drawing ---- */
@@ -846,6 +1004,87 @@ export class HatchTool {
         }
         ctx.restore();
       }
+      return;
+    }
+
+    if (this.drawMode === "circle") {
+      if (!this.circleCenter) return;
+      ctx.save();
+      const c = cam.worldToScreen(this.circleCenter.x, this.circleCenter.y);
+      ctx.fillStyle = "rgba(77,163,255,0.95)";
+      ctx.beginPath();
+      ctx.arc(c.x, c.y, 4, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (this.circleState === "radius") {
+        const p = this._circlePreviewRadiusWorld(this.app.input);
+        const sp = cam.worldToScreen(p.x, p.y);
+        const r = dist(this.circleCenter, p) * cam.scale;
+
+        if (scaledStrokePx > 0) {
+          ctx.strokeStyle = style.strokeColor;
+          ctx.lineWidth = scaledStrokePx;
+        } else {
+          ctx.strokeStyle = "rgba(77,163,255,0.85)";
+          ctx.lineWidth = 1.5;
+        }
+        ctx.beginPath();
+        ctx.moveTo(c.x, c.y);
+        ctx.lineTo(sp.x, sp.y);
+        ctx.stroke();
+
+        ctx.setLineDash([6, 6]);
+        ctx.strokeStyle = "rgba(77,163,255,0.65)";
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, r, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      } else if (this.circleState === "arc") {
+        const previewPts = buildCircleOrSectorPoints(
+          this.circleCenter,
+          this.circleRadiusM,
+          this.circleStartAngleDeg,
+          this.circleEndAngleDeg,
+          96
+        );
+        if (previewPts.length >= 3) {
+          ctx.beginPath();
+          const p0 = cam.worldToScreen(previewPts[0].x, previewPts[0].y);
+          ctx.moveTo(p0.x, p0.y);
+          for (let i = 1; i < previewPts.length; i++) {
+            const sp = cam.worldToScreen(previewPts[i].x, previewPts[i].y);
+            ctx.lineTo(sp.x, sp.y);
+          }
+          ctx.closePath();
+          ctx.fillStyle = fillCol;
+          ctx.fill();
+          if (scaledStrokePx > 0) {
+            ctx.strokeStyle = style.strokeColor;
+            ctx.lineWidth = scaledStrokePx;
+            ctx.stroke();
+          }
+        }
+
+        // Helper radii
+        const startP = pointFromLengthAngle(this.circleCenter, this.circleRadiusM, this.circleStartAngleDeg);
+        const endP = pointFromLengthAngle(this.circleCenter, this.circleRadiusM, this.circleEndAngleDeg);
+        const ss = cam.worldToScreen(startP.x, startP.y);
+        const se = cam.worldToScreen(endP.x, endP.y);
+        ctx.strokeStyle = "rgba(77,163,255,0.8)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(c.x, c.y); ctx.lineTo(ss.x, ss.y);
+        ctx.moveTo(c.x, c.y); ctx.lineTo(se.x, se.y);
+        ctx.stroke();
+
+        // Endpoint markers
+        ctx.fillStyle = "rgba(77,163,255,0.85)";
+        ctx.beginPath(); ctx.arc(ss.x, ss.y, 4, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(se.x, se.y, 4, 0, Math.PI * 2); ctx.fill();
+      }
+
+      ctx.restore();
       return;
     }
 

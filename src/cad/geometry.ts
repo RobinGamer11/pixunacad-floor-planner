@@ -62,6 +62,51 @@ export function pointFromLengthAngle(a: Vec2, lengthM: number, angleDegValue: nu
   };
 }
 
+export function normalizeDeg(deg: number): number {
+  return ((deg % 360) + 360) % 360;
+}
+
+/**
+ * Build polygon points along a circular arc from startAngleDeg → endAngleDeg.
+ * If start≈end (within 0.1°), produces a full closed circle.
+ * Otherwise produces a sector (pie slice) including the center, swept counter-clockwise.
+ */
+export function buildCircleOrSectorPoints(
+  center: Vec2,
+  radius: number,
+  startAngleDeg: number,
+  endAngleDeg: number,
+  segments: number = 96
+): Vec2[] {
+  if (radius <= 0 || segments < 3) return [];
+  const start = normalizeDeg(startAngleDeg);
+  const end = normalizeDeg(endAngleDeg);
+  let sweep = end - start;
+  if (sweep <= 0) sweep += 360;
+
+  // Treat tiny sweep or near-full as full circle
+  const isFull = sweep < 0.1 || sweep > 359.9;
+
+  const pts: Vec2[] = [];
+
+  if (isFull) {
+    for (let i = 0; i < segments; i++) {
+      const ang = (i / segments) * 360;
+      pts.push(pointFromLengthAngle(center, radius, ang));
+    }
+    return pts;
+  }
+
+  // Sector: include center as first point so it forms a pie slice
+  const arcSegs = Math.max(2, Math.ceil((sweep / 360) * segments));
+  pts.push(v(center.x, center.y));
+  for (let i = 0; i <= arcSegs; i++) {
+    const ang = start + (sweep * i) / arcSegs;
+    pts.push(pointFromLengthAngle(center, radius, ang));
+  }
+  return pts;
+}
+
 export function nearestAngleToReference(options: number[], ref: number): number {
   let best = options[0];
   let bestDiff = Infinity;
