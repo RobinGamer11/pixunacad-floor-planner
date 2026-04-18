@@ -172,17 +172,22 @@ export class TextTool {
       ctx.restore();
     }
 
-    // Preview rectangle at anchor (top-left = anchor, default size, no rotation)
-    const anchor = this._previewAnchor(this.app.input);
-    const widthPx = Defaults.textBoxWidthM * cam.scale;
-    const heightPx = Defaults.textBoxHeightM * cam.scale;
-    const tl = cam.worldToScreen(anchor.x, anchor.y);
-    ctx.save();
-    ctx.fillStyle = "rgba(77,163,255,0.08)";
-    ctx.strokeStyle = "rgba(77,163,255,0.85)";
-    ctx.lineWidth = 1.8;
-    ctx.fillRect(tl.x, tl.y, widthPx, heightPx);
-    ctx.strokeRect(tl.x, tl.y, widthPx, heightPx);
-    ctx.restore();
+    // Preview rectangle at anchor (top-left = anchor, default size, no rotation).
+    // Hide the preview while an editor is open — the next click will commit
+    // it AND place the new textbox at the same time, so the preview reappears
+    // immediately on the following frame.
+    if (!this.app.textEditor?.isActive()) {
+      const anchor = this._previewAnchor(this.app.input);
+      const widthPx = Defaults.textBoxWidthM * cam.scale;
+      const heightPx = Defaults.textBoxHeightM * cam.scale;
+      const tl = cam.worldToScreen(anchor.x, anchor.y);
+      ctx.save();
+      ctx.fillStyle = "rgba(77,163,255,0.08)";
+      ctx.strokeStyle = "rgba(77,163,255,0.85)";
+      ctx.lineWidth = 1.8;
+      ctx.fillRect(tl.x, tl.y, widthPx, heightPx);
+      ctx.strokeRect(tl.x, tl.y, widthPx, heightPx);
+      ctx.restore();
+    }
   }
 }
