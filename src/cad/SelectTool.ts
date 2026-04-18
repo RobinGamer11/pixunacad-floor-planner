@@ -35,6 +35,11 @@ export class SelectTool {
   dragDimId: string | null = null;
   dragDimOffsetAlongNormal = 0;
 
+  // Sticker-Instanz Drag-State
+  dragStickerId: string | null = null;
+  dragStickerOrigin: Vec2 | null = null; // Position der Instanz beim Drag-Start
+  dragStickerMouseStart: Vec2 | null = null; // Mausposition (Welt) bei Drag-Start
+
   constructor(app: CadApp) {
     this.app = app;
   }
