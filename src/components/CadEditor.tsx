@@ -114,6 +114,8 @@ const CadEditor: React.FC = () => {
   const [canRedo, setCanRedo] = useState(false);
   const [hatchDrawMode, setHatchDrawMode] = useState<HatchDrawMode>("polygon");
   const [stickers, setStickers] = useState<StickerDefinition[]>([]);
+  const [stickerSelCount, setStickerSelCount] = useState(0);
+  const [stickerPhase, setStickerPhase] = useState<"idle" | "selecting" | "placing" | "rotating">("idle");
   const stickerImportRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -225,6 +227,10 @@ const CadEditor: React.FC = () => {
     app.onToolChange = (id) => setActiveTool(id);
     app.onHistoryChange = (u, r) => { setCanUndo(u); setCanRedo(r); };
     app.onStickersChange = () => setStickers([...app.stickers]);
+    app.stickerTool.onSelectionChange = () => {
+      setStickerSelCount(app.stickerTool.getSelectionCount());
+      setStickerPhase(app.stickerTool.phase);
+    };
     app.hatchTool.onDrawModeChange = (m) => setHatchDrawMode(m);
     setHatchDrawMode(app.hatchTool.drawMode);
     app.setTool(ToolIds.SELECT);
