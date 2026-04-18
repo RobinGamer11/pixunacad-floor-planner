@@ -639,6 +639,41 @@ const CadEditor: React.FC = () => {
           <button ref={pointDeleteBtnRef} title="Löschen">🗑</button>
         </div>
 
+        {/* Text Editor Toolbar (floating) */}
+        <div ref={textEditorToolbarRef} className="hidden absolute z-40 flex items-center gap-1 px-2 py-1 rounded-md shadow-lg" style={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}>
+          <button ref={textEditorBoldRef} type="button" className="cad-toolbar-btn h-7 w-7 justify-center px-0" title="Fett (Strg+B)">
+            <Bold className="h-3.5 w-3.5" />
+          </button>
+          <button ref={textEditorItalicRef} type="button" className="cad-toolbar-btn h-7 w-7 justify-center px-0" title="Kursiv (Strg+I)">
+            <Italic className="h-3.5 w-3.5" />
+          </button>
+          <input ref={textEditorColorRef} type="color" defaultValue="#111111" className="w-7 h-7 cursor-pointer border-0 p-0 bg-transparent" title="Textfarbe" />
+          <select ref={textEditorSizeRef} className="cad-settings-select h-7 text-xs" title="Schriftgröße">
+            {[10, 12, 14, 16, 18, 20, 24, 28, 32, 40, 48].map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <select ref={textEditorSymbolRef} className="cad-settings-select h-7 text-xs" title="Symbol einfügen" defaultValue="">
+            <option value="">∑ Symbol</option>
+            <option value="²">²</option>
+            <option value="³">³</option>
+            <option value="°">°</option>
+            <option value="±">±</option>
+            <option value="×">×</option>
+            <option value="÷">÷</option>
+            <option value="∅">∅</option>
+            <option value="√">√</option>
+            <option value="≈">≈</option>
+            <option value="≤">≤</option>
+            <option value="≥">≥</option>
+            <option value="→">→</option>
+            <option value="←">←</option>
+            <option value="↑">↑</option>
+            <option value="↓">↓</option>
+          </select>
+        </div>
+
+        {/* Text Editor (contenteditable) */}
+        <div ref={textEditorElRef} className="hidden absolute z-40 outline-none" />
+
         {/* Canvas */}
         <canvas ref={canvasRef} className="block w-full h-full" />
       </div>
