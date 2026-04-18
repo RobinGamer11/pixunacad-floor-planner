@@ -1,9 +1,9 @@
 import { v, Vec2, projectPointToSegment, pointInPolygon } from "./geometry";
-import { Defaults } from "./constants";
+import { Defaults, SelectionType } from "./constants";
 import type { CadApp } from "./CadApp";
 import type { Input } from "./Input";
 import type { ClipboardItem } from "./ClipboardManager";
-import { StickerDefinition, transformedStickerItems, commitStickerAt } from "./StickerManager";
+import { StickerDefinition, transformedStickerItems, commitStickerAt, pointInInstance } from "./StickerManager";
 import { getDimensionGeometry } from "./dimensionGeometry";
 
 type Phase = "idle" | "selecting" | "placing" | "rotating";
