@@ -3,6 +3,7 @@ import { Vec2, v, projectPointToSegment } from "./geometry";
 import { Scene, Segment, Hatch } from "./Scene";
 import { Camera } from "./Camera";
 import { LabelManager } from "./LabelManager";
+import { boxCornersWorld } from "./textGeometry";
 
 export interface Snap {
   type: string;
