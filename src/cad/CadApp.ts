@@ -84,6 +84,8 @@ export class CadApp {
   areaBgColorPreview: HTMLDivElement;
   areaBgAlphaInput: HTMLInputElement;
 
+  measureRefs!: MeasureSettingsRefs;
+
   defaultLineColor = Defaults.lineColor;
   defaultLineThicknessM = Defaults.lineThicknessM;
   defaultHatchFillColor = Defaults.hatchFillColor;
