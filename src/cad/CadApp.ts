@@ -18,6 +18,7 @@ import { PipetteTool } from "./PipetteTool";
 import { Clipboard, buildClipboardFromSelection, commitClipboardAt, translatedItems, ClipboardItem } from "./ClipboardManager";
 import { StickerTool } from "./StickerTool";
 import { StickerDefinition, buildStickerFromSelection, buildStickerFromIds, StickerIdSet, exportStickersToJson, importStickersFromJson, instanceBoundingCornersWorld, transformedInstanceItems, pointInInstance, localItemsBounds } from "./StickerManager";
+import { DocumentTool } from "./DocumentTool";
 
 import { IdPanel } from "./IdPanel";
 
@@ -157,7 +158,8 @@ export class CadApp {
   textTool!: TextTool;
   pipetteTool!: PipetteTool;
   stickerTool!: StickerTool;
-  activeTool: SelectTool | LineTool | HatchTool | MeasureTool | TextTool | PipetteTool | StickerTool;
+  documentTool!: DocumentTool;
+  activeTool: SelectTool | LineTool | HatchTool | MeasureTool | TextTool | PipetteTool | StickerTool | DocumentTool;
 
   // Clipboard + Paste-Vorschau
   clipboard: Clipboard | null = null;
@@ -284,6 +286,7 @@ export class CadApp {
     this.textTool = new TextTool(this);
     this.pipetteTool = new PipetteTool(this);
     this.stickerTool = new StickerTool(this);
+    this.documentTool = new DocumentTool(this);
     this.activeTool = this.selectTool;
 
     this.idPanel = new IdPanel(this, idPanelRoot, idPanelBody, idPanelList, idPanelAddBtn, idPanelToggleBtn);
@@ -356,6 +359,12 @@ export class CadApp {
       })),
       _stickerEditInstanceId: this._stickerEditInstanceId,
       _stickerEditSnapshot: this._stickerEditSnapshot,
+      documents: this.scene.documents.map(d => ({
+        id: d.id, name: d.name, kind: d.kind, src: d.src, pageIndex: d.pageIndex,
+        position: { x: d.position.x, y: d.position.y },
+        widthM: d.widthM, heightM: d.heightM, rotationRad: d.rotationRad,
+        pixelWidth: d.pixelWidth, pixelHeight: d.pixelHeight, labelId: d.labelId,
+      })),
     });
   }
 
@@ -372,11 +381,13 @@ export class CadApp {
     this.scene.dimensions = [];
     this.scene.textBoxes = [];
     this.scene.stickerInstances = [];
+    this.scene.documents = [];
     (this.scene as any)._rebuildSegIdMap?.();
     (this.scene as any)._rebuildHatchIdMap?.();
     (this.scene as any)._rebuildDimIdMap?.();
     (this.scene as any)._rebuildTextIdMap?.();
     (this.scene as any)._rebuildStickerIdMap?.();
+    (this.scene as any)._rebuildDocIdMap?.();
     // Re-add segments
     for (const s of data.segments || []) {
       const seg = this.scene.createSegment(s.a, s.b, { color: s.color, thicknessM: s.thicknessM, labelId: s.labelId });
@@ -1604,6 +1615,7 @@ export class CadApp {
     else if (id === ToolIds.TEXT) { this.activeTool = this.textTool; this.textTool.activate(); }
     else if (id === ToolIds.PIPETTE) { this.activeTool = this.pipetteTool; this.pipetteTool.activate(); }
     else if (id === ToolIds.STICKER) { this.activeTool = this.stickerTool; this.stickerTool.activate(); }
+    else if (id === ToolIds.DOCUMENT) { this.activeTool = this.documentTool; this.documentTool.activate(); }
     this._syncLineSettingsFromContext();
     this._syncHatchSettingsFromContext();
     this._syncMeasureSettingsFromContext();

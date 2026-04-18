@@ -218,12 +218,54 @@ export class StickerInstance {
   }
 }
 
+export class DocumentObject {
+  id: string;
+  name: string;
+  /** "image" (jpg/png) oder "pdf-page" (gerendertes PDF). */
+  kind: "image" | "pdf-page";
+  /** Base64 DataURL des gerenderten Bildes (PNG für PDF, original für JPG/PNG). */
+  src: string;
+  /** Bei PDFs: Seitenindex (0-basiert). */
+  pageIndex: number;
+  /** Welt-Position der oberen-linken Ecke (vor Rotation). */
+  position: Vec2;
+  /** Welt-Breite/-Höhe in Metern. */
+  widthM: number;
+  heightM: number;
+  /** Rotation um die Mitte, in Radiant. */
+  rotationRad: number;
+  /** Original-Pixelgröße. */
+  pixelWidth: number;
+  pixelHeight: number;
+  labelId: string;
+
+  constructor({ id, name, kind, src, pageIndex, position, widthM, heightM, rotationRad, pixelWidth, pixelHeight, labelId }: {
+    id: string; name?: string; kind?: "image" | "pdf-page"; src: string;
+    pageIndex?: number; position: Vec2; widthM: number; heightM: number;
+    rotationRad?: number; pixelWidth?: number; pixelHeight?: number; labelId?: string;
+  }) {
+    this.id = id;
+    this.name = name || "Dokument";
+    this.kind = kind || "image";
+    this.src = src;
+    this.pageIndex = pageIndex || 0;
+    this.position = v(position.x, position.y);
+    this.widthM = Math.max(0.001, widthM);
+    this.heightM = Math.max(0.001, heightM);
+    this.rotationRad = rotationRad || 0;
+    this.pixelWidth = pixelWidth || 0;
+    this.pixelHeight = pixelHeight || 0;
+    this.labelId = labelId || Defaults.defaultLabelId;
+  }
+}
+
 export class Scene {
   segments: Segment[] = [];
   hatches: Hatch[] = [];
   dimensions: Dimension[] = [];
   textBoxes: TextBox[] = [];
   stickerInstances: StickerInstance[] = [];
+  documents: DocumentObject[] = [];
   /**
    * Wenn !== null: alle danach via create* erzeugten Objekte werden mit dieser
    * Sticker-Edit-Owner-ID markiert. Wird von CadApp während enterStickerEdit
@@ -235,6 +277,7 @@ export class Scene {
   private _dimIdMap = new Map<string, Dimension>();
   private _textIdMap = new Map<string, TextBox>();
   private _stickerIdMap = new Map<string, StickerInstance>();
+  private _docIdMap = new Map<string, DocumentObject>();
 
   private _makeId(): string {
     return (crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now() + Math.random());
@@ -263,6 +306,54 @@ export class Scene {
   private _rebuildStickerIdMap() {
     this._stickerIdMap.clear();
     for (const s of this.stickerInstances) this._stickerIdMap.set(s.id, s);
+  }
+
+  private _rebuildDocIdMap() {
+    this._docIdMap.clear();
+    for (const d of this.documents) this._docIdMap.set(d.id, d);
+  }
+
+  // ---- Documents (PDF/JPG/PNG) ----
+  createDocument(opts: {
+    name?: string; kind?: "image" | "pdf-page"; src: string; pageIndex?: number;
+    position: Vec2; widthM: number; heightM: number; rotationRad?: number;
+    pixelWidth?: number; pixelHeight?: number; labelId?: string;
+  }): DocumentObject {
+    const doc = new DocumentObject({ id: this._makeId(), ...opts });
+    this.documents.push(doc);
+    this._rebuildDocIdMap();
+    return doc;
+  }
+
+  getDocumentById(id: string): DocumentObject | null { return this._docIdMap.get(id) || null; }
+
+  getDocumentsByLabelId(labelId: string): DocumentObject[] {
+    return this.documents.filter(d => d.labelId === labelId);
+  }
+
+  removeDocument(doc: DocumentObject) {
+    this.documents = this.documents.filter(d => d !== doc);
+    this._rebuildDocIdMap();
+  }
+
+  removeDocumentsByIds(ids: string[]) {
+    const set = new Set(ids);
+    this.documents = this.documents.filter(d => !set.has(d.id));
+    this._rebuildDocIdMap();
+  }
+
+  removeDocumentsByLabelId(labelId: string) {
+    this.documents = this.documents.filter(d => d.labelId !== labelId);
+    this._rebuildDocIdMap();
+  }
+
+  reassignDocumentsLabel(oldId: string, newId: string) {
+    for (const d of this.documents) if (d.labelId === oldId) d.labelId = newId;
+  }
+
+  assignDocumentsToLabel(ids: string[], newId: string) {
+    const set = new Set(ids);
+    for (const d of this.documents) if (set.has(d.id)) d.labelId = newId;
   }
 
   // ---- Sticker Instances ----
