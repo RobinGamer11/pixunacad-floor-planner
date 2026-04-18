@@ -171,6 +171,27 @@ export class StickerTool {
       return;
     }
 
+    // Im idle-Modus: Doppelklick auf Sticker-Instanz öffnet Edit-Mode
+    if (this.phase === "idle" && input.doubleClicked && !this.app.isStickerEditing()) {
+      const hit = this._hitStickerInstance(input);
+      if (hit) {
+        this.app.enterStickerEdit(hit as any);
+        return;
+      }
+    }
+
+    // Im Edit-Mode: Klick außerhalb der Bounding-Box verlässt ihn
+    if (this.phase === "idle" && input.clicked && this.app.isStickerEditing()) {
+      const mouseW = v(input.mouse.wx, input.mouse.wy);
+      if (this.app.isPointOutsideStickerEdit(mouseW)) {
+        this.app.exitStickerEdit();
+        this.app.clearSelection();
+        return;
+      }
+      // Innerhalb: keine spezielle Sticker-Selektion (Innenobjekte sind echte Scene-Objekte, im Sticker-Tool nicht editierbar).
+      return;
+    }
+
     // Im idle-Modus: Klick auf existierende Sticker-Instanz wählt sie aus + startet Drag
     if (this.phase === "idle" && input.clicked) {
       const hit = this._hitStickerInstance(input);
