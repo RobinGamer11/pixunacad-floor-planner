@@ -517,6 +517,76 @@ const CadEditor: React.FC = () => {
               </div>
             </div>
           </div>
+
+          {/* Text Settings */}
+          <div ref={textSettingsRef} className={`cad-settings-panel hidden ${sidebarCollapsed ? "!hidden" : ""}`}>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+              Text
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label>ID</label>
+                <select ref={textIdSelectRef} className="cad-settings-select w-full" />
+              </div>
+              <div>
+                <label>Textfarbe</label>
+                <div className="flex items-center gap-2">
+                  <div ref={textColorPreviewRef} className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))" }} />
+                  <input ref={textColorRef} type="color" defaultValue="#111111" className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
+                </div>
+              </div>
+              <div>
+                <label>Schriftgröße (px)</label>
+                <input ref={textFontSizeRef} type="text" defaultValue="16" />
+              </div>
+              <div>
+                <label>Ausrichtung</label>
+                <div className="flex gap-1">
+                  <button ref={textAlignLeftRef} type="button" className="cad-toolbar-btn flex-1 justify-center h-9" title="Links">
+                    <AlignLeft className="h-4 w-4" />
+                  </button>
+                  <button ref={textAlignCenterRef} type="button" className="cad-toolbar-btn flex-1 justify-center h-9" title="Mitte">
+                    <AlignCenter className="h-4 w-4" />
+                  </button>
+                  <button ref={textAlignRightRef} type="button" className="cad-toolbar-btn flex-1 justify-center h-9" title="Rechts">
+                    <AlignRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label>Hintergrundfarbe</label>
+                <div className="flex items-center gap-2">
+                  <div ref={textBgColorPreviewRef} className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))" }} />
+                  <input ref={textBgColorRef} type="color" defaultValue="#ffffff" className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
+                </div>
+              </div>
+              <div>
+                <label>HG-Transparenz (0–100%)</label>
+                <input ref={textBgAlphaRef} type="text" defaultValue="0" />
+              </div>
+              <div className="flex items-center gap-2">
+                <input ref={textWrapRef} type="checkbox" className="accent-primary" />
+                <label className="!mb-0 cursor-pointer">Zeilenumbruch</label>
+              </div>
+              <div className="flex items-center gap-2">
+                <input ref={textBorderToggleRef} type="checkbox" className="accent-primary" />
+                <label className="!mb-0 cursor-pointer">Rahmen</label>
+              </div>
+              <div ref={textBorderGroupRef} className="hidden space-y-2 pt-2" style={{ borderTop: "1px solid hsl(var(--border))" }}>
+                <div>
+                  <label>Rahmenfarbe</label>
+                  <div className="flex items-center gap-2">
+                    <div ref={textBorderColorPreviewRef} className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))" }} />
+                    <input ref={textBorderColorRef} type="color" defaultValue="#111111" className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
+                  </div>
+                </div>
+                <div>
+                  <label>Rahmenstärke (px)</label>
+                  <input ref={textBorderWidthRef} type="text" defaultValue="1" />
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Collapse toggle */}
