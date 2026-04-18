@@ -57,6 +57,7 @@ const CadEditor: React.FC = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
+  const [hatchDrawMode, setHatchDrawMode] = useState<HatchDrawMode>("polygon");
 
   useEffect(() => {
     if (
