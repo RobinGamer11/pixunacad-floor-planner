@@ -74,6 +74,17 @@ export class SelectTool {
     return null;
   }
 
+  /** Returns the topmost sticker instance under the mouse, or null. */
+  private _hitStickerInstance(input: Input) {
+    const mouseW = v(input.mouse.wx, input.mouse.wy);
+    for (let i = this.app.scene.stickerInstances.length - 1; i >= 0; i--) {
+      const inst = this.app.scene.stickerInstances[i];
+      if (!this.app.labelManager.isVisible(inst.labelId)) continue;
+      if (pointInInstance(inst.items as any, inst.position, inst.rotationRad, inst.scale, mouseW)) return inst;
+    }
+    return null;
+  }
+
   isEditing() { return !!this.activeEditAction; }
 
   hasPointMenu() {
