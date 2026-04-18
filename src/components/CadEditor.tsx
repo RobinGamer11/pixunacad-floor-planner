@@ -113,6 +113,8 @@ const CadEditor: React.FC = () => {
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [hatchDrawMode, setHatchDrawMode] = useState<HatchDrawMode>("polygon");
+  const [stickers, setStickers] = useState<StickerDefinition[]>([]);
+  const stickerImportRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (
