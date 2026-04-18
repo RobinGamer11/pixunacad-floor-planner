@@ -131,12 +131,36 @@ export function buildStickerFromSelection(app: CadApp, name: string): StickerDef
     for (const t of app.scene.getTextBoxesByLabelId(app.selectedLabelId)) items.push(snapTextBox(t));
   }
 
-  if (items.length === 0) return null;
+  return _finalizeSticker(items, name);
+}
 
+/** Build sticker from explicit object id sets (used by StickerTool's multi-select). */
+export interface StickerIdSet {
+  segmentIds?: Set<string> | string[];
+  hatchIds?: Set<string> | string[];
+  dimensionIds?: Set<string> | string[];
+  textBoxIds?: Set<string> | string[];
+}
+export function buildStickerFromIds(app: CadApp, ids: StickerIdSet, name: string): StickerDefinition | null {
+  const items: ClipboardItem[] = [];
+  const segIds = Array.from(ids.segmentIds || []);
+  const hatchIds = Array.from(ids.hatchIds || []);
+  const dimIds = Array.from(ids.dimensionIds || []);
+  const tbIds = Array.from(ids.textBoxIds || []);
+
+  for (const id of segIds) { const s = app.scene.getSegmentById(id); if (s) items.push(snapSegment(s)); }
+  for (const id of hatchIds) { const h = app.scene.getHatchById(id); if (h) items.push(snapHatch(h)); }
+  for (const id of dimIds) { const d = app.scene.getDimensionById(id); if (d) items.push(snapDimension(d)); }
+  for (const id of tbIds) { const t = app.scene.getTextBoxById(id); if (t) items.push(snapTextBox(t)); }
+
+  return _finalizeSticker(items, name);
+}
+
+function _finalizeSticker(items: ClipboardItem[], name: string): StickerDefinition | null {
+  if (items.length === 0) return null;
   // Re-Center auf Schwerpunkt -> lokale Koordinaten
   const c = itemsCentroid(items);
   const localItems = items.map(it => translateItem(it, -c.x, -c.y));
-
   return {
     id: (crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now() + Math.random()),
     name: name.trim() || "Sticker",

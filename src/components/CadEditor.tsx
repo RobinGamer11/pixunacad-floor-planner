@@ -114,6 +114,8 @@ const CadEditor: React.FC = () => {
   const [canRedo, setCanRedo] = useState(false);
   const [hatchDrawMode, setHatchDrawMode] = useState<HatchDrawMode>("polygon");
   const [stickers, setStickers] = useState<StickerDefinition[]>([]);
+  const [stickerSelCount, setStickerSelCount] = useState(0);
+  const [stickerPhase, setStickerPhase] = useState<"idle" | "selecting" | "placing" | "rotating">("idle");
   const stickerImportRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -222,9 +224,17 @@ const CadEditor: React.FC = () => {
       },
     );
 
-    app.onToolChange = (id) => setActiveTool(id);
+    app.onToolChange = (id) => {
+      setActiveTool(id);
+      setStickerPhase(app.stickerTool.phase);
+      setStickerSelCount(app.stickerTool.getSelectionCount());
+    };
     app.onHistoryChange = (u, r) => { setCanUndo(u); setCanRedo(r); };
     app.onStickersChange = () => setStickers([...app.stickers]);
+    app.stickerTool.onSelectionChange = () => {
+      setStickerSelCount(app.stickerTool.getSelectionCount());
+      setStickerPhase(app.stickerTool.phase);
+    };
     app.hatchTool.onDrawModeChange = (m) => setHatchDrawMode(m);
     setHatchDrawMode(app.hatchTool.drawMode);
     app.setTool(ToolIds.SELECT);
@@ -599,14 +609,38 @@ const CadEditor: React.FC = () => {
             <div className="cad-settings-panel mb-2">
               <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Sticker</div>
               <div className="space-y-3">
-                <button type="button" onClick={() => {
-                  const name = window.prompt("Name für neuen Sticker:", `Sticker ${appRef.current!.stickers.length + 1}`);
-                  if (!name) return;
-                  const def = appRef.current!.createStickerFromSelection(name);
-                  if (!def) window.alert("Bitte erst ein Objekt oder eine Bezeichnungs-ID-Gruppe auswählen.");
-                }} className="cad-toolbar-btn w-full justify-center h-9" title="Aus aktueller Auswahl oder Bezeichnungs-ID-Gruppe">
-                  <Plus className="h-4 w-4" /> <span className="text-xs">Aus Auswahl</span>
-                </button>
+                {stickerPhase === "selecting" ? (
+                  <>
+                    <div className="rounded-md p-2 text-xs space-y-2" style={{ background: "hsl(var(--primary) / 0.12)", border: "1px solid hsl(var(--primary) / 0.4)" }}>
+                      <div className="font-medium">Auswahl-Modus aktiv</div>
+                      <div style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+                        Klicke Objekte zum Hinzufügen / Entfernen.<br />
+                        <strong>Enter</strong> oder <strong>Doppelklick</strong> = speichern · <strong>Esc</strong> = abbrechen
+                      </div>
+                      <div className="font-mono text-[11px] pt-1" style={{ borderTop: "1px solid hsl(var(--primary) / 0.3)" }}>
+                        Objekte ausgewählt: <strong>{stickerSelCount}</strong>
+                      </div>
+                    </div>
+                    <div className="flex gap-1">
+                      <button type="button" disabled={stickerSelCount === 0} onClick={() => {
+                        const name = window.prompt("Name für neuen Sticker:", `Sticker ${appRef.current!.stickers.length + 1}`);
+                        if (!name) return;
+                        appRef.current!.stickerTool.commitSelectionAsSticker(name);
+                      }} className="cad-toolbar-btn flex-1 justify-center h-9 disabled:opacity-40 disabled:cursor-not-allowed" title="Auswahl als Sticker speichern">
+                        <Plus className="h-4 w-4" /> <span className="text-xs">Speichern</span>
+                      </button>
+                      <button type="button" onClick={() => { appRef.current!.stickerTool.cancel(); }} className="cad-toolbar-btn h-9 px-3 justify-center" title="Abbrechen">
+                        <span className="text-xs">Abbrechen</span>
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <button type="button" onClick={() => {
+                    appRef.current!.stickerTool.beginSelectionMode();
+                  }} className="cad-toolbar-btn w-full justify-center h-9" title="Mehrere Objekte für neuen Sticker auswählen">
+                    <Plus className="h-4 w-4" /> <span className="text-xs">Auswahl</span>
+                  </button>
+                )}
 
                 <div className="flex gap-1">
                   <button type="button" onClick={() => {
@@ -662,7 +696,8 @@ const CadEditor: React.FC = () => {
                 </div>
 
                 <div className="text-[11px] leading-relaxed pt-2" style={{ color: "hsl(var(--cad-toolbar-muted))", borderTop: "1px solid hsl(var(--border))" }}>
-                  <div>Klick auf Sticker → Platzieren-Modus</div>
+                  <div><strong>Auswahl</strong>: Objekte sammeln · Enter speichert</div>
+                  <div><strong>Klick auf Sticker</strong>: Platzieren-Modus</div>
                   <div>1. Klick: Position · Maus: Rotation · 2. Klick: bestätigt</div>
                   <div>SHIFT: 90°-Snap · ENTER: Winkel eingeben</div>
                 </div>

@@ -17,7 +17,7 @@ import { TextEditorOverlay } from "./TextEditorOverlay";
 import { PipetteTool } from "./PipetteTool";
 import { Clipboard, buildClipboardFromSelection, commitClipboardAt, translatedItems, ClipboardItem } from "./ClipboardManager";
 import { StickerTool } from "./StickerTool";
-import { StickerDefinition, buildStickerFromSelection, exportStickersToJson, importStickersFromJson } from "./StickerManager";
+import { StickerDefinition, buildStickerFromSelection, buildStickerFromIds, StickerIdSet, exportStickersToJson, importStickersFromJson } from "./StickerManager";
 
 import { IdPanel } from "./IdPanel";
 
@@ -1048,6 +1048,10 @@ export class CadApp {
         }
       }
 
+      if (e.key === "Enter" && this.activeTool === this.stickerTool && !isHubInput) {
+        if (this.stickerTool.handleEnterKey()) { e.preventDefault(); return; }
+      }
+
       // Don't trigger tool shortcuts while text editor is active
       const isTextEditing = this.textEditor?.isActive();
       if (isTextEditing) {
@@ -1171,6 +1175,14 @@ export class CadApp {
   /* ---- Sticker library ---- */
   createStickerFromSelection(name: string): StickerDefinition | null {
     const def = buildStickerFromSelection(this, name);
+    if (!def) return null;
+    this.stickers.push(def);
+    this.onStickersChange?.();
+    return def;
+  }
+
+  createStickerFromIds(ids: StickerIdSet, name: string): StickerDefinition | null {
+    const def = buildStickerFromIds(this, ids, name);
     if (!def) return null;
     this.stickers.push(def);
     this.onStickersChange?.();
