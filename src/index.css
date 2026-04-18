@@ -55,7 +55,7 @@
     --cad-snap-line: 215 70% 65%;
     --cad-selection-stroke: 215 90% 55%;
     --cad-selection-fill: 215 90% 55%;
-    --cad-settings-bg: 222 16% 34%;
+    --cad-settings-bg: 222 20% 22%;
     --cad-tools-bg: 222 20% 22%;
 
     --sidebar-background: 0 0% 98%;
@@ -110,7 +110,7 @@
     --cad-snap-line: 215 60% 45%;
     --cad-selection-stroke: 215 90% 55%;
     --cad-selection-fill: 215 90% 55%;
-    --cad-settings-bg: 222 12% 30%;
+    --cad-settings-bg: 222 16% 18%;
     --cad-tools-bg: 222 16% 18%;
 
     --sidebar-background: 240 5.9% 10%;
@@ -210,9 +210,9 @@
   }
 
   .cad-settings-panel {
-    @apply rounded-lg border p-3 space-y-3;
-    background: hsl(var(--cad-settings-bg));
-    border-color: hsl(var(--cad-hub-border));
+    @apply rounded-lg p-3 space-y-3;
+    background: transparent;
+    border: none;
     color: hsl(var(--cad-toolbar-foreground));
   }
 
