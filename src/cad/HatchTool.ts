@@ -73,6 +73,9 @@ export class HatchTool {
     this.app.hub.bindCommit((vals) => this._applyHubValues(vals));
     this.state = "idle";
     this.points = [];
+    this.rectState = "idle";
+    this.rectPointA = null;
+    this.rectPointB = null;
     this.snap = null;
     this.activeTargetHatchId = null;
     this.startReferenceEdge = null;
@@ -90,6 +93,9 @@ export class HatchTool {
     this.resetGuides();
     this.state = "idle";
     this.points = [];
+    this.rectState = "idle";
+    this.rectPointA = null;
+    this.rectPointB = null;
     this.snap = null;
     this.activeTargetHatchId = null;
     this.startReferenceEdge = null;
@@ -102,7 +108,7 @@ export class HatchTool {
   }
 
   finish() { this.cancel(); }
-  isDrawing() { return this.state === "drawing"; }
+  isDrawing() { return this.state === "drawing" || this.rectState !== "idle"; }
   resetGuides() { this.guideAnchors = []; this.parallelGuideSegments = []; }
 
   /* ---- Guide system (identical pattern to LineTool) ---- */
