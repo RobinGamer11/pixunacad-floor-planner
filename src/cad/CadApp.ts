@@ -166,6 +166,7 @@ export class CadApp {
     areaTextColorInput: HTMLInputElement, areaTextColorPreview: HTMLDivElement,
     areaFontSizeInput: HTMLInputElement,
     areaBgColorInput: HTMLInputElement, areaBgColorPreview: HTMLDivElement, areaBgAlphaInput: HTMLInputElement,
+    measureRefs: MeasureSettingsRefs,
   ) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d")!;
@@ -195,6 +196,7 @@ export class CadApp {
     this.areaBgColorInput = areaBgColorInput;
     this.areaBgColorPreview = areaBgColorPreview;
     this.areaBgAlphaInput = areaBgAlphaInput;
+    this.measureRefs = measureRefs;
 
     this.camera = new Camera();
     this.scene = new Scene();
@@ -217,6 +219,7 @@ export class CadApp {
 
     this._setupLineSettingsPanel();
     this._setupHatchSettingsPanel();
+    this._setupMeasureSettingsPanel();
     this._setupShortcuts();
     this.refreshLabelUI();
     this._resize();
