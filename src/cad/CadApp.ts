@@ -233,6 +233,17 @@ export class CadApp {
         fillAlphaPct: h.fillAlphaPct, strokeWidthPx: h.strokeWidthPx,
         labelId: h.labelId, areaLabel: { ...h.areaLabel },
       })),
+      dimensions: this.scene.dimensions.map(d => ({
+        id: d.id,
+        p1: { x: d.p1.x, y: d.p1.y }, p2: { x: d.p2.x, y: d.p2.y },
+        placementPoint: { x: d.placementPoint.x, y: d.placementPoint.y },
+        mode: d.mode, refDir: d.refDir ? { x: d.refDir.x, y: d.refDir.y } : null,
+        textColor: d.textColor, textSizePx: d.textSizePx, lineColor: d.lineColor,
+        decimals: d.decimals, tickLengthM: d.tickLengthM, showExtensions: d.showExtensions,
+        useFreeText: d.useFreeText, freeText: d.freeText,
+        textBgEnabled: d.textBgEnabled, textBgColor: d.textBgColor, textBgAlpha: d.textBgAlpha,
+        labelId: d.labelId,
+      })),
       labels: this.labelManager.list().map(l => ({ ...l })),
     });
   }
