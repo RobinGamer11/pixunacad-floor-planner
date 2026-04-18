@@ -224,6 +224,7 @@ const CadEditor: React.FC = () => {
 
     app.onToolChange = (id) => setActiveTool(id);
     app.onHistoryChange = (u, r) => { setCanUndo(u); setCanRedo(r); };
+    app.onStickersChange = () => setStickers([...app.stickers]);
     app.hatchTool.onDrawModeChange = (m) => setHatchDrawMode(m);
     setHatchDrawMode(app.hatchTool.drawMode);
     app.setTool(ToolIds.SELECT);
