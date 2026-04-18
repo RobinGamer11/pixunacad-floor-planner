@@ -1114,6 +1114,11 @@ export class CadApp {
           if (dim) { this.scene.removeDimension(dim); this.clearSelection(); this.refreshLabelUI(); }
           return;
         }
+        if (this.selection && this.selection.type === SelectionType.STICKER_INSTANCE) {
+          const inst = this.scene.getStickerInstanceById((this.selection as any).stickerInstanceId);
+          if (inst) { this.scene.removeStickerInstance(inst); this.clearSelection(); }
+          return;
+        }
         if (this.selection && (this.selection.type === SelectionType.TEXTBOX || this.selection.type === SelectionType.TEXTBOX_HANDLE)) {
           const box = this.getSelectedTextBox();
           if (box) { this.scene.removeTextBox(box); this.clearSelection(); this.refreshLabelUI(); }
