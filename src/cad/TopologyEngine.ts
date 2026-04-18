@@ -4,6 +4,7 @@ import { Scene, Segment, Hatch } from "./Scene";
 import { Camera } from "./Camera";
 import { LabelManager } from "./LabelManager";
 import { boxCornersWorld } from "./textGeometry";
+import { documentCornersWorld, documentEdgeMidpointsWorld } from "./documentGeometry";
 
 export interface Snap {
   type: string;
@@ -103,6 +104,12 @@ export class TopologyEngine {
       if (!this.labels.isVisible(dim.labelId)) continue;
       considerPoint(dim.p1, null, null, -1);
       considerPoint(dim.p2, null, null, -1);
+    }
+    // Document corners + edge midpoints
+    for (const doc of this.scene.documents) {
+      if (!this.labels.isVisible(doc.labelId)) continue;
+      for (const c of documentCornersWorld(doc)) considerPoint(c, null, null, -1);
+      for (const m of documentEdgeMidpointsWorld(doc)) considerPoint(m, null, null, -1);
     }
     // Segment lines
     for (const seg of segs) {
