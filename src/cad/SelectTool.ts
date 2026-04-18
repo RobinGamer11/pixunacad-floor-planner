@@ -681,9 +681,13 @@ export class SelectTool {
         if (stickerHit) {
           this.app.setSelection({ type: SelectionType.STICKER_INSTANCE, stickerInstanceId: stickerHit.id });
           // Drag vorbereiten (verschieben, solange Maustaste gedrückt bleibt)
+          const mouseW0 = v(input.mouse.wx, input.mouse.wy);
           this.dragStickerId = stickerHit.id;
           this.dragStickerOrigin = { x: stickerHit.position.x, y: stickerHit.position.y };
-          this.dragStickerMouseStart = v(input.mouse.wx, input.mouse.wy);
+          this.dragStickerMouseStart = mouseW0;
+          // Greifpunkt-Offset: position + offset = mouse → offset = mouse - position
+          this.dragStickerGrabOffset = { x: mouseW0.x - stickerHit.position.x, y: mouseW0.y - stickerHit.position.y };
+          this.dragStickerSnap = null;
           return;
         }
       }
