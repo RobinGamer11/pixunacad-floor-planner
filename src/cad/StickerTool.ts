@@ -131,12 +131,7 @@ export class StickerTool {
   private _dragGrabOffset: Vec2 | null = null;
   private _dragSnap: any = null;
 
-  // Corner-Drag-State (Rotate + Scale um Center)
-  private _cornerDragStickerId: string | null = null;
-  private _cornerDragStartAngle = 0;
-  private _cornerDragStartDist = 0;
-  private _cornerDragInitRot = 0;
-  private _cornerDragInitScale = 1;
+  // (corner drag entfernt)
 
   /** Hit-Test gegen platzierte Sticker-Instanzen. */
   private _hitStickerInstance(input: Input) {
@@ -167,34 +162,7 @@ export class StickerTool {
   }
 
   update(input: Input) {
-    // Aktiver Corner-Drag (Rotate + Scale)
-    if (this._cornerDragStickerId) {
-      const inst = this.app.scene.getStickerInstanceById(this._cornerDragStickerId);
-      if (!inst) {
-        this._cornerDragStickerId = null;
-      } else {
-        const mouseW = v(input.mouse.wx, input.mouse.wy);
-        const dx = mouseW.x - inst.position.x;
-        const dy = mouseW.y - inst.position.y;
-        const curDist = Math.hypot(dx, dy);
-        const curAng = Math.atan2(dy, dx);
-        let newRot = this._cornerDragInitRot + (curAng - this._cornerDragStartAngle);
-        if (input.keys.shift) {
-          const step = Math.PI / 12;
-          newRot = Math.round(newRot / step) * step;
-        }
-        inst.rotationRad = newRot;
-        if (this._cornerDragStartDist > 1e-6) {
-          const ratio = curDist / this._cornerDragStartDist;
-          inst.scale = Math.max(0.05, this._cornerDragInitScale * ratio);
-        }
-        this.app.syncStickerInstanceHub();
-        if (!input.mouse.left) {
-          this._cornerDragStickerId = null;
-        }
-        return;
-      }
-    }
+    // (corner-drag entfernt: Eckpunkte machen jetzt Translate-Drag)
 
     // Aktiver Drag (Verschieben einer ausgewählten Sticker-Instanz) mit Punkt-Snap
     if (this._dragStickerId) {
