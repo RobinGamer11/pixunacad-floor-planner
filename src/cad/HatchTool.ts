@@ -84,6 +84,7 @@ export class HatchTool {
     this.rectState = "idle";
     this.rectPointA = null;
     this.rectPointB = null;
+    this._resetCircleState();
     this.snap = null;
     this.activeTargetHatchId = null;
     this.startReferenceEdge = null;
@@ -104,6 +105,7 @@ export class HatchTool {
     this.rectState = "idle";
     this.rectPointA = null;
     this.rectPointB = null;
+    this._resetCircleState();
     this.snap = null;
     this.activeTargetHatchId = null;
     this.startReferenceEdge = null;
@@ -116,8 +118,16 @@ export class HatchTool {
   }
 
   finish() { this.cancel(); }
-  isDrawing() { return this.state === "drawing" || this.rectState !== "idle"; }
+  isDrawing() { return this.state === "drawing" || this.rectState !== "idle" || this.circleState !== "idle"; }
   resetGuides() { this.guideAnchors = []; this.parallelGuideSegments = []; }
+
+  private _resetCircleState() {
+    this.circleState = "idle";
+    this.circleCenter = null;
+    this.circleRadiusM = 0;
+    this.circleStartAngleDeg = 0;
+    this.circleEndAngleDeg = 0;
+  }
 
   /* ---- Guide system (identical pattern to LineTool) ---- */
 
