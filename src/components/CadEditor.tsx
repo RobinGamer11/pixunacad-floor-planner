@@ -167,14 +167,9 @@ const CadEditor: React.FC = () => {
 
         {/* Settings area (scrollable) */}
         <div className="flex-1 min-h-0 overflow-y-auto p-2">
-          {/* Line Settings - inline in sidebar (only when LINE tool active and not collapsed) */}
-          <div
-            ref={settingsRef}
-            className="cad-settings-panel hidden"
-            style={{
-              display: !sidebarCollapsed && showLineSettings ? "block" : "none",
-            }}
-          >
+          {/* Settings hidden when sidebar collapsed */}
+          {/* Line Settings - inline in sidebar; visibility ('hidden' class) is controlled by CadApp */}
+          <div ref={settingsRef} className={`cad-settings-panel hidden mb-2 ${sidebarCollapsed ? "!hidden" : ""}`}>
             <div className="text-xs font-semibold mb-2" style={{ color: "hsl(var(--foreground))" }}>
               Linie-Einstellungen
             </div>
@@ -197,14 +192,9 @@ const CadEditor: React.FC = () => {
             </div>
           </div>
 
-          {/* Hatch Settings - inline in sidebar */}
-          <div
-            ref={hatchSettingsRef}
-            className="cad-settings-panel hidden"
-            style={{
-              display: !sidebarCollapsed && showHatchSettings ? "block" : "none",
-            }}
-          >
+          {/* Hatch Settings - inline in sidebar; visibility ('hidden' class) is controlled by CadApp */}
+          <div ref={hatchSettingsRef} className={`cad-settings-panel hidden ${sidebarCollapsed ? "!hidden" : ""}`}>
+
             <div className="text-xs font-semibold mb-2" style={{ color: "hsl(var(--foreground))" }}>
               Schraffur-Einstellungen
             </div>
