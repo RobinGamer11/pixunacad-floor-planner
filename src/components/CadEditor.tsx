@@ -830,7 +830,136 @@ const CadEditor: React.FC = () => {
               </div>
             </div>
           )}
+
+          {/* Document Settings */}
+          {!sidebarCollapsed && activeTool === ToolIds.DOCUMENT && (
+            <div className="cad-settings-panel mb-2">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Dokument</div>
+              <div className="space-y-3">
+                <button
+                  type="button"
+                  disabled={docImporting}
+                  onClick={() => docFileInputRef.current?.click()}
+                  className="cad-toolbar-btn w-full justify-center h-9 disabled:opacity-50 disabled:cursor-wait"
+                  title="PDF, JPG oder PNG importieren"
+                >
+                  <Upload className="h-4 w-4" />
+                  <span className="text-xs">{docImporting ? "Importiere…" : "Datei importieren"}</span>
+                </button>
+                <input
+                  ref={docFileInputRef}
+                  type="file"
+                  accept="application/pdf,image/png,image/jpeg"
+                  className="hidden"
+                  onChange={handleDocFileChange}
+                />
+
+                {docToolPhase !== "idle" && (
+                  <div className="rounded-md p-2 text-xs" style={{ background: "hsl(var(--primary) / 0.12)", border: "1px solid hsl(var(--primary) / 0.4)" }}>
+                    {docToolPhase === "placing" && <span>Klick auf Canvas: Dokument absetzen · Esc: abbrechen</span>}
+                    {docToolPhase === "scale-pick-1" && <span>1. Skalier-Punkt anklicken (Snap aktiv)</span>}
+                    {docToolPhase === "scale-pick-2" && <span>2. Skalier-Punkt anklicken</span>}
+                    {docToolPhase === "scale-await-input" && <span>Soll-Länge im Hub eingeben + Enter</span>}
+                  </div>
+                )}
+
+                {docSelected && (
+                  <div className="space-y-2 pt-2" style={{ borderTop: "1px solid hsl(var(--border))" }}>
+                    <div className="text-xs">
+                      <div className="font-medium truncate" title={docSelected.name}>{docSelected.name}</div>
+                      <div style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+                        {docSelected.widthM.toFixed(3)} × {docSelected.heightM.toFixed(3)} m
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => appRef.current?.documentTool.beginScaleTwoPoints(docSelected.id)}
+                      className="cad-toolbar-btn w-full justify-center h-9"
+                      title="Über zwei Snap-Punkte und eine Soll-Länge skalieren"
+                    >
+                      <Maximize2 className="h-4 w-4" />
+                      <span className="text-xs">Skalieren (2 Punkte)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => appRef.current?.documentTool.beginScaleFromLastDimension(docSelected.id)}
+                      className="cad-toolbar-btn w-full justify-center h-9"
+                      title="Skaliere mit der zuletzt erstellten Maßkette als Referenz"
+                    >
+                      <RulerIcon className="h-4 w-4" />
+                      <span className="text-xs">Skalieren (Maßkette)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const app = appRef.current; if (!app) return;
+                        const doc = app.scene.getDocumentById(docSelected.id);
+                        if (doc && window.confirm(`Dokument "${doc.name}" löschen?`)) {
+                          app.scene.removeDocument(doc); app.clearSelection(); app.refreshLabelUI();
+                        }
+                      }}
+                      className="cad-toolbar-btn w-full justify-center h-9"
+                      title="Dokument löschen"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      <span className="text-xs">Löschen</span>
+                    </button>
+                  </div>
+                )}
+
+                <div className="text-[11px] leading-relaxed pt-2" style={{ color: "hsl(var(--cad-toolbar-muted))", borderTop: "1px solid hsl(var(--border))" }}>
+                  <div>PDF, JPG, PNG werden mit 96 DPI / 72 pt importiert.</div>
+                  <div>Klick: Auswahl · Drag: verschieben (Snap aktiv) · Entf: löschen</div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
+
+        {/* PDF Page Picker Dialog */}
+        <Dialog open={!!docPickerPages} onOpenChange={(o) => { if (!o) setDocPickerPages(null); }}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Seiten auswählen</DialogTitle>
+            </DialogHeader>
+            <div className="max-h-[60vh] overflow-y-auto grid grid-cols-3 gap-3 p-1">
+              {docPickerPages?.map((p, i) => {
+                const checked = docPickerSelected.has(i);
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => {
+                      setDocPickerSelected(prev => {
+                        const next = new Set(prev);
+                        if (next.has(i)) next.delete(i); else next.add(i);
+                        return next;
+                      });
+                    }}
+                    className={`relative rounded-md border-2 transition-all overflow-hidden ${checked ? "border-primary" : "border-border"}`}
+                  >
+                    <img src={p.src} alt={p.name} className="w-full h-32 object-contain bg-muted" />
+                    <div className="text-[10px] p-1 text-center truncate bg-muted/50">Seite {i + 1}</div>
+                    {checked && (
+                      <div className="absolute top-1 right-1 w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">✓</div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => { setDocPickerSelected(new Set()); }}>Keine</Button>
+              <Button variant="outline" onClick={() => {
+                const all = new Set<number>();
+                docPickerPages?.forEach((_, i) => all.add(i));
+                setDocPickerSelected(all);
+              }}>Alle</Button>
+              <Button onClick={handleDocPickerConfirm} disabled={docPickerSelected.size === 0}>
+                {docPickerSelected.size} importieren
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Collapse toggle */}
         <button
