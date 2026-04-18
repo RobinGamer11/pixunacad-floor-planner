@@ -856,11 +856,20 @@ export class HatchTool {
   onTabRequest(): boolean {
     if (this.drawMode === "polygon") {
       if (this.state !== "drawing") return false;
-    } else {
+    } else if (this.drawMode === "rectangle") {
       if (this.rectState === "idle") return false;
+    } else {
+      if (this.circleState === "idle") return false;
     }
     this._openHubWithCurrentPreview();
     return true;
+  }
+
+  /** Called by CadApp on Enter key while in arc state to commit a full circle. */
+  finishCircleFromKey() {
+    if (this.drawMode === "circle" && this.circleState === "arc") {
+      this._finishCircle(true);
+    }
   }
 
   /* ---- Overlay Drawing ---- */
