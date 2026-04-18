@@ -121,9 +121,6 @@ const CadEditor: React.FC = () => {
   }, []);
 
   const sidebarWidth = sidebarCollapsed ? 56 : 240;
-  const showLineSettings = activeTool === ToolIds.LINE;
-  const showHatchSettings = activeTool === ToolIds.HATCH;
-  const showAnySettings = showLineSettings || showHatchSettings;
 
   return (
     <div className="flex w-full h-full overflow-hidden" style={{ background: "hsl(var(--cad-canvas))" }}>
@@ -161,7 +158,7 @@ const CadEditor: React.FC = () => {
         </div>
 
         {/* Divider */}
-        {!sidebarCollapsed && showAnySettings && (
+        {!sidebarCollapsed && (
           <div className="mx-3 border-t" style={{ borderColor: "hsl(var(--cad-toolbar-border))" }} />
         )}
 
