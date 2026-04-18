@@ -4,6 +4,8 @@ import type { CadApp } from "./CadApp";
 import type { Snap } from "./TopologyEngine";
 import type { Input } from "./Input";
 import { getDimensionGeometry } from "./dimensionGeometry";
+import { pointInOrientedBox } from "./textGeometry";
+import type { TextBox } from "./Scene";
 
 type EditTarget =
   | { kind: "segment"; segmentId: string; pointIndex: number }
