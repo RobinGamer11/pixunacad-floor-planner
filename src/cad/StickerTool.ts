@@ -128,6 +128,8 @@ export class StickerTool {
   private _dragStickerId: string | null = null;
   private _dragOrigin: Vec2 | null = null;
   private _dragMouseStart: Vec2 | null = null;
+  private _dragGrabOffset: Vec2 | null = null;
+  private _dragSnap: any = null;
 
   /** Hit-Test gegen platzierte Sticker-Instanzen. */
   private _hitStickerInstance(input: Input) {
@@ -141,20 +143,28 @@ export class StickerTool {
   }
 
   update(input: Input) {
-    // Aktiver Drag (Verschieben einer ausgewählten Sticker-Instanz)
+    // Aktiver Drag (Verschieben einer ausgewählten Sticker-Instanz) mit Punkt-Snap
     if (this._dragStickerId) {
       const inst = this.app.scene.getStickerInstanceById(this._dragStickerId);
-      if (inst && this._dragOrigin && this._dragMouseStart) {
-        const m = v(input.mouse.wx, input.mouse.wy);
+      if (inst && this._dragGrabOffset) {
+        const mouseW = v(input.mouse.wx, input.mouse.wy);
+        const snap = this.app.topology.findBestSnap(
+          v(input.mouse.sx, input.mouse.sy),
+          mouseW
+        );
+        this._dragSnap = snap;
+        const target = (snap && snap.world) ? snap.world : mouseW;
         inst.position = {
-          x: this._dragOrigin.x + (m.x - this._dragMouseStart.x),
-          y: this._dragOrigin.y + (m.y - this._dragMouseStart.y),
+          x: target.x - this._dragGrabOffset.x,
+          y: target.y - this._dragGrabOffset.y,
         };
       }
       if (!input.mouse.left) {
         this._dragStickerId = null;
         this._dragOrigin = null;
         this._dragMouseStart = null;
+        this._dragGrabOffset = null;
+        this._dragSnap = null;
       }
       return;
     }
