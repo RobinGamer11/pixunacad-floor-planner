@@ -1417,6 +1417,7 @@ export class CadApp {
           this.scene.removeHatchesByLabelId(this.selectedLabelId);
           this.scene.removeDimensionsByLabelId(this.selectedLabelId);
           this.scene.removeTextBoxesByLabelId(this.selectedLabelId);
+          this.scene.removeDocumentsByLabelId(this.selectedLabelId);
           this.setSelectedLabelId(null);
           this.refreshLabelUI();
         }
