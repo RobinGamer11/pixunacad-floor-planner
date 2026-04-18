@@ -255,14 +255,31 @@ export class PipetteTool {
   }
 
   private _drawOverlay(ctx: CanvasRenderingContext2D, cam: any) {
-    if (!this.hoverSource) return;
-    ctx.save();
-    ctx.strokeStyle = "hsl(var(--primary))";
-    try { ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue("--primary") || "#4da3ff"; } catch {}
-    ctx.lineWidth = 2;
-    ctx.setLineDash([4, 4]);
+    let primary = "#4da3ff";
+    try { primary = getComputedStyle(document.documentElement).getPropertyValue("--primary") || primary; } catch {}
 
-    const src = this.hoverSource;
+    // Gemerkte Quelle (durchgehend)
+    if (this.pickedSource) {
+      ctx.save();
+      ctx.strokeStyle = primary;
+      ctx.lineWidth = 2.5;
+      ctx.setLineDash([]);
+      this._strokePickedShape(ctx, cam, this.pickedSource);
+      ctx.restore();
+    }
+
+    // Hover (gestrichelt)
+    if (this.hoverSource) {
+      ctx.save();
+      ctx.strokeStyle = primary;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 4]);
+      this._strokePickedShape(ctx, cam, this.hoverSource);
+      ctx.restore();
+    }
+  }
+
+  private _strokePickedShape(ctx: CanvasRenderingContext2D, cam: any, src: PickedSource) {
     if (src.kind === "segment") {
       const a = cam.worldToScreen(src.obj.a.x, src.obj.a.y);
       const b = cam.worldToScreen(src.obj.b.x, src.obj.b.y);
@@ -293,6 +310,5 @@ export class PipetteTool {
       const b = cam.worldToScreen(g.d2.x, g.d2.y);
       ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
     }
-    ctx.restore();
   }
 }
