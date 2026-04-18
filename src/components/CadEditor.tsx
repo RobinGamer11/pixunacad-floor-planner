@@ -137,8 +137,6 @@ const CadEditor: React.FC = () => {
           boxShadow: "1px 0 0 hsl(0 0% 100% / 0.03) inset",
         }}
       >
-        {/* Tool list */}
-        <div className="flex flex-col gap-1 p-2">
         {/* Undo / Redo */}
         <div className={`flex gap-1 p-2 ${sidebarCollapsed ? "flex-col items-center" : ""}`}>
           <button
