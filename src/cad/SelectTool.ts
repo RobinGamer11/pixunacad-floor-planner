@@ -481,6 +481,26 @@ export class SelectTool {
   }
 
   update(input: Input) {
+    // Active dimension parallel-drag
+    if (this.dragDimId) {
+      const dim = this.app.scene.getDimensionById(this.dragDimId);
+      if (!dim) {
+        this.dragDimId = null;
+      } else {
+        const g = getDimensionGeometry(dim);
+        const mouseW = v(input.mouse.wx, input.mouse.wy);
+        const mouseOffset = dot(sub(mouseW, dim.p1), g.n);
+        const newOffset = mouseOffset - this.dragDimOffsetAlongNormal;
+        dim.placementPoint = add(dim.p1, mul(g.n, newOffset));
+        this.app.renderer.setHoverSegmentId(null);
+        this.app.hub.hide();
+        if (!input.mouse.left) {
+          this.dragDimId = null;
+        }
+        return;
+      }
+    }
+
     if (this.isEditing()) {
       if (this.activeEditAction === PointEditAction.MOVE) {
         const p = this._previewMovePoint(input);
