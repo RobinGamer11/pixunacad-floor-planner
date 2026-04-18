@@ -338,14 +338,12 @@ const CadEditor: React.FC = () => {
       const pages = await importFile(f);
       if (pages.length === 0) { window.alert("Keine Seiten gefunden."); return; }
       if (pages.length === 1) {
-        const p = pages[0];
-        appRef.current?.setTool(ToolIds.DOCUMENT);
-        appRef.current?.documentTool.beginPlacement({
-          src: p.src, widthM: p.widthM, heightM: p.heightM,
-          pixelWidth: p.pixelWidth, pixelHeight: p.pixelHeight,
-          name: p.name, kind: p.kind, pageIndex: p.pageIndex,
-        });
+        // Direkt zum Maßstab-Dialog
+        setScaleChoice(pages[0].kind === "pdf-page" ? "100" : "1");
+        setScaleCustom("100");
+        setScaleDialogPages(pages);
       } else {
+        // PDF mit mehreren Seiten → erst Page-Picker
         const all = new Set<number>();
         pages.forEach((_, i) => all.add(i));
         setDocPickerSelected(all);
@@ -360,17 +358,30 @@ const CadEditor: React.FC = () => {
 
   const handleDocPickerConfirm = useCallback(() => {
     if (!docPickerPages) return;
-    const app = appRef.current; if (!app) return;
     const selectedPages = docPickerPages.filter((_, i) => docPickerSelected.has(i));
     if (selectedPages.length === 0) { setDocPickerPages(null); return; }
+    // → Maßstab-Dialog
+    setScaleChoice(selectedPages[0].kind === "pdf-page" ? "100" : "1");
+    setScaleCustom("100");
+    setDocPickerPages(null);
+    setDocPickerSelected(new Set());
+    setScaleDialogPages(selectedPages);
+  }, [docPickerPages, docPickerSelected]);
+
+  /** Maßstab anwenden: skaliert die Welt-Größe mit dem Nenner. Beispiel: 1:100 → ×100. */
+  const handleScaleConfirm = useCallback(() => {
+    if (!scaleDialogPages) return;
+    const app = appRef.current; if (!app) return;
+    const denom = scaleChoice === "custom" ? parseFloat(scaleCustom.replace(",", ".")) : parseFloat(scaleChoice);
+    const factor = Number.isFinite(denom) && denom > 0 ? denom : 1;
+    const scaledPages = scaleDialogPages.map(p => ({ ...p, widthM: p.widthM * factor, heightM: p.heightM * factor }));
+    const [first, ...rest] = scaledPages;
     app.setTool(ToolIds.DOCUMENT);
-    const [first, ...rest] = selectedPages;
     app.documentTool.beginPlacement({
       src: first.src, widthM: first.widthM, heightM: first.heightM,
       pixelWidth: first.pixelWidth, pixelHeight: first.pixelHeight,
       name: first.name, kind: first.kind, pageIndex: first.pageIndex,
     });
-    // Restliche Seiten direkt nebeneinander absetzen
     let offX = first.widthM + 0.5;
     for (const p of rest) {
       app.scene.createDocument({
@@ -381,9 +392,8 @@ const CadEditor: React.FC = () => {
       });
       offX += p.widthM + 0.5;
     }
-    setDocPickerPages(null);
-    setDocPickerSelected(new Set());
-  }, [docPickerPages, docPickerSelected]);
+    setScaleDialogPages(null);
+  }, [scaleDialogPages, scaleChoice, scaleCustom]);
 
   const sidebarWidth = sidebarCollapsed ? 56 : 240;
 
