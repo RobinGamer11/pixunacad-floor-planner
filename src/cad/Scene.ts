@@ -128,13 +128,64 @@ export class Dimension {
   }
 }
 
+export interface TextBoxStyle {
+  textColor?: string;
+  fontSizePx?: number;
+  bgColor?: string;
+  bgAlphaPct?: number;
+  wrap?: boolean;
+  align?: "left" | "center" | "right";
+  borderEnabled?: boolean;
+  borderColor?: string;
+  borderWidthPx?: number;
+  labelId?: string;
+}
+
+export class TextBox {
+  id: string;
+  center: Vec2;
+  widthM: number;
+  heightM: number;
+  rotationRad: number;
+  html: string;
+  style: Required<Omit<TextBoxStyle, "labelId">>;
+  labelId: string;
+
+  constructor({ id, center, widthM, heightM, rotationRad, html, style, labelId }: {
+    id: string; center: Vec2; widthM: number; heightM: number;
+    rotationRad?: number; html?: string; style?: TextBoxStyle; labelId?: string;
+  }) {
+    this.id = id;
+    this.center = v(center.x, center.y);
+    this.widthM = Math.max(Defaults.textMinBoxSizeM, widthM);
+    this.heightM = Math.max(Defaults.textMinBoxSizeM, heightM);
+    this.rotationRad = rotationRad || 0;
+    this.html = html || "";
+    const s = style || {};
+    this.style = {
+      textColor: s.textColor || Defaults.textColor,
+      fontSizePx: clamp(s.fontSizePx ?? Defaults.textFontSizePx, 6, 200),
+      bgColor: s.bgColor || Defaults.textBgColor,
+      bgAlphaPct: clamp(s.bgAlphaPct ?? Defaults.textBgAlphaPct, 0, 100),
+      wrap: (typeof s.wrap === "boolean") ? s.wrap : Defaults.textWrap,
+      align: s.align || Defaults.textAlign,
+      borderEnabled: (typeof s.borderEnabled === "boolean") ? s.borderEnabled : Defaults.textBorderEnabled,
+      borderColor: s.borderColor || Defaults.textBorderColor,
+      borderWidthPx: clamp(s.borderWidthPx ?? Defaults.textBorderWidthPx, 0, 30),
+    };
+    this.labelId = labelId || s.labelId || Defaults.defaultLabelId;
+  }
+}
+
 export class Scene {
   segments: Segment[] = [];
   hatches: Hatch[] = [];
   dimensions: Dimension[] = [];
+  textBoxes: TextBox[] = [];
   private _segIdMap = new Map<string, Segment>();
   private _hatchIdMap = new Map<string, Hatch>();
   private _dimIdMap = new Map<string, Dimension>();
+  private _textIdMap = new Map<string, TextBox>();
 
   private _makeId(): string {
     return (crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now() + Math.random());
