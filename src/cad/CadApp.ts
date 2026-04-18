@@ -18,6 +18,7 @@ import { PipetteTool } from "./PipetteTool";
 import { Clipboard, buildClipboardFromSelection, commitClipboardAt, translatedItems, ClipboardItem } from "./ClipboardManager";
 import { StickerTool } from "./StickerTool";
 import { StickerDefinition, buildStickerFromSelection, buildStickerFromIds, StickerIdSet, exportStickersToJson, importStickersFromJson, instanceBoundingCornersWorld, transformedInstanceItems, pointInInstance, localItemsBounds } from "./StickerManager";
+import { DocumentTool } from "./DocumentTool";
 
 import { IdPanel } from "./IdPanel";
 
@@ -157,7 +158,8 @@ export class CadApp {
   textTool!: TextTool;
   pipetteTool!: PipetteTool;
   stickerTool!: StickerTool;
-  activeTool: SelectTool | LineTool | HatchTool | MeasureTool | TextTool | PipetteTool | StickerTool;
+  documentTool!: DocumentTool;
+  activeTool: SelectTool | LineTool | HatchTool | MeasureTool | TextTool | PipetteTool | StickerTool | DocumentTool;
 
   // Clipboard + Paste-Vorschau
   clipboard: Clipboard | null = null;
@@ -284,6 +286,7 @@ export class CadApp {
     this.textTool = new TextTool(this);
     this.pipetteTool = new PipetteTool(this);
     this.stickerTool = new StickerTool(this);
+    this.documentTool = new DocumentTool(this);
     this.activeTool = this.selectTool;
 
     this.idPanel = new IdPanel(this, idPanelRoot, idPanelBody, idPanelList, idPanelAddBtn, idPanelToggleBtn);
