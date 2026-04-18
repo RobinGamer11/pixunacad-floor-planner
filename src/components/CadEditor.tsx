@@ -1,11 +1,12 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import { CadApp } from "@/cad/CadApp";
 import { ToolIds, PointEditAction } from "@/cad/constants";
+import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight } from "lucide-react";
 
 const CAD_TOOLS = [
-  { id: ToolIds.SELECT, label: "Auswahl", key: "V" },
-  { id: ToolIds.LINE, label: "Linie", key: "L" },
-  { id: ToolIds.HATCH, label: "Schraffur", key: "H" },
+  { id: ToolIds.SELECT, label: "Auswahl", key: "V", icon: MousePointer2 },
+  { id: ToolIds.LINE, label: "Linie", key: "L", icon: Minus },
+  { id: ToolIds.HATCH, label: "Schraffur", key: "H", icon: Square },
 ];
 
 const CadEditor: React.FC = () => {
@@ -52,6 +53,7 @@ const CadEditor: React.FC = () => {
 
   const appRef = useRef<CadApp | null>(null);
   const [activeTool, setActiveTool] = useState<string>(ToolIds.SELECT);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
 
   useEffect(() => {
     if (
@@ -107,142 +109,216 @@ const CadEditor: React.FC = () => {
     };
   }, []);
 
+  // Resize canvas when sidebar collapses/expands
+  useEffect(() => {
+    const t = setTimeout(() => appRef.current?.resize(), 180);
+    return () => clearTimeout(t);
+  }, [sidebarCollapsed]);
+
   const handleToolClick = useCallback((id: string) => {
     appRef.current?.setTool(id);
     setActiveTool(id);
   }, []);
 
+  const sidebarWidth = sidebarCollapsed ? 56 : 240;
+  const showLineSettings = activeTool === ToolIds.LINE;
+  const showHatchSettings = activeTool === ToolIds.HATCH;
+  const showAnySettings = showLineSettings || showHatchSettings;
+
   return (
-    <div ref={containerRef} className="relative w-full h-full overflow-hidden" style={{ background: "hsl(var(--cad-canvas))" }}>
-      {/* Toolbar */}
-      <div
-        className="absolute top-3 left-3 z-20 flex gap-1 rounded-lg border px-1 py-1 shadow-sm"
-        style={{ background: "hsl(var(--cad-toolbar))", borderColor: "hsl(var(--cad-toolbar-border))" }}
+    <div className="flex w-full h-full overflow-hidden" style={{ background: "hsl(var(--cad-canvas))" }}>
+      {/* Left Sidebar */}
+      <aside
+        className="relative shrink-0 flex flex-col border-r transition-[width] duration-150 ease-out"
+        style={{
+          width: sidebarWidth,
+          background: "hsl(var(--cad-toolbar))",
+          borderColor: "hsl(var(--cad-toolbar-border))",
+        }}
       >
-        {CAD_TOOLS.map((t) => (
-          <button
-            key={t.id}
-            className={`cad-toolbar-btn ${activeTool === t.id ? "active" : ""}`}
-            onClick={() => handleToolClick(t.id)}
+        {/* Tool list */}
+        <div className="flex flex-col gap-1 p-2">
+          {CAD_TOOLS.map((t) => {
+            const Icon = t.icon;
+            const isActive = activeTool === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => handleToolClick(t.id)}
+                title={sidebarCollapsed ? `${t.label} (${t.key})` : undefined}
+                className={`cad-toolbar-btn ${isActive ? "active" : ""} ${
+                  sidebarCollapsed ? "justify-center px-0 h-10 w-10 mx-auto" : "w-full justify-between"
+                }`}
+              >
+                <span className="flex items-center gap-2 min-w-0">
+                  <Icon className="h-4 w-4 shrink-0" />
+                  {!sidebarCollapsed && <span className="truncate">{t.label}</span>}
+                </span>
+                {!sidebarCollapsed && <span className="tool-key">{t.key}</span>}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Divider */}
+        {!sidebarCollapsed && showAnySettings && (
+          <div className="mx-3 border-t" style={{ borderColor: "hsl(var(--cad-toolbar-border))" }} />
+        )}
+
+        {/* Settings area (scrollable) */}
+        <div className="flex-1 min-h-0 overflow-y-auto p-2">
+          {/* Line Settings - inline in sidebar (only when LINE tool active and not collapsed) */}
+          <div
+            ref={settingsRef}
+            className="cad-settings-panel hidden"
+            style={{
+              display: !sidebarCollapsed && showLineSettings ? "block" : "none",
+            }}
           >
-            <span>{t.label}</span>
-            <span className="tool-key">{t.key}</span>
-          </button>
-        ))}
-      </div>
-
-      {/* Line Settings Panel */}
-      <div ref={settingsRef} className="cad-settings-panel absolute top-3 right-[240px] z-20 hidden w-48">
-        <div>
-          <label>ID</label>
-          <select ref={idSelectRef} className="cad-settings-select w-full" />
-        </div>
-        <div>
-          <label>Farbe</label>
-          <div className="flex items-center gap-2">
-            <div ref={colorPreviewRef} className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))" }} />
-            <input ref={colorInputRef} type="color" defaultValue="#111111" className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
-          </div>
-        </div>
-        <div>
-          <label>Stärke (m)</label>
-          <input ref={thicknessInputRef} type="text" defaultValue="0.03" />
-        </div>
-      </div>
-
-      {/* Hatch Settings Panel */}
-      <div ref={hatchSettingsRef} className="cad-settings-panel absolute top-14 right-[240px] z-20 hidden w-52">
-        <div className="text-xs font-semibold mb-2" style={{ color: "hsl(var(--foreground))" }}>Schraffur-Einstellungen</div>
-        <div>
-          <label>ID</label>
-          <select ref={hatchIdSelectRef} className="cad-settings-select w-full" />
-        </div>
-        <div>
-          <label>Flächenfarbe</label>
-          <div className="flex items-center gap-2">
-            <div ref={hatchFillPreviewRef} className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))" }} />
-            <input ref={hatchFillColorRef} type="color" defaultValue="#4da3ff" className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
-          </div>
-        </div>
-        <div>
-          <label>Polylinienfarbe</label>
-          <div className="flex items-center gap-2">
-            <div ref={hatchStrokePreviewRef} className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))" }} />
-            <input ref={hatchStrokeColorRef} type="color" defaultValue="#111111" className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
-          </div>
-        </div>
-        <div>
-          <label>Polyliniendicke</label>
-          <input ref={hatchStrokeWidthRef} type="text" defaultValue="2.2" />
-        </div>
-        <div>
-          <label>Transparenz (0–100%)</label>
-          <input ref={hatchAlphaRef} type="text" defaultValue="35" />
-        </div>
-        <div className="flex items-center gap-2 mt-1">
-          <input ref={areaShowRef} type="checkbox" className="accent-primary" />
-          <label className="!mb-0 cursor-pointer">Flächenanzeige</label>
-        </div>
-        <div ref={areaSettingsGroupRef} className="hidden mt-2 pt-2 space-y-2" style={{ borderTop: "1px solid hsl(var(--border))" }}>
-          <div>
-            <label>Textfarbe</label>
-            <div className="flex items-center gap-2">
-              <div ref={areaTextPreviewRef} className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))" }} />
-              <input ref={areaTextColorRef} type="color" defaultValue="#000000" className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
+            <div className="text-xs font-semibold mb-2" style={{ color: "hsl(var(--foreground))" }}>
+              Linie-Einstellungen
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label>ID</label>
+                <select ref={idSelectRef} className="cad-settings-select w-full" />
+              </div>
+              <div>
+                <label>Farbe</label>
+                <div className="flex items-center gap-2">
+                  <div ref={colorPreviewRef} className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))" }} />
+                  <input ref={colorInputRef} type="color" defaultValue="#111111" className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
+                </div>
+              </div>
+              <div>
+                <label>Stärke (m)</label>
+                <input ref={thicknessInputRef} type="text" defaultValue="0.03" />
+              </div>
             </div>
           </div>
-          <div>
-            <label>Textgröße</label>
-            <input ref={areaFontSizeRef} type="text" defaultValue="16" />
-          </div>
-          <div>
-            <label>Hintergrundfarbe</label>
-            <div className="flex items-center gap-2">
-              <div ref={areaBgPreviewRef} className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))" }} />
-              <input ref={areaBgColorRef} type="color" defaultValue="#ffffff" className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
+
+          {/* Hatch Settings - inline in sidebar */}
+          <div
+            ref={hatchSettingsRef}
+            className="cad-settings-panel hidden"
+            style={{
+              display: !sidebarCollapsed && showHatchSettings ? "block" : "none",
+            }}
+          >
+            <div className="text-xs font-semibold mb-2" style={{ color: "hsl(var(--foreground))" }}>
+              Schraffur-Einstellungen
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label>ID</label>
+                <select ref={hatchIdSelectRef} className="cad-settings-select w-full" />
+              </div>
+              <div>
+                <label>Flächenfarbe</label>
+                <div className="flex items-center gap-2">
+                  <div ref={hatchFillPreviewRef} className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))" }} />
+                  <input ref={hatchFillColorRef} type="color" defaultValue="#4da3ff" className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
+                </div>
+              </div>
+              <div>
+                <label>Polylinienfarbe</label>
+                <div className="flex items-center gap-2">
+                  <div ref={hatchStrokePreviewRef} className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))" }} />
+                  <input ref={hatchStrokeColorRef} type="color" defaultValue="#111111" className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
+                </div>
+              </div>
+              <div>
+                <label>Polyliniendicke</label>
+                <input ref={hatchStrokeWidthRef} type="text" defaultValue="2.2" />
+              </div>
+              <div>
+                <label>Transparenz (0–100%)</label>
+                <input ref={hatchAlphaRef} type="text" defaultValue="35" />
+              </div>
+              <div className="flex items-center gap-2 mt-1">
+                <input ref={areaShowRef} type="checkbox" className="accent-primary" />
+                <label className="!mb-0 cursor-pointer">Flächenanzeige</label>
+              </div>
+              <div ref={areaSettingsGroupRef} className="hidden mt-2 pt-2 space-y-2" style={{ borderTop: "1px solid hsl(var(--border))" }}>
+                <div>
+                  <label>Textfarbe</label>
+                  <div className="flex items-center gap-2">
+                    <div ref={areaTextPreviewRef} className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))" }} />
+                    <input ref={areaTextColorRef} type="color" defaultValue="#000000" className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
+                  </div>
+                </div>
+                <div>
+                  <label>Textgröße</label>
+                  <input ref={areaFontSizeRef} type="text" defaultValue="16" />
+                </div>
+                <div>
+                  <label>Hintergrundfarbe</label>
+                  <div className="flex items-center gap-2">
+                    <div ref={areaBgPreviewRef} className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))" }} />
+                    <input ref={areaBgColorRef} type="color" defaultValue="#ffffff" className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
+                  </div>
+                </div>
+                <div>
+                  <label>HG-Transparenz (0–100%)</label>
+                  <input ref={areaBgAlphaRef} type="text" defaultValue="72" />
+                </div>
+              </div>
             </div>
           </div>
-          <div>
-            <label>HG-Transparenz (0–100%)</label>
-            <input ref={areaBgAlphaRef} type="text" defaultValue="72" />
+        </div>
+
+        {/* Collapse toggle - bottom */}
+        <button
+          onClick={() => setSidebarCollapsed((v) => !v)}
+          className="absolute -right-3 top-4 z-30 flex items-center justify-center w-6 h-6 rounded-full border shadow-sm transition-colors hover:bg-secondary"
+          style={{
+            background: "hsl(var(--cad-settings-bg))",
+            borderColor: "hsl(var(--cad-toolbar-border))",
+            color: "hsl(var(--foreground))",
+          }}
+          title={sidebarCollapsed ? "Sidebar ausklappen" : "Sidebar einklappen"}
+        >
+          {sidebarCollapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
+        </button>
+      </aside>
+
+      {/* Canvas Area */}
+      <div ref={containerRef} className="relative flex-1 min-w-0 h-full overflow-hidden">
+        {/* ID Panel */}
+        <div ref={idPanelRef} className="cad-id-panel absolute top-3 right-3 z-20 w-[220px]">
+          <div className="id-head">
+            <div className="id-title">Bezeichnungs-ID</div>
+            <div className="id-head-actions">
+              <button ref={idToggleBtnRef} className="id-head-btn icon-only" title="Ein-/Ausklappen">
+                <span className="id-toggle-chevron" />
+              </button>
+            </div>
+          </div>
+          <div ref={idBodyRef} className="id-body">
+            <div className="id-add-wrap">
+              <button ref={idAddBtnRef} className="id-head-btn id-add-btn">+ ID</button>
+            </div>
+            <div ref={idListRef} className="id-list" />
           </div>
         </div>
-      </div>
 
-      {/* ID Panel */}
-      <div ref={idPanelRef} className="cad-id-panel absolute top-3 right-3 z-20 w-[220px]">
-        <div className="id-head">
-          <div className="id-title">Bezeichnungs-ID</div>
-          <div className="id-head-actions">
-            <button ref={idToggleBtnRef} className="id-head-btn icon-only" title="Ein-/Ausklappen">
-              <span className="id-toggle-chevron" />
-            </button>
-          </div>
+        {/* Line Hub */}
+        <div ref={hubRef} className="cad-hub absolute z-30 hidden flex gap-2 items-center">
+          <input ref={hubLenRef} type="text" readOnly className="text-xs" />
+          <input ref={hubAngRef} type="text" readOnly className="text-xs" />
         </div>
-        <div ref={idBodyRef} className="id-body">
-          <div className="id-add-wrap">
-            <button ref={idAddBtnRef} className="id-head-btn id-add-btn">+ ID</button>
-          </div>
-          <div ref={idListRef} className="id-list" />
+
+        {/* Point Edit Menu */}
+        <div ref={pointEditRef} className="cad-point-menu absolute z-30 hidden">
+          <button ref={pointMoveBtnRef} title="Bewegen">◉</button>
+          <button ref={pointTranslateBtnRef} title="Verschieben">✥</button>
+          <button ref={pointRotateBtnRef} title="Drehen">⟳</button>
+          <button ref={pointDeleteBtnRef} title="Löschen">🗑</button>
         </div>
-      </div>
 
-      {/* Line Hub */}
-      <div ref={hubRef} className="cad-hub absolute z-30 hidden flex gap-2 items-center">
-        <input ref={hubLenRef} type="text" readOnly className="text-xs" />
-        <input ref={hubAngRef} type="text" readOnly className="text-xs" />
+        {/* Canvas */}
+        <canvas ref={canvasRef} className="block w-full h-full" />
       </div>
-
-      {/* Point Edit Menu */}
-      <div ref={pointEditRef} className="cad-point-menu absolute z-30 hidden">
-        <button ref={pointMoveBtnRef} title="Bewegen">◉</button>
-        <button ref={pointTranslateBtnRef} title="Verschieben">✥</button>
-        <button ref={pointRotateBtnRef} title="Drehen">⟳</button>
-        <button ref={pointDeleteBtnRef} title="Löschen">🗑</button>
-      </div>
-
-      {/* Canvas */}
-      <canvas ref={canvasRef} className="block w-full h-full" />
     </div>
   );
 };
