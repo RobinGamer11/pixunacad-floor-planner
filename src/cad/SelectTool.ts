@@ -6,7 +6,7 @@ import type { Input } from "./Input";
 import { getDimensionGeometry } from "./dimensionGeometry";
 import { pointInOrientedBox } from "./textGeometry";
 import type { TextBox } from "./Scene";
-import { pointInInstance } from "./StickerManager";
+import { pointInInstance, instanceBoundingCornersWorld } from "./StickerManager";
 
 type EditTarget =
   | { kind: "segment"; segmentId: string; pointIndex: number }
@@ -35,12 +35,20 @@ export class SelectTool {
   dragDimId: string | null = null;
   dragDimOffsetAlongNormal = 0;
 
-  // Sticker-Instanz Drag-State
+  // Sticker-Instanz Drag-State (Translate)
   dragStickerId: string | null = null;
   dragStickerOrigin: Vec2 | null = null; // Position der Instanz beim Drag-Start
   dragStickerMouseStart: Vec2 | null = null; // Mausposition (Welt) bei Drag-Start
   dragStickerGrabOffset: Vec2 | null = null; // mouseStart - instanceOrigin (Greifpunkt-Offset relativ zur Position)
   dragStickerSnap: Snap | null = null; // letzter aktiver Snap während Drag (für Overlay)
+
+  // Sticker-Corner Drag-State (Rotate + Scale um Center)
+  cornerDragStickerId: string | null = null;
+  cornerDragCornerIndex = 0;
+  cornerDragStartAngle = 0;     // Winkel (rad) Center→Corner zu Drag-Start
+  cornerDragStartDist = 0;      // Distanz Center→Corner zu Drag-Start (Welt)
+  cornerDragInitRot = 0;        // inst.rotationRad zu Drag-Start
+  cornerDragInitScale = 1;      // inst.scale zu Drag-Start
 
   constructor(app: CadApp) {
     this.app = app;
