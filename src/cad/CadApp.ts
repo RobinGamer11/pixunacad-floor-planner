@@ -1177,6 +1177,14 @@ export class CadApp {
     return def;
   }
 
+  createStickerFromIds(ids: StickerIdSet, name: string): StickerDefinition | null {
+    const def = buildStickerFromIds(this, ids, name);
+    if (!def) return null;
+    this.stickers.push(def);
+    this.onStickersChange?.();
+    return def;
+  }
+
   renameSticker(id: string, name: string): boolean {
     const s = this.stickers.find(x => x.id === id);
     if (!s) return false;
