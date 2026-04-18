@@ -1102,6 +1102,111 @@ export class CadApp {
     window.addEventListener("keydown", this._keydownHandler);
   }
 
+  /* ---- Copy / Paste ---- */
+  copySelection(): boolean {
+    const clip = buildClipboardFromSelection(this);
+    if (!clip) return false;
+    this.clipboard = clip;
+    return true;
+  }
+
+  startPastePreview(): boolean {
+    if (!this.clipboard || this.clipboard.items.length === 0) return false;
+    if (this.textEditor?.isActive()) return false;
+    // Switch to select tool but stay in a paste-overlay mode
+    if (this.activeTool !== this.selectTool) {
+      this._toolBeforePaste = (this.activeTool as any).id || ToolIds.SELECT;
+      this.setTool(ToolIds.SELECT);
+    } else {
+      this._toolBeforePaste = ToolIds.SELECT;
+    }
+    this.clearSelection();
+    this.setSelectedLabelId(null);
+    this.pointEditMenu.hide();
+    this.pastePreviewActive = true;
+    this.canvas.style.cursor = "copy";
+    return true;
+  }
+
+  cancelPastePreview() {
+    this.pastePreviewActive = false;
+    this._toolBeforePaste = null;
+    this.canvas.style.cursor = "";
+  }
+
+  private _commitPasteAtMouse() {
+    if (!this.clipboard) { this.cancelPastePreview(); return; }
+    const mw = v(this.input.mouse.wx, this.input.mouse.wy);
+    commitClipboardAt(this, this.clipboard, mw);
+    this.pastePreviewActive = false;
+    this.canvas.style.cursor = "";
+    this.refreshLabelUI();
+  }
+
+  private _drawPastePreview(ctx: CanvasRenderingContext2D) {
+    if (!this.pastePreviewActive || !this.clipboard) return;
+    const dx = this.input.mouse.wx - this.clipboard.anchor.x;
+    const dy = this.input.mouse.wy - this.clipboard.anchor.y;
+    const items = translatedItems(this.clipboard.items, dx, dy);
+    const cam = this.camera;
+
+    ctx.save();
+    ctx.globalAlpha = 0.55;
+    let primary = "#4da3ff";
+    try { primary = (getComputedStyle(document.documentElement).getPropertyValue("--primary") || "").trim() || primary; } catch {}
+
+    for (const it of items) {
+      if (it.kind === "segment") {
+        const a = cam.worldToScreen(it.a.x, it.a.y);
+        const b = cam.worldToScreen(it.b.x, it.b.y);
+        ctx.strokeStyle = it.color || primary;
+        ctx.lineWidth = Math.max(1, it.thicknessM * cam.scale);
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      } else if (it.kind === "hatch") {
+        ctx.beginPath();
+        for (let i = 0; i < it.points.length; i++) {
+          const p = cam.worldToScreen(it.points[i].x, it.points[i].y);
+          if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+        }
+        ctx.closePath();
+        ctx.fillStyle = it.fillColor;
+        ctx.globalAlpha = 0.3 * (it.fillAlphaPct / 100 + 0.5);
+        ctx.fill();
+        ctx.globalAlpha = 0.7;
+        ctx.strokeStyle = it.strokeColor;
+        ctx.lineWidth = Math.max(1, it.strokeWidthPx);
+        ctx.stroke();
+        ctx.globalAlpha = 0.55;
+      } else if (it.kind === "textbox") {
+        const cx = it.center.x, cy = it.center.y;
+        const w = it.widthM, h = it.heightM;
+        const rot = it.rotationRad || 0;
+        const cs = Math.cos(rot), sn = Math.sin(rot);
+        const corners = [
+          { x: -w / 2, y: -h / 2 }, { x: w / 2, y: -h / 2 },
+          { x: w / 2, y: h / 2 }, { x: -w / 2, y: h / 2 },
+        ].map(p => cam.worldToScreen(cx + p.x * cs - p.y * sn, cy + p.x * sn + p.y * cs));
+        ctx.strokeStyle = primary;
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([5, 4]);
+        ctx.beginPath();
+        ctx.moveTo(corners[0].x, corners[0].y);
+        for (let i = 1; i < corners.length; i++) ctx.lineTo(corners[i].x, corners[i].y);
+        ctx.closePath(); ctx.stroke();
+        ctx.setLineDash([]);
+      } else if (it.kind === "dimension") {
+        const a = cam.worldToScreen(it.p1.x, it.p1.y);
+        const b = cam.worldToScreen(it.p2.x, it.p2.y);
+        ctx.strokeStyle = it.lineColor || primary;
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([4, 3]);
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+    ctx.restore();
+  }
+
   setTool(id: string) {
     if (this.pastePreviewActive) this.cancelPastePreview();
     if (this.activeTool && this.activeTool.cancel) this.activeTool.cancel();
