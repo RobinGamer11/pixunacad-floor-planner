@@ -95,6 +95,23 @@ export class SelectTool {
     return null;
   }
 
+  /** Hit-Test gegen die 4 Eck-Handles der aktuell selektierten Sticker-Instanz. */
+  private _hitStickerCorner(input: Input): { instId: string; cornerIndex: number } | null {
+    const sel = this.app.selection;
+    if (!sel || sel.type !== SelectionType.STICKER_INSTANCE) return null;
+    const inst = this.app.scene.getStickerInstanceById((sel as any).stickerInstanceId);
+    if (!inst || !this.app.labelManager.isVisible(inst.labelId)) return null;
+    const corners = instanceBoundingCornersWorld(inst.items as any, inst.position, inst.rotationRad, inst.scale);
+    const mouseS = v(input.mouse.sx, input.mouse.sy);
+    for (let i = 0; i < corners.length; i++) {
+      const sp = this.app.camera.worldToScreen(corners[i].x, corners[i].y);
+      if (Math.hypot(sp.x - mouseS.x, sp.y - mouseS.y) <= Defaults.hitPx + 2) {
+        return { instId: inst.id, cornerIndex: i };
+      }
+    }
+    return null;
+  }
+
   isEditing() { return !!this.activeEditAction; }
 
   hasPointMenu() {
