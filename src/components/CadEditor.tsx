@@ -709,7 +709,7 @@ const CadEditor: React.FC = () => {
                         <button type="button" onClick={() => {
                           const ok = appRef.current!.openStickerEditByDefId(s.id);
                           if (!ok) window.alert("Keine platzierte Instanz dieses Stickers gefunden. Platziere ihn zuerst auf dem Canvas.");
-                        }} className="cad-toolbar-btn h-8 w-8 justify-center px-0" title="Bearbeiten (öffnet erste platzierte Instanz)">
+                        }} className="cad-toolbar-btn h-8 w-8 justify-center px-0" title="Sticker-Inhalt bearbeiten (Edit-Mode)" style={{ color: "hsl(var(--primary))" }}>
                           <Pencil className="h-3.5 w-3.5" />
                         </button>
                         <button type="button" onClick={() => {
