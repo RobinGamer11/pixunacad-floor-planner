@@ -42,13 +42,7 @@ export class SelectTool {
   dragStickerGrabOffset: Vec2 | null = null; // mouseStart - instanceOrigin (Greifpunkt-Offset relativ zur Position)
   dragStickerSnap: Snap | null = null; // letzter aktiver Snap während Drag (für Overlay)
 
-  // Sticker-Corner Drag-State (Rotate + Scale um Center)
-  cornerDragStickerId: string | null = null;
-  cornerDragCornerIndex = 0;
-  cornerDragStartAngle = 0;     // Winkel (rad) Center→Corner zu Drag-Start
-  cornerDragStartDist = 0;      // Distanz Center→Corner zu Drag-Start (Welt)
-  cornerDragInitRot = 0;        // inst.rotationRad zu Drag-Start
-  cornerDragInitScale = 1;      // inst.scale zu Drag-Start
+
 
   constructor(app: CadApp) {
     this.app = app;
@@ -539,39 +533,6 @@ export class SelectTool {
   }
 
   update(input: Input) {
-    // Active sticker corner drag (Rotate + Scale um Mittelpunkt)
-    if (this.cornerDragStickerId) {
-      const inst = this.app.scene.getStickerInstanceById(this.cornerDragStickerId);
-      if (!inst) {
-        this.cornerDragStickerId = null;
-      } else {
-        const mouseW = v(input.mouse.wx, input.mouse.wy);
-        const dx = mouseW.x - inst.position.x;
-        const dy = mouseW.y - inst.position.y;
-        const curDist = Math.hypot(dx, dy);
-        const curAng = Math.atan2(dy, dx);
-        // Rotation: aktuelle Rotation = init + (curAng - startAng)
-        let newRot = this.cornerDragInitRot + (curAng - this.cornerDragStartAngle);
-        // Shift = 15°-Snap
-        if (input.keys.shift) {
-          const step = Math.PI / 12;
-          newRot = Math.round(newRot / step) * step;
-        }
-        inst.rotationRad = newRot;
-        // Skalierung proportional zum Distanz-Verhältnis
-        if (this.cornerDragStartDist > 1e-6) {
-          const ratio = curDist / this.cornerDragStartDist;
-          const newScale = Math.max(0.05, this.cornerDragInitScale * ratio);
-          inst.scale = newScale;
-        }
-        this.app.syncStickerInstanceHub();
-        if (!input.mouse.left) {
-          this.cornerDragStickerId = null;
-        }
-        return;
-      }
-    }
-
     // Active sticker drag with point snapping
     if (this.dragStickerId) {
       const inst = this.app.scene.getStickerInstanceById(this.dragStickerId);
@@ -738,20 +699,19 @@ export class SelectTool {
         }
         // Innerhalb: ganz normal Innenobjekte selektieren (kein Sticker-Hit-Test, da die Instanz im Edit-Mode nicht existiert).
       } else {
-        // Eck-Handle der bereits selektierten Sticker-Instanz? → Rotate+Scale-Drag starten
+        // Eck-Handle der bereits selektierten Sticker-Instanz? → Translate-Drag mit Eckpunkt als Greifanker
         const cornerHit = this._hitStickerCorner(input);
         if (cornerHit) {
           const inst = this.app.scene.getStickerInstanceById(cornerHit.instId);
           if (inst) {
-            const mouseW0 = v(input.mouse.wx, input.mouse.wy);
-            const dx0 = mouseW0.x - inst.position.x;
-            const dy0 = mouseW0.y - inst.position.y;
-            this.cornerDragStickerId = inst.id;
-            this.cornerDragCornerIndex = cornerHit.cornerIndex;
-            this.cornerDragStartAngle = Math.atan2(dy0, dx0);
-            this.cornerDragStartDist = Math.hypot(dx0, dy0);
-            this.cornerDragInitRot = inst.rotationRad;
-            this.cornerDragInitScale = inst.scale;
+            const corners = instanceBoundingCornersWorld(inst.items as any, inst.position, inst.rotationRad, inst.scale);
+            const cornerW = corners[cornerHit.cornerIndex];
+            this.dragStickerId = inst.id;
+            this.dragStickerOrigin = { x: inst.position.x, y: inst.position.y };
+            this.dragStickerMouseStart = { x: cornerW.x, y: cornerW.y };
+            // Greifpunkt = Eckpunkt: offset = corner - position
+            this.dragStickerGrabOffset = { x: cornerW.x - inst.position.x, y: cornerW.y - inst.position.y };
+            this.dragStickerSnap = null;
             return;
           }
         }
