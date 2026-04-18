@@ -231,7 +231,38 @@ export class TextEditorOverlay {
   commit() {
     if (!this.isActive()) return;
     const box = this.app.scene.getTextBoxById(this.activeBoxId!);
-    if (box) box.html = this.el.innerHTML;
+    if (!box) { this.hide(); return; }
+
+    // 1) Persist HTML
+    const html = this.el.innerHTML;
+    box.html = html;
+
+    // 2) Empty box → auto-delete
+    const plain = (this.el.textContent || "").replace(/\u200B/g, "").trim();
+    const hasContent = plain.length > 0 || /<img|<br\s*\/?>(?!\s*$)/i.test(html);
+    if (!hasContent) {
+      this.app.scene.removeTextBox(box);
+      this.app.clearSelection();
+      this.app.refreshLabelUI();
+      this.hide();
+      return;
+    }
+
+    // 3) Auto-grow box to fit text content (DOM-measured), keeping top-left anchored.
+    const cam = this.app.camera;
+    const rect = this.el.getBoundingClientRect();
+    const measuredWidthPx = rect.width;
+    const measuredHeightPx = rect.height;
+    const newWidthM = Math.max(Defaults.textMinBoxSizeM, measuredWidthPx / cam.scale);
+    const newHeightM = Math.max(Defaults.textMinBoxSizeM, measuredHeightPx / cam.scale);
+
+    // Anchor top-left: tl_world = center - (w/2, h/2). Keep tl_world fixed.
+    const tlX = box.center.x - box.widthM / 2;
+    const tlY = box.center.y - box.heightM / 2;
+    box.widthM = newWidthM;
+    box.heightM = newHeightM;
+    box.center = { x: tlX + newWidthM / 2, y: tlY + newHeightM / 2 } as any;
+
     this.hide();
   }
 
