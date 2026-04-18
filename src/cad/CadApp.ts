@@ -1104,7 +1104,18 @@ export class CadApp {
 
   /* ---- Copy / Paste ---- */
   copySelection(): boolean {
-    const clip = buildClipboardFromSelection(this);
+    // Anker: ausgewählter Segment-Endpunkt > Mausposition
+    let anchor: { x: number; y: number } | null = null;
+    const sel = this.selection;
+    if (sel && sel.type === SelectionType.POINT) {
+      const seg = this.scene.getSegmentById(sel.segmentId);
+      if (seg) {
+        const p = sel.pointIndex === 0 ? seg.a : seg.b;
+        anchor = { x: p.x, y: p.y };
+      }
+    }
+    if (!anchor) anchor = { x: this.input.mouse.wx, y: this.input.mouse.wy };
+    const clip = buildClipboardFromSelection(this, anchor);
     if (!clip) return false;
     this.clipboard = clip;
     return true;
