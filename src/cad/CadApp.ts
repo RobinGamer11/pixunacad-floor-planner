@@ -1003,6 +1003,17 @@ export class CadApp {
 
       if ((tag === "input" || tag === "textarea" || tag === "select") && !isHubInput) return;
 
+      // Copy / Paste (after early-return for inputs)
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
+        const k = e.key.toLowerCase();
+        if (k === "c") {
+          if (this.copySelection()) { e.preventDefault(); return; }
+        }
+        if (k === "v") {
+          if (this.startPastePreview()) { e.preventDefault(); return; }
+        }
+      }
+
       if (this.activeTool === this.selectTool) {
         if (e.key === "Tab" && this.selectTool.hasPointMenu()) { e.preventDefault(); this.selectTool.cyclePointMenu(); return; }
         if (e.key === "Enter" && this.selectTool.hasPointMenu()) { e.preventDefault(); this.selectTool.activatePointMenu(); return; }
@@ -1033,12 +1044,15 @@ export class CadApp {
       if (e.key === "h" || e.key === "H") this.setTool(ToolIds.HATCH);
       if (e.key === "m" || e.key === "M") this.setTool(ToolIds.MEASURE);
       if (e.key === "t" || e.key === "T") this.setTool(ToolIds.TEXT);
+      if (e.key === "p" || e.key === "P") this.setTool(ToolIds.PIPETTE);
 
       if (e.key === "Escape") {
+        if (this.pastePreviewActive) { this.cancelPastePreview(); return; }
         if (this.activeTool === this.lineTool) { this.lineTool.cancel(); this.clearSelection(); this.setSelectedLabelId(null); this.setTool(ToolIds.SELECT); return; }
         if (this.activeTool === this.hatchTool) { this.hatchTool.cancel(); this.clearSelection(); this.setTool(ToolIds.SELECT); return; }
         if (this.activeTool === this.textTool) { this.textTool.cancel(); this.clearSelection(); this.setSelectedLabelId(null); this.setTool(ToolIds.SELECT); return; }
         if (this.activeTool === this.measureTool) { this.measureTool.cancel(); this.clearSelection(); this.setTool(ToolIds.SELECT); return; }
+        if (this.activeTool === this.pipetteTool) { this.pipetteTool.cancel(); this.setTool(ToolIds.SELECT); return; }
         if (this.activeTool === this.selectTool) { this.selectTool.cancel(); this.clearSelection(); this.setSelectedLabelId(null); this.pointEditMenu.hide(); return; }
         this.activeTool.cancel();
         this.clearSelection();
