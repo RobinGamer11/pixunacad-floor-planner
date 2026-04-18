@@ -643,6 +643,17 @@ export class SelectTool {
     }
 
     if (input.clicked) {
+      // Sticker-Instanzen haben höchste Priorität (sie liegen visuell oben)
+      const stickerHit = this._hitStickerInstance(input);
+      if (stickerHit) {
+        this.app.setSelection({ type: SelectionType.STICKER_INSTANCE, stickerInstanceId: stickerHit.id });
+        // Drag vorbereiten (verschieben, solange Maustaste gedrückt bleibt)
+        this.dragStickerId = stickerHit.id;
+        this.dragStickerOrigin = { x: stickerHit.position.x, y: stickerHit.position.y };
+        this.dragStickerMouseStart = v(input.mouse.wx, input.mouse.wy);
+        return;
+      }
+
       // Textbox hits take priority — they sit on top visually
       const box = this._hitTextBox(input);
       if (box) {
