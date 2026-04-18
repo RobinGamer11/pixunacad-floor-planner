@@ -9,17 +9,17 @@ import { documentCenterWorld, documentCornersWorld, scaleDocumentAroundCenter } 
 type Phase =
   | "idle"
   | "placing"          // gerade importiertes Dokument folgt der Maus, Klick setzt es ab
-  | "scale-pick-1"     // Dokument selektiert, wartet auf 1. Skalier-Punkt
-  | "scale-pick-2"     // 1. Punkt gesetzt, wartet auf 2. Punkt
-  | "scale-await-input"; // beide Punkte gesetzt, Hub eingeblendet
+  | "scale-pick-1"     // wartet auf 1. Punkt (Start Ist-Strecke)
+  | "scale-pick-2"     // wartet auf 2. Punkt (Ende Ist-Strecke; definiert auch Richtung)
+  | "scale-pick-3";    // Ist-Strecke fix, wartet auf 3. Punkt entlang derselben Richtung (= Soll-Länge ab P1)
 
 /**
  * DocumentTool: PDF/JPG/PNG-Import & Maßstabs-Skalierung.
  *
- * Workflows:
- *  - Datei importieren -> Phase "placing", Klick setzt das Dokument ab
- *  - Skalier-Modus 'two-points': Klick auf Doc -> 2 Snap-Punkte -> Soll-Länge im Hub -> Enter
- *  - Skalier-Modus 'measure-line': nutzt zuletzt erstellte Maßkette als Referenz (per externem Aufruf)
+ * Workflow Skalierung (3 Punkte):
+ *  P1 → P2 (Ist-Strecke; Shift = Ortho, Distanz im Hub eingebbar)
+ *  P2 → P3 entlang der Richtung P1→P2 (Soll-Länge ab P1; Distanz im Hub eingebbar)
+ *  Skalierungsfaktor = |P1 P3| / |P1 P2|
  */
 export class DocumentTool {
   app: CadApp;
@@ -34,6 +34,7 @@ export class DocumentTool {
   scaleTargetDocId: string | null = null;
   scalePoint1: Vec2 | null = null;
   scalePoint2: Vec2 | null = null;
+  scalePoint3: Vec2 | null = null;
   scaleSnap: Snap | null = null;
 
   onPhaseChange?: () => void;
@@ -47,12 +48,13 @@ export class DocumentTool {
   }
 
   cancel() {
-    if (this.phase === "scale-await-input" || this.phase === "scale-pick-2") this.app.hub.hide();
+    if (this.phase === "scale-pick-2" || this.phase === "scale-pick-3") this.app.hub.hide();
     this.phase = "idle";
     this.pendingDoc = null;
     this.scaleTargetDocId = null;
     this.scalePoint1 = null;
     this.scalePoint2 = null;
+    this.scalePoint3 = null;
     this.scaleSnap = null;
     this.app.hub.bindCommit(null);
     this.app.hub.angInputEl.readOnly = true;
@@ -69,18 +71,17 @@ export class DocumentTool {
     this.onPhaseChange?.();
   }
 
-  /** Externe API: leitet den 2-Punkt-Skaliervorgang für ein bestimmtes Dokument ein. */
+  /** Externe API: leitet den 3-Punkt-Skaliervorgang für ein bestimmtes Dokument ein. */
   beginScaleTwoPoints(docId: string) {
     const doc = this.app.scene.getDocumentById(docId);
     if (!doc) return;
-    // Switch to DocumentTool so update() & overlay run; preserve selection.
     if (this.app.activeTool !== this) {
       this.app.setTool("document");
     }
-    // setTool may have called cancel() — set state AFTER the switch.
     this.scaleTargetDocId = docId;
     this.scalePoint1 = null;
     this.scalePoint2 = null;
+    this.scalePoint3 = null;
     this.scaleSnap = null;
     this.phase = "scale-pick-1";
     this.app.hub.hide();
@@ -88,7 +89,7 @@ export class DocumentTool {
     this.onPhaseChange?.();
   }
 
-  /** Externe API: skaliere ein Dokument anhand der zuletzt erstellten Maßkette. */
+  /** Externe API: skaliere ein Dokument anhand der zuletzt erstellten Maßkette (überspringt P1/P2). */
   beginScaleFromLastDimension(docId: string) {
     const doc = this.app.scene.getDocumentById(docId);
     if (!doc) return;
@@ -104,18 +105,18 @@ export class DocumentTool {
     this.scaleTargetDocId = docId;
     this.scalePoint1 = v(lastDim.p1.x, lastDim.p1.y);
     this.scalePoint2 = v(lastDim.p2.x, lastDim.p2.y);
-    this.phase = "scale-await-input";
+    this.scalePoint3 = null;
+    this.phase = "scale-pick-3";
     this.app.setSelection({ type: "document", documentId: docId } as any);
-    this._showScaleHub();
+    this._showPick3Hub();
     this.onPhaseChange?.();
   }
 
   isPlacing() { return this.phase === "placing"; }
-  isScaling() { return this.phase === "scale-pick-1" || this.phase === "scale-pick-2" || this.phase === "scale-await-input"; }
+  isScaling() { return this.phase === "scale-pick-1" || this.phase === "scale-pick-2" || this.phase === "scale-pick-3"; }
 
   update(input: Input) {
     if (this.phase === "placing") {
-      // Snap auf vorhandene Geometrie für saubere Platzierung
       const snap = this.app.topology.findBestSnap(v(input.mouse.sx, input.mouse.sy), v(input.mouse.wx, input.mouse.wy));
       this.scaleSnap = snap;
       if (input.clicked && this.pendingDoc) {
@@ -148,21 +149,18 @@ export class DocumentTool {
         const p = this.scaleSnap ? v(this.scaleSnap.world.x, this.scaleSnap.world.y) : v(input.mouse.wx, input.mouse.wy);
         this.scalePoint1 = p;
         this.phase = "scale-pick-2";
-        this._showPickHub();
+        this._showPick2Hub();
         this.onPhaseChange?.();
       }
       return;
     }
 
     if (this.phase === "scale-pick-2") {
-      // Snap suchen
       this.scaleSnap = this.app.topology.findBestSnap(v(input.mouse.sx, input.mouse.sy), v(input.mouse.wx, input.mouse.wy));
       let raw = this.scaleSnap ? v(this.scaleSnap.world.x, this.scaleSnap.world.y) : v(input.mouse.wx, input.mouse.wy);
-      // Shift → Ortho-Constraint relativ zu scalePoint1
       if (input.keys.shift && this.scalePoint1) {
         raw = orthoSnapFromA(this.scalePoint1, raw);
       }
-      // Live-Distanz im Hub anzeigen (wenn nicht vom User editiert)
       if (this.scalePoint1) {
         const measured = dist(this.scalePoint1, raw);
         const ms = this.app.camera.worldToScreen((this.scalePoint1.x + raw.x) / 2, (this.scalePoint1.y + raw.y) / 2);
@@ -173,36 +171,59 @@ export class DocumentTool {
       }
       if (input.clicked) {
         this.scalePoint2 = raw;
-        this.phase = "scale-await-input";
+        this.phase = "scale-pick-3";
         this.app.hub.bindCommit(null);
-        this._showScaleHub();
+        this._showPick3Hub();
         this.onPhaseChange?.();
       }
       return;
     }
 
-    if (this.phase === "scale-await-input") {
-      // Hub übernimmt Eingabe — keine Klick-Logik nötig (Klick außerhalb beendet via Esc)
+    if (this.phase === "scale-pick-3") {
+      // Richtung fix von P1→P2; P3 wird auf diese Linie projiziert.
+      if (!this.scalePoint1 || !this.scalePoint2) return;
+      this.scaleSnap = this.app.topology.findBestSnap(v(input.mouse.sx, input.mouse.sy), v(input.mouse.wx, input.mouse.wy));
+      const mouseW = this.scaleSnap ? this.scaleSnap.world : v(input.mouse.wx, input.mouse.wy);
+      const projected = this._projectOnAxis(this.scalePoint1, this.scalePoint2, mouseW);
+      // Live-Anzeige Soll-Länge ab P1
+      const sollLen = dist(this.scalePoint1, projected);
+      const ms = this.app.camera.worldToScreen((this.scalePoint1.x + projected.x) / 2, (this.scalePoint1.y + projected.y) / 2);
+      this.app.hub.showAt(ms.x, ms.y);
+      if (document.activeElement !== this.app.hub.lenInputEl) {
+        this.app.hub.lenInputEl.value = `${sollLen.toFixed(3)} m`;
+      }
+      if (input.clicked) {
+        this.scalePoint3 = projected;
+        this._commitScale();
+      }
       return;
     }
+  }
+
+  /** Projektion eines Weltpunkts auf die Achse durch a→b (verlängert). */
+  private _projectOnAxis(a: Vec2, b: Vec2, p: Vec2): Vec2 {
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const lenSq = dx * dx + dy * dy;
+    if (lenSq < 1e-12) return v(b.x, b.y);
+    const t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / lenSq;
+    return v(a.x + dx * t, a.y + dy * t);
   }
 
   /**
    * Hub während scale-pick-2: User kann Distanz für Punkt-2 selbst tippen + Enter
    * → Punkt 2 wird entlang der aktuellen Maus-Richtung in der getippten Distanz gesetzt.
    */
-  private _showPickHub() {
+  private _showPick2Hub() {
     if (!this.scalePoint1) return;
     const ms = this.app.camera.worldToScreen(this.scalePoint1.x, this.scalePoint1.y);
     this.app.hub.showAt(ms.x + 20, ms.y + 20);
     this.app.hub.enterEditMode();
     this.app.hub.lenInputEl.value = "0.000 m";
-    this.app.hub.angInputEl.value = "Distanz eingeben";
+    this.app.hub.angInputEl.value = "Ist-Strecke";
     this.app.hub.angInputEl.readOnly = true;
     this.app.hub.bindCommit((vals) => {
       const d = vals.lengthM;
       if (!d || d <= 0 || !this.scalePoint1) return;
-      // Richtung: aktuelle Mausposition (ggf. Ortho gesnappt), Länge = User-Distanz
       let dirTo = v(this.app.input.mouse.wx, this.app.input.mouse.wy);
       if (this.app.input.keys.shift) dirTo = orthoSnapFromA(this.scalePoint1, dirTo);
       const dx = dirTo.x - this.scalePoint1.x, dy = dirTo.y - this.scalePoint1.y;
@@ -210,50 +231,58 @@ export class DocumentTool {
       if (len < 1e-9) return;
       const ux = dx / len, uy = dy / len;
       this.scalePoint2 = v(this.scalePoint1.x + ux * d, this.scalePoint1.y + uy * d);
-      this.phase = "scale-await-input";
+      this.phase = "scale-pick-3";
       this.app.hub.bindCommit(null);
-      this._showScaleHub();
+      this._showPick3Hub();
       this.onPhaseChange?.();
     });
   }
 
-  private _showScaleHub() {
+  /**
+   * Hub während scale-pick-3: User kann Soll-Länge ab P1 tippen + Enter
+   * → P3 wird auf die Achse P1→P2 in der getippten Distanz gesetzt, dann committen.
+   */
+  private _showPick3Hub() {
     if (!this.scalePoint1 || !this.scalePoint2 || !this.scaleTargetDocId) return;
     const measured = dist(this.scalePoint1, this.scalePoint2);
-    // Hub mittig zwischen den Punkten anzeigen
-    const mid = v((this.scalePoint1.x + this.scalePoint2.x) / 2, (this.scalePoint1.y + this.scalePoint2.y) / 2);
-    const ms = this.app.camera.worldToScreen(mid.x, mid.y);
+    const ms = this.app.camera.worldToScreen((this.scalePoint1.x + this.scalePoint2.x) / 2, (this.scalePoint1.y + this.scalePoint2.y) / 2);
     this.app.hub.showAt(ms.x, ms.y);
     this.app.hub.enterEditMode();
     this.app.hub.lenInputEl.value = `${measured.toFixed(3)} m`;
-    this.app.hub.angInputEl.value = "Soll-Länge eingeben";
+    this.app.hub.angInputEl.value = "Soll-Länge";
     this.app.hub.angInputEl.readOnly = true;
-    // Kurz warten und dann fokussieren+selektieren
-    requestAnimationFrame(() => {
-      this.app.hub.lenInputEl.focus();
-      this.app.hub.lenInputEl.select();
-    });
     this.app.hub.bindCommit((vals) => {
       const target = vals.lengthM;
-      if (!target || target <= 0) return;
-      const doc = this.scaleTargetDocId ? this.app.scene.getDocumentById(this.scaleTargetDocId) : null;
-      if (!doc || !this.scalePoint1 || !this.scalePoint2) return;
-      const measured = dist(this.scalePoint1, this.scalePoint2);
-      if (measured < 1e-6) return;
-      const factor = target / measured;
-      scaleDocumentAroundCenter(doc, factor);
-      const finishedDocId = this.scaleTargetDocId;
-      this.app.hub.hide();
-      this.app.hub.bindCommit(null);
-      this.scaleTargetDocId = null;
-      this.scalePoint1 = null;
-      this.scalePoint2 = null;
-      this.phase = "idle";
-      this.onPhaseChange?.();
-      // Zurück zum Auswahl-Tool, Dokument bleibt selektiert.
-      this.app.setTool("select");
-      if (finishedDocId) this.app.setSelection({ type: "document", documentId: finishedDocId } as any);
+      if (!target || target <= 0 || !this.scalePoint1 || !this.scalePoint2) return;
+      const dx = this.scalePoint2.x - this.scalePoint1.x, dy = this.scalePoint2.y - this.scalePoint1.y;
+      const len = Math.hypot(dx, dy);
+      if (len < 1e-9) return;
+      const ux = dx / len, uy = dy / len;
+      this.scalePoint3 = v(this.scalePoint1.x + ux * target, this.scalePoint1.y + uy * target);
+      this._commitScale();
     });
+  }
+
+  private _commitScale() {
+    if (!this.scaleTargetDocId || !this.scalePoint1 || !this.scalePoint2 || !this.scalePoint3) return;
+    const doc = this.app.scene.getDocumentById(this.scaleTargetDocId);
+    if (!doc) return;
+    const istLen = dist(this.scalePoint1, this.scalePoint2);
+    const sollLen = dist(this.scalePoint1, this.scalePoint3);
+    if (istLen < 1e-6 || sollLen < 1e-6) return;
+    const factor = sollLen / istLen;
+    scaleDocumentAroundCenter(doc, factor);
+    const finishedDocId = this.scaleTargetDocId;
+    this.app.hub.hide();
+    this.app.hub.bindCommit(null);
+    this.scaleTargetDocId = null;
+    this.scalePoint1 = null;
+    this.scalePoint2 = null;
+    this.scalePoint3 = null;
+    this.phase = "idle";
+    this.onPhaseChange?.();
+    this.app.setTool("select");
+    if (finishedDocId) this.app.setSelection({ type: "document", documentId: finishedDocId } as any);
   }
 
   private _drawOverlay(ctx: CanvasRenderingContext2D, cam: any) {
@@ -282,7 +311,7 @@ export class DocumentTool {
     }
 
     // Snap-Indikator
-    if ((this.phase === "placing" || this.phase === "scale-pick-1" || this.phase === "scale-pick-2") && this.scaleSnap) {
+    if ((this.phase === "placing" || this.phase === "scale-pick-1" || this.phase === "scale-pick-2" || this.phase === "scale-pick-3") && this.scaleSnap) {
       const sp = cam.worldToScreen(this.scaleSnap.world.x, this.scaleSnap.world.y);
       ctx.save();
       ctx.fillStyle = "rgba(77,163,255,0.95)";
@@ -293,8 +322,8 @@ export class DocumentTool {
       ctx.restore();
     }
 
-    // Skalier-Punkt 1
-    if ((this.phase === "scale-pick-2" || this.phase === "scale-await-input") && this.scalePoint1) {
+    // P1 Marker
+    if (this.scalePoint1 && (this.phase === "scale-pick-2" || this.phase === "scale-pick-3")) {
       const sp = cam.worldToScreen(this.scalePoint1.x, this.scalePoint1.y);
       ctx.save();
       ctx.fillStyle = "rgba(255,140,0,0.95)";
@@ -304,10 +333,10 @@ export class DocumentTool {
       ctx.restore();
     }
 
-    // Linie zwischen Punkt 1 und Cursor (oder Punkt 2)
-    if (this.scalePoint1 && (this.phase === "scale-pick-2" || this.phase === "scale-await-input")) {
+    // Linie P1 → P2 (Ist-Strecke)
+    if (this.scalePoint1 && (this.phase === "scale-pick-2" || this.phase === "scale-pick-3")) {
       let p2: Vec2;
-      if (this.phase === "scale-await-input" && this.scalePoint2) {
+      if (this.phase === "scale-pick-3" && this.scalePoint2) {
         p2 = this.scalePoint2;
       } else {
         p2 = this.scaleSnap ? this.scaleSnap.world : v(this.app.input.mouse.wx, this.app.input.mouse.wy);
@@ -323,24 +352,63 @@ export class DocumentTool {
       ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
       ctx.stroke();
       ctx.setLineDash([]);
-      // Live-Längenanzeige
       const measured = dist(this.scalePoint1, p2);
       const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
       ctx.fillStyle = "rgba(255,140,0,0.95)";
       ctx.font = "bold 12px system-ui";
       ctx.textAlign = "center";
-      ctx.fillText(`${measured.toFixed(3)} m`, mx, my - 6);
+      ctx.fillText(`Ist: ${measured.toFixed(3)} m`, mx, my - 6);
       ctx.restore();
     }
 
-    // Punkt 2 markiert
-    if (this.phase === "scale-await-input" && this.scalePoint2) {
+    // P2 Marker
+    if (this.scalePoint2 && this.phase === "scale-pick-3") {
       const sp = cam.worldToScreen(this.scalePoint2.x, this.scalePoint2.y);
       ctx.save();
       ctx.fillStyle = "rgba(255,140,0,0.95)";
       ctx.strokeStyle = "#fff";
       ctx.lineWidth = 1.8;
       ctx.beginPath(); ctx.arc(sp.x, sp.y, 6, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.restore();
+    }
+
+    // Achsen-Verlängerung + Soll-Linie P1 → P3 (Cursor projiziert)
+    if (this.phase === "scale-pick-3" && this.scalePoint1 && this.scalePoint2) {
+      const mouseW = this.scaleSnap ? this.scaleSnap.world : v(this.app.input.mouse.wx, this.app.input.mouse.wy);
+      const p3 = this._projectOnAxis(this.scalePoint1, this.scalePoint2, mouseW);
+      const a = cam.worldToScreen(this.scalePoint1.x, this.scalePoint1.y);
+      const c = cam.worldToScreen(p3.x, p3.y);
+      // dünne Achsen-Hilfslinie (durch P1 in Richtung P2, lang)
+      const dx = this.scalePoint2.x - this.scalePoint1.x, dy = this.scalePoint2.y - this.scalePoint1.y;
+      const len = Math.hypot(dx, dy) || 1;
+      const ux = dx / len, uy = dy / len;
+      const farLen = 10000;
+      const axisA = cam.worldToScreen(this.scalePoint1.x - ux * farLen, this.scalePoint1.y - uy * farLen);
+      const axisB = cam.worldToScreen(this.scalePoint1.x + ux * farLen, this.scalePoint1.y + uy * farLen);
+      ctx.save();
+      ctx.strokeStyle = "rgba(120,180,255,0.35)";
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 5]);
+      ctx.beginPath(); ctx.moveTo(axisA.x, axisA.y); ctx.lineTo(axisB.x, axisB.y); ctx.stroke();
+      ctx.setLineDash([]);
+      // Soll-Strecke P1 → P3 (kräftig grün)
+      ctx.strokeStyle = "rgba(72,201,124,0.95)";
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y); ctx.lineTo(c.x, c.y);
+      ctx.stroke();
+      // P3-Punkt
+      ctx.fillStyle = "rgba(72,201,124,0.95)";
+      ctx.strokeStyle = "#fff";
+      ctx.lineWidth = 1.8;
+      ctx.beginPath(); ctx.arc(c.x, c.y, 6, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      // Soll-Label
+      const sollLen = dist(this.scalePoint1, p3);
+      const mx = (a.x + c.x) / 2, my = (a.y + c.y) / 2;
+      ctx.fillStyle = "rgba(72,201,124,1)";
+      ctx.font = "bold 12px system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText(`Soll: ${sollLen.toFixed(3)} m`, mx, my + 16);
       ctx.restore();
     }
   }
