@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import { CadApp } from "@/cad/CadApp";
 import { ToolIds, PointEditAction } from "@/cad/constants";
-import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal } from "lucide-react";
+import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle } from "lucide-react";
 import type { HatchDrawMode } from "@/cad/HatchTool";
 
 const CAD_TOOLS = [
@@ -246,6 +246,14 @@ const CadEditor: React.FC = () => {
                 className={`cad-toolbar-btn flex-1 justify-center h-9 ${hatchDrawMode === "rectangle" ? "active" : ""}`}
               >
                 <RectangleHorizontal className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => appRef.current?.hatchTool.setDrawMode("circle")}
+                title="Kreis / Kreissektor zeichnen (Doppelklick oder Enter = Vollkreis)"
+                className={`cad-toolbar-btn flex-1 justify-center h-9 ${hatchDrawMode === "circle" ? "active" : ""}`}
+              >
+                <Circle className="h-4 w-4" />
               </button>
             </div>
 

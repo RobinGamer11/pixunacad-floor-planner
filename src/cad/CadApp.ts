@@ -626,6 +626,14 @@ export class CadApp {
         if (this.activeTool === this.hatchTool) { const h = this.hatchTool.onTabRequest(); if (h) { e.preventDefault(); return; } }
       }
 
+      if (e.key === "Enter" && this.activeTool === this.hatchTool && !isHubInput) {
+        if (this.hatchTool.drawMode === "circle" && this.hatchTool.circleState === "arc") {
+          e.preventDefault();
+          this.hatchTool.finishCircleFromKey();
+          return;
+        }
+      }
+
       if (e.key === "v" || e.key === "V") this.setTool(ToolIds.SELECT);
       if (e.key === "l" || e.key === "L") this.setTool(ToolIds.LINE);
       if (e.key === "h" || e.key === "H") this.setTool(ToolIds.HATCH);
