@@ -725,11 +725,18 @@ export class CadApp {
     cx /= corners.length; cy /= corners.length;
     const screen = this.camera.worldToScreen(cx, cy);
     this.hub.showAt(screen.x, screen.y);
+    // Inputs editierbar machen, damit der User Werte eintippen kann
+    this.hub.enterEditMode();
     const scalePct = inst.scale * 100;
     const rotDeg = (inst.rotationRad * 180 / Math.PI + 360) % 360;
-    this.hub.lenInputEl.value = `${scalePct.toFixed(1)} %`;
-    this.hub.angInputEl.value = `${rotDeg.toFixed(1)}°`;
-    this.hub.bindCommit((vals) => {
+    // Aktuell fokussiertes Input NICHT überschreiben (sonst kann man nicht tippen)
+    if (document.activeElement !== this.hub.lenInputEl) {
+      this.hub.lenInputEl.value = `${scalePct.toFixed(1)} %`;
+    }
+    if (document.activeElement !== this.hub.angInputEl) {
+      this.hub.angInputEl.value = `${rotDeg.toFixed(1)}°`;
+    }
+    this.hub.bindCommit(() => {
       const cur = this.getSelectedStickerInstance();
       if (!cur) return;
       // lenInput hier als Skalierung in % interpretiert
