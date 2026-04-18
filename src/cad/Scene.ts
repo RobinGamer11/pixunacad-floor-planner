@@ -177,15 +177,49 @@ export class TextBox {
   }
 }
 
+export interface StickerInstanceItem {
+  // Lokale Snapshot-Items (relativ zu (0,0)). Strukturell identisch zu ClipboardItem.
+  // Wir lassen das absichtlich "any" um keine Zirkulärimporte zu erzeugen.
+  [key: string]: any;
+}
+
+export class StickerInstance {
+  id: string;
+  defId: string | null; // optional: Referenz auf Bibliotheks-Definition
+  name: string;
+  items: StickerInstanceItem[]; // lokale Geometrie (Kopie)
+  position: Vec2;
+  rotationRad: number;
+  scale: number;
+  labelId: string;
+
+  constructor({ id, defId, name, items, position, rotationRad, scale, labelId }: {
+    id: string; defId?: string | null; name?: string;
+    items: StickerInstanceItem[];
+    position: Vec2; rotationRad?: number; scale?: number; labelId?: string;
+  }) {
+    this.id = id;
+    this.defId = defId || null;
+    this.name = name || "Sticker";
+    this.items = items;
+    this.position = v(position.x, position.y);
+    this.rotationRad = rotationRad || 0;
+    this.scale = (typeof scale === "number" && scale > 0) ? scale : 1;
+    this.labelId = labelId || Defaults.defaultLabelId;
+  }
+}
+
 export class Scene {
   segments: Segment[] = [];
   hatches: Hatch[] = [];
   dimensions: Dimension[] = [];
   textBoxes: TextBox[] = [];
+  stickerInstances: StickerInstance[] = [];
   private _segIdMap = new Map<string, Segment>();
   private _hatchIdMap = new Map<string, Hatch>();
   private _dimIdMap = new Map<string, Dimension>();
   private _textIdMap = new Map<string, TextBox>();
+  private _stickerIdMap = new Map<string, StickerInstance>();
 
   private _makeId(): string {
     return (crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now() + Math.random());
