@@ -125,6 +125,14 @@ const CadEditor: React.FC = () => {
   // Floating edit-pencil overlay near selected sticker instance
   const [stickerEditOverlay, setStickerEditOverlay] = useState<{ id: string; x: number; y: number } | null>(null);
 
+  // Document import state
+  const docFileInputRef = useRef<HTMLInputElement>(null);
+  const [docPickerPages, setDocPickerPages] = useState<ImportedPage[] | null>(null);
+  const [docPickerSelected, setDocPickerSelected] = useState<Set<number>>(new Set());
+  const [docImporting, setDocImporting] = useState(false);
+  const [docSelected, setDocSelected] = useState<{ id: string; name: string; widthM: number; heightM: number } | null>(null);
+  const [docToolPhase, setDocToolPhase] = useState<string>("idle");
+
   useEffect(() => {
     if (
       !canvasRef.current || !hubRef.current || !hubLenRef.current || !hubAngRef.current ||
