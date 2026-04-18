@@ -1,8 +1,9 @@
 import { Defaults, SelectionType } from "./constants";
-import { Vec2, v, clamp, rgbaFromHex, polygonAreaAbs, polygonCentroid } from "./geometry";
+import { Vec2, v, sub, add, mul, norm, perpLeft, clamp, rgbaFromHex, hexToRgba, polygonAreaAbs, polygonCentroid } from "./geometry";
 import { Camera } from "./Camera";
-import { Scene, Hatch } from "./Scene";
+import { Scene, Hatch, Dimension } from "./Scene";
 import { LabelManager } from "./LabelManager";
+import { getDimensionGeometry, type DimensionLike } from "./dimensionGeometry";
 
 export interface Selection {
   type: string;
