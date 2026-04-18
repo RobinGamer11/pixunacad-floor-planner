@@ -95,6 +95,17 @@ export class SelectTool {
     return null;
   }
 
+  /** Returns the topmost document under the mouse, or null. */
+  private _hitDocument(input: Input) {
+    const mouseW = v(input.mouse.wx, input.mouse.wy);
+    for (let i = this.app.scene.documents.length - 1; i >= 0; i--) {
+      const doc = this.app.scene.documents[i];
+      if (!this.app.labelManager.isVisible(doc.labelId)) continue;
+      if (pointInDocument(mouseW, doc)) return doc;
+    }
+    return null;
+  }
+
   /** Hit-Test gegen die 4 Eck-Handles der aktuell selektierten Sticker-Instanz. */
   private _hitStickerCorner(input: Input): { instId: string; cornerIndex: number } | null {
     const sel = this.app.selection;
