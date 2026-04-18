@@ -2,7 +2,7 @@ import { Defaults, ToolIds, PointEditAction, SelectionType } from "./constants";
 import { clamp } from "./geometry";
 import { Camera } from "./Camera";
 import { Input } from "./Input";
-import { Scene, AreaLabel, DimensionStyle, TextBoxStyle } from "./Scene";
+import { Scene, AreaLabel, DimensionStyle, TextBoxStyle, TextBox } from "./Scene";
 import { LabelManager } from "./LabelManager";
 import { TopologyEngine } from "./TopologyEngine";
 import { Renderer, Selection } from "./Renderer";
@@ -12,8 +12,40 @@ import { SelectTool } from "./SelectTool";
 import { LineTool } from "./LineTool";
 import { HatchTool } from "./HatchTool";
 import { MeasureTool } from "./MeasureTool";
+import { TextTool } from "./TextTool";
+import { TextEditorOverlay } from "./TextEditorOverlay";
 
 import { IdPanel } from "./IdPanel";
+
+export interface TextSettingsRefs {
+  panel: HTMLDivElement;
+  idSelect: HTMLSelectElement;
+  textColor: HTMLInputElement;
+  textColorPreview: HTMLDivElement;
+  fontSize: HTMLInputElement;
+  alignLeftBtn: HTMLButtonElement;
+  alignCenterBtn: HTMLButtonElement;
+  alignRightBtn: HTMLButtonElement;
+  bgColor: HTMLInputElement;
+  bgColorPreview: HTMLDivElement;
+  bgAlpha: HTMLInputElement;
+  wrapToggle: HTMLInputElement;
+  borderToggle: HTMLInputElement;
+  borderGroup: HTMLDivElement;
+  borderColor: HTMLInputElement;
+  borderColorPreview: HTMLDivElement;
+  borderWidth: HTMLInputElement;
+}
+
+export interface TextEditorRefs {
+  editor: HTMLDivElement;
+  toolbar: HTMLDivElement;
+  boldBtn: HTMLButtonElement;
+  italicBtn: HTMLButtonElement;
+  colorInput: HTMLInputElement;
+  sizeSelect: HTMLSelectElement;
+  symbolSelect: HTMLSelectElement;
+}
 
 export interface MeasureSettings {
   orientation: "parallel" | "diagonal";
@@ -86,6 +118,9 @@ export class CadApp {
   areaBgAlphaInput: HTMLInputElement;
 
   measureRefs!: MeasureSettingsRefs;
+  textRefs!: TextSettingsRefs;
+  textEditorRefs!: TextEditorRefs;
+  textEditor!: TextEditorOverlay;
 
   defaultLineColor = Defaults.lineColor;
   defaultLineThicknessM = Defaults.lineThicknessM;
@@ -93,6 +128,16 @@ export class CadApp {
   defaultHatchStrokeColor = Defaults.hatchStrokeColor;
   defaultHatchStrokeWidthPx = Defaults.hatchStrokePx;
   defaultHatchFillAlphaPct = Defaults.hatchFillAlphaPct;
+
+  defaultTextColor = Defaults.textColor;
+  defaultTextFontSizePx = Defaults.textFontSizePx;
+  defaultTextBgColor = Defaults.textBgColor;
+  defaultTextBgAlphaPct = Defaults.textBgAlphaPct;
+  defaultTextWrap = Defaults.textWrap;
+  defaultTextAlign: "left" | "center" | "right" = Defaults.textAlign;
+  defaultTextBorderEnabled = Defaults.textBorderEnabled;
+  defaultTextBorderColor = Defaults.textBorderColor;
+  defaultTextBorderWidthPx = Defaults.textBorderWidthPx;
 
   camera: Camera;
   scene: Scene;
@@ -105,7 +150,8 @@ export class CadApp {
   lineTool: LineTool;
   hatchTool: HatchTool;
   measureTool!: MeasureTool;
-  activeTool: SelectTool | LineTool | HatchTool | MeasureTool;
+  textTool!: TextTool;
+  activeTool: SelectTool | LineTool | HatchTool | MeasureTool | TextTool;
 
   measureSettings: MeasureSettings = {
     orientation: Defaults.measureOrientation,
@@ -168,6 +214,8 @@ export class CadApp {
     areaFontSizeInput: HTMLInputElement,
     areaBgColorInput: HTMLInputElement, areaBgColorPreview: HTMLDivElement, areaBgAlphaInput: HTMLInputElement,
     measureRefs: MeasureSettingsRefs,
+    textRefs: TextSettingsRefs,
+    textEditorRefs: TextEditorRefs,
   ) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d")!;
@@ -198,6 +246,8 @@ export class CadApp {
     this.areaBgColorPreview = areaBgColorPreview;
     this.areaBgAlphaInput = areaBgAlphaInput;
     this.measureRefs = measureRefs;
+    this.textRefs = textRefs;
+    this.textEditorRefs = textEditorRefs;
 
     this.camera = new Camera();
     this.scene = new Scene();
@@ -210,9 +260,17 @@ export class CadApp {
     this.lineTool = new LineTool(this);
     this.hatchTool = new HatchTool(this);
     this.measureTool = new MeasureTool(this);
+    this.textTool = new TextTool(this);
     this.activeTool = this.selectTool;
 
     this.idPanel = new IdPanel(this, idPanelRoot, idPanelBody, idPanelList, idPanelAddBtn, idPanelToggleBtn);
+
+    this.textEditor = new TextEditorOverlay(
+      textEditorRefs.editor, textEditorRefs.toolbar,
+      textEditorRefs.boldBtn, textEditorRefs.italicBtn,
+      textEditorRefs.colorInput, textEditorRefs.sizeSelect, textEditorRefs.symbolSelect,
+      this,
+    );
 
     this.pointEditMenu.bindActivate((action) => {
       this.selectTool.beginPointEdit(action);
@@ -221,6 +279,7 @@ export class CadApp {
     this._setupLineSettingsPanel();
     this._setupHatchSettingsPanel();
     this._setupMeasureSettingsPanel();
+    this._setupTextSettingsPanel();
     this._setupShortcuts();
     this.refreshLabelUI();
     this._resize();
@@ -253,6 +312,14 @@ export class CadApp {
         textBgEnabled: d.textBgEnabled, textBgColor: d.textBgColor, textBgAlpha: d.textBgAlpha,
         labelId: d.labelId,
       })),
+      textBoxes: this.scene.textBoxes.map(t => ({
+        id: t.id,
+        center: { x: t.center.x, y: t.center.y },
+        widthM: t.widthM, heightM: t.heightM,
+        rotationRad: t.rotationRad, html: t.html,
+        style: { ...t.style },
+        labelId: t.labelId,
+      })),
       labels: this.labelManager.list().map(l => ({ ...l })),
     });
   }
@@ -268,9 +335,11 @@ export class CadApp {
     this.scene.segments = [];
     this.scene.hatches = [];
     this.scene.dimensions = [];
+    this.scene.textBoxes = [];
     (this.scene as any)._rebuildSegIdMap?.();
     (this.scene as any)._rebuildHatchIdMap?.();
     (this.scene as any)._rebuildDimIdMap?.();
+    (this.scene as any)._rebuildTextIdMap?.();
     // Re-add segments
     for (const s of data.segments || []) {
       this.scene.createSegment(s.a, s.b, { color: s.color, thicknessM: s.thicknessM, labelId: s.labelId });
@@ -292,6 +361,10 @@ export class CadApp {
         textBgEnabled: d.textBgEnabled, textBgColor: d.textBgColor, textBgAlpha: d.textBgAlpha,
         labelId: d.labelId,
       });
+    }
+    // Re-add text boxes
+    for (const t of data.textBoxes || []) {
+      this.scene.createTextBox(t.center, t.widthM, t.heightM, { ...(t.style || {}), labelId: t.labelId }, t.html || "", t.rotationRad || 0);
     }
     this.clearSelection();
     this.setSelectedLabelId(null);
@@ -353,6 +426,7 @@ export class CadApp {
     this._syncLineSettingsFromContext();
     this._syncHatchSettingsFromContext();
     this._syncMeasureSettingsFromContext();
+    this._syncTextSettingsFromContext();
     this._updateSettingsVisibility();
   }
 
@@ -371,6 +445,14 @@ export class CadApp {
   getSelectedDimension() {
     if (!this.selection || this.selection.type !== SelectionType.DIMENSION) return null;
     return this.scene.getDimensionById((this.selection as any).dimensionId);
+  }
+
+  getSelectedTextBox(): TextBox | null {
+    if (!this.selection) return null;
+    if (this.selection.type !== SelectionType.TEXTBOX && this.selection.type !== SelectionType.TEXTBOX_HANDLE) return null;
+    const id = (this.selection as any).textBoxId;
+    if (!id) return null;
+    return this.scene.getTextBoxById(id);
   }
 
 
@@ -398,10 +480,12 @@ export class CadApp {
     this._syncLabelSelect();
     this._syncHatchLabelSelect();
     this._syncMeasureLabelSelect();
+    this._syncTextLabelSelect();
     this.idPanel.render();
     this._syncLineSettingsFromContext();
     this._syncHatchSettingsFromContext();
     this._syncMeasureSettingsFromContext();
+    this._syncTextSettingsFromContext();
   }
 
   private _syncLabelSelect() {
@@ -554,17 +638,180 @@ export class CadApp {
   showLineSettingsPanel(shouldShow: boolean) { this.lineSettingsPanel.classList.toggle("hidden", !shouldShow); }
   showHatchSettingsPanel(shouldShow: boolean) { this.hatchSettingsPanel.classList.toggle("hidden", !shouldShow); }
   showMeasureSettingsPanel(shouldShow: boolean) { this.measureRefs.panel.classList.toggle("hidden", !shouldShow); }
+  showTextSettingsPanel(shouldShow: boolean) { this.textRefs.panel.classList.toggle("hidden", !shouldShow); }
+
+  getCurrentTextStyle(): TextBoxStyle {
+    const sel = this.getSelectedTextBox();
+    if (sel) {
+      return {
+        textColor: sel.style.textColor, fontSizePx: sel.style.fontSizePx,
+        bgColor: sel.style.bgColor, bgAlphaPct: sel.style.bgAlphaPct,
+        wrap: sel.style.wrap, align: sel.style.align,
+        borderEnabled: sel.style.borderEnabled, borderColor: sel.style.borderColor,
+        borderWidthPx: sel.style.borderWidthPx,
+        labelId: sel.labelId,
+      };
+    }
+    return {
+      textColor: this.defaultTextColor, fontSizePx: this.defaultTextFontSizePx,
+      bgColor: this.defaultTextBgColor, bgAlphaPct: this.defaultTextBgAlphaPct,
+      wrap: this.defaultTextWrap, align: this.defaultTextAlign,
+      borderEnabled: this.defaultTextBorderEnabled, borderColor: this.defaultTextBorderColor,
+      borderWidthPx: this.defaultTextBorderWidthPx,
+      labelId: this.activeDrawLabelId || Defaults.defaultLabelId,
+    };
+  }
+
+  beginTextEdit(box: TextBox) {
+    this.showTextSettingsPanel(true);
+    this.textEditor.beginEdit(box);
+  }
 
   private _updateSettingsVisibility() {
     const isMeasureCtx = this.activeTool === this.measureTool || !!this.getSelectedDimension();
     const isHatchCtx = this.activeTool === this.hatchTool || !!(this.selection && this.selection.hatchId);
     const isLineCtx = this.activeTool === this.lineTool || !!(this.selection && this.selection.segmentId);
-    const showLine = isLineCtx || (!!this.selectedLabelId && !isMeasureCtx);
-    const showHatch = isHatchCtx || (!!this.selectedLabelId && !isMeasureCtx);
+    const isTextCtx = this.activeTool === this.textTool || !!this.getSelectedTextBox();
+    const showLine = isLineCtx || (!!this.selectedLabelId && !isMeasureCtx && !isTextCtx);
+    const showHatch = isHatchCtx || (!!this.selectedLabelId && !isMeasureCtx && !isTextCtx);
     const showMeasure = isMeasureCtx;
+    const showText = isTextCtx;
     this.showLineSettingsPanel(showLine);
     this.showHatchSettingsPanel(showHatch);
     this.showMeasureSettingsPanel(showMeasure);
+    this.showTextSettingsPanel(showText);
+  }
+
+  /* ---- Text Settings Panel ---- */
+  private _syncTextLabelSelect() {
+    if (!this.textRefs?.idSelect) return;
+    const groups = this.labelManager.list();
+    const cur = this.textRefs.idSelect.value;
+    this.textRefs.idSelect.innerHTML = "";
+    for (const g of groups) {
+      const opt = document.createElement("option");
+      opt.value = g.id; opt.textContent = g.name;
+      this.textRefs.idSelect.appendChild(opt);
+    }
+    const preferred =
+      (this.labelManager.getById(cur) ? cur : null) ||
+      (this.labelManager.getById(this.activeDrawLabelId) ? this.activeDrawLabelId : Defaults.defaultLabelId);
+    this.textRefs.idSelect.value = preferred;
+  }
+
+  private _setupTextSettingsPanel() {
+    const r = this.textRefs;
+    if (!r) return;
+
+    r.idSelect.addEventListener("change", () => {
+      const nextId = r.idSelect.value || Defaults.defaultLabelId;
+      const sel = this.getSelectedTextBox();
+      if (sel) { sel.labelId = nextId; this.setSelectedLabelId(nextId); this.refreshLabelUI(); return; }
+      this.setActiveDrawLabelId(nextId);
+    });
+
+    r.textColor.addEventListener("input", () => {
+      const sel = this.getSelectedTextBox();
+      if (sel) sel.style.textColor = r.textColor.value;
+      else this.defaultTextColor = r.textColor.value;
+      r.textColorPreview.style.background = r.textColor.value;
+    });
+
+    r.fontSize.addEventListener("input", () => {
+      let v = parseFloat((r.fontSize.value || "").replace(",", "."));
+      if (!Number.isFinite(v) || v <= 0) return;
+      v = clamp(v, 6, 200);
+      const sel = this.getSelectedTextBox();
+      if (sel) sel.style.fontSizePx = v;
+      else this.defaultTextFontSizePx = v;
+    });
+    r.fontSize.addEventListener("blur", () => this._syncTextSettingsFromContext());
+
+    const setAlign = (a: "left" | "center" | "right") => {
+      const sel = this.getSelectedTextBox();
+      if (sel) sel.style.align = a;
+      else this.defaultTextAlign = a;
+      this._syncTextSettingsFromContext();
+    };
+    r.alignLeftBtn.addEventListener("click", () => setAlign("left"));
+    r.alignCenterBtn.addEventListener("click", () => setAlign("center"));
+    r.alignRightBtn.addEventListener("click", () => setAlign("right"));
+
+    r.bgColor.addEventListener("input", () => {
+      const sel = this.getSelectedTextBox();
+      if (sel) sel.style.bgColor = r.bgColor.value;
+      else this.defaultTextBgColor = r.bgColor.value;
+      this._syncTextSettingsFromContext();
+    });
+
+    r.bgAlpha.addEventListener("input", () => {
+      let v = parseFloat((r.bgAlpha.value || "").replace(",", "."));
+      if (!Number.isFinite(v)) return;
+      v = clamp(v, 0, 100);
+      const sel = this.getSelectedTextBox();
+      if (sel) sel.style.bgAlphaPct = v;
+      else this.defaultTextBgAlphaPct = v;
+      this._syncTextSettingsFromContext();
+    });
+
+    r.wrapToggle.addEventListener("change", () => {
+      const sel = this.getSelectedTextBox();
+      if (sel) sel.style.wrap = !!r.wrapToggle.checked;
+      else this.defaultTextWrap = !!r.wrapToggle.checked;
+    });
+
+    r.borderToggle.addEventListener("change", () => {
+      const v = !!r.borderToggle.checked;
+      const sel = this.getSelectedTextBox();
+      if (sel) sel.style.borderEnabled = v;
+      else this.defaultTextBorderEnabled = v;
+      r.borderGroup.classList.toggle("hidden", !v);
+    });
+
+    r.borderColor.addEventListener("input", () => {
+      const sel = this.getSelectedTextBox();
+      if (sel) sel.style.borderColor = r.borderColor.value;
+      else this.defaultTextBorderColor = r.borderColor.value;
+      r.borderColorPreview.style.background = r.borderColor.value;
+    });
+
+    r.borderWidth.addEventListener("input", () => {
+      let v = parseFloat((r.borderWidth.value || "").replace(",", "."));
+      if (!Number.isFinite(v) || v < 0) return;
+      v = clamp(v, 0, 30);
+      const sel = this.getSelectedTextBox();
+      if (sel) sel.style.borderWidthPx = v;
+      else this.defaultTextBorderWidthPx = v;
+    });
+    r.borderWidth.addEventListener("blur", () => this._syncTextSettingsFromContext());
+
+    this._syncTextSettingsFromContext();
+  }
+
+  private _syncTextSettingsFromContext() {
+    const r = this.textRefs;
+    if (!r) return;
+    const s = this.getCurrentTextStyle();
+    r.textColor.value = this._toHexColor(s.textColor || Defaults.textColor);
+    r.textColorPreview.style.background = r.textColor.value;
+    r.fontSize.value = String(Math.round(s.fontSizePx ?? Defaults.textFontSizePx));
+    r.bgColor.value = this._toHexColor(s.bgColor || Defaults.textBgColor);
+    r.bgColorPreview.style.background = `${r.bgColor.value}`;
+    r.bgAlpha.value = String(Math.round(s.bgAlphaPct ?? Defaults.textBgAlphaPct));
+    r.wrapToggle.checked = !!s.wrap;
+    r.alignLeftBtn.classList.toggle("active", s.align === "left");
+    r.alignCenterBtn.classList.toggle("active", s.align === "center");
+    r.alignRightBtn.classList.toggle("active", s.align === "right");
+    r.borderToggle.checked = !!s.borderEnabled;
+    r.borderGroup.classList.toggle("hidden", !s.borderEnabled);
+    r.borderColor.value = this._toHexColor(s.borderColor || Defaults.textBorderColor);
+    r.borderColorPreview.style.background = r.borderColor.value;
+    r.borderWidth.value = String((s.borderWidthPx ?? Defaults.textBorderWidthPx).toFixed(1).replace(/\.0$/, ""));
+    const labelForDisplay =
+      (this.selectedLabelId && this.labelManager.getById(this.selectedLabelId)) ? this.selectedLabelId
+        : (s.labelId && this.labelManager.getById(s.labelId)) ? s.labelId
+        : (this.labelManager.getById(this.activeDrawLabelId) ? this.activeDrawLabelId : Defaults.defaultLabelId);
+    r.idSelect.value = labelForDisplay;
   }
 
   /* ---- Line Settings Panel ---- */
@@ -765,10 +1012,18 @@ export class CadApp {
         }
       }
 
+      // Don't trigger tool shortcuts while text editor is active
+      const isTextEditing = this.textEditor?.isActive();
+      if (isTextEditing) {
+        if (e.key === "Escape") { e.preventDefault(); this.textEditor.commit(); return; }
+        return;
+      }
+
       if (e.key === "v" || e.key === "V") this.setTool(ToolIds.SELECT);
       if (e.key === "l" || e.key === "L") this.setTool(ToolIds.LINE);
       if (e.key === "h" || e.key === "H") this.setTool(ToolIds.HATCH);
       if (e.key === "m" || e.key === "M") this.setTool(ToolIds.MEASURE);
+      if (e.key === "t" || e.key === "T") this.setTool(ToolIds.TEXT);
 
       if (e.key === "Escape") {
         if (this.activeTool === this.lineTool) { this.lineTool.cancel(); this.clearSelection(); this.setSelectedLabelId(null); this.setTool(ToolIds.SELECT); return; }
@@ -790,6 +1045,11 @@ export class CadApp {
           if (dim) { this.scene.removeDimension(dim); this.clearSelection(); this.refreshLabelUI(); }
           return;
         }
+        if (this.selection && (this.selection.type === SelectionType.TEXTBOX || this.selection.type === SelectionType.TEXTBOX_HANDLE)) {
+          const box = this.getSelectedTextBox();
+          if (box) { this.scene.removeTextBox(box); this.clearSelection(); this.refreshLabelUI(); }
+          return;
+        }
         if (this.selection && this.selection.hatchId) {
           const hatch = this.scene.getHatchById(this.selection.hatchId);
           if (hatch) {
@@ -808,6 +1068,7 @@ export class CadApp {
           this.scene.removeSegmentsByLabelId(this.selectedLabelId);
           this.scene.removeHatchesByLabelId(this.selectedLabelId);
           this.scene.removeDimensionsByLabelId(this.selectedLabelId);
+          this.scene.removeTextBoxesByLabelId(this.selectedLabelId);
           this.setSelectedLabelId(null);
           this.refreshLabelUI();
         }
@@ -822,7 +1083,11 @@ export class CadApp {
     else if (id === ToolIds.LINE) { this.activeTool = this.lineTool; this.lineTool.activate(); }
     else if (id === ToolIds.HATCH) { this.activeTool = this.hatchTool; this.hatchTool.activate(); }
     else if (id === ToolIds.MEASURE) { this.activeTool = this.measureTool; this.measureTool.activate(); }
+    else if (id === ToolIds.TEXT) { this.activeTool = this.textTool; this.textTool.activate(); }
     this._syncLineSettingsFromContext();
+    this._syncHatchSettingsFromContext();
+    this._syncMeasureSettingsFromContext();
+    this._syncTextSettingsFromContext();
     this._syncHatchSettingsFromContext();
     this._syncMeasureSettingsFromContext();
     this._updateSettingsVisibility();
@@ -1037,6 +1302,7 @@ export class CadApp {
     if (this._snapshotTimer != null) { clearInterval(this._snapshotTimer); this._snapshotTimer = null; }
     this.input.destroy();
     this.hub.destroy();
+    this.textEditor?.destroy();
     if (this._keydownHandler) window.removeEventListener("keydown", this._keydownHandler);
   }
 }
