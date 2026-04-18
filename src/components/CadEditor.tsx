@@ -296,10 +296,90 @@ const CadEditor: React.FC = () => {
     return () => cancelAnimationFrame(raf);
   }, []);
 
+  // Poll selected document for the settings panel
+  useEffect(() => {
+    let raf = 0;
+    const tick = () => {
+      const app = appRef.current;
+      if (app) {
+        const sel = app.selection as any;
+        if (sel && sel.type === "document") {
+          const doc = app.scene.getDocumentById(sel.documentId);
+          if (doc) {
+            setDocSelected(prev => (prev && prev.id === doc.id && prev.widthM === doc.widthM && prev.heightM === doc.heightM) ? prev : { id: doc.id, name: doc.name, widthM: doc.widthM, heightM: doc.heightM });
+          } else {
+            setDocSelected(prev => prev ? null : prev);
+          }
+        } else {
+          setDocSelected(prev => prev ? null : prev);
+        }
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
   const handleToolClick = useCallback((id: string) => {
     appRef.current?.setTool(id);
     setActiveTool(id);
   }, []);
+
+  const handleDocFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    e.target.value = "";
+    if (!f) return;
+    setDocImporting(true);
+    try {
+      const pages = await importFile(f);
+      if (pages.length === 0) { window.alert("Keine Seiten gefunden."); return; }
+      if (pages.length === 1) {
+        const p = pages[0];
+        appRef.current?.setTool(ToolIds.DOCUMENT);
+        appRef.current?.documentTool.beginPlacement({
+          src: p.src, widthM: p.widthM, heightM: p.heightM,
+          pixelWidth: p.pixelWidth, pixelHeight: p.pixelHeight,
+          name: p.name, kind: p.kind, pageIndex: p.pageIndex,
+        });
+      } else {
+        const all = new Set<number>();
+        pages.forEach((_, i) => all.add(i));
+        setDocPickerSelected(all);
+        setDocPickerPages(pages);
+      }
+    } catch (err: any) {
+      window.alert(err?.message || "Import fehlgeschlagen.");
+    } finally {
+      setDocImporting(false);
+    }
+  }, []);
+
+  const handleDocPickerConfirm = useCallback(() => {
+    if (!docPickerPages) return;
+    const app = appRef.current; if (!app) return;
+    const selectedPages = docPickerPages.filter((_, i) => docPickerSelected.has(i));
+    if (selectedPages.length === 0) { setDocPickerPages(null); return; }
+    app.setTool(ToolIds.DOCUMENT);
+    const [first, ...rest] = selectedPages;
+    app.documentTool.beginPlacement({
+      src: first.src, widthM: first.widthM, heightM: first.heightM,
+      pixelWidth: first.pixelWidth, pixelHeight: first.pixelHeight,
+      name: first.name, kind: first.kind, pageIndex: first.pageIndex,
+    });
+    // Restliche Seiten direkt nebeneinander absetzen
+    let offX = first.widthM + 0.5;
+    for (const p of rest) {
+      app.scene.createDocument({
+        name: p.name, kind: p.kind, src: p.src, pageIndex: p.pageIndex,
+        position: { x: offX, y: 0 }, widthM: p.widthM, heightM: p.heightM,
+        pixelWidth: p.pixelWidth, pixelHeight: p.pixelHeight,
+        labelId: app.activeDrawLabelId,
+      });
+      offX += p.widthM + 0.5;
+    }
+    setDocPickerPages(null);
+    setDocPickerSelected(new Set());
+  }, [docPickerPages, docPickerSelected]);
 
   const sidebarWidth = sidebarCollapsed ? 56 : 240;
 
