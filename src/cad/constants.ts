@@ -73,6 +73,7 @@ export const SelectionType = {
   DIMENSION: "dimension",
   TEXTBOX: "textbox",
   TEXTBOX_HANDLE: "textbox_handle",
+  STICKER_INSTANCE: "sticker_instance",
 } as const;
 
 export const SnapType = {
