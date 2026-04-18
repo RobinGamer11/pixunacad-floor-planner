@@ -368,12 +368,21 @@ const CadEditor: React.FC = () => {
     setScaleDialogPages(selectedPages);
   }, [docPickerPages, docPickerSelected]);
 
-  /** Maßstab anwenden: skaliert die Welt-Größe mit dem Nenner. Beispiel: 1:100 → ×100. */
+  /**
+   * Maßstab anwenden. User-Erwartung: 1:200 ist die Hälfte von 1:100.
+   * Referenz ist 1:100 → Faktor 1.
+   * 1:50  → ×2    (größer als 1:100)
+   * 1:100 → ×1
+   * 1:200 → ×0.5  (Hälfte von 1:100)
+   * 1:500 → ×0.2
+   * 1:1   → ×100  (Originalgröße als 1:1-Vergleich)
+   */
   const handleScaleConfirm = useCallback(() => {
     if (!scaleDialogPages) return;
     const app = appRef.current; if (!app) return;
     const denom = scaleChoice === "custom" ? parseFloat(scaleCustom.replace(",", ".")) : parseFloat(scaleChoice);
-    const factor = Number.isFinite(denom) && denom > 0 ? denom : 1;
+    const safeDenom = Number.isFinite(denom) && denom > 0 ? denom : 100;
+    const factor = 100 / safeDenom;
     const scaledPages = scaleDialogPages.map(p => ({ ...p, widthM: p.widthM * factor, heightM: p.heightM * factor }));
     const [first, ...rest] = scaledPages;
     app.setTool(ToolIds.DOCUMENT);
@@ -845,10 +854,10 @@ const CadEditor: React.FC = () => {
             </div>
           )}
 
-          {/* Document Settings — sichtbar wenn DOCUMENT-Tool aktiv ODER (Auswahl-Tool aktiv UND Doc selektiert) */}
-          {!sidebarCollapsed && (activeTool === ToolIds.DOCUMENT || (activeTool === ToolIds.SELECT && !!docSelected)) && (
+          {/* Document-Tool-Panel: nur Import */}
+          {!sidebarCollapsed && activeTool === ToolIds.DOCUMENT && (
             <div className="cad-settings-panel mb-2">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Dokument</div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Dokument importieren</div>
               <div className="space-y-3">
                 <button
                   type="button"
@@ -868,62 +877,76 @@ const CadEditor: React.FC = () => {
                   onChange={handleDocFileChange}
                 />
 
-                {docToolPhase !== "idle" && (
+                {docToolPhase === "placing" && (
                   <div className="rounded-md p-2 text-xs" style={{ background: "hsl(var(--primary) / 0.12)", border: "1px solid hsl(var(--primary) / 0.4)" }}>
-                    {docToolPhase === "placing" && <span>Klick auf Canvas: Dokument absetzen · Esc: abbrechen</span>}
-                    {docToolPhase === "scale-pick-1" && <span>1. Skalier-Punkt anklicken (Snap aktiv)</span>}
-                    {docToolPhase === "scale-pick-2" && <span>2. Skalier-Punkt anklicken</span>}
-                    {docToolPhase === "scale-await-input" && <span>Soll-Länge im Hub eingeben + Enter</span>}
-                  </div>
-                )}
-
-                {docSelected && (
-                  <div className="space-y-2 pt-2" style={{ borderTop: "1px solid hsl(var(--border))" }}>
-                    <div className="text-xs">
-                      <div className="font-medium truncate" title={docSelected.name}>{docSelected.name}</div>
-                      <div style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
-                        {docSelected.widthM.toFixed(3)} × {docSelected.heightM.toFixed(3)} m
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => appRef.current?.documentTool.beginScaleTwoPoints(docSelected.id)}
-                      className="cad-toolbar-btn w-full justify-center h-9"
-                      title="Über zwei Snap-Punkte und eine Soll-Länge skalieren"
-                    >
-                      <Maximize2 className="h-4 w-4" />
-                      <span className="text-xs">Skalieren (2 Punkte)</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => appRef.current?.documentTool.beginScaleFromLastDimension(docSelected.id)}
-                      className="cad-toolbar-btn w-full justify-center h-9"
-                      title="Skaliere mit der zuletzt erstellten Maßkette als Referenz"
-                    >
-                      <RulerIcon className="h-4 w-4" />
-                      <span className="text-xs">Skalieren (Maßkette)</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const app = appRef.current; if (!app) return;
-                        const doc = app.scene.getDocumentById(docSelected.id);
-                        if (doc && window.confirm(`Dokument "${doc.name}" löschen?`)) {
-                          app.scene.removeDocument(doc); app.clearSelection(); app.refreshLabelUI();
-                        }
-                      }}
-                      className="cad-toolbar-btn w-full justify-center h-9"
-                      title="Dokument löschen"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      <span className="text-xs">Löschen</span>
-                    </button>
+                    Klick auf Canvas: Dokument absetzen · Esc: abbrechen
                   </div>
                 )}
 
                 <div className="text-[11px] leading-relaxed pt-2" style={{ color: "hsl(var(--cad-toolbar-muted))", borderTop: "1px solid hsl(var(--border))" }}>
                   <div>PDF, JPG, PNG werden mit 96 DPI / 72 pt importiert.</div>
-                  <div>Klick: Auswahl · Drag: verschieben (Snap aktiv) · Entf: löschen</div>
+                  <div>Zum Skalieren: <strong>Auswahl-Tool</strong> (V) → Dokument anklicken.</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Document-Eigenschaften: nur im Auswahl-Tool, wenn Dokument selektiert */}
+          {!sidebarCollapsed && activeTool === ToolIds.SELECT && !!docSelected && (
+            <div className="cad-settings-panel mb-2">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Dokument-Eigenschaften</div>
+              <div className="space-y-3">
+                <div className="text-xs">
+                  <div className="font-medium truncate" title={docSelected.name}>{docSelected.name}</div>
+                  <div style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+                    {docSelected.widthM.toFixed(3)} × {docSelected.heightM.toFixed(3)} m
+                  </div>
+                </div>
+
+                {(docToolPhase === "scale-pick-1" || docToolPhase === "scale-pick-2" || docToolPhase === "scale-await-input") && (
+                  <div className="rounded-md p-2 text-xs" style={{ background: "hsl(var(--primary) / 0.12)", border: "1px solid hsl(var(--primary) / 0.4)" }}>
+                    {docToolPhase === "scale-pick-1" && <span>1. Skalier-Punkt anklicken (Snap aktiv)</span>}
+                    {docToolPhase === "scale-pick-2" && <span>2. Punkt setzen · Shift: Ortho · Klick auf m-Anzeige: Distanz tippen</span>}
+                    {docToolPhase === "scale-await-input" && <span>Soll-Länge im Hub eingeben + Enter</span>}
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => appRef.current?.documentTool.beginScaleTwoPoints(docSelected.id)}
+                  className="cad-toolbar-btn w-full justify-center h-9"
+                  title="Über zwei Snap-Punkte und eine Soll-Länge skalieren"
+                >
+                  <Maximize2 className="h-4 w-4" />
+                  <span className="text-xs">Skalieren (2 Punkte)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => appRef.current?.documentTool.beginScaleFromLastDimension(docSelected.id)}
+                  className="cad-toolbar-btn w-full justify-center h-9"
+                  title="Skaliere mit der zuletzt erstellten Maßkette als Referenz"
+                >
+                  <RulerIcon className="h-4 w-4" />
+                  <span className="text-xs">Skalieren (Maßkette)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const app = appRef.current; if (!app) return;
+                    const doc = app.scene.getDocumentById(docSelected.id);
+                    if (doc && window.confirm(`Dokument "${doc.name}" löschen?`)) {
+                      app.scene.removeDocument(doc); app.clearSelection(); app.refreshLabelUI();
+                    }
+                  }}
+                  className="cad-toolbar-btn w-full justify-center h-9"
+                  title="Dokument löschen"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span className="text-xs">Löschen</span>
+                </button>
+
+                <div className="text-[11px] leading-relaxed pt-2" style={{ color: "hsl(var(--cad-toolbar-muted))", borderTop: "1px solid hsl(var(--border))" }}>
+                  <div>Drag: verschieben (Snap aktiv) · Entf: löschen</div>
                 </div>
               </div>
             </div>
@@ -977,15 +1000,15 @@ const CadEditor: React.FC = () => {
 
         {/* Maßstab-Dialog vor Platzierung */}
         <Dialog open={!!scaleDialogPages} onOpenChange={(o) => { if (!o) setScaleDialogPages(null); }}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-sm">
             <DialogHeader>
-              <DialogTitle>Maßstab des Dokuments</DialogTitle>
+              <DialogTitle className="text-base">Maßstab des Dokuments</DialogTitle>
             </DialogHeader>
-            <div className="space-y-3 py-2">
-              <p className="text-xs text-muted-foreground">
-                In welchem Maßstab liegt der Plan vor? Das Dokument wird entsprechend in die Zeichenebene skaliert.
+            <div className="space-y-2 py-1">
+              <p className="text-[11px] text-muted-foreground">
+                In welchem Maßstab liegt der Plan vor?
               </p>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 gap-1.5">
                 {[
                   { v: "50", label: "1 : 50" },
                   { v: "100", label: "1 : 100" },
@@ -993,37 +1016,42 @@ const CadEditor: React.FC = () => {
                   { v: "500", label: "1 : 500" },
                   { v: "1", label: "1 : 1" },
                   { v: "custom", label: "Frei…" },
-                ].map(opt => (
-                  <button
-                    key={opt.v}
-                    type="button"
-                    onClick={() => setScaleChoice(opt.v)}
-                    className={`cad-toolbar-btn justify-center h-10 text-xs ${scaleChoice === opt.v ? "active" : ""}`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
+                ].map(opt => {
+                  const active = scaleChoice === opt.v;
+                  return (
+                    <button
+                      key={opt.v}
+                      type="button"
+                      onClick={() => setScaleChoice(opt.v)}
+                      className="rounded-md h-9 text-xs font-semibold border transition-colors"
+                      style={{
+                        background: active ? "hsl(var(--primary))" : "hsl(var(--muted))",
+                        color: active ? "hsl(var(--primary-foreground))" : "hsl(var(--foreground))",
+                        borderColor: active ? "hsl(var(--primary))" : "hsl(var(--border))",
+                      }}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
               </div>
               {scaleChoice === "custom" && (
                 <div className="flex items-center gap-2 pt-1">
-                  <span className="text-xs text-muted-foreground">1 :</span>
+                  <span className="text-xs text-foreground">1 :</span>
                   <input
                     type="text"
                     value={scaleCustom}
                     onChange={(e) => setScaleCustom(e.target.value)}
-                    className="cad-settings-select flex-1"
+                    className="cad-settings-select flex-1 h-8 text-xs"
                     placeholder="z. B. 75"
                     autoFocus
                   />
                 </div>
               )}
-              <p className="text-[11px] text-muted-foreground pt-1">
-                Tipp: Du kannst den Maßstab später jederzeit über „Skalieren (2 Punkte)" oder „Skalieren (Maßkette)" feinjustieren.
-              </p>
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setScaleDialogPages(null)}>Abbrechen</Button>
-              <Button onClick={handleScaleConfirm}>Übernehmen & platzieren</Button>
+            <DialogFooter className="gap-2 sm:gap-2">
+              <Button variant="outline" size="sm" onClick={() => setScaleDialogPages(null)}>Abbrechen</Button>
+              <Button size="sm" onClick={handleScaleConfirm}>Übernehmen</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
