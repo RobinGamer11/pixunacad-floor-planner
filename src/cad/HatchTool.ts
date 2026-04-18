@@ -25,12 +25,23 @@ interface GuideDef {
   dir: Vec2;
 }
 
+export type HatchDrawMode = "polygon" | "rectangle";
+
 export class HatchTool {
   app: CadApp;
   id = "hatch";
 
+  drawMode: HatchDrawMode = "polygon";
+
+  // Polygon mode state
   state: "idle" | "drawing" = "idle";
   points: Vec2[] = [];
+
+  // Rectangle mode state ("idle" | "firstSide" | "secondSide")
+  rectState: "idle" | "firstSide" | "secondSide" = "idle";
+  rectPointA: Vec2 | null = null;
+  rectPointB: Vec2 | null = null;
+
   snap: Snap | null = null;
   activeTargetHatchId: string | null = null;
   startReferenceEdge: { hatchId: string; edgeIndex: number } | null = null;
@@ -42,6 +53,15 @@ export class HatchTool {
 
   guideAnchors: GuideAnchor[] = [];
   parallelGuideSegments: ParallelGuide[] = [];
+
+  onDrawModeChange?: (mode: HatchDrawMode) => void;
+
+  setDrawMode(mode: HatchDrawMode) {
+    if (this.drawMode === mode) return;
+    this.cancel();
+    this.drawMode = mode;
+    this.onDrawModeChange?.(mode);
+  }
 
   constructor(app: CadApp) {
     this.app = app;
