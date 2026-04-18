@@ -845,8 +845,8 @@ const CadEditor: React.FC = () => {
             </div>
           )}
 
-          {/* Document Settings */}
-          {!sidebarCollapsed && activeTool === ToolIds.DOCUMENT && (
+          {/* Document Settings — sichtbar wenn DOCUMENT-Tool aktiv ODER (Auswahl-Tool aktiv UND Doc selektiert) */}
+          {!sidebarCollapsed && (activeTool === ToolIds.DOCUMENT || (activeTool === ToolIds.SELECT && !!docSelected)) && (
             <div className="cad-settings-panel mb-2">
               <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Dokument</div>
               <div className="space-y-3">
