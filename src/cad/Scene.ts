@@ -157,6 +157,7 @@ export class TextBox {
   html: string;
   style: Required<Omit<TextBoxStyle, "labelId">>;
   labelId: string;
+  _stickerEditOwnerId?: string | null;
 
   constructor({ id, center, widthM, heightM, rotationRad, html, style, labelId }: {
     id: string; center: Vec2; widthM: number; heightM: number;
@@ -181,6 +182,7 @@ export class TextBox {
       borderWidthPx: clamp(s.borderWidthPx ?? Defaults.textBorderWidthPx, 0, 30),
     };
     this.labelId = labelId || s.labelId || Defaults.defaultLabelId;
+    this._stickerEditOwnerId = null;
   }
 }
 
