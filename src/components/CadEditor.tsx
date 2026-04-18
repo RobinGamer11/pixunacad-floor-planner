@@ -252,6 +252,7 @@ const CadEditor: React.FC = () => {
     };
     app.hatchTool.onDrawModeChange = (m) => setHatchDrawMode(m);
     setHatchDrawMode(app.hatchTool.drawMode);
+    app.documentTool.onPhaseChange = () => setDocToolPhase(app.documentTool.phase);
     app.setTool(ToolIds.SELECT);
     appRef.current = app;
 
