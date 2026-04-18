@@ -1061,6 +1061,7 @@ export class CadApp {
       if (e.key === "m" || e.key === "M") this.setTool(ToolIds.MEASURE);
       if (e.key === "t" || e.key === "T") this.setTool(ToolIds.TEXT);
       if (e.key === "p" || e.key === "P") this.setTool(ToolIds.PIPETTE);
+      if (e.key === "o" || e.key === "O") this.setTool(ToolIds.STICKER);
 
       if (e.key === "Escape") {
         if (this.pastePreviewActive) { this.cancelPastePreview(); return; }
