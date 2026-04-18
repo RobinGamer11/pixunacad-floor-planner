@@ -853,10 +853,10 @@ const CadEditor: React.FC = () => {
             </div>
           )}
 
-          {/* Document Settings — sichtbar wenn DOCUMENT-Tool aktiv ODER (Auswahl-Tool aktiv UND Doc selektiert) */}
-          {!sidebarCollapsed && (activeTool === ToolIds.DOCUMENT || (activeTool === ToolIds.SELECT && !!docSelected)) && (
+          {/* Document-Tool-Panel: nur Import */}
+          {!sidebarCollapsed && activeTool === ToolIds.DOCUMENT && (
             <div className="cad-settings-panel mb-2">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Dokument</div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Dokument importieren</div>
               <div className="space-y-3">
                 <button
                   type="button"
@@ -876,63 +876,80 @@ const CadEditor: React.FC = () => {
                   onChange={handleDocFileChange}
                 />
 
-                {docToolPhase !== "idle" && (
+                {docToolPhase === "placing" && (
                   <div className="rounded-md p-2 text-xs" style={{ background: "hsl(var(--primary) / 0.12)", border: "1px solid hsl(var(--primary) / 0.4)" }}>
-                    {docToolPhase === "placing" && <span>Klick auf Canvas: Dokument absetzen · Esc: abbrechen</span>}
-                    {docToolPhase === "scale-pick-1" && <span>1. Skalier-Punkt anklicken (Snap aktiv)</span>}
-                    {docToolPhase === "scale-pick-2" && <span>2. Skalier-Punkt anklicken</span>}
-                    {docToolPhase === "scale-await-input" && <span>Soll-Länge im Hub eingeben + Enter</span>}
-                  </div>
-                )}
-
-                {docSelected && (
-                  <div className="space-y-2 pt-2" style={{ borderTop: "1px solid hsl(var(--border))" }}>
-                    <div className="text-xs">
-                      <div className="font-medium truncate" title={docSelected.name}>{docSelected.name}</div>
-                      <div style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
-                        {docSelected.widthM.toFixed(3)} × {docSelected.heightM.toFixed(3)} m
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => appRef.current?.documentTool.beginScaleTwoPoints(docSelected.id)}
-                      className="cad-toolbar-btn w-full justify-center h-9"
-                      title="Über zwei Snap-Punkte und eine Soll-Länge skalieren"
-                    >
-                      <Maximize2 className="h-4 w-4" />
-                      <span className="text-xs">Skalieren (2 Punkte)</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => appRef.current?.documentTool.beginScaleFromLastDimension(docSelected.id)}
-                      className="cad-toolbar-btn w-full justify-center h-9"
-                      title="Skaliere mit der zuletzt erstellten Maßkette als Referenz"
-                    >
-                      <RulerIcon className="h-4 w-4" />
-                      <span className="text-xs">Skalieren (Maßkette)</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const app = appRef.current; if (!app) return;
-                        const doc = app.scene.getDocumentById(docSelected.id);
-                        if (doc && window.confirm(`Dokument "${doc.name}" löschen?`)) {
-                          app.scene.removeDocument(doc); app.clearSelection(); app.refreshLabelUI();
-                        }
-                      }}
-                      className="cad-toolbar-btn w-full justify-center h-9"
-                      title="Dokument löschen"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      <span className="text-xs">Löschen</span>
-                    </button>
+                    Klick auf Canvas: Dokument absetzen · Esc: abbrechen
                   </div>
                 )}
 
                 <div className="text-[11px] leading-relaxed pt-2" style={{ color: "hsl(var(--cad-toolbar-muted))", borderTop: "1px solid hsl(var(--border))" }}>
                   <div>PDF, JPG, PNG werden mit 96 DPI / 72 pt importiert.</div>
-                  <div>Klick: Auswahl · Drag: verschieben (Snap aktiv) · Entf: löschen</div>
+                  <div>Zum Skalieren: <strong>Auswahl-Tool</strong> (V) → Dokument anklicken.</div>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* Document-Eigenschaften: nur im Auswahl-Tool, wenn Dokument selektiert */}
+          {!sidebarCollapsed && activeTool === ToolIds.SELECT && !!docSelected && (
+            <div className="cad-settings-panel mb-2">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Dokument-Eigenschaften</div>
+              <div className="space-y-3">
+                <div className="text-xs">
+                  <div className="font-medium truncate" title={docSelected.name}>{docSelected.name}</div>
+                  <div style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+                    {docSelected.widthM.toFixed(3)} × {docSelected.heightM.toFixed(3)} m
+                  </div>
+                </div>
+
+                {(docToolPhase === "scale-pick-1" || docToolPhase === "scale-pick-2" || docToolPhase === "scale-await-input") && (
+                  <div className="rounded-md p-2 text-xs" style={{ background: "hsl(var(--primary) / 0.12)", border: "1px solid hsl(var(--primary) / 0.4)" }}>
+                    {docToolPhase === "scale-pick-1" && <span>1. Skalier-Punkt anklicken (Snap aktiv)</span>}
+                    {docToolPhase === "scale-pick-2" && <span>2. Punkt setzen · Shift: Ortho · Klick auf m-Anzeige: Distanz tippen</span>}
+                    {docToolPhase === "scale-await-input" && <span>Soll-Länge im Hub eingeben + Enter</span>}
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => appRef.current?.documentTool.beginScaleTwoPoints(docSelected.id)}
+                  className="cad-toolbar-btn w-full justify-center h-9"
+                  title="Über zwei Snap-Punkte und eine Soll-Länge skalieren"
+                >
+                  <Maximize2 className="h-4 w-4" />
+                  <span className="text-xs">Skalieren (2 Punkte)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => appRef.current?.documentTool.beginScaleFromLastDimension(docSelected.id)}
+                  className="cad-toolbar-btn w-full justify-center h-9"
+                  title="Skaliere mit der zuletzt erstellten Maßkette als Referenz"
+                >
+                  <RulerIcon className="h-4 w-4" />
+                  <span className="text-xs">Skalieren (Maßkette)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const app = appRef.current; if (!app) return;
+                    const doc = app.scene.getDocumentById(docSelected.id);
+                    if (doc && window.confirm(`Dokument "${doc.name}" löschen?`)) {
+                      app.scene.removeDocument(doc); app.clearSelection(); app.refreshLabelUI();
+                    }
+                  }}
+                  className="cad-toolbar-btn w-full justify-center h-9"
+                  title="Dokument löschen"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span className="text-xs">Löschen</span>
+                </button>
+
+                <div className="text-[11px] leading-relaxed pt-2" style={{ color: "hsl(var(--cad-toolbar-muted))", borderTop: "1px solid hsl(var(--border))" }}>
+                  <div>Drag: verschieben (Snap aktiv) · Entf: löschen</div>
+                </div>
+              </div>
+            </div>
+          )}
               </div>
             </div>
           )}
