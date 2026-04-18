@@ -129,8 +129,9 @@ const CadEditor: React.FC = () => {
         className="relative shrink-0 flex flex-col border-r transition-[width] duration-150 ease-out"
         style={{
           width: sidebarWidth,
-          background: "hsl(var(--cad-toolbar))",
+          background: "linear-gradient(180deg, hsl(222 30% 15%), hsl(222 32% 12%))",
           borderColor: "hsl(var(--cad-toolbar-border))",
+          boxShadow: "1px 0 0 hsl(0 0% 100% / 0.03) inset",
         }}
       >
         {/* Tool list */}
@@ -167,8 +168,8 @@ const CadEditor: React.FC = () => {
           {/* Settings hidden when sidebar collapsed */}
           {/* Line Settings - inline in sidebar; visibility ('hidden' class) is controlled by CadApp */}
           <div ref={settingsRef} className={`cad-settings-panel hidden mb-2 ${sidebarCollapsed ? "!hidden" : ""}`}>
-            <div className="text-xs font-semibold mb-2" style={{ color: "hsl(var(--foreground))" }}>
-              Linie-Einstellungen
+            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+              Linie
             </div>
             <div className="space-y-3">
               <div>
@@ -192,8 +193,8 @@ const CadEditor: React.FC = () => {
           {/* Hatch Settings - inline in sidebar; visibility ('hidden' class) is controlled by CadApp */}
           <div ref={hatchSettingsRef} className={`cad-settings-panel hidden ${sidebarCollapsed ? "!hidden" : ""}`}>
 
-            <div className="text-xs font-semibold mb-2" style={{ color: "hsl(var(--foreground))" }}>
-              Schraffur-Einstellungen
+            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+              Schraffur
             </div>
             <div className="space-y-3">
               <div>
@@ -257,11 +258,12 @@ const CadEditor: React.FC = () => {
         {/* Collapse toggle - positioned on the divider between tools and settings */}
         <button
           onClick={() => setSidebarCollapsed((v) => !v)}
-          className="absolute -right-3 top-[88px] z-30 flex items-center justify-center w-6 h-6 rounded-full border shadow-sm transition-colors hover:bg-secondary"
+          className="absolute -right-3 top-[88px] z-30 flex items-center justify-center w-6 h-6 rounded-full border shadow-md transition-all hover:scale-110"
           style={{
-            background: "hsl(var(--cad-toolbar))",
-            borderColor: "hsl(var(--cad-toolbar-border))",
-            color: "hsl(var(--foreground))",
+            background: "linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)))",
+            borderColor: "hsl(var(--primary) / 0.6)",
+            color: "#fff",
+            boxShadow: "0 4px 12px -2px hsl(var(--primary) / 0.5)",
           }}
           title={sidebarCollapsed ? "Sidebar ausklappen" : "Sidebar einklappen"}
         >

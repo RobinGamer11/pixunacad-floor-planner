@@ -6,51 +6,56 @@
 
 @layer base {
   :root {
-    --background: 210 20% 98%;
-    --foreground: 220 20% 10%;
+    /* Refined slate / indigo palette — professional, modern */
+    --background: 220 24% 97%;
+    --foreground: 222 32% 12%;
 
     --card: 0 0% 100%;
-    --card-foreground: 220 20% 10%;
+    --card-foreground: 222 32% 12%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 220 20% 10%;
+    --popover-foreground: 222 32% 12%;
 
-    --primary: 215 90% 52%;
+    --primary: 230 70% 56%;
     --primary-foreground: 0 0% 100%;
+    --primary-glow: 230 90% 68%;
 
-    --secondary: 210 18% 93%;
-    --secondary-foreground: 220 20% 20%;
+    --secondary: 220 18% 92%;
+    --secondary-foreground: 222 28% 22%;
 
-    --muted: 210 14% 95%;
-    --muted-foreground: 215 12% 50%;
+    --muted: 220 16% 94%;
+    --muted-foreground: 220 10% 44%;
 
-    --accent: 215 90% 52%;
+    --accent: 230 70% 56%;
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 72% 56%;
+    --destructive: 0 72% 54%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 214 20% 88%;
-    --input: 214 20% 88%;
-    --ring: 215 90% 52%;
+    --border: 220 16% 86%;
+    --input: 220 16% 86%;
+    --ring: 230 70% 56%;
 
-    --radius: 0.5rem;
+    --radius: 0.625rem;
 
-    /* CAD-specific tokens */
+    /* CAD-specific tokens — canvas intentionally untouched */
     --cad-canvas: 0 0% 100%;
-    --cad-toolbar: 220 16% 96%;
-    --cad-toolbar-border: 214 20% 90%;
-    --cad-toolbar-active: 215 90% 52%;
+    --cad-toolbar: 222 28% 14%;
+    --cad-toolbar-border: 222 24% 22%;
+    --cad-toolbar-foreground: 220 18% 88%;
+    --cad-toolbar-muted: 220 12% 62%;
+    --cad-toolbar-hover: 222 24% 20%;
+    --cad-toolbar-active: 230 80% 62%;
     --cad-toolbar-active-foreground: 0 0% 100%;
-    --cad-hub: 0 0% 100%;
-    --cad-hub-border: 214 20% 85%;
+    --cad-hub: 222 28% 16%;
+    --cad-hub-border: 222 24% 26%;
     --cad-grid: 220 10% 92%;
     --cad-axis: 215 80% 65%;
     --cad-snap-point: 215 90% 55%;
     --cad-snap-line: 215 70% 65%;
     --cad-selection-stroke: 215 90% 55%;
     --cad-selection-fill: 215 90% 55%;
-    --cad-settings-bg: 0 0% 100%;
+    --cad-settings-bg: 222 28% 16%;
 
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
@@ -132,41 +137,45 @@
 @layer components {
   .cad-toolbar-btn {
     @apply flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-150;
-    color: hsl(var(--foreground));
+    color: hsl(var(--cad-toolbar-foreground));
     background: transparent;
   }
 
   .cad-toolbar-btn:hover {
-    background: hsl(var(--secondary));
+    background: hsl(var(--cad-toolbar-hover));
+    color: #fff;
   }
 
   .cad-toolbar-btn.active {
-    background: hsl(var(--cad-toolbar-active));
+    background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)));
     color: hsl(var(--cad-toolbar-active-foreground));
-    box-shadow: 0 1px 3px hsl(var(--cad-toolbar-active) / 0.3);
+    box-shadow: 0 4px 12px -2px hsl(var(--primary) / 0.45), inset 0 1px 0 hsl(0 0% 100% / 0.15);
   }
 
   .cad-toolbar-btn .tool-key {
-    @apply text-xs opacity-50 font-mono;
+    @apply text-xs font-mono;
+    color: hsl(var(--cad-toolbar-muted));
     font-family: 'JetBrains Mono', monospace;
   }
 
   .cad-toolbar-btn.active .tool-key {
-    opacity: 0.7;
+    color: hsl(0 0% 100% / 0.75);
   }
 
   .cad-hub {
     @apply rounded-lg shadow-lg border px-3 py-2;
     background: hsl(var(--cad-hub));
     border-color: hsl(var(--cad-hub-border));
+    color: hsl(var(--cad-toolbar-foreground));
     font-family: 'JetBrains Mono', monospace;
+    box-shadow: 0 10px 30px -10px hsl(222 40% 4% / 0.5);
   }
 
   .cad-hub input {
     @apply text-xs px-1.5 py-0.5 rounded border w-[72px] text-center;
-    background: hsl(var(--muted));
-    border-color: hsl(var(--border));
-    color: hsl(var(--foreground));
+    background: hsl(var(--cad-toolbar-hover));
+    border-color: hsl(var(--cad-hub-border));
+    color: hsl(var(--cad-toolbar-foreground));
     font-family: 'JetBrains Mono', monospace;
   }
 
@@ -180,15 +189,17 @@
     @apply flex gap-1 rounded-lg shadow-lg border p-1;
     background: hsl(var(--cad-hub));
     border-color: hsl(var(--cad-hub-border));
+    box-shadow: 0 10px 30px -10px hsl(222 40% 4% / 0.5);
   }
 
   .cad-point-menu button {
     @apply px-2 py-1 rounded text-xs font-medium transition-colors;
-    color: hsl(var(--foreground));
+    color: hsl(var(--cad-toolbar-foreground));
   }
 
   .cad-point-menu button:hover {
-    background: hsl(var(--secondary));
+    background: hsl(var(--cad-toolbar-hover));
+    color: #fff;
   }
 
   .cad-point-menu button.active {
@@ -201,19 +212,21 @@
     background: transparent;
     border-color: transparent;
     box-shadow: none;
+    color: hsl(var(--cad-toolbar-foreground));
   }
 
   .cad-settings-panel label {
     @apply text-xs font-medium block mb-1;
-    color: hsl(var(--muted-foreground));
+    color: hsl(var(--cad-toolbar-muted));
+    letter-spacing: 0.02em;
   }
 
   .cad-settings-panel input[type="text"],
   .cad-settings-panel input[type="number"] {
     @apply text-xs px-2 py-1 rounded border w-full;
-    background: hsl(var(--muted));
-    border-color: hsl(var(--border));
-    color: hsl(var(--foreground));
+    background: hsl(var(--cad-toolbar-hover));
+    border-color: hsl(var(--cad-hub-border));
+    color: hsl(var(--cad-toolbar-foreground));
     font-family: 'JetBrains Mono', monospace;
   }
 
@@ -224,9 +237,9 @@
 
   .cad-settings-select {
     @apply text-xs px-2 py-1 rounded border w-full;
-    background: hsl(var(--muted));
-    border-color: hsl(var(--border));
-    color: hsl(var(--foreground));
+    background: hsl(var(--cad-toolbar-hover));
+    border-color: hsl(var(--cad-hub-border));
+    color: hsl(var(--cad-toolbar-foreground));
     appearance: none;
     -webkit-appearance: none;
   }
@@ -237,15 +250,15 @@
     border-color: hsl(var(--ring));
   }
 
-  /* ---- ID Panel ---- */
+  /* ---- ID Panel (sits over white canvas → keep light theme) ---- */
   .cad-id-panel {
     max-height: calc(100% - 20px);
     overflow: hidden;
     border-radius: 12px;
-    background: hsl(var(--cad-settings-bg) / 0.95);
-    border: 1px solid hsl(var(--cad-hub-border));
-    backdrop-filter: blur(4px);
-    box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+    background: hsl(0 0% 100% / 0.92);
+    border: 1px solid hsl(220 16% 86%);
+    backdrop-filter: blur(8px);
+    box-shadow: 0 12px 32px -12px hsl(222 40% 20% / 0.18), 0 2px 6px -2px hsl(222 40% 20% / 0.08);
     transition: width 0.15s ease;
   }
 
