@@ -84,7 +84,7 @@ function itemsAnchor(items: ClipboardItem[]): Vec2 {
  * - Single object selection -> that one
  * - Group (selectedLabelId, no single selection) -> all objects with that labelId
  */
-export function buildClipboardFromSelection(app: CadApp): Clipboard | null {
+export function buildClipboardFromSelection(app: CadApp, anchorOverride?: Vec2 | null): Clipboard | null {
   const items: ClipboardItem[] = [];
 
   const seg = app.getSelectedSegment();
@@ -104,7 +104,8 @@ export function buildClipboardFromSelection(app: CadApp): Clipboard | null {
   }
 
   if (items.length === 0) return null;
-  return { items, anchor: itemsAnchor(items) };
+  const anchor = anchorOverride ? v(anchorOverride.x, anchorOverride.y) : itemsAnchor(items);
+  return { items, anchor };
 }
 
 /* ---- Translation helpers ---- */
