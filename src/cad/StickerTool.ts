@@ -207,9 +207,12 @@ export class StickerTool {
       const hit = this._hitStickerInstance(input);
       if (hit) {
         this.app.setSelection({ type: SelectionType.STICKER_INSTANCE, stickerInstanceId: hit.id });
+        const mouseW0 = v(input.mouse.wx, input.mouse.wy);
         this._dragStickerId = hit.id;
         this._dragOrigin = { x: hit.position.x, y: hit.position.y };
-        this._dragMouseStart = v(input.mouse.wx, input.mouse.wy);
+        this._dragMouseStart = mouseW0;
+        this._dragGrabOffset = { x: mouseW0.x - hit.position.x, y: mouseW0.y - hit.position.y };
+        this._dragSnap = null;
         return;
       }
       // Klick ins Leere = deselektieren
