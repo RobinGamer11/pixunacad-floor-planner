@@ -73,12 +73,18 @@ export class DocumentTool {
   beginScaleTwoPoints(docId: string) {
     const doc = this.app.scene.getDocumentById(docId);
     if (!doc) return;
+    // Switch to DocumentTool so update() & overlay run; preserve selection.
+    if (this.app.activeTool !== this) {
+      this.app.setTool("document");
+    }
+    // setTool may have called cancel() — set state AFTER the switch.
     this.scaleTargetDocId = docId;
     this.scalePoint1 = null;
     this.scalePoint2 = null;
     this.scaleSnap = null;
     this.phase = "scale-pick-1";
     this.app.hub.hide();
+    this.app.setSelection({ type: "document", documentId: docId } as any);
     this.onPhaseChange?.();
   }
 
@@ -91,11 +97,15 @@ export class DocumentTool {
       alert("Keine Maßkette vorhanden. Erstelle zuerst eine Maßkette über das Dokument.");
       return;
     }
+    if (this.app.activeTool !== this) {
+      this.app.setTool("document");
+    }
     const lastDim = dims[dims.length - 1];
     this.scaleTargetDocId = docId;
     this.scalePoint1 = v(lastDim.p1.x, lastDim.p1.y);
     this.scalePoint2 = v(lastDim.p2.x, lastDim.p2.y);
     this.phase = "scale-await-input";
+    this.app.setSelection({ type: "document", documentId: docId } as any);
     this._showScaleHub();
     this.onPhaseChange?.();
   }
