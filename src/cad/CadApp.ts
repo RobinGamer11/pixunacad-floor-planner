@@ -17,6 +17,7 @@ import { IdPanel } from "./IdPanel";
 export interface MeasureSettings {
   orientation: "parallel" | "diagonal";
   pointCount: "two" | "multi";
+  editMode: "parallel" | "endpoints";
   textColor: string;
   textSizePx: number;
   lineColor: string;
@@ -35,6 +36,7 @@ export interface MeasureSettingsRefs {
   idSelect: HTMLSelectElement;
   orientation: HTMLSelectElement;
   pointCount: HTMLSelectElement;
+  editMode: HTMLSelectElement;
   extensionsToggle: HTMLInputElement;
   freeTextToggle: HTMLInputElement;
   freeTextInput: HTMLInputElement;

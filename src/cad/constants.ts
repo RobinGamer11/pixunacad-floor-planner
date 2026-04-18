@@ -26,6 +26,7 @@ export const Defaults = {
   // Measure (dimension) defaults
   measureOrientation: "parallel" as "parallel" | "diagonal",
   measurePointCount: "two" as "two" | "multi",
+  measureEditMode: "parallel" as "parallel" | "endpoints",
   measureTextColor: "#111111",
   measureTextSizePx: 12,
   measureLineColor: "#2b2b2b",
