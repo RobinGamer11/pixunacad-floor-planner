@@ -117,6 +117,8 @@ const CadEditor: React.FC = () => {
   const [stickerSelCount, setStickerSelCount] = useState(0);
   const [stickerPhase, setStickerPhase] = useState<"idle" | "selecting" | "placing" | "rotating">("idle");
   const stickerImportRef = useRef<HTMLInputElement>(null);
+  // Floating edit-pencil overlay near selected sticker instance
+  const [stickerEditOverlay, setStickerEditOverlay] = useState<{ id: string; x: number; y: number } | null>(null);
 
   useEffect(() => {
     if (
