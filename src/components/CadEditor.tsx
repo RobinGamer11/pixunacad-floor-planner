@@ -136,6 +136,10 @@ const CadEditor: React.FC = () => {
   const [scaleDialogPages, setScaleDialogPages] = useState<ImportedPage[] | null>(null);
   const [scaleChoice, setScaleChoice] = useState<string>("100"); // "50" | "100" | "200" | "500" | "1" | "custom"
   const [scaleCustom, setScaleCustom] = useState<string>("100");
+  // Zeichnen-Maßstab (Default-Vorauswahl beim PDF-Import)
+  const [drawingScale, setDrawingScale] = useState<number>(100);
+  const [drawingScaleOpen, setDrawingScaleOpen] = useState(false);
+  const [drawingScaleCustom, setDrawingScaleCustom] = useState<string>("100");
 
   useEffect(() => {
     if (
@@ -338,9 +342,10 @@ const CadEditor: React.FC = () => {
       const pages = await importFile(f);
       if (pages.length === 0) { window.alert("Keine Seiten gefunden."); return; }
       if (pages.length === 1) {
-        // Direkt zum Maßstab-Dialog
-        setScaleChoice(pages[0].kind === "pdf-page" ? "100" : "1");
-        setScaleCustom("100");
+        // Direkt zum Maßstab-Dialog – Default = aktueller Zeichen-Maßstab
+        const def = pages[0].kind === "pdf-page" ? String(drawingScale) : "1";
+        setScaleChoice(def);
+        setScaleCustom(String(drawingScale));
         setScaleDialogPages(pages);
       } else {
         // PDF mit mehreren Seiten → erst Page-Picker
@@ -354,35 +359,32 @@ const CadEditor: React.FC = () => {
     } finally {
       setDocImporting(false);
     }
-  }, []);
+  }, [drawingScale]);
 
   const handleDocPickerConfirm = useCallback(() => {
     if (!docPickerPages) return;
     const selectedPages = docPickerPages.filter((_, i) => docPickerSelected.has(i));
     if (selectedPages.length === 0) { setDocPickerPages(null); return; }
-    // → Maßstab-Dialog
-    setScaleChoice(selectedPages[0].kind === "pdf-page" ? "100" : "1");
-    setScaleCustom("100");
+    // → Maßstab-Dialog (Default = aktueller Zeichen-Maßstab)
+    setScaleChoice(selectedPages[0].kind === "pdf-page" ? String(drawingScale) : "1");
+    setScaleCustom(String(drawingScale));
     setDocPickerPages(null);
     setDocPickerSelected(new Set());
     setScaleDialogPages(selectedPages);
   }, [docPickerPages, docPickerSelected]);
 
   /**
-   * Maßstab anwenden. User-Erwartung: 1:200 ist die Hälfte von 1:100.
-   * Referenz ist 1:100 → Faktor 1.
-   * 1:50  → ×2    (größer als 1:100)
-   * 1:100 → ×1
-   * 1:200 → ×0.5  (Hälfte von 1:100)
-   * 1:500 → ×0.2
-   * 1:1   → ×100  (Originalgröße als 1:1-Vergleich)
+   * Maßstab anwenden. Real-World-Mapping:
+   *   weltMeter = paperMeter × denom_pdf
+   * Beispiel A4 1:100 → 0.21m × 100 = 21m Welt.
+   * Der gewählte Zeichenmaßstab dient nur als Default-Vorauswahl.
    */
   const handleScaleConfirm = useCallback(() => {
     if (!scaleDialogPages) return;
     const app = appRef.current; if (!app) return;
     const denom = scaleChoice === "custom" ? parseFloat(scaleCustom.replace(",", ".")) : parseFloat(scaleChoice);
     const safeDenom = Number.isFinite(denom) && denom > 0 ? denom : 100;
-    const factor = 100 / safeDenom;
+    const factor = safeDenom;
     const scaledPages = scaleDialogPages.map(p => ({ ...p, widthM: p.widthM * factor, heightM: p.heightM * factor }));
     const [first, ...rest] = scaledPages;
     app.setTool(ToolIds.DOCUMENT);
@@ -892,7 +894,7 @@ const CadEditor: React.FC = () => {
           )}
 
           {/* Document-Eigenschaften: nur im Auswahl-Tool, wenn Dokument selektiert */}
-          {!sidebarCollapsed && activeTool === ToolIds.SELECT && !!docSelected && (
+          {!sidebarCollapsed && !!docSelected && (activeTool === ToolIds.SELECT || (activeTool === ToolIds.DOCUMENT && (docToolPhase === "scale-pick-1" || docToolPhase === "scale-pick-2" || docToolPhase === "scale-await-input"))) && (
             <div className="cad-settings-panel mb-2">
               <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Dokument-Eigenschaften</div>
               <div className="space-y-3">
@@ -1165,6 +1167,82 @@ const CadEditor: React.FC = () => {
 
         {/* Canvas */}
         <canvas ref={canvasRef} className="block w-full h-full" />
+
+        {/* Drawing Scale Drop-Up (bottom-left) */}
+        <div className="absolute left-3 bottom-3 z-30">
+          {drawingScaleOpen && (
+            <div
+              className="mb-2 rounded-md shadow-lg p-2 w-44"
+              style={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}
+            >
+              <div className="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "hsl(var(--muted-foreground))" }}>
+                Maßstab Zeichnung
+              </div>
+              <div className="grid grid-cols-3 gap-1 mb-2">
+                {[100, 200, 500, 50, 10, 1].map(d => {
+                  const active = drawingScale === d;
+                  return (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => { setDrawingScale(d); setDrawingScaleOpen(false); }}
+                      className="rounded h-7 text-[11px] font-semibold border transition-colors"
+                      style={{
+                        background: active ? "hsl(var(--primary))" : "hsl(var(--muted))",
+                        color: active ? "hsl(var(--primary-foreground))" : "hsl(var(--foreground))",
+                        borderColor: active ? "hsl(var(--primary))" : "hsl(var(--border))",
+                      }}
+                    >
+                      1:{d}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-[11px]" style={{ color: "hsl(var(--foreground))" }}>1 :</span>
+                <input
+                  type="text"
+                  value={drawingScaleCustom}
+                  onChange={(e) => setDrawingScaleCustom(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      const n = parseFloat(drawingScaleCustom.replace(",", "."));
+                      if (Number.isFinite(n) && n > 0) { setDrawingScale(n); setDrawingScaleOpen(false); }
+                    }
+                  }}
+                  className="cad-settings-select h-7 flex-1 text-[11px]"
+                  placeholder="frei"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const n = parseFloat(drawingScaleCustom.replace(",", "."));
+                    if (Number.isFinite(n) && n > 0) { setDrawingScale(n); setDrawingScaleOpen(false); }
+                  }}
+                  className="rounded h-7 px-2 text-[11px] font-semibold"
+                  style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
+                >
+                  OK
+                </button>
+              </div>
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => setDrawingScaleOpen(o => !o)}
+            className="rounded-md px-3 h-8 text-xs font-semibold shadow-md flex items-center gap-1.5 transition-colors"
+            style={{
+              background: "hsl(var(--card))",
+              color: "hsl(var(--foreground))",
+              border: "1px solid hsl(var(--border))",
+            }}
+            title="Maßstab der Zeichenoberfläche"
+          >
+            <span style={{ color: "hsl(var(--muted-foreground))" }}>M</span>
+            <span>1 : {drawingScale}</span>
+            <span className="text-[10px]" style={{ color: "hsl(var(--muted-foreground))" }}>{drawingScaleOpen ? "▾" : "▴"}</span>
+          </button>
+        </div>
       </div>
     </div>
   );
