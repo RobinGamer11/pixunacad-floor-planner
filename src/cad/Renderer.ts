@@ -1,12 +1,13 @@
 import { Defaults, SelectionType } from "./constants";
 import { Vec2, v, sub, add, mul, norm, perpLeft, clamp, rgbaFromHex, hexToRgba, polygonAreaAbs, polygonCentroid } from "./geometry";
 import { Camera } from "./Camera";
-import { Scene, Hatch, Dimension, TextBox, StickerInstance } from "./Scene";
+import { Scene, Hatch, Dimension, TextBox, StickerInstance, DocumentObject } from "./Scene";
 import { LabelManager } from "./LabelManager";
 import { getDimensionGeometry, type DimensionLike } from "./dimensionGeometry";
 import { boxCornersWorld } from "./textGeometry";
 import { drawRichTextBox } from "./textRichRenderer";
 import { transformedInstanceItems, instanceBoundingCornersWorld } from "./StickerManager";
+import { documentCornersWorld, documentCenterWorld } from "./documentGeometry";
 
 export interface Selection {
   type: string;
@@ -15,6 +16,7 @@ export interface Selection {
   dimensionId?: string;
   textBoxId?: string;
   stickerInstanceId?: string;
+  documentId?: string;
   handleIndex?: number | null;
   pointIndex?: number | null;
 }
