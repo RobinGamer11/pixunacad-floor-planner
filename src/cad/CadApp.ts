@@ -396,9 +396,11 @@ export class CadApp {
   refreshLabelUI() {
     this._syncLabelSelect();
     this._syncHatchLabelSelect();
+    this._syncMeasureLabelSelect();
     this.idPanel.render();
     this._syncLineSettingsFromContext();
     this._syncHatchSettingsFromContext();
+    this._syncMeasureSettingsFromContext();
   }
 
   private _syncLabelSelect() {
