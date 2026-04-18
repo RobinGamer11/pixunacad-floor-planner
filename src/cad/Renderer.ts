@@ -86,6 +86,9 @@ export class Renderer {
     return baseWidth * (this.camera.scale / Defaults.strokeWidthBaseScale);
   }
 
+  /** Cache: docId -> HTMLImageElement (lazy-load aus DataURL). */
+  private _docImageCache = new Map<string, HTMLImageElement>();
+
   render() {
     const ctx = this.ctx;
     ctx.save();
@@ -94,6 +97,7 @@ export class Renderer {
     ctx.restore();
 
     this._drawGrid();
+    this._drawDocuments();
     this._drawHatches();
     this._drawSegments();
     this._drawDimensions();
@@ -104,6 +108,7 @@ export class Renderer {
     this._drawDimensionSelection();
     this._drawTextBoxSelection();
     this._drawStickerInstanceSelection();
+    this._drawDocumentSelection();
     this._drawHoverSegmentPoints();
 
     this._drawStickerEditFrame();
@@ -111,6 +116,97 @@ export class Renderer {
     if (this.overlay && this.overlay.draw) {
       this.overlay.draw(ctx, this.camera);
     }
+  }
+
+  private _getDocImage(doc: DocumentObject): HTMLImageElement | null {
+    let img = this._docImageCache.get(doc.id);
+    if (img && img.src === doc.src) {
+      return img.complete ? img : null;
+    }
+    img = new Image();
+    img.src = doc.src;
+    img.onload = () => {
+      // Trigger re-render when image becomes available
+      // (next animation frame from CadApp's tick will pick it up)
+    };
+    this._docImageCache.set(doc.id, img);
+    return null;
+  }
+
+  private _documentsBackToFront(): DocumentObject[] {
+    const order = this.labels.list();
+    const rank = new Map(order.map((g, i) => [g.id, i]));
+    return [...this.scene.documents]
+      .filter(d => this.labels.isVisible(d.labelId))
+      .sort((a, b) => (rank.get(a.labelId) || 0) - (rank.get(b.labelId) || 0));
+  }
+
+  private _drawDocuments() {
+    const ctx = this.ctx;
+    const cam = this.camera;
+    for (const doc of this._documentsBackToFront()) {
+      const img = this._getDocImage(doc);
+      const center = documentCenterWorld(doc);
+      const cs = cam.worldToScreen(center.x, center.y);
+      const wPx = doc.widthM * cam.scale;
+      const hPx = doc.heightM * cam.scale;
+
+      ctx.save();
+      ctx.translate(cs.x, cs.y);
+      if (doc.rotationRad) ctx.rotate(doc.rotationRad);
+      if (img) {
+        ctx.drawImage(img, -wPx / 2, -hPx / 2, wPx, hPx);
+      } else {
+        // Placeholder während das Bild lädt
+        ctx.fillStyle = "rgba(180,180,180,0.3)";
+        ctx.fillRect(-wPx / 2, -hPx / 2, wPx, hPx);
+        ctx.fillStyle = "rgba(0,0,0,0.6)";
+        ctx.font = "12px system-ui";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("Lade …", 0, 0);
+      }
+      ctx.restore();
+    }
+  }
+
+  private _drawDocumentSelection() {
+    if (!this.selection || this.selection.type !== SelectionType.DOCUMENT) return;
+    const doc = this.scene.getDocumentById(this.selection.documentId!);
+    if (!doc || !this.labels.isVisible(doc.labelId)) return;
+    const ctx = this.ctx;
+    const cam = this.camera;
+    const corners = documentCornersWorld(doc);
+    const sc = corners.map(c => cam.worldToScreen(c.x, c.y));
+    ctx.save();
+    ctx.strokeStyle = "rgba(77,163,255,0.95)";
+    ctx.fillStyle = "rgba(77,163,255,0.06)";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath();
+    ctx.moveTo(sc[0].x, sc[0].y);
+    for (let i = 1; i < sc.length; i++) ctx.lineTo(sc[i].x, sc[i].y);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.setLineDash([]);
+    // Eckhandles
+    for (const p of sc) {
+      ctx.fillStyle = "rgba(77,163,255,0.95)";
+      ctx.strokeStyle = "#fff";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.rect(p.x - 4, p.y - 4, 8, 8);
+      ctx.fill();
+      ctx.stroke();
+    }
+    // Center
+    const center = cam.worldToScreen(doc.position.x + doc.widthM / 2, doc.position.y + doc.heightM / 2);
+    ctx.fillStyle = "rgba(77,163,255,0.95)";
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(center.x, center.y, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.restore();
   }
 
   /** Dashed Frame um die Owner-Objekte einer aktuell im Edit-Mode befindlichen Sticker-Instanz. */
