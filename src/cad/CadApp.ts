@@ -1003,6 +1003,7 @@ export class CadApp {
     r.idSelect.value = labelForDisplay;
   }
 
+  resize() { this._resize(); }
 
   private _resize() {
     const rect = this.canvas.getBoundingClientRect();
