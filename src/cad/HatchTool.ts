@@ -1007,6 +1007,87 @@ export class HatchTool {
       return;
     }
 
+    if (this.drawMode === "circle") {
+      if (!this.circleCenter) return;
+      ctx.save();
+      const c = cam.worldToScreen(this.circleCenter.x, this.circleCenter.y);
+      ctx.fillStyle = "rgba(77,163,255,0.95)";
+      ctx.beginPath();
+      ctx.arc(c.x, c.y, 4, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (this.circleState === "radius") {
+        const p = this._circlePreviewRadiusWorld(this.app.input);
+        const sp = cam.worldToScreen(p.x, p.y);
+        const r = dist(this.circleCenter, p) * cam.scale;
+
+        if (scaledStrokePx > 0) {
+          ctx.strokeStyle = style.strokeColor;
+          ctx.lineWidth = scaledStrokePx;
+        } else {
+          ctx.strokeStyle = "rgba(77,163,255,0.85)";
+          ctx.lineWidth = 1.5;
+        }
+        ctx.beginPath();
+        ctx.moveTo(c.x, c.y);
+        ctx.lineTo(sp.x, sp.y);
+        ctx.stroke();
+
+        ctx.setLineDash([6, 6]);
+        ctx.strokeStyle = "rgba(77,163,255,0.65)";
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, r, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      } else if (this.circleState === "arc") {
+        const previewPts = buildCircleOrSectorPoints(
+          this.circleCenter,
+          this.circleRadiusM,
+          this.circleStartAngleDeg,
+          this.circleEndAngleDeg,
+          96
+        );
+        if (previewPts.length >= 3) {
+          ctx.beginPath();
+          const p0 = cam.worldToScreen(previewPts[0].x, previewPts[0].y);
+          ctx.moveTo(p0.x, p0.y);
+          for (let i = 1; i < previewPts.length; i++) {
+            const sp = cam.worldToScreen(previewPts[i].x, previewPts[i].y);
+            ctx.lineTo(sp.x, sp.y);
+          }
+          ctx.closePath();
+          ctx.fillStyle = fillCol;
+          ctx.fill();
+          if (scaledStrokePx > 0) {
+            ctx.strokeStyle = style.strokeColor;
+            ctx.lineWidth = scaledStrokePx;
+            ctx.stroke();
+          }
+        }
+
+        // Helper radii
+        const startP = pointFromLengthAngle(this.circleCenter, this.circleRadiusM, this.circleStartAngleDeg);
+        const endP = pointFromLengthAngle(this.circleCenter, this.circleRadiusM, this.circleEndAngleDeg);
+        const ss = cam.worldToScreen(startP.x, startP.y);
+        const se = cam.worldToScreen(endP.x, endP.y);
+        ctx.strokeStyle = "rgba(77,163,255,0.8)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(c.x, c.y); ctx.lineTo(ss.x, ss.y);
+        ctx.moveTo(c.x, c.y); ctx.lineTo(se.x, se.y);
+        ctx.stroke();
+
+        // Endpoint markers
+        ctx.fillStyle = "rgba(77,163,255,0.85)";
+        ctx.beginPath(); ctx.arc(ss.x, ss.y, 4, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(se.x, se.y, 4, 0, Math.PI * 2); ctx.fill();
+      }
+
+      ctx.restore();
+      return;
+    }
+
     if (this.state !== "drawing" || this.points.length === 0) return;
 
     const previewPoint = this._previewWorld(this.app.input);
