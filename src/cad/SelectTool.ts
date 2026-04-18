@@ -7,6 +7,7 @@ import { getDimensionGeometry } from "./dimensionGeometry";
 import { pointInOrientedBox } from "./textGeometry";
 import type { TextBox } from "./Scene";
 import { pointInInstance, instanceBoundingCornersWorld } from "./StickerManager";
+import { pointInDocument } from "./documentGeometry";
 
 type EditTarget =
   | { kind: "segment"; segmentId: string; pointIndex: number }
@@ -41,6 +42,11 @@ export class SelectTool {
   dragStickerMouseStart: Vec2 | null = null; // Mausposition (Welt) bei Drag-Start
   dragStickerGrabOffset: Vec2 | null = null; // mouseStart - instanceOrigin (Greifpunkt-Offset relativ zur Position)
   dragStickerSnap: Snap | null = null; // letzter aktiver Snap während Drag (für Overlay)
+
+  // Document Drag-State (Translate via Mausziehen, snap-fähig)
+  dragDocId: string | null = null;
+  dragDocGrabOffset: Vec2 | null = null;
+  dragDocSnap: Snap | null = null;
 
 
 
