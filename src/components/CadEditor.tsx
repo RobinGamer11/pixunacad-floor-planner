@@ -6,6 +6,7 @@ import type { HatchDrawMode } from "@/cad/HatchTool";
 import type { StickerDefinition } from "@/cad/StickerManager";
 import { instanceBoundingCornersWorld } from "@/cad/StickerManager";
 import { importFile, type ImportedPage } from "@/cad/documentImport";
+import { scaleDocumentAroundCenter } from "@/cad/documentGeometry";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
@@ -140,6 +141,7 @@ const CadEditor: React.FC = () => {
   const [drawingScale, setDrawingScale] = useState<number>(100);
   const [drawingScaleOpen, setDrawingScaleOpen] = useState(false);
   const [drawingScaleCustom, setDrawingScaleCustom] = useState<string>("100");
+  const previousDrawingScaleRef = useRef<number>(100);
 
   useEffect(() => {
     if (
@@ -280,12 +282,23 @@ const CadEditor: React.FC = () => {
     return () => clearTimeout(t);
   }, [sidebarCollapsed]);
 
-  // Drawing scale → Camera scale (M 1:100 ⇒ 80 px/m). Zoomt um den Viewport-Mittelpunkt.
+  // Drawing scale → Camera scale + Dokumente proportional nachskalieren.
   useEffect(() => {
     const app = appRef.current;
     if (!app) return;
+
+    const previousScale = Math.max(0.0001, previousDrawingScaleRef.current);
+    const nextScale = Math.max(0.0001, drawingScale);
+    const docFactor = nextScale / previousScale;
+    if (Math.abs(docFactor - 1) > 1e-6) {
+      for (const doc of app.scene.documents) {
+        scaleDocumentAroundCenter(doc, docFactor);
+      }
+    }
+    previousDrawingScaleRef.current = nextScale;
+
     const cam = app.camera;
-    const target = 80 * (100 / Math.max(0.0001, drawingScale));
+    const target = 80 * (100 / nextScale);
     const newScale = Math.max(cam.minScale, Math.min(cam.maxScale, target));
     if (Math.abs(newScale - cam.scale) < 1e-6) return;
     const rect = canvasRef.current?.getBoundingClientRect();
