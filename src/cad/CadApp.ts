@@ -552,12 +552,18 @@ export class CadApp {
 
   showLineSettingsPanel(shouldShow: boolean) { this.lineSettingsPanel.classList.toggle("hidden", !shouldShow); }
   showHatchSettingsPanel(shouldShow: boolean) { this.hatchSettingsPanel.classList.toggle("hidden", !shouldShow); }
+  showMeasureSettingsPanel(shouldShow: boolean) { this.measureRefs.panel.classList.toggle("hidden", !shouldShow); }
 
   private _updateSettingsVisibility() {
-    const showLine = (this.activeTool === this.lineTool) || !!(this.selection && this.selection.segmentId) || !!this.selectedLabelId;
-    const showHatch = (this.activeTool === this.hatchTool) || !!(this.selection && this.selection.hatchId) || !!this.selectedLabelId;
+    const isMeasureCtx = this.activeTool === this.measureTool || !!this.getSelectedDimension();
+    const isHatchCtx = this.activeTool === this.hatchTool || !!(this.selection && this.selection.hatchId);
+    const isLineCtx = this.activeTool === this.lineTool || !!(this.selection && this.selection.segmentId);
+    const showLine = isLineCtx || (!!this.selectedLabelId && !isMeasureCtx);
+    const showHatch = isHatchCtx || (!!this.selectedLabelId && !isMeasureCtx);
+    const showMeasure = isMeasureCtx;
     this.showLineSettingsPanel(showLine);
     this.showHatchSettingsPanel(showHatch);
+    this.showMeasureSettingsPanel(showMeasure);
   }
 
   /* ---- Line Settings Panel ---- */
