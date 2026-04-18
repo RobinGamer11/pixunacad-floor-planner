@@ -39,6 +39,21 @@ export const Defaults = {
   measureTextBgColor: "#ffffff",
   measureTextBgAlpha: 0.8,
   measureReferenceScalePxPerM: 80,
+
+  // TextBox defaults
+  textColor: "#111111",
+  textFontSizePx: 16,
+  textBgColor: "#ffffff",
+  textBgAlphaPct: 0,
+  textWrap: true,
+  textAlign: "left" as "left" | "center" | "right",
+  textBorderEnabled: false,
+  textBorderColor: "#111111",
+  textBorderWidthPx: 1.5,
+  textBoxWidthM: 2.6,
+  textBoxHeightM: 0.6,
+  textMinBoxSizeM: 0.05,
+  textHandlePx: 10,
 };
 
 export const ToolIds = {
@@ -46,6 +61,7 @@ export const ToolIds = {
   LINE: "line",
   HATCH: "hatch",
   MEASURE: "measure",
+  TEXT: "text",
 } as const;
 
 export const SelectionType = {
@@ -53,6 +69,8 @@ export const SelectionType = {
   POINT: "point",
   HATCH: "hatch",
   DIMENSION: "dimension",
+  TEXTBOX: "textbox",
+  TEXTBOX_HANDLE: "textbox_handle",
 } as const;
 
 export const SnapType = {
