@@ -828,7 +828,181 @@ export class CadApp {
     this.onToolChange?.(id);
   }
 
-  resize() { this._resize(); }
+  /* ---- Measure Settings Panel ---- */
+  private _syncMeasureLabelSelect() {
+    if (!this.measureRefs?.idSelect) return;
+    const groups = this.labelManager.list();
+    const cur = this.measureRefs.idSelect.value;
+    this.measureRefs.idSelect.innerHTML = "";
+    for (const g of groups) {
+      const opt = document.createElement("option");
+      opt.value = g.id; opt.textContent = g.name;
+      this.measureRefs.idSelect.appendChild(opt);
+    }
+    const preferred =
+      (this.labelManager.getById(cur) ? cur : null) ||
+      (this.labelManager.getById(this.activeDrawLabelId) ? this.activeDrawLabelId : Defaults.defaultLabelId);
+    this.measureRefs.idSelect.value = preferred;
+  }
+
+  private _setupMeasureSettingsPanel() {
+    const r = this.measureRefs;
+    if (!r) return;
+
+    r.idSelect.addEventListener("change", () => {
+      const nextId = r.idSelect.value || Defaults.defaultLabelId;
+      const sel = this.getSelectedDimension();
+      if (sel) { sel.labelId = nextId; this.setSelectedLabelId(nextId); this.refreshLabelUI(); return; }
+      this.setActiveDrawLabelId(nextId);
+    });
+
+    r.orientation.addEventListener("change", () => {
+      const val = r.orientation.value as "parallel" | "diagonal";
+      this.measureSettings.orientation = val;
+      const sel = this.getSelectedDimension();
+      if (sel) sel.mode = val;
+    });
+
+    r.pointCount.addEventListener("change", () => {
+      this.measureSettings.pointCount = r.pointCount.value as "two" | "multi";
+    });
+
+    r.editMode.addEventListener("change", () => {
+      this.measureSettings.editMode = r.editMode.value as "parallel" | "endpoints";
+    });
+
+    r.extensionsToggle.addEventListener("change", () => {
+      const val = !!r.extensionsToggle.checked;
+      this.measureSettings.showExtensions = val;
+      const sel = this.getSelectedDimension();
+      if (sel) sel.showExtensions = val;
+    });
+
+    r.freeTextToggle.addEventListener("change", () => {
+      const val = !!r.freeTextToggle.checked;
+      this.measureSettings.useFreeText = val;
+      const sel = this.getSelectedDimension();
+      if (sel) sel.useFreeText = val;
+      r.freeTextInput.classList.toggle("hidden", !val);
+    });
+
+    r.freeTextInput.addEventListener("input", () => {
+      const val = r.freeTextInput.value;
+      this.measureSettings.freeText = val;
+      const sel = this.getSelectedDimension();
+      if (sel) sel.freeText = val;
+    });
+
+    r.textColor.addEventListener("input", () => {
+      const val = r.textColor.value;
+      this.measureSettings.textColor = val;
+      const sel = this.getSelectedDimension();
+      if (sel) sel.textColor = val;
+      r.textColorPreview.style.background = val;
+    });
+
+    r.textSize.addEventListener("input", () => {
+      const v = parseFloat((r.textSize.value || "").replace(",", "."));
+      if (!Number.isFinite(v) || v <= 0) return;
+      const c = clamp(v, 1, 200);
+      this.measureSettings.textSizePx = c;
+      const sel = this.getSelectedDimension();
+      if (sel) sel.textSizePx = c;
+    });
+
+    r.decimals.addEventListener("input", () => {
+      const v = parseInt(r.decimals.value || "0", 10);
+      if (!Number.isFinite(v)) return;
+      const c = clamp(v, 0, 6);
+      this.measureSettings.decimals = c;
+      const sel = this.getSelectedDimension();
+      if (sel) sel.decimals = c;
+    });
+
+    r.textBgToggle.addEventListener("change", () => {
+      const val = !!r.textBgToggle.checked;
+      this.measureSettings.textBgEnabled = val;
+      const sel = this.getSelectedDimension();
+      if (sel) sel.textBgEnabled = val;
+      r.textBgGroup.classList.toggle("hidden", !val);
+    });
+
+    r.textBgColor.addEventListener("input", () => {
+      const val = r.textBgColor.value;
+      this.measureSettings.textBgColor = val;
+      const sel = this.getSelectedDimension();
+      if (sel) sel.textBgColor = val;
+      r.textBgColorPreview.style.background = val;
+    });
+
+    r.textBgAlpha.addEventListener("input", () => {
+      const v = parseFloat((r.textBgAlpha.value || "").replace(",", "."));
+      if (!Number.isFinite(v)) return;
+      const c = clamp(v, 0, 1);
+      this.measureSettings.textBgAlpha = c;
+      const sel = this.getSelectedDimension();
+      if (sel) sel.textBgAlpha = c;
+    });
+
+    r.lineColor.addEventListener("input", () => {
+      const val = r.lineColor.value;
+      this.measureSettings.lineColor = val;
+      const sel = this.getSelectedDimension();
+      if (sel) sel.lineColor = val;
+      r.lineColorPreview.style.background = val;
+    });
+
+    r.tickLength.addEventListener("input", () => {
+      const v = parseFloat((r.tickLength.value || "").replace(",", "."));
+      if (!Number.isFinite(v) || v <= 0) return;
+      const c = clamp(v, 0.001, 10);
+      this.measureSettings.tickLengthM = c;
+      const sel = this.getSelectedDimension();
+      if (sel) sel.tickLengthM = c;
+    });
+
+    this._syncMeasureSettingsFromContext();
+  }
+
+  private _syncMeasureSettingsFromContext() {
+    const r = this.measureRefs;
+    if (!r) return;
+    const sel = this.getSelectedDimension();
+    const s = sel ? {
+      orientation: sel.mode, pointCount: this.measureSettings.pointCount,
+      editMode: this.measureSettings.editMode,
+      showExtensions: sel.showExtensions, useFreeText: sel.useFreeText, freeText: sel.freeText,
+      textColor: sel.textColor, textSizePx: sel.textSizePx, decimals: sel.decimals,
+      textBgEnabled: sel.textBgEnabled, textBgColor: sel.textBgColor, textBgAlpha: sel.textBgAlpha,
+      lineColor: sel.lineColor, tickLengthM: sel.tickLengthM, labelId: sel.labelId,
+    } : { ...this.measureSettings, labelId: this.activeDrawLabelId };
+
+    r.orientation.value = s.orientation;
+    r.pointCount.value = s.pointCount;
+    r.editMode.value = s.editMode;
+    r.extensionsToggle.checked = !!s.showExtensions;
+    r.freeTextToggle.checked = !!s.useFreeText;
+    r.freeTextInput.value = s.freeText || "";
+    r.freeTextInput.classList.toggle("hidden", !s.useFreeText);
+    r.textColor.value = this._toHexColor(s.textColor);
+    r.textColorPreview.style.background = r.textColor.value;
+    r.textSize.value = String(s.textSizePx);
+    r.decimals.value = String(s.decimals);
+    r.textBgToggle.checked = !!s.textBgEnabled;
+    r.textBgGroup.classList.toggle("hidden", !s.textBgEnabled);
+    r.textBgColor.value = this._toHexColor(s.textBgColor);
+    r.textBgColorPreview.style.background = r.textBgColor.value;
+    r.textBgAlpha.value = String(s.textBgAlpha);
+    r.lineColor.value = this._toHexColor(s.lineColor);
+    r.lineColorPreview.style.background = r.lineColor.value;
+    r.tickLength.value = String(s.tickLengthM);
+    const labelForDisplay =
+      (this.selectedLabelId && this.labelManager.getById(this.selectedLabelId)) ? this.selectedLabelId
+        : (s.labelId && this.labelManager.getById(s.labelId)) ? s.labelId
+        : (this.labelManager.getById(this.activeDrawLabelId) ? this.activeDrawLabelId : Defaults.defaultLabelId);
+    r.idSelect.value = labelForDisplay;
+  }
+
 
   private _resize() {
     const rect = this.canvas.getBoundingClientRect();
