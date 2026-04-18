@@ -90,6 +90,20 @@ export class TopologyEngine {
         considerPoint(hatch.points[i], null, hatch, i);
       }
     }
+    // TextBox corners
+    for (const box of this.scene.textBoxes) {
+      if (!this.labels.isVisible(box.labelId)) continue;
+      const corners = boxCornersWorld(box);
+      for (const c of corners) {
+        considerPoint(c, null, null, -1);
+      }
+    }
+    // Dimension endpoints
+    for (const dim of this.scene.dimensions) {
+      if (!this.labels.isVisible(dim.labelId)) continue;
+      considerPoint(dim.p1, null, null, -1);
+      considerPoint(dim.p2, null, null, -1);
+    }
     // Segment lines
     for (const seg of segs) {
       considerLine(seg.a, seg.b, seg, null);
