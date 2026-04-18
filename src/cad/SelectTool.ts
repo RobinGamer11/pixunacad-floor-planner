@@ -41,6 +41,7 @@ export class SelectTool {
   activate() {
     this._clearEditState();
     this.app.renderer.setHoverSegmentId(null);
+    this.app.renderer.setHoverTextBoxId(null);
     this.app.hub.hide();
     this.app.pointEditMenu.hide();
     this.app.renderer.overlay = { draw: (ctx, cam) => this._drawOverlay(ctx, cam) };
@@ -51,10 +52,21 @@ export class SelectTool {
     this.app.pointEditMenu.hide();
     this.app.hub.hide();
     this.app.renderer.setHoverSegmentId(null);
+    this.app.renderer.setHoverTextBoxId(null);
     this.dragDimId = null;
   }
 
   finish() {}
+
+  private _hitTextBox(input: Input): TextBox | null {
+    const mouseW = v(input.mouse.wx, input.mouse.wy);
+    for (let i = this.app.scene.textBoxes.length - 1; i >= 0; i--) {
+      const box = this.app.scene.textBoxes[i];
+      if (!this.app.labelManager.isVisible(box.labelId)) continue;
+      if (pointInOrientedBox(mouseW, box)) return box;
+    }
+    return null;
+  }
 
   isEditing() { return !!this.activeEditAction; }
 
