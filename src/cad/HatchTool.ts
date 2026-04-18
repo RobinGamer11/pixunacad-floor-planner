@@ -480,9 +480,16 @@ export class HatchTool {
       this.hubLocked = true;
       this.hubLengthM = metrics.lengthM;
       this.hubAngleDeg = metrics.angleDeg;
-    } else {
+    } else if (this.drawMode === "rectangle") {
       if (this.rectState === "idle") return;
       const metrics = this._rectPreviewMetrics(this.app.input);
+      this.hubLocked = true;
+      this.hubLengthM = metrics.lengthM;
+      this.hubAngleDeg = metrics.angleDeg;
+    } else {
+      // circle
+      if (this.circleState === "idle") return;
+      const metrics = this._circlePreviewMetrics(this.app.input);
       this.hubLocked = true;
       this.hubLengthM = metrics.lengthM;
       this.hubAngleDeg = metrics.angleDeg;
@@ -496,8 +503,13 @@ export class HatchTool {
   private _applyHubValues(vals: { lengthM: number | null; angleDeg: number | null }) {
     if (this.drawMode === "polygon") {
       if (this.state !== "drawing" || this.points.length === 0) return;
-    } else {
+    } else if (this.drawMode === "rectangle") {
       if (this.rectState === "idle") return;
+    } else {
+      // circle
+      if (this.circleState === "idle") return;
+      this._applyCircleHubValues(vals);
+      return;
     }
     const nextLen = (vals.lengthM != null) ? Math.max(0, vals.lengthM) : this.hubLengthM;
     const nextAng = (vals.angleDeg != null) ? vals.angleDeg : this.hubAngleDeg;
@@ -506,6 +518,34 @@ export class HatchTool {
     this.hubLocked = true;
     this.app.hub.setValues(this.hubLengthM!, this.hubAngleDeg);
     this.app.hub.updateDisplay(this.hubLengthM!, this.hubAngleDeg);
+  }
+
+  private _applyCircleHubValues(vals: { lengthM: number | null; angleDeg: number | null }) {
+    if (this.circleState === "radius") {
+      const nextLen = (vals.lengthM != null) ? Math.max(0, vals.lengthM) : (this.hubLengthM ?? 0);
+      const nextAng = normalizeDeg(vals.angleDeg ?? this.hubAngleDeg ?? 0);
+      this.hubLengthM = nextLen;
+      this.hubAngleDeg = nextAng;
+      this.hubLocked = true;
+
+      this.circleRadiusM = nextLen;
+      this.circleStartAngleDeg = nextAng;
+      this.circleEndAngleDeg = nextAng;
+      this.circleState = "arc";
+
+      this.app.hub.setValues(this.circleRadiusM, this.circleEndAngleDeg);
+      this.app.hub.updateDisplay(this.circleRadiusM, this.circleEndAngleDeg);
+      this.app.hub.enterEditMode();
+      return;
+    }
+
+    if (this.circleState === "arc") {
+      const nextAng = normalizeDeg(vals.angleDeg ?? this.circleEndAngleDeg);
+      this.hubAngleDeg = nextAng;
+      this.hubLocked = true;
+      this.circleEndAngleDeg = nextAng;
+      this._finishCircle(true);
+    }
   }
 
   /* ---- Finish ---- */
