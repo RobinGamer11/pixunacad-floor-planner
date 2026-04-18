@@ -516,7 +516,7 @@ export class CadApp {
       return;
     }
     (this.hub as any)._stickerMode = true;
-    const corners = require("./StickerManager").instanceBoundingCornersWorld(inst.items, inst.position, inst.rotationRad, inst.scale);
+    const corners = instanceBoundingCornersWorld(inst.items as any, inst.position, inst.rotationRad, inst.scale);
     let cx = 0, cy = 0;
     for (const c of corners) { cx += c.x; cy += c.y; }
     cx /= corners.length; cy /= corners.length;
