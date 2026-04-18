@@ -246,6 +246,8 @@ export class CadApp {
     this.areaBgColorPreview = areaBgColorPreview;
     this.areaBgAlphaInput = areaBgAlphaInput;
     this.measureRefs = measureRefs;
+    this.textRefs = textRefs;
+    this.textEditorRefs = textEditorRefs;
 
     this.camera = new Camera();
     this.scene = new Scene();
@@ -258,9 +260,17 @@ export class CadApp {
     this.lineTool = new LineTool(this);
     this.hatchTool = new HatchTool(this);
     this.measureTool = new MeasureTool(this);
+    this.textTool = new TextTool(this);
     this.activeTool = this.selectTool;
 
     this.idPanel = new IdPanel(this, idPanelRoot, idPanelBody, idPanelList, idPanelAddBtn, idPanelToggleBtn);
+
+    this.textEditor = new TextEditorOverlay(
+      textEditorRefs.editor, textEditorRefs.toolbar,
+      textEditorRefs.boldBtn, textEditorRefs.italicBtn,
+      textEditorRefs.colorInput, textEditorRefs.sizeSelect, textEditorRefs.symbolSelect,
+      this,
+    );
 
     this.pointEditMenu.bindActivate((action) => {
       this.selectTool.beginPointEdit(action);
@@ -269,6 +279,7 @@ export class CadApp {
     this._setupLineSettingsPanel();
     this._setupHatchSettingsPanel();
     this._setupMeasureSettingsPanel();
+    this._setupTextSettingsPanel();
     this._setupShortcuts();
     this.refreshLabelUI();
     this._resize();
