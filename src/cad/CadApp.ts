@@ -1,5 +1,5 @@
 import { Defaults, ToolIds, PointEditAction, SelectionType } from "./constants";
-import { clamp } from "./geometry";
+import { clamp, v, Vec2 } from "./geometry";
 import { Camera } from "./Camera";
 import { Input } from "./Input";
 import { Scene, AreaLabel, DimensionStyle, TextBoxStyle, TextBox } from "./Scene";
@@ -14,6 +14,8 @@ import { HatchTool } from "./HatchTool";
 import { MeasureTool } from "./MeasureTool";
 import { TextTool } from "./TextTool";
 import { TextEditorOverlay } from "./TextEditorOverlay";
+import { PipetteTool } from "./PipetteTool";
+import { Clipboard, buildClipboardFromSelection, commitClipboardAt, translatedItems, ClipboardItem } from "./ClipboardManager";
 
 import { IdPanel } from "./IdPanel";
 
