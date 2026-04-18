@@ -132,6 +132,10 @@ const CadEditor: React.FC = () => {
   const [docImporting, setDocImporting] = useState(false);
   const [docSelected, setDocSelected] = useState<{ id: string; name: string; widthM: number; heightM: number } | null>(null);
   const [docToolPhase, setDocToolPhase] = useState<string>("idle");
+  // Maßstab-Auswahl vor Platzierung
+  const [scaleDialogPages, setScaleDialogPages] = useState<ImportedPage[] | null>(null);
+  const [scaleChoice, setScaleChoice] = useState<string>("100"); // "50" | "100" | "200" | "500" | "1" | "custom"
+  const [scaleCustom, setScaleCustom] = useState<string>("100");
 
   useEffect(() => {
     if (
@@ -334,14 +338,12 @@ const CadEditor: React.FC = () => {
       const pages = await importFile(f);
       if (pages.length === 0) { window.alert("Keine Seiten gefunden."); return; }
       if (pages.length === 1) {
-        const p = pages[0];
-        appRef.current?.setTool(ToolIds.DOCUMENT);
-        appRef.current?.documentTool.beginPlacement({
-          src: p.src, widthM: p.widthM, heightM: p.heightM,
-          pixelWidth: p.pixelWidth, pixelHeight: p.pixelHeight,
-          name: p.name, kind: p.kind, pageIndex: p.pageIndex,
-        });
+        // Direkt zum Maßstab-Dialog
+        setScaleChoice(pages[0].kind === "pdf-page" ? "100" : "1");
+        setScaleCustom("100");
+        setScaleDialogPages(pages);
       } else {
+        // PDF mit mehreren Seiten → erst Page-Picker
         const all = new Set<number>();
         pages.forEach((_, i) => all.add(i));
         setDocPickerSelected(all);
@@ -356,17 +358,30 @@ const CadEditor: React.FC = () => {
 
   const handleDocPickerConfirm = useCallback(() => {
     if (!docPickerPages) return;
-    const app = appRef.current; if (!app) return;
     const selectedPages = docPickerPages.filter((_, i) => docPickerSelected.has(i));
     if (selectedPages.length === 0) { setDocPickerPages(null); return; }
+    // → Maßstab-Dialog
+    setScaleChoice(selectedPages[0].kind === "pdf-page" ? "100" : "1");
+    setScaleCustom("100");
+    setDocPickerPages(null);
+    setDocPickerSelected(new Set());
+    setScaleDialogPages(selectedPages);
+  }, [docPickerPages, docPickerSelected]);
+
+  /** Maßstab anwenden: skaliert die Welt-Größe mit dem Nenner. Beispiel: 1:100 → ×100. */
+  const handleScaleConfirm = useCallback(() => {
+    if (!scaleDialogPages) return;
+    const app = appRef.current; if (!app) return;
+    const denom = scaleChoice === "custom" ? parseFloat(scaleCustom.replace(",", ".")) : parseFloat(scaleChoice);
+    const factor = Number.isFinite(denom) && denom > 0 ? denom : 1;
+    const scaledPages = scaleDialogPages.map(p => ({ ...p, widthM: p.widthM * factor, heightM: p.heightM * factor }));
+    const [first, ...rest] = scaledPages;
     app.setTool(ToolIds.DOCUMENT);
-    const [first, ...rest] = selectedPages;
     app.documentTool.beginPlacement({
       src: first.src, widthM: first.widthM, heightM: first.heightM,
       pixelWidth: first.pixelWidth, pixelHeight: first.pixelHeight,
       name: first.name, kind: first.kind, pageIndex: first.pageIndex,
     });
-    // Restliche Seiten direkt nebeneinander absetzen
     let offX = first.widthM + 0.5;
     for (const p of rest) {
       app.scene.createDocument({
@@ -377,9 +392,8 @@ const CadEditor: React.FC = () => {
       });
       offX += p.widthM + 0.5;
     }
-    setDocPickerPages(null);
-    setDocPickerSelected(new Set());
-  }, [docPickerPages, docPickerSelected]);
+    setScaleDialogPages(null);
+  }, [scaleDialogPages, scaleChoice, scaleCustom]);
 
   const sidebarWidth = sidebarCollapsed ? 56 : 240;
 
@@ -831,8 +845,8 @@ const CadEditor: React.FC = () => {
             </div>
           )}
 
-          {/* Document Settings */}
-          {!sidebarCollapsed && activeTool === ToolIds.DOCUMENT && (
+          {/* Document Settings — sichtbar wenn DOCUMENT-Tool aktiv ODER (Auswahl-Tool aktiv UND Doc selektiert) */}
+          {!sidebarCollapsed && (activeTool === ToolIds.DOCUMENT || (activeTool === ToolIds.SELECT && !!docSelected)) && (
             <div className="cad-settings-panel mb-2">
               <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Dokument</div>
               <div className="space-y-3">
@@ -957,6 +971,59 @@ const CadEditor: React.FC = () => {
               <Button onClick={handleDocPickerConfirm} disabled={docPickerSelected.size === 0}>
                 {docPickerSelected.size} importieren
               </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Maßstab-Dialog vor Platzierung */}
+        <Dialog open={!!scaleDialogPages} onOpenChange={(o) => { if (!o) setScaleDialogPages(null); }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Maßstab des Dokuments</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 py-2">
+              <p className="text-xs text-muted-foreground">
+                In welchem Maßstab liegt der Plan vor? Das Dokument wird entsprechend in die Zeichenebene skaliert.
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { v: "50", label: "1 : 50" },
+                  { v: "100", label: "1 : 100" },
+                  { v: "200", label: "1 : 200" },
+                  { v: "500", label: "1 : 500" },
+                  { v: "1", label: "1 : 1" },
+                  { v: "custom", label: "Frei…" },
+                ].map(opt => (
+                  <button
+                    key={opt.v}
+                    type="button"
+                    onClick={() => setScaleChoice(opt.v)}
+                    className={`cad-toolbar-btn justify-center h-10 text-xs ${scaleChoice === opt.v ? "active" : ""}`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              {scaleChoice === "custom" && (
+                <div className="flex items-center gap-2 pt-1">
+                  <span className="text-xs text-muted-foreground">1 :</span>
+                  <input
+                    type="text"
+                    value={scaleCustom}
+                    onChange={(e) => setScaleCustom(e.target.value)}
+                    className="cad-settings-select flex-1"
+                    placeholder="z. B. 75"
+                    autoFocus
+                  />
+                </div>
+              )}
+              <p className="text-[11px] text-muted-foreground pt-1">
+                Tipp: Du kannst den Maßstab später jederzeit über „Skalieren (2 Punkte)" oder „Skalieren (Maßkette)" feinjustieren.
+              </p>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setScaleDialogPages(null)}>Abbrechen</Button>
+              <Button onClick={handleScaleConfirm}>Übernehmen & platzieren</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
