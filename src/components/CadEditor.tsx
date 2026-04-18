@@ -267,10 +267,7 @@ const CadEditor: React.FC = () => {
       if (app) {
         const inst = app.getSelectedStickerInstance?.();
         if (inst && !app.isStickerEditing()) {
-          // Obere rechte Ecke der Bounding-Box
-          // dynamic import vermeiden — nutze Camera direkt
-          const { instanceBoundingCornersWorld } = require("@/cad/StickerManager");
-          const corners = instanceBoundingCornersWorld(inst.items, inst.position, inst.rotationRad, inst.scale);
+          const corners = instanceBoundingCornersWorld(inst.items as any, inst.position, inst.rotationRad, inst.scale);
           let maxX = -Infinity, minY = Infinity;
           for (const c of corners) { if (c.x > maxX) maxX = c.x; if (c.y < minY) minY = c.y; }
           const sp = app.camera.worldToScreen(maxX, minY);
