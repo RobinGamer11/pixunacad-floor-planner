@@ -3,7 +3,7 @@ import { Defaults, SelectionType } from "./constants";
 import type { CadApp } from "./CadApp";
 import type { Input } from "./Input";
 import type { ClipboardItem } from "./ClipboardManager";
-import { StickerDefinition, transformedStickerItems, commitStickerAt, pointInInstance } from "./StickerManager";
+import { StickerDefinition, transformedStickerItems, commitStickerAt, pointInInstance, instanceBoundingCornersWorld } from "./StickerManager";
 import { getDimensionGeometry } from "./dimensionGeometry";
 
 type Phase = "idle" | "selecting" | "placing" | "rotating";
@@ -131,6 +131,13 @@ export class StickerTool {
   private _dragGrabOffset: Vec2 | null = null;
   private _dragSnap: any = null;
 
+  // Corner-Drag-State (Rotate + Scale um Center)
+  private _cornerDragStickerId: string | null = null;
+  private _cornerDragStartAngle = 0;
+  private _cornerDragStartDist = 0;
+  private _cornerDragInitRot = 0;
+  private _cornerDragInitScale = 1;
+
   /** Hit-Test gegen platzierte Sticker-Instanzen. */
   private _hitStickerInstance(input: Input) {
     const mouseW = v(input.mouse.wx, input.mouse.wy);
@@ -138,6 +145,23 @@ export class StickerTool {
       const inst = this.app.scene.stickerInstances[i];
       if (!this.app.labelManager.isVisible(inst.labelId)) continue;
       if (pointInInstance(inst.items as any, inst.position, inst.rotationRad, inst.scale, mouseW)) return inst;
+    }
+    return null;
+  }
+
+  /** Hit-Test gegen Eck-Handles der aktuell selektierten Sticker-Instanz. */
+  private _hitStickerCorner(input: Input): { instId: string; cornerIndex: number } | null {
+    const sel = this.app.selection;
+    if (!sel || sel.type !== SelectionType.STICKER_INSTANCE) return null;
+    const inst = this.app.scene.getStickerInstanceById((sel as any).stickerInstanceId);
+    if (!inst || !this.app.labelManager.isVisible(inst.labelId)) return null;
+    const corners = instanceBoundingCornersWorld(inst.items as any, inst.position, inst.rotationRad, inst.scale);
+    const mouseS = v(input.mouse.sx, input.mouse.sy);
+    for (let i = 0; i < corners.length; i++) {
+      const sp = this.app.camera.worldToScreen(corners[i].x, corners[i].y);
+      if (Math.hypot(sp.x - mouseS.x, sp.y - mouseS.y) <= Defaults.hitPx + 2) {
+        return { instId: inst.id, cornerIndex: i };
+      }
     }
     return null;
   }
