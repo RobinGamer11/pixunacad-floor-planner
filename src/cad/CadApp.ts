@@ -317,12 +317,14 @@ export class CadApp {
       segments: this.scene.segments.map(s => ({
         id: s.id, a: { x: s.a.x, y: s.a.y }, b: { x: s.b.x, y: s.b.y },
         color: s.color, thicknessM: s.thicknessM, labelId: s.labelId,
+        _stickerEditOwnerId: s._stickerEditOwnerId || null,
       })),
       hatches: this.scene.hatches.map(h => ({
         id: h.id, points: h.points.map(p => ({ x: p.x, y: p.y })),
         fillColor: h.fillColor, strokeColor: h.strokeColor,
         fillAlphaPct: h.fillAlphaPct, strokeWidthPx: h.strokeWidthPx,
         labelId: h.labelId, areaLabel: { ...h.areaLabel },
+        _stickerEditOwnerId: h._stickerEditOwnerId || null,
       })),
       dimensions: this.scene.dimensions.map(d => ({
         id: d.id,
@@ -334,6 +336,7 @@ export class CadApp {
         useFreeText: d.useFreeText, freeText: d.freeText,
         textBgEnabled: d.textBgEnabled, textBgColor: d.textBgColor, textBgAlpha: d.textBgAlpha,
         labelId: d.labelId,
+        _stickerEditOwnerId: d._stickerEditOwnerId || null,
       })),
       textBoxes: this.scene.textBoxes.map(t => ({
         id: t.id,
@@ -342,6 +345,7 @@ export class CadApp {
         rotationRad: t.rotationRad, html: t.html,
         style: { ...t.style },
         labelId: t.labelId,
+        _stickerEditOwnerId: t._stickerEditOwnerId || null,
       })),
       labels: this.labelManager.list().map(l => ({ ...l })),
       stickers: this.stickers.map(s => ({ id: s.id, name: s.name, items: s.items, createdAt: s.createdAt })),
@@ -350,6 +354,8 @@ export class CadApp {
         position: { x: si.position.x, y: si.position.y },
         rotationRad: si.rotationRad, scale: si.scale, labelId: si.labelId,
       })),
+      _stickerEditInstanceId: this._stickerEditInstanceId,
+      _stickerEditSnapshot: this._stickerEditSnapshot,
     });
   }
 
