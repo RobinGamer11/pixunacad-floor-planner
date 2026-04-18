@@ -220,7 +220,7 @@ export class CadApp {
   private _maybeSnapshot() {
     if (this._isRestoring || this._destroyed) return;
     // Don't snapshot mid-drag
-    if (this.input.isMouseDown || this.input.isPanning) return;
+    if (this.input.mouse.left || this.input.mouse.mid || this.input.mouse.right || this.input.isPanning) return;
     const snap = this._serializeScene();
     if (snap === this._lastSnapshot) return;
     // Drop redo branch
