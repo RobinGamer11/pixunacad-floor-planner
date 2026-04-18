@@ -242,6 +242,7 @@ export class DocumentTool {
       if (measured < 1e-6) return;
       const factor = target / measured;
       scaleDocumentAroundCenter(doc, factor);
+      const finishedDocId = this.scaleTargetDocId;
       this.app.hub.hide();
       this.app.hub.bindCommit(null);
       this.scaleTargetDocId = null;
@@ -249,6 +250,9 @@ export class DocumentTool {
       this.scalePoint2 = null;
       this.phase = "idle";
       this.onPhaseChange?.();
+      // Zurück zum Auswahl-Tool, Dokument bleibt selektiert.
+      this.app.setTool("select");
+      if (finishedDocId) this.app.setSelection({ type: "document", documentId: finishedDocId } as any);
     });
   }
 
