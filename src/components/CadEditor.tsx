@@ -139,6 +139,33 @@ const CadEditor: React.FC = () => {
       >
         {/* Tool list */}
         <div className="flex flex-col gap-1 p-2">
+        {/* Undo / Redo */}
+        <div className={`flex gap-1 p-2 ${sidebarCollapsed ? "flex-col items-center" : ""}`}>
+          <button
+            onClick={() => appRef.current?.undo()}
+            disabled={!canUndo}
+            title="Rückgängig (Strg+Z)"
+            className={`cad-toolbar-btn ${sidebarCollapsed ? "justify-center px-0 h-9 w-9" : "flex-1 justify-center"} disabled:opacity-40 disabled:cursor-not-allowed`}
+          >
+            <Undo2 className="h-4 w-4 shrink-0" />
+            {!sidebarCollapsed && <span className="text-xs">Undo</span>}
+          </button>
+          <button
+            onClick={() => appRef.current?.redo()}
+            disabled={!canRedo}
+            title="Wiederherstellen (Strg+Y)"
+            className={`cad-toolbar-btn ${sidebarCollapsed ? "justify-center px-0 h-9 w-9" : "flex-1 justify-center"} disabled:opacity-40 disabled:cursor-not-allowed`}
+          >
+            <Redo2 className="h-4 w-4 shrink-0" />
+            {!sidebarCollapsed && <span className="text-xs">Redo</span>}
+          </button>
+        </div>
+
+        {/* Divider */}
+        <div className="mx-3 border-t opacity-60" style={{ borderColor: "hsl(var(--cad-toolbar-border))" }} />
+
+        {/* Tool list */}
+        <div className="flex flex-col gap-1 p-2">
           {CAD_TOOLS.map((t) => {
             const Icon = t.icon;
             const isActive = activeTool === t.id;
