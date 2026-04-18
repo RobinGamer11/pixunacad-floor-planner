@@ -96,15 +96,134 @@ export class Renderer {
     this._drawSegments();
     this._drawDimensions();
     this._drawTextBoxes();
+    this._drawStickerInstances();
     this._drawHatchSelection();
     this._drawSegmentSelection();
     this._drawDimensionSelection();
     this._drawTextBoxSelection();
+    this._drawStickerInstanceSelection();
     this._drawHoverSegmentPoints();
 
     if (this.overlay && this.overlay.draw) {
       this.overlay.draw(ctx, this.camera);
     }
+  }
+
+  /* ---------- Sticker Instances ---------- */
+  private _stickersBackToFront(): StickerInstance[] {
+    const order = this.labels.list();
+    const rank = new Map(order.map((g, i) => [g.id, i]));
+    return [...this.scene.stickerInstances]
+      .filter(s => this.labels.isVisible(s.labelId))
+      .sort((a, b) => (rank.get(a.labelId) || 0) - (rank.get(b.labelId) || 0));
+  }
+
+  private _drawStickerInstances() {
+    const ctx = this.ctx;
+    const cam = this.camera;
+    for (const inst of this._stickersBackToFront()) {
+      const items = transformedInstanceItems(inst.items as any, inst.position, inst.rotationRad, inst.scale);
+      this._drawTransformedItems(ctx, cam, items);
+    }
+  }
+
+  private _drawTransformedItems(ctx: CanvasRenderingContext2D, cam: Camera, items: any[]) {
+    for (const it of items) {
+      if (it.kind === "segment") {
+        const a = cam.worldToScreen(it.a.x, it.a.y);
+        const b = cam.worldToScreen(it.b.x, it.b.y);
+        ctx.save();
+        ctx.strokeStyle = it.color || Defaults.lineColor;
+        ctx.lineWidth = Math.max(0.5, (it.thicknessM || Defaults.lineThicknessM) * cam.scale);
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+        ctx.restore();
+      } else if (it.kind === "hatch") {
+        if (!it.points || it.points.length < 3) continue;
+        const fillAlpha = (it.fillAlphaPct ?? Defaults.hatchFillAlphaPct) / 100;
+        ctx.save();
+        ctx.beginPath();
+        const p0 = cam.worldToScreen(it.points[0].x, it.points[0].y);
+        ctx.moveTo(p0.x, p0.y);
+        for (let i = 1; i < it.points.length; i++) {
+          const sp = cam.worldToScreen(it.points[i].x, it.points[i].y);
+          ctx.lineTo(sp.x, sp.y);
+        }
+        ctx.closePath();
+        ctx.fillStyle = rgbaFromHex(it.fillColor || Defaults.hatchFillColor, fillAlpha);
+        ctx.fill();
+        const strokePx = this._scaledStrokePx(it.strokeWidthPx ?? Defaults.hatchStrokePx);
+        if (strokePx > 0) {
+          ctx.strokeStyle = it.strokeColor || Defaults.hatchStrokeColor;
+          ctx.lineWidth = strokePx;
+          ctx.stroke();
+        }
+        ctx.restore();
+      } else if (it.kind === "dimension") {
+        this._drawSingleDimension(ctx, cam, it as any, false);
+      } else if (it.kind === "textbox") {
+        const cs = cam.worldToScreen(it.center.x, it.center.y);
+        const widthPx = it.widthM * cam.scale;
+        const heightPx = it.heightM * cam.scale;
+        drawRichTextBox({
+          ctx, centerScreenX: cs.x, centerScreenY: cs.y,
+          widthPx, heightPx,
+          rotationRad: it.rotationRad || 0,
+          html: it.html || "",
+          baseFontSizePx: (it.style?.fontSizePx || Defaults.textFontSizePx) * (cam.scale / Defaults.measureReferenceScalePxPerM),
+          baseColor: it.style?.textColor || Defaults.textColor,
+          bgColor: it.style?.bgColor || Defaults.textBgColor,
+          bgAlpha: ((it.style?.bgAlphaPct || 0)) / 100,
+          align: it.style?.align || Defaults.textAlign,
+          wrap: !!it.style?.wrap,
+          borderEnabled: !!it.style?.borderEnabled,
+          borderColor: it.style?.borderColor || Defaults.textBorderColor,
+          borderWidthPx: it.style?.borderWidthPx ?? Defaults.textBorderWidthPx,
+          paddingPx: 6,
+        });
+      }
+    }
+  }
+
+  private _drawStickerInstanceSelection() {
+    if (!this.selection || this.selection.type !== SelectionType.STICKER_INSTANCE) return;
+    const inst = this.scene.getStickerInstanceById(this.selection.stickerInstanceId!);
+    if (!inst) return;
+    if (!this.labels.isVisible(inst.labelId)) return;
+
+    const ctx = this.ctx;
+    const cam = this.camera;
+    const corners = instanceBoundingCornersWorld(inst.items as any, inst.position, inst.rotationRad, inst.scale);
+    const sc = corners.map(c => cam.worldToScreen(c.x, c.y));
+
+    ctx.save();
+    ctx.strokeStyle = "rgba(77,163,255,0.95)";
+    ctx.fillStyle = "rgba(77,163,255,0.08)";
+    ctx.lineWidth = 1.8;
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath();
+    ctx.moveTo(sc[0].x, sc[0].y);
+    for (let i = 1; i < sc.length; i++) ctx.lineTo(sc[i].x, sc[i].y);
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Center handle (Position)
+    const center = cam.worldToScreen(inst.position.x, inst.position.y);
+    ctx.fillStyle = "rgba(77,163,255,0.95)";
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(center.x, center.y, 6, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+
+    // Corner handles (visuell, Skalierung über Hub)
+    for (const p of sc) {
+      ctx.fillStyle = "rgba(77,163,255,0.95)";
+      ctx.strokeStyle = "#fff";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.rect(p.x - 4, p.y - 4, 8, 8);
+      ctx.fill(); ctx.stroke();
+    }
+    ctx.restore();
   }
 
   private _drawGrid() {
