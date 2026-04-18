@@ -1235,6 +1235,7 @@ export class CadApp {
     else if (id === ToolIds.MEASURE) { this.activeTool = this.measureTool; this.measureTool.activate(); }
     else if (id === ToolIds.TEXT) { this.activeTool = this.textTool; this.textTool.activate(); }
     else if (id === ToolIds.PIPETTE) { this.activeTool = this.pipetteTool; this.pipetteTool.activate(); }
+    else if (id === ToolIds.STICKER) { this.activeTool = this.stickerTool; this.stickerTool.activate(); }
     this._syncLineSettingsFromContext();
     this._syncHatchSettingsFromContext();
     this._syncMeasureSettingsFromContext();
