@@ -22,6 +22,8 @@ export class PipetteTool {
   app: CadApp;
   id = "pipette";
   hoverSource: PickedSource | null = null;
+  // Gemerkte Quelle für Quelle→Ziel-Übertragung (wenn keine passende Auswahl vorhanden)
+  pickedSource: PickedSource | null = null;
 
   constructor(app: CadApp) {
     this.app = app;
@@ -29,6 +31,7 @@ export class PipetteTool {
 
   activate() {
     this.hoverSource = null;
+    this.pickedSource = null;
     this.app.hub.hide();
     this.app.pointEditMenu.hide();
     this.app.renderer.setHoverSegmentId(null);
@@ -39,6 +42,7 @@ export class PipetteTool {
 
   cancel() {
     this.hoverSource = null;
+    this.pickedSource = null;
     this.app.renderer.setHoverSegmentId(null);
     this.app.renderer.setHoverHatchId(null);
     this.app.renderer.setHoverTextBoxId(null);
@@ -55,8 +59,66 @@ export class PipetteTool {
     this.app.renderer.setHoverTextBoxId(this.hoverSource?.kind === "textbox" ? this.hoverSource.obj.id : null);
 
     if (input.clicked && this.hoverSource) {
-      this._applyPick(this.hoverSource, !input.keys.shift);
+      const takeLabel = !input.keys.shift;
+
+      // Fall 1: passende Auswahl vorhanden -> direkt von Klick-Quelle auf Auswahl übertragen
+      if (this._hasMatchingSelection(this.hoverSource)) {
+        this._applyPick(this.hoverSource, takeLabel);
+        this.pickedSource = null;
+        return;
+      }
+
+      // Fall 2: gemerkte Quelle vorhanden und Ziel ist gleichartig & verschieden -> Quelle->Ziel übertragen
+      if (this.pickedSource && this.pickedSource.kind === this.hoverSource.kind &&
+          (this.pickedSource.obj as any).id !== (this.hoverSource.obj as any).id) {
+        this._applySourceToTarget(this.pickedSource, this.hoverSource, takeLabel);
+        this.pickedSource = null;
+        return;
+      }
+
+      // Fall 3: keine passende Auswahl, keine (gleichartige) gemerkte Quelle -> Quelle merken
+      this.pickedSource = this.hoverSource;
     }
+  }
+
+  private _hasMatchingSelection(src: PickedSource): boolean {
+    if (src.kind === "segment") return !!this.app.getSelectedSegment();
+    if (src.kind === "hatch") return !!this.app.getSelectedHatch();
+    if (src.kind === "dimension") return !!this.app.getSelectedDimension();
+    if (src.kind === "textbox") return !!this.app.getSelectedTextBox();
+    return false;
+  }
+
+  private _applySourceToTarget(src: PickedSource, tgt: PickedSource, takeLabel: boolean) {
+    const labelId = takeLabel ? src.obj.labelId : null;
+    if (src.kind === "segment" && tgt.kind === "segment") {
+      tgt.obj.color = src.obj.color;
+      tgt.obj.thicknessM = src.obj.thicknessM;
+      if (labelId) tgt.obj.labelId = labelId;
+      this.app.setSelection({ type: SelectionType.SEGMENT, segmentId: tgt.obj.id });
+    } else if (src.kind === "hatch" && tgt.kind === "hatch") {
+      tgt.obj.fillColor = src.obj.fillColor;
+      tgt.obj.strokeColor = src.obj.strokeColor;
+      tgt.obj.fillAlphaPct = src.obj.fillAlphaPct;
+      tgt.obj.strokeWidthPx = src.obj.strokeWidthPx;
+      tgt.obj.areaLabel = { ...src.obj.areaLabel, offsetX: tgt.obj.areaLabel.offsetX, offsetY: tgt.obj.areaLabel.offsetY };
+      if (labelId) tgt.obj.labelId = labelId;
+      this.app.setSelection({ type: SelectionType.HATCH, hatchId: tgt.obj.id, pointIndex: null });
+    } else if (src.kind === "dimension" && tgt.kind === "dimension") {
+      const s = src.obj, t = tgt.obj;
+      t.textColor = s.textColor; t.textSizePx = s.textSizePx;
+      t.lineColor = s.lineColor; t.decimals = s.decimals;
+      t.tickLengthM = s.tickLengthM; t.showExtensions = s.showExtensions;
+      t.textBgEnabled = s.textBgEnabled; t.textBgColor = s.textBgColor;
+      t.textBgAlpha = s.textBgAlpha;
+      if (labelId) t.labelId = labelId;
+      this.app.setSelection({ type: SelectionType.DIMENSION, dimensionId: t.id });
+    } else if (src.kind === "textbox" && tgt.kind === "textbox") {
+      tgt.obj.style = { ...src.obj.style };
+      if (labelId) tgt.obj.labelId = labelId;
+      this.app.setSelection({ type: SelectionType.TEXTBOX, textBoxId: tgt.obj.id });
+    }
+    this.app.refreshLabelUI();
   }
 
   private _pickAt(input: Input): PickedSource | null {
