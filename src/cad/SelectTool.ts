@@ -39,6 +39,8 @@ export class SelectTool {
   dragStickerId: string | null = null;
   dragStickerOrigin: Vec2 | null = null; // Position der Instanz beim Drag-Start
   dragStickerMouseStart: Vec2 | null = null; // Mausposition (Welt) bei Drag-Start
+  dragStickerGrabOffset: Vec2 | null = null; // mouseStart - instanceOrigin (Greifpunkt-Offset relativ zur Position)
+  dragStickerSnap: Snap | null = null; // letzter aktiver Snap während Drag (für Overlay)
 
   constructor(app: CadApp) {
     this.app = app;
@@ -512,23 +514,35 @@ export class SelectTool {
   }
 
   update(input: Input) {
-    // Active sticker drag
+    // Active sticker drag with point snapping
     if (this.dragStickerId) {
       const inst = this.app.scene.getStickerInstanceById(this.dragStickerId);
-      if (!inst || !this.dragStickerOrigin || !this.dragStickerMouseStart) {
+      if (!inst || !this.dragStickerOrigin || !this.dragStickerMouseStart || !this.dragStickerGrabOffset) {
         this.dragStickerId = null;
         this.dragStickerOrigin = null;
         this.dragStickerMouseStart = null;
+        this.dragStickerGrabOffset = null;
+        this.dragStickerSnap = null;
       } else {
         const mouseW = v(input.mouse.wx, input.mouse.wy);
+        // Snap gegen Scene-Punkte/Linien (Sticker-Instanzen sind dort nicht enthalten).
+        const snap = this.app.topology.findBestSnap(
+          v(input.mouse.sx, input.mouse.sy),
+          mouseW
+        );
+        this.dragStickerSnap = snap;
+        // Wir wollen, dass der ursprünglich gegriffene Punkt der Sticker-Instanz an mouseW (oder snap) landet.
+        const target = (snap && snap.world) ? snap.world : mouseW;
         inst.position = {
-          x: this.dragStickerOrigin.x + (mouseW.x - this.dragStickerMouseStart.x),
-          y: this.dragStickerOrigin.y + (mouseW.y - this.dragStickerMouseStart.y),
+          x: target.x - this.dragStickerGrabOffset.x,
+          y: target.y - this.dragStickerGrabOffset.y,
         };
         if (!input.mouse.left) {
           this.dragStickerId = null;
           this.dragStickerOrigin = null;
           this.dragStickerMouseStart = null;
+          this.dragStickerGrabOffset = null;
+          this.dragStickerSnap = null;
         }
         return;
       }
