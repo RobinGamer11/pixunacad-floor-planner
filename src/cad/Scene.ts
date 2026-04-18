@@ -277,6 +277,7 @@ export class Scene {
   private _dimIdMap = new Map<string, Dimension>();
   private _textIdMap = new Map<string, TextBox>();
   private _stickerIdMap = new Map<string, StickerInstance>();
+  private _docIdMap = new Map<string, DocumentObject>();
 
   private _makeId(): string {
     return (crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now() + Math.random());
@@ -305,6 +306,54 @@ export class Scene {
   private _rebuildStickerIdMap() {
     this._stickerIdMap.clear();
     for (const s of this.stickerInstances) this._stickerIdMap.set(s.id, s);
+  }
+
+  private _rebuildDocIdMap() {
+    this._docIdMap.clear();
+    for (const d of this.documents) this._docIdMap.set(d.id, d);
+  }
+
+  // ---- Documents (PDF/JPG/PNG) ----
+  createDocument(opts: {
+    name?: string; kind?: "image" | "pdf-page"; src: string; pageIndex?: number;
+    position: Vec2; widthM: number; heightM: number; rotationRad?: number;
+    pixelWidth?: number; pixelHeight?: number; labelId?: string;
+  }): DocumentObject {
+    const doc = new DocumentObject({ id: this._makeId(), ...opts });
+    this.documents.push(doc);
+    this._rebuildDocIdMap();
+    return doc;
+  }
+
+  getDocumentById(id: string): DocumentObject | null { return this._docIdMap.get(id) || null; }
+
+  getDocumentsByLabelId(labelId: string): DocumentObject[] {
+    return this.documents.filter(d => d.labelId === labelId);
+  }
+
+  removeDocument(doc: DocumentObject) {
+    this.documents = this.documents.filter(d => d !== doc);
+    this._rebuildDocIdMap();
+  }
+
+  removeDocumentsByIds(ids: string[]) {
+    const set = new Set(ids);
+    this.documents = this.documents.filter(d => !set.has(d.id));
+    this._rebuildDocIdMap();
+  }
+
+  removeDocumentsByLabelId(labelId: string) {
+    this.documents = this.documents.filter(d => d.labelId !== labelId);
+    this._rebuildDocIdMap();
+  }
+
+  reassignDocumentsLabel(oldId: string, newId: string) {
+    for (const d of this.documents) if (d.labelId === oldId) d.labelId = newId;
+  }
+
+  assignDocumentsToLabel(ids: string[], newId: string) {
+    const set = new Set(ids);
+    for (const d of this.documents) if (set.has(d.id)) d.labelId = newId;
   }
 
   // ---- Sticker Instances ----
