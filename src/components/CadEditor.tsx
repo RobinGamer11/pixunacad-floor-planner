@@ -1,10 +1,13 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import { CadApp } from "@/cad/CadApp";
 import { ToolIds, PointEditAction } from "@/cad/constants";
-import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Pipette, Sticker as StickerIcon, Pencil, Trash2, Download, Upload, Plus } from "lucide-react";
+import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Pipette, Sticker as StickerIcon, Pencil, Trash2, Download, Upload, Plus, FileImage, Maximize2, Ruler as RulerIcon } from "lucide-react";
 import type { HatchDrawMode } from "@/cad/HatchTool";
 import type { StickerDefinition } from "@/cad/StickerManager";
 import { instanceBoundingCornersWorld } from "@/cad/StickerManager";
+import { importFile, type ImportedPage } from "@/cad/documentImport";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 const CAD_TOOLS = [
   { id: ToolIds.SELECT, label: "Auswahl", key: "V", icon: MousePointer2 },
@@ -14,6 +17,7 @@ const CAD_TOOLS = [
   { id: ToolIds.TEXT, label: "Text", key: "T", icon: Type },
   { id: ToolIds.PIPETTE, label: "Pipette", key: "P", icon: Pipette },
   { id: ToolIds.STICKER, label: "Sticker", key: "O", icon: StickerIcon },
+  { id: ToolIds.DOCUMENT, label: "Dokument", key: "D", icon: FileImage },
 ];
 
 const CadEditor: React.FC = () => {
@@ -120,6 +124,14 @@ const CadEditor: React.FC = () => {
   const stickerImportRef = useRef<HTMLInputElement>(null);
   // Floating edit-pencil overlay near selected sticker instance
   const [stickerEditOverlay, setStickerEditOverlay] = useState<{ id: string; x: number; y: number } | null>(null);
+
+  // Document import state
+  const docFileInputRef = useRef<HTMLInputElement>(null);
+  const [docPickerPages, setDocPickerPages] = useState<ImportedPage[] | null>(null);
+  const [docPickerSelected, setDocPickerSelected] = useState<Set<number>>(new Set());
+  const [docImporting, setDocImporting] = useState(false);
+  const [docSelected, setDocSelected] = useState<{ id: string; name: string; widthM: number; heightM: number } | null>(null);
+  const [docToolPhase, setDocToolPhase] = useState<string>("idle");
 
   useEffect(() => {
     if (
@@ -240,6 +252,7 @@ const CadEditor: React.FC = () => {
     };
     app.hatchTool.onDrawModeChange = (m) => setHatchDrawMode(m);
     setHatchDrawMode(app.hatchTool.drawMode);
+    app.documentTool.onPhaseChange = () => setDocToolPhase(app.documentTool.phase);
     app.setTool(ToolIds.SELECT);
     appRef.current = app;
 
@@ -283,10 +296,90 @@ const CadEditor: React.FC = () => {
     return () => cancelAnimationFrame(raf);
   }, []);
 
+  // Poll selected document for the settings panel
+  useEffect(() => {
+    let raf = 0;
+    const tick = () => {
+      const app = appRef.current;
+      if (app) {
+        const sel = app.selection as any;
+        if (sel && sel.type === "document") {
+          const doc = app.scene.getDocumentById(sel.documentId);
+          if (doc) {
+            setDocSelected(prev => (prev && prev.id === doc.id && prev.widthM === doc.widthM && prev.heightM === doc.heightM) ? prev : { id: doc.id, name: doc.name, widthM: doc.widthM, heightM: doc.heightM });
+          } else {
+            setDocSelected(prev => prev ? null : prev);
+          }
+        } else {
+          setDocSelected(prev => prev ? null : prev);
+        }
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
   const handleToolClick = useCallback((id: string) => {
     appRef.current?.setTool(id);
     setActiveTool(id);
   }, []);
+
+  const handleDocFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    e.target.value = "";
+    if (!f) return;
+    setDocImporting(true);
+    try {
+      const pages = await importFile(f);
+      if (pages.length === 0) { window.alert("Keine Seiten gefunden."); return; }
+      if (pages.length === 1) {
+        const p = pages[0];
+        appRef.current?.setTool(ToolIds.DOCUMENT);
+        appRef.current?.documentTool.beginPlacement({
+          src: p.src, widthM: p.widthM, heightM: p.heightM,
+          pixelWidth: p.pixelWidth, pixelHeight: p.pixelHeight,
+          name: p.name, kind: p.kind, pageIndex: p.pageIndex,
+        });
+      } else {
+        const all = new Set<number>();
+        pages.forEach((_, i) => all.add(i));
+        setDocPickerSelected(all);
+        setDocPickerPages(pages);
+      }
+    } catch (err: any) {
+      window.alert(err?.message || "Import fehlgeschlagen.");
+    } finally {
+      setDocImporting(false);
+    }
+  }, []);
+
+  const handleDocPickerConfirm = useCallback(() => {
+    if (!docPickerPages) return;
+    const app = appRef.current; if (!app) return;
+    const selectedPages = docPickerPages.filter((_, i) => docPickerSelected.has(i));
+    if (selectedPages.length === 0) { setDocPickerPages(null); return; }
+    app.setTool(ToolIds.DOCUMENT);
+    const [first, ...rest] = selectedPages;
+    app.documentTool.beginPlacement({
+      src: first.src, widthM: first.widthM, heightM: first.heightM,
+      pixelWidth: first.pixelWidth, pixelHeight: first.pixelHeight,
+      name: first.name, kind: first.kind, pageIndex: first.pageIndex,
+    });
+    // Restliche Seiten direkt nebeneinander absetzen
+    let offX = first.widthM + 0.5;
+    for (const p of rest) {
+      app.scene.createDocument({
+        name: p.name, kind: p.kind, src: p.src, pageIndex: p.pageIndex,
+        position: { x: offX, y: 0 }, widthM: p.widthM, heightM: p.heightM,
+        pixelWidth: p.pixelWidth, pixelHeight: p.pixelHeight,
+        labelId: app.activeDrawLabelId,
+      });
+      offX += p.widthM + 0.5;
+    }
+    setDocPickerPages(null);
+    setDocPickerSelected(new Set());
+  }, [docPickerPages, docPickerSelected]);
 
   const sidebarWidth = sidebarCollapsed ? 56 : 240;
 
@@ -737,7 +830,136 @@ const CadEditor: React.FC = () => {
               </div>
             </div>
           )}
+
+          {/* Document Settings */}
+          {!sidebarCollapsed && activeTool === ToolIds.DOCUMENT && (
+            <div className="cad-settings-panel mb-2">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Dokument</div>
+              <div className="space-y-3">
+                <button
+                  type="button"
+                  disabled={docImporting}
+                  onClick={() => docFileInputRef.current?.click()}
+                  className="cad-toolbar-btn w-full justify-center h-9 disabled:opacity-50 disabled:cursor-wait"
+                  title="PDF, JPG oder PNG importieren"
+                >
+                  <Upload className="h-4 w-4" />
+                  <span className="text-xs">{docImporting ? "Importiere…" : "Datei importieren"}</span>
+                </button>
+                <input
+                  ref={docFileInputRef}
+                  type="file"
+                  accept="application/pdf,image/png,image/jpeg"
+                  className="hidden"
+                  onChange={handleDocFileChange}
+                />
+
+                {docToolPhase !== "idle" && (
+                  <div className="rounded-md p-2 text-xs" style={{ background: "hsl(var(--primary) / 0.12)", border: "1px solid hsl(var(--primary) / 0.4)" }}>
+                    {docToolPhase === "placing" && <span>Klick auf Canvas: Dokument absetzen · Esc: abbrechen</span>}
+                    {docToolPhase === "scale-pick-1" && <span>1. Skalier-Punkt anklicken (Snap aktiv)</span>}
+                    {docToolPhase === "scale-pick-2" && <span>2. Skalier-Punkt anklicken</span>}
+                    {docToolPhase === "scale-await-input" && <span>Soll-Länge im Hub eingeben + Enter</span>}
+                  </div>
+                )}
+
+                {docSelected && (
+                  <div className="space-y-2 pt-2" style={{ borderTop: "1px solid hsl(var(--border))" }}>
+                    <div className="text-xs">
+                      <div className="font-medium truncate" title={docSelected.name}>{docSelected.name}</div>
+                      <div style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+                        {docSelected.widthM.toFixed(3)} × {docSelected.heightM.toFixed(3)} m
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => appRef.current?.documentTool.beginScaleTwoPoints(docSelected.id)}
+                      className="cad-toolbar-btn w-full justify-center h-9"
+                      title="Über zwei Snap-Punkte und eine Soll-Länge skalieren"
+                    >
+                      <Maximize2 className="h-4 w-4" />
+                      <span className="text-xs">Skalieren (2 Punkte)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => appRef.current?.documentTool.beginScaleFromLastDimension(docSelected.id)}
+                      className="cad-toolbar-btn w-full justify-center h-9"
+                      title="Skaliere mit der zuletzt erstellten Maßkette als Referenz"
+                    >
+                      <RulerIcon className="h-4 w-4" />
+                      <span className="text-xs">Skalieren (Maßkette)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const app = appRef.current; if (!app) return;
+                        const doc = app.scene.getDocumentById(docSelected.id);
+                        if (doc && window.confirm(`Dokument "${doc.name}" löschen?`)) {
+                          app.scene.removeDocument(doc); app.clearSelection(); app.refreshLabelUI();
+                        }
+                      }}
+                      className="cad-toolbar-btn w-full justify-center h-9"
+                      title="Dokument löschen"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      <span className="text-xs">Löschen</span>
+                    </button>
+                  </div>
+                )}
+
+                <div className="text-[11px] leading-relaxed pt-2" style={{ color: "hsl(var(--cad-toolbar-muted))", borderTop: "1px solid hsl(var(--border))" }}>
+                  <div>PDF, JPG, PNG werden mit 96 DPI / 72 pt importiert.</div>
+                  <div>Klick: Auswahl · Drag: verschieben (Snap aktiv) · Entf: löschen</div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
+
+        {/* PDF Page Picker Dialog */}
+        <Dialog open={!!docPickerPages} onOpenChange={(o) => { if (!o) setDocPickerPages(null); }}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Seiten auswählen</DialogTitle>
+            </DialogHeader>
+            <div className="max-h-[60vh] overflow-y-auto grid grid-cols-3 gap-3 p-1">
+              {docPickerPages?.map((p, i) => {
+                const checked = docPickerSelected.has(i);
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => {
+                      setDocPickerSelected(prev => {
+                        const next = new Set(prev);
+                        if (next.has(i)) next.delete(i); else next.add(i);
+                        return next;
+                      });
+                    }}
+                    className={`relative rounded-md border-2 transition-all overflow-hidden ${checked ? "border-primary" : "border-border"}`}
+                  >
+                    <img src={p.src} alt={p.name} className="w-full h-32 object-contain bg-muted" />
+                    <div className="text-[10px] p-1 text-center truncate bg-muted/50">Seite {i + 1}</div>
+                    {checked && (
+                      <div className="absolute top-1 right-1 w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">✓</div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => { setDocPickerSelected(new Set()); }}>Keine</Button>
+              <Button variant="outline" onClick={() => {
+                const all = new Set<number>();
+                docPickerPages?.forEach((_, i) => all.add(i));
+                setDocPickerSelected(all);
+              }}>Alle</Button>
+              <Button onClick={handleDocPickerConfirm} disabled={docPickerSelected.size === 0}>
+                {docPickerSelected.size} importieren
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Collapse toggle */}
         <button

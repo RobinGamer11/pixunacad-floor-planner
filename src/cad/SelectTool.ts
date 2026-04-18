@@ -7,6 +7,7 @@ import { getDimensionGeometry } from "./dimensionGeometry";
 import { pointInOrientedBox } from "./textGeometry";
 import type { TextBox } from "./Scene";
 import { pointInInstance, instanceBoundingCornersWorld } from "./StickerManager";
+import { pointInDocument } from "./documentGeometry";
 
 type EditTarget =
   | { kind: "segment"; segmentId: string; pointIndex: number }
@@ -42,6 +43,11 @@ export class SelectTool {
   dragStickerGrabOffset: Vec2 | null = null; // mouseStart - instanceOrigin (Greifpunkt-Offset relativ zur Position)
   dragStickerSnap: Snap | null = null; // letzter aktiver Snap während Drag (für Overlay)
 
+  // Document Drag-State (Translate via Mausziehen, snap-fähig)
+  dragDocId: string | null = null;
+  dragDocGrabOffset: Vec2 | null = null;
+  dragDocSnap: Snap | null = null;
+
 
 
   constructor(app: CadApp) {
@@ -64,6 +70,9 @@ export class SelectTool {
     this.app.renderer.setHoverSegmentId(null);
     this.app.renderer.setHoverTextBoxId(null);
     this.dragDimId = null;
+    this.dragDocId = null;
+    this.dragDocGrabOffset = null;
+    this.dragDocSnap = null;
   }
 
   finish() {}
@@ -85,6 +94,17 @@ export class SelectTool {
       const inst = this.app.scene.stickerInstances[i];
       if (!this.app.labelManager.isVisible(inst.labelId)) continue;
       if (pointInInstance(inst.items as any, inst.position, inst.rotationRad, inst.scale, mouseW)) return inst;
+    }
+    return null;
+  }
+
+  /** Returns the topmost document under the mouse, or null. */
+  private _hitDocument(input: Input) {
+    const mouseW = v(input.mouse.wx, input.mouse.wy);
+    for (let i = this.app.scene.documents.length - 1; i >= 0; i--) {
+      const doc = this.app.scene.documents[i];
+      if (!this.app.labelManager.isVisible(doc.labelId)) continue;
+      if (pointInDocument(mouseW, doc)) return doc;
     }
     return null;
   }
@@ -567,6 +587,35 @@ export class SelectTool {
       }
     }
 
+    // Active document drag with point snapping
+    if (this.dragDocId) {
+      const doc = this.app.scene.getDocumentById(this.dragDocId);
+      if (!doc || !this.dragDocGrabOffset) {
+        this.dragDocId = null;
+        this.dragDocGrabOffset = null;
+        this.dragDocSnap = null;
+      } else {
+        const mouseW = v(input.mouse.wx, input.mouse.wy);
+        const snap = this.app.topology.findBestSnap(
+          v(input.mouse.sx, input.mouse.sy),
+          mouseW
+        );
+        this.dragDocSnap = snap;
+        const target = (snap && snap.world) ? snap.world : mouseW;
+        // doc.position ist die Top-Left-Ecke; Greifpunkt-Offset bezieht sich darauf.
+        doc.position = {
+          x: target.x - this.dragDocGrabOffset.x,
+          y: target.y - this.dragDocGrabOffset.y,
+        };
+        if (!input.mouse.left) {
+          this.dragDocId = null;
+          this.dragDocGrabOffset = null;
+          this.dragDocSnap = null;
+        }
+        return;
+      }
+    }
+
     // Active dimension parallel-drag
     if (this.dragDimId) {
       const dim = this.app.scene.getDimensionById(this.dragDimId);
@@ -739,20 +788,30 @@ export class SelectTool {
       }
 
       const hit = this._hitTestWithForegroundPriority(input);
-      this.app.setSelection(hit);
-      if (hit && (hit as any).segmentId) {
-        this.app.showLineSettingsPanel(true);
-      }
-      if (hit && (hit as any).hatchId) {
-        this.app.showHatchSettingsPanel(true);
-      }
-      if (hit && hit.type === SelectionType.DIMENSION) {
-        const dim = this.app.scene.getDimensionById((hit as any).dimensionId);
-        if (dim) {
-          const g = getDimensionGeometry(dim);
-          const mouseW = v(input.mouse.wx, input.mouse.wy);
-          this.dragDimId = dim.id;
-          this.dragDimOffsetAlongNormal = dot(sub(mouseW, dim.p1), g.n) - g.offset;
+      if (hit) {
+        this.app.setSelection(hit);
+        if ((hit as any).segmentId) this.app.showLineSettingsPanel(true);
+        if ((hit as any).hatchId) this.app.showHatchSettingsPanel(true);
+        if (hit.type === SelectionType.DIMENSION) {
+          const dim = this.app.scene.getDimensionById((hit as any).dimensionId);
+          if (dim) {
+            const g = getDimensionGeometry(dim);
+            const mouseW = v(input.mouse.wx, input.mouse.wy);
+            this.dragDimId = dim.id;
+            this.dragDimOffsetAlongNormal = dot(sub(mouseW, dim.p1), g.n) - g.offset;
+          }
+        }
+      } else {
+        // Kein Vordergrund-Hit → Document-Underlay testen (kann gewählt + gezogen werden)
+        const docHit = this._hitDocument(input);
+        if (docHit) {
+          this.app.setSelection({ type: SelectionType.DOCUMENT, documentId: docHit.id } as any);
+          const mouseW0 = v(input.mouse.wx, input.mouse.wy);
+          this.dragDocId = docHit.id;
+          this.dragDocGrabOffset = { x: mouseW0.x - docHit.position.x, y: mouseW0.y - docHit.position.y };
+          this.dragDocSnap = null;
+        } else {
+          this.app.setSelection(null);
         }
       }
     }
@@ -776,6 +835,31 @@ export class SelectTool {
     // Sticker-Drag-Snap-Marker
     if (this.dragStickerId && this.dragStickerSnap) {
       const sn = this.dragStickerSnap;
+      if ((sn.type === SnapType.LINE || sn.type === SnapType.GUIDE) && sn.lineA && sn.lineB) {
+        const a = cam.worldToScreen(sn.lineA.x, sn.lineA.y);
+        const b = cam.worldToScreen(sn.lineB.x, sn.lineB.y);
+        ctx.save();
+        ctx.strokeStyle = "rgba(77,163,255,0.42)";
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+        ctx.restore();
+      }
+      if (sn.world) {
+        const s = cam.worldToScreen(sn.world.x, sn.world.y);
+        ctx.save();
+        ctx.fillStyle = "rgba(77,163,255,0.95)";
+        ctx.beginPath(); ctx.arc(s.x, s.y, 4.5, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = "rgba(77,163,255,0.45)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(s.x, s.y, 10, 0, Math.PI * 2); ctx.stroke();
+        ctx.restore();
+      }
+      return;
+    }
+
+    // Document-Drag-Snap-Marker
+    if (this.dragDocId && this.dragDocSnap) {
+      const sn = this.dragDocSnap;
       if ((sn.type === SnapType.LINE || sn.type === SnapType.GUIDE) && sn.lineA && sn.lineB) {
         const a = cam.worldToScreen(sn.lineA.x, sn.lineA.y);
         const b = cam.worldToScreen(sn.lineB.x, sn.lineB.y);
