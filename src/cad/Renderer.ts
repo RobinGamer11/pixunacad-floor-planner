@@ -1,15 +1,19 @@
 import { Defaults, SelectionType } from "./constants";
 import { Vec2, v, sub, add, mul, norm, perpLeft, clamp, rgbaFromHex, hexToRgba, polygonAreaAbs, polygonCentroid } from "./geometry";
 import { Camera } from "./Camera";
-import { Scene, Hatch, Dimension } from "./Scene";
+import { Scene, Hatch, Dimension, TextBox } from "./Scene";
 import { LabelManager } from "./LabelManager";
 import { getDimensionGeometry, type DimensionLike } from "./dimensionGeometry";
+import { boxCornersWorld } from "./textGeometry";
+import { drawRichTextBox } from "./textRichRenderer";
 
 export interface Selection {
   type: string;
   segmentId?: string;
   hatchId?: string;
   dimensionId?: string;
+  textBoxId?: string;
+  handleIndex?: number | null;
   pointIndex?: number | null;
 }
 
@@ -38,6 +42,9 @@ export class Renderer {
   selectedLabelId: string | null = null;
   hoverSegmentId: string | null = null;
   hoverHatchId: string | null = null;
+  hoverTextBoxId: string | null = null;
+  /** Box currently being edited inline — skip canvas rendering for it. */
+  editingTextBoxId: string | null = null;
 
   constructor(ctx: CanvasRenderingContext2D, camera: Camera, scene: Scene, labels: LabelManager) {
     this.ctx = ctx;
@@ -51,6 +58,8 @@ export class Renderer {
   setSelectedLabelId(labelId: string | null) { this.selectedLabelId = labelId || null; }
   setHoverSegmentId(id: string | null) { this.hoverSegmentId = id || null; }
   setHoverHatchId(id: string | null) { this.hoverHatchId = id || null; }
+  setHoverTextBoxId(id: string | null) { this.hoverTextBoxId = id || null; }
+  setEditingTextBoxId(id: string | null) { this.editingTextBoxId = id || null; }
 
   private _segmentsBackToFront() {
     const order = this.labels.list();
@@ -84,9 +93,11 @@ export class Renderer {
     this._drawHatches();
     this._drawSegments();
     this._drawDimensions();
+    this._drawTextBoxes();
     this._drawHatchSelection();
     this._drawSegmentSelection();
     this._drawDimensionSelection();
+    this._drawTextBoxSelection();
     this._drawHoverSegmentPoints();
 
     if (this.overlay && this.overlay.draw) {
@@ -545,5 +556,95 @@ export class Renderer {
       ctx.stroke();
     }
     ctx.restore();
+  }
+
+  /* ---------- TextBoxes ---------- */
+
+  private _textBoxesBackToFront(): TextBox[] {
+    const order = this.labels.list();
+    const rank = new Map(order.map((g, i) => [g.id, i]));
+    return [...this.scene.textBoxes]
+      .filter(t => this.labels.isVisible(t.labelId))
+      .sort((a, b) => (rank.get(a.labelId) || 0) - (rank.get(b.labelId) || 0));
+  }
+
+  private _drawTextBoxes() {
+    const cam = this.camera;
+    for (const box of this._textBoxesBackToFront()) {
+      if (this.editingTextBoxId === box.id) continue;
+      const cs = cam.worldToScreen(box.center.x, box.center.y);
+      const widthPx = box.widthM * cam.scale;
+      const heightPx = box.heightM * cam.scale;
+      drawRichTextBox({
+        ctx: this.ctx,
+        centerScreenX: cs.x,
+        centerScreenY: cs.y,
+        widthPx, heightPx,
+        rotationRad: box.rotationRad,
+        html: box.html || "",
+        baseFontSizePx: box.style.fontSizePx * (cam.scale / Defaults.measureReferenceScalePxPerM),
+        baseColor: box.style.textColor,
+        bgColor: box.style.bgColor,
+        bgAlpha: (box.style.bgAlphaPct || 0) / 100,
+        align: box.style.align,
+        wrap: box.style.wrap,
+        borderEnabled: box.style.borderEnabled,
+        borderColor: box.style.borderColor,
+        borderWidthPx: box.style.borderWidthPx,
+        paddingPx: 6,
+      });
+    }
+
+    // Hover outline (non-selected)
+    if (this.hoverTextBoxId && (!this.selection || (this.selection as any).textBoxId !== this.hoverTextBoxId)) {
+      const box = this.scene.getTextBoxById(this.hoverTextBoxId);
+      if (box && this.labels.isVisible(box.labelId)) this._strokeBoxOutline(box, "rgba(77,163,255,0.55)", 2);
+    }
+  }
+
+  private _strokeBoxOutline(box: TextBox, strokeStyle: string, lineWidth: number) {
+    const ctx = this.ctx;
+    const cam = this.camera;
+    const corners = boxCornersWorld(box);
+    ctx.save();
+    ctx.beginPath();
+    const p0 = cam.worldToScreen(corners[0].x, corners[0].y);
+    ctx.moveTo(p0.x, p0.y);
+    for (let i = 1; i < corners.length; i++) {
+      const sp = cam.worldToScreen(corners[i].x, corners[i].y);
+      ctx.lineTo(sp.x, sp.y);
+    }
+    ctx.closePath();
+    ctx.strokeStyle = strokeStyle;
+    ctx.lineWidth = lineWidth;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  private _drawTextBoxSelection() {
+    if (!this.selection || (this.selection.type !== SelectionType.TEXTBOX && this.selection.type !== SelectionType.TEXTBOX_HANDLE)) return;
+    const id = (this.selection as any).textBoxId;
+    if (!id) return;
+    const box = this.scene.getTextBoxById(id);
+    if (!box || !this.labels.isVisible(box.labelId)) return;
+
+    const ctx = this.ctx;
+    const cam = this.camera;
+    this._strokeBoxOutline(box, "rgba(77,163,255,0.95)", 2);
+
+    const corners = boxCornersWorld(box);
+    const activeIdx = this.selection.handleIndex ?? -1;
+    for (let i = 0; i < corners.length; i++) {
+      const sp = cam.worldToScreen(corners[i].x, corners[i].y);
+      ctx.save();
+      ctx.fillStyle = (i === activeIdx) ? "rgba(77,163,255,0.95)" : "rgba(77,163,255,0.12)";
+      ctx.strokeStyle = "rgba(77,163,255,0.95)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(sp.x, sp.y, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
   }
 }

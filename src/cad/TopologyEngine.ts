@@ -3,6 +3,7 @@ import { Vec2, v, projectPointToSegment } from "./geometry";
 import { Scene, Segment, Hatch } from "./Scene";
 import { Camera } from "./Camera";
 import { LabelManager } from "./LabelManager";
+import { boxCornersWorld } from "./textGeometry";
 
 export interface Snap {
   type: string;
@@ -88,6 +89,20 @@ export class TopologyEngine {
       for (let i = 0; i < hatch.points.length; i++) {
         considerPoint(hatch.points[i], null, hatch, i);
       }
+    }
+    // TextBox corners
+    for (const box of this.scene.textBoxes) {
+      if (!this.labels.isVisible(box.labelId)) continue;
+      const corners = boxCornersWorld(box);
+      for (const c of corners) {
+        considerPoint(c, null, null, -1);
+      }
+    }
+    // Dimension endpoints
+    for (const dim of this.scene.dimensions) {
+      if (!this.labels.isVisible(dim.labelId)) continue;
+      considerPoint(dim.p1, null, null, -1);
+      considerPoint(dim.p2, null, null, -1);
     }
     // Segment lines
     for (const seg of segs) {

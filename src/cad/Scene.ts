@@ -128,13 +128,64 @@ export class Dimension {
   }
 }
 
+export interface TextBoxStyle {
+  textColor?: string;
+  fontSizePx?: number;
+  bgColor?: string;
+  bgAlphaPct?: number;
+  wrap?: boolean;
+  align?: "left" | "center" | "right";
+  borderEnabled?: boolean;
+  borderColor?: string;
+  borderWidthPx?: number;
+  labelId?: string;
+}
+
+export class TextBox {
+  id: string;
+  center: Vec2;
+  widthM: number;
+  heightM: number;
+  rotationRad: number;
+  html: string;
+  style: Required<Omit<TextBoxStyle, "labelId">>;
+  labelId: string;
+
+  constructor({ id, center, widthM, heightM, rotationRad, html, style, labelId }: {
+    id: string; center: Vec2; widthM: number; heightM: number;
+    rotationRad?: number; html?: string; style?: TextBoxStyle; labelId?: string;
+  }) {
+    this.id = id;
+    this.center = v(center.x, center.y);
+    this.widthM = Math.max(Defaults.textMinBoxSizeM, widthM);
+    this.heightM = Math.max(Defaults.textMinBoxSizeM, heightM);
+    this.rotationRad = rotationRad || 0;
+    this.html = html || "";
+    const s = style || {};
+    this.style = {
+      textColor: s.textColor || Defaults.textColor,
+      fontSizePx: clamp(s.fontSizePx ?? Defaults.textFontSizePx, 6, 200),
+      bgColor: s.bgColor || Defaults.textBgColor,
+      bgAlphaPct: clamp(s.bgAlphaPct ?? Defaults.textBgAlphaPct, 0, 100),
+      wrap: (typeof s.wrap === "boolean") ? s.wrap : Defaults.textWrap,
+      align: s.align || Defaults.textAlign,
+      borderEnabled: (typeof s.borderEnabled === "boolean") ? s.borderEnabled : Defaults.textBorderEnabled,
+      borderColor: s.borderColor || Defaults.textBorderColor,
+      borderWidthPx: clamp(s.borderWidthPx ?? Defaults.textBorderWidthPx, 0, 30),
+    };
+    this.labelId = labelId || s.labelId || Defaults.defaultLabelId;
+  }
+}
+
 export class Scene {
   segments: Segment[] = [];
   hatches: Hatch[] = [];
   dimensions: Dimension[] = [];
+  textBoxes: TextBox[] = [];
   private _segIdMap = new Map<string, Segment>();
   private _hatchIdMap = new Map<string, Hatch>();
   private _dimIdMap = new Map<string, Dimension>();
+  private _textIdMap = new Map<string, TextBox>();
 
   private _makeId(): string {
     return (crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now() + Math.random());
@@ -153,6 +204,56 @@ export class Scene {
   private _rebuildDimIdMap() {
     this._dimIdMap.clear();
     for (const d of this.dimensions) this._dimIdMap.set(d.id, d);
+  }
+
+  private _rebuildTextIdMap() {
+    this._textIdMap.clear();
+    for (const t of this.textBoxes) this._textIdMap.set(t.id, t);
+  }
+
+  // ---- TextBoxes ----
+  createTextBox(center: Vec2, widthM: number, heightM: number, style: TextBoxStyle = {}, html: string = "", rotationRad: number = 0) {
+    const box = new TextBox({
+      id: this._makeId(), center, widthM, heightM, rotationRad, html, style, labelId: style.labelId,
+    });
+    this.textBoxes.push(box);
+    this._rebuildTextIdMap();
+    return box;
+  }
+
+  getTextBoxById(id: string): TextBox | null { return this._textIdMap.get(id) || null; }
+
+  getTextBoxesByLabelId(labelId: string): TextBox[] {
+    return this.textBoxes.filter(t => t.labelId === labelId);
+  }
+
+  removeTextBox(box: TextBox) {
+    this.textBoxes = this.textBoxes.filter(t => t !== box);
+    this._rebuildTextIdMap();
+  }
+
+  removeTextBoxesByIds(ids: string[]) {
+    const set = new Set(ids);
+    this.textBoxes = this.textBoxes.filter(t => !set.has(t.id));
+    this._rebuildTextIdMap();
+  }
+
+  removeTextBoxesByLabelId(labelId: string) {
+    this.textBoxes = this.textBoxes.filter(t => t.labelId !== labelId);
+    this._rebuildTextIdMap();
+  }
+
+  reassignTextBoxesLabel(oldId: string, newId: string) {
+    for (const t of this.textBoxes) {
+      if (t.labelId === oldId) t.labelId = newId;
+    }
+  }
+
+  assignTextBoxesToLabel(ids: string[], newId: string) {
+    const set = new Set(ids);
+    for (const t of this.textBoxes) {
+      if (set.has(t.id)) t.labelId = newId;
+    }
   }
 
   // ---- Dimensions ----
