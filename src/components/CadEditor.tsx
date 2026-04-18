@@ -393,17 +393,19 @@ const CadEditor: React.FC = () => {
   }, [docPickerPages, docPickerSelected]);
 
   /**
-   * Maßstab anwenden. Real-World-Mapping:
-   *   weltMeter = paperMeter × denom_pdf
-   * Beispiel A4 1:100 → 0.21m × 100 = 21m Welt.
-   * Der gewählte Zeichenmaßstab dient nur als Default-Vorauswahl.
+   * Maßstab anwenden. Mapping relativ zum Zeichen-Maßstab:
+   *   weltMeter = paperMeter × (denom_pdf / drawingScale)
+   * → Wenn PDF-Maßstab == Zeichen-Maßstab, wird das PDF in Papiergröße
+   *   platziert (1:1 Anzeige zum Zeichenraster). Ein 1:200-PDF auf einer
+   *   1:100-Fläche erscheint doppelt so groß (korrekt, da es die doppelte
+   *   reale Strecke pro Papier-cm zeigt).
    */
   const handleScaleConfirm = useCallback(() => {
     if (!scaleDialogPages) return;
     const app = appRef.current; if (!app) return;
     const denom = scaleChoice === "custom" ? parseFloat(scaleCustom.replace(",", ".")) : parseFloat(scaleChoice);
     const safeDenom = Number.isFinite(denom) && denom > 0 ? denom : 100;
-    const factor = safeDenom;
+    const factor = safeDenom / Math.max(0.0001, drawingScale);
     const scaledPages = scaleDialogPages.map(p => ({ ...p, widthM: p.widthM * factor, heightM: p.heightM * factor }));
     const [first, ...rest] = scaledPages;
     app.setTool(ToolIds.DOCUMENT);
