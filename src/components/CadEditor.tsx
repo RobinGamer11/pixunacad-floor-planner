@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import { CadApp } from "@/cad/CadApp";
 import { ToolIds, PointEditAction } from "@/cad/constants";
-import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler } from "lucide-react";
+import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight } from "lucide-react";
 import type { HatchDrawMode } from "@/cad/HatchTool";
 
 const CAD_TOOLS = [
@@ -9,6 +9,7 @@ const CAD_TOOLS = [
   { id: ToolIds.LINE, label: "Linie", key: "L", icon: Minus },
   { id: ToolIds.HATCH, label: "Schraffur", key: "H", icon: Square },
   { id: ToolIds.MEASURE, label: "Maßkette", key: "M", icon: Ruler },
+  { id: ToolIds.TEXT, label: "Text", key: "T", icon: Type },
 ];
 
 const CadEditor: React.FC = () => {
@@ -75,6 +76,34 @@ const CadEditor: React.FC = () => {
   const measureLineColorPreviewRef = useRef<HTMLDivElement>(null);
   const measureTickLengthRef = useRef<HTMLInputElement>(null);
 
+  // Text settings refs
+  const textSettingsRef = useRef<HTMLDivElement>(null);
+  const textIdSelectRef = useRef<HTMLSelectElement>(null);
+  const textColorRef = useRef<HTMLInputElement>(null);
+  const textColorPreviewRef = useRef<HTMLDivElement>(null);
+  const textFontSizeRef = useRef<HTMLInputElement>(null);
+  const textAlignLeftRef = useRef<HTMLButtonElement>(null);
+  const textAlignCenterRef = useRef<HTMLButtonElement>(null);
+  const textAlignRightRef = useRef<HTMLButtonElement>(null);
+  const textBgColorRef = useRef<HTMLInputElement>(null);
+  const textBgColorPreviewRef = useRef<HTMLDivElement>(null);
+  const textBgAlphaRef = useRef<HTMLInputElement>(null);
+  const textWrapRef = useRef<HTMLInputElement>(null);
+  const textBorderToggleRef = useRef<HTMLInputElement>(null);
+  const textBorderGroupRef = useRef<HTMLDivElement>(null);
+  const textBorderColorRef = useRef<HTMLInputElement>(null);
+  const textBorderColorPreviewRef = useRef<HTMLDivElement>(null);
+  const textBorderWidthRef = useRef<HTMLInputElement>(null);
+
+  // Text editor overlay refs
+  const textEditorElRef = useRef<HTMLDivElement>(null);
+  const textEditorToolbarRef = useRef<HTMLDivElement>(null);
+  const textEditorBoldRef = useRef<HTMLButtonElement>(null);
+  const textEditorItalicRef = useRef<HTMLButtonElement>(null);
+  const textEditorColorRef = useRef<HTMLInputElement>(null);
+  const textEditorSizeRef = useRef<HTMLSelectElement>(null);
+  const textEditorSymbolRef = useRef<HTMLSelectElement>(null);
+
   const appRef = useRef<CadApp | null>(null);
   const [activeTool, setActiveTool] = useState<string>(ToolIds.SELECT);
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
@@ -102,7 +131,16 @@ const CadEditor: React.FC = () => {
       !measureTextColorRef.current || !measureTextColorPreviewRef.current || !measureTextSizeRef.current ||
       !measureDecimalsRef.current || !measureTextBgToggleRef.current || !measureTextBgGroupRef.current ||
       !measureTextBgColorRef.current || !measureTextBgColorPreviewRef.current || !measureTextBgAlphaRef.current ||
-      !measureLineColorRef.current || !measureLineColorPreviewRef.current || !measureTickLengthRef.current
+      !measureLineColorRef.current || !measureLineColorPreviewRef.current || !measureTickLengthRef.current ||
+      !textSettingsRef.current || !textIdSelectRef.current ||
+      !textColorRef.current || !textColorPreviewRef.current || !textFontSizeRef.current ||
+      !textAlignLeftRef.current || !textAlignCenterRef.current || !textAlignRightRef.current ||
+      !textBgColorRef.current || !textBgColorPreviewRef.current || !textBgAlphaRef.current ||
+      !textWrapRef.current || !textBorderToggleRef.current || !textBorderGroupRef.current ||
+      !textBorderColorRef.current || !textBorderColorPreviewRef.current || !textBorderWidthRef.current ||
+      !textEditorElRef.current || !textEditorToolbarRef.current ||
+      !textEditorBoldRef.current || !textEditorItalicRef.current ||
+      !textEditorColorRef.current || !textEditorSizeRef.current || !textEditorSymbolRef.current
     ) return;
 
     const app = new CadApp(
@@ -148,6 +186,34 @@ const CadEditor: React.FC = () => {
         lineColor: measureLineColorRef.current,
         lineColorPreview: measureLineColorPreviewRef.current,
         tickLength: measureTickLengthRef.current,
+      },
+      {
+        panel: textSettingsRef.current,
+        idSelect: textIdSelectRef.current,
+        textColor: textColorRef.current,
+        textColorPreview: textColorPreviewRef.current,
+        fontSize: textFontSizeRef.current,
+        alignLeftBtn: textAlignLeftRef.current,
+        alignCenterBtn: textAlignCenterRef.current,
+        alignRightBtn: textAlignRightRef.current,
+        bgColor: textBgColorRef.current,
+        bgColorPreview: textBgColorPreviewRef.current,
+        bgAlpha: textBgAlphaRef.current,
+        wrapToggle: textWrapRef.current,
+        borderToggle: textBorderToggleRef.current,
+        borderGroup: textBorderGroupRef.current,
+        borderColor: textBorderColorRef.current,
+        borderColorPreview: textBorderColorPreviewRef.current,
+        borderWidth: textBorderWidthRef.current,
+      },
+      {
+        editor: textEditorElRef.current,
+        toolbar: textEditorToolbarRef.current,
+        boldBtn: textEditorBoldRef.current,
+        italicBtn: textEditorItalicRef.current,
+        colorInput: textEditorColorRef.current,
+        sizeSelect: textEditorSizeRef.current,
+        symbolSelect: textEditorSymbolRef.current,
       },
     );
 
