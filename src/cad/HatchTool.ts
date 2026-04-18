@@ -2,7 +2,8 @@ import { Defaults, SnapType } from "./constants";
 import {
   Vec2, v, add, sub, mul, norm, dot, dist, angleDeg, pointFromLengthAngle,
   orthoSnapFromA, nearestAngleToReference, rgbaFromHex,
-  lineLineIntersectionInfinite, projectPointToInfiniteLine
+  lineLineIntersectionInfinite, projectPointToInfiniteLine,
+  normalizeDeg, buildCircleOrSectorPoints
 } from "./geometry";
 import type { CadApp } from "./CadApp";
 import type { Snap } from "./TopologyEngine";
@@ -25,7 +26,7 @@ interface GuideDef {
   dir: Vec2;
 }
 
-export type HatchDrawMode = "polygon" | "rectangle";
+export type HatchDrawMode = "polygon" | "rectangle" | "circle";
 
 export class HatchTool {
   app: CadApp;
@@ -37,10 +38,17 @@ export class HatchTool {
   state: "idle" | "drawing" = "idle";
   points: Vec2[] = [];
 
-  // Rectangle mode state ("idle" | "firstSide" | "secondSide")
+  // Rectangle mode state
   rectState: "idle" | "firstSide" | "secondSide" = "idle";
   rectPointA: Vec2 | null = null;
   rectPointB: Vec2 | null = null;
+
+  // Circle mode state ("idle" | "radius" | "arc")
+  circleState: "idle" | "radius" | "arc" = "idle";
+  circleCenter: Vec2 | null = null;
+  circleRadiusM = 0;
+  circleStartAngleDeg = 0;
+  circleEndAngleDeg = 0;
 
   snap: Snap | null = null;
   activeTargetHatchId: string | null = null;
