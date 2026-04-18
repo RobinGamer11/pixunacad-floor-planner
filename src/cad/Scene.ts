@@ -8,6 +8,8 @@ export class Segment {
   color: string;
   thicknessM: number;
   labelId: string;
+  /** Wenn gesetzt: dieses Objekt gehört zum Edit-Mode der Sticker-Instanz mit dieser ID. */
+  _stickerEditOwnerId?: string | null;
 
   constructor({ id, a, b, color, thicknessM, labelId }: { id: string; a: Vec2; b: Vec2; color?: string; thicknessM?: number; labelId?: string }) {
     this.id = id;
@@ -16,6 +18,7 @@ export class Segment {
     this.color = color || Defaults.lineColor;
     this.thicknessM = (typeof thicknessM === "number" && thicknessM > 0) ? thicknessM : Defaults.lineThicknessM;
     this.labelId = labelId || Defaults.defaultLabelId;
+    this._stickerEditOwnerId = null;
   }
 }
 
@@ -215,6 +218,12 @@ export class Scene {
   dimensions: Dimension[] = [];
   textBoxes: TextBox[] = [];
   stickerInstances: StickerInstance[] = [];
+  /**
+   * Wenn !== null: alle danach via create* erzeugten Objekte werden mit dieser
+   * Sticker-Edit-Owner-ID markiert. Wird von CadApp während enterStickerEdit
+   * gesetzt und beim Exit wieder geleert.
+   */
+  _currentEditOwnerId: string | null = null;
   private _segIdMap = new Map<string, Segment>();
   private _hatchIdMap = new Map<string, Hatch>();
   private _dimIdMap = new Map<string, Dimension>();
