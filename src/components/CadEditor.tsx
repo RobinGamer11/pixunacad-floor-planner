@@ -400,24 +400,20 @@ const CadEditor: React.FC = () => {
   }, [docPickerPages, docPickerSelected]);
 
   /**
-   * Maßstab anwenden. Import-Faktor:
-   *   factor = drawingScale / denom_pdf
-   * Beispiele (Zeichnenoberfläche / PDF → Faktor):
-   *   1:100 / 1:100 → 1   (1m Plan = 1m Welt)
-   *   1:200 / 1:100 → 2   (1m Plan = 2m Welt — PDF wirkt größer)
-   *   1:100 / 1:200 → 0.5 (1m Plan = 0.5m Welt — PDF wirkt kleiner)
-   * Höherer PDF-Maßstab (1:200, 1:500) bedeutet bei gleicher Zeichenoberfläche
-   * → kleinere Welt-Meter. Der Ansichts-/Zeichenmaßstab beeinflusst NUR den
-   * Import-Faktor; nach dem Import bleibt die Welt-Geometrie absolut.
+   * Maßstab anwenden. Import-Faktor ist KONSTANT 1:
+   *   PDF-Geometrie wird beim Import 1:1 in den Modellraum übernommen,
+   *   sodass eine 1m-Strecke im Plan IMMER 1m im Modell ist —
+   *   unabhängig vom aktuellen Ansichtsmaßstab (drawingScale).
+   * Der Ansichtsmaßstab beeinflusst nur die VISUELLE Darstellung der PDF
+   * (siehe Renderer._drawDocuments → displayFactor = importScaleDenom / drawingScale).
+   * Modellgeometrie, Maßketten und Snaps bleiben dadurch immer maßhaltig.
    */
   const handleScaleConfirm = useCallback(() => {
     if (!scaleDialogPages) return;
     const app = appRef.current; if (!app) return;
     const denom = scaleChoice === "custom" ? parseFloat(scaleCustom.replace(",", ".")) : parseFloat(scaleChoice);
     const safeDenom = Number.isFinite(denom) && denom > 0 ? denom : 100;
-    const factor = drawingScale / safeDenom;
-    const scaledPages = scaleDialogPages.map(p => ({ ...p, widthM: p.widthM * factor, heightM: p.heightM * factor }));
-    const [first, ...rest] = scaledPages;
+    const [first, ...rest] = scaleDialogPages;
     app.setTool(ToolIds.DOCUMENT);
     app.documentTool.beginPlacement({
       src: first.src, widthM: first.widthM, heightM: first.heightM,
@@ -437,7 +433,7 @@ const CadEditor: React.FC = () => {
       offX += p.widthM + 0.5;
     }
     setScaleDialogPages(null);
-  }, [scaleDialogPages, scaleChoice, scaleCustom, drawingScale]);
+  }, [scaleDialogPages, scaleChoice, scaleCustom]);
 
   const sidebarWidth = sidebarCollapsed ? 56 : 240;
 
