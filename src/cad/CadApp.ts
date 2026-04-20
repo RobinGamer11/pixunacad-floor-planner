@@ -151,6 +151,13 @@ export class CadApp {
   topology: TopologyEngine;
   renderer: Renderer;
 
+  /**
+   * Aktueller Ansichtsmaßstab (Nenner, z. B. 100 für 1:100).
+   * REIN visuell: beeinflusst NUR die Darstellung von Dokumenten (Renderer)
+   * und den Kamera-Zoom. Verändert NIE Modellgeometrie oder reale Maße.
+   */
+  drawingScale: number = 100;
+
   selectTool: SelectTool;
   lineTool: LineTool;
   hatchTool: HatchTool;
