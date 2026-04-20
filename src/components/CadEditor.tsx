@@ -131,7 +131,10 @@ const CadEditor: React.FC = () => {
   const [docPickerPages, setDocPickerPages] = useState<ImportedPage[] | null>(null);
   const [docPickerSelected, setDocPickerSelected] = useState<Set<number>>(new Set());
   const [docImporting, setDocImporting] = useState(false);
-  const [docSelected, setDocSelected] = useState<{ id: string; name: string; widthM: number; heightM: number } | null>(null);
+  const [docSelected, setDocSelected] = useState<{ id: string; name: string; widthM: number; heightM: number; importScaleDenom: number } | null>(null);
+  const [docScalePopoverOpen, setDocScalePopoverOpen] = useState(false);
+  const [docScaleChoice, setDocScaleChoice] = useState<string>("100");
+  const [docScaleCustom, setDocScaleCustom] = useState<string>("100");
   const [docToolPhase, setDocToolPhase] = useState<string>("idle");
   // Maßstab-Auswahl vor Platzierung
   const [scaleDialogPages, setScaleDialogPages] = useState<ImportedPage[] | null>(null);
@@ -337,7 +340,7 @@ const CadEditor: React.FC = () => {
         if (sel && sel.type === "document") {
           const doc = app.scene.getDocumentById(sel.documentId);
           if (doc) {
-            setDocSelected(prev => (prev && prev.id === doc.id && prev.widthM === doc.widthM && prev.heightM === doc.heightM) ? prev : { id: doc.id, name: doc.name, widthM: doc.widthM, heightM: doc.heightM });
+            setDocSelected(prev => (prev && prev.id === doc.id && prev.widthM === doc.widthM && prev.heightM === doc.heightM && prev.importScaleDenom === doc.importScaleDenom) ? prev : { id: doc.id, name: doc.name, widthM: doc.widthM, heightM: doc.heightM, importScaleDenom: doc.importScaleDenom });
           } else {
             setDocSelected(prev => prev ? null : prev);
           }
@@ -397,21 +400,22 @@ const CadEditor: React.FC = () => {
   }, [docPickerPages, docPickerSelected]);
 
   /**
-   * Maßstab anwenden. Real-World-Mapping (unabhängig vom Zeichen-Maßstab):
-   *   weltMeter = paperMeter × denom_pdf
-   * Beispiel A4 1:100 → 0.21m × 100 = 21m Welt — 1m im PDF bleibt 1m real.
-   * Importmaßstab definiert die reale Größe der PDF im Modell.
-   * Welt-Größe = Papier-Meter × Maßstabs-Nenner. Der Ansichtsmaßstab spielt
-   * dabei KEINE Rolle (er ist reine Bildschirmdarstellung).
-   * Beispiel: PDF im Maßstab 1:100 → 1 cm Papier = 1 m Welt → Faktor = 100.
+   * Maßstab anwenden. Import-Faktor:
+   *   factor = drawingScale / denom_pdf
+   * Beispiele (Zeichnenoberfläche / PDF → Faktor):
+   *   1:100 / 1:100 → 1   (1m Plan = 1m Welt)
+   *   1:200 / 1:100 → 2   (1m Plan = 2m Welt — PDF wirkt größer)
+   *   1:100 / 1:200 → 0.5 (1m Plan = 0.5m Welt — PDF wirkt kleiner)
+   * Höherer PDF-Maßstab (1:200, 1:500) bedeutet bei gleicher Zeichenoberfläche
+   * → kleinere Welt-Meter. Der Ansichts-/Zeichenmaßstab beeinflusst NUR den
+   * Import-Faktor; nach dem Import bleibt die Welt-Geometrie absolut.
    */
   const handleScaleConfirm = useCallback(() => {
     if (!scaleDialogPages) return;
     const app = appRef.current; if (!app) return;
     const denom = scaleChoice === "custom" ? parseFloat(scaleCustom.replace(",", ".")) : parseFloat(scaleChoice);
     const safeDenom = Number.isFinite(denom) && denom > 0 ? denom : 100;
-    // Modellgröße = Papier-Meter × Nenner. Unabhängig vom Ansichtsmaßstab.
-    const factor = safeDenom;
+    const factor = drawingScale / safeDenom;
     const scaledPages = scaleDialogPages.map(p => ({ ...p, widthM: p.widthM * factor, heightM: p.heightM * factor }));
     const [first, ...rest] = scaledPages;
     app.setTool(ToolIds.DOCUMENT);
@@ -419,6 +423,7 @@ const CadEditor: React.FC = () => {
       src: first.src, widthM: first.widthM, heightM: first.heightM,
       pixelWidth: first.pixelWidth, pixelHeight: first.pixelHeight,
       name: first.name, kind: first.kind, pageIndex: first.pageIndex,
+      importScaleDenom: safeDenom,
     });
     let offX = first.widthM + 0.5;
     for (const p of rest) {
@@ -427,6 +432,7 @@ const CadEditor: React.FC = () => {
         position: { x: offX, y: 0 }, widthM: p.widthM, heightM: p.heightM,
         pixelWidth: p.pixelWidth, pixelHeight: p.pixelHeight,
         labelId: app.activeDrawLabelId,
+        importScaleDenom: safeDenom,
       });
       offX += p.widthM + 0.5;
     }
@@ -930,6 +936,100 @@ const CadEditor: React.FC = () => {
                   <div style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
                     {docSelected.widthM.toFixed(3)} × {docSelected.heightM.toFixed(3)} m
                   </div>
+                </div>
+
+                {/* Plan-Maßstab nachträglich ändern */}
+                <div className="rounded-md p-2" style={{ background: "hsl(var(--muted))", border: "1px solid hsl(var(--border))" }}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[11px] font-semibold" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Plan-Maßstab</span>
+                    <span className="text-[11px] font-semibold" style={{ color: "hsl(var(--foreground))" }}>1 : {docSelected.importScaleDenom}</span>
+                  </div>
+                  {!docScalePopoverOpen ? (
+                    <button
+                      type="button"
+                      onClick={() => { setDocScaleChoice(String(docSelected.importScaleDenom)); setDocScaleCustom(String(docSelected.importScaleDenom)); setDocScalePopoverOpen(true); }}
+                      className="cad-toolbar-btn w-full justify-center h-7 text-[11px]"
+                      title="Plan-Maßstab nachträglich ändern (skaliert nur dieses Dokument)"
+                    >
+                      Maßstab ändern…
+                    </button>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <div className="grid grid-cols-3 gap-1">
+                        {[
+                          { v: "50", label: "1:50" },
+                          { v: "100", label: "1:100" },
+                          { v: "200", label: "1:200" },
+                          { v: "500", label: "1:500" },
+                          { v: "1", label: "1:1" },
+                          { v: "custom", label: "Frei" },
+                        ].map(opt => {
+                          const active = docScaleChoice === opt.v;
+                          return (
+                            <button
+                              key={opt.v}
+                              type="button"
+                              onClick={() => setDocScaleChoice(opt.v)}
+                              className="rounded h-7 text-[10px] font-semibold border transition-colors"
+                              style={{
+                                background: active ? "hsl(var(--primary))" : "hsl(var(--card))",
+                                color: active ? "hsl(var(--primary-foreground))" : "hsl(var(--foreground))",
+                                borderColor: active ? "hsl(var(--primary))" : "hsl(var(--border))",
+                              }}
+                            >
+                              {opt.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {docScaleChoice === "custom" && (
+                        <div className="flex items-center gap-1">
+                          <span className="text-[11px]">1 :</span>
+                          <input
+                            type="text"
+                            value={docScaleCustom}
+                            onChange={(e) => setDocScaleCustom(e.target.value)}
+                            className="cad-settings-select h-7 flex-1 text-[11px]"
+                            placeholder="z. B. 75"
+                          />
+                        </div>
+                      )}
+                      <div className="flex items-center gap-1 pt-0.5">
+                        <button
+                          type="button"
+                          onClick={() => setDocScalePopoverOpen(false)}
+                          className="cad-toolbar-btn flex-1 justify-center h-7 text-[11px]"
+                        >
+                          Abbrechen
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const app = appRef.current; if (!app) return;
+                            const doc = app.scene.getDocumentById(docSelected.id); if (!doc) return;
+                            const raw = docScaleChoice === "custom" ? parseFloat(docScaleCustom.replace(",", ".")) : parseFloat(docScaleChoice);
+                            const newDenom = Number.isFinite(raw) && raw > 0 ? raw : doc.importScaleDenom;
+                            const oldDenom = doc.importScaleDenom;
+                            if (newDenom === oldDenom) { setDocScalePopoverOpen(false); return; }
+                            // Skalierungsfaktor = alter Maßstab / neuer Maßstab.
+                            const factor = oldDenom / newDenom;
+                            const cx = doc.position.x + doc.widthM / 2;
+                            const cy = doc.position.y + doc.heightM / 2;
+                            doc.widthM = Math.max(0.001, doc.widthM * factor);
+                            doc.heightM = Math.max(0.001, doc.heightM * factor);
+                            doc.position.x = cx - doc.widthM / 2;
+                            doc.position.y = cy - doc.heightM / 2;
+                            doc.importScaleDenom = newDenom;
+                            setDocScalePopoverOpen(false);
+                          }}
+                          className="rounded h-7 px-2 text-[11px] font-semibold flex-1"
+                          style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
+                        >
+                          Übernehmen
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {(docToolPhase === "scale-pick-1" || docToolPhase === "scale-pick-2" || docToolPhase === "scale-await-input") && (

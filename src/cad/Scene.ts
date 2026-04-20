@@ -238,11 +238,14 @@ export class DocumentObject {
   pixelWidth: number;
   pixelHeight: number;
   labelId: string;
+  /** Beim Import gewählter Plan-Maßstab (Nenner). z. B. 100 für 1:100. Kann nachträglich geändert werden. */
+  importScaleDenom: number;
 
-  constructor({ id, name, kind, src, pageIndex, position, widthM, heightM, rotationRad, pixelWidth, pixelHeight, labelId }: {
+  constructor({ id, name, kind, src, pageIndex, position, widthM, heightM, rotationRad, pixelWidth, pixelHeight, labelId, importScaleDenom }: {
     id: string; name?: string; kind?: "image" | "pdf-page"; src: string;
     pageIndex?: number; position: Vec2; widthM: number; heightM: number;
     rotationRad?: number; pixelWidth?: number; pixelHeight?: number; labelId?: string;
+    importScaleDenom?: number;
   }) {
     this.id = id;
     this.name = name || "Dokument";
@@ -256,6 +259,7 @@ export class DocumentObject {
     this.pixelWidth = pixelWidth || 0;
     this.pixelHeight = pixelHeight || 0;
     this.labelId = labelId || Defaults.defaultLabelId;
+    this.importScaleDenom = (typeof importScaleDenom === "number" && importScaleDenom > 0) ? importScaleDenom : 100;
   }
 }
 
@@ -318,6 +322,7 @@ export class Scene {
     name?: string; kind?: "image" | "pdf-page"; src: string; pageIndex?: number;
     position: Vec2; widthM: number; heightM: number; rotationRad?: number;
     pixelWidth?: number; pixelHeight?: number; labelId?: string;
+    importScaleDenom?: number;
   }): DocumentObject {
     const doc = new DocumentObject({ id: this._makeId(), ...opts });
     this.documents.push(doc);

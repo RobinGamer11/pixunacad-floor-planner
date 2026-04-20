@@ -28,7 +28,7 @@ export class DocumentTool {
   phase: Phase = "idle";
 
   /** Pending Dokument (während "placing"), wird beim Klick in die Scene committet. */
-  pendingDoc: { src: string; widthM: number; heightM: number; pixelWidth: number; pixelHeight: number; name: string; kind: "image" | "pdf-page"; pageIndex: number } | null = null;
+  pendingDoc: { src: string; widthM: number; heightM: number; pixelWidth: number; pixelHeight: number; name: string; kind: "image" | "pdf-page"; pageIndex: number; importScaleDenom: number } | null = null;
 
   /** Aktueller Maßstabs-Workflow-State. */
   scaleTargetDocId: string | null = null;
@@ -64,7 +64,7 @@ export class DocumentTool {
   finish() { this.cancel(); }
 
   /** Externe API: nach erfolgreichem Datei-Import wird das Dokument zur Maus-Platzierung übergeben. */
-  beginPlacement(opts: { src: string; widthM: number; heightM: number; pixelWidth: number; pixelHeight: number; name: string; kind: "image" | "pdf-page"; pageIndex: number }) {
+  beginPlacement(opts: { src: string; widthM: number; heightM: number; pixelWidth: number; pixelHeight: number; name: string; kind: "image" | "pdf-page"; pageIndex: number; importScaleDenom: number }) {
     this.pendingDoc = opts;
     this.phase = "placing";
     this.app.clearSelection();
@@ -132,6 +132,7 @@ export class DocumentTool {
           pixelWidth: this.pendingDoc.pixelWidth,
           pixelHeight: this.pendingDoc.pixelHeight,
           labelId: this.app.activeDrawLabelId,
+          importScaleDenom: this.pendingDoc.importScaleDenom,
         });
         this.pendingDoc = null;
         this.phase = "idle";
