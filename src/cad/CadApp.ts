@@ -281,6 +281,9 @@ export class CadApp {
 
     this.camera = new Camera();
     this.scene = new Scene();
+    // Brücke für den Renderer: ermöglicht visuelles Skalieren von Dokumenten
+    // mit dem aktuellen Ansichtsmaßstab, ohne CadApp direkt zu importieren.
+    (this.scene as any)._drawingScaleRef = () => this.drawingScale;
     this.input = new Input(canvas);
     this.labelManager = new LabelManager();
     this.topology = new TopologyEngine(this.scene, this.camera, this.labelManager);
