@@ -285,12 +285,15 @@ const CadEditor: React.FC = () => {
     return () => clearTimeout(t);
   }, [sidebarCollapsed]);
 
-  // Ansichtsmaßstab: REIN visueller Zoom. Verändert KEINE Modellgeometrie
-  // und KEINE Dokumentgrößen. Modellkoordinaten bleiben in Metern erhalten.
+  // Ansichtsmaßstab: REIN visueller Zoom + visueller Darstellungsfaktor für PDFs.
+  // Verändert KEINE Modellgeometrie und KEINE Dokument-Welt-Maße.
+  // Der Wert wird zusätzlich an die App weitergereicht, damit der Renderer
+  // PDFs visuell mit (importScaleDenom / drawingScale) skalieren kann.
   useEffect(() => {
     const app = appRef.current;
     if (!app) return;
     const nextScale = Math.max(0.0001, drawingScale);
+    app.drawingScale = nextScale;
     const cam = app.camera;
     const target = 80 * (100 / nextScale);
     const newScale = Math.max(cam.minScale, Math.min(cam.maxScale, target));
@@ -400,24 +403,20 @@ const CadEditor: React.FC = () => {
   }, [docPickerPages, docPickerSelected]);
 
   /**
-   * Maßstab anwenden. Import-Faktor:
-   *   factor = drawingScale / denom_pdf
-   * Beispiele (Zeichnenoberfläche / PDF → Faktor):
-   *   1:100 / 1:100 → 1   (1m Plan = 1m Welt)
-   *   1:200 / 1:100 → 2   (1m Plan = 2m Welt — PDF wirkt größer)
-   *   1:100 / 1:200 → 0.5 (1m Plan = 0.5m Welt — PDF wirkt kleiner)
-   * Höherer PDF-Maßstab (1:200, 1:500) bedeutet bei gleicher Zeichenoberfläche
-   * → kleinere Welt-Meter. Der Ansichts-/Zeichenmaßstab beeinflusst NUR den
-   * Import-Faktor; nach dem Import bleibt die Welt-Geometrie absolut.
+   * Maßstab anwenden. Import-Faktor ist KONSTANT 1:
+   *   PDF-Geometrie wird beim Import 1:1 in den Modellraum übernommen,
+   *   sodass eine 1m-Strecke im Plan IMMER 1m im Modell ist —
+   *   unabhängig vom aktuellen Ansichtsmaßstab (drawingScale).
+   * Der Ansichtsmaßstab beeinflusst nur die VISUELLE Darstellung der PDF
+   * (siehe Renderer._drawDocuments → displayFactor = importScaleDenom / drawingScale).
+   * Modellgeometrie, Maßketten und Snaps bleiben dadurch immer maßhaltig.
    */
   const handleScaleConfirm = useCallback(() => {
     if (!scaleDialogPages) return;
     const app = appRef.current; if (!app) return;
     const denom = scaleChoice === "custom" ? parseFloat(scaleCustom.replace(",", ".")) : parseFloat(scaleChoice);
     const safeDenom = Number.isFinite(denom) && denom > 0 ? denom : 100;
-    const factor = drawingScale / safeDenom;
-    const scaledPages = scaleDialogPages.map(p => ({ ...p, widthM: p.widthM * factor, heightM: p.heightM * factor }));
-    const [first, ...rest] = scaledPages;
+    const [first, ...rest] = scaleDialogPages;
     app.setTool(ToolIds.DOCUMENT);
     app.documentTool.beginPlacement({
       src: first.src, widthM: first.widthM, heightM: first.heightM,
@@ -437,7 +436,7 @@ const CadEditor: React.FC = () => {
       offX += p.widthM + 0.5;
     }
     setScaleDialogPages(null);
-  }, [scaleDialogPages, scaleChoice, scaleCustom, drawingScale]);
+  }, [scaleDialogPages, scaleChoice, scaleCustom]);
 
   const sidebarWidth = sidebarCollapsed ? 56 : 240;
 
@@ -1009,16 +1008,11 @@ const CadEditor: React.FC = () => {
                             const doc = app.scene.getDocumentById(docSelected.id); if (!doc) return;
                             const raw = docScaleChoice === "custom" ? parseFloat(docScaleCustom.replace(",", ".")) : parseFloat(docScaleChoice);
                             const newDenom = Number.isFinite(raw) && raw > 0 ? raw : doc.importScaleDenom;
-                            const oldDenom = doc.importScaleDenom;
-                            if (newDenom === oldDenom) { setDocScalePopoverOpen(false); return; }
-                            // Skalierungsfaktor = alter Maßstab / neuer Maßstab.
-                            const factor = oldDenom / newDenom;
-                            const cx = doc.position.x + doc.widthM / 2;
-                            const cy = doc.position.y + doc.heightM / 2;
-                            doc.widthM = Math.max(0.001, doc.widthM * factor);
-                            doc.heightM = Math.max(0.001, doc.heightM * factor);
-                            doc.position.x = cx - doc.widthM / 2;
-                            doc.position.y = cy - doc.heightM / 2;
+                            if (newDenom === doc.importScaleDenom) { setDocScalePopoverOpen(false); return; }
+                            // Nur den Plan-Maßstab des Dokuments umstellen.
+                            // Welt-Geometrie (widthM/heightM/position) bleibt konstant maßhaltig
+                            // — die visuelle Anpassung erfolgt im Renderer über
+                            // displayFactor = importScaleDenom / drawingScale.
                             doc.importScaleDenom = newDenom;
                             setDocScalePopoverOpen(false);
                           }}

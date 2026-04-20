@@ -151,6 +151,13 @@ export class CadApp {
   topology: TopologyEngine;
   renderer: Renderer;
 
+  /**
+   * Aktueller Ansichtsmaßstab (Nenner, z. B. 100 für 1:100).
+   * REIN visuell: beeinflusst NUR die Darstellung von Dokumenten (Renderer)
+   * und den Kamera-Zoom. Verändert NIE Modellgeometrie oder reale Maße.
+   */
+  drawingScale: number = 100;
+
   selectTool: SelectTool;
   lineTool: LineTool;
   hatchTool: HatchTool;
@@ -274,6 +281,9 @@ export class CadApp {
 
     this.camera = new Camera();
     this.scene = new Scene();
+    // Brücke für den Renderer: ermöglicht visuelles Skalieren von Dokumenten
+    // mit dem aktuellen Ansichtsmaßstab, ohne CadApp direkt zu importieren.
+    (this.scene as any)._drawingScaleRef = () => this.drawingScale;
     this.input = new Input(canvas);
     this.labelManager = new LabelManager();
     this.topology = new TopologyEngine(this.scene, this.camera, this.labelManager);
