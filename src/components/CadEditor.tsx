@@ -131,7 +131,10 @@ const CadEditor: React.FC = () => {
   const [docPickerPages, setDocPickerPages] = useState<ImportedPage[] | null>(null);
   const [docPickerSelected, setDocPickerSelected] = useState<Set<number>>(new Set());
   const [docImporting, setDocImporting] = useState(false);
-  const [docSelected, setDocSelected] = useState<{ id: string; name: string; widthM: number; heightM: number } | null>(null);
+  const [docSelected, setDocSelected] = useState<{ id: string; name: string; widthM: number; heightM: number; importScaleDenom: number } | null>(null);
+  const [docScalePopoverOpen, setDocScalePopoverOpen] = useState(false);
+  const [docScaleChoice, setDocScaleChoice] = useState<string>("100");
+  const [docScaleCustom, setDocScaleCustom] = useState<string>("100");
   const [docToolPhase, setDocToolPhase] = useState<string>("idle");
   // Maßstab-Auswahl vor Platzierung
   const [scaleDialogPages, setScaleDialogPages] = useState<ImportedPage[] | null>(null);
@@ -337,7 +340,7 @@ const CadEditor: React.FC = () => {
         if (sel && sel.type === "document") {
           const doc = app.scene.getDocumentById(sel.documentId);
           if (doc) {
-            setDocSelected(prev => (prev && prev.id === doc.id && prev.widthM === doc.widthM && prev.heightM === doc.heightM) ? prev : { id: doc.id, name: doc.name, widthM: doc.widthM, heightM: doc.heightM });
+            setDocSelected(prev => (prev && prev.id === doc.id && prev.widthM === doc.widthM && prev.heightM === doc.heightM && prev.importScaleDenom === doc.importScaleDenom) ? prev : { id: doc.id, name: doc.name, widthM: doc.widthM, heightM: doc.heightM, importScaleDenom: doc.importScaleDenom });
           } else {
             setDocSelected(prev => prev ? null : prev);
           }
