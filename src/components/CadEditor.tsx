@@ -6,7 +6,7 @@ import type { HatchDrawMode } from "@/cad/HatchTool";
 import type { StickerDefinition } from "@/cad/StickerManager";
 import { instanceBoundingCornersWorld } from "@/cad/StickerManager";
 import { importFile, type ImportedPage } from "@/cad/documentImport";
-import { scaleDocumentAroundCenter } from "@/cad/documentGeometry";
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
@@ -141,7 +141,7 @@ const CadEditor: React.FC = () => {
   const [drawingScale, setDrawingScale] = useState<number>(100);
   const [drawingScaleOpen, setDrawingScaleOpen] = useState(false);
   const [drawingScaleCustom, setDrawingScaleCustom] = useState<string>("100");
-  const previousDrawingScaleRef = useRef<number>(100);
+  
 
   useEffect(() => {
     if (
@@ -282,23 +282,12 @@ const CadEditor: React.FC = () => {
     return () => clearTimeout(t);
   }, [sidebarCollapsed]);
 
-  // Drawing scale → Camera scale + Dokumente proportional nachskalieren.
-  // Welt-Größe eines Doks = paperMeter × pdfDenom / drawingScale.
-  // Wechsel A → B ⇒ Faktor pro Dok = (pdfDenom/B) / (pdfDenom/A) = A/B.
+  // Ansichtsmaßstab: REIN visueller Zoom. Verändert KEINE Modellgeometrie
+  // und KEINE Dokumentgrößen. Modellkoordinaten bleiben in Metern erhalten.
   useEffect(() => {
     const app = appRef.current;
     if (!app) return;
-
-    const previousScale = Math.max(0.0001, previousDrawingScaleRef.current);
     const nextScale = Math.max(0.0001, drawingScale);
-    const docFactor = previousScale / nextScale;
-    if (Math.abs(docFactor - 1) > 1e-6) {
-      for (const doc of app.scene.documents) {
-        scaleDocumentAroundCenter(doc, docFactor);
-      }
-    }
-    previousDrawingScaleRef.current = nextScale;
-
     const cam = app.camera;
     const target = 80 * (100 / nextScale);
     const newScale = Math.max(cam.minScale, Math.min(cam.maxScale, target));
@@ -411,19 +400,18 @@ const CadEditor: React.FC = () => {
    * Maßstab anwenden. Real-World-Mapping (unabhängig vom Zeichen-Maßstab):
    *   weltMeter = paperMeter × denom_pdf
    * Beispiel A4 1:100 → 0.21m × 100 = 21m Welt — 1m im PDF bleibt 1m real.
-   * Der Zeichen-Maßstab beeinflusst nur die Bildschirmanzeige (cam.scale).
+   * Importmaßstab definiert die reale Größe der PDF im Modell.
+   * Welt-Größe = Papier-Meter × Maßstabs-Nenner. Der Ansichtsmaßstab spielt
+   * dabei KEINE Rolle (er ist reine Bildschirmdarstellung).
+   * Beispiel: PDF im Maßstab 1:100 → 1 cm Papier = 1 m Welt → Faktor = 100.
    */
   const handleScaleConfirm = useCallback(() => {
     if (!scaleDialogPages) return;
     const app = appRef.current; if (!app) return;
     const denom = scaleChoice === "custom" ? parseFloat(scaleCustom.replace(",", ".")) : parseFloat(scaleChoice);
     const safeDenom = Number.isFinite(denom) && denom > 0 ? denom : 100;
-    // Welt-Größe = paperMeter × (pdfDenom / drawingScale).
-    // So gilt: PDF-Maßstab == Zeichenmaßstab → 1m im PDF = 1m Welt.
-    // Spätere Änderungen am Zeichenmaßstab werden über den useEffect-Hook
-    // proportional auf alle Dokumente angewendet.
-    const safeDrawing = Math.max(0.0001, drawingScale);
-    const factor = safeDenom / safeDrawing;
+    // Modellgröße = Papier-Meter × Nenner. Unabhängig vom Ansichtsmaßstab.
+    const factor = safeDenom;
     const scaledPages = scaleDialogPages.map(p => ({ ...p, widthM: p.widthM * factor, heightM: p.heightM * factor }));
     const [first, ...rest] = scaledPages;
     app.setTool(ToolIds.DOCUMENT);
