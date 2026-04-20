@@ -6,7 +6,7 @@ import type { HatchDrawMode } from "@/cad/HatchTool";
 import type { StickerDefinition } from "@/cad/StickerManager";
 import { instanceBoundingCornersWorld } from "@/cad/StickerManager";
 import { importFile, type ImportedPage } from "@/cad/documentImport";
-import { scaleDocumentAroundCenter } from "@/cad/documentGeometry";
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
