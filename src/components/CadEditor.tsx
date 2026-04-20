@@ -141,7 +141,7 @@ const CadEditor: React.FC = () => {
   const [drawingScale, setDrawingScale] = useState<number>(100);
   const [drawingScaleOpen, setDrawingScaleOpen] = useState(false);
   const [drawingScaleCustom, setDrawingScaleCustom] = useState<string>("100");
-  const previousDrawingScaleRef = useRef<number>(100);
+  
 
   useEffect(() => {
     if (
