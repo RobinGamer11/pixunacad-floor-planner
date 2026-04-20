@@ -282,23 +282,12 @@ const CadEditor: React.FC = () => {
     return () => clearTimeout(t);
   }, [sidebarCollapsed]);
 
-  // Drawing scale → Camera scale + Dokumente proportional nachskalieren.
-  // Welt-Größe eines Doks = paperMeter × pdfDenom / drawingScale.
-  // Wechsel A → B ⇒ Faktor pro Dok = (pdfDenom/B) / (pdfDenom/A) = A/B.
+  // Ansichtsmaßstab: REIN visueller Zoom. Verändert KEINE Modellgeometrie
+  // und KEINE Dokumentgrößen. Modellkoordinaten bleiben in Metern erhalten.
   useEffect(() => {
     const app = appRef.current;
     if (!app) return;
-
-    const previousScale = Math.max(0.0001, previousDrawingScaleRef.current);
     const nextScale = Math.max(0.0001, drawingScale);
-    const docFactor = previousScale / nextScale;
-    if (Math.abs(docFactor - 1) > 1e-6) {
-      for (const doc of app.scene.documents) {
-        scaleDocumentAroundCenter(doc, docFactor);
-      }
-    }
-    previousDrawingScaleRef.current = nextScale;
-
     const cam = app.camera;
     const target = 80 * (100 / nextScale);
     const newScale = Math.max(cam.minScale, Math.min(cam.maxScale, target));
