@@ -397,21 +397,22 @@ const CadEditor: React.FC = () => {
   }, [docPickerPages, docPickerSelected]);
 
   /**
-   * Maßstab anwenden. Real-World-Mapping (unabhängig vom Zeichen-Maßstab):
-   *   weltMeter = paperMeter × denom_pdf
-   * Beispiel A4 1:100 → 0.21m × 100 = 21m Welt — 1m im PDF bleibt 1m real.
-   * Importmaßstab definiert die reale Größe der PDF im Modell.
-   * Welt-Größe = Papier-Meter × Maßstabs-Nenner. Der Ansichtsmaßstab spielt
-   * dabei KEINE Rolle (er ist reine Bildschirmdarstellung).
-   * Beispiel: PDF im Maßstab 1:100 → 1 cm Papier = 1 m Welt → Faktor = 100.
+   * Maßstab anwenden. Import-Faktor:
+   *   factor = drawingScale / denom_pdf
+   * Beispiele (Zeichnenoberfläche / PDF → Faktor):
+   *   1:100 / 1:100 → 1   (1m Plan = 1m Welt)
+   *   1:200 / 1:100 → 2   (1m Plan = 2m Welt — PDF wirkt größer)
+   *   1:100 / 1:200 → 0.5 (1m Plan = 0.5m Welt — PDF wirkt kleiner)
+   * Höherer PDF-Maßstab (1:200, 1:500) bedeutet bei gleicher Zeichenoberfläche
+   * → kleinere Welt-Meter. Der Ansichts-/Zeichenmaßstab beeinflusst NUR den
+   * Import-Faktor; nach dem Import bleibt die Welt-Geometrie absolut.
    */
   const handleScaleConfirm = useCallback(() => {
     if (!scaleDialogPages) return;
     const app = appRef.current; if (!app) return;
     const denom = scaleChoice === "custom" ? parseFloat(scaleCustom.replace(",", ".")) : parseFloat(scaleChoice);
     const safeDenom = Number.isFinite(denom) && denom > 0 ? denom : 100;
-    // Modellgröße = Papier-Meter × Nenner. Unabhängig vom Ansichtsmaßstab.
-    const factor = safeDenom;
+    const factor = drawingScale / safeDenom;
     const scaledPages = scaleDialogPages.map(p => ({ ...p, widthM: p.widthM * factor, heightM: p.heightM * factor }));
     const [first, ...rest] = scaledPages;
     app.setTool(ToolIds.DOCUMENT);
@@ -419,6 +420,7 @@ const CadEditor: React.FC = () => {
       src: first.src, widthM: first.widthM, heightM: first.heightM,
       pixelWidth: first.pixelWidth, pixelHeight: first.pixelHeight,
       name: first.name, kind: first.kind, pageIndex: first.pageIndex,
+      importScaleDenom: safeDenom,
     });
     let offX = first.widthM + 0.5;
     for (const p of rest) {
@@ -427,6 +429,7 @@ const CadEditor: React.FC = () => {
         position: { x: offX, y: 0 }, widthM: p.widthM, heightM: p.heightM,
         pixelWidth: p.pixelWidth, pixelHeight: p.pixelHeight,
         labelId: app.activeDrawLabelId,
+        importScaleDenom: safeDenom,
       });
       offX += p.widthM + 0.5;
     }
