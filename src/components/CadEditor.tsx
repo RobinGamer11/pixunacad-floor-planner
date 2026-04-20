@@ -1008,16 +1008,11 @@ const CadEditor: React.FC = () => {
                             const doc = app.scene.getDocumentById(docSelected.id); if (!doc) return;
                             const raw = docScaleChoice === "custom" ? parseFloat(docScaleCustom.replace(",", ".")) : parseFloat(docScaleChoice);
                             const newDenom = Number.isFinite(raw) && raw > 0 ? raw : doc.importScaleDenom;
-                            const oldDenom = doc.importScaleDenom;
-                            if (newDenom === oldDenom) { setDocScalePopoverOpen(false); return; }
-                            // Skalierungsfaktor = alter Maßstab / neuer Maßstab.
-                            const factor = oldDenom / newDenom;
-                            const cx = doc.position.x + doc.widthM / 2;
-                            const cy = doc.position.y + doc.heightM / 2;
-                            doc.widthM = Math.max(0.001, doc.widthM * factor);
-                            doc.heightM = Math.max(0.001, doc.heightM * factor);
-                            doc.position.x = cx - doc.widthM / 2;
-                            doc.position.y = cy - doc.heightM / 2;
+                            if (newDenom === doc.importScaleDenom) { setDocScalePopoverOpen(false); return; }
+                            // Nur den Plan-Maßstab des Dokuments umstellen.
+                            // Welt-Geometrie (widthM/heightM/position) bleibt konstant maßhaltig
+                            // — die visuelle Anpassung erfolgt im Renderer über
+                            // displayFactor = importScaleDenom / drawingScale.
                             doc.importScaleDenom = newDenom;
                             setDocScalePopoverOpen(false);
                           }}
