@@ -285,12 +285,15 @@ const CadEditor: React.FC = () => {
     return () => clearTimeout(t);
   }, [sidebarCollapsed]);
 
-  // Ansichtsmaßstab: REIN visueller Zoom. Verändert KEINE Modellgeometrie
-  // und KEINE Dokumentgrößen. Modellkoordinaten bleiben in Metern erhalten.
+  // Ansichtsmaßstab: REIN visueller Zoom + visueller Darstellungsfaktor für PDFs.
+  // Verändert KEINE Modellgeometrie und KEINE Dokument-Welt-Maße.
+  // Der Wert wird zusätzlich an die App weitergereicht, damit der Renderer
+  // PDFs visuell mit (importScaleDenom / drawingScale) skalieren kann.
   useEffect(() => {
     const app = appRef.current;
     if (!app) return;
     const nextScale = Math.max(0.0001, drawingScale);
+    app.drawingScale = nextScale;
     const cam = app.camera;
     const target = 80 * (100 / nextScale);
     const newScale = Math.max(cam.minScale, Math.min(cam.maxScale, target));
