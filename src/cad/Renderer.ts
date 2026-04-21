@@ -144,25 +144,15 @@ export class Renderer {
   private _drawDocuments() {
     const ctx = this.ctx;
     const cam = this.camera;
-    // Reiner Darstellungsfaktor für Dokumente (NICHT für CAD-Geometrie!).
-    // displayFactor = PDF-Maßstab (Nenner) / Ansichtsmaßstab (Nenner)
-    //   PDF 1:100 in Ansicht 1:100 → 1
-    //   PDF 1:100 in Ansicht 1:200 → 0.5  (PDF visuell halb so groß)
-    //   PDF 1:200 in Ansicht 1:100 → 2    (PDF visuell doppelt so groß)
-    // Geometrie (widthM/heightM/position) bleibt unverändert; Maßketten,
-    // Snap & Hit-Test arbeiten weiterhin auf den realen Modellmaßen.
-    const app: any = (this.scene as any);
-    const drawingScale: number = (app && typeof app._drawingScaleRef === "function")
-      ? app._drawingScaleRef()
-      : 100;
+    // Dokumente werden 1:1 in Modellkoordinaten dargestellt:
+    // 1 m im PDF = 1 m im CAD. Der Ansichtsmaßstab (drawingScale) wirkt
+    // ausschließlich über cam.scale (Zoom) und verändert keine Geometrie.
     for (const doc of this._documentsBackToFront()) {
       const img = this._getDocImage(doc);
       const center = documentCenterWorld(doc);
       const cs = cam.worldToScreen(center.x, center.y);
-      const denom = doc.importScaleDenom > 0 ? doc.importScaleDenom : 100;
-      const displayFactor = denom / Math.max(0.0001, drawingScale);
-      const wPx = doc.widthM * cam.scale * displayFactor;
-      const hPx = doc.heightM * cam.scale * displayFactor;
+      const wPx = doc.widthM * cam.scale;
+      const hPx = doc.heightM * cam.scale;
 
       ctx.save();
       ctx.translate(cs.x, cs.y);
