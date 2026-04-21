@@ -651,7 +651,61 @@ export class SelectTool {
       }
     }
 
-    // Active dimension parallel-drag
+    // Active textbox drag (translate) with snap
+    if (this.dragTextBoxId) {
+      const box = this.app.scene.getTextBoxById(this.dragTextBoxId);
+      if (!box || !this.dragTextBoxGrabOffset) {
+        this.dragTextBoxId = null;
+        this.dragTextBoxGrabOffset = null;
+        this.dragTextBoxSnap = null;
+      } else {
+        const mouseW = v(input.mouse.wx, input.mouse.wy);
+        const snap = this.app.topology.findBestSnap(
+          v(input.mouse.sx, input.mouse.sy),
+          mouseW
+        );
+        this.dragTextBoxSnap = snap;
+        const target = (snap && snap.world) ? snap.world : mouseW;
+        box.center = v(target.x - this.dragTextBoxGrabOffset.x, target.y - this.dragTextBoxGrabOffset.y);
+        const len = Math.hypot(box.center.x, box.center.y);
+        const angDeg = (box.rotationRad * 180 / Math.PI + 360) % 360;
+        this.app.hub.showAt(input.mouse.sx, input.mouse.sy);
+        this.app.hub.updateDisplay(len, angDeg);
+        if (!input.mouse.left) {
+          this.dragTextBoxId = null;
+          this.dragTextBoxGrabOffset = null;
+          this.dragTextBoxSnap = null;
+          this.app.hub.hide();
+        }
+        return;
+      }
+    }
+
+    // Active textbox rotate
+    if (this.rotateTextBoxId) {
+      const box = this.app.scene.getTextBoxById(this.rotateTextBoxId);
+      if (!box) {
+        this.rotateTextBoxId = null;
+      } else {
+        const mouseW = v(input.mouse.wx, input.mouse.wy);
+        const curAng = Math.atan2(mouseW.y - box.center.y, mouseW.x - box.center.x);
+        let newRot = this.rotateTextBoxOriginalRot + (curAng - this.rotateTextBoxStartAngle);
+        if (input.keys.shift) {
+          const step = Math.PI / 12; // 15°
+          newRot = Math.round(newRot / step) * step;
+        }
+        box.rotationRad = newRot;
+        const angDeg = (newRot * 180 / Math.PI + 360) % 360;
+        this.app.hub.showAt(input.mouse.sx, input.mouse.sy);
+        this.app.hub.updateDisplay(Math.hypot(box.widthM, box.heightM), angDeg);
+        if (!input.mouse.left) {
+          this.rotateTextBoxId = null;
+          this.app.hub.hide();
+        }
+        return;
+      }
+    }
+
     if (this.dragDimId) {
       const dim = this.app.scene.getDimensionById(this.dragDimId);
       if (!dim) {
