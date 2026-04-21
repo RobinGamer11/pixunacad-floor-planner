@@ -48,6 +48,14 @@ export class SelectTool {
   dragDocGrabOffset: Vec2 | null = null;
   dragDocSnap: Snap | null = null;
 
+  // TextBox Drag/Rotate-State
+  dragTextBoxId: string | null = null;
+  dragTextBoxGrabOffset: Vec2 | null = null; // mouseStart - center
+  dragTextBoxSnap: Snap | null = null;
+  rotateTextBoxId: string | null = null;
+  rotateTextBoxStartAngle = 0; // initial mouse angle (rad) at rotate-begin
+  rotateTextBoxOriginalRot = 0; // box.rotationRad at rotate-begin
+
 
 
   constructor(app: CadApp) {
