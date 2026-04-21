@@ -704,7 +704,7 @@ export class Renderer {
     const rank = new Map(order.map((g, i) => [g.id, i]));
     return [...this.scene.dimensions]
       .filter(d => this.labels.isVisible(d.labelId))
-      .sort((a, b) => (rank.get(a.labelId) || 0) - (rank.get(b.labelId) || 0));
+      .sort((a, b) => (rank.get(b.labelId) ?? 0) - (rank.get(a.labelId) ?? 0));
   }
 
   private _drawDimensions() {
@@ -842,7 +842,7 @@ export class Renderer {
     const rank = new Map(order.map((g, i) => [g.id, i]));
     return [...this.scene.textBoxes]
       .filter(t => this.labels.isVisible(t.labelId))
-      .sort((a, b) => (rank.get(a.labelId) || 0) - (rank.get(b.labelId) || 0));
+      .sort((a, b) => (rank.get(b.labelId) ?? 0) - (rank.get(a.labelId) ?? 0));
   }
 
   private _drawTextBoxes() {
