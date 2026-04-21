@@ -554,18 +554,33 @@ export class SelectTool {
 
   private _findPreviewSnapForEdit(input: Input) {
     if (!this.editTarget) return null;
+    let topoSnap: Snap | null;
     if (this.editTarget.kind === "segment") {
-      return this.app.topology.findBestSnapExcludingSegment(
+      topoSnap = this.app.topology.findBestSnapExcludingSegment(
         v(input.mouse.sx, input.mouse.sy),
         v(input.mouse.wx, input.mouse.wy),
         this.editTarget.segmentId
       );
+    } else {
+      topoSnap = this.app.topology.findBestSnapExcludingHatch(
+        v(input.mouse.sx, input.mouse.sy),
+        v(input.mouse.wx, input.mouse.wy),
+        this.editTarget.hatchId
+      );
     }
-    return this.app.topology.findBestSnapExcludingHatch(
-      v(input.mouse.sx, input.mouse.sy),
-      v(input.mouse.wx, input.mouse.wy),
-      this.editTarget.hatchId
-    );
+    const guideSnap = this._findEditGuideSnap(input);
+    if (!guideSnap) return topoSnap;
+    if (!topoSnap) return guideSnap;
+    // GUIDE_POINT > POINT > GUIDE > LINE — bevorzuge präzisere; sonst geringerer Pixel-Abstand.
+    const rank = (s: Snap) => {
+      if (s.type === SnapType.POINT) return 0;
+      if (s.type === SnapType.GUIDE_POINT) return 0;
+      if (s.type === SnapType.GUIDE) return 2;
+      return 3;
+    };
+    if (rank(topoSnap) < rank(guideSnap)) return topoSnap;
+    if (rank(guideSnap) < rank(topoSnap)) return guideSnap;
+    return ((topoSnap.px ?? Infinity) <= (guideSnap.px ?? Infinity)) ? topoSnap : guideSnap;
   }
 
   private _findRotateAssistSegment(input: Input) {
