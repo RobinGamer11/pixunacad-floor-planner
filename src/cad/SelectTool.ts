@@ -793,6 +793,18 @@ export class SelectTool {
     }
 
     if (this.isEditing()) {
+      // Rechtsklick während Edit: Toggle eines Hilfslinien-Ankers am aktuellen Snap-Punkt.
+      if (input.rightClicked) {
+        const snap = this._findPreviewSnapForEdit(input);
+        if (snap && snap.world && (snap.type === SnapType.POINT || snap.type === SnapType.GUIDE_POINT)) {
+          const key = `${snap.world.x.toFixed(6)}_${snap.world.y.toFixed(6)}`;
+          const idx = this.editGuideAnchors.findIndex(a => a.key === key);
+          if (idx >= 0) this.editGuideAnchors.splice(idx, 1);
+          else this.editGuideAnchors.push({ key, point: v(snap.world.x, snap.world.y) });
+          return;
+        }
+      }
+
       if (this.activeEditAction === PointEditAction.MOVE) {
         const p = this._previewMovePoint(input);
         const metrics = { lengthM: dist(this.fixedPoint!, p), angleDeg: angleDeg(this.fixedPoint!, p) };
