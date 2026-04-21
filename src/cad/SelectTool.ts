@@ -364,7 +364,56 @@ export class SelectTool {
     this.moveHubLocked = false;
     this.moveHubLengthM = null;
     this.moveHubAngleDeg = null;
+    this.editGuideAnchors = [];
     this.app.hub.bindCommit(null);
+  }
+
+  /** Snap aus aktiven Edit-Hilfslinien (H/V durch Anker). Null falls keine Anker oder Maus zu weit. */
+  private _findEditGuideSnap(input: Input): Snap | null {
+    if (this.editGuideAnchors.length === 0) return null;
+    const mouseS = v(input.mouse.sx, input.mouse.sy);
+    const mouseW = v(input.mouse.wx, input.mouse.wy);
+    const cam = this.app.camera;
+
+    const defs: { point: Vec2; dir: Vec2 }[] = [];
+    for (const a of this.editGuideAnchors) {
+      defs.push({ point: a.point, dir: v(1, 0) });
+      defs.push({ point: a.point, dir: v(0, 1) });
+    }
+
+    let best: Snap | null = null;
+    let bestPx = Infinity;
+
+    // Schnittpunkte (höhere Priorität)
+    for (let i = 0; i < defs.length; i++) {
+      for (let j = i + 1; j < defs.length; j++) {
+        const ip = lineLineIntersectionInfinite(defs[i].point, defs[i].dir, defs[j].point, defs[j].dir);
+        if (!ip) continue;
+        const sp = cam.worldToScreen(ip.x, ip.y);
+        const px = Math.hypot(sp.x - mouseS.x, sp.y - mouseS.y);
+        if (px <= Defaults.snapPx && px < bestPx) {
+          bestPx = px;
+          best = { type: SnapType.GUIDE_POINT, world: v(ip.x, ip.y), segment: null, pointIndex: null, t: null, px } as any;
+        }
+      }
+    }
+    if (best) return best;
+
+    for (const def of defs) {
+      const proj = projectPointToInfiniteLine(mouseW, def.point, def.dir);
+      const sp = cam.worldToScreen(proj.q.x, proj.q.y);
+      const px = Math.hypot(sp.x - mouseS.x, sp.y - mouseS.y);
+      if (px > Defaults.snapPx) continue;
+      if (px < bestPx) {
+        bestPx = px;
+        const span = (Math.hypot(this.app.renderer.vw, this.app.renderer.vh) / cam.scale) * 1.5;
+        const d = norm(def.dir);
+        const lineA = sub(def.point, mul(d, span));
+        const lineB = add(def.point, mul(d, span));
+        best = { type: SnapType.GUIDE, world: v(proj.q.x, proj.q.y), segment: null, pointIndex: null, t: null, px, lineA, lineB } as any;
+      }
+    }
+    return best;
   }
 
   private _hitTestWithForegroundPriority(input: Input) {
