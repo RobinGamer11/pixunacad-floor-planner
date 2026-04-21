@@ -81,6 +81,33 @@ export class SelectTool {
     this.dragDocId = null;
     this.dragDocGrabOffset = null;
     this.dragDocSnap = null;
+    this.dragTextBoxId = null;
+    this.dragTextBoxGrabOffset = null;
+    this.dragTextBoxSnap = null;
+    this.rotateTextBoxId = null;
+  }
+
+  /** Welt-Position des Rotate-Handles über der Top-Edge-Mitte einer TextBox. */
+  private _textBoxRotateHandleWorld(box: TextBox): Vec2 {
+    const offsetPx = 22;
+    const offsetM = offsetPx / Math.max(1e-6, this.app.camera.scale);
+    const lx = 0, ly = -box.heightM * 0.5 - offsetM;
+    const c = Math.cos(box.rotationRad), s = Math.sin(box.rotationRad);
+    return v(box.center.x + lx * c - ly * s, box.center.y + lx * s + ly * c);
+  }
+
+  /** Hit-Test gegen Rotate-Handle der aktuell selektierten TextBox. */
+  private _hitTextBoxRotateHandle(input: Input): TextBox | null {
+    const sel = this.app.selection;
+    if (!sel || (sel.type !== SelectionType.TEXTBOX && sel.type !== SelectionType.TEXTBOX_HANDLE)) return null;
+    const box = this.app.getSelectedTextBox();
+    if (!box || !this.app.labelManager.isVisible(box.labelId)) return null;
+    const handleW = this._textBoxRotateHandleWorld(box);
+    const handleS = this.app.camera.worldToScreen(handleW.x, handleW.y);
+    const dx = handleS.x - input.mouse.sx;
+    const dy = handleS.y - input.mouse.sy;
+    if (Math.hypot(dx, dy) <= Defaults.hitPx + 4) return box;
+    return null;
   }
 
   finish() {}
