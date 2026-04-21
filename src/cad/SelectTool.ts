@@ -869,10 +869,25 @@ export class SelectTool {
         }
       }
 
+      // Rotate-Handle der bereits selektierten TextBox?
+      const rotateBox = this._hitTextBoxRotateHandle(input);
+      if (rotateBox) {
+        const mouseW0 = v(input.mouse.wx, input.mouse.wy);
+        this.rotateTextBoxId = rotateBox.id;
+        this.rotateTextBoxStartAngle = Math.atan2(mouseW0.y - rotateBox.center.y, mouseW0.x - rotateBox.center.x);
+        this.rotateTextBoxOriginalRot = rotateBox.rotationRad || 0;
+        return;
+      }
+
       // Textbox hits take priority — they sit on top visually
       const box = this._hitTextBox(input);
       if (box) {
+        const mouseW0 = v(input.mouse.wx, input.mouse.wy);
         this.app.setSelection({ type: SelectionType.TEXTBOX, textBoxId: box.id, handleIndex: null });
+        // Drag vorbereiten: Greifpunkt-Offset relativ zum Center
+        this.dragTextBoxId = box.id;
+        this.dragTextBoxGrabOffset = { x: mouseW0.x - box.center.x, y: mouseW0.y - box.center.y };
+        this.dragTextBoxSnap = null;
         return;
       }
 
