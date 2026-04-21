@@ -923,5 +923,35 @@ export class Renderer {
       ctx.stroke();
       ctx.restore();
     }
+
+    // Rotate handle: kleiner Kreis über der Top-Edge-Mitte
+    const offsetPx = 22;
+    const lx = 0, ly = -box.heightM * 0.5;
+    const cR = Math.cos(box.rotationRad), sR = Math.sin(box.rotationRad);
+    const topMidWorld = { x: box.center.x + lx * cR - ly * sR, y: box.center.y + lx * sR + ly * cR };
+    const topMidScreen = cam.worldToScreen(topMidWorld.x, topMidWorld.y);
+    // Lokal: -y-Richtung der Box rotiert, in Screen-Pixel-Offset.
+    const hx = topMidScreen.x + Math.sin(box.rotationRad) * offsetPx;
+    const hy = topMidScreen.y - Math.cos(box.rotationRad) * offsetPx;
+    ctx.save();
+    ctx.strokeStyle = "rgba(77,163,255,0.85)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(topMidScreen.x, topMidScreen.y);
+    ctx.lineTo(hx, hy);
+    ctx.stroke();
+    ctx.fillStyle = "rgba(77,163,255,0.95)";
+    ctx.beginPath();
+    ctx.arc(hx, hy, 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,0.95)";
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.arc(hx, hy, 3.2, -Math.PI * 0.6, Math.PI * 0.7);
+    ctx.stroke();
+    ctx.restore();
   }
 }
