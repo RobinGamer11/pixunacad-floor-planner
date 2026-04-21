@@ -1,5 +1,5 @@
 import { Defaults, SnapType, SelectionType, PointEditAction } from "./constants";
-import { Vec2, v, sub, add, mul, dot, dist, angleDeg, pointFromLengthAngle, projectPointToSegment, orthoSnapFromA, nearestAngleToReference, pointInPolygon, polygonCentroid } from "./geometry";
+import { Vec2, v, sub, add, mul, dot, dist, angleDeg, pointFromLengthAngle, projectPointToSegment, orthoSnapFromA, nearestAngleToReference, pointInPolygon, polygonCentroid, projectPointToInfiniteLine, lineLineIntersectionInfinite, norm } from "./geometry";
 import type { CadApp } from "./CadApp";
 import type { Snap } from "./TopologyEngine";
 import type { Input } from "./Input";
@@ -48,6 +48,17 @@ export class SelectTool {
   dragDocGrabOffset: Vec2 | null = null;
   dragDocSnap: Snap | null = null;
 
+  // TextBox Drag/Rotate-State
+  dragTextBoxId: string | null = null;
+  dragTextBoxGrabOffset: Vec2 | null = null; // mouseStart - center
+  dragTextBoxSnap: Snap | null = null;
+  rotateTextBoxId: string | null = null;
+  rotateTextBoxStartAngle = 0; // initial mouse angle (rad) at rotate-begin
+  rotateTextBoxOriginalRot = 0; // box.rotationRad at rotate-begin
+
+  // Hilfslinien-Anker während aktivem Punkt-Edit (per Rechtsklick auf Snap-Punkte gesetzt).
+  // Erzeugen vertikale + horizontale Hilfslinien durch jeden Anker, deren Schnittpunkte und Achsen snappen.
+  editGuideAnchors: { key: string; point: Vec2 }[] = [];
 
 
   constructor(app: CadApp) {
@@ -73,6 +84,33 @@ export class SelectTool {
     this.dragDocId = null;
     this.dragDocGrabOffset = null;
     this.dragDocSnap = null;
+    this.dragTextBoxId = null;
+    this.dragTextBoxGrabOffset = null;
+    this.dragTextBoxSnap = null;
+    this.rotateTextBoxId = null;
+  }
+
+  /** Welt-Position des Rotate-Handles über der Top-Edge-Mitte einer TextBox. */
+  private _textBoxRotateHandleWorld(box: TextBox): Vec2 {
+    const offsetPx = 22;
+    const offsetM = offsetPx / Math.max(1e-6, this.app.camera.scale);
+    const lx = 0, ly = -box.heightM * 0.5 - offsetM;
+    const c = Math.cos(box.rotationRad), s = Math.sin(box.rotationRad);
+    return v(box.center.x + lx * c - ly * s, box.center.y + lx * s + ly * c);
+  }
+
+  /** Hit-Test gegen Rotate-Handle der aktuell selektierten TextBox. */
+  private _hitTextBoxRotateHandle(input: Input): TextBox | null {
+    const sel = this.app.selection;
+    if (!sel || (sel.type !== SelectionType.TEXTBOX && sel.type !== SelectionType.TEXTBOX_HANDLE)) return null;
+    const box = this.app.getSelectedTextBox();
+    if (!box || !this.app.labelManager.isVisible(box.labelId)) return null;
+    const handleW = this._textBoxRotateHandleWorld(box);
+    const handleS = this.app.camera.worldToScreen(handleW.x, handleW.y);
+    const dx = handleS.x - input.mouse.sx;
+    const dy = handleS.y - input.mouse.sy;
+    if (Math.hypot(dx, dy) <= Defaults.hitPx + 4) return box;
+    return null;
   }
 
   finish() {}
@@ -326,7 +364,56 @@ export class SelectTool {
     this.moveHubLocked = false;
     this.moveHubLengthM = null;
     this.moveHubAngleDeg = null;
+    this.editGuideAnchors = [];
     this.app.hub.bindCommit(null);
+  }
+
+  /** Snap aus aktiven Edit-Hilfslinien (H/V durch Anker). Null falls keine Anker oder Maus zu weit. */
+  private _findEditGuideSnap(input: Input): Snap | null {
+    if (this.editGuideAnchors.length === 0) return null;
+    const mouseS = v(input.mouse.sx, input.mouse.sy);
+    const mouseW = v(input.mouse.wx, input.mouse.wy);
+    const cam = this.app.camera;
+
+    const defs: { point: Vec2; dir: Vec2 }[] = [];
+    for (const a of this.editGuideAnchors) {
+      defs.push({ point: a.point, dir: v(1, 0) });
+      defs.push({ point: a.point, dir: v(0, 1) });
+    }
+
+    let best: Snap | null = null;
+    let bestPx = Infinity;
+
+    // Schnittpunkte (höhere Priorität)
+    for (let i = 0; i < defs.length; i++) {
+      for (let j = i + 1; j < defs.length; j++) {
+        const ip = lineLineIntersectionInfinite(defs[i].point, defs[i].dir, defs[j].point, defs[j].dir);
+        if (!ip) continue;
+        const sp = cam.worldToScreen(ip.x, ip.y);
+        const px = Math.hypot(sp.x - mouseS.x, sp.y - mouseS.y);
+        if (px <= Defaults.snapPx && px < bestPx) {
+          bestPx = px;
+          best = { type: SnapType.GUIDE_POINT, world: v(ip.x, ip.y), segment: null, pointIndex: null, t: null, px } as any;
+        }
+      }
+    }
+    if (best) return best;
+
+    for (const def of defs) {
+      const proj = projectPointToInfiniteLine(mouseW, def.point, def.dir);
+      const sp = cam.worldToScreen(proj.q.x, proj.q.y);
+      const px = Math.hypot(sp.x - mouseS.x, sp.y - mouseS.y);
+      if (px > Defaults.snapPx) continue;
+      if (px < bestPx) {
+        bestPx = px;
+        const span = (Math.hypot(this.app.renderer.vw, this.app.renderer.vh) / cam.scale) * 1.5;
+        const d = norm(def.dir);
+        const lineA = sub(def.point, mul(d, span));
+        const lineB = add(def.point, mul(d, span));
+        best = { type: SnapType.GUIDE, world: v(proj.q.x, proj.q.y), segment: null, pointIndex: null, t: null, px, lineA, lineB } as any;
+      }
+    }
+    return best;
   }
 
   private _hitTestWithForegroundPriority(input: Input) {
@@ -467,18 +554,33 @@ export class SelectTool {
 
   private _findPreviewSnapForEdit(input: Input) {
     if (!this.editTarget) return null;
+    let topoSnap: Snap | null;
     if (this.editTarget.kind === "segment") {
-      return this.app.topology.findBestSnapExcludingSegment(
+      topoSnap = this.app.topology.findBestSnapExcludingSegment(
         v(input.mouse.sx, input.mouse.sy),
         v(input.mouse.wx, input.mouse.wy),
         this.editTarget.segmentId
       );
+    } else {
+      topoSnap = this.app.topology.findBestSnapExcludingHatch(
+        v(input.mouse.sx, input.mouse.sy),
+        v(input.mouse.wx, input.mouse.wy),
+        this.editTarget.hatchId
+      );
     }
-    return this.app.topology.findBestSnapExcludingHatch(
-      v(input.mouse.sx, input.mouse.sy),
-      v(input.mouse.wx, input.mouse.wy),
-      this.editTarget.hatchId
-    );
+    const guideSnap = this._findEditGuideSnap(input);
+    if (!guideSnap) return topoSnap;
+    if (!topoSnap) return guideSnap;
+    // GUIDE_POINT > POINT > GUIDE > LINE — bevorzuge präzisere; sonst geringerer Pixel-Abstand.
+    const rank = (s: Snap) => {
+      if (s.type === SnapType.POINT) return 0;
+      if (s.type === SnapType.GUIDE_POINT) return 0;
+      if (s.type === SnapType.GUIDE) return 2;
+      return 3;
+    };
+    if (rank(topoSnap) < rank(guideSnap)) return topoSnap;
+    if (rank(guideSnap) < rank(topoSnap)) return guideSnap;
+    return ((topoSnap.px ?? Infinity) <= (guideSnap.px ?? Infinity)) ? topoSnap : guideSnap;
   }
 
   private _findRotateAssistSegment(input: Input) {
@@ -616,7 +718,61 @@ export class SelectTool {
       }
     }
 
-    // Active dimension parallel-drag
+    // Active textbox drag (translate) with snap
+    if (this.dragTextBoxId) {
+      const box = this.app.scene.getTextBoxById(this.dragTextBoxId);
+      if (!box || !this.dragTextBoxGrabOffset) {
+        this.dragTextBoxId = null;
+        this.dragTextBoxGrabOffset = null;
+        this.dragTextBoxSnap = null;
+      } else {
+        const mouseW = v(input.mouse.wx, input.mouse.wy);
+        const snap = this.app.topology.findBestSnap(
+          v(input.mouse.sx, input.mouse.sy),
+          mouseW
+        );
+        this.dragTextBoxSnap = snap;
+        const target = (snap && snap.world) ? snap.world : mouseW;
+        box.center = v(target.x - this.dragTextBoxGrabOffset.x, target.y - this.dragTextBoxGrabOffset.y);
+        const len = Math.hypot(box.center.x, box.center.y);
+        const angDeg = (box.rotationRad * 180 / Math.PI + 360) % 360;
+        this.app.hub.showAt(input.mouse.sx, input.mouse.sy);
+        this.app.hub.updateDisplay(len, angDeg);
+        if (!input.mouse.left) {
+          this.dragTextBoxId = null;
+          this.dragTextBoxGrabOffset = null;
+          this.dragTextBoxSnap = null;
+          this.app.hub.hide();
+        }
+        return;
+      }
+    }
+
+    // Active textbox rotate
+    if (this.rotateTextBoxId) {
+      const box = this.app.scene.getTextBoxById(this.rotateTextBoxId);
+      if (!box) {
+        this.rotateTextBoxId = null;
+      } else {
+        const mouseW = v(input.mouse.wx, input.mouse.wy);
+        const curAng = Math.atan2(mouseW.y - box.center.y, mouseW.x - box.center.x);
+        let newRot = this.rotateTextBoxOriginalRot + (curAng - this.rotateTextBoxStartAngle);
+        if (input.keys.shift) {
+          const step = Math.PI / 12; // 15°
+          newRot = Math.round(newRot / step) * step;
+        }
+        box.rotationRad = newRot;
+        const angDeg = (newRot * 180 / Math.PI + 360) % 360;
+        this.app.hub.showAt(input.mouse.sx, input.mouse.sy);
+        this.app.hub.updateDisplay(Math.hypot(box.widthM, box.heightM), angDeg);
+        if (!input.mouse.left) {
+          this.rotateTextBoxId = null;
+          this.app.hub.hide();
+        }
+        return;
+      }
+    }
+
     if (this.dragDimId) {
       const dim = this.app.scene.getDimensionById(this.dragDimId);
       if (!dim) {
@@ -637,6 +793,18 @@ export class SelectTool {
     }
 
     if (this.isEditing()) {
+      // Rechtsklick während Edit: Toggle eines Hilfslinien-Ankers am aktuellen Snap-Punkt.
+      if (input.rightClicked) {
+        const snap = this._findPreviewSnapForEdit(input);
+        if (snap && snap.world && (snap.type === SnapType.POINT || snap.type === SnapType.GUIDE_POINT)) {
+          const key = `${snap.world.x.toFixed(6)}_${snap.world.y.toFixed(6)}`;
+          const idx = this.editGuideAnchors.findIndex(a => a.key === key);
+          if (idx >= 0) this.editGuideAnchors.splice(idx, 1);
+          else this.editGuideAnchors.push({ key, point: v(snap.world.x, snap.world.y) });
+          return;
+        }
+      }
+
       if (this.activeEditAction === PointEditAction.MOVE) {
         const p = this._previewMovePoint(input);
         const metrics = { lengthM: dist(this.fixedPoint!, p), angleDeg: angleDeg(this.fixedPoint!, p) };
@@ -780,10 +948,25 @@ export class SelectTool {
         }
       }
 
+      // Rotate-Handle der bereits selektierten TextBox?
+      const rotateBox = this._hitTextBoxRotateHandle(input);
+      if (rotateBox) {
+        const mouseW0 = v(input.mouse.wx, input.mouse.wy);
+        this.rotateTextBoxId = rotateBox.id;
+        this.rotateTextBoxStartAngle = Math.atan2(mouseW0.y - rotateBox.center.y, mouseW0.x - rotateBox.center.x);
+        this.rotateTextBoxOriginalRot = rotateBox.rotationRad || 0;
+        return;
+      }
+
       // Textbox hits take priority — they sit on top visually
       const box = this._hitTextBox(input);
       if (box) {
+        const mouseW0 = v(input.mouse.wx, input.mouse.wy);
         this.app.setSelection({ type: SelectionType.TEXTBOX, textBoxId: box.id, handleIndex: null });
+        // Drag vorbereiten: Greifpunkt-Offset relativ zum Center
+        this.dragTextBoxId = box.id;
+        this.dragTextBoxGrabOffset = { x: mouseW0.x - box.center.x, y: mouseW0.y - box.center.y };
+        this.dragTextBoxSnap = null;
         return;
       }
 
@@ -832,6 +1015,31 @@ export class SelectTool {
   }
 
   _drawOverlay(ctx: CanvasRenderingContext2D, cam: any) {
+    // Hilfslinien-Anker während Punkt-Edit
+    if (this.isEditing() && this.editGuideAnchors.length > 0) {
+      ctx.save();
+      ctx.strokeStyle = "rgba(110,110,110,0.42)";
+      ctx.lineWidth = 1;
+      ctx.setLineDash([5, 6]);
+      for (const a of this.editGuideAnchors) {
+        const s = cam.worldToScreen(a.point.x, a.point.y);
+        ctx.beginPath();
+        ctx.moveTo(0, s.y); ctx.lineTo(this.app.renderer.vw, s.y);
+        ctx.moveTo(s.x, 0); ctx.lineTo(s.x, this.app.renderer.vh);
+        ctx.stroke();
+      }
+      ctx.setLineDash([]);
+      // Anker-Marker
+      for (const a of this.editGuideAnchors) {
+        const s = cam.worldToScreen(a.point.x, a.point.y);
+        ctx.fillStyle = "rgba(110,110,110,0.85)";
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
     // Sticker-Drag-Snap-Marker
     if (this.dragStickerId && this.dragStickerSnap) {
       const sn = this.dragStickerSnap;

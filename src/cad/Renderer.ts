@@ -66,11 +66,13 @@ export class Renderer {
   setEditingTextBoxId(id: string | null) { this.editingTextBoxId = id || null; }
 
   private _segmentsBackToFront() {
+    // Höher in der ID-Panel-Liste (kleinerer Index) = Vordergrund.
+    // Wir zeichnen back-to-front, daher: höchster Index zuerst, Index 0 zuletzt.
     const order = this.labels.list();
     const rank = new Map(order.map((g, i) => [g.id, i]));
     return [...this.scene.segments]
       .filter(s => this.labels.isVisible(s.labelId))
-      .sort((a, b) => (rank.get(a.labelId) || 0) - (rank.get(b.labelId) || 0));
+      .sort((a, b) => (rank.get(b.labelId) ?? 0) - (rank.get(a.labelId) ?? 0));
   }
 
   private _hatchesBackToFront() {
@@ -78,7 +80,7 @@ export class Renderer {
     const rank = new Map(order.map((g, i) => [g.id, i]));
     return [...this.scene.hatches]
       .filter(h => this.labels.isVisible(h.labelId))
-      .sort((a, b) => (rank.get(a.labelId) || 0) - (rank.get(b.labelId) || 0));
+      .sort((a, b) => (rank.get(b.labelId) ?? 0) - (rank.get(a.labelId) ?? 0));
   }
 
   private _scaledStrokePx(storedWidth: number): number {
@@ -138,7 +140,7 @@ export class Renderer {
     const rank = new Map(order.map((g, i) => [g.id, i]));
     return [...this.scene.documents]
       .filter(d => this.labels.isVisible(d.labelId))
-      .sort((a, b) => (rank.get(a.labelId) || 0) - (rank.get(b.labelId) || 0));
+      .sort((a, b) => (rank.get(b.labelId) ?? 0) - (rank.get(a.labelId) ?? 0));
   }
 
   private _drawDocuments() {
@@ -269,7 +271,7 @@ export class Renderer {
     const rank = new Map(order.map((g, i) => [g.id, i]));
     return [...this.scene.stickerInstances]
       .filter(s => this.labels.isVisible(s.labelId))
-      .sort((a, b) => (rank.get(a.labelId) || 0) - (rank.get(b.labelId) || 0));
+      .sort((a, b) => (rank.get(b.labelId) ?? 0) - (rank.get(a.labelId) ?? 0));
   }
 
   private _drawStickerInstances() {
@@ -702,7 +704,7 @@ export class Renderer {
     const rank = new Map(order.map((g, i) => [g.id, i]));
     return [...this.scene.dimensions]
       .filter(d => this.labels.isVisible(d.labelId))
-      .sort((a, b) => (rank.get(a.labelId) || 0) - (rank.get(b.labelId) || 0));
+      .sort((a, b) => (rank.get(b.labelId) ?? 0) - (rank.get(a.labelId) ?? 0));
   }
 
   private _drawDimensions() {
@@ -840,7 +842,7 @@ export class Renderer {
     const rank = new Map(order.map((g, i) => [g.id, i]));
     return [...this.scene.textBoxes]
       .filter(t => this.labels.isVisible(t.labelId))
-      .sort((a, b) => (rank.get(a.labelId) || 0) - (rank.get(b.labelId) || 0));
+      .sort((a, b) => (rank.get(b.labelId) ?? 0) - (rank.get(a.labelId) ?? 0));
   }
 
   private _drawTextBoxes() {
@@ -921,5 +923,35 @@ export class Renderer {
       ctx.stroke();
       ctx.restore();
     }
+
+    // Rotate handle: kleiner Kreis über der Top-Edge-Mitte
+    const offsetPx = 22;
+    const lx = 0, ly = -box.heightM * 0.5;
+    const cR = Math.cos(box.rotationRad), sR = Math.sin(box.rotationRad);
+    const topMidWorld = { x: box.center.x + lx * cR - ly * sR, y: box.center.y + lx * sR + ly * cR };
+    const topMidScreen = cam.worldToScreen(topMidWorld.x, topMidWorld.y);
+    // Lokal: -y-Richtung der Box rotiert, in Screen-Pixel-Offset.
+    const hx = topMidScreen.x + Math.sin(box.rotationRad) * offsetPx;
+    const hy = topMidScreen.y - Math.cos(box.rotationRad) * offsetPx;
+    ctx.save();
+    ctx.strokeStyle = "rgba(77,163,255,0.85)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(topMidScreen.x, topMidScreen.y);
+    ctx.lineTo(hx, hy);
+    ctx.stroke();
+    ctx.fillStyle = "rgba(77,163,255,0.95)";
+    ctx.beginPath();
+    ctx.arc(hx, hy, 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,0.95)";
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.arc(hx, hy, 3.2, -Math.PI * 0.6, Math.PI * 0.7);
+    ctx.stroke();
+    ctx.restore();
   }
 }
