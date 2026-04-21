@@ -56,6 +56,9 @@ export class SelectTool {
   rotateTextBoxStartAngle = 0; // initial mouse angle (rad) at rotate-begin
   rotateTextBoxOriginalRot = 0; // box.rotationRad at rotate-begin
 
+  // Hilfslinien-Anker während aktivem Punkt-Edit (per Rechtsklick auf Snap-Punkte gesetzt).
+  // Erzeugen vertikale + horizontale Hilfslinien durch jeden Anker, deren Schnittpunkte und Achsen snappen.
+  editGuideAnchors: { key: string; point: Vec2 }[] = [];
 
 
   constructor(app: CadApp) {
