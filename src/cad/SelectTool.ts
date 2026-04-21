@@ -1015,6 +1015,31 @@ export class SelectTool {
   }
 
   _drawOverlay(ctx: CanvasRenderingContext2D, cam: any) {
+    // Hilfslinien-Anker während Punkt-Edit
+    if (this.isEditing() && this.editGuideAnchors.length > 0) {
+      ctx.save();
+      ctx.strokeStyle = "rgba(110,110,110,0.42)";
+      ctx.lineWidth = 1;
+      ctx.setLineDash([5, 6]);
+      for (const a of this.editGuideAnchors) {
+        const s = cam.worldToScreen(a.point.x, a.point.y);
+        ctx.beginPath();
+        ctx.moveTo(0, s.y); ctx.lineTo(this.app.renderer.vw, s.y);
+        ctx.moveTo(s.x, 0); ctx.lineTo(s.x, this.app.renderer.vh);
+        ctx.stroke();
+      }
+      ctx.setLineDash([]);
+      // Anker-Marker
+      for (const a of this.editGuideAnchors) {
+        const s = cam.worldToScreen(a.point.x, a.point.y);
+        ctx.fillStyle = "rgba(110,110,110,0.85)";
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
     // Sticker-Drag-Snap-Marker
     if (this.dragStickerId && this.dragStickerSnap) {
       const sn = this.dragStickerSnap;
