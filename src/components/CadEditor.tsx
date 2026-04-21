@@ -403,13 +403,12 @@ const CadEditor: React.FC = () => {
   }, [docPickerPages, docPickerSelected]);
 
   /**
-   * Maßstab anwenden. Import-Faktor ist KONSTANT 1:
-   *   PDF-Geometrie wird beim Import 1:1 in den Modellraum übernommen,
-   *   sodass eine 1m-Strecke im Plan IMMER 1m im Modell ist —
-   *   unabhängig vom aktuellen Ansichtsmaßstab (drawingScale).
-   * Der Ansichtsmaßstab beeinflusst nur die VISUELLE Darstellung der PDF
-   * (siehe Renderer._drawDocuments → displayFactor = importScaleDenom / drawingScale).
-   * Modellgeometrie, Maßketten und Snaps bleiben dadurch immer maßhaltig.
+   * Maßstab anwenden. Import-Faktor = importScaleDenom:
+   *   Die Importer liefern widthM/heightM als reine Papier-Größe in Metern
+   *   (z. B. A4 = 0.21 × 0.297 m). Damit 1 m im Plan bei z. B. 1:100 auch
+   *   1 m im Modell ergibt, wird die Welt-Größe mit dem Maßstabs-Nenner
+   *   multipliziert: weltM = papierM × denom.
+   * Geometrie ist danach maßhaltig; der Ansichtsmaßstab wirkt rein als Zoom.
    */
   const handleScaleConfirm = useCallback(() => {
     if (!scaleDialogPages) return;
@@ -417,23 +416,27 @@ const CadEditor: React.FC = () => {
     const denom = scaleChoice === "custom" ? parseFloat(scaleCustom.replace(",", ".")) : parseFloat(scaleChoice);
     const safeDenom = Number.isFinite(denom) && denom > 0 ? denom : 100;
     const [first, ...rest] = scaleDialogPages;
+    const firstW = first.widthM * safeDenom;
+    const firstH = first.heightM * safeDenom;
     app.setTool(ToolIds.DOCUMENT);
     app.documentTool.beginPlacement({
-      src: first.src, widthM: first.widthM, heightM: first.heightM,
+      src: first.src, widthM: firstW, heightM: firstH,
       pixelWidth: first.pixelWidth, pixelHeight: first.pixelHeight,
       name: first.name, kind: first.kind, pageIndex: first.pageIndex,
       importScaleDenom: safeDenom,
     });
-    let offX = first.widthM + 0.5;
+    let offX = firstW + 0.5;
     for (const p of rest) {
+      const pw = p.widthM * safeDenom;
+      const ph = p.heightM * safeDenom;
       app.scene.createDocument({
         name: p.name, kind: p.kind, src: p.src, pageIndex: p.pageIndex,
-        position: { x: offX, y: 0 }, widthM: p.widthM, heightM: p.heightM,
+        position: { x: offX, y: 0 }, widthM: pw, heightM: ph,
         pixelWidth: p.pixelWidth, pixelHeight: p.pixelHeight,
         labelId: app.activeDrawLabelId,
         importScaleDenom: safeDenom,
       });
-      offX += p.widthM + 0.5;
+      offX += pw + 0.5;
     }
     setScaleDialogPages(null);
   }, [scaleDialogPages, scaleChoice, scaleCustom]);
