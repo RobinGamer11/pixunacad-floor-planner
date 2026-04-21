@@ -66,11 +66,13 @@ export class Renderer {
   setEditingTextBoxId(id: string | null) { this.editingTextBoxId = id || null; }
 
   private _segmentsBackToFront() {
+    // Höher in der ID-Panel-Liste (kleinerer Index) = Vordergrund.
+    // Wir zeichnen back-to-front, daher: höchster Index zuerst, Index 0 zuletzt.
     const order = this.labels.list();
     const rank = new Map(order.map((g, i) => [g.id, i]));
     return [...this.scene.segments]
       .filter(s => this.labels.isVisible(s.labelId))
-      .sort((a, b) => (rank.get(a.labelId) || 0) - (rank.get(b.labelId) || 0));
+      .sort((a, b) => (rank.get(b.labelId) ?? 0) - (rank.get(a.labelId) ?? 0));
   }
 
   private _hatchesBackToFront() {
@@ -78,7 +80,7 @@ export class Renderer {
     const rank = new Map(order.map((g, i) => [g.id, i]));
     return [...this.scene.hatches]
       .filter(h => this.labels.isVisible(h.labelId))
-      .sort((a, b) => (rank.get(a.labelId) || 0) - (rank.get(b.labelId) || 0));
+      .sort((a, b) => (rank.get(b.labelId) ?? 0) - (rank.get(a.labelId) ?? 0));
   }
 
   private _scaledStrokePx(storedWidth: number): number {
@@ -138,7 +140,7 @@ export class Renderer {
     const rank = new Map(order.map((g, i) => [g.id, i]));
     return [...this.scene.documents]
       .filter(d => this.labels.isVisible(d.labelId))
-      .sort((a, b) => (rank.get(a.labelId) || 0) - (rank.get(b.labelId) || 0));
+      .sort((a, b) => (rank.get(b.labelId) ?? 0) - (rank.get(a.labelId) ?? 0));
   }
 
   private _drawDocuments() {
@@ -269,7 +271,7 @@ export class Renderer {
     const rank = new Map(order.map((g, i) => [g.id, i]));
     return [...this.scene.stickerInstances]
       .filter(s => this.labels.isVisible(s.labelId))
-      .sort((a, b) => (rank.get(a.labelId) || 0) - (rank.get(b.labelId) || 0));
+      .sort((a, b) => (rank.get(b.labelId) ?? 0) - (rank.get(a.labelId) ?? 0));
   }
 
   private _drawStickerInstances() {
