@@ -171,12 +171,11 @@ export class TopologyEngine {
     return best;
   }
 
-  findBestSnapExcludingHatch(mouseS: Vec2, mouseW: Vec2, excludedHatchId: string): Snap | null {
+  findBestSnapExcludingHatch(mouseS: Vec2, mouseW: Vec2, excludedHatchId: string, excludedPointIndex?: number): Snap | null {
     let best: Snap | null = null;
     let bestScore = Infinity;
 
     const considerPoint = (world: Vec2, segment: Segment | null, hatch: Hatch | null, pointIndex: number) => {
-      if (hatch && hatch.id === excludedHatchId) return;
       const px = this._worldToMousePx(world, mouseS);
       if (px > Defaults.snapPx) return;
       if (px < bestScore) {
@@ -203,8 +202,15 @@ export class TopologyEngine {
       considerPoint(seg.a, seg, null, 0);
       considerPoint(seg.b, seg, null, 1);
     }
+    // Hatches: andere Hatches voll snappen; das excluded Hatch nur an Punkten ungleich dem editierten.
     for (const hatch of this.scene.hatches) {
-      if (hatch.id === excludedHatchId) continue;
+      if (hatch.id === excludedHatchId) {
+        for (let i = 0; i < hatch.points.length; i++) {
+          if (excludedPointIndex != null && i === excludedPointIndex) continue;
+          considerPoint(hatch.points[i], null, hatch, i);
+        }
+        continue;
+      }
       for (let i = 0; i < hatch.points.length; i++) {
         considerPoint(hatch.points[i], null, hatch, i);
       }

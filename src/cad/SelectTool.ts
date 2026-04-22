@@ -565,7 +565,8 @@ export class SelectTool {
       topoSnap = this.app.topology.findBestSnapExcludingHatch(
         v(input.mouse.sx, input.mouse.sy),
         v(input.mouse.wx, input.mouse.wy),
-        this.editTarget.hatchId
+        this.editTarget.hatchId,
+        this.editTarget.pointIndex
       );
     }
     const guideSnap = this._findEditGuideSnap(input);
