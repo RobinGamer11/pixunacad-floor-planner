@@ -93,6 +93,28 @@ export class Renderer {
   /** Cache: docId -> HTMLImageElement (lazy-load aus DataURL). */
   private _docImageCache = new Map<string, HTMLImageElement>();
 
+  /**
+   * Zeichnet ALLE Objekte gruppiert nach Label-ID, von Hintergrund zu Vordergrund.
+   * Höher in der ID-Panel-Liste (kleinerer Index) = Vordergrund.
+   * Innerhalb einer ID-Gruppe gilt die Sub-Reihenfolge:
+   * Documents → Hatches → Segments → Dimensions → TextBoxes → Stickers.
+   * Damit liegen z. B. Schraffuren einer höher gerankten ID über Linien einer niedriger gerankten ID.
+   */
+  private _drawByLabelOrder() {
+    const order = this.labels.list();
+    // Iteriere von hinten nach vorne (höchster Index zuerst = Hintergrund).
+    for (let i = order.length - 1; i >= 0; i--) {
+      const labelId = order[i].id;
+      if (!this.labels.isVisible(labelId)) continue;
+      this._drawDocumentsForLabel(labelId);
+      this._drawHatchesForLabel(labelId);
+      this._drawSegmentsForLabel(labelId);
+      this._drawDimensionsForLabel(labelId);
+      this._drawTextBoxesForLabel(labelId);
+      this._drawStickerInstancesForLabel(labelId);
+    }
+  }
+
   render() {
     const ctx = this.ctx;
     ctx.save();
