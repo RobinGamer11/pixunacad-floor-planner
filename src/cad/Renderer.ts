@@ -19,6 +19,8 @@ export interface Selection {
   documentId?: string;
   handleIndex?: number | null;
   pointIndex?: number | null;
+  /** Bei HATCH-Selection optional: Index der angeklickten Kante (für Edge-Offset-Hub). */
+  edgeIndex?: number | null;
 }
 
 export interface Overlay {

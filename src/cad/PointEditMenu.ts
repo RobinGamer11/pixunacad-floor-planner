@@ -28,9 +28,19 @@ export class PointEditMenu {
     this._onActivate = handler;
   }
 
-  showAt(sx: number, sy: number) {
+  /** Optional: nur diese Actions als Buttons sichtbar (alle anderen werden ausgeblendet). */
+  showAt(sx: number, sy: number, allowedActions?: string[]) {
     this.visible = true;
     this.root.classList.remove("hidden");
+
+    // Buttons je nach allowedActions ein-/ausblenden.
+    const allow = allowedActions ? new Set(allowedActions) : null;
+    for (const action of this.actions) {
+      const btn = this.buttonsByAction[action];
+      if (!btn) continue;
+      const visible = !allow || allow.has(action);
+      btn.style.display = visible ? "" : "none";
+    }
 
     const pad = 12;
     const vp = this.root.parentElement!.getBoundingClientRect();
@@ -49,6 +59,11 @@ export class PointEditMenu {
     this.visible = false;
     this.index = -1;
     this.root.classList.add("hidden");
+    // Alle Buttons wieder einblenden für nächsten Aufruf.
+    for (const action of this.actions) {
+      const btn = this.buttonsByAction[action];
+      if (btn) btn.style.display = "";
+    }
     this._sync();
   }
 

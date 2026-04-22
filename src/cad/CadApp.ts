@@ -1020,7 +1020,16 @@ export class CadApp {
     r.idSelect.addEventListener("change", () => {
       const nextId = r.idSelect.value || Defaults.defaultLabelId;
       const sel = this.getSelectedTextBox();
-      if (sel) { sel.labelId = nextId; this.setSelectedLabelId(nextId); this.refreshLabelUI(); return; }
+      if (sel) { sel.labelId = nextId; this.refreshLabelUI(); return; }
+      if (this.selectedLabelId) {
+        const groupIds = this.scene.getTextBoxesByLabelId(this.selectedLabelId).map(t => t.id);
+        if (groupIds.length > 0) {
+          this.scene.assignTextBoxesToLabel(groupIds, nextId);
+          this.setSelectedLabelId(nextId);
+          this.refreshLabelUI();
+          return;
+        }
+      }
       this.setActiveDrawLabelId(nextId);
     });
 
@@ -1132,12 +1141,23 @@ export class CadApp {
   private _setupLineSettingsPanel() {
     this.lineIdSelect.addEventListener("change", () => {
       const nextId = this.lineIdSelect.value || Defaults.defaultLabelId;
-      const selectedIds = this.getSelectedObjectIds();
-      if (selectedIds.length > 0) {
-        this.scene.assignSegmentsToLabel(selectedIds, nextId);
-        this.setSelectedLabelId(nextId);
+      // Einzel-Objekt-Auswahl: nur dieses Objekt umhängen, keine Gruppen-Selektion auslösen.
+      const singleSel = this.getSelectedSegment();
+      if (singleSel) {
+        this.scene.assignSegmentsToLabel([singleSel.id], nextId);
+        singleSel.labelId = nextId;
         this.refreshLabelUI();
         return;
+      }
+      // Gruppen-Auswahl (über IdPanel-Klick) → ganze Gruppe umhängen.
+      if (this.selectedLabelId) {
+        const groupIds = this.scene.getSegmentsByLabelId(this.selectedLabelId).map(s => s.id);
+        if (groupIds.length > 0) {
+          this.scene.assignSegmentsToLabel(groupIds, nextId);
+          this.setSelectedLabelId(nextId);
+          this.refreshLabelUI();
+          return;
+        }
       }
       this.setActiveDrawLabelId(nextId);
     });
@@ -1185,12 +1205,21 @@ export class CadApp {
   private _setupHatchSettingsPanel() {
     this.hatchIdSelect.addEventListener("change", () => {
       const nextId = this.hatchIdSelect.value || Defaults.defaultLabelId;
-      const selectedHatchIds = this.getSelectedHatchObjectIds();
-      if (selectedHatchIds.length > 0) {
-        this.scene.assignHatchesToLabel(selectedHatchIds, nextId);
-        this.setSelectedLabelId(nextId);
+      const singleSel = this.getSelectedHatch();
+      if (singleSel) {
+        this.scene.assignHatchesToLabel([singleSel.id], nextId);
+        singleSel.labelId = nextId;
         this.refreshLabelUI();
         return;
+      }
+      if (this.selectedLabelId) {
+        const groupIds = this.scene.getHatchesByLabelId(this.selectedLabelId).map(h => h.id);
+        if (groupIds.length > 0) {
+          this.scene.assignHatchesToLabel(groupIds, nextId);
+          this.setSelectedLabelId(nextId);
+          this.refreshLabelUI();
+          return;
+        }
       }
       this.setActiveDrawLabelId(nextId);
     });
@@ -1672,7 +1701,16 @@ export class CadApp {
     r.idSelect.addEventListener("change", () => {
       const nextId = r.idSelect.value || Defaults.defaultLabelId;
       const sel = this.getSelectedDimension();
-      if (sel) { sel.labelId = nextId; this.setSelectedLabelId(nextId); this.refreshLabelUI(); return; }
+      if (sel) { sel.labelId = nextId; this.refreshLabelUI(); return; }
+      if (this.selectedLabelId) {
+        const groupIds = this.scene.getDimensionsByLabelId(this.selectedLabelId).map(d => d.id);
+        if (groupIds.length > 0) {
+          this.scene.assignDimensionsToLabel(groupIds, nextId);
+          this.setSelectedLabelId(nextId);
+          this.refreshLabelUI();
+          return;
+        }
+      }
       this.setActiveDrawLabelId(nextId);
     });
 
