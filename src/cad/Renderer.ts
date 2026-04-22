@@ -93,6 +93,28 @@ export class Renderer {
   /** Cache: docId -> HTMLImageElement (lazy-load aus DataURL). */
   private _docImageCache = new Map<string, HTMLImageElement>();
 
+  /**
+   * Zeichnet ALLE Objekte gruppiert nach Label-ID, von Hintergrund zu Vordergrund.
+   * Höher in der ID-Panel-Liste (kleinerer Index) = Vordergrund.
+   * Innerhalb einer ID-Gruppe gilt die Sub-Reihenfolge:
+   * Documents → Hatches → Segments → Dimensions → TextBoxes → Stickers.
+   * Damit liegen z. B. Schraffuren einer höher gerankten ID über Linien einer niedriger gerankten ID.
+   */
+  private _drawByLabelOrder() {
+    const order = this.labels.list();
+    // Iteriere von hinten nach vorne (höchster Index zuerst = Hintergrund).
+    for (let i = order.length - 1; i >= 0; i--) {
+      const labelId = order[i].id;
+      if (!this.labels.isVisible(labelId)) continue;
+      this._drawDocumentsForLabel(labelId);
+      this._drawHatchesForLabel(labelId);
+      this._drawSegmentsForLabel(labelId);
+      this._drawDimensionsForLabel(labelId);
+      this._drawTextBoxesForLabel(labelId);
+      this._drawStickerInstancesForLabel(labelId);
+    }
+  }
+
   render() {
     const ctx = this.ctx;
     ctx.save();
@@ -101,12 +123,7 @@ export class Renderer {
     ctx.restore();
 
     this._drawGrid();
-    this._drawDocuments();
-    this._drawHatches();
-    this._drawSegments();
-    this._drawDimensions();
-    this._drawTextBoxes();
-    this._drawStickerInstances();
+    this._drawByLabelOrder();
     this._drawHatchSelection();
     this._drawSegmentSelection();
     this._drawDimensionSelection();
@@ -146,35 +163,41 @@ export class Renderer {
   }
 
   private _drawDocuments() {
+    for (const doc of this._documentsBackToFront()) this._drawSingleDocument(doc);
+  }
+
+  private _drawDocumentsForLabel(labelId: string) {
+    for (const doc of this.scene.documents) {
+      if (doc.labelId !== labelId) continue;
+      if (!this.labels.isVisible(doc.labelId)) continue;
+      this._drawSingleDocument(doc);
+    }
+  }
+
+  private _drawSingleDocument(doc: DocumentObject) {
     const ctx = this.ctx;
     const cam = this.camera;
-    // Dokumente werden 1:1 in Modellkoordinaten dargestellt:
-    // 1 m im PDF = 1 m im CAD. Der Ansichtsmaßstab (drawingScale) wirkt
-    // ausschließlich über cam.scale (Zoom) und verändert keine Geometrie.
-    for (const doc of this._documentsBackToFront()) {
-      const img = this._getDocImage(doc);
-      const center = documentCenterWorld(doc);
-      const cs = cam.worldToScreen(center.x, center.y);
-      const wPx = doc.widthM * cam.scale;
-      const hPx = doc.heightM * cam.scale;
+    const img = this._getDocImage(doc);
+    const center = documentCenterWorld(doc);
+    const cs = cam.worldToScreen(center.x, center.y);
+    const wPx = doc.widthM * cam.scale;
+    const hPx = doc.heightM * cam.scale;
 
-      ctx.save();
-      ctx.translate(cs.x, cs.y);
-      if (doc.rotationRad) ctx.rotate(doc.rotationRad);
-      if (img) {
-        ctx.drawImage(img, -wPx / 2, -hPx / 2, wPx, hPx);
-      } else {
-        // Placeholder während das Bild lädt
-        ctx.fillStyle = "rgba(180,180,180,0.3)";
-        ctx.fillRect(-wPx / 2, -hPx / 2, wPx, hPx);
-        ctx.fillStyle = "rgba(0,0,0,0.6)";
-        ctx.font = "12px system-ui";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText("Lade …", 0, 0);
-      }
-      ctx.restore();
+    ctx.save();
+    ctx.translate(cs.x, cs.y);
+    if (doc.rotationRad) ctx.rotate(doc.rotationRad);
+    if (img) {
+      ctx.drawImage(img, -wPx / 2, -hPx / 2, wPx, hPx);
+    } else {
+      ctx.fillStyle = "rgba(180,180,180,0.3)";
+      ctx.fillRect(-wPx / 2, -hPx / 2, wPx, hPx);
+      ctx.fillStyle = "rgba(0,0,0,0.6)";
+      ctx.font = "12px system-ui";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("Lade …", 0, 0);
     }
+    ctx.restore();
   }
 
   private _drawDocumentSelection() {
@@ -277,12 +300,20 @@ export class Renderer {
   }
 
   private _drawStickerInstances() {
-    const ctx = this.ctx;
-    const cam = this.camera;
-    for (const inst of this._stickersBackToFront()) {
-      const items = transformedInstanceItems(inst.items as any, inst.position, inst.rotationRad, inst.scale);
-      this._drawTransformedItems(ctx, cam, items);
+    for (const inst of this._stickersBackToFront()) this._drawSingleStickerInstance(inst);
+  }
+
+  private _drawStickerInstancesForLabel(labelId: string) {
+    for (const inst of this.scene.stickerInstances) {
+      if (inst.labelId !== labelId) continue;
+      if (!this.labels.isVisible(inst.labelId)) continue;
+      this._drawSingleStickerInstance(inst);
     }
+  }
+
+  private _drawSingleStickerInstance(inst: StickerInstance) {
+    const items = transformedInstanceItems(inst.items as any, inst.position, inst.rotationRad, inst.scale);
+    this._drawTransformedItems(this.ctx, this.camera, items);
   }
 
   private _drawTransformedItems(ctx: CanvasRenderingContext2D, cam: Camera, items: any[]) {
@@ -427,77 +458,95 @@ export class Renderer {
   }
 
   private _drawSegments() {
+    for (const seg of this._segmentsBackToFront()) this._drawSingleSegment(seg);
+  }
+
+  private _drawSegmentsForLabel(labelId: string) {
+    for (const seg of this.scene.segments) {
+      if (seg.labelId !== labelId) continue;
+      if (!this.labels.isVisible(seg.labelId)) continue;
+      this._drawSingleSegment(seg);
+    }
+  }
+
+  private _drawSingleSegment(seg: { a: Vec2; b: Vec2; color?: string; thicknessM: number; labelId: string }) {
     const ctx = this.ctx;
     const cam = this.camera;
+    const a = cam.worldToScreen(seg.a.x, seg.a.y);
+    const b = cam.worldToScreen(seg.b.x, seg.b.y);
+    const isGroupSel = this.selectedLabelId && seg.labelId === this.selectedLabelId;
 
-    for (const seg of this._segmentsBackToFront()) {
-      const a = cam.worldToScreen(seg.a.x, seg.a.y);
-      const b = cam.worldToScreen(seg.b.x, seg.b.y);
-      const isGroupSel = this.selectedLabelId && seg.labelId === this.selectedLabelId;
+    ctx.save();
+    ctx.strokeStyle = seg.color || Defaults.lineColor;
+    ctx.lineWidth = Math.max(0.5, seg.thicknessM * cam.scale);
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
 
-      ctx.save();
-      ctx.strokeStyle = seg.color || Defaults.lineColor;
-      ctx.lineWidth = Math.max(0.5, seg.thicknessM * cam.scale);
+    if (isGroupSel) {
+      ctx.strokeStyle = "rgba(77,163,255,0.95)";
+      ctx.lineWidth = Math.max(4, Math.max(0.5, seg.thicknessM * cam.scale) + 1.4);
       ctx.beginPath();
       ctx.moveTo(a.x, a.y);
       ctx.lineTo(b.x, b.y);
       ctx.stroke();
-
-      if (isGroupSel) {
-        ctx.strokeStyle = "rgba(77,163,255,0.95)";
-        ctx.lineWidth = Math.max(4, Math.max(0.5, seg.thicknessM * cam.scale) + 1.4);
-        ctx.beginPath();
-        ctx.moveTo(a.x, a.y);
-        ctx.lineTo(b.x, b.y);
-        ctx.stroke();
-      }
-      ctx.restore();
     }
+    ctx.restore();
   }
 
   private _drawHatches() {
+    for (const hatch of this._hatchesBackToFront()) this._drawSingleHatch(hatch);
+  }
+
+  private _drawHatchesForLabel(labelId: string) {
+    for (const hatch of this.scene.hatches) {
+      if (hatch.labelId !== labelId) continue;
+      if (!this.labels.isVisible(hatch.labelId)) continue;
+      this._drawSingleHatch(hatch);
+    }
+  }
+
+  private _drawSingleHatch(hatch: Hatch) {
+    if (hatch.points.length < 3) return;
     const ctx = this.ctx;
     const cam = this.camera;
 
-    for (const hatch of this._hatchesBackToFront()) {
-      if (hatch.points.length < 3) continue;
+    const isHovered = this.hoverHatchId === hatch.id;
+    const isSelected = this.selection && this.selection.hatchId === hatch.id;
+    const fillAlpha = (hatch.fillAlphaPct ?? Defaults.hatchFillAlphaPct) / 100;
+    const fillCol = rgbaFromHex(hatch.fillColor, fillAlpha);
+    const strokeCol = hatch.strokeColor || Defaults.hatchStrokeColor;
+    const strokePx = this._scaledStrokePx(hatch.strokeWidthPx);
 
-      const isHovered = this.hoverHatchId === hatch.id;
-      const isSelected = this.selection && this.selection.hatchId === hatch.id;
-      const fillAlpha = (hatch.fillAlphaPct ?? Defaults.hatchFillAlphaPct) / 100;
-      const fillCol = rgbaFromHex(hatch.fillColor, fillAlpha);
-      const strokeCol = hatch.strokeColor || Defaults.hatchStrokeColor;
-      const strokePx = this._scaledStrokePx(hatch.strokeWidthPx);
+    ctx.save();
 
-      ctx.save();
-
-      ctx.beginPath();
-      const p0 = cam.worldToScreen(hatch.points[0].x, hatch.points[0].y);
-      ctx.moveTo(p0.x, p0.y);
-      for (let i = 1; i < hatch.points.length; i++) {
-        const sp = cam.worldToScreen(hatch.points[i].x, hatch.points[i].y);
-        ctx.lineTo(sp.x, sp.y);
-      }
-      ctx.closePath();
-
-      ctx.fillStyle = fillCol;
-      ctx.fill();
-
-      if (strokePx > 0) {
-        ctx.strokeStyle = strokeCol;
-        ctx.lineWidth = strokePx;
-        ctx.stroke();
-      }
-
-      if (isHovered && !isSelected) {
-        ctx.strokeStyle = "rgba(77,163,255,0.55)";
-        ctx.lineWidth = Math.max(1.5, strokePx + 1.2);
-        ctx.stroke();
-      }
-
-      this._drawAreaLabel(hatch, !!isSelected);
-      ctx.restore();
+    ctx.beginPath();
+    const p0 = cam.worldToScreen(hatch.points[0].x, hatch.points[0].y);
+    ctx.moveTo(p0.x, p0.y);
+    for (let i = 1; i < hatch.points.length; i++) {
+      const sp = cam.worldToScreen(hatch.points[i].x, hatch.points[i].y);
+      ctx.lineTo(sp.x, sp.y);
     }
+    ctx.closePath();
+
+    ctx.fillStyle = fillCol;
+    ctx.fill();
+
+    if (strokePx > 0) {
+      ctx.strokeStyle = strokeCol;
+      ctx.lineWidth = strokePx;
+      ctx.stroke();
+    }
+
+    if (isHovered && !isSelected) {
+      ctx.strokeStyle = "rgba(77,163,255,0.55)";
+      ctx.lineWidth = Math.max(1.5, strokePx + 1.2);
+      ctx.stroke();
+    }
+
+    this._drawAreaLabel(hatch, !!isSelected);
+    ctx.restore();
   }
 
   _getAreaLabelLayout(hatch: Hatch): AreaLabelLayout | null {
@@ -715,6 +764,14 @@ export class Renderer {
     }
   }
 
+  private _drawDimensionsForLabel(labelId: string) {
+    for (const dim of this.scene.dimensions) {
+      if (dim.labelId !== labelId) continue;
+      if (!this.labels.isVisible(dim.labelId)) continue;
+      this._drawSingleDimension(this.ctx, this.camera, dim, false);
+    }
+  }
+
   /**
    * Draws a dimension. Public so MeasureTool can render previews using the same logic.
    * `isPreview` slightly reduces line widths for the live preview.
@@ -848,33 +905,55 @@ export class Renderer {
   }
 
   private _drawTextBoxes() {
-    const cam = this.camera;
-    for (const box of this._textBoxesBackToFront()) {
-      if (this.editingTextBoxId === box.id) continue;
-      const cs = cam.worldToScreen(box.center.x, box.center.y);
-      const widthPx = box.widthM * cam.scale;
-      const heightPx = box.heightM * cam.scale;
-      drawRichTextBox({
-        ctx: this.ctx,
-        centerScreenX: cs.x,
-        centerScreenY: cs.y,
-        widthPx, heightPx,
-        rotationRad: box.rotationRad,
-        html: box.html || "",
-        baseFontSizePx: box.style.fontSizePx * (cam.scale / Defaults.measureReferenceScalePxPerM),
-        baseColor: box.style.textColor,
-        bgColor: box.style.bgColor,
-        bgAlpha: (box.style.bgAlphaPct || 0) / 100,
-        align: box.style.align,
-        wrap: box.style.wrap,
-        borderEnabled: box.style.borderEnabled,
-        borderColor: box.style.borderColor,
-        borderWidthPx: box.style.borderWidthPx,
-        paddingPx: 6,
-      });
-    }
+    for (const box of this._textBoxesBackToFront()) this._drawSingleTextBox(box);
+    this._drawTextBoxHoverOutline();
+  }
 
-    // Hover outline (non-selected)
+  private _drawTextBoxesForLabel(labelId: string) {
+    for (const box of this.scene.textBoxes) {
+      if (box.labelId !== labelId) continue;
+      if (!this.labels.isVisible(box.labelId)) continue;
+      this._drawSingleTextBox(box);
+    }
+    // Hover-Outline gehört global zur Vordergrund-Phase: am Ende rendern.
+    if (this._isLastVisibleLabel(labelId)) this._drawTextBoxHoverOutline();
+  }
+
+  private _isLastVisibleLabel(labelId: string): boolean {
+    const order = this.labels.list();
+    for (let i = 0; i < order.length; i++) {
+      if (this.labels.isVisible(order[i].id)) return order[i].id === labelId;
+    }
+    return false;
+  }
+
+  private _drawSingleTextBox(box: TextBox) {
+    if (this.editingTextBoxId === box.id) return;
+    const cam = this.camera;
+    const cs = cam.worldToScreen(box.center.x, box.center.y);
+    const widthPx = box.widthM * cam.scale;
+    const heightPx = box.heightM * cam.scale;
+    drawRichTextBox({
+      ctx: this.ctx,
+      centerScreenX: cs.x,
+      centerScreenY: cs.y,
+      widthPx, heightPx,
+      rotationRad: box.rotationRad,
+      html: box.html || "",
+      baseFontSizePx: box.style.fontSizePx * (cam.scale / Defaults.measureReferenceScalePxPerM),
+      baseColor: box.style.textColor,
+      bgColor: box.style.bgColor,
+      bgAlpha: (box.style.bgAlphaPct || 0) / 100,
+      align: box.style.align,
+      wrap: box.style.wrap,
+      borderEnabled: box.style.borderEnabled,
+      borderColor: box.style.borderColor,
+      borderWidthPx: box.style.borderWidthPx,
+      paddingPx: 6,
+    });
+  }
+
+  private _drawTextBoxHoverOutline() {
     if (this.hoverTextBoxId && (!this.selection || (this.selection as any).textBoxId !== this.hoverTextBoxId)) {
       const box = this.scene.getTextBoxById(this.hoverTextBoxId);
       if (box && this.labels.isVisible(box.labelId)) this._strokeBoxOutline(box, "rgba(77,163,255,0.55)", 2);
