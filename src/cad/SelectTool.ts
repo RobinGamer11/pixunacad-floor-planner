@@ -297,7 +297,7 @@ export class SelectTool {
         seg.b = v(newPoint.x, newPoint.y);
         seg.a = v(fixedKeep.x, fixedKeep.y);
       }
-    } else {
+    } else if (this.editTarget.kind === "hatch") {
       const hatch = this.app.scene.getHatchById(this.editTarget.hatchId);
       if (!hatch) return;
       hatch.points[this.editTarget.pointIndex] = v(newPoint.x, newPoint.y);
@@ -319,7 +319,7 @@ export class SelectTool {
         seg.b = v(movingFinal.x, movingFinal.y);
         seg.a = v(fixedFinal.x, fixedFinal.y);
       }
-    } else {
+    } else if (this.editTarget.kind === "hatch") {
       const hatch = this.app.scene.getHatchById(this.editTarget.hatchId);
       if (!hatch || !this.hatchPointsOriginal) return;
       for (let i = 0; i < hatch.points.length; i++) {
@@ -563,12 +563,17 @@ export class SelectTool {
         v(input.mouse.wx, input.mouse.wy),
         this.editTarget.segmentId
       );
-    } else {
+    } else if (this.editTarget.kind === "hatch") {
       topoSnap = this.app.topology.findBestSnapExcludingHatch(
         v(input.mouse.sx, input.mouse.sy),
         v(input.mouse.wx, input.mouse.wy),
         this.editTarget.hatchId,
         this.editTarget.pointIndex
+      );
+    } else {
+      topoSnap = this.app.topology.findBestSnap(
+        v(input.mouse.sx, input.mouse.sy),
+        v(input.mouse.wx, input.mouse.wy)
       );
     }
     const guideSnap = this._findEditGuideSnap(input);
