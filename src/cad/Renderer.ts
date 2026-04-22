@@ -300,12 +300,20 @@ export class Renderer {
   }
 
   private _drawStickerInstances() {
-    const ctx = this.ctx;
-    const cam = this.camera;
-    for (const inst of this._stickersBackToFront()) {
-      const items = transformedInstanceItems(inst.items as any, inst.position, inst.rotationRad, inst.scale);
-      this._drawTransformedItems(ctx, cam, items);
+    for (const inst of this._stickersBackToFront()) this._drawSingleStickerInstance(inst);
+  }
+
+  private _drawStickerInstancesForLabel(labelId: string) {
+    for (const inst of this.scene.stickerInstances) {
+      if (inst.labelId !== labelId) continue;
+      if (!this.labels.isVisible(inst.labelId)) continue;
+      this._drawSingleStickerInstance(inst);
     }
+  }
+
+  private _drawSingleStickerInstance(inst: StickerInstance) {
+    const items = transformedInstanceItems(inst.items as any, inst.position, inst.rotationRad, inst.scale);
+    this._drawTransformedItems(this.ctx, this.camera, items);
   }
 
   private _drawTransformedItems(ctx: CanvasRenderingContext2D, cam: Camera, items: any[]) {
@@ -756,6 +764,14 @@ export class Renderer {
     }
   }
 
+  private _drawDimensionsForLabel(labelId: string) {
+    for (const dim of this.scene.dimensions) {
+      if (dim.labelId !== labelId) continue;
+      if (!this.labels.isVisible(dim.labelId)) continue;
+      this._drawSingleDimension(this.ctx, this.camera, dim, false);
+    }
+  }
+
   /**
    * Draws a dimension. Public so MeasureTool can render previews using the same logic.
    * `isPreview` slightly reduces line widths for the live preview.
@@ -889,33 +905,55 @@ export class Renderer {
   }
 
   private _drawTextBoxes() {
-    const cam = this.camera;
-    for (const box of this._textBoxesBackToFront()) {
-      if (this.editingTextBoxId === box.id) continue;
-      const cs = cam.worldToScreen(box.center.x, box.center.y);
-      const widthPx = box.widthM * cam.scale;
-      const heightPx = box.heightM * cam.scale;
-      drawRichTextBox({
-        ctx: this.ctx,
-        centerScreenX: cs.x,
-        centerScreenY: cs.y,
-        widthPx, heightPx,
-        rotationRad: box.rotationRad,
-        html: box.html || "",
-        baseFontSizePx: box.style.fontSizePx * (cam.scale / Defaults.measureReferenceScalePxPerM),
-        baseColor: box.style.textColor,
-        bgColor: box.style.bgColor,
-        bgAlpha: (box.style.bgAlphaPct || 0) / 100,
-        align: box.style.align,
-        wrap: box.style.wrap,
-        borderEnabled: box.style.borderEnabled,
-        borderColor: box.style.borderColor,
-        borderWidthPx: box.style.borderWidthPx,
-        paddingPx: 6,
-      });
-    }
+    for (const box of this._textBoxesBackToFront()) this._drawSingleTextBox(box);
+    this._drawTextBoxHoverOutline();
+  }
 
-    // Hover outline (non-selected)
+  private _drawTextBoxesForLabel(labelId: string) {
+    for (const box of this.scene.textBoxes) {
+      if (box.labelId !== labelId) continue;
+      if (!this.labels.isVisible(box.labelId)) continue;
+      this._drawSingleTextBox(box);
+    }
+    // Hover-Outline gehört global zur Vordergrund-Phase: am Ende rendern.
+    if (this._isLastVisibleLabel(labelId)) this._drawTextBoxHoverOutline();
+  }
+
+  private _isLastVisibleLabel(labelId: string): boolean {
+    const order = this.labels.list();
+    for (let i = 0; i < order.length; i++) {
+      if (this.labels.isVisible(order[i].id)) return order[i].id === labelId;
+    }
+    return false;
+  }
+
+  private _drawSingleTextBox(box: TextBox) {
+    if (this.editingTextBoxId === box.id) return;
+    const cam = this.camera;
+    const cs = cam.worldToScreen(box.center.x, box.center.y);
+    const widthPx = box.widthM * cam.scale;
+    const heightPx = box.heightM * cam.scale;
+    drawRichTextBox({
+      ctx: this.ctx,
+      centerScreenX: cs.x,
+      centerScreenY: cs.y,
+      widthPx, heightPx,
+      rotationRad: box.rotationRad,
+      html: box.html || "",
+      baseFontSizePx: box.style.fontSizePx * (cam.scale / Defaults.measureReferenceScalePxPerM),
+      baseColor: box.style.textColor,
+      bgColor: box.style.bgColor,
+      bgAlpha: (box.style.bgAlphaPct || 0) / 100,
+      align: box.style.align,
+      wrap: box.style.wrap,
+      borderEnabled: box.style.borderEnabled,
+      borderColor: box.style.borderColor,
+      borderWidthPx: box.style.borderWidthPx,
+      paddingPx: 6,
+    });
+  }
+
+  private _drawTextBoxHoverOutline() {
     if (this.hoverTextBoxId && (!this.selection || (this.selection as any).textBoxId !== this.hoverTextBoxId)) {
       const box = this.scene.getTextBoxById(this.hoverTextBoxId);
       if (box && this.labels.isVisible(box.labelId)) this._strokeBoxOutline(box, "rgba(77,163,255,0.55)", 2);
