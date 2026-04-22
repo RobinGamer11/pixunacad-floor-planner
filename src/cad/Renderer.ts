@@ -101,12 +101,7 @@ export class Renderer {
     ctx.restore();
 
     this._drawGrid();
-    this._drawDocuments();
-    this._drawHatches();
-    this._drawSegments();
-    this._drawDimensions();
-    this._drawTextBoxes();
-    this._drawStickerInstances();
+    this._drawByLabelOrder();
     this._drawHatchSelection();
     this._drawSegmentSelection();
     this._drawDimensionSelection();
