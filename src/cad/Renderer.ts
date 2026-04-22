@@ -163,35 +163,41 @@ export class Renderer {
   }
 
   private _drawDocuments() {
+    for (const doc of this._documentsBackToFront()) this._drawSingleDocument(doc);
+  }
+
+  private _drawDocumentsForLabel(labelId: string) {
+    for (const doc of this.scene.documents) {
+      if (doc.labelId !== labelId) continue;
+      if (!this.labels.isVisible(doc.labelId)) continue;
+      this._drawSingleDocument(doc);
+    }
+  }
+
+  private _drawSingleDocument(doc: DocumentObject) {
     const ctx = this.ctx;
     const cam = this.camera;
-    // Dokumente werden 1:1 in Modellkoordinaten dargestellt:
-    // 1 m im PDF = 1 m im CAD. Der Ansichtsmaßstab (drawingScale) wirkt
-    // ausschließlich über cam.scale (Zoom) und verändert keine Geometrie.
-    for (const doc of this._documentsBackToFront()) {
-      const img = this._getDocImage(doc);
-      const center = documentCenterWorld(doc);
-      const cs = cam.worldToScreen(center.x, center.y);
-      const wPx = doc.widthM * cam.scale;
-      const hPx = doc.heightM * cam.scale;
+    const img = this._getDocImage(doc);
+    const center = documentCenterWorld(doc);
+    const cs = cam.worldToScreen(center.x, center.y);
+    const wPx = doc.widthM * cam.scale;
+    const hPx = doc.heightM * cam.scale;
 
-      ctx.save();
-      ctx.translate(cs.x, cs.y);
-      if (doc.rotationRad) ctx.rotate(doc.rotationRad);
-      if (img) {
-        ctx.drawImage(img, -wPx / 2, -hPx / 2, wPx, hPx);
-      } else {
-        // Placeholder während das Bild lädt
-        ctx.fillStyle = "rgba(180,180,180,0.3)";
-        ctx.fillRect(-wPx / 2, -hPx / 2, wPx, hPx);
-        ctx.fillStyle = "rgba(0,0,0,0.6)";
-        ctx.font = "12px system-ui";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText("Lade …", 0, 0);
-      }
-      ctx.restore();
+    ctx.save();
+    ctx.translate(cs.x, cs.y);
+    if (doc.rotationRad) ctx.rotate(doc.rotationRad);
+    if (img) {
+      ctx.drawImage(img, -wPx / 2, -hPx / 2, wPx, hPx);
+    } else {
+      ctx.fillStyle = "rgba(180,180,180,0.3)";
+      ctx.fillRect(-wPx / 2, -hPx / 2, wPx, hPx);
+      ctx.fillStyle = "rgba(0,0,0,0.6)";
+      ctx.font = "12px system-ui";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("Lade …", 0, 0);
     }
+    ctx.restore();
   }
 
   private _drawDocumentSelection() {
