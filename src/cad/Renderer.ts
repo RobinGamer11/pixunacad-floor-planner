@@ -450,77 +450,95 @@ export class Renderer {
   }
 
   private _drawSegments() {
+    for (const seg of this._segmentsBackToFront()) this._drawSingleSegment(seg);
+  }
+
+  private _drawSegmentsForLabel(labelId: string) {
+    for (const seg of this.scene.segments) {
+      if (seg.labelId !== labelId) continue;
+      if (!this.labels.isVisible(seg.labelId)) continue;
+      this._drawSingleSegment(seg);
+    }
+  }
+
+  private _drawSingleSegment(seg: { a: Vec2; b: Vec2; color?: string; thicknessM: number; labelId: string }) {
     const ctx = this.ctx;
     const cam = this.camera;
+    const a = cam.worldToScreen(seg.a.x, seg.a.y);
+    const b = cam.worldToScreen(seg.b.x, seg.b.y);
+    const isGroupSel = this.selectedLabelId && seg.labelId === this.selectedLabelId;
 
-    for (const seg of this._segmentsBackToFront()) {
-      const a = cam.worldToScreen(seg.a.x, seg.a.y);
-      const b = cam.worldToScreen(seg.b.x, seg.b.y);
-      const isGroupSel = this.selectedLabelId && seg.labelId === this.selectedLabelId;
+    ctx.save();
+    ctx.strokeStyle = seg.color || Defaults.lineColor;
+    ctx.lineWidth = Math.max(0.5, seg.thicknessM * cam.scale);
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
 
-      ctx.save();
-      ctx.strokeStyle = seg.color || Defaults.lineColor;
-      ctx.lineWidth = Math.max(0.5, seg.thicknessM * cam.scale);
+    if (isGroupSel) {
+      ctx.strokeStyle = "rgba(77,163,255,0.95)";
+      ctx.lineWidth = Math.max(4, Math.max(0.5, seg.thicknessM * cam.scale) + 1.4);
       ctx.beginPath();
       ctx.moveTo(a.x, a.y);
       ctx.lineTo(b.x, b.y);
       ctx.stroke();
-
-      if (isGroupSel) {
-        ctx.strokeStyle = "rgba(77,163,255,0.95)";
-        ctx.lineWidth = Math.max(4, Math.max(0.5, seg.thicknessM * cam.scale) + 1.4);
-        ctx.beginPath();
-        ctx.moveTo(a.x, a.y);
-        ctx.lineTo(b.x, b.y);
-        ctx.stroke();
-      }
-      ctx.restore();
     }
+    ctx.restore();
   }
 
   private _drawHatches() {
+    for (const hatch of this._hatchesBackToFront()) this._drawSingleHatch(hatch);
+  }
+
+  private _drawHatchesForLabel(labelId: string) {
+    for (const hatch of this.scene.hatches) {
+      if (hatch.labelId !== labelId) continue;
+      if (!this.labels.isVisible(hatch.labelId)) continue;
+      this._drawSingleHatch(hatch);
+    }
+  }
+
+  private _drawSingleHatch(hatch: Hatch) {
+    if (hatch.points.length < 3) return;
     const ctx = this.ctx;
     const cam = this.camera;
 
-    for (const hatch of this._hatchesBackToFront()) {
-      if (hatch.points.length < 3) continue;
+    const isHovered = this.hoverHatchId === hatch.id;
+    const isSelected = this.selection && this.selection.hatchId === hatch.id;
+    const fillAlpha = (hatch.fillAlphaPct ?? Defaults.hatchFillAlphaPct) / 100;
+    const fillCol = rgbaFromHex(hatch.fillColor, fillAlpha);
+    const strokeCol = hatch.strokeColor || Defaults.hatchStrokeColor;
+    const strokePx = this._scaledStrokePx(hatch.strokeWidthPx);
 
-      const isHovered = this.hoverHatchId === hatch.id;
-      const isSelected = this.selection && this.selection.hatchId === hatch.id;
-      const fillAlpha = (hatch.fillAlphaPct ?? Defaults.hatchFillAlphaPct) / 100;
-      const fillCol = rgbaFromHex(hatch.fillColor, fillAlpha);
-      const strokeCol = hatch.strokeColor || Defaults.hatchStrokeColor;
-      const strokePx = this._scaledStrokePx(hatch.strokeWidthPx);
+    ctx.save();
 
-      ctx.save();
-
-      ctx.beginPath();
-      const p0 = cam.worldToScreen(hatch.points[0].x, hatch.points[0].y);
-      ctx.moveTo(p0.x, p0.y);
-      for (let i = 1; i < hatch.points.length; i++) {
-        const sp = cam.worldToScreen(hatch.points[i].x, hatch.points[i].y);
-        ctx.lineTo(sp.x, sp.y);
-      }
-      ctx.closePath();
-
-      ctx.fillStyle = fillCol;
-      ctx.fill();
-
-      if (strokePx > 0) {
-        ctx.strokeStyle = strokeCol;
-        ctx.lineWidth = strokePx;
-        ctx.stroke();
-      }
-
-      if (isHovered && !isSelected) {
-        ctx.strokeStyle = "rgba(77,163,255,0.55)";
-        ctx.lineWidth = Math.max(1.5, strokePx + 1.2);
-        ctx.stroke();
-      }
-
-      this._drawAreaLabel(hatch, !!isSelected);
-      ctx.restore();
+    ctx.beginPath();
+    const p0 = cam.worldToScreen(hatch.points[0].x, hatch.points[0].y);
+    ctx.moveTo(p0.x, p0.y);
+    for (let i = 1; i < hatch.points.length; i++) {
+      const sp = cam.worldToScreen(hatch.points[i].x, hatch.points[i].y);
+      ctx.lineTo(sp.x, sp.y);
     }
+    ctx.closePath();
+
+    ctx.fillStyle = fillCol;
+    ctx.fill();
+
+    if (strokePx > 0) {
+      ctx.strokeStyle = strokeCol;
+      ctx.lineWidth = strokePx;
+      ctx.stroke();
+    }
+
+    if (isHovered && !isSelected) {
+      ctx.strokeStyle = "rgba(77,163,255,0.55)";
+      ctx.lineWidth = Math.max(1.5, strokePx + 1.2);
+      ctx.stroke();
+    }
+
+    this._drawAreaLabel(hatch, !!isSelected);
+    ctx.restore();
   }
 
   _getAreaLabelLayout(hatch: Hatch): AreaLabelLayout | null {
