@@ -1287,8 +1287,10 @@ export class SelectTool {
         PointEditAction.ROTATE,
         PointEditAction.DELETE,
       ]);
-    } else if (this._shouldKeepEdgeMenuOpen()) {
+    } else if (!this.isEditing() && this._isHatchEdgeSelectionActive()) {
       // Hatch-Edge-Auswahl: Menü mit Offset offen halten.
+    } else if (!this.isEditing() && this._isTextBoxHandleSelectionActive()) {
+      // TextBox-Handle-Auswahl: Menü offen halten.
     } else {
       this.app.pointEditMenu.hide();
     }
