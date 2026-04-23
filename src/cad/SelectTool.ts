@@ -1241,6 +1241,13 @@ export class SelectTool {
         }
       }
 
+      // Klick auf TextBox-Body (kein Eckpunkt-Handle) → nur selektieren, nicht ziehen.
+      const box = this._hitTextBox(input);
+      if (box) {
+        this.app.setSelection({ type: SelectionType.TEXTBOX, textBoxId: box.id, handleIndex: null });
+        return;
+      }
+
       const hit = this._hitTestWithForegroundPriority(input);
       if (hit) {
         this.app.setSelection(hit);
