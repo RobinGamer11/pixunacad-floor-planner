@@ -534,6 +534,18 @@ export class SelectTool {
     hatch.points[idxB] = newB;
   }
 
+  private _isHatchEdgeSelectionActive(): boolean {
+    const sel = this.app.selection;
+    if (!sel || sel.type !== SelectionType.HATCH) return false;
+    return (sel as any).edgeIndex != null;
+  }
+
+  private _isTextBoxHandleSelectionActive(): boolean {
+    const sel = this.app.selection;
+    if (!sel || sel.type !== SelectionType.TEXTBOX_HANDLE) return false;
+    return sel.handleIndex != null;
+  }
+
   private _getSelectedPointContext() {
     const sel = this.app.selection;
     if (!sel || sel.type !== SelectionType.POINT) return null;
