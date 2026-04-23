@@ -30,6 +30,24 @@ export class SelectTool {
   // Snapshot of all hatch points at edit start (for translate/rotate of full polygon if needed)
   hatchPointsOriginal: Vec2[] | null = null;
 
+  // Hatch-edge-offset state
+  hatchEdgeAOriginal: Vec2 | null = null;
+  hatchEdgeBOriginal: Vec2 | null = null;
+  hatchEdgePrevOriginal: Vec2 | null = null;
+  hatchEdgeNextOriginal: Vec2 | null = null;
+  hatchEdgeNormal: Vec2 | null = null;     // unit normal pointing "outward" (left of A→B)
+  hatchEdgeMidOriginal: Vec2 | null = null;
+  hatchEdgeOffsetM = 0;
+  hatchEdgeOffsetLocked = false;
+
+  // TextBox handle (corner) edit state
+  textBoxOppositeOriginal: Vec2 | null = null; // world pos of opposite corner at edit start
+  textBoxRotationOriginal = 0;
+  textBoxWidthOriginal = 0;
+  textBoxHeightOriginal = 0;
+  textBoxCenterOriginal: Vec2 | null = null;
+  textBoxCornerOriginal: Vec2 | null = null;   // moving (clicked) corner world pos at edit start
+
   moveHubLocked = false;
   moveHubLengthM: number | null = null;
   moveHubAngleDeg: number | null = null;
@@ -113,6 +131,27 @@ export class SelectTool {
     const dy = handleS.y - input.mouse.sy;
     if (Math.hypot(dx, dy) <= Defaults.hitPx + 4) return box;
     return null;
+  }
+
+  /** Hit-Test gegen die 4 Eck-Handles der aktuell selektierten TextBox. */
+  private _hitTextBoxCornerHandle(input: Input): { box: TextBox; handleIndex: number } | null {
+    const sel = this.app.selection;
+    if (!sel || (sel.type !== SelectionType.TEXTBOX && sel.type !== SelectionType.TEXTBOX_HANDLE)) return null;
+    const box = this.app.getSelectedTextBox();
+    if (!box || !this.app.labelManager.isVisible(box.labelId)) return null;
+    const corners = boxCornersWorld(box);
+    const mouseS = v(input.mouse.sx, input.mouse.sy);
+    let best: { box: TextBox; handleIndex: number } | null = null;
+    let bestPx = Infinity;
+    for (let i = 0; i < corners.length; i++) {
+      const sp = this.app.camera.worldToScreen(corners[i].x, corners[i].y);
+      const px = Math.hypot(sp.x - mouseS.x, sp.y - mouseS.y);
+      if (px <= Defaults.hitPx + 2 && px < bestPx) {
+        bestPx = px;
+        best = { box, handleIndex: i };
+      }
+    }
+    return best;
   }
 
   finish() {}
@@ -235,6 +274,98 @@ export class SelectTool {
     }
   }
 
+  /** Begin TextBox-Handle-Edit (move/translate/rotate) for a clicked corner. */
+  beginTextBoxHandleEdit(textBoxId: string, handleIndex: number, action: string) {
+    const box = this.app.scene.getTextBoxById(textBoxId);
+    if (!box) return;
+    if (action === PointEditAction.DELETE) return;
+
+    this.activeEditAction = action;
+    this.editTarget = { kind: "textboxHandle", textBoxId, handleIndex };
+
+    this.textBoxRotationOriginal = box.rotationRad;
+    this.textBoxWidthOriginal = box.widthM;
+    this.textBoxHeightOriginal = box.heightM;
+    this.textBoxCenterOriginal = v(box.center.x, box.center.y);
+    const corners = boxCornersWorld(box);
+    this.textBoxCornerOriginal = v(corners[handleIndex].x, corners[handleIndex].y);
+    this.textBoxOppositeOriginal = v(corners[(handleIndex + 2) % 4].x, corners[(handleIndex + 2) % 4].y);
+
+    this.fixedPoint = v(this.textBoxOppositeOriginal.x, this.textBoxOppositeOriginal.y);
+    this.otherPointOriginal = v(this.textBoxCornerOriginal.x, this.textBoxCornerOriginal.y);
+
+    this.moveHubLocked = false;
+    this.moveHubLengthM = null;
+    this.moveHubAngleDeg = null;
+    this.app.pointEditMenu.hide();
+
+    if (action === PointEditAction.ROTATE || action === PointEditAction.MOVE) {
+      const radius = dist(this.fixedPoint!, this.otherPointOriginal!);
+      const ang = angleDeg(this.fixedPoint!, this.otherPointOriginal!);
+      this.app.hub.bindCommit((vals) =>
+        action === PointEditAction.ROTATE ? this._applyRotateHubValues(vals) : this._applyMoveHubValues(vals)
+      );
+      this.app.hub.showAt(this.app.input.mouse.sx, this.app.input.mouse.sy);
+      this.app.hub.updateDisplay(radius, ang);
+      this.app.hub.setValues(radius, ang);
+      this.app.hub.enterEditMode();
+    } else {
+      this.app.hub.hide();
+      this.app.hub.bindCommit(null);
+    }
+  }
+
+  /** Begin Hatch-Edge-Offset (parallel shift along edge normal). */
+  beginHatchEdgeOffset(hatchId: string, edgeIndex: number) {
+    const hatch = this.app.scene.getHatchById(hatchId);
+    if (!hatch) return;
+    const n = hatch.points.length;
+    if (n < 3) return;
+
+    this.activeEditAction = PointEditAction.OFFSET;
+    this.editTarget = { kind: "hatchEdge", hatchId, edgeIndex };
+
+    const A = hatch.points[edgeIndex];
+    const B = hatch.points[(edgeIndex + 1) % n];
+    const Pp = hatch.points[(edgeIndex - 1 + n) % n];
+    const Nn = hatch.points[(edgeIndex + 2) % n];
+
+    this.hatchEdgeAOriginal = v(A.x, A.y);
+    this.hatchEdgeBOriginal = v(B.x, B.y);
+    this.hatchEdgePrevOriginal = v(Pp.x, Pp.y);
+    this.hatchEdgeNextOriginal = v(Nn.x, Nn.y);
+    this.hatchEdgeMidOriginal = v((A.x + B.x) * 0.5, (A.y + B.y) * 0.5);
+
+    const dir = sub(B, A);
+    const dirLen = Math.hypot(dir.x, dir.y) || 1;
+    const nUnit = v(-dir.y / dirLen, dir.x / dirLen);
+    const c = polygonCentroid(hatch.points);
+    const toCentroid = sub(c, this.hatchEdgeMidOriginal);
+    const sign = (nUnit.x * toCentroid.x + nUnit.y * toCentroid.y) > 0 ? -1 : 1;
+    this.hatchEdgeNormal = v(nUnit.x * sign, nUnit.y * sign);
+
+    this.hatchEdgeOffsetM = 0;
+    this.hatchEdgeOffsetLocked = false;
+    this.app.pointEditMenu.hide();
+
+    this.app.hub.bindCommit((vals) => this._applyHatchEdgeHubValues(vals));
+    this.app.hub.showAt(this.app.input.mouse.sx, this.app.input.mouse.sy);
+    this.app.hub.updateDisplay(0, 0);
+    this.app.hub.setValues(0, 0);
+    this.app.hub.enterEditMode();
+  }
+
+  private _applyHatchEdgeHubValues(vals: { lengthM: number | null; angleDeg: number | null }) {
+    if (this.activeEditAction !== PointEditAction.OFFSET || !this.editTarget) return;
+    if (this.editTarget.kind !== "hatchEdge") return;
+    const off = vals.lengthM != null ? vals.lengthM : this.hatchEdgeOffsetM;
+    this.hatchEdgeOffsetLocked = true;
+    this.hatchEdgeOffsetM = off;
+    this._applyHatchEdgeOffset(off);
+    this.app.hub.setValues(off, 0);
+    this.app.hub.updateDisplay(off, 0);
+  }
+
   private _deleteSelectedPoint() {
     const ctx = this._getSelectedPointContext();
     if (!ctx) return;
@@ -301,10 +432,46 @@ export class SelectTool {
       const hatch = this.app.scene.getHatchById(this.editTarget.hatchId);
       if (!hatch) return;
       hatch.points[this.editTarget.pointIndex] = v(newPoint.x, newPoint.y);
+    } else if (this.editTarget.kind === "textboxHandle") {
+      // For textbox MOVE/ROTATE: opposite corner is the pivot (fixedKeep);
+      // moving handle should land on newPoint. Box width/height stay constant.
+      // Compute new center and rotation so that opposite stays put and moving handle reaches newPoint.
+      const box = this.app.scene.getTextBoxById(this.editTarget.textBoxId);
+      if (!box || this.textBoxOppositeOriginal == null) return;
+      const opp = this.textBoxOppositeOriginal;
+      const w = this.textBoxWidthOriginal;
+      const h = this.textBoxHeightOriginal;
+      const diagLen = Math.hypot(w, h);
+      const distMoving = Math.hypot(newPoint.x - opp.x, newPoint.y - opp.y);
+      if (diagLen < 1e-9 || distMoving < 1e-9) return;
+      // Diagonal in local box-frame from opposite corner to moving corner depends on which corner index.
+      // boxLocalCorners order: 0=TL, 1=TR, 2=BR, 3=BL
+      // opposite-of(0)=2, of(1)=3, of(2)=0, of(3)=1
+      const handleIndex = this.editTarget.handleIndex;
+      const localMov = this._textBoxLocalCornerForIndex(handleIndex, w, h);
+      const localOpp = this._textBoxLocalCornerForIndex((handleIndex + 2) % 4, w, h);
+      // Local diagonal vector (from opp to mov)
+      const dxL = localMov.x - localOpp.x;
+      const dyL = localMov.y - localOpp.y;
+      const localDiagAng = Math.atan2(dyL, dxL);
+      const worldDiagAng = Math.atan2(newPoint.y - opp.y, newPoint.x - opp.x);
+      const newRot = worldDiagAng - localDiagAng;
+      // Center is midpoint of opp and moving in world.
+      const newCenter = v((opp.x + newPoint.x) * 0.5, (opp.y + newPoint.y) * 0.5);
+      box.center = newCenter;
+      box.rotationRad = newRot;
     }
   }
 
-  /** Apply translate delta for the whole object (segment or hatch). */
+  private _textBoxLocalCornerForIndex(i: number, w: number, h: number): Vec2 {
+    const hw = w * 0.5, hh = h * 0.5;
+    if (i === 0) return v(-hw, -hh);
+    if (i === 1) return v(hw, -hh);
+    if (i === 2) return v(hw, hh);
+    return v(-hw, hh);
+  }
+
+  /** Apply translate delta for the whole object (segment or hatch or textbox). */
   private _applyTranslateDelta(delta: Vec2) {
     if (!this.editTarget) return;
     if (this.editTarget.kind === "segment") {
@@ -326,7 +493,45 @@ export class SelectTool {
         const orig = this.hatchPointsOriginal[i];
         hatch.points[i] = v(orig.x + delta.x, orig.y + delta.y);
       }
+    } else if (this.editTarget.kind === "textboxHandle") {
+      const box = this.app.scene.getTextBoxById(this.editTarget.textBoxId);
+      if (!box || !this.textBoxCenterOriginal) return;
+      box.center = v(this.textBoxCenterOriginal.x + delta.x, this.textBoxCenterOriginal.y + delta.y);
+    } else if (this.editTarget.kind === "hatchEdge") {
+      // Translate-Mode für Edge entspricht Offset entlang Normale.
+      const n = this.hatchEdgeNormal;
+      if (!n) return;
+      const offset = delta.x * n.x + delta.y * n.y;
+      this._applyHatchEdgeOffset(offset);
     }
+  }
+
+  /** Apply parallel offset to selected hatch edge. Adjacent endpoints slide along their adjacent edges. */
+  private _applyHatchEdgeOffset(offsetM: number) {
+    if (!this.editTarget || this.editTarget.kind !== "hatchEdge") return;
+    const hatch = this.app.scene.getHatchById(this.editTarget.hatchId);
+    if (!hatch) return;
+    const A0 = this.hatchEdgeAOriginal!;
+    const B0 = this.hatchEdgeBOriginal!;
+    const Pp = this.hatchEdgePrevOriginal!;
+    const Nn = this.hatchEdgeNextOriginal!;
+    const n = this.hatchEdgeNormal!;
+    // Offset edge line: line through A0+offset*n with direction (B0-A0)
+    const A1 = v(A0.x + n.x * offsetM, A0.y + n.y * offsetM);
+    const B1 = v(B0.x + n.x * offsetM, B0.y + n.y * offsetM);
+    const dirEdge = sub(B1, A1);
+    // Adjacent edges (original lines)
+    const dirPrev = sub(A0, Pp);
+    const dirNext = sub(B0, Nn);
+    let newA = lineLineIntersectionInfinite(A1, dirEdge, Pp, dirPrev);
+    let newB = lineLineIntersectionInfinite(A1, dirEdge, Nn, dirNext);
+    // Fallback: if parallel, just use A1/B1
+    if (!newA) newA = A1;
+    if (!newB) newB = B1;
+    const idxA = this.editTarget.edgeIndex;
+    const idxB = (idxA + 1) % hatch.points.length;
+    hatch.points[idxA] = newA;
+    hatch.points[idxB] = newB;
   }
 
   private _getSelectedPointContext() {
@@ -363,6 +568,20 @@ export class SelectTool {
     this.fixedPoint = null;
     this.otherPointOriginal = null;
     this.hatchPointsOriginal = null;
+    this.hatchEdgeAOriginal = null;
+    this.hatchEdgeBOriginal = null;
+    this.hatchEdgePrevOriginal = null;
+    this.hatchEdgeNextOriginal = null;
+    this.hatchEdgeNormal = null;
+    this.hatchEdgeMidOriginal = null;
+    this.hatchEdgeOffsetM = 0;
+    this.hatchEdgeOffsetLocked = false;
+    this.textBoxOppositeOriginal = null;
+    this.textBoxRotationOriginal = 0;
+    this.textBoxWidthOriginal = 0;
+    this.textBoxHeightOriginal = 0;
+    this.textBoxCenterOriginal = null;
+    this.textBoxCornerOriginal = null;
     this.moveHubLocked = false;
     this.moveHubLengthM = null;
     this.moveHubAngleDeg = null;
@@ -868,6 +1087,30 @@ export class SelectTool {
         }
         return;
       }
+
+      if (this.activeEditAction === PointEditAction.OFFSET) {
+        // Live-Preview: Mausprojektion auf Edge-Normale (relativ zum Edge-Mittelpunkt)
+        if (!this.hatchEdgeOffsetLocked) {
+          const mouseW = v(input.mouse.wx, input.mouse.wy);
+          const rel = sub(mouseW, this.hatchEdgeMidOriginal!);
+          const off = rel.x * this.hatchEdgeNormal!.x + rel.y * this.hatchEdgeNormal!.y;
+          this.hatchEdgeOffsetM = off;
+          this._applyHatchEdgeOffset(off);
+          if (document.activeElement !== this.app.hub.lenInputEl && document.activeElement !== this.app.hub.angInputEl) {
+            this.app.hub.showAt(input.mouse.sx, input.mouse.sy);
+            this.app.hub.updateDisplay(off, 0);
+            this.app.hub.setValues(off, 0);
+          }
+        } else {
+          this.app.hub.showAt(input.mouse.sx, input.mouse.sy);
+          this.app.hub.updateDisplay(this.hatchEdgeOffsetM, 0);
+        }
+        if (input.clicked) {
+          this._clearEditState();
+          this.app.hub.hide();
+        }
+        return;
+      }
     }
 
     this.app.renderer.setHoverSegmentId(null);
@@ -956,6 +1199,26 @@ export class SelectTool {
         }
       }
 
+      // TextBox-Eckpunkt der bereits selektierten TextBox? → Hub-Menü (Move/Translate/Rotate)
+      const cornerHit = this._hitTextBoxCornerHandle(input);
+      if (cornerHit) {
+        this.app.setSelection({
+          type: SelectionType.TEXTBOX_HANDLE,
+          textBoxId: cornerHit.box.id,
+          handleIndex: cornerHit.handleIndex,
+        });
+        const sp = this.app.camera.worldToScreen(
+          boxCornersWorld(cornerHit.box)[cornerHit.handleIndex].x,
+          boxCornersWorld(cornerHit.box)[cornerHit.handleIndex].y,
+        );
+        this.app.pointEditMenu.showAt(sp.x, sp.y, [
+          PointEditAction.MOVE,
+          PointEditAction.TRANSLATE,
+          PointEditAction.ROTATE,
+        ]);
+        return;
+      }
+
       // Rotate-Handle der bereits selektierten TextBox?
       const rotateBox = this._hitTextBoxRotateHandle(input);
       if (rotateBox) {
@@ -964,6 +1227,44 @@ export class SelectTool {
         this.rotateTextBoxStartAngle = Math.atan2(mouseW0.y - rotateBox.center.y, mouseW0.x - rotateBox.center.x);
         this.rotateTextBoxOriginalRot = rotateBox.rotationRad || 0;
         return;
+      }
+
+      // Hatch-Edge der bereits selektierten Hatch? → direktes Offset-Hub
+      {
+        const sel = this.app.selection;
+        if (sel && (sel.type === SelectionType.HATCH || sel.type === SelectionType.POINT) && (sel as any).hatchId) {
+          const selectedHatch = this.app.scene.getHatchById((sel as any).hatchId);
+          if (selectedHatch && this.app.labelManager.isVisible(selectedHatch.labelId)) {
+            const mouseW = v(input.mouse.wx, input.mouse.wy);
+            const mouseS = v(input.mouse.sx, input.mouse.sy);
+            const cam = this.app.camera;
+            const nPts = selectedHatch.points.length;
+            let bestIdx = -1;
+            let bestPx = Infinity;
+            for (let i = 0; i < nPts; i++) {
+              const a = selectedHatch.points[i];
+              const b = selectedHatch.points[(i + 1) % nPts];
+              const proj = projectPointToSegment(mouseW, a, b);
+              if (proj.t <= Defaults.splitEpsT || proj.t >= 1 - Defaults.splitEpsT) continue;
+              const sp = cam.worldToScreen(proj.q.x, proj.q.y);
+              const px = Math.hypot(sp.x - mouseS.x, sp.y - mouseS.y);
+              if (px <= Defaults.hitPx && px < bestPx) {
+                bestPx = px;
+                bestIdx = i;
+              }
+            }
+            if (bestIdx >= 0) {
+              this.app.setSelection({
+                type: SelectionType.HATCH,
+                hatchId: selectedHatch.id,
+                pointIndex: null,
+                edgeIndex: bestIdx,
+              });
+              this.beginHatchEdgeOffset(selectedHatch.id, bestIdx);
+              return;
+            }
+          }
+        }
       }
 
       // Textbox hits take priority — they sit on top visually

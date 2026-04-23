@@ -309,6 +309,11 @@ export class CadApp {
     );
 
     this.pointEditMenu.bindActivate((action) => {
+      const sel = this.selection;
+      if (sel && sel.type === SelectionType.TEXTBOX_HANDLE && (sel as any).textBoxId && sel.handleIndex != null) {
+        this.selectTool.beginTextBoxHandleEdit((sel as any).textBoxId, sel.handleIndex, action);
+        return;
+      }
       this.selectTool.beginPointEdit(action);
     });
 
