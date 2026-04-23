@@ -115,6 +115,27 @@ export class SelectTool {
     return null;
   }
 
+  /** Hit-Test gegen die 4 Eck-Handles der aktuell selektierten TextBox. */
+  private _hitTextBoxCornerHandle(input: Input): { box: TextBox; handleIndex: number } | null {
+    const sel = this.app.selection;
+    if (!sel || (sel.type !== SelectionType.TEXTBOX && sel.type !== SelectionType.TEXTBOX_HANDLE)) return null;
+    const box = this.app.getSelectedTextBox();
+    if (!box || !this.app.labelManager.isVisible(box.labelId)) return null;
+    const corners = boxCornersWorld(box);
+    const mouseS = v(input.mouse.sx, input.mouse.sy);
+    let best: { box: TextBox; handleIndex: number } | null = null;
+    let bestPx = Infinity;
+    for (let i = 0; i < corners.length; i++) {
+      const sp = this.app.camera.worldToScreen(corners[i].x, corners[i].y);
+      const px = Math.hypot(sp.x - mouseS.x, sp.y - mouseS.y);
+      if (px <= Defaults.hitPx + 2 && px < bestPx) {
+        bestPx = px;
+        best = { box, handleIndex: i };
+      }
+    }
+    return best;
+  }
+
   finish() {}
 
   private _hitTextBox(input: Input): TextBox | null {
