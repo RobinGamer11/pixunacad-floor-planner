@@ -151,7 +151,7 @@ const CadEditor: React.FC = () => {
     if (
       !canvasRef.current || !hubRef.current || !hubLenRef.current || !hubAngRef.current ||
       !pointEditRef.current || !pointMoveBtnRef.current || !pointTranslateBtnRef.current ||
-      !pointRotateBtnRef.current || !pointDeleteBtnRef.current || !settingsRef.current || !idSelectRef.current ||
+      !pointRotateBtnRef.current || !pointDeleteBtnRef.current || !pointOffsetBtnRef.current || !settingsRef.current || !idSelectRef.current ||
       !colorInputRef.current || !colorPreviewRef.current || !thicknessInputRef.current ||
       !idPanelRef.current || !idBodyRef.current || !idListRef.current ||
       !idAddBtnRef.current || !idToggleBtnRef.current ||
@@ -188,6 +188,7 @@ const CadEditor: React.FC = () => {
         [PointEditAction.TRANSLATE]: pointTranslateBtnRef.current,
         [PointEditAction.ROTATE]: pointRotateBtnRef.current,
         [PointEditAction.DELETE]: pointDeleteBtnRef.current,
+        [PointEditAction.OFFSET]: pointOffsetBtnRef.current,
       },
       settingsRef.current, idSelectRef.current,
       colorInputRef.current, colorPreviewRef.current, thicknessInputRef.current,
