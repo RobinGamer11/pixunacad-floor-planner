@@ -401,7 +401,45 @@ export class SelectTool {
         const orig = this.hatchPointsOriginal[i];
         hatch.points[i] = v(orig.x + delta.x, orig.y + delta.y);
       }
+    } else if (this.editTarget.kind === "textboxHandle") {
+      const box = this.app.scene.getTextBoxById(this.editTarget.textBoxId);
+      if (!box || !this.textBoxCenterOriginal) return;
+      box.center = v(this.textBoxCenterOriginal.x + delta.x, this.textBoxCenterOriginal.y + delta.y);
+    } else if (this.editTarget.kind === "hatchEdge") {
+      // Translate-Mode für Edge entspricht Offset entlang Normale.
+      const n = this.hatchEdgeNormal;
+      if (!n) return;
+      const offset = delta.x * n.x + delta.y * n.y;
+      this._applyHatchEdgeOffset(offset);
     }
+  }
+
+  /** Apply parallel offset to selected hatch edge. Adjacent endpoints slide along their adjacent edges. */
+  private _applyHatchEdgeOffset(offsetM: number) {
+    if (!this.editTarget || this.editTarget.kind !== "hatchEdge") return;
+    const hatch = this.app.scene.getHatchById(this.editTarget.hatchId);
+    if (!hatch) return;
+    const A0 = this.hatchEdgeAOriginal!;
+    const B0 = this.hatchEdgeBOriginal!;
+    const Pp = this.hatchEdgePrevOriginal!;
+    const Nn = this.hatchEdgeNextOriginal!;
+    const n = this.hatchEdgeNormal!;
+    // Offset edge line: line through A0+offset*n with direction (B0-A0)
+    const A1 = v(A0.x + n.x * offsetM, A0.y + n.y * offsetM);
+    const B1 = v(B0.x + n.x * offsetM, B0.y + n.y * offsetM);
+    const dirEdge = sub(B1, A1);
+    // Adjacent edges (original lines)
+    const dirPrev = sub(A0, Pp);
+    const dirNext = sub(B0, Nn);
+    let newA = lineLineIntersectionInfinite(A1, dirEdge, Pp, dirPrev);
+    let newB = lineLineIntersectionInfinite(A1, dirEdge, Nn, dirNext);
+    // Fallback: if parallel, just use A1/B1
+    if (!newA) newA = A1;
+    if (!newB) newB = B1;
+    const idxA = this.editTarget.edgeIndex;
+    const idxB = (idxA + 1) % hatch.points.length;
+    hatch.points[idxA] = newA;
+    hatch.points[idxB] = newB;
   }
 
   private _getSelectedPointContext() {
