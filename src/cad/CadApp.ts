@@ -314,6 +314,10 @@ export class CadApp {
         this.selectTool.beginTextBoxHandleEdit((sel as any).textBoxId, sel.handleIndex, action);
         return;
       }
+      if (action === PointEditAction.OFFSET && sel && sel.type === SelectionType.HATCH && (sel as any).hatchId && (sel as any).edgeIndex != null) {
+        this.selectTool.beginHatchEdgeOffset((sel as any).hatchId, (sel as any).edgeIndex);
+        return;
+      }
       this.selectTool.beginPointEdit(action);
     });
 
