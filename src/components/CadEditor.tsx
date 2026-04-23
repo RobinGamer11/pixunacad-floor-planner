@@ -32,6 +32,7 @@ const CadEditor: React.FC = () => {
   const pointTranslateBtnRef = useRef<HTMLButtonElement>(null);
   const pointRotateBtnRef = useRef<HTMLButtonElement>(null);
   const pointDeleteBtnRef = useRef<HTMLButtonElement>(null);
+  const pointOffsetBtnRef = useRef<HTMLButtonElement>(null);
   const settingsRef = useRef<HTMLDivElement>(null);
   const idSelectRef = useRef<HTMLSelectElement>(null);
   const colorInputRef = useRef<HTMLInputElement>(null);
@@ -1140,6 +1141,7 @@ const CadEditor: React.FC = () => {
           <button ref={pointMoveBtnRef} title="Bewegen">◉</button>
           <button ref={pointTranslateBtnRef} title="Verschieben">✥</button>
           <button ref={pointRotateBtnRef} title="Drehen">⟳</button>
+          <button ref={pointOffsetBtnRef} title="Kante versetzen">⇆</button>
           <button ref={pointDeleteBtnRef} title="Löschen">🗑</button>
         </div>
 
