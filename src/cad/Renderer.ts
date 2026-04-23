@@ -1004,6 +1004,5 @@ export class Renderer {
       ctx.stroke();
       ctx.restore();
     }
-
   }
-
+}
