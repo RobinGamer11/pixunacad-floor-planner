@@ -274,6 +274,98 @@ export class SelectTool {
     }
   }
 
+  /** Begin TextBox-Handle-Edit (move/translate/rotate) for a clicked corner. */
+  beginTextBoxHandleEdit(textBoxId: string, handleIndex: number, action: string) {
+    const box = this.app.scene.getTextBoxById(textBoxId);
+    if (!box) return;
+    if (action === PointEditAction.DELETE) return;
+
+    this.activeEditAction = action;
+    this.editTarget = { kind: "textboxHandle", textBoxId, handleIndex };
+
+    this.textBoxRotationOriginal = box.rotationRad;
+    this.textBoxWidthOriginal = box.widthM;
+    this.textBoxHeightOriginal = box.heightM;
+    this.textBoxCenterOriginal = v(box.center.x, box.center.y);
+    const corners = boxCornersWorld(box);
+    this.textBoxCornerOriginal = v(corners[handleIndex].x, corners[handleIndex].y);
+    this.textBoxOppositeOriginal = v(corners[(handleIndex + 2) % 4].x, corners[(handleIndex + 2) % 4].y);
+
+    this.fixedPoint = v(this.textBoxOppositeOriginal.x, this.textBoxOppositeOriginal.y);
+    this.otherPointOriginal = v(this.textBoxCornerOriginal.x, this.textBoxCornerOriginal.y);
+
+    this.moveHubLocked = false;
+    this.moveHubLengthM = null;
+    this.moveHubAngleDeg = null;
+    this.app.pointEditMenu.hide();
+
+    if (action === PointEditAction.ROTATE || action === PointEditAction.MOVE) {
+      const radius = dist(this.fixedPoint!, this.otherPointOriginal!);
+      const ang = angleDeg(this.fixedPoint!, this.otherPointOriginal!);
+      this.app.hub.bindCommit((vals) =>
+        action === PointEditAction.ROTATE ? this._applyRotateHubValues(vals) : this._applyMoveHubValues(vals)
+      );
+      this.app.hub.showAt(this.app.input.mouse.sx, this.app.input.mouse.sy);
+      this.app.hub.updateDisplay(radius, ang);
+      this.app.hub.setValues(radius, ang);
+      this.app.hub.enterEditMode();
+    } else {
+      this.app.hub.hide();
+      this.app.hub.bindCommit(null);
+    }
+  }
+
+  /** Begin Hatch-Edge-Offset (parallel shift along edge normal). */
+  beginHatchEdgeOffset(hatchId: string, edgeIndex: number) {
+    const hatch = this.app.scene.getHatchById(hatchId);
+    if (!hatch) return;
+    const n = hatch.points.length;
+    if (n < 3) return;
+
+    this.activeEditAction = PointEditAction.OFFSET;
+    this.editTarget = { kind: "hatchEdge", hatchId, edgeIndex };
+
+    const A = hatch.points[edgeIndex];
+    const B = hatch.points[(edgeIndex + 1) % n];
+    const Pp = hatch.points[(edgeIndex - 1 + n) % n];
+    const Nn = hatch.points[(edgeIndex + 2) % n];
+
+    this.hatchEdgeAOriginal = v(A.x, A.y);
+    this.hatchEdgeBOriginal = v(B.x, B.y);
+    this.hatchEdgePrevOriginal = v(Pp.x, Pp.y);
+    this.hatchEdgeNextOriginal = v(Nn.x, Nn.y);
+    this.hatchEdgeMidOriginal = v((A.x + B.x) * 0.5, (A.y + B.y) * 0.5);
+
+    const dir = sub(B, A);
+    const dirLen = Math.hypot(dir.x, dir.y) || 1;
+    const nUnit = v(-dir.y / dirLen, dir.x / dirLen);
+    const c = polygonCentroid(hatch.points);
+    const toCentroid = sub(c, this.hatchEdgeMidOriginal);
+    const sign = (nUnit.x * toCentroid.x + nUnit.y * toCentroid.y) > 0 ? -1 : 1;
+    this.hatchEdgeNormal = v(nUnit.x * sign, nUnit.y * sign);
+
+    this.hatchEdgeOffsetM = 0;
+    this.hatchEdgeOffsetLocked = false;
+    this.app.pointEditMenu.hide();
+
+    this.app.hub.bindCommit((vals) => this._applyHatchEdgeHubValues(vals));
+    this.app.hub.showAt(this.app.input.mouse.sx, this.app.input.mouse.sy);
+    this.app.hub.updateDisplay(0, 0);
+    this.app.hub.setValues(0, 0);
+    this.app.hub.enterEditMode();
+  }
+
+  private _applyHatchEdgeHubValues(vals: { lengthM: number | null; angleDeg: number | null }) {
+    if (this.activeEditAction !== PointEditAction.OFFSET || !this.editTarget) return;
+    if (this.editTarget.kind !== "hatchEdge") return;
+    const off = vals.lengthM != null ? vals.lengthM : this.hatchEdgeOffsetM;
+    this.hatchEdgeOffsetLocked = true;
+    this.hatchEdgeOffsetM = off;
+    this._applyHatchEdgeOffset(off);
+    this.app.hub.setValues(off, 0);
+    this.app.hub.updateDisplay(off, 0);
+  }
+
   private _deleteSelectedPoint() {
     const ctx = this._getSelectedPointContext();
     if (!ctx) return;
