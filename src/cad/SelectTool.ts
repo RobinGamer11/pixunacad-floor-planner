@@ -30,6 +30,24 @@ export class SelectTool {
   // Snapshot of all hatch points at edit start (for translate/rotate of full polygon if needed)
   hatchPointsOriginal: Vec2[] | null = null;
 
+  // Hatch-edge-offset state
+  hatchEdgeAOriginal: Vec2 | null = null;
+  hatchEdgeBOriginal: Vec2 | null = null;
+  hatchEdgePrevOriginal: Vec2 | null = null;
+  hatchEdgeNextOriginal: Vec2 | null = null;
+  hatchEdgeNormal: Vec2 | null = null;     // unit normal pointing "outward" (left of A→B)
+  hatchEdgeMidOriginal: Vec2 | null = null;
+  hatchEdgeOffsetM = 0;
+  hatchEdgeOffsetLocked = false;
+
+  // TextBox handle (corner) edit state
+  textBoxOppositeOriginal: Vec2 | null = null; // world pos of opposite corner at edit start
+  textBoxRotationOriginal = 0;
+  textBoxWidthOriginal = 0;
+  textBoxHeightOriginal = 0;
+  textBoxCenterOriginal: Vec2 | null = null;
+  textBoxCornerOriginal: Vec2 | null = null;   // moving (clicked) corner world pos at edit start
+
   moveHubLocked = false;
   moveHubLengthM: number | null = null;
   moveHubAngleDeg: number | null = null;
