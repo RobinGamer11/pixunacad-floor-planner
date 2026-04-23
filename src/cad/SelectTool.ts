@@ -1199,6 +1199,26 @@ export class SelectTool {
         }
       }
 
+      // TextBox-Eckpunkt der bereits selektierten TextBox? → Hub-Menü (Move/Translate/Rotate)
+      const cornerHit = this._hitTextBoxCornerHandle(input);
+      if (cornerHit) {
+        this.app.setSelection({
+          type: SelectionType.TEXTBOX_HANDLE,
+          textBoxId: cornerHit.box.id,
+          handleIndex: cornerHit.handleIndex,
+        });
+        const sp = this.app.camera.worldToScreen(
+          boxCornersWorld(cornerHit.box)[cornerHit.handleIndex].x,
+          boxCornersWorld(cornerHit.box)[cornerHit.handleIndex].y,
+        );
+        this.app.pointEditMenu.showAt(sp.x, sp.y, [
+          PointEditAction.MOVE,
+          PointEditAction.TRANSLATE,
+          PointEditAction.ROTATE,
+        ]);
+        return;
+      }
+
       // Rotate-Handle der bereits selektierten TextBox?
       const rotateBox = this._hitTextBoxRotateHandle(input);
       if (rotateBox) {
@@ -1207,6 +1227,44 @@ export class SelectTool {
         this.rotateTextBoxStartAngle = Math.atan2(mouseW0.y - rotateBox.center.y, mouseW0.x - rotateBox.center.x);
         this.rotateTextBoxOriginalRot = rotateBox.rotationRad || 0;
         return;
+      }
+
+      // Hatch-Edge der bereits selektierten Hatch? → direktes Offset-Hub
+      {
+        const sel = this.app.selection;
+        if (sel && (sel.type === SelectionType.HATCH || sel.type === SelectionType.POINT) && (sel as any).hatchId) {
+          const selectedHatch = this.app.scene.getHatchById((sel as any).hatchId);
+          if (selectedHatch && this.app.labelManager.isVisible(selectedHatch.labelId)) {
+            const mouseW = v(input.mouse.wx, input.mouse.wy);
+            const mouseS = v(input.mouse.sx, input.mouse.sy);
+            const cam = this.app.camera;
+            const nPts = selectedHatch.points.length;
+            let bestIdx = -1;
+            let bestPx = Infinity;
+            for (let i = 0; i < nPts; i++) {
+              const a = selectedHatch.points[i];
+              const b = selectedHatch.points[(i + 1) % nPts];
+              const proj = projectPointToSegment(mouseW, a, b);
+              if (proj.t <= Defaults.splitEpsT || proj.t >= 1 - Defaults.splitEpsT) continue;
+              const sp = cam.worldToScreen(proj.q.x, proj.q.y);
+              const px = Math.hypot(sp.x - mouseS.x, sp.y - mouseS.y);
+              if (px <= Defaults.hitPx && px < bestPx) {
+                bestPx = px;
+                bestIdx = i;
+              }
+            }
+            if (bestIdx >= 0) {
+              this.app.setSelection({
+                type: SelectionType.HATCH,
+                hatchId: selectedHatch.id,
+                pointIndex: null,
+                edgeIndex: bestIdx,
+              });
+              this.beginHatchEdgeOffset(selectedHatch.id, bestIdx);
+              return;
+            }
+          }
+        }
       }
 
       // Textbox hits take priority — they sit on top visually
