@@ -32,6 +32,7 @@ const CadEditor: React.FC = () => {
   const pointTranslateBtnRef = useRef<HTMLButtonElement>(null);
   const pointRotateBtnRef = useRef<HTMLButtonElement>(null);
   const pointDeleteBtnRef = useRef<HTMLButtonElement>(null);
+  const pointOffsetBtnRef = useRef<HTMLButtonElement>(null);
   const settingsRef = useRef<HTMLDivElement>(null);
   const idSelectRef = useRef<HTMLSelectElement>(null);
   const colorInputRef = useRef<HTMLInputElement>(null);
@@ -150,7 +151,7 @@ const CadEditor: React.FC = () => {
     if (
       !canvasRef.current || !hubRef.current || !hubLenRef.current || !hubAngRef.current ||
       !pointEditRef.current || !pointMoveBtnRef.current || !pointTranslateBtnRef.current ||
-      !pointRotateBtnRef.current || !pointDeleteBtnRef.current || !settingsRef.current || !idSelectRef.current ||
+      !pointRotateBtnRef.current || !pointDeleteBtnRef.current || !pointOffsetBtnRef.current || !settingsRef.current || !idSelectRef.current ||
       !colorInputRef.current || !colorPreviewRef.current || !thicknessInputRef.current ||
       !idPanelRef.current || !idBodyRef.current || !idListRef.current ||
       !idAddBtnRef.current || !idToggleBtnRef.current ||
@@ -187,6 +188,7 @@ const CadEditor: React.FC = () => {
         [PointEditAction.TRANSLATE]: pointTranslateBtnRef.current,
         [PointEditAction.ROTATE]: pointRotateBtnRef.current,
         [PointEditAction.DELETE]: pointDeleteBtnRef.current,
+        [PointEditAction.OFFSET]: pointOffsetBtnRef.current,
       },
       settingsRef.current, idSelectRef.current,
       colorInputRef.current, colorPreviewRef.current, thicknessInputRef.current,
@@ -1140,6 +1142,7 @@ const CadEditor: React.FC = () => {
           <button ref={pointMoveBtnRef} title="Bewegen">◉</button>
           <button ref={pointTranslateBtnRef} title="Verschieben">✥</button>
           <button ref={pointRotateBtnRef} title="Drehen">⟳</button>
+          <button ref={pointOffsetBtnRef} title="Kante versetzen">⇆</button>
           <button ref={pointDeleteBtnRef} title="Löschen">🗑</button>
         </div>
 
