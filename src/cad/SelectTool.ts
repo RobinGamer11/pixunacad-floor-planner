@@ -1281,7 +1281,14 @@ export class SelectTool {
     if (ctx) {
       const p = ctx.point;
       const sp = this.app.camera.worldToScreen(p.x, p.y);
-      this.app.pointEditMenu.showAt(sp.x, sp.y);
+      this.app.pointEditMenu.showAt(sp.x, sp.y, [
+        PointEditAction.MOVE,
+        PointEditAction.TRANSLATE,
+        PointEditAction.ROTATE,
+        PointEditAction.DELETE,
+      ]);
+    } else if (this._shouldKeepEdgeMenuOpen()) {
+      // Hatch-Edge-Auswahl: Menü mit Offset offen halten.
     } else {
       this.app.pointEditMenu.hide();
     }
