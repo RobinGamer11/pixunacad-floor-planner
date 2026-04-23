@@ -1087,6 +1087,30 @@ export class SelectTool {
         }
         return;
       }
+
+      if (this.activeEditAction === PointEditAction.OFFSET) {
+        // Live-Preview: Mausprojektion auf Edge-Normale (relativ zum Edge-Mittelpunkt)
+        if (!this.hatchEdgeOffsetLocked) {
+          const mouseW = v(input.mouse.wx, input.mouse.wy);
+          const rel = sub(mouseW, this.hatchEdgeMidOriginal!);
+          const off = rel.x * this.hatchEdgeNormal!.x + rel.y * this.hatchEdgeNormal!.y;
+          this.hatchEdgeOffsetM = off;
+          this._applyHatchEdgeOffset(off);
+          if (document.activeElement !== this.app.hub.lenInputEl && document.activeElement !== this.app.hub.angInputEl) {
+            this.app.hub.showAt(input.mouse.sx, input.mouse.sy);
+            this.app.hub.updateDisplay(off, 0);
+            this.app.hub.setValues(off, 0);
+          }
+        } else {
+          this.app.hub.showAt(input.mouse.sx, input.mouse.sy);
+          this.app.hub.updateDisplay(this.hatchEdgeOffsetM, 0);
+        }
+        if (input.clicked) {
+          this._clearEditState();
+          this.app.hub.hide();
+        }
+        return;
+      }
     }
 
     this.app.renderer.setHoverSegmentId(null);
