@@ -340,10 +340,46 @@ export class SelectTool {
       const hatch = this.app.scene.getHatchById(this.editTarget.hatchId);
       if (!hatch) return;
       hatch.points[this.editTarget.pointIndex] = v(newPoint.x, newPoint.y);
+    } else if (this.editTarget.kind === "textboxHandle") {
+      // For textbox MOVE/ROTATE: opposite corner is the pivot (fixedKeep);
+      // moving handle should land on newPoint. Box width/height stay constant.
+      // Compute new center and rotation so that opposite stays put and moving handle reaches newPoint.
+      const box = this.app.scene.getTextBoxById(this.editTarget.textBoxId);
+      if (!box || this.textBoxOppositeOriginal == null) return;
+      const opp = this.textBoxOppositeOriginal;
+      const w = this.textBoxWidthOriginal;
+      const h = this.textBoxHeightOriginal;
+      const diagLen = Math.hypot(w, h);
+      const distMoving = Math.hypot(newPoint.x - opp.x, newPoint.y - opp.y);
+      if (diagLen < 1e-9 || distMoving < 1e-9) return;
+      // Diagonal in local box-frame from opposite corner to moving corner depends on which corner index.
+      // boxLocalCorners order: 0=TL, 1=TR, 2=BR, 3=BL
+      // opposite-of(0)=2, of(1)=3, of(2)=0, of(3)=1
+      const handleIndex = this.editTarget.handleIndex;
+      const localMov = this._textBoxLocalCornerForIndex(handleIndex, w, h);
+      const localOpp = this._textBoxLocalCornerForIndex((handleIndex + 2) % 4, w, h);
+      // Local diagonal vector (from opp to mov)
+      const dxL = localMov.x - localOpp.x;
+      const dyL = localMov.y - localOpp.y;
+      const localDiagAng = Math.atan2(dyL, dxL);
+      const worldDiagAng = Math.atan2(newPoint.y - opp.y, newPoint.x - opp.x);
+      const newRot = worldDiagAng - localDiagAng;
+      // Center is midpoint of opp and moving in world.
+      const newCenter = v((opp.x + newPoint.x) * 0.5, (opp.y + newPoint.y) * 0.5);
+      box.center = newCenter;
+      box.rotationRad = newRot;
     }
   }
 
-  /** Apply translate delta for the whole object (segment or hatch). */
+  private _textBoxLocalCornerForIndex(i: number, w: number, h: number): Vec2 {
+    const hw = w * 0.5, hh = h * 0.5;
+    if (i === 0) return v(-hw, -hh);
+    if (i === 1) return v(hw, -hh);
+    if (i === 2) return v(hw, hh);
+    return v(-hw, hh);
+  }
+
+  /** Apply translate delta for the whole object (segment or hatch or textbox). */
   private _applyTranslateDelta(delta: Vec2) {
     if (!this.editTarget) return;
     if (this.editTarget.kind === "segment") {
