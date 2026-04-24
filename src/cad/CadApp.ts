@@ -21,6 +21,8 @@ import { StickerDefinition, buildStickerFromSelection, buildStickerFromIds, Stic
 import { DocumentTool } from "./DocumentTool";
 
 import { IdPanel } from "./IdPanel";
+import { SheetManager, SheetOverlayStore, SheetDefaults } from "./SheetManager";
+import { SheetPanel } from "./SheetPanel";
 
 export interface TextSettingsRefs {
   panel: HTMLDivElement;
