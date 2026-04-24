@@ -202,6 +202,12 @@ export class CadApp {
 
   idPanel: IdPanel;
 
+  /** Zeichnungs-IDs (Blätter) — Schritt 1: nur Datenmodell + UI. Multi-Scene-Switching folgt. */
+  sheetManager: SheetManager = new SheetManager();
+  sheetOverlayStore: SheetOverlayStore = new SheetOverlayStore();
+  activeSheetId: string = SheetDefaults.defaultSheetId;
+  sheetPanel: SheetPanel | null = null;
+
   selection: Selection | null = null;
   selectedLabelId: string | null = null;
   activeDrawLabelId: string = Defaults.defaultLabelId;
