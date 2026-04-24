@@ -459,4 +459,142 @@
     transform: rotate(-35deg);
     border-radius: 999px;
   }
+
+  /* ---- Sheet Panel (Zeichnungs-ID / Transparentpause) ---- */
+  .sheet-item {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .sheet-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 6px;
+    align-items: center;
+    padding: 6px;
+    border-radius: 10px;
+    background: hsl(var(--muted));
+    border: 1px solid hsl(var(--border));
+    transition: transform 0.08s ease, opacity 0.12s ease;
+    cursor: grab;
+  }
+  .sheet-row:active { cursor: grabbing; }
+  .sheet-row.active {
+    outline: 2px solid hsl(var(--primary) / 0.24);
+    border-color: hsl(var(--primary) / 0.42);
+    background: hsl(var(--primary) / 0.10);
+  }
+  .sheet-row.dragging { opacity: 0.55; }
+
+  .sheet-main { min-width: 0; cursor: pointer; }
+  .sheet-name {
+    font-size: 12px;
+    color: hsl(var(--foreground));
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.2;
+  }
+  .sheet-sub {
+    font-size: 10px;
+    color: hsl(var(--muted-foreground));
+    margin-top: 1px;
+  }
+
+  .sheet-actions {
+    display: grid;
+    grid-template-columns: repeat(3, 22px);
+    gap: 4px;
+    align-items: center;
+  }
+
+  .sheet-icon-btn {
+    @apply rounded border bg-transparent flex items-center justify-center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    color: hsl(var(--foreground));
+    border-color: hsl(var(--border));
+    cursor: pointer;
+    transition: background-color 0.12s ease, border-color 0.12s ease;
+  }
+  .sheet-icon-btn:hover:not(:disabled) {
+    background: hsl(var(--accent));
+  }
+  .sheet-icon-btn:disabled {
+    cursor: default;
+  }
+  .sheet-icon-btn.active {
+    background: hsl(var(--primary) / 0.18);
+    border-color: hsl(var(--primary) / 0.42);
+  }
+
+  .sheet-drop-indicator {
+    height: 0;
+    margin: 0;
+    opacity: 0;
+    pointer-events: none;
+    transition: margin 0.08s ease, opacity 0.08s ease;
+  }
+  .sheet-drop-indicator.active {
+    margin: 3px 0;
+    opacity: 1;
+  }
+  .sheet-drop-indicator::before {
+    content: "";
+    display: block;
+    height: 2px;
+    border-radius: 999px;
+    background: hsl(var(--primary) / 0.7);
+  }
+
+  .sheet-visibility-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 6px;
+    border-radius: 10px;
+    background: hsl(var(--muted) / 0.6);
+    border: 1px solid hsl(var(--border));
+  }
+  .sheet-visibility-colors {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+  .sheet-swatch {
+    width: 18px;
+    height: 18px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    box-shadow: inset 0 0 0 1px hsl(var(--border));
+    position: relative;
+    overflow: hidden;
+  }
+  .sheet-swatch.active {
+    outline: 2px solid hsl(var(--primary) / 0.55);
+    outline-offset: 1px;
+  }
+  .sheet-swatch.gradient {
+    background: linear-gradient(135deg, #ff7a59 0%, #ffc857 30%, #5cd67a 60%, #5aa9ff 100%);
+  }
+  .sheet-opacity-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .sheet-opacity-label {
+    font-size: 10px;
+    color: hsl(var(--muted-foreground));
+    line-height: 1;
+  }
+  .sheet-opacity-slider {
+    width: 100%;
+    margin: 0;
+    accent-color: hsl(var(--primary));
+    background: transparent;
+  }
 }
