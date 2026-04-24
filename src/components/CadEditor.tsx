@@ -162,6 +162,8 @@ const CadEditor: React.FC = () => {
       !colorInputRef.current || !colorPreviewRef.current || !thicknessInputRef.current ||
       !idPanelRef.current || !idBodyRef.current || !idListRef.current ||
       !idAddBtnRef.current || !idToggleBtnRef.current ||
+      !sheetPanelRef.current || !sheetBodyRef.current || !sheetListRef.current ||
+      !sheetAddBtnRef.current || !sheetToggleBtnRef.current ||
       !hatchSettingsRef.current || !hatchIdSelectRef.current ||
       !hatchFillColorRef.current || !hatchFillPreviewRef.current ||
       !hatchStrokeColorRef.current || !hatchStrokePreviewRef.current || !hatchStrokeWidthRef.current ||
