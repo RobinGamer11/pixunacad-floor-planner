@@ -278,6 +278,16 @@ const CadEditor: React.FC = () => {
     setHatchDrawMode(app.hatchTool.drawMode);
     app.documentTool.onPhaseChange = () => setDocToolPhase(app.documentTool.phase);
     app.setTool(ToolIds.SELECT);
+
+    // Zeichnungs-ID-Panel verdrahten (Schritt 1: nur UI)
+    app.attachSheetPanel(
+      sheetPanelRef.current!,
+      sheetBodyRef.current!,
+      sheetListRef.current!,
+      sheetAddBtnRef.current!,
+      sheetToggleBtnRef.current!,
+    );
+
     appRef.current = app;
 
     const onResize = () => app.resize();
