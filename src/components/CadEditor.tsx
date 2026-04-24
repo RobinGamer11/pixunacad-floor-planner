@@ -46,6 +46,13 @@ const CadEditor: React.FC = () => {
   const idAddBtnRef = useRef<HTMLButtonElement>(null);
   const idToggleBtnRef = useRef<HTMLButtonElement>(null);
 
+  // SheetPanel refs (Zeichnungs-ID / Transparentpause)
+  const sheetPanelRef = useRef<HTMLDivElement>(null);
+  const sheetBodyRef = useRef<HTMLDivElement>(null);
+  const sheetListRef = useRef<HTMLDivElement>(null);
+  const sheetAddBtnRef = useRef<HTMLButtonElement>(null);
+  const sheetToggleBtnRef = useRef<HTMLButtonElement>(null);
+
   // Hatch settings refs
   const hatchSettingsRef = useRef<HTMLDivElement>(null);
   const hatchIdSelectRef = useRef<HTMLSelectElement>(null);
