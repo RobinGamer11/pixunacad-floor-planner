@@ -1130,21 +1130,42 @@ const CadEditor: React.FC = () => {
 
       {/* Canvas Area */}
       <div ref={containerRef} className="relative flex-1 min-w-0 h-full overflow-hidden">
-        {/* ID Panel */}
-        <div ref={idPanelRef} className="cad-id-panel absolute top-3 right-3 z-20 w-[220px]">
-          <div className="id-head">
-            <div className="id-title">Bezeichnungs-ID</div>
-            <div className="id-head-actions">
-              <button ref={idToggleBtnRef} className="id-head-btn icon-only" title="Ein-/Ausklappen">
-                <span className="id-toggle-chevron" />
-              </button>
+        {/* Right-side stacked panels: Bezeichnungs-ID + Zeichnungs-ID */}
+        <div className="absolute top-3 right-3 z-20 flex flex-col gap-2 items-end">
+          {/* Bezeichnungs-ID Panel */}
+          <div ref={idPanelRef} className="cad-id-panel w-[220px]">
+            <div className="id-head">
+              <div className="id-title">Bezeichnungs-ID</div>
+              <div className="id-head-actions">
+                <button ref={idToggleBtnRef} className="id-head-btn icon-only" title="Ein-/Ausklappen">
+                  <span className="id-toggle-chevron" />
+                </button>
+              </div>
+            </div>
+            <div ref={idBodyRef} className="id-body">
+              <div className="id-add-wrap">
+                <button ref={idAddBtnRef} className="id-head-btn id-add-btn">+ ID</button>
+              </div>
+              <div ref={idListRef} className="id-list" />
             </div>
           </div>
-          <div ref={idBodyRef} className="id-body">
-            <div className="id-add-wrap">
-              <button ref={idAddBtnRef} className="id-head-btn id-add-btn">+ ID</button>
+
+          {/* Zeichnungs-ID Panel (Blätter + Transparentpause) */}
+          <div ref={sheetPanelRef} className="cad-id-panel w-[220px]">
+            <div className="id-head">
+              <div className="id-title">Zeichnungs-ID</div>
+              <div className="id-head-actions">
+                <button ref={sheetToggleBtnRef} className="id-head-btn icon-only" title="Ein-/Ausklappen">
+                  <span className="id-toggle-chevron" />
+                </button>
+              </div>
             </div>
-            <div ref={idListRef} className="id-list" />
+            <div ref={sheetBodyRef} className="id-body">
+              <div className="id-add-wrap">
+                <button ref={sheetAddBtnRef} className="id-head-btn id-add-btn">+ Blatt</button>
+              </div>
+              <div ref={sheetListRef} className="id-list" />
+            </div>
           </div>
         </div>
 
