@@ -251,6 +251,15 @@
     border-color: hsl(var(--ring));
   }
 
+  .cad-kbd {
+    @apply inline-flex items-center justify-center text-[10px] font-mono px-1.5 py-0.5 rounded border;
+    min-width: 28px;
+    background: hsl(var(--cad-toolbar-hover));
+    border-color: hsl(var(--cad-hub-border));
+    color: hsl(var(--cad-toolbar-muted));
+    letter-spacing: 0.04em;
+  }
+
   /* ---- ID Panel (sits over white canvas → keep light theme) ---- */
   .cad-id-panel {
     max-height: calc(100% - 20px);
