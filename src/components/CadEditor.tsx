@@ -629,9 +629,14 @@ const CadEditor: React.FC = () => {
                   <label>HG-Transparenz (0–100%)</label>
                   <input ref={areaBgAlphaRef} type="text" defaultValue="72" />
                 </div>
-              </div>
-            </div>
-          </div>
+               </div>
+             </div>
+             <div className="mt-3 pt-2 flex flex-wrap gap-1.5" style={{ borderTop: "1px solid hsl(var(--border))" }}>
+               <span className="cad-kbd">Space</span>
+               <span className="cad-kbd">Shift</span>
+               <span className="cad-kbd">Tab</span>
+             </div>
+           </div>
 
           {/* Measure Settings */}
           <div ref={measureSettingsRef} className={`cad-settings-panel hidden ${sidebarCollapsed ? "!hidden" : ""}`}>
