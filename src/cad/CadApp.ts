@@ -21,6 +21,8 @@ import { StickerDefinition, buildStickerFromSelection, buildStickerFromIds, Stic
 import { DocumentTool } from "./DocumentTool";
 
 import { IdPanel } from "./IdPanel";
+import { SheetManager, SheetOverlayStore, SheetDefaults } from "./SheetManager";
+import { SheetPanel } from "./SheetPanel";
 
 export interface TextSettingsRefs {
   panel: HTMLDivElement;
@@ -199,6 +201,12 @@ export class CadApp {
   private _dragDimOffsetAlongNormal = 0;
 
   idPanel: IdPanel;
+
+  /** Zeichnungs-IDs (Blätter) — Schritt 1: nur Datenmodell + UI. Multi-Scene-Switching folgt. */
+  sheetManager: SheetManager = new SheetManager();
+  sheetOverlayStore: SheetOverlayStore = new SheetOverlayStore();
+  activeSheetId: string = SheetDefaults.defaultSheetId;
+  sheetPanel: SheetPanel | null = null;
 
   selection: Selection | null = null;
   selectedLabelId: string | null = null;
@@ -1903,6 +1911,40 @@ export class CadApp {
       try { this.input.endFrame(); } catch (_) {}
     }
     this._rafId = requestAnimationFrame(() => this._tick());
+  }
+
+  /**
+   * Verdrahtet das Zeichnungs-ID-Panel (Blätter + Transparentpause).
+   * Wird vom React-Wrapper nach dem Mount aufgerufen.
+   * Schritt 1: UI rendert nur — aktives Blatt hat noch keinen Effekt auf die Scene.
+   */
+  attachSheetPanel(
+    root: HTMLDivElement,
+    body: HTMLDivElement,
+    list: HTMLDivElement,
+    addBtn: HTMLButtonElement,
+    toggleBtn: HTMLButtonElement,
+  ) {
+    this.sheetPanel = new SheetPanel(
+      this.sheetManager,
+      this.sheetOverlayStore,
+      root, body, list, addBtn, toggleBtn,
+      {
+        getActiveSheetId: () => this.activeSheetId,
+        setActiveSheetId: (id: string) => {
+          if (!this.sheetManager.getById(id)) return;
+          this.activeSheetId = id;
+          this.refreshSheetUI();
+          // TODO Schritt 2: aktive Scene wechseln, Selection clearen, Tools resetten
+        },
+        onChange: () => this.refreshSheetUI(),
+      },
+    );
+    this.sheetPanel.render();
+  }
+
+  refreshSheetUI() {
+    this.sheetPanel?.render();
   }
 
   destroy() {
