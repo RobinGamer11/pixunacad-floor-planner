@@ -530,14 +530,19 @@ const CadEditor: React.FC = () => {
                   <input ref={colorInputRef} type="color" defaultValue="#111111" className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
                 </div>
               </div>
-              <div>
-                <label>Stärke (m)</label>
-                <input ref={thicknessInputRef} type="text" defaultValue="0.03" />
-              </div>
-            </div>
-          </div>
+               <div>
+                 <label>Stärke (m)</label>
+                 <input ref={thicknessInputRef} type="text" defaultValue="0.03" />
+               </div>
+             </div>
+             <div className="mt-3 pt-2 flex flex-wrap gap-1.5" style={{ borderTop: "1px solid hsl(var(--border))" }}>
+               <span className="cad-kbd">Space</span>
+               <span className="cad-kbd">Shift</span>
+               <span className="cad-kbd">Tab</span>
+             </div>
+           </div>
 
-          {/* Hatch Settings */}
+           {/* Hatch Settings */}
           <div ref={hatchSettingsRef} className={`cad-settings-panel hidden mb-2 ${sidebarCollapsed ? "!hidden" : ""}`}>
             <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
               Schraffur
