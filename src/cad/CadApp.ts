@@ -1913,6 +1913,40 @@ export class CadApp {
     this._rafId = requestAnimationFrame(() => this._tick());
   }
 
+  /**
+   * Verdrahtet das Zeichnungs-ID-Panel (Blätter + Transparentpause).
+   * Wird vom React-Wrapper nach dem Mount aufgerufen.
+   * Schritt 1: UI rendert nur — aktives Blatt hat noch keinen Effekt auf die Scene.
+   */
+  attachSheetPanel(
+    root: HTMLDivElement,
+    body: HTMLDivElement,
+    list: HTMLDivElement,
+    addBtn: HTMLButtonElement,
+    toggleBtn: HTMLButtonElement,
+  ) {
+    this.sheetPanel = new SheetPanel(
+      this.sheetManager,
+      this.sheetOverlayStore,
+      root, body, list, addBtn, toggleBtn,
+      {
+        getActiveSheetId: () => this.activeSheetId,
+        setActiveSheetId: (id: string) => {
+          if (!this.sheetManager.getById(id)) return;
+          this.activeSheetId = id;
+          this.refreshSheetUI();
+          // TODO Schritt 2: aktive Scene wechseln, Selection clearen, Tools resetten
+        },
+        onChange: () => this.refreshSheetUI(),
+      },
+    );
+    this.sheetPanel.render();
+  }
+
+  refreshSheetUI() {
+    this.sheetPanel?.render();
+  }
+
   destroy() {
     this._destroyed = true;
     cancelAnimationFrame(this._rafId);
