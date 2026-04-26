@@ -241,6 +241,46 @@ export class SheetPanel {
         this.cb.onChange();
       });
 
+      // Maßstab-Auswahl: native <select> für robustes UI
+      const scaleSel = document.createElement("select");
+      scaleSel.className = "sheet-scale-select";
+      scaleSel.title = "Maßstab des Blatts (für Plan-Projektion)";
+      for (const s of SheetScales) {
+        const opt = document.createElement("option");
+        opt.value = s.key;
+        opt.textContent = s.label;
+        if ((sheet.scaleKey || SheetDefaults.defaultScaleKey) === s.key) opt.selected = true;
+        scaleSel.appendChild(opt);
+      }
+      const freeOpt = document.createElement("option");
+      freeOpt.value = "free";
+      freeOpt.textContent = "Frei…";
+      if (sheet.scaleKey === "free") freeOpt.selected = true;
+      scaleSel.appendChild(freeOpt);
+      scaleSel.addEventListener("click", (e) => e.stopPropagation());
+      scaleSel.addEventListener("change", (e) => {
+        e.stopPropagation();
+        const val = scaleSel.value;
+        if (val === "free") {
+          const current = getSheetScaleValue(sheet);
+          const input = prompt("Freier Maßstab — bitte Wert eingeben (z.B. 75 für 1:75):", String(current));
+          if (input == null) {
+            scaleSel.value = sheet.scaleKey || SheetDefaults.defaultScaleKey;
+            return;
+          }
+          const num = parseFloat(input.replace(",", "."));
+          if (!isFinite(num) || num <= 0) {
+            scaleSel.value = sheet.scaleKey || SheetDefaults.defaultScaleKey;
+            return;
+          }
+          this.manager.setScale(sheet.id, "free", num);
+        } else {
+          this.manager.setScale(sheet.id, val);
+        }
+        this.cb.onChange();
+      });
+
+      actions.appendChild(scaleSel);
       actions.appendChild(visBtn);
       actions.appendChild(editBtn);
       actions.appendChild(deleteBtn);
