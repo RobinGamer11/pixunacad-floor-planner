@@ -294,6 +294,8 @@ export class CadApp {
     // Brücke für den Renderer: ermöglicht visuelles Skalieren von Dokumenten
     // mit dem aktuellen Ansichtsmaßstab, ohne CadApp direkt zu importieren.
     (this.scene as any)._drawingScaleRef = () => this.drawingScale;
+    // Default-Sheet teilt sich die initiale Scene.
+    this.scenesById.set(SheetDefaults.defaultSheetId, this.scene);
     this.input = new Input(canvas);
     this.labelManager = new LabelManager();
     this.topology = new TopologyEngine(this.scene, this.camera, this.labelManager);
