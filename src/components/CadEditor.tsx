@@ -296,6 +296,19 @@ const CadEditor: React.FC = () => {
       sheetToggleBtnRef.current!,
     );
 
+    // Druckpläne-Panel verdrahten (Schritt 2)
+    if (planPanelRef.current && planBodyRef.current && planListRef.current &&
+        planAddBtnRef.current && planPrintBtnRef.current && planToggleBtnRef.current) {
+      app.attachPlanPanel(
+        planPanelRef.current,
+        planBodyRef.current,
+        planListRef.current,
+        planAddBtnRef.current,
+        planPrintBtnRef.current,
+        planToggleBtnRef.current,
+      );
+    }
+
     appRef.current = app;
 
     const onResize = () => app.resize();
