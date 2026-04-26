@@ -53,6 +53,14 @@ const CadEditor: React.FC = () => {
   const sheetAddBtnRef = useRef<HTMLButtonElement>(null);
   const sheetToggleBtnRef = useRef<HTMLButtonElement>(null);
 
+  // PlanPanel refs (Druckpläne)
+  const planPanelRef = useRef<HTMLDivElement>(null);
+  const planBodyRef = useRef<HTMLDivElement>(null);
+  const planListRef = useRef<HTMLDivElement>(null);
+  const planAddBtnRef = useRef<HTMLButtonElement>(null);
+  const planPrintBtnRef = useRef<HTMLButtonElement>(null);
+  const planToggleBtnRef = useRef<HTMLButtonElement>(null);
+
   // Hatch settings refs
   const hatchSettingsRef = useRef<HTMLDivElement>(null);
   const hatchIdSelectRef = useRef<HTMLSelectElement>(null);
@@ -287,6 +295,19 @@ const CadEditor: React.FC = () => {
       sheetAddBtnRef.current!,
       sheetToggleBtnRef.current!,
     );
+
+    // Druckpläne-Panel verdrahten (Schritt 2)
+    if (planPanelRef.current && planBodyRef.current && planListRef.current &&
+        planAddBtnRef.current && planPrintBtnRef.current && planToggleBtnRef.current) {
+      app.attachPlanPanel(
+        planPanelRef.current,
+        planBodyRef.current,
+        planListRef.current,
+        planAddBtnRef.current,
+        planPrintBtnRef.current,
+        planToggleBtnRef.current,
+      );
+    }
 
     appRef.current = app;
 
@@ -1177,6 +1198,29 @@ const CadEditor: React.FC = () => {
                 <button ref={sheetAddBtnRef} className="id-head-btn id-add-btn">+ Blatt</button>
               </div>
               <div ref={sheetListRef} className="id-list" />
+            </div>
+          </div>
+
+          {/* Druckpläne Panel */}
+          <div ref={planPanelRef} className="cad-id-panel w-[220px]">
+            <div className="id-head">
+              <div className="id-title">Druckpläne</div>
+              <div className="id-head-actions">
+                <button ref={planToggleBtnRef} className="id-head-btn icon-only" title="Ein-/Ausklappen">
+                  <span className="id-toggle-chevron" />
+                </button>
+              </div>
+            </div>
+            <div ref={planBodyRef} className="id-body">
+              <div className="id-add-wrap">
+                <button ref={planAddBtnRef} className="id-head-btn id-add-btn">+ Plan</button>
+              </div>
+              <div ref={planListRef} className="id-list" />
+              <div className="plan-print-wrap">
+                <button ref={planPrintBtnRef} className="plan-print-btn" title="Ausgewählte Pläne als PDF drucken">
+                  🖨 PDF Drucken
+                </button>
+              </div>
             </div>
           </div>
         </div>
