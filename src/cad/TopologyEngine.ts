@@ -26,6 +26,8 @@ export class TopologyEngine {
   scene: Scene;
   camera: Camera;
   labels: LabelManager;
+  /** Read-only Snap-Quellen aus anderen Blättern (Transparentpause). */
+  overlayScenes: Scene[] = [];
 
   constructor(scene: Scene, camera: Camera, labels: LabelManager) {
     this.scene = scene;
