@@ -24,17 +24,44 @@ export const OverlayColors: { key: string; hex: string }[] = [
   { key: "yellow", hex: "#d6c248" },
 ];
 
+/** Vordefinierte Maßstäbe für Blätter (Wert = Welt-Einheiten pro 1 Plan-Einheit). */
+export const SheetScales: { key: string; label: string; value: number }[] = [
+  { key: "1:20",  label: "1:20",  value: 20 },
+  { key: "1:50",  label: "1:50",  value: 50 },
+  { key: "1:100", label: "1:100", value: 100 },
+  { key: "1:200", label: "1:200", value: 200 },
+  { key: "1:500", label: "1:500", value: 500 },
+];
+
 export interface Sheet {
   id: string;
   name: string;
   locked?: boolean; // Default-Sheet ist gesperrt (nicht löschbar/umbenennbar)
+  /** Maßstab-Schlüssel (z.B. "1:100") oder "free" für freien Wert. */
+  scaleKey?: string;
+  /** Numerischer Wert (Welt-Einheiten pro Plan-Einheit). Nur relevant wenn scaleKey === "free". */
+  scaleValue?: number;
 }
 
 export const SheetDefaults = {
   defaultSheetId: "default-sheet",
   defaultSheetName: "Default",
   defaultOpacity: 0.72,
+  defaultScaleKey: "1:100",
+  defaultScaleValue: 100,
 };
+
+/** Hilfsfunktion: numerischer Maßstabswert eines Blatts. */
+export function getSheetScaleValue(sheet: Sheet | null | undefined): number {
+  if (!sheet) return SheetDefaults.defaultScaleValue;
+  if (sheet.scaleKey === "free") {
+    return typeof sheet.scaleValue === "number" && sheet.scaleValue > 0
+      ? sheet.scaleValue
+      : SheetDefaults.defaultScaleValue;
+  }
+  const found = SheetScales.find(s => s.key === (sheet.scaleKey || SheetDefaults.defaultScaleKey));
+  return found ? found.value : SheetDefaults.defaultScaleValue;
+}
 
 /** Verwaltet Liste der Zeichnungs-IDs (Blätter) inkl. Reihenfolge. */
 export class SheetManager {
