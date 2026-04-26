@@ -211,6 +211,9 @@ export class CadApp {
   /** Map: sheetId → eigene Scene. Default-Sheet teilt sich die initiale `this.scene`. */
   scenesById: Map<string, Scene> = new Map();
 
+  /** Druckpläne (Layout-Blätter mit Papierformat). */
+  planManager: PlanManager = new PlanManager();
+
   selection: Selection | null = null;
   selectedLabelId: string | null = null;
   activeDrawLabelId: string = Defaults.defaultLabelId;
