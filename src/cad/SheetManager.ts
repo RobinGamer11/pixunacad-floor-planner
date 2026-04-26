@@ -70,7 +70,8 @@ export class SheetManager {
 
   constructor() {
     this.sheets = [
-      { id: SheetDefaults.defaultSheetId, name: SheetDefaults.defaultSheetName, locked: true },
+      { id: SheetDefaults.defaultSheetId, name: SheetDefaults.defaultSheetName, locked: true,
+        scaleKey: SheetDefaults.defaultScaleKey, scaleValue: SheetDefaults.defaultScaleValue },
     ];
   }
 
@@ -89,7 +90,11 @@ export class SheetManager {
   createSheet(): Sheet {
     const id = `sheet-${Date.now()}-${this._counter++}`;
     const name = `Blatt ${this._counter - 1}`;
-    const sheet: Sheet = { id, name, locked: false };
+    const sheet: Sheet = {
+      id, name, locked: false,
+      scaleKey: SheetDefaults.defaultScaleKey,
+      scaleValue: SheetDefaults.defaultScaleValue,
+    };
     // Neue Blätter oben einfügen → höchster Vordergrund
     this.sheets.unshift(sheet);
     return sheet;
@@ -101,6 +106,22 @@ export class SheetManager {
     const clean = (newName || "").trim();
     if (!clean) return null;
     s.name = clean;
+    return s;
+  }
+
+  /** Setzt den Maßstab eines Blatts. scaleKey "free" => benötigt scaleValue. */
+  setScale(id: string, scaleKey: string, scaleValue?: number): Sheet | null {
+    const s = this.getById(id);
+    if (!s) return null;
+    s.scaleKey = scaleKey;
+    if (scaleKey === "free") {
+      s.scaleValue = typeof scaleValue === "number" && scaleValue > 0
+        ? scaleValue
+        : SheetDefaults.defaultScaleValue;
+    } else {
+      const found = SheetScales.find(x => x.key === scaleKey);
+      s.scaleValue = found ? found.value : SheetDefaults.defaultScaleValue;
+    }
     return s;
   }
 
