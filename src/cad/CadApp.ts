@@ -1920,7 +1920,6 @@ export class CadApp {
   /**
    * Verdrahtet das Zeichnungs-ID-Panel (Blätter + Transparentpause).
    * Wird vom React-Wrapper nach dem Mount aufgerufen.
-   * Schritt 1: UI rendert nur — aktives Blatt hat noch keinen Effekt auf die Scene.
    */
   attachSheetPanel(
     root: HTMLDivElement,
@@ -1935,13 +1934,12 @@ export class CadApp {
       root, body, list, addBtn, toggleBtn,
       {
         getActiveSheetId: () => this.activeSheetId,
-        setActiveSheetId: (id: string) => {
-          if (!this.sheetManager.getById(id)) return;
-          this.activeSheetId = id;
+        setActiveSheetId: (id: string) => this.setActiveSheetId(id),
+        onChange: () => {
+          this._syncSheetSceneMap();
+          this._syncOverlayScenes();
           this.refreshSheetUI();
-          // TODO Schritt 2: aktive Scene wechseln, Selection clearen, Tools resetten
         },
-        onChange: () => this.refreshSheetUI(),
       },
     );
     this.sheetPanel.render();
@@ -1949,6 +1947,85 @@ export class CadApp {
 
   refreshSheetUI() {
     this.sheetPanel?.render();
+  }
+
+  /** Stellt sicher, dass für jedes Blatt eine Scene existiert; entfernt verwaiste Scenes. */
+  private _syncSheetSceneMap() {
+    const validIds = new Set(this.sheetManager.list().map(s => s.id));
+    // Neue Sheets → leere Scene anlegen.
+    for (const id of validIds) {
+      if (!this.scenesById.has(id)) {
+        const sc = new Scene();
+        (sc as any)._drawingScaleRef = () => this.drawingScale;
+        this.scenesById.set(id, sc);
+      }
+    }
+    // Verwaiste Scenes löschen (nicht das Default-Sheet).
+    for (const id of [...this.scenesById.keys()]) {
+      if (!validIds.has(id) && id !== SheetDefaults.defaultSheetId) {
+        this.scenesById.delete(id);
+      }
+    }
+    // Falls aktives Blatt gelöscht wurde → auf Default zurück.
+    if (!validIds.has(this.activeSheetId)) {
+      this.setActiveSheetId(SheetDefaults.defaultSheetId);
+    }
+  }
+
+  /** Wechselt das aktive Blatt: Scene swappen, UI/Selektion zurücksetzen, Overlay neu binden. */
+  setActiveSheetId(id: string) {
+    if (!this.sheetManager.getById(id)) return;
+    if (id === this.activeSheetId) {
+      this.refreshSheetUI();
+      return;
+    }
+    // Scene sicherstellen.
+    if (!this.scenesById.has(id)) {
+      const sc = new Scene();
+      (sc as any)._drawingScaleRef = () => this.drawingScale;
+      this.scenesById.set(id, sc);
+    }
+    // Tools/Selektion sauber beenden.
+    this.clearSelection();
+    this.pointEditMenu.hide();
+    this.hub.hide();
+    // Aktives Tool zurücksetzen, damit kein halb-fertiger State (z. B. laufende Linie) bleibt.
+    try { (this.activeTool as any)?.cancel?.(); } catch { /* noop */ }
+    try { (this.activeTool as any)?.reset?.(); } catch { /* noop */ }
+
+    this.activeSheetId = id;
+    const next = this.scenesById.get(id)!;
+    this.scene = next;
+    this.renderer.scene = next;
+    this.topology.scene = next;
+
+    this._syncOverlayScenes();
+    this.refreshLabelUI();
+    this.refreshSheetUI();
+    // History-Snapshot triggern, damit Sheetwechsel nicht als "keine Änderung" gewertet wird.
+    this._lastSnapshot = this._serializeScene();
+  }
+
+  /** Aktualisiert die Liste der Overlay-Scenes für Renderer & Topology. */
+  private _syncOverlayScenes() {
+    const overlays: { scene: Scene; mode: "stamp" | "tint"; color: string | null; opacity: number }[] = [];
+    const topoOverlays: Scene[] = [];
+    for (const sheet of this.sheetManager.list()) {
+      if (sheet.id === this.activeSheetId) continue;
+      const state = this.sheetOverlayStore.get(sheet.id);
+      if (!state || state.mode === "none") continue;
+      const sc = this.scenesById.get(sheet.id);
+      if (!sc) continue;
+      overlays.push({
+        scene: sc,
+        mode: state.mode === "tint" ? "tint" : "stamp",
+        color: state.color,
+        opacity: state.opacity,
+      });
+      topoOverlays.push(sc);
+    }
+    this.renderer.overlayScenes = overlays;
+    this.topology.overlayScenes = topoOverlays;
   }
 
   destroy() {
