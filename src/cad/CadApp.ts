@@ -478,6 +478,8 @@ export class CadApp {
       activeSheetId: this.activeSheetId,
       sheetOverlays: this.sheetOverlayStore.toJSON(),
       scenesById: scenesObj,
+      // Druckpläne
+      plans: this.planManager.toJSON(),
     });
   }
 
