@@ -126,6 +126,10 @@ export class Renderer {
     ctx.restore();
 
     this._drawGrid();
+
+    // Overlay-Sheets (Transparentpause) UNTER aktiver Scene zeichnen.
+    this._drawOverlayScenes();
+
     this._drawByLabelOrder();
     this._drawHatchSelection();
     this._drawSegmentSelection();
@@ -141,6 +145,90 @@ export class Renderer {
       this.overlay.draw(ctx, this.camera);
     }
   }
+
+  /** Rendert Overlay-Sheets in offscreen-Canvas, wendet Tint an und blittet mit Opacity. */
+  private _drawOverlayScenes() {
+    if (!this.overlayScenes || this.overlayScenes.length === 0) return;
+    const dpr = window.devicePixelRatio || 1;
+    const wPx = Math.floor(this.vw * dpr);
+    const hPx = Math.floor(this.vh * dpr);
+    if (wPx <= 0 || hPx <= 0) return;
+
+    if (!this._overlayCanvas) this._overlayCanvas = document.createElement("canvas");
+    const off = this._overlayCanvas;
+    if (off.width !== wPx) off.width = wPx;
+    if (off.height !== hPx) off.height = hPx;
+
+    const offCtx = off.getContext("2d");
+    if (!offCtx) return;
+
+    const realCtx = this.ctx;
+    const realScene = this.scene;
+    const realSelection = this.selection;
+    const realHoverSeg = this.hoverSegmentId;
+    const realHoverHatch = this.hoverHatchId;
+    const realHoverText = this.hoverTextBoxId;
+
+    try {
+      // Selection/Hover für Overlay deaktivieren — nicht editierbar.
+      this.selection = null;
+      this.hoverSegmentId = null;
+      this.hoverHatchId = null;
+      this.hoverTextBoxId = null;
+      (this as any).ctx = offCtx;
+
+      for (const ov of this.overlayScenes) {
+        if (!ov || !ov.scene) continue;
+        // Offscreen leeren
+        offCtx.setTransform(1, 0, 0, 1, 0, 0);
+        offCtx.clearRect(0, 0, wPx, hPx);
+        offCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        // Scene swap → bestehende _draw* nutzen
+        this.scene = ov.scene;
+        this._drawByLabelOrder();
+
+        // Tint: Pixel-Daten einfärben (alpha behalten).
+        if (ov.mode === "tint" && ov.color) {
+          const rgb = this._hexToRgb(ov.color);
+          offCtx.setTransform(1, 0, 0, 1, 0, 0);
+          try {
+            const img = offCtx.getImageData(0, 0, wPx, hPx);
+            const d = img.data;
+            for (let i = 0; i < d.length; i += 4) {
+              if (d[i + 3] === 0) continue;
+              d[i] = rgb.r;
+              d[i + 1] = rgb.g;
+              d[i + 2] = rgb.b;
+            }
+            offCtx.putImageData(img, 0, 0);
+          } catch { /* CORS-frei: hier eigene Canvas → no-op */ }
+          offCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        }
+
+        // Auf Hauptcanvas blitten mit Opacity.
+        realCtx.save();
+        realCtx.setTransform(1, 0, 0, 1, 0, 0);
+        realCtx.globalAlpha = Math.max(0, Math.min(1, ov.opacity));
+        realCtx.drawImage(off, 0, 0);
+        realCtx.restore();
+      }
+    } finally {
+      (this as any).ctx = realCtx;
+      this.scene = realScene;
+      this.selection = realSelection;
+      this.hoverSegmentId = realHoverSeg;
+      this.hoverHatchId = realHoverHatch;
+      this.hoverTextBoxId = realHoverText;
+    }
+  }
+
+  private _hexToRgb(hex: string): { r: number; g: number; b: number } {
+    const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || "");
+    if (!m) return { r: 120, g: 120, b: 120 };
+    return { r: parseInt(m[1], 16), g: parseInt(m[2], 16), b: parseInt(m[3], 16) };
+  }
+
 
   private _getDocImage(doc: DocumentObject): HTMLImageElement | null {
     let img = this._docImageCache.get(doc.id);
