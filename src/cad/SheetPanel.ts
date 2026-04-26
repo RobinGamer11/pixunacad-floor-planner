@@ -169,12 +169,25 @@ export class SheetPanel {
 
       const main = document.createElement("div");
       main.className = "sheet-main";
+      const scaleVal = getSheetScaleValue(sheet);
+      const scaleLabel = sheet.scaleKey === "free"
+        ? `frei 1:${Math.round(scaleVal)}`
+        : (sheet.scaleKey || SheetDefaults.defaultScaleKey);
       main.innerHTML = `
         <div class="sheet-name">${this._esc(sheet.name)}</div>
-        <div class="sheet-sub">${sheet.id === SheetDefaults.defaultSheetId ? "Standardblatt" : "Blatt"}</div>
+        <div class="sheet-sub">${sheet.id === SheetDefaults.defaultSheetId ? "Standardblatt" : "Blatt"} · ${this._esc(scaleLabel)}</div>
       `;
       main.addEventListener("click", () => {
         this.cb.setActiveSheetId(sheet.id);
+      });
+
+      // Drag-Quelle für Plan-Drop (Step 4): identifiziert das Blatt
+      main.addEventListener("dragstart", (e) => {
+        try {
+          e.dataTransfer?.setData("application/x-pixuna-sheet", sheet.id);
+          e.dataTransfer?.setData("text/plain", `sheet:${sheet.id}`);
+          if (e.dataTransfer) e.dataTransfer.effectAllowed = "copy";
+        } catch { /* noop */ }
       });
 
       const actions = document.createElement("div");
