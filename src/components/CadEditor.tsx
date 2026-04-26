@@ -1200,6 +1200,29 @@ const CadEditor: React.FC = () => {
               <div ref={sheetListRef} className="id-list" />
             </div>
           </div>
+
+          {/* Druckpläne Panel */}
+          <div ref={planPanelRef} className="cad-id-panel w-[220px]">
+            <div className="id-head">
+              <div className="id-title">Druckpläne</div>
+              <div className="id-head-actions">
+                <button ref={planToggleBtnRef} className="id-head-btn icon-only" title="Ein-/Ausklappen">
+                  <span className="id-toggle-chevron" />
+                </button>
+              </div>
+            </div>
+            <div ref={planBodyRef} className="id-body">
+              <div className="id-add-wrap">
+                <button ref={planAddBtnRef} className="id-head-btn id-add-btn">+ Plan</button>
+              </div>
+              <div ref={planListRef} className="id-list" />
+              <div className="plan-print-wrap">
+                <button ref={planPrintBtnRef} className="plan-print-btn" title="Ausgewählte Pläne als PDF drucken">
+                  🖨 PDF Drucken
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Line Hub */}
