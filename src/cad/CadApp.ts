@@ -2028,6 +2028,54 @@ export class CadApp {
     this.sheetPanel?.render();
   }
 
+  /**
+   * Verdrahtet das Druckpläne-Panel.
+   * Wird vom React-Wrapper nach dem Mount aufgerufen.
+   */
+  attachPlanPanel(
+    root: HTMLDivElement,
+    body: HTMLDivElement,
+    list: HTMLDivElement,
+    addBtn: HTMLButtonElement,
+    printBtn: HTMLButtonElement,
+    toggleBtn: HTMLButtonElement,
+  ) {
+    this.planPanel = new PlanPanel(
+      this.planManager,
+      root, body, list, addBtn, printBtn, toggleBtn,
+      {
+        getActivePlanId: () => this.activePlanId,
+        setActivePlanId: (id: string | null) => this.setActivePlanId(id),
+        printSelected: () => this.printSelectedPlans(),
+        onChange: () => {
+          this.refreshPlanUI();
+          // Snapshot, damit Plan-Änderungen in Undo/Redo landen.
+          this._lastSnapshot = this._serializeScene();
+        },
+      },
+    );
+    this.planPanel.render();
+  }
+
+  refreshPlanUI() {
+    this.planPanel?.render();
+  }
+
+  /** Setzt aktiven Plan (null = zurück zur Zeichnungsoberfläche). Plan-Render in Step 3. */
+  setActivePlanId(id: string | null) {
+    if (id != null && !this.planManager.getById(id)) return;
+    this.activePlanId = id;
+    this.refreshPlanUI();
+  }
+
+  /** Stub: Sammel-PDF-Druck — wird in Step 5 implementiert. */
+  printSelectedPlans() {
+    const sel = this.planManager.getSelected();
+    console.log("[printSelectedPlans] Auswahl:", sel.map(p => p.name));
+    alert(`PDF-Druck (Step 5): ${sel.length} Plan/Pläne ausgewählt:\n` + sel.map(p => `• ${p.name}`).join("\n"));
+  }
+
+
   /** Stellt sicher, dass für jedes Blatt eine Scene existiert; entfernt verwaiste Scenes. */
   private _syncSheetSceneMap() {
     const validIds = new Set(this.sheetManager.list().map(s => s.id));
