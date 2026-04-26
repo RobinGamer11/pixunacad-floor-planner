@@ -53,6 +53,14 @@ const CadEditor: React.FC = () => {
   const sheetAddBtnRef = useRef<HTMLButtonElement>(null);
   const sheetToggleBtnRef = useRef<HTMLButtonElement>(null);
 
+  // PlanPanel refs (Druckpläne)
+  const planPanelRef = useRef<HTMLDivElement>(null);
+  const planBodyRef = useRef<HTMLDivElement>(null);
+  const planListRef = useRef<HTMLDivElement>(null);
+  const planAddBtnRef = useRef<HTMLButtonElement>(null);
+  const planPrintBtnRef = useRef<HTMLButtonElement>(null);
+  const planToggleBtnRef = useRef<HTMLButtonElement>(null);
+
   // Hatch settings refs
   const hatchSettingsRef = useRef<HTMLDivElement>(null);
   const hatchIdSelectRef = useRef<HTMLSelectElement>(null);
