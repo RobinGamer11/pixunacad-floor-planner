@@ -144,22 +144,39 @@ export class SheetManager {
 
   /** Serialisierung für History/Save. */
   toJSON(): Sheet[] {
-    return this.sheets.map(s => ({ id: s.id, name: s.name, locked: !!s.locked }));
+    return this.sheets.map(s => ({
+      id: s.id,
+      name: s.name,
+      locked: !!s.locked,
+      scaleKey: s.scaleKey || SheetDefaults.defaultScaleKey,
+      scaleValue: typeof s.scaleValue === "number" ? s.scaleValue : SheetDefaults.defaultScaleValue,
+    }));
   }
 
   /** Wiederherstellung aus Snapshot. Default-Sheet wird immer garantiert. */
   restore(data: Sheet[]) {
+    const makeDefault = (): Sheet => ({
+      id: SheetDefaults.defaultSheetId,
+      name: SheetDefaults.defaultSheetName,
+      locked: true,
+      scaleKey: SheetDefaults.defaultScaleKey,
+      scaleValue: SheetDefaults.defaultScaleValue,
+    });
     if (!Array.isArray(data) || data.length === 0) {
-      this.sheets = [{ id: SheetDefaults.defaultSheetId, name: SheetDefaults.defaultSheetName, locked: true }];
+      this.sheets = [makeDefault()];
       return;
     }
-    const cleaned = data.map(s => ({
+    const cleaned: Sheet[] = data.map(s => ({
       id: String(s.id),
       name: String(s.name || "Blatt"),
       locked: s.id === SheetDefaults.defaultSheetId ? true : !!s.locked,
+      scaleKey: typeof s.scaleKey === "string" ? s.scaleKey : SheetDefaults.defaultScaleKey,
+      scaleValue: typeof s.scaleValue === "number" && s.scaleValue > 0
+        ? s.scaleValue
+        : SheetDefaults.defaultScaleValue,
     }));
     if (!cleaned.some(s => s.id === SheetDefaults.defaultSheetId)) {
-      cleaned.push({ id: SheetDefaults.defaultSheetId, name: SheetDefaults.defaultSheetName, locked: true });
+      cleaned.push(makeDefault());
     }
     this.sheets = cleaned;
   }
