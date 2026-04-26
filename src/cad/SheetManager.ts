@@ -24,17 +24,44 @@ export const OverlayColors: { key: string; hex: string }[] = [
   { key: "yellow", hex: "#d6c248" },
 ];
 
+/** Vordefinierte Maßstäbe für Blätter (Wert = Welt-Einheiten pro 1 Plan-Einheit). */
+export const SheetScales: { key: string; label: string; value: number }[] = [
+  { key: "1:20",  label: "1:20",  value: 20 },
+  { key: "1:50",  label: "1:50",  value: 50 },
+  { key: "1:100", label: "1:100", value: 100 },
+  { key: "1:200", label: "1:200", value: 200 },
+  { key: "1:500", label: "1:500", value: 500 },
+];
+
 export interface Sheet {
   id: string;
   name: string;
   locked?: boolean; // Default-Sheet ist gesperrt (nicht löschbar/umbenennbar)
+  /** Maßstab-Schlüssel (z.B. "1:100") oder "free" für freien Wert. */
+  scaleKey?: string;
+  /** Numerischer Wert (Welt-Einheiten pro Plan-Einheit). Nur relevant wenn scaleKey === "free". */
+  scaleValue?: number;
 }
 
 export const SheetDefaults = {
   defaultSheetId: "default-sheet",
   defaultSheetName: "Default",
   defaultOpacity: 0.72,
+  defaultScaleKey: "1:100",
+  defaultScaleValue: 100,
 };
+
+/** Hilfsfunktion: numerischer Maßstabswert eines Blatts. */
+export function getSheetScaleValue(sheet: Sheet | null | undefined): number {
+  if (!sheet) return SheetDefaults.defaultScaleValue;
+  if (sheet.scaleKey === "free") {
+    return typeof sheet.scaleValue === "number" && sheet.scaleValue > 0
+      ? sheet.scaleValue
+      : SheetDefaults.defaultScaleValue;
+  }
+  const found = SheetScales.find(s => s.key === (sheet.scaleKey || SheetDefaults.defaultScaleKey));
+  return found ? found.value : SheetDefaults.defaultScaleValue;
+}
 
 /** Verwaltet Liste der Zeichnungs-IDs (Blätter) inkl. Reihenfolge. */
 export class SheetManager {
@@ -43,7 +70,8 @@ export class SheetManager {
 
   constructor() {
     this.sheets = [
-      { id: SheetDefaults.defaultSheetId, name: SheetDefaults.defaultSheetName, locked: true },
+      { id: SheetDefaults.defaultSheetId, name: SheetDefaults.defaultSheetName, locked: true,
+        scaleKey: SheetDefaults.defaultScaleKey, scaleValue: SheetDefaults.defaultScaleValue },
     ];
   }
 
@@ -62,7 +90,11 @@ export class SheetManager {
   createSheet(): Sheet {
     const id = `sheet-${Date.now()}-${this._counter++}`;
     const name = `Blatt ${this._counter - 1}`;
-    const sheet: Sheet = { id, name, locked: false };
+    const sheet: Sheet = {
+      id, name, locked: false,
+      scaleKey: SheetDefaults.defaultScaleKey,
+      scaleValue: SheetDefaults.defaultScaleValue,
+    };
     // Neue Blätter oben einfügen → höchster Vordergrund
     this.sheets.unshift(sheet);
     return sheet;
@@ -74,6 +106,22 @@ export class SheetManager {
     const clean = (newName || "").trim();
     if (!clean) return null;
     s.name = clean;
+    return s;
+  }
+
+  /** Setzt den Maßstab eines Blatts. scaleKey "free" => benötigt scaleValue. */
+  setScale(id: string, scaleKey: string, scaleValue?: number): Sheet | null {
+    const s = this.getById(id);
+    if (!s) return null;
+    s.scaleKey = scaleKey;
+    if (scaleKey === "free") {
+      s.scaleValue = typeof scaleValue === "number" && scaleValue > 0
+        ? scaleValue
+        : SheetDefaults.defaultScaleValue;
+    } else {
+      const found = SheetScales.find(x => x.key === scaleKey);
+      s.scaleValue = found ? found.value : SheetDefaults.defaultScaleValue;
+    }
     return s;
   }
 
@@ -96,22 +144,39 @@ export class SheetManager {
 
   /** Serialisierung für History/Save. */
   toJSON(): Sheet[] {
-    return this.sheets.map(s => ({ id: s.id, name: s.name, locked: !!s.locked }));
+    return this.sheets.map(s => ({
+      id: s.id,
+      name: s.name,
+      locked: !!s.locked,
+      scaleKey: s.scaleKey || SheetDefaults.defaultScaleKey,
+      scaleValue: typeof s.scaleValue === "number" ? s.scaleValue : SheetDefaults.defaultScaleValue,
+    }));
   }
 
   /** Wiederherstellung aus Snapshot. Default-Sheet wird immer garantiert. */
   restore(data: Sheet[]) {
+    const makeDefault = (): Sheet => ({
+      id: SheetDefaults.defaultSheetId,
+      name: SheetDefaults.defaultSheetName,
+      locked: true,
+      scaleKey: SheetDefaults.defaultScaleKey,
+      scaleValue: SheetDefaults.defaultScaleValue,
+    });
     if (!Array.isArray(data) || data.length === 0) {
-      this.sheets = [{ id: SheetDefaults.defaultSheetId, name: SheetDefaults.defaultSheetName, locked: true }];
+      this.sheets = [makeDefault()];
       return;
     }
-    const cleaned = data.map(s => ({
+    const cleaned: Sheet[] = data.map(s => ({
       id: String(s.id),
       name: String(s.name || "Blatt"),
       locked: s.id === SheetDefaults.defaultSheetId ? true : !!s.locked,
+      scaleKey: typeof s.scaleKey === "string" ? s.scaleKey : SheetDefaults.defaultScaleKey,
+      scaleValue: typeof s.scaleValue === "number" && s.scaleValue > 0
+        ? s.scaleValue
+        : SheetDefaults.defaultScaleValue,
     }));
     if (!cleaned.some(s => s.id === SheetDefaults.defaultSheetId)) {
-      cleaned.push({ id: SheetDefaults.defaultSheetId, name: SheetDefaults.defaultSheetName, locked: true });
+      cleaned.push(makeDefault());
     }
     this.sheets = cleaned;
   }
