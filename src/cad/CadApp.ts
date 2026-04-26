@@ -202,11 +202,13 @@ export class CadApp {
 
   idPanel: IdPanel;
 
-  /** Zeichnungs-IDs (Blätter) — Schritt 1: nur Datenmodell + UI. Multi-Scene-Switching folgt. */
+  /** Zeichnungs-IDs (Blätter) — pro Blatt eine eigene Scene. */
   sheetManager: SheetManager = new SheetManager();
   sheetOverlayStore: SheetOverlayStore = new SheetOverlayStore();
   activeSheetId: string = SheetDefaults.defaultSheetId;
   sheetPanel: SheetPanel | null = null;
+  /** Map: sheetId → eigene Scene. Default-Sheet teilt sich die initiale `this.scene`. */
+  scenesById: Map<string, Scene> = new Map();
 
   selection: Selection | null = null;
   selectedLabelId: string | null = null;
