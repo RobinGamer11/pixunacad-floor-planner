@@ -504,7 +504,12 @@ export class CadApp {
     if (data.sheetOverlays && typeof data.sheetOverlays === "object") {
       this.sheetOverlayStore.restore(data.sheetOverlays);
     }
-    // Scenes pro Sheet wiederherstellen.
+    // Druckpläne wiederherstellen.
+    if (Array.isArray(data.plans)) {
+      this.planManager.restore(data.plans);
+    } else {
+      this.planManager.restore([]);
+    }
     if (data.scenesById && typeof data.scenesById === "object") {
       // Map auf gültige Sheet-Liste reduzieren / ergänzen.
       const validIds = new Set(this.sheetManager.list().map(s => s.id));
