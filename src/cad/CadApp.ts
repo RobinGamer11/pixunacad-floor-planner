@@ -23,6 +23,7 @@ import { DocumentTool } from "./DocumentTool";
 import { IdPanel } from "./IdPanel";
 import { SheetManager, SheetOverlayStore, SheetDefaults } from "./SheetManager";
 import { PlanManager } from "./PlanManager";
+import { PlanPanel } from "./PlanPanel";
 import { SheetPanel } from "./SheetPanel";
 
 export interface TextSettingsRefs {
