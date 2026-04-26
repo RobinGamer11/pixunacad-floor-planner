@@ -26,6 +26,8 @@ export class TopologyEngine {
   scene: Scene;
   camera: Camera;
   labels: LabelManager;
+  /** Read-only Snap-Quellen aus anderen Blättern (Transparentpause). */
+  overlayScenes: Scene[] = [];
 
   constructor(scene: Scene, camera: Camera, labels: LabelManager) {
     this.scene = scene;
@@ -119,6 +121,51 @@ export class TopologyEngine {
     for (const edge of this.scene.getHatchEdges()) {
       if (!this.labels.isVisible(edge.hatch.labelId)) continue;
       considerLine(edge.a, edge.b, null, edge.hatch, edge.edgeIndex);
+    }
+
+    // Overlay-Sheets (Transparentpause) — nur Snap, nicht editierbar.
+    // Wir geben Punkte/Linien als „freie" Snaps zurück (segment/hatch=null), damit
+    // resolveSnapPoint() nichts splittet/inserted.
+    for (const ovScene of this.overlayScenes) {
+      if (!ovScene) continue;
+      // Punkte: Segment-Endpunkte
+      for (const seg of ovScene.segments) {
+        if (!this.labels.isVisible(seg.labelId)) continue;
+        considerPoint(seg.a, null, null, -1);
+        considerPoint(seg.b, null, null, -1);
+      }
+      // Punkte: Hatch-Punkte
+      for (const hatch of ovScene.hatches) {
+        if (!this.labels.isVisible(hatch.labelId)) continue;
+        for (const p of hatch.points) considerPoint(p, null, null, -1);
+      }
+      // Punkte: TextBox-Ecken
+      for (const box of ovScene.textBoxes) {
+        if (!this.labels.isVisible(box.labelId)) continue;
+        for (const c of boxCornersWorld(box)) considerPoint(c, null, null, -1);
+      }
+      // Punkte: Dimension-Endpunkte
+      for (const dim of ovScene.dimensions) {
+        if (!this.labels.isVisible(dim.labelId)) continue;
+        considerPoint(dim.p1, null, null, -1);
+        considerPoint(dim.p2, null, null, -1);
+      }
+      // Punkte: Document-Ecken/Mittelpunkte
+      for (const doc of ovScene.documents) {
+        if (!this.labels.isVisible(doc.labelId)) continue;
+        for (const c of documentCornersWorld(doc)) considerPoint(c, null, null, -1);
+        for (const m of documentEdgeMidpointsWorld(doc)) considerPoint(m, null, null, -1);
+      }
+      // Linien: Segmente
+      for (const seg of ovScene.segments) {
+        if (!this.labels.isVisible(seg.labelId)) continue;
+        considerLine(seg.a, seg.b, null, null);
+      }
+      // Linien: Hatch-Kanten
+      for (const edge of ovScene.getHatchEdges()) {
+        if (!this.labels.isVisible(edge.hatch.labelId)) continue;
+        considerLine(edge.a, edge.b, null, null);
+      }
     }
 
     return best;

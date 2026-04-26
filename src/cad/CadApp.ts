@@ -202,11 +202,13 @@ export class CadApp {
 
   idPanel: IdPanel;
 
-  /** Zeichnungs-IDs (Blätter) — Schritt 1: nur Datenmodell + UI. Multi-Scene-Switching folgt. */
+  /** Zeichnungs-IDs (Blätter) — pro Blatt eine eigene Scene. */
   sheetManager: SheetManager = new SheetManager();
   sheetOverlayStore: SheetOverlayStore = new SheetOverlayStore();
   activeSheetId: string = SheetDefaults.defaultSheetId;
   sheetPanel: SheetPanel | null = null;
+  /** Map: sheetId → eigene Scene. Default-Sheet teilt sich die initiale `this.scene`. */
+  scenesById: Map<string, Scene> = new Map();
 
   selection: Selection | null = null;
   selectedLabelId: string | null = null;
@@ -292,6 +294,8 @@ export class CadApp {
     // Brücke für den Renderer: ermöglicht visuelles Skalieren von Dokumenten
     // mit dem aktuellen Ansichtsmaßstab, ohne CadApp direkt zu importieren.
     (this.scene as any)._drawingScaleRef = () => this.drawingScale;
+    // Default-Sheet teilt sich die initiale Scene.
+    this.scenesById.set(SheetDefaults.defaultSheetId, this.scene);
     this.input = new Input(canvas);
     this.labelManager = new LabelManager();
     this.topology = new TopologyEngine(this.scene, this.camera, this.labelManager);
@@ -342,21 +346,21 @@ export class CadApp {
   }
 
   /* ---- History (Undo / Redo) ---- */
-  private _serializeScene(): string {
-    return JSON.stringify({
-      segments: this.scene.segments.map(s => ({
+  private _serializeOneScene(scene: Scene) {
+    return {
+      segments: scene.segments.map(s => ({
         id: s.id, a: { x: s.a.x, y: s.a.y }, b: { x: s.b.x, y: s.b.y },
         color: s.color, thicknessM: s.thicknessM, labelId: s.labelId,
         _stickerEditOwnerId: s._stickerEditOwnerId || null,
       })),
-      hatches: this.scene.hatches.map(h => ({
+      hatches: scene.hatches.map(h => ({
         id: h.id, points: h.points.map(p => ({ x: p.x, y: p.y })),
         fillColor: h.fillColor, strokeColor: h.strokeColor,
         fillAlphaPct: h.fillAlphaPct, strokeWidthPx: h.strokeWidthPx,
         labelId: h.labelId, areaLabel: { ...h.areaLabel },
         _stickerEditOwnerId: h._stickerEditOwnerId || null,
       })),
-      dimensions: this.scene.dimensions.map(d => ({
+      dimensions: scene.dimensions.map(d => ({
         id: d.id,
         p1: { x: d.p1.x, y: d.p1.y }, p2: { x: d.p2.x, y: d.p2.y },
         placementPoint: { x: d.placementPoint.x, y: d.placementPoint.y },
@@ -368,7 +372,7 @@ export class CadApp {
         labelId: d.labelId,
         _stickerEditOwnerId: d._stickerEditOwnerId || null,
       })),
-      textBoxes: this.scene.textBoxes.map(t => ({
+      textBoxes: scene.textBoxes.map(t => ({
         id: t.id,
         center: { x: t.center.x, y: t.center.y },
         widthM: t.widthM, heightM: t.heightM,
@@ -377,21 +381,99 @@ export class CadApp {
         labelId: t.labelId,
         _stickerEditOwnerId: t._stickerEditOwnerId || null,
       })),
-      labels: this.labelManager.list().map(l => ({ ...l })),
-      stickers: this.stickers.map(s => ({ id: s.id, name: s.name, items: s.items, createdAt: s.createdAt })),
-      stickerInstances: this.scene.stickerInstances.map(si => ({
+      stickerInstances: scene.stickerInstances.map(si => ({
         id: si.id, defId: si.defId, name: si.name, items: si.items,
         position: { x: si.position.x, y: si.position.y },
         rotationRad: si.rotationRad, scale: si.scale, labelId: si.labelId,
       })),
-      _stickerEditInstanceId: this._stickerEditInstanceId,
-      _stickerEditSnapshot: this._stickerEditSnapshot,
-      documents: this.scene.documents.map(d => ({
+      documents: scene.documents.map(d => ({
         id: d.id, name: d.name, kind: d.kind, src: d.src, pageIndex: d.pageIndex,
         position: { x: d.position.x, y: d.position.y },
         widthM: d.widthM, heightM: d.heightM, rotationRad: d.rotationRad,
         pixelWidth: d.pixelWidth, pixelHeight: d.pixelHeight, labelId: d.labelId,
       })),
+    };
+  }
+
+  private _restoreOneScene(scene: Scene, data: any) {
+    scene.segments = [];
+    scene.hatches = [];
+    scene.dimensions = [];
+    scene.textBoxes = [];
+    scene.stickerInstances = [];
+    scene.documents = [];
+    (scene as any)._rebuildSegIdMap?.();
+    (scene as any)._rebuildHatchIdMap?.();
+    (scene as any)._rebuildDimIdMap?.();
+    (scene as any)._rebuildTextIdMap?.();
+    (scene as any)._rebuildStickerIdMap?.();
+    (scene as any)._rebuildDocIdMap?.();
+    if (!data) return;
+    for (const s of data.segments || []) {
+      const seg = scene.createSegment(s.a, s.b, { color: s.color, thicknessM: s.thicknessM, labelId: s.labelId });
+      if (s._stickerEditOwnerId) seg._stickerEditOwnerId = s._stickerEditOwnerId;
+    }
+    for (const h of data.hatches || []) {
+      const hatch = scene.createHatch(h.points, {
+        fillColor: h.fillColor, strokeColor: h.strokeColor,
+        fillAlphaPct: h.fillAlphaPct, strokeWidthPx: h.strokeWidthPx,
+        labelId: h.labelId, areaLabel: h.areaLabel,
+      });
+      if (h._stickerEditOwnerId) hatch._stickerEditOwnerId = h._stickerEditOwnerId;
+    }
+    for (const d of data.dimensions || []) {
+      const dim = scene.createDimension(d.p1, d.p2, d.placementPoint, d.mode, d.refDir, {
+        textColor: d.textColor, textSizePx: d.textSizePx, lineColor: d.lineColor,
+        decimals: d.decimals, tickLengthM: d.tickLengthM, showExtensions: d.showExtensions,
+        useFreeText: d.useFreeText, freeText: d.freeText,
+        textBgEnabled: d.textBgEnabled, textBgColor: d.textBgColor, textBgAlpha: d.textBgAlpha,
+        labelId: d.labelId,
+      });
+      if (d._stickerEditOwnerId) dim._stickerEditOwnerId = d._stickerEditOwnerId;
+    }
+    for (const t of data.textBoxes || []) {
+      const box = scene.createTextBox(t.center, t.widthM, t.heightM, { ...(t.style || {}), labelId: t.labelId }, t.html || "", t.rotationRad || 0);
+      if (t._stickerEditOwnerId) box._stickerEditOwnerId = t._stickerEditOwnerId;
+    }
+    if (Array.isArray(data.stickerInstances)) {
+      for (const si of data.stickerInstances) {
+        const inst = scene.createStickerInstance({
+          defId: si.defId, name: si.name, items: si.items,
+          position: si.position, rotationRad: si.rotationRad || 0,
+          scale: si.scale || 1, labelId: si.labelId,
+        });
+        if (si.id) (inst as any).id = si.id;
+      }
+      (scene as any)._rebuildStickerIdMap?.();
+    }
+    for (const d of data.documents || []) {
+      const doc = scene.createDocument({
+        name: d.name, kind: d.kind, src: d.src, pageIndex: d.pageIndex,
+        position: d.position, widthM: d.widthM, heightM: d.heightM, rotationRad: d.rotationRad,
+        pixelWidth: d.pixelWidth, pixelHeight: d.pixelHeight, labelId: d.labelId,
+      });
+      if (d.id) (doc as any).id = d.id;
+    }
+    (scene as any)._rebuildDocIdMap?.();
+  }
+
+  private _serializeScene(): string {
+    const scenesObj: Record<string, any> = {};
+    for (const [id, sc] of this.scenesById.entries()) {
+      scenesObj[id] = this._serializeOneScene(sc);
+    }
+    return JSON.stringify({
+      // Backwards-compat: aktive Scene flach.
+      ...this._serializeOneScene(this.scene),
+      labels: this.labelManager.list().map(l => ({ ...l })),
+      stickers: this.stickers.map(s => ({ id: s.id, name: s.name, items: s.items, createdAt: s.createdAt })),
+      _stickerEditInstanceId: this._stickerEditInstanceId,
+      _stickerEditSnapshot: this._stickerEditSnapshot,
+      // Multi-Sheet-State
+      sheets: this.sheetManager.toJSON(),
+      activeSheetId: this.activeSheetId,
+      sheetOverlays: this.sheetOverlayStore.toJSON(),
+      scenesById: scenesObj,
     });
   }
 
@@ -402,49 +484,6 @@ export class CadApp {
     if (Array.isArray(data.labels) && (this.labelManager as any).restore) {
       try { (this.labelManager as any).restore(data.labels); } catch {}
     }
-    // Clear scene
-    this.scene.segments = [];
-    this.scene.hatches = [];
-    this.scene.dimensions = [];
-    this.scene.textBoxes = [];
-    this.scene.stickerInstances = [];
-    this.scene.documents = [];
-    (this.scene as any)._rebuildSegIdMap?.();
-    (this.scene as any)._rebuildHatchIdMap?.();
-    (this.scene as any)._rebuildDimIdMap?.();
-    (this.scene as any)._rebuildTextIdMap?.();
-    (this.scene as any)._rebuildStickerIdMap?.();
-    (this.scene as any)._rebuildDocIdMap?.();
-    // Re-add segments
-    for (const s of data.segments || []) {
-      const seg = this.scene.createSegment(s.a, s.b, { color: s.color, thicknessM: s.thicknessM, labelId: s.labelId });
-      if (s._stickerEditOwnerId) seg._stickerEditOwnerId = s._stickerEditOwnerId;
-    }
-    // Re-add hatches
-    for (const h of data.hatches || []) {
-      const hatch = this.scene.createHatch(h.points, {
-        fillColor: h.fillColor, strokeColor: h.strokeColor,
-        fillAlphaPct: h.fillAlphaPct, strokeWidthPx: h.strokeWidthPx,
-        labelId: h.labelId, areaLabel: h.areaLabel,
-      });
-      if (h._stickerEditOwnerId) hatch._stickerEditOwnerId = h._stickerEditOwnerId;
-    }
-    // Re-add dimensions
-    for (const d of data.dimensions || []) {
-      const dim = this.scene.createDimension(d.p1, d.p2, d.placementPoint, d.mode, d.refDir, {
-        textColor: d.textColor, textSizePx: d.textSizePx, lineColor: d.lineColor,
-        decimals: d.decimals, tickLengthM: d.tickLengthM, showExtensions: d.showExtensions,
-        useFreeText: d.useFreeText, freeText: d.freeText,
-        textBgEnabled: d.textBgEnabled, textBgColor: d.textBgColor, textBgAlpha: d.textBgAlpha,
-        labelId: d.labelId,
-      });
-      if (d._stickerEditOwnerId) dim._stickerEditOwnerId = d._stickerEditOwnerId;
-    }
-    // Re-add text boxes
-    for (const t of data.textBoxes || []) {
-      const box = this.scene.createTextBox(t.center, t.widthM, t.heightM, { ...(t.style || {}), labelId: t.labelId }, t.html || "", t.rotationRad || 0);
-      if (t._stickerEditOwnerId) box._stickerEditOwnerId = t._stickerEditOwnerId;
-    }
     // Restore stickers
     if (Array.isArray(data.stickers)) {
       this.stickers = data.stickers.map((s: any) => ({
@@ -452,25 +491,54 @@ export class CadApp {
       }));
       this.onStickersChange?.();
     }
-    // Restore sticker instances
-    if (Array.isArray(data.stickerInstances)) {
-      for (const si of data.stickerInstances) {
-        const inst = this.scene.createStickerInstance({
-          defId: si.defId, name: si.name, items: si.items,
-          position: si.position, rotationRad: si.rotationRad || 0,
-          scale: si.scale || 1, labelId: si.labelId,
-        });
-        if (si.id) (inst as any).id = si.id;
-      }
-      (this.scene as any)._rebuildStickerIdMap?.();
+    // Restore sheets list (falls vorhanden).
+    if (Array.isArray(data.sheets)) {
+      this.sheetManager.restore(data.sheets);
     }
-    // Restore Sticker-Edit-Mode (so Undo/Redo while editing works correctly)
+    if (data.sheetOverlays && typeof data.sheetOverlays === "object") {
+      this.sheetOverlayStore.restore(data.sheetOverlays);
+    }
+    // Scenes pro Sheet wiederherstellen.
+    if (data.scenesById && typeof data.scenesById === "object") {
+      // Map auf gültige Sheet-Liste reduzieren / ergänzen.
+      const validIds = new Set(this.sheetManager.list().map(s => s.id));
+      // Verwaiste Scenes löschen.
+      for (const id of [...this.scenesById.keys()]) {
+        if (!validIds.has(id) && id !== SheetDefaults.defaultSheetId) this.scenesById.delete(id);
+      }
+      for (const id of validIds) {
+        let sc = this.scenesById.get(id);
+        if (!sc) {
+          sc = new Scene();
+          (sc as any)._drawingScaleRef = () => this.drawingScale;
+          this.scenesById.set(id, sc);
+        }
+        this._restoreOneScene(sc, data.scenesById[id] || null);
+      }
+    } else {
+      // Backwards-compat: nur aktive Scene aus flachen Feldern wiederherstellen.
+      this._restoreOneScene(this.scene, data);
+    }
+    // Aktives Sheet wiederherstellen.
+    const nextActive = (typeof data.activeSheetId === "string" && this.sheetManager.getById(data.activeSheetId))
+      ? data.activeSheetId
+      : SheetDefaults.defaultSheetId;
+    this.activeSheetId = nextActive;
+    const activeScene = this.scenesById.get(nextActive);
+    if (activeScene) {
+      this.scene = activeScene;
+      this.renderer.scene = activeScene;
+      this.topology.scene = activeScene;
+    }
+    // Restore Sticker-Edit-Mode
     this._stickerEditInstanceId = data._stickerEditInstanceId || null;
     this._stickerEditSnapshot = data._stickerEditSnapshot || null;
     this.clearSelection();
     this.setSelectedLabelId(null);
     this.pointEditMenu.hide();
+    this._syncOverlayScenes();
     this.refreshLabelUI();
+    this.refreshSheetUI();
     this._lastSnapshot = this._serializeScene();
     this._isRestoring = false;
   }
@@ -1916,7 +1984,6 @@ export class CadApp {
   /**
    * Verdrahtet das Zeichnungs-ID-Panel (Blätter + Transparentpause).
    * Wird vom React-Wrapper nach dem Mount aufgerufen.
-   * Schritt 1: UI rendert nur — aktives Blatt hat noch keinen Effekt auf die Scene.
    */
   attachSheetPanel(
     root: HTMLDivElement,
@@ -1931,13 +1998,12 @@ export class CadApp {
       root, body, list, addBtn, toggleBtn,
       {
         getActiveSheetId: () => this.activeSheetId,
-        setActiveSheetId: (id: string) => {
-          if (!this.sheetManager.getById(id)) return;
-          this.activeSheetId = id;
+        setActiveSheetId: (id: string) => this.setActiveSheetId(id),
+        onChange: () => {
+          this._syncSheetSceneMap();
+          this._syncOverlayScenes();
           this.refreshSheetUI();
-          // TODO Schritt 2: aktive Scene wechseln, Selection clearen, Tools resetten
         },
-        onChange: () => this.refreshSheetUI(),
       },
     );
     this.sheetPanel.render();
@@ -1945,6 +2011,85 @@ export class CadApp {
 
   refreshSheetUI() {
     this.sheetPanel?.render();
+  }
+
+  /** Stellt sicher, dass für jedes Blatt eine Scene existiert; entfernt verwaiste Scenes. */
+  private _syncSheetSceneMap() {
+    const validIds = new Set(this.sheetManager.list().map(s => s.id));
+    // Neue Sheets → leere Scene anlegen.
+    for (const id of validIds) {
+      if (!this.scenesById.has(id)) {
+        const sc = new Scene();
+        (sc as any)._drawingScaleRef = () => this.drawingScale;
+        this.scenesById.set(id, sc);
+      }
+    }
+    // Verwaiste Scenes löschen (nicht das Default-Sheet).
+    for (const id of [...this.scenesById.keys()]) {
+      if (!validIds.has(id) && id !== SheetDefaults.defaultSheetId) {
+        this.scenesById.delete(id);
+      }
+    }
+    // Falls aktives Blatt gelöscht wurde → auf Default zurück.
+    if (!validIds.has(this.activeSheetId)) {
+      this.setActiveSheetId(SheetDefaults.defaultSheetId);
+    }
+  }
+
+  /** Wechselt das aktive Blatt: Scene swappen, UI/Selektion zurücksetzen, Overlay neu binden. */
+  setActiveSheetId(id: string) {
+    if (!this.sheetManager.getById(id)) return;
+    if (id === this.activeSheetId) {
+      this.refreshSheetUI();
+      return;
+    }
+    // Scene sicherstellen.
+    if (!this.scenesById.has(id)) {
+      const sc = new Scene();
+      (sc as any)._drawingScaleRef = () => this.drawingScale;
+      this.scenesById.set(id, sc);
+    }
+    // Tools/Selektion sauber beenden.
+    this.clearSelection();
+    this.pointEditMenu.hide();
+    this.hub.hide();
+    // Aktives Tool zurücksetzen, damit kein halb-fertiger State (z. B. laufende Linie) bleibt.
+    try { (this.activeTool as any)?.cancel?.(); } catch { /* noop */ }
+    try { (this.activeTool as any)?.reset?.(); } catch { /* noop */ }
+
+    this.activeSheetId = id;
+    const next = this.scenesById.get(id)!;
+    this.scene = next;
+    this.renderer.scene = next;
+    this.topology.scene = next;
+
+    this._syncOverlayScenes();
+    this.refreshLabelUI();
+    this.refreshSheetUI();
+    // History-Snapshot triggern, damit Sheetwechsel nicht als "keine Änderung" gewertet wird.
+    this._lastSnapshot = this._serializeScene();
+  }
+
+  /** Aktualisiert die Liste der Overlay-Scenes für Renderer & Topology. */
+  private _syncOverlayScenes() {
+    const overlays: { scene: Scene; mode: "stamp" | "tint"; color: string | null; opacity: number }[] = [];
+    const topoOverlays: Scene[] = [];
+    for (const sheet of this.sheetManager.list()) {
+      if (sheet.id === this.activeSheetId) continue;
+      const state = this.sheetOverlayStore.get(sheet.id);
+      if (!state || state.mode === "none") continue;
+      const sc = this.scenesById.get(sheet.id);
+      if (!sc) continue;
+      overlays.push({
+        scene: sc,
+        mode: state.mode === "tint" ? "tint" : "stamp",
+        color: state.color,
+        opacity: state.opacity,
+      });
+      topoOverlays.push(sc);
+    }
+    this.renderer.overlayScenes = overlays;
+    this.topology.overlayScenes = topoOverlays;
   }
 
   destroy() {
