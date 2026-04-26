@@ -214,6 +214,9 @@ export class CadApp {
 
   /** Druckpläne (Layout-Blätter mit Papierformat). */
   planManager: PlanManager = new PlanManager();
+  planPanel: PlanPanel | null = null;
+  /** Aktiver Plan (null = Zeichnungsmodus, kein Plan-Hintergrund). */
+  activePlanId: string | null = null;
 
   selection: Selection | null = null;
   selectedLabelId: string | null = null;
