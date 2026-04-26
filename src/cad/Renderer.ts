@@ -44,6 +44,9 @@ export class Renderer {
   vw = 1;
   vh = 1;
   overlay: Overlay | null = null;
+  /** Andere Blätter, die als Transparentpause unter der aktiven Scene gezeichnet werden. */
+  overlayScenes: { scene: Scene; mode: "stamp" | "tint"; color: string | null; opacity: number }[] = [];
+  private _overlayCanvas: HTMLCanvasElement | null = null;
   selection: Selection | null = null;
   selectedLabelId: string | null = null;
   hoverSegmentId: string | null = null;
