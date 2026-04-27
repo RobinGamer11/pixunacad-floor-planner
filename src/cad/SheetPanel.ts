@@ -159,8 +159,13 @@ export class SheetPanel {
       row.addEventListener("dragstart", (e) => {
         this.draggingId = sheet.id;
         row.classList.add("dragging");
-        try { e.dataTransfer?.setData("text/plain", sheet.id); } catch { /* noop */ }
-        try { if (e.dataTransfer) e.dataTransfer.effectAllowed = "move"; } catch { /* noop */ }
+        try {
+          // Reorder-Mime
+          e.dataTransfer?.setData("text/plain", sheet.id);
+          // Plan-Drop-Mime: identifiziert das Blatt für Plan-Projektion
+          e.dataTransfer?.setData("application/x-pixuna-sheet", sheet.id);
+          if (e.dataTransfer) e.dataTransfer.effectAllowed = "copyMove";
+        } catch { /* noop */ }
       });
 
       row.addEventListener("dragend", () => {
@@ -179,15 +184,6 @@ export class SheetPanel {
       `;
       main.addEventListener("click", () => {
         this.cb.setActiveSheetId(sheet.id);
-      });
-
-      // Drag-Quelle für Plan-Drop (Step 4): identifiziert das Blatt
-      main.addEventListener("dragstart", (e) => {
-        try {
-          e.dataTransfer?.setData("application/x-pixuna-sheet", sheet.id);
-          e.dataTransfer?.setData("text/plain", `sheet:${sheet.id}`);
-          if (e.dataTransfer) e.dataTransfer.effectAllowed = "copy";
-        } catch { /* noop */ }
       });
 
       const actions = document.createElement("div");
