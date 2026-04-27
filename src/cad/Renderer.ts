@@ -55,6 +55,13 @@ export class Renderer {
   /** Box currently being edited inline — skip canvas rendering for it. */
   editingTextBoxId: string | null = null;
 
+  /**
+   * Plan-Modus: zeichnet grauen Hintergrund + weißes Papierblatt (in mm).
+   * Papier wird mit Mittelpunkt am Welt-Ursprung (0,0) gezeichnet.
+   * Wenn null → normaler Zeichnungsmodus (Grid + weißer Hintergrund).
+   */
+  planMode: { widthMm: number; heightMm: number } | null = null;
+
   constructor(ctx: CanvasRenderingContext2D, camera: Camera, scene: Scene, labels: LabelManager) {
     this.ctx = ctx;
     this.camera = camera;
