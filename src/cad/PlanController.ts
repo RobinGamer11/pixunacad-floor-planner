@@ -153,7 +153,7 @@ export class PlanController {
     // Drag fortsetzen
     if (this._drag) {
       this._continueDrag(sx, sy);
-      if (!input.lmbDown) this._endDrag();
+      if (!input.mouse.left) this._endDrag();
       return;
     }
 
