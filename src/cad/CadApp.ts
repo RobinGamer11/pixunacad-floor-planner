@@ -2048,6 +2048,8 @@ export class CadApp {
         setActivePlanId: (id: string | null) => this.setActivePlanId(id),
         printSelected: () => this.printSelectedPlans(),
         onChange: () => {
+          // Falls Format des aktiven Plans geändert wurde → Renderer aktualisieren.
+          if (this.activePlanId) this._applyPlanModeToRenderer();
           this.refreshPlanUI();
           // Snapshot, damit Plan-Änderungen in Undo/Redo landen.
           this._lastSnapshot = this._serializeScene();
