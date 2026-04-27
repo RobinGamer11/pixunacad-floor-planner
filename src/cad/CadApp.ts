@@ -2088,6 +2088,13 @@ export class CadApp {
         this.renderer.setHoverSegmentId(null);
         this.renderer.setHoverHatchId(null);
         this.renderer.setHoverTextBoxId(null);
+        // Overlay-Sheets im Plan-Modus deaktivieren.
+        this.renderer.overlayScenes = [];
+        // Tools/HUDs sauber beenden.
+        try { (this.activeTool as any)?.cancel?.(); } catch { /* noop */ }
+        try { (this.activeTool as any)?.reset?.(); } catch { /* noop */ }
+        this.pointEditMenu.hide();
+        this.hub.hide();
         // Kamera auf Papier zentrieren und passenden Zoom wählen.
         this._fitCameraToPaper(size.width, size.height);
       }
@@ -2096,6 +2103,8 @@ export class CadApp {
       // Aktive Sheet-Scene wiederherstellen.
       const activeScene = this.scenesById.get(this.activeSheetId) || this.scene;
       (this.renderer as any).scene = activeScene;
+      // Overlay-Sheets wiederherstellen.
+      this._syncOverlayScenes();
     }
   }
 
