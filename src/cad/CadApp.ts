@@ -312,6 +312,29 @@ export class CadApp {
     this.topology = new TopologyEngine(this.scene, this.camera, this.labelManager);
     this.renderer = new Renderer(this.ctx, this.camera, this.scene, this.labelManager);
 
+    // Plan-Modus Controller (Step 4): Drop, Selektion, Drag, HUB.
+    this.planController = new PlanController(this);
+    this.renderer.planOverlayDraw = (ctx) => this.planController?.drawAll(ctx);
+
+    // Drop von Sheet-Drags auf den Canvas (nur im Plan-Modus relevant).
+    this.canvas.addEventListener("dragover", (e) => {
+      if (!this.activePlanId) return;
+      const types = Array.from(e.dataTransfer?.types || []);
+      if (!types.includes("application/x-pixuna-sheet")) return;
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+    });
+    this.canvas.addEventListener("drop", (e) => {
+      if (!this.activePlanId) return;
+      const sheetId = e.dataTransfer?.getData("application/x-pixuna-sheet");
+      if (!sheetId) return;
+      e.preventDefault();
+      const rect = this.canvas.getBoundingClientRect();
+      const sx = e.clientX - rect.left;
+      const sy = e.clientY - rect.top;
+      this.planController?.createProjectionFromSheet(sheetId, sx, sy);
+    });
+
     this.selectTool = new SelectTool(this);
     this.lineTool = new LineTool(this);
     this.hatchTool = new HatchTool(this);
