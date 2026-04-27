@@ -24,6 +24,7 @@ import { IdPanel } from "./IdPanel";
 import { SheetManager, SheetOverlayStore, SheetDefaults } from "./SheetManager";
 import { PlanManager, getPlanPaperSize } from "./PlanManager";
 import { PlanPanel } from "./PlanPanel";
+import { PlanController } from "./PlanController";
 import { SheetPanel } from "./SheetPanel";
 
 export interface TextSettingsRefs {
@@ -217,6 +218,8 @@ export class CadApp {
   planPanel: PlanPanel | null = null;
   /** Aktiver Plan (null = Zeichnungsmodus, kein Plan-Hintergrund). */
   activePlanId: string | null = null;
+  /** Plan-Modus Controller (Drop / Selektion / Drag / HUB). */
+  planController: PlanController | null = null;
 
   selection: Selection | null = null;
   selectedLabelId: string | null = null;
@@ -308,6 +311,29 @@ export class CadApp {
     this.labelManager = new LabelManager();
     this.topology = new TopologyEngine(this.scene, this.camera, this.labelManager);
     this.renderer = new Renderer(this.ctx, this.camera, this.scene, this.labelManager);
+
+    // Plan-Modus Controller (Step 4): Drop, Selektion, Drag, HUB.
+    this.planController = new PlanController(this);
+    this.renderer.planOverlayDraw = (ctx) => this.planController?.drawAll(ctx);
+
+    // Drop von Sheet-Drags auf den Canvas (nur im Plan-Modus relevant).
+    this.canvas.addEventListener("dragover", (e) => {
+      if (!this.activePlanId) return;
+      const types = Array.from(e.dataTransfer?.types || []);
+      if (!types.includes("application/x-pixuna-sheet")) return;
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+    });
+    this.canvas.addEventListener("drop", (e) => {
+      if (!this.activePlanId) return;
+      const sheetId = e.dataTransfer?.getData("application/x-pixuna-sheet");
+      if (!sheetId) return;
+      e.preventDefault();
+      const rect = this.canvas.getBoundingClientRect();
+      const sx = e.clientX - rect.left;
+      const sy = e.clientY - rect.top;
+      this.planController?.createProjectionFromSheet(sheetId, sx, sy);
+    });
 
     this.selectTool = new SelectTool(this);
     this.lineTool = new LineTool(this);
@@ -515,6 +541,8 @@ export class CadApp {
     } else {
       this.planManager.restore([]);
     }
+    // PlanController-Cache invalidieren (Snapshot-Items neu flatten).
+    this.planController?.invalidateCache();
     if (data.scenesById && typeof data.scenesById === "object") {
       // Map auf gültige Sheet-Liste reduzieren / ergänzen.
       const validIds = new Set(this.sheetManager.list().map(s => s.id));
@@ -1986,7 +2014,10 @@ export class CadApp {
       if (this.input.wheelDelta !== 0) this.camera.zoomAt(this.input.wheelDelta, this.input.mouse.sx, this.input.mouse.sy);
       this.input.update(this.camera);
 
-      if (this.pastePreviewActive) {
+      if (this.activePlanId) {
+        // Plan-Modus: Eingaben gehen an PlanController; Werkzeuge ruhen.
+        this.planController?.update();
+      } else if (this.pastePreviewActive) {
         this.canvas.style.cursor = "copy";
         if (this.input.clicked) this._commitPasteAtMouse();
       } else {
@@ -2114,6 +2145,14 @@ export class CadApp {
       (this.renderer as any).scene = activeScene;
       // Overlay-Sheets wiederherstellen.
       this._syncOverlayScenes();
+      // Plan-Controller-State zurücksetzen (HUB ausblenden).
+      this.planController?.onExitPlanMode();
+      this.canvas.style.cursor = "";
+    }
+    // Beim Plan-Wechsel Auswahl/Hover des Plan-Controllers zurücksetzen.
+    if (this.planController && this.activePlanId) {
+      this.planController.selectedProjectionId = null;
+      this.planController.hoverProjectionId = null;
     }
   }
 
@@ -2228,6 +2267,7 @@ export class CadApp {
     this.input.destroy();
     this.hub.destroy();
     this.textEditor?.destroy();
+    this.planController?.destroy();
     if (this._keydownHandler) window.removeEventListener("keydown", this._keydownHandler);
   }
 }
