@@ -2012,7 +2012,10 @@ export class CadApp {
       if (this.input.wheelDelta !== 0) this.camera.zoomAt(this.input.wheelDelta, this.input.mouse.sx, this.input.mouse.sy);
       this.input.update(this.camera);
 
-      if (this.pastePreviewActive) {
+      if (this.activePlanId) {
+        // Plan-Modus: Eingaben gehen an PlanController; Werkzeuge ruhen.
+        this.planController?.update();
+      } else if (this.pastePreviewActive) {
         this.canvas.style.cursor = "copy";
         if (this.input.clicked) this._commitPasteAtMouse();
       } else {
