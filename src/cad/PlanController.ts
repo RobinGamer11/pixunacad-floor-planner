@@ -1,0 +1,389 @@
+/**
+ * PlanController (Step 4):
+ * - Verarbeitet Drop von Sheet-Drags auf den aktiven Plan (erzeugt Projektionen).
+ * - Übernimmt Plan-Modus-Input (Hover, Klick, Drag) und priorisiert über andere Tools.
+ * - Zeigt Mini-HUB (DOM) bei selektierter Projektion: Skalieren, Drehen, Löschen.
+ *
+ * Bewusst eigenständig — KEINE Integration in SelectTool/HatchTool, damit der
+ * Zeichenmodus unverändert bleibt.
+ */
+import { CadApp } from "./CadApp";
+import { Plan, Projection } from "./PlanManager";
+import {
+  flattenSheetSnapshot,
+  ProjectionItem,
+  drawProjection,
+  hitTestProjection,
+  computeProjectionLayout,
+  itemsBoundsM,
+  sheetToPlanFactor,
+} from "./PlanProjections";
+
+interface DragState {
+  kind: "move" | "edge-left" | "edge-right" | "edge-top" | "edge-bottom";
+  projectionId: string;
+  startSx: number;
+  startSy: number;
+  // Snapshot der Projection-Werte zum Drag-Start
+  origX: number;
+  origY: number;
+  origClip: { left: number; right: number; top: number; bottom: number };
+}
+
+export class PlanController {
+  app: CadApp;
+
+  /** Cache: projectionId → Items (aus Snapshot geflattent). */
+  private _itemsCache = new Map<string, ProjectionItem[]>();
+
+  selectedProjectionId: string | null = null;
+  hoverProjectionId: string | null = null;
+  hoverHandle: "body" | "edge-left" | "edge-right" | "edge-top" | "edge-bottom" | null = null;
+
+  private _drag: DragState | null = null;
+
+  // HUB DOM
+  private _hubEl: HTMLDivElement | null = null;
+
+  constructor(app: CadApp) {
+    this.app = app;
+  }
+
+  /** Liefert Items zur Projektion, mit Cache. */
+  getItems(proj: Projection): ProjectionItem[] {
+    let items = this._itemsCache.get(proj.id);
+    if (!items) {
+      items = flattenSheetSnapshot(proj.sceneSnapshot);
+      this._itemsCache.set(proj.id, items);
+    }
+    return items;
+  }
+
+  /** Cache leeren (bei History-Restore aufrufen). */
+  invalidateCache() {
+    this._itemsCache.clear();
+  }
+
+  /** Aktueller Plan oder null. */
+  private _activePlan(): Plan | null {
+    if (!this.app.activePlanId) return null;
+    return this.app.planManager.getById(this.app.activePlanId);
+  }
+
+  /**
+   * Erzeugt eine Projektion auf dem aktiven Plan, ausgehend von einem Sheet-Drop.
+   * sheetId = Quell-Blatt. (sx, sy) = Drop-Position in Bildschirm-Pixel.
+   */
+  createProjectionFromSheet(sheetId: string, sx: number, sy: number): Projection | null {
+    const plan = this._activePlan();
+    if (!plan) return null;
+    const sheet = this.app.sheetManager.getById(sheetId);
+    if (!sheet) return null;
+    const sheetScene = this.app.scenesById.get(sheetId);
+    if (!sheetScene) return null;
+
+    // Snapshot über CadApp's bestehende Serialisierung.
+    const snapshot = (this.app as any)._serializeOneScene(sheetScene);
+    const items = flattenSheetSnapshot(snapshot);
+    const bb = itemsBoundsM(items);
+    const factor = sheetToPlanFactor(this._sheetScaleValue(sheetId));
+
+    // Drop-Punkt in Plan-Welt (Meter) → mm
+    const world = this.app.camera.screenToWorld(sx, sy);
+    const xMm = world.x * 1000;
+    const yMm = world.y * 1000;
+
+    const proj: Projection = {
+      id: `proj-${Date.now()}-${Math.floor(Math.random() * 9999)}`,
+      sourceSheetId: sheetId,
+      sceneSnapshot: snapshot,
+      scale: this._sheetScaleValue(sheetId),
+      x: xMm,
+      y: yMm,
+      rotation: 0,
+      clip: { left: 0, right: 0, top: 0, bottom: 0 },
+    };
+    // Falls Sheet leer ist: kleines Default-Rechteck (sonst nichts sichtbar).
+    if (!isFinite(bb.minX) || bb.maxX === bb.minX) { /* nothing */ }
+    void factor;
+
+    this.app.planManager.addProjection(plan.id, proj);
+    this._itemsCache.set(proj.id, items);
+    this.selectedProjectionId = proj.id;
+    this._showHub();
+    this.app.refreshPlanUI();
+    // History-Snapshot
+    (this.app as any)._lastSnapshot = (this.app as any)._serializeScene();
+    return proj;
+  }
+
+  private _sheetScaleValue(sheetId: string): number {
+    // Lokal aufgelöst, um Zirkular-Imports zu vermeiden.
+    const sheet = this.app.sheetManager.getById(sheetId);
+    if (!sheet) return 100;
+    const key = sheet.scaleKey || "1:100";
+    if (key === "free" && typeof sheet.scaleValue === "number" && sheet.scaleValue > 0) return sheet.scaleValue;
+    const parsed = key.startsWith("1:") ? parseFloat(key.slice(2)) : NaN;
+    return isFinite(parsed) && parsed > 0 ? parsed : 100;
+  }
+
+  /** Zeichne alle Projektionen des aktiven Plans. */
+  drawAll(ctx: CanvasRenderingContext2D) {
+    const plan = this._activePlan();
+    if (!plan) return;
+    for (const proj of plan.projections) {
+      const items = this.getItems(proj);
+      const isSel = proj.id === this.selectedProjectionId;
+      const isHov = proj.id === this.hoverProjectionId && !isSel;
+      drawProjection(ctx, this.app.camera, items, proj, isSel, isHov);
+    }
+  }
+
+  /** Update jedes Frames (nur im Plan-Modus aufrufen). */
+  update() {
+    const plan = this._activePlan();
+    if (!plan) {
+      this._hideHub();
+      return;
+    }
+    const input = this.app.input;
+    const sx = input.mouse.sx;
+    const sy = input.mouse.sy;
+
+    // Drag fortsetzen
+    if (this._drag) {
+      this._continueDrag(sx, sy);
+      if (!input.lmbDown) this._endDrag();
+      return;
+    }
+
+    // Hover berechnen
+    let hoverId: string | null = null;
+    let hoverHandle: typeof this.hoverHandle = null;
+    // Selektierte Projektion zuerst prüfen (Edge-Handles).
+    const selected = this.selectedProjectionId
+      ? plan.projections.find(p => p.id === this.selectedProjectionId)
+      : null;
+    if (selected) {
+      const h = hitTestProjection(this.app.camera, this.getItems(selected), selected, sx, sy);
+      if (h) { hoverId = selected.id; hoverHandle = h; }
+    }
+    if (!hoverId) {
+      // Andere Projektionen (Body)
+      for (let i = plan.projections.length - 1; i >= 0; i--) {
+        const proj = plan.projections[i];
+        if (selected && proj.id === selected.id) continue;
+        const h = hitTestProjection(this.app.camera, this.getItems(proj), proj, sx, sy);
+        if (h) { hoverId = proj.id; hoverHandle = h; break; }
+      }
+    }
+    this.hoverProjectionId = hoverId;
+    this.hoverHandle = hoverHandle;
+
+    // Cursor
+    if (hoverHandle === "body") this.app.canvas.style.cursor = "move";
+    else if (hoverHandle === "edge-left" || hoverHandle === "edge-right") this.app.canvas.style.cursor = "ew-resize";
+    else if (hoverHandle === "edge-top" || hoverHandle === "edge-bottom") this.app.canvas.style.cursor = "ns-resize";
+    else this.app.canvas.style.cursor = "";
+
+    // Klick
+    if (input.clicked) {
+      if (hoverId && hoverHandle) {
+        this.selectedProjectionId = hoverId;
+        const proj = plan.projections.find(p => p.id === hoverId)!;
+        this._beginDrag(hoverHandle, proj, sx, sy);
+        this._showHub();
+      } else {
+        // Klick ins Leere → deselektieren
+        this.selectedProjectionId = null;
+        this._hideHub();
+      }
+    }
+
+    // HUB-Position aktualisieren
+    if (this.selectedProjectionId) this._positionHub();
+  }
+
+  private _beginDrag(
+    handle: "body" | "edge-left" | "edge-right" | "edge-top" | "edge-bottom",
+    proj: Projection,
+    sx: number,
+    sy: number,
+  ) {
+    this._drag = {
+      kind: handle === "body" ? "move" : handle,
+      projectionId: proj.id,
+      startSx: sx,
+      startSy: sy,
+      origX: proj.x,
+      origY: proj.y,
+      origClip: { ...proj.clip },
+    };
+  }
+
+  private _continueDrag(sx: number, sy: number) {
+    if (!this._drag) return;
+    const plan = this._activePlan();
+    if (!plan) return;
+    const proj = plan.projections.find(p => p.id === this._drag!.projectionId);
+    if (!proj) { this._drag = null; return; }
+    const cam = this.app.camera;
+    const dxPx = sx - this._drag.startSx;
+    const dyPx = sy - this._drag.startSy;
+    // Bildschirm-Pixel → Plan-Welt-mm (camera.scale = px/m)
+    const dxMm = (dxPx / cam.scale) * 1000;
+    const dyMm = (dyPx / cam.scale) * 1000;
+
+    if (this._drag.kind === "move") {
+      proj.x = this._drag.origX + dxMm;
+      proj.y = this._drag.origY + dyMm;
+    } else {
+      // Kanten ziehen: ins lokale (rotierte) System transformieren, dann clip anpassen
+      const cosA = Math.cos(-proj.rotation);
+      const sinA = Math.sin(-proj.rotation);
+      const ldxMm = dxMm * cosA - dyMm * sinA;
+      const ldyMm = dxMm * sinA + dyMm * cosA;
+      const next = { ...this._drag.origClip };
+      // Begrenzung: clip darf BBox nicht überschreiten
+      const items = this.getItems(proj);
+      const layout = computeProjectionLayout(items, { ...proj, clip: this._drag.origClip });
+      const bboxW = layout.bboxLocalMm.right - layout.bboxLocalMm.left;
+      const bboxH = layout.bboxLocalMm.bottom - layout.bboxLocalMm.top;
+      const maxW = bboxW - 5; // 5 mm Min-Breite
+      const maxH = bboxH - 5;
+
+      if (this._drag.kind === "edge-left") {
+        next.left = clampN(this._drag.origClip.left + ldxMm, 0, maxW - this._drag.origClip.right);
+      } else if (this._drag.kind === "edge-right") {
+        next.right = clampN(this._drag.origClip.right - ldxMm, 0, maxW - this._drag.origClip.left);
+      } else if (this._drag.kind === "edge-top") {
+        next.top = clampN(this._drag.origClip.top + ldyMm, 0, maxH - this._drag.origClip.bottom);
+      } else if (this._drag.kind === "edge-bottom") {
+        next.bottom = clampN(this._drag.origClip.bottom - ldyMm, 0, maxH - this._drag.origClip.top);
+      }
+      proj.clip = next;
+    }
+  }
+
+  private _endDrag() {
+    this._drag = null;
+    // Snapshot in History
+    (this.app as any)._lastSnapshot = (this.app as any)._serializeScene();
+  }
+
+  /* ---------- HUB ---------- */
+  private _ensureHub() {
+    if (this._hubEl) return this._hubEl;
+    const el = document.createElement("div");
+    el.className = "plan-projection-hub";
+    el.innerHTML = `
+      <button data-act="rot-l" title="-15°">⟲</button>
+      <button data-act="rot-r" title="+15°">⟳</button>
+      <span class="plan-hub-sep"></span>
+      <label>Maßstab 1:</label>
+      <input type="number" data-field="scale" min="1" step="1" />
+      <span class="plan-hub-sep"></span>
+      <button data-act="reset-clip" title="Clip zurücksetzen">⤢</button>
+      <button data-act="delete" title="Löschen" class="plan-hub-danger">🗑</button>
+    `;
+    document.body.appendChild(el);
+
+    el.addEventListener("click", (e) => {
+      const target = e.target as HTMLElement;
+      const act = target.closest("[data-act]")?.getAttribute("data-act");
+      if (!act) return;
+      e.stopPropagation();
+      const proj = this._currentProj();
+      if (!proj) return;
+      if (act === "rot-l") proj.rotation -= Math.PI / 12;
+      else if (act === "rot-r") proj.rotation += Math.PI / 12;
+      else if (act === "reset-clip") proj.clip = { left: 0, right: 0, top: 0, bottom: 0 };
+      else if (act === "delete") {
+        const plan = this._activePlan();
+        if (plan) this.app.planManager.removeProjection(plan.id, proj.id);
+        this.selectedProjectionId = null;
+        this._hideHub();
+      }
+      (this.app as any)._lastSnapshot = (this.app as any)._serializeScene();
+    });
+
+    el.addEventListener("change", (e) => {
+      const target = e.target as HTMLInputElement;
+      const field = target.getAttribute("data-field");
+      if (field === "scale") {
+        const proj = this._currentProj();
+        if (!proj) return;
+        const num = parseFloat(target.value);
+        if (isFinite(num) && num > 0) {
+          proj.scale = num;
+          (this.app as any)._lastSnapshot = (this.app as any)._serializeScene();
+        }
+      }
+    });
+
+    this._hubEl = el;
+    return el;
+  }
+
+  private _currentProj(): Projection | null {
+    const plan = this._activePlan();
+    if (!plan || !this.selectedProjectionId) return null;
+    return plan.projections.find(p => p.id === this.selectedProjectionId) || null;
+  }
+
+  private _showHub() {
+    const el = this._ensureHub();
+    el.style.display = "flex";
+    const proj = this._currentProj();
+    if (proj) {
+      const input = el.querySelector('input[data-field="scale"]') as HTMLInputElement | null;
+      if (input) input.value = String(Math.round(proj.scale));
+    }
+    this._positionHub();
+  }
+
+  private _hideHub() {
+    if (this._hubEl) this._hubEl.style.display = "none";
+  }
+
+  private _positionHub() {
+    if (!this._hubEl) return;
+    const proj = this._currentProj();
+    if (!proj) { this._hideHub(); return; }
+    const cam = this.app.camera;
+    const layout = computeProjectionLayout(this.getItems(proj), proj);
+    const cs = cam.worldToScreen(layout.centerPlanM.x, layout.centerPlanM.y);
+    const mmToPx = (mm: number) => (mm / 1000) * cam.scale;
+    // Oberkante des (rotierten) Clip-Rechtecks → Mittelpunkt
+    const top = mmToPx(layout.clipLocalMm.top);
+    // Punkt im rotierten Frame: (0, top), zurückrotieren in canvas-frame
+    const cosA = Math.cos(proj.rotation);
+    const sinA = Math.sin(proj.rotation);
+    const offX = -sinA * top;
+    const offY = cosA * top;
+    const rect = this.app.canvas.getBoundingClientRect();
+    const x = rect.left + cs.x + offX;
+    const y = rect.top + cs.y + offY - 44; // 44 px über Oberkante
+    this._hubEl.style.left = `${x}px`;
+    this._hubEl.style.top = `${y}px`;
+  }
+
+  /** Beim Verlassen des Plan-Modus aufrufen. */
+  onExitPlanMode() {
+    this.selectedProjectionId = null;
+    this.hoverProjectionId = null;
+    this.hoverHandle = null;
+    this._drag = null;
+    this._hideHub();
+  }
+
+  destroy() {
+    if (this._hubEl?.parentNode) this._hubEl.parentNode.removeChild(this._hubEl);
+    this._hubEl = null;
+  }
+}
+
+function clampN(v: number, min: number, max: number): number {
+  if (max < min) max = min;
+  return Math.max(min, Math.min(max, v));
+}
