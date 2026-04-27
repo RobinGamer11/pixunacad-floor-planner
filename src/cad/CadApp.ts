@@ -484,6 +484,7 @@ export class CadApp {
       scenesById: scenesObj,
       // Druckpläne
       plans: this.planManager.toJSON(),
+      activePlanId: this.activePlanId,
     });
   }
 
