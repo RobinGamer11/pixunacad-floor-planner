@@ -2267,6 +2267,7 @@ export class CadApp {
     this.input.destroy();
     this.hub.destroy();
     this.textEditor?.destroy();
+    this.planController?.destroy();
     if (this._keydownHandler) window.removeEventListener("keydown", this._keydownHandler);
   }
 }
