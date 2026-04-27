@@ -2143,6 +2143,14 @@ export class CadApp {
       (this.renderer as any).scene = activeScene;
       // Overlay-Sheets wiederherstellen.
       this._syncOverlayScenes();
+      // Plan-Controller-State zurücksetzen (HUB ausblenden).
+      this.planController?.onExitPlanMode();
+      this.canvas.style.cursor = "";
+    }
+    // Beim Plan-Wechsel Auswahl/Hover des Plan-Controllers zurücksetzen.
+    if (this.planController && this.activePlanId) {
+      this.planController.selectedProjectionId = null;
+      this.planController.hoverProjectionId = null;
     }
   }
 
