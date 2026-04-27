@@ -55,6 +55,13 @@ export class Renderer {
   /** Box currently being edited inline — skip canvas rendering for it. */
   editingTextBoxId: string | null = null;
 
+  /**
+   * Plan-Modus: zeichnet grauen Hintergrund + weißes Papierblatt (in mm).
+   * Papier wird mit Mittelpunkt am Welt-Ursprung (0,0) gezeichnet.
+   * Wenn null → normaler Zeichnungsmodus (Grid + weißer Hintergrund).
+   */
+  planMode: { widthMm: number; heightMm: number } | null = null;
+
   constructor(ctx: CanvasRenderingContext2D, camera: Camera, scene: Scene, labels: LabelManager) {
     this.ctx = ctx;
     this.camera = camera;
@@ -120,12 +127,19 @@ export class Renderer {
 
   render() {
     const ctx = this.ctx;
-    ctx.save();
-    ctx.fillStyle = "hsl(0 0% 100%)";
-    ctx.fillRect(0, 0, this.vw, this.vh);
-    ctx.restore();
-
-    this._drawGrid();
+    if (this.planMode) {
+      ctx.save();
+      ctx.fillStyle = "hsl(220 9% 46%)"; // mid-gray
+      ctx.fillRect(0, 0, this.vw, this.vh);
+      ctx.restore();
+      this._drawPlanPaper();
+    } else {
+      ctx.save();
+      ctx.fillStyle = "hsl(0 0% 100%)";
+      ctx.fillRect(0, 0, this.vw, this.vh);
+      ctx.restore();
+      this._drawGrid();
+    }
 
     // Overlay-Sheets (Transparentpause) UNTER aktiver Scene zeichnen.
     this._drawOverlayScenes();
@@ -144,6 +158,40 @@ export class Renderer {
     if (this.overlay && this.overlay.draw) {
       this.overlay.draw(ctx, this.camera);
     }
+  }
+
+  /**
+   * Zeichnet das Papierblatt im Plan-Modus.
+   * Konvention: 1 Welt-Einheit = 1 Meter; 1 mm = 0.001 m.
+   * Papier ist mittig am Welt-Ursprung (0,0).
+   */
+  private _drawPlanPaper() {
+    if (!this.planMode) return;
+    const ctx = this.ctx;
+    const cam = this.camera;
+    const wM = this.planMode.widthMm / 1000;
+    const hM = this.planMode.heightMm / 1000;
+    const tl = cam.worldToScreen(-wM / 2, -hM / 2);
+    const br = cam.worldToScreen(wM / 2, hM / 2);
+    const x = Math.min(tl.x, br.x);
+    const y = Math.min(tl.y, br.y);
+    const w = Math.abs(br.x - tl.x);
+    const h = Math.abs(br.y - tl.y);
+
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,0.35)";
+    ctx.shadowBlur = 18;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 6;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(x, y, w, h);
+    ctx.restore();
+
+    ctx.save();
+    ctx.strokeStyle = "rgba(0,0,0,0.55)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+    ctx.restore();
   }
 
   /** Rendert Overlay-Sheets in offscreen-Canvas, wendet Tint an und blittet mit Opacity. */

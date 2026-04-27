@@ -22,7 +22,7 @@ import { DocumentTool } from "./DocumentTool";
 
 import { IdPanel } from "./IdPanel";
 import { SheetManager, SheetOverlayStore, SheetDefaults } from "./SheetManager";
-import { PlanManager } from "./PlanManager";
+import { PlanManager, getPlanPaperSize } from "./PlanManager";
 import { PlanPanel } from "./PlanPanel";
 import { SheetPanel } from "./SheetPanel";
 
@@ -484,6 +484,7 @@ export class CadApp {
       scenesById: scenesObj,
       // Druckpläne
       plans: this.planManager.toJSON(),
+      activePlanId: this.activePlanId,
     });
   }
 
@@ -554,6 +555,12 @@ export class CadApp {
     this._syncOverlayScenes();
     this.refreshLabelUI();
     this.refreshSheetUI();
+    // Aktiven Plan wiederherstellen (löst auch Plan-Modus-Renderer-Sync aus).
+    const restoredPlanId = (typeof data.activePlanId === "string" && this.planManager.getById(data.activePlanId))
+      ? data.activePlanId : null;
+    this.activePlanId = restoredPlanId;
+    this._applyPlanModeToRenderer();
+    this.refreshPlanUI();
     this._lastSnapshot = this._serializeScene();
     this._isRestoring = false;
   }
@@ -2048,6 +2055,8 @@ export class CadApp {
         setActivePlanId: (id: string | null) => this.setActivePlanId(id),
         printSelected: () => this.printSelectedPlans(),
         onChange: () => {
+          // Falls Format des aktiven Plans geändert wurde → Renderer aktualisieren.
+          if (this.activePlanId) this._applyPlanModeToRenderer();
           this.refreshPlanUI();
           // Snapshot, damit Plan-Änderungen in Undo/Redo landen.
           this._lastSnapshot = this._serializeScene();
@@ -2061,11 +2070,68 @@ export class CadApp {
     this.planPanel?.render();
   }
 
-  /** Setzt aktiven Plan (null = zurück zur Zeichnungsoberfläche). Plan-Render in Step 3. */
+  /** Setzt aktiven Plan (null = zurück zur Zeichnungsoberfläche). */
   setActivePlanId(id: string | null) {
     if (id != null && !this.planManager.getById(id)) return;
     this.activePlanId = id;
+    this._applyPlanModeToRenderer();
     this.refreshPlanUI();
+  }
+
+  /** Wendet den aktuellen Plan-Status auf Renderer + Scene an. */
+  private _applyPlanModeToRenderer() {
+    if (this.activePlanId) {
+      const plan = this.planManager.getById(this.activePlanId);
+      if (plan) {
+        const size = getPlanPaperSize(plan);
+        this.renderer.planMode = { widthMm: size.width, heightMm: size.height };
+        // Im Plan-Modus keine Zeichnungs-Geometrie anzeigen — leere Scene anzeigen.
+        if (!this._planEmptyScene) {
+          this._planEmptyScene = new Scene();
+          (this._planEmptyScene as any)._drawingScaleRef = () => this.drawingScale;
+        }
+        (this.renderer as any).scene = this._planEmptyScene;
+        // Selection / Hover zurücksetzen, damit nichts vom Sheet rüberblutet.
+        this.selection = null;
+        this.renderer.setSelection(null);
+        this.renderer.setHoverSegmentId(null);
+        this.renderer.setHoverHatchId(null);
+        this.renderer.setHoverTextBoxId(null);
+        // Overlay-Sheets im Plan-Modus deaktivieren.
+        this.renderer.overlayScenes = [];
+        // Tools/HUDs sauber beenden.
+        try { (this.activeTool as any)?.cancel?.(); } catch { /* noop */ }
+        try { (this.activeTool as any)?.reset?.(); } catch { /* noop */ }
+        this.pointEditMenu.hide();
+        this.hub.hide();
+        // Kamera auf Papier zentrieren und passenden Zoom wählen.
+        this._fitCameraToPaper(size.width, size.height);
+      }
+    } else {
+      this.renderer.planMode = null;
+      // Aktive Sheet-Scene wiederherstellen.
+      const activeScene = this.scenesById.get(this.activeSheetId) || this.scene;
+      (this.renderer as any).scene = activeScene;
+      // Overlay-Sheets wiederherstellen.
+      this._syncOverlayScenes();
+    }
+  }
+
+  /** Cached leere Scene als Anzeige-Backing im Plan-Modus. */
+  private _planEmptyScene: Scene | null = null;
+
+  /** Zentriert Kamera auf (0,0) und zoomt so, dass das Papier mit Rand passt. */
+  private _fitCameraToPaper(widthMm: number, heightMm: number) {
+    const rect = this.canvas.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
+    const wM = widthMm / 1000;
+    const hM = heightMm / 1000;
+    const marginPx = 40;
+    const sx = (rect.width - marginPx * 2) / wM;
+    const sy = (rect.height - marginPx * 2) / hM;
+    const scale = Math.max(1, Math.min(sx, sy));
+    (this.camera as any).scale = scale;
+    this.camera.center(rect);
   }
 
   /** Stub: Sammel-PDF-Druck — wird in Step 5 implementiert. */
