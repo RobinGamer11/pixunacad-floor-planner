@@ -555,6 +555,12 @@ export class CadApp {
     this._syncOverlayScenes();
     this.refreshLabelUI();
     this.refreshSheetUI();
+    // Aktiven Plan wiederherstellen (löst auch Plan-Modus-Renderer-Sync aus).
+    const restoredPlanId = (typeof data.activePlanId === "string" && this.planManager.getById(data.activePlanId))
+      ? data.activePlanId : null;
+    this.activePlanId = restoredPlanId;
+    this._applyPlanModeToRenderer();
+    this.refreshPlanUI();
     this._lastSnapshot = this._serializeScene();
     this._isRestoring = false;
   }
