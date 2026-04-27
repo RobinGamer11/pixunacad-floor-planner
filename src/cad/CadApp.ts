@@ -24,6 +24,7 @@ import { IdPanel } from "./IdPanel";
 import { SheetManager, SheetOverlayStore, SheetDefaults } from "./SheetManager";
 import { PlanManager, getPlanPaperSize } from "./PlanManager";
 import { PlanPanel } from "./PlanPanel";
+import { PlanController } from "./PlanController";
 import { SheetPanel } from "./SheetPanel";
 
 export interface TextSettingsRefs {
@@ -217,6 +218,8 @@ export class CadApp {
   planPanel: PlanPanel | null = null;
   /** Aktiver Plan (null = Zeichnungsmodus, kein Plan-Hintergrund). */
   activePlanId: string | null = null;
+  /** Plan-Modus Controller (Drop / Selektion / Drag / HUB). */
+  planController: PlanController | null = null;
 
   selection: Selection | null = null;
   selectedLabelId: string | null = null;
