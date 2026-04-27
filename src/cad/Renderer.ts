@@ -62,6 +62,9 @@ export class Renderer {
    */
   planMode: { widthMm: number; heightMm: number } | null = null;
 
+  /** Hook: wird im Plan-Modus NACH dem Papier gezeichnet (Projektionen). */
+  planOverlayDraw: ((ctx: CanvasRenderingContext2D) => void) | null = null;
+
   constructor(ctx: CanvasRenderingContext2D, camera: Camera, scene: Scene, labels: LabelManager) {
     this.ctx = ctx;
     this.camera = camera;
