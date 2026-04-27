@@ -541,6 +541,8 @@ export class CadApp {
     } else {
       this.planManager.restore([]);
     }
+    // PlanController-Cache invalidieren (Snapshot-Items neu flatten).
+    this.planController?.invalidateCache();
     if (data.scenesById && typeof data.scenesById === "object") {
       // Map auf gültige Sheet-Liste reduzieren / ergänzen.
       const validIds = new Set(this.sheetManager.list().map(s => s.id));
