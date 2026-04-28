@@ -2129,20 +2129,22 @@ export class CadApp {
       if (plan) {
         const size = getPlanPaperSize(plan);
         this.renderer.planMode = { widthMm: size.width, heightMm: size.height };
-        // Im Plan-Modus keine Zeichnungs-Geometrie anzeigen — leere Scene anzeigen.
-        if (!this._planEmptyScene) {
-          this._planEmptyScene = new Scene();
-          (this._planEmptyScene as any)._drawingScaleRef = () => this.drawingScale;
-        }
-        (this.renderer as any).scene = this._planEmptyScene;
-        // Selection / Hover zurücksetzen, damit nichts vom Sheet rüberblutet.
+        // Annotation-Scene des Plans als aktive Scene swappen, damit Werkzeuge
+        // direkt auf dem Plan zeichnen können.
+        const planScene = this._ensurePlanScene(this.activePlanId);
+        this.scene = planScene;
+        (this.renderer as any).scene = planScene;
+        this.topology.scene = planScene;
+        // Selection / Hover zurücksetzen.
         this.selection = null;
         this.renderer.setSelection(null);
         this.renderer.setHoverSegmentId(null);
         this.renderer.setHoverHatchId(null);
         this.renderer.setHoverTextBoxId(null);
-        // Overlay-Sheets im Plan-Modus deaktivieren.
+        // Sheet-Overlays im Plan-Modus aus (Sheets gehören nicht auf Pläne).
         this.renderer.overlayScenes = [];
+        // Plan-Tracing (andere Pläne als Transparentpause) berechnen.
+        this._syncPlanTracingLayers();
         // Tools/HUDs sauber beenden.
         try { (this.activeTool as any)?.cancel?.(); } catch { /* noop */ }
         try { (this.activeTool as any)?.reset?.(); } catch { /* noop */ }
@@ -2153,9 +2155,12 @@ export class CadApp {
       }
     } else {
       this.renderer.planMode = null;
+      this.renderer.planTracingLayers = [];
       // Aktive Sheet-Scene wiederherstellen.
       const activeScene = this.scenesById.get(this.activeSheetId) || this.scene;
+      this.scene = activeScene;
       (this.renderer as any).scene = activeScene;
+      this.topology.scene = activeScene;
       // Overlay-Sheets wiederherstellen.
       this._syncOverlayScenes();
       // Plan-Controller-State zurücksetzen (HUB ausblenden).
@@ -2169,7 +2174,71 @@ export class CadApp {
     }
   }
 
-  /** Cached leere Scene als Anzeige-Backing im Plan-Modus. */
+  /** Stellt die Annotation-Scene für einen Plan sicher. */
+  private _ensurePlanScene(planId: string): Scene {
+    let sc = this.planScenesById.get(planId);
+    if (!sc) {
+      sc = new Scene();
+      (sc as any)._drawingScaleRef = () => this.drawingScale;
+      this.planScenesById.set(planId, sc);
+    }
+    return sc;
+  }
+
+  /**
+   * Baut die Tracing-Pause-Layer für den aktiven Plan zusammen.
+   * Jeder andere Plan mit aktiver Transparentpause liefert seine
+   * Projektionen + Annotation-Scene als ein Layer.
+   */
+  private _syncPlanTracingLayers() {
+    if (!this.activePlanId) {
+      this.renderer.planTracingLayers = [];
+      return;
+    }
+    const layers: Renderer["planTracingLayers"] = [];
+    for (const plan of this.planManager.list()) {
+      if (plan.id === this.activePlanId) continue;
+      const state = this.planOverlayStore.get(plan.id);
+      if (!state || state.mode === "none") continue;
+      const annotationScene = this._ensurePlanScene(plan.id);
+      // Projektionen via PlanController-Hilfen + Annotation-Scene via Renderer-Pfad.
+      const drawCb = (offCtx: CanvasRenderingContext2D) => {
+        // 1) Projektionen dieses Plans zeichnen
+        for (const proj of plan.projections) {
+          const items = this.planController?.getItems(proj) ?? [];
+          // drawProjection nutzt Renderer-Camera (passt, da Plan-Kamera = Welt-m)
+          try {
+            // Lokal importieren würde Zirkular vermeiden — wir haben aber
+            // bereits die globale Funktion im PlanProjections-Modul.
+            // Wir rufen via dynamisch geladenem Symbol auf.
+            (require_drawProjection())(offCtx, this.camera, items, proj, false, false);
+          } catch { /* noop */ }
+        }
+        // 2) Annotation-Scene über bestehenden Renderer-Pfad.
+        // Wir swappen Renderer.scene + ctx temporär.
+        const r = this.renderer;
+        const realScene = (r as any).scene;
+        const realCtx = (r as any).ctx;
+        try {
+          (r as any).scene = annotationScene;
+          (r as any).ctx = offCtx;
+          (r as any)._drawByLabelOrder?.();
+        } finally {
+          (r as any).scene = realScene;
+          (r as any).ctx = realCtx;
+        }
+      };
+      layers.push({
+        drawCb,
+        mode: state.mode === "tint" ? "tint" : "stamp",
+        color: state.color,
+        opacity: state.opacity,
+      });
+    }
+    this.renderer.planTracingLayers = layers;
+  }
+
+  /** Cached leere Scene als Anzeige-Backing im Plan-Modus (legacy, ungenutzt). */
   private _planEmptyScene: Scene | null = null;
 
   /** Zentriert Kamera auf (0,0) und zoomt so, dass das Papier mit Rand passt. */
