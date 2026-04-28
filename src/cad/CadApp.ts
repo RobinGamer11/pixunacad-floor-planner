@@ -2307,6 +2307,12 @@ export class CadApp {
   /** Wechselt das aktive Blatt: Scene swappen, UI/Selektion zurücksetzen, Overlay neu binden. */
   setActiveSheetId(id: string) {
     if (!this.sheetManager.getById(id)) return;
+    // Falls wir gerade im Plan-Modus sind: zurück in den Zeichenmodus.
+    if (this.activePlanId) {
+      this.activePlanId = null;
+      this._applyPlanModeToRenderer();
+      this.refreshPlanUI();
+    }
     if (id === this.activeSheetId) {
       this.refreshSheetUI();
       return;
