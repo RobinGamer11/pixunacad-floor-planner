@@ -516,6 +516,14 @@ export class CadApp {
       // Druckpläne
       plans: this.planManager.toJSON(),
       activePlanId: this.activePlanId,
+      planScenesById: (() => {
+        const out: Record<string, any> = {};
+        for (const [id, sc] of this.planScenesById.entries()) {
+          out[id] = this._serializeOneScene(sc);
+        }
+        return out;
+      })(),
+      planOverlays: this.planOverlayStore.toJSON(),
     });
   }
 
