@@ -556,6 +556,22 @@ export class CadApp {
     }
     // PlanController-Cache invalidieren (Snapshot-Items neu flatten).
     this.planController?.invalidateCache();
+    // Plan-Annotation-Scenes wiederherstellen.
+    this._syncPlanSceneMap();
+    if (data.planScenesById && typeof data.planScenesById === "object") {
+      for (const planId of [...this.planScenesById.keys()]) {
+        const sc = this.planScenesById.get(planId)!;
+        this._restoreOneScene(sc, data.planScenesById[planId] || null);
+      }
+    } else {
+      // Keine Daten → alle Plan-Scenes leeren.
+      for (const sc of this.planScenesById.values()) {
+        this._restoreOneScene(sc, null);
+      }
+    }
+    if (data.planOverlays && typeof data.planOverlays === "object") {
+      this.planOverlayStore.restore(data.planOverlays);
+    }
     if (data.scenesById && typeof data.scenesById === "object") {
       // Map auf gültige Sheet-Liste reduzieren / ergänzen.
       const validIds = new Set(this.sheetManager.list().map(s => s.id));
