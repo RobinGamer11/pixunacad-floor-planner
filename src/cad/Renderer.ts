@@ -294,6 +294,59 @@ export class Renderer {
     }
   }
 
+  /**
+   * Rendert Plan-Tracing-Layer (andere Druckpläne als Transparentpause).
+   * Jeder Layer wird offscreen gezeichnet, optional eingefärbt und mit
+   * Opacity auf den Hauptcanvas blittet.
+   */
+  private _drawPlanTracingLayers() {
+    if (!this.planTracingLayers || this.planTracingLayers.length === 0) return;
+    const dpr = window.devicePixelRatio || 1;
+    const wPx = Math.floor(this.vw * dpr);
+    const hPx = Math.floor(this.vh * dpr);
+    if (wPx <= 0 || hPx <= 0) return;
+
+    if (!this._overlayCanvas) this._overlayCanvas = document.createElement("canvas");
+    const off = this._overlayCanvas;
+    if (off.width !== wPx) off.width = wPx;
+    if (off.height !== hPx) off.height = hPx;
+    const offCtx = off.getContext("2d");
+    if (!offCtx) return;
+
+    const realCtx = this.ctx;
+    try {
+      (this as any).ctx = offCtx;
+      for (const layer of this.planTracingLayers) {
+        if (!layer || !layer.drawCb) continue;
+        offCtx.setTransform(1, 0, 0, 1, 0, 0);
+        offCtx.clearRect(0, 0, wPx, hPx);
+        offCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        try { layer.drawCb(offCtx); } catch (e) { console.error("planTracing draw error:", e); }
+        if (layer.mode === "tint" && layer.color) {
+          const rgb = this._hexToRgb(layer.color);
+          offCtx.setTransform(1, 0, 0, 1, 0, 0);
+          try {
+            const img = offCtx.getImageData(0, 0, wPx, hPx);
+            const d = img.data;
+            for (let i = 0; i < d.length; i += 4) {
+              if (d[i + 3] === 0) continue;
+              d[i] = rgb.r; d[i + 1] = rgb.g; d[i + 2] = rgb.b;
+            }
+            offCtx.putImageData(img, 0, 0);
+          } catch { /* noop */ }
+          offCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        }
+        realCtx.save();
+        realCtx.setTransform(1, 0, 0, 1, 0, 0);
+        realCtx.globalAlpha = Math.max(0, Math.min(1, layer.opacity));
+        realCtx.drawImage(off, 0, 0);
+        realCtx.restore();
+      }
+    } finally {
+      (this as any).ctx = realCtx;
+    }
+  }
+
   private _hexToRgb(hex: string): { r: number; g: number; b: number } {
     const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || "");
     if (!m) return { r: 120, g: 120, b: 120 };
