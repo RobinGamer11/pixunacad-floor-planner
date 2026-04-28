@@ -2094,14 +2094,19 @@ export class CadApp {
   ) {
     this.planPanel = new PlanPanel(
       this.planManager,
+      this.planOverlayStore,
       root, body, list, addBtn, printBtn, toggleBtn,
       {
         getActivePlanId: () => this.activePlanId,
         setActivePlanId: (id: string | null) => this.setActivePlanId(id),
         printSelected: () => this.printSelectedPlans(),
         onChange: () => {
+          // Verwaiste Plan-Scenes/Overlays aufräumen.
+          this._syncPlanSceneMap();
           // Falls Format des aktiven Plans geändert wurde → Renderer aktualisieren.
           if (this.activePlanId) this._applyPlanModeToRenderer();
+          // Tracing-Layer (andere Pläne) neu aufbauen.
+          this._syncPlanTracingLayers();
           this.refreshPlanUI();
           // Snapshot, damit Plan-Änderungen in Undo/Redo landen.
           this._lastSnapshot = this._serializeScene();
