@@ -25,6 +25,7 @@ import { SheetManager, SheetOverlayStore, SheetDefaults } from "./SheetManager";
 import { PlanManager, getPlanPaperSize } from "./PlanManager";
 import { PlanPanel } from "./PlanPanel";
 import { PlanController } from "./PlanController";
+import { drawProjection as drawPlanProjection } from "./PlanProjections";
 import { SheetPanel } from "./SheetPanel";
 
 export interface TextSettingsRefs {
