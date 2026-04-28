@@ -2207,12 +2207,8 @@ export class CadApp {
         // 1) Projektionen dieses Plans zeichnen
         for (const proj of plan.projections) {
           const items = this.planController?.getItems(proj) ?? [];
-          // drawProjection nutzt Renderer-Camera (passt, da Plan-Kamera = Welt-m)
           try {
-            // Lokal importieren würde Zirkular vermeiden — wir haben aber
-            // bereits die globale Funktion im PlanProjections-Modul.
-            // Wir rufen via dynamisch geladenem Symbol auf.
-            (require_drawProjection())(offCtx, this.camera, items, proj, false, false);
+            drawPlanProjection(offCtx, this.camera, items, proj, false, false);
           } catch { /* noop */ }
         }
         // 2) Annotation-Scene über bestehenden Renderer-Pfad.
