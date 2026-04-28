@@ -150,6 +150,8 @@ export class Renderer {
       ctx.fillRect(0, 0, this.vw, this.vh);
       ctx.restore();
       this._drawPlanPaper();
+      // Tracing-Pause anderer Druckpläne (unter aktiver Plan-Geometrie).
+      this._drawPlanTracingLayers();
       // Plan-Projektionen (Step 4) — gezeichnet vom PlanController via Hook.
       if (this.planOverlayDraw) {
         try { this.planOverlayDraw(ctx); } catch (e) { console.error("planOverlayDraw error:", e); }
