@@ -2019,8 +2019,17 @@ export class CadApp {
       this.input.update(this.camera);
 
       if (this.activePlanId) {
-        // Plan-Modus: Eingaben gehen an PlanController; Werkzeuge ruhen.
-        this.planController?.update();
+        // Plan-Modus: PlanController bekommt Vorrang (Selektion / Drag / HUB),
+        // Werkzeuge bleiben aber zusätzlich nutzbar (Annotation auf dem Plan).
+        const planConsumed = this.planController?.update() ?? false;
+        if (!planConsumed) {
+          if (this.pastePreviewActive) {
+            this.canvas.style.cursor = "copy";
+            if (this.input.clicked) this._commitPasteAtMouse();
+          } else {
+            this.activeTool.update(this.input);
+          }
+        }
       } else if (this.pastePreviewActive) {
         this.canvas.style.cursor = "copy";
         if (this.input.clicked) this._commitPasteAtMouse();
