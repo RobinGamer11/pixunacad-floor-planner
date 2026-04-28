@@ -139,22 +139,26 @@ export class PlanController {
     }
   }
 
-  /** Update jedes Frames (nur im Plan-Modus aufrufen). */
-  update() {
+  /**
+   * Update jedes Frames (nur im Plan-Modus aufrufen).
+   * Returns true, wenn der Controller die Eingabe verbraucht hat
+   * (Werkzeuge sollen dann diesen Frame nicht laufen).
+   */
+  update(): boolean {
     const plan = this._activePlan();
     if (!plan) {
       this._hideHub();
-      return;
+      return false;
     }
     const input = this.app.input;
     const sx = input.mouse.sx;
     const sy = input.mouse.sy;
 
-    // Drag fortsetzen
+    // Drag fortsetzen → konsumiert Eingabe komplett.
     if (this._drag) {
       this._continueDrag(sx, sy);
       if (!input.mouse.left) this._endDrag();
-      return;
+      return true;
     }
 
     // Hover berechnen
@@ -180,21 +184,24 @@ export class PlanController {
     this.hoverProjectionId = hoverId;
     this.hoverHandle = hoverHandle;
 
-    // Cursor
-    if (hoverHandle === "body") this.app.canvas.style.cursor = "move";
-    else if (hoverHandle === "edge-left" || hoverHandle === "edge-right") this.app.canvas.style.cursor = "ew-resize";
-    else if (hoverHandle === "edge-top" || hoverHandle === "edge-bottom") this.app.canvas.style.cursor = "ns-resize";
-    else this.app.canvas.style.cursor = "";
+    // Cursor nur setzen, wenn wir tatsächlich etwas treffen — sonst soll
+    // das aktive Werkzeug seinen Cursor bestimmen können.
+    let consumed = false;
+    if (hoverHandle === "body") { this.app.canvas.style.cursor = "move"; consumed = true; }
+    else if (hoverHandle === "edge-left" || hoverHandle === "edge-right") { this.app.canvas.style.cursor = "ew-resize"; consumed = true; }
+    else if (hoverHandle === "edge-top" || hoverHandle === "edge-bottom") { this.app.canvas.style.cursor = "ns-resize"; consumed = true; }
 
-    // Klick
+    // Klick: nur konsumieren, wenn wir etwas treffen.
     if (input.clicked) {
       if (hoverId && hoverHandle) {
         this.selectedProjectionId = hoverId;
         const proj = plan.projections.find(p => p.id === hoverId)!;
         this._beginDrag(hoverHandle, proj, sx, sy);
         this._showHub();
-      } else {
-        // Klick ins Leere → deselektieren
+        consumed = true;
+      } else if (this.selectedProjectionId) {
+        // Klick ins Leere bei aktiver Selektion → deselektieren,
+        // Klick aber NICHT konsumieren (Werkzeug darf reagieren).
         this.selectedProjectionId = null;
         this._hideHub();
       }
@@ -202,6 +209,7 @@ export class PlanController {
 
     // HUB-Position aktualisieren
     if (this.selectedProjectionId) this._positionHub();
+    return consumed;
   }
 
   private _beginDrag(
