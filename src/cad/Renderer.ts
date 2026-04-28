@@ -65,6 +65,20 @@ export class Renderer {
   /** Hook: wird im Plan-Modus NACH dem Papier gezeichnet (Projektionen). */
   planOverlayDraw: ((ctx: CanvasRenderingContext2D) => void) | null = null;
 
+  /**
+   * Plan-Tracing-Layer (Transparentpause zwischen Druckplänen).
+   * Jeder Layer hat eine drawCb, die im Bildschirm-Pixelraum auf den
+   * gegebenen ctx zeichnet (typischerweise Projektionen + Annotation-Scene
+   * eines anderen Plans). Wird im Plan-Modus zwischen Papier und aktiver
+   * Plan-Geometrie blittet (mit Tint + Opacity, wie Sheet-Overlays).
+   */
+  planTracingLayers: {
+    drawCb: (ctx: CanvasRenderingContext2D) => void;
+    mode: "stamp" | "tint";
+    color: string | null;
+    opacity: number;
+  }[] = [];
+
   constructor(ctx: CanvasRenderingContext2D, camera: Camera, scene: Scene, labels: LabelManager) {
     this.ctx = ctx;
     this.camera = camera;
