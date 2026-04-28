@@ -339,6 +339,27 @@ export class PlanPanel {
       const actions = document.createElement("div");
       actions.className = "plan-actions";
 
+      // Transparentpause-Button (analog Sheet-Panel)
+      const overlayState = this.overlayStore.get(plan.id);
+      const visBtn = document.createElement("button");
+      visBtn.className = "plan-icon-btn icon-only";
+      visBtn.title = "Transparentpause";
+      visBtn.innerHTML = `
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 3l18 18"/>
+          <path d="M10.58 10.58a2 2 0 102.83 2.83"/>
+          <path d="M9.88 5.09A10.94 10.94 0 0112 4.91c5.52 0 9.27 4.5 10 5.48a1 1 0 010 1.22 17.47 17.47 0 01-4.09 3.98"/>
+          <path d="M6.61 6.61A17.32 17.32 0 002 11.39a1 1 0 000 1.22c.73.98 4.48 5.48 10 5.48 1.53 0 2.96-.35 4.25-.92"/>
+        </svg>
+      `;
+      if (overlayState.mode !== OverlayMode.NONE || this.expandedVisibilityPlanId === plan.id) {
+        visBtn.classList.add("active");
+      }
+      visBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this._toggleVisibility(plan.id);
+      });
+
       const editBtn = document.createElement("button");
       editBtn.className = "plan-icon-btn icon-only";
       editBtn.title = "Umbenennen";
@@ -359,10 +380,12 @@ export class PlanPanel {
         e.stopPropagation();
         if (!confirm(`Plan "${plan.name}" wirklich löschen?`)) return;
         this.manager.deletePlan(plan.id);
+        this.overlayStore.delete(plan.id);
         if (activeId === plan.id) this.cb.setActivePlanId(null);
         this.cb.onChange();
       });
 
+      actions.appendChild(visBtn);
       actions.appendChild(editBtn);
       actions.appendChild(deleteBtn);
 
@@ -370,6 +393,63 @@ export class PlanPanel {
       row.appendChild(main);
       row.appendChild(actions);
       item.appendChild(row);
+
+      // Visibility-Panel (Farben + Opacity-Slider) wenn aufgeklappt
+      if (this.expandedVisibilityPlanId === plan.id) {
+        const vis = document.createElement("div");
+        vis.className = "sheet-visibility-panel";
+
+        const colors = document.createElement("div");
+        colors.className = "sheet-visibility-colors";
+
+        const gradientSw = document.createElement("button");
+        gradientSw.className = "sheet-swatch gradient";
+        gradientSw.title = "Originalfarben";
+        if (overlayState.mode === OverlayMode.STAMP) gradientSw.classList.add("active");
+        gradientSw.addEventListener("click", (e) => {
+          e.stopPropagation();
+          this.overlayStore.setStamp(plan.id);
+          this.cb.onChange();
+        });
+        colors.appendChild(gradientSw);
+
+        for (const col of OverlayColors) {
+          const sw = document.createElement("button");
+          sw.className = "sheet-swatch";
+          sw.style.background = col.hex;
+          if (overlayState.mode === OverlayMode.TINT && overlayState.color === col.hex) sw.classList.add("active");
+          sw.addEventListener("click", (e) => {
+            e.stopPropagation();
+            this.overlayStore.setTint(plan.id, col.hex);
+            this.cb.onChange();
+          });
+          colors.appendChild(sw);
+        }
+        vis.appendChild(colors);
+
+        const opacityWrap = document.createElement("div");
+        opacityWrap.className = "sheet-opacity-wrap";
+        const label = document.createElement("div");
+        label.className = "sheet-opacity-label";
+        label.textContent = "Transparenz";
+        const slider = document.createElement("input");
+        slider.className = "sheet-opacity-slider";
+        slider.type = "range";
+        slider.min = "0";
+        slider.max = "100";
+        slider.step = "1";
+        slider.value = String(Math.round((overlayState.opacity ?? 0.72) * 100));
+        slider.addEventListener("input", (e) => {
+          const val = Number((e.target as HTMLInputElement).value) / 100;
+          this.overlayStore.setOpacity(plan.id, val);
+          this.cb.onChange();
+        });
+        opacityWrap.appendChild(label);
+        opacityWrap.appendChild(slider);
+        vis.appendChild(opacityWrap);
+
+        item.appendChild(vis);
+      }
 
       this.listEl.appendChild(item);
       this.listEl.appendChild(makeIndicator(index + 1));
