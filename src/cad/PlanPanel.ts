@@ -1,10 +1,11 @@
 import { PlanManager, PaperFormats, PlanDefaults, getPlanPaperSize, type Plan } from "./PlanManager";
+import { SheetOverlayStore, OverlayMode, OverlayColors } from "./SheetManager";
 
 /**
  * Floating-Panel für Druckpläne.
  * - "+ Plan" → Format-Auswahldialog (A5..A0 / Frei BxL, Hoch-/Querformat)
- * - "PDF Drucken" → Sammelexport ausgewählter Pläne (Stub bis Step 5)
- * - Zeile pro Plan: Checkbox · Name · Format · ⋯ Aktionen
+ * - "PDF Drucken" → Sammelexport ausgewählter Pläne
+ * - Zeile pro Plan: Checkbox · Name · Format · Transparentpause · ⋯ Aktionen
  */
 export interface PlanPanelCallbacks {
   getActivePlanId: () => string | null;
@@ -24,17 +25,20 @@ export class PlanPanel {
   toggleBtn: HTMLButtonElement;
 
   manager: PlanManager;
+  overlayStore: SheetOverlayStore;
   cb: PlanPanelCallbacks;
 
   isCollapsed = false;
   draggingId: string | null = null;
   dropIndex: number | null = null;
+  expandedVisibilityPlanId: string | null = null;
 
   /** DOM-Element des Format-Dialogs (lazy). */
   private _formatDialog: HTMLDivElement | null = null;
 
   constructor(
     manager: PlanManager,
+    overlayStore: SheetOverlayStore,
     root: HTMLDivElement,
     bodyEl: HTMLDivElement,
     listEl: HTMLDivElement,
@@ -44,6 +48,7 @@ export class PlanPanel {
     cb: PlanPanelCallbacks,
   ) {
     this.manager = manager;
+    this.overlayStore = overlayStore;
     this.root = root;
     this.bodyEl = bodyEl;
     this.listEl = listEl;
@@ -59,6 +64,17 @@ export class PlanPanel {
     this.listEl.addEventListener("drop", (e) => this._onDrop(e));
     this.listEl.addEventListener("dragleave", (e) => this._onDragLeave(e));
     this.listEl.addEventListener("dragend", () => this._onDragEnd());
+  }
+
+  private _toggleVisibility(planId: string) {
+    const state = this.overlayStore.get(planId);
+    if (this.expandedVisibilityPlanId === planId || state.mode !== OverlayMode.NONE) {
+      this.expandedVisibilityPlanId = null;
+      this.overlayStore.setNone(planId);
+    } else {
+      this.expandedVisibilityPlanId = planId;
+    }
+    this.cb.onChange();
   }
 
   private _toggleCollapse() {
