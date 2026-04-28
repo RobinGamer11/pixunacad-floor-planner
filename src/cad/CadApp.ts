@@ -2173,11 +2173,32 @@ export class CadApp {
     this.camera.center(rect);
   }
 
-  /** Stub: Sammel-PDF-Druck — wird in Step 5 implementiert. */
-  printSelectedPlans() {
+  /** Sammel-PDF-Druck via pdf-lib (Multi-Page). */
+  async printSelectedPlans() {
     const sel = this.planManager.getSelected();
-    console.log("[printSelectedPlans] Auswahl:", sel.map(p => p.name));
-    alert(`PDF-Druck (Step 5): ${sel.length} Plan/Pläne ausgewählt:\n` + sel.map(p => `• ${p.name}`).join("\n"));
+    if (sel.length === 0) {
+      alert("Bitte mindestens einen Plan auswählen (Häkchen rechts neben dem Plannamen).");
+      return;
+    }
+    try {
+      const { exportPlansToPdf, downloadPdfBytes } = await import("./PlanPdfExport");
+      const resolveSheet = (sheetId: string): unknown | null => {
+        const sc = this.scenesById.get(sheetId);
+        if (!sc) return null;
+        return this._serializeOneScene(sc);
+      };
+      const bytes = await exportPlansToPdf(sel, resolveSheet);
+      const ts = new Date();
+      const pad = (n: number) => String(n).padStart(2, "0");
+      const stamp = `${ts.getFullYear()}${pad(ts.getMonth() + 1)}${pad(ts.getDate())}_${pad(ts.getHours())}${pad(ts.getMinutes())}`;
+      const fname = sel.length === 1
+        ? `${sel[0].name.replace(/[^\w\-]+/g, "_")}_${stamp}.pdf`
+        : `Druckplaene_${stamp}.pdf`;
+      downloadPdfBytes(bytes, fname);
+    } catch (err) {
+      console.error("[printSelectedPlans] PDF-Export fehlgeschlagen:", err);
+      alert("PDF-Export fehlgeschlagen. Details in der Browser-Konsole.");
+    }
   }
 
 
