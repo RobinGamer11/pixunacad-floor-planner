@@ -25,6 +25,7 @@ import { SheetManager, SheetOverlayStore, SheetDefaults } from "./SheetManager";
 import { PlanManager, getPlanPaperSize } from "./PlanManager";
 import { PlanPanel } from "./PlanPanel";
 import { PlanController } from "./PlanController";
+import { drawProjection as drawPlanProjection } from "./PlanProjections";
 import { SheetPanel } from "./SheetPanel";
 
 export interface TextSettingsRefs {
@@ -220,6 +221,10 @@ export class CadApp {
   activePlanId: string | null = null;
   /** Plan-Modus Controller (Drop / Selektion / Drag / HUB). */
   planController: PlanController | null = null;
+  /** Map: planId → eigene Annotation-Scene (Werkzeuge zeichnen darauf im Plan-Modus). */
+  planScenesById: Map<string, Scene> = new Map();
+  /** Transparentpause-States pro Plan (analog SheetOverlayStore). */
+  planOverlayStore: SheetOverlayStore = new SheetOverlayStore();
 
   selection: Selection | null = null;
   selectedLabelId: string | null = null;
@@ -511,6 +516,14 @@ export class CadApp {
       // Druckpläne
       plans: this.planManager.toJSON(),
       activePlanId: this.activePlanId,
+      planScenesById: (() => {
+        const out: Record<string, any> = {};
+        for (const [id, sc] of this.planScenesById.entries()) {
+          out[id] = this._serializeOneScene(sc);
+        }
+        return out;
+      })(),
+      planOverlays: this.planOverlayStore.toJSON(),
     });
   }
 
@@ -543,6 +556,22 @@ export class CadApp {
     }
     // PlanController-Cache invalidieren (Snapshot-Items neu flatten).
     this.planController?.invalidateCache();
+    // Plan-Annotation-Scenes wiederherstellen.
+    this._syncPlanSceneMap();
+    if (data.planScenesById && typeof data.planScenesById === "object") {
+      for (const planId of [...this.planScenesById.keys()]) {
+        const sc = this.planScenesById.get(planId)!;
+        this._restoreOneScene(sc, data.planScenesById[planId] || null);
+      }
+    } else {
+      // Keine Daten → alle Plan-Scenes leeren.
+      for (const sc of this.planScenesById.values()) {
+        this._restoreOneScene(sc, null);
+      }
+    }
+    if (data.planOverlays && typeof data.planOverlays === "object") {
+      this.planOverlayStore.restore(data.planOverlays);
+    }
     if (data.scenesById && typeof data.scenesById === "object") {
       // Map auf gültige Sheet-Liste reduzieren / ergänzen.
       const validIds = new Set(this.sheetManager.list().map(s => s.id));
@@ -2015,8 +2044,17 @@ export class CadApp {
       this.input.update(this.camera);
 
       if (this.activePlanId) {
-        // Plan-Modus: Eingaben gehen an PlanController; Werkzeuge ruhen.
-        this.planController?.update();
+        // Plan-Modus: PlanController bekommt Vorrang (Selektion / Drag / HUB),
+        // Werkzeuge bleiben aber zusätzlich nutzbar (Annotation auf dem Plan).
+        const planConsumed = this.planController?.update() ?? false;
+        if (!planConsumed) {
+          if (this.pastePreviewActive) {
+            this.canvas.style.cursor = "copy";
+            if (this.input.clicked) this._commitPasteAtMouse();
+          } else {
+            this.activeTool.update(this.input);
+          }
+        }
       } else if (this.pastePreviewActive) {
         this.canvas.style.cursor = "copy";
         if (this.input.clicked) this._commitPasteAtMouse();
@@ -2080,14 +2118,19 @@ export class CadApp {
   ) {
     this.planPanel = new PlanPanel(
       this.planManager,
+      this.planOverlayStore,
       root, body, list, addBtn, printBtn, toggleBtn,
       {
         getActivePlanId: () => this.activePlanId,
         setActivePlanId: (id: string | null) => this.setActivePlanId(id),
         printSelected: () => this.printSelectedPlans(),
         onChange: () => {
+          // Verwaiste Plan-Scenes/Overlays aufräumen.
+          this._syncPlanSceneMap();
           // Falls Format des aktiven Plans geändert wurde → Renderer aktualisieren.
           if (this.activePlanId) this._applyPlanModeToRenderer();
+          // Tracing-Layer (andere Pläne) neu aufbauen.
+          this._syncPlanTracingLayers();
           this.refreshPlanUI();
           // Snapshot, damit Plan-Änderungen in Undo/Redo landen.
           this._lastSnapshot = this._serializeScene();
@@ -2116,20 +2159,22 @@ export class CadApp {
       if (plan) {
         const size = getPlanPaperSize(plan);
         this.renderer.planMode = { widthMm: size.width, heightMm: size.height };
-        // Im Plan-Modus keine Zeichnungs-Geometrie anzeigen — leere Scene anzeigen.
-        if (!this._planEmptyScene) {
-          this._planEmptyScene = new Scene();
-          (this._planEmptyScene as any)._drawingScaleRef = () => this.drawingScale;
-        }
-        (this.renderer as any).scene = this._planEmptyScene;
-        // Selection / Hover zurücksetzen, damit nichts vom Sheet rüberblutet.
+        // Annotation-Scene des Plans als aktive Scene swappen, damit Werkzeuge
+        // direkt auf dem Plan zeichnen können.
+        const planScene = this._ensurePlanScene(this.activePlanId);
+        this.scene = planScene;
+        (this.renderer as any).scene = planScene;
+        this.topology.scene = planScene;
+        // Selection / Hover zurücksetzen.
         this.selection = null;
         this.renderer.setSelection(null);
         this.renderer.setHoverSegmentId(null);
         this.renderer.setHoverHatchId(null);
         this.renderer.setHoverTextBoxId(null);
-        // Overlay-Sheets im Plan-Modus deaktivieren.
+        // Sheet-Overlays im Plan-Modus aus (Sheets gehören nicht auf Pläne).
         this.renderer.overlayScenes = [];
+        // Plan-Tracing (andere Pläne als Transparentpause) berechnen.
+        this._syncPlanTracingLayers();
         // Tools/HUDs sauber beenden.
         try { (this.activeTool as any)?.cancel?.(); } catch { /* noop */ }
         try { (this.activeTool as any)?.reset?.(); } catch { /* noop */ }
@@ -2140,9 +2185,12 @@ export class CadApp {
       }
     } else {
       this.renderer.planMode = null;
+      this.renderer.planTracingLayers = [];
       // Aktive Sheet-Scene wiederherstellen.
       const activeScene = this.scenesById.get(this.activeSheetId) || this.scene;
+      this.scene = activeScene;
       (this.renderer as any).scene = activeScene;
+      this.topology.scene = activeScene;
       // Overlay-Sheets wiederherstellen.
       this._syncOverlayScenes();
       // Plan-Controller-State zurücksetzen (HUB ausblenden).
@@ -2156,7 +2204,67 @@ export class CadApp {
     }
   }
 
-  /** Cached leere Scene als Anzeige-Backing im Plan-Modus. */
+  /** Stellt die Annotation-Scene für einen Plan sicher. */
+  private _ensurePlanScene(planId: string): Scene {
+    let sc = this.planScenesById.get(planId);
+    if (!sc) {
+      sc = new Scene();
+      (sc as any)._drawingScaleRef = () => this.drawingScale;
+      this.planScenesById.set(planId, sc);
+    }
+    return sc;
+  }
+
+  /**
+   * Baut die Tracing-Pause-Layer für den aktiven Plan zusammen.
+   * Jeder andere Plan mit aktiver Transparentpause liefert seine
+   * Projektionen + Annotation-Scene als ein Layer.
+   */
+  private _syncPlanTracingLayers() {
+    if (!this.activePlanId) {
+      this.renderer.planTracingLayers = [];
+      return;
+    }
+    const layers: Renderer["planTracingLayers"] = [];
+    for (const plan of this.planManager.list()) {
+      if (plan.id === this.activePlanId) continue;
+      const state = this.planOverlayStore.get(plan.id);
+      if (!state || state.mode === "none") continue;
+      const annotationScene = this._ensurePlanScene(plan.id);
+      // Projektionen via PlanController-Hilfen + Annotation-Scene via Renderer-Pfad.
+      const drawCb = (offCtx: CanvasRenderingContext2D) => {
+        // 1) Projektionen dieses Plans zeichnen
+        for (const proj of plan.projections) {
+          const items = this.planController?.getItems(proj) ?? [];
+          try {
+            drawPlanProjection(offCtx, this.camera, items, proj, false, false);
+          } catch { /* noop */ }
+        }
+        // 2) Annotation-Scene über bestehenden Renderer-Pfad.
+        // Wir swappen Renderer.scene + ctx temporär.
+        const r = this.renderer;
+        const realScene = (r as any).scene;
+        const realCtx = (r as any).ctx;
+        try {
+          (r as any).scene = annotationScene;
+          (r as any).ctx = offCtx;
+          (r as any)._drawByLabelOrder?.();
+        } finally {
+          (r as any).scene = realScene;
+          (r as any).ctx = realCtx;
+        }
+      };
+      layers.push({
+        drawCb,
+        mode: state.mode === "tint" ? "tint" : "stamp",
+        color: state.color,
+        opacity: state.opacity,
+      });
+    }
+    this.renderer.planTracingLayers = layers;
+  }
+
+  /** Cached leere Scene als Anzeige-Backing im Plan-Modus (legacy, ungenutzt). */
   private _planEmptyScene: Scene | null = null;
 
   /** Zentriert Kamera auf (0,0) und zoomt so, dass das Papier mit Rand passt. */
@@ -2201,6 +2309,23 @@ export class CadApp {
     }
   }
 
+  /** Stellt sicher, dass für jeden Plan eine Annotation-Scene existiert; entfernt verwaiste. */
+  private _syncPlanSceneMap() {
+    const validIds = new Set(this.planManager.list().map(p => p.id));
+    for (const id of validIds) {
+      if (!this.planScenesById.has(id)) {
+        const sc = new Scene();
+        (sc as any)._drawingScaleRef = () => this.drawingScale;
+        this.planScenesById.set(id, sc);
+      }
+    }
+    for (const id of [...this.planScenesById.keys()]) {
+      if (!validIds.has(id)) {
+        this.planScenesById.delete(id);
+        this.planOverlayStore.delete(id);
+      }
+    }
+  }
 
   /** Stellt sicher, dass für jedes Blatt eine Scene existiert; entfernt verwaiste Scenes. */
   private _syncSheetSceneMap() {
@@ -2228,6 +2353,12 @@ export class CadApp {
   /** Wechselt das aktive Blatt: Scene swappen, UI/Selektion zurücksetzen, Overlay neu binden. */
   setActiveSheetId(id: string) {
     if (!this.sheetManager.getById(id)) return;
+    // Falls wir gerade im Plan-Modus sind: zurück in den Zeichenmodus.
+    if (this.activePlanId) {
+      this.activePlanId = null;
+      this._applyPlanModeToRenderer();
+      this.refreshPlanUI();
+    }
     if (id === this.activeSheetId) {
       this.refreshSheetUI();
       return;
