@@ -220,6 +220,10 @@ export class CadApp {
   activePlanId: string | null = null;
   /** Plan-Modus Controller (Drop / Selektion / Drag / HUB). */
   planController: PlanController | null = null;
+  /** Map: planId → eigene Annotation-Scene (Werkzeuge zeichnen darauf im Plan-Modus). */
+  planScenesById: Map<string, Scene> = new Map();
+  /** Transparentpause-States pro Plan (analog SheetOverlayStore). */
+  planOverlayStore: SheetOverlayStore = new SheetOverlayStore();
 
   selection: Selection | null = null;
   selectedLabelId: string | null = null;
