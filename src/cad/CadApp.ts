@@ -2285,6 +2285,23 @@ export class CadApp {
     }
   }
 
+  /** Stellt sicher, dass für jeden Plan eine Annotation-Scene existiert; entfernt verwaiste. */
+  private _syncPlanSceneMap() {
+    const validIds = new Set(this.planManager.list().map(p => p.id));
+    for (const id of validIds) {
+      if (!this.planScenesById.has(id)) {
+        const sc = new Scene();
+        (sc as any)._drawingScaleRef = () => this.drawingScale;
+        this.planScenesById.set(id, sc);
+      }
+    }
+    for (const id of [...this.planScenesById.keys()]) {
+      if (!validIds.has(id)) {
+        this.planScenesById.delete(id);
+        this.planOverlayStore.delete(id);
+      }
+    }
+  }
 
   /** Stellt sicher, dass für jedes Blatt eine Scene existiert; entfernt verwaiste Scenes. */
   private _syncSheetSceneMap() {
