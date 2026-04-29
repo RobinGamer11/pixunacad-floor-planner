@@ -915,7 +915,7 @@ export class Renderer {
     const cam = this.camera;
     const a = cam.worldToScreen(seg.a.x, seg.a.y);
     const b = cam.worldToScreen(seg.b.x, seg.b.y);
-    const segScreenThickness = Math.max(0.5, seg.thicknessM * cam.scale);
+    const segScreenThickness = this._segStrokePx(seg.thicknessM);
 
     ctx.save();
     ctx.strokeStyle = "rgba(77,163,255,0.95)";
