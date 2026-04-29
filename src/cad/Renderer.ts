@@ -556,7 +556,7 @@ export class Renderer {
         const b = cam.worldToScreen(it.b.x, it.b.y);
         ctx.save();
         ctx.strokeStyle = it.color || Defaults.lineColor;
-        ctx.lineWidth = Math.max(0.5, (it.thicknessM || Defaults.lineThicknessM) * cam.scale);
+        ctx.lineWidth = this._segStrokePx(it.thicknessM || Defaults.lineThicknessM);
         ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
         ctx.restore();
       } else if (it.kind === "hatch") {
