@@ -1047,7 +1047,7 @@ export class Renderer {
 
     // Text + background — proportional to dimension via reference scale
     const text = g.text || "";
-    const zoomFactor = cam.scale / Defaults.measureReferenceScalePxPerM;
+    const zoomFactor = cam.scale / this.referencePxPerM;
     const baseSize = dim.textSizePx || Defaults.measureTextSizePx;
     const fontPx = Math.max(1, baseSize * zoomFactor);
 
