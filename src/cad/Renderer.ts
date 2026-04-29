@@ -122,7 +122,7 @@ export class Renderer {
 
   private _scaledStrokePx(storedWidth: number): number {
     const baseWidth = Math.max(0, storedWidth || 0);
-    return baseWidth * (this.camera.scale / Defaults.strokeWidthBaseScale);
+    return baseWidth * (this.camera.scale / this.referencePxPerM);
   }
 
   /** Cache: docId -> HTMLImageElement (lazy-load aus DataURL). */
