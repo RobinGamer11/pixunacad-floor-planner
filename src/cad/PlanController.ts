@@ -279,23 +279,37 @@ export class PlanController {
     this.app.commitHistorySnapshot();
   }
 
-  /* ---------- HUB ---------- */
+  /* ---------- HUB (im Stil von cad-point-menu) ---------- */
+  /** Bevorzugte Bildschirm-Position für das HUB (z. B. innerer Snap-Punkt). */
+  private _hubAnchorScreen: { x: number; y: number } | null = null;
+
   private _ensureHub() {
     if (this._hubEl) return this._hubEl;
     const el = document.createElement("div");
-    el.className = "plan-projection-hub";
+    // Gleiche Klasse wie das Punkt-Bearbeitungs-HUB, plus Wrapper für Skala-Zeile.
+    el.className = "cad-point-menu plan-projection-hub";
+    el.style.position = "fixed";
+    el.style.zIndex = "60";
+    el.style.flexDirection = "column";
+    el.style.alignItems = "stretch";
+    el.style.gap = "4px";
     el.innerHTML = `
-      <button data-act="rot-l" title="-15°">⟲</button>
-      <button data-act="rot-r" title="+15°">⟳</button>
-      <span class="plan-hub-sep"></span>
-      <label>Maßstab 1:</label>
-      <input type="number" data-field="scale" min="1" step="1" />
-      <span class="plan-hub-sep"></span>
-      <button data-act="reset-clip" title="Clip zurücksetzen">⤢</button>
-      <button data-act="delete" title="Löschen" class="plan-hub-danger">🗑</button>
+      <div style="display:flex;gap:4px;align-items:center;">
+        <button data-act="move" title="Bewegen">◉</button>
+        <button data-act="translate" title="Verschieben">✥</button>
+        <button data-act="rot-l" title="-15°">⟲</button>
+        <button data-act="rot-r" title="+15°">⟳</button>
+        <button data-act="reset-clip" title="Clip zurücksetzen">⤢</button>
+        <button data-act="delete" title="Löschen">🗑</button>
+      </div>
+      <div style="display:flex;gap:4px;align-items:center;font-size:11px;color:hsl(var(--cad-toolbar-foreground));padding:0 2px;">
+        <span>1:</span>
+        <input type="number" data-field="scale" min="1" step="1" style="width:64px;height:22px;border-radius:4px;border:1px solid hsl(var(--cad-hub-border));background:hsl(var(--background));color:inherit;padding:0 4px;font-size:11px;" />
+      </div>
     `;
     document.body.appendChild(el);
 
+    el.addEventListener("mousedown", (e) => e.stopPropagation());
     el.addEventListener("click", (e) => {
       const target = e.target as HTMLElement;
       const act = target.closest("[data-act]")?.getAttribute("data-act");
@@ -303,7 +317,12 @@ export class PlanController {
       e.stopPropagation();
       const proj = this._currentProj();
       if (!proj) return;
-      if (act === "rot-l") proj.rotation -= Math.PI / 12;
+      if (act === "move" || act === "translate") {
+        // Initiiere Drag-Move unter Maus.
+        const sx = this.app.input.mouse.sx;
+        const sy = this.app.input.mouse.sy;
+        this._beginDrag("body", proj, sx, sy);
+      } else if (act === "rot-l") proj.rotation -= Math.PI / 12;
       else if (act === "rot-r") proj.rotation += Math.PI / 12;
       else if (act === "reset-clip") proj.clip = { left: 0, right: 0, top: 0, bottom: 0 };
       else if (act === "delete") {
@@ -339,9 +358,10 @@ export class PlanController {
     return plan.projections.find(p => p.id === this.selectedProjectionId) || null;
   }
 
-  private _showHub() {
+  private _showHub(anchorScreen?: { x: number; y: number }) {
     const el = this._ensureHub();
     el.style.display = "flex";
+    this._hubAnchorScreen = anchorScreen || null;
     const proj = this._currentProj();
     if (proj) {
       const input = el.querySelector('input[data-field="scale"]') as HTMLInputElement | null;
@@ -352,26 +372,34 @@ export class PlanController {
 
   private _hideHub() {
     if (this._hubEl) this._hubEl.style.display = "none";
+    this._hubAnchorScreen = null;
   }
 
   private _positionHub() {
     if (!this._hubEl) return;
     const proj = this._currentProj();
     if (!proj) { this._hideHub(); return; }
-    const cam = this.app.camera;
-    const layout = computeProjectionLayout(this.getItems(proj), proj);
-    const cs = cam.worldToScreen(layout.centerPlanM.x, layout.centerPlanM.y);
-    const mmToPx = (mm: number) => (mm / 1000) * cam.scale;
-    // Oberkante des (rotierten) Clip-Rechtecks → Mittelpunkt
-    const top = mmToPx(layout.clipLocalMm.top);
-    // Punkt im rotierten Frame: (0, top), zurückrotieren in canvas-frame
-    const cosA = Math.cos(proj.rotation);
-    const sinA = Math.sin(proj.rotation);
-    const offX = -sinA * top;
-    const offY = cosA * top;
     const rect = this.app.canvas.getBoundingClientRect();
-    const x = rect.left + cs.x + offX;
-    const y = rect.top + cs.y + offY - 44; // 44 px über Oberkante
+    let x: number, y: number;
+    if (this._hubAnchorScreen) {
+      x = rect.left + this._hubAnchorScreen.x + 12;
+      y = rect.top + this._hubAnchorScreen.y - 60;
+    } else {
+      const cam = this.app.camera;
+      const layout = computeProjectionLayout(this.getItems(proj), proj);
+      const cs = cam.worldToScreen(layout.centerPlanM.x, layout.centerPlanM.y);
+      const mmToPx = (mm: number) => (mm / 1000) * cam.scale;
+      const top = mmToPx(layout.clipLocalMm.top);
+      const cosA = Math.cos(proj.rotation);
+      const sinA = Math.sin(proj.rotation);
+      const offX = -sinA * top;
+      const offY = cosA * top;
+      x = rect.left + cs.x + offX;
+      y = rect.top + cs.y + offY - 60;
+    }
+    // Clampen ans Viewport.
+    x = Math.max(8, Math.min(window.innerWidth - 240, x));
+    y = Math.max(8, Math.min(window.innerHeight - 80, y));
     this._hubEl.style.left = `${x}px`;
     this._hubEl.style.top = `${y}px`;
   }
