@@ -125,8 +125,9 @@ export class TextTool {
       }
 
       const style = this.app.getCurrentTextStyle();
-      const widthM = Defaults.textBoxWidthM;
-      const heightM = Defaults.textBoxHeightM;
+      const wf = this.app.renderer.worldScaleFactor();
+      const widthM = Defaults.textBoxWidthM * wf;
+      const heightM = Defaults.textBoxHeightM * wf;
       const center = centerFromTopLeft(anchor, widthM, heightM, 0);
       const created = this.app.scene.createTextBox(center, widthM, heightM, style, "", 0);
       this.app.setSelection({ type: SelectionType.TEXTBOX, textBoxId: created.id, handleIndex: null });
@@ -177,8 +178,9 @@ export class TextTool {
     // immediately on the following frame.
     if (!this.app.textEditor?.isActive()) {
       const anchor = this._previewAnchor(this.app.input);
-      const widthPx = Defaults.textBoxWidthM * cam.scale;
-      const heightPx = Defaults.textBoxHeightM * cam.scale;
+      const wf = this.app.renderer.worldScaleFactor();
+      const widthPx = Defaults.textBoxWidthM * cam.scale * wf;
+      const heightPx = Defaults.textBoxHeightM * cam.scale * wf;
       const tl = cam.worldToScreen(anchor.x, anchor.y);
       ctx.save();
       ctx.fillStyle = "rgba(77,163,255,0.08)";

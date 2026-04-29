@@ -113,7 +113,7 @@ export class PlanController {
     this._showHub();
     this.app.refreshPlanUI();
     // History-Snapshot
-    (this.app as any)._lastSnapshot = (this.app as any)._serializeScene();
+    this.app.commitHistorySnapshot();
     return proj;
   }
 
@@ -137,6 +137,82 @@ export class PlanController {
       const isHov = proj.id === this.hoverProjectionId && !isSel;
       drawProjection(ctx, this.app.camera, items, proj, isSel, isHov);
     }
+    // Innen-Snap-Marker (Hover) zeichnen.
+    if (this._innerHover) {
+      ctx.save();
+      ctx.fillStyle = "rgba(77,163,255,0.95)";
+      ctx.beginPath();
+      ctx.arc(this._innerHover.sx, this._innerHover.sy, 4.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(77,163,255,0.45)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(this._innerHover.sx, this._innerHover.sy, 10, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  /** Letzter Hover auf einen inneren Snap-Punkt einer Projektion. */
+  private _innerHover: { projectionId: string; sx: number; sy: number } | null = null;
+
+  /** Sammelt Snap-Kandidaten (Bildschirm-Koords) für die gesamte Projektion. */
+  private _findInnerSnap(proj: Projection, sx: number, sy: number): { sx: number; sy: number } | null {
+    const items = this.getItems(proj);
+    if (items.length === 0) return null;
+    const layout = computeProjectionLayout(items, proj);
+    const cam = this.app.camera;
+    const cs = cam.worldToScreen(layout.centerPlanM.x, layout.centerPlanM.y);
+    const itemScalePxPerSheetM = layout.factor * cam.scale;
+    const offX = layout.itemOriginOffsetPlanM.x * cam.scale;
+    const offY = layout.itemOriginOffsetPlanM.y * cam.scale;
+    const cosA = Math.cos(proj.rotation);
+    const sinA = Math.sin(proj.rotation);
+    const toScreen = (x: number, y: number) => {
+      const lx = offX + x * itemScalePxPerSheetM;
+      const ly = offY + y * itemScalePxPerSheetM;
+      // Rotation um BBox-Center anwenden
+      const rx = lx * cosA - ly * sinA;
+      const ry = lx * sinA + ly * cosA;
+      return { x: cs.x + rx, y: cs.y + ry };
+    };
+    // Clip-Bereich (im rotierten lokalen Frame) — nur Punkte innerhalb akzeptieren.
+    const mmToPx = (mm: number) => (mm / 1000) * cam.scale;
+    const cl = mmToPx(layout.clipLocalMm.left);
+    const cr = mmToPx(layout.clipLocalMm.right);
+    const ct = mmToPx(layout.clipLocalMm.top);
+    const cb = mmToPx(layout.clipLocalMm.bottom);
+
+    const tol = 10;
+    let best: { sx: number; sy: number; d: number } | null = null;
+    const tryPoint = (x: number, y: number) => {
+      // Im lokalen (rotierten) Frame prüfen, ob innerhalb Clip.
+      const lx = offX + x * itemScalePxPerSheetM;
+      const ly = offY + y * itemScalePxPerSheetM;
+      if (lx < cl - 0.5 || lx > cr + 0.5 || ly < ct - 0.5 || ly > cb + 0.5) return;
+      const s = toScreen(x, y);
+      const d = Math.hypot(s.x - sx, s.y - sy);
+      if (d <= tol && (!best || d < best.d)) best = { sx: s.x, sy: s.y, d };
+    };
+    for (const it of items) {
+      if ((it.kind === "segment" || it.kind === "dimension-line") && it.a && it.b) {
+        tryPoint(it.a.x, it.a.y);
+        tryPoint(it.b.x, it.b.y);
+      } else if (it.kind === "hatch" && it.points) {
+        for (const p of it.points) tryPoint(p.x, p.y);
+      } else if ((it.kind === "textbox-rect" || it.kind === "document-rect") && it.center) {
+        const w = (it.widthM || 0) / 2;
+        const h = (it.heightM || 0) / 2;
+        const c = it.center;
+        // 4 Ecken (Rotation des Items hier ignoriert — gut genug).
+        tryPoint(c.x - w, c.y - h);
+        tryPoint(c.x + w, c.y - h);
+        tryPoint(c.x + w, c.y + h);
+        tryPoint(c.x - w, c.y + h);
+        tryPoint(c.x, c.y);
+      }
+    }
+    return best ? { sx: best.sx, sy: best.sy } : null;
   }
 
   /**
@@ -148,6 +224,7 @@ export class PlanController {
     const plan = this._activePlan();
     if (!plan) {
       this._hideHub();
+      this._innerHover = null;
       return false;
     }
     const input = this.app.input;
@@ -161,10 +238,9 @@ export class PlanController {
       return true;
     }
 
-    // Hover berechnen
+    // Hover berechnen: Edges/Body wie gehabt.
     let hoverId: string | null = null;
     let hoverHandle: typeof this.hoverHandle = null;
-    // Selektierte Projektion zuerst prüfen (Edge-Handles).
     const selected = this.selectedProjectionId
       ? plan.projections.find(p => p.id === this.selectedProjectionId)
       : null;
@@ -173,7 +249,6 @@ export class PlanController {
       if (h) { hoverId = selected.id; hoverHandle = h; }
     }
     if (!hoverId) {
-      // Andere Projektionen (Body)
       for (let i = plan.projections.length - 1; i >= 0; i--) {
         const proj = plan.projections[i];
         if (selected && proj.id === selected.id) continue;
@@ -184,30 +259,42 @@ export class PlanController {
     this.hoverProjectionId = hoverId;
     this.hoverHandle = hoverHandle;
 
-    // Cursor nur setzen, wenn wir tatsächlich etwas treffen — sonst soll
-    // das aktive Werkzeug seinen Cursor bestimmen können.
+    // Innerer Snap-Punkt (nur wenn wir auf einer Projektion sind und im Body).
+    let innerSnap: { projectionId: string; sx: number; sy: number } | null = null;
+    if (hoverId && hoverHandle === "body") {
+      const proj = plan.projections.find(p => p.id === hoverId)!;
+      const s = this._findInnerSnap(proj, sx, sy);
+      if (s) innerSnap = { projectionId: hoverId, sx: s.sx, sy: s.sy };
+    }
+    this._innerHover = innerSnap;
+
     let consumed = false;
-    if (hoverHandle === "body") { this.app.canvas.style.cursor = "move"; consumed = true; }
+    if (innerSnap) { this.app.canvas.style.cursor = "crosshair"; consumed = true; }
+    else if (hoverHandle === "body") { this.app.canvas.style.cursor = "move"; consumed = true; }
     else if (hoverHandle === "edge-left" || hoverHandle === "edge-right") { this.app.canvas.style.cursor = "ew-resize"; consumed = true; }
     else if (hoverHandle === "edge-top" || hoverHandle === "edge-bottom") { this.app.canvas.style.cursor = "ns-resize"; consumed = true; }
 
-    // Klick: nur konsumieren, wenn wir etwas treffen.
     if (input.clicked) {
-      if (hoverId && hoverHandle) {
+      if (innerSnap) {
+        // Klick auf Innenpunkt → Selektieren + HUB an Punkt zeigen + Drag (move).
+        this.selectedProjectionId = innerSnap.projectionId;
+        const proj = plan.projections.find(p => p.id === innerSnap!.projectionId)!;
+        this._beginDrag("body", proj, sx, sy);
+        this._showHub({ x: innerSnap.sx, y: innerSnap.sy });
+        consumed = true;
+      } else if (hoverId && hoverHandle) {
         this.selectedProjectionId = hoverId;
         const proj = plan.projections.find(p => p.id === hoverId)!;
         this._beginDrag(hoverHandle, proj, sx, sy);
-        this._showHub();
+        // HUB an Außenpunkt (Klickposition) anheften.
+        this._showHub({ x: sx, y: sy });
         consumed = true;
       } else if (this.selectedProjectionId) {
-        // Klick ins Leere bei aktiver Selektion → deselektieren,
-        // Klick aber NICHT konsumieren (Werkzeug darf reagieren).
         this.selectedProjectionId = null;
         this._hideHub();
       }
     }
 
-    // HUB-Position aktualisieren
     if (this.selectedProjectionId) this._positionHub();
     return consumed;
   }
@@ -276,26 +363,40 @@ export class PlanController {
   private _endDrag() {
     this._drag = null;
     // Snapshot in History
-    (this.app as any)._lastSnapshot = (this.app as any)._serializeScene();
+    this.app.commitHistorySnapshot();
   }
 
-  /* ---------- HUB ---------- */
+  /* ---------- HUB (im Stil von cad-point-menu) ---------- */
+  /** Bevorzugte Bildschirm-Position für das HUB (z. B. innerer Snap-Punkt). */
+  private _hubAnchorScreen: { x: number; y: number } | null = null;
+
   private _ensureHub() {
     if (this._hubEl) return this._hubEl;
     const el = document.createElement("div");
-    el.className = "plan-projection-hub";
+    // Gleiche Klasse wie das Punkt-Bearbeitungs-HUB, plus Wrapper für Skala-Zeile.
+    el.className = "cad-point-menu plan-projection-hub";
+    el.style.position = "fixed";
+    el.style.zIndex = "60";
+    el.style.flexDirection = "column";
+    el.style.alignItems = "stretch";
+    el.style.gap = "4px";
     el.innerHTML = `
-      <button data-act="rot-l" title="-15°">⟲</button>
-      <button data-act="rot-r" title="+15°">⟳</button>
-      <span class="plan-hub-sep"></span>
-      <label>Maßstab 1:</label>
-      <input type="number" data-field="scale" min="1" step="1" />
-      <span class="plan-hub-sep"></span>
-      <button data-act="reset-clip" title="Clip zurücksetzen">⤢</button>
-      <button data-act="delete" title="Löschen" class="plan-hub-danger">🗑</button>
+      <div style="display:flex;gap:4px;align-items:center;">
+        <button data-act="move" title="Bewegen">◉</button>
+        <button data-act="translate" title="Verschieben">✥</button>
+        <button data-act="rot-l" title="-15°">⟲</button>
+        <button data-act="rot-r" title="+15°">⟳</button>
+        <button data-act="reset-clip" title="Clip zurücksetzen">⤢</button>
+        <button data-act="delete" title="Löschen">🗑</button>
+      </div>
+      <div style="display:flex;gap:4px;align-items:center;font-size:11px;color:hsl(var(--cad-toolbar-foreground));padding:0 2px;">
+        <span>1:</span>
+        <input type="number" data-field="scale" min="1" step="1" style="width:64px;height:22px;border-radius:4px;border:1px solid hsl(var(--cad-hub-border));background:hsl(var(--background));color:inherit;padding:0 4px;font-size:11px;" />
+      </div>
     `;
     document.body.appendChild(el);
 
+    el.addEventListener("mousedown", (e) => e.stopPropagation());
     el.addEventListener("click", (e) => {
       const target = e.target as HTMLElement;
       const act = target.closest("[data-act]")?.getAttribute("data-act");
@@ -303,7 +404,12 @@ export class PlanController {
       e.stopPropagation();
       const proj = this._currentProj();
       if (!proj) return;
-      if (act === "rot-l") proj.rotation -= Math.PI / 12;
+      if (act === "move" || act === "translate") {
+        // Initiiere Drag-Move unter Maus.
+        const sx = this.app.input.mouse.sx;
+        const sy = this.app.input.mouse.sy;
+        this._beginDrag("body", proj, sx, sy);
+      } else if (act === "rot-l") proj.rotation -= Math.PI / 12;
       else if (act === "rot-r") proj.rotation += Math.PI / 12;
       else if (act === "reset-clip") proj.clip = { left: 0, right: 0, top: 0, bottom: 0 };
       else if (act === "delete") {
@@ -312,7 +418,7 @@ export class PlanController {
         this.selectedProjectionId = null;
         this._hideHub();
       }
-      (this.app as any)._lastSnapshot = (this.app as any)._serializeScene();
+      this.app.commitHistorySnapshot();
     });
 
     el.addEventListener("change", (e) => {
@@ -324,7 +430,7 @@ export class PlanController {
         const num = parseFloat(target.value);
         if (isFinite(num) && num > 0) {
           proj.scale = num;
-          (this.app as any)._lastSnapshot = (this.app as any)._serializeScene();
+          this.app.commitHistorySnapshot();
         }
       }
     });
@@ -339,9 +445,10 @@ export class PlanController {
     return plan.projections.find(p => p.id === this.selectedProjectionId) || null;
   }
 
-  private _showHub() {
+  private _showHub(anchorScreen?: { x: number; y: number }) {
     const el = this._ensureHub();
     el.style.display = "flex";
+    this._hubAnchorScreen = anchorScreen || null;
     const proj = this._currentProj();
     if (proj) {
       const input = el.querySelector('input[data-field="scale"]') as HTMLInputElement | null;
@@ -352,26 +459,34 @@ export class PlanController {
 
   private _hideHub() {
     if (this._hubEl) this._hubEl.style.display = "none";
+    this._hubAnchorScreen = null;
   }
 
   private _positionHub() {
     if (!this._hubEl) return;
     const proj = this._currentProj();
     if (!proj) { this._hideHub(); return; }
-    const cam = this.app.camera;
-    const layout = computeProjectionLayout(this.getItems(proj), proj);
-    const cs = cam.worldToScreen(layout.centerPlanM.x, layout.centerPlanM.y);
-    const mmToPx = (mm: number) => (mm / 1000) * cam.scale;
-    // Oberkante des (rotierten) Clip-Rechtecks → Mittelpunkt
-    const top = mmToPx(layout.clipLocalMm.top);
-    // Punkt im rotierten Frame: (0, top), zurückrotieren in canvas-frame
-    const cosA = Math.cos(proj.rotation);
-    const sinA = Math.sin(proj.rotation);
-    const offX = -sinA * top;
-    const offY = cosA * top;
     const rect = this.app.canvas.getBoundingClientRect();
-    const x = rect.left + cs.x + offX;
-    const y = rect.top + cs.y + offY - 44; // 44 px über Oberkante
+    let x: number, y: number;
+    if (this._hubAnchorScreen) {
+      x = rect.left + this._hubAnchorScreen.x + 12;
+      y = rect.top + this._hubAnchorScreen.y - 60;
+    } else {
+      const cam = this.app.camera;
+      const layout = computeProjectionLayout(this.getItems(proj), proj);
+      const cs = cam.worldToScreen(layout.centerPlanM.x, layout.centerPlanM.y);
+      const mmToPx = (mm: number) => (mm / 1000) * cam.scale;
+      const top = mmToPx(layout.clipLocalMm.top);
+      const cosA = Math.cos(proj.rotation);
+      const sinA = Math.sin(proj.rotation);
+      const offX = -sinA * top;
+      const offY = cosA * top;
+      x = rect.left + cs.x + offX;
+      y = rect.top + cs.y + offY - 60;
+    }
+    // Clampen ans Viewport.
+    x = Math.max(8, Math.min(window.innerWidth - 240, x));
+    y = Math.max(8, Math.min(window.innerHeight - 80, y));
     this._hubEl.style.left = `${x}px`;
     this._hubEl.style.top = `${y}px`;
   }

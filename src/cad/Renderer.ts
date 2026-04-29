@@ -121,6 +121,11 @@ export class Renderer {
   }
 
   private _scaledStrokePx(storedWidth: number): number {
+    return this.scaledStrokePx(storedWidth);
+  }
+
+  /** Public: skaliert eine in Px gespeicherte Strichbreite proportional zur Referenz. */
+  scaledStrokePx(storedWidth: number): number {
     const baseWidth = Math.max(0, storedWidth || 0);
     return baseWidth * (this.camera.scale / this.referencePxPerM);
   }
@@ -131,8 +136,18 @@ export class Renderer {
    * im Sheet- wie im Plan-Modus optisch ähnlich dick (referencePxPerM steuert).
    */
   private _segStrokePx(thicknessM: number): number {
+    return this.segStrokePx(thicknessM);
+  }
+
+  /** Public: Welt-Meter Strichbreite → Bildschirm-Pixel (referencePxPerM-skaliert). */
+  segStrokePx(thicknessM: number): number {
     const refRatio = Defaults.strokeWidthBaseScale / Math.max(1, this.referencePxPerM);
     return Math.max(0.5, (thicknessM || 0) * this.camera.scale * refRatio);
+  }
+
+  /** Faktor, um eine "in Welt-m gemeinte" Größe zu Plan-/Sheet-skalieren. */
+  worldScaleFactor(): number {
+    return Defaults.strokeWidthBaseScale / Math.max(1, this.referencePxPerM);
   }
 
   /** Cache: docId -> HTMLImageElement (lazy-load aus DataURL). */

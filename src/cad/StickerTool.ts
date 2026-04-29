@@ -584,7 +584,7 @@ export class StickerTool {
         const b = cam.worldToScreen(it.b.x, it.b.y);
         ctx.save();
         ctx.strokeStyle = it.color;
-        ctx.lineWidth = Math.max(1, it.thicknessM * cam.scale);
+        ctx.lineWidth = this.app.renderer.segStrokePx(it.thicknessM);
         ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
         ctx.restore();
       } else if (it.kind === "hatch") {

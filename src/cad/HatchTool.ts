@@ -956,7 +956,7 @@ export class HatchTool {
 
     const style = this.app.getCurrentHatchStyle();
     const fillCol = rgbaFromHex(style.fillColor, style.fillAlphaPct / 100);
-    const scaledStrokePx = Math.max(0, style.strokeWidthPx || 0) * (cam.scale / Defaults.strokeWidthBaseScale);
+    const scaledStrokePx = this.app.renderer.scaledStrokePx(style.strokeWidthPx || 0);
 
     if (this.drawMode === "rectangle") {
       if (this.rectState === "firstSide" && this.rectPointA) {

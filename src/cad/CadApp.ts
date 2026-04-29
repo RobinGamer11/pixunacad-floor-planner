@@ -233,7 +233,7 @@ export class CadApp {
   /** Default-Schriftgröße (px) speziell im Plan-Modus. */
   private _planDefaultTextFontSizePx: Map<string, number> = new Map();
   /** Gespeicherte Sheet-Defaults, damit beim Verlassen des Plan-Modus wiederhergestellt werden kann. */
-  private _savedSheetDefaults: { lineThicknessM: number; textFontSizePx: number } | null = null;
+  private _savedSheetDefaults: { lineThicknessM: number; textFontSizePx: number; tickLengthM: number } | null = null;
 
   selection: Selection | null = null;
   selectedLabelId: string | null = null;
@@ -647,6 +647,21 @@ export class CadApp {
     const snap = this._serializeScene();
     if (snap === this._lastSnapshot) return;
     // Drop redo branch
+    if (this._historyIndex < this._history.length - 1) {
+      this._history = this._history.slice(0, this._historyIndex + 1);
+    }
+    this._history.push(snap);
+    if (this._history.length > this._historyMax) this._history.shift();
+    this._historyIndex = this._history.length - 1;
+    this._lastSnapshot = snap;
+    this._emitHistoryChange();
+  }
+
+  /** Erzwingt einen History-Push der aktuellen Scene (für Plan-Operationen). */
+  commitHistorySnapshot() {
+    if (this._isRestoring || this._destroyed) return;
+    const snap = this._serializeScene();
+    if (snap === this._lastSnapshot) return;
     if (this._historyIndex < this._history.length - 1) {
       this._history = this._history.slice(0, this._historyIndex + 1);
     }
@@ -2142,7 +2157,7 @@ export class CadApp {
           this._syncPlanTracingLayers();
           this.refreshPlanUI();
           // Snapshot, damit Plan-Änderungen in Undo/Redo landen.
-          this._lastSnapshot = this._serializeScene();
+          this.commitHistorySnapshot();
         },
       },
     );
@@ -2206,20 +2221,25 @@ export class CadApp {
         const fitRef = this._computePlanFitScale(size.width, size.height);
         this.renderer.referencePxPerM = fitRef;
         // Plan-spezifische Defaults (Linienstärke, Schriftgröße) aktivieren.
+        // Plan-spezifische Defaults (Linienstärke, Schriftgröße, Maßketten-Tick) aktivieren.
         if (!this._savedSheetDefaults) {
           this._savedSheetDefaults = {
             lineThicknessM: this.defaultLineThicknessM,
             textFontSizePx: this.defaultTextFontSizePx,
+            tickLengthM: this.measureSettings.tickLengthM,
           };
         }
+        const planScale = Defaults.strokeWidthBaseScale / fitRef;
         const planLine = this._planDefaultLineThicknessM.get(this.activePlanId)
-          ?? Defaults.lineThicknessM * (Defaults.strokeWidthBaseScale / fitRef);
+          ?? Defaults.lineThicknessM * planScale;
         const planFont = this._planDefaultTextFontSizePx.get(this.activePlanId)
           ?? Defaults.textFontSizePx;
         this._planDefaultLineThicknessM.set(this.activePlanId, planLine);
         this._planDefaultTextFontSizePx.set(this.activePlanId, planFont);
         this.defaultLineThicknessM = planLine;
         this.defaultTextFontSizePx = planFont;
+        // Maßketten-Ticks: in m gespeichert → mit Plan-Skalierung anpassen.
+        this.measureSettings.tickLengthM = Defaults.measureTickLengthM * planScale;
       }
     } else {
       this.renderer.planMode = null;
@@ -2240,6 +2260,7 @@ export class CadApp {
       if (this._savedSheetDefaults) {
         this.defaultLineThicknessM = this._savedSheetDefaults.lineThicknessM;
         this.defaultTextFontSizePx = this._savedSheetDefaults.textFontSizePx;
+        this.measureSettings.tickLengthM = this._savedSheetDefaults.tickLengthM;
         this._savedSheetDefaults = null;
       }
     }
