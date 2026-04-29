@@ -781,7 +781,7 @@ export class Renderer {
     const areaM2 = polygonAreaAbs(hatch.points);
     const text = `${areaM2.toFixed(2)} m²`;
     const baseFontSize = clamp(hatch.areaLabel.fontSizePx ?? Defaults.areaFontSizePx, 8, 72);
-    const zoomFactor = cam.scale / Defaults.strokeWidthBaseScale;
+    const zoomFactor = cam.scale / this.referencePxPerM;
     const fontSizePx = Math.max(1, baseFontSize * zoomFactor);
     const padX = 8 * zoomFactor, padY = 5 * zoomFactor;
 
