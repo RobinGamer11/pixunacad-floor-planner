@@ -177,8 +177,9 @@ export class TextTool {
     // immediately on the following frame.
     if (!this.app.textEditor?.isActive()) {
       const anchor = this._previewAnchor(this.app.input);
-      const widthPx = Defaults.textBoxWidthM * cam.scale;
-      const heightPx = Defaults.textBoxHeightM * cam.scale;
+      const wf = this.app.renderer.worldScaleFactor();
+      const widthPx = Defaults.textBoxWidthM * cam.scale * wf;
+      const heightPx = Defaults.textBoxHeightM * cam.scale * wf;
       const tl = cam.worldToScreen(anchor.x, anchor.y);
       ctx.save();
       ctx.fillStyle = "rgba(77,163,255,0.08)";
