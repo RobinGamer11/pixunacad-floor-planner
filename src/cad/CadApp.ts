@@ -225,6 +225,15 @@ export class CadApp {
   planScenesById: Map<string, Scene> = new Map();
   /** Transparentpause-States pro Plan (analog SheetOverlayStore). */
   planOverlayStore: SheetOverlayStore = new SheetOverlayStore();
+  /** Pro Sheet/Plan gespeicherter Camera-State (Zoom + Pan), um beim Wechsel zurückzukehren. */
+  private _camStateBySheetId: Map<string, { scale: number; offsetX: number; offsetY: number }> = new Map();
+  private _camStateByPlanId: Map<string, { scale: number; offsetX: number; offsetY: number }> = new Map();
+  /** Default-Linienstärke (m) speziell im Plan-Modus, damit Werkzeuge der Plangröße entsprechen. */
+  private _planDefaultLineThicknessM: Map<string, number> = new Map();
+  /** Default-Schriftgröße (px) speziell im Plan-Modus. */
+  private _planDefaultTextFontSizePx: Map<string, number> = new Map();
+  /** Gespeicherte Sheet-Defaults, damit beim Verlassen des Plan-Modus wiederhergestellt werden kann. */
+  private _savedSheetDefaults: { lineThicknessM: number; textFontSizePx: number } | null = null;
 
   selection: Selection | null = null;
   selectedLabelId: string | null = null;
@@ -1773,7 +1782,7 @@ export class CadApp {
         const a = cam.worldToScreen(it.a.x, it.a.y);
         const b = cam.worldToScreen(it.b.x, it.b.y);
         ctx.strokeStyle = it.color || primary;
-        ctx.lineWidth = Math.max(1, it.thicknessM * cam.scale);
+        ctx.lineWidth = (this.renderer as any)._segStrokePx?.(it.thicknessM) ?? Math.max(1, it.thicknessM * cam.scale);
         ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
       } else if (it.kind === "hatch") {
         ctx.beginPath();
@@ -2147,6 +2156,9 @@ export class CadApp {
   /** Setzt aktiven Plan (null = zurück zur Zeichnungsoberfläche). */
   setActivePlanId(id: string | null) {
     if (id != null && !this.planManager.getById(id)) return;
+    if (id === this.activePlanId) { this.refreshPlanUI(); return; }
+    // Aktuellen Camera-State sichern (für Sheet bzw. den vorherigen Plan).
+    this._saveCurrentCameraState();
     this.activePlanId = id;
     this._applyPlanModeToRenderer();
     this.refreshPlanUI();
@@ -2180,12 +2192,40 @@ export class CadApp {
         try { (this.activeTool as any)?.reset?.(); } catch { /* noop */ }
         this.pointEditMenu.hide();
         this.hub.hide();
-        // Kamera auf Papier zentrieren und passenden Zoom wählen.
-        this._fitCameraToPaper(size.width, size.height);
+        // Kamera: gespeicherten Zustand wiederherstellen — sonst Fit auf Papier.
+        const cached = this._camStateByPlanId.get(this.activePlanId);
+        if (cached) {
+          this.camera.scale = cached.scale;
+          this.camera.offsetX = cached.offsetX;
+          this.camera.offsetY = cached.offsetY;
+        } else {
+          this._fitCameraToPaper(size.width, size.height);
+        }
+        // Referenz-Skalierung für Werkzeuge/Texte: an Plan-Fit-Größe binden,
+        // damit Werkzeuge nicht überdimensional auf dem Papier wirken.
+        const fitRef = this._computePlanFitScale(size.width, size.height);
+        this.renderer.referencePxPerM = fitRef;
+        // Plan-spezifische Defaults (Linienstärke, Schriftgröße) aktivieren.
+        if (!this._savedSheetDefaults) {
+          this._savedSheetDefaults = {
+            lineThicknessM: this.defaultLineThicknessM,
+            textFontSizePx: this.defaultTextFontSizePx,
+          };
+        }
+        const planLine = this._planDefaultLineThicknessM.get(this.activePlanId)
+          ?? Defaults.lineThicknessM * (Defaults.strokeWidthBaseScale / fitRef);
+        const planFont = this._planDefaultTextFontSizePx.get(this.activePlanId)
+          ?? Defaults.textFontSizePx;
+        this._planDefaultLineThicknessM.set(this.activePlanId, planLine);
+        this._planDefaultTextFontSizePx.set(this.activePlanId, planFont);
+        this.defaultLineThicknessM = planLine;
+        this.defaultTextFontSizePx = planFont;
       }
     } else {
       this.renderer.planMode = null;
       this.renderer.planTracingLayers = [];
+      // Referenz-Skalierung zurück auf Sheet-Default.
+      this.renderer.referencePxPerM = Defaults.strokeWidthBaseScale;
       // Aktive Sheet-Scene wiederherstellen.
       const activeScene = this.scenesById.get(this.activeSheetId) || this.scene;
       this.scene = activeScene;
@@ -2196,11 +2236,39 @@ export class CadApp {
       // Plan-Controller-State zurücksetzen (HUB ausblenden).
       this.planController?.onExitPlanMode();
       this.canvas.style.cursor = "";
+      // Sheet-Defaults zurückholen, falls wir aus einem Plan kommen.
+      if (this._savedSheetDefaults) {
+        this.defaultLineThicknessM = this._savedSheetDefaults.lineThicknessM;
+        this.defaultTextFontSizePx = this._savedSheetDefaults.textFontSizePx;
+        this._savedSheetDefaults = null;
+      }
     }
     // Beim Plan-Wechsel Auswahl/Hover des Plan-Controllers zurücksetzen.
     if (this.planController && this.activePlanId) {
       this.planController.selectedProjectionId = null;
       this.planController.hoverProjectionId = null;
+    }
+  }
+
+  /** Berechnet den Fit-Zoom (px/m) für ein Plan-Papier mit gegebener mm-Größe. */
+  private _computePlanFitScale(widthMm: number, heightMm: number): number {
+    const rect = this.canvas.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return Defaults.strokeWidthBaseScale;
+    const wM = widthMm / 1000;
+    const hM = heightMm / 1000;
+    const marginPx = 40;
+    const sx = (rect.width - marginPx * 2) / wM;
+    const sy = (rect.height - marginPx * 2) / hM;
+    return Math.max(1, Math.min(sx, sy));
+  }
+
+  /** Speichert den aktuellen Camera-State für die zuletzt aktive Ansicht. */
+  private _saveCurrentCameraState() {
+    const snap = { scale: this.camera.scale, offsetX: this.camera.offsetX, offsetY: this.camera.offsetY };
+    if (this.activePlanId) {
+      this._camStateByPlanId.set(this.activePlanId, snap);
+    } else if (this.activeSheetId) {
+      this._camStateBySheetId.set(this.activeSheetId, snap);
     }
   }
 
@@ -2353,6 +2421,8 @@ export class CadApp {
   /** Wechselt das aktive Blatt: Scene swappen, UI/Selektion zurücksetzen, Overlay neu binden. */
   setActiveSheetId(id: string) {
     if (!this.sheetManager.getById(id)) return;
+    // Aktuellen Camera-State der bisherigen Ansicht (Sheet ODER Plan) sichern.
+    this._saveCurrentCameraState();
     // Falls wir gerade im Plan-Modus sind: zurück in den Zeichenmodus.
     if (this.activePlanId) {
       this.activePlanId = null;
@@ -2360,6 +2430,13 @@ export class CadApp {
       this.refreshPlanUI();
     }
     if (id === this.activeSheetId) {
+      // Selber Sheet → ggf. gespeicherten Camera-State wiederherstellen.
+      const cached = this._camStateBySheetId.get(id);
+      if (cached) {
+        this.camera.scale = cached.scale;
+        this.camera.offsetX = cached.offsetX;
+        this.camera.offsetY = cached.offsetY;
+      }
       this.refreshSheetUI();
       return;
     }
@@ -2386,6 +2463,13 @@ export class CadApp {
     this._syncOverlayScenes();
     this.refreshLabelUI();
     this.refreshSheetUI();
+    // Camera-State des neuen Sheets wiederherstellen, falls vorhanden.
+    const cached = this._camStateBySheetId.get(id);
+    if (cached) {
+      this.camera.scale = cached.scale;
+      this.camera.offsetX = cached.offsetX;
+      this.camera.offsetY = cached.offsetY;
+    }
     // History-Snapshot triggern, damit Sheetwechsel nicht als "keine Änderung" gewertet wird.
     this._lastSnapshot = this._serializeScene();
   }

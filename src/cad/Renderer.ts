@@ -79,6 +79,14 @@ export class Renderer {
     opacity: number;
   }[] = [];
 
+  /**
+   * Referenz-Pixel pro Meter für Stroke- und Font-Skalierung.
+   * Im Sheet-Modus = Defaults.strokeWidthBaseScale (80). Im Plan-Modus wird
+   * dieser Wert auf den Plan-Fit-Zoom gesetzt, damit Linienstärken/Texte
+   * relativ zur Plangröße sinnvoll dimensioniert sind.
+   */
+  referencePxPerM: number = Defaults.strokeWidthBaseScale;
+
   constructor(ctx: CanvasRenderingContext2D, camera: Camera, scene: Scene, labels: LabelManager) {
     this.ctx = ctx;
     this.camera = camera;
@@ -114,7 +122,17 @@ export class Renderer {
 
   private _scaledStrokePx(storedWidth: number): number {
     const baseWidth = Math.max(0, storedWidth || 0);
-    return baseWidth * (this.camera.scale / Defaults.strokeWidthBaseScale);
+    return baseWidth * (this.camera.scale / this.referencePxPerM);
+  }
+
+  /**
+   * Wandelt eine in Welt-Metern gespeicherte Strichbreite (z. B. seg.thicknessM)
+   * in Bildschirm-Pixel — proportional zur Referenz-Skala. So bleiben Linien
+   * im Sheet- wie im Plan-Modus optisch ähnlich dick (referencePxPerM steuert).
+   */
+  private _segStrokePx(thicknessM: number): number {
+    const refRatio = Defaults.strokeWidthBaseScale / Math.max(1, this.referencePxPerM);
+    return Math.max(0.5, (thicknessM || 0) * this.camera.scale * refRatio);
   }
 
   /** Cache: docId -> HTMLImageElement (lazy-load aus DataURL). */
@@ -538,7 +556,7 @@ export class Renderer {
         const b = cam.worldToScreen(it.b.x, it.b.y);
         ctx.save();
         ctx.strokeStyle = it.color || Defaults.lineColor;
-        ctx.lineWidth = Math.max(0.5, (it.thicknessM || Defaults.lineThicknessM) * cam.scale);
+        ctx.lineWidth = this._segStrokePx(it.thicknessM || Defaults.lineThicknessM);
         ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
         ctx.restore();
       } else if (it.kind === "hatch") {
@@ -573,7 +591,7 @@ export class Renderer {
           widthPx, heightPx,
           rotationRad: it.rotationRad || 0,
           html: it.html || "",
-          baseFontSizePx: (it.style?.fontSizePx || Defaults.textFontSizePx) * (cam.scale / Defaults.measureReferenceScalePxPerM),
+          baseFontSizePx: (it.style?.fontSizePx || Defaults.textFontSizePx) * (cam.scale / this.referencePxPerM),
           baseColor: it.style?.textColor || Defaults.textColor,
           bgColor: it.style?.bgColor || Defaults.textBgColor,
           bgAlpha: ((it.style?.bgAlphaPct || 0)) / 100,
@@ -693,7 +711,7 @@ export class Renderer {
 
     ctx.save();
     ctx.strokeStyle = seg.color || Defaults.lineColor;
-    ctx.lineWidth = Math.max(0.5, seg.thicknessM * cam.scale);
+    ctx.lineWidth = this._segStrokePx(seg.thicknessM);
     ctx.beginPath();
     ctx.moveTo(a.x, a.y);
     ctx.lineTo(b.x, b.y);
@@ -701,7 +719,7 @@ export class Renderer {
 
     if (isGroupSel) {
       ctx.strokeStyle = "rgba(77,163,255,0.95)";
-      ctx.lineWidth = Math.max(4, Math.max(0.5, seg.thicknessM * cam.scale) + 1.4);
+      ctx.lineWidth = Math.max(4, this._segStrokePx(seg.thicknessM) + 1.4);
       ctx.beginPath();
       ctx.moveTo(a.x, a.y);
       ctx.lineTo(b.x, b.y);
@@ -773,7 +791,7 @@ export class Renderer {
     const areaM2 = polygonAreaAbs(hatch.points);
     const text = `${areaM2.toFixed(2)} m²`;
     const baseFontSize = clamp(hatch.areaLabel.fontSizePx ?? Defaults.areaFontSizePx, 8, 72);
-    const zoomFactor = cam.scale / Defaults.strokeWidthBaseScale;
+    const zoomFactor = cam.scale / this.referencePxPerM;
     const fontSizePx = Math.max(1, baseFontSize * zoomFactor);
     const padX = 8 * zoomFactor, padY = 5 * zoomFactor;
 
@@ -897,7 +915,7 @@ export class Renderer {
     const cam = this.camera;
     const a = cam.worldToScreen(seg.a.x, seg.a.y);
     const b = cam.worldToScreen(seg.b.x, seg.b.y);
-    const segScreenThickness = Math.max(0.5, seg.thicknessM * cam.scale);
+    const segScreenThickness = this._segStrokePx(seg.thicknessM);
 
     ctx.save();
     ctx.strokeStyle = "rgba(77,163,255,0.95)";
@@ -1039,7 +1057,7 @@ export class Renderer {
 
     // Text + background — proportional to dimension via reference scale
     const text = g.text || "";
-    const zoomFactor = cam.scale / Defaults.measureReferenceScalePxPerM;
+    const zoomFactor = cam.scale / this.referencePxPerM;
     const baseSize = dim.textSizePx || Defaults.measureTextSizePx;
     const fontPx = Math.max(1, baseSize * zoomFactor);
 
@@ -1155,7 +1173,7 @@ export class Renderer {
       widthPx, heightPx,
       rotationRad: box.rotationRad,
       html: box.html || "",
-      baseFontSizePx: box.style.fontSizePx * (cam.scale / Defaults.measureReferenceScalePxPerM),
+      baseFontSizePx: box.style.fontSizePx * (cam.scale / this.referencePxPerM),
       baseColor: box.style.textColor,
       bgColor: box.style.bgColor,
       bgAlpha: (box.style.bgAlphaPct || 0) / 100,

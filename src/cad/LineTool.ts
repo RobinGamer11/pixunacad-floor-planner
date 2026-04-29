@@ -522,7 +522,7 @@ export class LineTool {
 
     ctx.save();
     ctx.strokeStyle = style.color;
-    ctx.lineWidth = Math.max(0.5, style.thicknessM * cam.scale);
+    ctx.lineWidth = (this.app.renderer as any)._segStrokePx?.(style.thicknessM) ?? Math.max(0.5, style.thicknessM * cam.scale);
     ctx.beginPath();
     ctx.moveTo(sa.x, sa.y);
     ctx.lineTo(sb.x, sb.y);
