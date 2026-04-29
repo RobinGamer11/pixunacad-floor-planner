@@ -113,7 +113,7 @@ export class PlanController {
     this._showHub();
     this.app.refreshPlanUI();
     // History-Snapshot
-    (this.app as any)._lastSnapshot = (this.app as any)._serializeScene();
+    this.app.commitHistorySnapshot();
     return proj;
   }
 
@@ -276,7 +276,7 @@ export class PlanController {
   private _endDrag() {
     this._drag = null;
     // Snapshot in History
-    (this.app as any)._lastSnapshot = (this.app as any)._serializeScene();
+    this.app.commitHistorySnapshot();
   }
 
   /* ---------- HUB ---------- */
@@ -312,7 +312,7 @@ export class PlanController {
         this.selectedProjectionId = null;
         this._hideHub();
       }
-      (this.app as any)._lastSnapshot = (this.app as any)._serializeScene();
+      this.app.commitHistorySnapshot();
     });
 
     el.addEventListener("change", (e) => {
@@ -324,7 +324,7 @@ export class PlanController {
         const num = parseFloat(target.value);
         if (isFinite(num) && num > 0) {
           proj.scale = num;
-          (this.app as any)._lastSnapshot = (this.app as any)._serializeScene();
+          this.app.commitHistorySnapshot();
         }
       }
     });
