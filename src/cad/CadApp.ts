@@ -2157,7 +2157,7 @@ export class CadApp {
           this._syncPlanTracingLayers();
           this.refreshPlanUI();
           // Snapshot, damit Plan-Änderungen in Undo/Redo landen.
-          this._lastSnapshot = this._serializeScene();
+          this.commitHistorySnapshot();
         },
       },
     );
