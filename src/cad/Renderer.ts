@@ -125,6 +125,16 @@ export class Renderer {
     return baseWidth * (this.camera.scale / this.referencePxPerM);
   }
 
+  /**
+   * Wandelt eine in Welt-Metern gespeicherte Strichbreite (z. B. seg.thicknessM)
+   * in Bildschirm-Pixel — proportional zur Referenz-Skala. So bleiben Linien
+   * im Sheet- wie im Plan-Modus optisch ähnlich dick (referencePxPerM steuert).
+   */
+  private _segStrokePx(thicknessM: number): number {
+    const refRatio = Defaults.strokeWidthBaseScale / Math.max(1, this.referencePxPerM);
+    return Math.max(0.5, (thicknessM || 0) * this.camera.scale * refRatio);
+  }
+
   /** Cache: docId -> HTMLImageElement (lazy-load aus DataURL). */
   private _docImageCache = new Map<string, HTMLImageElement>();
 
