@@ -137,6 +137,82 @@ export class PlanController {
       const isHov = proj.id === this.hoverProjectionId && !isSel;
       drawProjection(ctx, this.app.camera, items, proj, isSel, isHov);
     }
+    // Innen-Snap-Marker (Hover) zeichnen.
+    if (this._innerHover) {
+      ctx.save();
+      ctx.fillStyle = "rgba(77,163,255,0.95)";
+      ctx.beginPath();
+      ctx.arc(this._innerHover.sx, this._innerHover.sy, 4.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(77,163,255,0.45)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(this._innerHover.sx, this._innerHover.sy, 10, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  /** Letzter Hover auf einen inneren Snap-Punkt einer Projektion. */
+  private _innerHover: { projectionId: string; sx: number; sy: number } | null = null;
+
+  /** Sammelt Snap-Kandidaten (Bildschirm-Koords) für die gesamte Projektion. */
+  private _findInnerSnap(proj: Projection, sx: number, sy: number): { sx: number; sy: number } | null {
+    const items = this.getItems(proj);
+    if (items.length === 0) return null;
+    const layout = computeProjectionLayout(items, proj);
+    const cam = this.app.camera;
+    const cs = cam.worldToScreen(layout.centerPlanM.x, layout.centerPlanM.y);
+    const itemScalePxPerSheetM = layout.factor * cam.scale;
+    const offX = layout.itemOriginOffsetPlanM.x * cam.scale;
+    const offY = layout.itemOriginOffsetPlanM.y * cam.scale;
+    const cosA = Math.cos(proj.rotation);
+    const sinA = Math.sin(proj.rotation);
+    const toScreen = (x: number, y: number) => {
+      const lx = offX + x * itemScalePxPerSheetM;
+      const ly = offY + y * itemScalePxPerSheetM;
+      // Rotation um BBox-Center anwenden
+      const rx = lx * cosA - ly * sinA;
+      const ry = lx * sinA + ly * cosA;
+      return { x: cs.x + rx, y: cs.y + ry };
+    };
+    // Clip-Bereich (im rotierten lokalen Frame) — nur Punkte innerhalb akzeptieren.
+    const mmToPx = (mm: number) => (mm / 1000) * cam.scale;
+    const cl = mmToPx(layout.clipLocalMm.left);
+    const cr = mmToPx(layout.clipLocalMm.right);
+    const ct = mmToPx(layout.clipLocalMm.top);
+    const cb = mmToPx(layout.clipLocalMm.bottom);
+
+    const tol = 10;
+    let best: { sx: number; sy: number; d: number } | null = null;
+    const tryPoint = (x: number, y: number) => {
+      // Im lokalen (rotierten) Frame prüfen, ob innerhalb Clip.
+      const lx = offX + x * itemScalePxPerSheetM;
+      const ly = offY + y * itemScalePxPerSheetM;
+      if (lx < cl - 0.5 || lx > cr + 0.5 || ly < ct - 0.5 || ly > cb + 0.5) return;
+      const s = toScreen(x, y);
+      const d = Math.hypot(s.x - sx, s.y - sy);
+      if (d <= tol && (!best || d < best.d)) best = { sx: s.x, sy: s.y, d };
+    };
+    for (const it of items) {
+      if ((it.kind === "segment" || it.kind === "dimension-line") && it.a && it.b) {
+        tryPoint(it.a.x, it.a.y);
+        tryPoint(it.b.x, it.b.y);
+      } else if (it.kind === "hatch" && it.points) {
+        for (const p of it.points) tryPoint(p.x, p.y);
+      } else if ((it.kind === "textbox-rect" || it.kind === "document-rect") && it.center) {
+        const w = (it.widthM || 0) / 2;
+        const h = (it.heightM || 0) / 2;
+        const c = it.center;
+        // 4 Ecken (Rotation des Items hier ignoriert — gut genug).
+        tryPoint(c.x - w, c.y - h);
+        tryPoint(c.x + w, c.y - h);
+        tryPoint(c.x + w, c.y + h);
+        tryPoint(c.x - w, c.y + h);
+        tryPoint(c.x, c.y);
+      }
+    }
+    return best ? { sx: best.sx, sy: best.sy } : null;
   }
 
   /**
@@ -148,6 +224,7 @@ export class PlanController {
     const plan = this._activePlan();
     if (!plan) {
       this._hideHub();
+      this._innerHover = null;
       return false;
     }
     const input = this.app.input;
@@ -161,10 +238,9 @@ export class PlanController {
       return true;
     }
 
-    // Hover berechnen
+    // Hover berechnen: Edges/Body wie gehabt.
     let hoverId: string | null = null;
     let hoverHandle: typeof this.hoverHandle = null;
-    // Selektierte Projektion zuerst prüfen (Edge-Handles).
     const selected = this.selectedProjectionId
       ? plan.projections.find(p => p.id === this.selectedProjectionId)
       : null;
@@ -173,7 +249,6 @@ export class PlanController {
       if (h) { hoverId = selected.id; hoverHandle = h; }
     }
     if (!hoverId) {
-      // Andere Projektionen (Body)
       for (let i = plan.projections.length - 1; i >= 0; i--) {
         const proj = plan.projections[i];
         if (selected && proj.id === selected.id) continue;
@@ -184,30 +259,42 @@ export class PlanController {
     this.hoverProjectionId = hoverId;
     this.hoverHandle = hoverHandle;
 
-    // Cursor nur setzen, wenn wir tatsächlich etwas treffen — sonst soll
-    // das aktive Werkzeug seinen Cursor bestimmen können.
+    // Innerer Snap-Punkt (nur wenn wir auf einer Projektion sind und im Body).
+    let innerSnap: { projectionId: string; sx: number; sy: number } | null = null;
+    if (hoverId && hoverHandle === "body") {
+      const proj = plan.projections.find(p => p.id === hoverId)!;
+      const s = this._findInnerSnap(proj, sx, sy);
+      if (s) innerSnap = { projectionId: hoverId, sx: s.sx, sy: s.sy };
+    }
+    this._innerHover = innerSnap;
+
     let consumed = false;
-    if (hoverHandle === "body") { this.app.canvas.style.cursor = "move"; consumed = true; }
+    if (innerSnap) { this.app.canvas.style.cursor = "crosshair"; consumed = true; }
+    else if (hoverHandle === "body") { this.app.canvas.style.cursor = "move"; consumed = true; }
     else if (hoverHandle === "edge-left" || hoverHandle === "edge-right") { this.app.canvas.style.cursor = "ew-resize"; consumed = true; }
     else if (hoverHandle === "edge-top" || hoverHandle === "edge-bottom") { this.app.canvas.style.cursor = "ns-resize"; consumed = true; }
 
-    // Klick: nur konsumieren, wenn wir etwas treffen.
     if (input.clicked) {
-      if (hoverId && hoverHandle) {
+      if (innerSnap) {
+        // Klick auf Innenpunkt → Selektieren + HUB an Punkt zeigen + Drag (move).
+        this.selectedProjectionId = innerSnap.projectionId;
+        const proj = plan.projections.find(p => p.id === innerSnap!.projectionId)!;
+        this._beginDrag("body", proj, sx, sy);
+        this._showHub({ x: innerSnap.sx, y: innerSnap.sy });
+        consumed = true;
+      } else if (hoverId && hoverHandle) {
         this.selectedProjectionId = hoverId;
         const proj = plan.projections.find(p => p.id === hoverId)!;
         this._beginDrag(hoverHandle, proj, sx, sy);
-        this._showHub();
+        // HUB an Außenpunkt (Klickposition) anheften.
+        this._showHub({ x: sx, y: sy });
         consumed = true;
       } else if (this.selectedProjectionId) {
-        // Klick ins Leere bei aktiver Selektion → deselektieren,
-        // Klick aber NICHT konsumieren (Werkzeug darf reagieren).
         this.selectedProjectionId = null;
         this._hideHub();
       }
     }
 
-    // HUB-Position aktualisieren
     if (this.selectedProjectionId) this._positionHub();
     return consumed;
   }
