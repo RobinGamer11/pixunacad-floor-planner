@@ -1163,7 +1163,7 @@ export class Renderer {
       widthPx, heightPx,
       rotationRad: box.rotationRad,
       html: box.html || "",
-      baseFontSizePx: box.style.fontSizePx * (cam.scale / Defaults.measureReferenceScalePxPerM),
+      baseFontSizePx: box.style.fontSizePx * (cam.scale / this.referencePxPerM),
       baseColor: box.style.textColor,
       bgColor: box.style.bgColor,
       bgAlpha: (box.style.bgAlphaPct || 0) / 100,
