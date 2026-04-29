@@ -711,7 +711,7 @@ export class Renderer {
 
     ctx.save();
     ctx.strokeStyle = seg.color || Defaults.lineColor;
-    ctx.lineWidth = Math.max(0.5, seg.thicknessM * cam.scale);
+    ctx.lineWidth = this._segStrokePx(seg.thicknessM);
     ctx.beginPath();
     ctx.moveTo(a.x, a.y);
     ctx.lineTo(b.x, b.y);
