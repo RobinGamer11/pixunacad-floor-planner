@@ -719,7 +719,7 @@ export class Renderer {
 
     if (isGroupSel) {
       ctx.strokeStyle = "rgba(77,163,255,0.95)";
-      ctx.lineWidth = Math.max(4, Math.max(0.5, seg.thicknessM * cam.scale) + 1.4);
+      ctx.lineWidth = Math.max(4, this._segStrokePx(seg.thicknessM) + 1.4);
       ctx.beginPath();
       ctx.moveTo(a.x, a.y);
       ctx.lineTo(b.x, b.y);
