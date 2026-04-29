@@ -1782,7 +1782,7 @@ export class CadApp {
         const a = cam.worldToScreen(it.a.x, it.a.y);
         const b = cam.worldToScreen(it.b.x, it.b.y);
         ctx.strokeStyle = it.color || primary;
-        ctx.lineWidth = Math.max(1, it.thicknessM * cam.scale);
+        ctx.lineWidth = (this.renderer as any)._segStrokePx?.(it.thicknessM) ?? Math.max(1, it.thicknessM * cam.scale);
         ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
       } else if (it.kind === "hatch") {
         ctx.beginPath();
