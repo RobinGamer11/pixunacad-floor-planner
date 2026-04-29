@@ -657,6 +657,21 @@ export class CadApp {
     this._emitHistoryChange();
   }
 
+  /** Erzwingt einen History-Push der aktuellen Scene (für Plan-Operationen). */
+  commitHistorySnapshot() {
+    if (this._isRestoring || this._destroyed) return;
+    const snap = this._serializeScene();
+    if (snap === this._lastSnapshot) return;
+    if (this._historyIndex < this._history.length - 1) {
+      this._history = this._history.slice(0, this._historyIndex + 1);
+    }
+    this._history.push(snap);
+    if (this._history.length > this._historyMax) this._history.shift();
+    this._historyIndex = this._history.length - 1;
+    this._lastSnapshot = snap;
+    this._emitHistoryChange();
+  }
+
   private _emitHistoryChange() {
     this.onHistoryChange?.(this._historyIndex > 0, this._historyIndex < this._history.length - 1);
   }
