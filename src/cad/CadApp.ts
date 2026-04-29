@@ -225,6 +225,15 @@ export class CadApp {
   planScenesById: Map<string, Scene> = new Map();
   /** Transparentpause-States pro Plan (analog SheetOverlayStore). */
   planOverlayStore: SheetOverlayStore = new SheetOverlayStore();
+  /** Pro Sheet/Plan gespeicherter Camera-State (Zoom + Pan), um beim Wechsel zurückzukehren. */
+  private _camStateBySheetId: Map<string, { scale: number; offsetX: number; offsetY: number }> = new Map();
+  private _camStateByPlanId: Map<string, { scale: number; offsetX: number; offsetY: number }> = new Map();
+  /** Default-Linienstärke (m) speziell im Plan-Modus, damit Werkzeuge der Plangröße entsprechen. */
+  private _planDefaultLineThicknessM: Map<string, number> = new Map();
+  /** Default-Schriftgröße (px) speziell im Plan-Modus. */
+  private _planDefaultTextFontSizePx: Map<string, number> = new Map();
+  /** Gespeicherte Sheet-Defaults, damit beim Verlassen des Plan-Modus wiederhergestellt werden kann. */
+  private _savedSheetDefaults: { lineThicknessM: number; textFontSizePx: number } | null = null;
 
   selection: Selection | null = null;
   selectedLabelId: string | null = null;
