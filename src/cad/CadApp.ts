@@ -2156,6 +2156,9 @@ export class CadApp {
   /** Setzt aktiven Plan (null = zurück zur Zeichnungsoberfläche). */
   setActivePlanId(id: string | null) {
     if (id != null && !this.planManager.getById(id)) return;
+    if (id === this.activePlanId) { this.refreshPlanUI(); return; }
+    // Aktuellen Camera-State sichern (für Sheet bzw. den vorherigen Plan).
+    this._saveCurrentCameraState();
     this.activePlanId = id;
     this._applyPlanModeToRenderer();
     this.refreshPlanUI();
