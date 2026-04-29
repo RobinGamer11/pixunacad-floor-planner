@@ -2421,6 +2421,8 @@ export class CadApp {
   /** Wechselt das aktive Blatt: Scene swappen, UI/Selektion zurücksetzen, Overlay neu binden. */
   setActiveSheetId(id: string) {
     if (!this.sheetManager.getById(id)) return;
+    // Aktuellen Camera-State der bisherigen Ansicht (Sheet ODER Plan) sichern.
+    this._saveCurrentCameraState();
     // Falls wir gerade im Plan-Modus sind: zurück in den Zeichenmodus.
     if (this.activePlanId) {
       this.activePlanId = null;
@@ -2428,6 +2430,13 @@ export class CadApp {
       this.refreshPlanUI();
     }
     if (id === this.activeSheetId) {
+      // Selber Sheet → ggf. gespeicherten Camera-State wiederherstellen.
+      const cached = this._camStateBySheetId.get(id);
+      if (cached) {
+        this.camera.scale = cached.scale;
+        this.camera.offsetX = cached.offsetX;
+        this.camera.offsetY = cached.offsetY;
+      }
       this.refreshSheetUI();
       return;
     }
@@ -2454,6 +2463,13 @@ export class CadApp {
     this._syncOverlayScenes();
     this.refreshLabelUI();
     this.refreshSheetUI();
+    // Camera-State des neuen Sheets wiederherstellen, falls vorhanden.
+    const cached = this._camStateBySheetId.get(id);
+    if (cached) {
+      this.camera.scale = cached.scale;
+      this.camera.offsetX = cached.offsetX;
+      this.camera.offsetY = cached.offsetY;
+    }
     // History-Snapshot triggern, damit Sheetwechsel nicht als "keine Änderung" gewertet wird.
     this._lastSnapshot = this._serializeScene();
   }
