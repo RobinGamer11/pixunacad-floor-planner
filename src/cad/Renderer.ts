@@ -581,7 +581,7 @@ export class Renderer {
           widthPx, heightPx,
           rotationRad: it.rotationRad || 0,
           html: it.html || "",
-          baseFontSizePx: (it.style?.fontSizePx || Defaults.textFontSizePx) * (cam.scale / Defaults.measureReferenceScalePxPerM),
+          baseFontSizePx: (it.style?.fontSizePx || Defaults.textFontSizePx) * (cam.scale / this.referencePxPerM),
           baseColor: it.style?.textColor || Defaults.textColor,
           bgColor: it.style?.bgColor || Defaults.textBgColor,
           bgAlpha: ((it.style?.bgAlphaPct || 0)) / 100,
