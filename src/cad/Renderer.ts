@@ -79,6 +79,14 @@ export class Renderer {
     opacity: number;
   }[] = [];
 
+  /**
+   * Referenz-Pixel pro Meter für Stroke- und Font-Skalierung.
+   * Im Sheet-Modus = Defaults.strokeWidthBaseScale (80). Im Plan-Modus wird
+   * dieser Wert auf den Plan-Fit-Zoom gesetzt, damit Linienstärken/Texte
+   * relativ zur Plangröße sinnvoll dimensioniert sind.
+   */
+  referencePxPerM: number = Defaults.strokeWidthBaseScale;
+
   constructor(ctx: CanvasRenderingContext2D, camera: Camera, scene: Scene, labels: LabelManager) {
     this.ctx = ctx;
     this.camera = camera;
