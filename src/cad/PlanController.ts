@@ -48,6 +48,8 @@ export class PlanController {
   hoverCornerIndex: number | null = null;
 
   private _drag: DragState | null = null;
+  /** Wenn gesetzt: nächste Canvas-Mausdown startet ein Drag dieser Art. */
+  private _armedDrag: { kind: "body" | "edge-left" | "edge-right" | "edge-top" | "edge-bottom"; projectionId: string } | null = null;
 
   // HUB DOM
   private _hubEl: HTMLDivElement | null = null;
