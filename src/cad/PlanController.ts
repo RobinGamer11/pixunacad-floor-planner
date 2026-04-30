@@ -48,6 +48,8 @@ export class PlanController {
   hoverCornerIndex: number | null = null;
 
   private _drag: DragState | null = null;
+  /** Wenn gesetzt: nächste Canvas-Mausdown startet ein Drag dieser Art. */
+  private _armedDrag: { kind: "body" | "edge-left" | "edge-right" | "edge-top" | "edge-bottom"; projectionId: string } | null = null;
 
   // HUB DOM
   private _hubEl: HTMLDivElement | null = null;
@@ -302,6 +304,21 @@ export class PlanController {
     const sx = input.mouse.sx;
     const sy = input.mouse.sy;
 
+    // Armed Drag: warte auf Maus-Down im Canvas, dann starte Drag.
+    if (this._armedDrag) {
+      this.app.canvas.style.cursor = this._armedDrag.kind === "body" ? "move"
+        : (this._armedDrag.kind === "edge-left" || this._armedDrag.kind === "edge-right") ? "ew-resize"
+        : "ns-resize";
+      if (input.mouse.left) {
+        const proj = plan.projections.find(p => p.id === this._armedDrag!.projectionId);
+        if (proj) {
+          this._beginDrag(this._armedDrag.kind, proj, sx, sy);
+        }
+        this._armedDrag = null;
+      }
+      return true;
+    }
+
     // Drag fortsetzen → konsumiert Eingabe komplett.
     if (this._drag) {
       this._continueDrag(sx, sy);
@@ -485,10 +502,9 @@ export class PlanController {
       if (!proj) return;
 
       if (act === "move" || act === "translate") {
-        // Drag-Move ab aktueller Mausposition.
-        const sx = this.app.input.mouse.sx;
-        const sy = this.app.input.mouse.sy;
-        this._beginDrag("body", proj, sx, sy);
+        // Verschieben: warte auf nächsten Canvas-Klick.
+        this._armedDrag = { kind: "body", projectionId: proj.id };
+        this.app.canvas.style.cursor = "move";
       } else if (act === "rot-l") {
         proj.rotation -= Math.PI / 12;
         this.app.commitHistorySnapshot();
@@ -499,16 +515,14 @@ export class PlanController {
         proj.clip = { left: 0, right: 0, top: 0, bottom: 0 };
         this.app.commitHistorySnapshot();
       } else if (act === "cut") {
-        // Edge-Drag ab aktueller Mausposition starten.
+        // Kanten-Drag: warte auf nächsten Canvas-Klick.
         if (
           this.selectedHandle === "edge-left" ||
           this.selectedHandle === "edge-right" ||
           this.selectedHandle === "edge-top" ||
           this.selectedHandle === "edge-bottom"
         ) {
-          const sx = this.app.input.mouse.sx;
-          const sy = this.app.input.mouse.sy;
-          this._beginDrag(this.selectedHandle, proj, sx, sy);
+          this._armedDrag = { kind: this.selectedHandle, projectionId: proj.id };
         }
       } else if (act === "delete") {
         const plan = this._activePlan();
@@ -530,8 +544,12 @@ export class PlanController {
     const handle = this.selectedHandle;
     let html = "";
     if (handle === "corner") {
-      // Eckpunkt: NUR Löschen.
-      html = `<button data-act="delete" title="Zeichnungsblatt löschen">🗑</button>`;
+      // Eckpunkt: Verschieben (ganzes Blatt) + Löschen.
+      html = `
+        <button data-act="move" title="Bewegen">◉</button>
+        <button data-act="translate" title="Verschieben">✥</button>
+        <button data-act="delete" title="Zeichnungsblatt löschen">🗑</button>
+      `;
     } else if (
       handle === "edge-left" ||
       handle === "edge-right" ||
@@ -636,6 +654,7 @@ export class PlanController {
     this.hoverHandle = null;
     this.hoverCornerIndex = null;
     this._drag = null;
+    this._armedDrag = null;
     this._hideHub();
   }
 

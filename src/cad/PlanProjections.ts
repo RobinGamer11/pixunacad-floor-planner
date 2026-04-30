@@ -150,6 +150,10 @@ export interface ProjectionLayout {
   itemOriginOffsetPlanM: { x: number; y: number };
 }
 
+/** Padding um die Items-BBox in Plan-mm — damit der blaue Auswahlrahmen Luft hat
+ *  und die Geometrie nicht bündig am Clip-Rand klebt. */
+export const PROJECTION_BBOX_PADDING_MM = 12;
+
 export function computeProjectionLayout(
   items: ProjectionItem[],
   proj: { x: number; y: number; rotation: number; scale: number; clip: { left: number; right: number; top: number; bottom: number } },
@@ -158,8 +162,9 @@ export function computeProjectionLayout(
   const factor = sheetToPlanFactor(proj.scale);
   const widthPlanM = (bb.maxX - bb.minX) * factor;
   const heightPlanM = (bb.maxY - bb.minY) * factor;
-  const widthMm = widthPlanM * 1000;
-  const heightMm = heightPlanM * 1000;
+  const padMm = PROJECTION_BBOX_PADDING_MM;
+  const widthMm = widthPlanM * 1000 + 2 * padMm;
+  const heightMm = heightPlanM * 1000 + 2 * padMm;
   const halfW = widthMm / 2;
   const halfH = heightMm / 2;
   // bbox local (in mm, relativ zum BBox-Mittelpunkt)
