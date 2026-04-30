@@ -530,8 +530,12 @@ export class PlanController {
     const handle = this.selectedHandle;
     let html = "";
     if (handle === "corner") {
-      // Eckpunkt: NUR Löschen.
-      html = `<button data-act="delete" title="Zeichnungsblatt löschen">🗑</button>`;
+      // Eckpunkt: Verschieben (ganzes Blatt) + Löschen.
+      html = `
+        <button data-act="move" title="Bewegen">◉</button>
+        <button data-act="translate" title="Verschieben">✥</button>
+        <button data-act="delete" title="Zeichnungsblatt löschen">🗑</button>
+      `;
     } else if (
       handle === "edge-left" ||
       handle === "edge-right" ||
