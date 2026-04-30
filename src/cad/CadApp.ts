@@ -1600,6 +1600,10 @@ export class CadApp {
       }
 
       if (e.key === "Delete" || e.key === "Backspace") {
+        // Plan-Modus: zuerst Projektion-Selektion versuchen zu löschen.
+        if (this.activePlanId && this.planController?.deleteSelected()) {
+          return;
+        }
         if (this.selection && this.selection.segmentId) {
           const seg = this.scene.getSegmentById(this.selection.segmentId);
           if (seg) { this.scene.removeSegment(seg); this.clearSelection(); this.pointEditMenu.hide(); this.refreshLabelUI(); }

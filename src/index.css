@@ -192,6 +192,18 @@
     background: hsl(var(--cad-hub));
     border-color: hsl(var(--cad-hub-border));
     box-shadow: 0 10px 30px -10px hsl(222 40% 4% / 0.5);
+    cursor: grab;
+    user-select: none;
+  }
+
+  .cad-point-menu.dragging {
+    cursor: grabbing;
+  }
+
+  .cad-point-menu button,
+  .cad-point-menu input,
+  .cad-point-menu select {
+    cursor: default;
   }
 
   .cad-point-menu button {

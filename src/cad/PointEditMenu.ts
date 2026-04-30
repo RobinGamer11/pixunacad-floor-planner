@@ -1,5 +1,6 @@
 import { PointEditAction } from "./constants";
 import { clamp } from "./geometry";
+import { makeHubDraggable, resetHubUserMoved, hubWasUserMoved } from "./hubDrag";
 
 export class PointEditMenu {
   root: HTMLDivElement;
@@ -8,10 +9,12 @@ export class PointEditMenu {
   index = -1;
   visible = false;
   private _onActivate: ((action: string) => void) | null = null;
+  private _dragCleanup: (() => void) | null = null;
 
   constructor(root: HTMLDivElement, buttonsByAction: Record<string, HTMLButtonElement>) {
     this.root = root;
     this.buttonsByAction = buttonsByAction;
+    this._dragCleanup = makeHubDraggable(root, { positionMode: "absolute" });
 
     for (const action of this.actions) {
       const btn = this.buttonsByAction[action];
@@ -30,6 +33,7 @@ export class PointEditMenu {
 
   /** Optional: nur diese Actions als Buttons sichtbar (alle anderen werden ausgeblendet). */
   showAt(sx: number, sy: number, allowedActions?: string[]) {
+    const wasVisible = this.visible;
     this.visible = true;
     this.root.classList.remove("hidden");
 
@@ -41,6 +45,10 @@ export class PointEditMenu {
       const visible = !allow || allow.has(action);
       btn.style.display = visible ? "" : "none";
     }
+
+    // Wenn der User die Box bereits manuell verschoben hat und wir nur
+    // re-positionieren würden (gleiche Selektion), Position respektieren.
+    if (wasVisible && hubWasUserMoved(this.root)) return;
 
     const pad = 12;
     const vp = this.root.parentElement!.getBoundingClientRect();
@@ -59,6 +67,7 @@ export class PointEditMenu {
     this.visible = false;
     this.index = -1;
     this.root.classList.add("hidden");
+    resetHubUserMoved(this.root);
     // Alle Buttons wieder einblenden für nächsten Aufruf.
     for (const action of this.actions) {
       const btn = this.buttonsByAction[action];
