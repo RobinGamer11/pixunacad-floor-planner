@@ -654,6 +654,7 @@ export class PlanController {
     this.hoverHandle = null;
     this.hoverCornerIndex = null;
     this._drag = null;
+    this._armedDrag = null;
     this._hideHub();
   }
 
