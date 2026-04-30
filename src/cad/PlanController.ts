@@ -18,13 +18,15 @@ import {
   itemsBoundsM,
   sheetToPlanFactor,
 } from "./PlanProjections";
+import { makeHubDraggable, resetHubUserMoved, hubWasUserMoved } from "./hubDrag";
+
+type HandleKind = "body" | "edge-left" | "edge-right" | "edge-top" | "edge-bottom" | "corner";
 
 interface DragState {
   kind: "move" | "edge-left" | "edge-right" | "edge-top" | "edge-bottom";
   projectionId: string;
   startSx: number;
   startSy: number;
-  // Snapshot der Projection-Werte zum Drag-Start
   origX: number;
   origY: number;
   origClip: { left: number; right: number; top: number; bottom: number };
