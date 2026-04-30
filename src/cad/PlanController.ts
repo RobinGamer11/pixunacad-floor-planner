@@ -502,10 +502,9 @@ export class PlanController {
       if (!proj) return;
 
       if (act === "move" || act === "translate") {
-        // Drag-Move ab aktueller Mausposition.
-        const sx = this.app.input.mouse.sx;
-        const sy = this.app.input.mouse.sy;
-        this._beginDrag("body", proj, sx, sy);
+        // Verschieben: warte auf nächsten Canvas-Klick.
+        this._armedDrag = { kind: "body", projectionId: proj.id };
+        this.app.canvas.style.cursor = "move";
       } else if (act === "rot-l") {
         proj.rotation -= Math.PI / 12;
         this.app.commitHistorySnapshot();
@@ -516,16 +515,14 @@ export class PlanController {
         proj.clip = { left: 0, right: 0, top: 0, bottom: 0 };
         this.app.commitHistorySnapshot();
       } else if (act === "cut") {
-        // Edge-Drag ab aktueller Mausposition starten.
+        // Kanten-Drag: warte auf nächsten Canvas-Klick.
         if (
           this.selectedHandle === "edge-left" ||
           this.selectedHandle === "edge-right" ||
           this.selectedHandle === "edge-top" ||
           this.selectedHandle === "edge-bottom"
         ) {
-          const sx = this.app.input.mouse.sx;
-          const sy = this.app.input.mouse.sy;
-          this._beginDrag(this.selectedHandle, proj, sx, sy);
+          this._armedDrag = { kind: this.selectedHandle, projectionId: proj.id };
         }
       } else if (act === "delete") {
         const plan = this._activePlan();
