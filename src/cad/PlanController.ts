@@ -224,6 +224,41 @@ export class PlanController {
   }
 
   /**
+   * Liefert die 4 Bildschirm-Koordinaten der Außenrahmen-Eckpunkte (clip-Rechteck).
+   * Reihenfolge: 0=TL, 1=TR, 2=BR, 3=BL.
+   */
+  private _cornerScreens(proj: Projection): { x: number; y: number }[] {
+    const items = this.getItems(proj);
+    const layout = computeProjectionLayout(items, proj);
+    const cam = this.app.camera;
+    const cs = cam.worldToScreen(layout.centerPlanM.x, layout.centerPlanM.y);
+    const mmToPx = (mm: number) => (mm / 1000) * cam.scale;
+    const L = mmToPx(layout.clipLocalMm.left);
+    const R = mmToPx(layout.clipLocalMm.right);
+    const T = mmToPx(layout.clipLocalMm.top);
+    const B = mmToPx(layout.clipLocalMm.bottom);
+    const cosA = Math.cos(proj.rotation);
+    const sinA = Math.sin(proj.rotation);
+    const xform = (lx: number, ly: number) => ({
+      x: cs.x + lx * cosA - ly * sinA,
+      y: cs.y + lx * sinA + ly * cosA,
+    });
+    return [xform(L, T), xform(R, T), xform(R, B), xform(L, B)];
+  }
+
+  private _hitCorner(proj: Projection, sx: number, sy: number): number | null {
+    const corners = this._cornerScreens(proj);
+    const tol = 9;
+    let best = -1;
+    let bestD = Infinity;
+    for (let i = 0; i < corners.length; i++) {
+      const d = Math.hypot(corners[i].x - sx, corners[i].y - sy);
+      if (d <= tol && d < bestD) { bestD = d; best = i; }
+    }
+    return best >= 0 ? best : null;
+  }
+
+  /**
    * Update jedes Frames (nur im Plan-Modus aufrufen).
    * Returns true, wenn der Controller die Eingabe verbraucht hat
    * (Werkzeuge sollen dann diesen Frame nicht laufen).
@@ -246,28 +281,35 @@ export class PlanController {
       return true;
     }
 
-    // Hover berechnen: Edges/Body wie gehabt.
+    // Hover-Reihenfolge: Eckpunkt > Edge > Body. Selektierte Projektion bevorzugt.
     let hoverId: string | null = null;
-    let hoverHandle: typeof this.hoverHandle = null;
+    let hoverHandle: HandleKind | null = null;
+    let hoverCorner: number | null = null;
     const selected = this.selectedProjectionId
       ? plan.projections.find(p => p.id === this.selectedProjectionId)
       : null;
-    if (selected) {
-      const h = hitTestProjection(this.app.camera, this.getItems(selected), selected, sx, sy);
-      if (h) { hoverId = selected.id; hoverHandle = h; }
-    }
+
+    const tryHit = (proj: Projection): boolean => {
+      const c = this._hitCorner(proj, sx, sy);
+      if (c !== null) { hoverId = proj.id; hoverHandle = "corner"; hoverCorner = c; return true; }
+      const h = hitTestProjection(this.app.camera, this.getItems(proj), proj, sx, sy);
+      if (h) { hoverId = proj.id; hoverHandle = h; return true; }
+      return false;
+    };
+
+    if (selected) tryHit(selected);
     if (!hoverId) {
       for (let i = plan.projections.length - 1; i >= 0; i--) {
         const proj = plan.projections[i];
         if (selected && proj.id === selected.id) continue;
-        const h = hitTestProjection(this.app.camera, this.getItems(proj), proj, sx, sy);
-        if (h) { hoverId = proj.id; hoverHandle = h; break; }
+        if (tryHit(proj)) break;
       }
     }
     this.hoverProjectionId = hoverId;
     this.hoverHandle = hoverHandle;
+    this.hoverCornerIndex = hoverCorner;
 
-    // Innerer Snap-Punkt (nur wenn wir auf einer Projektion sind und im Body).
+    // Innerer Snap-Punkt nur bei body-Hover (nicht auf Edges/Corners).
     let innerSnap: { projectionId: string; sx: number; sy: number } | null = null;
     if (hoverId && hoverHandle === "body") {
       const proj = plan.projections.find(p => p.id === hoverId)!;
@@ -277,28 +319,45 @@ export class PlanController {
     this._innerHover = innerSnap;
 
     let consumed = false;
-    if (innerSnap) { this.app.canvas.style.cursor = "crosshair"; consumed = true; }
-    else if (hoverHandle === "body") { this.app.canvas.style.cursor = "move"; consumed = true; }
+    if (hoverHandle === "corner") { this.app.canvas.style.cursor = "pointer"; consumed = true; }
+    else if (innerSnap) { this.app.canvas.style.cursor = "pointer"; consumed = true; }
+    else if (hoverHandle === "body") { this.app.canvas.style.cursor = "pointer"; consumed = true; }
     else if (hoverHandle === "edge-left" || hoverHandle === "edge-right") { this.app.canvas.style.cursor = "ew-resize"; consumed = true; }
     else if (hoverHandle === "edge-top" || hoverHandle === "edge-bottom") { this.app.canvas.style.cursor = "ns-resize"; consumed = true; }
 
     if (input.clicked) {
-      if (innerSnap) {
-        // Klick auf Innenpunkt → Selektieren + HUB an Punkt zeigen + Drag (move).
+      if (hoverId && hoverHandle === "corner") {
+        // Eckpunkt-HUB: nur Löschen.
+        this.selectedProjectionId = hoverId;
+        this.selectedHandle = "corner";
+        this.selectedCornerIndex = hoverCorner;
+        const corner = this._cornerScreens(plan.projections.find(p => p.id === hoverId)!)[hoverCorner!];
+        this._showHub({ x: corner.x, y: corner.y });
+        consumed = true;
+      } else if (innerSnap) {
+        // Innenpunkt-HUB: voll (Move/Rotate/Reset/Delete), an Snap-Punkt verankert.
         this.selectedProjectionId = innerSnap.projectionId;
-        const proj = plan.projections.find(p => p.id === innerSnap!.projectionId)!;
-        this._beginDrag("body", proj, sx, sy);
+        this.selectedHandle = "body";
+        this.selectedCornerIndex = null;
         this._showHub({ x: innerSnap.sx, y: innerSnap.sy });
         consumed = true;
-      } else if (hoverId && hoverHandle) {
+      } else if (hoverId && hoverHandle === "body") {
         this.selectedProjectionId = hoverId;
-        const proj = plan.projections.find(p => p.id === hoverId)!;
-        this._beginDrag(hoverHandle, proj, sx, sy);
-        // HUB an Außenpunkt (Klickposition) anheften.
+        this.selectedHandle = "body";
+        this.selectedCornerIndex = null;
+        this._showHub({ x: sx, y: sy });
+        consumed = true;
+      } else if (hoverId && (hoverHandle === "edge-left" || hoverHandle === "edge-right" || hoverHandle === "edge-top" || hoverHandle === "edge-bottom")) {
+        // Edge nur selektieren (kein automatisches Drag) → HUB zeigt Cut + Reset + Delete.
+        this.selectedProjectionId = hoverId;
+        this.selectedHandle = hoverHandle;
+        this.selectedCornerIndex = null;
         this._showHub({ x: sx, y: sy });
         consumed = true;
       } else if (this.selectedProjectionId) {
         this.selectedProjectionId = null;
+        this.selectedHandle = null;
+        this.selectedCornerIndex = null;
         this._hideHub();
       }
     }
