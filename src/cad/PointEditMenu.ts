@@ -1,5 +1,6 @@
 import { PointEditAction } from "./constants";
 import { clamp } from "./geometry";
+import { makeHubDraggable, resetHubUserMoved, hubWasUserMoved } from "./hubDrag";
 
 export class PointEditMenu {
   root: HTMLDivElement;
@@ -8,10 +9,12 @@ export class PointEditMenu {
   index = -1;
   visible = false;
   private _onActivate: ((action: string) => void) | null = null;
+  private _dragCleanup: (() => void) | null = null;
 
   constructor(root: HTMLDivElement, buttonsByAction: Record<string, HTMLButtonElement>) {
     this.root = root;
     this.buttonsByAction = buttonsByAction;
+    this._dragCleanup = makeHubDraggable(root, { positionMode: "absolute" });
 
     for (const action of this.actions) {
       const btn = this.buttonsByAction[action];
