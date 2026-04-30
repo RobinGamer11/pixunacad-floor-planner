@@ -145,6 +145,34 @@ export class PlanController {
       const isHov = proj.id === this.hoverProjectionId && !isSel;
       drawProjection(ctx, this.app.camera, items, proj, isSel, isHov);
     }
+    // Eckpunkte des Außenrahmens (klein, dezent) — nur für selektierte/hover Projektion.
+    const drawCorners = (proj: Projection, hovered: number | null, selected: number | null) => {
+      const corners = this._cornerScreens(proj);
+      ctx.save();
+      for (let i = 0; i < corners.length; i++) {
+        const c = corners[i];
+        const isSel = i === selected;
+        const isHov = i === hovered && !isSel;
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, isSel ? 5 : 4, 0, Math.PI * 2);
+        ctx.fillStyle = isSel ? "rgba(255,180,0,0.95)" : isHov ? "rgba(77,163,255,0.95)" : "rgba(255,255,255,0.95)";
+        ctx.fill();
+        ctx.strokeStyle = "rgba(40,60,90,0.85)";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+      ctx.restore();
+    };
+    const sel = this.selectedProjectionId
+      ? plan.projections.find(p => p.id === this.selectedProjectionId)
+      : null;
+    if (sel) {
+      drawCorners(sel, this.hoverProjectionId === sel.id ? this.hoverCornerIndex : null, this.selectedHandle === "corner" ? this.selectedCornerIndex : null);
+    }
+    if (this.hoverProjectionId && (!sel || this.hoverProjectionId !== sel.id)) {
+      const hp = plan.projections.find(p => p.id === this.hoverProjectionId);
+      if (hp) drawCorners(hp, this.hoverCornerIndex, null);
+    }
     // Innen-Snap-Marker (Hover) zeichnen.
     if (this._innerHover) {
       ctx.save();
