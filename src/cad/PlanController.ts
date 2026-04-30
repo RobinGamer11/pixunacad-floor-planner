@@ -434,36 +434,20 @@ export class PlanController {
   }
 
   /* ---------- HUB (im Stil von cad-point-menu) ---------- */
-  /** Bevorzugte Bildschirm-Position für das HUB (z. B. innerer Snap-Punkt). */
+  /** Bevorzugte Bildschirm-Position für das HUB. */
   private _hubAnchorScreen: { x: number; y: number } | null = null;
 
   private _ensureHub() {
     if (this._hubEl) return this._hubEl;
     const el = document.createElement("div");
-    // Gleiche Klasse wie das Punkt-Bearbeitungs-HUB, plus Wrapper für Skala-Zeile.
     el.className = "cad-point-menu plan-projection-hub";
     el.style.position = "fixed";
     el.style.zIndex = "60";
-    el.style.flexDirection = "column";
-    el.style.alignItems = "stretch";
-    el.style.gap = "4px";
-    el.innerHTML = `
-      <div style="display:flex;gap:4px;align-items:center;">
-        <button data-act="move" title="Bewegen">◉</button>
-        <button data-act="translate" title="Verschieben">✥</button>
-        <button data-act="rot-l" title="-15°">⟲</button>
-        <button data-act="rot-r" title="+15°">⟳</button>
-        <button data-act="reset-clip" title="Clip zurücksetzen">⤢</button>
-        <button data-act="delete" title="Löschen">🗑</button>
-      </div>
-      <div style="display:flex;gap:4px;align-items:center;font-size:11px;color:hsl(var(--cad-toolbar-foreground));padding:0 2px;">
-        <span>1:</span>
-        <input type="number" data-field="scale" min="1" step="1" style="width:64px;height:22px;border-radius:4px;border:1px solid hsl(var(--cad-hub-border));background:hsl(var(--background));color:inherit;padding:0 4px;font-size:11px;" />
-      </div>
-    `;
     document.body.appendChild(el);
 
-    el.addEventListener("mousedown", (e) => e.stopPropagation());
+    // Drag-Handle: Box ist greifbar zwischen Buttons (siehe hubDrag.ts).
+    this._hubDragCleanup = makeHubDraggable(el, { positionMode: "fixed" });
+
     el.addEventListener("click", (e) => {
       const target = e.target as HTMLElement;
       const act = target.closest("[data-act]")?.getAttribute("data-act");
@@ -471,39 +455,79 @@ export class PlanController {
       e.stopPropagation();
       const proj = this._currentProj();
       if (!proj) return;
+
       if (act === "move" || act === "translate") {
-        // Initiiere Drag-Move unter Maus.
+        // Drag-Move ab aktueller Mausposition.
         const sx = this.app.input.mouse.sx;
         const sy = this.app.input.mouse.sy;
         this._beginDrag("body", proj, sx, sy);
-      } else if (act === "rot-l") proj.rotation -= Math.PI / 12;
-      else if (act === "rot-r") proj.rotation += Math.PI / 12;
-      else if (act === "reset-clip") proj.clip = { left: 0, right: 0, top: 0, bottom: 0 };
-      else if (act === "delete") {
+      } else if (act === "rot-l") {
+        proj.rotation -= Math.PI / 12;
+        this.app.commitHistorySnapshot();
+      } else if (act === "rot-r") {
+        proj.rotation += Math.PI / 12;
+        this.app.commitHistorySnapshot();
+      } else if (act === "reset-clip") {
+        proj.clip = { left: 0, right: 0, top: 0, bottom: 0 };
+        this.app.commitHistorySnapshot();
+      } else if (act === "cut") {
+        // Edge-Drag ab aktueller Mausposition starten.
+        if (
+          this.selectedHandle === "edge-left" ||
+          this.selectedHandle === "edge-right" ||
+          this.selectedHandle === "edge-top" ||
+          this.selectedHandle === "edge-bottom"
+        ) {
+          const sx = this.app.input.mouse.sx;
+          const sy = this.app.input.mouse.sy;
+          this._beginDrag(this.selectedHandle, proj, sx, sy);
+        }
+      } else if (act === "delete") {
         const plan = this._activePlan();
         if (plan) this.app.planManager.removeProjection(plan.id, proj.id);
         this.selectedProjectionId = null;
+        this.selectedHandle = null;
+        this.selectedCornerIndex = null;
         this._hideHub();
-      }
-      this.app.commitHistorySnapshot();
-    });
-
-    el.addEventListener("change", (e) => {
-      const target = e.target as HTMLInputElement;
-      const field = target.getAttribute("data-field");
-      if (field === "scale") {
-        const proj = this._currentProj();
-        if (!proj) return;
-        const num = parseFloat(target.value);
-        if (isFinite(num) && num > 0) {
-          proj.scale = num;
-          this.app.commitHistorySnapshot();
-        }
+        this.app.commitHistorySnapshot();
       }
     });
 
     this._hubEl = el;
     return el;
+  }
+
+  private _renderHubButtons() {
+    if (!this._hubEl) return;
+    const handle = this.selectedHandle;
+    let html = "";
+    if (handle === "corner") {
+      // Eckpunkt: NUR Löschen.
+      html = `<button data-act="delete" title="Zeichnungsblatt löschen">🗑</button>`;
+    } else if (
+      handle === "edge-left" ||
+      handle === "edge-right" ||
+      handle === "edge-top" ||
+      handle === "edge-bottom"
+    ) {
+      // Edge: Cut + Reset + Delete.
+      html = `
+        <button data-act="cut" title="Einschneiden">✂</button>
+        <button data-act="reset-clip" title="Clip zurücksetzen">⤢</button>
+        <button data-act="delete" title="Löschen">🗑</button>
+      `;
+    } else {
+      // Body / Innenpunkt: Move + Rotate + Reset + Delete.
+      html = `
+        <button data-act="move" title="Bewegen">◉</button>
+        <button data-act="translate" title="Verschieben">✥</button>
+        <button data-act="rot-l" title="-15°">⟲</button>
+        <button data-act="rot-r" title="+15°">⟳</button>
+        <button data-act="reset-clip" title="Clip zurücksetzen">⤢</button>
+        <button data-act="delete" title="Löschen">🗑</button>
+      `;
+    }
+    this._hubEl.innerHTML = html;
   }
 
   private _currentProj(): Projection | null {
@@ -516,16 +540,17 @@ export class PlanController {
     const el = this._ensureHub();
     el.style.display = "flex";
     this._hubAnchorScreen = anchorScreen || null;
-    const proj = this._currentProj();
-    if (proj) {
-      const input = el.querySelector('input[data-field="scale"]') as HTMLInputElement | null;
-      if (input) input.value = String(Math.round(proj.scale));
-    }
+    // Bei jeder neuen Selektion vom User-Move-Flag befreien.
+    resetHubUserMoved(el);
+    this._renderHubButtons();
     this._positionHub();
   }
 
   private _hideHub() {
-    if (this._hubEl) this._hubEl.style.display = "none";
+    if (this._hubEl) {
+      this._hubEl.style.display = "none";
+      resetHubUserMoved(this._hubEl);
+    }
     this._hubAnchorScreen = null;
   }
 
@@ -533,6 +558,8 @@ export class PlanController {
     if (!this._hubEl) return;
     const proj = this._currentProj();
     if (!proj) { this._hideHub(); return; }
+    // Wenn der User die Box manuell verschoben hat: Position respektieren.
+    if (hubWasUserMoved(this._hubEl)) return;
     const rect = this.app.canvas.getBoundingClientRect();
     let x: number, y: number;
     if (this._hubAnchorScreen) {
@@ -551,23 +578,41 @@ export class PlanController {
       x = rect.left + cs.x + offX;
       y = rect.top + cs.y + offY - 60;
     }
-    // Clampen ans Viewport.
     x = Math.max(8, Math.min(window.innerWidth - 240, x));
     y = Math.max(8, Math.min(window.innerHeight - 80, y));
     this._hubEl.style.left = `${x}px`;
     this._hubEl.style.top = `${y}px`;
   }
 
+  /** Versucht, die aktuell selektierte Projektion zu löschen (für Delete-Key). */
+  deleteSelected(): boolean {
+    const proj = this._currentProj();
+    if (!proj) return false;
+    const plan = this._activePlan();
+    if (!plan) return false;
+    this.app.planManager.removeProjection(plan.id, proj.id);
+    this.selectedProjectionId = null;
+    this.selectedHandle = null;
+    this.selectedCornerIndex = null;
+    this._hideHub();
+    this.app.commitHistorySnapshot();
+    return true;
+  }
+
   /** Beim Verlassen des Plan-Modus aufrufen. */
   onExitPlanMode() {
     this.selectedProjectionId = null;
+    this.selectedHandle = null;
+    this.selectedCornerIndex = null;
     this.hoverProjectionId = null;
     this.hoverHandle = null;
+    this.hoverCornerIndex = null;
     this._drag = null;
     this._hideHub();
   }
 
   destroy() {
+    if (this._hubDragCleanup) { this._hubDragCleanup(); this._hubDragCleanup = null; }
     if (this._hubEl?.parentNode) this._hubEl.parentNode.removeChild(this._hubEl);
     this._hubEl = null;
   }
