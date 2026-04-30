@@ -304,6 +304,21 @@ export class PlanController {
     const sx = input.mouse.sx;
     const sy = input.mouse.sy;
 
+    // Armed Drag: warte auf Maus-Down im Canvas, dann starte Drag.
+    if (this._armedDrag) {
+      this.app.canvas.style.cursor = this._armedDrag.kind === "body" ? "move"
+        : (this._armedDrag.kind === "edge-left" || this._armedDrag.kind === "edge-right") ? "ew-resize"
+        : "ns-resize";
+      if (input.mouse.left) {
+        const proj = plan.projections.find(p => p.id === this._armedDrag!.projectionId);
+        if (proj) {
+          this._beginDrag(this._armedDrag.kind, proj, sx, sy);
+        }
+        this._armedDrag = null;
+      }
+      return true;
+    }
+
     // Drag fortsetzen → konsumiert Eingabe komplett.
     if (this._drag) {
       this._continueDrag(sx, sy);
