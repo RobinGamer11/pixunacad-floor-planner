@@ -39,13 +39,19 @@ export class PlanController {
   private _itemsCache = new Map<string, ProjectionItem[]>();
 
   selectedProjectionId: string | null = null;
+  /** Welches Handle ist aktuell selektiert (steuert Inhalt der HUB-Box). */
+  selectedHandle: HandleKind | null = null;
+  /** Wenn ein Eckpunkt selektiert ist, dessen Index 0..3. */
+  selectedCornerIndex: number | null = null;
   hoverProjectionId: string | null = null;
-  hoverHandle: "body" | "edge-left" | "edge-right" | "edge-top" | "edge-bottom" | null = null;
+  hoverHandle: HandleKind | null = null;
+  hoverCornerIndex: number | null = null;
 
   private _drag: DragState | null = null;
 
   // HUB DOM
   private _hubEl: HTMLDivElement | null = null;
+  private _hubDragCleanup: (() => void) | null = null;
 
   constructor(app: CadApp) {
     this.app = app;
