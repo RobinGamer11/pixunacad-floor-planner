@@ -23,13 +23,20 @@ import { makeHubDraggable, resetHubUserMoved, hubWasUserMoved } from "./hubDrag"
 type HandleKind = "body" | "edge-left" | "edge-right" | "edge-top" | "edge-bottom" | "corner";
 
 interface DragState {
-  kind: "move" | "edge-left" | "edge-right" | "edge-top" | "edge-bottom";
+  kind: "move" | "rotate" | "edge-left" | "edge-right" | "edge-top" | "edge-bottom";
   projectionId: string;
   startSx: number;
   startSy: number;
   origX: number;
   origY: number;
+  origRotation: number;
   origClip: { left: number; right: number; top: number; bottom: number };
+  /** Anker-Punkt für Move im Sheet-System der Projektion (Plan-Welt-mm). */
+  anchorPlanMm?: { x: number; y: number };
+  /** Pivot für Rotate (Plan-Welt-Meter, BBox-Center). */
+  rotatePivotPlanM?: { x: number; y: number };
+  /** Startwinkel zwischen Pivot und Maus (rad). */
+  rotateStartAngle?: number;
 }
 
 export class PlanController {
