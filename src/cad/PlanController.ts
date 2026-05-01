@@ -574,7 +574,7 @@ export class PlanController {
         proj.y = targetMm.y;
       }
       // HUB-Position folgt dem Anker.
-      this._hubAnchorScreen = snap ? { sx: snap.sx, sy: snap.sy } as any : { sx, sy } as any;
+      this._hubAnchorScreen = snap ? { x: snap.sx, y: snap.sy } : { x: sx, y: sy };
     } else if (this._drag.kind === "rotate") {
       const pivot = this._drag.rotatePivotPlanM!;
       const cs = cam.worldToScreen(pivot.x, pivot.y);
