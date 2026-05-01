@@ -702,9 +702,8 @@ export class PlanController {
     const handle = this.selectedHandle;
     let html = "";
     if (handle === "corner") {
-      // Eckpunkt: Verschieben (ganzes Blatt) + Löschen.
+      // Eckpunkt: nur Verschieben + Löschen.
       html = `
-        <button data-act="move" title="Bewegen">◉</button>
         <button data-act="translate" title="Verschieben">✥</button>
         <button data-act="delete" title="Zeichnungsblatt löschen">🗑</button>
       `;
@@ -714,19 +713,16 @@ export class PlanController {
       handle === "edge-top" ||
       handle === "edge-bottom"
     ) {
-      // Edge: Cut + Reset + Delete.
       html = `
         <button data-act="cut" title="Einschneiden">✂</button>
         <button data-act="reset-clip" title="Clip zurücksetzen">⤢</button>
         <button data-act="delete" title="Löschen">🗑</button>
       `;
     } else {
-      // Body / Innenpunkt: Move + Rotate + Reset + Delete.
+      // Body / Innenpunkt: Verschieben + Drehen + Reset + Delete.
       html = `
-        <button data-act="move" title="Bewegen">◉</button>
         <button data-act="translate" title="Verschieben">✥</button>
-        <button data-act="rot-l" title="-15°">⟲</button>
-        <button data-act="rot-r" title="+15°">⟳</button>
+        <button data-act="rotate" title="Drehen">⟳</button>
         <button data-act="reset-clip" title="Clip zurücksetzen">⤢</button>
         <button data-act="delete" title="Löschen">🗑</button>
       `;
