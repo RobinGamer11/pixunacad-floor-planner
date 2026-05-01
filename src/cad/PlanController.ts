@@ -418,11 +418,79 @@ export class PlanController {
     return consumed;
   }
 
+  /** Sammelt Snap-Punkte (Bildschirm + Plan-Welt-mm) von allen anderen Projektionen. */
+  private _collectAllSnapPointsScreen(excludeProjectionId: string): { sx: number; sy: number; planMm: { x: number; y: number } }[] {
+    const plan = this._activePlan();
+    if (!plan) return [];
+    const out: { sx: number; sy: number; planMm: { x: number; y: number } }[] = [];
+    const cam = this.app.camera;
+    for (const proj of plan.projections) {
+      if (proj.id === excludeProjectionId) continue;
+      const items = this.getItems(proj);
+      const layout = computeProjectionLayout(items, proj);
+      const cs = cam.worldToScreen(layout.centerPlanM.x, layout.centerPlanM.y);
+      const itemScalePxPerSheetM = layout.factor * cam.scale;
+      const offX = layout.itemOriginOffsetPlanM.x * cam.scale;
+      const offY = layout.itemOriginOffsetPlanM.y * cam.scale;
+      const cosA = Math.cos(proj.rotation);
+      const sinA = Math.sin(proj.rotation);
+      const mmToPx = (mm: number) => (mm / 1000) * cam.scale;
+      const cl = mmToPx(layout.clipLocalMm.left);
+      const cr = mmToPx(layout.clipLocalMm.right);
+      const ct = mmToPx(layout.clipLocalMm.top);
+      const cb = mmToPx(layout.clipLocalMm.bottom);
+      const tryPt = (x: number, y: number) => {
+        const lx = offX + x * itemScalePxPerSheetM;
+        const ly = offY + y * itemScalePxPerSheetM;
+        if (lx < cl - 0.5 || lx > cr + 0.5 || ly < ct - 0.5 || ly > cb + 0.5) return;
+        const rx = lx * cosA - ly * sinA;
+        const ry = lx * sinA + ly * cosA;
+        const sx = cs.x + rx;
+        const sy = cs.y + ry;
+        const w = cam.screenToWorld(sx, sy);
+        out.push({ sx, sy, planMm: { x: w.x * 1000, y: w.y * 1000 } });
+      };
+      for (const it of items) {
+        if ((it.kind === "segment" || it.kind === "dimension-line") && it.a && it.b) {
+          tryPt(it.a.x, it.a.y); tryPt(it.b.x, it.b.y);
+        } else if (it.kind === "hatch" && it.points) {
+          for (const p of it.points) tryPt(p.x, p.y);
+        } else if ((it.kind === "textbox-rect" || it.kind === "document-rect") && it.center) {
+          const w = (it.widthM || 0) / 2;
+          const h = (it.heightM || 0) / 2;
+          const c = it.center;
+          tryPt(c.x - w, c.y - h); tryPt(c.x + w, c.y - h);
+          tryPt(c.x + w, c.y + h); tryPt(c.x - w, c.y + h);
+          tryPt(c.x, c.y);
+        }
+      }
+    }
+    return out;
+  }
+
+  /** Findet besten Snap-Punkt nahe Maus aus allen anderen Projektionen. Liefert Plan-mm + Bildschirm. */
+  private _snapForMove(projectionId: string, sx: number, sy: number): { sx: number; sy: number; planMm: { x: number; y: number } } | null {
+    const cands = this._collectAllSnapPointsScreen(projectionId);
+    const tol = 12;
+    let best: { sx: number; sy: number; planMm: { x: number; y: number }; d: number } | null = null;
+    for (const c of cands) {
+      const d = Math.hypot(c.sx - sx, c.sy - sy);
+      if (d <= tol && (!best || d < best.d)) best = { ...c, d };
+    }
+    return best ? { sx: best.sx, sy: best.sy, planMm: best.planMm } : null;
+  }
+
+  /** Aktiver Snap-Marker (Bildschirm) während Drag. */
+  private _activeSnapMarker: { sx: number; sy: number } | null = null;
+  /** Liefert aktuellen Snap-Marker für Renderer. */
+  getActiveSnapMarker(): { sx: number; sy: number } | null { return this._activeSnapMarker; }
+
   private _beginDrag(
     handle: "body" | "edge-left" | "edge-right" | "edge-top" | "edge-bottom",
     proj: Projection,
     sx: number,
     sy: number,
+    anchorPlanMm?: { x: number; y: number },
   ) {
     this._drag = {
       kind: handle === "body" ? "move" : handle,
@@ -431,7 +499,29 @@ export class PlanController {
       startSy: sy,
       origX: proj.x,
       origY: proj.y,
+      origRotation: proj.rotation,
       origClip: { ...proj.clip },
+      anchorPlanMm,
+    };
+  }
+
+  private _beginRotateDrag(proj: Projection, sx: number, sy: number) {
+    const items = this.getItems(proj);
+    const layout = computeProjectionLayout(items, proj);
+    const cam = this.app.camera;
+    const cs = cam.worldToScreen(layout.centerPlanM.x, layout.centerPlanM.y);
+    const startAng = Math.atan2(sy - cs.y, sx - cs.x);
+    this._drag = {
+      kind: "rotate",
+      projectionId: proj.id,
+      startSx: sx,
+      startSy: sy,
+      origX: proj.x,
+      origY: proj.y,
+      origRotation: proj.rotation,
+      origClip: { ...proj.clip },
+      rotatePivotPlanM: layout.centerPlanM,
+      rotateStartAngle: startAng,
     };
   }
 
@@ -442,28 +532,62 @@ export class PlanController {
     const proj = plan.projections.find(p => p.id === this._drag!.projectionId);
     if (!proj) { this._drag = null; return; }
     const cam = this.app.camera;
-    const dxPx = sx - this._drag.startSx;
-    const dyPx = sy - this._drag.startSy;
-    // Bildschirm-Pixel → Plan-Welt-mm (camera.scale = px/m)
-    const dxMm = (dxPx / cam.scale) * 1000;
-    const dyMm = (dyPx / cam.scale) * 1000;
 
     if (this._drag.kind === "move") {
-      proj.x = this._drag.origX + dxMm;
-      proj.y = this._drag.origY + dyMm;
+      // Anker folgt der Maus. Snap zu anderen Projektions-Punkten.
+      const snap = this._snapForMove(this._drag.projectionId, sx, sy);
+      this._activeSnapMarker = snap ? { sx: snap.sx, sy: snap.sy } : null;
+      let targetWorld: { x: number; y: number };
+      if (snap) {
+        targetWorld = { x: snap.planMm.x / 1000, y: snap.planMm.y / 1000 };
+      } else {
+        targetWorld = cam.screenToWorld(sx, sy);
+      }
+      const targetMm = { x: targetWorld.x * 1000, y: targetWorld.y * 1000 };
+      const anchor = this._drag.anchorPlanMm;
+      if (anchor) {
+        // Die Anker-Welt-Position vor Drag-Start: anchor.
+        // Verschiebung = target - anchor → proj.x/y entsprechend.
+        proj.x = this._drag.origX + (targetMm.x - anchor.x);
+        proj.y = this._drag.origY + (targetMm.y - anchor.y);
+      } else {
+        // Kein Anker: BBox-Center folgt Maus (Fallback).
+        proj.x = targetMm.x;
+        proj.y = targetMm.y;
+      }
+      // HUB-Position folgt dem Anker.
+      this._hubAnchorScreen = snap ? { sx: snap.sx, sy: snap.sy } as any : { sx, sy } as any;
+    } else if (this._drag.kind === "rotate") {
+      const pivot = this._drag.rotatePivotPlanM!;
+      const cs = cam.worldToScreen(pivot.x, pivot.y);
+      const ang = Math.atan2(sy - cs.y, sx - cs.x);
+      let delta = ang - (this._drag.rotateStartAngle || 0);
+      // Shift = Snap auf 15°
+      if (this.app.input.shift) {
+        const step = Math.PI / 12;
+        delta = Math.round(delta / step) * step;
+      }
+      proj.rotation = this._drag.origRotation + delta;
+      this._activeSnapMarker = null;
+      // Live-Anzeige im LineHub aktualisieren.
+      const degTotal = (proj.rotation * 180) / Math.PI;
+      try { this.app.hub.updateDisplay(0, degTotal); } catch { /* noop */ }
     } else {
-      // Kanten ziehen: ins lokale (rotierte) System transformieren, dann clip anpassen
+      // Kanten ziehen: bestehende Logik.
+      const dxPx = sx - this._drag.startSx;
+      const dyPx = sy - this._drag.startSy;
+      const dxMm = (dxPx / cam.scale) * 1000;
+      const dyMm = (dyPx / cam.scale) * 1000;
       const cosA = Math.cos(-proj.rotation);
       const sinA = Math.sin(-proj.rotation);
       const ldxMm = dxMm * cosA - dyMm * sinA;
       const ldyMm = dxMm * sinA + dyMm * cosA;
       const next = { ...this._drag.origClip };
-      // Begrenzung: clip darf BBox nicht überschreiten
       const items = this.getItems(proj);
       const layout = computeProjectionLayout(items, { ...proj, clip: this._drag.origClip });
       const bboxW = layout.bboxLocalMm.right - layout.bboxLocalMm.left;
       const bboxH = layout.bboxLocalMm.bottom - layout.bboxLocalMm.top;
-      const maxW = bboxW - 5; // 5 mm Min-Breite
+      const maxW = bboxW - 5;
       const maxH = bboxH - 5;
 
       if (this._drag.kind === "edge-left") {
