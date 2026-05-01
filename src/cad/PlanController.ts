@@ -563,7 +563,7 @@ export class PlanController {
       const ang = Math.atan2(sy - cs.y, sx - cs.x);
       let delta = ang - (this._drag.rotateStartAngle || 0);
       // Shift = Snap auf 15°
-      if (this.app.input.shift) {
+      if (this.app.input.keys.shift) {
         const step = Math.PI / 12;
         delta = Math.round(delta / step) * step;
       }
