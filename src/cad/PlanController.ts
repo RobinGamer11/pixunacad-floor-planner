@@ -636,21 +636,44 @@ export class PlanController {
       const proj = this._currentProj();
       if (!proj) return;
 
-      if (act === "move" || act === "translate") {
-        // Verschieben: warte auf nächsten Canvas-Klick.
-        this._armedDrag = { kind: "body", projectionId: proj.id };
+      if (act === "translate") {
+        // Verschieben: Live-Drag startet sofort. Anker = aktuelle HUB-Verankerung
+        // (Innensnap-Punkt) in Plan-mm; sonst Mausposition.
+        const sx0 = this.app.input.mouse.sx;
+        const sy0 = this.app.input.mouse.sy;
+        let anchor: { x: number; y: number } | undefined;
+        if (this._hubAnchorScreen) {
+          const w = this.app.camera.screenToWorld(this._hubAnchorScreen.x, this._hubAnchorScreen.y);
+          anchor = { x: w.x * 1000, y: w.y * 1000 };
+        }
+        this._beginDrag("body", proj, sx0, sy0, anchor);
+        this._hideHub();
         this.app.canvas.style.cursor = "move";
-      } else if (act === "rot-l") {
-        proj.rotation -= Math.PI / 12;
-        this.app.commitHistorySnapshot();
-      } else if (act === "rot-r") {
-        proj.rotation += Math.PI / 12;
-        this.app.commitHistorySnapshot();
+      } else if (act === "rotate") {
+        const sx0 = this.app.input.mouse.sx;
+        const sy0 = this.app.input.mouse.sy;
+        this._beginRotateDrag(proj, sx0, sy0);
+        // LineHub mit Winkel-Eingabe öffnen.
+        try {
+          this.app.hub.bindCommit((vals) => {
+            if (!this._drag || this._drag.kind !== "rotate") return;
+            if (vals.angleDeg == null) return;
+            const p = this._currentProj();
+            if (!p) return;
+            p.rotation = (vals.angleDeg * Math.PI) / 180;
+            this._endDrag();
+          });
+          this.app.hub.showAt(sx0, sy0);
+          const deg = (proj.rotation * 180) / Math.PI;
+          this.app.hub.updateDisplay(0, deg);
+          this.app.hub.setValues(0, deg);
+        } catch { /* noop */ }
+        this._hideHub();
+        this.app.canvas.style.cursor = "crosshair";
       } else if (act === "reset-clip") {
         proj.clip = { left: 0, right: 0, top: 0, bottom: 0 };
         this.app.commitHistorySnapshot();
       } else if (act === "cut") {
-        // Kanten-Drag: warte auf nächsten Canvas-Klick.
         if (
           this.selectedHandle === "edge-left" ||
           this.selectedHandle === "edge-right" ||
