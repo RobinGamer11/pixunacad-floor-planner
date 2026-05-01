@@ -608,7 +608,19 @@ export class PlanController {
   }
 
   private _endDrag() {
+    const wasRotate = this._drag?.kind === "rotate";
     this._drag = null;
+    this._activeSnapMarker = null;
+    if (wasRotate) {
+      try { this.app.hub.bindCommit(null); this.app.hub.hide(); } catch { /* noop */ }
+    }
+    // HUB für aktuelle Selektion wieder einblenden.
+    if (this.selectedProjectionId) {
+      const sx = this.app.input.mouse.sx;
+      const sy = this.app.input.mouse.sy;
+      this._showHub({ x: sx, y: sy });
+    }
+    this.app.canvas.style.cursor = "";
     // Snapshot in History
     this.app.commitHistorySnapshot();
   }
