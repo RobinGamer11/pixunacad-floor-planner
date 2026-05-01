@@ -311,25 +311,29 @@ export class PlanController {
     const sx = input.mouse.sx;
     const sy = input.mouse.sy;
 
-    // Armed Drag: warte auf Maus-Down im Canvas, dann starte Drag.
+    // Armed Drag (nur für edge-cut): warte auf Maus-Down im Canvas, dann starte Edge-Drag.
     if (this._armedDrag) {
-      this.app.canvas.style.cursor = this._armedDrag.kind === "body" ? "move"
-        : (this._armedDrag.kind === "edge-left" || this._armedDrag.kind === "edge-right") ? "ew-resize"
-        : "ns-resize";
+      this.app.canvas.style.cursor =
+        (this._armedDrag.kind === "edge-left" || this._armedDrag.kind === "edge-right") ? "ew-resize" : "ns-resize";
       if (input.mouse.left) {
         const proj = plan.projections.find(p => p.id === this._armedDrag!.projectionId);
         if (proj) {
-          this._beginDrag(this._armedDrag.kind, proj, sx, sy);
+          this._beginDrag(this._armedDrag.kind as any, proj, sx, sy);
         }
         this._armedDrag = null;
       }
       return true;
     }
 
-    // Drag fortsetzen → konsumiert Eingabe komplett.
+    // Aktiver Live-Drag (Move/Rotate/Edge): jeden Frame Preview, Klick beendet.
     if (this._drag) {
       this._continueDrag(sx, sy);
-      if (!input.mouse.left) this._endDrag();
+      // Move/Rotate werden durch Mausklick beendet; Edge-Drag durch Maus loslassen.
+      if (this._drag.kind === "move" || this._drag.kind === "rotate") {
+        if (input.clicked) this._endDrag();
+      } else {
+        if (!input.mouse.left) this._endDrag();
+      }
       return true;
     }
 
