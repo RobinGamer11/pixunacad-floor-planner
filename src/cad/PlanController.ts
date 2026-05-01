@@ -196,6 +196,20 @@ export class PlanController {
       ctx.stroke();
       ctx.restore();
     }
+    // Aktiver Snap-Marker während Drag (Move): orange.
+    if (this._activeSnapMarker) {
+      ctx.save();
+      ctx.fillStyle = "rgba(255,160,0,0.95)";
+      ctx.beginPath();
+      ctx.arc(this._activeSnapMarker.sx, this._activeSnapMarker.sy, 5.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255,160,0,0.55)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(this._activeSnapMarker.sx, this._activeSnapMarker.sy, 12, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
   }
 
   /** Letzter Hover auf einen inneren Snap-Punkt einer Projektion. */
