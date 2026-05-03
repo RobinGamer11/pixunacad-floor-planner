@@ -1590,6 +1590,8 @@ export class CadApp {
       if (e.key === "p" || e.key === "P") this.setTool(ToolIds.PIPETTE);
       if (e.key === "o" || e.key === "O") this.setTool(ToolIds.STICKER);
       if (e.key === "d" || e.key === "D") this.setTool(ToolIds.DOCUMENT);
+      if (e.key === "f" || e.key === "F") this.setTool(ToolIds.FREE);
+      if (e.key === "e" || e.key === "E") this.setTool(ToolIds.ERASER);
 
       if (e.key === "Escape") {
         if (this.isStickerEditing()) { this.exitStickerEdit(); this.clearSelection(); return; }
