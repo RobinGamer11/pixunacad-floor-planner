@@ -152,6 +152,17 @@ export class CadApp {
   defaultTextBorderColor = Defaults.textBorderColor;
   defaultTextBorderWidthPx = Defaults.textBorderWidthPx;
 
+  // Freihand-Defaults
+  defaultFreeColor = Defaults.freeColor;
+  defaultFreeThicknessM = Defaults.freeThicknessM;
+  defaultFreeOpacity = Defaults.freeOpacity;
+  defaultFreeLineStyle: "solid" | "dashed" | "dotted" | "dashdot" | "blob" = Defaults.freeLineStyle;
+  defaultFreeGapM = Defaults.freeGapM;
+
+  // Eraser-Defaults
+  defaultEraserRadiusM = Defaults.eraserRadiusM;
+  defaultEraserStrength = Defaults.eraserStrength;
+
   camera: Camera;
   scene: Scene;
   input: Input;
