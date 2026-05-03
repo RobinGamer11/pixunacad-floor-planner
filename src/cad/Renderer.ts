@@ -1,7 +1,8 @@
 import { Defaults, SelectionType } from "./constants";
 import { Vec2, v, sub, add, mul, norm, perpLeft, clamp, rgbaFromHex, hexToRgba, polygonAreaAbs, polygonCentroid } from "./geometry";
 import { Camera } from "./Camera";
-import { Scene, Hatch, Dimension, TextBox, StickerInstance, DocumentObject } from "./Scene";
+import { Scene, Hatch, Dimension, TextBox, StickerInstance, DocumentObject, FreeStroke } from "./Scene";
+import { smoothChaikin } from "./freeGeom";
 import { LabelManager } from "./LabelManager";
 import { getDimensionGeometry, type DimensionLike } from "./dimensionGeometry";
 import { boxCornersWorld } from "./textGeometry";
@@ -1255,5 +1256,137 @@ export class Renderer {
       ctx.stroke();
       ctx.restore();
     }
+  // ---- FreeStrokes ----
+
+  private _freeStrokesForLabel(labelId: string): FreeStroke[] {
+    return this.scene.freeStrokes.filter(s => s.labelId === labelId && this.labels.isVisible(s.labelId));
+  }
+
+  private _dashForFreeStroke(s: FreeStroke): number[] {
+    const cam = this.camera;
+    const px = cam.scale;
+    if (s.lineStyle === "dashed") {
+      return [Math.max(s.gapM * 1.5, 0.001) * px, s.gapM * px];
+    }
+    if (s.lineStyle === "dotted") {
+      return [0.001 * px, s.gapM * px];
+    }
+    if (s.lineStyle === "dashdot") {
+      const dashLen = Math.max(s.gapM * 1.5, 0.001) * px;
+      const gap = s.gapM * px;
+      return [dashLen, gap, 0.001 * px, gap];
+    }
+    return [];
+  }
+
+  private _renderPointsForFreeStroke(s: FreeStroke): Vec2[] {
+    if (!s.points || s.points.length < 2) return s.points || [];
+    if (!s.smoothing) return s.points;
+    return smoothChaikin(s.points, 2);
+  }
+
+  private _drawFreeStrokeBlobs(s: FreeStroke) {
+    const ctx = this.ctx;
+    const cam = this.camera;
+    const pts = this._renderPointsForFreeStroke(s);
+    if (pts.length < 2) return;
+    const spacingPx = Math.max(2, s.blobSpacingM * cam.scale);
+    const radiusPx = Math.max(1, (s.blobSizeM / 2) * cam.scale);
+    ctx.save();
+    ctx.fillStyle = rgbaFromHex(s.color, s.opacity);
+    // Stamp entlang der Pfadlänge
+    let acc = 0;
+    let prev = cam.worldToScreen(pts[0].x, pts[0].y);
+    ctx.beginPath(); ctx.arc(prev.x, prev.y, radiusPx, 0, Math.PI * 2); ctx.fill();
+    for (let i = 1; i < pts.length; i++) {
+      const cur = cam.worldToScreen(pts[i].x, pts[i].y);
+      const dx = cur.x - prev.x, dy = cur.y - prev.y;
+      const segLen = Math.hypot(dx, dy);
+      if (segLen < 1e-3) { prev = cur; continue; }
+      let used = 0;
+      while (acc + (segLen - used) >= spacingPx) {
+        const need = spacingPx - acc;
+        used += need;
+        const t = used / segLen;
+        const px = prev.x + dx * t;
+        const py = prev.y + dy * t;
+        ctx.beginPath(); ctx.arc(px, py, radiusPx, 0, Math.PI * 2); ctx.fill();
+        acc = 0;
+      }
+      acc += segLen - used;
+      prev = cur;
+    }
+    ctx.restore();
+  }
+
+  private _drawSingleFreeStroke(s: FreeStroke, colorOverride: string | null = null, widthOverridePx: number | null = null) {
+    if (!s.points || s.points.length < 2) return;
+    if (s.lineStyle === "blob" && colorOverride === null) {
+      this._drawFreeStrokeBlobs(s);
+      return;
+    }
+    const ctx = this.ctx;
+    const cam = this.camera;
+    const pts = this._renderPointsForFreeStroke(s);
+    ctx.save();
+    ctx.strokeStyle = colorOverride || rgbaFromHex(s.color, s.opacity);
+    ctx.lineWidth = widthOverridePx != null ? widthOverridePx : this.segStrokePx(s.thicknessM);
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.setLineDash(this._dashForFreeStroke(s));
+    const p0 = cam.worldToScreen(pts[0].x, pts[0].y);
+    ctx.beginPath();
+    ctx.moveTo(p0.x, p0.y);
+    for (let i = 1; i < pts.length; i++) {
+      const p = cam.worldToScreen(pts[i].x, pts[i].y);
+      ctx.lineTo(p.x, p.y);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+
+  private _drawFreeStrokesForLabel(labelId: string) {
+    for (const s of this._freeStrokesForLabel(labelId)) this._drawSingleFreeStroke(s);
+  }
+
+  /** Public: Wird vom FreeDrawTool für Live-Vorschau verwendet. */
+  drawFreeStrokePreview(points: Vec2[], style: {
+    color: string; thicknessM: number; opacity: number; lineStyle: import("./Scene").FreeLineStyle;
+    gapM: number; blobSpacingM: number; blobSizeM: number; smoothing: boolean;
+  }) {
+    if (!points || points.length < 2) return;
+    const tmp = new FreeStroke({ id: "_preview", points, ...style });
+    this._drawSingleFreeStroke(tmp);
+  }
+
+  // ---- Ruler Guide ----
+  private _drawRulerGuide() {
+    const g = this.scene.rulerGuide;
+    if (!g) return;
+    const ctx = this.ctx;
+    const cam = this.camera;
+    const a = cam.worldToScreen(g.a.x, g.a.y);
+    const b = cam.worldToScreen(g.b.x, g.b.y);
+    ctx.save();
+    ctx.strokeStyle = "rgba(77,163,255,0.85)";
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([8, 5]);
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    // Endpunkt-Marker
+    for (const p of [a, b]) {
+      ctx.fillStyle = "rgba(77,163,255,0.95)";
+      ctx.strokeStyle = "#fff";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+    ctx.restore();
   }
 }
