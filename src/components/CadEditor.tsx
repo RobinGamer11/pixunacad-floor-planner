@@ -19,6 +19,8 @@ const CAD_TOOLS = [
   { id: ToolIds.PIPETTE, label: "Pipette", key: "P", icon: Pipette },
   { id: ToolIds.STICKER, label: "Sticker", key: "O", icon: StickerIcon },
   { id: ToolIds.DOCUMENT, label: "Dokument", key: "D", icon: FileImage },
+  { id: ToolIds.FREE, label: "Freihand", key: "F", icon: Pencil },
+  { id: ToolIds.ERASER, label: "Radiergummi", key: "E", icon: Eraser },
 ];
 
 const CadEditor: React.FC = () => {
