@@ -326,6 +326,7 @@ export class Scene {
   private _textIdMap = new Map<string, TextBox>();
   private _stickerIdMap = new Map<string, StickerInstance>();
   private _docIdMap = new Map<string, DocumentObject>();
+  private _freeIdMap = new Map<string, FreeStroke>();
 
   private _makeId(): string {
     return (crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now() + Math.random());
@@ -359,6 +360,63 @@ export class Scene {
   private _rebuildDocIdMap() {
     this._docIdMap.clear();
     for (const d of this.documents) this._docIdMap.set(d.id, d);
+  }
+
+  private _rebuildFreeIdMap() {
+    this._freeIdMap.clear();
+    for (const s of this.freeStrokes) this._freeIdMap.set(s.id, s);
+  }
+
+  // ---- FreeStrokes (Freihandzeichnen) ----
+  createFreeStroke(points: Vec2[], style: {
+    color?: string; thicknessM?: number; opacity?: number; lineStyle?: FreeLineStyle;
+    gapM?: number; blobSpacingM?: number; blobSizeM?: number; smoothing?: boolean; labelId?: string;
+  } = {}) {
+    const stroke = new FreeStroke({ id: this._makeId(), points, ...style });
+    stroke._stickerEditOwnerId = this._currentEditOwnerId;
+    this.freeStrokes.push(stroke);
+    this._rebuildFreeIdMap();
+    return stroke;
+  }
+
+  getFreeStrokeById(id: string): FreeStroke | null { return this._freeIdMap.get(id) || null; }
+
+  getFreeStrokesByLabelId(labelId: string): FreeStroke[] {
+    return this.freeStrokes.filter(s => s.labelId === labelId);
+  }
+
+  removeFreeStroke(s: FreeStroke) {
+    this.freeStrokes = this.freeStrokes.filter(x => x !== s);
+    this._rebuildFreeIdMap();
+  }
+
+  removeFreeStrokesByIds(ids: string[]) {
+    const set = new Set(ids);
+    this.freeStrokes = this.freeStrokes.filter(s => !set.has(s.id));
+    this._rebuildFreeIdMap();
+  }
+
+  removeFreeStrokesByLabelId(labelId: string) {
+    this.freeStrokes = this.freeStrokes.filter(s => s.labelId !== labelId);
+    this._rebuildFreeIdMap();
+  }
+
+  reassignFreeStrokesLabel(oldId: string, newId: string) {
+    for (const s of this.freeStrokes) if (s.labelId === oldId) s.labelId = newId;
+  }
+
+  /** Ersetzt einen Stroke durch beliebig viele Sub-Strokes (Eraser-Splitting). */
+  replaceFreeStrokeWithChunks(stroke: FreeStroke, chunks: Vec2[][]) {
+    this.removeFreeStroke(stroke);
+    for (const ch of chunks) {
+      if (!ch || ch.length < 2) continue;
+      this.createFreeStroke(ch, {
+        color: stroke.color, thicknessM: stroke.thicknessM, opacity: stroke.opacity,
+        lineStyle: stroke.lineStyle, gapM: stroke.gapM,
+        blobSpacingM: stroke.blobSpacingM, blobSizeM: stroke.blobSizeM,
+        smoothing: stroke.smoothing, labelId: stroke.labelId,
+      });
+    }
   }
 
   // ---- Documents (PDF/JPG/PNG) ----
