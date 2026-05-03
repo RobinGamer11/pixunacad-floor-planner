@@ -457,6 +457,18 @@ export class CadApp {
         widthM: d.widthM, heightM: d.heightM, rotationRad: d.rotationRad,
         pixelWidth: d.pixelWidth, pixelHeight: d.pixelHeight, labelId: d.labelId,
       })),
+      freeStrokes: scene.freeStrokes.map(s => ({
+        id: s.id, points: s.points.map(p => ({ x: p.x, y: p.y })),
+        color: s.color, thicknessM: s.thicknessM, opacity: s.opacity,
+        lineStyle: s.lineStyle, gapM: s.gapM,
+        blobSpacingM: s.blobSpacingM, blobSizeM: s.blobSizeM,
+        smoothing: s.smoothing, labelId: s.labelId,
+        _stickerEditOwnerId: s._stickerEditOwnerId || null,
+      })),
+      rulerGuide: scene.rulerGuide ? {
+        a: { x: scene.rulerGuide.a.x, y: scene.rulerGuide.a.y },
+        b: { x: scene.rulerGuide.b.x, y: scene.rulerGuide.b.y },
+      } : null,
     };
   }
 
