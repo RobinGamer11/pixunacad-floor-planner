@@ -9,6 +9,8 @@ import { importFile, type ImportedPage } from "@/cad/documentImport";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { FreeDrawSettingsPanel } from "@/components/cad/FreeDrawSettingsPanel";
+import { EraserSettingsPanel } from "@/components/cad/EraserSettingsPanel";
 
 const CAD_TOOLS = [
   { id: ToolIds.SELECT, label: "Auswahl", key: "V", icon: MousePointer2 },
