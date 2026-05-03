@@ -303,6 +303,7 @@ export class FreeStroke {
 export interface RulerGuide {
   a: Vec2;
   b: Vec2;
+}
 
 export class Scene {
   segments: Segment[] = [];
