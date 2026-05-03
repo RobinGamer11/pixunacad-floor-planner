@@ -19,6 +19,8 @@ import { Clipboard, buildClipboardFromSelection, commitClipboardAt, translatedIt
 import { StickerTool } from "./StickerTool";
 import { StickerDefinition, buildStickerFromSelection, buildStickerFromIds, StickerIdSet, exportStickersToJson, importStickersFromJson, instanceBoundingCornersWorld, transformedInstanceItems, pointInInstance, localItemsBounds } from "./StickerManager";
 import { DocumentTool } from "./DocumentTool";
+import { FreeDrawTool } from "./FreeDrawTool";
+import { EraserTool } from "./EraserTool";
 
 import { IdPanel } from "./IdPanel";
 import { SheetManager, SheetOverlayStore, SheetDefaults } from "./SheetManager";
@@ -150,6 +152,17 @@ export class CadApp {
   defaultTextBorderColor = Defaults.textBorderColor;
   defaultTextBorderWidthPx = Defaults.textBorderWidthPx;
 
+  // Freihand-Defaults
+  defaultFreeColor = Defaults.freeColor;
+  defaultFreeThicknessM = Defaults.freeThicknessM;
+  defaultFreeOpacity = Defaults.freeOpacity;
+  defaultFreeLineStyle: "solid" | "dashed" | "dotted" | "dashdot" | "blob" = Defaults.freeLineStyle;
+  defaultFreeGapM = Defaults.freeGapM;
+
+  // Eraser-Defaults
+  defaultEraserRadiusM = Defaults.eraserRadiusM;
+  defaultEraserStrength = Defaults.eraserStrength;
+
   camera: Camera;
   scene: Scene;
   input: Input;
@@ -172,7 +185,9 @@ export class CadApp {
   pipetteTool!: PipetteTool;
   stickerTool!: StickerTool;
   documentTool!: DocumentTool;
-  activeTool: SelectTool | LineTool | HatchTool | MeasureTool | TextTool | PipetteTool | StickerTool | DocumentTool;
+  freeDrawTool!: FreeDrawTool;
+  eraserTool!: EraserTool;
+  activeTool: SelectTool | LineTool | HatchTool | MeasureTool | TextTool | PipetteTool | StickerTool | DocumentTool | FreeDrawTool | EraserTool;
 
   // Clipboard + Paste-Vorschau
   clipboard: Clipboard | null = null;
@@ -357,6 +372,8 @@ export class CadApp {
     this.pipetteTool = new PipetteTool(this);
     this.stickerTool = new StickerTool(this);
     this.documentTool = new DocumentTool(this);
+    this.freeDrawTool = new FreeDrawTool(this);
+    this.eraserTool = new EraserTool(this);
     this.activeTool = this.selectTool;
 
     this.idPanel = new IdPanel(this, idPanelRoot, idPanelBody, idPanelList, idPanelAddBtn, idPanelToggleBtn);
@@ -440,6 +457,18 @@ export class CadApp {
         widthM: d.widthM, heightM: d.heightM, rotationRad: d.rotationRad,
         pixelWidth: d.pixelWidth, pixelHeight: d.pixelHeight, labelId: d.labelId,
       })),
+      freeStrokes: scene.freeStrokes.map(s => ({
+        id: s.id, points: s.points.map(p => ({ x: p.x, y: p.y })),
+        color: s.color, thicknessM: s.thicknessM, opacity: s.opacity,
+        lineStyle: s.lineStyle, gapM: s.gapM,
+        blobSpacingM: s.blobSpacingM, blobSizeM: s.blobSizeM,
+        smoothing: s.smoothing, labelId: s.labelId,
+        _stickerEditOwnerId: s._stickerEditOwnerId || null,
+      })),
+      rulerGuide: scene.rulerGuide ? {
+        a: { x: scene.rulerGuide.a.x, y: scene.rulerGuide.a.y },
+        b: { x: scene.rulerGuide.b.x, y: scene.rulerGuide.b.y },
+      } : null,
     };
   }
 
@@ -450,13 +479,31 @@ export class CadApp {
     scene.textBoxes = [];
     scene.stickerInstances = [];
     scene.documents = [];
+    scene.freeStrokes = [];
+    scene.rulerGuide = null;
     (scene as any)._rebuildSegIdMap?.();
     (scene as any)._rebuildHatchIdMap?.();
     (scene as any)._rebuildDimIdMap?.();
     (scene as any)._rebuildTextIdMap?.();
     (scene as any)._rebuildStickerIdMap?.();
     (scene as any)._rebuildDocIdMap?.();
+    (scene as any)._rebuildFreeIdMap?.();
     if (!data) return;
+    for (const s of data.freeStrokes || []) {
+      const stroke = scene.createFreeStroke(s.points || [], {
+        color: s.color, thicknessM: s.thicknessM, opacity: s.opacity,
+        lineStyle: s.lineStyle, gapM: s.gapM,
+        blobSpacingM: s.blobSpacingM, blobSizeM: s.blobSizeM,
+        smoothing: s.smoothing, labelId: s.labelId,
+      });
+      if (s._stickerEditOwnerId) stroke._stickerEditOwnerId = s._stickerEditOwnerId;
+    }
+    if (data.rulerGuide && data.rulerGuide.a && data.rulerGuide.b) {
+      scene.rulerGuide = {
+        a: { x: data.rulerGuide.a.x, y: data.rulerGuide.a.y },
+        b: { x: data.rulerGuide.b.x, y: data.rulerGuide.b.y },
+      };
+    }
     for (const s of data.segments || []) {
       const seg = scene.createSegment(s.a, s.b, { color: s.color, thicknessM: s.thicknessM, labelId: s.labelId });
       if (s._stickerEditOwnerId) seg._stickerEditOwnerId = s._stickerEditOwnerId;
@@ -1573,6 +1620,8 @@ export class CadApp {
       if (e.key === "p" || e.key === "P") this.setTool(ToolIds.PIPETTE);
       if (e.key === "o" || e.key === "O") this.setTool(ToolIds.STICKER);
       if (e.key === "d" || e.key === "D") this.setTool(ToolIds.DOCUMENT);
+      if (e.key === "f" || e.key === "F") this.setTool(ToolIds.FREE);
+      if (e.key === "e" || e.key === "E") this.setTool(ToolIds.ERASER);
 
       if (e.key === "Escape") {
         if (this.isStickerEditing()) { this.exitStickerEdit(); this.clearSelection(); return; }
@@ -1859,6 +1908,8 @@ export class CadApp {
     else if (id === ToolIds.PIPETTE) { this.activeTool = this.pipetteTool; this.pipetteTool.activate(); }
     else if (id === ToolIds.STICKER) { this.activeTool = this.stickerTool; this.stickerTool.activate(); }
     else if (id === ToolIds.DOCUMENT) { this.activeTool = this.documentTool; this.documentTool.activate(); }
+    else if (id === ToolIds.FREE) { this.activeTool = this.freeDrawTool; this.freeDrawTool.activate(); }
+    else if (id === ToolIds.ERASER) { this.activeTool = this.eraserTool; this.eraserTool.activate(); }
     this._syncLineSettingsFromContext();
     this._syncHatchSettingsFromContext();
     this._syncMeasureSettingsFromContext();

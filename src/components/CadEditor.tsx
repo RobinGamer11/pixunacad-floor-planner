@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import { CadApp } from "@/cad/CadApp";
 import { ToolIds, PointEditAction } from "@/cad/constants";
-import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Pipette, Sticker as StickerIcon, Pencil, Trash2, Download, Upload, Plus, FileImage, Maximize2, Ruler as RulerIcon } from "lucide-react";
+import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Pipette, Sticker as StickerIcon, Pencil, Trash2, Download, Upload, Plus, FileImage, Maximize2, Ruler as RulerIcon, Eraser } from "lucide-react";
 import type { HatchDrawMode } from "@/cad/HatchTool";
 import type { StickerDefinition } from "@/cad/StickerManager";
 import { instanceBoundingCornersWorld } from "@/cad/StickerManager";
@@ -9,6 +9,8 @@ import { importFile, type ImportedPage } from "@/cad/documentImport";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { FreeDrawSettingsPanel } from "@/components/cad/FreeDrawSettingsPanel";
+import { EraserSettingsPanel } from "@/components/cad/EraserSettingsPanel";
 
 const CAD_TOOLS = [
   { id: ToolIds.SELECT, label: "Auswahl", key: "V", icon: MousePointer2 },
@@ -19,6 +21,8 @@ const CAD_TOOLS = [
   { id: ToolIds.PIPETTE, label: "Pipette", key: "P", icon: Pipette },
   { id: ToolIds.STICKER, label: "Sticker", key: "O", icon: StickerIcon },
   { id: ToolIds.DOCUMENT, label: "Dokument", key: "D", icon: FileImage },
+  { id: ToolIds.FREE, label: "Freihand", key: "F", icon: Pencil },
+  { id: ToolIds.ERASER, label: "Radiergummi", key: "E", icon: Eraser },
 ];
 
 const CadEditor: React.FC = () => {
@@ -978,6 +982,16 @@ const CadEditor: React.FC = () => {
                 </div>
               </div>
             </div>
+          )}
+
+          {/* Freihand-Tool-Panel */}
+          {!sidebarCollapsed && activeTool === ToolIds.FREE && (
+            <FreeDrawSettingsPanel app={appRef.current} />
+          )}
+
+          {/* Eraser-Tool-Panel */}
+          {!sidebarCollapsed && activeTool === ToolIds.ERASER && (
+            <EraserSettingsPanel app={appRef.current} />
           )}
 
           {/* Document-Eigenschaften: nur im Auswahl-Tool, wenn Dokument selektiert */}
