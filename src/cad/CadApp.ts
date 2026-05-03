@@ -479,13 +479,31 @@ export class CadApp {
     scene.textBoxes = [];
     scene.stickerInstances = [];
     scene.documents = [];
+    scene.freeStrokes = [];
+    scene.rulerGuide = null;
     (scene as any)._rebuildSegIdMap?.();
     (scene as any)._rebuildHatchIdMap?.();
     (scene as any)._rebuildDimIdMap?.();
     (scene as any)._rebuildTextIdMap?.();
     (scene as any)._rebuildStickerIdMap?.();
     (scene as any)._rebuildDocIdMap?.();
+    (scene as any)._rebuildFreeIdMap?.();
     if (!data) return;
+    for (const s of data.freeStrokes || []) {
+      const stroke = scene.createFreeStroke(s.points || [], {
+        color: s.color, thicknessM: s.thicknessM, opacity: s.opacity,
+        lineStyle: s.lineStyle, gapM: s.gapM,
+        blobSpacingM: s.blobSpacingM, blobSizeM: s.blobSizeM,
+        smoothing: s.smoothing, labelId: s.labelId,
+      });
+      if (s._stickerEditOwnerId) stroke._stickerEditOwnerId = s._stickerEditOwnerId;
+    }
+    if (data.rulerGuide && data.rulerGuide.a && data.rulerGuide.b) {
+      scene.rulerGuide = {
+        a: { x: data.rulerGuide.a.x, y: data.rulerGuide.a.y },
+        b: { x: data.rulerGuide.b.x, y: data.rulerGuide.b.y },
+      };
+    }
     for (const s of data.segments || []) {
       const seg = scene.createSegment(s.a, s.b, { color: s.color, thicknessM: s.thicknessM, labelId: s.labelId });
       if (s._stickerEditOwnerId) seg._stickerEditOwnerId = s._stickerEditOwnerId;
