@@ -169,10 +169,13 @@ export class Renderer {
       this._drawDocumentsForLabel(labelId);
       this._drawHatchesForLabel(labelId);
       this._drawSegmentsForLabel(labelId);
+      this._drawFreeStrokesForLabel(labelId);
       this._drawDimensionsForLabel(labelId);
       this._drawTextBoxesForLabel(labelId);
       this._drawStickerInstancesForLabel(labelId);
     }
+    // Ruler-Guide (Lineal) immer ganz oben in der aktiven Scene zeichnen.
+    this._drawRulerGuide();
   }
 
   render() {
