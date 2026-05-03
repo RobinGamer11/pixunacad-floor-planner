@@ -103,6 +103,7 @@ export const SelectionType = {
   TEXTBOX_HANDLE: "textbox_handle",
   STICKER_INSTANCE: "sticker_instance",
   DOCUMENT: "document",
+  FREE_STROKE: "free_stroke",
 } as const;
 
 export const SnapType = {
