@@ -263,7 +263,47 @@ export class DocumentObject {
   }
 }
 
-export class Scene {
+export type FreeLineStyle = "solid" | "dashed" | "dotted" | "dashdot" | "blob";
+
+export class FreeStroke {
+  id: string;
+  points: Vec2[];
+  color: string;
+  thicknessM: number;
+  opacity: number;
+  lineStyle: FreeLineStyle;
+  gapM: number;
+  blobSpacingM: number;
+  blobSizeM: number;
+  smoothing: boolean;
+  labelId: string;
+  _stickerEditOwnerId?: string | null;
+
+  constructor(opts: {
+    id: string; points: Vec2[]; color?: string; thicknessM?: number; opacity?: number;
+    lineStyle?: FreeLineStyle; gapM?: number; blobSpacingM?: number; blobSizeM?: number;
+    smoothing?: boolean; labelId?: string;
+  }) {
+    this.id = opts.id;
+    this.points = opts.points.map(p => v(p.x, p.y));
+    this.color = opts.color || Defaults.freeColor;
+    this.thicknessM = (typeof opts.thicknessM === "number" && opts.thicknessM > 0) ? opts.thicknessM : Defaults.freeThicknessM;
+    this.opacity = clamp(typeof opts.opacity === "number" ? opts.opacity : Defaults.freeOpacity, 0, 1);
+    this.lineStyle = opts.lineStyle || (Defaults.freeLineStyle as FreeLineStyle);
+    this.gapM = (typeof opts.gapM === "number" && opts.gapM > 0) ? opts.gapM : Defaults.freeGapM;
+    this.blobSpacingM = (typeof opts.blobSpacingM === "number" && opts.blobSpacingM > 0) ? opts.blobSpacingM : Defaults.freeBlobSpacingM;
+    this.blobSizeM = (typeof opts.blobSizeM === "number" && opts.blobSizeM > 0) ? opts.blobSizeM : Defaults.freeBlobSizeM;
+    this.smoothing = (typeof opts.smoothing === "boolean") ? opts.smoothing : Defaults.freeSmooth;
+    this.labelId = opts.labelId || Defaults.defaultLabelId;
+    this._stickerEditOwnerId = null;
+  }
+}
+
+/** Hilfslinie (Lineal) für das Eraser-Tool. Optional, max. 1 pro Scene. */
+export interface RulerGuide {
+  a: Vec2;
+  b: Vec2;
+}
   segments: Segment[] = [];
   hatches: Hatch[] = [];
   dimensions: Dimension[] = [];
