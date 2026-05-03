@@ -55,6 +55,23 @@ export const Defaults = {
   textMinBoxSizeM: 0.05,
   textHandlePx: 10,
 
+  // FreeDraw defaults
+  freeColor: "#111111",
+  freeThicknessM: 0.03,
+  freeOpacity: 1.0,
+  freeLineStyle: "solid" as "solid" | "dashed" | "dotted" | "dashdot" | "blob",
+  freeGapM: 0.08,
+  freeSmooth: true,
+  freeSampleMinPx: 2.5,
+  freeBlobSpacingM: 0.12,
+  freeBlobSizeM: 0.06,
+
+  // Eraser defaults
+  eraserRadiusM: 0.12,
+  eraserStrength: 1.0,
+  eraserOpacity: 1.0,
+  eraserUseRuler: false,
+
   // Document import defaults
   // 96 DPI assumption: 96 px = 1 inch = 0.0254 m -> 1 px = 0.0254/96 m
   documentMetersPerPx: 0.0254 / 96,
@@ -73,6 +90,8 @@ export const ToolIds = {
   PIPETTE: "pipette",
   STICKER: "sticker",
   DOCUMENT: "document",
+  FREE: "free",
+  ERASER: "eraser",
 } as const;
 
 export const SelectionType = {
@@ -84,6 +103,7 @@ export const SelectionType = {
   TEXTBOX_HANDLE: "textbox_handle",
   STICKER_INSTANCE: "sticker_instance",
   DOCUMENT: "document",
+  FREE_STROKE: "free_stroke",
 } as const;
 
 export const SnapType = {
