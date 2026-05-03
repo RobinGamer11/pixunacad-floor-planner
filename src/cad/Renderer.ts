@@ -1256,6 +1256,8 @@ export class Renderer {
       ctx.stroke();
       ctx.restore();
     }
+  }
+
   // ---- FreeStrokes ----
 
   private _freeStrokesForLabel(labelId: string): FreeStroke[] {
