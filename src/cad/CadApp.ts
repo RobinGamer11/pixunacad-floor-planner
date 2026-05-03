@@ -19,6 +19,8 @@ import { Clipboard, buildClipboardFromSelection, commitClipboardAt, translatedIt
 import { StickerTool } from "./StickerTool";
 import { StickerDefinition, buildStickerFromSelection, buildStickerFromIds, StickerIdSet, exportStickersToJson, importStickersFromJson, instanceBoundingCornersWorld, transformedInstanceItems, pointInInstance, localItemsBounds } from "./StickerManager";
 import { DocumentTool } from "./DocumentTool";
+import { FreeDrawTool } from "./FreeDrawTool";
+import { EraserTool } from "./EraserTool";
 
 import { IdPanel } from "./IdPanel";
 import { SheetManager, SheetOverlayStore, SheetDefaults } from "./SheetManager";
