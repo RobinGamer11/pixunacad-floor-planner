@@ -185,7 +185,9 @@ export class CadApp {
   pipetteTool!: PipetteTool;
   stickerTool!: StickerTool;
   documentTool!: DocumentTool;
-  activeTool: SelectTool | LineTool | HatchTool | MeasureTool | TextTool | PipetteTool | StickerTool | DocumentTool;
+  freeDrawTool!: FreeDrawTool;
+  eraserTool!: EraserTool;
+  activeTool: SelectTool | LineTool | HatchTool | MeasureTool | TextTool | PipetteTool | StickerTool | DocumentTool | FreeDrawTool | EraserTool;
 
   // Clipboard + Paste-Vorschau
   clipboard: Clipboard | null = null;
