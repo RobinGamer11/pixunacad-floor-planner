@@ -240,12 +240,22 @@ export class DocumentObject {
   labelId: string;
   /** Beim Import gewählter Plan-Maßstab (Nenner). z. B. 100 für 1:100. Kann nachträglich geändert werden. */
   importScaleDenom: number;
+  /**
+   * Persistente Pixelmaske (Alpha) für den Radiergummi.
+   * Als PNG-DataURL serialisiert. null = keine Radierung.
+   * Wird in Renderer/Eraser lazy in HTMLCanvasElement umgewandelt.
+   */
+  eraseMaskDataUrl: string | null;
+  /** Runtime-Cache (NICHT serialisiert): Maske als Canvas. */
+  _eraseMask?: HTMLCanvasElement | null;
+  /** Runtime-Flag: Maske wurde verändert → Composite-Cache invalidieren + DataUrl neu exportieren. */
+  _eraseMaskDirty?: boolean;
 
-  constructor({ id, name, kind, src, pageIndex, position, widthM, heightM, rotationRad, pixelWidth, pixelHeight, labelId, importScaleDenom }: {
+  constructor({ id, name, kind, src, pageIndex, position, widthM, heightM, rotationRad, pixelWidth, pixelHeight, labelId, importScaleDenom, eraseMaskDataUrl }: {
     id: string; name?: string; kind?: "image" | "pdf-page"; src: string;
     pageIndex?: number; position: Vec2; widthM: number; heightM: number;
     rotationRad?: number; pixelWidth?: number; pixelHeight?: number; labelId?: string;
-    importScaleDenom?: number;
+    importScaleDenom?: number; eraseMaskDataUrl?: string | null;
   }) {
     this.id = id;
     this.name = name || "Dokument";
@@ -260,6 +270,9 @@ export class DocumentObject {
     this.pixelHeight = pixelHeight || 0;
     this.labelId = labelId || Defaults.defaultLabelId;
     this.importScaleDenom = (typeof importScaleDenom === "number" && importScaleDenom > 0) ? importScaleDenom : 100;
+    this.eraseMaskDataUrl = eraseMaskDataUrl || null;
+    this._eraseMask = null;
+    this._eraseMaskDirty = false;
   }
 }
 
