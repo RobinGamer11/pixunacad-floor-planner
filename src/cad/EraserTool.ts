@@ -5,6 +5,7 @@ import type { Input } from "./Input";
 import type { Segment, FreeStroke } from "./Scene";
 import { splitPolylineByCircle, splitSegmentByCircle, projectPointToInfiniteLineFromTwoPoints } from "./freeGeom";
 import { eraseDocCircle } from "./documentMask";
+import { RulerDragController } from "./rulerInteraction";
 
 /**
  * Radiergummi-Werkzeug (Hotkey: E).
@@ -18,14 +19,17 @@ export class EraserTool {
 
   private _erasing = false;
   private _lastWorld: Vec2 | null = null;
+  private _rulerDrag!: RulerDragController;
 
   constructor(app: CadApp) {
     this.app = app;
+    this._rulerDrag = new RulerDragController(app);
   }
 
   activate() {
     this._erasing = false;
     this._lastWorld = null;
+    this._rulerDrag.reset();
     this.app.hub.hide();
     this.app.pointEditMenu.hide();
     this.app.renderer.setHoverSegmentId(null);
@@ -38,9 +42,17 @@ export class EraserTool {
   }
 
   finish() { this.cancel(); }
-  getCursor() { return "none"; }
+  getCursor() {
+    const c = this._rulerDrag.hoverCursor(this.app.input);
+    return c || "none";
+  }
 
   update(input: Input) {
+    if (this._rulerDrag.update(input)) {
+      this._erasing = false;
+      this._lastWorld = null;
+      return;
+    }
     const ruler = this.app.scene.rulerGuide;
     const rawW = v(input.mouse.wx, input.mouse.wy);
     const projW = ruler ? projectPointToInfiniteLineFromTwoPoints(rawW, ruler.a, ruler.b) : rawW;
