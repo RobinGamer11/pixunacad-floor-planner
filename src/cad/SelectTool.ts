@@ -744,7 +744,7 @@ export class SelectTool {
     // Hatch polygon hit (pointInPolygon)
     for (const hatch of visibleHatches) {
       if (selectedHatch && hatch.id === selectedHatch.id) continue;
-      if (hatch.points.length >= 3 && pointInPolygon(mouseW, hatch.points)) {
+      if (hatch.points.length >= 3 && pointInHatchSolid(mouseW, hatch.points, hatch.holes)) {
         return { type: SelectionType.HATCH, hatchId: hatch.id, pointIndex: null };
       }
     }
