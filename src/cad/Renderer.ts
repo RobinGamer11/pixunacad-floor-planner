@@ -426,6 +426,35 @@ export class Renderer {
     }
   }
 
+  /** Cache: docId -> composite (image × mask) Canvas, key inkl. mask-rev. */
+  private _docCompositeCache = new Map<string, { canvas: HTMLCanvasElement; srcRef: string; maskRef: HTMLCanvasElement | null }>();
+
+  private _getDocComposite(doc: DocumentObject, img: HTMLImageElement): HTMLCanvasElement | null {
+    // Wenn keine Maske → direkt Bild verwenden (kein Composite nötig).
+    if (!doc.eraseMaskDataUrl && !doc._eraseMask) return null;
+    // Maske lazy holen (initialisiert weiß)
+    const { getOrCreateDocMask } = require("./documentMask") as typeof import("./documentMask");
+    const mask = getOrCreateDocMask(doc);
+    const cached = this._docCompositeCache.get(doc.id);
+    if (cached && cached.srcRef === doc.src && cached.maskRef === mask && !doc._eraseMaskDirty) {
+      return cached.canvas;
+    }
+    const w = img.naturalWidth || img.width;
+    const h = img.naturalHeight || img.height;
+    if (w <= 0 || h <= 0) return null;
+    const c = (cached && cached.canvas) || document.createElement("canvas");
+    c.width = w; c.height = h;
+    const cx = c.getContext("2d")!;
+    cx.clearRect(0, 0, w, h);
+    cx.drawImage(img, 0, 0, w, h);
+    cx.globalCompositeOperation = "destination-in";
+    cx.drawImage(mask, 0, 0, w, h);
+    cx.globalCompositeOperation = "source-over";
+    this._docCompositeCache.set(doc.id, { canvas: c, srcRef: doc.src, maskRef: mask });
+    doc._eraseMaskDirty = false;
+    return c;
+  }
+
   private _drawSingleDocument(doc: DocumentObject) {
     const ctx = this.ctx;
     const cam = this.camera;
@@ -439,7 +468,9 @@ export class Renderer {
     ctx.translate(cs.x, cs.y);
     if (doc.rotationRad) ctx.rotate(doc.rotationRad);
     if (img) {
-      ctx.drawImage(img, -wPx / 2, -hPx / 2, wPx, hPx);
+      const composite = this._getDocComposite(doc, img);
+      const drawSrc: CanvasImageSource = composite || img;
+      ctx.drawImage(drawSrc, -wPx / 2, -hPx / 2, wPx, hPx);
     } else {
       ctx.fillStyle = "rgba(180,180,180,0.3)";
       ctx.fillRect(-wPx / 2, -hPx / 2, wPx, hPx);
