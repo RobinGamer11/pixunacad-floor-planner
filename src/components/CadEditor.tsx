@@ -591,7 +591,7 @@ const CadEditor: React.FC = () => {
                     <button
                       key={v.id}
                       type="button"
-                      onClick={() => handleToolClick(v.id)}
+                      onClick={() => { appRef.current?.setTool(v.id); setActiveTool(v.id); setLineVariant(v.id); }}
                       title={v.label}
                       className={`cad-toolbar-btn flex-1 justify-center h-9 ${active ? "active" : ""}`}
                     >
