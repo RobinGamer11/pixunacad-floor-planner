@@ -382,6 +382,11 @@ export class SelectTool {
       this.app.clearSelection();
       this.app.pointEditMenu.hide();
       this.app.refreshLabelUI();
+    } else if (ctx.target.kind === "hatchHole") {
+      const hatch = ctx.hatch!;
+      this.app.scene.removePointFromHatchHole(hatch, ctx.target.holeIndex, ctx.target.pointIndex);
+      this.app.setSelection({ type: SelectionType.HATCH, hatchId: hatch.id, pointIndex: null });
+      this.app.pointEditMenu.hide();
     } else {
       const hatch = ctx.hatch!;
       if (hatch.points.length > 3) {
