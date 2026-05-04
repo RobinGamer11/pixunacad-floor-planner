@@ -440,6 +440,11 @@ export class SelectTool {
       const hatch = this.app.scene.getHatchById(this.editTarget.hatchId);
       if (!hatch) return;
       hatch.points[this.editTarget.pointIndex] = v(newPoint.x, newPoint.y);
+    } else if (this.editTarget.kind === "hatchHole") {
+      const hatch = this.app.scene.getHatchById(this.editTarget.hatchId);
+      const loop = hatch?.holes?.[this.editTarget.holeIndex];
+      if (!loop) return;
+      loop[this.editTarget.pointIndex] = v(newPoint.x, newPoint.y);
     } else if (this.editTarget.kind === "textboxHandle") {
       // For textbox MOVE/ROTATE: opposite corner is the pivot (fixedKeep);
       // moving handle should land on newPoint. Box width/height stay constant.
