@@ -455,18 +455,29 @@ export class CadApp {
         position: { x: si.position.x, y: si.position.y },
         rotationRad: si.rotationRad, scale: si.scale, labelId: si.labelId,
       })),
-      documents: scene.documents.map(d => ({
-        id: d.id, name: d.name, kind: d.kind, src: d.src, pageIndex: d.pageIndex,
-        position: { x: d.position.x, y: d.position.y },
-        widthM: d.widthM, heightM: d.heightM, rotationRad: d.rotationRad,
-        pixelWidth: d.pixelWidth, pixelHeight: d.pixelHeight, labelId: d.labelId,
-      })),
+      documents: scene.documents.map(d => {
+        // Falls Maske dirty ist, vor Serialisierung in DataUrl exportieren.
+        let maskUrl = d.eraseMaskDataUrl;
+        if (d._eraseMaskDirty && d._eraseMask) {
+          try { maskUrl = d._eraseMask.toDataURL("image/png"); d.eraseMaskDataUrl = maskUrl; d._eraseMaskDirty = false; }
+          catch { /* ignore */ }
+        }
+        return {
+          id: d.id, name: d.name, kind: d.kind, src: d.src, pageIndex: d.pageIndex,
+          position: { x: d.position.x, y: d.position.y },
+          widthM: d.widthM, heightM: d.heightM, rotationRad: d.rotationRad,
+          pixelWidth: d.pixelWidth, pixelHeight: d.pixelHeight, labelId: d.labelId,
+          eraseMaskDataUrl: maskUrl || null,
+        };
+      }),
       freeStrokes: scene.freeStrokes.map(s => ({
         id: s.id, points: s.points.map(p => ({ x: p.x, y: p.y })),
         color: s.color, thicknessM: s.thicknessM, opacity: s.opacity,
         lineStyle: s.lineStyle, gapM: s.gapM,
         blobSpacingM: s.blobSpacingM, blobSizeM: s.blobSizeM,
         smoothing: s.smoothing, labelId: s.labelId,
+        imageSrc: s.imageSrc, imageSizeM: s.imageSizeM,
+        imageSpacingM: s.imageSpacingM, imageRotateAlongPath: s.imageRotateAlongPath,
         _stickerEditOwnerId: s._stickerEditOwnerId || null,
       })),
       rulerGuide: scene.rulerGuide ? {
