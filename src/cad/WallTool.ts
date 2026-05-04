@@ -148,7 +148,6 @@ export class WallTool {
     if (snap.wallLine === want) return snap;
 
     // Suche bestpassenden Wall-Snap mit gewünschter Linie
-    const { computeWallLines } = require("./wallGeom");
     let best: import("./TopologyEngine").Snap | null = null;
     let bestPx = Defaults.snapPx;
     for (const wall of this.app.scene.walls) {
