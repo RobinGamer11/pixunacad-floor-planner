@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import type { CadApp } from "@/cad/CadApp";
+import { resetDocMask } from "@/cad/documentMask";
 
 interface Props { app: CadApp | null; }
 
@@ -14,6 +15,16 @@ export const EraserSettingsPanel: React.FC<Props> = ({ app }) => {
   }, [app]);
 
   if (!app) return null;
+
+  const resetSelected = () => {
+    const sel = app.selection;
+    if (sel && sel.type === "document" && (sel as any).documentId) {
+      const doc = app.scene.getDocumentById((sel as any).documentId);
+      if (doc) { resetDocMask(doc); return; }
+    }
+    if (!confirm("Keine Dokument-Auswahl. Radierung ALLER Dokumente in dieser Szene zurücksetzen?")) return;
+    for (const d of app.scene.documents) resetDocMask(d);
+  };
 
   return (
     <div className="cad-settings-panel mb-2">
@@ -33,8 +44,13 @@ export const EraserSettingsPanel: React.FC<Props> = ({ app }) => {
             className="w-full" />
         </label>
 
+        <button type="button" onClick={resetSelected}
+          className="cad-toolbar-btn w-full justify-center h-9">
+          <span className="text-xs">Radierung zurücksetzen</span>
+        </button>
+
         <div className="text-[11px] leading-relaxed pt-2" style={{ color: "hsl(var(--cad-toolbar-muted))", borderTop: "1px solid hsl(var(--border))" }}>
-          Maus gedrückt halten → radieren. Wirkt auf Freihand-Striche und Linien (splittet sie).
+          Maus gedrückt halten → radieren. Wirkt auf Freihand-Striche, Linien (splittet sie) und importierte Dokumente (persistent).
         </div>
       </div>
     </div>

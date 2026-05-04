@@ -156,8 +156,12 @@ export class CadApp {
   defaultFreeColor = Defaults.freeColor;
   defaultFreeThicknessM = Defaults.freeThicknessM;
   defaultFreeOpacity = Defaults.freeOpacity;
-  defaultFreeLineStyle: "solid" | "dashed" | "dotted" | "dashdot" | "blob" = Defaults.freeLineStyle;
+  defaultFreeLineStyle: "solid" | "dashed" | "dotted" | "dashdot" | "blob" | "image" = Defaults.freeLineStyle;
   defaultFreeGapM = Defaults.freeGapM;
+  defaultFreeImageSrc: string | null = null;
+  defaultFreeImageSizeM = Defaults.freeImageSizeM;
+  defaultFreeImageSpacingM = Defaults.freeImageSpacingM;
+  defaultFreeImageRotate = Defaults.freeImageRotate;
 
   // Eraser-Defaults
   defaultEraserRadiusM = Defaults.eraserRadiusM;
@@ -451,18 +455,29 @@ export class CadApp {
         position: { x: si.position.x, y: si.position.y },
         rotationRad: si.rotationRad, scale: si.scale, labelId: si.labelId,
       })),
-      documents: scene.documents.map(d => ({
-        id: d.id, name: d.name, kind: d.kind, src: d.src, pageIndex: d.pageIndex,
-        position: { x: d.position.x, y: d.position.y },
-        widthM: d.widthM, heightM: d.heightM, rotationRad: d.rotationRad,
-        pixelWidth: d.pixelWidth, pixelHeight: d.pixelHeight, labelId: d.labelId,
-      })),
+      documents: scene.documents.map(d => {
+        // Falls Maske dirty ist, vor Serialisierung in DataUrl exportieren.
+        let maskUrl = d.eraseMaskDataUrl;
+        if (d._eraseMaskDirty && d._eraseMask) {
+          try { maskUrl = d._eraseMask.toDataURL("image/png"); d.eraseMaskDataUrl = maskUrl; d._eraseMaskDirty = false; }
+          catch { /* ignore */ }
+        }
+        return {
+          id: d.id, name: d.name, kind: d.kind, src: d.src, pageIndex: d.pageIndex,
+          position: { x: d.position.x, y: d.position.y },
+          widthM: d.widthM, heightM: d.heightM, rotationRad: d.rotationRad,
+          pixelWidth: d.pixelWidth, pixelHeight: d.pixelHeight, labelId: d.labelId,
+          eraseMaskDataUrl: maskUrl || null,
+        };
+      }),
       freeStrokes: scene.freeStrokes.map(s => ({
         id: s.id, points: s.points.map(p => ({ x: p.x, y: p.y })),
         color: s.color, thicknessM: s.thicknessM, opacity: s.opacity,
         lineStyle: s.lineStyle, gapM: s.gapM,
         blobSpacingM: s.blobSpacingM, blobSizeM: s.blobSizeM,
         smoothing: s.smoothing, labelId: s.labelId,
+        imageSrc: s.imageSrc, imageSizeM: s.imageSizeM,
+        imageSpacingM: s.imageSpacingM, imageRotateAlongPath: s.imageRotateAlongPath,
         _stickerEditOwnerId: s._stickerEditOwnerId || null,
       })),
       rulerGuide: scene.rulerGuide ? {
@@ -495,6 +510,8 @@ export class CadApp {
         lineStyle: s.lineStyle, gapM: s.gapM,
         blobSpacingM: s.blobSpacingM, blobSizeM: s.blobSizeM,
         smoothing: s.smoothing, labelId: s.labelId,
+        imageSrc: s.imageSrc || null, imageSizeM: s.imageSizeM,
+        imageSpacingM: s.imageSpacingM, imageRotateAlongPath: s.imageRotateAlongPath,
       });
       if (s._stickerEditOwnerId) stroke._stickerEditOwnerId = s._stickerEditOwnerId;
     }
@@ -546,6 +563,7 @@ export class CadApp {
         name: d.name, kind: d.kind, src: d.src, pageIndex: d.pageIndex,
         position: d.position, widthM: d.widthM, heightM: d.heightM, rotationRad: d.rotationRad,
         pixelWidth: d.pixelWidth, pixelHeight: d.pixelHeight, labelId: d.labelId,
+        eraseMaskDataUrl: d.eraseMaskDataUrl || null,
       });
       if (d.id) (doc as any).id = d.id;
     }
