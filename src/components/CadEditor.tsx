@@ -285,6 +285,9 @@ const CadEditor: React.FC = () => {
 
     app.onToolChange = (id) => {
       setActiveTool(id);
+      if (id === ToolIds.LINE || id === ToolIds.FREE || id === ToolIds.ERASER) {
+        setLineVariant(id);
+      }
       setStickerPhase(app.stickerTool.phase);
       setStickerSelCount(app.stickerTool.getSelectionCount());
     };
