@@ -809,8 +809,14 @@ export class Renderer {
       };
       drawPoly(lines.subCorners, wall.color, 1.5);
       drawPoly(lines.mainCorners, wall.color, 2);
+      // Help-Linie nur als gestrichelte Hilfe wenn Wand-Tool aktiv
+      if (this.showWallHelpers) drawPoly(lines.helpCorners, "rgba(120,120,120,0.65)", 1, true);
     }
   }
+
+  /** Wenn aktiv, wird die Mittel-/Helplinie der Wände als Hilfslinie gezeichnet. */
+  showWallHelpers = false;
+  _drawWallsForLabel_dummy() { /* noop, anchor für search-replace */
 
   private _drawHatches() {
     for (const hatch of this._hatchesBackToFront()) this._drawSingleHatch(hatch);
