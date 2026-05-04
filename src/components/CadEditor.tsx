@@ -18,11 +18,16 @@ const CAD_TOOLS = [
   { id: ToolIds.HATCH, label: "Schraffur", key: "H", icon: Square },
   { id: ToolIds.MEASURE, label: "Maßkette", key: "M", icon: Ruler },
   { id: ToolIds.TEXT, label: "Text", key: "T", icon: Type },
-  { id: ToolIds.PIPETTE, label: "Pipette", key: "P", icon: Pipette },
   { id: ToolIds.STICKER, label: "Sticker", key: "O", icon: StickerIcon },
   { id: ToolIds.DOCUMENT, label: "Dokument", key: "D", icon: FileImage },
-  { id: ToolIds.FREE, label: "Freihand", key: "F", icon: Pencil },
-  { id: ToolIds.ERASER, label: "Radiergummi", key: "E", icon: Eraser },
+];
+
+// Sub-Werkzeuge unter "Linie": gemeinsam ein Einstellungsfenster mit
+// drei wählbaren Zeichenarten oben. Letzte Auswahl wird gemerkt.
+const LINE_VARIANTS = [
+  { id: ToolIds.LINE, label: "Linie", icon: Minus },
+  { id: ToolIds.FREE, label: "Freihand", icon: Pencil },
+  { id: ToolIds.ERASER, label: "Radiergummi", icon: Eraser },
 ];
 
 const CadEditor: React.FC = () => {
