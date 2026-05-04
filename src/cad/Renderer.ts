@@ -786,31 +786,57 @@ export class Renderer {
     if (!this.scene.walls || this.scene.walls.length === 0) return;
     const ctx = this.ctx;
     const cam = this.camera;
-    for (const wall of this.scene.walls) {
+    // Auto-Heal: außenwände vor innenwänden auflösen (höhere Priorität)
+    const allWalls = this.scene.walls;
+    for (const wall of allWalls) {
       if (wall.labelId !== labelId) continue;
       if (!this.labels.isVisible(wall.labelId)) continue;
-      const lines = computeWallLines(wall.corners, wall.thicknessM, wall.referenceSide);
-      const drawPoly = (pts: Vec2[], color: string, widthPx: number, dashed?: boolean) => {
-        if (pts.length < 2) return;
+      // Nachbarn = sichtbare andere Wände, gleiche oder höhere Priorität (Außen heilt Innen, nicht umgekehrt für Außenwände → wir heilen immer gegen alle, aber Außen verlieren keine Geometrie an Innen)
+      const others = allWalls.filter(w => w !== wall && this.labels.isVisible(w.labelId)
+        && (wall.kind === "inner" || w.kind === "outer")); // Innenwand heilt gegen alle, Außenwand nur gegen andere Außenwände
+      const healed = computeHealedWallLines(wall, others);
+      const main = healed.mainCorners;
+      const sub = healed.subCorners;
+      if (main.length < 2 || sub.length < 2) continue;
+
+      // Gefüllte Wandkontur: main vorwärts + sub rückwärts → geschlossenes Polygon
+      ctx.save();
+      ctx.beginPath();
+      const a0 = cam.worldToScreen(main[0].x, main[0].y);
+      ctx.moveTo(a0.x, a0.y);
+      for (let i = 1; i < main.length; i++) {
+        const s = cam.worldToScreen(main[i].x, main[i].y);
+        ctx.lineTo(s.x, s.y);
+      }
+      for (let i = sub.length - 1; i >= 0; i--) {
+        const s = cam.worldToScreen(sub[i].x, sub[i].y);
+        ctx.lineTo(s.x, s.y);
+      }
+      ctx.closePath();
+      ctx.fillStyle = "rgba(255,255,255,1)";
+      ctx.fill();
+      ctx.strokeStyle = wall.color;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.restore();
+
+      // Help-Linie nur als gestrichelte Hilfe wenn Wand-Tool aktiv
+      if (this.showWallHelpers && healed.helpCorners.length >= 2) {
         ctx.save();
-        ctx.strokeStyle = color;
-        ctx.lineWidth = widthPx;
-        if (dashed) ctx.setLineDash([5, 4]);
+        ctx.strokeStyle = "rgba(120,120,120,0.65)";
+        ctx.lineWidth = 1;
+        ctx.setLineDash([5, 4]);
         ctx.beginPath();
-        const a0 = cam.worldToScreen(pts[0].x, pts[0].y);
-        ctx.moveTo(a0.x, a0.y);
-        for (let i = 1; i < pts.length; i++) {
-          const s = cam.worldToScreen(pts[i].x, pts[i].y);
+        const h0 = cam.worldToScreen(healed.helpCorners[0].x, healed.helpCorners[0].y);
+        ctx.moveTo(h0.x, h0.y);
+        for (let i = 1; i < healed.helpCorners.length; i++) {
+          const s = cam.worldToScreen(healed.helpCorners[i].x, healed.helpCorners[i].y);
           ctx.lineTo(s.x, s.y);
         }
         ctx.stroke();
         ctx.setLineDash([]);
         ctx.restore();
-      };
-      drawPoly(lines.subCorners, wall.color, 1.5);
-      drawPoly(lines.mainCorners, wall.color, 2);
-      // Help-Linie nur als gestrichelte Hilfe wenn Wand-Tool aktiv
-      if (this.showWallHelpers) drawPoly(lines.helpCorners, "rgba(120,120,120,0.65)", 1, true);
+      }
     }
   }
 
