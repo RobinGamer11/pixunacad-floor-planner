@@ -1374,7 +1374,7 @@ export class Renderer {
     const spacingPx = Math.max(2, s.imageSpacingM * cam.scale);
     // Bild-Größe in Px: längere Kante = imageSizeM
     const aspect = img.naturalWidth / Math.max(1, img.naturalHeight);
-    const longerPx = s.imageSizeM * cam.scale;
+    const longerPx = Math.max(s.imageSizeM, s.thicknessM) * cam.scale;
     let drawW: number, drawH: number;
     if (aspect >= 1) { drawW = longerPx; drawH = longerPx / aspect; }
     else { drawH = longerPx; drawW = longerPx * aspect; }
