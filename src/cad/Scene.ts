@@ -683,9 +683,10 @@ export class Scene {
   createHatch(points: Vec2[], style: {
     fillColor?: string; strokeColor?: string; fillAlphaPct?: number;
     strokeWidthPx?: number; labelId?: string; areaLabel?: Partial<AreaLabel>;
+    holes?: Vec2[][];
   } = {}) {
     const hatch = new Hatch({
-      id: this._makeId(), points,
+      id: this._makeId(), points, holes: style.holes,
       fillColor: style.fillColor, strokeColor: style.strokeColor,
       fillAlphaPct: style.fillAlphaPct, strokeWidthPx: style.strokeWidthPx,
       labelId: style.labelId, areaLabel: style.areaLabel,
