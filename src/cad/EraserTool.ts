@@ -4,6 +4,7 @@ import type { CadApp } from "./CadApp";
 import type { Input } from "./Input";
 import type { Segment, FreeStroke } from "./Scene";
 import { splitPolylineByCircle, splitSegmentByCircle, projectPointToInfiniteLineFromTwoPoints } from "./freeGeom";
+import { eraseDocCircle } from "./documentMask";
 
 /**
  * Radiergummi-Werkzeug (Hotkey: E).
@@ -74,7 +75,14 @@ export class EraserTool {
 
   private _eraseAt(centerW: Vec2) {
     const r = this.app.defaultEraserRadiusM;
+    const strength = this.app.defaultEraserStrength;
     const scene = this.app.scene;
+
+    // Dokument-Pixelmasken radieren
+    for (const doc of scene.documents) {
+      if (!this.app.labelManager.isVisible(doc.labelId)) continue;
+      eraseDocCircle(doc, centerW, r, strength);
+    }
 
     // FreeStrokes splitten
     const freeStrokesCopy = scene.freeStrokes.slice();
