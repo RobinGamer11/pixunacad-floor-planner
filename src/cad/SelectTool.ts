@@ -1288,11 +1288,12 @@ export class SelectTool {
             hatchId: edgeHit.hatch.id,
             pointIndex: null,
             edgeIndex: edgeHit.edgeIndex,
-          });
+            holeIndex: edgeHit.holeIndex,
+          } as any);
           this.app.showHatchSettingsPanel(true);
-          // Mittelpunkt der Kante als Anker für das Menü
-          const a = edgeHit.hatch.points[edgeHit.edgeIndex];
-          const b = edgeHit.hatch.points[(edgeHit.edgeIndex + 1) % edgeHit.hatch.points.length];
+          const loop = edgeHit.holeIndex == null ? edgeHit.hatch.points : edgeHit.hatch.holes[edgeHit.holeIndex];
+          const a = loop[edgeHit.edgeIndex];
+          const b = loop[(edgeHit.edgeIndex + 1) % loop.length];
           const midW = { x: (a.x + b.x) * 0.5, y: (a.y + b.y) * 0.5 };
           const sp = this.app.camera.worldToScreen(midW.x, midW.y);
           this.app.pointEditMenu.showAt(sp.x, sp.y, [PointEditAction.OFFSET]);
