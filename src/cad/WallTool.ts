@@ -50,6 +50,7 @@ export class WallTool {
     this.corners = [];
     this.snap = null;
     this.app.renderer.overlay = { draw: (ctx, cam) => this._drawOverlay(ctx, cam) };
+    this.app.renderer.showWallHelpers = true;
     this.app.hub.hide();
     this.app.pointEditMenu.hide();
   }
@@ -58,6 +59,7 @@ export class WallTool {
     this.state = "idle";
     this.corners = [];
     this.snap = null;
+    this.app.renderer.showWallHelpers = false;
   }
 
   /** Liefert die Bezugslinien-Priorität dieser Wand. */
