@@ -35,6 +35,8 @@ export interface AreaLabel {
 export class Hatch {
   id: string;
   points: Vec2[];
+  /** Carved-out inner loops (holes). Each loop is a closed polygon. */
+  holes: Vec2[][];
   fillColor: string;
   strokeColor: string;
   fillAlphaPct: number;
@@ -43,12 +45,13 @@ export class Hatch {
   areaLabel: AreaLabel;
   _stickerEditOwnerId?: string | null;
 
-  constructor({ id, points, fillColor, strokeColor, fillAlphaPct, strokeWidthPx, labelId, areaLabel }: {
-    id: string; points: Vec2[]; fillColor?: string; strokeColor?: string;
+  constructor({ id, points, holes, fillColor, strokeColor, fillAlphaPct, strokeWidthPx, labelId, areaLabel }: {
+    id: string; points: Vec2[]; holes?: Vec2[][]; fillColor?: string; strokeColor?: string;
     fillAlphaPct?: number; strokeWidthPx?: number; labelId?: string; areaLabel?: Partial<AreaLabel>;
   }) {
     this.id = id;
     this.points = points.map(p => v(p.x, p.y));
+    this.holes = (holes || []).map(loop => loop.map(p => v(p.x, p.y)));
     this.fillColor = fillColor || Defaults.hatchFillColor;
     this.strokeColor = strokeColor || Defaults.hatchStrokeColor;
     this.fillAlphaPct = clamp(fillAlphaPct ?? Defaults.hatchFillAlphaPct, 0, 100);
