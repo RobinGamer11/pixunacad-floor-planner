@@ -1373,8 +1373,27 @@ export class SelectTool {
         return;
       }
 
-      // Hatch-Edge-Hit (irgendeiner sichtbaren Schraffur) → Menü mit Offset-Aktion öffnen.
-      // Wir benutzen _hitTestHatchEdge, das alle Front-to-Back-Hatches durchsucht.
+      // Wand-Hit (Eckpunkt oder Achslinie)
+      {
+        const wallHit = this._hitTestWall(input);
+        if (wallHit) {
+          if (wallHit.pointIndex != null) {
+            this.app.setSelection({ type: SelectionType.POINT, wallId: wallHit.wallId, pointIndex: wallHit.pointIndex } as any);
+            const wall = this.app.scene.getWallById(wallHit.wallId)!;
+            const p = wall.corners[wallHit.pointIndex];
+            const sp = this.app.camera.worldToScreen(p.x, p.y);
+            this.app.pointEditMenu.showAt(sp.x, sp.y, [
+              PointEditAction.MOVE,
+              PointEditAction.TRANSLATE,
+              PointEditAction.DELETE,
+            ]);
+          } else {
+            this.app.setSelection({ type: SelectionType.WALL, wallId: wallHit.wallId } as any);
+          }
+          return;
+        }
+      }
+
       {
         const edgeHit = this._hitTestHatchEdge(input);
         if (edgeHit) {
