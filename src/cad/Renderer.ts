@@ -813,8 +813,21 @@ export class Renderer {
     }
     ctx.closePath();
 
+    // Holes (carved-out inner loops) → evenodd Fill schneidet sie aus
+    const holes = hatch.holes || [];
+    for (const loop of holes) {
+      if (!loop || loop.length < 3) continue;
+      const h0 = cam.worldToScreen(loop[0].x, loop[0].y);
+      ctx.moveTo(h0.x, h0.y);
+      for (let i = 1; i < loop.length; i++) {
+        const hp = cam.worldToScreen(loop[i].x, loop[i].y);
+        ctx.lineTo(hp.x, hp.y);
+      }
+      ctx.closePath();
+    }
+
     ctx.fillStyle = fillCol;
-    ctx.fill();
+    ctx.fill("evenodd");
 
     if (strokePx > 0) {
       ctx.strokeStyle = strokeCol;
