@@ -533,6 +533,18 @@ export class SelectTool {
       if (!n) return;
       const offset = delta.x * n.x + delta.y * n.y;
       this._applyHatchEdgeOffset(offset);
+    } else if (this.editTarget.kind === "wallPoint") {
+      const wall = this.app.scene.getWallById(this.editTarget.wallId);
+      if (!wall || !this.wallPointsOriginal) return;
+      const orig = this.wallPointsOriginal[this.editTarget.pointIndex];
+      wall.corners[this.editTarget.pointIndex] = v(orig.x + delta.x, orig.y + delta.y);
+    } else if (this.editTarget.kind === "wall") {
+      const wall = this.app.scene.getWallById(this.editTarget.wallId);
+      if (!wall || !this.wallPointsOriginal) return;
+      for (let i = 0; i < wall.corners.length; i++) {
+        const orig = this.wallPointsOriginal[i];
+        wall.corners[i] = v(orig.x + delta.x, orig.y + delta.y);
+      }
     }
   }
 
