@@ -9,6 +9,7 @@ import { boxCornersWorld } from "./textGeometry";
 import { drawRichTextBox } from "./textRichRenderer";
 import { transformedInstanceItems, instanceBoundingCornersWorld } from "./StickerManager";
 import { documentCornersWorld, documentCenterWorld } from "./documentGeometry";
+import { getOrCreateDocMask } from "./documentMask";
 
 export interface Selection {
   type: string;
@@ -433,8 +434,7 @@ export class Renderer {
     // Wenn keine Maske → direkt Bild verwenden (kein Composite nötig).
     if (!doc.eraseMaskDataUrl && !doc._eraseMask) return null;
     // Maske lazy holen (initialisiert weiß)
-    const { getOrCreateDocMask } = require("./documentMask") as typeof import("./documentMask");
-    const mask = getOrCreateDocMask(doc);
+    const mask = getOrCreateDocMask(doc, () => { /* re-render via tick */ });
     const cached = this._docCompositeCache.get(doc.id);
     if (cached && cached.srcRef === doc.src && cached.maskRef === mask && !doc._eraseMaskDirty) {
       return cached.canvas;
