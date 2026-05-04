@@ -87,10 +87,16 @@ export class TopologyEngine {
       considerPoint(seg.a, seg, null, 0);
       considerPoint(seg.b, seg, null, 1);
     }
-    // Hatch points
+    // Hatch points (outer + holes)
     for (const hatch of this._hatchesFrontToBack()) {
       for (let i = 0; i < hatch.points.length; i++) {
         considerPoint(hatch.points[i], null, hatch, i);
+      }
+      if (hatch.holes) {
+        for (const loop of hatch.holes) {
+          if (!loop) continue;
+          for (const p of loop) considerPoint(p, null, null, -1);
+        }
       }
     }
     // TextBox corners
