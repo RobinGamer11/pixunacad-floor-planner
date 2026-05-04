@@ -1,9 +1,9 @@
-import { Defaults, SnapType } from "./constants";
+import { Defaults, SnapType, SelectionType } from "./constants";
 import {
   Vec2, v, add, sub, mul, norm, dot, dist, angleDeg, pointFromLengthAngle,
   orthoSnapFromA, nearestAngleToReference, rgbaFromHex,
   lineLineIntersectionInfinite, projectPointToInfiniteLine,
-  normalizeDeg, buildCircleOrSectorPoints
+  normalizeDeg, buildCircleOrSectorPoints, polygonCentroid, pointInPolygon
 } from "./geometry";
 import type { CadApp } from "./CadApp";
 import type { Snap } from "./TopologyEngine";
