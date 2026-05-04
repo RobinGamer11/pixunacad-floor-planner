@@ -552,6 +552,21 @@ export class HatchTool {
 
   private _finishAndCreateHatch(points: Vec2[]) {
     if (points.length < 3) return;
+
+    // Carve into selected hatch (if any), if the new polygon's centroid lies
+    // inside the selected hatch's outer polygon. Loch ohne Auto-Heal:
+    // Inneres Polygon wird zusätzlich als hole eingetragen, bleibt aber
+    // selbst als eigenständige Schraffur sichtbar.
+    const sel = this.app.selection;
+    const targetHatch = (sel && sel.hatchId) ? this.app.scene.getHatchById(sel.hatchId) : null;
+    if (targetHatch && targetHatch.points.length >= 3) {
+      const c = polygonCentroid(points);
+      if (pointInPolygon(c, targetHatch.points)) {
+        if (!targetHatch.holes) targetHatch.holes = [];
+        targetHatch.holes.push(points.map(p => v(p.x, p.y)));
+      }
+    }
+
     this.app.scene.createHatch(points, this.app.getCurrentHatchStyle());
     this.app.clearSelection();
     this.points = [];
