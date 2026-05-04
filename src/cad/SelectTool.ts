@@ -404,6 +404,18 @@ export class SelectTool {
       this.app.scene.removePointFromHatchHole(hatch, ctx.target.holeIndex, ctx.target.pointIndex);
       this.app.setSelection({ type: SelectionType.HATCH, hatchId: hatch.id, pointIndex: null });
       this.app.pointEditMenu.hide();
+    } else if (ctx.target.kind === "wallPoint") {
+      const wall = this.app.scene.getWallById(ctx.target.wallId);
+      if (!wall) return;
+      if (wall.corners.length > 2) {
+        wall.corners.splice(ctx.target.pointIndex, 1);
+        this.app.clearSelection();
+      } else {
+        this.app.scene.removeWall(wall);
+        this.app.clearSelection();
+        this.app.refreshLabelUI();
+      }
+      this.app.pointEditMenu.hide();
     } else {
       const hatch = ctx.hatch!;
       if (hatch.points.length > 3) {
