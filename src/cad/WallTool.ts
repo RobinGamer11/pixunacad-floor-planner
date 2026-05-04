@@ -69,7 +69,7 @@ export class WallTool {
         corners: this.corners,
         customName: this.settings.customName,
         color: this.settings.color,
-        labelId: this.app.getCurrentLabelId?.() ?? Defaults.defaultLabelId,
+        labelId: this.app.activeDrawLabelId || Defaults.defaultLabelId,
       });
     }
     this.cancel();
