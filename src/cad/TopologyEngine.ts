@@ -87,10 +87,16 @@ export class TopologyEngine {
       considerPoint(seg.a, seg, null, 0);
       considerPoint(seg.b, seg, null, 1);
     }
-    // Hatch points
+    // Hatch points (outer + holes)
     for (const hatch of this._hatchesFrontToBack()) {
       for (let i = 0; i < hatch.points.length; i++) {
         considerPoint(hatch.points[i], null, hatch, i);
+      }
+      if (hatch.holes) {
+        for (const loop of hatch.holes) {
+          if (!loop) continue;
+          for (const p of loop) considerPoint(p, null, null, -1);
+        }
       }
     }
     // TextBox corners
@@ -121,6 +127,18 @@ export class TopologyEngine {
     for (const edge of this.scene.getHatchEdges()) {
       if (!this.labels.isVisible(edge.hatch.labelId)) continue;
       considerLine(edge.a, edge.b, null, edge.hatch, edge.edgeIndex);
+    }
+    // Hole edges (Snap-Linien — kein insert-on-snap, da Loops keine "edgeIndex" im Scene-Modell haben)
+    for (const hatch of this._hatchesFrontToBack()) {
+      if (!hatch.holes) continue;
+      for (const loop of hatch.holes) {
+        if (!loop || loop.length < 2) continue;
+        for (let i = 0; i < loop.length; i++) {
+          const a = loop[i];
+          const b = loop[(i + 1) % loop.length];
+          considerLine(a, b, null, null);
+        }
+      }
     }
 
     // Overlay-Sheets (Transparentpause) — nur Snap, nicht editierbar.

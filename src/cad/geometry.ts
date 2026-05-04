@@ -132,6 +132,18 @@ export function pointInPolygon(p: Vec2, poly: Vec2[]): boolean {
   return inside;
 }
 
+/** True if p is inside outer polygon AND not inside any hole loop. */
+export function pointInHatchSolid(p: Vec2, outer: Vec2[], holes?: Vec2[][] | null): boolean {
+  if (!outer || outer.length < 3) return false;
+  if (!pointInPolygon(p, outer)) return false;
+  if (holes) {
+    for (const h of holes) {
+      if (h && h.length >= 3 && pointInPolygon(p, h)) return false;
+    }
+  }
+  return true;
+}
+
 export function rgbaFromHex(hex: string, alpha01: number): string {
   const clean = hex.replace("#", "");
   const full = (clean.length === 3)

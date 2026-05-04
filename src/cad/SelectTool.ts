@@ -1,5 +1,5 @@
 import { Defaults, SnapType, SelectionType, PointEditAction } from "./constants";
-import { Vec2, v, sub, add, mul, dot, dist, angleDeg, pointFromLengthAngle, projectPointToSegment, orthoSnapFromA, nearestAngleToReference, pointInPolygon, polygonCentroid, projectPointToInfiniteLine, lineLineIntersectionInfinite, norm, perpLeft, len } from "./geometry";
+import { Vec2, v, sub, add, mul, dot, dist, angleDeg, pointFromLengthAngle, projectPointToSegment, orthoSnapFromA, nearestAngleToReference, pointInPolygon, pointInHatchSolid, polygonCentroid, projectPointToInfiniteLine, lineLineIntersectionInfinite, norm, perpLeft, len } from "./geometry";
 import type { CadApp } from "./CadApp";
 import type { Snap } from "./TopologyEngine";
 import type { Input } from "./Input";
@@ -667,7 +667,7 @@ export class SelectTool {
         const px = distPxToWorldPoint(selectedHatch.points[i]);
         if (px <= Defaults.hitPx) return { type: SelectionType.POINT, hatchId: selectedHatch.id, pointIndex: i };
       }
-      if (selectedHatch.points.length >= 3 && pointInPolygon(mouseW, selectedHatch.points)) {
+      if (selectedHatch.points.length >= 3 && pointInHatchSolid(mouseW, selectedHatch.points, selectedHatch.holes)) {
         return { type: SelectionType.HATCH, hatchId: selectedHatch.id, pointIndex: null };
       }
     }
@@ -744,7 +744,7 @@ export class SelectTool {
     // Hatch polygon hit (pointInPolygon)
     for (const hatch of visibleHatches) {
       if (selectedHatch && hatch.id === selectedHatch.id) continue;
-      if (hatch.points.length >= 3 && pointInPolygon(mouseW, hatch.points)) {
+      if (hatch.points.length >= 3 && pointInHatchSolid(mouseW, hatch.points, hatch.holes)) {
         return { type: SelectionType.HATCH, hatchId: hatch.id, pointIndex: null };
       }
     }

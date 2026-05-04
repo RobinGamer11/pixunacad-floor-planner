@@ -930,6 +930,7 @@ export class Renderer {
 
     ctx.save();
     if (hatch.points.length >= 3) {
+      // Blue fill: outer minus holes (evenodd)
       ctx.beginPath();
       const p0 = cam.worldToScreen(hatch.points[0].x, hatch.points[0].y);
       ctx.moveTo(p0.x, p0.y);
@@ -938,15 +939,48 @@ export class Renderer {
         ctx.lineTo(sp.x, sp.y);
       }
       ctx.closePath();
+      const holes = hatch.holes || [];
+      for (const loop of holes) {
+        if (!loop || loop.length < 3) continue;
+        const h0 = cam.worldToScreen(loop[0].x, loop[0].y);
+        ctx.moveTo(h0.x, h0.y);
+        for (let i = 1; i < loop.length; i++) {
+          const hp = cam.worldToScreen(loop[i].x, loop[i].y);
+          ctx.lineTo(hp.x, hp.y);
+        }
+        ctx.closePath();
+      }
       ctx.fillStyle = "rgba(77,163,255,0.12)";
-      ctx.fill();
+      ctx.fill("evenodd");
+
+      // Outer outline
+      ctx.beginPath();
+      ctx.moveTo(p0.x, p0.y);
+      for (let i = 1; i < hatch.points.length; i++) {
+        const sp = cam.worldToScreen(hatch.points[i].x, hatch.points[i].y);
+        ctx.lineTo(sp.x, sp.y);
+      }
+      ctx.closePath();
       ctx.strokeStyle = "rgba(77,163,255,0.95)";
       ctx.lineWidth = Math.max(1.5, scaledStrokePx + 1.6);
       ctx.stroke();
+
+      // Hole outlines (sichtbar als Kanten)
+      for (const loop of holes) {
+        if (!loop || loop.length < 3) continue;
+        ctx.beginPath();
+        const h0 = cam.worldToScreen(loop[0].x, loop[0].y);
+        ctx.moveTo(h0.x, h0.y);
+        for (let i = 1; i < loop.length; i++) {
+          const hp = cam.worldToScreen(loop[i].x, loop[i].y);
+          ctx.lineTo(hp.x, hp.y);
+        }
+        ctx.closePath();
+        ctx.stroke();
+      }
     }
 
-    for (let i = 0; i < hatch.points.length; i++) {
-      const sp = cam.worldToScreen(hatch.points[i].x, hatch.points[i].y);
+    const drawHandle = (sp: Vec2, isActive: boolean) => {
       ctx.fillStyle = "rgba(77,163,255,0.12)";
       ctx.strokeStyle = "rgba(77,163,255,0.95)";
       ctx.lineWidth = 2;
@@ -954,8 +988,7 @@ export class Renderer {
       ctx.arc(sp.x, sp.y, 6, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
-
-      if (this.selection.type === SelectionType.POINT && this.selection.pointIndex === i) {
+      if (isActive) {
         ctx.fillStyle = "rgba(77,163,255,0.95)";
         ctx.strokeStyle = "#fff";
         ctx.lineWidth = 2;
@@ -963,6 +996,22 @@ export class Renderer {
         ctx.arc(sp.x, sp.y, 7, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
+      }
+    };
+
+    const sel = this.selection;
+    const isPointSel = sel && sel.type === SelectionType.POINT;
+    for (let i = 0; i < hatch.points.length; i++) {
+      const sp = cam.worldToScreen(hatch.points[i].x, hatch.points[i].y);
+      const active = !!(isPointSel && sel.pointIndex === i);
+      drawHandle(sp, active);
+    }
+    const holes = hatch.holes || [];
+    for (const loop of holes) {
+      if (!loop) continue;
+      for (let i = 0; i < loop.length; i++) {
+        const sp = cam.worldToScreen(loop[i].x, loop[i].y);
+        drawHandle(sp, false);
       }
     }
     ctx.restore();
