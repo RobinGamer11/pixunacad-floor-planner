@@ -739,6 +739,20 @@ export class Scene {
     return true;
   }
 
+  /** Punkt aus einer Hole-Loop entfernen. Bei < 3 verbleibenden Punkten wird die Loop entfernt. */
+  removePointFromHatchHole(hatch: Hatch, holeIndex: number, pointIndex: number): boolean {
+    if (!hatch || !hatch.holes) return false;
+    const loop = hatch.holes[holeIndex];
+    if (!loop) return false;
+    if (pointIndex < 0 || pointIndex >= loop.length) return false;
+    if (loop.length <= 3) {
+      hatch.holes.splice(holeIndex, 1);
+      return true;
+    }
+    loop.splice(pointIndex, 1);
+    return true;
+  }
+
   insertPointIntoHatchEdge(hatch: Hatch, edgeIndex: number, t: number) {
     if (!hatch || hatch.points.length < 2) {
       return { didInsert: false, point: v(0, 0) as Vec2, pointIndex: -1 };
@@ -751,6 +765,21 @@ export class Scene {
     if (t >= 1 - Defaults.splitEpsT) return { didInsert: false, point: v(b.x, b.y), pointIndex: (edgeIndex + 1) % n };
     const p = lerp(a, b, t);
     hatch.points.splice(edgeIndex + 1, 0, v(p.x, p.y));
+    return { didInsert: true, point: p, pointIndex: edgeIndex + 1 };
+  }
+
+  /** Punkt-Insertion in einer Hole-Kante. */
+  insertPointIntoHatchHoleEdge(hatch: Hatch, holeIndex: number, edgeIndex: number, t: number) {
+    const loop = hatch?.holes?.[holeIndex];
+    if (!loop || loop.length < 2) return { didInsert: false, point: v(0, 0) as Vec2, pointIndex: -1 };
+    const n = loop.length;
+    const a = loop[edgeIndex];
+    const b = loop[(edgeIndex + 1) % n];
+    t = clamp(t, 0, 1);
+    if (t <= Defaults.splitEpsT) return { didInsert: false, point: v(a.x, a.y), pointIndex: edgeIndex };
+    if (t >= 1 - Defaults.splitEpsT) return { didInsert: false, point: v(b.x, b.y), pointIndex: (edgeIndex + 1) % n };
+    const p = lerp(a, b, t);
+    loop.splice(edgeIndex + 1, 0, v(p.x, p.y));
     return { didInsert: true, point: p, pointIndex: edgeIndex + 1 };
   }
 

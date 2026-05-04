@@ -12,7 +12,9 @@ import { pointInDocument } from "./documentGeometry";
 type EditTarget =
   | { kind: "segment"; segmentId: string; pointIndex: number }
   | { kind: "hatch"; hatchId: string; pointIndex: number }
+  | { kind: "hatchHole"; hatchId: string; holeIndex: number; pointIndex: number }
   | { kind: "hatchEdge"; hatchId: string; edgeIndex: number }
+  | { kind: "hatchHoleEdge"; hatchId: string; holeIndex: number; edgeIndex: number }
   | { kind: "textboxHandle"; textBoxId: string; handleIndex: number };
 
 export class SelectTool {
@@ -237,10 +239,16 @@ export class SelectTool {
       this.fixedPoint = (ctx.target.pointIndex === 0) ? v(seg.b.x, seg.b.y) : v(seg.a.x, seg.a.y);
       this.otherPointOriginal = (ctx.target.pointIndex === 0) ? v(seg.a.x, seg.a.y) : v(seg.b.x, seg.b.y);
       this.hatchPointsOriginal = null;
+    } else if (ctx.target.kind === "hatchHole") {
+      const hatch = ctx.hatch!;
+      const loop = hatch.holes![ctx.target.holeIndex];
+      const idx = ctx.target.pointIndex;
+      this.fixedPoint = polygonCentroid(loop);
+      this.otherPointOriginal = v(loop[idx].x, loop[idx].y);
+      this.hatchPointsOriginal = loop.map(p => v(p.x, p.y));
     } else {
       const hatch = ctx.hatch!;
       const idx = ctx.target.pointIndex;
-      // For hatch points, pivot for rotate = polygon centroid (excluding moving point gives slightly biased pivot, use centroid of all to feel natural).
       this.fixedPoint = polygonCentroid(hatch.points);
       this.otherPointOriginal = v(hatch.points[idx].x, hatch.points[idx].y);
       this.hatchPointsOriginal = hatch.points.map(p => v(p.x, p.y));
@@ -316,19 +324,22 @@ export class SelectTool {
   }
 
   /** Begin Hatch-Edge-Offset (parallel shift along edge normal). */
-  beginHatchEdgeOffset(hatchId: string, edgeIndex: number) {
+  beginHatchEdgeOffset(hatchId: string, edgeIndex: number, holeIndex: number | null = null) {
     const hatch = this.app.scene.getHatchById(hatchId);
     if (!hatch) return;
-    const n = hatch.points.length;
+    const loop: Vec2[] = holeIndex == null ? hatch.points : (hatch.holes?.[holeIndex] || []);
+    const n = loop.length;
     if (n < 3) return;
 
     this.activeEditAction = PointEditAction.OFFSET;
-    this.editTarget = { kind: "hatchEdge", hatchId, edgeIndex };
+    this.editTarget = holeIndex == null
+      ? { kind: "hatchEdge", hatchId, edgeIndex }
+      : { kind: "hatchHoleEdge", hatchId, holeIndex, edgeIndex };
 
-    const A = hatch.points[edgeIndex];
-    const B = hatch.points[(edgeIndex + 1) % n];
-    const Pp = hatch.points[(edgeIndex - 1 + n) % n];
-    const Nn = hatch.points[(edgeIndex + 2) % n];
+    const A = loop[edgeIndex];
+    const B = loop[(edgeIndex + 1) % n];
+    const Pp = loop[(edgeIndex - 1 + n) % n];
+    const Nn = loop[(edgeIndex + 2) % n];
 
     this.hatchEdgeAOriginal = v(A.x, A.y);
     this.hatchEdgeBOriginal = v(B.x, B.y);
@@ -339,7 +350,7 @@ export class SelectTool {
     const dir = sub(B, A);
     const dirLen = Math.hypot(dir.x, dir.y) || 1;
     const nUnit = v(-dir.y / dirLen, dir.x / dirLen);
-    const c = polygonCentroid(hatch.points);
+    const c = polygonCentroid(loop);
     const toCentroid = sub(c, this.hatchEdgeMidOriginal);
     const sign = (nUnit.x * toCentroid.x + nUnit.y * toCentroid.y) > 0 ? -1 : 1;
     this.hatchEdgeNormal = v(nUnit.x * sign, nUnit.y * sign);
@@ -357,7 +368,7 @@ export class SelectTool {
 
   private _applyHatchEdgeHubValues(vals: { lengthM: number | null; angleDeg: number | null }) {
     if (this.activeEditAction !== PointEditAction.OFFSET || !this.editTarget) return;
-    if (this.editTarget.kind !== "hatchEdge") return;
+    if (this.editTarget.kind !== "hatchEdge" && this.editTarget.kind !== "hatchHoleEdge") return;
     const off = vals.lengthM != null ? vals.lengthM : this.hatchEdgeOffsetM;
     this.hatchEdgeOffsetLocked = true;
     this.hatchEdgeOffsetM = off;
@@ -374,6 +385,11 @@ export class SelectTool {
       this.app.clearSelection();
       this.app.pointEditMenu.hide();
       this.app.refreshLabelUI();
+    } else if (ctx.target.kind === "hatchHole") {
+      const hatch = ctx.hatch!;
+      this.app.scene.removePointFromHatchHole(hatch, ctx.target.holeIndex, ctx.target.pointIndex);
+      this.app.setSelection({ type: SelectionType.HATCH, hatchId: hatch.id, pointIndex: null });
+      this.app.pointEditMenu.hide();
     } else {
       const hatch = ctx.hatch!;
       if (hatch.points.length > 3) {
@@ -432,6 +448,11 @@ export class SelectTool {
       const hatch = this.app.scene.getHatchById(this.editTarget.hatchId);
       if (!hatch) return;
       hatch.points[this.editTarget.pointIndex] = v(newPoint.x, newPoint.y);
+    } else if (this.editTarget.kind === "hatchHole") {
+      const hatch = this.app.scene.getHatchById(this.editTarget.hatchId);
+      const loop = hatch?.holes?.[this.editTarget.holeIndex];
+      if (!loop) return;
+      loop[this.editTarget.pointIndex] = v(newPoint.x, newPoint.y);
     } else if (this.editTarget.kind === "textboxHandle") {
       // For textbox MOVE/ROTATE: opposite corner is the pivot (fixedKeep);
       // moving handle should land on newPoint. Box width/height stay constant.
@@ -508,30 +529,32 @@ export class SelectTool {
 
   /** Apply parallel offset to selected hatch edge. Adjacent endpoints slide along their adjacent edges. */
   private _applyHatchEdgeOffset(offsetM: number) {
-    if (!this.editTarget || this.editTarget.kind !== "hatchEdge") return;
+    if (!this.editTarget) return;
+    if (this.editTarget.kind !== "hatchEdge" && this.editTarget.kind !== "hatchHoleEdge") return;
     const hatch = this.app.scene.getHatchById(this.editTarget.hatchId);
     if (!hatch) return;
+    const loop: Vec2[] = this.editTarget.kind === "hatchEdge"
+      ? hatch.points
+      : (hatch.holes?.[this.editTarget.holeIndex] || []);
+    if (loop.length < 3) return;
     const A0 = this.hatchEdgeAOriginal!;
     const B0 = this.hatchEdgeBOriginal!;
     const Pp = this.hatchEdgePrevOriginal!;
     const Nn = this.hatchEdgeNextOriginal!;
     const n = this.hatchEdgeNormal!;
-    // Offset edge line: line through A0+offset*n with direction (B0-A0)
     const A1 = v(A0.x + n.x * offsetM, A0.y + n.y * offsetM);
     const B1 = v(B0.x + n.x * offsetM, B0.y + n.y * offsetM);
     const dirEdge = sub(B1, A1);
-    // Adjacent edges (original lines)
     const dirPrev = sub(A0, Pp);
     const dirNext = sub(B0, Nn);
     let newA = lineLineIntersectionInfinite(A1, dirEdge, Pp, dirPrev);
     let newB = lineLineIntersectionInfinite(A1, dirEdge, Nn, dirNext);
-    // Fallback: if parallel, just use A1/B1
     if (!newA) newA = A1;
     if (!newB) newB = B1;
     const idxA = this.editTarget.edgeIndex;
-    const idxB = (idxA + 1) % hatch.points.length;
-    hatch.points[idxA] = newA;
-    hatch.points[idxB] = newB;
+    const idxB = (idxA + 1) % loop.length;
+    loop[idxA] = newA;
+    loop[idxB] = newB;
   }
 
   private _isHatchEdgeSelectionActive(): boolean {
@@ -547,7 +570,7 @@ export class SelectTool {
   }
 
   private _getSelectedPointContext() {
-    const sel = this.app.selection;
+    const sel: any = this.app.selection;
     if (!sel || sel.type !== SelectionType.POINT) return null;
     if (sel.segmentId) {
       const segment = this.app.scene.getSegmentById(sel.segmentId);
@@ -563,6 +586,16 @@ export class SelectTool {
       const hatch = this.app.scene.getHatchById(sel.hatchId);
       if (!hatch) return null;
       const idx = sel.pointIndex!;
+      if (sel.holeIndex != null) {
+        const loop = hatch.holes?.[sel.holeIndex];
+        if (!loop || idx < 0 || idx >= loop.length) return null;
+        return {
+          target: { kind: "hatchHole" as const, hatchId: sel.hatchId, holeIndex: sel.holeIndex, pointIndex: idx },
+          segment: null,
+          hatch,
+          point: loop[idx],
+        };
+      }
       if (idx < 0 || idx >= hatch.points.length) return null;
       return {
         target: { kind: "hatch" as const, hatchId: sel.hatchId, pointIndex: idx },
@@ -661,11 +694,19 @@ export class SelectTool {
       return Math.hypot(sp.x - mouseS.x, sp.y - mouseS.y);
     };
 
-    // Priority: selected hatch points
+    // Priority: selected hatch points (outer + holes)
     if (selectedHatch && this.app.labelManager.isVisible(selectedHatch.labelId)) {
       for (let i = 0; i < selectedHatch.points.length; i++) {
         const px = distPxToWorldPoint(selectedHatch.points[i]);
         if (px <= Defaults.hitPx) return { type: SelectionType.POINT, hatchId: selectedHatch.id, pointIndex: i };
+      }
+      const hLoops = selectedHatch.holes || [];
+      for (let h = 0; h < hLoops.length; h++) {
+        const loop = hLoops[h];
+        for (let i = 0; i < loop.length; i++) {
+          const px = distPxToWorldPoint(loop[i]);
+          if (px <= Defaults.hitPx) return { type: SelectionType.POINT, hatchId: selectedHatch.id, holeIndex: h, pointIndex: i } as any;
+        }
       }
       if (selectedHatch.points.length >= 3 && pointInHatchSolid(mouseW, selectedHatch.points, selectedHatch.holes)) {
         return { type: SelectionType.HATCH, hatchId: selectedHatch.id, pointIndex: null };
@@ -752,7 +793,7 @@ export class SelectTool {
     return null;
   }
 
-  /** Look for a hatch edge near mouse; return {hatch, edgeIndex, t} or null. */
+  /** Look for a hatch edge near mouse; return {hatch, edgeIndex, t, holeIndex?} or null. */
   private _hitTestHatchEdge(input: Input) {
     const mouseW = v(input.mouse.wx, input.mouse.wy);
     const mouseS = v(input.mouse.sx, input.mouse.sy);
@@ -764,23 +805,29 @@ export class SelectTool {
     };
 
     const visibleHatches = this.app.topology._hatchesFrontToBack();
-    let best: { hatch: any; edgeIndex: number; t: number } | null = null;
+    let best: { hatch: any; edgeIndex: number; t: number; holeIndex: number | null } | null = null;
     let bestPx = Infinity;
 
-    for (const hatch of visibleHatches) {
-      const n = hatch.points.length;
-      if (n < 2) continue;
+    const tryLoop = (hatch: any, pts: Vec2[], holeIndex: number | null) => {
+      const n = pts.length;
+      if (n < 2) return;
       for (let i = 0; i < n; i++) {
-        const a = hatch.points[i];
-        const b = hatch.points[(i + 1) % n];
+        const a = pts[i];
+        const b = pts[(i + 1) % n];
         const proj = projectPointToSegment(mouseW, a, b);
         if (proj.t <= Defaults.splitEpsT || proj.t >= 1 - Defaults.splitEpsT) continue;
         const px = distPxToWorldPoint(proj.q);
         if (px <= Defaults.hitPx && px < bestPx) {
           bestPx = px;
-          best = { hatch, edgeIndex: i, t: proj.t };
+          best = { hatch, edgeIndex: i, t: proj.t, holeIndex };
         }
       }
+    };
+
+    for (const hatch of visibleHatches) {
+      tryLoop(hatch, hatch.points, null);
+      const loops = hatch.holes || [];
+      for (let h = 0; h < loops.length; h++) tryLoop(hatch, loops[h], h);
     }
     return best;
   }
@@ -1155,13 +1202,15 @@ export class SelectTool {
       }
     }
 
-    // Double-click on hatch edge → insert point
+    // Double-click on hatch edge → insert point (outer or hole)
     if (input.doubleClicked) {
       const edgeHit = this._hitTestHatchEdge(input);
       if (edgeHit) {
-        const result = this.app.scene.insertPointIntoHatchEdge(edgeHit.hatch, edgeHit.edgeIndex, edgeHit.t);
+        const result = edgeHit.holeIndex == null
+          ? this.app.scene.insertPointIntoHatchEdge(edgeHit.hatch, edgeHit.edgeIndex, edgeHit.t)
+          : this.app.scene.insertPointIntoHatchHoleEdge(edgeHit.hatch, edgeHit.holeIndex, edgeHit.edgeIndex, edgeHit.t);
         if (result.didInsert) {
-          this.app.setSelection({ type: SelectionType.POINT, hatchId: edgeHit.hatch.id, pointIndex: result.pointIndex });
+          this.app.setSelection({ type: SelectionType.POINT, hatchId: edgeHit.hatch.id, pointIndex: result.pointIndex, holeIndex: edgeHit.holeIndex } as any);
           this.app.showHatchSettingsPanel(true);
         }
         return;
@@ -1241,11 +1290,12 @@ export class SelectTool {
             hatchId: edgeHit.hatch.id,
             pointIndex: null,
             edgeIndex: edgeHit.edgeIndex,
-          });
+            holeIndex: edgeHit.holeIndex,
+          } as any);
           this.app.showHatchSettingsPanel(true);
-          // Mittelpunkt der Kante als Anker für das Menü
-          const a = edgeHit.hatch.points[edgeHit.edgeIndex];
-          const b = edgeHit.hatch.points[(edgeHit.edgeIndex + 1) % edgeHit.hatch.points.length];
+          const loop = edgeHit.holeIndex == null ? edgeHit.hatch.points : edgeHit.hatch.holes[edgeHit.holeIndex];
+          const a = loop[edgeHit.edgeIndex];
+          const b = loop[(edgeHit.edgeIndex + 1) % loop.length];
           const midW = { x: (a.x + b.x) * 0.5, y: (a.y + b.y) * 0.5 };
           const sp = this.app.camera.worldToScreen(midW.x, midW.y);
           this.app.pointEditMenu.showAt(sp.x, sp.y, [PointEditAction.OFFSET]);

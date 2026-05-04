@@ -18,11 +18,16 @@ const CAD_TOOLS = [
   { id: ToolIds.HATCH, label: "Schraffur", key: "H", icon: Square },
   { id: ToolIds.MEASURE, label: "Maßkette", key: "M", icon: Ruler },
   { id: ToolIds.TEXT, label: "Text", key: "T", icon: Type },
-  { id: ToolIds.PIPETTE, label: "Pipette", key: "P", icon: Pipette },
   { id: ToolIds.STICKER, label: "Sticker", key: "O", icon: StickerIcon },
   { id: ToolIds.DOCUMENT, label: "Dokument", key: "D", icon: FileImage },
-  { id: ToolIds.FREE, label: "Freihand", key: "F", icon: Pencil },
-  { id: ToolIds.ERASER, label: "Radiergummi", key: "E", icon: Eraser },
+];
+
+// Sub-Werkzeuge unter "Linie": gemeinsam ein Einstellungsfenster mit
+// drei wählbaren Zeichenarten oben. Letzte Auswahl wird gemerkt.
+const LINE_VARIANTS = [
+  { id: ToolIds.LINE, label: "Linie", icon: Minus },
+  { id: ToolIds.FREE, label: "Freihand", icon: Pencil },
+  { id: ToolIds.ERASER, label: "Radiergummi", icon: Eraser },
 ];
 
 const CadEditor: React.FC = () => {
@@ -139,6 +144,9 @@ const CadEditor: React.FC = () => {
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [hatchDrawMode, setHatchDrawMode] = useState<HatchDrawMode>("polygon");
+  // Letzter Zeichen-Modus innerhalb der "Linie"-Variante (Linie/Freihand/Radiergummi).
+  // Default = Linie. Bei jedem Wechsel wird gemerkt.
+  const [lineVariant, setLineVariant] = useState<string>(ToolIds.LINE);
   const [stickers, setStickers] = useState<StickerDefinition[]>([]);
   const [stickerSelCount, setStickerSelCount] = useState(0);
   const [stickerPhase, setStickerPhase] = useState<"idle" | "selecting" | "placing" | "rotating">("idle");
@@ -277,6 +285,9 @@ const CadEditor: React.FC = () => {
 
     app.onToolChange = (id) => {
       setActiveTool(id);
+      if (id === ToolIds.LINE || id === ToolIds.FREE || id === ToolIds.ERASER) {
+        setLineVariant(id);
+      }
       setStickerPhase(app.stickerTool.phase);
       setStickerSelCount(app.stickerTool.getSelectionCount());
     };
@@ -404,9 +415,12 @@ const CadEditor: React.FC = () => {
   }, []);
 
   const handleToolClick = useCallback((id: string) => {
-    appRef.current?.setTool(id);
-    setActiveTool(id);
-  }, []);
+    // "Linie" Sidebar-Knopf aktiviert die zuletzt gewählte Variante
+    // (Linie / Freihand / Radiergummi). Default: Linie.
+    const targetId = id === ToolIds.LINE ? lineVariant : id;
+    appRef.current?.setTool(targetId);
+    setActiveTool(targetId);
+  }, [lineVariant]);
 
   const handleDocFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -521,6 +535,13 @@ const CadEditor: React.FC = () => {
             <Redo2 className="h-4 w-4 shrink-0" />
             {!sidebarCollapsed && <span className="text-xs">Redo</span>}
           </button>
+          <button
+            onClick={() => handleToolClick(ToolIds.PIPETTE)}
+            title="Pipette (P)"
+            className={`cad-toolbar-btn ${sidebarCollapsed ? "justify-center px-0 h-9 w-9" : "justify-center px-2"} ${activeTool === ToolIds.PIPETTE ? "active" : ""}`}
+          >
+            <Pipette className="h-4 w-4 shrink-0" />
+          </button>
         </div>
 
         {/* Divider */}
@@ -530,7 +551,9 @@ const CadEditor: React.FC = () => {
         <div className="flex flex-col gap-1 p-2">
           {CAD_TOOLS.map((t) => {
             const Icon = t.icon;
-            const isActive = activeTool === t.id;
+            const isActive = t.id === ToolIds.LINE
+              ? (activeTool === ToolIds.LINE || activeTool === ToolIds.FREE || activeTool === ToolIds.ERASER)
+              : activeTool === t.id;
             return (
               <button
                 key={t.id}
@@ -557,6 +580,28 @@ const CadEditor: React.FC = () => {
 
         {/* Settings area (scrollable) */}
         <div className="flex-1 min-h-0 overflow-y-auto p-2">
+          {/* Variant switcher: Linie / Freihand / Radiergummi (immer sichtbar in einer dieser Tools) */}
+          {!sidebarCollapsed && (activeTool === ToolIds.LINE || activeTool === ToolIds.FREE || activeTool === ToolIds.ERASER) && (
+            <div className="cad-settings-panel mb-2">
+              <div className="flex gap-1">
+                {LINE_VARIANTS.map(v => {
+                  const Icon = v.icon;
+                  const active = activeTool === v.id;
+                  return (
+                    <button
+                      key={v.id}
+                      type="button"
+                      onClick={() => handleToolClick(v.id)}
+                      title={v.label}
+                      className={`cad-toolbar-btn flex-1 justify-center h-9 ${active ? "active" : ""}`}
+                    >
+                      <Icon className="h-4 w-4" />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           {/* Line Settings */}
           <div ref={settingsRef} className={`cad-settings-panel hidden mb-2 ${sidebarCollapsed ? "!hidden" : ""}`}>
             <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>

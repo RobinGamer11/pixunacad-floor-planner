@@ -23,6 +23,8 @@ export interface Selection {
   pointIndex?: number | null;
   /** Bei HATCH-Selection optional: Index der angeklickten Kante (für Edge-Offset-Hub). */
   edgeIndex?: number | null;
+  /** Bei Hatch Punkt/Kanten-Auswahl: Index der Hole-Loop (null/undefined = äußere Kontur). */
+  holeIndex?: number | null;
 }
 
 export interface Overlay {
@@ -1007,11 +1009,13 @@ export class Renderer {
       drawHandle(sp, active);
     }
     const holes = hatch.holes || [];
-    for (const loop of holes) {
+    for (let h = 0; h < holes.length; h++) {
+      const loop = holes[h];
       if (!loop) continue;
       for (let i = 0; i < loop.length; i++) {
         const sp = cam.worldToScreen(loop[i].x, loop[i].y);
-        drawHandle(sp, false);
+        const active = !!(isPointSel && (sel as any).holeIndex === h && sel.pointIndex === i);
+        drawHandle(sp, active);
       }
     }
     ctx.restore();

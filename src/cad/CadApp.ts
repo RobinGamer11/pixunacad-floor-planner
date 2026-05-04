@@ -396,7 +396,7 @@ export class CadApp {
         return;
       }
       if (action === PointEditAction.OFFSET && sel && sel.type === SelectionType.HATCH && (sel as any).hatchId && (sel as any).edgeIndex != null) {
-        this.selectTool.beginHatchEdgeOffset((sel as any).hatchId, (sel as any).edgeIndex);
+        this.selectTool.beginHatchEdgeOffset((sel as any).hatchId, (sel as any).edgeIndex, (sel as any).holeIndex ?? null);
         return;
       }
       this.selectTool.beginPointEdit(action);
