@@ -20,6 +20,7 @@ const CAD_TOOLS = [
   { id: ToolIds.TEXT, label: "Text", key: "T", icon: Type },
   { id: ToolIds.STICKER, label: "Sticker", key: "O", icon: StickerIcon },
   { id: ToolIds.DOCUMENT, label: "Dokument", key: "D", icon: FileImage },
+  { id: ToolIds.WALL, label: "Wand", key: "W", icon: Construction },
 ];
 
 // Sub-Werkzeuge unter "Linie": gemeinsam ein Einstellungsfenster mit
