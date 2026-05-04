@@ -12,7 +12,9 @@ import { pointInDocument } from "./documentGeometry";
 type EditTarget =
   | { kind: "segment"; segmentId: string; pointIndex: number }
   | { kind: "hatch"; hatchId: string; pointIndex: number }
+  | { kind: "hatchHole"; hatchId: string; holeIndex: number; pointIndex: number }
   | { kind: "hatchEdge"; hatchId: string; edgeIndex: number }
+  | { kind: "hatchHoleEdge"; hatchId: string; holeIndex: number; edgeIndex: number }
   | { kind: "textboxHandle"; textBoxId: string; handleIndex: number };
 
 export class SelectTool {
