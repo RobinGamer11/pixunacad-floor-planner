@@ -1464,6 +1464,7 @@ export class Renderer {
   drawFreeStrokePreview(points: Vec2[], style: {
     color: string; thicknessM: number; opacity: number; lineStyle: import("./Scene").FreeLineStyle;
     gapM: number; blobSpacingM: number; blobSizeM: number; smoothing: boolean;
+    imageSrc?: string | null; imageSizeM?: number; imageSpacingM?: number; imageRotateAlongPath?: boolean;
   }) {
     if (!points || points.length < 2) return;
     const tmp = new FreeStroke({ id: "_preview", points, ...style });
