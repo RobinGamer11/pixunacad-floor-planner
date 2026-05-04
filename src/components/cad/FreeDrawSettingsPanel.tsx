@@ -108,8 +108,8 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app }) => {
         </label>
 
         <label className="block text-xs">
-          <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Dicke (m): {thickness.toFixed(3)}</span>
-          <input type="range" min={0.005} max={0.5} step={0.005} value={thickness}
+          <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>{style === "image" ? "Stempel-Größe (m)" : "Dicke (m)"}: {thickness.toFixed(3)}</span>
+          <input type="range" min={0.005} max={style === "image" ? 2 : 0.5} step={style === "image" ? 0.01 : 0.005} value={thickness}
             onChange={(e) => { const v = parseFloat(e.target.value); setThickness(v); app.defaultFreeThicknessM = v; }}
             className="w-full" />
         </label>
