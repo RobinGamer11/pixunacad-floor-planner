@@ -816,7 +816,6 @@ export class Renderer {
 
   /** Wenn aktiv, wird die Mittel-/Helplinie der Wände als Hilfslinie gezeichnet. */
   showWallHelpers = false;
-  _drawWallsForLabel_dummy() { /* noop, anchor für search-replace */
 
   private _drawHatches() {
     for (const hatch of this._hatchesBackToFront()) this._drawSingleHatch(hatch);
