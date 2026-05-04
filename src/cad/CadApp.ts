@@ -156,8 +156,12 @@ export class CadApp {
   defaultFreeColor = Defaults.freeColor;
   defaultFreeThicknessM = Defaults.freeThicknessM;
   defaultFreeOpacity = Defaults.freeOpacity;
-  defaultFreeLineStyle: "solid" | "dashed" | "dotted" | "dashdot" | "blob" = Defaults.freeLineStyle;
+  defaultFreeLineStyle: "solid" | "dashed" | "dotted" | "dashdot" | "blob" | "image" = Defaults.freeLineStyle;
   defaultFreeGapM = Defaults.freeGapM;
+  defaultFreeImageSrc: string | null = null;
+  defaultFreeImageSizeM = Defaults.freeImageSizeM;
+  defaultFreeImageSpacingM = Defaults.freeImageSpacingM;
+  defaultFreeImageRotate = Defaults.freeImageRotate;
 
   // Eraser-Defaults
   defaultEraserRadiusM = Defaults.eraserRadiusM;
