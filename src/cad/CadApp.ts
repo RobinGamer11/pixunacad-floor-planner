@@ -1645,6 +1645,7 @@ export class CadApp {
       if (e.key === "d" || e.key === "D") this.setTool(ToolIds.DOCUMENT);
       if (e.key === "f" || e.key === "F") this.setTool(ToolIds.FREE);
       if (e.key === "e" || e.key === "E") this.setTool(ToolIds.ERASER);
+      if (e.key === "w" || e.key === "W") this.setTool(ToolIds.WALL);
 
       if (e.key === "Escape") {
         if (this.isStickerEditing()) { this.exitStickerEdit(); this.clearSelection(); return; }
