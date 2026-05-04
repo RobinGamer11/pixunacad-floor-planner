@@ -15,7 +15,9 @@ type EditTarget =
   | { kind: "hatchHole"; hatchId: string; holeIndex: number; pointIndex: number }
   | { kind: "hatchEdge"; hatchId: string; edgeIndex: number }
   | { kind: "hatchHoleEdge"; hatchId: string; holeIndex: number; edgeIndex: number }
-  | { kind: "textboxHandle"; textBoxId: string; handleIndex: number };
+  | { kind: "textboxHandle"; textBoxId: string; handleIndex: number }
+  | { kind: "wallPoint"; wallId: string; pointIndex: number }
+  | { kind: "wall"; wallId: string };
 
 export class SelectTool {
   app: CadApp;
