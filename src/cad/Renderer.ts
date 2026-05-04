@@ -1003,17 +1003,15 @@ export class Renderer {
     const isPointSel = sel && sel.type === SelectionType.POINT;
     for (let i = 0; i < hatch.points.length; i++) {
       const sp = cam.worldToScreen(hatch.points[i].x, hatch.points[i].y);
-      const active = !!(isPointSel && sel.holeIndex == null && sel.pointIndex === i);
+      const active = !!(isPointSel && sel.pointIndex === i);
       drawHandle(sp, active);
     }
     const holes = hatch.holes || [];
-    for (let hi = 0; hi < holes.length; hi++) {
-      const loop = holes[hi];
+    for (const loop of holes) {
       if (!loop) continue;
       for (let i = 0; i < loop.length; i++) {
         const sp = cam.worldToScreen(loop[i].x, loop[i].y);
-        const active = !!(isPointSel && sel.holeIndex === hi && sel.pointIndex === i);
-        drawHandle(sp, active);
+        drawHandle(sp, false);
       }
     }
     ctx.restore();
