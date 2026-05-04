@@ -529,30 +529,32 @@ export class SelectTool {
 
   /** Apply parallel offset to selected hatch edge. Adjacent endpoints slide along their adjacent edges. */
   private _applyHatchEdgeOffset(offsetM: number) {
-    if (!this.editTarget || this.editTarget.kind !== "hatchEdge") return;
+    if (!this.editTarget) return;
+    if (this.editTarget.kind !== "hatchEdge" && this.editTarget.kind !== "hatchHoleEdge") return;
     const hatch = this.app.scene.getHatchById(this.editTarget.hatchId);
     if (!hatch) return;
+    const loop: Vec2[] = this.editTarget.kind === "hatchEdge"
+      ? hatch.points
+      : (hatch.holes?.[this.editTarget.holeIndex] || []);
+    if (loop.length < 3) return;
     const A0 = this.hatchEdgeAOriginal!;
     const B0 = this.hatchEdgeBOriginal!;
     const Pp = this.hatchEdgePrevOriginal!;
     const Nn = this.hatchEdgeNextOriginal!;
     const n = this.hatchEdgeNormal!;
-    // Offset edge line: line through A0+offset*n with direction (B0-A0)
     const A1 = v(A0.x + n.x * offsetM, A0.y + n.y * offsetM);
     const B1 = v(B0.x + n.x * offsetM, B0.y + n.y * offsetM);
     const dirEdge = sub(B1, A1);
-    // Adjacent edges (original lines)
     const dirPrev = sub(A0, Pp);
     const dirNext = sub(B0, Nn);
     let newA = lineLineIntersectionInfinite(A1, dirEdge, Pp, dirPrev);
     let newB = lineLineIntersectionInfinite(A1, dirEdge, Nn, dirNext);
-    // Fallback: if parallel, just use A1/B1
     if (!newA) newA = A1;
     if (!newB) newB = B1;
     const idxA = this.editTarget.edgeIndex;
-    const idxB = (idxA + 1) % hatch.points.length;
-    hatch.points[idxA] = newA;
-    hatch.points[idxB] = newB;
+    const idxB = (idxA + 1) % loop.length;
+    loop[idxA] = newA;
+    loop[idxB] = newB;
   }
 
   private _isHatchEdgeSelectionActive(): boolean {
