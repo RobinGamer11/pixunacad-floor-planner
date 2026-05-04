@@ -603,6 +603,18 @@ export class SelectTool {
         point: sel.pointIndex === 0 ? segment.a : segment.b,
       };
     }
+    if (sel.wallId && sel.pointIndex != null) {
+      const wall = this.app.scene.getWallById(sel.wallId);
+      if (!wall) return null;
+      const idx = sel.pointIndex;
+      if (idx < 0 || idx >= wall.corners.length) return null;
+      return {
+        target: { kind: "wallPoint" as const, wallId: sel.wallId, pointIndex: idx },
+        segment: null,
+        hatch: null,
+        point: wall.corners[idx],
+      } as any;
+    }
     if (sel.hatchId) {
       const hatch = this.app.scene.getHatchById(sel.hatchId);
       if (!hatch) return null;
