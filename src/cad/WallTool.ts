@@ -60,8 +60,34 @@ export class WallTool {
     this.snap = null;
   }
 
+  /** Liefert die Bezugslinien-Priorität dieser Wand. */
+  ownLineKind(): "main" | "sub" | "help" {
+    if (this.settings.referenceSide === "outer") return "main";
+    if (this.settings.referenceSide === "inner") return "sub";
+    return "help";
+  }
+
+  /** Auto-ID AW01/AW02 / IW01/IW02 falls customName leer. Erzeugt Label-Group falls nötig. */
+  private _resolveLabelId(): string {
+    const customName = (this.settings.customName || "").trim();
+    if (customName) {
+      return this.app.labelManager.ensureGroupNamed(customName).id;
+    }
+    const prefix = this.settings.kind === "outer" ? "AW" : "IW";
+    const used = new Set<string>();
+    for (const w of this.app.scene.walls) {
+      const g = this.app.labelManager.getById(w.labelId);
+      if (g && g.name.startsWith(prefix)) used.add(g.name);
+    }
+    let n = 1;
+    while (used.has(`${prefix}${String(n).padStart(2, "0")}`)) n++;
+    const name = `${prefix}${String(n).padStart(2, "0")}`;
+    return this.app.labelManager.ensureGroupNamed(name).id;
+  }
+
   finish() {
     if (this.state === "drawing" && this.corners.length >= 2) {
+      const labelId = this._resolveLabelId();
       this.app.scene.createWall({
         kind: this.settings.kind,
         thicknessM: this.getThickness(),
@@ -69,7 +95,7 @@ export class WallTool {
         corners: this.corners,
         customName: this.settings.customName,
         color: this.settings.color,
-        labelId: this.app.activeDrawLabelId || Defaults.defaultLabelId,
+        labelId,
       });
     }
     this.cancel();
