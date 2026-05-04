@@ -661,11 +661,19 @@ export class SelectTool {
       return Math.hypot(sp.x - mouseS.x, sp.y - mouseS.y);
     };
 
-    // Priority: selected hatch points
+    // Priority: selected hatch points (outer + holes)
     if (selectedHatch && this.app.labelManager.isVisible(selectedHatch.labelId)) {
       for (let i = 0; i < selectedHatch.points.length; i++) {
         const px = distPxToWorldPoint(selectedHatch.points[i]);
         if (px <= Defaults.hitPx) return { type: SelectionType.POINT, hatchId: selectedHatch.id, pointIndex: i };
+      }
+      const hLoops = selectedHatch.holes || [];
+      for (let h = 0; h < hLoops.length; h++) {
+        const loop = hLoops[h];
+        for (let i = 0; i < loop.length; i++) {
+          const px = distPxToWorldPoint(loop[i]);
+          if (px <= Defaults.hitPx) return { type: SelectionType.POINT, hatchId: selectedHatch.id, holeIndex: h, pointIndex: i } as any;
+        }
       }
       if (selectedHatch.points.length >= 3 && pointInHatchSolid(mouseW, selectedHatch.points, selectedHatch.holes)) {
         return { type: SelectionType.HATCH, hatchId: selectedHatch.id, pointIndex: null };
