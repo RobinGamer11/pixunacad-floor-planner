@@ -549,7 +549,7 @@ export class SelectTool {
   }
 
   private _getSelectedPointContext() {
-    const sel = this.app.selection;
+    const sel: any = this.app.selection;
     if (!sel || sel.type !== SelectionType.POINT) return null;
     if (sel.segmentId) {
       const segment = this.app.scene.getSegmentById(sel.segmentId);
@@ -565,6 +565,16 @@ export class SelectTool {
       const hatch = this.app.scene.getHatchById(sel.hatchId);
       if (!hatch) return null;
       const idx = sel.pointIndex!;
+      if (sel.holeIndex != null) {
+        const loop = hatch.holes?.[sel.holeIndex];
+        if (!loop || idx < 0 || idx >= loop.length) return null;
+        return {
+          target: { kind: "hatchHole" as const, hatchId: sel.hatchId, holeIndex: sel.holeIndex, pointIndex: idx },
+          segment: null,
+          hatch,
+          point: loop[idx],
+        };
+      }
       if (idx < 0 || idx >= hatch.points.length) return null;
       return {
         target: { kind: "hatch" as const, hatchId: sel.hatchId, pointIndex: idx },
