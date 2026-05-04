@@ -375,6 +375,7 @@ export class Scene {
   textBoxes: TextBox[] = [];
   stickerInstances: StickerInstance[] = [];
   documents: DocumentObject[] = [];
+  walls: Wall[] = [];
   /**
    * Wenn !== null: alle danach via create* erzeugten Objekte werden mit dieser
    * Sticker-Edit-Owner-ID markiert. Wird von CadApp während enterStickerEdit
