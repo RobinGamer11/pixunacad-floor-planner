@@ -130,14 +130,26 @@ export class TopologyEngine {
     for (const seg of segs) {
       considerLine(seg.a, seg.b, seg, null);
     }
-    // Wall snap points & edges (Haupt + Sub)
+    // Wall snap points & edges (Haupt + Sub + Help) – mit wallId/wallLine markiert
     for (const wall of this.scene.walls) {
       if (!this.labels.isVisible(wall.labelId)) continue;
       const lines = computeWallLines(wall.corners, wall.thicknessM, wall.referenceSide);
-      const polylines = [lines.mainCorners, lines.subCorners];
-      for (const poly of polylines) {
-        for (const p of poly) considerPoint(p, null, null, -1);
-        for (let i = 0; i < poly.length - 1; i++) considerLine(poly[i], poly[i + 1], null, null);
+      const groups: { kind: "main" | "sub" | "help"; poly: Vec2[] }[] = [
+        { kind: "main", poly: lines.mainCorners },
+        { kind: "sub", poly: lines.subCorners },
+        { kind: "help", poly: lines.helpCorners },
+      ];
+      for (const g of groups) {
+        for (const p of g.poly) {
+          const before = best;
+          considerPoint(p, null, null, -1);
+          if (best !== before && best) { (best as Snap).wallId = wall.id; (best as Snap).wallLine = g.kind; }
+        }
+        for (let i = 0; i < g.poly.length - 1; i++) {
+          const before = best;
+          considerLine(g.poly[i], g.poly[i + 1], null, null);
+          if (best !== before && best) { (best as Snap).wallId = wall.id; (best as Snap).wallLine = g.kind; }
+        }
       }
     }
     // Hatch edges
