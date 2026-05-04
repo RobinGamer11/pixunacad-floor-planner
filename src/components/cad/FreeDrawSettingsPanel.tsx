@@ -148,12 +148,7 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app }) => {
           </div>
           {style === "image" && imageSrc && (
             <>
-              <label className="block text-xs">
-                <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Stempel-Größe (m): {imgSize.toFixed(3)}</span>
-                <input type="range" min={0.02} max={2} step={0.01} value={imgSize}
-                  onChange={(e) => { const v = parseFloat(e.target.value); setImgSize(v); app.defaultFreeImageSizeM = v; }}
-                  className="w-full" />
-              </label>
+              {/* Größe wird über den Dicke-Slider oben gesteuert. */}
               <label className="block text-xs">
                 <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Abstand (m): {imgSpacing.toFixed(3)}</span>
                 <input type="range" min={0.02} max={2} step={0.01} value={imgSpacing}
@@ -175,7 +170,7 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app }) => {
         </button>
 
         <div className="text-[11px] leading-relaxed pt-2" style={{ color: "hsl(var(--cad-toolbar-muted))", borderTop: "1px solid hsl(var(--border))" }}>
-          Maus gedrückt halten → zeichnen. Lineal: Stift folgt der Linie.
+          Maus gedrückt halten → zeichnen. Lineal: an Endpunkten oder Mitte verschiebbar; Stift folgt der Linie.
         </div>
       </div>
     </div>
