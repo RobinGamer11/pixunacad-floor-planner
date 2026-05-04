@@ -783,7 +783,6 @@ export class Renderer {
 
   private _drawWallsForLabel(labelId: string) {
     if (!this.scene.walls || this.scene.walls.length === 0) return;
-    const computeWallLines = (require("./wallGeom") as typeof import("./wallGeom")).computeWallLines;
     const ctx = this.ctx;
     const cam = this.camera;
     for (const wall of this.scene.walls) {
@@ -809,9 +808,10 @@ export class Renderer {
       };
       drawPoly(lines.subCorners, wall.color, 1.5);
       drawPoly(lines.mainCorners, wall.color, 2);
-      // Helplinie nicht im Endrendering anzeigen (laut Spec unsichtbar beim Zeichnen).
     }
   }
+
+  private _drawHatches() {
     for (const hatch of this._hatchesBackToFront()) this._drawSingleHatch(hatch);
   }
 
