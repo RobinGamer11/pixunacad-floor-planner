@@ -980,8 +980,7 @@ export class Renderer {
       }
     }
 
-    for (let i = 0; i < hatch.points.length; i++) {
-      const sp = cam.worldToScreen(hatch.points[i].x, hatch.points[i].y);
+    const drawHandle = (sp: Vec2, isActive: boolean) => {
       ctx.fillStyle = "rgba(77,163,255,0.12)";
       ctx.strokeStyle = "rgba(77,163,255,0.95)";
       ctx.lineWidth = 2;
@@ -989,8 +988,7 @@ export class Renderer {
       ctx.arc(sp.x, sp.y, 6, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
-
-      if (this.selection.type === SelectionType.POINT && this.selection.pointIndex === i) {
+      if (isActive) {
         ctx.fillStyle = "rgba(77,163,255,0.95)";
         ctx.strokeStyle = "#fff";
         ctx.lineWidth = 2;
@@ -998,6 +996,24 @@ export class Renderer {
         ctx.arc(sp.x, sp.y, 7, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
+      }
+    };
+
+    const sel = this.selection;
+    const isPointSel = sel && sel.type === SelectionType.POINT;
+    for (let i = 0; i < hatch.points.length; i++) {
+      const sp = cam.worldToScreen(hatch.points[i].x, hatch.points[i].y);
+      const active = !!(isPointSel && sel.holeIndex == null && sel.pointIndex === i);
+      drawHandle(sp, active);
+    }
+    const holes = hatch.holes || [];
+    for (let hi = 0; hi < holes.length; hi++) {
+      const loop = holes[hi];
+      if (!loop) continue;
+      for (let i = 0; i < loop.length; i++) {
+        const sp = cam.worldToScreen(loop[i].x, loop[i].y);
+        const active = !!(isPointSel && sel.holeIndex === hi && sel.pointIndex === i);
+        drawHandle(sp, active);
       }
     }
     ctx.restore();
