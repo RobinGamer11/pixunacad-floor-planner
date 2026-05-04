@@ -163,6 +163,44 @@ export class SelectTool {
 
   finish() {}
 
+  /** Hit-Test gegen Wand-Eckpunkte und Wand-Achslinien. */
+  private _hitTestWall(input: Input): { wallId: string; pointIndex: number | null } | null {
+    const mouseW = v(input.mouse.wx, input.mouse.wy);
+    const mouseS = v(input.mouse.sx, input.mouse.sy);
+    const cam = this.app.camera;
+    let bestPx = Infinity;
+    let bestPoint: { wallId: string; pointIndex: number | null } | null = null;
+    // Eckpunkte zuerst
+    for (const wall of this.app.scene.walls) {
+      if (!this.app.labelManager.isVisible(wall.labelId)) continue;
+      for (let i = 0; i < wall.corners.length; i++) {
+        const sp = cam.worldToScreen(wall.corners[i].x, wall.corners[i].y);
+        const px = Math.hypot(sp.x - mouseS.x, sp.y - mouseS.y);
+        if (px <= Defaults.hitPx + 2 && px < bestPx) {
+          bestPx = px;
+          bestPoint = { wallId: wall.id, pointIndex: i };
+        }
+      }
+    }
+    if (bestPoint) return bestPoint;
+    // Achslinien
+    for (const wall of this.app.scene.walls) {
+      if (!this.app.labelManager.isVisible(wall.labelId)) continue;
+      for (let i = 0; i < wall.corners.length - 1; i++) {
+        const a = wall.corners[i], b = wall.corners[i + 1];
+        const proj = projectPointToSegment(mouseW, a, b);
+        const sp = cam.worldToScreen(proj.q.x, proj.q.y);
+        const px = Math.hypot(sp.x - mouseS.x, sp.y - mouseS.y);
+        if (px <= Defaults.hitPx + 4 && px < bestPx) {
+          bestPx = px;
+          bestPoint = { wallId: wall.id, pointIndex: null };
+        }
+      }
+    }
+    return bestPoint;
+  }
+
+
   private _hitTextBox(input: Input): TextBox | null {
     const mouseW = v(input.mouse.wx, input.mouse.wy);
     for (let i = this.app.scene.textBoxes.length - 1; i >= 0; i--) {
