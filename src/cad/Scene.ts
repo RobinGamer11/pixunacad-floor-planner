@@ -825,6 +825,7 @@ export class Scene {
         edges.push({ hatch, edgeIndex: i, a: hatch.points[i], b: hatch.points[(i + 1) % n] });
       }
     }
+    return edges;
   }
 
   // ---- Walls ----
