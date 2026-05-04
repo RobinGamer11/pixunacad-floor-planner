@@ -7,14 +7,30 @@ interface Props { app: CadApp | null; }
 export const EraserSettingsPanel: React.FC<Props> = ({ app }) => {
   const [radius, setRadius] = useState(0.12);
   const [strength, setStrength] = useState(1);
+  const [hasRuler, setHasRuler] = useState(false);
 
   useEffect(() => {
     if (!app) return;
     setRadius(app.defaultEraserRadiusM);
     setStrength(app.defaultEraserStrength);
+    setHasRuler(!!app.scene.rulerGuide);
   }, [app]);
 
   if (!app) return null;
+
+  const toggleRuler = () => {
+    if (!app) return;
+    if (app.scene.rulerGuide) {
+      app.scene.rulerGuide = null;
+      setHasRuler(false);
+    } else {
+      const rect = app.canvas.getBoundingClientRect();
+      const left = app.camera.screenToWorld(rect.width * 0.2, rect.height * 0.5);
+      const right = app.camera.screenToWorld(rect.width * 0.8, rect.height * 0.5);
+      app.scene.rulerGuide = { a: { x: left.x, y: left.y }, b: { x: right.x, y: right.y } };
+      setHasRuler(true);
+    }
+  };
 
   const resetSelected = () => {
     const sel = app.selection;
@@ -44,13 +60,18 @@ export const EraserSettingsPanel: React.FC<Props> = ({ app }) => {
             className="w-full" />
         </label>
 
+        <button type="button" onClick={toggleRuler}
+          className="cad-toolbar-btn w-full justify-center h-9">
+          <span className="text-xs">{hasRuler ? "Lineal entfernen" : "Lineal hinzufügen"}</span>
+        </button>
+
         <button type="button" onClick={resetSelected}
           className="cad-toolbar-btn w-full justify-center h-9">
           <span className="text-xs">Radierung zurücksetzen</span>
         </button>
 
         <div className="text-[11px] leading-relaxed pt-2" style={{ color: "hsl(var(--cad-toolbar-muted))", borderTop: "1px solid hsl(var(--border))" }}>
-          Maus gedrückt halten → radieren. Wirkt auf Freihand-Striche, Linien (splittet sie) und importierte Dokumente (persistent).
+          Maus gedrückt halten → radieren. Lineal an Endpunkten oder Mitte verschiebbar.
         </div>
       </div>
     </div>
