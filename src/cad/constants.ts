@@ -59,18 +59,23 @@ export const Defaults = {
   freeColor: "#111111",
   freeThicknessM: 0.03,
   freeOpacity: 1.0,
-  freeLineStyle: "solid" as "solid" | "dashed" | "dotted" | "dashdot" | "blob",
+  freeLineStyle: "solid" as "solid" | "dashed" | "dotted" | "dashdot" | "blob" | "image",
   freeGapM: 0.08,
   freeSmooth: true,
   freeSampleMinPx: 2.5,
   freeBlobSpacingM: 0.12,
   freeBlobSizeM: 0.06,
+  freeImageSizeM: 0.18,
+  freeImageSpacingM: 0.22,
+  freeImageRotate: true,
 
   // Eraser defaults
   eraserRadiusM: 0.12,
   eraserStrength: 1.0,
   eraserOpacity: 1.0,
   eraserUseRuler: false,
+  // Auflösungs-Cap (px Kantenlänge) für persistente Dokument-Radiermaske
+  docMaskMaxPx: 2048,
 
   // Document import defaults
   // 96 DPI assumption: 96 px = 1 inch = 0.0254 m -> 1 px = 0.0254/96 m
