@@ -239,10 +239,16 @@ export class SelectTool {
       this.fixedPoint = (ctx.target.pointIndex === 0) ? v(seg.b.x, seg.b.y) : v(seg.a.x, seg.a.y);
       this.otherPointOriginal = (ctx.target.pointIndex === 0) ? v(seg.a.x, seg.a.y) : v(seg.b.x, seg.b.y);
       this.hatchPointsOriginal = null;
+    } else if (ctx.target.kind === "hatchHole") {
+      const hatch = ctx.hatch!;
+      const loop = hatch.holes![ctx.target.holeIndex];
+      const idx = ctx.target.pointIndex;
+      this.fixedPoint = polygonCentroid(loop);
+      this.otherPointOriginal = v(loop[idx].x, loop[idx].y);
+      this.hatchPointsOriginal = loop.map(p => v(p.x, p.y));
     } else {
       const hatch = ctx.hatch!;
       const idx = ctx.target.pointIndex;
-      // For hatch points, pivot for rotate = polygon centroid (excluding moving point gives slightly biased pivot, use centroid of all to feel natural).
       this.fixedPoint = polygonCentroid(hatch.points);
       this.otherPointOriginal = v(hatch.points[idx].x, hatch.points[idx].y);
       this.hatchPointsOriginal = hatch.points.map(p => v(p.x, p.y));
