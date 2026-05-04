@@ -397,6 +397,7 @@ export class Scene {
   createFreeStroke(points: Vec2[], style: {
     color?: string; thicknessM?: number; opacity?: number; lineStyle?: FreeLineStyle;
     gapM?: number; blobSpacingM?: number; blobSizeM?: number; smoothing?: boolean; labelId?: string;
+    imageSrc?: string | null; imageSizeM?: number; imageSpacingM?: number; imageRotateAlongPath?: boolean;
   } = {}) {
     const stroke = new FreeStroke({ id: this._makeId(), points, ...style });
     stroke._stickerEditOwnerId = this._currentEditOwnerId;
@@ -441,6 +442,8 @@ export class Scene {
         lineStyle: stroke.lineStyle, gapM: stroke.gapM,
         blobSpacingM: stroke.blobSpacingM, blobSizeM: stroke.blobSizeM,
         smoothing: stroke.smoothing, labelId: stroke.labelId,
+        imageSrc: stroke.imageSrc, imageSizeM: stroke.imageSizeM,
+        imageSpacingM: stroke.imageSpacingM, imageRotateAlongPath: stroke.imageRotateAlongPath,
       });
     }
   }
@@ -450,7 +453,7 @@ export class Scene {
     name?: string; kind?: "image" | "pdf-page"; src: string; pageIndex?: number;
     position: Vec2; widthM: number; heightM: number; rotationRad?: number;
     pixelWidth?: number; pixelHeight?: number; labelId?: string;
-    importScaleDenom?: number;
+    importScaleDenom?: number; eraseMaskDataUrl?: string | null;
   }): DocumentObject {
     const doc = new DocumentObject({ id: this._makeId(), ...opts });
     this.documents.push(doc);
