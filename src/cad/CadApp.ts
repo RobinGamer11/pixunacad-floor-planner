@@ -1678,6 +1678,11 @@ export class CadApp {
         if (this.activePlanId && this.planController?.deleteSelected()) {
           return;
         }
+        if (this.selection && (this.selection as any).wallId) {
+          const wall = this.scene.getWallById((this.selection as any).wallId);
+          if (wall) { this.scene.removeWall(wall); this.clearSelection(); this.pointEditMenu.hide(); this.refreshLabelUI(); }
+          return;
+        }
         if (this.selection && this.selection.segmentId) {
           const seg = this.scene.getSegmentById(this.selection.segmentId);
           if (seg) { this.scene.removeSegment(seg); this.clearSelection(); this.pointEditMenu.hide(); this.refreshLabelUI(); }

@@ -15,7 +15,9 @@ type EditTarget =
   | { kind: "hatchHole"; hatchId: string; holeIndex: number; pointIndex: number }
   | { kind: "hatchEdge"; hatchId: string; edgeIndex: number }
   | { kind: "hatchHoleEdge"; hatchId: string; holeIndex: number; edgeIndex: number }
-  | { kind: "textboxHandle"; textBoxId: string; handleIndex: number };
+  | { kind: "textboxHandle"; textBoxId: string; handleIndex: number }
+  | { kind: "wallPoint"; wallId: string; pointIndex: number }
+  | { kind: "wall"; wallId: string };
 
 export class SelectTool {
   app: CadApp;
@@ -53,6 +55,9 @@ export class SelectTool {
   moveHubLocked = false;
   moveHubLengthM: number | null = null;
   moveHubAngleDeg: number | null = null;
+
+  // Wall edit snapshot
+  wallPointsOriginal: Vec2[] | null = null;
 
   // Parallel-drag state for dimensions
   dragDimId: string | null = null;
@@ -158,6 +163,44 @@ export class SelectTool {
 
   finish() {}
 
+  /** Hit-Test gegen Wand-Eckpunkte und Wand-Achslinien. */
+  private _hitTestWall(input: Input): { wallId: string; pointIndex: number | null } | null {
+    const mouseW = v(input.mouse.wx, input.mouse.wy);
+    const mouseS = v(input.mouse.sx, input.mouse.sy);
+    const cam = this.app.camera;
+    let bestPx = Infinity;
+    let bestPoint: { wallId: string; pointIndex: number | null } | null = null;
+    // Eckpunkte zuerst
+    for (const wall of this.app.scene.walls) {
+      if (!this.app.labelManager.isVisible(wall.labelId)) continue;
+      for (let i = 0; i < wall.corners.length; i++) {
+        const sp = cam.worldToScreen(wall.corners[i].x, wall.corners[i].y);
+        const px = Math.hypot(sp.x - mouseS.x, sp.y - mouseS.y);
+        if (px <= Defaults.hitPx + 2 && px < bestPx) {
+          bestPx = px;
+          bestPoint = { wallId: wall.id, pointIndex: i };
+        }
+      }
+    }
+    if (bestPoint) return bestPoint;
+    // Achslinien
+    for (const wall of this.app.scene.walls) {
+      if (!this.app.labelManager.isVisible(wall.labelId)) continue;
+      for (let i = 0; i < wall.corners.length - 1; i++) {
+        const a = wall.corners[i], b = wall.corners[i + 1];
+        const proj = projectPointToSegment(mouseW, a, b);
+        const sp = cam.worldToScreen(proj.q.x, proj.q.y);
+        const px = Math.hypot(sp.x - mouseS.x, sp.y - mouseS.y);
+        if (px <= Defaults.hitPx + 4 && px < bestPx) {
+          bestPx = px;
+          bestPoint = { wallId: wall.id, pointIndex: null };
+        }
+      }
+    }
+    return bestPoint;
+  }
+
+
   private _hitTextBox(input: Input): TextBox | null {
     const mouseW = v(input.mouse.wx, input.mouse.wy);
     for (let i = this.app.scene.textBoxes.length - 1; i >= 0; i--) {
@@ -246,6 +289,15 @@ export class SelectTool {
       this.fixedPoint = polygonCentroid(loop);
       this.otherPointOriginal = v(loop[idx].x, loop[idx].y);
       this.hatchPointsOriginal = loop.map(p => v(p.x, p.y));
+    } else if (ctx.target.kind === "wallPoint") {
+      const wall = this.app.scene.getWallById(ctx.target.wallId)!;
+      const idx = ctx.target.pointIndex;
+      // Fixpunkt = Nachbar-Eckpunkt (vorhergehender; bei idx 0 nachfolgender)
+      const fixIdx = idx === 0 ? 1 : idx - 1;
+      this.fixedPoint = v(wall.corners[fixIdx].x, wall.corners[fixIdx].y);
+      this.otherPointOriginal = v(wall.corners[idx].x, wall.corners[idx].y);
+      this.wallPointsOriginal = wall.corners.map(p => v(p.x, p.y));
+      this.hatchPointsOriginal = null;
     } else {
       const hatch = ctx.hatch!;
       const idx = ctx.target.pointIndex;
@@ -390,6 +442,18 @@ export class SelectTool {
       this.app.scene.removePointFromHatchHole(hatch, ctx.target.holeIndex, ctx.target.pointIndex);
       this.app.setSelection({ type: SelectionType.HATCH, hatchId: hatch.id, pointIndex: null });
       this.app.pointEditMenu.hide();
+    } else if (ctx.target.kind === "wallPoint") {
+      const wall = this.app.scene.getWallById(ctx.target.wallId);
+      if (!wall) return;
+      if (wall.corners.length > 2) {
+        wall.corners.splice(ctx.target.pointIndex, 1);
+        this.app.clearSelection();
+      } else {
+        this.app.scene.removeWall(wall);
+        this.app.clearSelection();
+        this.app.refreshLabelUI();
+      }
+      this.app.pointEditMenu.hide();
     } else {
       const hatch = ctx.hatch!;
       if (hatch.points.length > 3) {
@@ -481,6 +545,10 @@ export class SelectTool {
       const newCenter = v((opp.x + newPoint.x) * 0.5, (opp.y + newPoint.y) * 0.5);
       box.center = newCenter;
       box.rotationRad = newRot;
+    } else if (this.editTarget.kind === "wallPoint") {
+      const wall = this.app.scene.getWallById(this.editTarget.wallId);
+      if (!wall) return;
+      wall.corners[this.editTarget.pointIndex] = v(newPoint.x, newPoint.y);
     }
   }
 
@@ -524,6 +592,18 @@ export class SelectTool {
       if (!n) return;
       const offset = delta.x * n.x + delta.y * n.y;
       this._applyHatchEdgeOffset(offset);
+    } else if (this.editTarget.kind === "wallPoint") {
+      const wall = this.app.scene.getWallById(this.editTarget.wallId);
+      if (!wall || !this.wallPointsOriginal) return;
+      const orig = this.wallPointsOriginal[this.editTarget.pointIndex];
+      wall.corners[this.editTarget.pointIndex] = v(orig.x + delta.x, orig.y + delta.y);
+    } else if (this.editTarget.kind === "wall") {
+      const wall = this.app.scene.getWallById(this.editTarget.wallId);
+      if (!wall || !this.wallPointsOriginal) return;
+      for (let i = 0; i < wall.corners.length; i++) {
+        const orig = this.wallPointsOriginal[i];
+        wall.corners[i] = v(orig.x + delta.x, orig.y + delta.y);
+      }
     }
   }
 
@@ -582,6 +662,18 @@ export class SelectTool {
         point: sel.pointIndex === 0 ? segment.a : segment.b,
       };
     }
+    if (sel.wallId && sel.pointIndex != null) {
+      const wall = this.app.scene.getWallById(sel.wallId);
+      if (!wall) return null;
+      const idx = sel.pointIndex;
+      if (idx < 0 || idx >= wall.corners.length) return null;
+      return {
+        target: { kind: "wallPoint" as const, wallId: sel.wallId, pointIndex: idx },
+        segment: null,
+        hatch: null,
+        point: wall.corners[idx],
+      } as any;
+    }
     if (sel.hatchId) {
       const hatch = this.app.scene.getHatchById(sel.hatchId);
       if (!hatch) return null;
@@ -631,6 +723,7 @@ export class SelectTool {
     this.moveHubLengthM = null;
     this.moveHubAngleDeg = null;
     this.editGuideAnchors = [];
+    this.wallPointsOriginal = null;
     this.app.hub.bindCommit(null);
   }
 
@@ -1280,8 +1373,27 @@ export class SelectTool {
         return;
       }
 
-      // Hatch-Edge-Hit (irgendeiner sichtbaren Schraffur) → Menü mit Offset-Aktion öffnen.
-      // Wir benutzen _hitTestHatchEdge, das alle Front-to-Back-Hatches durchsucht.
+      // Wand-Hit (Eckpunkt oder Achslinie)
+      {
+        const wallHit = this._hitTestWall(input);
+        if (wallHit) {
+          if (wallHit.pointIndex != null) {
+            this.app.setSelection({ type: SelectionType.POINT, wallId: wallHit.wallId, pointIndex: wallHit.pointIndex } as any);
+            const wall = this.app.scene.getWallById(wallHit.wallId)!;
+            const p = wall.corners[wallHit.pointIndex];
+            const sp = this.app.camera.worldToScreen(p.x, p.y);
+            this.app.pointEditMenu.showAt(sp.x, sp.y, [
+              PointEditAction.MOVE,
+              PointEditAction.TRANSLATE,
+              PointEditAction.DELETE,
+            ]);
+          } else {
+            this.app.setSelection({ type: SelectionType.WALL, wallId: wallHit.wallId } as any);
+          }
+          return;
+        }
+      }
+
       {
         const edgeHit = this._hitTestHatchEdge(input);
         if (edgeHit) {
