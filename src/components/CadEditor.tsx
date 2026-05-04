@@ -1041,6 +1041,11 @@ const CadEditor: React.FC = () => {
             <EraserSettingsPanel app={appRef.current} />
           )}
 
+          {/* Wand-Tool-Panel */}
+          {!sidebarCollapsed && activeTool === ToolIds.WALL && (
+            <WallSettingsPanel app={appRef.current} />
+          )}
+
           {/* Document-Eigenschaften: nur im Auswahl-Tool, wenn Dokument selektiert */}
           {!sidebarCollapsed && !!docSelected && (activeTool === ToolIds.SELECT || (activeTool === ToolIds.DOCUMENT && (docToolPhase === "scale-pick-1" || docToolPhase === "scale-pick-2" || docToolPhase === "scale-await-input"))) && (
             <div className="cad-settings-panel mb-2">
