@@ -510,6 +510,8 @@ export class CadApp {
         lineStyle: s.lineStyle, gapM: s.gapM,
         blobSpacingM: s.blobSpacingM, blobSizeM: s.blobSizeM,
         smoothing: s.smoothing, labelId: s.labelId,
+        imageSrc: s.imageSrc || null, imageSizeM: s.imageSizeM,
+        imageSpacingM: s.imageSpacingM, imageRotateAlongPath: s.imageRotateAlongPath,
       });
       if (s._stickerEditOwnerId) stroke._stickerEditOwnerId = s._stickerEditOwnerId;
     }
