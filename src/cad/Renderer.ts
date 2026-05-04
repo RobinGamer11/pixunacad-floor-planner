@@ -11,6 +11,7 @@ import { transformedInstanceItems, instanceBoundingCornersWorld } from "./Sticke
 import { documentCornersWorld, documentCenterWorld } from "./documentGeometry";
 import { getOrCreateDocMask } from "./documentMask";
 import { computeWallLines } from "./wallGeom";
+import { computeHealedWallLines } from "./wallHeal";
 
 export interface Selection {
   type: string;
