@@ -825,6 +825,22 @@ export class Scene {
         edges.push({ hatch, edgeIndex: i, a: hatch.points[i], b: hatch.points[(i + 1) % n] });
       }
     }
-    return edges;
   }
+
+  // ---- Walls ----
+  createWall(opts: {
+    kind: WallKind; thicknessM: number; referenceSide: WallReferenceSide;
+    corners: Vec2[]; customName?: string; color?: string; labelId?: string;
+  }) {
+    const w = new Wall({ id: this._makeId(), ...opts });
+    w._stickerEditOwnerId = this._currentEditOwnerId;
+    this.walls.push(w);
+    return w;
+  }
+
+  removeWall(w: Wall) { this.walls = this.walls.filter(x => x !== w); }
+  getWallById(id: string): Wall | null { return this.walls.find(w => w.id === id) || null; }
+  getWallsByLabelId(labelId: string): Wall[] { return this.walls.filter(w => w.labelId === labelId); }
+  removeWallsByLabelId(labelId: string) { this.walls = this.walls.filter(w => w.labelId !== labelId); }
+  reassignWallsLabel(oldId: string, newId: string) { for (const w of this.walls) if (w.labelId === oldId) w.labelId = newId; }
 }
