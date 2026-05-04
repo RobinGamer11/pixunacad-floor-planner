@@ -128,6 +128,18 @@ export class TopologyEngine {
       if (!this.labels.isVisible(edge.hatch.labelId)) continue;
       considerLine(edge.a, edge.b, null, edge.hatch, edge.edgeIndex);
     }
+    // Hole edges (Snap-Linien — kein insert-on-snap, da Loops keine "edgeIndex" im Scene-Modell haben)
+    for (const hatch of this._hatchesFrontToBack()) {
+      if (!hatch.holes) continue;
+      for (const loop of hatch.holes) {
+        if (!loop || loop.length < 2) continue;
+        for (let i = 0; i < loop.length; i++) {
+          const a = loop[i];
+          const b = loop[(i + 1) % loop.length];
+          considerLine(a, b, null, null);
+        }
+      }
+    }
 
     // Overlay-Sheets (Transparentpause) — nur Snap, nicht editierbar.
     // Wir geben Punkte/Linien als „freie" Snaps zurück (segment/hatch=null), damit
