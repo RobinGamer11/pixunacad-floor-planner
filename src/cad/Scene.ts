@@ -334,6 +334,38 @@ export interface RulerGuide {
   b: Vec2;
 }
 
+export type WallKind = "outer" | "inner";
+export type WallReferenceSide = "outer" | "center" | "inner";
+
+export class Wall {
+  id: string;
+  kind: WallKind;
+  thicknessM: number;
+  referenceSide: WallReferenceSide;
+  /** Bezugs-Polylinie (gezeichnete Eckpunkte). */
+  corners: Vec2[];
+  /** Freier ID-Name (überschreibt Auto-ID AW01/IW01). Leer = Auto. */
+  customName: string;
+  color: string;
+  labelId: string;
+  _stickerEditOwnerId?: string | null;
+
+  constructor(opts: {
+    id: string; kind: WallKind; thicknessM: number; referenceSide: WallReferenceSide;
+    corners: Vec2[]; customName?: string; color?: string; labelId?: string;
+  }) {
+    this.id = opts.id;
+    this.kind = opts.kind;
+    this.thicknessM = Math.max(0.001, opts.thicknessM);
+    this.referenceSide = opts.referenceSide;
+    this.corners = opts.corners.map(p => v(p.x, p.y));
+    this.customName = opts.customName || "";
+    this.color = opts.color || Defaults.lineColor;
+    this.labelId = opts.labelId || Defaults.defaultLabelId;
+    this._stickerEditOwnerId = null;
+  }
+}
+
 export class Scene {
   segments: Segment[] = [];
   freeStrokes: FreeStroke[] = [];
