@@ -119,7 +119,8 @@ export class WallTool {
   update(input: Input) {
     const mouseS = v(input.mouse.sx, input.mouse.sy);
     const mouseW = v(input.mouse.wx, input.mouse.wy);
-    this.snap = this.app.topology.findBestSnap(mouseS, mouseW);
+    const baseSnap = this.app.topology.findBestSnap(mouseS, mouseW);
+    this.snap = this._applyPrioritySnap(baseSnap, mouseS, mouseW);
 
     if (input.doubleClicked) { this.finish(); return; }
     if (input.clicked) {
