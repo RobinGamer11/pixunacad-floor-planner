@@ -1352,10 +1352,87 @@ export class Renderer {
     ctx.restore();
   }
 
+  /** Cache: Bildstempel DataURL → HTMLImageElement. */
+  private _stampImageCache = new Map<string, HTMLImageElement>();
+  private _getStampImage(src: string): HTMLImageElement | null {
+    let img = this._stampImageCache.get(src);
+    if (img) return img.complete && img.naturalWidth > 0 ? img : null;
+    img = new Image();
+    img.src = src;
+    this._stampImageCache.set(src, img);
+    return null;
+  }
+
+  private _drawFreeStrokeImage(s: FreeStroke) {
+    if (!s.imageSrc) return;
+    const img = this._getStampImage(s.imageSrc);
+    if (!img) return; // wird nach onload re-rendert (next tick)
+    const ctx = this.ctx;
+    const cam = this.camera;
+    const pts = this._renderPointsForFreeStroke(s);
+    if (pts.length < 2) return;
+    const spacingPx = Math.max(2, s.imageSpacingM * cam.scale);
+    // Bild-Größe in Px: längere Kante = imageSizeM
+    const aspect = img.naturalWidth / Math.max(1, img.naturalHeight);
+    const longerPx = s.imageSizeM * cam.scale;
+    let drawW: number, drawH: number;
+    if (aspect >= 1) { drawW = longerPx; drawH = longerPx / aspect; }
+    else { drawH = longerPx; drawW = longerPx * aspect; }
+
+    ctx.save();
+    ctx.globalAlpha = s.opacity;
+    let acc = 0;
+    let prev = cam.worldToScreen(pts[0].x, pts[0].y);
+    let prevAngle = 0;
+    // Erster Stempel
+    if (pts.length >= 2) {
+      const next = cam.worldToScreen(pts[1].x, pts[1].y);
+      prevAngle = Math.atan2(next.y - prev.y, next.x - prev.x);
+    }
+    this._stampImageAt(img, prev.x, prev.y, drawW, drawH, s.imageRotateAlongPath ? prevAngle : 0);
+    for (let i = 1; i < pts.length; i++) {
+      const cur = cam.worldToScreen(pts[i].x, pts[i].y);
+      const dx = cur.x - prev.x, dy = cur.y - prev.y;
+      const segLen = Math.hypot(dx, dy);
+      if (segLen < 1e-3) { prev = cur; continue; }
+      const angle = Math.atan2(dy, dx);
+      let used = 0;
+      while (acc + (segLen - used) >= spacingPx) {
+        const need = spacingPx - acc;
+        used += need;
+        const t = used / segLen;
+        const px = prev.x + dx * t;
+        const py = prev.y + dy * t;
+        this._stampImageAt(img, px, py, drawW, drawH, s.imageRotateAlongPath ? angle : 0);
+        acc = 0;
+      }
+      acc += segLen - used;
+      prev = cur;
+    }
+    ctx.restore();
+  }
+
+  private _stampImageAt(img: HTMLImageElement, x: number, y: number, w: number, h: number, angle: number) {
+    const ctx = this.ctx;
+    if (angle === 0) {
+      ctx.drawImage(img, x - w / 2, y - h / 2, w, h);
+      return;
+    }
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle);
+    ctx.drawImage(img, -w / 2, -h / 2, w, h);
+    ctx.restore();
+  }
+
   private _drawSingleFreeStroke(s: FreeStroke, colorOverride: string | null = null, widthOverridePx: number | null = null) {
     if (!s.points || s.points.length < 2) return;
     if (s.lineStyle === "blob" && colorOverride === null) {
       this._drawFreeStrokeBlobs(s);
+      return;
+    }
+    if (s.lineStyle === "image" && colorOverride === null) {
+      this._drawFreeStrokeImage(s);
       return;
     }
     const ctx = this.ctx;
