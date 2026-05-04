@@ -580,6 +580,28 @@ const CadEditor: React.FC = () => {
 
         {/* Settings area (scrollable) */}
         <div className="flex-1 min-h-0 overflow-y-auto p-2">
+          {/* Variant switcher: Linie / Freihand / Radiergummi (immer sichtbar in einer dieser Tools) */}
+          {!sidebarCollapsed && (activeTool === ToolIds.LINE || activeTool === ToolIds.FREE || activeTool === ToolIds.ERASER) && (
+            <div className="cad-settings-panel mb-2">
+              <div className="flex gap-1">
+                {LINE_VARIANTS.map(v => {
+                  const Icon = v.icon;
+                  const active = activeTool === v.id;
+                  return (
+                    <button
+                      key={v.id}
+                      type="button"
+                      onClick={() => handleToolClick(v.id)}
+                      title={v.label}
+                      className={`cad-toolbar-btn flex-1 justify-center h-9 ${active ? "active" : ""}`}
+                    >
+                      <Icon className="h-4 w-4" />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           {/* Line Settings */}
           <div ref={settingsRef} className={`cad-settings-panel hidden mb-2 ${sidebarCollapsed ? "!hidden" : ""}`}>
             <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
