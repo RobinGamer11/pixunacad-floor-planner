@@ -5,6 +5,7 @@ import { Camera } from "./Camera";
 import { LabelManager } from "./LabelManager";
 import { boxCornersWorld } from "./textGeometry";
 import { documentCornersWorld, documentEdgeMidpointsWorld } from "./documentGeometry";
+import { computeWallLines } from "./wallGeom";
 
 export interface Snap {
   type: string;
