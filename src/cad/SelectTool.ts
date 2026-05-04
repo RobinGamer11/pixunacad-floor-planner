@@ -324,19 +324,22 @@ export class SelectTool {
   }
 
   /** Begin Hatch-Edge-Offset (parallel shift along edge normal). */
-  beginHatchEdgeOffset(hatchId: string, edgeIndex: number) {
+  beginHatchEdgeOffset(hatchId: string, edgeIndex: number, holeIndex: number | null = null) {
     const hatch = this.app.scene.getHatchById(hatchId);
     if (!hatch) return;
-    const n = hatch.points.length;
+    const loop: Vec2[] = holeIndex == null ? hatch.points : (hatch.holes?.[holeIndex] || []);
+    const n = loop.length;
     if (n < 3) return;
 
     this.activeEditAction = PointEditAction.OFFSET;
-    this.editTarget = { kind: "hatchEdge", hatchId, edgeIndex };
+    this.editTarget = holeIndex == null
+      ? { kind: "hatchEdge", hatchId, edgeIndex }
+      : { kind: "hatchHoleEdge", hatchId, holeIndex, edgeIndex };
 
-    const A = hatch.points[edgeIndex];
-    const B = hatch.points[(edgeIndex + 1) % n];
-    const Pp = hatch.points[(edgeIndex - 1 + n) % n];
-    const Nn = hatch.points[(edgeIndex + 2) % n];
+    const A = loop[edgeIndex];
+    const B = loop[(edgeIndex + 1) % n];
+    const Pp = loop[(edgeIndex - 1 + n) % n];
+    const Nn = loop[(edgeIndex + 2) % n];
 
     this.hatchEdgeAOriginal = v(A.x, A.y);
     this.hatchEdgeBOriginal = v(B.x, B.y);
@@ -347,7 +350,7 @@ export class SelectTool {
     const dir = sub(B, A);
     const dirLen = Math.hypot(dir.x, dir.y) || 1;
     const nUnit = v(-dir.y / dirLen, dir.x / dirLen);
-    const c = polygonCentroid(hatch.points);
+    const c = polygonCentroid(loop);
     const toCentroid = sub(c, this.hatchEdgeMidOriginal);
     const sign = (nUnit.x * toCentroid.x + nUnit.y * toCentroid.y) > 0 ? -1 : 1;
     this.hatchEdgeNormal = v(nUnit.x * sign, nUnit.y * sign);
@@ -365,7 +368,7 @@ export class SelectTool {
 
   private _applyHatchEdgeHubValues(vals: { lengthM: number | null; angleDeg: number | null }) {
     if (this.activeEditAction !== PointEditAction.OFFSET || !this.editTarget) return;
-    if (this.editTarget.kind !== "hatchEdge") return;
+    if (this.editTarget.kind !== "hatchEdge" && this.editTarget.kind !== "hatchHoleEdge") return;
     const off = vals.lengthM != null ? vals.lengthM : this.hatchEdgeOffsetM;
     this.hatchEdgeOffsetLocked = true;
     this.hatchEdgeOffsetM = off;
