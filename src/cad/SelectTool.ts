@@ -1202,13 +1202,15 @@ export class SelectTool {
       }
     }
 
-    // Double-click on hatch edge → insert point
+    // Double-click on hatch edge → insert point (outer or hole)
     if (input.doubleClicked) {
       const edgeHit = this._hitTestHatchEdge(input);
       if (edgeHit) {
-        const result = this.app.scene.insertPointIntoHatchEdge(edgeHit.hatch, edgeHit.edgeIndex, edgeHit.t);
+        const result = edgeHit.holeIndex == null
+          ? this.app.scene.insertPointIntoHatchEdge(edgeHit.hatch, edgeHit.edgeIndex, edgeHit.t)
+          : this.app.scene.insertPointIntoHatchHoleEdge(edgeHit.hatch, edgeHit.holeIndex, edgeHit.edgeIndex, edgeHit.t);
         if (result.didInsert) {
-          this.app.setSelection({ type: SelectionType.POINT, hatchId: edgeHit.hatch.id, pointIndex: result.pointIndex });
+          this.app.setSelection({ type: SelectionType.POINT, hatchId: edgeHit.hatch.id, pointIndex: result.pointIndex, holeIndex: edgeHit.holeIndex } as any);
           this.app.showHatchSettingsPanel(true);
         }
         return;
