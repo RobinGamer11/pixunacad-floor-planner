@@ -531,6 +531,7 @@ export class CadApp {
         fillColor: h.fillColor, strokeColor: h.strokeColor,
         fillAlphaPct: h.fillAlphaPct, strokeWidthPx: h.strokeWidthPx,
         labelId: h.labelId, areaLabel: h.areaLabel,
+        holes: h.holes || [],
       });
       if (h._stickerEditOwnerId) hatch._stickerEditOwnerId = h._stickerEditOwnerId;
     }
