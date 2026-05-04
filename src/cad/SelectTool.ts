@@ -56,6 +56,9 @@ export class SelectTool {
   moveHubLengthM: number | null = null;
   moveHubAngleDeg: number | null = null;
 
+  // Wall edit snapshot
+  wallPointsOriginal: Vec2[] | null = null;
+
   // Parallel-drag state for dimensions
   dragDimId: string | null = null;
   dragDimOffsetAlongNormal = 0;
