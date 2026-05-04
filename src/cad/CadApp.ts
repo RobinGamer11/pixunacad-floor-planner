@@ -563,6 +563,7 @@ export class CadApp {
         name: d.name, kind: d.kind, src: d.src, pageIndex: d.pageIndex,
         position: d.position, widthM: d.widthM, heightM: d.heightM, rotationRad: d.rotationRad,
         pixelWidth: d.pixelWidth, pixelHeight: d.pixelHeight, labelId: d.labelId,
+        eraseMaskDataUrl: d.eraseMaskDataUrl || null,
       });
       if (d.id) (doc as any).id = d.id;
     }
