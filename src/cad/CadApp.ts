@@ -21,6 +21,7 @@ import { StickerDefinition, buildStickerFromSelection, buildStickerFromIds, Stic
 import { DocumentTool } from "./DocumentTool";
 import { FreeDrawTool } from "./FreeDrawTool";
 import { EraserTool } from "./EraserTool";
+import { WallTool } from "./WallTool";
 
 import { IdPanel } from "./IdPanel";
 import { SheetManager, SheetOverlayStore, SheetDefaults } from "./SheetManager";
