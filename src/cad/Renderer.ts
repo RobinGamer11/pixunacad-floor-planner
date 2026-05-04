@@ -10,6 +10,7 @@ import { drawRichTextBox } from "./textRichRenderer";
 import { transformedInstanceItems, instanceBoundingCornersWorld } from "./StickerManager";
 import { documentCornersWorld, documentCenterWorld } from "./documentGeometry";
 import { getOrCreateDocMask } from "./documentMask";
+import { computeWallLines } from "./wallGeom";
 
 export interface Selection {
   type: string;
@@ -172,6 +173,7 @@ export class Renderer {
       if (!this.labels.isVisible(labelId)) continue;
       this._drawDocumentsForLabel(labelId);
       this._drawHatchesForLabel(labelId);
+      this._drawWallsForLabel(labelId);
       this._drawSegmentsForLabel(labelId);
       this._drawFreeStrokesForLabel(labelId);
       this._drawDimensionsForLabel(labelId);
@@ -778,6 +780,36 @@ export class Renderer {
       ctx.stroke();
     }
     ctx.restore();
+  }
+
+  private _drawWallsForLabel(labelId: string) {
+    if (!this.scene.walls || this.scene.walls.length === 0) return;
+    const ctx = this.ctx;
+    const cam = this.camera;
+    for (const wall of this.scene.walls) {
+      if (wall.labelId !== labelId) continue;
+      if (!this.labels.isVisible(wall.labelId)) continue;
+      const lines = computeWallLines(wall.corners, wall.thicknessM, wall.referenceSide);
+      const drawPoly = (pts: Vec2[], color: string, widthPx: number, dashed?: boolean) => {
+        if (pts.length < 2) return;
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = widthPx;
+        if (dashed) ctx.setLineDash([5, 4]);
+        ctx.beginPath();
+        const a0 = cam.worldToScreen(pts[0].x, pts[0].y);
+        ctx.moveTo(a0.x, a0.y);
+        for (let i = 1; i < pts.length; i++) {
+          const s = cam.worldToScreen(pts[i].x, pts[i].y);
+          ctx.lineTo(s.x, s.y);
+        }
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+      };
+      drawPoly(lines.subCorners, wall.color, 1.5);
+      drawPoly(lines.mainCorners, wall.color, 2);
+    }
   }
 
   private _drawHatches() {

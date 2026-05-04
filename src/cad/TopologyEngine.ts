@@ -5,6 +5,7 @@ import { Camera } from "./Camera";
 import { LabelManager } from "./LabelManager";
 import { boxCornersWorld } from "./textGeometry";
 import { documentCornersWorld, documentEdgeMidpointsWorld } from "./documentGeometry";
+import { computeWallLines } from "./wallGeom";
 
 export interface Snap {
   type: string;
@@ -122,6 +123,16 @@ export class TopologyEngine {
     // Segment lines
     for (const seg of segs) {
       considerLine(seg.a, seg.b, seg, null);
+    }
+    // Wall snap points & edges (Haupt + Sub)
+    for (const wall of this.scene.walls) {
+      if (!this.labels.isVisible(wall.labelId)) continue;
+      const lines = computeWallLines(wall.corners, wall.thicknessM, wall.referenceSide);
+      const polylines = [lines.mainCorners, lines.subCorners];
+      for (const poly of polylines) {
+        for (const p of poly) considerPoint(p, null, null, -1);
+        for (let i = 0; i < poly.length - 1; i++) considerLine(poly[i], poly[i + 1], null, null);
+      }
     }
     // Hatch edges
     for (const edge of this.scene.getHatchEdges()) {

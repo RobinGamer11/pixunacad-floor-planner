@@ -334,6 +334,38 @@ export interface RulerGuide {
   b: Vec2;
 }
 
+export type WallKind = "outer" | "inner";
+export type WallReferenceSide = "outer" | "center" | "inner";
+
+export class Wall {
+  id: string;
+  kind: WallKind;
+  thicknessM: number;
+  referenceSide: WallReferenceSide;
+  /** Bezugs-Polylinie (gezeichnete Eckpunkte). */
+  corners: Vec2[];
+  /** Freier ID-Name (überschreibt Auto-ID AW01/IW01). Leer = Auto. */
+  customName: string;
+  color: string;
+  labelId: string;
+  _stickerEditOwnerId?: string | null;
+
+  constructor(opts: {
+    id: string; kind: WallKind; thicknessM: number; referenceSide: WallReferenceSide;
+    corners: Vec2[]; customName?: string; color?: string; labelId?: string;
+  }) {
+    this.id = opts.id;
+    this.kind = opts.kind;
+    this.thicknessM = Math.max(0.001, opts.thicknessM);
+    this.referenceSide = opts.referenceSide;
+    this.corners = opts.corners.map(p => v(p.x, p.y));
+    this.customName = opts.customName || "";
+    this.color = opts.color || Defaults.lineColor;
+    this.labelId = opts.labelId || Defaults.defaultLabelId;
+    this._stickerEditOwnerId = null;
+  }
+}
+
 export class Scene {
   segments: Segment[] = [];
   freeStrokes: FreeStroke[] = [];
@@ -343,6 +375,7 @@ export class Scene {
   textBoxes: TextBox[] = [];
   stickerInstances: StickerInstance[] = [];
   documents: DocumentObject[] = [];
+  walls: Wall[] = [];
   /**
    * Wenn !== null: alle danach via create* erzeugten Objekte werden mit dieser
    * Sticker-Edit-Owner-ID markiert. Wird von CadApp während enterStickerEdit
@@ -794,4 +827,21 @@ export class Scene {
     }
     return edges;
   }
+
+  // ---- Walls ----
+  createWall(opts: {
+    kind: WallKind; thicknessM: number; referenceSide: WallReferenceSide;
+    corners: Vec2[]; customName?: string; color?: string; labelId?: string;
+  }) {
+    const w = new Wall({ id: this._makeId(), ...opts });
+    w._stickerEditOwnerId = this._currentEditOwnerId;
+    this.walls.push(w);
+    return w;
+  }
+
+  removeWall(w: Wall) { this.walls = this.walls.filter(x => x !== w); }
+  getWallById(id: string): Wall | null { return this.walls.find(w => w.id === id) || null; }
+  getWallsByLabelId(labelId: string): Wall[] { return this.walls.filter(w => w.labelId === labelId); }
+  removeWallsByLabelId(labelId: string) { this.walls = this.walls.filter(w => w.labelId !== labelId); }
+  reassignWallsLabel(oldId: string, newId: string) { for (const w of this.walls) if (w.labelId === oldId) w.labelId = newId; }
 }

@@ -21,6 +21,7 @@ import { StickerDefinition, buildStickerFromSelection, buildStickerFromIds, Stic
 import { DocumentTool } from "./DocumentTool";
 import { FreeDrawTool } from "./FreeDrawTool";
 import { EraserTool } from "./EraserTool";
+import { WallTool } from "./WallTool";
 
 import { IdPanel } from "./IdPanel";
 import { SheetManager, SheetOverlayStore, SheetDefaults } from "./SheetManager";
@@ -191,7 +192,8 @@ export class CadApp {
   documentTool!: DocumentTool;
   freeDrawTool!: FreeDrawTool;
   eraserTool!: EraserTool;
-  activeTool: SelectTool | LineTool | HatchTool | MeasureTool | TextTool | PipetteTool | StickerTool | DocumentTool | FreeDrawTool | EraserTool;
+  wallTool!: WallTool;
+  activeTool: SelectTool | LineTool | HatchTool | MeasureTool | TextTool | PipetteTool | StickerTool | DocumentTool | FreeDrawTool | EraserTool | WallTool;
 
   // Clipboard + Paste-Vorschau
   clipboard: Clipboard | null = null;
@@ -378,6 +380,7 @@ export class CadApp {
     this.documentTool = new DocumentTool(this);
     this.freeDrawTool = new FreeDrawTool(this);
     this.eraserTool = new EraserTool(this);
+    this.wallTool = new WallTool(this);
     this.activeTool = this.selectTool;
 
     this.idPanel = new IdPanel(this, idPanelRoot, idPanelBody, idPanelList, idPanelAddBtn, idPanelToggleBtn);
@@ -1642,6 +1645,7 @@ export class CadApp {
       if (e.key === "d" || e.key === "D") this.setTool(ToolIds.DOCUMENT);
       if (e.key === "f" || e.key === "F") this.setTool(ToolIds.FREE);
       if (e.key === "e" || e.key === "E") this.setTool(ToolIds.ERASER);
+      if (e.key === "w" || e.key === "W") this.setTool(ToolIds.WALL);
 
       if (e.key === "Escape") {
         if (this.isStickerEditing()) { this.exitStickerEdit(); this.clearSelection(); return; }
@@ -1651,6 +1655,7 @@ export class CadApp {
         if (this.activeTool === this.textTool) { this.textTool.cancel(); this.clearSelection(); this.setSelectedLabelId(null); this.setTool(ToolIds.SELECT); return; }
         if (this.activeTool === this.measureTool) { this.measureTool.cancel(); this.clearSelection(); this.setTool(ToolIds.SELECT); return; }
         if (this.activeTool === this.pipetteTool) { this.pipetteTool.cancel(); this.setTool(ToolIds.SELECT); return; }
+        if (this.activeTool === this.wallTool) { this.wallTool.cancel(); this.setTool(ToolIds.SELECT); return; }
         if (this.activeTool === this.stickerTool) {
           // Erst aktive Platzierung abbrechen, sonst Tool wechseln
           if (this.stickerTool.phase !== "idle") { this.stickerTool.cancel(); return; }
@@ -1930,6 +1935,7 @@ export class CadApp {
     else if (id === ToolIds.DOCUMENT) { this.activeTool = this.documentTool; this.documentTool.activate(); }
     else if (id === ToolIds.FREE) { this.activeTool = this.freeDrawTool; this.freeDrawTool.activate(); }
     else if (id === ToolIds.ERASER) { this.activeTool = this.eraserTool; this.eraserTool.activate(); }
+    else if (id === ToolIds.WALL) { this.activeTool = this.wallTool; this.wallTool.activate(); }
     this._syncLineSettingsFromContext();
     this._syncHatchSettingsFromContext();
     this._syncMeasureSettingsFromContext();

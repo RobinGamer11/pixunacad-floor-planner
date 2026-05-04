@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import { CadApp } from "@/cad/CadApp";
 import { ToolIds, PointEditAction } from "@/cad/constants";
-import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Pipette, Sticker as StickerIcon, Pencil, Trash2, Download, Upload, Plus, FileImage, Maximize2, Ruler as RulerIcon, Eraser } from "lucide-react";
+import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Pipette, Sticker as StickerIcon, Pencil, Trash2, Download, Upload, Plus, FileImage, Maximize2, Ruler as RulerIcon, Eraser, Construction } from "lucide-react";
 import type { HatchDrawMode } from "@/cad/HatchTool";
 import type { StickerDefinition } from "@/cad/StickerManager";
 import { instanceBoundingCornersWorld } from "@/cad/StickerManager";
@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { FreeDrawSettingsPanel } from "@/components/cad/FreeDrawSettingsPanel";
 import { EraserSettingsPanel } from "@/components/cad/EraserSettingsPanel";
+import { WallSettingsPanel } from "@/components/cad/WallSettingsPanel";
 
 const CAD_TOOLS = [
   { id: ToolIds.SELECT, label: "Auswahl", key: "V", icon: MousePointer2 },
@@ -20,6 +21,7 @@ const CAD_TOOLS = [
   { id: ToolIds.TEXT, label: "Text", key: "T", icon: Type },
   { id: ToolIds.STICKER, label: "Sticker", key: "O", icon: StickerIcon },
   { id: ToolIds.DOCUMENT, label: "Dokument", key: "D", icon: FileImage },
+  { id: ToolIds.WALL, label: "Wand", key: "W", icon: Construction },
 ];
 
 // Sub-Werkzeuge unter "Linie": gemeinsam ein Einstellungsfenster mit
@@ -1037,6 +1039,11 @@ const CadEditor: React.FC = () => {
           {/* Eraser-Tool-Panel */}
           {!sidebarCollapsed && activeTool === ToolIds.ERASER && (
             <EraserSettingsPanel app={appRef.current} />
+          )}
+
+          {/* Wand-Tool-Panel */}
+          {!sidebarCollapsed && activeTool === ToolIds.WALL && (
+            <WallSettingsPanel app={appRef.current} />
           )}
 
           {/* Document-Eigenschaften: nur im Auswahl-Tool, wenn Dokument selektiert */}
