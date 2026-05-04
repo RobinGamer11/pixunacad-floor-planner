@@ -760,7 +760,7 @@ export class SelectTool {
     return null;
   }
 
-  /** Look for a hatch edge near mouse; return {hatch, edgeIndex, t} or null. */
+  /** Look for a hatch edge near mouse; return {hatch, edgeIndex, t, holeIndex?} or null. */
   private _hitTestHatchEdge(input: Input) {
     const mouseW = v(input.mouse.wx, input.mouse.wy);
     const mouseS = v(input.mouse.sx, input.mouse.sy);
@@ -772,23 +772,29 @@ export class SelectTool {
     };
 
     const visibleHatches = this.app.topology._hatchesFrontToBack();
-    let best: { hatch: any; edgeIndex: number; t: number } | null = null;
+    let best: { hatch: any; edgeIndex: number; t: number; holeIndex: number | null } | null = null;
     let bestPx = Infinity;
 
-    for (const hatch of visibleHatches) {
-      const n = hatch.points.length;
-      if (n < 2) continue;
+    const tryLoop = (hatch: any, pts: Vec2[], holeIndex: number | null) => {
+      const n = pts.length;
+      if (n < 2) return;
       for (let i = 0; i < n; i++) {
-        const a = hatch.points[i];
-        const b = hatch.points[(i + 1) % n];
+        const a = pts[i];
+        const b = pts[(i + 1) % n];
         const proj = projectPointToSegment(mouseW, a, b);
         if (proj.t <= Defaults.splitEpsT || proj.t >= 1 - Defaults.splitEpsT) continue;
         const px = distPxToWorldPoint(proj.q);
         if (px <= Defaults.hitPx && px < bestPx) {
           bestPx = px;
-          best = { hatch, edgeIndex: i, t: proj.t };
+          best = { hatch, edgeIndex: i, t: proj.t, holeIndex };
         }
       }
+    };
+
+    for (const hatch of visibleHatches) {
+      tryLoop(hatch, hatch.points, null);
+      const loops = hatch.holes || [];
+      for (let h = 0; h < loops.length; h++) tryLoop(hatch, loops[h], h);
     }
     return best;
   }
