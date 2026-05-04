@@ -110,6 +110,7 @@ export const SelectionType = {
   STICKER_INSTANCE: "sticker_instance",
   DOCUMENT: "document",
   FREE_STROKE: "free_stroke",
+  WALL: "wall",
 } as const;
 
 export const SnapType = {
