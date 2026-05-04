@@ -62,6 +62,19 @@ export class LabelManager {
     return true;
   }
 
+  /** Erzeugt (falls noch nicht vorhanden) eine Layer-Gruppe mit explizitem Namen und gibt sie zurück. */
+  ensureGroupNamed(name: string): LabelGroup {
+    const clean = (name || "").trim();
+    if (clean) {
+      const existing = this.groups.find(g => g.name === clean);
+      if (existing) return existing;
+    }
+    const id = `label-${Date.now()}-${this._counter++}`;
+    const group: LabelGroup = { id, name: clean || `ID-${String(this._counter - 1).padStart(2, "0")}`, locked: false, visible: true };
+    this.groups.unshift(group);
+    return group;
+  }
+
   moveToIndex(id: string, targetIndex: number): boolean {
     const from = this.getIndex(id);
     if (from < 0) return false;

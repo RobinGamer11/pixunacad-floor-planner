@@ -50,6 +50,7 @@ export class WallTool {
     this.corners = [];
     this.snap = null;
     this.app.renderer.overlay = { draw: (ctx, cam) => this._drawOverlay(ctx, cam) };
+    this.app.renderer.showWallHelpers = true;
     this.app.hub.hide();
     this.app.pointEditMenu.hide();
   }
@@ -58,10 +59,37 @@ export class WallTool {
     this.state = "idle";
     this.corners = [];
     this.snap = null;
+    this.app.renderer.showWallHelpers = false;
+  }
+
+  /** Liefert die Bezugslinien-Priorität dieser Wand. */
+  ownLineKind(): "main" | "sub" | "help" {
+    if (this.settings.referenceSide === "outer") return "main";
+    if (this.settings.referenceSide === "inner") return "sub";
+    return "help";
+  }
+
+  /** Auto-ID AW01/AW02 / IW01/IW02 falls customName leer. Erzeugt Label-Group falls nötig. */
+  private _resolveLabelId(): string {
+    const customName = (this.settings.customName || "").trim();
+    if (customName) {
+      return this.app.labelManager.ensureGroupNamed(customName).id;
+    }
+    const prefix = this.settings.kind === "outer" ? "AW" : "IW";
+    const used = new Set<string>();
+    for (const w of this.app.scene.walls) {
+      const g = this.app.labelManager.getById(w.labelId);
+      if (g && g.name.startsWith(prefix)) used.add(g.name);
+    }
+    let n = 1;
+    while (used.has(`${prefix}${String(n).padStart(2, "0")}`)) n++;
+    const name = `${prefix}${String(n).padStart(2, "0")}`;
+    return this.app.labelManager.ensureGroupNamed(name).id;
   }
 
   finish() {
     if (this.state === "drawing" && this.corners.length >= 2) {
+      const labelId = this._resolveLabelId();
       this.app.scene.createWall({
         kind: this.settings.kind,
         thicknessM: this.getThickness(),
@@ -69,7 +97,7 @@ export class WallTool {
         corners: this.corners,
         customName: this.settings.customName,
         color: this.settings.color,
-        labelId: this.app.activeDrawLabelId || Defaults.defaultLabelId,
+        labelId,
       });
     }
     this.cancel();
@@ -93,7 +121,8 @@ export class WallTool {
   update(input: Input) {
     const mouseS = v(input.mouse.sx, input.mouse.sy);
     const mouseW = v(input.mouse.wx, input.mouse.wy);
-    this.snap = this.app.topology.findBestSnap(mouseS, mouseW);
+    const baseSnap = this.app.topology.findBestSnap(mouseS, mouseW);
+    this.snap = this._applyPrioritySnap(baseSnap, mouseS, mouseW);
 
     if (input.doubleClicked) { this.finish(); return; }
     if (input.clicked) {
@@ -108,7 +137,54 @@ export class WallTool {
     }
   }
 
-  /** Polylinie + drei Wandlinien als Preview. */
+  /**
+   * Wenn der gefundene Snap auf einer Wandlinie liegt, deren Priorität nicht zu unserer
+   * eigenen Bezugslinie passt, suche nach einem alternativen Wand-Snap mit passender
+   * Priorität in der Nähe – nur dieser darf binden. So verbinden sich:
+   *   main↔main, sub↔sub, help↔help.
+   */
+  private _applyPrioritySnap(snap: import("./TopologyEngine").Snap | null, mouseS: Vec2, mouseW: Vec2) {
+    if (!snap) return snap;
+    if (!snap.wallId) return snap;
+    const want = this.ownLineKind();
+    if (snap.wallLine === want) return snap;
+
+    // Suche bestpassenden Wall-Snap mit gewünschter Linie
+    let best: import("./TopologyEngine").Snap | null = null;
+    let bestPx = Defaults.snapPx;
+    for (const wall of this.app.scene.walls) {
+      if (!this.app.labelManager.isVisible(wall.labelId)) continue;
+      const lines = computeWallLines(wall.corners, wall.thicknessM, wall.referenceSide);
+      const poly: Vec2[] = want === "main" ? lines.mainCorners : want === "sub" ? lines.subCorners : lines.helpCorners;
+      // Punkte
+      for (const p of poly) {
+        const sp = this.app.camera.worldToScreen(p.x, p.y);
+        const px = Math.hypot(sp.x - mouseS.x, sp.y - mouseS.y);
+        if (px <= bestPx) {
+          bestPx = px;
+          best = { type: SnapType.POINT, world: v(p.x, p.y), segment: null, hatch: null, pointIndex: null, t: null, px, wallId: wall.id, wallLine: want };
+        }
+      }
+      // Linien
+      for (let i = 0; i < poly.length - 1; i++) {
+        const a = poly[i], b = poly[i + 1];
+        const ab = sub(b, a);
+        const ap = sub(mouseW, a);
+        const ab2 = ab.x * ab.x + ab.y * ab.y || 1e-12;
+        let t = (ap.x * ab.x + ap.y * ab.y) / ab2;
+        if (t <= 0 || t >= 1) continue;
+        const q = { x: a.x + ab.x * t, y: a.y + ab.y * t };
+        const sp = this.app.camera.worldToScreen(q.x, q.y);
+        const px = Math.hypot(sp.x - mouseS.x, sp.y - mouseS.y);
+        if (px <= bestPx) {
+          bestPx = px;
+          best = { type: SnapType.LINE, world: q, segment: null, hatch: null, pointIndex: null, t, px, lineA: a, lineB: b, wallId: wall.id, wallLine: want };
+        }
+      }
+    }
+    return best || snap;
+  }
+
   private _drawPolyline(ctx: CanvasRenderingContext2D, cam: any, pts: Vec2[], style: { color: string; widthPx: number; dashed?: boolean }) {
     if (pts.length < 2) return;
     ctx.save();
