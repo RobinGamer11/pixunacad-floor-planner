@@ -7,6 +7,8 @@ import { boxCornersWorld } from "./textGeometry";
 import { documentCornersWorld, documentEdgeMidpointsWorld } from "./documentGeometry";
 import { computeWallLines } from "./wallGeom";
 
+export type WallLineKind = "main" | "sub" | "help";
+
 export interface Snap {
   type: string;
   world: Vec2;
@@ -21,6 +23,10 @@ export interface Snap {
   guidePoint?: Vec2;
   guideDir?: Vec2;
   isDraftStart?: boolean;
+  /** Wenn der Snap auf einer Wandlinie/-eckpunkt liegt: Wand-ID. */
+  wallId?: string | null;
+  /** Wandlinien-Typ (Priorität): main = Haupt (P1), help = Mitte (P2), sub = Sub (P3). */
+  wallLine?: WallLineKind | null;
 }
 
 export class TopologyEngine {
