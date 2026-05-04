@@ -91,6 +91,10 @@ export class FreeDrawTool {
       blobSpacingM: Defaults.freeBlobSpacingM,
       blobSizeM: Defaults.freeBlobSizeM,
       smoothing: Defaults.freeSmooth,
+      imageSrc: this.app.defaultFreeImageSrc,
+      imageSizeM: this.app.defaultFreeImageSizeM,
+      imageSpacingM: this.app.defaultFreeImageSpacingM,
+      imageRotateAlongPath: this.app.defaultFreeImageRotate,
       labelId: this.app.activeDrawLabelId || Defaults.defaultLabelId,
     };
   }
