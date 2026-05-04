@@ -23,6 +23,8 @@ export interface Selection {
   pointIndex?: number | null;
   /** Bei HATCH-Selection optional: Index der angeklickten Kante (für Edge-Offset-Hub). */
   edgeIndex?: number | null;
+  /** Bei Hatch Punkt/Kanten-Auswahl: Index der Hole-Loop (null/undefined = äußere Kontur). */
+  holeIndex?: number | null;
 }
 
 export interface Overlay {
