@@ -667,7 +667,7 @@ export class SelectTool {
         const px = distPxToWorldPoint(selectedHatch.points[i]);
         if (px <= Defaults.hitPx) return { type: SelectionType.POINT, hatchId: selectedHatch.id, pointIndex: i };
       }
-      if (selectedHatch.points.length >= 3 && pointInPolygon(mouseW, selectedHatch.points)) {
+      if (selectedHatch.points.length >= 3 && pointInHatchSolid(mouseW, selectedHatch.points, selectedHatch.holes)) {
         return { type: SelectionType.HATCH, hatchId: selectedHatch.id, pointIndex: null };
       }
     }
