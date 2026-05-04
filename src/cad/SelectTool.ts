@@ -486,6 +486,10 @@ export class SelectTool {
       const newCenter = v((opp.x + newPoint.x) * 0.5, (opp.y + newPoint.y) * 0.5);
       box.center = newCenter;
       box.rotationRad = newRot;
+    } else if (this.editTarget.kind === "wallPoint") {
+      const wall = this.app.scene.getWallById(this.editTarget.wallId);
+      if (!wall) return;
+      wall.corners[this.editTarget.pointIndex] = v(newPoint.x, newPoint.y);
     }
   }
 
