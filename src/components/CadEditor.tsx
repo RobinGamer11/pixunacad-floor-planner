@@ -535,6 +535,13 @@ const CadEditor: React.FC = () => {
             <Redo2 className="h-4 w-4 shrink-0" />
             {!sidebarCollapsed && <span className="text-xs">Redo</span>}
           </button>
+          <button
+            onClick={() => handleToolClick(ToolIds.PIPETTE)}
+            title="Pipette (P)"
+            className={`cad-toolbar-btn ${sidebarCollapsed ? "justify-center px-0 h-9 w-9" : "justify-center px-2"} ${activeTool === ToolIds.PIPETTE ? "active" : ""}`}
+          >
+            <Pipette className="h-4 w-4 shrink-0" />
+          </button>
         </div>
 
         {/* Divider */}
@@ -544,7 +551,9 @@ const CadEditor: React.FC = () => {
         <div className="flex flex-col gap-1 p-2">
           {CAD_TOOLS.map((t) => {
             const Icon = t.icon;
-            const isActive = activeTool === t.id;
+            const isActive = t.id === ToolIds.LINE
+              ? (activeTool === ToolIds.LINE || activeTool === ToolIds.FREE || activeTool === ToolIds.ERASER)
+              : activeTool === t.id;
             return (
               <button
                 key={t.id}
