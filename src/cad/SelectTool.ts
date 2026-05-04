@@ -251,6 +251,15 @@ export class SelectTool {
       this.fixedPoint = polygonCentroid(loop);
       this.otherPointOriginal = v(loop[idx].x, loop[idx].y);
       this.hatchPointsOriginal = loop.map(p => v(p.x, p.y));
+    } else if (ctx.target.kind === "wallPoint") {
+      const wall = this.app.scene.getWallById(ctx.target.wallId)!;
+      const idx = ctx.target.pointIndex;
+      // Fixpunkt = Nachbar-Eckpunkt (vorhergehender; bei idx 0 nachfolgender)
+      const fixIdx = idx === 0 ? 1 : idx - 1;
+      this.fixedPoint = v(wall.corners[fixIdx].x, wall.corners[fixIdx].y);
+      this.otherPointOriginal = v(wall.corners[idx].x, wall.corners[idx].y);
+      this.wallPointsOriginal = wall.corners.map(p => v(p.x, p.y));
+      this.hatchPointsOriginal = null;
     } else {
       const hatch = ctx.hatch!;
       const idx = ctx.target.pointIndex;
