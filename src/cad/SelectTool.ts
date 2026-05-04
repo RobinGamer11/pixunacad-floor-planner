@@ -652,6 +652,7 @@ export class SelectTool {
     this.moveHubLengthM = null;
     this.moveHubAngleDeg = null;
     this.editGuideAnchors = [];
+    this.wallPointsOriginal = null;
     this.app.hub.bindCommit(null);
   }
 
