@@ -4,6 +4,7 @@ import type { CadApp } from "./CadApp";
 import type { Input } from "./Input";
 import type { FreeLineStyle } from "./Scene";
 import { dedupePoints, projectPointToInfiniteLineFromTwoPoints } from "./freeGeom";
+import { RulerDragController } from "./rulerInteraction";
 
 /**
  * Freihand-Zeichenwerkzeug (Hotkey: F).
@@ -17,15 +18,18 @@ export class FreeDrawTool {
   private _drawing = false;
   private _points: Vec2[] = [];
   private _lastSamplePx: { x: number; y: number } | null = null;
+  private _rulerDrag!: RulerDragController;
 
   constructor(app: CadApp) {
     this.app = app;
+    this._rulerDrag = new RulerDragController(app);
   }
 
   activate() {
     this._drawing = false;
     this._points = [];
     this._lastSamplePx = null;
+    this._rulerDrag.reset();
     this.app.hub.hide();
     this.app.pointEditMenu.hide();
     this.app.renderer.setHoverSegmentId(null);
@@ -40,9 +44,18 @@ export class FreeDrawTool {
 
   finish() { this.cancel(); }
 
-  getCursor() { return "crosshair"; }
+  getCursor() {
+    const c = this._rulerDrag.hoverCursor(this.app.input);
+    return c || "crosshair";
+  }
 
   update(input: Input) {
+    // Ruler-Manipulation hat Vorrang vor dem Zeichnen.
+    if (this._rulerDrag.update(input)) {
+      // Sicherheit: laufendes Drawing abbrechen
+      if (this._drawing) { this._drawing = false; this._points = []; this._lastSamplePx = null; }
+      return;
+    }
     const ruler = this.app.scene.rulerGuide;
     const rawW = v(input.mouse.wx, input.mouse.wy);
     const projW = ruler ? projectPointToInfiniteLineFromTwoPoints(rawW, ruler.a, ruler.b) : rawW;
