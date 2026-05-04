@@ -424,6 +424,7 @@ export class CadApp {
       })),
       hatches: scene.hatches.map(h => ({
         id: h.id, points: h.points.map(p => ({ x: p.x, y: p.y })),
+        holes: (h.holes || []).map(loop => loop.map(p => ({ x: p.x, y: p.y }))),
         fillColor: h.fillColor, strokeColor: h.strokeColor,
         fillAlphaPct: h.fillAlphaPct, strokeWidthPx: h.strokeWidthPx,
         labelId: h.labelId, areaLabel: { ...h.areaLabel },
@@ -530,6 +531,7 @@ export class CadApp {
         fillColor: h.fillColor, strokeColor: h.strokeColor,
         fillAlphaPct: h.fillAlphaPct, strokeWidthPx: h.strokeWidthPx,
         labelId: h.labelId, areaLabel: h.areaLabel,
+        holes: h.holes || [],
       });
       if (h._stickerEditOwnerId) hatch._stickerEditOwnerId = h._stickerEditOwnerId;
     }
