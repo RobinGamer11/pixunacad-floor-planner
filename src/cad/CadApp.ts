@@ -402,6 +402,10 @@ export class CadApp {
         this.selectTool.beginHatchEdgeOffset((sel as any).hatchId, (sel as any).edgeIndex, (sel as any).holeIndex ?? null);
         return;
       }
+      if (sel && sel.type === SelectionType.WALL && (sel as any).wallId && (sel as any).edgeIndex != null) {
+        this.selectTool.beginWallEdgeAction((sel as any).wallId, (sel as any).edgeIndex, action);
+        return;
+      }
       this.selectTool.beginPointEdit(action);
     });
 
