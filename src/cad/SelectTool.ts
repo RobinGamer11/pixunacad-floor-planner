@@ -1638,6 +1638,8 @@ export class SelectTool {
       // Hatch-Edge-Auswahl: Menü mit Offset offen halten.
     } else if (!this.isEditing() && this._isTextBoxHandleSelectionActive()) {
       // TextBox-Handle-Auswahl: Menü offen halten.
+    } else if (!this.isEditing() && this._isWallEdgeSelectionActive()) {
+      // Wand-Edge-Auswahl: Menü offen halten.
     } else {
       this.app.pointEditMenu.hide();
     }
