@@ -885,11 +885,11 @@ export class Scene {
 
     const wA = new Wall({
       id: this._makeId(), kind: wall.kind, thicknessM: wall.thicknessM, referenceSide: wall.referenceSide,
-      corners: cornersA, customName: wall.customName, color: wall.color, labelId: wall.labelId,
+      corners: cornersA, customName: wall.customName, color: wall.color, fillColor: wall.fillColor, labelId: wall.labelId,
     });
     const wB = new Wall({
       id: this._makeId(), kind: wall.kind, thicknessM: wall.thicknessM, referenceSide: wall.referenceSide,
-      corners: cornersB, customName: "", color: wall.color, labelId: newLabelIdForB || wall.labelId,
+      corners: cornersB, customName: "", color: wall.color, fillColor: wall.fillColor, labelId: newLabelIdForB || wall.labelId,
     });
     wA._stickerEditOwnerId = wall._stickerEditOwnerId;
     wB._stickerEditOwnerId = wall._stickerEditOwnerId;
