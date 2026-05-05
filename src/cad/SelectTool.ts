@@ -859,6 +859,16 @@ export class SelectTool {
     this.moveHubAngleDeg = null;
     this.editGuideAnchors = [];
     this.wallPointsOriginal = null;
+    this.wallEdgeAOriginal = null;
+    this.wallEdgeBOriginal = null;
+    this.wallEdgePrevOriginal = null;
+    this.wallEdgeNextOriginal = null;
+    this.wallEdgeNormal = null;
+    this.wallEdgeMidOriginal = null;
+    this.wallEdgeOffsetM = 0;
+    this.wallEdgeOffsetLocked = false;
+    this.wallEdgeHasPrev = false;
+    this.wallEdgeHasNext = false;
     this.app.hub.bindCommit(null);
   }
 
