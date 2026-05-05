@@ -59,6 +59,17 @@ export class SelectTool {
 
   // Wall edit snapshot
   wallPointsOriginal: Vec2[] | null = null;
+  // Wall-Edge offset state (analog hatchEdge*)
+  wallEdgeAOriginal: Vec2 | null = null;
+  wallEdgeBOriginal: Vec2 | null = null;
+  wallEdgePrevOriginal: Vec2 | null = null;
+  wallEdgeNextOriginal: Vec2 | null = null;
+  wallEdgeNormal: Vec2 | null = null;
+  wallEdgeMidOriginal: Vec2 | null = null;
+  wallEdgeOffsetM = 0;
+  wallEdgeOffsetLocked = false;
+  wallEdgeHasPrev = false;
+  wallEdgeHasNext = false;
 
   // Parallel-drag state for dimensions
   dragDimId: string | null = null;
