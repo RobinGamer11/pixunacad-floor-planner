@@ -835,7 +835,7 @@ export class Scene {
   // ---- Walls ----
   createWall(opts: {
     kind: WallKind; thicknessM: number; referenceSide: WallReferenceSide;
-    corners: Vec2[]; customName?: string; color?: string; labelId?: string;
+    corners: Vec2[]; customName?: string; color?: string; fillColor?: string; labelId?: string;
   }) {
     const w = new Wall({ id: this._makeId(), ...opts });
     w._stickerEditOwnerId = this._currentEditOwnerId;
