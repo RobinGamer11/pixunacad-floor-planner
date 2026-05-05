@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import type { CadApp } from "@/cad/CadApp";
 import type { WallToolSettings } from "@/cad/WallTool";
+import { Defaults } from "@/cad/constants";
 
 interface Props { app: CadApp | null; }
 
@@ -16,6 +17,14 @@ export const WallSettingsPanel: React.FC<Props> = ({ app }) => {
   const update = (patch: Partial<WallToolSettings>) => {
     Object.assign(app.wallTool.settings, patch);
     force(x => x + 1);
+  };
+
+  const setKind = (kind: "outer" | "inner") => {
+    const patch: Partial<WallToolSettings> = { kind };
+    if (s.fillColorAuto) {
+      patch.fillColor = kind === "outer" ? Defaults.wallFillColorOuter : Defaults.wallFillColorInner;
+    }
+    update(patch);
   };
 
   return (
