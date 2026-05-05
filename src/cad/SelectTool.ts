@@ -175,13 +175,13 @@ export class SelectTool {
 
   finish() {}
 
-  /** Hit-Test gegen Wand-Eckpunkte und Wand-Achslinien. */
-  private _hitTestWall(input: Input): { wallId: string; pointIndex: number | null } | null {
+  /** Hit-Test gegen Wand-Eckpunkte und Wand-Achslinien. edgeIndex gesetzt bei Liniensegment-Treffer. */
+  private _hitTestWall(input: Input): { wallId: string; pointIndex: number | null; edgeIndex: number | null } | null {
     const mouseW = v(input.mouse.wx, input.mouse.wy);
     const mouseS = v(input.mouse.sx, input.mouse.sy);
     const cam = this.app.camera;
     let bestPx = Infinity;
-    let bestPoint: { wallId: string; pointIndex: number | null } | null = null;
+    let bestPoint: { wallId: string; pointIndex: number | null; edgeIndex: number | null } | null = null;
     // Eckpunkte zuerst
     for (const wall of this.app.scene.walls) {
       if (!this.app.labelManager.isVisible(wall.labelId)) continue;
@@ -190,7 +190,7 @@ export class SelectTool {
         const px = Math.hypot(sp.x - mouseS.x, sp.y - mouseS.y);
         if (px <= Defaults.hitPx + 2 && px < bestPx) {
           bestPx = px;
-          bestPoint = { wallId: wall.id, pointIndex: i };
+          bestPoint = { wallId: wall.id, pointIndex: i, edgeIndex: null };
         }
       }
     }
@@ -205,7 +205,7 @@ export class SelectTool {
         const px = Math.hypot(sp.x - mouseS.x, sp.y - mouseS.y);
         if (px <= Defaults.hitPx + 4 && px < bestPx) {
           bestPx = px;
-          bestPoint = { wallId: wall.id, pointIndex: null };
+          bestPoint = { wallId: wall.id, pointIndex: null, edgeIndex: i };
         }
       }
     }
