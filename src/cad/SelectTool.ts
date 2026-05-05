@@ -1362,7 +1362,11 @@ export class SelectTool {
         const p = pointFromLengthAngle(this.fixedPoint!, radius, ang);
 
         if (document.activeElement !== this.app.hub.lenInputEl && document.activeElement !== this.app.hub.angInputEl) {
-          this._applyMovingPoint(p, this.fixedPoint!);
+          if (this.editTarget?.kind === "wall") {
+            this._applyWallRotateHubValues({ lengthM: null, angleDeg: ang });
+          } else {
+            this._applyMovingPoint(p, this.fixedPoint!);
+          }
           this.app.hub.showAt(input.mouse.sx, input.mouse.sy);
           this.app.hub.updateDisplay(radius, ang);
         }
