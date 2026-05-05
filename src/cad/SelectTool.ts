@@ -17,6 +17,7 @@ type EditTarget =
   | { kind: "hatchHoleEdge"; hatchId: string; holeIndex: number; edgeIndex: number }
   | { kind: "textboxHandle"; textBoxId: string; handleIndex: number }
   | { kind: "wallPoint"; wallId: string; pointIndex: number }
+  | { kind: "wallEdge"; wallId: string; edgeIndex: number }
   | { kind: "wall"; wallId: string };
 
 export class SelectTool {
