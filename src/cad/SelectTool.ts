@@ -17,6 +17,7 @@ type EditTarget =
   | { kind: "hatchHoleEdge"; hatchId: string; holeIndex: number; edgeIndex: number }
   | { kind: "textboxHandle"; textBoxId: string; handleIndex: number }
   | { kind: "wallPoint"; wallId: string; pointIndex: number }
+  | { kind: "wallEdge"; wallId: string; edgeIndex: number }
   | { kind: "wall"; wallId: string };
 
 export class SelectTool {
@@ -58,6 +59,17 @@ export class SelectTool {
 
   // Wall edit snapshot
   wallPointsOriginal: Vec2[] | null = null;
+  // Wall-Edge offset state (analog hatchEdge*)
+  wallEdgeAOriginal: Vec2 | null = null;
+  wallEdgeBOriginal: Vec2 | null = null;
+  wallEdgePrevOriginal: Vec2 | null = null;
+  wallEdgeNextOriginal: Vec2 | null = null;
+  wallEdgeNormal: Vec2 | null = null;
+  wallEdgeMidOriginal: Vec2 | null = null;
+  wallEdgeOffsetM = 0;
+  wallEdgeOffsetLocked = false;
+  wallEdgeHasPrev = false;
+  wallEdgeHasNext = false;
 
   // Parallel-drag state for dimensions
   dragDimId: string | null = null;
@@ -163,13 +175,13 @@ export class SelectTool {
 
   finish() {}
 
-  /** Hit-Test gegen Wand-Eckpunkte und Wand-Achslinien. */
-  private _hitTestWall(input: Input): { wallId: string; pointIndex: number | null } | null {
+  /** Hit-Test gegen Wand-Eckpunkte und Wand-Achslinien. edgeIndex gesetzt bei Liniensegment-Treffer. */
+  private _hitTestWall(input: Input): { wallId: string; pointIndex: number | null; edgeIndex: number | null } | null {
     const mouseW = v(input.mouse.wx, input.mouse.wy);
     const mouseS = v(input.mouse.sx, input.mouse.sy);
     const cam = this.app.camera;
     let bestPx = Infinity;
-    let bestPoint: { wallId: string; pointIndex: number | null } | null = null;
+    let bestPoint: { wallId: string; pointIndex: number | null; edgeIndex: number | null } | null = null;
     // Eckpunkte zuerst
     for (const wall of this.app.scene.walls) {
       if (!this.app.labelManager.isVisible(wall.labelId)) continue;
@@ -178,7 +190,7 @@ export class SelectTool {
         const px = Math.hypot(sp.x - mouseS.x, sp.y - mouseS.y);
         if (px <= Defaults.hitPx + 2 && px < bestPx) {
           bestPx = px;
-          bestPoint = { wallId: wall.id, pointIndex: i };
+          bestPoint = { wallId: wall.id, pointIndex: i, edgeIndex: null };
         }
       }
     }
@@ -193,7 +205,7 @@ export class SelectTool {
         const px = Math.hypot(sp.x - mouseS.x, sp.y - mouseS.y);
         if (px <= Defaults.hitPx + 4 && px < bestPx) {
           bestPx = px;
-          bestPoint = { wallId: wall.id, pointIndex: null };
+          bestPoint = { wallId: wall.id, pointIndex: null, edgeIndex: i };
         }
       }
     }
@@ -429,6 +441,129 @@ export class SelectTool {
     this.app.hub.updateDisplay(off, 0);
   }
 
+  /** Begin Wall-Edit für Edge-Selection (OFFSET = Kantenverschiebung; TRANSLATE/ROTATE = ganze Wand). */
+  beginWallEdgeAction(wallId: string, edgeIndex: number, action: string) {
+    const wall = this.app.scene.getWallById(wallId);
+    if (!wall || wall.corners.length < 2) return;
+    if (edgeIndex < 0 || edgeIndex >= wall.corners.length - 1) return;
+
+    if (action === PointEditAction.OFFSET) {
+      this.activeEditAction = PointEditAction.OFFSET;
+      this.editTarget = { kind: "wallEdge", wallId, edgeIndex };
+      const A = wall.corners[edgeIndex];
+      const B = wall.corners[edgeIndex + 1];
+      this.wallEdgeAOriginal = v(A.x, A.y);
+      this.wallEdgeBOriginal = v(B.x, B.y);
+      this.wallEdgeHasPrev = edgeIndex > 0;
+      this.wallEdgeHasNext = edgeIndex + 2 < wall.corners.length;
+      this.wallEdgePrevOriginal = this.wallEdgeHasPrev ? v(wall.corners[edgeIndex - 1].x, wall.corners[edgeIndex - 1].y) : null;
+      this.wallEdgeNextOriginal = this.wallEdgeHasNext ? v(wall.corners[edgeIndex + 2].x, wall.corners[edgeIndex + 2].y) : null;
+      this.wallEdgeMidOriginal = v((A.x + B.x) * 0.5, (A.y + B.y) * 0.5);
+      const dir = sub(B, A);
+      const dirLen = Math.hypot(dir.x, dir.y) || 1;
+      // Linkes Lot der Zeichenrichtung (analog perpLeftScreen in wallGeom)
+      this.wallEdgeNormal = v(dir.y / dirLen, -dir.x / dirLen);
+      this.wallEdgeOffsetM = 0;
+      this.wallEdgeOffsetLocked = false;
+      this.wallPointsOriginal = wall.corners.map(p => v(p.x, p.y));
+      this.app.pointEditMenu.hide();
+      this.app.hub.bindCommit((vals) => this._applyWallEdgeHubValues(vals));
+      this.app.hub.showAt(this.app.input.mouse.sx, this.app.input.mouse.sy);
+      this.app.hub.updateDisplay(0, 0);
+      this.app.hub.setValues(0, 0);
+      this.app.hub.enterEditMode();
+      return;
+    }
+
+    if (action === PointEditAction.TRANSLATE || action === PointEditAction.ROTATE) {
+      // Ganze Wand: pivot/fixed = Mittelpunkt der Edge
+      this.activeEditAction = action;
+      this.editTarget = { kind: "wall", wallId };
+      const A = wall.corners[edgeIndex];
+      const B = wall.corners[edgeIndex + 1];
+      const mid = v((A.x + B.x) * 0.5, (A.y + B.y) * 0.5);
+      this.wallPointsOriginal = wall.corners.map(p => v(p.x, p.y));
+      this.fixedPoint = mid;
+      this.otherPointOriginal = v(B.x, B.y);
+      this.moveHubLocked = false;
+      this.moveHubLengthM = null;
+      this.moveHubAngleDeg = null;
+      this.app.pointEditMenu.hide();
+      if (action === PointEditAction.ROTATE) {
+        const radius = dist(this.fixedPoint, this.otherPointOriginal);
+        const ang = angleDeg(this.fixedPoint, this.otherPointOriginal);
+        this.app.hub.bindCommit((vals) => this._applyWallRotateHubValues(vals));
+        this.app.hub.showAt(this.app.input.mouse.sx, this.app.input.mouse.sy);
+        this.app.hub.updateDisplay(radius, ang);
+        this.app.hub.setValues(radius, ang);
+        this.app.hub.enterEditMode();
+      } else {
+        this.app.hub.hide();
+        this.app.hub.bindCommit(null);
+      }
+    }
+  }
+
+  private _applyWallEdgeHubValues(vals: { lengthM: number | null; angleDeg: number | null }) {
+    if (this.activeEditAction !== PointEditAction.OFFSET || !this.editTarget) return;
+    if (this.editTarget.kind !== "wallEdge") return;
+    const off = vals.lengthM != null ? vals.lengthM : this.wallEdgeOffsetM;
+    this.wallEdgeOffsetLocked = true;
+    this.wallEdgeOffsetM = off;
+    this._applyWallEdgeOffset(off);
+    this.app.hub.setValues(off, 0);
+    this.app.hub.updateDisplay(off, 0);
+  }
+
+  private _applyWallRotateHubValues(vals: { lengthM: number | null; angleDeg: number | null }) {
+    if (this.activeEditAction !== PointEditAction.ROTATE || !this.editTarget) return;
+    if (this.editTarget.kind !== "wall") return;
+    const wall = this.app.scene.getWallById(this.editTarget.wallId);
+    if (!wall || !this.wallPointsOriginal || !this.fixedPoint) return;
+    const radiusDefault = dist(this.fixedPoint, this.otherPointOriginal!);
+    const baseAng = angleDeg(this.fixedPoint, this.otherPointOriginal!);
+    const nextAng = vals.angleDeg != null ? vals.angleDeg : baseAng;
+    const dRad = ((nextAng - baseAng) * Math.PI) / 180;
+    const c = Math.cos(dRad), s = Math.sin(dRad);
+    for (let i = 0; i < wall.corners.length; i++) {
+      const o = this.wallPointsOriginal[i];
+      const dx = o.x - this.fixedPoint.x;
+      const dy = o.y - this.fixedPoint.y;
+      wall.corners[i] = v(this.fixedPoint.x + dx * c - dy * s, this.fixedPoint.y + dx * s + dy * c);
+    }
+    this.app.hub.setValues(radiusDefault, nextAng);
+    this.app.hub.updateDisplay(radiusDefault, nextAng);
+  }
+
+  /** Parallele Verschiebung einer Wand-Achs-Edge entlang ihrer Normale. Nachbar-Eckpunkte gleiten an angrenzender Edge. */
+  private _applyWallEdgeOffset(offsetM: number) {
+    if (!this.editTarget || this.editTarget.kind !== "wallEdge") return;
+    const wall = this.app.scene.getWallById(this.editTarget.wallId);
+    if (!wall || !this.wallPointsOriginal) return;
+    const A0 = this.wallEdgeAOriginal!;
+    const B0 = this.wallEdgeBOriginal!;
+    const n = this.wallEdgeNormal!;
+    const A1 = v(A0.x + n.x * offsetM, A0.y + n.y * offsetM);
+    const B1 = v(B0.x + n.x * offsetM, B0.y + n.y * offsetM);
+    const dirEdge = sub(B1, A1);
+    const idxA = this.editTarget.edgeIndex;
+    const idxB = idxA + 1;
+    let newA = A1;
+    let newB = B1;
+    if (this.wallEdgeHasPrev && this.wallEdgePrevOriginal) {
+      const dirPrev = sub(A0, this.wallEdgePrevOriginal);
+      const ip = lineLineIntersectionInfinite(A1, dirEdge, this.wallEdgePrevOriginal, dirPrev);
+      if (ip) newA = ip;
+    }
+    if (this.wallEdgeHasNext && this.wallEdgeNextOriginal) {
+      const dirNext = sub(B0, this.wallEdgeNextOriginal);
+      const ip = lineLineIntersectionInfinite(A1, dirEdge, this.wallEdgeNextOriginal, dirNext);
+      if (ip) newB = ip;
+    }
+    wall.corners[idxA] = newA;
+    wall.corners[idxB] = newB;
+  }
+
   private _deleteSelectedPoint() {
     const ctx = this._getSelectedPointContext();
     if (!ctx) return;
@@ -643,6 +778,12 @@ export class SelectTool {
     return (sel as any).edgeIndex != null;
   }
 
+  private _isWallEdgeSelectionActive(): boolean {
+    const sel: any = this.app.selection;
+    if (!sel || sel.type !== SelectionType.WALL) return false;
+    return sel.edgeIndex != null;
+  }
+
   private _isTextBoxHandleSelectionActive(): boolean {
     const sel = this.app.selection;
     if (!sel || sel.type !== SelectionType.TEXTBOX_HANDLE) return false;
@@ -724,6 +865,16 @@ export class SelectTool {
     this.moveHubAngleDeg = null;
     this.editGuideAnchors = [];
     this.wallPointsOriginal = null;
+    this.wallEdgeAOriginal = null;
+    this.wallEdgeBOriginal = null;
+    this.wallEdgePrevOriginal = null;
+    this.wallEdgeNextOriginal = null;
+    this.wallEdgeNormal = null;
+    this.wallEdgeMidOriginal = null;
+    this.wallEdgeOffsetM = 0;
+    this.wallEdgeOffsetLocked = false;
+    this.wallEdgeHasPrev = false;
+    this.wallEdgeHasNext = false;
     this.app.hub.bindCommit(null);
   }
 
@@ -1227,7 +1378,11 @@ export class SelectTool {
         const p = pointFromLengthAngle(this.fixedPoint!, radius, ang);
 
         if (document.activeElement !== this.app.hub.lenInputEl && document.activeElement !== this.app.hub.angInputEl) {
-          this._applyMovingPoint(p, this.fixedPoint!);
+          if (this.editTarget?.kind === "wall") {
+            this._applyWallRotateHubValues({ lengthM: null, angleDeg: ang });
+          } else {
+            this._applyMovingPoint(p, this.fixedPoint!);
+          }
           this.app.hub.showAt(input.mouse.sx, input.mouse.sy);
           this.app.hub.updateDisplay(radius, ang);
         }
@@ -1241,13 +1396,17 @@ export class SelectTool {
       }
 
       if (this.activeEditAction === PointEditAction.OFFSET) {
-        // Live-Preview: Mausprojektion auf Edge-Normale (relativ zum Edge-Mittelpunkt)
-        if (!this.hatchEdgeOffsetLocked) {
+        const isWallEdge = this.editTarget?.kind === "wallEdge";
+        const midOrig = isWallEdge ? this.wallEdgeMidOriginal : this.hatchEdgeMidOriginal;
+        const normal = isWallEdge ? this.wallEdgeNormal : this.hatchEdgeNormal;
+        const locked = isWallEdge ? this.wallEdgeOffsetLocked : this.hatchEdgeOffsetLocked;
+        const currentOff = isWallEdge ? this.wallEdgeOffsetM : this.hatchEdgeOffsetM;
+        if (!locked && midOrig && normal) {
           const mouseW = v(input.mouse.wx, input.mouse.wy);
-          const rel = sub(mouseW, this.hatchEdgeMidOriginal!);
-          const off = rel.x * this.hatchEdgeNormal!.x + rel.y * this.hatchEdgeNormal!.y;
-          this.hatchEdgeOffsetM = off;
-          this._applyHatchEdgeOffset(off);
+          const rel = sub(mouseW, midOrig);
+          const off = rel.x * normal.x + rel.y * normal.y;
+          if (isWallEdge) { this.wallEdgeOffsetM = off; this._applyWallEdgeOffset(off); }
+          else { this.hatchEdgeOffsetM = off; this._applyHatchEdgeOffset(off); }
           if (document.activeElement !== this.app.hub.lenInputEl && document.activeElement !== this.app.hub.angInputEl) {
             this.app.hub.showAt(input.mouse.sx, input.mouse.sy);
             this.app.hub.updateDisplay(off, 0);
@@ -1255,7 +1414,7 @@ export class SelectTool {
           }
         } else {
           this.app.hub.showAt(input.mouse.sx, input.mouse.sy);
-          this.app.hub.updateDisplay(this.hatchEdgeOffsetM, 0);
+          this.app.hub.updateDisplay(currentOff, 0);
         }
         if (input.clicked) {
           this._clearEditState();
@@ -1385,7 +1544,21 @@ export class SelectTool {
             this.app.pointEditMenu.showAt(sp.x, sp.y, [
               PointEditAction.MOVE,
               PointEditAction.TRANSLATE,
+              PointEditAction.ROTATE,
               PointEditAction.DELETE,
+            ]);
+          } else if (wallHit.edgeIndex != null) {
+            // Edge selektiert → Edge-Offset, Translate (ganze Wand) und Rotate
+            this.app.setSelection({ type: SelectionType.WALL, wallId: wallHit.wallId, edgeIndex: wallHit.edgeIndex } as any);
+            const wall = this.app.scene.getWallById(wallHit.wallId)!;
+            const a = wall.corners[wallHit.edgeIndex];
+            const b = wall.corners[wallHit.edgeIndex + 1];
+            const midW = { x: (a.x + b.x) * 0.5, y: (a.y + b.y) * 0.5 };
+            const sp = this.app.camera.worldToScreen(midW.x, midW.y);
+            this.app.pointEditMenu.showAt(sp.x, sp.y, [
+              PointEditAction.OFFSET,
+              PointEditAction.TRANSLATE,
+              PointEditAction.ROTATE,
             ]);
           } else {
             this.app.setSelection({ type: SelectionType.WALL, wallId: wallHit.wallId } as any);
@@ -1465,6 +1638,8 @@ export class SelectTool {
       // Hatch-Edge-Auswahl: Menü mit Offset offen halten.
     } else if (!this.isEditing() && this._isTextBoxHandleSelectionActive()) {
       // TextBox-Handle-Auswahl: Menü offen halten.
+    } else if (!this.isEditing() && this._isWallEdgeSelectionActive()) {
+      // Wand-Edge-Auswahl: Menü offen halten.
     } else {
       this.app.pointEditMenu.hide();
     }
