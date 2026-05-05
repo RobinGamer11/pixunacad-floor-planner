@@ -1397,7 +1397,21 @@ export class SelectTool {
             this.app.pointEditMenu.showAt(sp.x, sp.y, [
               PointEditAction.MOVE,
               PointEditAction.TRANSLATE,
+              PointEditAction.ROTATE,
               PointEditAction.DELETE,
+            ]);
+          } else if (wallHit.edgeIndex != null) {
+            // Edge selektiert → Edge-Offset, Translate (ganze Wand) und Rotate
+            this.app.setSelection({ type: SelectionType.WALL, wallId: wallHit.wallId, edgeIndex: wallHit.edgeIndex } as any);
+            const wall = this.app.scene.getWallById(wallHit.wallId)!;
+            const a = wall.corners[wallHit.edgeIndex];
+            const b = wall.corners[wallHit.edgeIndex + 1];
+            const midW = { x: (a.x + b.x) * 0.5, y: (a.y + b.y) * 0.5 };
+            const sp = this.app.camera.worldToScreen(midW.x, midW.y);
+            this.app.pointEditMenu.showAt(sp.x, sp.y, [
+              PointEditAction.OFFSET,
+              PointEditAction.TRANSLATE,
+              PointEditAction.ROTATE,
             ]);
           } else {
             this.app.setSelection({ type: SelectionType.WALL, wallId: wallHit.wallId } as any);
