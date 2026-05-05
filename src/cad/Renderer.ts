@@ -800,6 +800,8 @@ export class Renderer {
       const sub = healed.subCorners;
       if (main.length < 2 || sub.length < 2) continue;
 
+      const isSelected = !!(this.selection && this.selection.type === SelectionType.WALL && (this.selection as any).wallId === wall.id);
+
       // Gefüllte Wandkontur: main vorwärts + sub rückwärts → geschlossenes Polygon
       ctx.save();
       ctx.beginPath();
@@ -814,10 +816,18 @@ export class Renderer {
         ctx.lineTo(s.x, s.y);
       }
       ctx.closePath();
-      ctx.fillStyle = "rgba(255,255,255,1)";
+      ctx.fillStyle = wall.fillColor || (wall.kind === "outer" ? Defaults.wallFillColorOuter : Defaults.wallFillColorInner);
       ctx.fill();
-      ctx.strokeStyle = wall.color;
-      ctx.lineWidth = 1.5;
+      if (isSelected) {
+        // Bläuliche Hervorhebung der Füllung
+        ctx.fillStyle = "rgba(77,163,255,0.28)";
+        ctx.fill();
+        ctx.strokeStyle = Defaults.wallSelectionColor;
+        ctx.lineWidth = 2.2;
+      } else {
+        ctx.strokeStyle = wall.color;
+        ctx.lineWidth = 1.5;
+      }
       ctx.stroke();
       ctx.restore();
 
@@ -836,6 +846,22 @@ export class Renderer {
         }
         ctx.stroke();
         ctx.setLineDash([]);
+        ctx.restore();
+      }
+
+      // Fangpunkte (Eckpunkte der Bezugslinie) bei Selektion einblenden
+      if (isSelected) {
+        ctx.save();
+        for (const c of wall.corners) {
+          const s = cam.worldToScreen(c.x, c.y);
+          ctx.beginPath();
+          ctx.fillStyle = "#ffffff";
+          ctx.strokeStyle = Defaults.wallSelectionColor;
+          ctx.lineWidth = 1.6;
+          ctx.arc(s.x, s.y, 4.5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+        }
         ctx.restore();
       }
     }

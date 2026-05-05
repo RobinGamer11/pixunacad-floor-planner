@@ -9,6 +9,11 @@ export const Defaults = {
   defaultLabelId: "default-line",
   defaultLabelName: "Default",
 
+  // Wall defaults
+  wallFillColorOuter: "#4b4b4b",
+  wallFillColorInner: "#cfcfcf",
+  wallSelectionColor: "#4da3ff",
+
   // Hatch defaults
   hatchFillColor: "#4da3ff",
   hatchStrokeColor: "#111111",

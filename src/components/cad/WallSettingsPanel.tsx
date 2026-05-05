@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import type { CadApp } from "@/cad/CadApp";
 import type { WallToolSettings } from "@/cad/WallTool";
+import { Defaults } from "@/cad/constants";
 
 interface Props { app: CadApp | null; }
 
@@ -18,6 +19,14 @@ export const WallSettingsPanel: React.FC<Props> = ({ app }) => {
     force(x => x + 1);
   };
 
+  const setKind = (kind: "outer" | "inner") => {
+    const patch: Partial<WallToolSettings> = { kind };
+    if (s.fillColorAuto) {
+      patch.fillColor = kind === "outer" ? Defaults.wallFillColorOuter : Defaults.wallFillColorInner;
+    }
+    update(patch);
+  };
+
   return (
     <div className="cad-settings-panel mb-2">
       <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
@@ -28,7 +37,7 @@ export const WallSettingsPanel: React.FC<Props> = ({ app }) => {
       <div className="flex gap-1 mb-3">
         <button
           type="button"
-          onClick={() => update({ kind: "outer" })}
+          onClick={() => setKind("outer")}
           className={`cad-toolbar-btn flex-1 justify-center h-9 ${s.kind === "outer" ? "active" : ""}`}
           title="Außenwand (höhere Priorität)"
         >
@@ -36,7 +45,7 @@ export const WallSettingsPanel: React.FC<Props> = ({ app }) => {
         </button>
         <button
           type="button"
-          onClick={() => update({ kind: "inner" })}
+          onClick={() => setKind("inner")}
           className={`cad-toolbar-btn flex-1 justify-center h-9 ${s.kind === "inner" ? "active" : ""}`}
           title="Innenwand"
         >
@@ -106,13 +115,38 @@ export const WallSettingsPanel: React.FC<Props> = ({ app }) => {
           />
         </div>
 
-        {/* Farbe */}
+        {/* Linienfarbe */}
         <div>
-          <label>Farbe</label>
+          <label>Linienfarbe</label>
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))", background: s.color }} />
             <input type="color" value={s.color} onChange={e => update({ color: e.target.value })}
               className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
+          </div>
+        </div>
+
+        {/* Flächenfarbe (Füllung) */}
+        <div>
+          <label>Flächenfarbe</label>
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))", background: s.fillColor }} />
+            <input
+              type="color"
+              value={s.fillColor}
+              onChange={e => update({ fillColor: e.target.value, fillColorAuto: false })}
+              className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent"
+            />
+            <button
+              type="button"
+              onClick={() => update({
+                fillColor: s.kind === "outer" ? Defaults.wallFillColorOuter : Defaults.wallFillColorInner,
+                fillColorAuto: true,
+              })}
+              className="cad-toolbar-btn h-7 px-2 text-[11px]"
+              title="Standard (dunkelgrau / hellgrau)"
+            >
+              Standard
+            </button>
           </div>
         </div>
       </div>

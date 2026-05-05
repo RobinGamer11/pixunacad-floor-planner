@@ -51,13 +51,16 @@ export type WallKind = "outer" | "inner";
  */
 export function computeWallLines(corners: Vec2[], thicknessM: number, side: WallReferenceSide) {
   const t = Math.max(0, thicknessM);
+  // Hinweis: "outer" / "inner" wurden bewusst getauscht — die Bezugsseite "Außen"
+  // legt die Wand jetzt rechts der Zeichenrichtung an (Sub liegt rechts), "Innen"
+  // legt sie links an. Mittig bleibt symmetrisch.
   let mainOff = 0;
-  let subOff = t;
-  let helpOff = t / 2;
+  let subOff = -t;
+  let helpOff = -t / 2;
   if (side === "inner") {
-    // Sub liegt rechts (negativer Offset) der Zeichenrichtung
-    subOff = -t;
-    helpOff = -t / 2;
+    // Sub liegt links (positiver Offset) der Zeichenrichtung
+    subOff = t;
+    helpOff = t / 2;
   } else if (side === "center") {
     mainOff = t / 2;     // visuell verschiebt sich die Hauptlinie nach links
     subOff = -t / 2;     // Sub nach rechts
