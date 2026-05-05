@@ -1,60 +1,99 @@
-import { Vec2, v, sub, add, mul, norm, dot, dist, lineLineIntersectionInfinite } from "./geometry";
-import { computeWallLines, type WallReferenceSide } from "./wallGeom";
+import { Vec2, v, sub, norm, lineLineIntersectionInfinite } from "./geometry";
+import { computeWallLines } from "./wallGeom";
 import type { Wall } from "./Scene";
 
-const HEAL_TOL_M = 0.02;
+const HEAL_TOL_M = 0.05;
 
-/** Liefert healed mainCorners/subCorners einer Wand: Endpunkte werden an benachbarte Wandlinien verlängert/getrimmt. */
+/**
+ * Liefert healed mainCorners/subCorners/helpCorners einer Wand. Endpunkte werden
+ * an benachbarte Wandlinien getrimmt nach folgender Priorität:
+ *  1) Gleichnamiger Stoß (Main↔Main, Sub↔Sub, Help↔Help) der Nachbarwand.
+ *  2) Fallback: wenn der gleichnamige Schnitt jenseits der Main-Linie der Nachbar liegen
+ *     würde (= Main blockiert), trimme an der Main-Linie der Nachbarwand (S3).
+ * Außenwand (AW) hat höhere Priorität als Innenwand (IW). IW trimmt an AW;
+ * AW trimmt nur an gleichrangiger AW.
+ */
 export function computeHealedWallLines(wall: Wall, others: Wall[]) {
   const lines = computeWallLines(wall.corners, wall.thicknessM, wall.referenceSide);
   if (wall.corners.length < 2) return { ...lines, capStart: true, capEnd: true };
 
   const mainCorners = lines.mainCorners.map(p => v(p.x, p.y));
   const subCorners = lines.subCorners.map(p => v(p.x, p.y));
+  const helpCorners = lines.helpCorners.map(p => v(p.x, p.y));
 
-  let capStart = true;
-  let capEnd = true;
+  const capStart = !healEnd(wall, others, mainCorners, subCorners, helpCorners, true);
+  const capEnd = !healEnd(wall, others, mainCorners, subCorners, helpCorners, false);
 
-  // START-Endpunkt: untersuche corners[0], suche andere Wand, deren Hauptlinie nahe liegt
-  capStart = !healEnd(wall, others, mainCorners, subCorners, true);
-  capEnd = !healEnd(wall, others, mainCorners, subCorners, false);
-
-  return { mainCorners, subCorners, helpCorners: lines.helpCorners, capStart, capEnd };
+  return { mainCorners, subCorners, helpCorners, capStart, capEnd };
 }
 
-/** Verlängert/Trimmt das jeweilige Wand-Ende an eine getroffene Nachbar-Wandlinie. Returns true wenn geheilt. */
-function healEnd(wall: Wall, others: Wall[], mainCorners: Vec2[], subCorners: Vec2[], atStart: boolean): boolean {
+function healEnd(
+  wall: Wall,
+  others: Wall[],
+  mainCorners: Vec2[],
+  subCorners: Vec2[],
+  helpCorners: Vec2[],
+  atStart: boolean,
+): boolean {
   const n = wall.corners.length;
   if (n < 2) return false;
 
-  const idxMain = atStart ? 0 : mainCorners.length - 1;
-  const idxSub = atStart ? 0 : subCorners.length - 1;
+  const idx = atStart ? 0 : mainCorners.length - 1;
   const corner = atStart ? wall.corners[0] : wall.corners[n - 1];
-
-  // Richtung der ersten/letzten Wandachse
-  let dir: Vec2;
-  if (atStart) {
-    dir = norm(sub(wall.corners[1], wall.corners[0]));
-  } else {
-    dir = norm(sub(wall.corners[n - 1], wall.corners[n - 2]));
-  }
+  const dir = atStart
+    ? norm(sub(wall.corners[1], wall.corners[0]))
+    : norm(sub(wall.corners[n - 1], wall.corners[n - 2]));
   if (dir.x === 0 && dir.y === 0) return false;
 
-  // Suche andere Wand, deren Hauptlinie in der Nähe vom Corner liegt
+  // Suche beste Nachbarwand: deren Bezugs-Polylinie liegt nah am Endpunkt.
+  let bestNeighbor: Wall | null = null;
+  let bestPriority = -1;
   for (const ow of others) {
     if (ow === wall) continue;
-    const olines = computeWallLines(ow.corners, ow.thicknessM, ow.referenceSide);
-    // Prüfe Mittellinie (ow.corners) zuerst – wenn unser Endpunkt auf ihr liegt → T-Stoß
-    if (pointNearPolyline(corner, ow.corners, HEAL_TOL_M + ow.thicknessM * 0.6)) {
-      // Trimme/Verlängere main- und sub-Endpunkt an ow.mainCorners bzw. ow.subCorners
-      const newMain = intersectRayWithPolyline(mainCorners[idxMain], dir, olines.mainCorners, olines.subCorners);
-      const newSub = intersectRayWithPolyline(subCorners[idxSub], dir, olines.mainCorners, olines.subCorners);
-      if (newMain) mainCorners[idxMain] = newMain;
-      if (newSub) subCorners[idxSub] = newSub;
-      if (newMain || newSub) return true;
+    // AW darf nicht an IW trimmen
+    if (wall.kind === "outer" && ow.kind !== "outer") continue;
+    if (!pointNearPolyline(corner, ow.corners, HEAL_TOL_M + ow.thicknessM)) continue;
+    // AW>IW: Außenwände bevorzugt
+    const prio = ow.kind === "outer" ? 2 : 1;
+    if (prio > bestPriority) {
+      bestPriority = prio;
+      bestNeighbor = ow;
     }
   }
-  return false;
+  if (!bestNeighbor) return false;
+
+  const olines = computeWallLines(bestNeighbor.corners, bestNeighbor.thicknessM, bestNeighbor.referenceSide);
+
+  // Gleichnamiger Trim mit Fallback auf Main bei "Main blockiert"
+  const trim = (origin: Vec2, samePoly: Vec2[]): Vec2 | null => {
+    const same = intersectRayWithPoly(origin, dir, samePoly);
+    const main = intersectRayWithPoly(origin, dir, olines.mainCorners);
+    if (!same && !main) return null;
+    if (!same) return main;
+    if (!main) return same;
+    // Wenn die "same"-Schnittstelle weiter weg liegt als die Main-Schnittstelle in
+    // gleicher Bewegungsrichtung, liegt sie hinter der Main → Main blockiert (S3).
+    const tSame = signedT(origin, dir, same);
+    const tMain = signedT(origin, dir, main);
+    // beide in gleicher Richtung wie dir? Wir trimmen in Bewegungsrichtung dir
+    // (der Endpunkt sitzt bei start/end auf der Achse, dir zeigt von start nach corner[1]
+    //  bzw. corner[n-1]→corner[n-2] für end ist ABER wir benutzen oben "from prev to last"
+    //  → wir brauchen die Richtung ZUM Endpunkt, also ggf. negieren).
+    // Vereinfacht: wähle den Treffer, der näher an origin liegt entlang einer Achse,
+    // und stelle sicher, dass er nicht hinter Main liegt.
+    const useMainBlockade = (atStart ? (tSame < tMain) : (tSame > tMain));
+    return useMainBlockade ? main : same;
+  };
+
+  const newMain = intersectRayWithPoly(mainCorners[idx], dir, olines.mainCorners);
+  const newSub = trim(subCorners[idx], olines.subCorners);
+  const newHelp = trim(helpCorners[idx], olines.helpCorners);
+
+  let healed = false;
+  if (newMain) { mainCorners[idx] = newMain; healed = true; }
+  if (newSub) { subCorners[idx] = newSub; healed = true; }
+  if (newHelp) { helpCorners[idx] = newHelp; healed = true; }
+  return healed;
 }
 
 function pointNearPolyline(p: Vec2, poly: Vec2[], tol: number): boolean {
@@ -71,28 +110,24 @@ function pointNearPolyline(p: Vec2, poly: Vec2[], tol: number): boolean {
   return false;
 }
 
-/** Schiebt p entlang dir auf den nächstgelegenen Schnittpunkt mit einer der Polylinien. */
-function intersectRayWithPolyline(p: Vec2, dir: Vec2, polyA: Vec2[], polyB: Vec2[]): Vec2 | null {
+/** Schiebt p entlang dir auf den nächstgelegenen gültigen Schnittpunkt mit einer Polylinie. */
+function intersectRayWithPoly(p: Vec2, dir: Vec2, poly: Vec2[]): Vec2 | null {
   let best: Vec2 | null = null;
   let bestAbs = Infinity;
-  const tryPoly = (poly: Vec2[]) => {
-    for (let i = 0; i < poly.length - 1; i++) {
-      const a = poly[i], b = poly[i + 1];
-      const segDir = sub(b, a);
-      const ip = lineLineIntersectionInfinite(p, dir, a, segDir);
-      if (!ip) continue;
-      // Prüfe ob ip auf Segment liegt
-      const segLen2 = segDir.x * segDir.x + segDir.y * segDir.y || 1e-12;
-      const t = ((ip.x - a.x) * segDir.x + (ip.y - a.y) * segDir.y) / segLen2;
-      if (t < -0.05 || t > 1.05) continue;
-      const distToP = Math.hypot(ip.x - p.x, ip.y - p.y);
-      if (distToP < bestAbs) {
-        bestAbs = distToP;
-        best = ip;
-      }
-    }
-  };
-  tryPoly(polyA);
-  tryPoly(polyB);
+  for (let i = 0; i < poly.length - 1; i++) {
+    const a = poly[i], b = poly[i + 1];
+    const segDir = sub(b, a);
+    const ip = lineLineIntersectionInfinite(p, dir, a, segDir);
+    if (!ip) continue;
+    const segLen2 = segDir.x * segDir.x + segDir.y * segDir.y || 1e-12;
+    const t = ((ip.x - a.x) * segDir.x + (ip.y - a.y) * segDir.y) / segLen2;
+    if (t < -0.1 || t > 1.1) continue;
+    const distToP = Math.hypot(ip.x - p.x, ip.y - p.y);
+    if (distToP < bestAbs) { bestAbs = distToP; best = ip; }
+  }
   return best;
+}
+
+function signedT(origin: Vec2, dir: Vec2, p: Vec2): number {
+  return (p.x - origin.x) * dir.x + (p.y - origin.y) * dir.y;
 }
