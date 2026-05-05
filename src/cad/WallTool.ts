@@ -90,7 +90,7 @@ export class WallTool {
   finish() {
     if (this.state === "drawing" && this.corners.length >= 2) {
       const labelId = this._resolveLabelId();
-      this.app.scene.createWall({
+      const newWall = this.app.scene.createWall({
         kind: this.settings.kind,
         thicknessM: this.getThickness(),
         referenceSide: this.settings.referenceSide,
@@ -99,8 +99,85 @@ export class WallTool {
         color: this.settings.color,
         labelId,
       });
+      this._runConnectionPipeline(newWall);
+      this.app.refreshLabelUI?.();
     }
     this.cancel();
+  }
+
+  /**
+   * Auto-Split: für jeden Endpunkt der neuen Wand prüfen, ob er mitten auf einer Edge
+   * einer fremden Wand liegt UND die fremde Wand auf der "Rückseite" hinter dem Treffpunkt
+   * mit einer dritten Wand verbunden ist. Wenn ja, wird die fremde Wand gesplittet.
+   */
+  private _runConnectionPipeline(newWall: import("./Scene").Wall) {
+    const TOL = 0.02;
+    const endpoints = [newWall.corners[0], newWall.corners[newWall.corners.length - 1]];
+    for (const ep of endpoints) {
+      // Snapshot, da splitWallAt this.app.scene.walls verändert
+      const candidates = this.app.scene.walls.filter(w => w !== newWall);
+      for (const ow of candidates) {
+        if (!this.app.scene.walls.includes(ow)) continue;
+        const hit = this._findEdgeHit(ow, ep, TOL);
+        if (!hit) continue;
+        // Endpunkt liegt strikt innerhalb einer Edge → potentieller T-Stoß.
+        // Prüfen, ob die fremde Wand auf der "Rückseite" hinter dem Treffpunkt
+        // mit einer weiteren Wand verbunden ist.
+        if (!this._wallContinuesBeyond(ow, hit.edgeIndex, hit.t, newWall, TOL)) continue;
+        const split = this.app.scene.splitWallAt(ow, ep, 0.01);
+        if (split) {
+          // Auto-ID für Reststück (zweite Wand) generieren analog AW0n/IW0n.
+          const prefix = ow.kind === "outer" ? "AW" : "IW";
+          const used = new Set<string>();
+          for (const w of this.app.scene.walls) {
+            const g = this.app.labelManager.getById(w.labelId);
+            if (g && g.name.startsWith(prefix)) used.add(g.name);
+          }
+          let n = 1;
+          while (used.has(`${prefix}${String(n).padStart(2, "0")}`)) n++;
+          const newLabel = this.app.labelManager.ensureGroupNamed(`${prefix}${String(n).padStart(2, "0")}`);
+          split[1].labelId = newLabel.id;
+        }
+      }
+    }
+  }
+
+  /** Liefert {edgeIndex, t} wenn p strikt innerhalb einer Edge der Wand liegt (sonst null). */
+  private _findEdgeHit(w: import("./Scene").Wall, p: Vec2, tol: number): { edgeIndex: number; t: number } | null {
+    for (let i = 0; i < w.corners.length - 1; i++) {
+      const a = w.corners[i], b = w.corners[i + 1];
+      const ab = { x: b.x - a.x, y: b.y - a.y };
+      const ab2 = ab.x * ab.x + ab.y * ab.y || 1e-12;
+      const t = ((p.x - a.x) * ab.x + (p.y - a.y) * ab.y) / ab2;
+      if (t < 0.02 || t > 0.98) continue;
+      const q = { x: a.x + ab.x * t, y: a.y + ab.y * t };
+      if (Math.hypot(q.x - p.x, q.y - p.y) <= tol) return { edgeIndex: i, t };
+    }
+    return null;
+  }
+
+  /**
+   * Prüft, ob die Wand ow hinter dem Treffpunkt (edgeIndex/t) noch in eine weitere Wand
+   * (außer excludeWall) übergeht – d. h. ein Endpunkt von ow fällt mit einem Endpunkt
+   * einer anderen Wand zusammen.
+   */
+  private _wallContinuesBeyond(
+    ow: import("./Scene").Wall,
+    _edgeIndex: number,
+    _t: number,
+    excludeWall: import("./Scene").Wall,
+    tol: number,
+  ): boolean {
+    const ends = [ow.corners[0], ow.corners[ow.corners.length - 1]];
+    for (const end of ends) {
+      for (const other of this.app.scene.walls) {
+        if (other === ow || other === excludeWall) continue;
+        const a = other.corners[0], b = other.corners[other.corners.length - 1];
+        if (Math.hypot(end.x - a.x, end.y - a.y) <= tol) return true;
+        if (Math.hypot(end.x - b.x, end.y - b.y) <= tol) return true;
+      }
+    }
+    return false;
   }
 
   isDrawing() { return this.state === "drawing"; }
