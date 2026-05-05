@@ -562,6 +562,7 @@ export class SelectTool {
     }
     wall.corners[idxA] = newA;
     wall.corners[idxB] = newB;
+  }
 
   private _deleteSelectedPoint() {
     const ctx = this._getSelectedPointContext();
