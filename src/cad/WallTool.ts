@@ -102,6 +102,7 @@ export class WallTool {
         corners: this.corners,
         customName: this.settings.customName,
         color: this.settings.color,
+        fillColor: this.settings.fillColor,
         labelId,
       });
       this._runConnectionPipeline(newWall);
