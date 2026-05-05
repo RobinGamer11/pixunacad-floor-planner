@@ -1376,13 +1376,17 @@ export class SelectTool {
       }
 
       if (this.activeEditAction === PointEditAction.OFFSET) {
-        // Live-Preview: Mausprojektion auf Edge-Normale (relativ zum Edge-Mittelpunkt)
-        if (!this.hatchEdgeOffsetLocked) {
+        const isWallEdge = this.editTarget?.kind === "wallEdge";
+        const midOrig = isWallEdge ? this.wallEdgeMidOriginal : this.hatchEdgeMidOriginal;
+        const normal = isWallEdge ? this.wallEdgeNormal : this.hatchEdgeNormal;
+        const locked = isWallEdge ? this.wallEdgeOffsetLocked : this.hatchEdgeOffsetLocked;
+        const currentOff = isWallEdge ? this.wallEdgeOffsetM : this.hatchEdgeOffsetM;
+        if (!locked && midOrig && normal) {
           const mouseW = v(input.mouse.wx, input.mouse.wy);
-          const rel = sub(mouseW, this.hatchEdgeMidOriginal!);
-          const off = rel.x * this.hatchEdgeNormal!.x + rel.y * this.hatchEdgeNormal!.y;
-          this.hatchEdgeOffsetM = off;
-          this._applyHatchEdgeOffset(off);
+          const rel = sub(mouseW, midOrig);
+          const off = rel.x * normal.x + rel.y * normal.y;
+          if (isWallEdge) { this.wallEdgeOffsetM = off; this._applyWallEdgeOffset(off); }
+          else { this.hatchEdgeOffsetM = off; this._applyHatchEdgeOffset(off); }
           if (document.activeElement !== this.app.hub.lenInputEl && document.activeElement !== this.app.hub.angInputEl) {
             this.app.hub.showAt(input.mouse.sx, input.mouse.sy);
             this.app.hub.updateDisplay(off, 0);
@@ -1390,7 +1394,7 @@ export class SelectTool {
           }
         } else {
           this.app.hub.showAt(input.mouse.sx, input.mouse.sy);
-          this.app.hub.updateDisplay(this.hatchEdgeOffsetM, 0);
+          this.app.hub.updateDisplay(currentOff, 0);
         }
         if (input.clicked) {
           this._clearEditState();
