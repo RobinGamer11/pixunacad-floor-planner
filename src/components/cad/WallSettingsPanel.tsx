@@ -37,7 +37,7 @@ export const WallSettingsPanel: React.FC<Props> = ({ app }) => {
       <div className="flex gap-1 mb-3">
         <button
           type="button"
-          onClick={() => update({ kind: "outer" })}
+          onClick={() => setKind("outer")}
           className={`cad-toolbar-btn flex-1 justify-center h-9 ${s.kind === "outer" ? "active" : ""}`}
           title="Außenwand (höhere Priorität)"
         >
@@ -45,7 +45,7 @@ export const WallSettingsPanel: React.FC<Props> = ({ app }) => {
         </button>
         <button
           type="button"
-          onClick={() => update({ kind: "inner" })}
+          onClick={() => setKind("inner")}
           className={`cad-toolbar-btn flex-1 justify-center h-9 ${s.kind === "inner" ? "active" : ""}`}
           title="Innenwand"
         >
