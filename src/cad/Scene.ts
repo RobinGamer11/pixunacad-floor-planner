@@ -347,12 +347,14 @@ export class Wall {
   /** Freier ID-Name (überschreibt Auto-ID AW01/IW01). Leer = Auto. */
   customName: string;
   color: string;
+  /** Flächenfarbe (Füllung). Default: dunkelgrau (AW) / hellgrau (IW). */
+  fillColor: string;
   labelId: string;
   _stickerEditOwnerId?: string | null;
 
   constructor(opts: {
     id: string; kind: WallKind; thicknessM: number; referenceSide: WallReferenceSide;
-    corners: Vec2[]; customName?: string; color?: string; labelId?: string;
+    corners: Vec2[]; customName?: string; color?: string; fillColor?: string; labelId?: string;
   }) {
     this.id = opts.id;
     this.kind = opts.kind;
@@ -361,6 +363,8 @@ export class Wall {
     this.corners = opts.corners.map(p => v(p.x, p.y));
     this.customName = opts.customName || "";
     this.color = opts.color || Defaults.lineColor;
+    this.fillColor = opts.fillColor
+      || (opts.kind === "outer" ? Defaults.wallFillColorOuter : Defaults.wallFillColorInner);
     this.labelId = opts.labelId || Defaults.defaultLabelId;
     this._stickerEditOwnerId = null;
   }
