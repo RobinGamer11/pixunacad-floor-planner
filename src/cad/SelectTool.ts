@@ -783,6 +783,8 @@ export class SelectTool {
     if (!sel || sel.type !== SelectionType.WALL) return false;
     return sel.edgeIndex != null;
   }
+
+  private _isTextBoxHandleSelectionActive(): boolean {
     const sel = this.app.selection;
     if (!sel || sel.type !== SelectionType.TEXTBOX_HANDLE) return false;
     return sel.handleIndex != null;
