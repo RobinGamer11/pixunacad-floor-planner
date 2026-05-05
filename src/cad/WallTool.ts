@@ -17,6 +17,7 @@ export interface WallToolSettings {
   fillColor: string;
   /** Wenn true: fillColor folgt automatisch dem AW/IW-Default beim Wechsel. */
   fillColorAuto: boolean;
+}
 
 export class WallTool {
   app: CadApp;
@@ -34,6 +35,8 @@ export class WallTool {
     thicknessOverrideM: null,
     customName: "",
     color: Defaults.lineColor,
+    fillColor: Defaults.wallFillColorOuter,
+    fillColorAuto: true,
   };
 
   constructor(app: CadApp) {
