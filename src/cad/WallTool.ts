@@ -14,7 +14,9 @@ export interface WallToolSettings {
   thicknessOverrideM: number | null;
   customName: string;
   color: string;
-}
+  fillColor: string;
+  /** Wenn true: fillColor folgt automatisch dem AW/IW-Default beim Wechsel. */
+  fillColorAuto: boolean;
 
 export class WallTool {
   app: CadApp;
