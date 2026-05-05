@@ -115,13 +115,38 @@ export const WallSettingsPanel: React.FC<Props> = ({ app }) => {
           />
         </div>
 
-        {/* Farbe */}
+        {/* Linienfarbe */}
         <div>
-          <label>Farbe</label>
+          <label>Linienfarbe</label>
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))", background: s.color }} />
             <input type="color" value={s.color} onChange={e => update({ color: e.target.value })}
               className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
+          </div>
+        </div>
+
+        {/* Flächenfarbe (Füllung) */}
+        <div>
+          <label>Flächenfarbe</label>
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))", background: s.fillColor }} />
+            <input
+              type="color"
+              value={s.fillColor}
+              onChange={e => update({ fillColor: e.target.value, fillColorAuto: false })}
+              className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent"
+            />
+            <button
+              type="button"
+              onClick={() => update({
+                fillColor: s.kind === "outer" ? Defaults.wallFillColorOuter : Defaults.wallFillColorInner,
+                fillColorAuto: true,
+              })}
+              className="cad-toolbar-btn h-7 px-2 text-[11px]"
+              title="Standard (dunkelgrau / hellgrau)"
+            >
+              Standard
+            </button>
           </div>
         </div>
       </div>
