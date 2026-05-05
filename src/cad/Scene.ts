@@ -844,4 +844,54 @@ export class Scene {
   getWallsByLabelId(labelId: string): Wall[] { return this.walls.filter(w => w.labelId === labelId); }
   removeWallsByLabelId(labelId: string) { this.walls = this.walls.filter(w => w.labelId !== labelId); }
   reassignWallsLabel(oldId: string, newId: string) { for (const w of this.walls) if (w.labelId === oldId) w.labelId = newId; }
+
+  /**
+   * Splittet eine Wand exakt am Punkt p (muss auf einer Edge liegen). Erzeugt zwei neue
+   * Wände mit gleichen Eigenschaften und ersetzt die ursprüngliche Wand. Gibt [a, b] zurück
+   * oder null wenn Split nicht möglich (Punkt nicht auf Edge / Restlänge zu kurz).
+   */
+  splitWallAt(wall: Wall, p: Vec2, minSegLenM = 0.01, newLabelIdForB?: string): [Wall, Wall] | null {
+    if (wall.corners.length < 2) return null;
+    let edgeIdx = -1;
+    let bestT = 0;
+    let bestDist = Infinity;
+    for (let i = 0; i < wall.corners.length - 1; i++) {
+      const a = wall.corners[i], b = wall.corners[i + 1];
+      const ab = { x: b.x - a.x, y: b.y - a.y };
+      const ab2 = ab.x * ab.x + ab.y * ab.y || 1e-12;
+      const t = ((p.x - a.x) * ab.x + (p.y - a.y) * ab.y) / ab2;
+      if (t < 0.001 || t > 0.999) continue;
+      const q = { x: a.x + ab.x * t, y: a.y + ab.y * t };
+      const d = Math.hypot(q.x - p.x, q.y - p.y);
+      if (d < bestDist) { bestDist = d; edgeIdx = i; bestT = t; }
+    }
+    if (edgeIdx < 0) return null;
+
+    const cornersA = wall.corners.slice(0, edgeIdx + 1).map(pt => v(pt.x, pt.y));
+    cornersA.push(v(p.x, p.y));
+    const cornersB: Vec2[] = [v(p.x, p.y)];
+    for (let i = edgeIdx + 1; i < wall.corners.length; i++) cornersB.push(v(wall.corners[i].x, wall.corners[i].y));
+
+    const lenPoly = (pts: Vec2[]) => {
+      let L = 0;
+      for (let i = 0; i < pts.length - 1; i++) L += Math.hypot(pts[i + 1].x - pts[i].x, pts[i + 1].y - pts[i].y);
+      return L;
+    };
+    if (lenPoly(cornersA) < minSegLenM || lenPoly(cornersB) < minSegLenM) return null;
+
+    const wA = new Wall({
+      id: this._makeId(), kind: wall.kind, thicknessM: wall.thicknessM, referenceSide: wall.referenceSide,
+      corners: cornersA, customName: wall.customName, color: wall.color, labelId: wall.labelId,
+    });
+    const wB = new Wall({
+      id: this._makeId(), kind: wall.kind, thicknessM: wall.thicknessM, referenceSide: wall.referenceSide,
+      corners: cornersB, customName: "", color: wall.color, labelId: newLabelIdForB || wall.labelId,
+    });
+    wA._stickerEditOwnerId = wall._stickerEditOwnerId;
+    wB._stickerEditOwnerId = wall._stickerEditOwnerId;
+    const idx = this.walls.indexOf(wall);
+    if (idx >= 0) this.walls.splice(idx, 1, wA, wB);
+    else { this.walls.push(wA); this.walls.push(wB); }
+    return [wA, wB];
+  }
 }
