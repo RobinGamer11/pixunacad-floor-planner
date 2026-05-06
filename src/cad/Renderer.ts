@@ -819,16 +819,51 @@ export class Renderer {
       ctx.fillStyle = wall.fillColor || (wall.kind === "outer" ? Defaults.wallFillColorOuter : Defaults.wallFillColorInner);
       ctx.fill();
       if (isSelected) {
-        // Bläuliche Hervorhebung der Füllung
         ctx.fillStyle = "rgba(77,163,255,0.28)";
         ctx.fill();
-        ctx.strokeStyle = Defaults.wallSelectionColor;
-        ctx.lineWidth = 2.2;
-      } else {
-        ctx.strokeStyle = wall.color;
-        ctx.lineWidth = 1.5;
+      }
+
+      // Stroke: nur main- und sub-Polylinien plus offene End-Caps separat zeichnen,
+      // damit verbundene Wände keine sichtbare Naht zwischen den Polygonen haben.
+      const strokeStyle = isSelected ? Defaults.wallSelectionColor : wall.color;
+      const strokeWidth = isSelected ? 2.2 : 1.5;
+      ctx.strokeStyle = strokeStyle;
+      ctx.lineWidth = strokeWidth;
+      // main
+      ctx.beginPath();
+      const m0 = cam.worldToScreen(main[0].x, main[0].y);
+      ctx.moveTo(m0.x, m0.y);
+      for (let i = 1; i < main.length; i++) {
+        const s = cam.worldToScreen(main[i].x, main[i].y);
+        ctx.lineTo(s.x, s.y);
       }
       ctx.stroke();
+      // sub
+      ctx.beginPath();
+      const s0 = cam.worldToScreen(sub[0].x, sub[0].y);
+      ctx.moveTo(s0.x, s0.y);
+      for (let i = 1; i < sub.length; i++) {
+        const s = cam.worldToScreen(sub[i].x, sub[i].y);
+        ctx.lineTo(s.x, s.y);
+      }
+      ctx.stroke();
+      // End-Caps nur zeichnen, wenn nicht geheilt (offen)
+      if (healed.capStart) {
+        ctx.beginPath();
+        const ms = cam.worldToScreen(main[0].x, main[0].y);
+        const ss = cam.worldToScreen(sub[0].x, sub[0].y);
+        ctx.moveTo(ms.x, ms.y);
+        ctx.lineTo(ss.x, ss.y);
+        ctx.stroke();
+      }
+      if (healed.capEnd) {
+        ctx.beginPath();
+        const me = cam.worldToScreen(main[main.length - 1].x, main[main.length - 1].y);
+        const se = cam.worldToScreen(sub[sub.length - 1].x, sub[sub.length - 1].y);
+        ctx.moveTo(me.x, me.y);
+        ctx.lineTo(se.x, se.y);
+        ctx.stroke();
+      }
       ctx.restore();
 
       // Help-Linie nur als gestrichelte Hilfe wenn Wand-Tool aktiv
