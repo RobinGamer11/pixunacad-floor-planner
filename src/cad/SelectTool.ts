@@ -209,6 +209,18 @@ export class SelectTool {
         }
       }
     }
+    if (bestPoint) return bestPoint;
+    // Wand-Körper (gefülltes Polygon main+sub) – Klick irgendwo in der Wand.
+    for (let wi = this.app.scene.walls.length - 1; wi >= 0; wi--) {
+      const wall = this.app.scene.walls[wi];
+      if (!this.app.labelManager.isVisible(wall.labelId)) continue;
+      const lines = computeWallLines(wall.corners, wall.thicknessM, wall.referenceSide);
+      const poly: Vec2[] = [...lines.mainCorners];
+      for (let i = lines.subCorners.length - 1; i >= 0; i--) poly.push(lines.subCorners[i]);
+      if (pointInPolygon(mouseW, poly)) {
+        return { wallId: wall.id, pointIndex: null, edgeIndex: null };
+      }
+    }
     return bestPoint;
   }
 
