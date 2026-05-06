@@ -126,17 +126,7 @@ export class WallTool {
         if (!this._wallContinuesBeyond(ow, hit.edgeIndex, hit.t, newWall, TOL)) continue;
         const split = this.app.scene.splitWallAt(ow, ep, 0.01);
         if (split) {
-          // Auto-ID für Reststück (zweite Wand) generieren analog AW0n/IW0n.
-          const prefix = ow.kind === "outer" ? "AW" : "IW";
-          const used = new Set<string>();
-          for (const w of this.app.scene.walls) {
-            const g = this.app.labelManager.getById(w.labelId);
-            if (g && g.name.startsWith(prefix)) used.add(g.name);
-          }
-          let n = 1;
-          while (used.has(`${prefix}${String(n).padStart(2, "0")}`)) n++;
-          const newLabel = this.app.labelManager.ensureGroupNamed(`${prefix}${String(n).padStart(2, "0")}`);
-          split[1].labelId = newLabel.id;
+          split[1].labelId = ow.labelId;
         }
       }
     }
