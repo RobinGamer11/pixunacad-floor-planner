@@ -8,6 +8,7 @@ import { pointInOrientedBox, boxCornersWorld, rotateVector } from "./textGeometr
 import type { TextBox } from "./Scene";
 import { pointInInstance, instanceBoundingCornersWorld } from "./StickerManager";
 import { pointInDocument } from "./documentGeometry";
+import { computeWallLines } from "./wallGeom";
 
 type EditTarget =
   | { kind: "segment"; segmentId: string; pointIndex: number }
