@@ -199,7 +199,12 @@ export class WallTool {
         this.state = "drawing";
       } else {
         const last = this.corners[this.corners.length - 1];
-        if (dist(last, p) >= Defaults.minSegLenM) this.corners.push(v(p.x, p.y));
+        if (dist(last, p) >= Defaults.minSegLenM) {
+          // Jeder Klick = neues Wand-Objekt (analog Linienwerkzeug).
+          this._createSingleWall(last, p);
+          // Anschluss-Kette: nächster Startpunkt = aktueller Klickpunkt.
+          this.corners = [v(p.x, p.y)];
+        }
       }
     }
   }
