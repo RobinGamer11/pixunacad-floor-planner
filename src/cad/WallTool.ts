@@ -74,40 +74,34 @@ export class WallTool {
     return "help";
   }
 
-  /** Auto-ID AW01/AW02 / IW01/IW02 falls customName leer. Erzeugt Label-Group falls nötig. */
+  /** Wenn customName gesetzt → eigene Layer. Sonst: aktive Default-Layer-ID. */
   private _resolveLabelId(): string {
     const customName = (this.settings.customName || "").trim();
     if (customName) {
       return this.app.labelManager.ensureGroupNamed(customName).id;
     }
-    const prefix = this.settings.kind === "outer" ? "AW" : "IW";
-    const used = new Set<string>();
-    for (const w of this.app.scene.walls) {
-      const g = this.app.labelManager.getById(w.labelId);
-      if (g && g.name.startsWith(prefix)) used.add(g.name);
-    }
-    let n = 1;
-    while (used.has(`${prefix}${String(n).padStart(2, "0")}`)) n++;
-    const name = `${prefix}${String(n).padStart(2, "0")}`;
-    return this.app.labelManager.ensureGroupNamed(name).id;
+    return this.app.activeDrawLabelId || Defaults.defaultLabelId;
+  }
+
+  /** Erzeugt eine einzelne Wand zwischen zwei Punkten (jeder Klick = neues Objekt). */
+  private _createSingleWall(a: Vec2, b: Vec2) {
+    const labelId = this._resolveLabelId();
+    const newWall = this.app.scene.createWall({
+      kind: this.settings.kind,
+      thicknessM: this.getThickness(),
+      referenceSide: this.settings.referenceSide,
+      corners: [v(a.x, a.y), v(b.x, b.y)],
+      customName: this.settings.customName,
+      color: this.settings.color,
+      fillColor: this.settings.fillColor,
+      labelId,
+    });
+    this._runConnectionPipeline(newWall);
+    this.app.refreshLabelUI?.();
+    return newWall;
   }
 
   finish() {
-    if (this.state === "drawing" && this.corners.length >= 2) {
-      const labelId = this._resolveLabelId();
-      const newWall = this.app.scene.createWall({
-        kind: this.settings.kind,
-        thicknessM: this.getThickness(),
-        referenceSide: this.settings.referenceSide,
-        corners: this.corners,
-        customName: this.settings.customName,
-        color: this.settings.color,
-        fillColor: this.settings.fillColor,
-        labelId,
-      });
-      this._runConnectionPipeline(newWall);
-      this.app.refreshLabelUI?.();
-    }
     this.cancel();
   }
 
