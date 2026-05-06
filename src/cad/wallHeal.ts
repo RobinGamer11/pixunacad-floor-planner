@@ -119,9 +119,9 @@ function intersectRayWithPoly(p: Vec2, dir: Vec2, poly: Vec2[]): Vec2 | null {
     const segDir = sub(b, a);
     const ip = lineLineIntersectionInfinite(p, dir, a, segDir);
     if (!ip) continue;
-    const segLen2 = segDir.x * segDir.x + segDir.y * segDir.y || 1e-12;
-    const t = ((ip.x - a.x) * segDir.x + (ip.y - a.y) * segDir.y) / segLen2;
-    if (t < -0.1 || t > 1.1) continue;
+    // Bounds-Check bewusst sehr weit: Wandlinien benachbarter Wände werden zur
+    // Mitren-Bildung als unendlich angenommen. bestNeighbor ist bereits per
+    // Proximität vorgefiltert.
     const distToP = Math.hypot(ip.x - p.x, ip.y - p.y);
     if (distToP < bestAbs) { bestAbs = distToP; best = ip; }
   }
