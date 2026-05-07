@@ -398,19 +398,31 @@ export class Scene {
   /** Lazy/inkrementell aufgebauter Wand-Topologie-Graph (Phase 2). */
   private _wallTopology: WallTopologyGraph | null = null;
   private _wallTopologyDirty = true;
+  private _wallTopologyHash = "";
 
   /** Markiert die Wand-Topologie als veraltet — Aufruf nach jeder Wand-Mutation. */
   markWallsDirty(): void { this._wallTopologyDirty = true; }
 
-  /** Lazy: liefert den aktuellen Topologie-Graph (rebuild bei dirty). */
+  /** Lazy: liefert den aktuellen Topologie-Graph (rebuild bei dirty oder Hash-Change). */
   getWallTopology(): WallTopologyGraph {
     if (!this._wallTopology) this._wallTopology = new WallTopologyGraph();
-    if (this._wallTopologyDirty) {
+    // Inkrementelles Hashing als Sicherheitsnetz für vergessene markWallsDirty-Aufrufe.
+    let h = "" + this.walls.length;
+    for (const w of this.walls) {
+      h += "|" + w.id + ":" + w.corners.length;
+      const a = w.corners[0]; const b = w.corners[w.corners.length - 1];
+      if (a) h += "," + a.x.toFixed(3) + "," + a.y.toFixed(3);
+      if (b) h += "/" + b.x.toFixed(3) + "," + b.y.toFixed(3);
+      h += ":" + w.thicknessM + ":" + w.referenceSide;
+    }
+    if (this._wallTopologyDirty || h !== this._wallTopologyHash) {
       this._wallTopology.build(this.walls);
       this._wallTopologyDirty = false;
+      this._wallTopologyHash = h;
     }
     return this._wallTopology;
   }
+
 
   private _makeId(): string {
     return (crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now() + Math.random());
