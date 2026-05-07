@@ -409,11 +409,8 @@ export class Scene {
     // Inkrementelles Hashing als Sicherheitsnetz für vergessene markWallsDirty-Aufrufe.
     let h = "" + this.walls.length;
     for (const w of this.walls) {
-      h += "|" + w.id + ":" + w.corners.length;
-      const a = w.corners[0]; const b = w.corners[w.corners.length - 1];
-      if (a) h += "," + a.x.toFixed(3) + "," + a.y.toFixed(3);
-      if (b) h += "/" + b.x.toFixed(3) + "," + b.y.toFixed(3);
-      h += ":" + w.thicknessM + ":" + w.referenceSide;
+      h += "|" + w.id + ":" + w.corners.length + ":" + w.thicknessM + ":" + w.referenceSide;
+      for (const c of w.corners) h += "," + c.x.toFixed(3) + "," + c.y.toFixed(3);
     }
     if (this._wallTopologyDirty || h !== this._wallTopologyHash) {
       this._wallTopology.build(this.walls);
