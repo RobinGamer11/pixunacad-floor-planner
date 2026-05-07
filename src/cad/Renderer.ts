@@ -793,8 +793,8 @@ export class Renderer {
       if (wall.labelId !== labelId) continue;
       if (!this.labels.isVisible(wall.labelId)) continue;
       // Nachbarn = sichtbare andere Wände, gleiche oder höhere Priorität (Außen heilt Innen, nicht umgekehrt für Außenwände → wir heilen immer gegen alle, aber Außen verlieren keine Geometrie an Innen)
-      const others = allWalls.filter(w => w !== wall && this.labels.isVisible(w.labelId)
-        && (wall.kind === "inner" || w.kind === "outer")); // Innenwand heilt gegen alle, Außenwand nur gegen andere Außenwände
+      // Heal-Algorithmus filtert intern nach Priorität (AW nie an IW).
+      const others = allWalls.filter(w => w !== wall && this.labels.isVisible(w.labelId));
       const healed = computeHealedWallLines(wall, others);
       const main = healed.mainCorners;
       const sub = healed.subCorners;
