@@ -1,5 +1,6 @@
 import { Defaults } from "./constants";
 import { Vec2, v, clamp, lerp } from "./geometry";
+import { WallTopologyGraph } from "./WallTopologyGraph";
 
 export class Segment {
   id: string;
@@ -393,6 +394,23 @@ export class Scene {
   private _stickerIdMap = new Map<string, StickerInstance>();
   private _docIdMap = new Map<string, DocumentObject>();
   private _freeIdMap = new Map<string, FreeStroke>();
+
+  /** Lazy/inkrementell aufgebauter Wand-Topologie-Graph (Phase 2). */
+  private _wallTopology: WallTopologyGraph | null = null;
+  private _wallTopologyDirty = true;
+
+  /** Markiert die Wand-Topologie als veraltet — Aufruf nach jeder Wand-Mutation. */
+  markWallsDirty(): void { this._wallTopologyDirty = true; }
+
+  /** Lazy: liefert den aktuellen Topologie-Graph (rebuild bei dirty). */
+  getWallTopology(): WallTopologyGraph {
+    if (!this._wallTopology) this._wallTopology = new WallTopologyGraph();
+    if (this._wallTopologyDirty) {
+      this._wallTopology.build(this.walls);
+      this._wallTopologyDirty = false;
+    }
+    return this._wallTopology;
+  }
 
   private _makeId(): string {
     return (crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now() + Math.random());
@@ -840,14 +858,15 @@ export class Scene {
     const w = new Wall({ id: this._makeId(), ...opts });
     w._stickerEditOwnerId = this._currentEditOwnerId;
     this.walls.push(w);
+    this.markWallsDirty();
     return w;
   }
 
-  removeWall(w: Wall) { this.walls = this.walls.filter(x => x !== w); }
+  removeWall(w: Wall) { this.walls = this.walls.filter(x => x !== w); this.markWallsDirty(); }
   getWallById(id: string): Wall | null { return this.walls.find(w => w.id === id) || null; }
   getWallsByLabelId(labelId: string): Wall[] { return this.walls.filter(w => w.labelId === labelId); }
-  removeWallsByLabelId(labelId: string) { this.walls = this.walls.filter(w => w.labelId !== labelId); }
-  reassignWallsLabel(oldId: string, newId: string) { for (const w of this.walls) if (w.labelId === oldId) w.labelId = newId; }
+  removeWallsByLabelId(labelId: string) { this.walls = this.walls.filter(w => w.labelId !== labelId); this.markWallsDirty(); }
+  reassignWallsLabel(oldId: string, newId: string) { for (const w of this.walls) if (w.labelId === oldId) w.labelId = newId; this.markWallsDirty(); }
 
   /**
    * Splittet eine Wand exakt am Punkt p (muss auf einer Edge liegen). Erzeugt zwei neue
