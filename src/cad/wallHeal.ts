@@ -1,34 +1,22 @@
 import { Vec2, v, sub, norm, lineLineIntersectionInfinite, dist } from "./geometry";
 import { computeWallLines } from "./wallGeom";
 import type { Wall, WallKind } from "./Scene";
+import { WallTopologyGraph, CLEANUP_TOL, endpointLineCorners, priorityIndex } from "./WallTopologyGraph";
 
 const HEAL_TOL_M = 0.05;
 type LineType = "main" | "help" | "sub";
 
-/**
- * Hierarchie-Prioritätsindex. Niedrigere Zahl = höhere Priorität.
- * 1 AW-Bezugslinie · 2 AW-Helplinie · 3 AW-Sublinie ·
- * 4 IW-Bezugslinie · 5 IW-Helplinie · 6 IW-Sublinie.
- */
 function priorityOf(kind: WallKind, t: LineType): number {
-  const base = kind === "outer" ? 0 : 3;
-  const off = t === "main" ? 1 : t === "help" ? 2 : 3;
-  return base + off;
+  return priorityIndex(kind, t);
 }
 
 /**
- * Liefert getrimmte Polylinien (Main/Sub/Help) einer Wand. Funktioniert in zwei
- * Phasen pro Endpunkt und Linientyp:
- *  1) "Virtuelle Vollverbindung": ideale Zielposition = Schnitt mit gleichnamiger
- *     Linie (Main↔Main, Help↔Help, Sub↔Sub) der nächstgelegenen Nachbarwand.
- *  2) "Sichtbare Kürzung durch höhere Priorität": entlang des Pfades vom Endpunkt
- *     zum idealen Ziel wird der erste Schnitt mit einer Nachbar-Linie höherer
- *     Priorität gesucht; falls näher als das Ideal, wird dort gekappt.
- *
- * AW-Linien werden nie an IW-Linien getrimmt (Phase 1 überspringt IW als Ziel
- * für AW; Phase 2 kann AW nicht durch IW kappen, da IW immer niedrigere Priorität).
+ * Phase 2: Heal nutzt globalen Topologie-Graph (wenn übergeben), sonst Fallback
+ * auf paarweisen Modus. Zusätzlich Cleanup-Pass: Mikro-Lücken zwischen
+ * gleichnamigen Linien-Endpunkten am gleichen Knoten werden auf den Endpunkt
+ * der höchstpriorisierten inzidenten Wand gesnappt.
  */
-export function computeHealedWallLines(wall: Wall, others: Wall[]) {
+export function computeHealedWallLines(wall: Wall, others: Wall[], graph?: WallTopologyGraph) {
   const lines = computeWallLines(wall.corners, wall.thicknessM, wall.referenceSide);
   if (wall.corners.length < 2) return { ...lines, capStart: true, capEnd: true };
 
@@ -36,8 +24,11 @@ export function computeHealedWallLines(wall: Wall, others: Wall[]) {
   const subCorners = lines.subCorners.map(p => v(p.x, p.y));
   const helpCorners = lines.helpCorners.map(p => v(p.x, p.y));
 
-  const capStart = !healEnd(wall, others, mainCorners, subCorners, helpCorners, true);
-  const capEnd = !healEnd(wall, others, mainCorners, subCorners, helpCorners, false);
+  const capStart = !healEnd(wall, others, mainCorners, subCorners, helpCorners, true, graph);
+  const capEnd = !healEnd(wall, others, mainCorners, subCorners, helpCorners, false, graph);
+
+  // Cleanup-Pass: gleicher Knoten → gleichnamige Linien zusammenführen.
+  if (graph) cleanupAtNodes(wall, mainCorners, subCorners, helpCorners, graph, others);
 
   return { mainCorners, subCorners, helpCorners, capStart, capEnd };
 }
@@ -49,6 +40,7 @@ function healEnd(
   subCorners: Vec2[],
   helpCorners: Vec2[],
   atStart: boolean,
+  graph?: WallTopologyGraph,
 ): boolean {
   const n = wall.corners.length;
   if (n < 2) return false;
@@ -60,18 +52,24 @@ function healEnd(
     : norm(sub(wall.corners[n - 1], wall.corners[n - 2]));
   if (dir.x === 0 && dir.y === 0) return false;
 
-  // Sammle plausible Nachbarn über alle Linientypen (Endpunkt nahe an Bezugs-
-  // Polylinie der anderen Wand). Wir filtern später pro Trim-Schritt erneut
-  // (AW darf nicht durch IW getrimmt werden).
-  const candidates: Wall[] = [];
-  for (const ow of others) {
-    if (ow === wall) continue;
-    if (!pointNearPolyline(corner, ow.corners, HEAL_TOL_M + Math.max(ow.thicknessM, wall.thicknessM))) continue;
-    candidates.push(ow);
+  // Kandidaten: aus Graph (nur inzidente Wände am Knoten) — sonst alle nahen anderen.
+  let candidates: Wall[] = [];
+  if (graph) {
+    const node = graph.getNodeForEndpoint(wall.id, atStart);
+    if (node) {
+      const ids = new Set(node.incidents.filter(i => i.wallId !== wall.id).map(i => i.wallId));
+      candidates = others.filter(w => ids.has(w.id));
+    }
+  }
+  if (candidates.length === 0) {
+    for (const ow of others) {
+      if (ow === wall) continue;
+      if (!pointNearPolyline(corner, ow.corners, HEAL_TOL_M + Math.max(ow.thicknessM, wall.thicknessM))) continue;
+      candidates.push(ow);
+    }
   }
   if (candidates.length === 0) return false;
 
-  // Pre-compute neighbor lines (Cache pro healEnd-Aufruf).
   const cache = new Map<Wall, ReturnType<typeof computeWallLines>>();
   const linesOf = (ow: Wall) => {
     let l = cache.get(ow);
@@ -91,12 +89,11 @@ function healEnd(
     const ownPrio = priorityOf(wall.kind, T);
     const origin = polysSelf[T][idx];
 
-    // --- Phase 1: Ideale Zielposition (gleichnamige Linie der Nachbarwand) ---
+    // Phase 1: ideale Zielposition über alle Kandidaten (gleichnamige Linie).
     let ideal: Vec2 | null = null;
     let idealAbs = Infinity;
     let idealSignedT = 0;
     for (const ow of candidates) {
-      // AW darf nie gegen IW trimmen
       if (wall.kind === "outer" && ow.kind === "inner") continue;
       const ol = linesOf(ow);
       const targetPoly = T === "main" ? ol.mainCorners : T === "help" ? ol.helpCorners : ol.subCorners;
@@ -111,7 +108,7 @@ function healEnd(
     }
     if (!ideal) continue;
 
-    // --- Phase 2: Blockade durch höhere Priorität auf dem Pfad origin → ideal ---
+    // Phase 2: Blockade durch höhere Priorität (über alle Kandidaten und Linien-Typen).
     let endpoint: Vec2 = ideal;
     let endpointAbs = idealAbs;
     const idealSign = Math.sign(idealSignedT) || 1;
@@ -120,12 +117,12 @@ function healEnd(
       const ol = linesOf(ow);
       const tryBlock = (linePoly: Vec2[], otherType: LineType) => {
         const op = priorityOf(ow.kind, otherType);
-        if (op >= ownPrio) return; // nur strikt höhere Priorität blockiert
+        if (op >= ownPrio) return;
         const p = intersectRayWithPoly(origin, dir, linePoly);
         if (!p) return;
         const tP = (p.x - origin.x) * dir.x + (p.y - origin.y) * dir.y;
-        if (Math.sign(tP) !== idealSign) return;             // muss in Richtung Ideal liegen
-        if (Math.abs(tP) >= Math.abs(idealSignedT)) return;  // nur VOR dem Ideal kappen
+        if (Math.sign(tP) !== idealSign) return;
+        if (Math.abs(tP) >= Math.abs(idealSignedT)) return;
         const d = dist(origin, p);
         if (d < endpointAbs) {
           endpointAbs = d;
@@ -144,6 +141,52 @@ function healEnd(
   return healedAny;
 }
 
+/**
+ * Cleanup-Pass: an jedem Knoten, an dem die Wand mit einem Endpunkt hängt,
+ * alle gleichnamigen Linien-Endpunkte (main/help/sub) der inzidenten Wände
+ * vergleichen. Liegen Endpunkte innerhalb CLEANUP_TOL beieinander, wird der
+ * Endpunkt der niedrigeren Priorität auf den der höchsten Priorität gesetzt
+ * (Wand nur lokal verändert; Nachbarn werden in deren eigenem Heal-Lauf gleich
+ * behandelt → konvergent, da Prio-Reihenfolge deterministisch ist).
+ */
+function cleanupAtNodes(
+  wall: Wall,
+  mainCorners: Vec2[],
+  subCorners: Vec2[],
+  helpCorners: Vec2[],
+  graph: WallTopologyGraph,
+  others: Wall[],
+) {
+  const polys: Record<LineType, Vec2[]> = { main: mainCorners, help: helpCorners, sub: subCorners };
+  for (const atStart of [true, false]) {
+    const node = graph.getNodeForEndpoint(wall.id, atStart);
+    if (!node) continue;
+    const idx = atStart ? 0 : mainCorners.length - 1;
+    const ownPrio = (T: LineType) => priorityIndex(wall.kind, T);
+
+    for (const T of ["main", "help", "sub"] as LineType[]) {
+      let bestPrio = ownPrio(T);
+      let bestPoint: Vec2 = polys[T][idx];
+      for (const inc of node.incidents) {
+        if (inc.wallId === wall.id) continue;
+        const ow = others.find(w => w.id === inc.wallId);
+        if (!ow) continue;
+        const op = priorityIndex(ow.kind, T);
+        // gleichnamige Linien-Endpunkte des Nachbarn (start oder end)
+        for (const isStart of [true, false]) {
+          const corners = endpointLineCorners(ow, isStart);
+          const otherPoint = T === "main" ? corners.main : T === "help" ? corners.help : corners.sub;
+          if (dist(otherPoint, polys[T][idx]) <= CLEANUP_TOL && op < bestPrio) {
+            bestPrio = op;
+            bestPoint = otherPoint;
+          }
+        }
+      }
+      if (bestPrio < ownPrio(T)) polys[T][idx] = v(bestPoint.x, bestPoint.y);
+    }
+  }
+}
+
 function pointNearPolyline(p: Vec2, poly: Vec2[], tol: number): boolean {
   for (let i = 0; i < poly.length - 1; i++) {
     const a = poly[i], b = poly[i + 1];
@@ -158,11 +201,6 @@ function pointNearPolyline(p: Vec2, poly: Vec2[], tol: number): boolean {
   return false;
 }
 
-/**
- * Sucht nächstgelegenen Schnittpunkt der durch (p, dir) definierten Geraden mit
- * den Segmenten der Polylinie. Segmente werden als unendliche Geraden behandelt
- * (für Mitren-Verlängerung „virtueller Vollverbindung").
- */
 function intersectRayWithPoly(p: Vec2, dir: Vec2, poly: Vec2[]): Vec2 | null {
   let best: Vec2 | null = null;
   let bestAbs = Infinity;

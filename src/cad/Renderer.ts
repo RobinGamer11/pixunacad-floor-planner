@@ -789,13 +789,12 @@ export class Renderer {
     const cam = this.camera;
     // Auto-Heal: außenwände vor innenwänden auflösen (höhere Priorität)
     const allWalls = this.scene.walls;
+    const graph = this.scene.getWallTopology();
     for (const wall of allWalls) {
       if (wall.labelId !== labelId) continue;
       if (!this.labels.isVisible(wall.labelId)) continue;
-      // Nachbarn = sichtbare andere Wände, gleiche oder höhere Priorität (Außen heilt Innen, nicht umgekehrt für Außenwände → wir heilen immer gegen alle, aber Außen verlieren keine Geometrie an Innen)
-      // Heal-Algorithmus filtert intern nach Priorität (AW nie an IW).
       const others = allWalls.filter(w => w !== wall && this.labels.isVisible(w.labelId));
-      const healed = computeHealedWallLines(wall, others);
+      const healed = computeHealedWallLines(wall, others, graph);
       const main = healed.mainCorners;
       const sub = healed.subCorners;
       if (main.length < 2 || sub.length < 2) continue;
