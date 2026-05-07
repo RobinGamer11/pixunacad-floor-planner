@@ -915,6 +915,7 @@ export class Scene {
     const idx = this.walls.indexOf(wall);
     if (idx >= 0) this.walls.splice(idx, 1, wA, wB);
     else { this.walls.push(wA); this.walls.push(wB); }
+    this.markWallsDirty();
     return [wA, wB];
   }
 }
