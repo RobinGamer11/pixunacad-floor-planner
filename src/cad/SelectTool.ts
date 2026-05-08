@@ -9,6 +9,7 @@ import type { TextBox } from "./Scene";
 import { pointInInstance, instanceBoundingCornersWorld } from "./StickerManager";
 import { pointInDocument } from "./documentGeometry";
 import { computeWallLines } from "./wallGeom";
+import { runWallTopologyMaintenance } from "./wallTopologyMaintenance";
 
 type EditTarget =
   | { kind: "segment"; segmentId: string; pointIndex: number }
@@ -854,6 +855,15 @@ export class SelectTool {
   }
 
   _clearEditState() {
+    // Phase 3: nach Wand-Mutationen Topologie-Wartung (Auto-Split + Auto-Merge).
+    const wasWallEdit = !!this.editTarget && (
+      this.editTarget.kind === "wall" ||
+      this.editTarget.kind === "wallPoint" ||
+      this.editTarget.kind === "wallEdge"
+    );
+    if (wasWallEdit) {
+      try { runWallTopologyMaintenance(this.app.scene); } catch { /* noop */ }
+    }
     this.activeEditAction = null;
     this.editTarget = null;
     this.fixedPoint = null;
