@@ -4,6 +4,7 @@ import type { CadApp } from "./CadApp";
 import type { Snap } from "./TopologyEngine";
 import type { Input } from "./Input";
 import { computeWallLines, type WallKind, type WallReferenceSide } from "./wallGeom";
+import { runWallTopologyMaintenance } from "./wallTopologyMaintenance";
 
 export interface WallToolSettings {
   kind: WallKind;
