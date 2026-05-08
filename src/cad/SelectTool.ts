@@ -855,6 +855,15 @@ export class SelectTool {
   }
 
   _clearEditState() {
+    // Phase 3: nach Wand-Mutationen Topologie-Wartung (Auto-Split + Auto-Merge).
+    const wasWallEdit = !!this.editTarget && (
+      this.editTarget.kind === "wall" ||
+      this.editTarget.kind === "wallPoint" ||
+      this.editTarget.kind === "wallEdge"
+    );
+    if (wasWallEdit) {
+      try { runWallTopologyMaintenance(this.app.scene); } catch { /* noop */ }
+    }
     this.activeEditAction = null;
     this.editTarget = null;
     this.fixedPoint = null;
