@@ -1,6 +1,6 @@
 import { Vec2, v, sub, norm, lineLineIntersectionInfinite, dist } from "./geometry";
 import { computeWallLines } from "./wallGeom";
-import type { Wall, WallKind } from "./Scene";
+import type { Wall } from "./Scene";
 import { WallTopologyGraph, CLEANUP_TOL, endpointLineCorners, priorityIndex } from "./WallTopologyGraph";
 
 const HEAL_TOL_M = 0.05;
