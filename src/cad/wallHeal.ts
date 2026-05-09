@@ -4,6 +4,14 @@ import type { Wall, WallKind } from "./Scene";
 import { WallTopologyGraph, CLEANUP_TOL, endpointLineCorners, priorityIndex } from "./WallTopologyGraph";
 
 const HEAL_TOL_M = 0.05;
+/**
+ * Phase 4 — Stabilisierung: Maximale Heal-Distanz, jenseits derer ein
+ * Strahl-Treffer mit der gleichnamigen Linie eines Nachbarn als unrealistisch
+ * verworfen wird. Verhindert "explodierende" Verlängerungen bei sehr spitzen
+ * Winkeln (Strahl ist fast parallel zum Nachbarn → Treffpunkt extrem weit).
+ */
+const HEAL_MAX_DIST_M = 5.0;
+const RAY_EPS = 1e-6;
 type LineType = "main" | "help" | "sub";
 
 function priorityOf(kind: WallKind, t: LineType): number {
@@ -90,6 +98,8 @@ function healEnd(
     const origin = polysSelf[T][idx];
 
     // Phase 1: ideale Zielposition über alle Kandidaten (gleichnamige Linie).
+    // Phase 4: Distanz-Cap (HEAL_MAX_DIST_M) verhindert Ausreißer bei spitzen
+    // Winkeln; intersectRayWithPoly liefert nur Treffer in Strahl-Richtung.
     let ideal: Vec2 | null = null;
     let idealAbs = Infinity;
     let idealSignedT = 0;
@@ -100,6 +110,7 @@ function healEnd(
       const p = intersectRayWithPoly(origin, dir, targetPoly);
       if (!p) continue;
       const d = dist(origin, p);
+      if (d > HEAL_MAX_DIST_M) continue;
       if (d < idealAbs) {
         idealAbs = d;
         ideal = p;
@@ -165,24 +176,42 @@ function cleanupAtNodes(
     const ownPrio = (T: LineType) => priorityIndex(wall.kind, T);
 
     for (const T of ["main", "help", "sub"] as LineType[]) {
-      let bestPrio = ownPrio(T);
+      const ownP = ownPrio(T);
+      let bestPrio = ownP;
       let bestPoint: Vec2 = polys[T][idx];
+      let bestWallId: string | null = null;
       for (const inc of node.incidents) {
         if (inc.wallId === wall.id) continue;
+        // Nur "echte" Endpunkt-Inzidenzen — T-Stöße haben keine gleichnamige
+        // Endpunkt-Position am Knoten.
+        if (inc.kind === "tjunction") continue;
         const ow = others.find(w => w.id === inc.wallId);
         if (!ow) continue;
         const op = priorityIndex(ow.kind, T);
-        // gleichnamige Linien-Endpunkte des Nachbarn (start oder end)
         for (const isStart of [true, false]) {
           const corners = endpointLineCorners(ow, isStart);
           const otherPoint = T === "main" ? corners.main : T === "help" ? corners.help : corners.sub;
-          if (dist(otherPoint, polys[T][idx]) <= CLEANUP_TOL && op < bestPrio) {
+          if (dist(otherPoint, polys[T][idx]) > CLEANUP_TOL) continue;
+          // Phase 4: Strikt höhere Prio gewinnt; bei Gleichprio (4+ Wände
+          // gleicher Art am Knoten) deterministisch über kleinste wallId
+          // tie-breaken, damit alle inzidenten Wände konvergieren.
+          const isBetter =
+            op < bestPrio ||
+            (op === bestPrio && op < ownP &&
+              (bestWallId === null || ow.id < bestWallId));
+          if (isBetter) {
             bestPrio = op;
             bestPoint = otherPoint;
+            bestWallId = ow.id;
+          } else if (op === ownP && bestWallId === null && ow.id < wall.id) {
+            // Gleichprio mit eigener Wand: kleinste id im Cluster gewinnt.
+            bestPrio = op;
+            bestPoint = otherPoint;
+            bestWallId = ow.id;
           }
         }
       }
-      if (bestPrio < ownPrio(T)) polys[T][idx] = v(bestPoint.x, bestPoint.y);
+      if (bestWallId !== null) polys[T][idx] = v(bestPoint.x, bestPoint.y);
     }
   }
 }
@@ -201,16 +230,23 @@ function pointNearPolyline(p: Vec2, poly: Vec2[], tol: number): boolean {
   return false;
 }
 
+/**
+ * Phase 4: Strahl-Polylinien-Schnitt mit zwei zusätzlichen Constraints:
+ *  - Treffer muss in Strahl-Richtung liegen (signed param > -RAY_EPS); negative
+ *    Lösungen würden die Wand "rückwärts" verlängern und falsch heilen.
+ *  - Treffer wählt min. positive Distanz, nicht min. unsignierte Distanz.
+ */
 function intersectRayWithPoly(p: Vec2, dir: Vec2, poly: Vec2[]): Vec2 | null {
   let best: Vec2 | null = null;
-  let bestAbs = Infinity;
+  let bestT = Infinity;
   for (let i = 0; i < poly.length - 1; i++) {
     const a = poly[i], b = poly[i + 1];
     const segDir = sub(b, a);
     const ip = lineLineIntersectionInfinite(p, dir, a, segDir);
     if (!ip) continue;
-    const d = Math.hypot(ip.x - p.x, ip.y - p.y);
-    if (d < bestAbs) { bestAbs = d; best = ip; }
+    const tRay = (ip.x - p.x) * dir.x + (ip.y - p.y) * dir.y;
+    if (tRay < -RAY_EPS) continue;
+    if (tRay < bestT) { bestT = tRay; best = ip; }
   }
   return best;
 }

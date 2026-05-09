@@ -142,6 +142,12 @@ function findInteriorHit(w: Wall, p: Vec2, tol: number): { edgeIndex: number; t:
 }
 
 /** Prüft, ob das "Reststück" hinter dem Treffpunkt in eine dritte Wand übergeht. */
+/**
+ * Prüft, ob das "Reststück" hinter dem Treffpunkt in eine dritte Wand übergeht.
+ * Phase 4: Akzeptiert auch T-Stoß-Treffer einer dritten Wand auf einer Edge
+ * von ow (nicht nur Endpunkt-an-Endpunkt), damit Splits auch dann ausgelöst
+ * werden, wenn die dritte Wand selbst per T anschließt.
+ */
 function continuesToThirdWall(scene: Scene, ow: Wall, hit: ReturnType<typeof findInteriorHit>, driver: Wall): boolean {
   if (!hit) return false;
   const ends = [ow.corners[0], ow.corners[ow.corners.length - 1]];
@@ -152,6 +158,9 @@ function continuesToThirdWall(scene: Scene, ow: Wall, hit: ReturnType<typeof fin
       const a = other.corners[0], b = other.corners[other.corners.length - 1];
       if (dist(end, a) <= NODE_TOL) return true;
       if (dist(end, b) <= NODE_TOL) return true;
+      // T-Stoß: Endpunkt von ow liegt im Inneren einer Edge von other.
+      const tHit = findInteriorHit(other, end, NODE_TOL);
+      if (tHit) return true;
     }
   }
   return false;
