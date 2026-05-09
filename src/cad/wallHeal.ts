@@ -1,22 +1,18 @@
 import { Vec2, v, sub, norm, lineLineIntersectionInfinite, dist } from "./geometry";
 import { computeWallLines } from "./wallGeom";
-import type { Wall, WallKind } from "./Scene";
+import type { Wall } from "./Scene";
 import { WallTopologyGraph, CLEANUP_TOL, endpointLineCorners, priorityIndex } from "./WallTopologyGraph";
 
 const HEAL_TOL_M = 0.05;
 /**
  * Phase 4 — Stabilisierung: Maximale Heal-Distanz, jenseits derer ein
- * Strahl-Treffer mit der gleichnamigen Linie eines Nachbarn als unrealistisch
+ * Schnitt mit der gleichnamigen Linie eines Nachbarn als unrealistisch
  * verworfen wird. Verhindert "explodierende" Verlängerungen bei sehr spitzen
  * Winkeln (Strahl ist fast parallel zum Nachbarn → Treffpunkt extrem weit).
  */
 const HEAL_MAX_DIST_M = 5.0;
-const RAY_EPS = 1e-6;
 type LineType = "main" | "help" | "sub";
-
-function priorityOf(kind: WallKind, t: LineType): number {
-  return priorityIndex(kind, t);
-}
+type WallLines = ReturnType<typeof computeWallLines>;
 
 /**
  * Phase 2: Heal nutzt globalen Topologie-Graph (wenn übergeben), sonst Fallback
@@ -61,13 +57,11 @@ function healEnd(
   if (dir.x === 0 && dir.y === 0) return false;
 
   // Kandidaten: aus Graph (nur inzidente Wände am Knoten) — sonst alle nahen anderen.
+  const node = graph?.getNodeForEndpoint(wall.id, atStart) || null;
   let candidates: Wall[] = [];
-  if (graph) {
-    const node = graph.getNodeForEndpoint(wall.id, atStart);
-    if (node) {
-      const ids = new Set(node.incidents.filter(i => i.wallId !== wall.id).map(i => i.wallId));
-      candidates = others.filter(w => ids.has(w.id));
-    }
+  if (node) {
+    const ids = new Set(node.incidents.filter(i => i.wallId !== wall.id).map(i => i.wallId));
+    candidates = others.filter(w => ids.has(w.id));
   }
   if (candidates.length === 0) {
     for (const ow of others) {
@@ -78,7 +72,7 @@ function healEnd(
   }
   if (candidates.length === 0) return false;
 
-  const cache = new Map<Wall, ReturnType<typeof computeWallLines>>();
+  const cache = new Map<Wall, WallLines>();
   const linesOf = (ow: Wall) => {
     let l = cache.get(ow);
     if (!l) { l = computeWallLines(ow.corners, ow.thicknessM, ow.referenceSide); cache.set(ow, l); }
@@ -94,15 +88,13 @@ function healEnd(
   let healedAny = false;
 
   for (const T of ["main", "help", "sub"] as LineType[]) {
-    const ownPrio = priorityOf(wall.kind, T);
     const origin = polysSelf[T][idx];
 
     // Phase 1: ideale Zielposition über alle Kandidaten (gleichnamige Linie).
     // Phase 4: Distanz-Cap (HEAL_MAX_DIST_M) verhindert Ausreißer bei spitzen
-    // Winkeln; intersectRayWithPoly liefert nur Treffer in Strahl-Richtung.
+    // Winkeln; der gleichnamige Schnitt bestimmt echte Verlängerung/Kürzung.
     let ideal: Vec2 | null = null;
     let idealAbs = Infinity;
-    let idealSignedT = 0;
     for (const ow of candidates) {
       if (wall.kind === "outer" && ow.kind === "inner") continue;
       const ol = linesOf(ow);
@@ -114,38 +106,15 @@ function healEnd(
       if (d < idealAbs) {
         idealAbs = d;
         ideal = p;
-        idealSignedT = (p.x - origin.x) * dir.x + (p.y - origin.y) * dir.y;
       }
     }
     if (!ideal) continue;
 
-    // Phase 2: Blockade durch höhere Priorität (über alle Kandidaten und Linien-Typen).
-    let endpoint: Vec2 = ideal;
-    let endpointAbs = idealAbs;
-    const idealSign = Math.sign(idealSignedT) || 1;
-
-    for (const ow of candidates) {
-      const ol = linesOf(ow);
-      const tryBlock = (linePoly: Vec2[], otherType: LineType) => {
-        const op = priorityOf(ow.kind, otherType);
-        if (op >= ownPrio) return;
-        const p = intersectRayWithPoly(origin, dir, linePoly);
-        if (!p) return;
-        const tP = (p.x - origin.x) * dir.x + (p.y - origin.y) * dir.y;
-        if (Math.sign(tP) !== idealSign) return;
-        if (Math.abs(tP) >= Math.abs(idealSignedT)) return;
-        const d = dist(origin, p);
-        if (d < endpointAbs) {
-          endpointAbs = d;
-          endpoint = p;
-        }
-      };
-      tryBlock(ol.mainCorners, "main");
-      tryBlock(ol.helpCorners, "help");
-      tryBlock(ol.subCorners, "sub");
-    }
-
-    polysSelf[T][idx] = endpoint;
+    // Gleichnamige Linien müssen sich am Stoß wirklich treffen. Eine frühere
+    // Prioritäts-Blockade schnitt sub/help an main/help des Nachbarn ab; dadurch
+    // blieben sie faktisch auf Bezugslinien-Länge. Deshalb wird hier der echte
+    // gleichnamige Schnittpunkt direkt übernommen.
+    polysSelf[T][idx] = ideal;
     healedAny = true;
   }
 
@@ -176,6 +145,9 @@ function cleanupAtNodes(
     const ownPrio = (T: LineType) => priorityIndex(wall.kind, T);
 
     for (const T of ["main", "help", "sub"] as LineType[]) {
+      // Sub-/Hilfslinien werden bereits über echte gleichnamige Schnitte geheilt.
+      // Der Cleanup darf sie nicht zurück auf rohe Bezugslinien-Endlänge snappen.
+      if (T !== "main") continue;
       const ownP = ownPrio(T);
       let bestPrio = ownP;
       let bestPoint: Vec2 = polys[T][idx];
@@ -231,11 +203,9 @@ function pointNearPolyline(p: Vec2, poly: Vec2[], tol: number): boolean {
 }
 
 /**
- * Phase 4: Strahl-Polylinien-Schnitt. `dir` ist die Tangente am Eckpunkt
- * (zeigt in die Wand hinein); ein gültiger Heal-Treffer kann je nach Linientyp
- * sowohl vor als auch hinter dem Origin liegen (Außeneck vs. Innenneck).
- * Daher unsignierte Distanz minimieren — die Vorzeichen-Konsistenz beim
- * Blockade-Check (Phase 2) wird separat über `idealSign` geprüft.
+ * Schnitt der End-Tangente mit einer Polylinie. `dir` zeigt in die Wand hinein;
+ * gültige Gehrungspunkte können je nach Außenecke/Innenecke vor oder hinter
+ * dem Origin liegen. Deshalb wird der nächstgelegene unsignierte Schnitt gewählt.
  */
 function intersectRayWithPoly(p: Vec2, dir: Vec2, poly: Vec2[]): Vec2 | null {
   let best: Vec2 | null = null;
