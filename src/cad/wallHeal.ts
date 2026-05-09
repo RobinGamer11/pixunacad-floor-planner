@@ -96,6 +96,15 @@ function healEnd(
     const ownPrio = priorityOf(wall.kind, T);
     const origin = polysSelf[T][idx];
 
+    const nodeEndpoint = node
+      ? endpointFromTopologyNode(node, wall, T, ownPrio, candidates, linesOf)
+      : null;
+    if (nodeEndpoint) {
+      polysSelf[T][idx] = nodeEndpoint;
+      healedAny = true;
+      continue;
+    }
+
     // Phase 1: ideale Zielposition über alle Kandidaten (gleichnamige Linie).
     // Phase 4: Distanz-Cap (HEAL_MAX_DIST_M) verhindert Ausreißer bei spitzen
     // Winkeln; intersectRayWithPoly liefert nur Treffer in Strahl-Richtung.
