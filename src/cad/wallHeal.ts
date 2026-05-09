@@ -6,7 +6,7 @@ import { WallTopologyGraph, CLEANUP_TOL, endpointLineCorners, priorityIndex } fr
 const HEAL_TOL_M = 0.05;
 /**
  * Phase 4 — Stabilisierung: Maximale Heal-Distanz, jenseits derer ein
- * Strahl-Treffer mit der gleichnamigen Linie eines Nachbarn als unrealistisch
+ * Schnitt mit der gleichnamigen Linie eines Nachbarn als unrealistisch
  * verworfen wird. Verhindert "explodierende" Verlängerungen bei sehr spitzen
  * Winkeln (Strahl ist fast parallel zum Nachbarn → Treffpunkt extrem weit).
  */
@@ -97,7 +97,7 @@ function healEnd(
 
     // Phase 1: ideale Zielposition über alle Kandidaten (gleichnamige Linie).
     // Phase 4: Distanz-Cap (HEAL_MAX_DIST_M) verhindert Ausreißer bei spitzen
-    // Winkeln; intersectRayWithPoly liefert nur Treffer in Strahl-Richtung.
+    // Winkeln; der gleichnamige Schnitt bestimmt echte Verlängerung/Kürzung.
     let ideal: Vec2 | null = null;
     let idealAbs = Infinity;
     for (const ow of candidates) {
