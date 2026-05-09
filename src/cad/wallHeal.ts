@@ -2,7 +2,6 @@ import { Vec2, v, sub, norm, lineLineIntersectionInfinite, dist } from "./geomet
 import { computeWallLines } from "./wallGeom";
 import type { Wall, WallKind } from "./Scene";
 import { WallTopologyGraph, CLEANUP_TOL, endpointLineCorners, priorityIndex } from "./WallTopologyGraph";
-import type { WallIncidence, WallNode } from "./WallTopologyGraph";
 
 const HEAL_TOL_M = 0.05;
 /**
@@ -96,15 +95,6 @@ function healEnd(
     const ownPrio = priorityOf(wall.kind, T);
     const origin = polysSelf[T][idx];
 
-    const nodeEndpoint = node
-      ? endpointFromTopologyNode(node, wall, T, ownPrio, candidates, linesOf)
-      : null;
-    if (nodeEndpoint) {
-      polysSelf[T][idx] = nodeEndpoint;
-      healedAny = true;
-      continue;
-    }
-
     // Phase 1: ideale Zielposition über alle Kandidaten (gleichnamige Linie).
     // Phase 4: Distanz-Cap (HEAL_MAX_DIST_M) verhindert Ausreißer bei spitzen
     // Winkeln; intersectRayWithPoly liefert nur Treffer in Strahl-Richtung.
@@ -127,33 +117,11 @@ function healEnd(
     }
     if (!ideal) continue;
 
-    // Phase 2: Blockade durch höhere Priorität (über alle Kandidaten und Linien-Typen).
-    let endpoint: Vec2 = ideal;
-    let endpointAbs = idealAbs;
-    const idealSign = Math.sign(idealSignedT) || 1;
-
-    for (const ow of candidates) {
-      const ol = linesOf(ow);
-      const tryBlock = (linePoly: Vec2[], otherType: LineType) => {
-        const op = priorityOf(ow.kind, otherType);
-        if (op >= ownPrio) return;
-        const p = intersectRayWithPoly(origin, dir, linePoly);
-        if (!p) return;
-        const tP = (p.x - origin.x) * dir.x + (p.y - origin.y) * dir.y;
-        if (Math.sign(tP) !== idealSign) return;
-        if (Math.abs(tP) >= Math.abs(idealSignedT)) return;
-        const d = dist(origin, p);
-        if (d < endpointAbs) {
-          endpointAbs = d;
-          endpoint = p;
-        }
-      };
-      tryBlock(ol.mainCorners, "main");
-      tryBlock(ol.helpCorners, "help");
-      tryBlock(ol.subCorners, "sub");
-    }
-
-    polysSelf[T][idx] = endpoint;
+    // Gleichnamige Linien müssen sich am Stoß wirklich treffen. Eine frühere
+    // Prioritäts-Blockade schnitt sub/help an main/help des Nachbarn ab; dadurch
+    // blieben sie faktisch auf Bezugslinien-Länge. Deshalb wird hier der echte
+    // gleichnamige Schnittpunkt direkt übernommen.
+    polysSelf[T][idx] = ideal;
     healedAny = true;
   }
 
