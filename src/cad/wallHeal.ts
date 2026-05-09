@@ -2,6 +2,7 @@ import { Vec2, v, sub, norm, lineLineIntersectionInfinite, dist } from "./geomet
 import { computeWallLines } from "./wallGeom";
 import type { Wall, WallKind } from "./Scene";
 import { WallTopologyGraph, CLEANUP_TOL, endpointLineCorners, priorityIndex } from "./WallTopologyGraph";
+import type { WallIncidence, WallNode } from "./WallTopologyGraph";
 
 const HEAL_TOL_M = 0.05;
 /**
@@ -11,8 +12,8 @@ const HEAL_TOL_M = 0.05;
  * Winkeln (Strahl ist fast parallel zum Nachbarn → Treffpunkt extrem weit).
  */
 const HEAL_MAX_DIST_M = 5.0;
-const RAY_EPS = 1e-6;
 type LineType = "main" | "help" | "sub";
+type WallLines = ReturnType<typeof computeWallLines>;
 
 function priorityOf(kind: WallKind, t: LineType): number {
   return priorityIndex(kind, t);
@@ -61,13 +62,11 @@ function healEnd(
   if (dir.x === 0 && dir.y === 0) return false;
 
   // Kandidaten: aus Graph (nur inzidente Wände am Knoten) — sonst alle nahen anderen.
+  const node = graph?.getNodeForEndpoint(wall.id, atStart) || null;
   let candidates: Wall[] = [];
-  if (graph) {
-    const node = graph.getNodeForEndpoint(wall.id, atStart);
-    if (node) {
-      const ids = new Set(node.incidents.filter(i => i.wallId !== wall.id).map(i => i.wallId));
-      candidates = others.filter(w => ids.has(w.id));
-    }
+  if (node) {
+    const ids = new Set(node.incidents.filter(i => i.wallId !== wall.id).map(i => i.wallId));
+    candidates = others.filter(w => ids.has(w.id));
   }
   if (candidates.length === 0) {
     for (const ow of others) {
@@ -78,7 +77,7 @@ function healEnd(
   }
   if (candidates.length === 0) return false;
 
-  const cache = new Map<Wall, ReturnType<typeof computeWallLines>>();
+  const cache = new Map<Wall, WallLines>();
   const linesOf = (ow: Wall) => {
     let l = cache.get(ow);
     if (!l) { l = computeWallLines(ow.corners, ow.thicknessM, ow.referenceSide); cache.set(ow, l); }
