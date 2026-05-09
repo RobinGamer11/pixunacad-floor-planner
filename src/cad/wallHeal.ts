@@ -100,7 +100,6 @@ function healEnd(
     // Winkeln; intersectRayWithPoly liefert nur Treffer in Strahl-Richtung.
     let ideal: Vec2 | null = null;
     let idealAbs = Infinity;
-    let idealSignedT = 0;
     for (const ow of candidates) {
       if (wall.kind === "outer" && ow.kind === "inner") continue;
       const ol = linesOf(ow);
@@ -112,7 +111,6 @@ function healEnd(
       if (d < idealAbs) {
         idealAbs = d;
         ideal = p;
-        idealSignedT = (p.x - origin.x) * dir.x + (p.y - origin.y) * dir.y;
       }
     }
     if (!ideal) continue;
@@ -152,6 +150,9 @@ function cleanupAtNodes(
     const ownPrio = (T: LineType) => priorityIndex(wall.kind, T);
 
     for (const T of ["main", "help", "sub"] as LineType[]) {
+      // Sub-/Hilfslinien werden bereits über echte gleichnamige Schnitte geheilt.
+      // Der Cleanup darf sie nicht zurück auf rohe Bezugslinien-Endlänge snappen.
+      if (T !== "main") continue;
       const ownP = ownPrio(T);
       let bestPrio = ownP;
       let bestPoint: Vec2 = polys[T][idx];
