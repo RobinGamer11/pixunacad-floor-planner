@@ -14,10 +14,6 @@ const HEAL_MAX_DIST_M = 5.0;
 type LineType = "main" | "help" | "sub";
 type WallLines = ReturnType<typeof computeWallLines>;
 
-function priorityOf(kind: WallKind, t: LineType): number {
-  return priorityIndex(kind, t);
-}
-
 /**
  * Phase 2: Heal nutzt globalen Topologie-Graph (wenn übergeben), sonst Fallback
  * auf paarweisen Modus. Zusätzlich Cleanup-Pass: Mikro-Lücken zwischen
@@ -92,7 +88,6 @@ function healEnd(
   let healedAny = false;
 
   for (const T of ["main", "help", "sub"] as LineType[]) {
-    const ownPrio = priorityOf(wall.kind, T);
     const origin = polysSelf[T][idx];
 
     // Phase 1: ideale Zielposition über alle Kandidaten (gleichnamige Linie).
