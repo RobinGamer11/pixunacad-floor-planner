@@ -203,11 +203,9 @@ function pointNearPolyline(p: Vec2, poly: Vec2[], tol: number): boolean {
 }
 
 /**
- * Phase 4: Strahl-Polylinien-Schnitt. `dir` ist die Tangente am Eckpunkt
- * (zeigt in die Wand hinein); ein gültiger Heal-Treffer kann je nach Linientyp
- * sowohl vor als auch hinter dem Origin liegen (Außeneck vs. Innenneck).
- * Daher unsignierte Distanz minimieren — die Vorzeichen-Konsistenz beim
- * Blockade-Check (Phase 2) wird separat über `idealSign` geprüft.
+ * Schnitt der End-Tangente mit einer Polylinie. `dir` zeigt in die Wand hinein;
+ * gültige Gehrungspunkte können je nach Außenecke/Innenecke vor oder hinter
+ * dem Origin liegen. Deshalb wird der nächstgelegene unsignierte Schnitt gewählt.
  */
 function intersectRayWithPoly(p: Vec2, dir: Vec2, poly: Vec2[]): Vec2 | null {
   let best: Vec2 | null = null;
