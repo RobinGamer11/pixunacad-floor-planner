@@ -157,7 +157,6 @@ export class TopologyEngine {
         }
       }
     }
-    }
     // Hatch edges
     for (const edge of this.scene.getHatchEdges()) {
       if (!this.labels.isVisible(edge.hatch.labelId)) continue;
