@@ -6,6 +6,7 @@ import { LabelManager } from "./LabelManager";
 import { boxCornersWorld } from "./textGeometry";
 import { documentCornersWorld, documentEdgeMidpointsWorld } from "./documentGeometry";
 import { computeWallLines } from "./wallGeom";
+import { computeHealedWallLines } from "./wallHeal";
 
 export type WallLineKind = "main" | "sub" | "help";
 
@@ -130,10 +131,14 @@ export class TopologyEngine {
     for (const seg of segs) {
       considerLine(seg.a, seg.b, seg, null);
     }
-    // Wall snap points & edges (Haupt + Sub + Help) – mit wallId/wallLine markiert
-    for (const wall of this.scene.walls) {
-      if (!this.labels.isVisible(wall.labelId)) continue;
-      const lines = computeWallLines(wall.corners, wall.thicknessM, wall.referenceSide);
+    // Wall snap points & edges (Haupt + Sub + Help) – mit wallId/wallLine markiert.
+    // Wir verwenden die GEHEILTE Geometrie, damit auch Sub-/Hilfslinien an
+    // ihren echten (verlängerten/verkürzten) Endpunkten fangbar sind.
+    const wallGraph = this.scene.getWallTopology();
+    const visibleWalls = this.scene.walls.filter(w => this.labels.isVisible(w.labelId));
+    for (const wall of visibleWalls) {
+      const others = visibleWalls.filter(w => w !== wall);
+      const lines = computeHealedWallLines(wall, others, wallGraph);
       const groups: { kind: "main" | "sub" | "help"; poly: Vec2[] }[] = [
         { kind: "main", poly: lines.mainCorners },
         { kind: "sub", poly: lines.subCorners },
