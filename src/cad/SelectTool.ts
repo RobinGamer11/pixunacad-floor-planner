@@ -9,6 +9,7 @@ import type { TextBox } from "./Scene";
 import { pointInInstance, instanceBoundingCornersWorld } from "./StickerManager";
 import { pointInDocument } from "./documentGeometry";
 import { computeWallLines } from "./wallGeom";
+import { computeHealedWallLines } from "./wallHeal";
 import { runWallTopologyMaintenance } from "./wallTopologyMaintenance";
 
 type EditTarget =
