@@ -56,10 +56,10 @@ function runAutoSplit(scene: Scene, focusWalls?: Wall[]): boolean {
         if (!scene.walls.includes(ow)) continue;
         const hit = findInteriorHit(ow, ep, HIT_TOL);
         if (!hit) continue;
-        // Hinter dem Treffpunkt (relativer Anteil im Polylinien-Längenraum)
-        // muss ow noch mit einer dritten Wand (≠ driver, ≠ ow) am Endpunkt
-        // zusammentreffen — sonst kein Split.
-        if (!continuesToThirdWall(scene, ow, hit, driver)) continue;
+        // Phase 4 (T-Stoß): Jeder Endpunkt-im-Inneren-Treffer splittet die
+        // getroffene Wand. Dadurch entsteht am Treffpunkt ein echter Knoten,
+        // an dem Heal+Cleanup alle drei Wände sauber mitern können —
+        // notwendige Voraussetzung u.a. für künftige mehrschichtige Wände.
         const split = scene.splitWallAt(ow, ep, MIN_SEG_LEN_M);
         if (split) {
           split[1].labelId = ow.labelId;
@@ -141,30 +141,7 @@ function findInteriorHit(w: Wall, p: Vec2, tol: number): { edgeIndex: number; t:
   return best;
 }
 
-/** Prüft, ob das "Reststück" hinter dem Treffpunkt in eine dritte Wand übergeht. */
-/**
- * Prüft, ob das "Reststück" hinter dem Treffpunkt in eine dritte Wand übergeht.
- * Phase 4: Akzeptiert auch T-Stoß-Treffer einer dritten Wand auf einer Edge
- * von ow (nicht nur Endpunkt-an-Endpunkt), damit Splits auch dann ausgelöst
- * werden, wenn die dritte Wand selbst per T anschließt.
- */
-function continuesToThirdWall(scene: Scene, ow: Wall, hit: ReturnType<typeof findInteriorHit>, driver: Wall): boolean {
-  if (!hit) return false;
-  const ends = [ow.corners[0], ow.corners[ow.corners.length - 1]];
-  for (const end of ends) {
-    for (const other of scene.walls) {
-      if (other === ow || other === driver) continue;
-      if (other.corners.length < 2) continue;
-      const a = other.corners[0], b = other.corners[other.corners.length - 1];
-      if (dist(end, a) <= NODE_TOL) return true;
-      if (dist(end, b) <= NODE_TOL) return true;
-      // T-Stoß: Endpunkt von ow liegt im Inneren einer Edge von other.
-      const tHit = findInteriorHit(other, end, NODE_TOL);
-      if (tHit) return true;
-    }
-  }
-  return false;
-}
+/* continuesToThirdWall entfernt: T-Stöße splitten jetzt unbedingt. */
 
 function sameWallProps(a: Wall, b: Wall): boolean {
   return (
