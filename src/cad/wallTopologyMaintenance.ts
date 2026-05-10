@@ -56,10 +56,10 @@ function runAutoSplit(scene: Scene, focusWalls?: Wall[]): boolean {
         if (!scene.walls.includes(ow)) continue;
         const hit = findInteriorHit(ow, ep, HIT_TOL);
         if (!hit) continue;
-        // Hinter dem Treffpunkt (relativer Anteil im Polylinien-Längenraum)
-        // muss ow noch mit einer dritten Wand (≠ driver, ≠ ow) am Endpunkt
-        // zusammentreffen — sonst kein Split.
-        if (!continuesToThirdWall(scene, ow, hit, driver)) continue;
+        // Phase 4 (T-Stoß): Jeder Endpunkt-im-Inneren-Treffer splittet die
+        // getroffene Wand. Dadurch entsteht am Treffpunkt ein echter Knoten,
+        // an dem Heal+Cleanup alle drei Wände sauber mitern können —
+        // notwendige Voraussetzung u.a. für künftige mehrschichtige Wände.
         const split = scene.splitWallAt(ow, ep, MIN_SEG_LEN_M);
         if (split) {
           split[1].labelId = ow.labelId;
