@@ -142,6 +142,8 @@ function findInteriorHit(w: Wall, p: Vec2, tol: number): { edgeIndex: number; t:
 }
 
 /* continuesToThirdWall entfernt: T-Stöße splitten jetzt unbedingt. */
+
+function sameWallProps(a: Wall, b: Wall): boolean {
   return (
     a.kind === b.kind &&
     a.referenceSide === b.referenceSide &&
