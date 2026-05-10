@@ -213,11 +213,15 @@ export class SelectTool {
       }
     }
     if (bestPoint) return bestPoint;
-    // Wand-Körper (gefülltes Polygon main+sub) – Klick irgendwo in der Wand.
+    // Wand-Körper (gefülltes Polygon main+sub) – Klick irgendwo in der GEHEILTEN Wand,
+    // also auch im automatisch ergänzten Bereich bis zur Verbindung.
+    const wallGraph = this.app.scene.getWallTopology();
+    const visibleWalls = this.app.scene.walls.filter(w => this.app.labelManager.isVisible(w.labelId));
     for (let wi = this.app.scene.walls.length - 1; wi >= 0; wi--) {
       const wall = this.app.scene.walls[wi];
       if (!this.app.labelManager.isVisible(wall.labelId)) continue;
-      const lines = computeWallLines(wall.corners, wall.thicknessM, wall.referenceSide);
+      const others = visibleWalls.filter(w => w !== wall);
+      const lines = computeHealedWallLines(wall, others, wallGraph);
       const poly: Vec2[] = [...lines.mainCorners];
       for (let i = lines.subCorners.length - 1; i >= 0; i--) poly.push(lines.subCorners[i]);
       if (pointInPolygon(mouseW, poly)) {
