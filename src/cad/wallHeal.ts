@@ -110,10 +110,30 @@ function healEnd(
     }
     if (!ideal) continue;
 
-    // Gleichnamige Linien müssen sich am Stoß wirklich treffen. Eine frühere
-    // Prioritäts-Blockade schnitt sub/help an main/help des Nachbarn ab; dadurch
-    // blieben sie faktisch auf Bezugslinien-Länge. Deshalb wird hier der echte
-    // gleichnamige Schnittpunkt direkt übernommen.
+    // Phase 5: Bezugslinien (main) jeder Nachbarwand sind harte Grenzen.
+    // Sub/help dürfen nicht über eine fremde main-Linie hinausragen — sonst
+    // entstehen bei T-Stößen Überlappungen mit der bestehenden Wand.
+    if (T !== "main") {
+      const idealT = (ideal.x - origin.x) * dir.x + (ideal.y - origin.y) * dir.y;
+      const sign = idealT >= 0 ? 1 : -1;
+      let clampAbs = Math.abs(idealT);
+      let clamped: Vec2 | null = null;
+      for (const ow of candidates) {
+        if (wall.kind === "outer" && ow.kind === "inner") continue;
+        const ol = linesOf(ow);
+        const p = intersectRayWithPoly(origin, dir, ol.mainCorners);
+        if (!p) continue;
+        const tt = (p.x - origin.x) * dir.x + (p.y - origin.y) * dir.y;
+        if (Math.sign(tt) !== sign && tt !== 0) continue;
+        const a = Math.abs(tt);
+        if (a < clampAbs - 1e-9) {
+          clampAbs = a;
+          clamped = p;
+        }
+      }
+      if (clamped) ideal = clamped;
+    }
+
     polysSelf[T][idx] = ideal;
     healedAny = true;
   }
