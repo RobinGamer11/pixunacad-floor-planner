@@ -125,7 +125,10 @@ export class WallTool {
     let p = this._rawWorld(input);
     if (this.state === "drawing" && this.corners.length > 0) {
       const base = this.corners[this.corners.length - 1];
-      if (input.keys.shift) p = orthoSnapFromA(base, p);
+      // Wand-Endpunkt-Snap (Punkt auf einer Wandlinie) hat Vorrang vor Shift-Ortho,
+      // damit 90°-Anschlüsse an bestehenden Wänden trotzdem exakt verbinden.
+      const isWallPointSnap = !!(this.snap && this.snap.wallId && this.snap.type === SnapType.POINT);
+      if (input.keys.shift && !isWallPointSnap) p = orthoSnapFromA(base, p);
     }
     return p;
   }
