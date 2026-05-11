@@ -10,7 +10,7 @@ const HEAL_TOL_M = 0.05;
  * verworfen wird. Verhindert "explodierende" Verlängerungen bei sehr spitzen
  * Winkeln (Strahl ist fast parallel zum Nachbarn → Treffpunkt extrem weit).
  */
-const HEAL_MAX_DIST_M = 5.0;
+const HEAL_MAX_DIST_M = 30.0;
 type LineType = "main" | "help" | "sub";
 type WallLines = ReturnType<typeof computeWallLines>;
 
@@ -115,7 +115,6 @@ function healEnd(
     // entstehen bei T-Stößen Überlappungen mit der bestehenden Wand.
     if (T !== "main") {
       const idealT = (ideal.x - origin.x) * dir.x + (ideal.y - origin.y) * dir.y;
-      const sign = idealT >= 0 ? 1 : -1;
       let clampAbs = Math.abs(idealT);
       let clamped: Vec2 | null = null;
       for (const ow of candidates) {
@@ -123,9 +122,9 @@ function healEnd(
         const ol = linesOf(ow);
         const p = intersectRayWithPoly(origin, dir, ol.mainCorners);
         if (!p) continue;
-        const tt = (p.x - origin.x) * dir.x + (p.y - origin.y) * dir.y;
-        if (Math.sign(tt) !== sign && tt !== 0) continue;
-        const a = Math.abs(tt);
+        // Jeder Schnitt mit fremder main ist eine harte Grenze — der nächste
+        // gewinnt, unabhängig von der Strahl-Seite. Verhindert T-Stoß-Überlappungen.
+        const a = Math.abs((p.x - origin.x) * dir.x + (p.y - origin.y) * dir.y);
         if (a < clampAbs - 1e-9) {
           clampAbs = a;
           clamped = p;
