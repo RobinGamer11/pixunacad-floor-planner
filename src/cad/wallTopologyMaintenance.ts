@@ -38,37 +38,14 @@ export function runWallTopologyMaintenance(scene: Scene, focusWalls?: Wall[]): b
   return anyChange;
 }
 
-/** S4: T-Stoß-Split. Liefert true wenn mindestens ein Split passiert ist. */
-function runAutoSplit(scene: Scene, focusWalls?: Wall[]): boolean {
-  let changed = false;
-  // Snapshot, da scene.walls mutiert wird.
-  const drivers = (focusWalls ?? scene.walls).slice();
-  for (const driver of drivers) {
-    if (!scene.walls.includes(driver)) continue;
-    if (driver.corners.length < 2) continue;
-    const endpoints: Vec2[] = [
-      driver.corners[0],
-      driver.corners[driver.corners.length - 1],
-    ];
-    for (const ep of endpoints) {
-      const others = scene.walls.filter(w => w !== driver);
-      for (const ow of others) {
-        if (!scene.walls.includes(ow)) continue;
-        const hit = findInteriorHit(ow, ep, HIT_TOL);
-        if (!hit) continue;
-        // Phase 4 (T-Stoß): Jeder Endpunkt-im-Inneren-Treffer splittet die
-        // getroffene Wand. Dadurch entsteht am Treffpunkt ein echter Knoten,
-        // an dem Heal+Cleanup alle drei Wände sauber mitern können —
-        // notwendige Voraussetzung u.a. für künftige mehrschichtige Wände.
-        const split = scene.splitWallAt(ow, ep, MIN_SEG_LEN_M);
-        if (split) {
-          split[1].labelId = ow.labelId;
-          changed = true;
-        }
-      }
-    }
-  }
-  return changed;
+/**
+ * S4 (ArchiCAD-Verhalten): KEIN Auto-Split mehr. Die getroffene Wand bleibt
+ * unverändert; die neue Wand wird im Heal-Pass an die zugewandte Kante der
+ * bestehenden Wand getrimmt. Eine Wand wird nur verändert, wenn ihr eigener
+ * Endpunkt als Snap-Ziel verwendet wird.
+ */
+function runAutoSplit(_scene: Scene, _focusWalls?: Wall[]): boolean {
+  return false;
 }
 
 /** Inverse: kollineare Endpunkt-Paare ohne dritten Nachbar verschmelzen. */

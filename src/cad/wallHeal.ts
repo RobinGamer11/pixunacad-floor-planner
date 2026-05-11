@@ -110,9 +110,10 @@ function healEnd(
     }
     if (!ideal) continue;
 
-    // Phase 5: Bezugslinien (main) jeder Nachbarwand sind harte Grenzen.
-    // Sub/help dürfen nicht über eine fremde main-Linie hinausragen — sonst
-    // entstehen bei T-Stößen Überlappungen mit der bestehenden Wand.
+    // Phase 5 (ArchiCAD-Verhalten): Beide Bezugslinien (main UND sub) jeder
+    // Nachbarwand sind harte Grenzen — die neue Wand stoppt an der zugewandten
+    // Kante der bestehenden Wand. Der nächstgelegene Treffer gewinnt,
+    // unabhängig von der Strahl-Seite.
     if (T !== "main") {
       const idealT = (ideal.x - origin.x) * dir.x + (ideal.y - origin.y) * dir.y;
       let clampAbs = Math.abs(idealT);
@@ -120,14 +121,14 @@ function healEnd(
       for (const ow of candidates) {
         if (wall.kind === "outer" && ow.kind === "inner") continue;
         const ol = linesOf(ow);
-        const p = intersectRayWithPoly(origin, dir, ol.mainCorners);
-        if (!p) continue;
-        // Jeder Schnitt mit fremder main ist eine harte Grenze — der nächste
-        // gewinnt, unabhängig von der Strahl-Seite. Verhindert T-Stoß-Überlappungen.
-        const a = Math.abs((p.x - origin.x) * dir.x + (p.y - origin.y) * dir.y);
-        if (a < clampAbs - 1e-9) {
-          clampAbs = a;
-          clamped = p;
+        for (const boundary of [ol.mainCorners, ol.subCorners]) {
+          const p = intersectRayWithPoly(origin, dir, boundary);
+          if (!p) continue;
+          const a = Math.abs((p.x - origin.x) * dir.x + (p.y - origin.y) * dir.y);
+          if (a < clampAbs - 1e-9) {
+            clampAbs = a;
+            clamped = p;
+          }
         }
       }
       if (clamped) ideal = clamped;
