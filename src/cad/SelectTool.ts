@@ -1718,13 +1718,7 @@ export class SelectTool {
       }
       if (sn.world) {
         const s = cam.worldToScreen(sn.world.x, sn.world.y);
-        ctx.save();
-        ctx.fillStyle = "rgba(77,163,255,0.95)";
-        ctx.beginPath(); ctx.arc(s.x, s.y, 4.5, 0, Math.PI * 2); ctx.fill();
-        ctx.strokeStyle = "rgba(77,163,255,0.45)";
-        ctx.lineWidth = 1.5;
-        ctx.beginPath(); ctx.arc(s.x, s.y, 10, 0, Math.PI * 2); ctx.stroke();
-        ctx.restore();
+        drawSnapDot(ctx, s.x, s.y, { ring: true });
       }
       return;
     }
@@ -1743,13 +1737,7 @@ export class SelectTool {
       }
       if (sn.world) {
         const s = cam.worldToScreen(sn.world.x, sn.world.y);
-        ctx.save();
-        ctx.fillStyle = "rgba(77,163,255,0.95)";
-        ctx.beginPath(); ctx.arc(s.x, s.y, 4.5, 0, Math.PI * 2); ctx.fill();
-        ctx.strokeStyle = "rgba(77,163,255,0.45)";
-        ctx.lineWidth = 1.5;
-        ctx.beginPath(); ctx.arc(s.x, s.y, 10, 0, Math.PI * 2); ctx.stroke();
-        ctx.restore();
+        drawSnapDot(ctx, s.x, s.y, { ring: true });
       }
       return;
     }
@@ -1773,17 +1761,7 @@ export class SelectTool {
 
         if (snap && snap.world) {
           const s = cam.worldToScreen(snap.world.x, snap.world.y);
-          ctx.save();
-          ctx.fillStyle = "rgba(77,163,255,0.95)";
-          ctx.beginPath();
-          ctx.arc(s.x, s.y, 4.5, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.strokeStyle = "rgba(77,163,255,0.45)";
-          ctx.lineWidth = 1.5;
-          ctx.beginPath();
-          ctx.arc(s.x, s.y, 10, 0, Math.PI * 2);
-          ctx.stroke();
-          ctx.restore();
+          drawSnapDot(ctx, s.x, s.y, { ring: true });
         }
       }
       return;
@@ -1807,16 +1785,6 @@ export class SelectTool {
     }
 
     const s = cam.worldToScreen(this.snap.world.x, this.snap.world.y);
-    ctx.save();
-    ctx.fillStyle = "rgba(77,163,255,0.95)";
-    ctx.beginPath();
-    ctx.arc(s.x, s.y, 4.5, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = "rgba(77,163,255,0.45)";
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.arc(s.x, s.y, 10, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.restore();
+    drawSnapDot(ctx, s.x, s.y, { ring: true });
   }
 }
