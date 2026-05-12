@@ -1,3 +1,4 @@
+import { drawSnapDot } from "./snapDraw";
 import { Defaults, SnapType, SelectionType, PointEditAction } from "./constants";
 import { Vec2, v, sub, add, mul, dot, dist, angleDeg, pointFromLengthAngle, projectPointToSegment, orthoSnapFromA, nearestAngleToReference, pointInPolygon, pointInHatchSolid, polygonCentroid, projectPointToInfiniteLine, lineLineIntersectionInfinite, norm, perpLeft, len } from "./geometry";
 import type { CadApp } from "./CadApp";

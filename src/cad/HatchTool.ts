@@ -1,3 +1,4 @@
+import { drawSnapDot } from "./snapDraw";
 import { Defaults, SnapType } from "./constants";
 import {
   Vec2, v, add, sub, mul, norm, dot, dist, angleDeg, pointFromLengthAngle,

@@ -1,3 +1,4 @@
+import { drawSnapDot } from "./snapDraw";
 import { Defaults, SelectionType, ToolIds } from "./constants";
 import { Vec2, v } from "./geometry";
 import type { CadApp } from "./CadApp";

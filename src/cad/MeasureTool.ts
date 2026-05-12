@@ -1,3 +1,4 @@
+import { drawSnapDot } from "./snapDraw";
 import { Defaults, SnapType } from "./constants";
 import { Vec2, v, sub, norm, len, dist, projectPointToSegment } from "./geometry";
 import type { CadApp } from "./CadApp";
