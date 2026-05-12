@@ -3,6 +3,7 @@ import { clamp, v, Vec2 } from "./geometry";
 import { Camera } from "./Camera";
 import { Input } from "./Input";
 import { Scene, AreaLabel, DimensionStyle, TextBoxStyle, TextBox } from "./Scene";
+import { autoSizeTextBox } from "./textAutoSize";
 import { LabelManager } from "./LabelManager";
 import { TopologyEngine } from "./TopologyEngine";
 import { Renderer, Selection } from "./Renderer";
@@ -1307,7 +1308,7 @@ export class CadApp {
       if (!Number.isFinite(v) || v <= 0) return;
       v = clamp(v, 6, 200);
       const sel = this.getSelectedTextBox();
-      if (sel) sel.style.fontSizePx = v;
+      if (sel) { sel.style.fontSizePx = v; autoSizeTextBox(sel); }
       else this.defaultTextFontSizePx = v;
     });
     r.fontSize.addEventListener("blur", () => this._syncTextSettingsFromContext());
@@ -1341,7 +1342,7 @@ export class CadApp {
 
     r.wrapToggle.addEventListener("change", () => {
       const sel = this.getSelectedTextBox();
-      if (sel) sel.style.wrap = !!r.wrapToggle.checked;
+      if (sel) { sel.style.wrap = !!r.wrapToggle.checked; autoSizeTextBox(sel); }
       else this.defaultTextWrap = !!r.wrapToggle.checked;
     });
 
