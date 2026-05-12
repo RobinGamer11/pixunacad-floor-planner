@@ -3,6 +3,7 @@ import { clamp, v, Vec2 } from "./geometry";
 import { Camera } from "./Camera";
 import { Input } from "./Input";
 import { Scene, AreaLabel, DimensionStyle, TextBoxStyle, TextBox } from "./Scene";
+import { autoSizeTextBox } from "./textAutoSize";
 import { LabelManager } from "./LabelManager";
 import { TopologyEngine } from "./TopologyEngine";
 import { Renderer, Selection } from "./Renderer";
@@ -1307,7 +1308,7 @@ export class CadApp {
       if (!Number.isFinite(v) || v <= 0) return;
       v = clamp(v, 6, 200);
       const sel = this.getSelectedTextBox();
-      if (sel) sel.style.fontSizePx = v;
+      if (sel) { sel.style.fontSizePx = v; autoSizeTextBox(sel); }
       else this.defaultTextFontSizePx = v;
     });
     r.fontSize.addEventListener("blur", () => this._syncTextSettingsFromContext());
@@ -1341,7 +1342,7 @@ export class CadApp {
 
     r.wrapToggle.addEventListener("change", () => {
       const sel = this.getSelectedTextBox();
-      if (sel) sel.style.wrap = !!r.wrapToggle.checked;
+      if (sel) { sel.style.wrap = !!r.wrapToggle.checked; autoSizeTextBox(sel); }
       else this.defaultTextWrap = !!r.wrapToggle.checked;
     });
 
@@ -1514,8 +1515,15 @@ export class CadApp {
     });
     this.hatchAlphaInput.addEventListener("blur", () => this._syncHatchSettingsFromContext());
     this.areaShowInput.addEventListener("change", () => {
+      const checked = !!this.areaShowInput.checked;
       const sel = this.getSelectedHatch();
-      if (sel) sel.areaLabel.show = !!this.areaShowInput.checked;
+      if (sel) sel.areaLabel.show = checked;
+      // Also persist as default so newly-drawn hatches inherit the setting,
+      // and apply to ALL hatches if no specific selection (so the toggle is
+      // never a no-op when the user hits it without a selected hatch).
+      else {
+        for (const h of this.scene.hatches) h.areaLabel.show = checked;
+      }
       this._syncHatchSettingsFromContext();
     });
     this.areaTextColorInput.addEventListener("input", () => {

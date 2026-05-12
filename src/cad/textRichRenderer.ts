@@ -297,3 +297,38 @@ export function drawRichTextBox(opts: DrawTextBoxOptions) {
 
   ctx.restore();
 }
+
+/** Scratch canvas for offline text measurement (independent of camera). */
+const _measureCanvas = (typeof document !== "undefined") ? document.createElement("canvas") : null;
+const _measureCtx = _measureCanvas ? _measureCanvas.getContext("2d") : null;
+
+/**
+ * Measures the natural pixel size of a text-box's content given the current
+ * style. Used for auto-grow:
+ *  - wrap=true:  caller passes the desired widthPx; height grows.
+ *  - wrap=false: caller passes Infinity for widthPx; both width & height grow.
+ *
+ * Returns {widthPx, heightPx} INCLUDING padding on all sides.
+ */
+export function measureTextBoxContent(
+  html: string,
+  baseFontSizePx: number,
+  maxInnerWidthPx: number,
+  wrap: boolean,
+  paddingPx: number,
+): { widthPx: number; heightPx: number } {
+  if (!_measureCtx) return { widthPx: 0, heightPx: 0 };
+  const runs = htmlToRuns(html || "");
+  const lines = layoutLines(_measureCtx, runs, baseFontSizePx, "#000", maxInnerWidthPx, wrap);
+  let maxLineW = 0;
+  let totalH = 0;
+  for (const line of lines) {
+    if (line.width > maxLineW) maxLineW = line.width;
+    totalH += line.height;
+  }
+  return {
+    widthPx: maxLineW + paddingPx * 2,
+    heightPx: totalH + paddingPx * 2,
+  };
+}
+
