@@ -159,17 +159,7 @@ export class TextTool {
     // Snap indicator
     if (this.hoverSnapWorld) {
       const s = cam.worldToScreen(this.hoverSnapWorld.x, this.hoverSnapWorld.y);
-      ctx.save();
-      ctx.fillStyle = "rgba(77,163,255,0.95)";
-      ctx.beginPath();
-      ctx.arc(s.x, s.y, 4.5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = "rgba(77,163,255,0.45)";
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.arc(s.x, s.y, 10, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
+      drawSnapDot(ctx, s.x, s.y, { ring: true });
     }
 
     // Preview rectangle at anchor (top-left = anchor, default size, no rotation).
