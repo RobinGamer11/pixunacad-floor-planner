@@ -1184,7 +1184,7 @@ export class CadApp {
       strokeWidthPx: this.defaultHatchStrokeWidthPx,
       labelId: this.activeDrawLabelId || Defaults.defaultLabelId,
       areaLabel: {
-        show: false, textColor: Defaults.areaTextColor, fontSizePx: Defaults.areaFontSizePx,
+        show: this.defaultAreaShow, textColor: Defaults.areaTextColor, fontSizePx: Defaults.areaFontSizePx,
         bgColor: Defaults.areaBgColor, bgAlphaPct: Defaults.areaBgAlphaPct, offsetX: 0, offsetY: 0,
       } as Partial<AreaLabel>,
     };
