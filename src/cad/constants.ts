@@ -54,7 +54,7 @@ export const Defaults = {
   textAlign: "left" as "left" | "center" | "right",
   textBorderEnabled: false,
   textBorderColor: "#111111",
-  textBorderWidthPx: 1.5,
+  textBorderWidthPx: 1,
   textBoxWidthM: 2.6,
   textBoxHeightM: 0.6,
   textMinBoxSizeM: 0.05,
