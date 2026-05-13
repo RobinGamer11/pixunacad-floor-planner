@@ -17,7 +17,7 @@ export const Defaults = {
   // Hatch defaults
   hatchFillColor: "#4da3ff",
   hatchStrokeColor: "#111111",
-  hatchStrokePx: 2.2,
+  hatchStrokePx: 1,
   hatchFillAlphaPct: 35,
   strokeWidthBaseScale: 80,
 
