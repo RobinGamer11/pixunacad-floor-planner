@@ -1517,12 +1517,13 @@ export class CadApp {
     this.hatchAlphaInput.addEventListener("blur", () => this._syncHatchSettingsFromContext());
     this.areaShowInput.addEventListener("change", () => {
       const checked = !!this.areaShowInput.checked;
+      // Persist als Default für neue Schraffuren
+      this.defaultAreaShow = checked;
       const sel = this.getSelectedHatch();
-      if (sel) sel.areaLabel.show = checked;
-      // Also persist as default so newly-drawn hatches inherit the setting,
-      // and apply to ALL hatches if no specific selection (so the toggle is
-      // never a no-op when the user hits it without a selected hatch).
-      else {
+      if (sel) {
+        sel.areaLabel.show = checked;
+      } else {
+        // Keine Auswahl → auf alle bestehenden Schraffuren anwenden
         for (const h of this.scene.hatches) h.areaLabel.show = checked;
       }
       this._syncHatchSettingsFromContext();
