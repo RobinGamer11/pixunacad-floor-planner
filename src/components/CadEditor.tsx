@@ -687,7 +687,7 @@ const CadEditor: React.FC = () => {
               </div>
               <div>
                 <label>Polyliniendicke</label>
-                <input ref={hatchStrokeWidthRef} type="text" defaultValue="2.2" />
+                <input ref={hatchStrokeWidthRef} type="text" defaultValue="1" />
               </div>
               <div>
                 <label>Transparenz (0–100%)</label>

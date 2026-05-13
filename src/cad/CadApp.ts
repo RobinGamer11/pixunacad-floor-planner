@@ -143,6 +143,7 @@ export class CadApp {
   defaultHatchStrokeColor = Defaults.hatchStrokeColor;
   defaultHatchStrokeWidthPx = Defaults.hatchStrokePx;
   defaultHatchFillAlphaPct = Defaults.hatchFillAlphaPct;
+  defaultAreaShow = Defaults.areaShow;
 
   defaultTextColor = Defaults.textColor;
   defaultTextFontSizePx = Defaults.textFontSizePx;
@@ -1183,7 +1184,7 @@ export class CadApp {
       strokeWidthPx: this.defaultHatchStrokeWidthPx,
       labelId: this.activeDrawLabelId || Defaults.defaultLabelId,
       areaLabel: {
-        show: false, textColor: Defaults.areaTextColor, fontSizePx: Defaults.areaFontSizePx,
+        show: this.defaultAreaShow, textColor: Defaults.areaTextColor, fontSizePx: Defaults.areaFontSizePx,
         bgColor: Defaults.areaBgColor, bgAlphaPct: Defaults.areaBgAlphaPct, offsetX: 0, offsetY: 0,
       } as Partial<AreaLabel>,
     };
@@ -1516,12 +1517,13 @@ export class CadApp {
     this.hatchAlphaInput.addEventListener("blur", () => this._syncHatchSettingsFromContext());
     this.areaShowInput.addEventListener("change", () => {
       const checked = !!this.areaShowInput.checked;
+      // Persist als Default für neue Schraffuren
+      this.defaultAreaShow = checked;
       const sel = this.getSelectedHatch();
-      if (sel) sel.areaLabel.show = checked;
-      // Also persist as default so newly-drawn hatches inherit the setting,
-      // and apply to ALL hatches if no specific selection (so the toggle is
-      // never a no-op when the user hits it without a selected hatch).
-      else {
+      if (sel) {
+        sel.areaLabel.show = checked;
+      } else {
+        // Keine Auswahl → auf alle bestehenden Schraffuren anwenden
         for (const h of this.scene.hatches) h.areaLabel.show = checked;
       }
       this._syncHatchSettingsFromContext();

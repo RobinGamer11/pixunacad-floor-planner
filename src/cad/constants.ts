@@ -17,7 +17,7 @@ export const Defaults = {
   // Hatch defaults
   hatchFillColor: "#4da3ff",
   hatchStrokeColor: "#111111",
-  hatchStrokePx: 2.2,
+  hatchStrokePx: 1,
   hatchFillAlphaPct: 35,
   strokeWidthBaseScale: 80,
 
@@ -54,7 +54,7 @@ export const Defaults = {
   textAlign: "left" as "left" | "center" | "right",
   textBorderEnabled: false,
   textBorderColor: "#111111",
-  textBorderWidthPx: 1.5,
+  textBorderWidthPx: 1,
   textBoxWidthM: 2.6,
   textBoxHeightM: 0.6,
   textMinBoxSizeM: 0.05,
