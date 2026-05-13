@@ -1596,6 +1596,17 @@ export class SelectTool {
         }
       }
 
+      // Fangpunkte (Hatch-/Segment-Eckpunkte) immer vor Kanten priorisieren.
+      {
+        const pointHit = this._hitTestWithForegroundPriority(input);
+        if (pointHit && pointHit.type === SelectionType.POINT) {
+          this.app.setSelection(pointHit);
+          if ((pointHit as any).segmentId) this.app.showLineSettingsPanel(true);
+          if ((pointHit as any).hatchId) this.app.showHatchSettingsPanel(true);
+          return;
+        }
+      }
+
       {
         const edgeHit = this._hitTestHatchEdge(input);
         if (edgeHit) {
