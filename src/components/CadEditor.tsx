@@ -694,8 +694,8 @@ const CadEditor: React.FC = () => {
                 <input ref={hatchAlphaRef} type="text" defaultValue="35" />
               </div>
               <div className="flex items-center gap-2 mt-1">
-                <input ref={areaShowRef} type="checkbox" className="accent-primary" />
-                <label className="!mb-0 cursor-pointer">Flächenanzeige</label>
+                <input ref={areaShowRef} type="checkbox" id="cad-area-show" className="w-4 h-4 cursor-pointer accent-primary" style={{ accentColor: "hsl(var(--primary))" }} />
+                <label htmlFor="cad-area-show" className="!mb-0 cursor-pointer select-none">Flächenanzeige</label>
               </div>
               <div ref={areaSettingsGroupRef} className="hidden mt-2 pt-2 space-y-2" style={{ borderTop: "1px solid hsl(var(--border))" }}>
                 <div>
