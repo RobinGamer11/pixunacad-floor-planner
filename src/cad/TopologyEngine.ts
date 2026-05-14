@@ -270,7 +270,7 @@ export class TopologyEngine {
     return best;
   }
 
-  findBestSnapExcludingHatch(mouseS: Vec2, mouseW: Vec2, excludedHatchId: string, excludedPointIndex?: number): Snap | null {
+  findBestSnapExcludingHatch(mouseS: Vec2, mouseW: Vec2, excludedHatchId: string, excludedPointIndex?: number, excludeAllPoints?: boolean): Snap | null {
     let best: Snap | null = null;
     let bestScore = Infinity;
 
