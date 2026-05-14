@@ -31,6 +31,9 @@ export interface AreaLabel {
   bgAlphaPct: number;
   offsetX: number;
   offsetY: number;
+  borderEnabled: boolean;
+  borderColor: string;
+  borderWidthPx: number;
 }
 
 export class Hatch {
