@@ -1536,7 +1536,7 @@ export class CadApp {
     this.areaFontSizeInput.addEventListener("input", () => {
       let v = parseFloat((this.areaFontSizeInput.value || "").replace(",", "."));
       if (!Number.isFinite(v) || v <= 0) return;
-      v = clamp(v, 8, 72);
+      v = clamp(v, 6, 72);
       const sel = this.getSelectedHatch();
       if (sel) sel.areaLabel.fontSizePx = v;
     });
