@@ -304,6 +304,7 @@ export class TopologyEngine {
     // Hatches: andere Hatches voll snappen; das excluded Hatch nur an Punkten ungleich dem editierten.
     for (const hatch of this.scene.hatches) {
       if (hatch.id === excludedHatchId) {
+        if (excludeAllPoints) continue; // Translate/Rotate des ganzen Hatches: keine Selbst-Snaps
         for (let i = 0; i < hatch.points.length; i++) {
           if (excludedPointIndex != null && i === excludedPointIndex) continue;
           considerPoint(hatch.points[i], null, hatch, i);
