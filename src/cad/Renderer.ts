@@ -1018,12 +1018,14 @@ export class Renderer {
 
     ctx.save();
     ctx.fillStyle = bg;
-    ctx.strokeStyle = "rgba(0,0,0,0.18)";
-    ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.rect(layout.rect.x, layout.rect.y, layout.rect.w, layout.rect.h);
     ctx.fill();
-    ctx.stroke();
+    if (hatch.areaLabel.borderEnabled) {
+      ctx.strokeStyle = hatch.areaLabel.borderColor || Defaults.areaBorderColor;
+      ctx.lineWidth = Math.max(0.5, (hatch.areaLabel.borderWidthPx ?? Defaults.areaBorderWidthPx));
+      ctx.stroke();
+    }
 
     ctx.fillStyle = textColor;
     ctx.font = `${layout.fontSizePx}px system-ui, Arial, sans-serif`;
