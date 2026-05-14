@@ -1115,11 +1115,19 @@ export class SelectTool {
         this.editTarget.segmentId
       );
     } else if (this.editTarget.kind === "hatch") {
+      // Bei TRANSLATE/ROTATE bewegen sich ALLE Punkte des Hatches mit –
+      // ohne Self-Exclude würde das Snap-System auf andere Punkte derselben
+      // Schraffur einrasten und beim Verschieben (insb. Kreis-Hatches mit
+      // 96 Stützpunkten) ein Pendeln/Driften erzeugen.
+      const excludeAll =
+        this.activeEditAction === PointEditAction.TRANSLATE ||
+        this.activeEditAction === PointEditAction.ROTATE;
       topoSnap = this.app.topology.findBestSnapExcludingHatch(
         v(input.mouse.sx, input.mouse.sy),
         v(input.mouse.wx, input.mouse.wy),
         this.editTarget.hatchId,
-        this.editTarget.pointIndex
+        this.editTarget.pointIndex,
+        excludeAll
       );
     } else {
       topoSnap = this.app.topology.findBestSnap(
