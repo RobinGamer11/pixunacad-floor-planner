@@ -144,6 +144,9 @@ export class CadApp {
   defaultHatchStrokeWidthPx = Defaults.hatchStrokePx;
   defaultHatchFillAlphaPct = Defaults.hatchFillAlphaPct;
   defaultAreaShow = Defaults.areaShow;
+  defaultAreaBorderEnabled = Defaults.areaBorderEnabled;
+  defaultAreaBorderColor = Defaults.areaBorderColor;
+  defaultAreaBorderWidthPx = Defaults.areaBorderWidthPx;
 
   defaultTextColor = Defaults.textColor;
   defaultTextFontSizePx = Defaults.textFontSizePx;
