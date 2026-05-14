@@ -693,9 +693,16 @@ const CadEditor: React.FC = () => {
                 <label>Transparenz (0–100%)</label>
                 <input ref={hatchAlphaRef} type="text" defaultValue="35" />
               </div>
-              <div className="flex items-center gap-2 mt-1">
-                <input ref={areaShowRef} type="checkbox" id="cad-area-show" className="w-4 h-4 cursor-pointer accent-primary" style={{ accentColor: "hsl(var(--primary))" }} />
+              <div className="flex items-center justify-between gap-2 mt-1">
                 <label htmlFor="cad-area-show" className="!mb-0 cursor-pointer select-none">Flächenanzeige</label>
+                <label htmlFor="cad-area-show" className="relative inline-flex items-center cursor-pointer">
+                  <input ref={areaShowRef} type="checkbox" id="cad-area-show" className="sr-only peer" />
+                  <span
+                    className="w-9 h-5 rounded-full transition-colors peer-checked:bg-primary"
+                    style={{ background: "hsl(var(--muted))" }}
+                  />
+                  <span className="pointer-events-none absolute left-0.5 top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform peer-checked:translate-x-4" />
+                </label>
               </div>
               <div ref={areaSettingsGroupRef} className="hidden mt-2 pt-2 space-y-2" style={{ borderTop: "1px solid hsl(var(--border))" }}>
                 <div>
@@ -707,7 +714,7 @@ const CadEditor: React.FC = () => {
                 </div>
                 <div>
                   <label>Textgröße</label>
-                  <input ref={areaFontSizeRef} type="text" defaultValue="16" />
+                  <input ref={areaFontSizeRef} type="text" defaultValue="10" />
                 </div>
                 <div>
                   <label>Hintergrundfarbe</label>
@@ -719,6 +726,30 @@ const CadEditor: React.FC = () => {
                 <div>
                   <label>HG-Transparenz (0–100%)</label>
                   <input ref={areaBgAlphaRef} type="text" defaultValue="72" />
+                </div>
+                <div className="flex items-center justify-between gap-2 pt-1">
+                  <label htmlFor="cad-area-border" className="!mb-0 cursor-pointer select-none">Rahmen</label>
+                  <label htmlFor="cad-area-border" className="relative inline-flex items-center cursor-pointer">
+                    <input id="cad-area-border" data-area-border type="checkbox" className="sr-only peer" />
+                    <span
+                      className="w-9 h-5 rounded-full transition-colors peer-checked:bg-primary"
+                      style={{ background: "hsl(var(--muted))" }}
+                    />
+                    <span className="pointer-events-none absolute left-0.5 top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform peer-checked:translate-x-4" />
+                  </label>
+                </div>
+                <div data-area-border-group className="hidden space-y-2">
+                  <div>
+                    <label>Rahmenfarbe</label>
+                    <div className="flex items-center gap-2">
+                      <div data-area-border-preview className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))" }} />
+                      <input data-area-border-color type="color" defaultValue="#111111" className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
+                    </div>
+                  </div>
+                  <div>
+                    <label>Rahmenstärke (px)</label>
+                    <input data-area-border-width type="text" defaultValue="1" />
+                  </div>
                 </div>
                </div>
              </div>

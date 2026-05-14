@@ -144,6 +144,9 @@ export class CadApp {
   defaultHatchStrokeWidthPx = Defaults.hatchStrokePx;
   defaultHatchFillAlphaPct = Defaults.hatchFillAlphaPct;
   defaultAreaShow = Defaults.areaShow;
+  defaultAreaBorderEnabled = Defaults.areaBorderEnabled;
+  defaultAreaBorderColor = Defaults.areaBorderColor;
+  defaultAreaBorderWidthPx = Defaults.areaBorderWidthPx;
 
   defaultTextColor = Defaults.textColor;
   defaultTextFontSizePx = Defaults.textFontSizePx;
@@ -1536,7 +1539,7 @@ export class CadApp {
     this.areaFontSizeInput.addEventListener("input", () => {
       let v = parseFloat((this.areaFontSizeInput.value || "").replace(",", "."));
       if (!Number.isFinite(v) || v <= 0) return;
-      v = clamp(v, 8, 72);
+      v = clamp(v, 6, 72);
       const sel = this.getSelectedHatch();
       if (sel) sel.areaLabel.fontSizePx = v;
     });
@@ -1554,6 +1557,51 @@ export class CadApp {
       if (sel) sel.areaLabel.bgAlphaPct = v;
     });
     this.areaBgAlphaInput.addEventListener("blur", () => this._syncHatchSettingsFromContext());
+
+    // Border (Rahmen) für Flächenanzeige
+    const borderToggle = document.getElementById("cad-area-border") as HTMLInputElement | null;
+    const borderColor = document.querySelector<HTMLInputElement>("[data-area-border-color]");
+    const borderWidth = document.querySelector<HTMLInputElement>("[data-area-border-width]");
+    const borderPreview = document.querySelector<HTMLDivElement>("[data-area-border-preview]");
+    const borderGroup = document.querySelector<HTMLDivElement>("[data-area-border-group]");
+    const syncBorderUI = () => {
+      const sel = this.getSelectedHatch();
+      const enabled = sel ? !!sel.areaLabel.borderEnabled : this.defaultAreaBorderEnabled;
+      const col = sel ? sel.areaLabel.borderColor : this.defaultAreaBorderColor;
+      const wpx = sel ? sel.areaLabel.borderWidthPx : this.defaultAreaBorderWidthPx;
+      if (borderToggle) borderToggle.checked = enabled;
+      if (borderGroup) borderGroup.classList.toggle("hidden", !enabled);
+      if (borderColor) borderColor.value = this._toHexColor(col);
+      if (borderPreview) borderPreview.style.background = this._toHexColor(col);
+      if (borderWidth) borderWidth.value = String(wpx);
+    };
+    borderToggle?.addEventListener("change", () => {
+      const checked = !!borderToggle.checked;
+      this.defaultAreaBorderEnabled = checked;
+      const sel = this.getSelectedHatch();
+      if (sel) sel.areaLabel.borderEnabled = checked;
+      else for (const h of this.scene.hatches) h.areaLabel.borderEnabled = checked;
+      syncBorderUI();
+    });
+    borderColor?.addEventListener("input", () => {
+      const c = borderColor.value;
+      this.defaultAreaBorderColor = c;
+      const sel = this.getSelectedHatch();
+      if (sel) sel.areaLabel.borderColor = c;
+      if (borderPreview) borderPreview.style.background = c;
+    });
+    borderWidth?.addEventListener("input", () => {
+      let w = parseFloat((borderWidth.value || "").replace(",", "."));
+      if (!Number.isFinite(w)) return;
+      w = clamp(w, 0, 20);
+      this.defaultAreaBorderWidthPx = w;
+      const sel = this.getSelectedHatch();
+      if (sel) sel.areaLabel.borderWidthPx = w;
+    });
+    // Hook in den bestehenden Sync-Pfad: nach jedem _syncHatchSettingsFromContext aktualisieren
+    const origSync = this._syncHatchSettingsFromContext.bind(this);
+    this._syncHatchSettingsFromContext = () => { origSync(); syncBorderUI(); };
+
     this._syncHatchSettingsFromContext();
   }
 

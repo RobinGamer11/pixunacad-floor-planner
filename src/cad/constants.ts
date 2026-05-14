@@ -24,9 +24,12 @@ export const Defaults = {
   // Area label defaults
   areaShow: false,
   areaTextColor: "#000000",
-  areaFontSizePx: 16,
+  areaFontSizePx: 10,
   areaBgColor: "#ffffff",
   areaBgAlphaPct: 72,
+  areaBorderEnabled: false,
+  areaBorderColor: "#111111",
+  areaBorderWidthPx: 1,
 
   // Measure (dimension) defaults
   measureOrientation: "parallel" as "parallel" | "diagonal",

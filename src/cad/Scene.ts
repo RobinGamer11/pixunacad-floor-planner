@@ -31,6 +31,9 @@ export interface AreaLabel {
   bgAlphaPct: number;
   offsetX: number;
   offsetY: number;
+  borderEnabled: boolean;
+  borderColor: string;
+  borderWidthPx: number;
 }
 
 export class Hatch {
@@ -61,11 +64,14 @@ export class Hatch {
     this.areaLabel = {
       show: !!(areaLabel?.show ?? Defaults.areaShow),
       textColor: areaLabel?.textColor || Defaults.areaTextColor,
-      fontSizePx: clamp(areaLabel?.fontSizePx ?? Defaults.areaFontSizePx, 8, 72),
+      fontSizePx: clamp(areaLabel?.fontSizePx ?? Defaults.areaFontSizePx, 6, 72),
       bgColor: areaLabel?.bgColor || Defaults.areaBgColor,
       bgAlphaPct: clamp(areaLabel?.bgAlphaPct ?? Defaults.areaBgAlphaPct, 0, 100),
       offsetX: Number.isFinite(areaLabel?.offsetX) ? areaLabel!.offsetX! : 0,
       offsetY: Number.isFinite(areaLabel?.offsetY) ? areaLabel!.offsetY! : 0,
+      borderEnabled: !!(areaLabel?.borderEnabled ?? Defaults.areaBorderEnabled),
+      borderColor: areaLabel?.borderColor || Defaults.areaBorderColor,
+      borderWidthPx: clamp(areaLabel?.borderWidthPx ?? Defaults.areaBorderWidthPx, 0, 20),
     };
     this._stickerEditOwnerId = null;
   }
