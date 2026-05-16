@@ -99,6 +99,11 @@ export class SelectTool {
   rotateTextBoxStartAngle = 0; // initial mouse angle (rad) at rotate-begin
   rotateTextBoxOriginalRot = 0; // box.rotationRad at rotate-begin
 
+  // AreaLabel Drag-State (Verschieben der m²-Box innerhalb einer Schraffur)
+  dragAreaLabelHatchId: string | null = null;
+  dragAreaLabelGrabOffsetWorld: Vec2 | null = null; // mouse - labelCenterWorld at drag-start
+  dragAreaLabelStartOffset: Vec2 | null = null;     // hatch.areaLabel.offsetX/Y at drag-start
+
   // Hilfslinien-Anker während aktivem Punkt-Edit (per Rechtsklick auf Snap-Punkte gesetzt).
   // Erzeugen vertikale + horizontale Hilfslinien durch jeden Anker, deren Schnittpunkte und Achsen snappen.
   editGuideAnchors: { key: string; point: Vec2 }[] = [];
