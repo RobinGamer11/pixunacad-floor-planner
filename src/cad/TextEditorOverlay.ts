@@ -1,4 +1,5 @@
 import { Defaults } from "./constants";
+import { autoSizeTextBox } from "./textAutoSize";
 import type { CadApp } from "./CadApp";
 import type { TextBox } from "./Scene";
 import { rgbaFromHex } from "./geometry";
