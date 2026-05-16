@@ -136,6 +136,9 @@ export class SelectTool {
     this.dragTextBoxGrabOffset = null;
     this.dragTextBoxSnap = null;
     this.rotateTextBoxId = null;
+    this.dragAreaLabelHatchId = null;
+    this.dragAreaLabelGrabOffsetWorld = null;
+    this.dragAreaLabelStartOffset = null;
   }
 
   /** Welt-Position des Rotate-Handles über der Top-Edge-Mitte einer TextBox. */
