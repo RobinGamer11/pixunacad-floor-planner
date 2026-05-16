@@ -268,6 +268,10 @@ export class TextEditorOverlay {
     box.heightM = newHeightM;
     box.center = { x: tlX + newWidthM / 2, y: tlY + newHeightM / 2 } as any;
 
+    // 4) Reconcile with canvas-renderer measurement (independent of camera zoom)
+    //    so the placed box adapts to text exactly as it will be drawn.
+    autoSizeTextBox(box);
+
     this.hide();
   }
 
