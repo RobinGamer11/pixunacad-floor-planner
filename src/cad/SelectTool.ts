@@ -1585,6 +1585,30 @@ export class SelectTool {
         }
       }
 
+      // AreaLabel (m²-Anzeige) der selektierten Schraffur → ziehen zum Verschieben.
+      // Hit-Test gegen das Screen-Rect der Label-Box.
+      {
+        const sel = this.app.selection;
+        const selHatchId = sel && (sel as any).hatchId ? (sel as any).hatchId as string : null;
+        if (selHatchId) {
+          const hatch = this.app.scene.getHatchById(selHatchId);
+          if (hatch && hatch.areaLabel?.show) {
+            const layout = (this.app.renderer as any)._getAreaLabelLayout(hatch);
+            if (layout) {
+              const sx = input.mouse.sx, sy = input.mouse.sy;
+              const r = layout.rect;
+              if (sx >= r.x && sx <= r.x + r.w && sy >= r.y && sy <= r.y + r.h) {
+                const mouseW = v(input.mouse.wx, input.mouse.wy);
+                this.dragAreaLabelHatchId = hatch.id;
+                this.dragAreaLabelGrabOffsetWorld = { x: mouseW.x - layout.centerWorld.x, y: mouseW.y - layout.centerWorld.y };
+                this.dragAreaLabelStartOffset = { x: hatch.areaLabel.offsetX || 0, y: hatch.areaLabel.offsetY || 0 };
+                return;
+              }
+            }
+          }
+        }
+      }
+
       // TextBox-Eckpunkt der bereits selektierten TextBox? → Hub-Menü (Move/Translate/Rotate)
       const cornerHit = this._hitTextBoxCornerHandle(input);
       if (cornerHit) {
