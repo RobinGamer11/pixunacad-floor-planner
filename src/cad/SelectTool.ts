@@ -99,6 +99,11 @@ export class SelectTool {
   rotateTextBoxStartAngle = 0; // initial mouse angle (rad) at rotate-begin
   rotateTextBoxOriginalRot = 0; // box.rotationRad at rotate-begin
 
+  // AreaLabel Drag-State (Verschieben der m²-Box innerhalb einer Schraffur)
+  dragAreaLabelHatchId: string | null = null;
+  dragAreaLabelGrabOffsetWorld: Vec2 | null = null; // mouse - labelCenterWorld at drag-start
+  dragAreaLabelStartOffset: Vec2 | null = null;     // hatch.areaLabel.offsetX/Y at drag-start
+
   // Hilfslinien-Anker während aktivem Punkt-Edit (per Rechtsklick auf Snap-Punkte gesetzt).
   // Erzeugen vertikale + horizontale Hilfslinien durch jeden Anker, deren Schnittpunkte und Achsen snappen.
   editGuideAnchors: { key: string; point: Vec2 }[] = [];
@@ -131,6 +136,9 @@ export class SelectTool {
     this.dragTextBoxGrabOffset = null;
     this.dragTextBoxSnap = null;
     this.rotateTextBoxId = null;
+    this.dragAreaLabelHatchId = null;
+    this.dragAreaLabelGrabOffsetWorld = null;
+    this.dragAreaLabelStartOffset = null;
   }
 
   /** Welt-Position des Rotate-Handles über der Top-Edge-Mitte einer TextBox. */
@@ -1286,6 +1294,34 @@ export class SelectTool {
     }
 
     // Active textbox drag (translate) with snap
+    // Active area-label drag (verschieben der m²-Anzeige innerhalb einer Schraffur)
+    if (this.dragAreaLabelHatchId) {
+      const hatch = this.app.scene.getHatchById(this.dragAreaLabelHatchId);
+      if (!hatch || !this.dragAreaLabelGrabOffsetWorld || !this.dragAreaLabelStartOffset) {
+        this.dragAreaLabelHatchId = null;
+        this.dragAreaLabelGrabOffsetWorld = null;
+        this.dragAreaLabelStartOffset = null;
+      } else {
+        const mouseW = v(input.mouse.wx, input.mouse.wy);
+        const snap = this.app.topology.findBestSnap(
+          v(input.mouse.sx, input.mouse.sy),
+          mouseW
+        );
+        const target = (snap && snap.world) ? snap.world : mouseW;
+        // New label center should be: target - grabOffset
+        // Convert to offset relative to polygon centroid:
+        const centroid = polygonCentroid(hatch.points);
+        hatch.areaLabel.offsetX = (target.x - this.dragAreaLabelGrabOffsetWorld.x) - centroid.x;
+        hatch.areaLabel.offsetY = (target.y - this.dragAreaLabelGrabOffsetWorld.y) - centroid.y;
+        if (!input.mouse.left) {
+          this.dragAreaLabelHatchId = null;
+          this.dragAreaLabelGrabOffsetWorld = null;
+          this.dragAreaLabelStartOffset = null;
+        }
+        return;
+      }
+    }
+
     if (this.dragTextBoxId) {
       const box = this.app.scene.getTextBoxById(this.dragTextBoxId);
       if (!box || !this.dragTextBoxGrabOffset) {
@@ -1546,6 +1582,30 @@ export class SelectTool {
           this.dragStickerGrabOffset = { x: mouseW0.x - stickerHit.position.x, y: mouseW0.y - stickerHit.position.y };
           this.dragStickerSnap = null;
           return;
+        }
+      }
+
+      // AreaLabel (m²-Anzeige) der selektierten Schraffur → ziehen zum Verschieben.
+      // Hit-Test gegen das Screen-Rect der Label-Box.
+      {
+        const sel = this.app.selection;
+        const selHatchId = sel && (sel as any).hatchId ? (sel as any).hatchId as string : null;
+        if (selHatchId) {
+          const hatch = this.app.scene.getHatchById(selHatchId);
+          if (hatch && hatch.areaLabel?.show) {
+            const layout = (this.app.renderer as any)._getAreaLabelLayout(hatch);
+            if (layout) {
+              const sx = input.mouse.sx, sy = input.mouse.sy;
+              const r = layout.rect;
+              if (sx >= r.x && sx <= r.x + r.w && sy >= r.y && sy <= r.y + r.h) {
+                const mouseW = v(input.mouse.wx, input.mouse.wy);
+                this.dragAreaLabelHatchId = hatch.id;
+                this.dragAreaLabelGrabOffsetWorld = { x: mouseW.x - layout.centerWorld.x, y: mouseW.y - layout.centerWorld.y };
+                this.dragAreaLabelStartOffset = { x: hatch.areaLabel.offsetX || 0, y: hatch.areaLabel.offsetY || 0 };
+                return;
+              }
+            }
+          }
         }
       }
 

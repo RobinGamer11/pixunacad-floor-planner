@@ -695,14 +695,13 @@ const CadEditor: React.FC = () => {
               </div>
               <div className="flex items-center justify-between gap-2 mt-1">
                 <label htmlFor="cad-area-show" className="!mb-0 cursor-pointer select-none">Flächenanzeige</label>
-                <label htmlFor="cad-area-show" className="relative inline-flex items-center cursor-pointer">
-                  <input ref={areaShowRef} type="checkbox" id="cad-area-show" className="sr-only peer" />
-                  <span
-                    className="w-9 h-5 rounded-full transition-colors peer-checked:bg-primary"
-                    style={{ background: "hsl(var(--muted))" }}
-                  />
-                  <span className="pointer-events-none absolute left-0.5 top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform peer-checked:translate-x-4" />
-                </label>
+                <input
+                  ref={areaShowRef}
+                  type="checkbox"
+                  id="cad-area-show"
+                  className="w-[14px] h-[14px] cursor-pointer rounded-[3px] border accent-primary"
+                  style={{ accentColor: "hsl(var(--primary))", borderColor: "hsl(var(--border))" }}
+                />
               </div>
               <div ref={areaSettingsGroupRef} className="hidden mt-2 pt-2 space-y-2" style={{ borderTop: "1px solid hsl(var(--border))" }}>
                 <div>
@@ -729,14 +728,13 @@ const CadEditor: React.FC = () => {
                 </div>
                 <div className="flex items-center justify-between gap-2 pt-1">
                   <label htmlFor="cad-area-border" className="!mb-0 cursor-pointer select-none">Rahmen</label>
-                  <label htmlFor="cad-area-border" className="relative inline-flex items-center cursor-pointer">
-                    <input id="cad-area-border" data-area-border type="checkbox" className="sr-only peer" />
-                    <span
-                      className="w-9 h-5 rounded-full transition-colors peer-checked:bg-primary"
-                      style={{ background: "hsl(var(--muted))" }}
-                    />
-                    <span className="pointer-events-none absolute left-0.5 top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform peer-checked:translate-x-4" />
-                  </label>
+                  <input
+                    id="cad-area-border"
+                    data-area-border
+                    type="checkbox"
+                    className="w-[14px] h-[14px] cursor-pointer rounded-[3px] border accent-primary"
+                    style={{ accentColor: "hsl(var(--primary))", borderColor: "hsl(var(--border))" }}
+                  />
                 </div>
                 <div data-area-border-group className="hidden space-y-2">
                   <div>
