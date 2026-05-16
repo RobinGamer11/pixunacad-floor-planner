@@ -1294,6 +1294,34 @@ export class SelectTool {
     }
 
     // Active textbox drag (translate) with snap
+    // Active area-label drag (verschieben der m²-Anzeige innerhalb einer Schraffur)
+    if (this.dragAreaLabelHatchId) {
+      const hatch = this.app.scene.getHatchById(this.dragAreaLabelHatchId);
+      if (!hatch || !this.dragAreaLabelGrabOffsetWorld || !this.dragAreaLabelStartOffset) {
+        this.dragAreaLabelHatchId = null;
+        this.dragAreaLabelGrabOffsetWorld = null;
+        this.dragAreaLabelStartOffset = null;
+      } else {
+        const mouseW = v(input.mouse.wx, input.mouse.wy);
+        const snap = this.app.topology.findBestSnap(
+          v(input.mouse.sx, input.mouse.sy),
+          mouseW
+        );
+        const target = (snap && snap.world) ? snap.world : mouseW;
+        // New label center should be: target - grabOffset
+        // Convert to offset relative to polygon centroid:
+        const centroid = polygonCentroid(hatch.points);
+        hatch.areaLabel.offsetX = (target.x - this.dragAreaLabelGrabOffsetWorld.x) - centroid.x;
+        hatch.areaLabel.offsetY = (target.y - this.dragAreaLabelGrabOffsetWorld.y) - centroid.y;
+        if (!input.mouse.left) {
+          this.dragAreaLabelHatchId = null;
+          this.dragAreaLabelGrabOffsetWorld = null;
+          this.dragAreaLabelStartOffset = null;
+        }
+        return;
+      }
+    }
+
     if (this.dragTextBoxId) {
       const box = this.app.scene.getTextBoxById(this.dragTextBoxId);
       if (!box || !this.dragTextBoxGrabOffset) {
