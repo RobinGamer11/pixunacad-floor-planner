@@ -693,8 +693,7 @@ const CadEditor: React.FC = () => {
                 <label>Transparenz (0–100%)</label>
                 <input ref={hatchAlphaRef} type="text" defaultValue="35" />
               </div>
-              <div className="flex items-center justify-between gap-2 mt-1">
-                <label htmlFor="cad-area-show" className="!mb-0 cursor-pointer select-none">Flächenanzeige</label>
+              <div className="flex items-center gap-2 mt-1">
                 <input
                   ref={areaShowRef}
                   type="checkbox"
@@ -702,6 +701,7 @@ const CadEditor: React.FC = () => {
                   className="w-[14px] h-[14px] cursor-pointer rounded-[3px] border accent-primary"
                   style={{ accentColor: "hsl(var(--primary))", borderColor: "hsl(var(--border))" }}
                 />
+                <label htmlFor="cad-area-show" className="!mb-0 cursor-pointer select-none">Flächenanzeige</label>
               </div>
               <div ref={areaSettingsGroupRef} className="hidden mt-2 pt-2 space-y-2" style={{ borderTop: "1px solid hsl(var(--border))" }}>
                 <div>
@@ -726,8 +726,7 @@ const CadEditor: React.FC = () => {
                   <label>HG-Transparenz (0–100%)</label>
                   <input ref={areaBgAlphaRef} type="text" defaultValue="72" />
                 </div>
-                <div className="flex items-center justify-between gap-2 pt-1">
-                  <label htmlFor="cad-area-border" className="!mb-0 cursor-pointer select-none">Rahmen</label>
+                <div className="flex items-center gap-2 pt-1">
                   <input
                     id="cad-area-border"
                     data-area-border
@@ -735,6 +734,7 @@ const CadEditor: React.FC = () => {
                     className="w-[14px] h-[14px] cursor-pointer rounded-[3px] border accent-primary"
                     style={{ accentColor: "hsl(var(--primary))", borderColor: "hsl(var(--border))" }}
                   />
+                  <label htmlFor="cad-area-border" className="!mb-0 cursor-pointer select-none">Rahmen</label>
                 </div>
                 <div data-area-border-group className="hidden space-y-2">
                   <div>
