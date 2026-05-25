@@ -838,6 +838,11 @@ export class SelectTool {
       const box = this.app.scene.getTextBoxById(this.editTarget.textBoxId);
       if (!box || !this.textBoxCenterOriginal) return;
       box.center = v(this.textBoxCenterOriginal.x + delta.x, this.textBoxCenterOriginal.y + delta.y);
+    } else if (this.editTarget.kind === "areaLabelHandle") {
+      const hatch = this.app.scene.getHatchById(this.editTarget.hatchId);
+      if (!hatch || !this.areaLabelOriginalOffset) return;
+      hatch.areaLabel.offsetX = this.areaLabelOriginalOffset.x + delta.x;
+      hatch.areaLabel.offsetY = this.areaLabelOriginalOffset.y + delta.y;
     } else if (this.editTarget.kind === "hatchEdge") {
       // Translate-Mode für Edge entspricht Offset entlang Normale.
       const n = this.hatchEdgeNormal;
