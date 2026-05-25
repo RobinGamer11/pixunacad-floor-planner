@@ -860,64 +860,63 @@ export class Renderer {
       if (isSelected) {
         const selRing = buildHealedWallSolidRing(wall, this.scene.walls, this.scene.getWallTopology());
         if (selRing.length >= 3) {
-          let displayMulti: number[][][][] | null = null;
-          try {
-            const selPC = [ringToPCPolygon(selRing)];
-            const otherPolys: number[][][][] = [];
-            for (const ow of this.scene.walls) {
-              if (ow.id === wall.id) continue;
-              if (ow.labelId !== labelId) continue;
-              if (ow.corners.length < 2 || ow.thicknessM <= 0) continue;
-              // Nur strikt höher priorisierte Wände schneiden die Selektion aus —
-              // gleichrangige Wände dürfen die ausgefüllte Andock-Fläche nicht abziehen.
-              if ((ow.priority ?? 0) <= (wall.priority ?? 0)) continue;
-              const r = buildHealedWallSolidRing(ow, this.scene.walls, this.scene.getWallTopology());
-              if (r.length < 3) continue;
-              otherPolys.push([ringToPCPolygon(r)]);
-            }
-            if (otherPolys.length === 0) {
-              displayMulti = [selPC as any];
-            } else {
-              const [first, ...rest] = otherPolys as any[];
-              const otherUnion = rest.length === 0 ? first : polygonClipping.union(first, ...rest);
-              displayMulti = polygonClipping.difference(selPC as any, otherUnion as any) as any;
-            }
-          } catch {
-            displayMulti = null;
-          }
+          // Selektion: volles Wand-Solid blau füllen (ohne Clipping durch
+          // andere Wände). Höher priorisierte Gruppen werden danach erneut
+          // über die Selektion gezeichnet, damit sie optisch oben liegen.
           ctx.save();
           ctx.fillStyle = "rgba(77,163,255,0.28)";
           ctx.strokeStyle = Defaults.wallSelectionColor;
           ctx.lineWidth = 2.2;
-          if (displayMulti && displayMulti.length > 0) {
-            for (const poly of displayMulti) {
+          ctx.beginPath();
+          const p0 = cam.worldToScreen(selRing[0].x, selRing[0].y);
+          ctx.moveTo(p0.x, p0.y);
+          for (let i = 1; i < selRing.length; i++) {
+            const p = cam.worldToScreen(selRing[i].x, selRing[i].y);
+            ctx.lineTo(p.x, p.y);
+          }
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+          ctx.restore();
+
+          const selPrio = wall.priority ?? 0;
+          for (const group of groups) {
+            if ((group.priority ?? 0) <= selPrio) continue;
+            if (!group.multi || group.multi.length === 0) continue;
+            ctx.save();
+            ctx.fillStyle = group.fillColor;
+            ctx.beginPath();
+            for (const poly of group.multi) {
+              for (const ring of poly) {
+                if (!ring || ring.length < 3) continue;
+                const q0 = cam.worldToScreen(ring[0][0], ring[0][1]);
+                ctx.moveTo(q0.x, q0.y);
+                for (let i = 1; i < ring.length; i++) {
+                  const q = cam.worldToScreen(ring[i][0], ring[i][1]);
+                  ctx.lineTo(q.x, q.y);
+                }
+                ctx.closePath();
+              }
+            }
+            ctx.fill("evenodd");
+            ctx.strokeStyle = group.strokeColor;
+            ctx.lineWidth = 1.5;
+            for (const poly of group.multi) {
               for (const ring of poly) {
                 if (!ring || ring.length < 3) continue;
                 ctx.beginPath();
-                const p0 = cam.worldToScreen(ring[0][0], ring[0][1]);
-                ctx.moveTo(p0.x, p0.y);
+                const q0 = cam.worldToScreen(ring[0][0], ring[0][1]);
+                ctx.moveTo(q0.x, q0.y);
                 for (let i = 1; i < ring.length; i++) {
-                  const p = cam.worldToScreen(ring[i][0], ring[i][1]);
-                  ctx.lineTo(p.x, p.y);
+                  const q = cam.worldToScreen(ring[i][0], ring[i][1]);
+                  ctx.lineTo(q.x, q.y);
                 }
                 ctx.closePath();
-                ctx.fill();
                 ctx.stroke();
               }
             }
-          } else {
-            ctx.beginPath();
-            const p0 = cam.worldToScreen(selRing[0].x, selRing[0].y);
-            ctx.moveTo(p0.x, p0.y);
-            for (let i = 1; i < selRing.length; i++) {
-              const p = cam.worldToScreen(selRing[i].x, selRing[i].y);
-              ctx.lineTo(p.x, p.y);
-            }
-            ctx.closePath();
-            ctx.fill();
-            ctx.stroke();
+            ctx.restore();
           }
-          ctx.restore();
         }
       }
 
