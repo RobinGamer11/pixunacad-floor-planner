@@ -726,8 +726,7 @@ const CadEditor: React.FC = () => {
                   <label>HG-Transparenz (0–100%)</label>
                   <input ref={areaBgAlphaRef} type="text" defaultValue="72" />
                 </div>
-                <div className="flex items-center justify-between gap-2 pt-1">
-                  <label htmlFor="cad-area-border" className="!mb-0 cursor-pointer select-none">Rahmen</label>
+                <div className="flex items-center gap-2 pt-1">
                   <input
                     id="cad-area-border"
                     data-area-border
@@ -735,6 +734,7 @@ const CadEditor: React.FC = () => {
                     className="w-[14px] h-[14px] cursor-pointer rounded-[3px] border accent-primary"
                     style={{ accentColor: "hsl(var(--primary))", borderColor: "hsl(var(--border))" }}
                   />
+                  <label htmlFor="cad-area-border" className="!mb-0 cursor-pointer select-none">Rahmen</label>
                 </div>
                 <div data-area-border-group className="hidden space-y-2">
                   <div>
