@@ -1,35 +1,33 @@
-# Überlappung beim Selektions-Overlay entfernen
-
-## Beobachtung im Screenshot
-
-Zwei AW (gleiche Priorität 200) treffen sich am weißen Knotenpunkt. Das hellblaue **Selektions-Overlay** der angeklickten Wand poked als Dreieck nach oben in die Nachbarwand hinein. In der eigentlichen Wand-Füllung (graue Union) ist die Überlappung bereits sauber: die Boolean-Union mischt beide Solids zu einer Fläche. Die sichtbare „Überlappung" ist nur der Selektions-Highlight, der das **rohe geheilte Solid** der Einzelwand zeichnet — die durch den Heal in die Nachbarwand hineinragende Gehrungs-Spitze inklusive.
-
-## Ursache
-
-`Renderer.ts` Z. 856 ff.: für die selektierte Wand wird `buildHealedWallSolidRing(wall, …)` direkt mit Füllung + Konturlinie auf das Endbild gelegt. Der Ring enthält per Definition Gehrungs-Spitzen, die in benachbarte Wand-Solids hineinreichen — bei gleichpriorisierten Nachbarn überlappen sich diese Spitzen, und das Overlay zeichnet die fremde Wand sichtbar blau ein.
-
 ## Plan
 
-### `src/cad/Renderer.ts` — Selektions-Overlay gegen Nachbarn clippen
-Im Zweig `if (isSelected) { … }` (Z. 856–874):
+Ich fixe die Wand-Union so, dass eine neu andockende Wand die bestehende Wand nicht mehr ausschneidet, wenn beide Wände dieselbe Priorität haben.
 
-1. `selRing = buildHealedWallSolidRing(wall, scene.walls, graph)` wie bisher.
-2. Union aller anderen healed Wand-Solids im **selben Label** bilden:
-   ```
-   others = scene.walls.filter(w => w.labelId === labelId && w.id !== wall.id && w.corners.length >= 2 && w.thicknessM > 0)
-   otherRings = others.map(w => buildHealedWallSolidRing(w, scene.walls, graph)).filter(r => r.length >= 3)
-   otherUnion = polygonClipping.union(...otherRings als MultiPolygon)
-   ```
-3. `displayMulti = polygonClipping.difference([ringToPCPolygon(selRing)], otherUnion)`.
-   - Bei Fehler / leerem Ergebnis: Fallback auf rohen Ring (heute).
-4. `displayMulti` per Standardroutine (Fill + Stroke wie heute) zeichnen — über alle Polygone und Rings iterieren.
+### Änderungen
 
-Damit ist das Highlight exakt dort, wo die Wand im fertigen Plan tatsächlich zu sehen ist: gemittert an Knoten gleicher Priorität, abgeschnitten an Flanken höherer Priorität, ohne Eindringen in fremde Wand-Solids.
+1. **Subtraktion in `wallUnion.ts` auf Prioritäts-Tiers umstellen**
+   - Wände gleicher Priorität werden nicht mehr gegenseitig voneinander abgezogen.
+   - Nur Wände mit strikt höherer Priorität schneiden niedrigere Prioritäten aus.
 
-### Performance
-Pro Frame nur bei selektierter Wand — Anzahl Wände im Label typischerweise klein. Keine Caching-Notwendigkeit; bei Bedarf später memoisieren.
+2. **Bestehende visuelle Union beibehalten**
+   - Gleiche Wandtypen/-prioritäten bleiben optisch sauber verbunden.
+   - Unterschiedliche Styles bleiben weiterhin getrennt renderbar, aber ohne falsche Löcher in der Bestandswand.
 
-### Nicht im Scope
-- Hit-Test (`SelectTool`) bleibt auf rohem Rechteck — Klickfläche unverändert.
-- Wand-Helper (Bezugs-/Mittellinie) bleiben unverändert.
-- Union-/Subtraktionslogik der Hauptfüllung bleibt unverändert (funktioniert bereits korrekt).
+3. **Mittellinie bleibt separat**
+   - Dieser Fix konzentriert sich auf das falsche Ausschneiden der Wandflächen.
+   - Die gestrichelte Mittellinie kann danach gezielt gekürzt werden, falls sie noch störend tief hineinragt.
+
+### Technische Details
+
+Aktuell wird die Maskierung bucketweise akkumuliert. Dadurch kann eine gleich priorisierte Wand aus einer anderen gleich priorisierten Wand herausgeschnitten werden, wenn sie in einem anderen Style-Bucket landet.
+
+Ich ändere das zu:
+
+```text
+Prioritäten absteigend sammeln
+für jede Priorität:
+  Maske = Union aller bereits höheren Prioritäten
+  alle Buckets dieser Priorität nur gegen diese höhere Maske schneiden
+  danach diese Priorität zur Maske hinzufügen
+```
+
+Ergebnis: Gleichrangige Wände docken sauber an, ohne sich gegenseitig Löcher auszuschneiden.
