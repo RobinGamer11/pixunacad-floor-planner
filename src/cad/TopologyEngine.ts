@@ -5,8 +5,7 @@ import { Camera } from "./Camera";
 import { LabelManager } from "./LabelManager";
 import { boxCornersWorld } from "./textGeometry";
 import { documentCornersWorld, documentEdgeMidpointsWorld } from "./documentGeometry";
-import { computeWallLines } from "./wallGeom";
-// wallHeal entfernt: Snap nutzt ausschließlich Bezugslinien (wall.corners).
+// Wall-Snap nutzt ausschließlich wall.corners (Bezugslinie).
 
 export type WallLineKind = "main" | "sub" | "help";
 
