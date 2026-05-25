@@ -6,6 +6,9 @@ import type { Snap } from "./TopologyEngine";
 import type { Input } from "./Input";
 import { computeWallLines, type WallKind, type WallReferenceSide } from "./wallGeom";
 import { runWallTopologyMaintenance } from "./wallTopologyMaintenance";
+import { trimWallEndpointsToNeighbors } from "./wallConnect";
+
+export type WallInputMode = "single" | "chain";
 
 export interface WallToolSettings {
   kind: WallKind;
@@ -19,6 +22,8 @@ export interface WallToolSettings {
   fillColor: string;
   /** Wenn true: fillColor folgt automatisch dem AW/IW-Default beim Wechsel. */
   fillColorAuto: boolean;
+  /** "chain" = Polywand (jeder Klick verlängert), "single" = Klick-Klick einzeln. */
+  inputMode: WallInputMode;
 }
 
 export class WallTool {
@@ -28,6 +33,8 @@ export class WallTool {
   state: "idle" | "drawing" = "idle";
   corners: Vec2[] = [];
   snap: Snap | null = null;
+  /** Edge-Detection für Spacebar (Bezugsseite cyclen). */
+  private _prevSpace = false;
 
   settings: WallToolSettings = {
     kind: "outer",
@@ -39,6 +46,7 @@ export class WallTool {
     color: Defaults.lineColor,
     fillColor: Defaults.wallFillColorOuter,
     fillColorAuto: true,
+    inputMode: "chain",
   };
 
   constructor(app: CadApp) {
