@@ -21,11 +21,13 @@ export function unionWallSolids(
   if (polys.length === 0) return [];
   try {
     const [first, ...rest] = polys as any[];
-    if (rest.length === 0) return first as MultiPolygon;
+    // first ist bereits ein Polygon (Array von Ringen). MultiPolygon = Array von Polygonen.
+    if (rest.length === 0) return [first] as MultiPolygon;
     return polygonClipping.union(first, ...rest);
   } catch {
     return polys as unknown as MultiPolygon;
   }
+
 }
 
 
