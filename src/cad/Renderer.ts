@@ -852,8 +852,10 @@ export class Renderer {
     }
 
     // 3. Selektion / Helpers / Bezugslinien — pro Wand
-    const selectedWallId =
-      this.selection && this.selection.type === SelectionType.WALL
+    // Eine Wand gilt als selektiert, sobald die Selection eine wallId trägt —
+    // egal ob direkt (SelectionType.WALL) oder via Eckpunkt (SelectionType.POINT).
+    const selectedWallId: string | null =
+      this.selection && (this.selection as any).wallId
         ? (this.selection as any).wallId
         : null;
 
