@@ -14,7 +14,7 @@ import { computeWallLines } from "./wallGeom";
 import { computeHealedWallLines } from "./wallHeal";
 import { getWallUnionGroups } from "./wallUnion";
 import { buildHealedWallSolidRing, ringToPCPolygon } from "./wallSolid";
-import polygonClipping, { type MultiPolygon } from "polygon-clipping";
+import { type MultiPolygon } from "polygon-clipping";
 
 export interface Selection {
   type: string;
