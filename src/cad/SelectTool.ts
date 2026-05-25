@@ -20,6 +20,7 @@ type EditTarget =
   | { kind: "hatchEdge"; hatchId: string; edgeIndex: number }
   | { kind: "hatchHoleEdge"; hatchId: string; holeIndex: number; edgeIndex: number }
   | { kind: "textboxHandle"; textBoxId: string; handleIndex: number }
+  | { kind: "areaLabelHandle"; hatchId: string; handleIndex: number }
   | { kind: "wallPoint"; wallId: string; pointIndex: number }
   | { kind: "wallEdge"; wallId: string; edgeIndex: number }
   | { kind: "wall"; wallId: string };
@@ -56,6 +57,14 @@ export class SelectTool {
   textBoxHeightOriginal = 0;
   textBoxCenterOriginal: Vec2 | null = null;
   textBoxCornerOriginal: Vec2 | null = null;   // moving (clicked) corner world pos at edit start
+
+  // AreaLabel handle (corner) edit state
+  areaLabelOriginalRotation = 0;
+  areaLabelOriginalScale = 1;
+  areaLabelOriginalOffset: Vec2 | null = null;
+  areaLabelOriginalCornerWorld: Vec2 | null = null;
+  areaLabelOriginalOppositeWorld: Vec2 | null = null;
+  areaLabelPolyCenter: Vec2 | null = null;
 
   moveHubLocked = false;
   moveHubLengthM: number | null = null;
@@ -415,6 +424,60 @@ export class SelectTool {
     }
   }
 
+  /** Begin AreaLabel-Handle-Edit (move/translate/rotate) for a clicked m²-Box corner. */
+  beginAreaLabelHandleEdit(hatchId: string, handleIndex: number, action: string) {
+    const hatch = this.app.scene.getHatchById(hatchId);
+    if (!hatch || !hatch.areaLabel?.show) return;
+    if (action === PointEditAction.DELETE) return;
+    const layout = (this.app.renderer as any)._getAreaLabelLayout(hatch);
+    if (!layout) return;
+
+    this.activeEditAction = action;
+    this.editTarget = { kind: "areaLabelHandle", hatchId, handleIndex };
+
+    // Convert handle screen positions back to world for pivot math.
+    const cam = this.app.camera;
+    const handleWorlds = layout.handles.map((h: Vec2) => cam.screenToWorld(h.x, h.y));
+    const cornerW = handleWorlds[handleIndex];
+    const oppW = handleWorlds[(handleIndex + 2) % 4];
+
+    this.areaLabelOriginalRotation = hatch.areaLabel.rotationRad || 0;
+    this.areaLabelOriginalScale = hatch.areaLabel.scale ?? 1;
+    this.areaLabelOriginalOffset = v(hatch.areaLabel.offsetX || 0, hatch.areaLabel.offsetY || 0);
+    this.areaLabelOriginalCornerWorld = v(cornerW.x, cornerW.y);
+    this.areaLabelOriginalOppositeWorld = v(oppW.x, oppW.y);
+    this.areaLabelPolyCenter = polygonCentroid(hatch.points);
+
+    // For ROTATE: pivot = label center (world). For MOVE: pivot = opposite corner.
+    if (action === PointEditAction.ROTATE) {
+      this.fixedPoint = v(layout.centerWorld.x, layout.centerWorld.y);
+    } else {
+      this.fixedPoint = v(oppW.x, oppW.y);
+    }
+    this.otherPointOriginal = v(cornerW.x, cornerW.y);
+
+    this.moveHubLocked = false;
+    this.moveHubLengthM = null;
+    this.moveHubAngleDeg = null;
+    this.app.pointEditMenu.hide();
+
+    if (action === PointEditAction.ROTATE || action === PointEditAction.MOVE) {
+      const radius = dist(this.fixedPoint!, this.otherPointOriginal!);
+      const ang = angleDeg(this.fixedPoint!, this.otherPointOriginal!);
+      this.app.hub.bindCommit((vals) =>
+        action === PointEditAction.ROTATE ? this._applyRotateHubValues(vals) : this._applyMoveHubValues(vals)
+      );
+      this.app.hub.showAt(this.app.input.mouse.sx, this.app.input.mouse.sy);
+      this.app.hub.updateDisplay(radius, ang);
+      this.app.hub.setValues(radius, ang);
+      this.app.hub.enterEditMode();
+    } else {
+      this.app.hub.hide();
+      this.app.hub.bindCommit(null);
+    }
+  }
+
+
   /** Begin Hatch-Edge-Offset (parallel shift along edge normal). */
   beginHatchEdgeOffset(hatchId: string, edgeIndex: number, holeIndex: number | null = null) {
     const hatch = this.app.scene.getHatchById(hatchId);
@@ -708,12 +771,38 @@ export class SelectTool {
       const newCenter = v((opp.x + newPoint.x) * 0.5, (opp.y + newPoint.y) * 0.5);
       box.center = newCenter;
       box.rotationRad = newRot;
+    } else if (this.editTarget.kind === "areaLabelHandle") {
+      const hatch = this.app.scene.getHatchById(this.editTarget.hatchId);
+      if (!hatch || !this.areaLabelOriginalCornerWorld || !this.areaLabelOriginalOffset || !this.areaLabelPolyCenter) return;
+      const action = this.activeEditAction;
+      if (action === PointEditAction.ROTATE) {
+        // Pivot = label center (world position = polyCenter + offset). offset/scale stay.
+        const pivot = this.fixedPoint!;
+        const origAng = Math.atan2(this.areaLabelOriginalCornerWorld.y - pivot.y, this.areaLabelOriginalCornerWorld.x - pivot.x);
+        const newAng = Math.atan2(newPoint.y - pivot.y, newPoint.x - pivot.x);
+        hatch.areaLabel.rotationRad = this.areaLabelOriginalRotation + (newAng - origAng);
+      } else if (action === PointEditAction.MOVE) {
+        // Pivot = opposite corner (stays put). Box scales + rotates; center moves.
+        const opp = this.areaLabelOriginalOppositeWorld!;
+        const origDist = Math.hypot(this.areaLabelOriginalCornerWorld.x - opp.x, this.areaLabelOriginalCornerWorld.y - opp.y);
+        const newDist = Math.hypot(newPoint.x - opp.x, newPoint.y - opp.y);
+        if (origDist < 1e-9 || newDist < 1e-9) return;
+        const scaleFactor = newDist / origDist;
+        hatch.areaLabel.scale = Math.max(0.1, Math.min(20, this.areaLabelOriginalScale * scaleFactor));
+        const origAng = Math.atan2(this.areaLabelOriginalCornerWorld.y - opp.y, this.areaLabelOriginalCornerWorld.x - opp.x);
+        const newAng = Math.atan2(newPoint.y - opp.y, newPoint.x - opp.x);
+        hatch.areaLabel.rotationRad = this.areaLabelOriginalRotation + (newAng - origAng);
+        const newCenter = v((opp.x + newPoint.x) * 0.5, (opp.y + newPoint.y) * 0.5);
+        hatch.areaLabel.offsetX = newCenter.x - this.areaLabelPolyCenter.x;
+        hatch.areaLabel.offsetY = newCenter.y - this.areaLabelPolyCenter.y;
+      }
     } else if (this.editTarget.kind === "wallPoint") {
       const wall = this.app.scene.getWallById(this.editTarget.wallId);
       if (!wall) return;
       wall.corners[this.editTarget.pointIndex] = v(newPoint.x, newPoint.y);
     }
   }
+
 
   private _textBoxLocalCornerForIndex(i: number, w: number, h: number): Vec2 {
     const hw = w * 0.5, hh = h * 0.5;
@@ -749,6 +838,11 @@ export class SelectTool {
       const box = this.app.scene.getTextBoxById(this.editTarget.textBoxId);
       if (!box || !this.textBoxCenterOriginal) return;
       box.center = v(this.textBoxCenterOriginal.x + delta.x, this.textBoxCenterOriginal.y + delta.y);
+    } else if (this.editTarget.kind === "areaLabelHandle") {
+      const hatch = this.app.scene.getHatchById(this.editTarget.hatchId);
+      if (!hatch || !this.areaLabelOriginalOffset) return;
+      hatch.areaLabel.offsetX = this.areaLabelOriginalOffset.x + delta.x;
+      hatch.areaLabel.offsetY = this.areaLabelOriginalOffset.y + delta.y;
     } else if (this.editTarget.kind === "hatchEdge") {
       // Translate-Mode für Edge entspricht Offset entlang Normale.
       const n = this.hatchEdgeNormal;
@@ -897,6 +991,12 @@ export class SelectTool {
     this.textBoxHeightOriginal = 0;
     this.textBoxCenterOriginal = null;
     this.textBoxCornerOriginal = null;
+    this.areaLabelOriginalRotation = 0;
+    this.areaLabelOriginalScale = 1;
+    this.areaLabelOriginalOffset = null;
+    this.areaLabelOriginalCornerWorld = null;
+    this.areaLabelOriginalOppositeWorld = null;
+    this.areaLabelPolyCenter = null;
     this.moveHubLocked = false;
     this.moveHubLengthM = null;
     this.moveHubAngleDeg = null;
@@ -1585,8 +1685,7 @@ export class SelectTool {
         }
       }
 
-      // AreaLabel (m²-Anzeige) der selektierten Schraffur → ziehen zum Verschieben.
-      // Hit-Test gegen das Screen-Rect der Label-Box.
+      // AreaLabel (m²-Anzeige) der selektierten Schraffur → Ecken-HUB ODER ziehen zum Verschieben.
       {
         const sel = this.app.selection;
         const selHatchId = sel && (sel as any).hatchId ? (sel as any).hatchId as string : null;
@@ -1596,8 +1695,32 @@ export class SelectTool {
             const layout = (this.app.renderer as any)._getAreaLabelLayout(hatch);
             if (layout) {
               const sx = input.mouse.sx, sy = input.mouse.sy;
-              const r = layout.rect;
-              if (sx >= r.x && sx <= r.x + r.w && sy >= r.y && sy <= r.y + r.h) {
+              // 1) Eckpunkt-Hit zuerst (Fangpunkt-Box ~ hitPx)
+              const hitPx = Defaults.hitPx;
+              let bestCorner = -1;
+              let bestDist = Infinity;
+              for (let i = 0; i < layout.handles.length; i++) {
+                const h = layout.handles[i];
+                const d = Math.hypot(h.x - sx, h.y - sy);
+                if (d <= hitPx && d < bestDist) { bestDist = d; bestCorner = i; }
+              }
+              if (bestCorner >= 0) {
+                this.app.setSelection({ type: SelectionType.AREA_LABEL_HANDLE, hatchId: hatch.id, handleIndex: bestCorner } as any);
+                this.app.pointEditMenu.showAt(layout.handles[bestCorner].x, layout.handles[bestCorner].y, [
+                  PointEditAction.MOVE,
+                  PointEditAction.TRANSLATE,
+                  PointEditAction.ROTATE,
+                ]);
+                return;
+              }
+              // 2) Body-Hit für Drag (rotiertes Rechteck)
+              const dx = sx - layout.centerScreen.x;
+              const dy = sy - layout.centerScreen.y;
+              const cos = Math.cos(-(layout.rotationRad || 0));
+              const sin = Math.sin(-(layout.rotationRad || 0));
+              const lx = dx * cos - dy * sin;
+              const ly = dx * sin + dy * cos;
+              if (Math.abs(lx) <= layout.boxW / 2 && Math.abs(ly) <= layout.boxH / 2) {
                 const mouseW = v(input.mouse.wx, input.mouse.wy);
                 this.dragAreaLabelHatchId = hatch.id;
                 this.dragAreaLabelGrabOffsetWorld = { x: mouseW.x - layout.centerWorld.x, y: mouseW.y - layout.centerWorld.y };
@@ -1608,6 +1731,7 @@ export class SelectTool {
           }
         }
       }
+
 
       // TextBox-Eckpunkt der bereits selektierten TextBox? → Hub-Menü (Move/Translate/Rotate)
       const cornerHit = this._hitTextBoxCornerHandle(input);

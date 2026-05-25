@@ -34,6 +34,10 @@ export interface AreaLabel {
   borderEnabled: boolean;
   borderColor: string;
   borderWidthPx: number;
+  /** Rotation der m²-Box um ihr Zentrum (Bogenmaß). */
+  rotationRad: number;
+  /** Uniforme Skalierung der Box (Font + Padding × scale). Default 1. */
+  scale: number;
 }
 
 export class Hatch {
@@ -72,6 +76,8 @@ export class Hatch {
       borderEnabled: !!(areaLabel?.borderEnabled ?? Defaults.areaBorderEnabled),
       borderColor: areaLabel?.borderColor || Defaults.areaBorderColor,
       borderWidthPx: clamp(areaLabel?.borderWidthPx ?? Defaults.areaBorderWidthPx, 0, 20),
+      rotationRad: Number.isFinite(areaLabel?.rotationRad) ? areaLabel!.rotationRad! : 0,
+      scale: Number.isFinite(areaLabel?.scale) ? clamp(areaLabel!.scale!, 0.1, 20) : 1,
     };
     this._stickerEditOwnerId = null;
   }

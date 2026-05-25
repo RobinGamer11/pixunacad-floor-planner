@@ -40,6 +40,9 @@ export interface AreaLabelLayout {
   handles: { x: number; y: number }[];
   centerWorld: Vec2;
   centerScreen: Vec2;
+  rotationRad: number;
+  boxW: number;
+  boxH: number;
 }
 
 export class Renderer {
@@ -979,10 +982,11 @@ export class Renderer {
 
     const areaM2 = polygonAreaAbs(hatch.points);
     const text = `${areaM2.toFixed(2)} m²`;
-    const baseFontSize = clamp(hatch.areaLabel.fontSizePx ?? Defaults.areaFontSizePx, 8, 72);
+    const scale = Math.max(0.1, hatch.areaLabel.scale ?? 1);
+    const baseFontSize = clamp(hatch.areaLabel.fontSizePx ?? Defaults.areaFontSizePx, 6, 72) * scale;
     const zoomFactor = cam.scale / this.referencePxPerM;
     const fontSizePx = Math.max(1, baseFontSize * zoomFactor);
-    const padX = 8 * zoomFactor, padY = 5 * zoomFactor;
+    const padX = 8 * scale * zoomFactor, padY = 5 * scale * zoomFactor;
 
     ctx.save();
     ctx.font = `${fontSizePx}px system-ui, Arial, sans-serif`;
@@ -998,14 +1002,21 @@ export class Renderer {
     const centerScreen = cam.worldToScreen(centerWorld.x, centerWorld.y);
 
     const rect = { x: centerScreen.x - boxW / 2, y: centerScreen.y - boxH / 2, w: boxW, h: boxH };
-    const handles = [
-      { x: rect.x, y: rect.y },
-      { x: rect.x + rect.w, y: rect.y },
-      { x: rect.x + rect.w, y: rect.y + rect.h },
-      { x: rect.x, y: rect.y + rect.h },
+    const rotationRad = hatch.areaLabel.rotationRad || 0;
+    const cos = Math.cos(rotationRad), sin = Math.sin(rotationRad);
+    const hw = boxW / 2, hh = boxH / 2;
+    const localCorners = [
+      { x: -hw, y: -hh },
+      { x: hw, y: -hh },
+      { x: hw, y: hh },
+      { x: -hw, y: hh },
     ];
+    const handles = localCorners.map(p => ({
+      x: centerScreen.x + p.x * cos - p.y * sin,
+      y: centerScreen.y + p.x * sin + p.y * cos,
+    }));
 
-    return { text, fontSizePx, rect, handles, centerWorld, centerScreen };
+    return { text, fontSizePx, rect, handles, centerWorld, centerScreen, rotationRad, boxW, boxH } as AreaLabelLayout;
   }
 
   private _drawAreaLabel(hatch: Hatch, isSelected: boolean) {
@@ -1017,34 +1028,39 @@ export class Renderer {
     const textColor = hatch.areaLabel.textColor || Defaults.areaTextColor;
 
     ctx.save();
+    ctx.translate(layout.centerScreen.x, layout.centerScreen.y);
+    ctx.rotate(layout.rotationRad || 0);
+    const w = (layout as any).boxW as number;
+    const h = (layout as any).boxH as number;
     ctx.fillStyle = bg;
     ctx.beginPath();
-    ctx.rect(layout.rect.x, layout.rect.y, layout.rect.w, layout.rect.h);
+    ctx.rect(-w / 2, -h / 2, w, h);
     ctx.fill();
     if (hatch.areaLabel.borderEnabled) {
       ctx.strokeStyle = hatch.areaLabel.borderColor || Defaults.areaBorderColor;
       ctx.lineWidth = Math.max(0.5, (hatch.areaLabel.borderWidthPx ?? Defaults.areaBorderWidthPx));
       ctx.stroke();
     }
-
     ctx.fillStyle = textColor;
     ctx.font = `${layout.fontSizePx}px system-ui, Arial, sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(layout.text, layout.centerScreen.x, layout.centerScreen.y + 0.5);
+    ctx.fillText(layout.text, 0, 0.5);
+    ctx.restore();
 
     if (isSelected) {
+      ctx.save();
       ctx.fillStyle = "rgba(77,163,255,0.95)";
       ctx.strokeStyle = "#fff";
       ctx.lineWidth = 1.5;
-      for (const h of layout.handles) {
+      for (const hd of layout.handles) {
         ctx.beginPath();
-        ctx.rect(h.x - 4, h.y - 4, 8, 8);
+        ctx.rect(hd.x - 4, hd.y - 4, 8, 8);
         ctx.fill();
         ctx.stroke();
       }
+      ctx.restore();
     }
-    ctx.restore();
   }
 
   private _drawHatchSelection() {

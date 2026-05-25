@@ -403,6 +403,10 @@ export class CadApp {
         this.selectTool.beginTextBoxHandleEdit((sel as any).textBoxId, sel.handleIndex, action);
         return;
       }
+      if (sel && sel.type === SelectionType.AREA_LABEL_HANDLE && (sel as any).hatchId && (sel as any).handleIndex != null) {
+        this.selectTool.beginAreaLabelHandleEdit((sel as any).hatchId, (sel as any).handleIndex, action);
+        return;
+      }
       if (action === PointEditAction.OFFSET && sel && sel.type === SelectionType.HATCH && (sel as any).hatchId && (sel as any).edgeIndex != null) {
         this.selectTool.beginHatchEdgeOffset((sel as any).hatchId, (sel as any).edgeIndex, (sel as any).holeIndex ?? null);
         return;
