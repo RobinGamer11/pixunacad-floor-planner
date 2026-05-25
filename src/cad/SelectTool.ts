@@ -1016,6 +1016,9 @@ export class SelectTool {
     this.moveHubAngleDeg = null;
     this.editGuideAnchors = [];
     this.wallPointsOriginal = null;
+    this.wallPreviewPoint = null;
+    this.wallPreviewDelta = null;
+
     this.wallEdgeAOriginal = null;
     this.wallEdgeBOriginal = null;
     this.wallEdgePrevOriginal = null;
