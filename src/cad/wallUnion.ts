@@ -3,9 +3,6 @@ import type { Wall } from "./Scene";
 import { Defaults } from "./constants";
 import { buildWallSolidRing, ringToPCPolygon } from "./wallSolid";
 
-/**
- * Booleansche Union einer Wandliste (gleicher Stil-Gruppe).
- */
 export function unionWallSolids(walls: Wall[]): MultiPolygon {
   if (!walls || walls.length === 0) return [];
   const polys: number[][][][] = [];
@@ -26,22 +23,33 @@ export function unionWallSolids(walls: Wall[]): MultiPolygon {
 }
 
 export interface WallUnionGroup {
+  /** Höhere Werte rendern OBEN und "schneiden" niedrigere. */
+  priority: number;
   fillColor: string;
   strokeColor: string;
   kind: "outer" | "inner";
   wallIds: string[];
+  /** Bereits gegen alle höher priorisierten Gruppen subtrahiertes Polygon. */
   multi: MultiPolygon;
 }
 
 function styleKey(w: Wall): string {
   const fill = w.fillColor || (w.kind === "outer" ? Defaults.wallFillColorOuter : Defaults.wallFillColorInner);
-  return `${fill}|${w.color}|${w.kind}`;
+  return `${w.priority}|${fill}|${w.color}|${w.kind}`;
 }
 
 /**
- * Gruppiert Wände eines Labels nach visuellem Stil (fill+stroke+kind) und
- * liefert pro Gruppe das vereinigte Polygon. So bleiben unterschiedlich
- * gefärbte Wände visuell getrennt, gleich gefärbte verschmelzen nahtlos.
+ * Gruppiert Wände eines Labels nach (Priorität, Fill, Stroke, Kind) und
+ * liefert pro Gruppe das vereinigte Polygon. Anschließend wird jede Gruppe
+ * von der Vereinigung aller höher priorisierten Gruppen abgezogen — so läuft
+ * z. B. AW (Prio 200) ungebrochen durch, IW (Prio 100) endet sauber an der
+ * AW-Kante (ArchiCAD-Verschneidungspriorität).
+ *
+ * Innerhalb gleicher Priorität entstehen Gehrungen automatisch durch die
+ * Boolean-Union.
+ *
+ * Rückgabe ist nach Priorität AUFsteigend sortiert — der Renderer zeichnet
+ * also höher Priorisiertes zuletzt (oben).
  */
 const _cache = new Map<string, { hash: string; result: WallUnionGroup[] }>();
 
@@ -56,6 +64,7 @@ export function getWallUnionGroups(walls: Wall[], labelId: string): WallUnionGro
   const cached = _cache.get(labelId);
   if (cached && cached.hash === h) return cached.result;
 
+  // Bucket nach Style-Key (inkl. Priorität).
   const buckets = new Map<string, Wall[]>();
   for (const w of relevant) {
     const k = styleKey(w);
@@ -63,17 +72,56 @@ export function getWallUnionGroups(walls: Wall[], labelId: string): WallUnionGro
     if (!arr) { arr = []; buckets.set(k, arr); }
     arr.push(w);
   }
-  const out: WallUnionGroup[] = [];
+
+  // Vorab pro Bucket unionieren.
+  type Pre = { key: string; priority: number; fill: string; stroke: string; kind: "outer" | "inner"; wallIds: string[]; multi: MultiPolygon };
+  const pre: Pre[] = [];
   for (const [k, ws] of buckets) {
-    const [fill, stroke, kind] = k.split("|");
-    out.push({
-      fillColor: fill,
-      strokeColor: stroke,
+    const [prioStr, fill, stroke, kind] = k.split("|");
+    pre.push({
+      key: k,
+      priority: parseInt(prioStr, 10) || 0,
+      fill,
+      stroke,
       kind: kind as "outer" | "inner",
       wallIds: ws.map(w => w.id),
       multi: unionWallSolids(ws),
     });
   }
+
+  // Subtraktionsphase: jede Gruppe minus Union aller strikt höher priorisierten.
+  // Sortiere ABSTEIGEND, damit wir die "Maske" der höheren beim Durchlauf aufbauen.
+  pre.sort((a, b) => b.priority - a.priority);
+  let mask: MultiPolygon = [];
+  for (const g of pre) {
+    if (mask.length > 0 && g.multi.length > 0) {
+      try {
+        const diff = polygonClipping.difference(g.multi as any, mask as any);
+        g.multi = diff;
+      } catch {
+        // Bei Boolean-Fehler unbehandelt lassen.
+      }
+    }
+    if (g.multi.length > 0) {
+      try {
+        mask = mask.length === 0 ? g.multi : polygonClipping.union(mask as any, g.multi as any);
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  // Aufsteigend ausgeben, damit Renderer höhere Prio ZULETZT (oben) zeichnet.
+  pre.sort((a, b) => a.priority - b.priority);
+
+  const out: WallUnionGroup[] = pre.map(p => ({
+    priority: p.priority,
+    fillColor: p.fill,
+    strokeColor: p.stroke,
+    kind: p.kind,
+    wallIds: p.wallIds,
+    multi: p.multi,
+  }));
   _cache.set(labelId, { hash: h, result: out });
   return out;
 }

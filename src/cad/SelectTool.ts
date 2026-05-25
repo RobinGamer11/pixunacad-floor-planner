@@ -12,6 +12,7 @@ import { pointInDocument } from "./documentGeometry";
 import { computeWallLines } from "./wallGeom";
 import { buildWallSolidRing } from "./wallSolid";
 import { runWallTopologyMaintenance } from "./wallTopologyMaintenance";
+import { trimWallEndpointsToNeighbors } from "./wallConnect";
 
 type EditTarget =
   | { kind: "segment"; segmentId: string; pointIndex: number }
@@ -960,14 +961,20 @@ export class SelectTool {
   }
 
   _clearEditState() {
-    // Phase 3: nach Wand-Mutationen Topologie-Wartung (Auto-Split + Auto-Merge).
+    // Nach Wand-Mutationen: erst Auto-Trim der betroffenen Wand-Endpunkte an
+    // Nachbar-Bezugslinien, dann Topologie-Wartung (Auto-Split / Auto-Merge).
     const wasWallEdit = !!this.editTarget && (
       this.editTarget.kind === "wall" ||
       this.editTarget.kind === "wallPoint" ||
       this.editTarget.kind === "wallEdge"
     );
     if (wasWallEdit) {
-      try { runWallTopologyMaintenance(this.app.scene); } catch { /* noop */ }
+      try {
+        const wallId = (this.editTarget as any).wallId;
+        const wall = wallId ? this.app.scene.getWallById(wallId) : null;
+        if (wall) trimWallEndpointsToNeighbors(this.app.scene, wall);
+        runWallTopologyMaintenance(this.app.scene);
+      } catch { /* noop */ }
     }
     this.activeEditAction = null;
     this.editTarget = null;

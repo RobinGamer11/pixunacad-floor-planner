@@ -363,11 +363,18 @@ export class Wall {
   /** Flächenfarbe (Füllung). Default: dunkelgrau (AW) / hellgrau (IW). */
   fillColor: string;
   labelId: string;
+  /**
+   * ArchiCAD-Verschneidungspriorität — höhere Werte gewinnen am Knoten.
+   * Default: AW = 200, IW = 100. Beim Render werden niedrigere Prioritäten
+   * von höheren subtrahiert (kein Überlapp, sauberer T-Stoß).
+   */
+  priority: number;
   _stickerEditOwnerId?: string | null;
 
   constructor(opts: {
     id: string; kind: WallKind; thicknessM: number; referenceSide: WallReferenceSide;
     corners: Vec2[]; customName?: string; color?: string; fillColor?: string; labelId?: string;
+    priority?: number;
   }) {
     this.id = opts.id;
     this.kind = opts.kind;
@@ -379,6 +386,7 @@ export class Wall {
     this.fillColor = opts.fillColor
       || (opts.kind === "outer" ? Defaults.wallFillColorOuter : Defaults.wallFillColorInner);
     this.labelId = opts.labelId || Defaults.defaultLabelId;
+    this.priority = opts.priority ?? (opts.kind === "outer" ? 200 : 100);
     this._stickerEditOwnerId = null;
   }
 }
@@ -875,6 +883,7 @@ export class Scene {
   createWall(opts: {
     kind: WallKind; thicknessM: number; referenceSide: WallReferenceSide;
     corners: Vec2[]; customName?: string; color?: string; fillColor?: string; labelId?: string;
+    priority?: number;
   }) {
     const w = new Wall({ id: this._makeId(), ...opts });
     w._stickerEditOwnerId = this._currentEditOwnerId;
