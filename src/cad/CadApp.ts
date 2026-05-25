@@ -1684,6 +1684,7 @@ export class CadApp {
       if (e.key === "Tab") {
         if (this.activeTool === this.lineTool) { const h = this.lineTool.onTabRequest(); if (h) { e.preventDefault(); return; } }
         if (this.activeTool === this.hatchTool) { const h = this.hatchTool.onTabRequest(); if (h) { e.preventDefault(); return; } }
+        if (this.activeTool === this.wallTool) { const h = this.wallTool.onTabRequest(); if (h) { e.preventDefault(); return; } }
       }
 
       if (e.key === "Enter" && this.activeTool === this.hatchTool && !isHubInput) {
