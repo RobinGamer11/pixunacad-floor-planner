@@ -2254,6 +2254,7 @@ export class CadApp {
         this.activeTool.update(this.input);
       }
 
+      this.renderer.wallEditActive = !!(this.selectTool && this.selectTool.isEditing());
       this.renderer.render();
       if (this.pastePreviewActive) this._drawPastePreview(this.ctx);
       this.input.endFrame();
