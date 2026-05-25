@@ -14,7 +14,7 @@ import { computeWallLines } from "./wallGeom";
 import { computeHealedWallLines } from "./wallHeal";
 import { getWallUnionGroups } from "./wallUnion";
 import { buildWallSolidRing, buildHealedWallSolidRing, ringToPCPolygon } from "./wallSolid";
-import polygonClipping from "polygon-clipping";
+import polygonClipping, { type MultiPolygon } from "polygon-clipping";
 
 export interface Selection {
   type: string;
@@ -104,6 +104,48 @@ export class Renderer {
     this.camera = camera;
     this.scene = scene;
     this.labels = labels;
+  }
+
+  private _drawWallMulti(multi: MultiPolygon, fillStyle: string, strokeStyle?: string, lineWidth = 1.5) {
+    if (!multi || multi.length === 0) return;
+    const ctx = this.ctx;
+    const cam = this.camera;
+    ctx.save();
+    ctx.fillStyle = fillStyle;
+    ctx.beginPath();
+    for (const poly of multi) {
+      for (const ring of poly) {
+        if (!ring || ring.length < 3) continue;
+        const p0 = cam.worldToScreen(ring[0][0], ring[0][1]);
+        ctx.moveTo(p0.x, p0.y);
+        for (let i = 1; i < ring.length; i++) {
+          const p = cam.worldToScreen(ring[i][0], ring[i][1]);
+          ctx.lineTo(p.x, p.y);
+        }
+        ctx.closePath();
+      }
+    }
+    ctx.fill("evenodd");
+
+    if (strokeStyle) {
+      ctx.strokeStyle = strokeStyle;
+      ctx.lineWidth = lineWidth;
+      for (const poly of multi) {
+        for (const ring of poly) {
+          if (!ring || ring.length < 3) continue;
+          ctx.beginPath();
+          const p0 = cam.worldToScreen(ring[0][0], ring[0][1]);
+          ctx.moveTo(p0.x, p0.y);
+          for (let i = 1; i < ring.length; i++) {
+            const p = cam.worldToScreen(ring[i][0], ring[i][1]);
+            ctx.lineTo(p.x, p.y);
+          }
+          ctx.closePath();
+          ctx.stroke();
+        }
+      }
+    }
+    ctx.restore();
   }
 
   setViewport(w: number, h: number) { this.vw = w; this.vh = h; }
@@ -802,42 +844,7 @@ export class Renderer {
     for (const group of groups) {
       if (!group.multi || group.multi.length === 0) continue;
 
-      // 1. Füllung (evenodd → Löcher korrekt freigestellt)
-      ctx.save();
-      ctx.fillStyle = group.fillColor;
-      ctx.beginPath();
-      for (const poly of group.multi) {
-        for (const ring of poly) {
-          if (!ring || ring.length < 3) continue;
-          const p0 = cam.worldToScreen(ring[0][0], ring[0][1]);
-          ctx.moveTo(p0.x, p0.y);
-          for (let i = 1; i < ring.length; i++) {
-            const p = cam.worldToScreen(ring[i][0], ring[i][1]);
-            ctx.lineTo(p.x, p.y);
-          }
-          ctx.closePath();
-        }
-      }
-      ctx.fill("evenodd");
-
-      // 2. Kontur — nur äußere Boundary + Lochränder der vereinigten Wand
-      ctx.strokeStyle = group.strokeColor;
-      ctx.lineWidth = 1.5;
-      for (const poly of group.multi) {
-        for (const ring of poly) {
-          if (!ring || ring.length < 3) continue;
-          ctx.beginPath();
-          const p0 = cam.worldToScreen(ring[0][0], ring[0][1]);
-          ctx.moveTo(p0.x, p0.y);
-          for (let i = 1; i < ring.length; i++) {
-            const p = cam.worldToScreen(ring[i][0], ring[i][1]);
-            ctx.lineTo(p.x, p.y);
-          }
-          ctx.closePath();
-          ctx.stroke();
-        }
-      }
-      ctx.restore();
+      this._drawWallMulti(group.multi, group.fillColor, group.strokeColor, 1.5);
     }
 
     // 3. Selektion / Helpers / Bezugslinien — pro Wand
@@ -853,69 +860,50 @@ export class Renderer {
 
       const isSelected = selectedWallId === wall.id;
 
-      // Selektion: Solid der einzelnen Wand mit Selektionsfarbe überlagern.
-      // Gehrungs-Spitzen, die in benachbarte Wand-Solids hineinragen, werden
-      // gegen die Union aller anderen Wände im selben Label geclippt — sonst
-      // ragt das blaue Highlight sichtbar in fremde Wände hinein.
+      // Selektion: die selektierte Wand bleibt als eigenes Solid sichtbar.
+      // An T-Stößen wird nur die Fläche strikt höher priorisierter Wände aus
+      // dem blauen Overlay herausgenommen; die Nachbarwand wird danach erneut
+      // darüber gezeichnet. So gehört der Anschlussbereich optisch zur jeweils
+      // selektierten Wand, ohne die bestehende Wand zu übermalen.
       if (isSelected) {
         const selRing = buildHealedWallSolidRing(wall, this.scene.walls, this.scene.getWallTopology());
         if (selRing.length >= 3) {
-          // Selektion: volles Wand-Solid blau füllen (ohne Clipping durch
-          // andere Wände). Höher priorisierte Gruppen werden danach erneut
-          // über die Selektion gezeichnet, damit sie optisch oben liegen.
-          ctx.save();
-          ctx.fillStyle = "rgba(77,163,255,0.28)";
-          ctx.strokeStyle = Defaults.wallSelectionColor;
-          ctx.lineWidth = 2.2;
-          ctx.beginPath();
-          const p0 = cam.worldToScreen(selRing[0].x, selRing[0].y);
-          ctx.moveTo(p0.x, p0.y);
-          for (let i = 1; i < selRing.length; i++) {
-            const p = cam.worldToScreen(selRing[i].x, selRing[i].y);
-            ctx.lineTo(p.x, p.y);
-          }
-          ctx.closePath();
-          ctx.fill();
-          ctx.stroke();
-          ctx.restore();
-
+          let selMulti: MultiPolygon = [[ringToPCPolygon(selRing)]] as MultiPolygon;
           const selPrio = wall.priority ?? 0;
+          const graph = this.scene.getWallTopology();
+          const higherGroups = groups.filter(group => (group.priority ?? 0) > selPrio && group.multi && group.multi.length > 0);
+          const maskParts: MultiPolygon[] = higherGroups.map(group => group.multi);
+          const maskedHostIds = new Set<string>();
+          for (const atStart of [true, false]) {
+            const node = graph.getNodeForEndpoint(wall.id, atStart);
+            if (!node) continue;
+            for (const inc of node.incidents) {
+              if (inc.kind !== "tjunction" || inc.wallId === wall.id || maskedHostIds.has(inc.wallId)) continue;
+              const host = this.scene.walls.find(w => w.id === inc.wallId);
+              if (!host || host.labelId !== labelId || !this.labels.isVisible(host.labelId) || host.corners.length < 2) continue;
+              const hostRing = buildHealedWallSolidRing(host, this.scene.walls, graph);
+              const hostPc = ringToPCPolygon(hostRing);
+              if (hostPc.length < 4) continue;
+              maskParts.push([[hostPc]] as MultiPolygon);
+              maskedHostIds.add(inc.wallId);
+            }
+          }
+          if (maskParts.length > 0) {
+            try {
+              const [first, ...rest] = maskParts as any[];
+              const higherMask = rest.length > 0 ? polygonClipping.union(first, ...rest) : first;
+              selMulti = polygonClipping.difference(selMulti as any, higherMask as any) as MultiPolygon;
+            } catch {
+              // Fallback: ungeclipptes Overlay zeichnen.
+            }
+          }
+
+          this._drawWallMulti(selMulti, "rgba(77,163,255,0.28)", Defaults.wallSelectionColor, 2.2);
+
           for (const group of groups) {
             if ((group.priority ?? 0) <= selPrio) continue;
             if (!group.multi || group.multi.length === 0) continue;
-            ctx.save();
-            ctx.fillStyle = group.fillColor;
-            ctx.beginPath();
-            for (const poly of group.multi) {
-              for (const ring of poly) {
-                if (!ring || ring.length < 3) continue;
-                const q0 = cam.worldToScreen(ring[0][0], ring[0][1]);
-                ctx.moveTo(q0.x, q0.y);
-                for (let i = 1; i < ring.length; i++) {
-                  const q = cam.worldToScreen(ring[i][0], ring[i][1]);
-                  ctx.lineTo(q.x, q.y);
-                }
-                ctx.closePath();
-              }
-            }
-            ctx.fill("evenodd");
-            ctx.strokeStyle = group.strokeColor;
-            ctx.lineWidth = 1.5;
-            for (const poly of group.multi) {
-              for (const ring of poly) {
-                if (!ring || ring.length < 3) continue;
-                ctx.beginPath();
-                const q0 = cam.worldToScreen(ring[0][0], ring[0][1]);
-                ctx.moveTo(q0.x, q0.y);
-                for (let i = 1; i < ring.length; i++) {
-                  const q = cam.worldToScreen(ring[i][0], ring[i][1]);
-                  ctx.lineTo(q.x, q.y);
-                }
-                ctx.closePath();
-                ctx.stroke();
-              }
-            }
-            ctx.restore();
+            this._drawWallMulti(group.multi, group.fillColor, group.strokeColor, 1.5);
           }
         }
       }
