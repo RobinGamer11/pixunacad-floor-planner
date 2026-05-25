@@ -1521,7 +1521,13 @@ export class SelectTool {
         const p = this._previewMovePoint(input);
         const metrics = { lengthM: dist(this.fixedPoint!, p), angleDeg: angleDeg(this.fixedPoint!, p) };
 
-        this._applyMovingPoint(p, this.fixedPoint!);
+        const isWallPointEdit = this.editTarget?.kind === "wallPoint";
+        if (isWallPointEdit) {
+          // Vorschau-Only: Scene NICHT mutieren, nur Position merken.
+          this.wallPreviewPoint = v(p.x, p.y);
+        } else {
+          this._applyMovingPoint(p, this.fixedPoint!);
+        }
 
         this.app.renderer.setHoverSegmentId(null);
         this.app.hub.showAt(input.mouse.sx, input.mouse.sy);
@@ -1529,7 +1535,12 @@ export class SelectTool {
 
         if (input.clicked) {
           const finalP = this._commitMovePoint(input);
-          this._applyMovingPoint(finalP, this.fixedPoint!);
+          if (isWallPointEdit) {
+            // Jetzt erst einmalig auf die Scene anwenden → genau ein Undo-Schritt.
+            this._applyMovingPoint(finalP, this.fixedPoint!);
+          } else {
+            this._applyMovingPoint(finalP, this.fixedPoint!);
+          }
           this._clearEditState();
           this.app.hub.hide();
         }
@@ -1538,7 +1549,13 @@ export class SelectTool {
 
       if (this.activeEditAction === PointEditAction.TRANSLATE) {
         const delta = this._previewTranslateDelta(input);
-        this._applyTranslateDelta(delta);
+        const isWallPointEdit = this.editTarget?.kind === "wallPoint";
+        if (isWallPointEdit) {
+          // Vorschau-Only: Scene NICHT mutieren, nur Delta merken (ganze Wand).
+          this.wallPreviewDelta = v(delta.x, delta.y);
+        } else {
+          this._applyTranslateDelta(delta);
+        }
 
         this.app.renderer.setHoverSegmentId(null);
         this.app.hub.hide();
@@ -1550,6 +1567,7 @@ export class SelectTool {
         }
         return;
       }
+
 
       if (this.activeEditAction === PointEditAction.ROTATE) {
         const assistSeg = this._findRotateAssistSegment(input);
