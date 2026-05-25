@@ -119,6 +119,7 @@ export const SelectionType = {
   DOCUMENT: "document",
   FREE_STROKE: "free_stroke",
   WALL: "wall",
+  AREA_LABEL_HANDLE: "area_label_handle",
 } as const;
 
 export const SnapType = {
