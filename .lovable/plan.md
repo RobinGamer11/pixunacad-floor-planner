@@ -1,33 +1,28 @@
-## Plan
+## Problem
 
-Ich fixe die Wand-Union so, dass eine neu andockende Wand die bestehende Wand nicht mehr ausschneidet, wenn beide Wände dieselbe Priorität haben.
+Selektion einer Wand zeigt das eigene geheilte Solid abzüglich **aller** anderen Wand-Solids im selben Label (Renderer.ts, ~Zeile 867–880). Bei zwei gleich priorisierten Wänden (z. B. beide AW), die aneinander andocken, ragt das geheilte Solid der neuen Wand 1 in das Solid der bestehenden Wand 2 hinein (Gehrungs-/Andock-Spitze). Beim Selektieren von Wand 2 wird genau dieser Bereich abgezogen → sichtbare Kerbe, obwohl er optisch zur Vereinigung gehört.
 
-### Änderungen
+Im Renderpfad der Wandfüllung wurde dies bereits durch die tier-basierte Subtraktion in `wallUnion.ts` gefixt (gleiche Priorität schneidet sich nicht). Die Selektions-Overlay-Logik in `Renderer.ts` macht jedoch noch das alte „gegen alles andere abziehen".
 
-1. **Subtraktion in `wallUnion.ts` auf Prioritäts-Tiers umstellen**
-   - Wände gleicher Priorität werden nicht mehr gegenseitig voneinander abgezogen.
-   - Nur Wände mit strikt höherer Priorität schneiden niedrigere Prioritäten aus.
+## Fix
 
-2. **Bestehende visuelle Union beibehalten**
-   - Gleiche Wandtypen/-prioritäten bleiben optisch sauber verbunden.
-   - Unterschiedliche Styles bleiben weiterhin getrennt renderbar, aber ohne falsche Löcher in der Bestandswand.
+In `src/cad/Renderer.ts` (Block ab ~Zeile 860, `if (isSelected) { ... }`) die `otherPolys`-Sammlung so einschränken, dass nur Wände mit **strikt höherer Priorität** als die selektierte Wand einbezogen werden:
 
-3. **Mittellinie bleibt separat**
-   - Dieser Fix konzentriert sich auf das falsche Ausschneiden der Wandflächen.
-   - Die gestrichelte Mittellinie kann danach gezielt gekürzt werden, falls sie noch störend tief hineinragt.
-
-### Technische Details
-
-Aktuell wird die Maskierung bucketweise akkumuliert. Dadurch kann eine gleich priorisierte Wand aus einer anderen gleich priorisierten Wand herausgeschnitten werden, wenn sie in einem anderen Style-Bucket landet.
-
-Ich ändere das zu:
-
-```text
-Prioritäten absteigend sammeln
-für jede Priorität:
-  Maske = Union aller bereits höheren Prioritäten
-  alle Buckets dieser Priorität nur gegen diese höhere Maske schneiden
-  danach diese Priorität zur Maske hinzufügen
+```ts
+for (const ow of this.scene.walls) {
+  if (ow.id === wall.id) continue;
+  if (ow.labelId !== labelId) continue;
+  if (ow.corners.length < 2 || ow.thicknessM <= 0) continue;
+  if ((ow.priority ?? 0) <= (wall.priority ?? 0)) continue; // NEU
+  ...
+}
 ```
 
-Ergebnis: Gleichrangige Wände docken sauber an, ohne sich gegenseitig Löcher auszuschneiden.
+Damit:
+- Gleichrangige Nachbarwände (AW↔AW, IW↔IW) bleiben in der Selektionsdarstellung vollständig — das Andock-/Gehrungs-Solid der selektierten Wand wird nicht mehr fälschlich beschnitten.
+- Höher priorisierte Wände schneiden niedrigere weiterhin korrekt aus (z. B. AW schneidet IW-Selektion an der AW-Kante).
+- Verhalten ist konsistent mit der tier-basierten Logik in `wallUnion.ts`.
+
+## Nicht geändert
+
+- `wallUnion.ts` (Füllung), Heal-/Topologie-Pipeline, Hover, Mittellinien-Overlay.
