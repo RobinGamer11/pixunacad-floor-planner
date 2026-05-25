@@ -860,69 +860,33 @@ export class Renderer {
 
       const isSelected = selectedWallId === wall.id;
 
-      // Selektion: Solid der einzelnen Wand mit Selektionsfarbe überlagern.
-      // Gehrungs-Spitzen, die in benachbarte Wand-Solids hineinragen, werden
-      // gegen die Union aller anderen Wände im selben Label geclippt — sonst
-      // ragt das blaue Highlight sichtbar in fremde Wände hinein.
+      // Selektion: die selektierte Wand bleibt als eigenes Solid sichtbar.
+      // An T-Stößen wird nur die Fläche strikt höher priorisierter Wände aus
+      // dem blauen Overlay herausgenommen; die Nachbarwand wird danach erneut
+      // darüber gezeichnet. So gehört der Anschlussbereich optisch zur jeweils
+      // selektierten Wand, ohne die bestehende Wand zu übermalen.
       if (isSelected) {
         const selRing = buildHealedWallSolidRing(wall, this.scene.walls, this.scene.getWallTopology());
         if (selRing.length >= 3) {
-          // Selektion: volles Wand-Solid blau füllen (ohne Clipping durch
-          // andere Wände). Höher priorisierte Gruppen werden danach erneut
-          // über die Selektion gezeichnet, damit sie optisch oben liegen.
-          ctx.save();
-          ctx.fillStyle = "rgba(77,163,255,0.28)";
-          ctx.strokeStyle = Defaults.wallSelectionColor;
-          ctx.lineWidth = 2.2;
-          ctx.beginPath();
-          const p0 = cam.worldToScreen(selRing[0].x, selRing[0].y);
-          ctx.moveTo(p0.x, p0.y);
-          for (let i = 1; i < selRing.length; i++) {
-            const p = cam.worldToScreen(selRing[i].x, selRing[i].y);
-            ctx.lineTo(p.x, p.y);
-          }
-          ctx.closePath();
-          ctx.fill();
-          ctx.stroke();
-          ctx.restore();
-
+          let selMulti: MultiPolygon = [[ringToPCPolygon(selRing)]] as MultiPolygon;
           const selPrio = wall.priority ?? 0;
+          const higherGroups = groups.filter(group => (group.priority ?? 0) > selPrio && group.multi && group.multi.length > 0);
+          if (higherGroups.length > 0) {
+            try {
+              const [first, ...rest] = higherGroups.map(group => group.multi) as any[];
+              const higherMask = rest.length > 0 ? polygonClipping.union(first, ...rest) : first;
+              selMulti = polygonClipping.difference(selMulti as any, higherMask as any) as MultiPolygon;
+            } catch {
+              // Fallback: ungeclipptes Overlay zeichnen.
+            }
+          }
+
+          this._drawWallMulti(selMulti, "rgba(77,163,255,0.28)", Defaults.wallSelectionColor, 2.2);
+
           for (const group of groups) {
             if ((group.priority ?? 0) <= selPrio) continue;
             if (!group.multi || group.multi.length === 0) continue;
-            ctx.save();
-            ctx.fillStyle = group.fillColor;
-            ctx.beginPath();
-            for (const poly of group.multi) {
-              for (const ring of poly) {
-                if (!ring || ring.length < 3) continue;
-                const q0 = cam.worldToScreen(ring[0][0], ring[0][1]);
-                ctx.moveTo(q0.x, q0.y);
-                for (let i = 1; i < ring.length; i++) {
-                  const q = cam.worldToScreen(ring[i][0], ring[i][1]);
-                  ctx.lineTo(q.x, q.y);
-                }
-                ctx.closePath();
-              }
-            }
-            ctx.fill("evenodd");
-            ctx.strokeStyle = group.strokeColor;
-            ctx.lineWidth = 1.5;
-            for (const poly of group.multi) {
-              for (const ring of poly) {
-                if (!ring || ring.length < 3) continue;
-                ctx.beginPath();
-                const q0 = cam.worldToScreen(ring[0][0], ring[0][1]);
-                ctx.moveTo(q0.x, q0.y);
-                for (let i = 1; i < ring.length; i++) {
-                  const q = cam.worldToScreen(ring[i][0], ring[i][1]);
-                  ctx.lineTo(q.x, q.y);
-                }
-                ctx.closePath();
-                ctx.stroke();
-              }
-            }
-            ctx.restore();
+            this._drawWallMulti(group.multi, group.fillColor, group.strokeColor, 1.5);
           }
         }
       }
