@@ -1557,8 +1557,9 @@ export class SelectTool {
 
       if (this.activeEditAction === PointEditAction.TRANSLATE) {
         const delta = this._previewTranslateDelta(input);
-        const isWallPointEdit = this.editTarget?.kind === "wallPoint";
-        if (isWallPointEdit) {
+        const isWallTranslatePreview =
+          this.editTarget?.kind === "wallPoint" || this.editTarget?.kind === "wall";
+        if (isWallTranslatePreview) {
           // Vorschau-Only: Scene NICHT mutieren, nur Delta merken (ganze Wand).
           this.wallPreviewDelta = v(delta.x, delta.y);
         } else {
