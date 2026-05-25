@@ -1011,32 +1011,16 @@ export class Renderer {
         const s = cam.worldToScreen(c.x, c.y);
         dot(s.x, s.y, 3, "rgba(255,255,255,0.85)", "rgba(120,120,120,0.65)", 1);
       }
-      // Sub-Linien-Eckpunkte (Gegenkante) — sehr dezent
-      if (w.corners.length >= 2) {
-        const lines = computeWallLines(w.corners, w.thicknessM, w.referenceSide);
-        for (const c of lines.subCorners) {
-          const s = cam.worldToScreen(c.x, c.y);
-          dot(s.x, s.y, 2.5, "rgba(255,255,255,0.7)", "rgba(140,140,140,0.5)", 1);
-        }
-      }
     }
 
-    // Kräftige Fangpunkte der selektierten Wand (Bezugslinie + Gegenkante).
+    // Kräftige Fangpunkte der selektierten Wand (nur Bezugslinie).
     if (selWall && this.labels.isVisible(selWall.labelId)) {
       for (const c of selWall.corners) {
         const s = cam.worldToScreen(c.x, c.y);
         dot(s.x, s.y, 4.5, "#ffffff", Defaults.wallSelectionColor, 1.6);
       }
-      if (selWall.corners.length >= 2) {
-        const lines = computeWallLines(selWall.corners, selWall.thicknessM, selWall.referenceSide);
-        for (const c of lines.subCorners) {
-          const s = cam.worldToScreen(c.x, c.y);
-          // Etwas kleiner und dezenter — die Gegenkante ist sekundär, soll aber
-          // sichtbar greifbar wirken.
-          dot(s.x, s.y, 3.5, "rgba(255,255,255,0.95)", Defaults.wallSelectionColor, 1.2);
-        }
-      }
     }
+
     ctx.restore();
   }
 
