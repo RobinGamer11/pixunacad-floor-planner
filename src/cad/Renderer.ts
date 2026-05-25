@@ -868,6 +868,7 @@ export class Renderer {
               if (ow.id === wall.id) continue;
               if (ow.labelId !== labelId) continue;
               if (ow.corners.length < 2 || ow.thicknessM <= 0) continue;
+              if ((ow.priority ?? 0) <= (wall.priority ?? 0)) continue;
               const r = buildHealedWallSolidRing(ow, this.scene.walls, this.scene.getWallTopology());
               if (r.length < 3) continue;
               otherPolys.push([ringToPCPolygon(r)]);
