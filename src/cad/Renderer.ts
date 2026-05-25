@@ -14,7 +14,7 @@ import { computeWallLines } from "./wallGeom";
 import { computeHealedWallLines } from "./wallHeal";
 import { getWallUnionGroups } from "./wallUnion";
 import { buildWallSolidRing, buildHealedWallSolidRing, ringToPCPolygon } from "./wallSolid";
-import polygonClipping from "polygon-clipping";
+import polygonClipping, { type MultiPolygon } from "polygon-clipping";
 
 export interface Selection {
   type: string;
@@ -104,6 +104,48 @@ export class Renderer {
     this.camera = camera;
     this.scene = scene;
     this.labels = labels;
+  }
+
+  private _drawWallMulti(multi: MultiPolygon, fillStyle: string, strokeStyle?: string, lineWidth = 1.5) {
+    if (!multi || multi.length === 0) return;
+    const ctx = this.ctx;
+    const cam = this.camera;
+    ctx.save();
+    ctx.fillStyle = fillStyle;
+    ctx.beginPath();
+    for (const poly of multi) {
+      for (const ring of poly) {
+        if (!ring || ring.length < 3) continue;
+        const p0 = cam.worldToScreen(ring[0][0], ring[0][1]);
+        ctx.moveTo(p0.x, p0.y);
+        for (let i = 1; i < ring.length; i++) {
+          const p = cam.worldToScreen(ring[i][0], ring[i][1]);
+          ctx.lineTo(p.x, p.y);
+        }
+        ctx.closePath();
+      }
+    }
+    ctx.fill("evenodd");
+
+    if (strokeStyle) {
+      ctx.strokeStyle = strokeStyle;
+      ctx.lineWidth = lineWidth;
+      for (const poly of multi) {
+        for (const ring of poly) {
+          if (!ring || ring.length < 3) continue;
+          ctx.beginPath();
+          const p0 = cam.worldToScreen(ring[0][0], ring[0][1]);
+          ctx.moveTo(p0.x, p0.y);
+          for (let i = 1; i < ring.length; i++) {
+            const p = cam.worldToScreen(ring[i][0], ring[i][1]);
+            ctx.lineTo(p.x, p.y);
+          }
+          ctx.closePath();
+          ctx.stroke();
+        }
+      }
+    }
+    ctx.restore();
   }
 
   setViewport(w: number, h: number) { this.vw = w; this.vh = h; }
