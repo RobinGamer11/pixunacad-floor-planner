@@ -229,9 +229,13 @@ export class Renderer {
       this._drawTextBoxesForLabel(labelId);
       this._drawStickerInstancesForLabel(labelId);
     }
+    // Fangpunkte der selektierten Wand IMMER ganz oben (über allen Wänden/Hatches),
+    // damit Bewegen/Verschieben/Drehen jederzeit greifbar bleibt.
+    this._drawSelectedWallHandles();
     // Ruler-Guide (Lineal) immer ganz oben in der aktiven Scene zeichnen.
     this._drawRulerGuide();
   }
+
 
   render() {
     const ctx = this.ctx;
