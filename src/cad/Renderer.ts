@@ -871,29 +871,57 @@ export class Renderer {
       // selektierte Wand optisch sauber an sie andockt — ohne aus der
       // Nachbarwand etwas auszusparen.
       if (isSelected) {
-        const selRing = buildHealedWallSolidRing(wall, this.scene.walls, this.scene.getWallTopology());
+        const topo = this.scene.getWallTopology();
+        const selRing = buildHealedWallSolidRing(wall, this.scene.walls, topo);
         if (selRing.length >= 3) {
           const selMulti: MultiPolygon = [[ringToPCPolygon(selRing)]] as MultiPolygon;
           this._drawWallMulti(selMulti, "rgba(77,163,255,0.28)", Defaults.wallSelectionColor, 2.2);
 
+          // T-Stoß-Analyse: Wände, die in die selektierte Wand HINEIN-T-stoßen
+          // (Selektion ist Host, die andere Wand ist Branch) müssen beim Re-Draw
+          // gegen das Selektions-Solid geclippt werden, damit die blaue Fläche
+          // an T-Stößen, wo die Selektion Host ist, vollständig sichtbar bleibt.
+          // Wände, in die die Selektion selbst hinein-T-stößt (Selektion = Branch,
+          // andere = Host), werden unverändert über das blaue Overlay gezeichnet
+          // → blaue Selektion dockt visuell an die Host-Wand an.
+          const branchesIntoSelected = new Set<string>();
+          for (const node of topo.nodes) {
+            const selIsHostHere = node.incidents.some(
+              i => i.wallId === wall.id && i.kind === "tjunction"
+            );
+            if (!selIsHostHere) continue;
+            for (const inc of node.incidents) {
+              if (inc.wallId === wall.id) continue;
+              if (inc.kind === "start" || inc.kind === "end") {
+                branchesIntoSelected.add(inc.wallId);
+              }
+            }
+          }
+
           for (const group of groups) {
             if (!group.multi || group.multi.length === 0) continue;
-            // Eigene Wandgruppe NICHT erneut zeichnen — sonst übermalt sie das blaue Overlay.
             if (group.wallIds.length === 1 && group.wallIds[0] === wall.id) continue;
-            // Gruppen, die diese Wand enthalten: blende sie aus, indem nur die anderen
-            // Wände der Gruppe als separate Solids neu gezeichnet werden.
-            if (group.wallIds.includes(wall.id)) {
-              for (const wid of group.wallIds) {
-                if (wid === wall.id) continue;
-                const ow = this.scene.walls.find(w => w.id === wid);
-                if (!ow || ow.corners.length < 2) continue;
-                const r = buildHealedWallSolidRing(ow, this.scene.walls, this.scene.getWallTopology());
-                if (r.length < 3) continue;
-                this._drawWallMulti([[ringToPCPolygon(r)]] as MultiPolygon, group.fillColor, group.strokeColor, 1.5);
+
+            // Liste der in dieser Gruppe zu zeichnenden Wand-IDs (selektierte ausschließen).
+            const wids = group.wallIds.includes(wall.id)
+              ? group.wallIds.filter(id => id !== wall.id)
+              : group.wallIds;
+
+            for (const wid of wids) {
+              const ow = this.scene.walls.find(w => w.id === wid);
+              if (!ow || ow.corners.length < 2) continue;
+              const r = buildHealedWallSolidRing(ow, this.scene.walls, topo);
+              if (r.length < 3) continue;
+              let multi: MultiPolygon = [[ringToPCPolygon(r)]] as MultiPolygon;
+              if (branchesIntoSelected.has(wid)) {
+                try {
+                  const diff = polygonClipping.difference(multi as any, selMulti as any);
+                  multi = diff as MultiPolygon;
+                } catch { /* keep original on clipping failure */ }
               }
-              continue;
+              if (!multi || multi.length === 0) continue;
+              this._drawWallMulti(multi, group.fillColor, group.strokeColor, 1.5);
             }
-            this._drawWallMulti(group.multi, group.fillColor, group.strokeColor, 1.5);
           }
         }
       }
