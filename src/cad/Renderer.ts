@@ -868,6 +868,9 @@ export class Renderer {
               if (ow.id === wall.id) continue;
               if (ow.labelId !== labelId) continue;
               if (ow.corners.length < 2 || ow.thicknessM <= 0) continue;
+              // Nur strikt höher priorisierte Wände schneiden die Selektion aus —
+              // gleichrangige Wände dürfen die ausgefüllte Andock-Fläche nicht abziehen.
+              if ((ow.priority ?? 0) <= (wall.priority ?? 0)) continue;
               const r = buildHealedWallSolidRing(ow, this.scene.walls, this.scene.getWallTopology());
               if (r.length < 3) continue;
               otherPolys.push([ringToPCPolygon(r)]);
