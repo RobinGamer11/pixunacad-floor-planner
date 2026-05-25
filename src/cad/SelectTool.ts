@@ -424,6 +424,60 @@ export class SelectTool {
     }
   }
 
+  /** Begin AreaLabel-Handle-Edit (move/translate/rotate) for a clicked m²-Box corner. */
+  beginAreaLabelHandleEdit(hatchId: string, handleIndex: number, action: string) {
+    const hatch = this.app.scene.getHatchById(hatchId);
+    if (!hatch || !hatch.areaLabel?.show) return;
+    if (action === PointEditAction.DELETE) return;
+    const layout = (this.app.renderer as any)._getAreaLabelLayout(hatch);
+    if (!layout) return;
+
+    this.activeEditAction = action;
+    this.editTarget = { kind: "areaLabelHandle", hatchId, handleIndex };
+
+    // Convert handle screen positions back to world for pivot math.
+    const cam = this.app.camera;
+    const handleWorlds = layout.handles.map((h: Vec2) => cam.screenToWorld(h.x, h.y));
+    const cornerW = handleWorlds[handleIndex];
+    const oppW = handleWorlds[(handleIndex + 2) % 4];
+
+    this.areaLabelOriginalRotation = hatch.areaLabel.rotationRad || 0;
+    this.areaLabelOriginalScale = hatch.areaLabel.scale ?? 1;
+    this.areaLabelOriginalOffset = v(hatch.areaLabel.offsetX || 0, hatch.areaLabel.offsetY || 0);
+    this.areaLabelOriginalCornerWorld = v(cornerW.x, cornerW.y);
+    this.areaLabelOriginalOppositeWorld = v(oppW.x, oppW.y);
+    this.areaLabelPolyCenter = polygonCentroid(hatch.points);
+
+    // For ROTATE: pivot = label center (world). For MOVE: pivot = opposite corner.
+    if (action === PointEditAction.ROTATE) {
+      this.fixedPoint = v(layout.centerWorld.x, layout.centerWorld.y);
+    } else {
+      this.fixedPoint = v(oppW.x, oppW.y);
+    }
+    this.otherPointOriginal = v(cornerW.x, cornerW.y);
+
+    this.moveHubLocked = false;
+    this.moveHubLengthM = null;
+    this.moveHubAngleDeg = null;
+    this.app.pointEditMenu.hide();
+
+    if (action === PointEditAction.ROTATE || action === PointEditAction.MOVE) {
+      const radius = dist(this.fixedPoint!, this.otherPointOriginal!);
+      const ang = angleDeg(this.fixedPoint!, this.otherPointOriginal!);
+      this.app.hub.bindCommit((vals) =>
+        action === PointEditAction.ROTATE ? this._applyRotateHubValues(vals) : this._applyMoveHubValues(vals)
+      );
+      this.app.hub.showAt(this.app.input.mouse.sx, this.app.input.mouse.sy);
+      this.app.hub.updateDisplay(radius, ang);
+      this.app.hub.setValues(radius, ang);
+      this.app.hub.enterEditMode();
+    } else {
+      this.app.hub.hide();
+      this.app.hub.bindCommit(null);
+    }
+  }
+
+
   /** Begin Hatch-Edge-Offset (parallel shift along edge normal). */
   beginHatchEdgeOffset(hatchId: string, edgeIndex: number, holeIndex: number | null = null) {
     const hatch = this.app.scene.getHatchById(hatchId);
