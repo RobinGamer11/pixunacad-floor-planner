@@ -5,7 +5,10 @@ import { Camera } from "./Camera";
 import { LabelManager } from "./LabelManager";
 import { boxCornersWorld } from "./textGeometry";
 import { documentCornersWorld, documentEdgeMidpointsWorld } from "./documentGeometry";
-// Wall-Snap nutzt ausschließlich wall.corners (Bezugslinie).
+import { computeWallLines } from "./wallGeom";
+// Wall-Snap nutzt primär wall.corners (Bezugslinie); optional zusätzlich
+// die Sub-Linien-Eckpunkte/-Kanten (gegenüberliegende Wandkante), wenn das
+// aktive Werkzeug das anfordert (z. B. WallTool beim Zeichnen).
 
 export type WallLineKind = "main" | "sub" | "help";
 
