@@ -12,7 +12,7 @@ import { documentCornersWorld, documentCenterWorld } from "./documentGeometry";
 import { getOrCreateDocMask } from "./documentMask";
 import { computeWallLines } from "./wallGeom";
 import { getWallUnionGroups } from "./wallUnion";
-import { buildWallSolidRing } from "./wallSolid";
+import { buildWallSolidRing, buildHealedWallSolidRing } from "./wallSolid";
 
 export interface Selection {
   type: string;
@@ -794,7 +794,7 @@ export class Renderer {
 
     // BIM-Pipeline: Pro Label/Style-Gruppe alle Wandkörper unionieren.
     // Das eliminiert automatisch innere Stoßkanten und doppelte Konturen.
-    const groups = getWallUnionGroups(this.scene.walls, labelId);
+    const groups = getWallUnionGroups(this.scene.walls, labelId, this.scene.getWallTopology());
     if (groups.length === 0) return;
 
     for (const group of groups) {
@@ -853,7 +853,7 @@ export class Renderer {
 
       // Selektion: Solid der einzelnen Wand mit Selektionsfarbe überlagern
       if (isSelected) {
-        const ring = buildWallSolidRing(wall);
+        const ring = buildHealedWallSolidRing(wall, this.scene.walls, this.scene.getWallTopology());
         if (ring.length >= 3) {
           ctx.save();
           ctx.fillStyle = "rgba(77,163,255,0.28)";
