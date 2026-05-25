@@ -991,6 +991,12 @@ export class SelectTool {
     this.textBoxHeightOriginal = 0;
     this.textBoxCenterOriginal = null;
     this.textBoxCornerOriginal = null;
+    this.areaLabelOriginalRotation = 0;
+    this.areaLabelOriginalScale = 1;
+    this.areaLabelOriginalOffset = null;
+    this.areaLabelOriginalCornerWorld = null;
+    this.areaLabelOriginalOppositeWorld = null;
+    this.areaLabelPolyCenter = null;
     this.moveHubLocked = false;
     this.moveHubLengthM = null;
     this.moveHubAngleDeg = null;
