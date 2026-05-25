@@ -20,13 +20,11 @@ export function unionWallSolids(walls: Wall[]): MultiPolygon {
   }
   if (polys.length === 0) return [];
   try {
-    // polygon-clipping union: erstes Polygon + Rest → MultiPolygon
-    const [first, ...rest] = polys;
+    const [first, ...rest] = polys as any[];
     if (rest.length === 0) return first as MultiPolygon;
-    return polygonClipping.union(first as any, ...(rest as any[]));
+    return polygonClipping.union(first, ...rest);
   } catch {
-    // Robustheit: bei degenerierter Geometrie auf Einzel-Polygone zurückfallen
-    return polys as MultiPolygon;
+    return polys as unknown as MultiPolygon;
   }
 }
 
