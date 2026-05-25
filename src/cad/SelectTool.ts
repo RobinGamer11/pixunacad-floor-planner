@@ -304,6 +304,20 @@ export class SelectTool {
 
   isEditing() { return !!this.activeEditAction; }
 
+  getPriorityWallId(): string | null {
+    if (this.editTarget) {
+      if (
+        this.editTarget.kind === "wall" ||
+        this.editTarget.kind === "wallEdge" ||
+        this.editTarget.kind === "wallPoint"
+      ) {
+        return this.editTarget.wallId;
+      }
+    }
+    const sel: any = this.app.selection;
+    return sel?.wallId || null;
+  }
+
   hasPointMenu() {
     return !this.isEditing() && !!this._getSelectedPointContext();
   }
@@ -1232,6 +1246,7 @@ export class SelectTool {
 
   private _findPreviewSnapForEdit(input: Input) {
     if (!this.editTarget) return null;
+    this.app.topology.priorityWallId = this.getPriorityWallId();
     let topoSnap: Snap | null;
     if (this.editTarget.kind === "segment") {
       topoSnap = this.app.topology.findBestSnapExcludingSegment(
@@ -1347,6 +1362,8 @@ export class SelectTool {
   }
 
   update(input: Input) {
+    this.app.topology.priorityWallId = this.getPriorityWallId();
+
     // Active sticker drag with point snapping
     if (this.dragStickerId) {
       const inst = this.app.scene.getStickerInstanceById(this.dragStickerId);
