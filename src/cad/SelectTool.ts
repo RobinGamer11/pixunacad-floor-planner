@@ -12,6 +12,7 @@ import { pointInDocument } from "./documentGeometry";
 import { computeWallLines } from "./wallGeom";
 import { buildWallSolidRing } from "./wallSolid";
 import { runWallTopologyMaintenance } from "./wallTopologyMaintenance";
+import { trimWallEndpointsToNeighbors } from "./wallConnect";
 
 type EditTarget =
   | { kind: "segment"; segmentId: string; pointIndex: number }
@@ -971,10 +972,7 @@ export class SelectTool {
       try {
         const wallId = (this.editTarget as any).wallId;
         const wall = wallId ? this.app.scene.getWallById(wallId) : null;
-        if (wall) {
-          const { trimWallEndpointsToNeighbors } = require("./wallConnect");
-          trimWallEndpointsToNeighbors(this.app.scene, wall);
-        }
+        if (wall) trimWallEndpointsToNeighbors(this.app.scene, wall);
         runWallTopologyMaintenance(this.app.scene);
       } catch { /* noop */ }
     }

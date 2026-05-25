@@ -53,6 +53,24 @@ export const WallSettingsPanel: React.FC<Props> = ({ app }) => {
         </button>
       </div>
 
+      {/* Eingabemodus: Einzeln / Verkettet */}
+      <div className="mb-3">
+        <label>Eingabemodus</label>
+        <div className="flex gap-1">
+          {(["chain", "single"] as const).map(m => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => update({ inputMode: m })}
+              className={`cad-toolbar-btn flex-1 justify-center h-8 ${s.inputMode === m ? "active" : ""}`}
+              title={m === "chain" ? "Polywand (mehrere Wände in einem Zug)" : "Einzelwand (Klick-Klick, dann fertig)"}
+            >
+              <span className="text-[11px]">{m === "chain" ? "Verkettet" : "Einzeln"}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="space-y-3">
         {/* Bezugsseite */}
         <div>
@@ -152,7 +170,7 @@ export const WallSettingsPanel: React.FC<Props> = ({ app }) => {
       </div>
 
       <div className="mt-3 pt-2 text-[11px]" style={{ borderTop: "1px solid hsl(var(--border))", color: "hsl(var(--cad-toolbar-muted))" }}>
-        Klick: Eckpunkt setzen · Doppelklick: Wand abschließen · Shift: Ortho
+        Klick: Eckpunkt setzen · Doppelklick: abschließen · Shift: Ortho · <b>Leertaste</b>: Bezugsseite wechseln
       </div>
     </div>
   );
