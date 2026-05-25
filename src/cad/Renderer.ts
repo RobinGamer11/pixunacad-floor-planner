@@ -969,6 +969,32 @@ export class Renderer {
     }
   }
 
+  /** Zeichnet die weißen Fangpunkte der aktuell selektierten Wand über allen anderen Wänden. */
+  private _drawSelectedWallHandles() {
+    const sel = this.selection;
+    if (!sel || sel.type !== SelectionType.WALL) return;
+    const wallId = (sel as any).wallId as string | null;
+    if (!wallId) return;
+    const wall = this.scene.walls.find(w => w.id === wallId);
+    if (!wall || wall.corners.length < 1) return;
+    if (!this.labels.isVisible(wall.labelId)) return;
+    const ctx = this.ctx;
+    const cam = this.camera;
+    ctx.save();
+    for (const c of wall.corners) {
+      const s = cam.worldToScreen(c.x, c.y);
+      ctx.beginPath();
+      ctx.fillStyle = "#ffffff";
+      ctx.strokeStyle = Defaults.wallSelectionColor;
+      ctx.lineWidth = 1.6;
+      ctx.arc(s.x, s.y, 4.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+
   /** Wenn aktiv, wird die Mittel-/Helplinie der Wände als Hilfslinie gezeichnet. */
   showWallHelpers = false;
 
