@@ -10,7 +10,7 @@ import type { TextBox } from "./Scene";
 import { pointInInstance, instanceBoundingCornersWorld } from "./StickerManager";
 import { pointInDocument } from "./documentGeometry";
 import { computeWallLines } from "./wallGeom";
-import { buildWallSolidRing } from "./wallSolid";
+import { buildWallSolidRing, buildHealedWallSolidRing } from "./wallSolid";
 import { runWallTopologyMaintenance } from "./wallTopologyMaintenance";
 import { trimWallEndpointsToNeighbors } from "./wallConnect";
 
