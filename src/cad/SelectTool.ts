@@ -58,6 +58,14 @@ export class SelectTool {
   textBoxCenterOriginal: Vec2 | null = null;
   textBoxCornerOriginal: Vec2 | null = null;   // moving (clicked) corner world pos at edit start
 
+  // AreaLabel handle (corner) edit state
+  areaLabelOriginalRotation = 0;
+  areaLabelOriginalScale = 1;
+  areaLabelOriginalOffset: Vec2 | null = null;
+  areaLabelOriginalCornerWorld: Vec2 | null = null;
+  areaLabelOriginalOppositeWorld: Vec2 | null = null;
+  areaLabelPolyCenter: Vec2 | null = null;
+
   moveHubLocked = false;
   moveHubLengthM: number | null = null;
   moveHubAngleDeg: number | null = null;
