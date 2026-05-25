@@ -1,33 +1,33 @@
-## Plan
+## Problem
 
-Ich fixe die Wand-Union so, dass eine neu andockende Wand die bestehende Wand nicht mehr ausschneidet, wenn beide Wände dieselbe Priorität haben.
+Im neuen Render-Code wird die selektierte Wand als volles blaues Solid gezeichnet und ALLE anderen Wände werden danach komplett darüber gerendert. Das funktioniert für Wand 1 selektiert (Branch dockt an Wand 2 an), erzeugt aber bei Wand 2 selektiert eine sichtbare Kerbe: die geheilte Form von Wand 1 reicht in den Körper von Wand 2 hinein und übermalt einen Teil der blauen Selektion.
 
-### Änderungen
+## Ursache
 
-1. **Subtraktion in `wallUnion.ts` auf Prioritäts-Tiers umstellen**
-   - Wände gleicher Priorität werden nicht mehr gegenseitig voneinander abgezogen.
-   - Nur Wände mit strikt höherer Priorität schneiden niedrigere Prioritäten aus.
+T-Stöße sind asymmetrisch: eine Wand ist „Host" (durchgehend), die andere „Branch" (endet an der Host-Wand). Die Topologie kennt diese Rolle bereits über `node.incidents[].kind === "tjunction"` (die T-Junctionende Wand ist die Branch, die andere die Host).
 
-2. **Bestehende visuelle Union beibehalten**
-   - Gleiche Wandtypen/-prioritäten bleiben optisch sauber verbunden.
-   - Unterschiedliche Styles bleiben weiterhin getrennt renderbar, aber ohne falsche Löcher in der Bestandswand.
+Der aktuelle Renderer ignoriert das beim Übermalen.
 
-3. **Mittellinie bleibt separat**
-   - Dieser Fix konzentriert sich auf das falsche Ausschneiden der Wandflächen.
-   - Die gestrichelte Mittellinie kann danach gezielt gekürzt werden, falls sie noch störend tief hineinragt.
+## Lösung
 
-### Technische Details
+Beim Neuzeichnen der anderen Wände über das blaue Overlay die Rolle pro Wand auswerten:
 
-Aktuell wird die Maskierung bucketweise akkumuliert. Dadurch kann eine gleich priorisierte Wand aus einer anderen gleich priorisierten Wand herausgeschnitten werden, wenn sie in einem anderen Style-Bucket landet.
+- **Host gegenüber der selektierten Wand** (selektierte Wand T-junctioniert in diese Wand): unverändert vollständig drüber zeichnen → selektierte Branch endet optisch an der Host-Wand.
+- **Branch gegenüber der selektierten Wand** (diese Wand T-junctioniert in die selektierte Wand): vor dem Zeichnen das Solid der selektierten Wand abziehen → Branch endet an der blauen Kante, selektierte Host bleibt komplett blau.
+- **Sonst** (kein T-Stoß zur Selektion): unverändert übermalen.
 
-Ich ändere das zu:
+Konkret in `src/cad/Renderer.ts` im Selektionsblock (Zeilen 868–899):
 
-```text
-Prioritäten absteigend sammeln
-für jede Priorität:
-  Maske = Union aller bereits höheren Prioritäten
-  alle Buckets dieser Priorität nur gegen diese höhere Maske schneiden
-  danach diese Priorität zur Maske hinzufügen
-```
+1. Aus dem Topologie-Graph zwei Sets der Wand-IDs am Selektionsknoten bestimmen:
+   - `branchesIntoSelected` – andere Wände, deren T-Junction-Inzidenz zur selektierten Wand zeigt.
+   - `hostsOfSelected` – Wände, in die die Selektion selbst T-junctioniert (Endpunkt-Knoten der Selektion, andere Inzidenz mit `kind === "tjunction"`).
+2. Beim Re-Draw-Loop pro „andere Wand"-Ring:
+   - Wenn `wid ∈ branchesIntoSelected` → Solid mit `polygonClipping.difference` gegen das Selektions-Solid clippen und das Ergebnis zeichnen.
+   - Sonst (inkl. `hostsOfSelected`) → unverändert zeichnen.
 
-Ergebnis: Gleichrangige Wände docken sauber an, ohne sich gegenseitig Löcher auszuschneiden.
+Damit:
+
+- Wand 1 selektiert (Branch in Wand 2): Wand 2 ist Host → bleibt komplett → blaue Wand 1 dockt sauber an. ✓
+- Wand 2 selektiert (Host für Wand 1): Wand 1 ist Branch → wird gegen Wand 2 geclippt → blaue Wand 2 bleibt komplett, Wand 1 endet an Wand 2's Kante. ✓
+
+Keine Änderungen außerhalb des Selektionsblocks; `wallUnion.ts` und die Heilung bleiben unangetastet.
