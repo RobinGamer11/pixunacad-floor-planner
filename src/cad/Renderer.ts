@@ -852,8 +852,10 @@ export class Renderer {
     }
 
     // 3. Selektion / Helpers / Bezugslinien — pro Wand
-    const selectedWallId =
-      this.selection && this.selection.type === SelectionType.WALL
+    // Eine Wand gilt als selektiert, sobald die Selection eine wallId trägt —
+    // egal ob direkt (SelectionType.WALL) oder via Eckpunkt (SelectionType.POINT).
+    const selectedWallId: string | null =
+      this.selection && (this.selection as any).wallId
         ? (this.selection as any).wallId
         : null;
 
@@ -969,27 +971,50 @@ export class Renderer {
     }
   }
 
-  /** Zeichnet die weißen Fangpunkte der aktuell selektierten Wand über allen anderen Wänden. */
+  /**
+   * Fangpunkte:
+   *  – Selektierte Wand: kräftige weiße Punkte mit blauem Ring (immer ganz vorne).
+   *  – Alle anderen Wände: dezente Hilfs-Punkte, sobald irgendeine Wand selektiert
+   *    oder gerade ein Wand-Edit aktiv ist, damit Verschieben/Bewegen jederzeit
+   *    eindeutig an Nachbarwände andocken kann.
+   */
   private _drawSelectedWallHandles() {
-    const sel = this.selection;
-    if (!sel || sel.type !== SelectionType.WALL) return;
-    const wallId = (sel as any).wallId as string | null;
-    if (!wallId) return;
-    const wall = this.scene.walls.find(w => w.id === wallId);
-    if (!wall || wall.corners.length < 1) return;
-    if (!this.labels.isVisible(wall.labelId)) return;
+    const sel: any = this.selection;
+    const selWallId: string | null = sel && sel.wallId ? sel.wallId : null;
+    if (!selWallId) return;
     const ctx = this.ctx;
     const cam = this.camera;
     ctx.save();
-    for (const c of wall.corners) {
-      const s = cam.worldToScreen(c.x, c.y);
-      ctx.beginPath();
-      ctx.fillStyle = "#ffffff";
-      ctx.strokeStyle = Defaults.wallSelectionColor;
-      ctx.lineWidth = 1.6;
-      ctx.arc(s.x, s.y, 4.5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
+    // Dezente Hilfs-Punkte auf allen anderen Wänden im selben Label.
+    const selWall = this.scene.walls.find(w => w.id === selWallId);
+    const selLabel = selWall?.labelId;
+    for (const w of this.scene.walls) {
+      if (w.id === selWallId) continue;
+      if (selLabel && w.labelId !== selLabel) continue;
+      if (!this.labels.isVisible(w.labelId)) continue;
+      for (const c of w.corners) {
+        const s = cam.worldToScreen(c.x, c.y);
+        ctx.beginPath();
+        ctx.fillStyle = "rgba(255,255,255,0.85)";
+        ctx.strokeStyle = "rgba(120,120,120,0.65)";
+        ctx.lineWidth = 1;
+        ctx.arc(s.x, s.y, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+    }
+    // Kräftige Fangpunkte der selektierten Wand.
+    if (selWall && this.labels.isVisible(selWall.labelId)) {
+      for (const c of selWall.corners) {
+        const s = cam.worldToScreen(c.x, c.y);
+        ctx.beginPath();
+        ctx.fillStyle = "#ffffff";
+        ctx.strokeStyle = Defaults.wallSelectionColor;
+        ctx.lineWidth = 1.6;
+        ctx.arc(s.x, s.y, 4.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
     }
     ctx.restore();
   }

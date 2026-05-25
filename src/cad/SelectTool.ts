@@ -1557,8 +1557,9 @@ export class SelectTool {
 
       if (this.activeEditAction === PointEditAction.TRANSLATE) {
         const delta = this._previewTranslateDelta(input);
-        const isWallPointEdit = this.editTarget?.kind === "wallPoint";
-        if (isWallPointEdit) {
+        const isWallTranslatePreview =
+          this.editTarget?.kind === "wallPoint" || this.editTarget?.kind === "wall";
+        if (isWallTranslatePreview) {
           // Vorschau-Only: Scene NICHT mutieren, nur Delta merken (ganze Wand).
           this.wallPreviewDelta = v(delta.x, delta.y);
         } else {
@@ -1982,26 +1983,40 @@ export class SelectTool {
     }
 
     if (this.isEditing()) {
-      // Vorschau-Wandkontur für Wand-Punkt-Edits (MOVE / TRANSLATE).
-      if (this.editTarget?.kind === "wallPoint" && this.wallPointsOriginal) {
-        const wall = this.app.scene.getWallById(this.editTarget.wallId);
+      // Vorschau-Wandkontur für Wand-Punkt-Edits (MOVE / TRANSLATE) und für
+      // ganze Wand-Translation (Edge-basiert). Render-Stil entspricht dem
+      // Wand-Werkzeug: Haupt-/Sub-Linie als kräftige Linie in Wandfarbe,
+      // Mittellinie gestrichelt, plus weiße Eckpunkte.
+      const isWallKind =
+        this.editTarget?.kind === "wallPoint" || this.editTarget?.kind === "wall";
+      if (isWallKind && this.wallPointsOriginal) {
+        const wallId = (this.editTarget as any).wallId as string;
+        const wall = this.app.scene.getWallById(wallId);
         if (wall) {
           let previewCorners: Vec2[] | null = null;
-          if (this.activeEditAction === PointEditAction.MOVE && this.wallPreviewPoint) {
+          if (
+            this.activeEditAction === PointEditAction.MOVE &&
+            this.wallPreviewPoint &&
+            this.editTarget?.kind === "wallPoint"
+          ) {
             previewCorners = this.wallPointsOriginal.map(p => v(p.x, p.y));
-            previewCorners[this.editTarget.pointIndex] = v(this.wallPreviewPoint.x, this.wallPreviewPoint.y);
-          } else if (this.activeEditAction === PointEditAction.TRANSLATE && this.wallPreviewDelta) {
+            previewCorners[(this.editTarget as any).pointIndex] =
+              v(this.wallPreviewPoint.x, this.wallPreviewPoint.y);
+          } else if (
+            this.activeEditAction === PointEditAction.TRANSLATE &&
+            this.wallPreviewDelta
+          ) {
             const d = this.wallPreviewDelta;
             previewCorners = this.wallPointsOriginal.map(p => v(p.x + d.x, p.y + d.y));
           }
           if (previewCorners && previewCorners.length >= 2) {
             const lines = computeWallLines(previewCorners, wall.thicknessM, wall.referenceSide);
-            ctx.save();
-            ctx.strokeStyle = "rgba(77,163,255,0.85)";
-            ctx.lineWidth = 1.6;
-            ctx.setLineDash([6, 4]);
-            const drawPoly = (pts: Vec2[]) => {
+            const drawPoly = (pts: Vec2[], opts: { color: string; widthPx: number; dashed?: boolean }) => {
               if (pts.length < 2) return;
+              ctx.save();
+              ctx.strokeStyle = opts.color;
+              ctx.lineWidth = opts.widthPx;
+              if (opts.dashed) ctx.setLineDash([5, 4]);
               ctx.beginPath();
               const s0 = cam.worldToScreen(pts[0].x, pts[0].y);
               ctx.moveTo(s0.x, s0.y);
@@ -2010,14 +2025,18 @@ export class SelectTool {
                 ctx.lineTo(s.x, s.y);
               }
               ctx.stroke();
+              ctx.setLineDash([]);
+              ctx.restore();
             };
-            drawPoly(lines.mainCorners);
-            drawPoly(lines.subCorners);
-            ctx.setLineDash([2, 4]);
-            ctx.strokeStyle = "rgba(77,163,255,0.55)";
-            drawPoly(previewCorners);
-            ctx.setLineDash([]);
-            // Vorschau-Eckpunkte
+            const wallColor = wall.color || "#1a1a1a";
+            // Sub-Linie (Gegenkante) – kräftig
+            drawPoly(lines.subCorners, { color: wallColor, widthPx: 1.5 });
+            // Mittellinie – gestrichelt, dezent
+            drawPoly(lines.helpCorners, { color: "rgba(120,120,120,0.7)", widthPx: 1, dashed: true });
+            // Hauptlinie (= Bezug) – kräftig
+            drawPoly(lines.mainCorners, { color: wallColor, widthPx: 2 });
+            // Vorschau-Eckpunkte (weiß mit blauem Ring, wie Selektion)
+            ctx.save();
             ctx.fillStyle = "#ffffff";
             ctx.strokeStyle = "rgba(77,163,255,0.95)";
             ctx.lineWidth = 1.4;
