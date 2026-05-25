@@ -870,10 +870,27 @@ export class Renderer {
         if (selRing.length >= 3) {
           let selMulti: MultiPolygon = [[ringToPCPolygon(selRing)]] as MultiPolygon;
           const selPrio = wall.priority ?? 0;
+          const graph = this.scene.getWallTopology();
           const higherGroups = groups.filter(group => (group.priority ?? 0) > selPrio && group.multi && group.multi.length > 0);
-          if (higherGroups.length > 0) {
+          const maskParts: MultiPolygon[] = higherGroups.map(group => group.multi);
+          const maskedHostIds = new Set<string>();
+          for (const atStart of [true, false]) {
+            const node = graph.getNodeForEndpoint(wall.id, atStart);
+            if (!node) continue;
+            for (const inc of node.incidents) {
+              if (inc.kind !== "tjunction" || inc.wallId === wall.id || maskedHostIds.has(inc.wallId)) continue;
+              const host = this.scene.walls.find(w => w.id === inc.wallId);
+              if (!host || host.labelId !== labelId || !this.labels.isVisible(host.labelId) || host.corners.length < 2) continue;
+              const hostRing = buildHealedWallSolidRing(host, this.scene.walls, graph);
+              const hostPc = ringToPCPolygon(hostRing);
+              if (hostPc.length < 4) continue;
+              maskParts.push([[hostPc]] as MultiPolygon);
+              maskedHostIds.add(inc.wallId);
+            }
+          }
+          if (maskParts.length > 0) {
             try {
-              const [first, ...rest] = higherGroups.map(group => group.multi) as any[];
+              const [first, ...rest] = maskParts as any[];
               const higherMask = rest.length > 0 ? polygonClipping.union(first, ...rest) : first;
               selMulti = polygonClipping.difference(selMulti as any, higherMask as any) as MultiPolygon;
             } catch {
