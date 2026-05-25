@@ -1567,7 +1567,15 @@ export class SelectTool {
         }
 
         this.app.renderer.setHoverSegmentId(null);
-        this.app.hub.hide();
+        // Distanz-/Winkel-Anzeige der Verschiebung (wie beim Linienwerkzeug)
+        if (isWallTranslatePreview) {
+          const len = Math.hypot(delta.x, delta.y);
+          const ang = len > 1e-6 ? (Math.atan2(delta.y, delta.x) * 180) / Math.PI : 0;
+          this.app.hub.showAt(input.mouse.sx, input.mouse.sy);
+          this.app.hub.updateDisplay(len, ang);
+        } else {
+          this.app.hub.hide();
+        }
 
         if (input.clicked) {
           const finalDelta = this._commitTranslateDelta(input);
