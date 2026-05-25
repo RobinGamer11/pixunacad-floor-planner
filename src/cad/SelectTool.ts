@@ -20,6 +20,7 @@ type EditTarget =
   | { kind: "hatchEdge"; hatchId: string; edgeIndex: number }
   | { kind: "hatchHoleEdge"; hatchId: string; holeIndex: number; edgeIndex: number }
   | { kind: "textboxHandle"; textBoxId: string; handleIndex: number }
+  | { kind: "areaLabelHandle"; hatchId: string; handleIndex: number }
   | { kind: "wallPoint"; wallId: string; pointIndex: number }
   | { kind: "wallEdge"; wallId: string; edgeIndex: number }
   | { kind: "wall"; wallId: string };
