@@ -66,6 +66,8 @@ export class Renderer {
   hoverTextBoxId: string | null = null;
   /** Box currently being edited inline — skip canvas rendering for it. */
   editingTextBoxId: string | null = null;
+  /** True während ein Wand-Edit (Bewegen/Verschieben/Drehen) läuft. */
+  wallEditActive = false;
 
   /**
    * Plan-Modus: zeichnet grauen Hintergrund + weißes Papierblatt (in mm).
@@ -985,10 +987,11 @@ export class Renderer {
     const ctx = this.ctx;
     const cam = this.camera;
     ctx.save();
-    // Dezente Hilfs-Punkte auf allen anderen Wänden im selben Label.
+    // Dezente Hilfs-Punkte auf allen anderen Wänden — NUR während eines aktiven
+    // Wand-Edits (Bewegen/Verschieben/Drehen aus der Hub-Box).
     const selWall = this.scene.walls.find(w => w.id === selWallId);
     const selLabel = selWall?.labelId;
-    for (const w of this.scene.walls) {
+    if (this.wallEditActive) for (const w of this.scene.walls) {
       if (w.id === selWallId) continue;
       if (selLabel && w.labelId !== selLabel) continue;
       if (!this.labels.isVisible(w.labelId)) continue;
