@@ -40,6 +40,9 @@ export interface AreaLabelLayout {
   handles: { x: number; y: number }[];
   centerWorld: Vec2;
   centerScreen: Vec2;
+  rotationRad: number;
+  boxW: number;
+  boxH: number;
 }
 
 export class Renderer {
