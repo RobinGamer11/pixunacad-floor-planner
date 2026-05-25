@@ -108,12 +108,63 @@ export class WallTool {
   }
 
   /**
-   * Phase 3: Auto-Split (T-Stoß) + Auto-Merge (kollineare Geschwister) als
-   * deterministische Topologie-Wartung. Wird auf die neu erzeugte Wand
-   * fokussiert; Split-/Merge-Folgewellen laufen frei über alle Wände.
+   * ArchiCAD-Verhalten: Beim Erzeugen einer Wand werden ihre Endpunkte an
+   * benachbarte Bezugslinien gezogen, sofern sie in greifbarer Distanz liegen.
+   * Damit entstehen echte gemeinsame Knoten — Voraussetzung für Auto-Split
+   * und für die nahtlose Boolean-Union der Wandkörper.
    */
   private _runConnectionPipeline(newWall: import("./Scene").Wall) {
+    this._trimEndpointsToNeighbors(newWall);
     runWallTopologyMaintenance(this.app.scene, [newWall]);
+  }
+
+  private _trimEndpointsToNeighbors(newWall: import("./Scene").Wall) {
+    const all = this.app.scene.walls;
+    if (newWall.corners.length < 2 || all.length < 2) return;
+    // Snap-Reichweite: skaliert mit Wanddicke, damit dickere Wände entsprechend
+    // großzügiger andocken.
+    const reach = Math.max(0.08, newWall.thicknessM * 1.2);
+    for (const atStart of [true, false]) {
+      const idx = atStart ? 0 : newWall.corners.length - 1;
+      const p = newWall.corners[idx];
+      let bestQ: Vec2 | null = null;
+      let bestD = reach;
+      for (const host of all) {
+        if (host === newWall) continue;
+        if (host.corners.length < 2) continue;
+        // 1) Endpunkt-Match hat Vorrang.
+        for (const ep of [host.corners[0], host.corners[host.corners.length - 1]]) {
+          const d = dist(p, ep);
+          if (d < bestD) { bestD = d; bestQ = v(ep.x, ep.y); }
+        }
+        // 2) Interner Eckpunkt-Match.
+        for (let i = 1; i < host.corners.length - 1; i++) {
+          const ep = host.corners[i];
+          const d = dist(p, ep);
+          if (d < bestD) { bestD = d; bestQ = v(ep.x, ep.y); }
+        }
+        // 3) Projektion auf Bezugslinien-Segment.
+        for (let i = 0; i < host.corners.length - 1; i++) {
+          const a = host.corners[i], b = host.corners[i + 1];
+          const ab = sub(b, a);
+          const ab2 = ab.x * ab.x + ab.y * ab.y || 1e-12;
+          let t = ((p.x - a.x) * ab.x + (p.y - a.y) * ab.y) / ab2;
+          if (t <= 0.001 || t >= 0.999) continue;
+          const q = { x: a.x + ab.x * t, y: a.y + ab.y * t };
+          const d = Math.hypot(q.x - p.x, q.y - p.y);
+          if (d < bestD) { bestD = d; bestQ = v(q.x, q.y); }
+        }
+      }
+      if (bestQ) {
+        // Vermeide degenerierte Wand: getrimmter Endpunkt darf nicht mit dem
+        // gegenüberliegenden Endpunkt zusammenfallen.
+        const other = newWall.corners[atStart ? newWall.corners.length - 1 : 0];
+        if (dist(bestQ, other) >= Defaults.minSegLenM) {
+          newWall.corners[idx] = bestQ;
+        }
+      }
+    }
+    this.app.scene.markWallsDirty();
   }
 
   isDrawing() { return this.state === "drawing"; }
