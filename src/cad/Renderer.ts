@@ -877,7 +877,20 @@ export class Renderer {
             } else {
               const [first, ...rest] = otherPolys as any[];
               const otherUnion = rest.length === 0 ? first : polygonClipping.union(first, ...rest);
-              displayMulti = polygonClipping.difference(selPC as any, otherUnion as any) as any;
+              // Nur Nachbar-Anteile außerhalb des Rohrechtecks der selektierten
+              // Wand subtrahieren — so verschwinden Heal-Zipfel, die in den
+              // Nachbarn ragen, aber Nachbar-Zipfel, die im eigenen Rohkörper
+              // liegen, bleiben Teil des Highlights (kein V-Notch am Stoß).
+              const selRawRing = buildWallSolidRing(wall);
+              if (selRawRing.length >= 3) {
+                const selRawPC = [ringToPCPolygon(selRawRing)];
+                const subtractMask = polygonClipping.difference(otherUnion as any, selRawPC as any);
+                displayMulti = subtractMask.length === 0
+                  ? [selPC as any]
+                  : polygonClipping.difference(selPC as any, subtractMask as any) as any;
+              } else {
+                displayMulti = polygonClipping.difference(selPC as any, otherUnion as any) as any;
+              }
             }
           } catch {
             displayMulti = null;

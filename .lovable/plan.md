@@ -1,35 +1,34 @@
-# Überlappung beim Selektions-Overlay entfernen
+# Selektion: V-Ausschnitt am Stoß zur Nachbarwand schließen
 
-## Beobachtung im Screenshot
+## Beobachtung
 
-Zwei AW (gleiche Priorität 200) treffen sich am weißen Knotenpunkt. Das hellblaue **Selektions-Overlay** der angeklickten Wand poked als Dreieck nach oben in die Nachbarwand hinein. In der eigentlichen Wand-Füllung (graue Union) ist die Überlappung bereits sauber: die Boolean-Union mischt beide Solids zu einer Fläche. Die sichtbare „Überlappung" ist nur der Selektions-Highlight, der das **rohe geheilte Solid** der Einzelwand zeichnet — die durch den Heal in die Nachbarwand hineinragende Gehrungs-Spitze inklusive.
+Vorherige Korrektur clippt das Selektions-Overlay gegen alle Nachbarwände. Folge: Greift der **Heal-Zipfel der Nachbarwand** in den Körper der selektierten Wand hinein (Bild: V-förmiger Ausschnitt unten), wird dieser Bereich aus dem blauen Highlight weggeschnitten — die graue Nachbar-Spitze ragt sichtbar in die selektierte Wand hinein, statt zu „verschmelzen".
 
 ## Ursache
 
-`Renderer.ts` Z. 856 ff.: für die selektierte Wand wird `buildHealedWallSolidRing(wall, …)` direkt mit Füllung + Konturlinie auf das Endbild gelegt. Der Ring enthält per Definition Gehrungs-Spitzen, die in benachbarte Wand-Solids hineinreichen — bei gleichpriorisierten Nachbarn überlappen sich diese Spitzen, und das Overlay zeichnet die fremde Wand sichtbar blau ein.
+`Renderer.ts` Z. 856 ff. zieht die volle `nbrHealed`-Union von `selHealed` ab. Das entfernt zwei Dinge zugleich:
+
+- **Zipfel A** — Teil der selektierten Wand, der per Heal in den Nachbar hineinragt (war Ziel der letzten Korrektur, soll weiterhin entfernt werden).
+- **Zipfel B** — Teil des Nachbarn, der per Heal in den **Rohkörper** der selektierten Wand hineinragt (soll erhalten bleiben, da er innerhalb des „echten" Wand-Rechtecks der Selektion liegt).
+
+Aktuell wird auch Zipfel B subtrahiert → V-Notch.
 
 ## Plan
 
-### `src/cad/Renderer.ts` — Selektions-Overlay gegen Nachbarn clippen
-Im Zweig `if (isSelected) { … }` (Z. 856–874):
+### `src/cad/Renderer.ts` — Subtrahieren nur außerhalb des Rohrechtecks
+Im `isSelected`-Block:
 
-1. `selRing = buildHealedWallSolidRing(wall, scene.walls, graph)` wie bisher.
-2. Union aller anderen healed Wand-Solids im **selben Label** bilden:
-   ```
-   others = scene.walls.filter(w => w.labelId === labelId && w.id !== wall.id && w.corners.length >= 2 && w.thicknessM > 0)
-   otherRings = others.map(w => buildHealedWallSolidRing(w, scene.walls, graph)).filter(r => r.length >= 3)
-   otherUnion = polygonClipping.union(...otherRings als MultiPolygon)
-   ```
-3. `displayMulti = polygonClipping.difference([ringToPCPolygon(selRing)], otherUnion)`.
-   - Bei Fehler / leerem Ergebnis: Fallback auf rohen Ring (heute).
-4. `displayMulti` per Standardroutine (Fill + Stroke wie heute) zeichnen — über alle Polygone und Rings iterieren.
+1. `selHealed` (wie bisher) per `buildHealedWallSolidRing`.
+2. **Neu:** `selRaw` per `buildWallSolidRing(wall)` — das ungeheilte Wand-Rechteck der selektierten Wand.
+3. `nbrUnion` (wie bisher) Union aller anderen Healed-Solids im selben Label.
+4. **Maske:** `subtractMask = polygonClipping.difference(nbrUnion, [selRawPC])` — Nachbar-Anteile, die OUTSIDE des selektierten Rohkörpers liegen (= Zipfel A der selektierten Wand und Reste der Nachbarwände, nicht Zipfel B).
+5. `displayMulti = polygonClipping.difference([selHealedPC], subtractMask)`.
+6. Fallback bei Fehler: rohe `selHealed`-Darstellung wie heute.
 
-Damit ist das Highlight exakt dort, wo die Wand im fertigen Plan tatsächlich zu sehen ist: gemittert an Knoten gleicher Priorität, abgeschnitten an Flanken höherer Priorität, ohne Eindringen in fremde Wand-Solids.
-
-### Performance
-Pro Frame nur bei selektierter Wand — Anzahl Wände im Label typischerweise klein. Keine Caching-Notwendigkeit; bei Bedarf später memoisieren.
+### Effekt
+- Zipfel A (Selektion ragt in Nachbar): liegt außerhalb `selRaw` → in `subtractMask` enthalten → wird entfernt. ✓
+- Zipfel B (Nachbar ragt in selektiertes Rohrechteck): liegt innerhalb `selRaw` → NICHT in `subtractMask` → bleibt im Display erhalten, der V-Notch verschwindet. ✓
+- An gleichpriorisierten Stößen wirkt die Selektion damit wie ArchiCAD: die Wand „verschmilzt" optisch mit dem Nachbarn, ohne in dessen Außenbereich überzuragen.
 
 ### Nicht im Scope
-- Hit-Test (`SelectTool`) bleibt auf rohem Rechteck — Klickfläche unverändert.
-- Wand-Helper (Bezugs-/Mittellinie) bleiben unverändert.
-- Union-/Subtraktionslogik der Hauptfüllung bleibt unverändert (funktioniert bereits korrekt).
+- Hit-Test, Helper, Union-Pipeline unverändert.
