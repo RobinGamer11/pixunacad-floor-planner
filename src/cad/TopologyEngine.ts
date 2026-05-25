@@ -40,6 +40,9 @@ export class TopologyEngine {
   overlayScenes: Scene[] = [];
   /** Wand-ID mit Snap-Vorrang (z. B. aktuell selektierte Wand) — deren Eckpunkte gewinnen Ties. */
   priorityWallId: string | null = null;
+  /** Wenn true, werden zusätzlich Sub-Linien-Eckpunkte/-Kanten anderer Wände
+   * (gegenüberliegende Wandkante) als Snap-Kandidaten berücksichtigt. */
+  includeWallOffsetSnaps = false;
 
 
   constructor(scene: Scene, camera: Camera, labels: LabelManager) {
