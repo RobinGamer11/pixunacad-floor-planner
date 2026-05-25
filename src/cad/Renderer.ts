@@ -987,36 +987,54 @@ export class Renderer {
     const ctx = this.ctx;
     const cam = this.camera;
     ctx.save();
-    // Dezente Hilfs-Punkte auf allen anderen Wänden — NUR während eines aktiven
-    // Wand-Edits (Bewegen/Verschieben/Drehen aus der Hub-Box).
     const selWall = this.scene.walls.find(w => w.id === selWallId);
     const selLabel = selWall?.labelId;
+
+    const dot = (x: number, y: number, r: number, fill: string, stroke: string, lw: number) => {
+      ctx.beginPath();
+      ctx.fillStyle = fill;
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = lw;
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    };
+
+    // Dezente Hilfs-Punkte auf allen anderen Wänden — NUR während eines aktiven
+    // Wand-Edits (Bewegen/Verschieben/Drehen aus der Hub-Box).
     if (this.wallEditActive) for (const w of this.scene.walls) {
       if (w.id === selWallId) continue;
       if (selLabel && w.labelId !== selLabel) continue;
       if (!this.labels.isVisible(w.labelId)) continue;
+      // Bezugslinien-Eckpunkte (kräftiger als die Gegenseite)
       for (const c of w.corners) {
         const s = cam.worldToScreen(c.x, c.y);
-        ctx.beginPath();
-        ctx.fillStyle = "rgba(255,255,255,0.85)";
-        ctx.strokeStyle = "rgba(120,120,120,0.65)";
-        ctx.lineWidth = 1;
-        ctx.arc(s.x, s.y, 3, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
+        dot(s.x, s.y, 3, "rgba(255,255,255,0.85)", "rgba(120,120,120,0.65)", 1);
+      }
+      // Sub-Linien-Eckpunkte (Gegenkante) — sehr dezent
+      if (w.corners.length >= 2) {
+        const lines = computeWallLines(w.corners, w.thicknessM, w.referenceSide);
+        for (const c of lines.subCorners) {
+          const s = cam.worldToScreen(c.x, c.y);
+          dot(s.x, s.y, 2.5, "rgba(255,255,255,0.7)", "rgba(140,140,140,0.5)", 1);
+        }
       }
     }
-    // Kräftige Fangpunkte der selektierten Wand.
+
+    // Kräftige Fangpunkte der selektierten Wand (Bezugslinie + Gegenkante).
     if (selWall && this.labels.isVisible(selWall.labelId)) {
       for (const c of selWall.corners) {
         const s = cam.worldToScreen(c.x, c.y);
-        ctx.beginPath();
-        ctx.fillStyle = "#ffffff";
-        ctx.strokeStyle = Defaults.wallSelectionColor;
-        ctx.lineWidth = 1.6;
-        ctx.arc(s.x, s.y, 4.5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
+        dot(s.x, s.y, 4.5, "#ffffff", Defaults.wallSelectionColor, 1.6);
+      }
+      if (selWall.corners.length >= 2) {
+        const lines = computeWallLines(selWall.corners, selWall.thicknessM, selWall.referenceSide);
+        for (const c of lines.subCorners) {
+          const s = cam.worldToScreen(c.x, c.y);
+          // Etwas kleiner und dezenter — die Gegenkante ist sekundär, soll aber
+          // sichtbar greifbar wirken.
+          dot(s.x, s.y, 3.5, "rgba(255,255,255,0.95)", Defaults.wallSelectionColor, 1.2);
+        }
       }
     }
     ctx.restore();
