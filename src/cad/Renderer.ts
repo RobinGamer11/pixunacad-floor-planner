@@ -853,7 +853,7 @@ export class Renderer {
 
       // Selektion: Solid der einzelnen Wand mit Selektionsfarbe überlagern
       if (isSelected) {
-        const ring = buildWallSolidRing(wall);
+        const ring = buildHealedWallSolidRing(wall, this.scene.walls, this.scene.getWallTopology());
         if (ring.length >= 3) {
           ctx.save();
           ctx.fillStyle = "rgba(77,163,255,0.28)";
