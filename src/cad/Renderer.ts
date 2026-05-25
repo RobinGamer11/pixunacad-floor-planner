@@ -853,24 +853,67 @@ export class Renderer {
 
       const isSelected = selectedWallId === wall.id;
 
-      // Selektion: Solid der einzelnen Wand mit Selektionsfarbe überlagern
+      // Selektion: Solid der einzelnen Wand mit Selektionsfarbe überlagern.
+      // Gehrungs-Spitzen, die in benachbarte Wand-Solids hineinragen, werden
+      // gegen die Union aller anderen Wände im selben Label geclippt — sonst
+      // ragt das blaue Highlight sichtbar in fremde Wände hinein.
       if (isSelected) {
-        const ring = buildHealedWallSolidRing(wall, this.scene.walls, this.scene.getWallTopology());
-        if (ring.length >= 3) {
+        const selRing = buildHealedWallSolidRing(wall, this.scene.walls, this.scene.getWallTopology());
+        if (selRing.length >= 3) {
+          let displayMulti: number[][][][] | null = null;
+          try {
+            const selPC = [ringToPCPolygon(selRing)];
+            const otherPolys: number[][][][] = [];
+            for (const ow of this.scene.walls) {
+              if (ow.id === wall.id) continue;
+              if (ow.labelId !== labelId) continue;
+              if (ow.corners.length < 2 || ow.thicknessM <= 0) continue;
+              const r = buildHealedWallSolidRing(ow, this.scene.walls, this.scene.getWallTopology());
+              if (r.length < 3) continue;
+              otherPolys.push([ringToPCPolygon(r)]);
+            }
+            if (otherPolys.length === 0) {
+              displayMulti = [selPC as any];
+            } else {
+              const [first, ...rest] = otherPolys as any[];
+              const otherUnion = rest.length === 0 ? first : polygonClipping.union(first, ...rest);
+              displayMulti = polygonClipping.difference(selPC as any, otherUnion as any) as any;
+            }
+          } catch {
+            displayMulti = null;
+          }
           ctx.save();
           ctx.fillStyle = "rgba(77,163,255,0.28)";
-          ctx.beginPath();
-          const p0 = cam.worldToScreen(ring[0].x, ring[0].y);
-          ctx.moveTo(p0.x, p0.y);
-          for (let i = 1; i < ring.length; i++) {
-            const p = cam.worldToScreen(ring[i].x, ring[i].y);
-            ctx.lineTo(p.x, p.y);
-          }
-          ctx.closePath();
-          ctx.fill();
           ctx.strokeStyle = Defaults.wallSelectionColor;
           ctx.lineWidth = 2.2;
-          ctx.stroke();
+          if (displayMulti && displayMulti.length > 0) {
+            for (const poly of displayMulti) {
+              for (const ring of poly) {
+                if (!ring || ring.length < 3) continue;
+                ctx.beginPath();
+                const p0 = cam.worldToScreen(ring[0][0], ring[0][1]);
+                ctx.moveTo(p0.x, p0.y);
+                for (let i = 1; i < ring.length; i++) {
+                  const p = cam.worldToScreen(ring[i][0], ring[i][1]);
+                  ctx.lineTo(p.x, p.y);
+                }
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+              }
+            }
+          } else {
+            ctx.beginPath();
+            const p0 = cam.worldToScreen(selRing[0].x, selRing[0].y);
+            ctx.moveTo(p0.x, p0.y);
+            for (let i = 1; i < selRing.length; i++) {
+              const p = cam.worldToScreen(selRing[i].x, selRing[i].y);
+              ctx.lineTo(p.x, p.y);
+            }
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+          }
           ctx.restore();
         }
       }
