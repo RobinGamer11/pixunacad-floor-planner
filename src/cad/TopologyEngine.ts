@@ -173,6 +173,33 @@ export class TopologyEngine {
       if (this.includeWallOffsetSnaps) {
         const otherVisibleWalls = visibleWalls.filter(w => w !== wall && w.corners.length >= 2);
         const healed = computeHealedWallLines(wall, otherVisibleWalls, this.scene.getWallTopology());
+
+        // Gehealte Hauptlinie (verlängerte Bezugslinie an Gehrung/T-Stoß) als
+        // zusätzliche Snap-Kandidaten — damit Wände auch im verlängerten
+        // Bereich angedockt werden können.
+        const mainPts = healed.mainCorners;
+        for (const p of mainPts) {
+          const px = this._worldToMousePx(p, mouseS);
+          if (px > Defaults.snapPx) continue;
+          const score = isPriority ? px - 10000 : px;
+          if (score < bestScore) {
+            bestScore = score;
+            best = { type: SnapType.POINT, world: v(p.x, p.y), segment: null, hatch: null, pointIndex: -1, edgeIndex: null, t: null, px, wallId: wall.id, wallLine: "main" };
+          }
+        }
+        for (let i = 0; i < mainPts.length - 1; i++) {
+          const a = mainPts[i], b = mainPts[i + 1];
+          const proj = projectPointToSegment(mouseW, a, b);
+          const px = this._worldToMousePx(proj.q, mouseS);
+          if (px > Defaults.snapPx) continue;
+          if (proj.t <= Defaults.splitEpsT || proj.t >= 1 - Defaults.splitEpsT) continue;
+          const score = (isPriority ? -10000 : 0) + 1000 + px;
+          if (score < bestScore) {
+            bestScore = score;
+            best = { type: SnapType.LINE, world: v(proj.q.x, proj.q.y), segment: null, hatch: null, pointIndex: null, edgeIndex: null, t: proj.t, px, lineA: a, lineB: b, wallId: wall.id, wallLine: "main" };
+          }
+        }
+
         const subPts = healed.subCorners;
         const subBias = isPriority ? -10000 : 0;
         for (const p of subPts) {
