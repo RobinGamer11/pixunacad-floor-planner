@@ -73,6 +73,11 @@ export class SelectTool {
 
   // Wall edit snapshot
   wallPointsOriginal: Vec2[] | null = null;
+  // Preview-State für Wand-Punkt-Edits (Bewegen / Verschieben).
+  // Während der Bewegung wird die Wand NICHT mutiert — erst beim Commit-Klick.
+  wallPreviewPoint: Vec2 | null = null;
+  wallPreviewDelta: Vec2 | null = null;
+
   // Wall-Edge offset state (analog hatchEdge*)
   wallEdgeAOriginal: Vec2 | null = null;
   wallEdgeBOriginal: Vec2 | null = null;
