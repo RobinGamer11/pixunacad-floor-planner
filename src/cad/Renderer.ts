@@ -12,8 +12,8 @@ import { documentCornersWorld, documentCenterWorld } from "./documentGeometry";
 import { getOrCreateDocMask } from "./documentMask";
 import { computeWallLines } from "./wallGeom";
 import { computeHealedWallLines } from "./wallHeal";
-import { getWallUnionGroups } from "./wallUnion";
-import { buildWallSolidRing, buildHealedWallSolidRing, ringToPCPolygon } from "./wallSolid";
+import { getWallUnionGroups, unionWallSolids } from "./wallUnion";
+import { buildHealedWallSolidRing, ringToPCPolygon } from "./wallSolid";
 import polygonClipping, { type MultiPolygon } from "polygon-clipping";
 
 export interface Selection {
@@ -915,30 +915,50 @@ export class Renderer {
             }
           }
 
+          const wallsById = new Map(this.scene.walls.map(w => [w.id, w]));
+          const unionIds = (ids: string[]): MultiPolygon => {
+            const ws = ids
+              .map(id => wallsById.get(id))
+              .filter((w): w is NonNullable<typeof w> => !!w && w.corners.length >= 2);
+            return ws.length > 0 ? unionWallSolids(ws, this.scene.walls, topo) : [];
+          };
+          const unionMultis = (a: MultiPolygon, b: MultiPolygon): MultiPolygon => {
+            if (!a || a.length === 0) return b || [];
+            if (!b || b.length === 0) return a || [];
+            try { return polygonClipping.union(a as any, b as any) as MultiPolygon; }
+            catch { return [...a, ...b] as MultiPolygon; }
+          };
+
           for (const group of groups) {
             if (!group.multi || group.multi.length === 0) continue;
-            if (group.wallIds.length === 1 && group.wallIds[0] === wall.id) continue;
 
-            // Liste der in dieser Gruppe zu zeichnenden Wand-IDs (selektierte ausschließen).
-            const wids = group.wallIds.includes(wall.id)
-              ? group.wallIds.filter(id => id !== wall.id)
-              : group.wallIds;
+            const containsSelected = group.wallIds.includes(wall.id);
+            const branchIds = group.wallIds.filter(id => branchesIntoSelected.has(id));
 
-            for (const wid of wids) {
-              const ow = this.scene.walls.find(w => w.id === wid);
-              if (!ow || ow.corners.length < 2) continue;
-              const r = buildHealedWallSolidRing(ow, this.scene.walls, topo);
-              if (r.length < 3) continue;
-              let multi: MultiPolygon = [[ringToPCPolygon(r)]] as MultiPolygon;
-              if (branchesIntoSelected.has(wid)) {
-                try {
-                  const diff = polygonClipping.difference(multi as any, selMulti as any);
-                  multi = diff as MultiPolygon;
-                } catch { /* keep original on clipping failure */ }
-              }
-              if (!multi || multi.length === 0) continue;
-              this._drawWallMulti(multi, group.fillColor, group.strokeColor, 1.5);
+            // Unbeteiligte Wandgruppen als fertige Union erneut zeichnen. Dadurch
+            // bleiben T-Kreuzungen zwischen anderen Wänden exakt wie im Basisbild
+            // und werden nicht durch Einzelwand-Redraws wieder falsch sichtbar.
+            if (!containsSelected && branchIds.length === 0) {
+              this._drawWallMulti(group.multi, group.fillColor, group.strokeColor, 1.5);
+              continue;
             }
+
+            const redrawIds = group.wallIds.filter(id => id !== wall.id);
+            if (redrawIds.length === 0) continue;
+
+            const fullIds = redrawIds.filter(id => !branchesIntoSelected.has(id));
+            const clippedIds = redrawIds.filter(id => branchesIntoSelected.has(id));
+            let redrawMulti = unionIds(fullIds);
+
+            let clippedMulti = unionIds(clippedIds);
+            if (clippedMulti.length > 0) {
+              try { clippedMulti = polygonClipping.difference(clippedMulti as any, selMulti as any) as MultiPolygon; }
+              catch { /* keep original on clipping failure */ }
+              redrawMulti = unionMultis(redrawMulti, clippedMulti);
+            }
+
+            if (!redrawMulti || redrawMulti.length === 0) continue;
+            this._drawWallMulti(redrawMulti, group.fillColor, group.strokeColor, 1.5);
           }
         }
       }
