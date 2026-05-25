@@ -11,6 +11,7 @@ import { transformedInstanceItems, instanceBoundingCornersWorld } from "./Sticke
 import { documentCornersWorld, documentCenterWorld } from "./documentGeometry";
 import { getOrCreateDocMask } from "./documentMask";
 import { computeWallLines } from "./wallGeom";
+import { computeHealedWallLines } from "./wallHeal";
 import { getWallUnionGroups } from "./wallUnion";
 import { buildWallSolidRing, buildHealedWallSolidRing } from "./wallSolid";
 
