@@ -864,32 +864,12 @@ export class Renderer {
           try {
             const selPC = [ringToPCPolygon(selRing)];
             const otherPolys: number[][][][] = [];
-            // Bestimme alle Nachbarwände, in deren Inneres die selektierte
-            // Wand als T-Stoß einmündet (Stem-Beziehung). Diese müssen die
-            // Selektionsfläche beschneiden, damit Stems nicht in den
-            // "Through"-Wand-Streifen hineinragen.
-            const topo = this.scene.getWallTopology();
-            const stemHostIds = new Set<string>();
-            for (const atStart of [true, false]) {
-              const node = topo?.getNodeForEndpoint(wall.id, atStart) || null;
-              if (!node) continue;
-              const selfIsEndpoint = node.incidents.some(
-                (i: any) => i.wallId === wall.id && i.kind !== "tjunction",
-              );
-              if (!selfIsEndpoint) continue;
-              for (const inc of node.incidents as any[]) {
-                if (inc.wallId === wall.id) continue;
-                if (inc.kind === "tjunction") stemHostIds.add(inc.wallId);
-              }
-            }
             for (const ow of this.scene.walls) {
               if (ow.id === wall.id) continue;
               if (ow.labelId !== labelId) continue;
               if (ow.corners.length < 2 || ow.thicknessM <= 0) continue;
-              const higher = (ow.priority ?? 0) > (wall.priority ?? 0);
-              const equalStem = (ow.priority ?? 0) === (wall.priority ?? 0) && stemHostIds.has(ow.id);
-              if (!higher && !equalStem) continue;
-              const r = buildHealedWallSolidRing(ow, this.scene.walls, topo);
+              if ((ow.priority ?? 0) <= (wall.priority ?? 0)) continue;
+              const r = buildHealedWallSolidRing(ow, this.scene.walls, this.scene.getWallTopology());
               if (r.length < 3) continue;
               otherPolys.push([ringToPCPolygon(r)]);
             }
