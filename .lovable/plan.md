@@ -1,13 +1,25 @@
-Ich behebe den Selektions-Renderer so, dass beim Anklicken von Wand 2 die blaue Fläche von Wand 2 nicht mehr von Wand 1 übermalt wird, während der Fall „Wand 1 angeklickt dockt an Wand 2 an“ erhalten bleibt.
+## Ziel
 
-Plan:
-1. Im Selektionsblock von `src/cad/Renderer.ts` die T-Stoß-Erkennung korrigieren:
-   - Wenn die selektierte Wand am Knoten als `tjunction` auftaucht, ist sie die durchlaufende Host-Wand.
-   - Alle anderen Wände mit `start`/`end` an diesem Knoten sind Branch-Wände und dürfen beim erneuten Zeichnen nicht über dem blauen Overlay liegen.
-2. Branch-Wände nicht nur mit ihrem Einzel-Ring clippen, sondern gegen das tatsächliche selektierte Overlay so subtrahieren, dass die selektierte Host-Wand sichtbar oben bleibt.
-3. Falls eine Gruppe mehrere Wand-IDs enthält, die selektierte Wand konsequent aus dem Re-Draw ausschließen und Branch-Wände einzeln geclippt zeichnen.
-4. Danach per TypeScript/Test-Signal prüfen, dass der Code sauber ist.
+Beim Zeichnen einer Wand sollen Sub-Linien-Snaps an bestehenden Wänden die **tatsächliche, gehealte Kantengeometrie** (mit Gehrungen, T-Stößen, Verlängerungen/Kürzungen) widerspiegeln — nicht nur den rohen Offset bis zur Bezugslinie. Aktuell endet die Sub-Linie im Snap an der unverlängerten Bezugslinien-Senkrechten, wodurch Gehrungen die echte Kantenlänge nicht abbilden.
 
-Ergebnis:
-- Wand 1 ausgewählt: Wand 2 bleibt grau oben, Wand 1 dockt optisch sauber an.
-- Wand 2 ausgewählt: Wand 2 bleibt komplett blau, Wand 1 übermalt das blaue Overlay nicht mehr.
+Wichtig: Die Preview-Sub-/Hilfslinie der *eigenen, gerade gezeichneten* Wand bleibt unverändert „roh" (kein Auto-Verlängern), wie zuvor festgelegt. Geändert wird ausschließlich die Snap-Quelle für **bestehende Nachbarwände**.
+
+## Änderung
+
+### `src/cad/TopologyEngine.ts` — `computeSnap`, Block `if (this.includeWallOffsetSnaps)`
+
+- Statt `computeWallLines(ref, wall.thicknessM, wall.referenceSide)` die gehealten Linien verwenden:
+  `computeHealedWallLines(wall, otherVisibleWalls, this.scene.getWallTopology())`
+  - `otherVisibleWalls` = `visibleWalls.filter(w => w !== wall && w.corners.length >= 2)` (einmal vor der Schleife berechnen).
+  - `computeHealedWallLines` ist bereits importiert in `Renderer.ts`; Import hier ergänzen aus `./wallHeal`.
+- Aus dem Heal-Ergebnis weiterhin `subCorners` (jetzt verlängert/gekürzt) als Snap-Kandidaten verwenden — Punkte und Segmente, identisch zur bisherigen Logik (gleicher Score, gleiche Strafe gegenüber Bezugslinie, gleiche `wallLine: "sub"`-Markierung).
+- Optional: Heal-Ergebnis pro Tick cachen (`Map<Wall, WallLines>`), um Mehrfachberechnung zu vermeiden, falls Performance auffällt.
+
+### Keine weiteren Dateien betroffen
+
+- `WallTool.ts` Preview bleibt wie ist (rohe Sub-Linie für Orientierung).
+- Renderer, Heal-Logik selbst unverändert.
+
+## Resultat
+
+Hovert man beim Wand-Zeichnen über die gegenüberliegende Kante einer bestehenden Wand, deckt die snapbare Sub-Linie nun die volle gehealte Länge ab (inkl. der durch Gehrung verlängerten Ecke). Der End-Eckpunkt der Sub-Linie liegt exakt dort, wo sich die Wand im fertigen Bild mit Nachbarn verbindet — also fangbar bis zur echten Ecke.

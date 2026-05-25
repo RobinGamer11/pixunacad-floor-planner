@@ -6,6 +6,7 @@ import { LabelManager } from "./LabelManager";
 import { boxCornersWorld } from "./textGeometry";
 import { documentCornersWorld, documentEdgeMidpointsWorld } from "./documentGeometry";
 import { computeWallLines } from "./wallGeom";
+import { computeHealedWallLines } from "./wallHeal";
 // Wall-Snap nutzt primär wall.corners (Bezugslinie); optional zusätzlich
 // die Sub-Linien-Eckpunkte/-Kanten (gegenüberliegende Wandkante), wenn das
 // aktive Werkzeug das anfordert (z. B. WallTool beim Zeichnen).
