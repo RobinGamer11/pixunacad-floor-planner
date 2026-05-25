@@ -5,6 +5,9 @@ import type { CadApp } from "./CadApp";
 import type { Snap } from "./TopologyEngine";
 import type { Input } from "./Input";
 import { computeWallLines, type WallKind, type WallReferenceSide } from "./wallGeom";
+import { computeHealedWallLines } from "./wallHeal";
+import { WallTopologyGraph } from "./WallTopologyGraph";
+import { Wall } from "./Scene";
 import { runWallTopologyMaintenance } from "./wallTopologyMaintenance";
 import { trimWallEndpointsToNeighbors } from "./wallConnect";
 
@@ -237,8 +240,32 @@ export class WallTool {
     const previewPt = this._previewWorld(this.app.input);
     const allCorners = [...this.corners, previewPt];
 
-    // Wandlinien preview (live-gemeißelt)
-    const lines = computeWallLines(allCorners, this.getThickness(), this.settings.referenceSide);
+    // Wandlinien preview (live-gemeißelt) — geheilt gegen vorhandene Scene-Wände
+    // im selben Layer, damit main/help/sub am Snap-Endpunkt sichtbar in
+    // Nachbarwände hineinlaufen.
+    const previewLabelId = this._resolveLabelId();
+    const previewThickness = this.getThickness();
+    const previewWall = new Wall({
+      id: "__wallToolPreview__",
+      kind: this.settings.kind,
+      thicknessM: previewThickness,
+      referenceSide: this.settings.referenceSide,
+      corners: allCorners,
+      labelId: previewLabelId,
+      color: this.settings.color,
+      fillColor: this.settings.fillColor,
+    });
+    const others = this.app.scene.walls.filter(
+      w => w.labelId === previewLabelId && w.id !== previewWall.id && w.corners.length >= 2,
+    );
+    let lines: ReturnType<typeof computeWallLines>;
+    if (others.length > 0) {
+      const graph = new WallTopologyGraph();
+      graph.build([...others, previewWall]);
+      lines = computeHealedWallLines(previewWall, others, graph);
+    } else {
+      lines = computeWallLines(allCorners, previewThickness, this.settings.referenceSide);
+    }
 
     // Sub (Help-Linie der Innenkante / Gegenkante) – etwas dezenter
     this._drawPolyline(ctx, cam, lines.subCorners, { color: this.settings.color, widthPx: 1.5 });

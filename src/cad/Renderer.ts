@@ -11,6 +11,7 @@ import { transformedInstanceItems, instanceBoundingCornersWorld } from "./Sticke
 import { documentCornersWorld, documentCenterWorld } from "./documentGeometry";
 import { getOrCreateDocMask } from "./documentMask";
 import { computeWallLines } from "./wallGeom";
+import { computeHealedWallLines } from "./wallHeal";
 import { getWallUnionGroups } from "./wallUnion";
 import { buildWallSolidRing, buildHealedWallSolidRing } from "./wallSolid";
 
@@ -875,7 +876,7 @@ export class Renderer {
 
       // Bezugslinie + Mittellinie als Helper (nur Wand-Tool aktiv ODER selektiert)
       if (this.showWallHelpers || isSelected) {
-        const lines = computeWallLines(wall.corners, wall.thicknessM, wall.referenceSide);
+        const lines = computeHealedWallLines(wall, this.scene.walls, this.scene.getWallTopology());
         // Bezugslinie (= wall.corners) durchgezogen, dünn
         ctx.save();
         ctx.strokeStyle = "rgba(80,80,80,0.85)";
