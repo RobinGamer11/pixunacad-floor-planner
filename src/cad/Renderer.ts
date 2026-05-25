@@ -12,7 +12,7 @@ import { documentCornersWorld, documentCenterWorld } from "./documentGeometry";
 import { getOrCreateDocMask } from "./documentMask";
 import { computeWallLines } from "./wallGeom";
 import { getWallUnionGroups } from "./wallUnion";
-import { buildWallSolidRing } from "./wallSolid";
+import { buildWallSolidRing, buildHealedWallSolidRing } from "./wallSolid";
 
 export interface Selection {
   type: string;
