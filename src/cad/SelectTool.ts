@@ -771,12 +771,38 @@ export class SelectTool {
       const newCenter = v((opp.x + newPoint.x) * 0.5, (opp.y + newPoint.y) * 0.5);
       box.center = newCenter;
       box.rotationRad = newRot;
+    } else if (this.editTarget.kind === "areaLabelHandle") {
+      const hatch = this.app.scene.getHatchById(this.editTarget.hatchId);
+      if (!hatch || !this.areaLabelOriginalCornerWorld || !this.areaLabelOriginalOffset || !this.areaLabelPolyCenter) return;
+      const action = this.activeEditAction;
+      if (action === PointEditAction.ROTATE) {
+        // Pivot = label center (world position = polyCenter + offset). offset/scale stay.
+        const pivot = this.fixedPoint!;
+        const origAng = Math.atan2(this.areaLabelOriginalCornerWorld.y - pivot.y, this.areaLabelOriginalCornerWorld.x - pivot.x);
+        const newAng = Math.atan2(newPoint.y - pivot.y, newPoint.x - pivot.x);
+        hatch.areaLabel.rotationRad = this.areaLabelOriginalRotation + (newAng - origAng);
+      } else if (action === PointEditAction.MOVE) {
+        // Pivot = opposite corner (stays put). Box scales + rotates; center moves.
+        const opp = this.areaLabelOriginalOppositeWorld!;
+        const origDist = Math.hypot(this.areaLabelOriginalCornerWorld.x - opp.x, this.areaLabelOriginalCornerWorld.y - opp.y);
+        const newDist = Math.hypot(newPoint.x - opp.x, newPoint.y - opp.y);
+        if (origDist < 1e-9 || newDist < 1e-9) return;
+        const scaleFactor = newDist / origDist;
+        hatch.areaLabel.scale = Math.max(0.1, Math.min(20, this.areaLabelOriginalScale * scaleFactor));
+        const origAng = Math.atan2(this.areaLabelOriginalCornerWorld.y - opp.y, this.areaLabelOriginalCornerWorld.x - opp.x);
+        const newAng = Math.atan2(newPoint.y - opp.y, newPoint.x - opp.x);
+        hatch.areaLabel.rotationRad = this.areaLabelOriginalRotation + (newAng - origAng);
+        const newCenter = v((opp.x + newPoint.x) * 0.5, (opp.y + newPoint.y) * 0.5);
+        hatch.areaLabel.offsetX = newCenter.x - this.areaLabelPolyCenter.x;
+        hatch.areaLabel.offsetY = newCenter.y - this.areaLabelPolyCenter.y;
+      }
     } else if (this.editTarget.kind === "wallPoint") {
       const wall = this.app.scene.getWallById(this.editTarget.wallId);
       if (!wall) return;
       wall.corners[this.editTarget.pointIndex] = v(newPoint.x, newPoint.y);
     }
   }
+
 
   private _textBoxLocalCornerForIndex(i: number, w: number, h: number): Vec2 {
     const hw = w * 0.5, hh = h * 0.5;
