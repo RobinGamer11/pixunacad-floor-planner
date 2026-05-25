@@ -794,7 +794,7 @@ export class Renderer {
 
     // BIM-Pipeline: Pro Label/Style-Gruppe alle Wandkörper unionieren.
     // Das eliminiert automatisch innere Stoßkanten und doppelte Konturen.
-    const groups = getWallUnionGroups(this.scene.walls, labelId);
+    const groups = getWallUnionGroups(this.scene.walls, labelId, this.scene.getWallTopology());
     if (groups.length === 0) return;
 
     for (const group of groups) {
