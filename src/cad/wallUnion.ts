@@ -1,13 +1,19 @@
 import polygonClipping, { type MultiPolygon } from "polygon-clipping";
 import type { Wall } from "./Scene";
 import { Defaults } from "./constants";
-import { buildWallSolidRing, ringToPCPolygon } from "./wallSolid";
+import { buildHealedWallSolidRing, ringToPCPolygon } from "./wallSolid";
+import type { WallTopologyGraph } from "./WallTopologyGraph";
 
-export function unionWallSolids(walls: Wall[]): MultiPolygon {
+export function unionWallSolids(
+  walls: Wall[],
+  allWalls?: Wall[],
+  graph?: WallTopologyGraph,
+): MultiPolygon {
   if (!walls || walls.length === 0) return [];
+  const neighborPool = allWalls && allWalls.length ? allWalls : walls;
   const polys: number[][][][] = [];
   for (const w of walls) {
-    const ring = buildWallSolidRing(w);
+    const ring = buildHealedWallSolidRing(w, neighborPool, graph);
     const pc = ringToPCPolygon(ring);
     if (pc.length < 4) continue;
     polys.push([pc]);
@@ -21,6 +27,7 @@ export function unionWallSolids(walls: Wall[]): MultiPolygon {
     return polys as unknown as MultiPolygon;
   }
 }
+
 
 export interface WallUnionGroup {
   /** Höhere Werte rendern OBEN und "schneiden" niedrigere. */
