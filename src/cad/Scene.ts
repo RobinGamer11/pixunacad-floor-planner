@@ -1,6 +1,7 @@
 import { Defaults } from "./constants";
 import { Vec2, v, clamp, lerp } from "./geometry";
 import { WallTopologyGraph } from "./WallTopologyGraph";
+import { offsetPolyline } from "./wallGeom";
 
 export class Segment {
   id: string;
