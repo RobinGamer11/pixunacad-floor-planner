@@ -171,8 +171,9 @@ export class TopologyEngine {
       // Schlechtere Priorität als Bezugslinie, damit reference-line corners
       // bei Überlagerung weiterhin gewinnen.
       if (this.includeWallOffsetSnaps) {
-        const offsetLines = computeWallLines(ref, wall.thicknessM, wall.referenceSide);
-        const subPts = offsetLines.subCorners;
+        const otherVisibleWalls = visibleWalls.filter(w => w !== wall && w.corners.length >= 2);
+        const healed = computeHealedWallLines(wall, otherVisibleWalls, this.scene.getWallTopology());
+        const subPts = healed.subCorners;
         const subBias = isPriority ? -10000 : 0;
         for (const p of subPts) {
           const px = this._worldToMousePx(p, mouseS);
