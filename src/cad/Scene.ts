@@ -76,6 +76,8 @@ export class Hatch {
       borderEnabled: !!(areaLabel?.borderEnabled ?? Defaults.areaBorderEnabled),
       borderColor: areaLabel?.borderColor || Defaults.areaBorderColor,
       borderWidthPx: clamp(areaLabel?.borderWidthPx ?? Defaults.areaBorderWidthPx, 0, 20),
+      rotationRad: Number.isFinite(areaLabel?.rotationRad) ? areaLabel!.rotationRad! : 0,
+      scale: Number.isFinite(areaLabel?.scale) ? clamp(areaLabel!.scale!, 0.1, 20) : 1,
     };
     this._stickerEditOwnerId = null;
   }
