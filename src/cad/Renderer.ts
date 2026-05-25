@@ -877,24 +877,41 @@ export class Renderer {
           const selMulti: MultiPolygon = [[ringToPCPolygon(selRing)]] as MultiPolygon;
           this._drawWallMulti(selMulti, "rgba(77,163,255,0.28)", Defaults.wallSelectionColor, 2.2);
 
-          // T-Stoß-Analyse: Wände, die in die selektierte Wand HINEIN-T-stoßen
-          // (Selektion ist Host, die andere Wand ist Branch) müssen beim Re-Draw
-          // gegen das Selektions-Solid geclippt werden, damit die blaue Fläche
-          // an T-Stößen, wo die Selektion Host ist, vollständig sichtbar bleibt.
-          // Wände, in die die Selektion selbst hinein-T-stößt (Selektion = Branch,
-          // andere = Host), werden unverändert über das blaue Overlay gezeichnet
-          // → blaue Selektion dockt visuell an die Host-Wand an.
+          // T-Stoß-Analyse (geometrisch, auto-split-robust):
+          // Eine "andere Wand" gilt als Branch in die Selektion, wenn einer
+          // ihrer Endpunkte auf der Bezugslinie der selektierten Wand liegt
+          // (als interner Corner ODER innerhalb einer Edge), aber NICHT mit
+          // einem Endpunkt der Selektion zusammenfällt. Solche Branch-Wände
+          // werden beim Re-Draw gegen das Selektions-Solid geclippt, damit
+          // die blaue Fläche der Host-Selektion vollständig sichtbar bleibt.
           const branchesIntoSelected = new Set<string>();
-          for (const node of topo.nodes) {
-            const selIsHostHere = node.incidents.some(
-              i => i.wallId === wall.id && i.kind === "tjunction"
-            );
-            if (!selIsHostHere) continue;
-            for (const inc of node.incidents) {
-              if (inc.wallId === wall.id) continue;
-              if (inc.kind === "start" || inc.kind === "end") {
-                branchesIntoSelected.add(inc.wallId);
+          const selStart = wall.corners[0];
+          const selEnd = wall.corners[wall.corners.length - 1];
+          const NODE_TOL = 0.05;
+          const EDGE_TOL = 0.03;
+          for (const ow of this.scene.walls) {
+            if (ow.id === wall.id || ow.corners.length < 2) continue;
+            for (const atStart of [true, false]) {
+              const ep = atStart ? ow.corners[0] : ow.corners[ow.corners.length - 1];
+              if (Math.hypot(ep.x - selStart.x, ep.y - selStart.y) <= NODE_TOL) continue;
+              if (Math.hypot(ep.x - selEnd.x, ep.y - selEnd.y) <= NODE_TOL) continue;
+              let onSel = false;
+              for (let i = 1; i < wall.corners.length - 1; i++) {
+                const c = wall.corners[i];
+                if (Math.hypot(ep.x - c.x, ep.y - c.y) <= NODE_TOL) { onSel = true; break; }
               }
+              if (!onSel) {
+                for (let i = 0; i < wall.corners.length - 1; i++) {
+                  const a = wall.corners[i], b = wall.corners[i + 1];
+                  const abx = b.x - a.x, aby = b.y - a.y;
+                  const ab2 = abx * abx + aby * aby || 1e-12;
+                  const t = ((ep.x - a.x) * abx + (ep.y - a.y) * aby) / ab2;
+                  if (t <= 0.02 || t >= 0.98) continue;
+                  const qx = a.x + abx * t, qy = a.y + aby * t;
+                  if (Math.hypot(qx - ep.x, qy - ep.y) <= EDGE_TOL) { onSel = true; break; }
+                }
+              }
+              if (onSel) { branchesIntoSelected.add(ow.id); break; }
             }
           }
 
