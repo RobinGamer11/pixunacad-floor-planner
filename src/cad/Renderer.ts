@@ -12,7 +12,7 @@ import { documentCornersWorld, documentCenterWorld } from "./documentGeometry";
 import { getOrCreateDocMask } from "./documentMask";
 import { computeWallLines } from "./wallGeom";
 import { computeHealedWallLines } from "./wallHeal";
-import { getWallUnionGroups, unionWallSolids } from "./wallUnion";
+import { getWallUnionGroups } from "./wallUnion";
 import { buildHealedWallSolidRing, ringToPCPolygon } from "./wallSolid";
 import polygonClipping, { type MultiPolygon } from "polygon-clipping";
 
@@ -877,32 +877,31 @@ export class Renderer {
           const selMulti: MultiPolygon = [[ringToPCPolygon(selRing)]] as MultiPolygon;
           this._drawWallMulti(selMulti, "rgba(77,163,255,0.28)", Defaults.wallSelectionColor, 2.2);
 
-          // T-Stoß-Analyse (geometrisch, auto-split-robust):
-          // Eine "andere Wand" gilt als Branch in die Selektion, wenn einer
-          // ihrer Endpunkte auf der Bezugslinie der selektierten Wand liegt
-          // (als interner Corner ODER innerhalb einer Edge), aber NICHT mit
-          // einem Endpunkt der Selektion zusammenfällt. Solche Branch-Wände
-          // werden beim Re-Draw gegen das Selektions-Solid geclippt, damit
-          // die blaue Fläche der Host-Selektion vollständig sichtbar bleibt.
-          const branchesIntoSelected = new Set<string>();
+          // T-Stoß-Analyse (geometrisch, auto-split-robust): Nur wenn die
+          // selektierte Wand selbst als Branch in eine Host-Wand läuft, wird
+          // diese Host-Wand nochmals darüber gezeichnet. Alle anderen Wände
+          // bleiben im ursprünglichen Union-Render, damit fremde T-Kreuzungen
+          // nicht durch Einzelwand-Redraws verfälscht werden.
+          const hostsOfSelected = new Set<string>();
           const selStart = wall.corners[0];
           const selEnd = wall.corners[wall.corners.length - 1];
           const NODE_TOL = 0.05;
           const EDGE_TOL = 0.03;
           for (const ow of this.scene.walls) {
             if (ow.id === wall.id || ow.corners.length < 2) continue;
-            for (const atStart of [true, false]) {
-              const ep = atStart ? ow.corners[0] : ow.corners[ow.corners.length - 1];
-              if (Math.hypot(ep.x - selStart.x, ep.y - selStart.y) <= NODE_TOL) continue;
-              if (Math.hypot(ep.x - selEnd.x, ep.y - selEnd.y) <= NODE_TOL) continue;
+            for (const ep of [selStart, selEnd]) {
+              const owStart = ow.corners[0];
+              const owEnd = ow.corners[ow.corners.length - 1];
+              if (Math.hypot(ep.x - owStart.x, ep.y - owStart.y) <= NODE_TOL) continue;
+              if (Math.hypot(ep.x - owEnd.x, ep.y - owEnd.y) <= NODE_TOL) continue;
               let onSel = false;
-              for (let i = 1; i < wall.corners.length - 1; i++) {
-                const c = wall.corners[i];
+              for (let i = 1; i < ow.corners.length - 1; i++) {
+                const c = ow.corners[i];
                 if (Math.hypot(ep.x - c.x, ep.y - c.y) <= NODE_TOL) { onSel = true; break; }
               }
               if (!onSel) {
-                for (let i = 0; i < wall.corners.length - 1; i++) {
-                  const a = wall.corners[i], b = wall.corners[i + 1];
+                for (let i = 0; i < ow.corners.length - 1; i++) {
+                  const a = ow.corners[i], b = ow.corners[i + 1];
                   const abx = b.x - a.x, aby = b.y - a.y;
                   const ab2 = abx * abx + aby * aby || 1e-12;
                   const t = ((ep.x - a.x) * abx + (ep.y - a.y) * aby) / ab2;
@@ -911,54 +910,18 @@ export class Renderer {
                   if (Math.hypot(qx - ep.x, qy - ep.y) <= EDGE_TOL) { onSel = true; break; }
                 }
               }
-              if (onSel) { branchesIntoSelected.add(ow.id); break; }
+              if (onSel) { hostsOfSelected.add(ow.id); break; }
             }
           }
 
-          const wallsById = new Map(this.scene.walls.map(w => [w.id, w]));
-          const unionIds = (ids: string[]): MultiPolygon => {
-            const ws = ids
-              .map(id => wallsById.get(id))
-              .filter((w): w is NonNullable<typeof w> => !!w && w.corners.length >= 2);
-            return ws.length > 0 ? unionWallSolids(ws, this.scene.walls, topo) : [];
-          };
-          const unionMultis = (a: MultiPolygon, b: MultiPolygon): MultiPolygon => {
-            if (!a || a.length === 0) return b || [];
-            if (!b || b.length === 0) return a || [];
-            try { return polygonClipping.union(a as any, b as any) as MultiPolygon; }
-            catch { return [...a, ...b] as MultiPolygon; }
-          };
-
-          for (const group of groups) {
-            if (!group.multi || group.multi.length === 0) continue;
-
-            const containsSelected = group.wallIds.includes(wall.id);
-            const branchIds = group.wallIds.filter(id => branchesIntoSelected.has(id));
-
-            // Unbeteiligte Wandgruppen als fertige Union erneut zeichnen. Dadurch
-            // bleiben T-Kreuzungen zwischen anderen Wänden exakt wie im Basisbild
-            // und werden nicht durch Einzelwand-Redraws wieder falsch sichtbar.
-            if (!containsSelected && branchIds.length === 0) {
-              this._drawWallMulti(group.multi, group.fillColor, group.strokeColor, 1.5);
-              continue;
-            }
-
-            const redrawIds = group.wallIds.filter(id => id !== wall.id);
-            if (redrawIds.length === 0) continue;
-
-            const fullIds = redrawIds.filter(id => !branchesIntoSelected.has(id));
-            const clippedIds = redrawIds.filter(id => branchesIntoSelected.has(id));
-            let redrawMulti = unionIds(fullIds);
-
-            let clippedMulti = unionIds(clippedIds);
-            if (clippedMulti.length > 0) {
-              try { clippedMulti = polygonClipping.difference(clippedMulti as any, selMulti as any) as MultiPolygon; }
-              catch { /* keep original on clipping failure */ }
-              redrawMulti = unionMultis(redrawMulti, clippedMulti);
-            }
-
-            if (!redrawMulti || redrawMulti.length === 0) continue;
-            this._drawWallMulti(redrawMulti, group.fillColor, group.strokeColor, 1.5);
+          for (const wid of hostsOfSelected) {
+            const ow = this.scene.walls.find(w => w.id === wid);
+            const group = groups.find(g => g.wallIds.includes(wid));
+            if (!ow || !group || ow.corners.length < 2) continue;
+            const r = buildHealedWallSolidRing(ow, this.scene.walls, topo);
+            if (r.length < 3) continue;
+            const multi: MultiPolygon = [[ringToPCPolygon(r)]] as MultiPolygon;
+            this._drawWallMulti(multi, group.fillColor, group.strokeColor, 1.5);
           }
         }
       }
