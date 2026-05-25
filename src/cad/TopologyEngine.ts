@@ -141,10 +141,17 @@ export class TopologyEngine {
     for (const wall of visibleWalls) {
       const ref = wall.corners;
       if (ref.length < 2) continue;
+      const isPriority = !!(this.priorityWallId && wall.id === this.priorityWallId);
       for (const p of ref) {
-        const before = best;
-        considerPoint(p, null, null, -1);
-        if (best !== before && best) { (best as Snap).wallId = wall.id; (best as Snap).wallLine = "main"; }
+        const px = this._worldToMousePx(p, mouseS);
+        if (px > Defaults.snapPx) continue;
+        // Priority-Wand: Score deutlich nach unten ziehen, sodass deren
+        // Bezugslinien-Eckpunkte konkurrierende Nachbarpunkte schlagen.
+        const score = isPriority ? px - 10000 : px;
+        if (score < bestScore) {
+          bestScore = score;
+          best = { type: SnapType.POINT, world: v(p.x, p.y), segment: null, hatch: null, pointIndex: -1, edgeIndex: null, t: null, px, wallId: wall.id, wallLine: "main" };
+        }
       }
       for (let i = 0; i < ref.length - 1; i++) {
         const before = best;
@@ -152,6 +159,7 @@ export class TopologyEngine {
         if (best !== before && best) { (best as Snap).wallId = wall.id; (best as Snap).wallLine = "main"; }
       }
     }
+
     // Hatch edges
     for (const edge of this.scene.getHatchEdges()) {
       if (!this.labels.isVisible(edge.hatch.labelId)) continue;
