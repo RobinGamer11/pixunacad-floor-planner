@@ -865,48 +865,39 @@ export class Renderer {
       // dem blauen Overlay herausgenommen; die Nachbarwand wird danach erneut
       // darüber gezeichnet. So gehört der Anschlussbereich optisch zur jeweils
       // selektierten Wand, ohne die bestehende Wand zu übermalen.
+      // Selektion: die selektierte Wand wird als volles blaues Solid gezeichnet.
+      // Anschließend werden ALLE anderen Wandgruppen erneut darüber gezeichnet,
+      // damit Nachbarwände visuell unverändert (komplett) bleiben und die
+      // selektierte Wand optisch sauber an sie andockt — ohne aus der
+      // Nachbarwand etwas auszusparen.
       if (isSelected) {
         const selRing = buildHealedWallSolidRing(wall, this.scene.walls, this.scene.getWallTopology());
         if (selRing.length >= 3) {
-          let selMulti: MultiPolygon = [[ringToPCPolygon(selRing)]] as MultiPolygon;
-          const selPrio = wall.priority ?? 0;
-          const graph = this.scene.getWallTopology();
-          const higherGroups = groups.filter(group => (group.priority ?? 0) > selPrio && group.multi && group.multi.length > 0);
-          const maskParts: MultiPolygon[] = higherGroups.map(group => group.multi);
-          const maskedHostIds = new Set<string>();
-          for (const atStart of [true, false]) {
-            const node = graph.getNodeForEndpoint(wall.id, atStart);
-            if (!node) continue;
-            for (const inc of node.incidents) {
-              if (inc.kind !== "tjunction" || inc.wallId === wall.id || maskedHostIds.has(inc.wallId)) continue;
-              const host = this.scene.walls.find(w => w.id === inc.wallId);
-              if (!host || host.labelId !== labelId || !this.labels.isVisible(host.labelId) || host.corners.length < 2) continue;
-              const hostRing = buildHealedWallSolidRing(host, this.scene.walls, graph);
-              const hostPc = ringToPCPolygon(hostRing);
-              if (hostPc.length < 4) continue;
-              maskParts.push([[hostPc]] as MultiPolygon);
-              maskedHostIds.add(inc.wallId);
-            }
-          }
-          if (maskParts.length > 0) {
-            try {
-              const [first, ...rest] = maskParts as any[];
-              const higherMask = rest.length > 0 ? polygonClipping.union(first, ...rest) : first;
-              selMulti = polygonClipping.difference(selMulti as any, higherMask as any) as MultiPolygon;
-            } catch {
-              // Fallback: ungeclipptes Overlay zeichnen.
-            }
-          }
-
+          const selMulti: MultiPolygon = [[ringToPCPolygon(selRing)]] as MultiPolygon;
           this._drawWallMulti(selMulti, "rgba(77,163,255,0.28)", Defaults.wallSelectionColor, 2.2);
 
           for (const group of groups) {
-            if ((group.priority ?? 0) <= selPrio) continue;
             if (!group.multi || group.multi.length === 0) continue;
+            // Eigene Wandgruppe NICHT erneut zeichnen — sonst übermalt sie das blaue Overlay.
+            if (group.wallIds.length === 1 && group.wallIds[0] === wall.id) continue;
+            // Gruppen, die diese Wand enthalten: blende sie aus, indem nur die anderen
+            // Wände der Gruppe als separate Solids neu gezeichnet werden.
+            if (group.wallIds.includes(wall.id)) {
+              for (const wid of group.wallIds) {
+                if (wid === wall.id) continue;
+                const ow = this.scene.walls.find(w => w.id === wid);
+                if (!ow || ow.corners.length < 2) continue;
+                const r = buildHealedWallSolidRing(ow, this.scene.walls, this.scene.getWallTopology());
+                if (r.length < 3) continue;
+                this._drawWallMulti([[ringToPCPolygon(r)]] as MultiPolygon, group.fillColor, group.strokeColor, 1.5);
+              }
+              continue;
+            }
             this._drawWallMulti(group.multi, group.fillColor, group.strokeColor, 1.5);
           }
         }
       }
+
 
       // Bezugslinie + Mittellinie als Helper (nur Wand-Tool aktiv ODER selektiert)
       if (this.showWallHelpers || isSelected) {
