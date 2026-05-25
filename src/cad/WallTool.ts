@@ -117,6 +117,7 @@ export class WallTool {
     this.activeTargetKey = null;
     this.app.renderer.overlay = { draw: (ctx, cam) => this._drawOverlay(ctx, cam) };
     this.app.renderer.showWallHelpers = true;
+    this.app.topology.includeWallOffsetSnaps = true;
     this.app.hub.bindCommit((vals) => this._applyHubValues(vals));
     this.app.hub.hide();
     this.app.pointEditMenu.hide();
@@ -133,6 +134,7 @@ export class WallTool {
     this.spaceShiftLocked = false;
     this.spaceShiftLockedAngleDeg = null;
     this.app.renderer.showWallHelpers = false;
+    this.app.topology.includeWallOffsetSnaps = false;
     this.app.hub.hide();
   }
 
