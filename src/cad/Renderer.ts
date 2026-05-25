@@ -844,42 +844,7 @@ export class Renderer {
     for (const group of groups) {
       if (!group.multi || group.multi.length === 0) continue;
 
-      // 1. Füllung (evenodd → Löcher korrekt freigestellt)
-      ctx.save();
-      ctx.fillStyle = group.fillColor;
-      ctx.beginPath();
-      for (const poly of group.multi) {
-        for (const ring of poly) {
-          if (!ring || ring.length < 3) continue;
-          const p0 = cam.worldToScreen(ring[0][0], ring[0][1]);
-          ctx.moveTo(p0.x, p0.y);
-          for (let i = 1; i < ring.length; i++) {
-            const p = cam.worldToScreen(ring[i][0], ring[i][1]);
-            ctx.lineTo(p.x, p.y);
-          }
-          ctx.closePath();
-        }
-      }
-      ctx.fill("evenodd");
-
-      // 2. Kontur — nur äußere Boundary + Lochränder der vereinigten Wand
-      ctx.strokeStyle = group.strokeColor;
-      ctx.lineWidth = 1.5;
-      for (const poly of group.multi) {
-        for (const ring of poly) {
-          if (!ring || ring.length < 3) continue;
-          ctx.beginPath();
-          const p0 = cam.worldToScreen(ring[0][0], ring[0][1]);
-          ctx.moveTo(p0.x, p0.y);
-          for (let i = 1; i < ring.length; i++) {
-            const p = cam.worldToScreen(ring[i][0], ring[i][1]);
-            ctx.lineTo(p.x, p.y);
-          }
-          ctx.closePath();
-          ctx.stroke();
-        }
-      }
-      ctx.restore();
+      this._drawWallMulti(group.multi, group.fillColor, group.strokeColor, 1.5);
     }
 
     // 3. Selektion / Helpers / Bezugslinien — pro Wand
