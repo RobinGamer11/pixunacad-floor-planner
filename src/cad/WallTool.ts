@@ -116,6 +116,15 @@ export class WallTool {
   }
 
   /**
+   * Auto-Trim der Endpunkte an Nachbar-Bezugslinien + deterministische
+   * Topologie-Wartung (Auto-Split / Auto-Merge).
+   */
+  private _runConnectionPipeline(newWall: import("./Scene").Wall) {
+    trimWallEndpointsToNeighbors(this.app.scene, newWall);
+    runWallTopologyMaintenance(this.app.scene, [newWall]);
+  }
+
+  /**
    * ArchiCAD-Verhalten: Beim Erzeugen einer Wand werden ihre Endpunkte an
    * benachbarte Bezugslinien gezogen, sofern sie in greifbarer Distanz liegen.
    * Damit entstehen echte gemeinsame Knoten — Voraussetzung für Auto-Split
