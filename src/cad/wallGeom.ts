@@ -9,8 +9,13 @@ export function perpLeftScreen(d: Vec2): Vec2 {
  * Erzeugt versetzte Polylinie zur Bezugs-Polylinie `corners` mit Offset-Distanz `offset`.
  * Positiver Offset = Versatz in Richtung perpLeftScreen(dir(A->B)).
  * Live-Gehrung an inneren Eckpunkten via Schnitt der versetzten Geraden.
+ *
+ * miterLimitAbs (Welt-Einheiten): Maximaler Abstand der Gehrungsspitze vom
+ * idealen Eckpunkt. Wird dieser Wert überschritten (sehr spitzer Winkel),
+ * fällt die Ecke auf einen sauberen Bevel zurück (zwei Endpunkte der
+ * benachbarten Offset-Segmente). Verhindert "explodierende" Spitzen.
  */
-export function offsetPolyline(corners: Vec2[], offset: number): Vec2[] {
+export function offsetPolyline(corners: Vec2[], offset: number, miterLimitAbs: number = Math.abs(offset) * 8 + 1e-6): Vec2[] {
   if (corners.length < 2) return corners.map(c => v(c.x, c.y));
   const segs: { a: Vec2; b: Vec2; dir: Vec2; n: Vec2 }[] = [];
   for (let i = 0; i < corners.length - 1; i++) {
@@ -29,8 +34,21 @@ export function offsetPolyline(corners: Vec2[], offset: number): Vec2[] {
   for (let i = 0; i < segs.length - 1; i++) {
     const s1 = segs[i], s2 = segs[i + 1];
     const ip = lineLineIntersectionInfinite(s1.a, s1.dir, s2.a, s2.dir);
-    if (ip) out.push(ip);
-    else out.push(v(s1.b.x, s1.b.y));
+    const idealCorner = corners[i + 1];
+    if (ip) {
+      const dx = ip.x - idealCorner.x;
+      const dy = ip.y - idealCorner.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist <= miterLimitAbs) {
+        out.push(ip);
+      } else {
+        // Bevel-Fallback: Ende von s1 und Anfang von s2 separat.
+        out.push(v(s1.b.x, s1.b.y));
+        out.push(v(s2.a.x, s2.a.y));
+      }
+    } else {
+      out.push(v(s1.b.x, s1.b.y));
+    }
   }
   out.push(v(segs[segs.length - 1].b.x, segs[segs.length - 1].b.y));
   return out;
