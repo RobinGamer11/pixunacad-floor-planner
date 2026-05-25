@@ -103,22 +103,30 @@ export function getWallUnionGroups(
   }
 
 
-  // Subtraktionsphase: jede Gruppe minus Union aller strikt höher priorisierten.
-  // Sortiere ABSTEIGEND, damit wir die "Maske" der höheren beim Durchlauf aufbauen.
+  // Subtraktionsphase auf Prioritäts-Tier-Basis:
+  // Gleichrangige Gruppen schneiden sich NICHT gegenseitig (sie sollen sauber
+  // anschließen/unionieren). Nur strikt höhere Prioritäten schneiden niedrigere aus.
   pre.sort((a, b) => b.priority - a.priority);
-  let mask: MultiPolygon = [];
-  for (const g of pre) {
-    if (mask.length > 0 && g.multi.length > 0) {
-      try {
-        const diff = polygonClipping.difference(g.multi as any, mask as any);
-        g.multi = diff;
-      } catch {
-        // Bei Boolean-Fehler unbehandelt lassen.
+  const prios = Array.from(new Set(pre.map(p => p.priority))); // bereits absteigend
+  let higherMask: MultiPolygon = [];
+  for (const prio of prios) {
+    const tier = pre.filter(p => p.priority === prio);
+    // 1) Dieses Tier gegen die bisher akkumulierte (strikt höhere) Maske schneiden.
+    if (higherMask.length > 0) {
+      for (const g of tier) {
+        if (g.multi.length === 0) continue;
+        try {
+          g.multi = polygonClipping.difference(g.multi as any, higherMask as any);
+        } catch {
+          // ignore
+        }
       }
     }
-    if (g.multi.length > 0) {
+    // 2) Tier zur Maske für nachfolgende (niedrigere) Tiers hinzufügen.
+    for (const g of tier) {
+      if (g.multi.length === 0) continue;
       try {
-        mask = mask.length === 0 ? g.multi : polygonClipping.union(mask as any, g.multi as any);
+        higherMask = higherMask.length === 0 ? g.multi : polygonClipping.union(higherMask as any, g.multi as any);
       } catch {
         // ignore
       }
