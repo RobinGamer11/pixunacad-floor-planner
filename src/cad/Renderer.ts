@@ -13,7 +13,8 @@ import { getOrCreateDocMask } from "./documentMask";
 import { computeWallLines } from "./wallGeom";
 import { computeHealedWallLines } from "./wallHeal";
 import { getWallUnionGroups } from "./wallUnion";
-import { buildWallSolidRing, buildHealedWallSolidRing } from "./wallSolid";
+import { buildWallSolidRing, buildHealedWallSolidRing, ringToPCPolygon } from "./wallSolid";
+import polygonClipping from "polygon-clipping";
 
 export interface Selection {
   type: string;
