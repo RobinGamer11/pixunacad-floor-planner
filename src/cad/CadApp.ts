@@ -2256,6 +2256,9 @@ export class CadApp {
       }
 
       this.renderer.wallEditActive = !!(this.selectTool && this.selectTool.isEditing());
+      const _selWallId = (this.selectTool && (this.selectTool as any).selection && (this.selectTool as any).selection.wallId) || null;
+      this.topology.priorityWallId = _selWallId;
+
       this.renderer.render();
       if (this.pastePreviewActive) this._drawPastePreview(this.ctx);
       this.input.endFrame();
