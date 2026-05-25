@@ -913,7 +913,6 @@ export class Scene {
     const delta = c(oldSide) - c(target);
     if (Math.abs(delta) > 1e-9 && wall.corners.length >= 2) {
       // Verschiebt jeden Knoten entlang perpLeftScreen mit Live-Gehrung.
-      const { offsetPolyline } = require("./wallGeom") as typeof import("./wallGeom");
       wall.corners = offsetPolyline(wall.corners, delta);
     }
     wall.referenceSide = target;
