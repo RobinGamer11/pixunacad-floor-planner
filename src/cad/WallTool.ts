@@ -117,6 +117,7 @@ export class WallTool {
     this.activeTargetKey = null;
     this.app.renderer.overlay = { draw: (ctx, cam) => this._drawOverlay(ctx, cam) };
     this.app.renderer.showWallHelpers = true;
+    this.app.topology.includeWallOffsetSnaps = true;
     this.app.hub.bindCommit((vals) => this._applyHubValues(vals));
     this.app.hub.hide();
     this.app.pointEditMenu.hide();
@@ -133,6 +134,7 @@ export class WallTool {
     this.spaceShiftLocked = false;
     this.spaceShiftLockedAngleDeg = null;
     this.app.renderer.showWallHelpers = false;
+    this.app.topology.includeWallOffsetSnaps = false;
     this.app.hub.hide();
   }
 
@@ -677,8 +679,12 @@ export class WallTool {
       lines = computeWallLines(allCorners, previewThickness, this.settings.referenceSide);
     }
 
-    this._drawPolyline(ctx, cam, lines.subCorners, { color: this.settings.color, widthPx: 1.5 });
-    this._drawPolyline(ctx, cam, lines.helpCorners, { color: "rgba(120,120,120,0.7)", widthPx: 1, dashed: true });
+    // Sub-/Help-Linie immer aus dem rohen Offset zeichnen — unabhängig von
+    // der gehealten Bezugslinie, damit sie nur die tatsächliche Wandlänge
+    // zur Orientierung anzeigen (kein automatisches Verlängern).
+    const rawLines = computeWallLines(allCorners, previewThickness, this.settings.referenceSide);
+    this._drawPolyline(ctx, cam, rawLines.subCorners, { color: this.settings.color, widthPx: 1.5 });
+    this._drawPolyline(ctx, cam, rawLines.helpCorners, { color: "rgba(120,120,120,0.7)", widthPx: 1, dashed: true });
     this._drawPolyline(ctx, cam, lines.mainCorners, { color: this.settings.color, widthPx: 2 });
 
     ctx.save();
