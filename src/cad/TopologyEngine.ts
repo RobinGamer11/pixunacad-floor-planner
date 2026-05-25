@@ -35,6 +35,9 @@ export class TopologyEngine {
   labels: LabelManager;
   /** Read-only Snap-Quellen aus anderen Blättern (Transparentpause). */
   overlayScenes: Scene[] = [];
+  /** Wand-ID mit Snap-Vorrang (z. B. aktuell selektierte Wand) — deren Eckpunkte gewinnen Ties. */
+  priorityWallId: string | null = null;
+
 
   constructor(scene: Scene, camera: Camera, labels: LabelManager) {
     this.scene = scene;
