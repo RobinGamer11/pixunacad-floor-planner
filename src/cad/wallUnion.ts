@@ -60,9 +60,14 @@ function styleKey(w: Wall): string {
  */
 const _cache = new Map<string, { hash: string; result: WallUnionGroup[] }>();
 
-export function getWallUnionGroups(walls: Wall[], labelId: string): WallUnionGroup[] {
+export function getWallUnionGroups(
+  walls: Wall[],
+  labelId: string,
+  graph?: WallTopologyGraph,
+): WallUnionGroup[] {
   const relevant = walls.filter(w => w.labelId === labelId && w.corners.length >= 2 && w.thicknessM > 0);
   if (relevant.length === 0) { _cache.delete(labelId); return []; }
+  // Hash beinhaltet ALLE Wände im selben Label — Nachbar-Heal hängt davon ab.
   let h = "" + relevant.length;
   for (const w of relevant) {
     h += "|" + w.id + ":" + w.thicknessM.toFixed(4) + ":" + w.referenceSide + ":" + styleKey(w);
@@ -80,7 +85,8 @@ export function getWallUnionGroups(walls: Wall[], labelId: string): WallUnionGro
     arr.push(w);
   }
 
-  // Vorab pro Bucket unionieren.
+  // Vorab pro Bucket unionieren — Heal nutzt ALLE relevanten Wände als Nachbar-Pool,
+  // damit Außenkanten gleichnamiger Linien an Knoten korrekt mitern.
   type Pre = { key: string; priority: number; fill: string; stroke: string; kind: "outer" | "inner"; wallIds: string[]; multi: MultiPolygon };
   const pre: Pre[] = [];
   for (const [k, ws] of buckets) {
@@ -92,9 +98,10 @@ export function getWallUnionGroups(walls: Wall[], labelId: string): WallUnionGro
       stroke,
       kind: kind as "outer" | "inner",
       wallIds: ws.map(w => w.id),
-      multi: unionWallSolids(ws),
+      multi: unionWallSolids(ws, relevant, graph),
     });
   }
+
 
   // Subtraktionsphase: jede Gruppe minus Union aller strikt höher priorisierten.
   // Sortiere ABSTEIGEND, damit wir die "Maske" der höheren beim Durchlauf aufbauen.
