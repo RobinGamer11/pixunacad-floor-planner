@@ -73,6 +73,11 @@ export class SelectTool {
 
   // Wall edit snapshot
   wallPointsOriginal: Vec2[] | null = null;
+  // Preview-State für Wand-Punkt-Edits (Bewegen / Verschieben).
+  // Während der Bewegung wird die Wand NICHT mutiert — erst beim Commit-Klick.
+  wallPreviewPoint: Vec2 | null = null;
+  wallPreviewDelta: Vec2 | null = null;
+
   // Wall-Edge offset state (analog hatchEdge*)
   wallEdgeAOriginal: Vec2 | null = null;
   wallEdgeBOriginal: Vec2 | null = null;
@@ -848,10 +853,15 @@ export class SelectTool {
       const offset = delta.x * n.x + delta.y * n.y;
       this._applyHatchEdgeOffset(offset);
     } else if (this.editTarget.kind === "wallPoint") {
+      // TRANSLATE auf einem Wand-Fangpunkt = die GANZE Wand wird am gegriffenen
+      // Punkt verschoben (alle Eckpunkte um delta).
       const wall = this.app.scene.getWallById(this.editTarget.wallId);
       if (!wall || !this.wallPointsOriginal) return;
-      const orig = this.wallPointsOriginal[this.editTarget.pointIndex];
-      wall.corners[this.editTarget.pointIndex] = v(orig.x + delta.x, orig.y + delta.y);
+      for (let i = 0; i < wall.corners.length; i++) {
+        const orig = this.wallPointsOriginal[i];
+        wall.corners[i] = v(orig.x + delta.x, orig.y + delta.y);
+      }
+
     } else if (this.editTarget.kind === "wall") {
       const wall = this.app.scene.getWallById(this.editTarget.wallId);
       if (!wall || !this.wallPointsOriginal) return;
@@ -1006,6 +1016,9 @@ export class SelectTool {
     this.moveHubAngleDeg = null;
     this.editGuideAnchors = [];
     this.wallPointsOriginal = null;
+    this.wallPreviewPoint = null;
+    this.wallPreviewDelta = null;
+
     this.wallEdgeAOriginal = null;
     this.wallEdgeBOriginal = null;
     this.wallEdgePrevOriginal = null;
@@ -1516,7 +1529,13 @@ export class SelectTool {
         const p = this._previewMovePoint(input);
         const metrics = { lengthM: dist(this.fixedPoint!, p), angleDeg: angleDeg(this.fixedPoint!, p) };
 
-        this._applyMovingPoint(p, this.fixedPoint!);
+        const isWallPointEdit = this.editTarget?.kind === "wallPoint";
+        if (isWallPointEdit) {
+          // Vorschau-Only: Scene NICHT mutieren, nur Position merken.
+          this.wallPreviewPoint = v(p.x, p.y);
+        } else {
+          this._applyMovingPoint(p, this.fixedPoint!);
+        }
 
         this.app.renderer.setHoverSegmentId(null);
         this.app.hub.showAt(input.mouse.sx, input.mouse.sy);
@@ -1524,7 +1543,12 @@ export class SelectTool {
 
         if (input.clicked) {
           const finalP = this._commitMovePoint(input);
-          this._applyMovingPoint(finalP, this.fixedPoint!);
+          if (isWallPointEdit) {
+            // Jetzt erst einmalig auf die Scene anwenden → genau ein Undo-Schritt.
+            this._applyMovingPoint(finalP, this.fixedPoint!);
+          } else {
+            this._applyMovingPoint(finalP, this.fixedPoint!);
+          }
           this._clearEditState();
           this.app.hub.hide();
         }
@@ -1533,7 +1557,13 @@ export class SelectTool {
 
       if (this.activeEditAction === PointEditAction.TRANSLATE) {
         const delta = this._previewTranslateDelta(input);
-        this._applyTranslateDelta(delta);
+        const isWallPointEdit = this.editTarget?.kind === "wallPoint";
+        if (isWallPointEdit) {
+          // Vorschau-Only: Scene NICHT mutieren, nur Delta merken (ganze Wand).
+          this.wallPreviewDelta = v(delta.x, delta.y);
+        } else {
+          this._applyTranslateDelta(delta);
+        }
 
         this.app.renderer.setHoverSegmentId(null);
         this.app.hub.hide();
@@ -1545,6 +1575,7 @@ export class SelectTool {
         }
         return;
       }
+
 
       if (this.activeEditAction === PointEditAction.ROTATE) {
         const assistSeg = this._findRotateAssistSegment(input);
@@ -1951,7 +1982,59 @@ export class SelectTool {
     }
 
     if (this.isEditing()) {
+      // Vorschau-Wandkontur für Wand-Punkt-Edits (MOVE / TRANSLATE).
+      if (this.editTarget?.kind === "wallPoint" && this.wallPointsOriginal) {
+        const wall = this.app.scene.getWallById(this.editTarget.wallId);
+        if (wall) {
+          let previewCorners: Vec2[] | null = null;
+          if (this.activeEditAction === PointEditAction.MOVE && this.wallPreviewPoint) {
+            previewCorners = this.wallPointsOriginal.map(p => v(p.x, p.y));
+            previewCorners[this.editTarget.pointIndex] = v(this.wallPreviewPoint.x, this.wallPreviewPoint.y);
+          } else if (this.activeEditAction === PointEditAction.TRANSLATE && this.wallPreviewDelta) {
+            const d = this.wallPreviewDelta;
+            previewCorners = this.wallPointsOriginal.map(p => v(p.x + d.x, p.y + d.y));
+          }
+          if (previewCorners && previewCorners.length >= 2) {
+            const lines = computeWallLines(previewCorners, wall.thicknessM, wall.referenceSide);
+            ctx.save();
+            ctx.strokeStyle = "rgba(77,163,255,0.85)";
+            ctx.lineWidth = 1.6;
+            ctx.setLineDash([6, 4]);
+            const drawPoly = (pts: Vec2[]) => {
+              if (pts.length < 2) return;
+              ctx.beginPath();
+              const s0 = cam.worldToScreen(pts[0].x, pts[0].y);
+              ctx.moveTo(s0.x, s0.y);
+              for (let i = 1; i < pts.length; i++) {
+                const s = cam.worldToScreen(pts[i].x, pts[i].y);
+                ctx.lineTo(s.x, s.y);
+              }
+              ctx.stroke();
+            };
+            drawPoly(lines.mainCorners);
+            drawPoly(lines.subCorners);
+            ctx.setLineDash([2, 4]);
+            ctx.strokeStyle = "rgba(77,163,255,0.55)";
+            drawPoly(previewCorners);
+            ctx.setLineDash([]);
+            // Vorschau-Eckpunkte
+            ctx.fillStyle = "#ffffff";
+            ctx.strokeStyle = "rgba(77,163,255,0.95)";
+            ctx.lineWidth = 1.4;
+            for (const c of previewCorners) {
+              const s = cam.worldToScreen(c.x, c.y);
+              ctx.beginPath();
+              ctx.arc(s.x, s.y, 4, 0, Math.PI * 2);
+              ctx.fill();
+              ctx.stroke();
+            }
+            ctx.restore();
+          }
+        }
+      }
+
       if (this.activeEditAction === PointEditAction.MOVE || this.activeEditAction === PointEditAction.TRANSLATE) {
+
         const snap = this._findPreviewSnapForEdit(this.app.input);
 
         if (snap && snap.type === SnapType.LINE && snap.lineA && snap.lineB) {

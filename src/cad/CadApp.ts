@@ -727,6 +727,10 @@ export class CadApp {
     if (this._isRestoring || this._destroyed) return;
     // Don't snapshot mid-drag
     if (this.input.mouse.left || this.input.mouse.mid || this.input.mouse.right || this.input.isPanning) return;
+    // Don't snapshot during an active point edit (Bewegen/Verschieben/Drehen/Offset),
+    // damit Undo den gesamten Edit als einen Schritt zurücknimmt.
+    if (this.selectTool && this.selectTool.isEditing()) return;
+
     const snap = this._serializeScene();
     if (snap === this._lastSnapshot) return;
     // Drop redo branch
