@@ -39,12 +39,45 @@ export function runWallTopologyMaintenance(scene: Scene, focusWalls?: Wall[]): b
 }
 
 /**
- * S4 (ArchiCAD-Verhalten): KEIN Auto-Split mehr. Die getroffene Wand bleibt
- * unverändert; die neue Wand wird im Heal-Pass an die zugewandte Kante der
- * bestehenden Wand getrimmt. Eine Wand wird nur verändert, wenn ihr eigener
- * Endpunkt als Snap-Ziel verwendet wird.
+ * Auto-Split: Endet ein Wand-Endpunkt strikt im Inneren einer fremden
+ * Bezugslinie, wird die getroffene Wand am Treffpunkt gesplittet. So entsteht
+ * im Topologie-Graph ein echter T-Knoten — Anschluss-Logik & Union arbeiten
+ * dann auf gemeinsamen Bezugslinien-Endpunkten statt auf T-Stoß-Inzidenzen.
  */
-function runAutoSplit(_scene: Scene, _focusWalls?: Wall[]): boolean {
+function runAutoSplit(scene: Scene, focusWalls?: Wall[]): boolean {
+  const targets = focusWalls && focusWalls.length > 0 ? focusWalls : scene.walls;
+  for (const moving of targets) {
+    if (moving.corners.length < 2) continue;
+    for (const atStart of [true, false]) {
+      const p = atStart ? moving.corners[0] : moving.corners[moving.corners.length - 1];
+      for (const host of scene.walls) {
+        if (host === moving) continue;
+        if (host.corners.length < 2) continue;
+        // Endpunkt-Cluster: nur splitten, wenn p NICHT bereits ein Endpunkt von host ist.
+        if (dist(host.corners[0], p) <= NODE_TOL) continue;
+        if (dist(host.corners[host.corners.length - 1], p) <= NODE_TOL) continue;
+        const hit = findInteriorHit(host, p, HIT_TOL);
+        if (!hit) continue;
+        // Auch interne Eckpunkte von host nicht versehentlich verdoppeln.
+        let nearExistingCorner = false;
+        for (const c of host.corners) {
+          if (dist(c, hit.pos) <= NODE_TOL) { nearExistingCorner = true; break; }
+        }
+        if (nearExistingCorner) continue;
+        // Split: neuen Corner am Treffpunkt in host.corners einfügen.
+        host.corners = [
+          ...host.corners.slice(0, hit.edgeIndex + 1),
+          v(hit.pos.x, hit.pos.y),
+          ...host.corners.slice(hit.edgeIndex + 1),
+        ];
+        // Mikro-Segmente vermeiden.
+        if (dist(host.corners[hit.edgeIndex], host.corners[hit.edgeIndex + 1]) < MIN_SEG_LEN_M) {
+          host.corners.splice(hit.edgeIndex + 1, 1);
+        }
+        return true;
+      }
+    }
+  }
   return false;
 }
 
