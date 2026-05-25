@@ -876,7 +876,7 @@ export class Renderer {
 
       // Bezugslinie + Mittellinie als Helper (nur Wand-Tool aktiv ODER selektiert)
       if (this.showWallHelpers || isSelected) {
-        const lines = computeWallLines(wall.corners, wall.thicknessM, wall.referenceSide);
+        const lines = computeHealedWallLines(wall, this.scene.walls, this.scene.getWallTopology());
         // Bezugslinie (= wall.corners) durchgezogen, dünn
         ctx.save();
         ctx.strokeStyle = "rgba(80,80,80,0.85)";
