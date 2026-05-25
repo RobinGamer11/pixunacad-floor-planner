@@ -170,7 +170,8 @@ export const WallSettingsPanel: React.FC<Props> = ({ app }) => {
       </div>
 
       <div className="mt-3 pt-2 text-[11px]" style={{ borderTop: "1px solid hsl(var(--border))", color: "hsl(var(--cad-toolbar-muted))" }}>
-        Klick: Eckpunkt setzen · Doppelklick: abschließen · Shift: Ortho · <b>Leertaste</b>: Bezugsseite wechseln
+        Klick: Eckpunkt setzen · Doppelklick: abschließen · Shift: Ortho<br />
+        <b>Leertaste</b>: Bezugsseite beim Zeichnen wechseln · <b>B</b>: Bezugslinie einer selektierten Wand an gegenüberliegender Kante koppeln (Körper bleibt sichtbar gleich)
       </div>
     </div>
   );
