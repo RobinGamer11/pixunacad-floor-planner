@@ -10,7 +10,7 @@ import type { TextBox } from "./Scene";
 import { pointInInstance, instanceBoundingCornersWorld } from "./StickerManager";
 import { pointInDocument } from "./documentGeometry";
 import { computeWallLines } from "./wallGeom";
-import { buildWallSolidRing } from "./wallSolid";
+import { buildWallSolidRing, buildHealedWallSolidRing } from "./wallSolid";
 import { runWallTopologyMaintenance } from "./wallTopologyMaintenance";
 import { trimWallEndpointsToNeighbors } from "./wallConnect";
 
@@ -237,13 +237,17 @@ export class SelectTool {
       }
     }
     if (bestPoint) return bestPoint;
-    // Wand-Körper-Treffer: Klick irgendwo im parametrisch erzeugten Wand-Solid.
-    // (Topologie/Heal spielen für Selektion keine Rolle — der Hit gilt der
-    // einzelnen Wand, deren Solid sich aus Bezugslinie + Dicke ergibt.)
-    for (let wi = this.app.scene.walls.length - 1; wi >= 0; wi--) {
-      const wall = this.app.scene.walls[wi];
-      if (!this.app.labelManager.isVisible(wall.labelId)) continue;
-      const ring = buildWallSolidRing(wall);
+    // Wand-Körper-Treffer: Klick irgendwo im GEHEILTEN Wand-Solid (inkl. der
+    // durch Gehrungen/T-Stöße verlängerten Bereiche), damit die Wand auch
+    // dort selektierbar ist, wo sie sich an Nachbarn anpasst.
+    const visibleWalls = this.app.scene.walls.filter(w => this.app.labelManager.isVisible(w.labelId));
+    const graph = this.app.scene.getWallTopology();
+    for (let wi = visibleWalls.length - 1; wi >= 0; wi--) {
+      const wall = visibleWalls[wi];
+      const others = visibleWalls.filter(w => w !== wall && w.corners.length >= 2);
+      const ring = others.length > 0
+        ? buildHealedWallSolidRing(wall, others, graph)
+        : buildWallSolidRing(wall);
       if (ring.length < 3) continue;
       if (pointInPolygon(mouseW, ring)) {
         return { wallId: wall.id, pointIndex: null, edgeIndex: null };
