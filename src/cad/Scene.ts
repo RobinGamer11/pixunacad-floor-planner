@@ -34,6 +34,10 @@ export interface AreaLabel {
   borderEnabled: boolean;
   borderColor: string;
   borderWidthPx: number;
+  /** Rotation der m²-Box um ihr Zentrum (Bogenmaß). */
+  rotationRad: number;
+  /** Uniforme Skalierung der Box (Font + Padding × scale). Default 1. */
+  scale: number;
 }
 
 export class Hatch {
