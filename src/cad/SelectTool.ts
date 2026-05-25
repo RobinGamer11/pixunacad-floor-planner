@@ -1685,8 +1685,7 @@ export class SelectTool {
         }
       }
 
-      // AreaLabel (m²-Anzeige) der selektierten Schraffur → ziehen zum Verschieben.
-      // Hit-Test gegen das Screen-Rect der Label-Box.
+      // AreaLabel (m²-Anzeige) der selektierten Schraffur → Ecken-HUB ODER ziehen zum Verschieben.
       {
         const sel = this.app.selection;
         const selHatchId = sel && (sel as any).hatchId ? (sel as any).hatchId as string : null;
@@ -1696,8 +1695,32 @@ export class SelectTool {
             const layout = (this.app.renderer as any)._getAreaLabelLayout(hatch);
             if (layout) {
               const sx = input.mouse.sx, sy = input.mouse.sy;
-              const r = layout.rect;
-              if (sx >= r.x && sx <= r.x + r.w && sy >= r.y && sy <= r.y + r.h) {
+              // 1) Eckpunkt-Hit zuerst (Fangpunkt-Box ~ hitPx)
+              const hitPx = Defaults.hitPx;
+              let bestCorner = -1;
+              let bestDist = Infinity;
+              for (let i = 0; i < layout.handles.length; i++) {
+                const h = layout.handles[i];
+                const d = Math.hypot(h.x - sx, h.y - sy);
+                if (d <= hitPx && d < bestDist) { bestDist = d; bestCorner = i; }
+              }
+              if (bestCorner >= 0) {
+                this.app.setSelection({ type: SelectionType.AREA_LABEL_HANDLE, hatchId: hatch.id, handleIndex: bestCorner } as any);
+                this.app.pointEditMenu.showAt(layout.handles[bestCorner].x, layout.handles[bestCorner].y, [
+                  PointEditAction.MOVE,
+                  PointEditAction.TRANSLATE,
+                  PointEditAction.ROTATE,
+                ]);
+                return;
+              }
+              // 2) Body-Hit für Drag (rotiertes Rechteck)
+              const dx = sx - layout.centerScreen.x;
+              const dy = sy - layout.centerScreen.y;
+              const cos = Math.cos(-(layout.rotationRad || 0));
+              const sin = Math.sin(-(layout.rotationRad || 0));
+              const lx = dx * cos - dy * sin;
+              const ly = dx * sin + dy * cos;
+              if (Math.abs(lx) <= layout.boxW / 2 && Math.abs(ly) <= layout.boxH / 2) {
                 const mouseW = v(input.mouse.wx, input.mouse.wy);
                 this.dragAreaLabelHatchId = hatch.id;
                 this.dragAreaLabelGrabOffsetWorld = { x: mouseW.x - layout.centerWorld.x, y: mouseW.y - layout.centerWorld.y };
@@ -1708,6 +1731,7 @@ export class SelectTool {
           }
         }
       }
+
 
       // TextBox-Eckpunkt der bereits selektierten TextBox? → Hub-Menü (Move/Translate/Rotate)
       const cornerHit = this._hitTextBoxCornerHandle(input);
