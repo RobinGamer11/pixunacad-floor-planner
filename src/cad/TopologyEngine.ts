@@ -164,6 +164,39 @@ export class TopologyEngine {
         considerLine(ref[i], ref[i + 1], null, null);
         if (best !== before && best) { (best as Snap).wallId = wall.id; (best as Snap).wallLine = "main"; }
       }
+
+      // Optional: Sub-Linien-Eckpunkte/-Kanten als Fang anbieten (z. B.
+      // beim Zeichnen einer Innenwand mit Bezugsseite „Außen" oder umgekehrt).
+      // Schlechtere Priorität als Bezugslinie, damit reference-line corners
+      // bei Überlagerung weiterhin gewinnen.
+      if (this.includeWallOffsetSnaps) {
+        const offsetLines = computeWallLines(ref, wall.thicknessM, wall.referenceSide);
+        const subPts = offsetLines.subCorners;
+        const subBias = isPriority ? -10000 : 0;
+        for (const p of subPts) {
+          const px = this._worldToMousePx(p, mouseS);
+          if (px > Defaults.snapPx) continue;
+          // +200 Strafpunkte: Bezugslinien-Punkte (px direkt) gewinnen Ties.
+          const score = subBias + px + 200;
+          if (score < bestScore) {
+            bestScore = score;
+            best = { type: SnapType.POINT, world: v(p.x, p.y), segment: null, hatch: null, pointIndex: -1, edgeIndex: null, t: null, px, wallId: wall.id, wallLine: "sub" };
+          }
+        }
+        for (let i = 0; i < subPts.length - 1; i++) {
+          const a = subPts[i], b = subPts[i + 1];
+          const proj = projectPointToSegment(mouseW, a, b);
+          const px = this._worldToMousePx(proj.q, mouseS);
+          if (px > Defaults.snapPx) continue;
+          if (proj.t <= Defaults.splitEpsT || proj.t >= 1 - Defaults.splitEpsT) continue;
+          // Sub-Linien-Kanten: 1200 (Linien-Basis 1000 + 200 Strafe ggü. Bezugslinie)
+          const score = subBias + 1200 + px;
+          if (score < bestScore) {
+            bestScore = score;
+            best = { type: SnapType.LINE, world: v(proj.q.x, proj.q.y), segment: null, hatch: null, pointIndex: null, edgeIndex: null, t: proj.t, px, lineA: a, lineB: b, wallId: wall.id, wallLine: "sub" };
+          }
+        }
+      }
     }
 
     // Hatch edges
