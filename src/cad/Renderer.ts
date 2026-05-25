@@ -959,21 +959,9 @@ export class Renderer {
         ctx.restore();
       }
 
-      // Fangpunkte der Bezugslinie bei Selektion
-      if (isSelected) {
-        ctx.save();
-        for (const c of wall.corners) {
-          const s = cam.worldToScreen(c.x, c.y);
-          ctx.beginPath();
-          ctx.fillStyle = "#ffffff";
-          ctx.strokeStyle = Defaults.wallSelectionColor;
-          ctx.lineWidth = 1.6;
-          ctx.arc(s.x, s.y, 4.5, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.stroke();
-        }
-        ctx.restore();
-      }
+      // Fangpunkte werden ganz am Ende (über ALLEN Wänden/Labeln) gezeichnet,
+      // damit sie sichtbar bleiben und stets greifbar sind. Siehe _drawSelectedWallHandles().
+
     }
   }
 
