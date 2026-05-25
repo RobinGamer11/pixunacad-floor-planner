@@ -114,24 +114,43 @@ function healEnd(
     // Nachbarwand sind harte Grenzen — die neue Wand stoppt an der zugewandten
     // Kante der bestehenden Wand. Der nächstgelegene Treffer gewinnt,
     // unabhängig von der Strahl-Seite.
+    //
+    // ABER: An einem reinen Endpunkt-zu-Endpunkt-Knoten (alle anderen
+    // inzidenten Wände hängen mit IHREM Endpunkt am selben Knoten und kein
+    // T-Stoß ist beteiligt) ist die Klemmung schädlich: die Nachbar-main
+    // endet exakt im geteilten Eckpunkt und liegt damit zwangsläufig näher
+    // am Origin als der korrekte Sub-Gehrungspunkt → sie würde die Sub-
+    // Verlängerung zurück auf die Ecke ziehen und die gegenüberliegende
+    // Kante nicht mitern. In dem Fall: Klemmung überspringen.
     if (T !== "main") {
-      const idealT = (ideal.x - origin.x) * dir.x + (ideal.y - origin.y) * dir.y;
-      let clampAbs = Math.abs(idealT);
-      let clamped: Vec2 | null = null;
-      for (const ow of candidates) {
-        if (wall.kind === "outer" && ow.kind === "inner") continue;
-        const ol = linesOf(ow);
-        for (const boundary of [ol.mainCorners, ol.subCorners]) {
-          const p = intersectRayWithPoly(origin, dir, boundary);
-          if (!p) continue;
-          const a = Math.abs((p.x - origin.x) * dir.x + (p.y - origin.y) * dir.y);
-          if (a < clampAbs - 1e-9) {
-            clampAbs = a;
-            clamped = p;
+      let tjunctionIds: Set<string> | null = null;
+      if (node) {
+        const tj = node.incidents.filter(i => i.wallId !== wall.id && i.kind === "tjunction");
+        if (tj.length > 0) tjunctionIds = new Set(tj.map(i => i.wallId));
+      }
+      const skipClamp = node != null && tjunctionIds === null;
+      if (!skipClamp) {
+        const clampPool = tjunctionIds
+          ? candidates.filter(c => tjunctionIds!.has(c.id))
+          : candidates;
+        const idealT = (ideal.x - origin.x) * dir.x + (ideal.y - origin.y) * dir.y;
+        let clampAbs = Math.abs(idealT);
+        let clamped: Vec2 | null = null;
+        for (const ow of clampPool) {
+          if (wall.kind === "outer" && ow.kind === "inner") continue;
+          const ol = linesOf(ow);
+          for (const boundary of [ol.mainCorners, ol.subCorners]) {
+            const p = intersectRayWithPoly(origin, dir, boundary);
+            if (!p) continue;
+            const a = Math.abs((p.x - origin.x) * dir.x + (p.y - origin.y) * dir.y);
+            if (a < clampAbs - 1e-9) {
+              clampAbs = a;
+              clamped = p;
+            }
           }
         }
+        if (clamped) ideal = clamped;
       }
-      if (clamped) ideal = clamped;
     }
 
     polysSelf[T][idx] = ideal;
