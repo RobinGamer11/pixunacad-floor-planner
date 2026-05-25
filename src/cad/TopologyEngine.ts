@@ -5,8 +5,7 @@ import { Camera } from "./Camera";
 import { LabelManager } from "./LabelManager";
 import { boxCornersWorld } from "./textGeometry";
 import { documentCornersWorld, documentEdgeMidpointsWorld } from "./documentGeometry";
-import { computeWallLines } from "./wallGeom";
-import { computeHealedWallLines } from "./wallHeal";
+// Wall-Snap nutzt ausschließlich wall.corners (Bezugslinie).
 
 export type WallLineKind = "main" | "sub" | "help";
 
@@ -131,30 +130,23 @@ export class TopologyEngine {
     for (const seg of segs) {
       considerLine(seg.a, seg.b, seg, null);
     }
-    // Wall snap points & edges (Haupt + Sub + Help) – mit wallId/wallLine markiert.
-    // Wir verwenden die GEHEILTE Geometrie, damit auch Sub-/Hilfslinien an
-    // ihren echten (verlängerten/verkürzten) Endpunkten fangbar sind.
-    const wallGraph = this.scene.getWallTopology();
+    // Wand-Snap: AUSSCHLIESSLICH Bezugslinien (wall.corners) – Offsetlinien
+    // (sub/help) sind abgeleitete Geometrie und besitzen keine topologische
+    // Bedeutung. Damit werden Anschlüsse zwingend über Bezugslinie ↔ Bezugslinie
+    // gebildet, nicht über parallele Wandkanten.
     const visibleWalls = this.scene.walls.filter(w => this.labels.isVisible(w.labelId));
     for (const wall of visibleWalls) {
-      const others = visibleWalls.filter(w => w !== wall);
-      const lines = computeHealedWallLines(wall, others, wallGraph);
-      const groups: { kind: "main" | "sub" | "help"; poly: Vec2[] }[] = [
-        { kind: "main", poly: lines.mainCorners },
-        { kind: "sub", poly: lines.subCorners },
-        { kind: "help", poly: lines.helpCorners },
-      ];
-      for (const g of groups) {
-        for (const p of g.poly) {
-          const before = best;
-          considerPoint(p, null, null, -1);
-          if (best !== before && best) { (best as Snap).wallId = wall.id; (best as Snap).wallLine = g.kind; }
-        }
-        for (let i = 0; i < g.poly.length - 1; i++) {
-          const before = best;
-          considerLine(g.poly[i], g.poly[i + 1], null, null);
-          if (best !== before && best) { (best as Snap).wallId = wall.id; (best as Snap).wallLine = g.kind; }
-        }
+      const ref = wall.corners;
+      if (ref.length < 2) continue;
+      for (const p of ref) {
+        const before = best;
+        considerPoint(p, null, null, -1);
+        if (best !== before && best) { (best as Snap).wallId = wall.id; (best as Snap).wallLine = "main"; }
+      }
+      for (let i = 0; i < ref.length - 1; i++) {
+        const before = best;
+        considerLine(ref[i], ref[i + 1], null, null);
+        if (best !== before && best) { (best as Snap).wallId = wall.id; (best as Snap).wallLine = "main"; }
       }
     }
     // Hatch edges

@@ -11,7 +11,8 @@ import { transformedInstanceItems, instanceBoundingCornersWorld } from "./Sticke
 import { documentCornersWorld, documentCenterWorld } from "./documentGeometry";
 import { getOrCreateDocMask } from "./documentMask";
 import { computeWallLines } from "./wallGeom";
-import { computeHealedWallLines } from "./wallHeal";
+import { getWallUnionGroups } from "./wallUnion";
+import { buildWallSolidRing } from "./wallSolid";
 
 export interface Selection {
   type: string;
@@ -790,103 +791,121 @@ export class Renderer {
     if (!this.scene.walls || this.scene.walls.length === 0) return;
     const ctx = this.ctx;
     const cam = this.camera;
-    // Auto-Heal: außenwände vor innenwänden auflösen (höhere Priorität)
-    const allWalls = this.scene.walls;
-    const graph = this.scene.getWallTopology();
-    for (const wall of allWalls) {
-      if (wall.labelId !== labelId) continue;
-      if (!this.labels.isVisible(wall.labelId)) continue;
-      const others = allWalls.filter(w => w !== wall && this.labels.isVisible(w.labelId));
-      const healed = computeHealedWallLines(wall, others, graph);
-      const main = healed.mainCorners;
-      const sub = healed.subCorners;
-      if (main.length < 2 || sub.length < 2) continue;
 
-      const isSelected = !!(this.selection && this.selection.type === SelectionType.WALL && (this.selection as any).wallId === wall.id);
+    // BIM-Pipeline: Pro Label/Style-Gruppe alle Wandkörper unionieren.
+    // Das eliminiert automatisch innere Stoßkanten und doppelte Konturen.
+    const groups = getWallUnionGroups(this.scene.walls, labelId);
+    if (groups.length === 0) return;
 
-      // Gefüllte Wandkontur: main vorwärts + sub rückwärts → geschlossenes Polygon
+    for (const group of groups) {
+      if (!group.multi || group.multi.length === 0) continue;
+
+      // 1. Füllung (evenodd → Löcher korrekt freigestellt)
       ctx.save();
+      ctx.fillStyle = group.fillColor;
       ctx.beginPath();
-      const a0 = cam.worldToScreen(main[0].x, main[0].y);
-      ctx.moveTo(a0.x, a0.y);
-      for (let i = 1; i < main.length; i++) {
-        const s = cam.worldToScreen(main[i].x, main[i].y);
-        ctx.lineTo(s.x, s.y);
+      for (const poly of group.multi) {
+        for (const ring of poly) {
+          if (!ring || ring.length < 3) continue;
+          const p0 = cam.worldToScreen(ring[0][0], ring[0][1]);
+          ctx.moveTo(p0.x, p0.y);
+          for (let i = 1; i < ring.length; i++) {
+            const p = cam.worldToScreen(ring[i][0], ring[i][1]);
+            ctx.lineTo(p.x, p.y);
+          }
+          ctx.closePath();
+        }
       }
-      for (let i = sub.length - 1; i >= 0; i--) {
-        const s = cam.worldToScreen(sub[i].x, sub[i].y);
-        ctx.lineTo(s.x, s.y);
-      }
-      ctx.closePath();
-      ctx.fillStyle = wall.fillColor || (wall.kind === "outer" ? Defaults.wallFillColorOuter : Defaults.wallFillColorInner);
-      ctx.fill();
-      if (isSelected) {
-        ctx.fillStyle = "rgba(77,163,255,0.28)";
-        ctx.fill();
-      }
+      ctx.fill("evenodd");
 
-      // Stroke: nur main- und sub-Polylinien plus offene End-Caps separat zeichnen,
-      // damit verbundene Wände keine sichtbare Naht zwischen den Polygonen haben.
-      const strokeStyle = isSelected ? Defaults.wallSelectionColor : wall.color;
-      const strokeWidth = isSelected ? 2.2 : 1.5;
-      ctx.strokeStyle = strokeStyle;
-      ctx.lineWidth = strokeWidth;
-      // main
-      ctx.beginPath();
-      const m0 = cam.worldToScreen(main[0].x, main[0].y);
-      ctx.moveTo(m0.x, m0.y);
-      for (let i = 1; i < main.length; i++) {
-        const s = cam.worldToScreen(main[i].x, main[i].y);
-        ctx.lineTo(s.x, s.y);
-      }
-      ctx.stroke();
-      // sub
-      ctx.beginPath();
-      const s0 = cam.worldToScreen(sub[0].x, sub[0].y);
-      ctx.moveTo(s0.x, s0.y);
-      for (let i = 1; i < sub.length; i++) {
-        const s = cam.worldToScreen(sub[i].x, sub[i].y);
-        ctx.lineTo(s.x, s.y);
-      }
-      ctx.stroke();
-      // End-Caps nur zeichnen, wenn nicht geheilt (offen)
-      if (healed.capStart) {
-        ctx.beginPath();
-        const ms = cam.worldToScreen(main[0].x, main[0].y);
-        const ss = cam.worldToScreen(sub[0].x, sub[0].y);
-        ctx.moveTo(ms.x, ms.y);
-        ctx.lineTo(ss.x, ss.y);
-        ctx.stroke();
-      }
-      if (healed.capEnd) {
-        ctx.beginPath();
-        const me = cam.worldToScreen(main[main.length - 1].x, main[main.length - 1].y);
-        const se = cam.worldToScreen(sub[sub.length - 1].x, sub[sub.length - 1].y);
-        ctx.moveTo(me.x, me.y);
-        ctx.lineTo(se.x, se.y);
-        ctx.stroke();
+      // 2. Kontur — nur äußere Boundary + Lochränder der vereinigten Wand
+      ctx.strokeStyle = group.strokeColor;
+      ctx.lineWidth = 1.5;
+      for (const poly of group.multi) {
+        for (const ring of poly) {
+          if (!ring || ring.length < 3) continue;
+          ctx.beginPath();
+          const p0 = cam.worldToScreen(ring[0][0], ring[0][1]);
+          ctx.moveTo(p0.x, p0.y);
+          for (let i = 1; i < ring.length; i++) {
+            const p = cam.worldToScreen(ring[i][0], ring[i][1]);
+            ctx.lineTo(p.x, p.y);
+          }
+          ctx.closePath();
+          ctx.stroke();
+        }
       }
       ctx.restore();
+    }
 
-      // Help-Linie nur als gestrichelte Hilfe wenn Wand-Tool aktiv
-      if (this.showWallHelpers && healed.helpCorners.length >= 2) {
+    // 3. Selektion / Helpers / Bezugslinien — pro Wand
+    const selectedWallId =
+      this.selection && this.selection.type === SelectionType.WALL
+        ? (this.selection as any).wallId
+        : null;
+
+    for (const wall of this.scene.walls) {
+      if (wall.labelId !== labelId) continue;
+      if (!this.labels.isVisible(wall.labelId)) continue;
+      if (wall.corners.length < 2) continue;
+
+      const isSelected = selectedWallId === wall.id;
+
+      // Selektion: Solid der einzelnen Wand mit Selektionsfarbe überlagern
+      if (isSelected) {
+        const ring = buildWallSolidRing(wall);
+        if (ring.length >= 3) {
+          ctx.save();
+          ctx.fillStyle = "rgba(77,163,255,0.28)";
+          ctx.beginPath();
+          const p0 = cam.worldToScreen(ring[0].x, ring[0].y);
+          ctx.moveTo(p0.x, p0.y);
+          for (let i = 1; i < ring.length; i++) {
+            const p = cam.worldToScreen(ring[i].x, ring[i].y);
+            ctx.lineTo(p.x, p.y);
+          }
+          ctx.closePath();
+          ctx.fill();
+          ctx.strokeStyle = Defaults.wallSelectionColor;
+          ctx.lineWidth = 2.2;
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+
+      // Bezugslinie + Mittellinie als Helper (nur Wand-Tool aktiv ODER selektiert)
+      if (this.showWallHelpers || isSelected) {
+        const lines = computeWallLines(wall.corners, wall.thicknessM, wall.referenceSide);
+        // Bezugslinie (= wall.corners) durchgezogen, dünn
         ctx.save();
-        ctx.strokeStyle = "rgba(120,120,120,0.65)";
+        ctx.strokeStyle = "rgba(80,80,80,0.85)";
         ctx.lineWidth = 1;
-        ctx.setLineDash([5, 4]);
         ctx.beginPath();
-        const h0 = cam.worldToScreen(healed.helpCorners[0].x, healed.helpCorners[0].y);
-        ctx.moveTo(h0.x, h0.y);
-        for (let i = 1; i < healed.helpCorners.length; i++) {
-          const s = cam.worldToScreen(healed.helpCorners[i].x, healed.helpCorners[i].y);
-          ctx.lineTo(s.x, s.y);
+        const r0 = cam.worldToScreen(wall.corners[0].x, wall.corners[0].y);
+        ctx.moveTo(r0.x, r0.y);
+        for (let i = 1; i < wall.corners.length; i++) {
+          const p = cam.worldToScreen(wall.corners[i].x, wall.corners[i].y);
+          ctx.lineTo(p.x, p.y);
         }
         ctx.stroke();
-        ctx.setLineDash([]);
+        // Mittellinie gestrichelt
+        if (lines.helpCorners.length >= 2) {
+          ctx.strokeStyle = "rgba(120,120,120,0.55)";
+          ctx.setLineDash([5, 4]);
+          ctx.beginPath();
+          const h0 = cam.worldToScreen(lines.helpCorners[0].x, lines.helpCorners[0].y);
+          ctx.moveTo(h0.x, h0.y);
+          for (let i = 1; i < lines.helpCorners.length; i++) {
+            const p = cam.worldToScreen(lines.helpCorners[i].x, lines.helpCorners[i].y);
+            ctx.lineTo(p.x, p.y);
+          }
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
         ctx.restore();
       }
 
-      // Fangpunkte (Eckpunkte der Bezugslinie) bei Selektion einblenden
+      // Fangpunkte der Bezugslinie bei Selektion
       if (isSelected) {
         ctx.save();
         for (const c of wall.corners) {
