@@ -66,6 +66,8 @@ export class Renderer {
   hoverTextBoxId: string | null = null;
   /** Box currently being edited inline — skip canvas rendering for it. */
   editingTextBoxId: string | null = null;
+  /** True während ein Wand-Edit (Bewegen/Verschieben/Drehen) läuft. */
+  wallEditActive = false;
 
   /**
    * Plan-Modus: zeichnet grauen Hintergrund + weißes Papierblatt (in mm).
