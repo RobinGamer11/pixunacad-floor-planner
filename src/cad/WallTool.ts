@@ -159,51 +159,13 @@ export class WallTool {
   }
 
   /**
-   * Wenn der gefundene Snap auf einer Wandlinie liegt, deren Priorität nicht zu unserer
-   * eigenen Bezugslinie passt, suche nach einem alternativen Wand-Snap mit passender
-   * Priorität in der Nähe – nur dieser darf binden. So verbinden sich:
-   *   main↔main, sub↔sub, help↔help.
+   * Topologie-Reform: Wand-Anschlüsse entstehen ausschließlich über die
+   * Bezugslinie (wall.corners). Es gibt deshalb keine Prioritätssuche zwischen
+   * main/sub/help-Snaps mehr — der von der TopologyEngine gelieferte Snap
+   * gilt unverändert.
    */
-  private _applyPrioritySnap(snap: import("./TopologyEngine").Snap | null, mouseS: Vec2, mouseW: Vec2) {
-    if (!snap) return snap;
-    if (!snap.wallId) return snap;
-    const want = this.ownLineKind();
-    if (snap.wallLine === want) return snap;
-
-    // Suche bestpassenden Wall-Snap mit gewünschter Linie
-    let best: import("./TopologyEngine").Snap | null = null;
-    let bestPx = Defaults.snapPx;
-    for (const wall of this.app.scene.walls) {
-      if (!this.app.labelManager.isVisible(wall.labelId)) continue;
-      const lines = computeWallLines(wall.corners, wall.thicknessM, wall.referenceSide);
-      const poly: Vec2[] = want === "main" ? lines.mainCorners : want === "sub" ? lines.subCorners : lines.helpCorners;
-      // Punkte
-      for (const p of poly) {
-        const sp = this.app.camera.worldToScreen(p.x, p.y);
-        const px = Math.hypot(sp.x - mouseS.x, sp.y - mouseS.y);
-        if (px <= bestPx) {
-          bestPx = px;
-          best = { type: SnapType.POINT, world: v(p.x, p.y), segment: null, hatch: null, pointIndex: null, t: null, px, wallId: wall.id, wallLine: want };
-        }
-      }
-      // Linien
-      for (let i = 0; i < poly.length - 1; i++) {
-        const a = poly[i], b = poly[i + 1];
-        const ab = sub(b, a);
-        const ap = sub(mouseW, a);
-        const ab2 = ab.x * ab.x + ab.y * ab.y || 1e-12;
-        let t = (ap.x * ab.x + ap.y * ab.y) / ab2;
-        if (t <= 0 || t >= 1) continue;
-        const q = { x: a.x + ab.x * t, y: a.y + ab.y * t };
-        const sp = this.app.camera.worldToScreen(q.x, q.y);
-        const px = Math.hypot(sp.x - mouseS.x, sp.y - mouseS.y);
-        if (px <= bestPx) {
-          bestPx = px;
-          best = { type: SnapType.LINE, world: q, segment: null, hatch: null, pointIndex: null, t, px, lineA: a, lineB: b, wallId: wall.id, wallLine: want };
-        }
-      }
-    }
-    return best || snap;
+  private _applyPrioritySnap(snap: import("./TopologyEngine").Snap | null, _mouseS: Vec2, _mouseW: Vec2) {
+    return snap;
   }
 
   private _drawPolyline(ctx: CanvasRenderingContext2D, cam: any, pts: Vec2[], style: { color: string; widthPx: number; dashed?: boolean }) {
