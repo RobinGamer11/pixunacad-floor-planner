@@ -1713,6 +1713,18 @@ export class CadApp {
       if (e.key === "e" || e.key === "E") this.setTool(ToolIds.ERASER);
       if (e.key === "w" || e.key === "W") this.setTool(ToolIds.WALL);
 
+      // 'B' = Bezugslinie einer selektierten Wand an gegenüberliegender Kante koppeln
+      // (cycelt outer → center → inner → outer, Wandkörper bleibt sichtbar gleich).
+      if ((e.key === "b" || e.key === "B") && this.selection && (this.selection as any).wallId) {
+        const wall = this.scene.getWallById((this.selection as any).wallId);
+        if (wall) {
+          e.preventDefault();
+          this.scene.flipWallReferenceSide(wall);
+          this.scene.markWallsDirty();
+          return;
+        }
+      }
+
       if (e.key === "Escape") {
         if (this.isStickerEditing()) { this.exitStickerEdit(); this.clearSelection(); return; }
         if (this.pastePreviewActive) { this.cancelPastePreview(); return; }

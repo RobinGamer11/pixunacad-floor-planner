@@ -215,10 +215,21 @@ export class WallTool {
   }
 
   private _drawOverlay(ctx: CanvasRenderingContext2D, cam: any) {
-    // Snap-Cursor
+    // Snap-Cursor + kleines Label mit aktiver Bezugsseite (Außen/Mitte/Innen)
     if (this.snap) {
       const s = cam.worldToScreen(this.snap.world.x, this.snap.world.y);
       drawSnapDot(ctx, s.x, s.y, { ring: true });
+      const sideLabel = this.settings.referenceSide === "outer"
+        ? "Außen" : this.settings.referenceSide === "inner" ? "Innen" : "Mitte";
+      ctx.save();
+      ctx.font = "11px sans-serif";
+      ctx.fillStyle = "rgba(20,20,20,0.85)";
+      ctx.strokeStyle = "rgba(255,255,255,0.9)";
+      ctx.lineWidth = 3;
+      const tx = s.x + 10, ty = s.y - 10;
+      ctx.strokeText(sideLabel, tx, ty);
+      ctx.fillText(sideLabel, tx, ty);
+      ctx.restore();
     }
 
     if (this.state !== "drawing" || this.corners.length === 0) return;
