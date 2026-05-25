@@ -1720,7 +1720,7 @@ export class CadApp {
         if (wall) {
           e.preventDefault();
           this.scene.flipWallReferenceSide(wall);
-          this.renderer.markDirty?.();
+          this.scene.markWallsDirty();
           return;
         }
       }
