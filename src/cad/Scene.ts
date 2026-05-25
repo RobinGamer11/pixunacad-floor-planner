@@ -893,6 +893,33 @@ export class Scene {
   }
 
   removeWall(w: Wall) { this.walls = this.walls.filter(x => x !== w); this.markWallsDirty(); }
+
+  /**
+   * Wechselt die Bezugsseite einer Wand und verschiebt gleichzeitig die
+   * Bezugspolylinie so, dass der sichtbare Wandkörper exakt erhalten bleibt
+   * (ArchiCAD: "Bezugslinie an gegenüberliegender Kante koppeln").
+   * Cycelt outer → center → inner → outer.
+   */
+  flipWallReferenceSide(wall: Wall, newSide?: WallReferenceSide): WallReferenceSide {
+    const order: WallReferenceSide[] = ["outer", "center", "inner"];
+    const oldSide = wall.referenceSide;
+    const target: WallReferenceSide = newSide ?? order[(order.indexOf(oldSide) + 1) % order.length];
+    if (target === oldSide) return oldSide;
+    const t = wall.thicknessM;
+    // Body-Center-Offset relativ zur Bezugslinie (in perpLeftScreen-Richtung):
+    // outer = -t/2, center = 0, inner = +t/2.
+    const c = (s: WallReferenceSide) => s === "outer" ? -t / 2 : s === "inner" ? t / 2 : 0;
+    const delta = c(oldSide) - c(target);
+    if (Math.abs(delta) > 1e-9 && wall.corners.length >= 2) {
+      // Verschiebt jeden Knoten entlang perpLeftScreen mit Live-Gehrung.
+      const { offsetPolyline } = require("./wallGeom") as typeof import("./wallGeom");
+      wall.corners = offsetPolyline(wall.corners, delta);
+    }
+    wall.referenceSide = target;
+    this.markWallsDirty();
+    return target;
+  }
+
   getWallById(id: string): Wall | null { return this.walls.find(w => w.id === id) || null; }
   getWallsByLabelId(labelId: string): Wall[] { return this.walls.filter(w => w.labelId === labelId); }
   removeWallsByLabelId(labelId: string) { this.walls = this.walls.filter(w => w.labelId !== labelId); this.markWallsDirty(); }
