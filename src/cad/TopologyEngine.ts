@@ -182,6 +182,9 @@ export class TopologyEngine {
     // Bedeutung. Damit werden Anschlüsse zwingend über Bezugslinie ↔ Bezugslinie
     // gebildet, nicht über parallele Wandkanten.
     const visibleWalls = this.scene.walls.filter(w => this.labels.isVisible(w.labelId));
+    // Cache der gehealten Wandlinien für diesen Snap-Call (und nachfolgende,
+    // solange die Wandgeometrie unverändert bleibt).
+    if (this.includeWallOffsetSnaps) this._ensureHealCache(visibleWalls);
     for (const wall of visibleWalls) {
       const ref = wall.corners;
       if (ref.length < 2) continue;
