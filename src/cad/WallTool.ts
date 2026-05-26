@@ -118,6 +118,7 @@ export class WallTool {
     this.app.renderer.overlay = { draw: (ctx, cam) => this._drawOverlay(ctx, cam) };
     this.app.renderer.showWallHelpers = true;
     this.app.topology.includeWallOffsetSnaps = true;
+    this.app.topology.activeDrawingWallKind = this.settings.kind;
     this.app.hub.bindCommit((vals) => this._applyHubValues(vals));
     this.app.hub.hide();
     this.app.pointEditMenu.hide();
