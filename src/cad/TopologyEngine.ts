@@ -224,7 +224,7 @@ export class TopologyEngine {
       // Optional: Sub-Linien + gehealte Main-Verlängerung als Fang anbieten.
       if (this.includeWallOffsetSnaps) {
         const otherVisibleWalls = visibleWalls.filter(w => w !== wall && w.corners.length >= 2);
-        const healed = computeHealedWallLines(wall, otherVisibleWalls, this.scene.getWallTopology());
+        const healed = this._getHealed(wall, otherVisibleWalls);
 
         // Gehealte Hauptlinie (verlängerte Bezugslinie).
         const mainPts = healed.mainCorners;
