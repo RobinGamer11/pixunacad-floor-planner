@@ -502,6 +502,7 @@ export class WallTool {
   /* ===== Update / Click ===== */
 
   update(input: Input) {
+    this.app.topology.activeDrawingWallKind = this.settings.kind;
     this.snap = this._findWallToolSnap(input);
     this._syncSpaceShiftLock(input);
 
