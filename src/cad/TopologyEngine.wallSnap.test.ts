@@ -40,7 +40,7 @@ describe("TopologyEngine wall snap priority", () => {
     const { scene, camera, topo } = env;
     // Außenwand horizontal, Bezugsseite außen (oben), Dicke 0.3 m → Sublinie liegt 0.3 m unter ref.
     const outer = scene.createWall({
-      kind: "outer", thicknessM: 0.3, referenceSide: "outer",
+      kind: "outer", thicknessM: 0.05, referenceSide: "outer",
       corners: [v(0, 0), v(5, 0)],
     });
     const lines = computeWallLines(outer.corners, outer.thicknessM, outer.referenceSide);
@@ -61,7 +61,7 @@ describe("TopologyEngine wall snap priority", () => {
   it("inner wall drawing prefers reference line of other inner walls", () => {
     const { scene, camera, topo } = env;
     const inner = scene.createWall({
-      kind: "inner", thicknessM: 0.15, referenceSide: "center",
+      kind: "inner", thicknessM: 0.05, referenceSide: "center",
       corners: [v(0, 0), v(5, 0)],
     });
     const lines = computeWallLines(inner.corners, inner.thicknessM, inner.referenceSide);
@@ -81,7 +81,7 @@ describe("TopologyEngine wall snap priority", () => {
   it("outer wall drawing prefers reference line of other outer walls", () => {
     const { scene, camera, topo } = env;
     const outer = scene.createWall({
-      kind: "outer", thicknessM: 0.3, referenceSide: "outer",
+      kind: "outer", thicknessM: 0.05, referenceSide: "outer",
       corners: [v(0, 0), v(5, 0)],
     });
     const lines = computeWallLines(outer.corners, outer.thicknessM, outer.referenceSide);
@@ -101,7 +101,7 @@ describe("TopologyEngine wall snap priority", () => {
   it("heal cache is reused across snap calls and invalidated on wall mutation", () => {
     const { scene, camera, topo } = env;
     scene.createWall({
-      kind: "outer", thicknessM: 0.3, referenceSide: "outer",
+      kind: "outer", thicknessM: 0.05, referenceSide: "outer",
       corners: [v(0, 0), v(5, 0)],
     });
     topo.activeDrawingWallKind = "inner";
