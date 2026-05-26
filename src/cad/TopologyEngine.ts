@@ -53,6 +53,35 @@ export class TopologyEngine {
    */
   activeDrawingWallKind: "outer" | "inner" | null = null;
 
+  /** Cache für gehealte Wandlinien während des Snap-Vorgangs. Wird über
+   * einen Hash der sichtbaren Wände invalidiert (gleiche Strategie wie der
+   * Wand-Topologie-Hash in Scene). Reduziert die `computeHealedWallLines`-
+   * Aufrufe von O(walls × mouseMoves) auf O(walls), solange sich die
+   * Wandgeometrie zwischen mouseMoves nicht ändert. */
+  private _healCache = new Map<string, ReturnType<typeof computeHealedWallLines>>();
+  private _healCacheHash = "";
+
+  private _ensureHealCache(visibleWalls: import("./Scene").Wall[]): void {
+    let h = "" + visibleWalls.length;
+    for (const w of visibleWalls) {
+      h += "|" + w.id + ":" + w.kind + ":" + w.thicknessM + ":" + w.referenceSide + ":" + w.corners.length;
+      for (const c of w.corners) h += "," + c.x.toFixed(3) + "," + c.y.toFixed(3);
+    }
+    if (h !== this._healCacheHash) {
+      this._healCache.clear();
+      this._healCacheHash = h;
+    }
+  }
+
+  private _getHealed(wall: import("./Scene").Wall, others: import("./Scene").Wall[]) {
+    let cached = this._healCache.get(wall.id);
+    if (!cached) {
+      cached = computeHealedWallLines(wall, others, this.scene.getWallTopology());
+      this._healCache.set(wall.id, cached);
+    }
+    return cached;
+  }
+
 
   constructor(scene: Scene, camera: Camera, labels: LabelManager) {
     this.scene = scene;
