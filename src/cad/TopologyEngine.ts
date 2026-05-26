@@ -157,39 +157,49 @@ export class TopologyEngine {
       const ref = wall.corners;
       if (ref.length < 2) continue;
       const isPriority = !!(this.priorityWallId && wall.id === this.priorityWallId);
+      // Beim Zeichnen einer Innenwand orientieren wir uns an der SUB-Linie
+      // (Innenkante) bestehender Außenwände — nicht an deren Bezugslinie.
+      // Bei Innenwand-gegen-Innenwand bleibt die Bezugslinie bevorzugt.
+      const preferSub = this.activeDrawingWallKind === "inner" && wall.kind === "outer";
+      const MAIN_PEN = preferSub ? 200 : 0;
+      const SUB_PEN = preferSub ? 0 : 200;
+      const prioBias = isPriority ? -10000 : 0;
+
+      // Bezugslinien-Eckpunkte (immer aktiv).
       for (const p of ref) {
         const px = this._worldToMousePx(p, mouseS);
         if (px > Defaults.snapPx) continue;
-        // Priority-Wand: Score deutlich nach unten ziehen, sodass deren
-        // Bezugslinien-Eckpunkte konkurrierende Nachbarpunkte schlagen.
-        const score = isPriority ? px - 10000 : px;
+        const score = prioBias + px + MAIN_PEN;
         if (score < bestScore) {
           bestScore = score;
           best = { type: SnapType.POINT, world: v(p.x, p.y), segment: null, hatch: null, pointIndex: -1, edgeIndex: null, t: null, px, wallId: wall.id, wallLine: "main" };
         }
       }
+      // Bezugslinien-Kanten (immer aktiv).
       for (let i = 0; i < ref.length - 1; i++) {
-        const before = best;
-        considerLine(ref[i], ref[i + 1], null, null);
-        if (best !== before && best) { (best as Snap).wallId = wall.id; (best as Snap).wallLine = "main"; }
+        const a = ref[i], b = ref[i + 1];
+        const proj = projectPointToSegment(mouseW, a, b);
+        const px = this._worldToMousePx(proj.q, mouseS);
+        if (px > Defaults.snapPx) continue;
+        if (proj.t <= Defaults.splitEpsT || proj.t >= 1 - Defaults.splitEpsT) continue;
+        const score = prioBias + 1000 + px + MAIN_PEN;
+        if (score < bestScore) {
+          bestScore = score;
+          best = { type: SnapType.LINE, world: v(proj.q.x, proj.q.y), segment: null, hatch: null, pointIndex: null, edgeIndex: i, t: proj.t, px, lineA: a, lineB: b, wallId: wall.id, wallLine: "main" };
+        }
       }
 
-      // Optional: Sub-Linien-Eckpunkte/-Kanten als Fang anbieten (z. B.
-      // beim Zeichnen einer Innenwand mit Bezugsseite „Außen" oder umgekehrt).
-      // Schlechtere Priorität als Bezugslinie, damit reference-line corners
-      // bei Überlagerung weiterhin gewinnen.
+      // Optional: Sub-Linien + gehealte Main-Verlängerung als Fang anbieten.
       if (this.includeWallOffsetSnaps) {
         const otherVisibleWalls = visibleWalls.filter(w => w !== wall && w.corners.length >= 2);
         const healed = computeHealedWallLines(wall, otherVisibleWalls, this.scene.getWallTopology());
 
-        // Gehealte Hauptlinie (verlängerte Bezugslinie an Gehrung/T-Stoß) als
-        // zusätzliche Snap-Kandidaten — damit Wände auch im verlängerten
-        // Bereich angedockt werden können.
+        // Gehealte Hauptlinie (verlängerte Bezugslinie).
         const mainPts = healed.mainCorners;
         for (const p of mainPts) {
           const px = this._worldToMousePx(p, mouseS);
           if (px > Defaults.snapPx) continue;
-          const score = isPriority ? px - 10000 : px;
+          const score = prioBias + px + MAIN_PEN;
           if (score < bestScore) {
             bestScore = score;
             best = { type: SnapType.POINT, world: v(p.x, p.y), segment: null, hatch: null, pointIndex: -1, edgeIndex: null, t: null, px, wallId: wall.id, wallLine: "main" };
@@ -201,20 +211,19 @@ export class TopologyEngine {
           const px = this._worldToMousePx(proj.q, mouseS);
           if (px > Defaults.snapPx) continue;
           if (proj.t <= Defaults.splitEpsT || proj.t >= 1 - Defaults.splitEpsT) continue;
-          const score = (isPriority ? -10000 : 0) + 1000 + px;
+          const score = prioBias + 1000 + px + MAIN_PEN;
           if (score < bestScore) {
             bestScore = score;
             best = { type: SnapType.LINE, world: v(proj.q.x, proj.q.y), segment: null, hatch: null, pointIndex: null, edgeIndex: null, t: proj.t, px, lineA: a, lineB: b, wallId: wall.id, wallLine: "main" };
           }
         }
 
+        // Sub-Linie (gehealte Gegenkante) — Eckpunkte UND Kanten snapbar.
         const subPts = healed.subCorners;
-        const subBias = isPriority ? -10000 : 0;
         for (const p of subPts) {
           const px = this._worldToMousePx(p, mouseS);
           if (px > Defaults.snapPx) continue;
-          // +200 Strafpunkte: Bezugslinien-Punkte (px direkt) gewinnen Ties.
-          const score = subBias + px + 200;
+          const score = prioBias + px + SUB_PEN;
           if (score < bestScore) {
             bestScore = score;
             best = { type: SnapType.POINT, world: v(p.x, p.y), segment: null, hatch: null, pointIndex: -1, edgeIndex: null, t: null, px, wallId: wall.id, wallLine: "sub" };
@@ -226,8 +235,7 @@ export class TopologyEngine {
           const px = this._worldToMousePx(proj.q, mouseS);
           if (px > Defaults.snapPx) continue;
           if (proj.t <= Defaults.splitEpsT || proj.t >= 1 - Defaults.splitEpsT) continue;
-          // Sub-Linien-Kanten: 1200 (Linien-Basis 1000 + 200 Strafe ggü. Bezugslinie)
-          const score = subBias + 1200 + px;
+          const score = prioBias + 1000 + px + SUB_PEN;
           if (score < bestScore) {
             bestScore = score;
             best = { type: SnapType.LINE, world: v(proj.q.x, proj.q.y), segment: null, hatch: null, pointIndex: null, edgeIndex: null, t: proj.t, px, lineA: a, lineB: b, wallId: wall.id, wallLine: "sub" };
