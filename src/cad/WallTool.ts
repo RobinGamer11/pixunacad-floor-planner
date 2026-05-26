@@ -136,6 +136,7 @@ export class WallTool {
     this.spaceShiftLockedAngleDeg = null;
     this.app.renderer.showWallHelpers = false;
     this.app.topology.includeWallOffsetSnaps = false;
+    this.app.topology.activeDrawingWallKind = null;
     this.app.hub.hide();
   }
 
