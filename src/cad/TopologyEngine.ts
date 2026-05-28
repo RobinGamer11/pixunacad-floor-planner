@@ -82,6 +82,10 @@ export class TopologyEngine {
     return cached;
   }
 
+  private _isHiddenWallCorner(wall: import("./Scene").Wall, pointIndex: number): boolean {
+    return !!wall.hiddenCornerIndices?.includes(pointIndex);
+  }
+
 
   constructor(scene: Scene, camera: Camera, labels: LabelManager) {
     this.scene = scene;
@@ -198,7 +202,9 @@ export class TopologyEngine {
       const prioBias = isPriority ? -10000 : 0;
 
       // Bezugslinien-Eckpunkte (immer aktiv).
-      for (const p of ref) {
+      for (let pi = 0; pi < ref.length; pi++) {
+        if (this._isHiddenWallCorner(wall, pi)) continue;
+        const p = ref[pi];
         const px = this._worldToMousePx(p, mouseS);
         if (px > Defaults.snapPx) continue;
         const score = prioBias + px + MAIN_PEN;
@@ -228,7 +234,9 @@ export class TopologyEngine {
 
         // Gehealte Hauptlinie (verlängerte Bezugslinie).
         const mainPts = healed.mainCorners;
-        for (const p of mainPts) {
+        for (let pi = 0; pi < mainPts.length; pi++) {
+          if (this._isHiddenWallCorner(wall, pi)) continue;
+          const p = mainPts[pi];
           const px = this._worldToMousePx(p, mouseS);
           if (px > Defaults.snapPx) continue;
           const score = prioBias + px + MAIN_PEN;
@@ -252,7 +260,9 @@ export class TopologyEngine {
 
         // Sub-Linie (gehealte Gegenkante) — Eckpunkte UND Kanten snapbar.
         const subPts = healed.subCorners;
-        for (const p of subPts) {
+        for (let pi = 0; pi < subPts.length; pi++) {
+          if (this._isHiddenWallCorner(wall, pi)) continue;
+          const p = subPts[pi];
           const px = this._worldToMousePx(p, mouseS);
           if (px > Defaults.snapPx) continue;
           const score = prioBias + px + SUB_PEN;

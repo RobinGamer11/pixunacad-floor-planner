@@ -5,6 +5,7 @@ import { LabelManager } from "./LabelManager";
 import { TopologyEngine } from "./TopologyEngine";
 import { v } from "./geometry";
 import { computeWallLines } from "./wallGeom";
+import { runWallTopologyMaintenance } from "./wallTopologyMaintenance";
 
 /**
  * Snap-Prioritätstests für die kontextabhängige Sub-/Bezugslinien-Wahl beim
@@ -125,5 +126,30 @@ describe("TopologyEngine wall snap priority", () => {
     topo.findBestSnap(mouseS, mouseW);
     // @ts-expect-error privater Zugriff für Test
     expect(topo._healCacheHash).not.toBe(hashA);
+  });
+
+  it("auto-created T-junction host point is hidden and not returned as wall point snap", () => {
+    const { scene, camera, topo } = env;
+    const host = scene.createWall({
+      kind: "outer", thicknessM: 0.3, referenceSide: "outer",
+      corners: [v(0, 0), v(5, 0)],
+    });
+    const branch = scene.createWall({
+      kind: "inner", thicknessM: 0.115, referenceSide: "center",
+      corners: [v(2.5, 2), v(2.5, 0)],
+    });
+
+    runWallTopologyMaintenance(scene, [branch]);
+    expect(host.corners.length).toBe(3);
+    expect(host.hiddenCornerIndices).toContain(1);
+
+    topo.activeDrawingWallKind = "inner";
+    const mouseW = { x: 2.5, y: 0 };
+    const mouseS = ws(camera, mouseW);
+    const snap = topo.findBestSnap(mouseS, mouseW)!;
+
+    expect(snap).toBeTruthy();
+    expect(snap.wallId).toBe(branch.id);
+    expect(snap.wallLine).toBe("main");
   });
 });

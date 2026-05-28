@@ -358,6 +358,9 @@ export class Wall {
   referenceSide: WallReferenceSide;
   /** Bezugs-Polylinie (gezeichnete Eckpunkte). */
   corners: Vec2[];
+  /** Automatisch erzeugte T-Anschluss-Stützpunkte: topologisch vorhanden,
+   * aber nicht sichtbar und nicht direkt als Fangpunkt auswählbar. */
+  hiddenCornerIndices: number[];
   /** Freier ID-Name (überschreibt Auto-ID AW01/IW01). Leer = Auto. */
   customName: string;
   color: string;
@@ -375,13 +378,15 @@ export class Wall {
   constructor(opts: {
     id: string; kind: WallKind; thicknessM: number; referenceSide: WallReferenceSide;
     corners: Vec2[]; customName?: string; color?: string; fillColor?: string; labelId?: string;
-    priority?: number;
+    priority?: number; hiddenCornerIndices?: number[];
   }) {
     this.id = opts.id;
     this.kind = opts.kind;
     this.thicknessM = Math.max(0.001, opts.thicknessM);
     this.referenceSide = opts.referenceSide;
     this.corners = opts.corners.map(p => v(p.x, p.y));
+    this.hiddenCornerIndices = (opts.hiddenCornerIndices || [])
+      .filter(i => Number.isInteger(i) && i >= 0 && i < this.corners.length);
     this.customName = opts.customName || "";
     this.color = opts.color || Defaults.lineColor;
     this.fillColor = opts.fillColor
@@ -884,7 +889,7 @@ export class Scene {
   createWall(opts: {
     kind: WallKind; thicknessM: number; referenceSide: WallReferenceSide;
     corners: Vec2[]; customName?: string; color?: string; fillColor?: string; labelId?: string;
-    priority?: number;
+    priority?: number; hiddenCornerIndices?: number[];
   }) {
     const w = new Wall({ id: this._makeId(), ...opts });
     w._stickerEditOwnerId = this._currentEditOwnerId;

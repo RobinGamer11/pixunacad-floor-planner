@@ -989,6 +989,7 @@ export class Renderer {
     ctx.save();
     const selWall = this.scene.walls.find(w => w.id === selWallId);
     const selLabel = selWall?.labelId;
+    const isHiddenCorner = (w: any, idx: number) => !!w?.hiddenCornerIndices?.includes(idx);
 
     const dot = (x: number, y: number, r: number, fill: string, stroke: string, lw: number) => {
       ctx.beginPath();
@@ -1007,7 +1008,9 @@ export class Renderer {
       if (selLabel && w.labelId !== selLabel) continue;
       if (!this.labels.isVisible(w.labelId)) continue;
       // Bezugslinien-Eckpunkte (kräftiger als die Gegenseite)
-      for (const c of w.corners) {
+      for (let i = 0; i < w.corners.length; i++) {
+        if (isHiddenCorner(w, i)) continue;
+        const c = w.corners[i];
         const s = cam.worldToScreen(c.x, c.y);
         dot(s.x, s.y, 3, "rgba(255,255,255,0.85)", "rgba(120,120,120,0.65)", 1);
       }
@@ -1015,7 +1018,9 @@ export class Renderer {
 
     // Kräftige Fangpunkte der selektierten Wand (nur Bezugslinie).
     if (selWall && this.labels.isVisible(selWall.labelId)) {
-      for (const c of selWall.corners) {
+      for (let i = 0; i < selWall.corners.length; i++) {
+        if (isHiddenCorner(selWall, i)) continue;
+        const c = selWall.corners[i];
         const s = cam.worldToScreen(c.x, c.y);
         dot(s.x, s.y, 4.5, "#ffffff", Defaults.wallSelectionColor, 1.6);
       }
