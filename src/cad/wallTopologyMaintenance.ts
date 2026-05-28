@@ -70,9 +70,16 @@ function runAutoSplit(scene: Scene, focusWalls?: Wall[]): boolean {
           v(hit.pos.x, hit.pos.y),
           ...host.corners.slice(hit.edgeIndex + 1),
         ];
+        host.hiddenCornerIndices = [
+          ...(host.hiddenCornerIndices || []).map(i => i > hit.edgeIndex ? i + 1 : i),
+          hit.edgeIndex + 1,
+        ];
         // Mikro-Segmente vermeiden.
         if (dist(host.corners[hit.edgeIndex], host.corners[hit.edgeIndex + 1]) < MIN_SEG_LEN_M) {
           host.corners.splice(hit.edgeIndex + 1, 1);
+          host.hiddenCornerIndices = (host.hiddenCornerIndices || [])
+            .filter(i => i !== hit.edgeIndex + 1)
+            .map(i => i > hit.edgeIndex + 1 ? i - 1 : i);
         }
         return true;
       }
@@ -121,6 +128,7 @@ function runAutoMerge(scene: Scene): boolean {
     if (merged.length < 2) continue;
     // Ursprungs-Wand A behält id und Eigenschaften, B wird entfernt.
     a.wall.corners = merged;
+    a.wall.hiddenCornerIndices = [];
     scene.removeWall(b.wall);
     return true; // Nach Mutation neu starten (Cluster-Indizes sind ungültig).
   }
