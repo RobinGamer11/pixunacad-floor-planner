@@ -228,6 +228,9 @@ export class SelectTool {
         if (this._isHiddenWallCorner(wall, i)) continue;
         const sp = cam.worldToScreen(wall.corners[i].x, wall.corners[i].y);
         const px = Math.hypot(sp.x - mouseS.x, sp.y - mouseS.y);
+        if (wall.id === selectedWallId && px <= Defaults.hitPx + 2) {
+          return { wallId: wall.id, pointIndex: i, edgeIndex: null };
+        }
         if (px <= Defaults.hitPx + 2 && (px < bestPx || (wall.id === selectedWallId && bestPoint?.wallId !== selectedWallId))) {
           bestPx = px;
           bestPoint = { wallId: wall.id, pointIndex: i, edgeIndex: null };
@@ -707,6 +710,9 @@ export class SelectTool {
       if (!wall) return;
       if (wall.corners.length > 2) {
         wall.corners.splice(ctx.target.pointIndex, 1);
+        wall.hiddenCornerIndices = (wall.hiddenCornerIndices || [])
+          .filter(i => i !== ctx.target.pointIndex)
+          .map(i => i > ctx.target.pointIndex ? i - 1 : i);
         this.app.clearSelection();
       } else {
         this.app.scene.removeWall(wall);
