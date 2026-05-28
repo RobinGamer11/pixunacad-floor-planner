@@ -446,6 +446,20 @@ export class CadApp {
         labelId: h.labelId, areaLabel: { ...h.areaLabel },
         _stickerEditOwnerId: h._stickerEditOwnerId || null,
       })),
+      walls: scene.walls.map(w => ({
+        id: w.id,
+        kind: w.kind,
+        thicknessM: w.thicknessM,
+        referenceSide: w.referenceSide,
+        corners: w.corners.map(p => ({ x: p.x, y: p.y })),
+        hiddenCornerIndices: [...(w.hiddenCornerIndices || [])],
+        customName: w.customName,
+        color: w.color,
+        fillColor: w.fillColor,
+        labelId: w.labelId,
+        priority: w.priority,
+        _stickerEditOwnerId: w._stickerEditOwnerId || null,
+      })),
       dimensions: scene.dimensions.map(d => ({
         id: d.id,
         p1: { x: d.p1.x, y: d.p1.y }, p2: { x: d.p2.x, y: d.p2.y },
@@ -512,7 +526,9 @@ export class CadApp {
     scene.stickerInstances = [];
     scene.documents = [];
     scene.freeStrokes = [];
+    scene.walls = [];
     scene.rulerGuide = null;
+    scene.markWallsDirty();
     (scene as any)._rebuildSegIdMap?.();
     (scene as any)._rebuildHatchIdMap?.();
     (scene as any)._rebuildDimIdMap?.();
@@ -550,6 +566,22 @@ export class CadApp {
         holes: h.holes || [],
       });
       if (h._stickerEditOwnerId) hatch._stickerEditOwnerId = h._stickerEditOwnerId;
+    }
+    for (const w of data.walls || []) {
+      const wall = scene.createWall({
+        kind: w.kind === "inner" ? "inner" : "outer",
+        thicknessM: w.thicknessM,
+        referenceSide: w.referenceSide === "inner" ? "inner" : w.referenceSide === "center" ? "center" : "outer",
+        corners: w.corners || [],
+        hiddenCornerIndices: Array.isArray(w.hiddenCornerIndices) ? w.hiddenCornerIndices : [],
+        customName: w.customName || "",
+        color: w.color,
+        fillColor: w.fillColor,
+        labelId: w.labelId,
+        priority: w.priority,
+      });
+      if (w.id) (wall as any).id = w.id;
+      if (w._stickerEditOwnerId) wall._stickerEditOwnerId = w._stickerEditOwnerId;
     }
     for (const d of data.dimensions || []) {
       const dim = scene.createDimension(d.p1, d.p2, d.placementPoint, d.mode, d.refDir, {
