@@ -128,6 +128,10 @@ export class SelectTool {
     this.app = app;
   }
 
+  private _isHiddenWallCorner(wall: { hiddenCornerIndices?: number[] } | null | undefined, pointIndex: number): boolean {
+    return !!wall?.hiddenCornerIndices?.includes(pointIndex);
+  }
+
   activate() {
     this._clearEditState();
     this.app.renderer.setHoverSegmentId(null);
@@ -209,13 +213,22 @@ export class SelectTool {
     const cam = this.app.camera;
     let bestPx = Infinity;
     let bestPoint: { wallId: string; pointIndex: number | null; edgeIndex: number | null } | null = null;
-    // Eckpunkte zuerst
-    for (const wall of this.app.scene.walls) {
+    const selectedWallId = this.getPriorityWallId();
+    const wallsByPriority = selectedWallId
+      ? [
+          ...this.app.scene.walls.filter(w => w.id === selectedWallId),
+          ...this.app.scene.walls.filter(w => w.id !== selectedWallId),
+        ]
+      : this.app.scene.walls;
+    // Eckpunkte zuerst — die aktuell selektierte Wand gewinnt bei überlagerten
+    // Verbindungspunkten; automatische T-Stoß-Stützpunkte bleiben unsichtbar.
+    for (const wall of wallsByPriority) {
       if (!this.app.labelManager.isVisible(wall.labelId)) continue;
       for (let i = 0; i < wall.corners.length; i++) {
+        if (this._isHiddenWallCorner(wall, i)) continue;
         const sp = cam.worldToScreen(wall.corners[i].x, wall.corners[i].y);
         const px = Math.hypot(sp.x - mouseS.x, sp.y - mouseS.y);
-        if (px <= Defaults.hitPx + 2 && px < bestPx) {
+        if (px <= Defaults.hitPx + 2 && (px < bestPx || (wall.id === selectedWallId && bestPoint?.wallId !== selectedWallId))) {
           bestPx = px;
           bestPoint = { wallId: wall.id, pointIndex: i, edgeIndex: null };
         }
