@@ -131,8 +131,10 @@ export class WallTool {
   }
 
   cancel() {
-    this.state = "idle";
     this.corners = [];
+    this.cornerSnaps = [];
+    this.snap = null;
+
     this.snap = null;
     this.resetGuides();
     this.hubLocked = false;
