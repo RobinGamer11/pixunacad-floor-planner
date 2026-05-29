@@ -574,7 +574,9 @@ export class CadApp {
         kind: w.kind === "inner" ? "inner" : "outer",
         thicknessM: w.thicknessM,
         referenceSide: w.referenceSide === "inner" ? "inner" : w.referenceSide === "center" ? "center" : "outer",
-        corners: w.corners || [],
+        hiddenCornerIndices: Array.isArray(w.hiddenCornerIndices) ? w.hiddenCornerIndices : [],
+        cornerAnchors: Array.isArray(w.cornerAnchors) ? w.cornerAnchors : undefined,
+
         hiddenCornerIndices: Array.isArray(w.hiddenCornerIndices) ? w.hiddenCornerIndices : [],
         customName: w.customName || "",
         color: w.color,
