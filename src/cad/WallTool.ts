@@ -163,13 +163,27 @@ export class WallTool {
     return this.app.activeDrawLabelId || Defaults.defaultLabelId;
   }
 
-  private _createSingleWall(a: Vec2, b: Vec2) {
+  /** Bildet einen `WallCornerAnchor` aus einem Snap, sofern der Snap auf
+   * eine Sub-Linie einer fremden Wand zeigt. */
+  private _anchorFromSnap(snap: Snap | null): import("./Scene").WallCornerAnchor | null {
+    if (!snap || !snap.wallId || snap.wallLine !== "sub") return null;
+    if (snap.type === SnapType.POINT && snap.pointIndex != null && snap.pointIndex >= 0) {
+      return { kind: "subMiter", hostWallId: snap.wallId, hostCornerIndex: snap.pointIndex };
+    }
+    if (snap.type === SnapType.LINE && snap.edgeIndex != null && snap.t != null) {
+      return { kind: "subEdge", hostWallId: snap.wallId, hostEdgeIndex: snap.edgeIndex, t: snap.t };
+    }
+    return null;
+  }
+
+  private _createSingleWall(a: Vec2, b: Vec2, anchorA: import("./Scene").WallCornerAnchor | null = null, anchorB: import("./Scene").WallCornerAnchor | null = null) {
     const labelId = this._resolveLabelId();
     const newWall = this.app.scene.createWall({
       kind: this.settings.kind,
       thicknessM: this.getThickness(),
       referenceSide: this.settings.referenceSide,
       corners: [v(a.x, a.y), v(b.x, b.y)],
+      cornerAnchors: [anchorA, anchorB],
       customName: this.settings.customName,
       color: this.settings.color,
       fillColor: this.settings.fillColor,
@@ -179,6 +193,7 @@ export class WallTool {
     this.app.refreshLabelUI?.();
     return newWall;
   }
+
 
   private _runConnectionPipeline(newWall: import("./Scene").Wall) {
     trimWallEndpointsToNeighbors(this.app.scene, newWall);
