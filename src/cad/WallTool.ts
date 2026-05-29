@@ -58,8 +58,11 @@ export class WallTool {
 
   state: "idle" | "drawing" = "idle";
   corners: Vec2[] = [];
+  /** Index-parallel zu `corners`: Snap, der zu jedem Eckpunkt geführt hat. */
+  cornerSnaps: (Snap | null)[] = [];
   snap: Snap | null = null;
   private _prevSpace = false;
+
 
   // Hub (Length / Angle) lock — identisch zum Linienwerkzeug.
   hubLocked = false;
