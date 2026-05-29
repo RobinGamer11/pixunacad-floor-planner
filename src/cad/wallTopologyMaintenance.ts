@@ -1,5 +1,8 @@
 import { Vec2, v, sub, norm, dist } from "./geometry";
 import type { Scene, Wall } from "./Scene";
+import { computeHealedWallLines } from "./wallHeal";
+import { WallTopologyGraph } from "./WallTopologyGraph";
+
 
 /**
  * Phase 3 — Wand-Topologie-Wartung
