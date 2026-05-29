@@ -553,9 +553,11 @@ export class WallTool {
   }
 
   private _onClick(input: Input) {
+    const snapAtClick = this.snap;
     const p = this._commitPoint(input);
     if (this.state === "idle") {
       this.corners = [v(p.x, p.y)];
+      this.cornerSnaps = [snapAtClick];
       this.state = "drawing";
       this.hubLocked = false;
       this.hubLengthM = null;
@@ -564,17 +566,22 @@ export class WallTool {
     }
     const last = this.corners[this.corners.length - 1];
     if (dist(last, p) < Defaults.minSegLenM) return;
-    this._createSingleWall(last, p);
+    const anchorA = this._anchorFromSnap(this.cornerSnaps[this.cornerSnaps.length - 1] || null);
+    const anchorB = this._anchorFromSnap(snapAtClick);
+    this._createSingleWall(last, p, anchorA, anchorB);
     if (this.settings.inputMode === "chain") {
       this.corners = [v(p.x, p.y)];
+      this.cornerSnaps = [snapAtClick];
     } else {
       this.state = "idle";
       this.corners = [];
+      this.cornerSnaps = [];
     }
     this.hubLocked = false;
     this.hubLengthM = null;
     this.hubAngleDeg = null;
   }
+
 
   /* ===== Overlay-Render ===== */
 
