@@ -95,7 +95,6 @@ function reapplySubAnchors(scene: Scene): boolean {
   return changed;
 }
 
-}
 
 /**
  * Entfernt verwaiste T-Stoß-Hilfspunkte: Hidden-Corners, an denen keine andere
