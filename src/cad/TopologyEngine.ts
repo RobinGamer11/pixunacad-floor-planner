@@ -267,23 +267,7 @@ export class TopologyEngine {
           }
         }
 
-          if (score < bestScore) {
-            bestScore = score;
-            best = { type: SnapType.POINT, world: v(p.x, p.y), segment: null, hatch: null, pointIndex: -1, edgeIndex: null, t: null, px, wallId: wall.id, wallLine: "sub" };
-          }
-        }
-        for (let i = 0; i < subPts.length - 1; i++) {
-          const a = subPts[i], b = subPts[i + 1];
-          const proj = projectPointToSegment(mouseW, a, b);
-          const px = this._worldToMousePx(proj.q, mouseS);
-          if (px > Defaults.snapPx) continue;
-          if (proj.t <= Defaults.splitEpsT || proj.t >= 1 - Defaults.splitEpsT) continue;
-          const score = prioBias + 1000 + px + SUB_PEN;
-          if (score < bestScore) {
-            bestScore = score;
-            best = { type: SnapType.LINE, world: v(proj.q.x, proj.q.y), segment: null, hatch: null, pointIndex: null, edgeIndex: null, t: proj.t, px, lineA: a, lineB: b, wallId: wall.id, wallLine: "sub" };
-          }
-        }
+
       }
     }
 
