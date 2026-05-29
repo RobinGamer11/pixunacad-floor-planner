@@ -241,6 +241,24 @@ export class TopologyEngine {
           const px = this._worldToMousePx(p, mouseS);
           if (px > Defaults.snapPx) continue;
           const score = prioBias + px + MAIN_PEN;
+          if (score < bestScore) {
+            bestScore = score;
+            best = { type: SnapType.POINT, world: v(p.x, p.y), segment: null, hatch: null, pointIndex: -1, edgeIndex: null, t: null, px, wallId: wall.id, wallLine: "main" };
+          }
+        }
+        for (let i = 0; i < mainPts.length - 1; i++) {
+          const a = mainPts[i], b = mainPts[i + 1];
+          const proj = projectPointToSegment(mouseW, a, b);
+          const px = this._worldToMousePx(proj.q, mouseS);
+          if (px > Defaults.snapPx) continue;
+          if (proj.t <= Defaults.splitEpsT || proj.t >= 1 - Defaults.splitEpsT) continue;
+          const score = prioBias + 1000 + px + MAIN_PEN;
+          if (score < bestScore) {
+            bestScore = score;
+            best = { type: SnapType.LINE, world: v(proj.q.x, proj.q.y), segment: null, hatch: null, pointIndex: null, edgeIndex: null, t: proj.t, px, lineA: a, lineB: b, wallId: wall.id, wallLine: "main" };
+          }
+        }
+
         // Sub-Linie (gehealte Gegenkante) — Eckpunkte UND Kanten snapbar.
         const subPts = healed.subCorners;
         for (let pi = 0; pi < subPts.length; pi++) {
@@ -266,9 +284,9 @@ export class TopologyEngine {
             best = { type: SnapType.LINE, world: v(proj.q.x, proj.q.y), segment: null, hatch: null, pointIndex: null, edgeIndex: i, t: proj.t, px, lineA: a, lineB: b, wallId: wall.id, wallLine: "sub" };
           }
         }
-
-
       }
+    }
+
     }
 
     // Hatch edges
