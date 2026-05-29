@@ -287,7 +287,6 @@ export class TopologyEngine {
       }
     }
 
-    }
 
     // Hatch edges
     for (const edge of this.scene.getHatchEdges()) {
