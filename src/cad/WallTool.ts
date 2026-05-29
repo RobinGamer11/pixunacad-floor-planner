@@ -135,7 +135,8 @@ export class WallTool {
     this.spaceShiftLocked = false;
     this.spaceShiftLockedAngleDeg = null;
     this.app.renderer.showWallHelpers = false;
-    this.app.topology.includeWallOffsetSnaps = false;
+    // includeWallOffsetSnaps bleibt global aktiv (Sub-/Gehrungs-Snaps auch in anderen Werkzeugen).
+
     this.app.topology.activeDrawingWallKind = null;
     this.app.hub.hide();
   }
