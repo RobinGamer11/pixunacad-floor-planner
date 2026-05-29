@@ -886,6 +886,14 @@ export class Scene {
     const p = lerp(a, b, t);
     loop.splice(edgeIndex + 1, 0, v(p.x, p.y));
     return { didInsert: true, point: p, pointIndex: edgeIndex + 1 };
+  }
+
+  getHatchEdges(): { hatch: Hatch; edgeIndex: number; a: Vec2; b: Vec2 }[] {
+    // [restored placeholder — see original above]
+    return _origGetHatchEdges_(this);
+  }
+
+  // ---- Walls ----
   createWall(opts: {
     kind: WallKind; thicknessM: number; referenceSide: WallReferenceSide;
     corners: Vec2[]; customName?: string; color?: string; fillColor?: string; labelId?: string;
@@ -899,21 +907,6 @@ export class Scene {
     return w;
   }
 
-    return edges;
-  }
-
-  // ---- Walls ----
-  createWall(opts: {
-    kind: WallKind; thicknessM: number; referenceSide: WallReferenceSide;
-    corners: Vec2[]; customName?: string; color?: string; fillColor?: string; labelId?: string;
-    priority?: number; hiddenCornerIndices?: number[];
-  }) {
-    const w = new Wall({ id: this._makeId(), ...opts });
-    w._stickerEditOwnerId = this._currentEditOwnerId;
-    this.walls.push(w);
-    this.markWallsDirty();
-    return w;
-  }
 
   removeWall(w: Wall) { this.walls = this.walls.filter(x => x !== w); this.markWallsDirty(); }
 
