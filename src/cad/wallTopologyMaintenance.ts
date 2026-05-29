@@ -28,15 +28,58 @@ export function runWallTopologyMaintenance(scene: Scene, focusWalls?: Wall[]): b
   let anyChange = false;
   for (let pass = 0; pass < MAX_PASSES; pass++) {
     const split = runAutoSplit(scene, focusWalls);
+    const cleaned = runHiddenCornerCleanup(scene);
     const merged = runAutoMerge(scene);
-    if (!split && !merged) break;
-    anyChange = anyChange || split || merged;
+    if (!split && !merged && !cleaned) break;
+    anyChange = anyChange || split || merged || cleaned;
     // Nach Split/Merge nicht mehr auf focusWalls beschränken — Folgewellen frei.
     focusWalls = undefined;
   }
   if (anyChange) scene.markWallsDirty();
   return anyChange;
 }
+
+/**
+ * Entfernt verwaiste T-Stoß-Hilfspunkte: Hidden-Corners, an denen keine andere
+ * Wand mehr mit einem Endpunkt andockt, sind topologisch bedeutungslos und
+ * werden inklusive Eckpunkt aus der Wand entfernt. Wird z. B. nötig, wenn die
+ * andockende Wand verschoben/gedreht/gelöscht wurde und der T-Stoß sich auflöst.
+ */
+function runHiddenCornerCleanup(scene: Scene): boolean {
+  let changed = false;
+  for (const wall of scene.walls) {
+    const hidden = wall.hiddenCornerIndices;
+    if (!hidden || hidden.length === 0) continue;
+    // Verwaiste Indizes ermitteln (kein anderer Wand-Endpunkt am Punkt).
+    const stale = new Set<number>();
+    for (const idx of hidden) {
+      if (idx <= 0 || idx >= wall.corners.length - 1) { stale.add(idx); continue; }
+      const p = wall.corners[idx];
+      let docked = false;
+      for (const ow of scene.walls) {
+        if (ow === wall) continue;
+        if (ow.corners.length < 2) continue;
+        if (dist(ow.corners[0], p) <= NODE_TOL || dist(ow.corners[ow.corners.length - 1], p) <= NODE_TOL) {
+          docked = true; break;
+        }
+      }
+      if (!docked) stale.add(idx);
+    }
+    if (stale.size === 0) continue;
+    // Eckpunkte entfernen (von hinten nach vorn) und Hidden-Indizes anpassen.
+    const sortedStale = [...stale].sort((a, b) => b - a);
+    for (const idx of sortedStale) {
+      wall.corners.splice(idx, 1);
+    }
+    // Hidden-Indizes neu mappen: stale weg, höhere Indizes um Anzahl entfernter Vorgänger verringern.
+    wall.hiddenCornerIndices = (wall.hiddenCornerIndices || [])
+      .filter(i => !stale.has(i))
+      .map(i => i - sortedStale.filter(s => s < i).length);
+    changed = true;
+  }
+  return changed;
+}
+
 
 /**
  * Auto-Split: Endet ein Wand-Endpunkt strikt im Inneren einer fremden
