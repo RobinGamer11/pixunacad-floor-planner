@@ -889,9 +889,17 @@ export class Scene {
   }
 
   getHatchEdges(): { hatch: Hatch; edgeIndex: number; a: Vec2; b: Vec2 }[] {
-    // [restored placeholder — see original above]
-    return _origGetHatchEdges_(this);
+    const edges: { hatch: Hatch; edgeIndex: number; a: Vec2; b: Vec2 }[] = [];
+    for (const hatch of this.hatches) {
+      const n = hatch.points.length;
+      if (n < 2) continue;
+      for (let i = 0; i < n; i++) {
+        edges.push({ hatch, edgeIndex: i, a: hatch.points[i], b: hatch.points[(i + 1) % n] });
+      }
+    }
+    return edges;
   }
+
 
   // ---- Walls ----
   createWall(opts: {
