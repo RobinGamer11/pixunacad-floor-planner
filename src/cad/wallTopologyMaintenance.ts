@@ -123,16 +123,18 @@ function runHiddenCornerCleanup(scene: Scene): boolean {
       if (!docked) stale.add(idx);
     }
     if (stale.size === 0) continue;
-    // Eckpunkte entfernen (von hinten nach vorn) und Hidden-Indizes anpassen.
+    // Eckpunkte entfernen (von hinten nach vorn) und Hidden-/Anker-Indizes anpassen.
     const sortedStale = [...stale].sort((a, b) => b - a);
     for (const idx of sortedStale) {
       wall.corners.splice(idx, 1);
+      if (wall.cornerAnchors) wall.cornerAnchors.splice(idx, 1);
     }
     // Hidden-Indizes neu mappen: stale weg, höhere Indizes um Anzahl entfernter Vorgänger verringern.
     wall.hiddenCornerIndices = (wall.hiddenCornerIndices || [])
       .filter(i => !stale.has(i))
       .map(i => i - sortedStale.filter(s => s < i).length);
     changed = true;
+
   }
   return changed;
 }
