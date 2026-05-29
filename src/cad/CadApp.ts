@@ -453,6 +453,8 @@ export class CadApp {
         referenceSide: w.referenceSide,
         corners: w.corners.map(p => ({ x: p.x, y: p.y })),
         hiddenCornerIndices: [...(w.hiddenCornerIndices || [])],
+        cornerAnchors: (w.cornerAnchors || []).map(a => a ? { ...a } : null),
+
         customName: w.customName,
         color: w.color,
         fillColor: w.fillColor,
