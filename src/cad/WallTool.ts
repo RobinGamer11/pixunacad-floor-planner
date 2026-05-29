@@ -58,8 +58,11 @@ export class WallTool {
 
   state: "idle" | "drawing" = "idle";
   corners: Vec2[] = [];
+  /** Index-parallel zu `corners`: Snap, der zu jedem Eckpunkt geführt hat. */
+  cornerSnaps: (Snap | null)[] = [];
   snap: Snap | null = null;
   private _prevSpace = false;
+
 
   // Hub (Length / Angle) lock — identisch zum Linienwerkzeug.
   hubLocked = false;
@@ -106,7 +109,9 @@ export class WallTool {
   activate() {
     this.state = "idle";
     this.corners = [];
+    this.cornerSnaps = [];
     this.snap = null;
+
     this.resetGuides();
     this.hubLocked = false;
     this.hubLengthM = null;
@@ -126,8 +131,10 @@ export class WallTool {
   }
 
   cancel() {
-    this.state = "idle";
     this.corners = [];
+    this.cornerSnaps = [];
+    this.snap = null;
+
     this.snap = null;
     this.resetGuides();
     this.hubLocked = false;
@@ -160,13 +167,27 @@ export class WallTool {
     return this.app.activeDrawLabelId || Defaults.defaultLabelId;
   }
 
-  private _createSingleWall(a: Vec2, b: Vec2) {
+  /** Bildet einen `WallCornerAnchor` aus einem Snap, sofern der Snap auf
+   * eine Sub-Linie einer fremden Wand zeigt. */
+  private _anchorFromSnap(snap: Snap | null): import("./Scene").WallCornerAnchor | null {
+    if (!snap || !snap.wallId || snap.wallLine !== "sub") return null;
+    if (snap.type === SnapType.POINT && snap.pointIndex != null && snap.pointIndex >= 0) {
+      return { kind: "subMiter", hostWallId: snap.wallId, hostCornerIndex: snap.pointIndex };
+    }
+    if (snap.type === SnapType.LINE && snap.edgeIndex != null && snap.t != null) {
+      return { kind: "subEdge", hostWallId: snap.wallId, hostEdgeIndex: snap.edgeIndex, t: snap.t };
+    }
+    return null;
+  }
+
+  private _createSingleWall(a: Vec2, b: Vec2, anchorA: import("./Scene").WallCornerAnchor | null = null, anchorB: import("./Scene").WallCornerAnchor | null = null) {
     const labelId = this._resolveLabelId();
     const newWall = this.app.scene.createWall({
       kind: this.settings.kind,
       thicknessM: this.getThickness(),
       referenceSide: this.settings.referenceSide,
       corners: [v(a.x, a.y), v(b.x, b.y)],
+      cornerAnchors: [anchorA, anchorB],
       customName: this.settings.customName,
       color: this.settings.color,
       fillColor: this.settings.fillColor,
@@ -176,6 +197,7 @@ export class WallTool {
     this.app.refreshLabelUI?.();
     return newWall;
   }
+
 
   private _runConnectionPipeline(newWall: import("./Scene").Wall) {
     trimWallEndpointsToNeighbors(this.app.scene, newWall);
@@ -535,9 +557,11 @@ export class WallTool {
   }
 
   private _onClick(input: Input) {
+    const snapAtClick = this.snap;
     const p = this._commitPoint(input);
     if (this.state === "idle") {
       this.corners = [v(p.x, p.y)];
+      this.cornerSnaps = [snapAtClick];
       this.state = "drawing";
       this.hubLocked = false;
       this.hubLengthM = null;
@@ -546,17 +570,22 @@ export class WallTool {
     }
     const last = this.corners[this.corners.length - 1];
     if (dist(last, p) < Defaults.minSegLenM) return;
-    this._createSingleWall(last, p);
+    const anchorA = this._anchorFromSnap(this.cornerSnaps[this.cornerSnaps.length - 1] || null);
+    const anchorB = this._anchorFromSnap(snapAtClick);
+    this._createSingleWall(last, p, anchorA, anchorB);
     if (this.settings.inputMode === "chain") {
       this.corners = [v(p.x, p.y)];
+      this.cornerSnaps = [snapAtClick];
     } else {
       this.state = "idle";
       this.corners = [];
+      this.cornerSnaps = [];
     }
     this.hubLocked = false;
     this.hubLengthM = null;
     this.hubAngleDeg = null;
   }
+
 
   /* ===== Overlay-Render ===== */
 

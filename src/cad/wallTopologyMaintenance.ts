@@ -1,5 +1,8 @@
 import { Vec2, v, sub, norm, dist } from "./geometry";
 import type { Scene, Wall } from "./Scene";
+import { computeHealedWallLines } from "./wallHeal";
+import { WallTopologyGraph } from "./WallTopologyGraph";
+
 
 /**
  * Phase 3 — Wand-Topologie-Wartung
@@ -23,21 +26,75 @@ const NODE_TOL = 0.05;           // Endpunkt-Cluster (analog WallTopologyGraph.N
 const COLLINEAR_DOT = 0.9998;    // ~1.15° Abweichung erlaubt
 const MIN_SEG_LEN_M = 0.01;
 const MAX_PASSES = 4;
-
 export function runWallTopologyMaintenance(scene: Scene, focusWalls?: Wall[]): boolean {
   let anyChange = false;
   for (let pass = 0; pass < MAX_PASSES; pass++) {
     const split = runAutoSplit(scene, focusWalls);
     const cleaned = runHiddenCornerCleanup(scene);
     const merged = runAutoMerge(scene);
-    if (!split && !merged && !cleaned) break;
-    anyChange = anyChange || split || merged || cleaned;
+    const anchors = reapplySubAnchors(scene);
+    if (!split && !merged && !cleaned && !anchors) break;
+    anyChange = anyChange || split || merged || cleaned || anchors;
     // Nach Split/Merge nicht mehr auf focusWalls beschränken — Folgewellen frei.
     focusWalls = undefined;
   }
   if (anyChange) scene.markWallsDirty();
   return anyChange;
 }
+
+/**
+ * Projiziert verankerte Wand-Eckpunkte auf die aktuelle gehealte Sub-Geometrie
+ * der jeweiligen Host-Wand. Verschwindet die Host-Wand oder wird der Index
+ * ungültig, wird der Anker gelöscht — der Endpunkt bleibt zuletzt-bekannt.
+ */
+function reapplySubAnchors(scene: Scene): boolean {
+  // Anker-Hosts gibt es nur, wenn überhaupt Anker existieren.
+  let anyAnchor = false;
+  for (const w of scene.walls) {
+    if (w.cornerAnchors && w.cornerAnchors.some(a => !!a)) { anyAnchor = true; break; }
+  }
+  if (!anyAnchor) return false;
+  const graph = new WallTopologyGraph();
+  graph.build(scene.walls);
+  const wallById = new Map(scene.walls.map(w => [w.id, w] as const));
+  let changed = false;
+
+  for (const wall of scene.walls) {
+    const anchors = wall.cornerAnchors;
+    if (!anchors) continue;
+    for (let i = 0; i < anchors.length; i++) {
+      const a = anchors[i];
+      if (!a) continue;
+      const host = wallById.get(a.hostWallId);
+      if (!host || host === wall || host.corners.length < 2) {
+        anchors[i] = null; changed = true; continue;
+      }
+      const others = scene.walls.filter(w => w !== host && w.corners.length >= 2);
+      const healed = computeHealedWallLines(host, others, graph);
+      let target: Vec2 | null = null;
+      if (a.kind === "subMiter") {
+        if (a.hostCornerIndex >= 0 && a.hostCornerIndex < healed.subCorners.length) {
+          const tp = healed.subCorners[a.hostCornerIndex];
+          target = v(tp.x, tp.y);
+        }
+      } else {
+        const subs = healed.subCorners;
+        if (a.hostEdgeIndex >= 0 && a.hostEdgeIndex < subs.length - 1) {
+          const p0 = subs[a.hostEdgeIndex], p1 = subs[a.hostEdgeIndex + 1];
+          target = v(p0.x + (p1.x - p0.x) * a.t, p0.y + (p1.y - p0.y) * a.t);
+        }
+      }
+      if (!target) { anchors[i] = null; changed = true; continue; }
+      const cur = wall.corners[i];
+      if (Math.hypot(cur.x - target.x, cur.y - target.y) > 1e-5) {
+        wall.corners[i] = target;
+        changed = true;
+      }
+    }
+  }
+  return changed;
+}
+
 
 /**
  * Entfernt verwaiste T-Stoß-Hilfspunkte: Hidden-Corners, an denen keine andere
@@ -66,16 +123,18 @@ function runHiddenCornerCleanup(scene: Scene): boolean {
       if (!docked) stale.add(idx);
     }
     if (stale.size === 0) continue;
-    // Eckpunkte entfernen (von hinten nach vorn) und Hidden-Indizes anpassen.
+    // Eckpunkte entfernen (von hinten nach vorn) und Hidden-/Anker-Indizes anpassen.
     const sortedStale = [...stale].sort((a, b) => b - a);
     for (const idx of sortedStale) {
       wall.corners.splice(idx, 1);
+      if (wall.cornerAnchors) wall.cornerAnchors.splice(idx, 1);
     }
     // Hidden-Indizes neu mappen: stale weg, höhere Indizes um Anzahl entfernter Vorgänger verringern.
     wall.hiddenCornerIndices = (wall.hiddenCornerIndices || [])
       .filter(i => !stale.has(i))
       .map(i => i - sortedStale.filter(s => s < i).length);
     changed = true;
+
   }
   return changed;
 }
@@ -113,6 +172,13 @@ function runAutoSplit(scene: Scene, focusWalls?: Wall[]): boolean {
           v(hit.pos.x, hit.pos.y),
           ...host.corners.slice(hit.edgeIndex + 1),
         ];
+        if (host.cornerAnchors) {
+          host.cornerAnchors = [
+            ...host.cornerAnchors.slice(0, hit.edgeIndex + 1),
+            null,
+            ...host.cornerAnchors.slice(hit.edgeIndex + 1),
+          ];
+        }
         host.hiddenCornerIndices = [
           ...(host.hiddenCornerIndices || []).map(i => i > hit.edgeIndex ? i + 1 : i),
           hit.edgeIndex + 1,
@@ -120,10 +186,12 @@ function runAutoSplit(scene: Scene, focusWalls?: Wall[]): boolean {
         // Mikro-Segmente vermeiden.
         if (dist(host.corners[hit.edgeIndex], host.corners[hit.edgeIndex + 1]) < MIN_SEG_LEN_M) {
           host.corners.splice(hit.edgeIndex + 1, 1);
+          if (host.cornerAnchors) host.cornerAnchors.splice(hit.edgeIndex + 1, 1);
           host.hiddenCornerIndices = (host.hiddenCornerIndices || [])
             .filter(i => i !== hit.edgeIndex + 1)
             .map(i => i > hit.edgeIndex + 1 ? i - 1 : i);
         }
+
         return true;
       }
     }

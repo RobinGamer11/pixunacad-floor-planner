@@ -27,9 +27,13 @@ export function trimWallEndpointsToNeighbors(
   for (const which of sides) {
     const atStart = which === "start";
     const idx = atStart ? 0 : wall.corners.length - 1;
+    // Hat dieser Endpunkt einen Sub-/Gehrungs-Anker, ist er bewusst auf der
+    // Sub-Linie eines Nachbarn platziert worden → nicht auf Bezugslinie ziehen.
+    if (wall.cornerAnchors && wall.cornerAnchors[idx]) continue;
     const p = wall.corners[idx];
     let bestQ: Vec2 | null = null;
     let bestD = reach;
+
 
     for (const host of all) {
       if (host === wall) continue;

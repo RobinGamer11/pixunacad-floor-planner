@@ -1,25 +1,74 @@
-## Ziel
+## Problem
 
-Beim Zeichnen einer Wand sollen Sub-Linien-Snaps an bestehenden Wänden die **tatsächliche, gehealte Kantengeometrie** (mit Gehrungen, T-Stößen, Verlängerungen/Kürzungen) widerspiegeln — nicht nur den rohen Offset bis zur Bezugslinie. Aktuell endet die Sub-Linie im Snap an der unverlängerten Bezugslinien-Senkrechten, wodurch Gehrungen die echte Kantenlänge nicht abbilden.
+Beim Zeichnen einer Wand kann zwar bereits auf den Sub-/Gehrungspunkt einer Nachbarwand gefangen werden (`includeWallOffsetSnaps`), aber:
 
-Wichtig: Die Preview-Sub-/Hilfslinie der *eigenen, gerade gezeichneten* Wand bleibt unverändert „roh" (kein Auto-Verlängern), wie zuvor festgelegt. Geändert wird ausschließlich die Snap-Quelle für **bestehende Nachbarwände**.
+1. `trimWallEndpointsToNeighbors` zieht den Endpunkt nach dem Commit zurück auf die nächste **Bezugslinie** des Nachbarn — die Wand „rutscht" weg vom Gehrungspunkt zurück auf die Reflinie.
+2. Selbst ohne Trim wäre die Verbindung nur geometrisch: der Sub-Mitre-Punkt ist kein Topologie-Knoten. Beim Verschieben/Drehen einer V-Wand würde die angedockte Wand stehenbleiben und der Anschluss bräche.
 
-## Änderung
+## Lösung
 
-### `src/cad/TopologyEngine.ts` — `computeSnap`, Block `if (this.includeWallOffsetSnaps)`
+Ein neuer Anker-Typ „Sub-Mitre-Anschluss" auf Wand-Endpunkten plus Maintenance-Pass, der die Position bei Topologie-Änderungen nachzieht.
 
-- Statt `computeWallLines(ref, wall.thicknessM, wall.referenceSide)` die gehealten Linien verwenden:
-  `computeHealedWallLines(wall, otherVisibleWalls, this.scene.getWallTopology())`
-  - `otherVisibleWalls` = `visibleWalls.filter(w => w !== wall && w.corners.length >= 2)` (einmal vor der Schleife berechnen).
-  - `computeHealedWallLines` ist bereits importiert in `Renderer.ts`; Import hier ergänzen aus `./wallHeal`.
-- Aus dem Heal-Ergebnis weiterhin `subCorners` (jetzt verlängert/gekürzt) als Snap-Kandidaten verwenden — Punkte und Segmente, identisch zur bisherigen Logik (gleicher Score, gleiche Strafe gegenüber Bezugslinie, gleiche `wallLine: "sub"`-Markierung).
-- Optional: Heal-Ergebnis pro Tick cachen (`Map<Wall, WallLines>`), um Mehrfachberechnung zu vermeiden, falls Performance auffällt.
+### 1. Daten-Modell (`Scene.ts`)
 
-### Keine weiteren Dateien betroffen
+Pro Wand ein neues optionales Feld:
 
-- `WallTool.ts` Preview bleibt wie ist (rohe Sub-Linie für Orientierung).
-- Renderer, Heal-Logik selbst unverändert.
+```ts
+type WallCornerAnchor =
+  | { kind: "subMiter"; hostWallId: string; hostCornerIndex: number }
+  | { kind: "subEdge";  hostWallId: string; hostEdgeIndex: number; t: number };
 
-## Resultat
+// auf Wall:
+cornerAnchors?: (WallCornerAnchor | null)[]; // index-parallel zu corners
+```
 
-Hovert man beim Wand-Zeichnen über die gegenüberliegende Kante einer bestehenden Wand, deckt die snapbare Sub-Linie nun die volle gehealte Länge ab (inkl. der durch Gehrung verlängerten Ecke). Der End-Eckpunkt der Sub-Linie liegt exakt dort, wo sich die Wand im fertigen Bild mit Nachbarn verbindet — also fangbar bis zur echten Ecke.
+Serialisierung in `CadApp.ts` (snapshot/restore) analog zu `hiddenCornerIndices` ergänzen.
+
+### 2. Anker beim Commit setzen (`WallTool.ts`)
+
+Bei `_commitPoint` / chain-Knoten: wenn `this.snap.wallId` gesetzt ist UND `snap.wallLine === "sub"`:
+- Bei Punkt-Snap auf Sub-Eckpunkt → `{kind:"subMiter", hostWallId, hostCornerIndex}` (Index aus dem getroffenen `subCorners[i]` zurückrechnen).
+- Bei Linien-Snap auf Sub-Kante → `{kind:"subEdge", hostWallId, hostEdgeIndex, t}`.
+
+Anker werden in `wall.cornerAnchors[idx]` geschrieben (vor `_runConnectionPipeline`).
+
+### 3. Trim respektiert Anker (`wallConnect.ts`)
+
+`trimWallEndpointsToNeighbors` überspringt Endpunkte, die einen `cornerAnchors[idx]` besitzen — der gefangene Sub-/Gehrungspunkt bleibt erhalten.
+
+### 4. Maintenance / Recompute (`wallTopologyMaintenance.ts`)
+
+Neue Phase `reapplySubAnchors(scene)` nach Split/Merge/Cleanup:
+- Für jeden Anker: gehealte Sub-Linie der `hostWallId` via `computeHealedWallLines(host, others, graph)` neu berechnen.
+- `subMiter`: Endpunkt = `healed.subCorners[hostCornerIndex]`.
+- `subEdge`: Endpunkt = Interpolation auf gehealtem Sub-Segment.
+- Wenn Host-Wand verschwunden / Index out-of-range → Anker löschen (Endpunkt bleibt wo er ist, einmaliges Detaching).
+
+Pass wird in `runWallTopologyMaintenance` als zusätzlicher Schritt eingehängt. Idempotent: ändert sich keine Geometrie, kein weiterer Pass.
+
+### 5. Topologie-Graph erweitern (`WallTopologyGraph.ts`)
+
+Beim Build zusätzlich für jeden Anker eine Inzidenz auf der Host-Wand am betreffenden Sub-Knoten registrieren (analog `tjunction`-Inzidenz), damit Heal der V-Wände korrekt erkennt: an dieser Stelle hängt etwas → Mitre-Berechnung bleibt stabil.
+
+Optional in dieser Iteration weglassen, falls Heal ohnehin geometrisch korrekt rechnet — Punkt 4 reicht für das sichtbare Andocken.
+
+### 6. Bereinigung bei Wand-Mutation
+
+In `SelectTool._clearEditState` und überall, wo Anker-Hosts gelöscht/geändert werden: `runWallTopologyMaintenance` führt automatisch `reapplySubAnchors` aus, daher kein extra Hook nötig.
+
+## Ergebnis
+
+- Beim Zeichnen rastet die Wand am Sub-/Gehrungspunkt ein und **bleibt** dort (kein Trim-Rücksprung).
+- Verschiebt/dreht/skaliert man später eine der V-Wände, wandert der Anschluss automatisch mit der Gehrung mit.
+- Wird die Host-Wand gelöscht, löst sich der Anker auf, der Endpunkt verbleibt zuletzt-bekannt.
+- Keine Änderung am UI/Wall-Settings-Panel nötig.
+
+## Betroffene Dateien
+
+- `src/cad/Scene.ts` — Feld `cornerAnchors`
+- `src/cad/CadApp.ts` — Snapshot/Restore
+- `src/cad/WallTool.ts` — Anker beim Commit setzen
+- `src/cad/wallConnect.ts` — Trim respektiert Anker
+- `src/cad/wallTopologyMaintenance.ts` — neuer `reapplySubAnchors`-Pass
+- `src/cad/WallTopologyGraph.ts` — optional Anker-Inzidenzen
+- Test in `src/cad/TopologyEngine.wallSnap.test.ts` ergänzen: Anker bleibt nach Verschieben der Host-Wand korrekt.

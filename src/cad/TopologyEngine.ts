@@ -269,7 +269,7 @@ export class TopologyEngine {
           const score = prioBias + px + SUB_PEN;
           if (score < bestScore) {
             bestScore = score;
-            best = { type: SnapType.POINT, world: v(p.x, p.y), segment: null, hatch: null, pointIndex: -1, edgeIndex: null, t: null, px, wallId: wall.id, wallLine: "sub" };
+            best = { type: SnapType.POINT, world: v(p.x, p.y), segment: null, hatch: null, pointIndex: pi, edgeIndex: null, t: null, px, wallId: wall.id, wallLine: "sub" };
           }
         }
         for (let i = 0; i < subPts.length - 1; i++) {
@@ -281,11 +281,12 @@ export class TopologyEngine {
           const score = prioBias + 1000 + px + SUB_PEN;
           if (score < bestScore) {
             bestScore = score;
-            best = { type: SnapType.LINE, world: v(proj.q.x, proj.q.y), segment: null, hatch: null, pointIndex: null, edgeIndex: null, t: proj.t, px, lineA: a, lineB: b, wallId: wall.id, wallLine: "sub" };
+            best = { type: SnapType.LINE, world: v(proj.q.x, proj.q.y), segment: null, hatch: null, pointIndex: null, edgeIndex: i, t: proj.t, px, lineA: a, lineB: b, wallId: wall.id, wallLine: "sub" };
           }
         }
       }
     }
+
 
     // Hatch edges
     for (const edge of this.scene.getHatchEdges()) {

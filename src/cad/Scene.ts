@@ -361,6 +361,11 @@ export class Wall {
   /** Automatisch erzeugte T-Anschluss-Stützpunkte: topologisch vorhanden,
    * aber nicht sichtbar und nicht direkt als Fangpunkt auswählbar. */
   hiddenCornerIndices: number[];
+  /** Pro Eckpunkt (index-parallel zu `corners`) optional ein Anker auf eine
+   * Nachbar-Wand-Sub-Linie/-Gehrung. Wird im Maintenance-Pass kontinuierlich
+   * neu auf die gehealte Sub-Geometrie projiziert, sodass der Anschluss bei
+   * Änderungen der Host-Wände automatisch mitwandert. */
+  cornerAnchors: (WallCornerAnchor | null)[];
   /** Freier ID-Name (überschreibt Auto-ID AW01/IW01). Leer = Auto. */
   customName: string;
   color: string;
@@ -379,6 +384,7 @@ export class Wall {
     id: string; kind: WallKind; thicknessM: number; referenceSide: WallReferenceSide;
     corners: Vec2[]; customName?: string; color?: string; fillColor?: string; labelId?: string;
     priority?: number; hiddenCornerIndices?: number[];
+    cornerAnchors?: (WallCornerAnchor | null)[];
   }) {
     this.id = opts.id;
     this.kind = opts.kind;
@@ -387,6 +393,9 @@ export class Wall {
     this.corners = opts.corners.map(p => v(p.x, p.y));
     this.hiddenCornerIndices = (opts.hiddenCornerIndices || [])
       .filter(i => Number.isInteger(i) && i >= 0 && i < this.corners.length);
+    this.cornerAnchors = (opts.cornerAnchors && opts.cornerAnchors.length === this.corners.length)
+      ? opts.cornerAnchors.map(a => a ? { ...a } : null)
+      : new Array(this.corners.length).fill(null);
     this.customName = opts.customName || "";
     this.color = opts.color || Defaults.lineColor;
     this.fillColor = opts.fillColor
@@ -396,6 +405,12 @@ export class Wall {
     this._stickerEditOwnerId = null;
   }
 }
+
+/** Anker eines Wand-Eckpunkts an die Sub-/Gehrungsgeometrie einer anderen Wand. */
+export type WallCornerAnchor =
+  | { kind: "subMiter"; hostWallId: string; hostCornerIndex: number }
+  | { kind: "subEdge"; hostWallId: string; hostEdgeIndex: number; t: number };
+
 
 export class Scene {
   segments: Segment[] = [];
@@ -873,7 +888,7 @@ export class Scene {
     return { didInsert: true, point: p, pointIndex: edgeIndex + 1 };
   }
 
-  getHatchEdges() {
+  getHatchEdges(): { hatch: Hatch; edgeIndex: number; a: Vec2; b: Vec2 }[] {
     const edges: { hatch: Hatch; edgeIndex: number; a: Vec2; b: Vec2 }[] = [];
     for (const hatch of this.hatches) {
       const n = hatch.points.length;
@@ -885,11 +900,13 @@ export class Scene {
     return edges;
   }
 
+
   // ---- Walls ----
   createWall(opts: {
     kind: WallKind; thicknessM: number; referenceSide: WallReferenceSide;
     corners: Vec2[]; customName?: string; color?: string; fillColor?: string; labelId?: string;
     priority?: number; hiddenCornerIndices?: number[];
+    cornerAnchors?: (WallCornerAnchor | null)[];
   }) {
     const w = new Wall({ id: this._makeId(), ...opts });
     w._stickerEditOwnerId = this._currentEditOwnerId;
@@ -897,6 +914,7 @@ export class Scene {
     this.markWallsDirty();
     return w;
   }
+
 
   removeWall(w: Wall) { this.walls = this.walls.filter(x => x !== w); this.markWallsDirty(); }
 
