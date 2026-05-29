@@ -43,7 +43,8 @@ export class TopologyEngine {
   priorityWallId: string | null = null;
   /** Wenn true, werden zusätzlich Sub-Linien-Eckpunkte/-Kanten anderer Wände
    * (gegenüberliegende Wandkante) als Snap-Kandidaten berücksichtigt. */
-  includeWallOffsetSnaps = false;
+  includeWallOffsetSnaps = true;
+
   /** Art der gerade gezeichneten Wand. Steuert, ob bei Nachbarwänden die
    * Bezugslinie (main) oder die Sublinie (sub) als bevorzugter Snap-Kandidat
    * gilt:
