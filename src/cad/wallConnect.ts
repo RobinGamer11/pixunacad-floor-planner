@@ -34,7 +34,6 @@ export function trimWallEndpointsToNeighbors(
     let bestQ: Vec2 | null = null;
     let bestD = reach;
 
-    let bestD = reach;
 
     for (const host of all) {
       if (host === wall) continue;
