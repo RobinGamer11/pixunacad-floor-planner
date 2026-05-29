@@ -109,7 +109,9 @@ export class WallTool {
   activate() {
     this.state = "idle";
     this.corners = [];
+    this.cornerSnaps = [];
     this.snap = null;
+
     this.resetGuides();
     this.hubLocked = false;
     this.hubLengthM = null;
