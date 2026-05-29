@@ -172,6 +172,13 @@ function runAutoSplit(scene: Scene, focusWalls?: Wall[]): boolean {
           v(hit.pos.x, hit.pos.y),
           ...host.corners.slice(hit.edgeIndex + 1),
         ];
+        if (host.cornerAnchors) {
+          host.cornerAnchors = [
+            ...host.cornerAnchors.slice(0, hit.edgeIndex + 1),
+            null,
+            ...host.cornerAnchors.slice(hit.edgeIndex + 1),
+          ];
+        }
         host.hiddenCornerIndices = [
           ...(host.hiddenCornerIndices || []).map(i => i > hit.edgeIndex ? i + 1 : i),
           hit.edgeIndex + 1,
@@ -179,10 +186,12 @@ function runAutoSplit(scene: Scene, focusWalls?: Wall[]): boolean {
         // Mikro-Segmente vermeiden.
         if (dist(host.corners[hit.edgeIndex], host.corners[hit.edgeIndex + 1]) < MIN_SEG_LEN_M) {
           host.corners.splice(hit.edgeIndex + 1, 1);
+          if (host.cornerAnchors) host.cornerAnchors.splice(hit.edgeIndex + 1, 1);
           host.hiddenCornerIndices = (host.hiddenCornerIndices || [])
             .filter(i => i !== hit.edgeIndex + 1)
             .map(i => i > hit.edgeIndex + 1 ? i - 1 : i);
         }
+
         return true;
       }
     }
