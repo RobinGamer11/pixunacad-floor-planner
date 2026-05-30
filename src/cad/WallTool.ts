@@ -167,8 +167,8 @@ export class WallTool {
     return this.app.activeDrawLabelId || Defaults.defaultLabelId;
   }
 
-  /** Bildet einen `WallCornerAnchor` aus einem Snap, sofern der Snap auf
-   * eine Sub-Linie einer fremden Wand zeigt. */
+  /** Markiert Sub-Linien-Snaps als fixierte Kanten-Andockpunkte: Der Punkt
+   * bleibt dort liegen, wird aber später nicht mit der Host-Wand mitgezogen. */
   private _anchorFromSnap(snap: Snap | null): import("./Scene").WallCornerAnchor | null {
     if (!snap || !snap.wallId || snap.wallLine !== "sub") return null;
     if (snap.type === SnapType.POINT && snap.pointIndex != null && snap.pointIndex >= 0) {
