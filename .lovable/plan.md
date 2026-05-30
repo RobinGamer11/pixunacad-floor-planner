@@ -5,9 +5,9 @@ Beim Zeichnen einer Wand kann zwar bereits auf den Sub-/Gehrungspunkt einer Nach
 1. `trimWallEndpointsToNeighbors` zieht den Endpunkt nach dem Commit zurück auf die nächste **Bezugslinie** des Nachbarn — die Wand „rutscht" weg vom Gehrungspunkt zurück auf die Reflinie.
 2. Selbst ohne Trim wäre die Verbindung nur geometrisch: der Sub-Mitre-Punkt ist kein Topologie-Knoten. Beim Verschieben/Drehen einer V-Wand würde die angedockte Wand stehenbleiben und der Anschluss bräche.
 
-## Lösung
+## Korrektur
 
-Ein neuer Anker-Typ „Sub-Mitre-Anschluss" auf Wand-Endpunkten plus Maintenance-Pass, der die Position bei Topologie-Änderungen nachzieht.
+Der Anschluss an Sub-/Gehrungskanten soll **nur geometrisch fixiert** werden: Beim Zeichnen bleibt der gefangene Punkt exakt dort, aber er wird später nicht mit der Host-Wand mitgezogen.
 
 ### 1. Daten-Modell (`Scene.ts`)
 
@@ -38,13 +38,7 @@ Anker werden in `wall.cornerAnchors[idx]` geschrieben (vor `_runConnectionPipeli
 
 ### 4. Maintenance / Recompute (`wallTopologyMaintenance.ts`)
 
-Neue Phase `reapplySubAnchors(scene)` nach Split/Merge/Cleanup:
-- Für jeden Anker: gehealte Sub-Linie der `hostWallId` via `computeHealedWallLines(host, others, graph)` neu berechnen.
-- `subMiter`: Endpunkt = `healed.subCorners[hostCornerIndex]`.
-- `subEdge`: Endpunkt = Interpolation auf gehealtem Sub-Segment.
-- Wenn Host-Wand verschwunden / Index out-of-range → Anker löschen (Endpunkt bleibt wo er ist, einmaliges Detaching).
-
-Pass wird in `runWallTopologyMaintenance` als zusätzlicher Schritt eingehängt. Idempotent: ändert sich keine Geometrie, kein weiterer Pass.
+Kein Recompute/Mitziehen der Anker. `runWallTopologyMaintenance` darf diese Punkte nur index-parallel mitführen, wenn die eigene Wand gesplittet oder bereinigt wird.
 
 ### 5. Topologie-Graph erweitern (`WallTopologyGraph.ts`)
 
@@ -59,7 +53,7 @@ In `SelectTool._clearEditState` und überall, wo Anker-Hosts gelöscht/geändert
 ## Ergebnis
 
 - Beim Zeichnen rastet die Wand am Sub-/Gehrungspunkt ein und **bleibt** dort (kein Trim-Rücksprung).
-- Verschiebt/dreht/skaliert man später eine der V-Wände, wandert der Anschluss automatisch mit der Gehrung mit.
+- Verschiebt/dreht/skaliert man später eine der V-Wände, bleibt die angedockte Wand an ihrer eigenen Position und wird nicht automatisch mitgezogen.
 - Wird die Host-Wand gelöscht, löst sich der Anker auf, der Endpunkt verbleibt zuletzt-bekannt.
 - Keine Änderung am UI/Wall-Settings-Panel nötig.
 
