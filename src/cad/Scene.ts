@@ -361,10 +361,9 @@ export class Wall {
   /** Automatisch erzeugte T-Anschluss-Stützpunkte: topologisch vorhanden,
    * aber nicht sichtbar und nicht direkt als Fangpunkt auswählbar. */
   hiddenCornerIndices: number[];
-  /** Pro Eckpunkt (index-parallel zu `corners`) optional ein Anker auf eine
-   * Nachbar-Wand-Sub-Linie/-Gehrung. Wird im Maintenance-Pass kontinuierlich
-   * neu auf die gehealte Sub-Geometrie projiziert, sodass der Anschluss bei
-   * Änderungen der Host-Wände automatisch mitwandert. */
+  /** Pro Eckpunkt (index-parallel zu `corners`) optional ein fixer Anschluss
+   * an eine Nachbar-Wand-Sub-Linie/-Gehrung. Der Anker verhindert nur das
+   * Zurücktrimmen auf die Bezugslinie; er zieht später nicht mit der Host-Wand mit. */
   cornerAnchors: (WallCornerAnchor | null)[];
   /** Freier ID-Name (überschreibt Auto-ID AW01/IW01). Leer = Auto. */
   customName: string;
@@ -406,7 +405,7 @@ export class Wall {
   }
 }
 
-/** Anker eines Wand-Eckpunkts an die Sub-/Gehrungsgeometrie einer anderen Wand. */
+/** Fixierter Anschluss eines Wand-Eckpunkts an die Sub-/Gehrungsgeometrie einer anderen Wand. */
 export type WallCornerAnchor =
   | { kind: "subMiter"; hostWallId: string; hostCornerIndex: number }
   | { kind: "subEdge"; hostWallId: string; hostEdgeIndex: number; t: number };
