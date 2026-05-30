@@ -152,4 +152,25 @@ describe("TopologyEngine wall snap priority", () => {
     expect(snap.wallId).toBe(branch.id);
     expect(snap.wallLine).toBe("main");
   });
+
+  it("sub-line docking stays geometrically fixed when the host wall is moved", () => {
+    const { scene } = env;
+    const host = scene.createWall({
+      kind: "outer", thicknessM: 0.3, referenceSide: "outer",
+      corners: [v(0, 0), v(5, 0)],
+    });
+    const hostLines = computeWallLines(host.corners, host.thicknessM, host.referenceSide);
+    const fixedDockPoint = v(2.5, hostLines.subCorners[0].y);
+    const docked = scene.createWall({
+      kind: "inner", thicknessM: 0.115, referenceSide: "center",
+      corners: [v(2.5, 2), fixedDockPoint],
+      cornerAnchors: [null, { kind: "subEdge", hostWallId: host.id, hostEdgeIndex: 0, t: 0.5 }],
+    });
+
+    host.corners = [v(1, 1), v(6, 1)];
+    runWallTopologyMaintenance(scene, [host]);
+
+    expect(docked.corners[1].x).toBeCloseTo(fixedDockPoint.x);
+    expect(docked.corners[1].y).toBeCloseTo(fixedDockPoint.y);
+  });
 });
