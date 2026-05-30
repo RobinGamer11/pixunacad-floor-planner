@@ -1,7 +1,5 @@
 import { Vec2, v, sub, norm, dist } from "./geometry";
 import type { Scene, Wall } from "./Scene";
-import { computeHealedWallLines } from "./wallHeal";
-import { WallTopologyGraph } from "./WallTopologyGraph";
 
 
 /**
@@ -32,69 +30,14 @@ export function runWallTopologyMaintenance(scene: Scene, focusWalls?: Wall[]): b
     const split = runAutoSplit(scene, focusWalls);
     const cleaned = runHiddenCornerCleanup(scene);
     const merged = runAutoMerge(scene);
-    const anchors = reapplySubAnchors(scene);
-    if (!split && !merged && !cleaned && !anchors) break;
-    anyChange = anyChange || split || merged || cleaned || anchors;
+    if (!split && !merged && !cleaned) break;
+    anyChange = anyChange || split || merged || cleaned;
     // Nach Split/Merge nicht mehr auf focusWalls beschränken — Folgewellen frei.
     focusWalls = undefined;
   }
   if (anyChange) scene.markWallsDirty();
   return anyChange;
 }
-
-/**
- * Projiziert verankerte Wand-Eckpunkte auf die aktuelle gehealte Sub-Geometrie
- * der jeweiligen Host-Wand. Verschwindet die Host-Wand oder wird der Index
- * ungültig, wird der Anker gelöscht — der Endpunkt bleibt zuletzt-bekannt.
- */
-function reapplySubAnchors(scene: Scene): boolean {
-  // Anker-Hosts gibt es nur, wenn überhaupt Anker existieren.
-  let anyAnchor = false;
-  for (const w of scene.walls) {
-    if (w.cornerAnchors && w.cornerAnchors.some(a => !!a)) { anyAnchor = true; break; }
-  }
-  if (!anyAnchor) return false;
-  const graph = new WallTopologyGraph();
-  graph.build(scene.walls);
-  const wallById = new Map(scene.walls.map(w => [w.id, w] as const));
-  let changed = false;
-
-  for (const wall of scene.walls) {
-    const anchors = wall.cornerAnchors;
-    if (!anchors) continue;
-    for (let i = 0; i < anchors.length; i++) {
-      const a = anchors[i];
-      if (!a) continue;
-      const host = wallById.get(a.hostWallId);
-      if (!host || host === wall || host.corners.length < 2) {
-        anchors[i] = null; changed = true; continue;
-      }
-      const others = scene.walls.filter(w => w !== host && w.corners.length >= 2);
-      const healed = computeHealedWallLines(host, others, graph);
-      let target: Vec2 | null = null;
-      if (a.kind === "subMiter") {
-        if (a.hostCornerIndex >= 0 && a.hostCornerIndex < healed.subCorners.length) {
-          const tp = healed.subCorners[a.hostCornerIndex];
-          target = v(tp.x, tp.y);
-        }
-      } else {
-        const subs = healed.subCorners;
-        if (a.hostEdgeIndex >= 0 && a.hostEdgeIndex < subs.length - 1) {
-          const p0 = subs[a.hostEdgeIndex], p1 = subs[a.hostEdgeIndex + 1];
-          target = v(p0.x + (p1.x - p0.x) * a.t, p0.y + (p1.y - p0.y) * a.t);
-        }
-      }
-      if (!target) { anchors[i] = null; changed = true; continue; }
-      const cur = wall.corners[i];
-      if (Math.hypot(cur.x - target.x, cur.y - target.y) > 1e-5) {
-        wall.corners[i] = target;
-        changed = true;
-      }
-    }
-  }
-  return changed;
-}
-
 
 /**
  * Entfernt verwaiste T-Stoß-Hilfspunkte: Hidden-Corners, an denen keine andere
