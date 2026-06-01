@@ -45,14 +45,6 @@ export class TopologyEngine {
    * (gegenüberliegende Wandkante) als Snap-Kandidaten berücksichtigt. */
   includeWallOffsetSnaps = true;
 
-  /** Art der gerade gezeichneten Wand. Steuert, ob bei Nachbarwänden die
-   * Bezugslinie (main) oder die Sublinie (sub) als bevorzugter Snap-Kandidat
-   * gilt:
-   *  - "inner" zeichnen + Nachbar ist "outer" → Sub bevorzugt (Innenwand
-   *    orientiert sich an Innenkante der Außenwand).
-   *  - sonst → Bezugslinie bevorzugt.
-   */
-  activeDrawingWallKind: "outer" | "inner" | null = null;
 
   /** Cache für gehealte Wandlinien während des Snap-Vorgangs. Wird über
    * einen Hash der sichtbaren Wände invalidiert (gleiche Strategie wie der
@@ -194,12 +186,10 @@ export class TopologyEngine {
       const ref = wall.corners;
       if (ref.length < 2) continue;
       const isPriority = !!(this.priorityWallId && wall.id === this.priorityWallId);
-      // Beim Zeichnen einer Innenwand orientieren wir uns an der SUB-Linie
-      // (Innenkante) bestehender Außenwände — nicht an deren Bezugslinie.
-      // Bei Innenwand-gegen-Innenwand bleibt die Bezugslinie bevorzugt.
-      const preferSub = this.activeDrawingWallKind === "inner" && wall.kind === "outer";
-      const MAIN_PEN = preferSub ? 200 : 0;
-      const SUB_PEN = preferSub ? 0 : 200;
+      // Bezugslinie und Sub-Linie werden für alle Wand-Arten gleich gewichtet;
+      // Priorität entscheidet rein über priorityWallId und Distanz.
+      const MAIN_PEN = 0;
+      const SUB_PEN = 200;
       const prioBias = isPriority ? -10000 : 0;
 
       // Bezugslinien-Eckpunkte (immer aktiv).
