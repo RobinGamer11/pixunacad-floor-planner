@@ -127,10 +127,9 @@ export class WallTool {
   }
 
   cancel() {
+    this.state = "idle";
     this.corners = [];
     this.cornerSnaps = [];
-    this.snap = null;
-
     this.snap = null;
     this.resetGuides();
     this.hubLocked = false;
@@ -138,9 +137,9 @@ export class WallTool {
     this.hubAngleDeg = null;
     this.spaceShiftLocked = false;
     this.spaceShiftLockedAngleDeg = null;
-    this.app.renderer.showWallHelpers = false;
-    // includeWallOffsetSnaps bleibt global aktiv (Sub-/Gehrungs-Snaps auch in anderen Werkzeugen).
-
+    // showWallHelpers + includeWallOffsetSnaps bleiben aktiv, solange das
+    // Wandwerkzeug aktiv ist — sonst kann unmittelbar danach keine neue Wand
+    // ohne Toolwechsel gezeichnet werden.
     this.app.hub.hide();
   }
 
