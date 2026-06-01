@@ -688,35 +688,16 @@ export class WallTool {
 
     const previewLabelId = this._resolveLabelId();
     const previewThickness = this.getThickness();
-    const previewWall = new Wall({
-      id: "__wallToolPreview__",
-      kind: this.settings.kind,
-      thicknessM: previewThickness,
-      referenceSide: this.settings.referenceSide,
-      corners: allCorners,
-      labelId: previewLabelId,
-      color: this.settings.color,
-      fillColor: this.settings.fillColor,
-    });
-    const others = this.app.scene.walls.filter(
-      w => w.labelId === previewLabelId && w.id !== previewWall.id && w.corners.length >= 2,
-    );
-    let lines: ReturnType<typeof computeWallLines>;
-    if (others.length > 0) {
-      const graph = new WallTopologyGraph();
-      graph.build([...others, previewWall]);
-      lines = computeHealedWallLines(previewWall, others, graph);
-    } else {
-      lines = computeWallLines(allCorners, previewThickness, this.settings.referenceSide);
-    }
 
-    // Sub-/Help-Linie immer aus dem rohen Offset zeichnen — unabhängig von
-    // der gehealten Bezugslinie, damit sie nur die tatsächliche Wandlänge
-    // zur Orientierung anzeigen (kein automatisches Verlängern).
+    // Preview wird IMMER aus rohen Offset-Linien gezeichnet. Healing gegen
+    // Nachbarwände würde das Maus-Ende auf eine bestehende Wand klemmen
+    // (Main-Linie kollabiert auf einen Punkt → Vorschau unsichtbar). Die
+    // gehealte Geometrie wird erst beim Commit durch die Topologie-Pipeline
+    // erzeugt.
     const rawLines = computeWallLines(allCorners, previewThickness, this.settings.referenceSide);
     this._drawPolyline(ctx, cam, rawLines.subCorners, { color: this.settings.color, widthPx: 1.5 });
     this._drawPolyline(ctx, cam, rawLines.helpCorners, { color: "rgba(120,120,120,0.7)", widthPx: 1, dashed: true });
-    this._drawPolyline(ctx, cam, lines.mainCorners, { color: this.settings.color, widthPx: 2 });
+    this._drawPolyline(ctx, cam, rawLines.mainCorners, { color: this.settings.color, widthPx: 2 });
 
     ctx.save();
     ctx.fillStyle = "rgba(77,163,255,0.95)";
