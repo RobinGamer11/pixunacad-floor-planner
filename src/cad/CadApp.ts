@@ -2049,6 +2049,10 @@ export class CadApp {
   setTool(id: string) {
     if (this.pastePreviewActive) this.cancelPastePreview();
     if (this.activeTool && this.activeTool.cancel) this.activeTool.cancel();
+    // Wand-Helfer ausschalten, wenn das Wandwerkzeug verlassen wird.
+    if (this.activeTool === this.wallTool && id !== ToolIds.WALL) {
+      this.renderer.showWallHelpers = false;
+    }
     if (id === ToolIds.SELECT) { this.activeTool = this.selectTool; this.selectTool.activate(); }
     else if (id === ToolIds.LINE) { this.activeTool = this.lineTool; this.lineTool.activate(); }
     else if (id === ToolIds.HATCH) { this.activeTool = this.hatchTool; this.hatchTool.activate(); }
