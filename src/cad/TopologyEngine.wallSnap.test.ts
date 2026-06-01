@@ -37,9 +37,8 @@ describe("TopologyEngine wall snap priority", () => {
   let env: ReturnType<typeof setup>;
   beforeEach(() => { env = setup(); });
 
-  it("inner wall drawing snaps to outer wall's sub-line (inner edge) instead of reference", () => {
+  it("wall drawing prefers reference line (main) of other walls regardless of kind", () => {
     const { scene, camera, topo } = env;
-    // Außenwand horizontal, Bezugsseite außen (oben), Dicke 0.3 m → Sublinie liegt 0.3 m unter ref.
     const outer = scene.createWall({
       kind: "outer", thicknessM: 0.05, referenceSide: "outer",
       corners: [v(0, 0), v(5, 0)],
@@ -48,14 +47,13 @@ describe("TopologyEngine wall snap priority", () => {
     const refMid = { x: 2.5, y: lines.mainCorners[0].y };
     const subMid = { x: 2.5, y: lines.subCorners[0].y };
 
-    // Maus genau zwischen Bezugs- und Sublinie der Außenwand.
     const mouseW = { x: 2.5, y: (refMid.y + subMid.y) / 2 };
     const mouseS = ws(camera, mouseW);
     const snap = topo.findBestSnap(mouseS, mouseW)!;
 
     expect(snap).toBeTruthy();
     expect(snap.wallId).toBe(outer.id);
-    expect(snap.wallLine).toBe("sub");
+    expect(snap.wallLine).toBe("main");
   });
 
   it("inner wall drawing prefers reference line of other inner walls", () => {
