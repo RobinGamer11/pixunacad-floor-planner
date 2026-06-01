@@ -96,7 +96,8 @@ function healEnd(
     let ideal: Vec2 | null = null;
     let idealAbs = Infinity;
     for (const ow of candidates) {
-      if (wall.kind === "outer" && ow.kind === "inner") continue;
+      // Wand mit niedrigerer Priorität darf eine höher priorisierte nicht stutzen.
+      if (ow.priority < wall.priority) continue;
       const ol = linesOf(ow);
       const targetPoly = T === "main" ? ol.mainCorners : T === "help" ? ol.helpCorners : ol.subCorners;
       const p = intersectRayWithPoly(origin, dir, targetPoly);
