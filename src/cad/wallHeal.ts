@@ -138,7 +138,7 @@ function healEnd(
         let clampAbs = Math.abs(idealT);
         let clamped: Vec2 | null = null;
         for (const ow of clampPool) {
-          if (wall.kind === "outer" && ow.kind === "inner") continue;
+          if (ow.priority < wall.priority) continue;
           const ol = linesOf(ow);
           for (const boundary of [ol.mainCorners, ol.subCorners]) {
             const p = intersectRayWithPoly(origin, dir, boundary);
