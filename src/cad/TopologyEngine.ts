@@ -45,9 +45,6 @@ export class TopologyEngine {
    * (gegenüberliegende Wandkante) als Snap-Kandidaten berücksichtigt. */
   includeWallOffsetSnaps = true;
 
-  /** Wenn true, werden zusätzlich Sub-Linien-Eckpunkte/-Kanten anderer Wände
-   * (gegenüberliegende Wandkante) als Snap-Kandidaten berücksichtigt. */
-  includeWallOffsetSnaps = true;
 
   /** Cache für gehealte Wandlinien während des Snap-Vorgangs. Wird über
    * einen Hash der sichtbaren Wände invalidiert (gleiche Strategie wie der
