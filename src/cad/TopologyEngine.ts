@@ -186,12 +186,10 @@ export class TopologyEngine {
       const ref = wall.corners;
       if (ref.length < 2) continue;
       const isPriority = !!(this.priorityWallId && wall.id === this.priorityWallId);
-      // Beim Zeichnen einer Innenwand orientieren wir uns an der SUB-Linie
-      // (Innenkante) bestehender Außenwände — nicht an deren Bezugslinie.
-      // Bei Innenwand-gegen-Innenwand bleibt die Bezugslinie bevorzugt.
-      const preferSub = this.activeDrawingWallKind === "inner" && wall.kind === "outer";
-      const MAIN_PEN = preferSub ? 200 : 0;
-      const SUB_PEN = preferSub ? 0 : 200;
+      // Bezugslinie und Sub-Linie werden für alle Wand-Arten gleich gewichtet;
+      // Priorität entscheidet rein über priorityWallId und Distanz.
+      const MAIN_PEN = 0;
+      const SUB_PEN = 200;
       const prioBias = isPriority ? -10000 : 0;
 
       // Bezugslinien-Eckpunkte (immer aktiv).
