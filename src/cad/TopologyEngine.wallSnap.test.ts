@@ -48,7 +48,6 @@ describe("TopologyEngine wall snap priority", () => {
     const refMid = { x: 2.5, y: lines.mainCorners[0].y };
     const subMid = { x: 2.5, y: lines.subCorners[0].y };
 
-    topo.activeDrawingWallKind = "inner";
     // Maus genau zwischen Bezugs- und Sublinie der Außenwand.
     const mouseW = { x: 2.5, y: (refMid.y + subMid.y) / 2 };
     const mouseS = ws(camera, mouseW);
@@ -69,7 +68,6 @@ describe("TopologyEngine wall snap priority", () => {
     const refMid = { x: 2.5, y: lines.mainCorners[0].y };
     const subMid = { x: 2.5, y: lines.subCorners[0].y };
 
-    topo.activeDrawingWallKind = "inner";
     const mouseW = { x: 2.5, y: (refMid.y + subMid.y) / 2 };
     const mouseS = ws(camera, mouseW);
     const snap = topo.findBestSnap(mouseS, mouseW)!;
@@ -89,7 +87,6 @@ describe("TopologyEngine wall snap priority", () => {
     const refMid = { x: 2.5, y: lines.mainCorners[0].y };
     const subMid = { x: 2.5, y: lines.subCorners[0].y };
 
-    topo.activeDrawingWallKind = "outer";
     const mouseW = { x: 2.5, y: (refMid.y + subMid.y) / 2 };
     const mouseS = ws(camera, mouseW);
     const snap = topo.findBestSnap(mouseS, mouseW)!;
@@ -105,7 +102,6 @@ describe("TopologyEngine wall snap priority", () => {
       kind: "outer", thicknessM: 0.05, referenceSide: "outer",
       corners: [v(0, 0), v(5, 0)],
     });
-    topo.activeDrawingWallKind = "inner";
 
     const mouseW = { x: 2.5, y: 0.15 };
     const mouseS = ws(camera, mouseW);
@@ -143,7 +139,6 @@ describe("TopologyEngine wall snap priority", () => {
     expect(host.corners.length).toBe(3);
     expect(host.hiddenCornerIndices).toContain(1);
 
-    topo.activeDrawingWallKind = "inner";
     const mouseW = { x: 2.5, y: 0 };
     const mouseS = ws(camera, mouseW);
     const snap = topo.findBestSnap(mouseS, mouseW)!;

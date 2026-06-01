@@ -124,7 +124,6 @@ export class WallTool {
     this.app.renderer.showWallHelpers = true;
     this.app.topology.includeWallOffsetSnaps = true;
 
-    this.app.topology.activeDrawingWallKind = this.settings.kind;
     this.app.hub.bindCommit((vals) => this._applyHubValues(vals));
     this.app.hub.hide();
     this.app.pointEditMenu.hide();
@@ -145,7 +144,6 @@ export class WallTool {
     this.app.renderer.showWallHelpers = false;
     // includeWallOffsetSnaps bleibt global aktiv (Sub-/Gehrungs-Snaps auch in anderen Werkzeugen).
 
-    this.app.topology.activeDrawingWallKind = null;
     this.app.hub.hide();
   }
 
@@ -526,7 +524,6 @@ export class WallTool {
   /* ===== Update / Click ===== */
 
   update(input: Input) {
-    this.app.topology.activeDrawingWallKind = this.settings.kind;
     this.snap = this._findWallToolSnap(input);
     this._syncSpaceShiftLock(input);
 
