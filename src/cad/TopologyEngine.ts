@@ -45,14 +45,9 @@ export class TopologyEngine {
    * (gegenüberliegende Wandkante) als Snap-Kandidaten berücksichtigt. */
   includeWallOffsetSnaps = true;
 
-  /** Art der gerade gezeichneten Wand. Steuert, ob bei Nachbarwänden die
-   * Bezugslinie (main) oder die Sublinie (sub) als bevorzugter Snap-Kandidat
-   * gilt:
-   *  - "inner" zeichnen + Nachbar ist "outer" → Sub bevorzugt (Innenwand
-   *    orientiert sich an Innenkante der Außenwand).
-   *  - sonst → Bezugslinie bevorzugt.
-   */
-  activeDrawingWallKind: "outer" | "inner" | null = null;
+  /** Wenn true, werden zusätzlich Sub-Linien-Eckpunkte/-Kanten anderer Wände
+   * (gegenüberliegende Wandkante) als Snap-Kandidaten berücksichtigt. */
+  includeWallOffsetSnaps = true;
 
   /** Cache für gehealte Wandlinien während des Snap-Vorgangs. Wird über
    * einen Hash der sichtbaren Wände invalidiert (gleiche Strategie wie der
