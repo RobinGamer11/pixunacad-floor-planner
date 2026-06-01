@@ -9,9 +9,6 @@ import type { CadApp } from "./CadApp";
 import type { Snap } from "./TopologyEngine";
 import type { Input } from "./Input";
 import { computeWallLines, type WallKind, type WallReferenceSide } from "./wallGeom";
-import { computeHealedWallLines } from "./wallHeal";
-import { WallTopologyGraph } from "./WallTopologyGraph";
-import { Wall } from "./Scene";
 import { runWallTopologyMaintenance } from "./wallTopologyMaintenance";
 import { trimWallEndpointsToNeighbors } from "./wallConnect";
 
