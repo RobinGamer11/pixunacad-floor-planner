@@ -254,23 +254,10 @@ export class TextEditorOverlay {
       return;
     }
 
-    // 3) Auto-grow box to fit text content (DOM-measured), keeping top-left anchored.
-    const cam = this.app.camera;
-    const rect = this.el.getBoundingClientRect();
-    const measuredWidthPx = rect.width;
-    const measuredHeightPx = rect.height;
-    const newWidthM = Math.max(Defaults.textMinBoxSizeM, measuredWidthPx / cam.scale);
-    const newHeightM = Math.max(Defaults.textMinBoxSizeM, measuredHeightPx / cam.scale);
-
-    // Anchor top-left: tl_world = center - (w/2, h/2). Keep tl_world fixed.
-    const tlX = box.center.x - box.widthM / 2;
-    const tlY = box.center.y - box.heightM / 2;
-    box.widthM = newWidthM;
-    box.heightM = newHeightM;
-    box.center = { x: tlX + newWidthM / 2, y: tlY + newHeightM / 2 } as any;
-
-    // 4) Reconcile with canvas-renderer measurement (independent of camera zoom)
-    //    so the placed box adapts to text exactly as it will be drawn.
+    // 3) Auto-grow box to fit the content using the canvas-renderer measurement
+    //    (zoom-independent, source of truth). Top-left stays anchored.
+    //    - wrap=true : width fixed, height grows.
+    //    - wrap=false: width AND height grow to fit the longest line.
     autoSizeTextBox(box);
 
     this.hide();
