@@ -709,7 +709,7 @@ export class Renderer {
           borderEnabled: !!it.style?.borderEnabled,
           borderColor: it.style?.borderColor || Defaults.textBorderColor,
           borderWidthPx: it.style?.borderWidthPx ?? Defaults.textBorderWidthPx,
-          paddingPx: 6,
+          paddingPx: 6 * (cam.scale / this.referencePxPerM),
         });
       }
     }
