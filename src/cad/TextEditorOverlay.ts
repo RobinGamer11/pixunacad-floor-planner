@@ -165,7 +165,7 @@ export class TextEditorOverlay {
     this.el.style.textAlign = box.style.align;
     this.el.style.whiteSpace = box.style.wrap ? "pre-wrap" : "pre";
     this.el.style.overflowWrap = box.style.wrap ? "break-word" : "normal";
-    this.el.style.padding = "6px";
+    this.el.style.padding = `${6 * (cam.scale / Defaults.measureReferenceScalePxPerM)}px`;
     this.el.style.boxSizing = "border-box";
     this.el.style.overflow = "visible";
     this.el.style.outline = "2px solid rgba(77,163,255,0.45)";
