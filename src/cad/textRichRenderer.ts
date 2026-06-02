@@ -195,16 +195,33 @@ function layoutLines(
         if (!wrap) {
           addText(run, chunk);
         } else {
-          // Word wrap
+          // Word wrap (with character-level break for words wider than the line)
           const words = chunk.split(/(\s+)/);
           for (const word of words) {
             if (!word.length) continue;
             const wordWidth = measureChunk(ctx, run, word);
-            if (cur.width + wordWidth <= maxWidthPx || cur.segments.length === 0) {
+            if (cur.width + wordWidth <= maxWidthPx || (cur.segments.length === 0 && wordWidth <= maxWidthPx)) {
               addText(run, word);
+            } else if (wordWidth > maxWidthPx && !/^\s+$/.test(word)) {
+              // Word longer than a full line — break by character.
+              let buf = "";
+              for (const ch of word) {
+                const test = buf + ch;
+                const testW = measureChunk(ctx, run, test);
+                if (cur.width + testW > maxWidthPx && (buf.length > 0 || cur.segments.length > 0)) {
+                  if (buf.length > 0) addText(run, buf);
+                  pushLine();
+                  buf = ch;
+                } else {
+                  buf = test ? buf + ch : buf;
+                  // recompute buf properly
+                  buf = (buf === test) ? buf : test;
+                  buf = test;
+                }
+              }
+              if (buf.length > 0) addText(run, buf);
             } else {
               pushLine();
-              // skip leading whitespace on the new line
               if (/^\s+$/.test(word)) continue;
               addText(run, word);
             }
