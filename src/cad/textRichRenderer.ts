@@ -213,9 +213,6 @@ function layoutLines(
                   pushLine();
                   buf = ch;
                 } else {
-                  buf = test ? buf + ch : buf;
-                  // recompute buf properly
-                  buf = (buf === test) ? buf : test;
                   buf = test;
                 }
               }
