@@ -1566,7 +1566,7 @@ export class Renderer {
       borderEnabled: box.style.borderEnabled,
       borderColor: box.style.borderColor,
       borderWidthPx: box.style.borderWidthPx,
-      paddingPx: 6,
+      paddingPx: 6 * (cam.scale / this.referencePxPerM),
     });
   }
 
