@@ -733,6 +733,12 @@ export class HatchTool {
       if (this.snap && this.snap.type === SnapType.LINE) { this._toggleParallelGuideFromSnap(this.snap); return; }
     }
 
+    if (this.drawMode === "fill") {
+      this.app.hub.hide();
+      if (input.clicked) this._onFillClick(input);
+      return;
+    }
+
     if (this.drawMode === "polygon") {
       if (this.state === "drawing") {
         const metrics = this._previewMetrics(input);
