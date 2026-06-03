@@ -664,6 +664,14 @@ const CadEditor: React.FC = () => {
               >
                 <Circle className="h-4 w-4" />
               </button>
+              <button
+                type="button"
+                onClick={() => appRef.current?.hatchTool.setDrawMode("fill")}
+                title="Füllung: Klick in einen von Linien/Wänden umschlossenen Bereich"
+                className={`cad-toolbar-btn flex-1 justify-center h-9 ${hatchDrawMode === "fill" ? "active" : ""}`}
+              >
+                <PaintBucket className="h-4 w-4" />
+              </button>
             </div>
 
             <div className="space-y-3">
