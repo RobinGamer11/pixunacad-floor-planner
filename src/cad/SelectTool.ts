@@ -1951,6 +1951,12 @@ export class SelectTool {
           }
         }
       } else {
+        // Freihand-Stroke: Klick auf Polylinie selektiert
+        const freeHit = this._hitFreeStroke(input);
+        if (freeHit) {
+          this.app.setSelection({ type: SelectionType.FREE_STROKE, freeStrokeId: freeHit.id } as any);
+          return;
+        }
         // Kein Vordergrund-Hit → Document-Underlay testen (kann gewählt + gezogen werden)
         const docHit = this._hitDocument(input);
         if (docHit) {
