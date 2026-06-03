@@ -271,6 +271,7 @@ export class Renderer {
     this._drawTextBoxSelection();
     this._drawStickerInstanceSelection();
     this._drawDocumentSelection();
+    this._drawFreeStrokeSelection();
     this._drawHoverSegmentPoints();
 
     this._drawStickerEditFrame();
