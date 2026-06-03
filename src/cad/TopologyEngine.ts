@@ -170,6 +170,13 @@ export class TopologyEngine {
       for (const c of documentCornersWorld(doc)) considerPoint(c, null, null, -1);
       for (const m of documentEdgeMidpointsWorld(doc)) considerPoint(m, null, null, -1);
     }
+    // Freihand-Stroke Endpunkte (nur erster + letzter Punkt)
+    for (const s of this.scene.freeStrokes) {
+      if (!this.labels.isVisible(s.labelId)) continue;
+      if (!s.points || s.points.length < 2) continue;
+      considerPoint(s.points[0], null, null, -1);
+      considerPoint(s.points[s.points.length - 1], null, null, -1);
+    }
     // Segment lines
     for (const seg of segs) {
       considerLine(seg.a, seg.b, seg, null);
