@@ -1827,6 +1827,11 @@ export class CadApp {
           if (box) { this.scene.removeTextBox(box); this.clearSelection(); this.refreshLabelUI(); }
           return;
         }
+        if (this.selection && this.selection.type === SelectionType.FREE_STROKE) {
+          const stroke = this.scene.getFreeStrokeById((this.selection as any).freeStrokeId);
+          if (stroke) { this.scene.removeFreeStroke(stroke); this.clearSelection(); this.refreshLabelUI(); }
+          return;
+        }
         if (this.selection && this.selection.hatchId) {
           const hatch = this.scene.getHatchById(this.selection.hatchId);
           if (hatch) {

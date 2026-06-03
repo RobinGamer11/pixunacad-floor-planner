@@ -9,6 +9,8 @@ import {
 import type { CadApp } from "./CadApp";
 import type { Snap } from "./TopologyEngine";
 import type { Input } from "./Input";
+import { findEnclosingFace } from "./hatchFill";
+import { toast } from "sonner";
 
 interface GuideAnchor {
   key: string;
@@ -27,7 +29,7 @@ interface GuideDef {
   dir: Vec2;
 }
 
-export type HatchDrawMode = "polygon" | "rectangle" | "circle";
+export type HatchDrawMode = "polygon" | "rectangle" | "circle" | "fill";
 
 export class HatchTool {
   app: CadApp;
@@ -731,6 +733,12 @@ export class HatchTool {
       if (this.snap && this.snap.type === SnapType.LINE) { this._toggleParallelGuideFromSnap(this.snap); return; }
     }
 
+    if (this.drawMode === "fill") {
+      this.app.hub.hide();
+      if (input.clicked) this._onFillClick(input);
+      return;
+    }
+
     if (this.drawMode === "polygon") {
       if (this.state === "drawing") {
         const metrics = this._previewMetrics(input);
@@ -831,6 +839,19 @@ export class HatchTool {
     this.hubAngleDeg = null;
   }
 
+  private _onFillClick(input: Input) {
+    const mouseW = v(input.mouse.wx, input.mouse.wy);
+    const loop = findEnclosingFace(this.app.scene, mouseW);
+    if (!loop || loop.length < 3) {
+      toast.error("Bereich nicht geschlossen", {
+        description: "Klicke in einen vollständig von Linien oder Wänden umschlossenen Bereich.",
+      });
+      return;
+    }
+    this.app.scene.createHatch(loop, this.app.getCurrentHatchStyle());
+    this.app.clearSelection();
+  }
+
   private _onRectClick(input: Input) {
     if (this.rectState === "idle") {
       const p = this._commitPoint(input);
@@ -873,6 +894,7 @@ export class HatchTool {
   }
 
   onTabRequest(): boolean {
+    if (this.drawMode === "fill") return false;
     if (this.drawMode === "polygon") {
       if (this.state !== "drawing") return false;
     } else if (this.drawMode === "rectangle") {

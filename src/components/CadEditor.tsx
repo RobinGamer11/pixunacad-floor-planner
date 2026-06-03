@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import { CadApp } from "@/cad/CadApp";
 import { ToolIds, PointEditAction } from "@/cad/constants";
-import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Pipette, Sticker as StickerIcon, Pencil, Trash2, Download, Upload, Plus, FileImage, Maximize2, Ruler as RulerIcon, Eraser, Construction } from "lucide-react";
+import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Pipette, Sticker as StickerIcon, Pencil, Trash2, Download, Upload, Plus, FileImage, Maximize2, Ruler as RulerIcon, Eraser, Construction, PaintBucket } from "lucide-react";
 import type { HatchDrawMode } from "@/cad/HatchTool";
 import type { StickerDefinition } from "@/cad/StickerManager";
 import { instanceBoundingCornersWorld } from "@/cad/StickerManager";
@@ -663,6 +663,14 @@ const CadEditor: React.FC = () => {
                 className={`cad-toolbar-btn flex-1 justify-center h-9 ${hatchDrawMode === "circle" ? "active" : ""}`}
               >
                 <Circle className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => appRef.current?.hatchTool.setDrawMode("fill")}
+                title="Füllung: Klick in einen von Linien/Wänden umschlossenen Bereich"
+                className={`cad-toolbar-btn flex-1 justify-center h-9 ${hatchDrawMode === "fill" ? "active" : ""}`}
+              >
+                <PaintBucket className="h-4 w-4" />
               </button>
             </div>
 

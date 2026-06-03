@@ -271,6 +271,7 @@ export class Renderer {
     this._drawTextBoxSelection();
     this._drawStickerInstanceSelection();
     this._drawDocumentSelection();
+    this._drawFreeStrokeSelection();
     this._drawHoverSegmentPoints();
 
     this._drawStickerEditFrame();
@@ -1622,6 +1623,42 @@ export class Renderer {
       ctx.restore();
     }
   }
+
+  private _drawFreeStrokeSelection() {
+    const sel = this.selection as any;
+    if (!sel || sel.type !== SelectionType.FREE_STROKE || !sel.freeStrokeId) return;
+    const s = this.scene.getFreeStrokeById(sel.freeStrokeId);
+    if (!s || s.points.length < 2 || !this.labels.isVisible(s.labelId)) return;
+    const ctx = this.ctx;
+    const cam = this.camera;
+    ctx.save();
+    ctx.strokeStyle = "rgba(77,163,255,0.95)";
+    ctx.lineWidth = Math.max(s.thicknessM * cam.scale + 2.5, 4);
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    const p0 = cam.worldToScreen(s.points[0].x, s.points[0].y);
+    ctx.moveTo(p0.x, p0.y);
+    for (let i = 1; i < s.points.length; i++) {
+      const p = cam.worldToScreen(s.points[i].x, s.points[i].y);
+      ctx.lineTo(p.x, p.y);
+    }
+    ctx.stroke();
+    // Endpoint markers
+    const last = s.points[s.points.length - 1];
+    for (const ep of [s.points[0], last]) {
+      const sp = cam.worldToScreen(ep.x, ep.y);
+      ctx.fillStyle = "rgba(77,163,255,0.18)";
+      ctx.strokeStyle = "rgba(77,163,255,0.95)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(sp.x, sp.y, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
 
   // ---- FreeStrokes ----
 

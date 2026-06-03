@@ -305,6 +305,32 @@ export class SelectTool {
     return null;
   }
 
+  /** Hit-Test gegen Freihand-Strokes (Polyline-Abstand in Pixel). */
+  private _hitFreeStroke(input: Input) {
+    const cam = this.app.camera;
+    const tolM = Defaults.hitPx / Math.max(1e-6, cam.scale);
+    const mouseW = v(input.mouse.wx, input.mouse.wy);
+    for (let i = this.app.scene.freeStrokes.length - 1; i >= 0; i--) {
+      const s = this.app.scene.freeStrokes[i];
+      if (!this.app.labelManager.isVisible(s.labelId)) continue;
+      if (s.points.length < 2) continue;
+      // distance from polyline
+      let best = Infinity;
+      for (let k = 0; k < s.points.length - 1; k++) {
+        const proj = projectPointToSegment(mouseW, s.points[k], s.points[k + 1]);
+        const d = Math.hypot(mouseW.x - proj.q.x, mouseW.y - proj.q.y);
+        if (d < best) best = d;
+      }
+      // Hit if within tolerance OR within actual stroke thickness (+small slack).
+      const effectiveTol = Math.max(tolM, (s.thicknessM || 0) * 0.6);
+      if (best <= effectiveTol) return s;
+    }
+    return null;
+  }
+
+
+
+
   /** Hit-Test gegen die 4 Eck-Handles der aktuell selektierten Sticker-Instanz. */
   private _hitStickerCorner(input: Input): { instId: string; cornerIndex: number } | null {
     const sel = this.app.selection;
@@ -1830,7 +1856,6 @@ export class SelectTool {
           boxCornersWorld(cornerHit.box)[cornerHit.handleIndex].y,
         );
         this.app.pointEditMenu.showAt(sp.x, sp.y, [
-          PointEditAction.MOVE,
           PointEditAction.TRANSLATE,
           PointEditAction.ROTATE,
         ]);
@@ -1926,6 +1951,12 @@ export class SelectTool {
           }
         }
       } else {
+        // Freihand-Stroke: Klick auf Polylinie selektiert
+        const freeHit = this._hitFreeStroke(input);
+        if (freeHit) {
+          this.app.setSelection({ type: SelectionType.FREE_STROKE, freeStrokeId: freeHit.id } as any);
+          return;
+        }
         // Kein Vordergrund-Hit → Document-Underlay testen (kann gewählt + gezogen werden)
         const docHit = this._hitDocument(input);
         if (docHit) {
