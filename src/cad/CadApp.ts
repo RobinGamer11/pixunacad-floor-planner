@@ -1831,6 +1831,7 @@ export class CadApp {
           const stroke = this.scene.getFreeStrokeById((this.selection as any).freeStrokeId);
           if (stroke) { this.scene.removeFreeStroke(stroke); this.clearSelection(); this.refreshLabelUI(); }
           return;
+        }
         if (this.selection && this.selection.hatchId) {
           const hatch = this.scene.getHatchById(this.selection.hatchId);
           if (hatch) {
