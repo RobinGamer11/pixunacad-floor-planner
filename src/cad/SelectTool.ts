@@ -1830,7 +1830,6 @@ export class SelectTool {
           boxCornersWorld(cornerHit.box)[cornerHit.handleIndex].y,
         );
         this.app.pointEditMenu.showAt(sp.x, sp.y, [
-          PointEditAction.MOVE,
           PointEditAction.TRANSLATE,
           PointEditAction.ROTATE,
         ]);
