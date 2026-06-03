@@ -9,6 +9,8 @@ import {
 import type { CadApp } from "./CadApp";
 import type { Snap } from "./TopologyEngine";
 import type { Input } from "./Input";
+import { findEnclosingFace } from "./hatchFill";
+import { toast } from "sonner";
 
 interface GuideAnchor {
   key: string;
