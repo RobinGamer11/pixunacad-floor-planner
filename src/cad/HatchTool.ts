@@ -839,6 +839,19 @@ export class HatchTool {
     this.hubAngleDeg = null;
   }
 
+  private _onFillClick(input: Input) {
+    const mouseW = v(input.mouse.wx, input.mouse.wy);
+    const loop = findEnclosingFace(this.app.scene, mouseW);
+    if (!loop || loop.length < 3) {
+      toast.error("Bereich nicht geschlossen", {
+        description: "Klicke in einen vollständig von Linien oder Wänden umschlossenen Bereich.",
+      });
+      return;
+    }
+    this.app.scene.createHatch(loop, this.app.getCurrentHatchStyle());
+    this.app.clearSelection();
+  }
+
   private _onRectClick(input: Input) {
     if (this.rectState === "idle") {
       const p = this._commitPoint(input);
