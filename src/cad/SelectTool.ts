@@ -326,6 +326,9 @@ export class SelectTool {
       if (best <= effectiveTol) return s;
     }
     return null;
+  }
+
+
 
 
   /** Hit-Test gegen die 4 Eck-Handles der aktuell selektierten Sticker-Instanz. */
