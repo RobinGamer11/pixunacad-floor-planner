@@ -894,6 +894,7 @@ export class HatchTool {
   }
 
   onTabRequest(): boolean {
+    if (this.drawMode === "fill") return false;
     if (this.drawMode === "polygon") {
       if (this.state !== "drawing") return false;
     } else if (this.drawMode === "rectangle") {
