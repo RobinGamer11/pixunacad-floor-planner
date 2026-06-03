@@ -27,7 +27,7 @@ interface GuideDef {
   dir: Vec2;
 }
 
-export type HatchDrawMode = "polygon" | "rectangle" | "circle";
+export type HatchDrawMode = "polygon" | "rectangle" | "circle" | "fill";
 
 export class HatchTool {
   app: CadApp;
