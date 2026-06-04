@@ -860,6 +860,13 @@ export class CadApp {
     return this.scene.getStickerInstanceById((this.selection as any).stickerInstanceId);
   }
 
+  getSelectedWall() {
+    if (!this.selection) return null;
+    const wallId = (this.selection as any).wallId;
+    if (!wallId) return null;
+    return this.scene.getWallById(wallId);
+  }
+
   /* ===== Sticker Edit Mode ("Ghost Scene") ===== */
   isStickerEditing(): boolean { return !!this._stickerEditInstanceId; }
   getStickerEditInstanceId(): string | null { return this._stickerEditInstanceId; }
