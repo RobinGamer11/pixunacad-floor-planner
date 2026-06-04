@@ -156,6 +156,9 @@ export class WallTool {
   }
 
   private _resolveLabelId(): string {
+    if (this.settings.labelId && this.app.labelManager.getById(this.settings.labelId)) {
+      return this.settings.labelId;
+    }
     const customName = (this.settings.customName || "").trim();
     if (customName) {
       return this.app.labelManager.ensureGroupNamed(customName).id;
