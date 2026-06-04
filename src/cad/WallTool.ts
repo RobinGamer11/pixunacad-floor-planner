@@ -25,6 +25,7 @@ export interface WallToolSettings {
   fillColor: string;
   fillColorAuto: boolean;
   inputMode: WallInputMode;
+  labelId: string;
 }
 
 interface GuideAnchor {
