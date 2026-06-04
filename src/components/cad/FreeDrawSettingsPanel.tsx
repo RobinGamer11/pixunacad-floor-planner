@@ -25,6 +25,8 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app }) => {
   const [imgSize, setImgSize] = useState(0.18);
   const [imgSpacing, setImgSpacing] = useState(0.22);
   const [imgRotate, setImgRotate] = useState(true);
+  const [labelId, setLabelId] = useState<string>("");
+  const [, force] = useState(0);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -39,9 +41,14 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app }) => {
     setImgSize(app.defaultFreeImageSizeM);
     setImgSpacing(app.defaultFreeImageSpacingM);
     setImgRotate(app.defaultFreeImageRotate);
+    setLabelId(app.activeDrawLabelId);
+    const prev = app.onLabelsChange;
+    app.onLabelsChange = () => { prev?.(); setLabelId(app.activeDrawLabelId); force(x => x + 1); };
+    return () => { app.onLabelsChange = prev; };
   }, [app]);
 
   if (!app) return null;
+  const labels = app.labelManager.list();
 
   const toggleRuler = () => {
     if (!app) return;
