@@ -149,6 +149,7 @@ const CadEditor: React.FC = () => {
   // Letzter Zeichen-Modus innerhalb der "Linie"-Variante (Linie/Freihand/Radiergummi).
   // Default = Linie. Bei jedem Wechsel wird gemerkt.
   const [lineVariant, setLineVariant] = useState<string>(ToolIds.LINE);
+  const [selectedWallId, setSelectedWallId] = useState<string | null>(null);
   const [stickers, setStickers] = useState<StickerDefinition[]>([]);
   const [stickerSelCount, setStickerSelCount] = useState(0);
   const [stickerPhase, setStickerPhase] = useState<"idle" | "selecting" | "placing" | "rotating">("idle");
