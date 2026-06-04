@@ -281,6 +281,9 @@ export class CadApp {
 
   onToolChange?: (toolId: string) => void;
 
+  onSelectionChange?: () => void;
+  onLabelsChange?: () => void;
+
   // ---- Sticker Edit Mode ("Ghost Scene") ----
   /** ID der Sticker-Instanz, die gerade im Edit-Mode ist. null = kein Edit-Mode. */
   _stickerEditInstanceId: string | null = null;
@@ -824,6 +827,7 @@ export class CadApp {
     this._syncTextSettingsFromContext();
     this._updateSettingsVisibility();
     this._syncStickerInstanceHub();
+    this.onSelectionChange?.();
   }
 
   clearSelection() { this.setSelection(null); }
@@ -854,6 +858,13 @@ export class CadApp {
   getSelectedStickerInstance() {
     if (!this.selection || this.selection.type !== SelectionType.STICKER_INSTANCE) return null;
     return this.scene.getStickerInstanceById((this.selection as any).stickerInstanceId);
+  }
+
+  getSelectedWall() {
+    if (!this.selection) return null;
+    const wallId = (this.selection as any).wallId;
+    if (!wallId) return null;
+    return this.scene.getWallById(wallId);
   }
 
   /* ===== Sticker Edit Mode ("Ghost Scene") ===== */
@@ -1111,6 +1122,7 @@ export class CadApp {
     this._syncHatchSettingsFromContext();
     this._syncMeasureSettingsFromContext();
     this._syncTextSettingsFromContext();
+    this.onLabelsChange?.();
   }
 
   private _syncLabelSelect() {

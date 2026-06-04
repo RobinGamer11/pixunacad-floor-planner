@@ -149,6 +149,7 @@ const CadEditor: React.FC = () => {
   // Letzter Zeichen-Modus innerhalb der "Linie"-Variante (Linie/Freihand/Radiergummi).
   // Default = Linie. Bei jedem Wechsel wird gemerkt.
   const [lineVariant, setLineVariant] = useState<string>(ToolIds.LINE);
+  const [selectedWallId, setSelectedWallId] = useState<string | null>(null);
   const [stickers, setStickers] = useState<StickerDefinition[]>([]);
   const [stickerSelCount, setStickerSelCount] = useState(0);
   const [stickerPhase, setStickerPhase] = useState<"idle" | "selecting" | "placing" | "rotating">("idle");
@@ -302,6 +303,7 @@ const CadEditor: React.FC = () => {
     app.hatchTool.onDrawModeChange = (m) => setHatchDrawMode(m);
     setHatchDrawMode(app.hatchTool.drawMode);
     app.documentTool.onPhaseChange = () => setDocToolPhase(app.documentTool.phase);
+    app.onSelectionChange = () => setSelectedWallId(app.getSelectedWall()?.id || null);
     app.setTool(ToolIds.SELECT);
 
     // Zeichnungs-ID-Panel verdrahten (Schritt 1: nur UI)
@@ -1079,7 +1081,7 @@ const CadEditor: React.FC = () => {
           )}
 
           {/* Wand-Tool-Panel */}
-          {!sidebarCollapsed && activeTool === ToolIds.WALL && (
+          {!sidebarCollapsed && (activeTool === ToolIds.WALL || (activeTool === ToolIds.SELECT && selectedWallId)) && (
             <WallSettingsPanel app={appRef.current} />
           )}
 
