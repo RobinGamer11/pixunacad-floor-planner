@@ -90,6 +90,7 @@ export class WallTool {
     fillColor: Defaults.wallFillColorOuter,
     fillColorAuto: true,
     inputMode: "chain",
+    labelId: Defaults.defaultLabelId,
   };
 
   constructor(app: CadApp) {
