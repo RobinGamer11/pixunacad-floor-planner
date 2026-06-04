@@ -302,6 +302,7 @@ const CadEditor: React.FC = () => {
     app.hatchTool.onDrawModeChange = (m) => setHatchDrawMode(m);
     setHatchDrawMode(app.hatchTool.drawMode);
     app.documentTool.onPhaseChange = () => setDocToolPhase(app.documentTool.phase);
+    app.onSelectionChange = () => setSelectedWallId(app.getSelectedWall()?.id || null);
     app.setTool(ToolIds.SELECT);
 
     // Zeichnungs-ID-Panel verdrahten (Schritt 1: nur UI)
