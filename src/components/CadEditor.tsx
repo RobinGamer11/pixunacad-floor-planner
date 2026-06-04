@@ -1081,7 +1081,7 @@ const CadEditor: React.FC = () => {
           )}
 
           {/* Wand-Tool-Panel */}
-          {!sidebarCollapsed && activeTool === ToolIds.WALL && (
+          {!sidebarCollapsed && (activeTool === ToolIds.WALL || (activeTool === ToolIds.SELECT && selectedWallId)) && (
             <WallSettingsPanel app={appRef.current} />
           )}
 
