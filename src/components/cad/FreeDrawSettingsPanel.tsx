@@ -97,6 +97,17 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app }) => {
       <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Freihand</div>
       <div className="space-y-3">
         <label className="block text-xs">
+          <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Bezeichnungs-ID</span>
+          <select
+            value={labelId || app.activeDrawLabelId}
+            onChange={(e) => { setLabelId(e.target.value); app.setActiveDrawLabelId(e.target.value); app.refreshLabelUI(); }}
+            className="cad-settings-select w-full">
+            {labels.map(l => (<option key={l.id} value={l.id}>{l.name}</option>))}
+          </select>
+        </label>
+
+        <label className="block text-xs">
+
           <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Farbe</span>
           <input type="color" value={color}
             onChange={(e) => { setColor(e.target.value); app.defaultFreeColor = e.target.value; }}
