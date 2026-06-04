@@ -827,6 +827,7 @@ export class CadApp {
     this._syncTextSettingsFromContext();
     this._updateSettingsVisibility();
     this._syncStickerInstanceHub();
+    this.onSelectionChange?.();
   }
 
   clearSelection() { this.setSelection(null); }
