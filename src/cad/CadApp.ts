@@ -281,6 +281,9 @@ export class CadApp {
 
   onToolChange?: (toolId: string) => void;
 
+  onSelectionChange?: () => void;
+  onLabelsChange?: () => void;
+
   // ---- Sticker Edit Mode ("Ghost Scene") ----
   /** ID der Sticker-Instanz, die gerade im Edit-Mode ist. null = kein Edit-Mode. */
   _stickerEditInstanceId: string | null = null;
