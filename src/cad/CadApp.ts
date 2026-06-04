@@ -1115,6 +1115,7 @@ export class CadApp {
     this._syncHatchSettingsFromContext();
     this._syncMeasureSettingsFromContext();
     this._syncTextSettingsFromContext();
+    this.onLabelsChange?.();
   }
 
   private _syncLabelSelect() {
