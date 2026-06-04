@@ -51,7 +51,6 @@ export const WallSettingsPanel: React.FC<Props> = ({ app }) => {
     if (!selectedWall) return;
     apply();
     runWallTopologyMaintenance(app.scene, [selectedWall]);
-    app.requestRedraw?.();
     rerender();
   };
 
