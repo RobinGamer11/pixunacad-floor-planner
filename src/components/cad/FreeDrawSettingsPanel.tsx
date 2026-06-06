@@ -74,7 +74,7 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app }) => {
   const selectedStroke = () => app?.getSelectedFreeStroke?.() || null;
   const applyToStroke = (mutate: (s: any) => void) => {
     const s = selectedStroke();
-    if (s) { mutate(s); app?.requestRender?.(); }
+    if (s) { mutate(s); }
   };
 
   if (!app) return null;
