@@ -150,6 +150,7 @@ const CadEditor: React.FC = () => {
   // Default = Linie. Bei jedem Wechsel wird gemerkt.
   const [lineVariant, setLineVariant] = useState<string>(ToolIds.LINE);
   const [selectedWallId, setSelectedWallId] = useState<string | null>(null);
+  const [selectedFreeStrokeId, setSelectedFreeStrokeId] = useState<string | null>(null);
   const [stickers, setStickers] = useState<StickerDefinition[]>([]);
   const [stickerSelCount, setStickerSelCount] = useState(0);
   const [stickerPhase, setStickerPhase] = useState<"idle" | "selecting" | "placing" | "rotating">("idle");
