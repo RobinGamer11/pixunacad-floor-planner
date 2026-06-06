@@ -26,26 +26,56 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app }) => {
   const [imgSpacing, setImgSpacing] = useState(0.22);
   const [imgRotate, setImgRotate] = useState(true);
   const [labelId, setLabelId] = useState<string>("");
+  const [selectedStrokeId, setSelectedStrokeId] = useState<string | null>(null);
   const [, force] = useState(0);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
+  const syncFromState = () => {
+    if (!app) return;
+    const stroke = app.getSelectedFreeStroke?.() || null;
+    if (stroke) {
+      setSelectedStrokeId(stroke.id);
+      setColor(stroke.color);
+      setThickness(stroke.thicknessM);
+      setOpacity(stroke.opacity);
+      setStyle(stroke.lineStyle as LineStyle);
+      setGap(stroke.gapM);
+      setImageSrc(stroke.imageSrc);
+      setImgSize(stroke.imageSizeM);
+      setImgSpacing(stroke.imageSpacingM);
+      setImgRotate(stroke.imageRotateAlongPath);
+      setLabelId(stroke.labelId);
+    } else {
+      setSelectedStrokeId(null);
+      setColor(app.defaultFreeColor);
+      setThickness(app.defaultFreeThicknessM);
+      setOpacity(app.defaultFreeOpacity);
+      setStyle(app.defaultFreeLineStyle);
+      setGap(app.defaultFreeGapM);
+      setImageSrc(app.defaultFreeImageSrc);
+      setImgSize(app.defaultFreeImageSizeM);
+      setImgSpacing(app.defaultFreeImageSpacingM);
+      setImgRotate(app.defaultFreeImageRotate);
+      setLabelId(app.activeDrawLabelId);
+    }
+    setHasRuler(!!app.scene.rulerGuide);
+  };
+
   useEffect(() => {
     if (!app) return;
-    setColor(app.defaultFreeColor);
-    setThickness(app.defaultFreeThicknessM);
-    setOpacity(app.defaultFreeOpacity);
-    setStyle(app.defaultFreeLineStyle);
-    setGap(app.defaultFreeGapM);
-    setHasRuler(!!app.scene.rulerGuide);
-    setImageSrc(app.defaultFreeImageSrc);
-    setImgSize(app.defaultFreeImageSizeM);
-    setImgSpacing(app.defaultFreeImageSpacingM);
-    setImgRotate(app.defaultFreeImageRotate);
-    setLabelId(app.activeDrawLabelId);
-    const prev = app.onLabelsChange;
-    app.onLabelsChange = () => { prev?.(); setLabelId(app.activeDrawLabelId); force(x => x + 1); };
-    return () => { app.onLabelsChange = prev; };
+    syncFromState();
+    const prevLabels = app.onLabelsChange;
+    app.onLabelsChange = () => { prevLabels?.(); syncFromState(); force(x => x + 1); };
+    const prevSel = app.onSelectionChange;
+    app.onSelectionChange = () => { prevSel?.(); syncFromState(); force(x => x + 1); };
+    return () => { app.onLabelsChange = prevLabels; app.onSelectionChange = prevSel; };
   }, [app]);
+
+  const selectedStroke = () => app?.getSelectedFreeStroke?.() || null;
+  const applyToStroke = (mutate: (s: any) => void) => {
+    const s = selectedStroke();
+    if (s) { mutate(s); app?.requestRender?.(); }
+  };
 
   if (!app) return null;
   const labels = app.labelManager.list();
