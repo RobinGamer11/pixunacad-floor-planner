@@ -1075,7 +1075,7 @@ const CadEditor: React.FC = () => {
           )}
 
           {/* Freihand-Tool-Panel */}
-          {!sidebarCollapsed && activeTool === ToolIds.FREE && (
+          {!sidebarCollapsed && (activeTool === ToolIds.FREE || (activeTool === ToolIds.SELECT && selectedFreeStrokeId)) && (
             <FreeDrawSettingsPanel app={appRef.current} />
           )}
 
