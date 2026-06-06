@@ -83,6 +83,7 @@ export class FreeDrawTool {
         this._lastSamplePx = null;
         if (pts.length >= 2 && this._pathLength(pts) > 1e-4) {
           this.app.scene.createFreeStroke(pts, this._currentStyle());
+          this.app.refreshLabelUI?.();
         }
       }
     }

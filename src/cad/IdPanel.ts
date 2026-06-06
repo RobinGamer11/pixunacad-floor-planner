@@ -120,7 +120,9 @@ export class IdPanel {
       const hatchCount = this.app.scene.getHatchesByLabelId(group.id).length;
       const dimCount = this.app.scene.getDimensionsByLabelId(group.id).length;
       const textCount = this.app.scene.getTextBoxesByLabelId(group.id).length;
-      const count = segCount + hatchCount + dimCount + textCount;
+      const freeCount = this.app.scene.getFreeStrokesByLabelId(group.id).length;
+      const wallCount = this.app.scene.getWallsByLabelId(group.id).length;
+      const count = segCount + hatchCount + dimCount + textCount + freeCount + wallCount;
       const row = document.createElement("div");
       row.className = "id-row";
       row.dataset.id = group.id;

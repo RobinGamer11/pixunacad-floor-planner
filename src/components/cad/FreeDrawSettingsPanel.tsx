@@ -26,26 +26,56 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app }) => {
   const [imgSpacing, setImgSpacing] = useState(0.22);
   const [imgRotate, setImgRotate] = useState(true);
   const [labelId, setLabelId] = useState<string>("");
+  const [selectedStrokeId, setSelectedStrokeId] = useState<string | null>(null);
   const [, force] = useState(0);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
+  const syncFromState = () => {
+    if (!app) return;
+    const stroke = app.getSelectedFreeStroke?.() || null;
+    if (stroke) {
+      setSelectedStrokeId(stroke.id);
+      setColor(stroke.color);
+      setThickness(stroke.thicknessM);
+      setOpacity(stroke.opacity);
+      setStyle(stroke.lineStyle as LineStyle);
+      setGap(stroke.gapM);
+      setImageSrc(stroke.imageSrc);
+      setImgSize(stroke.imageSizeM);
+      setImgSpacing(stroke.imageSpacingM);
+      setImgRotate(stroke.imageRotateAlongPath);
+      setLabelId(stroke.labelId);
+    } else {
+      setSelectedStrokeId(null);
+      setColor(app.defaultFreeColor);
+      setThickness(app.defaultFreeThicknessM);
+      setOpacity(app.defaultFreeOpacity);
+      setStyle(app.defaultFreeLineStyle);
+      setGap(app.defaultFreeGapM);
+      setImageSrc(app.defaultFreeImageSrc);
+      setImgSize(app.defaultFreeImageSizeM);
+      setImgSpacing(app.defaultFreeImageSpacingM);
+      setImgRotate(app.defaultFreeImageRotate);
+      setLabelId(app.activeDrawLabelId);
+    }
+    setHasRuler(!!app.scene.rulerGuide);
+  };
+
   useEffect(() => {
     if (!app) return;
-    setColor(app.defaultFreeColor);
-    setThickness(app.defaultFreeThicknessM);
-    setOpacity(app.defaultFreeOpacity);
-    setStyle(app.defaultFreeLineStyle);
-    setGap(app.defaultFreeGapM);
-    setHasRuler(!!app.scene.rulerGuide);
-    setImageSrc(app.defaultFreeImageSrc);
-    setImgSize(app.defaultFreeImageSizeM);
-    setImgSpacing(app.defaultFreeImageSpacingM);
-    setImgRotate(app.defaultFreeImageRotate);
-    setLabelId(app.activeDrawLabelId);
-    const prev = app.onLabelsChange;
-    app.onLabelsChange = () => { prev?.(); setLabelId(app.activeDrawLabelId); force(x => x + 1); };
-    return () => { app.onLabelsChange = prev; };
+    syncFromState();
+    const prevLabels = app.onLabelsChange;
+    app.onLabelsChange = () => { prevLabels?.(); syncFromState(); force(x => x + 1); };
+    const prevSel = app.onSelectionChange;
+    app.onSelectionChange = () => { prevSel?.(); syncFromState(); force(x => x + 1); };
+    return () => { app.onLabelsChange = prevLabels; app.onSelectionChange = prevSel; };
   }, [app]);
+
+  const selectedStroke = () => app?.getSelectedFreeStroke?.() || null;
+  const applyToStroke = (mutate: (s: any) => void) => {
+    const s = selectedStroke();
+    if (s) { mutate(s); }
+  };
 
   if (!app) return null;
   const labels = app.labelManager.list();
@@ -97,10 +127,19 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app }) => {
       <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Freihand</div>
       <div className="space-y-3">
         <label className="block text-xs">
-          <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Bezeichnungs-ID</span>
+          <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Bezeichnungs-ID{selectedStrokeId ? " (Auswahl)" : ""}</span>
           <select
             value={labelId || app.activeDrawLabelId}
-            onChange={(e) => { setLabelId(e.target.value); app.setActiveDrawLabelId(e.target.value); app.refreshLabelUI(); }}
+            onChange={(e) => {
+              const v = e.target.value;
+              setLabelId(v);
+              if (selectedStrokeId) {
+                applyToStroke((s) => { s.labelId = v; });
+              } else {
+                app.setActiveDrawLabelId(v);
+              }
+              app.refreshLabelUI();
+            }}
             className="cad-settings-select w-full">
             {labels.map(l => (<option key={l.id} value={l.id}>{l.name}</option>))}
           </select>
@@ -110,14 +149,22 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app }) => {
 
           <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Farbe</span>
           <input type="color" value={color}
-            onChange={(e) => { setColor(e.target.value); app.defaultFreeColor = e.target.value; }}
+            onChange={(e) => {
+              const v = e.target.value; setColor(v);
+              if (selectedStrokeId) applyToStroke((s) => { s.color = v; });
+              else app.defaultFreeColor = v;
+            }}
             className="w-full h-8 rounded border" />
         </label>
 
         <label className="block text-xs">
           <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Linienart</span>
           <select value={style}
-            onChange={(e) => { const v = e.target.value as LineStyle; setStyle(v); app.defaultFreeLineStyle = v; }}
+            onChange={(e) => {
+              const v = e.target.value as LineStyle; setStyle(v);
+              if (selectedStrokeId) applyToStroke((s) => { s.lineStyle = v; });
+              else app.defaultFreeLineStyle = v;
+            }}
             className="w-full h-8 rounded border bg-background px-2 text-xs">
             {STYLE_OPTIONS.map(o => (
               <option key={o.value} value={o.value} disabled={o.value === "image" && !imageSrc}>{o.label}{o.value === "image" && !imageSrc ? " (Bild laden)" : ""}</option>
@@ -128,14 +175,22 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app }) => {
         <label className="block text-xs">
           <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>{style === "image" ? "Stempel-Größe (m)" : "Dicke (m)"}: {thickness.toFixed(3)}</span>
           <input type="range" min={0.005} max={style === "image" ? 2 : 0.5} step={style === "image" ? 0.01 : 0.005} value={thickness}
-            onChange={(e) => { const v = parseFloat(e.target.value); setThickness(v); app.defaultFreeThicknessM = v; }}
+            onChange={(e) => {
+              const v = parseFloat(e.target.value); setThickness(v);
+              if (selectedStrokeId) applyToStroke((s) => { s.thicknessM = v; });
+              else app.defaultFreeThicknessM = v;
+            }}
             className="w-full" />
         </label>
 
         <label className="block text-xs">
           <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Transparenz: {Math.round(opacity * 100)}%</span>
           <input type="range" min={0.05} max={1} step={0.05} value={opacity}
-            onChange={(e) => { const v = parseFloat(e.target.value); setOpacity(v); app.defaultFreeOpacity = v; }}
+            onChange={(e) => {
+              const v = parseFloat(e.target.value); setOpacity(v);
+              if (selectedStrokeId) applyToStroke((s) => { s.opacity = v; });
+              else app.defaultFreeOpacity = v;
+            }}
             className="w-full" />
         </label>
 
@@ -143,7 +198,11 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app }) => {
           <label className="block text-xs">
             <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>{style === "blob" ? "Abstand (m)" : "Lücke (m)"}: {gap.toFixed(3)}</span>
             <input type="range" min={0.01} max={0.5} step={0.005} value={gap}
-              onChange={(e) => { const v = parseFloat(e.target.value); setGap(v); app.defaultFreeGapM = v; }}
+              onChange={(e) => {
+                const v = parseFloat(e.target.value); setGap(v);
+                if (selectedStrokeId) applyToStroke((s) => { s.gapM = v; });
+                else app.defaultFreeGapM = v;
+              }}
               className="w-full" />
           </label>
         )}

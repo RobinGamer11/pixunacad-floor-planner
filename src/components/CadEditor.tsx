@@ -150,6 +150,7 @@ const CadEditor: React.FC = () => {
   // Default = Linie. Bei jedem Wechsel wird gemerkt.
   const [lineVariant, setLineVariant] = useState<string>(ToolIds.LINE);
   const [selectedWallId, setSelectedWallId] = useState<string | null>(null);
+  const [selectedFreeStrokeId, setSelectedFreeStrokeId] = useState<string | null>(null);
   const [stickers, setStickers] = useState<StickerDefinition[]>([]);
   const [stickerSelCount, setStickerSelCount] = useState(0);
   const [stickerPhase, setStickerPhase] = useState<"idle" | "selecting" | "placing" | "rotating">("idle");
@@ -303,7 +304,10 @@ const CadEditor: React.FC = () => {
     app.hatchTool.onDrawModeChange = (m) => setHatchDrawMode(m);
     setHatchDrawMode(app.hatchTool.drawMode);
     app.documentTool.onPhaseChange = () => setDocToolPhase(app.documentTool.phase);
-    app.onSelectionChange = () => setSelectedWallId(app.getSelectedWall()?.id || null);
+    app.onSelectionChange = () => {
+      setSelectedWallId(app.getSelectedWall()?.id || null);
+      setSelectedFreeStrokeId(app.getSelectedFreeStroke()?.id || null);
+    };
     app.setTool(ToolIds.SELECT);
 
     // Zeichnungs-ID-Panel verdrahten (Schritt 1: nur UI)
@@ -1071,7 +1075,7 @@ const CadEditor: React.FC = () => {
           )}
 
           {/* Freihand-Tool-Panel */}
-          {!sidebarCollapsed && activeTool === ToolIds.FREE && (
+          {!sidebarCollapsed && (activeTool === ToolIds.FREE || (activeTool === ToolIds.SELECT && selectedFreeStrokeId)) && (
             <FreeDrawSettingsPanel app={appRef.current} />
           )}
 
