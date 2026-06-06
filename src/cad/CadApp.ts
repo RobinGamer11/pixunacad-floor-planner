@@ -867,6 +867,11 @@ export class CadApp {
     return this.scene.getWallById(wallId);
   }
 
+  getSelectedFreeStroke() {
+    if (!this.selection || this.selection.type !== SelectionType.FREE_STROKE) return null;
+    return this.scene.getFreeStrokeById((this.selection as any).freeStrokeId);
+  }
+
   /* ===== Sticker Edit Mode ("Ghost Scene") ===== */
   isStickerEditing(): boolean { return !!this._stickerEditInstanceId; }
   getStickerEditInstanceId(): string | null { return this._stickerEditInstanceId; }
