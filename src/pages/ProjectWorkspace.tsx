@@ -606,6 +606,7 @@ function RightInspector({
   setTab,
   project,
   onJumpCad,
+  onCollapse,
 }: {
   projectId: string;
   page?: import("@/lib/projectStore").ProjectPage;
@@ -614,13 +615,21 @@ function RightInspector({
   setTab: (t: "settings" | "tools" | "tasks") => void;
   project: import("@/lib/projectStore").Project;
   onJumpCad: (sheetId?: string) => void;
+  onCollapse?: () => void;
 }) {
   const taskCount = project.tasks.filter((t) => !t.done).length;
   return (
     <aside
-      className="w-[340px] shrink-0 border-l flex flex-col"
+      className="w-[340px] shrink-0 border-l flex flex-col relative"
       style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
     >
+      <button
+        onClick={onCollapse}
+        title="Einklappen"
+        className="absolute top-2 right-2 h-6 w-6 rounded-md flex items-center justify-center hover:bg-muted z-10"
+      >
+        <PanelRightClose size={14} className="text-muted-foreground" />
+      </button>
       <div className="grid grid-cols-3 border-b" style={{ borderColor: "hsl(var(--hairline))" }}>
         <TabButton active={tab === "settings"} onClick={() => setTab("settings")} icon={<Settings size={14} />} label="Seiteneinstellungen" />
         <TabButton active={tab === "tools"} onClick={() => setTab("tools")} icon={<Wrench size={14} />} label="Werkzeug" />
@@ -632,6 +641,7 @@ function RightInspector({
           badge={taskCount > 0 ? taskCount : undefined}
         />
       </div>
+
       <div className="flex-1 overflow-y-auto p-5 space-y-5">
         {tab === "settings" && page && <PageSettings projectId={projectId} page={page} />}
         {tab === "tools" && (
