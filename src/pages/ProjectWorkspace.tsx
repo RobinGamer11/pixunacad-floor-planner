@@ -763,7 +763,10 @@ function PageCanvas({
   const otherEls = page.elements.filter((e) => e.kind !== "line" && e.kind !== "guide");
 
   return (
-    <div className="min-h-full flex items-start justify-center p-10">
+    <div
+      className="min-h-full flex items-start justify-center"
+      style={{ padding: "60vh 60vw" }}
+    >
       <div
         className="relative"
         style={{
