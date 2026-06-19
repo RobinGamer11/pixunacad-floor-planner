@@ -88,8 +88,7 @@ export class MiniCad {
   readonly lineTool: LineTool;
   readonly textTool: TextTool;
   readonly textEditor: TextEditorOverlay;
-  readonly selectTool: MiniSelectTool;
-  readonly textHub: TextHub | null;
+  readonly selectTool: SelectTool;
 
   // Stubs required by tools / editor.
   activeDrawLabelId = Defaults.defaultLabelId;
