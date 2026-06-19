@@ -108,13 +108,14 @@ export default function CadOverlayLayer({
     engineRef.current?.setActiveTool(activeTool);
   }, [activeTool]);
 
-  // Line defaults.
+  // Line defaults (color, thickness, alpha).
   useEffect(() => {
     engineRef.current?.setLineDefaults({
       color: lineColor,
       thicknessM: typeof lineThicknessMm === "number" ? lineThicknessMm / 1000 : undefined,
+      alpha: typeof lineAlpha === "number" ? lineAlpha : undefined,
     });
-  }, [lineColor, lineThicknessMm]);
+  }, [lineColor, lineThicknessMm, lineAlpha]);
 
 
   return (
