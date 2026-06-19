@@ -491,6 +491,8 @@ function PageCanvas({
   overlayOpacity,
   selectedElementId,
   zoom,
+  activeTool,
+  onCommitTool,
   onSelect,
 }: {
   projectId: string;
@@ -499,6 +501,8 @@ function PageCanvas({
   overlayOpacity: number;
   selectedElementId?: string;
   zoom: number;
+  activeTool: PageTool;
+  onCommitTool: () => void;
   onSelect: (id?: string) => void;
 }) {
   const fmt = FORMAT_SIZES[page.format];
@@ -509,10 +513,92 @@ function PageCanvas({
   const mmToPx = width / fmt.w;
   const marginPx = (page.margins ?? 0) * mmToPx;
 
+  // Tool drawing state (click-click). Coordinates in % of page.
+  const [pendingStart, setPendingStart] = useState<{ x: number; y: number } | null>(null);
+  const [hoverPt, setHoverPt] = useState<{ x: number; y: number } | null>(null);
+  const pageRef = useRef<HTMLDivElement>(null);
+
+  const toPct = (clientX: number, clientY: number) => {
+    const r = pageRef.current?.getBoundingClientRect();
+    if (!r) return { x: 0, y: 0 };
+    return {
+      x: ((clientX - r.left) / r.width) * 100,
+      y: ((clientY - r.top) / r.height) * 100,
+    };
+  };
+
+  const drawingTool = activeTool === "line" || activeTool === "guide";
+  const cursorStyle = drawingTool ? "crosshair" : activeTool === "text" ? "text" : undefined;
+
+  const handlePageMouseDown = (e: React.MouseEvent) => {
+    if (e.target !== e.currentTarget && !drawingTool && activeTool !== "text") return;
+    if (activeTool === "text") {
+      const p = toPct(e.clientX, e.clientY);
+      projectStore.addElement(projectId, page.id, {
+        kind: "text",
+        x: Math.max(0, p.x),
+        y: Math.max(0, p.y - 2),
+        w: 25,
+        h: 6,
+        text: "Text",
+        fontSize: 16,
+      });
+      onCommitTool();
+      return;
+    }
+    if (drawingTool) {
+      const p = toPct(e.clientX, e.clientY);
+      if (!pendingStart) {
+        setPendingStart(p);
+        setHoverPt(p);
+      } else {
+        const pts = [pendingStart, p];
+        const minX = Math.min(pts[0].x, pts[1].x);
+        const minY = Math.min(pts[0].y, pts[1].y);
+        const maxX = Math.max(pts[0].x, pts[1].x);
+        const maxY = Math.max(pts[0].y, pts[1].y);
+        projectStore.addElement(projectId, page.id, {
+          kind: activeTool === "guide" ? "guide" : "line",
+          x: minX,
+          y: minY,
+          w: Math.max(0.2, maxX - minX),
+          h: Math.max(0.2, maxY - minY),
+          points: pts,
+          color: activeTool === "guide" ? "#7DD3FC" : "#1a1a1a",
+          strokeWidth: activeTool === "guide" ? 1 : 1.5,
+          nonPrinting: activeTool === "guide" ? true : undefined,
+        });
+        setPendingStart(null);
+        setHoverPt(null);
+      }
+      return;
+    }
+    // not drawing: deselect
+    if (e.target === e.currentTarget) onSelect(undefined);
+  };
+
+  const handlePageMouseMove = (e: React.MouseEvent) => {
+    if (!drawingTool || !pendingStart) return;
+    setHoverPt(toPct(e.clientX, e.clientY));
+  };
+
+  // Escape cancels pending draw
+  React.useEffect(() => {
+    if (!pendingStart && activeTool === null) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setPendingStart(null);
+        setHoverPt(null);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [pendingStart, activeTool]);
+
   const punchSide: PunchSide = page.punchSide ?? "left";
   const punchPattern = page.punchPattern ?? "none";
   const punchCfg = punchPattern !== "none" ? PUNCH_PATTERNS[punchPattern] : undefined;
-  const edgeInsetMm = 12; // distance of hole center from bound edge
+  const edgeInsetMm = 12;
   const holes: { left: number; top: number; size: number }[] = [];
   if (punchCfg) {
     const sizePx = punchCfg.diameter * mmToPx;
@@ -536,19 +622,23 @@ function PageCanvas({
     }
   }
 
+  const lineEls = page.elements.filter((e) => e.kind === "line" || e.kind === "guide");
+  const otherEls = page.elements.filter((e) => e.kind !== "line" && e.kind !== "guide");
+
   return (
     <div className="min-h-full flex items-start justify-center p-10">
       <div
+        ref={pageRef}
         className="relative shadow-xl"
         style={{
           width,
           height,
           background: "white",
           border: "1px solid hsl(var(--hairline))",
+          cursor: cursorStyle,
         }}
-        onMouseDown={(e) => {
-          if (e.target === e.currentTarget) onSelect(undefined);
-        }}
+        onMouseDown={handlePageMouseDown}
+        onMouseMove={handlePageMouseMove}
       >
         {/* Margin overlay (light grey ring) */}
         {marginPx > 0 && (
@@ -568,13 +658,15 @@ function PageCanvas({
             className="absolute inset-0 pointer-events-none"
             style={{ opacity: overlayOpacity }}
           >
-            {overlayPage.elements.map((el) => (
-              <ElementView key={el.id} el={el} readOnly />
-            ))}
+            {overlayPage.elements
+              .filter((e) => e.kind !== "line" && e.kind !== "guide")
+              .map((el) => (
+                <ElementView key={el.id} el={el} readOnly />
+              ))}
             <div className="absolute inset-0 bg-amber-100/10" />
           </div>
         )}
-        {page.elements.map((el) => (
+        {otherEls.map((el) => (
           <ElementView
             key={el.id}
             el={el}
@@ -588,6 +680,54 @@ function PageCanvas({
             }}
           />
         ))}
+
+        {/* Lines and guides (SVG layer in page-% coords) */}
+        <svg
+          className="absolute inset-0 pointer-events-none"
+          viewBox="0 0 100 100"
+          preserveAspectRatio="none"
+          style={{ width: "100%", height: "100%" }}
+        >
+          {lineEls.map((el) => {
+            const pts = el.points ?? [];
+            if (pts.length < 2) return null;
+            const isGuide = el.kind === "guide";
+            return (
+              <line
+                key={el.id}
+                x1={pts[0].x}
+                y1={pts[0].y}
+                x2={pts[1].x}
+                y2={pts[1].y}
+                stroke={el.color ?? (isGuide ? "#7DD3FC" : "#1a1a1a")}
+                strokeWidth={(el.strokeWidth ?? (isGuide ? 1 : 1.5)) * 0.15}
+                strokeDasharray={isGuide ? "1.2 0.8" : undefined}
+                vectorEffect="non-scaling-stroke"
+                style={{ pointerEvents: "stroke", cursor: "pointer" }}
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                  onSelect(el.id);
+                }}
+                opacity={el.id === selectedElementId ? 1 : 0.95}
+              />
+            );
+          })}
+          {/* Preview of line being drawn */}
+          {drawingTool && pendingStart && hoverPt && (
+            <line
+              x1={pendingStart.x}
+              y1={pendingStart.y}
+              x2={hoverPt.x}
+              y2={hoverPt.y}
+              stroke={activeTool === "guide" ? "#7DD3FC" : "#1a1a1a"}
+              strokeWidth={0.2}
+              strokeDasharray={activeTool === "guide" ? "1.2 0.8" : "0.6 0.6"}
+              vectorEffect="non-scaling-stroke"
+              opacity={0.7}
+            />
+          )}
+        </svg>
+
         {/* Punch holes overlay */}
         {holes.map((h, i) => (
           <div
@@ -607,6 +747,7 @@ function PageCanvas({
     </div>
   );
 }
+
 
 function ZoomBar({ zoom, setZoom }: { zoom: number; setZoom: (v: number) => void }) {
   const [draft, setDraft] = useState<string | null>(null);
