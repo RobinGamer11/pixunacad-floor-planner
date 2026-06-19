@@ -117,11 +117,33 @@ export default function ProjectWorkspace() {
         style={{ borderColor: "hsl(var(--hairline))" }}
       >
         <ToolRailButton icon={<LayoutTemplate size={18} />} label="Seiten" active />
-        <ToolRailButton icon={<Type size={18} />} label="Text" />
-        <ToolRailButton icon={<Minus size={18} />} label="Linie" />
         <ToolRailButton
-          icon={<Compass size={18} />}
-          label="CAD-Zeichnen"
+          icon={<Minus size={18} style={{ strokeDasharray: "3 2" }} />}
+          label="Hilfslinie"
+          active={activeTool === "guide"}
+          onClick={() => setActiveToolAndTab(activeTool === "guide" ? null : "guide")}
+        />
+        <ToolRailButton
+          icon={<Type size={18} />}
+          label="Text"
+          active={activeTool === "text"}
+          onClick={() => setActiveToolAndTab(activeTool === "text" ? null : "text")}
+        />
+        <ToolRailButton
+          icon={<Minus size={18} />}
+          label="Linie"
+          active={activeTool === "line"}
+          onClick={() => setActiveToolAndTab(activeTool === "line" ? null : "line")}
+        />
+        <ToolRailButton
+          icon={<CompassIcon size={18} />}
+          label="CAD-Blatt"
+          active={activeTool === "cad"}
+          onClick={() => setActiveToolAndTab(activeTool === "cad" ? null : "cad")}
+        />
+        <ToolRailButton
+          icon={<ExternalLink size={18} />}
+          label="CAD öffnen"
           onClick={() => navigate(`/project/${project.id}/cad`)}
           accent
         />
