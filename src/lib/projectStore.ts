@@ -14,7 +14,8 @@ export type ElementKind =
   | "timeline"
   | "cad-view"
   | "shape"
-  | "line";
+  | "line"
+  | "guide";
 
 export interface PageElement {
   id: string;
@@ -33,7 +34,16 @@ export interface PageElement {
   border?: boolean;
   sheetId?: string;
   rotation?: number;
+  // line / guide: two endpoints in % of page
+  points?: { x: number; y: number }[];
+  strokeWidth?: number;
+  // cad-view
+  scale?: string;
+  lastSyncAt?: string;
+  // generic
+  nonPrinting?: boolean;
 }
+
 
 export type PunchPattern = "none" | "2-fach" | "4-fach" | "6-fach-a5";
 export type PunchSide = "left" | "right" | "top" | "bottom";
