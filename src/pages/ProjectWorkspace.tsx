@@ -1283,6 +1283,8 @@ function ToolsTab({
   setActiveTool,
   selectedElementId,
   setSelectedElementId,
+  toolSettings,
+  updateToolSettings,
   onJumpCad,
 }: {
   projectId: string;
@@ -1293,6 +1295,8 @@ function ToolsTab({
   setActiveTool: (t: PageTool) => void;
   selectedElementId?: string;
   setSelectedElementId: (id?: string) => void;
+  toolSettings: ToolSettings;
+  updateToolSettings: <K extends keyof ToolSettings>(k: K, patch: Partial<ToolSettings[K]>) => void;
   onJumpCad: (sheetId?: string) => void;
 }) {
   return (
@@ -1333,6 +1337,26 @@ function ToolsTab({
         )}
       </div>
 
+      {/* Per-tool settings */}
+      {activeTool === "guide" && (
+        <GuideSettings
+          settings={toolSettings.guide}
+          onChange={(p) => updateToolSettings("guide", p)}
+        />
+      )}
+      {activeTool === "line" && (
+        <LineSettings
+          settings={toolSettings.line}
+          onChange={(p) => updateToolSettings("line", p)}
+        />
+      )}
+      {activeTool === "text" && (
+        <TextSettings
+          settings={toolSettings.text}
+          onChange={(p) => updateToolSettings("text", p)}
+        />
+      )}
+
       {/* CAD section */}
       {activeTool === "cad" && (
         <CadToolSection
@@ -1357,6 +1381,161 @@ function ToolsTab({
     </div>
   );
 }
+
+function GuideSettings({
+  settings,
+  onChange,
+}: {
+  settings: ToolSettings["guide"];
+  onChange: (p: Partial<ToolSettings["guide"]>) => void;
+}) {
+  return (
+    <SettingsBlock title="HILFSLINIE">
+      <Row label="Farbe">
+        <ColorInput value={settings.color} onChange={(v) => onChange({ color: v })} />
+      </Row>
+      <Row label="Strichstärke">
+        <div className="flex items-center gap-2">
+          <input
+            type="range"
+            min={0.5}
+            max={4}
+            step={0.1}
+            value={settings.strokeWidth}
+            onChange={(e) => onChange({ strokeWidth: Number(e.target.value) })}
+            className="flex-1 accent-foreground"
+          />
+          <span className="text-xs tabular-nums w-10 text-right">{settings.strokeWidth.toFixed(1)} px</span>
+        </div>
+      </Row>
+      <div className="text-[11px] text-muted-foreground">
+        Hilfslinien werden hellblau gestrichelt angezeigt und beim Druck nicht ausgegeben.
+      </div>
+    </SettingsBlock>
+  );
+}
+
+function LineSettings({
+  settings,
+  onChange,
+}: {
+  settings: ToolSettings["line"];
+  onChange: (p: Partial<ToolSettings["line"]>) => void;
+}) {
+  return (
+    <SettingsBlock title="LINIE">
+      <Row label="Farbe">
+        <ColorInput value={settings.color} onChange={(v) => onChange({ color: v })} />
+      </Row>
+      <Row label="Stärke (mm)">
+        <input
+          type="number"
+          step={0.1}
+          min={0.1}
+          value={settings.thicknessMm}
+          onChange={(e) => {
+            const v = Number(e.target.value);
+            if (!Number.isNaN(v) && v > 0) onChange({ thicknessMm: v });
+          }}
+          className="w-full h-8 px-2 rounded bg-transparent border text-sm tabular-nums"
+          style={{ borderColor: "hsl(var(--hairline))" }}
+        />
+      </Row>
+      <div className="text-[11px] text-muted-foreground">
+        Zeichnet 1:1 mit CAD-Engine: Snap, Ortho (Shift), Hub-Eingabe für Länge/Winkel.
+      </div>
+    </SettingsBlock>
+  );
+}
+
+function TextSettings({
+  settings,
+  onChange,
+}: {
+  settings: ToolSettings["text"];
+  onChange: (p: Partial<ToolSettings["text"]>) => void;
+}) {
+  return (
+    <SettingsBlock title="TEXT">
+      <Row label="Schriftgröße">
+        <div className="flex items-center gap-2">
+          <input
+            type="range"
+            min={8}
+            max={64}
+            step={1}
+            value={settings.fontSize}
+            onChange={(e) => onChange({ fontSize: Number(e.target.value) })}
+            className="flex-1 accent-foreground"
+          />
+          <span className="text-xs tabular-nums w-10 text-right">{settings.fontSize} px</span>
+        </div>
+      </Row>
+      <Row label="Farbe">
+        <ColorInput value={settings.color} onChange={(v) => onChange({ color: v })} />
+      </Row>
+      <Row label="Stil">
+        <div className="flex gap-2">
+          <button
+            onClick={() => onChange({ bold: !settings.bold })}
+            className="h-8 w-8 rounded border text-sm font-bold"
+            style={{
+              borderColor: "hsl(var(--hairline))",
+              background: settings.bold ? "hsl(var(--accent-gold-soft))" : "transparent",
+            }}
+            title="Fett"
+          >
+            B
+          </button>
+          <button
+            onClick={() => onChange({ italic: !settings.italic })}
+            className="h-8 w-8 rounded border text-sm italic"
+            style={{
+              borderColor: "hsl(var(--hairline))",
+              background: settings.italic ? "hsl(var(--accent-gold-soft))" : "transparent",
+            }}
+            title="Kursiv"
+          >
+            I
+          </button>
+        </div>
+      </Row>
+    </SettingsBlock>
+  );
+}
+
+function SettingsBlock({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-3">
+        {title}
+      </div>
+      <div className="space-y-3">{children}</div>
+    </div>
+  );
+}
+
+function ColorInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        type="color"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-8 w-10 rounded border bg-transparent cursor-pointer"
+        style={{ borderColor: "hsl(var(--hairline))" }}
+      />
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="flex-1 h-8 px-2 rounded bg-transparent border text-sm tabular-nums"
+        style={{ borderColor: "hsl(var(--hairline))" }}
+      />
+    </div>
+  );
+}
+
 
 function ToolPickButton({
   label,
