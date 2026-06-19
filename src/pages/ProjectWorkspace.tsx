@@ -632,18 +632,26 @@ function PageCanvas({
   return (
     <div className="min-h-full flex items-start justify-center p-10">
       <div
-        ref={pageRef}
-        className="relative shadow-xl"
         style={{
-          width,
-          height,
-          background: "white",
-          border: "1px solid hsl(var(--hairline))",
-          cursor: cursorStyle,
+          width: width * scale,
+          height: height * scale,
         }}
-        onMouseDown={handlePageMouseDown}
-        onMouseMove={handlePageMouseMove}
       >
+        <div
+          ref={pageRef}
+          className="relative shadow-xl"
+          style={{
+            width,
+            height,
+            background: "white",
+            border: "1px solid hsl(var(--hairline))",
+            cursor: cursorStyle,
+            transform: `scale(${scale})`,
+            transformOrigin: "top left",
+          }}
+          onMouseDown={handlePageMouseDown}
+          onMouseMove={handlePageMouseMove}
+        >
         {/* Margin overlay (light grey ring) */}
         {marginPx > 0 && (
           <div
@@ -678,8 +686,8 @@ function PageCanvas({
             onSelect={() => onSelect(el.id)}
             onDrag={(dx, dy) => {
               projectStore.updateElement(projectId, page.id, el.id, {
-                x: Math.max(0, Math.min(95, el.x + (dx / width) * 100)),
-                y: Math.max(0, Math.min(95, el.y + (dy / height) * 100)),
+                x: Math.max(0, Math.min(95, el.x + (dx / scale / width) * 100)),
+                y: Math.max(0, Math.min(95, el.y + (dy / scale / height) * 100)),
               });
             }}
           />
