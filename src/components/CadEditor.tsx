@@ -6,6 +6,7 @@ import type { HatchDrawMode } from "@/cad/HatchTool";
 import type { StickerDefinition } from "@/cad/StickerManager";
 import { instanceBoundingCornersWorld } from "@/cad/StickerManager";
 import { importFile, type ImportedPage } from "@/cad/documentImport";
+import { projectStore } from "@/lib/projectStore";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -32,7 +33,8 @@ const LINE_VARIANTS = [
   { id: ToolIds.ERASER, label: "Radiergummi", icon: Eraser },
 ];
 
-const CadEditor: React.FC = () => {
+interface CadEditorProps { projectId?: string }
+const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const hubRef = useRef<HTMLDivElement>(null);
@@ -295,7 +297,37 @@ const CadEditor: React.FC = () => {
       setStickerPhase(app.stickerTool.phase);
       setStickerSelCount(app.stickerTool.getSelectionCount());
     };
-    app.onHistoryChange = (u, r) => { setCanUndo(u); setCanRedo(r); };
+    // CAD-State pro Projekt aus localStorage wiederherstellen
+    const persistKey = `pixuna.cad.${projectId ?? "default"}`;
+    const persist = () => {
+      try {
+        const snap = (app as any)._serializeScene?.();
+        if (typeof snap !== "string") return;
+        localStorage.setItem(persistKey, snap);
+        if (projectId) {
+          try {
+            const data = JSON.parse(snap);
+            const list = Array.isArray(data.sheets) ? data.sheets : [];
+            const sheets = list
+              .filter((s: any) => s && s.id && s.id !== "default-sheet")
+              .map((s: any) => ({
+                id: s.id,
+                name: s.name || "Sheet",
+                scale: typeof s.scaleValue === "number" ? `1:${s.scaleValue}` : (s.scaleKey || "1:100"),
+              }));
+            projectStore.updateProject(projectId, { sheets });
+          } catch {}
+        }
+      } catch (e) { console.error("CAD persist failed:", e); }
+    };
+    try {
+      const saved = localStorage.getItem(persistKey);
+      if (saved) (app as any)._restoreScene?.(saved);
+    } catch (e) { console.error("CAD restore failed:", e); }
+
+    app.onHistoryChange = (u, r) => { setCanUndo(u); setCanRedo(r); persist(); };
+    // Periodischer Fallback (Sheet-Renames etc. pushen keine History).
+    const persistTimer = window.setInterval(persist, 4000);
     app.onStickersChange = () => setStickers([...app.stickers]);
     app.stickerTool.onSelectionChange = () => {
       setStickerSelCount(app.stickerTool.getSelectionCount());
@@ -339,6 +371,8 @@ const CadEditor: React.FC = () => {
 
     return () => {
       window.removeEventListener("resize", onResize);
+      window.clearInterval(persistTimer);
+      try { persist(); } catch {}
       app.destroy();
       appRef.current = null;
     };

@@ -50,7 +50,7 @@ const CadPage = () => {
         </div>
       </header>
       <main className="flex-1 relative min-h-0">
-        <CadEditor />
+        <CadEditor projectId={projectId} />
       </main>
     </div>
   );
