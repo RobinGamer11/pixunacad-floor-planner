@@ -26,6 +26,7 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app }) => {
   const [imgSpacing, setImgSpacing] = useState(0.22);
   const [imgRotate, setImgRotate] = useState(true);
   const [labelId, setLabelId] = useState<string>("");
+  const [autoShape, setAutoShape] = useState(false);
   const [selectedStrokeId, setSelectedStrokeId] = useState<string | null>(null);
   const [, force] = useState(0);
   const fileRef = useRef<HTMLInputElement | null>(null);
@@ -59,6 +60,7 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app }) => {
       setLabelId(app.activeDrawLabelId);
     }
     setHasRuler(!!app.scene.rulerGuide);
+    setAutoShape(app.defaultFreeAutoShape);
   };
 
   useEffect(() => {
@@ -240,6 +242,18 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app }) => {
             </>
           )}
         </div>
+
+        <button type="button"
+          onClick={() => {
+            const v = !autoShape;
+            setAutoShape(v);
+            app.defaultFreeAutoShape = v;
+          }}
+          className="cad-toolbar-btn w-full justify-center h-9"
+          style={autoShape ? { background: "hsl(var(--cad-toolbar-active))", color: "hsl(var(--cad-toolbar-active-foreground))" } : undefined}
+          title="Beim Loslassen werden Geraden geradegezogen und Kreise zu echten Kreisen geformt.">
+          <span className="text-xs">{autoShape ? "Auto-Form: AN" : "Auto-Form: AUS"}</span>
+        </button>
 
         <button type="button" onClick={toggleRuler}
           className="cad-toolbar-btn w-full justify-center h-9">

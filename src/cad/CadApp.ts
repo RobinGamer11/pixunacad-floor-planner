@@ -168,6 +168,7 @@ export class CadApp {
   defaultFreeImageSizeM = Defaults.freeImageSizeM;
   defaultFreeImageSpacingM = Defaults.freeImageSpacingM;
   defaultFreeImageRotate = Defaults.freeImageRotate;
+  defaultFreeAutoShape = false;
 
   // Eraser-Defaults
   defaultEraserRadiusM = Defaults.eraserRadiusM;
