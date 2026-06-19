@@ -98,8 +98,8 @@ export default function ProjectWorkspace() {
   // Per-tool settings (live in workspace state; persist could come later).
   const [toolSettings, setToolSettings] = useState({
     guide: { color: "#7DD3FC", strokeWidth: 1 },
-    line: { color: "#111111", thicknessMm: 0.5 },
-    text: { fontSize: 16, color: "#111111", bold: false, italic: false },
+    line: { color: "#111111", thicknessMm: 0.5, alpha: 100 },
+    text: { fontSize: 16, color: "#111111", bold: false, italic: false, alpha: 100 },
   });
   const updateToolSettings = <K extends keyof typeof toolSettings>(k: K, patch: Partial<(typeof toolSettings)[K]>) =>
     setToolSettings((s) => ({ ...s, [k]: { ...s[k], ...patch } }));
