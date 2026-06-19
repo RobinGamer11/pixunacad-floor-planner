@@ -1093,8 +1093,8 @@ function RightInspector({
   projectId: string;
   page?: import("@/lib/projectStore").ProjectPage;
   element?: PageElement;
-  tab: "settings" | "tools" | "tasks";
-  setTab: (t: "settings" | "tools" | "tasks") => void;
+  tab: "settings" | "tools" | "layers";
+  setTab: (t: "settings" | "tools" | "layers") => void;
   project: import("@/lib/projectStore").Project;
   activeTool: PageTool;
   setActiveTool: (t: PageTool) => void;
@@ -1105,7 +1105,7 @@ function RightInspector({
   onJumpCad: (sheetId?: string) => void;
   onCollapse?: () => void;
 }) {
-  const taskCount = project.tasks.filter((t) => !t.done).length;
+  const layerCount = page?.elements.length ?? 0;
   return (
     <aside
       className="w-[340px] shrink-0 border-l flex flex-col relative"
@@ -1122,11 +1122,11 @@ function RightInspector({
         <TabButton active={tab === "settings"} onClick={() => setTab("settings")} icon={<Settings size={14} />} label="Seiteneinstellung" />
         <TabButton active={tab === "tools"} onClick={() => setTab("tools")} icon={<Wrench size={14} />} label="Werkzeugeinstellung" />
         <TabButton
-          active={tab === "tasks"}
-          onClick={() => setTab("tasks")}
-          icon={<CheckSquare size={14} />}
-          label="Aufgaben"
-          badge={taskCount > 0 ? taskCount : undefined}
+          active={tab === "layers"}
+          onClick={() => setTab("layers")}
+          icon={<LayersIcon size={14} />}
+          label="Ebenen"
+          badge={layerCount > 0 ? layerCount : undefined}
         />
       </div>
 
@@ -1147,7 +1147,14 @@ function RightInspector({
             onJumpCad={onJumpCad}
           />
         )}
-        {tab === "tasks" && <TasksTab project={project} />}
+        {tab === "layers" && page && (
+          <LayersTab
+            projectId={projectId}
+            page={page}
+            selectedElementId={selectedElementId}
+            setSelectedElementId={setSelectedElementId}
+          />
+        )}
       </div>
     </aside>
   );
