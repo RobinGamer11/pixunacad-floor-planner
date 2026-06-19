@@ -1032,6 +1032,8 @@ function RightInspector({
   setActiveTool,
   selectedElementId,
   setSelectedElementId,
+  toolSettings,
+  updateToolSettings,
   onJumpCad,
   onCollapse,
 }: {
@@ -1045,6 +1047,8 @@ function RightInspector({
   setActiveTool: (t: PageTool) => void;
   selectedElementId?: string;
   setSelectedElementId: (id?: string) => void;
+  toolSettings: ToolSettings;
+  updateToolSettings: <K extends keyof ToolSettings>(k: K, patch: Partial<ToolSettings[K]>) => void;
   onJumpCad: (sheetId?: string) => void;
   onCollapse?: () => void;
 }) {
@@ -1085,6 +1089,8 @@ function RightInspector({
             setActiveTool={setActiveTool}
             selectedElementId={selectedElementId}
             setSelectedElementId={setSelectedElementId}
+            toolSettings={toolSettings}
+            updateToolSettings={updateToolSettings}
             onJumpCad={onJumpCad}
           />
         )}
