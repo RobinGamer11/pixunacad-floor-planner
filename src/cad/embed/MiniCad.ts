@@ -23,9 +23,8 @@ import { PointEditMenu } from "../PointEditMenu";
 import { LineTool } from "../LineTool";
 import { TextTool } from "../TextTool";
 import { TextEditorOverlay } from "../TextEditorOverlay";
-import { MiniSelectTool } from "./MiniSelectTool";
-import { TextHub } from "./TextHub";
-import { Defaults, SelectionType } from "../constants";
+import { SelectTool } from "../SelectTool";
+import { Defaults, SelectionType, PointEditAction } from "../constants";
 import type { TextBox, TextBoxStyle } from "../Scene";
 
 export interface MiniCadTextEditorDom {
