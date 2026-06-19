@@ -1,4 +1,4 @@
-import { useMemo, useState, useRef } from "react";
+import React, { useMemo, useState, useRef, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ChevronLeft,
@@ -36,6 +36,11 @@ import {
   PanelRightOpen,
   ZoomIn,
   ZoomOut,
+  RefreshCw,
+  Compass as CompassIcon,
+  MousePointer2,
+  ExternalLink,
+
 } from "lucide-react";
 
 import {
@@ -56,6 +61,8 @@ const FORMAT_SIZES: Record<PageFormat, { w: number; h: number; label: string }> 
   frei: { w: 400, h: 300, label: "Freies Format" },
 };
 
+export type PageTool = "guide" | "line" | "text" | "cad" | null;
+
 export default function ProjectWorkspace() {
   const { projectId } = useParams();
   const project = useProject(projectId);
@@ -63,6 +70,7 @@ export default function ProjectWorkspace() {
   const [activePageId, setActivePageId] = useState<string | undefined>(project?.pages[0]?.id);
   const [selectedElementId, setSelectedElementId] = useState<string | undefined>();
   const [rightTab, setRightTab] = useState<"settings" | "tools" | "tasks">("settings");
+  const [activeTool, setActiveTool] = useState<PageTool>(null);
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
   const [renamingPageId, setRenamingPageId] = useState<string | undefined>();
@@ -73,6 +81,11 @@ export default function ProjectWorkspace() {
   });
   const [zoom, setZoom] = useState(77);
   const setZoomClamped = (v: number) => setZoom(Math.max(10, Math.min(400, Math.round(v))));
+  const setActiveToolAndTab = (t: PageTool) => {
+    setActiveTool(t);
+    if (t) setRightTab("tools");
+  };
+
 
 
   if (!project) {
@@ -381,6 +394,8 @@ export default function ProjectWorkspace() {
                   overlayOpacity={bgOverlay.opacity}
                   selectedElementId={selectedElementId}
                   zoom={zoom}
+                  activeTool={activeTool}
+                  onCommitTool={() => setActiveTool(null)}
                   onSelect={(id) => {
                     setSelectedElementId(id);
                     if (id) setRightTab("tools");
@@ -400,9 +415,14 @@ export default function ProjectWorkspace() {
               tab={rightTab}
               setTab={setRightTab}
               project={project}
+              activeTool={activeTool}
+              setActiveTool={setActiveToolAndTab}
+              selectedElementId={selectedElementId}
+              setSelectedElementId={setSelectedElementId}
               onJumpCad={(sheetId) => navigate(`/project/${project.id}/cad${sheetId ? `/${sheetId}` : ""}`)}
               onCollapse={() => setRightOpen(false)}
             />
+
           ) : (
             <div
               className="w-7 shrink-0 border-l flex items-start justify-center pt-3"
@@ -471,6 +491,8 @@ function PageCanvas({
   overlayOpacity,
   selectedElementId,
   zoom,
+  activeTool,
+  onCommitTool,
   onSelect,
 }: {
   projectId: string;
@@ -479,6 +501,8 @@ function PageCanvas({
   overlayOpacity: number;
   selectedElementId?: string;
   zoom: number;
+  activeTool: PageTool;
+  onCommitTool: () => void;
   onSelect: (id?: string) => void;
 }) {
   const fmt = FORMAT_SIZES[page.format];
@@ -489,10 +513,92 @@ function PageCanvas({
   const mmToPx = width / fmt.w;
   const marginPx = (page.margins ?? 0) * mmToPx;
 
+  // Tool drawing state (click-click). Coordinates in % of page.
+  const [pendingStart, setPendingStart] = useState<{ x: number; y: number } | null>(null);
+  const [hoverPt, setHoverPt] = useState<{ x: number; y: number } | null>(null);
+  const pageRef = useRef<HTMLDivElement>(null);
+
+  const toPct = (clientX: number, clientY: number) => {
+    const r = pageRef.current?.getBoundingClientRect();
+    if (!r) return { x: 0, y: 0 };
+    return {
+      x: ((clientX - r.left) / r.width) * 100,
+      y: ((clientY - r.top) / r.height) * 100,
+    };
+  };
+
+  const drawingTool = activeTool === "line" || activeTool === "guide";
+  const cursorStyle = drawingTool ? "crosshair" : activeTool === "text" ? "text" : undefined;
+
+  const handlePageMouseDown = (e: React.MouseEvent) => {
+    if (e.target !== e.currentTarget && !drawingTool && activeTool !== "text") return;
+    if (activeTool === "text") {
+      const p = toPct(e.clientX, e.clientY);
+      projectStore.addElement(projectId, page.id, {
+        kind: "text",
+        x: Math.max(0, p.x),
+        y: Math.max(0, p.y - 2),
+        w: 25,
+        h: 6,
+        text: "Text",
+        fontSize: 16,
+      });
+      onCommitTool();
+      return;
+    }
+    if (drawingTool) {
+      const p = toPct(e.clientX, e.clientY);
+      if (!pendingStart) {
+        setPendingStart(p);
+        setHoverPt(p);
+      } else {
+        const pts = [pendingStart, p];
+        const minX = Math.min(pts[0].x, pts[1].x);
+        const minY = Math.min(pts[0].y, pts[1].y);
+        const maxX = Math.max(pts[0].x, pts[1].x);
+        const maxY = Math.max(pts[0].y, pts[1].y);
+        projectStore.addElement(projectId, page.id, {
+          kind: activeTool === "guide" ? "guide" : "line",
+          x: minX,
+          y: minY,
+          w: Math.max(0.2, maxX - minX),
+          h: Math.max(0.2, maxY - minY),
+          points: pts,
+          color: activeTool === "guide" ? "#7DD3FC" : "#1a1a1a",
+          strokeWidth: activeTool === "guide" ? 1 : 1.5,
+          nonPrinting: activeTool === "guide" ? true : undefined,
+        });
+        setPendingStart(null);
+        setHoverPt(null);
+      }
+      return;
+    }
+    // not drawing: deselect
+    if (e.target === e.currentTarget) onSelect(undefined);
+  };
+
+  const handlePageMouseMove = (e: React.MouseEvent) => {
+    if (!drawingTool || !pendingStart) return;
+    setHoverPt(toPct(e.clientX, e.clientY));
+  };
+
+  // Escape cancels pending draw
+  React.useEffect(() => {
+    if (!pendingStart && activeTool === null) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setPendingStart(null);
+        setHoverPt(null);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [pendingStart, activeTool]);
+
   const punchSide: PunchSide = page.punchSide ?? "left";
   const punchPattern = page.punchPattern ?? "none";
   const punchCfg = punchPattern !== "none" ? PUNCH_PATTERNS[punchPattern] : undefined;
-  const edgeInsetMm = 12; // distance of hole center from bound edge
+  const edgeInsetMm = 12;
   const holes: { left: number; top: number; size: number }[] = [];
   if (punchCfg) {
     const sizePx = punchCfg.diameter * mmToPx;
@@ -516,19 +622,23 @@ function PageCanvas({
     }
   }
 
+  const lineEls = page.elements.filter((e) => e.kind === "line" || e.kind === "guide");
+  const otherEls = page.elements.filter((e) => e.kind !== "line" && e.kind !== "guide");
+
   return (
     <div className="min-h-full flex items-start justify-center p-10">
       <div
+        ref={pageRef}
         className="relative shadow-xl"
         style={{
           width,
           height,
           background: "white",
           border: "1px solid hsl(var(--hairline))",
+          cursor: cursorStyle,
         }}
-        onMouseDown={(e) => {
-          if (e.target === e.currentTarget) onSelect(undefined);
-        }}
+        onMouseDown={handlePageMouseDown}
+        onMouseMove={handlePageMouseMove}
       >
         {/* Margin overlay (light grey ring) */}
         {marginPx > 0 && (
@@ -548,13 +658,15 @@ function PageCanvas({
             className="absolute inset-0 pointer-events-none"
             style={{ opacity: overlayOpacity }}
           >
-            {overlayPage.elements.map((el) => (
-              <ElementView key={el.id} el={el} readOnly />
-            ))}
+            {overlayPage.elements
+              .filter((e) => e.kind !== "line" && e.kind !== "guide")
+              .map((el) => (
+                <ElementView key={el.id} el={el} readOnly />
+              ))}
             <div className="absolute inset-0 bg-amber-100/10" />
           </div>
         )}
-        {page.elements.map((el) => (
+        {otherEls.map((el) => (
           <ElementView
             key={el.id}
             el={el}
@@ -568,6 +680,54 @@ function PageCanvas({
             }}
           />
         ))}
+
+        {/* Lines and guides (SVG layer in page-% coords) */}
+        <svg
+          className="absolute inset-0 pointer-events-none"
+          viewBox="0 0 100 100"
+          preserveAspectRatio="none"
+          style={{ width: "100%", height: "100%" }}
+        >
+          {lineEls.map((el) => {
+            const pts = el.points ?? [];
+            if (pts.length < 2) return null;
+            const isGuide = el.kind === "guide";
+            return (
+              <line
+                key={el.id}
+                x1={pts[0].x}
+                y1={pts[0].y}
+                x2={pts[1].x}
+                y2={pts[1].y}
+                stroke={el.color ?? (isGuide ? "#7DD3FC" : "#1a1a1a")}
+                strokeWidth={(el.strokeWidth ?? (isGuide ? 1 : 1.5)) * 0.15}
+                strokeDasharray={isGuide ? "1.2 0.8" : undefined}
+                vectorEffect="non-scaling-stroke"
+                style={{ pointerEvents: "stroke", cursor: "pointer" }}
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                  onSelect(el.id);
+                }}
+                opacity={el.id === selectedElementId ? 1 : 0.95}
+              />
+            );
+          })}
+          {/* Preview of line being drawn */}
+          {drawingTool && pendingStart && hoverPt && (
+            <line
+              x1={pendingStart.x}
+              y1={pendingStart.y}
+              x2={hoverPt.x}
+              y2={hoverPt.y}
+              stroke={activeTool === "guide" ? "#7DD3FC" : "#1a1a1a"}
+              strokeWidth={0.2}
+              strokeDasharray={activeTool === "guide" ? "1.2 0.8" : "0.6 0.6"}
+              vectorEffect="non-scaling-stroke"
+              opacity={0.7}
+            />
+          )}
+        </svg>
+
         {/* Punch holes overlay */}
         {holes.map((h, i) => (
           <div
@@ -587,6 +747,7 @@ function PageCanvas({
     </div>
   );
 }
+
 
 function ZoomBar({ zoom, setZoom }: { zoom: number; setZoom: (v: number) => void }) {
   const [draft, setDraft] = useState<string | null>(null);
@@ -760,6 +921,10 @@ function RightInspector({
   tab,
   setTab,
   project,
+  activeTool,
+  setActiveTool,
+  selectedElementId,
+  setSelectedElementId,
   onJumpCad,
   onCollapse,
 }: {
@@ -769,6 +934,10 @@ function RightInspector({
   tab: "settings" | "tools" | "tasks";
   setTab: (t: "settings" | "tools" | "tasks") => void;
   project: import("@/lib/projectStore").Project;
+  activeTool: PageTool;
+  setActiveTool: (t: PageTool) => void;
+  selectedElementId?: string;
+  setSelectedElementId: (id?: string) => void;
   onJumpCad: (sheetId?: string) => void;
   onCollapse?: () => void;
 }) {
@@ -786,7 +955,7 @@ function RightInspector({
         <PanelRightClose size={14} className="text-muted-foreground" />
       </button>
       <div className="grid grid-cols-3 border-b" style={{ borderColor: "hsl(var(--hairline))" }}>
-        <TabButton active={tab === "settings"} onClick={() => setTab("settings")} icon={<Settings size={14} />} label="Seiteneinstellungen" />
+        <TabButton active={tab === "settings"} onClick={() => setTab("settings")} icon={<Settings size={14} />} label="Seiteneinstellung" />
         <TabButton active={tab === "tools"} onClick={() => setTab("tools")} icon={<Wrench size={14} />} label="Werkzeug" />
         <TabButton
           active={tab === "tasks"}
@@ -800,13 +969,24 @@ function RightInspector({
       <div className="flex-1 overflow-y-auto p-5 space-y-5">
         {tab === "settings" && page && <PageSettings projectId={projectId} page={page} />}
         {tab === "tools" && (
-          <ToolsTab projectId={projectId} pageId={page?.id} element={element} project={project} onJumpCad={onJumpCad} />
+          <ToolsTab
+            projectId={projectId}
+            pageId={page?.id}
+            element={element}
+            project={project}
+            activeTool={activeTool}
+            setActiveTool={setActiveTool}
+            selectedElementId={selectedElementId}
+            setSelectedElementId={setSelectedElementId}
+            onJumpCad={onJumpCad}
+          />
         )}
         {tab === "tasks" && <TasksTab project={project} />}
       </div>
     </aside>
   );
 }
+
 
 function TabButton({
   active,
@@ -986,62 +1166,311 @@ function ToolsTab({
   pageId,
   element,
   project,
+  activeTool,
+  setActiveTool,
+  selectedElementId,
+  setSelectedElementId,
   onJumpCad,
 }: {
   projectId: string;
   pageId?: string;
   element?: PageElement;
   project: import("@/lib/projectStore").Project;
+  activeTool: PageTool;
+  setActiveTool: (t: PageTool) => void;
+  selectedElementId?: string;
+  setSelectedElementId: (id?: string) => void;
   onJumpCad: (sheetId?: string) => void;
 }) {
-  if (!element) {
-    return (
+  return (
+    <div className="space-y-5">
+      {/* Tool picker */}
       <div>
         <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-3">
-          ZEICHNUNGSBLÄTTER
+          WERKZEUG
         </div>
-        <div className="space-y-2">
-          {project.sheets.length === 0 && (
-            <div className="text-sm text-muted-foreground">
-              Noch keine Zeichnungsblätter. Wechsle in den CAD-Bereich.
-            </div>
-          )}
-          {project.sheets.map((s) => (
-            <div
-              key={s.id}
-              onClick={() => {
-                if (pageId) {
-                  projectStore.addElement(projectId, pageId, {
-                    kind: "cad-view",
-                    x: 30,
-                    y: 30,
-                    w: 40,
-                    h: 30,
-                    sheetId: s.id,
-                  });
-                }
-              }}
-              onDoubleClick={() => onJumpCad(s.id)}
-              className="flex items-center gap-3 p-2 rounded-md border cursor-pointer hover:bg-muted"
-              style={{ borderColor: "hsl(var(--hairline))" }}
-              title="Klick: auf Seite platzieren · Doppelklick: CAD öffnen"
-            >
-              <div className="w-12 h-9 rounded bg-white border" style={{ borderColor: "hsl(var(--hairline))" }} />
-              <div className="flex-1">
-                <div className="text-sm">{s.name}</div>
-                <div className="text-[11px] text-muted-foreground">{s.scale}</div>
-              </div>
-            </div>
-          ))}
+        <div className="grid grid-cols-2 gap-2">
+          <ToolPickButton
+            label="Hilfslinie"
+            sub="Hellblau · gestrichelt"
+            icon={<Minus size={16} />}
+            active={activeTool === "guide"}
+            onClick={() => setActiveTool(activeTool === "guide" ? null : "guide")}
+          />
+          <ToolPickButton
+            label="Linie"
+            sub="Wie in CAD"
+            icon={<Minus size={16} />}
+            active={activeTool === "line"}
+            onClick={() => setActiveTool(activeTool === "line" ? null : "line")}
+          />
+          <ToolPickButton
+            label="Text"
+            sub="Wie in CAD"
+            icon={<Type size={16} />}
+            active={activeTool === "text"}
+            onClick={() => setActiveTool(activeTool === "text" ? null : "text")}
+          />
+          <ToolPickButton
+            label="CAD"
+            sub="Zeichenblatt"
+            icon={<CompassIcon size={16} />}
+            active={activeTool === "cad"}
+            onClick={() => setActiveTool(activeTool === "cad" ? null : "cad")}
+          />
         </div>
-        <div className="mt-5 text-xs text-muted-foreground">
-          Klicke ein Element auf der Seite an, um seine Werkzeug-Eigenschaften zu bearbeiten.
-        </div>
+        {activeTool && activeTool !== "cad" && (
+          <div className="mt-2 text-[11px] text-muted-foreground">
+            {activeTool === "text"
+              ? "Klick auf die Seite, um Text einzufügen. ESC = abbrechen."
+              : "Zwei Klicks auf der Seite setzen Start- und Endpunkt. ESC = abbrechen."}
+          </div>
+        )}
       </div>
-    );
-  }
 
-  if (!pageId) return null;
+      {/* CAD section */}
+      {activeTool === "cad" && (
+        <CadToolSection
+          project={project}
+          projectId={projectId}
+          pageId={pageId}
+          selectedElementId={selectedElementId}
+          setSelectedElementId={setSelectedElementId}
+          onJumpCad={onJumpCad}
+        />
+      )}
+
+      {/* Element inspector (only when an element is selected and no tool is active) */}
+      {!activeTool && element && pageId && (
+        <ElementInspector
+          element={element}
+          projectId={projectId}
+          pageId={pageId}
+          onJumpCad={onJumpCad}
+        />
+      )}
+      {!activeTool && !element && (
+        <div className="text-xs text-muted-foreground">
+          Wähle ein Werkzeug oben, oder klicke ein Element auf der Seite an, um es zu bearbeiten.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ToolPickButton({
+  label,
+  sub,
+  icon,
+  active,
+  onClick,
+}: {
+  label: string;
+  sub?: string;
+  icon: React.ReactNode;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="rounded-lg p-3 text-left transition border"
+      style={{
+        borderColor: active ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
+        background: active ? "hsl(var(--accent-gold-soft))" : "hsl(var(--surface))",
+        color: "hsl(var(--ink))",
+      }}
+    >
+      <div className="flex items-center gap-2">
+        <span style={{ color: active ? "hsl(var(--accent-gold))" : "hsl(var(--ink-soft))" }}>
+          {icon}
+        </span>
+        <span className="text-sm font-medium">{label}</span>
+      </div>
+      {sub && <div className="text-[10px] text-muted-foreground mt-0.5">{sub}</div>}
+    </button>
+  );
+}
+
+function CadToolSection({
+  project,
+  projectId,
+  pageId,
+  selectedElementId,
+  setSelectedElementId,
+  onJumpCad,
+}: {
+  project: import("@/lib/projectStore").Project;
+  projectId: string;
+  pageId?: string;
+  selectedElementId?: string;
+  setSelectedElementId: (id?: string) => void;
+  onJumpCad: (sheetId?: string) => void;
+}) {
+  const page = project.pages.find((p) => p.id === pageId);
+  const placed = (page?.elements ?? []).filter((e) => e.kind === "cad-view");
+  const [chosenSheet, setChosenSheet] = useState<string>("");
+
+  const placeSheet = () => {
+    if (!pageId || !chosenSheet) return;
+    const sheet = project.sheets.find((s) => s.id === chosenSheet);
+    if (!sheet) return;
+    const id = projectStore.addElement(projectId, pageId, {
+      kind: "cad-view",
+      x: 20,
+      y: 20,
+      w: 50,
+      h: 35,
+      sheetId: sheet.id,
+      scale: sheet.scale,
+      lastSyncAt: new Date().toISOString(),
+    });
+    setSelectedElementId(id);
+  };
+
+  return (
+    <div className="space-y-3">
+      <button
+        onClick={() => onJumpCad()}
+        className="w-full h-9 rounded-md text-sm font-medium flex items-center justify-center gap-2"
+        style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
+      >
+        <ExternalLink size={14} /> Zur CAD-Oberfläche
+      </button>
+
+      <div>
+        <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-2">
+          ZEICHENBLATT WÄHLEN
+        </div>
+        <div className="flex gap-2">
+          <select
+            value={chosenSheet}
+            onChange={(e) => setChosenSheet(e.target.value)}
+            className="flex-1 h-8 px-2 rounded bg-transparent border text-sm"
+            style={{ borderColor: "hsl(var(--hairline))" }}
+          >
+            <option value="">— Zeichenblatt —</option>
+            {project.sheets.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name} · {s.scale}
+              </option>
+            ))}
+          </select>
+          <button
+            disabled={!chosenSheet || !pageId}
+            onClick={placeSheet}
+            className="h-8 px-3 rounded text-sm font-medium disabled:opacity-40"
+            style={{ background: "hsl(var(--accent-gold))", color: "white" }}
+          >
+            Einfügen
+          </button>
+        </div>
+        {project.sheets.length === 0 && (
+          <div className="text-[11px] text-muted-foreground mt-2">
+            Noch keine Zeichenblätter vorhanden — wechsle in die CAD-Oberfläche.
+          </div>
+        )}
+      </div>
+
+      {placed.length > 0 && (
+        <div>
+          <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-2">
+            AUF DIESER SEITE
+          </div>
+          <div className="space-y-2">
+            {placed.map((el) => {
+              const sheet = project.sheets.find((s) => s.id === el.sheetId);
+              const isSelected = el.id === selectedElementId;
+              return (
+                <div
+                  key={el.id}
+                  onClick={() => setSelectedElementId(el.id)}
+                  className="rounded-lg p-2.5 border cursor-pointer transition"
+                  style={{
+                    borderColor: isSelected ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
+                    background: isSelected
+                      ? "hsl(var(--accent-gold-soft))"
+                      : "hsl(var(--surface))",
+                  }}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div
+                      className="w-10 h-7 rounded bg-white border shrink-0 flex items-center justify-center"
+                      style={{ borderColor: "hsl(var(--hairline))" }}
+                    >
+                      <CompassIcon size={12} className="text-muted-foreground" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm truncate">{sheet?.name ?? "Unbekanntes Blatt"}</div>
+                      <div className="text-[10px] text-muted-foreground">
+                        Auf Seite · Stand{" "}
+                        {el.lastSyncAt
+                          ? new Date(el.lastSyncAt).toLocaleDateString("de-DE")
+                          : "—"}
+                      </div>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (!pageId) return;
+                        projectStore.updateElement(projectId, pageId, el.id, {
+                          lastSyncAt: new Date().toISOString(),
+                        });
+                      }}
+                      title="Aktualisieren (aus CAD übernehmen)"
+                      className="h-7 w-7 rounded flex items-center justify-center hover:bg-muted"
+                    >
+                      <RefreshCw size={13} className="text-muted-foreground" />
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="text-[11px] text-muted-foreground">Maßstab</span>
+                    <input
+                      value={el.scale ?? sheet?.scale ?? "1:100"}
+                      onChange={(ev) => {
+                        if (!pageId) return;
+                        projectStore.updateElement(projectId, pageId, el.id, {
+                          scale: ev.target.value,
+                        });
+                      }}
+                      onClick={(ev) => ev.stopPropagation()}
+                      className="flex-1 h-7 px-2 rounded bg-transparent border text-sm"
+                      style={{ borderColor: "hsl(var(--hairline))" }}
+                    />
+                    <button
+                      onClick={(ev) => {
+                        ev.stopPropagation();
+                        if (!pageId) return;
+                        if (!confirm("CAD-Ansicht entfernen?")) return;
+                        projectStore.deleteElement(projectId, pageId, el.id);
+                      }}
+                      title="Entfernen"
+                      className="h-7 w-7 rounded flex items-center justify-center hover:bg-muted"
+                    >
+                      <Trash2 size={13} className="text-muted-foreground" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ElementInspector({
+  element,
+  projectId,
+  pageId,
+  onJumpCad,
+}: {
+  element: PageElement;
+  projectId: string;
+  pageId: string;
+  onJumpCad: (sheetId?: string) => void;
+}) {
   const update = (patch: Partial<PageElement>) =>
     projectStore.updateElement(projectId, pageId, element.id, patch);
 
@@ -1118,6 +1547,36 @@ function ToolsTab({
           </Row>
         </>
       )}
+
+      {(element.kind === "line" || element.kind === "guide") && (
+        <>
+          <Row label="Farbe">
+            <input
+              type="color"
+              value={element.color ?? (element.kind === "guide" ? "#7DD3FC" : "#1a1a1a")}
+              onChange={(e) => update({ color: e.target.value })}
+              className="h-8 w-full rounded border bg-transparent"
+              style={{ borderColor: "hsl(var(--hairline))" }}
+            />
+          </Row>
+          <Row label="Stärke">
+            <input
+              type="number"
+              step={0.1}
+              value={element.strokeWidth ?? (element.kind === "guide" ? 1 : 1.5)}
+              onChange={(e) => update({ strokeWidth: Number(e.target.value) })}
+              className="w-full h-8 px-2 rounded bg-transparent border text-sm"
+              style={{ borderColor: "hsl(var(--hairline))" }}
+            />
+          </Row>
+          {element.kind === "guide" && (
+            <div className="text-[11px] text-muted-foreground">
+              Hilfslinien werden beim späteren Druck/Export nicht angezeigt.
+            </div>
+          )}
+        </>
+      )}
+
       {element.kind === "image" && (
         <Row label="Bild-URL">
           <input
@@ -1128,6 +1587,7 @@ function ToolsTab({
           />
         </Row>
       )}
+
       <Row label="Transparenz">
         <input
           type="range"
@@ -1138,31 +1598,25 @@ function ToolsTab({
           className="w-full"
         />
       </Row>
-      <Row label="Schatten">
-        <input
-          type="checkbox"
-          checked={!!element.shadow}
-          onChange={(e) => update({ shadow: e.target.checked })}
-        />
-      </Row>
-      <Row label="Rahmen">
-        <input
-          type="checkbox"
-          checked={!!element.border}
-          onChange={(e) => update({ border: e.target.checked })}
-        />
-      </Row>
 
       {element.kind === "cad-view" && (
-        <div className="pt-2">
+        <>
+          <Row label="Maßstab">
+            <input
+              value={element.scale ?? "1:100"}
+              onChange={(e) => update({ scale: e.target.value })}
+              className="w-full h-8 px-2 rounded bg-transparent border text-sm"
+              style={{ borderColor: "hsl(var(--hairline))" }}
+            />
+          </Row>
           <button
             onClick={() => onJumpCad(element.sheetId)}
             className="w-full h-9 rounded-md text-sm font-medium flex items-center justify-center gap-2"
             style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
           >
-            <Move size={14} /> Im CAD öffnen
+            <ExternalLink size={14} /> Im CAD öffnen
           </button>
-        </div>
+        </>
       )}
 
       <button
@@ -1175,6 +1629,7 @@ function ToolsTab({
     </div>
   );
 }
+
 
 function TasksTab({ project }: { project: import("@/lib/projectStore").Project }) {
   const [draft, setDraft] = useState("");
