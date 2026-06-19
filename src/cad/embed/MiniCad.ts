@@ -227,20 +227,25 @@ export class MiniCad {
   serialize(): any {
     return {
       version: 1,
-      segments: this.scene.segments.map((s) => ({
-        id: s.id,
-        a: { x: s.a.x, y: s.a.y },
-        b: { x: s.b.x, y: s.b.y },
-        color: s.color,
-        thicknessM: s.thicknessM,
-        labelId: s.labelId,
-      })),
+      // Filter out invisible page-frame segments — they are regenerated on mount.
+      segments: this.scene.segments
+        .filter((s) => s.labelId !== this._frameLabelId)
+        .map((s) => ({
+          id: s.id,
+          a: { x: s.a.x, y: s.a.y },
+          b: { x: s.b.x, y: s.b.y },
+          color: s.color,
+          thicknessM: s.thicknessM,
+          labelId: s.labelId,
+        })),
     };
   }
 
   private _restore(data: any) {
     if (!data || !Array.isArray(data.segments)) return;
     for (const s of data.segments) {
+      // Defensive: never restore frame segments — they live only in memory.
+      if (s.labelId === this._frameLabelId) continue;
       try {
         this.scene.createSegment(
           { x: s.a.x, y: s.a.y },
@@ -268,8 +273,11 @@ export class MiniCad {
   /* ===== Required CadApp surface for LineTool / Renderer ===== */
 
   getCurrentLineStyle() {
+    // Encode the line alpha into the color (rgba), so we don't need to patch
+    // the renderer — strokeStyle honors the alpha channel directly.
+    const color = applyAlphaToColor(this.defaultLineColor, this.defaultLineAlpha);
     return {
-      color: this.defaultLineColor,
+      color,
       thicknessM: this.defaultLineThicknessM,
       labelId: this.activeDrawLabelId || Defaults.defaultLabelId,
     };
