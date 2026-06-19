@@ -44,6 +44,8 @@ import {
   type PageElement,
   type ElementKind,
   type PageFormat,
+  type PunchPattern,
+  type PunchSide,
 } from "@/lib/projectStore";
 
 const FORMAT_SIZES: Record<PageFormat, { w: number; h: number; label: string }> = {
