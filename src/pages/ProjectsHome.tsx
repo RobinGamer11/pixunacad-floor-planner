@@ -232,7 +232,7 @@ export default function ProjectsHome() {
                   style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
                   onClick={() => navigate(`/project/${selected.id}`)}
                 >
-                  <Pencil size={14} /> Öffnen
+                  <Pencil size={14} /> Bearbeiten
                 </button>
               </div>
             </div>
