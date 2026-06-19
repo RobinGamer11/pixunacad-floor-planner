@@ -142,11 +142,11 @@ function demoProjects(): Project[] {
   });
 
   return [
-    mk("p-wohnhaus", "Wohnhaus am See", "Starnberger See", { favorite: true }),
-    mk("p-umbau", "Umbau Stadthaus", "München"),
-    mk("p-buero", "Bürogebäude Nord", "Hamburg"),
-    mk("p-ferien", "Ferienhaus Alpenblick", "Garmisch-Partenkirchen", { favorite: true }),
-    mk("p-praxis", "Innenausbau Praxis", "Frankfurt"),
+    mk("p-wohnhaus", "Wohnhaus am See", "Starnberger See", {
+      favorite: true,
+      konzept:
+        "Die Variante A öffnet den Wohn-, Ess- und Kochbereich zum See hin und schafft eine fließende Verbindung zwischen Innen- und Außenraum.",
+    }),
   ];
 }
 
