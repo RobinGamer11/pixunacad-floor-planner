@@ -474,9 +474,13 @@ export default function ProjectWorkspace() {
                 }
               }}
               onMouseDown={(e) => {
-                // Middle-mouse-button drag = pan view (like CAD/PowerPoint)
-                const wantPan = e.button === 1 || (e.button === 0 && (e as any).altKey);
-                if (!wantPan) return;
+                // Pan via:
+                //  • Middle-mouse / Alt+Left (always works, even with a tool active)
+                //  • Plain Left click on empty surface when no tool is active
+                //    (clicks on page elements call stopPropagation, so they don't reach here)
+                const isMiddle = e.button === 1 || (e.button === 0 && (e as any).altKey);
+                const isPlainLeftIdle = e.button === 0 && !(e as any).altKey && activeTool === null;
+                if (!isMiddle && !isPlainLeftIdle) return;
                 e.preventDefault();
                 const container = e.currentTarget as HTMLDivElement;
                 const startX = e.clientX;
