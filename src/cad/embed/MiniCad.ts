@@ -329,8 +329,9 @@ export class MiniCad {
   }
 
   serialize(): any {
+    const f = this._strokeFactor || 1;
     return {
-      version: 2,
+      version: 3,
       segments: this.scene.segments
         .filter((s) => s.labelId !== this._frameLabelId)
         .map((s) => ({
@@ -338,7 +339,8 @@ export class MiniCad {
           a: { x: s.a.x, y: s.a.y },
           b: { x: s.b.x, y: s.b.y },
           color: s.color,
-          thicknessM: s.thicknessM,
+          // Speichern in "echten Metern" (intern wird mit _strokeFactor multipliziert).
+          thicknessM: s.thicknessM / f,
           labelId: s.labelId,
         })),
       textBoxes: this.scene.textBoxes.map((t) => ({
@@ -356,6 +358,10 @@ export class MiniCad {
 
   private _restore(data: any) {
     if (!data) return;
+    const f = this._strokeFactor || 1;
+    // Vor v3 wurden Strichbreiten bereits intern (in der alten,
+    // überdimensionierten Skala) gespeichert → nicht erneut skalieren.
+    const segScale = (data.version ?? 1) >= 3 ? f : 1;
     if (Array.isArray(data.segments)) {
       for (const s of data.segments) {
         if (s.labelId === this._frameLabelId) continue;
@@ -365,7 +371,7 @@ export class MiniCad {
             { x: s.b.x, y: s.b.y },
             {
               color: s.color || this.defaultLineColor,
-              thicknessM: s.thicknessM || this.defaultLineThicknessM,
+              thicknessM: (s.thicknessM || (this.defaultLineThicknessM / f)) * segScale,
               labelId: s.labelId || Defaults.defaultLabelId,
             },
           );
@@ -386,6 +392,7 @@ export class MiniCad {
       }
     }
   }
+
 
   destroy() {
     this._destroyed = true;
