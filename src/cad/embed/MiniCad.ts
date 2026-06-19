@@ -484,6 +484,30 @@ export class MiniCad {
     this._changeDirty = true;
   }
 
+  /* ===== CadApp surface stubs (required by SelectTool) ===== */
+
+  getSelectedSegment() {
+    if (!this.selection || !this.selection.segmentId) return null;
+    return this.scene.getSegmentById(this.selection.segmentId);
+  }
+
+  getSelectedHatch() {
+    if (!this.selection || !this.selection.hatchId) return null;
+    return this.scene.getHatchById(this.selection.hatchId);
+  }
+
+  getSelectedDimension() { return null; }
+
+  // Sticker-Edit ist im Embed nicht verfügbar — feste No-Op-Werte.
+  isStickerEditing(): boolean { return false; }
+  enterStickerEdit(_inst: any) {}
+  exitStickerEdit() {}
+  isPointOutsideStickerEdit(_mouseW: any): boolean { return true; }
+
+  // Settings-Panels existieren im Embed nicht.
+  showLineSettingsPanel(_show: boolean) {}
+  showHatchSettingsPanel(_show: boolean) {}
+
   /* ===== Internals ===== */
 
   private _patchRendererTransparent() {
