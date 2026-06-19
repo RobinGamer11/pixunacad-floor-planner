@@ -1610,9 +1610,94 @@ function TextSettings({
           </button>
         </div>
       </Row>
+      <Row label="Ausrichtung">
+        <div className="flex gap-1">
+          {(["left", "center", "right"] as const).map((a) => (
+            <button
+              key={a}
+              onClick={() => onChange({ align: a })}
+              className="h-8 flex-1 rounded border text-xs"
+              style={{
+                borderColor: "hsl(var(--hairline))",
+                background: settings.align === a ? "hsl(var(--accent-gold-soft))" : "transparent",
+              }}
+              title={a === "left" ? "Links" : a === "center" ? "Zentriert" : "Rechts"}
+            >
+              {a === "left" ? "⯇" : a === "center" ? "≡" : "⯈"}
+            </button>
+          ))}
+        </div>
+      </Row>
+      <Row label="Transparenz">
+        <div className="flex items-center gap-2">
+          <input
+            type="range" min={0} max={100} step={1}
+            value={settings.alpha}
+            onChange={(e) => onChange({ alpha: Number(e.target.value) })}
+            className="flex-1 accent-foreground"
+          />
+          <span className="text-xs tabular-nums w-10 text-right">{settings.alpha}%</span>
+        </div>
+      </Row>
+      <Row label="Umbruch">
+        <label className="flex items-center gap-2 text-xs">
+          <input
+            type="checkbox"
+            checked={settings.wrap}
+            onChange={(e) => onChange({ wrap: e.target.checked })}
+          />
+          Auto-Umbruch (Breite fix, Höhe wächst)
+        </label>
+      </Row>
+      <Row label="Hintergrund">
+        <ColorInput value={settings.bgColor} onChange={(v) => onChange({ bgColor: v })} />
+      </Row>
+      <Row label="Hintergrund-Alpha">
+        <div className="flex items-center gap-2">
+          <input
+            type="range" min={0} max={100} step={1}
+            value={settings.bgAlphaPct}
+            onChange={(e) => onChange({ bgAlphaPct: Number(e.target.value) })}
+            className="flex-1 accent-foreground"
+          />
+          <span className="text-xs tabular-nums w-10 text-right">{settings.bgAlphaPct}%</span>
+        </div>
+      </Row>
+      <Row label="Rahmen">
+        <label className="flex items-center gap-2 text-xs">
+          <input
+            type="checkbox"
+            checked={settings.borderEnabled}
+            onChange={(e) => onChange({ borderEnabled: e.target.checked })}
+          />
+          Rahmen anzeigen
+        </label>
+      </Row>
+      {settings.borderEnabled && (
+        <>
+          <Row label="Rahmenfarbe">
+            <ColorInput value={settings.borderColor} onChange={(v) => onChange({ borderColor: v })} />
+          </Row>
+          <Row label="Rahmenstärke">
+            <div className="flex items-center gap-2">
+              <input
+                type="range" min={0.5} max={8} step={0.5}
+                value={settings.borderWidthPx}
+                onChange={(e) => onChange({ borderWidthPx: Number(e.target.value) })}
+                className="flex-1 accent-foreground"
+              />
+              <span className="text-xs tabular-nums w-10 text-right">{settings.borderWidthPx} px</span>
+            </div>
+          </Row>
+        </>
+      )}
+      <div className="text-[11px] text-muted-foreground">
+        Text wird mit CAD-Engine erstellt: Snap an Linien, Texte und Seitenränder. Doppelklick zum Editieren.
+      </div>
     </SettingsBlock>
   );
 }
+
 
 function SettingsBlock({ title, children }: { title: string; children: React.ReactNode }) {
   return (
