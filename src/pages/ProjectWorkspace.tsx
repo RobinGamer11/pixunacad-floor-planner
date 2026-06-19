@@ -541,6 +541,12 @@ const PUNCH_PATTERNS: Record<Exclude<PunchPattern, "none">, { label: string; off
   "6-fach-a5": { label: "6-fach A5 Ringbuch", offsets: [-79, -47.5, -15.8, 15.8, 47.5, 79], diameter: 5.5 },
 };
 
+type ToolSettings = {
+  guide: { color: string; strokeWidth: number };
+  line: { color: string; thicknessMm: number };
+  text: { fontSize: number; color: string; bold: boolean; italic: boolean };
+};
+
 function PageCanvas({
   projectId,
   page,
@@ -549,6 +555,7 @@ function PageCanvas({
   selectedElementId,
   zoom,
   activeTool,
+  toolSettings,
   onCommitTool,
   onSelect,
 }: {
@@ -559,6 +566,7 @@ function PageCanvas({
   selectedElementId?: string;
   zoom: number;
   activeTool: PageTool;
+  toolSettings: ToolSettings;
   onCommitTool: () => void;
   onSelect: (id?: string) => void;
 }) {
