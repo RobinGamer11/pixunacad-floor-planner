@@ -636,6 +636,7 @@ function PageCanvas({
   return (
     <div className="min-h-full flex items-start justify-center p-10">
       <div
+        className="relative"
         style={{
           width: width * scale,
           height: height * scale,
