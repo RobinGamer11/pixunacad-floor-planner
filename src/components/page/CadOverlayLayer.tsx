@@ -25,6 +25,8 @@ interface Props {
   onChange: (state: any) => void;
   lineColor?: string;
   lineThicknessMm?: number;
+  /** Linien-Transparenz, 0..1 (1 = vollständig deckend). */
+  lineAlpha?: number;
 }
 
 export default function CadOverlayLayer({
