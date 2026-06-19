@@ -117,11 +117,33 @@ export default function ProjectWorkspace() {
         style={{ borderColor: "hsl(var(--hairline))" }}
       >
         <ToolRailButton icon={<LayoutTemplate size={18} />} label="Seiten" active />
-        <ToolRailButton icon={<Type size={18} />} label="Text" />
-        <ToolRailButton icon={<Minus size={18} />} label="Linie" />
         <ToolRailButton
-          icon={<Compass size={18} />}
-          label="CAD-Zeichnen"
+          icon={<Minus size={18} style={{ strokeDasharray: "3 2" }} />}
+          label="Hilfslinie"
+          active={activeTool === "guide"}
+          onClick={() => setActiveToolAndTab(activeTool === "guide" ? null : "guide")}
+        />
+        <ToolRailButton
+          icon={<Type size={18} />}
+          label="Text"
+          active={activeTool === "text"}
+          onClick={() => setActiveToolAndTab(activeTool === "text" ? null : "text")}
+        />
+        <ToolRailButton
+          icon={<Minus size={18} />}
+          label="Linie"
+          active={activeTool === "line"}
+          onClick={() => setActiveToolAndTab(activeTool === "line" ? null : "line")}
+        />
+        <ToolRailButton
+          icon={<CompassIcon size={18} />}
+          label="CAD-Blatt"
+          active={activeTool === "cad"}
+          onClick={() => setActiveToolAndTab(activeTool === "cad" ? null : "cad")}
+        />
+        <ToolRailButton
+          icon={<ExternalLink size={18} />}
+          label="CAD öffnen"
           onClick={() => navigate(`/project/${project.id}/cad`)}
           accent
         />
@@ -385,6 +407,30 @@ export default function ProjectWorkspace() {
                   const delta = -e.deltaY;
                   setZoomClamped(zoom + (delta > 0 ? 5 : -5));
                 }
+              }}
+              onMouseDown={(e) => {
+                // Middle-mouse-button drag = pan view (like CAD/PowerPoint)
+                const wantPan = e.button === 1 || (e.button === 0 && (e as any).altKey);
+                if (!wantPan) return;
+                e.preventDefault();
+                const container = e.currentTarget as HTMLDivElement;
+                const startX = e.clientX;
+                const startY = e.clientY;
+                const startScrollL = container.scrollLeft;
+                const startScrollT = container.scrollTop;
+                const prevCursor = container.style.cursor;
+                container.style.cursor = "grabbing";
+                const onMove = (ev: MouseEvent) => {
+                  container.scrollLeft = startScrollL - (ev.clientX - startX);
+                  container.scrollTop = startScrollT - (ev.clientY - startY);
+                };
+                const onUp = () => {
+                  container.style.cursor = prevCursor;
+                  window.removeEventListener("mousemove", onMove);
+                  window.removeEventListener("mouseup", onUp);
+                };
+                window.addEventListener("mousemove", onMove);
+                window.addEventListener("mouseup", onUp);
               }}
             >
               {activePage && (
@@ -992,7 +1038,7 @@ function RightInspector({
       </button>
       <div className="grid grid-cols-3 border-b" style={{ borderColor: "hsl(var(--hairline))" }}>
         <TabButton active={tab === "settings"} onClick={() => setTab("settings")} icon={<Settings size={14} />} label="Seiteneinstellung" />
-        <TabButton active={tab === "tools"} onClick={() => setTab("tools")} icon={<Wrench size={14} />} label="Werkzeug" />
+        <TabButton active={tab === "tools"} onClick={() => setTab("tools")} icon={<Wrench size={14} />} label="Werkzeugeinstellung" />
         <TabButton
           active={tab === "tasks"}
           onClick={() => setTab("tasks")}
@@ -1220,46 +1266,38 @@ function ToolsTab({
 }) {
   return (
     <div className="space-y-5">
-      {/* Tool picker */}
+      {/* Active tool header */}
       <div>
         <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-3">
-          WERKZEUG
+          AKTIVES WERKZEUG
         </div>
-        <div className="grid grid-cols-2 gap-2">
-          <ToolPickButton
-            label="Hilfslinie"
-            sub="Hellblau · gestrichelt"
-            icon={<Minus size={16} />}
-            active={activeTool === "guide"}
-            onClick={() => setActiveTool(activeTool === "guide" ? null : "guide")}
-          />
-          <ToolPickButton
-            label="Linie"
-            sub="Wie in CAD"
-            icon={<Minus size={16} />}
-            active={activeTool === "line"}
-            onClick={() => setActiveTool(activeTool === "line" ? null : "line")}
-          />
-          <ToolPickButton
-            label="Text"
-            sub="Wie in CAD"
-            icon={<Type size={16} />}
-            active={activeTool === "text"}
-            onClick={() => setActiveTool(activeTool === "text" ? null : "text")}
-          />
-          <ToolPickButton
-            label="CAD"
-            sub="Zeichenblatt"
-            icon={<CompassIcon size={16} />}
-            active={activeTool === "cad"}
-            onClick={() => setActiveTool(activeTool === "cad" ? null : "cad")}
-          />
-        </div>
+        {!activeTool ? (
+          <div className="text-xs text-muted-foreground">
+            Wähle links in der Werkzeugleiste ein Werkzeug (Hilfslinie, Linie, Text, CAD-Blatt) — die zugehörigen Einstellungen erscheinen hier.
+          </div>
+        ) : (
+          <div className="flex items-center justify-between rounded-md border px-3 py-2" style={{ borderColor: "hsl(var(--hairline))" }}>
+            <div className="text-sm font-medium">
+              {activeTool === "guide" && "Hilfslinie"}
+              {activeTool === "line" && "Linie (CAD)"}
+              {activeTool === "text" && "Text (CAD)"}
+              {activeTool === "cad" && "CAD-Zeichenblatt"}
+            </div>
+            <button
+              onClick={() => setActiveTool(null)}
+              className="text-[11px] text-muted-foreground hover:text-foreground"
+            >
+              Beenden
+            </button>
+          </div>
+        )}
         {activeTool && activeTool !== "cad" && (
           <div className="mt-2 text-[11px] text-muted-foreground">
             {activeTool === "text"
               ? "Klick auf die Seite, um Text einzufügen. ESC = abbrechen."
-              : "Zwei Klicks auf der Seite setzen Start- und Endpunkt. ESC = abbrechen."}
+              : activeTool === "line"
+              ? "Klicken setzt Punkte (Snap/Ortho/Hub wie in CAD). ESC = abbrechen."
+              : "Zwei Klicks setzen Start- und Endpunkt. ESC = abbrechen."}
           </div>
         )}
       </div>
@@ -1284,11 +1322,6 @@ function ToolsTab({
           pageId={pageId}
           onJumpCad={onJumpCad}
         />
-      )}
-      {!activeTool && !element && (
-        <div className="text-xs text-muted-foreground">
-          Wähle ein Werkzeug oben, oder klicke ein Element auf der Seite an, um es zu bearbeiten.
-        </div>
       )}
     </div>
   );
