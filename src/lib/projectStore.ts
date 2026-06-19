@@ -287,7 +287,7 @@ export const projectStore = {
       }),
     }));
   },
-  addCustomField: (projectId: string) => {
+  addCustomField: (projectId: string, label = "Neues Feld") => {
     const id = `cf-${Date.now().toString(36)}`;
     setState((s) => ({
       projects: s.projects.map((p) =>
@@ -295,7 +295,7 @@ export const projectStore = {
           ? {
               ...p,
               updatedAt: new Date().toISOString(),
-              customFields: [...(p.customFields ?? []), { id, label: "Neues Feld", value: "" }],
+              customFields: [...(p.customFields ?? []), { id, label, value: "" }],
             }
           : p
       ),
