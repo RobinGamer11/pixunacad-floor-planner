@@ -1,77 +1,50 @@
-## Ziel
+# Linie 1:1 im Seiten-Canvas
 
-Im Seiteneditor (`ProjectWorkspace`) erhält der Tab **„Werkzeug"** (rechts neben „Seiteneinstellung") vier Werkzeuge: **Hilfslinie, Linie, Text, CAD**. Linie/Text/Schraffur sollen funktional 1:1 zur CAD-Oberfläche sein. CAD bettet ein vorhandenes Zeichenblatt als platzierbares Element ein.
+Ziel: Das Werkzeug „Linie" im Seiteneditor verhält sich exakt wie in der CAD-Oberfläche — gleiches Snapping, Ortho, Hub (Längen-/Winkel-Eingabe), Punkt-Edit. Spätere Iterationen erweitern um „Text" und „Schraffur" nach demselben Muster.
 
-## Realitäts-Check (wichtig)
+## Vorgehen
 
-Die CAD-Engine (`src/cad/CadApp.ts`, 2766 Zeilen) ist eng an die Vollbild-CAD-Oberfläche gekoppelt: sie erwartet eigene DOM-Panels (Linien-, Hatch-, Text-Settings, IdPanel, SheetPanel, PlanPanel, TextEditorOverlay), eigene Toolbar, ein eigenes Canvas, eigene Tastaturhooks (Strg+Z, P, H, T, L …) und globale Maus-/Touch-Listener.
+### 1. CAD-Engine entkoppeln
+- Neuer Einstiegspunkt `src/cad/embed/MiniCad.ts`: instanziiert die nötigen Bausteine ohne CAD-Toolbar/Side-Panels.
+- Wiederverwendet 1:1: `Scene`, `Renderer`, `Camera`, `Input`, `TopologyEngine`, `LineHub`, `PointEditMenu`, `LineTool`, `snapDraw`, `geometry`, `LabelManager`.
+- Mock-Implementierungen für `CadApp`-Felder, die `LineTool` anfasst, aber im Seitenkontext nicht gebraucht werden (z. B. `pipette`, `eraser`, Sheet/Plan-Manager) — als No-Op-Stubs, damit `LineTool` unverändert bleibt.
+- Wichtig: `LineTool.ts` wird **nicht** verändert — die Engine-Hülle stellt dieselbe Schnittstelle bereit wie `CadApp`.
 
-**„1:1 wie in CAD"** heißt deshalb realistisch: die CAD-Engine wird in einem **Container über dem Seiten-Canvas** instanziiert — nicht in einer separat reimplementierten Version. Die Zeichnung wird als CAD-Szene gespeichert (eigener Layer pro Seite) und bei der Druckansicht in Seitenkoordinaten gerendert.
+### 2. Einbettung im Seiten-Canvas
+- In `PageCanvas` (innerhalb `src/pages/ProjectWorkspace.tsx`) zwei neue Layer **über** dem bestehenden Seiteninhalt:
+  - `<canvas>` für die CAD-Engine (deckt das Blatt exakt ab, gleiche Pixelmaße wie die Seite ohne View-Scale)
+  - DOM-Container für `LineHub` und `PointEditMenu` (die Engine erzeugt deren UI selbst)
+- Kamera-Setup: 1 mm Welt = 1 mm Seite (Welt-Ursprung links oben). Kein Pan/Zoom in der Engine — der Page-Zoom skaliert den Canvas via CSS-Transform mit (gleiches `scale` wie die Seite).
+- Mouse/Keyboard-Events laufen über den vorhandenen `Input`-Adapter; nur aktiv, wenn `activeTool === "line"`.
 
-## Schritte
+### 3. Persistenz
+- Engine-Szene wird pro Seite gehalten: neues Feld `ProjectPage.cadOverlay` (serialisierte Scene als JSON) in `projectStore.ts`.
+- Speichern bei jeder Commit-Aktion (Linie fertiggestellt, Punkt verschoben, gelöscht); Laden beim Seitenwechsel.
+- Existierende `kind: "line"`-PageElements bleiben für nicht-CAD-Linien (z. B. künftige einfache Hilfslinien) bestehen — werden separat unter der CAD-Schicht gerendert.
 
-### 1. Werkzeug-Tab umbauen (`src/pages/ProjectWorkspace.tsx`)
-Vier Sektionen statt der heutigen Element-Auswahl:
+### 4. Cleanup bestehender Provisorien
+- Der jetzige „Klick-Klick"-Provisorischer-Linien-Modus für `activeTool === "line"` wird durch die Engine ersetzt.
+- Hilfslinie (`guide`) bleibt vorerst beim bisherigen, einfachen SVG-Mechanismus (hellblau gestrichelt) — Hilfslinien sind nicht-druckend und brauchen kein CAD-Snap.
 
-```text
-WERKZEUG
-┌──────────────────────────────────┐
-│ [ Hilfslinie ] [ Linie ]        │
-│ [ Text      ] [ CAD   ]         │
-└──────────────────────────────────┘
-+ aktive Tool-Sektion darunter
-```
+### 5. Nicht in diesem Schritt
+- Text-Werkzeug und Schraffur-Werkzeug folgen in eigenen Iterationen nach demselben Muster (jeweils mit Tool-Settings-Panel im Inspector).
+- CAD-Zeichenblatt-Platzierung (`cad-view`) bleibt unverändert.
 
-Auswahl setzt `activeTool: 'guide' | 'line' | 'text' | 'cad' | null` im Workspace-State; der Seiten-Canvas reagiert darauf.
+## Technische Details
 
-### 2. Hilfslinie (`guide`)
-- Neuer Element-Typ `guide` in `projectStore.ts` (Polyline in mm, Stil hellblau gestrichelt).
-- Im Seiten-Canvas: gleiche Zeichenmechanik wie „Linie" (Click-Click), aber gerendert als `<svg>`-Polyline `stroke="#7DD3FC" stroke-dasharray="6 4"`.
-- Wird in einer späteren `print`/`export`-Ansicht ausgeblendet (Flag `nonPrinting: true`).
+**Neue Dateien**
+- `src/cad/embed/MiniCad.ts` — Engine-Hülle, exportiert `createMiniCad({ canvas, mmWidth, mmHeight, hubContainer, onChange })`
+- `src/cad/embed/CadAppLike.ts` — Typdefinition / Stub-Felder, die `LineTool` erwartet
+- `src/components/page/CadOverlayLayer.tsx` — React-Wrapper, der `MiniCad` lifecycle-managed
 
-### 3. Linie / Text / Schraffur — CAD-Engine einbetten
-- Neues Feld `ProjectPage.cadOverlay?: CadSceneJson` (serialisierte Scene; nutzt vorhandenes Scene-Snapshot-Format).
-- Neue Komponente `PageCadOverlay` mountet ein eigenes `<canvas>` über dem Seiten-Canvas (gleiche Pixel-Größe, gleiche `mmToPx`-Skala) und instanziiert `new CadApp(canvas, …)`.
-- `CadApp`-Kamera wird so initialisiert, dass mm-Welt 1:1 zum Seiten-mm passt; Panning/Zoom des CAD wird deaktiviert (Zoom kommt vom Seiten-Zoom).
-- Tool-Auswahl im Werkzeug-Tab triggert `cadApp.activateTool(ToolIds.LINE | TEXT | HATCH)`.
-- Die nötigen DOM-Panels (Line/Text/Hatch-Settings) werden in den Werkzeug-Tab rechts gerendert (versteckte Container, die `CadApp` als Refs bekommt) — so funktionieren ID-Wahl, Farben, Größen 1:1.
-- Auf `cadApp`-Änderungen wird Scene serialisiert und in `projectStore.updatePage(..., { cadOverlay })` gespeichert.
+**Geänderte Dateien**
+- `src/pages/ProjectWorkspace.tsx` — Overlay einbinden, Provisorium für `line`-Tool entfernen
+- `src/lib/projectStore.ts` — `cadOverlay?: SerializedScene` an `ProjectPage`
 
-**Hinweis:** Wenn der Aufwand zu groß wird, sage Bescheid — dann liefere ich erst Hilfslinie + CAD-Blatt (Schritt 5) aus und Linie/Text/Schraffur in einer zweiten Iteration.
+**Risiken**
+- `LineTool` greift auf viele `CadApp`-Felder zu (`hub`, `renderer`, `topology`, `labels`, `id`, `scene`, `input`, `pointEditMenu`, `pipette`, …). Jeder Zugriff muss in `MiniCad` mindestens als No-Op existieren, sonst Runtime-Fehler. Erste Implementierungsrunde wird Lücken aufdecken — kurze Korrektur-Iterationen einplanen.
+- Koordinaten-Mapping: CSS-Scale auf dem Engine-Canvas darf Maus-Koordinaten nicht verfälschen — `Input` muss `getBoundingClientRect()` nutzen (tut es bereits), das die Skalierung berücksichtigt.
 
-### 4. Werkzeug-Sektionen rechts
-- Bei aktivem Tool wird unter den vier Buttons die zugehörige CAD-Settings-Panel-DOM eingeblendet (versteckte Refs aus Schritt 3) — Layout an PixunaCAD-Helligkeit angepasst.
-
-### 5. CAD-Werkzeug (Zeichenblatt platzieren)
-- Section „CAD" im Werkzeug-Tab:
-  - Oben Button **„Zur CAD-Oberfläche →"** → `navigate('/project/<id>/cad')`.
-  - Dropdown **„Zeichenblatt"** aus `project.sheets`.
-  - Maßstab-Anzeige (read-only aus Sheet) + Button **„Auf Seite einfügen"** → erstellt `PageElement { kind: 'cad-view', sheetId, scale, snapshot }` in `activePage`.
-- Unter dem Dropdown: Liste der **bereits eingefügten** CAD-Blätter dieser Seite. Jede Zeile:
-  - Vorschau-Thumbnail des Sheets (klein), Sheet-Name, aktueller Maßstab.
-  - Inputs: Maßstab (`1:50`, `1:100`, …) bearbeitbar pro Instanz.
-  - Symbol **Aktualisieren** (Refresh-Icon) → kopiert aktuellen Sheet-Stand neu, Maßstab bleibt.
-  - Klick auf Zeile → selektiert das CAD-Element auf der Seite (kein Sprung zur CAD-Oberfläche; gemäß Antwort).
-- Auf der Seite wird das CAD-View 1:1 im gewählten Maßstab gerendert (mm-Welt aus Sheet × 1/Scale × `mmToPx`).
-
-### 6. Speicher-Schema (`src/lib/projectStore.ts`)
-```ts
-ElementKind += 'guide'
-interface PageElement {
-  // bestehend …
-  scale?: string;      // CAD-View
-  cadSnapshot?: any;   // CAD-View: serialisierte Scene-Kopie
-  points?: {x:number;y:number}[]; // guide
-  nonPrinting?: boolean;
-}
-ProjectPage.cadOverlay?: any;   // optionale eingebettete CAD-Scene (Schritt 3)
-```
-Plus Store-Helfer: `updateCadElement(projectId, pageId, elementId, patch)`, `refreshCadElement(projectId, pageId, elementId)`.
-
-## Was bleibt unangetastet
-- Linkes Tool-Rail (Großbuttons) und CAD-Oberfläche selbst.
-- Bestehende Seiten-, Zoom-, Lochungs-, Margin-Logik.
-- Alle nicht genannten Bereiche von `ProjectsHome.tsx`.
-
-## Offene Frage / Risiko
-Punkt 3 (CAD-Engine in den Seiten-Canvas einbetten) ist der mit Abstand größte Brocken — die Panels müssen mit gerendert werden, sonst funktionieren ID-Auswahl/Farbe/Schraffur-Settings nicht. Ich starte mit Schritten 1, 2, 5, 6 (sofort sichtbarer Mehrwert) und ziehe Schritt 3 in einer Folgeiteration nach, sofern du nicht aktiv „alles in einem Rutsch" wünschst.
+## Validierung
+- Im Seiteneditor „Linie" aktivieren → erste Linie ziehen → Snap-Punkte erscheinen identisch zur CAD-Oberfläche → Hub erscheint mit Länge/Winkel → Eingabe & Enter committen → Linie bleibt sichtbar nach Tool-Wechsel → Seitenwechsel & Rücksprung lädt sie wieder.
+- Ortho (Shift) und Punkt-Edit (Klick auf Endpunkt) wie in CAD.
