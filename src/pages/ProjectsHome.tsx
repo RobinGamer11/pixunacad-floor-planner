@@ -30,7 +30,12 @@ type Tab = "uebersicht" | "seiten" | "aufgaben" | "infos" | "team";
 export default function ProjectsHome() {
   const projects = useProjects();
   const navigate = useNavigate();
-  const [selectedId, setSelectedId] = useState<string | undefined>(projects[0]?.id);
+  const [mode, setMode] = useState<"projects" | "templates">("projects");
+  const visibleProjects = useMemo(
+    () => projects.filter((p) => (mode === "templates" ? p.isTemplate : !p.isTemplate)),
+    [projects, mode]
+  );
+  const [selectedId, setSelectedId] = useState<string | undefined>(visibleProjects[0]?.id);
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<Tab>("seiten");
   const [leftOpen, setLeftOpen] = useState(true);
@@ -38,16 +43,17 @@ export default function ProjectsHome() {
 
   const filtered = useMemo(
     () =>
-      projects.filter(
+      visibleProjects.filter(
         (p) =>
           !search ||
           p.name.toLowerCase().includes(search.toLowerCase()) ||
           p.ort.toLowerCase().includes(search.toLowerCase())
       ),
-    [projects, search]
+    [visibleProjects, search]
   );
 
-  const selected = projects.find((p) => p.id === selectedId) ?? projects[0];
+  const selected =
+    visibleProjects.find((p) => p.id === selectedId) ?? visibleProjects[0];
 
   const allTasks = useMemo(
     () =>
@@ -80,8 +86,24 @@ export default function ProjectsHome() {
           >
             A
           </div>
-          <NavIcon icon={<FolderKanban size={18} />} label="Projekte" active />
-          <NavIcon icon={<LayoutTemplate size={18} />} label="Vorlagen" />
+          <NavIcon
+            icon={<FolderKanban size={18} />}
+            label="Projekte"
+            active={mode === "projects"}
+            onClick={() => {
+              setMode("projects");
+              setSelectedId(projects.find((p) => !p.isTemplate)?.id);
+            }}
+          />
+          <NavIcon
+            icon={<LayoutTemplate size={18} />}
+            label="Vorlagen"
+            active={mode === "templates"}
+            onClick={() => {
+              setMode("templates");
+              setSelectedId(projects.find((p) => p.isTemplate)?.id);
+            }}
+          />
           <NavIcon icon={<Star size={18} />} label="Favoriten" />
           <NavIcon icon={<Users size={18} />} label="Geteilt" />
           <NavIcon icon={<Trash2 size={18} />} label="Papierkorb" />
@@ -113,18 +135,20 @@ export default function ProjectsHome() {
           <div className="px-5 pt-5 pb-3">
             <Pixuna />
             <div className="mt-5 text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">
-              PROJEKTE
+              {mode === "templates" ? "VORLAGEN" : "PROJEKTE"}
             </div>
-            <button
-              onClick={() => {
-                const id = projectStore.createProject();
-                setSelectedId(id);
-              }}
-              className="mt-3 w-full h-10 rounded-lg flex items-center justify-center gap-2 text-sm font-medium"
-              style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
-            >
-              <Plus size={15} /> Neues Projekt
-            </button>
+            {mode === "projects" && (
+              <button
+                onClick={() => {
+                  const id = projectStore.createProject();
+                  setSelectedId(id);
+                }}
+                className="mt-3 w-full h-10 rounded-lg flex items-center justify-center gap-2 text-sm font-medium"
+                style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
+              >
+                <Plus size={15} /> Neues Projekt
+              </button>
+            )}
             <div
               className="mt-3 flex items-center gap-2 h-9 rounded-md px-2.5"
               style={{ background: "hsl(var(--surface-muted))" }}
@@ -133,7 +157,7 @@ export default function ProjectsHome() {
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Projekte suchen..."
+                placeholder={mode === "templates" ? "Vorlagen suchen..." : "Projekte suchen..."}
                 className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
               />
             </div>
@@ -221,12 +245,34 @@ export default function ProjectsHome() {
                 <button className="text-muted-foreground" title="Mehr">···</button>
               </div>
               <div className="flex items-center gap-2">
-                <button
-                  className="h-9 px-3 rounded-md border text-sm flex items-center gap-2"
-                  style={{ borderColor: "hsl(var(--hairline))" }}
-                >
-                  <Share2 size={14} /> Teilen
-                </button>
+                {selected.isTemplate ? (
+                  <button
+                    onClick={() => {
+                      if (confirm("Vorlage zurücksetzen? Alle projektspezifischen Inhalte (Texte, Seiteninhalte, Termine) werden geleert.")) {
+                        projectStore.resetTemplate(selected.id);
+                      }
+                    }}
+                    className="h-9 px-3 rounded-md border text-sm flex items-center gap-2"
+                    style={{ borderColor: "hsl(var(--hairline))" }}
+                  >
+                    Reset
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      const id = projectStore.duplicateAsTemplate(selected.id);
+                      if (id) {
+                        setMode("templates");
+                        setSelectedId(id);
+                      }
+                    }}
+                    className="h-9 px-3 rounded-md border text-sm flex items-center gap-2"
+                    style={{ borderColor: "hsl(var(--hairline))" }}
+                    title="Als Vorlage speichern"
+                  >
+                    <LayoutTemplate size={14} /> Vorlage+
+                  </button>
+                )}
                 <button
                   className="h-9 px-3 rounded-md text-sm font-medium flex items-center gap-2"
                   style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
@@ -327,6 +373,9 @@ export default function ProjectsHome() {
                     timeStyle: "short",
                   })}
                 />
+                {selected.customFields?.map((f) => (
+                  <KV key={f.id} label={f.label} value={f.value || "—"} />
+                ))}
               </Card>
 
               <Card title="AUFGABEN" action="+ Aufgabe">
@@ -1145,8 +1194,54 @@ function InfosView({ project }: { project: Project }) {
         value={project.erstelltAm ?? ""}
         onChange={(v) => update({ erstelltAm: v })}
       />
-      <div className="col-span-2 text-xs text-muted-foreground">
-        Änderungen werden automatisch in der rechten Projektinfo übernommen.
+
+      {(project.customFields ?? []).map((f) => (
+        <div key={f.id} className="col-span-2 grid grid-cols-[1fr_2fr_auto] gap-2 items-end">
+          <label className="block">
+            <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">
+              FELD-TITEL
+            </div>
+            <input
+              defaultValue={f.label}
+              onBlur={(e) => projectStore.updateCustomField(project.id, f.id, { label: e.target.value })}
+              className="mt-1 w-full h-9 rounded-md border px-3 text-sm bg-transparent outline-none"
+              style={{ borderColor: "hsl(var(--hairline))" }}
+            />
+          </label>
+          <label className="block">
+            <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">
+              INHALT
+            </div>
+            <textarea
+              defaultValue={f.value}
+              onBlur={(e) => projectStore.updateCustomField(project.id, f.id, { value: e.target.value })}
+              rows={1}
+              className="mt-1 w-full min-h-9 rounded-md border px-3 py-1.5 text-sm bg-transparent outline-none resize-y"
+              style={{ borderColor: "hsl(var(--hairline))" }}
+            />
+          </label>
+          <button
+            onClick={() => projectStore.deleteCustomField(project.id, f.id)}
+            title="Feld löschen"
+            className="h-9 w-9 rounded-md border flex items-center justify-center text-muted-foreground hover:text-foreground"
+            style={{ borderColor: "hsl(var(--hairline))" }}
+          >
+            <Trash2 size={14} />
+          </button>
+        </div>
+      ))}
+
+      <div className="col-span-2 flex items-center justify-between">
+        <button
+          onClick={() => projectStore.addCustomField(project.id)}
+          className="h-9 px-3 rounded-md border text-sm flex items-center gap-2"
+          style={{ borderColor: "hsl(var(--hairline))" }}
+        >
+          <Plus size={14} /> Feld hinzufügen
+        </button>
+        <div className="text-xs text-muted-foreground">
+          Änderungen werden automatisch in der rechten Projektinfo übernommen.
+        </div>
       </div>
     </div>
   );
@@ -1158,14 +1253,17 @@ function NavIcon({
   icon,
   label,
   active,
+  onClick,
 }: {
   icon: React.ReactNode;
   label: string;
   active?: boolean;
+  onClick?: () => void;
 }) {
   return (
     <button
       title={label}
+      onClick={onClick}
       className="w-9 h-9 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground"
       style={{
         background: active ? "hsl(var(--surface-muted))" : "transparent",

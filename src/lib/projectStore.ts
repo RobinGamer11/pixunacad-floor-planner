@@ -73,6 +73,12 @@ export interface CalendarEvent {
   location?: string;
 }
 
+export interface CustomField {
+  id: string;
+  label: string;
+  value: string;
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -89,6 +95,8 @@ export interface Project {
   tasks: Task[];
   events: CalendarEvent[];
   konzept?: string;
+  customFields?: CustomField[];
+  isTemplate?: boolean;
 }
 
 const STORAGE_KEY = "pixuna.projects.v2";
@@ -227,6 +235,96 @@ export const projectStore = {
   },
   deleteProject: (id: string) => {
     setState((s) => ({ projects: s.projects.filter((p) => p.id !== id) }));
+  },
+  duplicateAsTemplate: (id: string) => {
+    const src = state.projects.find((p) => p.id === id);
+    if (!src) return undefined;
+    const newId = `tpl-${Date.now().toString(36)}`;
+    const remap: Record<string, string> = {};
+    const newPages = src.pages.map((pg) => {
+      const nid = `${newId}-${pg.id}`;
+      remap[pg.id] = nid;
+      return {
+        ...pg,
+        id: nid,
+        elements: pg.elements.map((el) => ({ ...el, id: `${newId}-${el.id}` })),
+      };
+    });
+    const tpl: Project = {
+      ...src,
+      id: newId,
+      name: `${src.name} (Vorlage)`,
+      isTemplate: true,
+      favorite: false,
+      updatedAt: new Date().toISOString(),
+      pages: newPages,
+      sheets: src.sheets.map((s) => ({ ...s })),
+      tasks: src.tasks.map((t) => ({ ...t, id: `${newId}-${t.id}`, done: false })),
+      events: src.events.map((e) => ({ ...e, id: `${newId}-${e.id}` })),
+      customFields: src.customFields?.map((f) => ({ ...f })),
+    };
+    setState((s) => ({ projects: [tpl, ...s.projects] }));
+    return newId;
+  },
+  resetTemplate: (id: string) => {
+    setState((s) => ({
+      projects: s.projects.map((p) => {
+        if (p.id !== id) return p;
+        return {
+          ...p,
+          bauherr: "",
+          ort: "",
+          projektTyp: "",
+          status: "",
+          erstelltAm: "",
+          konzept: "",
+          updatedAt: new Date().toISOString(),
+          pages: p.pages.map((pg) => ({ ...pg, elements: [], notes: "" })),
+          tasks: p.tasks.map((t) => ({ ...t, date: undefined, time: undefined, done: false })),
+          events: [],
+          customFields: p.customFields?.map((f) => ({ ...f, value: "" })),
+        };
+      }),
+    }));
+  },
+  addCustomField: (projectId: string) => {
+    const id = `cf-${Date.now().toString(36)}`;
+    setState((s) => ({
+      projects: s.projects.map((p) =>
+        p.id === projectId
+          ? {
+              ...p,
+              updatedAt: new Date().toISOString(),
+              customFields: [...(p.customFields ?? []), { id, label: "Neues Feld", value: "" }],
+            }
+          : p
+      ),
+    }));
+    return id;
+  },
+  updateCustomField: (projectId: string, fieldId: string, patch: Partial<CustomField>) => {
+    setState((s) => ({
+      projects: s.projects.map((p) =>
+        p.id === projectId
+          ? {
+              ...p,
+              updatedAt: new Date().toISOString(),
+              customFields: (p.customFields ?? []).map((f) =>
+                f.id === fieldId ? { ...f, ...patch } : f
+              ),
+            }
+          : p
+      ),
+    }));
+  },
+  deleteCustomField: (projectId: string, fieldId: string) => {
+    setState((s) => ({
+      projects: s.projects.map((p) =>
+        p.id === projectId
+          ? { ...p, customFields: (p.customFields ?? []).filter((f) => f.id !== fieldId) }
+          : p
+      ),
+    }));
   },
   addPage: (projectId: string) => {
     const newId = `${projectId}-p${Date.now().toString(36)}`;
