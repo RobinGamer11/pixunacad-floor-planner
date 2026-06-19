@@ -394,6 +394,8 @@ export default function ProjectWorkspace() {
                   overlayOpacity={bgOverlay.opacity}
                   selectedElementId={selectedElementId}
                   zoom={zoom}
+                  activeTool={activeTool}
+                  onCommitTool={() => setActiveTool(null)}
                   onSelect={(id) => {
                     setSelectedElementId(id);
                     if (id) setRightTab("tools");
@@ -413,9 +415,14 @@ export default function ProjectWorkspace() {
               tab={rightTab}
               setTab={setRightTab}
               project={project}
+              activeTool={activeTool}
+              setActiveTool={setActiveToolAndTab}
+              selectedElementId={selectedElementId}
+              setSelectedElementId={setSelectedElementId}
               onJumpCad={(sheetId) => navigate(`/project/${project.id}/cad${sheetId ? `/${sheetId}` : ""}`)}
               onCollapse={() => setRightOpen(false)}
             />
+
           ) : (
             <div
               className="w-7 shrink-0 border-l flex items-start justify-center pt-3"
