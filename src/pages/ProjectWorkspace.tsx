@@ -909,6 +909,7 @@ function PageCanvas({
           initialState={page.cadOverlay}
           lineColor={toolSettings.line.color}
           lineThicknessMm={toolSettings.line.thicknessMm}
+          lineAlpha={toolSettings.line.alpha / 100}
           onChange={(state) =>
             projectStore.updatePage(projectId, page.id, { cadOverlay: state })
           }
