@@ -1,88 +1,77 @@
-# Projektmappen-Architektur
+## Ziel
 
-Das bisherige CAD-Programm wird in eine dreistufige Anwendung eingebettet:
+Im Seiteneditor (`ProjectWorkspace`) erhält der Tab **„Werkzeug"** (rechts neben „Seiteneinstellung") vier Werkzeuge: **Hilfslinie, Linie, Text, CAD**. Linie/Text/Schraffur sollen funktional 1:1 zur CAD-Oberfläche sein. CAD bettet ein vorhandenes Zeichenblatt als platzierbares Element ein.
 
+## Realitäts-Check (wichtig)
+
+Die CAD-Engine (`src/cad/CadApp.ts`, 2766 Zeilen) ist eng an die Vollbild-CAD-Oberfläche gekoppelt: sie erwartet eigene DOM-Panels (Linien-, Hatch-, Text-Settings, IdPanel, SheetPanel, PlanPanel, TextEditorOverlay), eigene Toolbar, ein eigenes Canvas, eigene Tastaturhooks (Strg+Z, P, H, T, L …) und globale Maus-/Touch-Listener.
+
+**„1:1 wie in CAD"** heißt deshalb realistisch: die CAD-Engine wird in einem **Container über dem Seiten-Canvas** instanziiert — nicht in einer separat reimplementierten Version. Die Zeichnung wird als CAD-Szene gespeichert (eigener Layer pro Seite) und bei der Druckansicht in Seitenkoordinaten gerendert.
+
+## Schritte
+
+### 1. Werkzeug-Tab umbauen (`src/pages/ProjectWorkspace.tsx`)
+Vier Sektionen statt der heutigen Element-Auswahl:
+
+```text
+WERKZEUG
+┌──────────────────────────────────┐
+│ [ Hilfslinie ] [ Linie ]        │
+│ [ Text      ] [ CAD   ]         │
+└──────────────────────────────────┘
++ aktive Tool-Sektion darunter
 ```
-Startseite (Projektübersicht)
-    └── Projektmappe (Seiten-/Layout-Editor)
-            └── CAD-Zeichnen  ← bisheriges Programm, unverändert
+
+Auswahl setzt `activeTool: 'guide' | 'line' | 'text' | 'cad' | null` im Workspace-State; der Seiten-Canvas reagiert darauf.
+
+### 2. Hilfslinie (`guide`)
+- Neuer Element-Typ `guide` in `projectStore.ts` (Polyline in mm, Stil hellblau gestrichelt).
+- Im Seiten-Canvas: gleiche Zeichenmechanik wie „Linie" (Click-Click), aber gerendert als `<svg>`-Polyline `stroke="#7DD3FC" stroke-dasharray="6 4"`.
+- Wird in einer späteren `print`/`export`-Ansicht ausgeblendet (Flag `nonPrinting: true`).
+
+### 3. Linie / Text / Schraffur — CAD-Engine einbetten
+- Neues Feld `ProjectPage.cadOverlay?: CadSceneJson` (serialisierte Scene; nutzt vorhandenes Scene-Snapshot-Format).
+- Neue Komponente `PageCadOverlay` mountet ein eigenes `<canvas>` über dem Seiten-Canvas (gleiche Pixel-Größe, gleiche `mmToPx`-Skala) und instanziiert `new CadApp(canvas, …)`.
+- `CadApp`-Kamera wird so initialisiert, dass mm-Welt 1:1 zum Seiten-mm passt; Panning/Zoom des CAD wird deaktiviert (Zoom kommt vom Seiten-Zoom).
+- Tool-Auswahl im Werkzeug-Tab triggert `cadApp.activateTool(ToolIds.LINE | TEXT | HATCH)`.
+- Die nötigen DOM-Panels (Line/Text/Hatch-Settings) werden in den Werkzeug-Tab rechts gerendert (versteckte Container, die `CadApp` als Refs bekommt) — so funktionieren ID-Wahl, Farben, Größen 1:1.
+- Auf `cadApp`-Änderungen wird Scene serialisiert und in `projectStore.updatePage(..., { cadOverlay })` gespeichert.
+
+**Hinweis:** Wenn der Aufwand zu groß wird, sage Bescheid — dann liefere ich erst Hilfslinie + CAD-Blatt (Schritt 5) aus und Linie/Text/Schraffur in einer zweiten Iteration.
+
+### 4. Werkzeug-Sektionen rechts
+- Bei aktivem Tool wird unter den vier Buttons die zugehörige CAD-Settings-Panel-DOM eingeblendet (versteckte Refs aus Schritt 3) — Layout an PixunaCAD-Helligkeit angepasst.
+
+### 5. CAD-Werkzeug (Zeichenblatt platzieren)
+- Section „CAD" im Werkzeug-Tab:
+  - Oben Button **„Zur CAD-Oberfläche →"** → `navigate('/project/<id>/cad')`.
+  - Dropdown **„Zeichenblatt"** aus `project.sheets`.
+  - Maßstab-Anzeige (read-only aus Sheet) + Button **„Auf Seite einfügen"** → erstellt `PageElement { kind: 'cad-view', sheetId, scale, snapshot }` in `activePage`.
+- Unter dem Dropdown: Liste der **bereits eingefügten** CAD-Blätter dieser Seite. Jede Zeile:
+  - Vorschau-Thumbnail des Sheets (klein), Sheet-Name, aktueller Maßstab.
+  - Inputs: Maßstab (`1:50`, `1:100`, …) bearbeitbar pro Instanz.
+  - Symbol **Aktualisieren** (Refresh-Icon) → kopiert aktuellen Sheet-Stand neu, Maßstab bleibt.
+  - Klick auf Zeile → selektiert das CAD-Element auf der Seite (kein Sprung zur CAD-Oberfläche; gemäß Antwort).
+- Auf der Seite wird das CAD-View 1:1 im gewählten Maßstab gerendert (mm-Welt aus Sheet × 1/Scale × `mmToPx`).
+
+### 6. Speicher-Schema (`src/lib/projectStore.ts`)
+```ts
+ElementKind += 'guide'
+interface PageElement {
+  // bestehend …
+  scale?: string;      // CAD-View
+  cadSnapshot?: any;   // CAD-View: serialisierte Scene-Kopie
+  points?: {x:number;y:number}[]; // guide
+  nonPrinting?: boolean;
+}
+ProjectPage.cadOverlay?: any;   // optionale eingebettete CAD-Scene (Schritt 3)
 ```
+Plus Store-Helfer: `updateCadElement(projectId, pageId, elementId, patch)`, `refreshCadElement(projectId, pageId, elementId)`.
 
-## 1. Routing & App-Struktur
+## Was bleibt unangetastet
+- Linkes Tool-Rail (Großbuttons) und CAD-Oberfläche selbst.
+- Bestehende Seiten-, Zoom-, Lochungs-, Margin-Logik.
+- Alle nicht genannten Bereiche von `ProjectsHome.tsx`.
 
-Neue Routes in `src/App.tsx`:
-- `/` → `ProjectsHome` (Startseite, Projektübersicht)
-- `/project/:projectId` → `ProjectWorkspace` (Projektmappe / Seiten-Editor)
-- `/project/:projectId/cad/:sheetId?` → bisheriger `CadEditor` mit „Zurück"-Button oben
-
-Zentraler Zustand in `src/store/projectStore.ts` (Zustand + localStorage):
-- `projects[]` mit `{ id, name, ort, thumbnail, pages[], sheets[], tasks[], events[], info, updatedAt }`
-- `pages[]` mit `{ id, title, format, orientation, margins, background, elements[], backgroundOverlay }`
-- `sheets[]` = bisherige CAD-Zeichnungsblätter (Maßstab etc.) – Brücke zur bestehenden `SheetManager`-Logik
-- `tasks[]`, `events[]` projektweit
-
-Damit der bestehende CAD-Code unangetastet bleibt, lädt/speichert `CadEditor` weiterhin über seinen internen `SheetManager`; pro Projekt wird ein Storage-Key-Prefix verwendet.
-
-## 2. Startseite `src/pages/ProjectsHome.tsx`
-
-3-spaltiges Layout:
-- **Links**: Projektkarten-Liste (`ProjectCard`) mit Thumbnail, Seiten-/Zeichnungsanzahl, letzter Änderung, „+ Neues Projekt".
-- **Mitte**: Schnellansicht des ausgewählten Projekts (read-only): Tabs Übersicht / Seiten / Zeichnungen / Notizen / Varianten / Team, Konzept-Preview, Zeitstrahl.
-- **Rechts**: Dashboard – Projektinfo, Aufgaben (projektübergreifend), Kalender, Termine.
-
-Doppelklick auf eine Projektkarte → Navigation zu `/project/:id`.
-
-## 3. Projektmappe `src/pages/ProjectWorkspace.tsx`
-
-Ersetzt die Startansicht komplett (eigene Vollbild-Route).
-
-**Linke Sidebar** (`PagesSidebar`):
-- Schmale Werkzeugleiste ganz links: Seiten, Text, Linie, **CAD-Zeichnen**, PDF einfügen, Bild, Notiz, Formen, Tabelle, Zeitstrahl, unten Ebenen/Vorlagen.
-- Seiten-Liste mit Thumbnails, Drag-Reorder, „+"-Button.
-- Unten: **Hintergrund-Transparenz** – Auswahl einer anderen Seite + Slider (0–100 %), Sichtbar-Toggle. Rendert die gewählte Seite als halbtransparenter Hintergrund-Layer.
-
-**Mittlere Canvas** (`PageCanvas`):
-- Blatt im gewählten Format (A3 quer / A4 hoch / frei), Zoom-Pills unten.
-- Freie Platzierung von Elementen: `text`, `image`, `pdf`, `table`, `note`, `timeline`, `cad-view`, `line`, `shape`.
-- Element-Typ `cad-view` rendert einen statischen Snapshot eines Zeichnungsblatts (via bestehender Renderer-Export-Funktion, read-only auf dem Blatt).
-- Klick auf „CAD-Zeichnen" in der Werkzeugleiste → Route zu `/project/:id/cad`.
-
-**Rechte Sidebar** (`RightInspector`) mit 3 Tabs:
-1. **Seiteneinstellungen** (Default, wenn nichts gewählt): Seitentitel, Format, Ausrichtung, Ränder, Hintergrund-Toggle, Layout (Spalten, Spaltenabstand, Hilfslinien), seitenbezogene Notizen.
-2. **Werkzeug** (kontextabhängig, wenn Element gewählt):
-   - Bild: Breite, Höhe, Position, Transparenz, Schatten, Rahmen.
-   - Text: Schrift, Größe, Farbe, Ausrichtung.
-   - CAD-Ansicht: Liste der Zeichnungsblätter mit Maßstab (aus bestehendem `SheetManager`); Klick = auswählen/platzieren, Doppelklick = wechselt in den CAD-Editor des Blatts.
-   - Weitere Typen: minimaler Default-Inspector.
-3. **Aufgaben**: Liste der Projektaufgaben mit Checkbox + Datum, Gruppierung „Heute / Diese Woche / Geplante Termine".
-
-## 4. CAD-Bereich (bestehend)
-
-`CadEditor` bleibt funktional 1:1 erhalten. Einzige Ergänzung: Header-Leiste mit „← Zurück zur Projektmappe"-Button, die nur erscheint, wenn `projectId` aus der Route vorhanden ist. Kein Eingriff in Tools/Renderer/Topology.
-
-## 5. Persistenz
-
-- `localStorage`-Key `pixuna.projects.v1` für Projektliste & Seiten/Tasks/Events.
-- CAD-Daten pro Projekt unter `pixuna.cad.<projectId>.*` (Prefix-Erweiterung der bestehenden Storage-Keys in `SheetManager`/`PlanManager`).
-- Auto-Save bei jeder Änderung (debounced).
-
-## 6. Design
-
-Helle, moderne Ästhetik analog zu den Mockups: warmes Off-White (`#FAF8F5`), feines Beige für Karten, Akzent Terrakotta/Gold (`#C9874C`), schwarze Primary-Buttons, Inter/Geometric Sans. Semantische Tokens in `src/index.css` ergänzen (`--surface`, `--surface-muted`, `--accent-gold`, `--ink`).
-
-## 7. Umsetzung in Etappen (in dieser Reihenfolge)
-
-1. Design-Tokens + Routing-Grundgerüst + Zustand-Store mit Demo-Projekten.
-2. Startseite (Karten, Schnellansicht, Dashboard).
-3. Projektmappe (Sidebar, Canvas mit Basis-Elementen Text/Bild/Notiz, Rechte Sidebar mit 3 Tabs).
-4. CAD-Integration: „Zurück"-Button, CAD-Ansicht-Element + Doppelklick-Sprung, Sheet-Liste im Werkzeug-Tab.
-5. Hintergrund-Transparenz-Layer.
-6. Aufgaben/Kalender-Logik scharf schalten (CRUD).
-
-## Offene Punkte / Annahmen
-
-- Element-Editor ist bewusst MVP: Drag/Resize via einfacher Mouse-Handler (kein externes Lib), Inspector setzt Werte. Reicht für das geforderte „frei platzierbar".
-- CAD-Ansicht im Blatt = Bild-Snapshot (PNG) des Zeichnungsblatts, generiert über bestehenden `Renderer`. Aktualisierung beim Öffnen der Seite.
-- Keine Authentifizierung / kein Cloud-Backend in diesem Schritt – alles client-seitig (passt zur bisherigen Roadmap: Registrierung später).
-
-Soll ich so umsetzen? Falls du Reihenfolge/Scope anpassen willst (z.B. zuerst nur Startseite + Projektmappe ohne CAD-Snapshots), sag kurz Bescheid.
+## Offene Frage / Risiko
+Punkt 3 (CAD-Engine in den Seiten-Canvas einbetten) ist der mit Abstand größte Brocken — die Panels müssen mit gerendert werden, sonst funktionieren ID-Auswahl/Farbe/Schraffur-Settings nicht. Ich starte mit Schritten 1, 2, 5, 6 (sofort sichtbarer Mehrwert) und ziehe Schritt 3 in einer Folgeiteration nach, sofern du nicht aktiv „alles in einem Rutsch" wünschst.
