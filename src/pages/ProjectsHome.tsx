@@ -1302,6 +1302,152 @@ function InfosView({ project }: { project: Project }) {
   );
 }
 
+function CustomFieldEditor({
+  projectId,
+  field,
+}: {
+  projectId: string;
+  field: { id: string; label: string; value: string };
+}) {
+  const [editingLabel, setEditingLabel] = useState(false);
+  const [labelDraft, setLabelDraft] = useState(field.label);
+  return (
+    <label className="block">
+      <div className="flex items-center gap-1.5 min-h-[18px]">
+        {editingLabel ? (
+          <>
+            <input
+              autoFocus
+              value={labelDraft}
+              onChange={(e) => setLabelDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  projectStore.updateCustomField(projectId, field.id, {
+                    label: labelDraft.trim() || field.label,
+                  });
+                  setEditingLabel(false);
+                } else if (e.key === "Escape") {
+                  setLabelDraft(field.label);
+                  setEditingLabel(false);
+                }
+              }}
+              className="text-[11px] font-semibold tracking-[0.18em] bg-transparent border-b outline-none flex-1"
+              style={{ borderColor: "hsl(var(--hairline))" }}
+            />
+            <button
+              type="button"
+              onClick={() => {
+                projectStore.updateCustomField(projectId, field.id, {
+                  label: labelDraft.trim() || field.label,
+                });
+                setEditingLabel(false);
+              }}
+              className="text-muted-foreground hover:text-foreground"
+              title="Speichern"
+            >
+              <Check size={12} />
+            </button>
+          </>
+        ) : (
+          <>
+            <span className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground flex-1 uppercase">
+              {field.label}
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setLabelDraft(field.label);
+                setEditingLabel(true);
+              }}
+              className="text-muted-foreground hover:text-foreground"
+              title="Umbenennen"
+            >
+              <Pencil size={11} />
+            </button>
+            <button
+              type="button"
+              onClick={() => projectStore.deleteCustomField(projectId, field.id)}
+              className="text-muted-foreground hover:text-foreground"
+              title="Feld löschen"
+            >
+              <Trash2 size={11} />
+            </button>
+          </>
+        )}
+      </div>
+      <input
+        defaultValue={field.value}
+        key={field.value}
+        onBlur={(e) => projectStore.updateCustomField(projectId, field.id, { value: e.target.value })}
+        className="mt-1 w-full h-9 rounded-md border px-3 text-sm bg-transparent outline-none"
+        style={{ borderColor: "hsl(var(--hairline))" }}
+      />
+    </label>
+  );
+}
+
+function AddCustomFieldControl({ projectId }: { projectId: string }) {
+  const [adding, setAdding] = useState(false);
+  const [label, setLabel] = useState("");
+  const save = () => {
+    const v = label.trim();
+    if (!v) return;
+    projectStore.addCustomField(projectId, v);
+    setLabel("");
+    setAdding(false);
+  };
+  if (!adding) {
+    return (
+      <button
+        onClick={() => setAdding(true)}
+        className="h-9 px-3 rounded-md border text-sm flex items-center gap-2"
+        style={{ borderColor: "hsl(var(--hairline))" }}
+      >
+        <Plus size={14} /> Feld
+      </button>
+    );
+  }
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        autoFocus
+        value={label}
+        onChange={(e) => setLabel(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") save();
+          else if (e.key === "Escape") {
+            setAdding(false);
+            setLabel("");
+          }
+        }}
+        placeholder="Feldtitel…"
+        className="h-9 px-3 rounded-md border text-sm bg-transparent outline-none"
+        style={{ borderColor: "hsl(var(--hairline))" }}
+      />
+      <button
+        onClick={save}
+        title="Speichern"
+        className="h-9 w-9 rounded-md flex items-center justify-center"
+        style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
+      >
+        <Check size={14} />
+      </button>
+      <button
+        onClick={() => {
+          setAdding(false);
+          setLabel("");
+        }}
+        title="Abbrechen"
+        className="h-9 w-9 rounded-md border flex items-center justify-center text-muted-foreground hover:text-foreground"
+        style={{ borderColor: "hsl(var(--hairline))" }}
+      >
+        <X size={14} />
+      </button>
+    </div>
+  );
+}
+
+
 /* -------- Helpers -------- */
 
 function NavIcon({
