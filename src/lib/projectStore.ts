@@ -61,6 +61,12 @@ export interface ProjectPage {
   guides?: boolean;
   punchPattern?: PunchPattern;
   punchSide?: PunchSide;
+  /**
+   * Serialized CAD overlay scene for the page-embedded CAD engine.
+   * Holds geometry drawn with the embedded CAD tools (Line, later Text/Hatch).
+   * Opaque JSON.
+   */
+  cadOverlay?: any;
 }
 
 export interface Sheet {

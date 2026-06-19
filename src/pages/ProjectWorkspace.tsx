@@ -52,6 +52,7 @@ import {
   type PunchPattern,
   type PunchSide,
 } from "@/lib/projectStore";
+import CadOverlayLayer from "@/components/page/CadOverlayLayer";
 
 const FORMAT_SIZES: Record<PageFormat, { w: number; h: number; label: string }> = {
   "A3-quer": { w: 420, h: 297, label: "A3 Querformat (420 × 297 mm)" },
@@ -531,7 +532,10 @@ function PageCanvas({
     };
   };
 
-  const drawingTool = activeTool === "line" || activeTool === "guide";
+  // Click-to-draw is used ONLY for the lightweight "Hilfslinie" (guide) and
+  // "Text" tools. The real "Linie" tool is handled by the embedded CAD engine
+  // (CadOverlayLayer) — see below — so it provides 1:1 snap/ortho/hub.
+  const drawingTool = activeTool === "guide";
   const cursorStyle = drawingTool ? "crosshair" : activeTool === "text" ? "text" : undefined;
 
   const handlePageMouseDown = (e: React.MouseEvent) => {
@@ -562,15 +566,15 @@ function PageCanvas({
         const maxX = Math.max(pts[0].x, pts[1].x);
         const maxY = Math.max(pts[0].y, pts[1].y);
         projectStore.addElement(projectId, page.id, {
-          kind: activeTool === "guide" ? "guide" : "line",
+          kind: "guide",
           x: minX,
           y: minY,
           w: Math.max(0.2, maxX - minX),
           h: Math.max(0.2, maxY - minY),
           points: pts,
-          color: activeTool === "guide" ? "#7DD3FC" : "#1a1a1a",
-          strokeWidth: activeTool === "guide" ? 1 : 1.5,
-          nonPrinting: activeTool === "guide" ? true : undefined,
+          color: "#7DD3FC",
+          strokeWidth: 1,
+          nonPrinting: true,
         });
         setPendingStart(null);
         setHoverPt(null);
@@ -632,6 +636,7 @@ function PageCanvas({
   return (
     <div className="min-h-full flex items-start justify-center p-10">
       <div
+        className="relative"
         style={{
           width: width * scale,
           height: height * scale,
@@ -756,6 +761,24 @@ function PageCanvas({
           />
         ))}
         </div>
+        {/*
+          Embedded CAD engine overlay — sibling of the scaled page so the
+          canvas itself is rendered at the *visual* size (no double-scale)
+          while reusing the standalone CAD engine for 1:1 snap/ortho/hub.
+        */}
+        <CadOverlayLayer
+          key={page.id}
+          pageWidthMm={fmt.w}
+          pageHeightMm={fmt.h}
+          basePxPerMm={baseWidth / fmt.w}
+          zoom={scale}
+          activeTool={activeTool === "line" ? "line" : null}
+          enabled={activeTool === "line"}
+          initialState={page.cadOverlay}
+          onChange={(state) =>
+            projectStore.updatePage(projectId, page.id, { cadOverlay: state })
+          }
+        />
       </div>
     </div>
   );
