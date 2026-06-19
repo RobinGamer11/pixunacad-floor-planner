@@ -156,7 +156,12 @@ export class TextEditorOverlay {
     this.el.style.transform = `rotate(${box.rotationRad}rad)`;
     this.el.style.transformOrigin = "top left";
 
-    const fontPx = box.style.fontSizePx * (cam.scale / Defaults.measureReferenceScalePxPerM);
+    // Use the renderer's referencePxPerM (matches the canvas-rendered text 1:1).
+    // For the standalone CAD this equals Defaults.measureReferenceScalePxPerM (80),
+    // for MiniCad (embedded in a page) it is basePxPerMm * 1000, so the editor
+    // overlay no longer renders text orders of magnitude larger than the canvas.
+    const refPxPerM = (this.app.renderer as any).referencePxPerM || Defaults.measureReferenceScalePxPerM;
+    const fontPx = box.style.fontSizePx * (cam.scale / refPxPerM);
     this.el.style.fontSize = `${fontPx}px`;
     this.el.style.fontFamily = "system-ui, Arial, sans-serif";
     this.el.style.lineHeight = "1.2";
@@ -165,7 +170,7 @@ export class TextEditorOverlay {
     this.el.style.textAlign = box.style.align;
     this.el.style.whiteSpace = box.style.wrap ? "pre-wrap" : "pre";
     this.el.style.overflowWrap = box.style.wrap ? "break-word" : "normal";
-    this.el.style.padding = `${6 * (cam.scale / Defaults.measureReferenceScalePxPerM)}px`;
+    this.el.style.padding = `${6 * (cam.scale / refPxPerM)}px`;
     this.el.style.boxSizing = "border-box";
     this.el.style.overflow = "visible";
     this.el.style.outline = "2px solid rgba(77,163,255,0.45)";
