@@ -34,6 +34,8 @@ import {
   PanelLeftOpen,
   PanelRightClose,
   PanelRightOpen,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 
 import {
