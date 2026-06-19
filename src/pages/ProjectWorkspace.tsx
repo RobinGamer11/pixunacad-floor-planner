@@ -1513,8 +1513,22 @@ function LineSettings({
           style={{ borderColor: "hsl(var(--hairline))" }}
         />
       </Row>
+      <Row label="Transparenz">
+        <div className="flex items-center gap-2">
+          <input
+            type="range"
+            min={0}
+            max={100}
+            step={1}
+            value={settings.alpha}
+            onChange={(e) => onChange({ alpha: Number(e.target.value) })}
+            className="flex-1 accent-foreground"
+          />
+          <span className="text-xs tabular-nums w-10 text-right">{settings.alpha}%</span>
+        </div>
+      </Row>
       <div className="text-[11px] text-muted-foreground">
-        Zeichnet 1:1 mit CAD-Engine: Snap, Ortho (Shift), Hub-Eingabe für Länge/Winkel.
+        Zeichnet 1:1 mit CAD-Engine: Snap, Ortho (Shift), Hub-Eingabe für Länge/Winkel. Snap auch an Seitenränder.
       </div>
     </SettingsBlock>
   );
