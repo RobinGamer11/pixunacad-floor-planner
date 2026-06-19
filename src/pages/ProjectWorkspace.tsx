@@ -59,10 +59,15 @@ export default function ProjectWorkspace() {
   const [activePageId, setActivePageId] = useState<string | undefined>(project?.pages[0]?.id);
   const [selectedElementId, setSelectedElementId] = useState<string | undefined>();
   const [rightTab, setRightTab] = useState<"settings" | "tools" | "tasks">("settings");
+  const [leftOpen, setLeftOpen] = useState(true);
+  const [rightOpen, setRightOpen] = useState(true);
+  const [renamingPageId, setRenamingPageId] = useState<string | undefined>();
+  const [pageNameDraft, setPageNameDraft] = useState("");
   const [bgOverlay, setBgOverlay] = useState<{ pageId?: string; opacity: number; visible: boolean }>({
     opacity: 0.35,
     visible: true,
   });
+
 
   if (!project) {
     return (
