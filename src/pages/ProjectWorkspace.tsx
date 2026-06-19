@@ -619,7 +619,20 @@ const PUNCH_PATTERNS: Record<Exclude<PunchPattern, "none">, { label: string; off
 type ToolSettings = {
   guide: { color: string; strokeWidth: number };
   line: { color: string; thicknessMm: number; alpha: number };
-  text: { fontSize: number; color: string; bold: boolean; italic: boolean; alpha: number };
+  text: {
+    fontSize: number;
+    color: string;
+    bold: boolean;
+    italic: boolean;
+    alpha: number;
+    align: "left" | "center" | "right";
+    bgColor: string;
+    bgAlphaPct: number;
+    wrap: boolean;
+    borderEnabled: boolean;
+    borderColor: string;
+    borderWidthPx: number;
+  };
 };
 
 function PageCanvas({
