@@ -2,6 +2,7 @@ import { useMemo, useState, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ChevronLeft,
+  ChevronRight,
   Plus,
   Type,
   Minus,
@@ -26,7 +27,15 @@ import {
   Play,
   Maximize2,
   Move,
+  Pencil,
+  Check,
+  X,
+  PanelLeftClose,
+  PanelLeftOpen,
+  PanelRightClose,
+  PanelRightOpen,
 } from "lucide-react";
+
 import {
   projectStore,
   useProject,
