@@ -547,13 +547,15 @@ export class MiniCad {
     if (this._destroyed) return;
     try {
       this.input.wheelDelta = 0;
-      this.input.panDX = 0;
-      this.input.panDY = 0;
+
+      // Panning (Mittlere Maustaste) — identisch zur CAD-Oberfläche.
+      if (this.input.isPanning) this.camera.panBy(this.input.panDX, this.input.panDY);
 
       this.input.update(this.camera);
 
       if (this._activeTool === "line") this.lineTool.update(this.input);
       else if (this._activeTool === "text") this.textTool.update(this.input);
+      else if (this._activeTool === "select") this.selectTool.update(this.input);
 
       // Geometry change → persist (cover segments AND text boxes AND edits).
       const sig = this._sceneSignature();
