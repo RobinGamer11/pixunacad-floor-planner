@@ -243,6 +243,18 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app }) => {
           )}
         </div>
 
+        <button type="button"
+          onClick={() => {
+            const v = !autoShape;
+            setAutoShape(v);
+            app.defaultFreeAutoShape = v;
+          }}
+          className="cad-toolbar-btn w-full justify-center h-9"
+          style={autoShape ? { background: "hsl(var(--cad-toolbar-active))", color: "hsl(var(--cad-toolbar-active-foreground))" } : undefined}
+          title="Beim Loslassen werden Geraden geradegezogen und Kreise zu echten Kreisen geformt.">
+          <span className="text-xs">{autoShape ? "Auto-Form: AN" : "Auto-Form: AUS"}</span>
+        </button>
+
         <button type="button" onClick={toggleRuler}
           className="cad-toolbar-btn w-full justify-center h-9">
           <span className="text-xs">{hasRuler ? "Lineal entfernen" : "Lineal hinzufügen"}</span>
