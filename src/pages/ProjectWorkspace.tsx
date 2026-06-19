@@ -1090,14 +1090,7 @@ function ElementView({
           {el.text || "Notiz"}
         </div>
       )}
-      {el.kind === "cad-view" && (
-        <div
-          className="w-full h-full flex items-center justify-center text-xs text-muted-foreground border-2 border-dashed"
-          style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-muted))" }}
-        >
-          CAD-Ansicht{el.sheetId ? ` · ${el.sheetId}` : ""}
-        </div>
-      )}
+      {el.kind === "cad-view" && <CadViewThumb sheetId={el.sheetId} />}
       {(el.kind === "shape" || el.kind === "line" || el.kind === "table" || el.kind === "pdf" || el.kind === "timeline") && (
         <div
           className="w-full h-full flex items-center justify-center text-xs text-muted-foreground"
