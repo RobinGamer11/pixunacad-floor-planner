@@ -976,6 +976,8 @@ function ElementView({
           style={{
             fontSize: el.fontSize ?? 16,
             color: el.color ?? "hsl(var(--ink))",
+            fontWeight: el.bold ? 700 : 400,
+            fontStyle: el.italic ? "italic" : "normal",
             width: "100%",
             height: "100%",
             display: "flex",
