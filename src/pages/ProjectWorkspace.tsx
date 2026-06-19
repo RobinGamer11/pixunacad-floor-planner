@@ -761,6 +761,23 @@ function PageCanvas({
           />
         ))}
         </div>
+        {/*
+          Embedded CAD engine overlay — sibling of the scaled page so the
+          canvas itself is rendered at the *visual* size (no double-scale)
+          while reusing the standalone CAD engine for 1:1 snap/ortho/hub.
+        */}
+        <CadOverlayLayer
+          pageWidthMm={fmt.w}
+          pageHeightMm={fmt.h}
+          basePxPerMm={baseWidth / fmt.w}
+          zoom={scale}
+          activeTool={activeTool === "line" ? "line" : null}
+          enabled={activeTool === "line"}
+          initialState={page.cadOverlay}
+          onChange={(state) =>
+            projectStore.updatePage(projectId, page.id, { cadOverlay: state })
+          }
+        />
       </div>
     </div>
   );
