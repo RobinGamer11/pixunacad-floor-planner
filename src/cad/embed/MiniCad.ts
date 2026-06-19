@@ -23,8 +23,7 @@ import { PointEditMenu } from "../PointEditMenu";
 import { LineTool } from "../LineTool";
 import { TextTool } from "../TextTool";
 import { TextEditorOverlay } from "../TextEditorOverlay";
-import { MiniSelectTool } from "./MiniSelectTool";
-import { TextHub } from "./TextHub";
+import { SelectTool } from "../SelectTool";
 import { Defaults, SelectionType } from "../constants";
 import type { TextBox, TextBoxStyle } from "../Scene";
 
@@ -38,15 +37,6 @@ export interface MiniCadTextEditorDom {
   symbolSelect: HTMLSelectElement;
 }
 
-export interface MiniCadTextHubDom {
-  root: HTMLDivElement;
-  widthInput: HTMLInputElement;
-  heightInput: HTMLInputElement;
-  rotationInput: HTMLInputElement;
-  xInput: HTMLInputElement;
-  yInput: HTMLInputElement;
-}
-
 export interface MiniCadDom {
   canvas: HTMLCanvasElement;
   hubRoot: HTMLDivElement;
@@ -55,8 +45,6 @@ export interface MiniCadDom {
   pointEditRoot: HTMLDivElement;
   pointEditButtons: Record<string, HTMLButtonElement>;
   textEditor: MiniCadTextEditorDom;
-  /** Optional — Hub-Box für Textboxen (Breite/Höhe/Drehung/X/Y). */
-  textHub?: MiniCadTextHubDom;
 }
 
 export interface MiniCadInit {
@@ -100,8 +88,7 @@ export class MiniCad {
   readonly lineTool: LineTool;
   readonly textTool: TextTool;
   readonly textEditor: TextEditorOverlay;
-  readonly selectTool: MiniSelectTool;
-  readonly textHub: TextHub | null;
+  readonly selectTool: SelectTool;
 
   // Stubs required by tools / editor.
   activeDrawLabelId = Defaults.defaultLabelId;
@@ -194,17 +181,17 @@ export class MiniCad {
       this.dom.textEditor.symbolSelect,
       this as any,
     );
-    this.selectTool = new MiniSelectTool(this);
-    this.textHub = this.dom.textHub
-      ? new TextHub(
-          this.dom.textHub.root,
-          this.dom.textHub.widthInput,
-          this.dom.textHub.heightInput,
-          this.dom.textHub.rotationInput,
-          this.dom.textHub.xInput,
-          this.dom.textHub.yInput,
-        )
-      : null;
+    this.selectTool = new SelectTool(this as any);
+
+    // Wire PointEditMenu activation identisch zur CadApp-Oberfläche.
+    this.pointEditMenu.bindActivate((action) => {
+      const sel = this.selection;
+      if (sel && sel.type === SelectionType.TEXTBOX_HANDLE && (sel as any).textBoxId && sel.handleIndex != null) {
+        this.selectTool.beginTextBoxHandleEdit((sel as any).textBoxId, sel.handleIndex, action);
+        return;
+      }
+      this.selectTool.beginPointEdit(action);
+    });
 
     this._installCoordRemap();
     this.applyZoom(this._zoom);
@@ -497,6 +484,30 @@ export class MiniCad {
     this._changeDirty = true;
   }
 
+  /* ===== CadApp surface stubs (required by SelectTool) ===== */
+
+  getSelectedSegment() {
+    if (!this.selection || !this.selection.segmentId) return null;
+    return this.scene.getSegmentById(this.selection.segmentId);
+  }
+
+  getSelectedHatch() {
+    if (!this.selection || !this.selection.hatchId) return null;
+    return this.scene.getHatchById(this.selection.hatchId);
+  }
+
+  getSelectedDimension() { return null; }
+
+  // Sticker-Edit ist im Embed nicht verfügbar — feste No-Op-Werte.
+  isStickerEditing(): boolean { return false; }
+  enterStickerEdit(_inst: any) {}
+  exitStickerEdit() {}
+  isPointOutsideStickerEdit(_mouseW: any): boolean { return true; }
+
+  // Settings-Panels existieren im Embed nicht.
+  showLineSettingsPanel(_show: boolean) {}
+  showHatchSettingsPanel(_show: boolean) {}
+
   /* ===== Internals ===== */
 
   private _patchRendererTransparent() {
@@ -536,13 +547,15 @@ export class MiniCad {
     if (this._destroyed) return;
     try {
       this.input.wheelDelta = 0;
-      this.input.panDX = 0;
-      this.input.panDY = 0;
+
+      // Panning (Mittlere Maustaste) — identisch zur CAD-Oberfläche.
+      if (this.input.isPanning) this.camera.panBy(this.input.panDX, this.input.panDY);
 
       this.input.update(this.camera);
 
       if (this._activeTool === "line") this.lineTool.update(this.input);
       else if (this._activeTool === "text") this.textTool.update(this.input);
+      else if (this._activeTool === "select") this.selectTool.update(this.input);
 
       // Geometry change → persist (cover segments AND text boxes AND edits).
       const sig = this._sceneSignature();
