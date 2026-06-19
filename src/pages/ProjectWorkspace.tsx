@@ -52,6 +52,7 @@ import {
   type PunchPattern,
   type PunchSide,
 } from "@/lib/projectStore";
+import CadOverlayLayer from "@/components/page/CadOverlayLayer";
 
 const FORMAT_SIZES: Record<PageFormat, { w: number; h: number; label: string }> = {
   "A3-quer": { w: 420, h: 297, label: "A3 Querformat (420 × 297 mm)" },
