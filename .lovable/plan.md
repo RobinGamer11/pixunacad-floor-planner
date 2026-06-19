@@ -1,55 +1,45 @@
-## Ziel
+Du hast drei größere Themen angesprochen — bevor ich die alle anpacke, hier mein Plan zur Abstimmung. Bitte sag, was passt und was du anders haben möchtest (oder welche Punkte zuerst).
 
-1. **Text-Werkzeug 1:1** aus der CAD-Oberfläche im Seiten-Editor verfügbar machen — inklusive Snap, Guide-Anchors, Inline-Editor (contenteditable mit Bold/Italic/Color/Size/Symbol), Auto-Größe, Wrap, Hintergrund/Border-Settings.
-2. **Margin-Snap** sichtbar machen: blaue Snap-Linien & Fangpunkte an *allen vier Rändern beidseitig* (außen=Seitenkante, innen=Marginkante) — Fangpunkte werden zur Zeit von Rändern und Seitenkante überdeckt, weil das CAD-Canvas exakt seitengroß ist.
+## 1) Text-Werkzeug: korrekte Skalierung auf der Seite
 
-## Phase D — Text-Werkzeug
+**Diagnose (was ich gemessen habe)**
+Auf einer A4-Seite (210 mm) bei `width=1100 px` ergibt sich `basePxPerMm≈5.24` und `referencePxPerM=5240`. Daraus folgt:
+- Default-Textbox: `2.6 m × 0.6 m`, multipliziert mit `worldScaleFactor (80/5240≈0.0153)` → ca. **4 cm × 1 cm** auf dem Blatt. Optisch nach wie vor groß und nicht "Papier-realistisch".
+- Schriftgröße `16 px` wird per `cam.scale/referencePxPerM = zoom` skaliert → bei 100 % Zoom = 16 Bildschirm-px ≈ **3 mm auf Papier** (≈ 9 pt). Wirkt im aktuellen Render trotzdem zu groß, weil die Textbox selbst überdimensioniert ist (siehe oben) und die Vorschau am falschen Punkt sitzt.
 
-### MiniCad erweitern (`src/cad/embed/MiniCad.ts`)
-Bisher kennt MiniCad nur `lineTool`. Wir fügen `textTool` + `textEditor` + Selection-Modell hinzu und stubsen die übrigen CadApp-Felder, die `TextTool` / `TextEditorOverlay` lesen:
+**Geplante Fixes**
+1. `defaultTextBoxWidthM/HeightM` für MiniCad neu rechnen statt `Defaults.textBoxWidthM` (2.6 m) zu nehmen: Standardbox = z. B. 60 mm × 14 mm (passend zu 9–12 pt Standard­schrift, mehrzeilig wächst).
+2. Schriftgrößen-Mapping eindeutig in "Papier-Pixel": ein `16 px`-Wert im Settings-Panel ergibt **exakt 16 px auf dem Blatt** (≈ 4.2 mm bei A4) — TextTool/Renderer entsprechend anpassen.
+3. Inline-Editor (contenteditable) erhält dieselbe Pixelgröße auf der Seite, damit "Was du tippst = was du siehst".
+4. Vorschau-Rechteck am tatsächlichen Snap-Punkt (Maus) zentriert, nicht an Seitenecke.
 
-- Neue Felder: `textTool: TextTool`, `textEditor: TextEditorOverlay`, `selection: Selection|null`, `activeTool` (Pointer auf aktives Tool-Instance — wird von `TextEditorOverlay._onDocMouseDown` geprüft).
-- Neue Methoden: `setSelection(sel)`, `clearSelection()`, `beginTextEdit(box)`, `getCurrentTextStyle()`, `setTextDefaults({...})`.
-- Erweiterung von `setActiveTool`: zusätzlich `"text"`; aktiviert/deaktiviert `textTool`, setzt `activeTool`-Pointer.
-- Renderer-Patch: `_drawTextBoxes?.()` zusätzlich im `render()` aufrufen, damit Boxen erscheinen.
-- `serialize()`/`_restore()`: `textBoxes[]` mitnehmen (id, center, widthM/heightM, rotationRad, html, style, labelId).
-- `_tick`: `if (activeTool === "text") textTool.update(input)`.
+## 2) Auswahl / Hub-Box für Text & Linie (1:1 wie CAD)
 
-### DOM-Hosts (`src/components/page/CadOverlayLayer.tsx`)
-- Refs + DOM für **Text-Editor**: `editor` (contenteditable div, anfangs `.hidden`), `toolbar` mit `boldBtn`, `italicBtn`, `colorInput`, `sizeSelect`, `symbolSelect`. Styles aus den Defaults der CAD-Oberfläche (kleines weißes Bar oberhalb der Box).
-- Refs an `MiniCad`-Konstruktor durchreichen (neues `dom.textEditor`-Objekt).
-- Neue Props: `textColor`, `textFontSize`, `textBold`, `textItalic`, `textAlpha`, `textBgColor`, `textBgAlphaPct`, `textWrap`, `textAlign`, `textBorderEnabled`, `textBorderColor`, `textBorderWidthPx`. Effect ruft `engine.setTextDefaults({...})` auf.
+Aktuell macht `MiniSelectTool` direktes Drag. Du willst stattdessen das CAD-Verhalten: **klicken → markieren → Bearbeitung NUR über Hub-Box** (Länge/Winkel bei Linien, Größe/Rotation/Position bei Textboxen). Pan auf leerer Fläche bleibt.
 
-### UI / Werkzeugleiste (`src/pages/ProjectWorkspace.tsx`)
-- `PageTool` um `"text"` (existiert) → CAD-Pfad einschlagen, nicht mehr den Legacy-`addElement("text",...)`.
-- In `PageCanvas`: `activeTool === "text" ? "text" : ...` an `CadOverlayLayer` weiterreichen; pointer-events ON wenn `text` aktiv. Den alten "Text"-Klick-Handler auf der Seite entfernen, damit der CAD-Editor exklusiv reagiert.
-- Werkzeugeinstellungen "Text" um die fehlenden Felder erweitern: Schriftgröße, Farbe, Bold/Italic, Ausrichtung (links/mitte/rechts), Transparenz, Hintergrundfarbe + Hintergrund-Alpha, Wrap-Toggle, Border-Toggle (mit Farbe + Breite). Alle Werte fließen via Props → `setTextDefaults`.
+**Plan**
+1. Den vollständigen `SelectTool` aus der CAD-Oberfläche in `MiniCad` einbinden (statt der schlanken Eigenentwicklung). Abhängigkeiten (`PointEditMenu`, `LineHub`, Clipboard) sind bereits gehostet — nur fehlende Andockstellen ergänzen.
+2. Direktes Drag in MiniSelectTool deaktivieren — Objekt wird beim Linksklick nur **selektiert**, Hub-Box öffnet (für Linien `LineHub` mit Länge/Winkel, für Textboxen ein **TextHub** mit Breite/Höhe/Drehung wie in der CAD-Oberfläche).
+3. Verschieben/Drehen läuft komplett über Hub-Box-Eingaben (Tab/Enter wie gewohnt) und über die Translate-/Rotate-Buttons aus dem `PointEditMenu`.
+4. Wenn nichts getroffen wird → bestehender Pan-Pfad (Plain-Left-Drag) bleibt aktiv.
 
-### Transparenz
-- `defaultTextAlpha` (0..1) → bei `getCurrentTextStyle()` in `textColor` als rgba kodieren (gleicher Helper wie für Linien). Hintergrund: `textBgAlphaPct` ist bereits eigener Wert in `TextBoxStyle`.
+Offene Frage: In der CAD-Oberfläche **gibt es aktuell keinen eigenen "TextHub" mit Maßen/Rotation** — Textboxen werden dort über die Eck-Handles und das PointEditMenu transformiert. Soll ich:
+- (a) genau das in der Seite übernehmen (Eck-Handles + PointEditMenu), oder
+- (b) zusätzlich eine neue Hub-Box "Breite × Höhe × Winkel" für Textboxen bauen?
 
-## Phase F — Margin-Snap & Foreground
+## 3) CAD-Ansicht (Bild des Zeichenblatts) im Seiten-Element
 
-### `MiniCad._rebuildPageFrame` (4 → 8 Segmente)
-Heute werden 4 unsichtbare Segmente an den Seitenkanten erzeugt. Erweiterung: **4 zusätzliche Segmente** an den Margin-Innenkanten (Position aus aktuellem `pageMarginsMm`).
-- Neuer Init-Param `pageMarginsMm: number` + Methode `setPageMargins(mm)` → ruft `_rebuildPageFrame()` neu auf.
-- `CadOverlayLayer` reicht `page.margins ?? 0` und aktualisiert via Effect.
+Aktuell rendert `cad-view` nur einen Platzhalter ("CAD-Ansicht · sheet-id"). Du willst dort das **tatsächliche Bild des Zeichenblatts** sehen.
 
-### Foreground / Clipping fixen
-Snap-Visualisierungen (blaue Linie + Dot) werden vom `Renderer.overlay` exakt auf dem Page-Canvas gezeichnet. Bei Edge-Snap (x=0/W bzw. y=0/H) wird der Dot zur Hälfte vom Canvas-Rand geclippt; bei Margin-Snap überdeckt zusätzlich der graue Margin-Border (`hsl(0 0% 92%)`) den Dot.
+**Plan**
+1. Neuer Helper `renderSheetToImage(projectId, sheetId, widthPx)` — lädt den persistierten CAD-State, baut einen unsichtbaren `Renderer`/`Scene` (ohne UI), rendert das Sheet 1:1 in einen Off-Screen-Canvas und liefert eine DataURL.
+2. `cad-view`-Element rendert dieses Bild in seinem Rahmen (object-fit: contain, Maßstab gemäß `element.scale`).
+3. Re-Render automatisch beim Öffnen einer Seite und beim Verlassen der CAD-Oberfläche (über das bereits existierende Auto-Save in `CadEditor`).
+4. Optional (später): Live-Update statt DataURL, sobald Performance es erlaubt.
 
-Fix-Strategie:
-- **Padding ums Canvas:** `MiniCad.applyZoom` erweitert Canvas-Größe um konstante `frameSnapPaddingPx = 14` (CSS-Pixel, unabhängig vom Zoom) auf jeder Seite. Camera-Offset wird um `+padding` verschoben, sodass Weltkoordinate `(0,0)` bei `padding,padding` landet. Geometrie bleibt visuell identisch, Snap-Dots an Page-Edges sind komplett sichtbar.
-- **Canvas-Sibling-Position:** `CadOverlayLayer` rendert das Canvas mit `left: -padding; top: -padding;` (statt `left:0;top:0`) und Pointer-Events bleiben am Wrapper.
-- **Margin-Overlay z-Index:** Margin-Border-Div in `PageCanvas` bekommt `zIndex: 0`; `CadOverlayLayer` bekommt `zIndex: 30`. Damit liegen Snap-Visualisierungen über dem grauen Margin-Ring auf beiden Seiten der Marginkante.
+---
 
-## Reihenfolge
-
-1. Phase F (klein, eigenständig, schneller Win — Frame + Margin snap + Canvas-Padding + z-Index).
-2. Phase D Schritt 1: MiniCad um TextTool/TextEditor erweitern, Serialisierung, Tool-Switching.
-3. Phase D Schritt 2: CadOverlayLayer DOM-Hosts, Text-Defaults-Pipe.
-4. Phase D Schritt 3: ProjectWorkspace Toolbar-Werkzeugeinstellungen ausbauen, alten Text-Code im PageCanvas-Handler entfernen.
-5. Manuelle Verifikation per Playwright-Screenshot: Text platzieren → editieren → Bold/Italic → Snap an Linie & Margin → Transparenz.
-
-## Offene Frage
-Alte `kind: "text"`-Elemente (Legacy `projectStore.addElement("text",...)`): bleiben **read-only sichtbar** wie bisher (`ElementView`), neue Texte werden ausschließlich als CAD-TextBoxen erstellt. Keine automatische Migration. OK?
+**Bitte bestätige / korrigiere:**
+- Punkt 1: passt das Maß "Standard-Textbox 60 × 14 mm, Schrift = echte Papier-Pixel"?
+- Punkt 2: Variante (a) oder (b) für Textbox-Bearbeitung?
+- Punkt 3: Bild beim Seiten-Öffnen + nach CAD-Bearbeitung neu rendern (statt Live) ok?
