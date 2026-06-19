@@ -253,20 +253,47 @@ export default function ProjectWorkspace() {
                 {project.pages.map((pg, idx) => {
                   const active = pg.id === activePage?.id;
                   const isRenaming = renamingPageId === pg.id;
+                  const showActions = active && pageActionsSticky;
                   return (
                     <div
                       key={pg.id}
+                      draggable={!isRenaming}
+                      onDragStart={(e) => {
+                        setDragPageIdx(idx);
+                        e.dataTransfer.effectAllowed = "move";
+                      }}
+                      onDragOver={(e) => {
+                        if (dragPageIdx !== null && dragPageIdx !== idx) e.preventDefault();
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        if (dragPageIdx !== null && dragPageIdx !== idx) {
+                          projectStore.reorderPage(project.id, dragPageIdx, idx);
+                        }
+                        setDragPageIdx(null);
+                      }}
+                      onDragEnd={() => setDragPageIdx(null)}
                       onClick={() => {
                         if (isRenaming) return;
+                        if (active) {
+                          // re-click the active page toggles sticky action icons
+                          setPageActionsSticky((v) => !v);
+                          return;
+                        }
                         setActivePageId(pg.id);
                         setSelectedElementId(undefined);
+                        setPageActionsSticky(false);
                       }}
                       className="group w-full text-left rounded-lg p-2 flex gap-2.5 transition cursor-pointer"
                       style={{
                         background: active ? "hsl(var(--surface-card))" : "transparent",
                         border: active ? "1px solid hsl(var(--accent-gold) / 0.4)" : "1px solid transparent",
+                        opacity: dragPageIdx === idx ? 0.5 : 1,
                       }}
                     >
+                      <div className="flex flex-col items-center justify-center text-muted-foreground opacity-0 group-hover:opacity-100 transition cursor-grab">
+                        <GripVertical size={12} />
+                      </div>
                       <div
                         className="w-12 h-9 rounded shrink-0 border"
                         style={{ background: "white", borderColor: "hsl(var(--hairline))" }}
@@ -275,7 +302,22 @@ export default function ProjectWorkspace() {
                         <div className="text-[10px] text-muted-foreground flex items-center justify-between gap-1">
                           <span>{String(idx + 1).padStart(2, "0")}</span>
                           {!isRenaming && (
-                            <span className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                            <span
+                              className={`flex items-center gap-1 transition ${
+                                showActions ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                              }`}
+                            >
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const newId = projectStore.duplicatePage(project.id, pg.id);
+                                  if (newId) setActivePageId(newId);
+                                }}
+                                title="Duplizieren"
+                                className="hover:text-foreground"
+                              >
+                                <Copy size={11} />
+                              </button>
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
