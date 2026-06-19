@@ -507,11 +507,15 @@ function PageCanvas({
 }) {
   const fmt = FORMAT_SIZES[page.format];
   const aspect = fmt.w / fmt.h;
+  // The sheet is rendered at a FIXED real size (mm-defined). Zoom is a pure
+  // view transform applied via CSS scale, like PowerPoint / CAD — page, holes,
+  // margins, frame and strokes all scale together with the view.
   const baseWidth = 1100;
-  const width = baseWidth * (zoom / 100);
+  const width = baseWidth;
   const height = width / aspect;
   const mmToPx = width / fmt.w;
   const marginPx = (page.margins ?? 0) * mmToPx;
+  const scale = zoom / 100;
 
   // Tool drawing state (click-click). Coordinates in % of page.
   const [pendingStart, setPendingStart] = useState<{ x: number; y: number } | null>(null);
