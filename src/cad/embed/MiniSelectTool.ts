@@ -137,7 +137,7 @@ export class MiniSelectTool {
     if (e.button !== 0 || e.altKey) return; // Mid/Alt → Parent-Pan
     const wp = this.clientToWorld(e.clientX, e.clientY);
 
-    // Textbox: nur auswählen — Verschieben/Drehen passiert über die Hub-Box
+    // Textbox: nur auswählen — Verschieben/Drehen/Resize läuft über die TextHub
     // (1:1 wie in der CAD-Oberfläche, kein direktes Drag).
     const tb = this.hitTextBox(wp);
     if (tb) {
@@ -147,8 +147,9 @@ export class MiniSelectTool {
       this.dragTextId = tb.id;
       this.dragSegId = null;
       this.app.setSelection({ type: SelectionType.TEXTBOX, textBoxId: tb.id } as any);
-      this.app.hub.hide();
-      this.app.hub.bindCommit(null);
+      try { this.app.hub.hide(); } catch {}
+      try { this.app.hub.bindCommit(null); } catch {}
+      this.showHubForTextBox(tb);
       return;
     }
 
