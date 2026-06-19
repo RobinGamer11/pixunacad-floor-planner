@@ -24,6 +24,7 @@ import { LineTool } from "../LineTool";
 import { TextTool } from "../TextTool";
 import { TextEditorOverlay } from "../TextEditorOverlay";
 import { MiniSelectTool } from "./MiniSelectTool";
+import { TextHub } from "./TextHub";
 import { Defaults, SelectionType } from "../constants";
 import type { TextBox, TextBoxStyle } from "../Scene";
 
@@ -37,6 +38,15 @@ export interface MiniCadTextEditorDom {
   symbolSelect: HTMLSelectElement;
 }
 
+export interface MiniCadTextHubDom {
+  root: HTMLDivElement;
+  widthInput: HTMLInputElement;
+  heightInput: HTMLInputElement;
+  rotationInput: HTMLInputElement;
+  xInput: HTMLInputElement;
+  yInput: HTMLInputElement;
+}
+
 export interface MiniCadDom {
   canvas: HTMLCanvasElement;
   hubRoot: HTMLDivElement;
@@ -45,6 +55,8 @@ export interface MiniCadDom {
   pointEditRoot: HTMLDivElement;
   pointEditButtons: Record<string, HTMLButtonElement>;
   textEditor: MiniCadTextEditorDom;
+  /** Optional — Hub-Box für Textboxen (Breite/Höhe/Drehung/X/Y). */
+  textHub?: MiniCadTextHubDom;
 }
 
 export interface MiniCadInit {
