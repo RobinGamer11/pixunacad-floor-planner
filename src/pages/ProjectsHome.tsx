@@ -16,7 +16,7 @@ import {
   PanelRightClose,
   PanelRightOpen,
 } from "lucide-react";
-import { useProjects, projectStore, type Project } from "@/lib/projectStore";
+import { useProjects, projectStore, type Project, type Task, type TaskPriority } from "@/lib/projectStore";
 
 const Pixuna = () => (
   <span className="font-semibold tracking-tight text-base">
