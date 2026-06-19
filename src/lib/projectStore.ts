@@ -343,7 +343,8 @@ export const projectStore = {
       ),
     }));
   },
-  addTask: (projectId: string, title: string, date?: string) => {
+  addTask: (projectId: string, task: Omit<Task, "id" | "done"> & { done?: boolean }) => {
+    const id = `t-${Date.now().toString(36)}`;
     setState((s) => ({
       projects: s.projects.map((p) =>
         p.id === projectId
@@ -351,10 +352,27 @@ export const projectStore = {
               ...p,
               tasks: [
                 ...p.tasks,
-                { id: `t-${Date.now().toString(36)}`, title, done: false, date },
+                { done: false, ...task, id },
               ],
             }
           : p
+      ),
+    }));
+    return id;
+  },
+  updateTask: (projectId: string, taskId: string, patch: Partial<Task>) => {
+    setState((s) => ({
+      projects: s.projects.map((p) =>
+        p.id === projectId
+          ? { ...p, tasks: p.tasks.map((t) => (t.id === taskId ? { ...t, ...patch } : t)) }
+          : p
+      ),
+    }));
+  },
+  deleteTask: (projectId: string, taskId: string) => {
+    setState((s) => ({
+      projects: s.projects.map((p) =>
+        p.id === projectId ? { ...p, tasks: p.tasks.filter((t) => t.id !== taskId) } : p
       ),
     }));
   },
