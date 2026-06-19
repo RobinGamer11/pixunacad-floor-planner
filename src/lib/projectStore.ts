@@ -84,9 +84,10 @@ export interface Project {
   sheets: Sheet[];
   tasks: Task[];
   events: CalendarEvent[];
+  konzept?: string;
 }
 
-const STORAGE_KEY = "pixuna.projects.v1";
+const STORAGE_KEY = "pixuna.projects.v2";
 
 const placeholder = (label: string) =>
   `data:image/svg+xml;utf8,${encodeURIComponent(
@@ -141,11 +142,11 @@ function demoProjects(): Project[] {
   });
 
   return [
-    mk("p-wohnhaus", "Wohnhaus am See", "Starnberger See", { favorite: true }),
-    mk("p-umbau", "Umbau Stadthaus", "München"),
-    mk("p-buero", "Bürogebäude Nord", "Hamburg"),
-    mk("p-ferien", "Ferienhaus Alpenblick", "Garmisch-Partenkirchen", { favorite: true }),
-    mk("p-praxis", "Innenausbau Praxis", "Frankfurt"),
+    mk("p-wohnhaus", "Wohnhaus am See", "Starnberger See", {
+      favorite: true,
+      konzept:
+        "Die Variante A öffnet den Wohn-, Ess- und Kochbereich zum See hin und schafft eine fließende Verbindung zwischen Innen- und Außenraum.",
+    }),
   ];
 }
 
@@ -224,6 +225,7 @@ export const projectStore = {
     setState((s) => ({ projects: s.projects.filter((p) => p.id !== id) }));
   },
   addPage: (projectId: string) => {
+    const newId = `${projectId}-p${Date.now().toString(36)}`;
     setState((s) => ({
       projects: s.projects.map((p) => {
         if (p.id !== projectId) return p;
@@ -235,7 +237,7 @@ export const projectStore = {
           pages: [
             ...p.pages,
             {
-              id: `${projectId}-p${Date.now().toString(36)}`,
+              id: newId,
               title: `${num} Neue Seite`,
               format: "A3-quer",
               margins: 20,
@@ -246,6 +248,7 @@ export const projectStore = {
         };
       }),
     }));
+    return newId;
   },
   updatePage: (projectId: string, pageId: string, patch: Partial<ProjectPage>) => {
     setState((s) => ({
