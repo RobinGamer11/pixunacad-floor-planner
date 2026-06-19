@@ -36,6 +36,8 @@ export default function CadOverlayLayer({
   enabled,
   initialState,
   onChange,
+  lineColor,
+  lineThicknessMm,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const hubRef = useRef<HTMLDivElement>(null);
