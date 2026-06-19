@@ -84,9 +84,10 @@ export interface Project {
   sheets: Sheet[];
   tasks: Task[];
   events: CalendarEvent[];
+  konzept?: string;
 }
 
-const STORAGE_KEY = "pixuna.projects.v1";
+const STORAGE_KEY = "pixuna.projects.v2";
 
 const placeholder = (label: string) =>
   `data:image/svg+xml;utf8,${encodeURIComponent(
