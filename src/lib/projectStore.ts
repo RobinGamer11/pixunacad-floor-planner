@@ -28,6 +28,8 @@ export interface PageElement {
   text?: string;
   fontSize?: number;
   color?: string;
+  bold?: boolean;
+  italic?: boolean;
   imageUrl?: string;
   opacity?: number;
   shadow?: boolean;
