@@ -245,12 +245,34 @@ export default function ProjectsHome() {
                 <button className="text-muted-foreground" title="Mehr">···</button>
               </div>
               <div className="flex items-center gap-2">
-                <button
-                  className="h-9 px-3 rounded-md border text-sm flex items-center gap-2"
-                  style={{ borderColor: "hsl(var(--hairline))" }}
-                >
-                  <Share2 size={14} /> Teilen
-                </button>
+                {selected.isTemplate ? (
+                  <button
+                    onClick={() => {
+                      if (confirm("Vorlage zurücksetzen? Alle projektspezifischen Inhalte (Texte, Seiteninhalte, Termine) werden geleert.")) {
+                        projectStore.resetTemplate(selected.id);
+                      }
+                    }}
+                    className="h-9 px-3 rounded-md border text-sm flex items-center gap-2"
+                    style={{ borderColor: "hsl(var(--hairline))" }}
+                  >
+                    Reset
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      const id = projectStore.duplicateAsTemplate(selected.id);
+                      if (id) {
+                        setMode("templates");
+                        setSelectedId(id);
+                      }
+                    }}
+                    className="h-9 px-3 rounded-md border text-sm flex items-center gap-2"
+                    style={{ borderColor: "hsl(var(--hairline))" }}
+                    title="Als Vorlage speichern"
+                  >
+                    <LayoutTemplate size={14} /> Vorlage+
+                  </button>
+                )}
                 <button
                   className="h-9 px-3 rounded-md text-sm font-medium flex items-center gap-2"
                   style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
