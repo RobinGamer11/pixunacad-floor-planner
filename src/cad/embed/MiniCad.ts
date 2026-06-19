@@ -134,12 +134,56 @@ export class MiniCad {
     // Resize + camera setup.
     this.applyZoom(this._zoom);
 
+    // Register the invisible page-frame as snap geometry (4 segments at the
+    // page edges). The frame is hidden from rendering by filtering its label
+    // out of labelManager.list(), but stays visible to TopologyEngine because
+    // isVisible(frameLabelId) still returns true.
+    this._installPageFrameSnap();
+
     // Restore state, if any.
     if (init.initialState) this._restore(init.initialState);
     this._segmentCountLast = this.scene.segments.length;
 
     // Start the animation loop.
     this._tick();
+  }
+
+  /** Returns true if a segment is part of the invisible page frame. */
+  isFrameSegment(seg: { labelId?: string }): boolean {
+    return seg.labelId === this._frameLabelId;
+  }
+
+  private _installPageFrameSnap() {
+    // 1) Register a dedicated label that *exists* and is *visible* (so the
+    //    topology engine includes its segments in snap queries), but hide it
+    //    from labelManager.list() so the renderer never iterates it.
+    const lm: any = this.labelManager;
+    lm.groups.push({ id: this._frameLabelId, name: "__page_frame__", locked: true, visible: true });
+    const origList = lm.list.bind(lm);
+    lm.list = () => origList().filter((g: any) => g.id !== this._frameLabelId);
+
+    // 2) Build the 4 frame segments.
+    this._rebuildPageFrame();
+  }
+
+  private _rebuildPageFrame() {
+    // Remove any previously created frame segs.
+    this.scene.segments = this.scene.segments.filter((s) => s.labelId !== this._frameLabelId);
+    const wM = this.pageWidthMm / 1000;
+    const hM = this.pageHeightMm / 1000;
+    const style = {
+      color: "rgba(0,0,0,0)",
+      thicknessM: 0.0001,
+      labelId: this._frameLabelId,
+    };
+    try {
+      this.scene.createSegment({ x: 0, y: 0 }, { x: wM, y: 0 }, style);
+      this.scene.createSegment({ x: wM, y: 0 }, { x: wM, y: hM }, style);
+      this.scene.createSegment({ x: wM, y: hM }, { x: 0, y: hM }, style);
+      this.scene.createSegment({ x: 0, y: hM }, { x: 0, y: 0 }, style);
+    } catch (e) {
+      console.error("MiniCad: page-frame segment creation failed:", e);
+    }
   }
 
   /* ===== Public API ===== */
