@@ -133,7 +133,12 @@ export default function ProjectWorkspace() {
         className="flex flex-col items-center py-3 w-14 shrink-0 border-r gap-1"
         style={{ borderColor: "hsl(var(--hairline))" }}
       >
-        <ToolRailButton icon={<LayoutTemplate size={18} />} label="Seiten" active />
+        <ToolRailButton
+          icon={<MousePointer2 size={18} />}
+          label="Auswahl"
+          active={activeTool === null}
+          onClick={() => setActiveTool(null)}
+        />
         <ToolRailButton
           icon={<ExternalLink size={18} />}
           label="CAD öffnen"
