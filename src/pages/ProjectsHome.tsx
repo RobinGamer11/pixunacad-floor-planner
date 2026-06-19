@@ -1180,14 +1180,17 @@ function NavIcon({
   icon,
   label,
   active,
+  onClick,
 }: {
   icon: React.ReactNode;
   label: string;
   active?: boolean;
+  onClick?: () => void;
 }) {
   return (
     <button
       title={label}
+      onClick={onClick}
       className="w-9 h-9 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground"
       style={{
         background: active ? "hsl(var(--surface-muted))" : "transparent",
