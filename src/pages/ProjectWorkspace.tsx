@@ -71,6 +71,8 @@ export default function ProjectWorkspace() {
     opacity: 0.35,
     visible: true,
   });
+  const [zoom, setZoom] = useState(77);
+  const setZoomClamped = (v: number) => setZoom(Math.max(10, Math.min(400, Math.round(v))));
 
 
   if (!project) {
