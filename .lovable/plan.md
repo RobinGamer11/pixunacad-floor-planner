@@ -1,84 +1,88 @@
-# Plan: Wand-Preview reparieren & Innenwand-Aufbau vereinheitlichen
+# Projektmappen-Architektur
 
-## Punkt 01 — Preview wird beim Zeichnen der zweiten Wand nicht angezeigt
+Das bisherige CAD-Programm wird in eine dreistufige Anwendung eingebettet:
 
-### Diagnose
-In `WallTool._drawOverlay()` (Zeilen ~687–722) wird die Live-Vorschau gebaut.
-Sobald bereits eine Wand mit gleichem `labelId` existiert, wird der Pfad
-mit `WallTopologyGraph.build([...others, previewWall])` + `computeHealedWallLines`
-genommen. Vermutete Ursache:
+```
+Startseite (Projektübersicht)
+    └── Projektmappe (Seiten-/Layout-Editor)
+            └── CAD-Zeichnen  ← bisheriges Programm, unverändert
+```
 
-- Der Preview-Wall hat erst **einen** echten Eckpunkt + den Maus-Punkt
-  (`allCorners = [...corners, previewPt]`, also Länge 2). Wenn `previewPt` per
-  Snap **exakt auf der bestehenden Wand** liegt (Wand-Endpunkt-Snap, häufig
-  beim ersten Mausmove nach Commit), entsteht im Graphen ein Knoten zwischen
-  den beiden Wänden, und `computeHealedWallLines` klemmt die Preview-Main-Linie
-  auf den selben Punkt → `mainCorners` kollabiert auf einen Punkt → keine
-  sichtbare Linie. Außerdem wird `subCorners`/`helpCorners` aus der gehealten
-  Variante NICHT gezeichnet, sondern aus dem rohen Offset — der ist bei nur
-  2 Punkten aber sichtbar. Mainline (die eigentliche Wand) fehlt.
+## 1. Routing & App-Struktur
 
-### Fix
-1. Preview-Wall **nicht** in den Topologie-Graph einhängen, solange er nur
-   2 Eckpunkte hat **und** noch kein echter zweiter Klick erfolgte.
-   Stattdessen: rohe `computeWallLines` für die Preview verwenden und die
-   gehealten Endpunkte **nur** am Startpunkt (Index 0, bereits committed)
-   anwenden, nicht am Maus-Punkt.
-2. Konkret in `_drawOverlay`:
-   - Immer `computeWallLines` als Grundlage benutzen.
-   - Anschließend nur die Eckpunkte mit Index < `this.corners.length` durch
-     gehealte Werte ersetzen (über `computeHealedWallLines` mit allen
-     `others`-Wänden, aber das Preview-Endstück bleibt roh).
-3. Falls die Maus tatsächlich auf einer bestehenden Wand snappt
-   (`snap.wallId`), trotzdem den rohen Endpunkt anzeigen — der Snap-Dot
-   markiert den Anschluss bereits visuell.
+Neue Routes in `src/App.tsx`:
+- `/` → `ProjectsHome` (Startseite, Projektübersicht)
+- `/project/:projectId` → `ProjectWorkspace` (Projektmappe / Seiten-Editor)
+- `/project/:projectId/cad/:sheetId?` → bisheriger `CadEditor` mit „Zurück"-Button oben
 
-## Punkt 02 — Innenwände codeseitig wie Außenwände, nur Priorität unterscheidet
+Zentraler Zustand in `src/store/projectStore.ts` (Zustand + localStorage):
+- `projects[]` mit `{ id, name, ort, thumbnail, pages[], sheets[], tasks[], events[], info, updatedAt }`
+- `pages[]` mit `{ id, title, format, orientation, margins, background, elements[], backgroundOverlay }`
+- `sheets[]` = bisherige CAD-Zeichnungsblätter (Maßstab etc.) – Brücke zur bestehenden `SheetManager`-Logik
+- `tasks[]`, `events[]` projektweit
 
-Aktuelle Sonderfälle für `kind === "inner"`/`"outer"` entfernen, sodass
-Geometrie, Heal und Topologie identisch laufen. Priorität (für
-Konfliktauflösung beim Heal/Trim) bleibt das einzige Unterscheidungsmerkmal.
+Damit der bestehende CAD-Code unangetastet bleibt, lädt/speichert `CadEditor` weiterhin über seinen internen `SheetManager`; pro Projekt wird ein Storage-Key-Prefix verwendet.
 
-### Änderungen
+## 2. Startseite `src/pages/ProjectsHome.tsx`
 
-- **`src/cad/wallHeal.ts`** (Z. 99 & 140):
-  Die Bedingung `if (wall.kind === "outer" && ow.kind === "inner") continue;`
-  entfernen. Stattdessen wird die Priorität (`priorityIndex`) verwendet, um
-  bei Konflikten zu entscheiden, welche Wand gewinnt — Außen heilt jetzt auch
-  gegen Innen, aber Außen-Klemmungen werden nur akzeptiert, wenn die
-  Nachbarwand gleiche oder höhere Priorität hat.
-  → Konkret: Außen vs. Innen → Außen ignoriert Innen weiterhin beim Klemmen
-  (Innen darf Außen nicht stutzen), aber das wird über
-  `priorityIndex(ow.kind, …) <= priorityIndex(wall.kind, …)` ausgedrückt
-  statt über hartkodierte `kind`-Checks. Resultat ist verhaltensgleich,
-  Code aber einheitlich.
+3-spaltiges Layout:
+- **Links**: Projektkarten-Liste (`ProjectCard`) mit Thumbnail, Seiten-/Zeichnungsanzahl, letzter Änderung, „+ Neues Projekt".
+- **Mitte**: Schnellansicht des ausgewählten Projekts (read-only): Tabs Übersicht / Seiten / Zeichnungen / Notizen / Varianten / Team, Konzept-Preview, Zeitstrahl.
+- **Rechts**: Dashboard – Projektinfo, Aufgaben (projektübergreifend), Kalender, Termine.
 
-- **`src/cad/TopologyEngine.ts`** (Z. ~200):
-  `activeDrawingWallKind`-Sonderlogik (`preferSub` für inner-vs-outer)
-  entfernen. Sub-Linien werden für alle Wand-Arten gleichermaßen als
-  Snap-Kandidat angeboten; die Priorität entscheidet rein über `priorityWallId`
-  und Distanz, nicht über `kind`. `activeDrawingWallKind` kann
-  als Feld entfernt werden (auch Setzer in `WallTool.activate/cancel/update`).
+Doppelklick auf eine Projektkarte → Navigation zu `/project/:id`.
 
-- **`src/cad/Scene.ts`** (Z. 403):
-  `priority` bleibt kind-abhängig (Außen=200, Innen=100) — das ist die
-  gewünschte Einzelausnahme.
+## 3. Projektmappe `src/pages/ProjectWorkspace.tsx`
 
-- **`src/cad/WallTopologyGraph.ts`** (`priorityIndex`):
-  Unverändert — ist der zentrale Punkt, an dem die Priorität wirkt.
+Ersetzt die Startansicht komplett (eigene Vollbild-Route).
 
-- **`src/cad/wallUnion.ts` / `src/cad/Scene.ts`** (Default-Fillfarbe):
-  Bleibt `kind`-abhängig (rein visuell, nicht topologisch).
+**Linke Sidebar** (`PagesSidebar`):
+- Schmale Werkzeugleiste ganz links: Seiten, Text, Linie, **CAD-Zeichnen**, PDF einfügen, Bild, Notiz, Formen, Tabelle, Zeitstrahl, unten Ebenen/Vorlagen.
+- Seiten-Liste mit Thumbnails, Drag-Reorder, „+"-Button.
+- Unten: **Hintergrund-Transparenz** – Auswahl einer anderen Seite + Slider (0–100 %), Sichtbar-Toggle. Rendert die gewählte Seite als halbtransparenter Hintergrund-Layer.
 
-### Erwartetes Verhalten
-- Innenwand und Außenwand werden geometrisch identisch gezeichnet, gehealt,
-  getrimmt, verbunden.
-- An T-Stößen Außen↔Innen gewinnt weiterhin Außen (höhere Priorität) —
-  Innenwand mitert/stoppt an Außenkante, nicht umgekehrt.
-- Snap-Verhalten beim Zeichnen ist für beide Wandtypen gleich.
+**Mittlere Canvas** (`PageCanvas`):
+- Blatt im gewählten Format (A3 quer / A4 hoch / frei), Zoom-Pills unten.
+- Freie Platzierung von Elementen: `text`, `image`, `pdf`, `table`, `note`, `timeline`, `cad-view`, `line`, `shape`.
+- Element-Typ `cad-view` rendert einen statischen Snapshot eines Zeichnungsblatts (via bestehender Renderer-Export-Funktion, read-only auf dem Blatt).
+- Klick auf „CAD-Zeichnen" in der Werkzeugleiste → Route zu `/project/:id/cad`.
 
-## Betroffene Dateien
-- `src/cad/WallTool.ts` (Preview-Fix + `activeDrawingWallKind` entfernen)
-- `src/cad/TopologyEngine.ts` (Sub-Snap-Sonderlogik entfernen, Feld weg)
-- `src/cad/wallHeal.ts` (Kind-Checks durch Prioritäts-Vergleich ersetzen)
-- ggf. `src/cad/TopologyEngine.wallSnap.test.ts` (Tests anpassen)
+**Rechte Sidebar** (`RightInspector`) mit 3 Tabs:
+1. **Seiteneinstellungen** (Default, wenn nichts gewählt): Seitentitel, Format, Ausrichtung, Ränder, Hintergrund-Toggle, Layout (Spalten, Spaltenabstand, Hilfslinien), seitenbezogene Notizen.
+2. **Werkzeug** (kontextabhängig, wenn Element gewählt):
+   - Bild: Breite, Höhe, Position, Transparenz, Schatten, Rahmen.
+   - Text: Schrift, Größe, Farbe, Ausrichtung.
+   - CAD-Ansicht: Liste der Zeichnungsblätter mit Maßstab (aus bestehendem `SheetManager`); Klick = auswählen/platzieren, Doppelklick = wechselt in den CAD-Editor des Blatts.
+   - Weitere Typen: minimaler Default-Inspector.
+3. **Aufgaben**: Liste der Projektaufgaben mit Checkbox + Datum, Gruppierung „Heute / Diese Woche / Geplante Termine".
+
+## 4. CAD-Bereich (bestehend)
+
+`CadEditor` bleibt funktional 1:1 erhalten. Einzige Ergänzung: Header-Leiste mit „← Zurück zur Projektmappe"-Button, die nur erscheint, wenn `projectId` aus der Route vorhanden ist. Kein Eingriff in Tools/Renderer/Topology.
+
+## 5. Persistenz
+
+- `localStorage`-Key `pixuna.projects.v1` für Projektliste & Seiten/Tasks/Events.
+- CAD-Daten pro Projekt unter `pixuna.cad.<projectId>.*` (Prefix-Erweiterung der bestehenden Storage-Keys in `SheetManager`/`PlanManager`).
+- Auto-Save bei jeder Änderung (debounced).
+
+## 6. Design
+
+Helle, moderne Ästhetik analog zu den Mockups: warmes Off-White (`#FAF8F5`), feines Beige für Karten, Akzent Terrakotta/Gold (`#C9874C`), schwarze Primary-Buttons, Inter/Geometric Sans. Semantische Tokens in `src/index.css` ergänzen (`--surface`, `--surface-muted`, `--accent-gold`, `--ink`).
+
+## 7. Umsetzung in Etappen (in dieser Reihenfolge)
+
+1. Design-Tokens + Routing-Grundgerüst + Zustand-Store mit Demo-Projekten.
+2. Startseite (Karten, Schnellansicht, Dashboard).
+3. Projektmappe (Sidebar, Canvas mit Basis-Elementen Text/Bild/Notiz, Rechte Sidebar mit 3 Tabs).
+4. CAD-Integration: „Zurück"-Button, CAD-Ansicht-Element + Doppelklick-Sprung, Sheet-Liste im Werkzeug-Tab.
+5. Hintergrund-Transparenz-Layer.
+6. Aufgaben/Kalender-Logik scharf schalten (CRUD).
+
+## Offene Punkte / Annahmen
+
+- Element-Editor ist bewusst MVP: Drag/Resize via einfacher Mouse-Handler (kein externes Lib), Inspector setzt Werte. Reicht für das geforderte „frei platzierbar".
+- CAD-Ansicht im Blatt = Bild-Snapshot (PNG) des Zeichnungsblatts, generiert über bestehenden `Renderer`. Aktualisierung beim Öffnen der Seite.
+- Keine Authentifizierung / kein Cloud-Backend in diesem Schritt – alles client-seitig (passt zur bisherigen Roadmap: Registrierung später).
+
+Soll ich so umsetzen? Falls du Reihenfolge/Scope anpassen willst (z.B. zuerst nur Startseite + Projektmappe ohne CAD-Snapshots), sag kurz Bescheid.
