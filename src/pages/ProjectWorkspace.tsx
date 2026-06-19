@@ -1220,46 +1220,38 @@ function ToolsTab({
 }) {
   return (
     <div className="space-y-5">
-      {/* Tool picker */}
+      {/* Active tool header */}
       <div>
         <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-3">
-          WERKZEUG
+          AKTIVES WERKZEUG
         </div>
-        <div className="grid grid-cols-2 gap-2">
-          <ToolPickButton
-            label="Hilfslinie"
-            sub="Hellblau · gestrichelt"
-            icon={<Minus size={16} />}
-            active={activeTool === "guide"}
-            onClick={() => setActiveTool(activeTool === "guide" ? null : "guide")}
-          />
-          <ToolPickButton
-            label="Linie"
-            sub="Wie in CAD"
-            icon={<Minus size={16} />}
-            active={activeTool === "line"}
-            onClick={() => setActiveTool(activeTool === "line" ? null : "line")}
-          />
-          <ToolPickButton
-            label="Text"
-            sub="Wie in CAD"
-            icon={<Type size={16} />}
-            active={activeTool === "text"}
-            onClick={() => setActiveTool(activeTool === "text" ? null : "text")}
-          />
-          <ToolPickButton
-            label="CAD"
-            sub="Zeichenblatt"
-            icon={<CompassIcon size={16} />}
-            active={activeTool === "cad"}
-            onClick={() => setActiveTool(activeTool === "cad" ? null : "cad")}
-          />
-        </div>
+        {!activeTool ? (
+          <div className="text-xs text-muted-foreground">
+            Wähle links in der Werkzeugleiste ein Werkzeug (Hilfslinie, Linie, Text, CAD-Blatt) — die zugehörigen Einstellungen erscheinen hier.
+          </div>
+        ) : (
+          <div className="flex items-center justify-between rounded-md border px-3 py-2" style={{ borderColor: "hsl(var(--hairline))" }}>
+            <div className="text-sm font-medium">
+              {activeTool === "guide" && "Hilfslinie"}
+              {activeTool === "line" && "Linie (CAD)"}
+              {activeTool === "text" && "Text (CAD)"}
+              {activeTool === "cad" && "CAD-Zeichenblatt"}
+            </div>
+            <button
+              onClick={() => setActiveTool(null)}
+              className="text-[11px] text-muted-foreground hover:text-foreground"
+            >
+              Beenden
+            </button>
+          </div>
+        )}
         {activeTool && activeTool !== "cad" && (
           <div className="mt-2 text-[11px] text-muted-foreground">
             {activeTool === "text"
               ? "Klick auf die Seite, um Text einzufügen. ESC = abbrechen."
-              : "Zwei Klicks auf der Seite setzen Start- und Endpunkt. ESC = abbrechen."}
+              : activeTool === "line"
+              ? "Klicken setzt Punkte (Snap/Ortho/Hub wie in CAD). ESC = abbrechen."
+              : "Zwei Klicks setzen Start- und Endpunkt. ESC = abbrechen."}
           </div>
         )}
       </div>
@@ -1284,11 +1276,6 @@ function ToolsTab({
           pageId={pageId}
           onJumpCad={onJumpCad}
         />
-      )}
-      {!activeTool && !element && (
-        <div className="text-xs text-muted-foreground">
-          Wähle ein Werkzeug oben, oder klicke ein Element auf der Seite an, um es zu bearbeiten.
-        </div>
       )}
     </div>
   );
