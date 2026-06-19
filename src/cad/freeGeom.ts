@@ -107,3 +107,131 @@ export function projectPointToInfiniteLineFromTwoPoints(p: Vec2, a: Vec2, b: Vec
   const t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / lenSq;
   return v(a.x + dx * t, a.y + dy * t);
 }
+
+/**
+ * Erkennt aus einem Freihand-Pfad, ob eine gerade Linie oder ein Kreis gemeint war,
+ * und liefert eine bereinigte Punktfolge zurück. Wenn keine klare Form erkannt wird,
+ * werden die Punkte stark geglättet (Chaikin) zurückgegeben.
+ */
+export function autoShapePoints(points: Vec2[]): Vec2[] {
+  const pts = dedupePoints(points);
+  if (pts.length < 3) return pts;
+
+  // Gesamtlänge und Sehne
+  let L = 0;
+  for (let i = 1; i < pts.length; i++) L += dist(pts[i - 1], pts[i]);
+  const a = pts[0], b = pts[pts.length - 1];
+  const chord = dist(a, b);
+  if (L < 1e-6) return pts;
+
+  // 1) Geradenerkennung: max. senkrechter Abstand zur Sehne (start→end)
+  if (chord / L > 0.85 && chord > 1e-4) {
+    let maxPerp = 0;
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const nx = -dy / len, ny = dx / len;
+    for (const p of pts) {
+      const d = Math.abs((p.x - a.x) * nx + (p.y - a.y) * ny);
+      if (d > maxPerp) maxPerp = d;
+    }
+    if (maxPerp / chord < 0.06) {
+      return [v(a.x, a.y), v(b.x, b.y)];
+    }
+  }
+
+  // 2) Kreiserkennung: Kasa-Fit (algebraisch) über alle Punkte.
+  // Mindestens „geschlossen-artig": chord/L < 0.55 (offener Bogen bis ~Halbkreis)
+  if (pts.length >= 6) {
+    // Berechne Sum-Terms
+    let sx = 0, sy = 0, sxx = 0, syy = 0, sxy = 0, sxz = 0, syz = 0, sz = 0;
+    const n = pts.length;
+    for (const p of pts) {
+      const z = p.x * p.x + p.y * p.y;
+      sx += p.x; sy += p.y;
+      sxx += p.x * p.x; syy += p.y * p.y; sxy += p.x * p.y;
+      sxz += p.x * z; syz += p.y * z; sz += z;
+    }
+    // Löse [[sxx,sxy,sx],[sxy,syy,sy],[sx,sy,n]] * [A,B,C] = [sxz,syz,sz]
+    const m: number[][] = [
+      [sxx, sxy, sx, sxz],
+      [sxy, syy, sy, syz],
+      [sx,  sy,  n,  sz ],
+    ];
+    // Gaussian elimination
+    let ok = true;
+    for (let i = 0; i < 3; i++) {
+      let pivot = i;
+      for (let k = i + 1; k < 3; k++) if (Math.abs(m[k][i]) > Math.abs(m[pivot][i])) pivot = k;
+      if (Math.abs(m[pivot][i]) < 1e-12) { ok = false; break; }
+      if (pivot !== i) { const t = m[i]; m[i] = m[pivot]; m[pivot] = t; }
+      for (let k = i + 1; k < 3; k++) {
+        const f = m[k][i] / m[i][i];
+        for (let j = i; j < 4; j++) m[k][j] -= f * m[i][j];
+      }
+    }
+    if (ok) {
+      const C = m[2][3] / m[2][2];
+      const B = (m[1][3] - m[1][2] * C) / m[1][1];
+      const A = (m[0][3] - m[0][1] * B - m[0][2] * C) / m[0][0];
+      const cx = A / 2, cy = B / 2;
+      const r2 = C + cx * cx + cy * cy;
+      if (r2 > 1e-8) {
+        const r = Math.sqrt(r2);
+        // Residuen
+        let maxRes = 0, sumRes = 0;
+        for (const p of pts) {
+          const d = Math.abs(Math.hypot(p.x - cx, p.y - cy) - r);
+          sumRes += d;
+          if (d > maxRes) maxRes = d;
+        }
+        const avgRes = sumRes / n;
+        // Winkel-Spannweite ermitteln
+        const angles = pts.map(p => Math.atan2(p.y - cy, p.x - cx));
+        // Sortieren und größte Lücke finden
+        const sorted = angles.slice().sort((x, y) => x - y);
+        let maxGap = sorted[0] + 2 * Math.PI - sorted[sorted.length - 1];
+        for (let i = 1; i < sorted.length; i++) {
+          const g = sorted[i] - sorted[i - 1];
+          if (g > maxGap) maxGap = g;
+        }
+        const span = 2 * Math.PI - maxGap; // belegter Winkel
+        const isClosed = chord < r * 0.5;
+        // Strenge Akzeptanz: Residuen klein im Verhältnis zum Radius
+        if (avgRes / r < 0.08 && maxRes / r < 0.18 && r > 1e-4) {
+          if (isClosed && span > Math.PI * 1.5) {
+            // Voller Kreis
+            const out: Vec2[] = [];
+            const N = 64;
+            for (let i = 0; i <= N; i++) {
+              const t = (i / N) * Math.PI * 2;
+              out.push(v(cx + r * Math.cos(t), cy + r * Math.sin(t)));
+            }
+            return out;
+          } else if (span > Math.PI * 0.35) {
+            // Bogen zwischen Start- und Endwinkel — kürzester Weg, der die Mittelpunkte abdeckt
+            const a0 = Math.atan2(a.y - cy, a.x - cx);
+            const a1 = Math.atan2(b.y - cy, b.x - cx);
+            // Wähle Drehrichtung so, dass mittlerer Punkt enthalten ist
+            const mid = pts[Math.floor(pts.length / 2)];
+            const am = Math.atan2(mid.y - cy, mid.x - cx);
+            const norm = (x: number) => ((x % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+            const ccwSpan = norm(a1 - a0);
+            const midOffsetCcw = norm(am - a0);
+            const useCcw = midOffsetCcw <= ccwSpan;
+            const N = 48;
+            const out: Vec2[] = [];
+            for (let i = 0; i <= N; i++) {
+              const t = i / N;
+              const ang = useCcw ? a0 + t * ccwSpan : a0 - t * (2 * Math.PI - ccwSpan);
+              out.push(v(cx + r * Math.cos(ang), cy + r * Math.sin(ang)));
+            }
+            return out;
+          }
+        }
+      }
+    }
+  }
+
+  // 3) Fallback: stärkeres Glätten
+  return smoothChaikin(pts, 3);
+}
