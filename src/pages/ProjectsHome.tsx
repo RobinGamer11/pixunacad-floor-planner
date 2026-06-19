@@ -135,18 +135,20 @@ export default function ProjectsHome() {
           <div className="px-5 pt-5 pb-3">
             <Pixuna />
             <div className="mt-5 text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">
-              PROJEKTE
+              {mode === "templates" ? "VORLAGEN" : "PROJEKTE"}
             </div>
-            <button
-              onClick={() => {
-                const id = projectStore.createProject();
-                setSelectedId(id);
-              }}
-              className="mt-3 w-full h-10 rounded-lg flex items-center justify-center gap-2 text-sm font-medium"
-              style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
-            >
-              <Plus size={15} /> Neues Projekt
-            </button>
+            {mode === "projects" && (
+              <button
+                onClick={() => {
+                  const id = projectStore.createProject();
+                  setSelectedId(id);
+                }}
+                className="mt-3 w-full h-10 rounded-lg flex items-center justify-center gap-2 text-sm font-medium"
+                style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
+              >
+                <Plus size={15} /> Neues Projekt
+              </button>
+            )}
             <div
               className="mt-3 flex items-center gap-2 h-9 rounded-md px-2.5"
               style={{ background: "hsl(var(--surface-muted))" }}
@@ -155,7 +157,7 @@ export default function ProjectsHome() {
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Projekte suchen..."
+                placeholder={mode === "templates" ? "Vorlagen suchen..." : "Projekte suchen..."}
                 className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
               />
             </div>
