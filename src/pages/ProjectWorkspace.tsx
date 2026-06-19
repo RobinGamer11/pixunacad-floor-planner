@@ -1103,6 +1103,40 @@ function ElementView({
   );
 }
 
+/** Vorschau-Bild eines CAD-Sheets. Liest live aus dem projectStore und
+ *  zeigt den `thumbnail` (PNG aus dem CAD-Editor). Fallback: dezenter
+ *  Platzhalter, wenn das Sheet noch nie im CAD geöffnet wurde. */
+function CadViewThumb({ sheetId }: { sheetId?: string }) {
+  const projects = useProjects();
+  const sheet = React.useMemo(() => {
+    if (!sheetId) return undefined;
+    for (const p of projects) {
+      const s = p.sheets.find((x) => x.id === sheetId);
+      if (s) return s;
+    }
+    return undefined;
+  }, [projects, sheetId]);
+  if (sheet?.thumbnail) {
+    return (
+      <img
+        src={sheet.thumbnail}
+        alt={sheet.name}
+        className="w-full h-full object-contain"
+        style={{ background: "white" }}
+        draggable={false}
+      />
+    );
+  }
+  return (
+    <div
+      className="w-full h-full flex items-center justify-center text-xs text-muted-foreground border-2 border-dashed"
+      style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-muted))" }}
+    >
+      {sheet ? `${sheet.name} — noch keine Vorschau (Sheet im CAD öffnen)` : "Kein Zeichenblatt"}
+    </div>
+  );
+}
+
 function RightInspector({
   projectId,
   page,
