@@ -1289,49 +1289,11 @@ function InfosView({ project }: { project: Project }) {
       />
 
       {(project.customFields ?? []).map((f) => (
-        <div key={f.id} className="col-span-2 grid grid-cols-[1fr_2fr_auto] gap-2 items-end">
-          <label className="block">
-            <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">
-              FELD-TITEL
-            </div>
-            <input
-              defaultValue={f.label}
-              onBlur={(e) => projectStore.updateCustomField(project.id, f.id, { label: e.target.value })}
-              className="mt-1 w-full h-9 rounded-md border px-3 text-sm bg-transparent outline-none"
-              style={{ borderColor: "hsl(var(--hairline))" }}
-            />
-          </label>
-          <label className="block">
-            <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">
-              INHALT
-            </div>
-            <textarea
-              defaultValue={f.value}
-              onBlur={(e) => projectStore.updateCustomField(project.id, f.id, { value: e.target.value })}
-              rows={1}
-              className="mt-1 w-full min-h-9 rounded-md border px-3 py-1.5 text-sm bg-transparent outline-none resize-y"
-              style={{ borderColor: "hsl(var(--hairline))" }}
-            />
-          </label>
-          <button
-            onClick={() => projectStore.deleteCustomField(project.id, f.id)}
-            title="Feld löschen"
-            className="h-9 w-9 rounded-md border flex items-center justify-center text-muted-foreground hover:text-foreground"
-            style={{ borderColor: "hsl(var(--hairline))" }}
-          >
-            <Trash2 size={14} />
-          </button>
-        </div>
+        <CustomFieldEditor key={f.id} projectId={project.id} field={f} />
       ))}
 
       <div className="col-span-2 flex items-center justify-between">
-        <button
-          onClick={() => projectStore.addCustomField(project.id)}
-          className="h-9 px-3 rounded-md border text-sm flex items-center gap-2"
-          style={{ borderColor: "hsl(var(--hairline))" }}
-        >
-          <Plus size={14} /> Feld hinzufügen
-        </button>
+        <AddCustomFieldControl projectId={project.id} />
         <div className="text-xs text-muted-foreground">
           Änderungen werden automatisch in der rechten Projektinfo übernommen.
         </div>
