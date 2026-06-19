@@ -110,16 +110,6 @@ export default function CadOverlayLayer(props: Props) {
           sizeSelect: teSizeRef.current,
           symbolSelect: teSymbolRef.current,
         },
-        textHub: thRef.current && thWRef.current && thHRef.current && thRRef.current && thXRef.current && thYRef.current
-          ? {
-              root: thRef.current,
-              widthInput: thWRef.current,
-              heightInput: thHRef.current,
-              rotationInput: thRRef.current,
-              xInput: thXRef.current,
-              yInput: thYRef.current,
-            }
-          : undefined,
       },
       pageWidthMm,
       pageHeightMm,
