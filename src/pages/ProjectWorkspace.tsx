@@ -36,6 +36,11 @@ import {
   PanelRightOpen,
   ZoomIn,
   ZoomOut,
+  RefreshCw,
+  Compass as CompassIcon,
+  MousePointer2,
+  ExternalLink,
+
 } from "lucide-react";
 
 import {
@@ -56,6 +61,8 @@ const FORMAT_SIZES: Record<PageFormat, { w: number; h: number; label: string }> 
   frei: { w: 400, h: 300, label: "Freies Format" },
 };
 
+export type PageTool = "guide" | "line" | "text" | "cad" | null;
+
 export default function ProjectWorkspace() {
   const { projectId } = useParams();
   const project = useProject(projectId);
@@ -63,6 +70,7 @@ export default function ProjectWorkspace() {
   const [activePageId, setActivePageId] = useState<string | undefined>(project?.pages[0]?.id);
   const [selectedElementId, setSelectedElementId] = useState<string | undefined>();
   const [rightTab, setRightTab] = useState<"settings" | "tools" | "tasks">("settings");
+  const [activeTool, setActiveTool] = useState<PageTool>(null);
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
   const [renamingPageId, setRenamingPageId] = useState<string | undefined>();
@@ -73,6 +81,11 @@ export default function ProjectWorkspace() {
   });
   const [zoom, setZoom] = useState(77);
   const setZoomClamped = (v: number) => setZoom(Math.max(10, Math.min(400, Math.round(v))));
+  const setActiveToolAndTab = (t: PageTool) => {
+    setActiveTool(t);
+    if (t) setRightTab("tools");
+  };
+
 
 
   if (!project) {
