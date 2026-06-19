@@ -921,6 +921,10 @@ function RightInspector({
   tab,
   setTab,
   project,
+  activeTool,
+  setActiveTool,
+  selectedElementId,
+  setSelectedElementId,
   onJumpCad,
   onCollapse,
 }: {
@@ -930,6 +934,10 @@ function RightInspector({
   tab: "settings" | "tools" | "tasks";
   setTab: (t: "settings" | "tools" | "tasks") => void;
   project: import("@/lib/projectStore").Project;
+  activeTool: PageTool;
+  setActiveTool: (t: PageTool) => void;
+  selectedElementId?: string;
+  setSelectedElementId: (id?: string) => void;
   onJumpCad: (sheetId?: string) => void;
   onCollapse?: () => void;
 }) {
@@ -947,7 +955,7 @@ function RightInspector({
         <PanelRightClose size={14} className="text-muted-foreground" />
       </button>
       <div className="grid grid-cols-3 border-b" style={{ borderColor: "hsl(var(--hairline))" }}>
-        <TabButton active={tab === "settings"} onClick={() => setTab("settings")} icon={<Settings size={14} />} label="Seiteneinstellungen" />
+        <TabButton active={tab === "settings"} onClick={() => setTab("settings")} icon={<Settings size={14} />} label="Seiteneinstellung" />
         <TabButton active={tab === "tools"} onClick={() => setTab("tools")} icon={<Wrench size={14} />} label="Werkzeug" />
         <TabButton
           active={tab === "tasks"}
@@ -961,13 +969,24 @@ function RightInspector({
       <div className="flex-1 overflow-y-auto p-5 space-y-5">
         {tab === "settings" && page && <PageSettings projectId={projectId} page={page} />}
         {tab === "tools" && (
-          <ToolsTab projectId={projectId} pageId={page?.id} element={element} project={project} onJumpCad={onJumpCad} />
+          <ToolsTab
+            projectId={projectId}
+            pageId={page?.id}
+            element={element}
+            project={project}
+            activeTool={activeTool}
+            setActiveTool={setActiveTool}
+            selectedElementId={selectedElementId}
+            setSelectedElementId={setSelectedElementId}
+            onJumpCad={onJumpCad}
+          />
         )}
         {tab === "tasks" && <TasksTab project={project} />}
       </div>
     </aside>
   );
 }
+
 
 function TabButton({
   active,
