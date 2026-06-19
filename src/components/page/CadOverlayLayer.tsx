@@ -23,6 +23,8 @@ interface Props {
   enabled: boolean; // pointer-events on/off
   initialState?: any;
   onChange: (state: any) => void;
+  lineColor?: string;
+  lineThicknessMm?: number;
 }
 
 export default function CadOverlayLayer({
