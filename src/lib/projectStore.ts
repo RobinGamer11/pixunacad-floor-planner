@@ -225,6 +225,7 @@ export const projectStore = {
     setState((s) => ({ projects: s.projects.filter((p) => p.id !== id) }));
   },
   addPage: (projectId: string) => {
+    const newId = `${projectId}-p${Date.now().toString(36)}`;
     setState((s) => ({
       projects: s.projects.map((p) => {
         if (p.id !== projectId) return p;
@@ -236,7 +237,7 @@ export const projectStore = {
           pages: [
             ...p.pages,
             {
-              id: `${projectId}-p${Date.now().toString(36)}`,
+              id: newId,
               title: `${num} Neue Seite`,
               format: "A3-quer",
               margins: 20,
@@ -247,6 +248,7 @@ export const projectStore = {
         };
       }),
     }));
+    return newId;
   },
   updatePage: (projectId: string, pageId: string, patch: Partial<ProjectPage>) => {
     setState((s) => ({
