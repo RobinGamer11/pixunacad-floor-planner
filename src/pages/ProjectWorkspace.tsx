@@ -842,6 +842,8 @@ function PageCanvas({
           activeTool={activeTool === "line" ? "line" : null}
           enabled={activeTool === "line"}
           initialState={page.cadOverlay}
+          lineColor={toolSettings.line.color}
+          lineThicknessMm={toolSettings.line.thicknessMm}
           onChange={(state) =>
             projectStore.updatePage(projectId, page.id, { cadOverlay: state })
           }
