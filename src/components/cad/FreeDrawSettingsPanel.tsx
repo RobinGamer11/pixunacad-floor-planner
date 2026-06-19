@@ -60,6 +60,7 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app }) => {
       setLabelId(app.activeDrawLabelId);
     }
     setHasRuler(!!app.scene.rulerGuide);
+    setAutoShape(app.defaultFreeAutoShape);
   };
 
   useEffect(() => {
