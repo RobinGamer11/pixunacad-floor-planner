@@ -270,7 +270,10 @@ export default function ProjectsHome() {
               ))}
             </div>
 
-            {(tab === "seiten" || tab === "uebersicht") && (
+            {tab === "uebersicht" && (
+              <UebersichtView project={selected} onAddPage={handleAddPage} />
+            )}
+            {tab === "seiten" && (
               <SeitenView project={selected} onAddPage={handleAddPage} />
             )}
             {tab === "infos" && <InfosView project={selected} />}
