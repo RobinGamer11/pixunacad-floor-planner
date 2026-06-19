@@ -171,6 +171,7 @@ export class MiniSelectTool {
     this.app.clearSelection();
     this.app.hub.hide();
     this.app.hub.bindCommit(null);
+    try { this.app.textHub?.hide(); this.app.textHub?.bindCommit(null); } catch {}
     this.dragSegId = null;
     this.dragTextId = null;
   }
