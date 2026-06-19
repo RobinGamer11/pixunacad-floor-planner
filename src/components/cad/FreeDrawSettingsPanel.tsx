@@ -26,6 +26,7 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app }) => {
   const [imgSpacing, setImgSpacing] = useState(0.22);
   const [imgRotate, setImgRotate] = useState(true);
   const [labelId, setLabelId] = useState<string>("");
+  const [autoShape, setAutoShape] = useState(false);
   const [selectedStrokeId, setSelectedStrokeId] = useState<string | null>(null);
   const [, force] = useState(0);
   const fileRef = useRef<HTMLInputElement | null>(null);
