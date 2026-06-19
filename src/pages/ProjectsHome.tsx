@@ -246,6 +246,7 @@ export default function ProjectsHome() {
                 [
                   ["uebersicht", "Übersicht"],
                   ["seiten", "Seiten"],
+                  ["aufgaben", "Aufgaben"],
                   ["infos", "Infos"],
                   ["team", "Team"],
                 ] as const
@@ -276,6 +277,7 @@ export default function ProjectsHome() {
             {tab === "seiten" && (
               <SeitenView project={selected} onAddPage={handleAddPage} />
             )}
+            {tab === "aufgaben" && <AufgabenView project={selected} />}
             {tab === "infos" && <InfosView project={selected} />}
             {tab === "team" && (
               <div className="mt-6 text-sm text-muted-foreground">
