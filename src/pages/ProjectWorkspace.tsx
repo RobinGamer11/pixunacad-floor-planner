@@ -945,50 +945,37 @@ function PageSettings({
 
       <div>
         <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-3">
-          LAYOUT
+          ABHEFTUNG
         </div>
         <div className="space-y-3">
-          <Row label="Spalten">
-            <input
-              type="number"
-              value={page.columns ?? 12}
-              onChange={(e) => update({ columns: Number(e.target.value) })}
+          <Row label="Lochung">
+            <select
+              value={page.punchPattern ?? "none"}
+              onChange={(e) => update({ punchPattern: e.target.value as PunchPattern })}
               className="w-full h-8 px-2 rounded bg-transparent border text-sm"
               style={{ borderColor: "hsl(var(--hairline))" }}
-            />
+            >
+              <option value="none">Keine</option>
+              <option value="2-fach">2-fach (DIN 5005, 80 mm)</option>
+              <option value="4-fach">4-fach (8/8/8 cm)</option>
+              <option value="6-fach-a5">6-fach A5 Ringbuch</option>
+            </select>
           </Row>
-          <Row label="Spaltenabstand">
-            <input
-              value={`${page.columnGap ?? 6} mm`}
-              onChange={(e) =>
-                update({ columnGap: Number(e.target.value.replace(/\D/g, "")) || 0 })
-              }
-              className="w-full h-8 px-2 rounded bg-transparent border text-sm"
+          <Row label="Position">
+            <select
+              value={page.punchSide ?? "left"}
+              onChange={(e) => update({ punchSide: e.target.value as PunchSide })}
+              disabled={(page.punchPattern ?? "none") === "none"}
+              className="w-full h-8 px-2 rounded bg-transparent border text-sm disabled:opacity-50"
               style={{ borderColor: "hsl(var(--hairline))" }}
-            />
-          </Row>
-          <Row label="Hilfslinien">
-            <input
-              type="checkbox"
-              checked={page.guides ?? true}
-              onChange={(e) => update({ guides: e.target.checked })}
-            />
+            >
+              <option value="left">Links</option>
+              <option value="right">Rechts</option>
+              <option value="top">Oben</option>
+              <option value="bottom">Unten</option>
+            </select>
           </Row>
         </div>
-      </div>
-
-      <div>
-        <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-2">
-          NOTIZEN (SEITENBEZOGEN)
-        </div>
-        <textarea
-          value={page.notes ?? ""}
-          onChange={(e) => update({ notes: e.target.value })}
-          rows={5}
-          placeholder="Bauherren wünschen eine größere Terrassenüberdachung…"
-          className="w-full text-sm p-2 rounded border bg-transparent"
-          style={{ borderColor: "hsl(var(--hairline))" }}
-        />
       </div>
     </div>
   );
