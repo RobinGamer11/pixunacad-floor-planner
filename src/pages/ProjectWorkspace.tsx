@@ -87,6 +87,15 @@ export default function ProjectWorkspace() {
     if (t) setRightTab("tools");
   };
 
+  // Per-tool settings (live in workspace state; persist could come later).
+  const [toolSettings, setToolSettings] = useState({
+    guide: { color: "#7DD3FC", strokeWidth: 1 },
+    line: { color: "#111111", thicknessMm: 0.5 },
+    text: { fontSize: 16, color: "#111111", bold: false, italic: false },
+  });
+  const updateToolSettings = <K extends keyof typeof toolSettings>(k: K, patch: Partial<(typeof toolSettings)[K]>) =>
+    setToolSettings((s) => ({ ...s, [k]: { ...s[k], ...patch } }));
+
 
 
   if (!project) {
@@ -442,6 +451,7 @@ export default function ProjectWorkspace() {
                   selectedElementId={selectedElementId}
                   zoom={zoom}
                   activeTool={activeTool}
+                  toolSettings={toolSettings}
                   onCommitTool={() => setActiveTool(null)}
                   onSelect={(id) => {
                     setSelectedElementId(id);
@@ -466,6 +476,8 @@ export default function ProjectWorkspace() {
               setActiveTool={setActiveToolAndTab}
               selectedElementId={selectedElementId}
               setSelectedElementId={setSelectedElementId}
+              toolSettings={toolSettings}
+              updateToolSettings={updateToolSettings}
               onJumpCad={(sheetId) => navigate(`/project/${project.id}/cad${sheetId ? `/${sheetId}` : ""}`)}
               onCollapse={() => setRightOpen(false)}
             />
@@ -531,6 +543,12 @@ const PUNCH_PATTERNS: Record<Exclude<PunchPattern, "none">, { label: string; off
   "6-fach-a5": { label: "6-fach A5 Ringbuch", offsets: [-79, -47.5, -15.8, 15.8, 47.5, 79], diameter: 5.5 },
 };
 
+type ToolSettings = {
+  guide: { color: string; strokeWidth: number };
+  line: { color: string; thicknessMm: number };
+  text: { fontSize: number; color: string; bold: boolean; italic: boolean };
+};
+
 function PageCanvas({
   projectId,
   page,
@@ -539,6 +557,7 @@ function PageCanvas({
   selectedElementId,
   zoom,
   activeTool,
+  toolSettings,
   onCommitTool,
   onSelect,
 }: {
@@ -549,6 +568,7 @@ function PageCanvas({
   selectedElementId?: string;
   zoom: number;
   activeTool: PageTool;
+  toolSettings: ToolSettings;
   onCommitTool: () => void;
   onSelect: (id?: string) => void;
 }) {
@@ -595,7 +615,10 @@ function PageCanvas({
         w: 25,
         h: 6,
         text: "Text",
-        fontSize: 16,
+        fontSize: toolSettings.text.fontSize,
+        color: toolSettings.text.color,
+        bold: toolSettings.text.bold,
+        italic: toolSettings.text.italic,
       });
       onCommitTool();
       return;
@@ -618,8 +641,8 @@ function PageCanvas({
           w: Math.max(0.2, maxX - minX),
           h: Math.max(0.2, maxY - minY),
           points: pts,
-          color: "#7DD3FC",
-          strokeWidth: 1,
+          color: toolSettings.guide.color,
+          strokeWidth: toolSettings.guide.strokeWidth,
           nonPrinting: true,
         });
         setPendingStart(null);
@@ -821,6 +844,8 @@ function PageCanvas({
           activeTool={activeTool === "line" ? "line" : null}
           enabled={activeTool === "line"}
           initialState={page.cadOverlay}
+          lineColor={toolSettings.line.color}
+          lineThicknessMm={toolSettings.line.thicknessMm}
           onChange={(state) =>
             projectStore.updatePage(projectId, page.id, { cadOverlay: state })
           }
@@ -951,6 +976,8 @@ function ElementView({
           style={{
             fontSize: el.fontSize ?? 16,
             color: el.color ?? "hsl(var(--ink))",
+            fontWeight: el.bold ? 700 : 400,
+            fontStyle: el.italic ? "italic" : "normal",
             width: "100%",
             height: "100%",
             display: "flex",
@@ -1007,6 +1034,8 @@ function RightInspector({
   setActiveTool,
   selectedElementId,
   setSelectedElementId,
+  toolSettings,
+  updateToolSettings,
   onJumpCad,
   onCollapse,
 }: {
@@ -1020,6 +1049,8 @@ function RightInspector({
   setActiveTool: (t: PageTool) => void;
   selectedElementId?: string;
   setSelectedElementId: (id?: string) => void;
+  toolSettings: ToolSettings;
+  updateToolSettings: <K extends keyof ToolSettings>(k: K, patch: Partial<ToolSettings[K]>) => void;
   onJumpCad: (sheetId?: string) => void;
   onCollapse?: () => void;
 }) {
@@ -1060,6 +1091,8 @@ function RightInspector({
             setActiveTool={setActiveTool}
             selectedElementId={selectedElementId}
             setSelectedElementId={setSelectedElementId}
+            toolSettings={toolSettings}
+            updateToolSettings={updateToolSettings}
             onJumpCad={onJumpCad}
           />
         )}
@@ -1252,6 +1285,8 @@ function ToolsTab({
   setActiveTool,
   selectedElementId,
   setSelectedElementId,
+  toolSettings,
+  updateToolSettings,
   onJumpCad,
 }: {
   projectId: string;
@@ -1262,6 +1297,8 @@ function ToolsTab({
   setActiveTool: (t: PageTool) => void;
   selectedElementId?: string;
   setSelectedElementId: (id?: string) => void;
+  toolSettings: ToolSettings;
+  updateToolSettings: <K extends keyof ToolSettings>(k: K, patch: Partial<ToolSettings[K]>) => void;
   onJumpCad: (sheetId?: string) => void;
 }) {
   return (
@@ -1302,6 +1339,26 @@ function ToolsTab({
         )}
       </div>
 
+      {/* Per-tool settings */}
+      {activeTool === "guide" && (
+        <GuideSettings
+          settings={toolSettings.guide}
+          onChange={(p) => updateToolSettings("guide", p)}
+        />
+      )}
+      {activeTool === "line" && (
+        <LineSettings
+          settings={toolSettings.line}
+          onChange={(p) => updateToolSettings("line", p)}
+        />
+      )}
+      {activeTool === "text" && (
+        <TextSettings
+          settings={toolSettings.text}
+          onChange={(p) => updateToolSettings("text", p)}
+        />
+      )}
+
       {/* CAD section */}
       {activeTool === "cad" && (
         <CadToolSection
@@ -1326,6 +1383,161 @@ function ToolsTab({
     </div>
   );
 }
+
+function GuideSettings({
+  settings,
+  onChange,
+}: {
+  settings: ToolSettings["guide"];
+  onChange: (p: Partial<ToolSettings["guide"]>) => void;
+}) {
+  return (
+    <SettingsBlock title="HILFSLINIE">
+      <Row label="Farbe">
+        <ColorInput value={settings.color} onChange={(v) => onChange({ color: v })} />
+      </Row>
+      <Row label="Strichstärke">
+        <div className="flex items-center gap-2">
+          <input
+            type="range"
+            min={0.5}
+            max={4}
+            step={0.1}
+            value={settings.strokeWidth}
+            onChange={(e) => onChange({ strokeWidth: Number(e.target.value) })}
+            className="flex-1 accent-foreground"
+          />
+          <span className="text-xs tabular-nums w-10 text-right">{settings.strokeWidth.toFixed(1)} px</span>
+        </div>
+      </Row>
+      <div className="text-[11px] text-muted-foreground">
+        Hilfslinien werden hellblau gestrichelt angezeigt und beim Druck nicht ausgegeben.
+      </div>
+    </SettingsBlock>
+  );
+}
+
+function LineSettings({
+  settings,
+  onChange,
+}: {
+  settings: ToolSettings["line"];
+  onChange: (p: Partial<ToolSettings["line"]>) => void;
+}) {
+  return (
+    <SettingsBlock title="LINIE">
+      <Row label="Farbe">
+        <ColorInput value={settings.color} onChange={(v) => onChange({ color: v })} />
+      </Row>
+      <Row label="Stärke (mm)">
+        <input
+          type="number"
+          step={0.1}
+          min={0.1}
+          value={settings.thicknessMm}
+          onChange={(e) => {
+            const v = Number(e.target.value);
+            if (!Number.isNaN(v) && v > 0) onChange({ thicknessMm: v });
+          }}
+          className="w-full h-8 px-2 rounded bg-transparent border text-sm tabular-nums"
+          style={{ borderColor: "hsl(var(--hairline))" }}
+        />
+      </Row>
+      <div className="text-[11px] text-muted-foreground">
+        Zeichnet 1:1 mit CAD-Engine: Snap, Ortho (Shift), Hub-Eingabe für Länge/Winkel.
+      </div>
+    </SettingsBlock>
+  );
+}
+
+function TextSettings({
+  settings,
+  onChange,
+}: {
+  settings: ToolSettings["text"];
+  onChange: (p: Partial<ToolSettings["text"]>) => void;
+}) {
+  return (
+    <SettingsBlock title="TEXT">
+      <Row label="Schriftgröße">
+        <div className="flex items-center gap-2">
+          <input
+            type="range"
+            min={8}
+            max={64}
+            step={1}
+            value={settings.fontSize}
+            onChange={(e) => onChange({ fontSize: Number(e.target.value) })}
+            className="flex-1 accent-foreground"
+          />
+          <span className="text-xs tabular-nums w-10 text-right">{settings.fontSize} px</span>
+        </div>
+      </Row>
+      <Row label="Farbe">
+        <ColorInput value={settings.color} onChange={(v) => onChange({ color: v })} />
+      </Row>
+      <Row label="Stil">
+        <div className="flex gap-2">
+          <button
+            onClick={() => onChange({ bold: !settings.bold })}
+            className="h-8 w-8 rounded border text-sm font-bold"
+            style={{
+              borderColor: "hsl(var(--hairline))",
+              background: settings.bold ? "hsl(var(--accent-gold-soft))" : "transparent",
+            }}
+            title="Fett"
+          >
+            B
+          </button>
+          <button
+            onClick={() => onChange({ italic: !settings.italic })}
+            className="h-8 w-8 rounded border text-sm italic"
+            style={{
+              borderColor: "hsl(var(--hairline))",
+              background: settings.italic ? "hsl(var(--accent-gold-soft))" : "transparent",
+            }}
+            title="Kursiv"
+          >
+            I
+          </button>
+        </div>
+      </Row>
+    </SettingsBlock>
+  );
+}
+
+function SettingsBlock({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-3">
+        {title}
+      </div>
+      <div className="space-y-3">{children}</div>
+    </div>
+  );
+}
+
+function ColorInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        type="color"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-8 w-10 rounded border bg-transparent cursor-pointer"
+        style={{ borderColor: "hsl(var(--hairline))" }}
+      />
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="flex-1 h-8 px-2 rounded bg-transparent border text-sm tabular-nums"
+        style={{ borderColor: "hsl(var(--hairline))" }}
+      />
+    </div>
+  );
+}
+
 
 function ToolPickButton({
   label,

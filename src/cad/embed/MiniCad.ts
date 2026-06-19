@@ -147,6 +147,13 @@ export class MiniCad {
     if (tool === "line") this.lineTool.activate();
   }
 
+  setLineDefaults(opts: { color?: string; thicknessM?: number }) {
+    if (opts.color) this.defaultLineColor = opts.color;
+    if (typeof opts.thicknessM === "number" && opts.thicknessM > 0) {
+      this.defaultLineThicknessM = opts.thicknessM;
+    }
+  }
+
   applyZoom(zoom: number) {
     this._zoom = zoom;
     const cssW = this.pageWidthMm * this.basePxPerMm * zoom;

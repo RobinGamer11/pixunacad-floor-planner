@@ -23,6 +23,8 @@ interface Props {
   enabled: boolean; // pointer-events on/off
   initialState?: any;
   onChange: (state: any) => void;
+  lineColor?: string;
+  lineThicknessMm?: number;
 }
 
 export default function CadOverlayLayer({
@@ -34,6 +36,8 @@ export default function CadOverlayLayer({
   enabled,
   initialState,
   onChange,
+  lineColor,
+  lineThicknessMm,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const hubRef = useRef<HTMLDivElement>(null);
@@ -100,6 +104,15 @@ export default function CadOverlayLayer({
   useEffect(() => {
     engineRef.current?.setActiveTool(activeTool);
   }, [activeTool]);
+
+  // Line defaults.
+  useEffect(() => {
+    engineRef.current?.setLineDefaults({
+      color: lineColor,
+      thicknessM: typeof lineThicknessMm === "number" ? lineThicknessMm / 1000 : undefined,
+    });
+  }, [lineColor, lineThicknessMm]);
+
 
   return (
     <div
