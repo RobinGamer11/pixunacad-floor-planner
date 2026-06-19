@@ -34,6 +34,8 @@ import {
   PanelLeftOpen,
   PanelRightClose,
   PanelRightOpen,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 
 import {
@@ -42,6 +44,8 @@ import {
   type PageElement,
   type ElementKind,
   type PageFormat,
+  type PunchPattern,
+  type PunchSide,
 } from "@/lib/projectStore";
 
 const FORMAT_SIZES: Record<PageFormat, { w: number; h: number; label: string }> = {
@@ -67,6 +71,8 @@ export default function ProjectWorkspace() {
     opacity: 0.35,
     visible: true,
   });
+  const [zoom, setZoom] = useState(77);
+  const setZoomClamped = (v: number) => setZoom(Math.max(10, Math.min(400, Math.round(v))));
 
 
   if (!project) {
@@ -148,7 +154,7 @@ export default function ProjectWorkspace() {
             <button className="h-8 w-8 rounded-md flex items-center justify-center hover:bg-muted" title="Wiederherstellen">
               <Redo2 size={16} />
             </button>
-            <span className="text-xs px-2">77%</span>
+            <span className="text-xs px-2 tabular-nums">{zoom}%</span>
             <button className="h-8 w-8 rounded-md flex items-center justify-center hover:bg-muted" title="Vollbild">
               <Maximize2 size={16} />
             </button>
@@ -351,20 +357,38 @@ export default function ProjectWorkspace() {
           )}
 
           {/* Canvas */}
-          <main className="flex-1 relative overflow-auto" style={{ background: "hsl(var(--surface))" }}>
-            {activePage && (
-              <PageCanvas
-                projectId={project.id}
-                page={activePage}
-                overlayPage={bgOverlay.visible ? bgPage : undefined}
-                overlayOpacity={bgOverlay.opacity}
-                selectedElementId={selectedElementId}
-                onSelect={(id) => {
-                  setSelectedElementId(id);
-                  if (id) setRightTab("tools");
-                }}
-              />
-            )}
+          <main
+            className="flex-1 relative flex flex-col min-w-0"
+            style={{ background: "hsl(var(--surface))" }}
+          >
+            <div
+              className="flex-1 overflow-auto"
+              onWheel={(e) => {
+                if (e.ctrlKey || e.metaKey || !e.shiftKey) {
+                  // mouse wheel zooms; allow scroll only with shift
+                  if (e.shiftKey) return;
+                  e.preventDefault();
+                  const delta = -e.deltaY;
+                  setZoomClamped(zoom + (delta > 0 ? 5 : -5));
+                }
+              }}
+            >
+              {activePage && (
+                <PageCanvas
+                  projectId={project.id}
+                  page={activePage}
+                  overlayPage={bgOverlay.visible ? bgPage : undefined}
+                  overlayOpacity={bgOverlay.opacity}
+                  selectedElementId={selectedElementId}
+                  zoom={zoom}
+                  onSelect={(id) => {
+                    setSelectedElementId(id);
+                    if (id) setRightTab("tools");
+                  }}
+                />
+              )}
+            </div>
+            <ZoomBar zoom={zoom} setZoom={setZoomClamped} />
           </main>
 
           {/* Right inspector (collapsible) */}
@@ -433,12 +457,20 @@ function ToolRailButton({
   );
 }
 
+const PUNCH_PATTERNS: Record<Exclude<PunchPattern, "none">, { label: string; offsets: number[]; diameter: number }> = {
+  // offsets are distances (mm) of each hole center measured from the start of the bound edge (page corner)
+  "2-fach": { label: "2-fach (DIN 5005, 80 mm)", offsets: [-40, 40], diameter: 6 },
+  "4-fach": { label: "4-fach (8/8/8 cm)", offsets: [-120, -40, 40, 120], diameter: 6 },
+  "6-fach-a5": { label: "6-fach A5 Ringbuch", offsets: [-79, -47.5, -15.8, 15.8, 47.5, 79], diameter: 5.5 },
+};
+
 function PageCanvas({
   projectId,
   page,
   overlayPage,
   overlayOpacity,
   selectedElementId,
+  zoom,
   onSelect,
 }: {
   projectId: string;
@@ -446,14 +478,46 @@ function PageCanvas({
   overlayPage?: import("@/lib/projectStore").ProjectPage;
   overlayOpacity: number;
   selectedElementId?: string;
+  zoom: number;
   onSelect: (id?: string) => void;
 }) {
   const fmt = FORMAT_SIZES[page.format];
   const aspect = fmt.w / fmt.h;
-  const width = Math.min(1100, 1100);
+  const baseWidth = 1100;
+  const width = baseWidth * (zoom / 100);
   const height = width / aspect;
+  const mmToPx = width / fmt.w;
+  const marginPx = (page.margins ?? 0) * mmToPx;
+
+  const punchSide: PunchSide = page.punchSide ?? "left";
+  const punchPattern = page.punchPattern ?? "none";
+  const punchCfg = punchPattern !== "none" ? PUNCH_PATTERNS[punchPattern] : undefined;
+  const edgeInsetMm = 12; // distance of hole center from bound edge
+  const holes: { left: number; top: number; size: number }[] = [];
+  if (punchCfg) {
+    const sizePx = punchCfg.diameter * mmToPx;
+    const inset = edgeInsetMm * mmToPx;
+    if (punchSide === "left" || punchSide === "right") {
+      const cx = punchSide === "left" ? inset : width - inset;
+      punchCfg.offsets.forEach((o) => {
+        const cy = height / 2 + o * mmToPx;
+        if (cy > sizePx / 2 && cy < height - sizePx / 2) {
+          holes.push({ left: cx - sizePx / 2, top: cy - sizePx / 2, size: sizePx });
+        }
+      });
+    } else {
+      const cy = punchSide === "top" ? inset : height - inset;
+      punchCfg.offsets.forEach((o) => {
+        const cx = width / 2 + o * mmToPx;
+        if (cx > sizePx / 2 && cx < width - sizePx / 2) {
+          holes.push({ left: cx - sizePx / 2, top: cy - sizePx / 2, size: sizePx });
+        }
+      });
+    }
+  }
+
   return (
-    <div className="min-h-full flex items-center justify-center p-10">
+    <div className="min-h-full flex items-start justify-center p-10">
       <div
         className="relative shadow-xl"
         style={{
@@ -466,6 +530,19 @@ function PageCanvas({
           if (e.target === e.currentTarget) onSelect(undefined);
         }}
       >
+        {/* Margin overlay (light grey ring) */}
+        {marginPx > 0 && (
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              borderTop: `${marginPx}px solid hsl(0 0% 92%)`,
+              borderBottom: `${marginPx}px solid hsl(0 0% 92%)`,
+              borderLeft: `${marginPx}px solid hsl(0 0% 92%)`,
+              borderRight: `${marginPx}px solid hsl(0 0% 92%)`,
+              boxSizing: "border-box",
+            }}
+          />
+        )}
         {overlayPage && (
           <div
             className="absolute inset-0 pointer-events-none"
@@ -491,7 +568,85 @@ function PageCanvas({
             }}
           />
         ))}
+        {/* Punch holes overlay */}
+        {holes.map((h, i) => (
+          <div
+            key={i}
+            className="absolute rounded-full pointer-events-none"
+            style={{
+              left: h.left,
+              top: h.top,
+              width: h.size,
+              height: h.size,
+              background: "hsl(0 0% 88%)",
+              border: "1px solid hsl(0 0% 75%)",
+            }}
+          />
+        ))}
       </div>
+    </div>
+  );
+}
+
+function ZoomBar({ zoom, setZoom }: { zoom: number; setZoom: (v: number) => void }) {
+  const [draft, setDraft] = useState<string | null>(null);
+  return (
+    <div
+      className="h-10 shrink-0 border-t flex items-center justify-center gap-3 px-4"
+      style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
+    >
+      <button
+        onClick={() => setZoom(zoom - 10)}
+        className="h-7 w-7 rounded-md flex items-center justify-center hover:bg-muted text-muted-foreground"
+        title="Verkleinern"
+      >
+        <ZoomOut size={14} />
+      </button>
+      <input
+        type="range"
+        min={10}
+        max={400}
+        step={1}
+        value={zoom}
+        onChange={(e) => setZoom(Number(e.target.value))}
+        className="w-64 accent-foreground"
+      />
+      <button
+        onClick={() => setZoom(zoom + 10)}
+        className="h-7 w-7 rounded-md flex items-center justify-center hover:bg-muted text-muted-foreground"
+        title="Vergrößern"
+      >
+        <ZoomIn size={14} />
+      </button>
+      <div className="flex items-center gap-1">
+        <input
+          type="number"
+          min={10}
+          max={400}
+          value={draft ?? zoom}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={() => {
+            if (draft !== null) {
+              const n = Number(draft);
+              if (!Number.isNaN(n)) setZoom(n);
+              setDraft(null);
+            }
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+          }}
+          className="w-14 h-7 px-2 rounded border bg-transparent text-sm text-right tabular-nums"
+          style={{ borderColor: "hsl(var(--hairline))" }}
+        />
+        <span className="text-xs text-muted-foreground">%</span>
+      </div>
+      <button
+        onClick={() => setZoom(100)}
+        className="text-xs text-muted-foreground hover:text-foreground ml-2"
+        title="Auf 100 %"
+      >
+        100 %
+      </button>
     </div>
   );
 }
@@ -790,50 +945,37 @@ function PageSettings({
 
       <div>
         <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-3">
-          LAYOUT
+          ABHEFTUNG
         </div>
         <div className="space-y-3">
-          <Row label="Spalten">
-            <input
-              type="number"
-              value={page.columns ?? 12}
-              onChange={(e) => update({ columns: Number(e.target.value) })}
+          <Row label="Lochung">
+            <select
+              value={page.punchPattern ?? "none"}
+              onChange={(e) => update({ punchPattern: e.target.value as PunchPattern })}
               className="w-full h-8 px-2 rounded bg-transparent border text-sm"
               style={{ borderColor: "hsl(var(--hairline))" }}
-            />
+            >
+              <option value="none">Keine</option>
+              <option value="2-fach">2-fach (DIN 5005, 80 mm)</option>
+              <option value="4-fach">4-fach (8/8/8 cm)</option>
+              <option value="6-fach-a5">6-fach A5 Ringbuch</option>
+            </select>
           </Row>
-          <Row label="Spaltenabstand">
-            <input
-              value={`${page.columnGap ?? 6} mm`}
-              onChange={(e) =>
-                update({ columnGap: Number(e.target.value.replace(/\D/g, "")) || 0 })
-              }
-              className="w-full h-8 px-2 rounded bg-transparent border text-sm"
+          <Row label="Position">
+            <select
+              value={page.punchSide ?? "left"}
+              onChange={(e) => update({ punchSide: e.target.value as PunchSide })}
+              disabled={(page.punchPattern ?? "none") === "none"}
+              className="w-full h-8 px-2 rounded bg-transparent border text-sm disabled:opacity-50"
               style={{ borderColor: "hsl(var(--hairline))" }}
-            />
-          </Row>
-          <Row label="Hilfslinien">
-            <input
-              type="checkbox"
-              checked={page.guides ?? true}
-              onChange={(e) => update({ guides: e.target.checked })}
-            />
+            >
+              <option value="left">Links</option>
+              <option value="right">Rechts</option>
+              <option value="top">Oben</option>
+              <option value="bottom">Unten</option>
+            </select>
           </Row>
         </div>
-      </div>
-
-      <div>
-        <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-2">
-          NOTIZEN (SEITENBEZOGEN)
-        </div>
-        <textarea
-          value={page.notes ?? ""}
-          onChange={(e) => update({ notes: e.target.value })}
-          rows={5}
-          placeholder="Bauherren wünschen eine größere Terrassenüberdachung…"
-          className="w-full text-sm p-2 rounded border bg-transparent"
-          style={{ borderColor: "hsl(var(--hairline))" }}
-        />
       </div>
     </div>
   );

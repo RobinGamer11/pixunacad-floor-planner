@@ -35,6 +35,9 @@ export interface PageElement {
   rotation?: number;
 }
 
+export type PunchPattern = "none" | "2-fach" | "4-fach" | "6-fach-a5";
+export type PunchSide = "left" | "right" | "top" | "bottom";
+
 export interface ProjectPage {
   id: string;
   title: string;
@@ -46,6 +49,8 @@ export interface ProjectPage {
   columns?: number;
   columnGap?: number;
   guides?: boolean;
+  punchPattern?: PunchPattern;
+  punchSide?: PunchSide;
 }
 
 export interface Sheet {
