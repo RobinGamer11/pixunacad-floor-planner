@@ -65,13 +65,6 @@ export default function CadOverlayLayer(props: Props) {
   const teColorRef = useRef<HTMLInputElement>(null);
   const teSizeRef = useRef<HTMLSelectElement>(null);
   const teSymbolRef = useRef<HTMLSelectElement>(null);
-  // TextHub DOM (Hub-Box für Textboxen: Breite/Höhe/Drehung/X/Y)
-  const thRef = useRef<HTMLDivElement>(null);
-  const thWRef = useRef<HTMLInputElement>(null);
-  const thHRef = useRef<HTMLInputElement>(null);
-  const thRRef = useRef<HTMLInputElement>(null);
-  const thXRef = useRef<HTMLInputElement>(null);
-  const thYRef = useRef<HTMLInputElement>(null);
 
   const engineRef = useRef<MiniCad | null>(null);
   const onChangeRef = useRef(onChange);
