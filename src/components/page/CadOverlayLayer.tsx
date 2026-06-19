@@ -255,13 +255,6 @@ export default function CadOverlayLayer(props: Props) {
   );
 }
 
-const hubInput: React.CSSProperties = {
-  width: 64, fontSize: 11, padding: "2px 4px",
-  border: "1px solid hsl(var(--hairline))", borderRadius: 4,
-};
-const hubSep: React.CSSProperties = {
-  fontSize: 11, color: "hsl(var(--ink-soft))", padding: "0 1px",
-};
 
 const pointEditBtn: React.CSSProperties = {
   width: 24, height: 24, fontSize: 12,
