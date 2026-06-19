@@ -221,6 +221,54 @@ export class MiniSelectTool {
     this.updateHubForSegment(s);
     this.app.refreshLabelUI();
   }
+
+  /* ===== TextHub (Textbox) ===== */
+
+  private showHubForTextBox(tb: TextBox) {
+    const th = this.app.textHub;
+    if (!th) return;
+    const sM = this.app.camera.worldToScreen(tb.center.x, tb.center.y);
+    const r = this.canvas.getBoundingClientRect();
+    const scaleX = r.width / Math.max(1, this.canvas.width);
+    const scaleY = r.height / Math.max(1, this.canvas.height);
+    th.showAt(sM.x * scaleX + 12, sM.y * scaleY + 12);
+    this.updateHubForTextBox(tb);
+    th.bindCommit((v) => this.commitTextHub(v));
+  }
+
+  private updateHubForTextBox(tb: TextBox) {
+    const th = this.app.textHub;
+    if (!th) return;
+    // Welt-Einheit = 1 m. Auf der Seite gilt 1 m = referencePxPerM Pixel,
+    // und die Seite ist `pageWidthMm` mm breit. → Welt-mm = m * 1000.
+    th.updateDisplay({
+      widthMm: tb.widthM * 1000,
+      heightMm: tb.heightM * 1000,
+      rotationDeg: (tb.rotationRad * 180) / Math.PI,
+      xMm: (tb.center.x - tb.widthM / 2) * 1000,
+      yMm: (tb.center.y - tb.heightM / 2) * 1000,
+    });
+  }
+
+  private commitTextHub(v: { widthMm: number | null; heightMm: number | null; rotationDeg: number | null; xMm: number | null; yMm: number | null }) {
+    if (!this.dragTextId) return;
+    const tb = this.app.scene.getTextBoxById(this.dragTextId);
+    if (!tb) return;
+    const wM = v.widthMm != null && v.widthMm > 0 ? v.widthMm / 1000 : tb.widthM;
+    const hM = v.heightMm != null && v.heightMm > 0 ? v.heightMm / 1000 : tb.heightM;
+    const rot = v.rotationDeg != null ? (v.rotationDeg * Math.PI) / 180 : tb.rotationRad;
+    // Position interpretiert als Top-Left (mm). Wenn nichts angegeben →
+    // alten Top-Left beibehalten (Größenänderung bleibt verankert oben-links).
+    const tlX = v.xMm != null ? v.xMm / 1000 : tb.center.x - tb.widthM / 2;
+    const tlY = v.yMm != null ? v.yMm / 1000 : tb.center.y - tb.heightM / 2;
+    tb.widthM = wM;
+    tb.heightM = hM;
+    tb.rotationRad = rot;
+    tb.center.x = tlX + wM / 2;
+    tb.center.y = tlY + hM / 2;
+    this.updateHubForTextBox(tb);
+    this.app.refreshLabelUI();
+  }
 }
 
 function distancePointToSegment(
