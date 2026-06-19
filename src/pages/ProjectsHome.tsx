@@ -30,7 +30,12 @@ type Tab = "uebersicht" | "seiten" | "aufgaben" | "infos" | "team";
 export default function ProjectsHome() {
   const projects = useProjects();
   const navigate = useNavigate();
-  const [selectedId, setSelectedId] = useState<string | undefined>(projects[0]?.id);
+  const [mode, setMode] = useState<"projects" | "templates">("projects");
+  const visibleProjects = useMemo(
+    () => projects.filter((p) => (mode === "templates" ? p.isTemplate : !p.isTemplate)),
+    [projects, mode]
+  );
+  const [selectedId, setSelectedId] = useState<string | undefined>(visibleProjects[0]?.id);
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<Tab>("seiten");
   const [leftOpen, setLeftOpen] = useState(true);
@@ -38,16 +43,17 @@ export default function ProjectsHome() {
 
   const filtered = useMemo(
     () =>
-      projects.filter(
+      visibleProjects.filter(
         (p) =>
           !search ||
           p.name.toLowerCase().includes(search.toLowerCase()) ||
           p.ort.toLowerCase().includes(search.toLowerCase())
       ),
-    [projects, search]
+    [visibleProjects, search]
   );
 
-  const selected = projects.find((p) => p.id === selectedId) ?? projects[0];
+  const selected =
+    visibleProjects.find((p) => p.id === selectedId) ?? visibleProjects[0];
 
   const allTasks = useMemo(
     () =>
