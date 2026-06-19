@@ -373,6 +373,9 @@ export default function ProjectsHome() {
                     timeStyle: "short",
                   })}
                 />
+                {selected.customFields?.map((f) => (
+                  <KV key={f.id} label={f.label} value={f.value || "—"} />
+                ))}
               </Card>
 
               <Card title="AUFGABEN" action="+ Aufgabe">
