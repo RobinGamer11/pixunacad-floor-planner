@@ -613,7 +613,10 @@ function PageCanvas({
         w: 25,
         h: 6,
         text: "Text",
-        fontSize: 16,
+        fontSize: toolSettings.text.fontSize,
+        color: toolSettings.text.color,
+        bold: toolSettings.text.bold,
+        italic: toolSettings.text.italic,
       });
       onCommitTool();
       return;
