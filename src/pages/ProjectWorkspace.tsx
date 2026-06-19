@@ -172,91 +172,183 @@ export default function ProjectWorkspace() {
         </header>
 
         <div className="flex-1 flex min-h-0">
-          {/* Pages sidebar */}
-          <aside
-            className="w-[240px] shrink-0 border-r flex flex-col"
-            style={{ borderColor: "hsl(var(--hairline))" }}
-          >
-            <div className="flex items-center justify-between px-4 pt-4 pb-2">
-              <span className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">SEITEN</span>
-              <button onClick={() => projectStore.addPage(project.id)}>
-                <Plus size={14} className="text-muted-foreground" />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto px-3 pb-3 space-y-2">
-              {project.pages.map((pg, idx) => {
-                const active = pg.id === activePage?.id;
-                return (
-                  <button
-                    key={pg.id}
-                    onClick={() => {
-                      setActivePageId(pg.id);
-                      setSelectedElementId(undefined);
-                    }}
-                    className="w-full text-left rounded-lg p-2 flex gap-2.5 transition"
-                    style={{
-                      background: active ? "hsl(var(--surface-card))" : "transparent",
-                      border: active ? "1px solid hsl(var(--accent-gold) / 0.4)" : "1px solid transparent",
-                    }}
-                  >
-                    <div
-                      className="w-12 h-9 rounded shrink-0 border"
-                      style={{ background: "white", borderColor: "hsl(var(--hairline))" }}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="text-[10px] text-muted-foreground">
-                        {String(idx + 1).padStart(2, "0")}
-                      </div>
-                      <div className="text-sm truncate">{pg.title.replace(/^\d+\s*/, "")}</div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Background overlay */}
-            <div
-              className="border-t p-3"
+          {/* Pages sidebar (collapsible) */}
+          {leftOpen ? (
+            <aside
+              className="w-[240px] shrink-0 border-r flex flex-col relative"
               style={{ borderColor: "hsl(var(--hairline))" }}
             >
-              <div className="flex items-center justify-between text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-2">
-                HINTERGRUND (TRANSPARENZ)
-                <button onClick={() => setBgOverlay((o) => ({ ...o, visible: !o.visible }))}>
-                  <Eye size={13} style={{ opacity: bgOverlay.visible ? 1 : 0.4 }} />
-                </button>
+              <div className="flex items-center justify-between px-4 pt-4 pb-2">
+                <span className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">SEITEN</span>
+                <div className="flex items-center gap-1.5">
+                  <button onClick={() => projectStore.addPage(project.id)} title="Seite hinzufügen">
+                    <Plus size={14} className="text-muted-foreground" />
+                  </button>
+                  <button onClick={() => setLeftOpen(false)} title="Einklappen">
+                    <PanelLeftClose size={14} className="text-muted-foreground" />
+                  </button>
+                </div>
               </div>
-              <select
-                value={bgOverlay.pageId ?? ""}
-                onChange={(e) => setBgOverlay((o) => ({ ...o, pageId: e.target.value || undefined }))}
-                className="w-full text-sm h-8 px-2 rounded bg-transparent border"
+              <div className="flex-1 overflow-y-auto px-3 pb-3 space-y-2">
+                {project.pages.map((pg, idx) => {
+                  const active = pg.id === activePage?.id;
+                  const isRenaming = renamingPageId === pg.id;
+                  return (
+                    <div
+                      key={pg.id}
+                      onClick={() => {
+                        if (isRenaming) return;
+                        setActivePageId(pg.id);
+                        setSelectedElementId(undefined);
+                      }}
+                      className="group w-full text-left rounded-lg p-2 flex gap-2.5 transition cursor-pointer"
+                      style={{
+                        background: active ? "hsl(var(--surface-card))" : "transparent",
+                        border: active ? "1px solid hsl(var(--accent-gold) / 0.4)" : "1px solid transparent",
+                      }}
+                    >
+                      <div
+                        className="w-12 h-9 rounded shrink-0 border"
+                        style={{ background: "white", borderColor: "hsl(var(--hairline))" }}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[10px] text-muted-foreground flex items-center justify-between gap-1">
+                          <span>{String(idx + 1).padStart(2, "0")}</span>
+                          {!isRenaming && (
+                            <span className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setRenamingPageId(pg.id);
+                                  setPageNameDraft(pg.title.replace(/^\d+\s*/, ""));
+                                }}
+                                title="Umbenennen"
+                                className="hover:text-foreground"
+                              >
+                                <Pencil size={11} />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (project.pages.length <= 1) return;
+                                  if (!confirm(`Seite "${pg.title}" löschen?`)) return;
+                                  projectStore.deletePage(project.id, pg.id);
+                                  if (activePageId === pg.id) {
+                                    setActivePageId(project.pages.find((p) => p.id !== pg.id)?.id);
+                                  }
+                                }}
+                                title="Löschen"
+                                className="hover:text-destructive"
+                              >
+                                <Trash2 size={11} />
+                              </button>
+                            </span>
+                          )}
+                        </div>
+                        {isRenaming ? (
+                          <div className="flex items-center gap-1 mt-0.5">
+                            <input
+                              autoFocus
+                              value={pageNameDraft}
+                              onChange={(e) => setPageNameDraft(e.target.value)}
+                              onClick={(e) => e.stopPropagation()}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  projectStore.updatePage(project.id, pg.id, { title: pageNameDraft.trim() || pg.title });
+                                  setRenamingPageId(undefined);
+                                } else if (e.key === "Escape") {
+                                  setRenamingPageId(undefined);
+                                }
+                              }}
+                              className="flex-1 min-w-0 text-sm h-6 px-1 rounded border bg-background"
+                              style={{ borderColor: "hsl(var(--hairline))" }}
+                            />
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                projectStore.updatePage(project.id, pg.id, { title: pageNameDraft.trim() || pg.title });
+                                setRenamingPageId(undefined);
+                              }}
+                              title="Speichern"
+                            >
+                              <Check size={12} />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setRenamingPageId(undefined);
+                              }}
+                              title="Abbrechen"
+                            >
+                              <X size={12} />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="text-sm truncate">{pg.title.replace(/^\d+\s*/, "")}</div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Background overlay */}
+              <div
+                className="border-t p-3"
                 style={{ borderColor: "hsl(var(--hairline))" }}
               >
-                <option value="">— Keine —</option>
-                {project.pages
-                  .filter((p) => p.id !== activePage?.id)
-                  .map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.title}
-                    </option>
-                  ))}
-              </select>
-              <div className="mt-2 flex items-center gap-2">
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  value={Math.round(bgOverlay.opacity * 100)}
-                  onChange={(e) =>
-                    setBgOverlay((o) => ({ ...o, opacity: Number(e.target.value) / 100 }))
-                  }
-                  className="flex-1 accent-foreground"
-                />
-                <span className="text-xs w-8 text-right">
-                  {Math.round(bgOverlay.opacity * 100)} %
-                </span>
+                <div className="flex items-center justify-between text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-2">
+                  HINTERGRUND (TRANSPARENZ)
+                  <button onClick={() => setBgOverlay((o) => ({ ...o, visible: !o.visible }))}>
+                    <Eye size={13} style={{ opacity: bgOverlay.visible ? 1 : 0.4 }} />
+                  </button>
+                </div>
+                <select
+                  value={bgOverlay.pageId ?? ""}
+                  onChange={(e) => setBgOverlay((o) => ({ ...o, pageId: e.target.value || undefined }))}
+                  className="w-full text-sm h-8 px-2 rounded bg-transparent border"
+                  style={{ borderColor: "hsl(var(--hairline))" }}
+                >
+                  <option value="">— Keine —</option>
+                  {project.pages
+                    .filter((p) => p.id !== activePage?.id)
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.title}
+                      </option>
+                    ))}
+                </select>
+                <div className="mt-2 flex items-center gap-2">
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={Math.round(bgOverlay.opacity * 100)}
+                    onChange={(e) =>
+                      setBgOverlay((o) => ({ ...o, opacity: Number(e.target.value) / 100 }))
+                    }
+                    className="flex-1 accent-foreground"
+                  />
+                  <span className="text-xs w-8 text-right">
+                    {Math.round(bgOverlay.opacity * 100)} %
+                  </span>
+                </div>
               </div>
+            </aside>
+          ) : (
+            <div
+              className="w-7 shrink-0 border-r flex items-start justify-center pt-3"
+              style={{ borderColor: "hsl(var(--hairline))" }}
+            >
+              <button
+                onClick={() => setLeftOpen(true)}
+                title="Seiten einblenden"
+                className="h-7 w-7 rounded-md flex items-center justify-center hover:bg-muted"
+              >
+                <PanelLeftOpen size={14} className="text-muted-foreground" />
+              </button>
             </div>
-          </aside>
+          )}
 
           {/* Canvas */}
           <main className="flex-1 relative overflow-auto" style={{ background: "hsl(var(--surface))" }}>
@@ -273,61 +365,15 @@ export default function ProjectWorkspace() {
                 }}
               />
             )}
-
-            {/* bottom bar */}
-            <div
-              className="absolute left-1/2 -translate-x-1/2 bottom-4 flex items-center gap-2 rounded-full px-4 py-2 text-sm"
-              style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
-            >
-              <button
-                onClick={() => {
-                  if (!activePage) return;
-                  projectStore.addElement(project.id, activePage.id, {
-                    kind: "text",
-                    x: 10,
-                    y: 10,
-                    w: 30,
-                    h: 8,
-                    text: "Neuer Text",
-                    fontSize: 16,
-                  });
-                }}
-                className="flex items-center gap-1"
-              >
-                <Plus size={14} /> Element hinzufügen
-              </button>
-              <span className="text-muted-foreground">▾</span>
-            </div>
-            <div className="absolute right-4 bottom-4 flex items-center gap-2">
-              <button
-                className="h-8 w-8 rounded-md border flex items-center justify-center"
-                style={{ background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" }}
-                onClick={() => projectStore.addPage(project.id)}
-                title="Seite duplizieren"
-              >
-                <Copy size={14} />
-              </button>
-              <button
-                className="h-8 w-8 rounded-md border flex items-center justify-center"
-                style={{ background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" }}
-                onClick={() => {
-                  if (activePage && project.pages.length > 1) {
-                    projectStore.deletePage(project.id, activePage.id);
-                    setActivePageId(project.pages.find((p) => p.id !== activePage.id)?.id);
-                  }
-                }}
-                title="Seite löschen"
-              >
-                <Trash2 size={14} />
-              </button>
-            </div>
           </main>
 
-          {/* Right inspector */}
-          <RightInspector
-            projectId={project.id}
-            page={activePage}
-            element={selectedElement}
+          {/* Right inspector (collapsible) */}
+          {rightOpen ? (
+            <RightInspector
+              projectId={project.id}
+              page={activePage}
+              element={selectedElement}
+
             tab={rightTab}
             setTab={setRightTab}
             project={project}
