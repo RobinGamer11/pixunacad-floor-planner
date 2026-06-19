@@ -335,7 +335,8 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
                 }
               }
             } catch {}
-            const prevSheets = projectStore.getProject(projectId)?.sheets ?? [];
+            const prevSheets: import("@/lib/projectStore").Sheet[] =
+              projectStore.getState().projects.find((p) => p.id === projectId)?.sheets ?? [];
             const prevById = new Map(prevSheets.map((s) => [s.id, s] as const));
             const sheets = list
               .filter((s: any) => s && s.id && s.id !== "default-sheet")
