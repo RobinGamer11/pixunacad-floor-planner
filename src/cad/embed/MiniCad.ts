@@ -24,7 +24,7 @@ import { LineTool } from "../LineTool";
 import { TextTool } from "../TextTool";
 import { TextEditorOverlay } from "../TextEditorOverlay";
 import { SelectTool } from "../SelectTool";
-import { Defaults, SelectionType, PointEditAction } from "../constants";
+import { Defaults, SelectionType } from "../constants";
 import type { TextBox, TextBoxStyle } from "../Scene";
 
 export interface MiniCadTextEditorDom {
