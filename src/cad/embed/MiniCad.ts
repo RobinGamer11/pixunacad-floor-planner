@@ -121,6 +121,13 @@ export class MiniCad {
   basePxPerMm: number;
   pageMarginsMm: number;
   private _zoom: number;
+  /** Skaliert "echte Meter"-Strichbreiten auf die internen, von der
+   *  CAD-Engine erwarteten thicknessM-Werte. Notwendig, weil wir
+   *  `renderer.referencePxPerM` auf `basePxPerMm * 1000` (statt 80 px/m)
+   *  setzen, damit Text-Schriftgrößen und Textbox-Defaults auf einer
+   *  realen Papierseite vernünftig dimensioniert sind.
+   *  Faktor = referencePxPerM / 80. */
+  private _strokeFactor: number;
 
   /** Special label-ID for invisible page-frame segments (snap-only). */
   private _frameLabelId = "__page_frame__";
@@ -140,8 +147,9 @@ export class MiniCad {
     this.pageMarginsMm = init.pageMarginsMm ?? 0;
     this._zoom = init.initialZoom;
     this._onChange = init.onChange;
+    this._strokeFactor = (this.basePxPerMm * 1000) / 80;
     this.defaultLineColor = init.defaultLineColor ?? Defaults.lineColor;
-    this.defaultLineThicknessM = init.defaultLineThicknessM ?? Defaults.lineThicknessM;
+    this.defaultLineThicknessM = (init.defaultLineThicknessM ?? Defaults.lineThicknessM) * this._strokeFactor;
 
     this.camera = new Camera();
     this.scene = new Scene();
