@@ -507,11 +507,15 @@ function PageCanvas({
 }) {
   const fmt = FORMAT_SIZES[page.format];
   const aspect = fmt.w / fmt.h;
+  // The sheet is rendered at a FIXED real size (mm-defined). Zoom is a pure
+  // view transform applied via CSS scale, like PowerPoint / CAD — page, holes,
+  // margins, frame and strokes all scale together with the view.
   const baseWidth = 1100;
-  const width = baseWidth * (zoom / 100);
+  const width = baseWidth;
   const height = width / aspect;
   const mmToPx = width / fmt.w;
   const marginPx = (page.margins ?? 0) * mmToPx;
+  const scale = zoom / 100;
 
   // Tool drawing state (click-click). Coordinates in % of page.
   const [pendingStart, setPendingStart] = useState<{ x: number; y: number } | null>(null);
@@ -628,18 +632,26 @@ function PageCanvas({
   return (
     <div className="min-h-full flex items-start justify-center p-10">
       <div
-        ref={pageRef}
-        className="relative shadow-xl"
         style={{
-          width,
-          height,
-          background: "white",
-          border: "1px solid hsl(var(--hairline))",
-          cursor: cursorStyle,
+          width: width * scale,
+          height: height * scale,
         }}
-        onMouseDown={handlePageMouseDown}
-        onMouseMove={handlePageMouseMove}
       >
+        <div
+          ref={pageRef}
+          className="relative shadow-xl"
+          style={{
+            width,
+            height,
+            background: "white",
+            border: "1px solid hsl(var(--hairline))",
+            cursor: cursorStyle,
+            transform: `scale(${scale})`,
+            transformOrigin: "top left",
+          }}
+          onMouseDown={handlePageMouseDown}
+          onMouseMove={handlePageMouseMove}
+        >
         {/* Margin overlay (light grey ring) */}
         {marginPx > 0 && (
           <div
@@ -674,8 +686,8 @@ function PageCanvas({
             onSelect={() => onSelect(el.id)}
             onDrag={(dx, dy) => {
               projectStore.updateElement(projectId, page.id, el.id, {
-                x: Math.max(0, Math.min(95, el.x + (dx / width) * 100)),
-                y: Math.max(0, Math.min(95, el.y + (dy / height) * 100)),
+                x: Math.max(0, Math.min(95, el.x + (dx / scale / width) * 100)),
+                y: Math.max(0, Math.min(95, el.y + (dy / scale / height) * 100)),
               });
             }}
           />
@@ -743,6 +755,7 @@ function PageCanvas({
             }}
           />
         ))}
+        </div>
       </div>
     </div>
   );
