@@ -66,6 +66,16 @@
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Projektmappen-Tokens – warmes Off-White, Beige, Gold */
+    --surface: 36 33% 97%;
+    --surface-muted: 36 25% 93%;
+    --surface-card: 0 0% 100%;
+    --ink: 222 20% 12%;
+    --ink-soft: 222 12% 38%;
+    --accent-gold: 32 55% 52%;
+    --accent-gold-soft: 32 60% 88%;
+    --hairline: 30 12% 86%;
   }
 
   .dark {
