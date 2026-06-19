@@ -902,94 +902,10 @@ function AufgabenView({ project }: { project: Project }) {
   };
 
   return (
-    <div className="grid grid-cols-[1fr_320px] gap-6 mt-6">
-      {/* Aufgabenliste + Form */}
-      <div className="space-y-5">
-        <div
-          className="rounded-2xl p-5"
-          style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
-        >
-          <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-3">
-            NEUE AUFGABE
-          </div>
-          <div className="grid grid-cols-[1fr_140px_110px_130px_auto] gap-2">
-            <input
-              value={draft.title}
-              onChange={(e) => setDraft({ ...draft, title: e.target.value })}
-              onKeyDown={(e) => e.key === "Enter" && addTask()}
-              placeholder="Titel der Aufgabe…"
-              className="h-9 px-3 rounded-md border bg-transparent text-sm outline-none"
-              style={{ borderColor: "hsl(var(--hairline))" }}
-            />
-            <input
-              type="date"
-              value={draft.date}
-              onChange={(e) => setDraft({ ...draft, date: e.target.value })}
-              className="h-9 px-2 rounded-md border bg-transparent text-sm outline-none"
-              style={{ borderColor: "hsl(var(--hairline))" }}
-            />
-            <input
-              type="time"
-              value={draft.time}
-              onChange={(e) => setDraft({ ...draft, time: e.target.value })}
-              className="h-9 px-2 rounded-md border bg-transparent text-sm outline-none"
-              style={{ borderColor: "hsl(var(--hairline))" }}
-            />
-            <select
-              value={draft.priority}
-              onChange={(e) => setDraft({ ...draft, priority: e.target.value as TaskPriority })}
-              className="h-9 px-2 rounded-md border bg-transparent text-sm outline-none"
-              style={{ borderColor: "hsl(var(--hairline))" }}
-            >
-              <option value="low">Niedrig</option>
-              <option value="medium">Mittel</option>
-              <option value="high">Hoch</option>
-            </select>
-            <button
-              onClick={addTask}
-              className="h-9 px-4 rounded-md text-sm font-medium flex items-center gap-1"
-              style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
-            >
-              <Plus size={14} /> Hinzufügen
-            </button>
-          </div>
-        </div>
-
-        <div
-          className="rounded-2xl p-5"
-          style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
-        >
-          <div className="flex items-center justify-between mb-3">
-            <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">
-              AUFGABEN {selectedDate && `· ${new Date(selectedDate).toLocaleDateString("de-DE")}`}
-            </div>
-            {selectedDate && (
-              <button
-                onClick={() => setSelectedDate(undefined)}
-                className="text-xs text-muted-foreground hover:text-foreground"
-              >
-                Filter aufheben
-              </button>
-            )}
-          </div>
-          <div className="divide-y" style={{ borderColor: "hsl(var(--hairline))" }}>
-            {filtered.length === 0 && (
-              <div className="text-sm text-muted-foreground italic py-3">
-                Keine Aufgaben.
-              </div>
-            )}
-            {filtered.map((t) => (
-              <TaskRow key={t.id} task={t} projectId={project.id} />
-            ))}
-          </div>
-        </div>
-
-        <TaskTimeline project={project} />
-      </div>
-
-      {/* Kalender */}
+    <div className="mt-6 space-y-5">
+      {/* Kalender ganz oben */}
       <div
-        className="rounded-2xl p-5 h-fit"
+        className="rounded-2xl p-5"
         style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
       >
         <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-3">
@@ -1004,9 +920,92 @@ function AufgabenView({ project }: { project: Project }) {
           }}
         />
         <div className="mt-3 text-[11px] text-muted-foreground">
-          Tipp: Tag im Kalender klicken, dann oben Aufgabe für diesen Tag hinzufügen.
+          Tipp: Tag im Kalender klicken, dann unten Aufgabe für diesen Tag hinzufügen.
         </div>
       </div>
+
+      {/* Neue Aufgabe */}
+      <div
+        className="rounded-2xl p-5"
+        style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
+      >
+        <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-3">
+          NEUE AUFGABE
+        </div>
+        <div className="grid grid-cols-[1fr_140px_110px_130px_auto] gap-2">
+          <input
+            value={draft.title}
+            onChange={(e) => setDraft({ ...draft, title: e.target.value })}
+            onKeyDown={(e) => e.key === "Enter" && addTask()}
+            placeholder="Titel der Aufgabe…"
+            className="h-9 px-3 rounded-md border bg-transparent text-sm outline-none"
+            style={{ borderColor: "hsl(var(--hairline))" }}
+          />
+          <input
+            type="date"
+            value={draft.date}
+            onChange={(e) => setDraft({ ...draft, date: e.target.value })}
+            className="h-9 px-2 rounded-md border bg-transparent text-sm outline-none"
+            style={{ borderColor: "hsl(var(--hairline))" }}
+          />
+          <input
+            type="time"
+            value={draft.time}
+            onChange={(e) => setDraft({ ...draft, time: e.target.value })}
+            className="h-9 px-2 rounded-md border bg-transparent text-sm outline-none"
+            style={{ borderColor: "hsl(var(--hairline))" }}
+          />
+          <select
+            value={draft.priority}
+            onChange={(e) => setDraft({ ...draft, priority: e.target.value as TaskPriority })}
+            className="h-9 px-2 rounded-md border bg-transparent text-sm outline-none"
+            style={{ borderColor: "hsl(var(--hairline))" }}
+          >
+            <option value="low">Niedrig</option>
+            <option value="medium">Mittel</option>
+            <option value="high">Hoch</option>
+          </select>
+          <button
+            onClick={addTask}
+            className="h-9 px-4 rounded-md text-sm font-medium flex items-center gap-1"
+            style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
+          >
+            <Plus size={14} /> Hinzufügen
+          </button>
+        </div>
+      </div>
+
+      {/* Aufgabenliste */}
+      <div
+        className="rounded-2xl p-5"
+        style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
+      >
+        <div className="flex items-center justify-between mb-3">
+          <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">
+            AUFGABEN {selectedDate && `· ${new Date(selectedDate).toLocaleDateString("de-DE")}`}
+          </div>
+          {selectedDate && (
+            <button
+              onClick={() => setSelectedDate(undefined)}
+              className="text-xs text-muted-foreground hover:text-foreground"
+            >
+              Filter aufheben
+            </button>
+          )}
+        </div>
+        <div className="divide-y" style={{ borderColor: "hsl(var(--hairline))" }}>
+          {filtered.length === 0 && (
+            <div className="text-sm text-muted-foreground italic py-3">
+              Keine Aufgaben.
+            </div>
+          )}
+          {filtered.map((t) => (
+            <TaskRow key={t.id} task={t} projectId={project.id} />
+          ))}
+        </div>
+      </div>
+
+      <TaskTimeline project={project} />
     </div>
   );
 }
