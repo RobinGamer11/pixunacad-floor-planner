@@ -54,11 +54,15 @@ export interface Sheet {
   scale: string; // e.g. "1:100"
 }
 
+export type TaskPriority = "low" | "medium" | "high";
+
 export interface Task {
   id: string;
   title: string;
   done: boolean;
-  date?: string; // ISO date
+  date?: string; // ISO date YYYY-MM-DD
+  time?: string; // HH:MM
+  priority?: TaskPriority;
 }
 
 export interface CalendarEvent {
@@ -128,11 +132,11 @@ function demoProjects(): Project[] {
       { id: `${id}-s5`, name: "Lageplan", scale: "1:500" },
     ],
     tasks: [
-      { id: `${id}-t1`, title: "Bestandsaufnahme prüfen", done: true, date: "2026-06-03" },
-      { id: `${id}-t2`, title: "Entwurf Variante A fertigstellen", done: true, date: "2026-06-07" },
-      { id: `${id}-t3`, title: "Variante B ausarbeiten", done: false, date: "2026-06-15" },
-      { id: `${id}-t4`, title: "Bauherrengespräch vorbereiten", done: false, date: "2026-06-18" },
-      { id: `${id}-t5`, title: "Materialkonzept abstimmen", done: false, date: "2026-06-22" },
+      { id: `${id}-t1`, title: "Bestandsaufnahme prüfen", done: true, date: "2026-06-03", time: "09:00", priority: "medium" },
+      { id: `${id}-t2`, title: "Entwurf Variante A fertigstellen", done: true, date: "2026-06-07", time: "14:00", priority: "high" },
+      { id: `${id}-t3`, title: "Variante B ausarbeiten", done: false, date: "2026-06-15", time: "10:00", priority: "high" },
+      { id: `${id}-t4`, title: "Bauherrengespräch vorbereiten", done: false, date: "2026-06-18", time: "11:30", priority: "medium" },
+      { id: `${id}-t5`, title: "Materialkonzept abstimmen", done: false, date: "2026-06-22", time: "15:00", priority: "low" },
     ],
     events: [
       { id: `${id}-e1`, date: "2026-06-12", time: "10:00", title: "Bauherrengespräch", location: "Besprechungsraum 1" },
@@ -339,7 +343,8 @@ export const projectStore = {
       ),
     }));
   },
-  addTask: (projectId: string, title: string, date?: string) => {
+  addTask: (projectId: string, task: Omit<Task, "id" | "done"> & { done?: boolean }) => {
+    const id = `t-${Date.now().toString(36)}`;
     setState((s) => ({
       projects: s.projects.map((p) =>
         p.id === projectId
@@ -347,10 +352,27 @@ export const projectStore = {
               ...p,
               tasks: [
                 ...p.tasks,
-                { id: `t-${Date.now().toString(36)}`, title, done: false, date },
+                { done: false, ...task, id },
               ],
             }
           : p
+      ),
+    }));
+    return id;
+  },
+  updateTask: (projectId: string, taskId: string, patch: Partial<Task>) => {
+    setState((s) => ({
+      projects: s.projects.map((p) =>
+        p.id === projectId
+          ? { ...p, tasks: p.tasks.map((t) => (t.id === taskId ? { ...t, ...patch } : t)) }
+          : p
+      ),
+    }));
+  },
+  deleteTask: (projectId: string, taskId: string) => {
+    setState((s) => ({
+      projects: s.projects.map((p) =>
+        p.id === projectId ? { ...p, tasks: p.tasks.filter((t) => t.id !== taskId) } : p
       ),
     }));
   },
