@@ -767,6 +767,7 @@ function PageCanvas({
           while reusing the standalone CAD engine for 1:1 snap/ortho/hub.
         */}
         <CadOverlayLayer
+          key={page.id}
           pageWidthMm={fmt.w}
           pageHeightMm={fmt.h}
           basePxPerMm={baseWidth / fmt.w}
