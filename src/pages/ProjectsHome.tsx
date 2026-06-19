@@ -247,7 +247,44 @@ export default function ProjectsHome() {
           <div className="px-10 py-7">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-semibold tracking-tight">{selected.name}</h1>
+                {renaming ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      autoFocus
+                      value={nameDraft}
+                      onChange={(e) => setNameDraft(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          projectStore.updateProject(selected.id, { name: nameDraft.trim() || selected.name });
+                          setRenaming(false);
+                        } else if (e.key === "Escape") {
+                          setRenaming(false);
+                        }
+                      }}
+                      className="text-2xl font-semibold tracking-tight bg-transparent border-b outline-none"
+                      style={{ borderColor: "hsl(var(--hairline))" }}
+                    />
+                    <button
+                      onClick={() => {
+                        projectStore.updateProject(selected.id, { name: nameDraft.trim() || selected.name });
+                        setRenaming(false);
+                      }}
+                      className="text-muted-foreground hover:text-foreground"
+                      title="Speichern"
+                    >
+                      <Check size={16} />
+                    </button>
+                    <button
+                      onClick={() => setRenaming(false)}
+                      className="text-muted-foreground hover:text-foreground"
+                      title="Abbrechen"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                ) : (
+                  <h1 className="text-2xl font-semibold tracking-tight">{selected.name}</h1>
+                )}
                 <Star
                   size={18}
                   fill={selected.favorite ? "hsl(var(--accent-gold))" : "none"}
@@ -257,7 +294,49 @@ export default function ProjectsHome() {
                     projectStore.updateProject(selected.id, { favorite: !selected.favorite })
                   }
                 />
-                <button className="text-muted-foreground" title="Mehr">···</button>
+                <div className="relative" ref={titleMenuRef}>
+                  <button
+                    onClick={() => setTitleMenuOpen((v) => !v)}
+                    className="text-muted-foreground hover:text-foreground h-7 w-7 rounded-md flex items-center justify-center"
+                    title="Mehr"
+                  >
+                    <MoreHorizontal size={18} />
+                  </button>
+                  {titleMenuOpen && (
+                    <div
+                      className="absolute left-0 top-full mt-1 z-20 min-w-[180px] rounded-md border shadow-md py-1 text-sm"
+                      style={{ background: "hsl(var(--surface))", borderColor: "hsl(var(--hairline))" }}
+                    >
+                      <button
+                        onClick={() => {
+                          setNameDraft(selected.name);
+                          setRenaming(true);
+                          setTitleMenuOpen(false);
+                        }}
+                        className="w-full px-3 py-1.5 flex items-center gap-2 hover:bg-muted text-left"
+                      >
+                        <Pencil size={14} /> Umbenennen
+                      </button>
+                      <button
+                        onClick={() => {
+                          const label = selected.isTemplate ? "Vorlage" : "Projekt";
+                          if (confirm(`${label} "${selected.name}" wirklich löschen?`)) {
+                            projectStore.deleteProject(selected.id);
+                            setTitleMenuOpen(false);
+                            const next = projects.find(
+                              (p) => p.id !== selected.id && !!p.isTemplate === !!selected.isTemplate
+                            );
+                            setSelectedId(next?.id);
+                          }
+                        }}
+                        className="w-full px-3 py-1.5 flex items-center gap-2 hover:bg-muted text-left"
+                        style={{ color: "hsl(0 70% 50%)" }}
+                      >
+                        <Trash2 size={14} /> Löschen
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 {selected.isTemplate ? (
