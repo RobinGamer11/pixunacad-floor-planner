@@ -61,6 +61,8 @@ export class MiniSelectTool {
     try { this.app.clearSelection(); } catch {}
     try { this.app.hub.hide(); } catch {}
     try { this.app.hub.bindCommit(null); } catch {}
+    try { this.app.textHub?.hide(); } catch {}
+    try { this.app.textHub?.bindCommit(null); } catch {}
     for (const fn of this.cleanups) { try { fn(); } catch {} }
     this.cleanups = [];
   }
