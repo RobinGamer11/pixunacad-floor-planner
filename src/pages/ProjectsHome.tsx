@@ -730,6 +730,374 @@ function SeitenInhaltGrid({ project, onAddPage }: { project: Project; onAddPage:
   );
 }
 
+function AufgabenView({ project }: { project: Project }) {
+  const [selectedDate, setSelectedDate] = useState<string | undefined>(undefined);
+  const [draft, setDraft] = useState<{ title: string; date: string; time: string; priority: TaskPriority }>({
+    title: "",
+    date: "",
+    time: "",
+    priority: "medium",
+  });
+
+  const tasks = [...project.tasks].sort((a, b) => {
+    const da = `${a.date ?? "9999-99-99"} ${a.time ?? "99:99"}`;
+    const db = `${b.date ?? "9999-99-99"} ${b.time ?? "99:99"}`;
+    return da.localeCompare(db);
+  });
+
+  const filtered = selectedDate ? tasks.filter((t) => t.date === selectedDate) : tasks;
+
+  const addTask = () => {
+    if (!draft.title.trim()) return;
+    projectStore.addTask(project.id, {
+      title: draft.title.trim(),
+      date: draft.date || undefined,
+      time: draft.time || undefined,
+      priority: draft.priority,
+    });
+    setDraft({ title: "", date: selectedDate ?? "", time: "", priority: "medium" });
+  };
+
+  return (
+    <div className="grid grid-cols-[1fr_320px] gap-6 mt-6">
+      {/* Aufgabenliste + Form */}
+      <div className="space-y-5">
+        <div
+          className="rounded-2xl p-5"
+          style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
+        >
+          <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-3">
+            NEUE AUFGABE
+          </div>
+          <div className="grid grid-cols-[1fr_140px_110px_130px_auto] gap-2">
+            <input
+              value={draft.title}
+              onChange={(e) => setDraft({ ...draft, title: e.target.value })}
+              onKeyDown={(e) => e.key === "Enter" && addTask()}
+              placeholder="Titel der Aufgabe…"
+              className="h-9 px-3 rounded-md border bg-transparent text-sm outline-none"
+              style={{ borderColor: "hsl(var(--hairline))" }}
+            />
+            <input
+              type="date"
+              value={draft.date}
+              onChange={(e) => setDraft({ ...draft, date: e.target.value })}
+              className="h-9 px-2 rounded-md border bg-transparent text-sm outline-none"
+              style={{ borderColor: "hsl(var(--hairline))" }}
+            />
+            <input
+              type="time"
+              value={draft.time}
+              onChange={(e) => setDraft({ ...draft, time: e.target.value })}
+              className="h-9 px-2 rounded-md border bg-transparent text-sm outline-none"
+              style={{ borderColor: "hsl(var(--hairline))" }}
+            />
+            <select
+              value={draft.priority}
+              onChange={(e) => setDraft({ ...draft, priority: e.target.value as TaskPriority })}
+              className="h-9 px-2 rounded-md border bg-transparent text-sm outline-none"
+              style={{ borderColor: "hsl(var(--hairline))" }}
+            >
+              <option value="low">Niedrig</option>
+              <option value="medium">Mittel</option>
+              <option value="high">Hoch</option>
+            </select>
+            <button
+              onClick={addTask}
+              className="h-9 px-4 rounded-md text-sm font-medium flex items-center gap-1"
+              style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
+            >
+              <Plus size={14} /> Hinzufügen
+            </button>
+          </div>
+        </div>
+
+        <div
+          className="rounded-2xl p-5"
+          style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">
+              AUFGABEN {selectedDate && `· ${new Date(selectedDate).toLocaleDateString("de-DE")}`}
+            </div>
+            {selectedDate && (
+              <button
+                onClick={() => setSelectedDate(undefined)}
+                className="text-xs text-muted-foreground hover:text-foreground"
+              >
+                Filter aufheben
+              </button>
+            )}
+          </div>
+          <div className="divide-y" style={{ borderColor: "hsl(var(--hairline))" }}>
+            {filtered.length === 0 && (
+              <div className="text-sm text-muted-foreground italic py-3">
+                Keine Aufgaben.
+              </div>
+            )}
+            {filtered.map((t) => (
+              <TaskRow key={t.id} task={t} projectId={project.id} />
+            ))}
+          </div>
+        </div>
+
+        <TaskTimeline project={project} />
+      </div>
+
+      {/* Kalender */}
+      <div
+        className="rounded-2xl p-5 h-fit"
+        style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
+      >
+        <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-3">
+          KALENDER
+        </div>
+        <TaskCalendar
+          tasks={project.tasks}
+          selectedDate={selectedDate}
+          onSelectDate={(d) => {
+            setSelectedDate(d);
+            setDraft((s) => ({ ...s, date: d ?? "" }));
+          }}
+        />
+        <div className="mt-3 text-[11px] text-muted-foreground">
+          Tipp: Tag im Kalender klicken, dann oben Aufgabe für diesen Tag hinzufügen.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TaskRow({ task, projectId }: { task: Task; projectId: string }) {
+  const [editing, setEditing] = useState(false);
+  const [d, setD] = useState({
+    title: task.title,
+    date: task.date ?? "",
+    time: task.time ?? "",
+    priority: (task.priority ?? "medium") as TaskPriority,
+  });
+  const prio = task.priority ?? "medium";
+  const prioColor =
+    prio === "high"
+      ? "hsl(0 70% 55%)"
+      : prio === "medium"
+      ? "hsl(var(--accent-gold))"
+      : "hsl(140 35% 55%)";
+
+  if (editing) {
+    return (
+      <div className="grid grid-cols-[1fr_140px_110px_130px_auto_auto] gap-2 py-2 items-center">
+        <input
+          value={d.title}
+          onChange={(e) => setD({ ...d, title: e.target.value })}
+          className="h-8 px-2 rounded-md border bg-transparent text-sm"
+          style={{ borderColor: "hsl(var(--hairline))" }}
+        />
+        <input
+          type="date"
+          value={d.date}
+          onChange={(e) => setD({ ...d, date: e.target.value })}
+          className="h-8 px-2 rounded-md border bg-transparent text-sm"
+          style={{ borderColor: "hsl(var(--hairline))" }}
+        />
+        <input
+          type="time"
+          value={d.time}
+          onChange={(e) => setD({ ...d, time: e.target.value })}
+          className="h-8 px-2 rounded-md border bg-transparent text-sm"
+          style={{ borderColor: "hsl(var(--hairline))" }}
+        />
+        <select
+          value={d.priority}
+          onChange={(e) => setD({ ...d, priority: e.target.value as TaskPriority })}
+          className="h-8 px-2 rounded-md border bg-transparent text-sm"
+          style={{ borderColor: "hsl(var(--hairline))" }}
+        >
+          <option value="low">Niedrig</option>
+          <option value="medium">Mittel</option>
+          <option value="high">Hoch</option>
+        </select>
+        <button
+          onClick={() => {
+            projectStore.updateTask(projectId, task.id, {
+              title: d.title,
+              date: d.date || undefined,
+              time: d.time || undefined,
+              priority: d.priority,
+            });
+            setEditing(false);
+          }}
+          className="h-8 px-3 rounded-md text-xs font-medium"
+          style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
+        >
+          OK
+        </button>
+        <button
+          onClick={() => setEditing(false)}
+          className="h-8 px-2 text-xs text-muted-foreground"
+        >
+          Abbr.
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-3 py-2.5">
+      <input
+        type="checkbox"
+        checked={task.done}
+        onChange={() => projectStore.toggleTask(projectId, task.id)}
+        className="accent-foreground"
+      />
+      <span
+        className="w-2 h-2 rounded-full shrink-0"
+        style={{ background: prioColor }}
+        title={`Priorität: ${prio}`}
+      />
+      <div className="flex-1 min-w-0">
+        <div
+          className={`text-sm truncate ${task.done ? "line-through text-muted-foreground" : ""}`}
+        >
+          {task.title}
+        </div>
+        <div className="text-[11px] text-muted-foreground">
+          {task.date
+            ? new Date(task.date).toLocaleDateString("de-DE", {
+                day: "2-digit",
+                month: "2-digit",
+                year: "numeric",
+              })
+            : "Ohne Datum"}
+          {task.time ? ` · ${task.time}` : ""}
+        </div>
+      </div>
+      <button
+        onClick={() => setEditing(true)}
+        title="Bearbeiten"
+        className="text-muted-foreground hover:text-foreground"
+      >
+        <Pencil size={14} />
+      </button>
+      <button
+        onClick={() => projectStore.deleteTask(projectId, task.id)}
+        title="Löschen"
+        className="text-muted-foreground hover:text-foreground"
+      >
+        <Trash2 size={14} />
+      </button>
+    </div>
+  );
+}
+
+function TaskCalendar({
+  tasks,
+  selectedDate,
+  onSelectDate,
+}: {
+  tasks: Task[];
+  selectedDate?: string;
+  onSelectDate: (date: string | undefined) => void;
+}) {
+  const today = new Date();
+  const [view, setView] = useState({ year: today.getFullYear(), month: today.getMonth() });
+  const first = new Date(view.year, view.month, 1);
+  const start = (first.getDay() + 6) % 7;
+  const days = new Date(view.year, view.month + 1, 0).getDate();
+  const byDay = new Map<number, Task[]>();
+  tasks.forEach((t) => {
+    if (!t.date) return;
+    const d = new Date(t.date);
+    if (d.getFullYear() === view.year && d.getMonth() === view.month) {
+      const day = d.getDate();
+      if (!byDay.has(day)) byDay.set(day, []);
+      byDay.get(day)!.push(t);
+    }
+  });
+  const cells: (number | null)[] = [];
+  for (let i = 0; i < start; i++) cells.push(null);
+  for (let d = 1; d <= days; d++) cells.push(d);
+
+  const fmt = (d: number) =>
+    `${view.year}-${String(view.month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+
+  const nav = (dir: number) => {
+    const m = view.month + dir;
+    const y = view.year + Math.floor(m / 12);
+    setView({ year: y, month: ((m % 12) + 12) % 12 });
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between text-sm mb-2">
+        <button onClick={() => nav(-1)} className="text-muted-foreground hover:text-foreground px-1">
+          ‹
+        </button>
+        <span className="font-medium">
+          {first.toLocaleString("de-DE", { month: "long", year: "numeric" })}
+        </span>
+        <button onClick={() => nav(1)} className="text-muted-foreground hover:text-foreground px-1">
+          ›
+        </button>
+      </div>
+      <div className="grid grid-cols-7 gap-1 text-[11px] text-muted-foreground text-center">
+        {["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"].map((d) => (
+          <div key={d}>{d}</div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 gap-1 mt-1 text-xs">
+        {cells.map((c, i) => {
+          if (c === null) return <div key={i} className="h-9" />;
+          const iso = fmt(c);
+          const dayTasks = byDay.get(c) ?? [];
+          const isToday =
+            today.getFullYear() === view.year &&
+            today.getMonth() === view.month &&
+            today.getDate() === c;
+          const isSelected = iso === selectedDate;
+          const hasOpen = dayTasks.some((t) => !t.done);
+          const hasHigh = dayTasks.some((t) => !t.done && t.priority === "high");
+          return (
+            <button
+              key={i}
+              onClick={() => onSelectDate(isSelected ? undefined : iso)}
+              className="h-9 flex flex-col items-center justify-center rounded-md relative"
+              style={{
+                background: isSelected
+                  ? "hsl(var(--accent-gold) / 0.2)"
+                  : isToday
+                  ? "hsl(var(--ink))"
+                  : "transparent",
+                color: isToday && !isSelected ? "hsl(var(--surface))" : undefined,
+                border: isSelected
+                  ? "1px solid hsl(var(--accent-gold))"
+                  : "1px solid transparent",
+                fontWeight: isToday || isSelected ? 600 : undefined,
+              }}
+            >
+              <span>{c}</span>
+              {dayTasks.length > 0 && (
+                <span className="flex gap-0.5 absolute bottom-1">
+                  <span
+                    className="w-1 h-1 rounded-full"
+                    style={{
+                      background: hasHigh
+                        ? "hsl(0 70% 55%)"
+                        : hasOpen
+                        ? "hsl(var(--accent-gold))"
+                        : "hsl(var(--ink-soft))",
+                    }}
+                  />
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function InfosView({ project }: { project: Project }) {
   const update = (patch: Partial<Project>) => projectStore.updateProject(project.id, patch);
   const Field = ({
