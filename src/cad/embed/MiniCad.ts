@@ -364,3 +364,35 @@ export class MiniCad {
     this._rafId = requestAnimationFrame(this._tick);
   };
 }
+
+/* ============ Helpers ============ */
+
+/**
+ * Applies an alpha (0..1) to any CSS color string and returns an rgba(...)
+ * string. Supports #rgb / #rrggbb / rgb(...) / rgba(...). Falls back to the
+ * original color if parsing fails (so behavior matches the CAD engine).
+ */
+function applyAlphaToColor(color: string, alpha: number): string {
+  if (alpha >= 1) return color;
+  const a = Math.max(0, Math.min(1, alpha));
+  const c = (color || "").trim();
+  // #rgb
+  let m = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/i.exec(c);
+  if (m) {
+    const r = parseInt(m[1] + m[1], 16);
+    const g = parseInt(m[2] + m[2], 16);
+    const b = parseInt(m[3] + m[3], 16);
+    return `rgba(${r},${g},${b},${a})`;
+  }
+  // #rrggbb
+  m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(c);
+  if (m) {
+    return `rgba(${parseInt(m[1], 16)},${parseInt(m[2], 16)},${parseInt(m[3], 16)},${a})`;
+  }
+  // rgb(r,g,b) or rgba(r,g,b,a) — replace/append alpha
+  m = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*[\d.]+\s*)?\)$/i.exec(c);
+  if (m) {
+    return `rgba(${m[1]},${m[2]},${m[3]},${a})`;
+  }
+  return c;
+}
