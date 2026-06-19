@@ -308,13 +308,46 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
           try {
             const data = JSON.parse(snap);
             const list = Array.isArray(data.sheets) ? data.sheets : [];
+            // Vorschau (PNG) für das gerade aktive Sheet aus dem Canvas erzeugen.
+            // Andere Sheets behalten ihr bestehendes thumbnail (wird beim
+            // Sheet-Wechsel jeweils neu erzeugt).
+            const activeSheetId: string | undefined = (app as any).activeSheetId;
+            let activeThumb: string | undefined;
+            try {
+              const cv = canvasRef.current;
+              if (cv && cv.width > 0 && cv.height > 0) {
+                // Skaliere auf max. 480px Breite, um localStorage nicht zu sprengen.
+                const maxW = 480;
+                const k = Math.min(1, maxW / cv.width);
+                if (k < 1) {
+                  const off = document.createElement("canvas");
+                  off.width = Math.max(1, Math.round(cv.width * k));
+                  off.height = Math.max(1, Math.round(cv.height * k));
+                  const octx = off.getContext("2d");
+                  if (octx) {
+                    octx.fillStyle = "#ffffff";
+                    octx.fillRect(0, 0, off.width, off.height);
+                    octx.drawImage(cv, 0, 0, off.width, off.height);
+                    activeThumb = off.toDataURL("image/jpeg", 0.78);
+                  }
+                } else {
+                  activeThumb = cv.toDataURL("image/jpeg", 0.78);
+                }
+              }
+            } catch {}
+            const prevSheets = projectStore.getProject(projectId)?.sheets ?? [];
+            const prevById = new Map(prevSheets.map((s) => [s.id, s] as const));
             const sheets = list
               .filter((s: any) => s && s.id && s.id !== "default-sheet")
-              .map((s: any) => ({
-                id: s.id,
-                name: s.name || "Sheet",
-                scale: typeof s.scaleValue === "number" ? `1:${s.scaleValue}` : (s.scaleKey || "1:100"),
-              }));
+              .map((s: any) => {
+                const prev = prevById.get(s.id);
+                return {
+                  id: s.id,
+                  name: s.name || "Sheet",
+                  scale: typeof s.scaleValue === "number" ? `1:${s.scaleValue}` : (s.scaleKey || "1:100"),
+                  thumbnail: s.id === activeSheetId && activeThumb ? activeThumb : prev?.thumbnail,
+                };
+              });
             projectStore.updateProject(projectId, { sheets });
           } catch {}
         }
