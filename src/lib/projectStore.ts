@@ -73,6 +73,12 @@ export interface CalendarEvent {
   location?: string;
 }
 
+export interface CustomField {
+  id: string;
+  label: string;
+  value: string;
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -89,6 +95,8 @@ export interface Project {
   tasks: Task[];
   events: CalendarEvent[];
   konzept?: string;
+  customFields?: CustomField[];
+  isTemplate?: boolean;
 }
 
 const STORAGE_KEY = "pixuna.projects.v2";
