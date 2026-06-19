@@ -137,30 +137,30 @@ export class MiniSelectTool {
     if (e.button !== 0 || e.altKey) return; // Mid/Alt → Parent-Pan
     const wp = this.clientToWorld(e.clientX, e.clientY);
 
+    // Textbox: nur auswählen — Verschieben/Drehen passiert über die Hub-Box
+    // (1:1 wie in der CAD-Oberfläche, kein direktes Drag).
     const tb = this.hitTextBox(wp);
     if (tb) {
       e.preventDefault();
       e.stopPropagation();
-      this.mode = "moveText";
+      this.mode = "idle";
       this.dragTextId = tb.id;
       this.dragSegId = null;
-      this.dragStartWorld = wp;
-      this.startTextCenter = { x: tb.center.x, y: tb.center.y };
       this.app.setSelection({ type: SelectionType.TEXTBOX, textBoxId: tb.id } as any);
       this.app.hub.hide();
+      this.app.hub.bindCommit(null);
       return;
     }
 
+    // Linie: auswählen + LineHub einblenden. Bearbeitung NUR über die
+    // Hub-Box (Länge/Winkel) — kein direktes Drag.
     const seg = this.hitSegment(wp);
     if (seg) {
       e.preventDefault();
       e.stopPropagation();
-      this.mode = "moveSeg";
+      this.mode = "idle";
       this.dragSegId = seg.id;
       this.dragTextId = null;
-      this.dragStartWorld = wp;
-      this.startSegA = { x: seg.a.x, y: seg.a.y };
-      this.startSegB = { x: seg.b.x, y: seg.b.y };
       this.app.setSelection({ type: SelectionType.SEGMENT, segmentId: seg.id } as any);
       this.showHubForSegment(seg);
       return;
@@ -174,25 +174,8 @@ export class MiniSelectTool {
     this.dragTextId = null;
   }
 
-  private onMove(e: MouseEvent) {
-    if (this.mode === "idle") return;
-    const wp = this.clientToWorld(e.clientX, e.clientY);
-    const dx = wp.x - this.dragStartWorld.x;
-    const dy = wp.y - this.dragStartWorld.y;
-    if (this.mode === "moveSeg" && this.dragSegId) {
-      const s = this.app.scene.getSegmentById(this.dragSegId);
-      if (!s) return;
-      s.a.x = this.startSegA.x + dx;
-      s.a.y = this.startSegA.y + dy;
-      s.b.x = this.startSegB.x + dx;
-      s.b.y = this.startSegB.y + dy;
-      this.updateHubForSegment(s);
-    } else if (this.mode === "moveText" && this.dragTextId) {
-      const t = this.app.scene.getTextBoxById(this.dragTextId);
-      if (!t) return;
-      t.center.x = this.startTextCenter.x + dx;
-      t.center.y = this.startTextCenter.y + dy;
-    }
+  private onMove(_e: MouseEvent) {
+    /* Drag deaktiviert — Bearbeitung erfolgt ausschließlich über die Hub-Box. */
   }
 
   private onUp(_e: MouseEvent) {
