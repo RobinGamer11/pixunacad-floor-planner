@@ -195,6 +195,16 @@ export class MiniCad {
       this as any,
     );
     this.selectTool = new MiniSelectTool(this);
+    this.textHub = this.dom.textHub
+      ? new TextHub(
+          this.dom.textHub.root,
+          this.dom.textHub.widthInput,
+          this.dom.textHub.heightInput,
+          this.dom.textHub.rotationInput,
+          this.dom.textHub.xInput,
+          this.dom.textHub.yInput,
+        )
+      : null;
 
     this._installCoordRemap();
     this.applyZoom(this._zoom);
