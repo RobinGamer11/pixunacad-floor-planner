@@ -992,7 +992,7 @@ function RightInspector({
       </button>
       <div className="grid grid-cols-3 border-b" style={{ borderColor: "hsl(var(--hairline))" }}>
         <TabButton active={tab === "settings"} onClick={() => setTab("settings")} icon={<Settings size={14} />} label="Seiteneinstellung" />
-        <TabButton active={tab === "tools"} onClick={() => setTab("tools")} icon={<Wrench size={14} />} label="Werkzeug" />
+        <TabButton active={tab === "tools"} onClick={() => setTab("tools")} icon={<Wrench size={14} />} label="Werkzeugeinstellung" />
         <TabButton
           active={tab === "tasks"}
           onClick={() => setTab("tasks")}
