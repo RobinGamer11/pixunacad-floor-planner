@@ -105,6 +105,15 @@ export default function CadOverlayLayer({
     engineRef.current?.setActiveTool(activeTool);
   }, [activeTool]);
 
+  // Line defaults.
+  useEffect(() => {
+    engineRef.current?.setLineDefaults({
+      color: lineColor,
+      thicknessM: typeof lineThicknessMm === "number" ? lineThicknessMm / 1000 : undefined,
+    });
+  }, [lineColor, lineThicknessMm]);
+
+
   return (
     <div
       className="absolute inset-0"
