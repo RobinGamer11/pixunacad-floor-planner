@@ -16,6 +16,7 @@ import {
   Layers as LayersIcon,
   LayoutTemplate,
   Eye,
+  EyeOff,
   Settings,
   Wrench,
   CheckSquare,
@@ -40,7 +41,12 @@ import {
   Compass as CompassIcon,
   MousePointer2,
   ExternalLink,
-
+  Hash,
+  FolderPlus,
+  Folder,
+  ChevronUp,
+  ChevronDown,
+  GripVertical,
 } from "lucide-react";
 
 import {
@@ -70,12 +76,14 @@ export default function ProjectWorkspace() {
   const navigate = useNavigate();
   const [activePageId, setActivePageId] = useState<string | undefined>(project?.pages[0]?.id);
   const [selectedElementId, setSelectedElementId] = useState<string | undefined>();
-  const [rightTab, setRightTab] = useState<"settings" | "tools" | "tasks">("settings");
+  const [rightTab, setRightTab] = useState<"settings" | "tools" | "layers">("settings");
   const [activeTool, setActiveTool] = useState<PageTool>(null);
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
   const [renamingPageId, setRenamingPageId] = useState<string | undefined>();
   const [pageNameDraft, setPageNameDraft] = useState("");
+  const [pageActionsSticky, setPageActionsSticky] = useState(false);
+  const [dragPageIdx, setDragPageIdx] = useState<number | null>(null);
   const [bgOverlay, setBgOverlay] = useState<{ pageId?: string; opacity: number; visible: boolean }>({
     opacity: 0.35,
     visible: true,
@@ -127,22 +135,10 @@ export default function ProjectWorkspace() {
       >
         <ToolRailButton icon={<LayoutTemplate size={18} />} label="Seiten" active />
         <ToolRailButton
-          icon={<Minus size={18} style={{ strokeDasharray: "3 2" }} />}
-          label="Hilfslinie"
-          active={activeTool === "guide"}
-          onClick={() => setActiveToolAndTab(activeTool === "guide" ? null : "guide")}
-        />
-        <ToolRailButton
-          icon={<Type size={18} />}
-          label="Text"
-          active={activeTool === "text"}
-          onClick={() => setActiveToolAndTab(activeTool === "text" ? null : "text")}
-        />
-        <ToolRailButton
-          icon={<Minus size={18} />}
-          label="Linie"
-          active={activeTool === "line"}
-          onClick={() => setActiveToolAndTab(activeTool === "line" ? null : "line")}
+          icon={<ExternalLink size={18} />}
+          label="CAD öffnen"
+          onClick={() => navigate(`/project/${project.id}/cad`)}
+          accent
         />
         <ToolRailButton
           icon={<CompassIcon size={18} />}
@@ -151,19 +147,32 @@ export default function ProjectWorkspace() {
           onClick={() => setActiveToolAndTab(activeTool === "cad" ? null : "cad")}
         />
         <ToolRailButton
-          icon={<ExternalLink size={18} />}
-          label="CAD öffnen"
-          onClick={() => navigate(`/project/${project.id}/cad`)}
-          accent
+          icon={<Type size={18} />}
+          label="Text"
+          active={activeTool === "text"}
+          onClick={() => setActiveToolAndTab(activeTool === "text" ? null : "text")}
         />
+        <ToolRailButton
+          icon={<Minus size={18} style={{ strokeDasharray: "3 2" }} />}
+          label="Hilfslinie"
+          active={activeTool === "guide"}
+          onClick={() => setActiveToolAndTab(activeTool === "guide" ? null : "guide")}
+        />
+        <ToolRailButton
+          icon={<Minus size={18} />}
+          label="Linie"
+          active={activeTool === "line"}
+          onClick={() => setActiveToolAndTab(activeTool === "line" ? null : "line")}
+        />
+        <ToolRailButton icon={<Hash size={18} />} label="Schraffur" />
         <ToolRailButton icon={<FileText size={18} />} label="PDF einfügen" />
         <ToolRailButton icon={<ImageIcon size={18} />} label="Bild" />
-        <ToolRailButton icon={<StickyNote size={18} />} label="Notiz" />
-        <ToolRailButton icon={<Shapes size={18} />} label="Formen" />
         <ToolRailButton icon={<TableIcon size={18} />} label="Tabelle" />
+        <ToolRailButton icon={<StickyNote size={18} />} label="Notiz" />
         <ToolRailButton icon={<Clock size={18} />} label="Zeitstrahl" />
+        <ToolRailButton icon={<Shapes size={18} />} label="Formen" />
         <div className="mt-auto flex flex-col items-center gap-1">
-          <ToolRailButton icon={<LayersIcon size={18} />} label="Ebenen" />
+          <ToolRailButton icon={<LayersIcon size={18} />} label="Ebenen" onClick={() => setRightTab("layers")} />
           <ToolRailButton icon={<LayoutTemplate size={18} />} label="Vorlagen" />
         </div>
       </aside>
