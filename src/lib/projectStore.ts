@@ -127,7 +127,7 @@ export interface Project {
   isTemplate?: boolean;
 }
 
-const STORAGE_KEY = "pixuna.projects.v2";
+const STORAGE_KEY = "pixuna.projects.v3";
 
 const placeholder = (label: string) =>
   `data:image/svg+xml;utf8,${encodeURIComponent(
