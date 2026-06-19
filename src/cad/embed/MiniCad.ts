@@ -158,6 +158,9 @@ export class MiniCad {
     this.topology = new TopologyEngine(this.scene, this.camera, this.labelManager);
     const ctx = this.dom.canvas.getContext("2d")!;
     this.renderer = new Renderer(ctx, this.camera, this.scene, this.labelManager);
+    // Wichtig: Text/Stroke-Skalierung an Seitengröße (echte mm) ausrichten,
+    // damit ein 16-px-Text auch 16 px auf der Seite ist (statt riesig).
+    this.renderer.referencePxPerM = this.basePxPerMm * 1000;
 
     this._patchRendererTransparent();
 
