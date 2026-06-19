@@ -44,6 +44,9 @@ export interface PageElement {
   lastSyncAt?: string;
   // generic
   nonPrinting?: boolean;
+  // layer / group
+  groupId?: string;
+  layerName?: string;
 }
 
 
@@ -69,6 +72,8 @@ export interface ProjectPage {
    * Opaque JSON.
    */
   cadOverlay?: any;
+  /** Named groups for the layers panel. */
+  groups?: { id: string; name: string; collapsed?: boolean }[];
 }
 
 export interface Sheet {
@@ -392,6 +397,149 @@ export const projectStore = {
     setState((s) => ({
       projects: s.projects.map((p) =>
         p.id === projectId ? { ...p, pages: p.pages.filter((pg) => pg.id !== pageId) } : p
+      ),
+    }));
+  },
+  reorderPage: (projectId: string, fromIndex: number, toIndex: number) => {
+    setState((s) => ({
+      projects: s.projects.map((p) => {
+        if (p.id !== projectId) return p;
+        const pages = [...p.pages];
+        if (fromIndex < 0 || fromIndex >= pages.length) return p;
+        const [moved] = pages.splice(fromIndex, 1);
+        const insertAt = Math.max(0, Math.min(pages.length, toIndex));
+        pages.splice(insertAt, 0, moved);
+        return { ...p, updatedAt: new Date().toISOString(), pages };
+      }),
+    }));
+  },
+  duplicatePage: (projectId: string, pageId: string) => {
+    const project = state.projects.find((p) => p.id === projectId);
+    if (!project) return undefined;
+    const src = project.pages.find((pg) => pg.id === pageId);
+    if (!src) return undefined;
+    const newId = `${projectId}-p${Date.now().toString(36)}`;
+    const stripNum = src.title.replace(/^\d+\s*/, "");
+    const copy: ProjectPage = {
+      ...src,
+      id: newId,
+      title: `${stripNum} (Kopie)`,
+      elements: src.elements.map((e) => ({ ...e, id: `el-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}` })),
+      groups: src.groups?.map((g) => ({ ...g })),
+    };
+    setState((s) => ({
+      projects: s.projects.map((p) => {
+        if (p.id !== projectId) return p;
+        const idx = p.pages.findIndex((pg) => pg.id === pageId);
+        const pages = [...p.pages];
+        pages.splice(idx + 1, 0, copy);
+        return { ...p, updatedAt: new Date().toISOString(), pages };
+      }),
+    }));
+    return newId;
+  },
+  reorderElement: (projectId: string, pageId: string, fromIndex: number, toIndex: number) => {
+    setState((s) => ({
+      projects: s.projects.map((p) =>
+        p.id === projectId
+          ? {
+              ...p,
+              updatedAt: new Date().toISOString(),
+              pages: p.pages.map((pg) => {
+                if (pg.id !== pageId) return pg;
+                const els = [...pg.elements];
+                if (fromIndex < 0 || fromIndex >= els.length) return pg;
+                const [moved] = els.splice(fromIndex, 1);
+                els.splice(Math.max(0, Math.min(els.length, toIndex)), 0, moved);
+                return { ...pg, elements: els };
+              }),
+            }
+          : p
+      ),
+    }));
+  },
+  groupElements: (projectId: string, pageId: string, elementIds: string[], name = "Gruppe") => {
+    if (!elementIds.length) return undefined;
+    const groupId = `g-${Date.now().toString(36)}`;
+    setState((s) => ({
+      projects: s.projects.map((p) =>
+        p.id === projectId
+          ? {
+              ...p,
+              updatedAt: new Date().toISOString(),
+              pages: p.pages.map((pg) =>
+                pg.id === pageId
+                  ? {
+                      ...pg,
+                      groups: [...(pg.groups ?? []), { id: groupId, name }],
+                      elements: pg.elements.map((e) =>
+                        elementIds.includes(e.id) ? { ...e, groupId } : e
+                      ),
+                    }
+                  : pg
+              ),
+            }
+          : p
+      ),
+    }));
+    return groupId;
+  },
+  renameGroup: (projectId: string, pageId: string, groupId: string, name: string) => {
+    setState((s) => ({
+      projects: s.projects.map((p) =>
+        p.id === projectId
+          ? {
+              ...p,
+              pages: p.pages.map((pg) =>
+                pg.id === pageId
+                  ? { ...pg, groups: (pg.groups ?? []).map((g) => (g.id === groupId ? { ...g, name } : g)) }
+                  : pg
+              ),
+            }
+          : p
+      ),
+    }));
+  },
+  ungroup: (projectId: string, pageId: string, groupId: string) => {
+    setState((s) => ({
+      projects: s.projects.map((p) =>
+        p.id === projectId
+          ? {
+              ...p,
+              pages: p.pages.map((pg) =>
+                pg.id === pageId
+                  ? {
+                      ...pg,
+                      groups: (pg.groups ?? []).filter((g) => g.id !== groupId),
+                      elements: pg.elements.map((e) =>
+                        e.groupId === groupId ? { ...e, groupId: undefined } : e
+                      ),
+                    }
+                  : pg
+              ),
+            }
+          : p
+      ),
+    }));
+  },
+  renameLayer: (projectId: string, pageId: string, elementId: string, layerName: string) => {
+    setState((s) => ({
+      projects: s.projects.map((p) =>
+        p.id === projectId
+          ? {
+              ...p,
+              pages: p.pages.map((pg) =>
+                pg.id === pageId
+                  ? {
+                      ...pg,
+                      elements: pg.elements.map((e) =>
+                        e.id === elementId ? { ...e, layerName } : e
+                      ),
+                    }
+                  : pg
+              ),
+            }
+          : p
       ),
     }));
   },

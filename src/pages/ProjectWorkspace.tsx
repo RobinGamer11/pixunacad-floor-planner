@@ -16,6 +16,7 @@ import {
   Layers as LayersIcon,
   LayoutTemplate,
   Eye,
+  EyeOff,
   Settings,
   Wrench,
   CheckSquare,
@@ -40,7 +41,12 @@ import {
   Compass as CompassIcon,
   MousePointer2,
   ExternalLink,
-
+  Hash,
+  FolderPlus,
+  Folder,
+  ChevronUp,
+  ChevronDown,
+  GripVertical,
 } from "lucide-react";
 
 import {
@@ -70,12 +76,14 @@ export default function ProjectWorkspace() {
   const navigate = useNavigate();
   const [activePageId, setActivePageId] = useState<string | undefined>(project?.pages[0]?.id);
   const [selectedElementId, setSelectedElementId] = useState<string | undefined>();
-  const [rightTab, setRightTab] = useState<"settings" | "tools" | "tasks">("settings");
+  const [rightTab, setRightTab] = useState<"settings" | "tools" | "layers">("settings");
   const [activeTool, setActiveTool] = useState<PageTool>(null);
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
   const [renamingPageId, setRenamingPageId] = useState<string | undefined>();
   const [pageNameDraft, setPageNameDraft] = useState("");
+  const [pageActionsSticky, setPageActionsSticky] = useState(false);
+  const [dragPageIdx, setDragPageIdx] = useState<number | null>(null);
   const [bgOverlay, setBgOverlay] = useState<{ pageId?: string; opacity: number; visible: boolean }>({
     opacity: 0.35,
     visible: true,
@@ -127,22 +135,10 @@ export default function ProjectWorkspace() {
       >
         <ToolRailButton icon={<LayoutTemplate size={18} />} label="Seiten" active />
         <ToolRailButton
-          icon={<Minus size={18} style={{ strokeDasharray: "3 2" }} />}
-          label="Hilfslinie"
-          active={activeTool === "guide"}
-          onClick={() => setActiveToolAndTab(activeTool === "guide" ? null : "guide")}
-        />
-        <ToolRailButton
-          icon={<Type size={18} />}
-          label="Text"
-          active={activeTool === "text"}
-          onClick={() => setActiveToolAndTab(activeTool === "text" ? null : "text")}
-        />
-        <ToolRailButton
-          icon={<Minus size={18} />}
-          label="Linie"
-          active={activeTool === "line"}
-          onClick={() => setActiveToolAndTab(activeTool === "line" ? null : "line")}
+          icon={<ExternalLink size={18} />}
+          label="CAD öffnen"
+          onClick={() => navigate(`/project/${project.id}/cad`)}
+          accent
         />
         <ToolRailButton
           icon={<CompassIcon size={18} />}
@@ -151,19 +147,32 @@ export default function ProjectWorkspace() {
           onClick={() => setActiveToolAndTab(activeTool === "cad" ? null : "cad")}
         />
         <ToolRailButton
-          icon={<ExternalLink size={18} />}
-          label="CAD öffnen"
-          onClick={() => navigate(`/project/${project.id}/cad`)}
-          accent
+          icon={<Type size={18} />}
+          label="Text"
+          active={activeTool === "text"}
+          onClick={() => setActiveToolAndTab(activeTool === "text" ? null : "text")}
         />
+        <ToolRailButton
+          icon={<Minus size={18} style={{ strokeDasharray: "3 2" }} />}
+          label="Hilfslinie"
+          active={activeTool === "guide"}
+          onClick={() => setActiveToolAndTab(activeTool === "guide" ? null : "guide")}
+        />
+        <ToolRailButton
+          icon={<Minus size={18} />}
+          label="Linie"
+          active={activeTool === "line"}
+          onClick={() => setActiveToolAndTab(activeTool === "line" ? null : "line")}
+        />
+        <ToolRailButton icon={<Hash size={18} />} label="Schraffur" />
         <ToolRailButton icon={<FileText size={18} />} label="PDF einfügen" />
         <ToolRailButton icon={<ImageIcon size={18} />} label="Bild" />
-        <ToolRailButton icon={<StickyNote size={18} />} label="Notiz" />
-        <ToolRailButton icon={<Shapes size={18} />} label="Formen" />
         <ToolRailButton icon={<TableIcon size={18} />} label="Tabelle" />
+        <ToolRailButton icon={<StickyNote size={18} />} label="Notiz" />
         <ToolRailButton icon={<Clock size={18} />} label="Zeitstrahl" />
+        <ToolRailButton icon={<Shapes size={18} />} label="Formen" />
         <div className="mt-auto flex flex-col items-center gap-1">
-          <ToolRailButton icon={<LayersIcon size={18} />} label="Ebenen" />
+          <ToolRailButton icon={<LayersIcon size={18} />} label="Ebenen" onClick={() => setRightTab("layers")} />
           <ToolRailButton icon={<LayoutTemplate size={18} />} label="Vorlagen" />
         </div>
       </aside>
@@ -244,20 +253,47 @@ export default function ProjectWorkspace() {
                 {project.pages.map((pg, idx) => {
                   const active = pg.id === activePage?.id;
                   const isRenaming = renamingPageId === pg.id;
+                  const showActions = active && pageActionsSticky;
                   return (
                     <div
                       key={pg.id}
+                      draggable={!isRenaming}
+                      onDragStart={(e) => {
+                        setDragPageIdx(idx);
+                        e.dataTransfer.effectAllowed = "move";
+                      }}
+                      onDragOver={(e) => {
+                        if (dragPageIdx !== null && dragPageIdx !== idx) e.preventDefault();
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        if (dragPageIdx !== null && dragPageIdx !== idx) {
+                          projectStore.reorderPage(project.id, dragPageIdx, idx);
+                        }
+                        setDragPageIdx(null);
+                      }}
+                      onDragEnd={() => setDragPageIdx(null)}
                       onClick={() => {
                         if (isRenaming) return;
+                        if (active) {
+                          // re-click the active page toggles sticky action icons
+                          setPageActionsSticky((v) => !v);
+                          return;
+                        }
                         setActivePageId(pg.id);
                         setSelectedElementId(undefined);
+                        setPageActionsSticky(false);
                       }}
                       className="group w-full text-left rounded-lg p-2 flex gap-2.5 transition cursor-pointer"
                       style={{
                         background: active ? "hsl(var(--surface-card))" : "transparent",
                         border: active ? "1px solid hsl(var(--accent-gold) / 0.4)" : "1px solid transparent",
+                        opacity: dragPageIdx === idx ? 0.5 : 1,
                       }}
                     >
+                      <div className="flex flex-col items-center justify-center text-muted-foreground opacity-0 group-hover:opacity-100 transition cursor-grab">
+                        <GripVertical size={12} />
+                      </div>
                       <div
                         className="w-12 h-9 rounded shrink-0 border"
                         style={{ background: "white", borderColor: "hsl(var(--hairline))" }}
@@ -266,7 +302,22 @@ export default function ProjectWorkspace() {
                         <div className="text-[10px] text-muted-foreground flex items-center justify-between gap-1">
                           <span>{String(idx + 1).padStart(2, "0")}</span>
                           {!isRenaming && (
-                            <span className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                            <span
+                              className={`flex items-center gap-1 transition ${
+                                showActions ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                              }`}
+                            >
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const newId = projectStore.duplicatePage(project.id, pg.id);
+                                  if (newId) setActivePageId(newId);
+                                }}
+                                title="Duplizieren"
+                                className="hover:text-foreground"
+                              >
+                                <Copy size={11} />
+                              </button>
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -1042,8 +1093,8 @@ function RightInspector({
   projectId: string;
   page?: import("@/lib/projectStore").ProjectPage;
   element?: PageElement;
-  tab: "settings" | "tools" | "tasks";
-  setTab: (t: "settings" | "tools" | "tasks") => void;
+  tab: "settings" | "tools" | "layers";
+  setTab: (t: "settings" | "tools" | "layers") => void;
   project: import("@/lib/projectStore").Project;
   activeTool: PageTool;
   setActiveTool: (t: PageTool) => void;
@@ -1054,7 +1105,7 @@ function RightInspector({
   onJumpCad: (sheetId?: string) => void;
   onCollapse?: () => void;
 }) {
-  const taskCount = project.tasks.filter((t) => !t.done).length;
+  const layerCount = page?.elements.length ?? 0;
   return (
     <aside
       className="w-[340px] shrink-0 border-l flex flex-col relative"
@@ -1071,11 +1122,11 @@ function RightInspector({
         <TabButton active={tab === "settings"} onClick={() => setTab("settings")} icon={<Settings size={14} />} label="Seiteneinstellung" />
         <TabButton active={tab === "tools"} onClick={() => setTab("tools")} icon={<Wrench size={14} />} label="Werkzeugeinstellung" />
         <TabButton
-          active={tab === "tasks"}
-          onClick={() => setTab("tasks")}
-          icon={<CheckSquare size={14} />}
-          label="Aufgaben"
-          badge={taskCount > 0 ? taskCount : undefined}
+          active={tab === "layers"}
+          onClick={() => setTab("layers")}
+          icon={<LayersIcon size={14} />}
+          label="Ebenen"
+          badge={layerCount > 0 ? layerCount : undefined}
         />
       </div>
 
@@ -1096,7 +1147,14 @@ function RightInspector({
             onJumpCad={onJumpCad}
           />
         )}
-        {tab === "tasks" && <TasksTab project={project} />}
+        {tab === "layers" && page && (
+          <LayersTab
+            projectId={projectId}
+            page={page}
+            selectedElementId={selectedElementId}
+            setSelectedElementId={setSelectedElementId}
+          />
+        )}
       </div>
     </aside>
   );
@@ -1997,6 +2055,191 @@ function TasksTab({ project }: { project: import("@/lib/projectStore").Project }
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function LayersTab({
+  projectId,
+  page,
+  selectedElementId,
+  setSelectedElementId,
+}: {
+  projectId: string;
+  page: import("@/lib/projectStore").ProjectPage;
+  selectedElementId?: string;
+  setSelectedElementId: (id?: string) => void;
+}) {
+  const [multi, setMulti] = useState<Set<string>>(new Set());
+  const groups = page.groups ?? [];
+  const els = page.elements;
+
+  const layerLabel = (el: PageElement) => {
+    if (el.layerName) return el.layerName;
+    const kindMap: Record<string, string> = {
+      text: "Text",
+      line: "Linie",
+      guide: "Hilfslinie",
+      image: "Bild",
+      pdf: "PDF",
+      table: "Tabelle",
+      note: "Notiz",
+      timeline: "Zeitstrahl",
+      "cad-view": "CAD-Ansicht",
+      shape: "Form",
+    };
+    const base = kindMap[el.kind] ?? el.kind;
+    return el.kind === "text" && el.text ? `${base}: ${el.text.slice(0, 16)}` : base;
+  };
+
+  const toggleMulti = (id: string, ev: React.MouseEvent) => {
+    setMulti((prev) => {
+      const next = new Set(prev);
+      if (ev.shiftKey) {
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+      } else {
+        next.clear();
+        next.add(id);
+      }
+      return next;
+    });
+    setSelectedElementId(id);
+  };
+
+  const moveZ = (elementId: string, dir: -1 | 1) => {
+    const idx = els.findIndex((e) => e.id === elementId);
+    if (idx < 0) return;
+    // "Up" in the panel (top of list) = foreground = higher index in array
+    projectStore.reorderElement(projectId, page.id, idx, idx + (dir === 1 ? 1 : -1));
+  };
+
+  const doGroup = () => {
+    const ids = Array.from(multi);
+    if (ids.length < 2) return;
+    const name = prompt("Gruppenname", "Neue Gruppe") ?? "Neue Gruppe";
+    projectStore.groupElements(projectId, page.id, ids, name);
+    setMulti(new Set());
+  };
+
+  // Build display list — highest index first (foreground at top).
+  const order = els.map((e, i) => ({ el: e, idx: i })).reverse();
+
+  // Group items by groupId, but preserve order; first group occurrence wins position.
+  const renderedGroups = new Set<string>();
+  const rows: React.ReactNode[] = [];
+
+  const renderItem = (el: PageElement, idx: number, indent = false) => {
+    const isSelected = el.id === selectedElementId || multi.has(el.id);
+    return (
+      <div
+        key={el.id}
+        onClick={(e) => toggleMulti(el.id, e)}
+        className="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer text-sm"
+        style={{
+          background: isSelected ? "hsl(var(--accent-gold-soft))" : "transparent",
+          marginLeft: indent ? 18 : 0,
+          border: isSelected ? "1px solid hsl(var(--accent-gold) / 0.6)" : "1px solid transparent",
+        }}
+      >
+        <GripVertical size={12} className="text-muted-foreground shrink-0" />
+        <span className="flex-1 truncate">{layerLabel(el)}</span>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            moveZ(el.id, 1);
+          }}
+          title="Nach vorne"
+          className="h-6 w-6 rounded hover:bg-muted flex items-center justify-center text-muted-foreground"
+        >
+          <ChevronUp size={12} />
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            moveZ(el.id, -1);
+          }}
+          title="Nach hinten"
+          className="h-6 w-6 rounded hover:bg-muted flex items-center justify-center text-muted-foreground"
+        >
+          <ChevronDown size={12} />
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            if (!confirm("Ebene löschen?")) return;
+            projectStore.deleteElement(projectId, page.id, el.id);
+          }}
+          title="Löschen"
+          className="h-6 w-6 rounded hover:bg-muted flex items-center justify-center text-muted-foreground"
+        >
+          <Trash2 size={12} />
+        </button>
+      </div>
+    );
+  };
+
+  for (const { el, idx } of order) {
+    if (el.groupId) {
+      if (renderedGroups.has(el.groupId)) continue;
+      renderedGroups.add(el.groupId);
+      const group = groups.find((g) => g.id === el.groupId);
+      const members = els
+        .map((e, i) => ({ e, i }))
+        .filter((x) => x.e.groupId === el.groupId)
+        .reverse();
+      rows.push(
+        <div key={`g-${el.groupId}`} className="rounded border" style={{ borderColor: "hsl(var(--hairline))" }}>
+          <div className="flex items-center gap-2 px-2 py-1.5 bg-muted/40">
+            <Folder size={13} className="text-muted-foreground" />
+            <input
+              defaultValue={group?.name ?? "Gruppe"}
+              onBlur={(e) =>
+                projectStore.renameGroup(projectId, page.id, el.groupId!, e.target.value || "Gruppe")
+              }
+              className="flex-1 bg-transparent text-sm outline-none"
+            />
+            <button
+              onClick={() => projectStore.ungroup(projectId, page.id, el.groupId!)}
+              title="Gruppierung aufheben"
+              className="text-[11px] text-muted-foreground hover:text-foreground"
+            >
+              Auflösen
+            </button>
+          </div>
+          <div className="py-1">{members.map((m) => renderItem(m.e, m.i, true))}</div>
+        </div>
+      );
+    } else {
+      rows.push(renderItem(el, idx));
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">
+          EBENEN
+        </div>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={doGroup}
+            disabled={multi.size < 2}
+            title="Auswahl gruppieren (Shift+Klick zum Mehrfachauswählen)"
+            className="h-7 w-7 rounded flex items-center justify-center hover:bg-muted disabled:opacity-40"
+          >
+            <FolderPlus size={14} className="text-muted-foreground" />
+          </button>
+        </div>
+      </div>
+      <div className="text-[11px] text-muted-foreground">
+        Oben = Vordergrund. Shift+Klick wählt mehrere Ebenen aus, dann gruppieren.
+      </div>
+      {rows.length === 0 ? (
+        <div className="text-xs text-muted-foreground italic">Noch keine Ebenen auf dieser Seite.</div>
+      ) : (
+        <div className="space-y-1">{rows}</div>
+      )}
     </div>
   );
 }
