@@ -232,7 +232,7 @@ export default function ProjectsHome() {
                   style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
                   onClick={() => navigate(`/project/${selected.id}`)}
                 >
-                  <Pencil size={14} /> Öffnen
+                  <Pencil size={14} /> Bearbeiten
                 </button>
               </div>
             </div>
@@ -270,7 +270,10 @@ export default function ProjectsHome() {
               ))}
             </div>
 
-            {(tab === "seiten" || tab === "uebersicht") && (
+            {tab === "uebersicht" && (
+              <UebersichtView project={selected} onAddPage={handleAddPage} />
+            )}
+            {tab === "seiten" && (
               <SeitenView project={selected} onAddPage={handleAddPage} />
             )}
             {tab === "infos" && <InfosView project={selected} />}
@@ -397,7 +400,163 @@ export default function ProjectsHome() {
 
 /* -------- Tab views -------- */
 
+function UebersichtView({ project, onAddPage }: { project: Project; onAddPage: () => void }) {
+  return (
+    <div className="space-y-6">
+      <SeitenInhaltGrid project={project} onAddPage={onAddPage} />
+      <TaskTimeline project={project} />
+    </div>
+  );
+}
+
 function SeitenView({ project, onAddPage }: { project: Project; onAddPage: () => void }) {
+  const [selectedPageId, setSelectedPageId] = useState<string | undefined>(project.pages[0]?.id);
+  const selectedPage =
+    project.pages.find((p) => p.id === selectedPageId) ?? project.pages[0];
+
+  const isLandscape = (selectedPage?.format ?? "A3-quer").includes("quer");
+
+  return (
+    <div className="grid grid-cols-[220px_1fr] gap-6 mt-6">
+      <div
+        className="rounded-2xl p-4"
+        style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
+      >
+        <div className="flex items-center justify-between text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">
+          SEITEN
+          <button
+            onClick={onAddPage}
+            title="Neue Seite hinzufügen"
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <Plus size={14} />
+          </button>
+        </div>
+        <div className="mt-3 space-y-2">
+          {project.pages.map((pg) => {
+            const active = pg.id === selectedPage?.id;
+            return (
+              <button
+                key={pg.id}
+                onClick={() => setSelectedPageId(pg.id)}
+                className="w-full flex items-center gap-3 p-2 rounded-md text-left transition border"
+                style={{
+                  background: active
+                    ? "hsl(var(--surface-muted))"
+                    : "hsl(var(--surface))",
+                  borderColor: active ? "hsl(var(--accent-gold) / 0.4)" : "transparent",
+                }}
+              >
+                <div
+                  className="w-10 h-10 rounded bg-white border shrink-0"
+                  style={{ borderColor: "hsl(var(--hairline))" }}
+                />
+                <div className="flex-1 text-sm truncate">{pg.title}</div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div
+        className="rounded-2xl p-6 flex flex-col items-center"
+        style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
+      >
+        {selectedPage && (
+          <>
+            <div className="w-full flex items-center justify-between text-xs text-muted-foreground mb-4">
+              <span className="font-medium text-sm" style={{ color: "hsl(var(--ink))" }}>
+                {selectedPage.title}
+              </span>
+              <span>{selectedPage.format}</span>
+            </div>
+            <div
+              className="bg-white border shadow-sm"
+              style={{
+                borderColor: "hsl(var(--hairline))",
+                width: isLandscape ? "100%" : "70%",
+                aspectRatio: isLandscape ? "1.414 / 1" : "1 / 1.414",
+                maxWidth: "100%",
+              }}
+            />
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function TaskTimeline({ project }: { project: Project }) {
+  const tasks = [...project.tasks].sort((a, b) =>
+    (a.date ?? "").localeCompare(b.date ?? "")
+  );
+  const firstOpenIdx = tasks.findIndex((t) => !t.done);
+
+  return (
+    <div
+      className="rounded-2xl p-6"
+      style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
+    >
+      <div
+        className="text-xs font-semibold tracking-[0.18em] mb-5"
+        style={{ color: "hsl(var(--accent-gold))" }}
+      >
+        ZEITSTRAHL
+      </div>
+      <div className="relative">
+        <div
+          className="absolute left-0 right-0 top-2 h-px"
+          style={{ background: "hsl(var(--hairline))" }}
+        />
+        <div className="flex justify-between gap-3 relative">
+          {tasks.map((t, i) => {
+            let dotColor = "hsl(var(--surface-muted))";
+            let dotBorder = "hsl(var(--hairline))";
+            if (t.done) {
+              dotColor = "hsl(var(--accent-gold) / 0.35)";
+              dotBorder = "hsl(var(--accent-gold) / 0.5)";
+            } else if (i === firstOpenIdx) {
+              dotColor = "hsl(var(--accent-gold))";
+              dotBorder = "hsl(var(--accent-gold))";
+            }
+            return (
+              <div key={t.id} className="flex-1 flex flex-col items-center text-center min-w-0">
+                <span
+                  className="w-4 h-4 rounded-full border-2 relative z-10"
+                  style={{ background: dotColor, borderColor: dotBorder }}
+                />
+                <div className="mt-3 text-[11px] text-muted-foreground">
+                  {t.date
+                    ? new Date(t.date).toLocaleDateString("de-DE", {
+                        day: "2-digit",
+                        month: "2-digit",
+                      })
+                    : ""}
+                </div>
+                <div
+                  className="mt-1 text-xs leading-tight px-1 truncate w-full"
+                  style={{
+                    color: t.done
+                      ? "hsl(var(--ink-soft))"
+                      : i === firstOpenIdx
+                      ? "hsl(var(--ink))"
+                      : "hsl(var(--ink-soft))",
+                    fontWeight: i === firstOpenIdx ? 600 : 400,
+                  }}
+                  title={t.title}
+                >
+                  {t.title}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SeitenInhaltGrid({ project, onAddPage }: { project: Project; onAddPage: () => void }) {
   const thumbInput = useRef<HTMLInputElement | null>(null);
   const [editKonzept, setEditKonzept] = useState(false);
   const [konzeptDraft, setKonzeptDraft] = useState(project.konzept ?? "");
