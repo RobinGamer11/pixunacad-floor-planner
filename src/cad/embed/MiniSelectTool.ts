@@ -118,7 +118,12 @@ export class MiniSelectTool {
       this.app.clearSelection();
       this.app.hub.hide();
       this.app.hub.bindCommit(null);
+      try { this.app.textHub?.hide(); this.app.textHub?.bindCommit(null); } catch {}
     } else if (e.key === "Delete" || e.key === "Backspace") {
+      // Nicht löschen, wenn der Fokus in einem Eingabefeld liegt (z. B. Hub-Box).
+      const tgt = e.target as HTMLElement | null;
+      const tag = tgt?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || tgt?.isContentEditable) return;
       if (this.dragSegId) {
         const s = this.app.scene.getSegmentById(this.dragSegId);
         if (s) this.app.scene.removeSegment(s);
@@ -130,6 +135,7 @@ export class MiniSelectTool {
         if (t) this.app.scene.removeTextBox(t);
         this.dragTextId = null;
         this.app.clearSelection();
+        try { this.app.textHub?.hide(); this.app.textHub?.bindCommit(null); } catch {}
         this.app.refreshLabelUI();
       }
     }
