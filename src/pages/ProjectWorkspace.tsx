@@ -373,17 +373,32 @@ export default function ProjectWorkspace() {
               projectId={project.id}
               page={activePage}
               element={selectedElement}
-
-            tab={rightTab}
-            setTab={setRightTab}
-            project={project}
-            onJumpCad={(sheetId) => navigate(`/project/${project.id}/cad${sheetId ? `/${sheetId}` : ""}`)}
-          />
+              tab={rightTab}
+              setTab={setRightTab}
+              project={project}
+              onJumpCad={(sheetId) => navigate(`/project/${project.id}/cad${sheetId ? `/${sheetId}` : ""}`)}
+              onCollapse={() => setRightOpen(false)}
+            />
+          ) : (
+            <div
+              className="w-7 shrink-0 border-l flex items-start justify-center pt-3"
+              style={{ borderColor: "hsl(var(--hairline))" }}
+            >
+              <button
+                onClick={() => setRightOpen(true)}
+                title="Inspector einblenden"
+                className="h-7 w-7 rounded-md flex items-center justify-center hover:bg-muted"
+              >
+                <PanelRightOpen size={14} className="text-muted-foreground" />
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
 }
+
 
 function ToolRailButton({
   icon,
