@@ -52,6 +52,7 @@ import {
 import {
   projectStore,
   useProject,
+  useProjects,
   type PageElement,
   type ElementKind,
   type PageFormat,
