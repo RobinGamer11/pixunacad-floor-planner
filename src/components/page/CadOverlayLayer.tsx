@@ -251,38 +251,6 @@ export default function CadOverlayLayer(props: Props) {
           <option value="→">→ Pfeil</option>
         </select>
       </div>
-      {/* TextHub — Breite / Höhe / Drehung / X / Y (mm) für ausgewählte Textbox */}
-      <div
-        ref={thRef}
-        className="hidden"
-        style={{
-          position: "absolute",
-          background: "white",
-          border: "1px solid hsl(var(--hairline))",
-          borderRadius: 6,
-          padding: 6,
-          boxShadow: "0 4px 16px -4px rgba(0,0,0,0.18)",
-          gap: 4,
-          alignItems: "center",
-          zIndex: 50,
-        }}
-        title="Tab = Bearbeiten · Enter = Übernehmen · Esc = abbrechen"
-      >
-        <input ref={thWRef} type="text" readOnly title="Breite (mm)"
-          style={hubInput} />
-        <span style={hubSep}>×</span>
-        <input ref={thHRef} type="text" readOnly title="Höhe (mm)"
-          style={hubInput} />
-        <span style={hubSep}>·</span>
-        <input ref={thRRef} type="text" readOnly title="Drehung (°)"
-          style={{ ...hubInput, width: 52 }} />
-        <span style={hubSep}>@</span>
-        <input ref={thXRef} type="text" readOnly title="X (mm, links)"
-          style={hubInput} />
-        <span style={hubSep}>,</span>
-        <input ref={thYRef} type="text" readOnly title="Y (mm, oben)"
-          style={hubInput} />
-      </div>
     </div>
   );
 }
