@@ -175,6 +175,7 @@ export class MiniCad {
 
     if (init.initialState) this._restore(init.initialState);
     this._changeDirty = false;
+    this._lastSig = this._sceneSignature();
 
     this._tick();
   }
