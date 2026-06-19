@@ -77,7 +77,8 @@ export class FreeDrawTool {
       }
       if (!input.mouse.left) {
         // Commit
-        const pts = dedupePoints(this._points);
+        let pts = dedupePoints(this._points);
+        if (this.app.defaultFreeAutoShape) pts = autoShapePoints(pts);
         this._drawing = false;
         this._points = [];
         this._lastSamplePx = null;
