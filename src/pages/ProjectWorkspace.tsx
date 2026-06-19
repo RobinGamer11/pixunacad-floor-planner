@@ -99,7 +99,20 @@ export default function ProjectWorkspace() {
   const [toolSettings, setToolSettings] = useState({
     guide: { color: "#7DD3FC", strokeWidth: 1 },
     line: { color: "#111111", thicknessMm: 0.5, alpha: 100 },
-    text: { fontSize: 16, color: "#111111", bold: false, italic: false, alpha: 100 },
+    text: {
+      fontSize: 16,
+      color: "#111111",
+      bold: false,
+      italic: false,
+      alpha: 100,
+      align: "left" as "left" | "center" | "right",
+      bgColor: "#ffffff",
+      bgAlphaPct: 0,
+      wrap: true,
+      borderEnabled: false,
+      borderColor: "#111111",
+      borderWidthPx: 1,
+    },
   });
   const updateToolSettings = <K extends keyof typeof toolSettings>(k: K, patch: Partial<(typeof toolSettings)[K]>) =>
     setToolSettings((s) => ({ ...s, [k]: { ...s[k], ...patch } }));
@@ -606,7 +619,20 @@ const PUNCH_PATTERNS: Record<Exclude<PunchPattern, "none">, { label: string; off
 type ToolSettings = {
   guide: { color: string; strokeWidth: number };
   line: { color: string; thicknessMm: number; alpha: number };
-  text: { fontSize: number; color: string; bold: boolean; italic: boolean; alpha: number };
+  text: {
+    fontSize: number;
+    color: string;
+    bold: boolean;
+    italic: boolean;
+    alpha: number;
+    align: "left" | "center" | "right";
+    bgColor: string;
+    bgAlphaPct: number;
+    wrap: boolean;
+    borderEnabled: boolean;
+    borderColor: string;
+    borderWidthPx: number;
+  };
 };
 
 function PageCanvas({
@@ -658,31 +684,14 @@ function PageCanvas({
     };
   };
 
-  // Click-to-draw is used ONLY for the lightweight "Hilfslinie" (guide) and
-  // "Text" tools. The real "Linie" tool is handled by the embedded CAD engine
-  // (CadOverlayLayer) — see below — so it provides 1:1 snap/ortho/hub.
+  // Click-to-draw is used ONLY for the lightweight "Hilfslinie" (guide) tool.
+  // The "Linie" and "Text" tools are handled by the embedded CAD engine
+  // (CadOverlayLayer) — see below — so they provide 1:1 snap/ortho/hub.
   const drawingTool = activeTool === "guide";
-  const cursorStyle = drawingTool ? "crosshair" : activeTool === "text" ? "text" : undefined;
+  const cursorStyle = drawingTool ? "crosshair" : undefined;
 
   const handlePageMouseDown = (e: React.MouseEvent) => {
-    if (e.target !== e.currentTarget && !drawingTool && activeTool !== "text") return;
-    if (activeTool === "text") {
-      const p = toPct(e.clientX, e.clientY);
-      projectStore.addElement(projectId, page.id, {
-        kind: "text",
-        x: Math.max(0, p.x),
-        y: Math.max(0, p.y - 2),
-        w: 25,
-        h: 6,
-        text: "Text",
-        fontSize: toolSettings.text.fontSize,
-        color: toolSettings.text.color,
-        bold: toolSettings.text.bold,
-        italic: toolSettings.text.italic,
-      });
-      onCommitTool();
-      return;
-    }
+    if (e.target !== e.currentTarget && !drawingTool) return;
     if (drawingTool) {
       const p = toPct(e.clientX, e.clientY);
       if (!pendingStart) {
@@ -903,17 +912,31 @@ function PageCanvas({
           pageWidthMm={fmt.w}
           pageHeightMm={fmt.h}
           basePxPerMm={baseWidth / fmt.w}
+          pageMarginsMm={page.margins ?? 0}
           zoom={scale}
-          activeTool={activeTool === "line" ? "line" : null}
-          enabled={activeTool === "line"}
+          activeTool={activeTool === "line" ? "line" : activeTool === "text" ? "text" : null}
+          enabled={activeTool === "line" || activeTool === "text"}
           initialState={page.cadOverlay}
           lineColor={toolSettings.line.color}
           lineThicknessMm={toolSettings.line.thicknessMm}
           lineAlpha={toolSettings.line.alpha / 100}
+          textColor={toolSettings.text.color}
+          textFontSizePx={toolSettings.text.fontSize}
+          textBold={toolSettings.text.bold}
+          textItalic={toolSettings.text.italic}
+          textAlpha={toolSettings.text.alpha / 100}
+          textAlign={toolSettings.text.align}
+          textBgColor={toolSettings.text.bgColor}
+          textBgAlphaPct={toolSettings.text.bgAlphaPct}
+          textWrap={toolSettings.text.wrap}
+          textBorderEnabled={toolSettings.text.borderEnabled}
+          textBorderColor={toolSettings.text.borderColor}
+          textBorderWidthPx={toolSettings.text.borderWidthPx}
           onChange={(state) =>
             projectStore.updatePage(projectId, page.id, { cadOverlay: state })
           }
         />
+
       </div>
     </div>
   );
@@ -1587,9 +1610,94 @@ function TextSettings({
           </button>
         </div>
       </Row>
+      <Row label="Ausrichtung">
+        <div className="flex gap-1">
+          {(["left", "center", "right"] as const).map((a) => (
+            <button
+              key={a}
+              onClick={() => onChange({ align: a })}
+              className="h-8 flex-1 rounded border text-xs"
+              style={{
+                borderColor: "hsl(var(--hairline))",
+                background: settings.align === a ? "hsl(var(--accent-gold-soft))" : "transparent",
+              }}
+              title={a === "left" ? "Links" : a === "center" ? "Zentriert" : "Rechts"}
+            >
+              {a === "left" ? "⯇" : a === "center" ? "≡" : "⯈"}
+            </button>
+          ))}
+        </div>
+      </Row>
+      <Row label="Transparenz">
+        <div className="flex items-center gap-2">
+          <input
+            type="range" min={0} max={100} step={1}
+            value={settings.alpha}
+            onChange={(e) => onChange({ alpha: Number(e.target.value) })}
+            className="flex-1 accent-foreground"
+          />
+          <span className="text-xs tabular-nums w-10 text-right">{settings.alpha}%</span>
+        </div>
+      </Row>
+      <Row label="Umbruch">
+        <label className="flex items-center gap-2 text-xs">
+          <input
+            type="checkbox"
+            checked={settings.wrap}
+            onChange={(e) => onChange({ wrap: e.target.checked })}
+          />
+          Auto-Umbruch (Breite fix, Höhe wächst)
+        </label>
+      </Row>
+      <Row label="Hintergrund">
+        <ColorInput value={settings.bgColor} onChange={(v) => onChange({ bgColor: v })} />
+      </Row>
+      <Row label="Hintergrund-Alpha">
+        <div className="flex items-center gap-2">
+          <input
+            type="range" min={0} max={100} step={1}
+            value={settings.bgAlphaPct}
+            onChange={(e) => onChange({ bgAlphaPct: Number(e.target.value) })}
+            className="flex-1 accent-foreground"
+          />
+          <span className="text-xs tabular-nums w-10 text-right">{settings.bgAlphaPct}%</span>
+        </div>
+      </Row>
+      <Row label="Rahmen">
+        <label className="flex items-center gap-2 text-xs">
+          <input
+            type="checkbox"
+            checked={settings.borderEnabled}
+            onChange={(e) => onChange({ borderEnabled: e.target.checked })}
+          />
+          Rahmen anzeigen
+        </label>
+      </Row>
+      {settings.borderEnabled && (
+        <>
+          <Row label="Rahmenfarbe">
+            <ColorInput value={settings.borderColor} onChange={(v) => onChange({ borderColor: v })} />
+          </Row>
+          <Row label="Rahmenstärke">
+            <div className="flex items-center gap-2">
+              <input
+                type="range" min={0.5} max={8} step={0.5}
+                value={settings.borderWidthPx}
+                onChange={(e) => onChange({ borderWidthPx: Number(e.target.value) })}
+                className="flex-1 accent-foreground"
+              />
+              <span className="text-xs tabular-nums w-10 text-right">{settings.borderWidthPx} px</span>
+            </div>
+          </Row>
+        </>
+      )}
+      <div className="text-[11px] text-muted-foreground">
+        Text wird mit CAD-Engine erstellt: Snap an Linien, Texte und Seitenränder. Doppelklick zum Editieren.
+      </div>
     </SettingsBlock>
   );
 }
+
 
 function SettingsBlock({ title, children }: { title: string; children: React.ReactNode }) {
   return (
