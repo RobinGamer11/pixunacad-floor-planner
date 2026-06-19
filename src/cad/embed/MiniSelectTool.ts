@@ -124,7 +124,8 @@ export class MiniSelectTool {
         this.app.clearSelection(); this.app.hub.hide();
         this.app.refreshLabelUI();
       } else if (this.dragTextId) {
-        try { (this.app.scene as any).removeTextBoxById?.(this.dragTextId); } catch {}
+        const t = this.app.scene.getTextBoxById(this.dragTextId);
+        if (t) this.app.scene.removeTextBox(t);
         this.dragTextId = null;
         this.app.clearSelection();
         this.app.refreshLabelUI();
