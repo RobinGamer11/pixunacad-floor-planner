@@ -357,20 +357,38 @@ export default function ProjectWorkspace() {
           )}
 
           {/* Canvas */}
-          <main className="flex-1 relative overflow-auto" style={{ background: "hsl(var(--surface))" }}>
-            {activePage && (
-              <PageCanvas
-                projectId={project.id}
-                page={activePage}
-                overlayPage={bgOverlay.visible ? bgPage : undefined}
-                overlayOpacity={bgOverlay.opacity}
-                selectedElementId={selectedElementId}
-                onSelect={(id) => {
-                  setSelectedElementId(id);
-                  if (id) setRightTab("tools");
-                }}
-              />
-            )}
+          <main
+            className="flex-1 relative flex flex-col min-w-0"
+            style={{ background: "hsl(var(--surface))" }}
+          >
+            <div
+              className="flex-1 overflow-auto"
+              onWheel={(e) => {
+                if (e.ctrlKey || e.metaKey || !e.shiftKey) {
+                  // mouse wheel zooms; allow scroll only with shift
+                  if (e.shiftKey) return;
+                  e.preventDefault();
+                  const delta = -e.deltaY;
+                  setZoomClamped(zoom + (delta > 0 ? 5 : -5));
+                }
+              }}
+            >
+              {activePage && (
+                <PageCanvas
+                  projectId={project.id}
+                  page={activePage}
+                  overlayPage={bgOverlay.visible ? bgPage : undefined}
+                  overlayOpacity={bgOverlay.opacity}
+                  selectedElementId={selectedElementId}
+                  zoom={zoom}
+                  onSelect={(id) => {
+                    setSelectedElementId(id);
+                    if (id) setRightTab("tools");
+                  }}
+                />
+              )}
+            </div>
+            <ZoomBar zoom={zoom} setZoom={setZoomClamped} />
           </main>
 
           {/* Right inspector (collapsible) */}
