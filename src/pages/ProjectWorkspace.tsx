@@ -912,17 +912,31 @@ function PageCanvas({
           pageWidthMm={fmt.w}
           pageHeightMm={fmt.h}
           basePxPerMm={baseWidth / fmt.w}
+          pageMarginsMm={page.margins ?? 0}
           zoom={scale}
-          activeTool={activeTool === "line" ? "line" : null}
-          enabled={activeTool === "line"}
+          activeTool={activeTool === "line" ? "line" : activeTool === "text" ? "text" : null}
+          enabled={activeTool === "line" || activeTool === "text"}
           initialState={page.cadOverlay}
           lineColor={toolSettings.line.color}
           lineThicknessMm={toolSettings.line.thicknessMm}
           lineAlpha={toolSettings.line.alpha / 100}
+          textColor={toolSettings.text.color}
+          textFontSizePx={toolSettings.text.fontSize}
+          textBold={toolSettings.text.bold}
+          textItalic={toolSettings.text.italic}
+          textAlpha={toolSettings.text.alpha / 100}
+          textAlign={toolSettings.text.align}
+          textBgColor={toolSettings.text.bgColor}
+          textBgAlphaPct={toolSettings.text.bgAlphaPct}
+          textWrap={toolSettings.text.wrap}
+          textBorderEnabled={toolSettings.text.borderEnabled}
+          textBorderColor={toolSettings.text.borderColor}
+          textBorderWidthPx={toolSettings.text.borderWidthPx}
           onChange={(state) =>
             projectStore.updatePage(projectId, page.id, { cadOverlay: state })
           }
         />
+
       </div>
     </div>
   );
