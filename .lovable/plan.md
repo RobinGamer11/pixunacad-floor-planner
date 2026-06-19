@@ -1,50 +1,78 @@
-# Linie 1:1 im Seiten-Canvas
+## Ziel
+Die vier Punkte in der Seitenansicht (`ProjectWorkspace`) umsetzen — schrittweise, mit klaren Etappen, damit keine bestehende Funktion (Linien-Tool, Hilfslinie, Layers, Pan/Zoom) bricht.
 
-Ziel: Das Werkzeug „Linie" im Seiteneditor verhält sich exakt wie in der CAD-Oberfläche — gleiches Snapping, Ortho, Hub (Längen-/Winkel-Eingabe), Punkt-Edit. Spätere Iterationen erweitern um „Text" und „Schraffur" nach demselben Muster.
+---
 
-## Vorgehen
+### 1. „Seiten" → „Auswahl" (oberster Tab) + Pan überall
 
-### 1. CAD-Engine entkoppeln
-- Neuer Einstiegspunkt `src/cad/embed/MiniCad.ts`: instanziiert die nötigen Bausteine ohne CAD-Toolbar/Side-Panels.
-- Wiederverwendet 1:1: `Scene`, `Renderer`, `Camera`, `Input`, `TopologyEngine`, `LineHub`, `PointEditMenu`, `LineTool`, `snapDraw`, `geometry`, `LabelManager`.
-- Mock-Implementierungen für `CadApp`-Felder, die `LineTool` anfasst, aber im Seitenkontext nicht gebraucht werden (z. B. `pipette`, `eraser`, Sheet/Plan-Manager) — als No-Op-Stubs, damit `LineTool` unverändert bleibt.
-- Wichtig: `LineTool.ts` wird **nicht** verändert — die Engine-Hülle stellt dieselbe Schnittstelle bereit wie `CadApp`.
+- Tab umbenennen: erstes Tab im rechten Inspector heißt **„Auswahl"** (bisher „Seiten"). Inhalt = aktuelle Seitenliste **plus** oben eine kompakte Auswahl-Sektion (selektiertes Objekt, „Alles auswählen", Mehrfachauswahl-Info). Wenn nichts aktiv ist, ist „Auswahl" der Default-Tab.
+- Aktives Werkzeug `select` wird automatisch gesetzt, wenn der User ein anderes Werkzeug per „Beenden" verlässt.
+- Auf der weißen Fläche **außerhalb des Blattes** und auf dem Blatt (wenn `select`/kein Tool aktiv ist) gilt: **Linksklick + Ziehen = Pan**. Mittlere Maustaste / Alt+Links bleibt zusätzlich erhalten.
+- Scroll-Bereich wird vergrößert (großzügiges Padding um das Blatt herum, z. B. `min(100vw, 100vh)` zusätzlich auf jeder Seite), sodass auch bei starkem Zoom in alle Ecken gepannt werden kann.
 
-### 2. Einbettung im Seiten-Canvas
-- In `PageCanvas` (innerhalb `src/pages/ProjectWorkspace.tsx`) zwei neue Layer **über** dem bestehenden Seiteninhalt:
-  - `<canvas>` für die CAD-Engine (deckt das Blatt exakt ab, gleiche Pixelmaße wie die Seite ohne View-Scale)
-  - DOM-Container für `LineHub` und `PointEditMenu` (die Engine erzeugt deren UI selbst)
-- Kamera-Setup: 1 mm Welt = 1 mm Seite (Welt-Ursprung links oben). Kein Pan/Zoom in der Engine — der Page-Zoom skaliert den Canvas via CSS-Transform mit (gleiches `scale` wie die Seite).
-- Mouse/Keyboard-Events laufen über den vorhandenen `Input`-Adapter; nur aktiv, wenn `activeTool === "line"`.
+### 2. Text 1:1 aus CAD-Oberfläche
 
-### 3. Persistenz
-- Engine-Szene wird pro Seite gehalten: neues Feld `ProjectPage.cadOverlay` (serialisierte Scene als JSON) in `projectStore.ts`.
-- Speichern bei jeder Commit-Aktion (Linie fertiggestellt, Punkt verschoben, gelöscht); Laden beim Seitenwechsel.
-- Existierende `kind: "line"`-PageElements bleiben für nicht-CAD-Linien (z. B. künftige einfache Hilfslinien) bestehen — werden separat unter der CAD-Schicht gerendert.
+Statt das bestehende einfache HTML-Text-Element zu erweitern, wird der CAD-`TextTool` analog zum bereits eingebauten `LineTool` in `MiniCad` exponiert:
 
-### 4. Cleanup bestehender Provisorien
-- Der jetzige „Klick-Klick"-Provisorischer-Linien-Modus für `activeTool === "line"` wird durch die Engine ersetzt.
-- Hilfslinie (`guide`) bleibt vorerst beim bisherigen, einfachen SVG-Mechanismus (hellblau gestrichelt) — Hilfslinien sind nicht-druckend und brauchen kein CAD-Snap.
+- `MiniCad` bekommt: `textTool` (Instanz von `TextTool`), `textEditor` (`TextEditorOverlay`), `selection`, `setSelection`, `beginTextEdit`, `getCurrentTextStyle`, `defaultTextStyle`, plus Serialisierung der `scene.textBoxes`.
+- `setActiveTool("text")` wird unterstützt; Tool-Schaltzustand wechselt zwischen `line` / `text` / `null`.
+- `CadOverlayLayer` mountet zusätzlich den DOM-Host für `TextEditorOverlay` (contenteditable Layer) und die Toolbar-Hooks, die `TextEditorOverlay` erwartet.
+- `ProjectWorkspace`-Tool-Panel „Werkzeugeinstellung → Text" liefert: Schriftgröße, Farbe, Fett, Kursiv, Unterstrichen, Ausrichtung — Werte werden in `MiniCad.setTextDefaults({...})` synchronisiert (analog `setLineDefaults`).
+- Das bestehende generische `text`-PageElement entfällt für neu gesetzte Texte; alte Elemente bleiben rückwärtskompatibel renderbar.
 
-### 5. Nicht in diesem Schritt
-- Text-Werkzeug und Schraffur-Werkzeug folgen in eigenen Iterationen nach demselben Muster (jeweils mit Tool-Settings-Panel im Inspector).
-- CAD-Zeichenblatt-Platzierung (`cad-view`) bleibt unverändert.
+### 3. Übergreifende Snap-Interaktion + Ränder snapbar
 
-## Technische Details
+- Da Text & Linie jetzt beide in derselben `MiniCad`-Scene leben, snappen sie automatisch aufeinander (Topologie-Engine kennt Segment-, TextBox-Ecken und Hatch-Snaps).
+- **Seitenränder als Snap-Quelle**: In `MiniCad` wird beim Mount ein unsichtbares „Page-Frame"-Objekt als 4 Segmente registriert (links/oben/rechts/unten) mit `labelId: "__frame__"`, das:
+  - **nicht** gerendert wird (Renderer-Patch filtert die Frame-`labelId` heraus),
+  - **nicht** selektierbar / verschiebbar ist (LineTool/SelectTool ignorieren es per Label-Check),
+  - aber von `TopologyEngine.findBestSnap` ganz normal als Snap- und Hover-Quelle behandelt wird → blaue Hover-Linie + Fangpunkt wie bei normalen Linien.
+- Die Frame-Segmente werden bei Änderung der Seiten-Maße (Seiteneinstellung) neu erzeugt.
 
-**Neue Dateien**
-- `src/cad/embed/MiniCad.ts` — Engine-Hülle, exportiert `createMiniCad({ canvas, mmWidth, mmHeight, hubContainer, onChange })`
-- `src/cad/embed/CadAppLike.ts` — Typdefinition / Stub-Felder, die `LineTool` erwartet
-- `src/components/page/CadOverlayLayer.tsx` — React-Wrapper, der `MiniCad` lifecycle-managed
+### 4. Transparenz
 
-**Geänderte Dateien**
-- `src/pages/ProjectWorkspace.tsx` — Overlay einbinden, Provisorium für `line`-Tool entfernen
-- `src/lib/projectStore.ts` — `cadOverlay?: SerializedScene` an `ProjectPage`
+- Werkzeugeinstellung für **Linie** und **Text** bekommt einen `Transparenz`-Slider (0–100 %).
+- Wird auf `defaultLineAlpha` / `defaultTextAlpha` in `MiniCad` geschrieben.
+- Renderer-Patch in `MiniCad._patchRendererTransparent` setzt `ctx.globalAlpha` pro Objekt anhand eines neuen optionalen `alpha`-Felds auf `Segment` / `TextBox`. Default 1.0 ⇒ visuell identisch zum CAD.
+- Serialisierung speichert `alpha` mit; Restore liest es.
 
-**Risiken**
-- `LineTool` greift auf viele `CadApp`-Felder zu (`hub`, `renderer`, `topology`, `labels`, `id`, `scene`, `input`, `pointEditMenu`, `pipette`, …). Jeder Zugriff muss in `MiniCad` mindestens als No-Op existieren, sonst Runtime-Fehler. Erste Implementierungsrunde wird Lücken aufdecken — kurze Korrektur-Iterationen einplanen.
-- Koordinaten-Mapping: CSS-Scale auf dem Engine-Canvas darf Maus-Koordinaten nicht verfälschen — `Input` muss `getBoundingClientRect()` nutzen (tut es bereits), das die Skalierung berücksichtigt.
+---
 
-## Validierung
-- Im Seiteneditor „Linie" aktivieren → erste Linie ziehen → Snap-Punkte erscheinen identisch zur CAD-Oberfläche → Hub erscheint mit Länge/Winkel → Eingabe & Enter committen → Linie bleibt sichtbar nach Tool-Wechsel → Seitenwechsel & Rücksprung lädt sie wieder.
-- Ortho (Shift) und Punkt-Edit (Klick auf Endpunkt) wie in CAD.
+### Technik-Details
+
+```text
+src/cad/embed/MiniCad.ts
+  + setActiveTool("text")
+  + textTool, textEditor, selection state
+  + setTextDefaults({fontSize,color,bold,italic,...,alphaPercent})
+  + setLineDefaults({..., alphaPercent})
+  + registerPageFrame(widthMm, heightMm) → 4 protected segments
+  + serialize/restore: textBoxes[], alpha
+  + renderer patch: globalAlpha pro Objekt, Frame-Label überspringen
+
+src/components/page/CadOverlayLayer.tsx
+  + DOM-Host für TextEditorOverlay (contenteditable div + toolbar-Stubs)
+  + Props: activeTool: "line"|"text"|null, textDefaults, lineAlpha, textAlpha
+  + ruft registerPageFrame initial + bei Seitenänderung
+
+src/pages/ProjectWorkspace.tsx
+  + Tab „Seiten" → „Auswahl" inkl. Auswahl-Sektion
+  + activeTool default = "select"
+  + Pan-Handler: Linksklick auf Hintergrund & auf Blatt (wenn select)
+  + größeres Padding im Scroll-Container
+  + Werkzeugeinstellung „Text": volle CAD-Optionen + Transparenz
+  + Werkzeugeinstellung „Linie": + Transparenz
+  + Text-Tool aktiviert MiniCad("text") statt PageElement-Insert
+```
+
+### Reihenfolge (jede Etappe einzeln verifizierbar)
+
+1. **Etappe A** — Tab-Rename + Pan auf weißer Fläche & Blatt + erweitertes Scroll-Padding.
+2. **Etappe B** — Page-Frame als unsichtbares Snap-Ziel (Punkt 3, Teil 1).
+3. **Etappe C** — Transparenz für Linie (Punkt 4, Teil 1) — kleine, isolierte Änderung.
+4. **Etappe D** — Text 1:1 aus CAD in MiniCad + Werkzeugeinstellung Text (Punkt 2).
+5. **Etappe E** — Transparenz auch für Text (Punkt 4, Teil 2) + finaler Snap-Test Text↔Linie↔Frame.
+
+### Offene Punkte
+- Sollen vorhandene „alte" Text-Elemente (vor dieser Änderung) automatisch in CAD-TextBoxes migriert werden, oder nebeneinander bestehen bleiben (rückwärtskompatibel)?
+- Soll der Auswahl-Tab auch Bulk-Aktionen (Löschen, Gruppieren) für seitenweite Mehrfachauswahl bekommen, oder reicht Anzeige + „Alle auswählen"?

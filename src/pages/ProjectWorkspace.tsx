@@ -98,8 +98,8 @@ export default function ProjectWorkspace() {
   // Per-tool settings (live in workspace state; persist could come later).
   const [toolSettings, setToolSettings] = useState({
     guide: { color: "#7DD3FC", strokeWidth: 1 },
-    line: { color: "#111111", thicknessMm: 0.5 },
-    text: { fontSize: 16, color: "#111111", bold: false, italic: false },
+    line: { color: "#111111", thicknessMm: 0.5, alpha: 100 },
+    text: { fontSize: 16, color: "#111111", bold: false, italic: false, alpha: 100 },
   });
   const updateToolSettings = <K extends keyof typeof toolSettings>(k: K, patch: Partial<(typeof toolSettings)[K]>) =>
     setToolSettings((s) => ({ ...s, [k]: { ...s[k], ...patch } }));
@@ -133,7 +133,12 @@ export default function ProjectWorkspace() {
         className="flex flex-col items-center py-3 w-14 shrink-0 border-r gap-1"
         style={{ borderColor: "hsl(var(--hairline))" }}
       >
-        <ToolRailButton icon={<LayoutTemplate size={18} />} label="Seiten" active />
+        <ToolRailButton
+          icon={<MousePointer2 size={18} />}
+          label="Auswahl"
+          active={activeTool === null}
+          onClick={() => setActiveTool(null)}
+        />
         <ToolRailButton
           icon={<ExternalLink size={18} />}
           label="CAD öffnen"
@@ -469,9 +474,13 @@ export default function ProjectWorkspace() {
                 }
               }}
               onMouseDown={(e) => {
-                // Middle-mouse-button drag = pan view (like CAD/PowerPoint)
-                const wantPan = e.button === 1 || (e.button === 0 && (e as any).altKey);
-                if (!wantPan) return;
+                // Pan via:
+                //  • Middle-mouse / Alt+Left (always works, even with a tool active)
+                //  • Plain Left click on empty surface when no tool is active
+                //    (clicks on page elements call stopPropagation, so they don't reach here)
+                const isMiddle = e.button === 1 || (e.button === 0 && (e as any).altKey);
+                const isPlainLeftIdle = e.button === 0 && !(e as any).altKey && activeTool === null;
+                if (!isMiddle && !isPlainLeftIdle) return;
                 e.preventDefault();
                 const container = e.currentTarget as HTMLDivElement;
                 const startX = e.clientX;
@@ -596,8 +605,8 @@ const PUNCH_PATTERNS: Record<Exclude<PunchPattern, "none">, { label: string; off
 
 type ToolSettings = {
   guide: { color: string; strokeWidth: number };
-  line: { color: string; thicknessMm: number };
-  text: { fontSize: number; color: string; bold: boolean; italic: boolean };
+  line: { color: string; thicknessMm: number; alpha: number };
+  text: { fontSize: number; color: string; bold: boolean; italic: boolean; alpha: number };
 };
 
 function PageCanvas({
@@ -754,7 +763,10 @@ function PageCanvas({
   const otherEls = page.elements.filter((e) => e.kind !== "line" && e.kind !== "guide");
 
   return (
-    <div className="min-h-full flex items-start justify-center p-10">
+    <div
+      className="min-h-full flex items-start justify-center"
+      style={{ padding: "60vh 60vw" }}
+    >
       <div
         className="relative"
         style={{
@@ -897,6 +909,7 @@ function PageCanvas({
           initialState={page.cadOverlay}
           lineColor={toolSettings.line.color}
           lineThicknessMm={toolSettings.line.thicknessMm}
+          lineAlpha={toolSettings.line.alpha / 100}
           onChange={(state) =>
             projectStore.updatePage(projectId, page.id, { cadOverlay: state })
           }
@@ -1501,8 +1514,22 @@ function LineSettings({
           style={{ borderColor: "hsl(var(--hairline))" }}
         />
       </Row>
+      <Row label="Transparenz">
+        <div className="flex items-center gap-2">
+          <input
+            type="range"
+            min={0}
+            max={100}
+            step={1}
+            value={settings.alpha}
+            onChange={(e) => onChange({ alpha: Number(e.target.value) })}
+            className="flex-1 accent-foreground"
+          />
+          <span className="text-xs tabular-nums w-10 text-right">{settings.alpha}%</span>
+        </div>
+      </Row>
       <div className="text-[11px] text-muted-foreground">
-        Zeichnet 1:1 mit CAD-Engine: Snap, Ortho (Shift), Hub-Eingabe für Länge/Winkel.
+        Zeichnet 1:1 mit CAD-Engine: Snap, Ortho (Shift), Hub-Eingabe für Länge/Winkel. Snap auch an Seitenränder.
       </div>
     </SettingsBlock>
   );

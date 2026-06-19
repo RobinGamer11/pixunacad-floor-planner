@@ -25,6 +25,8 @@ interface Props {
   onChange: (state: any) => void;
   lineColor?: string;
   lineThicknessMm?: number;
+  /** Linien-Transparenz, 0..1 (1 = vollständig deckend). */
+  lineAlpha?: number;
 }
 
 export default function CadOverlayLayer({
@@ -38,6 +40,7 @@ export default function CadOverlayLayer({
   onChange,
   lineColor,
   lineThicknessMm,
+  lineAlpha,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const hubRef = useRef<HTMLDivElement>(null);
@@ -105,13 +108,14 @@ export default function CadOverlayLayer({
     engineRef.current?.setActiveTool(activeTool);
   }, [activeTool]);
 
-  // Line defaults.
+  // Line defaults (color, thickness, alpha).
   useEffect(() => {
     engineRef.current?.setLineDefaults({
       color: lineColor,
       thicknessM: typeof lineThicknessMm === "number" ? lineThicknessMm / 1000 : undefined,
+      alpha: typeof lineAlpha === "number" ? lineAlpha : undefined,
     });
-  }, [lineColor, lineThicknessMm]);
+  }, [lineColor, lineThicknessMm, lineAlpha]);
 
 
   return (

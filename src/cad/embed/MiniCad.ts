@@ -77,12 +77,17 @@ export class MiniCad {
   activeDrawLabelId = Defaults.defaultLabelId;
   defaultLineColor: string;
   defaultLineThicknessM: number;
+  /** Linien-Transparenz 0..1 (1 = vollständig deckend). */
+  defaultLineAlpha = 1;
 
   // Page geometry.
   pageWidthMm: number;
   pageHeightMm: number;
   basePxPerMm: number;
   private _zoom: number;
+
+  /** Spezielle Label-ID für die unsichtbaren Page-Frame-Segmente (Snap-Ziel). */
+  private _frameLabelId = "__page_frame__";
 
   private _activeTool: MiniTool = null;
   private _rafId: number | null = null;
@@ -129,12 +134,56 @@ export class MiniCad {
     // Resize + camera setup.
     this.applyZoom(this._zoom);
 
+    // Register the invisible page-frame as snap geometry (4 segments at the
+    // page edges). The frame is hidden from rendering by filtering its label
+    // out of labelManager.list(), but stays visible to TopologyEngine because
+    // isVisible(frameLabelId) still returns true.
+    this._installPageFrameSnap();
+
     // Restore state, if any.
     if (init.initialState) this._restore(init.initialState);
     this._segmentCountLast = this.scene.segments.length;
 
     // Start the animation loop.
     this._tick();
+  }
+
+  /** Returns true if a segment is part of the invisible page frame. */
+  isFrameSegment(seg: { labelId?: string }): boolean {
+    return seg.labelId === this._frameLabelId;
+  }
+
+  private _installPageFrameSnap() {
+    // 1) Register a dedicated label that *exists* and is *visible* (so the
+    //    topology engine includes its segments in snap queries), but hide it
+    //    from labelManager.list() so the renderer never iterates it.
+    const lm: any = this.labelManager;
+    lm.groups.push({ id: this._frameLabelId, name: "__page_frame__", locked: true, visible: true });
+    const origList = lm.list.bind(lm);
+    lm.list = () => origList().filter((g: any) => g.id !== this._frameLabelId);
+
+    // 2) Build the 4 frame segments.
+    this._rebuildPageFrame();
+  }
+
+  private _rebuildPageFrame() {
+    // Remove any previously created frame segs.
+    this.scene.segments = this.scene.segments.filter((s) => s.labelId !== this._frameLabelId);
+    const wM = this.pageWidthMm / 1000;
+    const hM = this.pageHeightMm / 1000;
+    const style = {
+      color: "rgba(0,0,0,0)",
+      thicknessM: 0.0001,
+      labelId: this._frameLabelId,
+    };
+    try {
+      this.scene.createSegment({ x: 0, y: 0 }, { x: wM, y: 0 }, style);
+      this.scene.createSegment({ x: wM, y: 0 }, { x: wM, y: hM }, style);
+      this.scene.createSegment({ x: wM, y: hM }, { x: 0, y: hM }, style);
+      this.scene.createSegment({ x: 0, y: hM }, { x: 0, y: 0 }, style);
+    } catch (e) {
+      console.error("MiniCad: page-frame segment creation failed:", e);
+    }
   }
 
   /* ===== Public API ===== */
@@ -147,10 +196,13 @@ export class MiniCad {
     if (tool === "line") this.lineTool.activate();
   }
 
-  setLineDefaults(opts: { color?: string; thicknessM?: number }) {
+  setLineDefaults(opts: { color?: string; thicknessM?: number; alpha?: number }) {
     if (opts.color) this.defaultLineColor = opts.color;
     if (typeof opts.thicknessM === "number" && opts.thicknessM > 0) {
       this.defaultLineThicknessM = opts.thicknessM;
+    }
+    if (typeof opts.alpha === "number" && opts.alpha >= 0 && opts.alpha <= 1) {
+      this.defaultLineAlpha = opts.alpha;
     }
   }
 
@@ -175,20 +227,25 @@ export class MiniCad {
   serialize(): any {
     return {
       version: 1,
-      segments: this.scene.segments.map((s) => ({
-        id: s.id,
-        a: { x: s.a.x, y: s.a.y },
-        b: { x: s.b.x, y: s.b.y },
-        color: s.color,
-        thicknessM: s.thicknessM,
-        labelId: s.labelId,
-      })),
+      // Filter out invisible page-frame segments — they are regenerated on mount.
+      segments: this.scene.segments
+        .filter((s) => s.labelId !== this._frameLabelId)
+        .map((s) => ({
+          id: s.id,
+          a: { x: s.a.x, y: s.a.y },
+          b: { x: s.b.x, y: s.b.y },
+          color: s.color,
+          thicknessM: s.thicknessM,
+          labelId: s.labelId,
+        })),
     };
   }
 
   private _restore(data: any) {
     if (!data || !Array.isArray(data.segments)) return;
     for (const s of data.segments) {
+      // Defensive: never restore frame segments — they live only in memory.
+      if (s.labelId === this._frameLabelId) continue;
       try {
         this.scene.createSegment(
           { x: s.a.x, y: s.a.y },
@@ -216,8 +273,11 @@ export class MiniCad {
   /* ===== Required CadApp surface for LineTool / Renderer ===== */
 
   getCurrentLineStyle() {
+    // Encode the line alpha into the color (rgba), so we don't need to patch
+    // the renderer — strokeStyle honors the alpha channel directly.
+    const color = applyAlphaToColor(this.defaultLineColor, this.defaultLineAlpha);
     return {
-      color: this.defaultLineColor,
+      color,
       thicknessM: this.defaultLineThicknessM,
       labelId: this.activeDrawLabelId || Defaults.defaultLabelId,
     };
@@ -303,4 +363,36 @@ export class MiniCad {
     }
     this._rafId = requestAnimationFrame(this._tick);
   };
+}
+
+/* ============ Helpers ============ */
+
+/**
+ * Applies an alpha (0..1) to any CSS color string and returns an rgba(...)
+ * string. Supports #rgb / #rrggbb / rgb(...) / rgba(...). Falls back to the
+ * original color if parsing fails (so behavior matches the CAD engine).
+ */
+function applyAlphaToColor(color: string, alpha: number): string {
+  if (alpha >= 1) return color;
+  const a = Math.max(0, Math.min(1, alpha));
+  const c = (color || "").trim();
+  // #rgb
+  let m = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/i.exec(c);
+  if (m) {
+    const r = parseInt(m[1] + m[1], 16);
+    const g = parseInt(m[2] + m[2], 16);
+    const b = parseInt(m[3] + m[3], 16);
+    return `rgba(${r},${g},${b},${a})`;
+  }
+  // #rrggbb
+  m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(c);
+  if (m) {
+    return `rgba(${parseInt(m[1], 16)},${parseInt(m[2], 16)},${parseInt(m[3], 16)},${a})`;
+  }
+  // rgb(r,g,b) or rgba(r,g,b,a) — replace/append alpha
+  m = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*[\d.]+\s*)?\)$/i.exec(c);
+  if (m) {
+    return `rgba(${m[1]},${m[2]},${m[3]},${a})`;
+  }
+  return c;
 }
