@@ -127,7 +127,7 @@ export interface Project {
   isTemplate?: boolean;
 }
 
-const STORAGE_KEY = "pixuna.projects.v2";
+const STORAGE_KEY = "pixuna.projects.v3";
 
 const placeholder = (label: string) =>
   `data:image/svg+xml;utf8,${encodeURIComponent(
@@ -160,13 +160,7 @@ function demoProjects(): Project[] {
       { id: `${id}-p6`, title: "06 Präsentation", format: "A3-quer", margins: 20, background: false, elements: [] },
       { id: `${id}-p7`, title: "07 Kostenübersicht", format: "A3-quer", margins: 20, background: false, elements: [] },
     ],
-    sheets: [
-      { id: `${id}-s1`, name: "EG Grundriss", scale: "1:100" },
-      { id: `${id}-s2`, name: "OG Grundriss", scale: "1:100" },
-      { id: `${id}-s3`, name: "Schnitt A-A", scale: "1:100" },
-      { id: `${id}-s4`, name: "Ansicht Süd", scale: "1:100" },
-      { id: `${id}-s5`, name: "Lageplan", scale: "1:500" },
-    ],
+    sheets: [],
     tasks: [
       { id: `${id}-t1`, title: "Bestandsaufnahme prüfen", done: true, date: "2026-06-03", time: "09:00", priority: "medium" },
       { id: `${id}-t2`, title: "Entwurf Variante A fertigstellen", done: true, date: "2026-06-07", time: "14:00", priority: "high" },

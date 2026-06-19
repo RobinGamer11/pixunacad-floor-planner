@@ -121,6 +121,13 @@ export class MiniCad {
   basePxPerMm: number;
   pageMarginsMm: number;
   private _zoom: number;
+  /** Skaliert "echte Meter"-Strichbreiten auf die internen, von der
+   *  CAD-Engine erwarteten thicknessM-Werte. Notwendig, weil wir
+   *  `renderer.referencePxPerM` auf `basePxPerMm * 1000` (statt 80 px/m)
+   *  setzen, damit Text-Schriftgrößen und Textbox-Defaults auf einer
+   *  realen Papierseite vernünftig dimensioniert sind.
+   *  Faktor = referencePxPerM / 80. */
+  private _strokeFactor: number;
 
   /** Special label-ID for invisible page-frame segments (snap-only). */
   private _frameLabelId = "__page_frame__";
@@ -140,8 +147,9 @@ export class MiniCad {
     this.pageMarginsMm = init.pageMarginsMm ?? 0;
     this._zoom = init.initialZoom;
     this._onChange = init.onChange;
+    this._strokeFactor = (this.basePxPerMm * 1000) / 80;
     this.defaultLineColor = init.defaultLineColor ?? Defaults.lineColor;
-    this.defaultLineThicknessM = init.defaultLineThicknessM ?? Defaults.lineThicknessM;
+    this.defaultLineThicknessM = (init.defaultLineThicknessM ?? Defaults.lineThicknessM) * this._strokeFactor;
 
     this.camera = new Camera();
     this.scene = new Scene();
@@ -150,6 +158,9 @@ export class MiniCad {
     this.topology = new TopologyEngine(this.scene, this.camera, this.labelManager);
     const ctx = this.dom.canvas.getContext("2d")!;
     this.renderer = new Renderer(ctx, this.camera, this.scene, this.labelManager);
+    // Wichtig: Text/Stroke-Skalierung an Seitengröße (echte mm) ausrichten,
+    // damit ein 16-px-Text auch 16 px auf der Seite ist (statt riesig).
+    this.renderer.referencePxPerM = this.basePxPerMm * 1000;
 
     this._patchRendererTransparent();
 
@@ -252,7 +263,7 @@ export class MiniCad {
   setLineDefaults(opts: { color?: string; thicknessM?: number; alpha?: number }) {
     if (opts.color) this.defaultLineColor = opts.color;
     if (typeof opts.thicknessM === "number" && opts.thicknessM > 0) {
-      this.defaultLineThicknessM = opts.thicknessM;
+      this.defaultLineThicknessM = opts.thicknessM * this._strokeFactor;
     }
     if (typeof opts.alpha === "number" && opts.alpha >= 0 && opts.alpha <= 1) {
       this.defaultLineAlpha = opts.alpha;
@@ -318,8 +329,9 @@ export class MiniCad {
   }
 
   serialize(): any {
+    const f = this._strokeFactor || 1;
     return {
-      version: 2,
+      version: 3,
       segments: this.scene.segments
         .filter((s) => s.labelId !== this._frameLabelId)
         .map((s) => ({
@@ -327,7 +339,8 @@ export class MiniCad {
           a: { x: s.a.x, y: s.a.y },
           b: { x: s.b.x, y: s.b.y },
           color: s.color,
-          thicknessM: s.thicknessM,
+          // Speichern in "echten Metern" (intern wird mit _strokeFactor multipliziert).
+          thicknessM: s.thicknessM / f,
           labelId: s.labelId,
         })),
       textBoxes: this.scene.textBoxes.map((t) => ({
@@ -345,6 +358,10 @@ export class MiniCad {
 
   private _restore(data: any) {
     if (!data) return;
+    const f = this._strokeFactor || 1;
+    // Vor v3 wurden Strichbreiten bereits intern (in der alten,
+    // überdimensionierten Skala) gespeichert → nicht erneut skalieren.
+    const segScale = (data.version ?? 1) >= 3 ? f : 1;
     if (Array.isArray(data.segments)) {
       for (const s of data.segments) {
         if (s.labelId === this._frameLabelId) continue;
@@ -354,7 +371,7 @@ export class MiniCad {
             { x: s.b.x, y: s.b.y },
             {
               color: s.color || this.defaultLineColor,
-              thicknessM: s.thicknessM || this.defaultLineThicknessM,
+              thicknessM: (s.thicknessM || (this.defaultLineThicknessM / f)) * segScale,
               labelId: s.labelId || Defaults.defaultLabelId,
             },
           );
@@ -375,6 +392,7 @@ export class MiniCad {
       }
     }
   }
+
 
   destroy() {
     this._destroyed = true;
