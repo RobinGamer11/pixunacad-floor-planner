@@ -977,7 +977,7 @@ function TasksTab({ project }: { project: import("@/lib/projectStore").Project }
         <button
           onClick={() => {
             if (!draft.trim()) return;
-            projectStore.addTask(project.id, draft.trim());
+            projectStore.addTask(project.id, { title: draft.trim() });
             setDraft("");
           }}
           className="text-xs"
@@ -991,7 +991,7 @@ function TasksTab({ project }: { project: import("@/lib/projectStore").Project }
         onChange={(e) => setDraft(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === "Enter" && draft.trim()) {
-            projectStore.addTask(project.id, draft.trim());
+            projectStore.addTask(project.id, { title: draft.trim() });
             setDraft("");
           }
         }}
