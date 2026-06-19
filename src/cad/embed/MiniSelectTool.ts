@@ -61,6 +61,8 @@ export class MiniSelectTool {
     try { this.app.clearSelection(); } catch {}
     try { this.app.hub.hide(); } catch {}
     try { this.app.hub.bindCommit(null); } catch {}
+    try { this.app.textHub?.hide(); } catch {}
+    try { this.app.textHub?.bindCommit(null); } catch {}
     for (const fn of this.cleanups) { try { fn(); } catch {} }
     this.cleanups = [];
   }
@@ -116,7 +118,12 @@ export class MiniSelectTool {
       this.app.clearSelection();
       this.app.hub.hide();
       this.app.hub.bindCommit(null);
+      try { this.app.textHub?.hide(); this.app.textHub?.bindCommit(null); } catch {}
     } else if (e.key === "Delete" || e.key === "Backspace") {
+      // Nicht löschen, wenn der Fokus in einem Eingabefeld liegt (z. B. Hub-Box).
+      const tgt = e.target as HTMLElement | null;
+      const tag = tgt?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || tgt?.isContentEditable) return;
       if (this.dragSegId) {
         const s = this.app.scene.getSegmentById(this.dragSegId);
         if (s) this.app.scene.removeSegment(s);
@@ -128,6 +135,7 @@ export class MiniSelectTool {
         if (t) this.app.scene.removeTextBox(t);
         this.dragTextId = null;
         this.app.clearSelection();
+        try { this.app.textHub?.hide(); this.app.textHub?.bindCommit(null); } catch {}
         this.app.refreshLabelUI();
       }
     }
@@ -137,7 +145,7 @@ export class MiniSelectTool {
     if (e.button !== 0 || e.altKey) return; // Mid/Alt → Parent-Pan
     const wp = this.clientToWorld(e.clientX, e.clientY);
 
-    // Textbox: nur auswählen — Verschieben/Drehen passiert über die Hub-Box
+    // Textbox: nur auswählen — Verschieben/Drehen/Resize läuft über die TextHub
     // (1:1 wie in der CAD-Oberfläche, kein direktes Drag).
     const tb = this.hitTextBox(wp);
     if (tb) {
@@ -147,8 +155,9 @@ export class MiniSelectTool {
       this.dragTextId = tb.id;
       this.dragSegId = null;
       this.app.setSelection({ type: SelectionType.TEXTBOX, textBoxId: tb.id } as any);
-      this.app.hub.hide();
-      this.app.hub.bindCommit(null);
+      try { this.app.hub.hide(); } catch {}
+      try { this.app.hub.bindCommit(null); } catch {}
+      this.showHubForTextBox(tb);
       return;
     }
 
@@ -170,6 +179,7 @@ export class MiniSelectTool {
     this.app.clearSelection();
     this.app.hub.hide();
     this.app.hub.bindCommit(null);
+    try { this.app.textHub?.hide(); this.app.textHub?.bindCommit(null); } catch {}
     this.dragSegId = null;
     this.dragTextId = null;
   }
@@ -217,6 +227,54 @@ export class MiniSelectTool {
     s.b.x = s.a.x + Math.cos(newAngRad) * newLen;
     s.b.y = s.a.y + Math.sin(newAngRad) * newLen;
     this.updateHubForSegment(s);
+    this.app.refreshLabelUI();
+  }
+
+  /* ===== TextHub (Textbox) ===== */
+
+  private showHubForTextBox(tb: TextBox) {
+    const th = this.app.textHub;
+    if (!th) return;
+    const sM = this.app.camera.worldToScreen(tb.center.x, tb.center.y);
+    const r = this.canvas.getBoundingClientRect();
+    const scaleX = r.width / Math.max(1, this.canvas.width);
+    const scaleY = r.height / Math.max(1, this.canvas.height);
+    th.showAt(sM.x * scaleX + 12, sM.y * scaleY + 12);
+    this.updateHubForTextBox(tb);
+    th.bindCommit((v) => this.commitTextHub(v));
+  }
+
+  private updateHubForTextBox(tb: TextBox) {
+    const th = this.app.textHub;
+    if (!th) return;
+    // Welt-Einheit = 1 m. Auf der Seite gilt 1 m = referencePxPerM Pixel,
+    // und die Seite ist `pageWidthMm` mm breit. → Welt-mm = m * 1000.
+    th.updateDisplay({
+      widthMm: tb.widthM * 1000,
+      heightMm: tb.heightM * 1000,
+      rotationDeg: (tb.rotationRad * 180) / Math.PI,
+      xMm: (tb.center.x - tb.widthM / 2) * 1000,
+      yMm: (tb.center.y - tb.heightM / 2) * 1000,
+    });
+  }
+
+  private commitTextHub(v: { widthMm: number | null; heightMm: number | null; rotationDeg: number | null; xMm: number | null; yMm: number | null }) {
+    if (!this.dragTextId) return;
+    const tb = this.app.scene.getTextBoxById(this.dragTextId);
+    if (!tb) return;
+    const wM = v.widthMm != null && v.widthMm > 0 ? v.widthMm / 1000 : tb.widthM;
+    const hM = v.heightMm != null && v.heightMm > 0 ? v.heightMm / 1000 : tb.heightM;
+    const rot = v.rotationDeg != null ? (v.rotationDeg * Math.PI) / 180 : tb.rotationRad;
+    // Position interpretiert als Top-Left (mm). Wenn nichts angegeben →
+    // alten Top-Left beibehalten (Größenänderung bleibt verankert oben-links).
+    const tlX = v.xMm != null ? v.xMm / 1000 : tb.center.x - tb.widthM / 2;
+    const tlY = v.yMm != null ? v.yMm / 1000 : tb.center.y - tb.heightM / 2;
+    tb.widthM = wM;
+    tb.heightM = hM;
+    tb.rotationRad = rot;
+    tb.center.x = tlX + wM / 2;
+    tb.center.y = tlY + hM / 2;
+    this.updateHubForTextBox(tb);
     this.app.refreshLabelUI();
   }
 }

@@ -80,6 +80,9 @@ export interface Sheet {
   id: string;
   name: string;
   scale: string; // e.g. "1:100"
+  /** Optionales Vorschau-Bild (PNG-DataURL) — wird beim Speichern aus dem
+   *  CAD-Editor-Canvas erzeugt und im `cad-view`-Element angezeigt. */
+  thumbnail?: string;
 }
 
 export type TaskPriority = "low" | "medium" | "high";
