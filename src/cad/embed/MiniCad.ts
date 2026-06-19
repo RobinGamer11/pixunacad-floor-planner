@@ -77,12 +77,17 @@ export class MiniCad {
   activeDrawLabelId = Defaults.defaultLabelId;
   defaultLineColor: string;
   defaultLineThicknessM: number;
+  /** Linien-Transparenz 0..1 (1 = vollständig deckend). */
+  defaultLineAlpha = 1;
 
   // Page geometry.
   pageWidthMm: number;
   pageHeightMm: number;
   basePxPerMm: number;
   private _zoom: number;
+
+  /** Spezielle Label-ID für die unsichtbaren Page-Frame-Segmente (Snap-Ziel). */
+  private _frameLabelId = "__page_frame__";
 
   private _activeTool: MiniTool = null;
   private _rafId: number | null = null;
