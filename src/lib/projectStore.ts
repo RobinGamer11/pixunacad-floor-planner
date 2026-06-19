@@ -54,11 +54,15 @@ export interface Sheet {
   scale: string; // e.g. "1:100"
 }
 
+export type TaskPriority = "low" | "medium" | "high";
+
 export interface Task {
   id: string;
   title: string;
   done: boolean;
-  date?: string; // ISO date
+  date?: string; // ISO date YYYY-MM-DD
+  time?: string; // HH:MM
+  priority?: TaskPriority;
 }
 
 export interface CalendarEvent {
