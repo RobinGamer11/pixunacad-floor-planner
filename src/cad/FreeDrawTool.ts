@@ -3,7 +3,7 @@ import { Vec2, v, dist } from "./geometry";
 import type { CadApp } from "./CadApp";
 import type { Input } from "./Input";
 import type { FreeLineStyle } from "./Scene";
-import { dedupePoints, projectPointToInfiniteLineFromTwoPoints } from "./freeGeom";
+import { dedupePoints, projectPointToInfiniteLineFromTwoPoints, autoShapePoints } from "./freeGeom";
 import { RulerDragController } from "./rulerInteraction";
 
 /**
