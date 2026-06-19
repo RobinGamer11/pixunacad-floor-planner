@@ -451,6 +451,7 @@ export default function ProjectWorkspace() {
                   selectedElementId={selectedElementId}
                   zoom={zoom}
                   activeTool={activeTool}
+                  toolSettings={toolSettings}
                   onCommitTool={() => setActiveTool(null)}
                   onSelect={(id) => {
                     setSelectedElementId(id);
