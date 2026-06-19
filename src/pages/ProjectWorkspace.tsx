@@ -154,7 +154,7 @@ export default function ProjectWorkspace() {
             <button className="h-8 w-8 rounded-md flex items-center justify-center hover:bg-muted" title="Wiederherstellen">
               <Redo2 size={16} />
             </button>
-            <span className="text-xs px-2">77%</span>
+            <span className="text-xs px-2 tabular-nums">{zoom}%</span>
             <button className="h-8 w-8 rounded-md flex items-center justify-center hover:bg-muted" title="Vollbild">
               <Maximize2 size={16} />
             </button>
