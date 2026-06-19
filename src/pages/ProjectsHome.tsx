@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Plus,
@@ -15,6 +15,9 @@ import {
   PanelLeftOpen,
   PanelRightClose,
   PanelRightOpen,
+  MoreHorizontal,
+  Check,
+  X,
 } from "lucide-react";
 import { useProjects, projectStore, type Project, type Task, type TaskPriority } from "@/lib/projectStore";
 
