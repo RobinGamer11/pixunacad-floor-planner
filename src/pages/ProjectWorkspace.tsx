@@ -755,6 +755,7 @@ function PageCanvas({
             }}
           />
         ))}
+        </div>
       </div>
     </div>
   );
