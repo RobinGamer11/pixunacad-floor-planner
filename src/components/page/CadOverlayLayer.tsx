@@ -177,7 +177,6 @@ export default function CadOverlayLayer(props: Props) {
           borderRadius: 6,
           padding: 6,
           boxShadow: "0 4px 16px -4px rgba(0,0,0,0.18)",
-          display: "flex",
           gap: 6,
           zIndex: 50,
         }}
@@ -198,7 +197,6 @@ export default function CadOverlayLayer(props: Props) {
           borderRadius: 6,
           padding: 4,
           boxShadow: "0 4px 16px -4px rgba(0,0,0,0.18)",
-          display: "flex",
           gap: 2,
           zIndex: 50,
         }}
@@ -225,7 +223,6 @@ export default function CadOverlayLayer(props: Props) {
           borderRadius: 6,
           padding: "4px 6px",
           boxShadow: "0 4px 16px -4px rgba(0,0,0,0.18)",
-          display: "flex",
           gap: 4,
           alignItems: "center",
           zIndex: 70,
