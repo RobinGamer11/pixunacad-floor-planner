@@ -43,6 +43,18 @@ export default function ProjectsHome() {
   const [tab, setTab] = useState<Tab>("seiten");
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
+  const [titleMenuOpen, setTitleMenuOpen] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [nameDraft, setNameDraft] = useState("");
+  const titleMenuRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!titleMenuOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (!titleMenuRef.current?.contains(e.target as Node)) setTitleMenuOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [titleMenuOpen]);
 
   const filtered = useMemo(
     () =>
