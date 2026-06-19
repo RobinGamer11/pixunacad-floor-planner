@@ -2059,5 +2059,190 @@ function TasksTab({ project }: { project: import("@/lib/projectStore").Project }
   );
 }
 
+function LayersTab({
+  projectId,
+  page,
+  selectedElementId,
+  setSelectedElementId,
+}: {
+  projectId: string;
+  page: import("@/lib/projectStore").ProjectPage;
+  selectedElementId?: string;
+  setSelectedElementId: (id?: string) => void;
+}) {
+  const [multi, setMulti] = useState<Set<string>>(new Set());
+  const groups = page.groups ?? [];
+  const els = page.elements;
+
+  const layerLabel = (el: PageElement) => {
+    if (el.layerName) return el.layerName;
+    const kindMap: Record<string, string> = {
+      text: "Text",
+      line: "Linie",
+      guide: "Hilfslinie",
+      image: "Bild",
+      pdf: "PDF",
+      table: "Tabelle",
+      note: "Notiz",
+      timeline: "Zeitstrahl",
+      "cad-view": "CAD-Ansicht",
+      shape: "Form",
+    };
+    const base = kindMap[el.kind] ?? el.kind;
+    return el.kind === "text" && el.text ? `${base}: ${el.text.slice(0, 16)}` : base;
+  };
+
+  const toggleMulti = (id: string, ev: React.MouseEvent) => {
+    setMulti((prev) => {
+      const next = new Set(prev);
+      if (ev.shiftKey) {
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+      } else {
+        next.clear();
+        next.add(id);
+      }
+      return next;
+    });
+    setSelectedElementId(id);
+  };
+
+  const moveZ = (elementId: string, dir: -1 | 1) => {
+    const idx = els.findIndex((e) => e.id === elementId);
+    if (idx < 0) return;
+    // "Up" in the panel (top of list) = foreground = higher index in array
+    projectStore.reorderElement(projectId, page.id, idx, idx + (dir === 1 ? 1 : -1));
+  };
+
+  const doGroup = () => {
+    const ids = Array.from(multi);
+    if (ids.length < 2) return;
+    const name = prompt("Gruppenname", "Neue Gruppe") ?? "Neue Gruppe";
+    projectStore.groupElements(projectId, page.id, ids, name);
+    setMulti(new Set());
+  };
+
+  // Build display list — highest index first (foreground at top).
+  const order = els.map((e, i) => ({ el: e, idx: i })).reverse();
+
+  // Group items by groupId, but preserve order; first group occurrence wins position.
+  const renderedGroups = new Set<string>();
+  const rows: React.ReactNode[] = [];
+
+  const renderItem = (el: PageElement, idx: number, indent = false) => {
+    const isSelected = el.id === selectedElementId || multi.has(el.id);
+    return (
+      <div
+        key={el.id}
+        onClick={(e) => toggleMulti(el.id, e)}
+        className="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer text-sm"
+        style={{
+          background: isSelected ? "hsl(var(--accent-gold-soft))" : "transparent",
+          marginLeft: indent ? 18 : 0,
+          border: isSelected ? "1px solid hsl(var(--accent-gold) / 0.6)" : "1px solid transparent",
+        }}
+      >
+        <GripVertical size={12} className="text-muted-foreground shrink-0" />
+        <span className="flex-1 truncate">{layerLabel(el)}</span>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            moveZ(el.id, 1);
+          }}
+          title="Nach vorne"
+          className="h-6 w-6 rounded hover:bg-muted flex items-center justify-center text-muted-foreground"
+        >
+          <ChevronUp size={12} />
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            moveZ(el.id, -1);
+          }}
+          title="Nach hinten"
+          className="h-6 w-6 rounded hover:bg-muted flex items-center justify-center text-muted-foreground"
+        >
+          <ChevronDown size={12} />
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            if (!confirm("Ebene löschen?")) return;
+            projectStore.deleteElement(projectId, page.id, el.id);
+          }}
+          title="Löschen"
+          className="h-6 w-6 rounded hover:bg-muted flex items-center justify-center text-muted-foreground"
+        >
+          <Trash2 size={12} />
+        </button>
+      </div>
+    );
+  };
+
+  for (const { el, idx } of order) {
+    if (el.groupId) {
+      if (renderedGroups.has(el.groupId)) continue;
+      renderedGroups.add(el.groupId);
+      const group = groups.find((g) => g.id === el.groupId);
+      const members = els
+        .map((e, i) => ({ e, i }))
+        .filter((x) => x.e.groupId === el.groupId)
+        .reverse();
+      rows.push(
+        <div key={`g-${el.groupId}`} className="rounded border" style={{ borderColor: "hsl(var(--hairline))" }}>
+          <div className="flex items-center gap-2 px-2 py-1.5 bg-muted/40">
+            <Folder size={13} className="text-muted-foreground" />
+            <input
+              defaultValue={group?.name ?? "Gruppe"}
+              onBlur={(e) =>
+                projectStore.renameGroup(projectId, page.id, el.groupId!, e.target.value || "Gruppe")
+              }
+              className="flex-1 bg-transparent text-sm outline-none"
+            />
+            <button
+              onClick={() => projectStore.ungroup(projectId, page.id, el.groupId!)}
+              title="Gruppierung aufheben"
+              className="text-[11px] text-muted-foreground hover:text-foreground"
+            >
+              Auflösen
+            </button>
+          </div>
+          <div className="py-1">{members.map((m) => renderItem(m.e, m.i, true))}</div>
+        </div>
+      );
+    } else {
+      rows.push(renderItem(el, idx));
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">
+          EBENEN
+        </div>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={doGroup}
+            disabled={multi.size < 2}
+            title="Auswahl gruppieren (Shift+Klick zum Mehrfachauswählen)"
+            className="h-7 w-7 rounded flex items-center justify-center hover:bg-muted disabled:opacity-40"
+          >
+            <FolderPlus size={14} className="text-muted-foreground" />
+          </button>
+        </div>
+      </div>
+      <div className="text-[11px] text-muted-foreground">
+        Oben = Vordergrund. Shift+Klick wählt mehrere Ebenen aus, dann gruppieren.
+      </div>
+      {rows.length === 0 ? (
+        <div className="text-xs text-muted-foreground italic">Noch keine Ebenen auf dieser Seite.</div>
+      ) : (
+        <div className="space-y-1">{rows}</div>
+      )}
+    </div>
+  );
+}
+
 // re-export helpful types
 export type { PageElement, ElementKind };
