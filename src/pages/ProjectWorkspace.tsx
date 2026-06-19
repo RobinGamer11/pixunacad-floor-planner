@@ -684,31 +684,14 @@ function PageCanvas({
     };
   };
 
-  // Click-to-draw is used ONLY for the lightweight "Hilfslinie" (guide) and
-  // "Text" tools. The real "Linie" tool is handled by the embedded CAD engine
-  // (CadOverlayLayer) — see below — so it provides 1:1 snap/ortho/hub.
+  // Click-to-draw is used ONLY for the lightweight "Hilfslinie" (guide) tool.
+  // The "Linie" and "Text" tools are handled by the embedded CAD engine
+  // (CadOverlayLayer) — see below — so they provide 1:1 snap/ortho/hub.
   const drawingTool = activeTool === "guide";
-  const cursorStyle = drawingTool ? "crosshair" : activeTool === "text" ? "text" : undefined;
+  const cursorStyle = drawingTool ? "crosshair" : undefined;
 
   const handlePageMouseDown = (e: React.MouseEvent) => {
-    if (e.target !== e.currentTarget && !drawingTool && activeTool !== "text") return;
-    if (activeTool === "text") {
-      const p = toPct(e.clientX, e.clientY);
-      projectStore.addElement(projectId, page.id, {
-        kind: "text",
-        x: Math.max(0, p.x),
-        y: Math.max(0, p.y - 2),
-        w: 25,
-        h: 6,
-        text: "Text",
-        fontSize: toolSettings.text.fontSize,
-        color: toolSettings.text.color,
-        bold: toolSettings.text.bold,
-        italic: toolSettings.text.italic,
-      });
-      onCommitTool();
-      return;
-    }
+    if (e.target !== e.currentTarget && !drawingTool) return;
     if (drawingTool) {
       const p = toPct(e.clientX, e.clientY);
       if (!pendingStart) {
