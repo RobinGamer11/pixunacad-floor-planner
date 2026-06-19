@@ -263,7 +263,7 @@ export class MiniCad {
   setLineDefaults(opts: { color?: string; thicknessM?: number; alpha?: number }) {
     if (opts.color) this.defaultLineColor = opts.color;
     if (typeof opts.thicknessM === "number" && opts.thicknessM > 0) {
-      this.defaultLineThicknessM = opts.thicknessM;
+      this.defaultLineThicknessM = opts.thicknessM * this._strokeFactor;
     }
     if (typeof opts.alpha === "number" && opts.alpha >= 0 && opts.alpha <= 1) {
       this.defaultLineAlpha = opts.alpha;
