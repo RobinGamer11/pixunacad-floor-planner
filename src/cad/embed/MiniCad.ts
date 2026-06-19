@@ -181,17 +181,17 @@ export class MiniCad {
       this.dom.textEditor.symbolSelect,
       this as any,
     );
-    this.selectTool = new MiniSelectTool(this);
-    this.textHub = this.dom.textHub
-      ? new TextHub(
-          this.dom.textHub.root,
-          this.dom.textHub.widthInput,
-          this.dom.textHub.heightInput,
-          this.dom.textHub.rotationInput,
-          this.dom.textHub.xInput,
-          this.dom.textHub.yInput,
-        )
-      : null;
+    this.selectTool = new SelectTool(this as any);
+
+    // Wire PointEditMenu activation identisch zur CadApp-Oberfläche.
+    this.pointEditMenu.bindActivate((action) => {
+      const sel = this.selection;
+      if (sel && sel.type === SelectionType.TEXTBOX_HANDLE && (sel as any).textBoxId && sel.handleIndex != null) {
+        this.selectTool.beginTextBoxHandleEdit((sel as any).textBoxId, sel.handleIndex, action);
+        return;
+      }
+      this.selectTool.beginPointEdit(action);
+    });
 
     this._installCoordRemap();
     this.applyZoom(this._zoom);
