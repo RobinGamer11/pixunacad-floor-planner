@@ -639,8 +639,8 @@ function PageCanvas({
           w: Math.max(0.2, maxX - minX),
           h: Math.max(0.2, maxY - minY),
           points: pts,
-          color: "#7DD3FC",
-          strokeWidth: 1,
+          color: toolSettings.guide.color,
+          strokeWidth: toolSettings.guide.strokeWidth,
           nonPrinting: true,
         });
         setPendingStart(null);
