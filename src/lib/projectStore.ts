@@ -132,11 +132,11 @@ function demoProjects(): Project[] {
       { id: `${id}-s5`, name: "Lageplan", scale: "1:500" },
     ],
     tasks: [
-      { id: `${id}-t1`, title: "Bestandsaufnahme prüfen", done: true, date: "2026-06-03" },
-      { id: `${id}-t2`, title: "Entwurf Variante A fertigstellen", done: true, date: "2026-06-07" },
-      { id: `${id}-t3`, title: "Variante B ausarbeiten", done: false, date: "2026-06-15" },
-      { id: `${id}-t4`, title: "Bauherrengespräch vorbereiten", done: false, date: "2026-06-18" },
-      { id: `${id}-t5`, title: "Materialkonzept abstimmen", done: false, date: "2026-06-22" },
+      { id: `${id}-t1`, title: "Bestandsaufnahme prüfen", done: true, date: "2026-06-03", time: "09:00", priority: "medium" },
+      { id: `${id}-t2`, title: "Entwurf Variante A fertigstellen", done: true, date: "2026-06-07", time: "14:00", priority: "high" },
+      { id: `${id}-t3`, title: "Variante B ausarbeiten", done: false, date: "2026-06-15", time: "10:00", priority: "high" },
+      { id: `${id}-t4`, title: "Bauherrengespräch vorbereiten", done: false, date: "2026-06-18", time: "11:30", priority: "medium" },
+      { id: `${id}-t5`, title: "Materialkonzept abstimmen", done: false, date: "2026-06-22", time: "15:00", priority: "low" },
     ],
     events: [
       { id: `${id}-e1`, date: "2026-06-12", time: "10:00", title: "Bauherrengespräch", location: "Besprechungsraum 1" },
