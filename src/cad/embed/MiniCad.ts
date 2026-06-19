@@ -1,23 +1,15 @@
 /**
  * MiniCad — lightweight host for the CAD engine inside the page editor.
  *
- * Reuses the *exact* CAD engine modules (Scene, Camera, Input, TopologyEngine,
- * Renderer, LineHub, PointEditMenu, LineTool) so that drawing behavior on the
- * page canvas is 1:1 identical to the standalone CAD editor — same snapping,
- * ortho, hub (length/angle input), guides, point-edit.
+ * Wires Camera, Scene, Input, TopologyEngine, Renderer, LineHub,
+ * PointEditMenu, LineTool, TextTool and TextEditorOverlay so the embedded
+ * page editor behaves 1:1 like the standalone CAD editor (snap, ortho,
+ * hub, text editing).
  *
- * The fat surroundings of the full CadApp (toolbar, IdPanel, SheetPanel,
- * PlanPanel, TextEditor, sticker library, undo history, etc.) are deliberately
- * NOT instantiated. LineTool only touches a small handful of CadApp fields;
- * MiniCad provides those (`scene`, `camera`, `input`, `topology`, `renderer`,
- * `hub`, `pointEditMenu`, `getCurrentLineStyle()`, `clearSelection()`,
- * `refreshLabelUI()`) and stubs out anything else so the tool runs unmodified.
- *
- * Coordinate convention (matches CAD engine): 1 world unit = 1 meter.
- * The page is laid out so that page top-left = world (0, 0), and 1 mm on the
- * page = 1/1000 world units. The page-editor's view zoom is applied via CSS
- * on the parent element; the canvas itself is sized to the *scaled* page
- * pixel dimensions so geometry stays crisp.
+ * Coordinate convention: 1 world unit = 1 meter. Page top-left = world (0,0)
+ * + a small constant CSS-pixel padding so snap visualizations at the page
+ * edges (and at the page margins) are not clipped or hidden under the grey
+ * margin ring.
  */
 
 import { Camera } from "../Camera";
@@ -25,11 +17,24 @@ import { Scene } from "../Scene";
 import { Input } from "../Input";
 import { LabelManager } from "../LabelManager";
 import { TopologyEngine } from "../TopologyEngine";
-import { Renderer } from "../Renderer";
+import { Renderer, type Selection } from "../Renderer";
 import { LineHub } from "../LineHub";
 import { PointEditMenu } from "../PointEditMenu";
 import { LineTool } from "../LineTool";
-import { Defaults } from "../constants";
+import { TextTool } from "../TextTool";
+import { TextEditorOverlay } from "../TextEditorOverlay";
+import { Defaults, SelectionType } from "../constants";
+import type { TextBox, TextBoxStyle } from "../Scene";
+
+export interface MiniCadTextEditorDom {
+  editor: HTMLDivElement;
+  toolbar: HTMLDivElement;
+  boldBtn: HTMLButtonElement;
+  italicBtn: HTMLButtonElement;
+  colorInput: HTMLInputElement;
+  sizeSelect: HTMLSelectElement;
+  symbolSelect: HTMLSelectElement;
+}
 
 export interface MiniCadDom {
   canvas: HTMLCanvasElement;
@@ -38,6 +43,7 @@ export interface MiniCadDom {
   hubAngInput: HTMLInputElement;
   pointEditRoot: HTMLDivElement;
   pointEditButtons: Record<string, HTMLButtonElement>;
+  textEditor: MiniCadTextEditorDom;
 }
 
 export interface MiniCadInit {
@@ -50,16 +56,23 @@ export interface MiniCadInit {
   basePxPerMm: number;
   /** Current view zoom (1.0 = 100%). */
   initialZoom: number;
+  /** Margin width in millimeters (also exposed as inner snap frame). */
+  pageMarginsMm?: number;
   /** Initial line color / thickness defaults. */
   defaultLineColor?: string;
   defaultLineThicknessM?: number;
-  /** Called whenever scene geometry changes (debounced caller's choice). */
+  /** Called whenever scene geometry changes. */
   onChange?: () => void;
   /** Initial serialized state. */
   initialState?: any;
 }
 
-export type MiniTool = "line" | null;
+export type MiniTool = "line" | "text" | null;
+
+/** Extra CSS pixels around the page on the canvas so edge snap dots and the
+ *  blue snap line are fully visible (and not occluded by the page's margin
+ *  border). Independent of zoom. */
+const FRAME_PAD_PX = 16;
 
 export class MiniCad {
   readonly dom: MiniCadDom;
@@ -72,27 +85,50 @@ export class MiniCad {
   readonly pointEditMenu: PointEditMenu;
   readonly labelManager: LabelManager;
   readonly lineTool: LineTool;
+  readonly textTool: TextTool;
+  readonly textEditor: TextEditorOverlay;
 
-  // Stubs required by tools but not used in the page editor.
+  // Stubs required by tools / editor.
   activeDrawLabelId = Defaults.defaultLabelId;
   defaultLineColor: string;
   defaultLineThicknessM: number;
-  /** Linien-Transparenz 0..1 (1 = vollständig deckend). */
+  /** 0..1 (1 = vollständig deckend). */
   defaultLineAlpha = 1;
+
+  // Text defaults (mirror of CadApp).
+  defaultTextColor = Defaults.textColor;
+  defaultTextFontSizePx = Defaults.textFontSizePx;
+  defaultTextBgColor = Defaults.textBgColor;
+  defaultTextBgAlphaPct = Defaults.textBgAlphaPct;
+  defaultTextWrap = Defaults.textWrap;
+  defaultTextAlign: "left" | "center" | "right" = Defaults.textAlign;
+  defaultTextBorderEnabled = Defaults.textBorderEnabled;
+  defaultTextBorderColor = Defaults.textBorderColor;
+  defaultTextBorderWidthPx = Defaults.textBorderWidthPx;
+  defaultTextBold = false;
+  defaultTextItalic = false;
+  defaultTextAlpha = 1;
+
+  // Selection (consumed by TextEditorOverlay & TextTool).
+  selection: Selection | null = null;
+  /** Pointer to the currently active tool *instance* (TextEditorOverlay
+   *  compares against this.app.textTool). */
+  activeTool: LineTool | TextTool | null = null;
 
   // Page geometry.
   pageWidthMm: number;
   pageHeightMm: number;
   basePxPerMm: number;
+  pageMarginsMm: number;
   private _zoom: number;
 
-  /** Spezielle Label-ID für die unsichtbaren Page-Frame-Segmente (Snap-Ziel). */
+  /** Special label-ID for invisible page-frame segments (snap-only). */
   private _frameLabelId = "__page_frame__";
 
   private _activeTool: MiniTool = null;
   private _rafId: number | null = null;
   private _destroyed = false;
-  private _segmentCountLast = 0;
+  private _changeDirty = false;
   private _onChange?: () => void;
   private _coordCleanups: Array<() => void> = [];
 
@@ -101,12 +137,12 @@ export class MiniCad {
     this.pageWidthMm = init.pageWidthMm;
     this.pageHeightMm = init.pageHeightMm;
     this.basePxPerMm = init.basePxPerMm;
+    this.pageMarginsMm = init.pageMarginsMm ?? 0;
     this._zoom = init.initialZoom;
     this._onChange = init.onChange;
     this.defaultLineColor = init.defaultLineColor ?? Defaults.lineColor;
     this.defaultLineThicknessM = init.defaultLineThicknessM ?? Defaults.lineThicknessM;
 
-    // Core engine — identical to CadApp wiring (CadApp.ts lines 347–357).
     this.camera = new Camera();
     this.scene = new Scene();
     this.input = new Input(this.dom.canvas);
@@ -115,75 +151,80 @@ export class MiniCad {
     const ctx = this.dom.canvas.getContext("2d")!;
     this.renderer = new Renderer(ctx, this.camera, this.scene, this.labelManager);
 
-    // Strip the renderer's white background + grid + plan stuff. We want a
-    // transparent overlay that draws only geometry + tool preview overlay.
     this._patchRendererTransparent();
 
-    // UI hubs (also identical to CadApp).
     this.hub = new LineHub(this.dom.hubRoot, this.dom.hubLenInput, this.dom.hubAngInput);
     this.pointEditMenu = new PointEditMenu(this.dom.pointEditRoot, this.dom.pointEditButtons);
 
-    // The tool.
     this.lineTool = new LineTool(this as any);
+    this.textTool = new TextTool(this as any);
+    this.textEditor = new TextEditorOverlay(
+      this.dom.textEditor.editor,
+      this.dom.textEditor.toolbar,
+      this.dom.textEditor.boldBtn,
+      this.dom.textEditor.italicBtn,
+      this.dom.textEditor.colorInput,
+      this.dom.textEditor.sizeSelect,
+      this.dom.textEditor.symbolSelect,
+      this as any,
+    );
 
-    // Coordinate mapping: the canvas can be CSS-scaled by the parent. Override
-    // Input's last-known mouse position with the canvas-internal pixel value
-    // after every mousemove the browser fires on the canvas.
     this._installCoordRemap();
-
-    // Resize + camera setup.
     this.applyZoom(this._zoom);
-
-    // Register the invisible page-frame as snap geometry (4 segments at the
-    // page edges). The frame is hidden from rendering by filtering its label
-    // out of labelManager.list(), but stays visible to TopologyEngine because
-    // isVisible(frameLabelId) still returns true.
     this._installPageFrameSnap();
 
-    // Restore state, if any.
     if (init.initialState) this._restore(init.initialState);
-    this._segmentCountLast = this.scene.segments.length;
+    this._changeDirty = false;
 
-    // Start the animation loop.
     this._tick();
   }
 
-  /** Returns true if a segment is part of the invisible page frame. */
+  /* ===== Frame snap (page edges + margin edges, invisible) ===== */
+
   isFrameSegment(seg: { labelId?: string }): boolean {
     return seg.labelId === this._frameLabelId;
   }
 
   private _installPageFrameSnap() {
-    // 1) Register a dedicated label that *exists* and is *visible* (so the
-    //    topology engine includes its segments in snap queries), but hide it
-    //    from labelManager.list() so the renderer never iterates it.
     const lm: any = this.labelManager;
     lm.groups.push({ id: this._frameLabelId, name: "__page_frame__", locked: true, visible: true });
     const origList = lm.list.bind(lm);
     lm.list = () => origList().filter((g: any) => g.id !== this._frameLabelId);
-
-    // 2) Build the 4 frame segments.
     this._rebuildPageFrame();
   }
 
   private _rebuildPageFrame() {
-    // Remove any previously created frame segs.
     this.scene.segments = this.scene.segments.filter((s) => s.labelId !== this._frameLabelId);
     const wM = this.pageWidthMm / 1000;
     const hM = this.pageHeightMm / 1000;
+    const mM = Math.max(0, this.pageMarginsMm) / 1000;
     const style = {
       color: "rgba(0,0,0,0)",
       thicknessM: 0.0001,
       labelId: this._frameLabelId,
     };
-    try {
-      this.scene.createSegment({ x: 0, y: 0 }, { x: wM, y: 0 }, style);
-      this.scene.createSegment({ x: wM, y: 0 }, { x: wM, y: hM }, style);
-      this.scene.createSegment({ x: wM, y: hM }, { x: 0, y: hM }, style);
-      this.scene.createSegment({ x: 0, y: hM }, { x: 0, y: 0 }, style);
-    } catch (e) {
-      console.error("MiniCad: page-frame segment creation failed:", e);
+    const seg = (a: { x: number; y: number }, b: { x: number; y: number }) => {
+      try { this.scene.createSegment(a, b, style); }
+      catch (e) { console.error("MiniCad: frame seg failed:", e); }
+    };
+    // Outer page frame.
+    seg({ x: 0, y: 0 }, { x: wM, y: 0 });
+    seg({ x: wM, y: 0 }, { x: wM, y: hM });
+    seg({ x: wM, y: hM }, { x: 0, y: hM });
+    seg({ x: 0, y: hM }, { x: 0, y: 0 });
+    // Inner margin frame (only if margins > 0 and fits inside the page).
+    if (mM > 0 && wM - 2 * mM > 1e-4 && hM - 2 * mM > 1e-4) {
+      seg({ x: mM, y: mM }, { x: wM - mM, y: mM });
+      seg({ x: wM - mM, y: mM }, { x: wM - mM, y: hM - mM });
+      seg({ x: wM - mM, y: hM - mM }, { x: mM, y: hM - mM });
+      seg({ x: mM, y: hM - mM }, { x: mM, y: mM });
     }
+  }
+
+  setPageMargins(mm: number) {
+    if (this.pageMarginsMm === mm) return;
+    this.pageMarginsMm = mm;
+    this._rebuildPageFrame();
   }
 
   /* ===== Public API ===== */
@@ -192,8 +233,19 @@ export class MiniCad {
     if (this._activeTool === tool) return;
     // Deactivate previous.
     if (this._activeTool === "line") this.lineTool.cancel();
+    if (this._activeTool === "text") {
+      try { this.textEditor.commit(); } catch {}
+      this.textTool.cancel();
+    }
     this._activeTool = tool;
-    if (tool === "line") this.lineTool.activate();
+    this.activeTool = null;
+    if (tool === "line") {
+      this.lineTool.activate();
+      this.activeTool = this.lineTool;
+    } else if (tool === "text") {
+      this.textTool.activate();
+      this.activeTool = this.textTool;
+    }
   }
 
   setLineDefaults(opts: { color?: string; thicknessM?: number; alpha?: number }) {
@@ -206,28 +258,67 @@ export class MiniCad {
     }
   }
 
+  setTextDefaults(opts: {
+    color?: string;
+    fontSizePx?: number;
+    bold?: boolean;
+    italic?: boolean;
+    alpha?: number;
+    align?: "left" | "center" | "right";
+    bgColor?: string;
+    bgAlphaPct?: number;
+    wrap?: boolean;
+    borderEnabled?: boolean;
+    borderColor?: string;
+    borderWidthPx?: number;
+  }) {
+    if (opts.color) this.defaultTextColor = opts.color;
+    if (typeof opts.fontSizePx === "number" && opts.fontSizePx > 0) this.defaultTextFontSizePx = opts.fontSizePx;
+    if (typeof opts.bold === "boolean") this.defaultTextBold = opts.bold;
+    if (typeof opts.italic === "boolean") this.defaultTextItalic = opts.italic;
+    if (typeof opts.alpha === "number" && opts.alpha >= 0 && opts.alpha <= 1) this.defaultTextAlpha = opts.alpha;
+    if (opts.align) this.defaultTextAlign = opts.align;
+    if (opts.bgColor) this.defaultTextBgColor = opts.bgColor;
+    if (typeof opts.bgAlphaPct === "number") this.defaultTextBgAlphaPct = Math.max(0, Math.min(100, opts.bgAlphaPct));
+    if (typeof opts.wrap === "boolean") this.defaultTextWrap = opts.wrap;
+    if (typeof opts.borderEnabled === "boolean") this.defaultTextBorderEnabled = opts.borderEnabled;
+    if (opts.borderColor) this.defaultTextBorderColor = opts.borderColor;
+    if (typeof opts.borderWidthPx === "number" && opts.borderWidthPx >= 0) this.defaultTextBorderWidthPx = opts.borderWidthPx;
+  }
+
   applyZoom(zoom: number) {
     this._zoom = zoom;
-    const cssW = this.pageWidthMm * this.basePxPerMm * zoom;
-    const cssH = this.pageHeightMm * this.basePxPerMm * zoom;
+    const pageW = this.pageWidthMm * this.basePxPerMm * zoom;
+    const pageH = this.pageHeightMm * this.basePxPerMm * zoom;
+    const cssW = pageW + FRAME_PAD_PX * 2;
+    const cssH = pageH + FRAME_PAD_PX * 2;
     const c = this.dom.canvas;
-    // Set both internal pixel buffer and CSS size; no DPR scaling for simplicity.
-    if (c.width !== Math.round(cssW)) c.width = Math.max(1, Math.round(cssW));
-    if (c.height !== Math.round(cssH)) c.height = Math.max(1, Math.round(cssH));
+    const wPx = Math.max(1, Math.round(cssW));
+    const hPx = Math.max(1, Math.round(cssH));
+    if (c.width !== wPx) c.width = wPx;
+    if (c.height !== hPx) c.height = hPx;
     c.style.width = `${cssW}px`;
     c.style.height = `${cssH}px`;
+    // Position the canvas so world (0,0) (page top-left) is at FRAME_PAD_PX,FRAME_PAD_PX
+    // visually, by shifting the canvas itself.
+    c.style.left = `${-FRAME_PAD_PX}px`;
+    c.style.top = `${-FRAME_PAD_PX}px`;
 
     this.renderer.setViewport(c.width, c.height);
-    // Camera: world origin (0,0) at top-left; 1m world = basePxPerMm * 1000 * zoom screen px.
     this.camera.scale = this.basePxPerMm * 1000 * zoom;
-    this.camera.offsetX = 0;
-    this.camera.offsetY = 0;
+    this.camera.offsetX = FRAME_PAD_PX;
+    this.camera.offsetY = FRAME_PAD_PX;
+
+    // Re-position any open text editor.
+    if (this.textEditor.isActive() && this.selection?.textBoxId) {
+      const box = this.scene.getTextBoxById(this.selection.textBoxId);
+      if (box) this.textEditor.reposition(box);
+    }
   }
 
   serialize(): any {
     return {
-      version: 1,
-      // Filter out invisible page-frame segments — they are regenerated on mount.
+      version: 2,
       segments: this.scene.segments
         .filter((s) => s.labelId !== this._frameLabelId)
         .map((s) => ({
@@ -238,22 +329,48 @@ export class MiniCad {
           thicknessM: s.thicknessM,
           labelId: s.labelId,
         })),
+      textBoxes: this.scene.textBoxes.map((t) => ({
+        id: t.id,
+        center: { x: t.center.x, y: t.center.y },
+        widthM: t.widthM,
+        heightM: t.heightM,
+        rotationRad: t.rotationRad,
+        html: t.html,
+        style: { ...t.style },
+        labelId: t.labelId,
+      })),
     };
   }
 
   private _restore(data: any) {
-    if (!data || !Array.isArray(data.segments)) return;
-    for (const s of data.segments) {
-      // Defensive: never restore frame segments — they live only in memory.
-      if (s.labelId === this._frameLabelId) continue;
-      try {
-        this.scene.createSegment(
-          { x: s.a.x, y: s.a.y },
-          { x: s.b.x, y: s.b.y },
-          { color: s.color || this.defaultLineColor, thicknessM: s.thicknessM || this.defaultLineThicknessM, labelId: s.labelId || Defaults.defaultLabelId },
-        );
-      } catch (e) {
-        console.error("MiniCad restore segment failed:", e);
+    if (!data) return;
+    if (Array.isArray(data.segments)) {
+      for (const s of data.segments) {
+        if (s.labelId === this._frameLabelId) continue;
+        try {
+          this.scene.createSegment(
+            { x: s.a.x, y: s.a.y },
+            { x: s.b.x, y: s.b.y },
+            {
+              color: s.color || this.defaultLineColor,
+              thicknessM: s.thicknessM || this.defaultLineThicknessM,
+              labelId: s.labelId || Defaults.defaultLabelId,
+            },
+          );
+        } catch (e) { console.error("MiniCad restore segment:", e); }
+      }
+    }
+    if (Array.isArray(data.textBoxes)) {
+      for (const t of data.textBoxes) {
+        try {
+          this.scene.createTextBox(
+            { x: t.center.x, y: t.center.y },
+            t.widthM, t.heightM,
+            { ...(t.style || {}), labelId: t.labelId || Defaults.defaultLabelId },
+            t.html || "",
+            t.rotationRad || 0,
+          );
+        } catch (e) { console.error("MiniCad restore textBox:", e); }
       }
     }
   }
@@ -264,17 +381,14 @@ export class MiniCad {
     this._rafId = null;
     try { this.input.destroy(); } catch {}
     try { this.hub.destroy(); } catch {}
-    for (const fn of this._coordCleanups) {
-      try { fn(); } catch {}
-    }
+    try { this.textEditor.destroy(); } catch {}
+    for (const fn of this._coordCleanups) { try { fn(); } catch {} }
     this._coordCleanups = [];
   }
 
-  /* ===== Required CadApp surface for LineTool / Renderer ===== */
+  /* ===== Required CadApp surface for LineTool / TextTool / TextEditor ===== */
 
   getCurrentLineStyle() {
-    // Encode the line alpha into the color (rgba), so we don't need to patch
-    // the renderer — strokeStyle honors the alpha channel directly.
     const color = applyAlphaToColor(this.defaultLineColor, this.defaultLineAlpha);
     return {
       color,
@@ -283,16 +397,56 @@ export class MiniCad {
     };
   }
 
-  clearSelection() {
-    // No selection model in the page-embedded engine yet.
+  getCurrentTextStyle(): TextBoxStyle {
+    const sel = this.getSelectedTextBox();
+    if (sel) {
+      return {
+        textColor: sel.style.textColor,
+        fontSizePx: sel.style.fontSizePx,
+        bgColor: sel.style.bgColor,
+        bgAlphaPct: sel.style.bgAlphaPct,
+        wrap: sel.style.wrap,
+        align: sel.style.align,
+        borderEnabled: sel.style.borderEnabled,
+        borderColor: sel.style.borderColor,
+        borderWidthPx: sel.style.borderWidthPx,
+        labelId: sel.labelId,
+      };
+    }
+    return {
+      textColor: applyAlphaToColor(this.defaultTextColor, this.defaultTextAlpha),
+      fontSizePx: this.defaultTextFontSizePx,
+      bgColor: this.defaultTextBgColor,
+      bgAlphaPct: this.defaultTextBgAlphaPct,
+      wrap: this.defaultTextWrap,
+      align: this.defaultTextAlign,
+      borderEnabled: this.defaultTextBorderEnabled,
+      borderColor: this.defaultTextBorderColor,
+      borderWidthPx: this.defaultTextBorderWidthPx,
+      labelId: this.activeDrawLabelId || Defaults.defaultLabelId,
+    };
+  }
+
+  getSelectedTextBox(): TextBox | null {
+    if (!this.selection) return null;
+    if (this.selection.type !== SelectionType.TEXTBOX && this.selection.type !== SelectionType.TEXTBOX_HANDLE) return null;
+    if (!this.selection.textBoxId) return null;
+    return this.scene.getTextBoxById(this.selection.textBoxId);
+  }
+
+  setSelection(selection: Selection | null) {
+    this.selection = selection;
+    this.renderer.setSelection(selection);
+  }
+
+  clearSelection() { this.setSelection(null); }
+
+  beginTextEdit(box: TextBox) {
+    this.textEditor.beginEdit(box);
   }
 
   refreshLabelUI() {
-    // No label panel in the page editor. Trigger persistence on geometry change.
-    if (this.scene.segments.length !== this._segmentCountLast) {
-      this._segmentCountLast = this.scene.segments.length;
-      this._onChange?.();
-    }
+    this._changeDirty = true;
   }
 
   /* ===== Internals ===== */
@@ -303,12 +457,10 @@ export class MiniCad {
       const ctx: CanvasRenderingContext2D = this.ctx;
       ctx.save();
       ctx.clearRect(0, 0, this.vw, this.vh);
-      // Reuse the renderer's internals to draw geometry the same way the
-      // standalone editor does. These are private TS methods but exist at
-      // runtime — we deliberately call them by name to stay 1:1 visually.
       try { this._drawByLabelOrder?.(); } catch (e) { console.error(e); }
       try { this._drawSegmentSelection?.(); } catch {}
       try { this._drawHoverSegmentPoints?.(); } catch {}
+      try { this._drawTextBoxSelection?.(); } catch {}
       if (this.overlay && this.overlay.draw) {
         try { this.overlay.draw(ctx, this.camera); } catch (e) { console.error(e); }
       }
@@ -326,9 +478,6 @@ export class MiniCad {
       this.input.mouse.sx = (e.clientX - r.left) * sxScale;
       this.input.mouse.sy = (e.clientY - r.top) * syScale;
     };
-    // Fires AFTER Input's own mousemove handler (Input binds in its constructor,
-    // which we called before this), so our values overwrite the visual-pixel
-    // ones with canvas-internal pixels.
     c.addEventListener("mousemove", remap);
     c.addEventListener("mousedown", remap);
     this._coordCleanups.push(() => c.removeEventListener("mousemove", remap));
@@ -338,20 +487,22 @@ export class MiniCad {
   private _tick = () => {
     if (this._destroyed) return;
     try {
-      // Suppress engine pan/zoom — page zoom is owned by the React parent.
       this.input.wheelDelta = 0;
       this.input.panDX = 0;
       this.input.panDY = 0;
 
       this.input.update(this.camera);
 
-      if (this._activeTool === "line") {
-        this.lineTool.update(this.input);
-      }
+      if (this._activeTool === "line") this.lineTool.update(this.input);
+      else if (this._activeTool === "text") this.textTool.update(this.input);
 
-      // Persist on geometry change.
-      if (this.scene.segments.length !== this._segmentCountLast) {
-        this._segmentCountLast = this.scene.segments.length;
+      // Geometry change → persist (cover segments AND text boxes AND edits).
+      const sig = this._sceneSignature();
+      if (sig !== this._lastSig) {
+        this._lastSig = sig;
+        this._onChange?.();
+      } else if (this._changeDirty) {
+        this._changeDirty = false;
         this._onChange?.();
       }
 
@@ -363,20 +514,26 @@ export class MiniCad {
     }
     this._rafId = requestAnimationFrame(this._tick);
   };
+
+  private _lastSig = "";
+  private _sceneSignature(): string {
+    const segs = this.scene.segments.length;
+    const texts = this.scene.textBoxes.length;
+    // Include a coarse text snapshot so edits to HTML also fire onChange.
+    let h = 0;
+    for (const t of this.scene.textBoxes) {
+      h = (h * 31 + (t.html?.length || 0) + Math.round(t.center.x * 1000) + Math.round(t.center.y * 1000)) | 0;
+    }
+    return `${segs}|${texts}|${h}`;
+  }
 }
 
 /* ============ Helpers ============ */
 
-/**
- * Applies an alpha (0..1) to any CSS color string and returns an rgba(...)
- * string. Supports #rgb / #rrggbb / rgb(...) / rgba(...). Falls back to the
- * original color if parsing fails (so behavior matches the CAD engine).
- */
 function applyAlphaToColor(color: string, alpha: number): string {
   if (alpha >= 1) return color;
   const a = Math.max(0, Math.min(1, alpha));
   const c = (color || "").trim();
-  // #rgb
   let m = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/i.exec(c);
   if (m) {
     const r = parseInt(m[1] + m[1], 16);
@@ -384,15 +541,9 @@ function applyAlphaToColor(color: string, alpha: number): string {
     const b = parseInt(m[3] + m[3], 16);
     return `rgba(${r},${g},${b},${a})`;
   }
-  // #rrggbb
   m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(c);
-  if (m) {
-    return `rgba(${parseInt(m[1], 16)},${parseInt(m[2], 16)},${parseInt(m[3], 16)},${a})`;
-  }
-  // rgb(r,g,b) or rgba(r,g,b,a) — replace/append alpha
+  if (m) return `rgba(${parseInt(m[1], 16)},${parseInt(m[2], 16)},${parseInt(m[3], 16)},${a})`;
   m = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*[\d.]+\s*)?\)$/i.exec(c);
-  if (m) {
-    return `rgba(${m[1]},${m[2]},${m[3]},${a})`;
-  }
+  if (m) return `rgba(${m[1]},${m[2]},${m[3]},${a})`;
   return c;
 }
