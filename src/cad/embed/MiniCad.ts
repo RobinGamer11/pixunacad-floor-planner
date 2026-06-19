@@ -23,6 +23,7 @@ import { PointEditMenu } from "../PointEditMenu";
 import { LineTool } from "../LineTool";
 import { TextTool } from "../TextTool";
 import { TextEditorOverlay } from "../TextEditorOverlay";
+import { MiniSelectTool } from "./MiniSelectTool";
 import { Defaults, SelectionType } from "../constants";
 import type { TextBox, TextBoxStyle } from "../Scene";
 
@@ -67,7 +68,7 @@ export interface MiniCadInit {
   initialState?: any;
 }
 
-export type MiniTool = "line" | "text" | null;
+export type MiniTool = "line" | "text" | "select" | null;
 
 /** Extra CSS pixels around the page on the canvas so edge snap dots and the
  *  blue snap line are fully visible (and not occluded by the page's margin
@@ -87,6 +88,7 @@ export class MiniCad {
   readonly lineTool: LineTool;
   readonly textTool: TextTool;
   readonly textEditor: TextEditorOverlay;
+  readonly selectTool: MiniSelectTool;
 
   // Stubs required by tools / editor.
   activeDrawLabelId = Defaults.defaultLabelId;
@@ -179,6 +181,7 @@ export class MiniCad {
       this.dom.textEditor.symbolSelect,
       this as any,
     );
+    this.selectTool = new MiniSelectTool(this);
 
     this._installCoordRemap();
     this.applyZoom(this._zoom);
@@ -249,6 +252,7 @@ export class MiniCad {
       try { this.textEditor.commit(); } catch {}
       this.textTool.cancel();
     }
+    if (this._activeTool === "select") this.selectTool.cancel();
     this._activeTool = tool;
     this.activeTool = null;
     if (tool === "line") {
@@ -257,6 +261,8 @@ export class MiniCad {
     } else if (tool === "text") {
       this.textTool.activate();
       this.activeTool = this.textTool;
+    } else if (tool === "select") {
+      this.selectTool.activate();
     }
   }
 

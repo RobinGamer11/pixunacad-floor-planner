@@ -914,8 +914,8 @@ function PageCanvas({
           basePxPerMm={baseWidth / fmt.w}
           pageMarginsMm={page.margins ?? 0}
           zoom={scale}
-          activeTool={activeTool === "line" ? "line" : activeTool === "text" ? "text" : null}
-          enabled={activeTool === "line" || activeTool === "text"}
+          activeTool={activeTool === "line" ? "line" : activeTool === "text" ? "text" : activeTool === null ? "select" : null}
+          enabled={activeTool === "line" || activeTool === "text" || activeTool === null}
           initialState={page.cadOverlay}
           lineColor={toolSettings.line.color}
           lineThicknessMm={toolSettings.line.thicknessMm}
