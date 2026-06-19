@@ -86,8 +86,24 @@ export default function ProjectsHome() {
           >
             A
           </div>
-          <NavIcon icon={<FolderKanban size={18} />} label="Projekte" active />
-          <NavIcon icon={<LayoutTemplate size={18} />} label="Vorlagen" />
+          <NavIcon
+            icon={<FolderKanban size={18} />}
+            label="Projekte"
+            active={mode === "projects"}
+            onClick={() => {
+              setMode("projects");
+              setSelectedId(projects.find((p) => !p.isTemplate)?.id);
+            }}
+          />
+          <NavIcon
+            icon={<LayoutTemplate size={18} />}
+            label="Vorlagen"
+            active={mode === "templates"}
+            onClick={() => {
+              setMode("templates");
+              setSelectedId(projects.find((p) => p.isTemplate)?.id);
+            }}
+          />
           <NavIcon icon={<Star size={18} />} label="Favoriten" />
           <NavIcon icon={<Users size={18} />} label="Geteilt" />
           <NavIcon icon={<Trash2 size={18} />} label="Papierkorb" />
