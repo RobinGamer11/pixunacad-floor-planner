@@ -25,7 +25,7 @@ const Pixuna = () => (
   </span>
 );
 
-type Tab = "uebersicht" | "seiten" | "infos" | "team";
+type Tab = "uebersicht" | "seiten" | "aufgaben" | "infos" | "team";
 
 export default function ProjectsHome() {
   const projects = useProjects();
