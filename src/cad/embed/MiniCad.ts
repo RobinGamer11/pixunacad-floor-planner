@@ -581,7 +581,10 @@ export class MiniCad {
               thicknessM: (s.thicknessM || (this.defaultLineThicknessM / f)) * segScale,
               labelId: s.labelId || Defaults.defaultLabelId,
               isGuide: !!s.isGuide,
+              midpointSnap: !!s.midpointSnap,
+              divisionSnap: typeof s.divisionSnap === "number" && s.divisionSnap >= 2 ? Math.floor(s.divisionSnap) : undefined,
             },
+
           );
         } catch (e) { console.error("MiniCad restore segment:", e); }
       }
