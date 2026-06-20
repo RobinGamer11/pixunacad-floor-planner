@@ -766,3 +766,17 @@ function applyAlphaToColor(color: string, alpha: number): string {
   if (m) return `rgba(${m[1]},${m[2]},${m[3]},${a})`;
   return c;
 }
+
+function splitColorAlpha(color: string, fallback: string): { color: string; alpha: number } {
+  const c = (color || "").trim();
+  let m = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+)\s*)?\)$/i.exec(c);
+  if (m) {
+    const hex = `#${Number(m[1]).toString(16).padStart(2, "0")}${Number(m[2]).toString(16).padStart(2, "0")}${Number(m[3]).toString(16).padStart(2, "0")}`;
+    const alpha = m[4] == null ? 1 : Math.max(0, Math.min(1, Number(m[4])));
+    return { color: hex, alpha };
+  }
+  m = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/i.exec(c);
+  if (m) return { color: `#${m[1]}${m[1]}${m[2]}${m[2]}${m[3]}${m[3]}`.toLowerCase(), alpha: 1 };
+  if (/^#[0-9a-f]{6}$/i.test(c)) return { color: c.toLowerCase(), alpha: 1 };
+  return { color: fallback, alpha: 1 };
+}
