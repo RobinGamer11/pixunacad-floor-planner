@@ -110,7 +110,9 @@ export class TextEditorOverlay {
   beginEdit(box: TextBox) {
     this.activeBoxId = box.id;
     this.el.classList.remove("hidden");
-    this.toolbarEl.classList.remove("hidden");
+    // Toolbar im Embed ausgeblendet lassen — Einstellungen liegen bereits
+    // im seitlichen Werkzeug-Einstellungs-Panel.
+    this.toolbarEl.classList.add("hidden");
     this.el.contentEditable = "true";
     this.el.spellcheck = false;
     this.el.innerHTML = box.html || "";
