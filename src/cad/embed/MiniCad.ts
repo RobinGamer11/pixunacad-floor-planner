@@ -26,6 +26,7 @@ import { TextEditorOverlay } from "../TextEditorOverlay";
 import { SelectTool } from "../SelectTool";
 import { Defaults, SelectionType } from "../constants";
 import type { TextBox, TextBoxStyle } from "../Scene";
+import { drawRichTextBox } from "../textRichRenderer";
 
 export interface MiniCadTextEditorDom {
   editor: HTMLDivElement;
