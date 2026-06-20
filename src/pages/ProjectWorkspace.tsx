@@ -2159,13 +2159,17 @@ function ElementInspector({
     const isGeometryOnly = Object.keys(patch).every((k) => geometryKeys.has(k));
     projectStore.updateElement(projectId, pageId, element.id, patch);
     if (!isGeometryOnly && siblingIds && siblingIds.length > 0) {
-      for (const id of siblingIds) {
-        // Geschwister-Patch ohne Geometrie-Felder
+      const project = projectStore.getState().projects.find((p) => p.id === projectId);
+      const page = project?.pages.find((p) => p.id === pageId);
+      const sameKindSiblings = (page?.elements ?? []).filter(
+        (e) => siblingIds.includes(e.id) && e.kind === element.kind,
+      );
+      for (const sib of sameKindSiblings) {
         const cleaned: any = {};
         for (const k of Object.keys(patch)) {
           if (!geometryKeys.has(k)) cleaned[k] = (patch as any)[k];
         }
-        projectStore.updateElement(projectId, pageId, id, cleaned);
+        projectStore.updateElement(projectId, pageId, sib.id, cleaned);
       }
     }
   };
