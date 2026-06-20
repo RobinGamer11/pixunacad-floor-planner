@@ -461,6 +461,36 @@ export class MiniCad {
     }
   }
 
+  /** Schaltet Mittelpunkt-/Teilungs-Snap auf der/den aktuell selektierten
+   *  Linie(n) und Hilfslinie(n) um. `divisionSnap`: ≥2 setzen, null/0 löschen. */
+  setSelectedSegmentSnapSettings(opts: { midpointSnap?: boolean; divisionSnap?: number | null }) {
+    const ids = new Set<string>();
+    for (const sel of this.selections) {
+      if ((sel as any)?.segmentId) ids.add((sel as any).segmentId);
+    }
+    if (this.selection && (this.selection as any).segmentId) ids.add((this.selection as any).segmentId);
+    let changed = false;
+    for (const id of ids) {
+      const seg = this.scene.getSegmentById(id);
+      if (!seg || this.isFrameSegment(seg)) continue;
+      if (typeof opts.midpointSnap === "boolean") { seg.midpointSnap = !!opts.midpointSnap; changed = true; }
+      if (opts.divisionSnap !== undefined) {
+        if (opts.divisionSnap == null || opts.divisionSnap < 2) {
+          seg.divisionSnap = undefined;
+        } else {
+          seg.divisionSnap = Math.floor(opts.divisionSnap);
+        }
+        changed = true;
+      }
+    }
+    if (changed) {
+      this._changeDirty = true;
+      // Selection-Info neu emittieren, damit Inspector aktuelle Werte zeigt.
+      this._onSelectionChange?.(this._selectionInfo(this.selection), this.selections.length);
+    }
+  }
+
+
   setTextDefaults(opts: {
     color?: string;
     fontSizePx?: number;
