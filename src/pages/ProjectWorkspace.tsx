@@ -790,18 +790,21 @@ function PageCanvas({
     setHoverPt(toPct(e.clientX, e.clientY));
   };
 
-  // Escape cancels pending draw
+  // Escape cancels pending draw and resets back to the select tool.
   React.useEffect(() => {
-    if (!pendingStart && activeTool === null) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setPendingStart(null);
-        setHoverPt(null);
-      }
+      if (e.key !== "Escape") return;
+      const t = e.target as HTMLElement | null;
+      // Don't hijack ESC while user is editing text in an input/textarea/contenteditable.
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || (t as any).isContentEditable)) return;
+      setPendingStart(null);
+      setHoverPt(null);
+      if (activeTool !== null) setActiveTool(null);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [pendingStart, activeTool]);
+
 
   const punchSide: PunchSide = page.punchSide ?? "left";
   const punchPattern = page.punchPattern ?? "none";
