@@ -223,17 +223,19 @@ export class TextEditorOverlay {
     sel.addRange(range);
   }
 
-  private _applyFontSizeToSelection(sizePx: string) {
+  private _applyFontSizeToSelection(sizePt: string) {
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0) return;
     const range = sel.getRangeAt(0);
     if (range.collapsed) return;
+    // Auswahl-Wert ist pt (Word/PPT) — wir speichern intern in CSS-Pixel.
+    const px = Math.max(1, parseFloat(sizePt) || 0) * (4 / 3);
     try {
       document.execCommand("fontSize", false, "7"); // tagging trick
       const fonts = this.el.querySelectorAll('font[size="7"]');
       fonts.forEach(node => {
         const span = document.createElement("span");
-        span.style.fontSize = `${sizePx}px`;
+        span.style.fontSize = `${px}px`;
         span.innerHTML = (node as HTMLElement).innerHTML;
         node.replaceWith(span);
       });
