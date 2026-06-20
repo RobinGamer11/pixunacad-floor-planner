@@ -25,6 +25,7 @@ interface Props {
    *  Snap-Einstellungen der gerade selektierten Linie/Hilfslinie ändern). */
   onEngineReady?: (api: {
     setSelectedSegmentSnap: (opts: { midpointSnap?: boolean; divisionSnap?: number | null }) => void;
+    duplicateSelectedSegments: (offsetMm?: number) => number;
   }) => void;
 
   // Line defaults
