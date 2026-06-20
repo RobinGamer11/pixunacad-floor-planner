@@ -811,7 +811,7 @@ export class MiniCad {
 
       this.input.update(this.camera);
 
-      if (this._activeTool === "line") this.lineTool.update(this.input);
+      if (this._activeTool === "line" || this._activeTool === "guide") this.lineTool.update(this.input);
       else if (this._activeTool === "text") this.textTool.update(this.input);
       else if (this._activeTool === "select") this.selectTool.update(this.input);
 
