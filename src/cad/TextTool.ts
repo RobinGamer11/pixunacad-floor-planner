@@ -166,6 +166,8 @@ export class TextTool {
           widthM = Defaults.textBoxWidthM * wf;
           heightM = Defaults.textBoxHeightM * wf;
         }
+        widthM = Math.max(widthM, Defaults.textMinBoxSizeM);
+        heightM = Math.max(heightM, Defaults.textMinBoxSizeM);
         const tl = v(Math.min(a.x, b.x), Math.min(a.y, b.y));
         const center = centerFromTopLeft(tl, widthM, heightM, 0);
         const created = this.app.scene.createTextBox(
@@ -192,8 +194,8 @@ export class TextTool {
         return;
       }
       const wf = this.app.renderer.worldScaleFactor();
-      const widthM = Defaults.textBoxWidthM * wf;
-      const heightM = Defaults.textBoxHeightM * wf;
+      const widthM = Math.max(Defaults.textBoxWidthM * wf, Defaults.textMinBoxSizeM);
+      const heightM = Math.max(Defaults.textBoxHeightM * wf, Defaults.textMinBoxSizeM);
       const center = centerFromTopLeft(anchor, widthM, heightM, 0);
       const created = this.app.scene.createTextBox(center, widthM, heightM, style, "", 0);
       this.app.setSelection({ type: SelectionType.TEXTBOX, textBoxId: created.id, handleIndex: null });
