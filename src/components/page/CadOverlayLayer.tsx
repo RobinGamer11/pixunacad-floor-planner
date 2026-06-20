@@ -101,6 +101,7 @@ export default function CadOverlayLayer(props: Props) {
           [PointEditAction.DELETE]: peDeleteRef.current,
           [PointEditAction.OFFSET]: peOffsetRef.current,
           [PointEditAction.RESIZE]: peResizeRef.current!,
+          [PointEditAction.DUPLICATE]: peDuplicateRef.current!,
         },
         textEditor: {
           editor: teEditorRef.current,
