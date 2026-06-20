@@ -1588,6 +1588,13 @@ function ToolsTab({
       </div>
 
       {/* Per-tool settings */}
+      {!activeTool && (
+        <SelectSettings
+          settings={toolSettings.select}
+          onChange={(p) => updateToolSettings("select", p)}
+          selectedCount={selectedElementIds?.length ?? 0}
+        />
+      )}
       {settingsTool === "guide" && (
         <GuideSettings
           settings={toolSettings.guide}
@@ -1625,6 +1632,7 @@ function ToolsTab({
           element={element}
           projectId={projectId}
           pageId={pageId}
+          siblingIds={(selectedElementIds ?? []).filter((id) => id !== element.id)}
           onJumpCad={onJumpCad}
         />
       )}
