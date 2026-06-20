@@ -1232,7 +1232,8 @@ export class SelectTool {
       if (pxSel <= Defaults.hitPx) return { type: SelectionType.SEGMENT, segmentId: selectedSeg.id };
     }
 
-    const visibleSegs = this.app.topology._segmentsFrontToBack();
+    const isFrameSeg = (s: any) => s?.labelId === "__page_frame__";
+    const visibleSegs = this.app.topology._segmentsFrontToBack().filter((s: any) => !isFrameSeg(s));
     const visibleHatches = this.app.topology._hatchesFrontToBack();
 
     let best: any = null;
@@ -1275,6 +1276,7 @@ export class SelectTool {
         best = { type: SelectionType.SEGMENT, segmentId: seg.id };
       }
     }
+
 
     if (best) return best;
 
