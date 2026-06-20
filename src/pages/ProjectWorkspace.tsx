@@ -981,12 +981,20 @@ function PageCanvas({
           basePxPerMm={baseWidth / fmt.w}
           pageMarginsMm={page.margins ?? 0}
           zoom={scale}
-          activeTool={activeTool === "line" ? "line" : activeTool === "text" ? "text" : activeTool === null ? "select" : null}
-          enabled={activeTool === "line" || activeTool === "text" || activeTool === null}
+          activeTool={
+            activeTool === "line" ? "line"
+            : activeTool === "text" ? "text"
+            : activeTool === "guide" ? "guide"
+            : activeTool === null ? "select"
+            : null
+          }
+          enabled={activeTool === "line" || activeTool === "text" || activeTool === "guide" || activeTool === null}
           initialState={page.cadOverlay}
-          lineColor={toolSettings.line.color}
-          lineThicknessMm={toolSettings.line.thicknessMm}
+          lineColor={activeTool === "guide" ? toolSettings.guide.color : toolSettings.line.color}
+          lineThicknessMm={activeTool === "guide" ? Math.max(0.1, toolSettings.guide.strokeWidth * 0.2) : toolSettings.line.thicknessMm}
           lineAlpha={toolSettings.line.alpha / 100}
+          guideColor={toolSettings.guide.color}
+          guidesLocked={toolSettings.guide.locked}
           textColor={toolSettings.text.color}
           textFontSizePx={toolSettings.text.fontSize}
           textBold={toolSettings.text.bold}
