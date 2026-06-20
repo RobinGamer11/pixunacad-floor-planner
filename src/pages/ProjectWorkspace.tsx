@@ -977,11 +977,11 @@ function PageCanvas({
                 x: Math.min(95, (el.x ?? 0) + 2),
                 y: Math.min(95, (el.y ?? 0) + 2),
               });
-              setSelectedElementIds([newId]);
+              setSelectedElementIds_NA: void(onSelect(newId));
             }}
             onDelete={() => {
               projectStore.deleteElement(projectId, page.id, el.id);
-              setSelectedElementIds([]);
+              onSelect(undefined);
             }}
           />
         ))}
