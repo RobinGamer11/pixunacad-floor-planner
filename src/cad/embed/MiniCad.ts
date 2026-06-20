@@ -191,6 +191,8 @@ export class MiniCad {
 
   /** Special label-ID for invisible page-frame segments (snap-only). */
   private _frameLabelId = "__page_frame__";
+  /** Special label-ID for invisible external rect segments (Zeichenblatt/PDF/Bild). */
+  private _extRectLabelId = "__ext_rect__";
 
   private _activeTool: MiniTool = null;
   private _rafId: number | null = null;
@@ -310,7 +312,7 @@ export class MiniCad {
   /* ===== Page-frame snap (invisible segments at page edge + margin edge) ===== */
 
   isFrameSegment(seg: { labelId?: string }): boolean {
-    return seg.labelId === this._frameLabelId;
+    return seg.labelId === this._frameLabelId || seg.labelId === this._extRectLabelId;
   }
 
   private _installPageFrameSnap() {
