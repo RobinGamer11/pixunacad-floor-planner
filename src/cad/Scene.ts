@@ -10,16 +10,20 @@ export class Segment {
   color: string;
   thicknessM: number;
   labelId: string;
+  /** Wenn true: Hilfslinie — wird hellblau gestrichelt im Hintergrund gezeichnet
+   *  und vom Druck/Export ausgeschlossen. */
+  isGuide: boolean;
   /** Wenn gesetzt: dieses Objekt gehört zum Edit-Mode der Sticker-Instanz mit dieser ID. */
   _stickerEditOwnerId?: string | null;
 
-  constructor({ id, a, b, color, thicknessM, labelId }: { id: string; a: Vec2; b: Vec2; color?: string; thicknessM?: number; labelId?: string }) {
+  constructor({ id, a, b, color, thicknessM, labelId, isGuide }: { id: string; a: Vec2; b: Vec2; color?: string; thicknessM?: number; labelId?: string; isGuide?: boolean }) {
     this.id = id;
     this.a = v(a.x, a.y);
     this.b = v(b.x, b.y);
     this.color = color || Defaults.lineColor;
     this.thicknessM = (typeof thicknessM === "number" && thicknessM > 0) ? thicknessM : Defaults.lineThicknessM;
     this.labelId = labelId || Defaults.defaultLabelId;
+    this.isGuide = !!isGuide;
     this._stickerEditOwnerId = null;
   }
 }
