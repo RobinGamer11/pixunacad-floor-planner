@@ -123,24 +123,9 @@ export default function ProjectWorkspace() {
   const updateToolSettings = <K extends keyof typeof toolSettings>(k: K, patch: Partial<(typeof toolSettings)[K]>) =>
     setToolSettings((s) => ({ ...s, [k]: { ...s[k], ...patch } }));
 
-
-
-  if (!project) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-background text-foreground">
-        <div className="text-center">
-          <div className="text-lg">Projekt nicht gefunden.</div>
-          <button onClick={() => navigate("/")} className="mt-3 underline">
-            Zurück zur Startseite
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  const activePage = project.pages.find((p) => p.id === activePageId) ?? project.pages[0];
+  const activePage = project?.pages.find((p) => p.id === activePageId) ?? project?.pages[0];
   const selectedElement = activePage?.elements.find((e) => e.id === selectedElementId);
-  const bgPage = bgOverlay.pageId ? project.pages.find((p) => p.id === bgOverlay.pageId) : undefined;
+  const bgPage = bgOverlay.pageId ? project?.pages.find((p) => p.id === bgOverlay.pageId) : undefined;
 
   useLayoutEffect(() => {
     if (!activePage || !canvasViewportRef.current) return;
@@ -161,6 +146,19 @@ export default function ProjectWorkspace() {
     };
     fitPage();
   }, [activePage?.id, activePage?.format]);
+
+  if (!project) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-background text-foreground">
+        <div className="text-center">
+          <div className="text-lg">Projekt nicht gefunden.</div>
+          <button onClick={() => navigate("/")} className="mt-3 underline">
+            Zurück zur Startseite
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
