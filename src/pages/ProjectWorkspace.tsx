@@ -1370,6 +1370,7 @@ function RightInspector({
             cadSelectionCount={cadSelectionCount}
             cadSelectedLineSnap={cadSelectedLineSnap}
             onCadLineSnapChange={onCadLineSnapChange}
+            onCadDuplicateSegments={onCadDuplicateSegments}
             updateToolSettings={updateToolSettings}
             onJumpCad={onJumpCad}
 
