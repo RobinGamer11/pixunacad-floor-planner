@@ -52,7 +52,7 @@ export class PointEditMenu {
 
     const pad = 12;
     const vp = this.root.parentElement!.getBoundingClientRect();
-    const boxW = 136;
+    const boxW = 168;
     const boxH = 36;
 
     const left = clamp(sx + pad, 8, vp.width - boxW - 8);
