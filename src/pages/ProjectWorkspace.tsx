@@ -1524,6 +1524,7 @@ function ToolsTab({
   setActiveTool,
   selectedCadTool,
   selectedElementId,
+  selectedElementIds,
   setSelectedElementId,
   toolSettings,
   updateToolSettings,
@@ -1537,6 +1538,7 @@ function ToolsTab({
   setActiveTool: (t: PageTool) => void;
   selectedCadTool?: "line" | "text";
   selectedElementId?: string;
+  selectedElementIds?: string[];
   setSelectedElementId: (id?: string) => void;
   toolSettings: ToolSettings;
   updateToolSettings: <K extends keyof ToolSettings>(k: K, patch: Partial<ToolSettings[K]>) => void;
