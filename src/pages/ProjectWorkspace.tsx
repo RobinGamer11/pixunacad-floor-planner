@@ -662,6 +662,7 @@ export default function ProjectWorkspace() {
                   isGuide: prev.isGuide,
                 } : prev);
               }}
+              onCadDuplicateSegments={() => { cadEngineApiRef.current?.duplicateSelectedSegments(5); }}
 
               updateToolSettings={updateToolSettings}
 
