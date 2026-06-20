@@ -1069,10 +1069,180 @@ export class MiniCad {
     }
   }
 
+  /* ===== Multi-Select Marquee (Drag-Rect) =====================================
+   * Wenn der User mit gehaltener Shift-Taste (oder im Mehrfach-Modus) auf eine
+   * leere Stelle klickt und zieht, wird ein gestricheltes Auswahlrechteck
+   * gezeichnet. Beim Loslassen werden alle Objekte (Linien, Hatches, TextBoxen,
+   * Sticker, Documents, FreeStrokes) deren Anker im Rechteck liegt, gewählt. */
+  private _marqueeActive = false;
+  private _marqueeStart: { x: number; y: number } | null = null; // Welt
+  private _marqueeEnd: { x: number; y: number } | null = null;   // Welt
+  /** Während aktiver Marquee werden setSelection-Aufrufe (z.B. vom SelectTool
+   *  für „Klick ins Leere") ignoriert — die Marquee bestimmt die Auswahl. */
+  private _suppressSetSelection = false;
 
+  private _installMarquee() {
+    const c = this.dom.canvas;
+    const screenToWorld = (e: MouseEvent) => {
+      const r = c.getBoundingClientRect();
+      const sx = (e.clientX - r.left) * (c.width / r.width);
+      const sy = (e.clientY - r.top) * (c.height / r.height);
+      return this.camera.screenToWorld(sx, sy);
+    };
+    const onDown = (e: MouseEvent) => {
+      if (e.button !== 0) return;
+      if (this._activeTool !== "select" && this._activeTool !== null) return;
+      const wantMulti = e.shiftKey || this._multiSelectMode;
+      if (!wantMulti) return;
+      // Nur starten wenn der Klick wirklich in den leeren Raum geht — wir
+      // erkennen das vereinfachend so: kein vorhandenes Objekt unter der Maus.
+      const w = screenToWorld(e);
+      if (this._hitAnyObject(w.x, w.y)) return;
+      this._marqueeActive = true;
+      this._marqueeStart = { x: w.x, y: w.y };
+      this._marqueeEnd = { x: w.x, y: w.y };
+      this._installMarqueeOverlay();
+    };
+    const onMove = (e: MouseEvent) => {
+      if (!this._marqueeActive) return;
+      const w = screenToWorld(e);
+      this._marqueeEnd = { x: w.x, y: w.y };
+    };
+    const onUp = (_e: MouseEvent) => {
+      if (!this._marqueeActive) return;
+      this._marqueeActive = false;
+      this._suppressSetSelection = true;
+      try {
+        const a = this._marqueeStart!;
+        const b = this._marqueeEnd!;
+        const x0 = Math.min(a.x, b.x), x1 = Math.max(a.x, b.x);
+        const y0 = Math.min(a.y, b.y), y1 = Math.max(a.y, b.y);
+        // Mindestgröße — sonst war's nur ein Klick ohne Drag.
+        const minSize = 0.005; // 5 mm in Welt-Metern
+        if (x1 - x0 > minSize || y1 - y0 > minSize) {
+          const picks = this._marqueePick(x0, y0, x1, y1);
+          // Bestehende Selektionen bleiben erhalten (Marquee additiv im Multi/Shift-Modus).
+          const current = this.selections.slice();
+          for (const p of picks) {
+            if (!current.some((s) => _sameObject(s, p))) current.push(p);
+          }
+          const primary = current[current.length - 1] ?? null;
+          this._applyPrimary(primary, current);
+        }
+      } finally {
+        this._marqueeStart = null;
+        this._marqueeEnd = null;
+        // SetSelection-Sperre erst im NÄCHSTEN Tick lösen, damit das SelectTool
+        // (das nach mouseup ebenfalls setSelection(null) auslösen könnte) noch
+        // unterdrückt wird.
+        setTimeout(() => { this._suppressSetSelection = false; }, 0);
+        this.renderer.overlay = null;
+      }
+    };
+    c.addEventListener("mousedown", onDown);
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    this._coordCleanups.push(() => c.removeEventListener("mousedown", onDown));
+    this._coordCleanups.push(() => window.removeEventListener("mousemove", onMove));
+    this._coordCleanups.push(() => window.removeEventListener("mouseup", onUp));
+  }
+
+  private _installMarqueeOverlay() {
+    this.renderer.overlay = {
+      draw: (ctx, cam) => {
+        if (!this._marqueeStart || !this._marqueeEnd) return;
+        const a = cam.worldToScreen(this._marqueeStart.x, this._marqueeStart.y);
+        const b = cam.worldToScreen(this._marqueeEnd.x, this._marqueeEnd.y);
+        const x = Math.min(a.x, b.x), y = Math.min(a.y, b.y);
+        const w = Math.abs(b.x - a.x), h = Math.abs(b.y - a.y);
+        ctx.save();
+        ctx.fillStyle = "rgba(56, 132, 255, 0.10)";
+        ctx.strokeStyle = "rgba(56, 132, 255, 0.85)";
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 3]);
+        ctx.fillRect(x, y, w, h);
+        ctx.strokeRect(x + 0.5, y + 0.5, w, h);
+        ctx.restore();
+      },
+    } as any;
+  }
+
+  /** Liefert true, wenn an Welt-Position (wx,wy) irgendein selektierbares Objekt liegt.
+   *  Sehr grobe Heuristik (Bbox-Test mit Toleranz). */
+  private _hitAnyObject(wx: number, wy: number): boolean {
+    const tol = 5 / this.camera.scale; // 5 px in Welt-Einheiten
+    for (const seg of this.scene.segments) {
+      if (this.isFrameSegment(seg)) continue;
+      if (seg.isGuide && this._guidesLocked) continue;
+      const x0 = Math.min(seg.a.x, seg.b.x) - tol, x1 = Math.max(seg.a.x, seg.b.x) + tol;
+      const y0 = Math.min(seg.a.y, seg.b.y) - tol, y1 = Math.max(seg.a.y, seg.b.y) + tol;
+      if (wx >= x0 && wx <= x1 && wy >= y0 && wy <= y1) {
+        // Segment-Abstand grob
+        const dx = seg.b.x - seg.a.x, dy = seg.b.y - seg.a.y;
+        const L2 = dx * dx + dy * dy || 1;
+        const t = Math.max(0, Math.min(1, ((wx - seg.a.x) * dx + (wy - seg.a.y) * dy) / L2));
+        const px = seg.a.x + t * dx, py = seg.a.y + t * dy;
+        if (Math.hypot(px - wx, py - wy) <= tol) return true;
+      }
+    }
+    for (const h of this.scene.hatches) {
+      const xs = h.points.map((p) => p.x), ys = h.points.map((p) => p.y);
+      if (wx >= Math.min(...xs) && wx <= Math.max(...xs) && wy >= Math.min(...ys) && wy <= Math.max(...ys)) return true;
+    }
+    for (const b of this.scene.textBoxes) {
+      if (Math.abs(wx - b.center.x) <= b.widthM / 2 && Math.abs(wy - b.center.y) <= b.heightM / 2) return true;
+    }
+    for (const i of this.scene.stickerInstances || []) {
+      if (Math.hypot(wx - i.position.x, wy - i.position.y) <= 0.05) return true;
+    }
+    for (const d of this.scene.documents) {
+      if (wx >= d.position.x && wx <= d.position.x + d.widthM && wy >= d.position.y && wy <= d.position.y + d.heightM) return true;
+    }
+    return false;
+  }
+
+  private _marqueePick(x0: number, y0: number, x1: number, y1: number): Selection[] {
+    const inRect = (x: number, y: number) => x >= x0 && x <= x1 && y >= y0 && y <= y1;
+    const picks: Selection[] = [];
+    for (const seg of this.scene.segments) {
+      if (this.isFrameSegment(seg)) continue;
+      if (seg.isGuide && this._guidesLocked) continue;
+      // Eine Linie ist „getroffen", wenn beide Endpunkte im Rechteck liegen.
+      if (inRect(seg.a.x, seg.a.y) && inRect(seg.b.x, seg.b.y)) {
+        picks.push({ type: SelectionType.SEGMENT, segmentId: seg.id } as any);
+      }
+    }
+    for (const h of this.scene.hatches) {
+      if (h.points.every((p) => inRect(p.x, p.y))) {
+        picks.push({ type: SelectionType.HATCH, hatchId: h.id, pointIndex: null });
+      }
+    }
+    for (const b of this.scene.textBoxes) {
+      if (inRect(b.center.x, b.center.y)) {
+        picks.push({ type: SelectionType.TEXTBOX, textBoxId: b.id, handleIndex: null });
+      }
+    }
+    for (const i of this.scene.stickerInstances || []) {
+      if (inRect(i.position.x, i.position.y)) {
+        picks.push({ type: SelectionType.STICKER_INSTANCE, stickerInstanceId: i.id } as any);
+      }
+    }
+    for (const d of this.scene.documents) {
+      const cx = d.position.x + d.widthM / 2;
+      const cy = d.position.y + d.heightM / 2;
+      if (inRect(cx, cy)) picks.push({ type: SelectionType.DOCUMENT, documentId: d.id } as any);
+    }
+    for (const f of this.scene.freeStrokes) {
+      if (f.points.length && inRect(f.points[0].x, f.points[0].y)) {
+        picks.push({ type: SelectionType.FREE_STROKE, freeStrokeId: f.id } as any);
+      }
+    }
+    return picks;
+  }
 
   private _installCoordRemap() {
     const c = this.dom.canvas;
+
     const remap = (e: MouseEvent) => {
       const r = c.getBoundingClientRect();
       if (r.width <= 0 || r.height <= 0) return;
