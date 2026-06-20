@@ -682,6 +682,7 @@ const PUNCH_PATTERNS: Record<Exclude<PunchPattern, "none">, { label: string; off
 };
 
 type ToolSettings = {
+  select: { multi: boolean };
   guide: { color: string; strokeWidth: number; locked: boolean };
   line: { color: string; thicknessMm: number; alpha: number };
   text: {
