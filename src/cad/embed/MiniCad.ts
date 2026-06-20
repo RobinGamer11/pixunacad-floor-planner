@@ -27,6 +27,7 @@ import { SelectTool } from "../SelectTool";
 import { Defaults, SelectionType } from "../constants";
 import type { TextBox, TextBoxStyle } from "../Scene";
 import { drawRichTextBox } from "../textRichRenderer";
+import { autoSizeTextBox } from "../textAutoSize";
 
 export interface MiniCadTextEditorDom {
   editor: HTMLDivElement;
@@ -65,11 +66,29 @@ export interface MiniCadInit {
   defaultLineThicknessM?: number;
   /** Called whenever scene geometry changes. */
   onChange?: () => void;
+  /** Called whenever a CAD object selection changes in the embedded editor. */
+  onSelectionChange?: (info: MiniCadSelectionInfo | null) => void;
   /** Initial serialized state. */
   initialState?: any;
 }
 
 export type MiniTool = "line" | "text" | "select" | null;
+export type MiniCadSelectionInfo =
+  | { tool: "line"; color: string; thicknessMm: number; alpha: number }
+  | {
+      tool: "text";
+      color: string;
+      fontSize: number;
+      alpha: number;
+      align: "left" | "center" | "right";
+      bgColor: string;
+      bgAlphaPct: number;
+      wrap: boolean;
+      autoSize: boolean;
+      borderEnabled: boolean;
+      borderColor: string;
+      borderWidthPx: number;
+    };
 
 /** Extra CSS pixels around the page on the canvas so edge snap dots and the
  *  blue snap line are fully visible (and not occluded by the page's margin
@@ -142,6 +161,7 @@ export class MiniCad {
   private _destroyed = false;
   private _changeDirty = false;
   private _onChange?: () => void;
+  private _onSelectionChange?: (info: MiniCadSelectionInfo | null) => void;
   private _coordCleanups: Array<() => void> = [];
 
   constructor(init: MiniCadInit) {
@@ -152,6 +172,7 @@ export class MiniCad {
     this.pageMarginsMm = init.pageMarginsMm ?? 0;
     this._zoom = init.initialZoom;
     this._onChange = init.onChange;
+    this._onSelectionChange = init.onSelectionChange;
     this._strokeFactor = (this.basePxPerMm * 1000) / 80;
     this.defaultLineColor = init.defaultLineColor ?? Defaults.lineColor;
     this.defaultLineThicknessM = (init.defaultLineThicknessM ?? Defaults.lineThicknessM) * this._strokeFactor;
@@ -316,6 +337,12 @@ export class MiniCad {
     if (typeof opts.alpha === "number" && opts.alpha >= 0 && opts.alpha <= 1) {
       this.defaultLineAlpha = opts.alpha;
     }
+    const selected = this.getSelectedSegment();
+    if (selected && !this.isFrameSegment(selected)) {
+      selected.color = applyAlphaToColor(this.defaultLineColor, this.defaultLineAlpha);
+      selected.thicknessM = this.defaultLineThicknessM;
+      this.refreshLabelUI();
+    }
   }
 
   setTextDefaults(opts: {
@@ -346,6 +373,22 @@ export class MiniCad {
     if (typeof opts.borderEnabled === "boolean") this.defaultTextBorderEnabled = opts.borderEnabled;
     if (opts.borderColor) this.defaultTextBorderColor = opts.borderColor;
     if (typeof opts.borderWidthPx === "number" && opts.borderWidthPx >= 0) this.defaultTextBorderWidthPx = opts.borderWidthPx;
+    const selected = this.getSelectedTextBox();
+    if (selected) {
+      selected.style.textColor = applyAlphaToColor(this.defaultTextColor, this.defaultTextAlpha);
+      selected.style.fontSizePx = this.defaultTextFontSizePx;
+      selected.style.bgColor = this.defaultTextBgColor;
+      selected.style.bgAlphaPct = this.defaultTextBgAlphaPct;
+      selected.style.wrap = this.defaultTextAutoSize ? this.defaultTextWrap : true;
+      selected.style.align = this.defaultTextAlign;
+      selected.style.borderEnabled = this.defaultTextBorderEnabled;
+      selected.style.borderColor = this.defaultTextBorderColor;
+      selected.style.borderWidthPx = this.defaultTextBorderWidthPx;
+      (selected.style as any).autoSize = this.defaultTextAutoSize;
+      autoSizeTextBox(selected, (this.renderer as any).referencePxPerM);
+      if (this.textEditor.isActive()) this.textEditor.reposition(selected);
+      this.refreshLabelUI();
+    }
   }
 
   applyZoom(zoom: number) {
@@ -506,9 +549,45 @@ export class MiniCad {
     return this.scene.getTextBoxById(this.selection.textBoxId);
   }
 
+  private _selectionInfo(selection: Selection | null): MiniCadSelectionInfo | null {
+    if (!selection) return null;
+    const box = this.getSelectedTextBox();
+    if (box) {
+      const textColor = splitColorAlpha(box.style.textColor, this.defaultTextColor);
+      return {
+        tool: "text",
+        color: textColor.color,
+        fontSize: Math.round(box.style.fontSizePx),
+        alpha: Math.round(textColor.alpha * 100),
+        align: box.style.align,
+        bgColor: box.style.bgColor,
+        bgAlphaPct: box.style.bgAlphaPct,
+        wrap: box.style.wrap,
+        autoSize: (box.style as any).autoSize !== false,
+        borderEnabled: box.style.borderEnabled,
+        borderColor: box.style.borderColor,
+        borderWidthPx: box.style.borderWidthPx,
+      };
+    }
+    if (selection.segmentId) {
+      const seg = this.scene.getSegmentById(selection.segmentId);
+      if (seg && !this.isFrameSegment(seg)) {
+        const lineColor = splitColorAlpha(seg.color, this.defaultLineColor);
+        return {
+          tool: "line",
+          color: lineColor.color,
+          thicknessMm: Math.max(0.1, Number(((seg.thicknessM / (this._strokeFactor || 1)) * 1000).toFixed(2))),
+          alpha: Math.round(lineColor.alpha * 100),
+        };
+      }
+    }
+    return null;
+  }
+
   setSelection(selection: Selection | null) {
     this.selection = selection;
     this.renderer.setSelection(selection);
+    this._onSelectionChange?.(this._selectionInfo(selection));
   }
 
   clearSelection() { this.setSelection(null); }
@@ -709,4 +788,18 @@ function applyAlphaToColor(color: string, alpha: number): string {
   m = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*[\d.]+\s*)?\)$/i.exec(c);
   if (m) return `rgba(${m[1]},${m[2]},${m[3]},${a})`;
   return c;
+}
+
+function splitColorAlpha(color: string, fallback: string): { color: string; alpha: number } {
+  const c = (color || "").trim();
+  let m = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+)\s*)?\)$/i.exec(c);
+  if (m) {
+    const hex = `#${Number(m[1]).toString(16).padStart(2, "0")}${Number(m[2]).toString(16).padStart(2, "0")}${Number(m[3]).toString(16).padStart(2, "0")}`;
+    const alpha = m[4] == null ? 1 : Math.max(0, Math.min(1, Number(m[4])));
+    return { color: hex, alpha };
+  }
+  m = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/i.exec(c);
+  if (m) return { color: `#${m[1]}${m[1]}${m[2]}${m[2]}${m[3]}${m[3]}`.toLowerCase(), alpha: 1 };
+  if (/^#[0-9a-f]{6}$/i.test(c)) return { color: c.toLowerCase(), alpha: 1 };
+  return { color: fallback, alpha: 1 };
 }

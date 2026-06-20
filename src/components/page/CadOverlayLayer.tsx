@@ -6,6 +6,7 @@
  */
 import { useEffect, useRef } from "react";
 import { MiniCad, type MiniTool } from "@/cad/embed/MiniCad";
+import type { MiniCadSelectionInfo } from "@/cad/embed/MiniCad";
 import { PointEditAction } from "@/cad/constants";
 
 interface Props {
@@ -19,6 +20,7 @@ interface Props {
   enabled: boolean;
   initialState?: any;
   onChange: (state: any) => void;
+  onSelectionChange?: (info: MiniCadSelectionInfo | null) => void;
   // Line defaults
   lineColor?: string;
   lineThicknessMm?: number;
@@ -42,7 +44,7 @@ interface Props {
 export default function CadOverlayLayer(props: Props) {
   const {
     pageWidthMm, pageHeightMm, basePxPerMm, pageMarginsMm,
-    zoom, activeTool, enabled, initialState, onChange,
+    zoom, activeTool, enabled, initialState, onChange, onSelectionChange,
     lineColor, lineThicknessMm, lineAlpha,
     textColor, textFontSizePx, textBold, textItalic, textAlpha, textAlign,
     textBgColor, textBgAlphaPct, textWrap, textAutoSize, textBorderEnabled, textBorderColor, textBorderWidthPx,
@@ -70,6 +72,8 @@ export default function CadOverlayLayer(props: Props) {
   const engineRef = useRef<MiniCad | null>(null);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
+  const onSelectionChangeRef = useRef(onSelectionChange);
+  onSelectionChangeRef.current = onSelectionChange;
 
   // Mount engine once per page-size combination.
   useEffect(() => {
@@ -112,6 +116,7 @@ export default function CadOverlayLayer(props: Props) {
       initialZoom: zoom,
       initialState,
       onChange: () => onChangeRef.current(engine.serialize()),
+      onSelectionChange: (info) => onSelectionChangeRef.current?.(info),
     });
     engineRef.current = engine;
     return () => {

@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useRef, useEffect } from "react";
+import React, { useMemo, useState, useRef, useEffect, useLayoutEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ChevronLeft,
@@ -60,6 +60,7 @@ import {
   type PunchSide,
 } from "@/lib/projectStore";
 import CadOverlayLayer from "@/components/page/CadOverlayLayer";
+import type { MiniCadSelectionInfo } from "@/cad/embed/MiniCad";
 
 const FORMAT_SIZES: Record<PageFormat, { w: number; h: number; label: string }> = {
   "A3-quer": { w: 420, h: 297, label: "A3 Querformat (420 × 297 mm)" },
@@ -79,6 +80,7 @@ export default function ProjectWorkspace() {
   const [selectedElementId, setSelectedElementId] = useState<string | undefined>();
   const [rightTab, setRightTab] = useState<"settings" | "tools" | "layers">("settings");
   const [activeTool, setActiveTool] = useState<PageTool>(null);
+  const [selectedCadTool, setSelectedCadTool] = useState<"line" | "text" | undefined>();
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
   const [renamingPageId, setRenamingPageId] = useState<string | undefined>();
@@ -90,9 +92,11 @@ export default function ProjectWorkspace() {
     visible: true,
   });
   const [zoom, setZoom] = useState(77);
+  const canvasViewportRef = useRef<HTMLDivElement>(null);
   const setZoomClamped = (v: number) => setZoom(Math.max(10, Math.min(400, Math.round(v))));
   const setActiveToolAndTab = (t: PageTool) => {
     setActiveTool(t);
+    if (t) setSelectedCadTool(undefined);
     if (t) setRightTab("tools");
   };
 
@@ -119,7 +123,31 @@ export default function ProjectWorkspace() {
   const updateToolSettings = <K extends keyof typeof toolSettings>(k: K, patch: Partial<(typeof toolSettings)[K]>) =>
     setToolSettings((s) => ({ ...s, [k]: { ...s[k], ...patch } }));
 
+  const activePage = project?.pages.find((p) => p.id === activePageId) ?? project?.pages[0];
+  const selectedElement = activePage?.elements.find((e) => e.id === selectedElementId);
+  const bgPage = bgOverlay.pageId ? project?.pages.find((p) => p.id === bgOverlay.pageId) : undefined;
 
+  useLayoutEffect(() => {
+    if (!activePage || !canvasViewportRef.current) return;
+    const fitPage = () => {
+      const fmt = FORMAT_SIZES[activePage.format];
+      const baseWidth = 1100;
+      const baseHeight = baseWidth / (fmt.w / fmt.h);
+      const box = canvasViewportRef.current!;
+      const nextZoom = Math.max(10, Math.min(100, Math.floor(Math.min(
+        ((box.clientWidth - 96) / baseWidth) * 100,
+        ((box.clientHeight - 96) / baseHeight) * 100,
+      ))));
+      setZoom(nextZoom);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          box.scrollLeft = Math.max(0, (box.scrollWidth - box.clientWidth) / 2);
+          box.scrollTop = Math.max(0, (box.scrollHeight - box.clientHeight) / 2);
+        });
+      });
+    };
+    fitPage();
+  }, [activePage?.id, activePage?.format]);
 
   if (!project) {
     return (
@@ -133,10 +161,6 @@ export default function ProjectWorkspace() {
       </div>
     );
   }
-
-  const activePage = project.pages.find((p) => p.id === activePageId) ?? project.pages[0];
-  const selectedElement = activePage?.elements.find((e) => e.id === selectedElementId);
-  const bgPage = bgOverlay.pageId ? project.pages.find((p) => p.id === bgOverlay.pageId) : undefined;
 
   return (
     <div
@@ -302,6 +326,7 @@ export default function ProjectWorkspace() {
                         }
                         setActivePageId(pg.id);
                         setSelectedElementId(undefined);
+                        setSelectedCadTool(undefined);
                         setPageActionsSticky(false);
                       }}
                       className="group w-full text-left rounded-lg p-2 flex gap-2.5 transition cursor-pointer"
@@ -478,6 +503,7 @@ export default function ProjectWorkspace() {
             style={{ background: "hsl(var(--surface))" }}
           >
             <div
+              ref={canvasViewportRef}
               className="flex-1 overflow-hidden relative"
               onWheel={(e) => {
                 if (e.ctrlKey || e.metaKey || !e.shiftKey) {
@@ -529,7 +555,38 @@ export default function ProjectWorkspace() {
                   onCommitTool={() => setActiveTool(null)}
                   onSelect={(id) => {
                     setSelectedElementId(id);
+                    if (id) setSelectedCadTool(undefined);
                     if (id) setRightTab("tools");
+                  }}
+                  onCadSelectionChange={(info) => {
+                    if (!info) {
+                      setSelectedCadTool(undefined);
+                      return;
+                    }
+                    setSelectedElementId(undefined);
+                    setSelectedCadTool(info.tool);
+                    setRightTab("tools");
+                    if (info.tool === "line") {
+                      updateToolSettings("line", {
+                        color: info.color,
+                        thicknessMm: info.thicknessMm,
+                        alpha: info.alpha,
+                      });
+                    } else {
+                      updateToolSettings("text", {
+                        color: info.color,
+                        fontSize: info.fontSize,
+                        alpha: info.alpha,
+                        align: info.align,
+                        bgColor: info.bgColor,
+                        bgAlphaPct: info.bgAlphaPct,
+                        wrap: info.wrap,
+                        autoSize: info.autoSize,
+                        borderEnabled: info.borderEnabled,
+                        borderColor: info.borderColor,
+                        borderWidthPx: info.borderWidthPx,
+                      });
+                    }
                   }}
                 />
               )}
@@ -548,6 +605,7 @@ export default function ProjectWorkspace() {
               project={project}
               activeTool={activeTool}
               setActiveTool={setActiveToolAndTab}
+              selectedCadTool={selectedCadTool}
               selectedElementId={selectedElementId}
               setSelectedElementId={setSelectedElementId}
               toolSettings={toolSettings}
@@ -648,6 +706,7 @@ function PageCanvas({
   toolSettings,
   onCommitTool,
   onSelect,
+  onCadSelectionChange,
 }: {
   projectId: string;
   page: import("@/lib/projectStore").ProjectPage;
@@ -659,6 +718,7 @@ function PageCanvas({
   toolSettings: ToolSettings;
   onCommitTool: () => void;
   onSelect: (id?: string) => void;
+  onCadSelectionChange: (info: MiniCadSelectionInfo | null) => void;
 }) {
   const fmt = FORMAT_SIZES[page.format];
   const aspect = fmt.w / fmt.h;
@@ -938,6 +998,7 @@ function PageCanvas({
           onChange={(state) =>
             projectStore.updatePage(projectId, page.id, { cadOverlay: state })
           }
+          onSelectionChange={onCadSelectionChange}
         />
 
       </div>
@@ -1149,6 +1210,7 @@ function RightInspector({
   project,
   activeTool,
   setActiveTool,
+  selectedCadTool,
   selectedElementId,
   setSelectedElementId,
   toolSettings,
@@ -1164,6 +1226,7 @@ function RightInspector({
   project: import("@/lib/projectStore").Project;
   activeTool: PageTool;
   setActiveTool: (t: PageTool) => void;
+  selectedCadTool?: "line" | "text";
   selectedElementId?: string;
   setSelectedElementId: (id?: string) => void;
   toolSettings: ToolSettings;
@@ -1206,6 +1269,7 @@ function RightInspector({
             project={project}
             activeTool={activeTool}
             setActiveTool={setActiveTool}
+            selectedCadTool={selectedCadTool}
             selectedElementId={selectedElementId}
             setSelectedElementId={setSelectedElementId}
             toolSettings={toolSettings}
@@ -1417,6 +1481,7 @@ function ToolsTab({
   project,
   activeTool,
   setActiveTool,
+  selectedCadTool,
   selectedElementId,
   setSelectedElementId,
   toolSettings,
@@ -1429,12 +1494,14 @@ function ToolsTab({
   project: import("@/lib/projectStore").Project;
   activeTool: PageTool;
   setActiveTool: (t: PageTool) => void;
+  selectedCadTool?: "line" | "text";
   selectedElementId?: string;
   setSelectedElementId: (id?: string) => void;
   toolSettings: ToolSettings;
   updateToolSettings: <K extends keyof ToolSettings>(k: K, patch: Partial<ToolSettings[K]>) => void;
   onJumpCad: (sheetId?: string) => void;
 }) {
+  const settingsTool = activeTool ?? selectedCadTool ?? null;
   return (
     <div className="space-y-5">
       {/* Active tool header */}
@@ -1442,17 +1509,17 @@ function ToolsTab({
         <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-3">
           AKTIVES WERKZEUG
         </div>
-        {!activeTool ? (
+        {!settingsTool ? (
           <div className="text-xs text-muted-foreground">
             Wähle links in der Werkzeugleiste ein Werkzeug (Hilfslinie, Linie, Text, CAD-Blatt) — die zugehörigen Einstellungen erscheinen hier.
           </div>
         ) : (
           <div className="flex items-center justify-between rounded-md border px-3 py-2" style={{ borderColor: "hsl(var(--hairline))" }}>
             <div className="text-sm font-medium">
-              {activeTool === "guide" && "Hilfslinie"}
-              {activeTool === "line" && "Linie (CAD)"}
-              {activeTool === "text" && "Text (CAD)"}
-              {activeTool === "cad" && "CAD-Zeichenblatt"}
+              {settingsTool === "guide" && "Hilfslinie"}
+              {settingsTool === "line" && "Linie (CAD)"}
+              {settingsTool === "text" && "Text (CAD)"}
+              {settingsTool === "cad" && "CAD-Zeichenblatt"}
             </div>
             <button
               onClick={() => setActiveTool(null)}
@@ -1474,19 +1541,19 @@ function ToolsTab({
       </div>
 
       {/* Per-tool settings */}
-      {activeTool === "guide" && (
+      {settingsTool === "guide" && (
         <GuideSettings
           settings={toolSettings.guide}
           onChange={(p) => updateToolSettings("guide", p)}
         />
       )}
-      {activeTool === "line" && (
+      {settingsTool === "line" && (
         <LineSettings
           settings={toolSettings.line}
           onChange={(p) => updateToolSettings("line", p)}
         />
       )}
-      {activeTool === "text" && (
+      {settingsTool === "text" && (
         <TextSettings
           settings={toolSettings.text}
           onChange={(p) => updateToolSettings("text", p)}
