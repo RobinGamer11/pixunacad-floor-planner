@@ -696,7 +696,6 @@ export class MiniCad {
   setSelection(selection: Selection | null) {
     // Während einer aktiven Marquee gehört die Selection-Hoheit dem Marquee.
     if (this._suppressSetSelection || this._marqueeActive) return;
-    console.log("[MiniCad.setSelection]", { selection, multi: this._multiSelectMode, shift: this._shiftDown, currentLen: this.selections.length });
     if (selection === null) {
       if ((this._multiSelectMode || this._shiftDown) && this.selections.length > 0) return;
       this._applyPrimary(null, []);
@@ -717,6 +716,7 @@ export class MiniCad {
     }
     this._applyPrimary(selection, [selection]);
   }
+
 
 
   /** Setzt primary + Liste; aktualisiert Renderer & feuert onSelectionChange. */
