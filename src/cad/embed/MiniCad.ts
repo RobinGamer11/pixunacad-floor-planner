@@ -165,6 +165,8 @@ export class MiniCad {
   private _changeDirty = false;
   private _onChange?: () => void;
   private _onSelectionChange?: (info: MiniCadSelectionInfo | null) => void;
+  private _onCreateParallelGuide?: (p1: { x: number; y: number }, p2: { x: number; y: number }) => void;
+  private _parallelGuideHub: import("../ParallelGuideHub").ParallelGuideHub | null = null;
   private _coordCleanups: Array<() => void> = [];
 
   constructor(init: MiniCadInit) {
