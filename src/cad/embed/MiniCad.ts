@@ -279,8 +279,12 @@ export class MiniCad {
     this._installCoordRemap();
     this._installDeleteKey();
     this._installShiftTracker();
+    this._installGroupMove();
+    this._installMarquee();
     this.applyZoom(this._zoom);
     this._installPageFrameSnap();
+
+
 
     
     
@@ -690,7 +694,10 @@ export class MiniCad {
   }
 
   setSelection(selection: Selection | null) {
+    // Während einer aktiven Marquee gehört die Selection-Hoheit dem Marquee.
+    if (this._suppressSetSelection || this._marqueeActive) return;
     if (selection === null) {
+
       // Wenn der Multi-Modus oder Shift aktiv ist und es schon eine Auswahl gibt,
       // wird ein "Klick ins Leere" (SelectTool ruft setSelection(null)) ignoriert —
       // sonst würde jede leere Klickfläche die Mehrfachauswahl wegwerfen.
@@ -882,9 +889,372 @@ export class MiniCad {
     this._coordCleanups.push(() => window.removeEventListener("keydown", onKey));
   }
 
+  /* ===== Multi-Select Group-Move ============================================
+   * Während eines Drag-Vorgangs am primary-Selection-Objekt werden alle weiteren
+   * Selektionen mit demselben Delta verschoben. Die Geometrie der Extras wird
+   * beim Pointer-Down snapshotted und bei jedem Tick auf (snapshot + delta) gesetzt
+   * — so vermeiden wir Eingriffe in das SelectTool. */
+  private _groupMoveSnap: null | {
+    primarySel: Selection;
+    primaryAnchor: { x: number; y: number };
+    extras: Array<{ sel: Selection; snapshot: any }>;
+  } = null;
+
+  private _isTranslationSel(s: Selection): boolean {
+    if (!s) return false;
+    if (s.type === SelectionType.POINT) return false;
+    if (s.type === SelectionType.TEXTBOX_HANDLE) return false;
+    if (s.type === SelectionType.AREA_LABEL_HANDLE) return false;
+    if (s.type === SelectionType.DIMENSION) return false;
+    if (s.type === SelectionType.WALL && (s as any).edgeIndex != null) return false;
+    return true;
+  }
+
+  private _getSelAnchor(s: Selection): { x: number; y: number } | null {
+    if (s.segmentId) {
+      const seg = this.scene.getSegmentById(s.segmentId);
+      if (!seg) return null;
+      return { x: (seg.a.x + seg.b.x) / 2, y: (seg.a.y + seg.b.y) / 2 };
+    }
+    if (s.hatchId) {
+      const h = this.scene.getHatchById(s.hatchId);
+      if (!h || !h.points.length) return null;
+      return { x: h.points[0].x, y: h.points[0].y };
+    }
+    if (s.textBoxId) {
+      const b = this.scene.getTextBoxById(s.textBoxId);
+      if (!b) return null;
+      return { x: b.center.x, y: b.center.y };
+    }
+    const sid = (s as any).stickerInstanceId;
+    if (sid) {
+      const i = this.scene.getStickerInstanceById(sid);
+      if (!i) return null;
+      return { x: i.position.x, y: i.position.y };
+    }
+    const did = (s as any).documentId;
+    if (did) {
+      const d = this.scene.documents.find((x) => x.id === did);
+      if (!d) return null;
+      return { x: d.position.x, y: d.position.y };
+    }
+    const fid = (s as any).freeStrokeId;
+    if (fid) {
+      const f = this.scene.freeStrokes.find((x) => x.id === fid);
+      if (!f || !f.points.length) return null;
+      return { x: f.points[0].x, y: f.points[0].y };
+    }
+    return null;
+  }
+
+  private _snapshotSelGeometry(s: Selection): any {
+    if (s.segmentId) {
+      const seg = this.scene.getSegmentById(s.segmentId);
+      if (!seg) return null;
+      return { kind: "segment", a: { x: seg.a.x, y: seg.a.y }, b: { x: seg.b.x, y: seg.b.y } };
+    }
+    if (s.hatchId) {
+      const h = this.scene.getHatchById(s.hatchId);
+      if (!h) return null;
+      return {
+        kind: "hatch",
+        pts: h.points.map((p) => ({ x: p.x, y: p.y })),
+        holes: (h as any).holes ? (h as any).holes.map((ring: any[]) => ring.map((p: any) => ({ x: p.x, y: p.y }))) : null,
+      };
+    }
+    if (s.textBoxId) {
+      const b = this.scene.getTextBoxById(s.textBoxId);
+      if (!b) return null;
+      return { kind: "textbox", center: { x: b.center.x, y: b.center.y } };
+    }
+    const sid = (s as any).stickerInstanceId;
+    if (sid) {
+      const i = this.scene.getStickerInstanceById(sid);
+      if (!i) return null;
+      return { kind: "sticker", pos: { x: i.position.x, y: i.position.y } };
+    }
+    const did = (s as any).documentId;
+    if (did) {
+      const d = this.scene.documents.find((x) => x.id === did);
+      if (!d) return null;
+      return { kind: "doc", pos: { x: d.position.x, y: d.position.y } };
+    }
+    const fid = (s as any).freeStrokeId;
+    if (fid) {
+      const f = this.scene.freeStrokes.find((x) => x.id === fid);
+      if (!f) return null;
+      return { kind: "freestroke", pts: f.points.map((p: any) => ({ x: p.x, y: p.y })) };
+    }
+    return null;
+  }
+
+  private _installGroupMove() {
+    const c = this.dom.canvas;
+    const onDown = () => {
+      if (this._activeTool !== "select" && this._activeTool !== null) {
+        this._groupMoveSnap = null;
+        return;
+      }
+      const sels = this.selections;
+      if (sels.length < 2) { this._groupMoveSnap = null; return; }
+      const primary = sels[sels.length - 1];
+      if (!this._isTranslationSel(primary)) { this._groupMoveSnap = null; return; }
+      const anchor = this._getSelAnchor(primary);
+      if (!anchor) { this._groupMoveSnap = null; return; }
+      const extras: Array<{ sel: Selection; snapshot: any }> = [];
+      for (const s of sels) {
+        if (s === primary) continue;
+        const snap = this._snapshotSelGeometry(s);
+        if (snap) extras.push({ sel: s, snapshot: snap });
+      }
+      this._groupMoveSnap = { primarySel: primary, primaryAnchor: { x: anchor.x, y: anchor.y }, extras };
+    };
+    const onUp = () => { this._groupMoveSnap = null; };
+    c.addEventListener("mousedown", onDown);
+    window.addEventListener("mouseup", onUp);
+    this._coordCleanups.push(() => c.removeEventListener("mousedown", onDown));
+    this._coordCleanups.push(() => window.removeEventListener("mouseup", onUp));
+  }
+
+  private _applyGroupTranslate() {
+    const snap = this._groupMoveSnap;
+    if (!snap) return;
+    // Wenn das primary-Objekt nicht mehr Teil der aktuellen Selektion ist
+    // (z.B. weil ein Plain-Klick ohne Shift sie ersetzt hat), Snap verwerfen.
+    if (!this.selections.some((s) => _sameObject(s, snap.primarySel))) {
+      this._groupMoveSnap = null;
+      return;
+    }
+    const cur = this._getSelAnchor(snap.primarySel);
+
+    if (!cur) return;
+    const dx = cur.x - snap.primaryAnchor.x;
+    const dy = cur.y - snap.primaryAnchor.y;
+    if (dx === 0 && dy === 0) return;
+    for (const e of snap.extras) {
+      const s = e.sel;
+      const sg = e.snapshot;
+      if (sg.kind === "segment" && s.segmentId) {
+        const seg = this.scene.getSegmentById(s.segmentId);
+        if (!seg) continue;
+        seg.a.x = sg.a.x + dx; seg.a.y = sg.a.y + dy;
+        seg.b.x = sg.b.x + dx; seg.b.y = sg.b.y + dy;
+      } else if (sg.kind === "hatch" && s.hatchId) {
+        const h = this.scene.getHatchById(s.hatchId);
+        if (!h) continue;
+        for (let i = 0; i < h.points.length && i < sg.pts.length; i++) {
+          h.points[i].x = sg.pts[i].x + dx;
+          h.points[i].y = sg.pts[i].y + dy;
+        }
+        if (sg.holes && (h as any).holes) {
+          for (let r = 0; r < (h as any).holes.length && r < sg.holes.length; r++) {
+            const ring = (h as any).holes[r];
+            for (let i = 0; i < ring.length && i < sg.holes[r].length; i++) {
+              ring[i].x = sg.holes[r][i].x + dx;
+              ring[i].y = sg.holes[r][i].y + dy;
+            }
+          }
+        }
+      } else if (sg.kind === "textbox" && s.textBoxId) {
+        const b = this.scene.getTextBoxById(s.textBoxId);
+        if (!b) continue;
+        b.center.x = sg.center.x + dx;
+        b.center.y = sg.center.y + dy;
+      } else if (sg.kind === "sticker") {
+        const i = this.scene.getStickerInstanceById((s as any).stickerInstanceId);
+        if (!i) continue;
+        i.position.x = sg.pos.x + dx;
+        i.position.y = sg.pos.y + dy;
+      } else if (sg.kind === "doc") {
+        const d = this.scene.documents.find((x) => x.id === (s as any).documentId);
+        if (!d) continue;
+        d.position.x = sg.pos.x + dx;
+        d.position.y = sg.pos.y + dy;
+      } else if (sg.kind === "freestroke") {
+        const f = this.scene.freeStrokes.find((x) => x.id === (s as any).freeStrokeId);
+        if (!f) continue;
+        for (let i = 0; i < f.points.length && i < sg.pts.length; i++) {
+          f.points[i].x = sg.pts[i].x + dx;
+          f.points[i].y = sg.pts[i].y + dy;
+        }
+      }
+    }
+  }
+
+  /* ===== Multi-Select Marquee (Drag-Rect) =====================================
+   * Wenn der User mit gehaltener Shift-Taste (oder im Mehrfach-Modus) auf eine
+   * leere Stelle klickt und zieht, wird ein gestricheltes Auswahlrechteck
+   * gezeichnet. Beim Loslassen werden alle Objekte (Linien, Hatches, TextBoxen,
+   * Sticker, Documents, FreeStrokes) deren Anker im Rechteck liegt, gewählt. */
+  private _marqueeActive = false;
+  private _marqueeStart: { x: number; y: number } | null = null; // Welt
+  private _marqueeEnd: { x: number; y: number } | null = null;   // Welt
+  /** Während aktiver Marquee werden setSelection-Aufrufe (z.B. vom SelectTool
+   *  für „Klick ins Leere") ignoriert — die Marquee bestimmt die Auswahl. */
+  private _suppressSetSelection = false;
+
+  private _installMarquee() {
+    const c = this.dom.canvas;
+    const screenToWorld = (e: MouseEvent) => {
+      const r = c.getBoundingClientRect();
+      const sx = (e.clientX - r.left) * (c.width / r.width);
+      const sy = (e.clientY - r.top) * (c.height / r.height);
+      return this.camera.screenToWorld(sx, sy);
+    };
+    const onDown = (e: MouseEvent) => {
+      if (e.button !== 0) return;
+      if (this._activeTool !== "select" && this._activeTool !== null) return;
+      const wantMulti = e.shiftKey || this._multiSelectMode;
+      if (!wantMulti) return;
+      // Nur starten wenn der Klick wirklich in den leeren Raum geht — wir
+      // erkennen das vereinfachend so: kein vorhandenes Objekt unter der Maus.
+      const w = screenToWorld(e);
+      if (this._hitAnyObject(w.x, w.y)) return;
+      this._marqueeActive = true;
+      this._marqueeStart = { x: w.x, y: w.y };
+      this._marqueeEnd = { x: w.x, y: w.y };
+      this._installMarqueeOverlay();
+    };
+    const onMove = (e: MouseEvent) => {
+      if (!this._marqueeActive) return;
+      const w = screenToWorld(e);
+      this._marqueeEnd = { x: w.x, y: w.y };
+    };
+    const onUp = (_e: MouseEvent) => {
+      if (!this._marqueeActive) return;
+      this._marqueeActive = false;
+      this._suppressSetSelection = true;
+      try {
+        const a = this._marqueeStart!;
+        const b = this._marqueeEnd!;
+        const x0 = Math.min(a.x, b.x), x1 = Math.max(a.x, b.x);
+        const y0 = Math.min(a.y, b.y), y1 = Math.max(a.y, b.y);
+        // Mindestgröße — sonst war's nur ein Klick ohne Drag.
+        const minSize = 0.005; // 5 mm in Welt-Metern
+        if (x1 - x0 > minSize || y1 - y0 > minSize) {
+          const picks = this._marqueePick(x0, y0, x1, y1);
+          // Bestehende Selektionen bleiben erhalten (Marquee additiv im Multi/Shift-Modus).
+          const current = this.selections.slice();
+          for (const p of picks) {
+            if (!current.some((s) => _sameObject(s, p))) current.push(p);
+          }
+          const primary = current[current.length - 1] ?? null;
+          this._applyPrimary(primary, current);
+        }
+      } finally {
+        this._marqueeStart = null;
+        this._marqueeEnd = null;
+        // SetSelection-Sperre erst im NÄCHSTEN Tick lösen, damit das SelectTool
+        // (das nach mouseup ebenfalls setSelection(null) auslösen könnte) noch
+        // unterdrückt wird.
+        setTimeout(() => { this._suppressSetSelection = false; }, 0);
+        this.renderer.overlay = null;
+      }
+    };
+    c.addEventListener("mousedown", onDown);
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    this._coordCleanups.push(() => c.removeEventListener("mousedown", onDown));
+    this._coordCleanups.push(() => window.removeEventListener("mousemove", onMove));
+    this._coordCleanups.push(() => window.removeEventListener("mouseup", onUp));
+  }
+
+  private _installMarqueeOverlay() {
+    this.renderer.overlay = {
+      draw: (ctx, cam) => {
+        if (!this._marqueeStart || !this._marqueeEnd) return;
+        const a = cam.worldToScreen(this._marqueeStart.x, this._marqueeStart.y);
+        const b = cam.worldToScreen(this._marqueeEnd.x, this._marqueeEnd.y);
+        const x = Math.min(a.x, b.x), y = Math.min(a.y, b.y);
+        const w = Math.abs(b.x - a.x), h = Math.abs(b.y - a.y);
+        ctx.save();
+        ctx.fillStyle = "rgba(56, 132, 255, 0.10)";
+        ctx.strokeStyle = "rgba(56, 132, 255, 0.85)";
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 3]);
+        ctx.fillRect(x, y, w, h);
+        ctx.strokeRect(x + 0.5, y + 0.5, w, h);
+        ctx.restore();
+      },
+    } as any;
+  }
+
+  /** Liefert true, wenn an Welt-Position (wx,wy) irgendein selektierbares Objekt liegt.
+   *  Sehr grobe Heuristik (Bbox-Test mit Toleranz). */
+  private _hitAnyObject(wx: number, wy: number): boolean {
+    const tol = 5 / this.camera.scale; // 5 px in Welt-Einheiten
+    for (const seg of this.scene.segments) {
+      if (this.isFrameSegment(seg)) continue;
+      if (seg.isGuide && this._guidesLocked) continue;
+      const x0 = Math.min(seg.a.x, seg.b.x) - tol, x1 = Math.max(seg.a.x, seg.b.x) + tol;
+      const y0 = Math.min(seg.a.y, seg.b.y) - tol, y1 = Math.max(seg.a.y, seg.b.y) + tol;
+      if (wx >= x0 && wx <= x1 && wy >= y0 && wy <= y1) {
+        // Segment-Abstand grob
+        const dx = seg.b.x - seg.a.x, dy = seg.b.y - seg.a.y;
+        const L2 = dx * dx + dy * dy || 1;
+        const t = Math.max(0, Math.min(1, ((wx - seg.a.x) * dx + (wy - seg.a.y) * dy) / L2));
+        const px = seg.a.x + t * dx, py = seg.a.y + t * dy;
+        if (Math.hypot(px - wx, py - wy) <= tol) return true;
+      }
+    }
+    for (const h of this.scene.hatches) {
+      const xs = h.points.map((p) => p.x), ys = h.points.map((p) => p.y);
+      if (wx >= Math.min(...xs) && wx <= Math.max(...xs) && wy >= Math.min(...ys) && wy <= Math.max(...ys)) return true;
+    }
+    for (const b of this.scene.textBoxes) {
+      if (Math.abs(wx - b.center.x) <= b.widthM / 2 && Math.abs(wy - b.center.y) <= b.heightM / 2) return true;
+    }
+    for (const i of this.scene.stickerInstances || []) {
+      if (Math.hypot(wx - i.position.x, wy - i.position.y) <= 0.05) return true;
+    }
+    for (const d of this.scene.documents) {
+      if (wx >= d.position.x && wx <= d.position.x + d.widthM && wy >= d.position.y && wy <= d.position.y + d.heightM) return true;
+    }
+    return false;
+  }
+
+  private _marqueePick(x0: number, y0: number, x1: number, y1: number): Selection[] {
+    const inRect = (x: number, y: number) => x >= x0 && x <= x1 && y >= y0 && y <= y1;
+    const picks: Selection[] = [];
+    for (const seg of this.scene.segments) {
+      if (this.isFrameSegment(seg)) continue;
+      if (seg.isGuide && this._guidesLocked) continue;
+      // Eine Linie ist „getroffen", wenn beide Endpunkte im Rechteck liegen.
+      if (inRect(seg.a.x, seg.a.y) && inRect(seg.b.x, seg.b.y)) {
+        picks.push({ type: SelectionType.SEGMENT, segmentId: seg.id } as any);
+      }
+    }
+    for (const h of this.scene.hatches) {
+      if (h.points.every((p) => inRect(p.x, p.y))) {
+        picks.push({ type: SelectionType.HATCH, hatchId: h.id, pointIndex: null });
+      }
+    }
+    for (const b of this.scene.textBoxes) {
+      if (inRect(b.center.x, b.center.y)) {
+        picks.push({ type: SelectionType.TEXTBOX, textBoxId: b.id, handleIndex: null });
+      }
+    }
+    for (const i of this.scene.stickerInstances || []) {
+      if (inRect(i.position.x, i.position.y)) {
+        picks.push({ type: SelectionType.STICKER_INSTANCE, stickerInstanceId: i.id } as any);
+      }
+    }
+    for (const d of this.scene.documents) {
+      const cx = d.position.x + d.widthM / 2;
+      const cy = d.position.y + d.heightM / 2;
+      if (inRect(cx, cy)) picks.push({ type: SelectionType.DOCUMENT, documentId: d.id } as any);
+    }
+    for (const f of this.scene.freeStrokes) {
+      if (f.points.length && inRect(f.points[0].x, f.points[0].y)) {
+        picks.push({ type: SelectionType.FREE_STROKE, freeStrokeId: f.id } as any);
+      }
+    }
+    return picks;
+  }
 
   private _installCoordRemap() {
     const c = this.dom.canvas;
+
     const remap = (e: MouseEvent) => {
       const r = c.getBoundingClientRect();
       if (r.width <= 0 || r.height <= 0) return;
@@ -912,6 +1282,11 @@ export class MiniCad {
       if (this._activeTool === "line" || this._activeTool === "guide") this.lineTool.update(this.input);
       else if (this._activeTool === "text") this.textTool.update(this.input);
       else if (this._activeTool === "select") this.selectTool.update(this.input);
+
+      // Multi-Select Group-Move: nach SelectTool-Update das Delta des Primary
+      // auf die Snapshot-Positionen der Extras anwenden.
+      this._applyGroupTranslate();
+
 
       // Geometry change → persist (cover segments AND text boxes AND edits).
       const sig = this._sceneSignature();
