@@ -558,23 +558,23 @@ export class MiniCad {
       try { this._drawTextBoxSelection?.(); } catch {}
       if (this.overlay && this.overlay.draw) {
         try { this.overlay.draw(ctx, this.camera); } catch (e) { console.error(e); }
+      }
+      ctx.restore();
+    };
   }
 
   /** Override paddingPx auf 0 für eingebettete Textboxen, damit Text exakt
    *  am Platzierungspunkt beginnt (kein 6-px-Versatz nach innen). */
   private _patchRendererTextPadding() {
     const r: any = this.renderer;
-    const orig = r._drawSingleTextBox?.bind(r);
-    if (!orig) return;
+    if (typeof r._drawSingleTextBox !== "function") return;
     r._drawSingleTextBox = (box: any) => {
       if (r.editingTextBoxId === box.id) return;
       const cam = r.camera;
       const cs = cam.worldToScreen(box.center.x, box.center.y);
       const widthPx = box.widthM * cam.scale;
       const heightPx = box.heightM * cam.scale;
-      // Direkt drawRichTextBox aufrufen mit paddingPx=0.
-      const mod = require("../textRichRenderer");
-      mod.drawRichTextBox({
+      drawRichTextBox({
         ctx: r.ctx,
         centerScreenX: cs.x,
         centerScreenY: cs.y,
@@ -592,8 +592,6 @@ export class MiniCad {
         borderWidthPx: box.style.borderWidthPx,
         paddingPx: 0,
       });
-    };
-      ctx.restore();
     };
   }
 
