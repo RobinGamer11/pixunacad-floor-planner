@@ -734,8 +734,10 @@ export class MiniCad {
 
   /** API: wird vom React-Layer aus dem "Einzel/Mehrfach"-Toggle bedient. */
   setMultiSelectMode(on: boolean) {
+    console.log("[MiniCad.setMultiSelectMode]", on);
     this._multiSelectMode = !!on;
   }
+
 
   getSelections(): Selection[] {
     return this.selections.slice();
