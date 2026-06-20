@@ -751,6 +751,7 @@ function PageCanvas({
   onCommitTool,
   onSelect,
   onCadSelectionChange,
+  onCadEngineReady,
 }: {
   projectId: string;
   page: import("@/lib/projectStore").ProjectPage;
@@ -764,7 +765,9 @@ function PageCanvas({
   onCommitTool: () => void;
   onSelect: (id?: string, opts?: { shift?: boolean }) => void;
   onCadSelectionChange: (info: MiniCadSelectionInfo | null, count?: number) => void;
+  onCadEngineReady?: (api: { setSelectedSegmentSnap: (opts: { midpointSnap?: boolean; divisionSnap?: number | null }) => void }) => void;
 }) {
+
   const fmt = FORMAT_SIZES[page.format];
   const aspect = fmt.w / fmt.h;
   // The sheet is rendered at a FIXED real size (mm-defined). Zoom is a pure
