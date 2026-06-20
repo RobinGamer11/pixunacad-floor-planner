@@ -1843,7 +1843,7 @@ export class SelectTool {
       }
 
 
-      // TextBox-Eckpunkt der bereits selektierten TextBox? → Hub-Menü (Move/Translate/Rotate)
+      // TextBox-Eckpunkt der bereits selektierten TextBox? → Hub-Menü (Translate/Rotate/Resize)
       const cornerHit = this._hitTextBoxCornerHandle(input);
       if (cornerHit) {
         this.app.setSelection({
@@ -1851,13 +1851,21 @@ export class SelectTool {
           textBoxId: cornerHit.box.id,
           handleIndex: cornerHit.handleIndex,
         });
-        const sp = this.app.camera.worldToScreen(
-          boxCornersWorld(cornerHit.box)[cornerHit.handleIndex].x,
-          boxCornersWorld(cornerHit.box)[cornerHit.handleIndex].y,
-        );
-        this.app.pointEditMenu.showAt(sp.x, sp.y, [
+        // Menü immer horizontal mittig OBERHALB der Textbox platzieren.
+        const corners = boxCornersWorld(cornerHit.box);
+        let minSx = Infinity, minSy = Infinity, maxSx = -Infinity;
+        for (const c of corners) {
+          const s = this.app.camera.worldToScreen(c.x, c.y);
+          if (s.x < minSx) minSx = s.x;
+          if (s.x > maxSx) maxSx = s.x;
+          if (s.y < minSy) minSy = s.y;
+        }
+        const anchorSx = (minSx + maxSx) * 0.5;
+        const anchorSy = minSy; // top edge
+        this.app.pointEditMenu.showAt(anchorSx, anchorSy, [
           PointEditAction.TRANSLATE,
           PointEditAction.ROTATE,
+          PointEditAction.RESIZE,
         ]);
         return;
       }
