@@ -734,8 +734,8 @@ export class Scene {
   }
 
   // ---- Segments ----
-  createSegment(a: Vec2, b: Vec2, style: { color?: string; thicknessM?: number; labelId?: string } = {}) {
-    const seg = new Segment({ id: this._makeId(), a, b, color: style.color, thicknessM: style.thicknessM, labelId: style.labelId });
+  createSegment(a: Vec2, b: Vec2, style: { color?: string; thicknessM?: number; labelId?: string; isGuide?: boolean } = {}) {
+    const seg = new Segment({ id: this._makeId(), a, b, color: style.color, thicknessM: style.thicknessM, labelId: style.labelId, isGuide: style.isGuide });
     seg._stickerEditOwnerId = this._currentEditOwnerId;
     this.segments.push(seg);
     this._rebuildSegIdMap();
@@ -783,7 +783,7 @@ export class Scene {
       return { didSplit: false, point: (t < 0.5 ? seg.a : seg.b), newSegments: [seg] };
     }
     const p = lerp(seg.a, seg.b, t);
-    const style = { color: seg.color, thicknessM: seg.thicknessM, labelId: seg.labelId };
+    const style = { color: seg.color, thicknessM: seg.thicknessM, labelId: seg.labelId, isGuide: seg.isGuide };
     this.removeSegment(seg);
     const s1 = this.createSegment(seg.a, p, style);
     const s2 = this.createSegment(p, seg.b, style);
