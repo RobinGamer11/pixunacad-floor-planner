@@ -1432,8 +1432,10 @@ export class Renderer {
     ctx.fill();
     ctx.stroke();
 
+    this._drawSegmentMidDivisionMarkers(seg);
     ctx.restore();
   }
+
 
   /* ---------- Dimensions ---------- */
 
