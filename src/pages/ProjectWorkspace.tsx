@@ -102,7 +102,7 @@ export default function ProjectWorkspace() {
 
   // Per-tool settings (live in workspace state; persist could come later).
   const [toolSettings, setToolSettings] = useState({
-    guide: { color: "#7DD3FC", strokeWidth: 1 },
+    guide: { color: "#7DD3FC", strokeWidth: 1, locked: false },
     line: { color: "#111111", thicknessMm: 0.5, alpha: 100 },
     text: {
       fontSize: 16,
@@ -676,7 +676,7 @@ const PUNCH_PATTERNS: Record<Exclude<PunchPattern, "none">, { label: string; off
 };
 
 type ToolSettings = {
-  guide: { color: string; strokeWidth: number };
+  guide: { color: string; strokeWidth: number; locked: boolean };
   line: { color: string; thicknessMm: number; alpha: number };
   text: {
     fontSize: number;
@@ -1614,8 +1614,24 @@ function GuideSettings({
           <span className="text-xs tabular-nums w-10 text-right">{settings.strokeWidth.toFixed(1)} px</span>
         </div>
       </Row>
+      <Row label="Fixiert">
+        <button
+          type="button"
+          onClick={() => onChange({ locked: !settings.locked })}
+          className="h-7 px-2 rounded-md border text-xs flex items-center gap-1.5"
+          style={{
+            borderColor: "hsl(var(--hairline))",
+            background: settings.locked ? "hsl(var(--surface-strong))" : "transparent",
+          }}
+          title={settings.locked ? "Hilfslinien sind gesperrt — klicken zum Entsperren" : "Klicken um alle Hilfslinien zu sperren"}
+        >
+          <span aria-hidden>{settings.locked ? "🔒" : "🔓"}</span>
+          <span>{settings.locked ? "Gesperrt" : "Frei"}</span>
+        </button>
+      </Row>
       <div className="text-[11px] text-muted-foreground">
         Hilfslinien werden hellblau gestrichelt angezeigt und beim Druck nicht ausgegeben.
+        Bei „Gesperrt" können sie weder ausgewählt, verschoben noch gelöscht werden.
       </div>
     </SettingsBlock>
   );
