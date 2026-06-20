@@ -491,7 +491,7 @@ export default function ProjectWorkspace() {
                 // Pan via Middle-Maus, Alt+Links, oder Links auf leerer Fläche
                 // (Auswahlwerkzeug aktiv oder kein Tool aktiv).
                 const isMiddle = e.button === 1 || (e.button === 0 && (e as any).altKey);
-                const isPlainLeft = e.button === 0 && !(e as any).altKey && (activeTool === null || activeTool === "select");
+                const isPlainLeft = e.button === 0 && !(e as any).altKey && activeTool === null;
                 if (!isMiddle && !isPlainLeft) return;
                 e.preventDefault();
                 const container = e.currentTarget as HTMLDivElement;
