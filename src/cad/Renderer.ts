@@ -155,6 +155,8 @@ export class Renderer {
 
   setViewport(w: number, h: number) { this.vw = w; this.vh = h; }
   setSelection(selection: Selection | null) { this.selection = selection; }
+  setExtraSelections(list: Selection[]) { this.extraSelections = list || []; }
+
   setSelectedLabelId(labelId: string | null) { this.selectedLabelId = labelId || null; }
   setHoverSegmentId(id: string | null) { this.hoverSegmentId = id || null; }
   setHoverHatchId(id: string | null) { this.hoverHatchId = id || null; }
