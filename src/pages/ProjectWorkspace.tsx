@@ -86,6 +86,8 @@ export default function ProjectWorkspace() {
   const [rightTab, setRightTab] = useState<"settings" | "tools" | "layers">("settings");
   const [activeTool, setActiveTool] = useState<PageTool>(null);
   const [selectedCadTool, setSelectedCadTool] = useState<"line" | "text" | undefined>();
+  const [cadSelectionCount, setCadSelectionCount] = useState<number>(0);
+
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
   const [renamingPageId, setRenamingPageId] = useState<string | undefined>();
