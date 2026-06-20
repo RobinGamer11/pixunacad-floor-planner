@@ -135,4 +135,5 @@ export const PointEditAction = {
   ROTATE: "rotate",
   DELETE: "delete",
   OFFSET: "offset",
+  RESIZE: "resize",
 } as const;
