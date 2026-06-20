@@ -945,9 +945,9 @@ function PageCanvas({
                 onMouseDown={(e) => {
                   if (guideLocked) return;
                   e.stopPropagation();
-                  onSelect(el.id);
+                  onSelect(el.id, { shift: e.shiftKey });
                 }}
-                opacity={el.id === selectedElementId ? 1 : 0.95}
+                opacity={selectedElementIds.includes(el.id) ? 1 : 0.95}
               />
             );
           })}
@@ -1107,7 +1107,7 @@ function ElementView({
   el: PageElement;
   selected?: boolean;
   readOnly?: boolean;
-  onSelect?: () => void;
+  onSelect?: (opts?: { shift?: boolean }) => void;
   onDrag?: (dx: number, dy: number) => void;
 }) {
   const dragRef = useRef<{ x: number; y: number } | null>(null);
@@ -1115,7 +1115,7 @@ function ElementView({
   const handleMouseDown = (e: React.MouseEvent) => {
     if (readOnly) return;
     e.stopPropagation();
-    onSelect?.();
+    onSelect?.({ shift: e.shiftKey });
     dragRef.current = { x: e.clientX, y: e.clientY };
     const handleMove = (ev: MouseEvent) => {
       if (!dragRef.current) return;
