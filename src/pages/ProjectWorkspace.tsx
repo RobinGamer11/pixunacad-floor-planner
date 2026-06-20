@@ -746,48 +746,20 @@ function PageCanvas({
     };
   };
 
-  // Click-to-draw is used ONLY for the lightweight "Hilfslinie" (guide) tool.
-  // The "Linie" and "Text" tools are handled by the embedded CAD engine
-  // (CadOverlayLayer) — see below — so they provide 1:1 snap/ortho/hub.
-  const drawingTool = activeTool === "guide";
-  const cursorStyle = drawingTool ? "crosshair" : undefined;
+  // Click-to-draw was used for the lightweight SVG "Hilfslinie" tool — now
+  // routed through the embedded CAD engine (1:1 wie Linienwerkzeug), so kein
+  // separater Draw-Modus mehr in der React-Schicht.
+  const drawingTool = false;
+  const cursorStyle = undefined;
 
   const handlePageMouseDown = (e: React.MouseEvent) => {
-    if (e.target !== e.currentTarget && !drawingTool) return;
-    if (drawingTool) {
-      const p = toPct(e.clientX, e.clientY);
-      if (!pendingStart) {
-        setPendingStart(p);
-        setHoverPt(p);
-      } else {
-        const pts = [pendingStart, p];
-        const minX = Math.min(pts[0].x, pts[1].x);
-        const minY = Math.min(pts[0].y, pts[1].y);
-        const maxX = Math.max(pts[0].x, pts[1].x);
-        const maxY = Math.max(pts[0].y, pts[1].y);
-        projectStore.addElement(projectId, page.id, {
-          kind: "guide",
-          x: minX,
-          y: minY,
-          w: Math.max(0.2, maxX - minX),
-          h: Math.max(0.2, maxY - minY),
-          points: pts,
-          color: toolSettings.guide.color,
-          strokeWidth: toolSettings.guide.strokeWidth,
-          nonPrinting: true,
-        });
-        setPendingStart(null);
-        setHoverPt(null);
-      }
-      return;
-    }
+    if (e.target !== e.currentTarget) return;
     // not drawing: deselect
-    if (e.target === e.currentTarget) onSelect(undefined);
+    onSelect(undefined);
   };
 
-  const handlePageMouseMove = (e: React.MouseEvent) => {
-    if (!drawingTool || !pendingStart) return;
-    setHoverPt(toPct(e.clientX, e.clientY));
+  const handlePageMouseMove = (_e: React.MouseEvent) => {
+    /* no-op */
   };
 
   // Escape cancels pending draw and resets back to the select tool.
