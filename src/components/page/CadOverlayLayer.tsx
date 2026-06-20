@@ -140,6 +140,7 @@ export default function CadOverlayLayer(props: Props) {
     engineRef.current = engine;
     onEngineReady?.({
       setSelectedSegmentSnap: (opts) => engine.setSelectedSegmentSnapSettings(opts),
+      duplicateSelectedSegments: (offsetMm) => engine.duplicateSelectedSegments(offsetMm),
     });
     return () => {
       engine.destroy();
