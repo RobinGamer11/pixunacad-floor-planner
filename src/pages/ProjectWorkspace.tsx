@@ -77,7 +77,12 @@ export default function ProjectWorkspace() {
   const project = useProject(projectId);
   const navigate = useNavigate();
   const [activePageId, setActivePageId] = useState<string | undefined>(project?.pages[0]?.id);
-  const [selectedElementId, setSelectedElementId] = useState<string | undefined>();
+  const [selectedElementIds, setSelectedElementIds] = useState<string[]>([]);
+  // `selectedElementId` ist das ZULETZT angeklickte Element — alle bestehenden
+  // Lese-Stellen (Inspector etc.) benutzen es weiterhin. Bei Multi-Auswahl
+  // beschreibt die volle Liste `selectedElementIds`.
+  const selectedElementId = selectedElementIds[selectedElementIds.length - 1];
+  const setSelectedElementId = (id?: string) => setSelectedElementIds(id ? [id] : []);
   const [rightTab, setRightTab] = useState<"settings" | "tools" | "layers">("settings");
   const [activeTool, setActiveTool] = useState<PageTool>(null);
   const [selectedCadTool, setSelectedCadTool] = useState<"line" | "text" | undefined>();
@@ -102,6 +107,7 @@ export default function ProjectWorkspace() {
 
   // Per-tool settings (live in workspace state; persist could come later).
   const [toolSettings, setToolSettings] = useState({
+    select: { multi: false },
     guide: { color: "#7DD3FC", strokeWidth: 1, locked: false },
     line: { color: "#111111", thicknessMm: 0.5, alpha: 100 },
     text: {
@@ -553,17 +559,33 @@ export default function ProjectWorkspace() {
                   activeTool={activeTool}
                   toolSettings={toolSettings}
                   onCommitTool={() => setActiveTool(null)}
-                  onSelect={(id) => {
-                    setSelectedElementId(id);
-                    if (id) setSelectedCadTool(undefined);
-                    if (id) setRightTab("tools");
+                  selectedElementIds={selectedElementIds}
+                  onSelect={(id, opts) => {
+                    if (!id) {
+                      setSelectedElementIds([]);
+                      return;
+                    }
+                    const multi = toolSettings.select.multi || !!opts?.shift;
+                    setSelectedElementIds((prev) => {
+                      if (!multi) return [id];
+                      const idx = prev.indexOf(id);
+                      if (opts?.shift && idx >= 0) {
+                        // Shift-Klick auf bereits selektiertes → entfernen
+                        return prev.filter((x) => x !== id);
+                      }
+                      // Multi: nach hinten (= zuletzt selektiert) verschieben
+                      const rest = prev.filter((x) => x !== id);
+                      return [...rest, id];
+                    });
+                    setSelectedCadTool(undefined);
+                    setRightTab("tools");
                   }}
                   onCadSelectionChange={(info) => {
                     if (!info) {
                       setSelectedCadTool(undefined);
                       return;
                     }
-                    setSelectedElementId(undefined);
+                    setSelectedElementIds([]);
                     setSelectedCadTool(info.tool);
                     setRightTab("tools");
                     if (info.tool === "line") {
@@ -607,6 +629,7 @@ export default function ProjectWorkspace() {
               setActiveTool={setActiveToolAndTab}
               selectedCadTool={selectedCadTool}
               selectedElementId={selectedElementId}
+              selectedElementIds={selectedElementIds}
               setSelectedElementId={setSelectedElementId}
               toolSettings={toolSettings}
               updateToolSettings={updateToolSettings}
@@ -676,6 +699,7 @@ const PUNCH_PATTERNS: Record<Exclude<PunchPattern, "none">, { label: string; off
 };
 
 type ToolSettings = {
+  select: { multi: boolean };
   guide: { color: string; strokeWidth: number; locked: boolean };
   line: { color: string; thicknessMm: number; alpha: number };
   text: {
@@ -701,6 +725,7 @@ function PageCanvas({
   overlayPage,
   overlayOpacity,
   selectedElementId,
+  selectedElementIds,
   zoom,
   activeTool,
   toolSettings,
@@ -713,11 +738,12 @@ function PageCanvas({
   overlayPage?: import("@/lib/projectStore").ProjectPage;
   overlayOpacity: number;
   selectedElementId?: string;
+  selectedElementIds: string[];
   zoom: number;
   activeTool: PageTool;
   toolSettings: ToolSettings;
   onCommitTool: () => void;
-  onSelect: (id?: string) => void;
+  onSelect: (id?: string, opts?: { shift?: boolean }) => void;
   onCadSelectionChange: (info: MiniCadSelectionInfo | null) => void;
 }) {
   const fmt = FORMAT_SIZES[page.format];
@@ -765,17 +791,30 @@ function PageCanvas({
   // Escape cancels pending draw and resets back to the select tool.
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
       const t = e.target as HTMLElement | null;
-      // Don't hijack ESC while user is editing text in an input/textarea/contenteditable.
-      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || (t as any).isContentEditable)) return;
-      setPendingStart(null);
-      setHoverPt(null);
-      if (activeTool !== null) onCommitTool();
+      const inField = t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || (t as any).isContentEditable);
+      if (e.key === "Escape") {
+        if (inField) return;
+        setPendingStart(null);
+        setHoverPt(null);
+        if (activeTool !== null) onCommitTool();
+        return;
+      }
+      if ((e.key === "Delete" || e.key === "Backspace") && !inField) {
+        if (selectedElementIds.length === 0) return;
+        // Bei Backspace: nur reagieren wenn KEINE Texteingabe — sonst würde
+        // das Tippen in Inspector-Inputs Elemente löschen.
+        if (e.key === "Backspace" && document.activeElement && (document.activeElement as HTMLElement).tagName !== "BODY") return;
+        e.preventDefault();
+        for (const id of selectedElementIds) {
+          projectStore.deleteElement(projectId, page.id, id);
+        }
+        onSelect(undefined);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [pendingStart, activeTool]);
+  }, [pendingStart, activeTool, selectedElementIds, projectId, page.id]);
 
 
   const punchSide: PunchSide = page.punchSide ?? "left";
@@ -865,13 +904,30 @@ function PageCanvas({
           <ElementView
             key={el.id}
             el={el}
-            selected={el.id === selectedElementId}
-            onSelect={() => onSelect(el.id)}
+            selected={selectedElementIds.includes(el.id)}
+            onSelect={(opts) => onSelect(el.id, opts)}
             onDrag={(dx, dy) => {
-              projectStore.updateElement(projectId, page.id, el.id, {
-                x: Math.max(0, Math.min(95, el.x + (dx / scale / width) * 100)),
-                y: Math.max(0, Math.min(95, el.y + (dy / scale / height) * 100)),
-              });
+              const dxPct = (dx / scale / width) * 100;
+              const dyPct = (dy / scale / height) * 100;
+              // Wenn dieses Element Teil einer Mehrfachauswahl ist, alle
+              // ausgewählten Elemente (auch unterschiedlicher Typen) mitziehen.
+              const ids = selectedElementIds.includes(el.id) && selectedElementIds.length > 1
+                ? selectedElementIds
+                : [el.id];
+              for (const id of ids) {
+                const target = page.elements.find((x) => x.id === id);
+                if (!target) continue;
+                if (target.kind === "line" || target.kind === "guide") {
+                  // SVG-Linien (kind="line"/"guide" in der React-Schicht) haben
+                  // points[] — diese werden hier nicht mitbewegt, da sie in der
+                  // CAD-Engine leben. Stattdessen Position-Felder nicht antasten.
+                  continue;
+                }
+                projectStore.updateElement(projectId, page.id, target.id, {
+                  x: Math.max(0, Math.min(95, target.x + dxPct)),
+                  y: Math.max(0, Math.min(95, target.y + dyPct)),
+                });
+              }
             }}
           />
         ))}
@@ -903,9 +959,9 @@ function PageCanvas({
                 onMouseDown={(e) => {
                   if (guideLocked) return;
                   e.stopPropagation();
-                  onSelect(el.id);
+                  onSelect(el.id, { shift: e.shiftKey });
                 }}
-                opacity={el.id === selectedElementId ? 1 : 0.95}
+                opacity={selectedElementIds.includes(el.id) ? 1 : 0.95}
               />
             );
           })}
@@ -1065,7 +1121,7 @@ function ElementView({
   el: PageElement;
   selected?: boolean;
   readOnly?: boolean;
-  onSelect?: () => void;
+  onSelect?: (opts?: { shift?: boolean }) => void;
   onDrag?: (dx: number, dy: number) => void;
 }) {
   const dragRef = useRef<{ x: number; y: number } | null>(null);
@@ -1073,7 +1129,7 @@ function ElementView({
   const handleMouseDown = (e: React.MouseEvent) => {
     if (readOnly) return;
     e.stopPropagation();
-    onSelect?.();
+    onSelect?.({ shift: e.shiftKey });
     dragRef.current = { x: e.clientX, y: e.clientY };
     const handleMove = (ev: MouseEvent) => {
       if (!dragRef.current) return;
@@ -1197,6 +1253,7 @@ function RightInspector({
   setActiveTool,
   selectedCadTool,
   selectedElementId,
+  selectedElementIds,
   setSelectedElementId,
   toolSettings,
   updateToolSettings,
@@ -1213,6 +1270,7 @@ function RightInspector({
   setActiveTool: (t: PageTool) => void;
   selectedCadTool?: "line" | "text";
   selectedElementId?: string;
+  selectedElementIds?: string[];
   setSelectedElementId: (id?: string) => void;
   toolSettings: ToolSettings;
   updateToolSettings: <K extends keyof ToolSettings>(k: K, patch: Partial<ToolSettings[K]>) => void;
@@ -1256,6 +1314,7 @@ function RightInspector({
             setActiveTool={setActiveTool}
             selectedCadTool={selectedCadTool}
             selectedElementId={selectedElementId}
+            selectedElementIds={selectedElementIds}
             setSelectedElementId={setSelectedElementId}
             toolSettings={toolSettings}
             updateToolSettings={updateToolSettings}
@@ -1468,6 +1527,7 @@ function ToolsTab({
   setActiveTool,
   selectedCadTool,
   selectedElementId,
+  selectedElementIds,
   setSelectedElementId,
   toolSettings,
   updateToolSettings,
@@ -1481,6 +1541,7 @@ function ToolsTab({
   setActiveTool: (t: PageTool) => void;
   selectedCadTool?: "line" | "text";
   selectedElementId?: string;
+  selectedElementIds?: string[];
   setSelectedElementId: (id?: string) => void;
   toolSettings: ToolSettings;
   updateToolSettings: <K extends keyof ToolSettings>(k: K, patch: Partial<ToolSettings[K]>) => void;
@@ -1496,7 +1557,8 @@ function ToolsTab({
         </div>
         {!settingsTool ? (
           <div className="text-xs text-muted-foreground">
-            Wähle links in der Werkzeugleiste ein Werkzeug (Hilfslinie, Linie, Text, CAD-Blatt) — die zugehörigen Einstellungen erscheinen hier.
+            Auswahlwerkzeug aktiv — klicke ein Objekt zum Auswählen.{" "}
+            Mit Mehrfachauswahl (siehe Einstellung unten) oder <kbd className="px-1 rounded border" style={{ borderColor: "hsl(var(--hairline))" }}>Shift</kbd>-Klick mehrere Objekte gleichzeitig auswählen.
           </div>
         ) : (
           <div className="flex items-center justify-between rounded-md border px-3 py-2" style={{ borderColor: "hsl(var(--hairline))" }}>
@@ -1526,6 +1588,13 @@ function ToolsTab({
       </div>
 
       {/* Per-tool settings */}
+      {!activeTool && (
+        <SelectSettings
+          settings={toolSettings.select}
+          onChange={(p) => updateToolSettings("select", p)}
+          selectedCount={selectedElementIds?.length ?? 0}
+        />
+      )}
       {settingsTool === "guide" && (
         <GuideSettings
           settings={toolSettings.guide}
@@ -1563,10 +1632,58 @@ function ToolsTab({
           element={element}
           projectId={projectId}
           pageId={pageId}
+          siblingIds={(selectedElementIds ?? []).filter((id) => id !== element.id)}
           onJumpCad={onJumpCad}
         />
       )}
     </div>
+  );
+}
+
+function SelectSettings({
+  settings,
+  onChange,
+  selectedCount,
+}: {
+  settings: ToolSettings["select"];
+  onChange: (p: Partial<ToolSettings["select"]>) => void;
+  selectedCount: number;
+}) {
+  return (
+    <SettingsBlock title="AUSWAHLWERKZEUG">
+      <Row label="Modus">
+        <div className="flex gap-1">
+          <button
+            type="button"
+            onClick={() => onChange({ multi: false })}
+            className="h-7 px-2 rounded-md border text-xs"
+            style={{
+              borderColor: "hsl(var(--hairline))",
+              background: !settings.multi ? "hsl(var(--surface-strong))" : "transparent",
+            }}
+          >
+            Einzel
+          </button>
+          <button
+            type="button"
+            onClick={() => onChange({ multi: true })}
+            className="h-7 px-2 rounded-md border text-xs"
+            style={{
+              borderColor: "hsl(var(--hairline))",
+              background: settings.multi ? "hsl(var(--surface-strong))" : "transparent",
+            }}
+          >
+            Mehrfach
+          </button>
+        </div>
+      </Row>
+      <div className="text-[11px] text-muted-foreground">
+        Im Mehrfach-Modus fügt jeder Klick zur Auswahl hinzu. Mit <kbd className="px-1 rounded border" style={{ borderColor: "hsl(var(--hairline))" }}>Shift</kbd>-Klick funktioniert das auch im Einzel-Modus; nochmaliges Shift-Klicken entfernt aus der Auswahl.
+        {selectedCount > 0 && (
+          <div className="mt-1">Aktuell ausgewählt: <strong className="text-foreground">{selectedCount}</strong></div>
+        )}
+      </div>
+    </SettingsBlock>
   );
 }
 
@@ -2070,20 +2187,49 @@ function ElementInspector({
   element,
   projectId,
   pageId,
+  siblingIds,
   onJumpCad,
 }: {
   element: PageElement;
   projectId: string;
   pageId: string;
+  /** Weitere selektierte Elemente (ohne `element.id`). Patches werden auf alle
+   *  Geschwister mit gleichem `kind` mit angewendet. Größen-/Geometrie-Felder
+   *  (x/y/w/h) bleiben jedoch lokal — Multi-Move geschieht über Drag. */
+  siblingIds?: string[];
   onJumpCad: (sheetId?: string) => void;
 }) {
-  const update = (patch: Partial<PageElement>) =>
+  const update = (patch: Partial<PageElement>) => {
+    // Felder, die NICHT auf gleichartige Geschwister mitübertragen werden,
+    // weil sie pro Objekt individuell sein müssen.
+    const geometryKeys = new Set(["x", "y", "w", "h", "points"]);
+    const isGeometryOnly = Object.keys(patch).every((k) => geometryKeys.has(k));
     projectStore.updateElement(projectId, pageId, element.id, patch);
+    if (!isGeometryOnly && siblingIds && siblingIds.length > 0) {
+      const project = projectStore.getState().projects.find((p) => p.id === projectId);
+      const page = project?.pages.find((p) => p.id === pageId);
+      const sameKindSiblings = (page?.elements ?? []).filter(
+        (e) => siblingIds.includes(e.id) && e.kind === element.kind,
+      );
+      for (const sib of sameKindSiblings) {
+        const cleaned: any = {};
+        for (const k of Object.keys(patch)) {
+          if (!geometryKeys.has(k)) cleaned[k] = (patch as any)[k];
+        }
+        projectStore.updateElement(projectId, pageId, sib.id, cleaned);
+      }
+    }
+  };
 
   return (
     <div className="space-y-4">
       <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-1">
         {element.kind.toUpperCase()}
+        {siblingIds && siblingIds.length > 0 && (
+          <span className="ml-2 text-muted-foreground font-normal normal-case tracking-normal">
+            (+{siblingIds.length} weitere ausgewählt — gleiche Einstellungen werden auf gleichartige Objekte angewendet)
+          </span>
+        )}
       </div>
       <Row label="Breite">
         <input
