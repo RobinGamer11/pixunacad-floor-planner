@@ -1544,6 +1544,7 @@ function ToolsTab({
   selectedElementIds,
   setSelectedElementId,
   toolSettings,
+  cadSelectionCount,
   updateToolSettings,
   onJumpCad,
 }: {
@@ -1558,7 +1559,9 @@ function ToolsTab({
   selectedElementIds?: string[];
   setSelectedElementId: (id?: string) => void;
   toolSettings: ToolSettings;
+  cadSelectionCount?: number;
   updateToolSettings: <K extends keyof ToolSettings>(k: K, patch: Partial<ToolSettings[K]>) => void;
+
   onJumpCad: (sheetId?: string) => void;
 }) {
   const settingsTool = activeTool ?? selectedCadTool ?? null;
