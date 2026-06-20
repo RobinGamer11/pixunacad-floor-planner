@@ -636,6 +636,8 @@ export default function ProjectWorkspace() {
               selectedElementIds={selectedElementIds}
               setSelectedElementId={setSelectedElementId}
               toolSettings={toolSettings}
+              cadSelectionCount={cadSelectionCount}
+
               updateToolSettings={updateToolSettings}
               onJumpCad={(sheetId) => navigate(`/project/${project.id}/cad${sheetId ? `/${sheetId}` : ""}`)}
               onCollapse={() => setRightOpen(false)}
