@@ -195,14 +195,9 @@ export class MiniCad {
       this.selectTool.beginPointEdit(action);
     });
 
-    // Frame-Segmente (Seitenrand/Innenrahmen) sollen NICHT auswählbar sein.
-    // Snap soll an ihnen weiterhin funktionieren → wir filtern nur, wenn der
-    // SelectTool die Liste konsultiert.
-    this._installSelectToolFrameFilter();
-
     this._installCoordRemap();
+    this._installDeleteKey();
     this.applyZoom(this._zoom);
-    this._installPageFrameSnap();
 
     if (init.initialState) this._restore(init.initialState);
     this._changeDirty = false;
@@ -211,55 +206,14 @@ export class MiniCad {
     this._tick();
   }
 
-  /* ===== Frame snap (page edges + margin edges, invisible) ===== */
+  /* ===== Page frame (removed: no visible guide lines, no snap segments) ===== */
 
-  isFrameSegment(seg: { labelId?: string }): boolean {
-    return seg.labelId === this._frameLabelId;
-  }
-
-  private _installPageFrameSnap() {
-    const lm: any = this.labelManager;
-    lm.groups.push({ id: this._frameLabelId, name: "__page_frame__", locked: true, visible: true });
-    const origList = lm.list.bind(lm);
-    lm.list = () => origList().filter((g: any) => g.id !== this._frameLabelId);
-    this._rebuildPageFrame();
-  }
-
-  private _rebuildPageFrame() {
-    this.scene.segments = this.scene.segments.filter((s) => s.labelId !== this._frameLabelId);
-    const wM = this.pageWidthMm / 1000;
-    const hM = this.pageHeightMm / 1000;
-    const mM = Math.max(0, this.pageMarginsMm) / 1000;
-    // Sichtbar (dünne graue Hilfslinien) – als Orientierung & Greifkante.
-    // Auswahl wird durch _installSelectToolFrameFilter unterbunden.
-    const style = {
-      color: "rgba(120,120,120,0.6)",
-      thicknessM: 0.0001,
-      labelId: this._frameLabelId,
-    };
-    const seg = (a: { x: number; y: number }, b: { x: number; y: number }) => {
-      try { this.scene.createSegment(a, b, style); }
-      catch (e) { console.error("MiniCad: frame seg failed:", e); }
-    };
-    // Outer page frame.
-    seg({ x: 0, y: 0 }, { x: wM, y: 0 });
-    seg({ x: wM, y: 0 }, { x: wM, y: hM });
-    seg({ x: wM, y: hM }, { x: 0, y: hM });
-    seg({ x: 0, y: hM }, { x: 0, y: 0 });
-    // Inner margin frame (only if margins > 0 and fits inside the page).
-    if (mM > 0 && wM - 2 * mM > 1e-4 && hM - 2 * mM > 1e-4) {
-      seg({ x: mM, y: mM }, { x: wM - mM, y: mM });
-      seg({ x: wM - mM, y: mM }, { x: wM - mM, y: hM - mM });
-      seg({ x: wM - mM, y: hM - mM }, { x: mM, y: hM - mM });
-      seg({ x: mM, y: hM - mM }, { x: mM, y: mM });
-    }
-  }
+  isFrameSegment(_seg: { labelId?: string }): boolean { return false; }
 
   setPageMargins(mm: number) {
-    if (this.pageMarginsMm === mm) return;
     this.pageMarginsMm = mm;
-    this._rebuildPageFrame();
   }
+
 
   /* ===== Public API ===== */
 
@@ -338,10 +292,11 @@ export class MiniCad {
     if (c.height !== hPx) c.height = hPx;
     c.style.width = `${cssW}px`;
     c.style.height = `${cssH}px`;
-    // Position the canvas so world (0,0) (page top-left) is at FRAME_PAD_PX,FRAME_PAD_PX
-    // visually, by shifting the canvas itself.
-    c.style.left = `${-FRAME_PAD_PX}px`;
-    c.style.top = `${-FRAME_PAD_PX}px`;
+    // Wrapper-Div in CadOverlayLayer ist bereits um -FRAME_PAD_PX verschoben,
+    // daher Canvas hier bei (0,0) lassen — sonst doppelter Offset.
+    c.style.left = `0px`;
+    c.style.top = `0px`;
+
 
     this.renderer.setViewport(c.width, c.height);
     this.camera.scale = this.basePxPerMm * 1000 * zoom;
@@ -540,22 +495,38 @@ export class MiniCad {
     };
   }
 
-  private _installSelectToolFrameFilter() {
-    const topo: any = this.topology;
-    const origSegs = topo._segmentsFrontToBack.bind(topo);
-    const isFrame = (s: any) => this.isFrameSegment(s);
-    let filtering = false;
-    topo._segmentsFrontToBack = () => {
-      const all = origSegs();
-      return filtering ? all.filter((s: any) => !isFrame(s)) : all;
+  private _installDeleteKey() {
+    const onKey = (e: KeyboardEvent) => {
+      if (this._destroyed) return;
+      if (e.key !== "Delete" && e.key !== "Backspace") return;
+      // Niemals löschen, während Text bearbeitet wird.
+      if (this.textEditor.isActive()) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      const sel = this.selection;
+      if (!sel) return;
+      let removed = false;
+      if (sel.segmentId) {
+        const s = this.scene.getSegmentById(sel.segmentId);
+        if (s) { this.scene.removeSegment(s); removed = true; }
+      } else if (sel.type === SelectionType.TEXTBOX || sel.type === SelectionType.TEXTBOX_HANDLE) {
+        const box = this.getSelectedTextBox();
+        if (box) { this.scene.removeTextBox(box); removed = true; }
+      } else if (sel.hatchId) {
+        const h = this.scene.getHatchById(sel.hatchId);
+        if (h) { this.scene.removeHatch(h); removed = true; }
+      }
+      if (removed) {
+        this.clearSelection();
+        this.pointEditMenu.hide();
+        this.refreshLabelUI();
+        e.preventDefault();
+      }
     };
-    const origUpdate = this.selectTool.update.bind(this.selectTool);
-    (this.selectTool as any).update = (input: any) => {
-      filtering = true;
-      try { return origUpdate(input); }
-      finally { filtering = false; }
-    };
+    window.addEventListener("keydown", onKey);
+    this._coordCleanups.push(() => window.removeEventListener("keydown", onKey));
   }
+
 
   private _installCoordRemap() {
     const c = this.dom.canvas;

@@ -478,45 +478,17 @@ export default function ProjectWorkspace() {
             style={{ background: "hsl(var(--surface))" }}
           >
             <div
-              className="flex-1 overflow-auto"
+              className="flex-1 overflow-hidden relative"
               onWheel={(e) => {
                 if (e.ctrlKey || e.metaKey || !e.shiftKey) {
-                  // mouse wheel zooms; allow scroll only with shift
                   if (e.shiftKey) return;
                   e.preventDefault();
                   const delta = -e.deltaY;
                   setZoomClamped(zoom + (delta > 0 ? 5 : -5));
                 }
               }}
-              onMouseDown={(e) => {
-                // Pan via:
-                //  • Middle-mouse / Alt+Left (always works, even with a tool active)
-                //  • Plain Left click on empty surface when no tool is active
-                //    (clicks on page elements call stopPropagation, so they don't reach here)
-                const isMiddle = e.button === 1 || (e.button === 0 && (e as any).altKey);
-                const isPlainLeftIdle = e.button === 0 && !(e as any).altKey && activeTool === null;
-                if (!isMiddle && !isPlainLeftIdle) return;
-                e.preventDefault();
-                const container = e.currentTarget as HTMLDivElement;
-                const startX = e.clientX;
-                const startY = e.clientY;
-                const startScrollL = container.scrollLeft;
-                const startScrollT = container.scrollTop;
-                const prevCursor = container.style.cursor;
-                container.style.cursor = "grabbing";
-                const onMove = (ev: MouseEvent) => {
-                  container.scrollLeft = startScrollL - (ev.clientX - startX);
-                  container.scrollTop = startScrollT - (ev.clientY - startY);
-                };
-                const onUp = () => {
-                  container.style.cursor = prevCursor;
-                  window.removeEventListener("mousemove", onMove);
-                  window.removeEventListener("mouseup", onUp);
-                };
-                window.addEventListener("mousemove", onMove);
-                window.addEventListener("mouseup", onUp);
-              }}
             >
+
               {activePage && (
                 <PageCanvas
                   projectId={project.id}
