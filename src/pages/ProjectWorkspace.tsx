@@ -966,6 +966,23 @@ function PageCanvas({
                 });
               }
             }}
+            onRotate={(deg, absolute) => {
+              const next = absolute ? deg : (el.rotation ?? 0) + deg;
+              projectStore.updateElement(projectId, page.id, el.id, { rotation: next });
+            }}
+            onDuplicate={() => {
+              const { id: _id, ...rest } = el as any;
+              const newId = projectStore.addElement(projectId, page.id, {
+                ...rest,
+                x: Math.min(95, (el.x ?? 0) + 2),
+                y: Math.min(95, (el.y ?? 0) + 2),
+              });
+              setSelectedElementIds([newId]);
+            }}
+            onDelete={() => {
+              projectStore.deleteElement(projectId, page.id, el.id);
+              setSelectedElementIds([]);
+            }}
           />
         ))}
 
