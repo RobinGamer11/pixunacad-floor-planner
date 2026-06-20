@@ -126,7 +126,7 @@ export default function CadOverlayLayer(props: Props) {
       initialZoom: zoom,
       initialState,
       onChange: () => onChangeRef.current(engine.serialize()),
-      onSelectionChange: (info) => onSelectionChangeRef.current?.(info),
+      onSelectionChange: (info, count) => onSelectionChangeRef.current?.(info, count),
       
     });
     engineRef.current = engine;
