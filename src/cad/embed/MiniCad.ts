@@ -96,6 +96,22 @@ export type MiniCadSelectionInfo =
  *  border). Independent of zoom. */
 const FRAME_PAD_PX = 16;
 
+/** Zwei Selections referenzieren dasselbe Objekt, wenn eine ihrer ID-Felder
+ *  (Segment, Hatch, TextBox, Sticker, FreeStroke, Document, Wall) übereinstimmt. */
+function _sameObject(a: Selection, b: Selection): boolean {
+  const ids: (keyof Selection | string)[] = [
+    "segmentId", "hatchId", "textBoxId", "stickerInstanceId",
+    "documentId", "freeStrokeId", "wallId",
+  ];
+  for (const k of ids) {
+    const av = (a as any)[k];
+    const bv = (b as any)[k];
+    if (av && bv && av === bv) return true;
+  }
+  return false;
+}
+
+
 export class MiniCad {
   readonly dom: MiniCadDom;
   readonly scene: Scene;
@@ -135,10 +151,18 @@ export class MiniCad {
   defaultTextAutoSize = true;
 
   // Selection (consumed by TextEditorOverlay & TextTool).
+  // `selection` ist die "primary" Selection (immer === selections.at(-1)).
+  // `selections` ist die volle Liste bei Mehrfach-Auswahl.
   selection: Selection | null = null;
+  selections: Selection[] = [];
   /** Pointer to the currently active tool *instance* (TextEditorOverlay
    *  compares against this.app.textTool). */
   activeTool: LineTool | TextTool | null = null;
+  /** Multi-Select-Modus: jeder Klick toggelt in/aus der Auswahl (statt zu ersetzen). */
+  private _multiSelectMode: boolean = false;
+  /** Live Shift-Status; während eines Pointer/Klick-Events read-aktualisiert. */
+  private _shiftDown: boolean = false;
+
 
   // Page geometry.
   pageWidthMm: number;
@@ -254,8 +278,10 @@ export class MiniCad {
     this._installGuideSegmentInterceptor();
     this._installCoordRemap();
     this._installDeleteKey();
+    this._installShiftTracker();
     this.applyZoom(this._zoom);
     this._installPageFrameSnap();
+
     
     
 
@@ -664,12 +690,67 @@ export class MiniCad {
   }
 
   setSelection(selection: Selection | null) {
-    this.selection = selection;
-    this.renderer.setSelection(selection);
-    this._onSelectionChange?.(this._selectionInfo(selection));
+    if (selection === null) {
+      // Wenn der Multi-Modus oder Shift aktiv ist und es schon eine Auswahl gibt,
+      // wird ein "Klick ins Leere" (SelectTool ruft setSelection(null)) ignoriert —
+      // sonst würde jede leere Klickfläche die Mehrfachauswahl wegwerfen.
+      if ((this._multiSelectMode || this._shiftDown) && this.selections.length > 0) return;
+      this._applyPrimary(null, []);
+      return;
+    }
+    const wantMulti = this._multiSelectMode || this._shiftDown;
+    if (wantMulti && this.selections.length > 0) {
+      const idx = this.selections.findIndex((s) => _sameObject(s, selection));
+      if (idx >= 0) {
+        // Bereits enthalten → entfernen (toggle off)
+        const next = this.selections.slice();
+        next.splice(idx, 1);
+        const primary = next[next.length - 1] ?? null;
+        this._applyPrimary(primary, next);
+        return;
+      }
+      this._applyPrimary(selection, [...this.selections, selection]);
+      return;
+    }
+    this._applyPrimary(selection, [selection]);
   }
 
-  clearSelection() { this.setSelection(null); }
+  /** Setzt primary + Liste; aktualisiert Renderer & feuert onSelectionChange. */
+  private _applyPrimary(primary: Selection | null, list: Selection[]) {
+    this.selection = primary;
+    this.selections = list;
+    this.renderer.setSelection(primary);
+    (this.renderer as any).setExtraSelections?.(list.filter((s) => s !== primary));
+    this._onSelectionChange?.(this._selectionInfo(primary));
+  }
+
+  clearSelection() {
+    this._applyPrimary(null, []);
+  }
+
+  /** API: wird vom React-Layer aus dem "Einzel/Mehrfach"-Toggle bedient. */
+  setMultiSelectMode(on: boolean) {
+    this._multiSelectMode = !!on;
+  }
+
+  getSelections(): Selection[] {
+    return this.selections.slice();
+  }
+
+  private _installShiftTracker() {
+    const onDown = (e: KeyboardEvent) => { if (e.key === "Shift") this._shiftDown = true; };
+    const onUp = (e: KeyboardEvent) => { if (e.key === "Shift") this._shiftDown = false; };
+    // Pointer-Events tragen den exakten shiftKey-Stand → noch zuverlässiger als
+    // Keyboard-Listener (z.B. wenn Fokus wechselt).
+    const onPointer = (e: PointerEvent | MouseEvent) => { this._shiftDown = !!(e as any).shiftKey; };
+    window.addEventListener("keydown", onDown);
+    window.addEventListener("keyup", onUp);
+    window.addEventListener("pointerdown", onPointer, true);
+    this._coordCleanups.push(() => window.removeEventListener("keydown", onDown));
+    this._coordCleanups.push(() => window.removeEventListener("keyup", onUp));
+    this._coordCleanups.push(() => window.removeEventListener("pointerdown", onPointer, true));
+  }
+
 
   beginTextEdit(box: TextBox) {
     this.textEditor.beginEdit(box);
@@ -762,19 +843,34 @@ export class MiniCad {
       if (this.textEditor.isActive()) return;
       const t = e.target as HTMLElement | null;
       if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
-      const sel = this.selection;
-      if (!sel) return;
+      const sels = this.selections.length > 0 ? this.selections : (this.selection ? [this.selection] : []);
+      if (sels.length === 0) return;
       let removed = false;
-      if (sel.segmentId) {
-        const s = this.scene.getSegmentById(sel.segmentId);
-        if (s) { this.scene.removeSegment(s); removed = true; }
-      } else if (sel.type === SelectionType.TEXTBOX || sel.type === SelectionType.TEXTBOX_HANDLE) {
-        const box = this.getSelectedTextBox();
-        if (box) { this.scene.removeTextBox(box); removed = true; }
-      } else if (sel.hatchId) {
-        const h = this.scene.getHatchById(sel.hatchId);
-        if (h) { this.scene.removeHatch(h); removed = true; }
+      for (const sel of sels) {
+        if (sel.segmentId) {
+          const s = this.scene.getSegmentById(sel.segmentId);
+          if (s) { this.scene.removeSegment(s); removed = true; }
+        } else if (sel.type === SelectionType.TEXTBOX || sel.type === SelectionType.TEXTBOX_HANDLE) {
+          if (sel.textBoxId) {
+            const box = this.scene.getTextBoxById(sel.textBoxId);
+            if (box) { this.scene.removeTextBox(box); removed = true; }
+          }
+        } else if (sel.hatchId) {
+          const h = this.scene.getHatchById(sel.hatchId);
+          if (h) { this.scene.removeHatch(h); removed = true; }
+        } else if ((sel as any).stickerInstanceId) {
+          const sid = (sel as any).stickerInstanceId as string;
+          const inst = this.scene.stickerInstances?.find?.((i: any) => i.id === sid);
+          if (inst) { this.scene.removeStickerInstance(inst); removed = true; }
+        } else if ((sel as any).freeStrokeId) {
+          this.scene.removeFreeStrokesByIds([(sel as any).freeStrokeId]);
+          removed = true;
+        } else if ((sel as any).documentId) {
+          this.scene.removeDocumentsByIds([(sel as any).documentId]);
+          removed = true;
+        }
       }
+
       if (removed) {
         this.clearSelection();
         this.pointEditMenu.hide();

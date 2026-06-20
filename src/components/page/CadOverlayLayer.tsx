@@ -28,6 +28,9 @@ interface Props {
   // Guide defaults
   guideColor?: string;
   guidesLocked?: boolean;
+  /** Wenn true: jeder Klick erweitert die Mehrfach-Auswahl (statt zu ersetzen). */
+  multiSelectMode?: boolean;
+
   // Text defaults
   textColor?: string;
   textFontSizePx?: number;
@@ -48,7 +51,7 @@ export default function CadOverlayLayer(props: Props) {
   const {
     pageWidthMm, pageHeightMm, basePxPerMm, pageMarginsMm,
     zoom, activeTool, enabled, initialState, onChange, onSelectionChange,
-    lineColor, lineThicknessMm, lineAlpha, guideColor, guidesLocked,
+    lineColor, lineThicknessMm, lineAlpha, guideColor, guidesLocked, multiSelectMode,
     textColor, textFontSizePx, textBold, textItalic, textAlpha, textAlign,
     textBgColor, textBgAlphaPct, textWrap, textAutoSize, textBorderEnabled, textBorderColor, textBorderWidthPx,
   } = props;
@@ -155,6 +158,11 @@ export default function CadOverlayLayer(props: Props) {
   useEffect(() => {
     engineRef.current?.setGuidesLocked(!!guidesLocked);
   }, [guidesLocked]);
+
+  useEffect(() => {
+    engineRef.current?.setMultiSelectMode(!!multiSelectMode);
+  }, [multiSelectMode]);
+
 
   useEffect(() => {
     engineRef.current?.setTextDefaults({

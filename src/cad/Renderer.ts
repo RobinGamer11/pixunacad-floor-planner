@@ -60,6 +60,9 @@ export class Renderer {
   overlayScenes: { scene: Scene; mode: "stamp" | "tint"; color: string | null; opacity: number }[] = [];
   private _overlayCanvas: HTMLCanvasElement | null = null;
   selection: Selection | null = null;
+  /** Sekundär-Selektionen für Mehrfachauswahl (Primary bleibt `selection`). */
+  extraSelections: Selection[] = [];
+
   selectedLabelId: string | null = null;
   hoverSegmentId: string | null = null;
   hoverHatchId: string | null = null;
@@ -152,6 +155,8 @@ export class Renderer {
 
   setViewport(w: number, h: number) { this.vw = w; this.vh = h; }
   setSelection(selection: Selection | null) { this.selection = selection; }
+  setExtraSelections(list: Selection[]) { this.extraSelections = list || []; }
+
   setSelectedLabelId(labelId: string | null) { this.selectedLabelId = labelId || null; }
   setHoverSegmentId(id: string | null) { this.hoverSegmentId = id || null; }
   setHoverHatchId(id: string | null) { this.hoverHatchId = id || null; }
@@ -281,7 +286,27 @@ export class Renderer {
     this._drawFreeStrokeSelection();
     this._drawHoverSegmentPoints();
 
+    // Sekundär-Selektionen (Multi-Select): identische Highlight-Pässe für jedes
+    // weitere Objekt — wir tauschen kurz `this.selection` aus, malen die
+    // entsprechenden Selection-Pässe, und stellen den Original-Zustand wieder her.
+    if (this.extraSelections && this.extraSelections.length > 0) {
+      const original = this.selection;
+      for (const extra of this.extraSelections) {
+        if (!extra || extra === original) continue;
+        this.selection = extra;
+        this._drawHatchSelection();
+        this._drawSegmentSelection();
+        this._drawDimensionSelection();
+        this._drawTextBoxSelection();
+        this._drawStickerInstanceSelection();
+        this._drawDocumentSelection();
+        this._drawFreeStrokeSelection();
+      }
+      this.selection = original;
+    }
+
     this._drawStickerEditFrame();
+
 
     if (this.overlay && this.overlay.draw) {
       this.overlay.draw(ctx, this.camera);
