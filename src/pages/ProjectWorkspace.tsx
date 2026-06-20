@@ -1581,6 +1581,8 @@ function ToolsTab({
   setSelectedElementId,
   toolSettings,
   cadSelectionCount,
+  cadSelectedLineSnap,
+  onCadLineSnapChange,
   updateToolSettings,
   onJumpCad,
 }: {
@@ -1596,10 +1598,13 @@ function ToolsTab({
   setSelectedElementId: (id?: string) => void;
   toolSettings: ToolSettings;
   cadSelectionCount?: number;
+  cadSelectedLineSnap?: { midpoint: boolean; division: number | null; isGuide: boolean } | null;
+  onCadLineSnapChange?: (patch: { midpointSnap?: boolean; divisionSnap?: number | null }) => void;
   updateToolSettings: <K extends keyof ToolSettings>(k: K, patch: Partial<ToolSettings[K]>) => void;
 
   onJumpCad: (sheetId?: string) => void;
 }) {
+
   const settingsTool = activeTool ?? selectedCadTool ?? null;
   return (
     <div className="space-y-5">
