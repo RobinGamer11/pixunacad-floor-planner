@@ -65,11 +65,29 @@ export interface MiniCadInit {
   defaultLineThicknessM?: number;
   /** Called whenever scene geometry changes. */
   onChange?: () => void;
+  /** Called whenever a CAD object selection changes in the embedded editor. */
+  onSelectionChange?: (info: MiniCadSelectionInfo | null) => void;
   /** Initial serialized state. */
   initialState?: any;
 }
 
 export type MiniTool = "line" | "text" | "select" | null;
+export type MiniCadSelectionInfo =
+  | { tool: "line"; color: string; thicknessMm: number; alpha: number }
+  | {
+      tool: "text";
+      color: string;
+      fontSize: number;
+      alpha: number;
+      align: "left" | "center" | "right";
+      bgColor: string;
+      bgAlphaPct: number;
+      wrap: boolean;
+      autoSize: boolean;
+      borderEnabled: boolean;
+      borderColor: string;
+      borderWidthPx: number;
+    };
 
 /** Extra CSS pixels around the page on the canvas so edge snap dots and the
  *  blue snap line are fully visible (and not occluded by the page's margin
@@ -142,6 +160,7 @@ export class MiniCad {
   private _destroyed = false;
   private _changeDirty = false;
   private _onChange?: () => void;
+  private _onSelectionChange?: (info: MiniCadSelectionInfo | null) => void;
   private _coordCleanups: Array<() => void> = [];
 
   constructor(init: MiniCadInit) {
@@ -152,6 +171,7 @@ export class MiniCad {
     this.pageMarginsMm = init.pageMarginsMm ?? 0;
     this._zoom = init.initialZoom;
     this._onChange = init.onChange;
+    this._onSelectionChange = init.onSelectionChange;
     this._strokeFactor = (this.basePxPerMm * 1000) / 80;
     this.defaultLineColor = init.defaultLineColor ?? Defaults.lineColor;
     this.defaultLineThicknessM = (init.defaultLineThicknessM ?? Defaults.lineThicknessM) * this._strokeFactor;

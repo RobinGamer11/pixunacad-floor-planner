@@ -20,7 +20,7 @@ export function autoSizeTextBox(box: TextBox, pxPerMOverride?: number) {
   const pxPerM = pxPerMOverride && pxPerMOverride > 0
     ? pxPerMOverride
     : Defaults.measureReferenceScalePxPerM;
-  const paddingPx = 6;
+  const paddingPx = 0;
   const baseFontPx = box.style.fontSizePx;
 
   const tlX = box.center.x - box.widthM / 2;

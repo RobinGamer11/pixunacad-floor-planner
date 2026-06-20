@@ -119,7 +119,7 @@ export class TextEditorOverlay {
     this._applyBoxStyle(box);
     this.reposition(box);
     this.app.renderer.setEditingTextBoxId(box.id);
-    this.el.focus();
+    this.el.focus({ preventScroll: true });
     this._placeCaretAtEnd();
     this._syncToolbarState();
   }
