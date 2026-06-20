@@ -1283,7 +1283,9 @@ function RightInspector({
   selectedElementIds?: string[];
   setSelectedElementId: (id?: string) => void;
   toolSettings: ToolSettings;
+  cadSelectionCount?: number;
   updateToolSettings: <K extends keyof ToolSettings>(k: K, patch: Partial<ToolSettings[K]>) => void;
+
   onJumpCad: (sheetId?: string) => void;
   onCollapse?: () => void;
 }) {
