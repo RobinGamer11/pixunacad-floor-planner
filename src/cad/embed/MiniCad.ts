@@ -292,10 +292,11 @@ export class MiniCad {
     if (c.height !== hPx) c.height = hPx;
     c.style.width = `${cssW}px`;
     c.style.height = `${cssH}px`;
-    // Position the canvas so world (0,0) (page top-left) is at FRAME_PAD_PX,FRAME_PAD_PX
-    // visually, by shifting the canvas itself.
-    c.style.left = `${-FRAME_PAD_PX}px`;
-    c.style.top = `${-FRAME_PAD_PX}px`;
+    // Wrapper-Div in CadOverlayLayer ist bereits um -FRAME_PAD_PX verschoben,
+    // daher Canvas hier bei (0,0) lassen — sonst doppelter Offset.
+    c.style.left = `0px`;
+    c.style.top = `0px`;
+
 
     this.renderer.setViewport(c.width, c.height);
     this.camera.scale = this.basePxPerMm * 1000 * zoom;
