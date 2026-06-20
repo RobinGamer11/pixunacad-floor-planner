@@ -21,6 +21,12 @@ interface Props {
   initialState?: any;
   onChange: (state: any) => void;
   onSelectionChange?: (info: MiniCadSelectionInfo | null, count?: number) => void;
+  /** Imperative API für punktuelle Aktionen auf der Engine (z. B.
+   *  Snap-Einstellungen der gerade selektierten Linie/Hilfslinie ändern). */
+  onEngineReady?: (api: {
+    setSelectedSegmentSnap: (opts: { midpointSnap?: boolean; divisionSnap?: number | null }) => void;
+  }) => void;
+
   // Line defaults
   lineColor?: string;
   lineThicknessMm?: number;
