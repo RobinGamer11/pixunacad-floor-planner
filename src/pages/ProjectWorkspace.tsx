@@ -1253,6 +1253,7 @@ function RightInspector({
   setActiveTool,
   selectedCadTool,
   selectedElementId,
+  selectedElementIds,
   setSelectedElementId,
   toolSettings,
   updateToolSettings,
@@ -1269,6 +1270,7 @@ function RightInspector({
   setActiveTool: (t: PageTool) => void;
   selectedCadTool?: "line" | "text";
   selectedElementId?: string;
+  selectedElementIds?: string[];
   setSelectedElementId: (id?: string) => void;
   toolSettings: ToolSettings;
   updateToolSettings: <K extends keyof ToolSettings>(k: K, patch: Partial<ToolSettings[K]>) => void;
@@ -1312,6 +1314,7 @@ function RightInspector({
             setActiveTool={setActiveTool}
             selectedCadTool={selectedCadTool}
             selectedElementId={selectedElementId}
+            selectedElementIds={selectedElementIds}
             setSelectedElementId={setSelectedElementId}
             toolSettings={toolSettings}
             updateToolSettings={updateToolSettings}
