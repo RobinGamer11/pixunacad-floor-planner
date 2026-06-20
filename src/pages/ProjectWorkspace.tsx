@@ -140,8 +140,10 @@ export default function ProjectWorkspace() {
       ))));
       setZoom(nextZoom);
       requestAnimationFrame(() => {
-        box.scrollLeft = Math.max(0, (box.scrollWidth - box.clientWidth) / 2);
-        box.scrollTop = Math.max(0, (box.scrollHeight - box.clientHeight) / 2);
+        requestAnimationFrame(() => {
+          box.scrollLeft = Math.max(0, (box.scrollWidth - box.clientWidth) / 2);
+          box.scrollTop = Math.max(0, (box.scrollHeight - box.clientHeight) / 2);
+        });
       });
     };
     fitPage();
