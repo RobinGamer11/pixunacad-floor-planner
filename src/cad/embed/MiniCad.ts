@@ -26,6 +26,7 @@ import { TextEditorOverlay } from "../TextEditorOverlay";
 import { SelectTool } from "../SelectTool";
 import { Defaults, SelectionType } from "../constants";
 import type { TextBox, TextBoxStyle } from "../Scene";
+import { drawRichTextBox } from "../textRichRenderer";
 
 export interface MiniCadTextEditorDom {
   editor: HTMLDivElement;
@@ -167,6 +168,7 @@ export class MiniCad {
     this.renderer.referencePxPerM = this.basePxPerMm * 1000;
 
     this._patchRendererTransparent();
+    this._patchRendererTextPadding();
 
     this.hub = new LineHub(this.dom.hubRoot, this.dom.hubLenInput, this.dom.hubAngInput);
     this.pointEditMenu = new PointEditMenu(this.dom.pointEditRoot, this.dom.pointEditButtons);
@@ -259,19 +261,24 @@ export class MiniCad {
   }
 
   private _installSelectToolFrameFilter() {
-    const topo: any = this.topology;
-    const origSegs = topo._segmentsFrontToBack.bind(topo);
-    const isFrame = (s: any) => this.isFrameSegment(s);
-    let filtering = false;
-    topo._segmentsFrontToBack = () => {
-      const all = origSegs();
-      return filtering ? all.filter((s: any) => !isFrame(s)) : all;
-    };
+    // Wir filtern Rahmen-Segmente NICHT mehr aus _segmentsFrontToBack heraus,
+    // weil dadurch auch das Snapping (findBestSnap nutzt dieselbe Liste) die
+    // Page-Frame-Kanten verloren hätte → Textboxen ließen sich beim Verschieben
+    // nicht mehr an Seiten-/Randkanten ausrichten.
+    // Stattdessen post-processen wir das Auswahlergebnis: landet eine
+    // Auswahl auf einem Rahmen-Segment, wird sie sofort wieder geleert.
     const origUpdate = this.selectTool.update.bind(this.selectTool);
     (this.selectTool as any).update = (input: any) => {
-      filtering = true;
-      try { return origUpdate(input); }
-      finally { filtering = false; }
+      const result = origUpdate(input);
+      const sel = this.selection;
+      if (sel && sel.segmentId) {
+        const seg = this.scene.getSegmentById(sel.segmentId);
+        if (seg && this.isFrameSegment(seg)) {
+          this.clearSelection();
+          try { this.pointEditMenu.hide(); } catch {}
+        }
+      }
+      return result;
     };
   }
 
@@ -554,6 +561,38 @@ export class MiniCad {
         try { this.overlay.draw(ctx, this.camera); } catch (e) { console.error(e); }
       }
       ctx.restore();
+    };
+  }
+
+  /** Override paddingPx auf 0 für eingebettete Textboxen, damit Text exakt
+   *  am Platzierungspunkt beginnt (kein 6-px-Versatz nach innen). */
+  private _patchRendererTextPadding() {
+    const r: any = this.renderer;
+    if (typeof r._drawSingleTextBox !== "function") return;
+    r._drawSingleTextBox = (box: any) => {
+      if (r.editingTextBoxId === box.id) return;
+      const cam = r.camera;
+      const cs = cam.worldToScreen(box.center.x, box.center.y);
+      const widthPx = box.widthM * cam.scale;
+      const heightPx = box.heightM * cam.scale;
+      drawRichTextBox({
+        ctx: r.ctx,
+        centerScreenX: cs.x,
+        centerScreenY: cs.y,
+        widthPx, heightPx,
+        rotationRad: box.rotationRad,
+        html: box.html || "",
+        baseFontSizePx: box.style.fontSizePx * (cam.scale / r.referencePxPerM),
+        baseColor: box.style.textColor,
+        bgColor: box.style.bgColor,
+        bgAlpha: (box.style.bgAlphaPct || 0) / 100,
+        align: box.style.align,
+        wrap: box.style.wrap,
+        borderEnabled: box.style.borderEnabled,
+        borderColor: box.style.borderColor,
+        borderWidthPx: box.style.borderWidthPx,
+        paddingPx: 0,
+      });
     };
   }
 
