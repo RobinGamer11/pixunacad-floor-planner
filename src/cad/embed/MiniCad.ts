@@ -674,12 +674,67 @@ export class MiniCad {
   }
 
   setSelection(selection: Selection | null) {
-    this.selection = selection;
-    this.renderer.setSelection(selection);
-    this._onSelectionChange?.(this._selectionInfo(selection));
+    if (selection === null) {
+      // Wenn der Multi-Modus oder Shift aktiv ist und es schon eine Auswahl gibt,
+      // wird ein "Klick ins Leere" (SelectTool ruft setSelection(null)) ignoriert —
+      // sonst würde jede leere Klickfläche die Mehrfachauswahl wegwerfen.
+      if ((this._multiSelectMode || this._shiftDown) && this.selections.length > 0) return;
+      this._applyPrimary(null, []);
+      return;
+    }
+    const wantMulti = this._multiSelectMode || this._shiftDown;
+    if (wantMulti && this.selections.length > 0) {
+      const idx = this.selections.findIndex((s) => _sameObject(s, selection));
+      if (idx >= 0) {
+        // Bereits enthalten → entfernen (toggle off)
+        const next = this.selections.slice();
+        next.splice(idx, 1);
+        const primary = next[next.length - 1] ?? null;
+        this._applyPrimary(primary, next);
+        return;
+      }
+      this._applyPrimary(selection, [...this.selections, selection]);
+      return;
+    }
+    this._applyPrimary(selection, [selection]);
   }
 
-  clearSelection() { this.setSelection(null); }
+  /** Setzt primary + Liste; aktualisiert Renderer & feuert onSelectionChange. */
+  private _applyPrimary(primary: Selection | null, list: Selection[]) {
+    this.selection = primary;
+    this.selections = list;
+    this.renderer.setSelection(primary);
+    (this.renderer as any).setExtraSelections?.(list.filter((s) => s !== primary));
+    this._onSelectionChange?.(this._selectionInfo(primary));
+  }
+
+  clearSelection() {
+    this._applyPrimary(null, []);
+  }
+
+  /** API: wird vom React-Layer aus dem "Einzel/Mehrfach"-Toggle bedient. */
+  setMultiSelectMode(on: boolean) {
+    this._multiSelectMode = !!on;
+  }
+
+  getSelections(): Selection[] {
+    return this.selections.slice();
+  }
+
+  private _installShiftTracker() {
+    const onDown = (e: KeyboardEvent) => { if (e.key === "Shift") this._shiftDown = true; };
+    const onUp = (e: KeyboardEvent) => { if (e.key === "Shift") this._shiftDown = false; };
+    // Pointer-Events tragen den exakten shiftKey-Stand → noch zuverlässiger als
+    // Keyboard-Listener (z.B. wenn Fokus wechselt).
+    const onPointer = (e: PointerEvent | MouseEvent) => { this._shiftDown = !!(e as any).shiftKey; };
+    window.addEventListener("keydown", onDown);
+    window.addEventListener("keyup", onUp);
+    window.addEventListener("pointerdown", onPointer, true);
+    this._coordCleanups.push(() => window.removeEventListener("keydown", onDown));
+    this._coordCleanups.push(() => window.removeEventListener("keyup", onUp));
+    this._coordCleanups.push(() => window.removeEventListener("pointerdown", onPointer, true));
+  }
+
 
   beginTextEdit(box: TextBox) {
     this.textEditor.beginEdit(box);
