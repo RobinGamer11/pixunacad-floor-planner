@@ -47,7 +47,7 @@ interface Props {
 export default function CadOverlayLayer(props: Props) {
   const {
     pageWidthMm, pageHeightMm, basePxPerMm, pageMarginsMm,
-    zoom, activeTool, enabled, initialState, onChange, onSelectionChange,
+    zoom, activeTool, enabled, initialState, onChange, onSelectionChange, onCreateParallelGuide,
     lineColor, lineThicknessMm, lineAlpha,
     textColor, textFontSizePx, textBold, textItalic, textAlpha, textAlign,
     textBgColor, textBgAlphaPct, textWrap, textAutoSize, textBorderEnabled, textBorderColor, textBorderWidthPx,
