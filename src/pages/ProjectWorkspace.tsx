@@ -1064,7 +1064,9 @@ function PageCanvas({
             projectStore.updatePage(projectId, page.id, { cadOverlay: state })
           }
           onSelectionChange={onCadSelectionChange}
+          onEngineReady={onCadEngineReady}
         />
+
 
       </div>
     </div>
