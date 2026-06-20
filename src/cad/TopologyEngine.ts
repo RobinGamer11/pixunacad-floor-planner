@@ -499,10 +499,9 @@ export class TopologyEngine {
       return v(snap.world.x, snap.world.y);
     }
     if (snap.type === SnapType.LINE) {
-      if (snap.segment && snap.t != null) {
-        const res = this.scene.splitSegmentAtT(snap.segment, snap.t);
-        return v(res.point.x, res.point.y);
-      }
+      // Linien werden beim Verbinden NICHT mehr automatisch geteilt — neue Linien
+      // dürfen sich an bestehende Linien anschließen, ohne diese aufzubrechen.
+      // Hatch-Kanten benötigen weiterhin einen echten Polygon-Punkt zum Verbinden.
       if (snap.hatch && snap.edgeIndex != null && snap.t != null) {
         const res = this.scene.insertPointIntoHatchEdge(snap.hatch, snap.edgeIndex, snap.t);
         return v(res.point.x, res.point.y);
