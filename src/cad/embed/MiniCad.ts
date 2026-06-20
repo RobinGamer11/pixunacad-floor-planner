@@ -259,19 +259,24 @@ export class MiniCad {
   }
 
   private _installSelectToolFrameFilter() {
-    const topo: any = this.topology;
-    const origSegs = topo._segmentsFrontToBack.bind(topo);
-    const isFrame = (s: any) => this.isFrameSegment(s);
-    let filtering = false;
-    topo._segmentsFrontToBack = () => {
-      const all = origSegs();
-      return filtering ? all.filter((s: any) => !isFrame(s)) : all;
-    };
+    // Wir filtern Rahmen-Segmente NICHT mehr aus _segmentsFrontToBack heraus,
+    // weil dadurch auch das Snapping (findBestSnap nutzt dieselbe Liste) die
+    // Page-Frame-Kanten verloren hätte → Textboxen ließen sich beim Verschieben
+    // nicht mehr an Seiten-/Randkanten ausrichten.
+    // Stattdessen post-processen wir das Auswahlergebnis: landet eine
+    // Auswahl auf einem Rahmen-Segment, wird sie sofort wieder geleert.
     const origUpdate = this.selectTool.update.bind(this.selectTool);
     (this.selectTool as any).update = (input: any) => {
-      filtering = true;
-      try { return origUpdate(input); }
-      finally { filtering = false; }
+      const result = origUpdate(input);
+      const sel = this.selection;
+      if (sel && sel.segmentId) {
+        const seg = this.scene.getSegmentById(sel.segmentId);
+        if (seg && this.isFrameSegment(seg)) {
+          this.clearSelection();
+          try { this.pointEditMenu.hide(); } catch {}
+        }
+      }
+      return result;
     };
   }
 
