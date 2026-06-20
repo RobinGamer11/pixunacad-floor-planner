@@ -1674,6 +1674,7 @@ function ToolsTab({
           midpoint={cadSelectedLineSnap.midpoint}
           division={cadSelectedLineSnap.division}
           onChange={onCadLineSnapChange}
+          onDuplicate={onCadDuplicateSegments}
         />
       )}
 
