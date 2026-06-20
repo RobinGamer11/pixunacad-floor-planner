@@ -230,8 +230,10 @@ export class MiniCad {
     const wM = this.pageWidthMm / 1000;
     const hM = this.pageHeightMm / 1000;
     const mM = Math.max(0, this.pageMarginsMm) / 1000;
+    // Sichtbar (dünne graue Hilfslinien) – als Orientierung & Greifkante.
+    // Auswahl wird durch _installSelectToolFrameFilter unterbunden.
     const style = {
-      color: "rgba(0,0,0,0)",
+      color: "rgba(120,120,120,0.6)",
       thicknessM: 0.0001,
       labelId: this._frameLabelId,
     };

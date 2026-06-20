@@ -137,29 +137,37 @@ export class TextEditorOverlay {
     this.el.style.top = `${topPx}px`;
 
     // While editing, the *box* follows the *text* (auto-grow), not the other way around.
+    // - autoSize=false: BOTH width and height are fixed → text wraps and is clipped/scrolled.
     // - wrap=true:  fixed width, height grows downward
     // - wrap=false: width and height both grow (single line / explicit \n)
-    if (box.style.wrap) {
+    const autoSize = (box.style as any).autoSize !== false;
+    if (!autoSize) {
+      this.el.style.width = `${widthPx}px`;
+      this.el.style.minWidth = `${widthPx}px`;
+      this.el.style.maxWidth = `${widthPx}px`;
+      this.el.style.height = `${heightPx}px`;
+      this.el.style.minHeight = `${heightPx}px`;
+      this.el.style.maxHeight = `${heightPx}px`;
+    } else if (box.style.wrap) {
       this.el.style.width = `${widthPx}px`;
       this.el.style.minWidth = `${widthPx}px`;
       this.el.style.maxWidth = `${widthPx}px`;
       this.el.style.height = "auto";
       this.el.style.minHeight = `${heightPx}px`;
+      this.el.style.maxHeight = "none";
     } else {
       this.el.style.width = "auto";
       this.el.style.minWidth = `${widthPx}px`;
       this.el.style.maxWidth = "none";
       this.el.style.height = "auto";
       this.el.style.minHeight = `${heightPx}px`;
+      this.el.style.maxHeight = "none";
     }
 
     this.el.style.transform = `rotate(${box.rotationRad}rad)`;
     this.el.style.transformOrigin = "top left";
 
     // Use the renderer's referencePxPerM (matches the canvas-rendered text 1:1).
-    // For the standalone CAD this equals Defaults.measureReferenceScalePxPerM (80),
-    // for MiniCad (embedded in a page) it is basePxPerMm * 1000, so the editor
-    // overlay no longer renders text orders of magnitude larger than the canvas.
     const refPxPerM = (this.app.renderer as any).referencePxPerM || Defaults.measureReferenceScalePxPerM;
     const fontPx = box.style.fontSizePx * (cam.scale / refPxPerM);
     this.el.style.fontSize = `${fontPx}px`;
@@ -172,7 +180,7 @@ export class TextEditorOverlay {
     this.el.style.overflowWrap = box.style.wrap ? "break-word" : "normal";
     this.el.style.padding = `${6 * (cam.scale / refPxPerM)}px`;
     this.el.style.boxSizing = "border-box";
-    this.el.style.overflow = "visible";
+    this.el.style.overflow = autoSize ? "visible" : "hidden";
     this.el.style.outline = "2px solid rgba(77,163,255,0.45)";
     this.el.style.border = box.style.borderEnabled
       ? `${box.style.borderWidthPx}px solid ${box.style.borderColor}`
