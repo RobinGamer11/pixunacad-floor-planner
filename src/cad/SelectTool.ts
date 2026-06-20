@@ -1096,6 +1096,7 @@ export class SelectTool {
     }
     this.activeEditAction = null;
     this.editTarget = null;
+    (this as any)._textBoxResizeMode = false;
     this.fixedPoint = null;
     this.otherPointOriginal = null;
     this.hatchPointsOriginal = null;
