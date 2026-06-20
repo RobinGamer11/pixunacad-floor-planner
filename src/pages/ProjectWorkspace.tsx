@@ -573,8 +573,19 @@ export default function ProjectWorkspace() {
                         alpha: info.alpha,
                       });
                     } else {
-                      const { tool: _tool, ...textSettings } = info;
-                      updateToolSettings("text", textSettings);
+                      updateToolSettings("text", {
+                        color: info.color,
+                        fontSize: info.fontSize,
+                        alpha: info.alpha,
+                        align: info.align,
+                        bgColor: info.bgColor,
+                        bgAlphaPct: info.bgAlphaPct,
+                        wrap: info.wrap,
+                        autoSize: info.autoSize,
+                        borderEnabled: info.borderEnabled,
+                        borderColor: info.borderColor,
+                        borderWidthPx: info.borderWidthPx,
+                      });
                     }
                   }}
                 />
