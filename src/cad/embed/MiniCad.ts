@@ -280,8 +280,10 @@ export class MiniCad {
     this._installDeleteKey();
     this._installShiftTracker();
     this._installGroupMove();
+    this._installMarquee();
     this.applyZoom(this._zoom);
     this._installPageFrameSnap();
+
 
 
     
