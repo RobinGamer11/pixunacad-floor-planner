@@ -744,7 +744,7 @@ function PageCanvas({
   toolSettings: ToolSettings;
   onCommitTool: () => void;
   onSelect: (id?: string, opts?: { shift?: boolean }) => void;
-  onCadSelectionChange: (info: MiniCadSelectionInfo | null) => void;
+  onCadSelectionChange: (info: MiniCadSelectionInfo | null, count?: number) => void;
 }) {
   const fmt = FORMAT_SIZES[page.format];
   const aspect = fmt.w / fmt.h;
