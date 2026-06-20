@@ -696,11 +696,8 @@ export class MiniCad {
   setSelection(selection: Selection | null) {
     // Während einer aktiven Marquee gehört die Selection-Hoheit dem Marquee.
     if (this._suppressSetSelection || this._marqueeActive) return;
+    console.log("[MiniCad.setSelection]", { selection, multi: this._multiSelectMode, shift: this._shiftDown, currentLen: this.selections.length });
     if (selection === null) {
-
-      // Wenn der Multi-Modus oder Shift aktiv ist und es schon eine Auswahl gibt,
-      // wird ein "Klick ins Leere" (SelectTool ruft setSelection(null)) ignoriert —
-      // sonst würde jede leere Klickfläche die Mehrfachauswahl wegwerfen.
       if ((this._multiSelectMode || this._shiftDown) && this.selections.length > 0) return;
       this._applyPrimary(null, []);
       return;
@@ -709,7 +706,6 @@ export class MiniCad {
     if (wantMulti && this.selections.length > 0) {
       const idx = this.selections.findIndex((s) => _sameObject(s, selection));
       if (idx >= 0) {
-        // Bereits enthalten → entfernen (toggle off)
         const next = this.selections.slice();
         next.splice(idx, 1);
         const primary = next[next.length - 1] ?? null;
@@ -721,6 +717,7 @@ export class MiniCad {
     }
     this._applyPrimary(selection, [selection]);
   }
+
 
   /** Setzt primary + Liste; aktualisiert Renderer & feuert onSelectionChange. */
   private _applyPrimary(primary: Selection | null, list: Selection[]) {
