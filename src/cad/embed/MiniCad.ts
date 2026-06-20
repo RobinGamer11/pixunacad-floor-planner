@@ -694,7 +694,10 @@ export class MiniCad {
   }
 
   setSelection(selection: Selection | null) {
+    // Während einer aktiven Marquee gehört die Selection-Hoheit dem Marquee.
+    if (this._suppressSetSelection || this._marqueeActive) return;
     if (selection === null) {
+
       // Wenn der Multi-Modus oder Shift aktiv ist und es schon eine Auswahl gibt,
       // wird ein "Klick ins Leere" (SelectTool ruft setSelection(null)) ignoriert —
       // sonst würde jede leere Klickfläche die Mehrfachauswahl wegwerfen.
