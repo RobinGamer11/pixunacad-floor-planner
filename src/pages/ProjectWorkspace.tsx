@@ -1850,6 +1850,79 @@ function LineSettings({
   );
 }
 
+function LineSnapSettings({
+  isGuide,
+  midpoint,
+  division,
+  onChange,
+}: {
+  isGuide: boolean;
+  midpoint: boolean;
+  division: number | null;
+  onChange: (patch: { midpointSnap?: boolean; divisionSnap?: number | null }) => void;
+}) {
+  const [draft, setDraft] = useState<string>(division ? String(division) : "");
+  // Keep draft in sync when selection switches to another line.
+  useEffect(() => {
+    setDraft(division ? String(division) : "");
+  }, [division]);
+  return (
+    <SettingsBlock title={isGuide ? "HILFSLINIEN-SNAPS" : "LINIEN-SNAPS"}>
+      <Row label="Mittelpunkt">
+        <button
+          type="button"
+          onClick={() => onChange({ midpointSnap: !midpoint })}
+          className="h-7 px-2 rounded-md border text-xs"
+          style={{
+            borderColor: "hsl(var(--hairline))",
+            background: midpoint ? "hsl(var(--surface-strong))" : "transparent",
+          }}
+        >
+          {midpoint ? "Ein" : "Aus"}
+        </button>
+      </Row>
+      <Row label="Teilung (N)">
+        <div className="flex items-center gap-2">
+          <input
+            type="number"
+            min={2}
+            max={64}
+            step={1}
+            value={draft}
+            placeholder="–"
+            onChange={(e) => {
+              const raw = e.target.value;
+              setDraft(raw);
+              if (raw.trim() === "") { onChange({ divisionSnap: null }); return; }
+              const n = Math.floor(Number(raw));
+              if (Number.isFinite(n) && n >= 2) onChange({ divisionSnap: n });
+            }}
+            className="w-20 h-7 px-2 rounded bg-transparent border text-sm tabular-nums"
+            style={{ borderColor: "hsl(var(--hairline))" }}
+          />
+          {division ? (
+            <button
+              type="button"
+              onClick={() => { setDraft(""); onChange({ divisionSnap: null }); }}
+              className="h-7 px-2 rounded-md border text-[11px] text-muted-foreground"
+              style={{ borderColor: "hsl(var(--hairline))" }}
+            >
+              Aus
+            </button>
+          ) : null}
+        </div>
+      </Row>
+      <div className="text-[11px] text-muted-foreground">
+        Mittelpunkt = Halbierungs-Snap (50 %). Teilung N (z. B. 3, 4) erzeugt N-1
+        zusätzliche Snap-Punkte für gleiche Abschnitte. Beide Optionen sind
+        kombinierbar.
+      </div>
+    </SettingsBlock>
+  );
+}
+
+
+
 function TextSettings({
   settings,
   onChange,
