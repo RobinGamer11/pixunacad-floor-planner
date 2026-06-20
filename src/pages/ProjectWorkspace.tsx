@@ -799,7 +799,7 @@ function PageCanvas({
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || (t as any).isContentEditable)) return;
       setPendingStart(null);
       setHoverPt(null);
-      if (activeTool !== null) setActiveTool(null);
+      if (activeTool !== null) onCommitTool();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
