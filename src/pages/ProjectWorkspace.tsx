@@ -1557,7 +1557,8 @@ function ToolsTab({
         </div>
         {!settingsTool ? (
           <div className="text-xs text-muted-foreground">
-            Wähle links in der Werkzeugleiste ein Werkzeug (Hilfslinie, Linie, Text, CAD-Blatt) — die zugehörigen Einstellungen erscheinen hier.
+            Auswahlwerkzeug aktiv — klicke ein Objekt zum Auswählen.{" "}
+            Mit Mehrfachauswahl (siehe Einstellung unten) oder <kbd className="px-1 rounded border" style={{ borderColor: "hsl(var(--hairline))" }}>Shift</kbd>-Klick mehrere Objekte gleichzeitig auswählen.
           </div>
         ) : (
           <div className="flex items-center justify-between rounded-md border px-3 py-2" style={{ borderColor: "hsl(var(--hairline))" }}>
