@@ -46,14 +46,24 @@ export class LineHub {
   showAt(sx: number, sy: number) {
     this.visible = true;
     this.root.classList.remove("hidden");
+    this.root.style.display = "flex";
+    this.root.style.flexDirection = "row";
+    this.root.style.alignItems = "center";
 
     const pad = 12;
-    const vp = this.root.parentElement!.getBoundingClientRect();
+    let vpW = window.innerWidth;
+    let vpH = window.innerHeight;
+    let node: HTMLElement | null = this.root.parentElement;
+    while (node) {
+      const r = node.getBoundingClientRect();
+      if (r.width > 50 && r.height > 50) { vpW = r.width; vpH = r.height; break; }
+      node = node.parentElement;
+    }
     const boxW = 132;
     const boxH = 56;
 
-    const left = clamp(sx + pad, 8, vp.width - boxW - 8);
-    const top = clamp(sy + pad, 8, vp.height - boxH - 8);
+    const left = clamp(sx + pad, 8, Math.max(8, vpW - boxW - 8));
+    const top = clamp(sy + pad, 8, Math.max(8, vpH - boxH - 8));
 
     this.root.style.left = `${left}px`;
     this.root.style.top = `${top}px`;
@@ -63,6 +73,7 @@ export class LineHub {
     this.visible = false;
     this.editMode = false;
     this.root.classList.add("hidden");
+    this.root.style.display = "";
     this.lenInputEl.readOnly = true;
     this.angInputEl.readOnly = true;
   }
