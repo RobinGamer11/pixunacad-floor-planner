@@ -67,11 +67,13 @@ export interface MiniCadInit {
   defaultLineThicknessM?: number;
   /** Called whenever scene geometry changes. */
   onChange?: () => void;
-  /** Called whenever a CAD object selection changes in the embedded editor. */
-  onSelectionChange?: (info: MiniCadSelectionInfo | null) => void;
+  /** Called whenever a CAD object selection changes in the embedded editor.
+   *  Second argument is the total number of selected objects (>= 1 when info != null). */
+  onSelectionChange?: (info: MiniCadSelectionInfo | null, count?: number) => void;
   /** Initial serialized state. */
   initialState?: any;
 }
+
 
 export type MiniTool = "line" | "text" | "select" | "guide" | null;
 export type MiniCadSelectionInfo =
@@ -186,7 +188,7 @@ export class MiniCad {
   private _destroyed = false;
   private _changeDirty = false;
   private _onChange?: () => void;
-  private _onSelectionChange?: (info: MiniCadSelectionInfo | null) => void;
+  private _onSelectionChange?: (info: MiniCadSelectionInfo | null, count?: number) => void;
   private _coordCleanups: Array<() => void> = [];
   /** Aktiv während das Hilfslinien-Werkzeug läuft — neue Segmente werden als
    *  Hilfslinien markiert (isGuide=true). */
@@ -697,10 +699,6 @@ export class MiniCad {
     // Während einer aktiven Marquee gehört die Selection-Hoheit dem Marquee.
     if (this._suppressSetSelection || this._marqueeActive) return;
     if (selection === null) {
-
-      // Wenn der Multi-Modus oder Shift aktiv ist und es schon eine Auswahl gibt,
-      // wird ein "Klick ins Leere" (SelectTool ruft setSelection(null)) ignoriert —
-      // sonst würde jede leere Klickfläche die Mehrfachauswahl wegwerfen.
       if ((this._multiSelectMode || this._shiftDown) && this.selections.length > 0) return;
       this._applyPrimary(null, []);
       return;
@@ -709,7 +707,6 @@ export class MiniCad {
     if (wantMulti && this.selections.length > 0) {
       const idx = this.selections.findIndex((s) => _sameObject(s, selection));
       if (idx >= 0) {
-        // Bereits enthalten → entfernen (toggle off)
         const next = this.selections.slice();
         next.splice(idx, 1);
         const primary = next[next.length - 1] ?? null;
@@ -722,14 +719,17 @@ export class MiniCad {
     this._applyPrimary(selection, [selection]);
   }
 
+
+
   /** Setzt primary + Liste; aktualisiert Renderer & feuert onSelectionChange. */
   private _applyPrimary(primary: Selection | null, list: Selection[]) {
     this.selection = primary;
     this.selections = list;
     this.renderer.setSelection(primary);
     (this.renderer as any).setExtraSelections?.(list.filter((s) => s !== primary));
-    this._onSelectionChange?.(this._selectionInfo(primary));
+    this._onSelectionChange?.(this._selectionInfo(primary), list.length);
   }
+
 
   clearSelection() {
     this._applyPrimary(null, []);
@@ -739,6 +739,8 @@ export class MiniCad {
   setMultiSelectMode(on: boolean) {
     this._multiSelectMode = !!on;
   }
+
+
 
   getSelections(): Selection[] {
     return this.selections.slice();

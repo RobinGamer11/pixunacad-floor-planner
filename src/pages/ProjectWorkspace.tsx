@@ -86,6 +86,8 @@ export default function ProjectWorkspace() {
   const [rightTab, setRightTab] = useState<"settings" | "tools" | "layers">("settings");
   const [activeTool, setActiveTool] = useState<PageTool>(null);
   const [selectedCadTool, setSelectedCadTool] = useState<"line" | "text" | undefined>();
+  const [cadSelectionCount, setCadSelectionCount] = useState<number>(0);
+
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
   const [renamingPageId, setRenamingPageId] = useState<string | undefined>();
@@ -580,7 +582,8 @@ export default function ProjectWorkspace() {
                     setSelectedCadTool(undefined);
                     setRightTab("tools");
                   }}
-                  onCadSelectionChange={(info) => {
+                  onCadSelectionChange={(info, count) => {
+                    setCadSelectionCount(count ?? (info ? 1 : 0));
                     if (!info) {
                       setSelectedCadTool(undefined);
                       return;
@@ -588,6 +591,7 @@ export default function ProjectWorkspace() {
                     setSelectedElementIds([]);
                     setSelectedCadTool(info.tool);
                     setRightTab("tools");
+
                     if (info.tool === "line") {
                       updateToolSettings("line", {
                         color: info.color,
@@ -632,6 +636,8 @@ export default function ProjectWorkspace() {
               selectedElementIds={selectedElementIds}
               setSelectedElementId={setSelectedElementId}
               toolSettings={toolSettings}
+              cadSelectionCount={cadSelectionCount}
+
               updateToolSettings={updateToolSettings}
               onJumpCad={(sheetId) => navigate(`/project/${project.id}/cad${sheetId ? `/${sheetId}` : ""}`)}
               onCollapse={() => setRightOpen(false)}
@@ -744,7 +750,7 @@ function PageCanvas({
   toolSettings: ToolSettings;
   onCommitTool: () => void;
   onSelect: (id?: string, opts?: { shift?: boolean }) => void;
-  onCadSelectionChange: (info: MiniCadSelectionInfo | null) => void;
+  onCadSelectionChange: (info: MiniCadSelectionInfo | null, count?: number) => void;
 }) {
   const fmt = FORMAT_SIZES[page.format];
   const aspect = fmt.w / fmt.h;
@@ -1258,7 +1264,9 @@ function RightInspector({
   selectedElementIds,
   setSelectedElementId,
   toolSettings,
+  cadSelectionCount,
   updateToolSettings,
+
   onJumpCad,
   onCollapse,
 }: {
@@ -1275,7 +1283,9 @@ function RightInspector({
   selectedElementIds?: string[];
   setSelectedElementId: (id?: string) => void;
   toolSettings: ToolSettings;
+  cadSelectionCount?: number;
   updateToolSettings: <K extends keyof ToolSettings>(k: K, patch: Partial<ToolSettings[K]>) => void;
+
   onJumpCad: (sheetId?: string) => void;
   onCollapse?: () => void;
 }) {
@@ -1319,8 +1329,10 @@ function RightInspector({
             selectedElementIds={selectedElementIds}
             setSelectedElementId={setSelectedElementId}
             toolSettings={toolSettings}
+            cadSelectionCount={cadSelectionCount}
             updateToolSettings={updateToolSettings}
             onJumpCad={onJumpCad}
+
           />
         )}
         {tab === "layers" && page && (
@@ -1532,6 +1544,7 @@ function ToolsTab({
   selectedElementIds,
   setSelectedElementId,
   toolSettings,
+  cadSelectionCount,
   updateToolSettings,
   onJumpCad,
 }: {
@@ -1546,7 +1559,9 @@ function ToolsTab({
   selectedElementIds?: string[];
   setSelectedElementId: (id?: string) => void;
   toolSettings: ToolSettings;
+  cadSelectionCount?: number;
   updateToolSettings: <K extends keyof ToolSettings>(k: K, patch: Partial<ToolSettings[K]>) => void;
+
   onJumpCad: (sheetId?: string) => void;
 }) {
   const settingsTool = activeTool ?? selectedCadTool ?? null;
@@ -1594,7 +1609,7 @@ function ToolsTab({
         <SelectSettings
           settings={toolSettings.select}
           onChange={(p) => updateToolSettings("select", p)}
-          selectedCount={selectedElementIds?.length ?? 0}
+          selectedCount={Math.max(selectedElementIds?.length ?? 0, cadSelectionCount ?? 0)}
         />
       )}
       {settingsTool === "guide" && (

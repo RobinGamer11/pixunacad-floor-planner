@@ -20,7 +20,7 @@ interface Props {
   enabled: boolean;
   initialState?: any;
   onChange: (state: any) => void;
-  onSelectionChange?: (info: MiniCadSelectionInfo | null) => void;
+  onSelectionChange?: (info: MiniCadSelectionInfo | null, count?: number) => void;
   // Line defaults
   lineColor?: string;
   lineThicknessMm?: number;
@@ -126,7 +126,7 @@ export default function CadOverlayLayer(props: Props) {
       initialZoom: zoom,
       initialState,
       onChange: () => onChangeRef.current(engine.serialize()),
-      onSelectionChange: (info) => onSelectionChangeRef.current?.(info),
+      onSelectionChange: (info, count) => onSelectionChangeRef.current?.(info, count),
       
     });
     engineRef.current = engine;
