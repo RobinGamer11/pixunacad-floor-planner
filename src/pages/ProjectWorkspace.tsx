@@ -650,8 +650,18 @@ export default function ProjectWorkspace() {
               setSelectedElementId={setSelectedElementId}
               toolSettings={toolSettings}
               cadSelectionCount={cadSelectionCount}
+              cadSelectedLineSnap={cadSelectedLineSnap}
+              onCadLineSnapChange={(patch) => {
+                cadEngineApiRef.current?.setSelectedSegmentSnap(patch);
+                setCadSelectedLineSnap((prev) => prev ? {
+                  midpoint: typeof patch.midpointSnap === "boolean" ? patch.midpointSnap : prev.midpoint,
+                  division: patch.divisionSnap !== undefined ? (patch.divisionSnap == null || patch.divisionSnap < 2 ? null : Math.floor(patch.divisionSnap)) : prev.division,
+                  isGuide: prev.isGuide,
+                } : prev);
+              }}
 
               updateToolSettings={updateToolSettings}
+
               onJumpCad={(sheetId) => navigate(`/project/${project.id}/cad${sheetId ? `/${sheetId}` : ""}`)}
               onCollapse={() => setRightOpen(false)}
             />
