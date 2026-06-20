@@ -389,9 +389,22 @@ export class LineTool {
     this._syncSpaceShiftLock(input);
 
     if (input.rightClicked) {
+      // Anfangspunkt (currentPoint) der aktuell gezeichneten Linie: erlaubt
+      // eine Anker-Hilfslinie durch genau diesen Punkt — auch wenn er noch
+      // nicht als Segment im Scene-Graph existiert.
+      if (this.state === "drawing" && this.currentPoint) {
+        const worldTol = Defaults.snapPx / Math.max(1e-6, this.app.camera.scale);
+        const dx = input.mouse.wx - this.currentPoint.x;
+        const dy = input.mouse.wy - this.currentPoint.y;
+        if (Math.hypot(dx, dy) <= worldTol) {
+          this._toggleCurrentPointGuide();
+          return;
+        }
+      }
       if (this.snap && this.snap.type === SnapType.POINT) { this._toggleGuideAnchorFromSnap(this.snap); return; }
       if (this.snap && this.snap.type === SnapType.LINE) { this._toggleParallelGuideFromSnap(this.snap); return; }
     }
+
 
     if (this.state === "drawing") {
       const metrics = this._previewMetrics(input);
