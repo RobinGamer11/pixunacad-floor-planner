@@ -778,7 +778,7 @@ function PageCanvas({
   onCommitTool: () => void;
   onSelect: (id?: string, opts?: { shift?: boolean }) => void;
   onCadSelectionChange: (info: MiniCadSelectionInfo | null, count?: number) => void;
-  onCadEngineReady?: (api: { setSelectedSegmentSnap: (opts: { midpointSnap?: boolean; divisionSnap?: number | null }) => void }) => void;
+  onCadEngineReady?: (api: { setSelectedSegmentSnap: (opts: { midpointSnap?: boolean; divisionSnap?: number | null }) => void; duplicateSelectedSegments: (offsetMm?: number) => number }) => void;
 }) {
 
   const fmt = FORMAT_SIZES[page.format];
