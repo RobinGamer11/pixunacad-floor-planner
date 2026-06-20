@@ -1,61 +1,77 @@
 ## Ziel
+Drei größere Änderungen am CAD-Editor:
 
-Rechtsklick auf eine bestehende CAD-Linie/-Kante öffnet einen Mini-Hub mit einem Eingabefeld „Abstand (mm)". Nach Bestätigung wird parallel zur angeklickten Linie im eingegebenen Abstand eine Hilfslinie (page-level Guide) erzeugt.
+1. Rechtsklick-Hilfslinien-Hub („Abstand 100 mm OK ✕") **entfernen**, stattdessen den **LineHub-Stil (Länge m / Winkel °)** wie im Linienwerkzeug auch für **alle anderen Werkzeuge** beim Setzen/Bearbeiten von Punkten anzeigen.
+2. Hilfslinien-Werkzeug überarbeiten: identisches Verhalten wie Linienwerkzeug, aber hellblau gestrichelt, nicht druckbar, fixierbar per Schloss.
+3. Auswahlwerkzeug: Single- vs. Multi-Select-Modus, gemeinsame Bearbeitung gleichartiger Objekte, gemeinsames Verschieben/Drehen/Duplizieren beliebiger Objekte.
 
-## Verhalten
+---
 
-1. Rechtsklick wird auf der CAD-Oberfläche abgefangen.
-2. Wird ein nicht-Frame-Segment getroffen, öffnet sich neben dem Klickpunkt ein kleiner Hub:
-   - Inputfeld für Abstand (mm), default = 100
-   - Vorschauseite zeigt die Linie live in zwei möglichen Parallel-Positionen (links/rechts der Quelllinie) — Klick auf die gewünschte Seite oder Enter platziert auf der dem Mauszeiger nähergelegenen Seite.
-   - ESC bricht ab.
-3. Nach Bestätigung wird der Hub geschlossen und die Hilfslinie in der Page-Guide-Liste angelegt — sie verhält sich wie alle bisherigen Hilfslinien (verschiebbar, löschbar, in „Hilfslinie"-Layer).
-4. Wenn der Rechtsklick KEIN Segment trifft, ändert sich nichts (kein Standard-Browser-Kontextmenü, das ist bereits unterdrückt).
+## 1. Distanz-Hub-Vereinheitlichung
 
-## Distanz-Referenz
+**Entfernen:**
+- `ParallelGuideHub.ts` und sein Aufruf via Rechtsklick in `MiniCad.ts` werden komplett deaktiviert/gelöscht.
+- Rechtsklick erzeugt keine Hilfslinie mehr (bleibt erstmal ohne Funktion).
 
-Der eingegebene mm-Wert ist der senkrechte Abstand zur Quelllinie. Die Seite wird über die Mausposition relativ zur Linie bestimmt — die Hilfslinie erscheint auf der Seite des Mauszeigers. Damit ist „vom letzten ausgewählten Punkt" implizit: der Rechtsklick selbst definiert die Seite und Referenzlage. (Optional: Wenn vorher ein Snap-Punkt selektiert war und auf der Linie liegt, dient er als Referenz; sonst der Lotfußpunkt vom Mausklick auf die Linie.)
+**Hinzufügen (LineHub-Stil, Screenshot 2: `0.131 m | 122.1°`):**
+- `LineHub` wird zu generischem „PointPlacementHub" erweitert und beim Setzen jedes neuen Punkts angezeigt für:
+  - **WallTool** (Wand-Stützpunkte)
+  - **HatchTool** (Polygon-Stützpunkte)
+  - **FreeDrawTool** (Endpunkt, falls geradlinig)
+  - **MeasureTool** (Messpunkte)
+  - **GuideTool** (neu, siehe Punkt 2)
+- Werte: Länge in m und Winkel ° vom **letzten gesetzten Punkt** zum aktuellen Cursor. Enter/Tab/Eingabe wie bei Linie.
 
-## Technik
+## 2. Hilfslinien-Werkzeug
 
-```text
-CadOverlayLayer (React)
-   │  onCreateParallelGuide(p1Pct, p2Pct)  ← Callback
-   ▼
-MiniCad
-   │  installt contextmenu-Listener auf canvas
-   │  hit-test gegen Scene.segments (ohne Frame-Segmente)
-   │  zeigt ParallelGuideHub (neues DOM-Element)
-   │  bei Commit: berechnet Parallel-Endpunkte in Welt-m
-   │             → konvertiert m → Page-% via pageWidthMm/pageHeightMm
-   │             → ruft onCreateParallelGuide
-   ▼
-ProjectWorkspace
-   │  fügt Element { kind:"guide", x1,y1,x2,y2 (in %) } zur Seite hinzu
-```
+- Werkzeug verhält sich **1:1 wie LineTool** (Snapping, Ortho, Hub, Mehrfachsegmente).
+- Erzeugte `PageElement.kind = "guide"`:
+  - Render: gestrichelt, Standardfarbe `#7DD3FC` (hellblau), im Hintergrund (z-Index niedriger als Linien/Text).
+  - Farbe in Werkzeugeinstellungen wählbar (Color-Picker, default hellblau).
+  - Strichmuster fest (z. B. `4 4`).
+- **Einstellungen** (neuer/erweiterter `GuideSettingsPanel`):
+  - Farbe
+  - Schloss-Toggle „Fixiert" → wenn aktiv, sind alle Hilfslinien nicht mehr selektierbar/verschiebbar/löschbar.
+- **Druck/Export**: `PlanPdfExport` und alle Render-Pfade filtern `kind === "guide"` heraus.
+- **Snapping**: Hilfslinien bleiben Snap-Targets (`SnapType.GUIDE`).
 
-### Neue Dateien
-- `src/cad/ParallelGuideHub.ts`: kleines DOM-Widget mit `<input>` (mm) + OK/Cancel; `bindCommit((mm)=>void)`, `showAt(sx,sy, defaultMm)`, `hide()`. Selbe Visual-Styles wie LineHub.
+## 3. Auswahlwerkzeug — Multi-Select
 
-### Geänderte Dateien
-- `src/cad/embed/MiniCad.ts`
-  - Konstruktor: `contextmenu` auf Canvas registrieren, `e.preventDefault()`, Segment-Hit per `topology.findBestSnap`/Segment-Loop.
-  - Neue Methode `_handleSegmentRightClick(seg, mouseW, sx, sy)`: berechnet Lotfußpunkt + Side, öffnet Hub.
-  - Auf Hub-Commit: rechnet Parallel-Linie, konvertiert mm-Welt-Endpunkte → Page-% (`xPct = (xM*1000)/pageWidthMm*100`), ruft `init.onCreateParallelGuide?.(p1, p2)`.
-- `src/components/page/CadOverlayLayer.tsx`
-  - neues ref `parallelHubRef` + Input
-  - propagiert `onCreateParallelGuide(p1,p2)` an Parent
-- `src/pages/ProjectWorkspace.tsx`
-  - neuer Handler legt ein Guide-`PageElement` mit den beiden %-Punkten an, kind=`"guide"`, Farbe/Strichstärke aus `toolSettings.guide`.
+**Werkzeugeinstellungen (SelectSettingsPanel):**
+- Toggle `Auswahlmodus`: „Einzel" / „Mehrfach".
 
-### Edge-Cases
-- Quelllinie ist sehr kurz / vertikal / horizontal: Berechnung über Normalenvektor (`nx = -dy/|d|, ny = dx/|d|`) deckt alle Winkel ab.
-- Negativer / zu großer Abstand: clamp ≥ 0; wenn Linie außerhalb Seite landet → trotzdem erzeugen (User-Entscheidung).
-- Rechtsklick auf Frame-Segment (unsichtbarer Page/Margin-Rahmen): ignorieren (`isFrameSegment`).
+**Mehrfachmodus:**
+- Klick auf Objekt → zur Auswahl hinzufügen (bestehendes bleibt). Klick auf leeren Bereich → Auswahl leeren. Shift-Klick entfernt aus Auswahl.
+- Marquee (Rechteck-Auswahl per Drag) bleibt erhalten.
 
-### Tests (manuell)
-- Horizontale Linie + 50mm → parallele Hilfslinie 50mm darüber/darunter je nach Mausseite.
-- 45°-Linie + 100mm → korrekt orthogonal versetzt.
-- ESC bricht Hub ab, keine Guide erzeugt.
+**Einstellungs-Anzeige bei Mehrfachauswahl:**
+- Es wird immer das Settings-Panel des **zuletzt angeklickten Objekts** angezeigt (Linie, Text, Wand, …).
+- Änderungen werden auf **alle gewählten Objekte vom selben Typ** angewendet (z. B. Strichstärke ändert alle Linien, andere Typen bleiben unverändert).
 
-Implementierung umfasst ~250 Zeilen über 4 Dateien.
+**Sammel-Aktionen für ALLE gewählten Objekte (unabhängig vom Typ):**
+- Verschieben (Drag der Auswahl)
+- Drehen (Rotations-Handle um den Auswahl-Mittelpunkt)
+- Duplizieren (Hub-Icon „Duplizieren", neue Kopien wieder gesetzt werden)
+- Löschen (Entf / Backspace)
+
+---
+
+## Technische Hinweise (für Entwickler)
+
+- `LineHub.ts` umbenennen/öffnen für generische Nutzung; `showAt(sx,sy,{lastPointW, currentW})` → berechnet selbst Länge/Winkel. Bestehende `LineTool`-Integration bleibt unverändert.
+- `MiniCad.ts`: zentrale Methode `_showPlacementHub(toolId, lastP, currentP)`; wird von Wall/Hatch/FreeDraw/Measure/Guide aufgerufen.
+- `ParallelGuideHub.ts` löschen, `contextmenu`-Handler entfernen.
+- `PageElement` Typ-Erweiterung für `guide`: `locked: boolean`, `color: string`.
+- `projectStore`: neuer Toolsettings-Slice `select.multi: boolean`.
+- `SelectTool.ts`: interner State `selection: SelectionItem[]` + `lastSelected` für Settings-Panel.
+- `CadOverlayLayer`/`ProjectWorkspace`: Settings-Panel rendert dynamisch nach `lastSelected.kind`, Änderungen werden auf `selection.filter(s => s.kind === lastSelected.kind)` gemapped.
+- Render-Reihenfolge: `guide` zuerst, danach reguläre Elemente.
+- `PlanPdfExport` & Druck-Pfade: `elements.filter(e => e.kind !== "guide")`.
+
+---
+
+## Offen / Rückfragen
+
+Bevor ich starte, eine Frage zum Auswahlmodus:
+- Soll **Shift-Klick im Einzelmodus** trotzdem temporär Mehrfachauswahl ermöglichen (Standard in CAD-Programmen), oder strikt nur das, was der Modus-Toggle sagt?
+- Drehen mehrerer Objekte: gemeinsamer Drehmittelpunkt = **geometrischer Mittelpunkt der Auswahl** ok?
