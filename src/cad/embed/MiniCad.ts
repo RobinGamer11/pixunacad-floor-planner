@@ -262,8 +262,10 @@ export class MiniCad {
     this._installGuideSegmentInterceptor();
     this._installCoordRemap();
     this._installDeleteKey();
+    this._installShiftTracker();
     this.applyZoom(this._zoom);
     this._installPageFrameSnap();
+
     
     
 
