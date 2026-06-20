@@ -1917,6 +1917,19 @@ function LineSnapSettings({
           ) : null}
         </div>
       </Row>
+      {onDuplicate && (
+        <Row label="Aktion">
+          <button
+            type="button"
+            onClick={onDuplicate}
+            className="h-7 px-2 rounded-md border text-xs inline-flex items-center gap-1"
+            style={{ borderColor: "hsl(var(--hairline))" }}
+            title="Auswahl duplizieren (leichter Versatz)"
+          >
+            <Copy size={12} /> Duplizieren
+          </button>
+        </Row>
+      )}
       <div className="text-[11px] text-muted-foreground">
         Mittelpunkt = Halbierungs-Snap (50 %). Teilung N (z. B. 3, 4) erzeugt N-1
         zusätzliche Snap-Punkte für gleiche Abschnitte. Beide Optionen sind
