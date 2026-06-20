@@ -364,6 +364,7 @@ export class MiniCad {
     if (this._activeTool === tool) return;
     // Deactivate previous.
     if (this._activeTool === "line") this.lineTool.cancel();
+    if (this._activeTool === "guide") this.lineTool.cancel();
     if (this._activeTool === "text") {
       try { this.textEditor.commit(); } catch {}
       this.textTool.cancel();
@@ -371,7 +372,9 @@ export class MiniCad {
     if (this._activeTool === "select") this.selectTool.cancel();
     this._activeTool = tool;
     this.activeTool = null;
-    if (tool === "line") {
+    // Guide-Modus aktivieren/deaktivieren — wirkt auf den createSegment-Interceptor.
+    this._guideMode = (tool === "guide");
+    if (tool === "line" || tool === "guide") {
       this.lineTool.activate();
       this.activeTool = this.lineTool;
     } else if (tool === "text") {
@@ -380,6 +383,25 @@ export class MiniCad {
     } else if (tool === "select") {
       this.selectTool.activate();
     }
+  }
+
+  /** Sperrt/entsperrt alle Hilfslinien (Auswahl, Verschieben, Punktedit). */
+  setGuidesLocked(locked: boolean) {
+    this._guidesLocked = !!locked;
+    // Wenn gerade eine Hilfslinie selektiert ist → Auswahl räumen.
+    const sel = this.selection;
+    if (sel && sel.segmentId) {
+      const seg = this.scene.getSegmentById(sel.segmentId);
+      if (seg?.isGuide && this._guidesLocked) {
+        try { this.clearSelection(); } catch {}
+        try { this.pointEditMenu.hide(); } catch {}
+      }
+    }
+  }
+
+  /** Setzt die Default-Farbe für neu erzeugte Hilfslinien. */
+  setGuideColor(color: string) {
+    if (color && typeof color === "string") this._guideColor = color;
   }
 
   setLineDefaults(opts: { color?: string; thicknessM?: number; alpha?: number }) {
