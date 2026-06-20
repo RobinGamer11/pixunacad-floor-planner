@@ -1101,6 +1101,11 @@ export class MiniCad {
       else if (this._activeTool === "text") this.textTool.update(this.input);
       else if (this._activeTool === "select") this.selectTool.update(this.input);
 
+      // Multi-Select Group-Move: nach SelectTool-Update das Delta des Primary
+      // auf die Snapshot-Positionen der Extras anwenden.
+      this._applyGroupTranslate();
+
+
       // Geometry change → persist (cover segments AND text boxes AND edits).
       const sig = this._sceneSignature();
       if (sig !== this._lastSig) {
