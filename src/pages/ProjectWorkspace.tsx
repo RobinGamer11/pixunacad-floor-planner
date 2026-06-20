@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useRef, useEffect } from "react";
+import React, { useMemo, useState, useRef, useEffect, useLayoutEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ChevronLeft,
@@ -90,6 +90,7 @@ export default function ProjectWorkspace() {
     visible: true,
   });
   const [zoom, setZoom] = useState(77);
+  const canvasViewportRef = useRef<HTMLDivElement>(null);
   const setZoomClamped = (v: number) => setZoom(Math.max(10, Math.min(400, Math.round(v))));
   const setActiveToolAndTab = (t: PageTool) => {
     setActiveTool(t);
@@ -137,6 +138,26 @@ export default function ProjectWorkspace() {
   const activePage = project.pages.find((p) => p.id === activePageId) ?? project.pages[0];
   const selectedElement = activePage?.elements.find((e) => e.id === selectedElementId);
   const bgPage = bgOverlay.pageId ? project.pages.find((p) => p.id === bgOverlay.pageId) : undefined;
+
+  useLayoutEffect(() => {
+    if (!activePage || !canvasViewportRef.current) return;
+    const fitPage = () => {
+      const fmt = FORMAT_SIZES[activePage.format];
+      const baseWidth = 1100;
+      const baseHeight = baseWidth / (fmt.w / fmt.h);
+      const box = canvasViewportRef.current!;
+      const nextZoom = Math.max(10, Math.min(100, Math.floor(Math.min(
+        ((box.clientWidth - 96) / baseWidth) * 100,
+        ((box.clientHeight - 96) / baseHeight) * 100,
+      ))));
+      setZoom(nextZoom);
+      requestAnimationFrame(() => {
+        box.scrollLeft = Math.max(0, (box.scrollWidth - box.clientWidth) / 2);
+        box.scrollTop = Math.max(0, (box.scrollHeight - box.clientHeight) / 2);
+      });
+    };
+    fitPage();
+  }, [activePage?.id, activePage?.format]);
 
   return (
     <div
@@ -478,6 +499,7 @@ export default function ProjectWorkspace() {
             style={{ background: "hsl(var(--surface))" }}
           >
             <div
+              ref={canvasViewportRef}
               className="flex-1 overflow-hidden relative"
               onWheel={(e) => {
                 if (e.ctrlKey || e.metaKey || !e.shiftKey) {
