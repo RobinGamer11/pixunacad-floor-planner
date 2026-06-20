@@ -1912,6 +1912,7 @@ export class SelectTool {
           PointEditAction.TRANSLATE,
           PointEditAction.ROTATE,
           PointEditAction.RESIZE,
+          PointEditAction.DUPLICATE,
         ], { align: "centerAbove" });
         return;
       }

@@ -5,7 +5,7 @@ import { makeHubDraggable, resetHubUserMoved, hubWasUserMoved } from "./hubDrag"
 export class PointEditMenu {
   root: HTMLDivElement;
   buttonsByAction: Record<string, HTMLButtonElement>;
-  actions = [PointEditAction.MOVE, PointEditAction.TRANSLATE, PointEditAction.ROTATE, PointEditAction.OFFSET, PointEditAction.RESIZE, PointEditAction.DELETE];
+  actions = [PointEditAction.MOVE, PointEditAction.TRANSLATE, PointEditAction.ROTATE, PointEditAction.OFFSET, PointEditAction.RESIZE, PointEditAction.DUPLICATE, PointEditAction.DELETE];
   index = -1;
   visible = false;
   private _onActivate: ((action: string) => void) | null = null;
@@ -74,7 +74,7 @@ export class PointEditMenu {
       }
     }
 
-    const boxW = 168;
+    const boxW = 200;
     const boxH = 36;
 
     let left: number;
