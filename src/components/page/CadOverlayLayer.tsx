@@ -60,6 +60,7 @@ export default function CadOverlayLayer(props: Props) {
   const peRotateRef = useRef<HTMLButtonElement>(null);
   const peDeleteRef = useRef<HTMLButtonElement>(null);
   const peOffsetRef = useRef<HTMLButtonElement>(null);
+  const peResizeRef = useRef<HTMLButtonElement>(null);
   // Text editor DOM
   const teEditorRef = useRef<HTMLDivElement>(null);
   const teToolbarRef = useRef<HTMLDivElement>(null);
