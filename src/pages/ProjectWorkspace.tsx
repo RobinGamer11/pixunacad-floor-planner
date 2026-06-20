@@ -1298,6 +1298,7 @@ function RightInspector({
   cadSelectionCount,
   cadSelectedLineSnap,
   onCadLineSnapChange,
+  onCadDuplicateSegments,
   updateToolSettings,
 
   onJumpCad,
@@ -1319,6 +1320,7 @@ function RightInspector({
   cadSelectionCount?: number;
   cadSelectedLineSnap?: { midpoint: boolean; division: number | null; isGuide: boolean } | null;
   onCadLineSnapChange?: (patch: { midpointSnap?: boolean; divisionSnap?: number | null }) => void;
+  onCadDuplicateSegments?: () => void;
   updateToolSettings: <K extends keyof ToolSettings>(k: K, patch: Partial<ToolSettings[K]>) => void;
 
   onJumpCad: (sheetId?: string) => void;
