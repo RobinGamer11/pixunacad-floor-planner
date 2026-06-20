@@ -533,7 +533,24 @@ export class MiniCad {
       try { this._drawTextBoxSelection?.(); } catch {}
       if (this.overlay && this.overlay.draw) {
         try { this.overlay.draw(ctx, this.camera); } catch (e) { console.error(e); }
-      }
+  }
+
+  private _installSelectToolFrameFilter() {
+    const topo: any = this.topology;
+    const origSegs = topo._segmentsFrontToBack.bind(topo);
+    const isFrame = (s: any) => this.isFrameSegment(s);
+    // Während selectTool.update läuft, blenden wir Rahmen-Segmente aus.
+    let filtering = false;
+    topo._segmentsFrontToBack = () => {
+      const all = origSegs();
+      return filtering ? all.filter((s: any) => !isFrame(s)) : all;
+    };
+    const origUpdate = this.selectTool.update.bind(this.selectTool);
+    this.selectTool.update = (input: any) => {
+      filtering = true;
+      try { return origUpdate(input); }
+      finally { filtering = false; }
+    };
       ctx.restore();
     };
   }
