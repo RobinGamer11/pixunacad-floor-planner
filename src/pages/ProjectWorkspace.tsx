@@ -77,7 +77,12 @@ export default function ProjectWorkspace() {
   const project = useProject(projectId);
   const navigate = useNavigate();
   const [activePageId, setActivePageId] = useState<string | undefined>(project?.pages[0]?.id);
-  const [selectedElementId, setSelectedElementId] = useState<string | undefined>();
+  const [selectedElementIds, setSelectedElementIds] = useState<string[]>([]);
+  // `selectedElementId` ist das ZULETZT angeklickte Element — alle bestehenden
+  // Lese-Stellen (Inspector etc.) benutzen es weiterhin. Bei Multi-Auswahl
+  // beschreibt die volle Liste `selectedElementIds`.
+  const selectedElementId = selectedElementIds[selectedElementIds.length - 1];
+  const setSelectedElementId = (id?: string) => setSelectedElementIds(id ? [id] : []);
   const [rightTab, setRightTab] = useState<"settings" | "tools" | "layers">("settings");
   const [activeTool, setActiveTool] = useState<PageTool>(null);
   const [selectedCadTool, setSelectedCadTool] = useState<"line" | "text" | undefined>();
@@ -102,6 +107,7 @@ export default function ProjectWorkspace() {
 
   // Per-tool settings (live in workspace state; persist could come later).
   const [toolSettings, setToolSettings] = useState({
+    select: { multi: false },
     guide: { color: "#7DD3FC", strokeWidth: 1, locked: false },
     line: { color: "#111111", thicknessMm: 0.5, alpha: 100 },
     text: {
