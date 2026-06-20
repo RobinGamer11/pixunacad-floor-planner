@@ -526,9 +526,45 @@ export class MiniCad {
     return this.scene.getTextBoxById(this.selection.textBoxId);
   }
 
+  private _selectionInfo(selection: Selection | null): MiniCadSelectionInfo | null {
+    if (!selection) return null;
+    const box = this.getSelectedTextBox();
+    if (box) {
+      const textColor = splitColorAlpha(box.style.textColor, this.defaultTextColor);
+      return {
+        tool: "text",
+        color: textColor.color,
+        fontSize: Math.round(box.style.fontSizePx),
+        alpha: Math.round(textColor.alpha * 100),
+        align: box.style.align,
+        bgColor: box.style.bgColor,
+        bgAlphaPct: box.style.bgAlphaPct,
+        wrap: box.style.wrap,
+        autoSize: (box.style as any).autoSize !== false,
+        borderEnabled: box.style.borderEnabled,
+        borderColor: box.style.borderColor,
+        borderWidthPx: box.style.borderWidthPx,
+      };
+    }
+    if (selection.segmentId) {
+      const seg = this.scene.getSegmentById(selection.segmentId);
+      if (seg && !this.isFrameSegment(seg)) {
+        const lineColor = splitColorAlpha(seg.color, this.defaultLineColor);
+        return {
+          tool: "line",
+          color: lineColor.color,
+          thicknessMm: Math.max(0.1, Number(((seg.thicknessM / (this._strokeFactor || 1)) * 1000).toFixed(2))),
+          alpha: Math.round(lineColor.alpha * 100),
+        };
+      }
+    }
+    return null;
+  }
+
   setSelection(selection: Selection | null) {
     this.selection = selection;
     this.renderer.setSelection(selection);
+    this._onSelectionChange?.(this._selectionInfo(selection));
   }
 
   clearSelection() { this.setSelection(null); }
