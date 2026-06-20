@@ -51,7 +51,7 @@ export default function CadOverlayLayer(props: Props) {
   const {
     pageWidthMm, pageHeightMm, basePxPerMm, pageMarginsMm,
     zoom, activeTool, enabled, initialState, onChange, onSelectionChange,
-    lineColor, lineThicknessMm, lineAlpha, guideColor, guidesLocked,
+    lineColor, lineThicknessMm, lineAlpha, guideColor, guidesLocked, multiSelectMode,
     textColor, textFontSizePx, textBold, textItalic, textAlpha, textAlign,
     textBgColor, textBgAlphaPct, textWrap, textAutoSize, textBorderEnabled, textBorderColor, textBorderWidthPx,
   } = props;
