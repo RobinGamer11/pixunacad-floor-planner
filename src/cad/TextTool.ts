@@ -120,22 +120,77 @@ export class TextTool {
       }
     }
 
-    if (input.clicked) {
-      // If an editor is still open, this click only commits it.
-      // The preview reappears and the *next* click actually places a new box.
-      if (this.app.textEditor?.isActive()) {
+    // ====== Modus 2: Text passt sich Rahmen an → Drag-Create ======
+    const style = this.app.getCurrentTextStyle();
+    const autoSize = (style as any).autoSize !== false;
+
+    if (!autoSize) {
+      const leftDown = input.mouse.left;
+      const wasDown = this._wasLeftDown;
+      this._wasLeftDown = leftDown;
+
+      // Editor open → erster Mausklick committet ihn (kein Drag).
+      if (leftDown && !wasDown && this.app.textEditor?.isActive()) {
         this.app.textEditor.commit();
         return;
       }
 
-      // If the user clicks an existing textbox, select it instead of creating one
+      // Klick auf bestehende Textbox = nur auswählen, kein Drag.
+      if (leftDown && !wasDown) {
+        const box = this._hitTextBox(input);
+        if (box) {
+          this.app.setSelection({ type: SelectionType.TEXTBOX, textBoxId: box.id, handleIndex: null });
+          return;
+        }
+        this._dragStart = v(anchor.x, anchor.y);
+        this._dragEnd = v(anchor.x, anchor.y);
+        return;
+      }
+
+      if (leftDown && this._dragStart) {
+        this._dragEnd = v(anchor.x, anchor.y);
+        return;
+      }
+
+      // Mouse-Up → Box finalisieren
+      if (!leftDown && wasDown && this._dragStart && this._dragEnd) {
+        const a = this._dragStart, b = this._dragEnd;
+        this._dragStart = null;
+        this._dragEnd = null;
+        const wf = this.app.renderer.worldScaleFactor();
+        const minM = Defaults.textMinBoxSizeM * wf;
+        let widthM = Math.abs(b.x - a.x);
+        let heightM = Math.abs(b.y - a.y);
+        // Zu kleiner Drag → Default-Größe
+        if (widthM < minM * 2 || heightM < minM * 2) {
+          widthM = Defaults.textBoxWidthM * wf;
+          heightM = Defaults.textBoxHeightM * wf;
+        }
+        const tl = v(Math.min(a.x, b.x), Math.min(a.y, b.y));
+        const center = centerFromTopLeft(tl, widthM, heightM, 0);
+        const created = this.app.scene.createTextBox(
+          center, widthM, heightM,
+          { ...style, wrap: true, autoSize: false } as any,
+          "", 0,
+        );
+        this.app.setSelection({ type: SelectionType.TEXTBOX, textBoxId: created.id, handleIndex: null });
+        this.app.refreshLabelUI();
+        this.app.beginTextEdit(created);
+      }
+      return;
+    }
+
+    // ====== Modus 1 (Default): Auto-Size — wie bisher ======
+    if (input.clicked) {
+      if (this.app.textEditor?.isActive()) {
+        this.app.textEditor.commit();
+        return;
+      }
       const box = this._hitTextBox(input);
       if (box) {
         this.app.setSelection({ type: SelectionType.TEXTBOX, textBoxId: box.id, handleIndex: null });
         return;
       }
-
-      const style = this.app.getCurrentTextStyle();
       const wf = this.app.renderer.worldScaleFactor();
       const widthM = Defaults.textBoxWidthM * wf;
       const heightM = Defaults.textBoxHeightM * wf;
