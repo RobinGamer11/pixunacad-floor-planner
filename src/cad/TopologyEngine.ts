@@ -137,7 +137,21 @@ export class TopologyEngine {
     for (const seg of segs) {
       considerPoint(seg.a, seg, null, 0);
       considerPoint(seg.b, seg, null, 1);
+      // Mittelpunkt-/Teilungs-Snap-Punkte (vom User pro Linie aktivierbar).
+      // pointIndex = -1 markiert sie als "interne" Snap-Punkte ohne Vertex-Index,
+      // damit sie nicht als echte Endpunkte (für Hub/Auswahl) interpretiert werden.
+      const divN = (typeof seg.divisionSnap === "number" && seg.divisionSnap >= 2) ? Math.floor(seg.divisionSnap) : 0;
+      if (seg.midpointSnap) {
+        considerPoint({ x: (seg.a.x + seg.b.x) * 0.5, y: (seg.a.y + seg.b.y) * 0.5 }, seg, null, -1);
+      }
+      if (divN >= 2) {
+        for (let k = 1; k < divN; k++) {
+          const t = k / divN;
+          considerPoint({ x: seg.a.x + (seg.b.x - seg.a.x) * t, y: seg.a.y + (seg.b.y - seg.a.y) * t }, seg, null, -1);
+        }
+      }
     }
+
     // Hatch points (outer + holes)
     for (const hatch of this._hatchesFrontToBack()) {
       for (let i = 0; i < hatch.points.length; i++) {
