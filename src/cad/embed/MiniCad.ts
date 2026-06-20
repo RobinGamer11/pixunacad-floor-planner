@@ -582,7 +582,7 @@ export class MiniCad {
       return {
         tool: "text",
         color: textColor.color,
-        fontSize: Math.round(box.style.fontSizePx),
+        fontSize: Math.round(box.style.fontSizePx * (3 / 4)),
         alpha: Math.round(textColor.alpha * 100),
         align: box.style.align,
         bgColor: box.style.bgColor,
