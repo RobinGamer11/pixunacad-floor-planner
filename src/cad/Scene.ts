@@ -10,16 +10,20 @@ export class Segment {
   color: string;
   thicknessM: number;
   labelId: string;
+  /** Wenn true: Hilfslinie — wird hellblau gestrichelt im Hintergrund gezeichnet
+   *  und vom Druck/Export ausgeschlossen. */
+  isGuide: boolean;
   /** Wenn gesetzt: dieses Objekt gehört zum Edit-Mode der Sticker-Instanz mit dieser ID. */
   _stickerEditOwnerId?: string | null;
 
-  constructor({ id, a, b, color, thicknessM, labelId }: { id: string; a: Vec2; b: Vec2; color?: string; thicknessM?: number; labelId?: string }) {
+  constructor({ id, a, b, color, thicknessM, labelId, isGuide }: { id: string; a: Vec2; b: Vec2; color?: string; thicknessM?: number; labelId?: string; isGuide?: boolean }) {
     this.id = id;
     this.a = v(a.x, a.y);
     this.b = v(b.x, b.y);
     this.color = color || Defaults.lineColor;
     this.thicknessM = (typeof thicknessM === "number" && thicknessM > 0) ? thicknessM : Defaults.lineThicknessM;
     this.labelId = labelId || Defaults.defaultLabelId;
+    this.isGuide = !!isGuide;
     this._stickerEditOwnerId = null;
   }
 }
@@ -730,8 +734,8 @@ export class Scene {
   }
 
   // ---- Segments ----
-  createSegment(a: Vec2, b: Vec2, style: { color?: string; thicknessM?: number; labelId?: string } = {}) {
-    const seg = new Segment({ id: this._makeId(), a, b, color: style.color, thicknessM: style.thicknessM, labelId: style.labelId });
+  createSegment(a: Vec2, b: Vec2, style: { color?: string; thicknessM?: number; labelId?: string; isGuide?: boolean } = {}) {
+    const seg = new Segment({ id: this._makeId(), a, b, color: style.color, thicknessM: style.thicknessM, labelId: style.labelId, isGuide: style.isGuide });
     seg._stickerEditOwnerId = this._currentEditOwnerId;
     this.segments.push(seg);
     this._rebuildSegIdMap();
@@ -779,7 +783,7 @@ export class Scene {
       return { didSplit: false, point: (t < 0.5 ? seg.a : seg.b), newSegments: [seg] };
     }
     const p = lerp(seg.a, seg.b, t);
-    const style = { color: seg.color, thicknessM: seg.thicknessM, labelId: seg.labelId };
+    const style = { color: seg.color, thicknessM: seg.thicknessM, labelId: seg.labelId, isGuide: seg.isGuide };
     this.removeSegment(seg);
     const s1 = this.createSegment(seg.a, p, style);
     const s2 = this.createSegment(p, seg.b, style);

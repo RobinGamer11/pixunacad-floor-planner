@@ -73,7 +73,7 @@ export interface MiniCadInit {
   initialState?: any;
 }
 
-export type MiniTool = "line" | "text" | "select" | null;
+export type MiniTool = "line" | "text" | "select" | "guide" | null;
 export type MiniCadSelectionInfo =
   | { tool: "line"; color: string; thicknessMm: number; alpha: number }
   | {
@@ -164,6 +164,13 @@ export class MiniCad {
   private _onChange?: () => void;
   private _onSelectionChange?: (info: MiniCadSelectionInfo | null) => void;
   private _coordCleanups: Array<() => void> = [];
+  /** Aktiv während das Hilfslinien-Werkzeug läuft — neue Segmente werden als
+   *  Hilfslinien markiert (isGuide=true). */
+  private _guideMode: boolean = false;
+  /** Wenn true, sind alle Hilfslinien-Segmente nicht auswählbar/editierbar. */
+  private _guidesLocked: boolean = false;
+  /** Default-Farbe für neue Hilfslinien (überschreibt Linienfarbe im Guide-Modus). */
+  private _guideColor: string = "#7DD3FC";
 
   constructor(init: MiniCadInit) {
     this.dom = init.dom;
@@ -244,10 +251,12 @@ export class MiniCad {
     });
 
     this._installSelectToolFrameFilter();
+    this._installGuideSegmentInterceptor();
     this._installCoordRemap();
     this._installDeleteKey();
     this.applyZoom(this._zoom);
     this._installPageFrameSnap();
+    
     
 
     if (init.initialState) this._restore(init.initialState);
@@ -314,18 +323,34 @@ export class MiniCad {
     // nicht mehr an Seiten-/Randkanten ausrichten.
     // Stattdessen post-processen wir das Auswahlergebnis: landet eine
     // Auswahl auf einem Rahmen-Segment, wird sie sofort wieder geleert.
+    // Genauso: gesperrte Hilfslinien dürfen nicht selektiert werden.
     const origUpdate = this.selectTool.update.bind(this.selectTool);
     (this.selectTool as any).update = (input: any) => {
       const result = origUpdate(input);
       const sel = this.selection;
       if (sel && sel.segmentId) {
         const seg = this.scene.getSegmentById(sel.segmentId);
-        if (seg && this.isFrameSegment(seg)) {
+        if (seg && (this.isFrameSegment(seg) || (seg.isGuide && this._guidesLocked))) {
           this.clearSelection();
           try { this.pointEditMenu.hide(); } catch {}
         }
       }
       return result;
+    };
+  }
+
+  /** Wickelt scene.createSegment so ein, dass im Guide-Modus alle neuen
+   *  Segmente als Hilfslinien (isGuide=true) markiert werden. Frame-Segmente
+   *  werden nie als Guides markiert. */
+  private _installGuideSegmentInterceptor() {
+    const orig = this.scene.createSegment.bind(this.scene);
+    (this.scene as any).createSegment = (a: any, b: any, style: any = {}) => {
+      const s = { ...style };
+      if (this._guideMode && style.labelId !== this._frameLabelId && s.isGuide === undefined) {
+        s.isGuide = true;
+        if (!s.color) s.color = this._guideColor;
+      }
+      return orig(a, b, s);
     };
   }
 
@@ -339,6 +364,7 @@ export class MiniCad {
     if (this._activeTool === tool) return;
     // Deactivate previous.
     if (this._activeTool === "line") this.lineTool.cancel();
+    if (this._activeTool === "guide") this.lineTool.cancel();
     if (this._activeTool === "text") {
       try { this.textEditor.commit(); } catch {}
       this.textTool.cancel();
@@ -346,7 +372,9 @@ export class MiniCad {
     if (this._activeTool === "select") this.selectTool.cancel();
     this._activeTool = tool;
     this.activeTool = null;
-    if (tool === "line") {
+    // Guide-Modus aktivieren/deaktivieren — wirkt auf den createSegment-Interceptor.
+    this._guideMode = (tool === "guide");
+    if (tool === "line" || tool === "guide") {
       this.lineTool.activate();
       this.activeTool = this.lineTool;
     } else if (tool === "text") {
@@ -355,6 +383,25 @@ export class MiniCad {
     } else if (tool === "select") {
       this.selectTool.activate();
     }
+  }
+
+  /** Sperrt/entsperrt alle Hilfslinien (Auswahl, Verschieben, Punktedit). */
+  setGuidesLocked(locked: boolean) {
+    this._guidesLocked = !!locked;
+    // Wenn gerade eine Hilfslinie selektiert ist → Auswahl räumen.
+    const sel = this.selection;
+    if (sel && sel.segmentId) {
+      const seg = this.scene.getSegmentById(sel.segmentId);
+      if (seg?.isGuide && this._guidesLocked) {
+        try { this.clearSelection(); } catch {}
+        try { this.pointEditMenu.hide(); } catch {}
+      }
+    }
+  }
+
+  /** Setzt die Default-Farbe für neu erzeugte Hilfslinien. */
+  setGuideColor(color: string) {
+    if (color && typeof color === "string") this._guideColor = color;
   }
 
   setLineDefaults(opts: { color?: string; thicknessM?: number; alpha?: number }) {
@@ -455,7 +502,7 @@ export class MiniCad {
   serialize(): any {
     const f = this._strokeFactor || 1;
     return {
-      version: 3,
+      version: 4,
       segments: this.scene.segments
         .filter((s) => s.labelId !== this._frameLabelId)
         .map((s) => ({
@@ -466,6 +513,7 @@ export class MiniCad {
           // Speichern in "echten Metern" (intern wird mit _strokeFactor multipliziert).
           thicknessM: s.thicknessM / f,
           labelId: s.labelId,
+          isGuide: !!s.isGuide,
         })),
       textBoxes: this.scene.textBoxes.map((t) => ({
         id: t.id,
@@ -497,6 +545,7 @@ export class MiniCad {
               color: s.color || this.defaultLineColor,
               thicknessM: (s.thicknessM || (this.defaultLineThicknessM / f)) * segScale,
               labelId: s.labelId || Defaults.defaultLabelId,
+              isGuide: !!s.isGuide,
             },
           );
         } catch (e) { console.error("MiniCad restore segment:", e); }
@@ -764,7 +813,7 @@ export class MiniCad {
 
       this.input.update(this.camera);
 
-      if (this._activeTool === "line") this.lineTool.update(this.input);
+      if (this._activeTool === "line" || this._activeTool === "guide") this.lineTool.update(this.input);
       else if (this._activeTool === "text") this.textTool.update(this.input);
       else if (this._activeTool === "select") this.selectTool.update(this.input);
 

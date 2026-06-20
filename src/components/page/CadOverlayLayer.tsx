@@ -25,6 +25,9 @@ interface Props {
   lineColor?: string;
   lineThicknessMm?: number;
   lineAlpha?: number;
+  // Guide defaults
+  guideColor?: string;
+  guidesLocked?: boolean;
   // Text defaults
   textColor?: string;
   textFontSizePx?: number;
@@ -45,7 +48,7 @@ export default function CadOverlayLayer(props: Props) {
   const {
     pageWidthMm, pageHeightMm, basePxPerMm, pageMarginsMm,
     zoom, activeTool, enabled, initialState, onChange, onSelectionChange,
-    lineColor, lineThicknessMm, lineAlpha,
+    lineColor, lineThicknessMm, lineAlpha, guideColor, guidesLocked,
     textColor, textFontSizePx, textBold, textItalic, textAlpha, textAlign,
     textBgColor, textBgAlphaPct, textWrap, textAutoSize, textBorderEnabled, textBorderColor, textBorderWidthPx,
   } = props;
@@ -144,6 +147,14 @@ export default function CadOverlayLayer(props: Props) {
       alpha: typeof lineAlpha === "number" ? lineAlpha : undefined,
     });
   }, [lineColor, lineThicknessMm, lineAlpha]);
+
+  useEffect(() => {
+    if (typeof guideColor === "string") engineRef.current?.setGuideColor(guideColor);
+  }, [guideColor]);
+
+  useEffect(() => {
+    engineRef.current?.setGuidesLocked(!!guidesLocked);
+  }, [guidesLocked]);
 
   useEffect(() => {
     engineRef.current?.setTextDefaults({

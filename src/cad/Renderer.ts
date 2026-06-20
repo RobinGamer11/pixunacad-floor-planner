@@ -161,11 +161,18 @@ export class Renderer {
   private _segmentsBackToFront() {
     // Höher in der ID-Panel-Liste (kleinerer Index) = Vordergrund.
     // Wir zeichnen back-to-front, daher: höchster Index zuerst, Index 0 zuletzt.
+    // Hilfslinien (isGuide) immer vor allen anderen Segmenten zeichnen, damit
+    // sie im Hintergrund liegen.
     const order = this.labels.list();
     const rank = new Map(order.map((g, i) => [g.id, i]));
     return [...this.scene.segments]
       .filter(s => this.labels.isVisible(s.labelId))
-      .sort((a, b) => (rank.get(b.labelId) ?? 0) - (rank.get(a.labelId) ?? 0));
+      .sort((a, b) => {
+        const ga = a.isGuide ? 1 : 0;
+        const gb = b.isGuide ? 1 : 0;
+        if (ga !== gb) return gb - ga; // guides first (back)
+        return (rank.get(b.labelId) ?? 0) - (rank.get(a.labelId) ?? 0);
+      });
   }
 
   private _hatchesBackToFront() {
@@ -812,7 +819,7 @@ export class Renderer {
     }
   }
 
-  private _drawSingleSegment(seg: { a: Vec2; b: Vec2; color?: string; thicknessM: number; labelId: string }) {
+  private _drawSingleSegment(seg: { a: Vec2; b: Vec2; color?: string; thicknessM: number; labelId: string; isGuide?: boolean }) {
     const ctx = this.ctx;
     const cam = this.camera;
     const a = cam.worldToScreen(seg.a.x, seg.a.y);
@@ -822,12 +829,21 @@ export class Renderer {
     ctx.save();
     ctx.strokeStyle = seg.color || Defaults.lineColor;
     ctx.lineWidth = this._segStrokePx(seg.thicknessM);
+    if (seg.isGuide) {
+      // Hilfslinie: hellblau gestrichelt, immer dünn (Screen-Pixel), Hintergrund.
+      ctx.strokeStyle = seg.color || "#7DD3FC";
+      ctx.lineWidth = Math.max(1, Math.min(2, this._segStrokePx(seg.thicknessM)));
+      const dash = Math.max(4, ctx.lineWidth * 4);
+      const gap = Math.max(3, ctx.lineWidth * 3);
+      ctx.setLineDash([dash, gap]);
+    }
     ctx.beginPath();
     ctx.moveTo(a.x, a.y);
     ctx.lineTo(b.x, b.y);
     ctx.stroke();
 
     if (isGroupSel) {
+      ctx.setLineDash([]);
       ctx.strokeStyle = "rgba(77,163,255,0.95)";
       ctx.lineWidth = Math.max(4, this._segStrokePx(seg.thicknessM) + 1.4);
       ctx.beginPath();

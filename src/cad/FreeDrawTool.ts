@@ -75,6 +75,19 @@ export class FreeDrawTool {
         this._points.push(v(projW.x, projW.y));
         this._lastSamplePx = { x: input.mouse.sx, y: input.mouse.sy };
       }
+      // Distanz-Hub: Pfadlänge ab Stroke-Start + aktueller Vektorwinkel
+      // (letzter Sample-Punkt → aktueller Cursor). Gleicher Stil wie im LineTool.
+      if (this._points.length >= 1) {
+        const totalLen = this._pathLength(this._points) +
+          Math.hypot(projW.x - this._points[this._points.length - 1].x,
+                     projW.y - this._points[this._points.length - 1].y);
+        const last = this._points[this._points.length - 1];
+        const dx = projW.x - last.x;
+        const dy = projW.y - last.y;
+        const angleDeg = Math.atan2(-dy, dx) * 180 / Math.PI;
+        this.app.hub.showAt(input.mouse.sx, input.mouse.sy);
+        this.app.hub.updateDisplay(totalLen, angleDeg);
+      }
       if (!input.mouse.left) {
         // Commit
         let pts = dedupePoints(this._points);
@@ -82,11 +95,15 @@ export class FreeDrawTool {
         this._drawing = false;
         this._points = [];
         this._lastSamplePx = null;
+        this.app.hub.hide();
         if (pts.length >= 2 && this._pathLength(pts) > 1e-4) {
           this.app.scene.createFreeStroke(pts, this._currentStyle());
           this.app.refreshLabelUI?.();
         }
       }
+    } else {
+      // Nicht aktiv zeichnen → Hub verbergen, falls noch sichtbar.
+      this.app.hub.hide();
     }
   }
 
