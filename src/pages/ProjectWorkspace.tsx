@@ -88,7 +88,10 @@ export default function ProjectWorkspace() {
   const [selectedCadTool, setSelectedCadTool] = useState<"line" | "text" | undefined>();
   const [cadSelectionCount, setCadSelectionCount] = useState<number>(0);
   const [cadSelectedLineSnap, setCadSelectedLineSnap] = useState<{ midpoint: boolean; division: number | null; isGuide: boolean } | null>(null);
-  const cadEngineApiRef = useRef<{ setSelectedSegmentSnap: (opts: { midpointSnap?: boolean; divisionSnap?: number | null }) => void } | null>(null);
+  const cadEngineApiRef = useRef<{
+    setSelectedSegmentSnap: (opts: { midpointSnap?: boolean; divisionSnap?: number | null }) => void;
+    duplicateSelectedSegments: (offsetMm?: number) => number;
+  } | null>(null);
 
 
 
