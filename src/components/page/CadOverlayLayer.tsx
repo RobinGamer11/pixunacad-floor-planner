@@ -33,6 +33,7 @@ interface Props {
   textBgColor?: string;
   textBgAlphaPct?: number;
   textWrap?: boolean;
+  textAutoSize?: boolean;
   textBorderEnabled?: boolean;
   textBorderColor?: string;
   textBorderWidthPx?: number;
@@ -44,7 +45,7 @@ export default function CadOverlayLayer(props: Props) {
     zoom, activeTool, enabled, initialState, onChange,
     lineColor, lineThicknessMm, lineAlpha,
     textColor, textFontSizePx, textBold, textItalic, textAlpha, textAlign,
-    textBgColor, textBgAlphaPct, textWrap, textBorderEnabled, textBorderColor, textBorderWidthPx,
+    textBgColor, textBgAlphaPct, textWrap, textAutoSize, textBorderEnabled, textBorderColor, textBorderWidthPx,
   } = props;
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -145,12 +146,13 @@ export default function CadOverlayLayer(props: Props) {
       bgColor: textBgColor,
       bgAlphaPct: textBgAlphaPct,
       wrap: textWrap,
+      autoSize: textAutoSize,
       borderEnabled: textBorderEnabled,
       borderColor: textBorderColor,
       borderWidthPx: textBorderWidthPx,
     });
   }, [textColor, textFontSizePx, textBold, textItalic, textAlpha, textAlign,
-      textBgColor, textBgAlphaPct, textWrap, textBorderEnabled, textBorderColor, textBorderWidthPx]);
+      textBgColor, textBgAlphaPct, textWrap, textAutoSize, textBorderEnabled, textBorderColor, textBorderWidthPx]);
 
   return (
     <div

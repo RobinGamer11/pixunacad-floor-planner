@@ -263,7 +263,7 @@ export class TextEditorOverlay {
     //    (zoom-independent, source of truth). Top-left stays anchored.
     //    - wrap=true : width fixed, height grows.
     //    - wrap=false: width AND height grow to fit the longest line.
-    autoSizeTextBox(box);
+    autoSizeTextBox(box, (this.app.renderer as any).referencePxPerM);
 
     this.hide();
   }

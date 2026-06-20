@@ -110,6 +110,8 @@ export class MiniCad {
   defaultTextBold = false;
   defaultTextItalic = false;
   defaultTextAlpha = 1;
+  /** true = Rahmen wächst automatisch (Modus 1). false = fixer Rahmen mit Drag-Create (Modus 2). */
+  defaultTextAutoSize = true;
 
   // Selection (consumed by TextEditorOverlay & TextTool).
   selection: Selection | null = null;
@@ -192,6 +194,11 @@ export class MiniCad {
       }
       this.selectTool.beginPointEdit(action);
     });
+
+    // Frame-Segmente (Seitenrand/Innenrahmen) sollen NICHT auswählbar sein.
+    // Snap soll an ihnen weiterhin funktionieren → wir filtern nur, wenn der
+    // SelectTool die Liste konsultiert.
+    this._installSelectToolFrameFilter();
 
     this._installCoordRemap();
     this.applyZoom(this._zoom);
@@ -296,6 +303,7 @@ export class MiniCad {
     bgColor?: string;
     bgAlphaPct?: number;
     wrap?: boolean;
+    autoSize?: boolean;
     borderEnabled?: boolean;
     borderColor?: string;
     borderWidthPx?: number;
@@ -309,6 +317,7 @@ export class MiniCad {
     if (opts.bgColor) this.defaultTextBgColor = opts.bgColor;
     if (typeof opts.bgAlphaPct === "number") this.defaultTextBgAlphaPct = Math.max(0, Math.min(100, opts.bgAlphaPct));
     if (typeof opts.wrap === "boolean") this.defaultTextWrap = opts.wrap;
+    if (typeof opts.autoSize === "boolean") this.defaultTextAutoSize = opts.autoSize;
     if (typeof opts.borderEnabled === "boolean") this.defaultTextBorderEnabled = opts.borderEnabled;
     if (opts.borderColor) this.defaultTextBorderColor = opts.borderColor;
     if (typeof opts.borderWidthPx === "number" && opts.borderWidthPx >= 0) this.defaultTextBorderWidthPx = opts.borderWidthPx;
@@ -445,21 +454,23 @@ export class MiniCad {
         borderEnabled: sel.style.borderEnabled,
         borderColor: sel.style.borderColor,
         borderWidthPx: sel.style.borderWidthPx,
+        autoSize: (sel.style as any).autoSize !== false,
         labelId: sel.labelId,
-      };
+      } as any;
     }
     return {
       textColor: applyAlphaToColor(this.defaultTextColor, this.defaultTextAlpha),
       fontSizePx: this.defaultTextFontSizePx,
       bgColor: this.defaultTextBgColor,
       bgAlphaPct: this.defaultTextBgAlphaPct,
-      wrap: this.defaultTextWrap,
+      wrap: this.defaultTextAutoSize ? this.defaultTextWrap : true,
       align: this.defaultTextAlign,
       borderEnabled: this.defaultTextBorderEnabled,
       borderColor: this.defaultTextBorderColor,
       borderWidthPx: this.defaultTextBorderWidthPx,
+      autoSize: this.defaultTextAutoSize,
       labelId: this.activeDrawLabelId || Defaults.defaultLabelId,
-    };
+    } as any;
   }
 
   getSelectedTextBox(): TextBox | null {
@@ -524,6 +535,23 @@ export class MiniCad {
         try { this.overlay.draw(ctx, this.camera); } catch (e) { console.error(e); }
       }
       ctx.restore();
+    };
+  }
+
+  private _installSelectToolFrameFilter() {
+    const topo: any = this.topology;
+    const origSegs = topo._segmentsFrontToBack.bind(topo);
+    const isFrame = (s: any) => this.isFrameSegment(s);
+    let filtering = false;
+    topo._segmentsFrontToBack = () => {
+      const all = origSegs();
+      return filtering ? all.filter((s: any) => !isFrame(s)) : all;
+    };
+    const origUpdate = this.selectTool.update.bind(this.selectTool);
+    (this.selectTool as any).update = (input: any) => {
+      filtering = true;
+      try { return origUpdate(input); }
+      finally { filtering = false; }
     };
   }
 

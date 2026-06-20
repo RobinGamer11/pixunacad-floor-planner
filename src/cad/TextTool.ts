@@ -21,6 +21,11 @@ export class TextTool {
   guideAnchors: { key: string; point: Vec2 }[] = [];
   hoverSnapWorld: Vec2 | null = null;
 
+  // Drag-create state (Modus "Text passt sich Rahmen an")
+  private _dragStart: Vec2 | null = null;
+  private _dragEnd: Vec2 | null = null;
+  private _wasLeftDown = false;
+
   constructor(app: CadApp) {
     this.app = app;
   }
@@ -28,6 +33,9 @@ export class TextTool {
   activate() {
     this.guideAnchors = [];
     this.hoverSnapWorld = null;
+    this._dragStart = null;
+    this._dragEnd = null;
+    this._wasLeftDown = false;
     this.app.renderer.setHoverSegmentId(null);
     this.app.renderer.setHoverHatchId(null);
     this.app.renderer.setHoverTextBoxId(null);
@@ -39,12 +47,14 @@ export class TextTool {
   cancel() {
     this.guideAnchors = [];
     this.hoverSnapWorld = null;
+    this._dragStart = null;
+    this._dragEnd = null;
     this.app.renderer.setHoverTextBoxId(null);
   }
 
   finish() { this.cancel(); }
 
-  isDrawing() { return false; }
+  isDrawing() { return !!this._dragStart; }
   onTabRequest(): boolean { return false; }
 
   /* ---- Hit-testing helpers ---- */
@@ -110,22 +120,77 @@ export class TextTool {
       }
     }
 
-    if (input.clicked) {
-      // If an editor is still open, this click only commits it.
-      // The preview reappears and the *next* click actually places a new box.
-      if (this.app.textEditor?.isActive()) {
+    // ====== Modus 2: Text passt sich Rahmen an → Drag-Create ======
+    const style = this.app.getCurrentTextStyle();
+    const autoSize = (style as any).autoSize !== false;
+
+    if (!autoSize) {
+      const leftDown = input.mouse.left;
+      const wasDown = this._wasLeftDown;
+      this._wasLeftDown = leftDown;
+
+      // Editor open → erster Mausklick committet ihn (kein Drag).
+      if (leftDown && !wasDown && this.app.textEditor?.isActive()) {
         this.app.textEditor.commit();
         return;
       }
 
-      // If the user clicks an existing textbox, select it instead of creating one
+      // Klick auf bestehende Textbox = nur auswählen, kein Drag.
+      if (leftDown && !wasDown) {
+        const box = this._hitTextBox(input);
+        if (box) {
+          this.app.setSelection({ type: SelectionType.TEXTBOX, textBoxId: box.id, handleIndex: null });
+          return;
+        }
+        this._dragStart = v(anchor.x, anchor.y);
+        this._dragEnd = v(anchor.x, anchor.y);
+        return;
+      }
+
+      if (leftDown && this._dragStart) {
+        this._dragEnd = v(anchor.x, anchor.y);
+        return;
+      }
+
+      // Mouse-Up → Box finalisieren
+      if (!leftDown && wasDown && this._dragStart && this._dragEnd) {
+        const a = this._dragStart, b = this._dragEnd;
+        this._dragStart = null;
+        this._dragEnd = null;
+        const wf = this.app.renderer.worldScaleFactor();
+        const minM = Defaults.textMinBoxSizeM * wf;
+        let widthM = Math.abs(b.x - a.x);
+        let heightM = Math.abs(b.y - a.y);
+        // Zu kleiner Drag → Default-Größe
+        if (widthM < minM * 2 || heightM < minM * 2) {
+          widthM = Defaults.textBoxWidthM * wf;
+          heightM = Defaults.textBoxHeightM * wf;
+        }
+        const tl = v(Math.min(a.x, b.x), Math.min(a.y, b.y));
+        const center = centerFromTopLeft(tl, widthM, heightM, 0);
+        const created = this.app.scene.createTextBox(
+          center, widthM, heightM,
+          { ...style, wrap: true, autoSize: false } as any,
+          "", 0,
+        );
+        this.app.setSelection({ type: SelectionType.TEXTBOX, textBoxId: created.id, handleIndex: null });
+        this.app.refreshLabelUI();
+        this.app.beginTextEdit(created);
+      }
+      return;
+    }
+
+    // ====== Modus 1 (Default): Auto-Size — wie bisher ======
+    if (input.clicked) {
+      if (this.app.textEditor?.isActive()) {
+        this.app.textEditor.commit();
+        return;
+      }
       const box = this._hitTextBox(input);
       if (box) {
         this.app.setSelection({ type: SelectionType.TEXTBOX, textBoxId: box.id, handleIndex: null });
         return;
       }
-
-      const style = this.app.getCurrentTextStyle();
       const wf = this.app.renderer.worldScaleFactor();
       const widthM = Defaults.textBoxWidthM * wf;
       const heightM = Defaults.textBoxHeightM * wf;
@@ -163,22 +228,29 @@ export class TextTool {
       drawSnapDot(ctx, s.x, s.y, { ring: true });
     }
 
-    // Preview rectangle at anchor (top-left = anchor, default size, no rotation).
-    // Hide the preview while an editor is open — the next click will commit
-    // it AND place the new textbox at the same time, so the preview reappears
-    // immediately on the following frame.
+    // Preview rectangle
     if (!this.app.textEditor?.isActive()) {
-      const anchor = this._previewAnchor(this.app.input);
-      const wf = this.app.renderer.worldScaleFactor();
-      const widthPx = Defaults.textBoxWidthM * cam.scale * wf;
-      const heightPx = Defaults.textBoxHeightM * cam.scale * wf;
-      const tl = cam.worldToScreen(anchor.x, anchor.y);
       ctx.save();
       ctx.fillStyle = "rgba(77,163,255,0.08)";
       ctx.strokeStyle = "rgba(77,163,255,0.85)";
       ctx.lineWidth = 1.8;
-      ctx.fillRect(tl.x, tl.y, widthPx, heightPx);
-      ctx.strokeRect(tl.x, tl.y, widthPx, heightPx);
+      if (this._dragStart && this._dragEnd) {
+        // Drag-Rechteck (Modus 2)
+        const a = cam.worldToScreen(this._dragStart.x, this._dragStart.y);
+        const b = cam.worldToScreen(this._dragEnd.x, this._dragEnd.y);
+        const x = Math.min(a.x, b.x), y = Math.min(a.y, b.y);
+        const w = Math.abs(b.x - a.x), h = Math.abs(b.y - a.y);
+        ctx.fillRect(x, y, w, h);
+        ctx.strokeRect(x, y, w, h);
+      } else {
+        const anchor = this._previewAnchor(this.app.input);
+        const wf = this.app.renderer.worldScaleFactor();
+        const widthPx = Defaults.textBoxWidthM * cam.scale * wf;
+        const heightPx = Defaults.textBoxHeightM * cam.scale * wf;
+        const tl = cam.worldToScreen(anchor.x, anchor.y);
+        ctx.fillRect(tl.x, tl.y, widthPx, heightPx);
+        ctx.strokeRect(tl.x, tl.y, widthPx, heightPx);
+      }
       ctx.restore();
     }
   }

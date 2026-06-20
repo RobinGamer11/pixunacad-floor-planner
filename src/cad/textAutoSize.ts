@@ -12,13 +12,17 @@ import { measureTextBoxContent } from "./textRichRenderer";
  * Uses Defaults.measureReferenceScalePxPerM as the px↔meter conversion so the
  * result is independent of the current camera zoom.
  */
-export function autoSizeTextBox(box: TextBox) {
+export function autoSizeTextBox(box: TextBox, pxPerMOverride?: number) {
   if (!box) return;
-  const pxPerM = Defaults.measureReferenceScalePxPerM;
+  // Wenn autoSize ausgeschaltet ist (Modus „Text passt sich Rahmen an"),
+  // bleibt der Rahmen fix; Text wird nur umbrochen.
+  if ((box.style as any).autoSize === false) return;
+  const pxPerM = pxPerMOverride && pxPerMOverride > 0
+    ? pxPerMOverride
+    : Defaults.measureReferenceScalePxPerM;
   const paddingPx = 6;
   const baseFontPx = box.style.fontSizePx;
 
-  // Anchor top-left in world space
   const tlX = box.center.x - box.widthM / 2;
   const tlY = box.center.y - box.heightM / 2;
 
@@ -26,12 +30,10 @@ export function autoSizeTextBox(box: TextBox) {
   let newHeightM = box.heightM;
 
   if (box.style.wrap) {
-    // Fixed width, height grows
     const innerWidthPx = Math.max(8, box.widthM * pxPerM - paddingPx * 2);
     const m = measureTextBoxContent(box.html || "", baseFontPx, innerWidthPx, true, paddingPx);
     newHeightM = Math.max(Defaults.textMinBoxSizeM, m.heightPx / pxPerM);
   } else {
-    // Both grow
     const m = measureTextBoxContent(box.html || "", baseFontPx, Infinity, false, paddingPx);
     newWidthM = Math.max(Defaults.textMinBoxSizeM, m.widthPx / pxPerM);
     newHeightM = Math.max(Defaults.textMinBoxSizeM, m.heightPx / pxPerM);

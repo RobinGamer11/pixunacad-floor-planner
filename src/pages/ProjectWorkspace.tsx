@@ -110,6 +110,7 @@ export default function ProjectWorkspace() {
       bgColor: "#ffffff",
       bgAlphaPct: 0,
       wrap: true,
+      autoSize: true,
       borderEnabled: false,
       borderColor: "#111111",
       borderWidthPx: 1,
@@ -630,6 +631,7 @@ type ToolSettings = {
     bgColor: string;
     bgAlphaPct: number;
     wrap: boolean;
+    autoSize: boolean;
     borderEnabled: boolean;
     borderColor: string;
     borderWidthPx: number;
@@ -929,10 +931,11 @@ function PageCanvas({
           textAlign={toolSettings.text.align}
           textBgColor={toolSettings.text.bgColor}
           textBgAlphaPct={toolSettings.text.bgAlphaPct}
-          textWrap={toolSettings.text.wrap}
-          textBorderEnabled={toolSettings.text.borderEnabled}
-          textBorderColor={toolSettings.text.borderColor}
-          textBorderWidthPx={toolSettings.text.borderWidthPx}
+         textWrap={toolSettings.text.wrap}
+         textAutoSize={toolSettings.text.autoSize}
+         textBorderEnabled={toolSettings.text.borderEnabled}
+         textBorderColor={toolSettings.text.borderColor}
+         textBorderWidthPx={toolSettings.text.borderWidthPx}
           onChange={(state) =>
             projectStore.updatePage(projectId, page.id, { cadOverlay: state })
           }
@@ -1595,6 +1598,30 @@ function TextSettings({
 }) {
   return (
     <SettingsBlock title="TEXT">
+      <Row label="Modus">
+        <div className="flex flex-col gap-1 w-full">
+          <label className="flex items-start gap-2 text-xs cursor-pointer">
+            <input
+              type="radio"
+              name="text-mode"
+              checked={settings.autoSize !== false}
+              onChange={() => onChange({ autoSize: true })}
+              className="mt-0.5"
+            />
+            <span>Rahmen passt sich Text an</span>
+          </label>
+          <label className="flex items-start gap-2 text-xs cursor-pointer">
+            <input
+              type="radio"
+              name="text-mode"
+              checked={settings.autoSize === false}
+              onChange={() => onChange({ autoSize: false, wrap: true })}
+              className="mt-0.5"
+            />
+            <span>Rahmen zeichnen — Text passt sich an</span>
+          </label>
+        </div>
+      </Row>
       <Row label="Schriftgröße">
         <div className="flex items-center gap-2">
           <input
