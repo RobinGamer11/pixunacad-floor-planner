@@ -60,6 +60,9 @@ export class Renderer {
   overlayScenes: { scene: Scene; mode: "stamp" | "tint"; color: string | null; opacity: number }[] = [];
   private _overlayCanvas: HTMLCanvasElement | null = null;
   selection: Selection | null = null;
+  /** Sekundär-Selektionen für Mehrfachauswahl (Primary bleibt `selection`). */
+  extraSelections: Selection[] = [];
+
   selectedLabelId: string | null = null;
   hoverSegmentId: string | null = null;
   hoverHatchId: string | null = null;
