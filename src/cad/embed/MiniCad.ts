@@ -68,6 +68,9 @@ export interface MiniCadInit {
   onChange?: () => void;
   /** Called whenever a CAD object selection changes in the embedded editor. */
   onSelectionChange?: (info: MiniCadSelectionInfo | null) => void;
+  /** Called when the user requests a parallel guide line via right-click on a
+   *  CAD segment. Coordinates are in page-percent (0..100). */
+  onCreateParallelGuide?: (p1: { x: number; y: number }, p2: { x: number; y: number }) => void;
   /** Initial serialized state. */
   initialState?: any;
 }
