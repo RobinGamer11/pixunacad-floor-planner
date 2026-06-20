@@ -228,22 +228,29 @@ export class TextTool {
       drawSnapDot(ctx, s.x, s.y, { ring: true });
     }
 
-    // Preview rectangle at anchor (top-left = anchor, default size, no rotation).
-    // Hide the preview while an editor is open — the next click will commit
-    // it AND place the new textbox at the same time, so the preview reappears
-    // immediately on the following frame.
+    // Preview rectangle
     if (!this.app.textEditor?.isActive()) {
-      const anchor = this._previewAnchor(this.app.input);
-      const wf = this.app.renderer.worldScaleFactor();
-      const widthPx = Defaults.textBoxWidthM * cam.scale * wf;
-      const heightPx = Defaults.textBoxHeightM * cam.scale * wf;
-      const tl = cam.worldToScreen(anchor.x, anchor.y);
       ctx.save();
       ctx.fillStyle = "rgba(77,163,255,0.08)";
       ctx.strokeStyle = "rgba(77,163,255,0.85)";
       ctx.lineWidth = 1.8;
-      ctx.fillRect(tl.x, tl.y, widthPx, heightPx);
-      ctx.strokeRect(tl.x, tl.y, widthPx, heightPx);
+      if (this._dragStart && this._dragEnd) {
+        // Drag-Rechteck (Modus 2)
+        const a = cam.worldToScreen(this._dragStart.x, this._dragStart.y);
+        const b = cam.worldToScreen(this._dragEnd.x, this._dragEnd.y);
+        const x = Math.min(a.x, b.x), y = Math.min(a.y, b.y);
+        const w = Math.abs(b.x - a.x), h = Math.abs(b.y - a.y);
+        ctx.fillRect(x, y, w, h);
+        ctx.strokeRect(x, y, w, h);
+      } else {
+        const anchor = this._previewAnchor(this.app.input);
+        const wf = this.app.renderer.worldScaleFactor();
+        const widthPx = Defaults.textBoxWidthM * cam.scale * wf;
+        const heightPx = Defaults.textBoxHeightM * cam.scale * wf;
+        const tl = cam.worldToScreen(anchor.x, anchor.y);
+        ctx.fillRect(tl.x, tl.y, widthPx, heightPx);
+        ctx.strokeRect(tl.x, tl.y, widthPx, heightPx);
+      }
       ctx.restore();
     }
   }
