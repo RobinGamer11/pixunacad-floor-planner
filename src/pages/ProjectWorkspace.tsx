@@ -487,7 +487,34 @@ export default function ProjectWorkspace() {
                   setZoomClamped(zoom + (delta > 0 ? 5 : -5));
                 }
               }}
+              onMouseDown={(e) => {
+                // Pan via Middle-Maus, Alt+Links, oder Links auf leerer Fläche
+                // (Auswahlwerkzeug aktiv oder kein Tool aktiv).
+                const isMiddle = e.button === 1 || (e.button === 0 && (e as any).altKey);
+                const isPlainLeft = e.button === 0 && !(e as any).altKey && (activeTool === null || activeTool === "select");
+                if (!isMiddle && !isPlainLeft) return;
+                e.preventDefault();
+                const container = e.currentTarget as HTMLDivElement;
+                const startX = e.clientX;
+                const startY = e.clientY;
+                const startScrollL = container.scrollLeft;
+                const startScrollT = container.scrollTop;
+                const prevCursor = container.style.cursor;
+                container.style.cursor = "grabbing";
+                const onMove = (ev: MouseEvent) => {
+                  container.scrollLeft = startScrollL - (ev.clientX - startX);
+                  container.scrollTop = startScrollT - (ev.clientY - startY);
+                };
+                const onUp = () => {
+                  container.style.cursor = prevCursor;
+                  window.removeEventListener("mousemove", onMove);
+                  window.removeEventListener("mouseup", onUp);
+                };
+                window.addEventListener("mousemove", onMove);
+                window.addEventListener("mouseup", onUp);
+              }}
             >
+
 
               {activePage && (
                 <PageCanvas
