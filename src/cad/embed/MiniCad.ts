@@ -330,7 +330,6 @@ export class MiniCad {
   }
 
   setLineDefaults(opts: { color?: string; thicknessM?: number; alpha?: number }) {
-    if (this._syncingSelectionSettings) return;
     if (opts.color) this.defaultLineColor = opts.color;
     if (typeof opts.thicknessM === "number" && opts.thicknessM > 0) {
       this.defaultLineThicknessM = opts.thicknessM * this._strokeFactor;
@@ -361,7 +360,6 @@ export class MiniCad {
     borderColor?: string;
     borderWidthPx?: number;
   }) {
-    if (this._syncingSelectionSettings) return;
     if (opts.color) this.defaultTextColor = opts.color;
     if (typeof opts.fontSizePx === "number" && opts.fontSizePx > 0) this.defaultTextFontSizePx = opts.fontSizePx;
     if (typeof opts.bold === "boolean") this.defaultTextBold = opts.bold;
