@@ -806,7 +806,7 @@ function PageCanvas({
         if (e.key === "Backspace" && document.activeElement && (document.activeElement as HTMLElement).tagName !== "BODY") return;
         e.preventDefault();
         for (const id of selectedElementIds) {
-          projectStore.removeElement(projectId, page.id, id);
+          projectStore.deleteElement(projectId, page.id, id);
         }
         onSelect(undefined);
       }
