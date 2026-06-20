@@ -495,22 +495,38 @@ export class MiniCad {
     };
   }
 
-  private _installSelectToolFrameFilter() {
-    const topo: any = this.topology;
-    const origSegs = topo._segmentsFrontToBack.bind(topo);
-    const isFrame = (s: any) => this.isFrameSegment(s);
-    let filtering = false;
-    topo._segmentsFrontToBack = () => {
-      const all = origSegs();
-      return filtering ? all.filter((s: any) => !isFrame(s)) : all;
+  private _installDeleteKey() {
+    const onKey = (e: KeyboardEvent) => {
+      if (this._destroyed) return;
+      if (e.key !== "Delete" && e.key !== "Backspace") return;
+      // Niemals löschen, während Text bearbeitet wird.
+      if (this.textEditor.isActive()) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      const sel = this.selection;
+      if (!sel) return;
+      let removed = false;
+      if (sel.segmentId) {
+        const s = this.scene.getSegmentById(sel.segmentId);
+        if (s) { this.scene.removeSegment(s); removed = true; }
+      } else if (sel.type === SelectionType.TEXTBOX || sel.type === SelectionType.TEXTBOX_HANDLE) {
+        const box = this.getSelectedTextBox();
+        if (box) { this.scene.removeTextBox(box); removed = true; }
+      } else if (sel.hatchId) {
+        const h = this.scene.getHatchById(sel.hatchId);
+        if (h) { this.scene.removeHatch(h); removed = true; }
+      }
+      if (removed) {
+        this.clearSelection();
+        this.pointEditMenu.hide();
+        this.refreshLabelUI();
+        e.preventDefault();
+      }
     };
-    const origUpdate = this.selectTool.update.bind(this.selectTool);
-    (this.selectTool as any).update = (input: any) => {
-      filtering = true;
-      try { return origUpdate(input); }
-      finally { filtering = false; }
-    };
+    window.addEventListener("keydown", onKey);
+    this._coordCleanups.push(() => window.removeEventListener("keydown", onKey));
   }
+
 
   private _installCoordRemap() {
     const c = this.dom.canvas;
