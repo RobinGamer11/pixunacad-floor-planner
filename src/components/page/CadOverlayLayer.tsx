@@ -21,6 +21,12 @@ interface Props {
   initialState?: any;
   onChange: (state: any) => void;
   onSelectionChange?: (info: MiniCadSelectionInfo | null, count?: number) => void;
+  /** Imperative API für punktuelle Aktionen auf der Engine (z. B.
+   *  Snap-Einstellungen der gerade selektierten Linie/Hilfslinie ändern). */
+  onEngineReady?: (api: {
+    setSelectedSegmentSnap: (opts: { midpointSnap?: boolean; divisionSnap?: number | null }) => void;
+  }) => void;
+
   // Line defaults
   lineColor?: string;
   lineThicknessMm?: number;
@@ -50,11 +56,12 @@ interface Props {
 export default function CadOverlayLayer(props: Props) {
   const {
     pageWidthMm, pageHeightMm, basePxPerMm, pageMarginsMm,
-    zoom, activeTool, enabled, initialState, onChange, onSelectionChange,
+    zoom, activeTool, enabled, initialState, onChange, onSelectionChange, onEngineReady,
     lineColor, lineThicknessMm, lineAlpha, guideColor, guidesLocked, multiSelectMode,
     textColor, textFontSizePx, textBold, textItalic, textAlpha, textAlign,
     textBgColor, textBgAlphaPct, textWrap, textAutoSize, textBorderEnabled, textBorderColor, textBorderWidthPx,
   } = props;
+
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const hubRef = useRef<HTMLDivElement>(null);
@@ -130,10 +137,14 @@ export default function CadOverlayLayer(props: Props) {
       
     });
     engineRef.current = engine;
+    onEngineReady?.({
+      setSelectedSegmentSnap: (opts) => engine.setSelectedSegmentSnapSettings(opts),
+    });
     return () => {
       engine.destroy();
       engineRef.current = null;
     };
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageWidthMm, pageHeightMm, basePxPerMm]);
 

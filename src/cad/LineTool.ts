@@ -111,6 +111,21 @@ export class LineTool {
     }
   }
 
+  /** Toggle einer Anker-Hilfslinie genau durch den aktuell gesetzten
+   *  Anfangspunkt der laufenden Zeichenoperation. */
+  private _toggleCurrentPointGuide() {
+    if (!this.currentPoint) return;
+    const key = `__current__${this.currentPoint.x.toFixed(6)}_${this.currentPoint.y.toFixed(6)}`;
+    const idx = this.guideAnchors.findIndex((a) => a.key === key);
+    if (idx >= 0) { this.guideAnchors.splice(idx, 1); return; }
+    this.guideAnchors.push({
+      key,
+      pointIndex: -1,
+      point: v(this.currentPoint.x, this.currentPoint.y),
+    });
+  }
+
+
   private _toggleParallelGuideFromSnap(snap: Snap) {
     if (!snap || snap.type !== SnapType.LINE || !this.currentPoint) return;
     if (snap.segment) {
@@ -389,9 +404,22 @@ export class LineTool {
     this._syncSpaceShiftLock(input);
 
     if (input.rightClicked) {
+      // Anfangspunkt (currentPoint) der aktuell gezeichneten Linie: erlaubt
+      // eine Anker-Hilfslinie durch genau diesen Punkt — auch wenn er noch
+      // nicht als Segment im Scene-Graph existiert.
+      if (this.state === "drawing" && this.currentPoint) {
+        const worldTol = Defaults.snapPx / Math.max(1e-6, this.app.camera.scale);
+        const dx = input.mouse.wx - this.currentPoint.x;
+        const dy = input.mouse.wy - this.currentPoint.y;
+        if (Math.hypot(dx, dy) <= worldTol) {
+          this._toggleCurrentPointGuide();
+          return;
+        }
+      }
       if (this.snap && this.snap.type === SnapType.POINT) { this._toggleGuideAnchorFromSnap(this.snap); return; }
       if (this.snap && this.snap.type === SnapType.LINE) { this._toggleParallelGuideFromSnap(this.snap); return; }
     }
+
 
     if (this.state === "drawing") {
       const metrics = this._previewMetrics(input);

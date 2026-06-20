@@ -13,10 +13,16 @@ export class Segment {
   /** Wenn true: Hilfslinie — wird hellblau gestrichelt im Hintergrund gezeichnet
    *  und vom Druck/Export ausgeschlossen. */
   isGuide: boolean;
+  /** Wenn true: Mittelpunkt der Linie wird als zusätzlicher Snap-Punkt
+   *  angeboten (für Halbierungs-Orientierung). */
+  midpointSnap?: boolean;
+  /** Wenn ≥ 2: erzeugt N-1 äquidistante Snap-Punkte auf der Linie,
+   *  die sie in N gleiche Abschnitte teilen. */
+  divisionSnap?: number;
   /** Wenn gesetzt: dieses Objekt gehört zum Edit-Mode der Sticker-Instanz mit dieser ID. */
   _stickerEditOwnerId?: string | null;
 
-  constructor({ id, a, b, color, thicknessM, labelId, isGuide }: { id: string; a: Vec2; b: Vec2; color?: string; thicknessM?: number; labelId?: string; isGuide?: boolean }) {
+  constructor({ id, a, b, color, thicknessM, labelId, isGuide, midpointSnap, divisionSnap }: { id: string; a: Vec2; b: Vec2; color?: string; thicknessM?: number; labelId?: string; isGuide?: boolean; midpointSnap?: boolean; divisionSnap?: number }) {
     this.id = id;
     this.a = v(a.x, a.y);
     this.b = v(b.x, b.y);
@@ -24,9 +30,12 @@ export class Segment {
     this.thicknessM = (typeof thicknessM === "number" && thicknessM > 0) ? thicknessM : Defaults.lineThicknessM;
     this.labelId = labelId || Defaults.defaultLabelId;
     this.isGuide = !!isGuide;
+    this.midpointSnap = !!midpointSnap;
+    this.divisionSnap = (typeof divisionSnap === "number" && divisionSnap >= 2) ? Math.floor(divisionSnap) : undefined;
     this._stickerEditOwnerId = null;
   }
 }
+
 
 export interface AreaLabel {
   show: boolean;
@@ -734,13 +743,14 @@ export class Scene {
   }
 
   // ---- Segments ----
-  createSegment(a: Vec2, b: Vec2, style: { color?: string; thicknessM?: number; labelId?: string; isGuide?: boolean } = {}) {
-    const seg = new Segment({ id: this._makeId(), a, b, color: style.color, thicknessM: style.thicknessM, labelId: style.labelId, isGuide: style.isGuide });
+  createSegment(a: Vec2, b: Vec2, style: { color?: string; thicknessM?: number; labelId?: string; isGuide?: boolean; midpointSnap?: boolean; divisionSnap?: number } = {}) {
+    const seg = new Segment({ id: this._makeId(), a, b, color: style.color, thicknessM: style.thicknessM, labelId: style.labelId, isGuide: style.isGuide, midpointSnap: style.midpointSnap, divisionSnap: style.divisionSnap });
     seg._stickerEditOwnerId = this._currentEditOwnerId;
     this.segments.push(seg);
     this._rebuildSegIdMap();
     return seg;
   }
+
 
   getSegmentById(id: string): Segment | null { return this._segIdMap.get(id) || null; }
 

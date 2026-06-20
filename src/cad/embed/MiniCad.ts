@@ -77,7 +77,15 @@ export interface MiniCadInit {
 
 export type MiniTool = "line" | "text" | "select" | "guide" | null;
 export type MiniCadSelectionInfo =
-  | { tool: "line"; color: string; thicknessMm: number; alpha: number }
+  | {
+      tool: "line";
+      color: string;
+      thicknessMm: number;
+      alpha: number;
+      isGuide?: boolean;
+      midpointSnap?: boolean;
+      divisionSnap?: number | null;
+    }
   | {
       tool: "text";
       color: string;
@@ -92,6 +100,7 @@ export type MiniCadSelectionInfo =
       borderColor: string;
       borderWidthPx: number;
     };
+
 
 /** Extra CSS pixels around the page on the canvas so edge snap dots and the
  *  blue snap line are fully visible (and not occluded by the page's margin
@@ -452,6 +461,36 @@ export class MiniCad {
     }
   }
 
+  /** Schaltet Mittelpunkt-/Teilungs-Snap auf der/den aktuell selektierten
+   *  Linie(n) und Hilfslinie(n) um. `divisionSnap`: ≥2 setzen, null/0 löschen. */
+  setSelectedSegmentSnapSettings(opts: { midpointSnap?: boolean; divisionSnap?: number | null }) {
+    const ids = new Set<string>();
+    for (const sel of this.selections) {
+      if ((sel as any)?.segmentId) ids.add((sel as any).segmentId);
+    }
+    if (this.selection && (this.selection as any).segmentId) ids.add((this.selection as any).segmentId);
+    let changed = false;
+    for (const id of ids) {
+      const seg = this.scene.getSegmentById(id);
+      if (!seg || this.isFrameSegment(seg)) continue;
+      if (typeof opts.midpointSnap === "boolean") { seg.midpointSnap = !!opts.midpointSnap; changed = true; }
+      if (opts.divisionSnap !== undefined) {
+        if (opts.divisionSnap == null || opts.divisionSnap < 2) {
+          seg.divisionSnap = undefined;
+        } else {
+          seg.divisionSnap = Math.floor(opts.divisionSnap);
+        }
+        changed = true;
+      }
+    }
+    if (changed) {
+      this._changeDirty = true;
+      // Selection-Info neu emittieren, damit Inspector aktuelle Werte zeigt.
+      this._onSelectionChange?.(this._selectionInfo(this.selection), this.selections.length);
+    }
+  }
+
+
   setTextDefaults(opts: {
     color?: string;
     fontSizePx?: number;
@@ -546,7 +585,10 @@ export class MiniCad {
           thicknessM: s.thicknessM / f,
           labelId: s.labelId,
           isGuide: !!s.isGuide,
+          midpointSnap: !!s.midpointSnap,
+          divisionSnap: s.divisionSnap,
         })),
+
       textBoxes: this.scene.textBoxes.map((t) => ({
         id: t.id,
         center: { x: t.center.x, y: t.center.y },
@@ -578,7 +620,10 @@ export class MiniCad {
               thicknessM: (s.thicknessM || (this.defaultLineThicknessM / f)) * segScale,
               labelId: s.labelId || Defaults.defaultLabelId,
               isGuide: !!s.isGuide,
+              midpointSnap: !!s.midpointSnap,
+              divisionSnap: typeof s.divisionSnap === "number" && s.divisionSnap >= 2 ? Math.floor(s.divisionSnap) : undefined,
             },
+
           );
         } catch (e) { console.error("MiniCad restore segment:", e); }
       }
@@ -689,9 +734,13 @@ export class MiniCad {
           color: lineColor.color,
           thicknessMm: Math.max(0.1, Number(((seg.thicknessM / (this._strokeFactor || 1)) * 1000).toFixed(2))),
           alpha: Math.round(lineColor.alpha * 100),
+          isGuide: !!seg.isGuide,
+          midpointSnap: !!seg.midpointSnap,
+          divisionSnap: typeof seg.divisionSnap === "number" ? seg.divisionSnap : null,
         };
       }
     }
+
     return null;
   }
 

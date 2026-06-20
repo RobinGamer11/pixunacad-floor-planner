@@ -87,6 +87,10 @@ export default function ProjectWorkspace() {
   const [activeTool, setActiveTool] = useState<PageTool>(null);
   const [selectedCadTool, setSelectedCadTool] = useState<"line" | "text" | undefined>();
   const [cadSelectionCount, setCadSelectionCount] = useState<number>(0);
+  const [cadSelectedLineSnap, setCadSelectedLineSnap] = useState<{ midpoint: boolean; division: number | null; isGuide: boolean } | null>(null);
+  const cadEngineApiRef = useRef<{ setSelectedSegmentSnap: (opts: { midpointSnap?: boolean; divisionSnap?: number | null }) => void } | null>(null);
+
+
 
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
@@ -586,6 +590,7 @@ export default function ProjectWorkspace() {
                     setCadSelectionCount(count ?? (info ? 1 : 0));
                     if (!info) {
                       setSelectedCadTool(undefined);
+                      setCadSelectedLineSnap(null);
                       return;
                     }
                     setSelectedElementIds([]);
@@ -598,7 +603,13 @@ export default function ProjectWorkspace() {
                         thicknessMm: info.thicknessMm,
                         alpha: info.alpha,
                       });
+                      setCadSelectedLineSnap({
+                        midpoint: !!info.midpointSnap,
+                        division: typeof info.divisionSnap === "number" ? info.divisionSnap : null,
+                        isGuide: !!info.isGuide,
+                      });
                     } else {
+                      setCadSelectedLineSnap(null);
                       updateToolSettings("text", {
                         color: info.color,
                         fontSize: info.fontSize,
@@ -614,6 +625,8 @@ export default function ProjectWorkspace() {
                       });
                     }
                   }}
+                  onCadEngineReady={(api) => { cadEngineApiRef.current = api; }}
+
                 />
               )}
             </div>
@@ -637,8 +650,18 @@ export default function ProjectWorkspace() {
               setSelectedElementId={setSelectedElementId}
               toolSettings={toolSettings}
               cadSelectionCount={cadSelectionCount}
+              cadSelectedLineSnap={cadSelectedLineSnap}
+              onCadLineSnapChange={(patch) => {
+                cadEngineApiRef.current?.setSelectedSegmentSnap(patch);
+                setCadSelectedLineSnap((prev) => prev ? {
+                  midpoint: typeof patch.midpointSnap === "boolean" ? patch.midpointSnap : prev.midpoint,
+                  division: patch.divisionSnap !== undefined ? (patch.divisionSnap == null || patch.divisionSnap < 2 ? null : Math.floor(patch.divisionSnap)) : prev.division,
+                  isGuide: prev.isGuide,
+                } : prev);
+              }}
 
               updateToolSettings={updateToolSettings}
+
               onJumpCad={(sheetId) => navigate(`/project/${project.id}/cad${sheetId ? `/${sheetId}` : ""}`)}
               onCollapse={() => setRightOpen(false)}
             />
@@ -738,6 +761,7 @@ function PageCanvas({
   onCommitTool,
   onSelect,
   onCadSelectionChange,
+  onCadEngineReady,
 }: {
   projectId: string;
   page: import("@/lib/projectStore").ProjectPage;
@@ -751,7 +775,9 @@ function PageCanvas({
   onCommitTool: () => void;
   onSelect: (id?: string, opts?: { shift?: boolean }) => void;
   onCadSelectionChange: (info: MiniCadSelectionInfo | null, count?: number) => void;
+  onCadEngineReady?: (api: { setSelectedSegmentSnap: (opts: { midpointSnap?: boolean; divisionSnap?: number | null }) => void }) => void;
 }) {
+
   const fmt = FORMAT_SIZES[page.format];
   const aspect = fmt.w / fmt.h;
   // The sheet is rendered at a FIXED real size (mm-defined). Zoom is a pure
@@ -1048,7 +1074,9 @@ function PageCanvas({
             projectStore.updatePage(projectId, page.id, { cadOverlay: state })
           }
           onSelectionChange={onCadSelectionChange}
+          onEngineReady={onCadEngineReady}
         />
+
 
       </div>
     </div>
@@ -1265,6 +1293,8 @@ function RightInspector({
   setSelectedElementId,
   toolSettings,
   cadSelectionCount,
+  cadSelectedLineSnap,
+  onCadLineSnapChange,
   updateToolSettings,
 
   onJumpCad,
@@ -1284,11 +1314,14 @@ function RightInspector({
   setSelectedElementId: (id?: string) => void;
   toolSettings: ToolSettings;
   cadSelectionCount?: number;
+  cadSelectedLineSnap?: { midpoint: boolean; division: number | null; isGuide: boolean } | null;
+  onCadLineSnapChange?: (patch: { midpointSnap?: boolean; divisionSnap?: number | null }) => void;
   updateToolSettings: <K extends keyof ToolSettings>(k: K, patch: Partial<ToolSettings[K]>) => void;
 
   onJumpCad: (sheetId?: string) => void;
   onCollapse?: () => void;
 }) {
+
   const layerCount = page?.elements.length ?? 0;
   return (
     <aside
@@ -1330,8 +1363,11 @@ function RightInspector({
             setSelectedElementId={setSelectedElementId}
             toolSettings={toolSettings}
             cadSelectionCount={cadSelectionCount}
+            cadSelectedLineSnap={cadSelectedLineSnap}
+            onCadLineSnapChange={onCadLineSnapChange}
             updateToolSettings={updateToolSettings}
             onJumpCad={onJumpCad}
+
 
           />
         )}
@@ -1545,6 +1581,8 @@ function ToolsTab({
   setSelectedElementId,
   toolSettings,
   cadSelectionCount,
+  cadSelectedLineSnap,
+  onCadLineSnapChange,
   updateToolSettings,
   onJumpCad,
 }: {
@@ -1560,10 +1598,13 @@ function ToolsTab({
   setSelectedElementId: (id?: string) => void;
   toolSettings: ToolSettings;
   cadSelectionCount?: number;
+  cadSelectedLineSnap?: { midpoint: boolean; division: number | null; isGuide: boolean } | null;
+  onCadLineSnapChange?: (patch: { midpointSnap?: boolean; divisionSnap?: number | null }) => void;
   updateToolSettings: <K extends keyof ToolSettings>(k: K, patch: Partial<ToolSettings[K]>) => void;
 
   onJumpCad: (sheetId?: string) => void;
 }) {
+
   const settingsTool = activeTool ?? selectedCadTool ?? null;
   return (
     <div className="space-y-5">
@@ -1624,6 +1665,15 @@ function ToolsTab({
           onChange={(p) => updateToolSettings("line", p)}
         />
       )}
+      {cadSelectedLineSnap && onCadLineSnapChange && (
+        <LineSnapSettings
+          isGuide={cadSelectedLineSnap.isGuide}
+          midpoint={cadSelectedLineSnap.midpoint}
+          division={cadSelectedLineSnap.division}
+          onChange={onCadLineSnapChange}
+        />
+      )}
+
       {settingsTool === "text" && (
         <TextSettings
           settings={toolSettings.text}
@@ -1799,6 +1849,79 @@ function LineSettings({
     </SettingsBlock>
   );
 }
+
+function LineSnapSettings({
+  isGuide,
+  midpoint,
+  division,
+  onChange,
+}: {
+  isGuide: boolean;
+  midpoint: boolean;
+  division: number | null;
+  onChange: (patch: { midpointSnap?: boolean; divisionSnap?: number | null }) => void;
+}) {
+  const [draft, setDraft] = useState<string>(division ? String(division) : "");
+  // Keep draft in sync when selection switches to another line.
+  useEffect(() => {
+    setDraft(division ? String(division) : "");
+  }, [division]);
+  return (
+    <SettingsBlock title={isGuide ? "HILFSLINIEN-SNAPS" : "LINIEN-SNAPS"}>
+      <Row label="Mittelpunkt">
+        <button
+          type="button"
+          onClick={() => onChange({ midpointSnap: !midpoint })}
+          className="h-7 px-2 rounded-md border text-xs"
+          style={{
+            borderColor: "hsl(var(--hairline))",
+            background: midpoint ? "hsl(var(--surface-strong))" : "transparent",
+          }}
+        >
+          {midpoint ? "Ein" : "Aus"}
+        </button>
+      </Row>
+      <Row label="Teilung (N)">
+        <div className="flex items-center gap-2">
+          <input
+            type="number"
+            min={2}
+            max={64}
+            step={1}
+            value={draft}
+            placeholder="–"
+            onChange={(e) => {
+              const raw = e.target.value;
+              setDraft(raw);
+              if (raw.trim() === "") { onChange({ divisionSnap: null }); return; }
+              const n = Math.floor(Number(raw));
+              if (Number.isFinite(n) && n >= 2) onChange({ divisionSnap: n });
+            }}
+            className="w-20 h-7 px-2 rounded bg-transparent border text-sm tabular-nums"
+            style={{ borderColor: "hsl(var(--hairline))" }}
+          />
+          {division ? (
+            <button
+              type="button"
+              onClick={() => { setDraft(""); onChange({ divisionSnap: null }); }}
+              className="h-7 px-2 rounded-md border text-[11px] text-muted-foreground"
+              style={{ borderColor: "hsl(var(--hairline))" }}
+            >
+              Aus
+            </button>
+          ) : null}
+        </div>
+      </Row>
+      <div className="text-[11px] text-muted-foreground">
+        Mittelpunkt = Halbierungs-Snap (50 %). Teilung N (z. B. 3, 4) erzeugt N-1
+        zusätzliche Snap-Punkte für gleiche Abschnitte. Beide Optionen sind
+        kombinierbar.
+      </div>
+    </SettingsBlock>
+  );
+}
+
+
 
 function TextSettings({
   settings,

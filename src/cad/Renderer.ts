@@ -1374,8 +1374,36 @@ export class Renderer {
       ctx.fill();
       ctx.stroke();
     }
+    this._drawSegmentMidDivisionMarkers(seg);
     ctx.restore();
   }
+
+  /** Zeichnet kleine Snap-Marker für aktivierte Mittel-/Teilungs-Snaps eines
+   *  Segments (nur wenn das Segment selektiert oder gehovert ist). */
+  private _drawSegmentMidDivisionMarkers(seg: { a: Vec2; b: Vec2; midpointSnap?: boolean; divisionSnap?: number }) {
+    const divN = (typeof seg.divisionSnap === "number" && seg.divisionSnap >= 2) ? Math.floor(seg.divisionSnap) : 0;
+    if (!seg.midpointSnap && divN < 2) return;
+    const ctx = this.ctx;
+    const cam = this.camera;
+    const ts: number[] = [];
+    if (seg.midpointSnap) ts.push(0.5);
+    if (divN >= 2) { for (let k = 1; k < divN; k++) ts.push(k / divN); }
+    ctx.save();
+    ctx.fillStyle = "#fff";
+    ctx.strokeStyle = "rgba(77,163,255,0.95)";
+    ctx.lineWidth = 1.5;
+    for (const t of ts) {
+      const wx = seg.a.x + (seg.b.x - seg.a.x) * t;
+      const wy = seg.a.y + (seg.b.y - seg.a.y) * t;
+      const sp = cam.worldToScreen(wx, wy);
+      ctx.beginPath();
+      ctx.arc(sp.x, sp.y, 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
 
   private _drawHoverSegmentPoints() {
     if (!this.hoverSegmentId) return;
@@ -1404,8 +1432,10 @@ export class Renderer {
     ctx.fill();
     ctx.stroke();
 
+    this._drawSegmentMidDivisionMarkers(seg);
     ctx.restore();
   }
+
 
   /* ---------- Dimensions ---------- */
 
