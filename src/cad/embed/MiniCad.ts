@@ -341,7 +341,6 @@ export class MiniCad {
     const mount = c.parentElement;
     if (!mount) return;
     // Hub lazy erzeugen (DOM wird an den Canvas-Wrapper angehängt).
-    const { ParallelGuideHub } = require("../ParallelGuideHub") as typeof import("../ParallelGuideHub");
     const hub = new ParallelGuideHub(mount);
     this._parallelGuideHub = hub;
 
