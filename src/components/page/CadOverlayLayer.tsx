@@ -28,6 +28,9 @@ interface Props {
   // Guide defaults
   guideColor?: string;
   guidesLocked?: boolean;
+  /** Wenn true: jeder Klick erweitert die Mehrfach-Auswahl (statt zu ersetzen). */
+  multiSelectMode?: boolean;
+
   // Text defaults
   textColor?: string;
   textFontSizePx?: number;
