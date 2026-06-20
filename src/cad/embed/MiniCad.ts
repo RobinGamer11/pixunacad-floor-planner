@@ -167,6 +167,7 @@ export class MiniCad {
     this.renderer.referencePxPerM = this.basePxPerMm * 1000;
 
     this._patchRendererTransparent();
+    this._patchRendererTextPadding();
 
     this.hub = new LineHub(this.dom.hubRoot, this.dom.hubLenInput, this.dom.hubAngInput);
     this.pointEditMenu = new PointEditMenu(this.dom.pointEditRoot, this.dom.pointEditButtons);
