@@ -1293,6 +1293,8 @@ function RightInspector({
   setSelectedElementId,
   toolSettings,
   cadSelectionCount,
+  cadSelectedLineSnap,
+  onCadLineSnapChange,
   updateToolSettings,
 
   onJumpCad,
@@ -1312,11 +1314,14 @@ function RightInspector({
   setSelectedElementId: (id?: string) => void;
   toolSettings: ToolSettings;
   cadSelectionCount?: number;
+  cadSelectedLineSnap?: { midpoint: boolean; division: number | null; isGuide: boolean } | null;
+  onCadLineSnapChange?: (patch: { midpointSnap?: boolean; divisionSnap?: number | null }) => void;
   updateToolSettings: <K extends keyof ToolSettings>(k: K, patch: Partial<ToolSettings[K]>) => void;
 
   onJumpCad: (sheetId?: string) => void;
   onCollapse?: () => void;
 }) {
+
   const layerCount = page?.elements.length ?? 0;
   return (
     <aside
