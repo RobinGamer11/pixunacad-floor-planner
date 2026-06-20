@@ -843,19 +843,34 @@ export class MiniCad {
       if (this.textEditor.isActive()) return;
       const t = e.target as HTMLElement | null;
       if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
-      const sel = this.selection;
-      if (!sel) return;
+      const sels = this.selections.length > 0 ? this.selections : (this.selection ? [this.selection] : []);
+      if (sels.length === 0) return;
       let removed = false;
-      if (sel.segmentId) {
-        const s = this.scene.getSegmentById(sel.segmentId);
-        if (s) { this.scene.removeSegment(s); removed = true; }
-      } else if (sel.type === SelectionType.TEXTBOX || sel.type === SelectionType.TEXTBOX_HANDLE) {
-        const box = this.getSelectedTextBox();
-        if (box) { this.scene.removeTextBox(box); removed = true; }
-      } else if (sel.hatchId) {
-        const h = this.scene.getHatchById(sel.hatchId);
-        if (h) { this.scene.removeHatch(h); removed = true; }
+      for (const sel of sels) {
+        if (sel.segmentId) {
+          const s = this.scene.getSegmentById(sel.segmentId);
+          if (s) { this.scene.removeSegment(s); removed = true; }
+        } else if (sel.type === SelectionType.TEXTBOX || sel.type === SelectionType.TEXTBOX_HANDLE) {
+          if (sel.textBoxId) {
+            const box = this.scene.getTextBoxById(sel.textBoxId);
+            if (box) { this.scene.removeTextBox(box); removed = true; }
+          }
+        } else if (sel.hatchId) {
+          const h = this.scene.getHatchById(sel.hatchId);
+          if (h) { this.scene.removeHatch(h); removed = true; }
+        } else if ((sel as any).stickerInstanceId) {
+          const sid = (sel as any).stickerInstanceId as string;
+          const inst = this.scene.stickerInstances?.find?.((i: any) => i.id === sid);
+          if (inst) { this.scene.removeStickerInstance(inst); removed = true; }
+        } else if ((sel as any).freeStrokeId) {
+          this.scene.removeFreeStrokesByIds([(sel as any).freeStrokeId]);
+          removed = true;
+        } else if ((sel as any).documentId) {
+          this.scene.removeDocumentsByIds([(sel as any).documentId]);
+          removed = true;
+        }
       }
+
       if (removed) {
         this.clearSelection();
         this.pointEditMenu.hide();
