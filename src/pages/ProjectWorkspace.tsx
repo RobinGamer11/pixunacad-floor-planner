@@ -1264,7 +1264,9 @@ function RightInspector({
   selectedElementIds,
   setSelectedElementId,
   toolSettings,
+  cadSelectionCount,
   updateToolSettings,
+
   onJumpCad,
   onCollapse,
 }: {
