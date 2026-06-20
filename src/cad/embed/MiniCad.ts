@@ -96,6 +96,22 @@ export type MiniCadSelectionInfo =
  *  border). Independent of zoom. */
 const FRAME_PAD_PX = 16;
 
+/** Zwei Selections referenzieren dasselbe Objekt, wenn eine ihrer ID-Felder
+ *  (Segment, Hatch, TextBox, Sticker, FreeStroke, Document, Wall) übereinstimmt. */
+function _sameObject(a: Selection, b: Selection): boolean {
+  const ids: (keyof Selection | string)[] = [
+    "segmentId", "hatchId", "textBoxId", "stickerInstanceId",
+    "documentId", "freeStrokeId", "wallId",
+  ];
+  for (const k of ids) {
+    const av = (a as any)[k];
+    const bv = (b as any)[k];
+    if (av && bv && av === bv) return true;
+  }
+  return false;
+}
+
+
 export class MiniCad {
   readonly dom: MiniCadDom;
   readonly scene: Scene;
