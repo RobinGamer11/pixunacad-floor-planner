@@ -1019,7 +1019,14 @@ export class MiniCad {
   private _applyGroupTranslate() {
     const snap = this._groupMoveSnap;
     if (!snap) return;
+    // Wenn das primary-Objekt nicht mehr Teil der aktuellen Selektion ist
+    // (z.B. weil ein Plain-Klick ohne Shift sie ersetzt hat), Snap verwerfen.
+    if (!this.selections.some((s) => _sameObject(s, snap.primarySel))) {
+      this._groupMoveSnap = null;
+      return;
+    }
     const cur = this._getSelAnchor(snap.primarySel);
+
     if (!cur) return;
     const dx = cur.x - snap.primaryAnchor.x;
     const dy = cur.y - snap.primaryAnchor.y;
