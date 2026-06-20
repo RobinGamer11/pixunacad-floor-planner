@@ -590,6 +590,7 @@ export default function ProjectWorkspace() {
                     setCadSelectionCount(count ?? (info ? 1 : 0));
                     if (!info) {
                       setSelectedCadTool(undefined);
+                      setCadSelectedLineSnap(null);
                       return;
                     }
                     setSelectedElementIds([]);
@@ -602,7 +603,13 @@ export default function ProjectWorkspace() {
                         thicknessMm: info.thicknessMm,
                         alpha: info.alpha,
                       });
+                      setCadSelectedLineSnap({
+                        midpoint: !!info.midpointSnap,
+                        division: typeof info.divisionSnap === "number" ? info.divisionSnap : null,
+                        isGuide: !!info.isGuide,
+                      });
                     } else {
+                      setCadSelectedLineSnap(null);
                       updateToolSettings("text", {
                         color: info.color,
                         fontSize: info.fontSize,
@@ -618,6 +625,8 @@ export default function ProjectWorkspace() {
                       });
                     }
                   }}
+                  onCadEngineReady={(api) => { cadEngineApiRef.current = api; }}
+
                 />
               )}
             </div>
