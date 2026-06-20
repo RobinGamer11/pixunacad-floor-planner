@@ -631,6 +631,7 @@ type ToolSettings = {
     bgColor: string;
     bgAlphaPct: number;
     wrap: boolean;
+    autoSize: boolean;
     borderEnabled: boolean;
     borderColor: string;
     borderWidthPx: number;
