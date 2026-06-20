@@ -1023,6 +1023,8 @@ function PageCanvas({
           lineAlpha={toolSettings.line.alpha / 100}
           guideColor={toolSettings.guide.color}
           guidesLocked={toolSettings.guide.locked}
+          multiSelectMode={toolSettings.select.multi}
+
           textColor={toolSettings.text.color}
           textFontSizePx={toolSettings.text.fontSize}
           textBold={toolSettings.text.bold}
