@@ -213,11 +213,12 @@ export default function CadOverlayLayer(props: Props) {
             zIndex: 50,
           }}
         >
-          <button ref={peMoveRef} style={pointEditBtn}>↔</button>
-          <button ref={peTranslateRef} style={pointEditBtn}>⇄</button>
-          <button ref={peRotateRef} style={pointEditBtn}>⟳</button>
-          <button ref={peOffsetRef} style={pointEditBtn}>±</button>
-          <button ref={peDeleteRef} style={pointEditBtn}>✕</button>
+          <button ref={peMoveRef} style={pointEditBtn} title="Verschieben">↔</button>
+          <button ref={peTranslateRef} style={pointEditBtn} title="Translation">⇄</button>
+          <button ref={peRotateRef} style={pointEditBtn} title="Drehen">⟳</button>
+          <button ref={peOffsetRef} style={pointEditBtn} title="Offset">±</button>
+          <button ref={peResizeRef} style={pointEditBtn} title="Box vergrößern/verkleinern">⤡</button>
+          <button ref={peDeleteRef} style={pointEditBtn} title="Löschen">✕</button>
         </div>
         {/* TextEditor (contenteditable) + toolbar */}
         <div
