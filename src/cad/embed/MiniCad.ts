@@ -73,7 +73,7 @@ export interface MiniCadInit {
   initialState?: any;
 }
 
-export type MiniTool = "line" | "text" | "select" | null;
+export type MiniTool = "line" | "text" | "select" | "guide" | null;
 export type MiniCadSelectionInfo =
   | { tool: "line"; color: string; thicknessMm: number; alpha: number }
   | {
@@ -164,6 +164,13 @@ export class MiniCad {
   private _onChange?: () => void;
   private _onSelectionChange?: (info: MiniCadSelectionInfo | null) => void;
   private _coordCleanups: Array<() => void> = [];
+  /** Aktiv während das Hilfslinien-Werkzeug läuft — neue Segmente werden als
+   *  Hilfslinien markiert (isGuide=true). */
+  private _guideMode: boolean = false;
+  /** Wenn true, sind alle Hilfslinien-Segmente nicht auswählbar/editierbar. */
+  private _guidesLocked: boolean = false;
+  /** Default-Farbe für neue Hilfslinien (überschreibt Linienfarbe im Guide-Modus). */
+  private _guideColor: string = "#7DD3FC";
 
   constructor(init: MiniCadInit) {
     this.dom = init.dom;
