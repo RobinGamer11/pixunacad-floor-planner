@@ -1,77 +1,62 @@
 ## Ziel
-Drei größere Änderungen am CAD-Editor:
 
-1. Rechtsklick-Hilfslinien-Hub („Abstand 100 mm OK ✕") **entfernen**, stattdessen den **LineHub-Stil (Länge m / Winkel °)** wie im Linienwerkzeug auch für **alle anderen Werkzeuge** beim Setzen/Bearbeiten von Punkten anzeigen.
-2. Hilfslinien-Werkzeug überarbeiten: identisches Verhalten wie Linienwerkzeug, aber hellblau gestrichelt, nicht druckbar, fixierbar per Schloss.
-3. Auswahlwerkzeug: Single- vs. Multi-Select-Modus, gemeinsame Bearbeitung gleichartiger Objekte, gemeinsames Verschieben/Drehen/Duplizieren beliebiger Objekte.
+Der „Mehrfach"-Modus im Auswahlwerkzeug soll für alle Objekttypen (Linien, Hatches, Text, Sticker, Hilfslinien) tatsächlich funktionieren — inkl. Shift-Klick, Aufziehen eines Auswahlrahmens, gemeinsames Verschieben/Löschen/Duplizieren und Bulk-Edit gleicher Typen in den Einstellungen.
 
----
+Heute hat `MiniCad` nur ein einzelnes `selection: Selection | null`. Alle Highlights, Tools und der Inspector hängen daran. Deshalb merkt man von dem React-Toggle nichts.
 
-## 1. Distanz-Hub-Vereinheitlichung
+## Umfang
 
-**Entfernen:**
-- `ParallelGuideHub.ts` und sein Aufruf via Rechtsklick in `MiniCad.ts` werden komplett deaktiviert/gelöscht.
-- Rechtsklick erzeugt keine Hilfslinie mehr (bleibt erstmal ohne Funktion).
+### 1. Datenmodell (`src/cad/embed/MiniCad.ts`)
+- Neu: `selections: Selection[]` als „Source of Truth" (Reihenfolge = Selektionsreihenfolge, letztes Element = „primary").
+- `selection` bleibt als Getter erhalten, der `selections.at(-1) ?? null` liefert (Rückwärtskompatibilität für ~60 Lesestellen).
+- Neue API: `addToSelection(sel)`, `toggleSelection(sel)`, `clearSelection()`, `setSelections(list)`.
+- `setSelection(sel)` setzt weiterhin Single-Select (ersetzt Liste).
+- `_selectionInfo` liefert `{ primary, all }` damit der React-Layer beide kennt.
 
-**Hinzufügen (LineHub-Stil, Screenshot 2: `0.131 m | 122.1°`):**
-- `LineHub` wird zu generischem „PointPlacementHub" erweitert und beim Setzen jedes neuen Punkts angezeigt für:
-  - **WallTool** (Wand-Stützpunkte)
-  - **HatchTool** (Polygon-Stützpunkte)
-  - **FreeDrawTool** (Endpunkt, falls geradlinig)
-  - **MeasureTool** (Messpunkte)
-  - **GuideTool** (neu, siehe Punkt 2)
-- Werte: Länge in m und Winkel ° vom **letzten gesetzten Punkt** zum aktuellen Cursor. Enter/Tab/Eingabe wie bei Linie.
+### 2. Renderer (`src/cad/Renderer.ts`)
+- `setSelection` → `setSelections(list)`.
+- Alle Highlight-Pfade (Linien-Endpunkte, Hatch-Polygon, TextBox-Rahmen, Sticker-Bbox) iterieren über die Liste.
+- Nur das **primary** bekommt die volle Handle-Garnitur (Drehgriff, Resize, etc.); Sekundäre nur einen dezenten Auswahlrahmen, damit die UI nicht überladen wirkt.
 
-## 2. Hilfslinien-Werkzeug
+### 3. SelectTool (`src/cad/SelectTool.ts`)
+- Beim `pointerDown` auf Objekt:
+  - ohne Shift + Multi-Mode aus → `setSelection(hit)` wie heute.
+  - mit Shift **oder** Multi-Mode an → `toggleSelection(hit)`.
+- Klick ins Leere (keine Treffer):
+  - Multi-Mode aus → `clearSelection()`.
+  - Multi-Mode an oder Shift gedrückt → **Drag-Rect** starten (Marquee).
+- Marquee: rechteckiger Auswahlrahmen wird live als gestrichelte Hellblau-Box gerendert; beim Release alle Objekte deren Bbox vollständig (Links→Rechts) bzw. teilweise (Rechts→Links, CAD-Konvention) im Rect liegen, in `selections` aufnehmen.
+- Verschieben: wenn primary gepackt & in `selections`, wandern alle Selektionen mit demselben Delta.
+- Punkt-Editieren / Drehgriffe / Resize-Handles sind weiterhin nur am **primary** aktiv (sonst wird's mehrdeutig).
+- Delete-Hotkey löscht alle.
 
-- Werkzeug verhält sich **1:1 wie LineTool** (Snapping, Ortho, Hub, Mehrfachsegmente).
-- Erzeugte `PageElement.kind = "guide"`:
-  - Render: gestrichelt, Standardfarbe `#7DD3FC` (hellblau), im Hintergrund (z-Index niedriger als Linien/Text).
-  - Farbe in Werkzeugeinstellungen wählbar (Color-Picker, default hellblau).
-  - Strichmuster fest (z. B. `4 4`).
-- **Einstellungen** (neuer/erweiterter `GuideSettingsPanel`):
-  - Farbe
-  - Schloss-Toggle „Fixiert" → wenn aktiv, sind alle Hilfslinien nicht mehr selektierbar/verschiebbar/löschbar.
-- **Druck/Export**: `PlanPdfExport` und alle Render-Pfade filtern `kind === "guide"` heraus.
-- **Snapping**: Hilfslinien bleiben Snap-Targets (`SnapType.GUIDE`).
+### 4. React-Layer (`src/pages/ProjectWorkspace.tsx`, `CadOverlayLayer.tsx`)
+- `MiniCadSelectionInfo` erweitern um `count` und `kinds`.
+- `onCadSelectionChange` füllt einen neuen State `selectedCadInfos` (Array) statt nur den letzten Typ.
+- Mode-Toggle „Einzel/Mehrfach" wird an MiniCad propagiert (neue Methode `setMultiSelectMode(bool)`), damit die Engine ohne Shift bereits togglet.
+- Inspector („Einstellungen"-Panel):
+  - Wenn alle Selektionen denselben `kind` haben → Multi-Edit (Patch wird auf alle angewandt, geometrie-spezifische Keys ausgenommen).
+  - Wenn gemischt → nur Settings des **primary** anzeigen, Patch greift nur auf gleichartige Objekte (so wie vom User gefordert).
+- Statuszeile „Aktuell ausgewählt: N" weiterhin sichtbar.
 
-## 3. Auswahlwerkzeug — Multi-Select
+### 5. React-Layer-Elements (Sticker etc.)
+- Bleibt wie in Phase 4 — die bestehende `selectedElementIds`-Logik bleibt funktionsfähig für reine React-Elemente, wird aber an den selben Mode-Toggle gekoppelt.
 
-**Werkzeugeinstellungen (SelectSettingsPanel):**
-- Toggle `Auswahlmodus`: „Einzel" / „Mehrfach".
+## Technische Details
 
-**Mehrfachmodus:**
-- Klick auf Objekt → zur Auswahl hinzufügen (bestehendes bleibt). Klick auf leeren Bereich → Auswahl leeren. Shift-Klick entfernt aus Auswahl.
-- Marquee (Rechteck-Auswahl per Drag) bleibt erhalten.
+- `Selection`-Equality über `(type, segmentId|hatchId|textBoxId|stickerInstanceId)`.
+- Marquee-Hit-Test nutzt vorhandene Bbox-Helper aus `Scene` (Segment-Bbox, Hatch-Polygon-Bbox, TextBox-Rect, Sticker-Rect). Hilfslinien-Segmente werden bei `_guidesLocked === true` ignoriert (konsistent mit aktueller Single-Select-Sperre).
+- Group-Move-Implementierung über `Scene.translateSegment / translateHatch / …` — eine neue Wrapper-Methode `translateSelections(dx, dy)` kapselt das pro Typ.
+- Render-Reihenfolge im Marquee: Box wird oberhalb aller Objekte, unterhalb der Hub/Menüs gezeichnet.
 
-**Einstellungs-Anzeige bei Mehrfachauswahl:**
-- Es wird immer das Settings-Panel des **zuletzt angeklickten Objekts** angezeigt (Linie, Text, Wand, …).
-- Änderungen werden auf **alle gewählten Objekte vom selben Typ** angewendet (z. B. Strichstärke ändert alle Linien, andere Typen bleiben unverändert).
+## Was NICHT Teil dieses Schritts ist
+- Gruppen als persistierte Entität (Group-Object speichern). Multi-Select bleibt sitzungsweit.
+- Rotations-Handle für Mehrfachauswahl (technisch heikel: gemeinsamer Pivot). Wenn gewünscht, in eigenem Schritt.
 
-**Sammel-Aktionen für ALLE gewählten Objekte (unabhängig vom Typ):**
-- Verschieben (Drag der Auswahl)
-- Drehen (Rotations-Handle um den Auswahl-Mittelpunkt)
-- Duplizieren (Hub-Icon „Duplizieren", neue Kopien wieder gesetzt werden)
-- Löschen (Entf / Backspace)
-
----
-
-## Technische Hinweise (für Entwickler)
-
-- `LineHub.ts` umbenennen/öffnen für generische Nutzung; `showAt(sx,sy,{lastPointW, currentW})` → berechnet selbst Länge/Winkel. Bestehende `LineTool`-Integration bleibt unverändert.
-- `MiniCad.ts`: zentrale Methode `_showPlacementHub(toolId, lastP, currentP)`; wird von Wall/Hatch/FreeDraw/Measure/Guide aufgerufen.
-- `ParallelGuideHub.ts` löschen, `contextmenu`-Handler entfernen.
-- `PageElement` Typ-Erweiterung für `guide`: `locked: boolean`, `color: string`.
-- `projectStore`: neuer Toolsettings-Slice `select.multi: boolean`.
-- `SelectTool.ts`: interner State `selection: SelectionItem[]` + `lastSelected` für Settings-Panel.
-- `CadOverlayLayer`/`ProjectWorkspace`: Settings-Panel rendert dynamisch nach `lastSelected.kind`, Änderungen werden auf `selection.filter(s => s.kind === lastSelected.kind)` gemapped.
-- Render-Reihenfolge: `guide` zuerst, danach reguläre Elemente.
-- `PlanPdfExport` & Druck-Pfade: `elements.filter(e => e.kind !== "guide")`.
-
----
-
-## Offen / Rückfragen
-
-Bevor ich starte, eine Frage zum Auswahlmodus:
-- Soll **Shift-Klick im Einzelmodus** trotzdem temporär Mehrfachauswahl ermöglichen (Standard in CAD-Programmen), oder strikt nur das, was der Modus-Toggle sagt?
-- Drehen mehrerer Objekte: gemeinsamer Drehmittelpunkt = **geometrischer Mittelpunkt der Auswahl** ok?
+## Reihenfolge der Umsetzung
+1. Engine-Selection-Liste + Getter-Kompat (kleine, breite Änderung, sofort testen).
+2. Renderer-Highlights auf Liste umstellen.
+3. SelectTool: Shift-Klick + Multi-Mode-Toggle.
+4. Marquee/Drag-Rect.
+5. Group-Move + Group-Delete.
+6. React-Inspector Bulk-Edit für CAD-Objekte.
