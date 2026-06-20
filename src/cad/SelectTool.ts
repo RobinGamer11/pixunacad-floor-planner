@@ -824,30 +824,61 @@ export class SelectTool {
       if (!loop) return;
       loop[this.editTarget.pointIndex] = v(newPoint.x, newPoint.y);
     } else if (this.editTarget.kind === "textboxHandle") {
-      // For textbox MOVE/ROTATE: opposite corner is the pivot (fixedKeep);
-      // moving handle should land on newPoint. Box width/height stay constant.
-      // Compute new center and rotation so that opposite stays put and moving handle reaches newPoint.
       const box = this.app.scene.getTextBoxById(this.editTarget.textBoxId);
       if (!box || this.textBoxOppositeOriginal == null) return;
       const opp = this.textBoxOppositeOriginal;
       const w = this.textBoxWidthOriginal;
       const h = this.textBoxHeightOriginal;
+      const handleIndex = this.editTarget.handleIndex;
+
+      if ((this as any)._textBoxResizeMode) {
+        // RESIZE: Rotation bleibt fix, gegenüberliegende Ecke bleibt fix,
+        // Box-Breite/Höhe folgen der Maus (Textgröße bleibt unverändert).
+        const rot = this.textBoxRotationOriginal;
+        const cos = Math.cos(-rot);
+        const sin = Math.sin(-rot);
+        const dx = newPoint.x - opp.x;
+        const dy = newPoint.y - opp.y;
+        // In Box-lokales Koordinatensystem (vor Rotation) projizieren.
+        const lx = dx * cos - dy * sin;
+        const ly = dx * sin + dy * cos;
+        const localOpp = this._textBoxLocalCornerForIndex((handleIndex + 2) % 4, w, h);
+        // signX/signY: Richtung von gegenüber zur bewegten Ecke
+        const signX = -Math.sign(localOpp.x) || 1;
+        const signY = -Math.sign(localOpp.y) || 1;
+        const minM = 0.02;
+        const newW = Math.max(minM, lx * signX);
+        const newH = Math.max(minM, ly * signY);
+        // Neues Center: Mittelpunkt zwischen opp (welt) und neuer bewegter Ecke (welt).
+        const localMovNew = { x: signX * newW * 0.5, y: signY * newH * 0.5 };
+        const localOppNew = { x: -localMovNew.x, y: -localMovNew.y };
+        // Welt-Position der bewegten Ecke aus opp+local-Differenz herleiten
+        const cosR = Math.cos(rot), sinR = Math.sin(rot);
+        const diffLx = localMovNew.x - localOppNew.x;
+        const diffLy = localMovNew.y - localOppNew.y;
+        const diffWx = diffLx * cosR - diffLy * sinR;
+        const diffWy = diffLx * sinR + diffLy * cosR;
+        const movWorld = { x: opp.x + diffWx, y: opp.y + diffWy };
+        box.center = v((opp.x + movWorld.x) * 0.5, (opp.y + movWorld.y) * 0.5);
+        box.widthM = newW;
+        box.heightM = newH;
+        box.rotationRad = rot;
+        return;
+      }
+
+      // MOVE/ROTATE (original): Box width/height stay constant; rotation +
+      // center are recomputed so that opposite stays put and moving handle
+      // reaches newPoint.
       const diagLen = Math.hypot(w, h);
       const distMoving = Math.hypot(newPoint.x - opp.x, newPoint.y - opp.y);
       if (diagLen < 1e-9 || distMoving < 1e-9) return;
-      // Diagonal in local box-frame from opposite corner to moving corner depends on which corner index.
-      // boxLocalCorners order: 0=TL, 1=TR, 2=BR, 3=BL
-      // opposite-of(0)=2, of(1)=3, of(2)=0, of(3)=1
-      const handleIndex = this.editTarget.handleIndex;
       const localMov = this._textBoxLocalCornerForIndex(handleIndex, w, h);
       const localOpp = this._textBoxLocalCornerForIndex((handleIndex + 2) % 4, w, h);
-      // Local diagonal vector (from opp to mov)
       const dxL = localMov.x - localOpp.x;
       const dyL = localMov.y - localOpp.y;
       const localDiagAng = Math.atan2(dyL, dxL);
       const worldDiagAng = Math.atan2(newPoint.y - opp.y, newPoint.x - opp.x);
       const newRot = worldDiagAng - localDiagAng;
-      // Center is midpoint of opp and moving in world.
       const newCenter = v((opp.x + newPoint.x) * 0.5, (opp.y + newPoint.y) * 0.5);
       box.center = newCenter;
       box.rotationRad = newRot;
