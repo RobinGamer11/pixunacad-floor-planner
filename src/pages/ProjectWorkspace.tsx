@@ -1002,6 +1002,23 @@ function PageCanvas({
             projectStore.updatePage(projectId, page.id, { cadOverlay: state })
           }
           onSelectionChange={onCadSelectionChange}
+          onCreateParallelGuide={(p1, p2) => {
+            const minX = Math.min(p1.x, p2.x);
+            const minY = Math.min(p1.y, p2.y);
+            const maxX = Math.max(p1.x, p2.x);
+            const maxY = Math.max(p1.y, p2.y);
+            projectStore.addElement(projectId, page.id, {
+              kind: "guide",
+              x: minX,
+              y: minY,
+              w: Math.max(0.2, maxX - minX),
+              h: Math.max(0.2, maxY - minY),
+              points: [p1, p2],
+              color: toolSettings.guide.color,
+              strokeWidth: toolSettings.guide.strokeWidth,
+              nonPrinting: true,
+            });
+          }}
         />
 
       </div>
