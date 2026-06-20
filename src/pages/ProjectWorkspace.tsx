@@ -79,6 +79,7 @@ export default function ProjectWorkspace() {
   const [selectedElementId, setSelectedElementId] = useState<string | undefined>();
   const [rightTab, setRightTab] = useState<"settings" | "tools" | "layers">("settings");
   const [activeTool, setActiveTool] = useState<PageTool>(null);
+  const [selectedCadTool, setSelectedCadTool] = useState<"line" | "text" | undefined>();
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
   const [renamingPageId, setRenamingPageId] = useState<string | undefined>();
@@ -94,6 +95,7 @@ export default function ProjectWorkspace() {
   const setZoomClamped = (v: number) => setZoom(Math.max(10, Math.min(400, Math.round(v))));
   const setActiveToolAndTab = (t: PageTool) => {
     setActiveTool(t);
+    if (t) setSelectedCadTool(undefined);
     if (t) setRightTab("tools");
   };
 
@@ -323,6 +325,7 @@ export default function ProjectWorkspace() {
                         }
                         setActivePageId(pg.id);
                         setSelectedElementId(undefined);
+                        setSelectedCadTool(undefined);
                         setPageActionsSticky(false);
                       }}
                       className="group w-full text-left rounded-lg p-2 flex gap-2.5 transition cursor-pointer"
@@ -551,7 +554,26 @@ export default function ProjectWorkspace() {
                   onCommitTool={() => setActiveTool(null)}
                   onSelect={(id) => {
                     setSelectedElementId(id);
+                    if (id) setSelectedCadTool(undefined);
                     if (id) setRightTab("tools");
+                  }}
+                  onCadSelectionChange={(info) => {
+                    if (!info) {
+                      setSelectedCadTool(undefined);
+                      return;
+                    }
+                    setSelectedElementId(undefined);
+                    setSelectedCadTool(info.tool);
+                    setRightTab("tools");
+                    if (info.tool === "line") {
+                      updateToolSettings("line", {
+                        color: info.color,
+                        thicknessMm: info.thicknessMm,
+                        alpha: info.alpha,
+                      });
+                    } else {
+                      updateToolSettings("text", info);
+                    }
                   }}
                 />
               )}
@@ -570,6 +592,7 @@ export default function ProjectWorkspace() {
               project={project}
               activeTool={activeTool}
               setActiveTool={setActiveToolAndTab}
+              selectedCadTool={selectedCadTool}
               selectedElementId={selectedElementId}
               setSelectedElementId={setSelectedElementId}
               toolSettings={toolSettings}
