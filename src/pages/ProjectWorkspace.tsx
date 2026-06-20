@@ -1198,6 +1198,7 @@ function RightInspector({
   project,
   activeTool,
   setActiveTool,
+  selectedCadTool,
   selectedElementId,
   setSelectedElementId,
   toolSettings,
@@ -1213,6 +1214,7 @@ function RightInspector({
   project: import("@/lib/projectStore").Project;
   activeTool: PageTool;
   setActiveTool: (t: PageTool) => void;
+  selectedCadTool?: "line" | "text";
   selectedElementId?: string;
   setSelectedElementId: (id?: string) => void;
   toolSettings: ToolSettings;
@@ -1255,6 +1257,7 @@ function RightInspector({
             project={project}
             activeTool={activeTool}
             setActiveTool={setActiveTool}
+            selectedCadTool={selectedCadTool}
             selectedElementId={selectedElementId}
             setSelectedElementId={setSelectedElementId}
             toolSettings={toolSettings}
