@@ -199,7 +199,8 @@ export class TextEditorOverlay {
   private _applyBoxStyle(box: TextBox) {
     // Sync color picker to box default for new edits
     this.colorInput.value = this._toHexColor(box.style.textColor);
-    this.sizeSelect.value = String(Math.round(box.style.fontSizePx));
+    // Toolbar zeigt die Größe in pt (Word/PowerPoint); intern px = pt * 4/3.
+    this.sizeSelect.value = String(Math.round(box.style.fontSizePx * (3 / 4)));
   }
 
   private _toHexColor(color: string): string {
@@ -222,17 +223,19 @@ export class TextEditorOverlay {
     sel.addRange(range);
   }
 
-  private _applyFontSizeToSelection(sizePx: string) {
+  private _applyFontSizeToSelection(sizePt: string) {
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0) return;
     const range = sel.getRangeAt(0);
     if (range.collapsed) return;
+    // Auswahl-Wert ist pt (Word/PPT) — wir speichern intern in CSS-Pixel.
+    const px = Math.max(1, parseFloat(sizePt) || 0) * (4 / 3);
     try {
       document.execCommand("fontSize", false, "7"); // tagging trick
       const fonts = this.el.querySelectorAll('font[size="7"]');
       fonts.forEach(node => {
         const span = document.createElement("span");
-        span.style.fontSize = `${sizePx}px`;
+        span.style.fontSize = `${px}px`;
         span.innerHTML = (node as HTMLElement).innerHTML;
         node.replaceWith(span);
       });

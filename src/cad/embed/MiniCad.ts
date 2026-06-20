@@ -384,7 +384,9 @@ export class MiniCad {
     borderWidthPx?: number;
   }) {
     if (opts.color) this.defaultTextColor = opts.color;
-    if (typeof opts.fontSizePx === "number" && opts.fontSizePx > 0) this.defaultTextFontSizePx = opts.fontSizePx;
+    // Schriftgrößen werden in Word/PowerPoint als Punkt (pt) eingegeben.
+    // 1pt = 4/3 CSS-Pixel — Umrechnung damit "11" so groß rendert wie in Word.
+    if (typeof opts.fontSizePx === "number" && opts.fontSizePx > 0) this.defaultTextFontSizePx = opts.fontSizePx * (4 / 3);
     if (typeof opts.bold === "boolean") this.defaultTextBold = opts.bold;
     if (typeof opts.italic === "boolean") this.defaultTextItalic = opts.italic;
     if (typeof opts.alpha === "number" && opts.alpha >= 0 && opts.alpha <= 1) this.defaultTextAlpha = opts.alpha;
@@ -580,7 +582,7 @@ export class MiniCad {
       return {
         tool: "text",
         color: textColor.color,
-        fontSize: Math.round(box.style.fontSizePx),
+        fontSize: Math.round(box.style.fontSizePx * (3 / 4)),
         alpha: Math.round(textColor.alpha * 100),
         align: box.style.align,
         bgColor: box.style.bgColor,
