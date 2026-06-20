@@ -359,6 +359,66 @@ export class MiniCad {
     this._rebuildPageFrame();
   }
 
+  /* ===== External-rect snap (Zeichenblatt / PDF / Bild) ===== */
+
+  private _extRectsInstalled = false;
+  private _installExtRectSnap() {
+    if (this._extRectsInstalled) return;
+    const lm: any = this.labelManager;
+    if (!lm.groups.find((g: any) => g.id === this._extRectLabelId)) {
+      lm.groups.push({ id: this._extRectLabelId, name: "__ext_rect__", locked: true, visible: true });
+      const origList = lm.list.bind(lm);
+      // already filtered by frame? Re-filter both.
+      lm.list = () => origList().filter((g: any) => g.id !== this._extRectLabelId);
+    }
+    this._extRectsInstalled = true;
+  }
+
+  /** Setzt externe Rechtecke (cad-view/pdf/image) als Snap-Quellen. mm-Koords. */
+  setExternalRects(rects: Array<{ id: string; xMM: number; yMM: number; wMM: number; hMM: number; rotationRad?: number }>) {
+    this._installExtRectSnap();
+    this.scene.segments = this.scene.segments.filter((s) => s.labelId !== this._extRectLabelId);
+    const style = {
+      color: "rgba(0,0,0,0)",
+      thicknessM: 0.00001,
+      labelId: this._extRectLabelId,
+    };
+    const seg = (a: { x: number; y: number }, b: { x: number; y: number }, mid = false) => {
+      try {
+        const s = this.scene.createSegment(a, b, { ...style });
+        if (mid && s) (s as any).midpointSnap = true;
+      } catch {}
+    };
+    for (const r of rects) {
+      const x0 = r.xMM / 1000;
+      const y0 = r.yMM / 1000;
+      const x1 = (r.xMM + r.wMM) / 1000;
+      const y1 = (r.yMM + r.hMM) / 1000;
+      const rot = r.rotationRad ?? 0;
+      const cx = (x0 + x1) / 2;
+      const cy = (y0 + y1) / 2;
+      const cs = Math.cos(rot);
+      const sn = Math.sin(rot);
+      const xf = (px: number, py: number) => ({
+        x: cx + (px - cx) * cs - (py - cy) * sn,
+        y: cy + (px - cx) * sn + (py - cy) * cs,
+      });
+      const A = xf(x0, y0);
+      const B = xf(x1, y0);
+      const C = xf(x1, y1);
+      const D = xf(x0, y1);
+      // 4 edges (midpointSnap → edge midpoints werden snapbar)
+      seg(A, B, true);
+      seg(B, C, true);
+      seg(C, D, true);
+      seg(D, A, true);
+      // 2 Diagonalen mit midpointSnap → Mittelpunkt der Box wird snapbar
+      seg(A, C, true);
+      seg(B, D, true);
+    }
+    this._changeDirty = true;
+  }
+
   private _installSelectToolFrameFilter() {
     // Wir filtern Rahmen-Segmente NICHT mehr aus _segmentsFrontToBack heraus,
     // weil dadurch auch das Snapping (findBestSnap nutzt dieselbe Liste) die
@@ -619,7 +679,7 @@ export class MiniCad {
     return {
       version: 4,
       segments: this.scene.segments
-        .filter((s) => s.labelId !== this._frameLabelId)
+        .filter((s) => s.labelId !== this._frameLabelId && s.labelId !== this._extRectLabelId)
         .map((s) => ({
           id: s.id,
           a: { x: s.a.x, y: s.a.y },
@@ -654,7 +714,7 @@ export class MiniCad {
     const segScale = (data.version ?? 1) >= 3 ? f : 1;
     if (Array.isArray(data.segments)) {
       for (const s of data.segments) {
-        if (s.labelId === this._frameLabelId) continue;
+        if (s.labelId === this._frameLabelId || s.labelId === this._extRectLabelId) continue;
         try {
           this.scene.createSegment(
             { x: s.a.x, y: s.a.y },
