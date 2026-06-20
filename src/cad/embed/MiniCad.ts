@@ -195,14 +195,9 @@ export class MiniCad {
       this.selectTool.beginPointEdit(action);
     });
 
-    // Frame-Segmente (Seitenrand/Innenrahmen) sollen NICHT auswählbar sein.
-    // Snap soll an ihnen weiterhin funktionieren → wir filtern nur, wenn der
-    // SelectTool die Liste konsultiert.
-    this._installSelectToolFrameFilter();
-
     this._installCoordRemap();
+    this._installDeleteKey();
     this.applyZoom(this._zoom);
-    this._installPageFrameSnap();
 
     if (init.initialState) this._restore(init.initialState);
     this._changeDirty = false;
@@ -211,11 +206,10 @@ export class MiniCad {
     this._tick();
   }
 
-  /* ===== Frame snap (page edges + margin edges, invisible) ===== */
+  /* ===== Page frame (removed: no visible guide lines, no snap segments) ===== */
 
-  isFrameSegment(seg: { labelId?: string }): boolean {
-    return seg.labelId === this._frameLabelId;
-  }
+  isFrameSegment(_seg: { labelId?: string }): boolean { return false; }
+
 
   private _installPageFrameSnap() {
     const lm: any = this.labelManager;
