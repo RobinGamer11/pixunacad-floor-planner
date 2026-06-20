@@ -695,9 +695,13 @@ export class MiniCad {
           color: lineColor.color,
           thicknessMm: Math.max(0.1, Number(((seg.thicknessM / (this._strokeFactor || 1)) * 1000).toFixed(2))),
           alpha: Math.round(lineColor.alpha * 100),
+          isGuide: !!seg.isGuide,
+          midpointSnap: !!seg.midpointSnap,
+          divisionSnap: typeof seg.divisionSnap === "number" ? seg.divisionSnap : null,
         };
       }
     }
+
     return null;
   }
 
