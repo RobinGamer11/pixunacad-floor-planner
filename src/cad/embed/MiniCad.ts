@@ -251,10 +251,12 @@ export class MiniCad {
     });
 
     this._installSelectToolFrameFilter();
+    this._installGuideSegmentInterceptor();
     this._installCoordRemap();
     this._installDeleteKey();
     this.applyZoom(this._zoom);
     this._installPageFrameSnap();
+    
     
 
     if (init.initialState) this._restore(init.initialState);
@@ -321,18 +323,34 @@ export class MiniCad {
     // nicht mehr an Seiten-/Randkanten ausrichten.
     // Stattdessen post-processen wir das Auswahlergebnis: landet eine
     // Auswahl auf einem Rahmen-Segment, wird sie sofort wieder geleert.
+    // Genauso: gesperrte Hilfslinien dürfen nicht selektiert werden.
     const origUpdate = this.selectTool.update.bind(this.selectTool);
     (this.selectTool as any).update = (input: any) => {
       const result = origUpdate(input);
       const sel = this.selection;
       if (sel && sel.segmentId) {
         const seg = this.scene.getSegmentById(sel.segmentId);
-        if (seg && this.isFrameSegment(seg)) {
+        if (seg && (this.isFrameSegment(seg) || (seg.isGuide && this._guidesLocked))) {
           this.clearSelection();
           try { this.pointEditMenu.hide(); } catch {}
         }
       }
       return result;
+    };
+  }
+
+  /** Wickelt scene.createSegment so ein, dass im Guide-Modus alle neuen
+   *  Segmente als Hilfslinien (isGuide=true) markiert werden. Frame-Segmente
+   *  werden nie als Guides markiert. */
+  private _installGuideSegmentInterceptor() {
+    const orig = this.scene.createSegment.bind(this.scene);
+    (this.scene as any).createSegment = (a: any, b: any, style: any = {}) => {
+      const s = { ...style };
+      if (this._guideMode && style.labelId !== this._frameLabelId && s.isGuide === undefined) {
+        s.isGuide = true;
+        if (!s.color) s.color = this._guideColor;
+      }
+      return orig(a, b, s);
     };
   }
 
