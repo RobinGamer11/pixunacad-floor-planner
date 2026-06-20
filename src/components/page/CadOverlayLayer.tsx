@@ -160,6 +160,11 @@ export default function CadOverlayLayer(props: Props) {
   }, [guidesLocked]);
 
   useEffect(() => {
+    engineRef.current?.setMultiSelectMode(!!multiSelectMode);
+  }, [multiSelectMode]);
+
+
+  useEffect(() => {
     engineRef.current?.setTextDefaults({
       color: textColor,
       fontSizePx: textFontSizePx,
