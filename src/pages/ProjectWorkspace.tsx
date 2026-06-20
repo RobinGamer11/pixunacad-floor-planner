@@ -1097,6 +1097,16 @@ function PageCanvas({
           }
           onSelectionChange={onCadSelectionChange}
           onEngineReady={onCadEngineReady}
+          externalRects={page.elements
+            .filter((e) => e.kind === "cad-view" || e.kind === "pdf" || e.kind === "image")
+            .map((e) => ({
+              id: e.id,
+              xMM: ((e.x ?? 0) / 100) * fmt.w,
+              yMM: ((e.y ?? 0) / 100) * fmt.h,
+              wMM: ((e.w ?? 0) / 100) * fmt.w,
+              hMM: ((e.h ?? 0) / 100) * fmt.h,
+              rotationRad: e.rotation ? (e.rotation * Math.PI) / 180 : 0,
+            }))}
         />
 
 
