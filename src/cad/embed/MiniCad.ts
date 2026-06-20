@@ -211,6 +211,29 @@ export class MiniCad {
     // Wire PointEditMenu activation identisch zur CadApp-Oberfläche.
     this.pointEditMenu.bindActivate((action) => {
       const sel = this.selection;
+      // Duplicate: TextBox 1:1 mit Inhalt + Style klonen, leicht versetzt einfügen,
+      // Klon selektieren — verschieben/ändern erfolgt mit dem Auswahlwerkzeug.
+      if (action === "duplicate" && sel &&
+          (sel.type === SelectionType.TEXTBOX || sel.type === SelectionType.TEXTBOX_HANDLE) &&
+          (sel as any).textBoxId) {
+        const src = this.scene.getTextBoxById((sel as any).textBoxId);
+        if (src) {
+          const offsetM = 0.15;
+          const styleClone = JSON.parse(JSON.stringify(src.style || {}));
+          const newBox = this.scene.createTextBox(
+            { x: src.center.x + offsetM, y: src.center.y + offsetM },
+            src.widthM,
+            src.heightM,
+            { ...styleClone, labelId: src.labelId },
+            src.html || "",
+            src.rotationRad || 0,
+          );
+          try { this.pointEditMenu.hide(); } catch {}
+          this.setSelection({ type: SelectionType.TEXTBOX, textBoxId: newBox.id, handleIndex: null } as any);
+          this._changeDirty = true;
+        }
+        return;
+      }
       if (sel && sel.type === SelectionType.TEXTBOX_HANDLE && (sel as any).textBoxId && sel.handleIndex != null) {
         this.selectTool.beginTextBoxHandleEdit((sel as any).textBoxId, sel.handleIndex, action);
         return;
