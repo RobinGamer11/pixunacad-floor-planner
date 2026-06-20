@@ -5,7 +5,7 @@ import { makeHubDraggable, resetHubUserMoved, hubWasUserMoved } from "./hubDrag"
 export class PointEditMenu {
   root: HTMLDivElement;
   buttonsByAction: Record<string, HTMLButtonElement>;
-  actions = [PointEditAction.MOVE, PointEditAction.TRANSLATE, PointEditAction.ROTATE, PointEditAction.OFFSET, PointEditAction.DELETE];
+  actions = [PointEditAction.MOVE, PointEditAction.TRANSLATE, PointEditAction.ROTATE, PointEditAction.OFFSET, PointEditAction.RESIZE, PointEditAction.DELETE];
   index = -1;
   visible = false;
   private _onActivate: ((action: string) => void) | null = null;
@@ -52,7 +52,7 @@ export class PointEditMenu {
 
     const pad = 12;
     const vp = this.root.parentElement!.getBoundingClientRect();
-    const boxW = 136;
+    const boxW = 168;
     const boxH = 36;
 
     const left = clamp(sx + pad, 8, vp.width - boxW - 8);
