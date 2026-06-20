@@ -724,6 +724,7 @@ function PageCanvas({
   overlayPage,
   overlayOpacity,
   selectedElementId,
+  selectedElementIds,
   zoom,
   activeTool,
   toolSettings,
@@ -736,11 +737,12 @@ function PageCanvas({
   overlayPage?: import("@/lib/projectStore").ProjectPage;
   overlayOpacity: number;
   selectedElementId?: string;
+  selectedElementIds: string[];
   zoom: number;
   activeTool: PageTool;
   toolSettings: ToolSettings;
   onCommitTool: () => void;
-  onSelect: (id?: string) => void;
+  onSelect: (id?: string, opts?: { shift?: boolean }) => void;
   onCadSelectionChange: (info: MiniCadSelectionInfo | null) => void;
 }) {
   const fmt = FORMAT_SIZES[page.format];
