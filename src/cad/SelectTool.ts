@@ -446,7 +446,7 @@ export class SelectTool {
     }
   }
 
-  /** Begin TextBox-Handle-Edit (move/translate/rotate) for a clicked corner. */
+  /** Begin TextBox-Handle-Edit (move/translate/rotate/resize) for a clicked corner. */
   beginTextBoxHandleEdit(textBoxId: string, handleIndex: number, action: string) {
     const box = this.app.scene.getTextBoxById(textBoxId);
     if (!box) return;
@@ -470,6 +470,20 @@ export class SelectTool {
     this.moveHubLengthM = null;
     this.moveHubAngleDeg = null;
     this.app.pointEditMenu.hide();
+
+    if (action === PointEditAction.RESIZE) {
+      // Box wird unabhängig vom Text skaliert: Textgröße bleibt, Text läuft in
+      // der Box um. Deshalb autoSize deaktivieren und wrap aktivieren.
+      (box.style as any).autoSize = false;
+      box.style.wrap = true;
+      this.app.hub.hide();
+      this.app.hub.bindCommit(null);
+      // Während der Resize-Aktion intern wie MOVE behandeln (Drag-Schleife).
+      this.activeEditAction = PointEditAction.MOVE;
+      (this as any)._textBoxResizeMode = true;
+      return;
+    }
+    (this as any)._textBoxResizeMode = false;
 
     if (action === PointEditAction.ROTATE || action === PointEditAction.MOVE) {
       const radius = dist(this.fixedPoint!, this.otherPointOriginal!);
