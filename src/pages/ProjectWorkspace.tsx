@@ -1329,8 +1329,10 @@ function RightInspector({
             selectedElementIds={selectedElementIds}
             setSelectedElementId={setSelectedElementId}
             toolSettings={toolSettings}
+            cadSelectionCount={cadSelectionCount}
             updateToolSettings={updateToolSettings}
             onJumpCad={onJumpCad}
+
           />
         )}
         {tab === "layers" && page && (
