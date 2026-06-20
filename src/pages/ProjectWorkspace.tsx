@@ -629,6 +629,7 @@ export default function ProjectWorkspace() {
               setActiveTool={setActiveToolAndTab}
               selectedCadTool={selectedCadTool}
               selectedElementId={selectedElementId}
+              selectedElementIds={selectedElementIds}
               setSelectedElementId={setSelectedElementId}
               toolSettings={toolSettings}
               updateToolSettings={updateToolSettings}
