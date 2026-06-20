@@ -36,6 +36,10 @@ export class PointEditMenu {
     const wasVisible = this.visible;
     this.visible = true;
     this.root.classList.remove("hidden");
+    // Layout horizontal (Buttons nebeneinander).
+    this.root.style.display = "flex";
+    this.root.style.flexDirection = "row";
+    this.root.style.alignItems = "center";
 
     // Buttons je nach allowedActions ein-/ausblenden.
     const allow = allowedActions ? new Set(allowedActions) : null;
@@ -50,19 +54,37 @@ export class PointEditMenu {
     // re-positionieren würden (gleiche Selektion), Position respektieren.
     if (wasVisible && hubWasUserMoved(this.root)) return;
 
-    const pad = 12;
-    const vp = this.root.parentElement!.getBoundingClientRect();
+    // Clamp gegen die nächste tatsächlich gemessene Viewport-Box.
+    // parentElement ist im Embed-Layout ein 0×0-Wrapper, daher Fallback.
+    let vpW = window.innerWidth;
+    let vpH = window.innerHeight;
+    const p = this.root.parentElement;
+    if (p) {
+      const r = p.getBoundingClientRect();
+      if (r.width > 0) vpW = r.width;
+      if (r.height > 0) vpH = r.height;
+      let node: HTMLElement | null = p;
+      while (node && (node.getBoundingClientRect().width < 50 || node.getBoundingClientRect().height < 50)) {
+        node = node.parentElement;
+        if (node) {
+          const rr = node.getBoundingClientRect();
+          if (rr.width > 50) vpW = rr.width;
+          if (rr.height > 50) vpH = rr.height;
+        }
+      }
+    }
+
     const boxW = 168;
     const boxH = 36;
 
     let left: number;
     let top: number;
     if (opts?.align === "centerAbove") {
-      left = clamp(sx - boxW / 2, 8, vp.width - boxW - 8);
-      top = clamp(sy - boxH - 12, 8, vp.height - boxH - 8);
+      left = clamp(sx - boxW / 2, 8, Math.max(8, vpW - boxW - 8));
+      top = clamp(sy - boxH - 12, 8, Math.max(8, vpH - boxH - 8));
     } else {
-      left = clamp(sx + pad, 8, vp.width - boxW - 8);
-      top = clamp(sy - boxH - 8, 8, vp.height - boxH - 8);
+      left = clamp(sx + 12, 8, Math.max(8, vpW - boxW - 8));
+      top = clamp(sy - boxH - 8, 8, Math.max(8, vpH - boxH - 8));
     }
 
     this.root.style.left = `${left}px`;
@@ -74,6 +96,7 @@ export class PointEditMenu {
     this.visible = false;
     this.index = -1;
     this.root.classList.add("hidden");
+    this.root.style.display = "";
     resetHubUserMoved(this.root);
     // Alle Buttons wieder einblenden für nächsten Aufruf.
     for (const action of this.actions) {
