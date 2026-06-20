@@ -558,7 +558,41 @@ export class MiniCad {
       try { this._drawTextBoxSelection?.(); } catch {}
       if (this.overlay && this.overlay.draw) {
         try { this.overlay.draw(ctx, this.camera); } catch (e) { console.error(e); }
-      }
+  }
+
+  /** Override paddingPx auf 0 für eingebettete Textboxen, damit Text exakt
+   *  am Platzierungspunkt beginnt (kein 6-px-Versatz nach innen). */
+  private _patchRendererTextPadding() {
+    const r: any = this.renderer;
+    const orig = r._drawSingleTextBox?.bind(r);
+    if (!orig) return;
+    r._drawSingleTextBox = (box: any) => {
+      if (r.editingTextBoxId === box.id) return;
+      const cam = r.camera;
+      const cs = cam.worldToScreen(box.center.x, box.center.y);
+      const widthPx = box.widthM * cam.scale;
+      const heightPx = box.heightM * cam.scale;
+      // Direkt drawRichTextBox aufrufen mit paddingPx=0.
+      const mod = require("../textRichRenderer");
+      mod.drawRichTextBox({
+        ctx: r.ctx,
+        centerScreenX: cs.x,
+        centerScreenY: cs.y,
+        widthPx, heightPx,
+        rotationRad: box.rotationRad,
+        html: box.html || "",
+        baseFontSizePx: box.style.fontSizePx * (cam.scale / r.referencePxPerM),
+        baseColor: box.style.textColor,
+        bgColor: box.style.bgColor,
+        bgAlpha: (box.style.bgAlphaPct || 0) / 100,
+        align: box.style.align,
+        wrap: box.style.wrap,
+        borderEnabled: box.style.borderEnabled,
+        borderColor: box.style.borderColor,
+        borderWidthPx: box.style.borderWidthPx,
+        paddingPx: 0,
+      });
+    };
       ctx.restore();
     };
   }
