@@ -1609,7 +1609,7 @@ function ToolsTab({
         <SelectSettings
           settings={toolSettings.select}
           onChange={(p) => updateToolSettings("select", p)}
-          selectedCount={selectedElementIds?.length ?? 0}
+          selectedCount={Math.max(selectedElementIds?.length ?? 0, cadSelectionCount ?? 0)}
         />
       )}
       {settingsTool === "guide" && (
