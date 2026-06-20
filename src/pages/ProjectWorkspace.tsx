@@ -1341,17 +1341,27 @@ function PageSettings({
             </div>
           </Row>
           <Row label="Ränder">
-            <select
-              value={page.margins}
-              onChange={(e) => update({ margins: Number(e.target.value) })}
-              className="w-full h-8 px-2 rounded bg-transparent border text-sm"
-              style={{ borderColor: "hsl(var(--hairline))" }}
-            >
-              <option value={10}>Schmal (10 mm)</option>
-              <option value={20}>Normal (20 mm)</option>
-              <option value={30}>Breit (30 mm)</option>
-            </select>
+            <div className="flex items-center gap-2 w-full">
+              <input
+                type="checkbox"
+                checked={(page.margins ?? 0) > 0}
+                onChange={(e) => update({ margins: e.target.checked ? (page.margins && page.margins > 0 ? page.margins : 20) : 0 })}
+              />
+              <input
+                type="number"
+                min={0}
+                max={100}
+                step={1}
+                value={page.margins ?? 0}
+                disabled={(page.margins ?? 0) === 0}
+                onChange={(e) => update({ margins: Math.max(0, Number(e.target.value) || 0) })}
+                className="flex-1 h-8 px-2 rounded bg-transparent border text-sm disabled:opacity-50"
+                style={{ borderColor: "hsl(var(--hairline))" }}
+              />
+              <span className="text-xs text-muted-foreground">mm</span>
+            </div>
           </Row>
+
           <Row label="Hintergrund">
             <input
               type="checkbox"
