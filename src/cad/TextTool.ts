@@ -21,6 +21,11 @@ export class TextTool {
   guideAnchors: { key: string; point: Vec2 }[] = [];
   hoverSnapWorld: Vec2 | null = null;
 
+  // Drag-create state (Modus "Text passt sich Rahmen an")
+  private _dragStart: Vec2 | null = null;
+  private _dragEnd: Vec2 | null = null;
+  private _wasLeftDown = false;
+
   constructor(app: CadApp) {
     this.app = app;
   }
@@ -28,6 +33,9 @@ export class TextTool {
   activate() {
     this.guideAnchors = [];
     this.hoverSnapWorld = null;
+    this._dragStart = null;
+    this._dragEnd = null;
+    this._wasLeftDown = false;
     this.app.renderer.setHoverSegmentId(null);
     this.app.renderer.setHoverHatchId(null);
     this.app.renderer.setHoverTextBoxId(null);
@@ -39,12 +47,14 @@ export class TextTool {
   cancel() {
     this.guideAnchors = [];
     this.hoverSnapWorld = null;
+    this._dragStart = null;
+    this._dragEnd = null;
     this.app.renderer.setHoverTextBoxId(null);
   }
 
   finish() { this.cancel(); }
 
-  isDrawing() { return false; }
+  isDrawing() { return !!this._dragStart; }
   onTabRequest(): boolean { return false; }
 
   /* ---- Hit-testing helpers ---- */
