@@ -727,8 +727,9 @@ export class MiniCad {
     this.selections = list;
     this.renderer.setSelection(primary);
     (this.renderer as any).setExtraSelections?.(list.filter((s) => s !== primary));
-    this._onSelectionChange?.(this._selectionInfo(primary));
+    this._onSelectionChange?.(this._selectionInfo(primary), list.length);
   }
+
 
   clearSelection() {
     this._applyPrimary(null, []);
