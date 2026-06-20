@@ -77,7 +77,15 @@ export interface MiniCadInit {
 
 export type MiniTool = "line" | "text" | "select" | "guide" | null;
 export type MiniCadSelectionInfo =
-  | { tool: "line"; color: string; thicknessMm: number; alpha: number }
+  | {
+      tool: "line";
+      color: string;
+      thicknessMm: number;
+      alpha: number;
+      isGuide?: boolean;
+      midpointSnap?: boolean;
+      divisionSnap?: number | null;
+    }
   | {
       tool: "text";
       color: string;
@@ -92,6 +100,7 @@ export type MiniCadSelectionInfo =
       borderColor: string;
       borderWidthPx: number;
     };
+
 
 /** Extra CSS pixels around the page on the canvas so edge snap dots and the
  *  blue snap line are fully visible (and not occluded by the page's margin
