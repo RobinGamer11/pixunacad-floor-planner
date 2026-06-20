@@ -21,6 +21,9 @@ interface Props {
   initialState?: any;
   onChange: (state: any) => void;
   onSelectionChange?: (info: MiniCadSelectionInfo | null) => void;
+  /** Wenn der User per Rechtsklick auf eine CAD-Linie eine parallele Hilfslinie
+   *  anfordert: Endpunkte in Seiten-Prozent (0..100). */
+  onCreateParallelGuide?: (p1: { x: number; y: number }, p2: { x: number; y: number }) => void;
   // Line defaults
   lineColor?: string;
   lineThicknessMm?: number;
