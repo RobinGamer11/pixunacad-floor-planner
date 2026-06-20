@@ -915,6 +915,7 @@ function PageCanvas({
             const pts = el.points ?? [];
             if (pts.length < 2) return null;
             const isGuide = el.kind === "guide";
+            const guideLocked = isGuide && toolSettings.guide.locked;
             return (
               <line
                 key={el.id}
@@ -926,8 +927,9 @@ function PageCanvas({
                 strokeWidth={(el.strokeWidth ?? (isGuide ? 1 : 1.5)) * 0.15}
                 strokeDasharray={isGuide ? "1.2 0.8" : undefined}
                 vectorEffect="non-scaling-stroke"
-                style={{ pointerEvents: "stroke", cursor: "pointer" }}
+                style={{ pointerEvents: guideLocked ? "none" : "stroke", cursor: guideLocked ? "default" : "pointer" }}
                 onMouseDown={(e) => {
+                  if (guideLocked) return;
                   e.stopPropagation();
                   onSelect(el.id);
                 }}
