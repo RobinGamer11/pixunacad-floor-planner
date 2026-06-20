@@ -882,6 +882,192 @@ export class MiniCad {
     this._coordCleanups.push(() => window.removeEventListener("keydown", onKey));
   }
 
+  /* ===== Multi-Select Group-Move ============================================
+   * Während eines Drag-Vorgangs am primary-Selection-Objekt werden alle weiteren
+   * Selektionen mit demselben Delta verschoben. Die Geometrie der Extras wird
+   * beim Pointer-Down snapshotted und bei jedem Tick auf (snapshot + delta) gesetzt
+   * — so vermeiden wir Eingriffe in das SelectTool. */
+  private _groupMoveSnap: null | {
+    primarySel: Selection;
+    primaryAnchor: { x: number; y: number };
+    extras: Array<{ sel: Selection; snapshot: any }>;
+  } = null;
+
+  private _isTranslationSel(s: Selection): boolean {
+    if (!s) return false;
+    if (s.type === SelectionType.POINT) return false;
+    if (s.type === SelectionType.TEXTBOX_HANDLE) return false;
+    if (s.type === SelectionType.AREA_LABEL_HANDLE) return false;
+    if (s.type === SelectionType.DIMENSION) return false;
+    if (s.type === SelectionType.WALL && (s as any).edgeIndex != null) return false;
+    return true;
+  }
+
+  private _getSelAnchor(s: Selection): { x: number; y: number } | null {
+    if (s.segmentId) {
+      const seg = this.scene.getSegmentById(s.segmentId);
+      if (!seg) return null;
+      return { x: (seg.a.x + seg.b.x) / 2, y: (seg.a.y + seg.b.y) / 2 };
+    }
+    if (s.hatchId) {
+      const h = this.scene.getHatchById(s.hatchId);
+      if (!h || !h.points.length) return null;
+      return { x: h.points[0].x, y: h.points[0].y };
+    }
+    if (s.textBoxId) {
+      const b = this.scene.getTextBoxById(s.textBoxId);
+      if (!b) return null;
+      return { x: b.center.x, y: b.center.y };
+    }
+    const sid = (s as any).stickerInstanceId;
+    if (sid) {
+      const i = this.scene.getStickerInstanceById(sid);
+      if (!i) return null;
+      return { x: i.position.x, y: i.position.y };
+    }
+    const did = (s as any).documentId;
+    if (did) {
+      const d = this.scene.documents.find((x) => x.id === did);
+      if (!d) return null;
+      return { x: d.position.x, y: d.position.y };
+    }
+    const fid = (s as any).freeStrokeId;
+    if (fid) {
+      const f = this.scene.freeStrokes.find((x) => x.id === fid);
+      if (!f || !f.points.length) return null;
+      return { x: f.points[0].x, y: f.points[0].y };
+    }
+    return null;
+  }
+
+  private _snapshotSelGeometry(s: Selection): any {
+    if (s.segmentId) {
+      const seg = this.scene.getSegmentById(s.segmentId);
+      if (!seg) return null;
+      return { kind: "segment", a: { x: seg.a.x, y: seg.a.y }, b: { x: seg.b.x, y: seg.b.y } };
+    }
+    if (s.hatchId) {
+      const h = this.scene.getHatchById(s.hatchId);
+      if (!h) return null;
+      return {
+        kind: "hatch",
+        pts: h.points.map((p) => ({ x: p.x, y: p.y })),
+        holes: (h as any).holes ? (h as any).holes.map((ring: any[]) => ring.map((p: any) => ({ x: p.x, y: p.y }))) : null,
+      };
+    }
+    if (s.textBoxId) {
+      const b = this.scene.getTextBoxById(s.textBoxId);
+      if (!b) return null;
+      return { kind: "textbox", center: { x: b.center.x, y: b.center.y } };
+    }
+    const sid = (s as any).stickerInstanceId;
+    if (sid) {
+      const i = this.scene.getStickerInstanceById(sid);
+      if (!i) return null;
+      return { kind: "sticker", pos: { x: i.position.x, y: i.position.y } };
+    }
+    const did = (s as any).documentId;
+    if (did) {
+      const d = this.scene.documents.find((x) => x.id === did);
+      if (!d) return null;
+      return { kind: "doc", pos: { x: d.position.x, y: d.position.y } };
+    }
+    const fid = (s as any).freeStrokeId;
+    if (fid) {
+      const f = this.scene.freeStrokes.find((x) => x.id === fid);
+      if (!f) return null;
+      return { kind: "freestroke", pts: f.points.map((p: any) => ({ x: p.x, y: p.y })) };
+    }
+    return null;
+  }
+
+  private _installGroupMove() {
+    const c = this.dom.canvas;
+    const onDown = () => {
+      if (this._activeTool !== "select" && this._activeTool !== null) {
+        this._groupMoveSnap = null;
+        return;
+      }
+      const sels = this.selections;
+      if (sels.length < 2) { this._groupMoveSnap = null; return; }
+      const primary = sels[sels.length - 1];
+      if (!this._isTranslationSel(primary)) { this._groupMoveSnap = null; return; }
+      const anchor = this._getSelAnchor(primary);
+      if (!anchor) { this._groupMoveSnap = null; return; }
+      const extras: Array<{ sel: Selection; snapshot: any }> = [];
+      for (const s of sels) {
+        if (s === primary) continue;
+        const snap = this._snapshotSelGeometry(s);
+        if (snap) extras.push({ sel: s, snapshot: snap });
+      }
+      this._groupMoveSnap = { primarySel: primary, primaryAnchor: { x: anchor.x, y: anchor.y }, extras };
+    };
+    const onUp = () => { this._groupMoveSnap = null; };
+    c.addEventListener("mousedown", onDown);
+    window.addEventListener("mouseup", onUp);
+    this._coordCleanups.push(() => c.removeEventListener("mousedown", onDown));
+    this._coordCleanups.push(() => window.removeEventListener("mouseup", onUp));
+  }
+
+  private _applyGroupTranslate() {
+    const snap = this._groupMoveSnap;
+    if (!snap) return;
+    const cur = this._getSelAnchor(snap.primarySel);
+    if (!cur) return;
+    const dx = cur.x - snap.primaryAnchor.x;
+    const dy = cur.y - snap.primaryAnchor.y;
+    if (dx === 0 && dy === 0) return;
+    for (const e of snap.extras) {
+      const s = e.sel;
+      const sg = e.snapshot;
+      if (sg.kind === "segment" && s.segmentId) {
+        const seg = this.scene.getSegmentById(s.segmentId);
+        if (!seg) continue;
+        seg.a.x = sg.a.x + dx; seg.a.y = sg.a.y + dy;
+        seg.b.x = sg.b.x + dx; seg.b.y = sg.b.y + dy;
+      } else if (sg.kind === "hatch" && s.hatchId) {
+        const h = this.scene.getHatchById(s.hatchId);
+        if (!h) continue;
+        for (let i = 0; i < h.points.length && i < sg.pts.length; i++) {
+          h.points[i].x = sg.pts[i].x + dx;
+          h.points[i].y = sg.pts[i].y + dy;
+        }
+        if (sg.holes && (h as any).holes) {
+          for (let r = 0; r < (h as any).holes.length && r < sg.holes.length; r++) {
+            const ring = (h as any).holes[r];
+            for (let i = 0; i < ring.length && i < sg.holes[r].length; i++) {
+              ring[i].x = sg.holes[r][i].x + dx;
+              ring[i].y = sg.holes[r][i].y + dy;
+            }
+          }
+        }
+      } else if (sg.kind === "textbox" && s.textBoxId) {
+        const b = this.scene.getTextBoxById(s.textBoxId);
+        if (!b) continue;
+        b.center.x = sg.center.x + dx;
+        b.center.y = sg.center.y + dy;
+      } else if (sg.kind === "sticker") {
+        const i = this.scene.getStickerInstanceById((s as any).stickerInstanceId);
+        if (!i) continue;
+        i.position.x = sg.pos.x + dx;
+        i.position.y = sg.pos.y + dy;
+      } else if (sg.kind === "doc") {
+        const d = this.scene.documents.find((x) => x.id === (s as any).documentId);
+        if (!d) continue;
+        d.position.x = sg.pos.x + dx;
+        d.position.y = sg.pos.y + dy;
+      } else if (sg.kind === "freestroke") {
+        const f = this.scene.freeStrokes.find((x) => x.id === (s as any).freeStrokeId);
+        if (!f) continue;
+        for (let i = 0; i < f.points.length && i < sg.pts.length; i++) {
+          f.points[i].x = sg.pts[i].x + dx;
+          f.points[i].y = sg.pts[i].y + dy;
+        }
+      }
+    }
+  }
+
+
 
   private _installCoordRemap() {
     const c = this.dom.canvas;
