@@ -582,7 +582,8 @@ export default function ProjectWorkspace() {
                     setSelectedCadTool(undefined);
                     setRightTab("tools");
                   }}
-                  onCadSelectionChange={(info) => {
+                  onCadSelectionChange={(info, count) => {
+                    setCadSelectionCount(count ?? (info ? 1 : 0));
                     if (!info) {
                       setSelectedCadTool(undefined);
                       return;
@@ -590,6 +591,7 @@ export default function ProjectWorkspace() {
                     setSelectedElementIds([]);
                     setSelectedCadTool(info.tool);
                     setRightTab("tools");
+
                     if (info.tool === "line") {
                       updateToolSettings("line", {
                         color: info.color,
