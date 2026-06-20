@@ -983,6 +983,28 @@ function PageCanvas({
               projectStore.deleteElement(projectId, page.id, el.id);
               onSelect(undefined);
             }}
+            onEdgeDrag={(edge, dx, dy) => {
+              const dxPct = (dx / scale / width) * 100;
+              const dyPct = (dy / scale / height) * 100;
+              const patch: Partial<PageElement> = {};
+              const minPct = 2;
+              if (edge === "left") {
+                const newX = Math.max(0, el.x + dxPct);
+                const newW = Math.max(minPct, el.w - (newX - el.x));
+                patch.x = newX;
+                patch.w = newW;
+              } else if (edge === "right") {
+                patch.w = Math.max(minPct, Math.min(100 - el.x, el.w + dxPct));
+              } else if (edge === "top") {
+                const newY = Math.max(0, el.y + dyPct);
+                const newH = Math.max(minPct, el.h - (newY - el.y));
+                patch.y = newY;
+                patch.h = newH;
+              } else if (edge === "bottom") {
+                patch.h = Math.max(minPct, Math.min(100 - el.y, el.h + dyPct));
+              }
+              projectStore.updateElement(projectId, page.id, el.id, patch);
+            }}
           />
         ))}
 
