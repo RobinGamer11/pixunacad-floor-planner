@@ -126,6 +126,7 @@ export default function CadOverlayLayer(props: Props) {
       initialState,
       onChange: () => onChangeRef.current(engine.serialize()),
       onSelectionChange: (info) => onSelectionChangeRef.current?.(info),
+      onCreateParallelGuide: (p1, p2) => onCreateParallelGuideRef.current?.(p1, p2),
     });
     engineRef.current = engine;
     return () => {
