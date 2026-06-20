@@ -1858,11 +1858,13 @@ function LineSnapSettings({
   midpoint,
   division,
   onChange,
+  onDuplicate,
 }: {
   isGuide: boolean;
   midpoint: boolean;
   division: number | null;
   onChange: (patch: { midpointSnap?: boolean; divisionSnap?: number | null }) => void;
+  onDuplicate?: () => void;
 }) {
   const [draft, setDraft] = useState<string>(division ? String(division) : "");
   // Keep draft in sync when selection switches to another line.
