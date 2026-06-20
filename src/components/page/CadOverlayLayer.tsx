@@ -159,99 +159,103 @@ export default function CadOverlayLayer(props: Props) {
       className="absolute inset-0"
       style={{ pointerEvents: enabled ? "auto" : "none", zIndex: 30 }}
     >
-      <canvas
-        ref={canvasRef}
-        style={{
-          position: "absolute",
-          left: 0,
-          top: 0,
-          background: "transparent",
-        }}
-      />
-      {/* LineHub */}
-      <div
-        ref={hubRef}
-        className="hidden"
-        style={{
-          position: "absolute",
-          background: "white",
-          border: "1px solid hsl(var(--hairline))",
-          borderRadius: 6,
-          padding: 6,
-          boxShadow: "0 4px 16px -4px rgba(0,0,0,0.18)",
-          gap: 6,
-          zIndex: 50,
-        }}
-      >
-        <input ref={hubLenRef} type="text" readOnly
-          style={{ width: 72, fontSize: 11, padding: "2px 4px", border: "1px solid hsl(var(--hairline))", borderRadius: 4 }} />
-        <input ref={hubAngRef} type="text" readOnly
-          style={{ width: 56, fontSize: 11, padding: "2px 4px", border: "1px solid hsl(var(--hairline))", borderRadius: 4 }} />
-      </div>
-      {/* PointEditMenu */}
-      <div
-        ref={peRef}
-        className="hidden"
-        style={{
-          position: "absolute",
-          background: "white",
-          border: "1px solid hsl(var(--hairline))",
-          borderRadius: 6,
-          padding: 4,
-          boxShadow: "0 4px 16px -4px rgba(0,0,0,0.18)",
-          gap: 2,
-          zIndex: 50,
-        }}
-      >
-        <button ref={peMoveRef} style={pointEditBtn}>↔</button>
-        <button ref={peTranslateRef} style={pointEditBtn}>⇄</button>
-        <button ref={peRotateRef} style={pointEditBtn}>⟳</button>
-        <button ref={peOffsetRef} style={pointEditBtn}>±</button>
-        <button ref={peDeleteRef} style={pointEditBtn}>✕</button>
-      </div>
-      {/* TextEditor (contenteditable) + toolbar */}
-      <div
-        ref={teEditorRef}
-        className="hidden"
-        style={{ zIndex: 60 }}
-      />
-      <div
-        ref={teToolbarRef}
-        className="hidden"
-        style={{
-          position: "absolute",
-          background: "white",
-          border: "1px solid hsl(var(--hairline))",
-          borderRadius: 6,
-          padding: "4px 6px",
-          boxShadow: "0 4px 16px -4px rgba(0,0,0,0.18)",
-          gap: 4,
-          alignItems: "center",
-          zIndex: 70,
-        }}
-      >
-        <button ref={teBoldRef} style={{ ...toolbarBtn, fontWeight: 700 }} title="Fett">B</button>
-        <button ref={teItalicRef} style={{ ...toolbarBtn, fontStyle: "italic" }} title="Kursiv">I</button>
-        <input ref={teColorRef} type="color" defaultValue="#111111"
-          style={{ width: 26, height: 22, padding: 0, border: "1px solid hsl(var(--hairline))", borderRadius: 4, background: "white" }} />
-        <select ref={teSizeRef} defaultValue="16"
-          style={{ height: 22, fontSize: 11, padding: "0 4px", border: "1px solid hsl(var(--hairline))", borderRadius: 4, background: "white" }}>
-          {[8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 40, 48, 64].map((s) => (
-            <option key={s} value={String(s)}>{s} px</option>
-          ))}
-        </select>
-        <select ref={teSymbolRef} defaultValue=""
-          style={{ height: 22, fontSize: 11, padding: "0 4px", border: "1px solid hsl(var(--hairline))", borderRadius: 4, background: "white" }}>
-          <option value="">⚙ Symbol</option>
-          <option value="°">° Grad</option>
-          <option value="±">± Plus/Minus</option>
-          <option value="Ø">Ø Durchmesser</option>
-          <option value="≈">≈ Ungefähr</option>
-          <option value="≤">≤ Kleiner-gleich</option>
-          <option value="≥">≥ Größer-gleich</option>
-          <option value="×">× Mal</option>
-          <option value="→">→ Pfeil</option>
-        </select>
+      {/* Wrapper offset matches MiniCad.FRAME_PAD_PX (-16px) so the canvas,
+          hub, point-edit menu and inline text editor share one coord system. */}
+      <div style={{ position: "absolute", left: -16, top: -16, width: 0, height: 0 }}>
+        <canvas
+          ref={canvasRef}
+          style={{
+            position: "absolute",
+            left: 0,
+            top: 0,
+            background: "transparent",
+          }}
+        />
+        {/* LineHub */}
+        <div
+          ref={hubRef}
+          className="hidden"
+          style={{
+            position: "absolute",
+            background: "white",
+            border: "1px solid hsl(var(--hairline))",
+            borderRadius: 6,
+            padding: 6,
+            boxShadow: "0 4px 16px -4px rgba(0,0,0,0.18)",
+            gap: 6,
+            zIndex: 50,
+          }}
+        >
+          <input ref={hubLenRef} type="text" readOnly
+            style={{ width: 72, fontSize: 11, padding: "2px 4px", border: "1px solid hsl(var(--hairline))", borderRadius: 4 }} />
+          <input ref={hubAngRef} type="text" readOnly
+            style={{ width: 56, fontSize: 11, padding: "2px 4px", border: "1px solid hsl(var(--hairline))", borderRadius: 4 }} />
+        </div>
+        {/* PointEditMenu */}
+        <div
+          ref={peRef}
+          className="hidden"
+          style={{
+            position: "absolute",
+            background: "white",
+            border: "1px solid hsl(var(--hairline))",
+            borderRadius: 6,
+            padding: 4,
+            boxShadow: "0 4px 16px -4px rgba(0,0,0,0.18)",
+            gap: 2,
+            zIndex: 50,
+          }}
+        >
+          <button ref={peMoveRef} style={pointEditBtn}>↔</button>
+          <button ref={peTranslateRef} style={pointEditBtn}>⇄</button>
+          <button ref={peRotateRef} style={pointEditBtn}>⟳</button>
+          <button ref={peOffsetRef} style={pointEditBtn}>±</button>
+          <button ref={peDeleteRef} style={pointEditBtn}>✕</button>
+        </div>
+        {/* TextEditor (contenteditable) + toolbar */}
+        <div
+          ref={teEditorRef}
+          className="hidden"
+          style={{ zIndex: 60 }}
+        />
+        <div
+          ref={teToolbarRef}
+          className="hidden"
+          style={{
+            position: "absolute",
+            background: "white",
+            border: "1px solid hsl(var(--hairline))",
+            borderRadius: 6,
+            padding: "4px 6px",
+            boxShadow: "0 4px 16px -4px rgba(0,0,0,0.18)",
+            gap: 4,
+            alignItems: "center",
+            zIndex: 70,
+          }}
+        >
+          <button ref={teBoldRef} style={{ ...toolbarBtn, fontWeight: 700 }} title="Fett">B</button>
+          <button ref={teItalicRef} style={{ ...toolbarBtn, fontStyle: "italic" }} title="Kursiv">I</button>
+          <input ref={teColorRef} type="color" defaultValue="#111111"
+            style={{ width: 26, height: 22, padding: 0, border: "1px solid hsl(var(--hairline))", borderRadius: 4, background: "white" }} />
+          <select ref={teSizeRef} defaultValue="16"
+            style={{ height: 22, fontSize: 11, padding: "0 4px", border: "1px solid hsl(var(--hairline))", borderRadius: 4, background: "white" }}>
+            {[8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 40, 48, 64].map((s) => (
+              <option key={s} value={String(s)}>{s} px</option>
+            ))}
+          </select>
+          <select ref={teSymbolRef} defaultValue=""
+            style={{ height: 22, fontSize: 11, padding: "0 4px", border: "1px solid hsl(var(--hairline))", borderRadius: 4, background: "white" }}>
+            <option value="">⚙ Symbol</option>
+            <option value="°">° Grad</option>
+            <option value="±">± Plus/Minus</option>
+            <option value="Ø">Ø Durchmesser</option>
+            <option value="≈">≈ Ungefähr</option>
+            <option value="≤">≤ Kleiner-gleich</option>
+            <option value="≥">≥ Größer-gleich</option>
+            <option value="×">× Mal</option>
+            <option value="→">→ Pfeil</option>
+          </select>
+        </div>
       </div>
     </div>
   );
