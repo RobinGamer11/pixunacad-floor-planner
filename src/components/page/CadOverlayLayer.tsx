@@ -27,6 +27,8 @@ interface Props {
     setSelectedSegmentSnap: (opts: { midpointSnap?: boolean; divisionSnap?: number | null }) => void;
     duplicateSelectedSegments: (offsetMm?: number) => number;
   }) => void;
+  /** Externe Rechtecke (Zeichenblatt/PDF/Bild) als Snap-Quellen. mm-Koords. */
+  externalRects?: Array<{ id: string; xMM: number; yMM: number; wMM: number; hMM: number; rotationRad?: number }>;
 
   // Line defaults
   lineColor?: string;
