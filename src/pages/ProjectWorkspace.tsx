@@ -88,7 +88,10 @@ export default function ProjectWorkspace() {
   const [selectedCadTool, setSelectedCadTool] = useState<"line" | "text" | undefined>();
   const [cadSelectionCount, setCadSelectionCount] = useState<number>(0);
   const [cadSelectedLineSnap, setCadSelectedLineSnap] = useState<{ midpoint: boolean; division: number | null; isGuide: boolean } | null>(null);
-  const cadEngineApiRef = useRef<{ setSelectedSegmentSnap: (opts: { midpointSnap?: boolean; divisionSnap?: number | null }) => void } | null>(null);
+  const cadEngineApiRef = useRef<{
+    setSelectedSegmentSnap: (opts: { midpointSnap?: boolean; divisionSnap?: number | null }) => void;
+    duplicateSelectedSegments: (offsetMm?: number) => number;
+  } | null>(null);
 
 
 
@@ -659,6 +662,7 @@ export default function ProjectWorkspace() {
                   isGuide: prev.isGuide,
                 } : prev);
               }}
+              onCadDuplicateSegments={() => { cadEngineApiRef.current?.duplicateSelectedSegments(5); }}
 
               updateToolSettings={updateToolSettings}
 
@@ -775,7 +779,7 @@ function PageCanvas({
   onCommitTool: () => void;
   onSelect: (id?: string, opts?: { shift?: boolean }) => void;
   onCadSelectionChange: (info: MiniCadSelectionInfo | null, count?: number) => void;
-  onCadEngineReady?: (api: { setSelectedSegmentSnap: (opts: { midpointSnap?: boolean; divisionSnap?: number | null }) => void }) => void;
+  onCadEngineReady?: (api: { setSelectedSegmentSnap: (opts: { midpointSnap?: boolean; divisionSnap?: number | null }) => void; duplicateSelectedSegments: (offsetMm?: number) => number }) => void;
 }) {
 
   const fmt = FORMAT_SIZES[page.format];
@@ -1295,6 +1299,7 @@ function RightInspector({
   cadSelectionCount,
   cadSelectedLineSnap,
   onCadLineSnapChange,
+  onCadDuplicateSegments,
   updateToolSettings,
 
   onJumpCad,
@@ -1316,6 +1321,7 @@ function RightInspector({
   cadSelectionCount?: number;
   cadSelectedLineSnap?: { midpoint: boolean; division: number | null; isGuide: boolean } | null;
   onCadLineSnapChange?: (patch: { midpointSnap?: boolean; divisionSnap?: number | null }) => void;
+  onCadDuplicateSegments?: () => void;
   updateToolSettings: <K extends keyof ToolSettings>(k: K, patch: Partial<ToolSettings[K]>) => void;
 
   onJumpCad: (sheetId?: string) => void;
@@ -1365,6 +1371,7 @@ function RightInspector({
             cadSelectionCount={cadSelectionCount}
             cadSelectedLineSnap={cadSelectedLineSnap}
             onCadLineSnapChange={onCadLineSnapChange}
+            onCadDuplicateSegments={onCadDuplicateSegments}
             updateToolSettings={updateToolSettings}
             onJumpCad={onJumpCad}
 
@@ -1583,6 +1590,7 @@ function ToolsTab({
   cadSelectionCount,
   cadSelectedLineSnap,
   onCadLineSnapChange,
+  onCadDuplicateSegments,
   updateToolSettings,
   onJumpCad,
 }: {
@@ -1600,6 +1608,7 @@ function ToolsTab({
   cadSelectionCount?: number;
   cadSelectedLineSnap?: { midpoint: boolean; division: number | null; isGuide: boolean } | null;
   onCadLineSnapChange?: (patch: { midpointSnap?: boolean; divisionSnap?: number | null }) => void;
+  onCadDuplicateSegments?: () => void;
   updateToolSettings: <K extends keyof ToolSettings>(k: K, patch: Partial<ToolSettings[K]>) => void;
 
   onJumpCad: (sheetId?: string) => void;
@@ -1671,6 +1680,7 @@ function ToolsTab({
           midpoint={cadSelectedLineSnap.midpoint}
           division={cadSelectedLineSnap.division}
           onChange={onCadLineSnapChange}
+          onDuplicate={onCadDuplicateSegments}
         />
       )}
 
@@ -1855,11 +1865,13 @@ function LineSnapSettings({
   midpoint,
   division,
   onChange,
+  onDuplicate,
 }: {
   isGuide: boolean;
   midpoint: boolean;
   division: number | null;
   onChange: (patch: { midpointSnap?: boolean; divisionSnap?: number | null }) => void;
+  onDuplicate?: () => void;
 }) {
   const [draft, setDraft] = useState<string>(division ? String(division) : "");
   // Keep draft in sync when selection switches to another line.
@@ -1912,6 +1924,19 @@ function LineSnapSettings({
           ) : null}
         </div>
       </Row>
+      {onDuplicate && (
+        <Row label="Aktion">
+          <button
+            type="button"
+            onClick={onDuplicate}
+            className="h-7 px-2 rounded-md border text-xs inline-flex items-center gap-1"
+            style={{ borderColor: "hsl(var(--hairline))" }}
+            title="Auswahl duplizieren (leichter Versatz)"
+          >
+            <Copy size={12} /> Duplizieren
+          </button>
+        </Row>
+      )}
       <div className="text-[11px] text-muted-foreground">
         Mittelpunkt = Halbierungs-Snap (50 %). Teilung N (z. B. 3, 4) erzeugt N-1
         zusätzliche Snap-Punkte für gleiche Abschnitte. Beide Optionen sind

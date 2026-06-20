@@ -490,6 +490,48 @@ export class MiniCad {
     }
   }
 
+  /** Dupliziert die aktuell selektierte(n) Linien/Hilfslinien mit einem kleinen
+   *  Versatz und selektiert die Kopien. Übernimmt Farbe, Stärke, labelId,
+   *  midpointSnap, divisionSnap und isGuide. */
+  duplicateSelectedSegments(offsetMm: number = 5): number {
+    const ids = new Set<string>();
+    for (const sel of this.selections) {
+      if ((sel as any)?.segmentId) ids.add((sel as any).segmentId);
+    }
+    if (this.selection && (this.selection as any).segmentId) ids.add((this.selection as any).segmentId);
+    if (ids.size === 0) return 0;
+    const dx = offsetMm / 1000;
+    const dy = offsetMm / 1000;
+    const newIds: string[] = [];
+    for (const id of ids) {
+      const seg = this.scene.getSegmentById(id);
+      if (!seg || this.isFrameSegment(seg)) continue;
+      const copy = this.scene.createSegment(
+        { x: seg.a.x + dx, y: seg.a.y + dy },
+        { x: seg.b.x + dx, y: seg.b.y + dy },
+        {
+          color: seg.color,
+          thicknessM: seg.thicknessM,
+          labelId: seg.labelId,
+          isGuide: !!seg.isGuide,
+          midpointSnap: !!seg.midpointSnap,
+          divisionSnap: seg.divisionSnap,
+        },
+      );
+      newIds.push(copy.id);
+    }
+    if (newIds.length === 0) return 0;
+    // Selektion auf die Kopien setzen.
+    const first = newIds[0];
+    this.selections = newIds.map((sid) => ({ type: (this.selection as any)?.type ?? 0, segmentId: sid } as any));
+    try {
+      this.setSelection({ type: (this.selection as any)?.type ?? 0, segmentId: first } as any);
+    } catch {}
+    this._changeDirty = true;
+    this._onSelectionChange?.(this._selectionInfo(this.selection), this.selections.length);
+    return newIds.length;
+  }
+
 
   setTextDefaults(opts: {
     color?: string;
