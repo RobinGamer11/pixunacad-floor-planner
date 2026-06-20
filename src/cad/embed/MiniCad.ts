@@ -195,6 +195,11 @@ export class MiniCad {
       this.selectTool.beginPointEdit(action);
     });
 
+    // Frame-Segmente (Seitenrand/Innenrahmen) sollen NICHT auswählbar sein.
+    // Snap soll an ihnen weiterhin funktionieren → wir filtern nur, wenn der
+    // SelectTool die Liste konsultiert.
+    this._installSelectToolFrameFilter();
+
     this._installCoordRemap();
     this.applyZoom(this._zoom);
     this._installPageFrameSnap();
