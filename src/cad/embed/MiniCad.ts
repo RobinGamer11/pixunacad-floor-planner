@@ -195,9 +195,11 @@ export class MiniCad {
       this.selectTool.beginPointEdit(action);
     });
 
+    this._installSelectToolFrameFilter();
     this._installCoordRemap();
     this._installDeleteKey();
     this.applyZoom(this._zoom);
+    this._installPageFrameSnap();
 
     if (init.initialState) this._restore(init.initialState);
     this._changeDirty = false;
@@ -206,13 +208,73 @@ export class MiniCad {
     this._tick();
   }
 
-  /* ===== Page frame (removed: no visible guide lines, no snap segments) ===== */
+  /* ===== Page-frame snap (invisible segments at page edge + margin edge) ===== */
 
-  isFrameSegment(_seg: { labelId?: string }): boolean { return false; }
+  isFrameSegment(seg: { labelId?: string }): boolean {
+    return seg.labelId === this._frameLabelId;
+  }
+
+  private _installPageFrameSnap() {
+    const lm: any = this.labelManager;
+    if (!lm.groups.find((g: any) => g.id === this._frameLabelId)) {
+      lm.groups.push({ id: this._frameLabelId, name: "__page_frame__", locked: true, visible: true });
+      const origList = lm.list.bind(lm);
+      lm.list = () => origList().filter((g: any) => g.id !== this._frameLabelId);
+    }
+    this._rebuildPageFrame();
+  }
+
+  private _rebuildPageFrame() {
+    this.scene.segments = this.scene.segments.filter((s) => s.labelId !== this._frameLabelId);
+    const wM = this.pageWidthMm / 1000;
+    const hM = this.pageHeightMm / 1000;
+    const mM = Math.max(0, this.pageMarginsMm) / 1000;
+    // Unsichtbare Snap-Segmente — Fang funktioniert, gezeichnet wird nichts.
+    const style = {
+      color: "rgba(0,0,0,0)",
+      thicknessM: 0.00001,
+      labelId: this._frameLabelId,
+    };
+    const seg = (a: { x: number; y: number }, b: { x: number; y: number }) => {
+      try { this.scene.createSegment(a, b, style); } catch {}
+    };
+    // Outer page frame.
+    seg({ x: 0, y: 0 }, { x: wM, y: 0 });
+    seg({ x: wM, y: 0 }, { x: wM, y: hM });
+    seg({ x: wM, y: hM }, { x: 0, y: hM });
+    seg({ x: 0, y: hM }, { x: 0, y: 0 });
+    // Inner margin frame (only if margins > 0 and fits).
+    if (mM > 0 && wM - 2 * mM > 1e-4 && hM - 2 * mM > 1e-4) {
+      seg({ x: mM, y: mM }, { x: wM - mM, y: mM });
+      seg({ x: wM - mM, y: mM }, { x: wM - mM, y: hM - mM });
+      seg({ x: wM - mM, y: hM - mM }, { x: mM, y: hM - mM });
+      seg({ x: mM, y: hM - mM }, { x: mM, y: mM });
+    }
+  }
 
   setPageMargins(mm: number) {
+    if (this.pageMarginsMm === mm) return;
     this.pageMarginsMm = mm;
+    this._rebuildPageFrame();
   }
+
+  private _installSelectToolFrameFilter() {
+    const topo: any = this.topology;
+    const origSegs = topo._segmentsFrontToBack.bind(topo);
+    const isFrame = (s: any) => this.isFrameSegment(s);
+    let filtering = false;
+    topo._segmentsFrontToBack = () => {
+      const all = origSegs();
+      return filtering ? all.filter((s: any) => !isFrame(s)) : all;
+    };
+    const origUpdate = this.selectTool.update.bind(this.selectTool);
+    (this.selectTool as any).update = (input: any) => {
+      filtering = true;
+      try { return origUpdate(input); }
+      finally { filtering = false; }
+    };
+  }
+
 
 
   /* ===== Public API ===== */
