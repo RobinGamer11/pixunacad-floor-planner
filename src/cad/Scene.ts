@@ -162,6 +162,8 @@ export interface TextBoxStyle {
   borderEnabled?: boolean;
   borderColor?: string;
   borderWidthPx?: number;
+  /** Wenn false: Box wächst NICHT automatisch; Text wird im fixen Rahmen umbrochen. */
+  autoSize?: boolean;
   labelId?: string;
 }
 
@@ -197,7 +199,8 @@ export class TextBox {
       borderEnabled: (typeof s.borderEnabled === "boolean") ? s.borderEnabled : Defaults.textBorderEnabled,
       borderColor: s.borderColor || Defaults.textBorderColor,
       borderWidthPx: clamp(s.borderWidthPx ?? Defaults.textBorderWidthPx, 0, 30),
-    };
+      autoSize: (typeof s.autoSize === "boolean") ? s.autoSize : true,
+    } as any;
     this.labelId = labelId || s.labelId || Defaults.defaultLabelId;
     this._stickerEditOwnerId = null;
   }
