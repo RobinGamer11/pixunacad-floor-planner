@@ -110,6 +110,8 @@ export class MiniCad {
   defaultTextBold = false;
   defaultTextItalic = false;
   defaultTextAlpha = 1;
+  /** true = Rahmen wächst automatisch (Modus 1). false = fixer Rahmen mit Drag-Create (Modus 2). */
+  defaultTextAutoSize = true;
 
   // Selection (consumed by TextEditorOverlay & TextTool).
   selection: Selection | null = null;
@@ -296,6 +298,7 @@ export class MiniCad {
     bgColor?: string;
     bgAlphaPct?: number;
     wrap?: boolean;
+    autoSize?: boolean;
     borderEnabled?: boolean;
     borderColor?: string;
     borderWidthPx?: number;
@@ -309,6 +312,7 @@ export class MiniCad {
     if (opts.bgColor) this.defaultTextBgColor = opts.bgColor;
     if (typeof opts.bgAlphaPct === "number") this.defaultTextBgAlphaPct = Math.max(0, Math.min(100, opts.bgAlphaPct));
     if (typeof opts.wrap === "boolean") this.defaultTextWrap = opts.wrap;
+    if (typeof opts.autoSize === "boolean") this.defaultTextAutoSize = opts.autoSize;
     if (typeof opts.borderEnabled === "boolean") this.defaultTextBorderEnabled = opts.borderEnabled;
     if (opts.borderColor) this.defaultTextBorderColor = opts.borderColor;
     if (typeof opts.borderWidthPx === "number" && opts.borderWidthPx >= 0) this.defaultTextBorderWidthPx = opts.borderWidthPx;
@@ -445,21 +449,23 @@ export class MiniCad {
         borderEnabled: sel.style.borderEnabled,
         borderColor: sel.style.borderColor,
         borderWidthPx: sel.style.borderWidthPx,
+        autoSize: (sel.style as any).autoSize !== false,
         labelId: sel.labelId,
-      };
+      } as any;
     }
     return {
       textColor: applyAlphaToColor(this.defaultTextColor, this.defaultTextAlpha),
       fontSizePx: this.defaultTextFontSizePx,
       bgColor: this.defaultTextBgColor,
       bgAlphaPct: this.defaultTextBgAlphaPct,
-      wrap: this.defaultTextWrap,
+      wrap: this.defaultTextAutoSize ? this.defaultTextWrap : true,
       align: this.defaultTextAlign,
       borderEnabled: this.defaultTextBorderEnabled,
       borderColor: this.defaultTextBorderColor,
       borderWidthPx: this.defaultTextBorderWidthPx,
+      autoSize: this.defaultTextAutoSize,
       labelId: this.activeDrawLabelId || Defaults.defaultLabelId,
-    };
+    } as any;
   }
 
   getSelectedTextBox(): TextBox | null {
