@@ -1188,6 +1188,7 @@ function ElementView({
   onDuplicate,
   onDelete,
   onRotate,
+  onEdgeDrag,
 }: {
   el: PageElement;
   selected?: boolean;
@@ -1197,6 +1198,7 @@ function ElementView({
   onDuplicate?: () => void;
   onDelete?: () => void;
   onRotate?: (deltaDeg: number, absolute?: boolean) => void;
+  onEdgeDrag?: (edge: "top" | "right" | "bottom" | "left", dx: number, dy: number) => void;
 }) {
   const dragRef = useRef<{ x: number; y: number } | null>(null);
   const rotateRef = useRef<HTMLDivElement | null>(null);
