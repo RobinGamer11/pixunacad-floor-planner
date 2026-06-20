@@ -1232,7 +1232,7 @@ export class SelectTool {
       if (pxSel <= Defaults.hitPx) return { type: SelectionType.SEGMENT, segmentId: selectedSeg.id };
     }
 
-    const isFrameSeg = (s: any) => s?.labelId === "__page_frame__";
+    const isFrameSeg = (s: any) => s?.labelId === "__page_frame__" || s?.labelId === "__ext_rect__";
     const visibleSegs = this.app.topology._segmentsFrontToBack().filter((s: any) => !isFrameSeg(s));
     const visibleHatches = this.app.topology._hatchesFrontToBack();
 

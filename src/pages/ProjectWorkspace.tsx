@@ -983,6 +983,28 @@ function PageCanvas({
               projectStore.deleteElement(projectId, page.id, el.id);
               onSelect(undefined);
             }}
+            onEdgeDrag={(edge, dx, dy) => {
+              const dxPct = (dx / scale / width) * 100;
+              const dyPct = (dy / scale / height) * 100;
+              const patch: Partial<PageElement> = {};
+              const minPct = 2;
+              if (edge === "left") {
+                const newX = Math.max(0, el.x + dxPct);
+                const newW = Math.max(minPct, el.w - (newX - el.x));
+                patch.x = newX;
+                patch.w = newW;
+              } else if (edge === "right") {
+                patch.w = Math.max(minPct, Math.min(100 - el.x, el.w + dxPct));
+              } else if (edge === "top") {
+                const newY = Math.max(0, el.y + dyPct);
+                const newH = Math.max(minPct, el.h - (newY - el.y));
+                patch.y = newY;
+                patch.h = newH;
+              } else if (edge === "bottom") {
+                patch.h = Math.max(minPct, Math.min(100 - el.y, el.h + dyPct));
+              }
+              projectStore.updateElement(projectId, page.id, el.id, patch);
+            }}
           />
         ))}
 
@@ -1097,6 +1119,16 @@ function PageCanvas({
           }
           onSelectionChange={onCadSelectionChange}
           onEngineReady={onCadEngineReady}
+          externalRects={page.elements
+            .filter((e) => e.kind === "cad-view" || e.kind === "pdf" || e.kind === "image")
+            .map((e) => ({
+              id: e.id,
+              xMM: ((e.x ?? 0) / 100) * fmt.w,
+              yMM: ((e.y ?? 0) / 100) * fmt.h,
+              wMM: ((e.w ?? 0) / 100) * fmt.w,
+              hMM: ((e.h ?? 0) / 100) * fmt.h,
+              rotationRad: e.rotation ? (e.rotation * Math.PI) / 180 : 0,
+            }))}
         />
 
 
@@ -1178,6 +1210,7 @@ function ElementView({
   onDuplicate,
   onDelete,
   onRotate,
+  onEdgeDrag,
 }: {
   el: PageElement;
   selected?: boolean;
@@ -1187,6 +1220,7 @@ function ElementView({
   onDuplicate?: () => void;
   onDelete?: () => void;
   onRotate?: (deltaDeg: number, absolute?: boolean) => void;
+  onEdgeDrag?: (edge: "top" | "right" | "bottom" | "left", dx: number, dy: number) => void;
 }) {
   const dragRef = useRef<{ x: number; y: number } | null>(null);
   const rotateRef = useRef<HTMLDivElement | null>(null);
@@ -1383,6 +1417,57 @@ function ElementView({
               <Trash2 size={14} />
             </button>
           </div>
+
+          {/* Edge-Drag-Handles (wie Schraffur-Werkzeug) — eine Kante reinziehen/rausziehen */}
+          {(["top", "right", "bottom", "left"] as const).map((edge) => {
+            const isHor = edge === "top" || edge === "bottom";
+            const startEdgeDrag = (e: React.MouseEvent) => {
+              if (!onEdgeDrag) return;
+              e.stopPropagation();
+              e.preventDefault();
+              let last = { x: e.clientX, y: e.clientY };
+              const move = (ev: MouseEvent) => {
+                const dx = ev.clientX - last.x;
+                const dy = ev.clientY - last.y;
+                last = { x: ev.clientX, y: ev.clientY };
+                onEdgeDrag(edge, dx, dy);
+              };
+              const up = () => {
+                window.removeEventListener("mousemove", move);
+                window.removeEventListener("mouseup", up);
+              };
+              window.addEventListener("mousemove", move);
+              window.addEventListener("mouseup", up);
+            };
+            const baseStyle: React.CSSProperties = {
+              position: "absolute",
+              background: "transparent",
+              cursor: isHor ? "ns-resize" : "ew-resize",
+              zIndex: 5,
+            };
+            const sizeStyle: React.CSSProperties = isHor
+              ? { left: 0, right: 0, height: 8, [edge === "top" ? "top" : "bottom"]: -4 }
+              : { top: 0, bottom: 0, width: 8, [edge === "left" ? "left" : "right"]: -4 };
+            return (
+              <div
+                key={edge}
+                data-hub-control
+                onMouseDown={startEdgeDrag}
+                title={`Kante ${edge} ziehen`}
+                style={{ ...baseStyle, ...sizeStyle }}
+              >
+                {/* Sichtbarer Strich auf der Kante (subtil) */}
+                <div
+                  className="absolute"
+                  style={
+                    isHor
+                      ? { left: 0, right: 0, top: "50%", height: 2, transform: "translateY(-50%)", background: "hsl(var(--accent-gold))", opacity: 0.7 }
+                      : { top: 0, bottom: 0, left: "50%", width: 2, transform: "translateX(-50%)", background: "hsl(var(--accent-gold))", opacity: 0.7 }
+                  }
+                />
+              </div>
+            );
+          })}
         </>
       )}
     </div>

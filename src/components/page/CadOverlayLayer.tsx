@@ -27,6 +27,8 @@ interface Props {
     setSelectedSegmentSnap: (opts: { midpointSnap?: boolean; divisionSnap?: number | null }) => void;
     duplicateSelectedSegments: (offsetMm?: number) => number;
   }) => void;
+  /** Externe Rechtecke (Zeichenblatt/PDF/Bild) als Snap-Quellen. mm-Koords. */
+  externalRects?: Array<{ id: string; xMM: number; yMM: number; wMM: number; hMM: number; rotationRad?: number }>;
 
   // Line defaults
   lineColor?: string;
@@ -58,6 +60,7 @@ export default function CadOverlayLayer(props: Props) {
   const {
     pageWidthMm, pageHeightMm, basePxPerMm, pageMarginsMm,
     zoom, activeTool, enabled, initialState, onChange, onSelectionChange, onEngineReady,
+    externalRects,
     lineColor, lineThicknessMm, lineAlpha, guideColor, guidesLocked, multiSelectMode,
     textColor, textFontSizePx, textBold, textItalic, textAlpha, textAlign,
     textBgColor, textBgAlphaPct, textWrap, textAutoSize, textBorderEnabled, textBorderColor, textBorderWidthPx,
@@ -155,6 +158,13 @@ export default function CadOverlayLayer(props: Props) {
   useEffect(() => {
     if (typeof pageMarginsMm === "number") engineRef.current?.setPageMargins(pageMarginsMm);
   }, [pageMarginsMm]);
+
+  // Externe Rechtecke (Zeichenblatt/PDF/Bild) als Snap-Quellen synchronisieren.
+  const extRectsKey = JSON.stringify(externalRects ?? []);
+  useEffect(() => {
+    engineRef.current?.setExternalRects(externalRects ?? []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [extRectsKey]);
 
   useEffect(() => {
     engineRef.current?.setLineDefaults({
