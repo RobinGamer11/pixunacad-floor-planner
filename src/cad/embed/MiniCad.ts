@@ -502,7 +502,7 @@ export class MiniCad {
   serialize(): any {
     const f = this._strokeFactor || 1;
     return {
-      version: 3,
+      version: 4,
       segments: this.scene.segments
         .filter((s) => s.labelId !== this._frameLabelId)
         .map((s) => ({
@@ -513,6 +513,7 @@ export class MiniCad {
           // Speichern in "echten Metern" (intern wird mit _strokeFactor multipliziert).
           thicknessM: s.thicknessM / f,
           labelId: s.labelId,
+          isGuide: !!s.isGuide,
         })),
       textBoxes: this.scene.textBoxes.map((t) => ({
         id: t.id,
@@ -544,6 +545,7 @@ export class MiniCad {
               color: s.color || this.defaultLineColor,
               thicknessM: (s.thicknessM || (this.defaultLineThicknessM / f)) * segScale,
               labelId: s.labelId || Defaults.defaultLabelId,
+              isGuide: !!s.isGuide,
             },
           );
         } catch (e) { console.error("MiniCad restore segment:", e); }
