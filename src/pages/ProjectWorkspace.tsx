@@ -487,7 +487,34 @@ export default function ProjectWorkspace() {
                   setZoomClamped(zoom + (delta > 0 ? 5 : -5));
                 }
               }}
+              onMouseDown={(e) => {
+                // Pan via Middle-Maus, Alt+Links, oder Links auf leerer Fläche
+                // (Auswahlwerkzeug aktiv oder kein Tool aktiv).
+                const isMiddle = e.button === 1 || (e.button === 0 && (e as any).altKey);
+                const isPlainLeft = e.button === 0 && !(e as any).altKey && activeTool === null;
+                if (!isMiddle && !isPlainLeft) return;
+                e.preventDefault();
+                const container = e.currentTarget as HTMLDivElement;
+                const startX = e.clientX;
+                const startY = e.clientY;
+                const startScrollL = container.scrollLeft;
+                const startScrollT = container.scrollTop;
+                const prevCursor = container.style.cursor;
+                container.style.cursor = "grabbing";
+                const onMove = (ev: MouseEvent) => {
+                  container.scrollLeft = startScrollL - (ev.clientX - startX);
+                  container.scrollTop = startScrollT - (ev.clientY - startY);
+                };
+                const onUp = () => {
+                  container.style.cursor = prevCursor;
+                  window.removeEventListener("mousemove", onMove);
+                  window.removeEventListener("mouseup", onUp);
+                };
+                window.addEventListener("mousemove", onMove);
+                window.addEventListener("mouseup", onUp);
+              }}
             >
+
 
               {activePage && (
                 <PageCanvas
@@ -1314,17 +1341,27 @@ function PageSettings({
             </div>
           </Row>
           <Row label="Ränder">
-            <select
-              value={page.margins}
-              onChange={(e) => update({ margins: Number(e.target.value) })}
-              className="w-full h-8 px-2 rounded bg-transparent border text-sm"
-              style={{ borderColor: "hsl(var(--hairline))" }}
-            >
-              <option value={10}>Schmal (10 mm)</option>
-              <option value={20}>Normal (20 mm)</option>
-              <option value={30}>Breit (30 mm)</option>
-            </select>
+            <div className="flex items-center gap-2 w-full">
+              <input
+                type="checkbox"
+                checked={(page.margins ?? 0) > 0}
+                onChange={(e) => update({ margins: e.target.checked ? (page.margins && page.margins > 0 ? page.margins : 20) : 0 })}
+              />
+              <input
+                type="number"
+                min={0}
+                max={100}
+                step={1}
+                value={page.margins ?? 0}
+                disabled={(page.margins ?? 0) === 0}
+                onChange={(e) => update({ margins: Math.max(0, Number(e.target.value) || 0) })}
+                className="flex-1 h-8 px-2 rounded bg-transparent border text-sm disabled:opacity-50"
+                style={{ borderColor: "hsl(var(--hairline))" }}
+              />
+              <span className="text-xs text-muted-foreground">mm</span>
+            </div>
           </Row>
+
           <Row label="Hintergrund">
             <input
               type="checkbox"
