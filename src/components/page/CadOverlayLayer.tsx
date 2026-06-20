@@ -79,6 +79,8 @@ export default function CadOverlayLayer(props: Props) {
   onChangeRef.current = onChange;
   const onSelectionChangeRef = useRef(onSelectionChange);
   onSelectionChangeRef.current = onSelectionChange;
+  const onCreateParallelGuideRef = useRef(onCreateParallelGuide);
+  onCreateParallelGuideRef.current = onCreateParallelGuide;
 
   // Mount engine once per page-size combination.
   useEffect(() => {
