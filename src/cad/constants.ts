@@ -136,4 +136,5 @@ export const PointEditAction = {
   DELETE: "delete",
   OFFSET: "offset",
   RESIZE: "resize",
+  DUPLICATE: "duplicate",
 } as const;
