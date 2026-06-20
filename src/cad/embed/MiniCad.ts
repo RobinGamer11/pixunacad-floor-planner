@@ -178,6 +178,7 @@ export class MiniCad {
     this._zoom = init.initialZoom;
     this._onChange = init.onChange;
     this._onSelectionChange = init.onSelectionChange;
+    this._onCreateParallelGuide = init.onCreateParallelGuide;
     this._strokeFactor = (this.basePxPerMm * 1000) / 80;
     this.defaultLineColor = init.defaultLineColor ?? Defaults.lineColor;
     this.defaultLineThicknessM = (init.defaultLineThicknessM ?? Defaults.lineThicknessM) * this._strokeFactor;
