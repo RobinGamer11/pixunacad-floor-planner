@@ -111,6 +111,21 @@ export class LineTool {
     }
   }
 
+  /** Toggle einer Anker-Hilfslinie genau durch den aktuell gesetzten
+   *  Anfangspunkt der laufenden Zeichenoperation. */
+  private _toggleCurrentPointGuide() {
+    if (!this.currentPoint) return;
+    const key = `__current__${this.currentPoint.x.toFixed(6)}_${this.currentPoint.y.toFixed(6)}`;
+    const idx = this.guideAnchors.findIndex((a) => a.key === key);
+    if (idx >= 0) { this.guideAnchors.splice(idx, 1); return; }
+    this.guideAnchors.push({
+      key,
+      pointIndex: -1,
+      point: v(this.currentPoint.x, this.currentPoint.y),
+    });
+  }
+
+
   private _toggleParallelGuideFromSnap(snap: Snap) {
     if (!snap || snap.type !== SnapType.LINE || !this.currentPoint) return;
     if (snap.segment) {
