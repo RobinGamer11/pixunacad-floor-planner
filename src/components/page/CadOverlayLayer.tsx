@@ -21,6 +21,9 @@ interface Props {
   initialState?: any;
   onChange: (state: any) => void;
   onSelectionChange?: (info: MiniCadSelectionInfo | null) => void;
+  /** Wenn der User per Rechtsklick auf eine CAD-Linie eine parallele Hilfslinie
+   *  anfordert: Endpunkte in Seiten-Prozent (0..100). */
+  onCreateParallelGuide?: (p1: { x: number; y: number }, p2: { x: number; y: number }) => void;
   // Line defaults
   lineColor?: string;
   lineThicknessMm?: number;
@@ -44,7 +47,7 @@ interface Props {
 export default function CadOverlayLayer(props: Props) {
   const {
     pageWidthMm, pageHeightMm, basePxPerMm, pageMarginsMm,
-    zoom, activeTool, enabled, initialState, onChange, onSelectionChange,
+    zoom, activeTool, enabled, initialState, onChange, onSelectionChange, onCreateParallelGuide,
     lineColor, lineThicknessMm, lineAlpha,
     textColor, textFontSizePx, textBold, textItalic, textAlpha, textAlign,
     textBgColor, textBgAlphaPct, textWrap, textAutoSize, textBorderEnabled, textBorderColor, textBorderWidthPx,
@@ -76,6 +79,8 @@ export default function CadOverlayLayer(props: Props) {
   onChangeRef.current = onChange;
   const onSelectionChangeRef = useRef(onSelectionChange);
   onSelectionChangeRef.current = onSelectionChange;
+  const onCreateParallelGuideRef = useRef(onCreateParallelGuide);
+  onCreateParallelGuideRef.current = onCreateParallelGuide;
 
   // Mount engine once per page-size combination.
   useEffect(() => {
@@ -121,6 +126,7 @@ export default function CadOverlayLayer(props: Props) {
       initialState,
       onChange: () => onChangeRef.current(engine.serialize()),
       onSelectionChange: (info) => onSelectionChangeRef.current?.(info),
+      onCreateParallelGuide: (p1, p2) => onCreateParallelGuideRef.current?.(p1, p2),
     });
     engineRef.current = engine;
     return () => {

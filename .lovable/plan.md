@@ -1,45 +1,61 @@
-Du hast drei größere Themen angesprochen — bevor ich die alle anpacke, hier mein Plan zur Abstimmung. Bitte sag, was passt und was du anders haben möchtest (oder welche Punkte zuerst).
+## Ziel
 
-## 1) Text-Werkzeug: korrekte Skalierung auf der Seite
+Rechtsklick auf eine bestehende CAD-Linie/-Kante öffnet einen Mini-Hub mit einem Eingabefeld „Abstand (mm)". Nach Bestätigung wird parallel zur angeklickten Linie im eingegebenen Abstand eine Hilfslinie (page-level Guide) erzeugt.
 
-**Diagnose (was ich gemessen habe)**
-Auf einer A4-Seite (210 mm) bei `width=1100 px` ergibt sich `basePxPerMm≈5.24` und `referencePxPerM=5240`. Daraus folgt:
-- Default-Textbox: `2.6 m × 0.6 m`, multipliziert mit `worldScaleFactor (80/5240≈0.0153)` → ca. **4 cm × 1 cm** auf dem Blatt. Optisch nach wie vor groß und nicht "Papier-realistisch".
-- Schriftgröße `16 px` wird per `cam.scale/referencePxPerM = zoom` skaliert → bei 100 % Zoom = 16 Bildschirm-px ≈ **3 mm auf Papier** (≈ 9 pt). Wirkt im aktuellen Render trotzdem zu groß, weil die Textbox selbst überdimensioniert ist (siehe oben) und die Vorschau am falschen Punkt sitzt.
+## Verhalten
 
-**Geplante Fixes**
-1. `defaultTextBoxWidthM/HeightM` für MiniCad neu rechnen statt `Defaults.textBoxWidthM` (2.6 m) zu nehmen: Standardbox = z. B. 60 mm × 14 mm (passend zu 9–12 pt Standard­schrift, mehrzeilig wächst).
-2. Schriftgrößen-Mapping eindeutig in "Papier-Pixel": ein `16 px`-Wert im Settings-Panel ergibt **exakt 16 px auf dem Blatt** (≈ 4.2 mm bei A4) — TextTool/Renderer entsprechend anpassen.
-3. Inline-Editor (contenteditable) erhält dieselbe Pixelgröße auf der Seite, damit "Was du tippst = was du siehst".
-4. Vorschau-Rechteck am tatsächlichen Snap-Punkt (Maus) zentriert, nicht an Seitenecke.
+1. Rechtsklick wird auf der CAD-Oberfläche abgefangen.
+2. Wird ein nicht-Frame-Segment getroffen, öffnet sich neben dem Klickpunkt ein kleiner Hub:
+   - Inputfeld für Abstand (mm), default = 100
+   - Vorschauseite zeigt die Linie live in zwei möglichen Parallel-Positionen (links/rechts der Quelllinie) — Klick auf die gewünschte Seite oder Enter platziert auf der dem Mauszeiger nähergelegenen Seite.
+   - ESC bricht ab.
+3. Nach Bestätigung wird der Hub geschlossen und die Hilfslinie in der Page-Guide-Liste angelegt — sie verhält sich wie alle bisherigen Hilfslinien (verschiebbar, löschbar, in „Hilfslinie"-Layer).
+4. Wenn der Rechtsklick KEIN Segment trifft, ändert sich nichts (kein Standard-Browser-Kontextmenü, das ist bereits unterdrückt).
 
-## 2) Auswahl / Hub-Box für Text & Linie (1:1 wie CAD)
+## Distanz-Referenz
 
-Aktuell macht `MiniSelectTool` direktes Drag. Du willst stattdessen das CAD-Verhalten: **klicken → markieren → Bearbeitung NUR über Hub-Box** (Länge/Winkel bei Linien, Größe/Rotation/Position bei Textboxen). Pan auf leerer Fläche bleibt.
+Der eingegebene mm-Wert ist der senkrechte Abstand zur Quelllinie. Die Seite wird über die Mausposition relativ zur Linie bestimmt — die Hilfslinie erscheint auf der Seite des Mauszeigers. Damit ist „vom letzten ausgewählten Punkt" implizit: der Rechtsklick selbst definiert die Seite und Referenzlage. (Optional: Wenn vorher ein Snap-Punkt selektiert war und auf der Linie liegt, dient er als Referenz; sonst der Lotfußpunkt vom Mausklick auf die Linie.)
 
-**Plan**
-1. Den vollständigen `SelectTool` aus der CAD-Oberfläche in `MiniCad` einbinden (statt der schlanken Eigenentwicklung). Abhängigkeiten (`PointEditMenu`, `LineHub`, Clipboard) sind bereits gehostet — nur fehlende Andockstellen ergänzen.
-2. Direktes Drag in MiniSelectTool deaktivieren — Objekt wird beim Linksklick nur **selektiert**, Hub-Box öffnet (für Linien `LineHub` mit Länge/Winkel, für Textboxen ein **TextHub** mit Breite/Höhe/Drehung wie in der CAD-Oberfläche).
-3. Verschieben/Drehen läuft komplett über Hub-Box-Eingaben (Tab/Enter wie gewohnt) und über die Translate-/Rotate-Buttons aus dem `PointEditMenu`.
-4. Wenn nichts getroffen wird → bestehender Pan-Pfad (Plain-Left-Drag) bleibt aktiv.
+## Technik
 
-Offene Frage: In der CAD-Oberfläche **gibt es aktuell keinen eigenen "TextHub" mit Maßen/Rotation** — Textboxen werden dort über die Eck-Handles und das PointEditMenu transformiert. Soll ich:
-- (a) genau das in der Seite übernehmen (Eck-Handles + PointEditMenu), oder
-- (b) zusätzlich eine neue Hub-Box "Breite × Höhe × Winkel" für Textboxen bauen?
+```text
+CadOverlayLayer (React)
+   │  onCreateParallelGuide(p1Pct, p2Pct)  ← Callback
+   ▼
+MiniCad
+   │  installt contextmenu-Listener auf canvas
+   │  hit-test gegen Scene.segments (ohne Frame-Segmente)
+   │  zeigt ParallelGuideHub (neues DOM-Element)
+   │  bei Commit: berechnet Parallel-Endpunkte in Welt-m
+   │             → konvertiert m → Page-% via pageWidthMm/pageHeightMm
+   │             → ruft onCreateParallelGuide
+   ▼
+ProjectWorkspace
+   │  fügt Element { kind:"guide", x1,y1,x2,y2 (in %) } zur Seite hinzu
+```
 
-## 3) CAD-Ansicht (Bild des Zeichenblatts) im Seiten-Element
+### Neue Dateien
+- `src/cad/ParallelGuideHub.ts`: kleines DOM-Widget mit `<input>` (mm) + OK/Cancel; `bindCommit((mm)=>void)`, `showAt(sx,sy, defaultMm)`, `hide()`. Selbe Visual-Styles wie LineHub.
 
-Aktuell rendert `cad-view` nur einen Platzhalter ("CAD-Ansicht · sheet-id"). Du willst dort das **tatsächliche Bild des Zeichenblatts** sehen.
+### Geänderte Dateien
+- `src/cad/embed/MiniCad.ts`
+  - Konstruktor: `contextmenu` auf Canvas registrieren, `e.preventDefault()`, Segment-Hit per `topology.findBestSnap`/Segment-Loop.
+  - Neue Methode `_handleSegmentRightClick(seg, mouseW, sx, sy)`: berechnet Lotfußpunkt + Side, öffnet Hub.
+  - Auf Hub-Commit: rechnet Parallel-Linie, konvertiert mm-Welt-Endpunkte → Page-% (`xPct = (xM*1000)/pageWidthMm*100`), ruft `init.onCreateParallelGuide?.(p1, p2)`.
+- `src/components/page/CadOverlayLayer.tsx`
+  - neues ref `parallelHubRef` + Input
+  - propagiert `onCreateParallelGuide(p1,p2)` an Parent
+- `src/pages/ProjectWorkspace.tsx`
+  - neuer Handler legt ein Guide-`PageElement` mit den beiden %-Punkten an, kind=`"guide"`, Farbe/Strichstärke aus `toolSettings.guide`.
 
-**Plan**
-1. Neuer Helper `renderSheetToImage(projectId, sheetId, widthPx)` — lädt den persistierten CAD-State, baut einen unsichtbaren `Renderer`/`Scene` (ohne UI), rendert das Sheet 1:1 in einen Off-Screen-Canvas und liefert eine DataURL.
-2. `cad-view`-Element rendert dieses Bild in seinem Rahmen (object-fit: contain, Maßstab gemäß `element.scale`).
-3. Re-Render automatisch beim Öffnen einer Seite und beim Verlassen der CAD-Oberfläche (über das bereits existierende Auto-Save in `CadEditor`).
-4. Optional (später): Live-Update statt DataURL, sobald Performance es erlaubt.
+### Edge-Cases
+- Quelllinie ist sehr kurz / vertikal / horizontal: Berechnung über Normalenvektor (`nx = -dy/|d|, ny = dx/|d|`) deckt alle Winkel ab.
+- Negativer / zu großer Abstand: clamp ≥ 0; wenn Linie außerhalb Seite landet → trotzdem erzeugen (User-Entscheidung).
+- Rechtsklick auf Frame-Segment (unsichtbarer Page/Margin-Rahmen): ignorieren (`isFrameSegment`).
 
----
+### Tests (manuell)
+- Horizontale Linie + 50mm → parallele Hilfslinie 50mm darüber/darunter je nach Mausseite.
+- 45°-Linie + 100mm → korrekt orthogonal versetzt.
+- ESC bricht Hub ab, keine Guide erzeugt.
 
-**Bitte bestätige / korrigiere:**
-- Punkt 1: passt das Maß "Standard-Textbox 60 × 14 mm, Schrift = echte Papier-Pixel"?
-- Punkt 2: Variante (a) oder (b) für Textbox-Bearbeitung?
-- Punkt 3: Bild beim Seiten-Öffnen + nach CAD-Bearbeitung neu rendern (statt Live) ok?
+Implementierung umfasst ~250 Zeilen über 4 Dateien.
