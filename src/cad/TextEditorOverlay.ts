@@ -110,7 +110,9 @@ export class TextEditorOverlay {
   beginEdit(box: TextBox) {
     this.activeBoxId = box.id;
     this.el.classList.remove("hidden");
-    this.toolbarEl.classList.remove("hidden");
+    // Toolbar im Embed ausgeblendet lassen — Einstellungen liegen bereits
+    // im seitlichen Werkzeug-Einstellungs-Panel.
+    this.toolbarEl.classList.add("hidden");
     this.el.contentEditable = "true";
     this.el.spellcheck = false;
     this.el.innerHTML = box.html || "";
@@ -172,7 +174,7 @@ export class TextEditorOverlay {
     const fontPx = box.style.fontSizePx * (cam.scale / refPxPerM);
     this.el.style.fontSize = `${fontPx}px`;
     this.el.style.fontFamily = "system-ui, Arial, sans-serif";
-    this.el.style.lineHeight = "1.2";
+    this.el.style.lineHeight = "1";
     this.el.style.color = box.style.textColor;
     this.el.style.background = rgbaFromHex(box.style.bgColor, (box.style.bgAlphaPct || 0) / 100);
     this.el.style.textAlign = box.style.align;
