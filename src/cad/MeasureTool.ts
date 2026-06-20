@@ -116,7 +116,22 @@ export class MeasureTool {
     this.pointSnap = this._findMeasureSnap(input);
     this.app.renderer.setHoverHatchId(this.pointSnap?.hatch?.id || null);
     this.app.renderer.setHoverSegmentId(this.pointSnap?.segment?.id || null);
-    this.app.hub.hide();
+
+    // Distanz-Hub: ab dem ersten gesetzten Punkt Länge/Winkel vom letzten
+    // gesetzten Punkt zur aktuellen Snap-Position anzeigen (gleicher Stil
+    // wie im Linienwerkzeug).
+    if (this.state === "collect" && this.selectedPoints.length >= 1 && this.pointSnap) {
+      const last = this.selectedPoints[this.selectedPoints.length - 1].world;
+      const cur = this.pointSnap.world;
+      const dx = cur.x - last.x;
+      const dy = cur.y - last.y;
+      const lengthM = Math.hypot(dx, dy);
+      const angleDeg = Math.atan2(-dy, dx) * 180 / Math.PI;
+      this.app.hub.showAt(input.mouse.sx, input.mouse.sy);
+      this.app.hub.updateDisplay(lengthM, angleDeg);
+    } else {
+      this.app.hub.hide();
+    }
 
     if (this.state === "collect") {
       if (input.doubleClicked && this.getPointCountMode() === "multi" && this._canStartPlacement()) {
