@@ -67,11 +67,13 @@ export interface MiniCadInit {
   defaultLineThicknessM?: number;
   /** Called whenever scene geometry changes. */
   onChange?: () => void;
-  /** Called whenever a CAD object selection changes in the embedded editor. */
-  onSelectionChange?: (info: MiniCadSelectionInfo | null) => void;
+  /** Called whenever a CAD object selection changes in the embedded editor.
+   *  Second argument is the total number of selected objects (>= 1 when info != null). */
+  onSelectionChange?: (info: MiniCadSelectionInfo | null, count?: number) => void;
   /** Initial serialized state. */
   initialState?: any;
 }
+
 
 export type MiniTool = "line" | "text" | "select" | "guide" | null;
 export type MiniCadSelectionInfo =
