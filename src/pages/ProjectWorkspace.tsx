@@ -2140,20 +2140,45 @@ function ElementInspector({
   element,
   projectId,
   pageId,
+  siblingIds,
   onJumpCad,
 }: {
   element: PageElement;
   projectId: string;
   pageId: string;
+  /** Weitere selektierte Elemente (ohne `element.id`). Patches werden auf alle
+   *  Geschwister mit gleichem `kind` mit angewendet. Größen-/Geometrie-Felder
+   *  (x/y/w/h) bleiben jedoch lokal — Multi-Move geschieht über Drag. */
+  siblingIds?: string[];
   onJumpCad: (sheetId?: string) => void;
 }) {
-  const update = (patch: Partial<PageElement>) =>
+  const update = (patch: Partial<PageElement>) => {
+    // Felder, die NICHT auf gleichartige Geschwister mitübertragen werden,
+    // weil sie pro Objekt individuell sein müssen.
+    const geometryKeys = new Set(["x", "y", "w", "h", "points"]);
+    const isGeometryOnly = Object.keys(patch).every((k) => geometryKeys.has(k));
     projectStore.updateElement(projectId, pageId, element.id, patch);
+    if (!isGeometryOnly && siblingIds && siblingIds.length > 0) {
+      for (const id of siblingIds) {
+        // Geschwister-Patch ohne Geometrie-Felder
+        const cleaned: any = {};
+        for (const k of Object.keys(patch)) {
+          if (!geometryKeys.has(k)) cleaned[k] = (patch as any)[k];
+        }
+        projectStore.updateElement(projectId, pageId, id, cleaned);
+      }
+    }
+  };
 
   return (
     <div className="space-y-4">
       <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-1">
         {element.kind.toUpperCase()}
+        {siblingIds && siblingIds.length > 0 && (
+          <span className="ml-2 text-muted-foreground font-normal normal-case tracking-normal">
+            (+{siblingIds.length} weitere ausgewählt — gleiche Einstellungen werden auf gleichartige Objekte angewendet)
+          </span>
+        )}
       </div>
       <Row label="Breite">
         <input
