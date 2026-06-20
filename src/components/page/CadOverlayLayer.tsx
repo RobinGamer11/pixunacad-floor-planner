@@ -149,6 +149,14 @@ export default function CadOverlayLayer(props: Props) {
   }, [lineColor, lineThicknessMm, lineAlpha]);
 
   useEffect(() => {
+    if (typeof guideColor === "string") engineRef.current?.setGuideColor(guideColor);
+  }, [guideColor]);
+
+  useEffect(() => {
+    engineRef.current?.setGuidesLocked(!!guidesLocked);
+  }, [guidesLocked]);
+
+  useEffect(() => {
     engineRef.current?.setTextDefaults({
       color: textColor,
       fontSizePx: textFontSizePx,
