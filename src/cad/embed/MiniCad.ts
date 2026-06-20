@@ -546,7 +546,10 @@ export class MiniCad {
           thicknessM: s.thicknessM / f,
           labelId: s.labelId,
           isGuide: !!s.isGuide,
+          midpointSnap: !!s.midpointSnap,
+          divisionSnap: s.divisionSnap,
         })),
+
       textBoxes: this.scene.textBoxes.map((t) => ({
         id: t.id,
         center: { x: t.center.x, y: t.center.y },
