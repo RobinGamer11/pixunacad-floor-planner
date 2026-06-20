@@ -137,10 +137,14 @@ export default function CadOverlayLayer(props: Props) {
       
     });
     engineRef.current = engine;
+    onEngineReady?.({
+      setSelectedSegmentSnap: (opts) => engine.setSelectedSegmentSnapSettings(opts),
+    });
     return () => {
       engine.destroy();
       engineRef.current = null;
     };
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageWidthMm, pageHeightMm, basePxPerMm]);
 
