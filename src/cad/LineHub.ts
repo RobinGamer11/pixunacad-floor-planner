@@ -73,6 +73,7 @@ export class LineHub {
     this.visible = false;
     this.editMode = false;
     this.root.classList.add("hidden");
+    this.root.style.display = "";
     this.lenInputEl.readOnly = true;
     this.angInputEl.readOnly = true;
   }
