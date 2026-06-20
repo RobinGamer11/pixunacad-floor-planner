@@ -199,7 +199,8 @@ export class TextEditorOverlay {
   private _applyBoxStyle(box: TextBox) {
     // Sync color picker to box default for new edits
     this.colorInput.value = this._toHexColor(box.style.textColor);
-    this.sizeSelect.value = String(Math.round(box.style.fontSizePx));
+    // Toolbar zeigt die Größe in pt (Word/PowerPoint); intern px = pt * 4/3.
+    this.sizeSelect.value = String(Math.round(box.style.fontSizePx * (3 / 4)));
   }
 
   private _toHexColor(color: string): string {
