@@ -977,7 +977,7 @@ function PageCanvas({
                 x: Math.min(95, (el.x ?? 0) + 2),
                 y: Math.min(95, (el.y ?? 0) + 2),
               });
-              setSelectedElementIds_NA: void(onSelect(newId));
+              onSelect(newId);
             }}
             onDelete={() => {
               projectStore.deleteElement(projectId, page.id, el.id);
