@@ -22,6 +22,7 @@ import {
   CheckSquare,
   Trash2,
   Copy,
+  RotateCw,
   Undo2,
   Redo2,
   Share2,
@@ -965,6 +966,23 @@ function PageCanvas({
                 });
               }
             }}
+            onRotate={(deg, absolute) => {
+              const next = absolute ? deg : (el.rotation ?? 0) + deg;
+              projectStore.updateElement(projectId, page.id, el.id, { rotation: next });
+            }}
+            onDuplicate={() => {
+              const { id: _id, ...rest } = el as any;
+              const newId = projectStore.addElement(projectId, page.id, {
+                ...rest,
+                x: Math.min(95, (el.x ?? 0) + 2),
+                y: Math.min(95, (el.y ?? 0) + 2),
+              });
+              onSelect(newId);
+            }}
+            onDelete={() => {
+              projectStore.deleteElement(projectId, page.id, el.id);
+              onSelect(undefined);
+            }}
           />
         ))}
 
@@ -1157,17 +1175,27 @@ function ElementView({
   readOnly,
   onSelect,
   onDrag,
+  onDuplicate,
+  onDelete,
+  onRotate,
 }: {
   el: PageElement;
   selected?: boolean;
   readOnly?: boolean;
   onSelect?: (opts?: { shift?: boolean }) => void;
   onDrag?: (dx: number, dy: number) => void;
+  onDuplicate?: () => void;
+  onDelete?: () => void;
+  onRotate?: (deltaDeg: number, absolute?: boolean) => void;
 }) {
   const dragRef = useRef<{ x: number; y: number } | null>(null);
+  const rotateRef = useRef<HTMLDivElement | null>(null);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (readOnly) return;
+    // Don't start a drag when the user clicks an interactive control inside the hub.
+    const t = e.target as HTMLElement;
+    if (t.closest("[data-hub-control]")) return;
     e.stopPropagation();
     onSelect?.({ shift: e.shiftKey });
     dragRef.current = { x: e.clientX, y: e.clientY };
@@ -1187,6 +1215,33 @@ function ElementView({
     window.addEventListener("mouseup", handleUp);
   };
 
+  const handleRotateStart = (e: React.MouseEvent) => {
+    if (readOnly || !onRotate) return;
+    e.stopPropagation();
+    e.preventDefault();
+    const node = rotateRef.current?.parentElement;
+    if (!node) return;
+    const rect = node.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const startAngle = Math.atan2(e.clientY - cy, e.clientX - cx);
+    const startRot = el.rotation ?? 0;
+    const handleMove = (ev: MouseEvent) => {
+      const a = Math.atan2(ev.clientY - cy, ev.clientX - cx);
+      const deg = startRot + ((a - startAngle) * 180) / Math.PI;
+      onRotate(deg, true);
+    };
+    const handleUp = () => {
+      window.removeEventListener("mousemove", handleMove);
+      window.removeEventListener("mouseup", handleUp);
+    };
+    window.addEventListener("mousemove", handleMove);
+    window.addEventListener("mouseup", handleUp);
+  };
+
+  const hubKinds = new Set(["cad-view", "pdf", "image"]);
+  const showHub = !readOnly && selected && hubKinds.has(el.kind);
+
   return (
     <div
       onMouseDown={handleMouseDown}
@@ -1201,6 +1256,8 @@ function ElementView({
         opacity: el.opacity ?? 1,
         boxShadow: el.shadow ? "0 8px 24px -8px rgba(0,0,0,0.25)" : undefined,
         border: el.border ? "1px solid hsl(var(--ink))" : undefined,
+        transform: el.rotation ? `rotate(${el.rotation}deg)` : undefined,
+        transformOrigin: "center center",
       }}
     >
       {el.kind === "text" && (
@@ -1236,13 +1293,97 @@ function ElementView({
         </div>
       )}
       {el.kind === "cad-view" && <CadViewThumb sheetId={el.sheetId} />}
-      {(el.kind === "shape" || el.kind === "line" || el.kind === "table" || el.kind === "pdf" || el.kind === "timeline") && (
+      {(el.kind === "shape" || el.kind === "line" || el.kind === "table" || el.kind === "pdf" || el.kind === "timeline") && el.kind !== "pdf" && (
         <div
           className="w-full h-full flex items-center justify-center text-xs text-muted-foreground"
           style={{ background: "hsl(var(--surface-muted))" }}
         >
           {el.kind}
         </div>
+      )}
+      {el.kind === "pdf" && (
+        <div
+          className="w-full h-full flex items-center justify-center text-xs text-muted-foreground"
+          style={{ background: "hsl(var(--surface-muted))" }}
+        >
+          PDF
+        </div>
+      )}
+
+      {showHub && (
+        <>
+          {/* Rotation handle: small circle above the element */}
+          <div
+            ref={rotateRef}
+            data-hub-control
+            onMouseDown={handleRotateStart}
+            title="Drehen (ziehen)"
+            className="absolute"
+            style={{
+              left: "50%",
+              top: -28,
+              transform: "translateX(-50%)",
+              width: 14,
+              height: 14,
+              borderRadius: 999,
+              background: "hsl(var(--accent-gold))",
+              border: "2px solid white",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
+              cursor: "grab",
+            }}
+          />
+          {/* Connector line from element top to rotation handle */}
+          <div
+            className="absolute pointer-events-none"
+            style={{
+              left: "50%",
+              top: -14,
+              width: 1,
+              height: 14,
+              background: "hsl(var(--accent-gold))",
+              transform: "translateX(-50%)",
+            }}
+          />
+          {/* Hub action bar */}
+          <div
+            data-hub-control
+            className="absolute flex items-center gap-1 rounded-md shadow-md"
+            style={{
+              right: 0,
+              top: -36,
+              background: "white",
+              border: "1px solid hsl(var(--hairline))",
+              padding: 3,
+            }}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <button
+              data-hub-control
+              onClick={(e) => { e.stopPropagation(); onRotate?.(15); }}
+              title="Drehen +15°"
+              className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
+            >
+              <RotateCw size={14} />
+            </button>
+            <button
+              data-hub-control
+              onClick={(e) => { e.stopPropagation(); onDuplicate?.(); }}
+              title="Duplizieren"
+              className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
+            >
+              <Copy size={14} />
+            </button>
+            <button
+              data-hub-control
+              onClick={(e) => { e.stopPropagation(); onDelete?.(); }}
+              title="Löschen"
+              className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
+              style={{ color: "hsl(0 65% 50%)" }}
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
+        </>
       )}
     </div>
   );
