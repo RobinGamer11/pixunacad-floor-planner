@@ -1469,6 +1469,7 @@ function ToolsTab({
   project,
   activeTool,
   setActiveTool,
+  selectedCadTool,
   selectedElementId,
   setSelectedElementId,
   toolSettings,
@@ -1481,12 +1482,14 @@ function ToolsTab({
   project: import("@/lib/projectStore").Project;
   activeTool: PageTool;
   setActiveTool: (t: PageTool) => void;
+  selectedCadTool?: "line" | "text";
   selectedElementId?: string;
   setSelectedElementId: (id?: string) => void;
   toolSettings: ToolSettings;
   updateToolSettings: <K extends keyof ToolSettings>(k: K, patch: Partial<ToolSettings[K]>) => void;
   onJumpCad: (sheetId?: string) => void;
 }) {
+  const settingsTool = activeTool ?? selectedCadTool ?? null;
   return (
     <div className="space-y-5">
       {/* Active tool header */}
@@ -1494,17 +1497,17 @@ function ToolsTab({
         <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-3">
           AKTIVES WERKZEUG
         </div>
-        {!activeTool ? (
+        {!settingsTool ? (
           <div className="text-xs text-muted-foreground">
             Wähle links in der Werkzeugleiste ein Werkzeug (Hilfslinie, Linie, Text, CAD-Blatt) — die zugehörigen Einstellungen erscheinen hier.
           </div>
         ) : (
           <div className="flex items-center justify-between rounded-md border px-3 py-2" style={{ borderColor: "hsl(var(--hairline))" }}>
             <div className="text-sm font-medium">
-              {activeTool === "guide" && "Hilfslinie"}
-              {activeTool === "line" && "Linie (CAD)"}
-              {activeTool === "text" && "Text (CAD)"}
-              {activeTool === "cad" && "CAD-Zeichenblatt"}
+              {settingsTool === "guide" && "Hilfslinie"}
+              {settingsTool === "line" && "Linie (CAD)"}
+              {settingsTool === "text" && "Text (CAD)"}
+              {settingsTool === "cad" && "CAD-Zeichenblatt"}
             </div>
             <button
               onClick={() => setActiveTool(null)}
@@ -1526,19 +1529,19 @@ function ToolsTab({
       </div>
 
       {/* Per-tool settings */}
-      {activeTool === "guide" && (
+      {settingsTool === "guide" && (
         <GuideSettings
           settings={toolSettings.guide}
           onChange={(p) => updateToolSettings("guide", p)}
         />
       )}
-      {activeTool === "line" && (
+      {settingsTool === "line" && (
         <LineSettings
           settings={toolSettings.line}
           onChange={(p) => updateToolSettings("line", p)}
         />
       )}
-      {activeTool === "text" && (
+      {settingsTool === "text" && (
         <TextSettings
           settings={toolSettings.text}
           onChange={(p) => updateToolSettings("text", p)}
