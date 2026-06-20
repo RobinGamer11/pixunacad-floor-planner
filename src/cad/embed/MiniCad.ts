@@ -135,10 +135,18 @@ export class MiniCad {
   defaultTextAutoSize = true;
 
   // Selection (consumed by TextEditorOverlay & TextTool).
+  // `selection` ist die "primary" Selection (immer === selections.at(-1)).
+  // `selections` ist die volle Liste bei Mehrfach-Auswahl.
   selection: Selection | null = null;
+  selections: Selection[] = [];
   /** Pointer to the currently active tool *instance* (TextEditorOverlay
    *  compares against this.app.textTool). */
   activeTool: LineTool | TextTool | null = null;
+  /** Multi-Select-Modus: jeder Klick toggelt in/aus der Auswahl (statt zu ersetzen). */
+  private _multiSelectMode: boolean = false;
+  /** Live Shift-Status; während eines Pointer/Klick-Events read-aktualisiert. */
+  private _shiftDown: boolean = false;
+
 
   // Page geometry.
   pageWidthMm: number;
