@@ -252,6 +252,7 @@ export class MiniCad {
     this._installDeleteKey();
     this.applyZoom(this._zoom);
     this._installPageFrameSnap();
+    this._installParallelGuideContextMenu();
 
     if (init.initialState) this._restore(init.initialState);
     this._changeDirty = false;
