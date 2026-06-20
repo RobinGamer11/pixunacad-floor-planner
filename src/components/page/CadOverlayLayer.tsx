@@ -20,7 +20,7 @@ interface Props {
   enabled: boolean;
   initialState?: any;
   onChange: (state: any) => void;
-  onSelectionChange?: (info: MiniCadSelectionInfo | null) => void;
+  onSelectionChange?: (info: MiniCadSelectionInfo | null, count?: number) => void;
   // Line defaults
   lineColor?: string;
   lineThicknessMm?: number;
