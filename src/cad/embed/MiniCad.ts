@@ -336,6 +336,12 @@ export class MiniCad {
     if (typeof opts.alpha === "number" && opts.alpha >= 0 && opts.alpha <= 1) {
       this.defaultLineAlpha = opts.alpha;
     }
+    const selected = this.getSelectedSegment();
+    if (selected && !this.isFrameSegment(selected)) {
+      selected.color = applyAlphaToColor(this.defaultLineColor, this.defaultLineAlpha);
+      selected.thicknessM = this.defaultLineThicknessM;
+      this.refreshLabelUI();
+    }
   }
 
   setTextDefaults(opts: {
@@ -366,6 +372,22 @@ export class MiniCad {
     if (typeof opts.borderEnabled === "boolean") this.defaultTextBorderEnabled = opts.borderEnabled;
     if (opts.borderColor) this.defaultTextBorderColor = opts.borderColor;
     if (typeof opts.borderWidthPx === "number" && opts.borderWidthPx >= 0) this.defaultTextBorderWidthPx = opts.borderWidthPx;
+    const selected = this.getSelectedTextBox();
+    if (selected) {
+      selected.style.textColor = applyAlphaToColor(this.defaultTextColor, this.defaultTextAlpha);
+      selected.style.fontSizePx = this.defaultTextFontSizePx;
+      selected.style.bgColor = this.defaultTextBgColor;
+      selected.style.bgAlphaPct = this.defaultTextBgAlphaPct;
+      selected.style.wrap = this.defaultTextAutoSize ? this.defaultTextWrap : true;
+      selected.style.align = this.defaultTextAlign;
+      selected.style.borderEnabled = this.defaultTextBorderEnabled;
+      selected.style.borderColor = this.defaultTextBorderColor;
+      selected.style.borderWidthPx = this.defaultTextBorderWidthPx;
+      (selected.style as any).autoSize = this.defaultTextAutoSize;
+      autoSizeTextBox(selected, (this.renderer as any).referencePxPerM);
+      if (this.textEditor.isActive()) this.textEditor.reposition(selected);
+      this.refreshLabelUI();
+    }
   }
 
   applyZoom(zoom: number) {
