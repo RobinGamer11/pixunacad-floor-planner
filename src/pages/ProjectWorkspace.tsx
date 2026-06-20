@@ -790,17 +790,30 @@ function PageCanvas({
   // Escape cancels pending draw and resets back to the select tool.
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
       const t = e.target as HTMLElement | null;
-      // Don't hijack ESC while user is editing text in an input/textarea/contenteditable.
-      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || (t as any).isContentEditable)) return;
-      setPendingStart(null);
-      setHoverPt(null);
-      if (activeTool !== null) onCommitTool();
+      const inField = t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || (t as any).isContentEditable);
+      if (e.key === "Escape") {
+        if (inField) return;
+        setPendingStart(null);
+        setHoverPt(null);
+        if (activeTool !== null) onCommitTool();
+        return;
+      }
+      if ((e.key === "Delete" || e.key === "Backspace") && !inField) {
+        if (selectedElementIds.length === 0) return;
+        // Bei Backspace: nur reagieren wenn KEINE Texteingabe — sonst würde
+        // das Tippen in Inspector-Inputs Elemente löschen.
+        if (e.key === "Backspace" && document.activeElement && (document.activeElement as HTMLElement).tagName !== "BODY") return;
+        e.preventDefault();
+        for (const id of selectedElementIds) {
+          projectStore.removeElement(projectId, page.id, id);
+        }
+        onSelect(undefined);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [pendingStart, activeTool]);
+  }, [pendingStart, activeTool, selectedElementIds, projectId, page.id]);
 
 
   const punchSide: PunchSide = page.punchSide ?? "left";
