@@ -573,7 +573,8 @@ export default function ProjectWorkspace() {
                         alpha: info.alpha,
                       });
                     } else {
-                      updateToolSettings("text", info);
+                      const { tool: _tool, ...textSettings } = info;
+                      updateToolSettings("text", textSettings);
                     }
                   }}
                 />
