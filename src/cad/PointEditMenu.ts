@@ -74,7 +74,7 @@ export class PointEditMenu {
       }
     }
 
-    const boxW = 168;
+    const boxW = 200;
     const boxH = 36;
 
     let left: number;
