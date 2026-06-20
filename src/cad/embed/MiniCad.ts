@@ -28,7 +28,7 @@ import { Defaults, SelectionType } from "../constants";
 import type { TextBox, TextBoxStyle } from "../Scene";
 import { drawRichTextBox } from "../textRichRenderer";
 import { autoSizeTextBox } from "../textAutoSize";
-import { ParallelGuideHub } from "../ParallelGuideHub";
+
 
 export interface MiniCadTextEditorDom {
   editor: HTMLDivElement;
@@ -69,9 +69,6 @@ export interface MiniCadInit {
   onChange?: () => void;
   /** Called whenever a CAD object selection changes in the embedded editor. */
   onSelectionChange?: (info: MiniCadSelectionInfo | null) => void;
-  /** Called when the user requests a parallel guide line via right-click on a
-   *  CAD segment. Coordinates are in page-percent (0..100). */
-  onCreateParallelGuide?: (p1: { x: number; y: number }, p2: { x: number; y: number }) => void;
   /** Initial serialized state. */
   initialState?: any;
 }
@@ -166,8 +163,6 @@ export class MiniCad {
   private _changeDirty = false;
   private _onChange?: () => void;
   private _onSelectionChange?: (info: MiniCadSelectionInfo | null) => void;
-  private _onCreateParallelGuide?: (p1: { x: number; y: number }, p2: { x: number; y: number }) => void;
-  private _parallelGuideHub: import("../ParallelGuideHub").ParallelGuideHub | null = null;
   private _coordCleanups: Array<() => void> = [];
 
   constructor(init: MiniCadInit) {
@@ -179,7 +174,7 @@ export class MiniCad {
     this._zoom = init.initialZoom;
     this._onChange = init.onChange;
     this._onSelectionChange = init.onSelectionChange;
-    this._onCreateParallelGuide = init.onCreateParallelGuide;
+    
     this._strokeFactor = (this.basePxPerMm * 1000) / 80;
     this.defaultLineColor = init.defaultLineColor ?? Defaults.lineColor;
     this.defaultLineThicknessM = (init.defaultLineThicknessM ?? Defaults.lineThicknessM) * this._strokeFactor;
@@ -253,7 +248,7 @@ export class MiniCad {
     this._installDeleteKey();
     this.applyZoom(this._zoom);
     this._installPageFrameSnap();
-    this._installParallelGuideContextMenu();
+    
 
     if (init.initialState) this._restore(init.initialState);
     this._changeDirty = false;
@@ -334,74 +329,6 @@ export class MiniCad {
     };
   }
 
-  /* ===== Parallel-Hilfslinie per Rechtsklick auf eine CAD-Linie ===== */
-
-  private _installParallelGuideContextMenu() {
-    const c = this.dom.canvas;
-    const mount = c.parentElement;
-    if (!mount) return;
-    // Hub lazy erzeugen (DOM wird an den Canvas-Wrapper angehängt).
-    const hub = new ParallelGuideHub(mount);
-    this._parallelGuideHub = hub;
-
-    const onCtx = (e: MouseEvent) => {
-      if (this._destroyed) return;
-      // Rechtsklick: contextmenu wird bereits von Input.ts unterdrückt.
-      const r = c.getBoundingClientRect();
-      const sx = e.clientX - r.left;
-      const sy = e.clientY - r.top;
-      const w = this.camera.screenToWorld(sx, sy);
-
-      // Hit-Test: nächstes nicht-Frame-Segment innerhalb 12 CSS-px.
-      const hitPx = 12;
-      let bestSeg: any = null;
-      let bestDistPx = Infinity;
-      for (const seg of this.scene.segments) {
-        if (this.isFrameSegment(seg)) continue;
-        const a = seg.a, b = seg.b;
-        const dxw = b.x - a.x, dyw = b.y - a.y;
-        const len2 = dxw * dxw + dyw * dyw;
-        if (len2 < 1e-12) continue;
-        const t = Math.max(0, Math.min(1, ((w.x - a.x) * dxw + (w.y - a.y) * dyw) / len2));
-        const px = a.x + t * dxw, py = a.y + t * dyw;
-        const dPx = Math.hypot(w.x - px, w.y - py) * this.camera.scale;
-        if (dPx < hitPx && dPx < bestDistPx) {
-          bestDistPx = dPx;
-          bestSeg = seg;
-        }
-      }
-      if (!bestSeg) return;
-
-      // Side (links/rechts der Quelllinie) anhand der Mausposition bestimmen.
-      const a = bestSeg.a, b = bestSeg.b;
-      const dxw = b.x - a.x, dyw = b.y - a.y;
-      const len = Math.hypot(dxw, dyw) || 1;
-      const nx = -dyw / len;
-      const ny = dxw / len;
-      const signed = (w.x - a.x) * nx + (w.y - a.y) * ny;
-      const side = signed >= 0 ? 1 : -1;
-
-      hub.bindCommit((mm) => {
-        if (mm == null || !Number.isFinite(mm) || mm < 0) return;
-        const dM = mm / 1000;
-        const ox = nx * side * dM;
-        const oy = ny * side * dM;
-        const p1W = { x: a.x + ox, y: a.y + oy };
-        const p2W = { x: b.x + ox, y: b.y + oy };
-        const toPct = (pt: { x: number; y: number }) => ({
-          x: (pt.x * 1000) / this.pageWidthMm * 100,
-          y: (pt.y * 1000) / this.pageHeightMm * 100,
-        });
-        try { this._onCreateParallelGuide?.(toPct(p1W), toPct(p2W)); } catch {}
-        hub.hide();
-      });
-      hub.bindCancel(() => { hub.hide(); });
-      hub.showAt(sx, sy, 100);
-    };
-    c.addEventListener("contextmenu", onCtx);
-    this._coordCleanups.push(() => c.removeEventListener("contextmenu", onCtx));
-    this._coordCleanups.push(() => { try { hub.destroy(); } catch {} });
-  }
 
 
 
