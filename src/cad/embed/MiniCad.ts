@@ -28,6 +28,7 @@ import { Defaults, SelectionType } from "../constants";
 import type { TextBox, TextBoxStyle } from "../Scene";
 import { drawRichTextBox } from "../textRichRenderer";
 import { autoSizeTextBox } from "../textAutoSize";
+import { ParallelGuideHub } from "../ParallelGuideHub";
 
 export interface MiniCadTextEditorDom {
   editor: HTMLDivElement;
