@@ -188,7 +188,7 @@ export class MiniCad {
   private _destroyed = false;
   private _changeDirty = false;
   private _onChange?: () => void;
-  private _onSelectionChange?: (info: MiniCadSelectionInfo | null) => void;
+  private _onSelectionChange?: (info: MiniCadSelectionInfo | null, count?: number) => void;
   private _coordCleanups: Array<() => void> = [];
   /** Aktiv während das Hilfslinien-Werkzeug läuft — neue Segmente werden als
    *  Hilfslinien markiert (isGuide=true). */
