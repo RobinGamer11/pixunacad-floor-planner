@@ -559,17 +559,33 @@ export default function ProjectWorkspace() {
                   activeTool={activeTool}
                   toolSettings={toolSettings}
                   onCommitTool={() => setActiveTool(null)}
-                  onSelect={(id) => {
-                    setSelectedElementId(id);
-                    if (id) setSelectedCadTool(undefined);
-                    if (id) setRightTab("tools");
+                  selectedElementIds={selectedElementIds}
+                  onSelect={(id, opts) => {
+                    if (!id) {
+                      setSelectedElementIds([]);
+                      return;
+                    }
+                    const multi = toolSettings.select.multi || !!opts?.shift;
+                    setSelectedElementIds((prev) => {
+                      if (!multi) return [id];
+                      const idx = prev.indexOf(id);
+                      if (opts?.shift && idx >= 0) {
+                        // Shift-Klick auf bereits selektiertes → entfernen
+                        return prev.filter((x) => x !== id);
+                      }
+                      // Multi: nach hinten (= zuletzt selektiert) verschieben
+                      const rest = prev.filter((x) => x !== id);
+                      return [...rest, id];
+                    });
+                    setSelectedCadTool(undefined);
+                    setRightTab("tools");
                   }}
                   onCadSelectionChange={(info) => {
                     if (!info) {
                       setSelectedCadTool(undefined);
                       return;
                     }
-                    setSelectedElementId(undefined);
+                    setSelectedElementIds([]);
                     setSelectedCadTool(info.tool);
                     setRightTab("tools");
                     if (info.tool === "line") {
