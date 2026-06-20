@@ -1665,6 +1665,15 @@ function ToolsTab({
           onChange={(p) => updateToolSettings("line", p)}
         />
       )}
+      {cadSelectedLineSnap && onCadLineSnapChange && (
+        <LineSnapSettings
+          isGuide={cadSelectedLineSnap.isGuide}
+          midpoint={cadSelectedLineSnap.midpoint}
+          division={cadSelectedLineSnap.division}
+          onChange={onCadLineSnapChange}
+        />
+      )}
+
       {settingsTool === "text" && (
         <TextSettings
           settings={toolSettings.text}
