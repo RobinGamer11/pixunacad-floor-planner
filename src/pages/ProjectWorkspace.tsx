@@ -1395,6 +1395,57 @@ function ElementView({
               <Trash2 size={14} />
             </button>
           </div>
+
+          {/* Edge-Drag-Handles (wie Schraffur-Werkzeug) — eine Kante reinziehen/rausziehen */}
+          {(["top", "right", "bottom", "left"] as const).map((edge) => {
+            const isHor = edge === "top" || edge === "bottom";
+            const startEdgeDrag = (e: React.MouseEvent) => {
+              if (!onEdgeDrag) return;
+              e.stopPropagation();
+              e.preventDefault();
+              let last = { x: e.clientX, y: e.clientY };
+              const move = (ev: MouseEvent) => {
+                const dx = ev.clientX - last.x;
+                const dy = ev.clientY - last.y;
+                last = { x: ev.clientX, y: ev.clientY };
+                onEdgeDrag(edge, dx, dy);
+              };
+              const up = () => {
+                window.removeEventListener("mousemove", move);
+                window.removeEventListener("mouseup", up);
+              };
+              window.addEventListener("mousemove", move);
+              window.addEventListener("mouseup", up);
+            };
+            const baseStyle: React.CSSProperties = {
+              position: "absolute",
+              background: "transparent",
+              cursor: isHor ? "ns-resize" : "ew-resize",
+              zIndex: 5,
+            };
+            const sizeStyle: React.CSSProperties = isHor
+              ? { left: 0, right: 0, height: 8, [edge === "top" ? "top" : "bottom"]: -4 }
+              : { top: 0, bottom: 0, width: 8, [edge === "left" ? "left" : "right"]: -4 };
+            return (
+              <div
+                key={edge}
+                data-hub-control
+                onMouseDown={startEdgeDrag}
+                title={`Kante ${edge} ziehen`}
+                style={{ ...baseStyle, ...sizeStyle }}
+              >
+                {/* Sichtbarer Strich auf der Kante (subtil) */}
+                <div
+                  className="absolute"
+                  style={
+                    isHor
+                      ? { left: 0, right: 0, top: "50%", height: 2, transform: "translateY(-50%)", background: "hsl(var(--accent-gold))", opacity: 0.7 }
+                      : { top: 0, bottom: 0, left: "50%", width: 2, transform: "translateX(-50%)", background: "hsl(var(--accent-gold))", opacity: 0.7 }
+                  }
+                />
+              </div>
+            );
+          })}
         </>
       )}
     </div>
