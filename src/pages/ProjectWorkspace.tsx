@@ -60,6 +60,7 @@ import {
   type PunchSide,
 } from "@/lib/projectStore";
 import CadOverlayLayer from "@/components/page/CadOverlayLayer";
+import type { MiniCadSelectionInfo } from "@/cad/embed/MiniCad";
 
 const FORMAT_SIZES: Record<PageFormat, { w: number; h: number; label: string }> = {
   "A3-quer": { w: 420, h: 297, label: "A3 Querformat (420 × 297 mm)" },
@@ -693,6 +694,7 @@ function PageCanvas({
   toolSettings,
   onCommitTool,
   onSelect,
+  onCadSelectionChange,
 }: {
   projectId: string;
   page: import("@/lib/projectStore").ProjectPage;
@@ -704,6 +706,7 @@ function PageCanvas({
   toolSettings: ToolSettings;
   onCommitTool: () => void;
   onSelect: (id?: string) => void;
+  onCadSelectionChange: (info: MiniCadSelectionInfo | null) => void;
 }) {
   const fmt = FORMAT_SIZES[page.format];
   const aspect = fmt.w / fmt.h;
@@ -983,6 +986,7 @@ function PageCanvas({
           onChange={(state) =>
             projectStore.updatePage(projectId, page.id, { cadOverlay: state })
           }
+          onSelectionChange={onCadSelectionChange}
         />
 
       </div>
