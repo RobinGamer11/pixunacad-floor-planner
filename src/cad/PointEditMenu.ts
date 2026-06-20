@@ -32,7 +32,7 @@ export class PointEditMenu {
   }
 
   /** Optional: nur diese Actions als Buttons sichtbar (alle anderen werden ausgeblendet). */
-  showAt(sx: number, sy: number, allowedActions?: string[]) {
+  showAt(sx: number, sy: number, allowedActions?: string[], opts?: { align?: "default" | "centerAbove" }) {
     const wasVisible = this.visible;
     this.visible = true;
     this.root.classList.remove("hidden");
@@ -55,8 +55,15 @@ export class PointEditMenu {
     const boxW = 168;
     const boxH = 36;
 
-    const left = clamp(sx + pad, 8, vp.width - boxW - 8);
-    const top = clamp(sy - boxH - 8, 8, vp.height - boxH - 8);
+    let left: number;
+    let top: number;
+    if (opts?.align === "centerAbove") {
+      left = clamp(sx - boxW / 2, 8, vp.width - boxW - 8);
+      top = clamp(sy - boxH - 12, 8, vp.height - boxH - 8);
+    } else {
+      left = clamp(sx + pad, 8, vp.width - boxW - 8);
+      top = clamp(sy - boxH - 8, 8, vp.height - boxH - 8);
+    }
 
     this.root.style.left = `${left}px`;
     this.root.style.top = `${top}px`;
