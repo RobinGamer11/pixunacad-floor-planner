@@ -286,7 +286,27 @@ export class Renderer {
     this._drawFreeStrokeSelection();
     this._drawHoverSegmentPoints();
 
+    // Sekundär-Selektionen (Multi-Select): identische Highlight-Pässe für jedes
+    // weitere Objekt — wir tauschen kurz `this.selection` aus, malen die
+    // entsprechenden Selection-Pässe, und stellen den Original-Zustand wieder her.
+    if (this.extraSelections && this.extraSelections.length > 0) {
+      const original = this.selection;
+      for (const extra of this.extraSelections) {
+        if (!extra || extra === original) continue;
+        this.selection = extra;
+        this._drawHatchSelection();
+        this._drawSegmentSelection();
+        this._drawDimensionSelection();
+        this._drawTextBoxSelection();
+        this._drawStickerInstanceSelection();
+        this._drawDocumentSelection();
+        this._drawFreeStrokeSelection();
+      }
+      this.selection = original;
+    }
+
     this._drawStickerEditFrame();
+
 
     if (this.overlay && this.overlay.draw) {
       this.overlay.draw(ctx, this.camera);
