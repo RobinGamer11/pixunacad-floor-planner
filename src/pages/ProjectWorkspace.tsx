@@ -890,13 +890,30 @@ function PageCanvas({
           <ElementView
             key={el.id}
             el={el}
-            selected={el.id === selectedElementId}
-            onSelect={() => onSelect(el.id)}
+            selected={selectedElementIds.includes(el.id)}
+            onSelect={(opts) => onSelect(el.id, opts)}
             onDrag={(dx, dy) => {
-              projectStore.updateElement(projectId, page.id, el.id, {
-                x: Math.max(0, Math.min(95, el.x + (dx / scale / width) * 100)),
-                y: Math.max(0, Math.min(95, el.y + (dy / scale / height) * 100)),
-              });
+              const dxPct = (dx / scale / width) * 100;
+              const dyPct = (dy / scale / height) * 100;
+              // Wenn dieses Element Teil einer Mehrfachauswahl ist, alle
+              // ausgewählten Elemente (auch unterschiedlicher Typen) mitziehen.
+              const ids = selectedElementIds.includes(el.id) && selectedElementIds.length > 1
+                ? selectedElementIds
+                : [el.id];
+              for (const id of ids) {
+                const target = page.elements.find((x) => x.id === id);
+                if (!target) continue;
+                if (target.kind === "line" || target.kind === "guide") {
+                  // SVG-Linien (kind="line"/"guide" in der React-Schicht) haben
+                  // points[] — diese werden hier nicht mitbewegt, da sie in der
+                  // CAD-Engine leben. Stattdessen Position-Felder nicht antasten.
+                  continue;
+                }
+                projectStore.updateElement(projectId, page.id, target.id, {
+                  x: Math.max(0, Math.min(95, target.x + dxPct)),
+                  y: Math.max(0, Math.min(95, target.y + dyPct)),
+                });
+              }
             }}
           />
         ))}
