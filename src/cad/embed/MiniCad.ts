@@ -210,50 +210,10 @@ export class MiniCad {
 
   isFrameSegment(_seg: { labelId?: string }): boolean { return false; }
 
-
-  private _installPageFrameSnap() {
-    const lm: any = this.labelManager;
-    lm.groups.push({ id: this._frameLabelId, name: "__page_frame__", locked: true, visible: true });
-    const origList = lm.list.bind(lm);
-    lm.list = () => origList().filter((g: any) => g.id !== this._frameLabelId);
-    this._rebuildPageFrame();
-  }
-
-  private _rebuildPageFrame() {
-    this.scene.segments = this.scene.segments.filter((s) => s.labelId !== this._frameLabelId);
-    const wM = this.pageWidthMm / 1000;
-    const hM = this.pageHeightMm / 1000;
-    const mM = Math.max(0, this.pageMarginsMm) / 1000;
-    // Sichtbar (dünne graue Hilfslinien) – als Orientierung & Greifkante.
-    // Auswahl wird durch _installSelectToolFrameFilter unterbunden.
-    const style = {
-      color: "rgba(120,120,120,0.6)",
-      thicknessM: 0.0001,
-      labelId: this._frameLabelId,
-    };
-    const seg = (a: { x: number; y: number }, b: { x: number; y: number }) => {
-      try { this.scene.createSegment(a, b, style); }
-      catch (e) { console.error("MiniCad: frame seg failed:", e); }
-    };
-    // Outer page frame.
-    seg({ x: 0, y: 0 }, { x: wM, y: 0 });
-    seg({ x: wM, y: 0 }, { x: wM, y: hM });
-    seg({ x: wM, y: hM }, { x: 0, y: hM });
-    seg({ x: 0, y: hM }, { x: 0, y: 0 });
-    // Inner margin frame (only if margins > 0 and fits inside the page).
-    if (mM > 0 && wM - 2 * mM > 1e-4 && hM - 2 * mM > 1e-4) {
-      seg({ x: mM, y: mM }, { x: wM - mM, y: mM });
-      seg({ x: wM - mM, y: mM }, { x: wM - mM, y: hM - mM });
-      seg({ x: wM - mM, y: hM - mM }, { x: mM, y: hM - mM });
-      seg({ x: mM, y: hM - mM }, { x: mM, y: mM });
-    }
-  }
-
   setPageMargins(mm: number) {
-    if (this.pageMarginsMm === mm) return;
     this.pageMarginsMm = mm;
-    this._rebuildPageFrame();
   }
+
 
   /* ===== Public API ===== */
 
