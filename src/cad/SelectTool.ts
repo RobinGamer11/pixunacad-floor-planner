@@ -1461,6 +1461,18 @@ export class SelectTool {
   update(input: Input) {
     this.app.topology.priorityWallId = this.getPriorityWallId();
 
+    // Tür-Klick → in Door-Tool wechseln & selektieren (zeigt Endpunkt-Snaps & Hub).
+    if (input.clicked && !this.isEditing() && !this.dragStickerId && !this.dragDocId
+        && !this.dragTextBoxId && !this.dragAreaLabelHatchId && !this.rotateTextBoxId) {
+      const doorHit = this.app.doorTool.hitDoorAt(input);
+      if (doorHit) {
+        this.app.setTool("door");
+        this.app.doorTool.selectDoor(doorHit.id);
+        return;
+      }
+    }
+
+
     // Active sticker drag with point snapping
     if (this.dragStickerId) {
       const inst = this.app.scene.getStickerInstanceById(this.dragStickerId);
