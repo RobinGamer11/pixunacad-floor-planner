@@ -23,6 +23,10 @@ export interface DoorToolSettings {
   sashEnabled: boolean;
   /** Farbe der Fenster-Linien. */
   glassColor: string;
+  /** Dicke des Fenster-Elements (Abstand der Linien, m). 0 = auto. */
+  glassThickM: number;
+  /** Füllfarbe zwischen den Fensterlinien. "" = keine Füllung. */
+  glassFillColor: string;
 }
 
 export interface DoorHubState {
@@ -31,8 +35,11 @@ export interface DoorHubState {
   screenY: number;
   doorId: string | null;
   posM: number;
-  /** true wenn aktuell im Follow-Move (Tür folgt Maus). */
+  widthM: number;
+  /** true wenn aktuell im Follow-Move (ganzes Element folgt Maus). */
   moving: boolean;
+  /** true wenn aktuell im Follow-Resize (Breite folgt Maus). */
+  resizing: boolean;
 }
 
 export class DoorTool {
@@ -53,6 +60,8 @@ export class DoorTool {
     jambThickM: 0,
     sashEnabled: true,
     glassColor: "#2a2f36",
+    glassThickM: 0,
+    glassFillColor: "",
   };
 
   /** ID der aktuell selektierten Tür (für Inspector). */
