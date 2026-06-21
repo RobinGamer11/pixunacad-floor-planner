@@ -317,6 +317,27 @@ export class DoorTool {
       }
     }
 
+    // Follow-Move: Tür folgt Maus ohne gedrückte Taste
+    if (this._followMove && this.selectedDoorId) {
+      const d = this.app.scene.getDoorById(this.selectedDoorId);
+      const w = d ? this.app.scene.getWallById(d.wallId) : null;
+      if (d && w) {
+        const proj = projectPointToWall(w, v(input.mouse.wx, input.mouse.wy));
+        if (proj) {
+          let total = 0;
+          for (let i = 1; i < w.corners.length; i++) total += dist(w.corners[i - 1], w.corners[i]);
+          const half = d.widthM / 2;
+          d.posM = Math.max(half, Math.min(total - half, proj.s));
+          this._refreshHub();
+        }
+      }
+      if (input.clicked) {
+        this._followMove = false;
+        this._refreshHub();
+        return;
+      }
+    }
+
     // Drag-Resize (Endpunkt-Handles)
     if (this._dragHandle && this.selectedDoorId) {
       if (!input.mouse.left) { this._dragHandle = null; }
@@ -336,6 +357,7 @@ export class DoorTool {
             d.posM = newCenter;
             this.settings.widthM = newWidth;
             this.onSelectionChange?.(d.id);
+            this._refreshHub();
           }
         }
         return;
@@ -357,6 +379,7 @@ export class DoorTool {
             const target = proj.s - this._dragMoveOffsetM;
             d.posM = Math.max(half, Math.min(total - half, target));
             this.onSelectionChange?.(d.id);
+            this._refreshHub();
           }
         }
         return;
@@ -364,7 +387,23 @@ export class DoorTool {
     }
 
     if (input.clicked) {
-      // 1) Center-Handle → Drag-Move
+      // 1) Endpunkt-Handle → Tür selektieren + Hubbox an Handle anzeigen.
+      //    Bei bereits selektierter Tür zusätzlich Drag-Resize starten.
+      const handleHit = this._hitDoorHandle(input);
+      if (handleHit) {
+        const wasSelected = this.selectedDoorId === handleHit.door.id;
+        if (!wasSelected) this.selectDoor(handleHit.door.id);
+        const w = this.app.scene.getWallById(handleHit.door.wallId);
+        const g = w ? doorGeometry(w, handleHit.door) : null;
+        if (g) {
+          const which = handleHit.which === "left" ? g.leftEnd : g.rightEnd;
+          const s = this.app.camera.worldToScreen(which.x, which.y);
+          this._showHub(s.x, s.y - 28);
+        }
+        if (wasSelected) this._dragHandle = handleHit.which;
+        return;
+      }
+      // 2) Center-Handle → Drag-Move
       const centerHit = this._hitDoorCenter(input);
       if (centerHit) {
         const w = this.app.scene.getWallById(centerHit.wallId);
@@ -375,26 +414,26 @@ export class DoorTool {
         this._dragMove = true;
         return;
       }
-      // 2) Endpunkt-Handle → unselektierte Tür: nur selektieren; sonst Drag-Resize
-      const handleHit = this._hitDoorHandle(input);
-      if (handleHit) {
-        if (this.selectedDoorId !== handleHit.door.id) {
-          this.selectDoor(handleHit.door.id);
-          return;
+      // 3) Tür-Click → selektieren + Hubbox an Türmitte
+      const doorHit = this._hitDoor(input);
+      if (doorHit) {
+        this.selectDoor(doorHit.id);
+        const w = this.app.scene.getWallById(doorHit.wallId);
+        const g = w ? doorGeometry(w, doorHit) : null;
+        if (g) {
+          const sC = this.app.camera.worldToScreen(g.center.x, g.center.y);
+          this._showHub(sC.x, sC.y - 28);
         }
-        this._dragHandle = handleHit.which;
         return;
       }
-      // 3) Tür-Click → selektieren
-      const doorHit = this._hitDoor(input);
-      if (doorHit) { this.selectDoor(doorHit.id); return; }
-      // 4) Wand-Click → neue Tür platzieren (nur im Platzierungs-Modus)
-      if (this.placementMode && this.settings.mode === "door" && this._hoverWallId) {
+      // 4) Wand-Click → neue Tür/Fenster platzieren (nur im Platzierungs-Modus)
+      if (this.placementMode && this._hoverWallId) {
         const w = this.app.scene.getWallById(this._hoverWallId);
         if (w) {
           const door = this.app.scene.createDoor({
             wallId: w.id,
             posM: this._hoverPosM,
+            kind: this.settings.mode,
             widthM: this.settings.widthM,
             heightM: this.settings.heightM,
             side: this.settings.side,
@@ -405,6 +444,8 @@ export class DoorTool {
             jambColor: this.settings.jambColor,
             jambLenM: this.settings.jambLenM,
             jambThickM: this.settings.jambThickM,
+            sashEnabled: this.settings.sashEnabled,
+            glassColor: this.settings.glassColor,
             labelId: w.labelId,
           });
           this.selectDoor(door.id);
@@ -413,6 +454,7 @@ export class DoorTool {
       }
       // 5) Sonst: Selektion aufheben — im Edit-Modus zurück zum Auswahlwerkzeug
       this.selectDoor(null);
+      this._hideHub();
       if (!this.placementMode) this.app.setTool("select");
     }
   }
@@ -420,11 +462,12 @@ export class DoorTool {
   /** Zeichnet Hover-Preview + Selection-Handles. */
   private _drawOverlay(ctx: CanvasRenderingContext2D, cam: any) {
     // Hover-Preview
-    if (this._hoverWallId && this.settings.mode === "door" && !this._dragHandle) {
+    if (this._hoverWallId && !this._dragHandle && this.placementMode) {
       const w = this.app.scene.getWallById(this._hoverWallId);
       if (w) {
         const fake: Door = {
           id: "_preview", wallId: w.id, posM: this._hoverPosM,
+          kind: this.settings.mode,
           widthM: this.settings.widthM, heightM: this.settings.heightM,
           side: this.settings.side, hand: this.settings.hand, edge: this.settings.edge,
           color: this.settings.color,
