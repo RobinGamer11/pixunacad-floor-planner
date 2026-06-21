@@ -137,7 +137,15 @@ export class DoorTool {
   /** Startet Follow-Move (Tür folgt Maus; nächster Klick fixiert). Von Hubbox aufgerufen. */
   beginFollowMove() {
     if (!this.selectedDoorId) return;
+    this._followResize = false;
     this._followMove = true;
+    this._refreshHub();
+  }
+  /** Startet Follow-Resize (Breite folgt Maus; nächster Klick fixiert). */
+  beginFollowResize() {
+    if (!this.selectedDoorId) return;
+    this._followMove = false;
+    this._followResize = true;
     this._refreshHub();
   }
   /** Setzt posM exakt (von Hubbox aufgerufen). */
@@ -150,6 +158,21 @@ export class DoorTool {
     for (let i = 1; i < w.corners.length; i++) total += dist(w.corners[i - 1], w.corners[i]);
     const half = d.widthM / 2;
     d.posM = Math.max(half, Math.min(total - half, posM));
+    this._refreshHub();
+  }
+  /** Setzt widthM exakt (von Hubbox aufgerufen). */
+  setSelectedWidthM(widthM: number) {
+    if (!this.selectedDoorId) return;
+    const d = this.app.scene.getDoorById(this.selectedDoorId);
+    const w = d ? this.app.scene.getWallById(d.wallId) : null;
+    if (!d || !w) return;
+    let total = 0;
+    for (let i = 1; i < w.corners.length; i++) total += dist(w.corners[i - 1], w.corners[i]);
+    d.widthM = Math.max(0.1, Math.min(total, widthM));
+    const half = d.widthM / 2;
+    d.posM = Math.max(half, Math.min(total - half, d.posM));
+    this.settings.widthM = d.widthM;
+    this.onSelectionChange?.(d.id);
     this._refreshHub();
   }
   hideHub() { this._hideHub(); }
