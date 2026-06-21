@@ -176,7 +176,7 @@ export class DoorTool {
       this._hoverPosM = clamped;
     }
 
-    // Drag-Resize
+    // Drag-Resize (Endpunkt-Handles)
     if (this._dragHandle && this.selectedDoorId) {
       if (!input.mouse.left) { this._dragHandle = null; }
       else {
@@ -201,14 +201,46 @@ export class DoorTool {
       }
     }
 
+    // Drag-Move (Center-Handle: verschiebt Tür entlang Wand)
+    if (this._dragMove && this.selectedDoorId) {
+      if (!input.mouse.left) { this._dragMove = false; }
+      else {
+        const d = this.app.scene.getDoorById(this.selectedDoorId);
+        const w = d ? this.app.scene.getWallById(d.wallId) : null;
+        if (d && w) {
+          const proj = projectPointToWall(w, v(input.mouse.wx, input.mouse.wy));
+          if (proj) {
+            let total = 0;
+            for (let i = 1; i < w.corners.length; i++) total += dist(w.corners[i - 1], w.corners[i]);
+            const half = d.widthM / 2;
+            const target = proj.s - this._dragMoveOffsetM;
+            d.posM = Math.max(half, Math.min(total - half, target));
+            this.onSelectionChange?.(d.id);
+          }
+        }
+        return;
+      }
+    }
+
     if (input.clicked) {
-      // 1) Handle-Click → Drag-Start (wird durch dragging weiter behandelt)
+      // 1) Center-Handle → Drag-Move
+      const centerHit = this._hitDoorCenter(input);
+      if (centerHit) {
+        const w = this.app.scene.getWallById(centerHit.wallId);
+        if (w) {
+          const proj = projectPointToWall(w, v(input.mouse.wx, input.mouse.wy));
+          this._dragMoveOffsetM = proj ? (proj.s - centerHit.posM) : 0;
+        }
+        this._dragMove = true;
+        return;
+      }
+      // 2) Endpunkt-Handle → Drag-Resize
       const handleHit = this._hitDoorHandle(input);
       if (handleHit) { this._dragHandle = handleHit.which; return; }
-      // 2) Tür-Click → selektieren
+      // 3) Tür-Click → selektieren
       const doorHit = this._hitDoor(input);
       if (doorHit) { this.selectDoor(doorHit.id); return; }
-      // 3) Wand-Click → neue Tür platzieren (wenn Modus = Tür)
+      // 4) Wand-Click → neue Tür platzieren (wenn Modus = Tür)
       if (this.settings.mode === "door" && this._hoverWallId) {
         const w = this.app.scene.getWallById(this._hoverWallId);
         if (w) {
@@ -226,7 +258,7 @@ export class DoorTool {
         }
         return;
       }
-      // 4) Sonst: Selektion aufheben
+      // 5) Sonst: Selektion aufheben
       this.selectDoor(null);
     }
   }
