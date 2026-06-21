@@ -178,6 +178,26 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
   const [drawingScale, setDrawingScale] = useState<number>(100);
   const [drawingScaleOpen, setDrawingScaleOpen] = useState(false);
   const [drawingScaleCustom, setDrawingScaleCustom] = useState<string>("100");
+
+  // Raster (Hintergrund-Grid) Einstellungen
+  const [gridPanelOpen, setGridPanelOpen] = useState(false);
+  const [gridEnabled, setGridEnabled] = useState(true);
+  const [gridSizeM, setGridSizeM] = useState<number>(1);
+  const [gridColor, setGridColor] = useState<string>("#000000");
+  const [gridOpacity, setGridOpacity] = useState<number>(0.06);
+
+  // Renderer-Settings synchron halten
+  useEffect(() => {
+    const app = appRef.current;
+    if (!app) return;
+    app.renderer.gridSettings = {
+      enabled: gridEnabled,
+      sizeM: gridSizeM,
+      color: gridColor,
+      opacity: gridOpacity,
+    };
+  }, [gridEnabled, gridSizeM, gridColor, gridOpacity]);
+
   
 
   useEffect(() => {
