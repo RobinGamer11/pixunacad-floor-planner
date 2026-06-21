@@ -1051,4 +1051,22 @@ export class Scene {
     this.markWallsDirty();
     return [wA, wB];
   }
+
+  // ---- Doors (Türen) ----
+  createDoor(opts: {
+    wallId: string; posM: number; widthM: number; heightM?: number;
+    side?: DoorSide; hand?: DoorHand; color?: string; labelId?: string;
+  }): Door {
+    const d = new Door({ id: this._makeId(), ...opts });
+    this.doors.push(d);
+    return d;
+  }
+  getDoorById(id: string): Door | null { return this.doors.find(d => d.id === id) || null; }
+  getDoorsByWallId(wallId: string): Door[] { return this.doors.filter(d => d.wallId === wallId); }
+  getDoorsByLabelId(labelId: string): Door[] { return this.doors.filter(d => d.labelId === labelId); }
+  removeDoor(d: Door) { this.doors = this.doors.filter(x => x !== d); }
+  removeDoorsByIds(ids: string[]) { const set = new Set(ids); this.doors = this.doors.filter(d => !set.has(d.id)); }
+  removeDoorsByWallId(wallId: string) { this.doors = this.doors.filter(d => d.wallId !== wallId); }
+  removeDoorsByLabelId(labelId: string) { this.doors = this.doors.filter(d => d.labelId !== labelId); }
+  reassignDoorsLabel(oldId: string, newId: string) { for (const d of this.doors) if (d.labelId === oldId) d.labelId = newId; }
 }
