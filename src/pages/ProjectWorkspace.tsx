@@ -1376,12 +1376,11 @@ function ElementView({
         </div>
       )}
       {el.kind === "pdf" && (
-        <div
-          className="w-full h-full flex items-center justify-center text-xs text-muted-foreground"
-          style={{ background: "hsl(var(--surface-muted))" }}
-        >
-          PDF
-        </div>
+        el.pdfSourceB64 ? (
+          <PdfPageView sourceB64={el.pdfSourceB64} pageIndex={el.pdfPageIndex ?? 0} />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground" style={{ background: "hsl(var(--surface-muted))" }}>PDF</div>
+        )
       )}
 
       {showHub && (
