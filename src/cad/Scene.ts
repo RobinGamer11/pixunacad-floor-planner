@@ -430,6 +430,37 @@ export type WallCornerAnchor =
   | { kind: "subMiter"; hostWallId: string; hostCornerIndex: number }
   | { kind: "subEdge"; hostWallId: string; hostEdgeIndex: number; t: number };
 
+export type DoorSide = "inner" | "outer";
+export type DoorHand = "left" | "right";
+
+export class Door {
+  id: string;
+  wallId: string;
+  /** Position des Türmittelpunkts entlang Wand-Bezugslinie (Meter ab Start). */
+  posM: number;
+  widthM: number;
+  heightM: number;
+  side: DoorSide;
+  hand: DoorHand;
+  color: string;
+  labelId: string;
+
+  constructor(opts: {
+    id: string; wallId: string; posM: number; widthM: number; heightM?: number;
+    side?: DoorSide; hand?: DoorHand; color?: string; labelId?: string;
+  }) {
+    this.id = opts.id;
+    this.wallId = opts.wallId;
+    this.posM = opts.posM;
+    this.widthM = Math.max(0.1, opts.widthM);
+    this.heightM = opts.heightM ?? 2.1;
+    this.side = opts.side || "inner";
+    this.hand = opts.hand || "left";
+    this.color = opts.color || "#111111";
+    this.labelId = opts.labelId || Defaults.defaultLabelId;
+  }
+}
+
 
 export class Scene {
   segments: Segment[] = [];
