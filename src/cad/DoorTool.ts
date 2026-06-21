@@ -82,12 +82,14 @@ export class DoorTool {
     return best ? { wall: best.wall, posM: best.posM } : null;
   }
 
-  /** Test ob ein Bildschirm-Punkt nahe einem Tür-Endpunkt-Handle ist. */
+  /** Test ob ein Bildschirm-Punkt nahe einem Tür-Endpunkt-Handle ist (alle Türen). */
   private _hitDoorHandle(input: Input): { door: Door; which: "left" | "right" } | null {
     const cam = this.app.camera;
     const sx = input.mouse.sx, sy = input.mouse.sy;
-    for (const d of this.app.scene.doors) {
-      if (d.id !== this.selectedDoorId) continue;
+    // Selektierte Tür zuerst priorisieren
+    const ordered = [...this.app.scene.doors].sort((a, b) =>
+      (a.id === this.selectedDoorId ? -1 : 0) - (b.id === this.selectedDoorId ? -1 : 0));
+    for (const d of ordered) {
       const w = this.app.scene.getWallById(d.wallId);
       if (!w) continue;
       const g = doorGeometry(w, d);
