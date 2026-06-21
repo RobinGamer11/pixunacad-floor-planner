@@ -535,10 +535,10 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
 
   const handleToolClick = useCallback((id: string) => {
     // "Linie" Sidebar-Knopf aktiviert die zuletzt gewählte Variante
-    // (Linie / Freihand / Radiergummi). Default: Linie.
     const targetId = id === ToolIds.LINE ? lineVariant : id;
     appRef.current?.setTool(targetId);
     setActiveTool(targetId);
+    setGridPanelOpen(false);
   }, [lineVariant]);
 
   const handleDocFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
