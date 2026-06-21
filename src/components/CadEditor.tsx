@@ -696,6 +696,76 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
 
         {/* Settings area (scrollable) */}
         <div className="flex-1 min-h-0 overflow-y-auto p-2">
+          {/* Raster-Einstellungen */}
+          {!sidebarCollapsed && gridPanelOpen && (
+            <div className="cad-settings-panel mb-2">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+                Raster
+              </div>
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <input
+                    id="grid-enabled"
+                    type="checkbox"
+                    checked={gridEnabled}
+                    onChange={(e) => setGridEnabled(e.target.checked)}
+                    className="accent-primary"
+                  />
+                  <label htmlFor="grid-enabled" className="!mb-0 cursor-pointer">Sichtbar</label>
+                </div>
+                <div>
+                  <label>Rastergröße (m)</label>
+                  <input
+                    type="number"
+                    min={0.01}
+                    step={0.1}
+                    value={gridSizeM}
+                    onChange={(e) => {
+                      const n = parseFloat(e.target.value.replace(",", "."));
+                      if (Number.isFinite(n) && n > 0) setGridSizeM(n);
+                    }}
+                  />
+                </div>
+                <div className="flex gap-1.5 flex-wrap">
+                  {[0.1, 0.25, 0.5, 1, 5, 10].map(v => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => setGridSizeM(v)}
+                      className={`cad-toolbar-btn h-7 px-2 text-[11px] ${Math.abs(gridSizeM - v) < 1e-6 ? "active" : ""}`}
+                    >
+                      {v < 1 ? `${v * 100} cm` : `${v} m`}
+                    </button>
+                  ))}
+                </div>
+                <div>
+                  <label>Farbe</label>
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))", background: gridColor }} />
+                    <input
+                      type="color"
+                      value={gridColor}
+                      onChange={(e) => setGridColor(e.target.value)}
+                      className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label>Transparenz ({Math.round((1 - gridOpacity) * 100)}%)</label>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={Math.round(gridOpacity * 100)}
+                    onChange={(e) => setGridOpacity(Math.max(0, Math.min(1, parseInt(e.target.value, 10) / 100)))}
+                    className="w-full"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Variant switcher: Linie / Freihand / Radiergummi (immer sichtbar in einer dieser Tools) */}
           {!sidebarCollapsed && (activeTool === ToolIds.LINE || activeTool === ToolIds.FREE || activeTool === ToolIds.ERASER) && (
             <div className="cad-settings-panel mb-2">
