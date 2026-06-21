@@ -23,6 +23,10 @@ export interface DoorToolSettings {
   sashEnabled: boolean;
   /** Farbe der Fenster-Linien. */
   glassColor: string;
+  /** Dicke des Fenster-Elements (Abstand der Linien, m). 0 = auto. */
+  glassThickM: number;
+  /** Füllfarbe zwischen den Fensterlinien. "" = keine Füllung. */
+  glassFillColor: string;
 }
 
 export interface DoorHubState {
@@ -31,8 +35,11 @@ export interface DoorHubState {
   screenY: number;
   doorId: string | null;
   posM: number;
-  /** true wenn aktuell im Follow-Move (Tür folgt Maus). */
+  widthM: number;
+  /** true wenn aktuell im Follow-Move (ganzes Element folgt Maus). */
   moving: boolean;
+  /** true wenn aktuell im Follow-Resize (Breite folgt Maus). */
+  resizing: boolean;
 }
 
 export class DoorTool {
@@ -53,6 +60,8 @@ export class DoorTool {
     jambThickM: 0,
     sashEnabled: true,
     glassColor: "#2a2f36",
+    glassThickM: 0,
+    glassFillColor: "",
   };
 
   /** ID der aktuell selektierten Tür (für Inspector). */
@@ -67,6 +76,8 @@ export class DoorTool {
   private _dragMoveOffsetM: number = 0;
   /** Follow-Move: Tür folgt Maus ohne gedrückte Taste; nächster Klick fixiert. */
   private _followMove: boolean = false;
+  /** Follow-Resize: Breite folgt Maus relativ zur Türmitte; nächster Klick fixiert. */
+  private _followResize: boolean = false;
   /** Settings-Update-Callback (von CadEditor gesetzt) — feuert wenn Selection wechselt. */
   onSelectionChange: ((doorId: string | null) => void) | null = null;
   /** Hubbox-Update-Callback (von CadEditor gesetzt). */
@@ -74,7 +85,7 @@ export class DoorTool {
   /** Wenn false: nur Selektion/Bearbeitung, keine neue Tür-Platzierung. */
   placementMode: boolean = true;
   /** Hub-Box-State. */
-  private _hub: DoorHubState = { visible: false, screenX: 0, screenY: 0, doorId: null, posM: 0, moving: false };
+  private _hub: DoorHubState = { visible: false, screenX: 0, screenY: 0, doorId: null, posM: 0, widthM: 0, moving: false, resizing: false };
 
   constructor(app: CadApp) { this.app = app; }
 
@@ -89,6 +100,7 @@ export class DoorTool {
     this._dragHandle = null;
     this._dragMove = false;
     this._followMove = false;
+    this._followResize = false;
     this._hideHub();
     this.app.renderer.overlay = null;
   }
@@ -100,13 +112,14 @@ export class DoorTool {
     if (!d) { this._hideHub(); return; }
     this._hub = {
       visible: true, screenX: sx, screenY: sy,
-      doorId: d.id, posM: d.posM, moving: this._followMove,
+      doorId: d.id, posM: d.posM, widthM: d.widthM,
+      moving: this._followMove, resizing: this._followResize,
     };
     this.onHubChange?.(this._hub);
   }
   private _hideHub() {
     if (!this._hub.visible && !this._hub.doorId) return;
-    this._hub = { visible: false, screenX: 0, screenY: 0, doorId: null, posM: 0, moving: false };
+    this._hub = { visible: false, screenX: 0, screenY: 0, doorId: null, posM: 0, widthM: 0, moving: false, resizing: false };
     this.onHubChange?.(this._hub);
   }
   private _refreshHub() {
@@ -118,13 +131,21 @@ export class DoorTool {
     const g = doorGeometry(w, d);
     if (!g) return;
     const sC = this.app.camera.worldToScreen(g.center.x, g.center.y);
-    this._hub = { ...this._hub, screenX: sC.x, screenY: sC.y - 28, posM: d.posM, moving: this._followMove };
+    this._hub = { ...this._hub, screenX: sC.x, screenY: sC.y - 28, posM: d.posM, widthM: d.widthM, moving: this._followMove, resizing: this._followResize };
     this.onHubChange?.(this._hub);
   }
   /** Startet Follow-Move (Tür folgt Maus; nächster Klick fixiert). Von Hubbox aufgerufen. */
   beginFollowMove() {
     if (!this.selectedDoorId) return;
+    this._followResize = false;
     this._followMove = true;
+    this._refreshHub();
+  }
+  /** Startet Follow-Resize (Breite folgt Maus; nächster Klick fixiert). */
+  beginFollowResize() {
+    if (!this.selectedDoorId) return;
+    this._followMove = false;
+    this._followResize = true;
     this._refreshHub();
   }
   /** Setzt posM exakt (von Hubbox aufgerufen). */
@@ -137,6 +158,21 @@ export class DoorTool {
     for (let i = 1; i < w.corners.length; i++) total += dist(w.corners[i - 1], w.corners[i]);
     const half = d.widthM / 2;
     d.posM = Math.max(half, Math.min(total - half, posM));
+    this._refreshHub();
+  }
+  /** Setzt widthM exakt (von Hubbox aufgerufen). */
+  setSelectedWidthM(widthM: number) {
+    if (!this.selectedDoorId) return;
+    const d = this.app.scene.getDoorById(this.selectedDoorId);
+    const w = d ? this.app.scene.getWallById(d.wallId) : null;
+    if (!d || !w) return;
+    let total = 0;
+    for (let i = 1; i < w.corners.length; i++) total += dist(w.corners[i - 1], w.corners[i]);
+    d.widthM = Math.max(0.1, Math.min(total, widthM));
+    const half = d.widthM / 2;
+    d.posM = Math.max(half, Math.min(total - half, d.posM));
+    this.settings.widthM = d.widthM;
+    this.onSelectionChange?.(d.id);
     this._refreshHub();
   }
   hideHub() { this._hideHub(); }
@@ -265,6 +301,8 @@ export class DoorTool {
         this.settings.jambThickM = d.jambThickM;
         this.settings.sashEnabled = d.sashEnabled;
         this.settings.glassColor = d.glassColor;
+        this.settings.glassThickM = d.glassThickM;
+        this.settings.glassFillColor = d.glassFillColor;
       }
     } else {
       this._hideHub();
@@ -297,6 +335,8 @@ export class DoorTool {
     d.jambThickM = Math.max(0, this.settings.jambThickM);
     d.sashEnabled = this.settings.sashEnabled;
     d.glassColor = this.settings.glassColor;
+    d.glassThickM = Math.max(0, this.settings.glassThickM);
+    d.glassFillColor = this.settings.glassFillColor;
     // Position innerhalb Wand halten
     d.posM = Math.max(d.widthM / 2, Math.min(total - d.widthM / 2, d.posM));
     this._refreshHub();
@@ -333,6 +373,33 @@ export class DoorTool {
       }
       if (input.clicked) {
         this._followMove = false;
+        this._refreshHub();
+        return;
+      }
+    }
+
+    // Follow-Resize: Breite wird durch Maus-Position relativ zur Türmitte gesteuert
+    if (this._followResize && this.selectedDoorId) {
+      const d = this.app.scene.getDoorById(this.selectedDoorId);
+      const w = d ? this.app.scene.getWallById(d.wallId) : null;
+      if (d && w) {
+        const proj = projectPointToWall(w, v(input.mouse.wx, input.mouse.wy));
+        if (proj) {
+          let total = 0;
+          for (let i = 1; i < w.corners.length; i++) total += dist(w.corners[i - 1], w.corners[i]);
+          const newHalf = Math.max(0.05, Math.abs(proj.s - d.posM));
+          let newWidth = Math.max(0.1, newHalf * 2);
+          // Innerhalb Wand halten
+          const maxHalf = Math.min(d.posM, total - d.posM);
+          if (newWidth / 2 > maxHalf) newWidth = maxHalf * 2;
+          d.widthM = newWidth;
+          this.settings.widthM = newWidth;
+          this.onSelectionChange?.(d.id);
+          this._refreshHub();
+        }
+      }
+      if (input.clicked) {
+        this._followResize = false;
         this._refreshHub();
         return;
       }
@@ -446,6 +513,8 @@ export class DoorTool {
             jambThickM: this.settings.jambThickM,
             sashEnabled: this.settings.sashEnabled,
             glassColor: this.settings.glassColor,
+            glassThickM: this.settings.glassThickM,
+            glassFillColor: this.settings.glassFillColor,
             labelId: w.labelId,
           });
           this.selectDoor(door.id);
@@ -474,6 +543,7 @@ export class DoorTool {
           jambEnabled: this.settings.jambEnabled, jambColor: this.settings.jambColor,
           jambLenM: this.settings.jambLenM, jambThickM: this.settings.jambThickM,
           sashEnabled: this.settings.sashEnabled, glassColor: this.settings.glassColor,
+          glassThickM: this.settings.glassThickM, glassFillColor: this.settings.glassFillColor,
           labelId: w.labelId,
         } as Door;
         drawDoor(ctx, cam, w, fake, 0.5);

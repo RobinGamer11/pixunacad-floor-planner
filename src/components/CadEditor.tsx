@@ -201,9 +201,12 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
   const [doorJambThickM, setDoorJambThickM] = useState<number>(0);
   const [doorSashEnabled, setDoorSashEnabled] = useState<boolean>(true);
   const [doorGlassColor, setDoorGlassColor] = useState<string>("#2a2f36");
+  const [doorGlassThickM, setDoorGlassThickM] = useState<number>(0);
+  const [doorGlassFillColor, setDoorGlassFillColor] = useState<string>("");
   const [doorSelectedId, setDoorSelectedId] = useState<string | null>(null);
-  const [doorHub, setDoorHub] = useState<{ visible: boolean; screenX: number; screenY: number; doorId: string | null; posM: number; moving: boolean }>({ visible: false, screenX: 0, screenY: 0, doorId: null, posM: 0, moving: false });
+  const [doorHub, setDoorHub] = useState<{ visible: boolean; screenX: number; screenY: number; doorId: string | null; posM: number; widthM: number; moving: boolean; resizing: boolean }>({ visible: false, screenX: 0, screenY: 0, doorId: null, posM: 0, widthM: 0, moving: false, resizing: false });
   const [doorHubPosInput, setDoorHubPosInput] = useState<string>("");
+  const [doorHubWidthInput, setDoorHubWidthInput] = useState<string>("");
 
   // Renderer-Settings synchron halten
   useEffect(() => {
@@ -234,8 +237,10 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
     app.doorTool.settings.jambThickM = doorJambThickM;
     app.doorTool.settings.sashEnabled = doorSashEnabled;
     app.doorTool.settings.glassColor = doorGlassColor;
+    app.doorTool.settings.glassThickM = doorGlassThickM;
+    app.doorTool.settings.glassFillColor = doorGlassFillColor;
     app.doorTool.applySettingsToSelection();
-  }, [doorMode, doorWidthM, doorHeightM, doorSide, doorHand, doorEdge, doorColor, doorJambEnabled, doorJambColor, doorJambLenM, doorJambThickM, doorSashEnabled, doorGlassColor]);
+  }, [doorMode, doorWidthM, doorHeightM, doorSide, doorHand, doorEdge, doorColor, doorJambEnabled, doorJambColor, doorJambLenM, doorJambThickM, doorSashEnabled, doorGlassColor, doorGlassThickM, doorGlassFillColor]);
 
 
 
@@ -455,12 +460,15 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
           setDoorJambThickM(d.jambThickM);
           setDoorSashEnabled(d.sashEnabled);
           setDoorGlassColor(d.glassColor);
+          setDoorGlassThickM(d.glassThickM);
+          setDoorGlassFillColor(d.glassFillColor);
         }
       }
     };
     app.doorTool.onHubChange = (state) => {
       setDoorHub({ ...state });
       setDoorHubPosInput(state.visible ? state.posM.toFixed(3) : "");
+      setDoorHubWidthInput(state.visible ? state.widthM.toFixed(3) : "");
     };
 
     // Zeichnungs-ID-Panel verdrahten (Schritt 1: nur UI)
@@ -1462,6 +1470,38 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
                       </div>
                     </div>
                     <div>
+                      <label>Fenster-Dicke (m, Abstand der Linien — 0 = auto)</label>
+                      <input
+                        type="number"
+                        step={0.005}
+                        min={0}
+                        value={doorGlassThickM}
+                        onChange={(e) => setDoorGlassThickM(Math.max(0, parseFloat(e.target.value) || 0))}
+                        className="w-full text-xs px-2 py-1 rounded border bg-background"
+                        style={{ borderColor: "hsl(var(--border))" }}
+                      />
+                    </div>
+                    <div>
+                      <label className="flex items-center justify-between">
+                        <span>Füllung</span>
+                        <button type="button"
+                          onClick={() => setDoorGlassFillColor(doorGlassFillColor ? "" : "#cfe2f3")}
+                          className={`cad-toolbar-btn h-7 px-2 text-[11px] ${doorGlassFillColor ? "active" : ""}`}>
+                          {doorGlassFillColor ? "Ein" : "Aus"}
+                        </button>
+                      </label>
+                    </div>
+                    {doorGlassFillColor && (
+                      <div>
+                        <label>Füll-Farbe</label>
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))", background: doorGlassFillColor }} />
+                          <input type="color" value={doorGlassFillColor} onChange={(e) => setDoorGlassFillColor(e.target.value)}
+                            className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
+                        </div>
+                      </div>
+                    )}
+                    <div>
                       <label className="flex items-center justify-between">
                         <span>Flügeltür (Schwung anzeigen)</span>
                         <button type="button" onClick={() => setDoorSashEnabled(!doorSashEnabled)}
@@ -1810,20 +1850,47 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
           <input ref={hubAngRef} type="text" readOnly className="text-xs" />
         </div>
 
-        {/* Door/Window Hub Box */}
+        {/* Door/Window Hub Box — LineHub-Stil: zwei Icons (Bewegen=Breite, Verschieben=Position) + zwei Inputs */}
         {doorHub.visible && (
           <div
-            className="absolute z-30 flex items-center gap-1 px-2 py-1 rounded-md shadow-lg"
+            className="absolute z-30 flex items-center gap-1.5 px-2 py-1.5 rounded-md shadow-lg"
             style={{
-              left: Math.max(8, doorHub.screenX - 70),
-              top: Math.max(8, doorHub.screenY - 32),
-              background: "hsl(var(--card))",
+              left: Math.max(8, doorHub.screenX + 12),
+              top: Math.max(8, doorHub.screenY + 12),
+              background: "white",
               border: "1px solid hsl(var(--border))",
+              boxShadow: "0 4px 16px -4px rgba(0,0,0,0.18)",
             }}
+            onMouseDown={(e) => e.stopPropagation()}
           >
             <button
               type="button"
-              title={doorHub.moving ? "Klicken im Plan fixiert" : "Bewegen"}
+              title={doorHub.resizing ? "Klicken im Plan fixiert die Breite" : "Bewegen — Breite anpassen"}
+              onClick={() => appRef.current?.doorTool.beginFollowResize()}
+              className={`cad-toolbar-btn h-7 w-7 justify-center px-0 ${doorHub.resizing ? "active" : ""}`}
+            >
+              <Maximize2 className="h-3.5 w-3.5" />
+            </button>
+            <input
+              type="text"
+              value={doorHubWidthInput}
+              onChange={(e) => setDoorHubWidthInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  const n = parseFloat(doorHubWidthInput.replace(",", "."));
+                  if (Number.isFinite(n)) appRef.current?.doorTool.setSelectedWidthM(n);
+                } else if (e.key === "Escape") {
+                  appRef.current?.doorTool.hideHub();
+                }
+              }}
+              className="text-[11px] w-[72px] px-1.5 py-1 rounded border tabular-nums"
+              style={{ borderColor: "hsl(var(--border))" }}
+              title="Breite (m)"
+            />
+            <span className="text-[10px] opacity-60 mr-1">m</span>
+            <button
+              type="button"
+              title={doorHub.moving ? "Klicken im Plan fixiert die Position" : "Verschieben — Position auf Wand"}
               onClick={() => appRef.current?.doorTool.beginFollowMove()}
               className={`cad-toolbar-btn h-7 w-7 justify-center px-0 ${doorHub.moving ? "active" : ""}`}
             >
@@ -1841,9 +1908,9 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
                   appRef.current?.doorTool.hideHub();
                 }
               }}
-              className="text-xs w-20 px-2 py-1 rounded border bg-background"
+              className="text-[11px] w-[72px] px-1.5 py-1 rounded border tabular-nums"
               style={{ borderColor: "hsl(var(--border))" }}
-              title="Position auf Wand (m)"
+              title="Position auf Wand (m ab Wandanfang)"
             />
             <span className="text-[10px] opacity-60">m</span>
           </div>
