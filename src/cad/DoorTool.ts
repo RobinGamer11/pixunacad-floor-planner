@@ -374,6 +374,33 @@ export class DoorTool {
       }
     }
 
+    // Follow-Resize: Breite wird durch Maus-Position relativ zur Türmitte gesteuert
+    if (this._followResize && this.selectedDoorId) {
+      const d = this.app.scene.getDoorById(this.selectedDoorId);
+      const w = d ? this.app.scene.getWallById(d.wallId) : null;
+      if (d && w) {
+        const proj = projectPointToWall(w, v(input.mouse.wx, input.mouse.wy));
+        if (proj) {
+          let total = 0;
+          for (let i = 1; i < w.corners.length; i++) total += dist(w.corners[i - 1], w.corners[i]);
+          const newHalf = Math.max(0.05, Math.abs(proj.s - d.posM));
+          let newWidth = Math.max(0.1, newHalf * 2);
+          // Innerhalb Wand halten
+          const maxHalf = Math.min(d.posM, total - d.posM);
+          if (newWidth / 2 > maxHalf) newWidth = maxHalf * 2;
+          d.widthM = newWidth;
+          this.settings.widthM = newWidth;
+          this.onSelectionChange?.(d.id);
+          this._refreshHub();
+        }
+      }
+      if (input.clicked) {
+        this._followResize = false;
+        this._refreshHub();
+        return;
+      }
+    }
+
     // Drag-Resize (Endpunkt-Handles)
     if (this._dragHandle && this.selectedDoorId) {
       if (!input.mouse.left) { this._dragHandle = null; }
@@ -482,6 +509,8 @@ export class DoorTool {
             jambThickM: this.settings.jambThickM,
             sashEnabled: this.settings.sashEnabled,
             glassColor: this.settings.glassColor,
+            glassThickM: this.settings.glassThickM,
+            glassFillColor: this.settings.glassFillColor,
             labelId: w.labelId,
           });
           this.selectDoor(door.id);
