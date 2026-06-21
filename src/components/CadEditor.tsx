@@ -1297,6 +1297,122 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
             <WallSettingsPanel app={appRef.current} />
           )}
 
+          {/* Türen/Fenster Panel */}
+          {!sidebarCollapsed && activeTool === ToolIds.DOOR && (
+            <div className="cad-settings-panel mb-2">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+                {doorSelectedId ? "Tür bearbeiten" : "Türen/Fenster"}
+              </div>
+              <div className="flex gap-1 mb-3">
+                <button
+                  type="button"
+                  onClick={() => setDoorMode("door")}
+                  title="Tür"
+                  className={`cad-toolbar-btn flex-1 justify-center h-9 ${doorMode === "door" ? "active" : ""}`}
+                >
+                  <DoorOpen className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDoorMode("window")}
+                  title="Fenster (demnächst)"
+                  className={`cad-toolbar-btn flex-1 justify-center h-9 ${doorMode === "window" ? "active" : ""}`}
+                >
+                  <AppWindow className="h-4 w-4" />
+                </button>
+              </div>
+              {doorMode === "window" && (
+                <div className="text-xs opacity-70 mb-2">Fenster-Werkzeug folgt im nächsten Schritt.</div>
+              )}
+              <div className="space-y-3">
+                <div>
+                  <label>Breite (m)</label>
+                  <input
+                    type="number" min={0.1} step={0.05}
+                    value={doorWidthM}
+                    onChange={(e) => {
+                      const n = parseFloat(e.target.value.replace(",", "."));
+                      if (Number.isFinite(n) && n > 0) setDoorWidthM(n);
+                    }}
+                  />
+                </div>
+                <div className="flex gap-1.5 flex-wrap">
+                  {[0.7, 0.8, 0.9, 1.0, 1.1].map(v => (
+                    <button key={v} type="button" onClick={() => setDoorWidthM(v)}
+                      className={`cad-toolbar-btn h-7 px-2 text-[11px] ${Math.abs(doorWidthM - v) < 1e-6 ? "active" : ""}`}>
+                      {v.toFixed(2)} m
+                    </button>
+                  ))}
+                </div>
+                <div>
+                  <label>Höhe (m)</label>
+                  <input
+                    type="number" min={0.5} step={0.05}
+                    value={doorHeightM}
+                    onChange={(e) => {
+                      const n = parseFloat(e.target.value.replace(",", "."));
+                      if (Number.isFinite(n) && n > 0) setDoorHeightM(n);
+                    }}
+                  />
+                </div>
+                <div>
+                  <label>Öffnungsseite</label>
+                  <div className="flex gap-1">
+                    <button type="button" onClick={() => setDoorSide("inner")}
+                      className={`cad-toolbar-btn flex-1 justify-center h-8 text-[11px] ${doorSide === "inner" ? "active" : ""}`}>
+                      Innen
+                    </button>
+                    <button type="button" onClick={() => setDoorSide("outer")}
+                      className={`cad-toolbar-btn flex-1 justify-center h-8 text-[11px] ${doorSide === "outer" ? "active" : ""}`}>
+                      Außen
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <label>Öffnungsrichtung</label>
+                  <div className="flex gap-1">
+                    <button type="button" onClick={() => setDoorHand("left")}
+                      className={`cad-toolbar-btn flex-1 justify-center h-8 text-[11px] ${doorHand === "left" ? "active" : ""}`}>
+                      Links
+                    </button>
+                    <button type="button" onClick={() => setDoorHand("right")}
+                      className={`cad-toolbar-btn flex-1 justify-center h-8 text-[11px] ${doorHand === "right" ? "active" : ""}`}>
+                      Rechts
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <label>Farbe</label>
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))", background: doorColor }} />
+                    <input type="color" value={doorColor} onChange={(e) => setDoorColor(e.target.value)}
+                      className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
+                  </div>
+                </div>
+                {doorSelectedId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const app = appRef.current;
+                      if (!app) return;
+                      const d = app.scene.getDoorById(doorSelectedId);
+                      if (d) { app.scene.removeDoor(d); app.doorTool.selectDoor(null); }
+                    }}
+                    className="cad-toolbar-btn w-full justify-center h-8 text-[11px]"
+                    style={{ color: "hsl(var(--destructive))" }}
+                  >
+                    Tür löschen
+                  </button>
+                )}
+                <div className="text-[11px] opacity-70">
+                  {doorSelectedId
+                    ? "Endpunkte mit den Hub-Boxen ziehen, um Breite anzupassen."
+                    : "Klick auf eine Wand setzt die Tür."}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Document-Eigenschaften: nur im Auswahl-Tool, wenn Dokument selektiert */}
           {!sidebarCollapsed && !!docSelected && (activeTool === ToolIds.SELECT || (activeTool === ToolIds.DOCUMENT && (docToolPhase === "scale-pick-1" || docToolPhase === "scale-pick-2" || docToolPhase === "scale-await-input"))) && (
             <div className="cad-settings-panel mb-2">
