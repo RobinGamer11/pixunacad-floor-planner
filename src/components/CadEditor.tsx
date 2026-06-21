@@ -199,7 +199,11 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
   const [doorJambColor, setDoorJambColor] = useState<string>("#9aa3ad");
   const [doorJambLenM, setDoorJambLenM] = useState<number>(0.06);
   const [doorJambThickM, setDoorJambThickM] = useState<number>(0);
+  const [doorSashEnabled, setDoorSashEnabled] = useState<boolean>(true);
+  const [doorGlassColor, setDoorGlassColor] = useState<string>("#2a2f36");
   const [doorSelectedId, setDoorSelectedId] = useState<string | null>(null);
+  const [doorHub, setDoorHub] = useState<{ visible: boolean; screenX: number; screenY: number; doorId: string | null; posM: number; moving: boolean }>({ visible: false, screenX: 0, screenY: 0, doorId: null, posM: 0, moving: false });
+  const [doorHubPosInput, setDoorHubPosInput] = useState<string>("");
 
   // Renderer-Settings synchron halten
   useEffect(() => {
