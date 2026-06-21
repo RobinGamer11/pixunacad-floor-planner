@@ -119,6 +119,7 @@ export class DoorTool {
   }
 
   /** Test ob ein Welt-Punkt eine Tür trifft (für Selektion). Robust: Blatt, Laibung, Schwung. */
+  hitDoorAt(input: Input): Door | null { return this._hitDoor(input); }
   private _hitDoor(input: Input): Door | null {
     const cam = this.app.camera;
     const wm = v(input.mouse.wx, input.mouse.wy);
