@@ -157,29 +157,29 @@ export class DoorTool {
     }
 
     // Drag-Resize
-    if (input.dragging && this._dragHandle && this.selectedDoorId) {
-      const d = this.app.scene.getDoorById(this.selectedDoorId);
-      const w = d ? this.app.scene.getWallById(d.wallId) : null;
-      if (d && w) {
-        const proj = projectPointToWall(w, v(input.mouse.wx, input.mouse.wy));
-        if (proj) {
-          let total = 0;
-          for (let i = 1; i < w.corners.length; i++) total += dist(w.corners[i - 1], w.corners[i]);
-          // Gegenüberliegende Seite ist fix:
-          const fixedSide = this._dragHandle === "left" ? d.posM + d.widthM / 2 : d.posM - d.widthM / 2;
-          const newOther = Math.max(0, Math.min(total, proj.s));
-          const newCenter = (fixedSide + newOther) / 2;
-          const newWidth = Math.max(0.1, Math.abs(fixedSide - newOther));
-          d.widthM = newWidth;
-          d.posM = newCenter;
-          this.settings.widthM = newWidth;
-          this.onSelectionChange?.(d.id);
+    if (this._dragHandle && this.selectedDoorId) {
+      if (!input.mouse.left) { this._dragHandle = null; }
+      else {
+        const d = this.app.scene.getDoorById(this.selectedDoorId);
+        const w = d ? this.app.scene.getWallById(d.wallId) : null;
+        if (d && w) {
+          const proj = projectPointToWall(w, v(input.mouse.wx, input.mouse.wy));
+          if (proj) {
+            let total = 0;
+            for (let i = 1; i < w.corners.length; i++) total += dist(w.corners[i - 1], w.corners[i]);
+            const fixedSide = this._dragHandle === "left" ? d.posM + d.widthM / 2 : d.posM - d.widthM / 2;
+            const newOther = Math.max(0, Math.min(total, proj.s));
+            const newCenter = (fixedSide + newOther) / 2;
+            const newWidth = Math.max(0.1, Math.abs(fixedSide - newOther));
+            d.widthM = newWidth;
+            d.posM = newCenter;
+            this.settings.widthM = newWidth;
+            this.onSelectionChange?.(d.id);
+          }
         }
+        return;
       }
-      return;
     }
-
-    if (input.dragEnded) { this._dragHandle = null; }
 
     if (input.clicked) {
       // 1) Handle-Click → Drag-Start (wird durch dragging weiter behandelt)
