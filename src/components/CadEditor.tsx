@@ -437,7 +437,12 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
           setDoorHeightM(d.heightM);
           setDoorSide(d.side);
           setDoorHand(d.hand);
+          setDoorEdge(d.edge);
           setDoorColor(d.color);
+          setDoorJambEnabled(d.jambEnabled);
+          setDoorJambColor(d.jambColor);
+          setDoorJambLenM(d.jambLenM);
+          setDoorJambThickM(d.jambThickM);
         }
       }
     };
