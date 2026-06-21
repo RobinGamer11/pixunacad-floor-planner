@@ -287,7 +287,9 @@ export class DoorTool {
         if (g) {
           const sL = cam.worldToScreen(g.leftEnd.x, g.leftEnd.y);
           const sR = cam.worldToScreen(g.rightEnd.x, g.rightEnd.y);
+          const sC = cam.worldToScreen(g.center.x, g.center.y);
           ctx.save();
+          // Endpunkt-Handles (Resize)
           for (const s of [sL, sR]) {
             ctx.fillStyle = "#ffffff";
             ctx.strokeStyle = "#4da3ff";
@@ -296,6 +298,47 @@ export class DoorTool {
             ctx.rect(s.x - 5, s.y - 5, 10, 10);
             ctx.fill();
             ctx.stroke();
+          }
+          // Center-Handle (Move) — rund, dezent
+          ctx.fillStyle = "#ffffff";
+          ctx.strokeStyle = "#4da3ff";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(sC.x, sC.y, 6, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+          // Innerer Punkt
+          ctx.fillStyle = "#4da3ff";
+          ctx.beginPath();
+          ctx.arc(sC.x, sC.y, 2, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Distanzanzeige beim Verschieben — modern schlicht
+          if (this._dragMove) {
+            // Distanz: posM vom Wandanfang
+            const txt = `${d.posM.toFixed(2)} m`;
+            ctx.font = "12px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto";
+            const padX = 8, padY = 4;
+            const tw = ctx.measureText(txt).width;
+            const bx = sC.x + 12, by = sC.y - 28;
+            const bw = tw + padX * 2, bh = 20;
+            ctx.fillStyle = "rgba(17,24,39,0.92)";
+            ctx.beginPath();
+            const r = 6;
+            ctx.moveTo(bx + r, by);
+            ctx.lineTo(bx + bw - r, by);
+            ctx.quadraticCurveTo(bx + bw, by, bx + bw, by + r);
+            ctx.lineTo(bx + bw, by + bh - r);
+            ctx.quadraticCurveTo(bx + bw, by + bh, bx + bw - r, by + bh);
+            ctx.lineTo(bx + r, by + bh);
+            ctx.quadraticCurveTo(bx, by + bh, bx, by + bh - r);
+            ctx.lineTo(bx, by + r);
+            ctx.quadraticCurveTo(bx, by, bx + r, by);
+            ctx.closePath();
+            ctx.fill();
+            ctx.fillStyle = "#ffffff";
+            ctx.textBaseline = "middle";
+            ctx.fillText(txt, bx + padX, by + bh / 2);
           }
           ctx.restore();
         }
