@@ -252,4 +252,4 @@ export class DoorTool {
   }
 }
 
-export { drawDoor } from "./doorGeom";
+
