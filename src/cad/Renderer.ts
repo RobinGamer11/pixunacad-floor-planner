@@ -14,6 +14,7 @@ import { getOrCreateDocMask } from "./documentMask";
 import { computeHealedWallLines } from "./wallHeal";
 import { getWallUnionGroups } from "./wallUnion";
 import { buildHealedWallSolidRing, ringToPCPolygon } from "./wallSolid";
+import { drawDoor } from "./doorGeom";
 import { type MultiPolygon } from "polygon-clipping";
 
 export interface Selection {
