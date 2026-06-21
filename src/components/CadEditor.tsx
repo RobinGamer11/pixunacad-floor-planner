@@ -165,7 +165,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
   const [docPickerPages, setDocPickerPages] = useState<ImportedPage[] | null>(null);
   const [docPickerSelected, setDocPickerSelected] = useState<Set<number>>(new Set());
   const [docImporting, setDocImporting] = useState(false);
-  const [docSelected, setDocSelected] = useState<{ id: string; name: string; widthM: number; heightM: number; importScaleDenom: number } | null>(null);
+  const [docSelected, setDocSelected] = useState<{ id: string; name: string; widthM: number; heightM: number; importScaleDenom: number; kind: "image" | "pdf-page"; pdfSourceB64: string | null } | null>(null);
   const [docScalePopoverOpen, setDocScalePopoverOpen] = useState(false);
   const [docScaleChoice, setDocScaleChoice] = useState<string>("100");
   const [docScaleCustom, setDocScaleCustom] = useState<string>("100");
@@ -476,7 +476,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
         if (sel && sel.type === "document") {
           const doc = app.scene.getDocumentById(sel.documentId);
           if (doc) {
-            setDocSelected(prev => (prev && prev.id === doc.id && prev.widthM === doc.widthM && prev.heightM === doc.heightM && prev.importScaleDenom === doc.importScaleDenom) ? prev : { id: doc.id, name: doc.name, widthM: doc.widthM, heightM: doc.heightM, importScaleDenom: doc.importScaleDenom });
+            setDocSelected(prev => (prev && prev.id === doc.id && prev.widthM === doc.widthM && prev.heightM === doc.heightM && prev.importScaleDenom === doc.importScaleDenom) ? prev : { id: doc.id, name: doc.name, widthM: doc.widthM, heightM: doc.heightM, importScaleDenom: doc.importScaleDenom, kind: doc.kind, pdfSourceB64: doc.pdfSourceB64 || null });
           } else {
             setDocSelected(prev => prev ? null : prev);
           }
