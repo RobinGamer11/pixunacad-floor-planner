@@ -51,6 +51,8 @@ export class DoorTool {
   private _dragMoveOffsetM: number = 0;
   /** Settings-Update-Callback (von CadEditor gesetzt) — feuert wenn Selection wechselt. */
   onSelectionChange: ((doorId: string | null) => void) | null = null;
+  /** Wenn false: nur Selektion/Bearbeitung, keine neue Tür-Platzierung. */
+  placementMode: boolean = true;
 
   constructor(app: CadApp) { this.app = app; }
 
@@ -58,6 +60,7 @@ export class DoorTool {
     this.app.renderer.overlay = { draw: (ctx, cam) => this._drawOverlay(ctx, cam) };
     this.app.hub.hide();
     this.app.pointEditMenu.hide();
+    this.placementMode = true;
   }
   cancel() {
     this._dragHandle = null;
