@@ -301,6 +301,8 @@ export class DoorTool {
         this.settings.jambThickM = d.jambThickM;
         this.settings.sashEnabled = d.sashEnabled;
         this.settings.glassColor = d.glassColor;
+        this.settings.glassThickM = d.glassThickM;
+        this.settings.glassFillColor = d.glassFillColor;
       }
     } else {
       this._hideHub();
@@ -333,6 +335,8 @@ export class DoorTool {
     d.jambThickM = Math.max(0, this.settings.jambThickM);
     d.sashEnabled = this.settings.sashEnabled;
     d.glassColor = this.settings.glassColor;
+    d.glassThickM = Math.max(0, this.settings.glassThickM);
+    d.glassFillColor = this.settings.glassFillColor;
     // Position innerhalb Wand halten
     d.posM = Math.max(d.widthM / 2, Math.min(total - d.widthM / 2, d.posM));
     this._refreshHub();
@@ -539,6 +543,7 @@ export class DoorTool {
           jambEnabled: this.settings.jambEnabled, jambColor: this.settings.jambColor,
           jambLenM: this.settings.jambLenM, jambThickM: this.settings.jambThickM,
           sashEnabled: this.settings.sashEnabled, glassColor: this.settings.glassColor,
+          glassThickM: this.settings.glassThickM, glassFillColor: this.settings.glassFillColor,
           labelId: w.labelId,
         } as Door;
         drawDoor(ctx, cam, w, fake, 0.5);
