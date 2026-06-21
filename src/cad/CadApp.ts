@@ -23,6 +23,7 @@ import { DocumentTool } from "./DocumentTool";
 import { FreeDrawTool } from "./FreeDrawTool";
 import { EraserTool } from "./EraserTool";
 import { WallTool } from "./WallTool";
+import { DoorTool } from "./DoorTool";
 
 import { IdPanel } from "./IdPanel";
 import { SheetManager, SheetOverlayStore, SheetDefaults } from "./SheetManager";
