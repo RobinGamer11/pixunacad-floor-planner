@@ -222,9 +222,14 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
     app.doorTool.settings.heightM = doorHeightM;
     app.doorTool.settings.side = doorSide;
     app.doorTool.settings.hand = doorHand;
+    app.doorTool.settings.edge = doorEdge;
     app.doorTool.settings.color = doorColor;
+    app.doorTool.settings.jambEnabled = doorJambEnabled;
+    app.doorTool.settings.jambColor = doorJambColor;
+    app.doorTool.settings.jambLenM = doorJambLenM;
+    app.doorTool.settings.jambThickM = doorJambThickM;
     app.doorTool.applySettingsToSelection();
-  }, [doorMode, doorWidthM, doorHeightM, doorSide, doorHand, doorColor]);
+  }, [doorMode, doorWidthM, doorHeightM, doorSide, doorHand, doorEdge, doorColor, doorJambEnabled, doorJambColor, doorJambLenM, doorJambThickM]);
 
   
 
