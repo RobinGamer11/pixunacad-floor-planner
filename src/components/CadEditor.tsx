@@ -237,10 +237,8 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
     app.doorTool.applySettingsToSelection();
   }, [doorMode, doorWidthM, doorHeightM, doorSide, doorHand, doorEdge, doorColor, doorJambEnabled, doorJambColor, doorJambLenM, doorJambThickM, doorSashEnabled, doorGlassColor]);
 
-  // Default Flügel: an für Tür, aus für Fenster (nur initial bei Modus-Wechsel)
-  useEffect(() => {
-    setDoorSashEnabled(doorMode === "door");
-  }, [doorMode]);
+
+
 
   
 
