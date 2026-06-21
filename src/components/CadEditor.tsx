@@ -1818,20 +1818,47 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
           <input ref={hubAngRef} type="text" readOnly className="text-xs" />
         </div>
 
-        {/* Door/Window Hub Box */}
+        {/* Door/Window Hub Box — LineHub-Stil: zwei Icons (Bewegen=Breite, Verschieben=Position) + zwei Inputs */}
         {doorHub.visible && (
           <div
-            className="absolute z-30 flex items-center gap-1 px-2 py-1 rounded-md shadow-lg"
+            className="absolute z-30 flex items-center gap-1.5 px-2 py-1.5 rounded-md shadow-lg"
             style={{
-              left: Math.max(8, doorHub.screenX - 70),
-              top: Math.max(8, doorHub.screenY - 32),
-              background: "hsl(var(--card))",
+              left: Math.max(8, doorHub.screenX + 12),
+              top: Math.max(8, doorHub.screenY + 12),
+              background: "white",
               border: "1px solid hsl(var(--border))",
+              boxShadow: "0 4px 16px -4px rgba(0,0,0,0.18)",
             }}
+            onMouseDown={(e) => e.stopPropagation()}
           >
             <button
               type="button"
-              title={doorHub.moving ? "Klicken im Plan fixiert" : "Bewegen"}
+              title={doorHub.resizing ? "Klicken im Plan fixiert die Breite" : "Bewegen — Breite anpassen"}
+              onClick={() => appRef.current?.doorTool.beginFollowResize()}
+              className={`cad-toolbar-btn h-7 w-7 justify-center px-0 ${doorHub.resizing ? "active" : ""}`}
+            >
+              <Maximize2 className="h-3.5 w-3.5" />
+            </button>
+            <input
+              type="text"
+              value={doorHubWidthInput}
+              onChange={(e) => setDoorHubWidthInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  const n = parseFloat(doorHubWidthInput.replace(",", "."));
+                  if (Number.isFinite(n)) appRef.current?.doorTool.setSelectedWidthM(n);
+                } else if (e.key === "Escape") {
+                  appRef.current?.doorTool.hideHub();
+                }
+              }}
+              className="text-[11px] w-[72px] px-1.5 py-1 rounded border tabular-nums"
+              style={{ borderColor: "hsl(var(--border))" }}
+              title="Breite (m)"
+            />
+            <span className="text-[10px] opacity-60 mr-1">m</span>
+            <button
+              type="button"
+              title={doorHub.moving ? "Klicken im Plan fixiert die Position" : "Verschieben — Position auf Wand"}
               onClick={() => appRef.current?.doorTool.beginFollowMove()}
               className={`cad-toolbar-btn h-7 w-7 justify-center px-0 ${doorHub.moving ? "active" : ""}`}
             >
@@ -1849,9 +1876,9 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
                   appRef.current?.doorTool.hideHub();
                 }
               }}
-              className="text-xs w-20 px-2 py-1 rounded border bg-background"
+              className="text-[11px] w-[72px] px-1.5 py-1 rounded border tabular-nums"
               style={{ borderColor: "hsl(var(--border))" }}
-              title="Position auf Wand (m)"
+              title="Position auf Wand (m ab Wandanfang)"
             />
             <span className="text-[10px] opacity-60">m</span>
           </div>
