@@ -83,13 +83,63 @@ export class DoorTool {
     this.app.hub.hide();
     this.app.pointEditMenu.hide();
     this.placementMode = true;
+    this._hideHub();
   }
   cancel() {
     this._dragHandle = null;
     this._dragMove = false;
+    this._followMove = false;
+    this._hideHub();
     this.app.renderer.overlay = null;
   }
   finish() { this.cancel(); }
+
+  /** Hubbox-API: zeigt die Box bei Schirmkoordinaten an, gebunden an die selektierte Tür. */
+  private _showHub(sx: number, sy: number) {
+    const d = this.selectedDoorId ? this.app.scene.getDoorById(this.selectedDoorId) : null;
+    if (!d) { this._hideHub(); return; }
+    this._hub = {
+      visible: true, screenX: sx, screenY: sy,
+      doorId: d.id, posM: d.posM, moving: this._followMove,
+    };
+    this.onHubChange?.(this._hub);
+  }
+  private _hideHub() {
+    if (!this._hub.visible && !this._hub.doorId) return;
+    this._hub = { visible: false, screenX: 0, screenY: 0, doorId: null, posM: 0, moving: false };
+    this.onHubChange?.(this._hub);
+  }
+  private _refreshHub() {
+    if (!this._hub.visible || !this._hub.doorId) return;
+    const d = this.app.scene.getDoorById(this._hub.doorId);
+    if (!d) { this._hideHub(); return; }
+    const w = this.app.scene.getWallById(d.wallId);
+    if (!w) { this._hideHub(); return; }
+    const g = doorGeometry(w, d);
+    if (!g) return;
+    const sC = this.app.camera.worldToScreen(g.center.x, g.center.y);
+    this._hub = { ...this._hub, screenX: sC.x, screenY: sC.y - 28, posM: d.posM, moving: this._followMove };
+    this.onHubChange?.(this._hub);
+  }
+  /** Startet Follow-Move (Tür folgt Maus; nächster Klick fixiert). Von Hubbox aufgerufen. */
+  beginFollowMove() {
+    if (!this.selectedDoorId) return;
+    this._followMove = true;
+    this._refreshHub();
+  }
+  /** Setzt posM exakt (von Hubbox aufgerufen). */
+  setSelectedPosM(posM: number) {
+    if (!this.selectedDoorId) return;
+    const d = this.app.scene.getDoorById(this.selectedDoorId);
+    const w = d ? this.app.scene.getWallById(d.wallId) : null;
+    if (!d || !w) return;
+    let total = 0;
+    for (let i = 1; i < w.corners.length; i++) total += dist(w.corners[i - 1], w.corners[i]);
+    const half = d.widthM / 2;
+    d.posM = Math.max(half, Math.min(total - half, posM));
+    this._refreshHub();
+  }
+  hideHub() { this._hideHub(); }
 
   /** Findet die nächstgelegene Wand und Position auf ihr. */
   private _hitWall(input: Input): { wall: Wall; posM: number } | null {
