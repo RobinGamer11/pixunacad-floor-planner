@@ -307,8 +307,8 @@ export class DoorTool {
       // 3) Tür-Click → selektieren
       const doorHit = this._hitDoor(input);
       if (doorHit) { this.selectDoor(doorHit.id); return; }
-      // 4) Wand-Click → neue Tür platzieren (wenn Modus = Tür)
-      if (this.settings.mode === "door" && this._hoverWallId) {
+      // 4) Wand-Click → neue Tür platzieren (nur im Platzierungs-Modus)
+      if (this.placementMode && this.settings.mode === "door" && this._hoverWallId) {
         const w = this.app.scene.getWallById(this._hoverWallId);
         if (w) {
           const door = this.app.scene.createDoor({
@@ -330,8 +330,9 @@ export class DoorTool {
         }
         return;
       }
-      // 5) Sonst: Selektion aufheben
+      // 5) Sonst: Selektion aufheben — im Edit-Modus zurück zum Auswahlwerkzeug
       this.selectDoor(null);
+      if (!this.placementMode) this.app.setTool("select");
     }
   }
 
