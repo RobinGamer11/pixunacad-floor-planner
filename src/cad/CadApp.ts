@@ -525,6 +525,10 @@ export class CadApp {
         a: { x: scene.rulerGuide.a.x, y: scene.rulerGuide.a.y },
         b: { x: scene.rulerGuide.b.x, y: scene.rulerGuide.b.y },
       } : null,
+      doors: scene.doors.map(d => ({
+        id: d.id, wallId: d.wallId, posM: d.posM, widthM: d.widthM, heightM: d.heightM,
+        side: d.side, hand: d.hand, color: d.color, labelId: d.labelId,
+      })),
     };
   }
 
