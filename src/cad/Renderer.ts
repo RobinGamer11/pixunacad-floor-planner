@@ -278,7 +278,7 @@ export class Renderer {
       ctx.fillStyle = "hsl(0 0% 100%)";
       ctx.fillRect(0, 0, this.vw, this.vh);
       ctx.restore();
-      this._drawGrid();
+      if (this.gridSettings.enabled) this._drawGrid();
     }
 
     // Overlay-Sheets (Transparentpause) UNTER aktiver Scene zeichnen.
