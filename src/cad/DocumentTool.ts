@@ -471,12 +471,18 @@ export class DocumentTool {
       nH++;
     }
     for (const t of result.texts) {
-      const center = toWorld(t.x + (t.widthM / 2) / (doc.widthM / pdfWidthPt), t.y + (t.heightM / 2) / (doc.heightM / pdfHeightPt));
+      // t.x/t.y sind PDF-Punkte (bottom-left); t.widthM/heightM in Paper-Meter.
+      const PT_PER_M = 72 / 0.0254;
+      const widthPt = t.widthM * PT_PER_M;
+      const heightPt = t.heightM * PT_PER_M;
+      const center = toWorld(t.x + widthPt / 2, t.y + heightPt / 2);
       const sxFactor = doc.widthM / pdfWidthPt;
+      const widthWorld = Math.max(0.005, widthPt * sxFactor);
+      const heightWorld = Math.max(0.005, heightPt * sxFactor);
       this.app.scene.createTextBox(
         center,
-        Math.max(0.005, t.widthM * sxFactor * 72 / 0.0254),
-        Math.max(0.005, t.heightM * sxFactor * 72 / 0.0254),
+        widthWorld,
+        heightWorld,
         { fontSizePx: t.fontSizePx, textColor: t.color, labelId, autoSize: true, bgAlphaPct: 0 },
         t.text,
         doc.rotationRad,
