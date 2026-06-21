@@ -1,79 +1,55 @@
-## Ziel
+# Vektorbasiertes PDF + "Auflösen"-Feature
 
-CAD-Blatt, PDF und Bild als vollwertige CAD-Objekte auf der Seite — mit Snap, Hilfslinien-Erzeugung, einheitlicher Hub-Box und Kanten-Drag wie beim Schraffur-Werkzeug. Zusätzlich „Duplizieren" für Linien und Hilfslinien.
+## Was umgesetzt wird
 
-## Was heute existiert
+### 1. Vektor-PDF auf Seite (`ProjectWorkspace`)
+- **"PDF einfügen"**-Button wird verkabelt (File-Picker, Multi-Page-Auswahl).
+- Neues Element `kind: "pdf"` speichert die Rohdaten der PDF-Seite (Base64) zusätzlich zur Rendervorschau.
+- Neue Komponente `PdfPageView` rendert die PDF-Seite über `pdfjs-dist` auf ein `<canvas>` und **re-rendert automatisch bei Zoom-/Größenänderung** (DevicePixelRatio × Zoom × Elementgröße). Cache pro Größe; debounced.
+- Element bekommt vollwertiges Verhalten: Hub-Box (vorhanden), Edge-Drag (vorhanden), Snap-Integration (vorhanden), Hilfslinien per Rechtsklick (vorhanden).
 
-- `cad-view` (CAD-Blatt), `pdf`, `image` sind reine HTML-Boxen in `ProjectWorkspace.tsx` (Prozent-Koordinaten in `PageElement`).
-- Snap-Provider (Rahmen, Seitenrand, Linien, Hatches) leben in `MiniCad`/`TopologyEngine`. Page-Elements sind dort unbekannt → keine Snap-Punkte/-Linien, kein Rechtsklick-Hilfslinien-Toggle.
-- Hub-Box (Verschieben / Drehen) existiert nur in `MiniCad` für Segmente/Hatches/Text/Sticker. Page-Elements haben eigene React-Resize/Move-Handles (anderes Bedien-Modell).
-- Schraffur-Edge-Drag (`HatchTool._dragEdge`) zieht eine ganze Kante ohne Eckpunkte zu verschieben.
-- Linien / Hilfslinien Inspector hat: Farbe, Stärke, Mittelpunkt, Teilung — aber kein „Duplizieren".
+### 2. Vektor-PDF in CAD-Oberfläche
+- `ImportedPage` und `DocumentObject` bekommen neues Feld `pdfSourceB64?: string` (Rohdaten der gesamten PDF-Datei, einmal pro Datei, alle Seiten teilen sich die Quelle via Modul-Cache).
+- Bei `kind === "pdf-page"`-Dokumenten ersetzt der Renderer den statischen `<img>`-Pfad durch einen **adaptiven Render-Canvas**:
+  - Ziel-Pixelgröße = `widthM × camera.scale × DPR`
+  - Wenn aktuelle Cache-Größe < 0.8× oder > 2× der Zielgröße → asynchrones Re-Render via pdfjs.
+  - Während des Re-Renders bleibt das alte Canvas sichtbar (kein Flackern).
+- Erase-Maske bleibt vollständig kompatibel (wird in Pixelraum der aktuellen Cache-Größe geführt).
+- Scene-Serialisierung erweitert: `pdfSourceB64` wird mit gespeichert.
 
-## Umfang
-
-### 1. Page-Elements als Snap-Provider in MiniCad
-
-Neue API in `MiniCad`: `setExternalRects(rects: ExternalRect[])` mit
-`{ id, kind: "cad-sheet" | "pdf" | "image", xMM, yMM, wMM, hMM, rotationRad }`.
-
-`TopologyEngine` bekommt eine zusätzliche Quelle „external rects":
-- Snap-Punkte: 4 Ecken + Mittelpunkt (+ optional 4 Kantenmitten).
-- Snap-Linien: 4 Kanten (für Achsen-/Lot-Snap, wie Seitenrahmen).
-- Label-ID-Schema: `__ext_rect_<id>__`, ausgenommen von normaler Auswahl (analog `__page_frame__`).
-
-`ProjectWorkspace` ruft `setExternalRects` immer dann auf, wenn Page-Element-Liste sich ändert (`useEffect` über `activePage.elements`).
-
-Rechtsklick-Hilfslinie auf einem Ecken-/Mittel-Snap funktioniert dann automatisch über die bestehende `_toggleGuideAnchorFromSnap`-Logik im `LineTool`/Right-Click-Path.
-
-### 2. Einheitliche Hub-Box für CAD-Blatt / PDF / Bild
-
-Ziel: gleiches Aussehen + Aktionen wie bei CAD-Objekten (Verschieben, Drehen, Duplizieren).
-
-Implementierungsweg:
-- Hub-Box bleibt React-DOM (passt zu den HTML-Boxen). Wir vereinheitlichen Optik mit der CAD-Hub-Box (gleiche Buttons/Icons/Farben — Quelle: `MiniCad`-Hub-Box-Styles).
-- Buttons: `Verschieben` (Drag aktiv, schon vorhanden), `Drehen` (mit Eckhandle → Winkel), `Duplizieren` (neues `PageElement` mit +12 px Offset), `Löschen` (vorhanden).
-- Rotation existiert teils schon (`rotation` auf PageElement). Wir setzen ein dediziertes Rotation-Handle wie in MiniCad.
-- Hub-Box-Komponente neu: `src/components/page/ElementHubBox.tsx`, gemeinsam genutzt von `cad-view`, `pdf`, `image`.
-
-### 3. Kanten-Drag wie Schraffur
-
-In `ElementHubBox`: zusätzliches Hover-Highlight + Drag-Handle entlang jeder der 4 Kanten — Drag mutiert nur diese Kante (Breite/Höhe + ggf. Position).
-- Top-Edge zieht ändert `y` + `h`.
-- Right-Edge ändert `w`.
-- Bottom-Edge ändert `h`.
-- Left-Edge ändert `x` + `w`.
-Snap an MiniCad-Snap-Punkte (über vorhandene MiniCad-Snap-API, falls erreichbar; sonst freier Drag mit Pixel-Snap auf MM-Raster). Verhalten orientiert sich an `HatchTool._dragEdge` aber für achsenparallele Rechtecke.
-
-### 4. „Duplizieren" für Linien und Hilfslinien
-
-- Im Inspector-Panel von Linie und Hilfslinie neuer Button „Duplizieren" (gleiches Icon wie bei der neuen Hub-Box).
-- Aktion: in `MiniCad` neue Methode `duplicateSelection()` → erzeugt Kopie des/der selektierten Segmente mit +5mm Versatz in X/Y, übernimmt `labelId`, `midpointSnap`, `divisionSnap`, Farbe, Stärke. Selektion wechselt auf die Kopie.
+### 3. PDF "Auflösen" in CAD-Oberfläche
+- Neuer Eintrag im Document-Kontextmenü (Rechtsklick auf selektiertes PDF) und im Hub: **"Auflösen → CAD-Objekte"**.
+- Mit `pdfjs`:
+  - `page.getOperatorList()` → Pfade extrahieren (Move/Line/Curve/Close, Stroke/Fill-Marker).
+  - Bézier-Kurven werden via adaptiver Subdivision in Polylinien zerlegt (max-Fehler ≈ 0.1 mm im Plan-Maßstab).
+  - `page.getTextContent()` → Texte mit Position + Größe.
+- Mapping in CAD-Objekte (alle in neuen Layer `"PDF-Import-<dateiname>"`):
+  - Stroke-only Pfade → **Linien** (`scene.lines`), Polylinien als Segmentketten.
+  - Fill-Pfade → **Schraffuren** (`scene.hatches`) mit Original-Füllfarbe.
+  - Texte → **Text-Objekte** (`scene.texts`) mit Position, Schriftgröße, Inhalt.
+- Welt-Koordinaten: PDF-Punkte → Meter (`metersPerPdfPt`) × `importScaleDenom` × Dokument-Skalierungsfaktor; danach Rotation + Translation des Dokuments anwenden.
+- Nach erfolgreichem Auflösen: Original-Dokument wird gelöscht und Auswahl auf die neu erzeugten Objekte gesetzt.
+- Toast: "X Linien, Y Schraffuren, Z Texte erzeugt."
 
 ## Technische Details
 
-### Geänderte/Neue Dateien
+### Geänderte/neue Dateien
+- `src/cad/documentImport.ts` — `pdfSourceB64` zurückliefern, pdfjs-Modul-Cache exportieren.
+- `src/cad/pdfVectorExtract.ts` *(neu)* — Extraktion via OperatorList + TextContent → Linien/Schraffuren/Texte.
+- `src/cad/Scene.ts` — `DocumentObject.pdfSourceB64`, serialize/deserialize.
+- `src/cad/Renderer.ts` — adaptiver PDF-Render-Pfad (`_getDocAdaptiveCanvas`).
+- `src/cad/DocumentTool.ts` oder `SelectTool.ts` — Kontextmenü-Eintrag "Auflösen".
+- `src/components/page/PdfPageView.tsx` *(neu)* — adaptive React-Komponente.
+- `src/pages/ProjectWorkspace.tsx` — "PDF einfügen"-Button verkabeln, `PdfPageView` für `kind === "pdf"` einbinden, Element-Inspector für PDF.
+- `src/lib/projectStore.ts` — `pdfSourceB64`, `pdfPageIndex`, `pdfPixelWidth/Height` an `PageElement`.
 
-- `src/cad/embed/MiniCad.ts` — `setExternalRects()`, `duplicateSelection()`, Snap-Filter für `__ext_rect_*`.
-- `src/cad/TopologyEngine.ts` — externe Rechtecke in Snap-Quelle einbeziehen.
-- `src/cad/SelectTool.ts` — `__ext_rect_*` aus Auswahl filtern (wie Page-Frame).
-- `src/cad/Scene.ts` — `duplicateSegments(ids)` Helper (Geometrie-Kopie).
-- `src/components/page/CadOverlayLayer.tsx` — neue Prop `externalRects`, durchreichen an Engine; `onEngineReady`-API um `duplicateSelection` erweitert.
-- `src/components/page/ElementHubBox.tsx` — neue Komponente.
-- `src/pages/ProjectWorkspace.tsx`
-  - `cad-view`, `pdf`, `image` rendern mit `ElementHubBox`.
-  - `externalRects` aus `activePage.elements` ableiten, Px → MM mit Page-Format.
-  - Inspector für Linie/Hilfslinie: Duplizier-Button.
+### Out-of-Scope (in dieser Iteration)
+- Echtes SVG-DOM-Rendering (Re-Render-Strategie liefert visuell dasselbe Ergebnis).
+- Schrift-Embedding 1:1 (Texte werden mit nächster passender System-Schrift gerendert; das ist konsistent mit anderem CAD-Text).
+- Komplexe PDF-Features (Pattern-Fills, Transparenz-Gruppen, Bilder im PDF-Inhalt) — werden beim Auflösen übersprungen.
 
-### Koordinaten
-
-- Page-Elements: Prozent von Seite. MiniCad arbeitet in MM. Umrechnung über bestehende Page-Format-Helpers (`pageMmDims(format)`) in `ProjectWorkspace`.
-
-## Reihenfolge
-
-1. `duplicateSelection` + Inspector-Button (klein, sofort testbar).
-2. `ElementHubBox` ohne Edge-Drag — Buttons (Move, Rotate, Duplicate) für `cad-view`/`pdf`/`image`.
-3. Edge-Drag in `ElementHubBox`.
-4. Externe Rects → MiniCad Snap.
-
-Frage: OK so umsetzen, oder zuerst nur Teil 1+2 (kleinste, sofort sichtbare Verbesserungen), und 3+4 separat?
+## Reihenfolge in einem Commit
+1. `documentImport.ts` + `pdfSourceB64`-Propagation.
+2. Adaptiver Renderer + Scene-Serialisierung.
+3. `PdfPageView` + Page-Verkabelung.
+4. `pdfVectorExtract.ts` + "Auflösen"-Eintrag.
