@@ -434,8 +434,18 @@ export class DoorTool {
             ctx.fillText(txt, bx + padX, by + bh / 2);
           }
           ctx.restore();
-        }
-      }
+  }
+}
+
+function _distPointToSegmentPx(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
+  const dx = bx - ax, dy = by - ay;
+  const L2 = dx * dx + dy * dy || 1e-9;
+  let t = ((px - ax) * dx + (py - ay) * dy) / L2;
+  t = Math.max(0, Math.min(1, t));
+  const qx = ax + dx * t, qy = ay + dy * t;
+  return Math.hypot(px - qx, py - qy);
+}
+
     }
   }
 }
