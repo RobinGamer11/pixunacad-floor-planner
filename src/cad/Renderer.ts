@@ -63,6 +63,14 @@ export class Renderer {
   /** Sekundär-Selektionen für Mehrfachauswahl (Primary bleibt `selection`). */
   extraSelections: Selection[] = [];
 
+  /** Raster-Einstellungen (Hintergrund-Grid). */
+  gridSettings: { enabled: boolean; sizeM: number; color: string; opacity: number } = {
+    enabled: true,
+    sizeM: 1,
+    color: "#000000",
+    opacity: 0.06,
+  };
+
   selectedLabelId: string | null = null;
   hoverSegmentId: string | null = null;
   hoverHatchId: string | null = null;
