@@ -932,6 +932,17 @@ export class Renderer {
     ctx.restore();
   }
 
+  private _drawDoorsForLabel(labelId: string) {
+    if (!this.scene.doors || this.scene.doors.length === 0) return;
+    const { drawDoor } = require("./DoorTool");
+    for (const d of this.scene.doors) {
+      if (d.labelId !== labelId) continue;
+      const w = this.scene.getWallById(d.wallId);
+      if (!w) continue;
+      drawDoor(this.ctx, this.camera, w, d, 1);
+    }
+  }
+
   private _drawWallsForLabel(labelId: string) {
     if (!this.scene.walls || this.scene.walls.length === 0) return;
     const ctx = this.ctx;
