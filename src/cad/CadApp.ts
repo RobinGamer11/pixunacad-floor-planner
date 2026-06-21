@@ -636,6 +636,13 @@ export class CadApp {
       if (d.id) (doc as any).id = d.id;
     }
     (scene as any)._rebuildDocIdMap?.();
+    for (const d of data.doors || []) {
+      const door = scene.createDoor({
+        wallId: d.wallId, posM: d.posM, widthM: d.widthM, heightM: d.heightM,
+        side: d.side, hand: d.hand, color: d.color, labelId: d.labelId,
+      });
+      if (d.id) (door as any).id = d.id;
+    }
   }
 
   private _serializeScene(): string {
