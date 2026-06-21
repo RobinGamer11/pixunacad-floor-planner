@@ -256,9 +256,13 @@ export class DoorTool {
         this._dragMove = true;
         return;
       }
-      // 2) Endpunkt-Handle → Drag-Resize
+      // 2) Endpunkt-Handle → ggf. Tür selektieren, dann Drag-Resize
       const handleHit = this._hitDoorHandle(input);
-      if (handleHit) { this._dragHandle = handleHit.which; return; }
+      if (handleHit) {
+        if (this.selectedDoorId !== handleHit.door.id) this.selectDoor(handleHit.door.id);
+        this._dragHandle = handleHit.which;
+        return;
+      }
       // 3) Tür-Click → selektieren
       const doorHit = this._hitDoor(input);
       if (doorHit) { this.selectDoor(doorHit.id); return; }
@@ -273,7 +277,12 @@ export class DoorTool {
             heightM: this.settings.heightM,
             side: this.settings.side,
             hand: this.settings.hand,
+            edge: this.settings.edge,
             color: this.settings.color,
+            jambEnabled: this.settings.jambEnabled,
+            jambColor: this.settings.jambColor,
+            jambLenM: this.settings.jambLenM,
+            jambThickM: this.settings.jambThickM,
             labelId: w.labelId,
           });
           this.selectDoor(door.id);
