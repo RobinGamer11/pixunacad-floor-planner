@@ -444,6 +444,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
       if (id) {
         const d = app.scene.getDoorById(id);
         if (d) {
+          setDoorMode(d.kind);
           setDoorWidthM(d.widthM);
           setDoorHeightM(d.heightM);
           setDoorSide(d.side);
@@ -454,8 +455,14 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
           setDoorJambColor(d.jambColor);
           setDoorJambLenM(d.jambLenM);
           setDoorJambThickM(d.jambThickM);
+          setDoorSashEnabled(d.sashEnabled);
+          setDoorGlassColor(d.glassColor);
         }
       }
+    };
+    app.doorTool.onHubChange = (state) => {
+      setDoorHub({ ...state });
+      setDoorHubPosInput(state.visible ? state.posM.toFixed(3) : "");
     };
 
     // Zeichnungs-ID-Panel verdrahten (Schritt 1: nur UI)
