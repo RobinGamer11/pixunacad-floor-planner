@@ -935,7 +935,6 @@ export class Renderer {
 
   private _drawDoorsForLabel(labelId: string) {
     if (!this.scene.doors || this.scene.doors.length === 0) return;
-    const { drawDoor } = require("./DoorTool");
     for (const d of this.scene.doors) {
       if (d.labelId !== labelId) continue;
       const w = this.scene.getWallById(d.wallId);
