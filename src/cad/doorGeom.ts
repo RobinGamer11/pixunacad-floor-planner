@@ -204,16 +204,50 @@ export function drawDoor(
   }
 
   // 3) Fenster-Variante: zwei parallele Linien quer durch die Öffnung statt Türblatt.
+  //    Linien laufen nur zwischen den Laibungen (lichte Öffnung), nicht in die Laibung hinein.
   if (door.kind === "window") {
-    const t = wall.thicknessM;
-    const off = t / 4; // Abstand der Glaslinien vom Wand-Mittelpunkt
+    const wallThick = wall.thicknessM;
+    // Element-Dicke (Abstand der beiden Linien). 0 = auto = halbe Wandstärke.
+    const thick = door.glassThickM > 0
+      ? Math.min(door.glassThickM, wallThick * 0.98)
+      : wallThick / 2;
+    const off = thick / 2;
+    // Linien-Endpunkte: vom leftEnd/rightEnd jeweils um jambLen nach innen verschoben.
+    const innerL = v(
+      g.leftEnd.x  + g.tan.x * g.jambLen,
+      g.leftEnd.y  + g.tan.y * g.jambLen,
+    );
+    const innerR = v(
+      g.rightEnd.x - g.tan.x * g.jambLen,
+      g.rightEnd.y - g.tan.y * g.jambLen,
+    );
+    // (a) optionale Füllung zwischen den Linien
+    if (door.glassFillColor && door.glassFillColor !== "") {
+      const corners = [
+        v(innerL.x - g.n.x * off, innerL.y - g.n.y * off),
+        v(innerL.x + g.n.x * off, innerL.y + g.n.y * off),
+        v(innerR.x + g.n.x * off, innerR.y + g.n.y * off),
+        v(innerR.x - g.n.x * off, innerR.y - g.n.y * off),
+      ];
+      ctx.fillStyle = door.glassFillColor;
+      ctx.beginPath();
+      const s0 = cam.worldToScreen(corners[0].x, corners[0].y);
+      ctx.moveTo(s0.x, s0.y);
+      for (let i = 1; i < corners.length; i++) {
+        const s = cam.worldToScreen(corners[i].x, corners[i].y);
+        ctx.lineTo(s.x, s.y);
+      }
+      ctx.closePath();
+      ctx.fill();
+    }
+    // (b) die beiden Linien
     ctx.strokeStyle = door.glassColor;
     ctx.lineWidth = 1.5;
     for (const sign of [-1, +1]) {
-      const aX = g.leftEnd.x + g.n.x * off * sign;
-      const aY = g.leftEnd.y + g.n.y * off * sign;
-      const bX = g.rightEnd.x + g.n.x * off * sign;
-      const bY = g.rightEnd.y + g.n.y * off * sign;
+      const aX = innerL.x + g.n.x * off * sign;
+      const aY = innerL.y + g.n.y * off * sign;
+      const bX = innerR.x + g.n.x * off * sign;
+      const bY = innerR.y + g.n.y * off * sign;
       const sa = cam.worldToScreen(aX, aY);
       const sb = cam.worldToScreen(bX, bY);
       ctx.beginPath();

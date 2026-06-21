@@ -464,6 +464,10 @@ export class Door {
   sashEnabled: boolean;
   /** Farbe der Fenster-Linien (nur kind="window"). */
   glassColor: string;
+  /** Dicke des Fenster-Elements (Abstand zwischen den beiden Linien, in m). 0 = auto = wallThick/2. */
+  glassThickM: number;
+  /** Füllfarbe zwischen den beiden Fensterlinien. "" = keine Füllung. */
+  glassFillColor: string;
   labelId: string;
 
   constructor(opts: {
@@ -471,7 +475,7 @@ export class Door {
     kind?: DoorKind;
     side?: DoorSide; hand?: DoorHand; edge?: DoorEdge; color?: string;
     jambEnabled?: boolean; jambColor?: string; jambLenM?: number; jambThickM?: number;
-    sashEnabled?: boolean; glassColor?: string;
+    sashEnabled?: boolean; glassColor?: string; glassThickM?: number; glassFillColor?: string;
     labelId?: string;
   }) {
     this.id = opts.id;
@@ -490,6 +494,8 @@ export class Door {
     this.jambThickM = (typeof opts.jambThickM === "number" && opts.jambThickM >= 0) ? opts.jambThickM : 0;
     this.sashEnabled = (typeof opts.sashEnabled === "boolean") ? opts.sashEnabled : (this.kind === "door");
     this.glassColor = opts.glassColor || "#2a2f36";
+    this.glassThickM = (typeof opts.glassThickM === "number" && opts.glassThickM >= 0) ? opts.glassThickM : 0;
+    this.glassFillColor = (typeof opts.glassFillColor === "string") ? opts.glassFillColor : "";
     this.labelId = opts.labelId || Defaults.defaultLabelId;
   }
 }
@@ -1091,7 +1097,7 @@ export class Scene {
     kind?: DoorKind;
     side?: DoorSide; hand?: DoorHand; edge?: DoorEdge; color?: string;
     jambEnabled?: boolean; jambColor?: string; jambLenM?: number; jambThickM?: number;
-    sashEnabled?: boolean; glassColor?: string;
+    sashEnabled?: boolean; glassColor?: string; glassThickM?: number; glassFillColor?: string;
     labelId?: string;
   }): Door {
     const d = new Door({ id: this._makeId(), ...opts });
