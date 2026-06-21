@@ -245,6 +245,7 @@ export class Renderer {
       this._drawDocumentsForLabel(labelId);
       this._drawHatchesForLabel(labelId);
       this._drawWallsForLabel(labelId);
+      this._drawDoorsForLabel(labelId);
       this._drawSegmentsForLabel(labelId);
       this._drawFreeStrokesForLabel(labelId);
       this._drawDimensionsForLabel(labelId);
