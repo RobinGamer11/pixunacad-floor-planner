@@ -1791,6 +1791,45 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
           <input ref={hubAngRef} type="text" readOnly className="text-xs" />
         </div>
 
+        {/* Door/Window Hub Box */}
+        {doorHub.visible && (
+          <div
+            className="absolute z-30 flex items-center gap-1 px-2 py-1 rounded-md shadow-lg"
+            style={{
+              left: Math.max(8, doorHub.screenX - 70),
+              top: Math.max(8, doorHub.screenY - 32),
+              background: "hsl(var(--card))",
+              border: "1px solid hsl(var(--border))",
+            }}
+          >
+            <button
+              type="button"
+              title={doorHub.moving ? "Klicken im Plan fixiert" : "Bewegen"}
+              onClick={() => appRef.current?.doorTool.beginFollowMove()}
+              className={`cad-toolbar-btn h-7 w-7 justify-center px-0 ${doorHub.moving ? "active" : ""}`}
+            >
+              <Move className="h-3.5 w-3.5" />
+            </button>
+            <input
+              type="text"
+              value={doorHubPosInput}
+              onChange={(e) => setDoorHubPosInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  const n = parseFloat(doorHubPosInput.replace(",", "."));
+                  if (Number.isFinite(n)) appRef.current?.doorTool.setSelectedPosM(n);
+                } else if (e.key === "Escape") {
+                  appRef.current?.doorTool.hideHub();
+                }
+              }}
+              className="text-xs w-20 px-2 py-1 rounded border bg-background"
+              style={{ borderColor: "hsl(var(--border))" }}
+              title="Position auf Wand (m)"
+            />
+            <span className="text-[10px] opacity-60">m</span>
+          </div>
+        )}
+
         {/* Point Edit Menu */}
         <div ref={pointEditRef} className="cad-point-menu absolute z-30 hidden">
           <button ref={pointMoveBtnRef} title="Bewegen">◉</button>
