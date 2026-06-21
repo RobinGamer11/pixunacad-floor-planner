@@ -76,6 +76,8 @@ export class DoorTool {
   private _dragMoveOffsetM: number = 0;
   /** Follow-Move: Tür folgt Maus ohne gedrückte Taste; nächster Klick fixiert. */
   private _followMove: boolean = false;
+  /** Follow-Resize: Breite folgt Maus relativ zur Türmitte; nächster Klick fixiert. */
+  private _followResize: boolean = false;
   /** Settings-Update-Callback (von CadEditor gesetzt) — feuert wenn Selection wechselt. */
   onSelectionChange: ((doorId: string | null) => void) | null = null;
   /** Hubbox-Update-Callback (von CadEditor gesetzt). */
