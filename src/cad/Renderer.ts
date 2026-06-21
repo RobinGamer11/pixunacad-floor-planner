@@ -547,19 +547,59 @@ export class Renderer {
     return c;
   }
 
+  /** Cache: docId -> adaptiver PDF-Render-Canvas (vektorbasiert, re-rendert bei Zoom). */
+  private _pdfAdaptiveCache = new Map<string, { canvas: HTMLCanvasElement | null; renderedWidthPx: number; renderingForPx: number | null }>();
+
+  private _getDocAdaptiveBitmap(doc: DocumentObject, targetWidthPx: number): HTMLCanvasElement | null {
+    if (doc.kind !== "pdf-page" || !doc.pdfSourceB64) return null;
+    const dpr = Math.max(1, (window.devicePixelRatio || 1));
+    const targetPx = Math.max(64, Math.ceil(targetWidthPx * dpr));
+    let entry = this._pdfAdaptiveCache.get(doc.id);
+    if (!entry) {
+      entry = { canvas: null, renderedWidthPx: 0, renderingForPx: null };
+      this._pdfAdaptiveCache.set(doc.id, entry);
+    }
+    const need = entry.renderedWidthPx === 0
+      || targetPx > entry.renderedWidthPx * 1.25
+      || targetPx < entry.renderedWidthPx * 0.4;
+    if (need && entry.renderingForPx !== targetPx) {
+      entry.renderingForPx = targetPx;
+      // Cap, um Speicher zu schonen (max ~6000 px Kante).
+      const cappedPx = Math.min(targetPx, 6000);
+      import("./documentImport").then(({ renderPdfPageToCanvas }) => {
+        return renderPdfPageToCanvas(doc.pdfSourceB64!, doc.pageIndex, cappedPx);
+      }).then(canvas => {
+        const e = this._pdfAdaptiveCache.get(doc.id);
+        if (!e || e.renderingForPx !== targetPx) return;
+        e.canvas = canvas;
+        e.renderedWidthPx = canvas.width;
+        e.renderingForPx = null;
+      }).catch(() => {
+        const e = this._pdfAdaptiveCache.get(doc.id);
+        if (e) e.renderingForPx = null;
+      });
+    }
+    return entry.canvas;
+  }
+
   private _drawSingleDocument(doc: DocumentObject) {
     const ctx = this.ctx;
     const cam = this.camera;
-    const img = this._getDocImage(doc);
     const center = documentCenterWorld(doc);
     const cs = cam.worldToScreen(center.x, center.y);
     const wPx = doc.widthM * cam.scale;
     const hPx = doc.heightM * cam.scale;
 
+    // Vektor-PDF: adaptiver Re-Render bei Zoom
+    const adaptive = this._getDocAdaptiveBitmap(doc, wPx);
+    const img = this._getDocImage(doc);
+
     ctx.save();
     ctx.translate(cs.x, cs.y);
     if (doc.rotationRad) ctx.rotate(doc.rotationRad);
-    if (img) {
+    if (adaptive) {
+      ctx.drawImage(adaptive, -wPx / 2, -hPx / 2, wPx, hPx);
+    } else if (img) {
       const composite = this._getDocComposite(doc, img);
       const drawSrc: CanvasImageSource = composite || img;
       ctx.drawImage(drawSrc, -wPx / 2, -hPx / 2, wPx, hPx);
@@ -574,6 +614,7 @@ export class Renderer {
     }
     ctx.restore();
   }
+
 
   private _drawDocumentSelection() {
     if (!this.selection || this.selection.type !== SelectionType.DOCUMENT) return;
