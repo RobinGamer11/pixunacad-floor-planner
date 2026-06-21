@@ -180,12 +180,21 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
   const [drawingScaleOpen, setDrawingScaleOpen] = useState(false);
   const [drawingScaleCustom, setDrawingScaleCustom] = useState<string>("100");
 
-  // Raster (Hintergrund-Grid) Einstellungen — Panel sichtbar, solange Raster aktiviert ist
-  
+  // Raster (Hintergrund-Grid) Einstellungen
   const [gridEnabled, setGridEnabled] = useState(true);
+  const [gridPanelOpen, setGridPanelOpen] = useState(false);
   const [gridSizeM, setGridSizeM] = useState<number>(1);
   const [gridColor, setGridColor] = useState<string>("#000000");
   const [gridOpacity, setGridOpacity] = useState<number>(0.06);
+
+  // Door tool state (Türen/Fenster)
+  const [doorMode, setDoorMode] = useState<"door" | "window">("door");
+  const [doorWidthM, setDoorWidthM] = useState<number>(0.9);
+  const [doorHeightM, setDoorHeightM] = useState<number>(2.1);
+  const [doorSide, setDoorSide] = useState<"inner" | "outer">("inner");
+  const [doorHand, setDoorHand] = useState<"left" | "right">("left");
+  const [doorColor, setDoorColor] = useState<string>("#111111");
+  const [doorSelectedId, setDoorSelectedId] = useState<string | null>(null);
 
   // Renderer-Settings synchron halten
   useEffect(() => {
@@ -198,6 +207,19 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
       opacity: gridOpacity,
     };
   }, [gridEnabled, gridSizeM, gridColor, gridOpacity]);
+
+  // Door tool settings sync
+  useEffect(() => {
+    const app = appRef.current;
+    if (!app) return;
+    app.doorTool.settings.mode = doorMode;
+    app.doorTool.settings.widthM = doorWidthM;
+    app.doorTool.settings.heightM = doorHeightM;
+    app.doorTool.settings.side = doorSide;
+    app.doorTool.settings.hand = doorHand;
+    app.doorTool.settings.color = doorColor;
+    app.doorTool.applySettingsToSelection();
+  }, [doorMode, doorWidthM, doorHeightM, doorSide, doorHand, doorColor]);
 
   
 
