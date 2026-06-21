@@ -80,3 +80,77 @@ export function doorGeometry(wall: Wall, door: Door) {
     openSign, dirAlong, thicknessM: wall.thicknessM,
   };
 }
+
+/** Eigenständiger Door-Renderer (im Renderer.ts + DoorTool-Preview verwendet). */
+export function drawDoor(
+  ctx: CanvasRenderingContext2D,
+  cam: any,
+  wall: Wall,
+  door: Door,
+  alpha = 1,
+) {
+  const g = doorGeometry(wall, door);
+  if (!g) return;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.strokeStyle = door.color;
+  ctx.lineWidth = 1.5;
+  ctx.lineCap = "round";
+
+  // Weiße "Öffnungsfüllung" — überdeckt Wandfläche zwischen den Laibungen
+  const half = wall.thicknessM / 2;
+  const corners = [
+    v(g.leftEnd.x - g.n.x * half, g.leftEnd.y - g.n.y * half),
+    v(g.leftEnd.x + g.n.x * half, g.leftEnd.y + g.n.y * half),
+    v(g.rightEnd.x + g.n.x * half, g.rightEnd.y + g.n.y * half),
+    v(g.rightEnd.x - g.n.x * half, g.rightEnd.y - g.n.y * half),
+  ];
+  ctx.save();
+  ctx.fillStyle = "#ffffff";
+  ctx.beginPath();
+  const s0 = cam.worldToScreen(corners[0].x, corners[0].y);
+  ctx.moveTo(s0.x, s0.y);
+  for (let i = 1; i < corners.length; i++) {
+    const s = cam.worldToScreen(corners[i].x, corners[i].y);
+    ctx.lineTo(s.x, s.y);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+
+  // Laibung (kurze Querstriche quer zur Wand) — markiert Öffnungs-Enden
+  for (const end of [g.leftEnd, g.rightEnd]) {
+    const a = cam.worldToScreen(end.x - g.n.x * half, end.y - g.n.y * half);
+    const b = cam.worldToScreen(end.x + g.n.x * half, end.y + g.n.y * half);
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+  }
+
+  // Türblatt
+  const sh = cam.worldToScreen(g.hinge.x, g.hinge.y);
+  const sl = cam.worldToScreen(g.leafEnd.x, g.leafEnd.y);
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(sh.x, sh.y);
+  ctx.lineTo(sl.x, sl.y);
+  ctx.stroke();
+
+  // Öffnungs-Bogen (Viertelkreis)
+  const opp = door.hand === "left" ? g.rightEnd : g.leftEnd;
+  const sCenter = cam.worldToScreen(g.hinge.x, g.hinge.y);
+  const radiusPx = Math.hypot(sl.x - sCenter.x, sl.y - sCenter.y);
+  const startAng = Math.atan2(sl.y - sCenter.y, sl.x - sCenter.x);
+  const sOpp = cam.worldToScreen(opp.x, opp.y);
+  const endAng = Math.atan2(sOpp.y - sCenter.y, sOpp.x - sCenter.x);
+  ctx.lineWidth = 1.2;
+  let delta = endAng - startAng;
+  while (delta > Math.PI) delta -= 2 * Math.PI;
+  while (delta < -Math.PI) delta += 2 * Math.PI;
+  ctx.beginPath();
+  ctx.arc(sCenter.x, sCenter.y, radiusPx, startAng, startAng + delta, delta < 0);
+  ctx.stroke();
+
+  ctx.restore();
+}
