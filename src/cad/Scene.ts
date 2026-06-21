@@ -1087,7 +1087,6 @@ export class Scene {
 
   // ---- Doors (Türen) ----
   createDoor(opts: {
-  createDoor(opts: {
     wallId: string; posM: number; widthM: number; heightM?: number;
     kind?: DoorKind;
     side?: DoorSide; hand?: DoorHand; edge?: DoorEdge; color?: string;
