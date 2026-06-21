@@ -1811,6 +1811,10 @@ export class CadApp {
         if (this.activeTool === this.measureTool) { this.measureTool.cancel(); this.clearSelection(); this.setTool(ToolIds.SELECT); return; }
         if (this.activeTool === this.pipetteTool) { this.pipetteTool.cancel(); this.setTool(ToolIds.SELECT); return; }
         if (this.activeTool === this.wallTool) { this.wallTool.cancel(); this.setTool(ToolIds.SELECT); return; }
+        if (this.activeTool === this.doorTool) {
+          if (this.doorTool.selectedDoorId) { this.doorTool.selectDoor(null); return; }
+          this.doorTool.cancel(); this.setTool(ToolIds.SELECT); return;
+        }
         if (this.activeTool === this.stickerTool) {
           // Erst aktive Platzierung abbrechen, sonst Tool wechseln
           if (this.stickerTool.phase !== "idle") { this.stickerTool.cancel(); return; }
