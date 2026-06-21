@@ -214,6 +214,14 @@ export async function extractPdfPageVectors(sourceB64: string, pageIndex: number
     else if (fn === OPS.setFillRGBColor) fillColor = colorArrayToHex(a);
     else if (fn === OPS.setStrokeRGBColor) strokeColor = colorArrayToHex(a);
     else if (fn === OPS.setLineWidth) lineWidth = typeof a[0] === "number" ? a[0] : lineWidth;
+    else if (
+      fn === OPS.showText ||
+      fn === OPS.showSpacedText ||
+      fn === OPS.nextLineShowText ||
+      fn === OPS.nextLineSetSpacingShowText
+    ) {
+      textOpFillColors.push(fillColor);
+    }
   }
 
   // Texte via getTextContent (zuverlässiger als opList-Text-State).
