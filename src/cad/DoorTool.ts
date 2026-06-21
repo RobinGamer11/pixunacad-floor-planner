@@ -126,12 +126,26 @@ export class DoorTool {
       if (!w) continue;
       const g = doorGeometry(w, d);
       if (!g) continue;
-      // Treffer-Rechteck: entlang Wand widthM, quer Wandstärke
       const dx = wm.x - g.center.x, dy = wm.y - g.center.y;
       const along = dx * g.tan.x + dy * g.tan.y;
       const across = dx * g.n.x + dy * g.n.y;
-      if (Math.abs(along) <= d.widthM / 2 && Math.abs(across) <= Math.max(w.thicknessM, 0.05) / 2 + 0.04) {
+      // (a) Wandöffnungs-Streifen
+      if (Math.abs(along) <= d.widthM / 2 + 0.02
+          && Math.abs(across) <= Math.max(w.thicknessM, 0.05) / 2 + 0.05) {
         return d;
+      }
+      // (b) Blatt + Schwungbereich (Viertelkreis um hinge mit Radius lichteM)
+      const hx = wm.x - g.hinge.x, hy = wm.y - g.hinge.y;
+      const rad = Math.hypot(hx, hy);
+      if (rad <= g.lichteM + 0.05) {
+        const aAlong = hx * g.tan.x + hy * g.tan.y;
+        const aAcross = hx * g.n.x + hy * g.n.y;
+        // Im Quadranten des Schwungs?
+        const handSign = d.hand === "left" ? -1 : +1;
+        const openSign = d.side === "inner" ? +1 : -1;
+        if (aAlong * (-handSign) >= -0.05 && aAcross * openSign >= -0.05) {
+          return d;
+        }
       }
     }
     return null;

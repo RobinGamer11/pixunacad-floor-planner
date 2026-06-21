@@ -163,7 +163,18 @@ export function drawDoor(
   if (door.jambEnabled && g.jambLen > 0) {
     // jambHalfT = halbe Laibungsdicke (quer zur Wand). 0 = volle Wandstärke.
     const jambHalfT = door.jambThickM > 0 ? Math.min(door.jambThickM / 2, halfFull) : halfFull;
-    const drawJamb = (endpoint: Vec2, inward: number) => {
+    // Wenn benutzerdefinierte Dicke: Laibung an die Startkante anlegen,
+    // sodass die Außenfläche bündig mit der Wandkante ist.
+    const acrossShift = door.jambThickM > 0
+      ? (door.edge === "inner" ? +halfFull - jambHalfT
+        : door.edge === "outer" ? -halfFull + jambHalfT
+        : 0)
+      : 0;
+    const drawJamb = (endpointRaw: Vec2, inward: number) => {
+      const endpoint = v(
+        endpointRaw.x + g.n.x * acrossShift,
+        endpointRaw.y + g.n.y * acrossShift,
+      );
       // inward = +1 means jamb extends from endpoint toward door-center.
       const ax = endpoint.x + g.tan.x * g.jambLen * inward;
       const ay = endpoint.y + g.tan.y * g.jambLen * inward;
