@@ -418,6 +418,19 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
       setSelectedFreeStrokeId(app.getSelectedFreeStroke()?.id || null);
     };
     app.setTool(ToolIds.SELECT);
+    app.doorTool.onSelectionChange = (id) => {
+      setDoorSelectedId(id);
+      if (id) {
+        const d = app.scene.getDoorById(id);
+        if (d) {
+          setDoorWidthM(d.widthM);
+          setDoorHeightM(d.heightM);
+          setDoorSide(d.side);
+          setDoorHand(d.hand);
+          setDoorColor(d.color);
+        }
+      }
+    };
 
     // Zeichnungs-ID-Panel verdrahten (Schritt 1: nur UI)
     app.attachSheetPanel(
