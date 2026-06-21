@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import { CadApp } from "@/cad/CadApp";
 import { ToolIds, PointEditAction } from "@/cad/constants";
-import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Pipette, Sticker as StickerIcon, Pencil, Trash2, Download, Upload, Plus, FileImage, FileText, Maximize2, Ruler as RulerIcon, Eraser, Construction, PaintBucket } from "lucide-react";
+import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Pipette, Sticker as StickerIcon, Pencil, Trash2, Download, Upload, Plus, FileImage, FileText, Maximize2, Ruler as RulerIcon, Eraser, Construction, PaintBucket, Grid3x3 } from "lucide-react";
 import type { HatchDrawMode } from "@/cad/HatchTool";
 import type { StickerDefinition } from "@/cad/StickerManager";
 import { instanceBoundingCornersWorld } from "@/cad/StickerManager";
@@ -178,6 +178,26 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
   const [drawingScale, setDrawingScale] = useState<number>(100);
   const [drawingScaleOpen, setDrawingScaleOpen] = useState(false);
   const [drawingScaleCustom, setDrawingScaleCustom] = useState<string>("100");
+
+  // Raster (Hintergrund-Grid) Einstellungen — Panel sichtbar, solange Raster aktiviert ist
+  
+  const [gridEnabled, setGridEnabled] = useState(true);
+  const [gridSizeM, setGridSizeM] = useState<number>(1);
+  const [gridColor, setGridColor] = useState<string>("#000000");
+  const [gridOpacity, setGridOpacity] = useState<number>(0.06);
+
+  // Renderer-Settings synchron halten
+  useEffect(() => {
+    const app = appRef.current;
+    if (!app) return;
+    app.renderer.gridSettings = {
+      enabled: gridEnabled,
+      sizeM: gridSizeM,
+      color: gridColor,
+      opacity: gridOpacity,
+    };
+  }, [gridEnabled, gridSizeM, gridColor, gridOpacity]);
+
   
 
   useEffect(() => {
@@ -625,8 +645,26 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
         {/* Divider */}
         <div className="mx-3 border-t opacity-60" style={{ borderColor: "hsl(var(--cad-toolbar-border))" }} />
 
+        {/* Raster (Grid) Toggle — über "Auswahl" */}
+        <div className="p-2">
+          <button
+            onClick={() => setGridEnabled(e => !e)}
+            title={sidebarCollapsed ? "Raster ein/aus" : undefined}
+            className={`cad-toolbar-btn ${gridEnabled ? "active" : ""} ${
+              sidebarCollapsed ? "justify-center px-0 h-10 w-10 mx-auto" : "w-full justify-between"
+            }`}
+          >
+            <span className="flex items-center gap-2 min-w-0">
+              <Grid3x3 className="h-4 w-4 shrink-0" />
+              {!sidebarCollapsed && <span className="truncate">Raster</span>}
+            </span>
+            {!sidebarCollapsed && <span className="tool-key">{gridEnabled ? "EIN" : "AUS"}</span>}
+          </button>
+        </div>
+
         {/* Tool list */}
         <div className="flex flex-col gap-1 p-2">
+
           {CAD_TOOLS.map((t) => {
             const Icon = t.icon;
             const isActive = t.id === ToolIds.LINE
@@ -658,6 +696,76 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
 
         {/* Settings area (scrollable) */}
         <div className="flex-1 min-h-0 overflow-y-auto p-2">
+          {/* Raster-Einstellungen */}
+          {!sidebarCollapsed && gridEnabled && (
+            <div className="cad-settings-panel mb-2">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+                Raster
+              </div>
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <input
+                    id="grid-enabled"
+                    type="checkbox"
+                    checked={gridEnabled}
+                    onChange={(e) => setGridEnabled(e.target.checked)}
+                    className="accent-primary"
+                  />
+                  <label htmlFor="grid-enabled" className="!mb-0 cursor-pointer">Sichtbar</label>
+                </div>
+                <div>
+                  <label>Rastergröße (m)</label>
+                  <input
+                    type="number"
+                    min={0.01}
+                    step={0.1}
+                    value={gridSizeM}
+                    onChange={(e) => {
+                      const n = parseFloat(e.target.value.replace(",", "."));
+                      if (Number.isFinite(n) && n > 0) setGridSizeM(n);
+                    }}
+                  />
+                </div>
+                <div className="flex gap-1.5 flex-wrap">
+                  {[0.1, 0.25, 0.5, 1, 5, 10].map(v => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => setGridSizeM(v)}
+                      className={`cad-toolbar-btn h-7 px-2 text-[11px] ${Math.abs(gridSizeM - v) < 1e-6 ? "active" : ""}`}
+                    >
+                      {v < 1 ? `${v * 100} cm` : `${v} m`}
+                    </button>
+                  ))}
+                </div>
+                <div>
+                  <label>Farbe</label>
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))", background: gridColor }} />
+                    <input
+                      type="color"
+                      value={gridColor}
+                      onChange={(e) => setGridColor(e.target.value)}
+                      className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label>Transparenz ({Math.round((1 - gridOpacity) * 100)}%)</label>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={Math.round(gridOpacity * 100)}
+                    onChange={(e) => setGridOpacity(Math.max(0, Math.min(1, parseInt(e.target.value, 10) / 100)))}
+                    className="w-full"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Variant switcher: Linie / Freihand / Radiergummi (immer sichtbar in einer dieser Tools) */}
           {!sidebarCollapsed && (activeTool === ToolIds.LINE || activeTool === ToolIds.FREE || activeTool === ToolIds.ERASER) && (
             <div className="cad-settings-panel mb-2">

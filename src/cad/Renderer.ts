@@ -63,6 +63,14 @@ export class Renderer {
   /** Sekundär-Selektionen für Mehrfachauswahl (Primary bleibt `selection`). */
   extraSelections: Selection[] = [];
 
+  /** Raster-Einstellungen (Hintergrund-Grid). */
+  gridSettings: { enabled: boolean; sizeM: number; color: string; opacity: number } = {
+    enabled: true,
+    sizeM: 1,
+    color: "#000000",
+    opacity: 0.06,
+  };
+
   selectedLabelId: string | null = null;
   hoverSegmentId: string | null = null;
   hoverHatchId: string | null = null;
@@ -270,7 +278,7 @@ export class Renderer {
       ctx.fillStyle = "hsl(0 0% 100%)";
       ctx.fillRect(0, 0, this.vw, this.vh);
       ctx.restore();
-      this._drawGrid();
+      if (this.gridSettings.enabled) this._drawGrid();
     }
 
     // Overlay-Sheets (Transparentpause) UNTER aktiver Scene zeichnen.
@@ -834,28 +842,31 @@ export class Renderer {
   private _drawGrid() {
     const ctx = this.ctx;
     const cam = this.camera;
+    const size = Math.max(0.01, this.gridSettings.sizeM || 1);
     const tl = cam.screenToWorld(0, 0);
     const br = cam.screenToWorld(this.vw, this.vh);
 
-    const minX = Math.floor(Math.min(tl.x, br.x));
-    const maxX = Math.ceil(Math.max(tl.x, br.x));
-    const minY = Math.floor(Math.min(tl.y, br.y));
-    const maxY = Math.ceil(Math.max(tl.y, br.y));
+    const minX = Math.floor(Math.min(tl.x, br.x) / size) * size;
+    const maxX = Math.ceil(Math.max(tl.x, br.x) / size) * size;
+    const minY = Math.floor(Math.min(tl.y, br.y) / size) * size;
+    const maxY = Math.ceil(Math.max(tl.y, br.y) / size) * size;
 
-    const pxPerM = cam.scale;
-    const skip = pxPerM < 35 ? 2 : pxPerM < 18 ? 4 : 1;
+    const pxPerCell = cam.scale * size;
+    const skip = pxPerCell < 18 ? 4 : pxPerCell < 35 ? 2 : 1;
 
     ctx.save();
     ctx.lineWidth = 1;
-    ctx.strokeStyle = "rgba(0,0,0,0.06)";
+    ctx.strokeStyle = hexToRgba(this.gridSettings.color || "#000000", this.gridSettings.opacity ?? 0.06);
 
     ctx.beginPath();
-    for (let x = minX; x <= maxX; x += skip) {
+    for (let i = 0; i * size + minX <= maxX; i += skip) {
+      const x = minX + i * size;
       const s = cam.worldToScreen(x, 0);
       ctx.moveTo(s.x, 0);
       ctx.lineTo(s.x, this.vh);
     }
-    for (let y = minY; y <= maxY; y += skip) {
+    for (let i = 0; i * size + minY <= maxY; i += skip) {
+      const y = minY + i * size;
       const s = cam.worldToScreen(0, y);
       ctx.moveTo(0, s.y);
       ctx.lineTo(this.vw, s.y);

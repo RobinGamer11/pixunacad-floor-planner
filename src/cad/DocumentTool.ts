@@ -490,8 +490,8 @@ export class DocumentTool {
       nT++;
     }
 
-    // Original-Dokument entfernen.
-    this.app.scene.removeDocument(doc);
+    // Original-PDF als Kopie unter den neuen Objekten liegen lassen (nicht löschen).
+    // Dokumente werden ohnehin im Hintergrund (vor Segments/Hatches/Texts) gezeichnet.
     this.app.clearSelection();
     this.app.refreshLabelUI();
     return { segments: nSeg, hatches: nH, texts: nT };

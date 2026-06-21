@@ -76,6 +76,8 @@ export async function extractPdfPageVectors(sourceB64: string, pageIndex: number
   let fillColor = "#000000";
   let strokeColor = "#000000";
   let lineWidth = 1; // in user units
+  /** fillColor zum Zeitpunkt jeder Text-Show-Op (Reihenfolge wie in der opList). */
+  const textOpFillColors: string[] = [];
 
   const addPathPoint = (xLocal: number, yLocal: number) => {
     const p = tx(ctm, xLocal, yLocal);
@@ -212,28 +214,47 @@ export async function extractPdfPageVectors(sourceB64: string, pageIndex: number
     else if (fn === OPS.setFillRGBColor) fillColor = colorArrayToHex(a);
     else if (fn === OPS.setStrokeRGBColor) strokeColor = colorArrayToHex(a);
     else if (fn === OPS.setLineWidth) lineWidth = typeof a[0] === "number" ? a[0] : lineWidth;
+    else if (
+      fn === OPS.showText ||
+      fn === OPS.showSpacedText ||
+      fn === OPS.nextLineShowText ||
+      fn === OPS.nextLineSetSpacingShowText
+    ) {
+      textOpFillColors.push(fillColor);
+    }
   }
 
   // Texte via getTextContent (zuverlässiger als opList-Text-State).
+  // Farben: aus textOpFillColors zuordnen — 1:1 wenn Längen passen, sonst
+  // häufigste Farbe (oder einzige), sonst Default schwarz.
+  let fallbackTextColor: string = "#000000";
+  if (textOpFillColors.length > 0) {
+    const counts = new Map<string, number>();
+    for (const c of textOpFillColors) counts.set(c, (counts.get(c) || 0) + 1);
+    let best = "#000000", n = 0;
+    counts.forEach((v, k) => { if (v > n) { n = v; best = k; } });
+    fallbackTextColor = best;
+  }
   try {
     const tc = await page.getTextContent();
-    for (const item of tc.items || []) {
-      if (!item || typeof item.str !== "string" || !item.str.trim()) continue;
+    const items = (tc.items || []).filter((it: any) => it && typeof it.str === "string" && it.str.trim());
+    const canMap1to1 = textOpFillColors.length === items.length;
+    items.forEach((item: any, idx: number) => {
       const t = item.transform; // [a, b, c, d, e, f] — PDF user space
-      if (!t) continue;
+      if (!t) return;
       const fontSizePt = Math.hypot(t[2], t[3]) || Math.abs(t[3]) || 10;
-      // y in PDF ist bottom-left → wir liefern PDF-Punkte; Caller flippt.
       const widthPt = item.width || fontSizePt * Math.max(1, item.str.length) * 0.5;
       const heightPt = fontSizePt * 1.2;
+      const col = canMap1to1 ? (textOpFillColors[idx] || fallbackTextColor) : fallbackTextColor;
       result.texts.push({
         x: t[4], y: t[5],
         widthM: widthPt * Defaults.documentMetersPerPdfPt,
         heightM: heightPt * Defaults.documentMetersPerPdfPt,
         fontSizePx: Math.max(6, fontSizePt),
         text: item.str,
-        color: fillColor,
+        color: col,
       });
-    }
+    });
   } catch { /* ignore */ }
 
   return result;
