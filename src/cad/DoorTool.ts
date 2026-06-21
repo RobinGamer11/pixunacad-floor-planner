@@ -289,10 +289,13 @@ export class DoorTool {
         this._dragMove = true;
         return;
       }
-      // 2) Endpunkt-Handle → ggf. Tür selektieren, dann Drag-Resize
+      // 2) Endpunkt-Handle → unselektierte Tür: nur selektieren; sonst Drag-Resize
       const handleHit = this._hitDoorHandle(input);
       if (handleHit) {
-        if (this.selectedDoorId !== handleHit.door.id) this.selectDoor(handleHit.door.id);
+        if (this.selectedDoorId !== handleHit.door.id) {
+          this.selectDoor(handleHit.door.id);
+          return;
+        }
         this._dragHandle = handleHit.which;
         return;
       }
