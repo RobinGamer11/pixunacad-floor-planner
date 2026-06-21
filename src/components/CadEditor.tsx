@@ -1334,7 +1334,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
           {!sidebarCollapsed && activeTool === ToolIds.DOOR && (
             <div className="cad-settings-panel mb-2">
               <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
-                {doorSelectedId ? "Tür bearbeiten" : "Türen/Fenster"}
+                {doorSelectedId ? (doorMode === "window" ? "Fenster bearbeiten" : "Tür bearbeiten") : "Türen/Fenster"}
               </div>
               <div className="flex gap-1 mb-3">
                 <button
@@ -1348,7 +1348,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
                 <button
                   type="button"
                   onClick={() => setDoorMode("window")}
-                  title="Fenster (demnächst)"
+                  title="Fenster"
                   className={`cad-toolbar-btn flex-1 justify-center h-9 ${doorMode === "window" ? "active" : ""}`}
                 >
                   <AppWindow className="h-4 w-4" />
