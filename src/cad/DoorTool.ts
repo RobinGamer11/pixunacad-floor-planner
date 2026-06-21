@@ -252,6 +252,7 @@ export class DoorTool {
     if (id) {
       const d = this.app.scene.getDoorById(id);
       if (d) {
+        this.settings.mode = d.kind;
         this.settings.widthM = d.widthM;
         this.settings.heightM = d.heightM;
         this.settings.side = d.side;
@@ -262,7 +263,11 @@ export class DoorTool {
         this.settings.jambColor = d.jambColor;
         this.settings.jambLenM = d.jambLenM;
         this.settings.jambThickM = d.jambThickM;
+        this.settings.sashEnabled = d.sashEnabled;
+        this.settings.glassColor = d.glassColor;
       }
+    } else {
+      this._hideHub();
     }
     this.onSelectionChange?.(id);
   }
@@ -279,6 +284,7 @@ export class DoorTool {
       for (let i = 1; i < w.corners.length; i++) total += dist(w.corners[i - 1], w.corners[i]);
       return { total };
     })();
+    d.kind = this.settings.mode;
     d.widthM = Math.max(0.1, Math.min(this.settings.widthM, total));
     d.heightM = this.settings.heightM;
     d.side = this.settings.side;
@@ -289,8 +295,11 @@ export class DoorTool {
     d.jambColor = this.settings.jambColor;
     d.jambLenM = Math.max(0, this.settings.jambLenM);
     d.jambThickM = Math.max(0, this.settings.jambThickM);
+    d.sashEnabled = this.settings.sashEnabled;
+    d.glassColor = this.settings.glassColor;
     // Position innerhalb Wand halten
     d.posM = Math.max(d.widthM / 2, Math.min(total - d.widthM / 2, d.posM));
+    this._refreshHub();
   }
 
   update(input: Input) {
