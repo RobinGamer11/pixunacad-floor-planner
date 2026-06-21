@@ -19,6 +19,20 @@ export interface DoorToolSettings {
   jambColor: string;
   jambLenM: number;
   jambThickM: number;
+  /** Flügeltür anzeigen (default true für door, false für window). */
+  sashEnabled: boolean;
+  /** Farbe der Fenster-Linien. */
+  glassColor: string;
+}
+
+export interface DoorHubState {
+  visible: boolean;
+  screenX: number;
+  screenY: number;
+  doorId: string | null;
+  posM: number;
+  /** true wenn aktuell im Follow-Move (Tür folgt Maus). */
+  moving: boolean;
 }
 
 export class DoorTool {
@@ -37,6 +51,8 @@ export class DoorTool {
     jambColor: "#9aa3ad",
     jambLenM: 0.06,
     jambThickM: 0,
+    sashEnabled: true,
+    glassColor: "#2a2f36",
   };
 
   /** ID der aktuell selektierten Tür (für Inspector). */
@@ -49,10 +65,16 @@ export class DoorTool {
   /** Drag-Move-State (Verschieben entlang Wand). */
   private _dragMove: boolean = false;
   private _dragMoveOffsetM: number = 0;
+  /** Follow-Move: Tür folgt Maus ohne gedrückte Taste; nächster Klick fixiert. */
+  private _followMove: boolean = false;
   /** Settings-Update-Callback (von CadEditor gesetzt) — feuert wenn Selection wechselt. */
   onSelectionChange: ((doorId: string | null) => void) | null = null;
+  /** Hubbox-Update-Callback (von CadEditor gesetzt). */
+  onHubChange: ((state: DoorHubState) => void) | null = null;
   /** Wenn false: nur Selektion/Bearbeitung, keine neue Tür-Platzierung. */
   placementMode: boolean = true;
+  /** Hub-Box-State. */
+  private _hub: DoorHubState = { visible: false, screenX: 0, screenY: 0, doorId: null, posM: 0, moving: false };
 
   constructor(app: CadApp) { this.app = app; }
 
