@@ -473,6 +473,7 @@ export class DoorTool {
           color: this.settings.color,
           jambEnabled: this.settings.jambEnabled, jambColor: this.settings.jambColor,
           jambLenM: this.settings.jambLenM, jambThickM: this.settings.jambThickM,
+          sashEnabled: this.settings.sashEnabled, glassColor: this.settings.glassColor,
           labelId: w.labelId,
         } as Door;
         drawDoor(ctx, cam, w, fake, 0.5);
