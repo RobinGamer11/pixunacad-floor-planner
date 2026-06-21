@@ -90,6 +90,22 @@ export class DoorTool {
     return null;
   }
 
+  /** Test ob ein Bildschirm-Punkt nahe dem Center-Move-Handle ist. */
+  private _hitDoorCenter(input: Input): Door | null {
+    const cam = this.app.camera;
+    const sx = input.mouse.sx, sy = input.mouse.sy;
+    for (const d of this.app.scene.doors) {
+      if (d.id !== this.selectedDoorId) continue;
+      const w = this.app.scene.getWallById(d.wallId);
+      if (!w) continue;
+      const g = doorGeometry(w, d);
+      if (!g) continue;
+      const sC = cam.worldToScreen(g.center.x, g.center.y);
+      if (Math.hypot(sx - sC.x, sy - sC.y) <= 8) return d;
+    }
+    return null;
+  }
+
   /** Test ob ein Welt-Punkt eine Tür trifft (für Selektion). */
   private _hitDoor(input: Input): Door | null {
     const wm = v(input.mouse.wx, input.mouse.wy);
