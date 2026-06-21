@@ -676,27 +676,21 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
           >
             <Pipette className="h-4 w-4 shrink-0" />
           </button>
+          <button
+            onClick={() => {
+              setGridEnabled((e) => !e);
+              setGridPanelOpen(true);
+            }}
+            title={`Raster ${gridEnabled ? "aus" : "ein"}schalten — Einstellungen`}
+            className={`cad-toolbar-btn justify-center px-0 h-9 w-9 ${gridPanelOpen ? "active" : ""}`}
+            style={gridEnabled && !gridPanelOpen ? { color: "hsl(var(--primary))" } : undefined}
+          >
+            <Grid3x3 className="h-4 w-4 shrink-0" />
+          </button>
         </div>
 
         {/* Divider */}
         <div className="mx-3 border-t opacity-60" style={{ borderColor: "hsl(var(--cad-toolbar-border))" }} />
-
-        {/* Raster (Grid) Toggle — über "Auswahl" */}
-        <div className="p-2">
-          <button
-            onClick={() => setGridEnabled(e => !e)}
-            title={sidebarCollapsed ? "Raster ein/aus" : undefined}
-            className={`cad-toolbar-btn ${gridEnabled ? "active" : ""} ${
-              sidebarCollapsed ? "justify-center px-0 h-10 w-10 mx-auto" : "w-full justify-between"
-            }`}
-          >
-            <span className="flex items-center gap-2 min-w-0">
-              <Grid3x3 className="h-4 w-4 shrink-0" />
-              {!sidebarCollapsed && <span className="truncate">Raster</span>}
-            </span>
-            {!sidebarCollapsed && <span className="tool-key">{gridEnabled ? "EIN" : "AUS"}</span>}
-          </button>
-        </div>
 
         {/* Tool list */}
         <div className="flex flex-col gap-1 p-2">
