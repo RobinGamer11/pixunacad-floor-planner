@@ -283,12 +283,15 @@ export class DocumentObject {
   _eraseMask?: HTMLCanvasElement | null;
   /** Runtime-Flag: Maske wurde verändert → Composite-Cache invalidieren + DataUrl neu exportieren. */
   _eraseMaskDirty?: boolean;
+  /** Bei kind === "pdf-page": Original-PDF-Bytes als Base64 (für Vektor-Re-Render & Auflösen). */
+  pdfSourceB64?: string | null;
 
-  constructor({ id, name, kind, src, pageIndex, position, widthM, heightM, rotationRad, pixelWidth, pixelHeight, labelId, importScaleDenom, eraseMaskDataUrl }: {
+  constructor({ id, name, kind, src, pageIndex, position, widthM, heightM, rotationRad, pixelWidth, pixelHeight, labelId, importScaleDenom, eraseMaskDataUrl, pdfSourceB64 }: {
     id: string; name?: string; kind?: "image" | "pdf-page"; src: string;
     pageIndex?: number; position: Vec2; widthM: number; heightM: number;
     rotationRad?: number; pixelWidth?: number; pixelHeight?: number; labelId?: string;
     importScaleDenom?: number; eraseMaskDataUrl?: string | null;
+    pdfSourceB64?: string | null;
   }) {
     this.id = id;
     this.name = name || "Dokument";
@@ -306,6 +309,7 @@ export class DocumentObject {
     this.eraseMaskDataUrl = eraseMaskDataUrl || null;
     this._eraseMask = null;
     this._eraseMaskDirty = false;
+    this.pdfSourceB64 = pdfSourceB64 || null;
   }
 }
 
@@ -577,6 +581,7 @@ export class Scene {
     position: Vec2; widthM: number; heightM: number; rotationRad?: number;
     pixelWidth?: number; pixelHeight?: number; labelId?: string;
     importScaleDenom?: number; eraseMaskDataUrl?: string | null;
+    pdfSourceB64?: string | null;
   }): DocumentObject {
     const doc = new DocumentObject({ id: this._makeId(), ...opts });
     this.documents.push(doc);

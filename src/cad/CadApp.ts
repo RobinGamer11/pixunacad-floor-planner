@@ -505,6 +505,7 @@ export class CadApp {
           widthM: d.widthM, heightM: d.heightM, rotationRad: d.rotationRad,
           pixelWidth: d.pixelWidth, pixelHeight: d.pixelHeight, labelId: d.labelId,
           eraseMaskDataUrl: maskUrl || null,
+          pdfSourceB64: d.pdfSourceB64 || null,
         };
       }),
       freeStrokes: scene.freeStrokes.map(s => ({
@@ -622,6 +623,7 @@ export class CadApp {
         position: d.position, widthM: d.widthM, heightM: d.heightM, rotationRad: d.rotationRad,
         pixelWidth: d.pixelWidth, pixelHeight: d.pixelHeight, labelId: d.labelId,
         eraseMaskDataUrl: d.eraseMaskDataUrl || null,
+        pdfSourceB64: d.pdfSourceB64 || null,
       });
       if (d.id) (doc as any).id = d.id;
     }
