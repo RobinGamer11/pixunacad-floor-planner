@@ -76,6 +76,8 @@ export async function extractPdfPageVectors(sourceB64: string, pageIndex: number
   let fillColor = "#000000";
   let strokeColor = "#000000";
   let lineWidth = 1; // in user units
+  /** fillColor zum Zeitpunkt jeder Text-Show-Op (Reihenfolge wie in der opList). */
+  const textOpFillColors: string[] = [];
 
   const addPathPoint = (xLocal: number, yLocal: number) => {
     const p = tx(ctm, xLocal, yLocal);
