@@ -1075,7 +1075,9 @@ export class Scene {
   // ---- Doors (Türen) ----
   createDoor(opts: {
     wallId: string; posM: number; widthM: number; heightM?: number;
-    side?: DoorSide; hand?: DoorHand; color?: string; labelId?: string;
+    side?: DoorSide; hand?: DoorHand; edge?: DoorEdge; color?: string;
+    jambEnabled?: boolean; jambColor?: string; jambLenM?: number; jambThickM?: number;
+    labelId?: string;
   }): Door {
     const d = new Door({ id: this._makeId(), ...opts });
     this.doors.push(d);
