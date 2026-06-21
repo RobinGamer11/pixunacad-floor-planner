@@ -527,7 +527,9 @@ export class CadApp {
       } : null,
       doors: scene.doors.map(d => ({
         id: d.id, wallId: d.wallId, posM: d.posM, widthM: d.widthM, heightM: d.heightM,
-        side: d.side, hand: d.hand, color: d.color, labelId: d.labelId,
+        side: d.side, hand: d.hand, edge: d.edge, color: d.color,
+        jambEnabled: d.jambEnabled, jambColor: d.jambColor, jambLenM: d.jambLenM, jambThickM: d.jambThickM,
+        labelId: d.labelId,
       })),
     };
   }
