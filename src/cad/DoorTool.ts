@@ -118,10 +118,17 @@ export class DoorTool {
     return null;
   }
 
-  /** Test ob ein Welt-Punkt eine Tür trifft (für Selektion). */
+  /** Test ob ein Welt-Punkt eine Tür trifft (für Selektion). Robust: Blatt, Laibung, Schwung. */
   private _hitDoor(input: Input): Door | null {
+    const cam = this.app.camera;
     const wm = v(input.mouse.wx, input.mouse.wy);
-    for (const d of this.app.scene.doors) {
+    const sx = input.mouse.sx, sy = input.mouse.sy;
+    // Pixel-Toleranz in Welt-Einheiten
+    const pxTolWorld = 8 / Math.max(cam.scale || 1, 1e-6);
+    // Selektierte Tür zuerst
+    const ordered = [...this.app.scene.doors].sort((a, b) =>
+      (a.id === this.selectedDoorId ? -1 : 0) - (b.id === this.selectedDoorId ? -1 : 0));
+    for (const d of ordered) {
       const w = this.app.scene.getWallById(d.wallId);
       if (!w) continue;
       const g = doorGeometry(w, d);
@@ -129,23 +136,35 @@ export class DoorTool {
       const dx = wm.x - g.center.x, dy = wm.y - g.center.y;
       const along = dx * g.tan.x + dy * g.tan.y;
       const across = dx * g.n.x + dy * g.n.y;
-      // (a) Wandöffnungs-Streifen
-      if (Math.abs(along) <= d.widthM / 2 + 0.02
-          && Math.abs(across) <= Math.max(w.thicknessM, 0.05) / 2 + 0.05) {
+      const tol = Math.max(0.05, pxTolWorld);
+      // (a) Wandöffnungs-Streifen inkl. Laibung über volle Wandstärke
+      if (Math.abs(along) <= d.widthM / 2 + tol
+          && Math.abs(across) <= Math.max(w.thicknessM, 0.05) / 2 + tol) {
         return d;
       }
       // (b) Blatt + Schwungbereich (Viertelkreis um hinge mit Radius lichteM)
       const hx = wm.x - g.hinge.x, hy = wm.y - g.hinge.y;
       const rad = Math.hypot(hx, hy);
-      if (rad <= g.lichteM + 0.05) {
-        const aAlong = hx * g.tan.x + hy * g.tan.y;
-        const aAcross = hx * g.n.x + hy * g.n.y;
-        // Im Quadranten des Schwungs?
-        const handSign = d.hand === "left" ? -1 : +1;
-        const openSign = d.side === "inner" ? +1 : -1;
-        if (aAlong * (-handSign) >= -0.05 && aAcross * openSign >= -0.05) {
-          return d;
-        }
+      const handSign = d.hand === "left" ? -1 : +1;
+      const openSign = d.side === "inner" ? +1 : -1;
+      const aAlong = hx * g.tan.x + hy * g.tan.y;
+      const aAcross = hx * g.n.x + hy * g.n.y;
+      // (b1) Innerhalb des Viertelkreis-Sektors (Schwung-Füllung)
+      if (rad <= g.lichteM + tol
+          && aAlong * (-handSign) >= -tol
+          && aAcross * openSign >= -tol) {
+        return d;
+      }
+      // (b2) Pixel-Toleranz zum Türblatt-Linienstück (hinge → leafEnd)
+      const sH = cam.worldToScreen(g.hinge.x, g.hinge.y);
+      const sLeaf = cam.worldToScreen(g.leafEnd.x, g.leafEnd.y);
+      if (_distPointToSegmentPx(sx, sy, sH.x, sH.y, sLeaf.x, sLeaf.y) <= 8) return d;
+      // (b3) Pixel-Toleranz zum Schwung-Bogen
+      const radPx = Math.hypot(sLeaf.x - sH.x, sLeaf.y - sH.y);
+      const distToCenter = Math.hypot(sx - sH.x, sy - sH.y);
+      if (Math.abs(distToCenter - radPx) <= 6) {
+        // Im Sektor?
+        if (aAlong * (-handSign) >= -tol && aAcross * openSign >= -tol) return d;
       }
     }
     return null;
@@ -270,10 +289,13 @@ export class DoorTool {
         this._dragMove = true;
         return;
       }
-      // 2) Endpunkt-Handle → ggf. Tür selektieren, dann Drag-Resize
+      // 2) Endpunkt-Handle → unselektierte Tür: nur selektieren; sonst Drag-Resize
       const handleHit = this._hitDoorHandle(input);
       if (handleHit) {
-        if (this.selectedDoorId !== handleHit.door.id) this.selectDoor(handleHit.door.id);
+        if (this.selectedDoorId !== handleHit.door.id) {
+          this.selectDoor(handleHit.door.id);
+          return;
+        }
         this._dragHandle = handleHit.which;
         return;
       }
@@ -412,8 +434,18 @@ export class DoorTool {
             ctx.fillText(txt, bx + padX, by + bh / 2);
           }
           ctx.restore();
-        }
-      }
+  }
+}
+
+function _distPointToSegmentPx(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
+  const dx = bx - ax, dy = by - ay;
+  const L2 = dx * dx + dy * dy || 1e-9;
+  let t = ((px - ax) * dx + (py - ay) * dy) / L2;
+  t = Math.max(0, Math.min(1, t));
+  const qx = ax + dx * t, qy = ay + dy * t;
+  return Math.hypot(px - qx, py - qy);
+}
+
     }
   }
 }
