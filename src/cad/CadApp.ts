@@ -541,6 +541,7 @@ export class CadApp {
     scene.documents = [];
     scene.freeStrokes = [];
     scene.walls = [];
+    scene.doors = [];
     scene.rulerGuide = null;
     scene.markWallsDirty();
     (scene as any)._rebuildSegIdMap?.();
