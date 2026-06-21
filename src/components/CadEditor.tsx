@@ -201,9 +201,12 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
   const [doorJambThickM, setDoorJambThickM] = useState<number>(0);
   const [doorSashEnabled, setDoorSashEnabled] = useState<boolean>(true);
   const [doorGlassColor, setDoorGlassColor] = useState<string>("#2a2f36");
+  const [doorGlassThickM, setDoorGlassThickM] = useState<number>(0);
+  const [doorGlassFillColor, setDoorGlassFillColor] = useState<string>("");
   const [doorSelectedId, setDoorSelectedId] = useState<string | null>(null);
-  const [doorHub, setDoorHub] = useState<{ visible: boolean; screenX: number; screenY: number; doorId: string | null; posM: number; moving: boolean }>({ visible: false, screenX: 0, screenY: 0, doorId: null, posM: 0, moving: false });
+  const [doorHub, setDoorHub] = useState<{ visible: boolean; screenX: number; screenY: number; doorId: string | null; posM: number; widthM: number; moving: boolean; resizing: boolean }>({ visible: false, screenX: 0, screenY: 0, doorId: null, posM: 0, widthM: 0, moving: false, resizing: false });
   const [doorHubPosInput, setDoorHubPosInput] = useState<string>("");
+  const [doorHubWidthInput, setDoorHubWidthInput] = useState<string>("");
 
   // Renderer-Settings synchron halten
   useEffect(() => {
@@ -234,8 +237,10 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
     app.doorTool.settings.jambThickM = doorJambThickM;
     app.doorTool.settings.sashEnabled = doorSashEnabled;
     app.doorTool.settings.glassColor = doorGlassColor;
+    app.doorTool.settings.glassThickM = doorGlassThickM;
+    app.doorTool.settings.glassFillColor = doorGlassFillColor;
     app.doorTool.applySettingsToSelection();
-  }, [doorMode, doorWidthM, doorHeightM, doorSide, doorHand, doorEdge, doorColor, doorJambEnabled, doorJambColor, doorJambLenM, doorJambThickM, doorSashEnabled, doorGlassColor]);
+  }, [doorMode, doorWidthM, doorHeightM, doorSide, doorHand, doorEdge, doorColor, doorJambEnabled, doorJambColor, doorJambLenM, doorJambThickM, doorSashEnabled, doorGlassColor, doorGlassThickM, doorGlassFillColor]);
 
 
 
