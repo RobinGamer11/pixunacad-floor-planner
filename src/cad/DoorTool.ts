@@ -3,7 +3,7 @@ import type { Input } from "./Input";
 import { v, Vec2, dist } from "./geometry";
 import { Defaults } from "./constants";
 import type { Door, DoorHand, DoorSide, Wall } from "./Scene";
-import { projectPointToWall, doorGeometry, pointOnWallAt } from "./doorGeom";
+import { projectPointToWall, doorGeometry, pointOnWallAt, drawDoor } from "./doorGeom";
 
 export type DoorMode = "door" | "window";
 
