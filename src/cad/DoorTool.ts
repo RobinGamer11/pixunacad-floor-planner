@@ -51,6 +51,8 @@ export class DoorTool {
   private _dragMoveOffsetM: number = 0;
   /** Settings-Update-Callback (von CadEditor gesetzt) — feuert wenn Selection wechselt. */
   onSelectionChange: ((doorId: string | null) => void) | null = null;
+  /** Wenn false: nur Selektion/Bearbeitung, keine neue Tür-Platzierung. */
+  placementMode: boolean = true;
 
   constructor(app: CadApp) { this.app = app; }
 
@@ -58,6 +60,7 @@ export class DoorTool {
     this.app.renderer.overlay = { draw: (ctx, cam) => this._drawOverlay(ctx, cam) };
     this.app.hub.hide();
     this.app.pointEditMenu.hide();
+    this.placementMode = true;
   }
   cancel() {
     this._dragHandle = null;
@@ -221,15 +224,16 @@ export class DoorTool {
   update(input: Input) {
     // Hover für Platzierung berechnen
     this._hoverWallId = null;
-    const hit = this._hitWall(input);
-    if (hit) {
-      // Begrenzung: Tür muss komplett auf der Wand liegen
-      let total = 0;
-      for (let i = 1; i < hit.wall.corners.length; i++) total += dist(hit.wall.corners[i - 1], hit.wall.corners[i]);
-      const half = this.settings.widthM / 2;
-      const clamped = Math.max(half, Math.min(total - half, hit.posM));
-      this._hoverWallId = hit.wall.id;
-      this._hoverPosM = clamped;
+    if (this.placementMode) {
+      const hit = this._hitWall(input);
+      if (hit) {
+        let total = 0;
+        for (let i = 1; i < hit.wall.corners.length; i++) total += dist(hit.wall.corners[i - 1], hit.wall.corners[i]);
+        const half = this.settings.widthM / 2;
+        const clamped = Math.max(half, Math.min(total - half, hit.posM));
+        this._hoverWallId = hit.wall.id;
+        this._hoverPosM = clamped;
+      }
     }
 
     // Drag-Resize (Endpunkt-Handles)
@@ -303,8 +307,8 @@ export class DoorTool {
       // 3) Tür-Click → selektieren
       const doorHit = this._hitDoor(input);
       if (doorHit) { this.selectDoor(doorHit.id); return; }
-      // 4) Wand-Click → neue Tür platzieren (wenn Modus = Tür)
-      if (this.settings.mode === "door" && this._hoverWallId) {
+      // 4) Wand-Click → neue Tür platzieren (nur im Platzierungs-Modus)
+      if (this.placementMode && this.settings.mode === "door" && this._hoverWallId) {
         const w = this.app.scene.getWallById(this._hoverWallId);
         if (w) {
           const door = this.app.scene.createDoor({
@@ -326,8 +330,9 @@ export class DoorTool {
         }
         return;
       }
-      // 5) Sonst: Selektion aufheben
+      // 5) Sonst: Selektion aufheben — im Edit-Modus zurück zum Auswahlwerkzeug
       this.selectDoor(null);
+      if (!this.placementMode) this.app.setTool("select");
     }
   }
 
