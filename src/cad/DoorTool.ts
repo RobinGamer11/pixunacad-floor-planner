@@ -36,6 +36,9 @@ export class DoorTool {
   private _hoverPosM: number = 0;
   /** Drag-Resize-State. */
   private _dragHandle: "left" | "right" | null = null;
+  /** Drag-Move-State (Verschieben entlang Wand). */
+  private _dragMove: boolean = false;
+  private _dragMoveOffsetM: number = 0;
   /** Settings-Update-Callback (von CadEditor gesetzt) — feuert wenn Selection wechselt. */
   onSelectionChange: ((doorId: string | null) => void) | null = null;
 
@@ -48,6 +51,7 @@ export class DoorTool {
   }
   cancel() {
     this._dragHandle = null;
+    this._dragMove = false;
     this.app.renderer.overlay = null;
   }
   finish() { this.cancel(); }
@@ -82,6 +86,22 @@ export class DoorTool {
       const sR = cam.worldToScreen(g.rightEnd.x, g.rightEnd.y);
       if (Math.hypot(sx - sL.x, sy - sL.y) <= 8) return { door: d, which: "left" };
       if (Math.hypot(sx - sR.x, sy - sR.y) <= 8) return { door: d, which: "right" };
+    }
+    return null;
+  }
+
+  /** Test ob ein Bildschirm-Punkt nahe dem Center-Move-Handle ist. */
+  private _hitDoorCenter(input: Input): Door | null {
+    const cam = this.app.camera;
+    const sx = input.mouse.sx, sy = input.mouse.sy;
+    for (const d of this.app.scene.doors) {
+      if (d.id !== this.selectedDoorId) continue;
+      const w = this.app.scene.getWallById(d.wallId);
+      if (!w) continue;
+      const g = doorGeometry(w, d);
+      if (!g) continue;
+      const sC = cam.worldToScreen(g.center.x, g.center.y);
+      if (Math.hypot(sx - sC.x, sy - sC.y) <= 8) return d;
     }
     return null;
   }
@@ -156,7 +176,7 @@ export class DoorTool {
       this._hoverPosM = clamped;
     }
 
-    // Drag-Resize
+    // Drag-Resize (Endpunkt-Handles)
     if (this._dragHandle && this.selectedDoorId) {
       if (!input.mouse.left) { this._dragHandle = null; }
       else {
@@ -181,14 +201,46 @@ export class DoorTool {
       }
     }
 
+    // Drag-Move (Center-Handle: verschiebt Tür entlang Wand)
+    if (this._dragMove && this.selectedDoorId) {
+      if (!input.mouse.left) { this._dragMove = false; }
+      else {
+        const d = this.app.scene.getDoorById(this.selectedDoorId);
+        const w = d ? this.app.scene.getWallById(d.wallId) : null;
+        if (d && w) {
+          const proj = projectPointToWall(w, v(input.mouse.wx, input.mouse.wy));
+          if (proj) {
+            let total = 0;
+            for (let i = 1; i < w.corners.length; i++) total += dist(w.corners[i - 1], w.corners[i]);
+            const half = d.widthM / 2;
+            const target = proj.s - this._dragMoveOffsetM;
+            d.posM = Math.max(half, Math.min(total - half, target));
+            this.onSelectionChange?.(d.id);
+          }
+        }
+        return;
+      }
+    }
+
     if (input.clicked) {
-      // 1) Handle-Click → Drag-Start (wird durch dragging weiter behandelt)
+      // 1) Center-Handle → Drag-Move
+      const centerHit = this._hitDoorCenter(input);
+      if (centerHit) {
+        const w = this.app.scene.getWallById(centerHit.wallId);
+        if (w) {
+          const proj = projectPointToWall(w, v(input.mouse.wx, input.mouse.wy));
+          this._dragMoveOffsetM = proj ? (proj.s - centerHit.posM) : 0;
+        }
+        this._dragMove = true;
+        return;
+      }
+      // 2) Endpunkt-Handle → Drag-Resize
       const handleHit = this._hitDoorHandle(input);
       if (handleHit) { this._dragHandle = handleHit.which; return; }
-      // 2) Tür-Click → selektieren
+      // 3) Tür-Click → selektieren
       const doorHit = this._hitDoor(input);
       if (doorHit) { this.selectDoor(doorHit.id); return; }
-      // 3) Wand-Click → neue Tür platzieren (wenn Modus = Tür)
+      // 4) Wand-Click → neue Tür platzieren (wenn Modus = Tür)
       if (this.settings.mode === "door" && this._hoverWallId) {
         const w = this.app.scene.getWallById(this._hoverWallId);
         if (w) {
@@ -206,7 +258,7 @@ export class DoorTool {
         }
         return;
       }
-      // 4) Sonst: Selektion aufheben
+      // 5) Sonst: Selektion aufheben
       this.selectDoor(null);
     }
   }
@@ -235,7 +287,9 @@ export class DoorTool {
         if (g) {
           const sL = cam.worldToScreen(g.leftEnd.x, g.leftEnd.y);
           const sR = cam.worldToScreen(g.rightEnd.x, g.rightEnd.y);
+          const sC = cam.worldToScreen(g.center.x, g.center.y);
           ctx.save();
+          // Endpunkt-Handles (Resize)
           for (const s of [sL, sR]) {
             ctx.fillStyle = "#ffffff";
             ctx.strokeStyle = "#4da3ff";
@@ -244,6 +298,47 @@ export class DoorTool {
             ctx.rect(s.x - 5, s.y - 5, 10, 10);
             ctx.fill();
             ctx.stroke();
+          }
+          // Center-Handle (Move) — rund, dezent
+          ctx.fillStyle = "#ffffff";
+          ctx.strokeStyle = "#4da3ff";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(sC.x, sC.y, 6, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+          // Innerer Punkt
+          ctx.fillStyle = "#4da3ff";
+          ctx.beginPath();
+          ctx.arc(sC.x, sC.y, 2, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Distanzanzeige beim Verschieben — modern schlicht
+          if (this._dragMove) {
+            // Distanz: posM vom Wandanfang
+            const txt = `${d.posM.toFixed(2)} m`;
+            ctx.font = "12px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto";
+            const padX = 8, padY = 4;
+            const tw = ctx.measureText(txt).width;
+            const bx = sC.x + 12, by = sC.y - 28;
+            const bw = tw + padX * 2, bh = 20;
+            ctx.fillStyle = "rgba(17,24,39,0.92)";
+            ctx.beginPath();
+            const r = 6;
+            ctx.moveTo(bx + r, by);
+            ctx.lineTo(bx + bw - r, by);
+            ctx.quadraticCurveTo(bx + bw, by, bx + bw, by + r);
+            ctx.lineTo(bx + bw, by + bh - r);
+            ctx.quadraticCurveTo(bx + bw, by + bh, bx + bw - r, by + bh);
+            ctx.lineTo(bx + r, by + bh);
+            ctx.quadraticCurveTo(bx, by + bh, bx, by + bh - r);
+            ctx.lineTo(bx, by + r);
+            ctx.quadraticCurveTo(bx, by, bx + r, by);
+            ctx.closePath();
+            ctx.fill();
+            ctx.fillStyle = "#ffffff";
+            ctx.textBaseline = "middle";
+            ctx.fillText(txt, bx + padX, by + bh / 2);
           }
           ctx.restore();
         }
