@@ -392,6 +392,7 @@ export class CadApp {
     this.freeDrawTool = new FreeDrawTool(this);
     this.eraserTool = new EraserTool(this);
     this.wallTool = new WallTool(this);
+    this.doorTool = new DoorTool(this);
     this.activeTool = this.selectTool;
 
     this.idPanel = new IdPanel(this, idPanelRoot, idPanelBody, idPanelList, idPanelAddBtn, idPanelToggleBtn);
