@@ -1470,6 +1470,38 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
                       </div>
                     </div>
                     <div>
+                      <label>Fenster-Dicke (m, Abstand der Linien — 0 = auto)</label>
+                      <input
+                        type="number"
+                        step={0.005}
+                        min={0}
+                        value={doorGlassThickM}
+                        onChange={(e) => setDoorGlassThickM(Math.max(0, parseFloat(e.target.value) || 0))}
+                        className="w-full text-xs px-2 py-1 rounded border bg-background"
+                        style={{ borderColor: "hsl(var(--border))" }}
+                      />
+                    </div>
+                    <div>
+                      <label className="flex items-center justify-between">
+                        <span>Füllung</span>
+                        <button type="button"
+                          onClick={() => setDoorGlassFillColor(doorGlassFillColor ? "" : "#cfe2f3")}
+                          className={`cad-toolbar-btn h-7 px-2 text-[11px] ${doorGlassFillColor ? "active" : ""}`}>
+                          {doorGlassFillColor ? "Ein" : "Aus"}
+                        </button>
+                      </label>
+                    </div>
+                    {doorGlassFillColor && (
+                      <div>
+                        <label>Füll-Farbe</label>
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))", background: doorGlassFillColor }} />
+                          <input type="color" value={doorGlassFillColor} onChange={(e) => setDoorGlassFillColor(e.target.value)}
+                            className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
+                        </div>
+                      </div>
+                    )}
+                    <div>
                       <label className="flex items-center justify-between">
                         <span>Flügeltür (Schwung anzeigen)</span>
                         <button type="button" onClick={() => setDoorSashEnabled(!doorSashEnabled)}
