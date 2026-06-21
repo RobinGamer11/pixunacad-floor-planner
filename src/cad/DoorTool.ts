@@ -2,7 +2,7 @@ import type { CadApp } from "./CadApp";
 import type { Input } from "./Input";
 import { v, Vec2, dist } from "./geometry";
 import { Defaults } from "./constants";
-import type { Door, DoorHand, DoorSide, Wall } from "./Scene";
+import type { Door, DoorHand, DoorSide, DoorEdge, Wall } from "./Scene";
 import { projectPointToWall, doorGeometry, pointOnWallAt, drawDoor } from "./doorGeom";
 
 export type DoorMode = "door" | "window";
@@ -13,7 +13,12 @@ export interface DoorToolSettings {
   heightM: number;
   side: DoorSide;
   hand: DoorHand;
+  edge: DoorEdge;
   color: string;
+  jambEnabled: boolean;
+  jambColor: string;
+  jambLenM: number;
+  jambThickM: number;
 }
 
 export class DoorTool {
@@ -26,7 +31,12 @@ export class DoorTool {
     heightM: 2.1,
     side: "inner",
     hand: "left",
+    edge: "center",
     color: "#111111",
+    jambEnabled: true,
+    jambColor: "#9aa3ad",
+    jambLenM: 0.06,
+    jambThickM: 0,
   };
 
   /** ID der aktuell selektierten Tür (für Inspector). */
