@@ -697,7 +697,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
         {/* Settings area (scrollable) */}
         <div className="flex-1 min-h-0 overflow-y-auto p-2">
           {/* Raster-Einstellungen */}
-          {!sidebarCollapsed && gridPanelOpen && (
+          {!sidebarCollapsed && gridEnabled && (
             <div className="cad-settings-panel mb-2">
               <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
                 Raster
