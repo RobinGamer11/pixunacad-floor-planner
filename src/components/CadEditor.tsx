@@ -1531,13 +1531,13 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
                     className="cad-toolbar-btn w-full justify-center h-8 text-[11px]"
                     style={{ color: "hsl(var(--destructive))" }}
                   >
-                    Tür löschen
+                    {doorMode === "window" ? "Fenster" : "Tür"} löschen
                   </button>
                 )}
                 <div className="text-[11px] opacity-70">
                   {doorSelectedId
-                    ? "Endpunkte mit den Hub-Boxen ziehen, um Breite anzupassen."
-                    : "Klick auf eine Wand setzt die Tür."}
+                    ? "Endpunkt anklicken → Hubbox für Bewegen/Position. Endpunkte ziehen ändert Breite."
+                    : `Klick auf eine Wand setzt ${doorMode === "window" ? "ein Fenster" : "eine Tür"}.`}
                 </div>
               </div>
             </div>
