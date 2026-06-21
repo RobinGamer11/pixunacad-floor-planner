@@ -1,88 +1,36 @@
-## Plan: Raster-Toggle kompakter + neues Werkzeug "Türen/Fenster"
+# Plan: Tür-Hubbox + Fenster-Werkzeug
 
-### Teil 1 — Raster: kompakter Toggle, Einstellungen nur on-demand
+## 1) Hubbox beim Anklicken eines Tür-Fangpunkts
 
-**Aktuell:** Großer Raster-Button (volle Toolbar-Breite) über "Auswahl" + Einstellungspanel ist permanent sichtbar, solange `gridEnabled` true ist (egal welches Werkzeug aktiv ist).
+- Klick auf Endpunkt-Snap einer Tür öffnet eine kleine, moderne Box am Cursor (Stil wie LineHub: dezenter Schatten, kleine Pille).
+- Inhalt:
+  - Symbol **Bewegen** (lucide `Move`). Klick aktiviert Move-Modus: Tür folgt Maus entlang Wand. Erneuter Klick fixiert.
+  - Nummerisches Feld **Position [m]** (Distanz vom Wandanfang) — Tippen + Enter setzt `posM` exakt.
+- Position oberhalb der Tür. Schließt bei Tool-Wechsel/ESC/Klick außerhalb.
+- Endpunkt-Handles bleiben für Resize per Drag erhalten (Drag startet ohne Hubbox-Interaktion).
 
-**Neu:**
-- Raster-Button schrumpft auf ein kleines Icon-Quadrat (40×40, wie ein Header-Icon) in der oberen Toolbar-Zeile neben Undo/Redo/Pipette — nimmt keine eigene Zeile mehr ein.
-- Klick auf das Icon:
-  - schaltet `gridEnabled` an/aus (Hebel)
-  - markiert intern "Raster ist aktives Panel" → Einstellungspanel erscheint im Inspector
-  - der bisherige `activeTool`-State (Linie, Wand etc.) bleibt unverändert, das Werkzeug ist weiter aktiv für Maus-Interaktion
-- Klick auf ein anderes Werkzeug ⇒ Raster-Panel wird ausgeblendet (Grid bleibt sichtbar, falls aktiviert)
-- Neuer State `gridPanelOpen: boolean` (true, wenn der User zuletzt das Raster-Icon angeklickt hat; false, sobald irgendein anderes Werkzeug angeklickt wird)
-- Panel-Anzeige-Bedingung wird von `gridEnabled` auf `gridPanelOpen` umgestellt
-- `handleToolClick` setzt `gridPanelOpen=false`
+## 2) Fenster-Werkzeug (vollwertig)
 
-### Teil 2 — Neues Werkzeug "Türen/Fenster"
+- Gleiches Datenmodell wie Tür (`Door`), neues Feld `kind: "door" | "window"` und `sashEnabled: boolean` (Flügel an/aus, default `false` für Fenster).
+- `drawDoor` erweitern bzw. `drawWindow` einführen:
+  - Identische Wandöffnung + Laibungs-Logik (Farbe/Breite/Dicke/Start-Kante exakt wie Tür).
+  - Statt Türblatt + Schwung: **zwei parallele Linien** quer durch die Öffnung (Fensterprofil), Farbe wie Laibungsfarbe konfigurierbar (`glassColor`).
+  - Bei `sashEnabled=true`: zusätzlich Flügel+Schwung wie Tür darüberlegen.
+- Settings-Panel: identische Einstellungen wie Tür (Breite, Lichte Breite, Höhe, Start-Kante, Öffnungsseite, Öffnungsrichtung, Farbe, Laibung an/aus + Farbe/Breite/Dicke). Zusätzlich:
+  - **Flügeltür ein/aus** (Toggle, default aus).
+  - **Fensterfarbe** (Farbe der zwei Linien).
+- Hit-Test, Selektion, Bearbeitung, Hubbox: identisch wie Tür (gleiche Wege).
 
-#### UI / Toolbar
-- Neuer Eintrag in `CAD_TOOLS` mit Icon (`DoorOpen` aus lucide), Label "Türen/Fenster", Hotkey "T"
-- Einstellungspanel mit zwei großen Symbol-Buttons oben: **Tür** | **Fenster** (Mode-Switch)
-- Gemeinsame Felder: Breite (m), Höhe (m, nur Metadaten/Eintrag), Wandstärke folgt automatisch der Trägerwand
-- Tür-spezifisch: Öffnungsseite (innen/außen), Öffnungsrichtung (links/rechts), Farbe
-- Fenster-spezifisch (Phase 2 — Platzhalter-UI vorgesehen, ohne Funktion, da heute nur Türen umzusetzen sind): Rahmenfarbe, Sprossen-Anzahl. *(Falls nur Tür für jetzt ausreicht, Fenster-Sub-Modus zeigt "Demnächst".)*
+## 3) Technische Hinweise
 
-#### Datenmodell (in `Scene.ts`)
-```
-type Opening = {
-  id: string;
-  kind: "door" | "window";
-  wallId: string;        // Trägerwand
-  tAlong: number;        // Parameter 0..1 entlang Wand-Mittelachse (Position des Tür-Mittelpunkts)
-  widthM: number;        // Öffnungsbreite
-  heightM: number;       // Türhöhe (Meta)
-  side: "inner" | "outer"; // Öffnung schwingt nach innen/außen
-  hand: "left" | "right";  // Drehrichtung (Angel links/rechts)
-  color: string;
-  labelId: string;       // Layer, vererbt von Wand
-};
-scene.openings: Opening[];
-```
-- Persistenz in Projektstore und Plan-Export, Undo/Redo via bestehendem History-Mechanismus
-- Boolean-Wandausschnitt: in `wallUnion.ts`/Renderer wird pro Wand-Polygon ein Loch (Rechteck quer zur Wand, volle Wandstärke × `widthM`) abgezogen, bevor das Wand-Polygon gefüllt/strichbar gerendert wird
+- `Scene.Door`: Felder `kind`, `sashEnabled`, `glassColor` ergänzen (default-kompatibel zu bestehenden Daten).
+- `DoorTool.settings`: `mode` bleibt Switch; bei Platzierung wird `kind` aus `mode` gesetzt; restliche Einstellungen geteilt.
+- `CadEditor.tsx`: Fenster-Panel sichtbar wenn `doorMode === "window"`, spiegelt Tür-Panel + Flügeltür-Toggle + Fensterfarbe.
+- Neue React-Komponente `DoorHubBox` (klein, absolut positioniert, Tailwind-Styling im Stil bestehender Inspector-Boxen). Steuerung über `doorTool` (Methoden `beginMoveFromHub`, `setPosM`).
+- ESC/Tool-Wechsel räumt Hubbox auf (`doorTool.cancel`).
 
-#### Rendering (in `Renderer.ts`)
-Für jede Tür:
-1. Mittelpunkt + Wand-Tangente/Normale aus Wand-Geometrie (Mittelachse)
-2. Wand wird an dieser Stelle "geöffnet" (Loch im Unionspolygon)
-3. Zwei kurze Querstriche (Laibung) an den Tür-Endpunkten quer zur Wand
-4. Türblatt: dünnes Rechteck (Länge = `widthM`, Dicke ≈ 4 px / 0.04 m) am Angelpunkt befestigt, Drehwinkel 90° entsprechend `side` × `hand`
-5. Öffnungs-Bogen (Viertelkreis, Radius = `widthM`) vom Türblatt-Ende zur Wandflucht, Farbe = `color` (siehe Referenzbild)
+## 4) Tests / Verifikation
 
-#### Interaktion (`DoorTool.ts`, neu, + `SelectTool.ts`-Erweiterung)
-**Setzen (DoorTool):**
-- Hover über Wand → Vorschau der Tür snappt entlang der Wand-Mittelachse
-- Klick fixiert Position (`tAlong` so, dass Mittelpunkt unter Cursor liegt; mit Min-Abstand zu Wand-Enden)
-- ESC/Rechtsklick beendet
-
-**Bearbeiten (SelectTool):**
-- Tür anklickbar wie andere Objekte; zeigt zwei kleine **Hub-Boxen** an beiden Endpunkten (wie bestehende Linien-Hubs in `hubDrag.ts`)
-- Ziehen einer Hub-Box ändert `widthM` (und verschiebt `tAlong` so, dass die gegenüberliegende Seite fix bleibt) — Snapping auf Raster/Wand-Enden
-- Inspector-Panel zeigt für ausgewählte Tür: Breite, Höhe, Öffnungsseite (Toggle innen/außen), Öffnungsrichtung (Toggle links/rechts), Farbe — alle Live-bearbeitbar
-
-#### Out-of-scope für diesen Schritt
-- Fenster-Geometrie (Glas/Rahmen-Linien) — nur UI-Switch vorbereitet, Implementierung später
-- 3D-Höhe (heightM ist nur Metadaten)
-- Eckwand-Türen über zwei Wände hinweg
-- Drag der Position via Mitte der Tür (Phase 2; Position fix nach Setzen, neu setzen via Neuzeichnen)
-
-### Geänderte/neue Dateien
-- `src/components/CadEditor.tsx` — Raster-Icon kompakt, `gridPanelOpen`-State, Tür/Fenster-Tool-Eintrag + Inspector
-- `src/cad/CadApp.ts` — DoorTool registrieren, Selection-Inspector-API erweitern
-- `src/cad/DoorTool.ts` *(neu)* — Setzen, Hover-Preview, Wand-Snap
-- `src/cad/SelectTool.ts` — Auswahl + Hub-Boxen für Türen, Resize-Logik
-- `src/cad/Scene.ts` — `Opening`-Typ, `openings`-Array, Serialisierung
-- `src/cad/Renderer.ts` — Türen rendern (Bogen, Blatt, Laibung), Wand-Loch
-- `src/cad/wallUnion.ts` — Öffnungen aus Wand-Unionspolygon ausschneiden
-- `src/lib/projectStore.ts` — Persistenz für `openings`
-
-### Reihenfolge der Umsetzung
-1. Raster-Toggle kompakt + Panel-Sichtbarkeit (klein, isoliert)
-2. Door-Datenmodell + Renderer + DoorTool (Setzen)
-3. SelectTool: Auswahl + Hub-Boxen + Inspector-Bearbeitung
-4. Fenster-Sub-Modus (UI-Stub)
-
-### Offene Frage
-Soll Tür **nur in Wänden** platzierbar sein (Setzen ist nur möglich, wenn Cursor über einer Wand hovert), oder auch freistehend? Empfehlung: **nur in Wänden** (so wie AutoCAD/ArchiCAD).
+- Manuelle Verifikation per Playwright-Screenshot:
+  - Tür setzen → Endpunkt anklicken → Hubbox erscheint → Move-Icon → entlang Wand → Klick fixiert.
+  - Fenster mit/ohne Flügeltür rendert mit zwei Linien bzw. Schwung.
