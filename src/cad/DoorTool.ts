@@ -124,7 +124,7 @@ export class DoorTool {
     const wm = v(input.mouse.wx, input.mouse.wy);
     const sx = input.mouse.sx, sy = input.mouse.sy;
     // Pixel-Toleranz in Welt-Einheiten
-    const pxTolWorld = 8 / Math.max(cam.zoom || 1, 1e-6);
+    const pxTolWorld = 8 / Math.max(cam.scale || 1, 1e-6);
     // Selektierte Tür zuerst
     const ordered = [...this.app.scene.doors].sort((a, b) =>
       (a.id === this.selectedDoorId ? -1 : 0) - (b.id === this.selectedDoorId ? -1 : 0));
