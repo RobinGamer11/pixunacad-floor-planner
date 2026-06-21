@@ -648,7 +648,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
         {/* Raster (Grid) Toggle — über "Auswahl" */}
         <div className="p-2">
           <button
-            onClick={() => { setGridPanelOpen(o => !o); setGridEnabled(e => !e); }}
+            onClick={() => { setGridEnabled(e => !e); setGridPanelOpen(true); }}
             title={sidebarCollapsed ? "Raster ein/aus" : undefined}
             className={`cad-toolbar-btn ${gridEnabled ? "active" : ""} ${
               sidebarCollapsed ? "justify-center px-0 h-10 w-10 mx-auto" : "w-full justify-between"
