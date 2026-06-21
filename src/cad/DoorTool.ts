@@ -224,15 +224,16 @@ export class DoorTool {
   update(input: Input) {
     // Hover für Platzierung berechnen
     this._hoverWallId = null;
-    const hit = this._hitWall(input);
-    if (hit) {
-      // Begrenzung: Tür muss komplett auf der Wand liegen
-      let total = 0;
-      for (let i = 1; i < hit.wall.corners.length; i++) total += dist(hit.wall.corners[i - 1], hit.wall.corners[i]);
-      const half = this.settings.widthM / 2;
-      const clamped = Math.max(half, Math.min(total - half, hit.posM));
-      this._hoverWallId = hit.wall.id;
-      this._hoverPosM = clamped;
+    if (this.placementMode) {
+      const hit = this._hitWall(input);
+      if (hit) {
+        let total = 0;
+        for (let i = 1; i < hit.wall.corners.length; i++) total += dist(hit.wall.corners[i - 1], hit.wall.corners[i]);
+        const half = this.settings.widthM / 2;
+        const clamped = Math.max(half, Math.min(total - half, hit.posM));
+        this._hoverWallId = hit.wall.id;
+        this._hoverPosM = clamped;
+      }
     }
 
     // Drag-Resize (Endpunkt-Handles)
