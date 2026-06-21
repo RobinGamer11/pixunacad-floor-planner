@@ -434,9 +434,13 @@ export type DoorSide = "inner" | "outer";
 export type DoorHand = "left" | "right";
 export type DoorEdge = "inner" | "center" | "outer";
 
+export type DoorKind = "door" | "window";
+
 export class Door {
   id: string;
   wallId: string;
+  /** "door" = klassische Tür mit Flügel+Schwung. "window" = Fenster mit zwei Linien. */
+  kind: DoorKind;
   /** Position des Türmittelpunkts entlang Wand-Bezugslinie (Meter ab Start). */
   posM: number;
   /** Gesamte Öffnungsbreite (mit Laibungen). */
@@ -456,16 +460,23 @@ export class Door {
   jambLenM: number;
   /** Laibungsdicke (quer zur Wand, in m). 0 = volle Wandstärke. */
   jambThickM: number;
+  /** Flügeltür sichtbar (default: true für Tür, false für Fenster). */
+  sashEnabled: boolean;
+  /** Farbe der Fenster-Linien (nur kind="window"). */
+  glassColor: string;
   labelId: string;
 
   constructor(opts: {
     id: string; wallId: string; posM: number; widthM: number; heightM?: number;
+    kind?: DoorKind;
     side?: DoorSide; hand?: DoorHand; edge?: DoorEdge; color?: string;
     jambEnabled?: boolean; jambColor?: string; jambLenM?: number; jambThickM?: number;
+    sashEnabled?: boolean; glassColor?: string;
     labelId?: string;
   }) {
     this.id = opts.id;
     this.wallId = opts.wallId;
+    this.kind = opts.kind || "door";
     this.posM = opts.posM;
     this.widthM = Math.max(0.1, opts.widthM);
     this.heightM = opts.heightM ?? 2.1;
@@ -477,6 +488,8 @@ export class Door {
     this.jambColor = opts.jambColor || "#9aa3ad";
     this.jambLenM = (typeof opts.jambLenM === "number" && opts.jambLenM >= 0) ? opts.jambLenM : 0.06;
     this.jambThickM = (typeof opts.jambThickM === "number" && opts.jambThickM >= 0) ? opts.jambThickM : 0;
+    this.sashEnabled = (typeof opts.sashEnabled === "boolean") ? opts.sashEnabled : (this.kind === "door");
+    this.glassColor = opts.glassColor || "#2a2f36";
     this.labelId = opts.labelId || Defaults.defaultLabelId;
   }
 }
@@ -1075,8 +1088,10 @@ export class Scene {
   // ---- Doors (Türen) ----
   createDoor(opts: {
     wallId: string; posM: number; widthM: number; heightM?: number;
+    kind?: DoorKind;
     side?: DoorSide; hand?: DoorHand; edge?: DoorEdge; color?: string;
     jambEnabled?: boolean; jambColor?: string; jambLenM?: number; jambThickM?: number;
+    sashEnabled?: boolean; glassColor?: string;
     labelId?: string;
   }): Door {
     const d = new Door({ id: this._makeId(), ...opts });

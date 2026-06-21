@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import { CadApp } from "@/cad/CadApp";
 import { ToolIds, PointEditAction } from "@/cad/constants";
-import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Pipette, Sticker as StickerIcon, Pencil, Trash2, Download, Upload, Plus, FileImage, FileText, Maximize2, Ruler as RulerIcon, Eraser, Construction, PaintBucket, Grid3x3, DoorOpen, AppWindow } from "lucide-react";
+import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Pipette, Sticker as StickerIcon, Pencil, Trash2, Download, Upload, Plus, FileImage, FileText, Maximize2, Ruler as RulerIcon, Eraser, Construction, PaintBucket, Grid3x3, DoorOpen, AppWindow, Move } from "lucide-react";
 import type { HatchDrawMode } from "@/cad/HatchTool";
 import type { StickerDefinition } from "@/cad/StickerManager";
 import { instanceBoundingCornersWorld } from "@/cad/StickerManager";
@@ -199,7 +199,11 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
   const [doorJambColor, setDoorJambColor] = useState<string>("#9aa3ad");
   const [doorJambLenM, setDoorJambLenM] = useState<number>(0.06);
   const [doorJambThickM, setDoorJambThickM] = useState<number>(0);
+  const [doorSashEnabled, setDoorSashEnabled] = useState<boolean>(true);
+  const [doorGlassColor, setDoorGlassColor] = useState<string>("#2a2f36");
   const [doorSelectedId, setDoorSelectedId] = useState<string | null>(null);
+  const [doorHub, setDoorHub] = useState<{ visible: boolean; screenX: number; screenY: number; doorId: string | null; posM: number; moving: boolean }>({ visible: false, screenX: 0, screenY: 0, doorId: null, posM: 0, moving: false });
+  const [doorHubPosInput, setDoorHubPosInput] = useState<string>("");
 
   // Renderer-Settings synchron halten
   useEffect(() => {
@@ -228,8 +232,13 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
     app.doorTool.settings.jambColor = doorJambColor;
     app.doorTool.settings.jambLenM = doorJambLenM;
     app.doorTool.settings.jambThickM = doorJambThickM;
+    app.doorTool.settings.sashEnabled = doorSashEnabled;
+    app.doorTool.settings.glassColor = doorGlassColor;
     app.doorTool.applySettingsToSelection();
-  }, [doorMode, doorWidthM, doorHeightM, doorSide, doorHand, doorEdge, doorColor, doorJambEnabled, doorJambColor, doorJambLenM, doorJambThickM]);
+  }, [doorMode, doorWidthM, doorHeightM, doorSide, doorHand, doorEdge, doorColor, doorJambEnabled, doorJambColor, doorJambLenM, doorJambThickM, doorSashEnabled, doorGlassColor]);
+
+
+
 
   
 
@@ -433,6 +442,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
       if (id) {
         const d = app.scene.getDoorById(id);
         if (d) {
+          setDoorMode(d.kind);
           setDoorWidthM(d.widthM);
           setDoorHeightM(d.heightM);
           setDoorSide(d.side);
@@ -443,8 +453,14 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
           setDoorJambColor(d.jambColor);
           setDoorJambLenM(d.jambLenM);
           setDoorJambThickM(d.jambThickM);
+          setDoorSashEnabled(d.sashEnabled);
+          setDoorGlassColor(d.glassColor);
         }
       }
+    };
+    app.doorTool.onHubChange = (state) => {
+      setDoorHub({ ...state });
+      setDoorHubPosInput(state.visible ? state.posM.toFixed(3) : "");
     };
 
     // Zeichnungs-ID-Panel verdrahten (Schritt 1: nur UI)
@@ -1316,12 +1332,12 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
           {!sidebarCollapsed && activeTool === ToolIds.DOOR && (
             <div className="cad-settings-panel mb-2">
               <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
-                {doorSelectedId ? "Tür bearbeiten" : "Türen/Fenster"}
+                {doorSelectedId ? (doorMode === "window" ? "Fenster bearbeiten" : "Tür bearbeiten") : "Türen/Fenster"}
               </div>
               <div className="flex gap-1 mb-3">
                 <button
                   type="button"
-                  onClick={() => setDoorMode("door")}
+                  onClick={() => { setDoorMode("door"); setDoorSashEnabled(true); }}
                   title="Tür"
                   className={`cad-toolbar-btn flex-1 justify-center h-9 ${doorMode === "door" ? "active" : ""}`}
                 >
@@ -1329,19 +1345,16 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setDoorMode("window")}
-                  title="Fenster (demnächst)"
+                  onClick={() => { setDoorMode("window"); setDoorSashEnabled(false); }}
+                  title="Fenster"
                   className={`cad-toolbar-btn flex-1 justify-center h-9 ${doorMode === "window" ? "active" : ""}`}
                 >
                   <AppWindow className="h-4 w-4" />
                 </button>
               </div>
-              {doorMode === "window" && (
-                <div className="text-xs opacity-70 mb-2">Fenster-Werkzeug folgt im nächsten Schritt.</div>
-              )}
               <div className="space-y-3">
                 <div>
-                  <label>Türbreite (m) — mit Laibung</label>
+                  <label>{doorMode === "window" ? "Fensterbreite" : "Türbreite"} (m) — mit Laibung</label>
                   <input
                     type="number" min={0.1} step={0.05}
                     value={doorWidthM}
@@ -1427,14 +1440,38 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
                     </button>
                   </div>
                 </div>
-                <div>
-                  <label>Tür-Farbe</label>
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))", background: doorColor }} />
-                    <input type="color" value={doorColor} onChange={(e) => setDoorColor(e.target.value)}
-                      className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
+                {(doorMode === "door" || doorSashEnabled) && (
+                  <div>
+                    <label>{doorMode === "window" ? "Flügel-Farbe" : "Tür-Farbe"}</label>
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))", background: doorColor }} />
+                      <input type="color" value={doorColor} onChange={(e) => setDoorColor(e.target.value)}
+                        className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
+                    </div>
                   </div>
-                </div>
+                )}
+
+                {doorMode === "window" && (
+                  <>
+                    <div>
+                      <label>Fenster-Farbe (Linien)</label>
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))", background: doorGlassColor }} />
+                        <input type="color" value={doorGlassColor} onChange={(e) => setDoorGlassColor(e.target.value)}
+                          className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="flex items-center justify-between">
+                        <span>Flügeltür (Schwung anzeigen)</span>
+                        <button type="button" onClick={() => setDoorSashEnabled(!doorSashEnabled)}
+                          className={`cad-toolbar-btn h-7 px-2 text-[11px] ${doorSashEnabled ? "active" : ""}`}>
+                          {doorSashEnabled ? "Ein" : "Aus"}
+                        </button>
+                      </label>
+                    </div>
+                  </>
+                )}
 
                 {/* Laibung */}
                 <div className="border-t pt-3" style={{ borderColor: "hsl(var(--border))" }}>
@@ -1492,13 +1529,13 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
                     className="cad-toolbar-btn w-full justify-center h-8 text-[11px]"
                     style={{ color: "hsl(var(--destructive))" }}
                   >
-                    Tür löschen
+                    {doorMode === "window" ? "Fenster" : "Tür"} löschen
                   </button>
                 )}
                 <div className="text-[11px] opacity-70">
                   {doorSelectedId
-                    ? "Endpunkte mit den Hub-Boxen ziehen, um Breite anzupassen."
-                    : "Klick auf eine Wand setzt die Tür."}
+                    ? "Endpunkt anklicken → Hubbox für Bewegen/Position. Endpunkte ziehen ändert Breite."
+                    : `Klick auf eine Wand setzt ${doorMode === "window" ? "ein Fenster" : "eine Tür"}.`}
                 </div>
               </div>
             </div>
@@ -1772,6 +1809,45 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
           <input ref={hubLenRef} type="text" readOnly className="text-xs" />
           <input ref={hubAngRef} type="text" readOnly className="text-xs" />
         </div>
+
+        {/* Door/Window Hub Box */}
+        {doorHub.visible && (
+          <div
+            className="absolute z-30 flex items-center gap-1 px-2 py-1 rounded-md shadow-lg"
+            style={{
+              left: Math.max(8, doorHub.screenX - 70),
+              top: Math.max(8, doorHub.screenY - 32),
+              background: "hsl(var(--card))",
+              border: "1px solid hsl(var(--border))",
+            }}
+          >
+            <button
+              type="button"
+              title={doorHub.moving ? "Klicken im Plan fixiert" : "Bewegen"}
+              onClick={() => appRef.current?.doorTool.beginFollowMove()}
+              className={`cad-toolbar-btn h-7 w-7 justify-center px-0 ${doorHub.moving ? "active" : ""}`}
+            >
+              <Move className="h-3.5 w-3.5" />
+            </button>
+            <input
+              type="text"
+              value={doorHubPosInput}
+              onChange={(e) => setDoorHubPosInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  const n = parseFloat(doorHubPosInput.replace(",", "."));
+                  if (Number.isFinite(n)) appRef.current?.doorTool.setSelectedPosM(n);
+                } else if (e.key === "Escape") {
+                  appRef.current?.doorTool.hideHub();
+                }
+              }}
+              className="text-xs w-20 px-2 py-1 rounded border bg-background"
+              style={{ borderColor: "hsl(var(--border))" }}
+              title="Position auf Wand (m)"
+            />
+            <span className="text-[10px] opacity-60">m</span>
+          </div>
+        )}
 
         {/* Point Edit Menu */}
         <div ref={pointEditRef} className="cad-point-menu absolute z-30 hidden">
