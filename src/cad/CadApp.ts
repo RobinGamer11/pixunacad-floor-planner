@@ -200,7 +200,8 @@ export class CadApp {
   freeDrawTool!: FreeDrawTool;
   eraserTool!: EraserTool;
   wallTool!: WallTool;
-  activeTool: SelectTool | LineTool | HatchTool | MeasureTool | TextTool | PipetteTool | StickerTool | DocumentTool | FreeDrawTool | EraserTool | WallTool;
+  doorTool!: DoorTool;
+  activeTool: SelectTool | LineTool | HatchTool | MeasureTool | TextTool | PipetteTool | StickerTool | DocumentTool | FreeDrawTool | EraserTool | WallTool | DoorTool;
 
   // Clipboard + Paste-Vorschau
   clipboard: Clipboard | null = null;
