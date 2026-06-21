@@ -36,6 +36,9 @@ export class DoorTool {
   private _hoverPosM: number = 0;
   /** Drag-Resize-State. */
   private _dragHandle: "left" | "right" | null = null;
+  /** Drag-Move-State (Verschieben entlang Wand). */
+  private _dragMove: boolean = false;
+  private _dragMoveOffsetM: number = 0;
   /** Settings-Update-Callback (von CadEditor gesetzt) — feuert wenn Selection wechselt. */
   onSelectionChange: ((doorId: string | null) => void) | null = null;
 
