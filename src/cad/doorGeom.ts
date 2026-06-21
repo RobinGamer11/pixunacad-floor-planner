@@ -66,17 +66,22 @@ export function doorGeometry(wall: Wall, door: Door) {
   const half = door.widthM / 2;
   const tan = at.t;
   const n = at.n;
-  const leftEnd = v(at.p.x - tan.x * half, at.p.y - tan.y * half);
-  const rightEnd = v(at.p.x + tan.x * half, at.p.y + tan.y * half);
+  // Bezugslinie → echte Wandmitte (n zeigt in Richtung perpLeftScreen der Zeichenrichtung).
+  // Offsets analog zu computeWallLines.helpOff:
+  const t = wall.thicknessM;
+  const helpOff = wall.referenceSide === "inner" ? +t / 2
+    : wall.referenceSide === "center" ? 0
+    : -t / 2;
+  const center = v(at.p.x + n.x * helpOff, at.p.y + n.y * helpOff);
+  const leftEnd = v(center.x - tan.x * half, center.y - tan.y * half);
+  const rightEnd = v(center.x + tan.x * half, center.y + tan.y * half);
   // "left" hand = Angel am linken Öffnungsende, "right" = rechts
   const hinge = door.hand === "left" ? leftEnd : rightEnd;
-  const openSign = door.side === "inner" ? +1 : -1; // n zeigt nach Screen-links (perpLeft)
-  // Türblatt-Ende: 90° gedreht vom Öffnungsverlauf
-  const dirAlong = door.hand === "left" ? +1 : -1; // Richtung Türblatt-Ende relativ zu tan
-  // Ende des geöffneten Türblatts ≈ rechtwinklig zur Wand mit Länge = widthM
+  const openSign = door.side === "inner" ? +1 : -1;
+  const dirAlong = door.hand === "left" ? +1 : -1;
   const leafEnd = v(hinge.x + n.x * door.widthM * openSign, hinge.y + n.y * door.widthM * openSign);
   return {
-    center: at.p, tan, n, leftEnd, rightEnd, hinge, leafEnd,
+    center, tan, n, leftEnd, rightEnd, hinge, leafEnd,
     openSign, dirAlong, thicknessM: wall.thicknessM,
   };
 }
@@ -97,8 +102,9 @@ export function drawDoor(
   ctx.lineWidth = 1.5;
   ctx.lineCap = "round";
 
-  // Weiße "Öffnungsfüllung" — überdeckt Wandfläche zwischen den Laibungen
-  const half = wall.thicknessM / 2;
+  // Weiße "Öffnungsfüllung" — überdeckt die GANZE Wandfläche zwischen den Laibungen.
+  // Kleiner Bleed, damit kein dünner Restbalken stehen bleibt.
+  const half = wall.thicknessM / 2 + 0.01;
   const corners = [
     v(g.leftEnd.x - g.n.x * half, g.leftEnd.y - g.n.y * half),
     v(g.leftEnd.x + g.n.x * half, g.leftEnd.y + g.n.y * half),
