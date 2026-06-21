@@ -53,12 +53,11 @@ export function projectPointToWall(wall: Wall, p: Vec2): { s: number; dist: numb
 
 /**
  * Geometrie einer Tür (in Welt-Koordinaten).
- * - center: Mittelpunkt der Tür auf Bezugslinie
- * - tan/normal: Wand-Tangente / Normale
- * - leftEnd/rightEnd: Türöffnungs-Endpunkte entlang Bezugslinie
- * - hingePoint: Türangel (Endpunkt je nach hand)
- * - leafEnd: freies Türblatt-Ende (rechtwinklig)
- * - openSign: Vorzeichen für Öffnungsseite (innen/außen)
+ *  - leftEnd/rightEnd: Öffnungs-Endpunkte auf der WAND-MITTELLINIE
+ *  - leftInner/rightInner/leftOuter/rightOuter: Ecken der Öffnung an den beiden Wandkanten
+ *  - hinge: Türangel-Eckpunkt (an einer der vier Ecken)
+ *  - closedEnd: gegenüberliegender Eckpunkt auf gleicher Wandkante wie hinge (Bogen-Endpunkt)
+ *  - leafEnd: Türblatt-Spitze (90° geöffnet, perpendicular vom hinge in Raum)
  */
 export function doorGeometry(wall: Wall, door: Door) {
   const at = pointOnWallAt(wall, door.posM);
@@ -66,23 +65,45 @@ export function doorGeometry(wall: Wall, door: Door) {
   const half = door.widthM / 2;
   const tan = at.t;
   const n = at.n;
-  // Bezugslinie → echte Wandmitte (n zeigt in Richtung perpLeftScreen der Zeichenrichtung).
-  // Offsets analog zu computeWallLines.helpOff:
+  // Bezugslinie → echte Wandmitte (Offset analog computeWallLines.helpOff):
   const t = wall.thicknessM;
   const helpOff = wall.referenceSide === "inner" ? +t / 2
     : wall.referenceSide === "center" ? 0
     : -t / 2;
   const center = v(at.p.x + n.x * helpOff, at.p.y + n.y * helpOff);
-  const leftEnd = v(center.x - tan.x * half, center.y - tan.y * half);
+  const leftEnd  = v(center.x - tan.x * half, center.y - tan.y * half);
   const rightEnd = v(center.x + tan.x * half, center.y + tan.y * half);
-  // "left" hand = Angel am linken Öffnungsende, "right" = rechts
-  const hinge = door.hand === "left" ? leftEnd : rightEnd;
-  const openSign = door.side === "inner" ? +1 : -1;
-  const dirAlong = door.hand === "left" ? +1 : -1;
+
+  // Wandkanten-Versatz: n zeigt vom Zentrum nach "links" in Screen-Koordinaten.
+  // Wir nennen +n = "innen" und -n = "außen" (konsistent zur bisherigen openSign).
+  const eInner = +1, eOuter = -1;
+  const edgeSign = door.side === "inner" ? eInner : eOuter;
+  const half_t = t / 2;
+  const off = (e: number) => v(n.x * half_t * e, n.y * half_t * e);
+  const oI = off(eInner), oO = off(eOuter);
+  const leftInner  = v(leftEnd.x + oI.x, leftEnd.y + oI.y);
+  const leftOuter  = v(leftEnd.x + oO.x, leftEnd.y + oO.y);
+  const rightInner = v(rightEnd.x + oI.x, rightEnd.y + oI.y);
+  const rightOuter = v(rightEnd.x + oO.x, rightEnd.y + oO.y);
+
+  // Hinge-Eckpunkt:  hand → links/rechts entlang Wand;  side → welche Kante
+  const hinge = door.hand === "left"
+    ? (edgeSign === eInner ? leftInner  : leftOuter)
+    : (edgeSign === eInner ? rightInner : rightOuter);
+  // "Geschlossen"-Endpunkt: gegenüberliegende Seite, gleiche Kante
+  const closedEnd = door.hand === "left"
+    ? (edgeSign === eInner ? rightInner : rightOuter)
+    : (edgeSign === eInner ? leftInner  : leftOuter);
+  // Türblatt schwingt in den GEGENÜBERLIEGENDEN Raum (weg von der Hinge-Kante)
+  const openSign = -edgeSign;
   const leafEnd = v(hinge.x + n.x * door.widthM * openSign, hinge.y + n.y * door.widthM * openSign);
+
   return {
-    center, tan, n, leftEnd, rightEnd, hinge, leafEnd,
-    openSign, dirAlong, thicknessM: wall.thicknessM,
+    center, tan, n,
+    leftEnd, rightEnd,
+    leftInner, leftOuter, rightInner, rightOuter,
+    hinge, closedEnd, leafEnd,
+    openSign, thicknessM: t,
   };
 }
 
@@ -98,43 +119,61 @@ export function drawDoor(
   if (!g) return;
   ctx.save();
   ctx.globalAlpha = alpha;
-  ctx.strokeStyle = door.color;
-  ctx.lineWidth = 1.5;
-  ctx.lineCap = "round";
 
-  // Weiße "Öffnungsfüllung" — überdeckt die GANZE Wandfläche zwischen den Laibungen.
-  // Kleiner Bleed, damit kein dünner Restbalken stehen bleibt.
+  // 1) Weiße Öffnungsfüllung — schneidet die Wand komplett auf
   const half = wall.thicknessM / 2 + 0.01;
-  const corners = [
-    v(g.leftEnd.x - g.n.x * half, g.leftEnd.y - g.n.y * half),
-    v(g.leftEnd.x + g.n.x * half, g.leftEnd.y + g.n.y * half),
+  const cornersOpen = [
+    v(g.leftEnd.x - g.n.x * half,  g.leftEnd.y - g.n.y * half),
+    v(g.leftEnd.x + g.n.x * half,  g.leftEnd.y + g.n.y * half),
     v(g.rightEnd.x + g.n.x * half, g.rightEnd.y + g.n.y * half),
     v(g.rightEnd.x - g.n.x * half, g.rightEnd.y - g.n.y * half),
   ];
-  ctx.save();
   ctx.fillStyle = "#ffffff";
   ctx.beginPath();
-  const s0 = cam.worldToScreen(corners[0].x, corners[0].y);
-  ctx.moveTo(s0.x, s0.y);
-  for (let i = 1; i < corners.length; i++) {
-    const s = cam.worldToScreen(corners[i].x, corners[i].y);
-    ctx.lineTo(s.x, s.y);
+  {
+    const s0 = cam.worldToScreen(cornersOpen[0].x, cornersOpen[0].y);
+    ctx.moveTo(s0.x, s0.y);
+    for (let i = 1; i < cornersOpen.length; i++) {
+      const s = cam.worldToScreen(cornersOpen[i].x, cornersOpen[i].y);
+      ctx.lineTo(s.x, s.y);
+    }
   }
   ctx.closePath();
   ctx.fill();
-  ctx.restore();
 
-  // Laibung (kurze Querstriche quer zur Wand) — markiert Öffnungs-Enden
-  for (const end of [g.leftEnd, g.rightEnd]) {
-    const a = cam.worldToScreen(end.x - g.n.x * half, end.y - g.n.y * half);
-    const b = cam.worldToScreen(end.x + g.n.x * half, end.y + g.n.y * half);
+  // 2) Laibungen (zwei kleine Blöcke) — voll über Wandstärke, kurze Länge entlang Wand
+  const jambLenM = Math.min(0.06, Math.max(0.03, wall.thicknessM * 0.35));
+  const drawJamb = (endpoint: Vec2, inward: number) => {
+    // inward = +1 (richtung Türmitte) oder -1 (von Mitte weg); Block geht nach AUSSEN, also -inward
+    const ax = endpoint.x - g.tan.x * jambLenM * inward;
+    const ay = endpoint.y - g.tan.y * jambLenM * inward;
+    const pts = [
+      v(endpoint.x - g.n.x * half, endpoint.y - g.n.y * half),
+      v(endpoint.x + g.n.x * half, endpoint.y + g.n.y * half),
+      v(ax + g.n.x * half,         ay + g.n.y * half),
+      v(ax - g.n.x * half,         ay - g.n.y * half),
+    ];
     ctx.beginPath();
-    ctx.moveTo(a.x, a.y);
-    ctx.lineTo(b.x, b.y);
+    const s0 = cam.worldToScreen(pts[0].x, pts[0].y);
+    ctx.moveTo(s0.x, s0.y);
+    for (let i = 1; i < pts.length; i++) {
+      const s = cam.worldToScreen(pts[i].x, pts[i].y);
+      ctx.lineTo(s.x, s.y);
+    }
+    ctx.closePath();
+    ctx.fillStyle = "#9aa3ad";
+    ctx.fill();
+    ctx.strokeStyle = "#3a3f46";
+    ctx.lineWidth = 1;
     ctx.stroke();
-  }
+  };
+  // leftEnd: Block ragt nach links (von Türmitte weg) → inward=+1 (so dass -inward = -1 → tan*-1)
+  drawJamb(g.leftEnd, +1);
+  drawJamb(g.rightEnd, -1);
 
-  // Türblatt
+  // 3) Türblatt (vom hinge zum leafEnd)
+  ctx.strokeStyle = door.color;
+  ctx.lineCap = "round";
   const sh = cam.worldToScreen(g.hinge.x, g.hinge.y);
   const sl = cam.worldToScreen(g.leafEnd.x, g.leafEnd.y);
   ctx.lineWidth = 2.5;
@@ -143,19 +182,17 @@ export function drawDoor(
   ctx.lineTo(sl.x, sl.y);
   ctx.stroke();
 
-  // Öffnungs-Bogen (Viertelkreis)
-  const opp = door.hand === "left" ? g.rightEnd : g.leftEnd;
-  const sCenter = cam.worldToScreen(g.hinge.x, g.hinge.y);
-  const radiusPx = Math.hypot(sl.x - sCenter.x, sl.y - sCenter.y);
-  const startAng = Math.atan2(sl.y - sCenter.y, sl.x - sCenter.x);
-  const sOpp = cam.worldToScreen(opp.x, opp.y);
-  const endAng = Math.atan2(sOpp.y - sCenter.y, sOpp.x - sCenter.x);
-  ctx.lineWidth = 1.2;
+  // 4) Öffnungs-Bogen (Viertelkreis): von leafEnd nach closedEnd, Zentrum = hinge
+  const sClosed = cam.worldToScreen(g.closedEnd.x, g.closedEnd.y);
+  const radiusPx = Math.hypot(sl.x - sh.x, sl.y - sh.y);
+  const startAng = Math.atan2(sl.y - sh.y, sl.x - sh.x);
+  const endAng   = Math.atan2(sClosed.y - sh.y, sClosed.x - sh.x);
   let delta = endAng - startAng;
   while (delta > Math.PI) delta -= 2 * Math.PI;
   while (delta < -Math.PI) delta += 2 * Math.PI;
+  ctx.lineWidth = 1.2;
   ctx.beginPath();
-  ctx.arc(sCenter.x, sCenter.y, radiusPx, startAng, startAng + delta, delta < 0);
+  ctx.arc(sh.x, sh.y, radiusPx, startAng, startAng + delta, delta < 0);
   ctx.stroke();
 
   ctx.restore();
