@@ -147,7 +147,12 @@ export class DoorTool {
         this.settings.heightM = d.heightM;
         this.settings.side = d.side;
         this.settings.hand = d.hand;
+        this.settings.edge = d.edge;
         this.settings.color = d.color;
+        this.settings.jambEnabled = d.jambEnabled;
+        this.settings.jambColor = d.jambColor;
+        this.settings.jambLenM = d.jambLenM;
+        this.settings.jambThickM = d.jambThickM;
       }
     }
     this.onSelectionChange?.(id);
@@ -169,7 +174,12 @@ export class DoorTool {
     d.heightM = this.settings.heightM;
     d.side = this.settings.side;
     d.hand = this.settings.hand;
+    d.edge = this.settings.edge;
     d.color = this.settings.color;
+    d.jambEnabled = this.settings.jambEnabled;
+    d.jambColor = this.settings.jambColor;
+    d.jambLenM = Math.max(0, this.settings.jambLenM);
+    d.jambThickM = Math.max(0, this.settings.jambThickM);
     // Position innerhalb Wand halten
     d.posM = Math.max(d.widthM / 2, Math.min(total - d.widthM / 2, d.posM));
   }
