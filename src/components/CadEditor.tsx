@@ -560,6 +560,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
       pixelWidth: first.pixelWidth, pixelHeight: first.pixelHeight,
       name: first.name, kind: first.kind, pageIndex: first.pageIndex,
       importScaleDenom: safeDenom,
+      pdfSourceB64: first.pdfSourceB64 || null,
     });
     let offX = firstW + 0.5;
     for (const p of rest) {
@@ -571,6 +572,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
         pixelWidth: p.pixelWidth, pixelHeight: p.pixelHeight,
         labelId: app.activeDrawLabelId,
         importScaleDenom: safeDenom,
+        pdfSourceB64: p.pdfSourceB64 || null,
       });
       offX += pw + 0.5;
     }
@@ -1195,6 +1197,24 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
                   <RulerIcon className="h-4 w-4" />
                   <span className="text-xs">Skalieren (Maßkette)</span>
                 </button>
+                {docSelected.kind === "pdf-page" && !!docSelected.pdfSourceB64 && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const app = appRef.current; if (!app) return;
+                      if (!window.confirm(`PDF "${docSelected.name}" in CAD-Objekte auflösen?\n\nLinien, Schraffuren und Texte werden in eine neue Ebene "PDF-Import — ${docSelected.name}" extrahiert; das Original wird entfernt.`)) return;
+                      const res = await app.documentTool.dissolvePdf(docSelected.id);
+                      if (res) {
+                        window.alert(`Auflösen erfolgreich:\n${res.segments} Linien · ${res.hatches} Schraffuren · ${res.texts} Texte`);
+                      }
+                    }}
+                    className="cad-toolbar-btn w-full justify-center h-9"
+                    title="PDF-Vektoren extrahieren und in Linien/Schraffuren/Texte konvertieren"
+                  >
+                    <FileText className="h-4 w-4" />
+                    <span className="text-xs">Auflösen → CAD-Objekte</span>
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => {
