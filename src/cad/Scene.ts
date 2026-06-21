@@ -430,6 +430,37 @@ export type WallCornerAnchor =
   | { kind: "subMiter"; hostWallId: string; hostCornerIndex: number }
   | { kind: "subEdge"; hostWallId: string; hostEdgeIndex: number; t: number };
 
+export type DoorSide = "inner" | "outer";
+export type DoorHand = "left" | "right";
+
+export class Door {
+  id: string;
+  wallId: string;
+  /** Position des Türmittelpunkts entlang Wand-Bezugslinie (Meter ab Start). */
+  posM: number;
+  widthM: number;
+  heightM: number;
+  side: DoorSide;
+  hand: DoorHand;
+  color: string;
+  labelId: string;
+
+  constructor(opts: {
+    id: string; wallId: string; posM: number; widthM: number; heightM?: number;
+    side?: DoorSide; hand?: DoorHand; color?: string; labelId?: string;
+  }) {
+    this.id = opts.id;
+    this.wallId = opts.wallId;
+    this.posM = opts.posM;
+    this.widthM = Math.max(0.1, opts.widthM);
+    this.heightM = opts.heightM ?? 2.1;
+    this.side = opts.side || "inner";
+    this.hand = opts.hand || "left";
+    this.color = opts.color || "#111111";
+    this.labelId = opts.labelId || Defaults.defaultLabelId;
+  }
+}
+
 
 export class Scene {
   segments: Segment[] = [];
@@ -441,6 +472,7 @@ export class Scene {
   stickerInstances: StickerInstance[] = [];
   documents: DocumentObject[] = [];
   walls: Wall[] = [];
+  doors: Door[] = [];
   /**
    * Wenn !== null: alle danach via create* erzeugten Objekte werden mit dieser
    * Sticker-Edit-Owner-ID markiert. Wird von CadApp während enterStickerEdit
@@ -1019,4 +1051,22 @@ export class Scene {
     this.markWallsDirty();
     return [wA, wB];
   }
+
+  // ---- Doors (Türen) ----
+  createDoor(opts: {
+    wallId: string; posM: number; widthM: number; heightM?: number;
+    side?: DoorSide; hand?: DoorHand; color?: string; labelId?: string;
+  }): Door {
+    const d = new Door({ id: this._makeId(), ...opts });
+    this.doors.push(d);
+    return d;
+  }
+  getDoorById(id: string): Door | null { return this.doors.find(d => d.id === id) || null; }
+  getDoorsByWallId(wallId: string): Door[] { return this.doors.filter(d => d.wallId === wallId); }
+  getDoorsByLabelId(labelId: string): Door[] { return this.doors.filter(d => d.labelId === labelId); }
+  removeDoor(d: Door) { this.doors = this.doors.filter(x => x !== d); }
+  removeDoorsByIds(ids: string[]) { const set = new Set(ids); this.doors = this.doors.filter(d => !set.has(d.id)); }
+  removeDoorsByWallId(wallId: string) { this.doors = this.doors.filter(d => d.wallId !== wallId); }
+  removeDoorsByLabelId(labelId: string) { this.doors = this.doors.filter(d => d.labelId !== labelId); }
+  reassignDoorsLabel(oldId: string, newId: string) { for (const d of this.doors) if (d.labelId === oldId) d.labelId = newId; }
 }

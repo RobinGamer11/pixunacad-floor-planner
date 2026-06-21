@@ -14,6 +14,7 @@ import { getOrCreateDocMask } from "./documentMask";
 import { computeHealedWallLines } from "./wallHeal";
 import { getWallUnionGroups } from "./wallUnion";
 import { buildHealedWallSolidRing, ringToPCPolygon } from "./wallSolid";
+import { drawDoor } from "./doorGeom";
 import { type MultiPolygon } from "polygon-clipping";
 
 export interface Selection {
@@ -245,6 +246,7 @@ export class Renderer {
       this._drawDocumentsForLabel(labelId);
       this._drawHatchesForLabel(labelId);
       this._drawWallsForLabel(labelId);
+      this._drawDoorsForLabel(labelId);
       this._drawSegmentsForLabel(labelId);
       this._drawFreeStrokesForLabel(labelId);
       this._drawDimensionsForLabel(labelId);
@@ -929,6 +931,16 @@ export class Renderer {
       ctx.stroke();
     }
     ctx.restore();
+  }
+
+  private _drawDoorsForLabel(labelId: string) {
+    if (!this.scene.doors || this.scene.doors.length === 0) return;
+    for (const d of this.scene.doors) {
+      if (d.labelId !== labelId) continue;
+      const w = this.scene.getWallById(d.wallId);
+      if (!w) continue;
+      drawDoor(this.ctx, this.camera, w, d, 1);
+    }
   }
 
   private _drawWallsForLabel(labelId: string) {

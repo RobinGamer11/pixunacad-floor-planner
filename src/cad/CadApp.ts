@@ -23,6 +23,7 @@ import { DocumentTool } from "./DocumentTool";
 import { FreeDrawTool } from "./FreeDrawTool";
 import { EraserTool } from "./EraserTool";
 import { WallTool } from "./WallTool";
+import { DoorTool } from "./DoorTool";
 
 import { IdPanel } from "./IdPanel";
 import { SheetManager, SheetOverlayStore, SheetDefaults } from "./SheetManager";
@@ -199,7 +200,8 @@ export class CadApp {
   freeDrawTool!: FreeDrawTool;
   eraserTool!: EraserTool;
   wallTool!: WallTool;
-  activeTool: SelectTool | LineTool | HatchTool | MeasureTool | TextTool | PipetteTool | StickerTool | DocumentTool | FreeDrawTool | EraserTool | WallTool;
+  doorTool!: DoorTool;
+  activeTool: SelectTool | LineTool | HatchTool | MeasureTool | TextTool | PipetteTool | StickerTool | DocumentTool | FreeDrawTool | EraserTool | WallTool | DoorTool;
 
   // Clipboard + Paste-Vorschau
   clipboard: Clipboard | null = null;
@@ -390,6 +392,7 @@ export class CadApp {
     this.freeDrawTool = new FreeDrawTool(this);
     this.eraserTool = new EraserTool(this);
     this.wallTool = new WallTool(this);
+    this.doorTool = new DoorTool(this);
     this.activeTool = this.selectTool;
 
     this.idPanel = new IdPanel(this, idPanelRoot, idPanelBody, idPanelList, idPanelAddBtn, idPanelToggleBtn);
@@ -522,6 +525,10 @@ export class CadApp {
         a: { x: scene.rulerGuide.a.x, y: scene.rulerGuide.a.y },
         b: { x: scene.rulerGuide.b.x, y: scene.rulerGuide.b.y },
       } : null,
+      doors: scene.doors.map(d => ({
+        id: d.id, wallId: d.wallId, posM: d.posM, widthM: d.widthM, heightM: d.heightM,
+        side: d.side, hand: d.hand, color: d.color, labelId: d.labelId,
+      })),
     };
   }
 
@@ -534,6 +541,7 @@ export class CadApp {
     scene.documents = [];
     scene.freeStrokes = [];
     scene.walls = [];
+    scene.doors = [];
     scene.rulerGuide = null;
     scene.markWallsDirty();
     (scene as any)._rebuildSegIdMap?.();
@@ -628,6 +636,13 @@ export class CadApp {
       if (d.id) (doc as any).id = d.id;
     }
     (scene as any)._rebuildDocIdMap?.();
+    for (const d of data.doors || []) {
+      const door = scene.createDoor({
+        wallId: d.wallId, posM: d.posM, widthM: d.widthM, heightM: d.heightM,
+        side: d.side, hand: d.hand, color: d.color, labelId: d.labelId,
+      });
+      if (d.id) (door as any).id = d.id;
+    }
   }
 
   private _serializeScene(): string {
@@ -1773,6 +1788,7 @@ export class CadApp {
       if (e.key === "f" || e.key === "F") this.setTool(ToolIds.FREE);
       if (e.key === "e" || e.key === "E") this.setTool(ToolIds.ERASER);
       if (e.key === "w" || e.key === "W") this.setTool(ToolIds.WALL);
+      if (e.key === "u" || e.key === "U") this.setTool(ToolIds.DOOR);
 
       // 'B' = Bezugslinie einer selektierten Wand an gegenüberliegender Kante koppeln
       // (cycelt outer → center → inner → outer, Wandkörper bleibt sichtbar gleich).
@@ -1795,6 +1811,10 @@ export class CadApp {
         if (this.activeTool === this.measureTool) { this.measureTool.cancel(); this.clearSelection(); this.setTool(ToolIds.SELECT); return; }
         if (this.activeTool === this.pipetteTool) { this.pipetteTool.cancel(); this.setTool(ToolIds.SELECT); return; }
         if (this.activeTool === this.wallTool) { this.wallTool.cancel(); this.setTool(ToolIds.SELECT); return; }
+        if (this.activeTool === this.doorTool) {
+          if (this.doorTool.selectedDoorId) { this.doorTool.selectDoor(null); return; }
+          this.doorTool.cancel(); this.setTool(ToolIds.SELECT); return;
+        }
         if (this.activeTool === this.stickerTool) {
           // Erst aktive Platzierung abbrechen, sonst Tool wechseln
           if (this.stickerTool.phase !== "idle") { this.stickerTool.cancel(); return; }
@@ -2089,6 +2109,7 @@ export class CadApp {
     else if (id === ToolIds.FREE) { this.activeTool = this.freeDrawTool; this.freeDrawTool.activate(); }
     else if (id === ToolIds.ERASER) { this.activeTool = this.eraserTool; this.eraserTool.activate(); }
     else if (id === ToolIds.WALL) { this.activeTool = this.wallTool; this.wallTool.activate(); }
+    else if (id === ToolIds.DOOR) { this.activeTool = this.doorTool; this.doorTool.activate(); }
     this._syncLineSettingsFromContext();
     this._syncHatchSettingsFromContext();
     this._syncMeasureSettingsFromContext();

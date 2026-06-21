@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import { CadApp } from "@/cad/CadApp";
 import { ToolIds, PointEditAction } from "@/cad/constants";
-import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Pipette, Sticker as StickerIcon, Pencil, Trash2, Download, Upload, Plus, FileImage, FileText, Maximize2, Ruler as RulerIcon, Eraser, Construction, PaintBucket, Grid3x3 } from "lucide-react";
+import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Pipette, Sticker as StickerIcon, Pencil, Trash2, Download, Upload, Plus, FileImage, FileText, Maximize2, Ruler as RulerIcon, Eraser, Construction, PaintBucket, Grid3x3, DoorOpen, AppWindow } from "lucide-react";
 import type { HatchDrawMode } from "@/cad/HatchTool";
 import type { StickerDefinition } from "@/cad/StickerManager";
 import { instanceBoundingCornersWorld } from "@/cad/StickerManager";
@@ -23,6 +23,7 @@ const CAD_TOOLS = [
   { id: ToolIds.STICKER, label: "Sticker", key: "O", icon: StickerIcon },
   { id: ToolIds.DOCUMENT, label: "Dokument", key: "D", icon: FileImage },
   { id: ToolIds.WALL, label: "Wand", key: "W", icon: Construction },
+  { id: ToolIds.DOOR, label: "Türen/Fenster", key: "U", icon: DoorOpen },
 ];
 
 // Sub-Werkzeuge unter "Linie": gemeinsam ein Einstellungsfenster mit
@@ -179,12 +180,21 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
   const [drawingScaleOpen, setDrawingScaleOpen] = useState(false);
   const [drawingScaleCustom, setDrawingScaleCustom] = useState<string>("100");
 
-  // Raster (Hintergrund-Grid) Einstellungen — Panel sichtbar, solange Raster aktiviert ist
-  
+  // Raster (Hintergrund-Grid) Einstellungen
   const [gridEnabled, setGridEnabled] = useState(true);
+  const [gridPanelOpen, setGridPanelOpen] = useState(false);
   const [gridSizeM, setGridSizeM] = useState<number>(1);
   const [gridColor, setGridColor] = useState<string>("#000000");
   const [gridOpacity, setGridOpacity] = useState<number>(0.06);
+
+  // Door tool state (Türen/Fenster)
+  const [doorMode, setDoorMode] = useState<"door" | "window">("door");
+  const [doorWidthM, setDoorWidthM] = useState<number>(0.9);
+  const [doorHeightM, setDoorHeightM] = useState<number>(2.1);
+  const [doorSide, setDoorSide] = useState<"inner" | "outer">("inner");
+  const [doorHand, setDoorHand] = useState<"left" | "right">("left");
+  const [doorColor, setDoorColor] = useState<string>("#111111");
+  const [doorSelectedId, setDoorSelectedId] = useState<string | null>(null);
 
   // Renderer-Settings synchron halten
   useEffect(() => {
@@ -197,6 +207,19 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
       opacity: gridOpacity,
     };
   }, [gridEnabled, gridSizeM, gridColor, gridOpacity]);
+
+  // Door tool settings sync
+  useEffect(() => {
+    const app = appRef.current;
+    if (!app) return;
+    app.doorTool.settings.mode = doorMode;
+    app.doorTool.settings.widthM = doorWidthM;
+    app.doorTool.settings.heightM = doorHeightM;
+    app.doorTool.settings.side = doorSide;
+    app.doorTool.settings.hand = doorHand;
+    app.doorTool.settings.color = doorColor;
+    app.doorTool.applySettingsToSelection();
+  }, [doorMode, doorWidthM, doorHeightM, doorSide, doorHand, doorColor]);
 
   
 
@@ -395,6 +418,19 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
       setSelectedFreeStrokeId(app.getSelectedFreeStroke()?.id || null);
     };
     app.setTool(ToolIds.SELECT);
+    app.doorTool.onSelectionChange = (id) => {
+      setDoorSelectedId(id);
+      if (id) {
+        const d = app.scene.getDoorById(id);
+        if (d) {
+          setDoorWidthM(d.widthM);
+          setDoorHeightM(d.heightM);
+          setDoorSide(d.side);
+          setDoorHand(d.hand);
+          setDoorColor(d.color);
+        }
+      }
+    };
 
     // Zeichnungs-ID-Panel verdrahten (Schritt 1: nur UI)
     app.attachSheetPanel(
@@ -512,10 +548,10 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
 
   const handleToolClick = useCallback((id: string) => {
     // "Linie" Sidebar-Knopf aktiviert die zuletzt gewählte Variante
-    // (Linie / Freihand / Radiergummi). Default: Linie.
     const targetId = id === ToolIds.LINE ? lineVariant : id;
     appRef.current?.setTool(targetId);
     setActiveTool(targetId);
+    setGridPanelOpen(false);
   }, [lineVariant]);
 
   const handleDocFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -640,27 +676,21 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
           >
             <Pipette className="h-4 w-4 shrink-0" />
           </button>
+          <button
+            onClick={() => {
+              setGridEnabled((e) => !e);
+              setGridPanelOpen(true);
+            }}
+            title={`Raster ${gridEnabled ? "aus" : "ein"}schalten — Einstellungen`}
+            className={`cad-toolbar-btn justify-center px-0 h-9 w-9 ${gridPanelOpen ? "active" : ""}`}
+            style={gridEnabled && !gridPanelOpen ? { color: "hsl(var(--primary))" } : undefined}
+          >
+            <Grid3x3 className="h-4 w-4 shrink-0" />
+          </button>
         </div>
 
         {/* Divider */}
         <div className="mx-3 border-t opacity-60" style={{ borderColor: "hsl(var(--cad-toolbar-border))" }} />
-
-        {/* Raster (Grid) Toggle — über "Auswahl" */}
-        <div className="p-2">
-          <button
-            onClick={() => setGridEnabled(e => !e)}
-            title={sidebarCollapsed ? "Raster ein/aus" : undefined}
-            className={`cad-toolbar-btn ${gridEnabled ? "active" : ""} ${
-              sidebarCollapsed ? "justify-center px-0 h-10 w-10 mx-auto" : "w-full justify-between"
-            }`}
-          >
-            <span className="flex items-center gap-2 min-w-0">
-              <Grid3x3 className="h-4 w-4 shrink-0" />
-              {!sidebarCollapsed && <span className="truncate">Raster</span>}
-            </span>
-            {!sidebarCollapsed && <span className="tool-key">{gridEnabled ? "EIN" : "AUS"}</span>}
-          </button>
-        </div>
 
         {/* Tool list */}
         <div className="flex flex-col gap-1 p-2">
@@ -697,7 +727,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
         {/* Settings area (scrollable) */}
         <div className="flex-1 min-h-0 overflow-y-auto p-2">
           {/* Raster-Einstellungen */}
-          {!sidebarCollapsed && gridEnabled && (
+          {!sidebarCollapsed && gridPanelOpen && (
             <div className="cad-settings-panel mb-2">
               <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
                 Raster
@@ -1265,6 +1295,122 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
           {/* Wand-Tool-Panel */}
           {!sidebarCollapsed && (activeTool === ToolIds.WALL || (activeTool === ToolIds.SELECT && selectedWallId)) && (
             <WallSettingsPanel app={appRef.current} />
+          )}
+
+          {/* Türen/Fenster Panel */}
+          {!sidebarCollapsed && activeTool === ToolIds.DOOR && (
+            <div className="cad-settings-panel mb-2">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+                {doorSelectedId ? "Tür bearbeiten" : "Türen/Fenster"}
+              </div>
+              <div className="flex gap-1 mb-3">
+                <button
+                  type="button"
+                  onClick={() => setDoorMode("door")}
+                  title="Tür"
+                  className={`cad-toolbar-btn flex-1 justify-center h-9 ${doorMode === "door" ? "active" : ""}`}
+                >
+                  <DoorOpen className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDoorMode("window")}
+                  title="Fenster (demnächst)"
+                  className={`cad-toolbar-btn flex-1 justify-center h-9 ${doorMode === "window" ? "active" : ""}`}
+                >
+                  <AppWindow className="h-4 w-4" />
+                </button>
+              </div>
+              {doorMode === "window" && (
+                <div className="text-xs opacity-70 mb-2">Fenster-Werkzeug folgt im nächsten Schritt.</div>
+              )}
+              <div className="space-y-3">
+                <div>
+                  <label>Breite (m)</label>
+                  <input
+                    type="number" min={0.1} step={0.05}
+                    value={doorWidthM}
+                    onChange={(e) => {
+                      const n = parseFloat(e.target.value.replace(",", "."));
+                      if (Number.isFinite(n) && n > 0) setDoorWidthM(n);
+                    }}
+                  />
+                </div>
+                <div className="flex gap-1.5 flex-wrap">
+                  {[0.7, 0.8, 0.9, 1.0, 1.1].map(v => (
+                    <button key={v} type="button" onClick={() => setDoorWidthM(v)}
+                      className={`cad-toolbar-btn h-7 px-2 text-[11px] ${Math.abs(doorWidthM - v) < 1e-6 ? "active" : ""}`}>
+                      {v.toFixed(2)} m
+                    </button>
+                  ))}
+                </div>
+                <div>
+                  <label>Höhe (m)</label>
+                  <input
+                    type="number" min={0.5} step={0.05}
+                    value={doorHeightM}
+                    onChange={(e) => {
+                      const n = parseFloat(e.target.value.replace(",", "."));
+                      if (Number.isFinite(n) && n > 0) setDoorHeightM(n);
+                    }}
+                  />
+                </div>
+                <div>
+                  <label>Öffnungsseite</label>
+                  <div className="flex gap-1">
+                    <button type="button" onClick={() => setDoorSide("inner")}
+                      className={`cad-toolbar-btn flex-1 justify-center h-8 text-[11px] ${doorSide === "inner" ? "active" : ""}`}>
+                      Innen
+                    </button>
+                    <button type="button" onClick={() => setDoorSide("outer")}
+                      className={`cad-toolbar-btn flex-1 justify-center h-8 text-[11px] ${doorSide === "outer" ? "active" : ""}`}>
+                      Außen
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <label>Öffnungsrichtung</label>
+                  <div className="flex gap-1">
+                    <button type="button" onClick={() => setDoorHand("left")}
+                      className={`cad-toolbar-btn flex-1 justify-center h-8 text-[11px] ${doorHand === "left" ? "active" : ""}`}>
+                      Links
+                    </button>
+                    <button type="button" onClick={() => setDoorHand("right")}
+                      className={`cad-toolbar-btn flex-1 justify-center h-8 text-[11px] ${doorHand === "right" ? "active" : ""}`}>
+                      Rechts
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <label>Farbe</label>
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))", background: doorColor }} />
+                    <input type="color" value={doorColor} onChange={(e) => setDoorColor(e.target.value)}
+                      className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
+                  </div>
+                </div>
+                {doorSelectedId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const app = appRef.current;
+                      if (!app) return;
+                      const d = app.scene.getDoorById(doorSelectedId);
+                      if (d) { app.scene.removeDoor(d); app.doorTool.selectDoor(null); }
+                    }}
+                    className="cad-toolbar-btn w-full justify-center h-8 text-[11px]"
+                    style={{ color: "hsl(var(--destructive))" }}
+                  >
+                    Tür löschen
+                  </button>
+                )}
+                <div className="text-[11px] opacity-70">
+                  {doorSelectedId
+                    ? "Endpunkte mit den Hub-Boxen ziehen, um Breite anzupassen."
+                    : "Klick auf eine Wand setzt die Tür."}
+                </div>
+              </div>
+            </div>
           )}
 
           {/* Document-Eigenschaften: nur im Auswahl-Tool, wenn Dokument selektiert */}
