@@ -1,55 +1,88 @@
-# Vektorbasiertes PDF + "Auflösen"-Feature
+## Plan: Raster-Toggle kompakter + neues Werkzeug "Türen/Fenster"
 
-## Was umgesetzt wird
+### Teil 1 — Raster: kompakter Toggle, Einstellungen nur on-demand
 
-### 1. Vektor-PDF auf Seite (`ProjectWorkspace`)
-- **"PDF einfügen"**-Button wird verkabelt (File-Picker, Multi-Page-Auswahl).
-- Neues Element `kind: "pdf"` speichert die Rohdaten der PDF-Seite (Base64) zusätzlich zur Rendervorschau.
-- Neue Komponente `PdfPageView` rendert die PDF-Seite über `pdfjs-dist` auf ein `<canvas>` und **re-rendert automatisch bei Zoom-/Größenänderung** (DevicePixelRatio × Zoom × Elementgröße). Cache pro Größe; debounced.
-- Element bekommt vollwertiges Verhalten: Hub-Box (vorhanden), Edge-Drag (vorhanden), Snap-Integration (vorhanden), Hilfslinien per Rechtsklick (vorhanden).
+**Aktuell:** Großer Raster-Button (volle Toolbar-Breite) über "Auswahl" + Einstellungspanel ist permanent sichtbar, solange `gridEnabled` true ist (egal welches Werkzeug aktiv ist).
 
-### 2. Vektor-PDF in CAD-Oberfläche
-- `ImportedPage` und `DocumentObject` bekommen neues Feld `pdfSourceB64?: string` (Rohdaten der gesamten PDF-Datei, einmal pro Datei, alle Seiten teilen sich die Quelle via Modul-Cache).
-- Bei `kind === "pdf-page"`-Dokumenten ersetzt der Renderer den statischen `<img>`-Pfad durch einen **adaptiven Render-Canvas**:
-  - Ziel-Pixelgröße = `widthM × camera.scale × DPR`
-  - Wenn aktuelle Cache-Größe < 0.8× oder > 2× der Zielgröße → asynchrones Re-Render via pdfjs.
-  - Während des Re-Renders bleibt das alte Canvas sichtbar (kein Flackern).
-- Erase-Maske bleibt vollständig kompatibel (wird in Pixelraum der aktuellen Cache-Größe geführt).
-- Scene-Serialisierung erweitert: `pdfSourceB64` wird mit gespeichert.
+**Neu:**
+- Raster-Button schrumpft auf ein kleines Icon-Quadrat (40×40, wie ein Header-Icon) in der oberen Toolbar-Zeile neben Undo/Redo/Pipette — nimmt keine eigene Zeile mehr ein.
+- Klick auf das Icon:
+  - schaltet `gridEnabled` an/aus (Hebel)
+  - markiert intern "Raster ist aktives Panel" → Einstellungspanel erscheint im Inspector
+  - der bisherige `activeTool`-State (Linie, Wand etc.) bleibt unverändert, das Werkzeug ist weiter aktiv für Maus-Interaktion
+- Klick auf ein anderes Werkzeug ⇒ Raster-Panel wird ausgeblendet (Grid bleibt sichtbar, falls aktiviert)
+- Neuer State `gridPanelOpen: boolean` (true, wenn der User zuletzt das Raster-Icon angeklickt hat; false, sobald irgendein anderes Werkzeug angeklickt wird)
+- Panel-Anzeige-Bedingung wird von `gridEnabled` auf `gridPanelOpen` umgestellt
+- `handleToolClick` setzt `gridPanelOpen=false`
 
-### 3. PDF "Auflösen" in CAD-Oberfläche
-- Neuer Eintrag im Document-Kontextmenü (Rechtsklick auf selektiertes PDF) und im Hub: **"Auflösen → CAD-Objekte"**.
-- Mit `pdfjs`:
-  - `page.getOperatorList()` → Pfade extrahieren (Move/Line/Curve/Close, Stroke/Fill-Marker).
-  - Bézier-Kurven werden via adaptiver Subdivision in Polylinien zerlegt (max-Fehler ≈ 0.1 mm im Plan-Maßstab).
-  - `page.getTextContent()` → Texte mit Position + Größe.
-- Mapping in CAD-Objekte (alle in neuen Layer `"PDF-Import-<dateiname>"`):
-  - Stroke-only Pfade → **Linien** (`scene.lines`), Polylinien als Segmentketten.
-  - Fill-Pfade → **Schraffuren** (`scene.hatches`) mit Original-Füllfarbe.
-  - Texte → **Text-Objekte** (`scene.texts`) mit Position, Schriftgröße, Inhalt.
-- Welt-Koordinaten: PDF-Punkte → Meter (`metersPerPdfPt`) × `importScaleDenom` × Dokument-Skalierungsfaktor; danach Rotation + Translation des Dokuments anwenden.
-- Nach erfolgreichem Auflösen: Original-Dokument wird gelöscht und Auswahl auf die neu erzeugten Objekte gesetzt.
-- Toast: "X Linien, Y Schraffuren, Z Texte erzeugt."
+### Teil 2 — Neues Werkzeug "Türen/Fenster"
 
-## Technische Details
+#### UI / Toolbar
+- Neuer Eintrag in `CAD_TOOLS` mit Icon (`DoorOpen` aus lucide), Label "Türen/Fenster", Hotkey "T"
+- Einstellungspanel mit zwei großen Symbol-Buttons oben: **Tür** | **Fenster** (Mode-Switch)
+- Gemeinsame Felder: Breite (m), Höhe (m, nur Metadaten/Eintrag), Wandstärke folgt automatisch der Trägerwand
+- Tür-spezifisch: Öffnungsseite (innen/außen), Öffnungsrichtung (links/rechts), Farbe
+- Fenster-spezifisch (Phase 2 — Platzhalter-UI vorgesehen, ohne Funktion, da heute nur Türen umzusetzen sind): Rahmenfarbe, Sprossen-Anzahl. *(Falls nur Tür für jetzt ausreicht, Fenster-Sub-Modus zeigt "Demnächst".)*
+
+#### Datenmodell (in `Scene.ts`)
+```
+type Opening = {
+  id: string;
+  kind: "door" | "window";
+  wallId: string;        // Trägerwand
+  tAlong: number;        // Parameter 0..1 entlang Wand-Mittelachse (Position des Tür-Mittelpunkts)
+  widthM: number;        // Öffnungsbreite
+  heightM: number;       // Türhöhe (Meta)
+  side: "inner" | "outer"; // Öffnung schwingt nach innen/außen
+  hand: "left" | "right";  // Drehrichtung (Angel links/rechts)
+  color: string;
+  labelId: string;       // Layer, vererbt von Wand
+};
+scene.openings: Opening[];
+```
+- Persistenz in Projektstore und Plan-Export, Undo/Redo via bestehendem History-Mechanismus
+- Boolean-Wandausschnitt: in `wallUnion.ts`/Renderer wird pro Wand-Polygon ein Loch (Rechteck quer zur Wand, volle Wandstärke × `widthM`) abgezogen, bevor das Wand-Polygon gefüllt/strichbar gerendert wird
+
+#### Rendering (in `Renderer.ts`)
+Für jede Tür:
+1. Mittelpunkt + Wand-Tangente/Normale aus Wand-Geometrie (Mittelachse)
+2. Wand wird an dieser Stelle "geöffnet" (Loch im Unionspolygon)
+3. Zwei kurze Querstriche (Laibung) an den Tür-Endpunkten quer zur Wand
+4. Türblatt: dünnes Rechteck (Länge = `widthM`, Dicke ≈ 4 px / 0.04 m) am Angelpunkt befestigt, Drehwinkel 90° entsprechend `side` × `hand`
+5. Öffnungs-Bogen (Viertelkreis, Radius = `widthM`) vom Türblatt-Ende zur Wandflucht, Farbe = `color` (siehe Referenzbild)
+
+#### Interaktion (`DoorTool.ts`, neu, + `SelectTool.ts`-Erweiterung)
+**Setzen (DoorTool):**
+- Hover über Wand → Vorschau der Tür snappt entlang der Wand-Mittelachse
+- Klick fixiert Position (`tAlong` so, dass Mittelpunkt unter Cursor liegt; mit Min-Abstand zu Wand-Enden)
+- ESC/Rechtsklick beendet
+
+**Bearbeiten (SelectTool):**
+- Tür anklickbar wie andere Objekte; zeigt zwei kleine **Hub-Boxen** an beiden Endpunkten (wie bestehende Linien-Hubs in `hubDrag.ts`)
+- Ziehen einer Hub-Box ändert `widthM` (und verschiebt `tAlong` so, dass die gegenüberliegende Seite fix bleibt) — Snapping auf Raster/Wand-Enden
+- Inspector-Panel zeigt für ausgewählte Tür: Breite, Höhe, Öffnungsseite (Toggle innen/außen), Öffnungsrichtung (Toggle links/rechts), Farbe — alle Live-bearbeitbar
+
+#### Out-of-scope für diesen Schritt
+- Fenster-Geometrie (Glas/Rahmen-Linien) — nur UI-Switch vorbereitet, Implementierung später
+- 3D-Höhe (heightM ist nur Metadaten)
+- Eckwand-Türen über zwei Wände hinweg
+- Drag der Position via Mitte der Tür (Phase 2; Position fix nach Setzen, neu setzen via Neuzeichnen)
 
 ### Geänderte/neue Dateien
-- `src/cad/documentImport.ts` — `pdfSourceB64` zurückliefern, pdfjs-Modul-Cache exportieren.
-- `src/cad/pdfVectorExtract.ts` *(neu)* — Extraktion via OperatorList + TextContent → Linien/Schraffuren/Texte.
-- `src/cad/Scene.ts` — `DocumentObject.pdfSourceB64`, serialize/deserialize.
-- `src/cad/Renderer.ts` — adaptiver PDF-Render-Pfad (`_getDocAdaptiveCanvas`).
-- `src/cad/DocumentTool.ts` oder `SelectTool.ts` — Kontextmenü-Eintrag "Auflösen".
-- `src/components/page/PdfPageView.tsx` *(neu)* — adaptive React-Komponente.
-- `src/pages/ProjectWorkspace.tsx` — "PDF einfügen"-Button verkabeln, `PdfPageView` für `kind === "pdf"` einbinden, Element-Inspector für PDF.
-- `src/lib/projectStore.ts` — `pdfSourceB64`, `pdfPageIndex`, `pdfPixelWidth/Height` an `PageElement`.
+- `src/components/CadEditor.tsx` — Raster-Icon kompakt, `gridPanelOpen`-State, Tür/Fenster-Tool-Eintrag + Inspector
+- `src/cad/CadApp.ts` — DoorTool registrieren, Selection-Inspector-API erweitern
+- `src/cad/DoorTool.ts` *(neu)* — Setzen, Hover-Preview, Wand-Snap
+- `src/cad/SelectTool.ts` — Auswahl + Hub-Boxen für Türen, Resize-Logik
+- `src/cad/Scene.ts` — `Opening`-Typ, `openings`-Array, Serialisierung
+- `src/cad/Renderer.ts` — Türen rendern (Bogen, Blatt, Laibung), Wand-Loch
+- `src/cad/wallUnion.ts` — Öffnungen aus Wand-Unionspolygon ausschneiden
+- `src/lib/projectStore.ts` — Persistenz für `openings`
 
-### Out-of-Scope (in dieser Iteration)
-- Echtes SVG-DOM-Rendering (Re-Render-Strategie liefert visuell dasselbe Ergebnis).
-- Schrift-Embedding 1:1 (Texte werden mit nächster passender System-Schrift gerendert; das ist konsistent mit anderem CAD-Text).
-- Komplexe PDF-Features (Pattern-Fills, Transparenz-Gruppen, Bilder im PDF-Inhalt) — werden beim Auflösen übersprungen.
+### Reihenfolge der Umsetzung
+1. Raster-Toggle kompakt + Panel-Sichtbarkeit (klein, isoliert)
+2. Door-Datenmodell + Renderer + DoorTool (Setzen)
+3. SelectTool: Auswahl + Hub-Boxen + Inspector-Bearbeitung
+4. Fenster-Sub-Modus (UI-Stub)
 
-## Reihenfolge in einem Commit
-1. `documentImport.ts` + `pdfSourceB64`-Propagation.
-2. Adaptiver Renderer + Scene-Serialisierung.
-3. `PdfPageView` + Page-Verkabelung.
-4. `pdfVectorExtract.ts` + "Auflösen"-Eintrag.
+### Offene Frage
+Soll Tür **nur in Wänden** platzierbar sein (Setzen ist nur möglich, wenn Cursor über einer Wand hovert), oder auch freistehend? Empfehlung: **nur in Wänden** (so wie AutoCAD/ArchiCAD).
