@@ -1442,14 +1442,38 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
                     </button>
                   </div>
                 </div>
-                <div>
-                  <label>Tür-Farbe</label>
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))", background: doorColor }} />
-                    <input type="color" value={doorColor} onChange={(e) => setDoorColor(e.target.value)}
-                      className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
+                {(doorMode === "door" || doorSashEnabled) && (
+                  <div>
+                    <label>{doorMode === "window" ? "Flügel-Farbe" : "Tür-Farbe"}</label>
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))", background: doorColor }} />
+                      <input type="color" value={doorColor} onChange={(e) => setDoorColor(e.target.value)}
+                        className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
+                    </div>
                   </div>
-                </div>
+                )}
+
+                {doorMode === "window" && (
+                  <>
+                    <div>
+                      <label>Fenster-Farbe (Linien)</label>
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))", background: doorGlassColor }} />
+                        <input type="color" value={doorGlassColor} onChange={(e) => setDoorGlassColor(e.target.value)}
+                          className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="flex items-center justify-between">
+                        <span>Flügeltür (Schwung anzeigen)</span>
+                        <button type="button" onClick={() => setDoorSashEnabled(!doorSashEnabled)}
+                          className={`cad-toolbar-btn h-7 px-2 text-[11px] ${doorSashEnabled ? "active" : ""}`}>
+                          {doorSashEnabled ? "Ein" : "Aus"}
+                        </button>
+                      </label>
+                    </div>
+                  </>
+                )}
 
                 {/* Laibung */}
                 <div className="border-t pt-3" style={{ borderColor: "hsl(var(--border))" }}>
