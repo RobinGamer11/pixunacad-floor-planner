@@ -28,7 +28,7 @@ export class DocumentTool {
   phase: Phase = "idle";
 
   /** Pending Dokument (während "placing"), wird beim Klick in die Scene committet. */
-  pendingDoc: { src: string; widthM: number; heightM: number; pixelWidth: number; pixelHeight: number; name: string; kind: "image" | "pdf-page"; pageIndex: number; importScaleDenom: number } | null = null;
+  pendingDoc: { src: string; widthM: number; heightM: number; pixelWidth: number; pixelHeight: number; name: string; kind: "image" | "pdf-page"; pageIndex: number; importScaleDenom: number; pdfSourceB64?: string | null } | null = null;
 
   /** Aktueller Maßstabs-Workflow-State. */
   scaleTargetDocId: string | null = null;
@@ -64,12 +64,13 @@ export class DocumentTool {
   finish() { this.cancel(); }
 
   /** Externe API: nach erfolgreichem Datei-Import wird das Dokument zur Maus-Platzierung übergeben. */
-  beginPlacement(opts: { src: string; widthM: number; heightM: number; pixelWidth: number; pixelHeight: number; name: string; kind: "image" | "pdf-page"; pageIndex: number; importScaleDenom: number }) {
+  beginPlacement(opts: { src: string; widthM: number; heightM: number; pixelWidth: number; pixelHeight: number; name: string; kind: "image" | "pdf-page"; pageIndex: number; importScaleDenom: number; pdfSourceB64?: string | null }) {
     this.pendingDoc = opts;
     this.phase = "placing";
     this.app.clearSelection();
     this.onPhaseChange?.();
   }
+
 
   /** Externe API: leitet den 3-Punkt-Skaliervorgang für ein bestimmtes Dokument ein. */
   beginScaleTwoPoints(docId: string) {
@@ -133,6 +134,7 @@ export class DocumentTool {
           pixelHeight: this.pendingDoc.pixelHeight,
           labelId: this.app.activeDrawLabelId,
           importScaleDenom: this.pendingDoc.importScaleDenom,
+          pdfSourceB64: this.pendingDoc.pdfSourceB64 || null,
         });
         this.pendingDoc = null;
         this.phase = "idle";
@@ -413,4 +415,86 @@ export class DocumentTool {
       ctx.restore();
     }
   }
+
+  /**
+   * PDF auflösen: extrahiert Vektorinhalte der zugrundeliegenden PDF-Seite
+   * und erzeugt daraus CAD-Objekte (Segments, Hatches, TextBoxes) in einer
+   * neuen Layer-Gruppe. Anschließend wird das Original-Dokument gelöscht.
+   */
+  async dissolvePdf(docId: string): Promise<{ segments: number; hatches: number; texts: number } | null> {
+    const doc = this.app.scene.getDocumentById(docId);
+    if (!doc) return null;
+    if (doc.kind !== "pdf-page" || !doc.pdfSourceB64) {
+      window.alert("Nur vektorbasierte PDFs können aufgelöst werden.");
+      return null;
+    }
+    const { extractPdfPageVectors, pdfPointToWorld } = await import("./pdfVectorExtract");
+    const { loadPdfDocFromB64 } = await import("./documentImport");
+    let result;
+    try {
+      result = await extractPdfPageVectors(doc.pdfSourceB64, doc.pageIndex);
+    } catch (e: any) {
+      window.alert("Auflösen fehlgeschlagen: " + (e?.message || e));
+      return null;
+    }
+    // PDF-Punkt-Abmessungen via pdfjs erneut holen (cached).
+    let pdfWidthPt = 0, pdfHeightPt = 0;
+    try {
+      const pdf = await loadPdfDocFromB64(doc.pdfSourceB64);
+      const page = await pdf.getPage(doc.pageIndex + 1);
+      const vp = page.getViewport({ scale: 1 });
+      pdfWidthPt = vp.width;
+      pdfHeightPt = vp.height;
+    } catch { return null; }
+
+    const layer = this.app.labelManager.ensureGroupNamed(`PDF-Import — ${doc.name}`.slice(0, 60));
+    const labelId = layer.id;
+
+    let nSeg = 0, nH = 0, nT = 0;
+    const toWorld = (x: number, y: number) =>
+      pdfPointToWorld(x, y, pdfWidthPt, pdfHeightPt, { position: doc.position, widthM: doc.widthM, heightM: doc.heightM, rotationRad: doc.rotationRad });
+
+    for (const s of result.segments) {
+      const a = toWorld(s.a.x, s.a.y);
+      const b = toWorld(s.b.x, s.b.y);
+      const len = Math.hypot(b.x - a.x, b.y - a.y);
+      if (len < 1e-5) continue;
+      // Strichstärke skalieren (PDF-Punkte → Welt-Meter mit Dokument-Skalierungsfaktor).
+      const sxFactor = doc.widthM / pdfWidthPt;
+      this.app.scene.createSegment(a, b, { color: s.color, thicknessM: Math.max(0.0005, s.thicknessM * sxFactor * 72 / 0.0254), labelId });
+      nSeg++;
+    }
+    for (const h of result.hatches) {
+      const pts = h.points.map(p => toWorld(p.x, p.y));
+      if (pts.length < 3) continue;
+      this.app.scene.createHatch(pts, { fillColor: h.fillColor, strokeColor: h.strokeColor, labelId, areaLabel: { show: false } });
+      nH++;
+    }
+    for (const t of result.texts) {
+      // t.x/t.y sind PDF-Punkte (bottom-left); t.widthM/heightM in Paper-Meter.
+      const PT_PER_M = 72 / 0.0254;
+      const widthPt = t.widthM * PT_PER_M;
+      const heightPt = t.heightM * PT_PER_M;
+      const center = toWorld(t.x + widthPt / 2, t.y + heightPt / 2);
+      const sxFactor = doc.widthM / pdfWidthPt;
+      const widthWorld = Math.max(0.005, widthPt * sxFactor);
+      const heightWorld = Math.max(0.005, heightPt * sxFactor);
+      this.app.scene.createTextBox(
+        center,
+        widthWorld,
+        heightWorld,
+        { fontSizePx: t.fontSizePx, textColor: t.color, labelId, autoSize: true, bgAlphaPct: 0 },
+        t.text,
+        doc.rotationRad,
+      );
+      nT++;
+    }
+
+    // Original-Dokument entfernen.
+    this.app.scene.removeDocument(doc);
+    this.app.clearSelection();
+    this.app.refreshLabelUI();
+    return { segments: nSeg, hatches: nH, texts: nT };
+  }
 }
+

@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import { CadApp } from "@/cad/CadApp";
 import { ToolIds, PointEditAction } from "@/cad/constants";
-import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Pipette, Sticker as StickerIcon, Pencil, Trash2, Download, Upload, Plus, FileImage, Maximize2, Ruler as RulerIcon, Eraser, Construction, PaintBucket } from "lucide-react";
+import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Pipette, Sticker as StickerIcon, Pencil, Trash2, Download, Upload, Plus, FileImage, FileText, Maximize2, Ruler as RulerIcon, Eraser, Construction, PaintBucket } from "lucide-react";
 import type { HatchDrawMode } from "@/cad/HatchTool";
 import type { StickerDefinition } from "@/cad/StickerManager";
 import { instanceBoundingCornersWorld } from "@/cad/StickerManager";
@@ -165,7 +165,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
   const [docPickerPages, setDocPickerPages] = useState<ImportedPage[] | null>(null);
   const [docPickerSelected, setDocPickerSelected] = useState<Set<number>>(new Set());
   const [docImporting, setDocImporting] = useState(false);
-  const [docSelected, setDocSelected] = useState<{ id: string; name: string; widthM: number; heightM: number; importScaleDenom: number } | null>(null);
+  const [docSelected, setDocSelected] = useState<{ id: string; name: string; widthM: number; heightM: number; importScaleDenom: number; kind: "image" | "pdf-page"; pdfSourceB64: string | null } | null>(null);
   const [docScalePopoverOpen, setDocScalePopoverOpen] = useState(false);
   const [docScaleChoice, setDocScaleChoice] = useState<string>("100");
   const [docScaleCustom, setDocScaleCustom] = useState<string>("100");
@@ -476,7 +476,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
         if (sel && sel.type === "document") {
           const doc = app.scene.getDocumentById(sel.documentId);
           if (doc) {
-            setDocSelected(prev => (prev && prev.id === doc.id && prev.widthM === doc.widthM && prev.heightM === doc.heightM && prev.importScaleDenom === doc.importScaleDenom) ? prev : { id: doc.id, name: doc.name, widthM: doc.widthM, heightM: doc.heightM, importScaleDenom: doc.importScaleDenom });
+            setDocSelected(prev => (prev && prev.id === doc.id && prev.widthM === doc.widthM && prev.heightM === doc.heightM && prev.importScaleDenom === doc.importScaleDenom) ? prev : { id: doc.id, name: doc.name, widthM: doc.widthM, heightM: doc.heightM, importScaleDenom: doc.importScaleDenom, kind: doc.kind, pdfSourceB64: doc.pdfSourceB64 || null });
           } else {
             setDocSelected(prev => prev ? null : prev);
           }
@@ -560,6 +560,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
       pixelWidth: first.pixelWidth, pixelHeight: first.pixelHeight,
       name: first.name, kind: first.kind, pageIndex: first.pageIndex,
       importScaleDenom: safeDenom,
+      pdfSourceB64: first.pdfSourceB64 || null,
     });
     let offX = firstW + 0.5;
     for (const p of rest) {
@@ -571,6 +572,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
         pixelWidth: p.pixelWidth, pixelHeight: p.pixelHeight,
         labelId: app.activeDrawLabelId,
         importScaleDenom: safeDenom,
+        pdfSourceB64: p.pdfSourceB64 || null,
       });
       offX += pw + 0.5;
     }
@@ -1195,6 +1197,24 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
                   <RulerIcon className="h-4 w-4" />
                   <span className="text-xs">Skalieren (Maßkette)</span>
                 </button>
+                {docSelected.kind === "pdf-page" && !!docSelected.pdfSourceB64 && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const app = appRef.current; if (!app) return;
+                      if (!window.confirm(`PDF "${docSelected.name}" in CAD-Objekte auflösen?\n\nLinien, Schraffuren und Texte werden in eine neue Ebene "PDF-Import — ${docSelected.name}" extrahiert; das Original wird entfernt.`)) return;
+                      const res = await app.documentTool.dissolvePdf(docSelected.id);
+                      if (res) {
+                        window.alert(`Auflösen erfolgreich:\n${res.segments} Linien · ${res.hatches} Schraffuren · ${res.texts} Texte`);
+                      }
+                    }}
+                    className="cad-toolbar-btn w-full justify-center h-9"
+                    title="PDF-Vektoren extrahieren und in Linien/Schraffuren/Texte konvertieren"
+                  >
+                    <FileText className="h-4 w-4" />
+                    <span className="text-xs">Auflösen → CAD-Objekte</span>
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => {

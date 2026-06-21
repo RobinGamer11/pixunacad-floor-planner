@@ -31,6 +31,12 @@ export interface PageElement {
   bold?: boolean;
   italic?: boolean;
   imageUrl?: string;
+  /** PDF-Rohdaten als Base64 (für vektorbasiertes Re-Rendering bei kind === "pdf"). */
+  pdfSourceB64?: string;
+  /** PDF: 0-basierter Seitenindex. */
+  pdfPageIndex?: number;
+  /** PDF: Seitenverhältnis (Breite/Höhe) für initial korrektes Aspect-Ratio. */
+  pdfAspect?: number;
   opacity?: number;
   shadow?: boolean;
   border?: boolean;

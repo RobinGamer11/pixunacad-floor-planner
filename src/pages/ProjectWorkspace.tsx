@@ -61,6 +61,8 @@ import {
   type PunchSide,
 } from "@/lib/projectStore";
 import CadOverlayLayer from "@/components/page/CadOverlayLayer";
+import { PdfPageView } from "@/components/page/PdfPageView";
+import { importFile } from "@/cad/documentImport";
 import type { MiniCadSelectionInfo } from "@/cad/embed/MiniCad";
 
 const FORMAT_SIZES: Record<PageFormat, { w: number; h: number; label: string }> = {
@@ -78,6 +80,7 @@ export default function ProjectWorkspace() {
   const project = useProject(projectId);
   const navigate = useNavigate();
   const [activePageId, setActivePageId] = useState<string | undefined>(project?.pages[0]?.id);
+  const pdfFileInputRef = useRef<HTMLInputElement>(null);
   const [selectedElementIds, setSelectedElementIds] = useState<string[]>([]);
   // `selectedElementId` ist das ZULETZT angeklickte Element — alle bestehenden
   // Lese-Stellen (Inspector etc.) benutzen es weiterhin. Bei Multi-Auswahl
@@ -225,7 +228,44 @@ export default function ProjectWorkspace() {
           onClick={() => setActiveToolAndTab(activeTool === "line" ? null : "line")}
         />
         <ToolRailButton icon={<Hash size={18} />} label="Schraffur" />
-        <ToolRailButton icon={<FileText size={18} />} label="PDF einfügen" />
+        <ToolRailButton icon={<FileText size={18} />} label="PDF einfügen" onClick={() => pdfFileInputRef.current?.click()} />
+        <input
+          ref={pdfFileInputRef}
+          type="file"
+          accept=".pdf,application/pdf"
+          className="hidden"
+          onChange={async (e) => {
+            const f = e.target.files?.[0];
+            e.target.value = "";
+            if (!f || !projectId || !activePage) return;
+            try {
+              const pages = await importFile(f);
+              if (pages.length === 0) return;
+              const fmt = FORMAT_SIZES[activePage.format];
+              let lastId: string | undefined;
+              for (let i = 0; i < pages.length; i++) {
+                const p = pages[i];
+                const aspect = (p.widthM > 0 && p.heightM > 0) ? p.widthM / p.heightM : (p.pixelWidth / p.pixelHeight) || 1;
+                const wPct = 50;
+                const pageAspect = fmt.w / fmt.h;
+                const hPct = wPct / aspect * pageAspect;
+                lastId = projectStore.addElement(projectId, activePage.id, {
+                  kind: "pdf",
+                  x: 10 + (i * 3),
+                  y: 10 + (i * 3),
+                  w: wPct,
+                  h: Math.min(80, hPct),
+                  pdfSourceB64: p.pdfSourceB64,
+                  pdfPageIndex: p.pageIndex,
+                  pdfAspect: aspect,
+                });
+              }
+              if (lastId) setSelectedElementIds([lastId]);
+            } catch (err: any) {
+              window.alert("PDF-Import fehlgeschlagen: " + (err?.message || err));
+            }
+          }}
+        />
         <ToolRailButton icon={<ImageIcon size={18} />} label="Bild" />
         <ToolRailButton icon={<TableIcon size={18} />} label="Tabelle" />
         <ToolRailButton icon={<StickyNote size={18} />} label="Notiz" />
@@ -1336,12 +1376,11 @@ function ElementView({
         </div>
       )}
       {el.kind === "pdf" && (
-        <div
-          className="w-full h-full flex items-center justify-center text-xs text-muted-foreground"
-          style={{ background: "hsl(var(--surface-muted))" }}
-        >
-          PDF
-        </div>
+        el.pdfSourceB64 ? (
+          <PdfPageView sourceB64={el.pdfSourceB64} pageIndex={el.pdfPageIndex ?? 0} />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground" style={{ background: "hsl(var(--surface-muted))" }}>PDF</div>
+        )
       )}
 
       {showHub && (
