@@ -51,6 +51,7 @@ export class DoorTool {
   }
   cancel() {
     this._dragHandle = null;
+    this._dragMove = false;
     this.app.renderer.overlay = null;
   }
   finish() { this.cancel(); }
