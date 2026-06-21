@@ -83,7 +83,7 @@ export class DoorTool {
   /** Wenn false: nur Selektion/Bearbeitung, keine neue Tür-Platzierung. */
   placementMode: boolean = true;
   /** Hub-Box-State. */
-  private _hub: DoorHubState = { visible: false, screenX: 0, screenY: 0, doorId: null, posM: 0, moving: false };
+  private _hub: DoorHubState = { visible: false, screenX: 0, screenY: 0, doorId: null, posM: 0, widthM: 0, moving: false, resizing: false };
 
   constructor(app: CadApp) { this.app = app; }
 
@@ -98,6 +98,7 @@ export class DoorTool {
     this._dragHandle = null;
     this._dragMove = false;
     this._followMove = false;
+    this._followResize = false;
     this._hideHub();
     this.app.renderer.overlay = null;
   }
@@ -109,13 +110,14 @@ export class DoorTool {
     if (!d) { this._hideHub(); return; }
     this._hub = {
       visible: true, screenX: sx, screenY: sy,
-      doorId: d.id, posM: d.posM, moving: this._followMove,
+      doorId: d.id, posM: d.posM, widthM: d.widthM,
+      moving: this._followMove, resizing: this._followResize,
     };
     this.onHubChange?.(this._hub);
   }
   private _hideHub() {
     if (!this._hub.visible && !this._hub.doorId) return;
-    this._hub = { visible: false, screenX: 0, screenY: 0, doorId: null, posM: 0, moving: false };
+    this._hub = { visible: false, screenX: 0, screenY: 0, doorId: null, posM: 0, widthM: 0, moving: false, resizing: false };
     this.onHubChange?.(this._hub);
   }
   private _refreshHub() {
@@ -127,7 +129,7 @@ export class DoorTool {
     const g = doorGeometry(w, d);
     if (!g) return;
     const sC = this.app.camera.worldToScreen(g.center.x, g.center.y);
-    this._hub = { ...this._hub, screenX: sC.x, screenY: sC.y - 28, posM: d.posM, moving: this._followMove };
+    this._hub = { ...this._hub, screenX: sC.x, screenY: sC.y - 28, posM: d.posM, widthM: d.widthM, moving: this._followMove, resizing: this._followResize };
     this.onHubChange?.(this._hub);
   }
   /** Startet Follow-Move (Tür folgt Maus; nächster Klick fixiert). Von Hubbox aufgerufen. */
