@@ -203,29 +203,51 @@ export function drawDoor(
     drawJamb(g.rightEnd, -1);
   }
 
-  // 3) Door leaf (hinge → leafEnd).
-  ctx.strokeStyle = door.color;
-  ctx.lineCap = "round";
-  const sh = cam.worldToScreen(g.hinge.x, g.hinge.y);
-  const sl = cam.worldToScreen(g.leafEnd.x, g.leafEnd.y);
-  ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  ctx.moveTo(sh.x, sh.y);
-  ctx.lineTo(sl.x, sl.y);
-  ctx.stroke();
+  // 3) Fenster-Variante: zwei parallele Linien quer durch die Öffnung statt Türblatt.
+  if (door.kind === "window") {
+    const t = wall.thicknessM;
+    const off = t / 4; // Abstand der Glaslinien vom Wand-Mittelpunkt
+    ctx.strokeStyle = door.glassColor;
+    ctx.lineWidth = 1.5;
+    for (const sign of [-1, +1]) {
+      const aX = g.leftEnd.x + g.n.x * off * sign;
+      const aY = g.leftEnd.y + g.n.y * off * sign;
+      const bX = g.rightEnd.x + g.n.x * off * sign;
+      const bY = g.rightEnd.y + g.n.y * off * sign;
+      const sa = cam.worldToScreen(aX, aY);
+      const sb = cam.worldToScreen(bX, bY);
+      ctx.beginPath();
+      ctx.moveTo(sa.x, sa.y);
+      ctx.lineTo(sb.x, sb.y);
+      ctx.stroke();
+    }
+  }
 
-  // 4) Swing arc (quarter): from leafEnd → closedEnd, center=hinge.
-  const sClosed = cam.worldToScreen(g.closedEnd.x, g.closedEnd.y);
-  const radiusPx = Math.hypot(sl.x - sh.x, sl.y - sh.y);
-  const startAng = Math.atan2(sl.y - sh.y, sl.x - sh.x);
-  const endAng   = Math.atan2(sClosed.y - sh.y, sClosed.x - sh.x);
-  let delta = endAng - startAng;
-  while (delta > Math.PI) delta -= 2 * Math.PI;
-  while (delta < -Math.PI) delta += 2 * Math.PI;
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  ctx.arc(sh.x, sh.y, radiusPx, startAng, startAng + delta, delta < 0);
-  ctx.stroke();
+  // 4) Türblatt + Schwung (nur wenn sashEnabled).
+  if (door.sashEnabled) {
+    ctx.strokeStyle = door.color;
+    ctx.lineCap = "round";
+    const sh = cam.worldToScreen(g.hinge.x, g.hinge.y);
+    const sl = cam.worldToScreen(g.leafEnd.x, g.leafEnd.y);
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(sh.x, sh.y);
+    ctx.lineTo(sl.x, sl.y);
+    ctx.stroke();
+
+    // Schwung-Bogen (Viertelkreis): leafEnd → closedEnd, Zentrum = hinge.
+    const sClosed = cam.worldToScreen(g.closedEnd.x, g.closedEnd.y);
+    const radiusPx = Math.hypot(sl.x - sh.x, sl.y - sh.y);
+    const startAng = Math.atan2(sl.y - sh.y, sl.x - sh.x);
+    const endAng   = Math.atan2(sClosed.y - sh.y, sClosed.x - sh.x);
+    let delta = endAng - startAng;
+    while (delta > Math.PI) delta -= 2 * Math.PI;
+    while (delta < -Math.PI) delta += 2 * Math.PI;
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.arc(sh.x, sh.y, radiusPx, startAng, startAng + delta, delta < 0);
+    ctx.stroke();
+  }
 
   ctx.restore();
 }
