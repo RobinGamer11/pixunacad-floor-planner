@@ -180,7 +180,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
   const [drawingScaleCustom, setDrawingScaleCustom] = useState<string>("100");
 
   // Raster (Hintergrund-Grid) Einstellungen — Panel sichtbar, solange Raster aktiviert ist
-  const [gridPanelOpen, setGridPanelOpen] = useState(false);
+  
   const [gridEnabled, setGridEnabled] = useState(true);
   const [gridSizeM, setGridSizeM] = useState<number>(1);
   const [gridColor, setGridColor] = useState<string>("#000000");
