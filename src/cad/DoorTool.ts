@@ -434,6 +434,9 @@ export class DoorTool {
             ctx.fillText(txt, bx + padX, by + bh / 2);
           }
           ctx.restore();
+        }
+      }
+    }
   }
 }
 
@@ -446,8 +449,5 @@ function _distPointToSegmentPx(px: number, py: number, ax: number, ay: number, b
   return Math.hypot(px - qx, py - qy);
 }
 
-    }
-  }
-}
 
 
