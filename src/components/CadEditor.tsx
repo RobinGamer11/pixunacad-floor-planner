@@ -193,7 +193,12 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
   const [doorHeightM, setDoorHeightM] = useState<number>(2.1);
   const [doorSide, setDoorSide] = useState<"inner" | "outer">("inner");
   const [doorHand, setDoorHand] = useState<"left" | "right">("left");
+  const [doorEdge, setDoorEdge] = useState<"inner" | "center" | "outer">("center");
   const [doorColor, setDoorColor] = useState<string>("#111111");
+  const [doorJambEnabled, setDoorJambEnabled] = useState<boolean>(true);
+  const [doorJambColor, setDoorJambColor] = useState<string>("#9aa3ad");
+  const [doorJambLenM, setDoorJambLenM] = useState<number>(0.06);
+  const [doorJambThickM, setDoorJambThickM] = useState<number>(0);
   const [doorSelectedId, setDoorSelectedId] = useState<string | null>(null);
 
   // Renderer-Settings synchron halten
@@ -217,9 +222,14 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
     app.doorTool.settings.heightM = doorHeightM;
     app.doorTool.settings.side = doorSide;
     app.doorTool.settings.hand = doorHand;
+    app.doorTool.settings.edge = doorEdge;
     app.doorTool.settings.color = doorColor;
+    app.doorTool.settings.jambEnabled = doorJambEnabled;
+    app.doorTool.settings.jambColor = doorJambColor;
+    app.doorTool.settings.jambLenM = doorJambLenM;
+    app.doorTool.settings.jambThickM = doorJambThickM;
     app.doorTool.applySettingsToSelection();
-  }, [doorMode, doorWidthM, doorHeightM, doorSide, doorHand, doorColor]);
+  }, [doorMode, doorWidthM, doorHeightM, doorSide, doorHand, doorEdge, doorColor, doorJambEnabled, doorJambColor, doorJambLenM, doorJambThickM]);
 
   
 
@@ -427,7 +437,12 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
           setDoorHeightM(d.heightM);
           setDoorSide(d.side);
           setDoorHand(d.hand);
+          setDoorEdge(d.edge);
           setDoorColor(d.color);
+          setDoorJambEnabled(d.jambEnabled);
+          setDoorJambColor(d.jambColor);
+          setDoorJambLenM(d.jambLenM);
+          setDoorJambThickM(d.jambThickM);
         }
       }
     };
@@ -1326,7 +1341,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
               )}
               <div className="space-y-3">
                 <div>
-                  <label>Breite (m)</label>
+                  <label>Türbreite (m) — mit Laibung</label>
                   <input
                     type="number" min={0.1} step={0.05}
                     value={doorWidthM}
@@ -1345,6 +1360,20 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
                   ))}
                 </div>
                 <div>
+                  <label>Lichte Breite (m) — nur Türschwung</label>
+                  <input
+                    type="number" min={0.05} step={0.05}
+                    value={Math.max(0, +(doorWidthM - (doorJambEnabled ? 2 * doorJambLenM : 0)).toFixed(4))}
+                    onChange={(e) => {
+                      const n = parseFloat(e.target.value.replace(",", "."));
+                      if (Number.isFinite(n) && n > 0) {
+                        const jl = doorJambEnabled ? doorJambLenM : 0;
+                        setDoorWidthM(n + 2 * jl);
+                      }
+                    }}
+                  />
+                </div>
+                <div>
                   <label>Höhe (m)</label>
                   <input
                     type="number" min={0.5} step={0.05}
@@ -1356,7 +1385,24 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
                   />
                 </div>
                 <div>
-                  <label>Öffnungsseite</label>
+                  <label>Startkante</label>
+                  <div className="flex gap-1">
+                    <button type="button" onClick={() => setDoorEdge("inner")}
+                      className={`cad-toolbar-btn flex-1 justify-center h-8 text-[11px] ${doorEdge === "inner" ? "active" : ""}`}>
+                      Innen
+                    </button>
+                    <button type="button" onClick={() => setDoorEdge("center")}
+                      className={`cad-toolbar-btn flex-1 justify-center h-8 text-[11px] ${doorEdge === "center" ? "active" : ""}`}>
+                      Mitte
+                    </button>
+                    <button type="button" onClick={() => setDoorEdge("outer")}
+                      className={`cad-toolbar-btn flex-1 justify-center h-8 text-[11px] ${doorEdge === "outer" ? "active" : ""}`}>
+                      Außen
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <label>Öffnungsseite (Aufschlag)</label>
                   <div className="flex gap-1">
                     <button type="button" onClick={() => setDoorSide("inner")}
                       className={`cad-toolbar-btn flex-1 justify-center h-8 text-[11px] ${doorSide === "inner" ? "active" : ""}`}>
@@ -1382,13 +1428,58 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
                   </div>
                 </div>
                 <div>
-                  <label>Farbe</label>
+                  <label>Tür-Farbe</label>
                   <div className="flex items-center gap-2">
                     <div className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))", background: doorColor }} />
                     <input type="color" value={doorColor} onChange={(e) => setDoorColor(e.target.value)}
                       className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
                   </div>
                 </div>
+
+                {/* Laibung */}
+                <div className="border-t pt-3" style={{ borderColor: "hsl(var(--border))" }}>
+                  <label className="flex items-center justify-between">
+                    <span>Laibung</span>
+                    <button type="button" onClick={() => setDoorJambEnabled(!doorJambEnabled)}
+                      className={`cad-toolbar-btn h-7 px-2 text-[11px] ${doorJambEnabled ? "active" : ""}`}>
+                      {doorJambEnabled ? "Ein" : "Aus"}
+                    </button>
+                  </label>
+                </div>
+                {doorJambEnabled && (
+                  <>
+                    <div>
+                      <label>Laibungsbreite (m, je Seite)</label>
+                      <input
+                        type="number" min={0} step={0.01}
+                        value={doorJambLenM}
+                        onChange={(e) => {
+                          const n = parseFloat(e.target.value.replace(",", "."));
+                          if (Number.isFinite(n) && n >= 0) setDoorJambLenM(n);
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label>Laibungsdicke (m, quer) — 0 = volle Wand</label>
+                      <input
+                        type="number" min={0} step={0.01}
+                        value={doorJambThickM}
+                        onChange={(e) => {
+                          const n = parseFloat(e.target.value.replace(",", "."));
+                          if (Number.isFinite(n) && n >= 0) setDoorJambThickM(n);
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label>Laibungs-Farbe</label>
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))", background: doorJambColor }} />
+                        <input type="color" value={doorJambColor} onChange={(e) => setDoorJambColor(e.target.value)}
+                          className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
+                      </div>
+                    </div>
+                  </>
+                )}
                 {doorSelectedId && (
                   <button
                     type="button"

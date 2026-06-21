@@ -14,7 +14,6 @@ export function wallReferenceLengths(wall: Wall): { lens: number[]; total: numbe
   return { lens, total };
 }
 
-/** Punkt entlang der Bezugslinie bei Bogenlänge s (m) + Tangenten-/Normalen-Vektor. */
 export function pointOnWallAt(wall: Wall, s: number): { p: Vec2; t: Vec2; n: Vec2; segIndex: number } | null {
   if (wall.corners.length < 2) return null;
   const { lens, total } = wallReferenceLengths(wall);
@@ -33,7 +32,6 @@ export function pointOnWallAt(wall: Wall, s: number): { p: Vec2; t: Vec2; n: Vec
   return { p, t: tan, n, segIndex: idx - 1 };
 }
 
-/** Projektion eines Welt-Punkts auf die Wand-Bezugslinie → Bogenlänge s. */
 export function projectPointToWall(wall: Wall, p: Vec2): { s: number; dist: number } | null {
   if (wall.corners.length < 2) return null;
   const { lens } = wallReferenceLengths(wall);
@@ -52,62 +50,82 @@ export function projectPointToWall(wall: Wall, p: Vec2): { s: number; dist: numb
 }
 
 /**
- * Geometrie einer Tür (in Welt-Koordinaten).
- *  - leftEnd/rightEnd: Öffnungs-Endpunkte auf der WAND-MITTELLINIE
- *  - leftInner/rightInner/leftOuter/rightOuter: Ecken der Öffnung an den beiden Wandkanten
- *  - hinge: Türangel-Eckpunkt (an einer der vier Ecken)
- *  - closedEnd: gegenüberliegender Eckpunkt auf gleicher Wandkante wie hinge (Bogen-Endpunkt)
- *  - leafEnd: Türblatt-Spitze (90° geöffnet, perpendicular vom hinge in Raum)
+ * Door geometry. Convention: +n in screen-coords = "inner" side, -n = "outer".
+ *  - widthM = full opening width (with jambs)
+ *  - lichteM = widthM - 2*jambLenM (when jambEnabled) = swing/leaf length
+ *  - Hinge sits on the chosen edge line (inner / center / outer) at the inner-jamb endpoint
+ *    of the chosen hand (left/right).
+ *  - Leaf swings into the chosen "side" half-space (+n if side=inner, -n if outer).
  */
 export function doorGeometry(wall: Wall, door: Door) {
   const at = pointOnWallAt(wall, door.posM);
   if (!at) return null;
-  const half = door.widthM / 2;
   const tan = at.t;
   const n = at.n;
-  // Bezugslinie → echte Wandmitte (Offset analog computeWallLines.helpOff):
   const t = wall.thicknessM;
+
+  // Reference line → true wall centerline.
   const helpOff = wall.referenceSide === "inner" ? +t / 2
     : wall.referenceSide === "center" ? 0
     : -t / 2;
   const center = v(at.p.x + n.x * helpOff, at.p.y + n.y * helpOff);
-  const leftEnd  = v(center.x - tan.x * half, center.y - tan.y * half);
-  const rightEnd = v(center.x + tan.x * half, center.y + tan.y * half);
 
-  // Wandkanten-Versatz: n zeigt vom Zentrum nach "links" in Screen-Koordinaten.
-  // Wir nennen +n = "innen" und -n = "außen" (konsistent zur bisherigen openSign).
-  const eInner = +1, eOuter = -1;
-  const edgeSign = door.side === "inner" ? eInner : eOuter;
-  const half_t = t / 2;
-  const off = (e: number) => v(n.x * half_t * e, n.y * half_t * e);
-  const oI = off(eInner), oO = off(eOuter);
-  const leftInner  = v(leftEnd.x + oI.x, leftEnd.y + oI.y);
-  const leftOuter  = v(leftEnd.x + oO.x, leftEnd.y + oO.y);
-  const rightInner = v(rightEnd.x + oI.x, rightEnd.y + oI.y);
-  const rightOuter = v(rightEnd.x + oO.x, rightEnd.y + oO.y);
+  // Opening endpoints on wall centerline.
+  const halfW = door.widthM / 2;
+  const leftEnd  = v(center.x - tan.x * halfW, center.y - tan.y * halfW);
+  const rightEnd = v(center.x + tan.x * halfW, center.y + tan.y * halfW);
 
-  // Hinge-Eckpunkt:  hand → links/rechts entlang Wand;  side → welche Kante
-  const hinge = door.hand === "left"
-    ? (edgeSign === eInner ? leftInner  : leftOuter)
-    : (edgeSign === eInner ? rightInner : rightOuter);
-  // "Geschlossen"-Endpunkt: gegenüberliegende Seite, gleiche Kante
-  const closedEnd = door.hand === "left"
-    ? (edgeSign === eInner ? rightInner : rightOuter)
-    : (edgeSign === eInner ? leftInner  : leftOuter);
-  // Türblatt schwingt in den GEGENÜBERLIEGENDEN Raum (weg von der Hinge-Kante)
-  const openSign = -edgeSign;
-  const leafEnd = v(hinge.x + n.x * door.widthM * openSign, hinge.y + n.y * door.widthM * openSign);
+  // Wall edges (perpendicular).
+  const halfT = t / 2;
+  const innerOff = v(n.x * halfT, n.y * halfT);   // +n = inner
+  const outerOff = v(-n.x * halfT, -n.y * halfT); // -n = outer
+  const leftInner  = v(leftEnd.x  + innerOff.x, leftEnd.y  + innerOff.y);
+  const leftOuter  = v(leftEnd.x  + outerOff.x, leftEnd.y  + outerOff.y);
+  const rightInner = v(rightEnd.x + innerOff.x, rightEnd.y + innerOff.y);
+  const rightOuter = v(rightEnd.x + outerOff.x, rightEnd.y + outerOff.y);
+
+  // Edge offset for hinge placement (start edge).
+  const edgeOff = door.edge === "inner" ? +halfT
+    : door.edge === "outer" ? -halfT
+    : 0;
+  const edgeSignForLine = door.edge === "inner" ? +1 : door.edge === "outer" ? -1 : 0;
+
+  // Jamb length consumed on each side (only if enabled).
+  const jambLen = door.jambEnabled ? Math.max(0, Math.min(door.jambLenM, door.widthM / 2 - 0.005)) : 0;
+  const lichteM = Math.max(0.01, door.widthM - 2 * jambLen);
+
+  // Hinge & closed-end on the chosen edge line, offset inward by jambLen from outer opening ends.
+  const handSign = door.hand === "left" ? -1 : +1; // along tan
+  const hingeBaseX = center.x + n.x * edgeOff;
+  const hingeBaseY = center.y + n.y * edgeOff;
+  // Hinge is positioned at handSign * (halfW - jambLen) along tan from center.
+  const inset = halfW - jambLen;
+  const hinge = v(
+    hingeBaseX + tan.x * handSign * inset,
+    hingeBaseY + tan.y * handSign * inset,
+  );
+  const closedEnd = v(
+    hingeBaseX - tan.x * handSign * inset,
+    hingeBaseY - tan.y * handSign * inset,
+  );
+
+  // Swing direction: leaf goes toward the chosen "side" half-space (+n inner, -n outer).
+  const openSign = door.side === "inner" ? +1 : -1;
+  const leafEnd = v(
+    hinge.x + n.x * lichteM * openSign,
+    hinge.y + n.y * lichteM * openSign,
+  );
 
   return {
     center, tan, n,
     leftEnd, rightEnd,
     leftInner, leftOuter, rightInner, rightOuter,
     hinge, closedEnd, leafEnd,
-    openSign, thicknessM: t,
+    openSign, edgeSignForLine, thicknessM: t, lichteM, jambLen,
   };
 }
 
-/** Eigenständiger Door-Renderer (im Renderer.ts + DoorTool-Preview verwendet). */
+/** Door renderer. */
 export function drawDoor(
   ctx: CanvasRenderingContext2D,
   cam: any,
@@ -120,13 +138,13 @@ export function drawDoor(
   ctx.save();
   ctx.globalAlpha = alpha;
 
-  // 1) Weiße Öffnungsfüllung — schneidet die Wand komplett auf
-  const half = wall.thicknessM / 2 + 0.01;
+  // 1) White opening fill — cuts wall across full thickness.
+  const halfFull = wall.thicknessM / 2 + 0.01;
   const cornersOpen = [
-    v(g.leftEnd.x - g.n.x * half,  g.leftEnd.y - g.n.y * half),
-    v(g.leftEnd.x + g.n.x * half,  g.leftEnd.y + g.n.y * half),
-    v(g.rightEnd.x + g.n.x * half, g.rightEnd.y + g.n.y * half),
-    v(g.rightEnd.x - g.n.x * half, g.rightEnd.y - g.n.y * half),
+    v(g.leftEnd.x  - g.n.x * halfFull, g.leftEnd.y  - g.n.y * halfFull),
+    v(g.leftEnd.x  + g.n.x * halfFull, g.leftEnd.y  + g.n.y * halfFull),
+    v(g.rightEnd.x + g.n.x * halfFull, g.rightEnd.y + g.n.y * halfFull),
+    v(g.rightEnd.x - g.n.x * halfFull, g.rightEnd.y - g.n.y * halfFull),
   ];
   ctx.fillStyle = "#ffffff";
   ctx.beginPath();
@@ -141,37 +159,40 @@ export function drawDoor(
   ctx.closePath();
   ctx.fill();
 
-  // 2) Laibungen (zwei kleine Blöcke) — voll über Wandstärke, kurze Länge entlang Wand
-  const jambLenM = Math.min(0.06, Math.max(0.03, wall.thicknessM * 0.35));
-  const drawJamb = (endpoint: Vec2, inward: number) => {
-    // inward = +1 (richtung Türmitte) oder -1 (von Mitte weg); Block geht nach AUSSEN, also -inward
-    const ax = endpoint.x - g.tan.x * jambLenM * inward;
-    const ay = endpoint.y - g.tan.y * jambLenM * inward;
-    const pts = [
-      v(endpoint.x - g.n.x * half, endpoint.y - g.n.y * half),
-      v(endpoint.x + g.n.x * half, endpoint.y + g.n.y * half),
-      v(ax + g.n.x * half,         ay + g.n.y * half),
-      v(ax - g.n.x * half,         ay - g.n.y * half),
-    ];
-    ctx.beginPath();
-    const s0 = cam.worldToScreen(pts[0].x, pts[0].y);
-    ctx.moveTo(s0.x, s0.y);
-    for (let i = 1; i < pts.length; i++) {
-      const s = cam.worldToScreen(pts[i].x, pts[i].y);
-      ctx.lineTo(s.x, s.y);
-    }
-    ctx.closePath();
-    ctx.fillStyle = "#9aa3ad";
-    ctx.fill();
-    ctx.strokeStyle = "#3a3f46";
-    ctx.lineWidth = 1;
-    ctx.stroke();
-  };
-  // leftEnd: Block ragt nach links (von Türmitte weg) → inward=+1 (so dass -inward = -1 → tan*-1)
-  drawJamb(g.leftEnd, +1);
-  drawJamb(g.rightEnd, -1);
+  // 2) Jambs (Laibungen) at both ends — optional, configurable thickness.
+  if (door.jambEnabled && g.jambLen > 0) {
+    // jambHalfT = halbe Laibungsdicke (quer zur Wand). 0 = volle Wandstärke.
+    const jambHalfT = door.jambThickM > 0 ? Math.min(door.jambThickM / 2, halfFull) : halfFull;
+    const drawJamb = (endpoint: Vec2, inward: number) => {
+      // inward = +1 means jamb extends from endpoint toward door-center.
+      const ax = endpoint.x + g.tan.x * g.jambLen * inward;
+      const ay = endpoint.y + g.tan.y * g.jambLen * inward;
+      const pts = [
+        v(endpoint.x - g.n.x * jambHalfT, endpoint.y - g.n.y * jambHalfT),
+        v(endpoint.x + g.n.x * jambHalfT, endpoint.y + g.n.y * jambHalfT),
+        v(ax + g.n.x * jambHalfT,         ay + g.n.y * jambHalfT),
+        v(ax - g.n.x * jambHalfT,         ay - g.n.y * jambHalfT),
+      ];
+      ctx.beginPath();
+      const s0 = cam.worldToScreen(pts[0].x, pts[0].y);
+      ctx.moveTo(s0.x, s0.y);
+      for (let i = 1; i < pts.length; i++) {
+        const s = cam.worldToScreen(pts[i].x, pts[i].y);
+        ctx.lineTo(s.x, s.y);
+      }
+      ctx.closePath();
+      ctx.fillStyle = door.jambColor;
+      ctx.fill();
+      ctx.strokeStyle = "#3a3f46";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    };
+    // leftEnd: jamb extends toward door center (positive tan direction → +1)
+    drawJamb(g.leftEnd, +1);
+    drawJamb(g.rightEnd, -1);
+  }
 
-  // 3) Türblatt (vom hinge zum leafEnd)
+  // 3) Door leaf (hinge → leafEnd).
   ctx.strokeStyle = door.color;
   ctx.lineCap = "round";
   const sh = cam.worldToScreen(g.hinge.x, g.hinge.y);
@@ -182,7 +203,7 @@ export function drawDoor(
   ctx.lineTo(sl.x, sl.y);
   ctx.stroke();
 
-  // 4) Öffnungs-Bogen (Viertelkreis): von leafEnd nach closedEnd, Zentrum = hinge
+  // 4) Swing arc (quarter): from leafEnd → closedEnd, center=hinge.
   const sClosed = cam.worldToScreen(g.closedEnd.x, g.closedEnd.y);
   const radiusPx = Math.hypot(sl.x - sh.x, sl.y - sh.y);
   const startAng = Math.atan2(sl.y - sh.y, sl.x - sh.x);

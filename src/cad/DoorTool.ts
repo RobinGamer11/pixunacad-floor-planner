@@ -2,7 +2,7 @@ import type { CadApp } from "./CadApp";
 import type { Input } from "./Input";
 import { v, Vec2, dist } from "./geometry";
 import { Defaults } from "./constants";
-import type { Door, DoorHand, DoorSide, Wall } from "./Scene";
+import type { Door, DoorHand, DoorSide, DoorEdge, Wall } from "./Scene";
 import { projectPointToWall, doorGeometry, pointOnWallAt, drawDoor } from "./doorGeom";
 
 export type DoorMode = "door" | "window";
@@ -13,7 +13,12 @@ export interface DoorToolSettings {
   heightM: number;
   side: DoorSide;
   hand: DoorHand;
+  edge: DoorEdge;
   color: string;
+  jambEnabled: boolean;
+  jambColor: string;
+  jambLenM: number;
+  jambThickM: number;
 }
 
 export class DoorTool {
@@ -26,7 +31,12 @@ export class DoorTool {
     heightM: 2.1,
     side: "inner",
     hand: "left",
+    edge: "center",
     color: "#111111",
+    jambEnabled: true,
+    jambColor: "#9aa3ad",
+    jambLenM: 0.06,
+    jambThickM: 0,
   };
 
   /** ID der aktuell selektierten Tür (für Inspector). */
@@ -72,12 +82,14 @@ export class DoorTool {
     return best ? { wall: best.wall, posM: best.posM } : null;
   }
 
-  /** Test ob ein Bildschirm-Punkt nahe einem Tür-Endpunkt-Handle ist. */
+  /** Test ob ein Bildschirm-Punkt nahe einem Tür-Endpunkt-Handle ist (alle Türen). */
   private _hitDoorHandle(input: Input): { door: Door; which: "left" | "right" } | null {
     const cam = this.app.camera;
     const sx = input.mouse.sx, sy = input.mouse.sy;
-    for (const d of this.app.scene.doors) {
-      if (d.id !== this.selectedDoorId) continue;
+    // Selektierte Tür zuerst priorisieren
+    const ordered = [...this.app.scene.doors].sort((a, b) =>
+      (a.id === this.selectedDoorId ? -1 : 0) - (b.id === this.selectedDoorId ? -1 : 0));
+    for (const d of ordered) {
       const w = this.app.scene.getWallById(d.wallId);
       if (!w) continue;
       const g = doorGeometry(w, d);
@@ -135,7 +147,12 @@ export class DoorTool {
         this.settings.heightM = d.heightM;
         this.settings.side = d.side;
         this.settings.hand = d.hand;
+        this.settings.edge = d.edge;
         this.settings.color = d.color;
+        this.settings.jambEnabled = d.jambEnabled;
+        this.settings.jambColor = d.jambColor;
+        this.settings.jambLenM = d.jambLenM;
+        this.settings.jambThickM = d.jambThickM;
       }
     }
     this.onSelectionChange?.(id);
@@ -157,7 +174,12 @@ export class DoorTool {
     d.heightM = this.settings.heightM;
     d.side = this.settings.side;
     d.hand = this.settings.hand;
+    d.edge = this.settings.edge;
     d.color = this.settings.color;
+    d.jambEnabled = this.settings.jambEnabled;
+    d.jambColor = this.settings.jambColor;
+    d.jambLenM = Math.max(0, this.settings.jambLenM);
+    d.jambThickM = Math.max(0, this.settings.jambThickM);
     // Position innerhalb Wand halten
     d.posM = Math.max(d.widthM / 2, Math.min(total - d.widthM / 2, d.posM));
   }
@@ -234,9 +256,13 @@ export class DoorTool {
         this._dragMove = true;
         return;
       }
-      // 2) Endpunkt-Handle → Drag-Resize
+      // 2) Endpunkt-Handle → ggf. Tür selektieren, dann Drag-Resize
       const handleHit = this._hitDoorHandle(input);
-      if (handleHit) { this._dragHandle = handleHit.which; return; }
+      if (handleHit) {
+        if (this.selectedDoorId !== handleHit.door.id) this.selectDoor(handleHit.door.id);
+        this._dragHandle = handleHit.which;
+        return;
+      }
       // 3) Tür-Click → selektieren
       const doorHit = this._hitDoor(input);
       if (doorHit) { this.selectDoor(doorHit.id); return; }
@@ -251,7 +277,12 @@ export class DoorTool {
             heightM: this.settings.heightM,
             side: this.settings.side,
             hand: this.settings.hand,
+            edge: this.settings.edge,
             color: this.settings.color,
+            jambEnabled: this.settings.jambEnabled,
+            jambColor: this.settings.jambColor,
+            jambLenM: this.settings.jambLenM,
+            jambThickM: this.settings.jambThickM,
             labelId: w.labelId,
           });
           this.selectDoor(door.id);
@@ -272,11 +303,37 @@ export class DoorTool {
         const fake: Door = {
           id: "_preview", wallId: w.id, posM: this._hoverPosM,
           widthM: this.settings.widthM, heightM: this.settings.heightM,
-          side: this.settings.side, hand: this.settings.hand,
-          color: this.settings.color, labelId: w.labelId,
+          side: this.settings.side, hand: this.settings.hand, edge: this.settings.edge,
+          color: this.settings.color,
+          jambEnabled: this.settings.jambEnabled, jambColor: this.settings.jambColor,
+          jambLenM: this.settings.jambLenM, jambThickM: this.settings.jambThickM,
+          labelId: w.labelId,
         } as Door;
         drawDoor(ctx, cam, w, fake, 0.5);
       }
+    }
+    // Endpunkt-Snaps für ALLE Türen (anklickbar zum Selektieren)
+    {
+      ctx.save();
+      for (const d of this.app.scene.doors) {
+        if (d.id === this.selectedDoorId) continue;
+        const w = this.app.scene.getWallById(d.wallId);
+        if (!w) continue;
+        const g = doorGeometry(w, d);
+        if (!g) continue;
+        const sL = cam.worldToScreen(g.leftEnd.x, g.leftEnd.y);
+        const sR = cam.worldToScreen(g.rightEnd.x, g.rightEnd.y);
+        ctx.fillStyle = "#ffffff";
+        ctx.strokeStyle = "#9ca3af";
+        ctx.lineWidth = 1.2;
+        for (const s of [sL, sR]) {
+          ctx.beginPath();
+          ctx.arc(s.x, s.y, 3.5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+        }
+      }
+      ctx.restore();
     }
     // Selection-Handles
     if (this.selectedDoorId) {

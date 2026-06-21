@@ -432,22 +432,37 @@ export type WallCornerAnchor =
 
 export type DoorSide = "inner" | "outer";
 export type DoorHand = "left" | "right";
+export type DoorEdge = "inner" | "center" | "outer";
 
 export class Door {
   id: string;
   wallId: string;
   /** Position des Türmittelpunkts entlang Wand-Bezugslinie (Meter ab Start). */
   posM: number;
+  /** Gesamte Öffnungsbreite (mit Laibungen). */
   widthM: number;
   heightM: number;
+  /** Öffnungsseite — auf welche Seite die Tür aufschlägt. */
   side: DoorSide;
+  /** Öffnungsrichtung links/rechts entlang Wand. */
   hand: DoorHand;
+  /** Start-Kante: Türschwung beginnt an dieser Kante (innen/mitte/außen). */
+  edge: DoorEdge;
   color: string;
+  /** Laibungen aktiv. */
+  jambEnabled: boolean;
+  jambColor: string;
+  /** Laibungsbreite (entlang Wand, je Seite, in m). */
+  jambLenM: number;
+  /** Laibungsdicke (quer zur Wand, in m). 0 = volle Wandstärke. */
+  jambThickM: number;
   labelId: string;
 
   constructor(opts: {
     id: string; wallId: string; posM: number; widthM: number; heightM?: number;
-    side?: DoorSide; hand?: DoorHand; color?: string; labelId?: string;
+    side?: DoorSide; hand?: DoorHand; edge?: DoorEdge; color?: string;
+    jambEnabled?: boolean; jambColor?: string; jambLenM?: number; jambThickM?: number;
+    labelId?: string;
   }) {
     this.id = opts.id;
     this.wallId = opts.wallId;
@@ -456,7 +471,12 @@ export class Door {
     this.heightM = opts.heightM ?? 2.1;
     this.side = opts.side || "inner";
     this.hand = opts.hand || "left";
+    this.edge = opts.edge || "center";
     this.color = opts.color || "#111111";
+    this.jambEnabled = opts.jambEnabled ?? true;
+    this.jambColor = opts.jambColor || "#9aa3ad";
+    this.jambLenM = (typeof opts.jambLenM === "number" && opts.jambLenM >= 0) ? opts.jambLenM : 0.06;
+    this.jambThickM = (typeof opts.jambThickM === "number" && opts.jambThickM >= 0) ? opts.jambThickM : 0;
     this.labelId = opts.labelId || Defaults.defaultLabelId;
   }
 }
@@ -1055,7 +1075,9 @@ export class Scene {
   // ---- Doors (Türen) ----
   createDoor(opts: {
     wallId: string; posM: number; widthM: number; heightM?: number;
-    side?: DoorSide; hand?: DoorHand; color?: string; labelId?: string;
+    side?: DoorSide; hand?: DoorHand; edge?: DoorEdge; color?: string;
+    jambEnabled?: boolean; jambColor?: string; jambLenM?: number; jambThickM?: number;
+    labelId?: string;
   }): Door {
     const d = new Door({ id: this._makeId(), ...opts });
     this.doors.push(d);
