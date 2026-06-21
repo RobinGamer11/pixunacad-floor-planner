@@ -106,6 +106,7 @@ export const ToolIds = {
   FREE: "free",
   ERASER: "eraser",
   WALL: "wall",
+  DOOR: "door",
 } as const;
 
 export const SelectionType = {
