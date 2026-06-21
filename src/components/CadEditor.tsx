@@ -1354,12 +1354,9 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
                   <AppWindow className="h-4 w-4" />
                 </button>
               </div>
-              {doorMode === "window" && (
-                <div className="text-xs opacity-70 mb-2">Fenster-Werkzeug folgt im nächsten Schritt.</div>
-              )}
               <div className="space-y-3">
                 <div>
-                  <label>Türbreite (m) — mit Laibung</label>
+                  <label>{doorMode === "window" ? "Fensterbreite" : "Türbreite"} (m) — mit Laibung</label>
                   <input
                     type="number" min={0.1} step={0.05}
                     value={doorWidthM}
