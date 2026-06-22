@@ -16,15 +16,16 @@ import { WallSettingsPanel } from "@/components/cad/WallSettingsPanel";
 
 const CAD_TOOLS = [
   { id: ToolIds.SELECT, label: "Auswahl", key: "V", icon: MousePointer2 },
+  { id: ToolIds.WALL, label: "Wand", key: "W", icon: Construction },
+  { id: ToolIds.DOOR, label: "Türen/Fenster", key: "U", icon: DoorOpen },
   { id: ToolIds.LINE, label: "Linie", key: "L", icon: Minus },
   { id: ToolIds.HATCH, label: "Schraffur", key: "H", icon: Square },
   { id: ToolIds.MEASURE, label: "Maßkette", key: "M", icon: Ruler },
   { id: ToolIds.TEXT, label: "Text", key: "T", icon: Type },
   { id: ToolIds.STICKER, label: "Sticker", key: "O", icon: StickerIcon },
   { id: ToolIds.DOCUMENT, label: "Dokument", key: "D", icon: FileImage },
-  { id: ToolIds.WALL, label: "Wand", key: "W", icon: Construction },
-  { id: ToolIds.DOOR, label: "Türen/Fenster", key: "U", icon: DoorOpen },
 ];
+
 
 // Sub-Werkzeuge unter "Linie": gemeinsam ein Einstellungsfenster mit
 // drei wählbaren Zeichenarten oben. Letzte Auswahl wird gemerkt.
