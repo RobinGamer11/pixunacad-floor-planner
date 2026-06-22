@@ -553,6 +553,7 @@ export class DoorTool {
           id: "_preview", wallId: w.id, posM: this._hoverPosM,
           kind: this.settings.mode,
           widthM: this.settings.widthM, heightM: this.settings.heightM,
+          breakHeightM: this.settings.breakHeightM,
           side: this.settings.side, hand: this.settings.hand, edge: this.settings.edge,
           color: this.settings.color,
           jambEnabled: this.settings.jambEnabled, jambColor: this.settings.jambColor,
@@ -561,6 +562,7 @@ export class DoorTool {
           glassThickM: this.settings.glassThickM, glassFillColor: this.settings.glassFillColor,
           labelId: w.labelId,
         } as Door;
+
         drawDoor(ctx, cam, w, fake, 0.5);
       }
     }
