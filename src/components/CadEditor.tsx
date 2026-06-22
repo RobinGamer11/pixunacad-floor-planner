@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import { CadApp } from "@/cad/CadApp";
 import { ToolIds, PointEditAction } from "@/cad/constants";
-import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Pipette, Sticker as StickerIcon, Pencil, Trash2, Download, Upload, Plus, FileImage, FileText, Maximize2, Ruler as RulerIcon, Eraser, Construction, PaintBucket, Grid3x3, DoorOpen, AppWindow, Move } from "lucide-react";
+import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Pipette, Sticker as StickerIcon, Pencil, Trash2, Download, Upload, Plus, FileImage, FileText, Maximize2, Ruler as RulerIcon, Eraser, Construction, PaintBucket, Grid3x3, DoorOpen, AppWindow, Move, PanelRightOpen, PanelRightClose } from "lucide-react";
 import type { HatchDrawMode } from "@/cad/HatchTool";
 import type { StickerDefinition } from "@/cad/StickerManager";
 import { instanceBoundingCornersWorld } from "@/cad/StickerManager";
@@ -146,6 +146,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
   const appRef = useRef<CadApp | null>(null);
   const [activeTool, setActiveTool] = useState<string>(ToolIds.SELECT);
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(true);
+  const [rightOpen, setRightOpen] = useState<boolean>(true);
   const [rightTab, setRightTab] = useState<"settings" | "sheets" | "layers">("settings");
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
