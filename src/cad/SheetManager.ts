@@ -70,7 +70,7 @@ export class SheetManager {
 
   constructor() {
     this.sheets = [
-      { id: SheetDefaults.defaultSheetId, name: SheetDefaults.defaultSheetName, locked: true,
+      { id: SheetDefaults.defaultSheetId, name: SheetDefaults.defaultSheetName, locked: false,
         scaleKey: SheetDefaults.defaultScaleKey, scaleValue: SheetDefaults.defaultScaleValue },
     ];
   }
