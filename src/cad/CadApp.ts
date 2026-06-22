@@ -145,6 +145,10 @@ export class CadApp {
 
   defaultLineColor = Defaults.lineColor;
   defaultLineThicknessM = Defaults.lineThicknessM;
+  defaultArrowStart = false;
+  defaultArrowEnd = false;
+  defaultArrowScale = 1;
+
   defaultHatchFillColor = Defaults.hatchFillColor;
   defaultHatchStrokeColor = Defaults.hatchStrokeColor;
   defaultHatchStrokeWidthPx = Defaults.hatchStrokePx;
@@ -1230,15 +1234,37 @@ export class CadApp {
   getCurrentLineStyle() {
     const selected = this.getSelectedSegment();
     if (selected) {
-      return { color: selected.color || this.defaultLineColor, thicknessM: selected.thicknessM || this.defaultLineThicknessM, labelId: selected.labelId || Defaults.defaultLabelId };
+      return {
+        color: selected.color || this.defaultLineColor,
+        thicknessM: selected.thicknessM || this.defaultLineThicknessM,
+        labelId: selected.labelId || Defaults.defaultLabelId,
+        arrowStart: !!selected.arrowStart,
+        arrowEnd: !!selected.arrowEnd,
+        arrowScale: (typeof selected.arrowScale === "number" && selected.arrowScale > 0) ? selected.arrowScale : 1,
+      };
     }
     const groupSegs = this.getSelectedGroupSegments();
     if (groupSegs.length > 0) {
       const ref = groupSegs[0];
-      return { color: ref.color || this.defaultLineColor, thicknessM: ref.thicknessM || this.defaultLineThicknessM, labelId: ref.labelId || Defaults.defaultLabelId };
+      return {
+        color: ref.color || this.defaultLineColor,
+        thicknessM: ref.thicknessM || this.defaultLineThicknessM,
+        labelId: ref.labelId || Defaults.defaultLabelId,
+        arrowStart: !!ref.arrowStart,
+        arrowEnd: !!ref.arrowEnd,
+        arrowScale: (typeof ref.arrowScale === "number" && ref.arrowScale > 0) ? ref.arrowScale : 1,
+      };
     }
-    return { color: this.defaultLineColor, thicknessM: this.defaultLineThicknessM, labelId: this.activeDrawLabelId || Defaults.defaultLabelId };
+    return {
+      color: this.defaultLineColor,
+      thicknessM: this.defaultLineThicknessM,
+      labelId: this.activeDrawLabelId || Defaults.defaultLabelId,
+      arrowStart: this.defaultArrowStart,
+      arrowEnd: this.defaultArrowEnd,
+      arrowScale: this.defaultArrowScale,
+    };
   }
+
 
   getCurrentHatchStyle() {
     const selected = this.getSelectedHatch();
