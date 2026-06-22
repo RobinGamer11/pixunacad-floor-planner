@@ -280,11 +280,27 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
     app.doorTool.applySettingsToSelection();
   }, [doorMode, doorWidthM, doorHeightM, doorBreakHeightM, doorSide, doorHand, doorEdge, doorColor, doorJambEnabled, doorJambColor, doorJambLenM, doorJambThickM, doorSashEnabled, doorGlassColor, doorGlassThickM, doorGlassFillColor]);
 
+  // Line arrow settings sync (Default + selektiertes Segment)
+  useEffect(() => {
+    const app = appRef.current;
+    if (!app) return;
+    app.defaultArrowStart = lineArrowStart;
+    app.defaultArrowEnd = lineArrowEnd;
+    app.defaultArrowScale = lineArrowScale;
+    const sel = app.getSelectedSegment?.();
+    const groupSegs = (typeof (app as any).getSelectedGroupSegments === "function")
+      ? (app as any).getSelectedGroupSegments() as any[] : [];
+    const targets: any[] = sel ? [sel] : groupSegs;
+    if (targets.length > 0) {
+      for (const seg of targets) {
+        seg.arrowStart = lineArrowStart;
+        seg.arrowEnd = lineArrowEnd;
+        seg.arrowScale = lineArrowScale;
+      }
+    }
+  }, [lineArrowStart, lineArrowEnd, lineArrowScale]);
 
 
-
-
-  
 
   useEffect(() => {
     if (
