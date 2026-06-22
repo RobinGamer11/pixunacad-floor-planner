@@ -442,8 +442,9 @@
   }
 
   .id-row.active {
-    outline: 2px solid hsl(var(--primary) / 0.24);
-    border-color: hsl(var(--primary) / 0.42);
+    outline: 2px solid hsl(var(--accent-gold) / 0.32);
+    border-color: hsl(var(--accent-gold) / 0.55);
+    background: hsl(var(--accent-gold) / 0.10);
   }
 
   .id-row.dragging {
@@ -517,9 +518,9 @@
   }
   .sheet-row:active { cursor: grabbing; }
   .sheet-row.active {
-    outline: 2px solid hsl(var(--primary) / 0.24);
-    border-color: hsl(var(--primary) / 0.42);
-    background: hsl(var(--primary) / 0.10);
+    outline: 2px solid hsl(var(--accent-gold) / 0.32);
+    border-color: hsl(var(--accent-gold) / 0.55);
+    background: hsl(var(--accent-gold) / 0.12);
   }
   .sheet-row.dragging { opacity: 0.55; }
 
@@ -585,8 +586,9 @@
     cursor: default;
   }
   .sheet-icon-btn.active {
-    background: hsl(var(--primary) / 0.18);
-    border-color: hsl(var(--primary) / 0.42);
+    background: hsl(var(--accent-gold) / 0.18);
+    border-color: hsl(var(--accent-gold) / 0.55);
+    color: hsl(var(--accent-gold));
   }
 
   .sheet-drop-indicator {
@@ -670,8 +672,8 @@
   }
   .plan-row:hover { background: hsl(var(--accent)); }
   .plan-row.active {
-    background: hsl(var(--primary) / 0.10);
-    border-color: hsl(var(--primary) / 0.45);
+    background: hsl(var(--accent-gold) / 0.12);
+    border-color: hsl(var(--accent-gold) / 0.55);
   }
   .plan-row.dragging { opacity: 0.5; }
   .plan-checkbox {
