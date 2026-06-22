@@ -588,7 +588,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
     return () => cancelAnimationFrame(raf);
   }, []);
 
-  // Poll selected document for the settings panel
+  // Poll selected document for the settings panel + Document Hub state
   useEffect(() => {
     let raf = 0;
     const tick = () => {
@@ -605,6 +605,15 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
         } else {
           setDocSelected(prev => prev ? null : prev);
         }
+        // Document Hub sync
+        const hs = app.documentHubState;
+        setDocHub(prev => {
+          if (!hs.visible) {
+            return prev.visible ? { visible: false, screenX: 0, screenY: 0, docId: null, mode: "none" } : prev;
+          }
+          if (prev.visible && prev.docId === hs.docId && Math.abs(prev.screenX - hs.screenX) < 0.5 && Math.abs(prev.screenY - hs.screenY) < 0.5) return prev;
+          return { visible: true, screenX: hs.screenX, screenY: hs.screenY, docId: hs.docId, mode: prev.mode === "none" ? "move" : prev.mode };
+        });
       }
       raf = requestAnimationFrame(tick);
     };
