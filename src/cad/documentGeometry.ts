@@ -26,6 +26,58 @@ export function documentEdgeMidpointsWorld(doc: DocumentObject): Vec2[] {
   ];
 }
 
+export type DocumentSide = "top" | "right" | "bottom" | "left";
+
+/** 4 Welt-Kanten als Segmente (Top, Right, Bottom, Left) inkl. Seitenname. */
+export function documentEdgesWorld(doc: DocumentObject): { side: DocumentSide; a: Vec2; b: Vec2 }[] {
+  const c = documentCornersWorld(doc);
+  return [
+    { side: "top",    a: c[0], b: c[1] },
+    { side: "right",  a: c[1], b: c[2] },
+    { side: "bottom", a: c[2], b: c[3] },
+    { side: "left",   a: c[3], b: c[0] },
+  ];
+}
+
+/** Hit-Test: liegt screen-Punkt (sx,sy) innerhalb tol Pixel an einer Eckpunkt-Welt-Position? */
+export function hitDocumentCorner(
+  doc: DocumentObject,
+  worldToScreen: (x: number, y: number) => { x: number; y: number },
+  sx: number,
+  sy: number,
+  tolPx = 9,
+): number | null {
+  const corners = documentCornersWorld(doc);
+  for (let i = 0; i < corners.length; i++) {
+    const s = worldToScreen(corners[i].x, corners[i].y);
+    if (Math.hypot(s.x - sx, s.y - sy) <= tolPx) return i;
+  }
+  return null;
+}
+
+/** Hit-Test: liegt screen-Punkt nahe einer Kante? Liefert Seite oder null. */
+export function hitDocumentEdge(
+  doc: DocumentObject,
+  worldToScreen: (x: number, y: number) => { x: number; y: number },
+  sx: number,
+  sy: number,
+  tolPx = 6,
+): DocumentSide | null {
+  const edges = documentEdgesWorld(doc);
+  let best: { side: DocumentSide; d: number } | null = null;
+  for (const e of edges) {
+    const a = worldToScreen(e.a.x, e.a.y);
+    const b = worldToScreen(e.b.x, e.b.y);
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const len2 = dx * dx + dy * dy;
+    if (len2 < 1e-6) continue;
+    const t = Math.max(0, Math.min(1, ((sx - a.x) * dx + (sy - a.y) * dy) / len2));
+    const px = a.x + dx * t, py = a.y + dy * t;
+    const d = Math.hypot(px - sx, py - sy);
+    if (d <= tolPx && (!best || d < best.d)) best = { side: e.side, d };
+  }
+  return best ? best.side : null;
+
 /** Center point in world coordinates. */
 export function documentCenterWorld(doc: DocumentObject): Vec2 {
   return v(doc.position.x + doc.widthM / 2, doc.position.y + doc.heightM / 2);
