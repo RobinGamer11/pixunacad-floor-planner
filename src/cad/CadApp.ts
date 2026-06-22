@@ -2189,6 +2189,11 @@ export class CadApp {
       this.measureSettings.pointCount = r.pointCount.value as "two" | "multi";
     });
 
+    r.direction.addEventListener("change", () => {
+      this.measureSettings.direction = r.direction.value as "horizontal" | "vertical" | "free";
+    });
+
+
     r.editMode.addEventListener("change", () => {
       this.measureSettings.editMode = r.editMode.value as "parallel" | "endpoints";
     });
