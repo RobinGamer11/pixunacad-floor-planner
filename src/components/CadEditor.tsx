@@ -34,6 +34,24 @@ const LINE_VARIANTS = [
   { id: ToolIds.ERASER, label: "Radiergummi", icon: Eraser },
 ];
 
+type ToolVariant =
+  | { kind: "tool"; id: string; label: string; icon: any }
+  | { kind: "hatch"; mode: HatchDrawMode; label: string; icon: any };
+
+const TOOL_VARIANTS: Record<string, ToolVariant[]> = {
+  [ToolIds.LINE]: [
+    { kind: "tool", id: ToolIds.LINE, label: "Linie", icon: Minus },
+    { kind: "tool", id: ToolIds.FREE, label: "Freihand", icon: Pencil },
+    { kind: "tool", id: ToolIds.ERASER, label: "Radiergummi", icon: Eraser },
+  ],
+  [ToolIds.HATCH]: [
+    { kind: "hatch", mode: "polygon", label: "Polygon", icon: Spline },
+    { kind: "hatch", mode: "rectangle", label: "Rechteck", icon: RectangleHorizontal },
+    { kind: "hatch", mode: "circle", label: "Kreis", icon: Circle },
+    { kind: "hatch", mode: "fill", label: "Füllung", icon: PaintBucket },
+  ],
+};
+
 interface CadEditorProps { projectId?: string }
 const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -148,6 +166,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(true);
   const [rightOpen, setRightOpen] = useState<boolean>(true);
   const [rightTab, setRightTab] = useState<"settings" | "sheets" | "layers">("settings");
+  const [expandedTool, setExpandedTool] = useState<string | null>(null);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [hatchDrawMode, setHatchDrawMode] = useState<HatchDrawMode>("polygon");
@@ -593,6 +612,8 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
     appRef.current?.setTool(targetId);
     setActiveTool(targetId);
     setGridPanelOpen(false);
+    // Flyout: bei Tools mit Varianten ausklappen, sonst schließen
+    setExpandedTool(TOOL_VARIANTS[id] ? id : null);
   }, [lineVariant]);
 
   const handleDocFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -741,16 +762,59 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
             const isActive = t.id === ToolIds.LINE
               ? (activeTool === ToolIds.LINE || activeTool === ToolIds.FREE || activeTool === ToolIds.ERASER)
               : activeTool === t.id;
+            const variants = TOOL_VARIANTS[t.id];
+            const isExpanded = expandedTool === t.id && !!variants;
             return (
-              <button
-                key={t.id}
-                onClick={() => handleToolClick(t.id)}
-                title={`${t.label} (${t.key})`}
-                className={`cad-rail-btn ${isActive ? "active" : ""}`}
-              >
-                <Icon size={18} />
-                <span>{t.label.length > 9 ? t.label.slice(0, 8) + "…" : t.label}</span>
-              </button>
+              <div key={t.id} className="relative w-full flex justify-center">
+                <button
+                  onClick={() => handleToolClick(t.id)}
+                  title={`${t.label} (${t.key})`}
+                  className={`cad-rail-btn ${isActive ? "active" : ""}`}
+                >
+                  <Icon size={18} />
+                  <span>{t.label.length > 9 ? t.label.slice(0, 8) + "…" : t.label}</span>
+                </button>
+                {isExpanded && (
+                  <div
+                    className="absolute top-0 left-full ml-1 flex flex-col gap-0.5 p-1 rounded-lg shadow-lg z-30"
+                    style={{
+                      background: "hsl(var(--surface-card))",
+                      border: "1px solid hsl(var(--hairline))",
+                    }}
+                  >
+                    {variants.map((v, i) => {
+                      const VIcon = v.icon;
+                      const vActive = v.kind === "tool"
+                        ? activeTool === v.id
+                        : (activeTool === ToolIds.HATCH && hatchDrawMode === v.mode);
+                      return (
+                        <button
+                          key={i}
+                          onClick={() => {
+                            if (v.kind === "tool") {
+                              appRef.current?.setTool(v.id);
+                              setActiveTool(v.id);
+                              setLineVariant(v.id);
+                            } else {
+                              if (activeTool !== ToolIds.HATCH) {
+                                appRef.current?.setTool(ToolIds.HATCH);
+                                setActiveTool(ToolIds.HATCH);
+                              }
+                              appRef.current?.hatchTool.setDrawMode(v.mode);
+                            }
+                            setExpandedTool(null);
+                          }}
+                          title={v.label}
+                          className={`cad-rail-btn ${vActive ? "active" : ""}`}
+                        >
+                          <VIcon size={18} />
+                          <span>{v.label.length > 9 ? v.label.slice(0, 8) + "…" : v.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>
