@@ -677,7 +677,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
   const sidebarWidth = sidebarCollapsed ? 56 : 240;
 
   return (
-    <div className="flex w-full h-full overflow-hidden" style={{ background: "hsl(var(--cad-canvas))" }}>
+    <div className="flex w-full h-full overflow-hidden" style={{ background: "hsl(var(--surface))" }}>
       {/* Left Sidebar */}
       <aside
         className="relative shrink-0 flex flex-col border-r transition-[width] duration-150 ease-out"
