@@ -107,6 +107,103 @@ export class TopologyEngine {
       .sort((a, b) => (rank.get(b.labelId) || 0) - (rank.get(a.labelId) || 0));
   }
 
+  /**
+   * Fügt Wand-Snap-Kandidaten (Bezugslinien-Eckpunkte/-Kanten + optional
+   * gehealte Sub-/Main-Linien) zu einer bestehenden Snap-Suche hinzu.
+   * Wird sowohl von findBestSnap als auch von findBestSnapExcluding*
+   * verwendet, damit Wände beim Nachbearbeiten von Objekten ebenso
+   * gefangen werden wie beim Neuzeichnen.
+   */
+  private _addWallSnapsTo(
+    mouseS: Vec2,
+    mouseW: Vec2,
+    register: (candidate: Snap, score: number) => void,
+  ): void {
+    const visibleWalls = this.scene.walls.filter(w => this.labels.isVisible(w.labelId));
+    if (this.includeWallOffsetSnaps) this._ensureHealCache(visibleWalls);
+    for (const wall of visibleWalls) {
+      const ref = wall.corners;
+      if (ref.length < 2) continue;
+      const isPriority = !!(this.priorityWallId && wall.id === this.priorityWallId);
+      const MAIN_PEN = 0;
+      const SUB_PEN = 200;
+      const prioBias = isPriority ? -10000 : 0;
+
+      for (let pi = 0; pi < ref.length; pi++) {
+        if (this._isHiddenWallCorner(wall, pi)) continue;
+        const p = ref[pi];
+        const px = this._worldToMousePx(p, mouseS);
+        if (px > Defaults.snapPx) continue;
+        register(
+          { type: SnapType.POINT, world: v(p.x, p.y), segment: null, hatch: null, pointIndex: -1, edgeIndex: null, t: null, px, wallId: wall.id, wallLine: "main" },
+          prioBias + px + MAIN_PEN,
+        );
+      }
+      for (let i = 0; i < ref.length - 1; i++) {
+        const a = ref[i], b = ref[i + 1];
+        const proj = projectPointToSegment(mouseW, a, b);
+        const px = this._worldToMousePx(proj.q, mouseS);
+        if (px > Defaults.snapPx) continue;
+        if (proj.t <= Defaults.splitEpsT || proj.t >= 1 - Defaults.splitEpsT) continue;
+        register(
+          { type: SnapType.LINE, world: v(proj.q.x, proj.q.y), segment: null, hatch: null, pointIndex: null, edgeIndex: i, t: proj.t, px, lineA: a, lineB: b, wallId: wall.id, wallLine: "main" },
+          prioBias + 1000 + px + MAIN_PEN,
+        );
+      }
+
+      if (this.includeWallOffsetSnaps) {
+        const otherVisibleWalls = visibleWalls.filter(w => w !== wall && w.corners.length >= 2);
+        const healed = this._getHealed(wall, otherVisibleWalls);
+
+        const mainPts = healed.mainCorners;
+        for (let pi = 0; pi < mainPts.length; pi++) {
+          if (this._isHiddenWallCorner(wall, pi)) continue;
+          const p = mainPts[pi];
+          const px = this._worldToMousePx(p, mouseS);
+          if (px > Defaults.snapPx) continue;
+          register(
+            { type: SnapType.POINT, world: v(p.x, p.y), segment: null, hatch: null, pointIndex: -1, edgeIndex: null, t: null, px, wallId: wall.id, wallLine: "main" },
+            prioBias + px + MAIN_PEN,
+          );
+        }
+        for (let i = 0; i < mainPts.length - 1; i++) {
+          const a = mainPts[i], b = mainPts[i + 1];
+          const proj = projectPointToSegment(mouseW, a, b);
+          const px = this._worldToMousePx(proj.q, mouseS);
+          if (px > Defaults.snapPx) continue;
+          if (proj.t <= Defaults.splitEpsT || proj.t >= 1 - Defaults.splitEpsT) continue;
+          register(
+            { type: SnapType.LINE, world: v(proj.q.x, proj.q.y), segment: null, hatch: null, pointIndex: null, edgeIndex: null, t: proj.t, px, lineA: a, lineB: b, wallId: wall.id, wallLine: "main" },
+            prioBias + 1000 + px + MAIN_PEN,
+          );
+        }
+
+        const subPts = healed.subCorners;
+        for (let pi = 0; pi < subPts.length; pi++) {
+          if (this._isHiddenWallCorner(wall, pi)) continue;
+          const p = subPts[pi];
+          const px = this._worldToMousePx(p, mouseS);
+          if (px > Defaults.snapPx) continue;
+          register(
+            { type: SnapType.POINT, world: v(p.x, p.y), segment: null, hatch: null, pointIndex: pi, edgeIndex: null, t: null, px, wallId: wall.id, wallLine: "sub" },
+            prioBias + px + SUB_PEN,
+          );
+        }
+        for (let i = 0; i < subPts.length - 1; i++) {
+          const a = subPts[i], b = subPts[i + 1];
+          const proj = projectPointToSegment(mouseW, a, b);
+          const px = this._worldToMousePx(proj.q, mouseS);
+          if (px > Defaults.snapPx) continue;
+          if (proj.t <= Defaults.splitEpsT || proj.t >= 1 - Defaults.splitEpsT) continue;
+          register(
+            { type: SnapType.LINE, world: v(proj.q.x, proj.q.y), segment: null, hatch: null, pointIndex: null, edgeIndex: i, t: proj.t, px, lineA: a, lineB: b, wallId: wall.id, wallLine: "sub" },
+            prioBias + 1000 + px + SUB_PEN,
+          );
+        }
+      }
+    }
+  }
+
   findBestSnap(mouseS: Vec2, mouseW: Vec2): Snap | null {
     let best: Snap | null = null;
     let bestScore = Infinity;
