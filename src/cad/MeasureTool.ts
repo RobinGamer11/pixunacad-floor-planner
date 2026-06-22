@@ -54,6 +54,10 @@ export class MeasureTool {
     return this.app.measureSettings.pointCount;
   }
 
+  getDirectionMode(): "horizontal" | "vertical" | "free" {
+    return this.app.measureSettings.direction;
+  }
+
   /** Find a snap on lines, hatch points, hatch edges, segment endpoints + midpoints. */
   private _findMeasureSnap(input: Input): Snap | null {
     const mouseS = v(input.mouse.sx, input.mouse.sy);
@@ -77,13 +81,23 @@ export class MeasureTool {
     return null;
   }
 
-  private _makeRefDir(pA: CollectedPoint, pB: CollectedPoint): Vec2 | null {
-    if (this.getOrientationMode() !== "parallel") return null;
-    if (pA.refDir && len(pA.refDir) > 1e-9) return norm(pA.refDir);
-    if (pB.refDir && len(pB.refDir) > 1e-9) return norm(pB.refDir);
-    const fallback = sub(pB.world, pA.world);
-    if (len(fallback) > 1e-9) return norm(fallback);
+  /** Achsen-Richtung der Maßkette. "horizontal" → (1,0); "vertical" → (0,1);
+   *  "free" → aus den ersten zwei gesetzten Punkten (oder Fallback). */
+  private _chainAxis(): Vec2 {
+    const dir = this.getDirectionMode();
+    if (dir === "horizontal") return v(1, 0);
+    if (dir === "vertical") return v(0, 1);
+    if (this.selectedPoints.length >= 2) {
+      const d = sub(this.selectedPoints[1].world, this.selectedPoints[0].world);
+      if (len(d) > 1e-9) return norm(d);
+    }
     return v(1, 0);
+  }
+
+  /** Projiziert einen Punkt orthogonal auf die durch `anchor` laufende Achse. */
+  private _projectOnAxis(p: Vec2, anchor: Vec2, axis: Vec2): Vec2 {
+    const t = (p.x - anchor.x) * axis.x + (p.y - anchor.y) * axis.y;
+    return v(anchor.x + axis.x * t, anchor.y + axis.y * t);
   }
 
   private _canStartPlacement() {
@@ -94,23 +108,52 @@ export class MeasureTool {
     const specs: Array<{ p1: Vec2; p2: Vec2; placementPoint: Vec2; mode: "parallel" | "diagonal"; refDir: Vec2 | null; style: DimensionStyle }> = [];
     if (this.selectedPoints.length < 2) return specs;
 
-    const mode = this.getOrientationMode();
     const style = this.app.getCurrentMeasureStyle();
+    const dirMode = this.getDirectionMode();
+    const orientation = this.getOrientationMode();
+    // Wenn eine Achse vorgegeben ist (H/V/Frei), erzwingen wir "parallel" damit
+    // die gesamte Kette EINE gemeinsame Maßlinie hat.
+    const mode: "parallel" | "diagonal" = orientation;
+
+    const axis = this._chainAxis();
+    const anchor = this.selectedPoints[0].world;
+
+    // Punkte ggf. auf gemeinsame Achse projizieren, dann nach Achsen-t sortieren,
+    // damit die Kette in eine Richtung läuft (egal in welcher Reihenfolge geklickt).
+    const projected = this.selectedPoints.map((sp) => {
+      const w = dirMode === "free" && this.selectedPoints.length < 2
+        ? sp.world
+        : this._projectOnAxis(sp.world, anchor, axis);
+      const t = (w.x - anchor.x) * axis.x + (w.y - anchor.y) * axis.y;
+      return { world: w, t };
+    });
+    projected.sort((a, b) => a.t - b.t);
 
     if (this.getPointCountMode() === "two") {
-      const a = this.selectedPoints[0];
-      const b = this.selectedPoints[1];
-      specs.push({ p1: a.world, p2: b.world, placementPoint, mode, refDir: this._makeRefDir(a, b), style });
+      specs.push({
+        p1: projected[0].world,
+        p2: projected[1].world,
+        placementPoint,
+        mode,
+        refDir: axis,
+        style,
+      });
       return specs;
     }
 
-    for (let i = 0; i < this.selectedPoints.length - 1; i++) {
-      const a = this.selectedPoints[i];
-      const b = this.selectedPoints[i + 1];
-      specs.push({ p1: a.world, p2: b.world, placementPoint, mode, refDir: this._makeRefDir(a, b), style });
+    for (let i = 0; i < projected.length - 1; i++) {
+      specs.push({
+        p1: projected[i].world,
+        p2: projected[i + 1].world,
+        placementPoint,
+        mode,
+        refDir: axis,
+        style,
+      });
     }
     return specs;
   }
+
 
   update(input: Input) {
     this.pointSnap = this._findMeasureSnap(input);
