@@ -292,6 +292,8 @@ export class Renderer {
     this._drawDimensionSelection();
     this._drawTextBoxSelection();
     this._drawStickerInstanceSelection();
+    this._drawDocumentSnapAffordances();
+    this._drawDocumentGuides();
     this._drawDocumentSelection();
     this._drawFreeStrokeSelection();
     this._drawHoverSegmentPoints();
