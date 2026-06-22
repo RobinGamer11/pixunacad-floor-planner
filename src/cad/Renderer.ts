@@ -292,6 +292,8 @@ export class Renderer {
     this._drawDimensionSelection();
     this._drawTextBoxSelection();
     this._drawStickerInstanceSelection();
+    this._drawDocumentSnapAffordances();
+    this._drawDocumentGuides();
     this._drawDocumentSelection();
     this._drawFreeStrokeSelection();
     this._drawHoverSegmentPoints();
@@ -626,6 +628,74 @@ export class Renderer {
   }
 
 
+  /** Zeichnet alle aktiven Document-Guide-Lines (unendlich verlängerte Kanten-Strahlen). */
+  private _drawDocumentGuides() {
+    const ctx = this.ctx;
+    const cam = this.camera;
+    const big = 100000;
+    for (const doc of this.scene.documents) {
+      if (!this.labels.isVisible(doc.labelId)) continue;
+      const g = doc.guideEdges;
+      if (!g || (!g.top && !g.right && !g.bottom && !g.left)) continue;
+      const corners = documentCornersWorld(doc);
+      const edges = [
+        { on: g.top,    a: corners[0], b: corners[1] },
+        { on: g.right,  a: corners[1], b: corners[2] },
+        { on: g.bottom, a: corners[2], b: corners[3] },
+        { on: g.left,   a: corners[3], b: corners[0] },
+      ];
+      ctx.save();
+      ctx.strokeStyle = "rgba(255,140,0,0.7)";
+      ctx.lineWidth = 1;
+      ctx.setLineDash([6, 4]);
+      for (const e of edges) {
+        if (!e.on) continue;
+        const dx = e.b.x - e.a.x, dy = e.b.y - e.a.y;
+        const L = Math.hypot(dx, dy) || 1;
+        const ux = dx / L, uy = dy / L;
+        const p1 = cam.worldToScreen(e.a.x - ux * big, e.a.y - uy * big);
+        const p2 = cam.worldToScreen(e.b.x + ux * big, e.b.y + uy * big);
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
+
+  /** Markiert ALLE Dokumente mit kleinen Snap-Eck-Markern + Kanten-Hovers (immer sichtbar). */
+  private _drawDocumentSnapAffordances() {
+    const ctx = this.ctx;
+    const cam = this.camera;
+    for (const doc of this.scene.documents) {
+      if (!this.labels.isVisible(doc.labelId)) continue;
+      const corners = documentCornersWorld(doc).map(c => cam.worldToScreen(c.x, c.y));
+      ctx.save();
+      // dezente Kanten-Hervorhebung
+      ctx.strokeStyle = "rgba(77,163,255,0.35)";
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.moveTo(corners[0].x, corners[0].y);
+      for (let i = 1; i < corners.length; i++) ctx.lineTo(corners[i].x, corners[i].y);
+      ctx.closePath();
+      ctx.stroke();
+      ctx.setLineDash([]);
+      // Eck-Snap-Marker (kleine Quadrate)
+      ctx.fillStyle = "#fff";
+      ctx.strokeStyle = "rgba(77,163,255,0.95)";
+      ctx.lineWidth = 1.5;
+      for (const p of corners) {
+        ctx.beginPath();
+        ctx.rect(p.x - 3.5, p.y - 3.5, 7, 7);
+        ctx.fill();
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
+
   private _drawDocumentSelection() {
     if (!this.selection || this.selection.type !== SelectionType.DOCUMENT) return;
     const doc = this.scene.getDocumentById(this.selection.documentId!);
@@ -646,13 +716,13 @@ export class Renderer {
     ctx.fill();
     ctx.stroke();
     ctx.setLineDash([]);
-    // Eckhandles
+    // Eckhandles (größer)
     for (const p of sc) {
       ctx.fillStyle = "rgba(77,163,255,0.95)";
       ctx.strokeStyle = "#fff";
       ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.rect(p.x - 4, p.y - 4, 8, 8);
+      ctx.rect(p.x - 5, p.y - 5, 10, 10);
       ctx.fill();
       ctx.stroke();
     }
@@ -664,6 +734,7 @@ export class Renderer {
     ctx.beginPath(); ctx.arc(center.x, center.y, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     ctx.restore();
   }
+
 
   /** Dashed Frame um die Owner-Objekte einer aktuell im Edit-Mode befindlichen Sticker-Instanz. */
   private _drawStickerEditFrame() {

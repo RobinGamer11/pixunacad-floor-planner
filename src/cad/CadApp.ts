@@ -203,6 +203,11 @@ export class CadApp {
   doorTool!: DoorTool;
   activeTool: SelectTool | LineTool | HatchTool | MeasureTool | TextTool | PipetteTool | StickerTool | DocumentTool | FreeDrawTool | EraserTool | WallTool | DoorTool;
 
+  /** Hub-Box-State für ausgewähltes Dokument (Verschieben/Drehen). Geschrieben von SelectTool, gelesen von CadEditor. */
+  documentHubState: { visible: boolean; screenX: number; screenY: number; docId: string | null; cornerIndex: number } = {
+    visible: false, screenX: 0, screenY: 0, docId: null, cornerIndex: 0,
+  };
+
   // Clipboard + Paste-Vorschau
   clipboard: Clipboard | null = null;
   pastePreviewActive = false;
@@ -509,6 +514,7 @@ export class CadApp {
           pixelWidth: d.pixelWidth, pixelHeight: d.pixelHeight, labelId: d.labelId,
           eraseMaskDataUrl: maskUrl || null,
           pdfSourceB64: d.pdfSourceB64 || null,
+          guideEdges: { ...d.guideEdges },
         };
       }),
       freeStrokes: scene.freeStrokes.map(s => ({
@@ -634,6 +640,7 @@ export class CadApp {
         pixelWidth: d.pixelWidth, pixelHeight: d.pixelHeight, labelId: d.labelId,
         eraseMaskDataUrl: d.eraseMaskDataUrl || null,
         pdfSourceB64: d.pdfSourceB64 || null,
+        guideEdges: d.guideEdges || undefined,
       });
       if (d.id) (doc as any).id = d.id;
     }

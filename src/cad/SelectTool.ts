@@ -8,7 +8,7 @@ import { getDimensionGeometry } from "./dimensionGeometry";
 import { pointInOrientedBox, boxCornersWorld, rotateVector } from "./textGeometry";
 import type { TextBox } from "./Scene";
 import { pointInInstance, instanceBoundingCornersWorld } from "./StickerManager";
-import { pointInDocument } from "./documentGeometry";
+import { pointInDocument, hitDocumentCorner, hitDocumentEdge, documentCornersWorld } from "./documentGeometry";
 import { computeWallLines } from "./wallGeom";
 import { buildWallSolidRing, buildHealedWallSolidRing } from "./wallSolid";
 import { runWallTopologyMaintenance } from "./wallTopologyMaintenance";
@@ -1819,7 +1819,37 @@ export class SelectTool {
     }
 
     if (input.clicked) {
-      // Edit-Mode: Klick außerhalb der Bounding-Box verlässt ihn (vor allen anderen Hits).
+      // Dokument-Auswahl: vor allen anderen Hits Eckpunkt/Kante des aktuell ausgewählten Dokuments testen.
+      {
+        const sel = this.app.selection as any;
+        if (sel && sel.type === SelectionType.DOCUMENT && sel.documentId) {
+          const doc = this.app.scene.getDocumentById(sel.documentId);
+          if (doc) {
+            const w2s = (x: number, y: number) => this.app.camera.worldToScreen(x, y);
+            const cornerIdx = hitDocumentCorner(doc, w2s, input.mouse.sx, input.mouse.sy, 10);
+            if (cornerIdx != null) {
+              const cornersW = documentCornersWorld(doc);
+              const cw = cornersW[cornerIdx];
+              const sp = this.app.camera.worldToScreen(cw.x, cw.y);
+              this.app.documentHubState = {
+                visible: true, screenX: sp.x, screenY: sp.y,
+                docId: doc.id, cornerIndex: cornerIdx,
+              };
+              return;
+            }
+            const edgeSide = hitDocumentEdge(doc, w2s, input.mouse.sx, input.mouse.sy, 8);
+            if (edgeSide) {
+              doc.guideEdges = { ...doc.guideEdges, [edgeSide]: !doc.guideEdges[edgeSide] };
+              return;
+            }
+            // Klick außerhalb von Ecke/Kante schließt die Hub-Box (Auswahl bleibt).
+            if (this.app.documentHubState.visible) {
+              this.app.documentHubState = { visible: false, screenX: 0, screenY: 0, docId: null, cornerIndex: 0 };
+            }
+          }
+        }
+      }
+
       if (this.app.isStickerEditing()) {
         const mouseW = v(input.mouse.wx, input.mouse.wy);
         if (this.app.isPointOutsideStickerEdit(mouseW)) {
@@ -2032,19 +2062,18 @@ export class SelectTool {
           this.app.setSelection({ type: SelectionType.FREE_STROKE, freeStrokeId: freeHit.id } as any);
           return;
         }
-        // Kein Vordergrund-Hit → Document-Underlay testen (kann gewählt + gezogen werden)
+        // Kein Vordergrund-Hit → Document-Underlay testen (Auswahl, kein Drag)
         const docHit = this._hitDocument(input);
         if (docHit) {
           this.app.setSelection({ type: SelectionType.DOCUMENT, documentId: docHit.id } as any);
-          const mouseW0 = v(input.mouse.wx, input.mouse.wy);
-          this.dragDocId = docHit.id;
-          this.dragDocGrabOffset = { x: mouseW0.x - docHit.position.x, y: mouseW0.y - docHit.position.y };
-          this.dragDocSnap = null;
+          // Hub-Box wird erst beim Klick auf eine Ecke geöffnet (siehe oben).
         } else {
           this.app.setSelection(null);
+          this.app.documentHubState = { visible: false, screenX: 0, screenY: 0, docId: null, cornerIndex: 0 };
         }
       }
     }
+
 
     const ctx = this._getSelectedPointContext();
     if (ctx) {

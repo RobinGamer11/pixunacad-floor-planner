@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import { CadApp } from "@/cad/CadApp";
 import { ToolIds, PointEditAction } from "@/cad/constants";
-import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Pipette, Sticker as StickerIcon, Pencil, Trash2, Download, Upload, Plus, FileImage, FileText, Maximize2, Ruler as RulerIcon, Eraser, Construction, PaintBucket, Grid3x3, DoorOpen, AppWindow, Move, PanelRightOpen, PanelRightClose } from "lucide-react";
+import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Pipette, Sticker as StickerIcon, Pencil, Trash2, Download, Upload, Plus, FileImage, FileText, Maximize2, Ruler as RulerIcon, Eraser, Construction, PaintBucket, Grid3x3, DoorOpen, AppWindow, Move, RotateCw, PanelRightOpen, PanelRightClose } from "lucide-react";
 import type { HatchDrawMode } from "@/cad/HatchTool";
 import type { StickerDefinition } from "@/cad/StickerManager";
 import { instanceBoundingCornersWorld } from "@/cad/StickerManager";
@@ -228,6 +228,12 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
   const [doorHub, setDoorHub] = useState<{ visible: boolean; screenX: number; screenY: number; doorId: string | null; posM: number; widthM: number; moving: boolean; resizing: boolean }>({ visible: false, screenX: 0, screenY: 0, doorId: null, posM: 0, widthM: 0, moving: false, resizing: false });
   const [doorHubPosInput, setDoorHubPosInput] = useState<string>("");
   const [doorHubWidthInput, setDoorHubWidthInput] = useState<string>("");
+
+  // Document Hub (Verschieben/Drehen) — wird beim Klick auf einen Eckpunkt geöffnet.
+  const [docHub, setDocHub] = useState<{ visible: boolean; screenX: number; screenY: number; docId: string | null; mode: "none" | "move" | "rotate" }>({ visible: false, screenX: 0, screenY: 0, docId: null, mode: "none" });
+  const [docHubDx, setDocHubDx] = useState<string>("0.000");
+  const [docHubDy, setDocHubDy] = useState<string>("0.000");
+  const [docHubRot, setDocHubRot] = useState<string>("0");
 
   // Renderer-Settings synchron halten
   useEffect(() => {
@@ -582,7 +588,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
     return () => cancelAnimationFrame(raf);
   }, []);
 
-  // Poll selected document for the settings panel
+  // Poll selected document for the settings panel + Document Hub state
   useEffect(() => {
     let raf = 0;
     const tick = () => {
@@ -599,6 +605,15 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
         } else {
           setDocSelected(prev => prev ? null : prev);
         }
+        // Document Hub sync
+        const hs = app.documentHubState;
+        setDocHub(prev => {
+          if (!hs.visible) {
+            return prev.visible ? { visible: false, screenX: 0, screenY: 0, docId: null, mode: "none" } : prev;
+          }
+          if (prev.visible && prev.docId === hs.docId && Math.abs(prev.screenX - hs.screenX) < 0.5 && Math.abs(prev.screenY - hs.screenY) < 0.5) return prev;
+          return { visible: true, screenX: hs.screenX, screenY: hs.screenY, docId: hs.docId, mode: prev.mode === "none" ? "move" : prev.mode };
+        });
       }
       raf = requestAnimationFrame(tick);
     };
@@ -999,6 +1014,132 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
             <span className="text-[10px] opacity-60">m</span>
           </div>
         )}
+
+        {/* Document Hub — Verschieben/Drehen für ausgewähltes Dokument (öffnet sich beim Klick auf einen Eckpunkt) */}
+        {docHub.visible && (
+          <div
+            className="absolute z-30 flex items-center gap-1.5 px-2 py-1.5 rounded-md shadow-lg"
+            style={{
+              left: Math.max(8, docHub.screenX + 12),
+              top: Math.max(8, docHub.screenY + 12),
+              background: "white",
+              border: "1px solid hsl(var(--border))",
+              boxShadow: "0 4px 16px -4px rgba(0,0,0,0.18)",
+            }}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              title="Verschieben (Δx, Δy in m)"
+              onClick={() => setDocHub(h => ({ ...h, mode: "move" }))}
+              className={`cad-toolbar-btn h-7 w-7 justify-center px-0 ${docHub.mode === "move" ? "active" : ""}`}
+            >
+              <Move className="h-3.5 w-3.5" />
+            </button>
+            {docHub.mode === "move" && (
+              <>
+                <input
+                  type="text"
+                  value={docHubDx}
+                  onChange={(e) => setDocHubDx(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      const dx = parseFloat(docHubDx.replace(",", "."));
+                      const dy = parseFloat(docHubDy.replace(",", "."));
+                      const app = appRef.current;
+                      if (app && docHub.docId && Number.isFinite(dx) && Number.isFinite(dy)) {
+                        const doc = app.scene.getDocumentById(docHub.docId);
+                        if (doc) {
+                          doc.position = { x: doc.position.x + dx, y: doc.position.y + dy };
+                          app.documentHubState = { visible: false, screenX: 0, screenY: 0, docId: null, cornerIndex: 0 };
+                          setDocHubDx("0.000"); setDocHubDy("0.000");
+                        }
+                      }
+                    } else if (e.key === "Escape") {
+                      const app = appRef.current;
+                      if (app) app.documentHubState = { visible: false, screenX: 0, screenY: 0, docId: null, cornerIndex: 0 };
+                    }
+                  }}
+                  className="text-[11px] w-[60px] px-1.5 py-1 rounded border tabular-nums"
+                  style={{ borderColor: "hsl(var(--border))" }}
+                  title="Δx (m)"
+                  placeholder="Δx"
+                />
+                <input
+                  type="text"
+                  value={docHubDy}
+                  onChange={(e) => setDocHubDy(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      const dx = parseFloat(docHubDx.replace(",", "."));
+                      const dy = parseFloat(docHubDy.replace(",", "."));
+                      const app = appRef.current;
+                      if (app && docHub.docId && Number.isFinite(dx) && Number.isFinite(dy)) {
+                        const doc = app.scene.getDocumentById(docHub.docId);
+                        if (doc) {
+                          doc.position = { x: doc.position.x + dx, y: doc.position.y + dy };
+                          app.documentHubState = { visible: false, screenX: 0, screenY: 0, docId: null, cornerIndex: 0 };
+                          setDocHubDx("0.000"); setDocHubDy("0.000");
+                        }
+                      }
+                    }
+                  }}
+                  className="text-[11px] w-[60px] px-1.5 py-1 rounded border tabular-nums"
+                  style={{ borderColor: "hsl(var(--border))" }}
+                  title="Δy (m)"
+                  placeholder="Δy"
+                />
+                <span className="text-[10px] opacity-60 mr-1">m</span>
+              </>
+            )}
+            <button
+              type="button"
+              title="Drehen (Winkel in Grad)"
+              onClick={() => {
+                const app = appRef.current;
+                if (app && docHub.docId) {
+                  const doc = app.scene.getDocumentById(docHub.docId);
+                  if (doc) setDocHubRot(((doc.rotationRad * 180 / Math.PI) % 360).toFixed(1));
+                }
+                setDocHub(h => ({ ...h, mode: "rotate" }));
+              }}
+              className={`cad-toolbar-btn h-7 w-7 justify-center px-0 ${docHub.mode === "rotate" ? "active" : ""}`}
+            >
+              <RotateCw className="h-3.5 w-3.5" />
+            </button>
+            {docHub.mode === "rotate" && (
+              <>
+                <input
+                  type="text"
+                  value={docHubRot}
+                  onChange={(e) => setDocHubRot(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      const deg = parseFloat(docHubRot.replace(",", "."));
+                      const app = appRef.current;
+                      if (app && docHub.docId && Number.isFinite(deg)) {
+                        const doc = app.scene.getDocumentById(docHub.docId);
+                        if (doc) {
+                          doc.rotationRad = (deg * Math.PI) / 180;
+                          app.documentHubState = { visible: false, screenX: 0, screenY: 0, docId: null, cornerIndex: 0 };
+                        }
+                      }
+                    } else if (e.key === "Escape") {
+                      const app = appRef.current;
+                      if (app) app.documentHubState = { visible: false, screenX: 0, screenY: 0, docId: null, cornerIndex: 0 };
+                    }
+                  }}
+                  className="text-[11px] w-[64px] px-1.5 py-1 rounded border tabular-nums"
+                  style={{ borderColor: "hsl(var(--border))" }}
+                  title="Drehwinkel absolut (°)"
+                  placeholder="°"
+                />
+                <span className="text-[10px] opacity-60">°</span>
+              </>
+            )}
+          </div>
+        )}
+
 
         {/* Point Edit Menu */}
         <div ref={pointEditRef} className="cad-point-menu absolute z-30 hidden">
