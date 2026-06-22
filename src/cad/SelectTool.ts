@@ -1464,12 +1464,16 @@ export class SelectTool {
     // Tür-Klick → in Door-Tool (nur Edit-Modus) wechseln & selektieren.
     if (input.clicked && !this.isEditing() && !this.dragStickerId && !this.dragDocId
         && !this.dragTextBoxId && !this.dragAreaLabelHatchId && !this.rotateTextBoxId) {
-      const doorHit = this.app.doorTool.hitDoorAt(input);
-      if (doorHit) {
-        this.app.setTool("door");
-        this.app.doorTool.placementMode = false;
-        this.app.doorTool.selectDoor(doorHit.id);
-        return;
+      // doorTool existiert nur in der vollständigen CadApp, nicht in MiniCad (Projektmappen-Seite).
+      const doorTool: any = (this.app as any).doorTool;
+      if (doorTool && typeof doorTool.hitDoorAt === "function") {
+        const doorHit = doorTool.hitDoorAt(input);
+        if (doorHit) {
+          this.app.setTool("door");
+          doorTool.placementMode = false;
+          doorTool.selectDoor(doorHit.id);
+          return;
+        }
       }
     }
 
