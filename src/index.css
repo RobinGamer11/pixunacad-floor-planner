@@ -38,25 +38,25 @@
 
     --radius: 0.625rem;
 
-    /* CAD-specific tokens — canvas intentionally untouched */
+    /* CAD-specific tokens — light theme matching Projektmappe surfaces */
     --cad-canvas: 0 0% 100%;
-    --cad-toolbar: 222 20% 22%;
-    --cad-toolbar-border: 222 16% 32%;
-    --cad-toolbar-foreground: 220 18% 92%;
-    --cad-toolbar-muted: 220 12% 62%;
-    --cad-toolbar-hover: 222 16% 28%;
-    --cad-toolbar-active: 230 80% 62%;
+    --cad-toolbar: 0 0% 100%;
+    --cad-toolbar-border: 30 12% 86%;
+    --cad-toolbar-foreground: 222 20% 12%;
+    --cad-toolbar-muted: 222 12% 38%;
+    --cad-toolbar-hover: 36 25% 93%;
+    --cad-toolbar-active: 32 55% 52%;
     --cad-toolbar-active-foreground: 0 0% 100%;
-    --cad-hub: 222 18% 28%;
-    --cad-hub-border: 222 14% 38%;
+    --cad-hub: 0 0% 100%;
+    --cad-hub-border: 30 12% 86%;
     --cad-grid: 220 10% 92%;
     --cad-axis: 215 80% 65%;
     --cad-snap-point: 215 90% 55%;
     --cad-snap-line: 215 70% 65%;
     --cad-selection-stroke: 215 90% 55%;
     --cad-selection-fill: 215 90% 55%;
-    --cad-settings-bg: 222 20% 22%;
-    --cad-tools-bg: 222 20% 22%;
+    --cad-settings-bg: 0 0% 100%;
+    --cad-tools-bg: 0 0% 100%;
 
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
@@ -155,7 +155,7 @@
 
   .cad-toolbar-btn:hover {
     background: hsl(var(--cad-toolbar-hover));
-    color: #fff;
+    color: hsl(var(--cad-toolbar-foreground));
   }
 
   .cad-toolbar-btn.active {
@@ -223,7 +223,7 @@
 
   .cad-point-menu button:hover {
     background: hsl(var(--cad-toolbar-hover));
-    color: #fff;
+    color: hsl(var(--cad-toolbar-foreground));
   }
 
   .cad-point-menu button.active {

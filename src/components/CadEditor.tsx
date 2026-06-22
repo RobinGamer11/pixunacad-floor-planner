@@ -1350,6 +1350,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
                     if (!doorSelectedId) {
                       setDoorHeightM(2.1);
                       setDoorSashEnabled(true);
+                      setDoorJambThickM(0.08);
                     }
                   }}
                   title="Tür"
@@ -1364,6 +1365,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
                     if (!doorSelectedId) {
                       setDoorHeightM(1.2);
                       setDoorSashEnabled(false);
+                      setDoorJambThickM(0.09);
                     }
                   }}
                   title="Fenster"

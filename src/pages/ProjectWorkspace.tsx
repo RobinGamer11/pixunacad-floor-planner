@@ -1132,7 +1132,7 @@ function PageCanvas({
             : activeTool === null ? "select"
             : null
           }
-          enabled={activeTool === "line" || activeTool === "text" || activeTool === "guide"}
+          enabled={activeTool === "line" || activeTool === "text" || activeTool === "guide" || activeTool === null}
           initialState={page.cadOverlay}
           lineColor={activeTool === "guide" ? toolSettings.guide.color : toolSettings.line.color}
           lineThicknessMm={activeTool === "guide" ? Math.max(0.1, toolSettings.guide.strokeWidth * 0.2) : toolSettings.line.thicknessMm}
