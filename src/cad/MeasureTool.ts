@@ -11,7 +11,10 @@ interface CollectedPoint {
   world: Vec2;
   // Reference info for parallel orientation
   refDir?: Vec2 | null;
+  /** Wenn der Punkt auf einem Tür-/Fenster-Endpunkt liegt: Tür-ID. */
+  doorId?: string | null;
 }
+
 
 export class MeasureTool {
   app: CadApp;
@@ -105,7 +108,7 @@ export class MeasureTool {
   }
 
   private _buildPreviewSpecs(placementPoint: Vec2) {
-    const specs: Array<{ p1: Vec2; p2: Vec2; placementPoint: Vec2; mode: "parallel" | "diagonal"; refDir: Vec2 | null; style: DimensionStyle }> = [];
+    const specs: Array<{ p1: Vec2; p2: Vec2; placementPoint: Vec2; mode: "parallel" | "diagonal"; refDir: Vec2 | null; style: DimensionStyle; doorRefId: string | null }> = [];
     if (this.selectedPoints.length < 2) return specs;
 
     const style = this.app.getCurrentMeasureStyle();
@@ -125,11 +128,12 @@ export class MeasureTool {
         ? sp.world
         : this._projectOnAxis(sp.world, anchor, axis);
       const t = (w.x - anchor.x) * axis.x + (w.y - anchor.y) * axis.y;
-      return { world: w, t };
+      return { world: w, t, doorId: sp.doorId || null };
     });
     projected.sort((a, b) => a.t - b.t);
 
     if (this.getPointCountMode() === "two") {
+      const doorRefId = (projected[0].doorId && projected[0].doorId === projected[1].doorId) ? projected[0].doorId : null;
       specs.push({
         p1: projected[0].world,
         p2: projected[1].world,
@@ -137,11 +141,13 @@ export class MeasureTool {
         mode,
         refDir: axis,
         style,
+        doorRefId,
       });
       return specs;
     }
 
     for (let i = 0; i < projected.length - 1; i++) {
+      const doorRefId = (projected[i].doorId && projected[i].doorId === projected[i + 1].doorId) ? projected[i].doorId : null;
       specs.push({
         p1: projected[i].world,
         p2: projected[i + 1].world,
@@ -149,10 +155,12 @@ export class MeasureTool {
         mode,
         refDir: axis,
         style,
+        doorRefId,
       });
     }
     return specs;
   }
+
 
 
   update(input: Input) {
@@ -186,7 +194,11 @@ export class MeasureTool {
         // Reference the snapped world position WITHOUT modifying the underlying geometry.
         // The MeasureTool must never split segments or insert hatch points — that's the LineTool's job.
         const refDir = this._refDirFromSnap(this.pointSnap);
-        this.selectedPoints.push({ world: v(this.pointSnap.world.x, this.pointSnap.world.y), refDir });
+        this.selectedPoints.push({
+          world: v(this.pointSnap.world.x, this.pointSnap.world.y),
+          refDir,
+          doorId: this.pointSnap.doorId || null,
+        });
         if (this.getPointCountMode() === "two" && this.selectedPoints.length === 2) {
           this.state = "place";
         }
@@ -199,7 +211,7 @@ export class MeasureTool {
         const placement = v(input.mouse.wx, input.mouse.wy);
         const specs = this._buildPreviewSpecs(placement);
         for (const s of specs) {
-          this.app.scene.createDimension(s.p1, s.p2, s.placementPoint, s.mode, s.refDir, s.style);
+          this.app.scene.createDimension(s.p1, s.p2, s.placementPoint, s.mode, s.refDir, s.style, s.doorRefId);
         }
         this.app.clearSelection();
         this.app.refreshLabelUI();
@@ -208,6 +220,7 @@ export class MeasureTool {
       }
     }
   }
+
 
   onTabRequest(): boolean { return false; }
 
@@ -289,6 +302,8 @@ export class MeasureTool {
       ...spec.style,
       decimals: spec.style.decimals ?? Defaults.measureDecimals,
       tickLengthM: spec.style.tickLengthM ?? Defaults.measureTickLengthM,
+      doorRefId: spec.doorRefId || null,
     } as any, true);
   }
 }
+

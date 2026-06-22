@@ -975,7 +975,7 @@ export class Renderer {
     }
   }
 
-  private _drawSingleSegment(seg: { a: Vec2; b: Vec2; color?: string; thicknessM: number; labelId: string; isGuide?: boolean }) {
+  private _drawSingleSegment(seg: { a: Vec2; b: Vec2; color?: string; thicknessM: number; labelId: string; isGuide?: boolean; arrowStart?: boolean; arrowEnd?: boolean; arrowScale?: number }) {
     const ctx = this.ctx;
     const cam = this.camera;
     const a = cam.worldToScreen(seg.a.x, seg.a.y);
@@ -984,6 +984,7 @@ export class Renderer {
 
     ctx.save();
     ctx.strokeStyle = seg.color || Defaults.lineColor;
+    ctx.fillStyle = seg.color || Defaults.lineColor;
     ctx.lineWidth = this._segStrokePx(seg.thicknessM);
     if (seg.isGuide) {
       // Hilfslinie: hellblau gestrichelt, immer dünn (Screen-Pixel), Hintergrund.
@@ -997,6 +998,31 @@ export class Renderer {
     ctx.moveTo(a.x, a.y);
     ctx.lineTo(b.x, b.y);
     ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Pfeilspitzen (nicht für Hilfslinien)
+    if (!seg.isGuide && (seg.arrowStart || seg.arrowEnd)) {
+      const scale = (typeof seg.arrowScale === "number" && seg.arrowScale > 0) ? seg.arrowScale : 1;
+      // Pfeilgröße proportional zur Linienstärke (in px).
+      const sizePx = Math.max(6, this._segStrokePx(seg.thicknessM) * 6 * scale);
+      const dxw = b.x - a.x, dyw = b.y - a.y;
+      const L = Math.hypot(dxw, dyw) || 1;
+      const ux = dxw / L, uy = dyw / L;
+      const drawHead = (tipX: number, tipY: number, dirX: number, dirY: number) => {
+        const baseX = tipX - dirX * sizePx;
+        const baseY = tipY - dirY * sizePx;
+        const px = -dirY, py = dirX; // perp
+        const halfW = sizePx * 0.5;
+        ctx.beginPath();
+        ctx.moveTo(tipX, tipY);
+        ctx.lineTo(baseX + px * halfW, baseY + py * halfW);
+        ctx.lineTo(baseX - px * halfW, baseY - py * halfW);
+        ctx.closePath();
+        ctx.fill();
+      };
+      if (seg.arrowEnd) drawHead(b.x, b.y, ux, uy);
+      if (seg.arrowStart) drawHead(a.x, a.y, -ux, -uy);
+    }
 
     if (isGroupSel) {
       ctx.setLineDash([]);
@@ -1009,6 +1035,7 @@ export class Renderer {
     }
     ctx.restore();
   }
+
 
   private _drawDoorsForLabel(labelId: string) {
     if (!this.scene.doors || this.scene.doors.length === 0) return;
@@ -1610,6 +1637,7 @@ export class Renderer {
     textColor?: string; textSizePx?: number; lineColor?: string; tickLengthM?: number;
     showExtensions?: boolean; useFreeText?: boolean; freeText?: string; decimals?: number;
     textBgEnabled?: boolean; textBgColor?: string; textBgAlpha?: number;
+    doorRefId?: string | null;
   }, isPreview = false) {
     const g = getDimensionGeometry(dim);
 
@@ -1688,8 +1716,38 @@ export class Renderer {
 
     ctx.fillStyle = dim.textColor || Defaults.measureTextColor;
     ctx.fillText(text, 0, textY);
+
+    // Tür-/Fenster-Referenz: Höhe + BRH unterhalb der Maßlinie anzeigen.
+    if (dim.doorRefId) {
+      const door = this.scene.getDoorById(dim.doorRefId);
+      if (door) {
+        const dec = Math.max(0, Math.min(6, dim.decimals ?? Defaults.measureDecimals));
+        const lines: string[] = [];
+        lines.push(`${door.heightM.toFixed(dec)} m`);
+        if (door.kind === "window" || door.breakHeightM > 0) {
+          lines.push(`BRH: ${door.breakHeightM.toFixed(dec)} m`);
+        }
+        const subFont = Math.max(1, baseSize * zoomFactor * 0.9);
+        ctx.font = `${subFont}px system-ui, Arial, sans-serif`;
+        let y = textOffsetPx + subFont * 0.6;
+        for (const line of lines) {
+          if (dim.textBgEnabled) {
+            const m = ctx.measureText(line);
+            const pX = Math.max(4, subFont * 0.4);
+            const pY = Math.max(2, subFont * 0.2);
+            ctx.fillStyle = hexToRgba(dim.textBgColor || Defaults.measureTextBgColor, dim.textBgAlpha ?? Defaults.measureTextBgAlpha);
+            ctx.fillRect(-m.width / 2 - pX, y - subFont / 2 - pY, m.width + pX * 2, subFont + pY * 2);
+          }
+          ctx.fillStyle = dim.textColor || Defaults.measureTextColor;
+          ctx.fillText(line, 0, y);
+          y += subFont * 1.15;
+        }
+      }
+    }
+
     ctx.restore();
   }
+
 
   private _drawDimensionSelection() {
     if (!this.selection || this.selection.type !== SelectionType.DIMENSION) return;

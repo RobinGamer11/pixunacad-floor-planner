@@ -7,6 +7,8 @@ import { boxCornersWorld } from "./textGeometry";
 import { documentCornersWorld, documentEdgeMidpointsWorld } from "./documentGeometry";
 import { computeWallLines } from "./wallGeom";
 import { computeHealedWallLines } from "./wallHeal";
+import { doorGeometry } from "./doorGeom";
+
 // Wall-Snap nutzt primär wall.corners (Bezugslinie); optional zusätzlich
 // die Sub-Linien-Eckpunkte/-Kanten (gegenüberliegende Wandkante), wenn das
 // aktive Werkzeug das anfordert (z. B. WallTool beim Zeichnen).
@@ -31,7 +33,12 @@ export interface Snap {
   wallId?: string | null;
   /** Wandlinien-Typ (Priorität): main = Haupt (P1), help = Mitte (P2), sub = Sub (P3). */
   wallLine?: WallLineKind | null;
+  /** Wenn der Snap auf einem Tür-/Fenster-Eckpunkt liegt: Tür-ID. */
+  doorId?: string | null;
+  /** Welcher Tür-Endpunkt: "left" | "right" | "center". */
+  doorEndpoint?: "left" | "right" | "center" | null;
 }
+
 
 export class TopologyEngine {
   scene: Scene;
@@ -295,6 +302,34 @@ export class TopologyEngine {
     this._addWallSnapsTo(mouseS, mouseW, (cand, score) => {
       if (score < bestScore) { bestScore = score; best = cand; }
     });
+
+    // Door / Window endpoints (leftEnd, rightEnd, center) — als freie Snap-Punkte
+    // mit doorId-Referenz, damit MeasureTool sie der jeweiligen Tür zuordnen kann.
+    for (const door of this.scene.doors) {
+      if (!this.labels.isVisible(door.labelId)) continue;
+      const wall = this.scene.getWallById(door.wallId);
+      if (!wall) continue;
+      const g = doorGeometry(wall, door);
+      if (!g) continue;
+      const candidates: Array<{ p: Vec2; ep: "left" | "right" | "center" }> = [
+        { p: g.leftEnd, ep: "left" },
+        { p: g.rightEnd, ep: "right" },
+        { p: g.center, ep: "center" },
+      ];
+      for (const c of candidates) {
+        const px = this._worldToMousePx(c.p, mouseS);
+        if (px > Defaults.snapPx) continue;
+        if (px < bestScore) {
+          bestScore = px;
+          best = {
+            type: SnapType.POINT, world: v(c.p.x, c.p.y),
+            segment: null, hatch: null, pointIndex: -1, edgeIndex: null, t: null, px,
+            doorId: door.id, doorEndpoint: c.ep,
+          };
+        }
+      }
+    }
+
 
 
     // Hatch edges

@@ -215,6 +215,13 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
   const [doorMode, setDoorMode] = useState<"door" | "window">("door");
   const [doorWidthM, setDoorWidthM] = useState<number>(0.9);
   const [doorHeightM, setDoorHeightM] = useState<number>(2.1);
+  const [doorBreakHeightM, setDoorBreakHeightM] = useState<number>(0);
+  // Line arrow settings
+  const [lineArrowStart, setLineArrowStart] = useState<boolean>(false);
+  const [lineArrowEnd, setLineArrowEnd] = useState<boolean>(false);
+  const [lineArrowScale, setLineArrowScale] = useState<number>(1);
+
+
   const [doorSide, setDoorSide] = useState<"inner" | "outer">("inner");
   const [doorHand, setDoorHand] = useState<"left" | "right">("left");
   const [doorEdge, setDoorEdge] = useState<"inner" | "center" | "outer">("center");
@@ -257,6 +264,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
     app.doorTool.settings.mode = doorMode;
     app.doorTool.settings.widthM = doorWidthM;
     app.doorTool.settings.heightM = doorHeightM;
+    app.doorTool.settings.breakHeightM = doorBreakHeightM;
     app.doorTool.settings.side = doorSide;
     app.doorTool.settings.hand = doorHand;
     app.doorTool.settings.edge = doorEdge;
@@ -270,12 +278,29 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
     app.doorTool.settings.glassThickM = doorGlassThickM;
     app.doorTool.settings.glassFillColor = doorGlassFillColor;
     app.doorTool.applySettingsToSelection();
-  }, [doorMode, doorWidthM, doorHeightM, doorSide, doorHand, doorEdge, doorColor, doorJambEnabled, doorJambColor, doorJambLenM, doorJambThickM, doorSashEnabled, doorGlassColor, doorGlassThickM, doorGlassFillColor]);
+  }, [doorMode, doorWidthM, doorHeightM, doorBreakHeightM, doorSide, doorHand, doorEdge, doorColor, doorJambEnabled, doorJambColor, doorJambLenM, doorJambThickM, doorSashEnabled, doorGlassColor, doorGlassThickM, doorGlassFillColor]);
+
+  // Line arrow settings sync (Default + selektiertes Segment)
+  useEffect(() => {
+    const app = appRef.current;
+    if (!app) return;
+    app.defaultArrowStart = lineArrowStart;
+    app.defaultArrowEnd = lineArrowEnd;
+    app.defaultArrowScale = lineArrowScale;
+    const sel = app.getSelectedSegment?.();
+    const groupSegs = (typeof (app as any).getSelectedGroupSegments === "function")
+      ? (app as any).getSelectedGroupSegments() as any[] : [];
+    const targets: any[] = sel ? [sel] : groupSegs;
+    if (targets.length > 0) {
+      for (const seg of targets) {
+        seg.arrowStart = lineArrowStart;
+        seg.arrowEnd = lineArrowEnd;
+        seg.arrowScale = lineArrowScale;
+      }
+    }
+  }, [lineArrowStart, lineArrowEnd, lineArrowScale]);
 
 
-
-
-  
 
   useEffect(() => {
     if (
@@ -472,7 +497,15 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
     app.onSelectionChange = () => {
       setSelectedWallId(app.getSelectedWall()?.id || null);
       setSelectedFreeStrokeId(app.getSelectedFreeStroke()?.id || null);
+      // Pfeil-Einstellungen mit aktueller Auswahl synchronisieren
+      try {
+        const style = app.getCurrentLineStyle() as any;
+        setLineArrowStart(!!style.arrowStart);
+        setLineArrowEnd(!!style.arrowEnd);
+        setLineArrowScale(typeof style.arrowScale === "number" ? style.arrowScale : 1);
+      } catch {}
     };
+
     app.setTool(ToolIds.SELECT);
     app.doorTool.onSelectionChange = (id) => {
       setDoorSelectedId(id);
@@ -482,6 +515,8 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
           setDoorMode(d.kind);
           setDoorWidthM(d.widthM);
           setDoorHeightM(d.heightM);
+          setDoorBreakHeightM(d.breakHeightM);
+
           setDoorSide(d.side);
           setDoorHand(d.hand);
           setDoorEdge(d.edge);
@@ -1439,7 +1474,34 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
                  <label>Stärke (m)</label>
                  <input ref={thicknessInputRef} type="text" defaultValue="0.03" />
                </div>
+               <div className="pt-2" style={{ borderTop: "1px solid hsl(var(--border))" }}>
+                 <label className="block mb-1.5">Pfeilspitzen</label>
+                 <div className="flex gap-1">
+                   <button type="button" onClick={() => setLineArrowStart(!lineArrowStart)}
+                     className={`cad-toolbar-btn flex-1 justify-center h-8 text-[11px] ${lineArrowStart ? "active" : ""}`}>
+                     Anfang
+                   </button>
+                   <button type="button" onClick={() => setLineArrowEnd(!lineArrowEnd)}
+                     className={`cad-toolbar-btn flex-1 justify-center h-8 text-[11px] ${lineArrowEnd ? "active" : ""}`}>
+                     Ende
+                   </button>
+                 </div>
+               </div>
+               {(lineArrowStart || lineArrowEnd) && (
+                 <div>
+                   <label>Pfeilgröße (×)</label>
+                   <input
+                     type="number" min={0.2} step={0.1}
+                     value={lineArrowScale}
+                     onChange={(e) => {
+                       const n = parseFloat(e.target.value.replace(",", "."));
+                       if (Number.isFinite(n) && n > 0) setLineArrowScale(n);
+                     }}
+                   />
+                 </div>
+               )}
              </div>
+
              <div className="mt-3 pt-2 flex flex-wrap gap-1.5" style={{ borderTop: "1px solid hsl(var(--border))" }}>
                <span className="cad-kbd">Space</span>
                <span className="cad-kbd">Shift</span>
@@ -1989,6 +2051,18 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
                     }}
                   />
                 </div>
+                <div>
+                  <label>Brüstungshöhe BRH (m)</label>
+                  <input
+                    type="number" min={0} step={0.05}
+                    value={doorBreakHeightM}
+                    onChange={(e) => {
+                      const n = parseFloat(e.target.value.replace(",", "."));
+                      if (Number.isFinite(n) && n >= 0) setDoorBreakHeightM(n);
+                    }}
+                  />
+                </div>
+
                 <div>
                   <label>Startkante</label>
                   <div className="flex gap-1">

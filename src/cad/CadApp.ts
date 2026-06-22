@@ -145,6 +145,10 @@ export class CadApp {
 
   defaultLineColor = Defaults.lineColor;
   defaultLineThicknessM = Defaults.lineThicknessM;
+  defaultArrowStart = false;
+  defaultArrowEnd = false;
+  defaultArrowScale = 1;
+
   defaultHatchFillColor = Defaults.hatchFillColor;
   defaultHatchStrokeColor = Defaults.hatchStrokeColor;
   defaultHatchStrokeWidthPx = Defaults.hatchStrokePx;
@@ -455,8 +459,10 @@ export class CadApp {
       segments: scene.segments.map(s => ({
         id: s.id, a: { x: s.a.x, y: s.a.y }, b: { x: s.b.x, y: s.b.y },
         color: s.color, thicknessM: s.thicknessM, labelId: s.labelId,
+        arrowStart: !!s.arrowStart, arrowEnd: !!s.arrowEnd, arrowScale: s.arrowScale || 1,
         _stickerEditOwnerId: s._stickerEditOwnerId || null,
       })),
+
       hatches: scene.hatches.map(h => ({
         id: h.id, points: h.points.map(p => ({ x: p.x, y: p.y })),
         holes: (h.holes || []).map(loop => loop.map(p => ({ x: p.x, y: p.y }))),
@@ -491,8 +497,10 @@ export class CadApp {
         useFreeText: d.useFreeText, freeText: d.freeText,
         textBgEnabled: d.textBgEnabled, textBgColor: d.textBgColor, textBgAlpha: d.textBgAlpha,
         labelId: d.labelId,
+        doorRefId: d.doorRefId || null,
         _stickerEditOwnerId: d._stickerEditOwnerId || null,
       })),
+
       textBoxes: scene.textBoxes.map(t => ({
         id: t.id,
         center: { x: t.center.x, y: t.center.y },
@@ -543,10 +551,14 @@ export class CadApp {
       } : null,
       doors: scene.doors.map(d => ({
         id: d.id, wallId: d.wallId, posM: d.posM, widthM: d.widthM, heightM: d.heightM,
+        breakHeightM: d.breakHeightM,
+        kind: d.kind,
         side: d.side, hand: d.hand, edge: d.edge, color: d.color,
         jambEnabled: d.jambEnabled, jambColor: d.jambColor, jambLenM: d.jambLenM, jambThickM: d.jambThickM,
+        sashEnabled: d.sashEnabled, glassColor: d.glassColor, glassThickM: d.glassThickM, glassFillColor: d.glassFillColor,
         labelId: d.labelId,
       })),
+
     };
   }
 
@@ -588,7 +600,7 @@ export class CadApp {
       };
     }
     for (const s of data.segments || []) {
-      const seg = scene.createSegment(s.a, s.b, { color: s.color, thicknessM: s.thicknessM, labelId: s.labelId });
+      const seg = scene.createSegment(s.a, s.b, { color: s.color, thicknessM: s.thicknessM, labelId: s.labelId, arrowStart: !!s.arrowStart, arrowEnd: !!s.arrowEnd, arrowScale: typeof s.arrowScale === "number" ? s.arrowScale : 1 });
       if (s._stickerEditOwnerId) seg._stickerEditOwnerId = s._stickerEditOwnerId;
     }
     for (const h of data.hatches || []) {
@@ -625,9 +637,10 @@ export class CadApp {
         useFreeText: d.useFreeText, freeText: d.freeText,
         textBgEnabled: d.textBgEnabled, textBgColor: d.textBgColor, textBgAlpha: d.textBgAlpha,
         labelId: d.labelId,
-      });
+      }, d.doorRefId || null);
       if (d._stickerEditOwnerId) dim._stickerEditOwnerId = d._stickerEditOwnerId;
     }
+
     for (const t of data.textBoxes || []) {
       const box = scene.createTextBox(t.center, t.widthM, t.heightM, { ...(t.style || {}), labelId: t.labelId }, t.html || "", t.rotationRad || 0);
       if (t._stickerEditOwnerId) box._stickerEditOwnerId = t._stickerEditOwnerId;
@@ -658,12 +671,16 @@ export class CadApp {
     for (const d of data.doors || []) {
       const door = scene.createDoor({
         wallId: d.wallId, posM: d.posM, widthM: d.widthM, heightM: d.heightM,
+        breakHeightM: d.breakHeightM,
+        kind: d.kind,
         side: d.side, hand: d.hand, edge: d.edge, color: d.color,
         jambEnabled: d.jambEnabled, jambColor: d.jambColor, jambLenM: d.jambLenM, jambThickM: d.jambThickM,
+        sashEnabled: d.sashEnabled, glassColor: d.glassColor, glassThickM: d.glassThickM, glassFillColor: d.glassFillColor,
         labelId: d.labelId,
       });
       if (d.id) (door as any).id = d.id;
     }
+
   }
 
   private _serializeScene(): string {
@@ -1230,15 +1247,37 @@ export class CadApp {
   getCurrentLineStyle() {
     const selected = this.getSelectedSegment();
     if (selected) {
-      return { color: selected.color || this.defaultLineColor, thicknessM: selected.thicknessM || this.defaultLineThicknessM, labelId: selected.labelId || Defaults.defaultLabelId };
+      return {
+        color: selected.color || this.defaultLineColor,
+        thicknessM: selected.thicknessM || this.defaultLineThicknessM,
+        labelId: selected.labelId || Defaults.defaultLabelId,
+        arrowStart: !!selected.arrowStart,
+        arrowEnd: !!selected.arrowEnd,
+        arrowScale: (typeof selected.arrowScale === "number" && selected.arrowScale > 0) ? selected.arrowScale : 1,
+      };
     }
     const groupSegs = this.getSelectedGroupSegments();
     if (groupSegs.length > 0) {
       const ref = groupSegs[0];
-      return { color: ref.color || this.defaultLineColor, thicknessM: ref.thicknessM || this.defaultLineThicknessM, labelId: ref.labelId || Defaults.defaultLabelId };
+      return {
+        color: ref.color || this.defaultLineColor,
+        thicknessM: ref.thicknessM || this.defaultLineThicknessM,
+        labelId: ref.labelId || Defaults.defaultLabelId,
+        arrowStart: !!ref.arrowStart,
+        arrowEnd: !!ref.arrowEnd,
+        arrowScale: (typeof ref.arrowScale === "number" && ref.arrowScale > 0) ? ref.arrowScale : 1,
+      };
     }
-    return { color: this.defaultLineColor, thicknessM: this.defaultLineThicknessM, labelId: this.activeDrawLabelId || Defaults.defaultLabelId };
+    return {
+      color: this.defaultLineColor,
+      thicknessM: this.defaultLineThicknessM,
+      labelId: this.activeDrawLabelId || Defaults.defaultLabelId,
+      arrowStart: this.defaultArrowStart,
+      arrowEnd: this.defaultArrowEnd,
+      arrowScale: this.defaultArrowScale,
+    };
   }
+
 
   getCurrentHatchStyle() {
     const selected = this.getSelectedHatch();
