@@ -155,12 +155,12 @@ export class SheetManager {
     }));
   }
 
-  /** Wiederherstellung aus Snapshot. Default-Sheet wird immer garantiert. */
+  /** Wiederherstellung aus Snapshot. Es muss immer mindestens ein Blatt existieren. */
   restore(data: Sheet[]) {
     const makeDefault = (): Sheet => ({
       id: SheetDefaults.defaultSheetId,
       name: SheetDefaults.defaultSheetName,
-      locked: true,
+      locked: false,
       scaleKey: SheetDefaults.defaultScaleKey,
       scaleValue: SheetDefaults.defaultScaleValue,
     });
@@ -171,15 +171,13 @@ export class SheetManager {
     const cleaned: Sheet[] = data.map(s => ({
       id: String(s.id),
       name: String(s.name || "Blatt"),
-      locked: s.id === SheetDefaults.defaultSheetId ? true : !!s.locked,
+      locked: false,
       scaleKey: typeof s.scaleKey === "string" ? s.scaleKey : SheetDefaults.defaultScaleKey,
       scaleValue: typeof s.scaleValue === "number" && s.scaleValue > 0
         ? s.scaleValue
         : SheetDefaults.defaultScaleValue,
     }));
-    if (!cleaned.some(s => s.id === SheetDefaults.defaultSheetId)) {
-      cleaned.push(makeDefault());
-    }
+    if (cleaned.length === 0) cleaned.push(makeDefault());
     this.sheets = cleaned;
   }
 }
