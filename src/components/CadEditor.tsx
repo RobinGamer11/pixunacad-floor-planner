@@ -34,6 +34,24 @@ const LINE_VARIANTS = [
   { id: ToolIds.ERASER, label: "Radiergummi", icon: Eraser },
 ];
 
+type ToolVariant =
+  | { kind: "tool"; id: string; label: string; icon: any }
+  | { kind: "hatch"; mode: HatchDrawMode; label: string; icon: any };
+
+const TOOL_VARIANTS: Record<string, ToolVariant[]> = {
+  [ToolIds.LINE]: [
+    { kind: "tool", id: ToolIds.LINE, label: "Linie", icon: Minus },
+    { kind: "tool", id: ToolIds.FREE, label: "Freihand", icon: Pencil },
+    { kind: "tool", id: ToolIds.ERASER, label: "Radiergummi", icon: Eraser },
+  ],
+  [ToolIds.HATCH]: [
+    { kind: "hatch", mode: "polygon", label: "Polygon", icon: Spline },
+    { kind: "hatch", mode: "rectangle", label: "Rechteck", icon: RectangleHorizontal },
+    { kind: "hatch", mode: "circle", label: "Kreis", icon: Circle },
+    { kind: "hatch", mode: "fill", label: "Füllung", icon: PaintBucket },
+  ],
+};
+
 interface CadEditorProps { projectId?: string }
 const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
