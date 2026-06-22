@@ -600,7 +600,7 @@ export class CadApp {
       };
     }
     for (const s of data.segments || []) {
-      const seg = scene.createSegment(s.a, s.b, { color: s.color, thicknessM: s.thicknessM, labelId: s.labelId });
+      const seg = scene.createSegment(s.a, s.b, { color: s.color, thicknessM: s.thicknessM, labelId: s.labelId, arrowStart: !!s.arrowStart, arrowEnd: !!s.arrowEnd, arrowScale: typeof s.arrowScale === "number" ? s.arrowScale : 1 });
       if (s._stickerEditOwnerId) seg._stickerEditOwnerId = s._stickerEditOwnerId;
     }
     for (const h of data.hatches || []) {
