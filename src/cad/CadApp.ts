@@ -66,6 +66,8 @@ export interface TextEditorRefs {
 export interface MeasureSettings {
   orientation: "parallel" | "diagonal";
   pointCount: "two" | "multi";
+  /** Achsen-Richtung der Maßkette. "free" wird aus den ersten zwei Punkten abgeleitet. */
+  direction: "horizontal" | "vertical" | "free";
   editMode: "parallel" | "endpoints";
   textColor: string;
   textSizePx: number;
@@ -79,6 +81,7 @@ export interface MeasureSettings {
   textBgColor: string;
   textBgAlpha: number;
 }
+
 
 export interface MeasureSettingsRefs {
   panel: HTMLDivElement;
