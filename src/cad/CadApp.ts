@@ -637,9 +637,10 @@ export class CadApp {
         useFreeText: d.useFreeText, freeText: d.freeText,
         textBgEnabled: d.textBgEnabled, textBgColor: d.textBgColor, textBgAlpha: d.textBgAlpha,
         labelId: d.labelId,
-      });
+      }, d.doorRefId || null);
       if (d._stickerEditOwnerId) dim._stickerEditOwnerId = d._stickerEditOwnerId;
     }
+
     for (const t of data.textBoxes || []) {
       const box = scene.createTextBox(t.center, t.widthM, t.heightM, { ...(t.style || {}), labelId: t.labelId }, t.html || "", t.rotationRad || 0);
       if (t._stickerEditOwnerId) box._stickerEditOwnerId = t._stickerEditOwnerId;
@@ -670,12 +671,16 @@ export class CadApp {
     for (const d of data.doors || []) {
       const door = scene.createDoor({
         wallId: d.wallId, posM: d.posM, widthM: d.widthM, heightM: d.heightM,
+        breakHeightM: d.breakHeightM,
+        kind: d.kind,
         side: d.side, hand: d.hand, edge: d.edge, color: d.color,
         jambEnabled: d.jambEnabled, jambColor: d.jambColor, jambLenM: d.jambLenM, jambThickM: d.jambThickM,
+        sashEnabled: d.sashEnabled, glassColor: d.glassColor, glassThickM: d.glassThickM, glassFillColor: d.glassFillColor,
         labelId: d.labelId,
       });
       if (d.id) (door as any).id = d.id;
     }
+
   }
 
   private _serializeScene(): string {
