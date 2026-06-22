@@ -13,6 +13,7 @@
  */
 import { Vec2, v, dist, pointInPolygon, polygonSignedArea, polygonAreaAbs } from "./geometry";
 import type { Scene } from "./Scene";
+import { buildHealedWallSolidRing } from "./wallSolid";
 
 interface RawEdge { a: Vec2; b: Vec2; }
 
@@ -28,9 +29,18 @@ function collectEdges(scene: Scene): RawEdge[] {
   for (const seg of scene.segments) {
     if (dist(seg.a, seg.b) > 1e-7) out.push({ a: v(seg.a.x, seg.a.y), b: v(seg.b.x, seg.b.y) });
   }
-  for (const w of scene.walls) {
-    for (let i = 0; i < w.corners.length - 1; i++) {
-      const a = w.corners[i], b = w.corners[i + 1];
+  // Wände: beide Wandseiten (Außen- + Innenkontur) als Begrenzung. Dadurch
+  // schnappt die Flood-Fill an die innere Wandkante und überspringt den
+  // Wandkörper nicht — Räume zwischen Wänden werden korrekt umrandet.
+  const wallGraph = scene.getWallTopology?.();
+  for (let wi = 0; wi < scene.walls.length; wi++) {
+    const w = scene.walls[wi];
+    if (w.corners.length < 2) continue;
+    const others = scene.walls.filter((_, i) => i !== wi);
+    const ring = buildHealedWallSolidRing(w, others, wallGraph);
+    for (let i = 0; i < ring.length; i++) {
+      const a = ring[i];
+      const b = ring[(i + 1) % ring.length];
       if (dist(a, b) > 1e-7) out.push({ a: v(a.x, a.y), b: v(b.x, b.y) });
     }
   }
