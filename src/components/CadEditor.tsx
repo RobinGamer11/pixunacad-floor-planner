@@ -117,7 +117,9 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
   const measureIdSelectRef = useRef<HTMLSelectElement>(null);
   const measureOrientationRef = useRef<HTMLSelectElement>(null);
   const measurePointCountRef = useRef<HTMLSelectElement>(null);
+  const measureDirectionRef = useRef<HTMLSelectElement>(null);
   const measureEditModeRef = useRef<HTMLSelectElement>(null);
+
   const measureExtRef = useRef<HTMLInputElement>(null);
   const measureFreeTextToggleRef = useRef<HTMLInputElement>(null);
   const measureFreeTextInputRef = useRef<HTMLInputElement>(null);
