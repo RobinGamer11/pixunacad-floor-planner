@@ -212,14 +212,19 @@ export function drawDoor(
       ? Math.min(door.glassThickM, wallThick * 0.98)
       : wallThick / 2;
     const off = thick / 2;
+    // Quer-Verschiebung der Linien gemäß Startkante (analog zur Laibung).
+    const halfFullW = wallThick / 2;
+    const acrossShiftWin = door.edge === "inner" ? +halfFullW - off
+      : door.edge === "outer" ? -halfFullW + off
+      : 0;
     // Linien-Endpunkte: vom leftEnd/rightEnd jeweils um jambLen nach innen verschoben.
     const innerL = v(
-      g.leftEnd.x  + g.tan.x * g.jambLen,
-      g.leftEnd.y  + g.tan.y * g.jambLen,
+      g.leftEnd.x  + g.tan.x * g.jambLen + g.n.x * acrossShiftWin,
+      g.leftEnd.y  + g.tan.y * g.jambLen + g.n.y * acrossShiftWin,
     );
     const innerR = v(
-      g.rightEnd.x - g.tan.x * g.jambLen,
-      g.rightEnd.y - g.tan.y * g.jambLen,
+      g.rightEnd.x - g.tan.x * g.jambLen + g.n.x * acrossShiftWin,
+      g.rightEnd.y - g.tan.y * g.jambLen + g.n.y * acrossShiftWin,
     );
     // (a) optionale Füllung zwischen den Linien
     if (door.glassFillColor && door.glassFillColor !== "") {
