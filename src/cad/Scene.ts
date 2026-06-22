@@ -811,13 +811,14 @@ export class Scene {
   }
 
   // ---- Dimensions ----
-  createDimension(p1: Vec2, p2: Vec2, placementPoint: Vec2, mode: "parallel" | "diagonal", refDir: Vec2 | null, style: DimensionStyle = {}) {
-    const dim = new Dimension({ id: this._makeId(), p1, p2, placementPoint, mode, refDir, style, labelId: style.labelId });
+  createDimension(p1: Vec2, p2: Vec2, placementPoint: Vec2, mode: "parallel" | "diagonal", refDir: Vec2 | null, style: DimensionStyle = {}, doorRefId: string | null = null) {
+    const dim = new Dimension({ id: this._makeId(), p1, p2, placementPoint, mode, refDir, style, labelId: style.labelId, doorRefId });
     dim._stickerEditOwnerId = this._currentEditOwnerId;
     this.dimensions.push(dim);
     this._rebuildDimIdMap();
     return dim;
   }
+
 
   getDimensionById(id: string): Dimension | null { return this._dimIdMap.get(id) || null; }
 
