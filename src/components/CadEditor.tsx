@@ -612,6 +612,8 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
     appRef.current?.setTool(targetId);
     setActiveTool(targetId);
     setGridPanelOpen(false);
+    // Flyout: bei Tools mit Varianten ausklappen, sonst schließen
+    setExpandedTool(TOOL_VARIANTS[id] ? id : null);
   }, [lineVariant]);
 
   const handleDocFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
