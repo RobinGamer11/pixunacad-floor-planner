@@ -19,10 +19,15 @@ export class Segment {
   /** Wenn ≥ 2: erzeugt N-1 äquidistante Snap-Punkte auf der Linie,
    *  die sie in N gleiche Abschnitte teilen. */
   divisionSnap?: number;
+  /** Pfeilspitze am Anfangs-/Endpunkt. */
+  arrowStart?: boolean;
+  arrowEnd?: boolean;
+  /** Skalierungsfaktor der Pfeilspitze (Multiplikator auf Linienstärke). Default 1. */
+  arrowScale?: number;
   /** Wenn gesetzt: dieses Objekt gehört zum Edit-Mode der Sticker-Instanz mit dieser ID. */
   _stickerEditOwnerId?: string | null;
 
-  constructor({ id, a, b, color, thicknessM, labelId, isGuide, midpointSnap, divisionSnap }: { id: string; a: Vec2; b: Vec2; color?: string; thicknessM?: number; labelId?: string; isGuide?: boolean; midpointSnap?: boolean; divisionSnap?: number }) {
+  constructor({ id, a, b, color, thicknessM, labelId, isGuide, midpointSnap, divisionSnap, arrowStart, arrowEnd, arrowScale }: { id: string; a: Vec2; b: Vec2; color?: string; thicknessM?: number; labelId?: string; isGuide?: boolean; midpointSnap?: boolean; divisionSnap?: number; arrowStart?: boolean; arrowEnd?: boolean; arrowScale?: number }) {
     this.id = id;
     this.a = v(a.x, a.y);
     this.b = v(b.x, b.y);
@@ -32,9 +37,13 @@ export class Segment {
     this.isGuide = !!isGuide;
     this.midpointSnap = !!midpointSnap;
     this.divisionSnap = (typeof divisionSnap === "number" && divisionSnap >= 2) ? Math.floor(divisionSnap) : undefined;
+    this.arrowStart = !!arrowStart;
+    this.arrowEnd = !!arrowEnd;
+    this.arrowScale = (typeof arrowScale === "number" && arrowScale > 0) ? arrowScale : 1;
     this._stickerEditOwnerId = null;
   }
 }
+
 
 
 export interface AreaLabel {
@@ -135,11 +144,15 @@ export class Dimension {
   textBgAlpha: number;
 
   labelId: string;
+  /** Optional: Referenz auf eine Tür/ein Fenster, wenn das Maß die Öffnungsbreite misst.
+   *  Wenn gesetzt, wird unterhalb der Maßlinie die Höhe und die Brüstungshöhe (BRH) ergänzt. */
+  doorRefId: string | null;
   _stickerEditOwnerId?: string | null;
 
-  constructor({ id, p1, p2, placementPoint, mode, refDir, style, labelId }: {
+  constructor({ id, p1, p2, placementPoint, mode, refDir, style, labelId, doorRefId }: {
     id: string; p1: Vec2; p2: Vec2; placementPoint: Vec2;
     mode?: "parallel" | "diagonal"; refDir?: Vec2 | null; style?: DimensionStyle; labelId?: string;
+    doorRefId?: string | null;
   }) {
     this.id = id;
     this.p1 = v(p1.x, p1.y);
@@ -161,9 +174,11 @@ export class Dimension {
     this.textBgColor = s.textBgColor || Defaults.measureTextBgColor;
     this.textBgAlpha = (typeof s.textBgAlpha === "number") ? clamp(s.textBgAlpha, 0, 1) : Defaults.measureTextBgAlpha;
     this.labelId = labelId || s.labelId || Defaults.defaultLabelId;
+    this.doorRefId = doorRefId || null;
     this._stickerEditOwnerId = null;
   }
 }
+
 
 export interface TextBoxStyle {
   textColor?: string;
@@ -459,6 +474,8 @@ export class Door {
   /** Gesamte Öffnungsbreite (mit Laibungen). */
   widthM: number;
   heightM: number;
+  /** Brüstungshöhe (m). Bei Fenstern üblich; bei Türen i. d. R. 0. */
+  breakHeightM: number;
   /** Öffnungsseite — auf welche Seite die Tür aufschlägt. */
   side: DoorSide;
   /** Öffnungsrichtung links/rechts entlang Wand. */
@@ -485,6 +502,7 @@ export class Door {
 
   constructor(opts: {
     id: string; wallId: string; posM: number; widthM: number; heightM?: number;
+    breakHeightM?: number;
     kind?: DoorKind;
     side?: DoorSide; hand?: DoorHand; edge?: DoorEdge; color?: string;
     jambEnabled?: boolean; jambColor?: string; jambLenM?: number; jambThickM?: number;
@@ -497,6 +515,9 @@ export class Door {
     this.posM = opts.posM;
     this.widthM = Math.max(0.1, opts.widthM);
     this.heightM = opts.heightM ?? 2.1;
+    this.breakHeightM = (typeof opts.breakHeightM === "number" && opts.breakHeightM >= 0)
+      ? opts.breakHeightM
+      : (this.kind === "window" ? 0.9 : 0);
     this.side = opts.side || "inner";
     this.hand = opts.hand || "left";
     this.edge = opts.edge || "center";
@@ -512,6 +533,7 @@ export class Door {
     this.labelId = opts.labelId || Defaults.defaultLabelId;
   }
 }
+
 
 
 export class Scene {
