@@ -215,6 +215,8 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
   const [doorMode, setDoorMode] = useState<"door" | "window">("door");
   const [doorWidthM, setDoorWidthM] = useState<number>(0.9);
   const [doorHeightM, setDoorHeightM] = useState<number>(2.1);
+  const [doorBreakHeightM, setDoorBreakHeightM] = useState<number>(0);
+
   const [doorSide, setDoorSide] = useState<"inner" | "outer">("inner");
   const [doorHand, setDoorHand] = useState<"left" | "right">("left");
   const [doorEdge, setDoorEdge] = useState<"inner" | "center" | "outer">("center");
@@ -257,6 +259,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
     app.doorTool.settings.mode = doorMode;
     app.doorTool.settings.widthM = doorWidthM;
     app.doorTool.settings.heightM = doorHeightM;
+    app.doorTool.settings.breakHeightM = doorBreakHeightM;
     app.doorTool.settings.side = doorSide;
     app.doorTool.settings.hand = doorHand;
     app.doorTool.settings.edge = doorEdge;
@@ -270,7 +273,8 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
     app.doorTool.settings.glassThickM = doorGlassThickM;
     app.doorTool.settings.glassFillColor = doorGlassFillColor;
     app.doorTool.applySettingsToSelection();
-  }, [doorMode, doorWidthM, doorHeightM, doorSide, doorHand, doorEdge, doorColor, doorJambEnabled, doorJambColor, doorJambLenM, doorJambThickM, doorSashEnabled, doorGlassColor, doorGlassThickM, doorGlassFillColor]);
+  }, [doorMode, doorWidthM, doorHeightM, doorBreakHeightM, doorSide, doorHand, doorEdge, doorColor, doorJambEnabled, doorJambColor, doorJambLenM, doorJambThickM, doorSashEnabled, doorGlassColor, doorGlassThickM, doorGlassFillColor]);
+
 
 
 
@@ -482,6 +486,8 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
           setDoorMode(d.kind);
           setDoorWidthM(d.widthM);
           setDoorHeightM(d.heightM);
+          setDoorBreakHeightM(d.breakHeightM);
+
           setDoorSide(d.side);
           setDoorHand(d.hand);
           setDoorEdge(d.edge);
