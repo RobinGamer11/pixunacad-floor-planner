@@ -762,16 +762,59 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
             const isActive = t.id === ToolIds.LINE
               ? (activeTool === ToolIds.LINE || activeTool === ToolIds.FREE || activeTool === ToolIds.ERASER)
               : activeTool === t.id;
+            const variants = TOOL_VARIANTS[t.id];
+            const isExpanded = expandedTool === t.id && !!variants;
             return (
-              <button
-                key={t.id}
-                onClick={() => handleToolClick(t.id)}
-                title={`${t.label} (${t.key})`}
-                className={`cad-rail-btn ${isActive ? "active" : ""}`}
-              >
-                <Icon size={18} />
-                <span>{t.label.length > 9 ? t.label.slice(0, 8) + "…" : t.label}</span>
-              </button>
+              <div key={t.id} className="relative w-full flex justify-center">
+                <button
+                  onClick={() => handleToolClick(t.id)}
+                  title={`${t.label} (${t.key})`}
+                  className={`cad-rail-btn ${isActive ? "active" : ""}`}
+                >
+                  <Icon size={18} />
+                  <span>{t.label.length > 9 ? t.label.slice(0, 8) + "…" : t.label}</span>
+                </button>
+                {isExpanded && (
+                  <div
+                    className="absolute top-0 left-full ml-1 flex flex-col gap-0.5 p-1 rounded-lg shadow-lg z-30"
+                    style={{
+                      background: "hsl(var(--surface-card))",
+                      border: "1px solid hsl(var(--hairline))",
+                    }}
+                  >
+                    {variants.map((v, i) => {
+                      const VIcon = v.icon;
+                      const vActive = v.kind === "tool"
+                        ? activeTool === v.id
+                        : (activeTool === ToolIds.HATCH && hatchDrawMode === v.mode);
+                      return (
+                        <button
+                          key={i}
+                          onClick={() => {
+                            if (v.kind === "tool") {
+                              appRef.current?.setTool(v.id);
+                              setActiveTool(v.id);
+                              setLineVariant(v.id);
+                            } else {
+                              if (activeTool !== ToolIds.HATCH) {
+                                appRef.current?.setTool(ToolIds.HATCH);
+                                setActiveTool(ToolIds.HATCH);
+                              }
+                              appRef.current?.hatchTool.setDrawMode(v.mode);
+                            }
+                            setExpandedTool(null);
+                          }}
+                          title={v.label}
+                          className={`cad-rail-btn ${vActive ? "active" : ""}`}
+                        >
+                          <VIcon size={18} />
+                          <span>{v.label.length > 9 ? v.label.slice(0, 8) + "…" : v.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>
