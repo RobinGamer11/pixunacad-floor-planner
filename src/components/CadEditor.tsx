@@ -1474,7 +1474,34 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
                  <label>Stärke (m)</label>
                  <input ref={thicknessInputRef} type="text" defaultValue="0.03" />
                </div>
+               <div className="pt-2" style={{ borderTop: "1px solid hsl(var(--border))" }}>
+                 <label className="block mb-1.5">Pfeilspitzen</label>
+                 <div className="flex gap-1">
+                   <button type="button" onClick={() => setLineArrowStart(!lineArrowStart)}
+                     className={`cad-toolbar-btn flex-1 justify-center h-8 text-[11px] ${lineArrowStart ? "active" : ""}`}>
+                     Anfang
+                   </button>
+                   <button type="button" onClick={() => setLineArrowEnd(!lineArrowEnd)}
+                     className={`cad-toolbar-btn flex-1 justify-center h-8 text-[11px] ${lineArrowEnd ? "active" : ""}`}>
+                     Ende
+                   </button>
+                 </div>
+               </div>
+               {(lineArrowStart || lineArrowEnd) && (
+                 <div>
+                   <label>Pfeilgröße (×)</label>
+                   <input
+                     type="number" min={0.2} step={0.1}
+                     value={lineArrowScale}
+                     onChange={(e) => {
+                       const n = parseFloat(e.target.value.replace(",", "."));
+                       if (Number.isFinite(n) && n > 0) setLineArrowScale(n);
+                     }}
+                   />
+                 </div>
+               )}
              </div>
+
              <div className="mt-3 pt-2 flex flex-wrap gap-1.5" style={{ borderTop: "1px solid hsl(var(--border))" }}>
                <span className="cad-kbd">Space</span>
                <span className="cad-kbd">Shift</span>
