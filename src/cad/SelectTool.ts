@@ -1819,7 +1819,37 @@ export class SelectTool {
     }
 
     if (input.clicked) {
-      // Edit-Mode: Klick außerhalb der Bounding-Box verlässt ihn (vor allen anderen Hits).
+      // Dokument-Auswahl: vor allen anderen Hits Eckpunkt/Kante des aktuell ausgewählten Dokuments testen.
+      {
+        const sel = this.app.selection as any;
+        if (sel && sel.type === SelectionType.DOCUMENT && sel.documentId) {
+          const doc = this.app.scene.getDocumentById(sel.documentId);
+          if (doc) {
+            const w2s = (x: number, y: number) => this.app.camera.worldToScreen(x, y);
+            const cornerIdx = hitDocumentCorner(doc, w2s, input.mouse.sx, input.mouse.sy, 10);
+            if (cornerIdx != null) {
+              const cornersW = (require("./documentGeometry") as typeof import("./documentGeometry")).documentCornersWorld(doc);
+              const cw = cornersW[cornerIdx];
+              const sp = this.app.camera.worldToScreen(cw.x, cw.y);
+              this.app.documentHubState = {
+                visible: true, screenX: sp.x, screenY: sp.y,
+                docId: doc.id, cornerIndex: cornerIdx,
+              };
+              return;
+            }
+            const edgeSide = hitDocumentEdge(doc, w2s, input.mouse.sx, input.mouse.sy, 8);
+            if (edgeSide) {
+              doc.guideEdges = { ...doc.guideEdges, [edgeSide]: !doc.guideEdges[edgeSide] };
+              return;
+            }
+            // Klick außerhalb von Ecke/Kante schließt die Hub-Box (Auswahl bleibt).
+            if (this.app.documentHubState.visible) {
+              this.app.documentHubState = { visible: false, screenX: 0, screenY: 0, docId: null, cornerIndex: 0 };
+            }
+          }
+        }
+      }
+
       if (this.app.isStickerEditing()) {
         const mouseW = v(input.mouse.wx, input.mouse.wy);
         if (this.app.isPointOutsideStickerEdit(mouseW)) {
