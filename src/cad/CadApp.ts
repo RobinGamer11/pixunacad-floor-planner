@@ -66,6 +66,8 @@ export interface TextEditorRefs {
 export interface MeasureSettings {
   orientation: "parallel" | "diagonal";
   pointCount: "two" | "multi";
+  /** Achsen-Richtung der Maßkette. "free" wird aus den ersten zwei Punkten abgeleitet. */
+  direction: "horizontal" | "vertical" | "free";
   editMode: "parallel" | "endpoints";
   textColor: string;
   textSizePx: number;
@@ -80,12 +82,15 @@ export interface MeasureSettings {
   textBgAlpha: number;
 }
 
+
 export interface MeasureSettingsRefs {
   panel: HTMLDivElement;
   idSelect: HTMLSelectElement;
   orientation: HTMLSelectElement;
   pointCount: HTMLSelectElement;
+  direction: HTMLSelectElement;
   editMode: HTMLSelectElement;
+
   extensionsToggle: HTMLInputElement;
   freeTextToggle: HTMLInputElement;
   freeTextInput: HTMLInputElement;
@@ -220,7 +225,9 @@ export class CadApp {
   measureSettings: MeasureSettings = {
     orientation: Defaults.measureOrientation,
     pointCount: Defaults.measurePointCount,
+    direction: Defaults.measureDirection,
     editMode: Defaults.measureEditMode,
+
     textColor: Defaults.measureTextColor,
     textSizePx: Defaults.measureTextSizePx,
     lineColor: Defaults.measureLineColor,
@@ -2181,6 +2188,11 @@ export class CadApp {
     r.pointCount.addEventListener("change", () => {
       this.measureSettings.pointCount = r.pointCount.value as "two" | "multi";
     });
+
+    r.direction.addEventListener("change", () => {
+      this.measureSettings.direction = r.direction.value as "horizontal" | "vertical" | "free";
+    });
+
 
     r.editMode.addEventListener("change", () => {
       this.measureSettings.editMode = r.editMode.value as "parallel" | "endpoints";

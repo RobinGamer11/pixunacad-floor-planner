@@ -117,7 +117,9 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
   const measureIdSelectRef = useRef<HTMLSelectElement>(null);
   const measureOrientationRef = useRef<HTMLSelectElement>(null);
   const measurePointCountRef = useRef<HTMLSelectElement>(null);
+  const measureDirectionRef = useRef<HTMLSelectElement>(null);
   const measureEditModeRef = useRef<HTMLSelectElement>(null);
+
   const measureExtRef = useRef<HTMLInputElement>(null);
   const measureFreeTextToggleRef = useRef<HTMLInputElement>(null);
   const measureFreeTextInputRef = useRef<HTMLInputElement>(null);
@@ -292,7 +294,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
       !areaTextColorRef.current || !areaTextPreviewRef.current || !areaFontSizeRef.current ||
       !areaBgColorRef.current || !areaBgPreviewRef.current || !areaBgAlphaRef.current ||
       !measureSettingsRef.current || !measureIdSelectRef.current ||
-      !measureOrientationRef.current || !measurePointCountRef.current || !measureEditModeRef.current ||
+      !measureOrientationRef.current || !measurePointCountRef.current || !measureDirectionRef.current || !measureEditModeRef.current ||
       !measureExtRef.current || !measureFreeTextToggleRef.current || !measureFreeTextInputRef.current ||
       !measureTextColorRef.current || !measureTextColorPreviewRef.current || !measureTextSizeRef.current ||
       !measureDecimalsRef.current || !measureTextBgToggleRef.current || !measureTextBgGroupRef.current ||
@@ -337,7 +339,9 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
         idSelect: measureIdSelectRef.current,
         orientation: measureOrientationRef.current,
         pointCount: measurePointCountRef.current,
+        direction: measureDirectionRef.current,
         editMode: measureEditModeRef.current,
+
         extensionsToggle: measureExtRef.current,
         freeTextToggle: measureFreeTextToggleRef.current,
         freeTextInput: measureFreeTextInputRef.current,
@@ -1596,10 +1600,19 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
               <div>
                 <label>Punkte</label>
                 <select ref={measurePointCountRef} className="cad-settings-select w-full">
-                  <option value="two">2 Punkte</option>
-                  <option value="multi">Mehrere Punkte</option>
+                  <option value="two">2 Punkte (Einzelmaß)</option>
+                  <option value="multi">Mehrere Punkte (Kette)</option>
                 </select>
               </div>
+              <div>
+                <label>Achse / Richtung</label>
+                <select ref={measureDirectionRef} className="cad-settings-select w-full" defaultValue="horizontal">
+                  <option value="horizontal">Horizontal</option>
+                  <option value="vertical">Vertikal</option>
+                  <option value="free">Frei (aus ersten 2 Punkten)</option>
+                </select>
+              </div>
+
               <div>
                 <label>Punktbearbeitung (Auswahl)</label>
                 <select ref={measureEditModeRef} className="cad-settings-select w-full">
