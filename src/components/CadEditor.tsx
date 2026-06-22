@@ -294,7 +294,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
       !areaTextColorRef.current || !areaTextPreviewRef.current || !areaFontSizeRef.current ||
       !areaBgColorRef.current || !areaBgPreviewRef.current || !areaBgAlphaRef.current ||
       !measureSettingsRef.current || !measureIdSelectRef.current ||
-      !measureOrientationRef.current || !measurePointCountRef.current || !measureEditModeRef.current ||
+      !measureOrientationRef.current || !measurePointCountRef.current || !measureDirectionRef.current || !measureEditModeRef.current ||
       !measureExtRef.current || !measureFreeTextToggleRef.current || !measureFreeTextInputRef.current ||
       !measureTextColorRef.current || !measureTextColorPreviewRef.current || !measureTextSizeRef.current ||
       !measureDecimalsRef.current || !measureTextBgToggleRef.current || !measureTextBgGroupRef.current ||
