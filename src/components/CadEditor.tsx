@@ -682,40 +682,40 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
     <div className="flex w-full h-full overflow-hidden" style={{ background: "hsl(var(--surface))" }}>
       {/* Left Sidebar */}
       <aside
-        className="relative shrink-0 flex flex-col border-r transition-[width] duration-150 ease-out"
+        className="relative shrink-0 flex flex-col border-r"
         style={{
           width: 56,
           background: "hsl(var(--surface-card))",
           borderColor: "hsl(var(--hairline))",
-          boxShadow: "1px 0 0 hsl(0 0% 100% / 0.03) inset",
         }}
       >
-        {/* Undo / Redo */}
-        <div className={`flex gap-1 p-2 ${sidebarCollapsed ? "flex-col items-center" : ""}`}>
+        {/* Undo / Redo / Pipette / Raster */}
+        <div className="flex flex-col items-center gap-0.5 p-1.5">
           <button
             onClick={() => appRef.current?.undo()}
             disabled={!canUndo}
             title="Rückgängig (Strg+Z)"
-            className={`cad-toolbar-btn ${sidebarCollapsed ? "justify-center px-0 h-9 w-9" : "flex-1 justify-center"} disabled:opacity-40 disabled:cursor-not-allowed`}
+            className="cad-rail-btn disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            <Undo2 className="h-4 w-4 shrink-0" />
-            {!sidebarCollapsed && <span className="text-xs">Undo</span>}
+            <Undo2 size={18} />
+            <span>Undo</span>
           </button>
           <button
             onClick={() => appRef.current?.redo()}
             disabled={!canRedo}
             title="Wiederherstellen (Strg+Y)"
-            className={`cad-toolbar-btn ${sidebarCollapsed ? "justify-center px-0 h-9 w-9" : "flex-1 justify-center"} disabled:opacity-40 disabled:cursor-not-allowed`}
+            className="cad-rail-btn disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            <Redo2 className="h-4 w-4 shrink-0" />
-            {!sidebarCollapsed && <span className="text-xs">Redo</span>}
+            <Redo2 size={18} />
+            <span>Redo</span>
           </button>
           <button
             onClick={() => handleToolClick(ToolIds.PIPETTE)}
             title="Pipette (P)"
-            className={`cad-toolbar-btn ${sidebarCollapsed ? "justify-center px-0 h-9 w-9" : "justify-center px-2"} ${activeTool === ToolIds.PIPETTE ? "active" : ""}`}
+            className={`cad-rail-btn ${activeTool === ToolIds.PIPETTE ? "active" : ""}`}
           >
-            <Pipette className="h-4 w-4 shrink-0" />
+            <Pipette size={18} />
+            <span>Pipette</span>
           </button>
           <button
             onClick={() => {
@@ -723,19 +723,19 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
               setGridPanelOpen(true);
             }}
             title={`Raster ${gridEnabled ? "aus" : "ein"}schalten — Einstellungen`}
-            className={`cad-toolbar-btn justify-center px-0 h-9 w-9 ${gridPanelOpen ? "active" : ""}`}
+            className={`cad-rail-btn ${gridPanelOpen ? "active" : ""}`}
             style={gridEnabled && !gridPanelOpen ? { color: "hsl(var(--primary))" } : undefined}
           >
-            <Grid3x3 className="h-4 w-4 shrink-0" />
+            <Grid3x3 size={18} />
+            <span>Raster</span>
           </button>
         </div>
 
         {/* Divider */}
-        <div className="mx-3 border-t opacity-60" style={{ borderColor: "hsl(var(--cad-toolbar-border))" }} />
+        <div className="mx-3 border-t" style={{ borderColor: "hsl(var(--hairline))" }} />
 
         {/* Tool list */}
-        <div className="flex flex-col gap-1 p-2">
-
+        <div className="flex flex-col items-center gap-0.5 p-1.5">
           {CAD_TOOLS.map((t) => {
             const Icon = t.icon;
             const isActive = t.id === ToolIds.LINE
@@ -745,20 +745,16 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
               <button
                 key={t.id}
                 onClick={() => handleToolClick(t.id)}
-                title={sidebarCollapsed ? `${t.label} (${t.key})` : undefined}
-                className={`cad-toolbar-btn ${isActive ? "active" : ""} ${
-                  sidebarCollapsed ? "justify-center px-0 h-10 w-10 mx-auto" : "w-full justify-between"
-                }`}
+                title={`${t.label} (${t.key})`}
+                className={`cad-rail-btn ${isActive ? "active" : ""}`}
               >
-                <span className="flex items-center gap-2 min-w-0">
-                  <Icon className="h-4 w-4 shrink-0" />
-                  {!sidebarCollapsed && <span className="truncate">{t.label}</span>}
-                </span>
-                {!sidebarCollapsed && <span className="tool-key">{t.key}</span>}
+                <Icon size={18} />
+                <span>{t.label.length > 9 ? t.label.slice(0, 8) + "…" : t.label}</span>
               </button>
             );
           })}
         </div>
+
 
 
         {/* PDF Page Picker Dialog */}
