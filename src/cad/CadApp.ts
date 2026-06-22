@@ -635,6 +635,7 @@ export class CadApp {
         pixelWidth: d.pixelWidth, pixelHeight: d.pixelHeight, labelId: d.labelId,
         eraseMaskDataUrl: d.eraseMaskDataUrl || null,
         pdfSourceB64: d.pdfSourceB64 || null,
+        guideEdges: d.guideEdges || undefined,
       });
       if (d.id) (doc as any).id = d.id;
     }
