@@ -1526,6 +1526,36 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
                         </button>
                       </label>
                     </div>
+                    {doorSashEnabled && (
+                      <>
+                        <div>
+                          <label>Öffnungsseite (Aufschlag)</label>
+                          <div className="flex gap-1">
+                            <button type="button" onClick={() => setDoorSide("inner")}
+                              className={`cad-toolbar-btn flex-1 justify-center h-8 text-[11px] ${doorSide === "inner" ? "active" : ""}`}>
+                              Innen
+                            </button>
+                            <button type="button" onClick={() => setDoorSide("outer")}
+                              className={`cad-toolbar-btn flex-1 justify-center h-8 text-[11px] ${doorSide === "outer" ? "active" : ""}`}>
+                              Außen
+                            </button>
+                          </div>
+                        </div>
+                        <div>
+                          <label>Öffnungsrichtung</label>
+                          <div className="flex gap-1">
+                            <button type="button" onClick={() => setDoorHand("left")}
+                              className={`cad-toolbar-btn flex-1 justify-center h-8 text-[11px] ${doorHand === "left" ? "active" : ""}`}>
+                              Links
+                            </button>
+                            <button type="button" onClick={() => setDoorHand("right")}
+                              className={`cad-toolbar-btn flex-1 justify-center h-8 text-[11px] ${doorHand === "right" ? "active" : ""}`}>
+                              Rechts
+                            </button>
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </>
                 )}
 
