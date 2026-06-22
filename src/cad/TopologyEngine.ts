@@ -31,7 +31,12 @@ export interface Snap {
   wallId?: string | null;
   /** Wandlinien-Typ (Priorität): main = Haupt (P1), help = Mitte (P2), sub = Sub (P3). */
   wallLine?: WallLineKind | null;
+  /** Wenn der Snap auf einem Tür-/Fenster-Eckpunkt liegt: Tür-ID. */
+  doorId?: string | null;
+  /** Welcher Tür-Endpunkt: "left" | "right" | "center". */
+  doorEndpoint?: "left" | "right" | "center" | null;
 }
+
 
 export class TopologyEngine {
   scene: Scene;
