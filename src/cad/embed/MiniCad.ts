@@ -432,6 +432,116 @@ export class MiniCad {
     this._changeDirty = true;
   }
 
+  /* ===== External DocumentObjects (Projektmappen-PDF/Bild als CAD-Dokument) ===== */
+
+  private _extDocsInstalled = false;
+  private _installExtDocLabel() {
+    if (this._extDocsInstalled) return;
+    const lm: any = this.labelManager;
+    if (!lm.groups.find((g: any) => g.id === this._extDocLabelId)) {
+      lm.groups.push({ id: this._extDocLabelId, name: "__ext_doc__", locked: true, visible: true });
+      const origList = lm.list.bind(lm);
+      lm.list = () => origList().filter((g: any) => g.id !== this._extDocLabelId);
+    }
+    this._extDocsInstalled = true;
+  }
+
+  private _docSnapshot(d: any): string {
+    const g = d.guideEdges || {};
+    return `${d.position.x.toFixed(6)}|${d.position.y.toFixed(6)}|${d.widthM.toFixed(6)}|${d.heightM.toFixed(6)}|${d.rotationRad.toFixed(6)}|${g.top?1:0}${g.right?1:0}${g.bottom?1:0}${g.left?1:0}`;
+  }
+
+  /**
+   * Synchronisiert externe Dokumente (Projektmappen-PDF/Bild) als snap-only
+   * DocumentObjects in der Szene. Stellt Ecken-Marker, Kanten-Hilfslinien und
+   * Hub-Box (Verschieben/Drehen) zur Verfügung. Änderungen werden über
+   * `onChange(id, transform)` zurück an den Host gemeldet.
+   */
+  setExternalDocuments(
+    docs: Array<{ id: string; xMM: number; yMM: number; wMM: number; hMM: number; rotationRad?: number; guideEdges?: { top: boolean; right: boolean; bottom: boolean; left: boolean } }>,
+    onChange?: (id: string, t: { xMM: number; yMM: number; rotationDeg: number; guideEdges: { top: boolean; right: boolean; bottom: boolean; left: boolean } }) => void,
+  ) {
+    this._installExtDocLabel();
+    this._externalDocChange = onChange ?? null;
+    const keepIds = new Set(docs.map(d => d.id));
+    // Entferne snap-only Docs, die nicht mehr im Input sind.
+    this.scene.documents = this.scene.documents.filter(d => !(d as any)._snapOnly || keepIds.has(d.id));
+    (this.scene as any)._rebuildDocIdMap?.();
+    const existing = new Map(
+      this.scene.documents.filter(d => (d as any)._snapOnly).map(d => [d.id, d]),
+    );
+    for (const r of docs) {
+      const wM = Math.max(0.001, r.wMM / 1000);
+      const hM = Math.max(0.001, r.hMM / 1000);
+      const xM = r.xMM / 1000;
+      const yM = r.yMM / 1000;
+      const rot = r.rotationRad || 0;
+      let doc: any = existing.get(r.id);
+      if (!doc) {
+        doc = this.scene.createDocument({
+          src: "",
+          position: { x: xM, y: yM },
+          widthM: wM,
+          heightM: hM,
+          rotationRad: rot,
+          pixelWidth: 1,
+          pixelHeight: 1,
+          labelId: this._extDocLabelId,
+          guideEdges: r.guideEdges,
+        });
+        // Stabilen Host-ID übernehmen (für Re-Render-Identität).
+        const idMap: any = (this.scene as any)._docIdMap;
+        if (idMap) {
+          idMap.delete(doc.id);
+          doc.id = r.id;
+          idMap.set(r.id, doc);
+        } else {
+          doc.id = r.id;
+        }
+        doc._snapOnly = true;
+      } else {
+        // Externe Geometrie-Updates anwenden, ohne erneut nach außen zu melden.
+        doc.position.x = xM;
+        doc.position.y = yM;
+        doc.widthM = wM;
+        doc.heightM = hM;
+        doc.rotationRad = rot;
+        if (r.guideEdges) doc.guideEdges = { ...r.guideEdges };
+      }
+      this._externalDocs.set(r.id, doc.id);
+      this._externalDocSnapshots.set(r.id, this._docSnapshot(doc));
+    }
+    // Entfernte IDs aus Tracker entfernen.
+    for (const id of Array.from(this._externalDocs.keys())) {
+      if (!keepIds.has(id)) {
+        this._externalDocs.delete(id);
+        this._externalDocSnapshots.delete(id);
+      }
+    }
+    this._changeDirty = true;
+  }
+
+  private _emitExternalDocChanges() {
+    if (!this._externalDocChange) return;
+    for (const d of this.scene.documents) {
+      if (!(d as any)._snapOnly) continue;
+      const last = this._externalDocSnapshots.get(d.id);
+      const now = this._docSnapshot(d);
+      if (last !== now) {
+        this._externalDocSnapshots.set(d.id, now);
+        if (last !== undefined) {
+          this._externalDocChange(d.id, {
+            xMM: d.position.x * 1000,
+            yMM: d.position.y * 1000,
+            rotationDeg: (d.rotationRad * 180) / Math.PI,
+            guideEdges: { ...d.guideEdges },
+          });
+        }
+      }
+    }
+  }
+
+
   private _installSelectToolFrameFilter() {
     // Wir filtern Rahmen-Segmente NICHT mehr aus _segmentsFrontToBack heraus,
     // weil dadurch auch das Snapping (findBestSnap nutzt dieselbe Liste) die
