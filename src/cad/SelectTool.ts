@@ -1828,7 +1828,7 @@ export class SelectTool {
             const w2s = (x: number, y: number) => this.app.camera.worldToScreen(x, y);
             const cornerIdx = hitDocumentCorner(doc, w2s, input.mouse.sx, input.mouse.sy, 10);
             if (cornerIdx != null) {
-              const cornersW = (require("./documentGeometry") as typeof import("./documentGeometry")).documentCornersWorld(doc);
+              const cornersW = documentCornersWorld(doc);
               const cw = cornersW[cornerIdx];
               const sp = this.app.camera.worldToScreen(cw.x, cw.y);
               this.app.documentHubState = {
