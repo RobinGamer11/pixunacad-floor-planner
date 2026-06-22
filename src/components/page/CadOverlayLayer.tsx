@@ -209,7 +209,7 @@ export default function CadOverlayLayer(props: Props) {
   return (
     <div
       className="absolute inset-0"
-      style={{ pointerEvents: enabled ? "auto" : "none", zIndex: 30 }}
+      style={{ pointerEvents: enabled ? "auto" : "none" }}
     >
       {/* Wrapper offset matches MiniCad.FRAME_PAD_PX (-16px) so the canvas,
           hub, point-edit menu and inline text editor share one coord system. */}
