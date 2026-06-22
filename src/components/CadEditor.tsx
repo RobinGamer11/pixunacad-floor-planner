@@ -1600,10 +1600,19 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
               <div>
                 <label>Punkte</label>
                 <select ref={measurePointCountRef} className="cad-settings-select w-full">
-                  <option value="two">2 Punkte</option>
-                  <option value="multi">Mehrere Punkte</option>
+                  <option value="two">2 Punkte (Einzelmaß)</option>
+                  <option value="multi">Mehrere Punkte (Kette)</option>
                 </select>
               </div>
+              <div>
+                <label>Achse / Richtung</label>
+                <select ref={measureDirectionRef} className="cad-settings-select w-full" defaultValue="horizontal">
+                  <option value="horizontal">Horizontal</option>
+                  <option value="vertical">Vertikal</option>
+                  <option value="free">Frei (aus ersten 2 Punkten)</option>
+                </select>
+              </div>
+
               <div>
                 <label>Punktbearbeitung (Auswahl)</label>
                 <select ref={measureEditModeRef} className="cad-settings-select w-full">
