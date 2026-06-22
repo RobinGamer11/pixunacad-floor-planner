@@ -570,11 +570,10 @@ export default function ProjectWorkspace() {
                 }
               }}
               onMouseDown={(e) => {
-                // Pan via Middle-Maus, Alt+Links, oder Links auf leerer Fläche
-                // (Auswahlwerkzeug aktiv oder kein Tool aktiv).
+                // Pan nur via Mittelmaus oder Alt+Links — sonst würde ein Links-Klick
+                // im Auswahlmodus die Auswahl der eingebetteten CAD-Engine abfangen.
                 const isMiddle = e.button === 1 || (e.button === 0 && (e as any).altKey);
-                const isPlainLeft = e.button === 0 && !(e as any).altKey && activeTool === null;
-                if (!isMiddle && !isPlainLeft) return;
+                if (!isMiddle) return;
                 e.preventDefault();
                 const container = e.currentTarget as HTMLDivElement;
                 const startX = e.clientX;
