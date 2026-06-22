@@ -586,8 +586,9 @@
     cursor: default;
   }
   .sheet-icon-btn.active {
-    background: hsl(var(--primary) / 0.18);
-    border-color: hsl(var(--primary) / 0.42);
+    background: hsl(var(--accent-gold) / 0.18);
+    border-color: hsl(var(--accent-gold) / 0.55);
+    color: hsl(var(--accent-gold));
   }
 
   .sheet-drop-indicator {
