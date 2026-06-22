@@ -1538,7 +1538,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
                 {doorJambEnabled && (
                   <>
                     <div>
-                      <label>Laibungsbreite (m, je Seite)</label>
+                      <label>Laibungslänge (m, je Seite)</label>
                       <input
                         type="number" min={0} step={0.01}
                         value={doorJambLenM}
