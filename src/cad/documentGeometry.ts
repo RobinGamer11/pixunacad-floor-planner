@@ -77,6 +77,8 @@ export function hitDocumentEdge(
     if (d <= tolPx && (!best || d < best.d)) best = { side: e.side, d };
   }
   return best ? best.side : null;
+}
+
 
 /** Center point in world coordinates. */
 export function documentCenterWorld(doc: DocumentObject): Vec2 {
