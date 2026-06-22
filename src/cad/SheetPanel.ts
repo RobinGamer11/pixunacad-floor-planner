@@ -180,7 +180,7 @@ export class SheetPanel {
         : (sheet.scaleKey || SheetDefaults.defaultScaleKey);
       main.innerHTML = `
         <div class="sheet-name">${this._esc(sheet.name)}</div>
-        <div class="sheet-sub">${sheet.id === SheetDefaults.defaultSheetId ? "Standardblatt" : "Blatt"} · ${this._esc(scaleLabel)}</div>
+        <div class="sheet-sub">Blatt · ${this._esc(scaleLabel)}</div>
       `;
       main.addEventListener("click", () => {
         this.cb.setActiveSheetId(sheet.id);
