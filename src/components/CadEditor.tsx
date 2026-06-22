@@ -710,8 +710,19 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
           borderColor: "hsl(var(--hairline))",
         }}
       >
-        {/* Undo / Redo / Pipette / Raster */}
+        {/* Raster / Undo / Redo / Pipette */}
         <div className="flex flex-col items-center gap-0.5 p-1.5">
+          <button
+            onClick={() => {
+              setGridEnabled((e) => !e);
+              setGridPanelOpen(true);
+            }}
+            title={`Raster ${gridEnabled ? "aus" : "ein"}schalten — Einstellungen`}
+            className={`cad-rail-btn ${gridPanelOpen || gridEnabled ? "active" : ""}`}
+          >
+            <Grid3x3 size={18} />
+            <span>Raster</span>
+          </button>
           <button
             onClick={() => appRef.current?.undo()}
             disabled={!canUndo}
@@ -737,17 +748,6 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
           >
             <Pipette size={18} />
             <span>Pipette</span>
-          </button>
-          <button
-            onClick={() => {
-              setGridEnabled((e) => !e);
-              setGridPanelOpen(true);
-            }}
-            title={`Raster ${gridEnabled ? "aus" : "ein"}schalten — Einstellungen`}
-            className={`cad-rail-btn ${gridPanelOpen || gridEnabled ? "active" : ""}`}
-          >
-            <Grid3x3 size={18} />
-            <span>Raster</span>
           </button>
         </div>
 
