@@ -13,29 +13,26 @@ const CadPage = () => {
       <header
         className="flex items-center justify-between h-12 px-3 border-b shrink-0 relative"
         style={{
-          background: "linear-gradient(180deg, hsl(222 32% 16%), hsl(222 30% 12%))",
-          borderColor: "hsl(var(--cad-toolbar-border))",
+          background: "hsl(var(--surface-card))",
+          borderColor: "hsl(var(--hairline))",
         }}
       >
         <div className="flex items-center gap-2">
           {projectId && (
             <button
               onClick={() => navigate(`/project/${projectId}`)}
-              className="h-8 px-2.5 rounded-md flex items-center gap-1.5 text-sm"
+              className="h-8 px-2.5 rounded-md flex items-center gap-1.5 text-sm transition-colors"
               style={{
-                background: "hsl(222 16% 28%)",
-                color: "hsl(220 18% 92%)",
+                background: "hsl(var(--surface-muted))",
+                color: "hsl(var(--ink))",
               }}
               title="Zurück zur Projektmappe"
             >
               <ChevronLeft size={16} /> Zurück
             </button>
           )}
-          <span className="text-base font-semibold tracking-tight ml-2" style={{ color: "hsl(220 18% 92%)" }}>
-            Pixuna<span style={{ color: "hsl(var(--primary-glow))" }}>CAD</span>
-          </span>
           {project && (
-            <span className="text-xs ml-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+            <span className="text-sm ml-2 font-medium" style={{ color: "hsl(var(--ink))" }}>
               {project.name}
             </span>
           )}
@@ -43,7 +40,7 @@ const CadPage = () => {
         <div className="flex items-center gap-2">
           <span
             className="text-[11px] uppercase tracking-[0.18em] font-medium"
-            style={{ color: "hsl(var(--cad-toolbar-muted))" }}
+            style={{ color: "hsl(var(--ink-soft))" }}
           >
             CAD-Zeichnen
           </span>
