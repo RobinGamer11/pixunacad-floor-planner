@@ -672,8 +672,8 @@
   }
   .plan-row:hover { background: hsl(var(--accent)); }
   .plan-row.active {
-    background: hsl(var(--primary) / 0.10);
-    border-color: hsl(var(--primary) / 0.45);
+    background: hsl(var(--accent-gold) / 0.12);
+    border-color: hsl(var(--accent-gold) / 0.55);
   }
   .plan-row.dragging { opacity: 0.5; }
   .plan-checkbox {
