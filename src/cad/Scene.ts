@@ -287,6 +287,10 @@ export class DocumentObject {
   pdfSourceB64?: string | null;
   /** Welche Kanten als unendliche Hilfslinien sichtbar sind (Toggle per Klick). */
   guideEdges: { top: boolean; right: boolean; bottom: boolean; left: boolean };
+  /** Runtime-Flag: Dokument existiert nur als Snap-/Hub-Quelle (z. B. Projektmappen-PDF),
+   *  Bild wird NICHT gezeichnet, Serialisierung überspringt es. Nicht persistiert. */
+  _snapOnly?: boolean;
+
 
   constructor({ id, name, kind, src, pageIndex, position, widthM, heightM, rotationRad, pixelWidth, pixelHeight, labelId, importScaleDenom, eraseMaskDataUrl, pdfSourceB64, guideEdges }: {
     id: string; name?: string; kind?: "image" | "pdf-page"; src: string;
