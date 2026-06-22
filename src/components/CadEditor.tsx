@@ -216,6 +216,11 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
   const [doorWidthM, setDoorWidthM] = useState<number>(0.9);
   const [doorHeightM, setDoorHeightM] = useState<number>(2.1);
   const [doorBreakHeightM, setDoorBreakHeightM] = useState<number>(0);
+  // Line arrow settings
+  const [lineArrowStart, setLineArrowStart] = useState<boolean>(false);
+  const [lineArrowEnd, setLineArrowEnd] = useState<boolean>(false);
+  const [lineArrowScale, setLineArrowScale] = useState<number>(1);
+
 
   const [doorSide, setDoorSide] = useState<"inner" | "outer">("inner");
   const [doorHand, setDoorHand] = useState<"left" | "right">("left");
