@@ -145,7 +145,8 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
 
   const appRef = useRef<CadApp | null>(null);
   const [activeTool, setActiveTool] = useState<string>(ToolIds.SELECT);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(true);
+  const [rightTab, setRightTab] = useState<"settings" | "sheets" | "layers">("settings");
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [hatchDrawMode, setHatchDrawMode] = useState<HatchDrawMode>("polygon");
@@ -682,9 +683,9 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
       <aside
         className="relative shrink-0 flex flex-col border-r transition-[width] duration-150 ease-out"
         style={{
-          width: sidebarWidth,
-          background: "linear-gradient(180deg, hsl(222 30% 15%), hsl(222 32% 12%))",
-          borderColor: "hsl(var(--cad-toolbar-border))",
+          width: 56,
+          background: "hsl(var(--surface-card))",
+          borderColor: "hsl(var(--hairline))",
           boxShadow: "1px 0 0 hsl(0 0% 100% / 0.03) inset",
         }}
       >
@@ -758,15 +759,358 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
           })}
         </div>
 
-        {/* Divider */}
-        {!sidebarCollapsed && (
-          <div className="mx-3 border-t" style={{ borderColor: "hsl(var(--cad-toolbar-border))" }} />
+
+        {/* PDF Page Picker Dialog */}
+        <Dialog open={!!docPickerPages} onOpenChange={(o) => { if (!o) setDocPickerPages(null); }}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Seiten auswählen</DialogTitle>
+            </DialogHeader>
+            <div className="max-h-[60vh] overflow-y-auto grid grid-cols-3 gap-3 p-1">
+              {docPickerPages?.map((p, i) => {
+                const checked = docPickerSelected.has(i);
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => {
+                      setDocPickerSelected(prev => {
+                        const next = new Set(prev);
+                        if (next.has(i)) next.delete(i); else next.add(i);
+                        return next;
+                      });
+                    }}
+                    className={`relative rounded-md border-2 transition-all overflow-hidden ${checked ? "border-primary" : "border-border"}`}
+                  >
+                    <img src={p.src} alt={p.name} className="w-full h-32 object-contain bg-muted" />
+                    <div className="text-[10px] p-1 text-center truncate bg-muted/50">Seite {i + 1}</div>
+                    {checked && (
+                      <div className="absolute top-1 right-1 w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">✓</div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => { setDocPickerSelected(new Set()); }}>Keine</Button>
+              <Button variant="outline" onClick={() => {
+                const all = new Set<number>();
+                docPickerPages?.forEach((_, i) => all.add(i));
+                setDocPickerSelected(all);
+              }}>Alle</Button>
+              <Button onClick={handleDocPickerConfirm} disabled={docPickerSelected.size === 0}>
+                {docPickerSelected.size} importieren
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Maßstab-Dialog vor Platzierung */}
+        <Dialog open={!!scaleDialogPages} onOpenChange={(o) => { if (!o) setScaleDialogPages(null); }}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle className="text-base">Maßstab des Dokuments</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-2 py-1">
+              <p className="text-[11px] text-muted-foreground">
+                In welchem Maßstab liegt der Plan vor?
+              </p>
+              <div className="grid grid-cols-3 gap-1.5">
+                {[
+                  { v: "50", label: "1 : 50" },
+                  { v: "100", label: "1 : 100" },
+                  { v: "200", label: "1 : 200" },
+                  { v: "500", label: "1 : 500" },
+                  { v: "1", label: "1 : 1" },
+                  { v: "custom", label: "Frei…" },
+                ].map(opt => {
+                  const active = scaleChoice === opt.v;
+                  return (
+                    <button
+                      key={opt.v}
+                      type="button"
+                      onClick={() => setScaleChoice(opt.v)}
+                      className="rounded-md h-9 text-xs font-semibold border transition-colors"
+                      style={{
+                        background: active ? "hsl(var(--primary))" : "hsl(var(--muted))",
+                        color: active ? "hsl(var(--primary-foreground))" : "hsl(var(--foreground))",
+                        borderColor: active ? "hsl(var(--primary))" : "hsl(var(--border))",
+                      }}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+              {scaleChoice === "custom" && (
+                <div className="flex items-center gap-2 pt-1">
+                  <span className="text-xs text-foreground">1 :</span>
+                  <input
+                    type="text"
+                    value={scaleCustom}
+                    onChange={(e) => setScaleCustom(e.target.value)}
+                    className="cad-settings-select flex-1 h-8 text-xs"
+                    placeholder="z. B. 75"
+                    autoFocus
+                  />
+                </div>
+              )}
+            </div>
+            <DialogFooter className="gap-2 sm:gap-2">
+              <Button variant="outline" size="sm" onClick={() => setScaleDialogPages(null)}>Abbrechen</Button>
+              <Button size="sm" onClick={handleScaleConfirm}>Übernehmen</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+      </aside>
+
+      {/* Canvas Area */}
+      <div ref={containerRef} className="relative flex-1 min-w-0 h-full overflow-hidden">
+
+        {/* Line Hub */}
+        <div ref={hubRef} className="cad-hub absolute z-30 hidden flex gap-2 items-center">
+          <input ref={hubLenRef} type="text" readOnly className="text-xs" />
+          <input ref={hubAngRef} type="text" readOnly className="text-xs" />
+        </div>
+
+        {/* Door/Window Hub Box — LineHub-Stil: zwei Icons (Bewegen=Breite, Verschieben=Position) + zwei Inputs */}
+        {doorHub.visible && (
+          <div
+            className="absolute z-30 flex items-center gap-1.5 px-2 py-1.5 rounded-md shadow-lg"
+            style={{
+              left: Math.max(8, doorHub.screenX + 12),
+              top: Math.max(8, doorHub.screenY + 12),
+              background: "white",
+              border: "1px solid hsl(var(--border))",
+              boxShadow: "0 4px 16px -4px rgba(0,0,0,0.18)",
+            }}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              title={doorHub.resizing ? "Klicken im Plan fixiert die Breite" : "Bewegen — Breite anpassen"}
+              onClick={() => appRef.current?.doorTool.beginFollowResize()}
+              className={`cad-toolbar-btn h-7 w-7 justify-center px-0 ${doorHub.resizing ? "active" : ""}`}
+            >
+              <Maximize2 className="h-3.5 w-3.5" />
+            </button>
+            <input
+              type="text"
+              value={doorHubWidthInput}
+              onChange={(e) => setDoorHubWidthInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  const n = parseFloat(doorHubWidthInput.replace(",", "."));
+                  if (Number.isFinite(n)) appRef.current?.doorTool.setSelectedWidthM(n);
+                } else if (e.key === "Escape") {
+                  appRef.current?.doorTool.hideHub();
+                }
+              }}
+              className="text-[11px] w-[72px] px-1.5 py-1 rounded border tabular-nums"
+              style={{ borderColor: "hsl(var(--border))" }}
+              title="Breite (m)"
+            />
+            <span className="text-[10px] opacity-60 mr-1">m</span>
+            <button
+              type="button"
+              title={doorHub.moving ? "Klicken im Plan fixiert die Position" : "Verschieben — Position auf Wand"}
+              onClick={() => appRef.current?.doorTool.beginFollowMove()}
+              className={`cad-toolbar-btn h-7 w-7 justify-center px-0 ${doorHub.moving ? "active" : ""}`}
+            >
+              <Move className="h-3.5 w-3.5" />
+            </button>
+            <input
+              type="text"
+              value={doorHubPosInput}
+              onChange={(e) => setDoorHubPosInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  const n = parseFloat(doorHubPosInput.replace(",", "."));
+                  if (Number.isFinite(n)) appRef.current?.doorTool.setSelectedPosM(n);
+                } else if (e.key === "Escape") {
+                  appRef.current?.doorTool.hideHub();
+                }
+              }}
+              className="text-[11px] w-[72px] px-1.5 py-1 rounded border tabular-nums"
+              style={{ borderColor: "hsl(var(--border))" }}
+              title="Position auf Wand (m ab Wandanfang)"
+            />
+            <span className="text-[10px] opacity-60">m</span>
+          </div>
         )}
 
+        {/* Point Edit Menu */}
+        <div ref={pointEditRef} className="cad-point-menu absolute z-30 hidden">
+          <button ref={pointMoveBtnRef} title="Bewegen">◉</button>
+          <button ref={pointTranslateBtnRef} title="Verschieben">✥</button>
+          <button ref={pointRotateBtnRef} title="Drehen">⟳</button>
+          <button ref={pointOffsetBtnRef} title="Kante versetzen">⇆</button>
+          <button ref={pointDeleteBtnRef} title="Löschen">🗑</button>
+        </div>
+
+        {/* Text Editor Toolbar (floating) */}
+        <div ref={textEditorToolbarRef} className="hidden absolute z-40 flex items-center gap-1 px-2 py-1 rounded-md shadow-lg" style={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}>
+          <button ref={textEditorBoldRef} type="button" className="cad-toolbar-btn h-7 w-7 justify-center px-0" title="Fett (Strg+B)">
+            <Bold className="h-3.5 w-3.5" />
+          </button>
+          <button ref={textEditorItalicRef} type="button" className="cad-toolbar-btn h-7 w-7 justify-center px-0" title="Kursiv (Strg+I)">
+            <Italic className="h-3.5 w-3.5" />
+          </button>
+          <input ref={textEditorColorRef} type="color" defaultValue="#111111" className="w-7 h-7 cursor-pointer border-0 p-0 bg-transparent" title="Textfarbe" />
+          <select ref={textEditorSizeRef} className="cad-settings-select h-7 text-xs" title="Schriftgröße">
+            {[10, 12, 14, 16, 18, 20, 24, 28, 32, 40, 48].map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <select ref={textEditorSymbolRef} className="cad-settings-select h-7 text-xs" title="Symbol einfügen" defaultValue="">
+            <option value="">∑ Symbol</option>
+            <option value="²">²</option>
+            <option value="³">³</option>
+            <option value="°">°</option>
+            <option value="±">±</option>
+            <option value="×">×</option>
+            <option value="÷">÷</option>
+            <option value="∅">∅</option>
+            <option value="√">√</option>
+            <option value="≈">≈</option>
+            <option value="≤">≤</option>
+            <option value="≥">≥</option>
+            <option value="→">→</option>
+            <option value="←">←</option>
+            <option value="↑">↑</option>
+            <option value="↓">↓</option>
+          </select>
+        </div>
+
+        {/* Text Editor (contenteditable) */}
+        <div ref={textEditorElRef} className="hidden absolute z-40 outline-none" />
+
+        {/* Floating Edit-Pencil bei ausgewählter Sticker-Instanz */}
+        {stickerEditOverlay && (
+          <button
+            type="button"
+            onClick={() => {
+              if (stickerEditOverlay) appRef.current?.openStickerEditByInstanceId(stickerEditOverlay.id);
+            }}
+            className="absolute z-30 flex items-center justify-center rounded-full shadow-lg transition-transform hover:scale-110"
+            style={{
+              left: stickerEditOverlay.x + 6,
+              top: stickerEditOverlay.y - 14,
+              width: 28, height: 28,
+              background: "linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)))",
+              color: "#fff",
+              border: "1px solid hsl(var(--primary) / 0.6)",
+            }}
+            title="Sticker-Inhalt bearbeiten"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
+        )}
+
+        {/* Canvas */}
+        <canvas ref={canvasRef} className="block w-full h-full" />
+
+        {/* Drawing Scale Drop-Up (bottom-left) */}
+        <div className="absolute left-3 bottom-3 z-30">
+          {drawingScaleOpen && (
+            <div
+              className="mb-2 rounded-md shadow-lg p-2 w-44"
+              style={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}
+            >
+              <div className="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "hsl(var(--muted-foreground))" }}>
+                Maßstab Zeichnung
+              </div>
+              <div className="grid grid-cols-3 gap-1 mb-2">
+                {[100, 200, 500, 50, 10, 1].map(d => {
+                  const active = drawingScale === d;
+                  return (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => { setDrawingScale(d); setDrawingScaleOpen(false); }}
+                      className="rounded h-7 text-[11px] font-semibold border transition-colors"
+                      style={{
+                        background: active ? "hsl(var(--primary))" : "hsl(var(--muted))",
+                        color: active ? "hsl(var(--primary-foreground))" : "hsl(var(--foreground))",
+                        borderColor: active ? "hsl(var(--primary))" : "hsl(var(--border))",
+                      }}
+                    >
+                      1:{d}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-[11px]" style={{ color: "hsl(var(--foreground))" }}>1 :</span>
+                <input
+                  type="text"
+                  value={drawingScaleCustom}
+                  onChange={(e) => setDrawingScaleCustom(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      const n = parseFloat(drawingScaleCustom.replace(",", "."));
+                      if (Number.isFinite(n) && n > 0) { setDrawingScale(n); setDrawingScaleOpen(false); }
+                    }
+                  }}
+                  className="cad-settings-select h-7 flex-1 text-[11px]"
+                  placeholder="frei"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const n = parseFloat(drawingScaleCustom.replace(",", "."));
+                    if (Number.isFinite(n) && n > 0) { setDrawingScale(n); setDrawingScaleOpen(false); }
+                  }}
+                  className="rounded h-7 px-2 text-[11px] font-semibold"
+                  style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
+                >
+                  OK
+                </button>
+              </div>
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => setDrawingScaleOpen(o => !o)}
+            className="rounded-md px-3 h-8 text-xs font-semibold shadow-md flex items-center gap-1.5 transition-colors"
+            style={{
+              background: "hsl(var(--card))",
+              color: "hsl(var(--foreground))",
+              border: "1px solid hsl(var(--border))",
+            }}
+            title="Maßstab der Zeichenoberfläche"
+          >
+            <span style={{ color: "hsl(var(--muted-foreground))" }}>M</span>
+            <span>1 : {drawingScale}</span>
+            <span className="text-[10px]" style={{ color: "hsl(var(--muted-foreground))" }}>{drawingScaleOpen ? "▾" : "▴"}</span>
+          </button>
+        </div>
+      </div>
+      {/* Right Tab Panel */}
+      <aside className="shrink-0 w-[280px] h-full flex flex-col border-l" style={{ background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" }}>
+        <div className="flex shrink-0 border-b" style={{ borderColor: "hsl(var(--hairline))" }}>
+          {([
+            { id: "settings" as const, label: "Werkzeugeinstellung" },
+            { id: "sheets" as const, label: "Zeichenblätter" },
+            { id: "layers" as const, label: "Ebenen" },
+          ]).map(t => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setRightTab(t.id)}
+              className="flex-1 px-2 py-2 text-[11px] font-medium transition-colors"
+              style={{
+                background: rightTab === t.id ? "hsl(var(--surface-card))" : "hsl(var(--surface-muted))",
+                color: rightTab === t.id ? "hsl(var(--ink))" : "hsl(var(--ink-soft))",
+                borderBottom: rightTab === t.id ? "2px solid hsl(var(--accent-gold))" : "2px solid transparent",
+              }}
+            >{t.label}</button>
+          ))}
+        </div>
+        <div className="flex-1 min-h-0 overflow-y-auto p-2" style={{ display: rightTab === "settings" ? "block" : "none" }}>
         {/* Settings area (scrollable) */}
         <div className="flex-1 min-h-0 overflow-y-auto p-2">
           {/* Raster-Einstellungen */}
-          {!sidebarCollapsed && gridPanelOpen && (
+          {gridPanelOpen && (
             <div className="cad-settings-panel mb-2">
               <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
                 Raster
@@ -836,7 +1180,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
           )}
 
           {/* Variant switcher: Linie / Freihand / Radiergummi (immer sichtbar in einer dieser Tools) */}
-          {!sidebarCollapsed && (activeTool === ToolIds.LINE || activeTool === ToolIds.FREE || activeTool === ToolIds.ERASER) && (
+          {(activeTool === ToolIds.LINE || activeTool === ToolIds.FREE || activeTool === ToolIds.ERASER) && (
             <div className="cad-settings-panel mb-2">
               <div className="flex gap-1">
                 {LINE_VARIANTS.map(v => {
@@ -858,7 +1202,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
             </div>
           )}
           {/* Line Settings */}
-          <div ref={settingsRef} className={`cad-settings-panel hidden mb-2 ${sidebarCollapsed ? "!hidden" : ""}`}>
+          <div ref={settingsRef} className={`cad-settings-panel hidden mb-2`}>
             <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
               Linie
             </div>
@@ -887,7 +1231,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
            </div>
 
            {/* Hatch Settings */}
-          <div ref={hatchSettingsRef} className={`cad-settings-panel hidden mb-2 ${sidebarCollapsed ? "!hidden" : ""}`}>
+          <div ref={hatchSettingsRef} className={`cad-settings-panel hidden mb-2`}>
             <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
               Schraffur
             </div>
@@ -1020,7 +1364,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
            </div>
 
           {/* Measure Settings */}
-          <div ref={measureSettingsRef} className={`cad-settings-panel hidden ${sidebarCollapsed ? "!hidden" : ""}`}>
+          <div ref={measureSettingsRef} className={`cad-settings-panel hidden`}>
             <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
               Maßkette
             </div>
@@ -1108,7 +1452,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
           </div>
 
           {/* Text Settings */}
-          <div ref={textSettingsRef} className={`cad-settings-panel hidden ${sidebarCollapsed ? "!hidden" : ""}`}>
+          <div ref={textSettingsRef} className={`cad-settings-panel hidden`}>
             <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
               Text
             </div>
@@ -1178,7 +1522,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
           </div>
 
           {/* Sticker Settings */}
-          {!sidebarCollapsed && activeTool === ToolIds.STICKER && (
+          {activeTool === ToolIds.STICKER && (
             <div className="cad-settings-panel mb-2">
               <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Sticker</div>
               <div className="space-y-3">
@@ -1285,7 +1629,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
           )}
 
           {/* Document-Tool-Panel: nur Import */}
-          {!sidebarCollapsed && activeTool === ToolIds.DOCUMENT && (
+          {activeTool === ToolIds.DOCUMENT && (
             <div className="cad-settings-panel mb-2">
               <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Dokument importieren</div>
               <div className="space-y-3">
@@ -1322,22 +1666,22 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
           )}
 
           {/* Freihand-Tool-Panel */}
-          {!sidebarCollapsed && (activeTool === ToolIds.FREE || (activeTool === ToolIds.SELECT && selectedFreeStrokeId)) && (
+          {(activeTool === ToolIds.FREE || (activeTool === ToolIds.SELECT && selectedFreeStrokeId)) && (
             <FreeDrawSettingsPanel app={appRef.current} />
           )}
 
           {/* Eraser-Tool-Panel */}
-          {!sidebarCollapsed && activeTool === ToolIds.ERASER && (
+          {activeTool === ToolIds.ERASER && (
             <EraserSettingsPanel app={appRef.current} />
           )}
 
           {/* Wand-Tool-Panel */}
-          {!sidebarCollapsed && (activeTool === ToolIds.WALL || (activeTool === ToolIds.SELECT && selectedWallId)) && (
+          {(activeTool === ToolIds.WALL || (activeTool === ToolIds.SELECT && selectedWallId)) && (
             <WallSettingsPanel app={appRef.current} />
           )}
 
           {/* Türen/Fenster Panel */}
-          {!sidebarCollapsed && activeTool === ToolIds.DOOR && (
+          {activeTool === ToolIds.DOOR && (
             <div className="cad-settings-panel mb-2">
               <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
                 {doorSelectedId ? (doorMode === "window" ? "Fenster bearbeiten" : "Tür bearbeiten") : "Türen/Fenster"}
@@ -1630,7 +1974,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
           )}
 
           {/* Document-Eigenschaften: nur im Auswahl-Tool, wenn Dokument selektiert */}
-          {!sidebarCollapsed && !!docSelected && (activeTool === ToolIds.SELECT || (activeTool === ToolIds.DOCUMENT && (docToolPhase === "scale-pick-1" || docToolPhase === "scale-pick-2" || docToolPhase === "scale-await-input"))) && (
+          {!!docSelected && (activeTool === ToolIds.SELECT || (activeTool === ToolIds.DOCUMENT && (docToolPhase === "scale-pick-1" || docToolPhase === "scale-pick-2" || docToolPhase === "scale-await-input"))) && (
             <div className="cad-settings-panel mb-2">
               <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Dokument-Eigenschaften</div>
               <div className="space-y-3">
@@ -1708,150 +2052,10 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
             </div>
           )}
         </div>
-
-        {/* PDF Page Picker Dialog */}
-        <Dialog open={!!docPickerPages} onOpenChange={(o) => { if (!o) setDocPickerPages(null); }}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Seiten auswählen</DialogTitle>
-            </DialogHeader>
-            <div className="max-h-[60vh] overflow-y-auto grid grid-cols-3 gap-3 p-1">
-              {docPickerPages?.map((p, i) => {
-                const checked = docPickerSelected.has(i);
-                return (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() => {
-                      setDocPickerSelected(prev => {
-                        const next = new Set(prev);
-                        if (next.has(i)) next.delete(i); else next.add(i);
-                        return next;
-                      });
-                    }}
-                    className={`relative rounded-md border-2 transition-all overflow-hidden ${checked ? "border-primary" : "border-border"}`}
-                  >
-                    <img src={p.src} alt={p.name} className="w-full h-32 object-contain bg-muted" />
-                    <div className="text-[10px] p-1 text-center truncate bg-muted/50">Seite {i + 1}</div>
-                    {checked && (
-                      <div className="absolute top-1 right-1 w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">✓</div>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => { setDocPickerSelected(new Set()); }}>Keine</Button>
-              <Button variant="outline" onClick={() => {
-                const all = new Set<number>();
-                docPickerPages?.forEach((_, i) => all.add(i));
-                setDocPickerSelected(all);
-              }}>Alle</Button>
-              <Button onClick={handleDocPickerConfirm} disabled={docPickerSelected.size === 0}>
-                {docPickerSelected.size} importieren
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Maßstab-Dialog vor Platzierung */}
-        <Dialog open={!!scaleDialogPages} onOpenChange={(o) => { if (!o) setScaleDialogPages(null); }}>
-          <DialogContent className="max-w-sm">
-            <DialogHeader>
-              <DialogTitle className="text-base">Maßstab des Dokuments</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-2 py-1">
-              <p className="text-[11px] text-muted-foreground">
-                In welchem Maßstab liegt der Plan vor?
-              </p>
-              <div className="grid grid-cols-3 gap-1.5">
-                {[
-                  { v: "50", label: "1 : 50" },
-                  { v: "100", label: "1 : 100" },
-                  { v: "200", label: "1 : 200" },
-                  { v: "500", label: "1 : 500" },
-                  { v: "1", label: "1 : 1" },
-                  { v: "custom", label: "Frei…" },
-                ].map(opt => {
-                  const active = scaleChoice === opt.v;
-                  return (
-                    <button
-                      key={opt.v}
-                      type="button"
-                      onClick={() => setScaleChoice(opt.v)}
-                      className="rounded-md h-9 text-xs font-semibold border transition-colors"
-                      style={{
-                        background: active ? "hsl(var(--primary))" : "hsl(var(--muted))",
-                        color: active ? "hsl(var(--primary-foreground))" : "hsl(var(--foreground))",
-                        borderColor: active ? "hsl(var(--primary))" : "hsl(var(--border))",
-                      }}
-                    >
-                      {opt.label}
-                    </button>
-                  );
-                })}
-              </div>
-              {scaleChoice === "custom" && (
-                <div className="flex items-center gap-2 pt-1">
-                  <span className="text-xs text-foreground">1 :</span>
-                  <input
-                    type="text"
-                    value={scaleCustom}
-                    onChange={(e) => setScaleCustom(e.target.value)}
-                    className="cad-settings-select flex-1 h-8 text-xs"
-                    placeholder="z. B. 75"
-                    autoFocus
-                  />
-                </div>
-              )}
-            </div>
-            <DialogFooter className="gap-2 sm:gap-2">
-              <Button variant="outline" size="sm" onClick={() => setScaleDialogPages(null)}>Abbrechen</Button>
-              <Button size="sm" onClick={handleScaleConfirm}>Übernehmen</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Collapse toggle */}
-        <button
-          onClick={() => setSidebarCollapsed((v) => !v)}
-          className="absolute -right-3 top-[88px] z-30 flex items-center justify-center w-6 h-6 rounded-full border shadow-md transition-all hover:scale-110"
-          style={{
-            background: "linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)))",
-            borderColor: "hsl(var(--primary) / 0.6)",
-            color: "#fff",
-            boxShadow: "0 4px 12px -2px hsl(var(--primary) / 0.5)",
-          }}
-          title={sidebarCollapsed ? "Sidebar ausklappen" : "Sidebar einklappen"}
-        >
-          {sidebarCollapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
-        </button>
-      </aside>
-
-      {/* Canvas Area */}
-      <div ref={containerRef} className="relative flex-1 min-w-0 h-full overflow-hidden">
-        {/* Right-side stacked panels: Bezeichnungs-ID + Zeichnungs-ID */}
-        <div className="absolute top-3 right-3 z-20 flex flex-col gap-2 items-end">
-          {/* Bezeichnungs-ID Panel */}
-          <div ref={idPanelRef} className="cad-id-panel w-[220px]">
-            <div className="id-head">
-              <div className="id-title">Bezeichnungs-ID</div>
-              <div className="id-head-actions">
-                <button ref={idToggleBtnRef} className="id-head-btn icon-only" title="Ein-/Ausklappen">
-                  <span className="id-toggle-chevron" />
-                </button>
-              </div>
-            </div>
-            <div ref={idBodyRef} className="id-body">
-              <div className="id-add-wrap">
-                <button ref={idAddBtnRef} className="id-head-btn id-add-btn">+ ID</button>
-              </div>
-              <div ref={idListRef} className="id-list" />
-            </div>
-          </div>
-
+        </div>
+        <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-2" style={{ display: rightTab === "sheets" ? "block" : "none" }}>
           {/* Zeichnungs-ID Panel (Blätter + Transparentpause) */}
-          <div ref={sheetPanelRef} className="cad-id-panel w-[220px]">
+          <div ref={sheetPanelRef} className="cad-id-panel w-full">
             <div className="id-head">
               <div className="id-title">Zeichnungs-ID</div>
               <div className="id-head-actions">
@@ -1869,7 +2073,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
           </div>
 
           {/* Druckpläne Panel */}
-          <div ref={planPanelRef} className="cad-id-panel w-[220px]">
+          <div ref={planPanelRef} className="cad-id-panel w-full">
             <div className="id-head">
               <div className="id-title">Druckpläne</div>
               <div className="id-head-actions">
@@ -1891,224 +2095,25 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
             </div>
           </div>
         </div>
-
-        {/* Line Hub */}
-        <div ref={hubRef} className="cad-hub absolute z-30 hidden flex gap-2 items-center">
-          <input ref={hubLenRef} type="text" readOnly className="text-xs" />
-          <input ref={hubAngRef} type="text" readOnly className="text-xs" />
-        </div>
-
-        {/* Door/Window Hub Box — LineHub-Stil: zwei Icons (Bewegen=Breite, Verschieben=Position) + zwei Inputs */}
-        {doorHub.visible && (
-          <div
-            className="absolute z-30 flex items-center gap-1.5 px-2 py-1.5 rounded-md shadow-lg"
-            style={{
-              left: Math.max(8, doorHub.screenX + 12),
-              top: Math.max(8, doorHub.screenY + 12),
-              background: "white",
-              border: "1px solid hsl(var(--border))",
-              boxShadow: "0 4px 16px -4px rgba(0,0,0,0.18)",
-            }}
-            onMouseDown={(e) => e.stopPropagation()}
-          >
-            <button
-              type="button"
-              title={doorHub.resizing ? "Klicken im Plan fixiert die Breite" : "Bewegen — Breite anpassen"}
-              onClick={() => appRef.current?.doorTool.beginFollowResize()}
-              className={`cad-toolbar-btn h-7 w-7 justify-center px-0 ${doorHub.resizing ? "active" : ""}`}
-            >
-              <Maximize2 className="h-3.5 w-3.5" />
-            </button>
-            <input
-              type="text"
-              value={doorHubWidthInput}
-              onChange={(e) => setDoorHubWidthInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  const n = parseFloat(doorHubWidthInput.replace(",", "."));
-                  if (Number.isFinite(n)) appRef.current?.doorTool.setSelectedWidthM(n);
-                } else if (e.key === "Escape") {
-                  appRef.current?.doorTool.hideHub();
-                }
-              }}
-              className="text-[11px] w-[72px] px-1.5 py-1 rounded border tabular-nums"
-              style={{ borderColor: "hsl(var(--border))" }}
-              title="Breite (m)"
-            />
-            <span className="text-[10px] opacity-60 mr-1">m</span>
-            <button
-              type="button"
-              title={doorHub.moving ? "Klicken im Plan fixiert die Position" : "Verschieben — Position auf Wand"}
-              onClick={() => appRef.current?.doorTool.beginFollowMove()}
-              className={`cad-toolbar-btn h-7 w-7 justify-center px-0 ${doorHub.moving ? "active" : ""}`}
-            >
-              <Move className="h-3.5 w-3.5" />
-            </button>
-            <input
-              type="text"
-              value={doorHubPosInput}
-              onChange={(e) => setDoorHubPosInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  const n = parseFloat(doorHubPosInput.replace(",", "."));
-                  if (Number.isFinite(n)) appRef.current?.doorTool.setSelectedPosM(n);
-                } else if (e.key === "Escape") {
-                  appRef.current?.doorTool.hideHub();
-                }
-              }}
-              className="text-[11px] w-[72px] px-1.5 py-1 rounded border tabular-nums"
-              style={{ borderColor: "hsl(var(--border))" }}
-              title="Position auf Wand (m ab Wandanfang)"
-            />
-            <span className="text-[10px] opacity-60">m</span>
-          </div>
-        )}
-
-        {/* Point Edit Menu */}
-        <div ref={pointEditRef} className="cad-point-menu absolute z-30 hidden">
-          <button ref={pointMoveBtnRef} title="Bewegen">◉</button>
-          <button ref={pointTranslateBtnRef} title="Verschieben">✥</button>
-          <button ref={pointRotateBtnRef} title="Drehen">⟳</button>
-          <button ref={pointOffsetBtnRef} title="Kante versetzen">⇆</button>
-          <button ref={pointDeleteBtnRef} title="Löschen">🗑</button>
-        </div>
-
-        {/* Text Editor Toolbar (floating) */}
-        <div ref={textEditorToolbarRef} className="hidden absolute z-40 flex items-center gap-1 px-2 py-1 rounded-md shadow-lg" style={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}>
-          <button ref={textEditorBoldRef} type="button" className="cad-toolbar-btn h-7 w-7 justify-center px-0" title="Fett (Strg+B)">
-            <Bold className="h-3.5 w-3.5" />
-          </button>
-          <button ref={textEditorItalicRef} type="button" className="cad-toolbar-btn h-7 w-7 justify-center px-0" title="Kursiv (Strg+I)">
-            <Italic className="h-3.5 w-3.5" />
-          </button>
-          <input ref={textEditorColorRef} type="color" defaultValue="#111111" className="w-7 h-7 cursor-pointer border-0 p-0 bg-transparent" title="Textfarbe" />
-          <select ref={textEditorSizeRef} className="cad-settings-select h-7 text-xs" title="Schriftgröße">
-            {[10, 12, 14, 16, 18, 20, 24, 28, 32, 40, 48].map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
-          <select ref={textEditorSymbolRef} className="cad-settings-select h-7 text-xs" title="Symbol einfügen" defaultValue="">
-            <option value="">∑ Symbol</option>
-            <option value="²">²</option>
-            <option value="³">³</option>
-            <option value="°">°</option>
-            <option value="±">±</option>
-            <option value="×">×</option>
-            <option value="÷">÷</option>
-            <option value="∅">∅</option>
-            <option value="√">√</option>
-            <option value="≈">≈</option>
-            <option value="≤">≤</option>
-            <option value="≥">≥</option>
-            <option value="→">→</option>
-            <option value="←">←</option>
-            <option value="↑">↑</option>
-            <option value="↓">↓</option>
-          </select>
-        </div>
-
-        {/* Text Editor (contenteditable) */}
-        <div ref={textEditorElRef} className="hidden absolute z-40 outline-none" />
-
-        {/* Floating Edit-Pencil bei ausgewählter Sticker-Instanz */}
-        {stickerEditOverlay && (
-          <button
-            type="button"
-            onClick={() => {
-              if (stickerEditOverlay) appRef.current?.openStickerEditByInstanceId(stickerEditOverlay.id);
-            }}
-            className="absolute z-30 flex items-center justify-center rounded-full shadow-lg transition-transform hover:scale-110"
-            style={{
-              left: stickerEditOverlay.x + 6,
-              top: stickerEditOverlay.y - 14,
-              width: 28, height: 28,
-              background: "linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)))",
-              color: "#fff",
-              border: "1px solid hsl(var(--primary) / 0.6)",
-            }}
-            title="Sticker-Inhalt bearbeiten"
-          >
-            <Pencil className="h-3.5 w-3.5" />
-          </button>
-        )}
-
-        {/* Canvas */}
-        <canvas ref={canvasRef} className="block w-full h-full" />
-
-        {/* Drawing Scale Drop-Up (bottom-left) */}
-        <div className="absolute left-3 bottom-3 z-30">
-          {drawingScaleOpen && (
-            <div
-              className="mb-2 rounded-md shadow-lg p-2 w-44"
-              style={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}
-            >
-              <div className="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "hsl(var(--muted-foreground))" }}>
-                Maßstab Zeichnung
-              </div>
-              <div className="grid grid-cols-3 gap-1 mb-2">
-                {[100, 200, 500, 50, 10, 1].map(d => {
-                  const active = drawingScale === d;
-                  return (
-                    <button
-                      key={d}
-                      type="button"
-                      onClick={() => { setDrawingScale(d); setDrawingScaleOpen(false); }}
-                      className="rounded h-7 text-[11px] font-semibold border transition-colors"
-                      style={{
-                        background: active ? "hsl(var(--primary))" : "hsl(var(--muted))",
-                        color: active ? "hsl(var(--primary-foreground))" : "hsl(var(--foreground))",
-                        borderColor: active ? "hsl(var(--primary))" : "hsl(var(--border))",
-                      }}
-                    >
-                      1:{d}
-                    </button>
-                  );
-                })}
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="text-[11px]" style={{ color: "hsl(var(--foreground))" }}>1 :</span>
-                <input
-                  type="text"
-                  value={drawingScaleCustom}
-                  onChange={(e) => setDrawingScaleCustom(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      const n = parseFloat(drawingScaleCustom.replace(",", "."));
-                      if (Number.isFinite(n) && n > 0) { setDrawingScale(n); setDrawingScaleOpen(false); }
-                    }
-                  }}
-                  className="cad-settings-select h-7 flex-1 text-[11px]"
-                  placeholder="frei"
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    const n = parseFloat(drawingScaleCustom.replace(",", "."));
-                    if (Number.isFinite(n) && n > 0) { setDrawingScale(n); setDrawingScaleOpen(false); }
-                  }}
-                  className="rounded h-7 px-2 text-[11px] font-semibold"
-                  style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
-                >
-                  OK
+        <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-2" style={{ display: rightTab === "layers" ? "block" : "none" }}>
+          <div ref={idPanelRef} className="cad-id-panel w-full">
+            <div className="id-head">
+              <div className="id-title">Bezeichnungs-ID</div>
+              <div className="id-head-actions">
+                <button ref={idToggleBtnRef} className="id-head-btn icon-only" title="Ein-/Ausklappen">
+                  <span className="id-toggle-chevron" />
                 </button>
               </div>
             </div>
-          )}
-          <button
-            type="button"
-            onClick={() => setDrawingScaleOpen(o => !o)}
-            className="rounded-md px-3 h-8 text-xs font-semibold shadow-md flex items-center gap-1.5 transition-colors"
-            style={{
-              background: "hsl(var(--card))",
-              color: "hsl(var(--foreground))",
-              border: "1px solid hsl(var(--border))",
-            }}
-            title="Maßstab der Zeichenoberfläche"
-          >
-            <span style={{ color: "hsl(var(--muted-foreground))" }}>M</span>
-            <span>1 : {drawingScale}</span>
-            <span className="text-[10px]" style={{ color: "hsl(var(--muted-foreground))" }}>{drawingScaleOpen ? "▾" : "▴"}</span>
-          </button>
+            <div ref={idBodyRef} className="id-body">
+              <div className="id-add-wrap">
+                <button ref={idAddBtnRef} className="id-head-btn id-add-btn">+ ID</button>
+              </div>
+              <div ref={idListRef} className="id-list" />
+            </div>
+          </div>
         </div>
-      </div>
+      </aside>
     </div>
   );
 };
