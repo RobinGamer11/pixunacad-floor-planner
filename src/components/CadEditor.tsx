@@ -1345,7 +1345,13 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
               <div className="flex gap-1 mb-3">
                 <button
                   type="button"
-                  onClick={() => { setDoorMode("door"); setDoorSashEnabled(true); }}
+                  onClick={() => {
+                    setDoorMode("door");
+                    if (!doorSelectedId) {
+                      setDoorHeightM(2.1);
+                      setDoorSashEnabled(true);
+                    }
+                  }}
                   title="Tür"
                   className={`cad-toolbar-btn flex-1 justify-center h-9 ${doorMode === "door" ? "active" : ""}`}
                 >
@@ -1353,7 +1359,13 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setDoorMode("window"); setDoorSashEnabled(false); }}
+                  onClick={() => {
+                    setDoorMode("window");
+                    if (!doorSelectedId) {
+                      setDoorHeightM(1.2);
+                      setDoorSashEnabled(false);
+                    }
+                  }}
                   title="Fenster"
                   className={`cad-toolbar-btn flex-1 justify-center h-9 ${doorMode === "window" ? "active" : ""}`}
                 >
