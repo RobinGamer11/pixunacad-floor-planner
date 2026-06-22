@@ -339,7 +339,9 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
         idSelect: measureIdSelectRef.current,
         orientation: measureOrientationRef.current,
         pointCount: measurePointCountRef.current,
+        direction: measureDirectionRef.current,
         editMode: measureEditModeRef.current,
+
         extensionsToggle: measureExtRef.current,
         freeTextToggle: measureFreeTextToggleRef.current,
         freeTextInput: measureFreeTextInputRef.current,
