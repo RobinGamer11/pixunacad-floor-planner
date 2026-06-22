@@ -285,13 +285,16 @@ export class DocumentObject {
   _eraseMaskDirty?: boolean;
   /** Bei kind === "pdf-page": Original-PDF-Bytes als Base64 (für Vektor-Re-Render & Auflösen). */
   pdfSourceB64?: string | null;
+  /** Welche Kanten als unendliche Hilfslinien sichtbar sind (Toggle per Klick). */
+  guideEdges: { top: boolean; right: boolean; bottom: boolean; left: boolean };
 
-  constructor({ id, name, kind, src, pageIndex, position, widthM, heightM, rotationRad, pixelWidth, pixelHeight, labelId, importScaleDenom, eraseMaskDataUrl, pdfSourceB64 }: {
+  constructor({ id, name, kind, src, pageIndex, position, widthM, heightM, rotationRad, pixelWidth, pixelHeight, labelId, importScaleDenom, eraseMaskDataUrl, pdfSourceB64, guideEdges }: {
     id: string; name?: string; kind?: "image" | "pdf-page"; src: string;
     pageIndex?: number; position: Vec2; widthM: number; heightM: number;
     rotationRad?: number; pixelWidth?: number; pixelHeight?: number; labelId?: string;
     importScaleDenom?: number; eraseMaskDataUrl?: string | null;
     pdfSourceB64?: string | null;
+    guideEdges?: { top?: boolean; right?: boolean; bottom?: boolean; left?: boolean };
   }) {
     this.id = id;
     this.name = name || "Dokument";
@@ -310,6 +313,12 @@ export class DocumentObject {
     this._eraseMask = null;
     this._eraseMaskDirty = false;
     this.pdfSourceB64 = pdfSourceB64 || null;
+    this.guideEdges = {
+      top: !!guideEdges?.top,
+      right: !!guideEdges?.right,
+      bottom: !!guideEdges?.bottom,
+      left: !!guideEdges?.left,
+    };
   }
 }
 
