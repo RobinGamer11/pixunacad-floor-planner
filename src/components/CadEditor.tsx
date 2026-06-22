@@ -1083,8 +1083,9 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
         </div>
       </div>
       {/* Right Tab Panel */}
+      {rightOpen ? (
       <aside className="shrink-0 w-[280px] h-full flex flex-col border-l" style={{ background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" }}>
-        <div className="flex shrink-0 border-b" style={{ borderColor: "hsl(var(--hairline))" }}>
+        <div className="flex shrink-0 border-b items-stretch" style={{ borderColor: "hsl(var(--hairline))" }}>
           {([
             { id: "settings" as const, label: "Werkzeugeinstellung" },
             { id: "sheets" as const, label: "Zeichenblätter" },
@@ -1102,7 +1103,17 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
               }}
             >{t.label}</button>
           ))}
+          <button
+            type="button"
+            onClick={() => setRightOpen(false)}
+            title="Panel ausblenden"
+            className="w-8 shrink-0 flex items-center justify-center hover:bg-muted"
+            style={{ color: "hsl(var(--ink-soft))" }}
+          >
+            <PanelRightClose size={14} />
+          </button>
         </div>
+
         <div className="flex-1 min-h-0 overflow-y-auto p-2" style={{ display: rightTab === "settings" ? "block" : "none" }}>
         {/* Settings area (scrollable) */}
         <div className="flex-1 min-h-0 overflow-y-auto p-2">
