@@ -193,6 +193,19 @@ export class MiniCad {
   private _frameLabelId = "__page_frame__";
   /** Special label-ID for invisible external rect segments (Zeichenblatt/PDF/Bild). */
   private _extRectLabelId = "__ext_rect__";
+  /** Special label-ID for invisible external DocumentObjects (Projektmappen-PDF/Bild). */
+  private _extDocLabelId = "__ext_doc__";
+
+  /** Hub-Box-Zustand für Dokument-Ecken (analog CadApp). Wird von SelectTool gesetzt. */
+  documentHubState: { visible: boolean; screenX: number; screenY: number; docId: string | null; cornerIndex: number } = {
+    visible: false, screenX: 0, screenY: 0, docId: null, cornerIndex: 0,
+  };
+
+  /** Map externalId → docId; Snapshot zur Diff-Erkennung. */
+  private _externalDocs: Map<string, string> = new Map();
+  private _externalDocSnapshots: Map<string, string> = new Map();
+  private _externalDocChange: ((id: string, t: { xMM: number; yMM: number; rotationDeg: number; guideEdges: { top: boolean; right: boolean; bottom: boolean; left: boolean } }) => void) | null = null;
+
 
   private _activeTool: MiniTool = null;
   private _rafId: number | null = null;
