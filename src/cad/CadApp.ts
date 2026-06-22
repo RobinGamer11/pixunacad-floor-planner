@@ -88,7 +88,9 @@ export interface MeasureSettingsRefs {
   idSelect: HTMLSelectElement;
   orientation: HTMLSelectElement;
   pointCount: HTMLSelectElement;
+  direction: HTMLSelectElement;
   editMode: HTMLSelectElement;
+
   extensionsToggle: HTMLInputElement;
   freeTextToggle: HTMLInputElement;
   freeTextInput: HTMLInputElement;
