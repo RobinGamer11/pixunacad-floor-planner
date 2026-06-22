@@ -127,7 +127,9 @@ export class SheetManager {
 
   deleteSheet(id: string): boolean {
     const s = this.getById(id);
-    if (!s || s.locked) return false;
+    if (!s) return false;
+    // Regel: es muss immer mindestens ein Blatt existieren
+    if (this.sheets.length <= 1) return false;
     this.sheets = this.sheets.filter(x => x.id !== id);
     return true;
   }
