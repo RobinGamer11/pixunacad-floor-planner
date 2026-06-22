@@ -459,8 +459,10 @@ export class CadApp {
       segments: scene.segments.map(s => ({
         id: s.id, a: { x: s.a.x, y: s.a.y }, b: { x: s.b.x, y: s.b.y },
         color: s.color, thicknessM: s.thicknessM, labelId: s.labelId,
+        arrowStart: !!s.arrowStart, arrowEnd: !!s.arrowEnd, arrowScale: s.arrowScale || 1,
         _stickerEditOwnerId: s._stickerEditOwnerId || null,
       })),
+
       hatches: scene.hatches.map(h => ({
         id: h.id, points: h.points.map(p => ({ x: p.x, y: p.y })),
         holes: (h.holes || []).map(loop => loop.map(p => ({ x: p.x, y: p.y }))),
@@ -495,8 +497,10 @@ export class CadApp {
         useFreeText: d.useFreeText, freeText: d.freeText,
         textBgEnabled: d.textBgEnabled, textBgColor: d.textBgColor, textBgAlpha: d.textBgAlpha,
         labelId: d.labelId,
+        doorRefId: d.doorRefId || null,
         _stickerEditOwnerId: d._stickerEditOwnerId || null,
       })),
+
       textBoxes: scene.textBoxes.map(t => ({
         id: t.id,
         center: { x: t.center.x, y: t.center.y },
@@ -547,10 +551,14 @@ export class CadApp {
       } : null,
       doors: scene.doors.map(d => ({
         id: d.id, wallId: d.wallId, posM: d.posM, widthM: d.widthM, heightM: d.heightM,
+        breakHeightM: d.breakHeightM,
+        kind: d.kind,
         side: d.side, hand: d.hand, edge: d.edge, color: d.color,
         jambEnabled: d.jambEnabled, jambColor: d.jambColor, jambLenM: d.jambLenM, jambThickM: d.jambThickM,
+        sashEnabled: d.sashEnabled, glassColor: d.glassColor, glassThickM: d.glassThickM, glassFillColor: d.glassFillColor,
         labelId: d.labelId,
       })),
+
     };
   }
 
