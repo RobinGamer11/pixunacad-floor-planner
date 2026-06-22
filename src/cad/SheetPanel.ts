@@ -212,30 +212,34 @@ export class SheetPanel {
       editBtn.className = "sheet-icon-btn icon-only";
       editBtn.title = "Umbenennen";
       editBtn.textContent = "✎";
-      editBtn.disabled = !!sheet.locked;
-      editBtn.style.opacity = sheet.locked ? "0.35" : "1";
       editBtn.addEventListener("click", (e) => {
         e.stopPropagation();
-        if (sheet.locked) return;
         const next = prompt("Blatt umbenennen", sheet.name);
         if (next == null) return;
         this.manager.renameSheet(sheet.id, next);
         this.cb.onChange();
       });
 
+      const isLastSheet = this.manager.list().length <= 1;
       const deleteBtn = document.createElement("button");
       deleteBtn.className = "sheet-icon-btn icon-only";
-      deleteBtn.title = "Löschen";
+      deleteBtn.title = isLastSheet ? "Mindestens ein Blatt erforderlich" : "Löschen";
       deleteBtn.textContent = "🗑";
-      deleteBtn.disabled = !!sheet.locked;
-      deleteBtn.style.opacity = sheet.locked ? "0.35" : "1";
+      deleteBtn.disabled = isLastSheet;
+      deleteBtn.style.opacity = isLastSheet ? "0.35" : "1";
       deleteBtn.addEventListener("click", (e) => {
         e.stopPropagation();
-        if (sheet.locked) return;
-        this.manager.deleteSheet(sheet.id);
+        if (isLastSheet) return;
+        const wasActive = this.cb.getActiveSheetId() === sheet.id;
+        if (!this.manager.deleteSheet(sheet.id)) return;
         this.overlayStore.delete(sheet.id);
+        if (wasActive) {
+          const remaining = this.manager.list();
+          if (remaining.length > 0) this.cb.setActiveSheetId(remaining[0].id);
+        }
         this.cb.onChange();
       });
+
 
       // Maßstab-Auswahl: native <select> für robustes UI
       const scaleSel = document.createElement("select");
