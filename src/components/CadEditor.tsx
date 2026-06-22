@@ -1393,7 +1393,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
                   ))}
                 </div>
                 <div>
-                  <label>Lichte Breite (m) — nur Türschwung</label>
+                  <label>Lichte Breite (m) — nur {doorMode === "window" ? "Fensterglas" : "Türschwung"}</label>
                   <input
                     type="number" min={0.05} step={0.05}
                     value={Math.max(0, +(doorWidthM - (doorJambEnabled ? 2 * doorJambLenM : 0)).toFixed(4))}
@@ -1482,7 +1482,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
                       </div>
                     </div>
                     <div>
-                      <label>Fenster-Dicke (m, Abstand der Linien — 0 = auto)</label>
+                      <label>Fensterglas-Dicke (m, Abstand der Linien — 0 = auto)</label>
                       <input
                         type="number"
                         step={0.005}
@@ -1538,7 +1538,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
                 {doorJambEnabled && (
                   <>
                     <div>
-                      <label>Laibungsbreite (m, je Seite)</label>
+                      <label>Laibungslänge (m, je Seite)</label>
                       <input
                         type="number" min={0} step={0.01}
                         value={doorJambLenM}
