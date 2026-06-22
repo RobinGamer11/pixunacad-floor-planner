@@ -16,7 +16,7 @@ import { WallSettingsPanel } from "@/components/cad/WallSettingsPanel";
 
 const CAD_TOOLS = [
   { id: ToolIds.SELECT, label: "Auswahl", key: "V", icon: MousePointer2 },
-  { id: ToolIds.WALL, label: "Wand", key: "W", icon: Construction },
+  { id: ToolIds.WALL, label: "Wand", key: "W", icon: BrickWall },
   { id: ToolIds.DOOR, label: "Türen/Fenster", key: "U", icon: DoorOpen },
   { id: ToolIds.LINE, label: "Linie", key: "L", icon: Minus },
   { id: ToolIds.HATCH, label: "Schraffur", key: "H", icon: Square },
