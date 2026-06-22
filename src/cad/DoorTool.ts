@@ -69,15 +69,17 @@ export class DoorTool {
   /** Hover-Wand für Platzierungs-Preview. */
   private _hoverWallId: string | null = null;
   private _hoverPosM: number = 0;
-  /** Drag-Resize-State. */
+  /** Drag-Resize-State (deprecated – nicht mehr automatisch via Maus-Drag). */
   private _dragHandle: "left" | "right" | null = null;
-  /** Drag-Move-State (Verschieben entlang Wand). */
+  /** Drag-Move-State (deprecated). */
   private _dragMove: boolean = false;
   private _dragMoveOffsetM: number = 0;
   /** Follow-Move: Tür folgt Maus ohne gedrückte Taste; nächster Klick fixiert. */
   private _followMove: boolean = false;
-  /** Follow-Resize: Breite folgt Maus relativ zur Türmitte; nächster Klick fixiert. */
+  /** Follow-Resize: ein Endpunkt folgt Maus; nächster Klick fixiert. */
   private _followResize: boolean = false;
+  /** Welcher Endpunkt wurde zuletzt im Hub aktiviert (für Follow-Resize). */
+  private _activeEndpoint: "left" | "right" | null = null;
   /** Settings-Update-Callback (von CadEditor gesetzt) — feuert wenn Selection wechselt. */
   onSelectionChange: ((doorId: string | null) => void) | null = null;
   /** Hubbox-Update-Callback (von CadEditor gesetzt). */
