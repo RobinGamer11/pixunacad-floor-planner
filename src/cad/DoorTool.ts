@@ -380,7 +380,7 @@ export class DoorTool {
       }
     }
 
-    // Follow-Resize: Breite wird durch Maus-Position relativ zur Türmitte gesteuert
+    // Follow-Resize: Ein Endpunkt folgt Maus, der andere Endpunkt bleibt fest.
     if (this._followResize && this.selectedDoorId) {
       const d = this.app.scene.getDoorById(this.selectedDoorId);
       const w = d ? this.app.scene.getWallById(d.wallId) : null;
@@ -389,13 +389,24 @@ export class DoorTool {
         if (proj) {
           let total = 0;
           for (let i = 1; i < w.corners.length; i++) total += dist(w.corners[i - 1], w.corners[i]);
-          const newHalf = Math.max(0.05, Math.abs(proj.s - d.posM));
-          let newWidth = Math.max(0.1, newHalf * 2);
-          // Innerhalb Wand halten
-          const maxHalf = Math.min(d.posM, total - d.posM);
-          if (newWidth / 2 > maxHalf) newWidth = maxHalf * 2;
-          d.widthM = newWidth;
-          this.settings.widthM = newWidth;
+          // Fester Endpunkt = der gegenüberliegende des aktiven Fangpunkts.
+          // Fällt _activeEndpoint weg, verhalten wir uns wie zentrum-skaliert.
+          const ep = this._activeEndpoint;
+          if (ep) {
+            const fixed = ep === "left" ? d.posM + d.widthM / 2 : d.posM - d.widthM / 2;
+            const moving = Math.max(0, Math.min(total, proj.s));
+            const newWidth = Math.max(0.1, Math.abs(fixed - moving));
+            const newCenter = (fixed + moving) / 2;
+            d.widthM = newWidth;
+            d.posM = newCenter;
+          } else {
+            const newHalf = Math.max(0.05, Math.abs(proj.s - d.posM));
+            let newWidth = Math.max(0.1, newHalf * 2);
+            const maxHalf = Math.min(d.posM, total - d.posM);
+            if (newWidth / 2 > maxHalf) newWidth = maxHalf * 2;
+            d.widthM = newWidth;
+          }
+          this.settings.widthM = d.widthM;
           this.onSelectionChange?.(d.id);
           this._refreshHub();
         }
