@@ -194,14 +194,14 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
   const [doorSide, setDoorSide] = useState<"inner" | "outer">("inner");
   const [doorHand, setDoorHand] = useState<"left" | "right">("left");
   const [doorEdge, setDoorEdge] = useState<"inner" | "center" | "outer">("center");
-  const [doorColor, setDoorColor] = useState<string>("#111111");
+  const [doorColor, setDoorColor] = useState<string>("#000000");
   const [doorJambEnabled, setDoorJambEnabled] = useState<boolean>(true);
-  const [doorJambColor, setDoorJambColor] = useState<string>("#9aa3ad");
-  const [doorJambLenM, setDoorJambLenM] = useState<number>(0.06);
-  const [doorJambThickM, setDoorJambThickM] = useState<number>(0);
+  const [doorJambColor, setDoorJambColor] = useState<string>("#808080");
+  const [doorJambLenM, setDoorJambLenM] = useState<number>(0.086);
+  const [doorJambThickM, setDoorJambThickM] = useState<number>(0.08);
   const [doorSashEnabled, setDoorSashEnabled] = useState<boolean>(true);
-  const [doorGlassColor, setDoorGlassColor] = useState<string>("#2a2f36");
-  const [doorGlassThickM, setDoorGlassThickM] = useState<number>(0);
+  const [doorGlassColor, setDoorGlassColor] = useState<string>("#000000");
+  const [doorGlassThickM, setDoorGlassThickM] = useState<number>(0.08);
   const [doorGlassFillColor, setDoorGlassFillColor] = useState<string>("");
   const [doorSelectedId, setDoorSelectedId] = useState<string | null>(null);
   const [doorHub, setDoorHub] = useState<{ visible: boolean; screenX: number; screenY: number; doorId: string | null; posM: number; widthM: number; moving: boolean; resizing: boolean }>({ visible: false, screenX: 0, screenY: 0, doorId: null, posM: 0, widthM: 0, moving: false, resizing: false });
@@ -1345,7 +1345,13 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
               <div className="flex gap-1 mb-3">
                 <button
                   type="button"
-                  onClick={() => { setDoorMode("door"); setDoorSashEnabled(true); }}
+                  onClick={() => {
+                    setDoorMode("door");
+                    if (!doorSelectedId) {
+                      setDoorHeightM(2.1);
+                      setDoorSashEnabled(true);
+                    }
+                  }}
                   title="Tür"
                   className={`cad-toolbar-btn flex-1 justify-center h-9 ${doorMode === "door" ? "active" : ""}`}
                 >
@@ -1353,7 +1359,13 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setDoorMode("window"); setDoorSashEnabled(false); }}
+                  onClick={() => {
+                    setDoorMode("window");
+                    if (!doorSelectedId) {
+                      setDoorHeightM(1.2);
+                      setDoorSashEnabled(false);
+                    }
+                  }}
                   title="Fenster"
                   className={`cad-toolbar-btn flex-1 justify-center h-9 ${doorMode === "window" ? "active" : ""}`}
                 >
