@@ -2122,6 +2122,21 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
           </div>
         </div>
       </aside>
+      ) : (
+        <div
+          className="w-7 shrink-0 border-l flex items-start justify-center pt-3"
+          style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
+        >
+          <button
+            onClick={() => setRightOpen(true)}
+            title="Panel einblenden"
+            className="h-7 w-7 rounded-md flex items-center justify-center hover:bg-muted"
+            style={{ color: "hsl(var(--ink-soft))" }}
+          >
+            <PanelRightOpen size={14} />
+          </button>
+        </div>
+      )}
     </div>
   );
 };
