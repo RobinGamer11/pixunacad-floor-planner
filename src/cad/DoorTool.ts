@@ -468,11 +468,11 @@ export class DoorTool {
 
     if (input.clicked) {
       // 1) Endpunkt-Handle → Tür selektieren + Hubbox an Handle anzeigen.
-      //    Bei bereits selektierter Tür zusätzlich Drag-Resize starten.
+      //    KEIN automatischer Drag — Bewegen nur via Hub-Icon.
       const handleHit = this._hitDoorHandle(input);
       if (handleHit) {
-        const wasSelected = this.selectedDoorId === handleHit.door.id;
-        if (!wasSelected) this.selectDoor(handleHit.door.id);
+        if (this.selectedDoorId !== handleHit.door.id) this.selectDoor(handleHit.door.id);
+        this._activeEndpoint = handleHit.which;
         const w = this.app.scene.getWallById(handleHit.door.wallId);
         const g = w ? doorGeometry(w, handleHit.door) : null;
         if (g) {
@@ -480,24 +480,15 @@ export class DoorTool {
           const s = this.app.camera.worldToScreen(which.x, which.y);
           this._showHub(s.x, s.y - 28);
         }
-        if (wasSelected) this._dragHandle = handleHit.which;
         return;
       }
-      // 2) Center-Handle → Drag-Move
+      // 2) Center-Handle oder Tür-Click → selektieren + Hubbox an Türmitte.
+      //    Auch hier KEIN automatischer Drag.
       const centerHit = this._hitDoorCenter(input);
-      if (centerHit) {
-        const w = this.app.scene.getWallById(centerHit.wallId);
-        if (w) {
-          const proj = projectPointToWall(w, v(input.mouse.wx, input.mouse.wy));
-          this._dragMoveOffsetM = proj ? (proj.s - centerHit.posM) : 0;
-        }
-        this._dragMove = true;
-        return;
-      }
-      // 3) Tür-Click → selektieren + Hubbox an Türmitte
-      const doorHit = this._hitDoor(input);
+      const doorHit = centerHit ?? this._hitDoor(input);
       if (doorHit) {
         this.selectDoor(doorHit.id);
+        this._activeEndpoint = null;
         const w = this.app.scene.getWallById(doorHit.wallId);
         const g = w ? doorGeometry(w, doorHit) : null;
         if (g) {
