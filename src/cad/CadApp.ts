@@ -509,6 +509,7 @@ export class CadApp {
           pixelWidth: d.pixelWidth, pixelHeight: d.pixelHeight, labelId: d.labelId,
           eraseMaskDataUrl: maskUrl || null,
           pdfSourceB64: d.pdfSourceB64 || null,
+          guideEdges: { ...d.guideEdges },
         };
       }),
       freeStrokes: scene.freeStrokes.map(s => ({
