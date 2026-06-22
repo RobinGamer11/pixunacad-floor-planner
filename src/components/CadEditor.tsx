@@ -1482,7 +1482,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
                       </div>
                     </div>
                     <div>
-                      <label>Fenster-Dicke (m, Abstand der Linien — 0 = auto)</label>
+                      <label>Fensterglas-Dicke (m, Abstand der Linien — 0 = auto)</label>
                       <input
                         type="number"
                         step={0.005}
