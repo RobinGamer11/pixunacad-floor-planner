@@ -11,6 +11,8 @@ export interface DoorToolSettings {
   mode: DoorMode;
   widthM: number;
   heightM: number;
+  /** Brüstungshöhe (m). Standardmäßig 0 für Türen, ~0.9 für Fenster. */
+  breakHeightM: number;
   side: DoorSide;
   hand: DoorHand;
   edge: DoorEdge;
@@ -28,6 +30,7 @@ export interface DoorToolSettings {
   /** Füllfarbe zwischen den Fensterlinien. "" = keine Füllung. */
   glassFillColor: string;
 }
+
 
 export interface DoorHubState {
   visible: boolean;
@@ -50,6 +53,7 @@ export class DoorTool {
     mode: "door",
     widthM: 0.9,
     heightM: 2.1,
+    breakHeightM: 0,
     side: "inner",
     hand: "left",
     edge: "center",
@@ -63,6 +67,7 @@ export class DoorTool {
     glassThickM: 0.08,
     glassFillColor: "",
   };
+
 
   /** ID der aktuell selektierten Tür (für Inspector). */
   selectedDoorId: string | null = null;
@@ -293,6 +298,7 @@ export class DoorTool {
         this.settings.mode = d.kind;
         this.settings.widthM = d.widthM;
         this.settings.heightM = d.heightM;
+        this.settings.breakHeightM = d.breakHeightM;
         this.settings.side = d.side;
         this.settings.hand = d.hand;
         this.settings.edge = d.edge;
@@ -306,6 +312,7 @@ export class DoorTool {
         this.settings.glassThickM = d.glassThickM;
         this.settings.glassFillColor = d.glassFillColor;
       }
+
     } else {
       this._hideHub();
     }
@@ -327,6 +334,7 @@ export class DoorTool {
     d.kind = this.settings.mode;
     d.widthM = Math.max(0.1, Math.min(this.settings.widthM, total));
     d.heightM = this.settings.heightM;
+    d.breakHeightM = Math.max(0, this.settings.breakHeightM);
     d.side = this.settings.side;
     d.hand = this.settings.hand;
     d.edge = this.settings.edge;
@@ -343,6 +351,7 @@ export class DoorTool {
     d.posM = Math.max(d.widthM / 2, Math.min(total - d.widthM / 2, d.posM));
     this._refreshHub();
   }
+
 
   update(input: Input) {
     // Hover für Platzierung berechnen
@@ -507,6 +516,7 @@ export class DoorTool {
             kind: this.settings.mode,
             widthM: this.settings.widthM,
             heightM: this.settings.heightM,
+            breakHeightM: this.settings.breakHeightM,
             side: this.settings.side,
             hand: this.settings.hand,
             edge: this.settings.edge,
@@ -521,6 +531,7 @@ export class DoorTool {
             glassFillColor: this.settings.glassFillColor,
             labelId: w.labelId,
           });
+
           this.selectDoor(door.id);
         }
         return;
