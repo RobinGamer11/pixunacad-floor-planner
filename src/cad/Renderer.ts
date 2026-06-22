@@ -975,7 +975,7 @@ export class Renderer {
     }
   }
 
-  private _drawSingleSegment(seg: { a: Vec2; b: Vec2; color?: string; thicknessM: number; labelId: string; isGuide?: boolean }) {
+  private _drawSingleSegment(seg: { a: Vec2; b: Vec2; color?: string; thicknessM: number; labelId: string; isGuide?: boolean; arrowStart?: boolean; arrowEnd?: boolean; arrowScale?: number }) {
     const ctx = this.ctx;
     const cam = this.camera;
     const a = cam.worldToScreen(seg.a.x, seg.a.y);
@@ -984,6 +984,7 @@ export class Renderer {
 
     ctx.save();
     ctx.strokeStyle = seg.color || Defaults.lineColor;
+    ctx.fillStyle = seg.color || Defaults.lineColor;
     ctx.lineWidth = this._segStrokePx(seg.thicknessM);
     if (seg.isGuide) {
       // Hilfslinie: hellblau gestrichelt, immer dünn (Screen-Pixel), Hintergrund.
@@ -997,6 +998,31 @@ export class Renderer {
     ctx.moveTo(a.x, a.y);
     ctx.lineTo(b.x, b.y);
     ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Pfeilspitzen (nicht für Hilfslinien)
+    if (!seg.isGuide && (seg.arrowStart || seg.arrowEnd)) {
+      const scale = (typeof seg.arrowScale === "number" && seg.arrowScale > 0) ? seg.arrowScale : 1;
+      // Pfeilgröße proportional zur Linienstärke (in px).
+      const sizePx = Math.max(6, this._segStrokePx(seg.thicknessM) * 6 * scale);
+      const dxw = b.x - a.x, dyw = b.y - a.y;
+      const L = Math.hypot(dxw, dyw) || 1;
+      const ux = dxw / L, uy = dyw / L;
+      const drawHead = (tipX: number, tipY: number, dirX: number, dirY: number) => {
+        const baseX = tipX - dirX * sizePx;
+        const baseY = tipY - dirY * sizePx;
+        const px = -dirY, py = dirX; // perp
+        const halfW = sizePx * 0.5;
+        ctx.beginPath();
+        ctx.moveTo(tipX, tipY);
+        ctx.lineTo(baseX + px * halfW, baseY + py * halfW);
+        ctx.lineTo(baseX - px * halfW, baseY - py * halfW);
+        ctx.closePath();
+        ctx.fill();
+      };
+      if (seg.arrowEnd) drawHead(b.x, b.y, ux, uy);
+      if (seg.arrowStart) drawHead(a.x, a.y, -ux, -uy);
+    }
 
     if (isGroupSel) {
       ctx.setLineDash([]);
@@ -1009,6 +1035,7 @@ export class Renderer {
     }
     ctx.restore();
   }
+
 
   private _drawDoorsForLabel(labelId: string) {
     if (!this.scene.doors || this.scene.doors.length === 0) return;
