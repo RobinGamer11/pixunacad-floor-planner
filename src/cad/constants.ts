@@ -34,6 +34,8 @@ export const Defaults = {
   // Measure (dimension) defaults
   measureOrientation: "parallel" as "parallel" | "diagonal",
   measurePointCount: "two" as "two" | "multi",
+  measureDirection: "horizontal" as "horizontal" | "vertical" | "free",
+
   measureEditMode: "parallel" as "parallel" | "endpoints",
   measureTextColor: "#111111",
   measureTextSizePx: 12,
