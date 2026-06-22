@@ -407,6 +407,10 @@ export class TopologyEngine {
       considerLine(edge.a, edge.b, null, edge.hatch);
     }
 
+    this._addWallSnapsTo(mouseS, mouseW, (cand, score) => {
+      if (score < bestScore) { bestScore = score; best = cand; }
+    });
+
     return best;
   }
 
