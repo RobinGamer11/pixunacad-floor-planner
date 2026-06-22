@@ -1996,6 +1996,18 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
                   />
                 </div>
                 <div>
+                  <label>Brüstungshöhe BRH (m)</label>
+                  <input
+                    type="number" min={0} step={0.05}
+                    value={doorBreakHeightM}
+                    onChange={(e) => {
+                      const n = parseFloat(e.target.value.replace(",", "."));
+                      if (Number.isFinite(n) && n >= 0) setDoorBreakHeightM(n);
+                    }}
+                  />
+                </div>
+
+                <div>
                   <label>Startkante</label>
                   <div className="flex gap-1">
                     <button type="button" onClick={() => setDoorEdge("inner")}
