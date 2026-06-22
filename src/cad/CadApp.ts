@@ -203,6 +203,11 @@ export class CadApp {
   doorTool!: DoorTool;
   activeTool: SelectTool | LineTool | HatchTool | MeasureTool | TextTool | PipetteTool | StickerTool | DocumentTool | FreeDrawTool | EraserTool | WallTool | DoorTool;
 
+  /** Hub-Box-State für ausgewähltes Dokument (Verschieben/Drehen). Geschrieben von SelectTool, gelesen von CadEditor. */
+  documentHubState: { visible: boolean; screenX: number; screenY: number; docId: string | null; cornerIndex: number } = {
+    visible: false, screenX: 0, screenY: 0, docId: null, cornerIndex: 0,
+  };
+
   // Clipboard + Paste-Vorschau
   clipboard: Clipboard | null = null;
   pastePreviewActive = false;
