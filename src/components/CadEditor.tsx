@@ -744,8 +744,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
               setGridPanelOpen(true);
             }}
             title={`Raster ${gridEnabled ? "aus" : "ein"}schalten — Einstellungen`}
-            className={`cad-rail-btn ${gridPanelOpen ? "active" : ""}`}
-            style={gridEnabled && !gridPanelOpen ? { color: "hsl(var(--primary))" } : undefined}
+            className={`cad-rail-btn ${gridPanelOpen || gridEnabled ? "active" : ""}`}
           >
             <Grid3x3 size={18} />
             <span>Raster</span>
