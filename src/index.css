@@ -442,8 +442,9 @@
   }
 
   .id-row.active {
-    outline: 2px solid hsl(var(--primary) / 0.24);
-    border-color: hsl(var(--primary) / 0.42);
+    outline: 2px solid hsl(var(--accent-gold) / 0.32);
+    border-color: hsl(var(--accent-gold) / 0.55);
+    background: hsl(var(--accent-gold) / 0.10);
   }
 
   .id-row.dragging {
