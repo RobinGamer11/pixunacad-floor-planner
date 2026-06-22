@@ -2062,19 +2062,18 @@ export class SelectTool {
           this.app.setSelection({ type: SelectionType.FREE_STROKE, freeStrokeId: freeHit.id } as any);
           return;
         }
-        // Kein Vordergrund-Hit → Document-Underlay testen (kann gewählt + gezogen werden)
+        // Kein Vordergrund-Hit → Document-Underlay testen (Auswahl, kein Drag)
         const docHit = this._hitDocument(input);
         if (docHit) {
           this.app.setSelection({ type: SelectionType.DOCUMENT, documentId: docHit.id } as any);
-          const mouseW0 = v(input.mouse.wx, input.mouse.wy);
-          this.dragDocId = docHit.id;
-          this.dragDocGrabOffset = { x: mouseW0.x - docHit.position.x, y: mouseW0.y - docHit.position.y };
-          this.dragDocSnap = null;
+          // Hub-Box wird erst beim Klick auf eine Ecke geöffnet (siehe oben).
         } else {
           this.app.setSelection(null);
+          this.app.documentHubState = { visible: false, screenX: 0, screenY: 0, docId: null, cornerIndex: 0 };
         }
       }
     }
+
 
     const ctx = this._getSelectedPointContext();
     if (ctx) {
