@@ -518,9 +518,9 @@
   }
   .sheet-row:active { cursor: grabbing; }
   .sheet-row.active {
-    outline: 2px solid hsl(var(--primary) / 0.24);
-    border-color: hsl(var(--primary) / 0.42);
-    background: hsl(var(--primary) / 0.10);
+    outline: 2px solid hsl(var(--accent-gold) / 0.32);
+    border-color: hsl(var(--accent-gold) / 0.55);
+    background: hsl(var(--accent-gold) / 0.12);
   }
   .sheet-row.dragging { opacity: 0.55; }
 
