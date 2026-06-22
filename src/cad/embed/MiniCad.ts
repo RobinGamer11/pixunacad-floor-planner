@@ -1576,7 +1576,11 @@ export class MiniCad {
         this._onChange?.();
       }
 
+      // Externe Dokument-Änderungen (Hub-Box) an Host melden.
+      this._emitExternalDocChanges();
+
       this.renderer.render();
+
       this.input.endFrame();
     } catch (err) {
       console.error("MiniCad tick error:", err);
