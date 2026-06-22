@@ -476,7 +476,15 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
     app.onSelectionChange = () => {
       setSelectedWallId(app.getSelectedWall()?.id || null);
       setSelectedFreeStrokeId(app.getSelectedFreeStroke()?.id || null);
+      // Pfeil-Einstellungen mit aktueller Auswahl synchronisieren
+      try {
+        const style = app.getCurrentLineStyle() as any;
+        setLineArrowStart(!!style.arrowStart);
+        setLineArrowEnd(!!style.arrowEnd);
+        setLineArrowScale(typeof style.arrowScale === "number" ? style.arrowScale : 1);
+      } catch {}
     };
+
     app.setTool(ToolIds.SELECT);
     app.doorTool.onSelectionChange = (id) => {
       setDoorSelectedId(id);
