@@ -53,6 +53,9 @@ export interface PageElement {
   // layer / group
   groupId?: string;
   layerName?: string;
+  /** PDF/Bild: Welche Kanten zeigen unendliche Hilfslinien (Toggle per Klick auf Kante im CAD-Layer). */
+  guideEdges?: { top: boolean; right: boolean; bottom: boolean; left: boolean };
+
 }
 
 

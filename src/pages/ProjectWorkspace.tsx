@@ -1158,7 +1158,7 @@ function PageCanvas({
           }
           onSelectionChange={onCadSelectionChange}
           onEngineReady={onCadEngineReady}
-          externalRects={page.elements
+          externalDocs={page.elements
             .filter((e) => e.kind === "cad-view" || e.kind === "pdf" || e.kind === "image")
             .map((e) => ({
               id: e.id,
@@ -1167,7 +1167,21 @@ function PageCanvas({
               wMM: ((e.w ?? 0) / 100) * fmt.w,
               hMM: ((e.h ?? 0) / 100) * fmt.h,
               rotationRad: e.rotation ? (e.rotation * Math.PI) / 180 : 0,
+              guideEdges: e.guideEdges ?? { top: false, right: false, bottom: false, left: false },
             }))}
+          onExternalDocChange={(id, t) => {
+            // mm → % der Seite zurückrechnen.
+            const xPct = (t.xMM / fmt.w) * 100;
+            const yPct = (t.yMM / fmt.h) * 100;
+            const rot = ((t.rotationDeg % 360) + 360) % 360;
+            projectStore.updateElement(projectId, page.id, id, {
+              x: xPct,
+              y: yPct,
+              rotation: rot,
+              guideEdges: t.guideEdges,
+            });
+          }}
+
         />
 
 

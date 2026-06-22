@@ -500,7 +500,9 @@ export class CadApp {
         position: { x: si.position.x, y: si.position.y },
         rotationRad: si.rotationRad, scale: si.scale, labelId: si.labelId,
       })),
-      documents: scene.documents.map(d => {
+      documents: scene.documents
+        .filter(d => !(d as any)._snapOnly)
+        .map(d => {
         // Falls Maske dirty ist, vor Serialisierung in DataUrl exportieren.
         let maskUrl = d.eraseMaskDataUrl;
         if (d._eraseMaskDirty && d._eraseMask) {
@@ -517,6 +519,7 @@ export class CadApp {
           guideEdges: { ...d.guideEdges },
         };
       }),
+
       freeStrokes: scene.freeStrokes.map(s => ({
         id: s.id, points: s.points.map(p => ({ x: p.x, y: p.y })),
         color: s.color, thicknessM: s.thicknessM, opacity: s.opacity,

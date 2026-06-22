@@ -595,12 +595,18 @@ export class Renderer {
   }
 
   private _drawSingleDocument(doc: DocumentObject) {
+    // Snap-only Dokumente (z. B. Projektmappen-PDF/Bild als Snap-Quelle) werden
+    // nicht gezeichnet — der echte Inhalt liegt im DOM darunter. Snap-Marker,
+    // Guides und Selektion werden weiterhin in _drawDocumentSnapAffordances /
+    // _drawDocumentGuides / _drawDocumentSelection gerendert.
+    if ((doc as any)._snapOnly) return;
     const ctx = this.ctx;
     const cam = this.camera;
     const center = documentCenterWorld(doc);
     const cs = cam.worldToScreen(center.x, center.y);
     const wPx = doc.widthM * cam.scale;
     const hPx = doc.heightM * cam.scale;
+
 
     // Vektor-PDF: adaptiver Re-Render bei Zoom
     const adaptive = this._getDocAdaptiveBitmap(doc, wPx);

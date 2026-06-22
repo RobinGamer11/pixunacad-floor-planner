@@ -3,17 +3,27 @@
  *
  * Hosts the CAD <canvas>, plus DOM hosts required by LineHub, PointEditMenu,
  * and the inline TextEditorOverlay. pointer-events is gated by `enabled`.
+ *
+ * Zusätzlich: rendert die Hub-Box für externe Dokumente (Projektmappen-
+ * PDFs/Bilder) — analog zur Hub-Box in der CAD-Hauptseite (Move/Rotate).
  */
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Move, RotateCw } from "lucide-react";
 import { MiniCad, type MiniTool } from "@/cad/embed/MiniCad";
 import type { MiniCadSelectionInfo } from "@/cad/embed/MiniCad";
 import { PointEditAction } from "@/cad/constants";
+
+export type ExternalDocSpec = {
+  id: string;
+  xMM: number; yMM: number; wMM: number; hMM: number;
+  rotationRad?: number;
+  guideEdges?: { top: boolean; right: boolean; bottom: boolean; left: boolean };
+};
 
 interface Props {
   pageWidthMm: number;
   pageHeightMm: number;
   basePxPerMm: number;
-  /** Page margins in mm (snap-only frame). */
   pageMarginsMm?: number;
   zoom: number;
   activeTool: MiniTool;
@@ -21,26 +31,29 @@ interface Props {
   initialState?: any;
   onChange: (state: any) => void;
   onSelectionChange?: (info: MiniCadSelectionInfo | null, count?: number) => void;
-  /** Imperative API für punktuelle Aktionen auf der Engine (z. B.
-   *  Snap-Einstellungen der gerade selektierten Linie/Hilfslinie ändern). */
   onEngineReady?: (api: {
     setSelectedSegmentSnap: (opts: { midpointSnap?: boolean; divisionSnap?: number | null }) => void;
     duplicateSelectedSegments: (offsetMm?: number) => number;
   }) => void;
-  /** Externe Rechtecke (Zeichenblatt/PDF/Bild) als Snap-Quellen. mm-Koords. */
-  externalRects?: Array<{ id: string; xMM: number; yMM: number; wMM: number; hMM: number; rotationRad?: number }>;
 
-  // Line defaults
+  /**
+   * Externe Dokumente (Projektmappen-PDF/Bild) als snap-only DocumentObjects.
+   * Bekommen Ecken-Marker, Kanten-Hilfslinien und Hub-Box. mm-Koords.
+   */
+  externalDocs?: ExternalDocSpec[];
+  /** Callback bei Hub-Verschiebung/-Drehung oder Hilfslinien-Toggle. */
+  onExternalDocChange?: (
+    id: string,
+    t: { xMM: number; yMM: number; rotationDeg: number; guideEdges: { top: boolean; right: boolean; bottom: boolean; left: boolean } },
+  ) => void;
+
   lineColor?: string;
   lineThicknessMm?: number;
   lineAlpha?: number;
-  // Guide defaults
   guideColor?: string;
   guidesLocked?: boolean;
-  /** Wenn true: jeder Klick erweitert die Mehrfach-Auswahl (statt zu ersetzen). */
   multiSelectMode?: boolean;
 
-  // Text defaults
   textColor?: string;
   textFontSizePx?: number;
   textBold?: boolean;
@@ -60,12 +73,11 @@ export default function CadOverlayLayer(props: Props) {
   const {
     pageWidthMm, pageHeightMm, basePxPerMm, pageMarginsMm,
     zoom, activeTool, enabled, initialState, onChange, onSelectionChange, onEngineReady,
-    externalRects,
+    externalDocs, onExternalDocChange,
     lineColor, lineThicknessMm, lineAlpha, guideColor, guidesLocked, multiSelectMode,
     textColor, textFontSizePx, textBold, textItalic, textAlpha, textAlign,
     textBgColor, textBgAlphaPct, textWrap, textAutoSize, textBorderEnabled, textBorderColor, textBorderWidthPx,
   } = props;
-
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const hubRef = useRef<HTMLDivElement>(null);
@@ -79,7 +91,6 @@ export default function CadOverlayLayer(props: Props) {
   const peOffsetRef = useRef<HTMLButtonElement>(null);
   const peResizeRef = useRef<HTMLButtonElement>(null);
   const peDuplicateRef = useRef<HTMLButtonElement>(null);
-  // Text editor DOM
   const teEditorRef = useRef<HTMLDivElement>(null);
   const teToolbarRef = useRef<HTMLDivElement>(null);
   const teBoldRef = useRef<HTMLButtonElement>(null);
@@ -93,8 +104,15 @@ export default function CadOverlayLayer(props: Props) {
   onChangeRef.current = onChange;
   const onSelectionChangeRef = useRef(onSelectionChange);
   onSelectionChangeRef.current = onSelectionChange;
+  const onExternalDocChangeRef = useRef(onExternalDocChange);
+  onExternalDocChangeRef.current = onExternalDocChange;
 
-  // Mount engine once per page-size combination.
+  // Hub-Box state (mirrors engine.documentHubState).
+  const [docHub, setDocHub] = useState<{ visible: boolean; screenX: number; screenY: number; docId: string | null; mode: "none" | "move" | "rotate" }>({ visible: false, screenX: 0, screenY: 0, docId: null, mode: "none" });
+  const [docHubDx, setDocHubDx] = useState<string>("0.000");
+  const [docHubDy, setDocHubDy] = useState<string>("0.000");
+  const [docHubRot, setDocHubRot] = useState<string>("0");
+
   useEffect(() => {
     if (
       !canvasRef.current || !hubRef.current || !hubLenRef.current || !hubAngRef.current ||
@@ -138,18 +156,36 @@ export default function CadOverlayLayer(props: Props) {
       initialState,
       onChange: () => onChangeRef.current(engine.serialize()),
       onSelectionChange: (info, count) => onSelectionChangeRef.current?.(info, count),
-      
     });
     engineRef.current = engine;
     onEngineReady?.({
       setSelectedSegmentSnap: (opts) => engine.setSelectedSegmentSnapSettings(opts),
       duplicateSelectedSegments: (offsetMm) => engine.duplicateSelectedSegments(offsetMm),
     });
+
+    // Hub-Box-Polling synchron zum Render-Tick.
+    let raf = 0;
+    const tick = () => {
+      const e = engineRef.current;
+      if (e) {
+        const hs = e.documentHubState;
+        setDocHub(prev => {
+          if (!hs?.visible) {
+            return prev.visible ? { visible: false, screenX: 0, screenY: 0, docId: null, mode: "none" } : prev;
+          }
+          if (prev.visible && prev.docId === hs.docId && Math.abs(prev.screenX - hs.screenX) < 0.5 && Math.abs(prev.screenY - hs.screenY) < 0.5) return prev;
+          return { visible: true, screenX: hs.screenX, screenY: hs.screenY, docId: hs.docId, mode: prev.mode === "none" ? "move" : prev.mode };
+        });
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+
     return () => {
+      cancelAnimationFrame(raf);
       engine.destroy();
       engineRef.current = null;
     };
-
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageWidthMm, pageHeightMm, basePxPerMm]);
 
@@ -159,12 +195,15 @@ export default function CadOverlayLayer(props: Props) {
     if (typeof pageMarginsMm === "number") engineRef.current?.setPageMargins(pageMarginsMm);
   }, [pageMarginsMm]);
 
-  // Externe Rechtecke (Zeichenblatt/PDF/Bild) als Snap-Quellen synchronisieren.
-  const extRectsKey = JSON.stringify(externalRects ?? []);
+  // Externe Dokumente (Projektmappen-PDF/Bild) synchronisieren — inkl. Callback.
+  const extDocsKey = JSON.stringify(externalDocs ?? []);
   useEffect(() => {
-    engineRef.current?.setExternalRects(externalRects ?? []);
+    engineRef.current?.setExternalDocuments(
+      externalDocs ?? [],
+      (id, t) => onExternalDocChangeRef.current?.(id, t),
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [extRectsKey]);
+  }, [extDocsKey]);
 
   useEffect(() => {
     engineRef.current?.setLineDefaults({
@@ -186,7 +225,6 @@ export default function CadOverlayLayer(props: Props) {
     engineRef.current?.setMultiSelectMode(!!multiSelectMode);
   }, [multiSelectMode]);
 
-
   useEffect(() => {
     engineRef.current?.setTextDefaults({
       color: textColor,
@@ -206,23 +244,147 @@ export default function CadOverlayLayer(props: Props) {
   }, [textColor, textFontSizePx, textBold, textItalic, textAlpha, textAlign,
       textBgColor, textBgAlphaPct, textWrap, textAutoSize, textBorderEnabled, textBorderColor, textBorderWidthPx]);
 
+  const closeDocHub = () => {
+    const e = engineRef.current;
+    if (e) e.documentHubState = { visible: false, screenX: 0, screenY: 0, docId: null, cornerIndex: 0 };
+    setDocHub({ visible: false, screenX: 0, screenY: 0, docId: null, mode: "none" });
+  };
+
+  const applyMove = () => {
+    const dx = parseFloat(docHubDx.replace(",", "."));
+    const dy = parseFloat(docHubDy.replace(",", "."));
+    const e = engineRef.current;
+    if (e && docHub.docId && Number.isFinite(dx) && Number.isFinite(dy)) {
+      const doc = e.scene.getDocumentById(docHub.docId);
+      if (doc) {
+        doc.position.x += dx;
+        doc.position.y += dy;
+        setDocHubDx("0.000"); setDocHubDy("0.000");
+        closeDocHub();
+      }
+    }
+  };
+
+  const applyRotate = () => {
+    const deg = parseFloat(docHubRot.replace(",", "."));
+    const e = engineRef.current;
+    if (e && docHub.docId && Number.isFinite(deg)) {
+      const doc = e.scene.getDocumentById(docHub.docId);
+      if (doc) {
+        doc.rotationRad = (deg * Math.PI) / 180;
+        closeDocHub();
+      }
+    }
+  };
+
   return (
     <div
       className="absolute inset-0"
       style={{ pointerEvents: enabled ? "auto" : "none" }}
     >
-      {/* Wrapper offset matches MiniCad.FRAME_PAD_PX (-16px) so the canvas,
-          hub, point-edit menu and inline text editor share one coord system. */}
       <div style={{ position: "absolute", left: -16, top: -16, width: 0, height: 0 }}>
         <canvas
           ref={canvasRef}
-          style={{
-            position: "absolute",
-            left: 0,
-            top: 0,
-            background: "transparent",
-          }}
+          style={{ position: "absolute", left: 0, top: 0, background: "transparent" }}
         />
+        {/* Document Hub (Move / Rotate) — analog CadEditor */}
+        {docHub.visible && (
+          <div
+            style={{
+              position: "absolute",
+              left: Math.max(8, docHub.screenX + 12),
+              top: Math.max(8, docHub.screenY + 12),
+              background: "white",
+              border: "1px solid hsl(var(--border))",
+              borderRadius: 6,
+              padding: "6px 8px",
+              boxShadow: "0 4px 16px -4px rgba(0,0,0,0.18)",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              zIndex: 55,
+              pointerEvents: "auto",
+            }}
+            onMouseDown={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              title="Verschieben (Δx, Δy in m)"
+              onClick={() => setDocHub(h => ({ ...h, mode: "move" }))}
+              style={{
+                ...hubBtnStyle,
+                background: docHub.mode === "move" ? "hsl(var(--accent))" : "white",
+              }}
+            >
+              <Move size={14} />
+            </button>
+            {docHub.mode === "move" && (
+              <>
+                <input
+                  type="text"
+                  value={docHubDx}
+                  onChange={(e) => setDocHubDx(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") applyMove();
+                    else if (e.key === "Escape") closeDocHub();
+                  }}
+                  style={hubInputStyle}
+                  title="Δx (m)"
+                  placeholder="Δx"
+                />
+                <input
+                  type="text"
+                  value={docHubDy}
+                  onChange={(e) => setDocHubDy(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") applyMove();
+                    else if (e.key === "Escape") closeDocHub();
+                  }}
+                  style={hubInputStyle}
+                  title="Δy (m)"
+                  placeholder="Δy"
+                />
+                <span style={{ fontSize: 10, opacity: 0.6 }}>m</span>
+              </>
+            )}
+            <button
+              type="button"
+              title="Drehen (Winkel in Grad)"
+              onClick={() => {
+                const e = engineRef.current;
+                if (e && docHub.docId) {
+                  const doc = e.scene.getDocumentById(docHub.docId);
+                  if (doc) setDocHubRot(((doc.rotationRad * 180 / Math.PI) % 360).toFixed(1));
+                }
+                setDocHub(h => ({ ...h, mode: "rotate" }));
+              }}
+              style={{
+                ...hubBtnStyle,
+                background: docHub.mode === "rotate" ? "hsl(var(--accent))" : "white",
+              }}
+            >
+              <RotateCw size={14} />
+            </button>
+            {docHub.mode === "rotate" && (
+              <>
+                <input
+                  type="text"
+                  value={docHubRot}
+                  onChange={(e) => setDocHubRot(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") applyRotate();
+                    else if (e.key === "Escape") closeDocHub();
+                  }}
+                  style={{ ...hubInputStyle, width: 64 }}
+                  title="Drehwinkel absolut (°)"
+                  placeholder="°"
+                />
+                <span style={{ fontSize: 10, opacity: 0.6 }}>°</span>
+              </>
+            )}
+          </div>
+        )}
         {/* LineHub */}
         <div
           ref={hubRef}
@@ -267,11 +429,7 @@ export default function CadOverlayLayer(props: Props) {
           <button ref={peDeleteRef} style={pointEditBtn} title="Löschen">✕</button>
         </div>
         {/* TextEditor (contenteditable) + toolbar */}
-        <div
-          ref={teEditorRef}
-          className="hidden"
-          style={{ zIndex: 60 }}
-        />
+        <div ref={teEditorRef} className="hidden" style={{ zIndex: 60 }} />
         <div
           ref={teToolbarRef}
           className="hidden"
@@ -325,4 +483,15 @@ const toolbarBtn: React.CSSProperties = {
   width: 26, height: 22, fontSize: 12,
   border: "1px solid hsl(var(--hairline))",
   borderRadius: 4, background: "white", cursor: "pointer", lineHeight: 1,
+};
+const hubBtnStyle: React.CSSProperties = {
+  width: 28, height: 28,
+  border: "1px solid hsl(var(--border))",
+  borderRadius: 4, background: "white", cursor: "pointer",
+  display: "inline-flex", alignItems: "center", justifyContent: "center",
+};
+const hubInputStyle: React.CSSProperties = {
+  width: 60, fontSize: 11, padding: "3px 6px",
+  border: "1px solid hsl(var(--border))",
+  borderRadius: 4, fontVariantNumeric: "tabular-nums",
 };
