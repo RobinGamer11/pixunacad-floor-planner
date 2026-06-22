@@ -662,6 +662,7 @@ export class Scene {
     pixelWidth?: number; pixelHeight?: number; labelId?: string;
     importScaleDenom?: number; eraseMaskDataUrl?: string | null;
     pdfSourceB64?: string | null;
+    guideEdges?: { top?: boolean; right?: boolean; bottom?: boolean; left?: boolean };
   }): DocumentObject {
     const doc = new DocumentObject({ id: this._makeId(), ...opts });
     this.documents.push(doc);
