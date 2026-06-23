@@ -200,18 +200,24 @@ export class IdPanel {
       deleteBtn.className = "id-icon-btn icon-only";
       deleteBtn.title = "Löschen";
       deleteBtn.textContent = "🗑";
-      deleteBtn.disabled = !!group.locked;
-      deleteBtn.style.opacity = group.locked ? "0.35" : "1";
+      const onlyOne = this.app.labelManager.list().length <= 1;
+      deleteBtn.disabled = onlyOne;
+      deleteBtn.style.opacity = onlyOne ? "0.35" : "1";
+      if (onlyOne) deleteBtn.title = "Mindestens eine Ebene muss existieren";
       deleteBtn.addEventListener("click", (e) => {
         e.stopPropagation();
-        if (group.locked) return;
-        this.app.scene.reassignSegmentsLabel(group.id, Defaults.defaultLabelId);
-        this.app.scene.reassignHatchesLabel(group.id, Defaults.defaultLabelId);
-        this.app.scene.reassignDimensionsLabel(group.id, Defaults.defaultLabelId);
-        this.app.scene.reassignTextBoxesLabel(group.id, Defaults.defaultLabelId);
+        const groups = this.app.labelManager.list();
+        if (groups.length <= 1) return;
+        // Fallback-Ebene = erste verbleibende Gruppe (kann z.B. Default oder eine andere sein).
+        const fallback = groups.find(g => g.id !== group.id);
+        const fallbackId = fallback ? fallback.id : Defaults.defaultLabelId;
+        this.app.scene.reassignSegmentsLabel(group.id, fallbackId);
+        this.app.scene.reassignHatchesLabel(group.id, fallbackId);
+        this.app.scene.reassignDimensionsLabel(group.id, fallbackId);
+        this.app.scene.reassignTextBoxesLabel(group.id, fallbackId);
         this.app.labelManager.deleteGroup(group.id);
         if (this.app.activeDrawLabelId === group.id) {
-          this.app.setActiveDrawLabelId(Defaults.defaultLabelId);
+          this.app.setActiveDrawLabelId(fallbackId);
         }
         if (this.app.selectedLabelId === group.id) {
           this.app.setSelectedLabelId(null);

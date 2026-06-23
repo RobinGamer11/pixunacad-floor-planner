@@ -57,7 +57,10 @@ export class LabelManager {
 
   deleteGroup(id: string): boolean {
     const g = this.getById(id);
-    if (!g || g.locked) return false;
+    if (!g) return false;
+    // Mindestens eine Ebene muss erhalten bleiben — auch die Default-Gruppe darf
+    // gelöscht werden, sofern noch mindestens eine andere Ebene existiert.
+    if (this.groups.length <= 1) return false;
     this.groups = this.groups.filter(x => x.id !== id);
     return true;
   }

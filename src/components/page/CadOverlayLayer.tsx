@@ -8,7 +8,7 @@
  * PDFs/Bilder) — analog zur Hub-Box in der CAD-Hauptseite (Move/Rotate).
  */
 import { useEffect, useRef, useState } from "react";
-import { Move, RotateCw } from "lucide-react";
+import { Move, RotateCw, Crosshair, Scaling } from "lucide-react";
 import { MiniCad, type MiniTool } from "@/cad/embed/MiniCad";
 import type { MiniCadSelectionInfo } from "@/cad/embed/MiniCad";
 import { PointEditAction } from "@/cad/constants";
@@ -108,10 +108,11 @@ export default function CadOverlayLayer(props: Props) {
   onExternalDocChangeRef.current = onExternalDocChange;
 
   // Hub-Box state (mirrors engine.documentHubState).
-  const [docHub, setDocHub] = useState<{ visible: boolean; screenX: number; screenY: number; docId: string | null; mode: "none" | "move" | "rotate" }>({ visible: false, screenX: 0, screenY: 0, docId: null, mode: "none" });
+  const [docHub, setDocHub] = useState<{ visible: boolean; screenX: number; screenY: number; docId: string | null; mode: "none" | "move" | "rotate" | "scale" }>({ visible: false, screenX: 0, screenY: 0, docId: null, mode: "none" });
   const [docHubDx, setDocHubDx] = useState<string>("0.000");
   const [docHubDy, setDocHubDy] = useState<string>("0.000");
   const [docHubRot, setDocHubRot] = useState<string>("0");
+  const [docHubScale, setDocHubScale] = useState<string>("1.000");
 
   useEffect(() => {
     if (
@@ -277,6 +278,44 @@ export default function CadOverlayLayer(props: Props) {
     }
   };
 
+  const applyScale = () => {
+    const f = parseFloat(docHubScale.replace(",", "."));
+    const e = engineRef.current;
+    if (e && docHub.docId && Number.isFinite(f) && f > 0) {
+      const doc = e.scene.getDocumentById(docHub.docId);
+      if (doc) {
+        const cx = doc.position.x + doc.widthM / 2;
+        const cy = doc.position.y + doc.heightM / 2;
+        doc.widthM = Math.max(0.001, doc.widthM * f);
+        doc.heightM = Math.max(0.001, doc.heightM * f);
+        doc.position.x = cx - doc.widthM / 2;
+        doc.position.y = cy - doc.heightM / 2;
+        setDocHubScale("1.000");
+        closeDocHub();
+      }
+    }
+  };
+
+  const cycleAnchor = () => {
+    const e = engineRef.current;
+    if (!e || !docHub.docId) return;
+    const doc = e.scene.getDocumentById(docHub.docId);
+    if (!doc) return;
+    const next = ((e.documentHubState.cornerIndex || 0) + 1) % 4;
+    const cx = doc.position.x + doc.widthM / 2;
+    const cy = doc.position.y + doc.heightM / 2;
+    const hw = doc.widthM / 2, hh = doc.heightM / 2;
+    const cc = Math.cos(doc.rotationRad), ss = Math.sin(doc.rotationRad);
+    const local = [
+      { x: -hw, y: -hh }, { x: hw, y: -hh }, { x: hw, y: hh }, { x: -hw, y: hh },
+    ];
+    const w = local[next];
+    const wx = cx + w.x * cc - w.y * ss;
+    const wy = cy + w.x * ss + w.y * cc;
+    const sp = e.camera.worldToScreen(wx, wy);
+    e.documentHubState = { visible: true, screenX: sp.x, screenY: sp.y, docId: doc.id, cornerIndex: next };
+  };
+
   return (
     <div
       className="absolute inset-0"
@@ -287,7 +326,7 @@ export default function CadOverlayLayer(props: Props) {
           ref={canvasRef}
           style={{ position: "absolute", left: 0, top: 0, background: "transparent" }}
         />
-        {/* Document Hub (Move / Rotate) — analog CadEditor */}
+        {/* Document Hub: Anker · Verschieben · Drehen · Skalieren — analog CadEditor */}
         {docHub.visible && (
           <div
             style={{
@@ -310,41 +349,28 @@ export default function CadOverlayLayer(props: Props) {
           >
             <button
               type="button"
+              title="Anker / Eckpunkt wechseln"
+              onClick={cycleAnchor}
+              style={hubBtnStyle}
+            >
+              <Crosshair size={14} />
+            </button>
+            <button
+              type="button"
               title="Verschieben (Δx, Δy in m)"
-              onClick={() => setDocHub(h => ({ ...h, mode: "move" }))}
-              style={{
-                ...hubBtnStyle,
-                background: docHub.mode === "move" ? "hsl(var(--accent))" : "white",
-              }}
+              onClick={() => setDocHub(h => ({ ...h, mode: h.mode === "move" ? "none" : "move" }))}
+              style={{ ...hubBtnStyle, background: docHub.mode === "move" ? "hsl(var(--accent))" : "white" }}
             >
               <Move size={14} />
             </button>
             {docHub.mode === "move" && (
               <>
-                <input
-                  type="text"
-                  value={docHubDx}
-                  onChange={(e) => setDocHubDx(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") applyMove();
-                    else if (e.key === "Escape") closeDocHub();
-                  }}
-                  style={hubInputStyle}
-                  title="Δx (m)"
-                  placeholder="Δx"
-                />
-                <input
-                  type="text"
-                  value={docHubDy}
-                  onChange={(e) => setDocHubDy(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") applyMove();
-                    else if (e.key === "Escape") closeDocHub();
-                  }}
-                  style={hubInputStyle}
-                  title="Δy (m)"
-                  placeholder="Δy"
-                />
+                <input type="text" value={docHubDx} onChange={(e) => setDocHubDx(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") applyMove(); else if (e.key === "Escape") closeDocHub(); }}
+                  style={hubInputStyle} title="Δx (m)" placeholder="Δx" />
+                <input type="text" value={docHubDy} onChange={(e) => setDocHubDy(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") applyMove(); else if (e.key === "Escape") closeDocHub(); }}
+                  style={hubInputStyle} title="Δy (m)" placeholder="Δy" />
                 <span style={{ fontSize: 10, opacity: 0.6 }}>m</span>
               </>
             )}
@@ -357,30 +383,34 @@ export default function CadOverlayLayer(props: Props) {
                   const doc = e.scene.getDocumentById(docHub.docId);
                   if (doc) setDocHubRot(((doc.rotationRad * 180 / Math.PI) % 360).toFixed(1));
                 }
-                setDocHub(h => ({ ...h, mode: "rotate" }));
+                setDocHub(h => ({ ...h, mode: h.mode === "rotate" ? "none" : "rotate" }));
               }}
-              style={{
-                ...hubBtnStyle,
-                background: docHub.mode === "rotate" ? "hsl(var(--accent))" : "white",
-              }}
+              style={{ ...hubBtnStyle, background: docHub.mode === "rotate" ? "hsl(var(--accent))" : "white" }}
             >
               <RotateCw size={14} />
             </button>
             {docHub.mode === "rotate" && (
               <>
-                <input
-                  type="text"
-                  value={docHubRot}
-                  onChange={(e) => setDocHubRot(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") applyRotate();
-                    else if (e.key === "Escape") closeDocHub();
-                  }}
-                  style={{ ...hubInputStyle, width: 64 }}
-                  title="Drehwinkel absolut (°)"
-                  placeholder="°"
-                />
+                <input type="text" value={docHubRot} onChange={(e) => setDocHubRot(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") applyRotate(); else if (e.key === "Escape") closeDocHub(); }}
+                  style={{ ...hubInputStyle, width: 64 }} title="Drehwinkel absolut (°)" placeholder="°" />
                 <span style={{ fontSize: 10, opacity: 0.6 }}>°</span>
+              </>
+            )}
+            <button
+              type="button"
+              title="Skalieren (Faktor um Zentrum)"
+              onClick={() => setDocHub(h => ({ ...h, mode: h.mode === "scale" ? "none" : "scale" }))}
+              style={{ ...hubBtnStyle, background: docHub.mode === "scale" ? "hsl(var(--accent))" : "white" }}
+            >
+              <Scaling size={14} />
+            </button>
+            {docHub.mode === "scale" && (
+              <>
+                <input type="text" value={docHubScale} onChange={(e) => setDocHubScale(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") applyScale(); else if (e.key === "Escape") closeDocHub(); }}
+                  style={{ ...hubInputStyle, width: 64 }} title="Skalierungsfaktor (× um Zentrum)" placeholder="×" />
+                <span style={{ fontSize: 10, opacity: 0.6 }}>×</span>
               </>
             )}
           </div>
