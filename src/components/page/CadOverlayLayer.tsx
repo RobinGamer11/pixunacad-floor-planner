@@ -108,10 +108,11 @@ export default function CadOverlayLayer(props: Props) {
   onExternalDocChangeRef.current = onExternalDocChange;
 
   // Hub-Box state (mirrors engine.documentHubState).
-  const [docHub, setDocHub] = useState<{ visible: boolean; screenX: number; screenY: number; docId: string | null; mode: "none" | "move" | "rotate" }>({ visible: false, screenX: 0, screenY: 0, docId: null, mode: "none" });
+  const [docHub, setDocHub] = useState<{ visible: boolean; screenX: number; screenY: number; docId: string | null; mode: "none" | "move" | "rotate" | "scale" }>({ visible: false, screenX: 0, screenY: 0, docId: null, mode: "none" });
   const [docHubDx, setDocHubDx] = useState<string>("0.000");
   const [docHubDy, setDocHubDy] = useState<string>("0.000");
   const [docHubRot, setDocHubRot] = useState<string>("0");
+  const [docHubScale, setDocHubScale] = useState<string>("1.000");
 
   useEffect(() => {
     if (
