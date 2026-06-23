@@ -278,6 +278,44 @@ export default function CadOverlayLayer(props: Props) {
     }
   };
 
+  const applyScale = () => {
+    const f = parseFloat(docHubScale.replace(",", "."));
+    const e = engineRef.current;
+    if (e && docHub.docId && Number.isFinite(f) && f > 0) {
+      const doc = e.scene.getDocumentById(docHub.docId);
+      if (doc) {
+        const cx = doc.position.x + doc.widthM / 2;
+        const cy = doc.position.y + doc.heightM / 2;
+        doc.widthM = Math.max(0.001, doc.widthM * f);
+        doc.heightM = Math.max(0.001, doc.heightM * f);
+        doc.position.x = cx - doc.widthM / 2;
+        doc.position.y = cy - doc.heightM / 2;
+        setDocHubScale("1.000");
+        closeDocHub();
+      }
+    }
+  };
+
+  const cycleAnchor = () => {
+    const e = engineRef.current;
+    if (!e || !docHub.docId) return;
+    const doc = e.scene.getDocumentById(docHub.docId);
+    if (!doc) return;
+    const next = ((e.documentHubState.cornerIndex || 0) + 1) % 4;
+    const cx = doc.position.x + doc.widthM / 2;
+    const cy = doc.position.y + doc.heightM / 2;
+    const hw = doc.widthM / 2, hh = doc.heightM / 2;
+    const cc = Math.cos(doc.rotationRad), ss = Math.sin(doc.rotationRad);
+    const local = [
+      { x: -hw, y: -hh }, { x: hw, y: -hh }, { x: hw, y: hh }, { x: -hw, y: hh },
+    ];
+    const w = local[next];
+    const wx = cx + w.x * cc - w.y * ss;
+    const wy = cy + w.x * ss + w.y * cc;
+    const sp = (e as any).camera ? (e as any).camera.worldToScreen(wx, wy) : { x: 0, y: 0 };
+    e.documentHubState = { visible: true, screenX: sp.x, screenY: sp.y, docId: doc.id, cornerIndex: next };
+  };
+
   return (
     <div
       className="absolute inset-0"
