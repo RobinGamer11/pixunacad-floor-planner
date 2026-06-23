@@ -593,6 +593,7 @@ export class SelectTool {
 
     this.app.hub.bindCommit((vals) => this._applyHatchEdgeHubValues(vals));
     this.app.hub.showAt(this.app.input.mouse.sx, this.app.input.mouse.sy);
+    this.app.hub.setCompact(true, "✂");
     this.app.hub.updateDisplay(0, 0);
     this.app.hub.setValues(0, 0);
     this.app.hub.enterEditMode();
