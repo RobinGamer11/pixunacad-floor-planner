@@ -312,7 +312,7 @@ export default function CadOverlayLayer(props: Props) {
     const w = local[next];
     const wx = cx + w.x * cc - w.y * ss;
     const wy = cy + w.x * ss + w.y * cc;
-    const sp = (e as any).camera ? (e as any).camera.worldToScreen(wx, wy) : { x: 0, y: 0 };
+    const sp = e.camera.worldToScreen(wx, wy);
     e.documentHubState = { visible: true, screenX: sp.x, screenY: sp.y, docId: doc.id, cornerIndex: next };
   };
 
