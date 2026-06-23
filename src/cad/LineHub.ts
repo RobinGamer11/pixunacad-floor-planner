@@ -78,6 +78,43 @@ export class LineHub {
     this.root.style.display = "";
     this.lenInputEl.readOnly = true;
     this.angInputEl.readOnly = true;
+    // Compact-Mode immer zurücksetzen, damit der nächste Aufrufer wieder normal startet.
+    this.setCompact(false);
+  }
+
+  /**
+   * Kompakt-Modus für Kanten-Offset (Schraffur/Wand-Edge).
+   * Blendet das Winkel-Feld aus und zeigt einen kleinen Icon-Präfix.
+   */
+  setCompact(enabled: boolean, iconText: string = "↔") {
+    this._compact = enabled;
+    if (enabled) {
+      if (!this._iconEl) {
+        const span = document.createElement("span");
+        span.style.display = "inline-flex";
+        span.style.alignItems = "center";
+        span.style.justifyContent = "center";
+        span.style.width = "22px";
+        span.style.height = "22px";
+        span.style.border = "1px solid hsl(var(--border, 220 13% 91%))";
+        span.style.borderRadius = "4px";
+        span.style.background = "white";
+        span.style.fontSize = "12px";
+        span.style.marginRight = "4px";
+        span.style.userSelect = "none";
+        this._iconEl = span;
+      }
+      this._iconEl.textContent = iconText;
+      if (this._iconEl.parentElement !== this.root) {
+        this.root.insertBefore(this._iconEl, this.root.firstChild);
+      }
+      this.angInputEl.style.display = "none";
+    } else {
+      if (this._iconEl && this._iconEl.parentElement === this.root) {
+        this.root.removeChild(this._iconEl);
+      }
+      this.angInputEl.style.display = "";
+    }
   }
 
   updateDisplay(lengthM: number, angleDegValue: number) {
