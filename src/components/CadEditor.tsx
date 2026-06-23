@@ -239,11 +239,12 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
   const [doorHubPosInput, setDoorHubPosInput] = useState<string>("");
   const [doorHubWidthInput, setDoorHubWidthInput] = useState<string>("");
 
-  // Document Hub (Verschieben/Drehen) — wird beim Klick auf einen Eckpunkt geöffnet.
-  const [docHub, setDocHub] = useState<{ visible: boolean; screenX: number; screenY: number; docId: string | null; mode: "none" | "move" | "rotate" }>({ visible: false, screenX: 0, screenY: 0, docId: null, mode: "none" });
+  // Document Hub (Anker/Verschieben/Drehen/Skalieren) — beim Klick auf einen Eckpunkt geöffnet.
+  const [docHub, setDocHub] = useState<{ visible: boolean; screenX: number; screenY: number; docId: string | null; mode: "none" | "move" | "rotate" | "scale" }>({ visible: false, screenX: 0, screenY: 0, docId: null, mode: "none" });
   const [docHubDx, setDocHubDx] = useState<string>("0.000");
   const [docHubDy, setDocHubDy] = useState<string>("0.000");
   const [docHubRot, setDocHubRot] = useState<string>("0");
+  const [docHubScale, setDocHubScale] = useState<string>("1.000");
 
   // Renderer-Settings synchron halten
   useEffect(() => {
