@@ -9,6 +9,8 @@ export class LineHub {
   private _activeIndex = 0;
   private _onCommit: ((vals: { lengthM: number | null; angleDeg: number | null }) => void) | null = null;
   private _cleanups: (() => void)[] = [];
+  private _iconEl: HTMLSpanElement | null = null;
+  private _compact = false;
 
   constructor(root: HTMLDivElement, lenInputEl: HTMLInputElement, angInputEl: HTMLInputElement) {
     this.root = root;
