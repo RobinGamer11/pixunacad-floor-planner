@@ -658,6 +658,13 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
           if (prev.visible && prev.docId === hs.docId && Math.abs(prev.screenX - hs.screenX) < 0.5 && Math.abs(prev.screenY - hs.screenY) < 0.5) return prev;
           return { visible: true, screenX: hs.screenX, screenY: hs.screenY, docId: hs.docId, mode: prev.mode === "none" ? "move" : prev.mode };
         });
+        // Measure-Finish-Hub sync
+        const mh = app.measureFinishHubState;
+        setMeasureFinishHub(prev => {
+          if (!mh.visible) return prev.visible ? { visible: false, screenX: 0, screenY: 0 } : prev;
+          if (prev.visible && Math.abs(prev.screenX - mh.screenX) < 0.5 && Math.abs(prev.screenY - mh.screenY) < 0.5) return prev;
+          return { visible: true, screenX: mh.screenX, screenY: mh.screenY };
+        });
       }
       raf = requestAnimationFrame(tick);
     };
