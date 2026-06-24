@@ -217,6 +217,13 @@ export class CadApp {
     visible: false, screenX: 0, screenY: 0, docId: null, cornerIndex: 0,
   };
 
+  /** Aktive Maus-Operation der PDF-/Bild-Hub-Box. Wird von CadEditor (React) gesetzt
+   *  und von SelectTool gelesen, damit Canvas-Klicks bei aktivem Modus den Ankerpunkt
+   *  verschieben/drehen/skalieren. */
+  documentHubMode: "none" | "move" | "rotate" | "scale" = "none";
+  /** Erster Referenz-Klick für Rotate/Scale (Welt-Koordinate). */
+  documentHubFirstClick: { x: number; y: number } | null = null;
+
   /** Kleiner "Maßkette fertig"-Button (Häkchen), den der MeasureTool im Sammel-Modus anzeigt. */
   measureFinishHubState: { visible: boolean; screenX: number; screenY: number } = {
     visible: false, screenX: 0, screenY: 0,
