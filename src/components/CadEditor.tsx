@@ -246,6 +246,9 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
   const [docHubRot, setDocHubRot] = useState<string>("0");
   const [docHubScale, setDocHubScale] = useState<string>("1.000");
 
+  // Maßkette „fertig"-Button (Häkchen) — vom MeasureTool gesetzt.
+  const [measureFinishHub, setMeasureFinishHub] = useState<{ visible: boolean; screenX: number; screenY: number }>({ visible: false, screenX: 0, screenY: 0 });
+
   // Renderer-Settings synchron halten
   useEffect(() => {
     const app = appRef.current;
