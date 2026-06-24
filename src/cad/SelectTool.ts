@@ -1821,6 +1821,78 @@ export class SelectTool {
     }
 
     if (input.clicked) {
+      // PDF/Bild-Hub: aktiver Maus-Modus (Move/Rotate/Scale) — Canvas-Klick setzt Zielpunkt
+      // bezogen auf den per "Anker"-Button gewählten Eckpunkt. Snap-fähig.
+      {
+        const sel = this.app.selection as any;
+        const hs = this.app.documentHubState;
+        const mode = this.app.documentHubMode;
+        if (mode !== "none" && hs.visible && sel && sel.type === SelectionType.DOCUMENT && sel.documentId && hs.docId === sel.documentId) {
+          const doc = this.app.scene.getDocumentById(sel.documentId);
+          if (doc) {
+            const mouseW = v(input.mouse.wx, input.mouse.wy);
+            const snap = this.app.topology.findBestSnap(v(input.mouse.sx, input.mouse.sy), mouseW);
+            const target = (snap && snap.world) ? snap.world : mouseW;
+            const anchorIdx = hs.cornerIndex || 0;
+            const cornerWorld = () => documentCornersWorld(doc)[anchorIdx];
+            const updateHubScreen = () => {
+              const c = cornerWorld();
+              const sp = this.app.camera.worldToScreen(c.x, c.y);
+              this.app.documentHubState = { ...hs, screenX: sp.x, screenY: sp.y };
+            };
+
+            if (mode === "move") {
+              const a = cornerWorld();
+              doc.position = { x: doc.position.x + (target.x - a.x), y: doc.position.y + (target.y - a.y) };
+              updateHubScreen();
+              return;
+            }
+            if (mode === "rotate") {
+              if (!this.app.documentHubFirstClick) {
+                this.app.documentHubFirstClick = { x: target.x, y: target.y };
+                return;
+              }
+              const a = cornerWorld();
+              const ref = this.app.documentHubFirstClick;
+              const angRef = Math.atan2(ref.y - a.y, ref.x - a.x);
+              const angTgt = Math.atan2(target.y - a.y, target.x - a.x);
+              const delta = angTgt - angRef;
+              if (Math.abs(delta) > 1e-6) {
+                doc.rotationRad = doc.rotationRad + delta;
+                // Anker fixieren: nach Rotation Korrekturverschiebung anwenden.
+                const aNew = documentCornersWorld(doc)[anchorIdx];
+                doc.position = { x: doc.position.x + (a.x - aNew.x), y: doc.position.y + (a.y - aNew.y) };
+              }
+              this.app.documentHubFirstClick = null;
+              updateHubScreen();
+              return;
+            }
+            if (mode === "scale") {
+              const a = cornerWorld();
+              if (!this.app.documentHubFirstClick) {
+                this.app.documentHubFirstClick = { x: target.x, y: target.y };
+                return;
+              }
+              const ref = this.app.documentHubFirstClick;
+              const dRef = Math.hypot(ref.x - a.x, ref.y - a.y);
+              const dTgt = Math.hypot(target.x - a.x, target.y - a.y);
+              if (dRef > 1e-6 && dTgt > 1e-6) {
+                const factor = dTgt / dRef;
+                doc.widthM = Math.max(0.001, doc.widthM * factor);
+                doc.heightM = Math.max(0.001, doc.heightM * factor);
+                // Anker fixieren: nach Skalierung verschieben, sodass cornerIndex am Punkt bleibt.
+                const aNew = documentCornersWorld(doc)[anchorIdx];
+                doc.position = { x: doc.position.x + (a.x - aNew.x), y: doc.position.y + (a.y - aNew.y) };
+              }
+              this.app.documentHubFirstClick = null;
+              updateHubScreen();
+              return;
+            }
+          }
+        }
+      }
+
+
       // Dokument-Auswahl: vor allen anderen Hits Eckpunkt/Kante des aktuell ausgewählten Dokuments testen.
       {
         const sel = this.app.selection as any;
