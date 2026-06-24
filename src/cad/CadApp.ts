@@ -217,6 +217,11 @@ export class CadApp {
     visible: false, screenX: 0, screenY: 0, docId: null, cornerIndex: 0,
   };
 
+  /** Kleiner "Maßkette fertig"-Button (Häkchen), den der MeasureTool im Sammel-Modus anzeigt. */
+  measureFinishHubState: { visible: boolean; screenX: number; screenY: number } = {
+    visible: false, screenX: 0, screenY: 0,
+  };
+
   // Clipboard + Paste-Vorschau
   clipboard: Clipboard | null = null;
   pastePreviewActive = false;
@@ -1828,6 +1833,10 @@ export class CadApp {
 
       if (e.key === "Enter" && this.activeTool === this.stickerTool && !isHubInput) {
         if (this.stickerTool.handleEnterKey()) { e.preventDefault(); return; }
+      }
+
+      if (e.key === "Enter" && this.activeTool === this.measureTool && !isHubInput) {
+        if (this.measureTool.finishCollect()) { e.preventDefault(); return; }
       }
 
       // Don't trigger tool shortcuts while text editor is active

@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import { CadApp } from "@/cad/CadApp";
 import { ToolIds, PointEditAction } from "@/cad/constants";
-import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Pipette, Sticker as StickerIcon, Pencil, Trash2, Download, Upload, Plus, FileImage, FileText, Maximize2, Ruler as RulerIcon, Eraser, Construction, BrickWall, PaintBucket, Grid3x3, DoorOpen, AppWindow, Move, RotateCw, PanelRightOpen, PanelRightClose, Crosshair, Scaling } from "lucide-react";
+import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Pipette, Sticker as StickerIcon, Pencil, Trash2, Download, Upload, Plus, FileImage, FileText, Maximize2, Ruler as RulerIcon, Eraser, Construction, BrickWall, PaintBucket, Grid3x3, DoorOpen, AppWindow, Move, RotateCw, PanelRightOpen, PanelRightClose, Crosshair, Scaling, Check } from "lucide-react";
 import type { HatchDrawMode } from "@/cad/HatchTool";
 import type { StickerDefinition } from "@/cad/StickerManager";
 import { instanceBoundingCornersWorld } from "@/cad/StickerManager";
@@ -245,6 +245,9 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
   const [docHubDy, setDocHubDy] = useState<string>("0.000");
   const [docHubRot, setDocHubRot] = useState<string>("0");
   const [docHubScale, setDocHubScale] = useState<string>("1.000");
+
+  // Maßkette „fertig"-Button (Häkchen) — vom MeasureTool gesetzt.
+  const [measureFinishHub, setMeasureFinishHub] = useState<{ visible: boolean; screenX: number; screenY: number }>({ visible: false, screenX: 0, screenY: 0 });
 
   // Renderer-Settings synchron halten
   useEffect(() => {
@@ -655,6 +658,13 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
           if (prev.visible && prev.docId === hs.docId && Math.abs(prev.screenX - hs.screenX) < 0.5 && Math.abs(prev.screenY - hs.screenY) < 0.5) return prev;
           return { visible: true, screenX: hs.screenX, screenY: hs.screenY, docId: hs.docId, mode: prev.mode === "none" ? "move" : prev.mode };
         });
+        // Measure-Finish-Hub sync
+        const mh = app.measureFinishHubState;
+        setMeasureFinishHub(prev => {
+          if (!mh.visible) return prev.visible ? { visible: false, screenX: 0, screenY: 0 } : prev;
+          if (prev.visible && Math.abs(prev.screenX - mh.screenX) < 0.5 && Math.abs(prev.screenY - mh.screenY) < 0.5) return prev;
+          return { visible: true, screenX: mh.screenX, screenY: mh.screenY };
+        });
       }
       raf = requestAnimationFrame(tick);
     };
@@ -1057,6 +1067,32 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
         )}
 
         {/* Document Hub — Anker · Verschieben · Drehen · Skalieren (öffnet beim Klick auf Eckpunkt) */}
+        {measureFinishHub.visible && (
+          <div
+            className="absolute z-30 flex items-center px-1 py-1 rounded-md shadow-lg"
+            style={{
+              left: Math.max(8, measureFinishHub.screenX + 14),
+              top: Math.max(8, measureFinishHub.screenY - 30),
+              background: "white",
+              border: "1px solid hsl(var(--border))",
+              boxShadow: "0 4px 16px -4px rgba(0,0,0,0.18)",
+            }}
+            onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              appRef.current?.measureTool.finishCollect();
+            }}
+          >
+            <button
+              type="button"
+              title="Maßkette fertig (Enter)"
+              className="cad-toolbar-btn h-7 w-7 justify-center px-0"
+            >
+              <Check className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+
         {docHub.visible && (() => {
           const app = appRef.current;
           const doc = app && docHub.docId ? app.scene.getDocumentById(docHub.docId) : null;

@@ -36,6 +36,7 @@ export class MeasureTool {
     this.app.renderer.setHoverHatchId(null);
     this.app.hub.hide();
     this.app.pointEditMenu.hide();
+    this.app.measureFinishHubState = { visible: false, screenX: 0, screenY: 0 };
     this.app.renderer.overlay = { draw: (ctx, cam) => this._drawOverlay(ctx, cam) };
   }
 
@@ -43,11 +44,33 @@ export class MeasureTool {
     this.state = "collect";
     this.pointSnap = null;
     this.selectedPoints = [];
+    this.app.measureFinishHubState = { visible: false, screenX: 0, screenY: 0 };
   }
 
   finish() { this.cancel(); }
 
+  /** Bricht das letzte Mini-Segment ab, falls dessen Länge ~0 ist (entsteht durch
+   *  den ersten Klick eines Doppelklicks oder einen Doppelpunkt). */
+  private _stripTrailingZeroLengthPoint() {
+    if (this.selectedPoints.length < 2) return;
+    const a = this.selectedPoints[this.selectedPoints.length - 1].world;
+    const b = this.selectedPoints[this.selectedPoints.length - 2].world;
+    if (Math.hypot(a.x - b.x, a.y - b.y) < 1e-4) this.selectedPoints.pop();
+  }
+
+  /** Schließt das Sammeln ab (Enter / Häkchen / Doppelklick) und wechselt
+   *  zum Platzieren. Liefert true, wenn der Wechsel erfolgte. */
+  finishCollect(): boolean {
+    if (this.state !== "collect") return false;
+    this._stripTrailingZeroLengthPoint();
+    if (!this._canStartPlacement()) return false;
+    this.state = "place";
+    this.app.measureFinishHubState = { visible: false, screenX: 0, screenY: 0 };
+    return true;
+  }
+
   isDrawing() { return this.selectedPoints.length > 0 || this.state === "place"; }
+
 
   getOrientationMode(): "parallel" | "diagonal" {
     return this.app.measureSettings.orientation;
@@ -185,9 +208,11 @@ export class MeasureTool {
     }
 
     if (this.state === "collect") {
-      if (input.doubleClicked && this.getPointCountMode() === "multi" && this._canStartPlacement()) {
-        this.state = "place";
-        return;
+      if (input.doubleClicked && this.getPointCountMode() === "multi") {
+        // Doppelklick fügt durch den ersten Klick einen Punkt am Mauszeiger ein,
+        // der oft mit dem zuletzt gesetzten Punkt zusammenfällt → entfernen,
+        // damit kein 0,00 m-Mini-Maß entsteht.
+        if (this.finishCollect()) return;
       }
       if (input.clicked) {
         if (!this.pointSnap) return;
@@ -203,8 +228,22 @@ export class MeasureTool {
           this.state = "place";
         }
       }
+      // "Maßkette fertig"-Häkchen-Button neben dem zuletzt gesetzten Punkt anzeigen
+      // (nur im Multi-Modus, sobald genug Punkte für eine Maßkette gesetzt sind).
+      if (
+        this.state === "collect" &&
+        this.getPointCountMode() === "multi" &&
+        this._canStartPlacement()
+      ) {
+        const last = this.selectedPoints[this.selectedPoints.length - 1].world;
+        const sp = this.app.camera.worldToScreen(last.x, last.y);
+        this.app.measureFinishHubState = { visible: true, screenX: sp.x, screenY: sp.y };
+      } else {
+        this.app.measureFinishHubState = { visible: false, screenX: 0, screenY: 0 };
+      }
       return;
     }
+
 
     if (this.state === "place") {
       if (input.clicked) {
