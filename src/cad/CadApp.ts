@@ -1835,6 +1835,10 @@ export class CadApp {
         if (this.stickerTool.handleEnterKey()) { e.preventDefault(); return; }
       }
 
+      if (e.key === "Enter" && this.activeTool === this.measureTool && !isHubInput) {
+        if (this.measureTool.finishCollect()) { e.preventDefault(); return; }
+      }
+
       // Don't trigger tool shortcuts while text editor is active
       const isTextEditing = this.textEditor?.isActive();
       if (isTextEditing) {
