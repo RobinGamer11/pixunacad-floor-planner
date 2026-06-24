@@ -1067,6 +1067,32 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
         )}
 
         {/* Document Hub — Anker · Verschieben · Drehen · Skalieren (öffnet beim Klick auf Eckpunkt) */}
+        {measureFinishHub.visible && (
+          <div
+            className="absolute z-30 flex items-center px-1 py-1 rounded-md shadow-lg"
+            style={{
+              left: Math.max(8, measureFinishHub.screenX + 14),
+              top: Math.max(8, measureFinishHub.screenY - 30),
+              background: "white",
+              border: "1px solid hsl(var(--border))",
+              boxShadow: "0 4px 16px -4px rgba(0,0,0,0.18)",
+            }}
+            onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              appRef.current?.measureTool.finishCollect();
+            }}
+          >
+            <button
+              type="button"
+              title="Maßkette fertig (Enter)"
+              className="cad-toolbar-btn h-7 w-7 justify-center px-0"
+            >
+              <Check className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+
         {docHub.visible && (() => {
           const app = appRef.current;
           const doc = app && docHub.docId ? app.scene.getDocumentById(docHub.docId) : null;
