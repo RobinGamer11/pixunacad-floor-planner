@@ -1125,6 +1125,34 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
           </div>
         )}
 
+        {/* Dimension Hub — Verschieben mit Snap auf andere Maßketten */}
+        {dimHub.visible && (
+          <div
+            className="absolute z-30 flex items-center px-1 py-1 rounded-md shadow-lg"
+            style={{
+              left: Math.max(8, dimHub.screenX + 14),
+              top: Math.max(8, dimHub.screenY - 30),
+              background: "white",
+              border: "1px solid hsl(var(--border))",
+              boxShadow: "0 4px 16px -4px rgba(0,0,0,0.18)",
+            }}
+            onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              title={dimHub.mode === "move" ? "Klick auf Canvas: neuen Platzierungspunkt setzen (Snap aktiv)" : "Maßkette frei verschieben (mit Snap)"}
+              className={`cad-toolbar-btn h-7 w-7 justify-center px-0 ${dimHub.mode === "move" ? "active" : ""}`}
+              onClick={() => {
+                setDimHub(prev => ({ ...prev, mode: prev.mode === "move" ? "none" : "move" }));
+              }}
+            >
+              <Move className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+
+
         {docHub.visible && (() => {
           const app = appRef.current;
           const doc = app && docHub.docId ? app.scene.getDocumentById(docHub.docId) : null;
