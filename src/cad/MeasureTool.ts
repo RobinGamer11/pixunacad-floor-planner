@@ -20,18 +20,24 @@ export class MeasureTool {
   app: CadApp;
   id = "measure";
 
-  state: "collect" | "place" = "collect";
+  state: "freeDir" | "collect" | "place" = "collect";
   pointSnap: Snap | null = null;
   selectedPoints: CollectedPoint[] = [];
+  /** Im "frei"-Modus: zwei Punkte, die die Richtungsachse vorgeben. */
+  freeDirPoints: Vec2[] = [];
+  /** Gespeicherte Richtungsachse (nur im "frei"-Modus). */
+  freeAxis: Vec2 | null = null;
 
   constructor(app: CadApp) {
     this.app = app;
   }
 
   activate() {
-    this.state = "collect";
     this.pointSnap = null;
     this.selectedPoints = [];
+    this.freeDirPoints = [];
+    this.freeAxis = null;
+    this.state = this.getDirectionMode() === "free" ? "freeDir" : "collect";
     this.app.renderer.setHoverSegmentId(null);
     this.app.renderer.setHoverHatchId(null);
     this.app.hub.hide();
@@ -41,9 +47,11 @@ export class MeasureTool {
   }
 
   cancel() {
-    this.state = "collect";
     this.pointSnap = null;
     this.selectedPoints = [];
+    this.freeDirPoints = [];
+    this.freeAxis = null;
+    this.state = this.getDirectionMode() === "free" ? "freeDir" : "collect";
     this.app.measureFinishHubState = { visible: false, screenX: 0, screenY: 0 };
   }
 
@@ -59,8 +67,18 @@ export class MeasureTool {
   }
 
   /** Schließt das Sammeln ab (Enter / Häkchen / Doppelklick) und wechselt
-   *  zum Platzieren. Liefert true, wenn der Wechsel erfolgte. */
+   *  zum nächsten Schritt. Liefert true, wenn der Wechsel erfolgte. */
   finishCollect(): boolean {
+    if (this.state === "freeDir") {
+      if (this.freeDirPoints.length < 2) return false;
+      const d = sub(this.freeDirPoints[1], this.freeDirPoints[0]);
+      if (len(d) < 1e-9) return false;
+      this.freeAxis = norm(d);
+      this.freeDirPoints = [];
+      this.state = "collect";
+      this.app.measureFinishHubState = { visible: false, screenX: 0, screenY: 0 };
+      return true;
+    }
     if (this.state !== "collect") return false;
     this._stripTrailingZeroLengthPoint();
     if (!this._canStartPlacement()) return false;
@@ -69,7 +87,10 @@ export class MeasureTool {
     return true;
   }
 
-  isDrawing() { return this.selectedPoints.length > 0 || this.state === "place"; }
+  isDrawing() {
+    return this.selectedPoints.length > 0 || this.freeDirPoints.length > 0 || this.state === "place";
+  }
+
 
 
   getOrientationMode(): "parallel" | "diagonal" {
@@ -113,6 +134,7 @@ export class MeasureTool {
     const dir = this.getDirectionMode();
     if (dir === "horizontal") return v(1, 0);
     if (dir === "vertical") return v(0, 1);
+    if (this.freeAxis) return this.freeAxis;
     if (this.selectedPoints.length >= 2) {
       const d = sub(this.selectedPoints[1].world, this.selectedPoints[0].world);
       if (len(d) > 1e-9) return norm(d);
@@ -191,14 +213,18 @@ export class MeasureTool {
     this.app.renderer.setHoverHatchId(this.pointSnap?.hatch?.id || null);
     this.app.renderer.setHoverSegmentId(this.pointSnap?.segment?.id || null);
 
-    // Distanz-Hub: ab dem ersten gesetzten Punkt Länge/Winkel vom letzten
-    // gesetzten Punkt zur aktuellen Snap-Position anzeigen (gleicher Stil
-    // wie im Linienwerkzeug).
-    if (this.state === "collect" && this.selectedPoints.length >= 1 && this.pointSnap) {
-      const last = this.selectedPoints[this.selectedPoints.length - 1].world;
+    // Distanz-Hub: Länge/Winkel vom letzten gesetzten Punkt (bzw. ersten
+    // Richtungspunkt im Frei-Modus) zur aktuellen Snap-Position.
+    const hubAnchor: Vec2 | null =
+      this.state === "freeDir" && this.freeDirPoints.length >= 1
+        ? this.freeDirPoints[this.freeDirPoints.length - 1]
+        : this.state === "collect" && this.selectedPoints.length >= 1
+          ? this.selectedPoints[this.selectedPoints.length - 1].world
+          : null;
+    if (hubAnchor && this.pointSnap) {
       const cur = this.pointSnap.world;
-      const dx = cur.x - last.x;
-      const dy = cur.y - last.y;
+      const dx = cur.x - hubAnchor.x;
+      const dy = cur.y - hubAnchor.y;
       const lengthM = Math.hypot(dx, dy);
       const angleDeg = Math.atan2(-dy, dx) * 180 / Math.PI;
       this.app.hub.showAt(input.mouse.sx, input.mouse.sy);
@@ -207,17 +233,36 @@ export class MeasureTool {
       this.app.hub.hide();
     }
 
+    if (this.state === "freeDir") {
+      if (input.doubleClicked && this.freeDirPoints.length >= 2) {
+        // Doppelklick auf den zweiten Punkt bestätigt die Richtung sofort.
+        if (this.finishCollect()) return;
+      }
+      if (input.clicked && this.pointSnap) {
+        if (this.freeDirPoints.length >= 2) {
+          // Bereits 2 Punkte – ein weiterer Klick ersetzt den zweiten.
+          this.freeDirPoints[1] = v(this.pointSnap.world.x, this.pointSnap.world.y);
+        } else {
+          this.freeDirPoints.push(v(this.pointSnap.world.x, this.pointSnap.world.y));
+        }
+      }
+      // Häkchen-Hub zum Bestätigen der Richtung anzeigen, sobald 2 Punkte gesetzt sind.
+      if (this.freeDirPoints.length >= 2) {
+        const last = this.freeDirPoints[this.freeDirPoints.length - 1];
+        const sp = this.app.camera.worldToScreen(last.x, last.y);
+        this.app.measureFinishHubState = { visible: true, screenX: sp.x, screenY: sp.y };
+      } else {
+        this.app.measureFinishHubState = { visible: false, screenX: 0, screenY: 0 };
+      }
+      return;
+    }
+
     if (this.state === "collect") {
       if (input.doubleClicked && this.getPointCountMode() === "multi") {
-        // Doppelklick fügt durch den ersten Klick einen Punkt am Mauszeiger ein,
-        // der oft mit dem zuletzt gesetzten Punkt zusammenfällt → entfernen,
-        // damit kein 0,00 m-Mini-Maß entsteht.
         if (this.finishCollect()) return;
       }
       if (input.clicked) {
         if (!this.pointSnap) return;
-        // Reference the snapped world position WITHOUT modifying the underlying geometry.
-        // The MeasureTool must never split segments or insert hatch points — that's the LineTool's job.
         const refDir = this._refDirFromSnap(this.pointSnap);
         this.selectedPoints.push({
           world: v(this.pointSnap.world.x, this.pointSnap.world.y),
@@ -228,8 +273,6 @@ export class MeasureTool {
           this.state = "place";
         }
       }
-      // "Maßkette fertig"-Häkchen-Button neben dem zuletzt gesetzten Punkt anzeigen
-      // (nur im Multi-Modus, sobald genug Punkte für eine Maßkette gesetzt sind).
       if (
         this.state === "collect" &&
         this.getPointCountMode() === "multi" &&
@@ -255,10 +298,13 @@ export class MeasureTool {
         this.app.clearSelection();
         this.app.refreshLabelUI();
         this.selectedPoints = [];
+        // Im Frei-Modus bleibt die einmal gesetzte Achse erhalten, damit nicht
+        // jedes Mal eine neue Richtungslinie gezeichnet werden muss.
         this.state = "collect";
       }
     }
   }
+
 
 
   onTabRequest(): boolean { return false; }
@@ -304,6 +350,40 @@ export class MeasureTool {
       ctx.stroke();
     }
     ctx.restore();
+
+    // Frei-Modus: Richtungslinie (vor dem Sammeln) zeichnen
+    if (this.state === "freeDir" && this.freeDirPoints.length > 0) {
+      const p0 = this.freeDirPoints[0];
+      const p1 = this.freeDirPoints.length >= 2
+        ? this.freeDirPoints[1]
+        : (this.pointSnap ? this.pointSnap.world : null);
+      const s0 = cam.worldToScreen(p0.x, p0.y);
+      ctx.save();
+      ctx.fillStyle = "rgba(255,140,0,0.95)";
+      ctx.strokeStyle = "rgba(255,255,255,0.95)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(s0.x, s0.y, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      if (p1) {
+        const s1 = cam.worldToScreen(p1.x, p1.y);
+        ctx.beginPath();
+        ctx.arc(s1.x, s1.y, 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.strokeStyle = "rgba(255,140,0,0.9)";
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([6, 4]);
+        ctx.beginPath();
+        ctx.moveTo(s0.x, s0.y);
+        ctx.lineTo(s1.x, s1.y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      ctx.restore();
+    }
+
 
     // Snap indicator
     if (this.pointSnap) {
