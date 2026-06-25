@@ -685,7 +685,19 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
           if (prev.visible && Math.abs(prev.screenX - mh.screenX) < 0.5 && Math.abs(prev.screenY - mh.screenY) < 0.5) return prev;
           return { visible: true, screenX: mh.screenX, screenY: mh.screenY };
         });
+        // Dimension-Hub sync
+        const dh = app.dimensionHubState;
+        setDimHub(prev => {
+          if (!dh.visible) {
+            return prev.visible ? { visible: false, screenX: 0, screenY: 0, dimensionId: null, mode: "none" } : prev;
+          }
+          if (prev.visible && prev.dimensionId === dh.dimensionId
+              && Math.abs(prev.screenX - dh.screenX) < 0.5
+              && Math.abs(prev.screenY - dh.screenY) < 0.5) return prev;
+          return { visible: true, screenX: dh.screenX, screenY: dh.screenY, dimensionId: dh.dimensionId, mode: prev.dimensionId === dh.dimensionId ? prev.mode : "none" };
+        });
       }
+
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
