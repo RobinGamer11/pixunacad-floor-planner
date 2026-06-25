@@ -1463,6 +1463,41 @@ export class SelectTool {
   update(input: Input) {
     this.app.topology.priorityWallId = this.getPriorityWallId();
 
+    // Dimension-Hub-Box: aktiver "move"-Modus → nächster Klick legt
+    // den PlacementPoint der ausgewählten Maßkette (mit Snap auf andere
+    // Maßketten / Geometrie) neu. Wir intercepten den Klick hier ganz oben,
+    // damit weder Drag noch andere Auswahl-Handler ausgelöst werden.
+    if (this.app.dimensionHubMode === "move" && this.app.dimensionHubState.dimensionId) {
+      const dim = this.app.scene.getDimensionById(this.app.dimensionHubState.dimensionId);
+      if (!dim) {
+        this.app.dimensionHubMode = "none";
+        this.app.dimensionHubState = { visible: false, screenX: 0, screenY: 0, dimensionId: null };
+      } else {
+        const mouseS = v(input.mouse.sx, input.mouse.sy);
+        const mouseW = v(input.mouse.wx, input.mouse.wy);
+        const snap = this.app.topology.findBestSnap(mouseS, mouseW);
+        // Live-Vorschau: PlacementPoint folgt dem Mauszeiger bzw. Snap.
+        const targetW = snap ? v(snap.world.x, snap.world.y) : mouseW;
+        // Eigene Geometrie nicht auf sich selbst snappen
+        const g0 = getDimensionGeometry(dim);
+        const eq = (a: Vec2, b: Vec2) => Math.hypot(a.x - b.x, a.y - b.y) < 1e-6;
+        const isSelf = snap && (eq(snap.world, dim.p1) || eq(snap.world, dim.p2)
+          || eq(snap.world, g0.d1) || eq(snap.world, g0.d2) || eq(snap.world, g0.mid));
+        dim.placementPoint = (snap && !isSelf) ? v(snap.world.x, snap.world.y) : mouseW;
+        // Hub-Position aktualisieren, damit sie der Maßlinie folgt
+        const g1 = getDimensionGeometry(dim);
+        const sp = this.app.camera.worldToScreen(g1.mid.x, g1.mid.y);
+        this.app.dimensionHubState = { visible: true, screenX: sp.x, screenY: sp.y, dimensionId: dim.id };
+        if (input.clicked) {
+          this.app.dimensionHubMode = "none";
+        }
+        // Snap-Indikator zeichnen
+        this.snap = snap;
+        return;
+      }
+    }
+
+
     // Tür-Klick → in Door-Tool (nur Edit-Modus) wechseln & selektieren.
     if (input.clicked && !this.isEditing() && !this.dragStickerId && !this.dragDocId
         && !this.dragTextBoxId && !this.dragAreaLabelHatchId && !this.rotateTextBoxId) {
