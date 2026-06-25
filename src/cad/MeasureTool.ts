@@ -213,14 +213,18 @@ export class MeasureTool {
     this.app.renderer.setHoverHatchId(this.pointSnap?.hatch?.id || null);
     this.app.renderer.setHoverSegmentId(this.pointSnap?.segment?.id || null);
 
-    // Distanz-Hub: ab dem ersten gesetzten Punkt Länge/Winkel vom letzten
-    // gesetzten Punkt zur aktuellen Snap-Position anzeigen (gleicher Stil
-    // wie im Linienwerkzeug).
-    if (this.state === "collect" && this.selectedPoints.length >= 1 && this.pointSnap) {
-      const last = this.selectedPoints[this.selectedPoints.length - 1].world;
+    // Distanz-Hub: Länge/Winkel vom letzten gesetzten Punkt (bzw. ersten
+    // Richtungspunkt im Frei-Modus) zur aktuellen Snap-Position.
+    const hubAnchor: Vec2 | null =
+      this.state === "freeDir" && this.freeDirPoints.length >= 1
+        ? this.freeDirPoints[this.freeDirPoints.length - 1]
+        : this.state === "collect" && this.selectedPoints.length >= 1
+          ? this.selectedPoints[this.selectedPoints.length - 1].world
+          : null;
+    if (hubAnchor && this.pointSnap) {
       const cur = this.pointSnap.world;
-      const dx = cur.x - last.x;
-      const dy = cur.y - last.y;
+      const dx = cur.x - hubAnchor.x;
+      const dy = cur.y - hubAnchor.y;
       const lengthM = Math.hypot(dx, dy);
       const angleDeg = Math.atan2(-dy, dx) * 180 / Math.PI;
       this.app.hub.showAt(input.mouse.sx, input.mouse.sy);
@@ -229,17 +233,36 @@ export class MeasureTool {
       this.app.hub.hide();
     }
 
+    if (this.state === "freeDir") {
+      if (input.doubleClicked && this.freeDirPoints.length >= 2) {
+        // Doppelklick auf den zweiten Punkt bestätigt die Richtung sofort.
+        if (this.finishCollect()) return;
+      }
+      if (input.clicked && this.pointSnap) {
+        if (this.freeDirPoints.length >= 2) {
+          // Bereits 2 Punkte – ein weiterer Klick ersetzt den zweiten.
+          this.freeDirPoints[1] = v(this.pointSnap.world.x, this.pointSnap.world.y);
+        } else {
+          this.freeDirPoints.push(v(this.pointSnap.world.x, this.pointSnap.world.y));
+        }
+      }
+      // Häkchen-Hub zum Bestätigen der Richtung anzeigen, sobald 2 Punkte gesetzt sind.
+      if (this.freeDirPoints.length >= 2) {
+        const last = this.freeDirPoints[this.freeDirPoints.length - 1];
+        const sp = this.app.camera.worldToScreen(last.x, last.y);
+        this.app.measureFinishHubState = { visible: true, screenX: sp.x, screenY: sp.y };
+      } else {
+        this.app.measureFinishHubState = { visible: false, screenX: 0, screenY: 0 };
+      }
+      return;
+    }
+
     if (this.state === "collect") {
       if (input.doubleClicked && this.getPointCountMode() === "multi") {
-        // Doppelklick fügt durch den ersten Klick einen Punkt am Mauszeiger ein,
-        // der oft mit dem zuletzt gesetzten Punkt zusammenfällt → entfernen,
-        // damit kein 0,00 m-Mini-Maß entsteht.
         if (this.finishCollect()) return;
       }
       if (input.clicked) {
         if (!this.pointSnap) return;
-        // Reference the snapped world position WITHOUT modifying the underlying geometry.
-        // The MeasureTool must never split segments or insert hatch points — that's the LineTool's job.
         const refDir = this._refDirFromSnap(this.pointSnap);
         this.selectedPoints.push({
           world: v(this.pointSnap.world.x, this.pointSnap.world.y),
@@ -250,8 +273,6 @@ export class MeasureTool {
           this.state = "place";
         }
       }
-      // "Maßkette fertig"-Häkchen-Button neben dem zuletzt gesetzten Punkt anzeigen
-      // (nur im Multi-Modus, sobald genug Punkte für eine Maßkette gesetzt sind).
       if (
         this.state === "collect" &&
         this.getPointCountMode() === "multi" &&
@@ -277,10 +298,13 @@ export class MeasureTool {
         this.app.clearSelection();
         this.app.refreshLabelUI();
         this.selectedPoints = [];
+        // Im Frei-Modus bleibt die einmal gesetzte Achse erhalten, damit nicht
+        // jedes Mal eine neue Richtungslinie gezeichnet werden muss.
         this.state = "collect";
       }
     }
   }
+
 
 
   onTabRequest(): boolean { return false; }
