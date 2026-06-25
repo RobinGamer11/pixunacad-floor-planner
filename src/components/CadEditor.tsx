@@ -249,6 +249,9 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
   // Maßkette „fertig"-Button (Häkchen) — vom MeasureTool gesetzt.
   const [measureFinishHub, setMeasureFinishHub] = useState<{ visible: boolean; screenX: number; screenY: number }>({ visible: false, screenX: 0, screenY: 0 });
 
+  // Hub-Box für ausgewählte Maßkette (Verschieben mit Snap auf andere Maßketten).
+  const [dimHub, setDimHub] = useState<{ visible: boolean; screenX: number; screenY: number; dimensionId: string | null; mode: "none" | "move" }>({ visible: false, screenX: 0, screenY: 0, dimensionId: null, mode: "none" });
+
   // PDF-/Bild-Hub: aktiven Maus-Modus an CadApp spiegeln, damit SelectTool die Canvas-Klicks
   // entsprechend behandeln kann. Beim Moduswechsel den Referenz-Klick zurücksetzen.
   useEffect(() => {
@@ -257,6 +260,14 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
     app.documentHubMode = docHub.mode;
     app.documentHubFirstClick = null;
   }, [docHub.mode]);
+
+  // Dimension-Hub-Modus an CadApp spiegeln.
+  useEffect(() => {
+    const app = appRef.current;
+    if (!app) return;
+    app.dimensionHubMode = dimHub.mode;
+  }, [dimHub.mode]);
+
 
   // Renderer-Settings synchron halten
   useEffect(() => {
@@ -674,7 +685,19 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
           if (prev.visible && Math.abs(prev.screenX - mh.screenX) < 0.5 && Math.abs(prev.screenY - mh.screenY) < 0.5) return prev;
           return { visible: true, screenX: mh.screenX, screenY: mh.screenY };
         });
+        // Dimension-Hub sync
+        const dh = app.dimensionHubState;
+        setDimHub(prev => {
+          if (!dh.visible) {
+            return prev.visible ? { visible: false, screenX: 0, screenY: 0, dimensionId: null, mode: "none" } : prev;
+          }
+          if (prev.visible && prev.dimensionId === dh.dimensionId
+              && Math.abs(prev.screenX - dh.screenX) < 0.5
+              && Math.abs(prev.screenY - dh.screenY) < 0.5) return prev;
+          return { visible: true, screenX: dh.screenX, screenY: dh.screenY, dimensionId: dh.dimensionId, mode: prev.dimensionId === dh.dimensionId ? prev.mode : "none" };
+        });
       }
+
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
@@ -1101,6 +1124,34 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
             </button>
           </div>
         )}
+
+        {/* Dimension Hub — Verschieben mit Snap auf andere Maßketten */}
+        {dimHub.visible && (
+          <div
+            className="absolute z-30 flex items-center px-1 py-1 rounded-md shadow-lg"
+            style={{
+              left: Math.max(8, dimHub.screenX + 14),
+              top: Math.max(8, dimHub.screenY - 30),
+              background: "white",
+              border: "1px solid hsl(var(--border))",
+              boxShadow: "0 4px 16px -4px rgba(0,0,0,0.18)",
+            }}
+            onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              title={dimHub.mode === "move" ? "Klick auf Canvas: neuen Platzierungspunkt setzen (Snap aktiv)" : "Maßkette frei verschieben (mit Snap)"}
+              className={`cad-toolbar-btn h-7 w-7 justify-center px-0 ${dimHub.mode === "move" ? "active" : ""}`}
+              onClick={() => {
+                setDimHub(prev => ({ ...prev, mode: prev.mode === "move" ? "none" : "move" }));
+              }}
+            >
+              <Move className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+
 
         {docHub.visible && (() => {
           const app = appRef.current;
