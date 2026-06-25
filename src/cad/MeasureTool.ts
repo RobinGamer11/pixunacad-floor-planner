@@ -351,6 +351,40 @@ export class MeasureTool {
     }
     ctx.restore();
 
+    // Frei-Modus: Richtungslinie (vor dem Sammeln) zeichnen
+    if (this.state === "freeDir" && this.freeDirPoints.length > 0) {
+      const p0 = this.freeDirPoints[0];
+      const p1 = this.freeDirPoints.length >= 2
+        ? this.freeDirPoints[1]
+        : (this.pointSnap ? this.pointSnap.world : null);
+      const s0 = cam.worldToScreen(p0.x, p0.y);
+      ctx.save();
+      ctx.fillStyle = "rgba(255,140,0,0.95)";
+      ctx.strokeStyle = "rgba(255,255,255,0.95)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(s0.x, s0.y, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      if (p1) {
+        const s1 = cam.worldToScreen(p1.x, p1.y);
+        ctx.beginPath();
+        ctx.arc(s1.x, s1.y, 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.strokeStyle = "rgba(255,140,0,0.9)";
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([6, 4]);
+        ctx.beginPath();
+        ctx.moveTo(s0.x, s0.y);
+        ctx.lineTo(s1.x, s1.y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      ctx.restore();
+    }
+
+
     // Snap indicator
     if (this.pointSnap) {
       const s = cam.worldToScreen(this.pointSnap.world.x, this.pointSnap.world.y);
