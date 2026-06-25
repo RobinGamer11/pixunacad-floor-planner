@@ -249,6 +249,9 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
   // Maßkette „fertig"-Button (Häkchen) — vom MeasureTool gesetzt.
   const [measureFinishHub, setMeasureFinishHub] = useState<{ visible: boolean; screenX: number; screenY: number }>({ visible: false, screenX: 0, screenY: 0 });
 
+  // Hub-Box für ausgewählte Maßkette (Verschieben mit Snap auf andere Maßketten).
+  const [dimHub, setDimHub] = useState<{ visible: boolean; screenX: number; screenY: number; dimensionId: string | null; mode: "none" | "move" }>({ visible: false, screenX: 0, screenY: 0, dimensionId: null, mode: "none" });
+
   // PDF-/Bild-Hub: aktiven Maus-Modus an CadApp spiegeln, damit SelectTool die Canvas-Klicks
   // entsprechend behandeln kann. Beim Moduswechsel den Referenz-Klick zurücksetzen.
   useEffect(() => {
@@ -257,6 +260,14 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
     app.documentHubMode = docHub.mode;
     app.documentHubFirstClick = null;
   }, [docHub.mode]);
+
+  // Dimension-Hub-Modus an CadApp spiegeln.
+  useEffect(() => {
+    const app = appRef.current;
+    if (!app) return;
+    app.dimensionHubMode = dimHub.mode;
+  }, [dimHub.mode]);
+
 
   // Renderer-Settings synchron halten
   useEffect(() => {
