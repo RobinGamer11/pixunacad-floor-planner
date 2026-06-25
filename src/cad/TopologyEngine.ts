@@ -308,6 +308,16 @@ export class TopologyEngine {
     for (const seg of segs) {
       considerLine(seg.a, seg.b, seg, null);
     }
+    // Dimension placement-line (Maßlinie d1↔d2) als Snap-Linie, damit neue
+    // oder verschobene Maßketten exakt auf bestehende Maßlinien gelegt werden
+    // können ("nebeneinandersetzen").
+    for (const dim of this.scene.dimensions) {
+      if (!this.labels.isVisible(dim.labelId)) continue;
+      try {
+        const g = getDimensionGeometry(dim);
+        considerLine(g.d1, g.d2, null, null);
+      } catch { /* ignore */ }
+    }
     this._addWallSnapsTo(mouseS, mouseW, (cand, score) => {
       if (score < bestScore) { bestScore = score; best = cand; }
     });
