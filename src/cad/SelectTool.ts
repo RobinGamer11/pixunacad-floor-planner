@@ -2221,6 +2221,25 @@ export class SelectTool {
       this.app.pointEditMenu.hide();
     }
 
+    // Dimension-Hub-Box: sichtbar, solange genau eine Maßkette selektiert ist
+    // (und wir nicht gerade aktiv ziehen). Position folgt der Maßlinien-Mitte.
+    if (this.app.dimensionHubMode !== "move") {
+      const sel = this.app.selection as any;
+      if (sel && sel.type === SelectionType.DIMENSION && sel.dimensionId && !this.dragDimId) {
+        const dim = this.app.scene.getDimensionById(sel.dimensionId);
+        if (dim) {
+          const g = getDimensionGeometry(dim);
+          const sp = this.app.camera.worldToScreen(g.mid.x, g.mid.y);
+          this.app.dimensionHubState = { visible: true, screenX: sp.x, screenY: sp.y, dimensionId: dim.id };
+        } else if (this.app.dimensionHubState.visible) {
+          this.app.dimensionHubState = { visible: false, screenX: 0, screenY: 0, dimensionId: null };
+        }
+      } else if (this.app.dimensionHubState.visible) {
+        this.app.dimensionHubState = { visible: false, screenX: 0, screenY: 0, dimensionId: null };
+      }
+    }
+
+
     this.snap = this.app.topology.findBestSnap(
       v(input.mouse.sx, input.mouse.sy),
       v(input.mouse.wx, input.mouse.wy)
