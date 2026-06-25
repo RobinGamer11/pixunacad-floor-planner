@@ -229,6 +229,13 @@ export class CadApp {
     visible: false, screenX: 0, screenY: 0,
   };
 
+  /** Hub-Box für eine ausgewählte Maßkette (Verschieben mit Snap). */
+  dimensionHubState: { visible: boolean; screenX: number; screenY: number; dimensionId: string | null } = {
+    visible: false, screenX: 0, screenY: 0, dimensionId: null,
+  };
+  /** Aktiver Modus der Dimension-Hub-Box. "move" = nächster Klick setzt PlacementPoint (mit Snap). */
+  dimensionHubMode: "none" | "move" = "none";
+
   // Clipboard + Paste-Vorschau
   clipboard: Clipboard | null = null;
   pastePreviewActive = false;
