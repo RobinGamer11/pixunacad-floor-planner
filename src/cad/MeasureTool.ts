@@ -290,7 +290,12 @@ export class MeasureTool {
 
     if (this.state === "place") {
       if (input.clicked) {
-        const placement = v(input.mouse.wx, input.mouse.wy);
+        // Wenn ein Snap aktiv ist (z. B. auf einer bestehenden Maßlinie),
+        // den Snap-Punkt als Platzierungspunkt nutzen ⇒ Maßketten lassen
+        // sich exakt nebeneinandersetzen.
+        const placement = this.pointSnap
+          ? v(this.pointSnap.world.x, this.pointSnap.world.y)
+          : v(input.mouse.wx, input.mouse.wy);
         const specs = this._buildPreviewSpecs(placement);
         for (const s of specs) {
           this.app.scene.createDimension(s.p1, s.p2, s.placementPoint, s.mode, s.refDir, s.style, s.doorRefId);
