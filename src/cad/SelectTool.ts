@@ -1634,9 +1634,26 @@ export class SelectTool {
       } else {
         const g = getDimensionGeometry(dim);
         const mouseW = v(input.mouse.wx, input.mouse.wy);
-        const mouseOffset = dot(sub(mouseW, dim.p1), g.n);
-        const newOffset = mouseOffset - this.dragDimOffsetAlongNormal;
-        dim.placementPoint = add(dim.p1, mul(g.n, newOffset));
+        // Snap-Versuch: bestehende Maßlinien/-punkte etc. dürfen die
+        // Platzierung fangen. Eigene Geometrie ausblenden, indem wir die
+        // Snap-Treffer auf "nicht dieses Dimensionsobjekt" filtern.
+        const mouseS = v(input.mouse.sx, input.mouse.sy);
+        const snap = this.app.topology.findBestSnap(mouseS, mouseW);
+        const isSelfSnap = (() => {
+          if (!snap) return false;
+          const eq = (a: Vec2, b: Vec2) => Math.hypot(a.x - b.x, a.y - b.y) < 1e-6;
+          return eq(snap.world, dim.p1) || eq(snap.world, dim.p2)
+            || eq(snap.world, g.d1) || eq(snap.world, g.d2) || eq(snap.world, g.mid);
+        })();
+        if (snap && !isSelfSnap) {
+          // PlacementPoint exakt auf den Snap-Punkt legen – die
+          // Maßlinien-Offset-Geometrie ergibt sich daraus automatisch.
+          dim.placementPoint = v(snap.world.x, snap.world.y);
+        } else {
+          const mouseOffset = dot(sub(mouseW, dim.p1), g.n);
+          const newOffset = mouseOffset - this.dragDimOffsetAlongNormal;
+          dim.placementPoint = add(dim.p1, mul(g.n, newOffset));
+        }
         this.app.renderer.setHoverSegmentId(null);
         this.app.hub.hide();
         if (!input.mouse.left) {
