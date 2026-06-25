@@ -20,18 +20,24 @@ export class MeasureTool {
   app: CadApp;
   id = "measure";
 
-  state: "collect" | "place" = "collect";
+  state: "freeDir" | "collect" | "place" = "collect";
   pointSnap: Snap | null = null;
   selectedPoints: CollectedPoint[] = [];
+  /** Im "frei"-Modus: zwei Punkte, die die Richtungsachse vorgeben. */
+  freeDirPoints: Vec2[] = [];
+  /** Gespeicherte Richtungsachse (nur im "frei"-Modus). */
+  freeAxis: Vec2 | null = null;
 
   constructor(app: CadApp) {
     this.app = app;
   }
 
   activate() {
-    this.state = "collect";
     this.pointSnap = null;
     this.selectedPoints = [];
+    this.freeDirPoints = [];
+    this.freeAxis = null;
+    this.state = this.getDirectionMode() === "free" ? "freeDir" : "collect";
     this.app.renderer.setHoverSegmentId(null);
     this.app.renderer.setHoverHatchId(null);
     this.app.hub.hide();
@@ -41,9 +47,11 @@ export class MeasureTool {
   }
 
   cancel() {
-    this.state = "collect";
     this.pointSnap = null;
     this.selectedPoints = [];
+    this.freeDirPoints = [];
+    this.freeAxis = null;
+    this.state = this.getDirectionMode() === "free" ? "freeDir" : "collect";
     this.app.measureFinishHubState = { visible: false, screenX: 0, screenY: 0 };
   }
 
@@ -59,8 +67,18 @@ export class MeasureTool {
   }
 
   /** Schließt das Sammeln ab (Enter / Häkchen / Doppelklick) und wechselt
-   *  zum Platzieren. Liefert true, wenn der Wechsel erfolgte. */
+   *  zum nächsten Schritt. Liefert true, wenn der Wechsel erfolgte. */
   finishCollect(): boolean {
+    if (this.state === "freeDir") {
+      if (this.freeDirPoints.length < 2) return false;
+      const d = sub(this.freeDirPoints[1], this.freeDirPoints[0]);
+      if (len(d) < 1e-9) return false;
+      this.freeAxis = norm(d);
+      this.freeDirPoints = [];
+      this.state = "collect";
+      this.app.measureFinishHubState = { visible: false, screenX: 0, screenY: 0 };
+      return true;
+    }
     if (this.state !== "collect") return false;
     this._stripTrailingZeroLengthPoint();
     if (!this._canStartPlacement()) return false;
@@ -69,7 +87,10 @@ export class MeasureTool {
     return true;
   }
 
-  isDrawing() { return this.selectedPoints.length > 0 || this.state === "place"; }
+  isDrawing() {
+    return this.selectedPoints.length > 0 || this.freeDirPoints.length > 0 || this.state === "place";
+  }
+
 
 
   getOrientationMode(): "parallel" | "diagonal" {
