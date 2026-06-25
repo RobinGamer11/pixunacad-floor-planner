@@ -134,6 +134,7 @@ export class MeasureTool {
     const dir = this.getDirectionMode();
     if (dir === "horizontal") return v(1, 0);
     if (dir === "vertical") return v(0, 1);
+    if (this.freeAxis) return this.freeAxis;
     if (this.selectedPoints.length >= 2) {
       const d = sub(this.selectedPoints[1].world, this.selectedPoints[0].world);
       if (len(d) > 1e-9) return norm(d);
