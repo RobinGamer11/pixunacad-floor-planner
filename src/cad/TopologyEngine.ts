@@ -8,6 +8,7 @@ import { documentCornersWorld, documentEdgeMidpointsWorld } from "./documentGeom
 import { computeWallLines } from "./wallGeom";
 import { computeHealedWallLines } from "./wallHeal";
 import { doorGeometry } from "./doorGeom";
+import { getDimensionGeometry } from "./dimensionGeometry";
 
 // Wall-Snap nutzt primär wall.corners (Bezugslinie); optional zusätzlich
 // die Sub-Linien-Eckpunkte/-Kanten (gegenüberliegende Wandkante), wenn das
