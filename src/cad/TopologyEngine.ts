@@ -277,11 +277,19 @@ export class TopologyEngine {
         considerPoint(c, null, null, -1);
       }
     }
-    // Dimension endpoints
+    // Dimension endpoints + placement-line endpoints/mid (zum Ausrichten
+    // mehrerer Maßketten nebeneinander). Die Maßlinie selbst (d1↔d2) wird
+    // weiter unten als Snap-Linie ergänzt.
     for (const dim of this.scene.dimensions) {
       if (!this.labels.isVisible(dim.labelId)) continue;
       considerPoint(dim.p1, null, null, -1);
       considerPoint(dim.p2, null, null, -1);
+      try {
+        const g = getDimensionGeometry(dim);
+        considerPoint(g.d1, null, null, -1);
+        considerPoint(g.d2, null, null, -1);
+        considerPoint(g.mid, null, null, -1);
+      } catch { /* defensive: ungültige Geometrie überspringen */ }
     }
     // Document corners + edge midpoints
     for (const doc of this.scene.documents) {
