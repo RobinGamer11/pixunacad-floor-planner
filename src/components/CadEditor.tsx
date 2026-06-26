@@ -566,6 +566,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
           setDoorWidthM(d.widthM);
           setDoorHeightM(d.heightM);
           setDoorBreakHeightM(d.breakHeightM);
+          setDoorBreakHeightVisible(!!d.breakHeightVisible);
 
           setDoorSide(d.side);
           setDoorHand(d.hand);
