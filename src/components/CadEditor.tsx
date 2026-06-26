@@ -2248,6 +2248,15 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
                     }}
                   />
                 </div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="accent-primary"
+                    checked={doorBreakHeightVisible}
+                    onChange={(e) => setDoorBreakHeightVisible(e.target.checked)}
+                  />
+                  <span>BRH in Maßketten anzeigen</span>
+                </label>
 
                 <div>
                   <label>Startkante</label>
