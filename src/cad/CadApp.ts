@@ -1386,6 +1386,8 @@ export class CadApp {
         decimals: sel.decimals, tickLengthM: sel.tickLengthM, showExtensions: sel.showExtensions,
         useFreeText: sel.useFreeText, freeText: sel.freeText,
         textBgEnabled: sel.textBgEnabled, textBgColor: sel.textBgColor, textBgAlpha: sel.textBgAlpha,
+        extensionStyle: sel.extensionStyle, extensionColor: sel.extensionColor, extensionAlpha: sel.extensionAlpha,
+        freeTextBold: sel.freeTextBold, freeTextItalic: sel.freeTextItalic, freeTextColor: sel.freeTextColor,
         labelId: sel.labelId,
       };
     }
@@ -1396,6 +1398,10 @@ export class CadApp {
       useFreeText: this.measureSettings.useFreeText, freeText: this.measureSettings.freeText,
       textBgEnabled: this.measureSettings.textBgEnabled, textBgColor: this.measureSettings.textBgColor,
       textBgAlpha: this.measureSettings.textBgAlpha,
+      extensionStyle: this.measureSettings.extensionStyle, extensionColor: this.measureSettings.extensionColor,
+      extensionAlpha: this.measureSettings.extensionAlpha,
+      freeTextBold: this.measureSettings.freeTextBold, freeTextItalic: this.measureSettings.freeTextItalic,
+      freeTextColor: this.measureSettings.freeTextColor,
       labelId: this.activeDrawLabelId || Defaults.defaultLabelId,
     };
   }
