@@ -13,6 +13,8 @@ export interface DoorToolSettings {
   heightM: number;
   /** Brüstungshöhe (m). Standardmäßig 0 für Türen, ~0.9 für Fenster. */
   breakHeightM: number;
+  /** Brüstungshöhe als BRH-Label in Maßketten anzeigen. */
+  breakHeightVisible: boolean;
   side: DoorSide;
   hand: DoorHand;
   edge: DoorEdge;
@@ -54,6 +56,7 @@ export class DoorTool {
     widthM: 0.9,
     heightM: 2.1,
     breakHeightM: 0,
+    breakHeightVisible: false,
     side: "inner",
     hand: "left",
     edge: "center",
@@ -299,6 +302,7 @@ export class DoorTool {
         this.settings.widthM = d.widthM;
         this.settings.heightM = d.heightM;
         this.settings.breakHeightM = d.breakHeightM;
+        this.settings.breakHeightVisible = d.breakHeightVisible;
         this.settings.side = d.side;
         this.settings.hand = d.hand;
         this.settings.edge = d.edge;
@@ -335,6 +339,7 @@ export class DoorTool {
     d.widthM = Math.max(0.1, Math.min(this.settings.widthM, total));
     d.heightM = this.settings.heightM;
     d.breakHeightM = Math.max(0, this.settings.breakHeightM);
+    d.breakHeightVisible = !!this.settings.breakHeightVisible;
     d.side = this.settings.side;
     d.hand = this.settings.hand;
     d.edge = this.settings.edge;
@@ -517,6 +522,7 @@ export class DoorTool {
             widthM: this.settings.widthM,
             heightM: this.settings.heightM,
             breakHeightM: this.settings.breakHeightM,
+            breakHeightVisible: this.settings.breakHeightVisible,
             side: this.settings.side,
             hand: this.settings.hand,
             edge: this.settings.edge,
@@ -554,6 +560,7 @@ export class DoorTool {
           kind: this.settings.mode,
           widthM: this.settings.widthM, heightM: this.settings.heightM,
           breakHeightM: this.settings.breakHeightM,
+          breakHeightVisible: this.settings.breakHeightVisible,
           side: this.settings.side, hand: this.settings.hand, edge: this.settings.edge,
           color: this.settings.color,
           jambEnabled: this.settings.jambEnabled, jambColor: this.settings.jambColor,

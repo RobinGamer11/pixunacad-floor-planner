@@ -80,6 +80,12 @@ export interface MeasureSettings {
   textBgEnabled: boolean;
   textBgColor: string;
   textBgAlpha: number;
+  extensionStyle: "dashed" | "solid";
+  extensionColor: string;
+  extensionAlpha: number;
+  freeTextBold: boolean;
+  freeTextItalic: boolean;
+  freeTextColor: string;
 }
 
 
@@ -92,8 +98,20 @@ export interface MeasureSettingsRefs {
   editMode: HTMLSelectElement;
 
   extensionsToggle: HTMLInputElement;
+  extensionsGroup: HTMLDivElement;
+  extensionStyle: HTMLSelectElement;
+  extensionColor: HTMLInputElement;
+  extensionColorPreview: HTMLDivElement;
+  extensionAlpha: HTMLInputElement;
+
   freeTextToggle: HTMLInputElement;
   freeTextInput: HTMLInputElement;
+  freeTextGroup: HTMLDivElement;
+  freeTextBold: HTMLButtonElement;
+  freeTextItalic: HTMLButtonElement;
+  freeTextColor: HTMLInputElement;
+  freeTextColorPreview: HTMLDivElement;
+
   textColor: HTMLInputElement;
   textColorPreview: HTMLDivElement;
   textSize: HTMLInputElement;
@@ -262,6 +280,12 @@ export class CadApp {
     textBgEnabled: Defaults.measureTextBgEnabled,
     textBgColor: Defaults.measureTextBgColor,
     textBgAlpha: Defaults.measureTextBgAlpha,
+    extensionStyle: Defaults.measureExtensionStyle,
+    extensionColor: Defaults.measureExtensionColor,
+    extensionAlpha: Defaults.measureExtensionAlpha,
+    freeTextBold: Defaults.measureFreeTextBold,
+    freeTextItalic: Defaults.measureFreeTextItalic,
+    freeTextColor: Defaults.measureFreeTextColor,
   };
 
   // Drag state for parallel-shifting a selected dimension
@@ -515,6 +539,8 @@ export class CadApp {
         decimals: d.decimals, tickLengthM: d.tickLengthM, showExtensions: d.showExtensions,
         useFreeText: d.useFreeText, freeText: d.freeText,
         textBgEnabled: d.textBgEnabled, textBgColor: d.textBgColor, textBgAlpha: d.textBgAlpha,
+        extensionStyle: d.extensionStyle, extensionColor: d.extensionColor, extensionAlpha: d.extensionAlpha,
+        freeTextBold: d.freeTextBold, freeTextItalic: d.freeTextItalic, freeTextColor: d.freeTextColor,
         labelId: d.labelId,
         doorRefId: d.doorRefId || null,
         _stickerEditOwnerId: d._stickerEditOwnerId || null,
@@ -571,6 +597,7 @@ export class CadApp {
       doors: scene.doors.map(d => ({
         id: d.id, wallId: d.wallId, posM: d.posM, widthM: d.widthM, heightM: d.heightM,
         breakHeightM: d.breakHeightM,
+        breakHeightVisible: d.breakHeightVisible,
         kind: d.kind,
         side: d.side, hand: d.hand, edge: d.edge, color: d.color,
         jambEnabled: d.jambEnabled, jambColor: d.jambColor, jambLenM: d.jambLenM, jambThickM: d.jambThickM,
@@ -655,6 +682,8 @@ export class CadApp {
         decimals: d.decimals, tickLengthM: d.tickLengthM, showExtensions: d.showExtensions,
         useFreeText: d.useFreeText, freeText: d.freeText,
         textBgEnabled: d.textBgEnabled, textBgColor: d.textBgColor, textBgAlpha: d.textBgAlpha,
+        extensionStyle: d.extensionStyle, extensionColor: d.extensionColor, extensionAlpha: d.extensionAlpha,
+        freeTextBold: d.freeTextBold, freeTextItalic: d.freeTextItalic, freeTextColor: d.freeTextColor,
         labelId: d.labelId,
       }, d.doorRefId || null);
       if (d._stickerEditOwnerId) dim._stickerEditOwnerId = d._stickerEditOwnerId;
@@ -691,6 +720,7 @@ export class CadApp {
       const door = scene.createDoor({
         wallId: d.wallId, posM: d.posM, widthM: d.widthM, heightM: d.heightM,
         breakHeightM: d.breakHeightM,
+        breakHeightVisible: !!d.breakHeightVisible,
         kind: d.kind,
         side: d.side, hand: d.hand, edge: d.edge, color: d.color,
         jambEnabled: d.jambEnabled, jambColor: d.jambColor, jambLenM: d.jambLenM, jambThickM: d.jambThickM,
@@ -1360,6 +1390,8 @@ export class CadApp {
         decimals: sel.decimals, tickLengthM: sel.tickLengthM, showExtensions: sel.showExtensions,
         useFreeText: sel.useFreeText, freeText: sel.freeText,
         textBgEnabled: sel.textBgEnabled, textBgColor: sel.textBgColor, textBgAlpha: sel.textBgAlpha,
+        extensionStyle: sel.extensionStyle, extensionColor: sel.extensionColor, extensionAlpha: sel.extensionAlpha,
+        freeTextBold: sel.freeTextBold, freeTextItalic: sel.freeTextItalic, freeTextColor: sel.freeTextColor,
         labelId: sel.labelId,
       };
     }
@@ -1370,6 +1402,10 @@ export class CadApp {
       useFreeText: this.measureSettings.useFreeText, freeText: this.measureSettings.freeText,
       textBgEnabled: this.measureSettings.textBgEnabled, textBgColor: this.measureSettings.textBgColor,
       textBgAlpha: this.measureSettings.textBgAlpha,
+      extensionStyle: this.measureSettings.extensionStyle, extensionColor: this.measureSettings.extensionColor,
+      extensionAlpha: this.measureSettings.extensionAlpha,
+      freeTextBold: this.measureSettings.freeTextBold, freeTextItalic: this.measureSettings.freeTextItalic,
+      freeTextColor: this.measureSettings.freeTextColor,
       labelId: this.activeDrawLabelId || Defaults.defaultLabelId,
     };
   }
@@ -2252,7 +2288,13 @@ export class CadApp {
     });
 
     r.direction.addEventListener("change", () => {
-      this.measureSettings.direction = r.direction.value as "horizontal" | "vertical" | "free";
+      const val = r.direction.value as "horizontal" | "vertical" | "free";
+      this.measureSettings.direction = val;
+      // Im "frei"-Modus ist Endpunkt-Editierung sinnvoller als Parallel-Verschiebung.
+      if (val === "free") {
+        this.measureSettings.editMode = "endpoints";
+        r.editMode.value = "endpoints";
+      }
     });
 
 
@@ -2265,6 +2307,31 @@ export class CadApp {
       this.measureSettings.showExtensions = val;
       const sel = this.getSelectedDimension();
       if (sel) sel.showExtensions = val;
+      r.extensionsGroup.classList.toggle("hidden", !val);
+    });
+
+    r.extensionStyle.addEventListener("change", () => {
+      const val = r.extensionStyle.value as "dashed" | "solid";
+      this.measureSettings.extensionStyle = val;
+      const sel = this.getSelectedDimension();
+      if (sel) sel.extensionStyle = val;
+    });
+
+    r.extensionColor.addEventListener("input", () => {
+      const val = r.extensionColor.value;
+      this.measureSettings.extensionColor = val;
+      const sel = this.getSelectedDimension();
+      if (sel) sel.extensionColor = val;
+      r.extensionColorPreview.style.background = val;
+    });
+
+    r.extensionAlpha.addEventListener("input", () => {
+      const v = parseFloat((r.extensionAlpha.value || "").replace(",", "."));
+      if (!Number.isFinite(v)) return;
+      const c = clamp(v, 0, 1);
+      this.measureSettings.extensionAlpha = c;
+      const sel = this.getSelectedDimension();
+      if (sel) sel.extensionAlpha = c;
     });
 
     r.freeTextToggle.addEventListener("change", () => {
@@ -2273,6 +2340,42 @@ export class CadApp {
       const sel = this.getSelectedDimension();
       if (sel) sel.useFreeText = val;
       r.freeTextInput.classList.toggle("hidden", !val);
+      r.freeTextGroup.classList.toggle("hidden", !val);
+    });
+
+    const toggleFreeTextBtn = (btn: HTMLButtonElement, get: () => boolean, set: (v: boolean) => void) => {
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        const next = !get();
+        set(next);
+        btn.classList.toggle("active", next);
+      });
+    };
+    toggleFreeTextBtn(
+      r.freeTextBold,
+      () => this.measureSettings.freeTextBold,
+      (v) => {
+        this.measureSettings.freeTextBold = v;
+        const sel = this.getSelectedDimension();
+        if (sel) sel.freeTextBold = v;
+      },
+    );
+    toggleFreeTextBtn(
+      r.freeTextItalic,
+      () => this.measureSettings.freeTextItalic,
+      (v) => {
+        this.measureSettings.freeTextItalic = v;
+        const sel = this.getSelectedDimension();
+        if (sel) sel.freeTextItalic = v;
+      },
+    );
+
+    r.freeTextColor.addEventListener("input", () => {
+      const val = r.freeTextColor.value;
+      this.measureSettings.freeTextColor = val;
+      const sel = this.getSelectedDimension();
+      if (sel) sel.freeTextColor = val;
+      r.freeTextColorPreview.style.background = val;
     });
 
     r.freeTextInput.addEventListener("input", () => {
@@ -2358,21 +2461,34 @@ export class CadApp {
     if (!r) return;
     const sel = this.getSelectedDimension();
     const s = sel ? {
-      orientation: sel.mode, pointCount: this.measureSettings.pointCount,
+      orientation: sel.mode, pointCount: this.measureSettings.pointCount, direction: this.measureSettings.direction,
       editMode: this.measureSettings.editMode,
       showExtensions: sel.showExtensions, useFreeText: sel.useFreeText, freeText: sel.freeText,
       textColor: sel.textColor, textSizePx: sel.textSizePx, decimals: sel.decimals,
       textBgEnabled: sel.textBgEnabled, textBgColor: sel.textBgColor, textBgAlpha: sel.textBgAlpha,
       lineColor: sel.lineColor, tickLengthM: sel.tickLengthM, labelId: sel.labelId,
+      extensionStyle: sel.extensionStyle, extensionColor: sel.extensionColor, extensionAlpha: sel.extensionAlpha,
+      freeTextBold: sel.freeTextBold, freeTextItalic: sel.freeTextItalic, freeTextColor: sel.freeTextColor,
     } : { ...this.measureSettings, labelId: this.activeDrawLabelId };
 
     r.orientation.value = s.orientation;
     r.pointCount.value = s.pointCount;
+    r.direction.value = s.direction;
     r.editMode.value = s.editMode;
     r.extensionsToggle.checked = !!s.showExtensions;
+    r.extensionsGroup.classList.toggle("hidden", !s.showExtensions);
+    r.extensionStyle.value = s.extensionStyle || "dashed";
+    r.extensionColor.value = this._toHexColor(s.extensionColor);
+    r.extensionColorPreview.style.background = r.extensionColor.value;
+    r.extensionAlpha.value = String(s.extensionAlpha ?? 1);
     r.freeTextToggle.checked = !!s.useFreeText;
     r.freeTextInput.value = s.freeText || "";
     r.freeTextInput.classList.toggle("hidden", !s.useFreeText);
+    r.freeTextGroup.classList.toggle("hidden", !s.useFreeText);
+    r.freeTextBold.classList.toggle("active", !!s.freeTextBold);
+    r.freeTextItalic.classList.toggle("active", !!s.freeTextItalic);
+    r.freeTextColor.value = this._toHexColor(s.freeTextColor);
+    r.freeTextColorPreview.style.background = r.freeTextColor.value;
     r.textColor.value = this._toHexColor(s.textColor);
     r.textColorPreview.style.background = r.textColor.value;
     r.textSize.value = String(s.textSizePx);

@@ -118,6 +118,14 @@ export interface DimensionStyle {
   textBgEnabled?: boolean;
   textBgColor?: string;
   textBgAlpha?: number;
+  /** Verlängerungslinien-Stil. */
+  extensionStyle?: "dashed" | "solid";
+  extensionColor?: string;
+  extensionAlpha?: number;
+  /** Freier-Text Styling. */
+  freeTextBold?: boolean;
+  freeTextItalic?: boolean;
+  freeTextColor?: string;
   labelId?: string;
 }
 
@@ -142,6 +150,14 @@ export class Dimension {
   textBgEnabled: boolean;
   textBgColor: string;
   textBgAlpha: number;
+
+  extensionStyle: "dashed" | "solid";
+  extensionColor: string;
+  extensionAlpha: number;
+
+  freeTextBold: boolean;
+  freeTextItalic: boolean;
+  freeTextColor: string;
 
   labelId: string;
   /** Optional: Referenz auf eine Tür/ein Fenster, wenn das Maß die Öffnungsbreite misst.
@@ -173,6 +189,12 @@ export class Dimension {
     this.textBgEnabled = (typeof s.textBgEnabled === "boolean") ? s.textBgEnabled : Defaults.measureTextBgEnabled;
     this.textBgColor = s.textBgColor || Defaults.measureTextBgColor;
     this.textBgAlpha = (typeof s.textBgAlpha === "number") ? clamp(s.textBgAlpha, 0, 1) : Defaults.measureTextBgAlpha;
+    this.extensionStyle = (s.extensionStyle === "solid" || s.extensionStyle === "dashed") ? s.extensionStyle : Defaults.measureExtensionStyle;
+    this.extensionColor = s.extensionColor || Defaults.measureExtensionColor;
+    this.extensionAlpha = (typeof s.extensionAlpha === "number") ? clamp(s.extensionAlpha, 0, 1) : Defaults.measureExtensionAlpha;
+    this.freeTextBold = !!(s.freeTextBold ?? Defaults.measureFreeTextBold);
+    this.freeTextItalic = !!(s.freeTextItalic ?? Defaults.measureFreeTextItalic);
+    this.freeTextColor = s.freeTextColor || Defaults.measureFreeTextColor;
     this.labelId = labelId || s.labelId || Defaults.defaultLabelId;
     this.doorRefId = doorRefId || null;
     this._stickerEditOwnerId = null;
@@ -476,6 +498,8 @@ export class Door {
   heightM: number;
   /** Brüstungshöhe (m). Bei Fenstern üblich; bei Türen i. d. R. 0. */
   breakHeightM: number;
+  /** Brüstungshöhe in Maßketten anzeigen (BRH-Label). */
+  breakHeightVisible: boolean;
   /** Öffnungsseite — auf welche Seite die Tür aufschlägt. */
   side: DoorSide;
   /** Öffnungsrichtung links/rechts entlang Wand. */
@@ -503,6 +527,7 @@ export class Door {
   constructor(opts: {
     id: string; wallId: string; posM: number; widthM: number; heightM?: number;
     breakHeightM?: number;
+    breakHeightVisible?: boolean;
     kind?: DoorKind;
     side?: DoorSide; hand?: DoorHand; edge?: DoorEdge; color?: string;
     jambEnabled?: boolean; jambColor?: string; jambLenM?: number; jambThickM?: number;
@@ -518,6 +543,7 @@ export class Door {
     this.breakHeightM = (typeof opts.breakHeightM === "number" && opts.breakHeightM >= 0)
       ? opts.breakHeightM
       : (this.kind === "window" ? 0.9 : 0);
+    this.breakHeightVisible = !!opts.breakHeightVisible;
     this.side = opts.side || "inner";
     this.hand = opts.hand || "left";
     this.edge = opts.edge || "center";
@@ -1133,6 +1159,7 @@ export class Scene {
   createDoor(opts: {
     wallId: string; posM: number; widthM: number; heightM?: number;
     breakHeightM?: number;
+    breakHeightVisible?: boolean;
     kind?: DoorKind;
     side?: DoorSide; hand?: DoorHand; edge?: DoorEdge; color?: string;
     jambEnabled?: boolean; jambColor?: string; jambLenM?: number; jambThickM?: number;
