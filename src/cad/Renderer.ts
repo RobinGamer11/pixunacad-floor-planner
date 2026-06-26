@@ -1637,6 +1637,8 @@ export class Renderer {
     textColor?: string; textSizePx?: number; lineColor?: string; tickLengthM?: number;
     showExtensions?: boolean; useFreeText?: boolean; freeText?: string; decimals?: number;
     textBgEnabled?: boolean; textBgColor?: string; textBgAlpha?: number;
+    extensionStyle?: "dashed" | "solid"; extensionColor?: string; extensionAlpha?: number;
+    freeTextBold?: boolean; freeTextItalic?: boolean; freeTextColor?: string;
     doorRefId?: string | null;
   }, isPreview = false) {
     const g = getDimensionGeometry(dim);
@@ -1650,14 +1652,33 @@ export class Renderer {
     const mid = cam.worldToScreen(g.mid.x, g.mid.y);
 
     ctx.save();
-    ctx.strokeStyle = dim.lineColor || Defaults.measureLineColor;
-    ctx.lineWidth = isPreview ? 1.2 : 1.3;
+    const baseStroke = dim.lineColor || Defaults.measureLineColor;
 
-    ctx.beginPath();
+    // Verlängerungslinien (eigene Farbe/Stil/Transparenz).
     if (dim.showExtensions) {
+      ctx.save();
+      const extColor = dim.extensionColor || baseStroke;
+      const extAlpha = (typeof dim.extensionAlpha === "number") ? Math.max(0, Math.min(1, dim.extensionAlpha)) : 1;
+      ctx.strokeStyle = hexToRgba(extColor, extAlpha);
+      ctx.lineWidth = isPreview ? 1.0 : 1.1;
+      const tickLenPxForDash = (dim.tickLengthM || Defaults.measureTickLengthM) * cam.scale;
+      if ((dim.extensionStyle || "dashed") === "dashed") {
+        const dash = Math.max(2, tickLenPxForDash * 0.45);
+        ctx.setLineDash([dash, dash]);
+      } else {
+        ctx.setLineDash([]);
+      }
+      ctx.beginPath();
       ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y);
       ctx.moveTo(p3.x, p3.y); ctx.lineTo(p4.x, p4.y);
+      ctx.stroke();
+      ctx.restore();
     }
+
+    // Maßlinie
+    ctx.strokeStyle = baseStroke;
+    ctx.lineWidth = isPreview ? 1.2 : 1.3;
+    ctx.beginPath();
     ctx.moveTo(d1.x, d1.y);
     ctx.lineTo(d2.x, d2.y);
     ctx.stroke();
@@ -1696,7 +1717,14 @@ export class Renderer {
 
     ctx.translate(mid.x, mid.y);
     ctx.rotate(normalizedAngle);
-    ctx.font = `${fontPx}px system-ui, Arial, sans-serif`;
+
+    // Freie-Text-Styling (Fett/Kursiv) nur wenn useFreeText aktiv.
+    const fontParts: string[] = [];
+    if (dim.useFreeText) {
+      if (dim.freeTextItalic) fontParts.push("italic");
+      if (dim.freeTextBold) fontParts.push("bold");
+    }
+    ctx.font = `${fontParts.join(" ")} ${fontPx}px system-ui, Arial, sans-serif`.trim();
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
 
@@ -1714,7 +1742,10 @@ export class Renderer {
       ctx.fillRect(-textWidth / 2 - padX, textY - textHeight / 2 - padY, textWidth + padX * 2, textHeight + padY * 2);
     }
 
-    ctx.fillStyle = dim.textColor || Defaults.measureTextColor;
+    const mainTextColor = (dim.useFreeText && dim.freeTextColor)
+      ? dim.freeTextColor
+      : (dim.textColor || Defaults.measureTextColor);
+    ctx.fillStyle = mainTextColor;
     ctx.fillText(text, 0, textY);
 
     // Tür-/Fenster-Referenz: Höhe + BRH unterhalb der Maßlinie anzeigen.
@@ -1724,12 +1755,13 @@ export class Renderer {
         const dec = Math.max(0, Math.min(6, dim.decimals ?? Defaults.measureDecimals));
         const lines: string[] = [];
         lines.push(`${door.heightM.toFixed(dec)} m`);
-        if (door.kind === "window" || door.breakHeightM > 0) {
+        if (door.breakHeightVisible) {
           lines.push(`BRH: ${door.breakHeightM.toFixed(dec)} m`);
         }
-        const subFont = Math.max(1, baseSize * zoomFactor * 0.9);
+        const subFont = Math.max(1, baseSize * zoomFactor * 0.78);
         ctx.font = `${subFont}px system-ui, Arial, sans-serif`;
-        let y = textOffsetPx + subFont * 0.6;
+        // Näher an die Maßkettenlinie heranrücken (kurzer Abstand unter Tick).
+        let y = tickOffsetPx * 0.55 + subFont * 0.55;
         for (const line of lines) {
           if (dim.textBgEnabled) {
             const m = ctx.measureText(line);
@@ -1740,7 +1772,7 @@ export class Renderer {
           }
           ctx.fillStyle = dim.textColor || Defaults.measureTextColor;
           ctx.fillText(line, 0, y);
-          y += subFont * 1.15;
+          y += subFont * 1.02;
         }
       }
     }

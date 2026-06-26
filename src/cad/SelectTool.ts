@@ -2173,13 +2173,9 @@ export class SelectTool {
         if ((hit as any).segmentId) this.app.showLineSettingsPanel(true);
         if ((hit as any).hatchId) this.app.showHatchSettingsPanel(true);
         if (hit.type === SelectionType.DIMENSION) {
-          const dim = this.app.scene.getDimensionById((hit as any).dimensionId);
-          if (dim) {
-            const g = getDimensionGeometry(dim);
-            const mouseW = v(input.mouse.wx, input.mouse.wy);
-            this.dragDimId = dim.id;
-            this.dragDimOffsetAlongNormal = dot(sub(mouseW, dim.p1), g.n) - g.offset;
-          }
+          // Hinweis: Dimensionen werden bewusst NICHT mehr per Maus-Drag verschoben.
+          // Verschieben passiert ausschließlich über das Move-Symbol in der Hub-Box
+          // (siehe dimensionHubMode === "move" in input.clicked-Handler).
         }
       } else {
         // Freihand-Stroke: Klick auf Polylinie selektiert

@@ -121,8 +121,18 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
   const measureEditModeRef = useRef<HTMLSelectElement>(null);
 
   const measureExtRef = useRef<HTMLInputElement>(null);
+  const measureExtGroupRef = useRef<HTMLDivElement>(null);
+  const measureExtStyleRef = useRef<HTMLSelectElement>(null);
+  const measureExtColorRef = useRef<HTMLInputElement>(null);
+  const measureExtColorPreviewRef = useRef<HTMLDivElement>(null);
+  const measureExtAlphaRef = useRef<HTMLInputElement>(null);
   const measureFreeTextToggleRef = useRef<HTMLInputElement>(null);
   const measureFreeTextInputRef = useRef<HTMLInputElement>(null);
+  const measureFreeTextGroupRef = useRef<HTMLDivElement>(null);
+  const measureFreeTextBoldRef = useRef<HTMLButtonElement>(null);
+  const measureFreeTextItalicRef = useRef<HTMLButtonElement>(null);
+  const measureFreeTextColorRef = useRef<HTMLInputElement>(null);
+  const measureFreeTextColorPreviewRef = useRef<HTMLDivElement>(null);
   const measureTextColorRef = useRef<HTMLInputElement>(null);
   const measureTextColorPreviewRef = useRef<HTMLDivElement>(null);
   const measureTextSizeRef = useRef<HTMLInputElement>(null);
@@ -344,7 +354,11 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
       !areaBgColorRef.current || !areaBgPreviewRef.current || !areaBgAlphaRef.current ||
       !measureSettingsRef.current || !measureIdSelectRef.current ||
       !measureOrientationRef.current || !measurePointCountRef.current || !measureDirectionRef.current || !measureEditModeRef.current ||
-      !measureExtRef.current || !measureFreeTextToggleRef.current || !measureFreeTextInputRef.current ||
+      !measureExtRef.current || !measureExtGroupRef.current || !measureExtStyleRef.current ||
+      !measureExtColorRef.current || !measureExtColorPreviewRef.current || !measureExtAlphaRef.current ||
+      !measureFreeTextToggleRef.current || !measureFreeTextInputRef.current ||
+      !measureFreeTextGroupRef.current || !measureFreeTextBoldRef.current || !measureFreeTextItalicRef.current ||
+      !measureFreeTextColorRef.current || !measureFreeTextColorPreviewRef.current ||
       !measureTextColorRef.current || !measureTextColorPreviewRef.current || !measureTextSizeRef.current ||
       !measureDecimalsRef.current || !measureTextBgToggleRef.current || !measureTextBgGroupRef.current ||
       !measureTextBgColorRef.current || !measureTextBgColorPreviewRef.current || !measureTextBgAlphaRef.current ||
@@ -392,8 +406,18 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
         editMode: measureEditModeRef.current,
 
         extensionsToggle: measureExtRef.current,
+        extensionsGroup: measureExtGroupRef.current,
+        extensionStyle: measureExtStyleRef.current,
+        extensionColor: measureExtColorRef.current,
+        extensionColorPreview: measureExtColorPreviewRef.current,
+        extensionAlpha: measureExtAlphaRef.current,
         freeTextToggle: measureFreeTextToggleRef.current,
         freeTextInput: measureFreeTextInputRef.current,
+        freeTextGroup: measureFreeTextGroupRef.current,
+        freeTextBold: measureFreeTextBoldRef.current,
+        freeTextItalic: measureFreeTextItalicRef.current,
+        freeTextColor: measureFreeTextColorRef.current,
+        freeTextColorPreview: measureFreeTextColorPreviewRef.current,
         textColor: measureTextColorRef.current,
         textColorPreview: measureTextColorPreviewRef.current,
         textSize: measureTextSizeRef.current,
@@ -1794,16 +1818,16 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
               </div>
               <div>
                 <label>Achse / Richtung</label>
-                <select ref={measureDirectionRef} className="cad-settings-select w-full" defaultValue="horizontal">
+                <select ref={measureDirectionRef} className="cad-settings-select w-full" defaultValue="free">
                   <option value="horizontal">Horizontal</option>
                   <option value="vertical">Vertikal</option>
-                  <option value="free">Frei (aus ersten 2 Punkten)</option>
+                  <option value="free">Frei</option>
                 </select>
               </div>
 
               <div>
                 <label>Punktbearbeitung (Auswahl)</label>
-                <select ref={measureEditModeRef} className="cad-settings-select w-full">
+                <select ref={measureEditModeRef} className="cad-settings-select w-full" defaultValue="endpoints">
                   <option value="parallel">Parallel verschieben</option>
                   <option value="endpoints">Endpunkte editieren</option>
                 </select>
@@ -1812,6 +1836,26 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
                 <input ref={measureExtRef} type="checkbox" className="accent-primary" />
                 <label className="!mb-0 cursor-pointer">Verlängerungslinien</label>
               </div>
+              <div ref={measureExtGroupRef} className="hidden space-y-2 pt-2" style={{ borderTop: "1px solid hsl(var(--border))" }}>
+                <div>
+                  <label>Stil</label>
+                  <select ref={measureExtStyleRef} className="cad-settings-select w-full" defaultValue="dashed">
+                    <option value="dashed">Gestrichelt</option>
+                    <option value="solid">Durchgezogen</option>
+                  </select>
+                </div>
+                <div>
+                  <label>Farbe</label>
+                  <div className="flex items-center gap-2">
+                    <div ref={measureExtColorPreviewRef} className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))" }} />
+                    <input ref={measureExtColorRef} type="color" defaultValue="#2b2b2b" className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
+                  </div>
+                </div>
+                <div>
+                  <label>Transparenz (0–1)</label>
+                  <input ref={measureExtAlphaRef} type="text" defaultValue="1" />
+                </div>
+              </div>
               <div className="flex items-center gap-2">
                 <input ref={measureFreeTextToggleRef} type="checkbox" className="accent-primary" />
                 <label className="!mb-0 cursor-pointer">Freier Text</label>
@@ -1819,20 +1863,33 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
               <div>
                 <input ref={measureFreeTextInputRef} type="text" placeholder="Text eingeben" className="hidden" />
               </div>
+              <div ref={measureFreeTextGroupRef} className="hidden space-y-2 pt-2" style={{ borderTop: "1px solid hsl(var(--border))" }}>
+                <div className="flex gap-1.5">
+                  <button type="button" ref={measureFreeTextBoldRef} className="cad-toolbar-btn h-8 px-3 text-[12px] font-bold">B</button>
+                  <button type="button" ref={measureFreeTextItalicRef} className="cad-toolbar-btn h-8 px-3 text-[12px] italic">I</button>
+                </div>
+                <div>
+                  <label>Textfarbe (Freier Text)</label>
+                  <div className="flex items-center gap-2">
+                    <div ref={measureFreeTextColorPreviewRef} className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))" }} />
+                    <input ref={measureFreeTextColorRef} type="color" defaultValue="#111111" className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
+                  </div>
+                </div>
+              </div>
               <div>
                 <label>Textfarbe</label>
                 <div className="flex items-center gap-2">
                   <div ref={measureTextColorPreviewRef} className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))" }} />
-                  <input ref={measureTextColorRef} type="color" defaultValue="#111111" className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
+                  <input ref={measureTextColorRef} type="color" defaultValue="#000000" className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
                 </div>
               </div>
               <div>
                 <label>Textgröße (px)</label>
-                <input ref={measureTextSizeRef} type="text" defaultValue="12" />
+                <input ref={measureTextSizeRef} type="text" defaultValue="11" />
               </div>
               <div>
                 <label>Kommastellen (0–6)</label>
-                <input ref={measureDecimalsRef} type="text" defaultValue="3" />
+                <input ref={measureDecimalsRef} type="text" defaultValue="2" />
               </div>
               <div className="flex items-center gap-2">
                 <input ref={measureTextBgToggleRef} type="checkbox" className="accent-primary" />
@@ -1860,7 +1917,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
               </div>
               <div>
                 <label>Endstrich-Länge (m)</label>
-                <input ref={measureTickLengthRef} type="text" defaultValue="0.06" />
+                <input ref={measureTickLengthRef} type="text" defaultValue="0.2" />
               </div>
             </div>
           </div>

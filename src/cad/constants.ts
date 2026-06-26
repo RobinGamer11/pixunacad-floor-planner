@@ -33,15 +33,15 @@ export const Defaults = {
 
   // Measure (dimension) defaults
   measureOrientation: "parallel" as "parallel" | "diagonal",
-  measurePointCount: "two" as "two" | "multi",
-  measureDirection: "horizontal" as "horizontal" | "vertical" | "free",
+  measurePointCount: "multi" as "two" | "multi",
+  measureDirection: "free" as "horizontal" | "vertical" | "free",
 
-  measureEditMode: "parallel" as "parallel" | "endpoints",
-  measureTextColor: "#111111",
-  measureTextSizePx: 12,
+  measureEditMode: "endpoints" as "parallel" | "endpoints",
+  measureTextColor: "#000000",
+  measureTextSizePx: 11,
   measureLineColor: "#2b2b2b",
-  measureDecimals: 3,
-  measureTickLengthM: 0.06,
+  measureDecimals: 2,
+  measureTickLengthM: 0.2,
   measureShowExtensions: false,
   measureUseFreeText: false,
   measureFreeText: "",
@@ -49,6 +49,14 @@ export const Defaults = {
   measureTextBgColor: "#ffffff",
   measureTextBgAlpha: 0.8,
   measureReferenceScalePxPerM: 80,
+  // Extension-line styling (only used when measureShowExtensions = true).
+  measureExtensionStyle: "dashed" as "dashed" | "solid",
+  measureExtensionColor: "#2b2b2b",
+  measureExtensionAlpha: 1,
+  // Free-text styling (only used when measureUseFreeText = true).
+  measureFreeTextBold: false,
+  measureFreeTextItalic: false,
+  measureFreeTextColor: "#111111",
 
   // TextBox defaults
   textColor: "#111111",
