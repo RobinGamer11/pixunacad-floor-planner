@@ -314,7 +314,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
     app.doorTool.settings.glassThickM = doorGlassThickM;
     app.doorTool.settings.glassFillColor = doorGlassFillColor;
     app.doorTool.applySettingsToSelection();
-  }, [doorMode, doorWidthM, doorHeightM, doorBreakHeightM, doorSide, doorHand, doorEdge, doorColor, doorJambEnabled, doorJambColor, doorJambLenM, doorJambThickM, doorSashEnabled, doorGlassColor, doorGlassThickM, doorGlassFillColor]);
+  }, [doorMode, doorWidthM, doorHeightM, doorBreakHeightM, doorBreakHeightVisible, doorSide, doorHand, doorEdge, doorColor, doorJambEnabled, doorJambColor, doorJambLenM, doorJambThickM, doorSashEnabled, doorGlassColor, doorGlassThickM, doorGlassFillColor]);
 
   // Line arrow settings sync (Default + selektiertes Segment)
   useEffect(() => {
