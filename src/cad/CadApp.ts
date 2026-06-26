@@ -539,6 +539,8 @@ export class CadApp {
         decimals: d.decimals, tickLengthM: d.tickLengthM, showExtensions: d.showExtensions,
         useFreeText: d.useFreeText, freeText: d.freeText,
         textBgEnabled: d.textBgEnabled, textBgColor: d.textBgColor, textBgAlpha: d.textBgAlpha,
+        extensionStyle: d.extensionStyle, extensionColor: d.extensionColor, extensionAlpha: d.extensionAlpha,
+        freeTextBold: d.freeTextBold, freeTextItalic: d.freeTextItalic, freeTextColor: d.freeTextColor,
         labelId: d.labelId,
         doorRefId: d.doorRefId || null,
         _stickerEditOwnerId: d._stickerEditOwnerId || null,
