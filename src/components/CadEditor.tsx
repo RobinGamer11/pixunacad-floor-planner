@@ -300,6 +300,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
     app.doorTool.settings.widthM = doorWidthM;
     app.doorTool.settings.heightM = doorHeightM;
     app.doorTool.settings.breakHeightM = doorBreakHeightM;
+    app.doorTool.settings.breakHeightVisible = doorBreakHeightVisible;
     app.doorTool.settings.side = doorSide;
     app.doorTool.settings.hand = doorHand;
     app.doorTool.settings.edge = doorEdge;
