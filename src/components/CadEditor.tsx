@@ -1814,7 +1814,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
               </div>
               <div>
                 <label>Punkte</label>
-                <select ref={measurePointCountRef} className="cad-settings-select w-full">
+                <select ref={measurePointCountRef} className="cad-settings-select w-full" defaultValue="multi">
                   <option value="two">2 Punkte (Einzelmaß)</option>
                   <option value="multi">Mehrere Punkte (Kette)</option>
                 </select>
