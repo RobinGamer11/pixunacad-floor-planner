@@ -235,8 +235,8 @@ export class CadApp {
   activeTool: SelectTool | LineTool | HatchTool | MeasureTool | TextTool | PipetteTool | StickerTool | DocumentTool | FreeDrawTool | EraserTool | WallTool | DoorTool;
 
   /** Hub-Box-State für ausgewähltes Dokument (Verschieben/Drehen). Geschrieben von SelectTool, gelesen von CadEditor. */
-  documentHubState: { visible: boolean; screenX: number; screenY: number; docId: string | null; cornerIndex: number } = {
-    visible: false, screenX: 0, screenY: 0, docId: null, cornerIndex: 0,
+  documentHubState: { visible: boolean; screenX: number; screenY: number; docId: string | null; cornerIndex: number; anchorWorld: { x: number; y: number } | null } = {
+    visible: false, screenX: 0, screenY: 0, docId: null, cornerIndex: 0, anchorWorld: null,
   };
 
   /** Aktive Maus-Operation der PDF-/Bild-Hub-Box. Wird von CadEditor (React) gesetzt
