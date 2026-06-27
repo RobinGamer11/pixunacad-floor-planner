@@ -288,6 +288,8 @@ export class CadApp {
     freeTextBold: Defaults.measureFreeTextBold,
     freeTextItalic: Defaults.measureFreeTextItalic,
     freeTextColor: Defaults.measureFreeTextColor,
+    showUnit: Defaults.measureShowUnit,
+    unit: Defaults.measureUnit,
   };
 
   // Drag state for parallel-shifting a selected dimension
