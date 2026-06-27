@@ -4,7 +4,7 @@ import { Scene, Segment, Hatch } from "./Scene";
 import { Camera } from "./Camera";
 import { LabelManager } from "./LabelManager";
 import { boxCornersWorld } from "./textGeometry";
-import { documentCornersWorld, documentEdgeMidpointsWorld } from "./documentGeometry";
+import { documentCornersWorld, documentEdgeMidpointsWorld, documentCenterWorld } from "./documentGeometry";
 import { computeWallLines } from "./wallGeom";
 import { computeHealedWallLines } from "./wallHeal";
 import { doorGeometry } from "./doorGeom";
