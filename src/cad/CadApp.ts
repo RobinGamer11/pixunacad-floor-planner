@@ -86,6 +86,8 @@ export interface MeasureSettings {
   freeTextBold: boolean;
   freeTextItalic: boolean;
   freeTextColor: string;
+  showUnit: boolean;
+  unit: "mm" | "cm" | "m";
 }
 
 
