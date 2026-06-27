@@ -1412,6 +1412,7 @@ export class CadApp {
       extensionAlpha: this.measureSettings.extensionAlpha,
       freeTextBold: this.measureSettings.freeTextBold, freeTextItalic: this.measureSettings.freeTextItalic,
       freeTextColor: this.measureSettings.freeTextColor,
+      showUnit: this.measureSettings.showUnit, unit: this.measureSettings.unit,
       labelId: this.activeDrawLabelId || Defaults.defaultLabelId,
     };
   }
