@@ -434,6 +434,8 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
         lineColor: measureLineColorRef.current,
         lineColorPreview: measureLineColorPreviewRef.current,
         tickLength: measureTickLengthRef.current,
+        showUnit: measureShowUnitRef.current!,
+        unit: measureUnitRef.current!,
       },
       {
         panel: textSettingsRef.current,
