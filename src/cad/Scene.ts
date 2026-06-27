@@ -163,6 +163,9 @@ export class Dimension {
   freeTextItalic: boolean;
   freeTextColor: string;
 
+  showUnit: boolean;
+  unit: "mm" | "cm" | "m";
+
   labelId: string;
   /** Optional: Referenz auf eine Tür/ein Fenster, wenn das Maß die Öffnungsbreite misst.
    *  Wenn gesetzt, wird unterhalb der Maßlinie die Höhe und die Brüstungshöhe (BRH) ergänzt. */
