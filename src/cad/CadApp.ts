@@ -126,6 +126,8 @@ export interface MeasureSettingsRefs {
   lineColor: HTMLInputElement;
   lineColorPreview: HTMLDivElement;
   tickLength: HTMLInputElement;
+  showUnit: HTMLInputElement;
+  unit: HTMLSelectElement;
 }
 
 export class CadApp {
