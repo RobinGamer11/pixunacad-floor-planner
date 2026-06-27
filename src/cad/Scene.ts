@@ -202,6 +202,9 @@ export class Dimension {
     this.freeTextBold = !!(s.freeTextBold ?? Defaults.measureFreeTextBold);
     this.freeTextItalic = !!(s.freeTextItalic ?? Defaults.measureFreeTextItalic);
     this.freeTextColor = s.freeTextColor || Defaults.measureFreeTextColor;
+    this.freeTextColor = s.freeTextColor || Defaults.measureFreeTextColor;
+    this.showUnit = (typeof s.showUnit === "boolean") ? s.showUnit : Defaults.measureShowUnit;
+    this.unit = (s.unit === "mm" || s.unit === "cm" || s.unit === "m") ? s.unit : Defaults.measureUnit;
     this.labelId = labelId || s.labelId || Defaults.defaultLabelId;
     this.doorRefId = doorRefId || null;
     this._stickerEditOwnerId = null;
