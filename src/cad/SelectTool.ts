@@ -1873,79 +1873,64 @@ export class SelectTool {
     }
 
     if (input.clicked) {
-      // PDF/Bild-Hub: aktiver Maus-Modus (Move/Rotate/Scale) — Canvas-Klick setzt Zielpunkt
-      // bezogen auf den per "Anker"-Button gewählten Eckpunkt. Snap-fähig.
+      // PDF/Bild-Hub: aktiver Maus-Modus (Move/Rotate/Scale) — Canvas-Klick committet
+      // die Transformation bezogen auf den frei gewählten Ankerpunkt (Welt).
       {
         const sel = this.app.selection as any;
         const hs = this.app.documentHubState;
         const mode = this.app.documentHubMode;
-        if (mode !== "none" && hs.visible && sel && sel.type === SelectionType.DOCUMENT && sel.documentId && hs.docId === sel.documentId) {
+        if (mode !== "none" && hs.visible && hs.anchorWorld && sel && sel.type === SelectionType.DOCUMENT && sel.documentId && hs.docId === sel.documentId) {
           const doc = this.app.scene.getDocumentById(sel.documentId);
           if (doc) {
             const mouseW = v(input.mouse.wx, input.mouse.wy);
             const snap = this.app.topology.findBestSnap(v(input.mouse.sx, input.mouse.sy), mouseW);
             const target = (snap && snap.world) ? snap.world : mouseW;
-            const anchorIdx = hs.cornerIndex || 0;
-            const cornerWorld = () => documentCornersWorld(doc)[anchorIdx];
-            const updateHubScreen = () => {
-              const c = cornerWorld();
-              const sp = this.app.camera.worldToScreen(c.x, c.y);
-              this.app.documentHubState = { ...hs, screenX: sp.x, screenY: sp.y };
-            };
+            const a = hs.anchorWorld;
 
             if (mode === "move") {
-              const a = cornerWorld();
-              doc.position = { x: doc.position.x + (target.x - a.x), y: doc.position.y + (target.y - a.y) };
-              updateHubScreen();
-              return;
-            }
-            if (mode === "rotate") {
-              if (!this.app.documentHubFirstClick) {
-                this.app.documentHubFirstClick = { x: target.x, y: target.y };
-                return;
-              }
-              const a = cornerWorld();
-              const ref = this.app.documentHubFirstClick;
-              const angRef = Math.atan2(ref.y - a.y, ref.x - a.x);
-              const angTgt = Math.atan2(target.y - a.y, target.x - a.x);
-              const delta = angTgt - angRef;
-              if (Math.abs(delta) > 1e-6) {
+              const dx = target.x - a.x;
+              const dy = target.y - a.y;
+              doc.position = { x: doc.position.x + dx, y: doc.position.y + dy };
+            } else if (mode === "rotate") {
+              const center = documentCenterWorld(doc);
+              const r0 = Math.hypot(center.x - a.x, center.y - a.y);
+              if (r0 > 1e-6) {
+                const ang0 = Math.atan2(center.y - a.y, center.x - a.x);
+                const ang1 = Math.atan2(target.y - a.y, target.x - a.x);
+                const delta = ang1 - ang0;
                 doc.rotationRad = doc.rotationRad + delta;
-                // Anker fixieren: nach Rotation Korrekturverschiebung anwenden.
-                const aNew = documentCornersWorld(doc)[anchorIdx];
-                doc.position = { x: doc.position.x + (a.x - aNew.x), y: doc.position.y + (a.y - aNew.y) };
+                // Pivot fixieren: Zentrum um anchor rotieren
+                const cs = Math.cos(delta), sn = Math.sin(delta);
+                const cx = a.x + (center.x - a.x) * cs - (center.y - a.y) * sn;
+                const cy = a.y + (center.x - a.x) * sn + (center.y - a.y) * cs;
+                doc.position = { x: cx - doc.widthM / 2, y: cy - doc.heightM / 2 };
               }
-              this.app.documentHubFirstClick = null;
-              updateHubScreen();
-              return;
+            } else if (mode === "scale") {
+              const center = documentCenterWorld(doc);
+              const r0 = Math.hypot(center.x - a.x, center.y - a.y);
+              const r1 = Math.hypot(target.x - a.x, target.y - a.y);
+              if (r0 > 1e-6 && r1 > 1e-6) {
+                const f = Math.max(0.05, Math.min(20, r1 / r0));
+                doc.widthM = Math.max(0.001, doc.widthM * f);
+                doc.heightM = Math.max(0.001, doc.heightM * f);
+                const cx = a.x + (center.x - a.x) * f;
+                const cy = a.y + (center.y - a.y) * f;
+                doc.position = { x: cx - doc.widthM / 2, y: cy - doc.heightM / 2 };
+              }
             }
-            if (mode === "scale") {
-              const a = cornerWorld();
-              if (!this.app.documentHubFirstClick) {
-                this.app.documentHubFirstClick = { x: target.x, y: target.y };
-                return;
-              }
-              const ref = this.app.documentHubFirstClick;
-              const dRef = Math.hypot(ref.x - a.x, ref.y - a.y);
-              const dTgt = Math.hypot(target.x - a.x, target.y - a.y);
-              if (dRef > 1e-6 && dTgt > 1e-6) {
-                const factor = dTgt / dRef;
-                doc.widthM = Math.max(0.001, doc.widthM * factor);
-                doc.heightM = Math.max(0.001, doc.heightM * factor);
-                // Anker fixieren: nach Skalierung verschieben, sodass cornerIndex am Punkt bleibt.
-                const aNew = documentCornersWorld(doc)[anchorIdx];
-                doc.position = { x: doc.position.x + (a.x - aNew.x), y: doc.position.y + (a.y - aNew.y) };
-              }
-              this.app.documentHubFirstClick = null;
-              updateHubScreen();
-              return;
-            }
+            // Modus & Hub schließen nach Commit.
+            this.app.documentHubMode = "none";
+            this.app.documentHubFirstClick = null;
+            this.app.documentHubState = { visible: false, screenX: 0, screenY: 0, docId: null, cornerIndex: 0, anchorWorld: null };
+            return;
           }
         }
       }
 
 
-      // Dokument-Auswahl: vor allen anderen Hits Eckpunkt/Kante des aktuell ausgewählten Dokuments testen.
+      // Dokument-Auswahl: bei aktiver Dokument-Selektion einen Klick irgendwo im
+      // Dokument als Ankerpunkt für die Hub-Box akzeptieren. Eckpunkte/Kanten
+      // werden wie bisher (Kante = Guide-Toggle, Ecke = Hub) behandelt.
       {
         const sel = this.app.selection as any;
         if (sel && sel.type === SelectionType.DOCUMENT && sel.documentId) {
@@ -1960,6 +1945,7 @@ export class SelectTool {
               this.app.documentHubState = {
                 visible: true, screenX: sp.x, screenY: sp.y,
                 docId: doc.id, cornerIndex: cornerIdx,
+                anchorWorld: { x: cw.x, y: cw.y },
               };
               return;
             }
@@ -1968,9 +1954,23 @@ export class SelectTool {
               doc.guideEdges = { ...doc.guideEdges, [edgeSide]: !doc.guideEdges[edgeSide] };
               return;
             }
-            // Klick außerhalb von Ecke/Kante schließt die Hub-Box (Auswahl bleibt).
+            // Klick irgendwo INNERHALB des Dokuments → Hub an Klick-Position öffnen,
+            // Anker = (gesnapter) Welt-Klickpunkt. So lässt sich die PDF von jeder
+            // Stelle aus verschieben/drehen/skalieren.
+            const mouseW = v(input.mouse.wx, input.mouse.wy);
+            if (pointInDocument(mouseW, doc)) {
+              const snap = this.app.topology.findBestSnap(v(input.mouse.sx, input.mouse.sy), mouseW);
+              const anchor = (snap && snap.world) ? snap.world : mouseW;
+              this.app.documentHubState = {
+                visible: true, screenX: input.mouse.sx, screenY: input.mouse.sy,
+                docId: doc.id, cornerIndex: 0,
+                anchorWorld: { x: anchor.x, y: anchor.y },
+              };
+              return;
+            }
+            // Klick außerhalb schließt die Hub-Box (Auswahl bleibt evtl. erhalten).
             if (this.app.documentHubState.visible) {
-              this.app.documentHubState = { visible: false, screenX: 0, screenY: 0, docId: null, cornerIndex: 0 };
+              this.app.documentHubState = { visible: false, screenX: 0, screenY: 0, docId: null, cornerIndex: 0, anchorWorld: null };
             }
           }
         }
