@@ -2243,6 +2243,73 @@ export class SelectTool {
   }
 
   _drawOverlay(ctx: CanvasRenderingContext2D, cam: any) {
+    // PDF/Bild-Hub: Live-Vorschau (Ghost) während aktivem Move/Rotate/Scale.
+    {
+      const mode = this.app.documentHubMode;
+      const hs = this.app.documentHubState;
+      const sel = this.app.selection as any;
+      if (mode !== "none" && hs.visible && hs.anchorWorld && sel && sel.type === SelectionType.DOCUMENT && sel.documentId && hs.docId === sel.documentId) {
+        const doc = this.app.scene.getDocumentById(sel.documentId);
+        if (doc) {
+          const mouseW = v(this.app.input.mouse.wx, this.app.input.mouse.wy);
+          const snap = this.app.topology.findBestSnap(v(this.app.input.mouse.sx, this.app.input.mouse.sy), mouseW);
+          const target = (snap && snap.world) ? snap.world : mouseW;
+          const a = hs.anchorWorld;
+          let ghost: any = null;
+          if (mode === "move") {
+            ghost = { ...doc, position: { x: doc.position.x + (target.x - a.x), y: doc.position.y + (target.y - a.y) }, _snapOnly: false };
+          } else if (mode === "rotate") {
+            const center = documentCenterWorld(doc);
+            const r0 = Math.hypot(center.x - a.x, center.y - a.y);
+            if (r0 > 1e-6) {
+              const ang0 = Math.atan2(center.y - a.y, center.x - a.x);
+              const ang1 = Math.atan2(target.y - a.y, target.x - a.x);
+              const delta = ang1 - ang0;
+              const cs = Math.cos(delta), sn = Math.sin(delta);
+              const cx = a.x + (center.x - a.x) * cs - (center.y - a.y) * sn;
+              const cy = a.y + (center.x - a.x) * sn + (center.y - a.y) * cs;
+              ghost = { ...doc, rotationRad: doc.rotationRad + delta, position: { x: cx - doc.widthM / 2, y: cy - doc.heightM / 2 }, _snapOnly: false };
+            }
+          } else if (mode === "scale") {
+            const center = documentCenterWorld(doc);
+            const r0 = Math.hypot(center.x - a.x, center.y - a.y);
+            const r1 = Math.hypot(target.x - a.x, target.y - a.y);
+            if (r0 > 1e-6 && r1 > 1e-6) {
+              const f = Math.max(0.05, Math.min(20, r1 / r0));
+              const nw = Math.max(0.001, doc.widthM * f);
+              const nh = Math.max(0.001, doc.heightM * f);
+              const cx = a.x + (center.x - a.x) * f;
+              const cy = a.y + (center.y - a.y) * f;
+              ghost = { ...doc, widthM: nw, heightM: nh, position: { x: cx - nw / 2, y: cy - nh / 2 }, _snapOnly: false };
+            }
+          }
+          if (ghost) {
+            ctx.save();
+            ctx.globalAlpha = 0.55;
+            try { (this.app.renderer as any)._drawSingleDocument(ghost); } catch { /* ignore */ }
+            ctx.restore();
+            // Anker-Marker + Linie zur Maus
+            const sa = cam.worldToScreen(a.x, a.y);
+            const st = cam.worldToScreen(target.x, target.y);
+            ctx.save();
+            ctx.strokeStyle = "rgba(77,163,255,0.8)";
+            ctx.setLineDash([5, 4]);
+            ctx.lineWidth = 1.2;
+            ctx.beginPath(); ctx.moveTo(sa.x, sa.y); ctx.lineTo(st.x, st.y); ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.fillStyle = "rgba(77,163,255,0.95)";
+            ctx.strokeStyle = "#fff";
+            ctx.lineWidth = 1.5;
+            ctx.beginPath(); ctx.arc(sa.x, sa.y, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+            ctx.restore();
+            if (snap && snap.world) {
+              drawSnapDot(ctx, st.x, st.y, { ring: true });
+            }
+          }
+        }
+      }
+    }
+
     // Hilfslinien-Anker während Punkt-Edit
     if (this.isEditing() && this.editGuideAnchors.length > 0) {
       ctx.save();
