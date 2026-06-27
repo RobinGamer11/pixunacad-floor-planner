@@ -2461,6 +2461,20 @@ export class CadApp {
       if (sel) sel.tickLengthM = c;
     });
 
+    if (r.showUnit) r.showUnit.addEventListener("change", () => {
+      const val = !!r.showUnit.checked;
+      this.measureSettings.showUnit = val;
+      const sel = this.getSelectedDimension();
+      if (sel) sel.showUnit = val;
+    });
+
+    if (r.unit) r.unit.addEventListener("change", () => {
+      const val = (r.unit.value === "mm" || r.unit.value === "cm" || r.unit.value === "m") ? r.unit.value : "m";
+      this.measureSettings.unit = val;
+      const sel = this.getSelectedDimension();
+      if (sel) sel.unit = val;
+    });
+
     this._syncMeasureSettingsFromContext();
   }
 
