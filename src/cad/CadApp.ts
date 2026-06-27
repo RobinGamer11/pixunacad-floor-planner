@@ -2508,6 +2508,8 @@ export class CadApp {
     r.lineColor.value = this._toHexColor(s.lineColor);
     r.lineColorPreview.style.background = r.lineColor.value;
     r.tickLength.value = String(s.tickLengthM);
+    if (r.showUnit) r.showUnit.checked = !!s.showUnit;
+    if (r.unit) r.unit.value = s.unit || "m";
     const labelForDisplay =
       (this.selectedLabelId && this.labelManager.getById(this.selectedLabelId)) ? this.selectedLabelId
         : (s.labelId && this.labelManager.getById(s.labelId)) ? s.labelId
