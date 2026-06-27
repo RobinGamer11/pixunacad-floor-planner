@@ -126,6 +126,10 @@ export interface DimensionStyle {
   freeTextBold?: boolean;
   freeTextItalic?: boolean;
   freeTextColor?: string;
+  /** Anzeige der Einheit hinter der Maßzahl (z. B. "2,45 m"). */
+  showUnit?: boolean;
+  /** Einheit für die Anzeige der Maßzahl (intern bleiben die Werte in m). */
+  unit?: "mm" | "cm" | "m";
   labelId?: string;
 }
 
