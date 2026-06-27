@@ -2475,6 +2475,7 @@ export class CadApp {
       lineColor: sel.lineColor, tickLengthM: sel.tickLengthM, labelId: sel.labelId,
       extensionStyle: sel.extensionStyle, extensionColor: sel.extensionColor, extensionAlpha: sel.extensionAlpha,
       freeTextBold: sel.freeTextBold, freeTextItalic: sel.freeTextItalic, freeTextColor: sel.freeTextColor,
+      showUnit: sel.showUnit, unit: sel.unit,
     } : { ...this.measureSettings, labelId: this.activeDrawLabelId };
 
     r.orientation.value = s.orientation;
