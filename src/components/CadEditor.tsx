@@ -145,6 +145,8 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
   const measureLineColorRef = useRef<HTMLInputElement>(null);
   const measureLineColorPreviewRef = useRef<HTMLDivElement>(null);
   const measureTickLengthRef = useRef<HTMLInputElement>(null);
+  const measureShowUnitRef = useRef<HTMLInputElement>(null);
+  const measureUnitRef = useRef<HTMLSelectElement>(null);
 
   // Text settings refs
   const textSettingsRef = useRef<HTMLDivElement>(null);
