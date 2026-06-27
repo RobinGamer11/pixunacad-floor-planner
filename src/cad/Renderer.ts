@@ -1753,10 +1753,17 @@ export class Renderer {
       const door = this.scene.getDoorById(dim.doorRefId);
       if (door) {
         const dec = Math.max(0, Math.min(6, dim.decimals ?? Defaults.measureDecimals));
+        const unit = (dim as any).unit ?? Defaults.measureUnit;
+        const showUnit = (typeof (dim as any).showUnit === "boolean") ? (dim as any).showUnit : Defaults.measureShowUnit;
+        const factor = unit === "mm" ? 1000 : unit === "cm" ? 100 : 1;
+        const fmt = (m: number) => {
+          const t = (m * factor).toFixed(dec);
+          return showUnit ? `${t} ${unit}` : t;
+        };
         const lines: string[] = [];
-        lines.push(`${door.heightM.toFixed(dec)} m`);
+        lines.push(fmt(door.heightM));
         if (door.breakHeightVisible) {
-          lines.push(`BRH: ${door.breakHeightM.toFixed(dec)} m`);
+          lines.push(`BRH: ${fmt(door.breakHeightM)}`);
         }
         const subFont = Math.max(1, baseSize * zoomFactor * 0.78);
         ctx.font = `${subFont}px system-ui, Arial, sans-serif`;

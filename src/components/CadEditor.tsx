@@ -145,6 +145,8 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
   const measureLineColorRef = useRef<HTMLInputElement>(null);
   const measureLineColorPreviewRef = useRef<HTMLDivElement>(null);
   const measureTickLengthRef = useRef<HTMLInputElement>(null);
+  const measureShowUnitRef = useRef<HTMLInputElement>(null);
+  const measureUnitRef = useRef<HTMLSelectElement>(null);
 
   // Text settings refs
   const textSettingsRef = useRef<HTMLDivElement>(null);
@@ -365,6 +367,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
       !measureDecimalsRef.current || !measureTextBgToggleRef.current || !measureTextBgGroupRef.current ||
       !measureTextBgColorRef.current || !measureTextBgColorPreviewRef.current || !measureTextBgAlphaRef.current ||
       !measureLineColorRef.current || !measureLineColorPreviewRef.current || !measureTickLengthRef.current ||
+      !measureShowUnitRef.current || !measureUnitRef.current ||
       !textSettingsRef.current || !textIdSelectRef.current ||
       !textColorRef.current || !textColorPreviewRef.current || !textFontSizeRef.current ||
       !textAlignLeftRef.current || !textAlignCenterRef.current || !textAlignRightRef.current ||
@@ -432,6 +435,8 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
         lineColor: measureLineColorRef.current,
         lineColorPreview: measureLineColorPreviewRef.current,
         tickLength: measureTickLengthRef.current,
+        showUnit: measureShowUnitRef.current!,
+        unit: measureUnitRef.current!,
       },
       {
         panel: textSettingsRef.current,
@@ -1184,7 +1189,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
           const app = appRef.current;
           const doc = app && docHub.docId ? app.scene.getDocumentById(docHub.docId) : null;
           const closeHub = () => {
-            if (app) app.documentHubState = { visible: false, screenX: 0, screenY: 0, docId: null, cornerIndex: 0 };
+            if (app) app.documentHubState = { visible: false, screenX: 0, screenY: 0, docId: null, cornerIndex: 0, anchorWorld: null };
             setDocHub({ visible: false, screenX: 0, screenY: 0, docId: null, mode: "none" });
           };
           const applyMove = () => {
@@ -1215,22 +1220,6 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
               closeHub();
             }
           };
-          const cycleAnchor = () => {
-            if (!app || !doc) return;
-            const next = ((app.documentHubState.cornerIndex || 0) + 1) % 4;
-            const cx = doc.position.x + doc.widthM / 2;
-            const cy = doc.position.y + doc.heightM / 2;
-            const hw = doc.widthM / 2, hh = doc.heightM / 2;
-            const c = Math.cos(doc.rotationRad), s = Math.sin(doc.rotationRad);
-            const local = [
-              { x: -hw, y: -hh }, { x: hw, y: -hh }, { x: hw, y: hh }, { x: -hw, y: hh },
-            ];
-            const w = local[next];
-            const wx = cx + w.x * c - w.y * s;
-            const wy = cy + w.x * s + w.y * c;
-            const sp = app.camera.worldToScreen(wx, wy);
-            app.documentHubState = { visible: true, screenX: sp.x, screenY: sp.y, docId: doc.id, cornerIndex: next };
-          };
           return (
             <div
               className="absolute z-30 flex items-center gap-1.5 px-2 py-1.5 rounded-md shadow-lg"
@@ -1243,14 +1232,6 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
               }}
               onMouseDown={(e) => e.stopPropagation()}
             >
-              <button
-                type="button"
-                title="Anker / Eckpunkt wechseln"
-                onClick={cycleAnchor}
-                className="cad-toolbar-btn h-7 w-7 justify-center px-0"
-              >
-                <Crosshair className="h-3.5 w-3.5" />
-              </button>
               <button
                 type="button"
                 title="Verschieben (Δx, Δy in m)"
@@ -1920,7 +1901,19 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
               </div>
               <div>
                 <label>Endstrich-Länge (m)</label>
-                <input ref={measureTickLengthRef} type="text" defaultValue="0.2" />
+                <input ref={measureTickLengthRef} type="text" defaultValue="0.15" />
+              </div>
+              <div className="flex items-center gap-2">
+                <input ref={measureShowUnitRef} type="checkbox" className="accent-primary" defaultChecked />
+                <label className="!mb-0 cursor-pointer">Einheit anzeigen</label>
+              </div>
+              <div>
+                <label>Einheit</label>
+                <select ref={measureUnitRef} className="cad-settings-select w-full" defaultValue="m">
+                  <option value="mm">mm</option>
+                  <option value="cm">cm</option>
+                  <option value="m">m</option>
+                </select>
               </div>
             </div>
           </div>

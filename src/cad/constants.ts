@@ -41,7 +41,11 @@ export const Defaults = {
   measureTextSizePx: 11,
   measureLineColor: "#2b2b2b",
   measureDecimals: 2,
-  measureTickLengthM: 0.2,
+  measureTickLengthM: 0.15,
+  /** Anzeige der Einheit hinter dem Maßzahl-Text (z. B. "2,45 m" vs. "2,45"). */
+  measureShowUnit: true,
+  /** Einheit für die Anzeige der Maßzahl (mm, cm, m). Wert ist intern immer in Metern. */
+  measureUnit: "m" as "mm" | "cm" | "m",
   measureShowExtensions: false,
   measureUseFreeText: false,
   measureFreeText: "",

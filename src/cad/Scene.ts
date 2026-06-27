@@ -126,6 +126,10 @@ export interface DimensionStyle {
   freeTextBold?: boolean;
   freeTextItalic?: boolean;
   freeTextColor?: string;
+  /** Anzeige der Einheit hinter der Maßzahl (z. B. "2,45 m"). */
+  showUnit?: boolean;
+  /** Einheit für die Anzeige der Maßzahl (intern bleiben die Werte in m). */
+  unit?: "mm" | "cm" | "m";
   labelId?: string;
 }
 
@@ -158,6 +162,9 @@ export class Dimension {
   freeTextBold: boolean;
   freeTextItalic: boolean;
   freeTextColor: string;
+
+  showUnit: boolean;
+  unit: "mm" | "cm" | "m";
 
   labelId: string;
   /** Optional: Referenz auf eine Tür/ein Fenster, wenn das Maß die Öffnungsbreite misst.
@@ -195,6 +202,9 @@ export class Dimension {
     this.freeTextBold = !!(s.freeTextBold ?? Defaults.measureFreeTextBold);
     this.freeTextItalic = !!(s.freeTextItalic ?? Defaults.measureFreeTextItalic);
     this.freeTextColor = s.freeTextColor || Defaults.measureFreeTextColor;
+    this.freeTextColor = s.freeTextColor || Defaults.measureFreeTextColor;
+    this.showUnit = (typeof s.showUnit === "boolean") ? s.showUnit : Defaults.measureShowUnit;
+    this.unit = (s.unit === "mm" || s.unit === "cm" || s.unit === "m") ? s.unit : Defaults.measureUnit;
     this.labelId = labelId || s.labelId || Defaults.defaultLabelId;
     this.doorRefId = doorRefId || null;
     this._stickerEditOwnerId = null;

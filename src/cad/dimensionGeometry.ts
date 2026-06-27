@@ -30,6 +30,8 @@ export interface DimensionLike {
   useFreeText?: boolean;
   freeText?: string;
   tickLengthM?: number;
+  showUnit?: boolean;
+  unit?: "mm" | "cm" | "m";
 }
 
 export function getDimensionBaseDirection(dim: DimensionLike): Vec2 {
@@ -45,7 +47,12 @@ export function getDimensionBaseDirection(dim: DimensionLike): Vec2 {
 export function getDimensionDisplayText(dim: DimensionLike, distanceValue: number): string {
   if (dim.useFreeText) return dim.freeText || "";
   const decimals = Math.max(0, Math.min(6, dim.decimals ?? Defaults.measureDecimals));
-  return `${distanceValue.toFixed(decimals)} m`;
+  const unit = dim.unit ?? Defaults.measureUnit;
+  const showUnit = (typeof dim.showUnit === "boolean") ? dim.showUnit : Defaults.measureShowUnit;
+  const factor = unit === "mm" ? 1000 : unit === "cm" ? 100 : 1;
+  const value = distanceValue * factor;
+  const numText = value.toFixed(decimals);
+  return showUnit ? `${numText} ${unit}` : numText;
 }
 
 export function getDimensionGeometry(dim: DimensionLike): DimensionGeometry {

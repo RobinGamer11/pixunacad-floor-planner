@@ -86,6 +86,8 @@ export interface MeasureSettings {
   freeTextBold: boolean;
   freeTextItalic: boolean;
   freeTextColor: string;
+  showUnit: boolean;
+  unit: "mm" | "cm" | "m";
 }
 
 
@@ -124,6 +126,8 @@ export interface MeasureSettingsRefs {
   lineColor: HTMLInputElement;
   lineColorPreview: HTMLDivElement;
   tickLength: HTMLInputElement;
+  showUnit: HTMLInputElement;
+  unit: HTMLSelectElement;
 }
 
 export class CadApp {
@@ -231,8 +235,8 @@ export class CadApp {
   activeTool: SelectTool | LineTool | HatchTool | MeasureTool | TextTool | PipetteTool | StickerTool | DocumentTool | FreeDrawTool | EraserTool | WallTool | DoorTool;
 
   /** Hub-Box-State für ausgewähltes Dokument (Verschieben/Drehen). Geschrieben von SelectTool, gelesen von CadEditor. */
-  documentHubState: { visible: boolean; screenX: number; screenY: number; docId: string | null; cornerIndex: number } = {
-    visible: false, screenX: 0, screenY: 0, docId: null, cornerIndex: 0,
+  documentHubState: { visible: boolean; screenX: number; screenY: number; docId: string | null; cornerIndex: number; anchorWorld: { x: number; y: number } | null } = {
+    visible: false, screenX: 0, screenY: 0, docId: null, cornerIndex: 0, anchorWorld: null,
   };
 
   /** Aktive Maus-Operation der PDF-/Bild-Hub-Box. Wird von CadEditor (React) gesetzt
@@ -286,6 +290,8 @@ export class CadApp {
     freeTextBold: Defaults.measureFreeTextBold,
     freeTextItalic: Defaults.measureFreeTextItalic,
     freeTextColor: Defaults.measureFreeTextColor,
+    showUnit: Defaults.measureShowUnit,
+    unit: Defaults.measureUnit,
   };
 
   // Drag state for parallel-shifting a selected dimension
@@ -1392,6 +1398,7 @@ export class CadApp {
         textBgEnabled: sel.textBgEnabled, textBgColor: sel.textBgColor, textBgAlpha: sel.textBgAlpha,
         extensionStyle: sel.extensionStyle, extensionColor: sel.extensionColor, extensionAlpha: sel.extensionAlpha,
         freeTextBold: sel.freeTextBold, freeTextItalic: sel.freeTextItalic, freeTextColor: sel.freeTextColor,
+        showUnit: sel.showUnit, unit: sel.unit,
         labelId: sel.labelId,
       };
     }
@@ -1406,6 +1413,7 @@ export class CadApp {
       extensionAlpha: this.measureSettings.extensionAlpha,
       freeTextBold: this.measureSettings.freeTextBold, freeTextItalic: this.measureSettings.freeTextItalic,
       freeTextColor: this.measureSettings.freeTextColor,
+      showUnit: this.measureSettings.showUnit, unit: this.measureSettings.unit,
       labelId: this.activeDrawLabelId || Defaults.defaultLabelId,
     };
   }
@@ -2453,6 +2461,20 @@ export class CadApp {
       if (sel) sel.tickLengthM = c;
     });
 
+    if (r.showUnit) r.showUnit.addEventListener("change", () => {
+      const val = !!r.showUnit.checked;
+      this.measureSettings.showUnit = val;
+      const sel = this.getSelectedDimension();
+      if (sel) sel.showUnit = val;
+    });
+
+    if (r.unit) r.unit.addEventListener("change", () => {
+      const val = (r.unit.value === "mm" || r.unit.value === "cm" || r.unit.value === "m") ? r.unit.value : "m";
+      this.measureSettings.unit = val;
+      const sel = this.getSelectedDimension();
+      if (sel) sel.unit = val;
+    });
+
     this._syncMeasureSettingsFromContext();
   }
 
@@ -2469,6 +2491,7 @@ export class CadApp {
       lineColor: sel.lineColor, tickLengthM: sel.tickLengthM, labelId: sel.labelId,
       extensionStyle: sel.extensionStyle, extensionColor: sel.extensionColor, extensionAlpha: sel.extensionAlpha,
       freeTextBold: sel.freeTextBold, freeTextItalic: sel.freeTextItalic, freeTextColor: sel.freeTextColor,
+      showUnit: sel.showUnit, unit: sel.unit,
     } : { ...this.measureSettings, labelId: this.activeDrawLabelId };
 
     r.orientation.value = s.orientation;
@@ -2501,6 +2524,8 @@ export class CadApp {
     r.lineColor.value = this._toHexColor(s.lineColor);
     r.lineColorPreview.style.background = r.lineColor.value;
     r.tickLength.value = String(s.tickLengthM);
+    if (r.showUnit) r.showUnit.checked = !!s.showUnit;
+    if (r.unit) r.unit.value = s.unit || "m";
     const labelForDisplay =
       (this.selectedLabelId && this.labelManager.getById(this.selectedLabelId)) ? this.selectedLabelId
         : (s.labelId && this.labelManager.getById(s.labelId)) ? s.labelId
