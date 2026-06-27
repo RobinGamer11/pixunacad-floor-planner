@@ -1398,6 +1398,7 @@ export class CadApp {
         textBgEnabled: sel.textBgEnabled, textBgColor: sel.textBgColor, textBgAlpha: sel.textBgAlpha,
         extensionStyle: sel.extensionStyle, extensionColor: sel.extensionColor, extensionAlpha: sel.extensionAlpha,
         freeTextBold: sel.freeTextBold, freeTextItalic: sel.freeTextItalic, freeTextColor: sel.freeTextColor,
+        showUnit: sel.showUnit, unit: sel.unit,
         labelId: sel.labelId,
       };
     }
