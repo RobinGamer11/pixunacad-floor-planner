@@ -2191,7 +2191,7 @@ export class SelectTool {
           // Hub-Box wird erst beim Klick auf eine Ecke geöffnet (siehe oben).
         } else {
           this.app.setSelection(null);
-          this.app.documentHubState = { visible: false, screenX: 0, screenY: 0, docId: null, cornerIndex: 0 };
+          this.app.documentHubState = { visible: false, screenX: 0, screenY: 0, docId: null, cornerIndex: 0, anchorWorld: null };
         }
       }
     }
