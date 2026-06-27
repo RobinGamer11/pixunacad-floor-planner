@@ -1924,7 +1924,19 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
               </div>
               <div>
                 <label>Endstrich-Länge (m)</label>
-                <input ref={measureTickLengthRef} type="text" defaultValue="0.2" />
+                <input ref={measureTickLengthRef} type="text" defaultValue="0.15" />
+              </div>
+              <div className="flex items-center gap-2">
+                <input ref={measureShowUnitRef} type="checkbox" className="accent-primary" defaultChecked />
+                <label className="!mb-0 cursor-pointer">Einheit anzeigen</label>
+              </div>
+              <div>
+                <label>Einheit</label>
+                <select ref={measureUnitRef} className="cad-settings-select w-full" defaultValue="m">
+                  <option value="mm">mm</option>
+                  <option value="cm">cm</option>
+                  <option value="m">m</option>
+                </select>
               </div>
             </div>
           </div>
