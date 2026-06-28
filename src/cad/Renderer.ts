@@ -615,6 +615,20 @@ export class Renderer {
     ctx.save();
     ctx.translate(cs.x, cs.y);
     if (doc.rotationRad) ctx.rotate(doc.rotationRad);
+    // Crop-Clip (lokale Doc-Koords, Pixel-Skalierung)
+    const crop = (doc as any).cropM as { top: number; right: number; bottom: number; left: number } | undefined;
+    if (crop && (crop.top > 0 || crop.right > 0 || crop.bottom > 0 || crop.left > 0)) {
+      const sx = cam.scale;
+      const clipL = -wPx / 2 + (crop.left || 0) * sx;
+      const clipT = -hPx / 2 + (crop.top || 0) * sx;
+      const clipW = wPx - ((crop.left || 0) + (crop.right || 0)) * sx;
+      const clipH = hPx - ((crop.top || 0) + (crop.bottom || 0)) * sx;
+      if (clipW > 0 && clipH > 0) {
+        ctx.beginPath();
+        ctx.rect(clipL, clipT, clipW, clipH);
+        ctx.clip();
+      }
+    }
     if (adaptive) {
       ctx.drawImage(adaptive, -wPx / 2, -hPx / 2, wPx, hPx);
     } else if (img) {

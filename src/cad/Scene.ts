@@ -334,18 +334,21 @@ export class DocumentObject {
   pdfSourceB64?: string | null;
   /** Welche Kanten als unendliche Hilfslinien sichtbar sind (Toggle per Klick). */
   guideEdges: { top: boolean; right: boolean; bottom: boolean; left: boolean };
+  /** Kanten-Crop in Metern (positiv = Kante nach innen geschoben, Inhalt wird abgeschnitten). */
+  cropM: { top: number; right: number; bottom: number; left: number };
   /** Runtime-Flag: Dokument existiert nur als Snap-/Hub-Quelle (z. B. Projektmappen-PDF),
    *  Bild wird NICHT gezeichnet, Serialisierung überspringt es. Nicht persistiert. */
   _snapOnly?: boolean;
 
 
-  constructor({ id, name, kind, src, pageIndex, position, widthM, heightM, rotationRad, pixelWidth, pixelHeight, labelId, importScaleDenom, eraseMaskDataUrl, pdfSourceB64, guideEdges }: {
+  constructor({ id, name, kind, src, pageIndex, position, widthM, heightM, rotationRad, pixelWidth, pixelHeight, labelId, importScaleDenom, eraseMaskDataUrl, pdfSourceB64, guideEdges, cropM }: {
     id: string; name?: string; kind?: "image" | "pdf-page"; src: string;
     pageIndex?: number; position: Vec2; widthM: number; heightM: number;
     rotationRad?: number; pixelWidth?: number; pixelHeight?: number; labelId?: string;
     importScaleDenom?: number; eraseMaskDataUrl?: string | null;
     pdfSourceB64?: string | null;
     guideEdges?: { top?: boolean; right?: boolean; bottom?: boolean; left?: boolean };
+    cropM?: { top?: number; right?: number; bottom?: number; left?: number };
   }) {
     this.id = id;
     this.name = name || "Dokument";
@@ -369,6 +372,12 @@ export class DocumentObject {
       right: !!guideEdges?.right,
       bottom: !!guideEdges?.bottom,
       left: !!guideEdges?.left,
+    };
+    this.cropM = {
+      top: Math.max(0, cropM?.top || 0),
+      right: Math.max(0, cropM?.right || 0),
+      bottom: Math.max(0, cropM?.bottom || 0),
+      left: Math.max(0, cropM?.left || 0),
     };
   }
 }
@@ -725,6 +734,7 @@ export class Scene {
     importScaleDenom?: number; eraseMaskDataUrl?: string | null;
     pdfSourceB64?: string | null;
     guideEdges?: { top?: boolean; right?: boolean; bottom?: boolean; left?: boolean };
+    cropM?: { top?: number; right?: number; bottom?: number; left?: number };
   }): DocumentObject {
     const doc = new DocumentObject({ id: this._makeId(), ...opts });
     this.documents.push(doc);

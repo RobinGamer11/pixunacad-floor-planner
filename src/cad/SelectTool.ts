@@ -8,7 +8,7 @@ import { getDimensionGeometry } from "./dimensionGeometry";
 import { pointInOrientedBox, boxCornersWorld, rotateVector } from "./textGeometry";
 import type { TextBox } from "./Scene";
 import { pointInInstance, instanceBoundingCornersWorld } from "./StickerManager";
-import { pointInDocument, hitDocumentCorner, hitDocumentEdge, documentCornersWorld, documentCenterWorld } from "./documentGeometry";
+import { pointInDocument, hitDocumentCorner, hitDocumentEdge, documentCornersWorld, documentCenterWorld, hitDocumentVisibleEdge, documentVisibleCornersWorld } from "./documentGeometry";
 import { computeWallLines } from "./wallGeom";
 import { buildWallSolidRing, buildHealedWallSolidRing } from "./wallSolid";
 import { runWallTopologyMaintenance } from "./wallTopologyMaintenance";
@@ -1873,13 +1873,13 @@ export class SelectTool {
     }
 
     if (input.clicked) {
-      // PDF/Bild-Hub: aktiver Maus-Modus (Move/Rotate/Scale) — Canvas-Klick committet
+      // PDF/Bild-Hub: aktiver Maus-Modus (Move/Rotate/Scale/Crop) — Canvas-Klick committet
       // die Transformation bezogen auf den frei gewählten Ankerpunkt (Welt).
       {
         const sel = this.app.selection as any;
         const hs = this.app.documentHubState;
         const mode = this.app.documentHubMode;
-        if (mode !== "none" && hs.visible && hs.anchorWorld && sel && sel.type === SelectionType.DOCUMENT && sel.documentId && hs.docId === sel.documentId) {
+        if (mode !== "none" && hs.visible && sel && sel.type === SelectionType.DOCUMENT && sel.documentId && hs.docId === sel.documentId) {
           const doc = this.app.scene.getDocumentById(sel.documentId);
           if (doc) {
             const mouseW = v(input.mouse.wx, input.mouse.wy);
@@ -1887,11 +1887,35 @@ export class SelectTool {
             const target = (snap && snap.world) ? snap.world : mouseW;
             const a = hs.anchorWorld;
 
-            if (mode === "move") {
+            if (mode === "crop" && hs.cropSide) {
+              // Klick-Position in lokale Doc-Koords (Origin = Doc-Center, unrotiert)
+              const cx = doc.position.x + doc.widthM / 2;
+              const cy = doc.position.y + doc.heightM / 2;
+              const dx = target.x - cx, dy = target.y - cy;
+              const cs = Math.cos(-doc.rotationRad), sn = Math.sin(-doc.rotationRad);
+              const lx = dx * cs - dy * sn;
+              const ly = dx * sn + dy * cs;
+              const hx = doc.widthM / 2, hy = doc.heightM / 2;
+              const cur = doc.cropM || { top: 0, right: 0, bottom: 0, left: 0 };
+              const side = hs.cropSide;
+              if (side === "left") {
+                const inset = Math.max(0, Math.min(doc.widthM - (cur.right || 0) - 0.001, lx + hx));
+                doc.cropM = { ...cur, left: inset };
+              } else if (side === "right") {
+                const inset = Math.max(0, Math.min(doc.widthM - (cur.left || 0) - 0.001, hx - lx));
+                doc.cropM = { ...cur, right: inset };
+              } else if (side === "top") {
+                const inset = Math.max(0, Math.min(doc.heightM - (cur.bottom || 0) - 0.001, ly + hy));
+                doc.cropM = { ...cur, top: inset };
+              } else if (side === "bottom") {
+                const inset = Math.max(0, Math.min(doc.heightM - (cur.top || 0) - 0.001, hy - ly));
+                doc.cropM = { ...cur, bottom: inset };
+              }
+            } else if (a && mode === "move") {
               const dx = target.x - a.x;
               const dy = target.y - a.y;
               doc.position = { x: doc.position.x + dx, y: doc.position.y + dy };
-            } else if (mode === "rotate") {
+            } else if (a && mode === "rotate") {
               const center = documentCenterWorld(doc);
               const r0 = Math.hypot(center.x - a.x, center.y - a.y);
               if (r0 > 1e-6) {
@@ -1899,13 +1923,12 @@ export class SelectTool {
                 const ang1 = Math.atan2(target.y - a.y, target.x - a.x);
                 const delta = ang1 - ang0;
                 doc.rotationRad = doc.rotationRad + delta;
-                // Pivot fixieren: Zentrum um anchor rotieren
                 const cs = Math.cos(delta), sn = Math.sin(delta);
                 const cx = a.x + (center.x - a.x) * cs - (center.y - a.y) * sn;
                 const cy = a.y + (center.x - a.x) * sn + (center.y - a.y) * cs;
                 doc.position = { x: cx - doc.widthM / 2, y: cy - doc.heightM / 2 };
               }
-            } else if (mode === "scale") {
+            } else if (a && mode === "scale") {
               const center = documentCenterWorld(doc);
               const r0 = Math.hypot(center.x - a.x, center.y - a.y);
               const r1 = Math.hypot(target.x - a.x, target.y - a.y);
@@ -1921,7 +1944,7 @@ export class SelectTool {
             // Modus & Hub schließen nach Commit.
             this.app.documentHubMode = "none";
             this.app.documentHubFirstClick = null;
-            this.app.documentHubState = { visible: false, screenX: 0, screenY: 0, docId: null, cornerIndex: 0, anchorWorld: null };
+            this.app.documentHubState = { visible: false, screenX: 0, screenY: 0, docId: null, cornerIndex: 0, anchorWorld: null, cropSide: null };
             return;
           }
         }
@@ -1930,7 +1953,7 @@ export class SelectTool {
 
       // Dokument-Auswahl: bei aktiver Dokument-Selektion einen Klick irgendwo im
       // Dokument als Ankerpunkt für die Hub-Box akzeptieren. Eckpunkte/Kanten
-      // werden wie bisher (Kante = Guide-Toggle, Ecke = Hub) behandelt.
+      // werden wie bisher (Kante = Crop-Hub, Ecke = Hub) behandelt.
       {
         const sel = this.app.selection as any;
         if (sel && sel.type === SelectionType.DOCUMENT && sel.documentId) {
@@ -1945,13 +1968,20 @@ export class SelectTool {
               this.app.documentHubState = {
                 visible: true, screenX: sp.x, screenY: sp.y,
                 docId: doc.id, cornerIndex: cornerIdx,
-                anchorWorld: { x: cw.x, y: cw.y },
+                anchorWorld: { x: cw.x, y: cw.y }, cropSide: null,
               };
               return;
             }
-            const edgeSide = hitDocumentEdge(doc, w2s, input.mouse.sx, input.mouse.sy, 8);
+            // Kante (sichtbar, nach Crop) klicken → Crop-Hub an Klick-Position öffnen.
+            const edgeSide = hitDocumentVisibleEdge(doc, w2s, input.mouse.sx, input.mouse.sy, 8)
+              || hitDocumentEdge(doc, w2s, input.mouse.sx, input.mouse.sy, 8);
             if (edgeSide) {
-              doc.guideEdges = { ...doc.guideEdges, [edgeSide]: !doc.guideEdges[edgeSide] };
+              this.app.documentHubState = {
+                visible: true, screenX: input.mouse.sx, screenY: input.mouse.sy,
+                docId: doc.id, cornerIndex: 0,
+                anchorWorld: { x: input.mouse.wx, y: input.mouse.wy },
+                cropSide: edgeSide,
+              };
               return;
             }
             // Klick irgendwo INNERHALB des Dokuments → Hub an Klick-Position öffnen,
@@ -1964,13 +1994,13 @@ export class SelectTool {
               this.app.documentHubState = {
                 visible: true, screenX: input.mouse.sx, screenY: input.mouse.sy,
                 docId: doc.id, cornerIndex: 0,
-                anchorWorld: { x: anchor.x, y: anchor.y },
+                anchorWorld: { x: anchor.x, y: anchor.y }, cropSide: null,
               };
               return;
             }
             // Klick außerhalb schließt die Hub-Box (Auswahl bleibt evtl. erhalten).
             if (this.app.documentHubState.visible) {
-              this.app.documentHubState = { visible: false, screenX: 0, screenY: 0, docId: null, cornerIndex: 0, anchorWorld: null };
+              this.app.documentHubState = { visible: false, screenX: 0, screenY: 0, docId: null, cornerIndex: 0, anchorWorld: null, cropSide: null };
             }
           }
         }
@@ -2191,7 +2221,7 @@ export class SelectTool {
           // Hub-Box wird erst beim Klick auf eine Ecke geöffnet (siehe oben).
         } else {
           this.app.setSelection(null);
-          this.app.documentHubState = { visible: false, screenX: 0, screenY: 0, docId: null, cornerIndex: 0, anchorWorld: null };
+          this.app.documentHubState = { visible: false, screenX: 0, screenY: 0, docId: null, cornerIndex: 0, anchorWorld: null, cropSide: null };
         }
       }
     }
@@ -2248,7 +2278,7 @@ export class SelectTool {
       const mode = this.app.documentHubMode;
       const hs = this.app.documentHubState;
       const sel = this.app.selection as any;
-      if (mode !== "none" && hs.visible && hs.anchorWorld && sel && sel.type === SelectionType.DOCUMENT && sel.documentId && hs.docId === sel.documentId) {
+      if (mode !== "none" && hs.visible && sel && sel.type === SelectionType.DOCUMENT && sel.documentId && hs.docId === sel.documentId) {
         const doc = this.app.scene.getDocumentById(sel.documentId);
         if (doc) {
           const mouseW = v(this.app.input.mouse.wx, this.app.input.mouse.wy);
@@ -2256,9 +2286,26 @@ export class SelectTool {
           const target = (snap && snap.world) ? snap.world : mouseW;
           const a = hs.anchorWorld;
           let ghost: any = null;
-          if (mode === "move") {
+          if (mode === "crop" && hs.cropSide) {
+            // Crop-Vorschau: projeziere Maus in lokale Doc-Koords und berechne neuen cropM.
+            const cx = doc.position.x + doc.widthM / 2;
+            const cy = doc.position.y + doc.heightM / 2;
+            const dxw = target.x - cx, dyw = target.y - cy;
+            const csA = Math.cos(-doc.rotationRad), snA = Math.sin(-doc.rotationRad);
+            const lx = dxw * csA - dyw * snA;
+            const ly = dxw * snA + dyw * csA;
+            const hx = doc.widthM / 2, hy = doc.heightM / 2;
+            const cur = (doc as any).cropM || { top: 0, right: 0, bottom: 0, left: 0 };
+            const next = { ...cur };
+            const side = hs.cropSide;
+            if (side === "left") next.left = Math.max(0, Math.min(doc.widthM - (cur.right || 0) - 0.001, lx + hx));
+            else if (side === "right") next.right = Math.max(0, Math.min(doc.widthM - (cur.left || 0) - 0.001, hx - lx));
+            else if (side === "top") next.top = Math.max(0, Math.min(doc.heightM - (cur.bottom || 0) - 0.001, ly + hy));
+            else if (side === "bottom") next.bottom = Math.max(0, Math.min(doc.heightM - (cur.top || 0) - 0.001, hy - ly));
+            ghost = { ...doc, cropM: next, _snapOnly: false };
+          } else if (a && mode === "move") {
             ghost = { ...doc, position: { x: doc.position.x + (target.x - a.x), y: doc.position.y + (target.y - a.y) }, _snapOnly: false };
-          } else if (mode === "rotate") {
+          } else if (a && mode === "rotate") {
             const center = documentCenterWorld(doc);
             const r0 = Math.hypot(center.x - a.x, center.y - a.y);
             if (r0 > 1e-6) {
@@ -2270,7 +2317,7 @@ export class SelectTool {
               const cy = a.y + (center.x - a.x) * sn + (center.y - a.y) * cs;
               ghost = { ...doc, rotationRad: doc.rotationRad + delta, position: { x: cx - doc.widthM / 2, y: cy - doc.heightM / 2 }, _snapOnly: false };
             }
-          } else if (mode === "scale") {
+          } else if (a && mode === "scale") {
             const center = documentCenterWorld(doc);
             const r0 = Math.hypot(center.x - a.x, center.y - a.y);
             const r1 = Math.hypot(target.x - a.x, target.y - a.y);
@@ -2288,20 +2335,22 @@ export class SelectTool {
             ctx.globalAlpha = 0.55;
             try { (this.app.renderer as any)._drawSingleDocument(ghost); } catch { /* ignore */ }
             ctx.restore();
-            // Anker-Marker + Linie zur Maus
-            const sa = cam.worldToScreen(a.x, a.y);
             const st = cam.worldToScreen(target.x, target.y);
-            ctx.save();
-            ctx.strokeStyle = "rgba(77,163,255,0.8)";
-            ctx.setLineDash([5, 4]);
-            ctx.lineWidth = 1.2;
-            ctx.beginPath(); ctx.moveTo(sa.x, sa.y); ctx.lineTo(st.x, st.y); ctx.stroke();
-            ctx.setLineDash([]);
-            ctx.fillStyle = "rgba(77,163,255,0.95)";
-            ctx.strokeStyle = "#fff";
-            ctx.lineWidth = 1.5;
-            ctx.beginPath(); ctx.arc(sa.x, sa.y, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-            ctx.restore();
+            if (a) {
+              // Anker-Marker + Linie zur Maus
+              const sa = cam.worldToScreen(a.x, a.y);
+              ctx.save();
+              ctx.strokeStyle = "rgba(77,163,255,0.8)";
+              ctx.setLineDash([5, 4]);
+              ctx.lineWidth = 1.2;
+              ctx.beginPath(); ctx.moveTo(sa.x, sa.y); ctx.lineTo(st.x, st.y); ctx.stroke();
+              ctx.setLineDash([]);
+              ctx.fillStyle = "rgba(77,163,255,0.95)";
+              ctx.strokeStyle = "#fff";
+              ctx.lineWidth = 1.5;
+              ctx.beginPath(); ctx.arc(sa.x, sa.y, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+              ctx.restore();
+            }
             if (snap && snap.world) {
               drawSnapDot(ctx, st.x, st.y, { ring: true });
             }
