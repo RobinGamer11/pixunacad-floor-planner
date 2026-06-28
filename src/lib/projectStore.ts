@@ -55,6 +55,8 @@ export interface PageElement {
   layerName?: string;
   /** PDF/Bild: Welche Kanten zeigen unendliche Hilfslinien (Toggle per Klick auf Kante im CAD-Layer). */
   guideEdges?: { top: boolean; right: boolean; bottom: boolean; left: boolean };
+  /** PDF/Bild: Kanten-Crop in Metern (positiv = Inhalt am Rand abgeschnitten). */
+  cropM?: { top: number; right: number; bottom: number; left: number };
 
 }
 

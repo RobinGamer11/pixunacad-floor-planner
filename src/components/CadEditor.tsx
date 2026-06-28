@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import { CadApp } from "@/cad/CadApp";
 import { ToolIds, PointEditAction } from "@/cad/constants";
-import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Pipette, Sticker as StickerIcon, Pencil, Trash2, Download, Upload, Plus, FileImage, FileText, Maximize2, Ruler as RulerIcon, Eraser, Construction, BrickWall, PaintBucket, Grid3x3, DoorOpen, AppWindow, Move, RotateCw, PanelRightOpen, PanelRightClose, Crosshair, Scaling, Check } from "lucide-react";
+import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Pipette, Sticker as StickerIcon, Pencil, Trash2, Download, Upload, Plus, FileImage, FileText, Maximize2, Ruler as RulerIcon, Eraser, Construction, BrickWall, PaintBucket, Grid3x3, DoorOpen, AppWindow, Move, RotateCw, PanelRightOpen, PanelRightClose, Crosshair, Scaling, Check, Scissors } from "lucide-react";
 import type { HatchDrawMode } from "@/cad/HatchTool";
 import type { StickerDefinition } from "@/cad/StickerManager";
 import { instanceBoundingCornersWorld } from "@/cad/StickerManager";
@@ -253,7 +253,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
   const [doorHubWidthInput, setDoorHubWidthInput] = useState<string>("");
 
   // Document Hub (Anker/Verschieben/Drehen/Skalieren) — beim Klick auf einen Eckpunkt geöffnet.
-  const [docHub, setDocHub] = useState<{ visible: boolean; screenX: number; screenY: number; docId: string | null; mode: "none" | "move" | "rotate" | "scale" }>({ visible: false, screenX: 0, screenY: 0, docId: null, mode: "none" });
+  const [docHub, setDocHub] = useState<{ visible: boolean; screenX: number; screenY: number; docId: string | null; mode: "none" | "move" | "rotate" | "scale" | "crop"; cropSide: "top" | "right" | "bottom" | "left" | null }>({ visible: false, screenX: 0, screenY: 0, docId: null, mode: "none", cropSide: null });
   const [docHubDx, setDocHubDx] = useState<string>("0.000");
   const [docHubDy, setDocHubDy] = useState<string>("0.000");
   const [docHubRot, setDocHubRot] = useState<string>("0");
@@ -705,10 +705,13 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
         const hs = app.documentHubState;
         setDocHub(prev => {
           if (!hs.visible) {
-            return prev.visible ? { visible: false, screenX: 0, screenY: 0, docId: null, mode: "none" } : prev;
+            return prev.visible ? { visible: false, screenX: 0, screenY: 0, docId: null, mode: "none", cropSide: null } : prev;
           }
-          if (prev.visible && prev.docId === hs.docId && Math.abs(prev.screenX - hs.screenX) < 0.5 && Math.abs(prev.screenY - hs.screenY) < 0.5) return prev;
-          return { visible: true, screenX: hs.screenX, screenY: hs.screenY, docId: hs.docId, mode: prev.mode === "none" ? "move" : prev.mode };
+          if (prev.visible && prev.docId === hs.docId && prev.cropSide === hs.cropSide && Math.abs(prev.screenX - hs.screenX) < 0.5 && Math.abs(prev.screenY - hs.screenY) < 0.5) return prev;
+          // Wenn cropSide gesetzt → Default-Modus = "none" (User muss Schere aktivieren), sonst "move".
+          const defaultMode: "move" | "none" = hs.cropSide ? "none" : "move";
+          const isSameAnchor = prev.visible && prev.docId === hs.docId && prev.cropSide === hs.cropSide;
+          return { visible: true, screenX: hs.screenX, screenY: hs.screenY, docId: hs.docId, cropSide: hs.cropSide, mode: isSameAnchor && prev.mode !== "none" ? prev.mode : defaultMode };
         });
         // Measure-Finish-Hub sync
         const mh = app.measureFinishHubState;
@@ -1189,8 +1192,8 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
           const app = appRef.current;
           const doc = app && docHub.docId ? app.scene.getDocumentById(docHub.docId) : null;
           const closeHub = () => {
-            if (app) app.documentHubState = { visible: false, screenX: 0, screenY: 0, docId: null, cornerIndex: 0, anchorWorld: null };
-            setDocHub({ visible: false, screenX: 0, screenY: 0, docId: null, mode: "none" });
+            if (app) app.documentHubState = { visible: false, screenX: 0, screenY: 0, docId: null, cornerIndex: 0, anchorWorld: null, cropSide: null };
+            setDocHub({ visible: false, screenX: 0, screenY: 0, docId: null, mode: "none", cropSide: null });
           };
           const applyMove = () => {
             const dx = parseFloat(docHubDx.replace(",", "."));
@@ -1308,6 +1311,34 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
                     title="Skalierungsfaktor (× um Zentrum)" placeholder="×"
                   />
                   <span className="text-[10px] opacity-60">×</span>
+                </>
+              )}
+              {docHub.cropSide && (
+                <>
+                  <span className="text-[10px] opacity-50 mx-1">|</span>
+                  <button
+                    type="button"
+                    title={`Kante "${docHub.cropSide}" zuschneiden (Klick auf Canvas setzt neue Kante)`}
+                    onClick={() => setDocHub(h => ({ ...h, mode: h.mode === "crop" ? "none" : "crop" }))}
+                    className={`cad-toolbar-btn h-7 w-7 justify-center px-0 ${docHub.mode === "crop" ? "active" : ""}`}
+                  >
+                    <Scissors className="h-3.5 w-3.5" />
+                  </button>
+                  {doc && ((doc as any).cropM?.top || (doc as any).cropM?.right || (doc as any).cropM?.bottom || (doc as any).cropM?.left) ? (
+                    <button
+                      type="button"
+                      title="Crop für diese Kante zurücksetzen"
+                      onClick={() => {
+                        if (!doc || !docHub.cropSide) return;
+                        const cur = (doc as any).cropM || { top: 0, right: 0, bottom: 0, left: 0 };
+                        (doc as any).cropM = { ...cur, [docHub.cropSide]: 0 };
+                        closeHub();
+                      }}
+                      className="cad-toolbar-btn h-7 px-1.5 text-[10px]"
+                    >
+                      ⟲
+                    </button>
+                  ) : null}
                 </>
               )}
             </div>
