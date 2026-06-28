@@ -690,7 +690,7 @@ export class Renderer {
     const cam = this.camera;
     for (const doc of this.scene.documents) {
       if (!this.labels.isVisible(doc.labelId)) continue;
-      const corners = documentCornersWorld(doc).map(c => cam.worldToScreen(c.x, c.y));
+      const corners = documentVisibleCornersWorld(doc).map(c => cam.worldToScreen(c.x, c.y));
       ctx.save();
       // dezente Kanten-Hervorhebung
       ctx.strokeStyle = "rgba(77,163,255,0.35)";
