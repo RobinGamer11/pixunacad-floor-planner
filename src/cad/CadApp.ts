@@ -719,6 +719,7 @@ export class CadApp {
         eraseMaskDataUrl: d.eraseMaskDataUrl || null,
         pdfSourceB64: d.pdfSourceB64 || null,
         guideEdges: d.guideEdges || undefined,
+        cropM: (d as any).cropM || undefined,
       });
       if (d.id) (doc as any).id = d.id;
     }
