@@ -657,7 +657,7 @@ export class Renderer {
       if (!this.labels.isVisible(doc.labelId)) continue;
       const g = doc.guideEdges;
       if (!g || (!g.top && !g.right && !g.bottom && !g.left)) continue;
-      const corners = documentCornersWorld(doc);
+      const corners = documentVisibleCornersWorld(doc);
       const edges = [
         { on: g.top,    a: corners[0], b: corners[1] },
         { on: g.right,  a: corners[1], b: corners[2] },
