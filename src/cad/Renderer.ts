@@ -722,7 +722,7 @@ export class Renderer {
     if (!doc || !this.labels.isVisible(doc.labelId)) return;
     const ctx = this.ctx;
     const cam = this.camera;
-    const corners = documentCornersWorld(doc);
+    const corners = documentVisibleCornersWorld(doc);
     const sc = corners.map(c => cam.worldToScreen(c.x, c.y));
     ctx.save();
     ctx.strokeStyle = "rgba(77,163,255,0.95)";
