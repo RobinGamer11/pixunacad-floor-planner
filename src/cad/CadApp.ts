@@ -583,6 +583,7 @@ export class CadApp {
           eraseMaskDataUrl: maskUrl || null,
           pdfSourceB64: d.pdfSourceB64 || null,
           guideEdges: { ...d.guideEdges },
+          cropM: { ...(d as any).cropM },
         };
       }),
 
