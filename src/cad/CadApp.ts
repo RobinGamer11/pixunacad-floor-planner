@@ -584,6 +584,9 @@ export class CadApp {
           pdfSourceB64: d.pdfSourceB64 || null,
           guideEdges: { ...d.guideEdges },
           cropM: { ...(d as any).cropM },
+          opacity: (d as any).opacity,
+          filters: ((d as any).filters || []).map((f: any) => ({ ...f })),
+          activeFilterId: (d as any).activeFilterId || null,
         };
       }),
 
