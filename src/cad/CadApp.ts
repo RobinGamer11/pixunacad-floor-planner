@@ -723,6 +723,9 @@ export class CadApp {
         pdfSourceB64: d.pdfSourceB64 || null,
         guideEdges: d.guideEdges || undefined,
         cropM: (d as any).cropM || undefined,
+        opacity: typeof d.opacity === "number" ? d.opacity : undefined,
+        filters: Array.isArray(d.filters) ? d.filters : undefined,
+        activeFilterId: d.activeFilterId || null,
       });
       if (d.id) (doc as any).id = d.id;
     }
