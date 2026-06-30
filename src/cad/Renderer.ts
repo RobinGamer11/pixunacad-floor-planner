@@ -594,6 +594,23 @@ export class Renderer {
     return entry.canvas;
   }
 
+  /** Cache: docId → gefiltertes Bild (key: sourceSig|filterSig|wxh). */
+  private _docFilterCache = new Map<string, { canvas: HTMLCanvasElement; key: string }>();
+
+  private _getFilteredBitmap(doc: DocumentObject, baseSource: CanvasImageSource, baseW: number, baseH: number, sourceSig: string): HTMLCanvasElement | null {
+    const activeId = doc.activeFilterId;
+    if (!activeId) return null;
+    const filter = doc.filters.find(f => f.id === activeId);
+    if (!filter) return null;
+    const { filterSignature, applyFilterToCanvas } = require("./documentFilters") as typeof import("./documentFilters");
+    const key = `${sourceSig}|${filterSignature(filter)}|${baseW}x${baseH}`;
+    const cached = this._docFilterCache.get(doc.id);
+    if (cached && cached.key === key) return cached.canvas;
+    const c = applyFilterToCanvas(baseSource, baseW, baseH, filter);
+    this._docFilterCache.set(doc.id, { canvas: c, key });
+    return c;
+  }
+
   private _drawSingleDocument(doc: DocumentObject) {
     // Snap-only Dokumente (z. B. Projektmappen-PDF/Bild als Snap-Quelle) werden
     // nicht gezeichnet — der echte Inhalt liegt im DOM darunter. Snap-Marker,
@@ -615,6 +632,9 @@ export class Renderer {
     ctx.save();
     ctx.translate(cs.x, cs.y);
     if (doc.rotationRad) ctx.rotate(doc.rotationRad);
+    // Opacity
+    const op = typeof doc.opacity === "number" ? doc.opacity : 1;
+    if (op < 1) ctx.globalAlpha = ctx.globalAlpha * op;
     // Crop-Clip (lokale Doc-Koords, Pixel-Skalierung)
     const crop = (doc as any).cropM as { top: number; right: number; bottom: number; left: number } | undefined;
     if (crop && (crop.top > 0 || crop.right > 0 || crop.bottom > 0 || crop.left > 0)) {
@@ -630,11 +650,16 @@ export class Renderer {
       }
     }
     if (adaptive) {
-      ctx.drawImage(adaptive, -wPx / 2, -hPx / 2, wPx, hPx);
+      const baseW = adaptive.width, baseH = adaptive.height;
+      const filtered = this._getFilteredBitmap(doc, adaptive, baseW, baseH, `adp:${baseW}`);
+      ctx.drawImage(filtered || adaptive, -wPx / 2, -hPx / 2, wPx, hPx);
     } else if (img) {
       const composite = this._getDocComposite(doc, img);
       const drawSrc: CanvasImageSource = composite || img;
-      ctx.drawImage(drawSrc, -wPx / 2, -hPx / 2, wPx, hPx);
+      const baseW = (composite ? composite.width : (img.naturalWidth || img.width));
+      const baseH = (composite ? composite.height : (img.naturalHeight || img.height));
+      const filtered = this._getFilteredBitmap(doc, drawSrc, baseW, baseH, composite ? `cmp:${baseW}` : `img:${img.src.length}`);
+      ctx.drawImage(filtered || drawSrc, -wPx / 2, -hPx / 2, wPx, hPx);
     } else {
       ctx.fillStyle = "rgba(180,180,180,0.3)";
       ctx.fillRect(-wPx / 2, -hPx / 2, wPx, hPx);
