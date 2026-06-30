@@ -203,6 +203,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
   const [docPickerSelected, setDocPickerSelected] = useState<Set<number>>(new Set());
   const [docImporting, setDocImporting] = useState(false);
   const [docSelected, setDocSelected] = useState<{ id: string; name: string; widthM: number; heightM: number; importScaleDenom: number; kind: "image" | "pdf-page"; pdfSourceB64: string | null } | null>(null);
+  const [docFilterSig, setDocFilterSig] = useState<string>("");
   const [docScalePopoverOpen, setDocScalePopoverOpen] = useState(false);
   const [docScaleChoice, setDocScaleChoice] = useState<string>("100");
   const [docScaleCustom, setDocScaleCustom] = useState<string>("100");
