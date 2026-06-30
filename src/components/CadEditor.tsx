@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { FreeDrawSettingsPanel } from "@/components/cad/FreeDrawSettingsPanel";
 import { EraserSettingsPanel } from "@/components/cad/EraserSettingsPanel";
 import { WallSettingsPanel } from "@/components/cad/WallSettingsPanel";
+import { DocumentFilterPanel } from "@/components/cad/DocumentFilterPanel";
 
 const CAD_TOOLS = [
   { id: ToolIds.SELECT, label: "Auswahl", key: "V", icon: MousePointer2 },
