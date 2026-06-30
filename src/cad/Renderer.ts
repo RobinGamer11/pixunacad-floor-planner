@@ -603,7 +603,6 @@ export class Renderer {
     if (!activeId) return null;
     const filter = doc.filters.find(f => f.id === activeId);
     if (!filter) return null;
-    const { filterSignature, applyFilterToCanvas } = require("./documentFilters") as typeof import("./documentFilters");
     const key = `${sourceSig}|${filterSignature(filter)}|${baseW}x${baseH}`;
     const cached = this._docFilterCache.get(doc.id);
     if (cached && cached.key === key) return cached.canvas;
