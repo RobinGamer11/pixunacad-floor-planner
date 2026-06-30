@@ -336,12 +336,18 @@ export class DocumentObject {
   guideEdges: { top: boolean; right: boolean; bottom: boolean; left: boolean };
   /** Kanten-Crop in Metern (positiv = Kante nach innen geschoben, Inhalt wird abgeschnitten). */
   cropM: { top: number; right: number; bottom: number; left: number };
+  /** Anzeigeopazität (0..1). Default 1. */
+  opacity: number;
+  /** Benutzerdefinierte Filter. "Original" ist immer aktiv, wenn activeFilterId === null. */
+  filters: import("./documentFilters").DocumentFilter[];
+  /** Aktiver Filter (id) oder null = Original. */
+  activeFilterId: string | null;
   /** Runtime-Flag: Dokument existiert nur als Snap-/Hub-Quelle (z. B. Projektmappen-PDF),
    *  Bild wird NICHT gezeichnet, Serialisierung überspringt es. Nicht persistiert. */
   _snapOnly?: boolean;
 
 
-  constructor({ id, name, kind, src, pageIndex, position, widthM, heightM, rotationRad, pixelWidth, pixelHeight, labelId, importScaleDenom, eraseMaskDataUrl, pdfSourceB64, guideEdges, cropM }: {
+  constructor({ id, name, kind, src, pageIndex, position, widthM, heightM, rotationRad, pixelWidth, pixelHeight, labelId, importScaleDenom, eraseMaskDataUrl, pdfSourceB64, guideEdges, cropM, opacity, filters, activeFilterId }: {
     id: string; name?: string; kind?: "image" | "pdf-page"; src: string;
     pageIndex?: number; position: Vec2; widthM: number; heightM: number;
     rotationRad?: number; pixelWidth?: number; pixelHeight?: number; labelId?: string;
@@ -349,6 +355,9 @@ export class DocumentObject {
     pdfSourceB64?: string | null;
     guideEdges?: { top?: boolean; right?: boolean; bottom?: boolean; left?: boolean };
     cropM?: { top?: number; right?: number; bottom?: number; left?: number };
+    opacity?: number;
+    filters?: import("./documentFilters").DocumentFilter[];
+    activeFilterId?: string | null;
   }) {
     this.id = id;
     this.name = name || "Dokument";
@@ -379,6 +388,9 @@ export class DocumentObject {
       bottom: Math.max(0, cropM?.bottom || 0),
       left: Math.max(0, cropM?.left || 0),
     };
+    this.opacity = typeof opacity === "number" ? Math.max(0, Math.min(1, opacity)) : 1;
+    this.filters = Array.isArray(filters) ? filters.map(f => ({ ...f })) : [];
+    this.activeFilterId = activeFilterId || null;
   }
 }
 
@@ -735,6 +747,9 @@ export class Scene {
     pdfSourceB64?: string | null;
     guideEdges?: { top?: boolean; right?: boolean; bottom?: boolean; left?: boolean };
     cropM?: { top?: number; right?: number; bottom?: number; left?: number };
+    opacity?: number;
+    filters?: import("./documentFilters").DocumentFilter[];
+    activeFilterId?: string | null;
   }): DocumentObject {
     const doc = new DocumentObject({ id: this._makeId(), ...opts });
     this.documents.push(doc);

@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { FreeDrawSettingsPanel } from "@/components/cad/FreeDrawSettingsPanel";
 import { EraserSettingsPanel } from "@/components/cad/EraserSettingsPanel";
 import { WallSettingsPanel } from "@/components/cad/WallSettingsPanel";
+import { DocumentFilterPanel } from "@/components/cad/DocumentFilterPanel";
 
 const CAD_TOOLS = [
   { id: ToolIds.SELECT, label: "Auswahl", key: "V", icon: MousePointer2 },
@@ -203,6 +204,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
   const [docPickerSelected, setDocPickerSelected] = useState<Set<number>>(new Set());
   const [docImporting, setDocImporting] = useState(false);
   const [docSelected, setDocSelected] = useState<{ id: string; name: string; widthM: number; heightM: number; importScaleDenom: number; kind: "image" | "pdf-page"; pdfSourceB64: string | null } | null>(null);
+  const [docFilterSig, setDocFilterSig] = useState<string>("");
   const [docScalePopoverOpen, setDocScalePopoverOpen] = useState(false);
   const [docScaleChoice, setDocScaleChoice] = useState<string>("100");
   const [docScaleCustom, setDocScaleCustom] = useState<string>("100");
@@ -695,6 +697,8 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
           const doc = app.scene.getDocumentById(sel.documentId);
           if (doc) {
             setDocSelected(prev => (prev && prev.id === doc.id && prev.widthM === doc.widthM && prev.heightM === doc.heightM && prev.importScaleDenom === doc.importScaleDenom) ? prev : { id: doc.id, name: doc.name, widthM: doc.widthM, heightM: doc.heightM, importScaleDenom: doc.importScaleDenom, kind: doc.kind, pdfSourceB64: doc.pdfSourceB64 || null });
+            const sig = `${(doc as any).activeFilterId || ""}|${(doc as any).opacity ?? 1}|${JSON.stringify(((doc as any).filters || []).map((f: any) => [f.id, f.name, f.mode, f.tintColor, f.bwThreshold, f.freeRemaps]))}`;
+            setDocFilterSig(prev => prev === sig ? prev : sig);
           } else {
             setDocSelected(prev => prev ? null : prev);
           }
@@ -2563,6 +2567,10 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
                   <Trash2 className="h-4 w-4" />
                   <span className="text-xs">Löschen</span>
                 </button>
+
+                <DocumentFilterPanel app={appRef.current} docId={docSelected.id} sig={docFilterSig} />
+
+
 
                 <div className="text-[11px] leading-relaxed pt-2" style={{ color: "hsl(var(--cad-toolbar-muted))", borderTop: "1px solid hsl(var(--border))" }}>
                   <div>Drag: verschieben (Snap aktiv) · Entf: löschen</div>
