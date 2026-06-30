@@ -747,6 +747,9 @@ export class Scene {
     pdfSourceB64?: string | null;
     guideEdges?: { top?: boolean; right?: boolean; bottom?: boolean; left?: boolean };
     cropM?: { top?: number; right?: number; bottom?: number; left?: number };
+    opacity?: number;
+    filters?: import("./documentFilters").DocumentFilter[];
+    activeFilterId?: string | null;
   }): DocumentObject {
     const doc = new DocumentObject({ id: this._makeId(), ...opts });
     this.documents.push(doc);
