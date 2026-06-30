@@ -2568,6 +2568,10 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
                   <span className="text-xs">Löschen</span>
                 </button>
 
+                <DocumentFilterPanel app={appRef.current} docId={docSelected.id} sig={docFilterSig} />
+
+
+
                 <div className="text-[11px] leading-relaxed pt-2" style={{ color: "hsl(var(--cad-toolbar-muted))", borderTop: "1px solid hsl(var(--border))" }}>
                   <div>Drag: verschieben (Snap aktiv) · Entf: löschen</div>
                 </div>
