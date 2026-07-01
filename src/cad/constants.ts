@@ -106,6 +106,13 @@ export const Defaults = {
   documentMetersPerPdfPt: 0.0254 / 72,
   // Render PDF pages at this device-pixel scale for crisper bitmaps
   documentPdfRenderScale: 2,
+  // Viewport-Tile-Rendering: max Kantenlänge eines gerenderten PDF-Tiles (Speicherschutz).
+  documentTileMaxPx: 4096,
+  // Fallback-Vollseiten-Bitmap: reduziert (Tile übernimmt Detail), spart Speicher.
+  documentFallbackMaxPx: 3000,
+  // Debounce: wie lange nach der letzten Kamera-/Filter-Änderung gewartet wird, bevor
+  // ein neues PDF-Tile in voller Zoom-Auflösung gerendert wird.
+  documentTileDebounceMs: 120,
 };
 
 export const ToolIds = {
