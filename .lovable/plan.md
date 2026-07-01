@@ -1,70 +1,47 @@
 ## Ziel
+PDFs im CAD-Canvas sollen bei jedem Zoom gestochen scharf bleiben (wie in Adobe), inklusive aktiver Farb-Filter.
 
-1. PDF-/Bild-Hub-Box visuell und funktional an das Referenzbild angleichen: 4 Icon-Buttons (Anker · Verschieben · Drehen · Skalieren).
-2. Schraffur-Kanten-Offset-Hub als kompakter Icon-Button mit klappbarem Eingabefeld.
-3. Default-Ebene löschbar machen, solange mindestens eine Ebene übrig bleibt.
+## Was heute passiert
+- Jede PDF-Seite wird als **ein einziges Raster-Bitmap** pro Dokument gecached (`_pdfAdaptiveCache` in `Renderer.ts`).
+- Neu-Rasterung nur, wenn Zoom > 25 % nach oben oder < 40 % nach unten aus dem letzten Render springt.
+- Hartes Cap: max. **6000 px** pro Kante — bei starkem Zoom skaliert das Bitmap hoch → sichtbare „Partikel/Pixel".
+- Filter (`_getFilteredBitmap`) arbeitet auf genau diesem Basis-Bitmap → erbt dieselbe Unschärfe.
+- Keine `imageSmoothingQuality`-Einstellung.
 
----
+## Neue Strategie: Viewport-Tile-Rendering
 
-## 1. PDF-/Bild-Hub-Box (CAD-Hauptseite + Projektmappe)
+Statt eines Vollseiten-Rasters wird **nur der aktuell sichtbare Ausschnitt** jedes PDFs bei der tatsächlichen Bildschirm-Pixeldichte gerendert. Das ergibt Adobe-ähnliche Schärfe unabhängig vom Zoom, ohne Speicher zu sprengen.
 
-**Dateien:** `src/components/CadEditor.tsx`, `src/components/page/CadOverlayLayer.tsx`
+### Ablauf pro PDF-Dokument, pro Frame
+1. Basis-Bitmap (niedrige Auflösung, ganze Seite) bleibt als **Fallback** erhalten und wird sofort gezeichnet — nie leere Fläche beim Panning.
+2. Aus Kamera-Viewport + Doc-Rotation den in PDF-Punkten sichtbaren Rechtecks-Ausschnitt (`clipRect`) berechnen.
+3. Ziel-Auflösung des Tiles = `clipRect_screen_px × devicePixelRatio`, gedeckelt (z. B. 4096² pro Tile, sonst in bis zu 4 Kacheln aufgeteilt).
+4. Debounced (~120 ms nach Zoom-/Pan-Ende) `pdfjs.page.render()` mit `viewport = page.getViewport({ scale, offsetX, offsetY })` in ein Offscreen-Canvas.
+5. Fertiges Tile wird gecached mit Key = `docId|clipRect|zoom-bucket`; LRU max ~6 Tiles pro Dokument.
+6. Beim nächsten Draw: erst Fallback, dann passendes Tile über die exakte Region gezeichnet → scharfe Kanten.
+7. Filter (`applyFilterToCanvas`) wird auf **jedes Tile** angewandt und im selben Cache-Eintrag gehalten (Key erweitert um Filter-Signatur).
 
-Bisher: zwei Buttons (Move, Rotate) mit Inline-Inputs.
-Neu: vier Icon-Buttons in einer schmalen weißen Pill-Toolbar (analog Referenzbild), gleiche Höhe/Padding wie heute.
+### Renderer-Anpassungen
+- `ctx.imageSmoothingEnabled = true` + `imageSmoothingQuality = "high"` beim Zeichnen von Dokumenten.
+- `_getDocAdaptiveBitmap`: bleibt als Low-Res-Fallback (Cap z. B. auf 3000 px reduziert, spart Speicher).
+- Neuer `_getDocViewportTile(doc, viewport)`-Pfad in `_drawSingleDocument` ersetzt den bisherigen Draw des Vollseiten-Rasters, sobald ein passendes Tile fertig ist.
+- Cache-Invalidierung bei: Filter-Wechsel, Opacity spielt keine Rolle (`globalAlpha` reicht), Doc-Rotation und -Größe fließen in den Key ein.
 
-Buttons (links nach rechts):
-- **Anker** (`Crosshair`-Icon): nur Anzeige, zeigt aktuell aktiven Eckpunkt; Klick wechselt zyklisch zwischen den 4 Ecken (setzt `documentHubState.cornerIndex`). Kein Eingabefeld.
-- **Verschieben** (`Move`-Icon): klappt Δx/Δy-Inputs auf (wie heute), Enter commit, Escape schließt.
-- **Drehen** (`RotateCw`-Icon): klappt Winkel-Input auf (wie heute), absoluter Winkel in °.
-- **Skalieren** (`Maximize2`- oder `Scaling`-Icon): klappt einen Faktor-Input (`× 1.000`) auf; Enter ruft `scaleDocumentAroundCenter(doc, factor)` aus `documentGeometry.ts` und schließt die Box.
+### pdfjs-Nutzung
+- `renderPdfPageToCanvas` in `documentImport.ts` bekommt eine Variante `renderPdfPageRegionToCanvas(sourceB64, pageIndex, targetWidthPx, targetHeightPx, offsetPt, sizePt)` — nutzt `getViewport({ scale, offsetX, offsetY })` und den `intent: "display"`-Render-Task.
+- Laufende Renderings werden bei neuem Zoom via `renderTask.cancel()` abgebrochen, damit sich Requests nicht stauen.
 
-Verhalten:
-- Nur ein Modus zur Zeit ist „aktiv"; Klick auf anderen Button wechselt Eingabefeld.
-- Buttons rendern grundsätzlich immer; Inputs nur im aktiven Modus.
-- Identische Implementierung in `CadOverlayLayer.tsx` (Projektmappe) für Konsistenz.
+### Sicherheitsnetze
+- Maximal 1 aktiver Render-Task pro Dokument gleichzeitig.
+- Bei extrem tiefem Zoom (Tile-Zielauflösung > 4096) automatische 2×2-Kachelung.
+- Beim Panning ohne Zoomänderung wird nur nachgerendert, wenn der neue Sichtausschnitt > 25 % außerhalb des zuletzt gerenderten Tiles liegt.
 
-State-Erweiterung in `CadEditor.tsx` / `CadOverlayLayer.tsx`:
-- `docHub.mode: "move" | "rotate" | "scale" | null`
-- Neuer Local-State `docHubScale` (String, Default „1.000").
+## Betroffene Dateien
+- `src/cad/Renderer.ts` — neuer Tile-Cache, angepasstes `_drawSingleDocument`, Smoothing-Setting.
+- `src/cad/documentImport.ts` — neue Region-Render-Funktion, Render-Task-Handle für Cancel.
+- `src/cad/constants.ts` — neue Defaults: `documentTileMaxPx = 4096`, `documentFallbackMaxPx = 3000`, `documentTileDebounceMs = 120`.
 
-Keine Änderungen an `documentHubState` in `CadApp.ts`/`MiniCad.ts` außer dem bestehenden `cornerIndex`-Feld, das jetzt für den Anker-Cycle verwendet wird.
-
----
-
-## 2. Schraffur-Kanten-Hub (Offset-Eingabe)
-
-**Dateien:** `src/cad/LineHub.ts` (oder neue kleine Hub-Komponente), `src/cad/SelectTool.ts`
-
-Heute: beim Klick auf Hatch-Kante mit OFFSET-Aktion öffnet sich der Standard-`LineHub` mit zwei Inputs (Länge + Winkel).
-
-Neu: kompakter Icon-Button (z.B. `Scissors`/`MoveHorizontal`-Icon) als kleine weiße Pill an Mausposition. Klick auf Icon → Eingabefeld (nur Offset in m) klappt rechts daneben auf. Enter commit (wie heute via `_applyHatchEdgeHubValues`), Escape schließt.
-
-Umsetzung:
-- Neue minimale Klasse `EdgeOffsetHub` in `src/cad/EdgeOffsetHub.ts` (analog `LineHub`, aber nur ein Wert + Icon-Button-State). Eigenes DOM-Element, fixed positioniert, draggable via `hubDrag.ts`.
-- Instanziieren in `CadApp.ts` und `MiniCad.ts`, parallel zum bestehenden `hub`.
-- `SelectTool._beginHatchEdgeOffsetAction` und `beginWallEdgeAction(... OFFSET)` schalten von `this.app.hub` auf `this.app.edgeHub` um.
-- Updates während Maus-Drag (`updateDisplay`) gehen weiterhin durchs neue Hub.
-
-Funktion bleibt 1:1 (gleiche Commit-Logik in SelectTool).
-
----
-
-## 3. Default-Ebene löschbar
-
-**Dateien:** `src/cad/LabelManager.ts`, `src/cad/IdPanel.ts`
-
-- `LabelManager.deleteGroup(id)`: Lock-Prüfung entfernen; stattdessen verweigern, wenn `this.groups.length <= 1`. Nach erfolgreichem Löschen: keine automatische Neuanlage.
-- Falls die gelöschte Gruppe die `activeDrawLabelId` war: auf erste verbleibende Gruppe umschalten (`groups[0].id`).
-- `IdPanel`-Reassign-Aufrufe nutzen weiterhin `Defaults.defaultLabelId` — bei Löschen einer beliebigen Gruppe wird auf die erste verbleibende Gruppe umgehängt (nicht zwingend Default). Falls Default selbst gelöscht wird, vorher Objekte auf erste andere Gruppe migrieren.
-- Im IdPanel-UI Lösch-Button auch für die Default-Gruppe sichtbar/aktiv schalten; deaktivieren wenn nur eine Gruppe existiert.
-- `LabelManager.restore`: weiterhin defensiv — falls leeres Array, behalte mindestens Default.
-
----
-
-## Technische Notizen
-
-- Keine Änderungen am Snap-/Topology-System.
-- Skalierung nutzt vorhandene `scaleDocumentAroundCenter` (zentrumserhaltend, ohne Rotation neu zu berechnen).
-- Icon-Set bleibt `lucide-react`: `Crosshair`, `Move`, `RotateCw`, `Scaling`, `Scissors`.
-- Pill-Stil identisch zur aktuellen Hub-Box (`bg white`, `border hsl(var(--border))`, Schatten).
+## Nicht Teil dieses Plans
+- Vektor-Overlay (SVG/DOM-Layer) — würde Interaktion und Filter deutlich verkomplizieren.
+- Änderungen am „Auflösen"-Workflow (`pdfVectorExtract.ts`).
+- Änderungen am Bild-Rendering (JPG/PNG) — die sind bereits pixelgenau.
