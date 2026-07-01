@@ -712,10 +712,9 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
             return prev.visible ? { visible: false, screenX: 0, screenY: 0, docId: null, mode: "none", cropSide: null } : prev;
           }
           if (prev.visible && prev.docId === hs.docId && prev.cropSide === hs.cropSide && Math.abs(prev.screenX - hs.screenX) < 0.5 && Math.abs(prev.screenY - hs.screenY) < 0.5) return prev;
-          // Wenn cropSide gesetzt → Default-Modus = "none" (User muss Schere aktivieren), sonst "move".
-          const defaultMode: "move" | "none" = hs.cropSide ? "none" : "move";
+          // Default-Modus IMMER "none" — User muss explizit Verschieben/Drehen/Skalieren/Schere aktivieren.
           const isSameAnchor = prev.visible && prev.docId === hs.docId && prev.cropSide === hs.cropSide;
-          return { visible: true, screenX: hs.screenX, screenY: hs.screenY, docId: hs.docId, cropSide: hs.cropSide, mode: isSameAnchor && prev.mode !== "none" ? prev.mode : defaultMode };
+          return { visible: true, screenX: hs.screenX, screenY: hs.screenY, docId: hs.docId, cropSide: hs.cropSide, mode: isSameAnchor ? prev.mode : "none" };
         });
         // Measure-Finish-Hub sync
         const mh = app.measureFinishHubState;

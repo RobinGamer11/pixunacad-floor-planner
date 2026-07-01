@@ -139,9 +139,13 @@ export class DocumentTool {
         this.pendingDoc = null;
         this.phase = "idle";
         this.scaleSnap = null;
-        this.app.setSelection({ type: SelectionType.DOCUMENT, documentId: doc.id } as any);
         this.app.refreshLabelUI();
         this.onPhaseChange?.();
+        // Nach dem Platzieren automatisch zurück zum Auswahl-Werkzeug wechseln,
+        // damit ein weiterer Canvas-Klick nicht versehentlich das Dokument erneut platziert
+        // und der User direkt via SelectTool das Dokument bearbeiten kann.
+        this.app.setTool("select");
+        this.app.setSelection({ type: SelectionType.DOCUMENT, documentId: doc.id } as any);
       }
       return;
     }
