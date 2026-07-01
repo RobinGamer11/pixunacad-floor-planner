@@ -782,10 +782,25 @@ export class Renderer {
         ctx.clip();
       }
     }
+    // High-Quality-Smoothing: sorgt für saubere Zwischenstufen bis das scharfe Tile da ist.
+    const prevSmoothing = ctx.imageSmoothingEnabled;
+    const prevQuality = (ctx as any).imageSmoothingQuality;
+    ctx.imageSmoothingEnabled = true;
+    (ctx as any).imageSmoothingQuality = "high";
     if (adaptive) {
+      // Zuerst die Low-Res-Fallback-Vollseite zeichnen — nie leere Fläche beim Panning/Zoomen.
       const baseW = adaptive.width, baseH = adaptive.height;
       const filtered = this._getFilteredBitmap(doc, adaptive, baseW, baseH, `adp:${baseW}`);
       ctx.drawImage(filtered || adaptive, -wPx / 2, -hPx / 2, wPx, hPx);
+      // Darüber das scharfe Viewport-Tile (nur wenn vorhanden) — Adobe-ähnliche Schärfe.
+      const tile = this._getDocPdfTile(doc, wPx, hPx);
+      if (tile) {
+        const tx = -wPx / 2 + tile.u0 * wPx;
+        const ty = -hPx / 2 + tile.v0 * hPx;
+        const tw = (tile.u1 - tile.u0) * wPx;
+        const th = (tile.v1 - tile.v0) * hPx;
+        ctx.drawImage(tile.canvas, tx, ty, tw, th);
+      }
     } else if (img) {
       const composite = this._getDocComposite(doc, img);
       const drawSrc: CanvasImageSource = composite || img;
@@ -802,6 +817,8 @@ export class Renderer {
       ctx.textBaseline = "middle";
       ctx.fillText("Lade …", 0, 0);
     }
+    ctx.imageSmoothingEnabled = prevSmoothing;
+    if (prevQuality) (ctx as any).imageSmoothingQuality = prevQuality;
     ctx.restore();
   }
 
