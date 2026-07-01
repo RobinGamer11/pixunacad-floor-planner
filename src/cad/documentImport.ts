@@ -152,3 +152,42 @@ export async function renderPdfPageToCanvas(sourceB64: string, pageIndex: number
   await page.render({ canvasContext: ctx, viewport }).promise;
   return canvas;
 }
+
+/**
+ * Rendert einen normalisierten Ausschnitt (u,v ∈ [0..1] auf der Seite,
+ * mit v=0 an der Oberkante) einer PDF-Seite in ein Offscreen-Canvas
+ * mit der Ziel-Pixelgröße `pxW × pxH`. Der Kern-Trick:
+ * `getViewport({ scale, offsetX, offsetY })` verschiebt die gesamte Seite,
+ * und die Canvas-Größe legt das Clipping fest.
+ *
+ * `onTask(task)` erlaubt es dem Aufrufer, den laufenden Render-Task zu speichern
+ * (für spätere `task.cancel()`-Aufrufe, wenn der Ausschnitt/Zoom sich ändert).
+ */
+export async function renderPdfPageRegionToCanvas(
+  sourceB64: string,
+  pageIndex: number,
+  u0: number, v0: number, u1: number, v1: number,
+  pxW: number, pxH: number,
+  onTask?: (task: any) => void,
+): Promise<HTMLCanvasElement> {
+  const pdf = await loadPdfDocFromB64(sourceB64);
+  const page = await pdf.getPage(pageIndex + 1);
+  const base = page.getViewport({ scale: 1 });
+  const regionWpt = Math.max(1e-6, (u1 - u0) * base.width);
+  const regionHpt = Math.max(1e-6, (v1 - v0) * base.height);
+  // Scale so region maps to pxW × pxH. Wir wählen die kleinere Skala, damit nichts abgeschnitten wird.
+  const scale = Math.min(pxW / regionWpt, pxH / regionHpt);
+  // offsetX/offsetY verschieben die gesamte Seite in Viewport-Pixel-Koordinaten.
+  // Wir wollen, dass der Punkt (u0, v0) der Seite auf (0,0) unseres Canvases landet.
+  const offsetX = -u0 * base.width * scale;
+  const offsetY = -v0 * base.height * scale;
+  const viewport = page.getViewport({ scale, offsetX, offsetY });
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(pxW));
+  canvas.height = Math.max(1, Math.round(pxH));
+  const ctx = canvas.getContext("2d")!;
+  const task = page.render({ canvasContext: ctx, viewport, intent: "display" });
+  if (onTask) onTask(task);
+  await task.promise;
+  return canvas;
+}

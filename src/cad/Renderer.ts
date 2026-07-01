@@ -560,13 +560,17 @@ export class Renderer {
     return c;
   }
 
-  /** Cache: docId -> adaptiver PDF-Render-Canvas (vektorbasiert, re-rendert bei Zoom). */
+  /** Cache: docId -> adaptiver PDF-Render-Canvas (Low-Res Fallback, ganze Seite). */
   private _pdfAdaptiveCache = new Map<string, { canvas: HTMLCanvasElement | null; renderedWidthPx: number; renderingForPx: number | null }>();
 
   private _getDocAdaptiveBitmap(doc: DocumentObject, targetWidthPx: number): HTMLCanvasElement | null {
     if (doc.kind !== "pdf-page" || !doc.pdfSourceB64) return null;
     const dpr = Math.max(1, (window.devicePixelRatio || 1));
-    const targetPx = Math.max(64, Math.ceil(targetWidthPx * dpr));
+    // Fallback bewusst gedeckelt — Tile übernimmt die Detailschärfe.
+    const targetPx = Math.min(
+      Defaults.documentFallbackMaxPx,
+      Math.max(64, Math.ceil(targetWidthPx * dpr)),
+    );
     let entry = this._pdfAdaptiveCache.get(doc.id);
     if (!entry) {
       entry = { canvas: null, renderedWidthPx: 0, renderingForPx: null };
@@ -577,8 +581,7 @@ export class Renderer {
       || targetPx < entry.renderedWidthPx * 0.4;
     if (need && entry.renderingForPx !== targetPx) {
       entry.renderingForPx = targetPx;
-      // Cap, um Speicher zu schonen (max ~6000 px Kante).
-      const cappedPx = Math.min(targetPx, 6000);
+      const cappedPx = Math.min(targetPx, Defaults.documentFallbackMaxPx);
       import("./documentImport").then(({ renderPdfPageToCanvas }) => {
         return renderPdfPageToCanvas(doc.pdfSourceB64!, doc.pageIndex, cappedPx);
       }).then(canvas => {
@@ -594,6 +597,136 @@ export class Renderer {
     }
     return entry.canvas;
   }
+
+  /**
+   * Cache: docId -> viewport-basiertes Tile.
+   * Rendert nur den aktuell sichtbaren Ausschnitt der PDF in voller Bildschirm-Pixeldichte,
+   * damit auch bei starkem Zoom keine Pixel/„Partikel" mehr sichtbar sind (Adobe-ähnlich scharf).
+   */
+  private _pdfTileCache = new Map<string, {
+    canvas: HTMLCanvasElement | null;
+    u0: number; v0: number; u1: number; v1: number;
+    pxW: number; pxH: number;
+    filterSig: string;
+    renderTask: any | null;
+    pendingKey: string | null;
+    debounceHandle: any;
+    lastRequestMs: number;
+  }>();
+
+  private _computeDocVisibleFraction(doc: DocumentObject): { u0: number; v0: number; u1: number; v1: number } | null {
+    const canvas = this.ctx.canvas as HTMLCanvasElement;
+    const dpr = Math.max(1, window.devicePixelRatio || 1);
+    const cssW = canvas.width / dpr;
+    const cssH = canvas.height / dpr;
+    const cx = doc.position.x + doc.widthM / 2;
+    const cy = doc.position.y + doc.heightM / 2;
+    const cs = Math.cos(-doc.rotationRad), sn = Math.sin(-doc.rotationRad);
+    const corners: [number, number][] = [[0, 0], [cssW, 0], [cssW, cssH], [0, cssH]];
+    let minU = Infinity, minV = Infinity, maxU = -Infinity, maxV = -Infinity;
+    for (const [sx, sy] of corners) {
+      const w = this.camera.screenToWorld(sx, sy);
+      const dx = w.x - cx, dy = w.y - cy;
+      const lx = dx * cs - dy * sn + doc.widthM / 2;
+      const ly = dx * sn + dy * cs + doc.heightM / 2;
+      const u = lx / doc.widthM, v = ly / doc.heightM;
+      if (u < minU) minU = u; if (u > maxU) maxU = u;
+      if (v < minV) minV = v; if (v > maxV) maxV = v;
+    }
+    const u0 = Math.max(0, minU), v0 = Math.max(0, minV);
+    const u1 = Math.min(1, maxU), v1 = Math.min(1, maxV);
+    if (u1 - u0 <= 1e-4 || v1 - v0 <= 1e-4) return null;
+    return { u0, v0, u1, v1 };
+  }
+
+  private _getDocPdfTile(doc: DocumentObject, wPx: number, hPx: number): { canvas: HTMLCanvasElement; u0: number; v0: number; u1: number; v1: number } | null {
+    if (doc.kind !== "pdf-page" || !doc.pdfSourceB64) return null;
+    if ((doc as any)._snapOnly) return null;
+    const frac = this._computeDocVisibleFraction(doc);
+    if (!frac) return null;
+    // Overscan 20 % pro Achse (aber innerhalb [0..1]) — reduziert Re-Renders beim Panning.
+    const dU = frac.u1 - frac.u0, dV = frac.v1 - frac.v0;
+    const ou0 = Math.max(0, frac.u0 - dU * 0.2);
+    const ov0 = Math.max(0, frac.v0 - dV * 0.2);
+    const ou1 = Math.min(1, frac.u1 + dU * 0.2);
+    const ov1 = Math.min(1, frac.v1 + dV * 0.2);
+    const dpr = Math.max(1, window.devicePixelRatio || 1);
+    const tileMax = Defaults.documentTileMaxPx;
+    let pxW = Math.ceil((ou1 - ou0) * wPx * dpr);
+    let pxH = Math.ceil((ov1 - ov0) * hPx * dpr);
+    if (pxW < 32 || pxH < 32) return null;
+    if (pxW > tileMax || pxH > tileMax) {
+      const s = Math.min(tileMax / pxW, tileMax / pxH);
+      pxW = Math.max(32, Math.floor(pxW * s));
+      pxH = Math.max(32, Math.floor(pxH * s));
+    }
+    const filter = doc.activeFilterId ? doc.filters.find(f => f.id === doc.activeFilterId) : undefined;
+    const filterSig = filter ? filterSignature(filter) : "";
+
+    let entry = this._pdfTileCache.get(doc.id);
+    if (!entry) {
+      entry = { canvas: null, u0: 0, v0: 0, u1: 0, v1: 0, pxW: 0, pxH: 0, filterSig: "", renderTask: null, pendingKey: null, debounceHandle: null, lastRequestMs: 0 };
+      this._pdfTileCache.set(doc.id, entry);
+    }
+
+    // Cache deckt sichtbare Region ab UND hat noch genug effektive Auflösung?
+    const covered = !!entry.canvas
+      && entry.u0 <= frac.u0 + 1e-4 && entry.u1 >= frac.u1 - 1e-4
+      && entry.v0 <= frac.v0 + 1e-4 && entry.v1 >= frac.v1 - 1e-4
+      && entry.filterSig === filterSig;
+    const desiredPxPerU = pxW / Math.max(1e-6, (ou1 - ou0));
+    const cachedPxPerU = entry.canvas ? entry.canvas.width / Math.max(1e-6, (entry.u1 - entry.u0)) : 0;
+    const resOk = covered && cachedPxPerU >= desiredPxPerU * 0.7;
+
+    const key = `${ou0.toFixed(3)}|${ov0.toFixed(3)}|${ou1.toFixed(3)}|${ov1.toFixed(3)}|${pxW}|${pxH}|${filterSig}`;
+    if (!resOk && entry.pendingKey !== key) {
+      entry.pendingKey = key;
+      entry.lastRequestMs = performance.now();
+      if (entry.debounceHandle) { clearTimeout(entry.debounceHandle); entry.debounceHandle = null; }
+      entry.debounceHandle = setTimeout(() => {
+        entry!.debounceHandle = null;
+        if (entry!.pendingKey !== key) return;
+        // Ggf. laufenden Render abbrechen — beim Zoom ändert sich der Wunsch schnell.
+        if (entry!.renderTask) { try { entry!.renderTask.cancel(); } catch { /* noop */ } entry!.renderTask = null; }
+        void this._renderPdfTile(doc, ou0, ov0, ou1, ov1, pxW, pxH, filterSig, entry!, key);
+      }, Defaults.documentTileDebounceMs);
+    }
+
+    return entry.canvas ? { canvas: entry.canvas, u0: entry.u0, v0: entry.v0, u1: entry.u1, v1: entry.v1 } : null;
+  }
+
+  private async _renderPdfTile(
+    doc: DocumentObject,
+    u0: number, v0: number, u1: number, v1: number,
+    pxW: number, pxH: number,
+    filterSig: string,
+    entry: NonNullable<ReturnType<Map<string, any>["get"]>>,
+    key: string,
+  ) {
+    try {
+      const { renderPdfPageRegionToCanvas } = await import("./documentImport");
+      const raw = await renderPdfPageRegionToCanvas(
+        doc.pdfSourceB64!, doc.pageIndex,
+        u0, v0, u1, v1, pxW, pxH,
+        (task) => { entry.renderTask = task; },
+      );
+      if (entry.pendingKey !== key) return;
+      let out: HTMLCanvasElement = raw;
+      if (filterSig && doc.activeFilterId) {
+        const filter = doc.filters.find(f => f.id === doc.activeFilterId);
+        if (filter) out = applyFilterToCanvas(raw, raw.width, raw.height, filter);
+      }
+      entry.canvas = out;
+      entry.u0 = u0; entry.v0 = v0; entry.u1 = u1; entry.v1 = v1;
+      entry.pxW = pxW; entry.pxH = pxH; entry.filterSig = filterSig;
+      entry.pendingKey = null;
+      entry.renderTask = null;
+    } catch {
+      if (entry.pendingKey === key) entry.pendingKey = null;
+      entry.renderTask = null;
+    }
+  }
+
 
   /** Cache: docId → gefiltertes Bild (key: sourceSig|filterSig|wxh). */
   private _docFilterCache = new Map<string, { canvas: HTMLCanvasElement; key: string }>();
@@ -649,10 +782,25 @@ export class Renderer {
         ctx.clip();
       }
     }
+    // High-Quality-Smoothing: sorgt für saubere Zwischenstufen bis das scharfe Tile da ist.
+    const prevSmoothing = ctx.imageSmoothingEnabled;
+    const prevQuality = (ctx as any).imageSmoothingQuality;
+    ctx.imageSmoothingEnabled = true;
+    (ctx as any).imageSmoothingQuality = "high";
     if (adaptive) {
+      // Zuerst die Low-Res-Fallback-Vollseite zeichnen — nie leere Fläche beim Panning/Zoomen.
       const baseW = adaptive.width, baseH = adaptive.height;
       const filtered = this._getFilteredBitmap(doc, adaptive, baseW, baseH, `adp:${baseW}`);
       ctx.drawImage(filtered || adaptive, -wPx / 2, -hPx / 2, wPx, hPx);
+      // Darüber das scharfe Viewport-Tile (nur wenn vorhanden) — Adobe-ähnliche Schärfe.
+      const tile = this._getDocPdfTile(doc, wPx, hPx);
+      if (tile) {
+        const tx = -wPx / 2 + tile.u0 * wPx;
+        const ty = -hPx / 2 + tile.v0 * hPx;
+        const tw = (tile.u1 - tile.u0) * wPx;
+        const th = (tile.v1 - tile.v0) * hPx;
+        ctx.drawImage(tile.canvas, tx, ty, tw, th);
+      }
     } else if (img) {
       const composite = this._getDocComposite(doc, img);
       const drawSrc: CanvasImageSource = composite || img;
@@ -669,6 +817,8 @@ export class Renderer {
       ctx.textBaseline = "middle";
       ctx.fillText("Lade …", 0, 0);
     }
+    ctx.imageSmoothingEnabled = prevSmoothing;
+    if (prevQuality) (ctx as any).imageSmoothingQuality = prevQuality;
     ctx.restore();
   }
 
