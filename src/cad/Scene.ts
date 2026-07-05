@@ -353,7 +353,7 @@ export class DocumentObject {
   _snapOnly?: boolean;
 
 
-  constructor({ id, name, kind, src, pageIndex, position, widthM, heightM, rotationRad, pixelWidth, pixelHeight, labelId, importScaleDenom, eraseMaskDataUrl, pdfSourceB64, guideEdges, cropM, opacity, filters, activeFilterId }: {
+  constructor({ id, name, kind, src, pageIndex, position, widthM, heightM, rotationRad, pixelWidth, pixelHeight, labelId, importScaleDenom, eraseMaskDataUrl, pdfSourceB64, guideEdges, cropM, opacity, filters, activeFilterId, bgRemoval }: {
     id: string; name?: string; kind?: "image" | "pdf-page"; src: string;
     pageIndex?: number; position: Vec2; widthM: number; heightM: number;
     rotationRad?: number; pixelWidth?: number; pixelHeight?: number; labelId?: string;
@@ -364,6 +364,7 @@ export class DocumentObject {
     opacity?: number;
     filters?: import("./documentFilters").DocumentFilter[];
     activeFilterId?: string | null;
+    bgRemoval?: import("./documentBgRemove").BgRemoval;
   }) {
     this.id = id;
     this.name = name || "Dokument";
