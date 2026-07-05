@@ -737,6 +737,7 @@ export class CadApp {
         opacity: typeof d.opacity === "number" ? d.opacity : undefined,
         filters: Array.isArray(d.filters) ? d.filters : undefined,
         activeFilterId: d.activeFilterId || null,
+        bgRemoval: d.bgRemoval || undefined,
       });
       if (d.id) (doc as any).id = d.id;
     }
