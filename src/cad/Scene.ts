@@ -342,6 +342,12 @@ export class DocumentObject {
   filters: import("./documentFilters").DocumentFilter[];
   /** Aktiver Filter (id) oder null = Original. */
   activeFilterId: string | null;
+  /** Hintergrund-Ausschnitt-Einstellungen (Magic-Wand + Pinsel + FG/BG-Einfärbung). */
+  bgRemoval?: import("./documentBgRemove").BgRemoval;
+  /** Runtime-Cache: FG-Maske als Canvas (weiß = Vordergrund). Nicht serialisiert. */
+  _bgFgMask?: HTMLCanvasElement | null;
+  /** Runtime-Revision (Cache-Invalidierung). */
+  _bgMaskRev?: number;
   /** Runtime-Flag: Dokument existiert nur als Snap-/Hub-Quelle (z. B. Projektmappen-PDF),
    *  Bild wird NICHT gezeichnet, Serialisierung überspringt es. Nicht persistiert. */
   _snapOnly?: boolean;
