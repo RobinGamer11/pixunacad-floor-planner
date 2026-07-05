@@ -11,6 +11,7 @@ import { transformedInstanceItems, instanceBoundingCornersWorld } from "./Sticke
 import { documentCornersWorld, documentCenterWorld, documentVisibleCornersWorld } from "./documentGeometry";
 import { getOrCreateDocMask } from "./documentMask";
 import { applyFilterToCanvas, filterSignature } from "./documentFilters";
+import { applyBgRemovalToCanvas, bgRemovalSignature } from "./documentBgRemove";
 
 import { computeHealedWallLines } from "./wallHeal";
 import { getWallUnionGroups } from "./wallUnion";
@@ -661,7 +662,8 @@ export class Renderer {
       pxH = Math.max(32, Math.floor(pxH * s));
     }
     const filter = doc.activeFilterId ? doc.filters.find(f => f.id === doc.activeFilterId) : undefined;
-    const filterSig = filter ? filterSignature(filter) : "";
+    const bgSig = bgRemovalSignature(doc);
+    const filterSig = (filter ? filterSignature(filter) : "") + "|bg:" + bgSig;
 
     let entry = this._pdfTileCache.get(doc.id);
     if (!entry) {
@@ -712,10 +714,11 @@ export class Renderer {
       );
       if (entry.pendingKey !== key) return;
       let out: HTMLCanvasElement = raw;
-      if (filterSig && doc.activeFilterId) {
+      if (doc.activeFilterId) {
         const filter = doc.filters.find(f => f.id === doc.activeFilterId);
         if (filter) out = applyFilterToCanvas(raw, raw.width, raw.height, filter);
       }
+      if (bgRemovalSignature(doc)) out = applyBgRemovalToCanvas(out, doc);
       entry.canvas = out;
       entry.u0 = u0; entry.v0 = v0; entry.u1 = u1; entry.v1 = v1;
       entry.pxW = pxW; entry.pxH = pxH; entry.filterSig = filterSig;
@@ -728,18 +731,19 @@ export class Renderer {
   }
 
 
-  /** Cache: docId → gefiltertes Bild (key: sourceSig|filterSig|wxh). */
+  /** Cache: docId → gefiltertes Bild (key: sourceSig|filterSig|bgSig|wxh). */
   private _docFilterCache = new Map<string, { canvas: HTMLCanvasElement; key: string }>();
 
   private _getFilteredBitmap(doc: DocumentObject, baseSource: CanvasImageSource, baseW: number, baseH: number, sourceSig: string): HTMLCanvasElement | null {
     const activeId = doc.activeFilterId;
-    if (!activeId) return null;
-    const filter = doc.filters.find(f => f.id === activeId);
-    if (!filter) return null;
-    const key = `${sourceSig}|${filterSignature(filter)}|${baseW}x${baseH}`;
+    const bgSig = bgRemovalSignature(doc);
+    if (!activeId && !bgSig) return null;
+    const filter = activeId ? doc.filters.find(f => f.id === activeId) || null : null;
+    const key = `${sourceSig}|${filter ? filterSignature(filter) : "-"}|${bgSig}|${baseW}x${baseH}`;
     const cached = this._docFilterCache.get(doc.id);
     if (cached && cached.key === key) return cached.canvas;
-    const c = applyFilterToCanvas(baseSource, baseW, baseH, filter);
+    let c = applyFilterToCanvas(baseSource, baseW, baseH, filter);
+    if (bgSig) c = applyBgRemovalToCanvas(c, doc);
     this._docFilterCache.set(doc.id, { canvas: c, key });
     return c;
   }

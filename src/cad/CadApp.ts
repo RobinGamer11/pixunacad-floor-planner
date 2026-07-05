@@ -243,6 +243,14 @@ export class CadApp {
    *  und von SelectTool gelesen, damit Canvas-Klicks bei aktivem Modus den Ankerpunkt
    *  verschieben/drehen/skalieren. */
   documentHubMode: "none" | "move" | "rotate" | "scale" | "crop" = "none";
+
+  /** Aktive Hintergrund-Ausschnitt-Interaktion (aus DocumentFilterPanel gesetzt).
+   *  Wird von SelectTool bei Klick/Drag über dem Ziel-Dokument verarbeitet. */
+  bgRemoveInteraction: null | {
+    docId: string;
+    tool: "wand" | "brush";
+    target: "fg" | "bg";
+  } = null;
   /** Erster Referenz-Klick für Rotate/Scale (Welt-Koordinate). */
   documentHubFirstClick: { x: number; y: number } | null = null;
 
@@ -575,6 +583,16 @@ export class CadApp {
           try { maskUrl = d._eraseMask.toDataURL("image/png"); d.eraseMaskDataUrl = maskUrl; d._eraseMaskDirty = false; }
           catch { /* ignore */ }
         }
+        // BgRemoval-Maske ebenfalls exportieren.
+        let bgClone: any = undefined;
+        const anyD = d as any;
+        if (anyD.bgRemoval) {
+          bgClone = { ...anyD.bgRemoval };
+          if (anyD._bgFgMask) {
+            try { bgClone.fgMaskDataUrl = (anyD._bgFgMask as HTMLCanvasElement).toDataURL("image/png"); }
+            catch { /* ignore */ }
+          }
+        }
         return {
           id: d.id, name: d.name, kind: d.kind, src: d.src, pageIndex: d.pageIndex,
           position: { x: d.position.x, y: d.position.y },
@@ -587,6 +605,7 @@ export class CadApp {
           opacity: (d as any).opacity,
           filters: ((d as any).filters || []).map((f: any) => ({ ...f })),
           activeFilterId: (d as any).activeFilterId || null,
+          bgRemoval: bgClone,
         };
       }),
 
@@ -726,6 +745,7 @@ export class CadApp {
         opacity: typeof d.opacity === "number" ? d.opacity : undefined,
         filters: Array.isArray(d.filters) ? d.filters : undefined,
         activeFilterId: d.activeFilterId || null,
+        bgRemoval: d.bgRemoval || undefined,
       });
       if (d.id) (doc as any).id = d.id;
     }

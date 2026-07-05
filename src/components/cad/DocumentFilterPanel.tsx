@@ -174,6 +174,173 @@ export function DocumentFilterPanel({ app, docId, sig }: Props) {
           doc={doc}
         />
       )}
+
+      {/* Hintergrund ausschneiden */}
+      <BgRemovePanel app={app} doc={doc} />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- BgRemovePanel
+function BgRemovePanel({ app, doc }: { app: CadApp | null; doc: any }) {
+  const [, force] = useState(0);
+  const rerender = () => force(v => v + 1);
+  const bg = doc.bgRemoval || null;
+  const inter = app?.bgRemoveInteraction || null;
+  const isThisDoc = inter && inter.docId === doc.id;
+
+  const enable = () => {
+    if (!doc.bgRemoval) {
+      import("@/cad/documentBgRemove").then(({ defaultBgRemoval }) => {
+        doc.bgRemoval = defaultBgRemoval();
+        doc.bgRemoval.enabled = true;
+        rerender();
+      });
+    } else {
+      doc.bgRemoval.enabled = !doc.bgRemoval.enabled;
+      rerender();
+    }
+  };
+  const setInter = (tool: "wand" | "brush" | null, target: "fg" | "bg" = "fg") => {
+    if (!app) return;
+    if (tool === null) app.bgRemoveInteraction = null;
+    else app.bgRemoveInteraction = { docId: doc.id, tool, target };
+    rerender();
+  };
+  const patchBg = (patch: any) => {
+    if (!doc.bgRemoval) return;
+    Object.assign(doc.bgRemoval, patch);
+    rerender();
+  };
+  const reset = () => {
+    if (!window.confirm("Auswahl zurücksetzen?")) return;
+    import("@/cad/documentBgRemove").then(({ resetBgMask }) => {
+      resetBgMask(doc);
+      rerender();
+    });
+  };
+
+  return (
+    <div className="space-y-2" style={{ borderTop: "1px solid hsl(var(--border))", paddingTop: 10 }}>
+      <div className="flex items-center justify-between">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.14em]" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+          Hintergrund ausschneiden
+        </div>
+        <label className="flex items-center gap-1 text-[11px] cursor-pointer">
+          <input type="checkbox" checked={!!bg?.enabled} onChange={enable} />
+          <span>Aktiv</span>
+        </label>
+      </div>
+
+      {bg?.enabled && (
+        <>
+          {/* Werkzeug-Auswahl */}
+          <div className="space-y-1">
+            <div className="text-[11px]" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+              Vordergrund auswählen
+            </div>
+            <div className="grid grid-cols-2 gap-1">
+              <ToolBtn active={!!isThisDoc && inter?.tool === "wand" && inter?.target === "fg"} onClick={() => setInter(isThisDoc && inter?.tool === "wand" && inter?.target === "fg" ? null : "wand", "fg")} label="Zauberstab" />
+              <ToolBtn active={!!isThisDoc && inter?.tool === "brush" && inter?.target === "fg"} onClick={() => setInter(isThisDoc && inter?.tool === "brush" && inter?.target === "fg" ? null : "brush", "fg")} label="Pinsel +" />
+              <ToolBtn active={!!isThisDoc && inter?.tool === "wand" && inter?.target === "bg"} onClick={() => setInter(isThisDoc && inter?.tool === "wand" && inter?.target === "bg" ? null : "wand", "bg")} label="Zauberstab (BG)" />
+              <ToolBtn active={!!isThisDoc && inter?.tool === "brush" && inter?.target === "bg"} onClick={() => setInter(isThisDoc && inter?.tool === "brush" && inter?.target === "bg" ? null : "brush", "bg")} label="Pinsel −" />
+            </div>
+            {isThisDoc && (
+              <div className="text-[10px]" style={{ color: "hsl(var(--primary))" }}>
+                Aktiv — im Canvas auf das Dokument klicken/ziehen.
+              </div>
+            )}
+          </div>
+
+          {/* Genauigkeit (Wand) */}
+          <div>
+            <div className="flex items-center justify-between text-xs mb-1">
+              <span>Genauigkeit (Zauberstab)</span>
+              <span style={{ color: "hsl(var(--cad-toolbar-muted))" }}>{bg.tolerance}</span>
+            </div>
+            <input type="range" min={1} max={128} step={1} value={bg.tolerance}
+              onChange={(e) => patchBg({ tolerance: parseInt(e.target.value, 10) })}
+              className="w-full" />
+          </div>
+
+          {/* Pinselgröße */}
+          <div>
+            <div className="flex items-center justify-between text-xs mb-1">
+              <span>Pinselgröße</span>
+              <span style={{ color: "hsl(var(--cad-toolbar-muted))" }}>{(bg.brushRadiusM * 100).toFixed(0)} cm</span>
+            </div>
+            <input type="range" min={1} max={200} step={1} value={Math.round(bg.brushRadiusM * 100)}
+              onChange={(e) => patchBg({ brushRadiusM: parseInt(e.target.value, 10) / 100 })}
+              className="w-full" />
+          </div>
+
+          {/* Vordergrundfarbe */}
+          <ColorAlphaRow
+            label="Vordergrund"
+            color={bg.fgColor}
+            alpha={bg.fgAlpha}
+            onChange={(color, alpha) => patchBg({ fgColor: color, fgAlpha: alpha })}
+          />
+          {/* Hintergrundfarbe */}
+          <ColorAlphaRow
+            label="Hintergrund"
+            color={bg.bgColor}
+            alpha={bg.bgAlpha}
+            onChange={(color, alpha) => patchBg({ bgColor: color, bgAlpha: alpha })}
+          />
+
+          <button type="button" onClick={reset} className="cad-toolbar-btn h-7 w-full text-[11px] justify-center">
+            Auswahl zurücksetzen
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+function ToolBtn({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="cad-toolbar-btn h-7 px-2 text-[11px] justify-center"
+      style={{
+        borderColor: active ? "hsl(var(--primary))" : undefined,
+        background: active ? "hsl(var(--primary) / 0.15)" : undefined,
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
+function ColorAlphaRow({ label, color, alpha, onChange }: {
+  label: string; color: string | null; alpha: number;
+  onChange: (color: string | null, alpha: number) => void;
+}) {
+  const transparent = color === null;
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between text-xs">
+        <span>{label}</span>
+        <label className="flex items-center gap-1 text-[10px]" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+          <input type="checkbox" checked={transparent} onChange={(e) => onChange(e.target.checked ? null : (color || "#ffffff"), alpha)} />
+          <span>Transparent</span>
+        </label>
+      </div>
+      {!transparent && (
+        <div className="flex items-center gap-2">
+          <input type="color" value={color || "#ffffff"} onChange={(e) => onChange(e.target.value, alpha)} className="w-8 h-7 rounded border cursor-pointer" />
+          <input type="text" value={color || "#ffffff"} onChange={(e) => onChange(e.target.value, alpha)} className="flex-1 bg-transparent border rounded px-2 py-1 text-xs" />
+        </div>
+      )}
+      <div className="flex items-center justify-between text-[11px]">
+        <span style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Deckkraft</span>
+        <span style={{ color: "hsl(var(--cad-toolbar-muted))" }}>{Math.round(alpha * 100)} %</span>
+      </div>
+      <input type="range" min={0} max={1} step={0.01} value={alpha}
+        onChange={(e) => onChange(color, parseFloat(e.target.value))}
+        className="w-full" />
     </div>
   );
 }

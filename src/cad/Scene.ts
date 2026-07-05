@@ -342,12 +342,18 @@ export class DocumentObject {
   filters: import("./documentFilters").DocumentFilter[];
   /** Aktiver Filter (id) oder null = Original. */
   activeFilterId: string | null;
+  /** Hintergrund-Ausschnitt-Einstellungen (Magic-Wand + Pinsel + FG/BG-Einfärbung). */
+  bgRemoval?: import("./documentBgRemove").BgRemoval;
+  /** Runtime-Cache: FG-Maske als Canvas (weiß = Vordergrund). Nicht serialisiert. */
+  _bgFgMask?: HTMLCanvasElement | null;
+  /** Runtime-Revision (Cache-Invalidierung). */
+  _bgMaskRev?: number;
   /** Runtime-Flag: Dokument existiert nur als Snap-/Hub-Quelle (z. B. Projektmappen-PDF),
    *  Bild wird NICHT gezeichnet, Serialisierung überspringt es. Nicht persistiert. */
   _snapOnly?: boolean;
 
 
-  constructor({ id, name, kind, src, pageIndex, position, widthM, heightM, rotationRad, pixelWidth, pixelHeight, labelId, importScaleDenom, eraseMaskDataUrl, pdfSourceB64, guideEdges, cropM, opacity, filters, activeFilterId }: {
+  constructor({ id, name, kind, src, pageIndex, position, widthM, heightM, rotationRad, pixelWidth, pixelHeight, labelId, importScaleDenom, eraseMaskDataUrl, pdfSourceB64, guideEdges, cropM, opacity, filters, activeFilterId, bgRemoval }: {
     id: string; name?: string; kind?: "image" | "pdf-page"; src: string;
     pageIndex?: number; position: Vec2; widthM: number; heightM: number;
     rotationRad?: number; pixelWidth?: number; pixelHeight?: number; labelId?: string;
@@ -358,6 +364,7 @@ export class DocumentObject {
     opacity?: number;
     filters?: import("./documentFilters").DocumentFilter[];
     activeFilterId?: string | null;
+    bgRemoval?: import("./documentBgRemove").BgRemoval;
   }) {
     this.id = id;
     this.name = name || "Dokument";
@@ -391,6 +398,9 @@ export class DocumentObject {
     this.opacity = typeof opacity === "number" ? Math.max(0, Math.min(1, opacity)) : 1;
     this.filters = Array.isArray(filters) ? filters.map(f => ({ ...f })) : [];
     this.activeFilterId = activeFilterId || null;
+    this.bgRemoval = bgRemoval ? { ...bgRemoval } : undefined;
+    this._bgFgMask = null;
+    this._bgMaskRev = 0;
   }
 }
 
@@ -750,6 +760,7 @@ export class Scene {
     opacity?: number;
     filters?: import("./documentFilters").DocumentFilter[];
     activeFilterId?: string | null;
+    bgRemoval?: import("./documentBgRemove").BgRemoval;
   }): DocumentObject {
     const doc = new DocumentObject({ id: this._makeId(), ...opts });
     this.documents.push(doc);

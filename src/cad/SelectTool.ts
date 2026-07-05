@@ -1463,6 +1463,35 @@ export class SelectTool {
   update(input: Input) {
     this.app.topology.priorityWallId = this.getPriorityWallId();
 
+    // Hintergrund-Ausschnitt-Interaktion (aktiviert via DocumentFilterPanel).
+    // Klick = Magic-Wand-Fill; Drag mit gedrückter Maustaste = Pinsel.
+    if (this.app.bgRemoveInteraction) {
+      const inter = this.app.bgRemoveInteraction;
+      const doc = this.app.scene.getDocumentById(inter.docId);
+      if (doc) {
+        const mouseW = v(input.mouse.wx, input.mouse.wy);
+        // Nur reagieren, wenn Cursor über dem Dokument ist.
+        if (pointInDocument(mouseW, doc)) {
+          void import("./documentBgRemove").then(({ ensureBgRemoval, floodFillAt, paintBrushAt }) => {
+            const b = ensureBgRemoval(doc);
+            b.enabled = true;
+            if (inter.tool === "wand") {
+              if (input.clicked) {
+                floodFillAt(doc, mouseW, b.tolerance, inter.target);
+              }
+            } else if (inter.tool === "brush") {
+              if (input.mouse.left) {
+                paintBrushAt(doc, mouseW, b.brushRadiusM, inter.target);
+              }
+            }
+          });
+          return; // Andere Klicks/Drag-Handler blockieren.
+        }
+      }
+    }
+
+
+
     // Dimension-Hub-Box: aktiver "move"-Modus → nächster Klick legt
     // den PlacementPoint der ausgewählten Maßkette (mit Snap auf andere
     // Maßketten / Geometrie) neu. Wir intercepten den Klick hier ganz oben,
