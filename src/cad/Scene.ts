@@ -398,6 +398,9 @@ export class DocumentObject {
     this.opacity = typeof opacity === "number" ? Math.max(0, Math.min(1, opacity)) : 1;
     this.filters = Array.isArray(filters) ? filters.map(f => ({ ...f })) : [];
     this.activeFilterId = activeFilterId || null;
+    this.bgRemoval = bgRemoval ? { ...bgRemoval } : undefined;
+    this._bgFgMask = null;
+    this._bgMaskRev = 0;
   }
 }
 
