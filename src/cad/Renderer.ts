@@ -714,10 +714,11 @@ export class Renderer {
       );
       if (entry.pendingKey !== key) return;
       let out: HTMLCanvasElement = raw;
-      if (filterSig && doc.activeFilterId) {
+      if (doc.activeFilterId) {
         const filter = doc.filters.find(f => f.id === doc.activeFilterId);
         if (filter) out = applyFilterToCanvas(raw, raw.width, raw.height, filter);
       }
+      if (bgRemovalSignature(doc)) out = applyBgRemovalToCanvas(out, doc);
       entry.canvas = out;
       entry.u0 = u0; entry.v0 = v0; entry.u1 = u1; entry.v1 = v1;
       entry.pxW = pxW; entry.pxH = pxH; entry.filterSig = filterSig;
