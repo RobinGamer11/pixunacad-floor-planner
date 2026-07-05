@@ -662,7 +662,8 @@ export class Renderer {
       pxH = Math.max(32, Math.floor(pxH * s));
     }
     const filter = doc.activeFilterId ? doc.filters.find(f => f.id === doc.activeFilterId) : undefined;
-    const filterSig = filter ? filterSignature(filter) : "";
+    const bgSig = bgRemovalSignature(doc);
+    const filterSig = (filter ? filterSignature(filter) : "") + "|bg:" + bgSig;
 
     let entry = this._pdfTileCache.get(doc.id);
     if (!entry) {
