@@ -11,6 +11,7 @@ import { transformedInstanceItems, instanceBoundingCornersWorld } from "./Sticke
 import { documentCornersWorld, documentCenterWorld, documentVisibleCornersWorld } from "./documentGeometry";
 import { getOrCreateDocMask } from "./documentMask";
 import { applyFilterToCanvas, filterSignature } from "./documentFilters";
+import { applyBgRemovalToCanvas, bgRemovalSignature } from "./documentBgRemove";
 
 import { computeHealedWallLines } from "./wallHeal";
 import { getWallUnionGroups } from "./wallUnion";
