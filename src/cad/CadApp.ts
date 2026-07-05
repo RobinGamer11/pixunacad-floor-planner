@@ -243,6 +243,14 @@ export class CadApp {
    *  und von SelectTool gelesen, damit Canvas-Klicks bei aktivem Modus den Ankerpunkt
    *  verschieben/drehen/skalieren. */
   documentHubMode: "none" | "move" | "rotate" | "scale" | "crop" = "none";
+
+  /** Aktive Hintergrund-Ausschnitt-Interaktion (aus DocumentFilterPanel gesetzt).
+   *  Wird von SelectTool bei Klick/Drag über dem Ziel-Dokument verarbeitet. */
+  bgRemoveInteraction: null | {
+    docId: string;
+    tool: "wand" | "brush";
+    target: "fg" | "bg";
+  } = null;
   /** Erster Referenz-Klick für Rotate/Scale (Welt-Koordinate). */
   documentHubFirstClick: { x: number; y: number } | null = null;
 
