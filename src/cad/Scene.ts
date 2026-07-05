@@ -760,6 +760,7 @@ export class Scene {
     opacity?: number;
     filters?: import("./documentFilters").DocumentFilter[];
     activeFilterId?: string | null;
+    bgRemoval?: import("./documentBgRemove").BgRemoval;
   }): DocumentObject {
     const doc = new DocumentObject({ id: this._makeId(), ...opts });
     this.documents.push(doc);
