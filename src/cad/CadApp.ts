@@ -958,6 +958,15 @@ export class CadApp {
 
   /* ---- Selection ---- */
   setSelection(selection: Selection | null) {
+    // Hintergrund-Ausschnitt-Interaktion beenden, sobald die Auswahl das
+    // zugehörige Dokument verlässt (oder komplett verschwindet). So kann der
+    // User das Bild frei an- und abwählen, ohne dass jeder Klick weiter malt.
+    if (this.bgRemoveInteraction) {
+      const stillOnSameDoc = !!selection
+        && (selection as any).type === "document"
+        && (selection as any).documentId === this.bgRemoveInteraction.docId;
+      if (!stillOnSameDoc) this.bgRemoveInteraction = null;
+    }
     this.selection = selection;
     this.renderer.setSelection(selection);
     this._syncLineSettingsFromContext();
