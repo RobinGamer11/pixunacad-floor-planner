@@ -2227,6 +2227,20 @@ export class SelectTool {
       }
 
       const hit = this._hitTestWithForegroundPriority(input);
+      // Dokument-Underlay-Priorität: Wenn der Vordergrund-Hit nur ein Hatch-Body
+      // ist (keine Kante, kein Eckpunkt) und ein Dokument unter der Maus liegt,
+      // bevorzugen wir das Dokument. So kann der User jederzeit ein Bild/PDF
+      // erneut anklicken, um die Werkzeug-Einstellungen (rechtes Panel) zu sehen.
+      const isPlainHatchBody = !!hit
+        && (hit as any).type === SelectionType.HATCH
+        && (hit as any).edgeIndex == null
+        && (hit as any).pointIndex == null
+        && (hit as any).holeIndex == null;
+      const docHitEarly = (!hit || isPlainHatchBody) ? this._hitDocument(input) : null;
+      if (docHitEarly) {
+        this.app.setSelection({ type: SelectionType.DOCUMENT, documentId: docHitEarly.id } as any);
+        return;
+      }
       if (hit) {
         this.app.setSelection(hit);
         if ((hit as any).segmentId) this.app.showLineSettingsPanel(true);
@@ -2243,15 +2257,9 @@ export class SelectTool {
           this.app.setSelection({ type: SelectionType.FREE_STROKE, freeStrokeId: freeHit.id } as any);
           return;
         }
-        // Kein Vordergrund-Hit → Document-Underlay testen (Auswahl, kein Drag)
-        const docHit = this._hitDocument(input);
-        if (docHit) {
-          this.app.setSelection({ type: SelectionType.DOCUMENT, documentId: docHit.id } as any);
-          // Hub-Box wird erst beim Klick auf eine Ecke geöffnet (siehe oben).
-        } else {
-          this.app.setSelection(null);
-          this.app.documentHubState = { visible: false, screenX: 0, screenY: 0, docId: null, cornerIndex: 0, anchorWorld: null, cropSide: null };
-        }
+        // Kein Vordergrund-Hit & kein Dokument → Auswahl aufheben.
+        this.app.setSelection(null);
+        this.app.documentHubState = { visible: false, screenX: 0, screenY: 0, docId: null, cornerIndex: 0, anchorWorld: null, cropSide: null };
       }
     }
 
