@@ -1638,6 +1638,53 @@ function ElementView({
               </div>
             );
           })}
+
+          {/* Ecken-Handles (1:1 wie Dokument-Hub) — Skalieren an einer Ecke,
+              Ankerpunkt = gegenüberliegende Ecke. Shift = Seitenverhältnis halten. */}
+          {onCornerDrag && (["tl", "tr", "bl", "br"] as const).map((corner) => {
+            const startCornerDrag = (e: React.MouseEvent) => {
+              e.stopPropagation();
+              e.preventDefault();
+              let last = { x: e.clientX, y: e.clientY };
+              const move = (ev: MouseEvent) => {
+                const dx = ev.clientX - last.x;
+                const dy = ev.clientY - last.y;
+                last = { x: ev.clientX, y: ev.clientY };
+                onCornerDrag(corner, dx, dy, ev.shiftKey);
+              };
+              const up = () => {
+                window.removeEventListener("mousemove", move);
+                window.removeEventListener("mouseup", up);
+              };
+              window.addEventListener("mousemove", move);
+              window.addEventListener("mouseup", up);
+            };
+            const isTop = corner === "tl" || corner === "tr";
+            const isLeft = corner === "tl" || corner === "bl";
+            const cursor =
+              corner === "tl" || corner === "br" ? "nwse-resize" : "nesw-resize";
+            return (
+              <div
+                key={corner}
+                data-hub-control
+                onMouseDown={startCornerDrag}
+                title={`Ecke skalieren (Shift: proportional)`}
+                className="absolute"
+                style={{
+                  [isTop ? "top" : "bottom"]: -6,
+                  [isLeft ? "left" : "right"]: -6,
+                  width: 12,
+                  height: 12,
+                  borderRadius: 999,
+                  background: "white",
+                  border: "2px solid hsl(var(--accent-gold))",
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.25)",
+                  cursor,
+                  zIndex: 6,
+                } as React.CSSProperties}
+              />
+            );
+          })}
         </>
       )}
     </div>
