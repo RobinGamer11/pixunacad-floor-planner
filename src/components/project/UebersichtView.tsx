@@ -20,23 +20,25 @@ export function UebersichtView({ project, activeMappeId, onSelectMappe }: Props)
   const activeMappe = mappen.find((m) => m.id === activeMappeId) ?? mappen[0];
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,420px)] gap-6 mt-6 items-start">
-      {/* Linke Spalte */}
-      <div className="space-y-5 min-w-0">
-        <MappenPanel project={project} activeId={activeMappe?.id} onSelect={onSelectMappe} />
-        <ProjektinfoPanel project={project} />
-        {timelinePos === "top" && <TaskTimeline project={project} />}
-        <AufgabenMini project={project} />
-        <KalenderMini project={project} />
-        {timelinePos === "bottom" && <TaskTimeline project={project} />}
+    <div className="mt-6 space-y-5">
+      {timelinePos === "top" && <TaskTimeline project={project} />}
+
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)] gap-6 items-start">
+        {/* Linke Spalte (schmal) */}
+        <div className="space-y-5 min-w-0">
+          <MappenPanel project={project} activeId={activeMappe?.id} onSelect={onSelectMappe} />
+          <ProjektinfoPanel project={project} />
+          <AufgabenMini project={project} />
+        </div>
+
+        {/* Rechte Spalte (dominant): Titelbild + Erläuterungen zusammen */}
+        <div className="min-w-0">
+          <HeroErlaeuterungPanel project={project} mappe={activeMappe} />
+        </div>
       </div>
 
-      {/* Rechte Spalte: Titelbild + Erläuterungen */}
-      <div className="space-y-5">
-        <HeroPanel project={project} />
-        <ErlaeuterungGesamt project={project} />
-        {activeMappe && <ErlaeuterungMappe project={project} mappe={activeMappe} />}
-      </div>
+      <KalenderMini project={project} />
+      {timelinePos === "bottom" && <TaskTimeline project={project} />}
     </div>
   );
 }
@@ -261,39 +263,20 @@ function TaskTimeline({ project }: { project: Project }) {
 /* ============================================================ Aufgaben-Mini */
 
 function AufgabenMini({ project }: { project: Project }) {
-  const [draft, setDraft] = useState("");
-  const open = project.tasks.filter((t) => !t.done).slice(0, 6);
-  const add = () => {
-    const v = draft.trim();
-    if (!v) return;
-    projectStore.addTask(project.id, { title: v, priority: "medium" });
-    setDraft("");
-  };
+  const open = project.tasks.filter((t) => !t.done).slice(0, 8);
   return (
     <section
       className="rounded-2xl p-5"
       style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
     >
-      <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-3">AUFGABEN</div>
-      <div className="flex items-center gap-2 mb-3">
-        <input
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && add()}
-          placeholder="Neue Aufgabe…"
-          className="h-8 px-3 rounded-md border bg-transparent text-sm outline-none flex-1"
-          style={{ borderColor: "hsl(var(--hairline))" }}
-        />
-        <button
-          onClick={add}
-          className="h-8 w-8 rounded-md flex items-center justify-center"
-          style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
-        >
-          <Plus size={14} />
-        </button>
+      <div className="flex items-center justify-between mb-3">
+        <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">AUFGABEN</div>
+        <div className="text-[10px] text-muted-foreground">Bearbeiten im Reiter „Aufgaben"</div>
       </div>
       {project.tasks.length === 0 ? (
         <div className="text-xs text-muted-foreground italic">Keine Aufgaben.</div>
+      ) : open.length === 0 ? (
+        <div className="text-xs text-muted-foreground italic">Alles erledigt 🎉</div>
       ) : (
         <div className="divide-y" style={{ borderColor: "hsl(var(--hairline))" }}>
           {open.map((t) => (
@@ -399,9 +382,15 @@ function KalenderMini({ project }: { project: Project }) {
   );
 }
 
-/* ============================================================ Hero */
+/* ============================================================ Hero + Erläuterungen (kombiniert) */
 
-function HeroPanel({ project }: { project: Project }) {
+function HeroErlaeuterungPanel({
+  project,
+  mappe,
+}: {
+  project: Project;
+  mappe: { id: string; name: string; konzept?: string } | undefined;
+}) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const handleThumb = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -412,61 +401,57 @@ function HeroPanel({ project }: { project: Project }) {
   };
   return (
     <section
-      className="rounded-2xl p-5"
+      className="rounded-2xl p-5 space-y-5"
       style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
     >
-      <div className="flex items-center justify-between text-xs text-muted-foreground mb-3">
-        <span>Projekttitelbild</span>
-        <span>Geändert: {new Date(project.updatedAt).toLocaleDateString("de-DE")}</span>
+      <div>
+        <div className="flex items-center justify-between text-xs text-muted-foreground mb-3">
+          <span>Projekttitelbild</span>
+          <span>Geändert: {new Date(project.updatedAt).toLocaleDateString("de-DE")}</span>
+        </div>
+        <div className="rounded-xl overflow-hidden aspect-[16/9] relative group" style={{ background: "hsl(var(--surface-muted))" }}>
+          <img src={project.thumbnail} alt="" className="w-full h-full object-cover" />
+          <button
+            onClick={() => inputRef.current?.click()}
+            title="Titelbild ändern"
+            className="absolute top-3 right-3 h-8 w-8 rounded-full flex items-center justify-center shadow"
+            style={{ background: "hsl(var(--surface))", color: "hsl(var(--ink))" }}
+          >
+            <Pencil size={14} />
+          </button>
+          <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={handleThumb} />
+        </div>
       </div>
-      <div className="rounded-xl overflow-hidden aspect-[16/10] relative group" style={{ background: "hsl(var(--surface-muted))" }}>
-        <img src={project.thumbnail} alt="" className="w-full h-full object-cover" />
-        <button
-          onClick={() => inputRef.current?.click()}
-          title="Titelbild ändern"
-          className="absolute top-3 right-3 h-8 w-8 rounded-full flex items-center justify-center shadow"
-          style={{ background: "hsl(var(--surface))", color: "hsl(var(--ink))" }}
-        >
-          <Pencil size={14} />
-        </button>
-        <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={handleThumb} />
-      </div>
+
+      <div className="h-px" style={{ background: "hsl(var(--hairline))" }} />
+
+      <InlineEditableText
+        title="ERLÄUTERUNG — GESAMTPROJEKT"
+        value={project.konzept ?? ""}
+        placeholder="Konzept, Leitgedanke oder kurze Beschreibung des gesamten Projekts…"
+        onSave={(v) => projectStore.updateProject(project.id, { konzept: v })}
+      />
+
+      {mappe && (
+        <>
+          <div className="h-px" style={{ background: "hsl(var(--hairline))" }} />
+          <InlineEditableText
+            title={`ERLÄUTERUNG — ${mappe.name.toUpperCase()}`}
+            value={mappe.konzept ?? ""}
+            placeholder="Beschreibung dieser Projektmappe (ändert sich je nach ausgewählter Mappe)…"
+            onSave={(v) => projectStore.updateMappeKonzept(project.id, mappe.id, v)}
+          />
+        </>
+      )}
     </section>
   );
 }
 
-/* ============================================================ Erläuterungen */
-
-function ErlaeuterungGesamt({ project }: { project: Project }) {
-  return (
-    <EditableTextPanel
-      title="ERLÄUTERUNG — GESAMTPROJEKT"
-      value={project.konzept ?? ""}
-      placeholder="Konzept, Leitgedanke oder kurze Beschreibung des gesamten Projekts…"
-      onSave={(v) => projectStore.updateProject(project.id, { konzept: v })}
-    />
-  );
-}
-
-function ErlaeuterungMappe({ project, mappe }: { project: Project; mappe: { id: string; name: string; konzept?: string } }) {
-  return (
-    <EditableTextPanel
-      title={`ERLÄUTERUNG — ${mappe.name.toUpperCase()}`}
-      value={mappe.konzept ?? ""}
-      placeholder="Beschreibung dieser Projektmappe (ändert sich je nach ausgewählter Mappe)…"
-      onSave={(v) => projectStore.updateMappeKonzept(project.id, mappe.id, v)}
-    />
-  );
-}
-
-function EditableTextPanel({ title, value, placeholder, onSave }: { title: string; value: string; placeholder: string; onSave: (v: string) => void }) {
+function InlineEditableText({ title, value, placeholder, onSave }: { title: string; value: string; placeholder: string; onSave: (v: string) => void }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
   return (
-    <section
-      className="rounded-2xl p-5"
-      style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
-    >
+    <div>
       <div className="flex items-center justify-between">
         <div className="text-xs font-semibold tracking-[0.18em]" style={{ color: "hsl(var(--accent-gold))" }}>
           {title}
@@ -486,7 +471,7 @@ function EditableTextPanel({ title, value, placeholder, onSave }: { title: strin
           <textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            rows={5}
+            rows={6}
             className="w-full text-sm rounded-md border p-2 bg-transparent outline-none"
             style={{ borderColor: "hsl(var(--hairline))" }}
           />
@@ -512,7 +497,8 @@ function EditableTextPanel({ title, value, placeholder, onSave }: { title: strin
           {value || placeholder}
         </p>
       )}
-    </section>
+    </div>
   );
 }
+
 
