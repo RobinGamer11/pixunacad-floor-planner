@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useRef } from "react";
-import { Plus, Pencil, Check, X, Trash2, Settings2, ArrowUp, ArrowDown } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Plus, Pencil, Check, X, Trash2, Settings2, GripVertical } from "lucide-react";
 import { projectStore, type Project, type Task } from "@/lib/projectStore";
 
 interface Props {
@@ -46,11 +47,27 @@ export function UebersichtView({ project, activeMappeId, onSelectMappe }: Props)
 /* ============================================================ Mappen-Panel */
 
 function MappenPanel({ project, activeId, onSelect }: { project: Project; activeId?: string; onSelect: (id: string) => void }) {
-  const [editMode, setEditMode] = useState(false);
+  const navigate = useNavigate();
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [nameDraft, setNameDraft] = useState("");
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
 
   const mappen = project.mappen ?? [];
+
+  const openEdit = (id?: string) => {
+    if (!id) return;
+    projectStore.setActiveMappe(project.id, id);
+    navigate(`/project/${project.id}`);
+  };
+
+  const handleDrop = (targetId: string) => {
+    if (!dragId || dragId === targetId) { setDragId(null); setDragOverId(null); return; }
+    const toIdx = mappen.findIndex((m) => m.id === targetId);
+    if (toIdx >= 0) projectStore.moveMappeToIndex(project.id, dragId, toIdx);
+    setDragId(null);
+    setDragOverId(null);
+  };
 
   return (
     <section
@@ -72,17 +89,18 @@ function MappenPanel({ project, activeId, onSelect }: { project: Project; active
         </button>
         <div className="flex-1" />
         <button
-          onClick={() => setEditMode((v) => !v)}
-          title={editMode ? "Bearbeiten beenden" : "Mappen bearbeiten"}
-          className="h-7 px-2.5 rounded-md flex items-center gap-1.5 text-[11px] font-medium border transition"
+          onClick={() => openEdit(activeId ?? mappen[0]?.id)}
+          disabled={mappen.length === 0}
+          title="Ausgewählte Projektmappe bearbeiten"
+          className="h-7 px-2.5 rounded-md flex items-center gap-1.5 text-[11px] font-medium border transition disabled:opacity-40"
           style={{
-            color: editMode ? "hsl(var(--surface))" : "hsl(var(--ink))",
-            background: editMode ? "hsl(var(--accent-gold))" : "transparent",
-            borderColor: editMode ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
+            color: "hsl(var(--surface))",
+            background: "hsl(var(--ink))",
+            borderColor: "hsl(var(--ink))",
           }}
         >
           <Pencil size={12} />
-          {editMode ? "Fertig" : "Bearbeiten"}
+          Bearbeiten
         </button>
       </div>
 
@@ -96,16 +114,36 @@ function MappenPanel({ project, activeId, onSelect }: { project: Project; active
             {mappen.map((m) => {
               const active = m.id === activeId;
               const isRenaming = renamingId === m.id;
+              const isDragOver = dragOverId === m.id && dragId !== m.id;
               return (
                 <div
                   key={m.id}
-                  className="flex items-center gap-2 p-2 rounded-md border transition cursor-pointer"
+                  draggable={!isRenaming}
+                  onDragStart={(e) => { setDragId(m.id); e.dataTransfer.effectAllowed = "move"; }}
+                  onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; if (dragOverId !== m.id) setDragOverId(m.id); }}
+                  onDragLeave={() => { if (dragOverId === m.id) setDragOverId(null); }}
+                  onDrop={(e) => { e.preventDefault(); handleDrop(m.id); }}
+                  onDragEnd={() => { setDragId(null); setDragOverId(null); }}
+                  className="group flex items-center gap-1.5 p-2 rounded-md border transition cursor-pointer"
                   style={{
                     background: active ? "hsl(var(--surface-muted))" : "transparent",
-                    borderColor: active ? "hsl(var(--accent-gold) / 0.4)" : "transparent",
+                    borderColor: isDragOver
+                      ? "hsl(var(--accent-gold))"
+                      : active
+                        ? "hsl(var(--accent-gold) / 0.4)"
+                        : "transparent",
+                    opacity: dragId === m.id ? 0.4 : 1,
                   }}
                   onClick={() => !isRenaming && onSelect(m.id)}
+                  onDoubleClick={() => !isRenaming && openEdit(m.id)}
                 >
+                  <span
+                    title="Zum Verschieben ziehen"
+                    className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground shrink-0"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <GripVertical size={14} />
+                  </span>
                   <div
                     className="w-8 h-8 rounded shrink-0 flex items-center justify-center text-[10px] font-semibold"
                     style={{ background: "hsl(var(--surface))", border: "1px solid hsl(var(--hairline))", color: "hsl(var(--accent-gold))" }}
@@ -129,30 +167,21 @@ function MappenPanel({ project, activeId, onSelect }: { project: Project; active
                   ) : (
                     <span className="flex-1 text-sm truncate">{m.name}</span>
                   )}
-                  {editMode && !isRenaming && (
-                    <div className="flex items-center gap-0.5">
-                      <button
-                        disabled={mappen.indexOf(m) === 0}
-                        onClick={(e) => { e.stopPropagation(); projectStore.reorderMappe(project.id, m.id, -1); }}
-                        title="Nach oben"
-                        className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
-                      >
-                        <ArrowUp size={12} />
-                      </button>
-                      <button
-                        disabled={mappen.indexOf(m) === mappen.length - 1}
-                        onClick={(e) => { e.stopPropagation(); projectStore.reorderMappe(project.id, m.id, 1); }}
-                        title="Nach unten"
-                        className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
-                      >
-                        <ArrowDown size={12} />
-                      </button>
+                  {!isRenaming && (
+                    <div className="flex items-center gap-0.5 shrink-0">
                       <button
                         onClick={(e) => { e.stopPropagation(); setRenamingId(m.id); setNameDraft(m.name); }}
                         title="Umbenennen"
                         className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted"
                       >
                         <Pencil size={12} />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); openEdit(m.id); }}
+                        title="Projektmappe bearbeiten"
+                        className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted"
+                      >
+                        <Settings2 size={12} />
                       </button>
                       {mappen.length > 1 && (
                         <button

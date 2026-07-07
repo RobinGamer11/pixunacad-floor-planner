@@ -809,6 +809,21 @@ export const projectStore = {
       }),
     }));
   },
+  moveMappeToIndex: (projectId: string, mappeId: string, toIndex: number) => {
+    setState((s) => ({
+      projects: s.projects.map((p) => {
+        if (p.id !== projectId) return p;
+        const mappen = [...(p.mappen ?? [])];
+        const from = mappen.findIndex((m) => m.id === mappeId);
+        if (from < 0) return p;
+        const clamped = Math.max(0, Math.min(mappen.length - 1, toIndex));
+        if (clamped === from) return p;
+        const [item] = mappen.splice(from, 1);
+        mappen.splice(clamped, 0, item);
+        return { ...p, mappen, updatedAt: new Date().toISOString() };
+      }),
+    }));
+  },
   setActiveMappe: (projectId: string, mappeId: string) => {
     setState((s) => ({
       projects: s.projects.map((p) => (p.id === projectId ? { ...p, activeMappeId: mappeId } : p)),
