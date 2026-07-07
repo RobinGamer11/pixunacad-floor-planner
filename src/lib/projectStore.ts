@@ -312,6 +312,8 @@ export const projectStore = {
   },
   createProject: () => {
     const id = `p-${Date.now().toString(36)}`;
+    const firstPageId = `${id}-p1`;
+    const mappeId = `m-${id}-main`;
     const blank: Project = {
       id,
       name: "Neues Projekt",
@@ -319,11 +321,16 @@ export const projectStore = {
       thumbnail: placeholder("Neues Projekt"),
       updatedAt: new Date().toISOString(),
       pages: [
-        { id: `${id}-p1`, title: "01 Titel", format: "A3-quer", margins: 20, background: false, elements: [] },
+        { id: firstPageId, title: "01 Titel", format: "A3-quer", margins: 20, background: false, elements: [] },
       ],
       sheets: [],
       tasks: [],
       events: [],
+      mappen: [{ id: mappeId, name: "Hauptmappe", konzept: "", pageIds: [firstPageId] }],
+      activeMappeId: mappeId,
+      files: [],
+      photos: [],
+      settings: { timelinePosition: "bottom" },
     };
     setState((s) => ({ projects: [blank, ...s.projects] }));
     return id;
