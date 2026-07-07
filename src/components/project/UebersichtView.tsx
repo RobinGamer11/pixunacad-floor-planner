@@ -130,11 +130,27 @@ function MappenPanel({ project, activeId, onSelect }: { project: Project; active
                     <span className="flex-1 text-sm truncate">{m.name}</span>
                   )}
                   {editMode && !isRenaming && (
-                    <>
+                    <div className="flex items-center gap-0.5">
+                      <button
+                        disabled={mappen.indexOf(m) === 0}
+                        onClick={(e) => { e.stopPropagation(); projectStore.reorderMappe(project.id, m.id, -1); }}
+                        title="Nach oben"
+                        className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                        <ArrowUp size={12} />
+                      </button>
+                      <button
+                        disabled={mappen.indexOf(m) === mappen.length - 1}
+                        onClick={(e) => { e.stopPropagation(); projectStore.reorderMappe(project.id, m.id, 1); }}
+                        title="Nach unten"
+                        className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                        <ArrowDown size={12} />
+                      </button>
                       <button
                         onClick={(e) => { e.stopPropagation(); setRenamingId(m.id); setNameDraft(m.name); }}
                         title="Umbenennen"
-                        className="text-muted-foreground hover:text-foreground"
+                        className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted"
                       >
                         <Pencil size={12} />
                       </button>
@@ -147,12 +163,12 @@ function MappenPanel({ project, activeId, onSelect }: { project: Project; active
                             }
                           }}
                           title="Löschen"
-                          className="text-muted-foreground hover:text-foreground"
+                          className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-muted"
                         >
                           <Trash2 size={12} />
                         </button>
                       )}
-                    </>
+                    </div>
                   )}
                 </div>
               );
