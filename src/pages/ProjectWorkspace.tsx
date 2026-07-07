@@ -109,8 +109,7 @@ export default function ProjectWorkspace() {
   const project = useProject(projectId);
   const navigate = useNavigate();
   const [activePageId, setActivePageId] = useState<string | undefined>(project?.pages[0]?.id);
-  const pdfFileInputRef = useRef<HTMLInputElement>(null);
-  const imgFileInputRef = useRef<HTMLInputElement>(null);
+  const documentFileInputRef = useRef<HTMLInputElement>(null);
   const [selectedElementIds, setSelectedElementIds] = useState<string[]>([]);
   // `selectedElementId` ist das ZULETZT angeklickte Element — alle bestehenden
   // Lese-Stellen (Inspector etc.) benutzen es weiterhin. Bei Multi-Auswahl
