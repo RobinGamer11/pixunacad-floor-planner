@@ -888,6 +888,7 @@ function ToolRailButton({
   accent,
   onClick,
   showLabel,
+  disabled,
 }: {
   icon: React.ReactNode;
   label: string;
@@ -895,19 +896,25 @@ function ToolRailButton({
   accent?: boolean;
   onClick?: () => void;
   showLabel?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <button
-      onClick={onClick}
-      title={label}
+      onClick={disabled ? undefined : onClick}
+      title={disabled ? `${label} — noch nicht verfügbar` : label}
+      disabled={disabled}
       className="cad-rail-btn"
       style={{
         background: active ? "hsl(var(--surface-muted))" : "transparent",
-        color: accent
+        color: disabled
+          ? "hsl(0 0% 75%)"
+          : accent
           ? "hsl(var(--accent-gold))"
           : active
           ? "hsl(var(--accent-gold))"
           : "hsl(var(--ink-soft))",
+        cursor: disabled ? "not-allowed" : undefined,
+        opacity: disabled ? 0.55 : undefined,
       }}
     >
       {icon}
