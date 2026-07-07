@@ -2617,8 +2617,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             </div>
           </div>
 
-        </div>
-        {/* Druckpläne wurden in den Druckmodus verschoben (Kopf → Exportieren). */}
+          {/* Druckpläne wurden in den Druckmodus verschoben (Kopf → Exportieren). */}
         </div>
         <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-2" style={{ display: rightTab === "layers" ? "block" : "none" }}>
           <div ref={idPanelRef} className="cad-id-panel w-full">
