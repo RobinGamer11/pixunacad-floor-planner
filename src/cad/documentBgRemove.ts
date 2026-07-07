@@ -276,6 +276,98 @@ export function autoRemoveBackgroundFromCorners(
   return any;
 }
 
+// ------------------------------------------------------------ visibility & crop
+
+/**
+ * Prüft, ob ein Weltpunkt in einem sichtbaren (nicht-maskierten und nicht-cropped)
+ * Bereich des Dokuments liegt. Wird für Hit-Tests genutzt, damit weggeschnittene
+ * Bereiche wirklich "nicht da" sind.
+ */
+export function pointInDocumentVisible(p: Vec2, doc: DocumentObject): boolean {
+  const cx = doc.position.x + doc.widthM / 2;
+  const cy = doc.position.y + doc.heightM / 2;
+  const dx = p.x - cx, dy = p.y - cy;
+  const cos = Math.cos(-doc.rotationRad), sin = Math.sin(-doc.rotationRad);
+  const lx = dx * cos - dy * sin;
+  const ly = dx * sin + dy * cos;
+  const hx = doc.widthM / 2, hy = doc.heightM / 2;
+  const crop = (doc as any).cropM || { top: 0, right: 0, bottom: 0, left: 0 };
+  if (lx < -hx + (crop.left || 0) || lx > hx - (crop.right || 0)) return false;
+  if (ly < -hy + (crop.top || 0) || ly > hy - (crop.bottom || 0)) return false;
+  const b: BgRemoval | undefined = (doc as any).bgRemoval;
+  const mask: HTMLCanvasElement | undefined = (doc as any)._bgFgMask;
+  if (b?.enabled && mask) {
+    const cache = _getMaskDataCache(doc, mask);
+    if (cache) {
+      const u = (lx + hx) / doc.widthM;
+      const v = (ly + hy) / doc.heightM;
+      const mx = Math.max(0, Math.min(mask.width - 1, Math.round(u * mask.width)));
+      const my = Math.max(0, Math.min(mask.height - 1, Math.round(v * mask.height)));
+      const idx = (my * mask.width + mx) * 4;
+      if (cache.data[idx] < 128) return false;
+    }
+  }
+  return true;
+}
+
+function _getMaskDataCache(doc: DocumentObject, mask: HTMLCanvasElement): { data: Uint8ClampedArray; rev: number } | null {
+  const anyDoc = doc as any;
+  const rev = anyDoc._bgMaskRev || 0;
+  const cached = anyDoc._bgMaskDataCache as { data: Uint8ClampedArray; rev: number } | undefined;
+  if (cached && cached.rev === rev) return cached;
+  try {
+    const ctx = mask.getContext("2d", { willReadFrequently: true })!;
+    const data = ctx.getImageData(0, 0, mask.width, mask.height).data;
+    const entry = { data, rev };
+    anyDoc._bgMaskDataCache = entry;
+    return entry;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Setzt cropM so, dass der äußere Rahmen des Dokuments exakt die Bounding-Box
+ * des sichtbaren (Vordergrund-)Maskeninhalts umschließt. Dadurch rutscht der
+ * "Mittelpunkt" (Rahmenmitte) automatisch in die Mitte des ausgeschnittenen
+ * Motivs, und Kanten-Handles liegen am Motiv-Rand. Beim Herausziehen einer
+ * Kante wird der Rahmen wieder größer — genau das Verhalten, das der Nutzer
+ * erwartet.
+ */
+export function applyMaskCropToDoc(doc: DocumentObject) {
+  const b: BgRemoval | undefined = (doc as any).bgRemoval;
+  const mask: HTMLCanvasElement | undefined = (doc as any)._bgFgMask;
+  if (!b?.enabled || !mask) return;
+  const cache = _getMaskDataCache(doc, mask);
+  if (!cache) return;
+  const w = mask.width, h = mask.height;
+  const data = cache.data;
+  let minX = w, minY = h, maxX = -1, maxY = -1;
+  for (let y = 0; y < h; y++) {
+    const row = y * w;
+    for (let x = 0; x < w; x++) {
+      if (data[(row + x) * 4] >= 128) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+  const anyDoc = doc as any;
+  if (maxX < 0) {
+    anyDoc.cropM = { top: 0, right: 0, bottom: 0, left: 0 };
+    return;
+  }
+  const sx = doc.widthM / w, sy = doc.heightM / h;
+  anyDoc.cropM = {
+    left: Math.max(0, minX * sx),
+    right: Math.max(0, doc.widthM - (maxX + 1) * sx),
+    top: Math.max(0, minY * sy),
+    bottom: Math.max(0, doc.heightM - (maxY + 1) * sy),
+  };
+}
+
 // ------------------------------------------------------------ brush
 
 export function paintBrushAt(doc: DocumentObject, worldPoint: Vec2, radiusM: number, target: "fg" | "bg"): boolean {
