@@ -20,23 +20,25 @@ export function UebersichtView({ project, activeMappeId, onSelectMappe }: Props)
   const activeMappe = mappen.find((m) => m.id === activeMappeId) ?? mappen[0];
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,420px)] gap-6 mt-6 items-start">
-      {/* Linke Spalte */}
-      <div className="space-y-5 min-w-0">
-        <MappenPanel project={project} activeId={activeMappe?.id} onSelect={onSelectMappe} />
-        <ProjektinfoPanel project={project} />
-        {timelinePos === "top" && <TaskTimeline project={project} />}
-        <AufgabenMini project={project} />
-        <KalenderMini project={project} />
-        {timelinePos === "bottom" && <TaskTimeline project={project} />}
+    <div className="mt-6 space-y-5">
+      {timelinePos === "top" && <TaskTimeline project={project} />}
+
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)] gap-6 items-start">
+        {/* Linke Spalte (schmal) */}
+        <div className="space-y-5 min-w-0">
+          <MappenPanel project={project} activeId={activeMappe?.id} onSelect={onSelectMappe} />
+          <ProjektinfoPanel project={project} />
+          <AufgabenMini project={project} />
+        </div>
+
+        {/* Rechte Spalte (dominant): Titelbild + Erläuterungen zusammen */}
+        <div className="min-w-0">
+          <HeroErlaeuterungPanel project={project} mappe={activeMappe} />
+        </div>
       </div>
 
-      {/* Rechte Spalte: Titelbild + Erläuterungen */}
-      <div className="space-y-5">
-        <HeroPanel project={project} />
-        <ErlaeuterungGesamt project={project} />
-        {activeMappe && <ErlaeuterungMappe project={project} mappe={activeMappe} />}
-      </div>
+      <KalenderMini project={project} />
+      {timelinePos === "bottom" && <TaskTimeline project={project} />}
     </div>
   );
 }
