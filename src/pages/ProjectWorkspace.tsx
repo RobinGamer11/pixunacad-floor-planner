@@ -83,6 +83,7 @@ export default function ProjectWorkspace() {
   const navigate = useNavigate();
   const [activePageId, setActivePageId] = useState<string | undefined>(project?.pages[0]?.id);
   const pdfFileInputRef = useRef<HTMLInputElement>(null);
+  const imgFileInputRef = useRef<HTMLInputElement>(null);
   const [selectedElementIds, setSelectedElementIds] = useState<string[]>([]);
   // `selectedElementId` ist das ZULETZT angeklickte Element — alle bestehenden
   // Lese-Stellen (Inspector etc.) benutzen es weiterhin. Bei Multi-Auswahl
@@ -256,9 +257,20 @@ export default function ProjectWorkspace() {
           label="Linie"
           active={activeTool === "line"}
           onClick={() => setActiveToolAndTab(activeTool === "line" ? null : "line")}
+          showLabel
         />
-        <ToolRailButton icon={<Hash size={18} />} label="Schraffur" />
-        <ToolRailButton icon={<FileText size={18} />} label="PDF einfügen" onClick={() => pdfFileInputRef.current?.click()} />
+        <ToolRailButton
+          icon={<Hash size={18} />}
+          label="Schraffur"
+          showLabel
+          onClick={() => navigate(`/project/${project.id}/cad`)}
+        />
+        <ToolRailButton
+          icon={<FileText size={18} />}
+          label="PDF einfügen"
+          showLabel
+          onClick={() => pdfFileInputRef.current?.click()}
+        />
         <input
           ref={pdfFileInputRef}
           type="file"
@@ -296,7 +308,49 @@ export default function ProjectWorkspace() {
             }
           }}
         />
-        <ToolRailButton icon={<ImageIcon size={18} />} label="Bild" />
+        <ToolRailButton
+          icon={<ImageIcon size={18} />}
+          label="Bild"
+          showLabel
+          onClick={() => imgFileInputRef.current?.click()}
+        />
+        <input
+          ref={imgFileInputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp,image/gif"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            e.target.value = "";
+            if (!f || !projectId || !activePage) return;
+            const reader = new FileReader();
+            reader.onload = () => {
+              const dataUrl = String(reader.result || "");
+              if (!dataUrl) return;
+              const img = new Image();
+              img.onload = () => {
+                const fmt = FORMAT_SIZES[activePage.format];
+                const aspect = img.width && img.height ? img.width / img.height : 1;
+                const wPct = 40;
+                const pageAspect = fmt.w / fmt.h;
+                const hPct = Math.min(80, wPct / aspect * pageAspect);
+                const id = projectStore.addElement(projectId, activePage.id, {
+                  kind: "image",
+                  x: 15,
+                  y: 15,
+                  w: wPct,
+                  h: hPct,
+                  imageUrl: dataUrl,
+                });
+                setSelectedElementIds([id]);
+              };
+              img.onerror = () => window.alert("Bild konnte nicht geladen werden.");
+              img.src = dataUrl;
+            };
+            reader.onerror = () => window.alert("Bild konnte nicht gelesen werden.");
+            reader.readAsDataURL(f);
+          }}
+        />
         <ToolRailButton icon={<TableIcon size={18} />} label="Tabelle" />
         <ToolRailButton icon={<StickyNote size={18} />} label="Notiz" />
         <ToolRailButton icon={<Clock size={18} />} label="Zeitstrahl" />
@@ -1603,24 +1657,10 @@ function RightInspector({
   const layerCount = page?.elements.length ?? 0;
   return (
     <aside
-      className="w-[346px] shrink-0 border-l flex flex-row"
+      className="w-[340px] shrink-0 border-l flex flex-col"
       style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
     >
-      {/* Linke Griffleiste zum Einklappen */}
-      <div
-        className="w-6 shrink-0 flex items-start justify-center pt-2 border-r"
-        style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-muted))" }}
-      >
-        <button
-          onClick={onCollapse}
-          title="Einklappen"
-          className="h-6 w-6 rounded-md flex items-center justify-center hover:bg-muted"
-        >
-          <PanelRightClose size={14} className="text-muted-foreground" />
-        </button>
-      </div>
-      <div className="flex-1 min-w-0 flex flex-col">
-      <div className="grid grid-cols-3 border-b" style={{ borderColor: "hsl(var(--hairline))" }}>
+      <div className="grid grid-cols-[1fr_1fr_1fr_auto] border-b" style={{ borderColor: "hsl(var(--hairline))" }}>
         <TabButton active={tab === "settings"} onClick={() => setTab("settings")} icon={<Settings size={14} />} label="Seiteneinstellung" />
         <TabButton active={tab === "tools"} onClick={() => setTab("tools")} icon={<Wrench size={14} />} label="Werkzeugeinstellung" />
         <TabButton
@@ -1630,6 +1670,14 @@ function RightInspector({
           label="Ebenen"
           badge={layerCount > 0 ? layerCount : undefined}
         />
+        <button
+          onClick={onCollapse}
+          title="Einklappen"
+          className="w-8 flex items-center justify-center hover:bg-muted border-l"
+          style={{ borderColor: "hsl(var(--hairline))" }}
+        >
+          <PanelRightClose size={14} className="text-muted-foreground" />
+        </button>
       </div>
 
       <div className="flex-1 overflow-y-auto p-5 space-y-5">
@@ -1665,7 +1713,6 @@ function RightInspector({
             setSelectedElementId={setSelectedElementId}
           />
         )}
-      </div>
       </div>
     </aside>
   );

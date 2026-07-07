@@ -1,41 +1,66 @@
-## 1. Übersicht → Projektmappen-Feld (`src/components/project/UebersichtView.tsx`)
+## Leitplanke (nicht verhandelbar)
 
-- **Symbol „Projektmappe bearbeiten" (Zahnrad `Settings2`) je Zeile entfernen** (Z. 179–185 im `MappenPanel`). Der oben rechts sitzende Button „Bearbeiten" reicht; ein Doppelklick auf die Zeile öffnet weiterhin die Bearbeitung. Umbenennen (Stift) und Löschen (Papierkorb) bleiben.
-- **Panel präsenter machen** — das Mappen-Feld ist das wichtigste Element der Übersicht:
-  - Höhe erhöhen: `height: 260` → `height: 360`.
-  - Panel-Padding: `p-4` → `p-5`, Kopfabstand `mb-3` → `mb-4`.
-  - Kopfzeile (Label „PROJEKTMAPPEN") in Akzentgold statt Muted, Größe `text-[11px]` → `text-xs`, damit es visuell dem Wichtigkeitsgrad entspricht.
-  - Mappen-Zeilen etwas großzügiger: Padding `p-2` → `p-2.5`, Vorschau-Kachel `w-8 h-8` → `w-10 h-10` mit Seitenzahl in `text-xs`, Name in `text-[13px]` → `text-sm font-medium`.
-  - Grid-Verhältnis in `UebersichtView` (Z. 27) leicht zugunsten links: `[minmax(0,320px)_minmax(0,1fr)]` → `[minmax(0,360px)_minmax(0,1fr)]`.
-- Keine Änderungen an Drag & Drop, Store oder Routing.
+**CAD-Oberfläche bleibt in Verhalten, Optik und Persistenz exakt wie heute.** Jede Änderung an CAD-Code ist rein struktureller Natur (Code-Extraktion in geteilte Komponenten, identische Props/Refs/Callbacks). Vor jedem Merge: die CAD-Oberfläche wird durch Sicht­kontrolle in denselben Zustand gebracht wie vorher (Werkzeuge, Hatch-Settings-Panel, floating DocHub, Undo/Redo, Zeichenblätter, Druckmodus).
 
-## 2. Einklappbares rechtes Panel — Symbol links vom Fenster
+## 1. Rechtes Panel — Einklappen wie linker „Seiten"-Sidebar
 
-Ziel: In **Projektmappe** und **CAD-Oberfläche** wird das rechte Panel wie in der Projektmappe eingeklappt/aufgeklappt, und der Toggle-Button sitzt in beiden Modi **an der linken Kante des rechten Panels** (nicht mehr in der Tab-Leiste rechts).
+Aktuell hat das rechte Panel eine eigene 24 px-Griffleiste links — wirkt wie ein zweites Fenster. Der linke Sidebar in der Projektmappe (Z. 316–331 `src/pages/ProjectWorkspace.tsx`) hat den `PanelLeftClose`-Button **in der Kopfzeile** neben Titel/„+".
 
-### 2a. CAD (`src/components/CadEditor.tsx`)
+- **`src/pages/ProjectWorkspace.tsx` — `RightInspector`** (Z. ~1605–1626): linke Griffleiste entfernen; kleinen `PanelRightClose`-Button in die Tab-Leiste rechts neben „Ebenen" einfügen.
+- **`src/components/CadEditor.tsx`** (Z. ~1517–1546): analog — linke Griffleiste entfernen, `PanelRightClose`-Button wieder in der Tab-Leiste. **Kein weiteres CAD-Verhalten ändert sich.**
+- Eingeklappter Zustand (schmaler `PanelRightOpen`-Griff) bleibt unverändert.
 
-- Bestehenden Ausblenden-Button aus der Tab-Reihe entfernen (Z. 1537–1545 — `PanelRightClose` neben den Tab-Buttons).
-- Neuen schmalen Rand (`w-6`, volle Höhe, `border-l`) am **linken Rand des Panels** einführen (innerhalb des `<aside>` bei Z. 1518, als erstes Child in einem neuen `flex-row`-Wrapper). Darin ein Button mit `PanelRightClose` oben, der `setRightOpen(false)` ausführt.
-- Der bestehende eingeklappte Zustand (Z. 2641–2655) bleibt unverändert und dient als „Öffnen"-Griff.
-- Kein Verhalten des Druckmodus ändern (der behält sein eigenes ✕ oben rechts).
+## 2. Werkzeug-Vereinheitlichung „Linie", „Schraffur", „PDF einfügen", „Bild"
 
-### 2b. Projektmappe (`src/pages/ProjectWorkspace.tsx` + `RightInspector`)
+Ziel: In Projektmappe verhalten sich diese vier Werkzeuge 1:1 wie in CAD — dieselben Settings-Panels, dieselben Hub-Boxen, dieselbe Optik. **Die CAD-Oberfläche selbst bekommt dabei nur eine Umverdrahtung auf denselben Komponentenbaum, keine Funktionsänderung.**
 
-- Aktuelle `onCollapse`-Übergabe (Z. 696) bleibt vom API her erhalten, wird aber **nicht mehr im Inspector-Header** angezeigt.
-- In `RightInspector` den bisherigen Collapse-Trigger (im Kopf des Panels) entfernen und stattdessen — analog zum CAD — eine schmale linke Griffleiste (`w-6`, volle Höhe, `border-l`) mit `PanelRightClose`-Button ganz oben rendern, die `onCollapse()` aufruft.
-- Auch für den `PrintPanel`-Pfad: Die linke Griffleiste wird als Wrapper um den rechten Bereich gerendert, damit Einklappen aus jedem Modus gleich funktioniert. `PrintPanel` selbst behält sein ✕ zum Verlassen des Druckmodus.
-- Der eingeklappte Zustand (Z. 702–715) bleibt gleich (kleiner `PanelRightOpen`-Griff).
+### 2a. Bestandsaufnahme
 
-### Ergebnis
+- **Linie**: MiniCad kann es schon (`MiniTool = "line"`), Settings-UI in Projektmappe ist aber eine eigene React-Version.
+- **Schraffur**: nur in CAD (`HatchTool`, 4 Draw-Modes, großes Settings-Panel).
+- **PDF einfügen** / **Bild**: in CAD über `DocumentTool` + `documentImport.ts` + floating DocHub (Move/Rotate/Scale/Crop). In Projektmappe direkt via `projectStore.addElement({kind:"pdf"})`, kein Hub.
 
-- Beide Kopfzeilen/Panels sind identisch bedienbar: **linker Rand des rechten Panels = Einklappen**, **schmaler Griff nach dem Einklappen = Ausklappen**.
-- Keine Änderungen an Store, Routing oder Business-Logik.
+### 2b. Architektur — geteilte Komponenten & erweitertes MiniCad
+
+**Schritt 1 — Reine Extraktion (Verhalten CAD unverändert):**
+Neue Dateien unter `src/components/cad/shared/`:
+- `HatchSettingsPanel.tsx` — 1:1-Extraktion des Hatch-Blocks aus `CadEditor.tsx` inkl. aller Refs, per Props reingereicht.
+- `LineSettingsPanel.tsx` — 1:1-Extraktion der Linien-Einstellungen.
+- `DocumentSettingsPanel.tsx` + `DocumentHubBox.tsx` — 1:1-Extraktion der PDF/Bild-Panels und der floating Hub-Box (Z. 1213 ff. + `docHub*`-States).
+
+`CadEditor.tsx` wird darauf umgestellt und danach visuell/funktional gegengeprüft (Sichtkontrolle in Preview, Undo/Redo/Selektion/Hub testen). Diese Phase darf **keine** Änderung an CAD-Verhalten bringen.
+
+**Schritt 2 — MiniCad erweitern:**
+- `MiniTool` in `src/cad/embed/MiniCad.ts` um `"hatch" | "document"` erweitern.
+- `HatchTool` und `DocumentTool` (aus `src/cad/`) an die MiniCad-`Scene`/`Renderer` hängen (dieselbe Engine wie CAD).
+- `MiniCad.beginDocumentImport(file)` ruft `importFile` aus `documentImport.ts` und delegiert an `DocumentTool.beginPlacement`.
+- Persistenz: neue Objekte werden über den bestehenden `MiniCad.onChange`-Serialisierer in den Page-State geschrieben (wie schon bei Linien).
+
+**Schritt 3 — Projektmappe verdrahten:**
+- `PageTool` (in `ProjectWorkspace.tsx`, Z. 78) um `"hatch" | "document"` erweitern.
+- Buttons „Schraffur", „PDF einfügen", „Bild":
+  - Schraffur → `setActiveTool("hatch")`.
+  - PDF / Bild → Datei-Picker (PDF bzw. `image/png,image/jpeg`) → `miniCadRef.current?.beginDocumentImport(file)`.
+- `RightInspector` rendert je nach aktivem Werkzeug / Selektion die shared Panels (`HatchSettingsPanel`, `DocumentSettingsPanel`, `LineSettingsPanel`) — dieselben Komponenten, die auch die CAD-Oberfläche nutzt.
+- `CadOverlayLayer` reicht die neuen Tools und die Hub-Box-DOM-Refs durch.
+
+**Rückwärtskompatibilität:** bestehende `kind:"pdf"` / `kind:"image"` React-Elemente in gespeicherten Projekten rendern wie bisher. Nur **neu** eingefügte PDFs/Bilder in der Projektmappe laufen über die CAD-Engine.
+
+### 2c. Tool-Rail-Optik in Projektmappe
+
+„Linie / Schraffur / PDF einfügen / Bild" bekommen `showLabel` und die gleiche Reihenfolge/Trennlinien wie das CAD-Rail — CAD-Rail selbst unverändert.
+
+## Reihenfolge & Verifikation
+
+1. Punkt 1 (Panel-Toggle) — sofort. CAD-Sichtkontrolle: Panel öffnet/schließt, Tabs & Druckmodus wie vorher.
+2. Punkt 2 in drei Etappen, nach jeder Etappe CAD-Oberfläche prüfen:
+   1. Extraktion in shared Komponenten (kein Verhaltenswechsel).
+   2. MiniCad erweitern (nur additive Änderungen).
+   3. Projektmappen-Werkzeuge anschließen, RightInspector auf shared Panels umstellen.
 
 ## Technische Details
 
-- Nur Frontend/Presentation. Keine neuen Dateien; drei bestehende werden bearbeitet:
-  - `src/components/project/UebersichtView.tsx`
-  - `src/components/CadEditor.tsx`
-  - `src/pages/ProjectWorkspace.tsx` (inkl. `RightInspector`-Block darin)
-- Kein Umbau der Tab-Logik, keine neuen Props außer der Wiederverwendung von `onCollapse`.
+- Neue Dateien: `src/components/cad/shared/{HatchSettingsPanel,LineSettingsPanel,DocumentSettingsPanel,DocumentHubBox}.tsx`.
+- Betroffen: `src/cad/embed/MiniCad.ts`, `src/components/page/CadOverlayLayer.tsx`, `src/components/CadEditor.tsx`, `src/pages/ProjectWorkspace.tsx`.
+- Keine Änderungen an `projectStore`-Schema; alte Elemente bleiben lauffähig.
+- Keine Änderungen an CAD-Persistenz oder CAD-Sheet-Manager.
