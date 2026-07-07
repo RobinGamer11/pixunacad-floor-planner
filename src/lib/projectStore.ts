@@ -121,6 +121,37 @@ export interface CustomField {
   value: string;
 }
 
+/**
+ * Projektmappe: übergeordnete Sammlung innerhalb eines Projekts, die eigene
+ * Seiten und eine eigene Konzept-Beschreibung besitzt. Pages leben weiterhin
+ * in `project.pages`; die Mappe referenziert sie per ID.
+ */
+export interface Mappe {
+  id: string;
+  name: string;
+  konzept?: string;
+  pageIds: string[];
+}
+
+export type FileKind = "folder" | "file";
+
+export interface FileNode {
+  id: string;
+  kind: FileKind;
+  name: string;
+  createdAt: string;
+  parentId: string | null;
+  /** Nur für Dateien: Base64-DataURL (Achtung: localStorage-Limit ~5MB gesamt). */
+  dataUrl?: string;
+  mimeType?: string;
+  sizeBytes?: number;
+}
+
+export interface ProjectSettings {
+  /** Position des Zeitstrahls im Übersichts-Tab. Default: "bottom". */
+  timelinePosition?: "top" | "bottom";
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -139,6 +170,14 @@ export interface Project {
   konzept?: string;
   customFields?: CustomField[];
   isTemplate?: boolean;
+  /** Projektmappen (falls fehlend, wird beim Laden eine "Hauptmappe" erzeugt). */
+  mappen?: Mappe[];
+  activeMappeId?: string;
+  /** Dateien-Reiter (dwg/dxf/pdf/…) — flache Liste mit parentId für Ordnerbaum. */
+  files?: FileNode[];
+  /** Fotos-Reiter (jpg/png/…). */
+  photos?: FileNode[];
+  settings?: ProjectSettings;
 }
 
 const STORAGE_KEY = "pixuna.projects.v3";
@@ -211,13 +250,40 @@ function load(): State {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && Array.isArray(parsed.projects) && parsed.projects.length) {
-        return parsed as State;
+        return { projects: parsed.projects.map(migrateProject) };
       }
     }
   } catch {
     /* ignore */
   }
-  return { projects: demoProjects() };
+  return { projects: demoProjects().map(migrateProject) };
+}
+
+/** Stellt sicher, dass jedes Projekt mindestens eine Mappe + Files/Photos-Arrays hat. */
+function migrateProject(p: Project): Project {
+  const next: Project = { ...p };
+  if (!Array.isArray(next.mappen) || next.mappen.length === 0) {
+    const defaultId = `m-${next.id}-main`;
+    next.mappen = [{
+      id: defaultId,
+      name: "Hauptmappe",
+      konzept: "",
+      pageIds: next.pages.map((pg) => pg.id),
+    }];
+    next.activeMappeId = defaultId;
+  } else if (!next.activeMappeId || !next.mappen.find((m) => m.id === next.activeMappeId)) {
+    next.activeMappeId = next.mappen[0].id;
+  }
+  // Alle noch nicht zugeordneten Seiten kommen in die erste Mappe.
+  const assigned = new Set(next.mappen.flatMap((m) => m.pageIds));
+  const orphan = next.pages.filter((pg) => !assigned.has(pg.id)).map((pg) => pg.id);
+  if (orphan.length) {
+    next.mappen = next.mappen.map((m, i) => (i === 0 ? { ...m, pageIds: [...m.pageIds, ...orphan] } : m));
+  }
+  if (!Array.isArray(next.files)) next.files = [];
+  if (!Array.isArray(next.photos)) next.photos = [];
+  if (!next.settings) next.settings = { timelinePosition: "bottom" };
+  return next;
 }
 
 function persist() {
@@ -246,6 +312,8 @@ export const projectStore = {
   },
   createProject: () => {
     const id = `p-${Date.now().toString(36)}`;
+    const firstPageId = `${id}-p1`;
+    const mappeId = `m-${id}-main`;
     const blank: Project = {
       id,
       name: "Neues Projekt",
@@ -253,11 +321,16 @@ export const projectStore = {
       thumbnail: placeholder("Neues Projekt"),
       updatedAt: new Date().toISOString(),
       pages: [
-        { id: `${id}-p1`, title: "01 Titel", format: "A3-quer", margins: 20, background: false, elements: [] },
+        { id: firstPageId, title: "01 Titel", format: "A3-quer", margins: 20, background: false, elements: [] },
       ],
       sheets: [],
       tasks: [],
       events: [],
+      mappen: [{ id: mappeId, name: "Hauptmappe", konzept: "", pageIds: [firstPageId] }],
+      activeMappeId: mappeId,
+      files: [],
+      photos: [],
+      settings: { timelinePosition: "bottom" },
     };
     setState((s) => ({ projects: [blank, ...s.projects] }));
     return id;
@@ -362,13 +435,17 @@ export const projectStore = {
       ),
     }));
   },
-  addPage: (projectId: string) => {
+  addPage: (projectId: string, mappeId?: string) => {
     const newId = `${projectId}-p${Date.now().toString(36)}`;
     setState((s) => ({
       projects: s.projects.map((p) => {
         if (p.id !== projectId) return p;
         const n = p.pages.length + 1;
         const num = String(n).padStart(2, "0");
+        const targetMappe = mappeId || p.activeMappeId || p.mappen?.[0]?.id;
+        const mappen = (p.mappen ?? []).map((m) =>
+          m.id === targetMappe ? { ...m, pageIds: [...m.pageIds, newId] } : m
+        );
         return {
           ...p,
           updatedAt: new Date().toISOString(),
@@ -383,6 +460,7 @@ export const projectStore = {
               elements: [],
             },
           ],
+          mappen,
         };
       }),
     }));
@@ -651,6 +729,151 @@ export const projectStore = {
       projects: s.projects.map((p) =>
         p.id === projectId ? { ...p, tasks: p.tasks.filter((t) => t.id !== taskId) } : p
       ),
+    }));
+  },
+
+  // ---------- Mappen ----------
+  addMappe: (projectId: string, name = "Neue Mappe") => {
+    const id = `m-${Date.now().toString(36)}`;
+    setState((s) => ({
+      projects: s.projects.map((p) =>
+        p.id === projectId
+          ? {
+              ...p,
+              updatedAt: new Date().toISOString(),
+              mappen: [...(p.mappen ?? []), { id, name, konzept: "", pageIds: [] }],
+              activeMappeId: id,
+            }
+          : p
+      ),
+    }));
+    return id;
+  },
+  renameMappe: (projectId: string, mappeId: string, name: string) => {
+    setState((s) => ({
+      projects: s.projects.map((p) =>
+        p.id === projectId
+          ? {
+              ...p,
+              updatedAt: new Date().toISOString(),
+              mappen: (p.mappen ?? []).map((m) => (m.id === mappeId ? { ...m, name } : m)),
+            }
+          : p
+      ),
+    }));
+  },
+  updateMappeKonzept: (projectId: string, mappeId: string, konzept: string) => {
+    setState((s) => ({
+      projects: s.projects.map((p) =>
+        p.id === projectId
+          ? {
+              ...p,
+              updatedAt: new Date().toISOString(),
+              mappen: (p.mappen ?? []).map((m) => (m.id === mappeId ? { ...m, konzept } : m)),
+            }
+          : p
+      ),
+    }));
+  },
+  deleteMappe: (projectId: string, mappeId: string) => {
+    setState((s) => ({
+      projects: s.projects.map((p) => {
+        if (p.id !== projectId) return p;
+        const mappen = p.mappen ?? [];
+        if (mappen.length <= 1) return p; // mindestens eine Mappe muss bleiben
+        const target = mappen.find((m) => m.id === mappeId);
+        if (!target) return p;
+        const rest = mappen.filter((m) => m.id !== mappeId);
+        // Verwaiste Seiten in die erste verbleibende Mappe verschieben.
+        rest[0] = { ...rest[0], pageIds: [...rest[0].pageIds, ...target.pageIds] };
+        return {
+          ...p,
+          updatedAt: new Date().toISOString(),
+          mappen: rest,
+          activeMappeId: p.activeMappeId === mappeId ? rest[0].id : p.activeMappeId,
+        };
+      }),
+    }));
+  },
+  setActiveMappe: (projectId: string, mappeId: string) => {
+    setState((s) => ({
+      projects: s.projects.map((p) => (p.id === projectId ? { ...p, activeMappeId: mappeId } : p)),
+    }));
+  },
+  updateProjectSettings: (projectId: string, patch: Partial<ProjectSettings>) => {
+    setState((s) => ({
+      projects: s.projects.map((p) =>
+        p.id === projectId ? { ...p, settings: { ...(p.settings ?? {}), ...patch } } : p
+      ),
+    }));
+  },
+
+  // ---------- Dateien & Fotos ----------
+  addFolder: (projectId: string, kind: "files" | "photos", parentId: string | null, name = "Neuer Ordner") => {
+    const id = `n-${Date.now().toString(36)}`;
+    const node: FileNode = { id, kind: "folder", name, createdAt: new Date().toISOString(), parentId };
+    setState((s) => ({
+      projects: s.projects.map((p) =>
+        p.id === projectId ? { ...p, [kind]: [...(p[kind] ?? []), node] } as Project : p
+      ),
+    }));
+    return id;
+  },
+  addFile: (
+    projectId: string,
+    kind: "files" | "photos",
+    parentId: string | null,
+    file: { name: string; dataUrl: string; mimeType: string; sizeBytes: number }
+  ) => {
+    const id = `n-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    const node: FileNode = {
+      id,
+      kind: "file",
+      name: file.name,
+      createdAt: new Date().toISOString(),
+      parentId,
+      dataUrl: file.dataUrl,
+      mimeType: file.mimeType,
+      sizeBytes: file.sizeBytes,
+    };
+    setState((s) => ({
+      projects: s.projects.map((p) =>
+        p.id === projectId ? ({ ...p, [kind]: [...(p[kind] ?? []), node] } as Project) : p
+      ),
+    }));
+    return id;
+  },
+  renameNode: (projectId: string, kind: "files" | "photos", nodeId: string, name: string) => {
+    setState((s) => ({
+      projects: s.projects.map((p) =>
+        p.id === projectId
+          ? ({
+              ...p,
+              [kind]: (p[kind] ?? []).map((n) => (n.id === nodeId ? { ...n, name } : n)),
+            } as Project)
+          : p
+      ),
+    }));
+  },
+  deleteNode: (projectId: string, kind: "files" | "photos", nodeId: string) => {
+    setState((s) => ({
+      projects: s.projects.map((p) => {
+        if (p.id !== projectId) return p;
+        const arr = p[kind] ?? [];
+        // Auch alle Nachfahren löschen.
+        const toDelete = new Set<string>([nodeId]);
+        let changed = true;
+        while (changed) {
+          changed = false;
+          for (const n of arr) {
+            if (n.parentId && toDelete.has(n.parentId) && !toDelete.has(n.id)) {
+              toDelete.add(n.id);
+              changed = true;
+            }
+          }
+        }
+        return { ...p, [kind]: arr.filter((n) => !toDelete.has(n.id)) } as Project;
+      }),
     }));
   },
 };

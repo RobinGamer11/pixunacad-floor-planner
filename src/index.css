@@ -924,3 +924,15 @@
   background: hsl(var(--border));
   margin: 0 2px;
 }
+
+/* Minimalist scrollbar für Projektmappen-Panel & andere schlanke Listen */
+.mappen-scroll::-webkit-scrollbar { width: 6px; }
+.mappen-scroll::-webkit-scrollbar-track { background: transparent; }
+.mappen-scroll::-webkit-scrollbar-thumb {
+  background: hsl(var(--hairline));
+  border-radius: 3px;
+}
+.mappen-scroll::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--accent-gold) / 0.5);
+}
+.mappen-scroll { scrollbar-width: thin; scrollbar-color: hsl(var(--hairline)) transparent; }
