@@ -124,7 +124,7 @@ function MappenPanel({ project, activeId, onSelect }: { project: Project; active
                   onDragLeave={() => { if (dragOverId === m.id) setDragOverId(null); }}
                   onDrop={(e) => { e.preventDefault(); handleDrop(m.id); }}
                   onDragEnd={() => { setDragId(null); setDragOverId(null); }}
-                  className="group flex items-center gap-1.5 p-2 rounded-md border transition cursor-pointer"
+                  className="group flex items-center gap-1.5 p-2.5 rounded-md border transition cursor-pointer"
                   style={{
                     background: active ? "hsl(var(--surface-muted))" : "transparent",
                     borderColor: isDragOver
@@ -145,7 +145,7 @@ function MappenPanel({ project, activeId, onSelect }: { project: Project; active
                     <GripVertical size={14} />
                   </span>
                   <div
-                    className="w-8 h-8 rounded shrink-0 flex items-center justify-center text-[10px] font-semibold"
+                    className="w-10 h-10 rounded shrink-0 flex items-center justify-center text-xs font-semibold"
                     style={{ background: "hsl(var(--surface))", border: "1px solid hsl(var(--hairline))", color: "hsl(var(--accent-gold))" }}
                   >
                     {m.pageIds.length}
@@ -165,7 +165,7 @@ function MappenPanel({ project, activeId, onSelect }: { project: Project; active
                       style={{ borderColor: "hsl(var(--hairline))" }}
                     />
                   ) : (
-                    <span className="flex-1 text-sm truncate">{m.name}</span>
+                    <span className="flex-1 text-sm font-medium truncate">{m.name}</span>
                   )}
                   {!isRenaming && (
                     <div className="flex items-center gap-0.5 shrink-0">
@@ -175,13 +175,6 @@ function MappenPanel({ project, activeId, onSelect }: { project: Project; active
                         className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted"
                       >
                         <Pencil size={12} />
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); openEdit(m.id); }}
-                        title="Projektmappe bearbeiten"
-                        className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted"
-                      >
-                        <Settings2 size={12} />
                       </button>
                       {mappen.length > 1 && (
                         <button
