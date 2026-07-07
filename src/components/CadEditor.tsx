@@ -188,6 +188,30 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const textEditorSymbolRef = useRef<HTMLSelectElement>(null);
 
   const appRef = useRef<CadApp | null>(null);
+
+  React.useImperativeHandle(ref, () => ({
+    undo: () => appRef.current?.undo(),
+    redo: () => appRef.current?.redo(),
+    exportPdf: () => appRef.current?.printSelectedPlans(),
+  }), []);
+
+  // Zoom-Anzeige nach oben spiegeln (Camera.scale, 80 = 100%).
+  useEffect(() => {
+    if (!onZoomChange) return;
+    let raf = 0;
+    let last = -1;
+    const tick = () => {
+      const s = appRef.current?.camera.scale;
+      if (typeof s === "number") {
+        const pct = Math.round((s / 80) * 100);
+        if (pct !== last) { last = pct; onZoomChange(pct); }
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [onZoomChange]);
+
   const [activeTool, setActiveTool] = useState<string>(ToolIds.SELECT);
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(true);
   const [rightOpen, setRightOpen] = useState<boolean>(true);
