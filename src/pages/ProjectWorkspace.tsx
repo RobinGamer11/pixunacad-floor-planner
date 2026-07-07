@@ -64,6 +64,7 @@ import CadOverlayLayer from "@/components/page/CadOverlayLayer";
 import { PdfPageView } from "@/components/page/PdfPageView";
 import { importFile } from "@/cad/documentImport";
 import type { MiniCadSelectionInfo } from "@/cad/embed/MiniCad";
+import { WorkspaceHeader } from "@/components/workspace/WorkspaceHeader";
 
 const FORMAT_SIZES: Record<PageFormat, { w: number; h: number; label: string }> = {
   "A3-quer": { w: 420, h: 297, label: "A3 Querformat (420 × 297 mm)" },
