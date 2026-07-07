@@ -181,7 +181,7 @@ export default function ProjectWorkspace() {
     guide: { color: "#7DD3FC", strokeWidth: 1, locked: false },
     line: { color: "#111111", thicknessMm: 0.5, alpha: 100 },
     text: {
-      fontSize: 16,
+      fontSize: 11,
       color: "#111111",
       bold: false,
       italic: false,
