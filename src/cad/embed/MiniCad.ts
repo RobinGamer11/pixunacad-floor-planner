@@ -1039,6 +1039,34 @@ export class MiniCad {
         } catch (e) { console.error("MiniCad restore hatch:", e); }
       }
     }
+    if (Array.isArray(data.documents)) {
+      for (const d of data.documents) {
+        try {
+          this.scene.createDocument({
+            name: d.name,
+            kind: d.kind,
+            src: d.src,
+            pageIndex: d.pageIndex,
+            position: { x: d.position?.x || 0, y: d.position?.y || 0 },
+            widthM: d.widthM,
+            heightM: d.heightM,
+            rotationRad: d.rotationRad || 0,
+            pixelWidth: d.pixelWidth || 0,
+            pixelHeight: d.pixelHeight || 0,
+            labelId: d.labelId || Defaults.defaultLabelId,
+            importScaleDenom: d.importScaleDenom || 100,
+            eraseMaskDataUrl: d.eraseMaskDataUrl || null,
+            pdfSourceB64: d.pdfSourceB64 || null,
+            guideEdges: d.guideEdges,
+            cropM: d.cropM,
+            opacity: d.opacity,
+            filters: d.filters,
+            activeFilterId: d.activeFilterId,
+            bgRemoval: d.bgRemoval,
+          });
+        } catch (e) { console.error("MiniCad restore document:", e); }
+      }
+    }
   }
 
 
