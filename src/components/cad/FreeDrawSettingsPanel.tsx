@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import type { CadApp } from "@/cad/CadApp";
+import type { MiniCad } from "@/cad/embed/MiniCad";
 
 type LineStyle = "solid" | "dashed" | "dotted" | "dashdot" | "blob" | "image";
 
@@ -12,7 +13,7 @@ const STYLE_OPTIONS: { value: LineStyle; label: string }[] = [
   { value: "image", label: "Bild-Stempel" },
 ];
 
-interface Props { app: CadApp | null; }
+interface Props { app: CadApp | MiniCad | null; }
 
 export const FreeDrawSettingsPanel: React.FC<Props> = ({ app }) => {
   const [color, setColor] = useState("#111111");

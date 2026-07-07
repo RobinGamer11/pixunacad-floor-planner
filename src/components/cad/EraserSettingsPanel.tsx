@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
 import type { CadApp } from "@/cad/CadApp";
+import type { MiniCad } from "@/cad/embed/MiniCad";
 import { resetDocMask } from "@/cad/documentMask";
 
-interface Props { app: CadApp | null; }
+interface Props { app: CadApp | MiniCad | null; }
 
 export const EraserSettingsPanel: React.FC<Props> = ({ app }) => {
   const [radius, setRadius] = useState(0.12);
