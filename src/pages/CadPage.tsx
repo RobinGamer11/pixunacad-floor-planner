@@ -25,7 +25,7 @@ const CadPage = () => {
         zoomPercent={zoom}
         onPresent={() => {}}
         onShare={() => {}}
-        onExport={() => editorRef.current?.exportPdf()}
+        onExport={() => editorRef.current?.openExportPanel()}
       />
       <main className="flex-1 relative min-h-0">
         <CadEditor
