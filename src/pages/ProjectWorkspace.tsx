@@ -295,18 +295,9 @@ export default function ProjectWorkspace() {
         </div>
       </aside>
 
-      {/* Top header */}
       <div className="flex-1 flex flex-col min-w-0">
-        <WorkspaceHeader
-          projectId={project.id}
-          projectName={project.name}
-          contextLabel={activePage?.title}
-          mode="workspace"
-          zoomPercent={zoom}
-          onPresent={() => {}}
-          onShare={() => {}}
-          onExport={() => {}}
-        />
+
+
 
         <div className="flex-1 flex min-h-0">
           {/* Pages sidebar (collapsible) */}
