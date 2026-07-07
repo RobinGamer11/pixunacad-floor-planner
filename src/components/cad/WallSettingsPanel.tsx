@@ -177,7 +177,7 @@ export const WallSettingsPanel: React.FC<Props> = ({ app }) => {
         </div>
 
         <div>
-          <label>Bezeichnungs-ID</label>
+          <label>Ebene</label>
           <select
             value={labelId}
             onChange={e => setLabel(e.target.value)}
