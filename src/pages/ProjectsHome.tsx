@@ -489,11 +489,12 @@ function SeitenView({ project, onAddPage }: { project: Project; onAddPage: () =>
         )}
         <span className="flex-1" />
         <button
-          onClick={onAddPage}
+          onClick={() => navigate(`/project/${project.id}`)}
           className="h-8 px-3 rounded-md text-xs font-medium flex items-center gap-1.5"
           style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
+          title="Projektmappe bearbeiten"
         >
-          <Plus size={13} /> Seite in Mappe
+          <Pencil size={13} /> Bearbeiten
         </button>
       </div>
 
