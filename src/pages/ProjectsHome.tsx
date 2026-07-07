@@ -461,77 +461,109 @@ export default function ProjectsHome() {
 // UebersichtView wird nun aus @/components/project/UebersichtView importiert.
 
 function SeitenView({ project, onAddPage }: { project: Project; onAddPage: () => void }) {
-  const [selectedPageId, setSelectedPageId] = useState<string | undefined>(project.pages[0]?.id);
+  const mappen = project.mappen ?? [];
+  const activeMappe = mappen.find((m) => m.id === project.activeMappeId) ?? mappen[0];
+  const mappePages = activeMappe
+    ? project.pages.filter((p) => activeMappe.pageIds.includes(p.id))
+    : [];
+  const [selectedPageId, setSelectedPageId] = useState<string | undefined>(mappePages[0]?.id);
   const selectedPage =
-    project.pages.find((p) => p.id === selectedPageId) ?? project.pages[0];
-
+    mappePages.find((p) => p.id === selectedPageId) ?? mappePages[0];
   const isLandscape = (selectedPage?.format ?? "A3-quer").includes("quer");
 
   return (
-    <div className="grid grid-cols-[220px_1fr] gap-6 mt-6">
+    <div className="mt-6 space-y-4">
+      {/* Mappen-Selector */}
       <div
-        className="rounded-2xl p-4"
+        className="rounded-2xl px-4 py-2.5 flex items-center gap-3 flex-wrap"
         style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
       >
-        <div className="flex items-center justify-between text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">
-          SEITEN
-          <button
-            onClick={onAddPage}
-            title="Neue Seite hinzufügen"
-            className="text-muted-foreground hover:text-foreground"
+        <span className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">MAPPE</span>
+        {mappen.length === 0 ? (
+          <span className="text-sm text-muted-foreground italic">Keine Mappe vorhanden.</span>
+        ) : (
+          <select
+            value={activeMappe?.id ?? ""}
+            onChange={(e) => projectStore.setActiveMappe(project.id, e.target.value)}
+            className="h-8 px-2 rounded-md border bg-transparent text-sm outline-none"
+            style={{ borderColor: "hsl(var(--hairline))" }}
           >
-            <Plus size={14} />
-          </button>
-        </div>
-        <div className="mt-3 space-y-2">
-          {project.pages.map((pg) => {
-            const active = pg.id === selectedPage?.id;
-            return (
-              <button
-                key={pg.id}
-                onClick={() => setSelectedPageId(pg.id)}
-                className="w-full flex items-center gap-3 p-2 rounded-md text-left transition border"
-                style={{
-                  background: active
-                    ? "hsl(var(--surface-muted))"
-                    : "hsl(var(--surface))",
-                  borderColor: active ? "hsl(var(--accent-gold) / 0.4)" : "transparent",
-                }}
-              >
-                <div
-                  className="w-10 h-10 rounded bg-white border shrink-0"
-                  style={{ borderColor: "hsl(var(--hairline))" }}
-                />
-                <div className="flex-1 text-sm truncate">{pg.title}</div>
-              </button>
-            );
-          })}
-        </div>
+            {mappen.map((m) => (
+              <option key={m.id} value={m.id}>{m.name} ({m.pageIds.length})</option>
+            ))}
+          </select>
+        )}
+        <span className="flex-1" />
+        <button
+          onClick={onAddPage}
+          className="h-8 px-3 rounded-md text-xs font-medium flex items-center gap-1.5"
+          style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
+        >
+          <Plus size={13} /> Seite in Mappe
+        </button>
       </div>
 
-      <div
-        className="rounded-2xl p-6 flex flex-col items-center"
-        style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
-      >
-        {selectedPage && (
-          <>
-            <div className="w-full flex items-center justify-between text-xs text-muted-foreground mb-4">
-              <span className="font-medium text-sm" style={{ color: "hsl(var(--ink))" }}>
-                {selectedPage.title}
-              </span>
-              <span>{selectedPage.format}</span>
+      <div className="grid grid-cols-[220px_1fr] gap-6">
+        <div
+          className="rounded-2xl p-4"
+          style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
+        >
+          <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-3">
+            SEITEN {activeMappe && <span className="normal-case tracking-normal font-normal">· {activeMappe.name}</span>}
+          </div>
+          {mappePages.length === 0 ? (
+            <div className="text-xs text-muted-foreground italic">Diese Mappe enthält noch keine Seiten.</div>
+          ) : (
+            <div className="space-y-2">
+              {mappePages.map((pg) => {
+                const active = pg.id === selectedPage?.id;
+                return (
+                  <button
+                    key={pg.id}
+                    onClick={() => setSelectedPageId(pg.id)}
+                    className="w-full flex items-center gap-3 p-2 rounded-md text-left transition border"
+                    style={{
+                      background: active ? "hsl(var(--surface-muted))" : "hsl(var(--surface))",
+                      borderColor: active ? "hsl(var(--accent-gold) / 0.4)" : "transparent",
+                    }}
+                  >
+                    <div className="w-10 h-10 rounded bg-white border shrink-0" style={{ borderColor: "hsl(var(--hairline))" }} />
+                    <div className="flex-1 text-sm truncate">{pg.title}</div>
+                  </button>
+                );
+              })}
             </div>
-            <div
-              className="bg-white border shadow-sm"
-              style={{
-                borderColor: "hsl(var(--hairline))",
-                width: isLandscape ? "100%" : "70%",
-                aspectRatio: isLandscape ? "1.414 / 1" : "1 / 1.414",
-                maxWidth: "100%",
-              }}
-            />
-          </>
-        )}
+          )}
+        </div>
+
+        <div
+          className="rounded-2xl p-6 flex flex-col items-center"
+          style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
+        >
+          {selectedPage ? (
+            <>
+              <div className="w-full flex items-center justify-between text-xs text-muted-foreground mb-4">
+                <span className="font-medium text-sm" style={{ color: "hsl(var(--ink))" }}>
+                  {selectedPage.title}
+                </span>
+                <span>{selectedPage.format}</span>
+              </div>
+              <div
+                className="bg-white border shadow-sm"
+                style={{
+                  borderColor: "hsl(var(--hairline))",
+                  width: isLandscape ? "100%" : "70%",
+                  aspectRatio: isLandscape ? "1.414 / 1" : "1 / 1.414",
+                  maxWidth: "100%",
+                }}
+              />
+            </>
+          ) : (
+            <div className="text-sm text-muted-foreground italic">
+              Keine Seite ausgewählt. Wähle oben eine Mappe oder lege eine neue Seite an.
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
