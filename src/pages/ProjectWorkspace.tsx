@@ -198,16 +198,11 @@ export default function ProjectWorkspace() {
           onClick={() => setActiveTool(null)}
         />
         <ToolRailButton
-          icon={<ExternalLink size={18} />}
-          label="CAD öffnen"
-          onClick={() => navigate(`/project/${project.id}/cad`)}
-          accent
-        />
-        <ToolRailButton
           icon={<CompassIcon size={18} />}
           label="CAD-Blatt"
           active={activeTool === "cad"}
           onClick={() => setActiveToolAndTab(activeTool === "cad" ? null : "cad")}
+          showLabel
         />
         <ToolRailButton
           icon={<Type size={18} />}
