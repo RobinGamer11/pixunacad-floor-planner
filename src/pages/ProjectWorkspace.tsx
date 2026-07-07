@@ -195,7 +195,7 @@ export default function ProjectWorkspace() {
       align: "left" as "left" | "center" | "right",
       bgColor: "#ffffff",
       bgAlphaPct: 0,
-      wrap: true,
+      wrap: false,
       autoSize: true,
       borderEnabled: false,
       borderColor: "#111111",
@@ -995,6 +995,102 @@ function ToolRailButton({
         {showLabel ? label : label.length > 8 ? label.slice(0, 6) + "…" : label}
       </span>
     </button>
+  );
+}
+
+function DocumentPagePickerDialog({
+  pages,
+  selected,
+  onToggle,
+  onSelectAll,
+  onSelectNone,
+  onCancel,
+  onConfirm,
+}: {
+  pages: ImportedPage[];
+  selected: Set<number>;
+  onToggle: (index: number) => void;
+  onSelectAll: () => void;
+  onSelectNone: () => void;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6" style={{ background: "hsl(var(--ink) / 0.32)" }}>
+      <div className="w-full max-w-2xl rounded-md border p-4 shadow-xl" style={{ background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" }}>
+        <div className="text-sm font-semibold mb-3">Seiten auswählen</div>
+        <div className="max-h-[60vh] overflow-y-auto grid grid-cols-3 gap-3 p-1">
+          {pages.map((p, i) => {
+            const checked = selected.has(i);
+            return (
+              <button key={`${p.name}-${i}`} type="button" onClick={() => onToggle(i)} className="relative rounded-md border-2 overflow-hidden" style={{ borderColor: checked ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))" }}>
+                <img src={p.src} alt={p.name} className="w-full h-32 object-contain" style={{ background: "hsl(var(--surface-muted))" }} />
+                <div className="text-[10px] p-1 text-center truncate" style={{ background: "hsl(var(--surface-muted))" }}>Seite {i + 1}</div>
+                {checked && <div className="absolute top-1 right-1 w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold" style={{ background: "hsl(var(--accent-gold))", color: "hsl(var(--surface-card))" }}>✓</div>}
+              </button>
+            );
+          })}
+        </div>
+        <div className="flex justify-end gap-2 pt-4">
+          <button type="button" onClick={onSelectNone} className="h-8 px-3 rounded-md border text-xs" style={{ borderColor: "hsl(var(--hairline))" }}>Keine</button>
+          <button type="button" onClick={onSelectAll} className="h-8 px-3 rounded-md border text-xs" style={{ borderColor: "hsl(var(--hairline))" }}>Alle</button>
+          <button type="button" onClick={onCancel} className="h-8 px-3 rounded-md border text-xs" style={{ borderColor: "hsl(var(--hairline))" }}>Abbrechen</button>
+          <button type="button" onClick={onConfirm} disabled={selected.size === 0} className="h-8 px-3 rounded-md text-xs font-semibold disabled:opacity-50" style={{ background: "hsl(var(--accent-gold))", color: "hsl(var(--surface-card))" }}>{selected.size} importieren</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DocumentScaleDialog({
+  choice,
+  custom,
+  onChoice,
+  onCustom,
+  onCancel,
+  onConfirm,
+}: {
+  choice: string;
+  custom: string;
+  onChoice: (value: string) => void;
+  onCustom: (value: string) => void;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const options = [
+    { v: "50", label: "1 : 50" },
+    { v: "100", label: "1 : 100" },
+    { v: "200", label: "1 : 200" },
+    { v: "500", label: "1 : 500" },
+    { v: "1", label: "1 : 1" },
+    { v: "custom", label: "Frei…" },
+  ];
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6" style={{ background: "hsl(var(--ink) / 0.32)" }}>
+      <div className="w-full max-w-sm rounded-md border p-4 shadow-xl" style={{ background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" }}>
+        <div className="text-sm font-semibold mb-3">Maßstab des Dokuments</div>
+        <div className="grid grid-cols-3 gap-1.5">
+          {options.map((opt) => {
+            const active = choice === opt.v;
+            return (
+              <button key={opt.v} type="button" onClick={() => onChoice(opt.v)} className="rounded-md h-9 text-xs font-semibold border" style={{ background: active ? "hsl(var(--accent-gold))" : "hsl(var(--surface-muted))", color: active ? "hsl(var(--surface-card))" : "hsl(var(--ink))", borderColor: active ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))" }}>
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+        {choice === "custom" && (
+          <div className="flex items-center gap-2 pt-3">
+            <span className="text-xs">1 :</span>
+            <input value={custom} onChange={(e) => onCustom(e.target.value)} className="flex-1 h-8 px-2 rounded border bg-transparent text-xs" style={{ borderColor: "hsl(var(--hairline))" }} autoFocus />
+          </div>
+        )}
+        <div className="flex justify-end gap-2 pt-4">
+          <button type="button" onClick={onCancel} className="h-8 px-3 rounded-md border text-xs" style={{ borderColor: "hsl(var(--hairline))" }}>Abbrechen</button>
+          <button type="button" onClick={onConfirm} className="h-8 px-3 rounded-md text-xs font-semibold" style={{ background: "hsl(var(--accent-gold))", color: "hsl(var(--surface-card))" }}>Übernehmen</button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -2342,6 +2438,24 @@ function EbeneSelect({ engine }: { engine: import("@/cad/embed/MiniCad").MiniCad
   );
 }
 
+function DocumentToolSettings({ importing, onImport }: { importing: boolean; onImport?: () => void }) {
+  return (
+    <SettingsBlock title="DOKUMENT IMPORTIEREN">
+      <button
+        type="button"
+        disabled={importing}
+        onClick={onImport}
+        className="w-full h-9 rounded-md border text-xs flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-wait"
+        style={{ borderColor: "hsl(var(--hairline))" }}
+        title="PDF, JPG oder PNG importieren"
+      >
+        <FileImage size={14} />
+        {importing ? "Importiere…" : "Datei importieren"}
+      </button>
+    </SettingsBlock>
+  );
+}
+
 function SelectSettings({
   selectedCount,
 
@@ -2552,7 +2666,7 @@ function TextSettings({
           value={settings.autoSize === false ? "frame" : "auto"}
           onChange={(e) => {
             if (e.target.value === "frame") onChange({ autoSize: false, wrap: true });
-            else onChange({ autoSize: true, wrap: true });
+            else onChange({ autoSize: true, wrap: false });
           }}
           className="w-full h-8 px-2 rounded bg-transparent border text-xs"
           style={{ borderColor: "hsl(var(--hairline))" }}
@@ -2946,11 +3060,6 @@ function ElementInspector({
     <div className="space-y-4">
       <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-1">
         {element.kind.toUpperCase()}
-        {siblingIds && siblingIds.length > 0 && (
-          <span className="ml-2 text-muted-foreground font-normal normal-case tracking-normal">
-            (+{siblingIds.length} weitere ausgewählt — gleiche Einstellungen werden auf gleichartige Objekte angewendet)
-          </span>
-        )}
       </div>
       <Row label="Breite">
         <input
