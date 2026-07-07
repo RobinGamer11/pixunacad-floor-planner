@@ -1063,7 +1063,7 @@ export class Renderer {
           borderEnabled: !!it.style?.borderEnabled,
           borderColor: it.style?.borderColor || Defaults.textBorderColor,
           borderWidthPx: it.style?.borderWidthPx ?? Defaults.textBorderWidthPx,
-          paddingPx: 2 * (cam.scale / this.referencePxPerM),
+          paddingPx: 1 * (cam.scale / this.referencePxPerM),
         });
       }
     }
@@ -2069,7 +2069,7 @@ export class Renderer {
       borderEnabled: box.style.borderEnabled,
       borderColor: box.style.borderColor,
       borderWidthPx: box.style.borderWidthPx,
-      paddingPx: 2 * (cam.scale / this.referencePxPerM),
+      paddingPx: 1 * (cam.scale / this.referencePxPerM),
     });
   }
 

@@ -168,8 +168,8 @@ function layoutLines(
   const pushLine = () => {
     if (cur.segments.length === 0) {
       // Empty line — give it the base font height
-      cur.height = baseFontSizePx * 1.15;
-      cur.ascent = baseFontSizePx * 0.82;
+      cur.height = baseFontSizePx * 1.05;
+      cur.ascent = baseFontSizePx * 0.86;
     }
     lines.push(cur);
     cur = { segments: [], width: 0, height: 0, ascent: 0 };
@@ -180,9 +180,9 @@ function layoutLines(
     const w = measureChunk(ctx, run, text);
     cur.segments.push({ run, text, width: w });
     cur.width += w;
-    const lh = run.fontSizePx * 1.15;
+    const lh = run.fontSizePx * 1.05;
     if (lh > cur.height) cur.height = lh;
-    const asc = run.fontSizePx * 0.82;
+    const asc = run.fontSizePx * 0.86;
     if (asc > cur.ascent) cur.ascent = asc;
   };
 
