@@ -981,6 +981,9 @@ export class MiniCad {
 
   private _restore(data: any) {
     if (!data) return;
+    if (Array.isArray(data.labels) && data.labels.length > 0) {
+      try { this.labelManager.restore(data.labels); } catch {}
+    }
     const f = this._strokeFactor || 1;
     // Vor v3 wurden Strichbreiten bereits intern (in der alten,
     // überdimensionierten Skala) gespeichert → nicht erneut skalieren.
