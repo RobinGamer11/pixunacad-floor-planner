@@ -386,8 +386,12 @@ export default function ProjectWorkspace() {
         <ToolRailButton
           icon={<FileImage size={18} />}
           label="Dokument"
+          active={activeTool === "document"}
           showLabel
-          onClick={() => documentFileInputRef.current?.click()}
+          onClick={() => {
+            setActiveToolAndTab("document");
+            documentFileInputRef.current?.click();
+          }}
         />
         <input
           ref={documentFileInputRef}
@@ -397,69 +401,47 @@ export default function ProjectWorkspace() {
           onChange={async (e) => {
             const f = e.target.files?.[0];
             e.target.value = "";
-            if (!f || !projectId || !activePage) return;
-            const lower = f.name.toLowerCase();
-            const isPdf = lower.endsWith(".pdf") || f.type === "application/pdf";
-            const isImage = /^image\//.test(f.type) || /\.(png|jpe?g|webp|gif)$/i.test(f.name);
-            if (isPdf) {
-              try {
-                const pages = await importFile(f);
-                if (pages.length === 0) return;
-                const fmt = FORMAT_SIZES[activePage.format];
-                let lastId: string | undefined;
-                for (let i = 0; i < pages.length; i++) {
-                  const p = pages[i];
-                  const aspect = (p.widthM > 0 && p.heightM > 0) ? p.widthM / p.heightM : (p.pixelWidth / p.pixelHeight) || 1;
-                  const wPct = 50;
-                  const pageAspect = fmt.w / fmt.h;
-                  const hPct = wPct / aspect * pageAspect;
-                  lastId = projectStore.addElement(projectId, activePage.id, {
-                    kind: "pdf",
-                    x: 10 + (i * 3),
-                    y: 10 + (i * 3),
-                    w: wPct,
-                    h: Math.min(80, hPct),
-                    pdfSourceB64: p.pdfSourceB64,
-                    pdfPageIndex: p.pageIndex,
-                    pdfAspect: aspect,
-                  });
-                }
-                if (lastId) setSelectedElementIds([lastId]);
-              } catch (err: any) {
-                window.alert("PDF-Import fehlgeschlagen: " + (err?.message || err));
-              }
-              return;
-            }
-            if (isImage) {
-              const reader = new FileReader();
-              reader.onload = () => {
-                const dataUrl = String(reader.result || "");
-                if (!dataUrl) return;
-                const img = new Image();
-                img.onload = () => {
-                  const fmt = FORMAT_SIZES[activePage.format];
-                  const aspect = img.width && img.height ? img.width / img.height : 1;
-                  const wPct = 40;
-                  const pageAspect = fmt.w / fmt.h;
-                  const hPct = Math.min(80, wPct / aspect * pageAspect);
-                  const id = projectStore.addElement(projectId, activePage.id, {
-                    kind: "image",
-                    x: 15,
-                    y: 15,
-                    w: wPct,
-                    h: hPct,
-                    imageUrl: dataUrl,
-                  });
-                  setSelectedElementIds([id]);
-                };
-                img.onerror = () => window.alert("Bild konnte nicht geladen werden.");
-                img.src = dataUrl;
+            const engine = cadEngineApiRef.current?.engine;
+            if (!f || !engine) return;
+            try {
+              const pages = await importFile(f);
+              if (pages.length === 0) return;
+              // Aktiviert Dokument-Tool, übergibt Seite 1 zur Klick-Platzierung.
+              // Weitere Seiten folgen automatisch nach jedem Klick.
+              setActiveToolAndTab("document");
+              let idx = 0;
+              const placeNext = () => {
+                if (idx >= pages.length) return;
+                const p = pages[idx++];
+                engine.beginDocumentPlacement({
+                  src: p.src,
+                  widthM: p.widthM,
+                  heightM: p.heightM,
+                  pixelWidth: p.pixelWidth,
+                  pixelHeight: p.pixelHeight,
+                  name: p.name,
+                  kind: p.kind,
+                  pageIndex: p.pageIndex,
+                  importScaleDenom: 100,
+                  pdfSourceB64: p.pdfSourceB64 || null,
+                });
               };
-              reader.onerror = () => window.alert("Bild konnte nicht gelesen werden.");
-              reader.readAsDataURL(f);
-              return;
+              const origOnPhase = engine.documentTool.onPhaseChange;
+              engine.documentTool.onPhaseChange = () => {
+                try { origOnPhase?.(); } catch {}
+                if (engine.documentTool.phase === "idle" && idx < pages.length) {
+                  // Auto-Advance zur nächsten Seite; setTool("select") wurde
+                  // vom DocumentTool nach Placement bereits aufgerufen — wir
+                  // reaktivieren "document" für die Folgeseite.
+                  setTimeout(() => placeNext(), 0);
+                } else if (engine.documentTool.phase === "idle") {
+                  engine.documentTool.onPhaseChange = origOnPhase;
+                }
+              };
+              placeNext();
+            } catch (err: any) {
+              window.alert("Dokument-Import fehlgeschlagen: " + (err?.message || err));
             }
-            window.alert("Nur PDF, PNG, JPG, WEBP oder GIF werden unterstützt.");
           }}
         />
         <ToolRailButton icon={<TableIcon size={18} />} label="Tabelle" />
