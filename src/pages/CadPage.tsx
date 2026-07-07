@@ -1,53 +1,39 @@
-import { ChevronLeft } from "lucide-react";
-import { useNavigate, useParams } from "react-router-dom";
-import CadEditor from "@/components/CadEditor";
+import { useRef, useState } from "react";
+import { useParams } from "react-router-dom";
+import CadEditor, { type CadEditorHandle } from "@/components/CadEditor";
 import { useProject } from "@/lib/projectStore";
+import { WorkspaceHeader } from "@/components/workspace/WorkspaceHeader";
 
 const CadPage = () => {
   const { projectId } = useParams();
   const project = useProject(projectId);
-  const navigate = useNavigate();
+  const editorRef = useRef<CadEditorHandle | null>(null);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+  const [zoom, setZoom] = useState<number | undefined>(undefined);
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden">
-      <header
-        className="flex items-center justify-between h-12 px-3 border-b shrink-0 relative"
-        style={{
-          background: "hsl(var(--surface-card))",
-          borderColor: "hsl(var(--hairline))",
-        }}
-      >
-        <div className="flex items-center gap-2">
-          {projectId && (
-            <button
-              onClick={() => navigate(`/project/${projectId}`)}
-              className="h-8 px-2.5 rounded-md flex items-center gap-1.5 text-sm transition-colors"
-              style={{
-                background: "hsl(var(--surface-muted))",
-                color: "hsl(var(--ink))",
-              }}
-              title="Zurück zur Projektmappe"
-            >
-              <ChevronLeft size={16} /> Zurück
-            </button>
-          )}
-          {project && (
-            <span className="text-sm ml-2 font-medium" style={{ color: "hsl(var(--ink))" }}>
-              {project.name}
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          <span
-            className="text-[11px] uppercase tracking-[0.18em] font-medium"
-            style={{ color: "hsl(var(--ink-soft))" }}
-          >
-            CAD-Zeichnen
-          </span>
-        </div>
-      </header>
+      <WorkspaceHeader
+        projectId={projectId}
+        projectName={project?.name}
+        mode="cad"
+        canUndo={canUndo}
+        canRedo={canRedo}
+        onUndo={() => editorRef.current?.undo()}
+        onRedo={() => editorRef.current?.redo()}
+        zoomPercent={zoom}
+        onPresent={() => {}}
+        onShare={() => {}}
+        onExport={() => editorRef.current?.exportPdf()}
+      />
       <main className="flex-1 relative min-h-0">
-        <CadEditor projectId={projectId} />
+        <CadEditor
+          ref={editorRef}
+          projectId={projectId}
+          onHistoryChange={(u, r) => { setCanUndo(u); setCanRedo(r); }}
+          onZoomChange={setZoom}
+        />
       </main>
     </div>
   );
