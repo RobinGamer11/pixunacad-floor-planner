@@ -116,8 +116,11 @@ export function resetBgMask(doc: DocumentObject) {
   const anyDoc = doc as any;
   anyDoc._bgFgMask = null;
   anyDoc._bgMaskRev = (anyDoc._bgMaskRev || 0) + 1;
+  anyDoc._bgMaskDataCache = null;
   const b = ensureBgRemoval(doc);
   b.fgMaskDataUrl = null;
+  // Crop ebenfalls freigeben, sonst bleibt der Rahmen eingezogen.
+  anyDoc.cropM = { top: 0, right: 0, bottom: 0, left: 0 };
 }
 
 export function exportBgMaskDataUrl(doc: DocumentObject): string | null {
