@@ -188,8 +188,12 @@ export default function ProjectWorkspace() {
     >
       {/* Far-left tool rail */}
       <aside
-        className="flex flex-col items-center py-3 w-14 shrink-0 border-r gap-1"
-        style={{ borderColor: "hsl(var(--hairline))" }}
+        className="flex flex-col items-center gap-0.5 py-1.5 shrink-0 border-r"
+        style={{
+          width: 56,
+          borderColor: "hsl(var(--hairline))",
+          background: "hsl(var(--surface-card))",
+        }}
       >
         <ToolRailButton
           icon={<MousePointer2 size={18} />}
