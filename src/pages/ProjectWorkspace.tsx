@@ -69,6 +69,7 @@ import {
 } from "@/lib/projectStore";
 import CadOverlayLayer from "@/components/page/CadOverlayLayer";
 import { CadDocumentInspector } from "@/components/page/CadDocumentInspector";
+import { CadIdPanelHost } from "@/components/page/CadIdPanelHost";
 import { PdfPageView } from "@/components/page/PdfPageView";
 import { importFile } from "@/cad/documentImport";
 import type { MiniCadSelectionInfo } from "@/cad/embed/MiniCad";
