@@ -263,39 +263,20 @@ function TaskTimeline({ project }: { project: Project }) {
 /* ============================================================ Aufgaben-Mini */
 
 function AufgabenMini({ project }: { project: Project }) {
-  const [draft, setDraft] = useState("");
-  const open = project.tasks.filter((t) => !t.done).slice(0, 6);
-  const add = () => {
-    const v = draft.trim();
-    if (!v) return;
-    projectStore.addTask(project.id, { title: v, priority: "medium" });
-    setDraft("");
-  };
+  const open = project.tasks.filter((t) => !t.done).slice(0, 8);
   return (
     <section
       className="rounded-2xl p-5"
       style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
     >
-      <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-3">AUFGABEN</div>
-      <div className="flex items-center gap-2 mb-3">
-        <input
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && add()}
-          placeholder="Neue Aufgabe…"
-          className="h-8 px-3 rounded-md border bg-transparent text-sm outline-none flex-1"
-          style={{ borderColor: "hsl(var(--hairline))" }}
-        />
-        <button
-          onClick={add}
-          className="h-8 w-8 rounded-md flex items-center justify-center"
-          style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
-        >
-          <Plus size={14} />
-        </button>
+      <div className="flex items-center justify-between mb-3">
+        <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">AUFGABEN</div>
+        <div className="text-[10px] text-muted-foreground">Bearbeiten im Reiter „Aufgaben"</div>
       </div>
       {project.tasks.length === 0 ? (
         <div className="text-xs text-muted-foreground italic">Keine Aufgaben.</div>
+      ) : open.length === 0 ? (
+        <div className="text-xs text-muted-foreground italic">Alles erledigt 🎉</div>
       ) : (
         <div className="divide-y" style={{ borderColor: "hsl(var(--hairline))" }}>
           {open.map((t) => (
