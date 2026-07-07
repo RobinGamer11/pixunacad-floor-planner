@@ -9,6 +9,7 @@ import { pointInOrientedBox, boxCornersWorld, rotateVector } from "./textGeometr
 import type { TextBox } from "./Scene";
 import { pointInInstance, instanceBoundingCornersWorld } from "./StickerManager";
 import { pointInDocument, hitDocumentCorner, hitDocumentEdge, documentCornersWorld, documentCenterWorld, hitDocumentVisibleEdge, documentVisibleCornersWorld } from "./documentGeometry";
+import { pointInDocumentVisible } from "./documentBgRemove";
 import { computeWallLines } from "./wallGeom";
 import { buildWallSolidRing, buildHealedWallSolidRing } from "./wallSolid";
 import { runWallTopologyMaintenance } from "./wallTopologyMaintenance";
@@ -300,7 +301,7 @@ export class SelectTool {
     for (let i = this.app.scene.documents.length - 1; i >= 0; i--) {
       const doc = this.app.scene.documents[i];
       if (!this.app.labelManager.isVisible(doc.labelId)) continue;
-      if (pointInDocument(mouseW, doc)) return doc;
+      if (pointInDocumentVisible(mouseW, doc)) return doc;
     }
     return null;
   }
@@ -2017,7 +2018,7 @@ export class SelectTool {
             // Anker = (gesnapter) Welt-Klickpunkt. So lässt sich die PDF von jeder
             // Stelle aus verschieben/drehen/skalieren.
             const mouseW = v(input.mouse.wx, input.mouse.wy);
-            if (pointInDocument(mouseW, doc)) {
+            if (pointInDocumentVisible(mouseW, doc)) {
               const snap = this.app.topology.findBestSnap(v(input.mouse.sx, input.mouse.sy), mouseW);
               const anchor = (snap && snap.world) ? snap.world : mouseW;
               this.app.documentHubState = {
