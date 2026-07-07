@@ -1263,9 +1263,29 @@ export class MiniCad {
       ctx.save();
       ctx.clearRect(0, 0, this.vw, this.vh);
       try { this._drawByLabelOrder?.(); } catch (e) { console.error(e); }
+      // Selection-Highlights 1:1 wie in der CAD-Oberfläche.
+      try { this._drawHatchSelection?.(); } catch {}
       try { this._drawSegmentSelection?.(); } catch {}
-      try { this._drawHoverSegmentPoints?.(); } catch {}
       try { this._drawTextBoxSelection?.(); } catch {}
+      try { this._drawStickerInstanceSelection?.(); } catch {}
+      try { this._drawDocumentSelection?.(); } catch {}
+      try { this._drawFreeStrokeSelection?.(); } catch {}
+      try { this._drawHoverSegmentPoints?.(); } catch {}
+      // Sekundäre Auswahlen (Multi-Select) mit identischen Passes zeichnen.
+      if (this.extraSelections && this.extraSelections.length > 0) {
+        const original = this.selection;
+        for (const extra of this.extraSelections) {
+          if (!extra || extra === original) continue;
+          this.selection = extra;
+          try { this._drawHatchSelection?.(); } catch {}
+          try { this._drawSegmentSelection?.(); } catch {}
+          try { this._drawTextBoxSelection?.(); } catch {}
+          try { this._drawStickerInstanceSelection?.(); } catch {}
+          try { this._drawDocumentSelection?.(); } catch {}
+          try { this._drawFreeStrokeSelection?.(); } catch {}
+        }
+        this.selection = original;
+      }
       if (this.overlay && this.overlay.draw) {
         try { this.overlay.draw(ctx, this.camera); } catch (e) { console.error(e); }
       }
