@@ -194,7 +194,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     undo: () => appRef.current?.undo(),
     redo: () => appRef.current?.redo(),
     exportPdf: () => appRef.current?.printSelectedPlans(),
-    openExportPanel: () => { setRightOpen(true); setRightTab("sheets"); },
+    openExportPanel: () => { setPrintOpen(v => !v); },
   }), []);
 
   // Zoom-Anzeige nach oben spiegeln (Camera.scale, 80 = 100%).
