@@ -1515,23 +1515,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       </div>
       {/* Right Tab Panel */}
       {rightOpen ? (
-      <aside className="shrink-0 w-[286px] h-full flex-row border-l" style={{ background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))", display: printOpen ? "none" : "flex" }}>
-        {/* Linke Griffleiste zum Einklappen */}
-        <div
-          className="w-6 shrink-0 flex items-start justify-center pt-2 border-r"
-          style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-muted))" }}
-        >
-          <button
-            type="button"
-            onClick={() => setRightOpen(false)}
-            title="Panel ausblenden"
-            className="h-6 w-6 rounded-md flex items-center justify-center hover:bg-muted"
-            style={{ color: "hsl(var(--ink-soft))" }}
-          >
-            <PanelRightClose size={14} />
-          </button>
-        </div>
-        <div className="flex-1 min-w-0 h-full flex flex-col">
+      <aside className="shrink-0 w-[280px] h-full flex-col border-l" style={{ background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))", display: printOpen ? "none" : "flex" }}>
         <div className="flex shrink-0 border-b items-stretch" style={{ borderColor: "hsl(var(--hairline))" }}>
           {([
             { id: "settings" as const, label: "Werkzeugeinstellung" },
@@ -1550,6 +1534,15 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               }}
             >{t.label}</button>
           ))}
+          <button
+            type="button"
+            onClick={() => setRightOpen(false)}
+            title="Panel ausblenden"
+            className="w-8 shrink-0 flex items-center justify-center hover:bg-muted"
+            style={{ color: "hsl(var(--ink-soft))" }}
+          >
+            <PanelRightClose size={14} />
+          </button>
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto p-2" style={{ display: rightTab === "settings" ? "block" : "none" }}>
