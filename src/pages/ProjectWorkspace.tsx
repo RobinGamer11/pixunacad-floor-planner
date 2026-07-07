@@ -74,7 +74,7 @@ const FORMAT_SIZES: Record<PageFormat, { w: number; h: number; label: string }> 
   frei: { w: 400, h: 300, label: "Freies Format" },
 };
 
-export type PageTool = "guide" | "line" | "text" | "cad" | null;
+export type PageTool = "guide" | "line" | "text" | "cad" | "pipette" | null;
 
 export default function ProjectWorkspace() {
   const { projectId } = useParams();
