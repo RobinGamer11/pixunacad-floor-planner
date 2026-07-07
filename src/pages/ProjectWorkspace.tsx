@@ -1603,24 +1603,10 @@ function RightInspector({
   const layerCount = page?.elements.length ?? 0;
   return (
     <aside
-      className="w-[346px] shrink-0 border-l flex flex-row"
+      className="w-[340px] shrink-0 border-l flex flex-col"
       style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
     >
-      {/* Linke Griffleiste zum Einklappen */}
-      <div
-        className="w-6 shrink-0 flex items-start justify-center pt-2 border-r"
-        style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-muted))" }}
-      >
-        <button
-          onClick={onCollapse}
-          title="Einklappen"
-          className="h-6 w-6 rounded-md flex items-center justify-center hover:bg-muted"
-        >
-          <PanelRightClose size={14} className="text-muted-foreground" />
-        </button>
-      </div>
-      <div className="flex-1 min-w-0 flex flex-col">
-      <div className="grid grid-cols-3 border-b" style={{ borderColor: "hsl(var(--hairline))" }}>
+      <div className="grid grid-cols-[1fr_1fr_1fr_auto] border-b" style={{ borderColor: "hsl(var(--hairline))" }}>
         <TabButton active={tab === "settings"} onClick={() => setTab("settings")} icon={<Settings size={14} />} label="Seiteneinstellung" />
         <TabButton active={tab === "tools"} onClick={() => setTab("tools")} icon={<Wrench size={14} />} label="Werkzeugeinstellung" />
         <TabButton
@@ -1630,6 +1616,14 @@ function RightInspector({
           label="Ebenen"
           badge={layerCount > 0 ? layerCount : undefined}
         />
+        <button
+          onClick={onCollapse}
+          title="Einklappen"
+          className="w-8 flex items-center justify-center hover:bg-muted border-l"
+          style={{ borderColor: "hsl(var(--hairline))" }}
+        >
+          <PanelRightClose size={14} className="text-muted-foreground" />
+        </button>
       </div>
 
       <div className="flex-1 overflow-y-auto p-5 space-y-5">
@@ -1665,7 +1659,6 @@ function RightInspector({
             setSelectedElementId={setSelectedElementId}
           />
         )}
-      </div>
       </div>
     </aside>
   );
