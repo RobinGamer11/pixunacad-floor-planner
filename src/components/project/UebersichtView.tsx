@@ -24,7 +24,7 @@ export function UebersichtView({ project, activeMappeId, onSelectMappe }: Props)
     <div className="mt-6 space-y-5">
       {timelinePos === "top" && <TaskTimeline project={project} />}
 
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)] gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)] gap-6 items-start">
         {/* Linke Spalte (schmal) */}
         <div className="space-y-5 min-w-0">
           <MappenPanel project={project} activeId={activeMappe?.id} onSelect={onSelectMappe} />
@@ -71,15 +71,15 @@ function MappenPanel({ project, activeId, onSelect }: { project: Project; active
 
   return (
     <section
-      className="rounded-2xl p-4 flex flex-col"
+      className="rounded-2xl p-5 flex flex-col"
       style={{
         background: "hsl(var(--surface-card))",
         border: "1px solid hsl(var(--hairline))",
-        height: 260,
+        height: 360,
       }}
     >
-      <div className="flex items-center gap-2 mb-3">
-        <span className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">PROJEKTMAPPEN</span>
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-xs font-semibold tracking-[0.18em]" style={{ color: "hsl(var(--accent-gold))" }}>PROJEKTMAPPEN</span>
         <button
           onClick={() => projectStore.addMappe(project.id, "Neue Mappe")}
           title="Neue Projektmappe"
@@ -124,7 +124,7 @@ function MappenPanel({ project, activeId, onSelect }: { project: Project; active
                   onDragLeave={() => { if (dragOverId === m.id) setDragOverId(null); }}
                   onDrop={(e) => { e.preventDefault(); handleDrop(m.id); }}
                   onDragEnd={() => { setDragId(null); setDragOverId(null); }}
-                  className="group flex items-center gap-1.5 p-2 rounded-md border transition cursor-pointer"
+                  className="group flex items-center gap-1.5 p-2.5 rounded-md border transition cursor-pointer"
                   style={{
                     background: active ? "hsl(var(--surface-muted))" : "transparent",
                     borderColor: isDragOver
@@ -145,7 +145,7 @@ function MappenPanel({ project, activeId, onSelect }: { project: Project; active
                     <GripVertical size={14} />
                   </span>
                   <div
-                    className="w-8 h-8 rounded shrink-0 flex items-center justify-center text-[10px] font-semibold"
+                    className="w-10 h-10 rounded shrink-0 flex items-center justify-center text-xs font-semibold"
                     style={{ background: "hsl(var(--surface))", border: "1px solid hsl(var(--hairline))", color: "hsl(var(--accent-gold))" }}
                   >
                     {m.pageIds.length}
@@ -165,7 +165,7 @@ function MappenPanel({ project, activeId, onSelect }: { project: Project; active
                       style={{ borderColor: "hsl(var(--hairline))" }}
                     />
                   ) : (
-                    <span className="flex-1 text-sm truncate">{m.name}</span>
+                    <span className="flex-1 text-sm font-medium truncate">{m.name}</span>
                   )}
                   {!isRenaming && (
                     <div className="flex items-center gap-0.5 shrink-0">
@@ -175,13 +175,6 @@ function MappenPanel({ project, activeId, onSelect }: { project: Project; active
                         className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted"
                       >
                         <Pencil size={12} />
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); openEdit(m.id); }}
-                        title="Projektmappe bearbeiten"
-                        className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted"
-                      >
-                        <Settings2 size={12} />
                       </button>
                       {mappen.length > 1 && (
                         <button
