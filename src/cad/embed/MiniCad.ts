@@ -79,7 +79,7 @@ export interface MiniCadInit {
 }
 
 
-export type MiniTool = "line" | "text" | "select" | "guide" | "free" | "eraser" | "hatch" | null;
+export type MiniTool = "line" | "text" | "select" | "guide" | "free" | "eraser" | "hatch" | "document" | null;
 export type MiniCadSelectionInfo =
   | {
       tool: "line";
