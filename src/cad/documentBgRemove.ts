@@ -192,13 +192,23 @@ export function floodFillAt(
   const mask = getOrCreateBgMask(doc);
   const p = worldToMaskPx(doc, worldPoint, mask);
   const px = Math.round(p.x), py = Math.round(p.y);
+  return _floodFillFromPixel(doc, src, mask, px, py, tolerance, target);
+}
+
+function _floodFillFromPixel(
+  doc: DocumentObject,
+  src: { data: Uint8ClampedArray; w: number; h: number },
+  mask: HTMLCanvasElement,
+  px: number, py: number,
+  tolerance: number,
+  target: "fg" | "bg",
+): boolean {
   if (px < 0 || py < 0 || px >= src.w || py >= src.h) return false;
 
   const idx0 = (py * src.w + px) * 4;
   const r0 = src.data[idx0], g0 = src.data[idx0 + 1], b0 = src.data[idx0 + 2];
-  const tol2 = tolerance * tolerance * 3; // Distanz² über 3 Kanäle
+  const tol2 = tolerance * tolerance * 3;
 
-  // BFS over pixels. Verwendet Uint8Array als visited.
   const w = src.w, h = src.h;
   const visited = new Uint8Array(w * h);
   const stack: number[] = [py * w + px];
@@ -214,7 +224,6 @@ export function floodFillAt(
     if (d2 > tol2) continue;
     hits.push(k);
     if (hits.length > maxHits) break;
-    // 4-neighborhood
     if (x > 0 && !visited[k - 1]) { visited[k - 1] = 1; stack.push(k - 1); }
     if (x < w - 1 && !visited[k + 1]) { visited[k + 1] = 1; stack.push(k + 1); }
     if (y > 0 && !visited[k - w]) { visited[k - w] = 1; stack.push(k - w); }
@@ -232,8 +241,39 @@ export function floodFillAt(
   ctx.putImageData(md, 0, 0);
   (doc as any)._bgMaskRev = ((doc as any)._bgMaskRev || 0) + 1;
   const b = ensureBgRemoval(doc);
-  b.fgMaskDataUrl = null; // dirty — Re-Export lazy
+  b.fgMaskDataUrl = null;
   return true;
+}
+
+/**
+ * Automatischer Hintergrund-Ausschnitt: sampelt die 4 Ecken des Bildes und
+ * flutet von dort. Ideal für Objekte auf uniformem Hintergrund (z. B. Baum
+ * auf weißem Grund). Muss ggf. auf Source-Load warten (returns false, ruft
+ * onReady wenn Pixel bereit sind).
+ */
+export function autoRemoveBackgroundFromCorners(
+  doc: DocumentObject,
+  tolerance: number,
+  onReady?: () => void,
+): boolean {
+  const src = ensureSourcePixels(doc, () => onReady?.());
+  if (!src) return false;
+  // Frische Maske (alles Vordergrund), damit Auto-Aktion idempotent ist.
+  resetBgMask(doc);
+  const mask = getOrCreateBgMask(doc);
+  const w = src.w, h = src.h;
+  const inset = 2;
+  const corners: [number, number][] = [
+    [inset, inset],
+    [w - 1 - inset, inset],
+    [inset, h - 1 - inset],
+    [w - 1 - inset, h - 1 - inset],
+  ];
+  let any = false;
+  for (const [cx, cy] of corners) {
+    if (_floodFillFromPixel(doc, src, mask, cx, cy, tolerance, "bg")) any = true;
+  }
+  return any;
 }
 
 // ------------------------------------------------------------ brush
