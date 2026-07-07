@@ -2637,7 +2637,6 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             </div>
           </div>
         </div>
-        </div>
       </aside>
       ) : (
         <div
