@@ -2223,8 +2223,43 @@ function ToolsTab({
   );
 }
 
+function EbeneSelect({ engine }: { engine: import("@/cad/embed/MiniCad").MiniCad }) {
+  // Re-render bei Auswahl-Änderung / Label-Erstellung.
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => setTick((t) => t + 1), 500);
+    return () => window.clearInterval(id);
+  }, []);
+  const groups = engine.labelManager?.list?.() ?? [];
+  const activeId =
+    (engine as any).activeDrawLabelId
+    ?? (engine as any).selectedLabelId
+    ?? groups[0]?.id
+    ?? "";
+  return (
+    <SettingsBlock title="EBENE">
+      <select
+        value={activeId}
+        onChange={(e) => {
+          const v = e.target.value;
+          try { (engine as any).setActiveDrawLabelId?.(v); } catch {}
+          try { (engine as any).refreshLabelUI?.(); } catch {}
+          setTick((t) => t + 1);
+        }}
+        className="w-full h-8 px-2 rounded border bg-transparent text-sm"
+        style={{ borderColor: "hsl(var(--hairline))" }}
+      >
+        {groups.map((g) => (
+          <option key={g.id} value={g.id}>{g.name}</option>
+        ))}
+      </select>
+    </SettingsBlock>
+  );
+}
+
 function SelectSettings({
   selectedCount,
+
 }: {
   settings: ToolSettings["select"];
   onChange: (p: Partial<ToolSettings["select"]>) => void;
