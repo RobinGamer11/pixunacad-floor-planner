@@ -2649,6 +2649,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       )}
     </div>
   );
-};
+});
+CadEditor.displayName = "CadEditor";
 
 export default CadEditor;
