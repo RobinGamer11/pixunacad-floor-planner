@@ -2033,6 +2033,16 @@ function ToolsTab({
           onChange={(p) => updateToolSettings("line", p)}
         />
       )}
+      {settingsTool === "free" && cadEngine && (
+        <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
+          <FreeDrawSettingsPanel app={cadEngine} />
+        </div>
+      )}
+      {settingsTool === "eraser" && cadEngine && (
+        <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
+          <EraserSettingsPanel app={cadEngine} />
+        </div>
+      )}
       {cadSelectedLineSnap && onCadLineSnapChange && (
         <LineSnapSettings
           isGuide={cadSelectedLineSnap.isGuide}
