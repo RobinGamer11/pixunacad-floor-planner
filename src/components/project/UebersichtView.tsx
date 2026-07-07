@@ -191,7 +191,7 @@ function ProjektinfoPanel({ project }: { project: Project }) {
       <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-3">
         PROJEKTINFO
       </div>
-      <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
+      <div className="space-y-3">
         <InfoRow label="Bauherr" value={project.bauherr || "—"} />
         <InfoRow label="Projektadresse" value={project.ort || "—"} />
         <InfoRow label="Projekttyp" value={project.projektTyp || "—"} />
@@ -209,9 +209,9 @@ function ProjektinfoPanel({ project }: { project: Project }) {
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-baseline justify-between gap-2 text-sm py-1 border-b" style={{ borderColor: "hsl(var(--hairline) / 0.5)" }}>
-      <span className="text-muted-foreground text-xs">{label}</span>
-      <span className="text-right truncate">{value}</span>
+    <div className="flex flex-col gap-0.5 pb-2 border-b" style={{ borderColor: "hsl(var(--hairline) / 0.5)" }}>
+      <span className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{label}</span>
+      <span className="text-sm break-words" style={{ color: "hsl(var(--ink))" }}>{value}</span>
     </div>
   );
 }
