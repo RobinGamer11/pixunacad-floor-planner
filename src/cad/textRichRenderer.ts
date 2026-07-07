@@ -180,9 +180,9 @@ function layoutLines(
     const w = measureChunk(ctx, run, text);
     cur.segments.push({ run, text, width: w });
     cur.width += w;
-    const lh = run.fontSizePx * 1.2;
+    const lh = run.fontSizePx * 1.15;
     if (lh > cur.height) cur.height = lh;
-    const asc = run.fontSizePx * 0.8;
+    const asc = run.fontSizePx * 0.82;
     if (asc > cur.ascent) cur.ascent = asc;
   };
 
