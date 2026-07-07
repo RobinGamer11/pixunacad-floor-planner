@@ -731,6 +731,151 @@ export const projectStore = {
       ),
     }));
   },
+
+  // ---------- Mappen ----------
+  addMappe: (projectId: string, name = "Neue Mappe") => {
+    const id = `m-${Date.now().toString(36)}`;
+    setState((s) => ({
+      projects: s.projects.map((p) =>
+        p.id === projectId
+          ? {
+              ...p,
+              updatedAt: new Date().toISOString(),
+              mappen: [...(p.mappen ?? []), { id, name, konzept: "", pageIds: [] }],
+              activeMappeId: id,
+            }
+          : p
+      ),
+    }));
+    return id;
+  },
+  renameMappe: (projectId: string, mappeId: string, name: string) => {
+    setState((s) => ({
+      projects: s.projects.map((p) =>
+        p.id === projectId
+          ? {
+              ...p,
+              updatedAt: new Date().toISOString(),
+              mappen: (p.mappen ?? []).map((m) => (m.id === mappeId ? { ...m, name } : m)),
+            }
+          : p
+      ),
+    }));
+  },
+  updateMappeKonzept: (projectId: string, mappeId: string, konzept: string) => {
+    setState((s) => ({
+      projects: s.projects.map((p) =>
+        p.id === projectId
+          ? {
+              ...p,
+              updatedAt: new Date().toISOString(),
+              mappen: (p.mappen ?? []).map((m) => (m.id === mappeId ? { ...m, konzept } : m)),
+            }
+          : p
+      ),
+    }));
+  },
+  deleteMappe: (projectId: string, mappeId: string) => {
+    setState((s) => ({
+      projects: s.projects.map((p) => {
+        if (p.id !== projectId) return p;
+        const mappen = p.mappen ?? [];
+        if (mappen.length <= 1) return p; // mindestens eine Mappe muss bleiben
+        const target = mappen.find((m) => m.id === mappeId);
+        if (!target) return p;
+        const rest = mappen.filter((m) => m.id !== mappeId);
+        // Verwaiste Seiten in die erste verbleibende Mappe verschieben.
+        rest[0] = { ...rest[0], pageIds: [...rest[0].pageIds, ...target.pageIds] };
+        return {
+          ...p,
+          updatedAt: new Date().toISOString(),
+          mappen: rest,
+          activeMappeId: p.activeMappeId === mappeId ? rest[0].id : p.activeMappeId,
+        };
+      }),
+    }));
+  },
+  setActiveMappe: (projectId: string, mappeId: string) => {
+    setState((s) => ({
+      projects: s.projects.map((p) => (p.id === projectId ? { ...p, activeMappeId: mappeId } : p)),
+    }));
+  },
+  updateProjectSettings: (projectId: string, patch: Partial<ProjectSettings>) => {
+    setState((s) => ({
+      projects: s.projects.map((p) =>
+        p.id === projectId ? { ...p, settings: { ...(p.settings ?? {}), ...patch } } : p
+      ),
+    }));
+  },
+
+  // ---------- Dateien & Fotos ----------
+  addFolder: (projectId: string, kind: "files" | "photos", parentId: string | null, name = "Neuer Ordner") => {
+    const id = `n-${Date.now().toString(36)}`;
+    const node: FileNode = { id, kind: "folder", name, createdAt: new Date().toISOString(), parentId };
+    setState((s) => ({
+      projects: s.projects.map((p) =>
+        p.id === projectId ? { ...p, [kind]: [...(p[kind] ?? []), node] } as Project : p
+      ),
+    }));
+    return id;
+  },
+  addFile: (
+    projectId: string,
+    kind: "files" | "photos",
+    parentId: string | null,
+    file: { name: string; dataUrl: string; mimeType: string; sizeBytes: number }
+  ) => {
+    const id = `n-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    const node: FileNode = {
+      id,
+      kind: "file",
+      name: file.name,
+      createdAt: new Date().toISOString(),
+      parentId,
+      dataUrl: file.dataUrl,
+      mimeType: file.mimeType,
+      sizeBytes: file.sizeBytes,
+    };
+    setState((s) => ({
+      projects: s.projects.map((p) =>
+        p.id === projectId ? ({ ...p, [kind]: [...(p[kind] ?? []), node] } as Project) : p
+      ),
+    }));
+    return id;
+  },
+  renameNode: (projectId: string, kind: "files" | "photos", nodeId: string, name: string) => {
+    setState((s) => ({
+      projects: s.projects.map((p) =>
+        p.id === projectId
+          ? ({
+              ...p,
+              [kind]: (p[kind] ?? []).map((n) => (n.id === nodeId ? { ...n, name } : n)),
+            } as Project)
+          : p
+      ),
+    }));
+  },
+  deleteNode: (projectId: string, kind: "files" | "photos", nodeId: string) => {
+    setState((s) => ({
+      projects: s.projects.map((p) => {
+        if (p.id !== projectId) return p;
+        const arr = p[kind] ?? [];
+        // Auch alle Nachfahren löschen.
+        const toDelete = new Set<string>([nodeId]);
+        let changed = true;
+        while (changed) {
+          changed = false;
+          for (const n of arr) {
+            if (n.parentId && toDelete.has(n.parentId) && !toDelete.has(n.id)) {
+              toDelete.add(n.id);
+              changed = true;
+            }
+          }
+        }
+        return { ...p, [kind]: arr.filter((n) => !toDelete.has(n.id)) } as Project;
+      }),
+    }));
+  },
 };
 
 export function useProjects(): Project[] {
