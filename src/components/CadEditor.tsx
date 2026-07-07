@@ -1515,7 +1515,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       </div>
       {/* Right Tab Panel */}
       {rightOpen ? (
-      <aside className="shrink-0 w-[280px] h-full flex flex-col border-l" style={{ background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" }}>
+      <aside className="shrink-0 w-[280px] h-full flex-col border-l" style={{ background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))", display: printOpen ? "none" : "flex" }}>
         <div className="flex shrink-0 border-b items-stretch" style={{ borderColor: "hsl(var(--hairline))" }}>
           {([
             { id: "settings" as const, label: "Werkzeugeinstellung" },
