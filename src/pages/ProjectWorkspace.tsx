@@ -1867,6 +1867,8 @@ function RightInspector({
   toolSettings,
   cadSelectionCount,
   cadSelectedLineSnap,
+  documentImporting,
+  onDocumentImport,
   onCadLineSnapChange,
   onCadDuplicateSegments,
   updateToolSettings,
@@ -1890,6 +1892,8 @@ function RightInspector({
   toolSettings: ToolSettings;
   cadSelectionCount?: number;
   cadSelectedLineSnap?: { midpoint: boolean; division: number | null; isGuide: boolean } | null;
+  documentImporting?: boolean;
+  onDocumentImport?: () => void;
   onCadLineSnapChange?: (patch: { midpointSnap?: boolean; divisionSnap?: number | null }) => void;
   onCadDuplicateSegments?: () => void;
   updateToolSettings: <K extends keyof ToolSettings>(k: K, patch: Partial<ToolSettings[K]>) => void;
@@ -1942,6 +1946,8 @@ function RightInspector({
             toolSettings={toolSettings}
             cadSelectionCount={cadSelectionCount}
             cadSelectedLineSnap={cadSelectedLineSnap}
+            documentImporting={documentImporting}
+            onDocumentImport={onDocumentImport}
             onCadLineSnapChange={onCadLineSnapChange}
             onCadDuplicateSegments={onCadDuplicateSegments}
             updateToolSettings={updateToolSettings}
@@ -2171,6 +2177,8 @@ function ToolsTab({
   toolSettings,
   cadSelectionCount,
   cadSelectedLineSnap,
+  documentImporting,
+  onDocumentImport,
   onCadLineSnapChange,
   onCadDuplicateSegments,
   updateToolSettings,
@@ -2190,6 +2198,8 @@ function ToolsTab({
   toolSettings: ToolSettings;
   cadSelectionCount?: number;
   cadSelectedLineSnap?: { midpoint: boolean; division: number | null; isGuide: boolean } | null;
+  documentImporting?: boolean;
+  onDocumentImport?: () => void;
   onCadLineSnapChange?: (patch: { midpointSnap?: boolean; divisionSnap?: number | null }) => void;
   onCadDuplicateSegments?: () => void;
   updateToolSettings: <K extends keyof ToolSettings>(k: K, patch: Partial<ToolSettings[K]>) => void;
@@ -2261,6 +2271,9 @@ function ToolsTab({
           settings={toolSettings.text}
           onChange={(p) => updateToolSettings("text", p)}
         />
+      )}
+      {settingsTool === "document" && (
+        <DocumentToolSettings importing={!!documentImporting} onImport={onDocumentImport} />
       )}
 
       {/* CAD section */}
@@ -2337,16 +2350,8 @@ function SelectSettings({
   onChange: (p: Partial<ToolSettings["select"]>) => void;
   selectedCount: number;
 }) {
-  return (
-    <SettingsBlock title="AUSWAHLWERKZEUG">
-      <div className="text-[11px] text-muted-foreground">
-        Klicke ein Objekt zum Auswählen. Mit <kbd className="px-1 rounded border" style={{ borderColor: "hsl(var(--hairline))" }}>Shift</kbd>-Klick mehrere Objekte gleichzeitig auswählen oder aus der Auswahl entfernen. Aufziehen mit gedrückter Maustaste selektiert alle Objekte im Rahmen.
-        {selectedCount > 0 && (
-          <div className="mt-1">Aktuell ausgewählt: <strong className="text-foreground">{selectedCount}</strong></div>
-        )}
-      </div>
-    </SettingsBlock>
-  );
+  void selectedCount;
+  return null;
 }
 
 function GuideSettings({
