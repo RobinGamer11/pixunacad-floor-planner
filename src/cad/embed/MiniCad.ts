@@ -109,6 +109,10 @@ export type MiniCadSelectionInfo =
       borderEnabled: boolean;
       borderColor: string;
       borderWidthPx: number;
+    }
+  | {
+      tool: "hatch";
+      id: string;
     };
 
 
