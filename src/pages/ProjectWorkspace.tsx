@@ -68,6 +68,7 @@ import {
   type PunchSide,
 } from "@/lib/projectStore";
 import CadOverlayLayer from "@/components/page/CadOverlayLayer";
+import { CadDocumentInspector } from "@/components/page/CadDocumentInspector";
 import { PdfPageView } from "@/components/page/PdfPageView";
 import { importFile } from "@/cad/documentImport";
 import type { MiniCadSelectionInfo } from "@/cad/embed/MiniCad";
@@ -2133,6 +2134,12 @@ function ToolsTab({
           siblingIds={(selectedElementIds ?? []).filter((id) => id !== element.id)}
           onJumpCad={onJumpCad}
         />
+      )}
+
+      {/* CAD-Dokument-Inspector: erscheint, sobald ein CAD-Dokument
+          (scene.documents) im Auswahl-Tool selektiert ist. */}
+      {!activeTool && cadEngine && (
+        <CadDocumentInspector engine={cadEngine} />
       )}
     </div>
   );
