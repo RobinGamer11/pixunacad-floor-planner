@@ -384,89 +384,82 @@ export default function ProjectWorkspace() {
           )}
         </div>
         <ToolRailButton
-          icon={<FileText size={18} />}
-          label="PDF einfügen"
+          icon={<FileImage size={18} />}
+          label="Dokument"
           showLabel
-          onClick={() => pdfFileInputRef.current?.click()}
+          onClick={() => documentFileInputRef.current?.click()}
         />
         <input
-          ref={pdfFileInputRef}
+          ref={documentFileInputRef}
           type="file"
-          accept=".pdf,application/pdf"
+          accept=".pdf,application/pdf,image/png,image/jpeg,image/webp,image/gif"
           className="hidden"
           onChange={async (e) => {
             const f = e.target.files?.[0];
             e.target.value = "";
             if (!f || !projectId || !activePage) return;
-            try {
-              const pages = await importFile(f);
-              if (pages.length === 0) return;
-              const fmt = FORMAT_SIZES[activePage.format];
-              let lastId: string | undefined;
-              for (let i = 0; i < pages.length; i++) {
-                const p = pages[i];
-                const aspect = (p.widthM > 0 && p.heightM > 0) ? p.widthM / p.heightM : (p.pixelWidth / p.pixelHeight) || 1;
-                const wPct = 50;
-                const pageAspect = fmt.w / fmt.h;
-                const hPct = wPct / aspect * pageAspect;
-                lastId = projectStore.addElement(projectId, activePage.id, {
-                  kind: "pdf",
-                  x: 10 + (i * 3),
-                  y: 10 + (i * 3),
-                  w: wPct,
-                  h: Math.min(80, hPct),
-                  pdfSourceB64: p.pdfSourceB64,
-                  pdfPageIndex: p.pageIndex,
-                  pdfAspect: aspect,
-                });
-              }
-              if (lastId) setSelectedElementIds([lastId]);
-            } catch (err: any) {
-              window.alert("PDF-Import fehlgeschlagen: " + (err?.message || err));
-            }
-          }}
-        />
-        <ToolRailButton
-          icon={<ImageIcon size={18} />}
-          label="Bild"
-          showLabel
-          onClick={() => imgFileInputRef.current?.click()}
-        />
-        <input
-          ref={imgFileInputRef}
-          type="file"
-          accept="image/png,image/jpeg,image/webp,image/gif"
-          className="hidden"
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            e.target.value = "";
-            if (!f || !projectId || !activePage) return;
-            const reader = new FileReader();
-            reader.onload = () => {
-              const dataUrl = String(reader.result || "");
-              if (!dataUrl) return;
-              const img = new Image();
-              img.onload = () => {
+            const lower = f.name.toLowerCase();
+            const isPdf = lower.endsWith(".pdf") || f.type === "application/pdf";
+            const isImage = /^image\//.test(f.type) || /\.(png|jpe?g|webp|gif)$/i.test(f.name);
+            if (isPdf) {
+              try {
+                const pages = await importFile(f);
+                if (pages.length === 0) return;
                 const fmt = FORMAT_SIZES[activePage.format];
-                const aspect = img.width && img.height ? img.width / img.height : 1;
-                const wPct = 40;
-                const pageAspect = fmt.w / fmt.h;
-                const hPct = Math.min(80, wPct / aspect * pageAspect);
-                const id = projectStore.addElement(projectId, activePage.id, {
-                  kind: "image",
-                  x: 15,
-                  y: 15,
-                  w: wPct,
-                  h: hPct,
-                  imageUrl: dataUrl,
-                });
-                setSelectedElementIds([id]);
+                let lastId: string | undefined;
+                for (let i = 0; i < pages.length; i++) {
+                  const p = pages[i];
+                  const aspect = (p.widthM > 0 && p.heightM > 0) ? p.widthM / p.heightM : (p.pixelWidth / p.pixelHeight) || 1;
+                  const wPct = 50;
+                  const pageAspect = fmt.w / fmt.h;
+                  const hPct = wPct / aspect * pageAspect;
+                  lastId = projectStore.addElement(projectId, activePage.id, {
+                    kind: "pdf",
+                    x: 10 + (i * 3),
+                    y: 10 + (i * 3),
+                    w: wPct,
+                    h: Math.min(80, hPct),
+                    pdfSourceB64: p.pdfSourceB64,
+                    pdfPageIndex: p.pageIndex,
+                    pdfAspect: aspect,
+                  });
+                }
+                if (lastId) setSelectedElementIds([lastId]);
+              } catch (err: any) {
+                window.alert("PDF-Import fehlgeschlagen: " + (err?.message || err));
+              }
+              return;
+            }
+            if (isImage) {
+              const reader = new FileReader();
+              reader.onload = () => {
+                const dataUrl = String(reader.result || "");
+                if (!dataUrl) return;
+                const img = new Image();
+                img.onload = () => {
+                  const fmt = FORMAT_SIZES[activePage.format];
+                  const aspect = img.width && img.height ? img.width / img.height : 1;
+                  const wPct = 40;
+                  const pageAspect = fmt.w / fmt.h;
+                  const hPct = Math.min(80, wPct / aspect * pageAspect);
+                  const id = projectStore.addElement(projectId, activePage.id, {
+                    kind: "image",
+                    x: 15,
+                    y: 15,
+                    w: wPct,
+                    h: hPct,
+                    imageUrl: dataUrl,
+                  });
+                  setSelectedElementIds([id]);
+                };
+                img.onerror = () => window.alert("Bild konnte nicht geladen werden.");
+                img.src = dataUrl;
               };
-              img.onerror = () => window.alert("Bild konnte nicht geladen werden.");
-              img.src = dataUrl;
-            };
-            reader.onerror = () => window.alert("Bild konnte nicht gelesen werden.");
-            reader.readAsDataURL(f);
+              reader.onerror = () => window.alert("Bild konnte nicht gelesen werden.");
+              reader.readAsDataURL(f);
+              return;
+            }
+            window.alert("Nur PDF, PNG, JPG, WEBP oder GIF werden unterstützt.");
           }}
         />
         <ToolRailButton icon={<TableIcon size={18} />} label="Tabelle" />
