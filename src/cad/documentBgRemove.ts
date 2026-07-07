@@ -389,6 +389,13 @@ export function paintBrushAt(doc: DocumentObject, worldPoint: Vec2, radiusM: num
   ctx.restore();
   (doc as any)._bgMaskRev = ((doc as any)._bgMaskRev || 0) + 1;
   ensureBgRemoval(doc).fgMaskDataUrl = null;
+  // Crop-Update throttlen (Full-Mask-Scan wäre pro Brush-Frame zu teuer).
+  const now = performance.now();
+  const anyDoc = doc as any;
+  if (!anyDoc._bgLastCropMs || now - anyDoc._bgLastCropMs > 400) {
+    anyDoc._bgLastCropMs = now;
+    applyMaskCropToDoc(doc);
+  }
   return true;
 }
 
