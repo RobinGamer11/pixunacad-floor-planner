@@ -54,8 +54,18 @@ const TOOL_VARIANTS: Record<string, ToolVariant[]> = {
   ],
 };
 
-interface CadEditorProps { projectId?: string }
-const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
+export interface CadEditorHandle {
+  undo: () => void;
+  redo: () => void;
+  exportPdf: () => void;
+}
+
+interface CadEditorProps {
+  projectId?: string;
+  onHistoryChange?: (canUndo: boolean, canRedo: boolean) => void;
+  onZoomChange?: (percent: number) => void;
+}
+const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId, onHistoryChange, onZoomChange }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const hubRef = useRef<HTMLDivElement>(null);
