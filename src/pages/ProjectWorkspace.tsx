@@ -983,6 +983,7 @@ function PageCanvas({
   onSelect,
   onCadSelectionChange,
   onCadEngineReady,
+  hatchDrawMode,
 }: {
   projectId: string;
   page: import("@/lib/projectStore").ProjectPage;
@@ -997,6 +998,7 @@ function PageCanvas({
   onSelect: (id?: string, opts?: { shift?: boolean }) => void;
   onCadSelectionChange: (info: MiniCadSelectionInfo | null, count?: number) => void;
   onCadEngineReady?: (api: { setSelectedSegmentSnap: (opts: { midpointSnap?: boolean; divisionSnap?: number | null }) => void; duplicateSelectedSegments: (offsetMm?: number) => number; engine: import("@/cad/embed/MiniCad").MiniCad }) => void;
+  hatchDrawMode?: HatchDrawMode;
 }) {
 
   const fmt = FORMAT_SIZES[page.format];
