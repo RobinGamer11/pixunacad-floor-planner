@@ -1093,6 +1093,10 @@ export class MiniCad {
       const stroke = this.scene.getFreeStrokeById((selection as any).freeStrokeId);
       if (stroke) return { tool: "free" };
     }
+    if ((selection as any).hatchId) {
+      const h = this.scene.getHatchById((selection as any).hatchId);
+      if (h) return { tool: "hatch", id: h.id };
+    }
     if ((selection as any).documentId) {
       const doc = this.scene.getDocumentById((selection as any).documentId);
       if (doc && (doc as any)._snapOnly) return { tool: "document", id: doc.id };
