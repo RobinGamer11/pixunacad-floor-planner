@@ -9,6 +9,7 @@ import { pointInOrientedBox, boxCornersWorld, rotateVector } from "./textGeometr
 import type { TextBox } from "./Scene";
 import { pointInInstance, instanceBoundingCornersWorld } from "./StickerManager";
 import { pointInDocument, hitDocumentCorner, hitDocumentEdge, documentCornersWorld, documentCenterWorld, hitDocumentVisibleEdge, documentVisibleCornersWorld } from "./documentGeometry";
+import { pointInDocumentVisible } from "./documentBgRemove";
 import { computeWallLines } from "./wallGeom";
 import { buildWallSolidRing, buildHealedWallSolidRing } from "./wallSolid";
 import { runWallTopologyMaintenance } from "./wallTopologyMaintenance";
