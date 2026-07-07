@@ -85,7 +85,7 @@ const FORMAT_SIZES: Record<PageFormat, { w: number; h: number; label: string }> 
   frei: { w: 400, h: 300, label: "Freies Format" },
 };
 
-export type PageTool = "guide" | "line" | "free" | "eraser" | "text" | "cad" | "pipette" | "hatch" | null;
+export type PageTool = "guide" | "line" | "free" | "eraser" | "text" | "cad" | "pipette" | "hatch" | "document" | null;
 type LinePageTool = "line" | "free" | "eraser";
 
 const LINE_TOOL_VARIANTS: Array<{ id: LinePageTool; label: string; icon: React.ElementType }> = [
