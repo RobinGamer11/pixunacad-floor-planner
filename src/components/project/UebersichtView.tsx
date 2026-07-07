@@ -447,7 +447,7 @@ function HeroErlaeuterungPanel({
       <div className="h-px" style={{ background: "hsl(var(--hairline))" }} />
 
       <InlineEditableText
-        title="ERLÄUTERUNG — GESAMTPROJEKT"
+        title="KONZEPT — GESAMTPROJEKT"
         value={project.konzept ?? ""}
         placeholder="Konzept, Leitgedanke oder kurze Beschreibung des gesamten Projekts…"
         onSave={(v) => projectStore.updateProject(project.id, { konzept: v })}
@@ -457,7 +457,7 @@ function HeroErlaeuterungPanel({
         <>
           <div className="h-px" style={{ background: "hsl(var(--hairline))" }} />
           <InlineEditableText
-            title={`ERLÄUTERUNG — ${mappe.name.toUpperCase()}`}
+            title={`KONZEPT — ${mappe.name.toUpperCase()}`}
             value={mappe.konzept ?? ""}
             placeholder="Beschreibung dieser Projektmappe (ändert sich je nach ausgewählter Mappe)…"
             onSave={(v) => projectStore.updateMappeKonzept(project.id, mappe.id, v)}
