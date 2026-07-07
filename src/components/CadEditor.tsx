@@ -860,24 +860,6 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
             <span>Raster</span>
           </button>
           <button
-            onClick={() => appRef.current?.undo()}
-            disabled={!canUndo}
-            title="Rückgängig (Strg+Z)"
-            className="cad-rail-btn disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <Undo2 size={18} />
-            <span>Undo</span>
-          </button>
-          <button
-            onClick={() => appRef.current?.redo()}
-            disabled={!canRedo}
-            title="Wiederherstellen (Strg+Y)"
-            className="cad-rail-btn disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <Redo2 size={18} />
-            <span>Redo</span>
-          </button>
-          <button
             onClick={() => handleToolClick(ToolIds.PIPETTE)}
             title="Pipette (P)"
             className={`cad-rail-btn ${activeTool === ToolIds.PIPETTE ? "active" : ""}`}
