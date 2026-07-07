@@ -1538,10 +1538,10 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             type="button"
             onClick={() => setRightOpen(false)}
             title="Panel ausblenden"
-            className="w-8 shrink-0 flex items-center justify-center hover:bg-muted"
-            style={{ color: "hsl(var(--ink-soft))" }}
+            className="w-8 shrink-0 flex items-center justify-center hover:bg-muted border-l"
+            style={{ borderColor: "hsl(var(--hairline))" }}
           >
-            <PanelRightClose size={14} />
+            <PanelRightClose size={14} className="text-muted-foreground" />
           </button>
         </div>
 
