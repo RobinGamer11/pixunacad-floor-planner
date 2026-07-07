@@ -340,12 +340,49 @@ export default function ProjectWorkspace() {
             </div>
           )}
         </div>
-        <ToolRailButton
-          icon={<Hash size={18} />}
-          label="Schraffur"
-          showLabel
-          onClick={() => navigate(`/project/${project.id}/cad`)}
-        />
+        <div className="relative w-full flex justify-center">
+          <ToolRailButton
+            icon={<Hash size={18} />}
+            label="Schraffur"
+            active={activeTool === "hatch"}
+            onClick={() => {
+              if (activeTool !== "hatch") {
+                activateHatchTool(hatchDrawMode);
+                setHatchToolFlyoutOpen(true);
+              } else {
+                setHatchToolFlyoutOpen((open) => !open);
+              }
+              setRightTabState("tools");
+            }}
+            showLabel
+          />
+          {hatchToolFlyoutOpen && (
+            <div
+              className="absolute top-0 left-full ml-1 flex flex-col gap-0.5 p-1 rounded-lg shadow-lg z-40"
+              style={{
+                background: "hsl(var(--surface-card))",
+                border: "1px solid hsl(var(--hairline))",
+              }}
+            >
+              {HATCH_MODE_VARIANTS.map((variant) => {
+                const Icon = variant.icon;
+                return (
+                  <ToolRailButton
+                    key={variant.id}
+                    icon={<Icon size={18} />}
+                    label={variant.label}
+                    active={activeTool === "hatch" && hatchDrawMode === variant.id}
+                    onClick={() => {
+                      activateHatchTool(variant.id);
+                      setHatchToolFlyoutOpen(false);
+                    }}
+                    showLabel
+                  />
+                );
+              })}
+            </div>
+          )}
+        </div>
         <ToolRailButton
           icon={<FileText size={18} />}
           label="PDF einfügen"
