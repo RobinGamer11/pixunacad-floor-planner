@@ -2112,50 +2112,8 @@ function ToolsTab({
   const settingsTool = activeTool ?? selectedCadTool ?? null;
   return (
     <div className="space-y-5">
-      {/* Active tool header */}
-      <div>
-        <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-3">
-          AKTIVES WERKZEUG
-        </div>
-        {!settingsTool ? (
-          <div className="text-xs text-muted-foreground">
-            Auswahlwerkzeug aktiv — klicke ein Objekt zum Auswählen. Mit <kbd className="px-1 rounded border" style={{ borderColor: "hsl(var(--hairline))" }}>Shift</kbd>-Klick mehrere Objekte gleichzeitig auswählen.
-          </div>
-        ) : (
-          <div className="flex items-center justify-between rounded-md border px-3 py-2" style={{ borderColor: "hsl(var(--hairline))" }}>
-            <div className="text-sm font-medium">
-              {settingsTool === "guide" && "Hilfslinie"}
-              {settingsTool === "line" && "Linie (CAD)"}
-              {settingsTool === "free" && "Freihand (CAD)"}
-              {settingsTool === "eraser" && "Radiergummi (CAD)"}
-              {settingsTool === "hatch" && "Schraffur (CAD)"}
-              {settingsTool === "text" && "Text (CAD)"}
-              {settingsTool === "cad" && "CAD-Zeichenblatt"}
-            </div>
-            <button
-              onClick={() => setActiveTool(null)}
-              className="text-[11px] text-muted-foreground hover:text-foreground"
-            >
-              Beenden
-            </button>
-          </div>
-        )}
-        {activeTool && activeTool !== "cad" && (
-          <div className="mt-2 text-[11px] text-muted-foreground">
-            {activeTool === "text"
-              ? "Klick auf die Seite, um Text einzufügen. ESC = abbrechen."
-              : activeTool === "line"
-              ? "Klicken setzt Punkte (Snap/Ortho/Hub wie in CAD). ESC = abbrechen."
-              : activeTool === "free"
-              ? "Maus gedrückt halten → Freihand-Strich zeichnen. Lineal-Snap unterstützt."
-              : activeTool === "eraser"
-              ? "Maus gedrückt halten → radiert Linien und Freihand-Striche entlang Pfad."
-              : activeTool === "hatch"
-              ? "Modus im Panel wählen — Polygon: Klicks + Doppelklick · Rechteck: 3 Klicks · Kreis: Zentrum→Radius · Füllung: in Fläche klicken."
-              : "Zwei Klicks setzen Start- und Endpunkt. ESC = abbrechen."}
-          </div>
-        )}
-      </div>
+      {/* "Aktives Werkzeug"-Kopfzeile entfernt — der Nutzer weiß, welches
+          Werkzeug er in der Rail angeklickt hat. */}
 
       {/* Per-tool settings */}
       {!activeTool && (
