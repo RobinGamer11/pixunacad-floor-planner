@@ -196,7 +196,7 @@ export default function ProjectWorkspace() {
       <WorkspaceHeader
         projectId={project.id}
         projectName={project.name}
-        contextLabel={activePage?.title}
+        
         mode="workspace"
         zoomPercent={zoom}
         onPresent={() => {}}
