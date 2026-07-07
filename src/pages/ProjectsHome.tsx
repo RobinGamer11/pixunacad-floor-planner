@@ -9,17 +9,17 @@ import {
   LayoutTemplate,
   Users,
   Trash2,
-  Share2,
   Pencil,
   PanelLeftClose,
   PanelLeftOpen,
-  PanelRightClose,
-  PanelRightOpen,
   MoreHorizontal,
   Check,
   X,
 } from "lucide-react";
 import { useProjects, projectStore, type Project, type Task, type TaskPriority } from "@/lib/projectStore";
+import { WeatherStrip } from "@/components/project/WeatherStrip";
+import { UebersichtView } from "@/components/project/UebersichtView";
+import { FileBrowser } from "@/components/project/FileBrowser";
 
 const Pixuna = () => (
   <span className="font-semibold tracking-tight text-base">
@@ -28,7 +28,7 @@ const Pixuna = () => (
   </span>
 );
 
-type Tab = "uebersicht" | "seiten" | "aufgaben" | "infos" | "team";
+type Tab = "uebersicht" | "seiten" | "aufgaben" | "dateien" | "fotos" | "infos" | "team";
 
 export default function ProjectsHome() {
   const projects = useProjects();
