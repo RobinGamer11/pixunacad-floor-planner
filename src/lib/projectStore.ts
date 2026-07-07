@@ -121,6 +121,37 @@ export interface CustomField {
   value: string;
 }
 
+/**
+ * Projektmappe: übergeordnete Sammlung innerhalb eines Projekts, die eigene
+ * Seiten und eine eigene Konzept-Beschreibung besitzt. Pages leben weiterhin
+ * in `project.pages`; die Mappe referenziert sie per ID.
+ */
+export interface Mappe {
+  id: string;
+  name: string;
+  konzept?: string;
+  pageIds: string[];
+}
+
+export type FileKind = "folder" | "file";
+
+export interface FileNode {
+  id: string;
+  kind: FileKind;
+  name: string;
+  createdAt: string;
+  parentId: string | null;
+  /** Nur für Dateien: Base64-DataURL (Achtung: localStorage-Limit ~5MB gesamt). */
+  dataUrl?: string;
+  mimeType?: string;
+  sizeBytes?: number;
+}
+
+export interface ProjectSettings {
+  /** Position des Zeitstrahls im Übersichts-Tab. Default: "bottom". */
+  timelinePosition?: "top" | "bottom";
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -139,6 +170,14 @@ export interface Project {
   konzept?: string;
   customFields?: CustomField[];
   isTemplate?: boolean;
+  /** Projektmappen (falls fehlend, wird beim Laden eine "Hauptmappe" erzeugt). */
+  mappen?: Mappe[];
+  activeMappeId?: string;
+  /** Dateien-Reiter (dwg/dxf/pdf/…) — flache Liste mit parentId für Ordnerbaum. */
+  files?: FileNode[];
+  /** Fotos-Reiter (jpg/png/…). */
+  photos?: FileNode[];
+  settings?: ProjectSettings;
 }
 
 const STORAGE_KEY = "pixuna.projects.v3";
