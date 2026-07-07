@@ -2636,7 +2636,11 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                   🖨 PDF Drucken
                 </button>
               </div>
+              <div className="text-[11px] leading-snug px-2 py-2 mt-2" style={{ color: "hsl(var(--ink-soft))" }}>
+                Tipp: Pläne kannst du auch über das Werkzeug „CAD-Blatt" in der Projektmappenbearbeitung einfügen.
+              </div>
             </div>
+
           </div>
         </div>
         <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-2" style={{ display: rightTab === "layers" ? "block" : "none" }}>
