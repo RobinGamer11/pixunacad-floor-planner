@@ -1,47 +1,50 @@
 ## Ziel
-PDFs im CAD-Canvas sollen bei jedem Zoom gestochen scharf bleiben (wie in Adobe), inklusive aktiver Farb-Filter.
+Einheitliche Kopf- und Werkzeugleisten für **Projektmappenbearbeitung** (`ProjectWorkspace`) und **CAD-Oberfläche** (`CadPage`/`CadEditor`) — schnelles Wechseln zwischen beiden Modi. Kleinere Aufräumarbeiten in der Projektübersicht.
 
-## Was heute passiert
-- Jede PDF-Seite wird als **ein einziges Raster-Bitmap** pro Dokument gecached (`_pdfAdaptiveCache` in `Renderer.ts`).
-- Neu-Rasterung nur, wenn Zoom > 25 % nach oben oder < 40 % nach unten aus dem letzten Render springt.
-- Hartes Cap: max. **6000 px** pro Kante — bei starkem Zoom skaliert das Bitmap hoch → sichtbare „Partikel/Pixel".
-- Filter (`_getFilteredBitmap`) arbeitet auf genau diesem Basis-Bitmap → erbt dieselbe Unschärfe.
-- Keine `imageSmoothingQuality`-Einstellung.
+## 1. Projektübersicht (`src/pages/ProjectsHome.tsx`)
 
-## Neue Strategie: Viewport-Tile-Rendering
+- **Default-Tab**: `useState<Tab>("uebersicht")` statt `"seiten"`.
+- **Reiter umbenennen**: `["seiten", "Seiten"]` → `["seiten", "Mappen"]` (Key bleibt intern `"seiten"`, damit nichts anderes bricht).
+- **Reiter „Mappen"**: Button `+ Seite in Mappe` wird zu `Bearbeiten` (Pencil-Icon). Klick öffnet `ProjectWorkspace` der aktiven Mappe — also `navigate(/project/:id)` mit gesetzter `activeMappeId`. Ein Klick auf eine einzelne Mappenkarte macht dasselbe wie bisher.
+- **Übersicht → „Projektinfo"-Panel**: kompakter — kleinere vertikale Abstände (`space-y-2` → `space-y-1.5`), kleinere Label-Zeile (10 → 9 px), enger padding (`p-5` → `p-4`), Werte weiterhin gestapelt aber dichter.
 
-Statt eines Vollseiten-Rasters wird **nur der aktuell sichtbare Ausschnitt** jedes PDFs bei der tatsächlichen Bildschirm-Pixeldichte gerendert. Das ergibt Adobe-ähnliche Schärfe unabhängig vom Zoom, ohne Speicher zu sprengen.
+## 2. Gemeinsamer Kopf (Projektmappenbearbeitung + CAD-Oberfläche)
 
-### Ablauf pro PDF-Dokument, pro Frame
-1. Basis-Bitmap (niedrige Auflösung, ganze Seite) bleibt als **Fallback** erhalten und wird sofort gezeichnet — nie leere Fläche beim Panning.
-2. Aus Kamera-Viewport + Doc-Rotation den in PDF-Punkten sichtbaren Rechtecks-Ausschnitt (`clipRect`) berechnen.
-3. Ziel-Auflösung des Tiles = `clipRect_screen_px × devicePixelRatio`, gedeckelt (z. B. 4096² pro Tile, sonst in bis zu 4 Kacheln aufgeteilt).
-4. Debounced (~120 ms nach Zoom-/Pan-Ende) `pdfjs.page.render()` mit `viewport = page.getViewport({ scale, offsetX, offsetY })` in ein Offscreen-Canvas.
-5. Fertiges Tile wird gecached mit Key = `docId|clipRect|zoom-bucket`; LRU max ~6 Tiles pro Dokument.
-6. Beim nächsten Draw: erst Fallback, dann passendes Tile über die exakte Region gezeichnet → scharfe Kanten.
-7. Filter (`applyFilterToCanvas`) wird auf **jedes Tile** angewandt und im selben Cache-Eintrag gehalten (Key erweitert um Filter-Signatur).
+Neue Komponente `src/components/workspace/WorkspaceHeader.tsx` — identisches Layout, unterscheidet nur den aktiven Modus:
 
-### Renderer-Anpassungen
-- `ctx.imageSmoothingEnabled = true` + `imageSmoothingQuality = "high"` beim Zeichnen von Dokumenten.
-- `_getDocAdaptiveBitmap`: bleibt als Low-Res-Fallback (Cap z. B. auf 3000 px reduziert, spart Speicher).
-- Neuer `_getDocViewportTile(doc, viewport)`-Pfad in `_drawSingleDocument` ersetzt den bisherigen Draw des Vollseiten-Rasters, sobald ein passendes Tile fertig ist.
-- Cache-Invalidierung bei: Filter-Wechsel, Opacity spielt keine Rolle (`globalAlpha` reicht), Doc-Rotation und -Größe fließen in den Key ein.
+```
+[ ‹ Zurück ]  Projektmappenname   [ Projektmappe ] [ CAD-Oberfläche ]   ...   [ ↶ ] [ ↷ ]  100%  [ Präsentieren ] [ Teilen ] [ Exportieren ]
+```
 
-### pdfjs-Nutzung
-- `renderPdfPageToCanvas` in `documentImport.ts` bekommt eine Variante `renderPdfPageRegionToCanvas(sourceB64, pageIndex, targetWidthPx, targetHeightPx, offsetPt, sizePt)` — nutzt `getViewport({ scale, offsetX, offsetY })` und den `intent: "display"`-Render-Task.
-- Laufende Renderings werden bei neuem Zoom via `renderTask.cancel()` abgebrochen, damit sich Requests nicht stauen.
+Props: `projectId`, `mappeName`, `mode: "workspace"|"cad"`, Undo/Redo-Callbacks + canUndo/canRedo, Zoom-Wert, Handler für Präsentieren/Teilen/Exportieren.
 
-### Sicherheitsnetze
-- Maximal 1 aktiver Render-Task pro Dokument gleichzeitig.
-- Bei extrem tiefem Zoom (Tile-Zielauflösung > 4096) automatische 2×2-Kachelung.
-- Beim Panning ohne Zoomänderung wird nur nachgerendert, wenn der neue Sichtausschnitt > 25 % außerhalb des zuletzt gerenderten Tiles liegt.
+- Zurück → `navigate('/')` (Projektübersicht).
+- Zwei Mode-Buttons: aktiver Modus gold-hinterlegt, inaktiver als Outline. Klick wechselt Route (`/project/:id` ↔ `/project/:id/cad`).
+- **Undo/Redo, Zoom-%, Vollbild/Präsentieren, Teilen, Exportieren** immer im Kopf rechts — in beiden Modi.
 
-## Betroffene Dateien
-- `src/cad/Renderer.ts` — neuer Tile-Cache, angepasstes `_drawSingleDocument`, Smoothing-Setting.
-- `src/cad/documentImport.ts` — neue Region-Render-Funktion, Render-Task-Handle für Cancel.
-- `src/cad/constants.ts` — neue Defaults: `documentTileMaxPx = 4096`, `documentFallbackMaxPx = 3000`, `documentTileDebounceMs = 120`.
+## 3. CAD-Oberfläche (`src/pages/CadPage.tsx`, `src/components/CadEditor.tsx`)
 
-## Nicht Teil dieses Plans
-- Vektor-Overlay (SVG/DOM-Layer) — würde Interaktion und Filter deutlich verkomplizieren.
-- Änderungen am „Auflösen"-Workflow (`pdfVectorExtract.ts`).
-- Änderungen am Bild-Rendering (JPG/PNG) — die sind bereits pixelgenau.
+- `CadPage`-Header durch `WorkspaceHeader` (`mode="cad"`) ersetzen.
+- `CadEditor` gibt Undo/Redo-State und Zoom nach oben (Callback-Props oder ref), damit der Header sie steuern kann.
+- Aus dem linken CAD-Rail (`CadEditor.tsx` ~Z. 862–879) werden **Undo- und Redo-Buttons entfernt**. „Raster" und „Pipette" bleiben. Der Export-Button im linken/unteren Panel bleibt bestehen — der neue Header-Export ruft dieselbe Aktion.
+
+## 4. Projektmappenbearbeitung (`src/pages/ProjectWorkspace.tsx`)
+
+- Bestehenden `<header>` (Z. 282–332) und den bisherigen kleinen Zurück/Titel/Aktionen-Block durch `WorkspaceHeader` (`mode="workspace"`) ersetzen. Bestehende Handler (Undo/Redo/Zoom/Teilen/Präsentieren/Exportieren) werden an den neuen Kopf verdrahtet.
+- **Linke Werkzeugleiste**: `CAD öffnen`-Button (Z. 200–205) entfernen (Wechsel läuft jetzt über den Header).
+- **CAD-Blatt-Werkzeug** (Z. 206–211): Anzeige anpassen. → siehe Klärungsfrage unten.
+- Optische Angleichung an CAD-Rail: gleiche Breite (56 px statt 14/w-14 → 14 = 56 px passt bereits), gleiche Button-Klasse (`cad-rail-btn`), gleicher Divider-Stil, gleiches Padding, gleiche Icon-Größe (18 px). `ToolRailButton` wird auf `cad-rail-btn`-Optik umgestellt, damit beide Rails visuell identisch wirken.
+
+## 5. Routing
+
+- Keine neuen Routen. Beide Modi teilen sich `projectId`; Wechsel per `navigate('/project/:id')` bzw. `.../cad`.
+
+## Technische Details
+
+- Neue Datei: `src/components/workspace/WorkspaceHeader.tsx`.
+- `CadEditor` bekommt optionale Props `onUndoState?(canUndo,canRedo)`, `onZoomChange?(n)`; alternativ Ref-API auf `appRef` freigeben. Wahrscheinlich sauberer: Kontext-loses Callback-Interface via `useImperativeHandle` auf einem forwarded ref.
+- `ProjectWorkspace`: bestehender `zoom`-State und Header-Buttons wandern in Props für `WorkspaceHeader`.
+- Keine Änderungen an `projectStore` nötig.
+
+## Klärungsfrage
+Der letzte Satz „In der Projektmappe soll das Werkzeug-Symbol 'CAD-Blatt' **besch** angezeigt werden." wirkt abgeschnitten. Ich lese das als **„beschriftet"** (also Icon + Text-Label wie im CAD-Rail bei „Raster/Pipette"), damit das Werkzeug klar erkennbar ist — passend zur Angleichung der Rails. Falls anders gemeint (z. B. „bescheiden/kleiner", „bezeichnet als …", „besser hervorgehoben"), bitte kurz korrigieren; sonst setze ich es als „beschriftet" um.
