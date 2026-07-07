@@ -20,8 +20,14 @@ export function autoSizeTextBox(box: TextBox, pxPerMOverride?: number) {
   const pxPerM = pxPerMOverride && pxPerMOverride > 0
     ? pxPerMOverride
     : Defaults.measureReferenceScalePxPerM;
-  const paddingPx = 2;
+  const paddingPx = 1;
   const baseFontPx = box.style.fontSizePx;
+  const plainText = (box.html || "")
+    .replace(/<br\s*\/?>(?=\s*$)/gi, "")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .trim();
+  const minContentPx = plainText.length > 0 ? 1 : Defaults.textMinBoxSizeM * pxPerM;
 
   const tlX = box.center.x - box.widthM / 2;
   const tlY = box.center.y - box.heightM / 2;
@@ -32,11 +38,11 @@ export function autoSizeTextBox(box: TextBox, pxPerMOverride?: number) {
   if (box.style.wrap) {
     const innerWidthPx = Math.max(8, box.widthM * pxPerM - paddingPx * 2);
     const m = measureTextBoxContent(box.html || "", baseFontPx, innerWidthPx, true, paddingPx);
-    newHeightM = Math.max(Defaults.textMinBoxSizeM, m.heightPx / pxPerM);
+    newHeightM = Math.max(minContentPx, m.heightPx) / pxPerM;
   } else {
     const m = measureTextBoxContent(box.html || "", baseFontPx, Infinity, false, paddingPx);
-    newWidthM = Math.max(Defaults.textMinBoxSizeM, m.widthPx / pxPerM);
-    newHeightM = Math.max(Defaults.textMinBoxSizeM, m.heightPx / pxPerM);
+    newWidthM = Math.max(minContentPx, m.widthPx) / pxPerM;
+    newHeightM = Math.max(minContentPx, m.heightPx) / pxPerM;
   }
 
   box.widthM = newWidthM;

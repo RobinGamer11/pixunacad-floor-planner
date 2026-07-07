@@ -8,7 +8,7 @@
  * PDFs/Bilder) — analog zur Hub-Box in der CAD-Hauptseite (Move/Rotate).
  */
 import { useEffect, useRef, useState } from "react";
-import { Move, RotateCw, Crosshair, Scaling } from "lucide-react";
+import { Move, RotateCw, Crosshair, Scaling, Scissors } from "lucide-react";
 import { MiniCad, type MiniTool } from "@/cad/embed/MiniCad";
 import type { MiniCadSelectionInfo } from "@/cad/embed/MiniCad";
 import type { HatchDrawMode } from "@/cad/HatchTool";
@@ -113,7 +113,7 @@ export default function CadOverlayLayer(props: Props) {
   onExternalDocChangeRef.current = onExternalDocChange;
 
   // Hub-Box state (mirrors engine.documentHubState).
-  const [docHub, setDocHub] = useState<{ visible: boolean; screenX: number; screenY: number; docId: string | null; mode: "none" | "move" | "rotate" | "scale" }>({ visible: false, screenX: 0, screenY: 0, docId: null, mode: "none" });
+  const [docHub, setDocHub] = useState<{ visible: boolean; screenX: number; screenY: number; docId: string | null; mode: "none" | "move" | "rotate" | "scale" | "crop"; cropSide: "top" | "right" | "bottom" | "left" | null }>({ visible: false, screenX: 0, screenY: 0, docId: null, mode: "none", cropSide: null });
   const [docHubDx, setDocHubDx] = useState<string>("0.000");
   const [docHubDy, setDocHubDy] = useState<string>("0.000");
   const [docHubRot, setDocHubRot] = useState<string>("0");
@@ -178,10 +178,11 @@ export default function CadOverlayLayer(props: Props) {
         const hs = e.documentHubState;
         setDocHub(prev => {
           if (!hs?.visible) {
-            return prev.visible ? { visible: false, screenX: 0, screenY: 0, docId: null, mode: "none" } : prev;
+              return prev.visible ? { visible: false, screenX: 0, screenY: 0, docId: null, mode: "none", cropSide: null } : prev;
           }
-          if (prev.visible && prev.docId === hs.docId && Math.abs(prev.screenX - hs.screenX) < 0.5 && Math.abs(prev.screenY - hs.screenY) < 0.5) return prev;
-          return { visible: true, screenX: hs.screenX, screenY: hs.screenY, docId: hs.docId, mode: prev.mode === "none" ? "move" : prev.mode };
+          const cropSide = (hs as any).cropSide ?? null;
+          if (prev.visible && prev.docId === hs.docId && prev.cropSide === cropSide && Math.abs(prev.screenX - hs.screenX) < 0.5 && Math.abs(prev.screenY - hs.screenY) < 0.5) return prev;
+          return { visible: true, screenX: hs.screenX, screenY: hs.screenY, docId: hs.docId, mode: prev.docId === hs.docId ? prev.mode : "none", cropSide };
         });
       }
       raf = requestAnimationFrame(tick);
@@ -198,6 +199,10 @@ export default function CadOverlayLayer(props: Props) {
 
   useEffect(() => { engineRef.current?.applyZoom(zoom); }, [zoom]);
   useEffect(() => { engineRef.current?.setActiveTool(activeTool); }, [activeTool]);
+  useEffect(() => {
+    const engine: any = engineRef.current;
+    if (engine) engine.documentHubMode = docHub.mode;
+  }, [docHub.mode]);
   useEffect(() => {
     if (hatchDrawMode) engineRef.current?.hatchTool.setDrawMode(hatchDrawMode);
   }, [hatchDrawMode, activeTool]);
@@ -255,9 +260,12 @@ export default function CadOverlayLayer(props: Props) {
       textBgColor, textBgAlphaPct, textWrap, textAutoSize, textBorderEnabled, textBorderColor, textBorderWidthPx]);
 
   const closeDocHub = () => {
-    const e = engineRef.current;
-    if (e) e.documentHubState = { visible: false, screenX: 0, screenY: 0, docId: null, cornerIndex: 0 };
-    setDocHub({ visible: false, screenX: 0, screenY: 0, docId: null, mode: "none" });
+    const e: any = engineRef.current;
+    if (e) {
+      e.documentHubMode = "none";
+      e.documentHubState = { visible: false, screenX: 0, screenY: 0, docId: null, cornerIndex: 0, anchorWorld: null, cropSide: null };
+    }
+    setDocHub({ visible: false, screenX: 0, screenY: 0, docId: null, mode: "none", cropSide: null });
   };
 
   const applyMove = () => {
@@ -322,7 +330,7 @@ export default function CadOverlayLayer(props: Props) {
     const wx = cx + w.x * cc - w.y * ss;
     const wy = cy + w.x * ss + w.y * cc;
     const sp = e.camera.worldToScreen(wx, wy);
-    e.documentHubState = { visible: true, screenX: sp.x, screenY: sp.y, docId: doc.id, cornerIndex: next };
+    e.documentHubState = { visible: true, screenX: sp.x, screenY: sp.y, docId: doc.id, cornerIndex: next, anchorWorld: { x: wx, y: wy }, cropSide: null };
   };
 
   return (
@@ -421,6 +429,16 @@ export default function CadOverlayLayer(props: Props) {
                   style={{ ...hubInputStyle, width: 64 }} title="Skalierungsfaktor (× um Zentrum)" placeholder="×" />
                 <span style={{ fontSize: 10, opacity: 0.6 }}>×</span>
               </>
+            )}
+            {docHub.cropSide && (
+              <button
+                type="button"
+                title={`Kante "${docHub.cropSide}" zuschneiden (Klick auf Canvas setzt neue Kante)`}
+                onClick={() => setDocHub(h => ({ ...h, mode: h.mode === "crop" ? "none" : "crop" }))}
+                style={{ ...hubBtnStyle, background: docHub.mode === "crop" ? "hsl(var(--accent))" : "white" }}
+              >
+                <Scissors size={14} />
+              </button>
             )}
           </div>
         )}

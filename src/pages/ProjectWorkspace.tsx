@@ -71,7 +71,7 @@ import CadOverlayLayer from "@/components/page/CadOverlayLayer";
 import { CadDocumentInspector } from "@/components/page/CadDocumentInspector";
 import { CadIdPanelHost } from "@/components/page/CadIdPanelHost";
 import { PdfPageView } from "@/components/page/PdfPageView";
-import { importFile } from "@/cad/documentImport";
+import { importFile, type ImportedPage } from "@/cad/documentImport";
 import type { MiniCadSelectionInfo } from "@/cad/embed/MiniCad";
 import type { HatchDrawMode } from "@/cad/HatchTool";
 import { FreeDrawSettingsPanel } from "@/components/cad/FreeDrawSettingsPanel";
@@ -112,6 +112,12 @@ export default function ProjectWorkspace() {
   const navigate = useNavigate();
   const [activePageId, setActivePageId] = useState<string | undefined>(project?.pages[0]?.id);
   const documentFileInputRef = useRef<HTMLInputElement>(null);
+  const [docImporting, setDocImporting] = useState(false);
+  const [docPickerPages, setDocPickerPages] = useState<ImportedPage[] | null>(null);
+  const [docPickerSelected, setDocPickerSelected] = useState<Set<number>>(new Set());
+  const [scaleDialogPages, setScaleDialogPages] = useState<ImportedPage[] | null>(null);
+  const [scaleChoice, setScaleChoice] = useState<string>("100");
+  const [scaleCustom, setScaleCustom] = useState<string>("100");
   const [selectedElementIds, setSelectedElementIds] = useState<string[]>([]);
   // `selectedElementId` ist das ZULETZT angeklickte Element — alle bestehenden
   // Lese-Stellen (Inspector etc.) benutzen es weiterhin. Bei Multi-Auswahl
@@ -189,7 +195,7 @@ export default function ProjectWorkspace() {
       align: "left" as "left" | "center" | "right",
       bgColor: "#ffffff",
       bgAlphaPct: 0,
-      wrap: true,
+      wrap: false,
       autoSize: true,
       borderEnabled: false,
       borderColor: "#111111",
@@ -202,6 +208,88 @@ export default function ProjectWorkspace() {
   const activePage = project?.pages.find((p) => p.id === activePageId) ?? project?.pages[0];
   const selectedElement = activePage?.elements.find((e) => e.id === selectedElementId);
   const bgPage = bgOverlay.pageId ? project?.pages.find((p) => p.id === bgOverlay.pageId) : undefined;
+
+  const handleDocumentFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    e.target.value = "";
+    if (!f) return;
+    setDocImporting(true);
+    try {
+      const pages = await importFile(f);
+      if (pages.length === 0) { window.alert("Keine Seiten gefunden."); return; }
+      if (pages.length === 1) {
+        setScaleChoice(pages[0].kind === "pdf-page" ? "100" : "1");
+        setScaleCustom("100");
+        setScaleDialogPages(pages);
+      } else {
+        const all = new Set<number>();
+        pages.forEach((_, i) => all.add(i));
+        setDocPickerSelected(all);
+        setDocPickerPages(pages);
+      }
+    } catch (err: any) {
+      window.alert("Dokument-Import fehlgeschlagen: " + (err?.message || err));
+    } finally {
+      setDocImporting(false);
+    }
+  };
+
+  const confirmDocumentPagePicker = () => {
+    if (!docPickerPages) return;
+    const selected = docPickerPages.filter((_, i) => docPickerSelected.has(i));
+    setDocPickerPages(null);
+    setDocPickerSelected(new Set());
+    if (selected.length === 0) return;
+    setScaleChoice(selected[0].kind === "pdf-page" ? "100" : "1");
+    setScaleCustom("100");
+    setScaleDialogPages(selected);
+  };
+
+  const confirmDocumentScale = () => {
+    const pages = scaleDialogPages;
+    const engine = cadEngineApiRef.current?.engine;
+    if (!pages || !engine) return;
+    const parsed = scaleChoice === "custom" ? parseFloat(scaleCustom.replace(",", ".")) : parseFloat(scaleChoice);
+    const denom = Number.isFinite(parsed) && parsed > 0 ? parsed : 100;
+    const [first, ...rest] = pages;
+    const firstW = first.widthM * denom;
+    const firstH = first.heightM * denom;
+    setActiveToolAndTab("document");
+    engine.beginDocumentPlacement({
+      src: first.src,
+      widthM: firstW,
+      heightM: firstH,
+      pixelWidth: first.pixelWidth,
+      pixelHeight: first.pixelHeight,
+      name: first.name,
+      kind: first.kind,
+      pageIndex: first.pageIndex,
+      importScaleDenom: denom,
+      pdfSourceB64: first.pdfSourceB64 || null,
+    });
+    let offX = firstW + 0.5;
+    for (const p of rest) {
+      const pw = p.widthM * denom;
+      const ph = p.heightM * denom;
+      engine.scene.createDocument({
+        name: p.name,
+        kind: p.kind,
+        src: p.src,
+        pageIndex: p.pageIndex,
+        position: { x: offX, y: 0 },
+        widthM: pw,
+        heightM: ph,
+        pixelWidth: p.pixelWidth,
+        pixelHeight: p.pixelHeight,
+        labelId: engine.activeDrawLabelId,
+        importScaleDenom: denom,
+        pdfSourceB64: p.pdfSourceB64 || null,
+      });
+      offX += pw + 0.5;
+    }
+    engine.refreshLabelUI();
+    setScaleDialogPages(null);
+  };
 
   useLayoutEffect(() => {
     if (!activePage || !canvasViewportRef.current) return;
@@ -390,62 +478,44 @@ export default function ProjectWorkspace() {
           label="Dokument"
           active={activeTool === "document"}
           showLabel
-          onClick={() => {
-            setActiveToolAndTab("document");
-            documentFileInputRef.current?.click();
-          }}
+          onClick={() => setActiveToolAndTab(activeTool === "document" ? null : "document")}
         />
         <input
           ref={documentFileInputRef}
           type="file"
           accept=".pdf,application/pdf,image/png,image/jpeg,image/webp,image/gif"
           className="hidden"
-          onChange={async (e) => {
-            const f = e.target.files?.[0];
-            e.target.value = "";
-            const engine = cadEngineApiRef.current?.engine;
-            if (!f || !engine) return;
-            try {
-              const pages = await importFile(f);
-              if (pages.length === 0) return;
-              // Aktiviert Dokument-Tool, übergibt Seite 1 zur Klick-Platzierung.
-              // Weitere Seiten folgen automatisch nach jedem Klick.
-              setActiveToolAndTab("document");
-              let idx = 0;
-              const placeNext = () => {
-                if (idx >= pages.length) return;
-                const p = pages[idx++];
-                engine.beginDocumentPlacement({
-                  src: p.src,
-                  widthM: p.widthM,
-                  heightM: p.heightM,
-                  pixelWidth: p.pixelWidth,
-                  pixelHeight: p.pixelHeight,
-                  name: p.name,
-                  kind: p.kind,
-                  pageIndex: p.pageIndex,
-                  importScaleDenom: 100,
-                  pdfSourceB64: p.pdfSourceB64 || null,
-                });
-              };
-              const origOnPhase = engine.documentTool.onPhaseChange;
-              engine.documentTool.onPhaseChange = () => {
-                try { origOnPhase?.(); } catch {}
-                if (engine.documentTool.phase === "idle" && idx < pages.length) {
-                  // Auto-Advance zur nächsten Seite; setTool("select") wurde
-                  // vom DocumentTool nach Placement bereits aufgerufen — wir
-                  // reaktivieren "document" für die Folgeseite.
-                  setTimeout(() => placeNext(), 0);
-                } else if (engine.documentTool.phase === "idle") {
-                  engine.documentTool.onPhaseChange = origOnPhase;
-                }
-              };
-              placeNext();
-            } catch (err: any) {
-              window.alert("Dokument-Import fehlgeschlagen: " + (err?.message || err));
-            }
-          }}
+          onChange={handleDocumentFileChange}
         />
+        {docPickerPages && (
+          <DocumentPagePickerDialog
+            pages={docPickerPages}
+            selected={docPickerSelected}
+            onToggle={(i) => setDocPickerSelected((prev) => {
+              const next = new Set(prev);
+              if (next.has(i)) next.delete(i); else next.add(i);
+              return next;
+            })}
+            onSelectAll={() => {
+              const all = new Set<number>();
+              docPickerPages.forEach((_, i) => all.add(i));
+              setDocPickerSelected(all);
+            }}
+            onSelectNone={() => setDocPickerSelected(new Set())}
+            onCancel={() => setDocPickerPages(null)}
+            onConfirm={confirmDocumentPagePicker}
+          />
+        )}
+        {scaleDialogPages && (
+          <DocumentScaleDialog
+            choice={scaleChoice}
+            custom={scaleCustom}
+            onChoice={setScaleChoice}
+            onCustom={setScaleCustom}
+            onCancel={() => setScaleDialogPages(null)}
+            onConfirm={confirmDocumentScale}
+          />
+        )}
         <ToolRailButton icon={<TableIcon size={18} />} label="Tabelle" disabled />
         <ToolRailButton icon={<StickyNote size={18} />} label="Notiz" disabled />
         <ToolRailButton icon={<Clock size={18} />} label="Zeitstrahl" disabled />
@@ -840,6 +910,8 @@ export default function ProjectWorkspace() {
               toolSettings={toolSettings}
               cadSelectionCount={cadSelectionCount}
               cadSelectedLineSnap={cadSelectedLineSnap}
+              documentImporting={docImporting}
+              onDocumentImport={() => documentFileInputRef.current?.click()}
               onCadLineSnapChange={(patch) => {
                 cadEngineApiRef.current?.setSelectedSegmentSnap(patch);
                 setCadSelectedLineSnap((prev) => prev ? {
@@ -923,6 +995,102 @@ function ToolRailButton({
         {showLabel ? label : label.length > 8 ? label.slice(0, 6) + "…" : label}
       </span>
     </button>
+  );
+}
+
+function DocumentPagePickerDialog({
+  pages,
+  selected,
+  onToggle,
+  onSelectAll,
+  onSelectNone,
+  onCancel,
+  onConfirm,
+}: {
+  pages: ImportedPage[];
+  selected: Set<number>;
+  onToggle: (index: number) => void;
+  onSelectAll: () => void;
+  onSelectNone: () => void;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6" style={{ background: "hsl(var(--ink) / 0.32)" }}>
+      <div className="w-full max-w-2xl rounded-md border p-4 shadow-xl" style={{ background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" }}>
+        <div className="text-sm font-semibold mb-3">Seiten auswählen</div>
+        <div className="max-h-[60vh] overflow-y-auto grid grid-cols-3 gap-3 p-1">
+          {pages.map((p, i) => {
+            const checked = selected.has(i);
+            return (
+              <button key={`${p.name}-${i}`} type="button" onClick={() => onToggle(i)} className="relative rounded-md border-2 overflow-hidden" style={{ borderColor: checked ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))" }}>
+                <img src={p.src} alt={p.name} className="w-full h-32 object-contain" style={{ background: "hsl(var(--surface-muted))" }} />
+                <div className="text-[10px] p-1 text-center truncate" style={{ background: "hsl(var(--surface-muted))" }}>Seite {i + 1}</div>
+                {checked && <div className="absolute top-1 right-1 w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold" style={{ background: "hsl(var(--accent-gold))", color: "hsl(var(--surface-card))" }}>✓</div>}
+              </button>
+            );
+          })}
+        </div>
+        <div className="flex justify-end gap-2 pt-4">
+          <button type="button" onClick={onSelectNone} className="h-8 px-3 rounded-md border text-xs" style={{ borderColor: "hsl(var(--hairline))" }}>Keine</button>
+          <button type="button" onClick={onSelectAll} className="h-8 px-3 rounded-md border text-xs" style={{ borderColor: "hsl(var(--hairline))" }}>Alle</button>
+          <button type="button" onClick={onCancel} className="h-8 px-3 rounded-md border text-xs" style={{ borderColor: "hsl(var(--hairline))" }}>Abbrechen</button>
+          <button type="button" onClick={onConfirm} disabled={selected.size === 0} className="h-8 px-3 rounded-md text-xs font-semibold disabled:opacity-50" style={{ background: "hsl(var(--accent-gold))", color: "hsl(var(--surface-card))" }}>{selected.size} importieren</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DocumentScaleDialog({
+  choice,
+  custom,
+  onChoice,
+  onCustom,
+  onCancel,
+  onConfirm,
+}: {
+  choice: string;
+  custom: string;
+  onChoice: (value: string) => void;
+  onCustom: (value: string) => void;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const options = [
+    { v: "50", label: "1 : 50" },
+    { v: "100", label: "1 : 100" },
+    { v: "200", label: "1 : 200" },
+    { v: "500", label: "1 : 500" },
+    { v: "1", label: "1 : 1" },
+    { v: "custom", label: "Frei…" },
+  ];
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6" style={{ background: "hsl(var(--ink) / 0.32)" }}>
+      <div className="w-full max-w-sm rounded-md border p-4 shadow-xl" style={{ background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" }}>
+        <div className="text-sm font-semibold mb-3">Maßstab des Dokuments</div>
+        <div className="grid grid-cols-3 gap-1.5">
+          {options.map((opt) => {
+            const active = choice === opt.v;
+            return (
+              <button key={opt.v} type="button" onClick={() => onChoice(opt.v)} className="rounded-md h-9 text-xs font-semibold border" style={{ background: active ? "hsl(var(--accent-gold))" : "hsl(var(--surface-muted))", color: active ? "hsl(var(--surface-card))" : "hsl(var(--ink))", borderColor: active ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))" }}>
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+        {choice === "custom" && (
+          <div className="flex items-center gap-2 pt-3">
+            <span className="text-xs">1 :</span>
+            <input value={custom} onChange={(e) => onCustom(e.target.value)} className="flex-1 h-8 px-2 rounded border bg-transparent text-xs" style={{ borderColor: "hsl(var(--hairline))" }} autoFocus />
+          </div>
+        )}
+        <div className="flex justify-end gap-2 pt-4">
+          <button type="button" onClick={onCancel} className="h-8 px-3 rounded-md border text-xs" style={{ borderColor: "hsl(var(--hairline))" }}>Abbrechen</button>
+          <button type="button" onClick={onConfirm} className="h-8 px-3 rounded-md text-xs font-semibold" style={{ background: "hsl(var(--accent-gold))", color: "hsl(var(--surface-card))" }}>Übernehmen</button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -1795,6 +1963,8 @@ function RightInspector({
   toolSettings,
   cadSelectionCount,
   cadSelectedLineSnap,
+  documentImporting,
+  onDocumentImport,
   onCadLineSnapChange,
   onCadDuplicateSegments,
   updateToolSettings,
@@ -1818,6 +1988,8 @@ function RightInspector({
   toolSettings: ToolSettings;
   cadSelectionCount?: number;
   cadSelectedLineSnap?: { midpoint: boolean; division: number | null; isGuide: boolean } | null;
+  documentImporting?: boolean;
+  onDocumentImport?: () => void;
   onCadLineSnapChange?: (patch: { midpointSnap?: boolean; divisionSnap?: number | null }) => void;
   onCadDuplicateSegments?: () => void;
   updateToolSettings: <K extends keyof ToolSettings>(k: K, patch: Partial<ToolSettings[K]>) => void;
@@ -1870,6 +2042,8 @@ function RightInspector({
             toolSettings={toolSettings}
             cadSelectionCount={cadSelectionCount}
             cadSelectedLineSnap={cadSelectedLineSnap}
+            documentImporting={documentImporting}
+            onDocumentImport={onDocumentImport}
             onCadLineSnapChange={onCadLineSnapChange}
             onCadDuplicateSegments={onCadDuplicateSegments}
             updateToolSettings={updateToolSettings}
@@ -2099,6 +2273,8 @@ function ToolsTab({
   toolSettings,
   cadSelectionCount,
   cadSelectedLineSnap,
+  documentImporting,
+  onDocumentImport,
   onCadLineSnapChange,
   onCadDuplicateSegments,
   updateToolSettings,
@@ -2118,6 +2294,8 @@ function ToolsTab({
   toolSettings: ToolSettings;
   cadSelectionCount?: number;
   cadSelectedLineSnap?: { midpoint: boolean; division: number | null; isGuide: boolean } | null;
+  documentImporting?: boolean;
+  onDocumentImport?: () => void;
   onCadLineSnapChange?: (patch: { midpointSnap?: boolean; divisionSnap?: number | null }) => void;
   onCadDuplicateSegments?: () => void;
   updateToolSettings: <K extends keyof ToolSettings>(k: K, patch: Partial<ToolSettings[K]>) => void;
@@ -2190,6 +2368,9 @@ function ToolsTab({
           onChange={(p) => updateToolSettings("text", p)}
         />
       )}
+      {settingsTool === "document" && (
+        <DocumentToolSettings importing={!!documentImporting} onImport={onDocumentImport} />
+      )}
 
       {/* CAD section */}
       {activeTool === "cad" && (
@@ -2257,6 +2438,24 @@ function EbeneSelect({ engine }: { engine: import("@/cad/embed/MiniCad").MiniCad
   );
 }
 
+function DocumentToolSettings({ importing, onImport }: { importing: boolean; onImport?: () => void }) {
+  return (
+    <SettingsBlock title="DOKUMENT IMPORTIEREN">
+      <button
+        type="button"
+        disabled={importing}
+        onClick={onImport}
+        className="w-full h-9 rounded-md border text-xs flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-wait"
+        style={{ borderColor: "hsl(var(--hairline))" }}
+        title="PDF, JPG oder PNG importieren"
+      >
+        <FileImage size={14} />
+        {importing ? "Importiere…" : "Datei importieren"}
+      </button>
+    </SettingsBlock>
+  );
+}
+
 function SelectSettings({
   selectedCount,
 
@@ -2265,16 +2464,8 @@ function SelectSettings({
   onChange: (p: Partial<ToolSettings["select"]>) => void;
   selectedCount: number;
 }) {
-  return (
-    <SettingsBlock title="AUSWAHLWERKZEUG">
-      <div className="text-[11px] text-muted-foreground">
-        Klicke ein Objekt zum Auswählen. Mit <kbd className="px-1 rounded border" style={{ borderColor: "hsl(var(--hairline))" }}>Shift</kbd>-Klick mehrere Objekte gleichzeitig auswählen oder aus der Auswahl entfernen. Aufziehen mit gedrückter Maustaste selektiert alle Objekte im Rahmen.
-        {selectedCount > 0 && (
-          <div className="mt-1">Aktuell ausgewählt: <strong className="text-foreground">{selectedCount}</strong></div>
-        )}
-      </div>
-    </SettingsBlock>
-  );
+  void selectedCount;
+  return null;
 }
 
 function GuideSettings({
@@ -2475,7 +2666,7 @@ function TextSettings({
           value={settings.autoSize === false ? "frame" : "auto"}
           onChange={(e) => {
             if (e.target.value === "frame") onChange({ autoSize: false, wrap: true });
-            else onChange({ autoSize: true, wrap: true });
+            else onChange({ autoSize: true, wrap: false });
           }}
           className="w-full h-8 px-2 rounded bg-transparent border text-xs"
           style={{ borderColor: "hsl(var(--hairline))" }}
@@ -2869,11 +3060,6 @@ function ElementInspector({
     <div className="space-y-4">
       <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-1">
         {element.kind.toUpperCase()}
-        {siblingIds && siblingIds.length > 0 && (
-          <span className="ml-2 text-muted-foreground font-normal normal-case tracking-normal">
-            (+{siblingIds.length} weitere ausgewählt — gleiche Einstellungen werden auf gleichartige Objekte angewendet)
-          </span>
-        )}
       </div>
       <Row label="Breite">
         <input

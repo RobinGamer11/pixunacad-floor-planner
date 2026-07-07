@@ -249,9 +249,11 @@ export class MiniCad {
   private _extDocLabelId = "__ext_doc__";
 
   /** Hub-Box-Zustand für Dokument-Ecken (analog CadApp). Wird von SelectTool gesetzt. */
-  documentHubState: { visible: boolean; screenX: number; screenY: number; docId: string | null; cornerIndex: number } = {
-    visible: false, screenX: 0, screenY: 0, docId: null, cornerIndex: 0,
+  documentHubState: { visible: boolean; screenX: number; screenY: number; docId: string | null; cornerIndex: number; anchorWorld: { x: number; y: number } | null; cropSide: "top" | "right" | "bottom" | "left" | null } = {
+    visible: false, screenX: 0, screenY: 0, docId: null, cornerIndex: 0, anchorWorld: null, cropSide: null,
   };
+  documentHubMode: "none" | "move" | "rotate" | "scale" | "crop" = "none";
+  documentHubFirstClick: { x: number; y: number } | null = null;
   /** Compat mit SelectTool aus CadApp — Maßketten gibt es im Embed nicht. */
   dimensionHubMode: "none" | "move" = "none";
   dimensionHubState: { visible: boolean; screenX: number; screenY: number; dimensionId: string | null } = {
@@ -1185,7 +1187,7 @@ export class MiniCad {
     }
     if ((selection as any).documentId) {
       const doc = this.scene.getDocumentById((selection as any).documentId);
-      if (doc && (doc as any)._snapOnly) return { tool: "document", id: doc.id };
+      if (doc) return { tool: "document", id: doc.id };
     }
 
     return null;
@@ -1411,8 +1413,8 @@ export class MiniCad {
     };
   }
 
-  /** Override paddingPx auf 0 für eingebettete Textboxen, damit Text exakt
-   *  am Platzierungspunkt beginnt (kein 6-px-Versatz nach innen). */
+  /** Override paddingPx auf 1 für eingebettete Textboxen, damit der Rahmen
+   *  sehr knapp am Text sitzt, ohne Buchstaben optisch anzuschneiden. */
   private _patchRendererTextPadding() {
     const r: any = this.renderer;
     if (typeof r._drawSingleTextBox !== "function") return;
@@ -1438,7 +1440,7 @@ export class MiniCad {
         borderEnabled: box.style.borderEnabled,
         borderColor: box.style.borderColor,
         borderWidthPx: box.style.borderWidthPx,
-        paddingPx: 0,
+        paddingPx: 1 * (cam.scale / r.referencePxPerM),
       });
     };
   }
