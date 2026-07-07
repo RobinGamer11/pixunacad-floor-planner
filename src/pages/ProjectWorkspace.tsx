@@ -1200,6 +1200,52 @@ function PageCanvas({
               }
               projectStore.updateElement(projectId, page.id, el.id, patch);
             }}
+            onCornerDrag={(corner, dx, dy, shift) => {
+              const dxPct = (dx / displayWidth) * 100;
+              const dyPct = (dy / displayHeight) * 100;
+              const minPct = 2;
+              // Anker = gegenüberliegende Ecke → nur die gezogene Ecke bewegt sich.
+              let x = el.x;
+              let y = el.y;
+              let w = el.w;
+              let h = el.h;
+              if (corner === "br") {
+                w = Math.max(minPct, Math.min(100 - el.x, el.w + dxPct));
+                h = Math.max(minPct, Math.min(100 - el.y, el.h + dyPct));
+              } else if (corner === "tr") {
+                w = Math.max(minPct, Math.min(100 - el.x, el.w + dxPct));
+                const newY = Math.max(0, el.y + dyPct);
+                h = Math.max(minPct, el.h - (newY - el.y));
+                y = newY;
+              } else if (corner === "bl") {
+                const newX = Math.max(0, el.x + dxPct);
+                w = Math.max(minPct, el.w - (newX - el.x));
+                x = newX;
+                h = Math.max(minPct, Math.min(100 - el.y, el.h + dyPct));
+              } else if (corner === "tl") {
+                const newX = Math.max(0, el.x + dxPct);
+                w = Math.max(minPct, el.w - (newX - el.x));
+                x = newX;
+                const newY = Math.max(0, el.y + dyPct);
+                h = Math.max(minPct, el.h - (newY - el.y));
+                y = newY;
+              }
+              if (shift && el.w > 0 && el.h > 0) {
+                // Seitenverhältnis halten — größere relative Änderung gewinnt.
+                const ratio = el.h / el.w;
+                const changedW = Math.abs(w - el.w) >= Math.abs((h - el.h) / ratio);
+                if (changedW) {
+                  const newH = w * ratio;
+                  if (corner === "tl" || corner === "tr") y = y + (h - newH);
+                  h = newH;
+                } else {
+                  const newW = h / ratio;
+                  if (corner === "tl" || corner === "bl") x = x + (w - newW);
+                  w = newW;
+                }
+              }
+              projectStore.updateElement(projectId, page.id, el.id, { x, y, w, h });
+            }}
           />
         ))}
 
