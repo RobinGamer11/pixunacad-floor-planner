@@ -79,6 +79,16 @@ const FORMAT_SIZES: Record<PageFormat, { w: number; h: number; label: string }> 
 };
 
 export type PageTool = "guide" | "line" | "free" | "eraser" | "text" | "cad" | "pipette" | null;
+type LinePageTool = "line" | "free" | "eraser";
+
+const LINE_TOOL_VARIANTS: Array<{ id: LinePageTool; label: string; icon: React.ElementType }> = [
+  { id: "line", label: "Linie", icon: Minus },
+  { id: "free", label: "Freihand", icon: Pencil },
+  { id: "eraser", label: "Radiergummi", icon: Eraser },
+];
+
+const isLinePageTool = (tool: PageTool): tool is LinePageTool =>
+  tool === "line" || tool === "free" || tool === "eraser";
 
 export default function ProjectWorkspace() {
   const { projectId } = useParams();
@@ -100,9 +110,11 @@ export default function ProjectWorkspace() {
     setRightTabState(t);
   };
   const [activeTool, setActiveTool] = useState<PageTool>(null);
-  const [selectedCadTool, setSelectedCadTool] = useState<"line" | "text" | undefined>();
+  const [selectedCadTool, setSelectedCadTool] = useState<"line" | "free" | "text" | undefined>();
   const [cadSelectionCount, setCadSelectionCount] = useState<number>(0);
   const [cadSelectedLineSnap, setCadSelectedLineSnap] = useState<{ midpoint: boolean; division: number | null; isGuide: boolean } | null>(null);
+  const [lineToolVariant, setLineToolVariant] = useState<LinePageTool>("line");
+  const [lineToolFlyoutOpen, setLineToolFlyoutOpen] = useState(false);
   const cadEngineApiRef = useRef<{
     setSelectedSegmentSnap: (opts: { midpointSnap?: boolean; divisionSnap?: number | null }) => void;
     duplicateSelectedSegments: (offsetMm?: number) => number;
@@ -129,8 +141,15 @@ export default function ProjectWorkspace() {
   const setActiveToolAndTab = (t: PageTool) => {
     setPrintMode(false);
     setActiveTool(t);
+    if (isLinePageTool(t)) setLineToolVariant(t);
+    if (!isLinePageTool(t)) setLineToolFlyoutOpen(false);
     if (t) setSelectedCadTool(undefined);
     if (t) setRightTabState("tools");
+  };
+
+  const activateLineTool = (tool: LinePageTool) => {
+    setLineToolVariant(tool);
+    setActiveToolAndTab(tool);
   };
 
   // Per-tool settings (live in workspace state; persist could come later).
@@ -243,7 +262,7 @@ export default function ProjectWorkspace() {
           icon={<MousePointer2 size={18} />}
           label="Auswahl"
           active={activeTool === null}
-          onClick={() => setActiveTool(null)}
+          onClick={() => { setLineToolFlyoutOpen(false); setActiveTool(null); }}
         />
         <ToolRailButton
           icon={<CompassIcon size={18} />}
@@ -258,27 +277,48 @@ export default function ProjectWorkspace() {
           active={activeTool === "text"}
           onClick={() => setActiveToolAndTab(activeTool === "text" ? null : "text")}
         />
-        <ToolRailButton
-          icon={<Minus size={18} />}
-          label="Linie"
-          active={activeTool === "line"}
-          onClick={() => setActiveToolAndTab(activeTool === "line" ? null : "line")}
-          showLabel
-        />
-        <ToolRailButton
-          icon={<Pencil size={18} />}
-          label="Freihand"
-          active={activeTool === "free"}
-          onClick={() => setActiveToolAndTab(activeTool === "free" ? null : "free")}
-          showLabel
-        />
-        <ToolRailButton
-          icon={<Eraser size={18} />}
-          label="Radiergummi"
-          active={activeTool === "eraser"}
-          onClick={() => setActiveToolAndTab(activeTool === "eraser" ? null : "eraser")}
-          showLabel
-        />
+        <div className="relative w-full flex justify-center">
+          <ToolRailButton
+            icon={<Minus size={18} />}
+            label="Linie"
+            active={isLinePageTool(activeTool)}
+            onClick={() => {
+              if (!isLinePageTool(activeTool)) {
+                activateLineTool(lineToolVariant);
+                setLineToolFlyoutOpen(true);
+              }
+              else setLineToolFlyoutOpen((open) => !open);
+              setRightTabState("tools");
+            }}
+            showLabel
+          />
+          {lineToolFlyoutOpen && (
+            <div
+              className="absolute top-0 left-full ml-1 flex flex-col gap-0.5 p-1 rounded-lg shadow-lg z-40"
+              style={{
+                background: "hsl(var(--surface-card))",
+                border: "1px solid hsl(var(--hairline))",
+              }}
+            >
+              {LINE_TOOL_VARIANTS.map((variant) => {
+                const Icon = variant.icon;
+                return (
+                  <ToolRailButton
+                    key={variant.id}
+                    icon={<Icon size={18} />}
+                    label={variant.label}
+                    active={activeTool === variant.id}
+                    onClick={() => {
+                      activateLineTool(variant.id);
+                      setLineToolFlyoutOpen(false);
+                    }}
+                    showLabel
+                  />
+                );
+              })}
+            </div>
+          )}
+        </div>
         <ToolRailButton
           icon={<Hash size={18} />}
           label="Schraffur"
@@ -686,8 +726,16 @@ export default function ProjectWorkspace() {
                   onCadSelectionChange={(info, count) => {
                     setCadSelectionCount(count ?? (info ? 1 : 0));
                     if (!info) {
+                      if ((count ?? 0) === 0) setSelectedElementIds([]);
                       setSelectedCadTool(undefined);
                       setCadSelectedLineSnap(null);
+                      return;
+                    }
+                    if (info.tool === "document") {
+                      setSelectedElementIds([info.id]);
+                      setSelectedCadTool(undefined);
+                      setCadSelectedLineSnap(null);
+                      setRightTab("tools");
                       return;
                     }
                     setSelectedElementIds([]);
@@ -705,7 +753,9 @@ export default function ProjectWorkspace() {
                         division: typeof info.divisionSnap === "number" ? info.divisionSnap : null,
                         isGuide: !!info.isGuide,
                       });
-                    } else {
+                    } else if (info.tool === "free") {
+                      setCadSelectedLineSnap(null);
+                    } else if (info.tool === "text") {
                       setCadSelectedLineSnap(null);
                       updateToolSettings("text", {
                         color: info.color,
@@ -899,9 +949,11 @@ function PageCanvas({
   const baseWidth = 1100;
   const width = baseWidth;
   const height = width / aspect;
-  const mmToPx = width / fmt.w;
-  const marginPx = (page.margins ?? 0) * mmToPx;
   const scale = zoom / 100;
+  const displayWidth = width * scale;
+  const displayHeight = height * scale;
+  const mmToPx = displayWidth / fmt.w;
+  const marginPx = (page.margins ?? 0) * mmToPx;
 
   // Tool drawing state (click-click). Coordinates in % of page.
   const [pendingStart, setPendingStart] = useState<{ x: number; y: number } | null>(null);
@@ -968,28 +1020,27 @@ function PageCanvas({
   const edgeInsetMm = 12;
   const holes: { left: number; top: number; size: number }[] = [];
   if (punchCfg) {
-    const sizePx = punchCfg.diameter * mmToPx;
-    const inset = edgeInsetMm * mmToPx;
+      const sizePx = punchCfg.diameter * mmToPx;
+      const inset = edgeInsetMm * mmToPx;
     if (punchSide === "left" || punchSide === "right") {
-      const cx = punchSide === "left" ? inset : width - inset;
+      const cx = punchSide === "left" ? inset : displayWidth - inset;
       punchCfg.offsets.forEach((o) => {
-        const cy = height / 2 + o * mmToPx;
-        if (cy > sizePx / 2 && cy < height - sizePx / 2) {
+        const cy = displayHeight / 2 + o * mmToPx;
+        if (cy > sizePx / 2 && cy < displayHeight - sizePx / 2) {
           holes.push({ left: cx - sizePx / 2, top: cy - sizePx / 2, size: sizePx });
         }
       });
     } else {
-      const cy = punchSide === "top" ? inset : height - inset;
+      const cy = punchSide === "top" ? inset : displayHeight - inset;
       punchCfg.offsets.forEach((o) => {
-        const cx = width / 2 + o * mmToPx;
-        if (cx > sizePx / 2 && cx < width - sizePx / 2) {
+        const cx = displayWidth / 2 + o * mmToPx;
+        if (cx > sizePx / 2 && cx < displayWidth - sizePx / 2) {
           holes.push({ left: cx - sizePx / 2, top: cy - sizePx / 2, size: sizePx });
         }
       });
     }
   }
 
-  const lineEls = page.elements.filter((e) => e.kind === "line" || e.kind === "guide");
   const otherEls = page.elements.filter((e) => e.kind !== "line" && e.kind !== "guide");
 
   return (
@@ -1000,21 +1051,19 @@ function PageCanvas({
       <div
         className="relative"
         style={{
-          width: width * scale,
-          height: height * scale,
+          width: displayWidth,
+          height: displayHeight,
         }}
       >
         <div
           ref={pageRef}
           className="relative shadow-xl"
           style={{
-            width,
-            height,
+            width: displayWidth,
+            height: displayHeight,
             background: "white",
             border: "1px solid hsl(var(--hairline))",
             cursor: cursorStyle,
-            transform: `scale(${scale})`,
-            transformOrigin: "top left",
           }}
           onMouseDown={handlePageMouseDown}
           onMouseMove={handlePageMouseMove}
@@ -1050,10 +1099,11 @@ function PageCanvas({
             key={el.id}
             el={el}
             selected={selectedElementIds.includes(el.id)}
+            elevated={activeTool === null && el.kind !== "cad-view" && el.kind !== "pdf" && el.kind !== "image"}
             onSelect={(opts) => onSelect(el.id, opts)}
             onDrag={(dx, dy) => {
-              const dxPct = (dx / scale / width) * 100;
-              const dyPct = (dy / scale / height) * 100;
+              const dxPct = (dx / displayWidth) * 100;
+              const dyPct = (dy / displayHeight) * 100;
               // Wenn dieses Element Teil einer Mehrfachauswahl ist, alle
               // ausgewählten Elemente (auch unterschiedlicher Typen) mitziehen.
               const ids = selectedElementIds.includes(el.id) && selectedElementIds.length > 1
@@ -1092,8 +1142,8 @@ function PageCanvas({
               onSelect(undefined);
             }}
             onEdgeDrag={(edge, dx, dy) => {
-              const dxPct = (dx / scale / width) * 100;
-              const dyPct = (dy / scale / height) * 100;
+              const dxPct = (dx / displayWidth) * 100;
+              const dyPct = (dy / displayHeight) * 100;
               const patch: Partial<PageElement> = {};
               const minPct = 2;
               if (edge === "left") {
@@ -1115,55 +1165,6 @@ function PageCanvas({
             }}
           />
         ))}
-
-        {/* Lines and guides (SVG layer in page-% coords) */}
-        <svg
-          className="absolute inset-0 pointer-events-none"
-          viewBox="0 0 100 100"
-          preserveAspectRatio="none"
-          style={{ width: "100%", height: "100%" }}
-        >
-          {lineEls.map((el) => {
-            const pts = el.points ?? [];
-            if (pts.length < 2) return null;
-            const isGuide = el.kind === "guide";
-            const guideLocked = isGuide && toolSettings.guide.locked;
-            return (
-              <line
-                key={el.id}
-                x1={pts[0].x}
-                y1={pts[0].y}
-                x2={pts[1].x}
-                y2={pts[1].y}
-                stroke={el.color ?? (isGuide ? "#7DD3FC" : "#1a1a1a")}
-                strokeWidth={(el.strokeWidth ?? (isGuide ? 1 : 1.5)) * 0.15}
-                strokeDasharray={isGuide ? "1.2 0.8" : undefined}
-                vectorEffect="non-scaling-stroke"
-                style={{ pointerEvents: guideLocked ? "none" : "stroke", cursor: guideLocked ? "default" : "pointer" }}
-                onMouseDown={(e) => {
-                  if (guideLocked) return;
-                  e.stopPropagation();
-                  onSelect(el.id, { shift: e.shiftKey });
-                }}
-                opacity={selectedElementIds.includes(el.id) ? 1 : 0.95}
-              />
-            );
-          })}
-          {/* Preview of line being drawn */}
-          {drawingTool && pendingStart && hoverPt && (
-            <line
-              x1={pendingStart.x}
-              y1={pendingStart.y}
-              x2={hoverPt.x}
-              y2={hoverPt.y}
-              stroke={activeTool === "guide" ? "#7DD3FC" : "#1a1a1a"}
-              strokeWidth={0.2}
-              strokeDasharray={activeTool === "guide" ? "1.2 0.8" : "0.6 0.6"}
-              vectorEffect="non-scaling-stroke"
-              opacity={0.7}
-            />
-          )}
-        </svg>
 
         {/* Punch holes overlay */}
         {holes.map((h, i) => (
@@ -1329,6 +1330,7 @@ function ElementView({
   el,
   selected,
   readOnly,
+  elevated,
   onSelect,
   onDrag,
   onDuplicate,
@@ -1339,6 +1341,7 @@ function ElementView({
   el: PageElement;
   selected?: boolean;
   readOnly?: boolean;
+  elevated?: boolean;
   onSelect?: (opts?: { shift?: boolean }) => void;
   onDrag?: (dx: number, dy: number) => void;
   onDuplicate?: () => void;
@@ -1416,6 +1419,7 @@ function ElementView({
         border: el.border ? "1px solid hsl(var(--ink))" : undefined,
         transform: el.rotation ? `rotate(${el.rotation}deg)` : undefined,
         transformOrigin: "center center",
+        zIndex: elevated ? 30 : undefined,
       }}
     >
       {el.kind === "text" && (
@@ -1663,7 +1667,7 @@ function RightInspector({
   project: import("@/lib/projectStore").Project;
   activeTool: PageTool;
   setActiveTool: (t: PageTool) => void;
-  selectedCadTool?: "line" | "text";
+  selectedCadTool?: "line" | "free" | "text";
   selectedElementId?: string;
   selectedElementIds?: string[];
   setSelectedElementId: (id?: string) => void;
@@ -1954,7 +1958,7 @@ function ToolsTab({
   project: import("@/lib/projectStore").Project;
   activeTool: PageTool;
   setActiveTool: (t: PageTool) => void;
-  selectedCadTool?: "line" | "text";
+  selectedCadTool?: "line" | "free" | "text";
   selectedElementId?: string;
   selectedElementIds?: string[];
   setSelectedElementId: (id?: string) => void;

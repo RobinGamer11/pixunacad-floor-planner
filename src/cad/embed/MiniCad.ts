@@ -89,6 +89,13 @@ export type MiniCadSelectionInfo =
       divisionSnap?: number | null;
     }
   | {
+      tool: "free";
+    }
+  | {
+      tool: "document";
+      id: string;
+    }
+  | {
       tool: "text";
       color: string;
       fontSize: number;
@@ -224,6 +231,11 @@ export class MiniCad {
   /** Hub-Box-Zustand für Dokument-Ecken (analog CadApp). Wird von SelectTool gesetzt. */
   documentHubState: { visible: boolean; screenX: number; screenY: number; docId: string | null; cornerIndex: number } = {
     visible: false, screenX: 0, screenY: 0, docId: null, cornerIndex: 0,
+  };
+  /** Compat mit SelectTool aus CadApp — Maßketten gibt es im Embed nicht. */
+  dimensionHubMode: "none" | "move" = "none";
+  dimensionHubState: { visible: boolean; screenX: number; screenY: number; dimensionId: string | null } = {
+    visible: false, screenX: 0, screenY: 0, dimensionId: null,
   };
 
   /** Map externalId → docId; Snapshot zur Diff-Erkennung. */
@@ -1033,6 +1045,14 @@ export class MiniCad {
           divisionSnap: typeof seg.divisionSnap === "number" ? seg.divisionSnap : null,
         };
       }
+    }
+    if ((selection as any).freeStrokeId) {
+      const stroke = this.scene.getFreeStrokeById((selection as any).freeStrokeId);
+      if (stroke) return { tool: "free" };
+    }
+    if ((selection as any).documentId) {
+      const doc = this.scene.getDocumentById((selection as any).documentId);
+      if (doc && (doc as any)._snapOnly) return { tool: "document", id: doc.id };
     }
 
     return null;
