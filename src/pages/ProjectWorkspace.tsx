@@ -1200,6 +1200,52 @@ function PageCanvas({
               }
               projectStore.updateElement(projectId, page.id, el.id, patch);
             }}
+            onCornerDrag={(corner, dx, dy, shift) => {
+              const dxPct = (dx / displayWidth) * 100;
+              const dyPct = (dy / displayHeight) * 100;
+              const minPct = 2;
+              // Anker = gegenüberliegende Ecke → nur die gezogene Ecke bewegt sich.
+              let x = el.x;
+              let y = el.y;
+              let w = el.w;
+              let h = el.h;
+              if (corner === "br") {
+                w = Math.max(minPct, Math.min(100 - el.x, el.w + dxPct));
+                h = Math.max(minPct, Math.min(100 - el.y, el.h + dyPct));
+              } else if (corner === "tr") {
+                w = Math.max(minPct, Math.min(100 - el.x, el.w + dxPct));
+                const newY = Math.max(0, el.y + dyPct);
+                h = Math.max(minPct, el.h - (newY - el.y));
+                y = newY;
+              } else if (corner === "bl") {
+                const newX = Math.max(0, el.x + dxPct);
+                w = Math.max(minPct, el.w - (newX - el.x));
+                x = newX;
+                h = Math.max(minPct, Math.min(100 - el.y, el.h + dyPct));
+              } else if (corner === "tl") {
+                const newX = Math.max(0, el.x + dxPct);
+                w = Math.max(minPct, el.w - (newX - el.x));
+                x = newX;
+                const newY = Math.max(0, el.y + dyPct);
+                h = Math.max(minPct, el.h - (newY - el.y));
+                y = newY;
+              }
+              if (shift && el.w > 0 && el.h > 0) {
+                // Seitenverhältnis halten — größere relative Änderung gewinnt.
+                const ratio = el.h / el.w;
+                const changedW = Math.abs(w - el.w) >= Math.abs((h - el.h) / ratio);
+                if (changedW) {
+                  const newH = w * ratio;
+                  if (corner === "tl" || corner === "tr") y = y + (h - newH);
+                  h = newH;
+                } else {
+                  const newW = h / ratio;
+                  if (corner === "tl" || corner === "bl") x = x + (w - newW);
+                  w = newW;
+                }
+              }
+              projectStore.updateElement(projectId, page.id, el.id, { x, y, w, h });
+            }}
           />
         ))}
 
@@ -1377,6 +1423,7 @@ function ElementView({
   onDelete,
   onRotate,
   onEdgeDrag,
+  onCornerDrag,
 }: {
   el: PageElement;
   selected?: boolean;
@@ -1388,6 +1435,7 @@ function ElementView({
   onDelete?: () => void;
   onRotate?: (deltaDeg: number, absolute?: boolean) => void;
   onEdgeDrag?: (edge: "top" | "right" | "bottom" | "left", dx: number, dy: number) => void;
+  onCornerDrag?: (corner: "tl" | "tr" | "bl" | "br", dx: number, dy: number, shift: boolean) => void;
 }) {
   const dragRef = useRef<{ x: number; y: number } | null>(null);
   const rotateRef = useRef<HTMLDivElement | null>(null);
@@ -1429,7 +1477,8 @@ function ElementView({
     const startRot = el.rotation ?? 0;
     const handleMove = (ev: MouseEvent) => {
       const a = Math.atan2(ev.clientY - cy, ev.clientX - cx);
-      const deg = startRot + ((a - startAngle) * 180) / Math.PI;
+      let deg = startRot + ((a - startAngle) * 180) / Math.PI;
+      if (ev.shiftKey) deg = Math.round(deg / 15) * 15;
       onRotate(deg, true);
     };
     const handleUp = () => {
@@ -1633,6 +1682,53 @@ function ElementView({
                   }
                 />
               </div>
+            );
+          })}
+
+          {/* Ecken-Handles (1:1 wie Dokument-Hub) — Skalieren an einer Ecke,
+              Ankerpunkt = gegenüberliegende Ecke. Shift = Seitenverhältnis halten. */}
+          {onCornerDrag && (["tl", "tr", "bl", "br"] as const).map((corner) => {
+            const startCornerDrag = (e: React.MouseEvent) => {
+              e.stopPropagation();
+              e.preventDefault();
+              let last = { x: e.clientX, y: e.clientY };
+              const move = (ev: MouseEvent) => {
+                const dx = ev.clientX - last.x;
+                const dy = ev.clientY - last.y;
+                last = { x: ev.clientX, y: ev.clientY };
+                onCornerDrag(corner, dx, dy, ev.shiftKey);
+              };
+              const up = () => {
+                window.removeEventListener("mousemove", move);
+                window.removeEventListener("mouseup", up);
+              };
+              window.addEventListener("mousemove", move);
+              window.addEventListener("mouseup", up);
+            };
+            const isTop = corner === "tl" || corner === "tr";
+            const isLeft = corner === "tl" || corner === "bl";
+            const cursor =
+              corner === "tl" || corner === "br" ? "nwse-resize" : "nesw-resize";
+            return (
+              <div
+                key={corner}
+                data-hub-control
+                onMouseDown={startCornerDrag}
+                title={`Ecke skalieren (Shift: proportional)`}
+                className="absolute"
+                style={{
+                  [isTop ? "top" : "bottom"]: -6,
+                  [isLeft ? "left" : "right"]: -6,
+                  width: 12,
+                  height: 12,
+                  borderRadius: 999,
+                  background: "white",
+                  border: "2px solid hsl(var(--accent-gold))",
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.25)",
+                  cursor,
+                  zIndex: 6,
+                } as React.CSSProperties}
+              />
             );
           })}
         </>
