@@ -1944,6 +1944,7 @@ function ToolsTab({
   onCadDuplicateSegments,
   updateToolSettings,
   onJumpCad,
+  cadEngine,
 }: {
   projectId: string;
   pageId?: string;
@@ -1963,6 +1964,7 @@ function ToolsTab({
   updateToolSettings: <K extends keyof ToolSettings>(k: K, patch: Partial<ToolSettings[K]>) => void;
 
   onJumpCad: (sheetId?: string) => void;
+  cadEngine?: import("@/cad/embed/MiniCad").MiniCad | null;
 }) {
 
   const settingsTool = activeTool ?? selectedCadTool ?? null;
