@@ -2056,6 +2056,7 @@ function ToolsTab({
               {settingsTool === "line" && "Linie (CAD)"}
               {settingsTool === "free" && "Freihand (CAD)"}
               {settingsTool === "eraser" && "Radiergummi (CAD)"}
+              {settingsTool === "hatch" && "Schraffur (CAD)"}
               {settingsTool === "text" && "Text (CAD)"}
               {settingsTool === "cad" && "CAD-Zeichenblatt"}
             </div>
