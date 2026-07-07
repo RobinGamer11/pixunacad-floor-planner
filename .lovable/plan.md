@@ -1,33 +1,59 @@
 ## Ziel
-Die Projektmappe soll bei **Auswahl**, **Linie**, **Freihand** und **Radiergummi** sichtbar und bedienbar wie die CAD-Oberfläche funktionieren. Zusätzlich werden die aktuellen Unsauberkeiten beim Zeichnen, Auswählen und Zoomen behoben.
 
-## Plan
-1. **Tool-Auswahl wie im CAD übernehmen**
-   - Die separaten Rail-Buttons **Linie**, **Freihand** und **Radiergummi** in der Projektmappe durch denselben ausklappbaren Linien-Button ersetzen, wie er in der CAD-Oberfläche unter „Linie“ genutzt wird.
-   - Das Popover zeigt **Linie / Freihand / Radiergummi** mit Icon, Label und aktivem Zustand wie im hochgeladenen Referenzbild.
-   - Auswahl bleibt als eigenes Werkzeug sichtbar und eindeutig aktivierbar.
+Drei Baustellen in der Projektmappe angleichen an die CAD-Oberfläche:
 
-2. **Doppelte/alte Zeichenlogik entfernen**
-   - Die alte React/SVG-Linienebene in der Projektmappe wird für neue CAD-Linien nicht mehr verwendet.
-   - Linie, Freihand, Radiergummi und Auswahl laufen ausschließlich über `MiniCad` mit den bestehenden CAD-Klassen (`LineTool`, `FreeDrawTool`, `EraserTool`, `SelectTool`).
-   - Dadurch gibt es keine zwei konkurrierenden Zeichen-/Auswahl-Systeme mehr.
+1. **Werkzeug "Dokument"** — PDF-einfügen + Bild zu einem Werkzeug zusammenlegen, das intern die **echte CAD-`DocumentTool`-Pipeline** verwendet (nicht die Projektmappen-`kind: pdf/image`-Elemente).
+2. **Werkzeug "CAD-Blatt"** — nach Platzierung identisches Verschieben/Skalieren/Drehen-Verhalten wie beim Dokument (nur diese drei Aktionen, kein Crop).
+3. **Schraffur-Highlight** — beim Auswählen mit dem Auswahl-Tool muss die Schraffur wie im CAD blau aufleuchten.
 
-3. **Zoom-/Verschwindeproblem korrigieren**
-   - Die Canvas-Größe und Position des `CadOverlayLayer` wird an die tatsächlich sichtbare Seitenfläche gekoppelt.
-   - Beim Zoomen darf die CAD-Canvas nicht aus dem sichtbaren Seitencontainer laufen oder durch CSS-Scale/Wrapper-Offsets falsch ausgerichtet werden.
-   - Selection-Hit-Tests und gezeichnete Objekte bleiben bei jedem Zoom deckungsgleich mit der Papierseite.
+## Umsetzung
 
-4. **Auswahlwerkzeug stabilisieren**
-   - Auswahl im Projektmappenmodus wird so verdrahtet, dass die CAD-Auswahl nicht von der React-Seitenauswahl überlagert oder sofort wieder abgewählt wird.
-   - Mehrfachauswahl/Shift-Auswahl bleibt erhalten, aber nur eine Instanz entscheidet über CAD-Objekte.
-   - CAD-Objekte (Linien/Freihand) und Projektmappen-Elemente (PDF/Bild/CAD-Blatt) werden klar getrennt, damit Klicks vorhersehbar sind.
+### 1. „Dokument"-Werkzeug 1:1 aus CAD
 
-5. **Settings-Panels konsistent machen**
-   - Bei aktivem Linien-Popover werden die passenden Einstellungen angezeigt: Linie, Freihand oder Radiergummi.
-   - Bestehende CAD-Settings-Panels werden weiterverwendet, keine vereinfachten Parallel-Panels.
+**Toolbar / UI**
+- Rail-Buttons „PDF einfügen" und „Bild" entfernen, ersetzt durch einen einzelnen Button **„Dokument"** (Icon `FileImage`, wie in `CadEditor`).
+- Ein gemeinsames `<input type="file" accept=".pdf,.png,.jpg,.jpeg,.webp">`.
+- Neuer `PageTool`-Wert `"document"`. Wenn aktiv, wird Datei-Dialog geöffnet; nach Import wechselt das Werkzeug in den **Platzierungs-Modus**.
 
-6. **Verifikation**
-   - Mit Playwright prüfen: Tool-Popover sichtbar wie Referenz, Linie zeichnen, Freihand zeichnen, Radiergummi radiert, Auswahl selektiert/verschiebt, Zoom rein/raus ohne Verschwinden oder Versatz.
+**Engine-Integration (`MiniCad`)**
+- `DocumentTool` aus `src/cad/DocumentTool.ts` in `MiniCad` einhängen (`this.documentTool = new DocumentTool(this as any)`), analog zu `LineTool`/`HatchTool`.
+- `setActiveTool("document")` erweitert; ruft `documentTool.activate()`.
+- `beginPlacement({ src, widthM, heightM, pdfSourceB64?, pdfPageIndex? })` genau wie in `CadEditor.tsx`.
+- Import läuft weiterhin über `importFile()`; für PDFs mit mehreren Seiten wird pro Seite eine Platzierung angeboten (wie CAD).
 
-## Technische Ursache, die behoben wird
-Aktuell ist die Projektmappe nicht komplett „clean“, weil sie zwar `MiniCad` nutzt, aber daneben noch alte Projektmappen-Logik existiert: skalierter Seiten-Div, SVG-Linienlayer, React-Auswahl und ein separat positionierter CAD-Canvas-Overlay. Diese Schichten können bei Zoom und Auswahl auseinanderlaufen. Der Fix reduziert das auf eine eindeutige CAD-Engine-Schicht für CAD-Werkzeuge und richtet den Overlay exakt an der Seite aus.
+**Persistenz**
+- CAD-`DocumentObject`s werden bereits über `MiniCad._serialize`/`_restore` und `scene.documents` persistiert (bestehende Pipeline, wie Segments/Hatches).
+- Alte Projektmappen-Elemente vom Typ `pdf`/`image` bleiben lesbar (Backwards-Compat), können aber nicht mehr neu angelegt werden.
+
+**Nachträgliche Bearbeitung**
+- SelectTool erkennt Dokumente bereits (`SelectionType.DOCUMENT`) und aktiviert den Dokument-Hub (Verschieben/Skalieren/Drehen). Der Hub wird ins Settings-Panel der Projektmappe gespiegelt.
+
+### 2. „CAD-Blatt"-Werkzeug nachträgliche Bearbeitung
+
+- CAD-Blatt bleibt Projektmappen-Element (`kind: "cad-view"`), da es Referenz auf ein anderes Sheet enthält.
+- Bei Auswahl wird derselbe **Dokument-Hub-Style** (Ecken-Handles + Rotate) über dem Element gezeichnet — konsistente Ecken-, Kanten- und Rotations-Handles wie beim Dokument-Element. **Kein Crop**.
+- Verschieben/Skalieren/Drehen wandern in die bestehende Hub-Logik (`hubKinds`-Set enthält bereits `cad-view`).
+
+### 3. Schraffur-Highlight blau
+
+- Root Cause: in der Projektmappe wird nach Zeichnen der Schraffur zwar `SelectionType.HATCH` gesetzt, aber `renderer.selection` wird durch die parallele Multi-Select-Liste evtl. zurückgesetzt. Fix in `MiniCad._applyPrimary`: sicherstellen, dass `renderer.setSelection(primary)` **auch bei Hatch** einen frischen Render triggert.
+- Zusätzlich: bei Klick mit Auswahl-Tool auf eine Schraffur einen Render-Tick erzwingen (`this.renderer.render()`), falls kein anderes Event Repaint auslöst.
+
+## Technische Details
+
+- **Betroffene Dateien:**
+  - `src/pages/ProjectWorkspace.tsx` — Rail-Buttons, `PageTool`-Typ, State für Placement, Settings-Panel „Dokument".
+  - `src/cad/embed/MiniCad.ts` — `documentTool` einhängen, `setActiveTool("document")`, `beginPlacement`-API, Serialisierung Dokumente.
+  - `src/components/page/CadOverlayLayer.tsx` — `activeTool="document"` durchreichen.
+  - Neu: `src/components/cad/DocumentSettingsPanel.tsx` — spiegelt CAD-Dokument-Panel (Scale-Two-Points, Maßstab, Sperren, Alpha, Rotation reset).
+- **Nicht enthalten (bewusst):** PDF-Auflösen, Hintergrund entfernen, Filter, Crop — wenn erwünscht separat als Folgeschritt.
+- **Migration:** Alte `pdf`/`image`-Elemente bleiben angezeigt (Legacy-Renderpfad in `PageCanvas`), neue Importe laufen ausschließlich über die CAD-Pipeline.
+
+## Verifikation
+
+Playwright-Skript:
+1. In Projektmappe eine PDF und ein PNG per „Dokument" importieren → Platzierungs-Cursor sichtbar → Klick → Element ist CAD-`DocumentObject`.
+2. Mit Auswahl-Tool anklicken → Hub mit Ecken/Rotate erscheint, Verschieben/Skalieren/Drehen funktioniert.
+3. CAD-Blatt platzieren, auswählen → identischer Hub, kein Crop-Griff.
+4. Schraffur zeichnen, Auswahl-Tool → Schraffur ist blau gefüllt.
+5. Reload → Zustand aller drei Elementtypen persistent.
