@@ -3089,7 +3089,7 @@ function PrintPanel({
   project,
   onClose,
 }: {
-  project: import("@/lib/projectStore").ProjectRecord;
+  project: import("@/lib/projectStore").Project;
   onClose: () => void;
 }) {
   const [pageMode, setPageMode] = useState<PrintPageMode>("all");
