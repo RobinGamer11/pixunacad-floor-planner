@@ -242,6 +242,7 @@ function _floodFillFromPixel(
   (doc as any)._bgMaskRev = ((doc as any)._bgMaskRev || 0) + 1;
   const b = ensureBgRemoval(doc);
   b.fgMaskDataUrl = null;
+  applyMaskCropToDoc(doc);
   return true;
 }
 
