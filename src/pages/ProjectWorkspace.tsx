@@ -1603,16 +1603,23 @@ function RightInspector({
   const layerCount = page?.elements.length ?? 0;
   return (
     <aside
-      className="w-[340px] shrink-0 border-l flex flex-col relative"
+      className="w-[346px] shrink-0 border-l flex flex-row"
       style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
     >
-      <button
-        onClick={onCollapse}
-        title="Einklappen"
-        className="absolute top-2 right-2 h-6 w-6 rounded-md flex items-center justify-center hover:bg-muted z-10"
+      {/* Linke Griffleiste zum Einklappen */}
+      <div
+        className="w-6 shrink-0 flex items-start justify-center pt-2 border-r"
+        style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-muted))" }}
       >
-        <PanelRightClose size={14} className="text-muted-foreground" />
-      </button>
+        <button
+          onClick={onCollapse}
+          title="Einklappen"
+          className="h-6 w-6 rounded-md flex items-center justify-center hover:bg-muted"
+        >
+          <PanelRightClose size={14} className="text-muted-foreground" />
+        </button>
+      </div>
+      <div className="flex-1 min-w-0 flex flex-col">
       <div className="grid grid-cols-3 border-b" style={{ borderColor: "hsl(var(--hairline))" }}>
         <TabButton active={tab === "settings"} onClick={() => setTab("settings")} icon={<Settings size={14} />} label="Seiteneinstellung" />
         <TabButton active={tab === "tools"} onClick={() => setTab("tools")} icon={<Wrench size={14} />} label="Werkzeugeinstellung" />
