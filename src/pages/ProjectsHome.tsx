@@ -41,7 +41,7 @@ export default function ProjectsHome() {
   );
   const [selectedId, setSelectedId] = useState<string | undefined>(visibleProjects[0]?.id);
   const [search, setSearch] = useState("");
-  const [tab, setTab] = useState<Tab>("seiten");
+  const [tab, setTab] = useState<Tab>("uebersicht");
   const [leftOpen, setLeftOpen] = useState(true);
   const [titleMenuOpen, setTitleMenuOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
