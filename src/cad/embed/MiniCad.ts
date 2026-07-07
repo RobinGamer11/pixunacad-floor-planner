@@ -1729,8 +1729,13 @@ export class MiniCad {
     try {
       this.input.wheelDelta = 0;
 
-      // Panning (Mittlere Maustaste) — identisch zur CAD-Oberfläche.
-      if (this.input.isPanning) this.camera.panBy(this.input.panDX, this.input.panDY);
+      // Embed-Modus: Kein Kamera-Pan und kein Wheel-Zoom. Die Projektmappe
+      // steuert Zoom/Position ausschließlich über die React-Wrapper-Ebene.
+      // Kamera-Offset bleibt fix an FRAME_PAD_PX gebunden, damit Objekte
+      // und Hilfslinien auf dem Blatt an ihrer Position kleben.
+      this.camera.offsetX = FRAME_PAD_PX;
+      this.camera.offsetY = FRAME_PAD_PX;
+      this.camera.scale = this.basePxPerMm * 1000 * this._zoom;
 
       this.input.update(this.camera);
 
