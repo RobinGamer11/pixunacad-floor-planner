@@ -27,6 +27,7 @@ import { SelectTool } from "../SelectTool";
 import { FreeDrawTool } from "../FreeDrawTool";
 import { EraserTool } from "../EraserTool";
 import { HatchTool, type HatchDrawMode } from "../HatchTool";
+import { DocumentTool } from "../DocumentTool";
 import { Defaults, SelectionType } from "../constants";
 import type { TextBox, TextBoxStyle, FreeLineStyle } from "../Scene";
 import { drawRichTextBox } from "../textRichRenderer";
@@ -78,7 +79,7 @@ export interface MiniCadInit {
 }
 
 
-export type MiniTool = "line" | "text" | "select" | "guide" | "free" | "eraser" | "hatch" | null;
+export type MiniTool = "line" | "text" | "select" | "guide" | "free" | "eraser" | "hatch" | "document" | null;
 export type MiniCadSelectionInfo =
   | {
       tool: "line";
@@ -154,6 +155,7 @@ export class MiniCad {
   readonly freeDrawTool: FreeDrawTool;
   readonly eraserTool: EraserTool;
   readonly hatchTool: HatchTool;
+  readonly documentTool: DocumentTool;
 
   // Stubs required by tools / editor.
   activeDrawLabelId = Defaults.defaultLabelId;
@@ -319,6 +321,7 @@ export class MiniCad {
     this.freeDrawTool = new FreeDrawTool(this as any);
     this.eraserTool = new EraserTool(this as any);
     this.hatchTool = new HatchTool(this as any);
+    this.documentTool = new DocumentTool(this as any);
 
     // Wire PointEditMenu activation identisch zur CadApp-Oberfläche.
     this.pointEditMenu.bindActivate((action) => {
@@ -652,6 +655,7 @@ export class MiniCad {
     if (this._activeTool === "free") this.freeDrawTool.cancel();
     if (this._activeTool === "eraser") this.eraserTool.cancel();
     if (this._activeTool === "hatch") this.hatchTool.cancel();
+    if (this._activeTool === "document") this.documentTool.cancel();
     this._activeTool = tool;
     this.activeTool = null;
     // Guide-Modus aktivieren/deaktivieren — wirkt auf den createSegment-Interceptor.
@@ -673,7 +677,26 @@ export class MiniCad {
     } else if (tool === "hatch") {
       this.hatchTool.activate();
       this.activeTool = this.hatchTool as any;
+    } else if (tool === "document") {
+      this.documentTool.activate();
+      this.activeTool = this.documentTool as any;
     }
+  }
+
+  /** Alias für `setActiveTool` — DocumentTool ruft `app.setTool(...)`. */
+  setTool(tool: MiniTool) { this.setActiveTool(tool); }
+
+  /** Startet die Dokument-Platzierung (nach erfolgreichem Datei-Import).
+   *  Aktiviert das Dokument-Werkzeug und übergibt die Import-Daten. */
+  beginDocumentPlacement(opts: {
+    src: string; widthM: number; heightM: number;
+    pixelWidth: number; pixelHeight: number;
+    name: string; kind: "image" | "pdf-page";
+    pageIndex: number; importScaleDenom: number;
+    pdfSourceB64?: string | null;
+  }) {
+    if (this._activeTool !== "document") this.setActiveTool("document");
+    this.documentTool.beginPlacement(opts);
   }
 
   /** Sperrt/entsperrt alle Hilfslinien (Auswahl, Verschieben, Punktedit). */
@@ -921,6 +944,32 @@ export class MiniCad {
         labelId: h.labelId,
         areaLabel: h.areaLabel ? { ...h.areaLabel } : undefined,
       })),
+
+      documents: this.scene.documents
+        .filter((d) => !(d as any)._snapOnly && d.labelId !== this._extDocLabelId)
+        .map((d) => ({
+          id: d.id,
+          name: d.name,
+          kind: d.kind,
+          src: d.src,
+          pageIndex: d.pageIndex,
+          position: { x: d.position.x, y: d.position.y },
+          widthM: d.widthM,
+          heightM: d.heightM,
+          rotationRad: d.rotationRad,
+          pixelWidth: d.pixelWidth,
+          pixelHeight: d.pixelHeight,
+          labelId: d.labelId,
+          importScaleDenom: d.importScaleDenom,
+          eraseMaskDataUrl: d.eraseMaskDataUrl,
+          pdfSourceB64: d.pdfSourceB64 || null,
+          guideEdges: { ...d.guideEdges },
+          cropM: { ...d.cropM },
+          opacity: d.opacity,
+          filters: d.filters ? d.filters.map((f) => ({ ...f })) : [],
+          activeFilterId: d.activeFilterId,
+          bgRemoval: d.bgRemoval,
+        })),
     };
   }
 
@@ -988,6 +1037,34 @@ export class MiniCad {
             areaLabel: h.areaLabel,
           });
         } catch (e) { console.error("MiniCad restore hatch:", e); }
+      }
+    }
+    if (Array.isArray(data.documents)) {
+      for (const d of data.documents) {
+        try {
+          this.scene.createDocument({
+            name: d.name,
+            kind: d.kind,
+            src: d.src,
+            pageIndex: d.pageIndex,
+            position: { x: d.position?.x || 0, y: d.position?.y || 0 },
+            widthM: d.widthM,
+            heightM: d.heightM,
+            rotationRad: d.rotationRad || 0,
+            pixelWidth: d.pixelWidth || 0,
+            pixelHeight: d.pixelHeight || 0,
+            labelId: d.labelId || Defaults.defaultLabelId,
+            importScaleDenom: d.importScaleDenom || 100,
+            eraseMaskDataUrl: d.eraseMaskDataUrl || null,
+            pdfSourceB64: d.pdfSourceB64 || null,
+            guideEdges: d.guideEdges,
+            cropM: d.cropM,
+            opacity: d.opacity,
+            filters: d.filters,
+            activeFilterId: d.activeFilterId,
+            bgRemoval: d.bgRemoval,
+          });
+        } catch (e) { console.error("MiniCad restore document:", e); }
       }
     }
   }
@@ -1773,6 +1850,7 @@ export class MiniCad {
       else if (this._activeTool === "free") this.freeDrawTool.update(this.input);
       else if (this._activeTool === "eraser") this.eraserTool.update(this.input);
       else if (this._activeTool === "hatch") this.hatchTool.update(this.input);
+      else if (this._activeTool === "document") this.documentTool.update(this.input);
 
       // Multi-Select Group-Move: nach SelectTool-Update das Delta des Primary
       // auf die Snapshot-Positionen der Extras anwenden.
