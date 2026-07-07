@@ -646,6 +646,12 @@ export default function ProjectWorkspace() {
 
           {/* Right inspector (collapsible) */}
           {rightOpen ? (
+            printMode ? (
+              <PrintPanel
+                project={project}
+                onClose={() => setPrintMode(false)}
+              />
+            ) : (
             <RightInspector
               projectId={project.id}
               page={activePage}
@@ -677,6 +683,9 @@ export default function ProjectWorkspace() {
               onJumpCad={(sheetId) => navigate(`/project/${project.id}/cad${sheetId ? `/${sheetId}` : ""}`)}
               onCollapse={() => setRightOpen(false)}
             />
+            )
+
+
 
           ) : (
             <div
