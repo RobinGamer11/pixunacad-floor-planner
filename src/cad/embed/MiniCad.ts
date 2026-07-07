@@ -1796,6 +1796,7 @@ export class MiniCad {
       else if (this._activeTool === "free") this.freeDrawTool.update(this.input);
       else if (this._activeTool === "eraser") this.eraserTool.update(this.input);
       else if (this._activeTool === "hatch") this.hatchTool.update(this.input);
+      else if (this._activeTool === "document") this.documentTool.update(this.input);
 
       // Multi-Select Group-Move: nach SelectTool-Update das Delta des Primary
       // auf die Snapshot-Positionen der Extras anwenden.
