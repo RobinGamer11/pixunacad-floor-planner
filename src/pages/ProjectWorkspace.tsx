@@ -2134,6 +2134,12 @@ function ToolsTab({
           onJumpCad={onJumpCad}
         />
       )}
+
+      {/* CAD-Dokument-Inspector: erscheint, sobald ein CAD-Dokument
+          (scene.documents) im Auswahl-Tool selektiert ist. */}
+      {!activeTool && cadEngine && (
+        <CadDocumentInspector engine={cadEngine} />
+      )}
     </div>
   );
 }
