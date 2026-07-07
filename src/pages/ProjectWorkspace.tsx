@@ -190,9 +190,20 @@ export default function ProjectWorkspace() {
 
   return (
     <div
-      className="flex h-screen w-screen overflow-hidden"
+      className="flex flex-col h-screen w-screen overflow-hidden"
       style={{ background: "hsl(var(--surface))", color: "hsl(var(--ink))" }}
     >
+      <WorkspaceHeader
+        projectId={project.id}
+        projectName={project.name}
+        contextLabel={activePage?.title}
+        mode="workspace"
+        zoomPercent={zoom}
+        onPresent={() => {}}
+        onShare={() => {}}
+        onExport={() => setPrintMode((v) => !v)}
+      />
+      <div className="flex-1 flex min-h-0">
       {/* Far-left tool rail */}
       <aside
         className="flex flex-col items-center gap-0.5 py-1.5 shrink-0 border-r"
@@ -202,6 +213,7 @@ export default function ProjectWorkspace() {
           background: "hsl(var(--surface-card))",
         }}
       >
+
         <ToolRailButton
           icon={<MousePointer2 size={18} />}
           label="Auswahl"
