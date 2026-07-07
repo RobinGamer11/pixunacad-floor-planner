@@ -655,6 +655,7 @@ export class MiniCad {
     if (this._activeTool === "free") this.freeDrawTool.cancel();
     if (this._activeTool === "eraser") this.eraserTool.cancel();
     if (this._activeTool === "hatch") this.hatchTool.cancel();
+    if (this._activeTool === "document") this.documentTool.cancel();
     this._activeTool = tool;
     this.activeTool = null;
     // Guide-Modus aktivieren/deaktivieren — wirkt auf den createSegment-Interceptor.
@@ -676,7 +677,26 @@ export class MiniCad {
     } else if (tool === "hatch") {
       this.hatchTool.activate();
       this.activeTool = this.hatchTool as any;
+    } else if (tool === "document") {
+      this.documentTool.activate();
+      this.activeTool = this.documentTool as any;
     }
+  }
+
+  /** Alias für `setActiveTool` — DocumentTool ruft `app.setTool(...)`. */
+  setTool(tool: MiniTool) { this.setActiveTool(tool); }
+
+  /** Startet die Dokument-Platzierung (nach erfolgreichem Datei-Import).
+   *  Aktiviert das Dokument-Werkzeug und übergibt die Import-Daten. */
+  beginDocumentPlacement(opts: {
+    src: string; widthM: number; heightM: number;
+    pixelWidth: number; pixelHeight: number;
+    name: string; kind: "image" | "pdf-page";
+    pageIndex: number; importScaleDenom: number;
+    pdfSourceB64?: string | null;
+  }) {
+    if (this._activeTool !== "document") this.setActiveTool("document");
+    this.documentTool.beginPlacement(opts);
   }
 
   /** Sperrt/entsperrt alle Hilfslinien (Auswahl, Verschieben, Punktedit). */
