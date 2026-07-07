@@ -62,6 +62,7 @@ function MappenPanel({ project, activeId, onSelect }: { project: Project; active
       }}
     >
       <div className="flex items-center gap-2 mb-3">
+        <span className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">PROJEKTMAPPEN</span>
         <button
           onClick={() => projectStore.addMappe(project.id, "Neue Mappe")}
           title="Neue Projektmappe"
@@ -69,15 +70,19 @@ function MappenPanel({ project, activeId, onSelect }: { project: Project; active
         >
           <Plus size={14} />
         </button>
-        <span className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">PROJEKTMAPPEN</span>
         <div className="flex-1" />
         <button
           onClick={() => setEditMode((v) => !v)}
-          title={editMode ? "Bearbeiten beenden" : "Bearbeiten"}
-          className="h-6 w-6 rounded-md flex items-center justify-center hover:bg-muted"
-          style={{ color: editMode ? "hsl(var(--accent-gold))" : "hsl(var(--ink-soft))" }}
+          title={editMode ? "Bearbeiten beenden" : "Mappen bearbeiten"}
+          className="h-7 px-2.5 rounded-md flex items-center gap-1.5 text-[11px] font-medium border transition"
+          style={{
+            color: editMode ? "hsl(var(--surface))" : "hsl(var(--ink))",
+            background: editMode ? "hsl(var(--accent-gold))" : "transparent",
+            borderColor: editMode ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
+          }}
         >
-          <Pencil size={13} />
+          <Pencil size={12} />
+          {editMode ? "Fertig" : "Bearbeiten"}
         </button>
       </div>
 
