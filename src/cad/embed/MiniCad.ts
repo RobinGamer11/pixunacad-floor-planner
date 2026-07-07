@@ -16,6 +16,7 @@ import { Camera } from "../Camera";
 import { Scene } from "../Scene";
 import { Input } from "../Input";
 import { LabelManager } from "../LabelManager";
+import { IdPanel } from "../IdPanel";
 import { TopologyEngine } from "../TopologyEngine";
 import { Renderer, type Selection } from "../Renderer";
 import { LineHub } from "../LineHub";
