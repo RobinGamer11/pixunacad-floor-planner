@@ -1232,7 +1232,12 @@ function InfosView({ project }: { project: Project }) {
     >
       <Field label="Projektname" value={project.name} onChange={(v) => update({ name: v })} />
       <Field label="Bauherr" value={project.bauherr ?? ""} onChange={(v) => update({ bauherr: v })} />
-      <Field label="Projektadresse" value={project.ort} onChange={(v) => update({ ort: v })} />
+      <div className="col-span-2">
+        <AddressField
+          value={project.ort}
+          onChange={(v) => update({ ort: v })}
+        />
+      </div>
       <Field
         label="Projekttyp"
         value={project.projektTyp ?? ""}
@@ -1259,6 +1264,117 @@ function InfosView({ project }: { project: Project }) {
           Änderungen werden automatisch in der rechten Projektinfo übernommen.
         </div>
       </div>
+    </div>
+  );
+}
+
+function AddressField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [query, setQuery] = useState(value);
+  const [hits, setHits] = useState<GeoHit[]>([]);
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [selected, setSelected] = useState<GeoHit | null>(null);
+  const debounceRef = useRef<number | null>(null);
+
+  // Sync when project.ort changes externally
+  useEffect(() => { setQuery(value); }, [value]);
+
+  // Auto-resolve current value to coordinates for the map (once, on mount / value change)
+  useEffect(() => {
+    let alive = true;
+    if (!value.trim()) { setSelected(null); return; }
+    geocodeSearch(value, 1).then((r) => {
+      if (alive && r[0]) setSelected(r[0]);
+    });
+    return () => { alive = false; };
+  }, [value]);
+
+  const runSearch = (q: string) => {
+    if (debounceRef.current) window.clearTimeout(debounceRef.current);
+    debounceRef.current = window.setTimeout(async () => {
+      if (q.trim().length < 2) { setHits([]); return; }
+      setLoading(true);
+      const r = await geocodeSearch(q, 6);
+      setHits(r);
+      setLoading(false);
+    }, 250);
+  };
+
+  const pick = (h: GeoHit) => {
+    setSelected(h);
+    setQuery(h.label);
+    setOpen(false);
+    setHits([]);
+    onChange(h.label);
+  };
+
+  const mapSrc = selected
+    ? `https://www.openstreetmap.org/export/embed.html?bbox=${selected.lon - 0.02}%2C${selected.lat - 0.01}%2C${selected.lon + 0.02}%2C${selected.lat + 0.01}&layer=mapnik&marker=${selected.lat}%2C${selected.lon}`
+    : null;
+
+  return (
+    <div>
+      <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">
+        PROJEKTADRESSE
+      </div>
+      <div className="relative mt-1">
+        <div className="flex items-center gap-2 h-9 rounded-md border px-3 bg-transparent"
+             style={{ borderColor: "hsl(var(--hairline))" }}>
+          <Search size={14} className="text-muted-foreground shrink-0" />
+          <input
+            value={query}
+            onChange={(e) => { setQuery(e.target.value); setOpen(true); runSearch(e.target.value); }}
+            onFocus={() => { setOpen(true); if (hits.length === 0 && query) runSearch(query); }}
+            onBlur={() => window.setTimeout(() => setOpen(false), 150)}
+            placeholder="Ort, Straße, PLZ suchen…"
+            className="flex-1 h-full bg-transparent outline-none text-sm"
+          />
+          {loading && <span className="text-[11px] text-muted-foreground">…</span>}
+        </div>
+        {open && hits.length > 0 && (
+          <div className="absolute z-20 left-0 right-0 mt-1 rounded-md border shadow-md max-h-64 overflow-y-auto"
+               style={{ background: "hsl(var(--surface))", borderColor: "hsl(var(--hairline))" }}>
+            {hits.map((h, i) => (
+              <button
+                key={`${h.lat}-${h.lon}-${i}`}
+                type="button"
+                onMouseDown={(e) => { e.preventDefault(); pick(h); }}
+                className="w-full text-left px-3 py-2 text-sm hover:bg-muted flex items-start gap-2"
+              >
+                <span className="text-muted-foreground text-xs mt-0.5">📍</span>
+                <span className="flex-1">
+                  <div>{h.name}</div>
+                  <div className="text-[11px] text-muted-foreground">
+                    {[h.admin1, h.country].filter(Boolean).join(", ")}
+                  </div>
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      <div
+        className="mt-2 rounded-md overflow-hidden border relative"
+        style={{ borderColor: "hsl(var(--hairline))", height: 220, background: "hsl(var(--surface-muted))" }}
+      >
+        {mapSrc ? (
+          <iframe
+            title="Karte"
+            src={mapSrc}
+            className="w-full h-full border-0"
+            loading="lazy"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground">
+            Adresse suchen, um die Karte anzuzeigen.
+          </div>
+        )}
+      </div>
+      {selected && (
+        <div className="mt-1 text-[11px] text-muted-foreground">
+          Aufgelöst: {selected.label} · {selected.lat.toFixed(4)}, {selected.lon.toFixed(4)} — Wetter wird für diesen Ort geladen.
+        </div>
+      )}
     </div>
   );
 }
