@@ -184,24 +184,38 @@ export function DocumentFilterPanel({ app, docId, sig }: Props) {
 // ---------------------------------------------------------------- BgRemovePanel
 function BgRemovePanel({ app, doc }: { app: CadApp | null; doc: any }) {
   const [, force] = useState(0);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [brushMode, setBrushMode] = useState<"fg" | "bg">("bg");
   const rerender = () => force(v => v + 1);
   const bg = doc.bgRemoval || null;
   const inter = app?.bgRemoveInteraction || null;
-  const isThisDoc = inter && inter.docId === doc.id;
+  const isThisDoc = !!inter && inter.docId === doc.id;
 
-  const enable = () => {
-    if (!doc.bgRemoval) {
-      import("@/cad/documentBgRemove").then(({ defaultBgRemoval }) => {
-        doc.bgRemoval = defaultBgRemoval();
-        doc.bgRemoval.enabled = true;
+  const runAuto = (tol?: number) => {
+    void import("@/cad/documentBgRemove").then(({ autoRemoveBackgroundFromCorners }) => {
+      const t = tol ?? doc.bgRemoval?.tolerance ?? 32;
+      const done = autoRemoveBackgroundFromCorners(doc, t, () => {
+        autoRemoveBackgroundFromCorners(doc, t);
         rerender();
       });
-    } else {
-      doc.bgRemoval.enabled = !doc.bgRemoval.enabled;
-      rerender();
-    }
+      if (done) rerender();
+    });
   };
-  const setInter = (tool: "wand" | "brush" | null, target: "fg" | "bg" = "fg") => {
+
+  const enable = () => {
+    void import("@/cad/documentBgRemove").then(({ defaultBgRemoval }) => {
+      if (!doc.bgRemoval) {
+        doc.bgRemoval = defaultBgRemoval();
+        doc.bgRemoval.enabled = true;
+        // Automatik direkt beim ersten Einschalten — genau das, was Nutzer erwartet.
+        runAuto(doc.bgRemoval.tolerance);
+      } else {
+        doc.bgRemoval.enabled = !doc.bgRemoval.enabled;
+      }
+      rerender();
+    });
+  };
+  const setInter = (tool: "wand" | "brush" | null, target: "fg" | "bg" = "bg") => {
     if (!app) return;
     if (tool === null) app.bgRemoveInteraction = null;
     else app.bgRemoveInteraction = { docId: doc.id, tool, target };
@@ -213,20 +227,22 @@ function BgRemovePanel({ app, doc }: { app: CadApp | null; doc: any }) {
     rerender();
   };
   const reset = () => {
-    if (!window.confirm("Auswahl zurücksetzen?")) return;
-    import("@/cad/documentBgRemove").then(({ resetBgMask }) => {
+    void import("@/cad/documentBgRemove").then(({ resetBgMask }) => {
       resetBgMask(doc);
       rerender();
     });
   };
 
+  const wandActive = (t: "fg" | "bg") => isThisDoc && inter?.tool === "wand" && inter?.target === t;
+  const brushActive = isThisDoc && inter?.tool === "brush";
+
   return (
     <div className="space-y-2" style={{ borderTop: "1px solid hsl(var(--border))", paddingTop: 10 }}>
       <div className="flex items-center justify-between">
         <div className="text-[11px] font-semibold uppercase tracking-[0.14em]" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
-          Hintergrund ausschneiden
+          Hintergrund entfernen
         </div>
-        <label className="flex items-center gap-1 text-[11px] cursor-pointer">
+        <label className="flex items-center gap-1 text-[11px] cursor-pointer" title="Aktiviert das Ausschneiden. Beim ersten Einschalten wird der Hintergrund automatisch anhand der Bild-Ecken erkannt.">
           <input type="checkbox" checked={!!bg?.enabled} onChange={enable} />
           <span>Aktiv</span>
         </label>
@@ -234,28 +250,28 @@ function BgRemovePanel({ app, doc }: { app: CadApp | null; doc: any }) {
 
       {bg?.enabled && (
         <>
-          {/* Werkzeug-Auswahl */}
-          <div className="space-y-1">
-            <div className="text-[11px]" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
-              Vordergrund auswählen
-            </div>
-            <div className="grid grid-cols-2 gap-1">
-              <ToolBtn active={!!isThisDoc && inter?.tool === "wand" && inter?.target === "fg"} onClick={() => setInter(isThisDoc && inter?.tool === "wand" && inter?.target === "fg" ? null : "wand", "fg")} label="Zauberstab" />
-              <ToolBtn active={!!isThisDoc && inter?.tool === "brush" && inter?.target === "fg"} onClick={() => setInter(isThisDoc && inter?.tool === "brush" && inter?.target === "fg" ? null : "brush", "fg")} label="Pinsel +" />
-              <ToolBtn active={!!isThisDoc && inter?.tool === "wand" && inter?.target === "bg"} onClick={() => setInter(isThisDoc && inter?.tool === "wand" && inter?.target === "bg" ? null : "wand", "bg")} label="Zauberstab (BG)" />
-              <ToolBtn active={!!isThisDoc && inter?.tool === "brush" && inter?.target === "bg"} onClick={() => setInter(isThisDoc && inter?.tool === "brush" && inter?.target === "bg" ? null : "brush", "bg")} label="Pinsel −" />
-            </div>
-            {isThisDoc && (
-              <div className="text-[10px]" style={{ color: "hsl(var(--primary))" }}>
-                Aktiv — im Canvas auf das Dokument klicken/ziehen.
-              </div>
-            )}
-          </div>
+          <p className="text-[10.5px] leading-snug" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+            Klicke im Canvas auf einen Hintergrund­bereich, um ihn zu entfernen.
+            Mit dem Pinsel kannst du feine Kanten nachjustieren.
+          </p>
 
-          {/* Genauigkeit (Wand) */}
+          {/* Auto-Button */}
+          <button
+            type="button"
+            onClick={() => runAuto()}
+            className="cad-toolbar-btn h-8 w-full text-[11px] justify-center"
+            style={{ borderColor: "hsl(var(--primary))", background: "hsl(var(--primary) / 0.12)" }}
+            title="Erkennt den Hintergrund automatisch anhand der 4 Bild-Ecken. Bei zu wenig/zu viel Wegschnitt die Genauigkeit unten anpassen und erneut klicken."
+          >
+            Automatisch erkennen
+          </button>
+
+          {/* Genauigkeit */}
           <div>
             <div className="flex items-center justify-between text-xs mb-1">
-              <span>Genauigkeit (Zauberstab)</span>
+              <span title="Farb-Toleranz. Niedrig = nur sehr ähnliche Farben werden entfernt. Hoch = auch abweichende Töne werden mitgenommen.">
+                Genauigkeit
+              </span>
               <span style={{ color: "hsl(var(--cad-toolbar-muted))" }}>{bg.tolerance}</span>
             </div>
             <input type="range" min={1} max={128} step={1} value={bg.tolerance}
@@ -263,34 +279,111 @@ function BgRemovePanel({ app, doc }: { app: CadApp | null; doc: any }) {
               className="w-full" />
           </div>
 
-          {/* Pinselgröße */}
-          <div>
-            <div className="flex items-center justify-between text-xs mb-1">
-              <span>Pinselgröße</span>
-              <span style={{ color: "hsl(var(--cad-toolbar-muted))" }}>{(bg.brushRadiusM * 100).toFixed(0)} cm</span>
+          {/* Klick-Werkzeuge */}
+          <div className="space-y-1">
+            <div className="text-[11px]" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Klick-Werkzeug</div>
+            <div className="grid grid-cols-2 gap-1">
+              <ToolBtn
+                active={wandActive("bg")}
+                onClick={() => setInter(wandActive("bg") ? null : "wand", "bg")}
+                label="Wegklicken"
+                title="Klick auf einen Bereich im Bild → alle zusammenhängenden ähnlich­farbigen Pixel werden entfernt."
+              />
+              <ToolBtn
+                active={wandActive("fg")}
+                onClick={() => setInter(wandActive("fg") ? null : "wand", "fg")}
+                label="Wiederherstellen"
+                title="Klick auf einen entfernten Bereich → er wird wieder sichtbar."
+              />
             </div>
-            <input type="range" min={1} max={200} step={1} value={Math.round(bg.brushRadiusM * 100)}
-              onChange={(e) => patchBg({ brushRadiusM: parseInt(e.target.value, 10) / 100 })}
-              className="w-full" />
           </div>
 
-          {/* Vordergrundfarbe */}
-          <ColorAlphaRow
-            label="Vordergrund"
-            color={bg.fgColor}
-            alpha={bg.fgAlpha}
-            onChange={(color, alpha) => patchBg({ fgColor: color, fgAlpha: alpha })}
-          />
-          {/* Hintergrundfarbe */}
-          <ColorAlphaRow
-            label="Hintergrund"
-            color={bg.bgColor}
-            alpha={bg.bgAlpha}
-            onChange={(color, alpha) => patchBg({ bgColor: color, bgAlpha: alpha })}
-          />
+          {/* Pinsel */}
+          <div className="space-y-1">
+            <div className="flex items-center justify-between text-[11px]">
+              <span style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Pinsel (Feinarbeit)</span>
+              <div className="flex gap-0.5">
+                <button
+                  type="button"
+                  onClick={() => setBrushMode("bg")}
+                  className="cad-toolbar-btn h-5 px-1.5 text-[10px]"
+                  style={{
+                    borderColor: brushMode === "bg" ? "hsl(var(--primary))" : undefined,
+                    background: brushMode === "bg" ? "hsl(var(--primary) / 0.15)" : undefined,
+                  }}
+                  title="Pinsel entfernt (radiert Vordergrund)"
+                >Entfernen</button>
+                <button
+                  type="button"
+                  onClick={() => setBrushMode("fg")}
+                  className="cad-toolbar-btn h-5 px-1.5 text-[10px]"
+                  style={{
+                    borderColor: brushMode === "fg" ? "hsl(var(--primary))" : undefined,
+                    background: brushMode === "fg" ? "hsl(var(--primary) / 0.15)" : undefined,
+                  }}
+                  title="Pinsel stellt wieder her"
+                >Zurückholen</button>
+              </div>
+            </div>
+            <ToolBtn
+              active={brushActive}
+              onClick={() => setInter(brushActive ? null : "brush", brushMode)}
+              label={brushActive ? "Pinsel aktiv — im Canvas ziehen" : "Pinsel aktivieren"}
+              title="Nach dem Aktivieren im Canvas auf das Bild klicken oder ziehen."
+            />
+            <div>
+              <div className="flex items-center justify-between text-xs mb-1">
+                <span>Pinselgröße</span>
+                <span style={{ color: "hsl(var(--cad-toolbar-muted))" }}>{(bg.brushRadiusM * 100).toFixed(0)} cm</span>
+              </div>
+              <input type="range" min={1} max={200} step={1} value={Math.round(bg.brushRadiusM * 100)}
+                onChange={(e) => patchBg({ brushRadiusM: parseInt(e.target.value, 10) / 100 })}
+                className="w-full" />
+            </div>
+          </div>
 
-          <button type="button" onClick={reset} className="cad-toolbar-btn h-7 w-full text-[11px] justify-center">
-            Auswahl zurücksetzen
+          {isThisDoc && (
+            <div className="text-[10px] rounded px-2 py-1" style={{ background: "hsl(var(--primary) / 0.1)", color: "hsl(var(--primary))" }}>
+              Bearbeitungs­modus aktiv — klicke im Canvas auf das Bild.
+            </div>
+          )}
+
+          {/* Erweitert */}
+          <button
+            type="button"
+            onClick={() => setAdvancedOpen(v => !v)}
+            className="text-[11px] w-full text-left"
+            style={{ color: "hsl(var(--cad-toolbar-muted))" }}
+          >
+            {advancedOpen ? "▾" : "▸"} Erweitert (Einfärben & Deckkraft)
+          </button>
+
+          {advancedOpen && (
+            <div className="space-y-2 pl-2" style={{ borderLeft: "1px solid hsl(var(--border))" }}>
+              <ColorAlphaRow
+                label="Vordergrund"
+                color={bg.fgColor}
+                alpha={bg.fgAlpha}
+                onChange={(color, alpha) => patchBg({ fgColor: color, fgAlpha: alpha })}
+                hint="Bleibt sichtbar. Farbe = Einfärbung, Deckkraft = Transparenz des sichtbaren Bild­teils."
+              />
+              <ColorAlphaRow
+                label="Hintergrund"
+                color={bg.bgColor}
+                alpha={bg.bgAlpha}
+                onChange={(color, alpha) => patchBg({ bgColor: color, bgAlpha: alpha })}
+                hint="Der weggeschnittene Bereich. Transparent + Deckkraft 0 % = komplett entfernt."
+              />
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={reset}
+            className="cad-toolbar-btn h-7 w-full text-[11px] justify-center"
+            title="Setzt die Maske zurück — das ganze Bild wird wieder komplett sichtbar."
+          >
+            Maske zurücksetzen
           </button>
         </>
       )}
@@ -298,11 +391,12 @@ function BgRemovePanel({ app, doc }: { app: CadApp | null; doc: any }) {
   );
 }
 
-function ToolBtn({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) {
+function ToolBtn({ active, onClick, label, title }: { active: boolean; onClick: () => void; label: string; title?: string }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      title={title}
       className="cad-toolbar-btn h-7 px-2 text-[11px] justify-center"
       style={{
         borderColor: active ? "hsl(var(--primary))" : undefined,
@@ -314,15 +408,16 @@ function ToolBtn({ active, onClick, label }: { active: boolean; onClick: () => v
   );
 }
 
-function ColorAlphaRow({ label, color, alpha, onChange }: {
+function ColorAlphaRow({ label, color, alpha, onChange, hint }: {
   label: string; color: string | null; alpha: number;
   onChange: (color: string | null, alpha: number) => void;
+  hint?: string;
 }) {
   const transparent = color === null;
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between text-xs">
-        <span>{label}</span>
+        <span title={hint}>{label}</span>
         <label className="flex items-center gap-1 text-[10px]" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
           <input type="checkbox" checked={transparent} onChange={(e) => onChange(e.target.checked ? null : (color || "#ffffff"), alpha)} />
           <span>Transparent</span>
