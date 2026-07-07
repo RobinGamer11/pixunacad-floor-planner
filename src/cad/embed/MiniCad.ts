@@ -321,6 +321,7 @@ export class MiniCad {
     this.freeDrawTool = new FreeDrawTool(this as any);
     this.eraserTool = new EraserTool(this as any);
     this.hatchTool = new HatchTool(this as any);
+    this.documentTool = new DocumentTool(this as any);
 
     // Wire PointEditMenu activation identisch zur CadApp-Oberfläche.
     this.pointEditMenu.bindActivate((action) => {
