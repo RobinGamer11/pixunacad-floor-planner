@@ -194,7 +194,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     undo: () => appRef.current?.undo(),
     redo: () => appRef.current?.redo(),
     exportPdf: () => appRef.current?.printSelectedPlans(),
-    openExportPanel: () => { setRightOpen(true); setRightTab("sheets"); },
+    openExportPanel: () => { setPrintOpen(v => !v); },
   }), []);
 
   // Zoom-Anzeige nach oben spiegeln (Camera.scale, 80 = 100%).
@@ -218,6 +218,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(true);
   const [rightOpen, setRightOpen] = useState<boolean>(true);
   const [rightTab, setRightTab] = useState<"settings" | "sheets" | "layers">("settings");
+  const [printOpen, setPrintOpen] = useState<boolean>(false);
   const [expandedTool, setExpandedTool] = useState<string | null>(null);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
@@ -2616,32 +2617,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             </div>
           </div>
 
-          {/* Druckpläne Panel */}
-          <div ref={planPanelRef} className="cad-id-panel w-full">
-            <div className="id-head">
-              <div className="id-title">Druckpläne</div>
-              <div className="id-head-actions">
-                <button ref={planToggleBtnRef} className="id-head-btn icon-only" title="Ein-/Ausklappen">
-                  <span className="id-toggle-chevron" />
-                </button>
-              </div>
-            </div>
-            <div ref={planBodyRef} className="id-body">
-              <div className="id-add-wrap">
-                <button ref={planAddBtnRef} className="id-head-btn id-add-btn">+ Plan</button>
-              </div>
-              <div ref={planListRef} className="id-list" />
-              <div className="plan-print-wrap">
-                <button ref={planPrintBtnRef} className="plan-print-btn" title="Ausgewählte Pläne als PDF drucken">
-                  🖨 PDF Drucken
-                </button>
-              </div>
-              <div className="text-[11px] leading-snug px-2 py-2 mt-2" style={{ color: "hsl(var(--ink-soft))" }}>
-                Tipp: Pläne kannst du auch über das Werkzeug „CAD-Blatt" in der Projektmappenbearbeitung einfügen.
-              </div>
-            </div>
-
-          </div>
+          {/* Druckpläne wurden in den Druckmodus verschoben (Kopf → Exportieren). */}
         </div>
         <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-2" style={{ display: rightTab === "layers" ? "block" : "none" }}>
           <div ref={idPanelRef} className="cad-id-panel w-full">
@@ -2677,6 +2653,57 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           </button>
         </div>
       )}
+
+      {/* Druckmodus (rechts) — beherbergt das Druckpläne-Panel. Immer im DOM, damit die refs stabil bleiben. */}
+      <aside
+        className="shrink-0 w-[280px] h-full flex-col border-l"
+        style={{
+          background: "hsl(var(--surface-card))",
+          borderColor: "hsl(var(--hairline))",
+          display: printOpen ? "flex" : "none",
+        }}
+      >
+        <div className="flex shrink-0 border-b items-center justify-between px-2 py-2" style={{ borderColor: "hsl(var(--hairline))" }}>
+          <div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "hsl(var(--ink))" }}>
+            Druckmodus
+          </div>
+          <button
+            type="button"
+            onClick={() => setPrintOpen(false)}
+            title="Druckmodus schließen"
+            className="h-6 w-6 rounded-md flex items-center justify-center hover:bg-muted"
+            style={{ color: "hsl(var(--ink-soft))" }}
+          >
+            ✕
+          </button>
+        </div>
+        <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-2">
+          <div ref={planPanelRef} className="cad-id-panel w-full">
+            <div className="id-head">
+              <div className="id-title">Druckpläne</div>
+              <div className="id-head-actions">
+                <button ref={planToggleBtnRef} className="id-head-btn icon-only" title="Ein-/Ausklappen">
+                  <span className="id-toggle-chevron" />
+                </button>
+              </div>
+            </div>
+            <div ref={planBodyRef} className="id-body">
+              <div className="id-add-wrap">
+                <button ref={planAddBtnRef} className="id-head-btn id-add-btn">+ Plan</button>
+              </div>
+              <div ref={planListRef} className="id-list" />
+              <div className="plan-print-wrap">
+                <button ref={planPrintBtnRef} className="plan-print-btn" title="Ausgewählte Pläne als PDF drucken">
+                  🖨 PDF Drucken
+                </button>
+              </div>
+              <div className="text-[11px] leading-snug px-2 py-2 mt-2" style={{ color: "hsl(var(--ink-soft))" }}>
+                Tipp: Pläne kannst du auch über das Werkzeug „CAD-Blatt" in der Projektmappenbearbeitung einfügen.
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
     </div>
   );
 });
