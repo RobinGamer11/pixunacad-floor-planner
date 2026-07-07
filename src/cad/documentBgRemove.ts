@@ -273,6 +273,7 @@ export function autoRemoveBackgroundFromCorners(
   for (const [cx, cy] of corners) {
     if (_floodFillFromPixel(doc, src, mask, cx, cy, tolerance, "bg")) any = true;
   }
+  if (any) applyMaskCropToDoc(doc);
   return any;
 }
 
