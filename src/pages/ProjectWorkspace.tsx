@@ -1377,6 +1377,7 @@ function ElementView({
   onDelete,
   onRotate,
   onEdgeDrag,
+  onCornerDrag,
 }: {
   el: PageElement;
   selected?: boolean;
@@ -1388,6 +1389,7 @@ function ElementView({
   onDelete?: () => void;
   onRotate?: (deltaDeg: number, absolute?: boolean) => void;
   onEdgeDrag?: (edge: "top" | "right" | "bottom" | "left", dx: number, dy: number) => void;
+  onCornerDrag?: (corner: "tl" | "tr" | "bl" | "br", dx: number, dy: number, shift: boolean) => void;
 }) {
   const dragRef = useRef<{ x: number; y: number } | null>(null);
   const rotateRef = useRef<HTMLDivElement | null>(null);
