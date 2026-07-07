@@ -1516,7 +1516,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       {/* Right Tab Panel */}
       {rightOpen ? (
       <aside className="shrink-0 w-[280px] h-full flex-col border-l" style={{ background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))", display: printOpen ? "none" : "flex" }}>
-        <div className="flex shrink-0 border-b items-stretch" style={{ borderColor: "hsl(var(--hairline))" }}>
+        <div className="grid grid-cols-[1fr_1fr_1fr_auto] shrink-0 border-b items-stretch" style={{ borderColor: "hsl(var(--hairline))" }}>
           {([
             { id: "settings" as const, label: "Werkzeugeinstellung" },
             { id: "sheets" as const, label: "Zeichenblätter" },
@@ -1526,7 +1526,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               key={t.id}
               type="button"
               onClick={() => setRightTab(t.id)}
-              className="flex-1 px-2 py-2 text-[11px] font-medium transition-colors"
+              className="min-w-0 truncate px-2 py-2 text-[11px] font-medium transition-colors"
               style={{
                 background: rightTab === t.id ? "hsl(var(--surface-card))" : "hsl(var(--surface-muted))",
                 color: rightTab === t.id ? "hsl(var(--ink))" : "hsl(var(--ink-soft))",
@@ -1537,8 +1537,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           <button
             type="button"
             onClick={() => setRightOpen(false)}
-            title="Panel ausblenden"
-            className="w-8 shrink-0 flex items-center justify-center hover:bg-muted border-l"
+            title="Einklappen"
+            className="w-8 flex items-center justify-center hover:bg-muted border-l"
             style={{ borderColor: "hsl(var(--hairline))" }}
           >
             <PanelRightClose size={14} className="text-muted-foreground" />
