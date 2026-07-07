@@ -944,6 +944,32 @@ export class MiniCad {
         labelId: h.labelId,
         areaLabel: h.areaLabel ? { ...h.areaLabel } : undefined,
       })),
+
+      documents: this.scene.documents
+        .filter((d) => !(d as any)._snapOnly && d.labelId !== this._extDocLabelId)
+        .map((d) => ({
+          id: d.id,
+          name: d.name,
+          kind: d.kind,
+          src: d.src,
+          pageIndex: d.pageIndex,
+          position: { x: d.position.x, y: d.position.y },
+          widthM: d.widthM,
+          heightM: d.heightM,
+          rotationRad: d.rotationRad,
+          pixelWidth: d.pixelWidth,
+          pixelHeight: d.pixelHeight,
+          labelId: d.labelId,
+          importScaleDenom: d.importScaleDenom,
+          eraseMaskDataUrl: d.eraseMaskDataUrl,
+          pdfSourceB64: d.pdfSourceB64 || null,
+          guideEdges: { ...d.guideEdges },
+          cropM: { ...d.cropM },
+          opacity: d.opacity,
+          filters: d.filters ? d.filters.map((f) => ({ ...f })) : [],
+          activeFilterId: d.activeFilterId,
+          bgRemoval: d.bgRemoval,
+        })),
     };
   }
 
