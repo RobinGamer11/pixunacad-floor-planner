@@ -122,6 +122,16 @@ export class TextEditorOverlay {
     this.el.focus({ preventScroll: true });
     this._placeCaretAtEnd();
     this._syncToolbarState();
+    // Live auto-grow: während des Tippens Rahmen an Inhalt anpassen.
+    this.el.oninput = () => {
+      const b = this.app.scene.getTextBoxById(this.activeBoxId!);
+      if (!b) return;
+      b.html = this.el.innerHTML;
+      if ((b.style as any).autoSize !== false) {
+        autoSizeTextBox(b, (this.app.renderer as any).referencePxPerM);
+        this.reposition(b);
+      }
+    };
   }
 
   reposition(box: TextBox) {
