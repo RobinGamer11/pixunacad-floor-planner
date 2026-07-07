@@ -447,7 +447,7 @@ export default function ProjectWorkspace() {
           }}
         />
         <ToolRailButton icon={<TableIcon size={18} />} label="Tabelle" disabled />
-        <ToolRailButton icon={<StickyNote size={18} />} label="Notiz" />
+        <ToolRailButton icon={<StickyNote size={18} />} label="Notiz" disabled />
         <ToolRailButton icon={<Clock size={18} />} label="Zeitstrahl" disabled />
         <ToolRailButton icon={<Shapes size={18} />} label="Formen" disabled />
         <div className="mt-auto flex flex-col items-center gap-1">

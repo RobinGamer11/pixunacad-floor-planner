@@ -130,7 +130,7 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app }) => {
       <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Freihand</div>
       <div className="space-y-3">
         <label className="block text-xs">
-          <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Bezeichnungs-ID{selectedStrokeId ? " (Auswahl)" : ""}</span>
+          <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Ebene{selectedStrokeId ? " (Auswahl)" : ""}</span>
           <select
             value={labelId || app.activeDrawLabelId}
             onChange={(e) => {

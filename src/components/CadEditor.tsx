@@ -1647,7 +1647,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             </div>
             <div className="space-y-3">
               <div>
-                <label>ID</label>
+                <label>Ebene</label>
                 <select ref={idSelectRef} className="cad-settings-select w-full" />
               </div>
               <div>
@@ -1739,7 +1739,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
 
             <div className="space-y-3">
               <div>
-                <label>ID</label>
+                <label>Ebene</label>
                 <select ref={hatchIdSelectRef} className="cad-settings-select w-full" />
               </div>
               <div>
@@ -1836,7 +1836,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             </div>
             <div className="space-y-3">
               <div>
-                <label>ID</label>
+                <label>Ebene</label>
                 <select ref={measureIdSelectRef} className="cad-settings-select w-full" />
               </div>
               <div>
@@ -1978,7 +1978,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             </div>
             <div className="space-y-3">
               <div>
-                <label>ID</label>
+                <label>Ebene</label>
                 <select ref={textIdSelectRef} className="cad-settings-select w-full" />
               </div>
               <div>
