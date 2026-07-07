@@ -66,6 +66,8 @@ import CadOverlayLayer from "@/components/page/CadOverlayLayer";
 import { PdfPageView } from "@/components/page/PdfPageView";
 import { importFile } from "@/cad/documentImport";
 import type { MiniCadSelectionInfo } from "@/cad/embed/MiniCad";
+import { FreeDrawSettingsPanel } from "@/components/cad/FreeDrawSettingsPanel";
+import { EraserSettingsPanel } from "@/components/cad/EraserSettingsPanel";
 import { WorkspaceHeader } from "@/components/workspace/WorkspaceHeader";
 
 const FORMAT_SIZES: Record<PageFormat, { w: number; h: number; label: string }> = {
