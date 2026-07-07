@@ -894,6 +894,7 @@ export class MiniCad {
     const f = this._strokeFactor || 1;
     return {
       version: 4,
+      labels: this.labelManager.list(),
       segments: this.scene.segments
         .filter((s) => s.labelId !== this._frameLabelId && s.labelId !== this._extRectLabelId)
         .map((s) => ({
