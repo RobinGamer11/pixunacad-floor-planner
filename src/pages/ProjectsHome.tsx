@@ -20,6 +20,7 @@ import { useProjects, projectStore, type Project, type Task, type TaskPriority }
 import { WeatherStrip } from "@/components/project/WeatherStrip";
 import { UebersichtView } from "@/components/project/UebersichtView";
 import { FileBrowser } from "@/components/project/FileBrowser";
+import { geocodeSearch, type GeoHit } from "@/lib/weather";
 
 const Pixuna = () => (
   <span className="font-semibold tracking-tight text-base">
