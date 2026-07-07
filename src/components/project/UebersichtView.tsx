@@ -382,9 +382,15 @@ function KalenderMini({ project }: { project: Project }) {
   );
 }
 
-/* ============================================================ Hero */
+/* ============================================================ Hero + Erläuterungen (kombiniert) */
 
-function HeroPanel({ project }: { project: Project }) {
+function HeroErlaeuterungPanel({
+  project,
+  mappe,
+}: {
+  project: Project;
+  mappe: { id: string; name: string; konzept?: string } | undefined;
+}) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const handleThumb = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -395,28 +401,106 @@ function HeroPanel({ project }: { project: Project }) {
   };
   return (
     <section
-      className="rounded-2xl p-5"
+      className="rounded-2xl p-5 space-y-5"
       style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
     >
-      <div className="flex items-center justify-between text-xs text-muted-foreground mb-3">
-        <span>Projekttitelbild</span>
-        <span>Geändert: {new Date(project.updatedAt).toLocaleDateString("de-DE")}</span>
+      <div>
+        <div className="flex items-center justify-between text-xs text-muted-foreground mb-3">
+          <span>Projekttitelbild</span>
+          <span>Geändert: {new Date(project.updatedAt).toLocaleDateString("de-DE")}</span>
+        </div>
+        <div className="rounded-xl overflow-hidden aspect-[16/9] relative group" style={{ background: "hsl(var(--surface-muted))" }}>
+          <img src={project.thumbnail} alt="" className="w-full h-full object-cover" />
+          <button
+            onClick={() => inputRef.current?.click()}
+            title="Titelbild ändern"
+            className="absolute top-3 right-3 h-8 w-8 rounded-full flex items-center justify-center shadow"
+            style={{ background: "hsl(var(--surface))", color: "hsl(var(--ink))" }}
+          >
+            <Pencil size={14} />
+          </button>
+          <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={handleThumb} />
+        </div>
       </div>
-      <div className="rounded-xl overflow-hidden aspect-[16/10] relative group" style={{ background: "hsl(var(--surface-muted))" }}>
-        <img src={project.thumbnail} alt="" className="w-full h-full object-cover" />
-        <button
-          onClick={() => inputRef.current?.click()}
-          title="Titelbild ändern"
-          className="absolute top-3 right-3 h-8 w-8 rounded-full flex items-center justify-center shadow"
-          style={{ background: "hsl(var(--surface))", color: "hsl(var(--ink))" }}
-        >
-          <Pencil size={14} />
-        </button>
-        <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={handleThumb} />
-      </div>
+
+      <div className="h-px" style={{ background: "hsl(var(--hairline))" }} />
+
+      <InlineEditableText
+        title="ERLÄUTERUNG — GESAMTPROJEKT"
+        value={project.konzept ?? ""}
+        placeholder="Konzept, Leitgedanke oder kurze Beschreibung des gesamten Projekts…"
+        onSave={(v) => projectStore.updateProject(project.id, { konzept: v })}
+      />
+
+      {mappe && (
+        <>
+          <div className="h-px" style={{ background: "hsl(var(--hairline))" }} />
+          <InlineEditableText
+            title={`ERLÄUTERUNG — ${mappe.name.toUpperCase()}`}
+            value={mappe.konzept ?? ""}
+            placeholder="Beschreibung dieser Projektmappe (ändert sich je nach ausgewählter Mappe)…"
+            onSave={(v) => projectStore.updateMappeKonzept(project.id, mappe.id, v)}
+          />
+        </>
+      )}
     </section>
   );
 }
+
+function InlineEditableText({ title, value, placeholder, onSave }: { title: string; value: string; placeholder: string; onSave: (v: string) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+  return (
+    <div>
+      <div className="flex items-center justify-between">
+        <div className="text-xs font-semibold tracking-[0.18em]" style={{ color: "hsl(var(--accent-gold))" }}>
+          {title}
+        </div>
+        {!editing && (
+          <button
+            onClick={() => { setDraft(value); setEditing(true); }}
+            className="text-muted-foreground hover:text-foreground"
+            title="Bearbeiten"
+          >
+            <Pencil size={13} />
+          </button>
+        )}
+      </div>
+      {editing ? (
+        <div className="mt-2 space-y-2">
+          <textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            rows={6}
+            className="w-full text-sm rounded-md border p-2 bg-transparent outline-none"
+            style={{ borderColor: "hsl(var(--hairline))" }}
+          />
+          <div className="flex gap-2 justify-end">
+            <button
+              onClick={() => setEditing(false)}
+              className="h-8 px-3 rounded-md border text-xs flex items-center gap-1"
+              style={{ borderColor: "hsl(var(--hairline))" }}
+            >
+              <X size={12} /> Abbrechen
+            </button>
+            <button
+              onClick={() => { onSave(draft); setEditing(false); }}
+              className="h-8 px-3 rounded-md text-xs font-medium flex items-center gap-1"
+              style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
+            >
+              <Check size={12} /> Speichern
+            </button>
+          </div>
+        </div>
+      ) : (
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground whitespace-pre-wrap min-h-[3em]">
+          {value || placeholder}
+        </p>
+      )}
+    </div>
+  );
+}
+
 
 /* ============================================================ Erläuterungen */
 
