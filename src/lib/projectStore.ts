@@ -435,13 +435,17 @@ export const projectStore = {
       ),
     }));
   },
-  addPage: (projectId: string) => {
+  addPage: (projectId: string, mappeId?: string) => {
     const newId = `${projectId}-p${Date.now().toString(36)}`;
     setState((s) => ({
       projects: s.projects.map((p) => {
         if (p.id !== projectId) return p;
         const n = p.pages.length + 1;
         const num = String(n).padStart(2, "0");
+        const targetMappe = mappeId || p.activeMappeId || p.mappen?.[0]?.id;
+        const mappen = (p.mappen ?? []).map((m) =>
+          m.id === targetMappe ? { ...m, pageIds: [...m.pageIds, newId] } : m
+        );
         return {
           ...p,
           updatedAt: new Date().toISOString(),
@@ -456,6 +460,7 @@ export const projectStore = {
               elements: [],
             },
           ],
+          mappen,
         };
       }),
     }));
