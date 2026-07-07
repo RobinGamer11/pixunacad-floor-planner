@@ -2078,6 +2078,8 @@ function ToolsTab({
               ? "Maus gedrückt halten → Freihand-Strich zeichnen. Lineal-Snap unterstützt."
               : activeTool === "eraser"
               ? "Maus gedrückt halten → radiert Linien und Freihand-Striche entlang Pfad."
+              : activeTool === "hatch"
+              ? "Modus im Panel wählen — Polygon: Klicks + Doppelklick · Rechteck: 3 Klicks · Kreis: Zentrum→Radius · Füllung: in Fläche klicken."
               : "Zwei Klicks setzen Start- und Endpunkt. ESC = abbrechen."}
           </div>
         )}
