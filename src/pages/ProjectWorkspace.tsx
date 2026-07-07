@@ -1985,6 +1985,8 @@ function ToolsTab({
             <div className="text-sm font-medium">
               {settingsTool === "guide" && "Hilfslinie"}
               {settingsTool === "line" && "Linie (CAD)"}
+              {settingsTool === "free" && "Freihand (CAD)"}
+              {settingsTool === "eraser" && "Radiergummi (CAD)"}
               {settingsTool === "text" && "Text (CAD)"}
               {settingsTool === "cad" && "CAD-Zeichenblatt"}
             </div>
@@ -2002,6 +2004,10 @@ function ToolsTab({
               ? "Klick auf die Seite, um Text einzufügen. ESC = abbrechen."
               : activeTool === "line"
               ? "Klicken setzt Punkte (Snap/Ortho/Hub wie in CAD). ESC = abbrechen."
+              : activeTool === "free"
+              ? "Maus gedrückt halten → Freihand-Strich zeichnen. Lineal-Snap unterstützt."
+              : activeTool === "eraser"
+              ? "Maus gedrückt halten → radiert Linien und Freihand-Striche entlang Pfad."
               : "Zwei Klicks setzen Start- und Endpunkt. ESC = abbrechen."}
           </div>
         )}
