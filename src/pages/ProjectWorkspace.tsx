@@ -2115,6 +2115,11 @@ function ToolsTab({
           <EraserSettingsPanel app={cadEngine} />
         </div>
       )}
+      {settingsTool === "hatch" && cadEngine && (
+        <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
+          <HatchSettingsPanel app={cadEngine} />
+        </div>
+      )}
       {cadSelectedLineSnap && onCadLineSnapChange && (
         <LineSnapSettings
           isGuide={cadSelectedLineSnap.isGuide}
