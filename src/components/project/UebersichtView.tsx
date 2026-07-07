@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef } from "react";
-import { Plus, Pencil, Check, X, Trash2, Settings2 } from "lucide-react";
+import { Plus, Pencil, Check, X, Trash2, Settings2, ArrowUp, ArrowDown } from "lucide-react";
 import { projectStore, type Project, type Task } from "@/lib/projectStore";
 
 interface Props {
@@ -62,6 +62,7 @@ function MappenPanel({ project, activeId, onSelect }: { project: Project; active
       }}
     >
       <div className="flex items-center gap-2 mb-3">
+        <span className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">PROJEKTMAPPEN</span>
         <button
           onClick={() => projectStore.addMappe(project.id, "Neue Mappe")}
           title="Neue Projektmappe"
@@ -69,15 +70,19 @@ function MappenPanel({ project, activeId, onSelect }: { project: Project; active
         >
           <Plus size={14} />
         </button>
-        <span className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">PROJEKTMAPPEN</span>
         <div className="flex-1" />
         <button
           onClick={() => setEditMode((v) => !v)}
-          title={editMode ? "Bearbeiten beenden" : "Bearbeiten"}
-          className="h-6 w-6 rounded-md flex items-center justify-center hover:bg-muted"
-          style={{ color: editMode ? "hsl(var(--accent-gold))" : "hsl(var(--ink-soft))" }}
+          title={editMode ? "Bearbeiten beenden" : "Mappen bearbeiten"}
+          className="h-7 px-2.5 rounded-md flex items-center gap-1.5 text-[11px] font-medium border transition"
+          style={{
+            color: editMode ? "hsl(var(--surface))" : "hsl(var(--ink))",
+            background: editMode ? "hsl(var(--accent-gold))" : "transparent",
+            borderColor: editMode ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
+          }}
         >
-          <Pencil size={13} />
+          <Pencil size={12} />
+          {editMode ? "Fertig" : "Bearbeiten"}
         </button>
       </div>
 
@@ -125,11 +130,27 @@ function MappenPanel({ project, activeId, onSelect }: { project: Project; active
                     <span className="flex-1 text-sm truncate">{m.name}</span>
                   )}
                   {editMode && !isRenaming && (
-                    <>
+                    <div className="flex items-center gap-0.5">
+                      <button
+                        disabled={mappen.indexOf(m) === 0}
+                        onClick={(e) => { e.stopPropagation(); projectStore.reorderMappe(project.id, m.id, -1); }}
+                        title="Nach oben"
+                        className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                        <ArrowUp size={12} />
+                      </button>
+                      <button
+                        disabled={mappen.indexOf(m) === mappen.length - 1}
+                        onClick={(e) => { e.stopPropagation(); projectStore.reorderMappe(project.id, m.id, 1); }}
+                        title="Nach unten"
+                        className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                        <ArrowDown size={12} />
+                      </button>
                       <button
                         onClick={(e) => { e.stopPropagation(); setRenamingId(m.id); setNameDraft(m.name); }}
                         title="Umbenennen"
-                        className="text-muted-foreground hover:text-foreground"
+                        className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted"
                       >
                         <Pencil size={12} />
                       </button>
@@ -142,12 +163,12 @@ function MappenPanel({ project, activeId, onSelect }: { project: Project; active
                             }
                           }}
                           title="Löschen"
-                          className="text-muted-foreground hover:text-foreground"
+                          className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-muted"
                         >
                           <Trash2 size={12} />
                         </button>
                       )}
-                    </>
+                    </div>
                   )}
                 </div>
               );
@@ -170,7 +191,7 @@ function ProjektinfoPanel({ project }: { project: Project }) {
       <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-3">
         PROJEKTINFO
       </div>
-      <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
+      <div className="space-y-3">
         <InfoRow label="Bauherr" value={project.bauherr || "—"} />
         <InfoRow label="Projektadresse" value={project.ort || "—"} />
         <InfoRow label="Projekttyp" value={project.projektTyp || "—"} />
@@ -188,9 +209,9 @@ function ProjektinfoPanel({ project }: { project: Project }) {
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-baseline justify-between gap-2 text-sm py-1 border-b" style={{ borderColor: "hsl(var(--hairline) / 0.5)" }}>
-      <span className="text-muted-foreground text-xs">{label}</span>
-      <span className="text-right truncate">{value}</span>
+    <div className="flex flex-col gap-0.5 pb-2 border-b" style={{ borderColor: "hsl(var(--hairline) / 0.5)" }}>
+      <span className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{label}</span>
+      <span className="text-sm break-words" style={{ color: "hsl(var(--ink))" }}>{value}</span>
     </div>
   );
 }
@@ -426,7 +447,7 @@ function HeroErlaeuterungPanel({
       <div className="h-px" style={{ background: "hsl(var(--hairline))" }} />
 
       <InlineEditableText
-        title="ERLÄUTERUNG — GESAMTPROJEKT"
+        title="KONZEPT — GESAMTPROJEKT"
         value={project.konzept ?? ""}
         placeholder="Konzept, Leitgedanke oder kurze Beschreibung des gesamten Projekts…"
         onSave={(v) => projectStore.updateProject(project.id, { konzept: v })}
@@ -436,7 +457,7 @@ function HeroErlaeuterungPanel({
         <>
           <div className="h-px" style={{ background: "hsl(var(--hairline))" }} />
           <InlineEditableText
-            title={`ERLÄUTERUNG — ${mappe.name.toUpperCase()}`}
+            title={`KONZEPT — ${mappe.name.toUpperCase()}`}
             value={mappe.konzept ?? ""}
             placeholder="Beschreibung dieser Projektmappe (ändert sich je nach ausgewählter Mappe)…"
             onSave={(v) => projectStore.updateMappeKonzept(project.id, mappe.id, v)}

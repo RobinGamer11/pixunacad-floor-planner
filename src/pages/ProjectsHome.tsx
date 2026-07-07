@@ -367,13 +367,6 @@ export default function ProjectsHome() {
                     <LayoutTemplate size={14} /> Vorlage+
                   </button>
                 )}
-                <button
-                  className="h-9 px-3 rounded-md text-sm font-medium flex items-center gap-2"
-                  style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
-                  onClick={() => navigate(`/project/${selected.id}`)}
-                >
-                  <Pencil size={14} /> Bearbeiten
-                </button>
               </div>
             </div>
 
