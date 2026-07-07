@@ -48,6 +48,7 @@ import {
   ChevronUp,
   ChevronDown,
   GripVertical,
+  Pipette,
 } from "lucide-react";
 
 import {
