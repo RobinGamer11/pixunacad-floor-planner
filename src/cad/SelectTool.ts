@@ -2018,7 +2018,7 @@ export class SelectTool {
             // Anker = (gesnapter) Welt-Klickpunkt. So lässt sich die PDF von jeder
             // Stelle aus verschieben/drehen/skalieren.
             const mouseW = v(input.mouse.wx, input.mouse.wy);
-            if (pointInDocument(mouseW, doc)) {
+            if (pointInDocumentVisible(mouseW, doc)) {
               const snap = this.app.topology.findBestSnap(v(input.mouse.sx, input.mouse.sy), mouseW);
               const anchor = (snap && snap.world) ? snap.world : mouseW;
               this.app.documentHubState = {
