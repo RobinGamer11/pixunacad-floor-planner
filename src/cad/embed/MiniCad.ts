@@ -1260,6 +1260,7 @@ export class MiniCad {
 
   refreshLabelUI() {
     this._changeDirty = true;
+    try { this.idPanel?.render(); } catch {}
     try { this.onLabelsChange?.(); } catch {}
   }
 
@@ -1269,6 +1270,37 @@ export class MiniCad {
   setActiveDrawLabelId(labelId: string) {
     this.activeDrawLabelId = labelId || Defaults.defaultLabelId;
     this.refreshLabelUI();
+  }
+
+  setSelectedLabelId(labelId: string | null) {
+    this.selectedLabelId = labelId || null;
+    try { (this.renderer as any).setSelectedLabelId?.(this.selectedLabelId); } catch {}
+    this.refreshLabelUI();
+  }
+
+  selectLabelGroup(labelId: string) {
+    this.setActiveDrawLabelId(labelId);
+    this.setSelectedLabelId(labelId);
+  }
+
+  /** Mount the imperativen IdPanel gegen ein DOM-Skeleton (analog CadApp). */
+  attachIdPanel(refs: {
+    root: HTMLDivElement;
+    body: HTMLDivElement;
+    list: HTMLDivElement;
+    addBtn: HTMLButtonElement;
+    toggleBtn: HTMLButtonElement;
+  }) {
+    if (this.idPanel) return;
+    this.idPanel = new IdPanel(this as any, refs.root, refs.body, refs.list, refs.addBtn, refs.toggleBtn);
+    this.idPanel.render();
+  }
+
+  detachIdPanel() {
+    // IdPanel hat kein destroy(); wir lösen einfach die Referenz.
+    // Event-Listener bleiben am (bald unmounteten) DOM hängen und werden mit
+    // dem Garbage-Collected DOM aufgeräumt.
+    this.idPanel = null;
   }
 
   getSelectedFreeStroke() {
