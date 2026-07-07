@@ -911,6 +911,28 @@ function AufgabenView({ project }: { project: Project }) {
             <Plus size={14} /> Hinzufügen
           </button>
         </div>
+        {/* Zeitstrahl-Position (Übersichts-Tab) */}
+        <div className="mt-4 pt-3 flex items-center gap-3 text-xs" style={{ borderTop: "1px solid hsl(var(--hairline))" }}>
+          <span className="text-muted-foreground">Zeitstrahl in Übersicht:</span>
+          {(["top", "bottom"] as const).map((pos) => {
+            const active = (project.settings?.timelinePosition ?? "bottom") === pos;
+            return (
+              <button
+                key={pos}
+                onClick={() => projectStore.updateProjectSettings(project.id, { timelinePosition: pos })}
+                className="h-7 px-3 rounded-md border"
+                style={{
+                  borderColor: active ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
+                  background: active ? "hsl(var(--accent-gold) / 0.12)" : "transparent",
+                  color: active ? "hsl(var(--ink))" : "hsl(var(--ink-soft))",
+                  fontWeight: active ? 600 : 400,
+                }}
+              >
+                {pos === "top" ? "Oben (über Projektmappen)" : "Unten (Standard)"}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Aufgabenliste */}
