@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useRef } from "react";
-import { Plus, Pencil, Check, X, Trash2, Settings2, ArrowUp, ArrowDown } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Plus, Pencil, Check, X, Trash2, Settings2, GripVertical } from "lucide-react";
 import { projectStore, type Project, type Task } from "@/lib/projectStore";
 
 interface Props {
