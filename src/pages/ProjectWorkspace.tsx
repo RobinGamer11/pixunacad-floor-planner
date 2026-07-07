@@ -2132,7 +2132,14 @@ function ToolsTab({
       {/* "Aktives Werkzeug"-Kopfzeile entfernt — der Nutzer weiß, welches
           Werkzeug er in der Rail angeklickt hat. */}
 
+      {/* Ebenen-Auswahl — bestimmt, in welche Ebene neu gezeichnete Objekte
+          landen. Analog zum "Ebene"-Dropdown in der CAD-Oberfläche. */}
+      {cadEngine && settingsTool && settingsTool !== "cad" && (
+        <EbeneSelect engine={cadEngine} />
+      )}
+
       {/* Per-tool settings */}
+
       {!activeTool && (
         <SelectSettings
           settings={toolSettings.select}
