@@ -758,6 +758,7 @@ export default function ProjectWorkspace() {
                   selectedElementId={selectedElementId}
                   zoom={zoom}
                   activeTool={activeTool}
+                  hatchDrawMode={hatchDrawMode}
                   toolSettings={toolSettings}
                   onCommitTool={() => setActiveTool(null)}
                   selectedElementIds={selectedElementIds}
