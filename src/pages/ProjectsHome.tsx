@@ -42,7 +42,6 @@ export default function ProjectsHome() {
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<Tab>("seiten");
   const [leftOpen, setLeftOpen] = useState(true);
-  const [rightOpen, setRightOpen] = useState(true);
   const [titleMenuOpen, setTitleMenuOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
