@@ -26,6 +26,7 @@ import { TextEditorOverlay } from "../TextEditorOverlay";
 import { SelectTool } from "../SelectTool";
 import { FreeDrawTool } from "../FreeDrawTool";
 import { EraserTool } from "../EraserTool";
+import { HatchTool, type HatchDrawMode } from "../HatchTool";
 import { Defaults, SelectionType } from "../constants";
 import type { TextBox, TextBoxStyle, FreeLineStyle } from "../Scene";
 import { drawRichTextBox } from "../textRichRenderer";
@@ -77,7 +78,7 @@ export interface MiniCadInit {
 }
 
 
-export type MiniTool = "line" | "text" | "select" | "guide" | "free" | "eraser" | null;
+export type MiniTool = "line" | "text" | "select" | "guide" | "free" | "eraser" | "hatch" | null;
 export type MiniCadSelectionInfo =
   | {
       tool: "line";
@@ -148,6 +149,7 @@ export class MiniCad {
   readonly selectTool: SelectTool;
   readonly freeDrawTool: FreeDrawTool;
   readonly eraserTool: EraserTool;
+  readonly hatchTool: HatchTool;
 
   // Stubs required by tools / editor.
   activeDrawLabelId = Defaults.defaultLabelId;
@@ -170,6 +172,13 @@ export class MiniCad {
   // Radiergummi-Defaults.
   defaultEraserRadiusM: number = Defaults.eraserRadiusM;
   defaultEraserStrength: number = Defaults.eraserStrength;
+
+  // Schraffur-Defaults (analog CadApp).
+  defaultHatchFillColor: string = Defaults.hatchFillColor;
+  defaultHatchStrokeColor: string = Defaults.hatchStrokeColor;
+  defaultHatchStrokeWidthPx: number = Defaults.hatchStrokePx;
+  defaultHatchFillAlphaPct: number = Defaults.hatchFillAlphaPct;
+  defaultAreaShow: boolean = Defaults.areaShow;
 
   /** Optionaler Callback für React-Panels (Bezeichnungen/Ausgewählter-Stroke-Refresh). */
   onLabelsChange?: () => void;
@@ -305,6 +314,7 @@ export class MiniCad {
     this.selectTool = new SelectTool(this as any);
     this.freeDrawTool = new FreeDrawTool(this as any);
     this.eraserTool = new EraserTool(this as any);
+    this.hatchTool = new HatchTool(this as any);
 
     // Wire PointEditMenu activation identisch zur CadApp-Oberfläche.
     this.pointEditMenu.bindActivate((action) => {
@@ -637,6 +647,7 @@ export class MiniCad {
     if (this._activeTool === "select") this.selectTool.cancel();
     if (this._activeTool === "free") this.freeDrawTool.cancel();
     if (this._activeTool === "eraser") this.eraserTool.cancel();
+    if (this._activeTool === "hatch") this.hatchTool.cancel();
     this._activeTool = tool;
     this.activeTool = null;
     // Guide-Modus aktivieren/deaktivieren — wirkt auf den createSegment-Interceptor.
@@ -655,6 +666,9 @@ export class MiniCad {
     } else if (tool === "eraser") {
       this.eraserTool.activate();
       this.activeTool = this.eraserTool as any;
+    } else if (tool === "hatch") {
+      this.hatchTool.activate();
+      this.activeTool = this.hatchTool as any;
     }
   }
 
@@ -891,6 +905,18 @@ export class MiniCad {
         imageSpacingM: s.imageSpacingM,
         imageRotateAlongPath: s.imageRotateAlongPath,
       })),
+
+      hatches: this.scene.hatches.map((h) => ({
+        id: h.id,
+        points: h.points.map((p) => ({ x: p.x, y: p.y })),
+        holes: Array.isArray(h.holes) ? h.holes.map((loop) => loop.map((p) => ({ x: p.x, y: p.y }))) : undefined,
+        fillColor: h.fillColor,
+        strokeColor: h.strokeColor,
+        fillAlphaPct: h.fillAlphaPct,
+        strokeWidthPx: h.strokeWidthPx,
+        labelId: h.labelId,
+        areaLabel: h.areaLabel ? { ...h.areaLabel } : undefined,
+      })),
     };
   }
 
@@ -945,6 +971,19 @@ export class MiniCad {
             imageSpacingM: s.imageSpacingM, imageRotateAlongPath: s.imageRotateAlongPath,
           });
         } catch (e) { console.error("MiniCad restore freeStroke:", e); }
+      }
+    }
+    if (Array.isArray(data.hatches)) {
+      for (const h of data.hatches) {
+        try {
+          this.scene.createHatch(h.points || [], {
+            holes: h.holes,
+            fillColor: h.fillColor, strokeColor: h.strokeColor,
+            fillAlphaPct: h.fillAlphaPct, strokeWidthPx: h.strokeWidthPx,
+            labelId: h.labelId || Defaults.defaultLabelId,
+            areaLabel: h.areaLabel,
+          });
+        } catch (e) { console.error("MiniCad restore hatch:", e); }
       }
     }
   }
@@ -1157,6 +1196,42 @@ export class MiniCad {
   getSelectedHatch() {
     if (!this.selection || !this.selection.hatchId) return null;
     return this.scene.getHatchById(this.selection.hatchId);
+  }
+
+  /** Für getCurrentHatchStyle — im Embed nutzen wir keine Gruppen-Auswahl. */
+  getSelectedGroupHatches(): any[] { return []; }
+
+  getCurrentHatchStyle() {
+    const sel = this.getSelectedHatch();
+    if (sel) {
+      return {
+        fillColor: sel.fillColor || this.defaultHatchFillColor,
+        strokeColor: sel.strokeColor || this.defaultHatchStrokeColor,
+        fillAlphaPct: sel.fillAlphaPct ?? this.defaultHatchFillAlphaPct,
+        strokeWidthPx: (typeof sel.strokeWidthPx === "number") ? sel.strokeWidthPx : this.defaultHatchStrokeWidthPx,
+        labelId: sel.labelId || Defaults.defaultLabelId,
+        areaLabel: {
+          show: !!sel.areaLabel?.show,
+          textColor: sel.areaLabel?.textColor || Defaults.areaTextColor,
+          fontSizePx: sel.areaLabel?.fontSizePx ?? Defaults.areaFontSizePx,
+          bgColor: sel.areaLabel?.bgColor || Defaults.areaBgColor,
+          bgAlphaPct: sel.areaLabel?.bgAlphaPct ?? Defaults.areaBgAlphaPct,
+          offsetX: sel.areaLabel?.offsetX || 0,
+          offsetY: sel.areaLabel?.offsetY || 0,
+        } as any,
+      };
+    }
+    return {
+      fillColor: this.defaultHatchFillColor,
+      strokeColor: this.defaultHatchStrokeColor,
+      fillAlphaPct: this.defaultHatchFillAlphaPct,
+      strokeWidthPx: this.defaultHatchStrokeWidthPx,
+      labelId: this.activeDrawLabelId || Defaults.defaultLabelId,
+      areaLabel: {
+        show: this.defaultAreaShow, textColor: Defaults.areaTextColor, fontSizePx: Defaults.areaFontSizePx,
+        bgColor: Defaults.areaBgColor, bgAlphaPct: Defaults.areaBgAlphaPct, offsetX: 0, offsetY: 0,
+      } as any,
+    };
   }
 
   getSelectedDimension() { return null; }
@@ -1664,6 +1739,7 @@ export class MiniCad {
       else if (this._activeTool === "select") this.selectTool.update(this.input);
       else if (this._activeTool === "free") this.freeDrawTool.update(this.input);
       else if (this._activeTool === "eraser") this.eraserTool.update(this.input);
+      else if (this._activeTool === "hatch") this.hatchTool.update(this.input);
 
       // Multi-Select Group-Move: nach SelectTool-Update das Delta des Primary
       // auf die Snapshot-Positionen der Extras anwenden.

@@ -50,6 +50,10 @@ import {
   GripVertical,
   Pipette,
   Eraser,
+  Spline,
+  RectangleHorizontal,
+  Circle as CircleIcon,
+  PaintBucket,
 } from "lucide-react";
 
 import {
@@ -66,8 +70,10 @@ import CadOverlayLayer from "@/components/page/CadOverlayLayer";
 import { PdfPageView } from "@/components/page/PdfPageView";
 import { importFile } from "@/cad/documentImport";
 import type { MiniCadSelectionInfo } from "@/cad/embed/MiniCad";
+import type { HatchDrawMode } from "@/cad/HatchTool";
 import { FreeDrawSettingsPanel } from "@/components/cad/FreeDrawSettingsPanel";
 import { EraserSettingsPanel } from "@/components/cad/EraserSettingsPanel";
+import { HatchSettingsPanel } from "@/components/cad/HatchSettingsPanel";
 import { WorkspaceHeader } from "@/components/workspace/WorkspaceHeader";
 
 const FORMAT_SIZES: Record<PageFormat, { w: number; h: number; label: string }> = {
@@ -78,13 +84,20 @@ const FORMAT_SIZES: Record<PageFormat, { w: number; h: number; label: string }> 
   frei: { w: 400, h: 300, label: "Freies Format" },
 };
 
-export type PageTool = "guide" | "line" | "free" | "eraser" | "text" | "cad" | "pipette" | null;
+export type PageTool = "guide" | "line" | "free" | "eraser" | "text" | "cad" | "pipette" | "hatch" | null;
 type LinePageTool = "line" | "free" | "eraser";
 
 const LINE_TOOL_VARIANTS: Array<{ id: LinePageTool; label: string; icon: React.ElementType }> = [
   { id: "line", label: "Linie", icon: Minus },
   { id: "free", label: "Freihand", icon: Pencil },
   { id: "eraser", label: "Radiergummi", icon: Eraser },
+];
+
+const HATCH_MODE_VARIANTS: Array<{ id: HatchDrawMode; label: string; icon: React.ElementType }> = [
+  { id: "polygon", label: "Polygon", icon: Spline },
+  { id: "rectangle", label: "Rechteck", icon: RectangleHorizontal },
+  { id: "circle", label: "Kreis", icon: CircleIcon },
+  { id: "fill", label: "Füllung", icon: PaintBucket },
 ];
 
 const isLinePageTool = (tool: PageTool): tool is LinePageTool =>
