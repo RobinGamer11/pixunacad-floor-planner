@@ -69,6 +69,7 @@ import {
 } from "@/lib/projectStore";
 import CadOverlayLayer from "@/components/page/CadOverlayLayer";
 import { CadDocumentInspector } from "@/components/page/CadDocumentInspector";
+import { CadIdPanelHost } from "@/components/page/CadIdPanelHost";
 import { PdfPageView } from "@/components/page/PdfPageView";
 import { importFile } from "@/cad/documentImport";
 import type { MiniCadSelectionInfo } from "@/cad/embed/MiniCad";
@@ -445,10 +446,10 @@ export default function ProjectWorkspace() {
             }
           }}
         />
-        <ToolRailButton icon={<TableIcon size={18} />} label="Tabelle" />
+        <ToolRailButton icon={<TableIcon size={18} />} label="Tabelle" disabled />
         <ToolRailButton icon={<StickyNote size={18} />} label="Notiz" />
-        <ToolRailButton icon={<Clock size={18} />} label="Zeitstrahl" />
-        <ToolRailButton icon={<Shapes size={18} />} label="Formen" />
+        <ToolRailButton icon={<Clock size={18} />} label="Zeitstrahl" disabled />
+        <ToolRailButton icon={<Shapes size={18} />} label="Formen" disabled />
         <div className="mt-auto flex flex-col items-center gap-1">
           <ToolRailButton icon={<LayersIcon size={18} />} label="Ebenen" onClick={() => setRightTab("layers")} />
           <ToolRailButton icon={<LayoutTemplate size={18} />} label="Vorlagen" />
@@ -888,6 +889,7 @@ function ToolRailButton({
   accent,
   onClick,
   showLabel,
+  disabled,
 }: {
   icon: React.ReactNode;
   label: string;
@@ -895,19 +897,25 @@ function ToolRailButton({
   accent?: boolean;
   onClick?: () => void;
   showLabel?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <button
-      onClick={onClick}
-      title={label}
+      onClick={disabled ? undefined : onClick}
+      title={disabled ? `${label} — noch nicht verfügbar` : label}
+      disabled={disabled}
       className="cad-rail-btn"
       style={{
         background: active ? "hsl(var(--surface-muted))" : "transparent",
-        color: accent
+        color: disabled
+          ? "hsl(0 0% 75%)"
+          : accent
           ? "hsl(var(--accent-gold))"
           : active
           ? "hsl(var(--accent-gold))"
           : "hsl(var(--ink-soft))",
+        cursor: disabled ? "not-allowed" : undefined,
+        opacity: disabled ? 0.55 : undefined,
       }}
     >
       {icon}
@@ -1872,12 +1880,21 @@ function RightInspector({
           />
         )}
         {tab === "layers" && page && (
-          <LayersTab
-            projectId={projectId}
-            page={page}
-            selectedElementId={selectedElementId}
-            setSelectedElementId={setSelectedElementId}
-          />
+          <div className="space-y-4">
+            {/* CAD-Ebenen (Bezeichnungs-ID) — 1:1 wie in der CAD-Oberfläche.
+                Verwaltet alle CAD-Objekte (Linien, Schraffuren, Texte,
+                Freihand, Dokumente, Wände, Maßketten) per Layer/Sichtbarkeit. */}
+            {cadEngine && <CadIdPanelHost engine={cadEngine} />}
+
+            {/* Projektmappen-Elemente (Notizen, Bilder, CAD-Blätter, …) —
+                Z-Order + Sichtbarkeit auf React-Ebene. */}
+            <LayersTab
+              projectId={projectId}
+              page={page}
+              selectedElementId={selectedElementId}
+              setSelectedElementId={setSelectedElementId}
+            />
+          </div>
         )}
       </div>
     </aside>
@@ -2112,50 +2129,8 @@ function ToolsTab({
   const settingsTool = activeTool ?? selectedCadTool ?? null;
   return (
     <div className="space-y-5">
-      {/* Active tool header */}
-      <div>
-        <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-3">
-          AKTIVES WERKZEUG
-        </div>
-        {!settingsTool ? (
-          <div className="text-xs text-muted-foreground">
-            Auswahlwerkzeug aktiv — klicke ein Objekt zum Auswählen. Mit <kbd className="px-1 rounded border" style={{ borderColor: "hsl(var(--hairline))" }}>Shift</kbd>-Klick mehrere Objekte gleichzeitig auswählen.
-          </div>
-        ) : (
-          <div className="flex items-center justify-between rounded-md border px-3 py-2" style={{ borderColor: "hsl(var(--hairline))" }}>
-            <div className="text-sm font-medium">
-              {settingsTool === "guide" && "Hilfslinie"}
-              {settingsTool === "line" && "Linie (CAD)"}
-              {settingsTool === "free" && "Freihand (CAD)"}
-              {settingsTool === "eraser" && "Radiergummi (CAD)"}
-              {settingsTool === "hatch" && "Schraffur (CAD)"}
-              {settingsTool === "text" && "Text (CAD)"}
-              {settingsTool === "cad" && "CAD-Zeichenblatt"}
-            </div>
-            <button
-              onClick={() => setActiveTool(null)}
-              className="text-[11px] text-muted-foreground hover:text-foreground"
-            >
-              Beenden
-            </button>
-          </div>
-        )}
-        {activeTool && activeTool !== "cad" && (
-          <div className="mt-2 text-[11px] text-muted-foreground">
-            {activeTool === "text"
-              ? "Klick auf die Seite, um Text einzufügen. ESC = abbrechen."
-              : activeTool === "line"
-              ? "Klicken setzt Punkte (Snap/Ortho/Hub wie in CAD). ESC = abbrechen."
-              : activeTool === "free"
-              ? "Maus gedrückt halten → Freihand-Strich zeichnen. Lineal-Snap unterstützt."
-              : activeTool === "eraser"
-              ? "Maus gedrückt halten → radiert Linien und Freihand-Striche entlang Pfad."
-              : activeTool === "hatch"
-              ? "Modus im Panel wählen — Polygon: Klicks + Doppelklick · Rechteck: 3 Klicks · Kreis: Zentrum→Radius · Füllung: in Fläche klicken."
-              : "Zwei Klicks setzen Start- und Endpunkt. ESC = abbrechen."}
-          </div>
-        )}
-      </div>
+      {/* "Aktives Werkzeug"-Kopfzeile entfernt — der Nutzer weiß, welches
+          Werkzeug er in der Rail angeklickt hat. */}
 
       {/* Per-tool settings */}
       {!activeTool && (

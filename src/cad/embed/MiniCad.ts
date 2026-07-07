@@ -16,6 +16,7 @@ import { Camera } from "../Camera";
 import { Scene } from "../Scene";
 import { Input } from "../Input";
 import { LabelManager } from "../LabelManager";
+import { IdPanel } from "../IdPanel";
 import { TopologyEngine } from "../TopologyEngine";
 import { Renderer, type Selection } from "../Renderer";
 import { LineHub } from "../LineHub";
@@ -159,6 +160,10 @@ export class MiniCad {
 
   // Stubs required by tools / editor.
   activeDrawLabelId = Defaults.defaultLabelId;
+  /** Aktive Ebenen-Auswahl (mirror of CadApp.selectedLabelId). */
+  selectedLabelId: string | null = null;
+  /** Optional imperativer IdPanel-Adapter (wenn CadOverlayLayer refs bereitstellt). */
+  idPanel: IdPanel | null = null;
   defaultLineColor: string;
   defaultLineThicknessM: number;
   /** 0..1 (1 = vollständig deckend). */
@@ -889,6 +894,7 @@ export class MiniCad {
     const f = this._strokeFactor || 1;
     return {
       version: 4,
+      labels: this.labelManager.list(),
       segments: this.scene.segments
         .filter((s) => s.labelId !== this._frameLabelId && s.labelId !== this._extRectLabelId)
         .map((s) => ({
@@ -975,6 +981,9 @@ export class MiniCad {
 
   private _restore(data: any) {
     if (!data) return;
+    if (Array.isArray(data.labels) && data.labels.length > 0) {
+      try { this.labelManager.restore(data.labels); } catch {}
+    }
     const f = this._strokeFactor || 1;
     // Vor v3 wurden Strichbreiten bereits intern (in der alten,
     // überdimensionierten Skala) gespeichert → nicht erneut skalieren.
@@ -1255,6 +1264,7 @@ export class MiniCad {
 
   refreshLabelUI() {
     this._changeDirty = true;
+    try { this.idPanel?.render(); } catch {}
     try { this.onLabelsChange?.(); } catch {}
   }
 
@@ -1264,6 +1274,37 @@ export class MiniCad {
   setActiveDrawLabelId(labelId: string) {
     this.activeDrawLabelId = labelId || Defaults.defaultLabelId;
     this.refreshLabelUI();
+  }
+
+  setSelectedLabelId(labelId: string | null) {
+    this.selectedLabelId = labelId || null;
+    try { (this.renderer as any).setSelectedLabelId?.(this.selectedLabelId); } catch {}
+    this.refreshLabelUI();
+  }
+
+  selectLabelGroup(labelId: string) {
+    this.setActiveDrawLabelId(labelId);
+    this.setSelectedLabelId(labelId);
+  }
+
+  /** Mount the imperativen IdPanel gegen ein DOM-Skeleton (analog CadApp). */
+  attachIdPanel(refs: {
+    root: HTMLDivElement;
+    body: HTMLDivElement;
+    list: HTMLDivElement;
+    addBtn: HTMLButtonElement;
+    toggleBtn: HTMLButtonElement;
+  }) {
+    if (this.idPanel) return;
+    this.idPanel = new IdPanel(this as any, refs.root, refs.body, refs.list, refs.addBtn, refs.toggleBtn);
+    this.idPanel.render();
+  }
+
+  detachIdPanel() {
+    // IdPanel hat kein destroy(); wir lösen einfach die Referenz.
+    // Event-Listener bleiben am (bald unmounteten) DOM hängen und werden mit
+    // dem Garbage-Collected DOM aufgeräumt.
+    this.idPanel = null;
   }
 
   getSelectedFreeStroke() {
