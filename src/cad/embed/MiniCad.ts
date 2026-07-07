@@ -155,6 +155,7 @@ export class MiniCad {
   readonly freeDrawTool: FreeDrawTool;
   readonly eraserTool: EraserTool;
   readonly hatchTool: HatchTool;
+  readonly documentTool: DocumentTool;
 
   // Stubs required by tools / editor.
   activeDrawLabelId = Defaults.defaultLabelId;
