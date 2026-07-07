@@ -550,7 +550,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       if (saved) (app as any)._restoreScene?.(saved);
     } catch (e) { console.error("CAD restore failed:", e); }
 
-    app.onHistoryChange = (u, r) => { setCanUndo(u); setCanRedo(r); persist(); };
+    app.onHistoryChange = (u, r) => { setCanUndo(u); setCanRedo(r); onHistoryChange?.(u, r); persist(); };
     // Periodischer Fallback (Sheet-Renames etc. pushen keine History).
     const persistTimer = window.setInterval(persist, 4000);
     app.onStickersChange = () => setStickers([...app.stickers]);
