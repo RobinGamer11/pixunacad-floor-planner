@@ -2641,14 +2641,14 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       ) : (
         <div
           className="w-7 shrink-0 border-l flex items-start justify-center pt-3"
-          style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))", display: printOpen ? "none" : "flex" }}
+          style={{ borderColor: "hsl(var(--hairline))", display: printOpen ? "none" : "flex" }}
         >
           <button
             onClick={() => setRightOpen(true)}
             title="Panel einblenden"
             className="h-7 w-7 rounded-md flex items-center justify-center hover:bg-muted"
           >
-            <PanelRightOpen size={14} className="text-muted-foreground" />
+            <PanelRightOpen size={14} style={{ color: "hsl(var(--ink-soft))" }} />
           </button>
         </div>
       )}
