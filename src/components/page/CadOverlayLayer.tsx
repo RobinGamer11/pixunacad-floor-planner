@@ -11,6 +11,7 @@ import { useEffect, useRef, useState } from "react";
 import { Move, RotateCw, Crosshair, Scaling } from "lucide-react";
 import { MiniCad, type MiniTool } from "@/cad/embed/MiniCad";
 import type { MiniCadSelectionInfo } from "@/cad/embed/MiniCad";
+import type { HatchDrawMode } from "@/cad/HatchTool";
 import { PointEditAction } from "@/cad/constants";
 
 export type ExternalDocSpec = {
@@ -68,6 +69,8 @@ interface Props {
   textBorderEnabled?: boolean;
   textBorderColor?: string;
   textBorderWidthPx?: number;
+
+  hatchDrawMode?: HatchDrawMode;
 }
 
 export default function CadOverlayLayer(props: Props) {
@@ -78,6 +81,7 @@ export default function CadOverlayLayer(props: Props) {
     lineColor, lineThicknessMm, lineAlpha, guideColor, guidesLocked, multiSelectMode,
     textColor, textFontSizePx, textBold, textItalic, textAlpha, textAlign,
     textBgColor, textBgAlphaPct, textWrap, textAutoSize, textBorderEnabled, textBorderColor, textBorderWidthPx,
+    hatchDrawMode,
   } = props;
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -194,6 +198,9 @@ export default function CadOverlayLayer(props: Props) {
 
   useEffect(() => { engineRef.current?.applyZoom(zoom); }, [zoom]);
   useEffect(() => { engineRef.current?.setActiveTool(activeTool); }, [activeTool]);
+  useEffect(() => {
+    if (hatchDrawMode) engineRef.current?.hatchTool.setDrawMode(hatchDrawMode);
+  }, [hatchDrawMode, activeTool]);
   useEffect(() => {
     if (typeof pageMarginsMm === "number") engineRef.current?.setPageMargins(pageMarginsMm);
   }, [pageMarginsMm]);

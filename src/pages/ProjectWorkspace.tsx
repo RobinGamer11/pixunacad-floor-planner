@@ -50,6 +50,10 @@ import {
   GripVertical,
   Pipette,
   Eraser,
+  Spline,
+  RectangleHorizontal,
+  Circle as CircleIcon,
+  PaintBucket,
 } from "lucide-react";
 
 import {
@@ -66,8 +70,10 @@ import CadOverlayLayer from "@/components/page/CadOverlayLayer";
 import { PdfPageView } from "@/components/page/PdfPageView";
 import { importFile } from "@/cad/documentImport";
 import type { MiniCadSelectionInfo } from "@/cad/embed/MiniCad";
+import type { HatchDrawMode } from "@/cad/HatchTool";
 import { FreeDrawSettingsPanel } from "@/components/cad/FreeDrawSettingsPanel";
 import { EraserSettingsPanel } from "@/components/cad/EraserSettingsPanel";
+import { HatchSettingsPanel } from "@/components/cad/HatchSettingsPanel";
 import { WorkspaceHeader } from "@/components/workspace/WorkspaceHeader";
 
 const FORMAT_SIZES: Record<PageFormat, { w: number; h: number; label: string }> = {
@@ -78,13 +84,20 @@ const FORMAT_SIZES: Record<PageFormat, { w: number; h: number; label: string }> 
   frei: { w: 400, h: 300, label: "Freies Format" },
 };
 
-export type PageTool = "guide" | "line" | "free" | "eraser" | "text" | "cad" | "pipette" | null;
+export type PageTool = "guide" | "line" | "free" | "eraser" | "text" | "cad" | "pipette" | "hatch" | null;
 type LinePageTool = "line" | "free" | "eraser";
 
 const LINE_TOOL_VARIANTS: Array<{ id: LinePageTool; label: string; icon: React.ElementType }> = [
   { id: "line", label: "Linie", icon: Minus },
   { id: "free", label: "Freihand", icon: Pencil },
   { id: "eraser", label: "Radiergummi", icon: Eraser },
+];
+
+const HATCH_MODE_VARIANTS: Array<{ id: HatchDrawMode; label: string; icon: React.ElementType }> = [
+  { id: "polygon", label: "Polygon", icon: Spline },
+  { id: "rectangle", label: "Rechteck", icon: RectangleHorizontal },
+  { id: "circle", label: "Kreis", icon: CircleIcon },
+  { id: "fill", label: "Füllung", icon: PaintBucket },
 ];
 
 const isLinePageTool = (tool: PageTool): tool is LinePageTool =>
@@ -115,6 +128,8 @@ export default function ProjectWorkspace() {
   const [cadSelectedLineSnap, setCadSelectedLineSnap] = useState<{ midpoint: boolean; division: number | null; isGuide: boolean } | null>(null);
   const [lineToolVariant, setLineToolVariant] = useState<LinePageTool>("line");
   const [lineToolFlyoutOpen, setLineToolFlyoutOpen] = useState(false);
+  const [hatchDrawMode, setHatchDrawMode] = useState<HatchDrawMode>("polygon");
+  const [hatchToolFlyoutOpen, setHatchToolFlyoutOpen] = useState(false);
   const cadEngineApiRef = useRef<{
     setSelectedSegmentSnap: (opts: { midpointSnap?: boolean; divisionSnap?: number | null }) => void;
     duplicateSelectedSegments: (offsetMm?: number) => number;
@@ -143,6 +158,7 @@ export default function ProjectWorkspace() {
     setActiveTool(t);
     if (isLinePageTool(t)) setLineToolVariant(t);
     if (!isLinePageTool(t)) setLineToolFlyoutOpen(false);
+    if (t !== "hatch") setHatchToolFlyoutOpen(false);
     if (t) setSelectedCadTool(undefined);
     if (t) setRightTabState("tools");
   };
@@ -150,6 +166,11 @@ export default function ProjectWorkspace() {
   const activateLineTool = (tool: LinePageTool) => {
     setLineToolVariant(tool);
     setActiveToolAndTab(tool);
+  };
+
+  const activateHatchTool = (mode: HatchDrawMode) => {
+    setHatchDrawMode(mode);
+    setActiveToolAndTab("hatch");
   };
 
   // Per-tool settings (live in workspace state; persist could come later).
@@ -319,12 +340,49 @@ export default function ProjectWorkspace() {
             </div>
           )}
         </div>
-        <ToolRailButton
-          icon={<Hash size={18} />}
-          label="Schraffur"
-          showLabel
-          onClick={() => navigate(`/project/${project.id}/cad`)}
-        />
+        <div className="relative w-full flex justify-center">
+          <ToolRailButton
+            icon={<Hash size={18} />}
+            label="Schraffur"
+            active={activeTool === "hatch"}
+            onClick={() => {
+              if (activeTool !== "hatch") {
+                activateHatchTool(hatchDrawMode);
+                setHatchToolFlyoutOpen(true);
+              } else {
+                setHatchToolFlyoutOpen((open) => !open);
+              }
+              setRightTabState("tools");
+            }}
+            showLabel
+          />
+          {hatchToolFlyoutOpen && (
+            <div
+              className="absolute top-0 left-full ml-1 flex flex-col gap-0.5 p-1 rounded-lg shadow-lg z-40"
+              style={{
+                background: "hsl(var(--surface-card))",
+                border: "1px solid hsl(var(--hairline))",
+              }}
+            >
+              {HATCH_MODE_VARIANTS.map((variant) => {
+                const Icon = variant.icon;
+                return (
+                  <ToolRailButton
+                    key={variant.id}
+                    icon={<Icon size={18} />}
+                    label={variant.label}
+                    active={activeTool === "hatch" && hatchDrawMode === variant.id}
+                    onClick={() => {
+                      activateHatchTool(variant.id);
+                      setHatchToolFlyoutOpen(false);
+                    }}
+                    showLabel
+                  />
+                );
+              })}
+            </div>
+          )}
+        </div>
         <ToolRailButton
           icon={<FileText size={18} />}
           label="PDF einfügen"
@@ -700,6 +758,7 @@ export default function ProjectWorkspace() {
                   selectedElementId={selectedElementId}
                   zoom={zoom}
                   activeTool={activeTool}
+                  hatchDrawMode={hatchDrawMode}
                   toolSettings={toolSettings}
                   onCommitTool={() => setActiveTool(null)}
                   selectedElementIds={selectedElementIds}
@@ -925,6 +984,7 @@ function PageCanvas({
   onSelect,
   onCadSelectionChange,
   onCadEngineReady,
+  hatchDrawMode,
 }: {
   projectId: string;
   page: import("@/lib/projectStore").ProjectPage;
@@ -939,6 +999,7 @@ function PageCanvas({
   onSelect: (id?: string, opts?: { shift?: boolean }) => void;
   onCadSelectionChange: (info: MiniCadSelectionInfo | null, count?: number) => void;
   onCadEngineReady?: (api: { setSelectedSegmentSnap: (opts: { midpointSnap?: boolean; divisionSnap?: number | null }) => void; duplicateSelectedSegments: (offsetMm?: number) => number; engine: import("@/cad/embed/MiniCad").MiniCad }) => void;
+  hatchDrawMode?: HatchDrawMode;
 }) {
 
   const fmt = FORMAT_SIZES[page.format];
@@ -1200,10 +1261,12 @@ function PageCanvas({
             : activeTool === "guide" ? "guide"
             : activeTool === "free" ? "free"
             : activeTool === "eraser" ? "eraser"
+            : activeTool === "hatch" ? "hatch"
             : activeTool === null ? "select"
             : null
           }
-          enabled={activeTool === "line" || activeTool === "text" || activeTool === "guide" || activeTool === "free" || activeTool === "eraser" || activeTool === null}
+          hatchDrawMode={hatchDrawMode}
+          enabled={activeTool === "line" || activeTool === "text" || activeTool === "guide" || activeTool === "free" || activeTool === "eraser" || activeTool === "hatch" || activeTool === null}
           initialState={page.cadOverlay}
           lineColor={activeTool === "guide" ? toolSettings.guide.color : toolSettings.line.color}
           lineThicknessMm={activeTool === "guide" ? Math.max(0.1, toolSettings.guide.strokeWidth * 0.2) : toolSettings.line.thicknessMm}
@@ -1993,6 +2056,7 @@ function ToolsTab({
               {settingsTool === "line" && "Linie (CAD)"}
               {settingsTool === "free" && "Freihand (CAD)"}
               {settingsTool === "eraser" && "Radiergummi (CAD)"}
+              {settingsTool === "hatch" && "Schraffur (CAD)"}
               {settingsTool === "text" && "Text (CAD)"}
               {settingsTool === "cad" && "CAD-Zeichenblatt"}
             </div>
@@ -2014,6 +2078,8 @@ function ToolsTab({
               ? "Maus gedrückt halten → Freihand-Strich zeichnen. Lineal-Snap unterstützt."
               : activeTool === "eraser"
               ? "Maus gedrückt halten → radiert Linien und Freihand-Striche entlang Pfad."
+              : activeTool === "hatch"
+              ? "Modus im Panel wählen — Polygon: Klicks + Doppelklick · Rechteck: 3 Klicks · Kreis: Zentrum→Radius · Füllung: in Fläche klicken."
               : "Zwei Klicks setzen Start- und Endpunkt. ESC = abbrechen."}
           </div>
         )}
@@ -2047,6 +2113,11 @@ function ToolsTab({
       {settingsTool === "eraser" && cadEngine && (
         <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
           <EraserSettingsPanel app={cadEngine} />
+        </div>
+      )}
+      {settingsTool === "hatch" && cadEngine && (
+        <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
+          <HatchSettingsPanel app={cadEngine} />
         </div>
       )}
       {cadSelectedLineSnap && onCadLineSnapChange && (
