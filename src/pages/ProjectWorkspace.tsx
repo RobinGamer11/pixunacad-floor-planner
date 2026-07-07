@@ -181,7 +181,7 @@ export default function ProjectWorkspace() {
     guide: { color: "#7DD3FC", strokeWidth: 1, locked: false },
     line: { color: "#111111", thicknessMm: 0.5, alpha: 100 },
     text: {
-      fontSize: 16,
+      fontSize: 11,
       color: "#111111",
       bold: false,
       italic: false,
@@ -2471,45 +2471,50 @@ function TextSettings({
   return (
     <SettingsBlock title="TEXT">
       <Row label="Modus">
-        <div className="flex flex-col gap-1 w-full">
-          <label className="flex items-start gap-2 text-xs cursor-pointer">
-            <input
-              type="radio"
-              name="text-mode"
-              checked={settings.autoSize !== false}
-              onChange={() => onChange({ autoSize: true })}
-              className="mt-0.5"
-            />
-            <span>Rahmen passt sich Text an</span>
-          </label>
-          <label className="flex items-start gap-2 text-xs cursor-pointer">
-            <input
-              type="radio"
-              name="text-mode"
-              checked={settings.autoSize === false}
-              onChange={() => onChange({ autoSize: false, wrap: true })}
-              className="mt-0.5"
-            />
-            <span>Rahmen zeichnen — Text passt sich an</span>
-          </label>
+        <select
+          value={settings.autoSize === false ? "frame" : "auto"}
+          onChange={(e) => {
+            if (e.target.value === "frame") onChange({ autoSize: false, wrap: true });
+            else onChange({ autoSize: true, wrap: true });
+          }}
+          className="w-full h-8 px-2 rounded bg-transparent border text-xs"
+          style={{ borderColor: "hsl(var(--hairline))" }}
+        >
+          <option value="auto">Rahmen passt sich an</option>
+          <option value="frame">Rahmen zeichnen</option>
+        </select>
+      </Row>
+      <Row label="Ausrichtung">
+        <div className="flex gap-1">
+          {(["left", "center", "right"] as const).map((a) => (
+            <button
+              key={a}
+              onClick={() => onChange({ align: a })}
+              className="h-8 flex-1 rounded border text-xs"
+              style={{
+                borderColor: "hsl(var(--hairline))",
+                background: settings.align === a ? "hsl(var(--accent-gold-soft))" : "transparent",
+              }}
+              title={a === "left" ? "Links" : a === "center" ? "Zentriert" : "Rechts"}
+            >
+              {a === "left" ? "⯇" : a === "center" ? "≡" : "⯈"}
+            </button>
+          ))}
         </div>
       </Row>
       <Row label="Schriftgröße">
-        <div className="flex items-center gap-2">
-          <input
-            type="range"
-            min={8}
-            max={64}
-            step={1}
-            value={settings.fontSize}
-            onChange={(e) => onChange({ fontSize: Number(e.target.value) })}
-            className="flex-1 accent-foreground"
-          />
-          <span className="text-xs tabular-nums w-10 text-right">{settings.fontSize} px</span>
-        </div>
-      </Row>
-      <Row label="Farbe">
-        <ColorInput value={settings.color} onChange={(v) => onChange({ color: v })} />
+        <input
+          type="number"
+          min={1}
+          step={1}
+          value={settings.fontSize}
+          onChange={(e) => {
+            const n = Number(e.target.value);
+            if (Number.isFinite(n) && n > 0) onChange({ fontSize: n });
+          }}
+          className="w-20 h-8 px-2 rounded bg-transparent border text-sm tabular-nums"
+          style={{ borderColor: "hsl(var(--hairline))" }}
+        />
       </Row>
       <Row label="Stil">
         <div className="flex gap-2">
@@ -2537,49 +2542,13 @@ function TextSettings({
           </button>
         </div>
       </Row>
-      <Row label="Ausrichtung">
-        <div className="flex gap-1">
-          {(["left", "center", "right"] as const).map((a) => (
-            <button
-              key={a}
-              onClick={() => onChange({ align: a })}
-              className="h-8 flex-1 rounded border text-xs"
-              style={{
-                borderColor: "hsl(var(--hairline))",
-                background: settings.align === a ? "hsl(var(--accent-gold-soft))" : "transparent",
-              }}
-              title={a === "left" ? "Links" : a === "center" ? "Zentriert" : "Rechts"}
-            >
-              {a === "left" ? "⯇" : a === "center" ? "≡" : "⯈"}
-            </button>
-          ))}
-        </div>
-      </Row>
-      <Row label="Transparenz">
-        <div className="flex items-center gap-2">
-          <input
-            type="range" min={0} max={100} step={1}
-            value={settings.alpha}
-            onChange={(e) => onChange({ alpha: Number(e.target.value) })}
-            className="flex-1 accent-foreground"
-          />
-          <span className="text-xs tabular-nums w-10 text-right">{settings.alpha}%</span>
-        </div>
-      </Row>
-      <Row label="Umbruch">
-        <label className="flex items-center gap-2 text-xs">
-          <input
-            type="checkbox"
-            checked={settings.wrap}
-            onChange={(e) => onChange({ wrap: e.target.checked })}
-          />
-          Auto-Umbruch (Breite fix, Höhe wächst)
-        </label>
+      <Row label="Farbe">
+        <ColorInput value={settings.color} onChange={(v) => onChange({ color: v })} />
       </Row>
       <Row label="Hintergrund">
         <ColorInput value={settings.bgColor} onChange={(v) => onChange({ bgColor: v })} />
       </Row>
-      <Row label="Hintergrund-Alpha">
+      <Row label="Transparenz">
         <div className="flex items-center gap-2">
           <input
             type="range" min={0} max={100} step={1}
@@ -2618,9 +2587,6 @@ function TextSettings({
           </Row>
         </>
       )}
-      <div className="text-[11px] text-muted-foreground">
-        Text wird mit CAD-Engine erstellt: Snap an Linien, Texte und Seitenränder. Doppelklick zum Editieren.
-      </div>
     </SettingsBlock>
   );
 }

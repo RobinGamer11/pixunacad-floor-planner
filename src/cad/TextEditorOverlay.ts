@@ -122,6 +122,16 @@ export class TextEditorOverlay {
     this.el.focus({ preventScroll: true });
     this._placeCaretAtEnd();
     this._syncToolbarState();
+    // Live auto-grow: während des Tippens Rahmen an Inhalt anpassen.
+    this.el.oninput = () => {
+      const b = this.app.scene.getTextBoxById(this.activeBoxId!);
+      if (!b) return;
+      b.html = this.el.innerHTML;
+      if ((b.style as any).autoSize !== false) {
+        autoSizeTextBox(b, (this.app.renderer as any).referencePxPerM);
+        this.reposition(b);
+      }
+    };
   }
 
   reposition(box: TextBox) {
@@ -174,13 +184,13 @@ export class TextEditorOverlay {
     const fontPx = box.style.fontSizePx * (cam.scale / refPxPerM);
     this.el.style.fontSize = `${fontPx}px`;
     this.el.style.fontFamily = "system-ui, Arial, sans-serif";
-    this.el.style.lineHeight = "1";
+    this.el.style.lineHeight = "1.15";
     this.el.style.color = box.style.textColor;
     this.el.style.background = rgbaFromHex(box.style.bgColor, (box.style.bgAlphaPct || 0) / 100);
     this.el.style.textAlign = box.style.align;
     this.el.style.whiteSpace = box.style.wrap ? "pre-wrap" : "pre";
     this.el.style.overflowWrap = box.style.wrap ? "break-word" : "normal";
-    this.el.style.padding = `0px`;
+    this.el.style.padding = `2px`;
     this.el.style.boxSizing = "border-box";
     this.el.style.overflow = autoSize ? "visible" : "hidden";
     this.el.style.outline = "2px solid rgba(77,163,255,0.45)";
