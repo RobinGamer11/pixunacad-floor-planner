@@ -1,50 +1,41 @@
-## Ziel
-Einheitliche Kopf- und Werkzeugleisten für **Projektmappenbearbeitung** (`ProjectWorkspace`) und **CAD-Oberfläche** (`CadPage`/`CadEditor`) — schnelles Wechseln zwischen beiden Modi. Kleinere Aufräumarbeiten in der Projektübersicht.
+## 1. Übersicht → Projektmappen-Feld (`src/components/project/UebersichtView.tsx`)
 
-## 1. Projektübersicht (`src/pages/ProjectsHome.tsx`)
+- **Symbol „Projektmappe bearbeiten" (Zahnrad `Settings2`) je Zeile entfernen** (Z. 179–185 im `MappenPanel`). Der oben rechts sitzende Button „Bearbeiten" reicht; ein Doppelklick auf die Zeile öffnet weiterhin die Bearbeitung. Umbenennen (Stift) und Löschen (Papierkorb) bleiben.
+- **Panel präsenter machen** — das Mappen-Feld ist das wichtigste Element der Übersicht:
+  - Höhe erhöhen: `height: 260` → `height: 360`.
+  - Panel-Padding: `p-4` → `p-5`, Kopfabstand `mb-3` → `mb-4`.
+  - Kopfzeile (Label „PROJEKTMAPPEN") in Akzentgold statt Muted, Größe `text-[11px]` → `text-xs`, damit es visuell dem Wichtigkeitsgrad entspricht.
+  - Mappen-Zeilen etwas großzügiger: Padding `p-2` → `p-2.5`, Vorschau-Kachel `w-8 h-8` → `w-10 h-10` mit Seitenzahl in `text-xs`, Name in `text-[13px]` → `text-sm font-medium`.
+  - Grid-Verhältnis in `UebersichtView` (Z. 27) leicht zugunsten links: `[minmax(0,320px)_minmax(0,1fr)]` → `[minmax(0,360px)_minmax(0,1fr)]`.
+- Keine Änderungen an Drag & Drop, Store oder Routing.
 
-- **Default-Tab**: `useState<Tab>("uebersicht")` statt `"seiten"`.
-- **Reiter umbenennen**: `["seiten", "Seiten"]` → `["seiten", "Mappen"]` (Key bleibt intern `"seiten"`, damit nichts anderes bricht).
-- **Reiter „Mappen"**: Button `+ Seite in Mappe` wird zu `Bearbeiten` (Pencil-Icon). Klick öffnet `ProjectWorkspace` der aktiven Mappe — also `navigate(/project/:id)` mit gesetzter `activeMappeId`. Ein Klick auf eine einzelne Mappenkarte macht dasselbe wie bisher.
-- **Übersicht → „Projektinfo"-Panel**: kompakter — kleinere vertikale Abstände (`space-y-2` → `space-y-1.5`), kleinere Label-Zeile (10 → 9 px), enger padding (`p-5` → `p-4`), Werte weiterhin gestapelt aber dichter.
+## 2. Einklappbares rechtes Panel — Symbol links vom Fenster
 
-## 2. Gemeinsamer Kopf (Projektmappenbearbeitung + CAD-Oberfläche)
+Ziel: In **Projektmappe** und **CAD-Oberfläche** wird das rechte Panel wie in der Projektmappe eingeklappt/aufgeklappt, und der Toggle-Button sitzt in beiden Modi **an der linken Kante des rechten Panels** (nicht mehr in der Tab-Leiste rechts).
 
-Neue Komponente `src/components/workspace/WorkspaceHeader.tsx` — identisches Layout, unterscheidet nur den aktiven Modus:
+### 2a. CAD (`src/components/CadEditor.tsx`)
 
-```
-[ ‹ Zurück ]  Projektmappenname   [ Projektmappe ] [ CAD-Oberfläche ]   ...   [ ↶ ] [ ↷ ]  100%  [ Präsentieren ] [ Teilen ] [ Exportieren ]
-```
+- Bestehenden Ausblenden-Button aus der Tab-Reihe entfernen (Z. 1537–1545 — `PanelRightClose` neben den Tab-Buttons).
+- Neuen schmalen Rand (`w-6`, volle Höhe, `border-l`) am **linken Rand des Panels** einführen (innerhalb des `<aside>` bei Z. 1518, als erstes Child in einem neuen `flex-row`-Wrapper). Darin ein Button mit `PanelRightClose` oben, der `setRightOpen(false)` ausführt.
+- Der bestehende eingeklappte Zustand (Z. 2641–2655) bleibt unverändert und dient als „Öffnen"-Griff.
+- Kein Verhalten des Druckmodus ändern (der behält sein eigenes ✕ oben rechts).
 
-Props: `projectId`, `mappeName`, `mode: "workspace"|"cad"`, Undo/Redo-Callbacks + canUndo/canRedo, Zoom-Wert, Handler für Präsentieren/Teilen/Exportieren.
+### 2b. Projektmappe (`src/pages/ProjectWorkspace.tsx` + `RightInspector`)
 
-- Zurück → `navigate('/')` (Projektübersicht).
-- Zwei Mode-Buttons: aktiver Modus gold-hinterlegt, inaktiver als Outline. Klick wechselt Route (`/project/:id` ↔ `/project/:id/cad`).
-- **Undo/Redo, Zoom-%, Vollbild/Präsentieren, Teilen, Exportieren** immer im Kopf rechts — in beiden Modi.
+- Aktuelle `onCollapse`-Übergabe (Z. 696) bleibt vom API her erhalten, wird aber **nicht mehr im Inspector-Header** angezeigt.
+- In `RightInspector` den bisherigen Collapse-Trigger (im Kopf des Panels) entfernen und stattdessen — analog zum CAD — eine schmale linke Griffleiste (`w-6`, volle Höhe, `border-l`) mit `PanelRightClose`-Button ganz oben rendern, die `onCollapse()` aufruft.
+- Auch für den `PrintPanel`-Pfad: Die linke Griffleiste wird als Wrapper um den rechten Bereich gerendert, damit Einklappen aus jedem Modus gleich funktioniert. `PrintPanel` selbst behält sein ✕ zum Verlassen des Druckmodus.
+- Der eingeklappte Zustand (Z. 702–715) bleibt gleich (kleiner `PanelRightOpen`-Griff).
 
-## 3. CAD-Oberfläche (`src/pages/CadPage.tsx`, `src/components/CadEditor.tsx`)
+### Ergebnis
 
-- `CadPage`-Header durch `WorkspaceHeader` (`mode="cad"`) ersetzen.
-- `CadEditor` gibt Undo/Redo-State und Zoom nach oben (Callback-Props oder ref), damit der Header sie steuern kann.
-- Aus dem linken CAD-Rail (`CadEditor.tsx` ~Z. 862–879) werden **Undo- und Redo-Buttons entfernt**. „Raster" und „Pipette" bleiben. Der Export-Button im linken/unteren Panel bleibt bestehen — der neue Header-Export ruft dieselbe Aktion.
-
-## 4. Projektmappenbearbeitung (`src/pages/ProjectWorkspace.tsx`)
-
-- Bestehenden `<header>` (Z. 282–332) und den bisherigen kleinen Zurück/Titel/Aktionen-Block durch `WorkspaceHeader` (`mode="workspace"`) ersetzen. Bestehende Handler (Undo/Redo/Zoom/Teilen/Präsentieren/Exportieren) werden an den neuen Kopf verdrahtet.
-- **Linke Werkzeugleiste**: `CAD öffnen`-Button (Z. 200–205) entfernen (Wechsel läuft jetzt über den Header).
-- **CAD-Blatt-Werkzeug** (Z. 206–211): Anzeige anpassen. → siehe Klärungsfrage unten.
-- Optische Angleichung an CAD-Rail: gleiche Breite (56 px statt 14/w-14 → 14 = 56 px passt bereits), gleiche Button-Klasse (`cad-rail-btn`), gleicher Divider-Stil, gleiches Padding, gleiche Icon-Größe (18 px). `ToolRailButton` wird auf `cad-rail-btn`-Optik umgestellt, damit beide Rails visuell identisch wirken.
-
-## 5. Routing
-
-- Keine neuen Routen. Beide Modi teilen sich `projectId`; Wechsel per `navigate('/project/:id')` bzw. `.../cad`.
+- Beide Kopfzeilen/Panels sind identisch bedienbar: **linker Rand des rechten Panels = Einklappen**, **schmaler Griff nach dem Einklappen = Ausklappen**.
+- Keine Änderungen an Store, Routing oder Business-Logik.
 
 ## Technische Details
 
-- Neue Datei: `src/components/workspace/WorkspaceHeader.tsx`.
-- `CadEditor` bekommt optionale Props `onUndoState?(canUndo,canRedo)`, `onZoomChange?(n)`; alternativ Ref-API auf `appRef` freigeben. Wahrscheinlich sauberer: Kontext-loses Callback-Interface via `useImperativeHandle` auf einem forwarded ref.
-- `ProjectWorkspace`: bestehender `zoom`-State und Header-Buttons wandern in Props für `WorkspaceHeader`.
-- Keine Änderungen an `projectStore` nötig.
-
-## Klärungsfrage
-Der letzte Satz „In der Projektmappe soll das Werkzeug-Symbol 'CAD-Blatt' **besch** angezeigt werden." wirkt abgeschnitten. Ich lese das als **„beschriftet"** (also Icon + Text-Label wie im CAD-Rail bei „Raster/Pipette"), damit das Werkzeug klar erkennbar ist — passend zur Angleichung der Rails. Falls anders gemeint (z. B. „bescheiden/kleiner", „bezeichnet als …", „besser hervorgehoben"), bitte kurz korrigieren; sonst setze ich es als „beschriftet" um.
+- Nur Frontend/Presentation. Keine neuen Dateien; drei bestehende werden bearbeitet:
+  - `src/components/project/UebersichtView.tsx`
+  - `src/components/CadEditor.tsx`
+  - `src/pages/ProjectWorkspace.tsx` (inkl. `RightInspector`-Block darin)
+- Kein Umbau der Tab-Logik, keine neuen Props außer der Wiederverwendung von `onCollapse`.
