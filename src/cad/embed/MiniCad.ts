@@ -89,6 +89,13 @@ export type MiniCadSelectionInfo =
       divisionSnap?: number | null;
     }
   | {
+      tool: "free";
+    }
+  | {
+      tool: "document";
+      id: string;
+    }
+  | {
       tool: "text";
       color: string;
       fontSize: number;
@@ -1033,6 +1040,14 @@ export class MiniCad {
           divisionSnap: typeof seg.divisionSnap === "number" ? seg.divisionSnap : null,
         };
       }
+    }
+    if ((selection as any).freeStrokeId) {
+      const stroke = this.scene.getFreeStrokeById((selection as any).freeStrokeId);
+      if (stroke) return { tool: "free" };
+    }
+    if ((selection as any).documentId) {
+      const doc = this.scene.getDocumentById((selection as any).documentId);
+      if (doc && (doc as any)._snapOnly) return { tool: "document", id: doc.id };
     }
 
     return null;
