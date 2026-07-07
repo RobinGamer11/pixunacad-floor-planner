@@ -168,8 +168,8 @@ function layoutLines(
   const pushLine = () => {
     if (cur.segments.length === 0) {
       // Empty line — give it the base font height
-      cur.height = baseFontSizePx * 1.2;
-      cur.ascent = baseFontSizePx * 0.8;
+      cur.height = baseFontSizePx * 1.15;
+      cur.ascent = baseFontSizePx * 0.82;
     }
     lines.push(cur);
     cur = { segments: [], width: 0, height: 0, ascent: 0 };
