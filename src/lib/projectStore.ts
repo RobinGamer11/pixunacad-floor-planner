@@ -250,13 +250,40 @@ function load(): State {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && Array.isArray(parsed.projects) && parsed.projects.length) {
-        return parsed as State;
+        return { projects: parsed.projects.map(migrateProject) };
       }
     }
   } catch {
     /* ignore */
   }
-  return { projects: demoProjects() };
+  return { projects: demoProjects().map(migrateProject) };
+}
+
+/** Stellt sicher, dass jedes Projekt mindestens eine Mappe + Files/Photos-Arrays hat. */
+function migrateProject(p: Project): Project {
+  const next: Project = { ...p };
+  if (!Array.isArray(next.mappen) || next.mappen.length === 0) {
+    const defaultId = `m-${next.id}-main`;
+    next.mappen = [{
+      id: defaultId,
+      name: "Hauptmappe",
+      konzept: "",
+      pageIds: next.pages.map((pg) => pg.id),
+    }];
+    next.activeMappeId = defaultId;
+  } else if (!next.activeMappeId || !next.mappen.find((m) => m.id === next.activeMappeId)) {
+    next.activeMappeId = next.mappen[0].id;
+  }
+  // Alle noch nicht zugeordneten Seiten kommen in die erste Mappe.
+  const assigned = new Set(next.mappen.flatMap((m) => m.pageIds));
+  const orphan = next.pages.filter((pg) => !assigned.has(pg.id)).map((pg) => pg.id);
+  if (orphan.length) {
+    next.mappen = next.mappen.map((m, i) => (i === 0 ? { ...m, pageIds: [...m.pageIds, ...orphan] } : m));
+  }
+  if (!Array.isArray(next.files)) next.files = [];
+  if (!Array.isArray(next.photos)) next.photos = [];
+  if (!next.settings) next.settings = { timelinePosition: "bottom" };
+  return next;
 }
 
 function persist() {
