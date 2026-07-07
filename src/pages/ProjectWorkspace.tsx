@@ -123,7 +123,7 @@ export default function ProjectWorkspace() {
     setRightTabState(t);
   };
   const [activeTool, setActiveTool] = useState<PageTool>(null);
-  const [selectedCadTool, setSelectedCadTool] = useState<"line" | "free" | "text" | undefined>();
+  const [selectedCadTool, setSelectedCadTool] = useState<"line" | "free" | "text" | "hatch" | undefined>();
   const [cadSelectionCount, setCadSelectionCount] = useState<number>(0);
   const [cadSelectedLineSnap, setCadSelectedLineSnap] = useState<{ midpoint: boolean; division: number | null; isGuide: boolean } | null>(null);
   const [lineToolVariant, setLineToolVariant] = useState<LinePageTool>("line");
@@ -1730,7 +1730,7 @@ function RightInspector({
   project: import("@/lib/projectStore").Project;
   activeTool: PageTool;
   setActiveTool: (t: PageTool) => void;
-  selectedCadTool?: "line" | "free" | "text";
+  selectedCadTool?: "line" | "free" | "text" | "hatch";
   selectedElementId?: string;
   selectedElementIds?: string[];
   setSelectedElementId: (id?: string) => void;
@@ -2021,7 +2021,7 @@ function ToolsTab({
   project: import("@/lib/projectStore").Project;
   activeTool: PageTool;
   setActiveTool: (t: PageTool) => void;
-  selectedCadTool?: "line" | "free" | "text";
+  selectedCadTool?: "line" | "free" | "text" | "hatch";
   selectedElementId?: string;
   selectedElementIds?: string[];
   setSelectedElementId: (id?: string) => void;
@@ -2046,8 +2046,7 @@ function ToolsTab({
         </div>
         {!settingsTool ? (
           <div className="text-xs text-muted-foreground">
-            Auswahlwerkzeug aktiv — klicke ein Objekt zum Auswählen.{" "}
-            Mit Mehrfachauswahl (siehe Einstellung unten) oder <kbd className="px-1 rounded border" style={{ borderColor: "hsl(var(--hairline))" }}>Shift</kbd>-Klick mehrere Objekte gleichzeitig auswählen.
+            Auswahlwerkzeug aktiv — klicke ein Objekt zum Auswählen. Mit <kbd className="px-1 rounded border" style={{ borderColor: "hsl(var(--hairline))" }}>Shift</kbd>-Klick mehrere Objekte gleichzeitig auswählen.
           </div>
         ) : (
           <div className="flex items-center justify-between rounded-md border px-3 py-2" style={{ borderColor: "hsl(var(--hairline))" }}>
@@ -2164,8 +2163,6 @@ function ToolsTab({
 }
 
 function SelectSettings({
-  settings,
-  onChange,
   selectedCount,
 }: {
   settings: ToolSettings["select"];
@@ -2174,34 +2171,8 @@ function SelectSettings({
 }) {
   return (
     <SettingsBlock title="AUSWAHLWERKZEUG">
-      <Row label="Modus">
-        <div className="flex gap-1">
-          <button
-            type="button"
-            onClick={() => onChange({ multi: false })}
-            className="h-7 px-2 rounded-md border text-xs"
-            style={{
-              borderColor: "hsl(var(--hairline))",
-              background: !settings.multi ? "hsl(var(--surface-strong))" : "transparent",
-            }}
-          >
-            Einzel
-          </button>
-          <button
-            type="button"
-            onClick={() => onChange({ multi: true })}
-            className="h-7 px-2 rounded-md border text-xs"
-            style={{
-              borderColor: "hsl(var(--hairline))",
-              background: settings.multi ? "hsl(var(--surface-strong))" : "transparent",
-            }}
-          >
-            Mehrfach
-          </button>
-        </div>
-      </Row>
       <div className="text-[11px] text-muted-foreground">
-        Im Mehrfach-Modus fügt jeder Klick zur Auswahl hinzu. Mit <kbd className="px-1 rounded border" style={{ borderColor: "hsl(var(--hairline))" }}>Shift</kbd>-Klick funktioniert das auch im Einzel-Modus; nochmaliges Shift-Klicken entfernt aus der Auswahl.
+        Klicke ein Objekt zum Auswählen. Mit <kbd className="px-1 rounded border" style={{ borderColor: "hsl(var(--hairline))" }}>Shift</kbd>-Klick mehrere Objekte gleichzeitig auswählen oder aus der Auswahl entfernen. Aufziehen mit gedrückter Maustaste selektiert alle Objekte im Rahmen.
         {selectedCount > 0 && (
           <div className="mt-1">Aktuell ausgewählt: <strong className="text-foreground">{selectedCount}</strong></div>
         )}

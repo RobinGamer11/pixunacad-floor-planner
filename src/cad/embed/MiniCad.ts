@@ -109,6 +109,10 @@ export type MiniCadSelectionInfo =
       borderEnabled: boolean;
       borderColor: string;
       borderWidthPx: number;
+    }
+  | {
+      tool: "hatch";
+      id: string;
     };
 
 
@@ -1088,6 +1092,10 @@ export class MiniCad {
     if ((selection as any).freeStrokeId) {
       const stroke = this.scene.getFreeStrokeById((selection as any).freeStrokeId);
       if (stroke) return { tool: "free" };
+    }
+    if ((selection as any).hatchId) {
+      const h = this.scene.getHatchById((selection as any).hatchId);
+      if (h) return { tool: "hatch", id: h.id };
     }
     if ((selection as any).documentId) {
       const doc = this.scene.getDocumentById((selection as any).documentId);
