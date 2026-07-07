@@ -232,6 +232,11 @@ export class MiniCad {
   documentHubState: { visible: boolean; screenX: number; screenY: number; docId: string | null; cornerIndex: number } = {
     visible: false, screenX: 0, screenY: 0, docId: null, cornerIndex: 0,
   };
+  /** Compat mit SelectTool aus CadApp — Maßketten gibt es im Embed nicht. */
+  dimensionHubMode: "none" | "move" = "none";
+  dimensionHubState: { visible: boolean; screenX: number; screenY: number; dimensionId: string | null } = {
+    visible: false, screenX: 0, screenY: 0, dimensionId: null,
+  };
 
   /** Map externalId → docId; Snapshot zur Diff-Erkennung. */
   private _externalDocs: Map<string, string> = new Map();
