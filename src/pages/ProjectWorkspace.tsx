@@ -54,6 +54,7 @@ import {
   RectangleHorizontal,
   Circle as CircleIcon,
   PaintBucket,
+  FileImage,
 } from "lucide-react";
 
 import {
