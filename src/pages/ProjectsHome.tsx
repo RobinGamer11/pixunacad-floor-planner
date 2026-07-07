@@ -381,7 +381,7 @@ export default function ProjectsHome() {
               {(
                 [
                   ["uebersicht", "Übersicht"],
-                  ["seiten", "Seiten"],
+                  ["seiten", "Mappen"],
                   ["aufgaben", "Aufgaben"],
                   ["dateien", "Dateien"],
                   ["fotos", "Fotos"],
