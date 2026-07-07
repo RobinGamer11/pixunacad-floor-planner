@@ -158,6 +158,7 @@ export default function ProjectWorkspace() {
     setActiveTool(t);
     if (isLinePageTool(t)) setLineToolVariant(t);
     if (!isLinePageTool(t)) setLineToolFlyoutOpen(false);
+    if (t !== "hatch") setHatchToolFlyoutOpen(false);
     if (t) setSelectedCadTool(undefined);
     if (t) setRightTabState("tools");
   };
@@ -165,6 +166,11 @@ export default function ProjectWorkspace() {
   const activateLineTool = (tool: LinePageTool) => {
     setLineToolVariant(tool);
     setActiveToolAndTab(tool);
+  };
+
+  const activateHatchTool = (mode: HatchDrawMode) => {
+    setHatchDrawMode(mode);
+    setActiveToolAndTab("hatch");
   };
 
   // Per-tool settings (live in workspace state; persist could come later).
