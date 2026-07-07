@@ -88,7 +88,12 @@ export default function ProjectWorkspace() {
   // beschreibt die volle Liste `selectedElementIds`.
   const selectedElementId = selectedElementIds[selectedElementIds.length - 1];
   const setSelectedElementId = (id?: string) => setSelectedElementIds(id ? [id] : []);
-  const [rightTab, setRightTab] = useState<"settings" | "tools" | "layers">("settings");
+  const [rightTab, setRightTabState] = useState<"settings" | "tools" | "layers">("settings");
+  const [printMode, setPrintMode] = useState(false);
+  const setRightTab = (t: "settings" | "tools" | "layers") => {
+    setPrintMode(false);
+    setRightTabState(t);
+  };
   const [activeTool, setActiveTool] = useState<PageTool>(null);
   const [selectedCadTool, setSelectedCadTool] = useState<"line" | "text" | undefined>();
   const [cadSelectionCount, setCadSelectionCount] = useState<number>(0);
@@ -114,9 +119,10 @@ export default function ProjectWorkspace() {
   const canvasViewportRef = useRef<HTMLDivElement>(null);
   const setZoomClamped = (v: number) => setZoom(Math.max(10, Math.min(400, Math.round(v))));
   const setActiveToolAndTab = (t: PageTool) => {
+    setPrintMode(false);
     setActiveTool(t);
     if (t) setSelectedCadTool(undefined);
-    if (t) setRightTab("tools");
+    if (t) setRightTabState("tools");
   };
 
   // Per-tool settings (live in workspace state; persist could come later).
