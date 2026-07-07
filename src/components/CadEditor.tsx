@@ -58,6 +58,7 @@ export interface CadEditorHandle {
   undo: () => void;
   redo: () => void;
   exportPdf: () => void;
+  openExportPanel: () => void;
 }
 
 interface CadEditorProps {
