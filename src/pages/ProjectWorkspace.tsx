@@ -1724,6 +1724,7 @@ function RightInspector({
             onCadDuplicateSegments={onCadDuplicateSegments}
             updateToolSettings={updateToolSettings}
             onJumpCad={onJumpCad}
+            cadEngine={cadEngine ?? null}
 
 
           />
