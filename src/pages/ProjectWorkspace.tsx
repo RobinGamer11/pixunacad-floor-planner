@@ -278,57 +278,16 @@ export default function ProjectWorkspace() {
 
       {/* Top header */}
       <div className="flex-1 flex flex-col min-w-0">
-        <header
-          className="h-12 flex items-center justify-between px-4 border-b shrink-0"
-          style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
-        >
-          <div className="flex items-center gap-3 min-w-0">
-            <button
-              onClick={() => navigate("/")}
-              className="h-8 w-8 rounded-md flex items-center justify-center hover:bg-muted"
-              title="Zurück zur Projektübersicht"
-            >
-              <ChevronLeft size={18} />
-            </button>
-            <div className="text-sm font-semibold truncate">{project.name}</div>
-            <span className="text-xs text-muted-foreground">›</span>
-            <div className="text-sm truncate">{activePage?.title}</div>
-            <span
-              className="ml-1 text-[11px] px-1.5 py-0.5 rounded"
-              style={{ background: "hsl(var(--accent-gold-soft))", color: "hsl(var(--accent-gold))" }}
-            >
-              Bearbeiten
-            </span>
-          </div>
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <button className="h-8 w-8 rounded-md flex items-center justify-center hover:bg-muted" title="Rückgängig">
-              <Undo2 size={16} />
-            </button>
-            <button className="h-8 w-8 rounded-md flex items-center justify-center hover:bg-muted" title="Wiederherstellen">
-              <Redo2 size={16} />
-            </button>
-            <span className="text-xs px-2 tabular-nums">{zoom}%</span>
-            <button className="h-8 w-8 rounded-md flex items-center justify-center hover:bg-muted" title="Vollbild">
-              <Maximize2 size={16} />
-            </button>
-            <button className="h-8 px-3 rounded-md border text-sm flex items-center gap-1.5" style={{ borderColor: "hsl(var(--hairline))" }}>
-              <Share2 size={14} /> Teilen
-            </button>
-            <button
-              className="h-8 w-8 rounded-md flex items-center justify-center"
-              style={{ background: "hsl(var(--accent-gold-soft))", color: "hsl(var(--accent-gold))" }}
-              title="Präsentieren"
-            >
-              <Play size={14} />
-            </button>
-            <button
-              className="h-8 px-3 rounded-md text-sm font-medium"
-              style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
-            >
-              Exportieren
-            </button>
-          </div>
-        </header>
+        <WorkspaceHeader
+          projectId={project.id}
+          projectName={project.name}
+          contextLabel={activePage?.title}
+          mode="workspace"
+          zoomPercent={zoom}
+          onPresent={() => {}}
+          onShare={() => {}}
+          onExport={() => {}}
+        />
 
         <div className="flex-1 flex min-h-0">
           {/* Pages sidebar (collapsible) */}
