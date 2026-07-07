@@ -160,6 +160,10 @@ export class MiniCad {
 
   // Stubs required by tools / editor.
   activeDrawLabelId = Defaults.defaultLabelId;
+  /** Aktive Ebenen-Auswahl (mirror of CadApp.selectedLabelId). */
+  selectedLabelId: string | null = null;
+  /** Optional imperativer IdPanel-Adapter (wenn CadOverlayLayer refs bereitstellt). */
+  idPanel: IdPanel | null = null;
   defaultLineColor: string;
   defaultLineThicknessM: number;
   /** 0..1 (1 = vollständig deckend). */
