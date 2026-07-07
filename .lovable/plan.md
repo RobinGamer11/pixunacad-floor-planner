@@ -1,59 +1,54 @@
 ## Ziel
 
-Drei Baustellen in der Projektmappe angleichen an die CAD-Oberfläche:
+Das Werkzeug „CAD-Blatt" in der Projektmappe bekommt beim nachträglichen Bearbeiten dasselbe Verhalten wie das Werkzeug „Dokument" — also identische Handles (Verschieben, Skalieren an den vier Ecken, Rotate-Griff oben) sowie identisches Snap-/Rasten-Verhalten. Kein Crop, keine zusätzliche Bearbeitungs-Ebene.
 
-1. **Werkzeug "Dokument"** — PDF-einfügen + Bild zu einem Werkzeug zusammenlegen, das intern die **echte CAD-`DocumentTool`-Pipeline** verwendet (nicht die Projektmappen-`kind: pdf/image`-Elemente).
-2. **Werkzeug "CAD-Blatt"** — nach Platzierung identisches Verschieben/Skalieren/Drehen-Verhalten wie beim Dokument (nur diese drei Aktionen, kein Crop).
-3. **Schraffur-Highlight** — beim Auswählen mit dem Auswahl-Tool muss die Schraffur wie im CAD blau aufleuchten.
+## Ist-Zustand
+
+- CAD-Blätter werden in `ProjectWorkspace` als `element.kind === "cad-view"` platziert.
+- Im `ElementDom`-Renderer (ca. Zeile 1442) ist `cad-view` bereits im `hubKinds`-Set → es zeichnet einen einfachen Rotate-Griff (`rotateRef`), aber **keine Ecken-Skalier-Handles**.
+- Verschieben läuft über generisches `handleMouseDown` auf dem Element-Wrapper.
+- Dokumente aus dem neuen „Dokument"-Werkzeug leben dagegen in `scene.documents` und benutzen den vollwertigen `documentHub` aus MiniCad (Ecken + Rotate + Snap).
+
+Diskrepanz: CAD-Blatt hat aktuell nur Rotate, keine Ecken-Skalierung mit visuellem Handle. Verhalten und Optik weichen vom Dokument-Hub ab.
 
 ## Umsetzung
 
-### 1. „Dokument"-Werkzeug 1:1 aus CAD
+### 1. Ecken-Handles am CAD-Blatt
 
-**Toolbar / UI**
-- Rail-Buttons „PDF einfügen" und „Bild" entfernen, ersetzt durch einen einzelnen Button **„Dokument"** (Icon `FileImage`, wie in `CadEditor`).
-- Ein gemeinsames `<input type="file" accept=".pdf,.png,.jpg,.jpeg,.webp">`.
-- Neuer `PageTool`-Wert `"document"`. Wenn aktiv, wird Datei-Dialog geöffnet; nach Import wechselt das Werkzeug in den **Platzierungs-Modus**.
+- In `ElementDom` (in `ProjectWorkspace.tsx`) bei `showHub && el.kind === "cad-view"` vier Ecken-Handles rendern (TL, TR, BL, BR), Style identisch zum Dokument-Hub in `CadOverlayLayer` (kleine Kreise mit Gold-Rahmen, `data-hub-control`).
+- Drag an einer Ecke skaliert `el.w` / `el.h` in Prozent (Seiten-Aspekt frei; Shift = proportional). Ankerpunkt = gegenüberliegende Ecke, damit sich die feste Ecke visuell nicht bewegt.
+- Wie beim Dokument-Hub: während Drag `onScale(w, h, x, y, /*live*/ true)`, am Ende `false` → persistiert via `projectStore.updateElement`.
 
-**Engine-Integration (`MiniCad`)**
-- `DocumentTool` aus `src/cad/DocumentTool.ts` in `MiniCad` einhängen (`this.documentTool = new DocumentTool(this as any)`), analog zu `LineTool`/`HatchTool`.
-- `setActiveTool("document")` erweitert; ruft `documentTool.activate()`.
-- `beginPlacement({ src, widthM, heightM, pdfSourceB64?, pdfPageIndex? })` genau wie in `CadEditor.tsx`.
-- Import läuft weiterhin über `importFile()`; für PDFs mit mehreren Seiten wird pro Seite eine Platzierung angeboten (wie CAD).
+### 2. Rotate-Griff optisch angleichen
 
-**Persistenz**
-- CAD-`DocumentObject`s werden bereits über `MiniCad._serialize`/`_restore` und `scene.documents` persistiert (bestehende Pipeline, wie Segments/Hatches).
-- Alte Projektmappen-Elemente vom Typ `pdf`/`image` bleiben lesbar (Backwards-Compat), können aber nicht mehr neu angelegt werden.
+- Position und Größe des vorhandenen Rotate-Handles (`rotateRef`) an den Dokument-Hub anpassen: kleiner Kreis mit `RotateCw`-Icon zentriert oberhalb, Offset ca. 28 px, dieselbe Gold-Umrandung.
+- Snap: alle 15° einrasten wenn Shift gedrückt (analog Dokument-Hub).
 
-**Nachträgliche Bearbeitung**
-- SelectTool erkennt Dokumente bereits (`SelectionType.DOCUMENT`) und aktiviert den Dokument-Hub (Verschieben/Skalieren/Drehen). Der Hub wird ins Settings-Panel der Projektmappe gespiegelt.
+### 3. Move-Verhalten
 
-### 2. „CAD-Blatt"-Werkzeug nachträgliche Bearbeitung
+- Bestehendes `handleMouseDown` bleibt (Drag verschiebt das Element per Prozent).
+- Erweiterung: `data-hub-control`-Kinder dürfen Move nicht triggern (ist schon so für Rotate, wird für die neuen Ecken übernommen).
+- Optional: Snap ans Seitenraster / Ränder wie beim Dokument-Hub (mm-basiertes Snapping), falls schon Hilfslinien vorhanden.
 
-- CAD-Blatt bleibt Projektmappen-Element (`kind: "cad-view"`), da es Referenz auf ein anderes Sheet enthält.
-- Bei Auswahl wird derselbe **Dokument-Hub-Style** (Ecken-Handles + Rotate) über dem Element gezeichnet — konsistente Ecken-, Kanten- und Rotations-Handles wie beim Dokument-Element. **Kein Crop**.
-- Verschieben/Skalieren/Drehen wandern in die bestehende Hub-Logik (`hubKinds`-Set enthält bereits `cad-view`).
+### 4. Auswahl-Feedback
 
-### 3. Schraffur-Highlight blau
+- Bei ausgewähltem CAD-Blatt bleibt der Gold-Outline; zusätzlich ein dezenter Rahmen im Dokument-Hub-Stil (dünn, halbtransparent) für Konsistenz.
 
-- Root Cause: in der Projektmappe wird nach Zeichnen der Schraffur zwar `SelectionType.HATCH` gesetzt, aber `renderer.selection` wird durch die parallele Multi-Select-Liste evtl. zurückgesetzt. Fix in `MiniCad._applyPrimary`: sicherstellen, dass `renderer.setSelection(primary)` **auch bei Hatch** einen frischen Render triggert.
-- Zusätzlich: bei Klick mit Auswahl-Tool auf eine Schraffur einen Render-Tick erzwingen (`this.renderer.render()`), falls kein anderes Event Repaint auslöst.
+## Betroffene Dateien
 
-## Technische Details
+- `src/pages/ProjectWorkspace.tsx` — `ElementDom`-Komponente: neue Ecken-Handles, Rotate-Griff aufhübschen, Scale-Drag-Logik.
+- Keine Änderungen an `MiniCad` oder `CadOverlayLayer` nötig (CAD-Blatt bleibt ein Projektmappen-Element, kein CAD-`DocumentObject`).
 
-- **Betroffene Dateien:**
-  - `src/pages/ProjectWorkspace.tsx` — Rail-Buttons, `PageTool`-Typ, State für Placement, Settings-Panel „Dokument".
-  - `src/cad/embed/MiniCad.ts` — `documentTool` einhängen, `setActiveTool("document")`, `beginPlacement`-API, Serialisierung Dokumente.
-  - `src/components/page/CadOverlayLayer.tsx` — `activeTool="document"` durchreichen.
-  - Neu: `src/components/cad/DocumentSettingsPanel.tsx` — spiegelt CAD-Dokument-Panel (Scale-Two-Points, Maßstab, Sperren, Alpha, Rotation reset).
-- **Nicht enthalten (bewusst):** PDF-Auflösen, Hintergrund entfernen, Filter, Crop — wenn erwünscht separat als Folgeschritt.
-- **Migration:** Alte `pdf`/`image`-Elemente bleiben angezeigt (Legacy-Renderpfad in `PageCanvas`), neue Importe laufen ausschließlich über die CAD-Pipeline.
+## Nicht enthalten
+
+- Kein Crop / kein Beschnitt.
+- Keine Migration bestehender CAD-Blätter in CAD-`DocumentObject`s (der CAD-Blatt-Referenz-Charakter zu einem anderen Sheet bleibt erhalten).
+- Kein Skalier-mit-2-Punkten-Modus (der ergibt bei CAD-Blättern konzeptionell keinen Sinn, da der Maßstab am Blatt selbst hängt).
 
 ## Verifikation
 
-Playwright-Skript:
-1. In Projektmappe eine PDF und ein PNG per „Dokument" importieren → Platzierungs-Cursor sichtbar → Klick → Element ist CAD-`DocumentObject`.
-2. Mit Auswahl-Tool anklicken → Hub mit Ecken/Rotate erscheint, Verschieben/Skalieren/Drehen funktioniert.
-3. CAD-Blatt platzieren, auswählen → identischer Hub, kein Crop-Griff.
-4. Schraffur zeichnen, Auswahl-Tool → Schraffur ist blau gefüllt.
-5. Reload → Zustand aller drei Elementtypen persistent.
+1. CAD-Blatt platzieren → auswählen → vier Ecken-Handles + Rotate-Griff sichtbar, gleicher Look wie Dokument-Hub.
+2. An einer Ecke ziehen → Blatt skaliert relativ zur gegenüberliegenden Ecke, Shift hält Seitenverhältnis.
+3. Rotate-Griff ziehen → Rotation, mit Shift 15°-Rasterung.
+4. Move per Drag im Element-Body → verschiebt wie bisher.
+5. Reload → alle Änderungen persistent.
