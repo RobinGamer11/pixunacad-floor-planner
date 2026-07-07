@@ -41,7 +41,7 @@ export default function ProjectsHome() {
   );
   const [selectedId, setSelectedId] = useState<string | undefined>(visibleProjects[0]?.id);
   const [search, setSearch] = useState("");
-  const [tab, setTab] = useState<Tab>("seiten");
+  const [tab, setTab] = useState<Tab>("uebersicht");
   const [leftOpen, setLeftOpen] = useState(true);
   const [titleMenuOpen, setTitleMenuOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
@@ -381,7 +381,7 @@ export default function ProjectsHome() {
               {(
                 [
                   ["uebersicht", "Übersicht"],
-                  ["seiten", "Seiten"],
+                  ["seiten", "Mappen"],
                   ["aufgaben", "Aufgaben"],
                   ["dateien", "Dateien"],
                   ["fotos", "Fotos"],
@@ -455,6 +455,7 @@ export default function ProjectsHome() {
 // UebersichtView wird nun aus @/components/project/UebersichtView importiert.
 
 function SeitenView({ project, onAddPage }: { project: Project; onAddPage: () => void }) {
+  const navigate = useNavigate();
   const mappen = project.mappen ?? [];
   const activeMappe = mappen.find((m) => m.id === project.activeMappeId) ?? mappen[0];
   const mappePages = activeMappe
@@ -489,11 +490,12 @@ function SeitenView({ project, onAddPage }: { project: Project; onAddPage: () =>
         )}
         <span className="flex-1" />
         <button
-          onClick={onAddPage}
+          onClick={() => navigate(`/project/${project.id}`)}
           className="h-8 px-3 rounded-md text-xs font-medium flex items-center gap-1.5"
           style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
+          title="Projektmappe bearbeiten"
         >
-          <Plus size={13} /> Seite in Mappe
+          <Pencil size={13} /> Bearbeiten
         </button>
       </div>
 

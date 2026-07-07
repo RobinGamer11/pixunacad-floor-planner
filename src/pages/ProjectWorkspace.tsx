@@ -64,6 +64,7 @@ import CadOverlayLayer from "@/components/page/CadOverlayLayer";
 import { PdfPageView } from "@/components/page/PdfPageView";
 import { importFile } from "@/cad/documentImport";
 import type { MiniCadSelectionInfo } from "@/cad/embed/MiniCad";
+import { WorkspaceHeader } from "@/components/workspace/WorkspaceHeader";
 
 const FORMAT_SIZES: Record<PageFormat, { w: number; h: number; label: string }> = {
   "A3-quer": { w: 420, h: 297, label: "A3 Querformat (420 × 297 mm)" },
@@ -188,8 +189,12 @@ export default function ProjectWorkspace() {
     >
       {/* Far-left tool rail */}
       <aside
-        className="flex flex-col items-center py-3 w-14 shrink-0 border-r gap-1"
-        style={{ borderColor: "hsl(var(--hairline))" }}
+        className="flex flex-col items-center gap-0.5 py-1.5 shrink-0 border-r"
+        style={{
+          width: 56,
+          borderColor: "hsl(var(--hairline))",
+          background: "hsl(var(--surface-card))",
+        }}
       >
         <ToolRailButton
           icon={<MousePointer2 size={18} />}
@@ -198,16 +203,11 @@ export default function ProjectWorkspace() {
           onClick={() => setActiveTool(null)}
         />
         <ToolRailButton
-          icon={<ExternalLink size={18} />}
-          label="CAD öffnen"
-          onClick={() => navigate(`/project/${project.id}/cad`)}
-          accent
-        />
-        <ToolRailButton
           icon={<CompassIcon size={18} />}
           label="CAD-Blatt"
           active={activeTool === "cad"}
           onClick={() => setActiveToolAndTab(activeTool === "cad" ? null : "cad")}
+          showLabel
         />
         <ToolRailButton
           icon={<Type size={18} />}
@@ -279,57 +279,16 @@ export default function ProjectWorkspace() {
 
       {/* Top header */}
       <div className="flex-1 flex flex-col min-w-0">
-        <header
-          className="h-12 flex items-center justify-between px-4 border-b shrink-0"
-          style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
-        >
-          <div className="flex items-center gap-3 min-w-0">
-            <button
-              onClick={() => navigate("/")}
-              className="h-8 w-8 rounded-md flex items-center justify-center hover:bg-muted"
-              title="Zurück zur Projektübersicht"
-            >
-              <ChevronLeft size={18} />
-            </button>
-            <div className="text-sm font-semibold truncate">{project.name}</div>
-            <span className="text-xs text-muted-foreground">›</span>
-            <div className="text-sm truncate">{activePage?.title}</div>
-            <span
-              className="ml-1 text-[11px] px-1.5 py-0.5 rounded"
-              style={{ background: "hsl(var(--accent-gold-soft))", color: "hsl(var(--accent-gold))" }}
-            >
-              Bearbeiten
-            </span>
-          </div>
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <button className="h-8 w-8 rounded-md flex items-center justify-center hover:bg-muted" title="Rückgängig">
-              <Undo2 size={16} />
-            </button>
-            <button className="h-8 w-8 rounded-md flex items-center justify-center hover:bg-muted" title="Wiederherstellen">
-              <Redo2 size={16} />
-            </button>
-            <span className="text-xs px-2 tabular-nums">{zoom}%</span>
-            <button className="h-8 w-8 rounded-md flex items-center justify-center hover:bg-muted" title="Vollbild">
-              <Maximize2 size={16} />
-            </button>
-            <button className="h-8 px-3 rounded-md border text-sm flex items-center gap-1.5" style={{ borderColor: "hsl(var(--hairline))" }}>
-              <Share2 size={14} /> Teilen
-            </button>
-            <button
-              className="h-8 w-8 rounded-md flex items-center justify-center"
-              style={{ background: "hsl(var(--accent-gold-soft))", color: "hsl(var(--accent-gold))" }}
-              title="Präsentieren"
-            >
-              <Play size={14} />
-            </button>
-            <button
-              className="h-8 px-3 rounded-md text-sm font-medium"
-              style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
-            >
-              Exportieren
-            </button>
-          </div>
-        </header>
+        <WorkspaceHeader
+          projectId={project.id}
+          projectName={project.name}
+          contextLabel={activePage?.title}
+          mode="workspace"
+          zoomPercent={zoom}
+          onPresent={() => {}}
+          onShare={() => {}}
+          onExport={() => {}}
+        />
 
         <div className="flex-1 flex min-h-0">
           {/* Pages sidebar (collapsible) */}
@@ -737,29 +696,33 @@ function ToolRailButton({
   active,
   accent,
   onClick,
+  showLabel,
 }: {
   icon: React.ReactNode;
   label: string;
   active?: boolean;
   accent?: boolean;
   onClick?: () => void;
+  showLabel?: boolean;
 }) {
   return (
     <button
       onClick={onClick}
       title={label}
-      className="w-10 h-10 rounded-lg flex flex-col items-center justify-center text-[9px] gap-0.5 hover:bg-muted"
+      className="cad-rail-btn"
       style={{
         background: active ? "hsl(var(--surface-muted))" : "transparent",
         color: accent
           ? "hsl(var(--accent-gold))"
           : active
-          ? "hsl(var(--ink))"
+          ? "hsl(var(--accent-gold))"
           : "hsl(var(--ink-soft))",
       }}
     >
       {icon}
-      <span className="leading-none">{label.length > 8 ? label.slice(0, 6) + "…" : label}</span>
+      <span className="leading-none">
+        {showLabel ? label : label.length > 8 ? label.slice(0, 6) + "…" : label}
+      </span>
     </button>
   );
 }

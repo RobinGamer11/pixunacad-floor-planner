@@ -185,13 +185,13 @@ function MappenPanel({ project, activeId, onSelect }: { project: Project; active
 function ProjektinfoPanel({ project }: { project: Project }) {
   return (
     <section
-      className="rounded-2xl p-5"
+      className="rounded-2xl p-4"
       style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
     >
-      <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-3">
+      <div className="text-[10px] font-semibold tracking-[0.18em] text-muted-foreground mb-2">
         PROJEKTINFO
       </div>
-      <div className="space-y-3">
+      <div className="space-y-1.5">
         <InfoRow label="Bauherr" value={project.bauherr || "—"} />
         <InfoRow label="Projektadresse" value={project.ort || "—"} />
         <InfoRow label="Projekttyp" value={project.projektTyp || "—"} />
@@ -209,9 +209,9 @@ function ProjektinfoPanel({ project }: { project: Project }) {
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex flex-col gap-0.5 pb-2 border-b" style={{ borderColor: "hsl(var(--hairline) / 0.5)" }}>
-      <span className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{label}</span>
-      <span className="text-sm break-words" style={{ color: "hsl(var(--ink))" }}>{value}</span>
+    <div className="flex flex-col gap-0 pb-1.5 border-b" style={{ borderColor: "hsl(var(--hairline) / 0.5)" }}>
+      <span className="text-[9px] uppercase tracking-[0.1em] text-muted-foreground leading-tight">{label}</span>
+      <span className="text-[13px] break-words leading-snug" style={{ color: "hsl(var(--ink))" }}>{value}</span>
     </div>
   );
 }

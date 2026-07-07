@@ -54,8 +54,18 @@ const TOOL_VARIANTS: Record<string, ToolVariant[]> = {
   ],
 };
 
-interface CadEditorProps { projectId?: string }
-const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
+export interface CadEditorHandle {
+  undo: () => void;
+  redo: () => void;
+  exportPdf: () => void;
+}
+
+interface CadEditorProps {
+  projectId?: string;
+  onHistoryChange?: (canUndo: boolean, canRedo: boolean) => void;
+  onZoomChange?: (percent: number) => void;
+}
+const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId, onHistoryChange, onZoomChange }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const hubRef = useRef<HTMLDivElement>(null);
@@ -178,6 +188,30 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
   const textEditorSymbolRef = useRef<HTMLSelectElement>(null);
 
   const appRef = useRef<CadApp | null>(null);
+
+  React.useImperativeHandle(ref, () => ({
+    undo: () => appRef.current?.undo(),
+    redo: () => appRef.current?.redo(),
+    exportPdf: () => appRef.current?.printSelectedPlans(),
+  }), []);
+
+  // Zoom-Anzeige nach oben spiegeln (Camera.scale, 80 = 100%).
+  useEffect(() => {
+    if (!onZoomChange) return;
+    let raf = 0;
+    let last = -1;
+    const tick = () => {
+      const s = appRef.current?.camera.scale;
+      if (typeof s === "number") {
+        const pct = Math.round((s / 80) * 100);
+        if (pct !== last) { last = pct; onZoomChange(pct); }
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [onZoomChange]);
+
   const [activeTool, setActiveTool] = useState<string>(ToolIds.SELECT);
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(true);
   const [rightOpen, setRightOpen] = useState<boolean>(true);
@@ -540,7 +574,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
       if (saved) (app as any)._restoreScene?.(saved);
     } catch (e) { console.error("CAD restore failed:", e); }
 
-    app.onHistoryChange = (u, r) => { setCanUndo(u); setCanRedo(r); persist(); };
+    app.onHistoryChange = (u, r) => { setCanUndo(u); setCanRedo(r); onHistoryChange?.(u, r); persist(); };
     // Periodischer Fallback (Sheet-Renames etc. pushen keine History).
     const persistTimer = window.setInterval(persist, 4000);
     app.onStickersChange = () => setStickers([...app.stickers]);
@@ -858,24 +892,6 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
           >
             <Grid3x3 size={18} />
             <span>Raster</span>
-          </button>
-          <button
-            onClick={() => appRef.current?.undo()}
-            disabled={!canUndo}
-            title="Rückgängig (Strg+Z)"
-            className="cad-rail-btn disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <Undo2 size={18} />
-            <span>Undo</span>
-          </button>
-          <button
-            onClick={() => appRef.current?.redo()}
-            disabled={!canRedo}
-            title="Wiederherstellen (Strg+Y)"
-            className="cad-rail-btn disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <Redo2 size={18} />
-            <span>Redo</span>
           </button>
           <button
             onClick={() => handleToolClick(ToolIds.PIPETTE)}
@@ -2657,6 +2673,7 @@ const CadEditor: React.FC<CadEditorProps> = ({ projectId }) => {
       )}
     </div>
   );
-};
+});
+CadEditor.displayName = "CadEditor";
 
 export default CadEditor;
