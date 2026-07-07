@@ -48,6 +48,7 @@ import {
   ChevronUp,
   ChevronDown,
   GripVertical,
+  Pipette,
 } from "lucide-react";
 
 import {
@@ -74,7 +75,7 @@ const FORMAT_SIZES: Record<PageFormat, { w: number; h: number; label: string }> 
   frei: { w: 400, h: 300, label: "Freies Format" },
 };
 
-export type PageTool = "guide" | "line" | "text" | "cad" | null;
+export type PageTool = "guide" | "line" | "text" | "cad" | "pipette" | null;
 
 export default function ProjectWorkspace() {
   const { projectId } = useParams();
@@ -215,6 +216,23 @@ export default function ProjectWorkspace() {
       >
 
         <ToolRailButton
+          icon={<Minus size={18} style={{ strokeDasharray: "3 2" }} />}
+          label="Hilfslinie"
+          active={activeTool === "guide"}
+          onClick={() => setActiveToolAndTab(activeTool === "guide" ? null : "guide")}
+          showLabel
+        />
+        <ToolRailButton
+          icon={<Pipette size={18} />}
+          label="Pipette"
+          active={activeTool === "pipette"}
+          onClick={() => setActiveToolAndTab(activeTool === "pipette" ? null : "pipette")}
+          showLabel
+        />
+
+        <div className="my-1 w-8 border-t" style={{ borderColor: "hsl(var(--hairline))" }} />
+
+        <ToolRailButton
           icon={<MousePointer2 size={18} />}
           label="Auswahl"
           active={activeTool === null}
@@ -232,12 +250,6 @@ export default function ProjectWorkspace() {
           label="Text"
           active={activeTool === "text"}
           onClick={() => setActiveToolAndTab(activeTool === "text" ? null : "text")}
-        />
-        <ToolRailButton
-          icon={<Minus size={18} style={{ strokeDasharray: "3 2" }} />}
-          label="Hilfslinie"
-          active={activeTool === "guide"}
-          onClick={() => setActiveToolAndTab(activeTool === "guide" ? null : "guide")}
         />
         <ToolRailButton
           icon={<Minus size={18} />}
