@@ -1666,6 +1666,7 @@ function RightInspector({
           />
         )}
       </div>
+      </div>
     </aside>
   );
 }
