@@ -1255,11 +1255,12 @@ function PageCanvas({
             : activeTool === "free" ? "free"
             : activeTool === "eraser" ? "eraser"
             : activeTool === "hatch" ? "hatch"
+            : activeTool === "document" ? "document"
             : activeTool === null ? "select"
             : null
           }
           hatchDrawMode={hatchDrawMode}
-          enabled={activeTool === "line" || activeTool === "text" || activeTool === "guide" || activeTool === "free" || activeTool === "eraser" || activeTool === "hatch" || activeTool === null}
+          enabled={activeTool === "line" || activeTool === "text" || activeTool === "guide" || activeTool === "free" || activeTool === "eraser" || activeTool === "hatch" || activeTool === "document" || activeTool === null}
           initialState={page.cadOverlay}
           lineColor={activeTool === "guide" ? toolSettings.guide.color : toolSettings.line.color}
           lineThicknessMm={activeTool === "guide" ? Math.max(0.1, toolSettings.guide.strokeWidth * 0.2) : toolSettings.line.thicknessMm}
