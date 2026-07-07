@@ -1431,7 +1431,8 @@ function ElementView({
     const startRot = el.rotation ?? 0;
     const handleMove = (ev: MouseEvent) => {
       const a = Math.atan2(ev.clientY - cy, ev.clientX - cx);
-      const deg = startRot + ((a - startAngle) * 180) / Math.PI;
+      let deg = startRot + ((a - startAngle) * 180) / Math.PI;
+      if (ev.shiftKey) deg = Math.round(deg / 15) * 15;
       onRotate(deg, true);
     };
     const handleUp = () => {
