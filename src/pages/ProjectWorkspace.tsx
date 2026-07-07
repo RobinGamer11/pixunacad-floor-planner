@@ -694,6 +694,7 @@ export default function ProjectWorkspace() {
           )}
         </div>
       </div>
+      </div>
     </div>
   );
 }
