@@ -87,8 +87,10 @@ export function getOrCreateBgMask(doc: DocumentObject, onLoaded?: () => void): H
   const c = document.createElement("canvas");
   c.width = w; c.height = h;
   const ctx = c.getContext("2d", { willReadFrequently: true })!;
-  // Start: alles Hintergrund (schwarz).
-  ctx.fillStyle = "#000000";
+  // Start: alles Vordergrund (weiß = sichtbar). Der Nutzer entfernt Bereiche
+  // aktiv, statt sie erst zurückzugewinnen — das entspricht dem intuitiven
+  // Modell "Ich klicke den Hintergrund weg".
+  ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, w, h);
   anyDoc._bgFgMask = c;
   anyDoc._bgMaskRev = (anyDoc._bgMaskRev || 0) + 1;
@@ -98,7 +100,7 @@ export function getOrCreateBgMask(doc: DocumentObject, onLoaded?: () => void): H
     img.onload = () => {
       try {
         ctx.clearRect(0, 0, w, h);
-        ctx.fillStyle = "#000000";
+        ctx.fillStyle = "#ffffff";
         ctx.fillRect(0, 0, w, h);
         ctx.drawImage(img, 0, 0, w, h);
         anyDoc._bgMaskRev = (anyDoc._bgMaskRev || 0) + 1;
