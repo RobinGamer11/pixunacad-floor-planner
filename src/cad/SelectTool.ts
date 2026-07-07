@@ -301,7 +301,7 @@ export class SelectTool {
     for (let i = this.app.scene.documents.length - 1; i >= 0; i--) {
       const doc = this.app.scene.documents[i];
       if (!this.app.labelManager.isVisible(doc.labelId)) continue;
-      if (pointInDocument(mouseW, doc)) return doc;
+      if (pointInDocumentVisible(mouseW, doc)) return doc;
     }
     return null;
   }
