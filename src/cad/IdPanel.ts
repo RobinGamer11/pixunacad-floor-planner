@@ -149,7 +149,13 @@ export class IdPanel {
       `;
       main.addEventListener("click", () => {
         if (group.visible === false) return;
-        this.app.selectLabelGroup(group.id);
+        // Toggle: erneuter Klick auf die bereits aktive Ebene hebt die Auswahl auf.
+        if (this.app.selectedLabelId === group.id) {
+          this.app.clearSelection?.();
+          this.app.setSelectedLabelId(null);
+        } else {
+          this.app.selectLabelGroup(group.id);
+        }
       });
 
       const actions = document.createElement("div");
