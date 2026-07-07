@@ -20,25 +20,52 @@ const geoCache = new Map<string, { lat: number; lon: number; label: string } | n
 const wxCache = new Map<string, { at: number; data: WeatherResult }>();
 const inflight = new Map<string, Promise<WeatherResult | null>>();
 
+export interface GeoHit {
+  lat: number;
+  lon: number;
+  label: string;         // "Starnberg, Bayern, DE"
+  name: string;
+  admin1?: string;
+  country?: string;
+  countryCode?: string;
+}
+
+export async function geocodeSearch(query: string, count = 5): Promise<GeoHit[]> {
+  const q = query.trim();
+  if (q.length < 2) return [];
+  const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=${count}&language=de&format=json`;
+  try {
+    const res = await fetch(url);
+    const json = await res.json();
+    const results = json?.results ?? [];
+    return results.map((hit: any) => ({
+      lat: hit.latitude,
+      lon: hit.longitude,
+      name: hit.name,
+      admin1: hit.admin1,
+      country: hit.country,
+      countryCode: hit.country_code,
+      label: [hit.name, hit.admin1, hit.country_code].filter(Boolean).join(", "),
+    }));
+  } catch {
+    return [];
+  }
+}
+
 async function geocode(ort: string) {
   const key = ort.trim().toLowerCase();
   if (geoCache.has(key)) return geoCache.get(key)!;
-  const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(ort)}&count=1&language=de&format=json`;
-  const res = await fetch(url);
-  const json = await res.json();
-  const hit = json?.results?.[0];
+  const hits = await geocodeSearch(ort, 1);
+  const hit = hits[0];
   if (!hit) {
     geoCache.set(key, null);
     return null;
   }
-  const entry = {
-    lat: hit.latitude,
-    lon: hit.longitude,
-    label: [hit.name, hit.admin1, hit.country_code].filter(Boolean).join(", "),
-  };
+  const entry = { lat: hit.lat, lon: hit.lon, label: hit.label };
   geoCache.set(key, entry);
   return entry;
 }
+
 
 async function fetchForecast(ort: string): Promise<WeatherResult | null> {
   const geo = await geocode(ort);
