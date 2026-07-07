@@ -71,15 +71,15 @@ function MappenPanel({ project, activeId, onSelect }: { project: Project; active
 
   return (
     <section
-      className="rounded-2xl p-4 flex flex-col"
+      className="rounded-2xl p-5 flex flex-col"
       style={{
         background: "hsl(var(--surface-card))",
         border: "1px solid hsl(var(--hairline))",
-        height: 260,
+        height: 360,
       }}
     >
-      <div className="flex items-center gap-2 mb-3">
-        <span className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">PROJEKTMAPPEN</span>
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-xs font-semibold tracking-[0.18em]" style={{ color: "hsl(var(--accent-gold))" }}>PROJEKTMAPPEN</span>
         <button
           onClick={() => projectStore.addMappe(project.id, "Neue Mappe")}
           title="Neue Projektmappe"
