@@ -795,6 +795,20 @@ export const projectStore = {
       }),
     }));
   },
+  reorderMappe: (projectId: string, mappeId: string, direction: -1 | 1) => {
+    setState((s) => ({
+      projects: s.projects.map((p) => {
+        if (p.id !== projectId) return p;
+        const mappen = [...(p.mappen ?? [])];
+        const idx = mappen.findIndex((m) => m.id === mappeId);
+        if (idx < 0) return p;
+        const target = idx + direction;
+        if (target < 0 || target >= mappen.length) return p;
+        [mappen[idx], mappen[target]] = [mappen[target], mappen[idx]];
+        return { ...p, mappen, updatedAt: new Date().toISOString() };
+      }),
+    }));
+  },
   setActiveMappe: (projectId: string, mappeId: string) => {
     setState((s) => ({
       projects: s.projects.map((p) => (p.id === projectId ? { ...p, activeMappeId: mappeId } : p)),
