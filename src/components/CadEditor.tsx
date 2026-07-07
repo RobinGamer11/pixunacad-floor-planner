@@ -1538,10 +1538,10 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             type="button"
             onClick={() => setRightOpen(false)}
             title="Panel ausblenden"
-            className="w-8 shrink-0 flex items-center justify-center hover:bg-muted"
-            style={{ color: "hsl(var(--ink-soft))" }}
+            className="w-8 shrink-0 flex items-center justify-center hover:bg-muted border-l"
+            style={{ borderColor: "hsl(var(--hairline))" }}
           >
-            <PanelRightClose size={14} />
+            <PanelRightClose size={14} className="text-muted-foreground" />
           </button>
         </div>
 
@@ -2640,16 +2640,15 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       </aside>
       ) : (
         <div
-          className="w-7 shrink-0 border-l items-start justify-center pt-3"
+          className="w-7 shrink-0 border-l flex items-start justify-center pt-3"
           style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))", display: printOpen ? "none" : "flex" }}
         >
           <button
             onClick={() => setRightOpen(true)}
             title="Panel einblenden"
             className="h-7 w-7 rounded-md flex items-center justify-center hover:bg-muted"
-            style={{ color: "hsl(var(--ink-soft))" }}
           >
-            <PanelRightOpen size={14} />
+            <PanelRightOpen size={14} className="text-muted-foreground" />
           </button>
         </div>
       )}
