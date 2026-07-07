@@ -257,9 +257,20 @@ export default function ProjectWorkspace() {
           label="Linie"
           active={activeTool === "line"}
           onClick={() => setActiveToolAndTab(activeTool === "line" ? null : "line")}
+          showLabel
         />
-        <ToolRailButton icon={<Hash size={18} />} label="Schraffur" />
-        <ToolRailButton icon={<FileText size={18} />} label="PDF einfügen" onClick={() => pdfFileInputRef.current?.click()} />
+        <ToolRailButton
+          icon={<Hash size={18} />}
+          label="Schraffur"
+          showLabel
+          onClick={() => navigate(`/project/${project.id}/cad`)}
+        />
+        <ToolRailButton
+          icon={<FileText size={18} />}
+          label="PDF einfügen"
+          showLabel
+          onClick={() => pdfFileInputRef.current?.click()}
+        />
         <input
           ref={pdfFileInputRef}
           type="file"
@@ -297,7 +308,49 @@ export default function ProjectWorkspace() {
             }
           }}
         />
-        <ToolRailButton icon={<ImageIcon size={18} />} label="Bild" />
+        <ToolRailButton
+          icon={<ImageIcon size={18} />}
+          label="Bild"
+          showLabel
+          onClick={() => imgFileInputRef.current?.click()}
+        />
+        <input
+          ref={imgFileInputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp,image/gif"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            e.target.value = "";
+            if (!f || !projectId || !activePage) return;
+            const reader = new FileReader();
+            reader.onload = () => {
+              const dataUrl = String(reader.result || "");
+              if (!dataUrl) return;
+              const img = new Image();
+              img.onload = () => {
+                const fmt = FORMAT_SIZES[activePage.format];
+                const aspect = img.width && img.height ? img.width / img.height : 1;
+                const wPct = 40;
+                const pageAspect = fmt.w / fmt.h;
+                const hPct = Math.min(80, wPct / aspect * pageAspect);
+                const id = projectStore.addElement(projectId, activePage.id, {
+                  kind: "image",
+                  x: 15,
+                  y: 15,
+                  w: wPct,
+                  h: hPct,
+                  imageUrl: dataUrl,
+                });
+                setSelectedElementIds([id]);
+              };
+              img.onerror = () => window.alert("Bild konnte nicht geladen werden.");
+              img.src = dataUrl;
+            };
+            reader.onerror = () => window.alert("Bild konnte nicht gelesen werden.");
+            reader.readAsDataURL(f);
+          }}
+        />
         <ToolRailButton icon={<TableIcon size={18} />} label="Tabelle" />
         <ToolRailButton icon={<StickyNote size={18} />} label="Notiz" />
         <ToolRailButton icon={<Clock size={18} />} label="Zeitstrahl" />
