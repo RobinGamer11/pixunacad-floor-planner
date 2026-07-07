@@ -37,7 +37,7 @@ export function defaultBgRemoval(): BgRemoval {
   return {
     enabled: false,
     fgMaskDataUrl: null,
-    tolerance: 24,
+    tolerance: 32,
     brushRadiusM: 0.15,
     fgColor: null,
     fgAlpha: 1,
