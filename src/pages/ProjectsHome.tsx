@@ -455,6 +455,7 @@ export default function ProjectsHome() {
 // UebersichtView wird nun aus @/components/project/UebersichtView importiert.
 
 function SeitenView({ project, onAddPage }: { project: Project; onAddPage: () => void }) {
+  const navigate = useNavigate();
   const mappen = project.mappen ?? [];
   const activeMappe = mappen.find((m) => m.id === project.activeMappeId) ?? mappen[0];
   const mappePages = activeMappe
