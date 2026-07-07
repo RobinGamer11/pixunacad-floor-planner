@@ -458,14 +458,7 @@ export default function ProjectsHome() {
 
 /* -------- Tab views -------- */
 
-function UebersichtView({ project, onAddPage }: { project: Project; onAddPage: () => void }) {
-  return (
-    <div className="space-y-6">
-      <SeitenInhaltGrid project={project} onAddPage={onAddPage} />
-      <TaskTimeline project={project} />
-    </div>
-  );
-}
+// UebersichtView wird nun aus @/components/project/UebersichtView importiert.
 
 function SeitenView({ project, onAddPage }: { project: Project; onAddPage: () => void }) {
   const [selectedPageId, setSelectedPageId] = useState<string | undefined>(project.pages[0]?.id);
