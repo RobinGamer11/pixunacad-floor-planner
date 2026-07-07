@@ -376,9 +376,12 @@ export default function ProjectsHome() {
               </div>
             </div>
 
+            {/* Wetter für Projektort */}
+            <WeatherStrip ort={selected.ort} />
+
             {/* Tabs */}
             <div
-              className="mt-5 flex items-center gap-7 text-sm border-b"
+              className="mt-5 flex items-center gap-7 text-sm border-b overflow-x-auto"
               style={{ borderColor: "hsl(var(--hairline))" }}
             >
               {(
@@ -386,6 +389,8 @@ export default function ProjectsHome() {
                   ["uebersicht", "Übersicht"],
                   ["seiten", "Seiten"],
                   ["aufgaben", "Aufgaben"],
+                  ["dateien", "Dateien"],
+                  ["fotos", "Fotos"],
                   ["infos", "Infos"],
                   ["team", "Team"],
                 ] as const
@@ -393,7 +398,7 @@ export default function ProjectsHome() {
                 <button
                   key={key}
                   onClick={() => setTab(key)}
-                  className="py-3 relative"
+                  className="py-3 relative whitespace-nowrap"
                   style={{
                     color: tab === key ? "hsl(var(--ink))" : "hsl(var(--ink-soft))",
                     fontWeight: tab === key ? 600 : 400,
@@ -411,12 +416,33 @@ export default function ProjectsHome() {
             </div>
 
             {tab === "uebersicht" && (
-              <UebersichtView project={selected} onAddPage={handleAddPage} />
+              <UebersichtView
+                project={selected}
+                activeMappeId={selected.activeMappeId}
+                onSelectMappe={(id) => projectStore.setActiveMappe(selected.id, id)}
+              />
             )}
             {tab === "seiten" && (
               <SeitenView project={selected} onAddPage={handleAddPage} />
             )}
             {tab === "aufgaben" && <AufgabenView project={selected} />}
+            {tab === "dateien" && (
+              <FileBrowser
+                project={selected}
+                kind="files"
+                accept=".pdf,.dwg,.dxf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,application/pdf"
+                emptyHint="Noch keine Dateien. Lade PDFs, DWG/DXF oder Dokumente hoch oder lege einen Ordner an."
+              />
+            )}
+            {tab === "fotos" && (
+              <FileBrowser
+                project={selected}
+                kind="photos"
+                accept="image/png,image/jpeg,image/webp,.jpg,.jpeg,.png,.webp"
+                emptyHint="Noch keine Fotos. Lade JPG/PNG-Dateien hoch oder lege einen Ordner an."
+                photoMode
+              />
+            )}
             {tab === "infos" && <InfosView project={selected} />}
             {tab === "team" && (
               <div className="mt-6 text-sm text-muted-foreground">
@@ -426,118 +452,6 @@ export default function ProjectsHome() {
           </div>
         )}
       </main>
-
-      {/* Right dashboard (collapsible) */}
-      {rightOpen ? (
-        <aside
-          className="w-[300px] shrink-0 border-l overflow-y-auto relative"
-          style={{ borderColor: "hsl(var(--hairline))" }}
-        >
-          <button
-            onClick={() => setRightOpen(false)}
-            title="Projektinfo einklappen"
-            className="absolute top-4 left-3 text-muted-foreground hover:text-foreground z-10"
-          >
-            <PanelRightClose size={16} />
-          </button>
-          {selected && (
-            <div className="p-5 pt-10 space-y-5">
-              <Card title="PROJEKTINFO">
-                <KV label="Bauherr" value={selected.bauherr || "—"} />
-                <KV label="Projektadresse" value={selected.ort || "—"} />
-                <KV label="Projekttyp" value={selected.projektTyp || "—"} />
-                <KV
-                  label="Status"
-                  value={
-                    <span className="flex items-center gap-1.5">
-                      <span
-                        className="w-2 h-2 rounded-full"
-                        style={{ background: "hsl(140 55% 45%)" }}
-                      />
-                      {selected.status || "—"}
-                    </span>
-                  }
-                />
-                <KV label="Erstellt am" value={selected.erstelltAm || "—"} />
-                <KV
-                  label="Zuletzt geändert"
-                  value={new Date(selected.updatedAt).toLocaleString("de-DE", {
-                    dateStyle: "short",
-                    timeStyle: "short",
-                  })}
-                />
-                {selected.customFields?.map((f) => (
-                  <KV key={f.id} label={f.label} value={f.value || "—"} />
-                ))}
-              </Card>
-
-              <Card title="AUFGABEN" action="+ Aufgabe">
-                {allTasks.slice(0, 6).map((t) => (
-                  <div key={t.id} className="flex items-center gap-2 py-1.5 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={t.done}
-                      onChange={() => projectStore.toggleTask(t.projectId, t.id)}
-                      className="accent-foreground"
-                    />
-                    <span
-                      className={`flex-1 truncate ${
-                        t.done ? "line-through text-muted-foreground" : ""
-                      }`}
-                    >
-                      {t.title}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {t.date
-                        ? new Date(t.date).toLocaleDateString("de-DE", {
-                            day: "2-digit",
-                            month: "2-digit",
-                          })
-                        : ""}
-                    </span>
-                  </div>
-                ))}
-              </Card>
-
-              <Card title="KALENDER" action="Alle anzeigen">
-                <MiniCalendar events={selected.events.map((e) => e.date)} />
-                <div className="mt-3 space-y-3">
-                  {selected.events.map((e) => (
-                    <div key={e.id}>
-                      <div className="text-[11px] text-muted-foreground">
-                        {new Date(e.date).toLocaleDateString("de-DE", {
-                          day: "numeric",
-                          month: "long",
-                          year: "numeric",
-                        })}
-                      </div>
-                      <div className="text-sm font-medium">
-                        {e.time} {e.title}
-                      </div>
-                      {e.location && (
-                        <div className="text-xs text-muted-foreground">{e.location}</div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            </div>
-          )}
-        </aside>
-      ) : (
-        <div
-          className="w-8 shrink-0 border-l flex items-start justify-center pt-4"
-          style={{ borderColor: "hsl(var(--hairline))" }}
-        >
-          <button
-            onClick={() => setRightOpen(true)}
-            title="Projektinfo ausklappen"
-            className="text-muted-foreground hover:text-foreground"
-          >
-            <PanelRightOpen size={16} />
-          </button>
-        </div>
-      )}
     </div>
   );
 }
