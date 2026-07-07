@@ -24,8 +24,10 @@ import { LineTool } from "../LineTool";
 import { TextTool } from "../TextTool";
 import { TextEditorOverlay } from "../TextEditorOverlay";
 import { SelectTool } from "../SelectTool";
+import { FreeDrawTool } from "../FreeDrawTool";
+import { EraserTool } from "../EraserTool";
 import { Defaults, SelectionType } from "../constants";
-import type { TextBox, TextBoxStyle } from "../Scene";
+import type { TextBox, TextBoxStyle, FreeLineStyle } from "../Scene";
 import { drawRichTextBox } from "../textRichRenderer";
 import { autoSizeTextBox } from "../textAutoSize";
 
@@ -75,7 +77,7 @@ export interface MiniCadInit {
 }
 
 
-export type MiniTool = "line" | "text" | "select" | "guide" | null;
+export type MiniTool = "line" | "text" | "select" | "guide" | "free" | "eraser" | null;
 export type MiniCadSelectionInfo =
   | {
       tool: "line";
@@ -137,6 +139,8 @@ export class MiniCad {
   readonly textTool: TextTool;
   readonly textEditor: TextEditorOverlay;
   readonly selectTool: SelectTool;
+  readonly freeDrawTool: FreeDrawTool;
+  readonly eraserTool: EraserTool;
 
   // Stubs required by tools / editor.
   activeDrawLabelId = Defaults.defaultLabelId;
@@ -144,6 +148,27 @@ export class MiniCad {
   defaultLineThicknessM: number;
   /** 0..1 (1 = vollständig deckend). */
   defaultLineAlpha = 1;
+
+  // Freihand-Defaults (analog CadApp).
+  defaultFreeColor: string = Defaults.freeColor;
+  defaultFreeThicknessM: number = Defaults.freeThicknessM;
+  defaultFreeOpacity: number = Defaults.freeOpacity;
+  defaultFreeLineStyle: FreeLineStyle = Defaults.freeLineStyle as FreeLineStyle;
+  defaultFreeGapM: number = Defaults.freeGapM;
+  defaultFreeImageSrc: string | null = null;
+  defaultFreeImageSizeM: number = Defaults.freeImageSizeM;
+  defaultFreeImageSpacingM: number = Defaults.freeImageSpacingM;
+  defaultFreeImageRotate: boolean = Defaults.freeImageRotate;
+  defaultFreeAutoShape: boolean = false;
+  // Radiergummi-Defaults.
+  defaultEraserRadiusM: number = Defaults.eraserRadiusM;
+  defaultEraserStrength: number = Defaults.eraserStrength;
+
+  /** Optionaler Callback für React-Panels (Bezeichnungen/Ausgewählter-Stroke-Refresh). */
+  onLabelsChange?: () => void;
+  /** Parameterloser Selection-Change-Callback für React-Panels (`FreeDrawSettingsPanel` etc.).
+   *  Wird nach dem intern getypten `_onSelectionChange` gefeuert. */
+  onSelectionChange?: () => void;
 
   // Text defaults (mirror of CadApp).
   defaultTextColor = Defaults.textColor;
@@ -266,6 +291,8 @@ export class MiniCad {
       this as any,
     );
     this.selectTool = new SelectTool(this as any);
+    this.freeDrawTool = new FreeDrawTool(this as any);
+    this.eraserTool = new EraserTool(this as any);
 
     // Wire PointEditMenu activation identisch zur CadApp-Oberfläche.
     this.pointEditMenu.bindActivate((action) => {
@@ -596,6 +623,8 @@ export class MiniCad {
       this.textTool.cancel();
     }
     if (this._activeTool === "select") this.selectTool.cancel();
+    if (this._activeTool === "free") this.freeDrawTool.cancel();
+    if (this._activeTool === "eraser") this.eraserTool.cancel();
     this._activeTool = tool;
     this.activeTool = null;
     // Guide-Modus aktivieren/deaktivieren — wirkt auf den createSegment-Interceptor.
@@ -608,6 +637,12 @@ export class MiniCad {
       this.activeTool = this.textTool;
     } else if (tool === "select") {
       this.selectTool.activate();
+    } else if (tool === "free") {
+      this.freeDrawTool.activate();
+      this.activeTool = this.freeDrawTool as any;
+    } else if (tool === "eraser") {
+      this.eraserTool.activate();
+      this.activeTool = this.eraserTool as any;
     }
   }
 
@@ -826,6 +861,24 @@ export class MiniCad {
         style: { ...t.style },
         labelId: t.labelId,
       })),
+
+      freeStrokes: this.scene.freeStrokes.map((s) => ({
+        id: s.id,
+        points: s.points.map((p) => ({ x: p.x, y: p.y })),
+        color: s.color,
+        thicknessM: s.thicknessM,
+        opacity: s.opacity,
+        lineStyle: s.lineStyle,
+        gapM: s.gapM,
+        blobSpacingM: s.blobSpacingM,
+        blobSizeM: s.blobSizeM,
+        smoothing: s.smoothing,
+        labelId: s.labelId,
+        imageSrc: s.imageSrc,
+        imageSizeM: s.imageSizeM,
+        imageSpacingM: s.imageSpacingM,
+        imageRotateAlongPath: s.imageRotateAlongPath,
+      })),
     };
   }
 
@@ -866,6 +919,20 @@ export class MiniCad {
             t.rotationRad || 0,
           );
         } catch (e) { console.error("MiniCad restore textBox:", e); }
+      }
+    }
+    if (Array.isArray(data.freeStrokes)) {
+      for (const s of data.freeStrokes) {
+        try {
+          this.scene.createFreeStroke(s.points || [], {
+            color: s.color, thicknessM: s.thicknessM, opacity: s.opacity,
+            lineStyle: s.lineStyle, gapM: s.gapM,
+            blobSpacingM: s.blobSpacingM, blobSizeM: s.blobSizeM,
+            smoothing: s.smoothing, labelId: s.labelId || Defaults.defaultLabelId,
+            imageSrc: s.imageSrc || null, imageSizeM: s.imageSizeM,
+            imageSpacingM: s.imageSpacingM, imageRotateAlongPath: s.imageRotateAlongPath,
+          });
+        } catch (e) { console.error("MiniCad restore freeStroke:", e); }
       }
     }
   }
@@ -1004,6 +1071,7 @@ export class MiniCad {
     this.renderer.setSelection(primary);
     (this.renderer as any).setExtraSelections?.(list.filter((s) => s !== primary));
     this._onSelectionChange?.(this._selectionInfo(primary), list.length);
+    try { this.onSelectionChange?.(); } catch {}
   }
 
 
@@ -1043,6 +1111,20 @@ export class MiniCad {
 
   refreshLabelUI() {
     this._changeDirty = true;
+    try { this.onLabelsChange?.(); } catch {}
+  }
+
+  /** Compat mit CadApp — von FreeDrawSettingsPanel/EraserSettingsPanel benutzt. */
+  get canvas(): HTMLCanvasElement { return this.dom.canvas; }
+
+  setActiveDrawLabelId(labelId: string) {
+    this.activeDrawLabelId = labelId || Defaults.defaultLabelId;
+    this.refreshLabelUI();
+  }
+
+  getSelectedFreeStroke() {
+    if (!this.selection || this.selection.type !== SelectionType.FREE_STROKE) return null;
+    return this.scene.getFreeStrokeById((this.selection as any).freeStrokeId);
   }
 
   /* ===== CadApp surface stubs (required by SelectTool) ===== */
@@ -1560,6 +1642,8 @@ export class MiniCad {
       if (this._activeTool === "line" || this._activeTool === "guide") this.lineTool.update(this.input);
       else if (this._activeTool === "text") this.textTool.update(this.input);
       else if (this._activeTool === "select") this.selectTool.update(this.input);
+      else if (this._activeTool === "free") this.freeDrawTool.update(this.input);
+      else if (this._activeTool === "eraser") this.eraserTool.update(this.input);
 
       // Multi-Select Group-Move: nach SelectTool-Update das Delta des Primary
       // auf die Snapshot-Positionen der Extras anwenden.
@@ -1593,12 +1677,16 @@ export class MiniCad {
   private _sceneSignature(): string {
     const segs = this.scene.segments.length;
     const texts = this.scene.textBoxes.length;
+    const strokes = this.scene.freeStrokes.length;
     // Include a coarse text snapshot so edits to HTML also fire onChange.
     let h = 0;
     for (const t of this.scene.textBoxes) {
       h = (h * 31 + (t.html?.length || 0) + Math.round(t.center.x * 1000) + Math.round(t.center.y * 1000)) | 0;
     }
-    return `${segs}|${texts}|${h}`;
+    for (const s of this.scene.freeStrokes) {
+      h = (h * 31 + s.points.length + (s.color?.length || 0)) | 0;
+    }
+    return `${segs}|${texts}|${strokes}|${h}`;
   }
 }
 

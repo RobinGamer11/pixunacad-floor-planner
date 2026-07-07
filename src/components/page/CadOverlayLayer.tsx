@@ -34,6 +34,7 @@ interface Props {
   onEngineReady?: (api: {
     setSelectedSegmentSnap: (opts: { midpointSnap?: boolean; divisionSnap?: number | null }) => void;
     duplicateSelectedSegments: (offsetMm?: number) => number;
+    engine: MiniCad;
   }) => void;
 
   /**
@@ -162,6 +163,7 @@ export default function CadOverlayLayer(props: Props) {
     onEngineReady?.({
       setSelectedSegmentSnap: (opts) => engine.setSelectedSegmentSnapSettings(opts),
       duplicateSelectedSegments: (offsetMm) => engine.duplicateSelectedSegments(offsetMm),
+      engine,
     });
 
     // Hub-Box-Polling synchron zum Render-Tick.

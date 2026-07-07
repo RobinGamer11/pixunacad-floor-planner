@@ -49,6 +49,7 @@ import {
   ChevronDown,
   GripVertical,
   Pipette,
+  Eraser,
 } from "lucide-react";
 
 import {
@@ -75,7 +76,7 @@ const FORMAT_SIZES: Record<PageFormat, { w: number; h: number; label: string }> 
   frei: { w: 400, h: 300, label: "Freies Format" },
 };
 
-export type PageTool = "guide" | "line" | "text" | "cad" | "pipette" | null;
+export type PageTool = "guide" | "line" | "free" | "eraser" | "text" | "cad" | "pipette" | null;
 
 export default function ProjectWorkspace() {
   const { projectId } = useParams();
@@ -103,7 +104,10 @@ export default function ProjectWorkspace() {
   const cadEngineApiRef = useRef<{
     setSelectedSegmentSnap: (opts: { midpointSnap?: boolean; divisionSnap?: number | null }) => void;
     duplicateSelectedSegments: (offsetMm?: number) => number;
+    engine: import("@/cad/embed/MiniCad").MiniCad;
   } | null>(null);
+  // Force-re-render der ToolsTab, sobald die Engine bereit ist (für Panel-Wiring).
+  const [, forceEngineTick] = useState(0);
 
 
 
@@ -257,6 +261,20 @@ export default function ProjectWorkspace() {
           label="Linie"
           active={activeTool === "line"}
           onClick={() => setActiveToolAndTab(activeTool === "line" ? null : "line")}
+          showLabel
+        />
+        <ToolRailButton
+          icon={<Pencil size={18} />}
+          label="Freihand"
+          active={activeTool === "free"}
+          onClick={() => setActiveToolAndTab(activeTool === "free" ? null : "free")}
+          showLabel
+        />
+        <ToolRailButton
+          icon={<Eraser size={18} />}
+          label="Radiergummi"
+          active={activeTool === "eraser"}
+          onClick={() => setActiveToolAndTab(activeTool === "eraser" ? null : "eraser")}
           showLabel
         />
         <ToolRailButton
@@ -702,7 +720,7 @@ export default function ProjectWorkspace() {
                       });
                     }
                   }}
-                  onCadEngineReady={(api) => { cadEngineApiRef.current = api; }}
+                  onCadEngineReady={(api) => { cadEngineApiRef.current = api; forceEngineTick(t => t + 1); }}
 
                 />
               )}
@@ -743,6 +761,7 @@ export default function ProjectWorkspace() {
                 } : prev);
               }}
               onCadDuplicateSegments={() => { cadEngineApiRef.current?.duplicateSelectedSegments(5); }}
+              cadEngine={cadEngineApiRef.current?.engine ?? null}
 
               updateToolSettings={updateToolSettings}
 
@@ -867,7 +886,7 @@ function PageCanvas({
   onCommitTool: () => void;
   onSelect: (id?: string, opts?: { shift?: boolean }) => void;
   onCadSelectionChange: (info: MiniCadSelectionInfo | null, count?: number) => void;
-  onCadEngineReady?: (api: { setSelectedSegmentSnap: (opts: { midpointSnap?: boolean; divisionSnap?: number | null }) => void; duplicateSelectedSegments: (offsetMm?: number) => number }) => void;
+  onCadEngineReady?: (api: { setSelectedSegmentSnap: (opts: { midpointSnap?: boolean; divisionSnap?: number | null }) => void; duplicateSelectedSegments: (offsetMm?: number) => number; engine: import("@/cad/embed/MiniCad").MiniCad }) => void;
 }) {
 
   const fmt = FORMAT_SIZES[page.format];
@@ -1176,10 +1195,12 @@ function PageCanvas({
             activeTool === "line" ? "line"
             : activeTool === "text" ? "text"
             : activeTool === "guide" ? "guide"
+            : activeTool === "free" ? "free"
+            : activeTool === "eraser" ? "eraser"
             : activeTool === null ? "select"
             : null
           }
-          enabled={activeTool === "line" || activeTool === "text" || activeTool === "guide" || activeTool === null}
+          enabled={activeTool === "line" || activeTool === "text" || activeTool === "guide" || activeTool === "free" || activeTool === "eraser" || activeTool === null}
           initialState={page.cadOverlay}
           lineColor={activeTool === "guide" ? toolSettings.guide.color : toolSettings.line.color}
           lineThicknessMm={activeTool === "guide" ? Math.max(0.1, toolSettings.guide.strokeWidth * 0.2) : toolSettings.line.thicknessMm}
@@ -1630,6 +1651,7 @@ function RightInspector({
 
   onJumpCad,
   onCollapse,
+  cadEngine,
 }: {
   projectId: string;
   page?: import("@/lib/projectStore").ProjectPage;
@@ -1652,6 +1674,7 @@ function RightInspector({
 
   onJumpCad: (sheetId?: string) => void;
   onCollapse?: () => void;
+  cadEngine?: import("@/cad/embed/MiniCad").MiniCad | null;
 }) {
 
   const layerCount = page?.elements.length ?? 0;
