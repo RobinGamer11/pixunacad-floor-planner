@@ -732,29 +732,33 @@ function ToolRailButton({
   active,
   accent,
   onClick,
+  showLabel,
 }: {
   icon: React.ReactNode;
   label: string;
   active?: boolean;
   accent?: boolean;
   onClick?: () => void;
+  showLabel?: boolean;
 }) {
   return (
     <button
       onClick={onClick}
       title={label}
-      className="w-10 h-10 rounded-lg flex flex-col items-center justify-center text-[9px] gap-0.5 hover:bg-muted"
+      className="cad-rail-btn"
       style={{
         background: active ? "hsl(var(--surface-muted))" : "transparent",
         color: accent
           ? "hsl(var(--accent-gold))"
           : active
-          ? "hsl(var(--ink))"
+          ? "hsl(var(--accent-gold))"
           : "hsl(var(--ink-soft))",
       }}
     >
       {icon}
-      <span className="leading-none">{label.length > 8 ? label.slice(0, 6) + "…" : label}</span>
+      <span className="leading-none">
+        {showLabel ? label : label.length > 8 ? label.slice(0, 6) + "…" : label}
+      </span>
     </button>
   );
 }
