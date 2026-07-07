@@ -2164,8 +2164,6 @@ function ToolsTab({
 }
 
 function SelectSettings({
-  settings,
-  onChange,
   selectedCount,
 }: {
   settings: ToolSettings["select"];
@@ -2174,34 +2172,8 @@ function SelectSettings({
 }) {
   return (
     <SettingsBlock title="AUSWAHLWERKZEUG">
-      <Row label="Modus">
-        <div className="flex gap-1">
-          <button
-            type="button"
-            onClick={() => onChange({ multi: false })}
-            className="h-7 px-2 rounded-md border text-xs"
-            style={{
-              borderColor: "hsl(var(--hairline))",
-              background: !settings.multi ? "hsl(var(--surface-strong))" : "transparent",
-            }}
-          >
-            Einzel
-          </button>
-          <button
-            type="button"
-            onClick={() => onChange({ multi: true })}
-            className="h-7 px-2 rounded-md border text-xs"
-            style={{
-              borderColor: "hsl(var(--hairline))",
-              background: settings.multi ? "hsl(var(--surface-strong))" : "transparent",
-            }}
-          >
-            Mehrfach
-          </button>
-        </div>
-      </Row>
       <div className="text-[11px] text-muted-foreground">
-        Im Mehrfach-Modus fügt jeder Klick zur Auswahl hinzu. Mit <kbd className="px-1 rounded border" style={{ borderColor: "hsl(var(--hairline))" }}>Shift</kbd>-Klick funktioniert das auch im Einzel-Modus; nochmaliges Shift-Klicken entfernt aus der Auswahl.
+        Klicke ein Objekt zum Auswählen. Mit <kbd className="px-1 rounded border" style={{ borderColor: "hsl(var(--hairline))" }}>Shift</kbd>-Klick mehrere Objekte gleichzeitig auswählen oder aus der Auswahl entfernen. Aufziehen mit gedrückter Maustaste selektiert alle Objekte im Rahmen.
         {selectedCount > 0 && (
           <div className="mt-1">Aktuell ausgewählt: <strong className="text-foreground">{selectedCount}</strong></div>
         )}
