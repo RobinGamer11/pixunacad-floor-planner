@@ -2641,7 +2641,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       ) : (
         <div
           className="w-7 shrink-0 border-l flex items-start justify-center pt-3"
-          style={{ borderColor: "hsl(var(--hairline))" }}
+          style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))", display: printOpen ? "none" : "flex" }}
         >
           <button
             onClick={() => setRightOpen(true)}
