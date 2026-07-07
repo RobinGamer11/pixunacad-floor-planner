@@ -3082,5 +3082,170 @@ function LayersTab({
   );
 }
 
+type PrintColorMode = "original" | "bw" | "gray" | "custom";
+type PrintPageMode = "all" | "range" | "current";
+
+function PrintPanel({
+  project,
+  onClose,
+}: {
+  project: import("@/lib/projectStore").ProjectRecord;
+  onClose: () => void;
+}) {
+  const [pageMode, setPageMode] = useState<PrintPageMode>("all");
+  const [rangeStart, setRangeStart] = useState<number>(1);
+  const [rangeEnd, setRangeEnd] = useState<number>(project.pages.length);
+  const [colorMode, setColorMode] = useState<PrintColorMode>("original");
+  const [customColor, setCustomColor] = useState("#111111");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set(project.pages.map(p => p.id)));
+
+  const toggleId = (id: string) => setSelectedIds(prev => {
+    const n = new Set(prev);
+    if (n.has(id)) n.delete(id); else n.add(id);
+    return n;
+  });
+
+  return (
+    <aside
+      className="w-[340px] shrink-0 border-l flex flex-col relative"
+      style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
+    >
+      <div
+        className="flex items-center justify-between px-4 py-3 border-b"
+        style={{ borderColor: "hsl(var(--hairline))" }}
+      >
+        <div className="flex items-center gap-2">
+          <span
+            className="h-6 w-6 rounded-md flex items-center justify-center"
+            style={{ background: "hsl(var(--accent-gold-soft))", color: "hsl(var(--accent-gold))" }}
+          >
+            🖨
+          </span>
+          <div className="text-sm font-semibold">Druckmodus</div>
+        </div>
+        <button
+          onClick={onClose}
+          className="h-7 w-7 rounded-md flex items-center justify-center hover:bg-muted text-muted-foreground"
+          title="Druckmodus schließen"
+        >
+          <X size={14} />
+        </button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-4 space-y-5">
+        <section>
+          <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-2">
+            SEITEN
+          </div>
+          <div className="space-y-2 text-sm">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="radio" checked={pageMode === "all"} onChange={() => setPageMode("all")} />
+              Alle Seiten ({project.pages.length})
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="radio" checked={pageMode === "current"} onChange={() => setPageMode("current")} />
+              Nur aktuelle Seite
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="radio" checked={pageMode === "range"} onChange={() => setPageMode("range")} />
+              Bereich
+            </label>
+            {pageMode === "range" && (
+              <div className="flex items-center gap-2 pl-6">
+                <input
+                  type="number" min={1} max={project.pages.length}
+                  value={rangeStart}
+                  onChange={(e) => setRangeStart(Number(e.target.value) || 1)}
+                  className="w-14 h-7 px-2 rounded border bg-transparent text-sm"
+                  style={{ borderColor: "hsl(var(--hairline))" }}
+                />
+                <span className="text-muted-foreground">bis</span>
+                <input
+                  type="number" min={1} max={project.pages.length}
+                  value={rangeEnd}
+                  onChange={(e) => setRangeEnd(Number(e.target.value) || project.pages.length)}
+                  className="w-14 h-7 px-2 rounded border bg-transparent text-sm"
+                  style={{ borderColor: "hsl(var(--hairline))" }}
+                />
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section>
+          <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-2">
+            AUSWAHL
+          </div>
+          <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
+            {project.pages.map((p, i) => (
+              <label key={p.id} className="flex items-center gap-2 text-sm cursor-pointer py-0.5">
+                <input
+                  type="checkbox"
+                  checked={selectedIds.has(p.id)}
+                  onChange={() => toggleId(p.id)}
+                />
+                <span className="text-muted-foreground w-6 text-right">{String(i + 1).padStart(2, "0")}</span>
+                <span className="truncate">{p.title}</span>
+              </label>
+            ))}
+          </div>
+        </section>
+
+        <section>
+          <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-2">
+            FARBE
+          </div>
+          <div className="space-y-2 text-sm">
+            {([
+              ["original", "Originalfarben"],
+              ["bw", "Schwarz / Weiß"],
+              ["gray", "Graustufen"],
+              ["custom", "Eigene Farbe"],
+            ] as [PrintColorMode, string][]).map(([v, l]) => (
+              <label key={v} className="flex items-center gap-2 cursor-pointer">
+                <input type="radio" checked={colorMode === v} onChange={() => setColorMode(v)} />
+                {l}
+              </label>
+            ))}
+            {colorMode === "custom" && (
+              <div className="flex items-center gap-2 pl-6">
+                <input
+                  type="color"
+                  value={customColor}
+                  onChange={(e) => setCustomColor(e.target.value)}
+                  className="h-7 w-10 rounded border bg-transparent"
+                  style={{ borderColor: "hsl(var(--hairline))" }}
+                />
+                <span className="text-xs text-muted-foreground">{customColor}</span>
+              </div>
+            )}
+          </div>
+        </section>
+      </div>
+
+      <div
+        className="border-t p-3 flex gap-2"
+        style={{ borderColor: "hsl(var(--hairline))" }}
+      >
+        <button
+          onClick={onClose}
+          className="flex-1 h-9 rounded-md text-sm border"
+          style={{ borderColor: "hsl(var(--hairline))", color: "hsl(var(--ink))" }}
+        >
+          Abbrechen
+        </button>
+        <button
+          onClick={() => window.print()}
+          className="flex-1 h-9 rounded-md text-sm font-medium"
+          style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
+        >
+          PDF erstellen
+        </button>
+      </div>
+    </aside>
+  );
+}
+
+
 // re-export helpful types
 export type { PageElement, ElementKind };
