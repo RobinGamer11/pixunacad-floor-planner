@@ -297,6 +297,7 @@ export class TopologyEngine {
       for (const c of documentCornersWorld(doc)) considerPoint(c, null, null, -1);
       for (const m of documentEdgeMidpointsWorld(doc)) considerPoint(m, null, null, -1);
       considerPoint(documentCenterWorld(doc), null, null, -1);
+      for (const a of documentAnchorsWorld(doc)) considerPoint(a, null, null, -1);
     }
     // Freihand-Stroke Endpunkte (nur erster + letzter Punkt)
     for (const s of this.scene.freeStrokes) {
