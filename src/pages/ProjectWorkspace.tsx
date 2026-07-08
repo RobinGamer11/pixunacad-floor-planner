@@ -195,10 +195,11 @@ export default function ProjectWorkspace() {
   const [pageNameDraft, setPageNameDraft] = useState("");
   const [pageActionsSticky, setPageActionsSticky] = useState(false);
   const [dragPageIdx, setDragPageIdx] = useState<number | null>(null);
-  const [bgOverlay, setBgOverlay] = useState<{ pageId?: string; opacity: number; visible: boolean; color: string }>({
+  const [bgOverlay, setBgOverlay] = useState<{ pageId?: string; opacity: number; visible: boolean; color: string; tintEnabled: boolean }>({
     opacity: 0.45,
     visible: true,
     color: "#c99a3b",
+    tintEnabled: true,
   });
   const [zoom, setZoom] = useState(77);
   const canvasViewportRef = useRef<HTMLDivElement>(null);
