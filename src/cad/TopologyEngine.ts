@@ -403,6 +403,7 @@ export class TopologyEngine {
         if (!this.labels.isVisible(doc.labelId)) continue;
         for (const c of documentCornersWorld(doc)) considerPoint(c, null, null, -1);
         for (const m of documentEdgeMidpointsWorld(doc)) considerPoint(m, null, null, -1);
+        for (const a of documentAnchorsWorld(doc)) considerPoint(a, null, null, -1);
       }
       // Linien: Segmente
       for (const seg of ovScene.segments) {
