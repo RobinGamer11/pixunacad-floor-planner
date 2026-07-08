@@ -1595,7 +1595,7 @@ function ZoomBar({ zoom, setZoom }: { zoom: number; setZoom: (v: number) => void
           type="number"
           min={10}
           max={400}
-          value={draft ?? zoom}
+          value={draft ?? Math.round(zoom)}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={() => {
             if (draft !== null) {
