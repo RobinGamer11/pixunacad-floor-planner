@@ -550,6 +550,9 @@ function FilterEditor({ filter, onChange, doc }: { filter: DocumentFilter; onCha
       {filter.mode === "free" && (
         <FreeFilterEditor filter={filter} onChange={onChange} doc={doc} />
       )}
+      {filter.mode === "adjust" && (
+        <AdjustEditor filter={filter} onChange={onChange} />
+      )}
       {filter.mode === "grayscale" && (
         <div className="text-[11px]" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
           Keine weiteren Einstellungen.
@@ -558,6 +561,114 @@ function FilterEditor({ filter, onChange, doc }: { filter: DocumentFilter; onCha
     </div>
   );
 }
+
+// ---------------------------------------------------------------- AdjustEditor
+const ADJUST_GROUPS: { title: string; keys: { key: keyof AdjustParams; label: string; bipolar?: boolean }[] }[] = [
+  {
+    title: "Licht",
+    keys: [
+      { key: "exposure", label: "Belichtung", bipolar: true },
+      { key: "contrast", label: "Kontrast", bipolar: true },
+      { key: "shadows", label: "Schatten", bipolar: true },
+      { key: "highlights", label: "Lichter", bipolar: true },
+    ],
+  },
+  {
+    title: "Farbe",
+    keys: [
+      { key: "saturation", label: "Sättigung", bipolar: true },
+      { key: "warmth", label: "Wärme", bipolar: true },
+      { key: "tint", label: "Tönung", bipolar: true },
+      { key: "sepia", label: "Sepia" },
+    ],
+  },
+  {
+    title: "Detail & Effekt",
+    keys: [
+      { key: "clarity", label: "Klarheit", bipolar: true },
+      { key: "sharpen", label: "Struktur" },
+      { key: "blur", label: "Weichzeichnen" },
+      { key: "vignette", label: "Vignette" },
+      { key: "grain", label: "Körnung" },
+      { key: "aquarell", label: "Aquarell" },
+    ],
+  },
+];
+
+const ADJUST_PRESETS: { name: string; params: Partial<AdjustParams> }[] = [
+  { name: "Neutral", params: {} },
+  { name: "Aquarell weich", params: { aquarell: 45, saturation: 15, warmth: 8, vignette: 15 } },
+  { name: "Aquarell Landschaft", params: { aquarell: 70, saturation: 25, warmth: 15, contrast: 10, clarity: 15 } },
+  { name: "Skizze", params: { saturation: -100, contrast: 40, clarity: 30, sharpen: 60 } },
+  { name: "Warm & weich", params: { warmth: 25, exposure: 8, blur: 6, vignette: 20, grain: 10 } },
+  { name: "Kühl technisch", params: { warmth: -25, contrast: 15, clarity: 20, saturation: -20 } },
+];
+
+function AdjustEditor({ filter, onChange }: { filter: DocumentFilter; onChange: (patch: Partial<DocumentFilter>) => void }) {
+  const a: AdjustParams = { ...DEFAULT_ADJUST, ...(filter.adjust || {}) };
+  const set = (patch: Partial<AdjustParams>) => onChange({ adjust: { ...a, ...patch } });
+  const applyPreset = (params: Partial<AdjustParams>) => onChange({ adjust: { ...DEFAULT_ADJUST, ...params } });
+
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-1">
+        {ADJUST_PRESETS.map(p => (
+          <button
+            key={p.name}
+            type="button"
+            onClick={() => applyPreset(p.params)}
+            className="cad-toolbar-btn h-6 px-2 text-[10px]"
+            title={`Preset "${p.name}" anwenden`}
+          >
+            {p.name}
+          </button>
+        ))}
+        <button
+          type="button"
+          onClick={() => applyPreset({})}
+          className="cad-toolbar-btn h-6 px-2 text-[10px] ml-auto"
+          title="Alle Regler zurücksetzen"
+        >
+          Reset
+        </button>
+      </div>
+
+      {ADJUST_GROUPS.map(group => (
+        <div key={group.title} className="space-y-1.5 pt-1" style={{ borderTop: "1px dashed hsl(var(--border))" }}>
+          <div className="text-[10px] uppercase tracking-wider" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+            {group.title}
+          </div>
+          {group.keys.map(({ key, label, bipolar }) => {
+            const value = a[key];
+            const min = bipolar ? -100 : 0;
+            return (
+              <div key={key}>
+                <div className="flex items-center justify-between text-[10.5px] mb-0.5">
+                  <span>{label}</span>
+                  <span className="tabular-nums" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+                    {value > 0 ? `+${value}` : value}
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={min}
+                  max={100}
+                  step={1}
+                  value={value}
+                  onChange={(e) => set({ [key]: parseInt(e.target.value, 10) } as any)}
+                  onDoubleClick={() => set({ [key]: 0 } as any)}
+                  className="w-full"
+                  title="Doppelklick = auf 0 zurücksetzen"
+                />
+              </div>
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 
 function FreeFilterEditor({ filter, onChange, doc }: { filter: DocumentFilter; onChange: (patch: Partial<DocumentFilter>) => void; doc: any }) {
   const remaps: FreeRemap[] = filter.freeRemaps || [];
