@@ -1075,6 +1075,7 @@ export class MiniCad {
             filters: d.filters,
             activeFilterId: d.activeFilterId,
             bgRemoval: d.bgRemoval,
+            anchors: Array.isArray(d.anchors) ? d.anchors : undefined,
           });
         } catch (e) { console.error("MiniCad restore document:", e); }
       }
