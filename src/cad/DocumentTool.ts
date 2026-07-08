@@ -11,7 +11,8 @@ type Phase =
   | "placing"          // gerade importiertes Dokument folgt der Maus, Klick setzt es ab
   | "scale-pick-1"     // wartet auf 1. Punkt (Start Ist-Strecke)
   | "scale-pick-2"     // wartet auf 2. Punkt (Ende Ist-Strecke; definiert auch Richtung)
-  | "scale-pick-3";    // Ist-Strecke fix, wartet auf 3. Punkt entlang derselben Richtung (= Soll-Länge ab P1)
+  | "scale-pick-3"     // Ist-Strecke fix, wartet auf 3. Punkt entlang derselben Richtung (= Soll-Länge ab P1)
+  | "anchor-edit";     // Anker (Fangpunkte) am Dokument setzen/entfernen
 
 /**
  * DocumentTool: PDF/JPG/PNG-Import & Maßstabs-Skalierung.
