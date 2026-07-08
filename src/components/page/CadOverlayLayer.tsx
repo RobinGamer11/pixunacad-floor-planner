@@ -46,7 +46,7 @@ interface Props {
   /** Callback bei Hub-Verschiebung/-Drehung oder Hilfslinien-Toggle. */
   onExternalDocChange?: (
     id: string,
-    t: { xMM: number; yMM: number; rotationDeg: number; guideEdges: { top: boolean; right: boolean; bottom: boolean; left: boolean } },
+    t: { xMM: number; yMM: number; wMM: number; hMM: number; rotationDeg: number; guideEdges: { top: boolean; right: boolean; bottom: boolean; left: boolean } },
   ) => void;
 
   lineColor?: string;
