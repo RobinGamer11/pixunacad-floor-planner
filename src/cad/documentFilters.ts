@@ -56,7 +56,7 @@ export function filterModeLabel(mode: DocumentFilterMode): string {
     case "grayscale": return "Graustufen";
     case "tint": return "Einzelfarbe";
     case "free": return "Frei";
-    case "adjust": return "Bildbearbeitung";
+    case "adjust": return "Filter";
   }
 }
 
