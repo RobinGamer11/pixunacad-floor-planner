@@ -4,7 +4,7 @@
  * Original = kein Filter (activeFilterId === null).
  */
 
-export type DocumentFilterMode = "bw" | "grayscale" | "tint" | "free";
+export type DocumentFilterMode = "bw" | "grayscale" | "tint" | "free" | "adjust";
 
 export interface FreeRemap {
   /** Quellfarbe (hex #rrggbb). */
@@ -12,6 +12,33 @@ export interface FreeRemap {
   /** Zielfarbe (hex #rrggbb). Leer = keine Änderung. */
   to: string;
 }
+
+/**
+ * Parameter für den "adjust"-Filter (Bildbearbeitung).
+ * Werte sind neutral bei 0 (bipolar) oder 0..100 (unipolar) — siehe Kommentare.
+ */
+export interface AdjustParams {
+  exposure: number;    // -100..100
+  contrast: number;    // -100..100
+  saturation: number;  // -100..100
+  warmth: number;      // -100..100 (kühl→warm)
+  tint: number;        // -100..100 (grün→magenta)
+  shadows: number;     // -100..100 (Schatten heben)
+  highlights: number;  // -100..100 (Lichter senken)
+  clarity: number;     // 0..100 (lokaler Kontrast)
+  blur: number;        // 0..100 (Weichzeichnung px)
+  sharpen: number;     // 0..100 (Struktur)
+  vignette: number;    // 0..100
+  grain: number;       // 0..100
+  sepia: number;       // 0..100
+  aquarell: number;    // 0..100 (Preset-Stärke: Blur + Kanten-Boost + Papier)
+}
+
+export const DEFAULT_ADJUST: AdjustParams = {
+  exposure: 0, contrast: 0, saturation: 0, warmth: 0, tint: 0,
+  shadows: 0, highlights: 0, clarity: 0, blur: 0, sharpen: 0,
+  vignette: 0, grain: 0, sepia: 0, aquarell: 0,
+};
 
 export interface DocumentFilter {
   id: string;
@@ -23,6 +50,8 @@ export interface DocumentFilter {
   bwThreshold?: number;
   /** "free" — Liste der dominanten Quellfarben → neuer Zielfarbe. */
   freeRemaps?: FreeRemap[];
+  /** "adjust" — Bildbearbeitungs-Parameter. */
+  adjust?: AdjustParams;
 }
 
 export function newFilterId(): string {
@@ -34,6 +63,7 @@ export function makeDefaultFilter(mode: DocumentFilterMode, name?: string): Docu
   if (mode === "bw") f.bwThreshold = 160;
   if (mode === "tint") f.tintColor = "#c0392b";
   if (mode === "free") f.freeRemaps = [];
+  if (mode === "adjust") f.adjust = { ...DEFAULT_ADJUST };
   return f;
 }
 
@@ -43,12 +73,13 @@ export function filterModeLabel(mode: DocumentFilterMode): string {
     case "grayscale": return "Graustufen";
     case "tint": return "Einzelfarbe";
     case "free": return "Frei";
+    case "adjust": return "Bildbearbeitung";
   }
 }
 
 /** Stabile Signatur — Cache-Key. */
 export function filterSignature(f: DocumentFilter): string {
-  return JSON.stringify([f.mode, f.tintColor || "", f.bwThreshold ?? 0, f.freeRemaps || []]);
+  return JSON.stringify([f.mode, f.tintColor || "", f.bwThreshold ?? 0, f.freeRemaps || [], f.adjust || null]);
 }
 
 // ---------------------------------------------------------------- color utils
