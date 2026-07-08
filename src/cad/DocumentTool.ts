@@ -38,6 +38,9 @@ export class DocumentTool {
   scalePoint3: Vec2 | null = null;
   scaleSnap: Snap | null = null;
 
+  /** Ziel-Dokument für die Anker-Bearbeitung. */
+  anchorTargetDocId: string | null = null;
+
   onPhaseChange?: () => void;
 
   constructor(app: CadApp) { this.app = app; }
