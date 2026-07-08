@@ -1239,7 +1239,7 @@ export default function ProjectWorkspace() {
                               void e;
                             }}
                           >
-                            {isFree && (
+                            {isFree && !p.spreadLayoutLocked && (
                               <SpreadPageDragHandle
                                 page={p}
                                 otherPages={pages.filter((x) => x.id !== p.id)}
