@@ -58,6 +58,8 @@ import {
   Link2,
   Link2Off,
   BookOpen,
+  Lock as LockIcon,
+  Unlock as UnlockIcon,
 } from "lucide-react";
 
 import {
@@ -193,9 +195,10 @@ export default function ProjectWorkspace() {
   const [pageNameDraft, setPageNameDraft] = useState("");
   const [pageActionsSticky, setPageActionsSticky] = useState(false);
   const [dragPageIdx, setDragPageIdx] = useState<number | null>(null);
-  const [bgOverlay, setBgOverlay] = useState<{ pageId?: string; opacity: number; visible: boolean }>({
-    opacity: 0.35,
+  const [bgOverlay, setBgOverlay] = useState<{ pageId?: string; opacity: number; visible: boolean; color: string }>({
+    opacity: 0.45,
     visible: true,
+    color: "#c99a3b",
   });
   const [zoom, setZoom] = useState(77);
   const canvasViewportRef = useRef<HTMLDivElement>(null);
@@ -994,6 +997,25 @@ export default function ProjectWorkspace() {
                     {Math.round(bgOverlay.opacity * 100)} %
                   </span>
                 </div>
+                <div className="mt-2 flex items-center gap-2">
+                  <span className="text-[11px] text-muted-foreground">Farbe</span>
+                  <input
+                    type="color"
+                    value={bgOverlay.color}
+                    onChange={(e) => setBgOverlay((o) => ({ ...o, color: e.target.value }))}
+                    className="h-6 w-8 rounded border cursor-pointer bg-transparent"
+                    style={{ borderColor: "hsl(var(--hairline))" }}
+                    title="Tintfarbe der Transparenzpause"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setBgOverlay((o) => ({ ...o, color: "#c99a3b" }))}
+                    className="text-[11px] text-muted-foreground underline"
+                    title="Zurücksetzen"
+                  >
+                    Reset
+                  </button>
+                </div>
               </div>
             </aside>
           ) : (
@@ -1158,6 +1180,7 @@ export default function ProjectWorkspace() {
                       page={p}
                       overlayPage={bgOverlay.visible ? bgPage : undefined}
                       overlayOpacity={bgOverlay.opacity}
+                      overlayColor={bgOverlay.color}
                       selectedElementId={selectedElementId}
                       zoom={zoom}
                       activeTool={activeTool}
@@ -1188,6 +1211,31 @@ export default function ProjectWorkspace() {
                       className={isFree ? "relative" : "flex items-start"}
                       style={isFree ? { minWidth: 800, minHeight: 400 } : undefined}
                     >
+                      {isFree && (() => {
+                        const locked = !!pages[0].spreadLayoutLocked;
+                        return (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              projectStore.setSpreadLayoutLocked(
+                                project.id,
+                                pages[0].spreadId!,
+                                !locked,
+                              )
+                            }
+                            title={locked ? "Anordnung gesperrt — Klick zum Entsperren" : "Anordnung sperren"}
+                            className="absolute -top-8 left-0 z-30 h-7 px-2 rounded-md flex items-center gap-1.5 text-[11px] font-medium shadow-md"
+                            style={{
+                              background: locked ? "hsl(var(--accent-gold))" : "hsl(var(--surface-card))",
+                              color: locked ? "white" : "hsl(var(--ink))",
+                              border: "1px solid hsl(var(--hairline))",
+                            }}
+                          >
+                            {locked ? <LockIcon size={12} /> : <UnlockIcon size={12} />}
+                            {locked ? "Gesperrt" : "Sperren"}
+                          </button>
+                        );
+                      })()}
                       {pages.map((p, i) => {
                         const isActiveMember = p.id === activePage.id;
                         const offset = isFree
@@ -1216,7 +1264,7 @@ export default function ProjectWorkspace() {
                               void e;
                             }}
                           >
-                            {isFree && (
+                            {isFree && !p.spreadLayoutLocked && (
                               <SpreadPageDragHandle
                                 page={p}
                                 otherPages={pages.filter((x) => x.id !== p.id)}
@@ -1637,6 +1685,7 @@ function PageCanvas({
   page,
   overlayPage,
   overlayOpacity,
+  overlayColor,
   selectedElementId,
   selectedElementIds,
   zoom,
@@ -1653,6 +1702,7 @@ function PageCanvas({
   page: import("@/lib/projectStore").ProjectPage;
   overlayPage?: import("@/lib/projectStore").ProjectPage;
   overlayOpacity: number;
+  overlayColor?: string;
   selectedElementId?: string;
   selectedElementIds: string[];
   zoom: number;
@@ -1804,19 +1854,43 @@ function PageCanvas({
             }}
           />
         )}
-        {overlayPage && (
-          <div
-            className="absolute inset-0 pointer-events-none"
-            style={{ opacity: overlayOpacity }}
-          >
-            {overlayPage.elements
-              .filter((e) => e.kind !== "line" && e.kind !== "guide")
-              .map((el) => (
-                <ElementView key={el.id} el={el} readOnly />
-              ))}
-            <div className="absolute inset-0 bg-amber-100/10" />
-          </div>
-        )}
+        {overlayPage && (() => {
+          const ofmt = FORMAT_SIZES[overlayPage.format];
+          const tint = overlayColor ?? "#c99a3b";
+          return (
+            <div
+              className="absolute inset-0 pointer-events-none overflow-hidden"
+              style={{ opacity: overlayOpacity, zIndex: 1 }}
+            >
+              {/* CAD-Ebene der Hintergrundseite als read-only Ghost */}
+              <div className="absolute inset-0" style={{ pointerEvents: "none" }}>
+                <CadOverlayLayer
+                  key={`ghost-${overlayPage.id}`}
+                  pageWidthMm={ofmt.w}
+                  pageHeightMm={ofmt.h}
+                  basePxPerMm={baseWidth / ofmt.w}
+                  pageMarginsMm={overlayPage.margins ?? 0}
+                  zoom={scale * (fmt.w / ofmt.w)}
+                  activeTool="select"
+                  enabled={false}
+                  initialState={overlayPage.cadOverlay}
+                  onChange={() => {}}
+                />
+              </div>
+              {/* Nicht-CAD Elemente (Text, Bilder, PDFs …) der Hintergrundseite */}
+              {overlayPage.elements
+                .filter((e) => e.kind !== "line" && e.kind !== "guide")
+                .map((el) => (
+                  <ElementView key={el.id} el={el} readOnly />
+                ))}
+              {/* Farb-Tint (Multiply) — färbt Linien der Hintergrundseite ein */}
+              <div
+                className="absolute inset-0 pointer-events-none"
+                style={{ background: tint, mixBlendMode: "multiply" }}
+              />
+            </div>
+          );
+        })()}
         {otherEls.map((el) => (
           <ElementView
             key={el.id}
@@ -2792,38 +2866,52 @@ function PageSettings({
           {!inSpread ? (
             <>
               <div className="text-[11px] text-muted-foreground">
-                Einzelseite. Zum Erstellen einer Doppelseite mit einer benachbarten Seite verbinden.
+                Einzelseite. Zum Erstellen einer Doppelseite mit einer benachbarten Seite verbinden — oder an einen bestehenden Verbund anfügen.
               </div>
               <div className="flex gap-2">
                 <button
                   type="button"
-                  disabled={!prevPage || !!prevPage.spreadId}
-                  onClick={() => prevPage && projectStore.linkPagesToSpread(projectId, [prevPage.id, page.id])}
+                  disabled={!prevPage}
+                  onClick={() => {
+                    if (!prevPage) return;
+                    if (prevPage.spreadId) {
+                      projectStore.addPageToSpread(projectId, prevPage.spreadId, page.id);
+                    } else {
+                      projectStore.linkPagesToSpread(projectId, [prevPage.id, page.id]);
+                    }
+                  }}
                   className="flex-1 h-8 rounded border text-xs flex items-center justify-center gap-1.5 disabled:opacity-40"
                   style={{ borderColor: "hsl(var(--hairline))" }}
-                  title="Mit vorheriger Seite verbinden"
+                  title={prevPage?.spreadId ? "An vorherigen Verbund anhängen" : "Mit vorheriger Seite verbinden"}
                 >
-                  <Link2 size={12} /> vorherige
+                  <Link2 size={12} /> {prevPage?.spreadId ? "an vorherigen Verbund" : "vorherige"}
                 </button>
                 <button
                   type="button"
-                  disabled={!nextPage || !!nextPage.spreadId}
-                  onClick={() => nextPage && projectStore.linkPagesToSpread(projectId, [page.id, nextPage.id])}
+                  disabled={!nextPage}
+                  onClick={() => {
+                    if (!nextPage) return;
+                    if (nextPage.spreadId) {
+                      projectStore.addPageToSpread(projectId, nextPage.spreadId, page.id);
+                    } else {
+                      projectStore.linkPagesToSpread(projectId, [page.id, nextPage.id]);
+                    }
+                  }}
                   className="flex-1 h-8 rounded border text-xs flex items-center justify-center gap-1.5 disabled:opacity-40"
                   style={{ borderColor: "hsl(var(--hairline))" }}
-                  title="Mit nächster Seite verbinden"
+                  title={nextPage?.spreadId ? "An nächsten Verbund anhängen" : "Mit nächster Seite verbinden"}
                 >
-                  <Link2 size={12} /> nächste
+                  <Link2 size={12} /> {nextPage?.spreadId ? "an nächsten Verbund" : "nächste"}
                 </button>
               </div>
-              <Row label="Ausschließen">
+              <Row label="Musterübernahme">
                 <label className="flex items-center gap-2 text-xs text-muted-foreground">
                   <input
                     type="checkbox"
-                    checked={!!page.spreadExcluded}
-                    onChange={(e) => update({ spreadExcluded: e.target.checked })}
+                    checked={!page.spreadExcluded}
+                    onChange={(e) => update({ spreadExcluded: !e.target.checked })}
                   />
-                  Von „Muster übernehmen" ausschließen
+                  Diese Seite beim „Für alle übernehmen" berücksichtigen
                 </label>
               </Row>
             </>
@@ -2844,6 +2932,29 @@ function PageSettings({
                   <option value="free">Freie Anordnung</option>
                 </select>
               </Row>
+              {(page.spreadLayoutMode ?? "grid") === "free" && (
+                <Row label="Anordnung">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      projectStore.setSpreadLayoutLocked(
+                        projectId,
+                        page.spreadId!,
+                        !page.spreadLayoutLocked,
+                      )
+                    }
+                    className="w-full h-8 rounded border text-xs flex items-center justify-center gap-1.5"
+                    style={{
+                      borderColor: "hsl(var(--hairline))",
+                      background: page.spreadLayoutLocked ? "hsl(var(--accent-gold) / 0.12)" : "transparent",
+                    }}
+                    title={page.spreadLayoutLocked ? "Anordnung ist gesperrt — Klick zum Entsperren" : "Anordnung sperren (Ziehen deaktivieren)"}
+                  >
+                    {page.spreadLayoutLocked ? <LockIcon size={12} /> : <UnlockIcon size={12} />}
+                    {page.spreadLayoutLocked ? "Anordnung gesperrt" : "Anordnung sperren"}
+                  </button>
+                </Row>
+              )}
               {nextPage && !nextPage.spreadId && (
                 <button
                   type="button"
@@ -2867,7 +2978,6 @@ function PageSettings({
                 onClick={() => {
                   const n = projectStore.applySpreadPatternToRest(projectId, page.spreadId!);
                   if (n > 0) {
-                    // Kleiner Bestätigungs-Toast über alert (Toast-System ist außerhalb dieses Scopes).
                     // eslint-disable-next-line no-alert
                     alert(`Muster auf ${n} weitere Verbund${n === 1 ? "" : "e"} angewendet.`);
                   } else {
@@ -2881,14 +2991,14 @@ function PageSettings({
               >
                 Für alle übernehmen
               </button>
-              <Row label="Ausschließen">
+              <Row label="Musterübernahme">
                 <label className="flex items-center gap-2 text-xs text-muted-foreground">
                   <input
                     type="checkbox"
-                    checked={!!page.spreadExcluded}
-                    onChange={(e) => update({ spreadExcluded: e.target.checked })}
+                    checked={!page.spreadExcluded}
+                    onChange={(e) => update({ spreadExcluded: !e.target.checked })}
                   />
-                  Diese Seite bei „Für alle übernehmen" überspringen
+                  Diese Seite beim „Für alle übernehmen" berücksichtigen
                 </label>
               </Row>
             </>

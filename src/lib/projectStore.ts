@@ -100,6 +100,8 @@ export interface ProjectPage {
   spreadExcluded?: boolean;
   /** UI: Spread im Seiten-Panel eingeklappt anzeigen. */
   spreadCollapsed?: boolean;
+  /** Nur bei "free"-Modus: Anordnung gesperrt (kein Ziehen, kein Griff sichtbar). */
+  spreadLayoutLocked?: boolean;
 }
 
 
@@ -634,6 +636,17 @@ export const projectStore = {
         p.id !== projectId ? p : {
           ...p,
           pages: p.pages.map((pg) => (pg.spreadId === spreadId ? { ...pg, spreadCollapsed: collapsed } : pg)),
+        }
+      ),
+    }));
+  },
+  setSpreadLayoutLocked: (projectId: string, spreadId: string, locked: boolean) => {
+    setState((s) => ({
+      projects: s.projects.map((p) =>
+        p.id !== projectId ? p : {
+          ...p,
+          updatedAt: new Date().toISOString(),
+          pages: p.pages.map((pg) => (pg.spreadId === spreadId ? { ...pg, spreadLayoutLocked: locked } : pg)),
         }
       ),
     }));
