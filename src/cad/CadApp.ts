@@ -606,6 +606,7 @@ export class CadApp {
           filters: ((d as any).filters || []).map((f: any) => ({ ...f })),
           activeFilterId: (d as any).activeFilterId || null,
           bgRemoval: bgClone,
+          anchors: ((d as any).anchors || []).map((a: any) => ({ x: a.x, y: a.y })),
         };
       }),
 
