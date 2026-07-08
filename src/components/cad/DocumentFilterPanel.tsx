@@ -6,6 +6,8 @@ import {
   type FreeRemap,
   type AdjustParams,
   DEFAULT_ADJUST,
+  ADJUST_GROUPS,
+  ADJUST_PRESETS,
   makeDefaultFilter,
   filterModeLabel,
   extractDominantColors,
@@ -114,7 +116,7 @@ export function DocumentFilterPanel({ app, docId, sig }: Props) {
       {/* Filter-Liste */}
       <div>
         <div className="flex items-center justify-between text-xs mb-2">
-          <span className="font-medium">Filter</span>
+          <span className="font-medium">Bildbearbeitung</span>
           <button
             type="button"
             className="cad-toolbar-btn h-6 px-2 text-[11px]"
@@ -563,46 +565,7 @@ function FilterEditor({ filter, onChange, doc }: { filter: DocumentFilter; onCha
 }
 
 // ---------------------------------------------------------------- AdjustEditor
-const ADJUST_GROUPS: { title: string; keys: { key: keyof AdjustParams; label: string; bipolar?: boolean }[] }[] = [
-  {
-    title: "Licht",
-    keys: [
-      { key: "exposure", label: "Belichtung", bipolar: true },
-      { key: "contrast", label: "Kontrast", bipolar: true },
-      { key: "shadows", label: "Schatten", bipolar: true },
-      { key: "highlights", label: "Lichter", bipolar: true },
-    ],
-  },
-  {
-    title: "Farbe",
-    keys: [
-      { key: "saturation", label: "Sättigung", bipolar: true },
-      { key: "warmth", label: "Wärme", bipolar: true },
-      { key: "tint", label: "Tönung", bipolar: true },
-      { key: "sepia", label: "Sepia" },
-    ],
-  },
-  {
-    title: "Detail & Effekt",
-    keys: [
-      { key: "clarity", label: "Klarheit", bipolar: true },
-      { key: "sharpen", label: "Struktur" },
-      { key: "blur", label: "Weichzeichnen" },
-      { key: "vignette", label: "Vignette" },
-      { key: "grain", label: "Körnung" },
-      { key: "aquarell", label: "Aquarell" },
-    ],
-  },
-];
-
-const ADJUST_PRESETS: { name: string; params: Partial<AdjustParams> }[] = [
-  { name: "Neutral", params: {} },
-  { name: "Aquarell weich", params: { aquarell: 45, saturation: 15, warmth: 8, vignette: 15 } },
-  { name: "Aquarell Landschaft", params: { aquarell: 70, saturation: 25, warmth: 15, contrast: 10, clarity: 15 } },
-  { name: "Skizze", params: { saturation: -100, contrast: 40, clarity: 30, sharpen: 60 } },
-  { name: "Warm & weich", params: { warmth: 25, exposure: 8, blur: 6, vignette: 20, grain: 10 } },
-  { name: "Kühl technisch", params: { warmth: -25, contrast: 15, clarity: 20, saturation: -20 } },
-];
+// Regler-Gruppen und Presets kommen zentral aus imageAdjustPipeline.ts.
 
 function AdjustEditor({ filter, onChange }: { filter: DocumentFilter; onChange: (patch: Partial<DocumentFilter>) => void }) {
   const a: AdjustParams = { ...DEFAULT_ADJUST, ...(filter.adjust || {}) };
@@ -614,9 +577,9 @@ function AdjustEditor({ filter, onChange }: { filter: DocumentFilter; onChange: 
       <div className="flex flex-wrap gap-1">
         {ADJUST_PRESETS.map(p => (
           <button
-            key={p.name}
+            key={p.key}
             type="button"
-            onClick={() => applyPreset(p.params)}
+            onClick={() => applyPreset(p.values)}
             className="cad-toolbar-btn h-6 px-2 text-[10px]"
             title={`Preset "${p.name}" anwenden`}
           >
@@ -634,29 +597,33 @@ function AdjustEditor({ filter, onChange }: { filter: DocumentFilter; onChange: 
       </div>
 
       {ADJUST_GROUPS.map(group => (
-        <div key={group.title} className="space-y-1.5 pt-1" style={{ borderTop: "1px dashed hsl(var(--border))" }}>
+        <div key={group.title} className="space-y-1 pt-1" style={{ borderTop: "1px dashed hsl(var(--border))" }}>
           <div className="text-[10px] uppercase tracking-wider" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
             {group.title}
           </div>
-          {group.keys.map(({ key, label, bipolar }) => {
+          {group.note && (
+            <div className="text-[9.5px] leading-tight" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+              {group.note}
+            </div>
+          )}
+          {group.keys.map(({ key, label }) => {
             const value = a[key];
-            const min = bipolar ? -100 : 0;
             return (
               <div key={key}>
                 <div className="flex items-center justify-between text-[10.5px] mb-0.5">
                   <span>{label}</span>
                   <span className="tabular-nums" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
-                    {value > 0 ? `+${value}` : value}
+                    {value}
                   </span>
                 </div>
                 <input
                   type="range"
-                  min={min}
+                  min={0}
                   max={100}
                   step={1}
                   value={value}
-                  onChange={(e) => set({ [key]: parseInt(e.target.value, 10) } as any)}
-                  onDoubleClick={() => set({ [key]: 0 } as any)}
+                  onChange={(e) => set({ [key]: parseInt(e.target.value, 10) } as Partial<AdjustParams>)}
+                  onDoubleClick={() => set({ [key]: 0 } as Partial<AdjustParams>)}
                   className="w-full"
                   title="Doppelklick = auf 0 zurücksetzen"
                 />

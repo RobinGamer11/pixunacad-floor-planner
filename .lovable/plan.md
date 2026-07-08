@@ -1,44 +1,56 @@
-## 01. Karte + Hintergrundfarbe im Raster-Popover (CAD-Oberfläche)
+## 01. Dokument-Inspektor: Layout vereinheitlichen
 
-**Datei:** `src/components/CadEditor.tsx`, `src/cad/Renderer.ts`, neu: `src/cad/MapBackground.ts`
+**Dateien:** `src/components/page/CadDocumentInspector.tsx`, `src/components/CadEditor.tsx` (die Dokument-Settings-Sektion), ggf. gemeinsame Buttons.
 
-Erweiterung des bestehenden Raster-Popovers um zwei neue Sektionen:
+- Rahmen/Card um „Freie Skalierung" entfernen — keine Border/Background, nur linksbündige Reihe.
+- Alle Aktions-Buttons werden linksbündig untereinander (oder in einheitlicher Flex-col mit gap-1) ausgerichtet:
+  - `Skalieren (2 Punkte)`
+  - `Skalieren (Maßkette)`
+  - `Löschen`
+  - `Anker +/−` (Label „Anker+" → „Anker +/−")
+- Einheitliche Button-Optik (gleiche Größe/Variante, `justify-start`, `w-full` oder kompakt links).
+- Beide Inspektoren (Projektmappe + CAD-Oberfläche) rendern exakt dieselbe Sektion — falls zwei Kopien existieren, in eine Shared-Komponente `DocumentActionsPanel` extrahieren und in beiden nutzen.
 
-**A) Hintergrundfarbe der CAD-Oberfläche**
-- Farbwähler + Hex-Feld, wirkt auf `renderer.backgroundColor` (neues Feld) → im Renderer statt `#fff` wird dieser Wert für den Clear genutzt.
-- Reset-Button auf Standard.
+## 02. Reihenfolge/Umbenennung Filter ↔ Bildbearbeitung
 
-**B) Kartenhintergrund (Sitemap-Overlay)**
-- Toggle „Karte anzeigen".
-- Adressfeld (Text) + „Suchen"-Button → Geocoding via **Lovable Google Maps Connector** (Gateway-Route `/maps/api/geocode/json`). Falls Connector nicht verknüpft, fordert der Button die Verbindung an (`standard_connectors--connect google_maps`) — erklärt, dass Cloud + Maps-Connector benötigt werden.
-- Distanz-Slider (10 m – 2000 m, Meter-Radius).
-- Nach Ergebnis: Lade Static Map-Kachel via Gateway `/maps/api/staticmap` mit Center `lat,lng`, `zoom` passend zum Radius, Größe `640x640`, `scale=2`. Das Bild wird als `HTMLImageElement` an den Renderer übergeben (`renderer.setMapBackground({image, centerLatLng, radiusM})`).
-- **Rendering (`Renderer.ts`)**: Vor dem Zeichnen der CAD-Objekte in Weltkoordinaten: `ctx.save()` → runde Clipping-Maske Radius=`radiusM` in Weltmetern um Weltursprung (0,0 = Adress-Mittelpunkt) → Karte gezeichnet mit korrekter m/px-Skalierung (Static Map: `metersPerPixel = 156543.03392 * cos(lat) / 2^zoom / scale`) → `restore()`. Außerhalb des Kreises bleibt `backgroundColor` sichtbar. Grid wird über die Karte gezeichnet.
-- Karte ist reine Hintergrund-Layer, nicht selektierbar / nicht gefangen — Werkzeuge arbeiten normal weiter.
-- Persistenz im projectStore als Teil des CAD-State (Adresse, Radius, LatLng, Farbe).
+**Datei:** `src/components/cad/DocumentFilterPanel.tsx`, `src/cad/documentFilters.ts` (Labels).
 
-## 02. Bildbearbeitung in Dokument-Inspektor (Projektmappe + CAD)
+- Aktuelle Sektion „Filter" (bw/grayscale/tint/free) wird zu **„Bildbearbeitung"** umbenannt — nein, umgekehrt gemäß User: die bisherige Sektion **„Filter"** heißt jetzt **„Bildbearbeitung"**? Klarstellung: User sagt „Ändere Filter zu Bildbearbeitung und Bildbearbeitung unten drunter zu Filter" → Tausch der Überschriften. Also:
+  - Obere Sektion (bisher „Filter") → Überschrift **„Bildbearbeitung"**
+  - Untere Sektion (bisher „Bildbearbeitung"/adjust) → Überschrift **„Filter"**
+- Reine Label-Änderung, Funktion bleibt gleich.
 
-**Dateien:** `src/components/page/CadDocumentInspector.tsx`, `src/components/CadEditor.tsx` (identisches UI), neu: `src/cad/imageAdjust.ts` (WebGL/Canvas Pipeline), Erweiterung `DocumentTool.ts`.
+## 03. Bildbearbeitung: Regler-Set an Vorlage anpassen
 
-Neue Sektion „Bildbearbeitung" unten in beiden Inspektoren, nur aktiv wenn selektiertes Dokument ein Bild oder gerastertes PDF ist:
+**Datei:** `src/cad/documentFilters.ts` (`AdjustParams`, `DEFAULT_ADJUST`, `applyAdjustFilter`), `src/components/cad/DocumentFilterPanel.tsx` (UI-Regler + Presets).
 
-**Regler (0–100, Default 0/50):**
-- Belichtung, Kontrast, Sättigung, Wärme, Tint
-- Klarheit (lokaler Kontrast), Struktur, Dunst entfernen
-- Schatten, Lichter, Weiß, Schwarz
-- Vignette, Körnung
-- Aquarell-Preset (aus Upload adaptiert: Pigment-Blur + Kanten-Bloom + Papiertextur), Stärke-Slider
-- Preset-Dropdown: Original, Aquarell weich, Aquarell Landschaft, Skizze, Grauwert
+Aktuelle 14 Regler werden durch die 30 Regler der Vorlage ersetzt, gruppiert wie im Original:
 
-**Umsetzung:**
-- Neuer Utility `imageAdjust.ts`: nimmt Source-`HTMLImageElement`+Params → rendert auf Off-screen-Canvas mit Filter-Pipeline (verbessert gegenüber Upload: einzelne unabhängige Regler statt Sammel-Presets, Live-Debounce 80 ms, Web-Worker-fähige `OffscreenCanvas` wenn verfügbar). Ergebnis als `ImageBitmap`/DataURL an das Dokument.
-- `DocumentTool.setImageAdjust(docId, params)` speichert Params im Doc-State und triggert Re-Render.
-- Renderer zeichnet Dokument mit dem angepassten Bitmap (Cache pro Params-Hash).
-- „Zurücksetzen"-Button und „Anwenden & speichern"-Button (persistent in projectStore).
+**Gruppe „Aquarell Basis"**: paper, wash, pigment, waterEdges, splatter, lift
+**Gruppe „Vegetation Layer"**: trees, leaves, greenVar, treeDepth, twigs, grass
+**Gruppe „Architektur"**: surface, linework, facade, plaza, ao, scalePeople
+**Gruppe „Atmosphäre & Licht"**: depthFog, skyGlow, haze, sunBloom, warmth, palette
+**Gruppe „Zeichnung & Finish"**: ink, softContrast, saturation, grain, vignette, detail
+
+Alle 0..100, mit Slider + Zahlanzeige, Doppelklick-Reset auf Preset-Default.
+
+**Presets** (Dropdown/Buttons): Wettbewerb, Archviz Warm, Vegetation Stark, Aquarell Landschaft, Nordic Soft, Tusche Skizze — Werte 1:1 aus Vorlage.
+
+**Rendering-Pipeline** in `documentFilters.ts` (`applyAdjustFilter`) wird komplett neu implementiert nach `App.Renderer.*` der Vorlage:
+1. Mask-Generator (green/sky/water/arch/ground/edge/dark/light/flat) via Luma/Chroma-Heuristik.
+2. `applyBaseGrade` — Kontrast, Posterize, Sättigung, Wärme, Vegetation-/Fassade-/Boden-/Sky-Remap, Depth-Fog, Vignette.
+3. Watercolor Washes (mehrfach `blurLayer` mit source-over/screen/multiply/overlay).
+4. Pigment-Blobs, Tree-Layer, Leaf-Details, Grass/Twigs.
+5. Architecture-Linework, Plaza-Linien, White-Lifts, Water-Edges.
+6. Ink/AO, Depth-Fog, Sky-Glow, Sun-Bloom, Scale-People.
+7. Paper & Grain, Detail-Recovery.
+
+Utility-Helpers (`hash`, `noise`, `fractalNoise`, `luma`, `mix`, `clamp`) werden in neue Datei `src/cad/imageAdjustPipeline.ts` ausgelagert, damit `documentFilters.ts` nicht zu groß wird. `applyAdjustFilter` delegiert dorthin.
+
+Signatur-Cache in `filterSignature` bleibt (nutzt bereits `JSON.stringify(adjust)`, deckt neue Felder automatisch ab).
+
+**Kompatibilität**: `AdjustParams` erweitert; alte gespeicherte Dokumente ohne neue Felder werden mit `{ ...DEFAULT_ADJUST, ...saved }` gemerged, damit projectStore-State nicht bricht.
 
 ## Verifikation
 - Typecheck läuft automatisch.
-- Manueller Playwright-Check: Raster-Popover öffnen, Farbe ändern, Karte togglen (nur wenn Connector vorhanden), Dokument selektieren → Bildbearbeitung erscheint, Regler verändert Preview.
-
-Wenn genehmigt, verknüpfe ich zunächst den Google-Maps-Connector (Punkt 01B braucht ihn) und liefere anschließend beide Features.
+- Manuell: Dokument einfügen → Bildbearbeitung (obere Sektion) zeigt alle 30 Regler in 5 Gruppen; Preset „Wettbewerb" ergibt Aquarell-Archviz-Look wie Vorlage. Untere Sektion heißt „Filter" mit bw/grayscale/tint/free. Aktions-Buttons linksbündig, kein Rahmen.
