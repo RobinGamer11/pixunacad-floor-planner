@@ -351,6 +351,10 @@ export class DocumentObject {
   /** Runtime-Flag: Dokument existiert nur als Snap-/Hub-Quelle (z. B. Projektmappen-PDF),
    *  Bild wird NICHT gezeichnet, Serialisierung überspringt es. Nicht persistiert. */
   _snapOnly?: boolean;
+  /** Benutzerdefinierte Fangpunkte in Dokument-lokalen UV-Koordinaten (0..1
+   *  relativ zu widthM/heightM). Werden über alle Werkzeuge fangbar; per
+   *  Anker-Werkzeug am Dokument platziert. */
+  anchors: { x: number; y: number }[];
 
 
   constructor({ id, name, kind, src, pageIndex, position, widthM, heightM, rotationRad, pixelWidth, pixelHeight, labelId, importScaleDenom, eraseMaskDataUrl, pdfSourceB64, guideEdges, cropM, opacity, filters, activeFilterId, bgRemoval }: {
