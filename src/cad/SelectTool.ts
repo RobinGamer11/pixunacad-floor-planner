@@ -8,7 +8,7 @@ import { getDimensionGeometry } from "./dimensionGeometry";
 import { pointInOrientedBox, boxCornersWorld, rotateVector } from "./textGeometry";
 import type { TextBox } from "./Scene";
 import { pointInInstance, instanceBoundingCornersWorld } from "./StickerManager";
-import { pointInDocument, hitDocumentCorner, hitDocumentEdge, documentCornersWorld, documentCenterWorld, hitDocumentVisibleEdge, documentVisibleCornersWorld } from "./documentGeometry";
+import { pointInDocument, hitDocumentCorner, hitDocumentEdge, documentCornersWorld, documentCenterWorld, hitDocumentVisibleEdge, documentVisibleCornersWorld, documentEdgeMidpointsWorld, documentAnchorsWorld } from "./documentGeometry";
 import { pointInDocumentVisible } from "./documentBgRemove";
 import { computeWallLines } from "./wallGeom";
 import { buildWallSolidRing, buildHealedWallSolidRing } from "./wallSolid";
@@ -304,6 +304,27 @@ export class SelectTool {
       if (pointInDocumentVisible(mouseW, doc)) return doc;
     }
     return null;
+  }
+
+  private _startDocumentDrag(doc: any, input: Input) {
+    const mouseW0 = v(input.mouse.wx, input.mouse.wy);
+    this.dragDocId = doc.id;
+    this.dragDocGrabOffset = { x: mouseW0.x - doc.position.x, y: mouseW0.y - doc.position.y };
+    this.dragDocSnap = null;
+    this.app.setSelection({ type: SelectionType.DOCUMENT, documentId: doc.id } as any);
+    this.app.documentHubMode = "none";
+    this.app.documentHubState = { visible: false, screenX: 0, screenY: 0, docId: null, cornerIndex: 0, anchorWorld: null, cropSide: null };
+  }
+
+  private _isOwnDocumentSnap(doc: any, snap: Snap | null): boolean {
+    if (!doc || !snap?.world) return false;
+    const eps = 1e-6;
+    const same = (p: Vec2) => Math.hypot(p.x - snap.world.x, p.y - snap.world.y) <= eps;
+    if (same(documentCenterWorld(doc))) return true;
+    for (const p of documentCornersWorld(doc)) if (same(p)) return true;
+    for (const p of documentEdgeMidpointsWorld(doc)) if (same(p)) return true;
+    for (const p of documentAnchorsWorld(doc)) if (same(p)) return true;
+    return false;
   }
 
   /** Hit-Test gegen Freihand-Strokes (Polyline-Abstand in Pixel). */
@@ -1589,10 +1610,11 @@ export class SelectTool {
         this.dragDocSnap = null;
       } else {
         const mouseW = v(input.mouse.wx, input.mouse.wy);
-        const snap = this.app.topology.findBestSnap(
+        const rawSnap = this.app.topology.findBestSnap(
           v(input.mouse.sx, input.mouse.sy),
           mouseW
         );
+        const snap = this._isOwnDocumentSnap(doc, rawSnap) ? null : rawSnap;
         this.dragDocSnap = snap;
         const target = (snap && snap.world) ? snap.world : mouseW;
         // doc.position ist die Top-Left-Ecke; Greifpunkt-Offset bezieht sich darauf.
@@ -2019,6 +2041,10 @@ export class SelectTool {
             // Stelle aus verschieben/drehen/skalieren.
             const mouseW = v(input.mouse.wx, input.mouse.wy);
             if (pointInDocumentVisible(mouseW, doc)) {
+              if ((doc as any)._snapOnly) {
+                this._startDocumentDrag(doc, input);
+                return;
+              }
               const snap = this.app.topology.findBestSnap(v(input.mouse.sx, input.mouse.sy), mouseW);
               const anchor = (snap && snap.world) ? snap.world : mouseW;
               this.app.documentHubState = {
@@ -2239,7 +2265,11 @@ export class SelectTool {
         && (hit as any).holeIndex == null;
       const docHitEarly = (!hit || isPlainHatchBody) ? this._hitDocument(input) : null;
       if (docHitEarly) {
-        this.app.setSelection({ type: SelectionType.DOCUMENT, documentId: docHitEarly.id } as any);
+        if ((docHitEarly as any)._snapOnly) {
+          this._startDocumentDrag(docHitEarly, input);
+        } else {
+          this.app.setSelection({ type: SelectionType.DOCUMENT, documentId: docHitEarly.id } as any);
+        }
         return;
       }
       if (hit) {
