@@ -2586,6 +2586,24 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                   <span className="text-xs">Löschen</span>
                 </button>
 
+                <button
+                  type="button"
+                  onClick={() => {
+                    const app = appRef.current; if (!app) return;
+                    const tool: any = app.documentTool;
+                    if (tool?.isAnchorEditing?.() && tool.anchorTargetDocId === docSelected.id) {
+                      tool.cancel?.();
+                    } else {
+                      tool?.beginAnchorEdit?.(docSelected.id);
+                    }
+                  }}
+                  className="cad-toolbar-btn w-full justify-center h-9"
+                  title="Anker (Fangpunkte) am Dokument setzen — Klick auf Dokument fügt hinzu, Klick auf Anker entfernt ihn. Erneut drücken zum Beenden."
+                >
+                  <AnchorIcon className="h-4 w-4" />
+                  <span className="text-xs">Anker +</span>
+                </button>
+
                 <DocumentFilterPanel app={appRef.current} docId={docSelected.id} sig={docFilterSig} />
 
 
