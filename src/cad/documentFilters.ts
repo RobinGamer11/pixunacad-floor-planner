@@ -4,7 +4,7 @@
  * Original = kein Filter (activeFilterId === null).
  */
 
-export type DocumentFilterMode = "bw" | "grayscale" | "tint" | "free";
+export type DocumentFilterMode = "bw" | "grayscale" | "tint" | "free" | "adjust";
 
 export interface FreeRemap {
   /** Quellfarbe (hex #rrggbb). */
@@ -12,6 +12,33 @@ export interface FreeRemap {
   /** Zielfarbe (hex #rrggbb). Leer = keine Änderung. */
   to: string;
 }
+
+/**
+ * Parameter für den "adjust"-Filter (Bildbearbeitung).
+ * Werte sind neutral bei 0 (bipolar) oder 0..100 (unipolar) — siehe Kommentare.
+ */
+export interface AdjustParams {
+  exposure: number;    // -100..100
+  contrast: number;    // -100..100
+  saturation: number;  // -100..100
+  warmth: number;      // -100..100 (kühl→warm)
+  tint: number;        // -100..100 (grün→magenta)
+  shadows: number;     // -100..100 (Schatten heben)
+  highlights: number;  // -100..100 (Lichter senken)
+  clarity: number;     // 0..100 (lokaler Kontrast)
+  blur: number;        // 0..100 (Weichzeichnung px)
+  sharpen: number;     // 0..100 (Struktur)
+  vignette: number;    // 0..100
+  grain: number;       // 0..100
+  sepia: number;       // 0..100
+  aquarell: number;    // 0..100 (Preset-Stärke: Blur + Kanten-Boost + Papier)
+}
+
+export const DEFAULT_ADJUST: AdjustParams = {
+  exposure: 0, contrast: 0, saturation: 0, warmth: 0, tint: 0,
+  shadows: 0, highlights: 0, clarity: 0, blur: 0, sharpen: 0,
+  vignette: 0, grain: 0, sepia: 0, aquarell: 0,
+};
 
 export interface DocumentFilter {
   id: string;
@@ -23,6 +50,8 @@ export interface DocumentFilter {
   bwThreshold?: number;
   /** "free" — Liste der dominanten Quellfarben → neuer Zielfarbe. */
   freeRemaps?: FreeRemap[];
+  /** "adjust" — Bildbearbeitungs-Parameter. */
+  adjust?: AdjustParams;
 }
 
 export function newFilterId(): string {
@@ -34,6 +63,7 @@ export function makeDefaultFilter(mode: DocumentFilterMode, name?: string): Docu
   if (mode === "bw") f.bwThreshold = 160;
   if (mode === "tint") f.tintColor = "#c0392b";
   if (mode === "free") f.freeRemaps = [];
+  if (mode === "adjust") f.adjust = { ...DEFAULT_ADJUST };
   return f;
 }
 
@@ -43,12 +73,13 @@ export function filterModeLabel(mode: DocumentFilterMode): string {
     case "grayscale": return "Graustufen";
     case "tint": return "Einzelfarbe";
     case "free": return "Frei";
+    case "adjust": return "Bildbearbeitung";
   }
 }
 
 /** Stabile Signatur — Cache-Key. */
 export function filterSignature(f: DocumentFilter): string {
-  return JSON.stringify([f.mode, f.tintColor || "", f.bwThreshold ?? 0, f.freeRemaps || []]);
+  return JSON.stringify([f.mode, f.tintColor || "", f.bwThreshold ?? 0, f.freeRemaps || [], f.adjust || null]);
 }
 
 // ---------------------------------------------------------------- color utils
@@ -86,6 +117,12 @@ export function applyFilterToCanvas(
   out.width = Math.max(1, Math.floor(width));
   out.height = Math.max(1, Math.floor(height));
   const ctx = out.getContext("2d", { willReadFrequently: true })!;
+
+  // "adjust" nutzt Canvas-Filter (Blur, Sepia, Saturate ...) plus per-Pixel-Passes.
+  if (filter && filter.mode === "adjust") {
+    return applyAdjustFilter(source, out, ctx, filter.adjust || DEFAULT_ADJUST);
+  }
+
   ctx.drawImage(source, 0, 0, out.width, out.height);
   if (!filter) return out;
   const img = ctx.getImageData(0, 0, out.width, out.height);
@@ -185,3 +222,125 @@ export function extractDominantColors(source: CanvasImageSource, sampleSize = 16
   const arr = Array.from(buckets.values()).sort((a, b) => b.count - a.count).slice(0, topN);
   return arr.map(e => rgbToHex(e.r / e.count, e.g / e.count, e.b / e.count));
 }
+
+// ---------------------------------------------------------------- adjust filter
+/**
+ * Wendet Bildbearbeitungs-Parameter an. Nutzt Canvas 2D Filter (schnell, GPU) für
+ * Blur/Sepia/Saturate/Kontrast/Helligkeit; danach zwei per-Pixel-Passes für
+ * Wärme/Tint/Schatten/Lichter/Klarheit sowie Vignette/Körnung/Aquarell.
+ */
+function applyAdjustFilter(
+  source: CanvasImageSource,
+  out: HTMLCanvasElement,
+  ctx: CanvasRenderingContext2D,
+  a: AdjustParams,
+): HTMLCanvasElement {
+  const W = out.width, H = out.height;
+
+  // ------- Aquarell-Preset (Pigment-Blur + Kanten-Kombination)
+  if (a.aquarell > 0) {
+    const strength = a.aquarell / 100;
+    // Basis leicht blur → sanfte Pigmentkanten
+    ctx.filter = `blur(${0.4 + strength * 2.2}px) saturate(${100 + strength * 30}%)`;
+    ctx.drawImage(source, 0, 0, W, H);
+    ctx.filter = "none";
+    // Kanten-Overlay (Sobel-artig via Difference von blur)
+    const edge = document.createElement("canvas");
+    edge.width = W; edge.height = H;
+    const ec = edge.getContext("2d")!;
+    ec.filter = `blur(${1.5 + strength * 3}px)`;
+    ec.drawImage(source, 0, 0, W, H);
+    ec.filter = "none";
+    ctx.globalCompositeOperation = "multiply";
+    ctx.globalAlpha = 0.35 + strength * 0.35;
+    ctx.drawImage(edge, 0, 0);
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = "source-over";
+  } else {
+    // Klassischer Filter-Stack via Canvas 2D Filter.
+    const parts: string[] = [];
+    if (a.blur > 0) parts.push(`blur(${(a.blur / 100) * 8}px)`);
+    if (a.exposure !== 0) parts.push(`brightness(${100 + a.exposure}%)`);
+    if (a.contrast !== 0) parts.push(`contrast(${100 + a.contrast}%)`);
+    if (a.saturation !== 0) parts.push(`saturate(${100 + a.saturation}%)`);
+    if (a.sepia > 0) parts.push(`sepia(${a.sepia}%)`);
+    ctx.filter = parts.length ? parts.join(" ") : "none";
+    ctx.drawImage(source, 0, 0, W, H);
+    ctx.filter = "none";
+  }
+
+  // ------- Per-Pixel-Pass 1: Warmth/Tint/Shadows/Highlights/Clarity approx.
+  const needsPixelPass =
+    a.warmth !== 0 || a.tint !== 0 ||
+    a.shadows !== 0 || a.highlights !== 0 ||
+    a.clarity !== 0 || a.sharpen !== 0;
+
+  if (needsPixelPass) {
+    const img = ctx.getImageData(0, 0, W, H);
+    const px = img.data;
+    const warmR = (a.warmth / 100) * 30;
+    const warmB = -(a.warmth / 100) * 30;
+    const tintG = -(a.tint / 100) * 30;
+    const tintM = (a.tint / 100) * 15; // magenta = +r +b
+    const shad = a.shadows / 100;
+    const high = a.highlights / 100;
+    const clar = a.clarity / 100;
+    for (let i = 0; i < px.length; i += 4) {
+      if (px[i + 3] === 0) continue;
+      let r = px[i], g = px[i + 1], b = px[i + 2];
+      // Wärme + Tint
+      r += warmR + tintM;
+      g += tintG;
+      b += warmB + tintM;
+      // Schatten/Lichter (Luminanz-basiert)
+      const lum = luminance(r, g, b) / 255;
+      if (shad !== 0) {
+        const w = Math.max(0, 1 - lum * 2) * shad * 60;
+        r += w; g += w; b += w;
+      }
+      if (high !== 0) {
+        const w = Math.max(0, lum * 2 - 1) * -high * 60;
+        r += w; g += w; b += w;
+      }
+      // Klarheit: einfacher Sättigungs-around-Mid Boost
+      if (clar !== 0) {
+        const boost = 1 + clar * 0.5;
+        const mid = (r + g + b) / 3;
+        r = mid + (r - mid) * boost;
+        g = mid + (g - mid) * boost;
+        b = mid + (b - mid) * boost;
+      }
+      px[i] = clamp8(r); px[i + 1] = clamp8(g); px[i + 2] = clamp8(b);
+    }
+    ctx.putImageData(img, 0, 0);
+  }
+
+  // ------- Vignette
+  if (a.vignette > 0) {
+    const v = a.vignette / 100;
+    const grad = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.max(W, H) * 0.75);
+    grad.addColorStop(0, "rgba(0,0,0,0)");
+    grad.addColorStop(1, `rgba(0,0,0,${v * 0.8})`);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  // ------- Körnung
+  if (a.grain > 0) {
+    const g = a.grain / 100;
+    const noise = ctx.getImageData(0, 0, W, H);
+    const np = noise.data;
+    const amp = g * 40;
+    for (let i = 0; i < np.length; i += 4) {
+      if (np[i + 3] === 0) continue;
+      const n = (Math.random() - 0.5) * amp;
+      np[i] = clamp8(np[i] + n);
+      np[i + 1] = clamp8(np[i + 1] + n);
+      np[i + 2] = clamp8(np[i + 2] + n);
+    }
+    ctx.putImageData(noise, 0, 0);
+  }
+
+  return out;
+}
+

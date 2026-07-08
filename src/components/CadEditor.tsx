@@ -274,6 +274,14 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const [gridSizeM, setGridSizeM] = useState<number>(1);
   const [gridColor, setGridColor] = useState<string>("#000000");
   const [gridOpacity, setGridOpacity] = useState<number>(0.06);
+  // Hintergrundfarbe der Oberfläche
+  const [bgColor, setBgColor] = useState<string>("#ffffff");
+  // Karten-Hintergrund
+  const [mapAddress, setMapAddress] = useState<string>("");
+  const [mapRadius, setMapRadius] = useState<number>(200);
+  const [mapLoading, setMapLoading] = useState<boolean>(false);
+  const [mapStatus, setMapStatus] = useState<string>("");
+  const [mapActive, setMapActive] = useState<boolean>(false);
 
   // Door tool state (Türen/Fenster)
   const [doorMode, setDoorMode] = useState<"door" | "window">("door");
@@ -345,6 +353,39 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       opacity: gridOpacity,
     };
   }, [gridEnabled, gridSizeM, gridColor, gridOpacity]);
+
+  // Hintergrundfarbe synchron halten
+  useEffect(() => {
+    const app = appRef.current;
+    if (!app) return;
+    app.renderer.backgroundColor = bgColor;
+    app.renderer.render();
+  }, [bgColor]);
+
+  const loadMap = useCallback(async () => {
+    const app = appRef.current;
+    if (!app || !mapAddress.trim()) return;
+    setMapLoading(true);
+    setMapStatus("Suche Adresse…");
+    try {
+      const { geocodeAddress, buildMapBackground } = await import("@/cad/mapBackground");
+      const geo = await geocodeAddress(mapAddress);
+      if (!geo) {
+        setMapStatus("Fehler: Adresse nicht gefunden.");
+        return;
+      }
+      setMapStatus("Lade Karte…");
+      const mb = await buildMapBackground(geo, mapRadius);
+      app.renderer.mapBackground = mb;
+      app.renderer.render();
+      setMapActive(true);
+      setMapStatus(`✓ ${geo.displayName.slice(0, 60)}${geo.displayName.length > 60 ? "…" : ""}`);
+    } catch (err: any) {
+      setMapStatus(`Fehler: ${err?.message || String(err)}`);
+    } finally {
+      setMapLoading(false);
+    }
+  }, [mapAddress, mapRadius]);
 
   // Door tool settings sync
   useEffect(() => {
@@ -1626,6 +1667,118 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                     onChange={(e) => setGridOpacity(Math.max(0, Math.min(1, parseInt(e.target.value, 10) / 100)))}
                     className="w-full"
                   />
+                </div>
+
+                {/* Hintergrundfarbe der Oberfläche */}
+                <div className="pt-3 mt-1" style={{ borderTop: "1px solid hsl(var(--border))" }}>
+                  <label>Hintergrundfarbe</label>
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))", background: bgColor }} />
+                    <input
+                      type="color"
+                      value={bgColor}
+                      onChange={(e) => setBgColor(e.target.value)}
+                      className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent"
+                    />
+                    <input
+                      type="text"
+                      value={bgColor}
+                      onChange={(e) => setBgColor(e.target.value)}
+                      className="flex-1 h-7 px-1.5 text-[11px] rounded border bg-transparent"
+                      style={{ borderColor: "hsl(var(--border))" }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setBgColor("#ffffff")}
+                      className="cad-toolbar-btn h-7 px-2 text-[10px]"
+                      title="Zurücksetzen"
+                    >
+                      Reset
+                    </button>
+                  </div>
+                </div>
+
+                {/* Karten-Hintergrund */}
+                <div className="pt-3 mt-1 space-y-2" style={{ borderTop: "1px solid hsl(var(--border))" }}>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em]" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+                    Karte im Hintergrund
+                  </div>
+                  <div>
+                    <label>Adresse</label>
+                    <input
+                      type="text"
+                      value={mapAddress}
+                      onChange={(e) => setMapAddress(e.target.value)}
+                      onKeyDown={async (e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          (e.currentTarget as HTMLInputElement).blur();
+                          void loadMap();
+                        }
+                      }}
+                      placeholder="z. B. Marienplatz 1, München"
+                      className="w-full h-7 px-1.5 text-[11px] rounded border bg-transparent"
+                      style={{ borderColor: "hsl(var(--border))" }}
+                    />
+                  </div>
+                  <div>
+                    <label>Radius ({mapRadius} m)</label>
+                    <input
+                      type="range"
+                      min={20}
+                      max={2000}
+                      step={10}
+                      value={mapRadius}
+                      onChange={(e) => setMapRadius(parseInt(e.target.value, 10))}
+                      className="w-full"
+                    />
+                    <div className="flex gap-1 mt-1 flex-wrap">
+                      {[50, 100, 250, 500, 1000].map(r => (
+                        <button
+                          key={r}
+                          type="button"
+                          onClick={() => setMapRadius(r)}
+                          className={`cad-toolbar-btn h-6 px-1.5 text-[10px] ${mapRadius === r ? "active" : ""}`}
+                        >
+                          {r} m
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex gap-1.5">
+                    <button
+                      type="button"
+                      disabled={mapLoading || !mapAddress.trim()}
+                      onClick={loadMap}
+                      className="cad-toolbar-btn h-7 flex-1 text-[11px] justify-center"
+                      style={{ borderColor: "hsl(var(--primary))", background: "hsl(var(--primary) / 0.12)" }}
+                    >
+                      {mapLoading ? "Lade…" : mapActive ? "Karte aktualisieren" : "Karte laden"}
+                    </button>
+                    {mapActive && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const app = appRef.current;
+                          if (app) { app.renderer.mapBackground = null; app.renderer.render(); }
+                          setMapActive(false);
+                          setMapStatus("");
+                        }}
+                        className="cad-toolbar-btn h-7 px-2 text-[11px]"
+                        title="Karte entfernen"
+                      >
+                        Aus
+                      </button>
+                    )}
+                  </div>
+                  {mapStatus && (
+                    <div className="text-[10px]" style={{ color: mapStatus.startsWith("Fehler") ? "hsl(var(--destructive))" : "hsl(var(--cad-toolbar-muted))" }}>
+                      {mapStatus}
+                    </div>
+                  )}
+                  <div className="text-[10px] leading-tight" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+                    Karten © OpenStreetMap-Mitwirkende. Adresse liegt im Welt-Ursprung, Kreis-Radius wird 1:1 in Meter angezeigt.
+                  </div>
                 </div>
               </div>
             </div>

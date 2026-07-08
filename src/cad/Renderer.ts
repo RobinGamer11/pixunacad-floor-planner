@@ -74,6 +74,12 @@ export class Renderer {
     opacity: 0.06,
   };
 
+  /** Hintergrundfarbe der CAD-Oberfläche (außerhalb des Kartenkreises). */
+  backgroundColor: string = "#ffffff";
+
+  /** Optionaler Karten-Hintergrund (siehe mapBackground.ts). Zentriert auf Welt-Ursprung. */
+  mapBackground: import("./mapBackground").MapBackground | null = null;
+
   selectedLabelId: string | null = null;
   hoverSegmentId: string | null = null;
   hoverHatchId: string | null = null;
@@ -279,9 +285,10 @@ export class Renderer {
       }
     } else {
       ctx.save();
-      ctx.fillStyle = "hsl(0 0% 100%)";
+      ctx.fillStyle = this.backgroundColor || "hsl(0 0% 100%)";
       ctx.fillRect(0, 0, this.vw, this.vh);
       ctx.restore();
+      if (this.mapBackground) this._drawMapBackground();
       if (this.gridSettings.enabled) this._drawGrid();
     }
 
@@ -1128,6 +1135,33 @@ export class Renderer {
       ctx.rect(p.x - 4, p.y - 4, 8, 8);
       ctx.fill(); ctx.stroke();
     }
+    ctx.restore();
+  }
+
+  private _drawMapBackground() {
+    const mb = this.mapBackground;
+    if (!mb) return;
+    const ctx = this.ctx;
+    const cam = this.camera;
+    // Karte ist auf Welt-Ursprung (0,0) zentriert.
+    const centerScreen = cam.worldToScreen(0, 0);
+    const radiusPx = mb.radiusM * cam.scale;
+    // Bildgröße in Weltmetern: (image.width * mppx). Wir zeichnen so, dass 1 Bildpixel = mppx Weltmeter.
+    const wPx = mb.image.width * mb.metersPerPixel * cam.scale;
+    const hPx = mb.image.height * mb.metersPerPixel * cam.scale;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(centerScreen.x, centerScreen.y, radiusPx, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.drawImage(mb.image, centerScreen.x - wPx / 2, centerScreen.y - hPx / 2, wPx, hPx);
+    ctx.restore();
+    // Dezente Kreis-Umrandung.
+    ctx.save();
+    ctx.strokeStyle = "rgba(0,0,0,0.35)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(centerScreen.x, centerScreen.y, radiusPx, 0, Math.PI * 2);
+    ctx.stroke();
     ctx.restore();
   }
 
