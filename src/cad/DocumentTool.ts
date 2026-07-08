@@ -60,12 +60,29 @@ export class DocumentTool {
     this.scalePoint2 = null;
     this.scalePoint3 = null;
     this.scaleSnap = null;
+    this.anchorTargetDocId = null;
     this.app.hub.bindCommit(null);
     this.app.hub.angInputEl.readOnly = true;
     this.onPhaseChange?.();
   }
 
   finish() { this.cancel(); }
+
+  /** Start Anker-Bearbeitung: Klick auf Dokument setzt/entfernt Anker. */
+  beginAnchorEdit(docId: string) {
+    const doc = this.app.scene.getDocumentById(docId);
+    if (!doc) return;
+    if (this.app.activeTool !== this) {
+      this.app.setTool("document");
+    }
+    this.anchorTargetDocId = docId;
+    this.phase = "anchor-edit";
+    this.app.hub.hide();
+    this.app.setSelection({ type: SelectionType.DOCUMENT, documentId: docId } as any);
+    this.onPhaseChange?.();
+  }
+
+  isAnchorEditing() { return this.phase === "anchor-edit"; }
 
   /** Externe API: nach erfolgreichem Datei-Import wird das Dokument zur Maus-Platzierung übergeben. */
   beginPlacement(opts: { src: string; widthM: number; heightM: number; pixelWidth: number; pixelHeight: number; name: string; kind: "image" | "pdf-page"; pageIndex: number; importScaleDenom: number; pdfSourceB64?: string | null }) {
