@@ -1827,19 +1827,43 @@ function PageCanvas({
             }}
           />
         )}
-        {overlayPage && (
-          <div
-            className="absolute inset-0 pointer-events-none"
-            style={{ opacity: overlayOpacity }}
-          >
-            {overlayPage.elements
-              .filter((e) => e.kind !== "line" && e.kind !== "guide")
-              .map((el) => (
-                <ElementView key={el.id} el={el} readOnly />
-              ))}
-            <div className="absolute inset-0 bg-amber-100/10" />
-          </div>
-        )}
+        {overlayPage && (() => {
+          const ofmt = FORMAT_SIZES[overlayPage.format];
+          const tint = overlayColor ?? "#c99a3b";
+          return (
+            <div
+              className="absolute inset-0 pointer-events-none overflow-hidden"
+              style={{ opacity: overlayOpacity, zIndex: 1 }}
+            >
+              {/* CAD-Ebene der Hintergrundseite als read-only Ghost */}
+              <div className="absolute inset-0" style={{ pointerEvents: "none" }}>
+                <CadOverlayLayer
+                  key={`ghost-${overlayPage.id}`}
+                  pageWidthMm={ofmt.w}
+                  pageHeightMm={ofmt.h}
+                  basePxPerMm={baseWidth / ofmt.w}
+                  pageMarginsMm={overlayPage.margins ?? 0}
+                  zoom={scale * (fmt.w / ofmt.w)}
+                  activeTool="select"
+                  enabled={false}
+                  initialState={overlayPage.cadOverlay}
+                  onChange={() => {}}
+                />
+              </div>
+              {/* Nicht-CAD Elemente (Text, Bilder, PDFs …) der Hintergrundseite */}
+              {overlayPage.elements
+                .filter((e) => e.kind !== "line" && e.kind !== "guide")
+                .map((el) => (
+                  <ElementView key={el.id} el={el} readOnly />
+                ))}
+              {/* Farb-Tint (Multiply) — färbt Linien der Hintergrundseite ein */}
+              <div
+                className="absolute inset-0 pointer-events-none"
+                style={{ background: tint, mixBlendMode: "multiply" }}
+              />
+            </div>
+          );
+        })()}
         {otherEls.map((el) => (
           <ElementView
             key={el.id}
