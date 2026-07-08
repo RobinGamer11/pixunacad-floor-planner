@@ -46,7 +46,11 @@ export class Input {
       window.removeEventListener("keyup", onKeyUp);
     });
 
-    const onMouseMove = (e: MouseEvent) => {
+    // Aktive Touch-Pointer zählen, damit Ein-Finger-Drag als Klick/Draw wirkt,
+    // aber Multi-Touch (Pinch/Pan) an höhere Handler durchgereicht wird.
+    const activePointers = new Set<number>();
+
+    const onPointerMove = (e: PointerEvent) => {
       const r = c.getBoundingClientRect();
       this.mouse.sx = e.clientX - r.left;
       this.mouse.sy = e.clientY - r.top;
@@ -57,8 +61,8 @@ export class Input {
         this._panLast.y = this.mouse.sy;
       }
     };
-    c.addEventListener("mousemove", onMouseMove);
-    this._cleanups.push(() => c.removeEventListener("mousemove", onMouseMove));
+    c.addEventListener("pointermove", onPointerMove);
+    this._cleanups.push(() => c.removeEventListener("pointermove", onPointerMove));
 
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
@@ -71,8 +75,20 @@ export class Input {
     c.addEventListener("contextmenu", onCtx);
     this._cleanups.push(() => c.removeEventListener("contextmenu", onCtx));
 
-    const onMouseDown = (e: MouseEvent) => {
-      if (e.button === 0) {
+    const onPointerDown = (e: PointerEvent) => {
+      // Zwei-Finger-Geste: an Pinch/Pan-Handler abgeben.
+      if (e.pointerType === "touch") {
+        activePointers.add(e.pointerId);
+        if (activePointers.size > 1) {
+          // Wenn bereits ein Ein-Finger-Drag lief, abbrechen.
+          this.mouse.left = false;
+          this._clickQueued = false;
+          this._dblQueued = false;
+          return;
+        }
+      }
+      try { c.setPointerCapture(e.pointerId); } catch {}
+      if (e.button === 0 || (e.pointerType === "touch" && e.button === -1)) {
         this.mouse.left = true;
         const now = performance.now();
         if (now - this._lastClickT <= this._doubleMs) {
@@ -98,24 +114,29 @@ export class Input {
         e.preventDefault();
       }
     };
-    c.addEventListener("mousedown", onMouseDown);
-    this._cleanups.push(() => c.removeEventListener("mousedown", onMouseDown));
+    c.addEventListener("pointerdown", onPointerDown);
+    this._cleanups.push(() => c.removeEventListener("pointerdown", onPointerDown));
 
-    const onMouseUp = (e: MouseEvent) => {
-      if (e.button === 0) this.mouse.left = false;
+    const onPointerUp = (e: PointerEvent) => {
+      if (e.pointerType === "touch") activePointers.delete(e.pointerId);
+      if (e.button === 0 || e.pointerType === "touch") this.mouse.left = false;
       if (e.button === 1) {
         this.mouse.mid = false;
         this._panning = false;
         this.isPanning = false;
       }
       if (e.button === 2) this.mouse.right = false;
+      try { c.releasePointerCapture(e.pointerId); } catch {}
     };
-    window.addEventListener("mouseup", onMouseUp);
-    this._cleanups.push(() => window.removeEventListener("mouseup", onMouseUp));
+    window.addEventListener("pointerup", onPointerUp);
+    window.addEventListener("pointercancel", onPointerUp);
+    this._cleanups.push(() => window.removeEventListener("pointerup", onPointerUp));
+    this._cleanups.push(() => window.removeEventListener("pointercancel", onPointerUp));
 
     const onAux = (e: MouseEvent) => { if (e.button === 1) e.preventDefault(); };
     c.addEventListener("auxclick", onAux);
     this._cleanups.push(() => c.removeEventListener("auxclick", onAux));
+
   }
 
   update(camera: Camera) {
