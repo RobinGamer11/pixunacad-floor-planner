@@ -359,7 +359,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     const app = appRef.current;
     if (!app) return;
     app.renderer.backgroundColor = bgColor;
-    app.render?.();
+    app.renderer.render();
   }, [bgColor]);
 
   // Door tool settings sync
