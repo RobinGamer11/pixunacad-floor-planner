@@ -1317,7 +1317,9 @@ export default function ProjectWorkspace() {
                                 ? (api) => { cadEngineApiRef.current = api; forceEngineTick(t => t + 1); }
                                 : undefined}
                               bare
+                              onJumpCad={(sheetId) => navigate(`/project/${project.id}/cad${sheetId ? `/${sheetId}` : ""}`)}
                             />
+
                           </div>
                         );
                       })}
