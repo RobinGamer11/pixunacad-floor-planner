@@ -1120,6 +1120,10 @@ export default function ProjectWorkspace() {
                 // Spread mit ≥2 Seiten — als flex-row rendern.
                 // Free-Layout: absolute Positionierung anhand spreadOffset (mm → px).
                 const isFree = layoutMode === "free";
+                // Einheitlicher px/mm-Faktor für alle Free-Layout-Offsets, damit
+                // Kanten benachbarter Seiten wirklich passgenau snappen.
+                const refFmt = FORMAT_SIZES[pages[0].format];
+                const pxPerMm = (1100 / refFmt.w) * (zoom / 100);
                 return (
                   <div
                     className="min-h-full flex items-start justify-center"
@@ -1137,8 +1141,8 @@ export default function ProjectWorkspace() {
                         const style: React.CSSProperties = isFree
                           ? {
                               position: "absolute",
-                              left: `${offset.xMm * 4}px`, // grober Preview-Maßstab, User verschiebt sichtbar
-                              top: `${offset.yMm * 4}px`,
+                              left: `${offset.xMm * pxPerMm}px`,
+                              top: `${offset.yMm * pxPerMm}px`,
                             }
                           : {};
                         return (
@@ -1157,6 +1161,15 @@ export default function ProjectWorkspace() {
                               void e;
                             }}
                           >
+                            {isFree && (
+                              <SpreadPageDragHandle
+                                page={p}
+                                otherPages={pages.filter((x) => x.id !== p.id)}
+                                pxPerMm={pxPerMm}
+                                projectId={project.id}
+                                formatSizes={FORMAT_SIZES}
+                              />
+                            )}
                             <PageCanvas
                               projectId={project.id}
                               page={p}
