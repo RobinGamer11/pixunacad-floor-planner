@@ -2307,9 +2307,7 @@ function ElementView({
   const showHub = !readOnly && selected && hubKinds.has(el.kind);
   // CAD-Blatt behält nur die blaue Frame-Optik; Bearbeitung bleibt 1:1 wie PDF.
   const isCadView = el.kind === "cad-view";
-  const isHubElement = hubKinds.has(el.kind);
   const hubBlue = "hsl(217 91% 60%)";
-  const outlineColor = selected ? (isCadView ? hubBlue : "hsl(var(--accent-gold))") : undefined;
   const outlineStyle = selected
     ? (isCadView ? `2px dashed ${hubBlue}` : "2px solid hsl(var(--accent-gold))")
     : "none";
