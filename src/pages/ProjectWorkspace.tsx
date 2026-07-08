@@ -55,6 +55,9 @@ import {
   Circle as CircleIcon,
   PaintBucket,
   FileImage,
+  Link2,
+  Link2Off,
+  BookOpen,
 } from "lucide-react";
 
 import {
@@ -176,6 +179,97 @@ export default function ProjectWorkspace() {
     el.scrollTop = pivot.contentY - pivot.my;
     zoomPivotRef.current = null;
   }, [zoom]);
+
+  // Aktueller Zoom als Ref, damit iPad-Touch-Handler ihn ohne Rerender lesen.
+  const zoomRef = useRef(zoom);
+  useEffect(() => { zoomRef.current = zoom; }, [zoom]);
+
+  // iPad: Zwei-Finger-Pinch = Zoom, Zwei-Finger-Drag = Pan. Ein Finger auf
+  // dem Canvas bleibt der aktiven CAD-/Werkzeug-Interaktion vorbehalten.
+  useEffect(() => {
+    const el = canvasViewportRef.current;
+    if (!el) return;
+    let mode: "idle" | "gesture" = "idle";
+    let startDist = 0;
+    let startZoom = 1;
+    let startMid = { x: 0, y: 0 };
+    let startScroll = { l: 0, t: 0 };
+    let startContent = { x: 0, y: 0 };
+    const pts = new Map<number, { x: number; y: number }>();
+    const midOf = () => {
+      const arr = [...pts.values()];
+      if (arr.length < 2) return { x: 0, y: 0 };
+      return { x: (arr[0].x + arr[1].x) / 2, y: (arr[0].y + arr[1].y) / 2 };
+    };
+    const distOf = () => {
+      const arr = [...pts.values()];
+      if (arr.length < 2) return 0;
+      return Math.hypot(arr[0].x - arr[1].x, arr[0].y - arr[1].y);
+    };
+    const onTouchStart = (e: TouchEvent) => {
+      for (const t of Array.from(e.touches)) pts.set(t.identifier, { x: t.clientX, y: t.clientY });
+      if (pts.size >= 2) {
+        const r = el.getBoundingClientRect();
+        const m = midOf();
+        mode = "gesture";
+        startDist = distOf();
+        startZoom = zoomRef.current;
+        startMid = { x: m.x - r.left, y: m.y - r.top };
+        startScroll = { l: el.scrollLeft, t: el.scrollTop };
+        startContent = { x: startScroll.l + startMid.x, y: startScroll.t + startMid.y };
+        e.preventDefault();
+      }
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      for (const t of Array.from(e.touches)) pts.set(t.identifier, { x: t.clientX, y: t.clientY });
+      if (mode === "gesture" && pts.size >= 2) {
+        const r = el.getBoundingClientRect();
+        const m = midOf();
+        const dist = distOf();
+        if (startDist > 4 && dist > 4) {
+          const factor = dist / startDist;
+          const next = Math.max(10, Math.min(1600, startZoom * factor));
+          const ratio = next / zoomRef.current;
+          const newContentX = startContent.x * (next / startZoom);
+          const newContentY = startContent.y * (next / startZoom);
+          const newMx = m.x - r.left;
+          const newMy = m.y - r.top;
+          zoomPivotRef.current = {
+            contentX: newContentX + (newMx - startMid.x) * -1 + newMx,
+            contentY: newContentY + (newMy - startMid.y) * -1 + newMy,
+            mx: newMx, my: newMy,
+          };
+          // Einfacher: nur Zoom setzen, Pan-Delta über scroll direkt anwenden.
+          void ratio;
+          setZoom(next);
+          // Pan-Anteil aus Mittelpunkt-Bewegung
+          const panDx = newMx - startMid.x;
+          const panDy = newMy - startMid.y;
+          requestAnimationFrame(() => {
+            el.scrollLeft -= panDx;
+            el.scrollTop -= panDy;
+          });
+          startMid = { x: newMx, y: newMy };
+        }
+        e.preventDefault();
+      }
+    };
+    const onTouchEnd = (e: TouchEvent) => {
+      for (const t of Array.from(e.changedTouches)) pts.delete(t.identifier);
+      if (pts.size < 2) mode = "idle";
+    };
+    el.addEventListener("touchstart", onTouchStart, { passive: false });
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    el.addEventListener("touchend", onTouchEnd);
+    el.addEventListener("touchcancel", onTouchEnd);
+    return () => {
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove", onTouchMove);
+      el.removeEventListener("touchend", onTouchEnd);
+      el.removeEventListener("touchcancel", onTouchEnd);
+    };
+  }, []);
+
   const setActiveToolAndTab = (t: PageTool) => {
     setPrintMode(false);
     setActiveTool(t);
@@ -343,7 +437,7 @@ export default function ProjectWorkspace() {
 
   return (
     <div
-      className="flex flex-col h-screen w-screen overflow-hidden"
+      className="flex flex-col h-[100dvh] w-screen overflow-hidden"
       style={{ background: "hsl(var(--surface))", color: "hsl(var(--ink))" }}
     >
       <WorkspaceHeader
@@ -568,141 +662,228 @@ export default function ProjectWorkspace() {
                   const active = pg.id === activePage?.id;
                   const isRenaming = renamingPageId === pg.id;
                   const showActions = active && pageActionsSticky;
+                  // Spread-Kontext berechnen: gehört pg zu einem Spread mit ≥ 2 Mitgliedern?
+                  const spreadId = pg.spreadId;
+                  const spreadMembers = spreadId
+                    ? project.pages
+                        .filter((x) => x.spreadId === spreadId)
+                        .sort((a, b) => (a.spreadIndex ?? 0) - (b.spreadIndex ?? 0))
+                    : [];
+                  const inSpread = spreadMembers.length >= 2;
+                  const spreadPosIdx = inSpread ? spreadMembers.findIndex((x) => x.id === pg.id) : -1;
+                  const isFirstInSpread = inSpread && spreadPosIdx === 0;
+                  const isLastInSpread = inSpread && spreadPosIdx === spreadMembers.length - 1;
+                  const collapsed = inSpread ? !!spreadMembers[0].spreadCollapsed : false;
+                  // Wenn Spread eingeklappt ist: nur die erste Seite (mit Chip „+N") zeigen.
+                  if (inSpread && collapsed && !isFirstInSpread) return null;
+                  // „Nächste Seite" für Link-Button.
+                  const nextPage = project.pages[idx + 1];
+                  const canLinkToNext = nextPage && !inSpread && !nextPage.spreadId;
+                  const canLinkAppend = nextPage && inSpread && isLastInSpread && !nextPage.spreadId;
+
                   return (
-                    <div
-                      key={pg.id}
-                      draggable={!isRenaming}
-                      onDragStart={(e) => {
-                        setDragPageIdx(idx);
-                        e.dataTransfer.effectAllowed = "move";
-                      }}
-                      onDragOver={(e) => {
-                        if (dragPageIdx !== null && dragPageIdx !== idx) e.preventDefault();
-                      }}
-                      onDrop={(e) => {
-                        e.preventDefault();
-                        if (dragPageIdx !== null && dragPageIdx !== idx) {
-                          projectStore.reorderPage(project.id, dragPageIdx, idx);
-                        }
-                        setDragPageIdx(null);
-                      }}
-                      onDragEnd={() => setDragPageIdx(null)}
-                      onClick={() => {
-                        if (isRenaming) return;
-                        if (active) {
-                          // re-click the active page toggles sticky action icons
-                          setPageActionsSticky((v) => !v);
-                          return;
-                        }
-                        setActivePageId(pg.id);
-                        setSelectedElementId(undefined);
-                        setSelectedCadTool(undefined);
-                        setPageActionsSticky(false);
-                      }}
-                      className="group w-full text-left rounded-lg p-2 flex gap-2.5 transition cursor-pointer"
-                      style={{
-                        background: active ? "hsl(var(--surface-card))" : "transparent",
-                        border: active ? "1px solid hsl(var(--accent-gold) / 0.4)" : "1px solid transparent",
-                        opacity: dragPageIdx === idx ? 0.5 : 1,
-                      }}
-                    >
-                      <div className="flex flex-col items-center justify-center text-muted-foreground opacity-0 group-hover:opacity-100 transition cursor-grab">
-                        <GripVertical size={12} />
+                    <div key={pg.id} className="flex gap-1.5">
+                      {/* Spread-Verbindungsbalken links */}
+                      <div className="w-[6px] shrink-0 relative flex flex-col items-center">
+                        {inSpread && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              projectStore.setSpreadCollapsed(project.id, spreadId!, !collapsed);
+                            }}
+                            title={collapsed ? `Verbund öffnen (${spreadMembers.length} Seiten)` : "Verbund einklappen"}
+                            className="absolute inset-0 w-full h-full rounded"
+                            style={{
+                              background: collapsed
+                                ? "hsl(var(--accent-gold) / 0.35)"
+                                : "hsl(var(--accent-gold) / 0.7)",
+                              // In geklapptem Zustand: gesamter Balken. Sonst
+                              // Ober/Unter-Radius nur an den Enden des Spreads.
+                              borderTopLeftRadius: isFirstInSpread || collapsed ? 4 : 0,
+                              borderTopRightRadius: isFirstInSpread || collapsed ? 4 : 0,
+                              borderBottomLeftRadius: isLastInSpread || collapsed ? 4 : 0,
+                              borderBottomRightRadius: isLastInSpread || collapsed ? 4 : 0,
+                            }}
+                          />
+                        )}
                       </div>
                       <div
-                        className="w-12 h-9 rounded shrink-0 border"
-                        style={{ background: "white", borderColor: "hsl(var(--hairline))" }}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <div className="text-[10px] text-muted-foreground flex items-center justify-between gap-1">
-                          <span>{String(idx + 1).padStart(2, "0")}</span>
-                          {!isRenaming && (
+                        draggable={!isRenaming}
+                        onDragStart={(e) => {
+                          setDragPageIdx(idx);
+                          e.dataTransfer.effectAllowed = "move";
+                        }}
+                        onDragOver={(e) => {
+                          if (dragPageIdx !== null && dragPageIdx !== idx) e.preventDefault();
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          if (dragPageIdx !== null && dragPageIdx !== idx) {
+                            projectStore.reorderPage(project.id, dragPageIdx, idx);
+                          }
+                          setDragPageIdx(null);
+                        }}
+                        onDragEnd={() => setDragPageIdx(null)}
+                        onClick={() => {
+                          if (isRenaming) return;
+                          if (active) {
+                            setPageActionsSticky((v) => !v);
+                            return;
+                          }
+                          setActivePageId(pg.id);
+                          setSelectedElementId(undefined);
+                          setSelectedCadTool(undefined);
+                          setPageActionsSticky(false);
+                        }}
+                        className="group flex-1 min-w-0 text-left rounded-lg p-2 flex gap-2.5 transition cursor-pointer"
+                        style={{
+                          background: active ? "hsl(var(--surface-card))" : "transparent",
+                          border: active ? "1px solid hsl(var(--accent-gold) / 0.4)" : "1px solid transparent",
+                          opacity: dragPageIdx === idx ? 0.5 : 1,
+                        }}
+                      >
+                        <div className="flex flex-col items-center justify-center text-muted-foreground opacity-0 group-hover:opacity-100 transition cursor-grab">
+                          <GripVertical size={12} />
+                        </div>
+                        <div
+                          className="w-12 h-9 rounded shrink-0 border relative"
+                          style={{ background: "white", borderColor: "hsl(var(--hairline))" }}
+                        >
+                          {inSpread && isFirstInSpread && collapsed && (
                             <span
-                              className={`flex items-center gap-1 transition ${
-                                showActions ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                              }`}
+                              className="absolute -right-1 -top-1 h-4 min-w-4 px-1 rounded-full text-[9px] font-semibold flex items-center justify-center"
+                              style={{ background: "hsl(var(--accent-gold))", color: "white" }}
+                              title={`${spreadMembers.length} Seiten im Verbund`}
                             >
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  const newId = projectStore.duplicatePage(project.id, pg.id);
-                                  if (newId) setActivePageId(newId);
-                                }}
-                                title="Duplizieren"
-                                className="hover:text-foreground"
-                              >
-                                <Copy size={11} />
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setRenamingPageId(pg.id);
-                                  setPageNameDraft(pg.title.replace(/^\d+\s*/, ""));
-                                }}
-                                title="Umbenennen"
-                                className="hover:text-foreground"
-                              >
-                                <Pencil size={11} />
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (project.pages.length <= 1) return;
-                                  if (!confirm(`Seite "${pg.title}" löschen?`)) return;
-                                  projectStore.deletePage(project.id, pg.id);
-                                  if (activePageId === pg.id) {
-                                    setActivePageId(project.pages.find((p) => p.id !== pg.id)?.id);
-                                  }
-                                }}
-                                title="Löschen"
-                                className="hover:text-destructive"
-                              >
-                                <Trash2 size={11} />
-                              </button>
+                              +{spreadMembers.length - 1}
                             </span>
                           )}
                         </div>
-                        {isRenaming ? (
-                          <div className="flex items-center gap-1 mt-0.5">
-                            <input
-                              autoFocus
-                              value={pageNameDraft}
-                              onChange={(e) => setPageNameDraft(e.target.value)}
-                              onClick={(e) => e.stopPropagation()}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
+                        <div className="min-w-0 flex-1">
+                          <div className="text-[10px] text-muted-foreground flex items-center justify-between gap-1">
+                            <span className="flex items-center gap-1">
+                              <span>{String(idx + 1).padStart(2, "0")}</span>
+                              {inSpread && (
+                                <BookOpen size={9} className="opacity-70" />
+                              )}
+                            </span>
+                            {!isRenaming && (
+                              <span
+                                className={`flex items-center gap-1 transition ${
+                                  showActions ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                                }`}
+                              >
+                                {(canLinkToNext || canLinkAppend) && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (canLinkAppend) {
+                                        projectStore.addPageToSpread(project.id, spreadId!, nextPage!.id);
+                                      } else if (canLinkToNext) {
+                                        projectStore.linkPagesToSpread(project.id, [pg.id, nextPage!.id]);
+                                      }
+                                    }}
+                                    title="Mit nächster Seite verbinden"
+                                    className="hover:text-foreground"
+                                  >
+                                    <Link2 size={11} />
+                                  </button>
+                                )}
+                                {inSpread && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      projectStore.removePageFromSpread(project.id, pg.id);
+                                    }}
+                                    title="Aus Verbund lösen"
+                                    className="hover:text-destructive"
+                                  >
+                                    <Link2Off size={11} />
+                                  </button>
+                                )}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const newId = projectStore.duplicatePage(project.id, pg.id);
+                                    if (newId) setActivePageId(newId);
+                                  }}
+                                  title="Duplizieren"
+                                  className="hover:text-foreground"
+                                >
+                                  <Copy size={11} />
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setRenamingPageId(pg.id);
+                                    setPageNameDraft(pg.title.replace(/^\d+\s*/, ""));
+                                  }}
+                                  title="Umbenennen"
+                                  className="hover:text-foreground"
+                                >
+                                  <Pencil size={11} />
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (project.pages.length <= 1) return;
+                                    if (!confirm(`Seite "${pg.title}" löschen?`)) return;
+                                    projectStore.deletePage(project.id, pg.id);
+                                    if (activePageId === pg.id) {
+                                      setActivePageId(project.pages.find((p) => p.id !== pg.id)?.id);
+                                    }
+                                  }}
+                                  title="Löschen"
+                                  className="hover:text-destructive"
+                                >
+                                  <Trash2 size={11} />
+                                </button>
+                              </span>
+                            )}
+                          </div>
+                          {isRenaming ? (
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <input
+                                autoFocus
+                                value={pageNameDraft}
+                                onChange={(e) => setPageNameDraft(e.target.value)}
+                                onClick={(e) => e.stopPropagation()}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    projectStore.updatePage(project.id, pg.id, { title: pageNameDraft.trim() || pg.title });
+                                    setRenamingPageId(undefined);
+                                  } else if (e.key === "Escape") {
+                                    setRenamingPageId(undefined);
+                                  }
+                                }}
+                                className="flex-1 min-w-0 text-sm h-6 px-1 rounded border bg-background"
+                                style={{ borderColor: "hsl(var(--hairline))" }}
+                              />
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   projectStore.updatePage(project.id, pg.id, { title: pageNameDraft.trim() || pg.title });
                                   setRenamingPageId(undefined);
-                                } else if (e.key === "Escape") {
+                                }}
+                                title="Speichern"
+                              >
+                                <Check size={12} />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   setRenamingPageId(undefined);
-                                }
-                              }}
-                              className="flex-1 min-w-0 text-sm h-6 px-1 rounded border bg-background"
-                              style={{ borderColor: "hsl(var(--hairline))" }}
-                            />
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                projectStore.updatePage(project.id, pg.id, { title: pageNameDraft.trim() || pg.title });
-                                setRenamingPageId(undefined);
-                              }}
-                              title="Speichern"
-                            >
-                              <Check size={12} />
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setRenamingPageId(undefined);
-                              }}
-                              title="Abbrechen"
-                            >
-                              <X size={12} />
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="text-sm truncate">{pg.title.replace(/^\d+\s*/, "")}</div>
-                        )}
+                                }}
+                                title="Abbrechen"
+                              >
+                                <X size={12} />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="text-sm truncate">{pg.title.replace(/^\d+\s*/, "")}</div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   );
@@ -775,23 +956,34 @@ export default function ProjectWorkspace() {
             <div
               ref={canvasViewportRef}
               className="flex-1 overflow-hidden relative"
+              style={{ touchAction: "pan-x pan-y" }}
               onWheel={(e) => {
-                if (e.shiftKey) return;
-                // Immer zoomen (Wheel + optional Ctrl/Cmd) — Zoom-Zentrum ist
-                // die Maus-Position (wie in PowerPoint/CAD/Figma).
+                if (e.shiftKey && !e.altKey) {
+                  // Shift alleine = normales horizontales Scrollen zulassen.
+                  return;
+                }
                 const container = e.currentTarget as HTMLDivElement;
                 const r = container.getBoundingClientRect();
                 const mx = e.clientX - r.left;
                 const my = e.clientY - r.top;
-                // Content-Position unter der Maus VOR dem Zoom.
                 const contentX0 = container.scrollLeft + mx;
                 const contentY0 = container.scrollTop + my;
-                // Exponentieller Zoom-Faktor (identisch zum CAD-Editor,
-                // Camera.zoomAt) → langsameres, feineres Zoomgefühl.
-                const factor = Math.pow(1.0015, -e.deltaY);
+                // Hoch-Delta-Dämpfer: sehr große Wheel-Ticks (Trackpad) werden
+                // logarithmisch begrenzt, damit ein einzelner „Kick" nicht
+                // 30 %-Sprünge erzeugt.
+                let dy = e.deltaY;
+                if (Math.abs(dy) > 60) {
+                  const sign = dy < 0 ? -1 : 1;
+                  dy = sign * (60 + Math.log2(Math.abs(dy) / 60 + 1) * 40);
+                }
+                // Basis-Faktor deutlich feiner als CAD (1.0015). Alt = grob (×2.5),
+                // Ctrl/Cmd = extra fein (×0.4).
+                let expScale = 1.0010;
+                if (e.altKey) expScale = 1.0025;
+                else if (e.ctrlKey || e.metaKey) expScale = 1.0004;
+                const factor = Math.pow(expScale, -dy);
                 const next = Math.max(10, Math.min(1600, zoom * factor));
-                if (Math.abs(next - zoom) < 0.01) return;
-                // Pivot in Content-Koordinaten der NEUEN Skala umrechnen.
+                if (Math.abs(next - zoom) < 0.005) { if (e.cancelable) e.preventDefault(); return; }
                 const ratio = next / zoom;
                 zoomPivotRef.current = {
                   contentX: contentX0 * ratio,
@@ -799,8 +991,6 @@ export default function ProjectWorkspace() {
                   mx, my,
                 };
                 setZoom(next);
-                // preventDefault erst nach der Rechnung — verhindert
-                // Browser-Scroll ohne die Zoom-Berechnung zu verzögern.
                 if (e.cancelable) e.preventDefault();
               }}
               onMouseDown={(e) => {
@@ -831,92 +1021,168 @@ export default function ProjectWorkspace() {
             >
 
 
-              {activePage && (
-                <PageCanvas
-                  projectId={project.id}
-                  page={activePage}
-                  overlayPage={bgOverlay.visible ? bgPage : undefined}
-                  overlayOpacity={bgOverlay.opacity}
-                  selectedElementId={selectedElementId}
-                  zoom={zoom}
-                  activeTool={activeTool}
-                  hatchDrawMode={hatchDrawMode}
-                  toolSettings={toolSettings}
-                  onCommitTool={() => setActiveTool(null)}
-                  selectedElementIds={selectedElementIds}
-                  onSelect={(id, opts) => {
-                    if (!id) {
-                      setSelectedElementIds([]);
-                      return;
-                    }
-                    const multi = toolSettings.select.multi || !!opts?.shift;
-                    setSelectedElementIds((prev) => {
-                      if (!multi) return [id];
-                      const idx = prev.indexOf(id);
-                      if (opts?.shift && idx >= 0) {
-                        // Shift-Klick auf bereits selektiertes → entfernen
-                        return prev.filter((x) => x !== id);
-                      }
-                      // Multi: nach hinten (= zuletzt selektiert) verschieben
-                      const rest = prev.filter((x) => x !== id);
-                      return [...rest, id];
-                    });
+              {activePage && (() => {
+                // Wenn die aktive Seite Teil eines Spreads mit ≥2 Mitgliedern
+                // ist, alle Mitglieder nebeneinander rendern; sonst nur die
+                // aktive Seite (bisheriges Verhalten).
+                const spreadMembers = activePage.spreadId
+                  ? project.pages
+                      .filter((p) => p.spreadId === activePage.spreadId)
+                      .sort((a, b) => (a.spreadIndex ?? 0) - (b.spreadIndex ?? 0))
+                  : [];
+                const pages = spreadMembers.length >= 2 ? spreadMembers : [activePage];
+                const layoutMode = spreadMembers.length >= 2 ? (spreadMembers[0].spreadLayoutMode ?? "grid") : "grid";
+
+                const handleSelect = (id?: string, opts?: { shift?: boolean }) => {
+                  if (!id) { setSelectedElementIds([]); return; }
+                  const multi = toolSettings.select.multi || !!opts?.shift;
+                  setSelectedElementIds((prev) => {
+                    if (!multi) return [id];
+                    const idx = prev.indexOf(id);
+                    if (opts?.shift && idx >= 0) return prev.filter((x) => x !== id);
+                    const rest = prev.filter((x) => x !== id);
+                    return [...rest, id];
+                  });
+                  setSelectedCadTool(undefined);
+                  setRightTab("tools");
+                };
+                const handleCadSelection: React.ComponentProps<typeof PageCanvas>["onCadSelectionChange"] = (info, count) => {
+                  setCadSelectionCount(count ?? (info ? 1 : 0));
+                  if (!info) {
+                    if ((count ?? 0) === 0) setSelectedElementIds([]);
                     setSelectedCadTool(undefined);
+                    setCadSelectedLineSnap(null);
+                    return;
+                  }
+                  if (info.tool === "document") {
+                    setSelectedElementIds([info.id]);
+                    setSelectedCadTool(undefined);
+                    setCadSelectedLineSnap(null);
                     setRightTab("tools");
-                  }}
-                  onCadSelectionChange={(info, count) => {
-                    setCadSelectionCount(count ?? (info ? 1 : 0));
-                    if (!info) {
-                      if ((count ?? 0) === 0) setSelectedElementIds([]);
-                      setSelectedCadTool(undefined);
-                      setCadSelectedLineSnap(null);
-                      return;
-                    }
-                    if (info.tool === "document") {
-                      setSelectedElementIds([info.id]);
-                      setSelectedCadTool(undefined);
-                      setCadSelectedLineSnap(null);
-                      setRightTab("tools");
-                      return;
-                    }
-                    setSelectedElementIds([]);
-                    setSelectedCadTool(info.tool);
-                    setRightTab("tools");
+                    return;
+                  }
+                  setSelectedElementIds([]);
+                  setSelectedCadTool(info.tool);
+                  setRightTab("tools");
+                  if (info.tool === "line") {
+                    updateToolSettings("line", {
+                      color: info.color,
+                      thicknessMm: info.thicknessMm,
+                      alpha: info.alpha,
+                    });
+                    setCadSelectedLineSnap({
+                      midpoint: !!info.midpointSnap,
+                      division: typeof info.divisionSnap === "number" ? info.divisionSnap : null,
+                      isGuide: !!info.isGuide,
+                    });
+                  } else if (info.tool === "free") {
+                    setCadSelectedLineSnap(null);
+                  } else if (info.tool === "text") {
+                    setCadSelectedLineSnap(null);
+                    updateToolSettings("text", {
+                      color: info.color,
+                      fontSize: info.fontSize,
+                      alpha: info.alpha,
+                      align: info.align,
+                      bgColor: info.bgColor,
+                      bgAlphaPct: info.bgAlphaPct,
+                      wrap: info.wrap,
+                      autoSize: info.autoSize,
+                      borderEnabled: info.borderEnabled,
+                      borderColor: info.borderColor,
+                      borderWidthPx: info.borderWidthPx,
+                    });
+                  }
+                };
 
-                    if (info.tool === "line") {
-                      updateToolSettings("line", {
-                        color: info.color,
-                        thicknessMm: info.thicknessMm,
-                        alpha: info.alpha,
-                      });
-                      setCadSelectedLineSnap({
-                        midpoint: !!info.midpointSnap,
-                        division: typeof info.divisionSnap === "number" ? info.divisionSnap : null,
-                        isGuide: !!info.isGuide,
-                      });
-                    } else if (info.tool === "free") {
-                      setCadSelectedLineSnap(null);
-                    } else if (info.tool === "text") {
-                      setCadSelectedLineSnap(null);
-                      updateToolSettings("text", {
-                        color: info.color,
-                        fontSize: info.fontSize,
-                        alpha: info.alpha,
-                        align: info.align,
-                        bgColor: info.bgColor,
-                        bgAlphaPct: info.bgAlphaPct,
-                        wrap: info.wrap,
-                        autoSize: info.autoSize,
-                        borderEnabled: info.borderEnabled,
-                        borderColor: info.borderColor,
-                        borderWidthPx: info.borderWidthPx,
-                      });
-                    }
-                  }}
-                  onCadEngineReady={(api) => { cadEngineApiRef.current = api; forceEngineTick(t => t + 1); }}
+                if (pages.length === 1) {
+                  const p = pages[0];
+                  return (
+                    <PageCanvas
+                      projectId={project.id}
+                      page={p}
+                      overlayPage={bgOverlay.visible ? bgPage : undefined}
+                      overlayOpacity={bgOverlay.opacity}
+                      selectedElementId={selectedElementId}
+                      zoom={zoom}
+                      activeTool={activeTool}
+                      hatchDrawMode={hatchDrawMode}
+                      toolSettings={toolSettings}
+                      onCommitTool={() => setActiveTool(null)}
+                      selectedElementIds={selectedElementIds}
+                      onSelect={handleSelect}
+                      onCadSelectionChange={handleCadSelection}
+                      onCadEngineReady={(api) => { cadEngineApiRef.current = api; forceEngineTick(t => t + 1); }}
+                    />
+                  );
+                }
 
-                />
-              )}
+                // Spread mit ≥2 Seiten — als flex-row rendern.
+                // Free-Layout: absolute Positionierung anhand spreadOffset (mm → px).
+                const isFree = layoutMode === "free";
+                return (
+                  <div
+                    className="min-h-full flex items-start justify-center"
+                    style={{ padding: "60vh 60vw" }}
+                  >
+                    <div
+                      className={isFree ? "relative" : "flex items-start"}
+                      style={isFree ? { minWidth: 800, minHeight: 400 } : undefined}
+                    >
+                      {pages.map((p, i) => {
+                        const isActiveMember = p.id === activePage.id;
+                        const offset = isFree
+                          ? (p.spreadOffset ?? { xMm: i * 20, yMm: 0 })
+                          : { xMm: 0, yMm: 0 };
+                        const style: React.CSSProperties = isFree
+                          ? {
+                              position: "absolute",
+                              left: `${offset.xMm * 4}px`, // grober Preview-Maßstab, User verschiebt sichtbar
+                              top: `${offset.yMm * 4}px`,
+                            }
+                          : {};
+                        return (
+                          <div
+                            key={p.id}
+                            style={{
+                              ...style,
+                              outline: isActiveMember && pages.length > 1 ? "2px solid hsl(var(--accent-gold) / 0.6)" : undefined,
+                              outlineOffset: -1,
+                            }}
+                            onClickCapture={(e) => {
+                              // Klick in fremdes Spread-Mitglied → aktivieren.
+                              if (!isActiveMember) {
+                                setActivePageId(p.id);
+                              }
+                              void e;
+                            }}
+                          >
+                            <PageCanvas
+                              projectId={project.id}
+                              page={p}
+                              overlayPage={undefined}
+                              overlayOpacity={0}
+                              selectedElementId={isActiveMember ? selectedElementId : undefined}
+                              zoom={zoom}
+                              activeTool={isActiveMember ? activeTool : null}
+                              hatchDrawMode={hatchDrawMode}
+                              toolSettings={toolSettings}
+                              onCommitTool={() => setActiveTool(null)}
+                              selectedElementIds={isActiveMember ? selectedElementIds : []}
+                              onSelect={handleSelect}
+                              onCadSelectionChange={isActiveMember ? handleCadSelection : () => {}}
+                              onCadEngineReady={isActiveMember
+                                ? (api) => { cadEngineApiRef.current = api; forceEngineTick(t => t + 1); }
+                                : undefined}
+                              bare
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
             <ZoomBar zoom={zoom} setZoom={setZoomClamped} />
           </main>
@@ -1172,6 +1438,7 @@ function PageCanvas({
   onCadSelectionChange,
   onCadEngineReady,
   hatchDrawMode,
+  bare,
 }: {
   projectId: string;
   page: import("@/lib/projectStore").ProjectPage;
@@ -1187,6 +1454,8 @@ function PageCanvas({
   onCadSelectionChange: (info: MiniCadSelectionInfo | null, count?: number) => void;
   onCadEngineReady?: (api: { setSelectedSegmentSnap: (opts: { midpointSnap?: boolean; divisionSnap?: number | null }) => void; duplicateSelectedSegments: (offsetMm?: number) => number; engine: import("@/cad/embed/MiniCad").MiniCad }) => void;
   hatchDrawMode?: HatchDrawMode;
+  /** Wenn true, wird die 60vh/60vw-Padding-Hülle weggelassen (für Spread-Layouts). */
+  bare?: boolean;
 }) {
 
   const fmt = FORMAT_SIZES[page.format];
@@ -1291,20 +1560,16 @@ function PageCanvas({
 
   const otherEls = page.elements.filter((e) => e.kind !== "line" && e.kind !== "guide");
 
-  return (
+  const inner = (
     <div
-      className="min-h-full flex items-start justify-center"
-      style={{ padding: "60vh 60vw" }}
+      className="relative"
+      style={{
+        width: displayWidth,
+        height: displayHeight,
+      }}
     >
       <div
-        className="relative"
-        style={{
-          width: displayWidth,
-          height: displayHeight,
-        }}
-      >
-        <div
-          ref={pageRef}
+        ref={pageRef}
           className="relative shadow-xl"
           style={{
             width: displayWidth,
@@ -1555,6 +1820,14 @@ function PageCanvas({
 
 
       </div>
+  );
+  if (bare) return inner;
+  return (
+    <div
+      className="min-h-full flex items-start justify-center"
+      style={{ padding: "60vh 60vw" }}
+    >
+      {inner}
     </div>
   );
 }
@@ -1568,25 +1841,25 @@ function ZoomBar({ zoom, setZoom }: { zoom: number; setZoom: (v: number) => void
       style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
     >
       <button
-        onClick={() => setZoom(zoom - 10)}
+        onClick={() => setZoom(Math.max(10, zoom / 1.05))}
         className="h-7 w-7 rounded-md flex items-center justify-center hover:bg-muted text-muted-foreground"
-        title="Verkleinern"
+        title="Verkleinern (−5 %)"
       >
         <ZoomOut size={14} />
       </button>
       <input
         type="range"
         min={10}
-        max={400}
+        max={1600}
         step={1}
         value={Math.round(zoom)}
         onChange={(e) => setZoom(Number(e.target.value))}
         className="w-64 accent-foreground"
       />
       <button
-        onClick={() => setZoom(zoom + 10)}
+        onClick={() => setZoom(Math.min(1600, zoom * 1.05))}
         className="h-7 w-7 rounded-md flex items-center justify-center hover:bg-muted text-muted-foreground"
-        title="Vergrößern"
+        title="Vergrößern (+5 %)"
       >
         <ZoomIn size={14} />
       </button>
@@ -1594,7 +1867,7 @@ function ZoomBar({ zoom, setZoom }: { zoom: number; setZoom: (v: number) => void
         <input
           type="number"
           min={10}
-          max={400}
+          max={1600}
           value={draft ?? Math.round(zoom)}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={() => {
@@ -2173,6 +2446,14 @@ function PageSettings({
   page: import("@/lib/projectStore").ProjectPage;
 }) {
   const update = (patch: Partial<typeof page>) => projectStore.updatePage(projectId, page.id, patch);
+  const project = useProject(projectId);
+  const spreadMembers = page.spreadId
+    ? (project?.pages.filter((x) => x.spreadId === page.spreadId).sort((a, b) => (a.spreadIndex ?? 0) - (b.spreadIndex ?? 0)) ?? [])
+    : [];
+  const inSpread = spreadMembers.length >= 2;
+  const pageIndex = project?.pages.findIndex((x) => x.id === page.id) ?? -1;
+  const prevPage = pageIndex > 0 ? project?.pages[pageIndex - 1] : undefined;
+  const nextPage = pageIndex >= 0 ? project?.pages[pageIndex + 1] : undefined;
   return (
     <div className="space-y-5">
       <div>
@@ -2288,6 +2569,118 @@ function PageSettings({
               <option value="bottom">Unten</option>
             </select>
           </Row>
+        </div>
+      </div>
+
+      <div>
+        <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-3">
+          SEITENANSICHT (VERBUND)
+        </div>
+        <div className="space-y-3">
+          {!inSpread ? (
+            <>
+              <div className="text-[11px] text-muted-foreground">
+                Einzelseite. Zum Erstellen einer Doppelseite mit einer benachbarten Seite verbinden.
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={!prevPage || !!prevPage.spreadId}
+                  onClick={() => prevPage && projectStore.linkPagesToSpread(projectId, [prevPage.id, page.id])}
+                  className="flex-1 h-8 rounded border text-xs flex items-center justify-center gap-1.5 disabled:opacity-40"
+                  style={{ borderColor: "hsl(var(--hairline))" }}
+                  title="Mit vorheriger Seite verbinden"
+                >
+                  <Link2 size={12} /> vorherige
+                </button>
+                <button
+                  type="button"
+                  disabled={!nextPage || !!nextPage.spreadId}
+                  onClick={() => nextPage && projectStore.linkPagesToSpread(projectId, [page.id, nextPage.id])}
+                  className="flex-1 h-8 rounded border text-xs flex items-center justify-center gap-1.5 disabled:opacity-40"
+                  style={{ borderColor: "hsl(var(--hairline))" }}
+                  title="Mit nächster Seite verbinden"
+                >
+                  <Link2 size={12} /> nächste
+                </button>
+              </div>
+              <Row label="Ausschließen">
+                <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    checked={!!page.spreadExcluded}
+                    onChange={(e) => update({ spreadExcluded: e.target.checked })}
+                  />
+                  Von „Muster übernehmen" ausschließen
+                </label>
+              </Row>
+            </>
+          ) : (
+            <>
+              <div className="text-[11px] text-muted-foreground">
+                Teil eines Verbunds aus <strong>{spreadMembers.length}</strong> Seiten
+                (Position {(page.spreadIndex ?? 0) + 1}).
+              </div>
+              <Row label="Layout">
+                <select
+                  value={page.spreadLayoutMode ?? "grid"}
+                  onChange={(e) => projectStore.setSpreadLayoutMode(projectId, page.spreadId!, e.target.value as "grid" | "free")}
+                  className="w-full h-8 px-2 rounded bg-transparent border text-sm"
+                  style={{ borderColor: "hsl(var(--hairline))" }}
+                >
+                  <option value="grid">Doppelseite (nebeneinander)</option>
+                  <option value="free">Freie Anordnung</option>
+                </select>
+              </Row>
+              {nextPage && !nextPage.spreadId && (
+                <button
+                  type="button"
+                  onClick={() => projectStore.addPageToSpread(projectId, page.spreadId!, nextPage.id)}
+                  className="w-full h-8 rounded border text-xs flex items-center justify-center gap-1.5"
+                  style={{ borderColor: "hsl(var(--hairline))" }}
+                >
+                  <Link2 size={12} /> Nächste Seite anfügen
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => projectStore.removePageFromSpread(projectId, page.id)}
+                className="w-full h-8 rounded border text-xs flex items-center justify-center gap-1.5"
+                style={{ borderColor: "hsl(var(--hairline))" }}
+              >
+                <Link2Off size={12} /> Diese Seite aus Verbund lösen
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const n = projectStore.applySpreadPatternToRest(projectId, page.spreadId!);
+                  if (n > 0) {
+                    // Kleiner Bestätigungs-Toast über alert (Toast-System ist außerhalb dieses Scopes).
+                    // eslint-disable-next-line no-alert
+                    alert(`Muster auf ${n} weitere Verbund${n === 1 ? "" : "e"} angewendet.`);
+                  } else {
+                    // eslint-disable-next-line no-alert
+                    alert("Keine weiteren passenden Seiten gefunden.");
+                  }
+                }}
+                className="w-full h-8 rounded text-xs font-medium"
+                style={{ background: "hsl(var(--accent-gold))", color: "white" }}
+                title="Muster (N Seiten) auf alle nachfolgenden Seiten anwenden"
+              >
+                Für alle übernehmen
+              </button>
+              <Row label="Ausschließen">
+                <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    checked={!!page.spreadExcluded}
+                    onChange={(e) => update({ spreadExcluded: e.target.checked })}
+                  />
+                  Diese Seite bei „Für alle übernehmen" überspringen
+                </label>
+              </Row>
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -3551,6 +3944,8 @@ function PrintPanel({
   const [colorMode, setColorMode] = useState<PrintColorMode>("original");
   const [customColor, setCustomColor] = useState("#111111");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set(project.pages.map(p => p.id)));
+  const hasSpreads = project.pages.some((p) => !!p.spreadId);
+  const [spreadCombined, setSpreadCombined] = useState<boolean>(hasSpreads);
 
   const toggleId = (id: string) => setSelectedIds(prev => {
     const n = new Set(prev);
@@ -3674,6 +4069,28 @@ function PrintPanel({
             )}
           </div>
         </section>
+
+        {hasSpreads && (
+          <section>
+            <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-2">
+              VERBUND
+            </div>
+            <label className="flex items-start gap-2 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                checked={spreadCombined}
+                onChange={(e) => setSpreadCombined(e.target.checked)}
+                className="mt-0.5"
+              />
+              <span>
+                Doppelseiten nebeneinander drucken
+                <span className="block text-[11px] text-muted-foreground">
+                  Verbundene Seiten erscheinen als eine PDF-Seite; einzelne Seiten unverändert.
+                </span>
+              </span>
+            </label>
+          </section>
+        )}
       </div>
 
       <div

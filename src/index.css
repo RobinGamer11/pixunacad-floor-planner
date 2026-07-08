@@ -142,6 +142,23 @@
   body {
     @apply bg-background text-foreground;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    /* iOS: Overscroll-Bounce der ganzen Seite unterdrücken. */
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  html, body, #root {
+    /* Verhindert 100vh-Bug in Safari iOS. */
+    height: 100%;
+  }
+  /* Toolbars/Panels: kein Text-Auswahl-Hover auf iPad. */
+  aside, header, nav, .cad-toolbar-btn {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  /* Explizit erlauben, wo Eingabe stattfindet. */
+  input, textarea, [contenteditable="true"], .allow-select {
+    -webkit-user-select: text;
+    user-select: text;
   }
 }
 
