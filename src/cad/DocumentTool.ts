@@ -138,6 +138,40 @@ export class DocumentTool {
   isScaling() { return this.phase === "scale-pick-1" || this.phase === "scale-pick-2" || this.phase === "scale-pick-3"; }
 
   update(input: Input) {
+    if (this.phase === "anchor-edit") {
+      // Kein Snap — Anker sitzen frei auf dem Dokument (User-definiert).
+      this.scaleSnap = null;
+      if (!input.clicked) return;
+      const docId = this.anchorTargetDocId;
+      if (!docId) return;
+      const doc = this.app.scene.getDocumentById(docId);
+      if (!doc) { this.cancel(); return; }
+      const worldPt = v(input.mouse.wx, input.mouse.wy);
+      // Zuerst: Hit auf existierendem Anker? → entfernen.
+      const worldAnchors = documentAnchorsWorld(doc);
+      const tolPx = 10;
+      let removeIdx = -1;
+      for (let i = 0; i < worldAnchors.length; i++) {
+        const s = this.app.camera.worldToScreen(worldAnchors[i].x, worldAnchors[i].y);
+        if (Math.hypot(s.x - input.mouse.sx, s.y - input.mouse.sy) <= tolPx) {
+          removeIdx = i;
+          break;
+        }
+      }
+      const anchors: { x: number; y: number }[] = ((doc as any).anchors || []).slice();
+      if (removeIdx >= 0) {
+        anchors.splice(removeIdx, 1);
+        (doc as any).anchors = anchors;
+      } else {
+        // Nur setzen, wenn Klick innerhalb des Dokuments liegt.
+        const uv = worldToDocumentUV(doc, worldPt);
+        if (uv.x >= -0.02 && uv.x <= 1.02 && uv.y >= -0.02 && uv.y <= 1.02) {
+          anchors.push({ x: Math.max(0, Math.min(1, uv.x)), y: Math.max(0, Math.min(1, uv.y)) });
+          (doc as any).anchors = anchors;
+        }
+      }
+      return;
+    }
     if (this.phase === "placing") {
       const snap = this.app.topology.findBestSnap(v(input.mouse.sx, input.mouse.sy), v(input.mouse.wx, input.mouse.wy));
       this.scaleSnap = snap;
