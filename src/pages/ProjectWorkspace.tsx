@@ -195,10 +195,11 @@ export default function ProjectWorkspace() {
   const [pageNameDraft, setPageNameDraft] = useState("");
   const [pageActionsSticky, setPageActionsSticky] = useState(false);
   const [dragPageIdx, setDragPageIdx] = useState<number | null>(null);
-  const [bgOverlay, setBgOverlay] = useState<{ pageId?: string; opacity: number; visible: boolean; color: string }>({
+  const [bgOverlay, setBgOverlay] = useState<{ pageId?: string; opacity: number; visible: boolean; color: string; tintEnabled: boolean }>({
     opacity: 0.45,
     visible: true,
     color: "#c99a3b",
+    tintEnabled: true,
   });
   const [zoom, setZoom] = useState(77);
   const canvasViewportRef = useRef<HTMLDivElement>(null);
@@ -1007,12 +1008,25 @@ export default function ProjectWorkspace() {
                   </span>
                 </div>
                 <div className="mt-2 flex items-center gap-2">
-                  <span className="text-[11px] text-muted-foreground">Farbe</span>
+                  <button
+                    type="button"
+                    onClick={() => setBgOverlay((o) => ({ ...o, tintEnabled: !o.tintEnabled }))}
+                    className="text-[11px] px-1.5 py-0.5 rounded border"
+                    style={{
+                      borderColor: "hsl(var(--hairline))",
+                      background: bgOverlay.tintEnabled ? "transparent" : "hsl(var(--accent-gold-soft))",
+                      color: bgOverlay.tintEnabled ? "hsl(var(--ink-soft))" : "hsl(var(--accent-gold))",
+                    }}
+                    title={bgOverlay.tintEnabled ? "Zurzeit eingefärbt — Klick zeigt Originalfarben" : "Zurzeit Originalfarben — Klick färbt ein"}
+                  >
+                    {bgOverlay.tintEnabled ? "Farbe: Tint" : "Farbe: Original"}
+                  </button>
                   <input
                     type="color"
                     value={bgOverlay.color}
+                    disabled={!bgOverlay.tintEnabled}
                     onChange={(e) => setBgOverlay((o) => ({ ...o, color: e.target.value }))}
-                    className="h-6 w-8 rounded border cursor-pointer bg-transparent"
+                    className="h-6 w-8 rounded border cursor-pointer bg-transparent disabled:opacity-40"
                     style={{ borderColor: "hsl(var(--hairline))" }}
                     title="Tintfarbe der Transparenzpause"
                   />
@@ -1020,11 +1034,12 @@ export default function ProjectWorkspace() {
                     type="button"
                     onClick={() => setBgOverlay((o) => ({ ...o, color: "#c99a3b" }))}
                     className="text-[11px] text-muted-foreground underline"
-                    title="Zurücksetzen"
+                    title="Farbe zurücksetzen"
                   >
                     Reset
                   </button>
                 </div>
+
               </div>
             </aside>
           ) : (
@@ -1189,7 +1204,7 @@ export default function ProjectWorkspace() {
                       page={p}
                       overlayPage={bgOverlay.visible ? bgPage : undefined}
                       overlayOpacity={bgOverlay.opacity}
-                      overlayColor={bgOverlay.color}
+                      overlayColor={bgOverlay.tintEnabled ? bgOverlay.color : undefined}
                       selectedElementId={selectedElementId}
                       zoom={zoom}
                       activeTool={activeTool}
@@ -1200,7 +1215,9 @@ export default function ProjectWorkspace() {
                       onSelect={handleSelect}
                       onCadSelectionChange={handleCadSelection}
                       onCadEngineReady={(api) => { cadEngineApiRef.current = api; forceEngineTick(t => t + 1); }}
+                      onJumpCad={(sheetId) => navigate(`/project/${project.id}/cad${sheetId ? `/${sheetId}` : ""}`)}
                     />
+
                   );
                 }
 
@@ -1300,7 +1317,9 @@ export default function ProjectWorkspace() {
                                 ? (api) => { cadEngineApiRef.current = api; forceEngineTick(t => t + 1); }
                                 : undefined}
                               bare
+                              onJumpCad={(sheetId) => navigate(`/project/${project.id}/cad${sheetId ? `/${sheetId}` : ""}`)}
                             />
+
                           </div>
                         );
                       })}
@@ -1706,6 +1725,7 @@ function PageCanvas({
   onCadEngineReady,
   hatchDrawMode,
   bare,
+  onJumpCad,
 }: {
   projectId: string;
   page: import("@/lib/projectStore").ProjectPage;
@@ -1724,7 +1744,10 @@ function PageCanvas({
   hatchDrawMode?: HatchDrawMode;
   /** Wenn true, wird die 60vh/60vw-Padding-Hülle weggelassen (für Spread-Layouts). */
   bare?: boolean;
+  /** Springt vom CAD-Blatt-Hub in den CAD-Editor. */
+  onJumpCad?: (sheetId?: string) => void;
 }) {
+
 
   const fmt = FORMAT_SIZES[page.format];
   const aspect = fmt.w / fmt.h;
@@ -1865,7 +1888,7 @@ function PageCanvas({
         )}
         {overlayPage && (() => {
           const ofmt = FORMAT_SIZES[overlayPage.format];
-          const tint = overlayColor ?? "#c99a3b";
+          const tint = overlayColor;
           return (
             <div
               className="absolute inset-0 pointer-events-none overflow-hidden"
@@ -1892,18 +1915,24 @@ function PageCanvas({
                 .map((el) => (
                   <ElementView key={el.id} el={el} readOnly />
                 ))}
-              {/* Farb-Tint (Multiply) — färbt Linien der Hintergrundseite ein */}
-              <div
-                className="absolute inset-0 pointer-events-none"
-                style={{ background: tint, mixBlendMode: "multiply" }}
-              />
+              {/* Farb-Tint (Multiply) — nur wenn eine Tintfarbe gesetzt ist.
+                  Wenn undefined, werden die Originalfarben der Hintergrundseite gezeigt. */}
+              {tint && (
+                <div
+                  className="absolute inset-0 pointer-events-none"
+                  style={{ background: tint, mixBlendMode: "multiply" }}
+                />
+              )}
             </div>
           );
         })()}
+
         {otherEls.map((el) => (
           <ElementView
             key={el.id}
             el={el}
+            onJumpCad={onJumpCad}
+
             selected={selectedElementIds.includes(el.id)}
             elevated={activeTool === null && el.kind !== "cad-view" && el.kind !== "pdf" && el.kind !== "image"}
             onSelect={(opts) => onSelect(el.id, opts)}
@@ -2203,6 +2232,7 @@ function ElementView({
   onRotate,
   onEdgeDrag,
   onCornerDrag,
+  onJumpCad,
 }: {
   el: PageElement;
   selected?: boolean;
@@ -2215,7 +2245,9 @@ function ElementView({
   onRotate?: (deltaDeg: number, absolute?: boolean) => void;
   onEdgeDrag?: (edge: "top" | "right" | "bottom" | "left", dx: number, dy: number) => void;
   onCornerDrag?: (corner: "tl" | "tr" | "bl" | "br", dx: number, dy: number, shift: boolean) => void;
+  onJumpCad?: (sheetId?: string) => void;
 }) {
+
   const dragRef = useRef<{ x: number; y: number } | null>(null);
   const rotateRef = useRef<HTMLDivElement | null>(null);
 
@@ -2270,6 +2302,14 @@ function ElementView({
 
   const hubKinds = new Set(["cad-view", "pdf", "image"]);
   const showHub = !readOnly && selected && hubKinds.has(el.kind);
+  // CAD-Blatt bekommt einen eigenen (blau-gestrichelten) Look — analog zum
+  // Dokument-Hub in der CAD-Oberfläche (siehe Bild-Referenz).
+  const isCadView = el.kind === "cad-view";
+  const hubBlue = "hsl(217 91% 60%)";
+  const outlineColor = selected ? (isCadView ? hubBlue : "hsl(var(--accent-gold))") : undefined;
+  const outlineStyle = selected
+    ? (isCadView ? `2px dashed ${hubBlue}` : "2px solid hsl(var(--accent-gold))")
+    : "none";
 
   return (
     <div
@@ -2280,7 +2320,8 @@ function ElementView({
         top: `${el.y}%`,
         width: `${el.w}%`,
         height: `${el.h}%`,
-        outline: selected ? "2px solid hsl(var(--accent-gold))" : "none",
+        outline: outlineStyle,
+        outlineOffset: selected && isCadView ? "1px" : undefined,
         cursor: readOnly ? "default" : "move",
         opacity: el.opacity ?? 1,
         boxShadow: el.shadow ? "0 8px 24px -8px rgba(0,0,0,0.25)" : undefined,
@@ -2290,6 +2331,7 @@ function ElementView({
         zIndex: elevated ? 30 : undefined,
       }}
     >
+
       {el.kind === "text" && (
         <div
           style={{
@@ -2341,39 +2383,42 @@ function ElementView({
 
       {showHub && (
         <>
-          {/* Rotation handle: small circle above the element */}
-          <div
-            ref={rotateRef}
-            data-hub-control
-            onMouseDown={handleRotateStart}
-            title="Drehen (ziehen)"
-            className="absolute"
-            style={{
-              left: "50%",
-              top: -28,
-              transform: "translateX(-50%)",
-              width: 14,
-              height: 14,
-              borderRadius: 999,
-              background: "hsl(var(--accent-gold))",
-              border: "2px solid white",
-              boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
-              cursor: "grab",
-            }}
-          />
-          {/* Connector line from element top to rotation handle */}
-          <div
-            className="absolute pointer-events-none"
-            style={{
-              left: "50%",
-              top: -14,
-              width: 1,
-              height: 14,
-              background: "hsl(var(--accent-gold))",
-              transform: "translateX(-50%)",
-            }}
-          />
-          {/* Hub action bar */}
+          {/* Rotation stem — nur für PDF/Image; CAD-Blatt bekommt Rotation über die Toolbar */}
+          {!isCadView && (
+            <>
+              <div
+                ref={rotateRef}
+                data-hub-control
+                onMouseDown={handleRotateStart}
+                title="Drehen (ziehen)"
+                className="absolute"
+                style={{
+                  left: "50%",
+                  top: -28,
+                  transform: "translateX(-50%)",
+                  width: 14,
+                  height: 14,
+                  borderRadius: 999,
+                  background: "hsl(var(--accent-gold))",
+                  border: "2px solid white",
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
+                  cursor: "grab",
+                }}
+              />
+              <div
+                className="absolute pointer-events-none"
+                style={{
+                  left: "50%",
+                  top: -14,
+                  width: 1,
+                  height: 14,
+                  background: "hsl(var(--accent-gold))",
+                  transform: "translateX(-50%)",
+                }}
+              />
+            </>
+          )}
+          {/* Hub action bar — CAD-Blatt: Move/Rotate/Öffnen, sonst Rotate/Duplicate/Delete */}
           <div
             data-hub-control
             className="absolute flex items-center gap-1 rounded-md shadow-md"
@@ -2381,39 +2426,94 @@ function ElementView({
               right: 0,
               top: -36,
               background: "white",
-              border: "1px solid hsl(var(--hairline))",
+              border: `1px solid ${isCadView ? hubBlue : "hsl(var(--hairline))"}`,
               padding: 3,
             }}
             onMouseDown={(e) => e.stopPropagation()}
           >
-            <button
-              data-hub-control
-              onClick={(e) => { e.stopPropagation(); onRotate?.(15); }}
-              title="Drehen +15°"
-              className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
-            >
-              <RotateCw size={14} />
-            </button>
-            <button
-              data-hub-control
-              onClick={(e) => { e.stopPropagation(); onDuplicate?.(); }}
-              title="Duplizieren"
-              className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
-            >
-              <Copy size={14} />
-            </button>
-            <button
-              data-hub-control
-              onClick={(e) => { e.stopPropagation(); onDelete?.(); }}
-              title="Löschen"
-              className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
-              style={{ color: "hsl(0 65% 50%)" }}
-            >
-              <Trash2 size={14} />
-            </button>
+            {isCadView ? (
+              <>
+                <button
+                  data-hub-control
+                  title="Verschieben (Klick+Ziehen auf dem Blatt)"
+                  className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
+                  style={{ color: hubBlue, cursor: "move" }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Move size={14} />
+                </button>
+                <button
+                  data-hub-control
+                  onClick={(e) => { e.stopPropagation(); onRotate?.(15); }}
+                  title="Drehen +15°"
+                  className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
+                  style={{ color: hubBlue }}
+                >
+                  <RotateCw size={14} />
+                </button>
+                <button
+                  data-hub-control
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (onJumpCad && (el as any).sheetId) onJumpCad((el as any).sheetId);
+                  }}
+                  title="Im CAD-Editor öffnen"
+                  className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
+                  style={{ color: hubBlue }}
+                >
+                  <ExternalLink size={14} />
+                </button>
+                <span className="w-px self-stretch mx-0.5" style={{ background: "hsl(var(--hairline))" }} />
+                <button
+                  data-hub-control
+                  onClick={(e) => { e.stopPropagation(); onDuplicate?.(); }}
+                  title="Duplizieren"
+                  className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
+                >
+                  <Copy size={14} />
+                </button>
+                <button
+                  data-hub-control
+                  onClick={(e) => { e.stopPropagation(); onDelete?.(); }}
+                  title="Löschen"
+                  className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
+                  style={{ color: "hsl(0 65% 50%)" }}
+                >
+                  <Trash2 size={14} />
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  data-hub-control
+                  onClick={(e) => { e.stopPropagation(); onRotate?.(15); }}
+                  title="Drehen +15°"
+                  className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
+                >
+                  <RotateCw size={14} />
+                </button>
+                <button
+                  data-hub-control
+                  onClick={(e) => { e.stopPropagation(); onDuplicate?.(); }}
+                  title="Duplizieren"
+                  className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
+                >
+                  <Copy size={14} />
+                </button>
+                <button
+                  data-hub-control
+                  onClick={(e) => { e.stopPropagation(); onDelete?.(); }}
+                  title="Löschen"
+                  className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
+                  style={{ color: "hsl(0 65% 50%)" }}
+                >
+                  <Trash2 size={14} />
+                </button>
+              </>
+            )}
           </div>
 
-          {/* Edge-Drag-Handles (wie Schraffur-Werkzeug) — eine Kante reinziehen/rausziehen */}
+          {/* Edge-Drag-Handles — Farbe passt zum Hub */}
           {(["top", "right", "bottom", "left"] as const).map((edge) => {
             const isHor = edge === "top" || edge === "bottom";
             const startEdgeDrag = (e: React.MouseEvent) => {
@@ -2443,6 +2543,7 @@ function ElementView({
             const sizeStyle: React.CSSProperties = isHor
               ? { left: 0, right: 0, height: 8, [edge === "top" ? "top" : "bottom"]: -4 }
               : { top: 0, bottom: 0, width: 8, [edge === "left" ? "left" : "right"]: -4 };
+            const edgeStroke = isCadView ? hubBlue : "hsl(var(--accent-gold))";
             return (
               <div
                 key={edge}
@@ -2451,21 +2552,19 @@ function ElementView({
                 title={`Kante ${edge} ziehen`}
                 style={{ ...baseStyle, ...sizeStyle }}
               >
-                {/* Sichtbarer Strich auf der Kante (subtil) */}
                 <div
                   className="absolute"
                   style={
                     isHor
-                      ? { left: 0, right: 0, top: "50%", height: 2, transform: "translateY(-50%)", background: "hsl(var(--accent-gold))", opacity: 0.7 }
-                      : { top: 0, bottom: 0, left: "50%", width: 2, transform: "translateX(-50%)", background: "hsl(var(--accent-gold))", opacity: 0.7 }
+                      ? { left: 0, right: 0, top: "50%", height: 2, transform: "translateY(-50%)", background: edgeStroke, opacity: 0.7 }
+                      : { top: 0, bottom: 0, left: "50%", width: 2, transform: "translateX(-50%)", background: edgeStroke, opacity: 0.7 }
                   }
                 />
               </div>
             );
           })}
 
-          {/* Ecken-Handles (1:1 wie Dokument-Hub) — Skalieren an einer Ecke,
-              Ankerpunkt = gegenüberliegende Ecke. Shift = Seitenverhältnis halten. */}
+          {/* Ecken-Handles: quadratisch + blau bei CAD-Blatt, sonst rund + gold */}
           {onCornerDrag && (["tl", "tr", "bl", "br"] as const).map((corner) => {
             const startCornerDrag = (e: React.MouseEvent) => {
               e.stopPropagation();
@@ -2488,6 +2587,7 @@ function ElementView({
             const isLeft = corner === "tl" || corner === "bl";
             const cursor =
               corner === "tl" || corner === "br" ? "nwse-resize" : "nesw-resize";
+            const size = isCadView ? 10 : 12;
             return (
               <div
                 key={corner}
@@ -2496,13 +2596,13 @@ function ElementView({
                 title={`Ecke skalieren (Shift: proportional)`}
                 className="absolute"
                 style={{
-                  [isTop ? "top" : "bottom"]: -6,
-                  [isLeft ? "left" : "right"]: -6,
-                  width: 12,
-                  height: 12,
-                  borderRadius: 999,
+                  [isTop ? "top" : "bottom"]: -Math.floor(size / 2),
+                  [isLeft ? "left" : "right"]: -Math.floor(size / 2),
+                  width: size,
+                  height: size,
+                  borderRadius: isCadView ? 2 : 999,
                   background: "white",
-                  border: "2px solid hsl(var(--accent-gold))",
+                  border: `2px solid ${isCadView ? hubBlue : "hsl(var(--accent-gold))"}`,
                   boxShadow: "0 1px 3px rgba(0,0,0,0.25)",
                   cursor,
                   zIndex: 6,
@@ -2515,6 +2615,7 @@ function ElementView({
     </div>
   );
 }
+
 
 /** Vorschau-Bild eines CAD-Sheets. Liest live aus dem projectStore und
  *  zeigt den `thumbnail` (PNG aus dem CAD-Editor). Fallback: dezenter
@@ -2608,30 +2709,30 @@ function RightInspector({
   const layerCount = page?.elements.length ?? 0;
   return (
     <aside
-      className="w-[280px] shrink-0 border-l flex flex-col text-xs"
+      className="w-[280px] shrink-0 border-l flex flex-col text-[11px]"
       style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
     >
-      <div className="grid grid-cols-[1fr_1fr_1fr_auto] border-b" style={{ borderColor: "hsl(var(--hairline))" }}>
-        <TabButton active={tab === "settings"} onClick={() => setTab("settings")} icon={<Settings size={12} />} label="Seiteneinstellung" />
-        <TabButton active={tab === "tools"} onClick={() => setTab("tools")} icon={<Wrench size={12} />} label="Werkzeugeinstellung" />
+      <div className="grid grid-cols-[1fr_1fr_1fr_auto] shrink-0 border-b items-stretch" style={{ borderColor: "hsl(var(--hairline))" }}>
+        <TabButton active={tab === "settings"} onClick={() => setTab("settings")} label="Seiteneinstellung" />
+        <TabButton active={tab === "tools"} onClick={() => setTab("tools")} label="Werkzeugeinstellung" />
         <TabButton
           active={tab === "layers"}
           onClick={() => setTab("layers")}
-          icon={<LayersIcon size={12} />}
           label="Ebenen"
           badge={layerCount > 0 ? layerCount : undefined}
         />
         <button
           onClick={onCollapse}
           title="Einklappen"
-          className="w-7 flex items-center justify-center hover:bg-muted border-l"
+          className="w-8 flex items-center justify-center hover:bg-muted border-l"
           style={{ borderColor: "hsl(var(--hairline))" }}
         >
           <PanelRightClose size={12} className="text-muted-foreground" />
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-3 space-y-3">
+      <div className="flex-1 overflow-y-auto p-2 space-y-2">
+
 
         {tab === "settings" && page && <PageSettings projectId={projectId} page={page} />}
         {tab === "tools" && (
@@ -2686,47 +2787,38 @@ function RightInspector({
 function TabButton({
   active,
   onClick,
-  icon,
   label,
   badge,
 }: {
   active: boolean;
   onClick: () => void;
-  icon: React.ReactNode;
   label: string;
   badge?: number;
 }) {
   return (
     <button
+      type="button"
       onClick={onClick}
-      className="py-3 flex flex-col items-center gap-1 text-[11px] relative"
+      className="min-w-0 truncate px-2 py-2 text-[11px] font-medium transition-colors relative"
       style={{
+        background: active ? "hsl(var(--surface-card))" : "hsl(var(--surface-muted))",
         color: active ? "hsl(var(--ink))" : "hsl(var(--ink-soft))",
-        fontWeight: active ? 600 : 400,
-        background: active ? "hsl(var(--surface))" : "transparent",
+        borderBottom: active ? "2px solid hsl(var(--accent-gold))" : "2px solid transparent",
       }}
     >
-      <span className="flex items-center gap-1">
-        {icon}
-        {badge !== undefined && (
-          <span
-            className="text-[10px] px-1.5 py-0.5 rounded-full"
-            style={{ background: "hsl(var(--accent-gold))", color: "white" }}
-          >
-            {badge}
-          </span>
-        )}
-      </span>
-      <span className="text-center leading-tight">{label}</span>
-      {active && (
+      {label}
+      {badge !== undefined && (
         <span
-          className="absolute left-2 right-2 -bottom-px h-[2px]"
-          style={{ background: "hsl(var(--accent-gold))" }}
-        />
+          className="ml-1 text-[9px] px-1 py-0.5 rounded-full align-middle"
+          style={{ background: "hsl(var(--accent-gold))", color: "white" }}
+        >
+          {badge}
+        </span>
       )}
     </button>
   );
 }
+
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
