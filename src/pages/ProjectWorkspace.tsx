@@ -2510,7 +2510,7 @@ function ElementView({
 /** Vorschau-Bild eines CAD-Sheets. Liest live aus dem projectStore und
  *  zeigt den `thumbnail` (PNG aus dem CAD-Editor). Fallback: dezenter
  *  Platzhalter, wenn das Sheet noch nie im CAD geöffnet wurde. */
-function CadViewThumb({ sheetId }: { sheetId?: string }) {
+function CadViewThumb({ sheetId, snapshot }: { sheetId?: string; snapshot?: string }) {
   const projects = useProjects();
   const sheet = React.useMemo(() => {
     if (!sheetId) return undefined;
@@ -2520,11 +2520,14 @@ function CadViewThumb({ sheetId }: { sheetId?: string }) {
     }
     return undefined;
   }, [projects, sheetId]);
-  if (sheet?.thumbnail) {
+  // Bevorzugt der eingefrorene Element-Snapshot (Ansicht+Zoom zum Zeitpunkt
+  // des Einfügens). Fallback: Live-Thumbnail des Sheets.
+  const src = snapshot || sheet?.thumbnail;
+  if (src) {
     return (
       <img
-        src={sheet.thumbnail}
-        alt={sheet.name}
+        src={src}
+        alt={sheet?.name ?? "CAD-Ansicht"}
         className="w-full h-full object-contain"
         style={{ background: "white" }}
         draggable={false}
