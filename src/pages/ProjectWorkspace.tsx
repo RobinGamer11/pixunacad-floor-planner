@@ -786,11 +786,11 @@ export default function ProjectWorkspace() {
                 // Content-Position unter der Maus VOR dem Zoom.
                 const contentX0 = container.scrollLeft + mx;
                 const contentY0 = container.scrollTop + my;
-                // Exponentieller Zoom-Faktor → glatter & konsistent unabhängig
-                // von Trackpad/Mausrad-Deltas. Deep-Zoom bis 1600 %.
-                const factor = Math.pow(1.0018, -e.deltaY);
-                const next = Math.max(10, Math.min(1600, Math.round(zoom * factor)));
-                if (next === zoom) return;
+                // Exponentieller Zoom-Faktor (identisch zum CAD-Editor,
+                // Camera.zoomAt) → langsameres, feineres Zoomgefühl.
+                const factor = Math.pow(1.0015, -e.deltaY);
+                const next = Math.max(10, Math.min(1600, zoom * factor));
+                if (Math.abs(next - zoom) < 0.01) return;
                 // Pivot in Content-Koordinaten der NEUEN Skala umrechnen.
                 const ratio = next / zoom;
                 zoomPivotRef.current = {
