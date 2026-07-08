@@ -1,59 +1,44 @@
+## 01. Karte + Hintergrundfarbe im Raster-Popover (CAD-Oberfläche)
 
-## 01 — Rechtes Panel: kompakter + CAD-Stil-Reiter
+**Datei:** `src/components/CadEditor.tsx`, `src/cad/Renderer.ts`, neu: `src/cad/MapBackground.ts`
 
-**In `src/pages/ProjectWorkspace.tsx` (`RightInspector` + `TabButton`, ca. 2610–2740):**
-- Reiter-Design vom CAD-Sidebar übernehmen (`src/components/CadEditor.tsx` Zeile 1519–1535):
-  - Aktiver Tab: 2px `hsl(var(--accent-gold))` Underline, weißer Hintergrund; inaktiver Tab: `surface-muted`, `ink-soft`.
-  - Kein Icon mehr in den Reitern, nur der Label-Text (11px, `truncate`) — wie im CAD.
-- Panel-Breite bleibt 280px, aber:
-  - Content-Padding auf `p-2 space-y-2` (statt `p-3 space-y-3`).
-  - Basis-Schriftgröße im Panel auf `text-[11px]`, Row-Label auf `text-[10px]`.
-  - Buttons/Selects auf Höhe `h-7` (statt `h-8/h-9`), Slider kompakter.
-- Auch das kompakte Styling für `CadDocumentInspector` (`p-2 space-y-2`, Buttons `h-7`, Label `text-[10px]`) übernehmen.
+Erweiterung des bestehenden Raster-Popovers um zwei neue Sektionen:
 
-## 02 — Dokument: Slider für freies Skalieren
+**A) Hintergrundfarbe der CAD-Oberfläche**
+- Farbwähler + Hex-Feld, wirkt auf `renderer.backgroundColor` (neues Feld) → im Renderer statt `#fff` wird dieser Wert für den Clear genutzt.
+- Reset-Button auf Standard.
 
-**In `src/components/page/CadDocumentInspector.tsx` unter „Skalieren (2 Punkte)":**
-- Neue Zeile „Freie Skalierung" mit `<input type="range" min={10} max={400} step={1}>` (%-Wert).
-- Anfangswert = 100 % relativ zur aktuellen `widthM/heightM` (in Ref merken).
-- `onChange` ruft eine neue Engine-API `documentTool.scaleUniform(docId, factor)` auf, die `widthM`, `heightM` proportional multipliziert und über `_emitExternalDocChanges` an den Host meldet (damit auch die letzte Sitzung persistiert wird).
-- Zusätzlich Zahlenfeld (%) mit Enter zum präzisen Eintippen.
-- Gleiche Slider-Zeile auch in `CadEditor` (Dokument-Panel) einbauen, damit CAD-Oberfläche und Projektmappe identisch bleiben.
+**B) Kartenhintergrund (Sitemap-Overlay)**
+- Toggle „Karte anzeigen".
+- Adressfeld (Text) + „Suchen"-Button → Geocoding via **Lovable Google Maps Connector** (Gateway-Route `/maps/api/geocode/json`). Falls Connector nicht verknüpft, fordert der Button die Verbindung an (`standard_connectors--connect google_maps`) — erklärt, dass Cloud + Maps-Connector benötigt werden.
+- Distanz-Slider (10 m – 2000 m, Meter-Radius).
+- Nach Ergebnis: Lade Static Map-Kachel via Gateway `/maps/api/staticmap` mit Center `lat,lng`, `zoom` passend zum Radius, Größe `640x640`, `scale=2`. Das Bild wird als `HTMLImageElement` an den Renderer übergeben (`renderer.setMapBackground({image, centerLatLng, radiusM})`).
+- **Rendering (`Renderer.ts`)**: Vor dem Zeichnen der CAD-Objekte in Weltkoordinaten: `ctx.save()` → runde Clipping-Maske Radius=`radiusM` in Weltmetern um Weltursprung (0,0 = Adress-Mittelpunkt) → Karte gezeichnet mit korrekter m/px-Skalierung (Static Map: `metersPerPixel = 156543.03392 * cos(lat) / 2^zoom / scale`) → `restore()`. Außerhalb des Kreises bleibt `backgroundColor` sichtbar. Grid wird über die Karte gezeichnet.
+- Karte ist reine Hintergrund-Layer, nicht selektierbar / nicht gefangen — Werkzeuge arbeiten normal weiter.
+- Persistenz im projectStore als Teil des CAD-State (Adresse, Radius, LatLng, Farbe).
 
-## 03 — CAD-Blatt Hub im Dokument-Look
+## 02. Bildbearbeitung in Dokument-Inspektor (Projektmappe + CAD)
 
-**Ziel:** In der Projektmappe soll der Rahmen um ein platziertes CAD-Blatt (Bild 52) wie ein PDF/Dokument im CAD-Look aussehen: blau-gestrichelte Umrandung, blaue quadratische Corner-Handles, Aktions-Toolbar mit **Move / Rotate / Detach (öffnen)**.
+**Dateien:** `src/components/page/CadDocumentInspector.tsx`, `src/components/CadEditor.tsx` (identisches UI), neu: `src/cad/imageAdjust.ts` (WebGL/Canvas Pipeline), Erweiterung `DocumentTool.ts`.
 
-**In `src/pages/ProjectWorkspace.tsx` (`ElementView`, ca. 2270–2515):**
-- Neue Farb-/Style-Variante, aktiv wenn `el.kind === "cad-view"` (und optional `pdf`):
-  - Outline: `2px dashed hsl(217 91% 60%)` (Blau) statt Gold-Solid.
-  - Corner-Handles: 10×10 px **Quadrate**, weißer Kern, 2px blaue Border (statt goldene Kreise).
-  - Edge-Handles: dünne blaue Linie statt gold.
-  - Rotations-Stem oberhalb entfernt (Rotation wandert in die Toolbar).
-- Neue Toolbar-Buttons (statt Rotate/Duplicate/Delete):
-  1. **Move** (`Move` Icon): rein visueller Hinweis-Button (Cursor bleibt sowieso „move").
-  2. **Rotate** (`RotateCw`): +15° pro Klick (bestehend).
-  3. **Detach/Open** (`ExternalLink`): springt via `onJumpCad(el.sheetId)` in die CAD-Oberfläche.
-  Delete/Duplicate wandert in ein „⋯"-Overflow-Menü, damit die Kern-Toolbar zu Bild 52 passt.
-- Für `kind === "pdf"` bleibt die bisherige Gold-Optik erhalten (User-Konsistenz mit früherem Verhalten).
+Neue Sektion „Bildbearbeitung" unten in beiden Inspektoren, nur aktiv wenn selektiertes Dokument ein Bild oder gerastertes PDF ist:
 
-## 04 — Transparenzpause: Originalfarbe zeigen
+**Regler (0–100, Default 0/50):**
+- Belichtung, Kontrast, Sättigung, Wärme, Tint
+- Klarheit (lokaler Kontrast), Struktur, Dunst entfernen
+- Schatten, Lichter, Weiß, Schwarz
+- Vignette, Körnung
+- Aquarell-Preset (aus Upload adaptiert: Pigment-Blur + Kanten-Bloom + Papiertextur), Stärke-Slider
+- Preset-Dropdown: Original, Aquarell weich, Aquarell Landschaft, Skizze, Grauwert
 
-**In `src/pages/ProjectWorkspace.tsx`:**
-- `bgOverlay`-State um `tintEnabled: boolean` erweitern (Default `true`).
-- Neuer Toggle-Button neben dem Farbwähler: „Originalfarbe" (Kontrast-Icon). Wenn aktiv:
-  - `tintEnabled = false` → im Overlay-Render (Zeile 1866–1900) wird der `<div style={{background: tint, mixBlendMode: multiply}}>` weggelassen, sodass die Hintergrundseite in ihren Originalfarben durchscheint.
-  - Farbwähler wird disabled/ausgegraut.
-- Persistenz in `bgOverlay` via bestehender useState (kein Store-Schema-Change nötig).
+**Umsetzung:**
+- Neuer Utility `imageAdjust.ts`: nimmt Source-`HTMLImageElement`+Params → rendert auf Off-screen-Canvas mit Filter-Pipeline (verbessert gegenüber Upload: einzelne unabhängige Regler statt Sammel-Presets, Live-Debounce 80 ms, Web-Worker-fähige `OffscreenCanvas` wenn verfügbar). Ergebnis als `ImageBitmap`/DataURL an das Dokument.
+- `DocumentTool.setImageAdjust(docId, params)` speichert Params im Doc-State und triggert Re-Render.
+- Renderer zeichnet Dokument mit dem angepassten Bitmap (Cache pro Params-Hash).
+- „Zurücksetzen"-Button und „Anwenden & speichern"-Button (persistent in projectStore).
 
-## Technische Details
+## Verifikation
+- Typecheck läuft automatisch.
+- Manueller Playwright-Check: Raster-Popover öffnen, Farbe ändern, Karte togglen (nur wenn Connector vorhanden), Dokument selektieren → Bildbearbeitung erscheint, Regler verändert Preview.
 
-- Slider-Kommunikation zur CAD-Engine läuft über `documentTool` (analog zu `beginScaleTwoPoints`). Neue Methode `scaleUniform(docId, factor)` skaliert `widthM/heightM` (Position bleibt fixiert an der linken oberen Ecke oder Bounding-Center — Center bevorzugt).
-- Der CAD-Blatt-Hub bleibt vollständig in React (kein Wechsel zur Engine-basierten Renderung nötig); nur Styling + Toolbar-Icons ändern sich.
-- Keine Änderungen an Persistenz-/Datenmodellen außer dem Slider-Emit-Pfad (nutzt bereits `_emitExternalDocChanges` bzw. `updateElement`).
-
-**Betroffene Dateien:**
-- `src/pages/ProjectWorkspace.tsx`
-- `src/components/page/CadDocumentInspector.tsx`
-- `src/components/CadEditor.tsx`
-- `src/cad/DocumentTool.ts` (neue `scaleUniform`)
+Wenn genehmigt, verknüpfe ich zunächst den Google-Maps-Connector (Punkt 01B braucht ihn) und liefere anschließend beide Features.
