@@ -6,6 +6,8 @@ import {
   type FreeRemap,
   type AdjustParams,
   DEFAULT_ADJUST,
+  ADJUST_GROUPS,
+  ADJUST_PRESETS,
   makeDefaultFilter,
   filterModeLabel,
   extractDominantColors,
