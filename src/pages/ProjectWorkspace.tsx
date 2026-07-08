@@ -1721,6 +1721,7 @@ function PageCanvas({
   onCadEngineReady,
   hatchDrawMode,
   bare,
+  onJumpCad,
 }: {
   projectId: string;
   page: import("@/lib/projectStore").ProjectPage;
@@ -1739,7 +1740,10 @@ function PageCanvas({
   hatchDrawMode?: HatchDrawMode;
   /** Wenn true, wird die 60vh/60vw-Padding-Hülle weggelassen (für Spread-Layouts). */
   bare?: boolean;
+  /** Springt vom CAD-Blatt-Hub in den CAD-Editor. */
+  onJumpCad?: (sheetId?: string) => void;
 }) {
+
 
   const fmt = FORMAT_SIZES[page.format];
   const aspect = fmt.w / fmt.h;
