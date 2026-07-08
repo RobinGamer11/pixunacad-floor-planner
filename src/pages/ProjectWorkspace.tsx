@@ -109,6 +109,28 @@ const HATCH_MODE_VARIANTS: Array<{ id: HatchDrawMode; label: string; icon: React
 const isLinePageTool = (tool: PageTool): tool is LinePageTool =>
   tool === "line" || tool === "free" || tool === "eraser";
 
+const PROJECT_ZOOM_MIN = 10;
+const PROJECT_ZOOM_MAX = 1600;
+const PROJECT_ZOOM_SLIDER_STEPS = 1000;
+const clampProjectZoom = (v: number) => Math.max(PROJECT_ZOOM_MIN, Math.min(PROJECT_ZOOM_MAX, v));
+const clampUnit = (v: number) => Math.max(0, Math.min(1, v));
+
+const zoomToSliderValue = (zoom: number) => {
+  const min = Math.log(PROJECT_ZOOM_MIN);
+  const max = Math.log(PROJECT_ZOOM_MAX);
+  return Math.round(((Math.log(clampProjectZoom(zoom)) - min) / (max - min)) * PROJECT_ZOOM_SLIDER_STEPS);
+};
+
+const sliderValueToZoom = (value: number) => {
+  const min = Math.log(PROJECT_ZOOM_MIN);
+  const max = Math.log(PROJECT_ZOOM_MAX);
+  return Math.exp(min + (clampUnit(value / PROJECT_ZOOM_SLIDER_STEPS) * (max - min)));
+};
+
+type ProjectZoomAnchor =
+  | { kind: "page"; pageId: string; xRatio: number; yRatio: number; clientX: number; clientY: number }
+  | { kind: "viewport"; contentX: number; contentY: number; mx: number; my: number };
+
 export default function ProjectWorkspace() {
   const { projectId } = useParams();
   const project = useProject(projectId);
@@ -177,21 +199,68 @@ export default function ProjectWorkspace() {
   });
   const [zoom, setZoom] = useState(77);
   const canvasViewportRef = useRef<HTMLDivElement>(null);
-  // Pivot für zoom-to-pointer: relative Content-Position (0..1) unter dem Mauszeiger
-  // + Maus-Position innerhalb des Containers. Wird nach setZoom in einem
-  // useLayoutEffect als Scroll-Korrektur angewendet.
-  const zoomPivotRef = useRef<{ contentX: number; contentY: number; mx: number; my: number } | null>(null);
-  const setZoomClamped = (v: number) => setZoom(Math.max(10, Math.min(1600, Math.round(v))));
+  // Zoom-Anker: merkt sich den echten Punkt auf der Seite unter Maus/Fingern.
+  // Dadurch bleibt der Zielpunkt auch bei großen Mappe-Paddings und Spreads stabil.
+  const zoomAnchorRef = useRef<ProjectZoomAnchor | null>(null);
+  const setZoomClamped = (v: number) => setZoom(clampProjectZoom(v));
+
+  const captureZoomAnchor = (clientX: number, clientY: number): ProjectZoomAnchor | null => {
+    const viewport = canvasViewportRef.current;
+    if (!viewport) return null;
+
+    const hit = document.elementFromPoint(clientX, clientY);
+    const hitPage = hit instanceof HTMLElement ? hit.closest<HTMLElement>("[data-page-id]") : null;
+    const pageEl = hitPage ?? viewport.querySelector<HTMLElement>("[data-page-id]");
+
+    if (pageEl) {
+      const r = pageEl.getBoundingClientRect();
+      return {
+        kind: "page",
+        pageId: pageEl.dataset.pageId ?? "",
+        xRatio: r.width > 0 ? clampUnit((clientX - r.left) / r.width) : 0.5,
+        yRatio: r.height > 0 ? clampUnit((clientY - r.top) / r.height) : 0.5,
+        clientX,
+        clientY,
+      };
+    }
+
+    const r = viewport.getBoundingClientRect();
+    const mx = clientX - r.left;
+    const my = clientY - r.top;
+    return {
+      kind: "viewport",
+      contentX: viewport.scrollLeft + mx,
+      contentY: viewport.scrollTop + my,
+      mx,
+      my,
+    };
+  };
+
+  const applyZoomAnchor = () => {
+    const viewport = canvasViewportRef.current;
+    const anchor = zoomAnchorRef.current;
+    if (!viewport || !anchor) return;
+
+    if (anchor.kind === "page") {
+      const pages = Array.from(viewport.querySelectorAll<HTMLElement>("[data-page-id]"));
+      const pageEl = pages.find((el) => el.dataset.pageId === anchor.pageId) ?? pages[0];
+      if (pageEl) {
+        const r = pageEl.getBoundingClientRect();
+        const anchoredClientX = r.left + r.width * anchor.xRatio;
+        const anchoredClientY = r.top + r.height * anchor.yRatio;
+        viewport.scrollLeft += anchoredClientX - anchor.clientX;
+        viewport.scrollTop += anchoredClientY - anchor.clientY;
+      }
+    } else {
+      viewport.scrollLeft = anchor.contentX - anchor.mx;
+      viewport.scrollTop = anchor.contentY - anchor.my;
+    }
+
+    zoomAnchorRef.current = null;
+  };
+
   useLayoutEffect(() => {
-    const el = canvasViewportRef.current;
-    const pivot = zoomPivotRef.current;
-    if (!el || !pivot) return;
-    // Neue Zoom-Skala ist bereits gerendert (CSS scale). Content-Größe verhält
-    // sich proportional zu zoom → neuen Scroll so setzen, dass der Punkt unter
-    // der Maus an derselben Bildschirmposition bleibt.
-    el.scrollLeft = pivot.contentX - pivot.mx;
-    el.scrollTop = pivot.contentY - pivot.my;
-    zoomPivotRef.current = null;
+    applyZoomAnchor();
   }, [zoom]);
 
   // Aktueller Zoom als Ref, damit iPad-Touch-Handler ihn ohne Rerender lesen.
@@ -206,9 +275,7 @@ export default function ProjectWorkspace() {
     let mode: "idle" | "gesture" = "idle";
     let startDist = 0;
     let startZoom = 1;
-    let startMid = { x: 0, y: 0 };
-    let startScroll = { l: 0, t: 0 };
-    let startContent = { x: 0, y: 0 };
+    let startAnchor: ProjectZoomAnchor | null = null;
     const pts = new Map<number, { x: number; y: number }>();
     const midOf = () => {
       const arr = [...pts.values()];
@@ -223,47 +290,29 @@ export default function ProjectWorkspace() {
     const onTouchStart = (e: TouchEvent) => {
       for (const t of Array.from(e.touches)) pts.set(t.identifier, { x: t.clientX, y: t.clientY });
       if (pts.size >= 2) {
-        const r = el.getBoundingClientRect();
         const m = midOf();
         mode = "gesture";
         startDist = distOf();
         startZoom = zoomRef.current;
-        startMid = { x: m.x - r.left, y: m.y - r.top };
-        startScroll = { l: el.scrollLeft, t: el.scrollTop };
-        startContent = { x: startScroll.l + startMid.x, y: startScroll.t + startMid.y };
+        startAnchor = captureZoomAnchor(m.x, m.y);
         e.preventDefault();
       }
     };
     const onTouchMove = (e: TouchEvent) => {
       for (const t of Array.from(e.touches)) pts.set(t.identifier, { x: t.clientX, y: t.clientY });
       if (mode === "gesture" && pts.size >= 2) {
-        const r = el.getBoundingClientRect();
         const m = midOf();
         const dist = distOf();
         if (startDist > 4 && dist > 4) {
           const factor = dist / startDist;
-          const next = Math.max(10, Math.min(1600, startZoom * factor));
-          const ratio = next / zoomRef.current;
-          const newContentX = startContent.x * (next / startZoom);
-          const newContentY = startContent.y * (next / startZoom);
-          const newMx = m.x - r.left;
-          const newMy = m.y - r.top;
-          zoomPivotRef.current = {
-            contentX: newContentX + (newMx - startMid.x) * -1 + newMx,
-            contentY: newContentY + (newMy - startMid.y) * -1 + newMy,
-            mx: newMx, my: newMy,
-          };
-          // Einfacher: nur Zoom setzen, Pan-Delta über scroll direkt anwenden.
-          void ratio;
+          const next = clampProjectZoom(startZoom * factor);
+          zoomAnchorRef.current = startAnchor?.kind === "page"
+            ? { ...startAnchor, clientX: m.x, clientY: m.y }
+            : captureZoomAnchor(m.x, m.y);
           setZoom(next);
-          // Pan-Anteil aus Mittelpunkt-Bewegung
-          const panDx = newMx - startMid.x;
-          const panDy = newMy - startMid.y;
           requestAnimationFrame(() => {
-            el.scrollLeft -= panDx;
-            el.scrollTop -= panDy;
+            applyZoomAnchor();
           });
-          startMid = { x: newMx, y: newMy };
         }
         e.preventDefault();
       }
@@ -977,33 +1026,25 @@ export default function ProjectWorkspace() {
                   return;
                 }
                 const container = e.currentTarget as HTMLDivElement;
-                const r = container.getBoundingClientRect();
-                const mx = e.clientX - r.left;
-                const my = e.clientY - r.top;
-                const contentX0 = container.scrollLeft + mx;
-                const contentY0 = container.scrollTop + my;
                 // Hoch-Delta-Dämpfer: sehr große Wheel-Ticks (Trackpad) werden
                 // logarithmisch begrenzt, damit ein einzelner „Kick" nicht
                 // 30 %-Sprünge erzeugt.
                 let dy = e.deltaY;
+                if (e.deltaMode === 1) dy *= 16;
+                if (e.deltaMode === 2) dy *= container.clientHeight;
                 if (Math.abs(dy) > 60) {
                   const sign = dy < 0 ? -1 : 1;
                   dy = sign * (60 + Math.log2(Math.abs(dy) / 60 + 1) * 40);
                 }
-                // Basis-Faktor deutlich feiner als CAD (1.0015). Alt = grob (×2.5),
-                // Ctrl/Cmd = extra fein (×0.4).
-                let expScale = 1.0010;
-                if (e.altKey) expScale = 1.0025;
-                else if (e.ctrlKey || e.metaKey) expScale = 1.0004;
-                const factor = Math.pow(expScale, -dy);
-                const next = Math.max(10, Math.min(1600, zoom * factor));
+                // Feiner, kontinuierlicher Zoom: normale Wheel-Ticks liegen nur
+                // bei ca. 4–5 %, Trackpads/Pinch laufen entsprechend weicher.
+                let sensitivity = 0.00055;
+                if (e.altKey) sensitivity = 0.0012;
+                else if (e.ctrlKey || e.metaKey) sensitivity = 0.00042;
+                const factor = Math.exp(-dy * sensitivity);
+                const next = clampProjectZoom(zoom * factor);
                 if (Math.abs(next - zoom) < 0.005) { if (e.cancelable) e.preventDefault(); return; }
-                const ratio = next / zoom;
-                zoomPivotRef.current = {
-                  contentX: contentX0 * ratio,
-                  contentY: contentY0 * ratio,
-                  mx, my,
-                };
+                zoomAnchorRef.current = captureZoomAnchor(e.clientX, e.clientY);
                 setZoom(next);
                 if (e.cancelable) e.preventDefault();
               }}
@@ -2004,40 +2045,42 @@ function PageCanvas({
 
 function ZoomBar({ zoom, setZoom }: { zoom: number; setZoom: (v: number) => void }) {
   const [draft, setDraft] = useState<string | null>(null);
+  const sliderValue = zoomToSliderValue(zoom);
   return (
     <div
       className="h-10 shrink-0 border-t flex items-center justify-center gap-3 px-4"
       style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
     >
       <button
-        onClick={() => setZoom(Math.max(10, zoom / 1.05))}
+        onClick={() => setZoom(clampProjectZoom(zoom / 1.02))}
         className="h-7 w-7 rounded-md flex items-center justify-center hover:bg-muted text-muted-foreground"
-        title="Verkleinern (−5 %)"
+        title="Verkleinern (−2 %)"
       >
         <ZoomOut size={14} />
       </button>
       <input
         type="range"
-        min={10}
-        max={1600}
+        min={0}
+        max={PROJECT_ZOOM_SLIDER_STEPS}
         step={1}
-        value={Math.round(zoom)}
-        onChange={(e) => setZoom(Number(e.target.value))}
+        value={sliderValue}
+        onChange={(e) => setZoom(sliderValueToZoom(Number(e.target.value)))}
         className="w-64 accent-foreground"
       />
       <button
-        onClick={() => setZoom(Math.min(1600, zoom * 1.05))}
+        onClick={() => setZoom(clampProjectZoom(zoom * 1.02))}
         className="h-7 w-7 rounded-md flex items-center justify-center hover:bg-muted text-muted-foreground"
-        title="Vergrößern (+5 %)"
+        title="Vergrößern (+2 %)"
       >
         <ZoomIn size={14} />
       </button>
       <div className="flex items-center gap-1">
         <input
           type="number"
-          min={10}
-          max={1600}
-          value={draft ?? Math.round(zoom)}
+          min={PROJECT_ZOOM_MIN}
+          max={PROJECT_ZOOM_MAX}
+          step={0.1}
+          value={draft ?? (zoom < 100 ? zoom.toFixed(1) : Math.round(zoom))}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={() => {
             if (draft !== null) {
