@@ -1570,6 +1570,7 @@ function PageCanvas({
     >
       <div
         ref={pageRef}
+        data-page-id={page.id}
           className="relative shadow-xl"
           style={{
             width: displayWidth,
