@@ -639,6 +639,16 @@ export const projectStore = {
         }
       ),
     }));
+  setSpreadLayoutLocked: (projectId: string, spreadId: string, locked: boolean) => {
+    setState((s) => ({
+      projects: s.projects.map((p) =>
+        p.id !== projectId ? p : {
+          ...p,
+          updatedAt: new Date().toISOString(),
+          pages: p.pages.map((pg) => (pg.spreadId === spreadId ? { ...pg, spreadLayoutLocked: locked } : pg)),
+        }
+      ),
+    }));
   },
   setSpreadOffset: (
     projectId: string,
