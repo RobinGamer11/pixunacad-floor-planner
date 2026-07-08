@@ -2703,16 +2703,26 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 <button
                   type="button"
                   onClick={() => appRef.current?.documentTool.beginScaleTwoPoints(docSelected.id)}
-                  className="cad-toolbar-btn w-full justify-center h-9"
+                  className="cad-toolbar-btn w-full justify-start px-2 h-9"
                   title="Über zwei Snap-Punkte und eine Soll-Länge skalieren"
                 >
                   <Maximize2 className="h-4 w-4" />
                   <span className="text-xs">Skalieren (2 Punkte)</span>
                 </button>
 
-                {/* Freie Skalierung — Slider (relativ zur Größe bei Auswahl) */}
-                <div className="rounded-md border p-2 space-y-1" style={{ borderColor: "hsl(var(--border))" }}>
-                  <div className="flex items-center justify-between text-[11px]" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+                <button
+                  type="button"
+                  onClick={() => appRef.current?.documentTool.beginScaleFromLastDimension(docSelected.id)}
+                  className="cad-toolbar-btn w-full justify-start px-2 h-9"
+                  title="Skaliere mit der zuletzt erstellten Maßkette als Referenz"
+                >
+                  <RulerIcon className="h-4 w-4" />
+                  <span className="text-xs">Skalieren (Maßkette)</span>
+                </button>
+
+                {/* Freie Skalierung — Slider (relativ zur Größe bei Auswahl), ohne Rahmen. */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-[11px] px-0.5" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
                     <span>Freie Skalierung</span>
                     <button
                       type="button"
@@ -2766,15 +2776,6 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => appRef.current?.documentTool.beginScaleFromLastDimension(docSelected.id)}
-                  className="cad-toolbar-btn w-full justify-center h-9"
-                  title="Skaliere mit der zuletzt erstellten Maßkette als Referenz"
-                >
-                  <RulerIcon className="h-4 w-4" />
-                  <span className="text-xs">Skalieren (Maßkette)</span>
-                </button>
                 {docSelected.kind === "pdf-page" && !!docSelected.pdfSourceB64 && (
                   <button
                     type="button"
@@ -2786,7 +2787,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                         window.alert(`Auflösen erfolgreich:\n${res.segments} Linien · ${res.hatches} Schraffuren · ${res.texts} Texte`);
                       }
                     }}
-                    className="cad-toolbar-btn w-full justify-center h-9"
+                    className="cad-toolbar-btn w-full justify-start px-2 h-9"
                     title="PDF-Vektoren extrahieren und in Linien/Schraffuren/Texte konvertieren"
                   >
                     <FileText className="h-4 w-4" />
@@ -2802,7 +2803,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                       app.scene.removeDocument(doc); app.clearSelection(); app.refreshLabelUI();
                     }
                   }}
-                  className="cad-toolbar-btn w-full justify-center h-9"
+                  className="cad-toolbar-btn w-full justify-start px-2 h-9"
                   title="Dokument löschen"
                 >
                   <Trash2 className="h-4 w-4" />
@@ -2820,11 +2821,11 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                       tool?.beginAnchorEdit?.(docSelected.id);
                     }
                   }}
-                  className="cad-toolbar-btn w-full justify-center h-9"
+                  className="cad-toolbar-btn w-full justify-start px-2 h-9"
                   title="Anker (Fangpunkte) am Dokument setzen — Klick auf Dokument fügt hinzu, Klick auf Anker entfernt ihn. Erneut drücken zum Beenden."
                 >
                   <AnchorIcon className="h-4 w-4" />
-                  <span className="text-xs">Anker +</span>
+                  <span className="text-xs">Anker +/−</span>
                 </button>
 
                 <DocumentFilterPanel app={appRef.current} docId={docSelected.id} sig={docFilterSig} />
