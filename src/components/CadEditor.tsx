@@ -274,6 +274,14 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const [gridSizeM, setGridSizeM] = useState<number>(1);
   const [gridColor, setGridColor] = useState<string>("#000000");
   const [gridOpacity, setGridOpacity] = useState<number>(0.06);
+  // Hintergrundfarbe der Oberfläche
+  const [bgColor, setBgColor] = useState<string>("#ffffff");
+  // Karten-Hintergrund
+  const [mapAddress, setMapAddress] = useState<string>("");
+  const [mapRadius, setMapRadius] = useState<number>(200);
+  const [mapLoading, setMapLoading] = useState<boolean>(false);
+  const [mapStatus, setMapStatus] = useState<string>("");
+  const [mapActive, setMapActive] = useState<boolean>(false);
 
   // Door tool state (Türen/Fenster)
   const [doorMode, setDoorMode] = useState<"door" | "window">("door");
