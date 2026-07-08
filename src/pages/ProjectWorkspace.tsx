@@ -1192,6 +1192,7 @@ export default function ProjectWorkspace() {
             printMode ? (
               <PrintPanel
                 project={project}
+                setActivePageId={setActivePageId}
                 onClose={() => setPrintMode(false)}
               />
             ) : (
