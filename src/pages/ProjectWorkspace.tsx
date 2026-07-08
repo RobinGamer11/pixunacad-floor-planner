@@ -4142,23 +4142,33 @@ function PrintPanel({
         )}
       </div>
 
+      {progress && (
+        <div
+          className="px-4 py-2 text-[11px] text-muted-foreground border-t"
+          style={{ borderColor: "hsl(var(--hairline))" }}
+        >
+          {progress.label} ({progress.current}/{progress.total})
+        </div>
+      )}
       <div
         className="border-t p-3 flex gap-2"
         style={{ borderColor: "hsl(var(--hairline))" }}
       >
         <button
           onClick={onClose}
-          className="flex-1 h-9 rounded-md text-sm border"
+          disabled={exporting}
+          className="flex-1 h-9 rounded-md text-sm border disabled:opacity-50"
           style={{ borderColor: "hsl(var(--hairline))", color: "hsl(var(--ink))" }}
         >
           Abbrechen
         </button>
         <button
-          onClick={() => window.print()}
-          className="flex-1 h-9 rounded-md text-sm font-medium"
+          onClick={handleExport}
+          disabled={exporting}
+          className="flex-1 h-9 rounded-md text-sm font-medium disabled:opacity-50"
           style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
         >
-          PDF erstellen
+          {exporting ? "Erstelle…" : "PDF erstellen"}
         </button>
       </div>
     </aside>
