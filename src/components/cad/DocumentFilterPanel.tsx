@@ -4,6 +4,8 @@ import {
   type DocumentFilter,
   type DocumentFilterMode,
   type FreeRemap,
+  type AdjustParams,
+  DEFAULT_ADJUST,
   makeDefaultFilter,
   filterModeLabel,
   extractDominantColors,
@@ -17,7 +19,7 @@ interface Props {
   sig: string;
 }
 
-const MODE_OPTIONS: DocumentFilterMode[] = ["bw", "grayscale", "tint", "free"];
+const MODE_OPTIONS: DocumentFilterMode[] = ["adjust", "bw", "grayscale", "tint", "free"];
 
 export function DocumentFilterPanel({ app, docId, sig }: Props) {
   // Doc bei jedem Render frisch lesen (sig erzwingt Re-Render via parent state).
