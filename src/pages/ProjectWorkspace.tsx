@@ -1215,7 +1215,9 @@ export default function ProjectWorkspace() {
                       onSelect={handleSelect}
                       onCadSelectionChange={handleCadSelection}
                       onCadEngineReady={(api) => { cadEngineApiRef.current = api; forceEngineTick(t => t + 1); }}
+                      onJumpCad={(sheetId) => navigate(`/project/${project.id}/cad${sheetId ? `/${sheetId}` : ""}`)}
                     />
+
                   );
                 }
 
