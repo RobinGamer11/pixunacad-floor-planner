@@ -364,14 +364,7 @@ export default function CadOverlayLayer(props: Props) {
             onMouseDown={(e) => e.stopPropagation()}
             onPointerDown={(e) => e.stopPropagation()}
           >
-            <button
-              type="button"
-              title="Anker / Eckpunkt wechseln"
-              onClick={cycleAnchor}
-              style={hubBtnStyle}
-            >
-              <Crosshair size={14} />
-            </button>
+            {/* „Anker wechseln" wurde entfernt (Wunsch: erste HUB-Funktion raus). */}
             <button
               type="button"
               title="Verschieben (Δx, Δy in m)"
