@@ -2556,6 +2556,63 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                   <Maximize2 className="h-4 w-4" />
                   <span className="text-xs">Skalieren (2 Punkte)</span>
                 </button>
+
+                {/* Freie Skalierung — Slider (relativ zur Größe bei Auswahl) */}
+                <div className="rounded-md border p-2 space-y-1" style={{ borderColor: "hsl(var(--border))" }}>
+                  <div className="flex items-center justify-between text-[11px]" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+                    <span>Freie Skalierung</span>
+                    <button
+                      type="button"
+                      className="hover:underline"
+                      title="Zurück auf 100%"
+                      onClick={() => {
+                        const base = docFreeScaleBaseRef.current;
+                        if (!base) return;
+                        setDocFreeScalePct(100);
+                        (appRef.current?.documentTool as any)?.scaleUniformAbsolute?.(docSelected.id, 1, base.w, base.h);
+                      }}
+                    >
+                      Reset
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="range"
+                      min={10}
+                      max={400}
+                      step={1}
+                      value={Math.round(docFreeScalePct)}
+                      onChange={(e) => {
+                        const pct = Number(e.target.value);
+                        const base = docFreeScaleBaseRef.current;
+                        if (!base) return;
+                        setDocFreeScalePct(pct);
+                        (appRef.current?.documentTool as any)?.scaleUniformAbsolute?.(docSelected.id, pct / 100, base.w, base.h);
+                      }}
+                      className="flex-1 accent-foreground"
+                    />
+                    <input
+                      type="number"
+                      min={10}
+                      max={400}
+                      step={1}
+                      value={Math.round(docFreeScalePct)}
+                      onChange={(e) => {
+                        const v = Number(e.target.value);
+                        if (!Number.isFinite(v)) return;
+                        const pct = Math.max(10, Math.min(400, v));
+                        const base = docFreeScaleBaseRef.current;
+                        if (!base) return;
+                        setDocFreeScalePct(pct);
+                        (appRef.current?.documentTool as any)?.scaleUniformAbsolute?.(docSelected.id, pct / 100, base.w, base.h);
+                      }}
+                      className="w-14 h-6 px-1 text-[11px] rounded border tabular-nums text-right"
+                      style={{ borderColor: "hsl(var(--border))" }}
+                    />
+                    <span className="text-[11px]" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>%</span>
+                  </div>
+                </div>
+
                 <button
                   type="button"
                   onClick={() => appRef.current?.documentTool.beginScaleFromLastDimension(docSelected.id)}
