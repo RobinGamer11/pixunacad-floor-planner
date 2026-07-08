@@ -58,6 +58,8 @@ import {
   Link2,
   Link2Off,
   BookOpen,
+  Lock as LockIcon,
+  Unlock as UnlockIcon,
 } from "lucide-react";
 
 import {
