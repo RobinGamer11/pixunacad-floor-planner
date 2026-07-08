@@ -1880,7 +1880,7 @@ function PageCanvas({
         )}
         {overlayPage && (() => {
           const ofmt = FORMAT_SIZES[overlayPage.format];
-          const tint = overlayColor ?? "#c99a3b";
+          const tint = overlayColor;
           return (
             <div
               className="absolute inset-0 pointer-events-none overflow-hidden"
@@ -1907,14 +1907,18 @@ function PageCanvas({
                 .map((el) => (
                   <ElementView key={el.id} el={el} readOnly />
                 ))}
-              {/* Farb-Tint (Multiply) — färbt Linien der Hintergrundseite ein */}
-              <div
-                className="absolute inset-0 pointer-events-none"
-                style={{ background: tint, mixBlendMode: "multiply" }}
-              />
+              {/* Farb-Tint (Multiply) — nur wenn eine Tintfarbe gesetzt ist.
+                  Wenn undefined, werden die Originalfarben der Hintergrundseite gezeigt. */}
+              {tint && (
+                <div
+                  className="absolute inset-0 pointer-events-none"
+                  style={{ background: tint, mixBlendMode: "multiply" }}
+                />
+              )}
             </div>
           );
         })()}
+
         {otherEls.map((el) => (
           <ElementView
             key={el.id}
