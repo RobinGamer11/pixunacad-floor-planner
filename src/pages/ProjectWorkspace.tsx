@@ -306,7 +306,7 @@ export default function ProjectWorkspace() {
         if (startDist > 4 && dist > 4) {
           const factor = dist / startDist;
           const next = clampProjectZoom(startZoom * factor);
-          zoomAnchorRef.current = startAnchor
+          zoomAnchorRef.current = startAnchor?.kind === "page"
             ? { ...startAnchor, clientX: m.x, clientY: m.y }
             : captureZoomAnchor(m.x, m.y);
           setZoom(next);
