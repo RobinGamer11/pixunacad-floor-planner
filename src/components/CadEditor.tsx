@@ -362,7 +362,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     app.renderer.render();
   }, [bgColor]);
 
-  const loadMap = React.useCallback(async () => {
+  const loadMap = useCallback(async () => {
     const app = appRef.current;
     if (!app || !mapAddress.trim()) return;
     setMapLoading(true);
