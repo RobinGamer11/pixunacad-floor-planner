@@ -2,12 +2,9 @@
  * CadDocumentInspector — Dokument-Eigenschaften Panel für die Projektmappe.
  *
  * Spiegelt 1:1 das "Dokument-Eigenschaften"-Panel aus der CAD-Oberfläche
- * (siehe CadEditor.tsx, ~Zeile 2517 ff.). Wird im rechten Inspector der
- * Projektmappe eingeblendet, sobald ein CAD-Dokument (scene.documents)
- * im Auswahl-Tool selektiert ist.
- *
- * Aktionen: Skalieren (2 Punkte), Skalieren (Maßkette), PDF auflösen,
- * Löschen, plus DocumentFilterPanel (Alpha, Farb-Filter, Presets).
+ * (siehe CadEditor.tsx). Wird im rechten Inspector der Projektmappe
+ * eingeblendet, sobald ein CAD-Dokument (scene.documents) im Auswahl-Tool
+ * selektiert ist.
  */
 import { useEffect, useRef, useState } from "react";
 import { Maximize2, Ruler as RulerIcon, Trash2, FileText, Anchor as AnchorIcon } from "lucide-react";
@@ -33,6 +30,10 @@ export function CadDocumentInspector({ engine }: Props) {
   const [filterSig, setFilterSig] = useState<string>("");
   const [phase, setPhase] = useState<string>("idle");
   const rafRef = useRef<number>(0);
+  // Basis-Größe für den Free-Scale-Slider — wird beim Auswechseln des
+  // Dokuments neu gesetzt, damit 100% immer die Ausgangsgröße meint.
+  const scaleBaseRef = useRef<{ id: string; w: number; h: number } | null>(null);
+  const [scalePct, setScalePct] = useState<number>(100);
 
   useEffect(() => {
     if (!engine) return;
@@ -78,20 +79,45 @@ export function CadDocumentInspector({ engine }: Props) {
     return () => cancelAnimationFrame(rafRef.current);
   }, [engine]);
 
+  // Slider-Basis initialisieren, wenn das Dokument wechselt.
+  useEffect(() => {
+    if (!sel) {
+      scaleBaseRef.current = null;
+      return;
+    }
+    if (!scaleBaseRef.current || scaleBaseRef.current.id !== sel.id) {
+      scaleBaseRef.current = { id: sel.id, w: sel.widthM, h: sel.heightM };
+      setScalePct(100);
+    } else {
+      // Externe Größenänderung (z.B. via 2-Punkt-Scale) → Slider zurückfahren.
+      const base = scaleBaseRef.current;
+      const cur = base.w > 0 ? (sel.widthM / base.w) * 100 : 100;
+      setScalePct((prev) => (Math.abs(prev - cur) > 0.5 ? Math.round(cur) : prev));
+    }
+  }, [sel?.id, sel?.widthM, sel?.heightM]);
+
   if (!engine || !sel) return null;
   const scaling =
     phase === "scale-pick-1" || phase === "scale-pick-2" || phase === "scale-await-input";
 
+  const applyScale = (pct: number) => {
+    const base = scaleBaseRef.current;
+    if (!base) return;
+    setScalePct(pct);
+    const factor = Math.max(0.05, pct / 100);
+    (engine as any).documentTool?.scaleUniformAbsolute?.(sel.id, factor, base.w, base.h);
+  };
+
   return (
     <div
-      className="rounded-md border p-3 space-y-3"
+      className="rounded-md border p-2 space-y-2"
       style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
     >
-      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
         Dokument-Eigenschaften
       </div>
 
-      <div className="text-xs">
+      <div className="text-[11px]">
         <div className="font-medium truncate" title={sel.name}>
           {sel.name}
         </div>
@@ -102,7 +128,7 @@ export function CadDocumentInspector({ engine }: Props) {
 
       {scaling && (
         <div
-          className="rounded-md p-2 text-xs"
+          className="rounded-md p-1.5 text-[10px]"
           style={{
             background: "hsl(var(--primary) / 0.12)",
             border: "1px solid hsl(var(--primary) / 0.4)",
@@ -119,20 +145,64 @@ export function CadDocumentInspector({ engine }: Props) {
       <button
         type="button"
         onClick={() => (engine as any).documentTool?.beginScaleTwoPoints(sel.id)}
-        className="w-full h-9 rounded-md border text-xs flex items-center justify-center gap-2 hover:bg-muted"
+        className="w-full h-7 rounded-md border text-[11px] flex items-center justify-center gap-1.5 hover:bg-muted"
         style={{ borderColor: "hsl(var(--hairline))" }}
         title="Über zwei Snap-Punkte und eine Soll-Länge skalieren"
       >
-        <Maximize2 size={14} /> Skalieren (2 Punkte)
+        <Maximize2 size={12} /> Skalieren (2 Punkte)
       </button>
+
+      {/* Freie Skalierung — Slider + %-Feld. Basis = Größe zum Zeitpunkt der Auswahl. */}
+      <div
+        className="rounded-md border p-1.5 space-y-1"
+        style={{ borderColor: "hsl(var(--hairline))" }}
+      >
+        <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+          <span>Freie Skalierung</span>
+          <button
+            type="button"
+            onClick={() => applyScale(100)}
+            className="hover:underline"
+            title="Zurück auf 100%"
+          >
+            Reset
+          </button>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <input
+            type="range"
+            min={10}
+            max={400}
+            step={1}
+            value={Math.round(scalePct)}
+            onChange={(e) => applyScale(Number(e.target.value))}
+            className="flex-1 accent-foreground"
+          />
+          <input
+            type="number"
+            min={10}
+            max={400}
+            step={1}
+            value={Math.round(scalePct)}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              if (Number.isFinite(v)) applyScale(Math.max(10, Math.min(400, v)));
+            }}
+            className="w-12 h-6 px-1 text-[11px] rounded border tabular-nums text-right"
+            style={{ borderColor: "hsl(var(--hairline))" }}
+          />
+          <span className="text-[10px] text-muted-foreground">%</span>
+        </div>
+      </div>
+
       <button
         type="button"
         onClick={() => (engine as any).documentTool?.beginScaleFromLastDimension?.(sel.id)}
-        className="w-full h-9 rounded-md border text-xs flex items-center justify-center gap-2 hover:bg-muted"
+        className="w-full h-7 rounded-md border text-[11px] flex items-center justify-center gap-1.5 hover:bg-muted"
         style={{ borderColor: "hsl(var(--hairline))" }}
         title="Skaliere mit der zuletzt erstellten Maßkette als Referenz"
       >
-        <RulerIcon size={14} /> Skalieren (Maßkette)
+        <RulerIcon size={12} /> Skalieren (Maßkette)
       </button>
 
       {sel.kind === "pdf-page" && !!sel.pdfSourceB64 && (
@@ -153,11 +223,11 @@ export function CadDocumentInspector({ engine }: Props) {
               );
             }
           }}
-          className="w-full h-9 rounded-md border text-xs flex items-center justify-center gap-2 hover:bg-muted"
+          className="w-full h-7 rounded-md border text-[11px] flex items-center justify-center gap-1.5 hover:bg-muted"
           style={{ borderColor: "hsl(var(--hairline))" }}
           title="PDF-Vektoren extrahieren und in Linien/Schraffuren/Texte konvertieren"
         >
-          <FileText size={14} /> Auflösen → CAD-Objekte
+          <FileText size={12} /> Auflösen → CAD-Objekte
         </button>
       )}
 
@@ -172,11 +242,11 @@ export function CadDocumentInspector({ engine }: Props) {
             app.refreshLabelUI?.();
           }
         }}
-        className="w-full h-9 rounded-md border text-xs flex items-center justify-center gap-2 hover:bg-muted"
+        className="w-full h-7 rounded-md border text-[11px] flex items-center justify-center gap-1.5 hover:bg-muted"
         style={{ borderColor: "hsl(var(--hairline))" }}
         title="Dokument löschen"
       >
-        <Trash2 size={14} /> Löschen
+        <Trash2 size={12} /> Löschen
       </button>
 
       <button
@@ -190,20 +260,20 @@ export function CadDocumentInspector({ engine }: Props) {
             tool?.beginAnchorEdit?.(sel.id);
           }
         }}
-        className="w-full h-9 rounded-md border text-xs flex items-center justify-center gap-2 hover:bg-muted"
+        className="w-full h-7 rounded-md border text-[11px] flex items-center justify-center gap-1.5 hover:bg-muted"
         style={{
           borderColor: phase === "anchor-edit" ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
           background: phase === "anchor-edit" ? "hsl(var(--accent-gold) / 0.12)" : undefined,
         }}
         title="Anker (Fangpunkte) am Dokument setzen — Klick platziert, erneuter Klick auf einen Anker entfernt ihn."
       >
-        <AnchorIcon size={14} /> {phase === "anchor-edit" ? "Anker beenden" : "Anker +"}
+        <AnchorIcon size={12} /> {phase === "anchor-edit" ? "Anker beenden" : "Anker +"}
       </button>
 
       <DocumentFilterPanel app={engine as any} docId={sel.id} sig={filterSig} />
 
       <div
-        className="text-[11px] leading-relaxed pt-2 text-muted-foreground"
+        className="text-[10px] leading-relaxed pt-1.5 text-muted-foreground"
         style={{ borderTop: "1px solid hsl(var(--hairline))" }}
       >
         Drag: verschieben (Snap aktiv) · Entf: löschen
