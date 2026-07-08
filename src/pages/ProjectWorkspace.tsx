@@ -1120,6 +1120,10 @@ export default function ProjectWorkspace() {
                 // Spread mit ≥2 Seiten — als flex-row rendern.
                 // Free-Layout: absolute Positionierung anhand spreadOffset (mm → px).
                 const isFree = layoutMode === "free";
+                // Einheitlicher px/mm-Faktor für alle Free-Layout-Offsets, damit
+                // Kanten benachbarter Seiten wirklich passgenau snappen.
+                const refFmt = FORMAT_SIZES[pages[0].format];
+                const pxPerMm = (1100 / refFmt.w) * (zoom / 100);
                 return (
                   <div
                     className="min-h-full flex items-start justify-center"
@@ -1137,8 +1141,8 @@ export default function ProjectWorkspace() {
                         const style: React.CSSProperties = isFree
                           ? {
                               position: "absolute",
-                              left: `${offset.xMm * 4}px`, // grober Preview-Maßstab, User verschiebt sichtbar
-                              top: `${offset.yMm * 4}px`,
+                              left: `${offset.xMm * pxPerMm}px`,
+                              top: `${offset.yMm * pxPerMm}px`,
                             }
                           : {};
                         return (
@@ -1157,6 +1161,15 @@ export default function ProjectWorkspace() {
                               void e;
                             }}
                           >
+                            {isFree && (
+                              <SpreadPageDragHandle
+                                page={p}
+                                otherPages={pages.filter((x) => x.id !== p.id)}
+                                pxPerMm={pxPerMm}
+                                projectId={project.id}
+                                formatSizes={FORMAT_SIZES}
+                              />
+                            )}
                             <PageCanvas
                               projectId={project.id}
                               page={p}
@@ -1423,6 +1436,146 @@ type ToolSettings = {
     borderWidthPx: number;
   };
 };
+
+/**
+ * Kleiner Griff oben auf jeder Seite im Free-Spread-Modus.
+ * Ermöglicht Ziehen der Seite in mm mit Snap zu Kanten benachbarter Seiten.
+ */
+function SpreadPageDragHandle({
+  page,
+  otherPages,
+  pxPerMm,
+  projectId,
+  formatSizes,
+}: {
+  page: import("@/lib/projectStore").ProjectPage;
+  otherPages: import("@/lib/projectStore").ProjectPage[];
+  pxPerMm: number;
+  projectId: string;
+  formatSizes: typeof FORMAT_SIZES;
+}) {
+  const [dragging, setDragging] = useState(false);
+  const [snapHint, setSnapHint] = useState<{ x: boolean; y: boolean }>({ x: false, y: false });
+  const stateRef = useRef<{
+    startClientX: number;
+    startClientY: number;
+    origXMm: number;
+    origYMm: number;
+  } | null>(null);
+
+  const fmt = formatSizes[page.format];
+
+  // Kanten der anderen Seiten (in mm, relativ zum Spread-Ursprung).
+  const otherEdges = otherPages.map((op) => {
+    const of = op.spreadOffset ?? { xMm: 0, yMm: 0 };
+    const ofmt = formatSizes[op.format];
+    return {
+      xLeft: of.xMm,
+      xRight: of.xMm + ofmt.w,
+      yTop: of.yMm,
+      yBottom: of.yMm + ofmt.h,
+    };
+  });
+
+  const snap = (candXMm: number, candYMm: number) => {
+    const thresholdMm = 6;
+    const selfLeft = candXMm;
+    const selfRight = candXMm + fmt.w;
+    const selfTop = candYMm;
+    const selfBottom = candYMm + fmt.h;
+    let bestDx = Infinity, snapX = candXMm, hitX = false;
+    let bestDy = Infinity, snapY = candYMm, hitY = false;
+    for (const e of otherEdges) {
+      const xTargets: [number, number][] = [
+        [selfLeft, e.xLeft], [selfLeft, e.xRight],
+        [selfRight, e.xLeft], [selfRight, e.xRight],
+      ];
+      for (const [self, target] of xTargets) {
+        const d = target - self;
+        if (Math.abs(d) < thresholdMm && Math.abs(d) < bestDx) {
+          bestDx = Math.abs(d); snapX = candXMm + d; hitX = true;
+        }
+      }
+      const yTargets: [number, number][] = [
+        [selfTop, e.yTop], [selfTop, e.yBottom],
+        [selfBottom, e.yTop], [selfBottom, e.yBottom],
+      ];
+      for (const [self, target] of yTargets) {
+        const d = target - self;
+        if (Math.abs(d) < thresholdMm && Math.abs(d) < bestDy) {
+          bestDy = Math.abs(d); snapY = candYMm + d; hitY = true;
+        }
+      }
+    }
+    return { xMm: snapX, yMm: snapY, hitX, hitY };
+  };
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const cur = page.spreadOffset ?? { xMm: 0, yMm: 0 };
+    stateRef.current = {
+      startClientX: e.clientX,
+      startClientY: e.clientY,
+      origXMm: cur.xMm,
+      origYMm: cur.yMm,
+    };
+    setDragging(true);
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  };
+
+  const onPointerMove = (e: React.PointerEvent) => {
+    const st = stateRef.current;
+    if (!st) return;
+    const dxMm = (e.clientX - st.startClientX) / pxPerMm;
+    const dyMm = (e.clientY - st.startClientY) / pxPerMm;
+    const raw = { xMm: st.origXMm + dxMm, yMm: st.origYMm + dyMm };
+    const snapped = snap(raw.xMm, raw.yMm);
+    setSnapHint({ x: snapped.hitX, y: snapped.hitY });
+    projectStore.setSpreadOffset(projectId, page.id, {
+      xMm: snapped.xMm,
+      yMm: snapped.yMm,
+      rotationDeg: page.spreadOffset?.rotationDeg,
+    });
+  };
+
+  const onPointerUp = (e: React.PointerEvent) => {
+    stateRef.current = null;
+    setDragging(false);
+    setSnapHint({ x: false, y: false });
+    try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch {}
+  };
+
+  const cur = page.spreadOffset ?? { xMm: 0, yMm: 0 };
+
+  return (
+    <div
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+      title="Ziehen, um Seite im Verbund zu verschieben (Snap zu Nachbarkanten)"
+      className="absolute -top-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 px-2 h-5 rounded-t-md text-[10px] font-medium select-none"
+      style={{
+        background: dragging ? "hsl(var(--accent-gold))" : "hsl(var(--ink))",
+        color: "hsl(var(--surface))",
+        cursor: dragging ? "grabbing" : "grab",
+        touchAction: "none",
+        boxShadow: (snapHint.x || snapHint.y) ? "0 0 0 2px hsl(var(--accent-gold))" : undefined,
+      }}
+    >
+      <GripVertical size={10} />
+      <span>{page.title}</span>
+      {dragging && (
+        <span className="ml-1 opacity-80">
+          {cur.xMm.toFixed(0)},{cur.yMm.toFixed(0)}mm
+        </span>
+      )}
+    </div>
+  );
+}
+
+
 
 function PageCanvas({
   projectId,
