@@ -1192,6 +1192,7 @@ export default function ProjectWorkspace() {
             printMode ? (
               <PrintPanel
                 project={project}
+                setActivePageId={setActivePageId}
                 onClose={() => setPrintMode(false)}
               />
             ) : (
@@ -1570,6 +1571,7 @@ function PageCanvas({
     >
       <div
         ref={pageRef}
+        data-page-id={page.id}
           className="relative shadow-xl"
           style={{
             width: displayWidth,
@@ -3933,9 +3935,11 @@ type PrintPageMode = "all" | "range" | "current";
 
 function PrintPanel({
   project,
+  setActivePageId,
   onClose,
 }: {
   project: import("@/lib/projectStore").Project;
+  setActivePageId: (id: string) => void;
   onClose: () => void;
 }) {
   const [pageMode, setPageMode] = useState<PrintPageMode>("all");
@@ -3946,6 +3950,51 @@ function PrintPanel({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set(project.pages.map(p => p.id)));
   const hasSpreads = project.pages.some((p) => !!p.spreadId);
   const [spreadCombined, setSpreadCombined] = useState<boolean>(hasSpreads);
+  const [exporting, setExporting] = useState(false);
+  const [progress, setProgress] = useState<{ current: number; total: number; label: string } | null>(null);
+
+  // Aktiv gefilterte Seiten anhand Modus (Alle / Aktuell / Bereich) und Auswahl.
+  const resolveExportIds = (): string[] => {
+    let base: string[] = [];
+    if (pageMode === "all") base = project.pages.map((p) => p.id);
+    else if (pageMode === "current") base = project.pages.slice(0, 1).map((p) => p.id);
+    else {
+      const from = Math.max(1, Math.min(project.pages.length, rangeStart)) - 1;
+      const to = Math.max(1, Math.min(project.pages.length, rangeEnd));
+      base = project.pages.slice(from, to).map((p) => p.id);
+    }
+    return base.filter((id) => selectedIds.has(id));
+  };
+
+  const handleExport = async () => {
+    const ids = resolveExportIds();
+    if (ids.length === 0) return;
+    setExporting(true);
+    try {
+      const { exportProjectToPdf, downloadPdf } = await import("@/lib/projectPdfExport");
+      const bytes = await exportProjectToPdf(
+        {
+          project,
+          selectedPageIds: ids,
+          colorMode,
+          customColor,
+          spreadCombined,
+          setActivePageId,
+        },
+        (p) => setProgress(p),
+      );
+      const safeName = (project.name || "projektmappe").replace(/[^\w-]+/g, "_");
+      downloadPdf(bytes, `${safeName}.pdf`);
+      onClose();
+    } catch (err) {
+      console.error("PDF-Export fehlgeschlagen:", err);
+      alert("PDF-Export fehlgeschlagen. Details in der Konsole.");
+    } finally {
+      setExporting(false);
+      setProgress(null);
+    }
+  };
+
 
   const toggleId = (id: string) => setSelectedIds(prev => {
     const n = new Set(prev);
@@ -4093,23 +4142,33 @@ function PrintPanel({
         )}
       </div>
 
+      {progress && (
+        <div
+          className="px-4 py-2 text-[11px] text-muted-foreground border-t"
+          style={{ borderColor: "hsl(var(--hairline))" }}
+        >
+          {progress.label} ({progress.current}/{progress.total})
+        </div>
+      )}
       <div
         className="border-t p-3 flex gap-2"
         style={{ borderColor: "hsl(var(--hairline))" }}
       >
         <button
           onClick={onClose}
-          className="flex-1 h-9 rounded-md text-sm border"
+          disabled={exporting}
+          className="flex-1 h-9 rounded-md text-sm border disabled:opacity-50"
           style={{ borderColor: "hsl(var(--hairline))", color: "hsl(var(--ink))" }}
         >
           Abbrechen
         </button>
         <button
-          onClick={() => window.print()}
-          className="flex-1 h-9 rounded-md text-sm font-medium"
+          onClick={handleExport}
+          disabled={exporting}
+          className="flex-1 h-9 rounded-md text-sm font-medium disabled:opacity-50"
           style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
         >
-          PDF erstellen
+          {exporting ? "Erstelle…" : "PDF erstellen"}
         </button>
       </div>
     </aside>
