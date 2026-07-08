@@ -1289,6 +1289,40 @@ export class MiniCad {
     this.setSelectedLabelId(labelId);
   }
 
+  /** Liefert die labelId der Primärauswahl (oder null). */
+  getSelectionLabelId(): string | null {
+    const sel: any = this.selection;
+    if (!sel) return null;
+    if (sel.segmentId) { const s = this.scene.getSegmentById(sel.segmentId); return s?.labelId ?? null; }
+    if (sel.textBoxId) { const b = this.scene.getTextBoxById(sel.textBoxId); return b?.labelId ?? null; }
+    if (sel.hatchId) { const h = this.scene.getHatchById(sel.hatchId); return h?.labelId ?? null; }
+    if (sel.freeStrokeId) { const f = this.scene.getFreeStrokeById(sel.freeStrokeId); return f?.labelId ?? null; }
+    if (sel.dimensionId) { const d = (this.scene as any).getDimensionById?.(sel.dimensionId); return d?.labelId ?? null; }
+    if (sel.documentId) { const d = this.scene.getDocumentById(sel.documentId); return d?.labelId ?? null; }
+    return null;
+  }
+
+  /** Weist allen aktuell selektierten Objekten die neue Ebene zu. */
+  setSelectionLabelId(labelId: string): boolean {
+    const list = this.selections.length ? this.selections : (this.selection ? [this.selection] : []);
+    if (!list.length) return false;
+    let changed = false;
+    for (const sel of list as any[]) {
+      if (sel.segmentId)      { const o = this.scene.getSegmentById(sel.segmentId);   if (o) { o.labelId = labelId; changed = true; } }
+      else if (sel.textBoxId) { const o = this.scene.getTextBoxById(sel.textBoxId);   if (o) { o.labelId = labelId; changed = true; } }
+      else if (sel.hatchId)   { const o = this.scene.getHatchById(sel.hatchId);       if (o) { o.labelId = labelId; changed = true; } }
+      else if (sel.freeStrokeId) { const o = this.scene.getFreeStrokeById(sel.freeStrokeId); if (o) { o.labelId = labelId; changed = true; } }
+      else if (sel.dimensionId)  { const o = (this.scene as any).getDimensionById?.(sel.dimensionId); if (o) { o.labelId = labelId; changed = true; } }
+      else if (sel.documentId)   { const o = this.scene.getDocumentById(sel.documentId); if (o) { o.labelId = labelId; changed = true; } }
+    }
+    if (changed) {
+      this._changeDirty = true;
+      this.refreshLabelUI();
+      try { this._onSelectionChange?.(this._selectionInfo(this.selection), this.selections.length); } catch {}
+    }
+    return changed;
+  }
+
   /** Mount the imperativen IdPanel gegen ein DOM-Skeleton (analog CadApp). */
   attachIdPanel(refs: {
     root: HTMLDivElement;
