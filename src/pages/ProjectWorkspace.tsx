@@ -3644,6 +3644,8 @@ function CadToolSection({
       h: 35,
       sheetId: sheet.id,
       scale: sheet.scale,
+      // Aktuelle Ansicht + Zoom der CAD-Oberfläche einfrieren (Snapshot).
+      viewSnapshot: sheet.thumbnail,
       lastSyncAt: new Date().toISOString(),
     });
     setSelectedElementId(id);
@@ -3651,13 +3653,6 @@ function CadToolSection({
 
   return (
     <div className="space-y-3">
-      <button
-        onClick={() => onJumpCad()}
-        className="w-full h-9 rounded-md text-sm font-medium flex items-center justify-center gap-2"
-        style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
-      >
-        <ExternalLink size={14} /> Zur CAD-Oberfläche
-      </button>
 
       <div>
         <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-2">
