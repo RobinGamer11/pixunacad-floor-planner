@@ -285,9 +285,10 @@ export class Renderer {
       }
     } else {
       ctx.save();
-      ctx.fillStyle = "hsl(0 0% 100%)";
+      ctx.fillStyle = this.backgroundColor || "hsl(0 0% 100%)";
       ctx.fillRect(0, 0, this.vw, this.vh);
       ctx.restore();
+      if (this.mapBackground) this._drawMapBackground();
       if (this.gridSettings.enabled) this._drawGrid();
     }
 
