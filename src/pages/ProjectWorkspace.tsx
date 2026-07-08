@@ -2839,38 +2839,52 @@ function PageSettings({
           {!inSpread ? (
             <>
               <div className="text-[11px] text-muted-foreground">
-                Einzelseite. Zum Erstellen einer Doppelseite mit einer benachbarten Seite verbinden.
+                Einzelseite. Zum Erstellen einer Doppelseite mit einer benachbarten Seite verbinden — oder an einen bestehenden Verbund anfügen.
               </div>
               <div className="flex gap-2">
                 <button
                   type="button"
-                  disabled={!prevPage || !!prevPage.spreadId}
-                  onClick={() => prevPage && projectStore.linkPagesToSpread(projectId, [prevPage.id, page.id])}
+                  disabled={!prevPage}
+                  onClick={() => {
+                    if (!prevPage) return;
+                    if (prevPage.spreadId) {
+                      projectStore.addPageToSpread(projectId, prevPage.spreadId, page.id);
+                    } else {
+                      projectStore.linkPagesToSpread(projectId, [prevPage.id, page.id]);
+                    }
+                  }}
                   className="flex-1 h-8 rounded border text-xs flex items-center justify-center gap-1.5 disabled:opacity-40"
                   style={{ borderColor: "hsl(var(--hairline))" }}
-                  title="Mit vorheriger Seite verbinden"
+                  title={prevPage?.spreadId ? "An vorherigen Verbund anhängen" : "Mit vorheriger Seite verbinden"}
                 >
-                  <Link2 size={12} /> vorherige
+                  <Link2 size={12} /> {prevPage?.spreadId ? "an vorherigen Verbund" : "vorherige"}
                 </button>
                 <button
                   type="button"
-                  disabled={!nextPage || !!nextPage.spreadId}
-                  onClick={() => nextPage && projectStore.linkPagesToSpread(projectId, [page.id, nextPage.id])}
+                  disabled={!nextPage}
+                  onClick={() => {
+                    if (!nextPage) return;
+                    if (nextPage.spreadId) {
+                      projectStore.addPageToSpread(projectId, nextPage.spreadId, page.id);
+                    } else {
+                      projectStore.linkPagesToSpread(projectId, [page.id, nextPage.id]);
+                    }
+                  }}
                   className="flex-1 h-8 rounded border text-xs flex items-center justify-center gap-1.5 disabled:opacity-40"
                   style={{ borderColor: "hsl(var(--hairline))" }}
-                  title="Mit nächster Seite verbinden"
+                  title={nextPage?.spreadId ? "An nächsten Verbund anhängen" : "Mit nächster Seite verbinden"}
                 >
-                  <Link2 size={12} /> nächste
+                  <Link2 size={12} /> {nextPage?.spreadId ? "an nächsten Verbund" : "nächste"}
                 </button>
               </div>
-              <Row label="Ausschließen">
+              <Row label="Musterübernahme">
                 <label className="flex items-center gap-2 text-xs text-muted-foreground">
                   <input
                     type="checkbox"
-                    checked={!!page.spreadExcluded}
-                    onChange={(e) => update({ spreadExcluded: e.target.checked })}
+                    checked={!page.spreadExcluded}
+                    onChange={(e) => update({ spreadExcluded: !e.target.checked })}
                   />
-                  Von „Muster übernehmen" ausschließen
+                  Diese Seite beim „Für alle übernehmen" berücksichtigen
                 </label>
               </Row>
             </>
@@ -2891,6 +2905,29 @@ function PageSettings({
                   <option value="free">Freie Anordnung</option>
                 </select>
               </Row>
+              {(page.spreadLayoutMode ?? "grid") === "free" && (
+                <Row label="Anordnung">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      projectStore.setSpreadLayoutLocked(
+                        projectId,
+                        page.spreadId!,
+                        !page.spreadLayoutLocked,
+                      )
+                    }
+                    className="w-full h-8 rounded border text-xs flex items-center justify-center gap-1.5"
+                    style={{
+                      borderColor: "hsl(var(--hairline))",
+                      background: page.spreadLayoutLocked ? "hsl(var(--accent-gold) / 0.12)" : "transparent",
+                    }}
+                    title={page.spreadLayoutLocked ? "Anordnung ist gesperrt — Klick zum Entsperren" : "Anordnung sperren (Ziehen deaktivieren)"}
+                  >
+                    {page.spreadLayoutLocked ? <Lock size={12} /> : <Unlock size={12} />}
+                    {page.spreadLayoutLocked ? "Anordnung gesperrt" : "Anordnung sperren"}
+                  </button>
+                </Row>
+              )}
               {nextPage && !nextPage.spreadId && (
                 <button
                   type="button"
@@ -2914,7 +2951,6 @@ function PageSettings({
                 onClick={() => {
                   const n = projectStore.applySpreadPatternToRest(projectId, page.spreadId!);
                   if (n > 0) {
-                    // Kleiner Bestätigungs-Toast über alert (Toast-System ist außerhalb dieses Scopes).
                     // eslint-disable-next-line no-alert
                     alert(`Muster auf ${n} weitere Verbund${n === 1 ? "" : "e"} angewendet.`);
                   } else {
@@ -2928,14 +2964,14 @@ function PageSettings({
               >
                 Für alle übernehmen
               </button>
-              <Row label="Ausschließen">
+              <Row label="Musterübernahme">
                 <label className="flex items-center gap-2 text-xs text-muted-foreground">
                   <input
                     type="checkbox"
-                    checked={!!page.spreadExcluded}
-                    onChange={(e) => update({ spreadExcluded: e.target.checked })}
+                    checked={!page.spreadExcluded}
+                    onChange={(e) => update({ spreadExcluded: !e.target.checked })}
                   />
-                  Diese Seite bei „Für alle übernehmen" überspringen
+                  Diese Seite beim „Für alle übernehmen" berücksichtigen
                 </label>
               </Row>
             </>
