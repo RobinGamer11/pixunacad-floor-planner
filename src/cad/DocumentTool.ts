@@ -111,6 +111,25 @@ export class DocumentTool {
     this.onPhaseChange?.();
   }
 
+  /**
+   * Freies uniformes Skalieren eines Dokuments um einen Faktor,
+   * verankert am Dokument-Center. Faktor ist ABSOLUT gegen die
+   * aktuelle Größe (nicht kumulativ). `baseW/baseH` ist die Größe,
+   * die als 100% gilt — muss vom Aufrufer gemerkt werden, weil der
+   * Slider live rutscht.
+   */
+  scaleUniformAbsolute(docId: string, factor: number, baseW: number, baseH: number) {
+    const doc = this.app.scene.getDocumentById(docId);
+    if (!doc) return;
+    const clamped = Math.max(0.05, Math.min(20, factor));
+    const targetW = Math.max(0.001, baseW * clamped);
+    const currentW = Math.max(0.001, doc.widthM);
+    const rel = targetW / currentW;
+    scaleDocumentAroundCenter(doc, rel);
+    // Anker (UV) sind stabil unter Center-Skalierung — keine weitere Aktion nötig.
+    this.app.render();
+  }
+
   /** Externe API: skaliere ein Dokument anhand der zuletzt erstellten Maßkette (überspringt P1/P2). */
   beginScaleFromLastDimension(docId: string) {
     const doc = this.app.scene.getDocumentById(docId);
