@@ -85,7 +85,23 @@ export interface ProjectPage {
   cadOverlay?: any;
   /** Named groups for the layers panel. */
   groups?: { id: string; name: string; collapsed?: boolean }[];
+
+  /* ---------- Seiten-Verbund (Spreads) ---------- */
+  /** Gruppen-ID. Mehrere Pages mit derselben spreadId bilden einen Spread
+   *  (Doppelseite / freie Anordnung). Fehlt = Einzelseite. */
+  spreadId?: string;
+  /** Reihenfolge der Seite innerhalb ihres Spreads (0 = ganz links). */
+  spreadIndex?: number;
+  /** Layout-Modus des Spreads: "grid" = nebeneinander, "free" = frei positioniert. */
+  spreadLayoutMode?: "grid" | "free";
+  /** Nur bei "free"-Modus: Offset der Seite in mm, rel. zur ersten Seite des Spreads. */
+  spreadOffset?: { xMm: number; yMm: number; rotationDeg?: number };
+  /** Bei true wird diese Seite von „Muster übernehmen" übersprungen. */
+  spreadExcluded?: boolean;
+  /** UI: Spread im Seiten-Panel eingeklappt anzeigen. */
+  spreadCollapsed?: boolean;
 }
+
 
 export interface Sheet {
   id: string;
@@ -524,6 +540,158 @@ export const projectStore = {
     }));
     return newId;
   },
+
+  // ---------- Spreads (Seiten-Verbund) ----------
+  /** Zwei oder mehr benachbarte Pages zu einem neuen Spread verbinden. */
+  linkPagesToSpread: (projectId: string, pageIds: string[]) => {
+    if (pageIds.length < 2) return;
+    const spreadId = `sp-${Date.now().toString(36)}`;
+    setState((s) => ({
+      projects: s.projects.map((p) => {
+        if (p.id !== projectId) return p;
+        // Alle bereits vorhandenen Zuordnungen für diese Pages neu setzen.
+        return {
+          ...p,
+          updatedAt: new Date().toISOString(),
+          pages: p.pages.map((pg) => {
+            const idx = pageIds.indexOf(pg.id);
+            if (idx < 0) return pg;
+            return {
+              ...pg,
+              spreadId,
+              spreadIndex: idx,
+              spreadLayoutMode: pg.spreadLayoutMode ?? "grid",
+              spreadExcluded: false,
+              spreadCollapsed: false,
+            };
+          }),
+        };
+      }),
+    }));
+  },
+  /** Eine Page an einen bestehenden Spread anhängen (ans Ende). */
+  addPageToSpread: (projectId: string, spreadId: string, pageId: string) => {
+    setState((s) => ({
+      projects: s.projects.map((p) => {
+        if (p.id !== projectId) return p;
+        const members = p.pages.filter((pg) => pg.spreadId === spreadId);
+        const nextIndex = members.length;
+        return {
+          ...p,
+          updatedAt: new Date().toISOString(),
+          pages: p.pages.map((pg) =>
+            pg.id === pageId
+              ? { ...pg, spreadId, spreadIndex: nextIndex, spreadLayoutMode: pg.spreadLayoutMode ?? "grid" }
+              : pg
+          ),
+        };
+      }),
+    }));
+  },
+  /** Page aus ihrem Spread entfernen (wird wieder Einzelseite). */
+  removePageFromSpread: (projectId: string, pageId: string) => {
+    setState((s) => ({
+      projects: s.projects.map((p) => {
+        if (p.id !== projectId) return p;
+        const target = p.pages.find((pg) => pg.id === pageId);
+        const spreadId = target?.spreadId;
+        if (!spreadId) return p;
+        // Zielseite lösen und übrige Members neu indexieren.
+        const others = p.pages
+          .filter((pg) => pg.spreadId === spreadId && pg.id !== pageId)
+          .sort((a, b) => (a.spreadIndex ?? 0) - (b.spreadIndex ?? 0));
+        const indexMap = new Map<string, number>();
+        others.forEach((pg, i) => indexMap.set(pg.id, i));
+        return {
+          ...p,
+          updatedAt: new Date().toISOString(),
+          pages: p.pages.map((pg) => {
+            if (pg.id === pageId) {
+              const { spreadId: _s, spreadIndex: _i, spreadOffset: _o, spreadCollapsed: _c, ...rest } = pg;
+              return { ...rest };
+            }
+            if (indexMap.has(pg.id)) return { ...pg, spreadIndex: indexMap.get(pg.id)! };
+            return pg;
+          }),
+        };
+      }),
+    }));
+  },
+  setSpreadLayoutMode: (projectId: string, spreadId: string, mode: "grid" | "free") => {
+    setState((s) => ({
+      projects: s.projects.map((p) =>
+        p.id !== projectId ? p : {
+          ...p,
+          updatedAt: new Date().toISOString(),
+          pages: p.pages.map((pg) => (pg.spreadId === spreadId ? { ...pg, spreadLayoutMode: mode } : pg)),
+        }
+      ),
+    }));
+  },
+  setSpreadCollapsed: (projectId: string, spreadId: string, collapsed: boolean) => {
+    setState((s) => ({
+      projects: s.projects.map((p) =>
+        p.id !== projectId ? p : {
+          ...p,
+          pages: p.pages.map((pg) => (pg.spreadId === spreadId ? { ...pg, spreadCollapsed: collapsed } : pg)),
+        }
+      ),
+    }));
+  },
+  setSpreadOffset: (
+    projectId: string,
+    pageId: string,
+    offset: { xMm: number; yMm: number; rotationDeg?: number }
+  ) => {
+    setState((s) => ({
+      projects: s.projects.map((p) =>
+        p.id !== projectId ? p : {
+          ...p,
+          updatedAt: new Date().toISOString(),
+          pages: p.pages.map((pg) => (pg.id === pageId ? { ...pg, spreadOffset: offset } : pg)),
+        }
+      ),
+    }));
+  },
+  /** Musterlänge des Spreads (N Seiten) auf alle weiteren Pages ohne spreadId
+   *  fortlaufend anwenden — überspringt spreadExcluded. */
+  applySpreadPatternToRest: (projectId: string, spreadId: string): number => {
+    let count = 0;
+    setState((s) => ({
+      projects: s.projects.map((p) => {
+        if (p.id !== projectId) return p;
+        const src = p.pages.filter((pg) => pg.spreadId === spreadId);
+        const N = src.length;
+        if (N < 2) return p;
+        const layoutMode = src[0]?.spreadLayoutMode ?? "grid";
+        const firstIdx = p.pages.findIndex((pg) => pg.spreadId === spreadId);
+        const lastIdx = firstIdx + N - 1;
+        const rest = p.pages.slice(lastIdx + 1);
+        // Neue Spread-IDs pro Chunk.
+        const patched = [...p.pages];
+        let i = 0;
+        while (i + N <= rest.length) {
+          const chunk = rest.slice(i, i + N);
+          if (chunk.some((pg) => pg.spreadId || pg.spreadExcluded)) { i += 1; continue; }
+          const newSid = `sp-${Date.now().toString(36)}-${count}`;
+          chunk.forEach((pg, k) => {
+            const globalIdx = lastIdx + 1 + i + k;
+            patched[globalIdx] = {
+              ...patched[globalIdx],
+              spreadId: newSid,
+              spreadIndex: k,
+              spreadLayoutMode: layoutMode,
+            };
+          });
+          count += 1;
+          i += N;
+        }
+        return { ...p, updatedAt: new Date().toISOString(), pages: patched };
+      }),
+    }));
+    return count;
+  },
+
   reorderElement: (projectId: string, pageId: string, fromIndex: number, toIndex: number) => {
     setState((s) => ({
       projects: s.projects.map((p) =>
