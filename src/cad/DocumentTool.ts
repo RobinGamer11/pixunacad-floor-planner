@@ -127,7 +127,7 @@ export class DocumentTool {
     const rel = targetW / currentW;
     scaleDocumentAroundCenter(doc, rel);
     // Anker (UV) sind stabil unter Center-Skalierung — keine weitere Aktion nötig.
-    this.app.render();
+    this.app.renderer.render();
   }
 
   /** Externe API: skaliere ein Dokument anhand der zuletzt erstellten Maßkette (überspringt P1/P2). */
