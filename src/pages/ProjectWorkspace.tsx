@@ -1658,6 +1658,7 @@ function PageCanvas({
   page,
   overlayPage,
   overlayOpacity,
+  overlayColor,
   selectedElementId,
   selectedElementIds,
   zoom,
@@ -1674,6 +1675,7 @@ function PageCanvas({
   page: import("@/lib/projectStore").ProjectPage;
   overlayPage?: import("@/lib/projectStore").ProjectPage;
   overlayOpacity: number;
+  overlayColor?: string;
   selectedElementId?: string;
   selectedElementIds: string[];
   zoom: number;
