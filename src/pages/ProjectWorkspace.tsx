@@ -995,6 +995,25 @@ export default function ProjectWorkspace() {
                     {Math.round(bgOverlay.opacity * 100)} %
                   </span>
                 </div>
+                <div className="mt-2 flex items-center gap-2">
+                  <span className="text-[11px] text-muted-foreground">Farbe</span>
+                  <input
+                    type="color"
+                    value={bgOverlay.color}
+                    onChange={(e) => setBgOverlay((o) => ({ ...o, color: e.target.value }))}
+                    className="h-6 w-8 rounded border cursor-pointer bg-transparent"
+                    style={{ borderColor: "hsl(var(--hairline))" }}
+                    title="Tintfarbe der Transparenzpause"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setBgOverlay((o) => ({ ...o, color: "#c99a3b" }))}
+                    className="text-[11px] text-muted-foreground underline"
+                    title="Zurücksetzen"
+                  >
+                    Reset
+                  </button>
+                </div>
               </div>
             </aside>
           ) : (
