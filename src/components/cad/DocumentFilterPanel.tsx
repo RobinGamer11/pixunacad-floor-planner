@@ -81,6 +81,7 @@ export function DocumentFilterPanel({ app, docId, sig }: Props) {
       case "grayscale": return ["#1a1a1a", "#808080", "#e6e6e6"];
       case "tint": return [f.tintColor || "#999999", "#ffffff"];
       case "free": return (f.freeRemaps || []).slice(0, 4).map(r => r.to || r.from || "#cccccc");
+      case "adjust": return ["#4dabff", "#89e576", "#d8b36a"];
     }
   };
 
