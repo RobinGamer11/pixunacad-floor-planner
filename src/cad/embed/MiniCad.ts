@@ -977,6 +977,7 @@ export class MiniCad {
           filters: d.filters ? d.filters.map((f) => ({ ...f })) : [],
           activeFilterId: d.activeFilterId,
           bgRemoval: d.bgRemoval,
+          anchors: (d.anchors || []).map((a) => ({ x: a.x, y: a.y })),
         })),
     };
   }
