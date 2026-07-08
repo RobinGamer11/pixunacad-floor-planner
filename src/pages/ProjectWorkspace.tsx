@@ -1008,12 +1008,25 @@ export default function ProjectWorkspace() {
                   </span>
                 </div>
                 <div className="mt-2 flex items-center gap-2">
-                  <span className="text-[11px] text-muted-foreground">Farbe</span>
+                  <button
+                    type="button"
+                    onClick={() => setBgOverlay((o) => ({ ...o, tintEnabled: !o.tintEnabled }))}
+                    className="text-[11px] px-1.5 py-0.5 rounded border"
+                    style={{
+                      borderColor: "hsl(var(--hairline))",
+                      background: bgOverlay.tintEnabled ? "transparent" : "hsl(var(--accent-gold-soft))",
+                      color: bgOverlay.tintEnabled ? "hsl(var(--ink-soft))" : "hsl(var(--accent-gold))",
+                    }}
+                    title={bgOverlay.tintEnabled ? "Zurzeit eingefärbt — Klick zeigt Originalfarben" : "Zurzeit Originalfarben — Klick färbt ein"}
+                  >
+                    {bgOverlay.tintEnabled ? "Farbe: Tint" : "Farbe: Original"}
+                  </button>
                   <input
                     type="color"
                     value={bgOverlay.color}
+                    disabled={!bgOverlay.tintEnabled}
                     onChange={(e) => setBgOverlay((o) => ({ ...o, color: e.target.value }))}
-                    className="h-6 w-8 rounded border cursor-pointer bg-transparent"
+                    className="h-6 w-8 rounded border cursor-pointer bg-transparent disabled:opacity-40"
                     style={{ borderColor: "hsl(var(--hairline))" }}
                     title="Tintfarbe der Transparenzpause"
                   />
@@ -1021,11 +1034,12 @@ export default function ProjectWorkspace() {
                     type="button"
                     onClick={() => setBgOverlay((o) => ({ ...o, color: "#c99a3b" }))}
                     className="text-[11px] text-muted-foreground underline"
-                    title="Zurücksetzen"
+                    title="Farbe zurücksetzen"
                   >
                     Reset
                   </button>
                 </div>
+
               </div>
             </aside>
           ) : (
