@@ -3935,9 +3935,11 @@ type PrintPageMode = "all" | "range" | "current";
 
 function PrintPanel({
   project,
+  setActivePageId,
   onClose,
 }: {
   project: import("@/lib/projectStore").Project;
+  setActivePageId: (id: string) => void;
   onClose: () => void;
 }) {
   const [pageMode, setPageMode] = useState<PrintPageMode>("all");
@@ -3948,6 +3950,51 @@ function PrintPanel({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set(project.pages.map(p => p.id)));
   const hasSpreads = project.pages.some((p) => !!p.spreadId);
   const [spreadCombined, setSpreadCombined] = useState<boolean>(hasSpreads);
+  const [exporting, setExporting] = useState(false);
+  const [progress, setProgress] = useState<{ current: number; total: number; label: string } | null>(null);
+
+  // Aktiv gefilterte Seiten anhand Modus (Alle / Aktuell / Bereich) und Auswahl.
+  const resolveExportIds = (): string[] => {
+    let base: string[] = [];
+    if (pageMode === "all") base = project.pages.map((p) => p.id);
+    else if (pageMode === "current") base = project.pages.slice(0, 1).map((p) => p.id);
+    else {
+      const from = Math.max(1, Math.min(project.pages.length, rangeStart)) - 1;
+      const to = Math.max(1, Math.min(project.pages.length, rangeEnd));
+      base = project.pages.slice(from, to).map((p) => p.id);
+    }
+    return base.filter((id) => selectedIds.has(id));
+  };
+
+  const handleExport = async () => {
+    const ids = resolveExportIds();
+    if (ids.length === 0) return;
+    setExporting(true);
+    try {
+      const { exportProjectToPdf, downloadPdf } = await import("@/lib/projectPdfExport");
+      const bytes = await exportProjectToPdf(
+        {
+          project,
+          selectedPageIds: ids,
+          colorMode,
+          customColor,
+          spreadCombined,
+          setActivePageId,
+        },
+        (p) => setProgress(p),
+      );
+      const safeName = (project.title || "projektmappe").replace(/[^\w-]+/g, "_");
+      downloadPdf(bytes, `${safeName}.pdf`);
+      onClose();
+    } catch (err) {
+      console.error("PDF-Export fehlgeschlagen:", err);
+      alert("PDF-Export fehlgeschlagen. Details in der Konsole.");
+    } finally {
+      setExporting(false);
+      setProgress(null);
+    }
+  };
+
 
   const toggleId = (id: string) => setSelectedIds(prev => {
     const n = new Set(prev);
