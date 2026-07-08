@@ -2608,30 +2608,31 @@ function RightInspector({
   const layerCount = page?.elements.length ?? 0;
   return (
     <aside
-      className="w-[340px] shrink-0 border-l flex flex-col"
+      className="w-[280px] shrink-0 border-l flex flex-col text-xs"
       style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
     >
       <div className="grid grid-cols-[1fr_1fr_1fr_auto] border-b" style={{ borderColor: "hsl(var(--hairline))" }}>
-        <TabButton active={tab === "settings"} onClick={() => setTab("settings")} icon={<Settings size={14} />} label="Seiteneinstellung" />
-        <TabButton active={tab === "tools"} onClick={() => setTab("tools")} icon={<Wrench size={14} />} label="Werkzeugeinstellung" />
+        <TabButton active={tab === "settings"} onClick={() => setTab("settings")} icon={<Settings size={12} />} label="Seiteneinstellung" />
+        <TabButton active={tab === "tools"} onClick={() => setTab("tools")} icon={<Wrench size={12} />} label="Werkzeugeinstellung" />
         <TabButton
           active={tab === "layers"}
           onClick={() => setTab("layers")}
-          icon={<LayersIcon size={14} />}
+          icon={<LayersIcon size={12} />}
           label="Ebenen"
           badge={layerCount > 0 ? layerCount : undefined}
         />
         <button
           onClick={onCollapse}
           title="Einklappen"
-          className="w-8 flex items-center justify-center hover:bg-muted border-l"
+          className="w-7 flex items-center justify-center hover:bg-muted border-l"
           style={{ borderColor: "hsl(var(--hairline))" }}
         >
-          <PanelRightClose size={14} className="text-muted-foreground" />
+          <PanelRightClose size={12} className="text-muted-foreground" />
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-5 space-y-5">
+      <div className="flex-1 overflow-y-auto p-3 space-y-3">
+
         {tab === "settings" && page && <PageSettings projectId={projectId} page={page} />}
         {tab === "tools" && (
           <ToolsTab
