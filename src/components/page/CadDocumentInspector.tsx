@@ -10,7 +10,7 @@
  * Löschen, plus DocumentFilterPanel (Alpha, Farb-Filter, Presets).
  */
 import { useEffect, useRef, useState } from "react";
-import { Maximize2, Ruler as RulerIcon, Trash2, FileText } from "lucide-react";
+import { Maximize2, Ruler as RulerIcon, Trash2, FileText, Anchor as AnchorIcon } from "lucide-react";
 import type { MiniCad } from "@/cad/embed/MiniCad";
 import { SelectionType } from "@/cad/constants";
 import { DocumentFilterPanel } from "@/components/cad/DocumentFilterPanel";
@@ -177,6 +177,27 @@ export function CadDocumentInspector({ engine }: Props) {
         title="Dokument löschen"
       >
         <Trash2 size={14} /> Löschen
+      </button>
+
+      <button
+        type="button"
+        onClick={() => {
+          const app: any = engine;
+          const tool: any = app?.documentTool;
+          if (tool?.isAnchorEditing?.() && tool.anchorTargetDocId === sel.id) {
+            tool.cancel?.();
+          } else {
+            tool?.beginAnchorEdit?.(sel.id);
+          }
+        }}
+        className="w-full h-9 rounded-md border text-xs flex items-center justify-center gap-2 hover:bg-muted"
+        style={{
+          borderColor: phase === "anchor-edit" ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
+          background: phase === "anchor-edit" ? "hsl(var(--accent-gold) / 0.12)" : undefined,
+        }}
+        title="Anker (Fangpunkte) am Dokument setzen — Klick platziert, erneuter Klick auf einen Anker entfernt ihn."
+      >
+        <AnchorIcon size={14} /> {phase === "anchor-edit" ? "Anker beenden" : "Anker +"}
       </button>
 
       <DocumentFilterPanel app={engine as any} docId={sel.id} sig={filterSig} />

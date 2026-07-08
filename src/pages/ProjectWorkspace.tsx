@@ -466,8 +466,16 @@ export default function ProjectWorkspace() {
     setScaleDialogPages(null);
   };
 
+  // Merkt sich das zuletzt eingepasste Layout — verhindert erneutes Recenter
+  // beim Umschalten der aktiven Seite innerhalb desselben Verbunds.
+  const lastFitKeyRef = useRef<string | null>(null);
   useLayoutEffect(() => {
     if (!activePage || !canvasViewportRef.current) return;
+    // Innerhalb eines Verbunds identifiziert die spreadId das gemeinsame Layout;
+    // Einzelseiten werden per pageId identifiziert.
+    const fitKey = `${activePage.spreadId ?? activePage.id}|${activePage.format}`;
+    if (lastFitKeyRef.current === fitKey) return;
+    lastFitKeyRef.current = fitKey;
     const fitPage = () => {
       const fmt = FORMAT_SIZES[activePage.format];
       const baseWidth = 1100;
@@ -486,7 +494,8 @@ export default function ProjectWorkspace() {
       });
     };
     fitPage();
-  }, [activePage?.id, activePage?.format]);
+  }, [activePage?.id, activePage?.spreadId, activePage?.format]);
+
 
   if (!project) {
     return (

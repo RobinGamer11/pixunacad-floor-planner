@@ -8,7 +8,7 @@ import { getDimensionGeometry, type DimensionLike } from "./dimensionGeometry";
 import { boxCornersWorld } from "./textGeometry";
 import { drawRichTextBox } from "./textRichRenderer";
 import { transformedInstanceItems, instanceBoundingCornersWorld } from "./StickerManager";
-import { documentCornersWorld, documentCenterWorld, documentVisibleCornersWorld } from "./documentGeometry";
+import { documentCornersWorld, documentCenterWorld, documentVisibleCornersWorld, documentAnchorsWorld } from "./documentGeometry";
 import { getOrCreateDocMask } from "./documentMask";
 import { applyFilterToCanvas, filterSignature } from "./documentFilters";
 import { applyBgRemovalToCanvas, bgRemovalSignature } from "./documentBgRemove";
@@ -890,6 +890,26 @@ export class Renderer {
         ctx.rect(p.x - 3.5, p.y - 3.5, 7, 7);
         ctx.fill();
         ctx.stroke();
+      }
+      // Benutzer-Anker (Fangpunkte) — goldenes Anker-Icon
+      const anchors = documentAnchorsWorld(doc);
+      if (anchors.length > 0) {
+        for (const w of anchors) {
+          const p = cam.worldToScreen(w.x, w.y);
+          ctx.beginPath();
+          ctx.fillStyle = "#c99a3b";
+          ctx.strokeStyle = "#fff";
+          ctx.lineWidth = 1.5;
+          ctx.arc(p.x, p.y, 4.5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+          // Kleiner Ring als „Anker"-Silhouette
+          ctx.beginPath();
+          ctx.strokeStyle = "#c99a3b";
+          ctx.lineWidth = 1;
+          ctx.arc(p.x, p.y, 8, 0, Math.PI * 2);
+          ctx.stroke();
+        }
       }
       ctx.restore();
     }

@@ -4,7 +4,7 @@ import { Scene, Segment, Hatch } from "./Scene";
 import { Camera } from "./Camera";
 import { LabelManager } from "./LabelManager";
 import { boxCornersWorld } from "./textGeometry";
-import { documentCornersWorld, documentEdgeMidpointsWorld, documentCenterWorld } from "./documentGeometry";
+import { documentCornersWorld, documentEdgeMidpointsWorld, documentCenterWorld, documentAnchorsWorld } from "./documentGeometry";
 import { computeWallLines } from "./wallGeom";
 import { computeHealedWallLines } from "./wallHeal";
 import { doorGeometry } from "./doorGeom";
@@ -297,6 +297,7 @@ export class TopologyEngine {
       for (const c of documentCornersWorld(doc)) considerPoint(c, null, null, -1);
       for (const m of documentEdgeMidpointsWorld(doc)) considerPoint(m, null, null, -1);
       considerPoint(documentCenterWorld(doc), null, null, -1);
+      for (const a of documentAnchorsWorld(doc)) considerPoint(a, null, null, -1);
     }
     // Freihand-Stroke Endpunkte (nur erster + letzter Punkt)
     for (const s of this.scene.freeStrokes) {
@@ -402,6 +403,7 @@ export class TopologyEngine {
         if (!this.labels.isVisible(doc.labelId)) continue;
         for (const c of documentCornersWorld(doc)) considerPoint(c, null, null, -1);
         for (const m of documentEdgeMidpointsWorld(doc)) considerPoint(m, null, null, -1);
+        for (const a of documentAnchorsWorld(doc)) considerPoint(a, null, null, -1);
       }
       // Linien: Segmente
       for (const seg of ovScene.segments) {

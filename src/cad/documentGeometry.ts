@@ -26,6 +26,40 @@ export function documentEdgeMidpointsWorld(doc: DocumentObject): Vec2[] {
   ];
 }
 
+/** Benutzer-Anker (Fangpunkte) im Welt-KS.
+ *  Anchors sind lokale UV-Koordinaten (0..1) — hier auf die volle
+ *  Rechteckfläche (widthM×heightM) angewendet und rotiert. */
+export function documentAnchorsWorld(doc: DocumentObject): Vec2[] {
+  const anchors = (doc as any).anchors as { x: number; y: number }[] | undefined;
+  if (!anchors || anchors.length === 0) return [];
+  const cx = doc.position.x + doc.widthM / 2;
+  const cy = doc.position.y + doc.heightM / 2;
+  const cos = Math.cos(doc.rotationRad);
+  const sin = Math.sin(doc.rotationRad);
+  return anchors.map((a) => {
+    const lx = (a.x - 0.5) * doc.widthM;
+    const ly = (a.y - 0.5) * doc.heightM;
+    return v(cx + lx * cos - ly * sin, cy + lx * sin + ly * cos);
+  });
+}
+
+/** Umkehrung: Welt-Punkt → lokale UV-Koordinaten (0..1) auf dem un-rotierten
+ *  Dokument-Rechteck. Werte außerhalb [0,1] deuten auf einen Klick außerhalb hin. */
+export function worldToDocumentUV(doc: DocumentObject, world: Vec2): { x: number; y: number } {
+  const cx = doc.position.x + doc.widthM / 2;
+  const cy = doc.position.y + doc.heightM / 2;
+  const cos = Math.cos(-doc.rotationRad);
+  const sin = Math.sin(-doc.rotationRad);
+  const dx = world.x - cx;
+  const dy = world.y - cy;
+  const lx = dx * cos - dy * sin;
+  const ly = dx * sin + dy * cos;
+  return {
+    x: lx / doc.widthM + 0.5,
+    y: ly / doc.heightM + 0.5,
+  };
+}
+
 export type DocumentSide = "top" | "right" | "bottom" | "left";
 
 /** 4 Welt-Kanten als Segmente (Top, Right, Bottom, Left) inkl. Seitenname. */

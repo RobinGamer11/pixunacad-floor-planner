@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import { CadApp } from "@/cad/CadApp";
 import { ToolIds, PointEditAction } from "@/cad/constants";
-import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Pipette, Sticker as StickerIcon, Pencil, Trash2, Download, Upload, Plus, FileImage, FileText, Maximize2, Ruler as RulerIcon, Eraser, Construction, BrickWall, PaintBucket, Grid3x3, DoorOpen, AppWindow, Move, RotateCw, PanelRightOpen, PanelRightClose, Crosshair, Scaling, Check, Scissors } from "lucide-react";
+import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Pipette, Sticker as StickerIcon, Pencil, Trash2, Download, Upload, Plus, FileImage, FileText, Maximize2, Ruler as RulerIcon, Eraser, Construction, BrickWall, PaintBucket, Grid3x3, DoorOpen, AppWindow, Move, RotateCw, PanelRightOpen, PanelRightClose, Crosshair, Scaling, Check, Scissors, Anchor as AnchorIcon } from "lucide-react";
 import type { HatchDrawMode } from "@/cad/HatchTool";
 import type { StickerDefinition } from "@/cad/StickerManager";
 import { instanceBoundingCornersWorld } from "@/cad/StickerManager";
@@ -2584,6 +2584,24 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 >
                   <Trash2 className="h-4 w-4" />
                   <span className="text-xs">Löschen</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const app = appRef.current; if (!app) return;
+                    const tool: any = app.documentTool;
+                    if (tool?.isAnchorEditing?.() && tool.anchorTargetDocId === docSelected.id) {
+                      tool.cancel?.();
+                    } else {
+                      tool?.beginAnchorEdit?.(docSelected.id);
+                    }
+                  }}
+                  className="cad-toolbar-btn w-full justify-center h-9"
+                  title="Anker (Fangpunkte) am Dokument setzen — Klick auf Dokument fügt hinzu, Klick auf Anker entfernt ihn. Erneut drücken zum Beenden."
+                >
+                  <AnchorIcon className="h-4 w-4" />
+                  <span className="text-xs">Anker +</span>
                 </button>
 
                 <DocumentFilterPanel app={appRef.current} docId={docSelected.id} sig={docFilterSig} />

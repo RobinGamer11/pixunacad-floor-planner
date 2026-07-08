@@ -351,9 +351,13 @@ export class DocumentObject {
   /** Runtime-Flag: Dokument existiert nur als Snap-/Hub-Quelle (z. B. Projektmappen-PDF),
    *  Bild wird NICHT gezeichnet, Serialisierung überspringt es. Nicht persistiert. */
   _snapOnly?: boolean;
+  /** Benutzerdefinierte Fangpunkte in Dokument-lokalen UV-Koordinaten (0..1
+   *  relativ zu widthM/heightM). Werden über alle Werkzeuge fangbar; per
+   *  Anker-Werkzeug am Dokument platziert. */
+  anchors: { x: number; y: number }[];
 
 
-  constructor({ id, name, kind, src, pageIndex, position, widthM, heightM, rotationRad, pixelWidth, pixelHeight, labelId, importScaleDenom, eraseMaskDataUrl, pdfSourceB64, guideEdges, cropM, opacity, filters, activeFilterId, bgRemoval }: {
+  constructor({ id, name, kind, src, pageIndex, position, widthM, heightM, rotationRad, pixelWidth, pixelHeight, labelId, importScaleDenom, eraseMaskDataUrl, pdfSourceB64, guideEdges, cropM, opacity, filters, activeFilterId, bgRemoval, anchors }: {
     id: string; name?: string; kind?: "image" | "pdf-page"; src: string;
     pageIndex?: number; position: Vec2; widthM: number; heightM: number;
     rotationRad?: number; pixelWidth?: number; pixelHeight?: number; labelId?: string;
@@ -365,6 +369,7 @@ export class DocumentObject {
     filters?: import("./documentFilters").DocumentFilter[];
     activeFilterId?: string | null;
     bgRemoval?: import("./documentBgRemove").BgRemoval;
+    anchors?: { x: number; y: number }[];
   }) {
     this.id = id;
     this.name = name || "Dokument";
@@ -401,6 +406,10 @@ export class DocumentObject {
     this.bgRemoval = bgRemoval ? { ...bgRemoval } : undefined;
     this._bgFgMask = null;
     this._bgMaskRev = 0;
+    this.anchors = Array.isArray(anchors)
+      ? anchors
+          .map((a) => ({ x: Math.max(0, Math.min(1, a?.x ?? 0)), y: Math.max(0, Math.min(1, a?.y ?? 0)) }))
+      : [];
   }
 }
 
@@ -761,6 +770,7 @@ export class Scene {
     filters?: import("./documentFilters").DocumentFilter[];
     activeFilterId?: string | null;
     bgRemoval?: import("./documentBgRemove").BgRemoval;
+    anchors?: { x: number; y: number }[];
   }): DocumentObject {
     const doc = new DocumentObject({ id: this._makeId(), ...opts });
     this.documents.push(doc);

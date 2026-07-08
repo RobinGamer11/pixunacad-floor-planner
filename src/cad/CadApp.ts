@@ -606,6 +606,7 @@ export class CadApp {
           filters: ((d as any).filters || []).map((f: any) => ({ ...f })),
           activeFilterId: (d as any).activeFilterId || null,
           bgRemoval: bgClone,
+          anchors: ((d as any).anchors || []).map((a: any) => ({ x: a.x, y: a.y })),
         };
       }),
 
@@ -746,6 +747,7 @@ export class CadApp {
         filters: Array.isArray(d.filters) ? d.filters : undefined,
         activeFilterId: d.activeFilterId || null,
         bgRemoval: d.bgRemoval || undefined,
+        anchors: Array.isArray(d.anchors) ? d.anchors : undefined,
       });
       if (d.id) (doc as any).id = d.id;
     }

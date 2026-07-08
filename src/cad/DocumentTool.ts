@@ -4,14 +4,15 @@ import type { CadApp } from "./CadApp";
 import type { Input } from "./Input";
 import type { Snap } from "./TopologyEngine";
 import { DocumentObject } from "./Scene";
-import { documentCenterWorld, documentCornersWorld, scaleDocumentAroundCenter } from "./documentGeometry";
+import { documentCenterWorld, documentCornersWorld, scaleDocumentAroundCenter, documentAnchorsWorld, worldToDocumentUV } from "./documentGeometry";
 
 type Phase =
   | "idle"
   | "placing"          // gerade importiertes Dokument folgt der Maus, Klick setzt es ab
   | "scale-pick-1"     // wartet auf 1. Punkt (Start Ist-Strecke)
   | "scale-pick-2"     // wartet auf 2. Punkt (Ende Ist-Strecke; definiert auch Richtung)
-  | "scale-pick-3";    // Ist-Strecke fix, wartet auf 3. Punkt entlang derselben Richtung (= Soll-Länge ab P1)
+  | "scale-pick-3"     // Ist-Strecke fix, wartet auf 3. Punkt entlang derselben Richtung (= Soll-Länge ab P1)
+  | "anchor-edit";     // Anker (Fangpunkte) am Dokument setzen/entfernen
 
 /**
  * DocumentTool: PDF/JPG/PNG-Import & Maßstabs-Skalierung.
@@ -37,6 +38,9 @@ export class DocumentTool {
   scalePoint3: Vec2 | null = null;
   scaleSnap: Snap | null = null;
 
+  /** Ziel-Dokument für die Anker-Bearbeitung. */
+  anchorTargetDocId: string | null = null;
+
   onPhaseChange?: () => void;
 
   constructor(app: CadApp) { this.app = app; }
@@ -56,12 +60,29 @@ export class DocumentTool {
     this.scalePoint2 = null;
     this.scalePoint3 = null;
     this.scaleSnap = null;
+    this.anchorTargetDocId = null;
     this.app.hub.bindCommit(null);
     this.app.hub.angInputEl.readOnly = true;
     this.onPhaseChange?.();
   }
 
   finish() { this.cancel(); }
+
+  /** Start Anker-Bearbeitung: Klick auf Dokument setzt/entfernt Anker. */
+  beginAnchorEdit(docId: string) {
+    const doc = this.app.scene.getDocumentById(docId);
+    if (!doc) return;
+    if (this.app.activeTool !== this) {
+      this.app.setTool("document");
+    }
+    this.anchorTargetDocId = docId;
+    this.phase = "anchor-edit";
+    this.app.hub.hide();
+    this.app.setSelection({ type: SelectionType.DOCUMENT, documentId: docId } as any);
+    this.onPhaseChange?.();
+  }
+
+  isAnchorEditing() { return this.phase === "anchor-edit"; }
 
   /** Externe API: nach erfolgreichem Datei-Import wird das Dokument zur Maus-Platzierung übergeben. */
   beginPlacement(opts: { src: string; widthM: number; heightM: number; pixelWidth: number; pixelHeight: number; name: string; kind: "image" | "pdf-page"; pageIndex: number; importScaleDenom: number; pdfSourceB64?: string | null }) {
@@ -117,6 +138,40 @@ export class DocumentTool {
   isScaling() { return this.phase === "scale-pick-1" || this.phase === "scale-pick-2" || this.phase === "scale-pick-3"; }
 
   update(input: Input) {
+    if (this.phase === "anchor-edit") {
+      // Kein Snap — Anker sitzen frei auf dem Dokument (User-definiert).
+      this.scaleSnap = null;
+      if (!input.clicked) return;
+      const docId = this.anchorTargetDocId;
+      if (!docId) return;
+      const doc = this.app.scene.getDocumentById(docId);
+      if (!doc) { this.cancel(); return; }
+      const worldPt = v(input.mouse.wx, input.mouse.wy);
+      // Zuerst: Hit auf existierendem Anker? → entfernen.
+      const worldAnchors = documentAnchorsWorld(doc);
+      const tolPx = 10;
+      let removeIdx = -1;
+      for (let i = 0; i < worldAnchors.length; i++) {
+        const s = this.app.camera.worldToScreen(worldAnchors[i].x, worldAnchors[i].y);
+        if (Math.hypot(s.x - input.mouse.sx, s.y - input.mouse.sy) <= tolPx) {
+          removeIdx = i;
+          break;
+        }
+      }
+      const anchors: { x: number; y: number }[] = ((doc as any).anchors || []).slice();
+      if (removeIdx >= 0) {
+        anchors.splice(removeIdx, 1);
+        (doc as any).anchors = anchors;
+      } else {
+        // Nur setzen, wenn Klick innerhalb des Dokuments liegt.
+        const uv = worldToDocumentUV(doc, worldPt);
+        if (uv.x >= -0.02 && uv.x <= 1.02 && uv.y >= -0.02 && uv.y <= 1.02) {
+          anchors.push({ x: Math.max(0, Math.min(1, uv.x)), y: Math.max(0, Math.min(1, uv.y)) });
+          (doc as any).anchors = anchors;
+        }
+      }
+      return;
+    }
     if (this.phase === "placing") {
       const snap = this.app.topology.findBestSnap(v(input.mouse.sx, input.mouse.sy), v(input.mouse.wx, input.mouse.wy));
       this.scaleSnap = snap;
