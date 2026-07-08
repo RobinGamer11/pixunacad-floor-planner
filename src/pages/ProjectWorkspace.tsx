@@ -2925,7 +2925,7 @@ function PageSettings({
                     }}
                     title={page.spreadLayoutLocked ? "Anordnung ist gesperrt — Klick zum Entsperren" : "Anordnung sperren (Ziehen deaktivieren)"}
                   >
-                    {page.spreadLayoutLocked ? <Lock size={12} /> : <Unlock size={12} />}
+                    {page.spreadLayoutLocked ? <LockIcon size={12} /> : <UnlockIcon size={12} />}
                     {page.spreadLayoutLocked ? "Anordnung gesperrt" : "Anordnung sperren"}
                   </button>
                 </Row>
