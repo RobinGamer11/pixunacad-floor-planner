@@ -151,8 +151,22 @@ export default function ProjectWorkspace() {
 
 
 
-  const [leftOpen, setLeftOpen] = useState(true);
-  const [rightOpen, setRightOpen] = useState(true);
+  // Auf schmalen Viewports (iPad Portrait, kleine Tablets) beide Panels
+  // initial einklappen — sonst bleibt für die Canvas kein Platz.
+  const isNarrowInitial = typeof window !== "undefined" && window.innerWidth < 1024;
+  const [leftOpen, setLeftOpen] = useState(!isNarrowInitial);
+  const [rightOpen, setRightOpen] = useState(!isNarrowInitial);
+  // Wenn beim Verkleinern (z.B. iPad-Rotation) der Viewport unter 1024px
+  // fällt und beide Panels offen sind, automatisch das rechte Panel schließen.
+  useEffect(() => {
+    const onResize = () => {
+      if (window.innerWidth < 900 && leftOpen && rightOpen) {
+        setRightOpen(false);
+      }
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [leftOpen, rightOpen]);
   const [renamingPageId, setRenamingPageId] = useState<string | undefined>();
   const [pageNameDraft, setPageNameDraft] = useState("");
   const [pageActionsSticky, setPageActionsSticky] = useState(false);
