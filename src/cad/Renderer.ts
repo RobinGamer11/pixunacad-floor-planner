@@ -891,6 +891,26 @@ export class Renderer {
         ctx.fill();
         ctx.stroke();
       }
+      // Benutzer-Anker (Fangpunkte) — goldenes Anker-Icon
+      const anchors = documentAnchorsWorld(doc);
+      if (anchors.length > 0) {
+        for (const w of anchors) {
+          const p = cam.worldToScreen(w.x, w.y);
+          ctx.beginPath();
+          ctx.fillStyle = "#c99a3b";
+          ctx.strokeStyle = "#fff";
+          ctx.lineWidth = 1.5;
+          ctx.arc(p.x, p.y, 4.5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+          // Kleiner Ring als „Anker"-Silhouette
+          ctx.beginPath();
+          ctx.strokeStyle = "#c99a3b";
+          ctx.lineWidth = 1;
+          ctx.arc(p.x, p.y, 8, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      }
       ctx.restore();
     }
   }
