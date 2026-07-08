@@ -8,7 +8,7 @@
  * PDFs/Bilder) — analog zur Hub-Box in der CAD-Hauptseite (Move/Rotate).
  */
 import { useEffect, useRef, useState } from "react";
-import { Move, RotateCw, Crosshair, Scaling, Scissors } from "lucide-react";
+import { Move, RotateCw, Scaling, Scissors } from "lucide-react";
 import { MiniCad, type MiniTool } from "@/cad/embed/MiniCad";
 import type { MiniCadSelectionInfo } from "@/cad/embed/MiniCad";
 import type { HatchDrawMode } from "@/cad/HatchTool";
