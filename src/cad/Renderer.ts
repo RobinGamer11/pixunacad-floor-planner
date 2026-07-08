@@ -74,6 +74,12 @@ export class Renderer {
     opacity: 0.06,
   };
 
+  /** Hintergrundfarbe der CAD-Oberfläche (außerhalb des Kartenkreises). */
+  backgroundColor: string = "#ffffff";
+
+  /** Optionaler Karten-Hintergrund (siehe mapBackground.ts). Zentriert auf Welt-Ursprung. */
+  mapBackground: import("./mapBackground").MapBackground | null = null;
+
   selectedLabelId: string | null = null;
   hoverSegmentId: string | null = null;
   hoverHatchId: string | null = null;
