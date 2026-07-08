@@ -263,7 +263,7 @@ export class MiniCad {
   /** Map externalId → docId; Snapshot zur Diff-Erkennung. */
   private _externalDocs: Map<string, string> = new Map();
   private _externalDocSnapshots: Map<string, string> = new Map();
-  private _externalDocChange: ((id: string, t: { xMM: number; yMM: number; rotationDeg: number; guideEdges: { top: boolean; right: boolean; bottom: boolean; left: boolean } }) => void) | null = null;
+  private _externalDocChange: ((id: string, t: { xMM: number; yMM: number; wMM: number; hMM: number; rotationDeg: number; guideEdges: { top: boolean; right: boolean; bottom: boolean; left: boolean } }) => void) | null = null;
 
 
   private _activeTool: MiniTool = null;
@@ -522,7 +522,7 @@ export class MiniCad {
    */
   setExternalDocuments(
     docs: Array<{ id: string; xMM: number; yMM: number; wMM: number; hMM: number; rotationRad?: number; guideEdges?: { top: boolean; right: boolean; bottom: boolean; left: boolean } }>,
-    onChange?: (id: string, t: { xMM: number; yMM: number; rotationDeg: number; guideEdges: { top: boolean; right: boolean; bottom: boolean; left: boolean } }) => void,
+    onChange?: (id: string, t: { xMM: number; yMM: number; wMM: number; hMM: number; rotationDeg: number; guideEdges: { top: boolean; right: boolean; bottom: boolean; left: boolean } }) => void,
   ) {
     this._installExtDocLabel();
     this._externalDocChange = onChange ?? null;
@@ -596,6 +596,8 @@ export class MiniCad {
           this._externalDocChange(d.id, {
             xMM: d.position.x * 1000,
             yMM: d.position.y * 1000,
+            wMM: d.widthM * 1000,
+            hMM: d.heightM * 1000,
             rotationDeg: (d.rotationRad * 180) / Math.PI,
             guideEdges: { ...d.guideEdges },
           });
