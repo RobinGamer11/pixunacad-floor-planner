@@ -770,6 +770,7 @@ export class Scene {
     filters?: import("./documentFilters").DocumentFilter[];
     activeFilterId?: string | null;
     bgRemoval?: import("./documentBgRemove").BgRemoval;
+    anchors?: { x: number; y: number }[];
   }): DocumentObject {
     const doc = new DocumentObject({ id: this._makeId(), ...opts });
     this.documents.push(doc);
