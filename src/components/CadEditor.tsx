@@ -362,6 +362,31 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     app.renderer.render();
   }, [bgColor]);
 
+  const loadMap = React.useCallback(async () => {
+    const app = appRef.current;
+    if (!app || !mapAddress.trim()) return;
+    setMapLoading(true);
+    setMapStatus("Suche Adresse…");
+    try {
+      const { geocodeAddress, buildMapBackground } = await import("@/cad/mapBackground");
+      const geo = await geocodeAddress(mapAddress);
+      if (!geo) {
+        setMapStatus("Fehler: Adresse nicht gefunden.");
+        return;
+      }
+      setMapStatus("Lade Karte…");
+      const mb = await buildMapBackground(geo, mapRadius);
+      app.renderer.mapBackground = mb;
+      app.renderer.render();
+      setMapActive(true);
+      setMapStatus(`✓ ${geo.displayName.slice(0, 60)}${geo.displayName.length > 60 ? "…" : ""}`);
+    } catch (err: any) {
+      setMapStatus(`Fehler: ${err?.message || String(err)}`);
+    } finally {
+      setMapLoading(false);
+    }
+  }, [mapAddress, mapRadius]);
+
   // Door tool settings sync
   useEffect(() => {
     const app = appRef.current;
