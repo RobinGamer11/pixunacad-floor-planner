@@ -8,7 +8,7 @@ import { getDimensionGeometry, type DimensionLike } from "./dimensionGeometry";
 import { boxCornersWorld } from "./textGeometry";
 import { drawRichTextBox } from "./textRichRenderer";
 import { transformedInstanceItems, instanceBoundingCornersWorld } from "./StickerManager";
-import { documentCornersWorld, documentCenterWorld, documentVisibleCornersWorld } from "./documentGeometry";
+import { documentCornersWorld, documentCenterWorld, documentVisibleCornersWorld, documentAnchorsWorld } from "./documentGeometry";
 import { getOrCreateDocMask } from "./documentMask";
 import { applyFilterToCanvas, filterSignature } from "./documentFilters";
 import { applyBgRemovalToCanvas, bgRemovalSignature } from "./documentBgRemove";
