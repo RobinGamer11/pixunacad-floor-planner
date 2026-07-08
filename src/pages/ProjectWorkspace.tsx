@@ -2496,6 +2496,10 @@ function DocumentToolSettings({ importing, onImport }: { importing: boolean; onI
         <FileImage size={14} />
         {importing ? "Importiere…" : "Datei importieren"}
       </button>
+      <div className="text-[11px] leading-relaxed text-muted-foreground pt-2 border-t" style={{ borderColor: "hsl(var(--hairline))" }}>
+        <div>PDF, JPG, PNG werden mit 96 DPI / 72 pt importiert.</div>
+        <div>Zum Skalieren, Drehen oder Zuschneiden: <strong>Auswahl-Werkzeug</strong> → Dokument anklicken.</div>
+      </div>
     </SettingsBlock>
   );
 }
