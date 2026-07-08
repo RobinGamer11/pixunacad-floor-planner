@@ -2222,6 +2222,7 @@ function ElementView({
   onRotate,
   onEdgeDrag,
   onCornerDrag,
+  onJumpCad,
 }: {
   el: PageElement;
   selected?: boolean;
@@ -2234,7 +2235,9 @@ function ElementView({
   onRotate?: (deltaDeg: number, absolute?: boolean) => void;
   onEdgeDrag?: (edge: "top" | "right" | "bottom" | "left", dx: number, dy: number) => void;
   onCornerDrag?: (corner: "tl" | "tr" | "bl" | "br", dx: number, dy: number, shift: boolean) => void;
+  onJumpCad?: (sheetId?: string) => void;
 }) {
+
   const dragRef = useRef<{ x: number; y: number } | null>(null);
   const rotateRef = useRef<HTMLDivElement | null>(null);
 
