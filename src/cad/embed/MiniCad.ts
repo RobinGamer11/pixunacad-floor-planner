@@ -1972,16 +1972,22 @@ export class MiniCad {
     for (const s of this.scene.freeStrokes) {
       h = (h * 31 + s.points.length + (s.color?.length || 0)) | 0;
     }
-    // Dokument-Anker in Signatur einbeziehen — Änderungen sollen persistieren.
-    for (const d of this.scene.documents) {
-      const anchors = (d as any).anchors as { x: number; y: number }[] | undefined;
+    // Dokument-Anker + Transform (Position/Größe/Rotation) in Signatur einbeziehen —
+    // Änderungen (z. B. Skalieren einer PDF) müssen persistiert werden.
+    for (const d of this.scene.documents as any[]) {
+      const anchors = d.anchors as { x: number; y: number }[] | undefined;
       const n = anchors?.length || 0;
       h = (h * 31 + n) | 0;
       if (anchors) for (const a of anchors) {
         h = (h * 31 + Math.round(a.x * 1000) + Math.round(a.y * 1000)) | 0;
       }
+      h = (h * 31 + Math.round((d.widthM ?? 0) * 10000)) | 0;
+      h = (h * 31 + Math.round((d.heightM ?? 0) * 10000)) | 0;
+      h = (h * 31 + Math.round((d.position?.x ?? 0) * 10000)) | 0;
+      h = (h * 31 + Math.round((d.position?.y ?? 0) * 10000)) | 0;
+      h = (h * 31 + Math.round((d.rotationRad ?? 0) * 10000)) | 0;
     }
-    return `${segs}|${texts}|${strokes}|${h}`;
+    return `${segs}|${texts}|${strokes}|${this.scene.documents.length}|${h}`;
   }
 }
 
