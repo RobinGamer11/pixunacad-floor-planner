@@ -100,6 +100,8 @@ export interface ProjectPage {
   spreadExcluded?: boolean;
   /** UI: Spread im Seiten-Panel eingeklappt anzeigen. */
   spreadCollapsed?: boolean;
+  /** Nur bei "free"-Modus: Anordnung gesperrt (kein Ziehen, kein Griff sichtbar). */
+  spreadLayoutLocked?: boolean;
 }
 
 
