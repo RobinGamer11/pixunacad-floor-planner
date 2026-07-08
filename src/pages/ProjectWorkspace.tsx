@@ -2686,47 +2686,38 @@ function RightInspector({
 function TabButton({
   active,
   onClick,
-  icon,
   label,
   badge,
 }: {
   active: boolean;
   onClick: () => void;
-  icon: React.ReactNode;
   label: string;
   badge?: number;
 }) {
   return (
     <button
+      type="button"
       onClick={onClick}
-      className="py-3 flex flex-col items-center gap-1 text-[11px] relative"
+      className="min-w-0 truncate px-2 py-2 text-[11px] font-medium transition-colors relative"
       style={{
+        background: active ? "hsl(var(--surface-card))" : "hsl(var(--surface-muted))",
         color: active ? "hsl(var(--ink))" : "hsl(var(--ink-soft))",
-        fontWeight: active ? 600 : 400,
-        background: active ? "hsl(var(--surface))" : "transparent",
+        borderBottom: active ? "2px solid hsl(var(--accent-gold))" : "2px solid transparent",
       }}
     >
-      <span className="flex items-center gap-1">
-        {icon}
-        {badge !== undefined && (
-          <span
-            className="text-[10px] px-1.5 py-0.5 rounded-full"
-            style={{ background: "hsl(var(--accent-gold))", color: "white" }}
-          >
-            {badge}
-          </span>
-        )}
-      </span>
-      <span className="text-center leading-tight">{label}</span>
-      {active && (
+      {label}
+      {badge !== undefined && (
         <span
-          className="absolute left-2 right-2 -bottom-px h-[2px]"
-          style={{ background: "hsl(var(--accent-gold))" }}
-        />
+          className="ml-1 text-[9px] px-1 py-0.5 rounded-full align-middle"
+          style={{ background: "hsl(var(--accent-gold))", color: "white" }}
+        >
+          {badge}
+        </span>
       )}
     </button>
   );
 }
+
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
