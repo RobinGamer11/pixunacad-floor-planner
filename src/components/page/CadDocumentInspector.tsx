@@ -145,19 +145,26 @@ export function CadDocumentInspector({ engine }: Props) {
       <button
         type="button"
         onClick={() => (engine as any).documentTool?.beginScaleTwoPoints(sel.id)}
-        className="w-full h-7 rounded-md border text-[11px] flex items-center justify-center gap-1.5 hover:bg-muted"
+        className="w-full h-7 rounded-md border text-[11px] flex items-center justify-start gap-1.5 px-2 hover:bg-muted"
         style={{ borderColor: "hsl(var(--hairline))" }}
         title="Über zwei Snap-Punkte und eine Soll-Länge skalieren"
       >
         <Maximize2 size={12} /> Skalieren (2 Punkte)
       </button>
 
-      {/* Freie Skalierung — Slider + %-Feld. Basis = Größe zum Zeitpunkt der Auswahl. */}
-      <div
-        className="rounded-md border p-1.5 space-y-1"
+      <button
+        type="button"
+        onClick={() => (engine as any).documentTool?.beginScaleFromLastDimension?.(sel.id)}
+        className="w-full h-7 rounded-md border text-[11px] flex items-center justify-start gap-1.5 px-2 hover:bg-muted"
         style={{ borderColor: "hsl(var(--hairline))" }}
+        title="Skaliere mit der zuletzt erstellten Maßkette als Referenz"
       >
-        <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+        <RulerIcon size={12} /> Skalieren (Maßkette)
+      </button>
+
+      {/* Freie Skalierung — Slider + %-Feld, ohne Rahmen. */}
+      <div className="space-y-1">
+        <div className="flex items-center justify-between text-[10px] text-muted-foreground px-0.5">
           <span>Freie Skalierung</span>
           <button
             type="button"
@@ -195,16 +202,6 @@ export function CadDocumentInspector({ engine }: Props) {
         </div>
       </div>
 
-      <button
-        type="button"
-        onClick={() => (engine as any).documentTool?.beginScaleFromLastDimension?.(sel.id)}
-        className="w-full h-7 rounded-md border text-[11px] flex items-center justify-center gap-1.5 hover:bg-muted"
-        style={{ borderColor: "hsl(var(--hairline))" }}
-        title="Skaliere mit der zuletzt erstellten Maßkette als Referenz"
-      >
-        <RulerIcon size={12} /> Skalieren (Maßkette)
-      </button>
-
       {sel.kind === "pdf-page" && !!sel.pdfSourceB64 && (
         <button
           type="button"
@@ -223,7 +220,7 @@ export function CadDocumentInspector({ engine }: Props) {
               );
             }
           }}
-          className="w-full h-7 rounded-md border text-[11px] flex items-center justify-center gap-1.5 hover:bg-muted"
+          className="w-full h-7 rounded-md border text-[11px] flex items-center justify-start gap-1.5 px-2 hover:bg-muted"
           style={{ borderColor: "hsl(var(--hairline))" }}
           title="PDF-Vektoren extrahieren und in Linien/Schraffuren/Texte konvertieren"
         >
@@ -242,7 +239,7 @@ export function CadDocumentInspector({ engine }: Props) {
             app.refreshLabelUI?.();
           }
         }}
-        className="w-full h-7 rounded-md border text-[11px] flex items-center justify-center gap-1.5 hover:bg-muted"
+        className="w-full h-7 rounded-md border text-[11px] flex items-center justify-start gap-1.5 px-2 hover:bg-muted"
         style={{ borderColor: "hsl(var(--hairline))" }}
         title="Dokument löschen"
       >
@@ -260,14 +257,14 @@ export function CadDocumentInspector({ engine }: Props) {
             tool?.beginAnchorEdit?.(sel.id);
           }
         }}
-        className="w-full h-7 rounded-md border text-[11px] flex items-center justify-center gap-1.5 hover:bg-muted"
+        className="w-full h-7 rounded-md border text-[11px] flex items-center justify-start gap-1.5 px-2 hover:bg-muted"
         style={{
           borderColor: phase === "anchor-edit" ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
           background: phase === "anchor-edit" ? "hsl(var(--accent-gold) / 0.12)" : undefined,
         }}
         title="Anker (Fangpunkte) am Dokument setzen — Klick platziert, erneuter Klick auf einen Anker entfernt ihn."
       >
-        <AnchorIcon size={12} /> {phase === "anchor-edit" ? "Anker beenden" : "Anker +"}
+        <AnchorIcon size={12} /> {phase === "anchor-edit" ? "Anker beenden" : "Anker +/−"}
       </button>
 
       <DocumentFilterPanel app={engine as any} docId={sel.id} sig={filterSig} />
