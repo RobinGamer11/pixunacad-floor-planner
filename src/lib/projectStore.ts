@@ -48,6 +48,9 @@ export interface PageElement {
   // cad-view
   scale?: string;
   lastSyncAt?: string;
+  /** cad-view: Eingefrorene Vorschau (DataURL) — Snapshot der CAD-Oberfläche
+   *  zum Zeitpunkt des Einfügens bzw. der Aktualisierung. */
+  viewSnapshot?: string;
   // generic
   nonPrinting?: boolean;
   // layer / group

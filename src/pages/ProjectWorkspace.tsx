@@ -2313,7 +2313,7 @@ function ElementView({
           {el.text || "Notiz"}
         </div>
       )}
-      {el.kind === "cad-view" && <CadViewThumb sheetId={el.sheetId} />}
+      {el.kind === "cad-view" && <CadViewThumb sheetId={el.sheetId} snapshot={el.viewSnapshot} />}
       {(el.kind === "shape" || el.kind === "line" || el.kind === "table" || el.kind === "pdf" || el.kind === "timeline") && el.kind !== "pdf" && (
         <div
           className="w-full h-full flex items-center justify-center text-xs text-muted-foreground"
@@ -2510,7 +2510,7 @@ function ElementView({
 /** Vorschau-Bild eines CAD-Sheets. Liest live aus dem projectStore und
  *  zeigt den `thumbnail` (PNG aus dem CAD-Editor). Fallback: dezenter
  *  Platzhalter, wenn das Sheet noch nie im CAD geöffnet wurde. */
-function CadViewThumb({ sheetId }: { sheetId?: string }) {
+function CadViewThumb({ sheetId, snapshot }: { sheetId?: string; snapshot?: string }) {
   const projects = useProjects();
   const sheet = React.useMemo(() => {
     if (!sheetId) return undefined;
@@ -2520,11 +2520,14 @@ function CadViewThumb({ sheetId }: { sheetId?: string }) {
     }
     return undefined;
   }, [projects, sheetId]);
-  if (sheet?.thumbnail) {
+  // Bevorzugt der eingefrorene Element-Snapshot (Ansicht+Zoom zum Zeitpunkt
+  // des Einfügens). Fallback: Live-Thumbnail des Sheets.
+  const src = snapshot || sheet?.thumbnail;
+  if (src) {
     return (
       <img
-        src={sheet.thumbnail}
-        alt={sheet.name}
+        src={src}
+        alt={sheet?.name ?? "CAD-Ansicht"}
         className="w-full h-full object-contain"
         style={{ background: "white" }}
         draggable={false}
@@ -3644,6 +3647,8 @@ function CadToolSection({
       h: 35,
       sheetId: sheet.id,
       scale: sheet.scale,
+      // Aktuelle Ansicht + Zoom der CAD-Oberfläche einfrieren (Snapshot).
+      viewSnapshot: sheet.thumbnail,
       lastSyncAt: new Date().toISOString(),
     });
     setSelectedElementId(id);
@@ -3651,13 +3656,6 @@ function CadToolSection({
 
   return (
     <div className="space-y-3">
-      <button
-        onClick={() => onJumpCad()}
-        className="w-full h-9 rounded-md text-sm font-medium flex items-center justify-center gap-2"
-        style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
-      >
-        <ExternalLink size={14} /> Zur CAD-Oberfläche
-      </button>
 
       <div>
         <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-2">
@@ -3735,10 +3733,11 @@ function CadToolSection({
                         e.stopPropagation();
                         if (!pageId) return;
                         projectStore.updateElement(projectId, pageId, el.id, {
+                          viewSnapshot: sheet?.thumbnail,
                           lastSyncAt: new Date().toISOString(),
                         });
                       }}
-                      title="Aktualisieren (aus CAD übernehmen)"
+                      title="Aktualisieren — aktuelle CAD-Ansicht als Snapshot übernehmen"
                       className="h-7 w-7 rounded flex items-center justify-center hover:bg-muted"
                     >
                       <RefreshCw size={13} className="text-muted-foreground" />
