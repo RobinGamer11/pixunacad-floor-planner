@@ -4,7 +4,7 @@ import type { CadApp } from "./CadApp";
 import type { Input } from "./Input";
 import type { Snap } from "./TopologyEngine";
 import { DocumentObject } from "./Scene";
-import { documentCenterWorld, documentCornersWorld, scaleDocumentAroundCenter } from "./documentGeometry";
+import { documentCenterWorld, documentCornersWorld, scaleDocumentAroundCenter, documentAnchorsWorld, worldToDocumentUV } from "./documentGeometry";
 
 type Phase =
   | "idle"
