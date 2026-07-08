@@ -1579,7 +1579,7 @@ function ZoomBar({ zoom, setZoom }: { zoom: number; setZoom: (v: number) => void
         min={10}
         max={400}
         step={1}
-        value={zoom}
+        value={Math.round(zoom)}
         onChange={(e) => setZoom(Number(e.target.value))}
         className="w-64 accent-foreground"
       />
