@@ -1211,6 +1211,31 @@ export default function ProjectWorkspace() {
                       className={isFree ? "relative" : "flex items-start"}
                       style={isFree ? { minWidth: 800, minHeight: 400 } : undefined}
                     >
+                      {isFree && (() => {
+                        const locked = !!pages[0].spreadLayoutLocked;
+                        return (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              projectStore.setSpreadLayoutLocked(
+                                project.id,
+                                pages[0].spreadId!,
+                                !locked,
+                              )
+                            }
+                            title={locked ? "Anordnung gesperrt — Klick zum Entsperren" : "Anordnung sperren"}
+                            className="absolute -top-8 left-0 z-30 h-7 px-2 rounded-md flex items-center gap-1.5 text-[11px] font-medium shadow-md"
+                            style={{
+                              background: locked ? "hsl(var(--accent-gold))" : "hsl(var(--surface-card))",
+                              color: locked ? "white" : "hsl(var(--ink))",
+                              border: "1px solid hsl(var(--hairline))",
+                            }}
+                          >
+                            {locked ? <LockIcon size={12} /> : <UnlockIcon size={12} />}
+                            {locked ? "Gesperrt" : "Sperren"}
+                          </button>
+                        );
+                      })()}
                       {pages.map((p, i) => {
                         const isActiveMember = p.id === activePage.id;
                         const offset = isFree
