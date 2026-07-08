@@ -3730,10 +3730,11 @@ function CadToolSection({
                         e.stopPropagation();
                         if (!pageId) return;
                         projectStore.updateElement(projectId, pageId, el.id, {
+                          viewSnapshot: sheet?.thumbnail,
                           lastSyncAt: new Date().toISOString(),
                         });
                       }}
-                      title="Aktualisieren (aus CAD übernehmen)"
+                      title="Aktualisieren — aktuelle CAD-Ansicht als Snapshot übernehmen"
                       className="h-7 w-7 rounded flex items-center justify-center hover:bg-muted"
                     >
                       <RefreshCw size={13} className="text-muted-foreground" />
