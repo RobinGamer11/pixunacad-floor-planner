@@ -747,6 +747,7 @@ export class CadApp {
         filters: Array.isArray(d.filters) ? d.filters : undefined,
         activeFilterId: d.activeFilterId || null,
         bgRemoval: d.bgRemoval || undefined,
+        anchors: Array.isArray(d.anchors) ? d.anchors : undefined,
       });
       if (d.id) (doc as any).id = d.id;
     }
