@@ -248,6 +248,17 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const [docToolPhase, setDocToolPhase] = useState<string>("idle");
   const docFreeScaleBaseRef = useRef<{ id: string; w: number; h: number } | null>(null);
   const [docFreeScalePct, setDocFreeScalePct] = useState<number>(100);
+  useEffect(() => {
+    if (!docSelected) { docFreeScaleBaseRef.current = null; return; }
+    const base = docFreeScaleBaseRef.current;
+    if (!base || base.id !== docSelected.id) {
+      docFreeScaleBaseRef.current = { id: docSelected.id, w: docSelected.widthM, h: docSelected.heightM };
+      setDocFreeScalePct(100);
+    } else {
+      const cur = base.w > 0 ? (docSelected.widthM / base.w) * 100 : 100;
+      setDocFreeScalePct(prev => Math.abs(prev - cur) > 0.5 ? Math.round(cur) : prev);
+    }
+  }, [docSelected?.id, docSelected?.widthM, docSelected?.heightM]);
   // Maßstab-Auswahl vor Platzierung
   const [scaleDialogPages, setScaleDialogPages] = useState<ImportedPage[] | null>(null);
   const [scaleChoice, setScaleChoice] = useState<string>("100"); // "50" | "100" | "200" | "500" | "1" | "custom"
