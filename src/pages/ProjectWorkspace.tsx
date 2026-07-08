@@ -160,7 +160,22 @@ export default function ProjectWorkspace() {
   });
   const [zoom, setZoom] = useState(77);
   const canvasViewportRef = useRef<HTMLDivElement>(null);
-  const setZoomClamped = (v: number) => setZoom(Math.max(10, Math.min(400, Math.round(v))));
+  // Pivot für zoom-to-pointer: relative Content-Position (0..1) unter dem Mauszeiger
+  // + Maus-Position innerhalb des Containers. Wird nach setZoom in einem
+  // useLayoutEffect als Scroll-Korrektur angewendet.
+  const zoomPivotRef = useRef<{ contentX: number; contentY: number; mx: number; my: number } | null>(null);
+  const setZoomClamped = (v: number) => setZoom(Math.max(10, Math.min(1600, Math.round(v))));
+  useLayoutEffect(() => {
+    const el = canvasViewportRef.current;
+    const pivot = zoomPivotRef.current;
+    if (!el || !pivot) return;
+    // Neue Zoom-Skala ist bereits gerendert (CSS scale). Content-Größe verhält
+    // sich proportional zu zoom → neuen Scroll so setzen, dass der Punkt unter
+    // der Maus an derselben Bildschirmposition bleibt.
+    el.scrollLeft = pivot.contentX - pivot.mx;
+    el.scrollTop = pivot.contentY - pivot.my;
+    zoomPivotRef.current = null;
+  }, [zoom]);
   const setActiveToolAndTab = (t: PageTool) => {
     setPrintMode(false);
     setActiveTool(t);
