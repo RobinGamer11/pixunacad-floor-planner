@@ -1204,7 +1204,7 @@ export default function ProjectWorkspace() {
                       page={p}
                       overlayPage={bgOverlay.visible ? bgPage : undefined}
                       overlayOpacity={bgOverlay.opacity}
-                      overlayColor={bgOverlay.color}
+                      overlayColor={bgOverlay.tintEnabled ? bgOverlay.color : undefined}
                       selectedElementId={selectedElementId}
                       zoom={zoom}
                       activeTool={activeTool}
