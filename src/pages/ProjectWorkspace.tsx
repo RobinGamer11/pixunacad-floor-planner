@@ -160,7 +160,22 @@ export default function ProjectWorkspace() {
   });
   const [zoom, setZoom] = useState(77);
   const canvasViewportRef = useRef<HTMLDivElement>(null);
-  const setZoomClamped = (v: number) => setZoom(Math.max(10, Math.min(400, Math.round(v))));
+  // Pivot für zoom-to-pointer: relative Content-Position (0..1) unter dem Mauszeiger
+  // + Maus-Position innerhalb des Containers. Wird nach setZoom in einem
+  // useLayoutEffect als Scroll-Korrektur angewendet.
+  const zoomPivotRef = useRef<{ contentX: number; contentY: number; mx: number; my: number } | null>(null);
+  const setZoomClamped = (v: number) => setZoom(Math.max(10, Math.min(1600, Math.round(v))));
+  useLayoutEffect(() => {
+    const el = canvasViewportRef.current;
+    const pivot = zoomPivotRef.current;
+    if (!el || !pivot) return;
+    // Neue Zoom-Skala ist bereits gerendert (CSS scale). Content-Größe verhält
+    // sich proportional zu zoom → neuen Scroll so setzen, dass der Punkt unter
+    // der Maus an derselben Bildschirmposition bleibt.
+    el.scrollLeft = pivot.contentX - pivot.mx;
+    el.scrollTop = pivot.contentY - pivot.my;
+    zoomPivotRef.current = null;
+  }, [zoom]);
   const setActiveToolAndTab = (t: PageTool) => {
     setPrintMode(false);
     setActiveTool(t);
@@ -761,12 +776,32 @@ export default function ProjectWorkspace() {
               ref={canvasViewportRef}
               className="flex-1 overflow-hidden relative"
               onWheel={(e) => {
-                if (e.ctrlKey || e.metaKey || !e.shiftKey) {
-                  if (e.shiftKey) return;
-                  e.preventDefault();
-                  const delta = -e.deltaY;
-                  setZoomClamped(zoom + (delta > 0 ? 5 : -5));
-                }
+                if (e.shiftKey) return;
+                // Immer zoomen (Wheel + optional Ctrl/Cmd) — Zoom-Zentrum ist
+                // die Maus-Position (wie in PowerPoint/CAD/Figma).
+                const container = e.currentTarget as HTMLDivElement;
+                const r = container.getBoundingClientRect();
+                const mx = e.clientX - r.left;
+                const my = e.clientY - r.top;
+                // Content-Position unter der Maus VOR dem Zoom.
+                const contentX0 = container.scrollLeft + mx;
+                const contentY0 = container.scrollTop + my;
+                // Exponentieller Zoom-Faktor → glatter & konsistent unabhängig
+                // von Trackpad/Mausrad-Deltas. Deep-Zoom bis 1600 %.
+                const factor = Math.pow(1.0018, -e.deltaY);
+                const next = Math.max(10, Math.min(1600, Math.round(zoom * factor)));
+                if (next === zoom) return;
+                // Pivot in Content-Koordinaten der NEUEN Skala umrechnen.
+                const ratio = next / zoom;
+                zoomPivotRef.current = {
+                  contentX: contentX0 * ratio,
+                  contentY: contentY0 * ratio,
+                  mx, my,
+                };
+                setZoom(next);
+                // preventDefault erst nach der Rechnung — verhindert
+                // Browser-Scroll ohne die Zoom-Berechnung zu verzögern.
+                if (e.cancelable) e.preventDefault();
               }}
               onMouseDown={(e) => {
                 // Pan nur via Mittelmaus oder Alt+Links — sonst würde ein Links-Klick
@@ -2408,12 +2443,15 @@ function EbeneSelect({ engine }: { engine: import("@/cad/embed/MiniCad").MiniCad
   // Re-render bei Auswahl-Änderung / Label-Erstellung.
   const [, setTick] = useState(0);
   useEffect(() => {
-    const id = window.setInterval(() => setTick((t) => t + 1), 500);
+    const id = window.setInterval(() => setTick((t) => t + 1), 300);
     return () => window.clearInterval(id);
   }, []);
   const groups = engine.labelManager?.list?.() ?? [];
+  const selectionLabelId = (engine as any).getSelectionLabelId?.() as string | null;
+  const hasSelection = selectionLabelId != null;
   const activeId =
-    (engine as any).activeDrawLabelId
+    selectionLabelId
+    ?? (engine as any).activeDrawLabelId
     ?? (engine as any).selectedLabelId
     ?? groups[0]?.id
     ?? "";
@@ -2423,7 +2461,13 @@ function EbeneSelect({ engine }: { engine: import("@/cad/embed/MiniCad").MiniCad
         value={activeId}
         onChange={(e) => {
           const v = e.target.value;
-          try { (engine as any).setActiveDrawLabelId?.(v); } catch {}
+          if (hasSelection) {
+            // Auswahl vorhanden → Ebene des Objekts persistent ändern.
+            try { (engine as any).setSelectionLabelId?.(v); } catch {}
+          } else {
+            // Nichts ausgewählt → Ebene für NEU zu zeichnende Objekte setzen.
+            try { (engine as any).setActiveDrawLabelId?.(v); } catch {}
+          }
           try { (engine as any).refreshLabelUI?.(); } catch {}
           setTick((t) => t + 1);
         }}
