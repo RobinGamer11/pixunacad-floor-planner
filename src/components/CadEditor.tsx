@@ -354,6 +354,14 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     };
   }, [gridEnabled, gridSizeM, gridColor, gridOpacity]);
 
+  // Hintergrundfarbe synchron halten
+  useEffect(() => {
+    const app = appRef.current;
+    if (!app) return;
+    app.renderer.backgroundColor = bgColor;
+    app.render?.();
+  }, [bgColor]);
+
   // Door tool settings sync
   useEffect(() => {
     const app = appRef.current;
