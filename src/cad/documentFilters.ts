@@ -15,30 +15,13 @@ export interface FreeRemap {
 
 /**
  * Parameter für den "adjust"-Filter (Bildbearbeitung).
- * Werte sind neutral bei 0 (bipolar) oder 0..100 (unipolar) — siehe Kommentare.
+ * 30 Regler in 5 Gruppen (Aquarell-Archviz-Pipeline), Werte 0..100.
+ * Definition + Presets in imageAdjustPipeline.ts.
  */
-export interface AdjustParams {
-  exposure: number;    // -100..100
-  contrast: number;    // -100..100
-  saturation: number;  // -100..100
-  warmth: number;      // -100..100 (kühl→warm)
-  tint: number;        // -100..100 (grün→magenta)
-  shadows: number;     // -100..100 (Schatten heben)
-  highlights: number;  // -100..100 (Lichter senken)
-  clarity: number;     // 0..100 (lokaler Kontrast)
-  blur: number;        // 0..100 (Weichzeichnung px)
-  sharpen: number;     // 0..100 (Struktur)
-  vignette: number;    // 0..100
-  grain: number;       // 0..100
-  sepia: number;       // 0..100
-  aquarell: number;    // 0..100 (Preset-Stärke: Blur + Kanten-Boost + Papier)
-}
-
-export const DEFAULT_ADJUST: AdjustParams = {
-  exposure: 0, contrast: 0, saturation: 0, warmth: 0, tint: 0,
-  shadows: 0, highlights: 0, clarity: 0, blur: 0, sharpen: 0,
-  vignette: 0, grain: 0, sepia: 0, aquarell: 0,
-};
+export type { AdjustParams } from "./imageAdjustPipeline";
+export { DEFAULT_ADJUST, ADJUST_GROUPS, ADJUST_PRESETS, ADJUST_KEYS } from "./imageAdjustPipeline";
+import type { AdjustParams } from "./imageAdjustPipeline";
+import { DEFAULT_ADJUST, renderAdjust } from "./imageAdjustPipeline";
 
 export interface DocumentFilter {
   id: string;
