@@ -3983,7 +3983,7 @@ function PrintPanel({
         },
         (p) => setProgress(p),
       );
-      const safeName = (project.title || "projektmappe").replace(/[^\w-]+/g, "_");
+      const safeName = (project.name || "projektmappe").replace(/[^\w-]+/g, "_");
       downloadPdf(bytes, `${safeName}.pdf`);
       onClose();
     } catch (err) {
