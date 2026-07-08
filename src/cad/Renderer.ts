@@ -2135,7 +2135,7 @@ export class Renderer {
     const cam = this.camera;
     ctx.save();
     ctx.strokeStyle = "rgba(77,163,255,0.95)";
-    ctx.lineWidth = Math.max(s.thicknessM * cam.scale + 2.5, 4);
+    ctx.lineWidth = Math.min(Math.max(s.thicknessM * cam.scale + 1.5, 2.5), 5);
     ctx.lineJoin = "round";
     ctx.lineCap = "round";
     ctx.beginPath();
