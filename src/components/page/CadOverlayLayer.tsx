@@ -8,7 +8,7 @@
  * PDFs/Bilder) — analog zur Hub-Box in der CAD-Hauptseite (Move/Rotate).
  */
 import { useEffect, useRef, useState } from "react";
-import { Move, RotateCw, Crosshair, Scaling, Scissors } from "lucide-react";
+import { Move, RotateCw, Scaling, Scissors } from "lucide-react";
 import { MiniCad, type MiniTool } from "@/cad/embed/MiniCad";
 import type { MiniCadSelectionInfo } from "@/cad/embed/MiniCad";
 import type { HatchDrawMode } from "@/cad/HatchTool";
@@ -313,25 +313,10 @@ export default function CadOverlayLayer(props: Props) {
     }
   };
 
-  const cycleAnchor = () => {
-    const e = engineRef.current;
-    if (!e || !docHub.docId) return;
-    const doc = e.scene.getDocumentById(docHub.docId);
-    if (!doc) return;
-    const next = ((e.documentHubState.cornerIndex || 0) + 1) % 4;
-    const cx = doc.position.x + doc.widthM / 2;
-    const cy = doc.position.y + doc.heightM / 2;
-    const hw = doc.widthM / 2, hh = doc.heightM / 2;
-    const cc = Math.cos(doc.rotationRad), ss = Math.sin(doc.rotationRad);
-    const local = [
-      { x: -hw, y: -hh }, { x: hw, y: -hh }, { x: hw, y: hh }, { x: -hw, y: hh },
-    ];
-    const w = local[next];
-    const wx = cx + w.x * cc - w.y * ss;
-    const wy = cy + w.x * ss + w.y * cc;
-    const sp = e.camera.worldToScreen(wx, wy);
-    e.documentHubState = { visible: true, screenX: sp.x, screenY: sp.y, docId: doc.id, cornerIndex: next, anchorWorld: { x: wx, y: wy }, cropSide: null };
-  };
+  // cycleAnchor entfernt — der Hub-Button „Anker wechseln" wurde aus dem UI
+  // genommen, damit der Dokumenten-Hub kompakt bleibt.
+  void 0;
+
 
   return (
     <div
@@ -364,14 +349,7 @@ export default function CadOverlayLayer(props: Props) {
             onMouseDown={(e) => e.stopPropagation()}
             onPointerDown={(e) => e.stopPropagation()}
           >
-            <button
-              type="button"
-              title="Anker / Eckpunkt wechseln"
-              onClick={cycleAnchor}
-              style={hubBtnStyle}
-            >
-              <Crosshair size={14} />
-            </button>
+            {/* „Anker wechseln" wurde entfernt (Wunsch: erste HUB-Funktion raus). */}
             <button
               type="button"
               title="Verschieben (Δx, Δy in m)"

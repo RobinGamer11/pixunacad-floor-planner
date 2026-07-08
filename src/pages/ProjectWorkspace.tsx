@@ -351,7 +351,7 @@ export default function ProjectWorkspace() {
         projectName={project.name}
         
         mode="workspace"
-        zoomPercent={zoom}
+        zoomPercent={Math.round(zoom)}
         onPresent={() => {}}
         onShare={() => {}}
         onExport={() => setPrintMode((v) => !v)}
@@ -786,11 +786,11 @@ export default function ProjectWorkspace() {
                 // Content-Position unter der Maus VOR dem Zoom.
                 const contentX0 = container.scrollLeft + mx;
                 const contentY0 = container.scrollTop + my;
-                // Exponentieller Zoom-Faktor → glatter & konsistent unabhängig
-                // von Trackpad/Mausrad-Deltas. Deep-Zoom bis 1600 %.
-                const factor = Math.pow(1.0018, -e.deltaY);
-                const next = Math.max(10, Math.min(1600, Math.round(zoom * factor)));
-                if (next === zoom) return;
+                // Exponentieller Zoom-Faktor (identisch zum CAD-Editor,
+                // Camera.zoomAt) → langsameres, feineres Zoomgefühl.
+                const factor = Math.pow(1.0015, -e.deltaY);
+                const next = Math.max(10, Math.min(1600, zoom * factor));
+                if (Math.abs(next - zoom) < 0.01) return;
                 // Pivot in Content-Koordinaten der NEUEN Skala umrechnen.
                 const ratio = next / zoom;
                 zoomPivotRef.current = {
@@ -1579,7 +1579,7 @@ function ZoomBar({ zoom, setZoom }: { zoom: number; setZoom: (v: number) => void
         min={10}
         max={400}
         step={1}
-        value={zoom}
+        value={Math.round(zoom)}
         onChange={(e) => setZoom(Number(e.target.value))}
         className="w-64 accent-foreground"
       />
@@ -1595,7 +1595,7 @@ function ZoomBar({ zoom, setZoom }: { zoom: number; setZoom: (v: number) => void
           type="number"
           min={10}
           max={400}
-          value={draft ?? zoom}
+          value={draft ?? Math.round(zoom)}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={() => {
             if (draft !== null) {
@@ -2496,6 +2496,10 @@ function DocumentToolSettings({ importing, onImport }: { importing: boolean; onI
         <FileImage size={14} />
         {importing ? "Importiere…" : "Datei importieren"}
       </button>
+      <div className="text-[11px] leading-relaxed text-muted-foreground pt-2 border-t" style={{ borderColor: "hsl(var(--hairline))" }}>
+        <div>PDF, JPG, PNG werden mit 96 DPI / 72 pt importiert.</div>
+        <div>Zum Skalieren, Drehen oder Zuschneiden: <strong>Auswahl-Werkzeug</strong> → Dokument anklicken.</div>
+      </div>
     </SettingsBlock>
   );
 }
