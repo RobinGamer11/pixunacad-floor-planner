@@ -2408,12 +2408,15 @@ function EbeneSelect({ engine }: { engine: import("@/cad/embed/MiniCad").MiniCad
   // Re-render bei Auswahl-Änderung / Label-Erstellung.
   const [, setTick] = useState(0);
   useEffect(() => {
-    const id = window.setInterval(() => setTick((t) => t + 1), 500);
+    const id = window.setInterval(() => setTick((t) => t + 1), 300);
     return () => window.clearInterval(id);
   }, []);
   const groups = engine.labelManager?.list?.() ?? [];
+  const selectionLabelId = (engine as any).getSelectionLabelId?.() as string | null;
+  const hasSelection = selectionLabelId != null;
   const activeId =
-    (engine as any).activeDrawLabelId
+    selectionLabelId
+    ?? (engine as any).activeDrawLabelId
     ?? (engine as any).selectedLabelId
     ?? groups[0]?.id
     ?? "";
@@ -2423,7 +2426,13 @@ function EbeneSelect({ engine }: { engine: import("@/cad/embed/MiniCad").MiniCad
         value={activeId}
         onChange={(e) => {
           const v = e.target.value;
-          try { (engine as any).setActiveDrawLabelId?.(v); } catch {}
+          if (hasSelection) {
+            // Auswahl vorhanden → Ebene des Objekts persistent ändern.
+            try { (engine as any).setSelectionLabelId?.(v); } catch {}
+          } else {
+            // Nichts ausgewählt → Ebene für NEU zu zeichnende Objekte setzen.
+            try { (engine as any).setActiveDrawLabelId?.(v); } catch {}
+          }
           try { (engine as any).refreshLabelUI?.(); } catch {}
           setTick((t) => t + 1);
         }}
