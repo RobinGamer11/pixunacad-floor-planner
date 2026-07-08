@@ -116,7 +116,7 @@ export function DocumentFilterPanel({ app, docId, sig }: Props) {
       {/* Filter-Liste */}
       <div>
         <div className="flex items-center justify-between text-xs mb-2">
-          <span className="font-medium">Filter</span>
+          <span className="font-medium">Bildbearbeitung</span>
           <button
             type="button"
             className="cad-toolbar-btn h-6 px-2 text-[11px]"
