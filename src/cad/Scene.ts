@@ -369,6 +369,7 @@ export class DocumentObject {
     filters?: import("./documentFilters").DocumentFilter[];
     activeFilterId?: string | null;
     bgRemoval?: import("./documentBgRemove").BgRemoval;
+    anchors?: { x: number; y: number }[];
   }) {
     this.id = id;
     this.name = name || "Dokument";
