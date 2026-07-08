@@ -101,9 +101,9 @@ export function applyFilterToCanvas(
   out.height = Math.max(1, Math.floor(height));
   const ctx = out.getContext("2d", { willReadFrequently: true })!;
 
-  // "adjust" nutzt Canvas-Filter (Blur, Sepia, Saturate ...) plus per-Pixel-Passes.
+  // "adjust" → Aquarell-Archviz-Pipeline.
   if (filter && filter.mode === "adjust") {
-    return applyAdjustFilter(source, out, ctx, filter.adjust || DEFAULT_ADJUST);
+    return renderAdjust(source, out.width, out.height, { ...DEFAULT_ADJUST, ...(filter.adjust || {}) });
   }
 
   ctx.drawImage(source, 0, 0, out.width, out.height);
