@@ -776,12 +776,32 @@ export default function ProjectWorkspace() {
               ref={canvasViewportRef}
               className="flex-1 overflow-hidden relative"
               onWheel={(e) => {
-                if (e.ctrlKey || e.metaKey || !e.shiftKey) {
-                  if (e.shiftKey) return;
-                  e.preventDefault();
-                  const delta = -e.deltaY;
-                  setZoomClamped(zoom + (delta > 0 ? 5 : -5));
-                }
+                if (e.shiftKey) return;
+                // Immer zoomen (Wheel + optional Ctrl/Cmd) — Zoom-Zentrum ist
+                // die Maus-Position (wie in PowerPoint/CAD/Figma).
+                const container = e.currentTarget as HTMLDivElement;
+                const r = container.getBoundingClientRect();
+                const mx = e.clientX - r.left;
+                const my = e.clientY - r.top;
+                // Content-Position unter der Maus VOR dem Zoom.
+                const contentX0 = container.scrollLeft + mx;
+                const contentY0 = container.scrollTop + my;
+                // Exponentieller Zoom-Faktor → glatter & konsistent unabhängig
+                // von Trackpad/Mausrad-Deltas. Deep-Zoom bis 1600 %.
+                const factor = Math.pow(1.0018, -e.deltaY);
+                const next = Math.max(10, Math.min(1600, Math.round(zoom * factor)));
+                if (next === zoom) return;
+                // Pivot in Content-Koordinaten der NEUEN Skala umrechnen.
+                const ratio = next / zoom;
+                zoomPivotRef.current = {
+                  contentX: contentX0 * ratio,
+                  contentY: contentY0 * ratio,
+                  mx, my,
+                };
+                setZoom(next);
+                // preventDefault erst nach der Rechnung — verhindert
+                // Browser-Scroll ohne die Zoom-Berechnung zu verzögern.
+                if (e.cancelable) e.preventDefault();
               }}
               onMouseDown={(e) => {
                 // Pan nur via Mittelmaus oder Alt+Links — sonst würde ein Links-Klick
