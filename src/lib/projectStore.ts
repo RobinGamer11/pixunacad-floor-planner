@@ -639,6 +639,7 @@ export const projectStore = {
         }
       ),
     }));
+  },
   setSpreadLayoutLocked: (projectId: string, spreadId: string, locked: boolean) => {
     setState((s) => ({
       projects: s.projects.map((p) =>
