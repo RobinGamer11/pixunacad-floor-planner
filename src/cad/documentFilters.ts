@@ -117,6 +117,12 @@ export function applyFilterToCanvas(
   out.width = Math.max(1, Math.floor(width));
   out.height = Math.max(1, Math.floor(height));
   const ctx = out.getContext("2d", { willReadFrequently: true })!;
+
+  // "adjust" nutzt Canvas-Filter (Blur, Sepia, Saturate ...) plus per-Pixel-Passes.
+  if (filter && filter.mode === "adjust") {
+    return applyAdjustFilter(source, out, ctx, filter.adjust || DEFAULT_ADJUST);
+  }
+
   ctx.drawImage(source, 0, 0, out.width, out.height);
   if (!filter) return out;
   const img = ctx.getImageData(0, 0, out.width, out.height);
