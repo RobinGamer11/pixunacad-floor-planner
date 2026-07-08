@@ -2292,6 +2292,14 @@ function ElementView({
 
   const hubKinds = new Set(["cad-view", "pdf", "image"]);
   const showHub = !readOnly && selected && hubKinds.has(el.kind);
+  // CAD-Blatt bekommt einen eigenen (blau-gestrichelten) Look — analog zum
+  // Dokument-Hub in der CAD-Oberfläche (siehe Bild-Referenz).
+  const isCadView = el.kind === "cad-view";
+  const hubBlue = "hsl(217 91% 60%)";
+  const outlineColor = selected ? (isCadView ? hubBlue : "hsl(var(--accent-gold))") : undefined;
+  const outlineStyle = selected
+    ? (isCadView ? `2px dashed ${hubBlue}` : "2px solid hsl(var(--accent-gold))")
+    : "none";
 
   return (
     <div
@@ -2302,7 +2310,8 @@ function ElementView({
         top: `${el.y}%`,
         width: `${el.w}%`,
         height: `${el.h}%`,
-        outline: selected ? "2px solid hsl(var(--accent-gold))" : "none",
+        outline: outlineStyle,
+        outlineOffset: selected && isCadView ? "1px" : undefined,
         cursor: readOnly ? "default" : "move",
         opacity: el.opacity ?? 1,
         boxShadow: el.shadow ? "0 8px 24px -8px rgba(0,0,0,0.25)" : undefined,
@@ -2312,6 +2321,7 @@ function ElementView({
         zIndex: elevated ? 30 : undefined,
       }}
     >
+
       {el.kind === "text" && (
         <div
           style={{
