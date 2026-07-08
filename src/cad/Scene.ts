@@ -406,6 +406,10 @@ export class DocumentObject {
     this.bgRemoval = bgRemoval ? { ...bgRemoval } : undefined;
     this._bgFgMask = null;
     this._bgMaskRev = 0;
+    this.anchors = Array.isArray(anchors)
+      ? anchors
+          .map((a) => ({ x: Math.max(0, Math.min(1, a?.x ?? 0)), y: Math.max(0, Math.min(1, a?.y ?? 0)) }))
+      : [];
   }
 }
 
