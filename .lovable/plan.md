@@ -1,56 +1,45 @@
-## 01. Dokument-Inspektor: Layout vereinheitlichen
+## Ziel
 
-**Dateien:** `src/components/page/CadDocumentInspector.tsx`, `src/components/CadEditor.tsx` (die Dokument-Settings-Sektion), ggf. gemeinsame Buttons.
+Das CAD-Blatt in der Projektmappe soll wie im Screenshot aussehen und bedienbar sein: blauer gestrichelter Rahmen, blaue Eck-/Kantenpunkte und eine kompakte weiße HUB-Box mit Symbolen für Verschieben, Drehen und Skalieren. Zusätzlich bekommt das Dokumentenwerkzeug in der CAD-HUB-Box ein Löschen-Symbol.
 
-- Rahmen/Card um „Freie Skalierung" entfernen — keine Border/Background, nur linksbündige Reihe.
-- Alle Aktions-Buttons werden linksbündig untereinander (oder in einheitlicher Flex-col mit gap-1) ausgerichtet:
-  - `Skalieren (2 Punkte)`
-  - `Skalieren (Maßkette)`
-  - `Löschen`
-  - `Anker +/−` (Label „Anker+" → „Anker +/−")
-- Einheitliche Button-Optik (gleiche Größe/Variante, `justify-start`, `w-full` oder kompakt links).
-- Beide Inspektoren (Projektmappe + CAD-Oberfläche) rendern exakt dieselbe Sektion — falls zwei Kopien existieren, in eine Shared-Komponente `DocumentActionsPanel` extrahieren und in beiden nutzen.
+## Ursache
 
-## 02. Reihenfolge/Umbenennung Filter ↔ Bildbearbeitung
+In der Projektmappe laufen aktuell zwei konkurrierende Bearbeitungsschichten für `cad-view`:
 
-**Datei:** `src/components/cad/DocumentFilterPanel.tsx`, `src/cad/documentFilters.ts` (Labels).
+- `ElementView` rendert den gewünschten blauen Rahmen und eigene Handles/HUB-Buttons.
+- `CadOverlayLayer` übergibt `cad-view` zusätzlich als `externalDocs` an die Mini-CAD-Engine, wodurch die Dokumenten-HUB-Logik/Hit-Tests der Engine ebenfalls aktiv werden.
 
-- Aktuelle Sektion „Filter" (bw/grayscale/tint/free) wird zu **„Bildbearbeitung"** umbenannt — nein, umgekehrt gemäß User: die bisherige Sektion **„Filter"** heißt jetzt **„Bildbearbeitung"**? Klarstellung: User sagt „Ändere Filter zu Bildbearbeitung und Bildbearbeitung unten drunter zu Filter" → Tausch der Überschriften. Also:
-  - Obere Sektion (bisher „Filter") → Überschrift **„Bildbearbeitung"**
-  - Untere Sektion (bisher „Bildbearbeitung"/adjust) → Überschrift **„Filter"**
-- Reine Label-Änderung, Funktion bleibt gleich.
+Dadurch entsteht abweichendes Design und Events für Verschieben, Drehen, Kantenbearbeitung/Skalieren werden teilweise von der falschen Ebene abgefangen.
 
-## 03. Bildbearbeitung: Regler-Set an Vorlage anpassen
+## Umsetzung
 
-**Datei:** `src/cad/documentFilters.ts` (`AdjustParams`, `DEFAULT_ADJUST`, `applyAdjustFilter`), `src/components/cad/DocumentFilterPanel.tsx` (UI-Regler + Presets).
+1. **CAD-Blatt in der Projektmappe eindeutig über `ElementView` steuern**
+   - `cad-view` aus `externalDocs` entfernen.
+   - `externalDocs` weiterhin nur für echte PDF-/Bild-Dokumente nutzen, damit deren Snap-/Dokumentenlogik unverändert bleibt.
+   - `cad-view` im Standardmodus dauerhaft über der CAD-Overlay-Canvas halten, damit Klicks/Drag auf Rahmen, HUB und Handles sicher bei `ElementView` landen.
 
-Aktuelle 14 Regler werden durch die 30 Regler der Vorlage ersetzt, gruppiert wie im Original:
+2. **HUB-Design für CAD-Blatt auf Screenshot-Design setzen**
+   - Blauer gestrichelter Rahmen wie im Screenshot.
+   - Weiße HUB-Box oben links/oben am Rahmen mit exakt drei Symbolbuttons:
+     - Verschieben
+     - Drehen
+     - Skalieren
+   - Aktuellen „Duplizieren/Löschen“-Button beim CAD-Blatt entfernen; „Löschen“ wird durch „Skalieren“ ersetzt.
+   - PDF/Bild-HUB in der Projektmappe nicht unnötig ändern, außer falls dieselbe Komponente davon profitiert.
 
-**Gruppe „Aquarell Basis"**: paper, wash, pigment, waterEdges, splatter, lift
-**Gruppe „Vegetation Layer"**: trees, leaves, greenVar, treeDepth, twigs, grass
-**Gruppe „Architektur"**: surface, linework, facade, plaza, ao, scalePeople
-**Gruppe „Atmosphäre & Licht"**: depthFog, skyGlow, haze, sunBloom, warmth, palette
-**Gruppe „Zeichnung & Finish"**: ink, softContrast, saturation, grain, vignette, detail
+3. **Funktionen zuverlässig verdrahten**
+   - Verschieben: Drag auf CAD-Blatt/Move-Button startet die bestehende Positionsänderung.
+   - Drehen: Rotationsfunktion über bestehenden `onRotate`-Handler beibehalten.
+   - Skalieren: Button/Handles nutzen bestehende Größenlogik; Ecken bleiben proportional mit Shift.
+   - Kantenbearbeitung: Kanten-Handles bleiben aktiv und ändern die sichtbare Blattfläche wie bisher, aber ohne Event-Konflikt mit der Mini-CAD-Engine.
 
-Alle 0..100, mit Slider + Zahlanzeige, Doppelklick-Reset auf Preset-Default.
+4. **Dokumentenwerkzeug-HUB um Löschen ergänzen**
+   - In der CAD-Oberfläche (`CadEditor`) in der vorhandenen Dokumenten-HUB-Box ein `Trash2`-Symbol ergänzen.
+   - Klick löscht das selektierte Dokument aus der CAD-Szene, schließt die HUB-Box und leert die Auswahl.
+   - Falls die Projektmappen-Dokumenten-HUB (`CadOverlayLayer`) dieselbe Dokumenten-HUB anzeigt, dort optisch/funktional analog ergänzen, damit die Bedienung konsistent bleibt.
 
-**Presets** (Dropdown/Buttons): Wettbewerb, Archviz Warm, Vegetation Stark, Aquarell Landschaft, Nordic Soft, Tusche Skizze — Werte 1:1 aus Vorlage.
-
-**Rendering-Pipeline** in `documentFilters.ts` (`applyAdjustFilter`) wird komplett neu implementiert nach `App.Renderer.*` der Vorlage:
-1. Mask-Generator (green/sky/water/arch/ground/edge/dark/light/flat) via Luma/Chroma-Heuristik.
-2. `applyBaseGrade` — Kontrast, Posterize, Sättigung, Wärme, Vegetation-/Fassade-/Boden-/Sky-Remap, Depth-Fog, Vignette.
-3. Watercolor Washes (mehrfach `blurLayer` mit source-over/screen/multiply/overlay).
-4. Pigment-Blobs, Tree-Layer, Leaf-Details, Grass/Twigs.
-5. Architecture-Linework, Plaza-Linien, White-Lifts, Water-Edges.
-6. Ink/AO, Depth-Fog, Sky-Glow, Sun-Bloom, Scale-People.
-7. Paper & Grain, Detail-Recovery.
-
-Utility-Helpers (`hash`, `noise`, `fractalNoise`, `luma`, `mix`, `clamp`) werden in neue Datei `src/cad/imageAdjustPipeline.ts` ausgelagert, damit `documentFilters.ts` nicht zu groß wird. `applyAdjustFilter` delegiert dorthin.
-
-Signatur-Cache in `filterSignature` bleibt (nutzt bereits `JSON.stringify(adjust)`, deckt neue Felder automatisch ab).
-
-**Kompatibilität**: `AdjustParams` erweitert; alte gespeicherte Dokumente ohne neue Felder werden mit `{ ...DEFAULT_ADJUST, ...saved }` gemerged, damit projectStore-State nicht bricht.
-
-## Verifikation
-- Typecheck läuft automatisch.
-- Manuell: Dokument einfügen → Bildbearbeitung (obere Sektion) zeigt alle 30 Regler in 5 Gruppen; Preset „Wettbewerb" ergibt Aquarell-Archviz-Look wie Vorlage. Untere Sektion heißt „Filter" mit bw/grayscale/tint/free. Aktions-Buttons linksbündig, kein Rahmen.
+5. **Validierung nach Umsetzung**
+   - Projektmappe öffnen, CAD-Blatt auswählen: nur ein blauer Rahmen und nur die gewünschte HUB-Box sichtbar.
+   - Verschieben, Drehen, Skalieren und Kantenziehen am CAD-Blatt testen.
+   - CAD-Dokument im Dokumentenwerkzeug auswählen und Löschen-Symbol testen.
+   - Sicherstellen, dass PDF/Bild-Dokumente und CAD-Snap im Seiteneditor nicht regressieren.
