@@ -27,6 +27,7 @@ import {
   Redo2,
   Share2,
   Play,
+  Move,
   Maximize2,
   Pencil,
   Check,
@@ -2139,6 +2140,10 @@ function PageCanvas({
               rotation: rot,
               guideEdges: t.guideEdges,
             });
+          }}
+          onExternalDocDelete={(id) => {
+            projectStore.deleteElement(projectId, page.id, id);
+            onSelect(undefined);
           }}
 
         />

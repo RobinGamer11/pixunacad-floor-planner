@@ -8,7 +8,7 @@
  * PDFs/Bilder) — analog zur Hub-Box in der CAD-Hauptseite (Move/Rotate).
  */
 import { useEffect, useRef, useState } from "react";
-import { Move, RotateCw, Scaling, Scissors } from "lucide-react";
+import { Move, RotateCw, Scaling, Scissors, Trash2 } from "lucide-react";
 import { MiniCad, type MiniTool } from "@/cad/embed/MiniCad";
 import type { MiniCadSelectionInfo } from "@/cad/embed/MiniCad";
 import type { HatchDrawMode } from "@/cad/HatchTool";
@@ -48,6 +48,8 @@ interface Props {
     id: string,
     t: { xMM: number; yMM: number; wMM: number; hMM: number; rotationDeg: number; guideEdges: { top: boolean; right: boolean; bottom: boolean; left: boolean } },
   ) => void;
+  /** Callback, wenn ein externes Projektmappen-Dokument über die HUB-Box gelöscht wird. */
+  onExternalDocDelete?: (id: string) => void;
 
   lineColor?: string;
   lineThicknessMm?: number;
@@ -77,7 +79,7 @@ export default function CadOverlayLayer(props: Props) {
   const {
     pageWidthMm, pageHeightMm, basePxPerMm, pageMarginsMm,
     zoom, activeTool, enabled, initialState, onChange, onSelectionChange, onEngineReady,
-    externalDocs, onExternalDocChange,
+    externalDocs, onExternalDocChange, onExternalDocDelete,
     lineColor, lineThicknessMm, lineAlpha, guideColor, guidesLocked, multiSelectMode,
     textColor, textFontSizePx, textBold, textItalic, textAlpha, textAlign,
     textBgColor, textBgAlphaPct, textWrap, textAutoSize, textBorderEnabled, textBorderColor, textBorderWidthPx,
@@ -111,6 +113,8 @@ export default function CadOverlayLayer(props: Props) {
   onSelectionChangeRef.current = onSelectionChange;
   const onExternalDocChangeRef = useRef(onExternalDocChange);
   onExternalDocChangeRef.current = onExternalDocChange;
+  const onExternalDocDeleteRef = useRef(onExternalDocDelete);
+  onExternalDocDeleteRef.current = onExternalDocDelete;
 
   // Hub-Box state (mirrors engine.documentHubState).
   const [docHub, setDocHub] = useState<{ visible: boolean; screenX: number; screenY: number; docId: string | null; mode: "none" | "move" | "rotate" | "scale" | "crop"; cropSide: "top" | "right" | "bottom" | "left" | null }>({ visible: false, screenX: 0, screenY: 0, docId: null, mode: "none", cropSide: null });
@@ -313,6 +317,21 @@ export default function CadOverlayLayer(props: Props) {
     }
   };
 
+  const applyDelete = () => {
+    const e: any = engineRef.current;
+    if (!e || !docHub.docId) return;
+    const doc = e.scene.getDocumentById(docHub.docId);
+    if (!doc) return;
+    if ((doc as any)._snapOnly) {
+      onExternalDocDeleteRef.current?.(docHub.docId);
+    } else {
+      e.scene.removeDocument(doc);
+      e.clearSelection?.();
+      e._changeDirty = true;
+    }
+    closeDocHub();
+  };
+
   // cycleAnchor entfernt — der Hub-Button „Anker wechseln" wurde aus dem UI
   // genommen, damit der Dokumenten-Hub kompakt bleibt.
   void 0;
@@ -418,6 +437,14 @@ export default function CadOverlayLayer(props: Props) {
                 <Scissors size={14} />
               </button>
             )}
+            <button
+              type="button"
+              title="Dokument löschen"
+              onClick={applyDelete}
+              style={{ ...hubBtnStyle, color: "hsl(0 65% 50%)" }}
+            >
+              <Trash2 size={14} />
+            </button>
           </div>
         )}
         {/* LineHub */}

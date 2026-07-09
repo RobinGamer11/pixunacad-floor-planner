@@ -1299,6 +1299,13 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               closeHub();
             }
           };
+          const applyDelete = () => {
+            if (!app || !doc) return;
+            app.scene.removeDocument(doc);
+            app.clearSelection();
+            app.refreshLabelUI();
+            closeHub();
+          };
           return (
             <div
               className="absolute z-30 flex items-center gap-1.5 px-2 py-1.5 rounded-md shadow-lg"
@@ -1417,6 +1424,15 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                   ) : null}
                 </>
               )}
+              <button
+                type="button"
+                title="Dokument löschen"
+                onClick={applyDelete}
+                className="cad-toolbar-btn h-7 w-7 justify-center px-0"
+                style={{ color: "hsl(0 65% 50%)" }}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
             </div>
           );
         })()}
