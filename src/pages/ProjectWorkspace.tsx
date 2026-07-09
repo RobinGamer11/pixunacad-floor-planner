@@ -2257,6 +2257,7 @@ function ElementView({
 }) {
 
   const dragRef = useRef<{ x: number; y: number } | null>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
   const rotateRef = useRef<HTMLDivElement | null>(null);
 
   const startDrag = (e: React.MouseEvent) => {
@@ -2293,7 +2294,7 @@ function ElementView({
     if (readOnly || !onRotate) return;
     e.stopPropagation();
     e.preventDefault();
-    const node = rotateRef.current?.parentElement;
+    const node = rootRef.current;
     if (!node) return;
     const rect = node.getBoundingClientRect();
     const cx = rect.left + rect.width / 2;
@@ -2325,6 +2326,7 @@ function ElementView({
 
   return (
     <div
+      ref={rootRef}
       onMouseDown={handleMouseDown}
       className="absolute"
       style={{
@@ -2456,15 +2458,26 @@ function ElementView({
                 <Move size={14} />
               </button>
             )}
-            <button
-              data-hub-control
-              onClick={(e) => { e.stopPropagation(); onRotate?.(15); }}
-              title="Drehen +15°"
-              className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
-              style={{ color: isCadView ? hubBlue : undefined }}
-            >
-              <RotateCw size={14} />
-            </button>
+            {isCadView ? (
+              <button
+                data-hub-control
+                onMouseDown={handleRotateStart}
+                title="Drehen (ziehen)"
+                className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
+                style={{ color: hubBlue }}
+              >
+                <RotateCw size={14} />
+              </button>
+            ) : (
+              <button
+                data-hub-control
+                onClick={(e) => { e.stopPropagation(); onRotate?.(15); }}
+                title="Drehen +15°"
+                className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
+              >
+                <RotateCw size={14} />
+              </button>
+            )}
             {isCadView ? (
               <button
                 data-hub-control
