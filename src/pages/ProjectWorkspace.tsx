@@ -2114,7 +2114,7 @@ function PageCanvas({
           onSelectionChange={onCadSelectionChange}
           onEngineReady={onCadEngineReady}
           externalDocs={page.elements
-            .filter((e) => e.kind === "cad-view" || e.kind === "pdf" || e.kind === "image")
+            .filter((e) => e.kind === "pdf" || e.kind === "image")
             .map((e) => ({
               id: e.id,
               xMM: ((e.x ?? 0) / 100) * fmt.w,
@@ -2254,12 +2254,10 @@ function ElementView({
   const dragRef = useRef<{ x: number; y: number } | null>(null);
   const rotateRef = useRef<HTMLDivElement | null>(null);
 
-  const handleMouseDown = (e: React.MouseEvent) => {
+  const startDrag = (e: React.MouseEvent) => {
     if (readOnly) return;
-    // Don't start a drag when the user clicks an interactive control inside the hub.
-    const t = e.target as HTMLElement;
-    if (t.closest("[data-hub-control]")) return;
     e.stopPropagation();
+    e.preventDefault();
     onSelect?.({ shift: e.shiftKey });
     dragRef.current = { x: e.clientX, y: e.clientY };
     const handleMove = (ev: MouseEvent) => {
@@ -2276,6 +2274,14 @@ function ElementView({
     };
     window.addEventListener("mousemove", handleMove);
     window.addEventListener("mouseup", handleUp);
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (readOnly) return;
+    // Don't start a drag when the user clicks an interactive control inside the hub.
+    const t = e.target as HTMLElement;
+    if (t.closest("[data-hub-control]")) return;
+    startDrag(e);
   };
 
   const handleRotateStart = (e: React.MouseEvent) => {
@@ -2329,7 +2335,7 @@ function ElementView({
         border: el.border ? "1px solid hsl(var(--ink))" : undefined,
         transform: el.rotation ? `rotate(${el.rotation}deg)` : undefined,
         transformOrigin: "center center",
-        zIndex: showHub ? 80 : (elevated ? 30 : undefined),
+        zIndex: isCadView ? (showHub ? 90 : 40) : (showHub ? 80 : (elevated ? 30 : undefined)),
       }}
     >
 
@@ -2384,50 +2390,67 @@ function ElementView({
 
       {showHub && (
         <>
-          {/* Rotation stem — für CAD-Blatt und PDF identisch; nur die Farbe unterscheidet sich. */}
-          <div
-            ref={rotateRef}
-            data-hub-control
-            onMouseDown={handleRotateStart}
-            title="Drehen (ziehen)"
-            className="absolute"
-            style={{
-              left: "50%",
-              top: -28,
-              transform: "translateX(-50%)",
-              width: 14,
-              height: 14,
-              borderRadius: 999,
-              background: isCadView ? hubBlue : "hsl(var(--accent-gold))",
-              border: "2px solid white",
-              boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
-              cursor: "grab",
-            }}
-          />
-          <div
-            className="absolute pointer-events-none"
-            style={{
-              left: "50%",
-              top: -14,
-              width: 1,
-              height: 14,
-              background: isCadView ? hubBlue : "hsl(var(--accent-gold))",
-              transform: "translateX(-50%)",
-            }}
-          />
+          {!isCadView && (
+            <>
+              {/* Rotation stem — für PDF/Bild beibehalten. */}
+              <div
+                ref={rotateRef}
+                data-hub-control
+                onMouseDown={handleRotateStart}
+                title="Drehen (ziehen)"
+                className="absolute"
+                style={{
+                  left: "50%",
+                  top: -28,
+                  transform: "translateX(-50%)",
+                  width: 14,
+                  height: 14,
+                  borderRadius: 999,
+                  background: "hsl(var(--accent-gold))",
+                  border: "2px solid white",
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
+                  cursor: "grab",
+                }}
+              />
+              <div
+                className="absolute pointer-events-none"
+                style={{
+                  left: "50%",
+                  top: -14,
+                  width: 1,
+                  height: 14,
+                  background: "hsl(var(--accent-gold))",
+                  transform: "translateX(-50%)",
+                }}
+              />
+            </>
+          )}
           {/* Hub action bar — CAD-Blatt und PDF haben dieselben Aktionen. */}
           <div
             data-hub-control
             className="absolute flex items-center gap-1 rounded-md shadow-md"
             style={{
-              right: 0,
-              top: -36,
+              left: isCadView ? 14 : undefined,
+              right: isCadView ? undefined : 0,
+              top: isCadView ? 14 : -36,
               background: "white",
               border: `1px solid ${isCadView ? hubBlue : "hsl(var(--hairline))"}`,
               padding: 3,
+              zIndex: 10,
             }}
             onMouseDown={(e) => e.stopPropagation()}
           >
+            {isCadView && (
+              <button
+                data-hub-control
+                onMouseDown={(e) => startDrag(e)}
+                title="Verschieben"
+                className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
+                style={{ color: hubBlue }}
+              >
+                <Move size={14} />
+              </button>
+            )}
             <button
               data-hub-control
               onClick={(e) => { e.stopPropagation(); onRotate?.(15); }}
@@ -2437,24 +2460,53 @@ function ElementView({
             >
               <RotateCw size={14} />
             </button>
-            <button
-              data-hub-control
-              onClick={(e) => { e.stopPropagation(); onDuplicate?.(); }}
-              title="Duplizieren"
-              className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
-              style={{ color: isCadView ? hubBlue : undefined }}
-            >
-              <Copy size={14} />
-            </button>
-            <button
-              data-hub-control
-              onClick={(e) => { e.stopPropagation(); onDelete?.(); }}
-              title="Löschen"
-              className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
-              style={{ color: "hsl(0 65% 50%)" }}
-            >
-              <Trash2 size={14} />
-            </button>
+            {isCadView ? (
+              <button
+                data-hub-control
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  let last = { x: e.clientX, y: e.clientY };
+                  const move = (ev: MouseEvent) => {
+                    const dx = ev.clientX - last.x;
+                    const dy = ev.clientY - last.y;
+                    last = { x: ev.clientX, y: ev.clientY };
+                    onCornerDrag?.("br", dx, dy, ev.shiftKey);
+                  };
+                  const up = () => {
+                    window.removeEventListener("mousemove", move);
+                    window.removeEventListener("mouseup", up);
+                  };
+                  window.addEventListener("mousemove", move);
+                  window.addEventListener("mouseup", up);
+                }}
+                title="Skalieren (ziehen)"
+                className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
+                style={{ color: hubBlue }}
+              >
+                <Maximize2 size={14} />
+              </button>
+            ) : (
+              <>
+                <button
+                  data-hub-control
+                  onClick={(e) => { e.stopPropagation(); onDuplicate?.(); }}
+                  title="Duplizieren"
+                  className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
+                >
+                  <Copy size={14} />
+                </button>
+                <button
+                  data-hub-control
+                  onClick={(e) => { e.stopPropagation(); onDelete?.(); }}
+                  title="Löschen"
+                  className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
+                  style={{ color: "hsl(0 65% 50%)" }}
+                >
+                  <Trash2 size={14} />
+                </button>
+              </>
+            )}
           </div>
 
           {/* Edge-Drag-Handles — Farbe passt zum Hub */}
