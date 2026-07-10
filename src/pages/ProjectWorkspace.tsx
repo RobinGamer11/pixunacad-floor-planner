@@ -4803,5 +4803,298 @@ function PrintPanel({
 }
 
 
+/* ---------- PresenterOverlay ---------- */
+/**
+ * Fullscreen-Präsentationsmodus:
+ * - Zeigt die aktive Seite formatfüllend zentriert.
+ * - Wischen/Ziehen horizontal → nächste / vorherige Seite.
+ * - Pfeiltasten / Leertaste → Navigation. ESC oder Wisch nach oben → Ende.
+ * - Wisch nach unten → Karussell-Ansicht (Cover-Flow-artig), Klick wählt Seite.
+ */
+function PresenterOverlay({
+  pages,
+  initialIndex,
+  projectId,
+  onClose,
+  onSelectPage,
+}: {
+  pages: import("@/lib/projectStore").ProjectPage[];
+  initialIndex: number;
+  projectId: string;
+  onClose: () => void;
+  onSelectPage: (id: string) => void;
+}) {
+  const [index, setIndex] = useState(Math.max(0, Math.min(pages.length - 1, initialIndex)));
+  const [carousel, setCarousel] = useState(false);
+  const [drag, setDrag] = useState<{ startX: number; startY: number; dx: number; dy: number } | null>(null);
+  const [viewport, setViewport] = useState({ w: window.innerWidth, h: window.innerHeight });
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  // Fullscreen API + Viewport-Beobachter.
+  useEffect(() => {
+    const el = document.documentElement;
+    if (el.requestFullscreen && !document.fullscreenElement) {
+      el.requestFullscreen().catch(() => {});
+    }
+    const onFs = () => {
+      if (!document.fullscreenElement) onClose();
+    };
+    const onResize = () => setViewport({ w: window.innerWidth, h: window.innerHeight });
+    document.addEventListener("fullscreenchange", onFs);
+    window.addEventListener("resize", onResize);
+    return () => {
+      document.removeEventListener("fullscreenchange", onFs);
+      window.removeEventListener("resize", onResize);
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    };
+  }, [onClose]);
+
+  const clampIdx = (i: number) => Math.max(0, Math.min(pages.length - 1, i));
+  const goto = (i: number) => setIndex(clampIdx(i));
+  const doExit = () => {
+    onSelectPage(pages[index]?.id ?? pages[0].id);
+    onClose();
+  };
+
+  // Keyboard
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { e.preventDefault(); doExit(); }
+      else if (e.key === "ArrowRight" || e.key === " " || e.key === "PageDown") { e.preventDefault(); goto(index + 1); }
+      else if (e.key === "ArrowLeft" || e.key === "PageUp") { e.preventDefault(); goto(index - 1); }
+      else if (e.key === "ArrowDown") { e.preventDefault(); setCarousel(true); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); setCarousel(false); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [index, pages.length]);
+
+  // Pointer drag / swipe
+  const onPointerDown = (e: React.PointerEvent) => {
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    setDrag({ startX: e.clientX, startY: e.clientY, dx: 0, dy: 0 });
+  };
+  const onPointerMove = (e: React.PointerEvent) => {
+    if (!drag) return;
+    setDrag({ ...drag, dx: e.clientX - drag.startX, dy: e.clientY - drag.startY });
+  };
+  const onPointerUp = () => {
+    if (!drag) return;
+    const { dx, dy } = drag;
+    setDrag(null);
+    const absX = Math.abs(dx), absY = Math.abs(dy);
+    const H_THRESH = Math.min(160, viewport.w * 0.15);
+    const V_THRESH = Math.min(120, viewport.h * 0.15);
+    if (absY > absX && absY > V_THRESH) {
+      if (dy < 0) doExit(); else setCarousel(true);
+      return;
+    }
+    if (absX > H_THRESH) {
+      if (dx < 0) goto(index + 1); else goto(index - 1);
+    }
+  };
+
+  const current = pages[index];
+  if (!current) return null;
+  const fmt = FORMAT_SIZES[current.format];
+  const aspect = fmt.w / fmt.h;
+  // Fit to viewport (10% padding).
+  const pad = 40;
+  const availW = viewport.w - pad * 2;
+  const availH = viewport.h - pad * 2;
+  const targetW = Math.min(availW, availH * aspect);
+  const zoomPct = (targetW / 1100) * 100;
+
+  const dragX = drag ? drag.dx : 0;
+
+  return (
+    <div
+      ref={rootRef}
+      className="fixed inset-0 z-[9999] select-none"
+      style={{ background: "#000", touchAction: "none" }}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+    >
+      {/* Hauptseite mit Nachbarn für Wisch-Vorschau */}
+      {!carousel && (
+        <div className="absolute inset-0 flex items-center justify-center overflow-hidden">
+          <div
+            className="relative flex items-center gap-16"
+            style={{
+              transform: `translateX(${dragX}px)`,
+              transition: drag ? "none" : "transform 240ms cubic-bezier(.22,.61,.36,1)",
+            }}
+          >
+            {[index - 1, index, index + 1].map((i) => {
+              const p = pages[i];
+              if (!p) return <div key={`empty-${i}`} style={{ width: targetW }} />;
+              return (
+                <div
+                  key={p.id}
+                  style={{
+                    width: targetW,
+                    pointerEvents: "none",
+                    filter: i === index ? "none" : "brightness(0.5)",
+                  }}
+                >
+                  <PageCanvas
+                    projectId={projectId}
+                    page={p}
+                    overlayOpacity={0}
+                    selectedElementIds={[]}
+                    zoom={zoomPct}
+                    activeTool={null}
+                    toolSettings={{} as any}
+                    onCommitTool={() => {}}
+                    onSelect={() => {}}
+                    onCadSelectionChange={() => {}}
+                    bare
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Karussell (Cover-Flow) */}
+      {carousel && (
+        <PresenterCarousel
+          pages={pages}
+          projectId={projectId}
+          index={index}
+          onPick={(i) => { setIndex(i); setCarousel(false); }}
+          onClose={() => setCarousel(false)}
+        />
+      )}
+
+      {/* Chrome: Seitenzähler + Hinweis */}
+      <div
+        className="absolute bottom-4 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-full text-[11px]"
+        style={{ background: "rgba(255,255,255,0.10)", color: "#fff", backdropFilter: "blur(6px)" }}
+      >
+        {index + 1} / {pages.length} · ← → Navigation · ↓ Karussell · ESC beenden
+      </div>
+      <button
+        onClick={doExit}
+        title="Beenden (ESC)"
+        className="absolute top-4 right-4 h-9 w-9 rounded-full flex items-center justify-center"
+        style={{ background: "rgba(255,255,255,0.10)", color: "#fff" }}
+      >
+        ✕
+      </button>
+    </div>
+  );
+}
+
+function PresenterCarousel({
+  pages,
+  projectId,
+  index,
+  onPick,
+  onClose,
+}: {
+  pages: import("@/lib/projectStore").ProjectPage[];
+  projectId: string;
+  index: number;
+  onPick: (i: number) => void;
+  onClose: () => void;
+}) {
+  const [center, setCenter] = useState(index);
+  useEffect(() => setCenter(index), [index]);
+  const vw = typeof window !== "undefined" ? window.innerWidth : 1200;
+  const vh = typeof window !== "undefined" ? window.innerHeight : 800;
+  const cardW = Math.min(vw * 0.42, vh * 0.55 * 1.4);
+  const gap = cardW * 0.55;
+
+  return (
+    <div className="absolute inset-0 flex flex-col items-center justify-center overflow-hidden" onClick={onClose}>
+      <div className="relative flex items-center justify-center" style={{ height: vh * 0.7, width: "100%" }} onClick={(e) => e.stopPropagation()}>
+        {pages.map((p, i) => {
+          const offset = i - center;
+          const absOff = Math.abs(offset);
+          if (absOff > 4) return null;
+          const fmt = FORMAT_SIZES[p.format];
+          const ratio = fmt.w / fmt.h;
+          const w = cardW * (1 - Math.min(0.35, absOff * 0.14));
+          const h = w / ratio;
+          const rotY = Math.max(-55, Math.min(55, -offset * 28));
+          const tx = offset * gap;
+          const z = -absOff;
+          return (
+            <button
+              key={p.id}
+              onClick={() => onPick(i)}
+              className="absolute rounded-lg overflow-hidden shadow-2xl transition-transform"
+              style={{
+                width: w,
+                height: h,
+                transform: `translateX(${tx}px) rotateY(${rotY}deg) scale(${1 - absOff * 0.06})`,
+                transformStyle: "preserve-3d",
+                zIndex: 100 + z,
+                background: "#fff",
+                border: offset === 0 ? "2px solid #fff" : "1px solid rgba(255,255,255,0.25)",
+                opacity: 1 - absOff * 0.18,
+                pointerEvents: absOff > 2 ? "none" : "auto",
+              }}
+            >
+              <div
+                style={{
+                  width: 1100,
+                  height: 1100 / ratio,
+                  transform: `scale(${w / 1100})`,
+                  transformOrigin: "top left",
+                  pointerEvents: "none",
+                }}
+              >
+                <PageCanvas
+                  projectId={projectId}
+                  page={p}
+                  overlayOpacity={0}
+                  selectedElementIds={[]}
+                  zoom={100}
+                  activeTool={null}
+                  toolSettings={{} as any}
+                  onCommitTool={() => {}}
+                  onSelect={() => {}}
+                  onCadSelectionChange={() => {}}
+                  bare
+                />
+              </div>
+              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded text-[10px]" style={{ background: "rgba(0,0,0,0.55)", color: "#fff" }}>
+                Seite {i + 1}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+      <div className="flex items-center gap-3 mt-4">
+        <button
+          onClick={() => setCenter((c) => Math.max(0, c - 1))}
+          className="h-9 w-9 rounded-full flex items-center justify-center"
+          style={{ background: "rgba(255,255,255,0.12)", color: "#fff" }}
+          title="Vorherige"
+        >
+          ‹
+        </button>
+        <div className="px-3 py-1.5 rounded-full text-[11px]" style={{ background: "rgba(255,255,255,0.10)", color: "#fff" }}>
+          Seite {center + 1} / {pages.length} · Klick zum Auswählen · ↑ oder ESC zurück
+        </div>
+        <button
+          onClick={() => setCenter((c) => Math.min(pages.length - 1, c + 1))}
+          className="h-9 w-9 rounded-full flex items-center justify-center"
+          style={{ background: "rgba(255,255,255,0.12)", color: "#fff" }}
+          title="Nächste"
+        >
+          ›
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // re-export helpful types
 export type { PageElement, ElementKind };
+
