@@ -5099,7 +5099,7 @@ function PresenterOverlay({
                     selectedElementIds={[]}
                     zoom={zoomPct}
                     activeTool={null}
-                    toolSettings={{} as any}
+                    toolSettings={DEFAULT_TOOL_SETTINGS}
                     onCommitTool={() => {}}
                     onSelect={() => {}}
                     onCadSelectionChange={() => {}}
@@ -5209,7 +5209,7 @@ function PresenterCarousel({
                   selectedElementIds={[]}
                   zoom={100}
                   activeTool={null}
-                  toolSettings={{} as any}
+                  toolSettings={DEFAULT_TOOL_SETTINGS}
                   onCommitTool={() => {}}
                   onSelect={() => {}}
                   onCadSelectionChange={() => {}}
