@@ -7,7 +7,7 @@
  * selektiert ist.
  */
 import { useEffect, useRef, useState } from "react";
-import { Maximize2, Ruler as RulerIcon, Trash2, FileText, Anchor as AnchorIcon } from "lucide-react";
+import { Anchor as AnchorIcon } from "lucide-react";
 import type { MiniCad } from "@/cad/embed/MiniCad";
 import { SelectionType } from "@/cad/constants";
 import { DocumentFilterPanel } from "@/components/cad/DocumentFilterPanel";
