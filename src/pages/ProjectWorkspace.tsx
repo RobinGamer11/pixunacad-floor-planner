@@ -390,6 +390,55 @@ export default function ProjectWorkspace() {
   const selectedElement = activePage?.elements.find((e) => e.id === selectedElementId);
   const bgPage = bgOverlay.pageId ? project?.pages.find((p) => p.id === bgOverlay.pageId) : undefined;
 
+  // Legt die importierten Seiten mit dem aktuell im rechten Panel
+  // gewählten Maßstab (docScale, z. B. "1:100") direkt im Modellbereich ab.
+  // Kein Modal mehr — der Nutzer wählt den Maßstab wie beim CAD-Blatt vor
+  // dem Import rechts über das Dropdown.
+  const placeImportedPages = (pages: ImportedPage[]) => {
+    const engine = cadEngineApiRef.current?.engine;
+    if (!engine || pages.length === 0) return;
+    const m = docScale.match(/^1\s*:\s*(\d+(?:[.,]\d+)?)$/);
+    const parsed = m ? parseFloat(m[1].replace(",", ".")) : NaN;
+    const denom = Number.isFinite(parsed) && parsed > 0 ? parsed : 100;
+    const [first, ...rest] = pages;
+    const firstW = first.widthM * denom;
+    const firstH = first.heightM * denom;
+    setActiveToolAndTab("document");
+    engine.beginDocumentPlacement({
+      src: first.src,
+      widthM: firstW,
+      heightM: firstH,
+      pixelWidth: first.pixelWidth,
+      pixelHeight: first.pixelHeight,
+      name: first.name,
+      kind: first.kind,
+      pageIndex: first.pageIndex,
+      importScaleDenom: denom,
+      pdfSourceB64: first.pdfSourceB64 || null,
+    });
+    let offX = firstW + 0.5;
+    for (const p of rest) {
+      const pw = p.widthM * denom;
+      const ph = p.heightM * denom;
+      engine.scene.createDocument({
+        name: p.name,
+        kind: p.kind,
+        src: p.src,
+        pageIndex: p.pageIndex,
+        position: { x: offX, y: 0 },
+        widthM: pw,
+        heightM: ph,
+        pixelWidth: p.pixelWidth,
+        pixelHeight: p.pixelHeight,
+        labelId: engine.activeDrawLabelId,
+        importScaleDenom: denom,
+        pdfSourceB64: p.pdfSourceB64 || null,
+      });
+      offX += pw + 0.5;
+    }
+    engine.refreshLabelUI();
+  };
+
   const handleDocumentFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     e.target.value = "";
@@ -399,9 +448,7 @@ export default function ProjectWorkspace() {
       const pages = await importFile(f);
       if (pages.length === 0) { window.alert("Keine Seiten gefunden."); return; }
       if (pages.length === 1) {
-        setScaleChoice(pages[0].kind === "pdf-page" ? "100" : "1");
-        setScaleCustom("100");
-        setScaleDialogPages(pages);
+        placeImportedPages(pages);
       } else {
         const all = new Set<number>();
         pages.forEach((_, i) => all.add(i));
