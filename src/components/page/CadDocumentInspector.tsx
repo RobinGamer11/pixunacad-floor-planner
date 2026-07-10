@@ -7,7 +7,7 @@
  * selektiert ist.
  */
 import { useEffect, useRef, useState } from "react";
-import { Anchor as AnchorIcon } from "lucide-react";
+
 import type { MiniCad } from "@/cad/embed/MiniCad";
 import { SelectionType } from "@/cad/constants";
 import { DocumentFilterPanel } from "@/components/cad/DocumentFilterPanel";
@@ -126,26 +126,6 @@ export function CadDocumentInspector({ engine }: Props) {
         </div>
       </div>
 
-      <button
-        type="button"
-        onClick={() => {
-          const app: any = engine;
-          const tool: any = app?.documentTool;
-          if (tool?.isAnchorEditing?.() && tool.anchorTargetDocId === sel.id) {
-            tool.cancel?.();
-          } else {
-            tool?.beginAnchorEdit?.(sel.id);
-          }
-        }}
-        className="w-full h-7 rounded-md border text-[11px] flex items-center justify-start gap-1.5 px-2 hover:bg-muted"
-        style={{
-          borderColor: phase === "anchor-edit" ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
-          background: phase === "anchor-edit" ? "hsl(var(--accent-gold) / 0.12)" : undefined,
-        }}
-        title="Anker (Fangpunkte) am Dokument setzen — Klick platziert (mit Snap), erneuter Klick auf einen Anker entfernt ihn."
-      >
-        <AnchorIcon size={12} /> {phase === "anchor-edit" ? "Anker beenden" : "Anker +/−"}
-      </button>
 
       <DocumentFilterPanel app={engine as any} docId={sel.id} sig={filterSig} showBgRemove={false} />
 
