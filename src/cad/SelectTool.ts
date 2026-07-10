@@ -1567,6 +1567,59 @@ export class SelectTool {
     }
 
 
+    // ── Marquee-Rahmen-Auswahl ───────────────────────────────────────────
+    // Nur aktiv, wenn nichts anderes läuft (kein Drag, kein Edit, keine
+    // Sonder-Modi, kein Pan). Wird beim Aufziehen aus der Leerraum-Situation
+    // heraus entstehen — sobald der Cursor sich > 6px vom Klickpunkt bewegt.
+    {
+      const anyDrag = !!(this.dragStickerId || this.dragDocId || this.dragFreeStrokeId
+        || this.dragTextBoxId || this.dragDimId || this.dragAreaLabelHatchId
+        || this.rotateTextBoxId);
+      const anyEdit = this.isEditing();
+      const specialMode = this.app.dimensionHubMode === "move"
+        || !!this.app.bgRemoveInteraction
+        || this.app.documentHubMode !== "none";
+      const blocked = anyDrag || anyEdit || specialMode || input.isPanning || input.keys.space;
+
+      if (input.mouse.left && !blocked) {
+        if (!this.marqueeStart) {
+          this.marqueeStart = v(input.mouse.sx, input.mouse.sy);
+          // Neuer Klick → alte Marquee-Auswahl verwerfen.
+          if (this.marqueeSelectedIds.length) this.marqueeSelectedIds = [];
+        }
+        const dx = input.mouse.sx - this.marqueeStart.x;
+        const dy = input.mouse.sy - this.marqueeStart.y;
+        if (this.marqueeActive || Math.hypot(dx, dy) > 6) {
+          this.marqueeActive = true;
+          this.marqueeCurrent = v(input.mouse.sx, input.mouse.sy);
+          // Vorherige Einzel-Selektion beim Aufziehen räumen.
+          if (this.app.selection) this.app.setSelection(null);
+          this.snap = null;
+          return;
+        }
+      } else if (!input.mouse.left) {
+        if (this.marqueeActive) {
+          this._commitMarquee();
+          this.marqueeActive = false;
+          this.marqueeStart = null;
+          this.marqueeCurrent = null;
+          // Den zugehörigen Click-Release schlucken, damit nicht direkt
+          // wieder setSelection(null) im Fallthrough getriggert wird.
+          input.clicked = false;
+          input.doubleClicked = false;
+          return;
+        }
+        this.marqueeStart = null;
+      } else if (blocked) {
+        // Etwas hat begonnen (z.B. Drag) → Marquee-Ansatz verwerfen.
+        this.marqueeStart = null;
+        this.marqueeCurrent = null;
+        this.marqueeActive = false;
+      }
+    }
+
+
+
     // Tür-Klick → in Door-Tool (nur Edit-Modus) wechseln & selektieren.
     if (input.clicked && !this.isEditing() && !this.dragStickerId && !this.dragDocId
         && !this.dragTextBoxId && !this.dragAreaLabelHatchId && !this.rotateTextBoxId) {
