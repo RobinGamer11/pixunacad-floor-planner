@@ -4015,9 +4015,17 @@ function CadToolSection({
   setSelectedElementId: (id?: string) => void;
   onJumpCad: (sheetId?: string) => void;
 }) {
+  const navigate = useNavigate();
   const page = project.pages.find((p) => p.id === pageId);
   const placed = (page?.elements ?? []).filter((e) => e.kind === "cad-view");
   const [chosenSheet, setChosenSheet] = useState<string>("");
+  const [pdfOpen, setPdfOpen] = useState<boolean>(false);
+  const [pdfPickedSheet, setPdfPickedSheet] = useState<string | null>(null);
+
+  const goCadForSheetPdf = (sheetId: string, mode: "view" | "frame") => {
+    if (!projectId) return;
+    navigate(`/project/${projectId}/cad?sheetPdf=${encodeURIComponent(sheetId)}&mode=${mode}`);
+  };
 
   const placeSheet = () => {
     if (!pageId || !chosenSheet) return;
