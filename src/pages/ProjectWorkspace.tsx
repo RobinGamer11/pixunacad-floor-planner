@@ -4059,11 +4059,13 @@ function CadToolSection({
   const placed = (page?.elements ?? []).filter((e) => e.kind === "cad-view");
   const [pdfOpen, setPdfOpen] = useState<boolean>(false);
   const [pdfPickedSheet, setPdfPickedSheet] = useState<string | null>(null);
+  const [pickScale, setPickScale] = useState<Record<string, string>>({});
 
-  const goCadForSheetPdf = (sheetId: string, mode: "view" | "frame") => {
+  const goCadForSheetPdf = (sheetId: string, mode: "view" | "frame", scale: string) => {
     if (!projectId) return;
-    navigate(`/project/${projectId}/cad?sheetPdf=${encodeURIComponent(sheetId)}&mode=${mode}`);
+    navigate(`/project/${projectId}/cad?sheetPdf=${encodeURIComponent(sheetId)}&mode=${mode}&scale=${encodeURIComponent(scale)}`);
   };
+
 
 
   return (
