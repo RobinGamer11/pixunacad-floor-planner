@@ -3336,7 +3336,7 @@ function ToolsTab({
         />
       )}
       {settingsTool === "document" && (
-        <DocumentToolSettings importing={!!documentImporting} onImport={onDocumentImport} />
+        <DocumentToolSettings importing={!!documentImporting} onImport={onDocumentImport} scale={docScale ?? "1:100"} onScaleChange={onDocScaleChange} />
       )}
 
       {/* CAD section */}
