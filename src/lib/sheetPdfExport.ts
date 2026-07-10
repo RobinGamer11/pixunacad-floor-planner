@@ -19,6 +19,37 @@ export async function canvasToPdfBytes(canvas: HTMLCanvasElement): Promise<Uint8
   return await pdf.save();
 }
 
+/** Schneidet einen Ausschnitt aus dem Canvas aus und packt ihn in ein einseitiges
+ *  PDF mit exakter physischer Papiergröße in mm — so wird das eingefügte Dokument
+ *  in der Projektmappe mit dem korrekten Maßstab dargestellt (z.B. 1:100 CAD-Blatt
+ *  → 5 m Welt-Region ⇒ 50 mm auf dem Papier). */
+export async function canvasRegionToPdfBytes(
+  canvas: HTMLCanvasElement,
+  srcRectPx: { x: number; y: number; w: number; h: number },
+  paperWidthMm: number,
+  paperHeightMm: number,
+): Promise<Uint8Array> {
+  const w = Math.max(1, Math.round(srcRectPx.w));
+  const h = Math.max(1, Math.round(srcRectPx.h));
+  const tmp = document.createElement("canvas");
+  tmp.width = w;
+  tmp.height = h;
+  const ctx = tmp.getContext("2d")!;
+  // Weißer Hintergrund (Canvas kann transparent sein → PDF-Import erwartet opak).
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, w, h);
+  ctx.drawImage(canvas, srcRectPx.x, srcRectPx.y, srcRectPx.w, srcRectPx.h, 0, 0, w, h);
+  const pngBytes = dataUrlToBytes(tmp.toDataURL("image/png"));
+  const pdf = await PDFDocument.create();
+  const png = await pdf.embedPng(pngBytes);
+  const MM_TO_PT = 72 / 25.4;
+  const wPt = Math.max(1, paperWidthMm * MM_TO_PT);
+  const hPt = Math.max(1, paperHeightMm * MM_TO_PT);
+  const page = pdf.addPage([wPt, hPt]);
+  page.drawImage(png, { x: 0, y: 0, width: wPt, height: hPt });
+  return await pdf.save();
+}
+
 /** Base64 → Uint8Array (kompakt, ohne Node/Buffer-Abhängigkeit). */
 export function base64ToBytes(b64: string): Uint8Array {
   const bin = atob(b64);
