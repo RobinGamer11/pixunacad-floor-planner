@@ -2500,57 +2500,13 @@ function ElementView({
     // Don't start a drag when the user clicks an interactive control inside the hub.
     const t = e.target as HTMLElement;
     if (t.closest("[data-hub-control]")) return;
-    if (el.kind === "cad-view") {
-      e.stopPropagation();
-      onSelect?.({ shift: e.shiftKey });
-      return;
-    }
     startDrag(e);
   };
 
   const handleRotateStart = (e: React.MouseEvent) => {
-    if (readOnly || (!onRotate && !(isCadView && onTransform))) return;
+    if (readOnly || !onRotate) return;
     e.stopPropagation();
     e.preventDefault();
-    if (isCadView && onTransform) {
-      const pageNode = rootRef.current?.parentElement as HTMLElement | null;
-      if (!pageNode) return;
-      const pageRect = pageNode.getBoundingClientRect();
-      const startRot = el.rotation ?? 0;
-      const patch0 = buildCadPatchAroundCorner(activeCadCorner, startRot, el.w, el.h);
-      if (!patch0) return;
-      const { sx, sy } = cornerSign(activeCadCorner);
-      const curRot = (startRot * Math.PI) / 180;
-      const curW = (el.w / 100) * pageRect.width;
-      const curH = (el.h / 100) * pageRect.height;
-      const curCenter = {
-        x: ((el.x + el.w / 2) / 100) * pageRect.width,
-        y: ((el.y + el.h / 2) / 100) * pageRect.height,
-      };
-      const local = { x: sx * curW / 2, y: sy * curH / 2 };
-      const pivot = {
-        x: curCenter.x + local.x * Math.cos(curRot) - local.y * Math.sin(curRot),
-        y: curCenter.y + local.x * Math.sin(curRot) + local.y * Math.cos(curRot),
-      };
-      const pivotClient = { x: pageRect.left + pivot.x, y: pageRect.top + pivot.y };
-      const startAngle = Math.atan2(e.clientY - pivotClient.y, e.clientX - pivotClient.x);
-      rotateMovedRef.current = false;
-      const handleMove = (ev: MouseEvent) => {
-        if (Math.hypot(ev.clientX - e.clientX, ev.clientY - e.clientY) > 3) rotateMovedRef.current = true;
-        const a = Math.atan2(ev.clientY - pivotClient.y, ev.clientX - pivotClient.x);
-        let deg = startRot + ((a - startAngle) * 180) / Math.PI;
-        if (ev.shiftKey) deg = Math.round(deg / 15) * 15;
-        const patch = buildCadPatchAroundCorner(activeCadCorner, deg, el.w, el.h, pivot);
-        if (patch) onTransform(patch);
-      };
-      const handleUp = () => {
-        window.removeEventListener("mousemove", handleMove);
-        window.removeEventListener("mouseup", handleUp);
-      };
-      window.addEventListener("mousemove", handleMove);
-      window.addEventListener("mouseup", handleUp);
-      return;
-    }
     const node = rootRef.current;
     if (!node) return;
     const rect = node.getBoundingClientRect();
@@ -2574,44 +2530,6 @@ function ElementView({
     window.addEventListener("mouseup", handleUp);
   };
 
-  const handleCadScaleStart = (e: React.MouseEvent) => {
-    if (readOnly || !isCadView || !onTransform) return;
-    e.stopPropagation();
-    e.preventDefault();
-    const pageNode = rootRef.current?.parentElement as HTMLElement | null;
-    if (!pageNode) return;
-    const pageRect = pageNode.getBoundingClientRect();
-    const startRot = el.rotation ?? 0;
-    const { sx, sy } = cornerSign(activeCadCorner);
-    const curRot = (startRot * Math.PI) / 180;
-    const curW = (el.w / 100) * pageRect.width;
-    const curH = (el.h / 100) * pageRect.height;
-    const curCenter = {
-      x: ((el.x + el.w / 2) / 100) * pageRect.width,
-      y: ((el.y + el.h / 2) / 100) * pageRect.height,
-    };
-    const local = { x: sx * curW / 2, y: sy * curH / 2 };
-    const pivot = {
-      x: curCenter.x + local.x * Math.cos(curRot) - local.y * Math.sin(curRot),
-      y: curCenter.y + local.x * Math.sin(curRot) + local.y * Math.cos(curRot),
-    };
-    const pivotClient = { x: pageRect.left + pivot.x, y: pageRect.top + pivot.y };
-    const startDist = Math.max(24, Math.hypot(e.clientX - pivotClient.x, e.clientY - pivotClient.y));
-    rotateMovedRef.current = false;
-    const handleMove = (ev: MouseEvent) => {
-      if (Math.hypot(ev.clientX - e.clientX, ev.clientY - e.clientY) > 3) rotateMovedRef.current = true;
-      const dist = Math.max(8, Math.hypot(ev.clientX - pivotClient.x, ev.clientY - pivotClient.y));
-      const factor = Math.max(0.05, Math.min(20, dist / startDist));
-      const patch = buildCadPatchAroundCorner(activeCadCorner, startRot, el.w * factor, el.h * factor, pivot);
-      if (patch) onTransform(patch);
-    };
-    const handleUp = () => {
-      window.removeEventListener("mousemove", handleMove);
-      window.removeEventListener("mouseup", handleUp);
-    };
-    window.addEventListener("mousemove", handleMove);
-    window.addEventListener("mouseup", handleUp);
-  };
 
   const hubKinds = new Set(["cad-view", "pdf", "image"]);
   const showHub = !readOnly && selected && hubKinds.has(el.kind);
