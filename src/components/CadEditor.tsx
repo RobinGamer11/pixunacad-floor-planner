@@ -219,6 +219,20 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     return () => cancelAnimationFrame(raf);
   }, [onZoomChange]);
 
+  // Melde Verfügbarkeit einer löschbaren Auswahl (für den Header-Papierkorb).
+  useEffect(() => {
+    if (!onCanDeleteChange) return;
+    let raf = 0;
+    let last = false;
+    const tick = () => {
+      const c = appRef.current?.hasDeletableSelection() ?? false;
+      if (c !== last) { last = c; onCanDeleteChange(c); }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [onCanDeleteChange]);
+
   const [activeTool, setActiveTool] = useState<string>(ToolIds.SELECT);
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(true);
   const [rightOpen, setRightOpen] = useState<boolean>(true);
