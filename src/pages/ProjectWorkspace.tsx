@@ -4059,11 +4059,13 @@ function CadToolSection({
   const placed = (page?.elements ?? []).filter((e) => e.kind === "cad-view");
   const [pdfOpen, setPdfOpen] = useState<boolean>(false);
   const [pdfPickedSheet, setPdfPickedSheet] = useState<string | null>(null);
+  const [pickScale, setPickScale] = useState<Record<string, string>>({});
 
-  const goCadForSheetPdf = (sheetId: string, mode: "view" | "frame") => {
+  const goCadForSheetPdf = (sheetId: string, mode: "view" | "frame", scale: string) => {
     if (!projectId) return;
-    navigate(`/project/${projectId}/cad?sheetPdf=${encodeURIComponent(sheetId)}&mode=${mode}`);
+    navigate(`/project/${projectId}/cad?sheetPdf=${encodeURIComponent(sheetId)}&mode=${mode}&scale=${encodeURIComponent(scale)}`);
   };
+
 
 
   return (
@@ -4092,22 +4094,49 @@ function CadToolSection({
             )}
             {project.sheets.map((s) => {
               const isActive = pdfPickedSheet === s.id;
+              const curScale = pickScale[s.id] ?? s.scale ?? "1:100";
+              const selectValue = PAGE_PLAN_SCALES.includes(curScale) ? curScale : "__other__";
               return (
                 <div key={s.id} className="space-y-1">
-                  <button
-                    type="button"
+                  <div
+                    role="button"
                     onClick={() => setPdfPickedSheet(isActive ? null : s.id)}
-                    className="w-full h-7 rounded-md text-[11px] flex items-center justify-between px-2 hover:bg-muted"
+                    className="w-full h-7 rounded-md text-[11px] flex items-center justify-between px-2 hover:bg-muted gap-2 cursor-pointer"
                     style={{ background: isActive ? "hsl(var(--surface-strong))" : undefined }}
                   >
-                    <span className="truncate">{s.name}</span>
-                    <span className="text-muted-foreground">{s.scale}</span>
-                  </button>
+                    <span className="truncate flex-1 text-left">{s.name}</span>
+                    <select
+                      value={selectValue}
+                      onClick={(ev) => ev.stopPropagation()}
+                      onMouseDown={(ev) => ev.stopPropagation()}
+                      onChange={(ev) => {
+                        ev.stopPropagation();
+                        const v = ev.target.value;
+                        if (v === "frei") {
+                          const picked = askPlanScale(curScale);
+                          if (!picked) return;
+                          setPickScale((m) => ({ ...m, [s.id]: picked }));
+                        } else if (v !== "__other__") {
+                          setPickScale((m) => ({ ...m, [s.id]: v }));
+                        }
+                      }}
+                      className="h-6 px-1 rounded bg-transparent border text-[11px] text-muted-foreground"
+                      style={{ borderColor: "hsl(var(--hairline))" }}
+                    >
+                      {!PAGE_PLAN_SCALES.includes(curScale) && (
+                        <option value="__other__">{curScale}</option>
+                      )}
+                      {PAGE_PLAN_SCALES.map((sc) => (
+                        <option key={sc} value={sc}>{sc}</option>
+                      ))}
+                      <option value="frei">frei…</option>
+                    </select>
+                  </div>
                   {isActive && (
                     <div className="grid grid-cols-2 gap-1 pl-2">
                       <button
                         type="button"
-                        onClick={() => goCadForSheetPdf(s.id, "view")}
+                        onClick={() => goCadForSheetPdf(s.id, "view", curScale)}
                         className="h-7 rounded-md border text-[10px] hover:bg-muted"
                         style={{ borderColor: "hsl(var(--hairline))" }}
                         title="Aktuell sichtbaren Ausschnitt im richtigen Maßstab einfügen"
@@ -4116,7 +4145,7 @@ function CadToolSection({
                       </button>
                       <button
                         type="button"
-                        onClick={() => goCadForSheetPdf(s.id, "frame")}
+                        onClick={() => goCadForSheetPdf(s.id, "frame", curScale)}
                         className="h-7 rounded-md border text-[10px] hover:bg-muted"
                         style={{ borderColor: "hsl(var(--hairline))" }}
                         title="Rahmen in CAD-Oberfläche aufziehen (mit Häkchen bestätigen)"
@@ -4128,6 +4157,7 @@ function CadToolSection({
                 </div>
               );
             })}
+
           </div>
         )}
       </div>

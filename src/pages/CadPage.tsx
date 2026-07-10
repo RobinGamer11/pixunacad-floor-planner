@@ -32,6 +32,7 @@ const CadPage = () => {
   const params = new URLSearchParams(location.search);
   const sheetPdfId = params.get("sheetPdf");
   const sheetPdfMode = (params.get("mode") as "view" | "frame" | null) ?? "view";
+  const sheetPdfScale = params.get("scale") ?? undefined;
   const [busy, setBusy] = useState(false);
 
   // Rahmen-Auswahl (CSS-Pixel im Fenster; wird in Canvas-Koordinaten umgerechnet).
@@ -88,7 +89,8 @@ const CadPage = () => {
     const worldWm = cssRect.w / camScale;
     const worldHm = cssRect.h / camScale;
     const sheet = project?.sheets.find((s) => s.id === sheetPdfId);
-    const scaleValue = parseSheetScale(sheet?.scale);
+    const effectiveScale = sheetPdfScale ?? sheet?.scale;
+    const scaleValue = parseSheetScale(effectiveScale);
     const paperWmm = (worldWm * 1000) / scaleValue;
     const paperHmm = (worldHm * 1000) / scaleValue;
 
@@ -102,7 +104,7 @@ const CadPage = () => {
         sheetName: sheet?.name || "CAD-Blatt",
         mode: sheetPdfMode,
         pdfBase64: bytesToBase64(bytes),
-        sheetScale: sheet?.scale,
+        sheetScale: effectiveScale,
       });
       navigate(`/project/${projectId}`);
     } catch (err: any) {
