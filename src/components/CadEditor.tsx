@@ -2880,66 +2880,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             </div>
           </div>
 
-          {/* Druckpläne wurden in den Druckmodus verschoben (Kopf → Exportieren). */}
-        </div>
-        <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-2" style={{ display: rightTab === "layers" ? "block" : "none" }}>
-          <div ref={idPanelRef} className="cad-id-panel w-full">
-            <div className="id-head">
-              <div className="id-title">Bezeichnungs-ID</div>
-              <div className="id-head-actions">
-                <button ref={idToggleBtnRef} className="id-head-btn icon-only" title="Ein-/Ausklappen">
-                  <span className="id-toggle-chevron" />
-                </button>
-              </div>
-            </div>
-            <div ref={idBodyRef} className="id-body">
-              <div className="id-add-wrap">
-                <button ref={idAddBtnRef} className="id-head-btn id-add-btn">+ ID</button>
-              </div>
-              <div ref={idListRef} className="id-list" />
-            </div>
-          </div>
-        </div>
-      </aside>
-      ) : (
-        <div
-          className="w-7 shrink-0 border-l flex items-start justify-center pt-3"
-          style={{ borderColor: "hsl(var(--hairline))", display: printOpen ? "none" : "flex" }}
-        >
-          <button
-            onClick={() => setRightOpen(true)}
-            title="Panel einblenden"
-            className="h-7 w-7 rounded-md flex items-center justify-center hover:bg-muted"
-          >
-            <PanelRightOpen size={14} style={{ color: "hsl(var(--ink-soft))" }} />
-          </button>
-        </div>
-      )}
-
-      {/* Druckmodus (rechts) — beherbergt das Druckpläne-Panel. Immer im DOM, damit die refs stabil bleiben. */}
-      <aside
-        className="shrink-0 w-[280px] h-full flex-col border-l"
-        style={{
-          background: "hsl(var(--surface-card))",
-          borderColor: "hsl(var(--hairline))",
-          display: printOpen ? "flex" : "none",
-        }}
-      >
-        <div className="flex shrink-0 border-b items-center justify-between px-2 py-2" style={{ borderColor: "hsl(var(--hairline))" }}>
-          <div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "hsl(var(--ink))" }}>
-            Druckmodus
-          </div>
-          <button
-            type="button"
-            onClick={() => setPrintOpen(false)}
-            title="Druckmodus schließen"
-            className="h-6 w-6 rounded-md flex items-center justify-center hover:bg-muted"
-            style={{ color: "hsl(var(--ink-soft))" }}
-          >
-            ✕
-          </button>
-        </div>
-        <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-2">
+          {/* Druckpläne — direkt im Sheets-Tab, unterhalb der Zeichenblätter. */}
           <div ref={planPanelRef} className="cad-id-panel w-full">
             <div className="id-head">
               <div className="id-title">Druckpläne</div>
@@ -2965,7 +2906,28 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             </div>
           </div>
         </div>
+        <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-2" style={{ display: rightTab === "layers" ? "block" : "none" }}>
+          <div ref={idPanelRef} className="cad-id-panel w-full">
+            <div className="id-head">
+              <div className="id-title">Bezeichnungs-ID</div>
+              <div className="id-head-actions">
+                <button ref={idToggleBtnRef} className="id-head-btn icon-only" title="Ein-/Ausklappen">
+                  <span className="id-toggle-chevron" />
+                </button>
+              </div>
+            </div>
+            <div ref={idBodyRef} className="id-body">
+              <div className="id-add-wrap">
+                <button ref={idAddBtnRef} className="id-head-btn id-add-btn">+ ID</button>
+              </div>
+              <div ref={idListRef} className="id-list" />
+            </div>
+          </div>
+        </div>
       </aside>
+      ) : (
+        <div
+          className="w-7 shrink-0 border-l flex items-start justify-center pt-3"
     </div>
   );
 });
