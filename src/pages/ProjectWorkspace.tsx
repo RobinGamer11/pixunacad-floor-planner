@@ -60,6 +60,8 @@ import {
   BookOpen,
   Lock as LockIcon,
   Unlock as UnlockIcon,
+  BoxSelect,
+  SquareDashed,
 } from "lucide-react";
 
 import {
