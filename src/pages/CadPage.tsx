@@ -11,6 +11,7 @@ const CadPage = () => {
   const mainRef = useRef<HTMLElement | null>(null);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
+  const [canDelete, setCanDelete] = useState(false);
   const [zoom, setZoom] = useState<number | undefined>(undefined);
 
   const handlePresent = () => {
@@ -33,6 +34,8 @@ const CadPage = () => {
         canRedo={canRedo}
         onUndo={() => editorRef.current?.undo()}
         onRedo={() => editorRef.current?.redo()}
+        canDelete={canDelete}
+        onDelete={() => editorRef.current?.deleteSelection()}
         zoomPercent={zoom}
         onPresent={handlePresent}
         onShare={() => {}}
@@ -44,6 +47,7 @@ const CadPage = () => {
           projectId={projectId}
           onHistoryChange={(u, r) => { setCanUndo(u); setCanRedo(r); }}
           onZoomChange={setZoom}
+          onCanDeleteChange={setCanDelete}
         />
       </main>
     </div>
@@ -51,4 +55,3 @@ const CadPage = () => {
 };
 
 export default CadPage;
-
