@@ -1295,6 +1295,7 @@ export default function ProjectWorkspace() {
                       onCommitTool={() => setActiveTool(null)}
                       selectedElementIds={selectedElementIds}
                       onSelect={handleSelect}
+                      onMultiSelect={(ids) => { setSelectedElementIds(ids); setSelectedCadTool(undefined); setRightTab("tools"); }}
                       onCadSelectionChange={handleCadSelection}
                       onCadEngineReady={(api) => { cadEngineApiRef.current = api; forceEngineTick(t => t + 1); }}
                       onJumpCad={(sheetId) => navigate(`/project/${project.id}/cad${sheetId ? `/${sheetId}` : ""}`)}
