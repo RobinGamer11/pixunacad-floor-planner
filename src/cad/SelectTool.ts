@@ -154,6 +154,10 @@ export class SelectTool {
     this.app.renderer.setHoverTextBoxId(null);
     this.app.hub.hide();
     this.app.pointEditMenu.hide();
+    this.marqueeStart = null;
+    this.marqueeCurrent = null;
+    this.marqueeActive = false;
+    this.marqueeSelectedIds = [];
     this.app.renderer.overlay = { draw: (ctx, cam) => this._drawOverlay(ctx, cam) };
   }
 
