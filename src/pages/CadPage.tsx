@@ -198,12 +198,18 @@ const CadPage = () => {
           onCanDeleteChange={setCanDelete}
         />
 
-        {/* Rahmen-Overlay: fängt Maus-Events, damit der Nutzer einen Ausschnitt
-            aufziehen kann. Nur aktiv im 'frame'-Modus. */}
+        {/* Rahmen-Overlay: Standardmäßig transparent für Pointer-Events, damit
+            der Nutzer sich frei in der CAD-Oberfläche bewegen kann (Pan/Zoom).
+            Erst wenn "Rahmen ziehen" gedrückt wurde, fängt das Overlay einen
+            einzigen Aufzieh-Vorgang ab. */}
         {sheetPdfId && sheetPdfMode === "frame" && (
           <div
             className="absolute inset-0 z-40"
-            style={{ cursor: "crosshair", background: "rgba(0,0,0,0.02)" }}
+            style={{
+              cursor: frameArmed ? "crosshair" : "default",
+              background: frameArmed ? "rgba(0,0,0,0.02)" : "transparent",
+              pointerEvents: frameArmed ? "auto" : "none",
+            }}
             onPointerDown={onFramePointerDown}
             onPointerMove={onFramePointerMove}
             onPointerUp={onFramePointerUp}
@@ -228,6 +234,7 @@ const CadPage = () => {
             })()}
           </div>
         )}
+
 
         {sheetPdfId && (
           <div
