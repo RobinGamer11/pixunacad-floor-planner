@@ -4090,39 +4090,7 @@ function CadToolSection({
   return (
     <div className="space-y-3">
 
-      <div>
-        <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-2">
-          ZEICHENBLATT WÄHLEN
-        </div>
-        <div className="flex gap-2">
-          <select
-            value={chosenSheet}
-            onChange={(e) => setChosenSheet(e.target.value)}
-            className="flex-1 h-8 px-2 rounded bg-transparent border text-sm"
-            style={{ borderColor: "hsl(var(--hairline))" }}
-          >
-            <option value="">— Zeichenblatt —</option>
-            {project.sheets.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name} · {s.scale}
-              </option>
-            ))}
-          </select>
-          <button
-            disabled={!chosenSheet || !pageId}
-            onClick={placeSheet}
-            className="h-8 px-3 rounded text-sm font-medium disabled:opacity-40"
-            style={{ background: "hsl(var(--accent-gold))", color: "white" }}
-          >
-            Einfügen
-          </button>
-        </div>
-        {project.sheets.length === 0 && (
-          <div className="text-[11px] text-muted-foreground mt-2">
-            Noch keine Zeichenblätter vorhanden — wechsle in die CAD-Oberfläche.
-          </div>
-        )}
-      </div>
+
 
       {/* CAD-Blatt als PDF einfügen (verschoben aus dem Dokument-Werkzeug). */}
       <div>
