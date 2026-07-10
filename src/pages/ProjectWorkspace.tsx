@@ -3584,21 +3584,6 @@ function EbeneSelect({ engine }: { engine: import("@/cad/embed/MiniCad").MiniCad
 }
 
 function DocumentToolSettings({ importing, onImport }: { importing: boolean; onImport?: () => void }) {
-  const navigate = useNavigate();
-  const { projectId } = useParams();
-  const project = useProject(projectId);
-  const [sheetsOpen, setSheetsOpen] = React.useState(false);
-  const [pickedSheet, setPickedSheet] = React.useState<string | null>(null);
-  const sheets = project?.sheets ?? [];
-  // Aktuell aktive Seite der Projektmappe → wird für die Rückkehr benötigt.
-  // (Der Handler in CadPage schreibt das PDF in sessionStorage und navigiert
-  // dann zurück nach /project/:id, wo die Projektmappe es aufnimmt.)
-  const goCadForSheetPdf = (sheetId: string, mode: "full" | "view" | "frame") => {
-    if (!projectId) return;
-    const returnPageId = window.location.hash || ""; // nicht verwendet
-    void returnPageId;
-    navigate(`/project/${projectId}/cad?sheetPdf=${encodeURIComponent(sheetId)}&mode=${mode}`);
-  };
   return (
     <SettingsBlock title="DOKUMENT IMPORTIEREN">
       <button
@@ -3612,67 +3597,6 @@ function DocumentToolSettings({ importing, onImport }: { importing: boolean; onI
         <FileImage size={14} />
         {importing ? "Importiere…" : "Datei importieren"}
       </button>
-
-      {/* CAD-Blatt als PDF einfügen */}
-      <div className="pt-2 mt-2 border-t" style={{ borderColor: "hsl(var(--hairline))" }}>
-        <button
-          type="button"
-          onClick={() => setSheetsOpen((v) => !v)}
-          className="w-full h-9 rounded-md border text-xs flex items-center justify-between gap-2 px-2"
-          style={{ borderColor: "hsl(var(--hairline))" }}
-          title="Ein Zeichenblatt aus der CAD-Oberfläche als PDF einfügen"
-        >
-          <span className="flex items-center gap-2"><Compass size={14} /> CAD-Blatt einfügen</span>
-          <span className="text-muted-foreground">{sheetsOpen ? "▴" : "▾"}</span>
-        </button>
-        {sheetsOpen && (
-          <div className="mt-1 rounded-md border p-1.5 space-y-1" style={{ borderColor: "hsl(var(--hairline))" }}>
-            {sheets.length === 0 && (
-              <div className="text-[11px] text-muted-foreground px-1 py-2">
-                Noch keine Zeichenblätter. In der CAD-Oberfläche anlegen.
-              </div>
-            )}
-            {sheets.map((s) => {
-              const isActive = pickedSheet === s.id;
-              return (
-                <div key={s.id} className="space-y-1">
-                  <button
-                    type="button"
-                    onClick={() => setPickedSheet(isActive ? null : s.id)}
-                    className="w-full h-7 rounded-md text-[11px] flex items-center justify-between px-2 hover:bg-muted"
-                    style={{ background: isActive ? "hsl(var(--surface-strong))" : undefined }}
-                  >
-                    <span className="truncate">{s.name}</span>
-                    <span className="text-muted-foreground">{s.scale}</span>
-                  </button>
-                  {isActive && (
-                    <div className="grid grid-cols-2 gap-1 pl-2">
-                      <button
-                        type="button"
-                        onClick={() => goCadForSheetPdf(s.id, "view")}
-                        className="h-7 rounded-md border text-[10px] hover:bg-muted"
-                        style={{ borderColor: "hsl(var(--hairline))" }}
-                        title="Aktuell sichtbaren Ausschnitt im richtigen Maßstab einfügen"
-                      >
-                        Ansicht
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => goCadForSheetPdf(s.id, "frame")}
-                        className="h-7 rounded-md border text-[10px] hover:bg-muted"
-                        style={{ borderColor: "hsl(var(--hairline))" }}
-                        title="Rahmen in CAD-Oberfläche aufziehen (mit Häkchen bestätigen)"
-                      >
-                        Rahmen
-                      </button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
 
       <div className="text-[11px] leading-relaxed text-muted-foreground pt-2 border-t" style={{ borderColor: "hsl(var(--hairline))" }}>
         <div>PDF, JPG, PNG werden mit 96 DPI / 72 pt importiert.</div>
