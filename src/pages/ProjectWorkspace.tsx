@@ -3480,16 +3480,60 @@ function DocumentToolSettings({
 
 
 function SelectSettings({
+  settings,
+  onChange,
   selectedCount,
-
 }: {
   settings: ToolSettings["select"];
   onChange: (p: Partial<ToolSettings["select"]>) => void;
   selectedCount: number;
 }) {
-  void selectedCount;
-  return null;
+  const mode = settings.marqueeMode;
+  return (
+    <SettingsBlock title="AUSWAHL">
+      <Row label="Rahmen-Modus">
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => onChange({ marqueeMode: "touch" })}
+            className="h-8 w-8 rounded-md border flex items-center justify-center"
+            style={{
+              borderColor: mode === "touch" ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
+              background: mode === "touch" ? "hsl(var(--accent-gold-soft))" : "transparent",
+            }}
+            title="Berühren: Objekte werden ausgewählt, sobald sie den Rahmen berühren (Crossing)"
+            aria-label="Rahmen-Modus: Berühren"
+          >
+            <SquareDashed size={14} />
+          </button>
+          <button
+            type="button"
+            onClick={() => onChange({ marqueeMode: "enclose" })}
+            className="h-8 w-8 rounded-md border flex items-center justify-center"
+            style={{
+              borderColor: mode === "enclose" ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
+              background: mode === "enclose" ? "hsl(var(--accent-gold-soft))" : "transparent",
+            }}
+            title="Vollständig einschließen: Nur Objekte, die komplett im Rahmen liegen (Window)"
+            aria-label="Rahmen-Modus: Einschließen"
+          >
+            <BoxSelect size={14} />
+          </button>
+        </div>
+      </Row>
+      <div className="text-[11px] text-muted-foreground leading-relaxed">
+        {mode === "touch"
+          ? "Ziehen Sie mit gedrückter Maustaste auf freier Blattfläche einen Rahmen — alle berührten Objekte werden ausgewählt."
+          : "Ziehen Sie einen Rahmen — nur Objekte, die vollständig im Rahmen liegen, werden ausgewählt."}
+        {" "}Auswahl mit <strong>Entf</strong> löschen.
+      </div>
+      {selectedCount > 0 && (
+        <div className="text-[11px] text-muted-foreground">Aktuell {selectedCount} Objekt(e) ausgewählt.</div>
+      )}
+    </SettingsBlock>
+  );
 }
+
 
 function GuideSettings({
   settings,
