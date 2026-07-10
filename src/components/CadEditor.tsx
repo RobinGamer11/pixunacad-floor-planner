@@ -69,7 +69,7 @@ interface CadEditorProps {
   onZoomChange?: (percent: number) => void;
   onCanDeleteChange?: (canDelete: boolean) => void;
 }
-const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId, onHistoryChange, onZoomChange }, ref) => {
+const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId, onHistoryChange, onZoomChange, onCanDeleteChange }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const hubRef = useRef<HTMLDivElement>(null);
