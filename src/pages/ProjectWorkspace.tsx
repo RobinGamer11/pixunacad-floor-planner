@@ -4083,6 +4083,69 @@ function CadToolSection({
         )}
       </div>
 
+      {/* CAD-Blatt als PDF einfügen (verschoben aus dem Dokument-Werkzeug). */}
+      <div>
+        <button
+          type="button"
+          onClick={() => setPdfOpen((v) => !v)}
+          className="w-full h-9 rounded-md border text-xs flex items-center justify-between gap-2 px-2"
+          style={{ borderColor: "hsl(var(--hairline))" }}
+          title="Ein Zeichenblatt aus der CAD-Oberfläche als PDF einfügen"
+        >
+          <span className="flex items-center gap-2"><CompassIcon size={14} /> CAD-Blatt als PDF einfügen</span>
+          <span className="text-muted-foreground">{pdfOpen ? "▴" : "▾"}</span>
+        </button>
+        {pdfOpen && (
+          <div className="mt-1 rounded-md border p-1.5 space-y-1" style={{ borderColor: "hsl(var(--hairline))" }}>
+            {project.sheets.length === 0 && (
+              <div className="text-[11px] text-muted-foreground px-1 py-2">
+                Noch keine Zeichenblätter. In der CAD-Oberfläche anlegen.
+              </div>
+            )}
+            {project.sheets.map((s) => {
+              const isActive = pdfPickedSheet === s.id;
+              return (
+                <div key={s.id} className="space-y-1">
+                  <button
+                    type="button"
+                    onClick={() => setPdfPickedSheet(isActive ? null : s.id)}
+                    className="w-full h-7 rounded-md text-[11px] flex items-center justify-between px-2 hover:bg-muted"
+                    style={{ background: isActive ? "hsl(var(--surface-strong))" : undefined }}
+                  >
+                    <span className="truncate">{s.name}</span>
+                    <span className="text-muted-foreground">{s.scale}</span>
+                  </button>
+                  {isActive && (
+                    <div className="grid grid-cols-2 gap-1 pl-2">
+                      <button
+                        type="button"
+                        onClick={() => goCadForSheetPdf(s.id, "view")}
+                        className="h-7 rounded-md border text-[10px] hover:bg-muted"
+                        style={{ borderColor: "hsl(var(--hairline))" }}
+                        title="Aktuell sichtbaren Ausschnitt im richtigen Maßstab einfügen"
+                      >
+                        Ansicht
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => goCadForSheetPdf(s.id, "frame")}
+                        className="h-7 rounded-md border text-[10px] hover:bg-muted"
+                        style={{ borderColor: "hsl(var(--hairline))" }}
+                        title="Rahmen in CAD-Oberfläche aufziehen (mit Häkchen bestätigen)"
+                      >
+                        Rahmen
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+
+
       {placed.length > 0 && (
         <div>
           <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-2">
