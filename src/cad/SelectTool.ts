@@ -2462,6 +2462,9 @@ export class SelectTool {
   }
 
   _drawOverlay(ctx: CanvasRenderingContext2D, cam: any) {
+    // ── Marquee-Rechteck + hervorgehobene Auswahl ──────────────────────
+    this._drawMarqueeOverlay(ctx, cam);
+
     // PDF/Bild-Hub: Live-Vorschau (Ghost) während aktivem Move/Rotate/Scale.
     {
       const mode = this.app.documentHubMode;
