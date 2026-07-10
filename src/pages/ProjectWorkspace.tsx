@@ -526,6 +526,48 @@ export default function ProjectWorkspace() {
   }, [activePage?.id, activePage?.spreadId, activePage?.format]);
 
 
+  // Löscht die aktuelle Auswahl — funktioniert für Seiten-Elemente wie auch
+  // für die eingebettete CAD-Auswahl. Wird sowohl vom Papierkorb-Button im
+  // Header als auch vom Entf-Shortcut ausgelöst.
+  const runDeleteSelection = () => {
+    if (!project) return;
+    let did = false;
+    if (activePage && selectedElementIds.length > 0) {
+      for (const id of selectedElementIds) {
+        projectStore.deleteElement(project.id, activePage.id, id);
+      }
+      setSelectedElementIds([]);
+      did = true;
+    }
+    const eng = cadEngineApiRef.current?.engine;
+    if (eng && (eng as any).hasDeletableSelection?.()) {
+      (eng as any).deleteSelection?.();
+      did = true;
+    }
+    return did;
+  };
+
+  // Entf-Shortcut auf Fenster-Ebene: nur reagieren, wenn kein Textfeld fokussiert
+  // ist und tatsächlich etwas ausgewählt ist. So bleibt der Trash-Button 1:1
+  // per Tastatur bedienbar (Projektmappe und CAD gleichermaßen).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Delete") return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      if (selectedElementIds.length === 0 && cadSelectionCount === 0) return;
+      // Wenn ausschließlich CAD-Auswahl existiert, überlassen wir es dem
+      // MiniCad-eigenen Handler (der bereits den passenden Scene-Kontext hat).
+      if (selectedElementIds.length === 0) return;
+      e.preventDefault();
+      runDeleteSelection();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedElementIds, cadSelectionCount, activePage?.id, project?.id]);
+
+
   if (!project) {
     return (
       <div className="h-screen flex items-center justify-center bg-background text-foreground">
