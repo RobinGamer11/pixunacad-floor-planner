@@ -4098,10 +4098,10 @@ function CadToolSection({
               const selectValue = PAGE_PLAN_SCALES.includes(curScale) ? curScale : "__other__";
               return (
                 <div key={s.id} className="space-y-1">
-                  <button
-                    type="button"
+                  <div
+                    role="button"
                     onClick={() => setPdfPickedSheet(isActive ? null : s.id)}
-                    className="w-full h-7 rounded-md text-[11px] flex items-center justify-between px-2 hover:bg-muted gap-2"
+                    className="w-full h-7 rounded-md text-[11px] flex items-center justify-between px-2 hover:bg-muted gap-2 cursor-pointer"
                     style={{ background: isActive ? "hsl(var(--surface-strong))" : undefined }}
                   >
                     <span className="truncate flex-1 text-left">{s.name}</span>
