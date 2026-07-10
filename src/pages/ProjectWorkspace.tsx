@@ -781,16 +781,9 @@ export default function ProjectWorkspace() {
             onConfirm={confirmDocumentPagePicker}
           />
         )}
-        {scaleDialogPages && (
-          <DocumentScaleDialog
-            choice={scaleChoice}
-            custom={scaleCustom}
-            onChoice={setScaleChoice}
-            onCustom={setScaleCustom}
-            onCancel={() => setScaleDialogPages(null)}
-            onConfirm={confirmDocumentScale}
-          />
-        )}
+        {/* Maßstab-Modal entfernt — Maßstab wird jetzt rechts im "Dokument"-
+            Werkzeug-Panel per Dropdown vor dem Import gewählt. */}
+
         <ToolRailButton icon={<TableIcon size={18} />} label="Tabelle" disabled />
         <ToolRailButton icon={<StickyNote size={18} />} label="Notiz" disabled />
         <ToolRailButton icon={<Clock size={18} />} label="Zeitstrahl" disabled />
