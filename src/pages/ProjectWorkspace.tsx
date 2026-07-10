@@ -412,6 +412,32 @@ export default function ProjectWorkspace() {
     }
   };
 
+  // Nach Rückkehr aus der CAD-Oberfläche: falls dort ein Zeichenblatt als PDF
+  // exportiert wurde, holen wir das Ergebnis aus sessionStorage und schleusen
+  // es durch die normale Import-Pipeline.
+  useEffect(() => {
+    if (!projectId) return;
+    const pending = popPendingSheetPdf(projectId);
+    if (!pending) return;
+    (async () => {
+      setDocImporting(true);
+      try {
+        const bytes = base64ToBytes(pending.pdfBase64);
+        const ab = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+        const file = new File([ab], `${pending.sheetName}.pdf`, { type: "application/pdf" });
+        const pages = await importFile(file);
+        if (pages.length === 0) return;
+        setScaleChoice(pages[0].kind === "pdf-page" ? "100" : "1");
+        setScaleCustom("100");
+        setScaleDialogPages(pages);
+      } catch (err: any) {
+        window.alert("Import des CAD-Blatts fehlgeschlagen: " + (err?.message || err));
+      } finally {
+        setDocImporting(false);
+      }
+    })();
+  }, [projectId]);
+
   const confirmDocumentPagePicker = () => {
     if (!docPickerPages) return;
     const selected = docPickerPages.filter((_, i) => docPickerSelected.has(i));
