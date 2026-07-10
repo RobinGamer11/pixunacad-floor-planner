@@ -1438,6 +1438,8 @@ export default function ProjectWorkspace() {
               cadSelectedLineSnap={cadSelectedLineSnap}
               documentImporting={docImporting}
               onDocumentImport={() => documentFileInputRef.current?.click()}
+              docScale={docScale}
+              onDocScaleChange={setDocScale}
               onCadLineSnapChange={(patch) => {
                 cadEngineApiRef.current?.setSelectedSegmentSnap(patch);
                 setCadSelectedLineSnap((prev) => prev ? {
