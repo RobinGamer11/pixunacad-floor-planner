@@ -3613,22 +3613,13 @@ function DocumentToolSettings({ importing, onImport }: { importing: boolean; onI
                     <span className="text-muted-foreground">{s.scale}</span>
                   </button>
                   {isActive && (
-                    <div className="grid grid-cols-3 gap-1 pl-2">
-                      <button
-                        type="button"
-                        onClick={() => goCadForSheetPdf(s.id, "full")}
-                        className="h-7 rounded-md border text-[10px] hover:bg-muted"
-                        style={{ borderColor: "hsl(var(--hairline))" }}
-                        title="Gesamtes Zeichenblatt als PDF einfügen"
-                      >
-                        Gesamt
-                      </button>
+                    <div className="grid grid-cols-2 gap-1 pl-2">
                       <button
                         type="button"
                         onClick={() => goCadForSheetPdf(s.id, "view")}
                         className="h-7 rounded-md border text-[10px] hover:bg-muted"
                         style={{ borderColor: "hsl(var(--hairline))" }}
-                        title="Nur aktuell sichtbaren Ausschnitt einfügen"
+                        title="Aktuell sichtbaren Ausschnitt im richtigen Maßstab einfügen"
                       >
                         Ansicht
                       </button>
@@ -3637,7 +3628,7 @@ function DocumentToolSettings({ importing, onImport }: { importing: boolean; onI
                         onClick={() => goCadForSheetPdf(s.id, "frame")}
                         className="h-7 rounded-md border text-[10px] hover:bg-muted"
                         style={{ borderColor: "hsl(var(--hairline))" }}
-                        title="Rahmen in CAD-Oberfläche setzen (mit Häkchen bestätigen)"
+                        title="Rahmen in CAD-Oberfläche aufziehen (mit Häkchen bestätigen)"
                       >
                         Rahmen
                       </button>
