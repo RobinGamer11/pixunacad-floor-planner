@@ -982,6 +982,23 @@ export class CadApp {
 
   clearSelection() { this.setSelection(null); }
 
+  /** True, wenn eine Löschung per Entf-Taste etwas entfernen würde. */
+  hasDeletableSelection(): boolean {
+    if (this.activePlanId && (this.planController as any)?.hasSelection?.()) return true;
+    if (this.selection) return true;
+    if (this.selectedLabelId) return true;
+    return false;
+  }
+
+  /** Programmgesteuertes Löschen der aktuellen Auswahl — identisches Verhalten
+   *  wie die Entf/Backspace-Taste. */
+  deleteSelection(): boolean {
+    const ev = new KeyboardEvent("keydown", { key: "Delete", bubbles: true });
+    try { Object.defineProperty(ev, "target", { value: document.body }); } catch {}
+    window.dispatchEvent(ev);
+    return true;
+  }
+
   getSelectedSegment() {
     if (!this.selection || !this.selection.segmentId) return null;
     return this.scene.getSegmentById(this.selection.segmentId);

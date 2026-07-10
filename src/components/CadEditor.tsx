@@ -59,14 +59,17 @@ export interface CadEditorHandle {
   redo: () => void;
   exportPdf: () => void;
   openExportPanel: () => void;
+  deleteSelection: () => void;
+  hasDeletableSelection: () => boolean;
 }
 
 interface CadEditorProps {
   projectId?: string;
   onHistoryChange?: (canUndo: boolean, canRedo: boolean) => void;
   onZoomChange?: (percent: number) => void;
+  onCanDeleteChange?: (canDelete: boolean) => void;
 }
-const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId, onHistoryChange, onZoomChange }, ref) => {
+const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId, onHistoryChange, onZoomChange, onCanDeleteChange }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const hubRef = useRef<HTMLDivElement>(null);
@@ -195,6 +198,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     redo: () => appRef.current?.redo(),
     exportPdf: () => appRef.current?.printSelectedPlans(),
     openExportPanel: () => { setPrintOpen(v => !v); },
+    deleteSelection: () => { appRef.current?.deleteSelection(); },
+    hasDeletableSelection: () => appRef.current?.hasDeletableSelection() ?? false,
   }), []);
 
   // Zoom-Anzeige nach oben spiegeln (Camera.scale, 80 = 100%).
@@ -213,6 +218,20 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, [onZoomChange]);
+
+  // Melde Verfügbarkeit einer löschbaren Auswahl (für den Header-Papierkorb).
+  useEffect(() => {
+    if (!onCanDeleteChange) return;
+    let raf = 0;
+    let last = false;
+    const tick = () => {
+      const c = appRef.current?.hasDeletableSelection() ?? false;
+      if (c !== last) { last = c; onCanDeleteChange(c); }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [onCanDeleteChange]);
 
   const [activeTool, setActiveTool] = useState<string>(ToolIds.SELECT);
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(true);

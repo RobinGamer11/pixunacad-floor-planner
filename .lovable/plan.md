@@ -1,45 +1,46 @@
-## Ziel
 
-Das CAD-Blatt in der Projektmappe soll wie im Screenshot aussehen und bedienbar sein: blauer gestrichelter Rahmen, blaue Eck-/Kantenpunkte und eine kompakte weiße HUB-Box mit Symbolen für Verschieben, Drehen und Skalieren. Zusätzlich bekommt das Dokumentenwerkzeug in der CAD-HUB-Box ein Löschen-Symbol.
+## 01 — Mülltonne-Button im Kopf (links neben Undo/Redo)
 
-## Ursache
+Ein neuer Button (`Trash2`) im `WorkspaceHeader` links vor Undo. Verhalten wie die `Entf`-Taste — löscht alle aktuell ausgewählten Objekte in Projektmappe oder CAD-Oberfläche.
 
-In der Projektmappe laufen aktuell zwei konkurrierende Bearbeitungsschichten für `cad-view`:
+- **Header (`src/components/workspace/WorkspaceHeader.tsx`):** Neue Props `canDelete: boolean`, `onDelete?: () => void`. Button ist ausgegraut (disabled) wenn `canDelete=false`.
+- **Projektmappe (`src/pages/ProjectWorkspace.tsx`):**
+  - `canDelete` = `!!selectedElementId` **oder** ein CAD-Dokument im eingebetteten Engine ist selektiert.
+  - `onDelete`: identisches Verhalten wie der bestehende Keyboard-Handler bei `Delete/Backspace` (Zeile ~1822) — dieselbe Funktion herausziehen und wiederverwenden.
+- **CAD-Oberfläche (`src/pages/CadPage.tsx`):**
+  - `canDelete` aus `app.selection` (Wand, Dokument, Textbox, Maßkette, Tür/Fenster, Sticker …) via kleines Polling/Abo wie es der Header schon für Undo/Redo hat.
+  - `onDelete`: ruft die bestehende CAD-Delete-Route auf (dieselbe, die `Entf` triggert — vermutlich `app.deleteSelection()` oder Äquivalent; wird beim Umsetzen im Code verifiziert).
 
-- `ElementView` rendert den gewünschten blauen Rahmen und eigene Handles/HUB-Buttons.
-- `CadOverlayLayer` übergibt `cad-view` zusätzlich als `externalDocs` an die Mini-CAD-Engine, wodurch die Dokumenten-HUB-Logik/Hit-Tests der Engine ebenfalls aktiv werden.
+## 02 — Dokumenten-Werkzeug: „CAD-Zeichenblatt als PDF einfügen“
 
-Dadurch entsteht abweichendes Design und Events für Verschieben, Drehen, Kantenbearbeitung/Skalieren werden teilweise von der falschen Ebene abgefangen.
+Neuer Menüpunkt im Dokumenten-Panel der Projektmappe (neben dem bestehenden Datei-Import-Button). Klick öffnet ein Dropdown mit den Zeichenblättern des Projekts (aus `cadEngine.sheetManager`). Nach Auswahl eines Zeichenblatts erscheint ein zweites Dropdown mit **Ausschnitt-Modus**:
 
-## Umsetzung
+1. **Gesamtes Zeichenblatt** — direkt exportieren.
+2. **Aktuell ausgewählte Ansicht** — nutzt den aktiven Viewport / Sheet-Ausschnitt in der CAD-Oberfläche.
+3. **Rahmen** — wechselt in die CAD-Oberfläche mit aktivem Rahmen-Werkzeug; Bestätigen per Häkchen-Symbol im Hub, dann Rückkehr zur Projektmappe.
 
-1. **CAD-Blatt in der Projektmappe eindeutig über `ElementView` steuern**
-   - `cad-view` aus `externalDocs` entfernen.
-   - `externalDocs` weiterhin nur für echte PDF-/Bild-Dokumente nutzen, damit deren Snap-/Dokumentenlogik unverändert bleibt.
-   - `cad-view` im Standardmodus dauerhaft über der CAD-Overlay-Canvas halten, damit Klicks/Drag auf Rahmen, HUB und Handles sicher bei `ElementView` landen.
+In allen drei Fällen wird das Ergebnis identisch zu einem normalen PDF-Import behandelt (gleicher Maßstabs-Dialog, gleiche Nachbearbeitung: Skalieren, Anker, Drehen, Filter, Auflösen).
 
-2. **HUB-Design für CAD-Blatt auf Screenshot-Design setzen**
-   - Blauer gestrichelter Rahmen wie im Screenshot.
-   - Weiße HUB-Box oben links/oben am Rahmen mit exakt drei Symbolbuttons:
-     - Verschieben
-     - Drehen
-     - Skalieren
-   - Aktuellen „Duplizieren/Löschen“-Button beim CAD-Blatt entfernen; „Löschen“ wird durch „Skalieren“ ersetzt.
-   - PDF/Bild-HUB in der Projektmappe nicht unnötig ändern, außer falls dieselbe Komponente davon profitiert.
+### Technischer Ablauf
 
-3. **Funktionen zuverlässig verdrahten**
-   - Verschieben: Drag auf CAD-Blatt/Move-Button startet die bestehende Positionsänderung.
-   - Drehen: Rotationsfunktion über bestehenden `onRotate`-Handler beibehalten.
-   - Skalieren: Button/Handles nutzen bestehende Größenlogik; Ecken bleiben proportional mit Shift.
-   - Kantenbearbeitung: Kanten-Handles bleiben aktiv und ändern die sichtbare Blattfläche wie bisher, aber ohne Event-Konflikt mit der Mini-CAD-Engine.
+- **Erzeugung des PDFs im Speicher:** eine Ein-Seiten-Variante von `exportPlansToPdf` (`src/cad/PlanPdfExport.ts`) — neue Funktion `exportSheetRegionToPdf(sheetId, region)` mit `region = "full" | "activeView" | { x, y, w, h }`. Rendert nur das eine Blatt anhand des vorhandenen `flattenSheetSnapshot` + `drawProjectionToPdf`-Codes und liefert `Uint8Array`.
+- **Übergabe an den Importer:** Uint8Array → `File`-Objekt (`new File([bytes], "Zeichenblatt XY.pdf", { type: "application/pdf" })`) → bestehende `importFile()`-Pipeline (`src/cad/documentImport.ts`) → gleicher `scaleDialogPages`-Flow wie beim Datei-Upload. Kein neuer Import-Code, keine Sonderbehandlung.
+- **Rahmen-Modus (Cross-Page-Handoff):**
+  - Beim Klick auf „Rahmen“ speichert die Projektmappe eine Absicht im `projectStore` bzw. `sessionStorage`: `{ kind: "sheet-crop", projectId, sheetId, returnTo: pageId }`.
+  - Navigation zu `/project/:id/cad` mit URL-Param `?crop=<sheetId>`.
+  - `CadPage` erkennt den Param, wechselt zum bestehenden CAD-Rahmen-/Ausschnitts-Werkzeug (falls nicht vorhanden: ein leichter Rechteck-Picker analog `MeasureTool`), und blendet einen kleinen Hub mit Häkchen (Bestätigen) + X (Abbrechen) ein.
+  - Häkchen → Rechteck in Sheet-Koordinaten wird an die Absicht angehängt → Rück-Navigation `/project/:id` → Projektmappe liest die Absicht, ruft `exportSheetRegionToPdf` und startet den normalen Import-Flow.
 
-4. **Dokumentenwerkzeug-HUB um Löschen ergänzen**
-   - In der CAD-Oberfläche (`CadEditor`) in der vorhandenen Dokumenten-HUB-Box ein `Trash2`-Symbol ergänzen.
-   - Klick löscht das selektierte Dokument aus der CAD-Szene, schließt die HUB-Box und leert die Auswahl.
-   - Falls die Projektmappen-Dokumenten-HUB (`CadOverlayLayer`) dieselbe Dokumenten-HUB anzeigt, dort optisch/funktional analog ergänzen, damit die Bedienung konsistent bleibt.
+### Neue / geänderte Dateien
 
-5. **Validierung nach Umsetzung**
-   - Projektmappe öffnen, CAD-Blatt auswählen: nur ein blauer Rahmen und nur die gewünschte HUB-Box sichtbar.
-   - Verschieben, Drehen, Skalieren und Kantenziehen am CAD-Blatt testen.
-   - CAD-Dokument im Dokumentenwerkzeug auswählen und Löschen-Symbol testen.
-   - Sicherstellen, dass PDF/Bild-Dokumente und CAD-Snap im Seiteneditor nicht regressieren.
+- `src/components/workspace/WorkspaceHeader.tsx` — Trash-Button + Props.
+- `src/pages/ProjectWorkspace.tsx` — Header-Props, Delete-Handler wiederverwenden, Dokumenten-Panel um Dropdown erweitern, Rahmen-Handoff-Auswertung.
+- `src/pages/CadPage.tsx` — Header-Props, `?crop=` erkennen und Rahmen-Werkzeug starten, Häkchen-Rückkehr.
+- `src/cad/PlanPdfExport.ts` — neue `exportSheetRegionToPdf`-Funktion.
+- Ggf. kleines neues Modul `src/cad/SheetCropTool.ts` (nur falls kein bestehendes Rahmen-Werkzeug wiederverwendbar ist — wird im Build-Modus geprüft; wenn `SelectTool` / `MeasureTool` reichen, entfällt es).
+- `src/lib/projectStore.ts` — falls die Absicht dort persistiert wird (alternativ nur `sessionStorage`, keine Store-Änderung nötig).
+
+### Offene Detailfragen, die beim Umsetzen entschieden werden
+
+- Ob „aktuell ausgewählte Ansicht“ = aktiver Kamera-Ausschnitt in `CadPage` oder = selektierter `PlanProjection`/Viewport. Standard-Annahme: aktive Kamera (WYSIWYG „was du gerade siehst“). Wenn Sie den anderen Fall wollen, bitte kurz sagen.
+- Ob der Rahmen fest im Sheet-Koordinatensystem (mm) oder in Weltkoordinaten gespeichert wird — plane in Sheet-mm, weil `exportSheetRegionToPdf` ohnehin sheet-basiert arbeitet.

@@ -8,6 +8,7 @@ import {
   Play,
   FolderKanban,
   Compass,
+  Trash2,
 } from "lucide-react";
 
 export type WorkspaceMode = "workspace" | "cad";
@@ -21,6 +22,8 @@ interface Props {
   canRedo?: boolean;
   onUndo?: () => void;
   onRedo?: () => void;
+  canDelete?: boolean;
+  onDelete?: () => void;
   zoomPercent?: number;          // display-only; may be undefined
   onPresent?: () => void;
   onShare?: () => void;
@@ -40,6 +43,8 @@ export function WorkspaceHeader({
   canRedo = false,
   onUndo,
   onRedo,
+  canDelete = false,
+  onDelete,
   zoomPercent,
   onPresent,
   onShare,
@@ -101,6 +106,14 @@ export function WorkspaceHeader({
 
       {/* Right: Undo/Redo · Zoom · Präsentieren · Teilen · Exportieren */}
       <div className="flex items-center gap-1.5 text-muted-foreground">
+        <button
+          onClick={onDelete}
+          disabled={!canDelete}
+          className="h-8 w-8 rounded-md flex items-center justify-center hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed"
+          title="Auswahl löschen (Entf)"
+        >
+          <Trash2 size={16} />
+        </button>
         <button
           onClick={onUndo}
           disabled={!canUndo}

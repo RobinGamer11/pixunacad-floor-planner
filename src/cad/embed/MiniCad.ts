@@ -1238,6 +1238,21 @@ export class MiniCad {
     this._applyPrimary(null, []);
   }
 
+  /** True, wenn eine Löschung per Entf-Taste etwas entfernen würde. */
+  hasDeletableSelection(): boolean {
+    if (this.selections && this.selections.length > 0) return true;
+    if (this.selection) return true;
+    return false;
+  }
+
+  /** Programmgesteuertes Löschen der aktuellen Auswahl (identisch mit Entf). */
+  deleteSelection(): boolean {
+    const ev = new KeyboardEvent("keydown", { key: "Delete", bubbles: true });
+    try { Object.defineProperty(ev, "target", { value: document.body }); } catch {}
+    window.dispatchEvent(ev);
+    return true;
+  }
+
   /** API: wird vom React-Layer aus dem "Einzel/Mehrfach"-Toggle bedient. */
   setMultiSelectMode(on: boolean) {
     this._multiSelectMode = !!on;

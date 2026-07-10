@@ -77,6 +77,7 @@ import { CadDocumentInspector } from "@/components/page/CadDocumentInspector";
 import { CadIdPanelHost } from "@/components/page/CadIdPanelHost";
 import { PdfPageView } from "@/components/page/PdfPageView";
 import { importFile, type ImportedPage } from "@/cad/documentImport";
+import { base64ToBytes, popPendingSheetPdf } from "@/lib/sheetPdfExport";
 import type { MiniCadSelectionInfo } from "@/cad/embed/MiniCad";
 import type { HatchDrawMode } from "@/cad/HatchTool";
 import { FreeDrawSettingsPanel } from "@/components/cad/FreeDrawSettingsPanel";
@@ -411,6 +412,32 @@ export default function ProjectWorkspace() {
     }
   };
 
+  // Nach Rückkehr aus der CAD-Oberfläche: falls dort ein Zeichenblatt als PDF
+  // exportiert wurde, holen wir das Ergebnis aus sessionStorage und schleusen
+  // es durch die normale Import-Pipeline.
+  useEffect(() => {
+    if (!projectId) return;
+    const pending = popPendingSheetPdf(projectId);
+    if (!pending) return;
+    (async () => {
+      setDocImporting(true);
+      try {
+        const bytes = base64ToBytes(pending.pdfBase64);
+        const ab = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+        const file = new File([ab], `${pending.sheetName}.pdf`, { type: "application/pdf" });
+        const pages = await importFile(file);
+        if (pages.length === 0) return;
+        setScaleChoice(pages[0].kind === "pdf-page" ? "100" : "1");
+        setScaleCustom("100");
+        setScaleDialogPages(pages);
+      } catch (err: any) {
+        window.alert("Import des CAD-Blatts fehlgeschlagen: " + (err?.message || err));
+      } finally {
+        setDocImporting(false);
+      }
+    })();
+  }, [projectId]);
+
   const confirmDocumentPagePicker = () => {
     if (!docPickerPages) return;
     const selected = docPickerPages.filter((_, i) => docPickerSelected.has(i));
@@ -524,6 +551,21 @@ export default function ProjectWorkspace() {
         
         mode="workspace"
         zoomPercent={Math.round(zoom)}
+        canDelete={selectedElementIds.length > 0 || cadSelectionCount > 0}
+        onDelete={() => {
+          // Seiten-Elemente löschen (falls markiert)
+          if (activePage && selectedElementIds.length > 0) {
+            for (const id of selectedElementIds) {
+              projectStore.deleteElement(project.id, activePage.id, id);
+            }
+            setSelectedElementIds([]);
+          }
+          // Eingebettete CAD-Auswahl löschen (falls vorhanden)
+          const eng = cadEngineApiRef.current?.engine;
+          if (eng && (eng as any).hasDeletableSelection?.()) {
+            (eng as any).deleteSelection?.();
+          }
+        }}
         onPresent={() => setPresenting(true)}
         onShare={() => {}}
         onExport={() => setPrintMode((v) => !v)}
@@ -3509,6 +3551,21 @@ function EbeneSelect({ engine }: { engine: import("@/cad/embed/MiniCad").MiniCad
 }
 
 function DocumentToolSettings({ importing, onImport }: { importing: boolean; onImport?: () => void }) {
+  const navigate = useNavigate();
+  const { projectId } = useParams();
+  const project = useProject(projectId);
+  const [sheetsOpen, setSheetsOpen] = React.useState(false);
+  const [pickedSheet, setPickedSheet] = React.useState<string | null>(null);
+  const sheets = project?.sheets ?? [];
+  // Aktuell aktive Seite der Projektmappe → wird für die Rückkehr benötigt.
+  // (Der Handler in CadPage schreibt das PDF in sessionStorage und navigiert
+  // dann zurück nach /project/:id, wo die Projektmappe es aufnimmt.)
+  const goCadForSheetPdf = (sheetId: string, mode: "full" | "view" | "frame") => {
+    if (!projectId) return;
+    const returnPageId = window.location.hash || ""; // nicht verwendet
+    void returnPageId;
+    navigate(`/project/${projectId}/cad?sheetPdf=${encodeURIComponent(sheetId)}&mode=${mode}`);
+  };
   return (
     <SettingsBlock title="DOKUMENT IMPORTIEREN">
       <button
@@ -3522,6 +3579,77 @@ function DocumentToolSettings({ importing, onImport }: { importing: boolean; onI
         <FileImage size={14} />
         {importing ? "Importiere…" : "Datei importieren"}
       </button>
+
+      {/* CAD-Blatt als PDF einfügen */}
+      <div className="pt-2 mt-2 border-t" style={{ borderColor: "hsl(var(--hairline))" }}>
+        <button
+          type="button"
+          onClick={() => setSheetsOpen((v) => !v)}
+          className="w-full h-9 rounded-md border text-xs flex items-center justify-between gap-2 px-2"
+          style={{ borderColor: "hsl(var(--hairline))" }}
+          title="Ein Zeichenblatt aus der CAD-Oberfläche als PDF einfügen"
+        >
+          <span className="flex items-center gap-2"><Compass size={14} /> CAD-Blatt einfügen</span>
+          <span className="text-muted-foreground">{sheetsOpen ? "▴" : "▾"}</span>
+        </button>
+        {sheetsOpen && (
+          <div className="mt-1 rounded-md border p-1.5 space-y-1" style={{ borderColor: "hsl(var(--hairline))" }}>
+            {sheets.length === 0 && (
+              <div className="text-[11px] text-muted-foreground px-1 py-2">
+                Noch keine Zeichenblätter. In der CAD-Oberfläche anlegen.
+              </div>
+            )}
+            {sheets.map((s) => {
+              const isActive = pickedSheet === s.id;
+              return (
+                <div key={s.id} className="space-y-1">
+                  <button
+                    type="button"
+                    onClick={() => setPickedSheet(isActive ? null : s.id)}
+                    className="w-full h-7 rounded-md text-[11px] flex items-center justify-between px-2 hover:bg-muted"
+                    style={{ background: isActive ? "hsl(var(--surface-strong))" : undefined }}
+                  >
+                    <span className="truncate">{s.name}</span>
+                    <span className="text-muted-foreground">{s.scale}</span>
+                  </button>
+                  {isActive && (
+                    <div className="grid grid-cols-3 gap-1 pl-2">
+                      <button
+                        type="button"
+                        onClick={() => goCadForSheetPdf(s.id, "full")}
+                        className="h-7 rounded-md border text-[10px] hover:bg-muted"
+                        style={{ borderColor: "hsl(var(--hairline))" }}
+                        title="Gesamtes Zeichenblatt als PDF einfügen"
+                      >
+                        Gesamt
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => goCadForSheetPdf(s.id, "view")}
+                        className="h-7 rounded-md border text-[10px] hover:bg-muted"
+                        style={{ borderColor: "hsl(var(--hairline))" }}
+                        title="Nur aktuell sichtbaren Ausschnitt einfügen"
+                      >
+                        Ansicht
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => goCadForSheetPdf(s.id, "frame")}
+                        className="h-7 rounded-md border text-[10px] hover:bg-muted"
+                        style={{ borderColor: "hsl(var(--hairline))" }}
+                        title="Rahmen in CAD-Oberfläche setzen (mit Häkchen bestätigen)"
+                      >
+                        Rahmen
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
       <div className="text-[11px] leading-relaxed text-muted-foreground pt-2 border-t" style={{ borderColor: "hsl(var(--hairline))" }}>
         <div>PDF, JPG, PNG werden mit 96 DPI / 72 pt importiert.</div>
         <div>Zum Skalieren, Drehen oder Zuschneiden: <strong>Auswahl-Werkzeug</strong> → Dokument anklicken.</div>
