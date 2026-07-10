@@ -3414,9 +3414,48 @@ function EbeneSelect({ engine }: { engine: import("@/cad/embed/MiniCad").MiniCad
   );
 }
 
-function DocumentToolSettings({ importing, onImport }: { importing: boolean; onImport?: () => void }) {
+function DocumentToolSettings({
+  importing,
+  onImport,
+  scale,
+  onScaleChange,
+}: {
+  importing: boolean;
+  onImport?: () => void;
+  scale: string;
+  onScaleChange?: (s: string) => void;
+}) {
+  const selectValue = PAGE_PLAN_SCALES.includes(scale) ? scale : "__other__";
   return (
     <SettingsBlock title="DOKUMENT IMPORTIEREN">
+      {/* Maßstab-Dropdown — wie beim CAD-Blatt: legt fest, in welchem
+          Ausgabemaßstab das importierte Dokument (A4/A3/A2 …) im
+          Modellbereich abgelegt wird. Modell selbst bleibt 1:1. */}
+      <Row label="Maßstab">
+        <select
+          value={selectValue}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (v === "frei") {
+              const picked = askPlanScale(scale);
+              if (picked) onScaleChange?.(picked);
+            } else if (v !== "__other__") {
+              onScaleChange?.(v);
+            }
+          }}
+          className="w-full h-8 px-2 rounded border bg-transparent text-sm"
+          style={{ borderColor: "hsl(var(--hairline))" }}
+        >
+          {!PAGE_PLAN_SCALES.includes(scale) && (
+            <option value="__other__">{scale}</option>
+          )}
+          {PAGE_PLAN_SCALES.map((sc) => (
+            <option key={sc} value={sc}>{sc}</option>
+          ))}
+          <option value="frei">frei…</option>
+        </select>
+      </Row>
+
       <button
         type="button"
         disabled={importing}
@@ -3430,12 +3469,13 @@ function DocumentToolSettings({ importing, onImport }: { importing: boolean; onI
       </button>
 
       <div className="text-[11px] leading-relaxed text-muted-foreground pt-2 border-t" style={{ borderColor: "hsl(var(--hairline))" }}>
-        <div>PDF, JPG, PNG werden mit 96 DPI / 72 pt importiert.</div>
+        <div>Import erfolgt im gewählten Maßstab (z. B. {scale}) auf A4/A3/A2 …</div>
         <div>Zum Skalieren, Drehen oder Zuschneiden: <strong>Auswahl-Werkzeug</strong> → Dokument anklicken.</div>
       </div>
     </SettingsBlock>
   );
 }
+
 
 function SelectSettings({
   selectedCount,
