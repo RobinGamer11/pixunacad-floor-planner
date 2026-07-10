@@ -1920,15 +1920,65 @@ function PageCanvas({
   const drawingTool = false;
   const cursorStyle = undefined;
 
+  // Rahmen-Auswahl (Marquee) auf freier Blattfläche — nur wenn Auswahl-
+  // Werkzeug aktiv ist. Modus kommt aus toolSettings.select.marqueeMode:
+  //   "touch"   → alle Objekte, die den Rahmen berühren
+  //   "enclose" → nur Objekte, die vollständig im Rahmen liegen
+  const [marquee, setMarquee] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
+  const marqueeMode = toolSettings.select.marqueeMode;
+
   const handlePageMouseDown = (e: React.MouseEvent) => {
     if (e.target !== e.currentTarget) return;
-    // not drawing: deselect
-    onSelect(undefined);
+    if (activeTool !== null) { onSelect(undefined); return; }
+    if (e.button !== 0) { onSelect(undefined); return; }
+    const start = toPct(e.clientX, e.clientY);
+    setMarquee({ x1: start.x, y1: start.y, x2: start.x, y2: start.y });
+    let dragged = false;
+    const onMove = (ev: MouseEvent) => {
+      const cur = toPct(ev.clientX, ev.clientY);
+      if (Math.abs(cur.x - start.x) > 0.3 || Math.abs(cur.y - start.y) > 0.3) dragged = true;
+      setMarquee({ x1: start.x, y1: start.y, x2: cur.x, y2: cur.y });
+    };
+    const onUp = (ev: MouseEvent) => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      const end = toPct(ev.clientX, ev.clientY);
+      setMarquee(null);
+      if (!dragged) { onSelect(undefined); return; }
+      const rx1 = Math.min(start.x, end.x);
+      const ry1 = Math.min(start.y, end.y);
+      const rx2 = Math.max(start.x, end.x);
+      const ry2 = Math.max(start.y, end.y);
+      const hit: string[] = [];
+      for (const el of page.elements) {
+        // CAD-Layer-Elemente (Linien, Guides, Hatches) sind Engine-verwaltet
+        // und tauchen nicht als React-Auswahl auf.
+        if (el.kind === "line" || el.kind === "guide") continue;
+        const ex1 = (el as any).x ?? 0;
+        const ey1 = (el as any).y ?? 0;
+        const ew = (el as any).w ?? 0;
+        const eh = (el as any).h ?? 0;
+        const ex2 = ex1 + ew;
+        const ey2 = ey1 + eh;
+        if (marqueeMode === "enclose") {
+          if (ex1 >= rx1 && ey1 >= ry1 && ex2 <= rx2 && ey2 <= ry2) hit.push(el.id);
+        } else {
+          // touch / crossing: AABB-Overlap
+          if (ex1 <= rx2 && ex2 >= rx1 && ey1 <= ry2 && ey2 >= ry1) hit.push(el.id);
+        }
+      }
+      if (onMultiSelect) onMultiSelect(hit);
+      else if (hit.length === 1) onSelect(hit[0]);
+      else onSelect(undefined);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
   };
 
   const handlePageMouseMove = (_e: React.MouseEvent) => {
     /* no-op */
   };
+
 
   // Escape cancels pending draw and resets back to the select tool.
   React.useEffect(() => {
