@@ -4,7 +4,16 @@ import CadEditor, { type CadEditorHandle } from "@/components/CadEditor";
 import { useProject } from "@/lib/projectStore";
 import { WorkspaceHeader } from "@/components/workspace/WorkspaceHeader";
 import { Check, X } from "lucide-react";
-import { bytesToBase64, canvasToPdfBytes, stashPendingSheetPdf } from "@/lib/sheetPdfExport";
+import { bytesToBase64, canvasRegionToPdfBytes, stashPendingSheetPdf } from "@/lib/sheetPdfExport";
+
+/** "1:100" → 100 (Welt-Einheiten pro Papier-Einheit). Fällt auf 100 zurück. */
+function parseSheetScale(scale: string | undefined): number {
+  if (!scale) return 100;
+  const m = String(scale).match(/1\s*:\s*(\d+(?:[.,]\d+)?)/);
+  if (!m) return 100;
+  const v = parseFloat(m[1].replace(",", "."));
+  return v > 0 ? v : 100;
+}
 
 const CadPage = () => {
   const { projectId } = useParams();
@@ -22,8 +31,13 @@ const CadPage = () => {
   // eine kleine Bestätigungsleiste einblenden.
   const params = new URLSearchParams(location.search);
   const sheetPdfId = params.get("sheetPdf");
-  const sheetPdfMode = (params.get("mode") as "full" | "view" | "frame" | null) ?? "full";
+  const sheetPdfMode = (params.get("mode") as "view" | "frame" | null) ?? "view";
   const [busy, setBusy] = useState(false);
+
+  // Rahmen-Auswahl (CSS-Pixel im Fenster; wird in Canvas-Koordinaten umgerechnet).
+  const [frameStart, setFrameStart] = useState<{ x: number; y: number } | null>(null);
+  const [frameRect, setFrameRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const [dragging, setDragging] = useState(false);
 
   const handlePresent = () => {
     const el = mainRef.current;
@@ -35,14 +49,52 @@ const CadPage = () => {
     }
   };
 
+  const getCanvas = (): HTMLCanvasElement | null =>
+    (mainRef.current?.querySelector("canvas") as HTMLCanvasElement | null) ?? null;
+
   const confirmSheetPdf = async () => {
     if (!projectId || !sheetPdfId) return;
+    const canvas = getCanvas();
+    if (!canvas) { alert("CAD-Canvas nicht gefunden"); return; }
+    const cRect = canvas.getBoundingClientRect();
+    // Ausschnitt in CSS-Pixel-Koordinaten (relativ zum Canvas).
+    let cssRect: { x: number; y: number; w: number; h: number };
+    if (sheetPdfMode === "frame") {
+      if (!frameRect || frameRect.w < 4 || frameRect.h < 4) {
+        alert("Bitte zuerst mit der Maus einen Rahmen aufziehen.");
+        return;
+      }
+      cssRect = {
+        x: frameRect.x - cRect.left,
+        y: frameRect.y - cRect.top,
+        w: frameRect.w,
+        h: frameRect.h,
+      };
+    } else {
+      cssRect = { x: 0, y: 0, w: cRect.width, h: cRect.height };
+    }
+    // Auf Canvas-Pixel-Raum umrechnen (dpr / Renderer-Auflösung).
+    const sx = canvas.width / Math.max(1, cRect.width);
+    const sy = canvas.height / Math.max(1, cRect.height);
+    const pxRect = {
+      x: Math.max(0, cssRect.x * sx),
+      y: Math.max(0, cssRect.y * sy),
+      w: Math.min(canvas.width, cssRect.w * sx),
+      h: Math.min(canvas.height, cssRect.h * sy),
+    };
+
+    // Welt-Meter → Papier-mm über Blatt-Maßstab.
+    const camScale = editorRef.current?.getCameraScale() ?? 80; // CSS-px pro Welt-m
+    const worldWm = cssRect.w / camScale;
+    const worldHm = cssRect.h / camScale;
+    const sheet = project?.sheets.find((s) => s.id === sheetPdfId);
+    const scaleValue = parseSheetScale(sheet?.scale);
+    const paperWmm = (worldWm * 1000) / scaleValue;
+    const paperHmm = (worldHm * 1000) / scaleValue;
+
     setBusy(true);
     try {
-      const canvas = mainRef.current?.querySelector("canvas") as HTMLCanvasElement | null;
-      if (!canvas) throw new Error("CAD-Canvas nicht gefunden");
-      const bytes = await canvasToPdfBytes(canvas);
-      const sheet = project?.sheets.find((s) => s.id === sheetPdfId);
+      const bytes = await canvasRegionToPdfBytes(canvas, pxRect, paperWmm, paperHmm);
       stashPendingSheetPdf({
         projectId,
         returnPageId: "",
@@ -64,10 +116,35 @@ const CadPage = () => {
     navigate(`/project/${projectId}`);
   };
 
+  // Rahmen-Interaktion: nur aktiv im Rahmen-Modus. Ein transparenter Overlay
+  // fängt Maus-Events, damit die CAD-Tools nicht mitlaufen.
+  const onFramePointerDown = (e: React.PointerEvent) => {
+    if (sheetPdfMode !== "frame") return;
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    setFrameStart({ x: e.clientX, y: e.clientY });
+    setFrameRect({ x: e.clientX, y: e.clientY, w: 0, h: 0 });
+    setDragging(true);
+  };
+  const onFramePointerMove = (e: React.PointerEvent) => {
+    if (!dragging || !frameStart) return;
+    const x = Math.min(frameStart.x, e.clientX);
+    const y = Math.min(frameStart.y, e.clientY);
+    const w = Math.abs(e.clientX - frameStart.x);
+    const h = Math.abs(e.clientY - frameStart.y);
+    setFrameRect({ x, y, w, h });
+  };
+  const onFramePointerUp = (e: React.PointerEvent) => {
+    if (!dragging) return;
+    setDragging(false);
+    try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch {}
+  };
+
   useEffect(() => {
-    // Bei Rahmen-Modus: (noch) keine spezielle Overlay-Logik — der Nutzer
-    // richtet den sichtbaren Ausschnitt selbst ein und bestätigt.
-  }, [sheetPdfId, sheetPdfMode]);
+    // Beim Moduswechsel Rahmen zurücksetzen.
+    setFrameStart(null);
+    setFrameRect(null);
+    setDragging(false);
+  }, [sheetPdfMode, sheetPdfId]);
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden">
@@ -95,6 +172,37 @@ const CadPage = () => {
           onCanDeleteChange={setCanDelete}
         />
 
+        {/* Rahmen-Overlay: fängt Maus-Events, damit der Nutzer einen Ausschnitt
+            aufziehen kann. Nur aktiv im 'frame'-Modus. */}
+        {sheetPdfId && sheetPdfMode === "frame" && (
+          <div
+            className="absolute inset-0 z-40"
+            style={{ cursor: "crosshair", background: "rgba(0,0,0,0.02)" }}
+            onPointerDown={onFramePointerDown}
+            onPointerMove={onFramePointerMove}
+            onPointerUp={onFramePointerUp}
+          >
+            {frameRect && frameRect.w > 0 && frameRect.h > 0 && (() => {
+              const cRect = getCanvas()?.getBoundingClientRect();
+              const parentRect = mainRef.current?.getBoundingClientRect();
+              if (!cRect || !parentRect) return null;
+              return (
+                <div
+                  className="absolute pointer-events-none"
+                  style={{
+                    left: frameRect.x - parentRect.left,
+                    top: frameRect.y - parentRect.top,
+                    width: frameRect.w,
+                    height: frameRect.h,
+                    border: "1.5px dashed hsl(var(--accent-gold))",
+                    background: "hsla(var(--accent-gold), 0.08)",
+                  }}
+                />
+              );
+            })()}
+          </div>
+        )}
+
         {sheetPdfId && (
           <div
             className="absolute top-2 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-3 py-2 rounded-md shadow-lg border"
@@ -108,15 +216,16 @@ const CadPage = () => {
                 PDF-Export → Projektmappe
               </div>
               <div className="text-muted-foreground">
-                {sheetPdfMode === "full" && "Gesamtes Zeichenblatt · sichtbaren Bereich anpassen und bestätigen."}
-                {sheetPdfMode === "view" && "Aktuelle Ansicht wird übernommen."}
-                {sheetPdfMode === "frame" && "Bildausschnitt einrichten (Zoom/Pan) und bestätigen."}
+                {sheetPdfMode === "view" && "Aktuelle Ansicht wird im richtigen Maßstab übernommen."}
+                {sheetPdfMode === "frame" && (frameRect
+                  ? "Rahmen mit Häkchen bestätigen — oder neu aufziehen."
+                  : "Bitte einen Rahmen aufziehen und mit Häkchen bestätigen.")}
               </div>
             </div>
             <button
               type="button"
               onClick={confirmSheetPdf}
-              disabled={busy}
+              disabled={busy || (sheetPdfMode === "frame" && !frameRect)}
               className="h-8 w-8 rounded-md flex items-center justify-center disabled:opacity-50"
               style={{ background: "hsl(var(--accent-gold))", color: "hsl(var(--surface))" }}
               title="Bestätigen"
