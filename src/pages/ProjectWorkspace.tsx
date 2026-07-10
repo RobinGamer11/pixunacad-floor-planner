@@ -1628,6 +1628,25 @@ function DocumentScaleDialog({
   );
 }
 
+/** Auswahl-Maßstäbe beim Ablegen eines CAD-Blatts in einen Plan. */
+const PAGE_PLAN_SCALES: readonly string[] = ["1:1", "1:20", "1:50", "1:100", "1:200", "1:1000", "1:2000"] as const;
+
+/** Öffnet einen kleinen Prompt-Dialog zur Maßstabs-Wahl. */
+function askPlanScale(current?: string): string | null {
+  const listed = PAGE_PLAN_SCALES.join(", ");
+  const raw = window.prompt(
+    `In welchem Maßstab soll das Blatt eingefügt werden?\n\nAuswahl: ${listed} (oder frei, z.B. "1:75")`,
+    current || "1:100",
+  );
+  if (raw == null) return null;
+  const s = raw.trim();
+  if (!s) return null;
+  // Normalisieren "1 : 75" → "1:75"
+  const m = s.match(/^1\s*:\s*(\d+(?:[.,]\d+)?)$/);
+  if (!m) { window.alert("Ungültiger Maßstab. Bitte im Format 1:100 eingeben."); return null; }
+  return `1:${m[1].replace(",", ".")}`;
+}
+
 const PUNCH_PATTERNS: Record<Exclude<PunchPattern, "none">, { label: string; offsets: number[]; diameter: number }> = {
   // offsets are distances (mm) of each hole center measured from the start of the bound edge (page corner)
   "2-fach": { label: "2-fach (DIN 5005, 80 mm)", offsets: [-40, 40], diameter: 6 },
@@ -4051,6 +4070,8 @@ function CadToolSection({
     if (!pageId || !chosenSheet) return;
     const sheet = project.sheets.find((s) => s.id === chosenSheet);
     if (!sheet) return;
+    const picked = askPlanScale(sheet.scale ?? "1:100");
+    if (!picked) return;
     const id = projectStore.addElement(projectId, pageId, {
       kind: "cad-view",
       x: 20,
@@ -4058,7 +4079,7 @@ function CadToolSection({
       w: 50,
       h: 35,
       sheetId: sheet.id,
-      scale: sheet.scale,
+      scale: picked,
       // Aktuelle Ansicht + Zoom der CAD-Oberfläche einfrieren (Snapshot).
       viewSnapshot: sheet.thumbnail,
       lastSyncAt: new Date().toISOString(),
@@ -4220,18 +4241,37 @@ function CadToolSection({
                   </div>
                   <div className="flex items-center gap-2 mt-2">
                     <span className="text-[11px] text-muted-foreground">Maßstab</span>
-                    <input
-                      value={el.scale ?? sheet?.scale ?? "1:100"}
+                    <select
+                      value={(() => {
+                        const cur = el.scale ?? sheet?.scale ?? "1:100";
+                        return PAGE_PLAN_SCALES.includes(cur) ? cur : "frei";
+                      })()}
                       onChange={(ev) => {
                         if (!pageId) return;
-                        projectStore.updateElement(projectId, pageId, el.id, {
-                          scale: ev.target.value,
-                        });
+                        let next = ev.target.value;
+                        if (next === "frei") {
+                          const picked = askPlanScale(el.scale ?? sheet?.scale ?? "1:100");
+                          if (!picked) return;
+                          next = picked;
+                        }
+                        projectStore.updateElement(projectId, pageId, el.id, { scale: next });
                       }}
                       onClick={(ev) => ev.stopPropagation()}
                       className="flex-1 h-7 px-2 rounded bg-transparent border text-sm"
                       style={{ borderColor: "hsl(var(--hairline))" }}
-                    />
+                    >
+                      {PAGE_PLAN_SCALES.map((s) => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                      {(() => {
+                        const cur = el.scale ?? sheet?.scale ?? "1:100";
+                        if (!PAGE_PLAN_SCALES.includes(cur)) {
+                          return <option key={cur} value={cur}>{cur}</option>;
+                        }
+                        return null;
+                      })()}
+                      <option value="frei">frei…</option>
+                    </select>
                     <button
                       onClick={(ev) => {
                         ev.stopPropagation();

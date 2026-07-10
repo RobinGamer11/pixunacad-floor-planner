@@ -107,6 +107,11 @@ export class SelectTool {
   dragDocGrabOffset: Vec2 | null = null;
   dragDocSnap: Snap | null = null;
 
+  // FreeStroke Drag-State (Verschieben der gesamten Freihand-Linie)
+  dragFreeStrokeId: string | null = null;
+  dragFreeStrokeGrabOffset: Vec2 | null = null; // mouseStart - points[0]
+  dragFreeStrokeOrigPoints: Vec2[] | null = null;
+
   // TextBox Drag/Rotate-State
   dragTextBoxId: string | null = null;
   dragTextBoxGrabOffset: Vec2 | null = null; // mouseStart - center
@@ -152,6 +157,9 @@ export class SelectTool {
     this.dragDocId = null;
     this.dragDocGrabOffset = null;
     this.dragDocSnap = null;
+    this.dragFreeStrokeId = null;
+    this.dragFreeStrokeGrabOffset = null;
+    this.dragFreeStrokeOrigPoints = null;
     this.dragTextBoxId = null;
     this.dragTextBoxGrabOffset = null;
     this.dragTextBoxSnap = null;
@@ -1631,6 +1639,39 @@ export class SelectTool {
       }
     }
 
+    // Aktives FreeStroke-Drag (Verschieben der gesamten Freihand-Linie mit Snap)
+    if (this.dragFreeStrokeId) {
+      const stroke = this.app.scene.getFreeStrokeById(this.dragFreeStrokeId);
+      if (!stroke || !this.dragFreeStrokeGrabOffset || !this.dragFreeStrokeOrigPoints) {
+        this.dragFreeStrokeId = null;
+        this.dragFreeStrokeGrabOffset = null;
+        this.dragFreeStrokeOrigPoints = null;
+      } else {
+        const mouseW = v(input.mouse.wx, input.mouse.wy);
+        const rawSnap = this.app.topology.findBestSnap(
+          v(input.mouse.sx, input.mouse.sy),
+          mouseW,
+        );
+        const target = (rawSnap && rawSnap.world) ? rawSnap.world : mouseW;
+        // Neuer Referenzpunkt (points[0]) = target - grabOffset
+        const p0x = target.x - this.dragFreeStrokeGrabOffset.x;
+        const p0y = target.y - this.dragFreeStrokeGrabOffset.y;
+        const orig = this.dragFreeStrokeOrigPoints;
+        const dx = p0x - orig[0].x;
+        const dy = p0y - orig[0].y;
+        for (let i = 0; i < stroke.points.length && i < orig.length; i++) {
+          stroke.points[i] = { x: orig[i].x + dx, y: orig[i].y + dy };
+        }
+        if (!input.mouse.left) {
+          this.dragFreeStrokeId = null;
+          this.dragFreeStrokeGrabOffset = null;
+          this.dragFreeStrokeOrigPoints = null;
+        }
+        return;
+      }
+    }
+
+
     // Active textbox drag (translate) with snap
     // Active area-label drag (verschieben der m²-Anzeige innerhalb einer Schraffur)
     if (this.dragAreaLabelHatchId) {
@@ -2290,10 +2331,19 @@ export class SelectTool {
           // (siehe dimensionHubMode === "move" in input.clicked-Handler).
         }
       } else {
-        // Freihand-Stroke: Klick auf Polylinie selektiert
+        // Freihand-Stroke: Klick auf Polylinie selektiert + startet Drag (Verschieben).
         const freeHit = this._hitFreeStroke(input);
         if (freeHit) {
           this.app.setSelection({ type: SelectionType.FREE_STROKE, freeStrokeId: freeHit.id } as any);
+          if (freeHit.points.length >= 1) {
+            const mouseW0 = v(input.mouse.wx, input.mouse.wy);
+            this.dragFreeStrokeId = freeHit.id;
+            this.dragFreeStrokeGrabOffset = {
+              x: mouseW0.x - freeHit.points[0].x,
+              y: mouseW0.y - freeHit.points[0].y,
+            };
+            this.dragFreeStrokeOrigPoints = freeHit.points.map((p) => ({ x: p.x, y: p.y }));
+          }
           return;
         }
         // Kein Vordergrund-Hit & kein Dokument → Auswahl aufheben.
