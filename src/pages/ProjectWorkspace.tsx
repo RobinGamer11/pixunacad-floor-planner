@@ -23,6 +23,7 @@ import {
   Trash2,
   Copy,
   RotateCw,
+  Maximize2,
   Undo2,
   Redo2,
   Share2,
@@ -2043,6 +2044,9 @@ function PageCanvas({
               }
               projectStore.updateElement(projectId, page.id, el.id, { x, y, w, h });
             }}
+            onTransform={(patch) => {
+              projectStore.updateElement(projectId, page.id, el.id, patch);
+            }}
           />
         ))}
 
@@ -2239,6 +2243,7 @@ function ElementView({
   onRotate,
   onEdgeDrag,
   onCornerDrag,
+  onTransform,
   onJumpCad,
 }: {
   el: PageElement;
@@ -2252,13 +2257,85 @@ function ElementView({
   onRotate?: (deltaDeg: number, absolute?: boolean) => void;
   onEdgeDrag?: (edge: "top" | "right" | "bottom" | "left", dx: number, dy: number) => void;
   onCornerDrag?: (corner: "tl" | "tr" | "bl" | "br", dx: number, dy: number, shift: boolean) => void;
+  onTransform?: (patch: Partial<PageElement>) => void;
   onJumpCad?: (sheetId?: string) => void;
 }) {
+
+  type CadCorner = "tl" | "tr" | "bl" | "br";
 
   const dragRef = useRef<{ x: number; y: number } | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const rotateRef = useRef<HTMLDivElement | null>(null);
   const rotateMovedRef = useRef(false);
+  const [activeCadCorner, setActiveCadCorner] = useState<CadCorner>("tl");
+
+  const isCadView = el.kind === "cad-view";
+  const hubBlue = "hsl(217 91% 60%)";
+
+  const cornerSign = (corner: CadCorner) => ({
+    sx: corner === "tl" || corner === "bl" ? -1 : 1,
+    sy: corner === "tl" || corner === "tr" ? -1 : 1,
+  });
+
+  const cadHubPosition = (corner: CadCorner): React.CSSProperties => {
+    if (corner === "tr") return { right: -145, top: -64 };
+    if (corner === "bl") return { left: -145, bottom: -64 };
+    if (corner === "br") return { right: -145, bottom: -64 };
+    return { left: -145, top: -64 };
+  };
+
+  const cadTransformOrigin = (corner: CadCorner) => {
+    if (corner === "tr") return "right top";
+    if (corner === "bl") return "left bottom";
+    if (corner === "br") return "right bottom";
+    return "left top";
+  };
+
+  const buildCadPatchAroundCorner = (
+    corner: CadCorner,
+    rotationDeg: number,
+    wPct: number,
+    hPct: number,
+    fixedPivotPx?: { x: number; y: number },
+  ): Partial<PageElement> | null => {
+    const pageNode = rootRef.current?.parentElement as HTMLElement | null;
+    if (!pageNode) return null;
+    const pageRect = pageNode.getBoundingClientRect();
+    if (pageRect.width <= 0 || pageRect.height <= 0) return null;
+
+    const currentRot = ((el.rotation ?? 0) * Math.PI) / 180;
+    const nextRot = (rotationDeg * Math.PI) / 180;
+    const { sx, sy } = cornerSign(corner);
+    const curW = (el.w / 100) * pageRect.width;
+    const curH = (el.h / 100) * pageRect.height;
+    const curCenter = {
+      x: ((el.x + el.w / 2) / 100) * pageRect.width,
+      y: ((el.y + el.h / 2) / 100) * pageRect.height,
+    };
+    const curLocal = { x: sx * curW / 2, y: sy * curH / 2 };
+    const pivot = fixedPivotPx ?? {
+      x: curCenter.x + curLocal.x * Math.cos(currentRot) - curLocal.y * Math.sin(currentRot),
+      y: curCenter.y + curLocal.x * Math.sin(currentRot) + curLocal.y * Math.cos(currentRot),
+    };
+
+    const nextW = Math.max(2, Math.min(100, wPct));
+    const nextH = Math.max(2, Math.min(100, hPct));
+    const nextWPx = (nextW / 100) * pageRect.width;
+    const nextHPx = (nextH / 100) * pageRect.height;
+    const nextLocal = { x: sx * nextWPx / 2, y: sy * nextHPx / 2 };
+    const nextCenter = {
+      x: pivot.x - (nextLocal.x * Math.cos(nextRot) - nextLocal.y * Math.sin(nextRot)),
+      y: pivot.y - (nextLocal.x * Math.sin(nextRot) + nextLocal.y * Math.cos(nextRot)),
+    };
+
+    return {
+      x: ((nextCenter.x - nextWPx / 2) / pageRect.width) * 100,
+      y: ((nextCenter.y - nextHPx / 2) / pageRect.height) * 100,
+      w: nextW,
+      h: nextH,
+      rotation: ((rotationDeg % 360) + 360) % 360,
+    };
+  };
 
   const startDrag = (e: React.MouseEvent) => {
     if (readOnly) return;
@@ -2270,7 +2347,6 @@ function ElementView({
       if (!dragRef.current) return;
       const dx = ev.clientX - dragRef.current.x;
       const dy = ev.clientY - dragRef.current.y;
-      dragRef.current = { x: ev.clientX, y: ev.clientY };
       onDrag?.(dx, dy);
     };
     const handleUp = () => {
@@ -2296,9 +2372,48 @@ function ElementView({
   };
 
   const handleRotateStart = (e: React.MouseEvent) => {
-    if (readOnly || !onRotate) return;
+    if (readOnly || (!onRotate && !(isCadView && onTransform))) return;
     e.stopPropagation();
     e.preventDefault();
+    if (isCadView && onTransform) {
+      const pageNode = rootRef.current?.parentElement as HTMLElement | null;
+      if (!pageNode) return;
+      const pageRect = pageNode.getBoundingClientRect();
+      const startRot = el.rotation ?? 0;
+      const patch0 = buildCadPatchAroundCorner(activeCadCorner, startRot, el.w, el.h);
+      if (!patch0) return;
+      const { sx, sy } = cornerSign(activeCadCorner);
+      const curRot = (startRot * Math.PI) / 180;
+      const curW = (el.w / 100) * pageRect.width;
+      const curH = (el.h / 100) * pageRect.height;
+      const curCenter = {
+        x: ((el.x + el.w / 2) / 100) * pageRect.width,
+        y: ((el.y + el.h / 2) / 100) * pageRect.height,
+      };
+      const local = { x: sx * curW / 2, y: sy * curH / 2 };
+      const pivot = {
+        x: curCenter.x + local.x * Math.cos(curRot) - local.y * Math.sin(curRot),
+        y: curCenter.y + local.x * Math.sin(curRot) + local.y * Math.cos(curRot),
+      };
+      const pivotClient = { x: pageRect.left + pivot.x, y: pageRect.top + pivot.y };
+      const startAngle = Math.atan2(e.clientY - pivotClient.y, e.clientX - pivotClient.x);
+      rotateMovedRef.current = false;
+      const handleMove = (ev: MouseEvent) => {
+        if (Math.hypot(ev.clientX - e.clientX, ev.clientY - e.clientY) > 3) rotateMovedRef.current = true;
+        const a = Math.atan2(ev.clientY - pivotClient.y, ev.clientX - pivotClient.x);
+        let deg = startRot + ((a - startAngle) * 180) / Math.PI;
+        if (ev.shiftKey) deg = Math.round(deg / 15) * 15;
+        const patch = buildCadPatchAroundCorner(activeCadCorner, deg, el.w, el.h, pivot);
+        if (patch) onTransform(patch);
+      };
+      const handleUp = () => {
+        window.removeEventListener("mousemove", handleMove);
+        window.removeEventListener("mouseup", handleUp);
+      };
+      window.addEventListener("mousemove", handleMove);
+      window.addEventListener("mouseup", handleUp);
+      return;
+    }
     const node = rootRef.current;
     if (!node) return;
     const rect = node.getBoundingClientRect();
@@ -2322,11 +2437,48 @@ function ElementView({
     window.addEventListener("mouseup", handleUp);
   };
 
+  const handleCadScaleStart = (e: React.MouseEvent) => {
+    if (readOnly || !isCadView || !onTransform) return;
+    e.stopPropagation();
+    e.preventDefault();
+    const pageNode = rootRef.current?.parentElement as HTMLElement | null;
+    if (!pageNode) return;
+    const pageRect = pageNode.getBoundingClientRect();
+    const startRot = el.rotation ?? 0;
+    const { sx, sy } = cornerSign(activeCadCorner);
+    const curRot = (startRot * Math.PI) / 180;
+    const curW = (el.w / 100) * pageRect.width;
+    const curH = (el.h / 100) * pageRect.height;
+    const curCenter = {
+      x: ((el.x + el.w / 2) / 100) * pageRect.width,
+      y: ((el.y + el.h / 2) / 100) * pageRect.height,
+    };
+    const local = { x: sx * curW / 2, y: sy * curH / 2 };
+    const pivot = {
+      x: curCenter.x + local.x * Math.cos(curRot) - local.y * Math.sin(curRot),
+      y: curCenter.y + local.x * Math.sin(curRot) + local.y * Math.cos(curRot),
+    };
+    const pivotClient = { x: pageRect.left + pivot.x, y: pageRect.top + pivot.y };
+    const startDist = Math.max(24, Math.hypot(e.clientX - pivotClient.x, e.clientY - pivotClient.y));
+    rotateMovedRef.current = false;
+    const handleMove = (ev: MouseEvent) => {
+      if (Math.hypot(ev.clientX - e.clientX, ev.clientY - e.clientY) > 3) rotateMovedRef.current = true;
+      const dist = Math.max(8, Math.hypot(ev.clientX - pivotClient.x, ev.clientY - pivotClient.y));
+      const factor = Math.max(0.05, Math.min(20, dist / startDist));
+      const patch = buildCadPatchAroundCorner(activeCadCorner, startRot, el.w * factor, el.h * factor, pivot);
+      if (patch) onTransform(patch);
+    };
+    const handleUp = () => {
+      window.removeEventListener("mousemove", handleMove);
+      window.removeEventListener("mouseup", handleUp);
+    };
+    window.addEventListener("mousemove", handleMove);
+    window.addEventListener("mouseup", handleUp);
+  };
+
   const hubKinds = new Set(["cad-view", "pdf", "image"]);
   const showHub = !readOnly && selected && hubKinds.has(el.kind);
   // CAD-Blatt behält nur die blaue Frame-Optik; Bearbeitung bleibt 1:1 wie PDF.
-  const isCadView = el.kind === "cad-view";
-  const hubBlue = "hsl(217 91% 60%)";
   const outlineStyle = selected
     ? (isCadView ? `2px dashed ${hubBlue}` : "2px solid hsl(var(--accent-gold))")
     : "none";
@@ -2444,13 +2596,17 @@ function ElementView({
             data-hub-control
             className="absolute flex items-center gap-1 rounded-md shadow-md"
             style={{
-              left: isCadView ? 14 : undefined,
+              left: isCadView ? undefined : undefined,
               right: isCadView ? undefined : 0,
-              top: isCadView ? 14 : -36,
+              top: isCadView ? undefined : -36,
+              bottom: undefined,
+              ...(isCadView ? cadHubPosition(activeCadCorner) : {}),
               background: "white",
               border: `1px solid ${isCadView ? hubBlue : "hsl(var(--hairline))"}`,
               padding: 3,
               zIndex: 10,
+              transform: isCadView && el.rotation ? `rotate(${-(el.rotation ?? 0)}deg)` : undefined,
+              transformOrigin: isCadView ? cadTransformOrigin(activeCadCorner) : undefined,
             }}
             onMouseDown={(e) => e.stopPropagation()}
           >
@@ -2474,7 +2630,11 @@ function ElementView({
                 onMouseDown={handleRotateStart}
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (!rotateMovedRef.current) onRotate?.(15);
+                  if (!rotateMovedRef.current) {
+                    const patch = buildCadPatchAroundCorner(activeCadCorner, (el.rotation ?? 0) + 15, el.w, el.h);
+                    if (patch) onTransform?.(patch);
+                    else onRotate?.(15);
+                  }
                   rotateMovedRef.current = false;
                 }}
                 title="Drehen (klicken oder ziehen)"
@@ -2494,16 +2654,29 @@ function ElementView({
               </button>
             )}
             {isCadView ? (
-              <button
-                type="button"
-                data-hub-control
-                onClick={(e) => { e.stopPropagation(); onDelete?.(); }}
-                title="Löschen"
-                className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
-                style={{ color: "hsl(0 65% 50%)" }}
-              >
-                <Trash2 size={14} />
-              </button>
+              <>
+                <button
+                  type="button"
+                  data-hub-control
+                  onMouseDown={handleCadScaleStart}
+                  onClick={(e) => e.stopPropagation()}
+                  title="Skalieren (ziehen)"
+                  className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))] cursor-nwse-resize"
+                  style={{ color: hubBlue }}
+                >
+                  <Maximize2 size={14} />
+                </button>
+                <button
+                  type="button"
+                  data-hub-control
+                  onClick={(e) => { e.stopPropagation(); onDelete?.(); }}
+                  title="Löschen"
+                  className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
+                  style={{ color: "hsl(0 65% 50%)" }}
+                >
+                  <Trash2 size={14} />
+                </button>
+              </>
             ) : (
               <>
                 <button
@@ -2538,7 +2711,6 @@ function ElementView({
               const move = (ev: MouseEvent) => {
                 const dx = ev.clientX - last.x;
                 const dy = ev.clientY - last.y;
-                last = { x: ev.clientX, y: ev.clientY };
                 onEdgeDrag(edge, dx, dy);
               };
               const up = () => {
@@ -2579,15 +2751,20 @@ function ElementView({
           })}
 
           {/* Ecken-Handles: quadratisch + blau bei CAD-Blatt, sonst rund + gold */}
-          {!isCadView && onCornerDrag && (["tl", "tr", "bl", "br"] as const).map((corner) => {
+          {(isCadView || onCornerDrag) && (["tl", "tr", "bl", "br"] as const).map((corner) => {
             const startCornerDrag = (e: React.MouseEvent) => {
               e.stopPropagation();
               e.preventDefault();
+              if (isCadView) {
+                setActiveCadCorner(corner);
+                onSelect?.({ shift: e.shiftKey });
+                return;
+              }
+              if (!onCornerDrag) return;
               let last = { x: e.clientX, y: e.clientY };
               const move = (ev: MouseEvent) => {
                 const dx = ev.clientX - last.x;
                 const dy = ev.clientY - last.y;
-                last = { x: ev.clientX, y: ev.clientY };
                 onCornerDrag(corner, dx, dy, ev.shiftKey);
               };
               const up = () => {
@@ -2615,11 +2792,12 @@ function ElementView({
                   width: size,
                   height: size,
                   borderRadius: isCadView ? 2 : 999,
-                  background: "white",
+                  background: isCadView && activeCadCorner === corner ? hubBlue : "white",
                   border: `2px solid ${isCadView ? hubBlue : "hsl(var(--accent-gold))"}`,
                   boxShadow: "0 1px 3px rgba(0,0,0,0.25)",
-                  cursor,
+                  cursor: isCadView ? "crosshair" : cursor,
                   zIndex: 6,
+                  transform: isCadView && el.rotation ? `rotate(${-(el.rotation ?? 0)}deg)` : undefined,
                 } as React.CSSProperties}
               />
             );
