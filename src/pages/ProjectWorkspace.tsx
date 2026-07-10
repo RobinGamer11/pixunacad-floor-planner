@@ -4402,33 +4402,15 @@ function ElementInspector({
         />
       </Row>
 
-      {element.kind === "cad-view" && (
-        <>
-          <Row label="Maßstab">
-            <input
-              value={element.scale ?? "1:100"}
-              onChange={(e) => update({ scale: e.target.value })}
-              className="w-full h-8 px-2 rounded bg-transparent border text-sm"
-              style={{ borderColor: "hsl(var(--hairline))" }}
-            />
-          </Row>
-          <button
-            onClick={() => onJumpCad(element.sheetId)}
-            className="w-full h-9 rounded-md text-sm font-medium flex items-center justify-center gap-2"
-            style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
-          >
-            <ExternalLink size={14} /> Im CAD öffnen
-          </button>
-        </>
+      {element.kind !== "cad-view" && (
+        <button
+          onClick={() => projectStore.deleteElement(projectId, pageId, element.id)}
+          className="w-full h-9 rounded-md text-sm border flex items-center justify-center gap-2 mt-2"
+          style={{ borderColor: "hsl(var(--hairline))", color: "hsl(0 60% 50%)" }}
+        >
+          <Trash2 size={14} /> Element löschen
+        </button>
       )}
-
-      <button
-        onClick={() => projectStore.deleteElement(projectId, pageId, element.id)}
-        className="w-full h-9 rounded-md text-sm border flex items-center justify-center gap-2 mt-2"
-        style={{ borderColor: "hsl(var(--hairline))", color: "hsl(0 60% 50%)" }}
-      >
-        <Trash2 size={14} /> Element löschen
-      </button>
     </div>
   );
 }
