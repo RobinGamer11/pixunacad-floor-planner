@@ -4278,42 +4278,46 @@ function ElementInspector({
       <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-1">
         {element.kind.toUpperCase()}
       </div>
-      <Row label="Breite">
-        <input
-          type="number"
-          value={Math.round(element.w)}
-          onChange={(e) => update({ w: Number(e.target.value) })}
-          className="w-full h-8 px-2 rounded bg-transparent border text-sm"
-          style={{ borderColor: "hsl(var(--hairline))" }}
-        />
-      </Row>
-      <Row label="Höhe">
-        <input
-          type="number"
-          value={Math.round(element.h)}
-          onChange={(e) => update({ h: Number(e.target.value) })}
-          className="w-full h-8 px-2 rounded bg-transparent border text-sm"
-          style={{ borderColor: "hsl(var(--hairline))" }}
-        />
-      </Row>
-      <Row label="Position X">
-        <input
-          type="number"
-          value={Math.round(element.x)}
-          onChange={(e) => update({ x: Number(e.target.value) })}
-          className="w-full h-8 px-2 rounded bg-transparent border text-sm"
-          style={{ borderColor: "hsl(var(--hairline))" }}
-        />
-      </Row>
-      <Row label="Position Y">
-        <input
-          type="number"
-          value={Math.round(element.y)}
-          onChange={(e) => update({ y: Number(e.target.value) })}
-          className="w-full h-8 px-2 rounded bg-transparent border text-sm"
-          style={{ borderColor: "hsl(var(--hairline))" }}
-        />
-      </Row>
+      {element.kind !== "cad-view" && (
+        <>
+          <Row label="Breite">
+            <input
+              type="number"
+              value={Math.round(element.w)}
+              onChange={(e) => update({ w: Number(e.target.value) })}
+              className="w-full h-8 px-2 rounded bg-transparent border text-sm"
+              style={{ borderColor: "hsl(var(--hairline))" }}
+            />
+          </Row>
+          <Row label="Höhe">
+            <input
+              type="number"
+              value={Math.round(element.h)}
+              onChange={(e) => update({ h: Number(e.target.value) })}
+              className="w-full h-8 px-2 rounded bg-transparent border text-sm"
+              style={{ borderColor: "hsl(var(--hairline))" }}
+            />
+          </Row>
+          <Row label="Position X">
+            <input
+              type="number"
+              value={Math.round(element.x)}
+              onChange={(e) => update({ x: Number(e.target.value) })}
+              className="w-full h-8 px-2 rounded bg-transparent border text-sm"
+              style={{ borderColor: "hsl(var(--hairline))" }}
+            />
+          </Row>
+          <Row label="Position Y">
+            <input
+              type="number"
+              value={Math.round(element.y)}
+              onChange={(e) => update({ y: Number(e.target.value) })}
+              className="w-full h-8 px-2 rounded bg-transparent border text-sm"
+              style={{ borderColor: "hsl(var(--hairline))" }}
+            />
+          </Row>
+        </>
+      )}
 
       {element.kind === "text" && (
         <>
