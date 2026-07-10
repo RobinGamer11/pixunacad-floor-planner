@@ -2016,6 +2016,11 @@ export class CadApp {
       }
 
       if (e.key === "Delete" || e.key === "Backspace") {
+        // Marquee-Auswahl hat Vorrang: mehrere Elemente in einem Rutsch löschen.
+        if (this.activeTool === this.selectTool && this.selectTool.marqueeSelectedIds.length > 0) {
+          this.selectTool.deleteMarqueeSelection();
+          return;
+        }
         // Plan-Modus: zuerst Projektion-Selektion versuchen zu löschen.
         if (this.activePlanId && this.planController?.deleteSelected()) {
           return;

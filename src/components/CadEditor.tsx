@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { FreeDrawSettingsPanel } from "@/components/cad/FreeDrawSettingsPanel";
 import { EraserSettingsPanel } from "@/components/cad/EraserSettingsPanel";
 import { WallSettingsPanel } from "@/components/cad/WallSettingsPanel";
+import { SelectSettingsPanel } from "@/components/cad/SelectSettingsPanel";
 import { DocumentFilterPanel } from "@/components/cad/DocumentFilterPanel";
 
 const CAD_TOOLS = [
@@ -2380,6 +2381,11 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           {/* Eraser-Tool-Panel */}
           {activeTool === ToolIds.ERASER && (
             <EraserSettingsPanel app={appRef.current} />
+          )}
+
+          {/* Select-Tool-Panel (Marquee-Modus: Berühren / Umschließen) */}
+          {activeTool === ToolIds.SELECT && (
+            <SelectSettingsPanel app={appRef.current} />
           )}
 
           {/* Wand-Tool-Panel */}
