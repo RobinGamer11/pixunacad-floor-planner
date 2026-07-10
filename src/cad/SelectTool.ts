@@ -129,6 +129,16 @@ export class SelectTool {
   // Erzeugen vertikale + horizontale Hilfslinien durch jeden Anker, deren Schnittpunkte und Achsen snappen.
   editGuideAnchors: { key: string; point: Vec2 }[] = [];
 
+  // ── Marquee (Rahmen-Auswahl) ─────────────────────────────────────────────
+  // Zwei Modi analog zu Archicad:
+  //   "touch"   → Crossing: alle Elemente, die den Rahmen berühren/schneiden
+  //   "enclose" → Window: nur Elemente, die vollständig im Rahmen liegen
+  marqueeMode: "touch" | "enclose" = "touch";
+  marqueeStart: Vec2 | null = null;    // Screen-Pixel
+  marqueeCurrent: Vec2 | null = null;  // Screen-Pixel
+  marqueeActive = false;
+  marqueeSelectedIds: { kind: string; id: string }[] = [];
+
 
   constructor(app: CadApp) {
     this.app = app;
