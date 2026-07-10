@@ -1656,6 +1656,27 @@ type ToolSettings = {
   };
 };
 
+const DEFAULT_TOOL_SETTINGS: ToolSettings = {
+  select: { multi: false },
+  guide: { color: "#7DD3FC", strokeWidth: 1, locked: false },
+  line: { color: "#111111", thicknessMm: 0.5, alpha: 100 },
+  text: {
+    fontSize: 11,
+    color: "#111111",
+    bold: false,
+    italic: false,
+    alpha: 100,
+    align: "left",
+    bgColor: "#ffffff",
+    bgAlphaPct: 0,
+    wrap: false,
+    autoSize: true,
+    borderEnabled: false,
+    borderColor: "#111111",
+    borderWidthPx: 1,
+  },
+};
+
 /**
  * Kleiner Griff oben auf jeder Seite im Free-Spread-Modus.
  * Ermöglicht Ziehen der Seite in mm mit Snap zu Kanten benachbarter Seiten.
