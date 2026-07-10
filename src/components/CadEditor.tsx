@@ -2383,6 +2383,11 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             <EraserSettingsPanel app={appRef.current} />
           )}
 
+          {/* Select-Tool-Panel (Marquee-Modus: Berühren / Umschließen) */}
+          {activeTool === ToolIds.SELECT && (
+            <SelectSettingsPanel app={appRef.current} />
+          )}
+
           {/* Wand-Tool-Panel */}
           {(activeTool === ToolIds.WALL || (activeTool === ToolIds.SELECT && selectedWallId)) && (
             <WallSettingsPanel app={appRef.current} />
