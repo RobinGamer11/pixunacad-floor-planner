@@ -2398,81 +2398,14 @@ function ElementView({
   onJumpCad?: (sheetId?: string) => void;
 }) {
 
-  type CadCorner = "tl" | "tr" | "bl" | "br";
-
   const dragRef = useRef<{ x: number; y: number } | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const rotateRef = useRef<HTMLDivElement | null>(null);
   const rotateMovedRef = useRef(false);
-  const [activeCadCorner, setActiveCadCorner] = useState<CadCorner>("tl");
 
   const isCadView = el.kind === "cad-view";
   const hubBlue = "hsl(217 91% 60%)";
 
-  const cornerSign = (corner: CadCorner) => ({
-    sx: corner === "tl" || corner === "bl" ? -1 : 1,
-    sy: corner === "tl" || corner === "tr" ? -1 : 1,
-  });
-
-  const cadHubPosition = (corner: CadCorner): React.CSSProperties => {
-    if (corner === "tr") return { right: -145, top: -64 };
-    if (corner === "bl") return { left: -145, bottom: -64 };
-    if (corner === "br") return { right: -145, bottom: -64 };
-    return { left: -145, top: -64 };
-  };
-
-  const cadTransformOrigin = (corner: CadCorner) => {
-    if (corner === "tr") return "right top";
-    if (corner === "bl") return "left bottom";
-    if (corner === "br") return "right bottom";
-    return "left top";
-  };
-
-  const buildCadPatchAroundCorner = (
-    corner: CadCorner,
-    rotationDeg: number,
-    wPct: number,
-    hPct: number,
-    fixedPivotPx?: { x: number; y: number },
-  ): Partial<PageElement> | null => {
-    const pageNode = rootRef.current?.parentElement as HTMLElement | null;
-    if (!pageNode) return null;
-    const pageRect = pageNode.getBoundingClientRect();
-    if (pageRect.width <= 0 || pageRect.height <= 0) return null;
-
-    const currentRot = ((el.rotation ?? 0) * Math.PI) / 180;
-    const nextRot = (rotationDeg * Math.PI) / 180;
-    const { sx, sy } = cornerSign(corner);
-    const curW = (el.w / 100) * pageRect.width;
-    const curH = (el.h / 100) * pageRect.height;
-    const curCenter = {
-      x: ((el.x + el.w / 2) / 100) * pageRect.width,
-      y: ((el.y + el.h / 2) / 100) * pageRect.height,
-    };
-    const curLocal = { x: sx * curW / 2, y: sy * curH / 2 };
-    const pivot = fixedPivotPx ?? {
-      x: curCenter.x + curLocal.x * Math.cos(currentRot) - curLocal.y * Math.sin(currentRot),
-      y: curCenter.y + curLocal.x * Math.sin(currentRot) + curLocal.y * Math.cos(currentRot),
-    };
-
-    const nextW = Math.max(2, Math.min(100, wPct));
-    const nextH = Math.max(2, Math.min(100, hPct));
-    const nextWPx = (nextW / 100) * pageRect.width;
-    const nextHPx = (nextH / 100) * pageRect.height;
-    const nextLocal = { x: sx * nextWPx / 2, y: sy * nextHPx / 2 };
-    const nextCenter = {
-      x: pivot.x - (nextLocal.x * Math.cos(nextRot) - nextLocal.y * Math.sin(nextRot)),
-      y: pivot.y - (nextLocal.x * Math.sin(nextRot) + nextLocal.y * Math.cos(nextRot)),
-    };
-
-    return {
-      x: ((nextCenter.x - nextWPx / 2) / pageRect.width) * 100,
-      y: ((nextCenter.y - nextHPx / 2) / pageRect.height) * 100,
-      w: nextW,
-      h: nextH,
-      rotation: ((rotationDeg % 360) + 360) % 360,
-    };
-  };
 
   const startDrag = (e: React.MouseEvent) => {
     if (readOnly) return;
