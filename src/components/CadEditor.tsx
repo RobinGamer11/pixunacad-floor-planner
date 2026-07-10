@@ -59,12 +59,15 @@ export interface CadEditorHandle {
   redo: () => void;
   exportPdf: () => void;
   openExportPanel: () => void;
+  deleteSelection: () => void;
+  hasDeletableSelection: () => boolean;
 }
 
 interface CadEditorProps {
   projectId?: string;
   onHistoryChange?: (canUndo: boolean, canRedo: boolean) => void;
   onZoomChange?: (percent: number) => void;
+  onCanDeleteChange?: (canDelete: boolean) => void;
 }
 const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId, onHistoryChange, onZoomChange }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
