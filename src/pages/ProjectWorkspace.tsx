@@ -4057,7 +4057,6 @@ function CadToolSection({
   const navigate = useNavigate();
   const page = project.pages.find((p) => p.id === pageId);
   const placed = (page?.elements ?? []).filter((e) => e.kind === "cad-view");
-  const [chosenSheet, setChosenSheet] = useState<string>("");
   const [pdfOpen, setPdfOpen] = useState<boolean>(false);
   const [pdfPickedSheet, setPdfPickedSheet] = useState<string | null>(null);
 
@@ -4066,26 +4065,6 @@ function CadToolSection({
     navigate(`/project/${projectId}/cad?sheetPdf=${encodeURIComponent(sheetId)}&mode=${mode}`);
   };
 
-  const placeSheet = () => {
-    if (!pageId || !chosenSheet) return;
-    const sheet = project.sheets.find((s) => s.id === chosenSheet);
-    if (!sheet) return;
-    const picked = askPlanScale(sheet.scale ?? "1:100");
-    if (!picked) return;
-    const id = projectStore.addElement(projectId, pageId, {
-      kind: "cad-view",
-      x: 20,
-      y: 20,
-      w: 50,
-      h: 35,
-      sheetId: sheet.id,
-      scale: picked,
-      // Aktuelle Ansicht + Zoom der CAD-Oberfläche einfrieren (Snapshot).
-      viewSnapshot: sheet.thumbnail,
-      lastSyncAt: new Date().toISOString(),
-    });
-    setSelectedElementId(id);
-  };
 
   return (
     <div className="space-y-3">
