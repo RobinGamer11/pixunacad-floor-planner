@@ -1514,6 +1514,31 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             <option value="↑">↑</option>
             <option value="↓">↓</option>
           </select>
+          <button
+            type="button"
+            title="Textbox löschen"
+            onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+            onClick={(e) => {
+              e.preventDefault(); e.stopPropagation();
+              const app = appRef.current as any;
+              if (!app) return;
+              const sel = app.selection;
+              const boxId = sel?.textBoxId;
+              try { app.textEditor?.commit?.(); } catch {}
+              if (boxId) {
+                const box = app.scene.getTextBoxById?.(boxId);
+                if (box) {
+                  app.scene.removeTextBox(box);
+                  app.clearSelection?.();
+                  app.refreshLabelUI?.();
+                }
+              }
+            }}
+            className="cad-toolbar-btn h-7 w-7 justify-center px-0"
+            style={{ color: "hsl(0 65% 50%)" }}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
         </div>
 
         {/* Text Editor (contenteditable) */}

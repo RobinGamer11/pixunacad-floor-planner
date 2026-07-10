@@ -137,10 +137,10 @@ export function WorkspaceHeader({
           <Play size={13} /> Präsentieren
         </button>
         <button
-          onClick={onShare}
-          className="h-8 px-2.5 rounded-md border text-xs flex items-center gap-1.5"
+          disabled
+          className="h-8 px-2.5 rounded-md border text-xs flex items-center gap-1.5 opacity-50 cursor-not-allowed"
           style={{ borderColor: "hsl(var(--hairline))", color: "hsl(var(--ink))" }}
-          title="Teilen"
+          title="Teilen — kommt später (wird mit Team-Funktion kombiniert)"
         >
           <Share2 size={13} /> Teilen
         </button>

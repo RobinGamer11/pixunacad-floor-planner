@@ -8,9 +8,20 @@ const CadPage = () => {
   const { projectId } = useParams();
   const project = useProject(projectId);
   const editorRef = useRef<CadEditorHandle | null>(null);
+  const mainRef = useRef<HTMLElement | null>(null);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [zoom, setZoom] = useState<number | undefined>(undefined);
+
+  const handlePresent = () => {
+    const el = mainRef.current;
+    if (!el) return;
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    } else {
+      el.requestFullscreen?.().catch(() => {});
+    }
+  };
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden">
@@ -23,11 +34,11 @@ const CadPage = () => {
         onUndo={() => editorRef.current?.undo()}
         onRedo={() => editorRef.current?.redo()}
         zoomPercent={zoom}
-        onPresent={() => {}}
+        onPresent={handlePresent}
         onShare={() => {}}
         onExport={() => editorRef.current?.openExportPanel()}
       />
-      <main className="flex-1 relative min-h-0">
+      <main ref={mainRef} className="flex-1 relative min-h-0 bg-background">
         <CadEditor
           ref={editorRef}
           projectId={projectId}
@@ -40,3 +51,4 @@ const CadPage = () => {
 };
 
 export default CadPage;
+
