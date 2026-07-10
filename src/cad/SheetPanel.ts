@@ -1,4 +1,4 @@
-import { SheetManager, SheetOverlayStore, OverlayMode, OverlayColors, SheetDefaults, SheetScales, getSheetScaleValue } from "./SheetManager";
+import { SheetManager, SheetOverlayStore, OverlayMode, OverlayColors } from "./SheetManager";
 
 /**
  * Floating-Panel für Zeichnungs-IDs (Blätter) inkl. Transparentpause.
@@ -174,14 +174,13 @@ export class SheetPanel {
 
       const main = document.createElement("div");
       main.className = "sheet-main";
-      const scaleVal = getSheetScaleValue(sheet);
-      const scaleLabel = sheet.scaleKey === "free"
-        ? `frei 1:${Math.round(scaleVal)}`
-        : (sheet.scaleKey || SheetDefaults.defaultScaleKey);
+      // Maßstab ist im Modellbereich immer 1:1 — Ausgabemaßstab wird erst
+      // beim Einfügen in die Projektmappe gewählt.
       main.innerHTML = `
         <div class="sheet-name">${this._esc(sheet.name)}</div>
-        <div class="sheet-sub">Blatt · ${this._esc(scaleLabel)}</div>
+        <div class="sheet-sub">Blatt · 1:1</div>
       `;
+
       main.addEventListener("click", () => {
         this.cb.setActiveSheetId(sheet.id);
       });
@@ -241,46 +240,11 @@ export class SheetPanel {
       });
 
 
-      // Maßstab-Auswahl: native <select> für robustes UI
-      const scaleSel = document.createElement("select");
-      scaleSel.className = "sheet-scale-select";
-      scaleSel.title = "Maßstab des Blatts (für Plan-Projektion)";
-      for (const s of SheetScales) {
-        const opt = document.createElement("option");
-        opt.value = s.key;
-        opt.textContent = s.label;
-        if ((sheet.scaleKey || SheetDefaults.defaultScaleKey) === s.key) opt.selected = true;
-        scaleSel.appendChild(opt);
-      }
-      const freeOpt = document.createElement("option");
-      freeOpt.value = "free";
-      freeOpt.textContent = "Frei…";
-      if (sheet.scaleKey === "free") freeOpt.selected = true;
-      scaleSel.appendChild(freeOpt);
-      scaleSel.addEventListener("click", (e) => e.stopPropagation());
-      scaleSel.addEventListener("change", (e) => {
-        e.stopPropagation();
-        const val = scaleSel.value;
-        if (val === "free") {
-          const current = getSheetScaleValue(sheet);
-          const input = prompt("Freier Maßstab — bitte Wert eingeben (z.B. 75 für 1:75):", String(current));
-          if (input == null) {
-            scaleSel.value = sheet.scaleKey || SheetDefaults.defaultScaleKey;
-            return;
-          }
-          const num = parseFloat(input.replace(",", "."));
-          if (!isFinite(num) || num <= 0) {
-            scaleSel.value = sheet.scaleKey || SheetDefaults.defaultScaleKey;
-            return;
-          }
-          this.manager.setScale(sheet.id, "free", num);
-        } else {
-          this.manager.setScale(sheet.id, val);
-        }
-        this.cb.onChange();
-      });
+      // Maßstab-Auswahl im Modellbereich entfernt — Zeichnungen liegen
+      // grundsätzlich 1:1 vor. Der Ausgabemaßstab wird erst beim Ablegen
+      // eines Blatts in die Projektmappe / einen Plan abgefragt.
 
-      actions.appendChild(scaleSel);
+
       actions.appendChild(visBtn);
       actions.appendChild(editBtn);
       actions.appendChild(deleteBtn);
