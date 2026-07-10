@@ -1399,6 +1399,16 @@ export default function ProjectWorkspace() {
       </div>
       </div>
     </div>
+    {presenting && project && (
+      <PresenterOverlay
+        pages={project.pages}
+        initialIndex={Math.max(0, project.pages.findIndex((p) => p.id === activePageId))}
+        projectId={project.id}
+        onClose={() => setPresenting(false)}
+        onSelectPage={(id) => setActivePageId(id)}
+      />
+    )}
+    </>
   );
 }
 
