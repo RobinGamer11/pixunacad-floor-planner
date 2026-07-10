@@ -77,7 +77,7 @@ import { CadDocumentInspector } from "@/components/page/CadDocumentInspector";
 import { CadIdPanelHost } from "@/components/page/CadIdPanelHost";
 import { PdfPageView } from "@/components/page/PdfPageView";
 import { importFile, type ImportedPage } from "@/cad/documentImport";
-import { base64ToBytes, popPendingSheetPdf } from "@/lib/sheetPdfExport";
+import { popPendingSheetPdf } from "@/lib/sheetPdfExport";
 import type { MiniCadSelectionInfo } from "@/cad/embed/MiniCad";
 import type { HatchDrawMode } from "@/cad/HatchTool";
 import { FreeDrawSettingsPanel } from "@/components/cad/FreeDrawSettingsPanel";
@@ -412,35 +412,44 @@ export default function ProjectWorkspace() {
     }
   };
 
-  // Nach Rückkehr aus der CAD-Oberfläche: falls dort ein Zeichenblatt als PDF
-  // exportiert wurde, holen wir das Ergebnis aus sessionStorage und schleusen
-  // es durch die normale Import-Pipeline.
+  // Nach Rückkehr aus der CAD-Oberfläche: falls dort ein Zeichenblatt
+  // übergeben wurde, fügen wir es als verknüpfte cad-view-Ansicht auf die
+  // ursprünglich aktive Seite ein (kein statisches PDF). Die Ansicht kann
+  // später über den "Aktualisieren"-Knopf im Inspector erneut aus der
+  // aktuellen CAD-Zeichnung eingefroren werden. Größe/Position/Maßstab
+  // bleiben dabei erhalten (Archicad-typisch).
   useEffect(() => {
     if (!projectId) return;
     const pending = popPendingSheetPdf(projectId);
     if (!pending) return;
-    (async () => {
-      setDocImporting(true);
-      try {
-        const bytes = base64ToBytes(pending.pdfBase64);
-        const ab = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
-        const file = new File([ab], `${pending.sheetName}.pdf`, { type: "application/pdf" });
-        const pages = await importFile(file);
-        if (pages.length === 0) return;
-        // CAD-Blatt-PDF: Maßstab ist bekannt → Dialog überspringen, damit
-        // 1cm-Papier = z.B. 1m real (bei 1:100) exakt eingehalten wird.
-        const m = String(pending.sheetScale || "1:100").match(/1\s*:\s*(\d+(?:[.,]\d+)?)/);
-        const denom = m ? parseFloat(m[1].replace(",", ".")) : 100;
-        setScaleChoice(String(denom));
-        setScaleCustom(String(denom));
-        setScaleDialogPages(pages);
-      } catch (err: any) {
-        window.alert("Import des CAD-Blatts fehlgeschlagen: " + (err?.message || err));
-      } finally {
-        setDocImporting(false);
-      }
-    })();
+    try {
+      const targetPageId = pending.returnPageId || project?.pages[0]?.id;
+      if (!targetPageId) return;
+      const targetPage = project?.pages.find((p) => p.id === targetPageId);
+      const fmt = targetPage ? FORMAT_SIZES[targetPage.format] : FORMAT_SIZES["A3-quer"];
+      const paperW = pending.paperWidthMm ?? 100;
+      const paperH = pending.paperHeightMm ?? 100;
+      const wPct = Math.max(2, Math.min(95, (paperW / fmt.w) * 100));
+      const hPct = Math.max(2, Math.min(95, (paperH / fmt.h) * 100));
+      const xPct = Math.max(0, (100 - wPct) / 2);
+      const yPct = Math.max(0, (100 - hPct) / 2);
+      projectStore.addElement(projectId, targetPageId, {
+        kind: "cad-view",
+        sheetId: pending.sheetId,
+        scale: pending.sheetScale,
+        viewSnapshot: pending.snapshotPng,
+        lastSyncAt: new Date().toISOString(),
+        x: xPct,
+        y: yPct,
+        w: wPct,
+        h: hPct,
+      });
+      setActivePageId(targetPageId);
+    } catch (err: any) {
+      window.alert("Einfügen des CAD-Blatts fehlgeschlagen: " + (err?.message || err));
+    }
   }, [projectId]);
+
 
   const confirmDocumentPagePicker = () => {
     if (!docPickerPages) return;
@@ -4062,9 +4071,10 @@ function CadToolSection({
   const [pickScale, setPickScale] = useState<Record<string, string>>({});
 
   const goCadForSheetPdf = (sheetId: string, mode: "view" | "frame", scale: string) => {
-    if (!projectId) return;
-    navigate(`/project/${projectId}/cad?sheetPdf=${encodeURIComponent(sheetId)}&mode=${mode}&scale=${encodeURIComponent(scale)}`);
+    if (!projectId || !pageId) return;
+    navigate(`/project/${projectId}/cad?sheetPdf=${encodeURIComponent(sheetId)}&mode=${mode}&scale=${encodeURIComponent(scale)}&pageId=${encodeURIComponent(pageId)}`);
   };
+
 
 
 

@@ -84,7 +84,13 @@ export interface PendingSheetPdf {
   /** Nennmaßstab des Quell-Blatts (z.B. "1:100") — erlaubt exakten Import
    *  ohne Skalier-Dialog. */
   sheetScale?: string;
+  /** Papiergröße (mm) — nötig für Layout des cad-view Elements. */
+  paperWidthMm?: number;
+  paperHeightMm?: number;
+  /** PNG-Snapshot des Ausschnitts (DataURL) — Vorschau des verknüpften Blatts. */
+  snapshotPng?: string;
 }
+
 
 export function pendingSheetPdfKey(projectId: string): string {
   return `pixuna.pendingSheetPdf.${projectId}`;

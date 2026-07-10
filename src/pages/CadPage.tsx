@@ -33,12 +33,19 @@ const CadPage = () => {
   const sheetPdfId = params.get("sheetPdf");
   const sheetPdfMode = (params.get("mode") as "view" | "frame" | null) ?? "view";
   const sheetPdfScale = params.get("scale") ?? undefined;
+  const sheetPdfPageId = params.get("pageId") ?? undefined;
   const [busy, setBusy] = useState(false);
 
   // Rahmen-Auswahl (CSS-Pixel im Fenster; wird in Canvas-Koordinaten umgerechnet).
   const [frameStart, setFrameStart] = useState<{ x: number; y: number } | null>(null);
   const [frameRect, setFrameRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const [dragging, setDragging] = useState(false);
+  // Rahmen-Werkzeug ist NICHT dauerhaft aktiv — Nutzer bewegt sich normal
+  // in der CAD-Oberfläche und aktiviert das Aufziehen explizit über einen
+  // Button ("Rahmen ziehen"). Nach dem PointerUp wird das Werkzeug wieder
+  // entwaffnet, damit Pan/Zoom sofort weitergehen.
+  const [frameArmed, setFrameArmed] = useState(false);
+
 
   const handlePresent = () => {
     const el = mainRef.current;
@@ -94,17 +101,30 @@ const CadPage = () => {
     const paperWmm = (worldWm * 1000) / scaleValue;
     const paperHmm = (worldHm * 1000) / scaleValue;
 
+    // PNG-Snapshot des Ausschnitts (für verknüpfte cad-view-Ansicht).
+    const tmp = document.createElement("canvas");
+    tmp.width = Math.max(1, Math.round(pxRect.w));
+    tmp.height = Math.max(1, Math.round(pxRect.h));
+    const tctx = tmp.getContext("2d")!;
+    tctx.fillStyle = "#ffffff";
+    tctx.fillRect(0, 0, tmp.width, tmp.height);
+    tctx.drawImage(canvas, pxRect.x, pxRect.y, pxRect.w, pxRect.h, 0, 0, tmp.width, tmp.height);
+    const snapshotPng = tmp.toDataURL("image/png");
+
     setBusy(true);
     try {
       const bytes = await canvasRegionToPdfBytes(canvas, pxRect, paperWmm, paperHmm);
       stashPendingSheetPdf({
         projectId,
-        returnPageId: "",
+        returnPageId: sheetPdfPageId ?? "",
         sheetId: sheetPdfId,
         sheetName: sheet?.name || "CAD-Blatt",
         mode: sheetPdfMode,
         pdfBase64: bytesToBase64(bytes),
         sheetScale: effectiveScale,
+        paperWidthMm: paperWmm,
+        paperHeightMm: paperHmm,
+        snapshotPng,
       });
       navigate(`/project/${projectId}`);
     } catch (err: any) {
@@ -116,18 +136,20 @@ const CadPage = () => {
 
   const cancelSheetPdf = () => {
     if (!projectId) return;
+
     navigate(`/project/${projectId}`);
   };
 
   // Rahmen-Interaktion: nur aktiv im Rahmen-Modus. Ein transparenter Overlay
   // fängt Maus-Events, damit die CAD-Tools nicht mitlaufen.
   const onFramePointerDown = (e: React.PointerEvent) => {
-    if (sheetPdfMode !== "frame") return;
+    if (sheetPdfMode !== "frame" || !frameArmed) return;
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     setFrameStart({ x: e.clientX, y: e.clientY });
     setFrameRect({ x: e.clientX, y: e.clientY, w: 0, h: 0 });
     setDragging(true);
   };
+
   const onFramePointerMove = (e: React.PointerEvent) => {
     if (!dragging || !frameStart) return;
     const x = Math.min(frameStart.x, e.clientX);
@@ -139,8 +161,10 @@ const CadPage = () => {
   const onFramePointerUp = (e: React.PointerEvent) => {
     if (!dragging) return;
     setDragging(false);
+    setFrameArmed(false); // Nach Aufziehen automatisch entwaffnen → Pan/Zoom wieder normal.
     try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch {}
   };
+
 
   useEffect(() => {
     // Beim Moduswechsel Rahmen zurücksetzen.
@@ -175,12 +199,18 @@ const CadPage = () => {
           onCanDeleteChange={setCanDelete}
         />
 
-        {/* Rahmen-Overlay: fängt Maus-Events, damit der Nutzer einen Ausschnitt
-            aufziehen kann. Nur aktiv im 'frame'-Modus. */}
+        {/* Rahmen-Overlay: Standardmäßig transparent für Pointer-Events, damit
+            der Nutzer sich frei in der CAD-Oberfläche bewegen kann (Pan/Zoom).
+            Erst wenn "Rahmen ziehen" gedrückt wurde, fängt das Overlay einen
+            einzigen Aufzieh-Vorgang ab. */}
         {sheetPdfId && sheetPdfMode === "frame" && (
           <div
             className="absolute inset-0 z-40"
-            style={{ cursor: "crosshair", background: "rgba(0,0,0,0.02)" }}
+            style={{
+              cursor: frameArmed ? "crosshair" : "default",
+              background: frameArmed ? "rgba(0,0,0,0.02)" : "transparent",
+              pointerEvents: frameArmed ? "auto" : "none",
+            }}
             onPointerDown={onFramePointerDown}
             onPointerMove={onFramePointerMove}
             onPointerUp={onFramePointerUp}
@@ -206,6 +236,7 @@ const CadPage = () => {
           </div>
         )}
 
+
         {sheetPdfId && (
           <div
             className="absolute top-2 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-3 py-2 rounded-md shadow-lg border"
@@ -216,15 +247,29 @@ const CadPage = () => {
           >
             <div className="text-xs">
               <div className="font-semibold">
-                PDF-Export → Projektmappe
+                CAD-Blatt → Projektmappe
               </div>
               <div className="text-muted-foreground">
                 {sheetPdfMode === "view" && "Aktuelle Ansicht wird im richtigen Maßstab übernommen."}
-                {sheetPdfMode === "frame" && (frameRect
-                  ? "Rahmen mit Häkchen bestätigen — oder neu aufziehen."
-                  : "Bitte einen Rahmen aufziehen und mit Häkchen bestätigen.")}
+                {sheetPdfMode === "frame" && (frameArmed
+                  ? "Rahmen aufziehen…"
+                  : (frameRect
+                    ? "Rahmen mit Häkchen bestätigen — oder neu ziehen."
+                    : "Frei bewegen · dann „Rahmen ziehen“ zum Aufziehen."))}
               </div>
             </div>
+            {sheetPdfMode === "frame" && (
+              <button
+                type="button"
+                onClick={() => setFrameArmed(true)}
+                disabled={busy || frameArmed}
+                className="h-8 px-2 rounded-md border text-xs disabled:opacity-50"
+                style={{ borderColor: "hsl(var(--hairline))" }}
+                title="Rahmen ziehen"
+              >
+                Rahmen ziehen
+              </button>
+            )}
             <button
               type="button"
               onClick={confirmSheetPdf}
@@ -235,6 +280,7 @@ const CadPage = () => {
             >
               <Check size={16} />
             </button>
+
             <button
               type="button"
               onClick={cancelSheetPdf}
