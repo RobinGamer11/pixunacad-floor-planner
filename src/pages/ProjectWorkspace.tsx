@@ -427,8 +427,12 @@ export default function ProjectWorkspace() {
         const file = new File([ab], `${pending.sheetName}.pdf`, { type: "application/pdf" });
         const pages = await importFile(file);
         if (pages.length === 0) return;
-        setScaleChoice(pages[0].kind === "pdf-page" ? "100" : "1");
-        setScaleCustom("100");
+        // CAD-Blatt-PDF: Maßstab ist bekannt → Dialog überspringen, damit
+        // 1cm-Papier = z.B. 1m real (bei 1:100) exakt eingehalten wird.
+        const m = String(pending.sheetScale || "1:100").match(/1\s*:\s*(\d+(?:[.,]\d+)?)/);
+        const denom = m ? parseFloat(m[1].replace(",", ".")) : 100;
+        setScaleChoice(String(denom));
+        setScaleCustom(String(denom));
         setScaleDialogPages(pages);
       } catch (err: any) {
         window.alert("Import des CAD-Blatts fehlgeschlagen: " + (err?.message || err));
