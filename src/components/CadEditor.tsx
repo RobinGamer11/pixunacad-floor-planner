@@ -2928,6 +2928,17 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       ) : (
         <div
           className="w-7 shrink-0 border-l flex items-start justify-center pt-3"
+          style={{ borderColor: "hsl(var(--hairline))" }}
+        >
+          <button
+            onClick={() => setRightOpen(true)}
+            title="Panel einblenden"
+            className="h-7 w-7 rounded-md flex items-center justify-center hover:bg-muted"
+          >
+            <PanelRightOpen size={14} style={{ color: "hsl(var(--ink-soft))" }} />
+          </button>
+        </div>
+      )}
     </div>
   );
 });
