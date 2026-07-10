@@ -32,6 +32,7 @@ const CadPage = () => {
   const params = new URLSearchParams(location.search);
   const sheetPdfId = params.get("sheetPdf");
   const sheetPdfMode = (params.get("mode") as "view" | "frame" | null) ?? "view";
+  const sheetPdfScale = params.get("scale") ?? undefined;
   const [busy, setBusy] = useState(false);
 
   // Rahmen-Auswahl (CSS-Pixel im Fenster; wird in Canvas-Koordinaten umgerechnet).
