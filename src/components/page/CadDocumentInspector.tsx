@@ -144,12 +144,19 @@ export function CadDocumentInspector({ engine }: Props) {
 
       <button
         type="button"
-        onClick={() => (engine as any).documentTool?.beginScaleTwoPoints(sel.id)}
+        onClick={() => {
+          const tool: any = (engine as any).documentTool;
+          if (tool?.isScaling?.() && tool.scaleTargetDocId === sel.id) tool.cancel();
+          else tool?.beginScaleTwoPoints(sel.id);
+        }}
         className="w-full h-7 rounded-md border text-[11px] flex items-center justify-start gap-1.5 px-2 hover:bg-muted"
-        style={{ borderColor: "hsl(var(--hairline))" }}
-        title="Über zwei Snap-Punkte und eine Soll-Länge skalieren"
+        style={{
+          borderColor: scaling ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
+          background: scaling ? "hsl(var(--accent-gold) / 0.12)" : undefined,
+        }}
+        title="Über zwei Snap-Punkte und eine Soll-Länge skalieren — erneut klicken zum Abbrechen"
       >
-        <Maximize2 size={12} /> Skalieren (2 Punkte)
+        <Maximize2 size={12} /> {scaling ? "Skalieren abbrechen" : "Skalieren (2 Punkte)"}
       </button>
 
       <button
