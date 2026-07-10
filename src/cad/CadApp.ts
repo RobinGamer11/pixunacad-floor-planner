@@ -984,7 +984,7 @@ export class CadApp {
 
   /** True, wenn eine Löschung per Entf-Taste etwas entfernen würde. */
   hasDeletableSelection(): boolean {
-    if (this.activePlanId && this.planController?.hasSelection?.()) return true;
+    if (this.activePlanId && (this.planController as any)?.hasSelection?.()) return true;
     if (this.selection) return true;
     if (this.selectedLabelId) return true;
     return false;
