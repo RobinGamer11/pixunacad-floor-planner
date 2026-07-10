@@ -1973,7 +1973,15 @@ export class SelectTool {
               if (r0 > 1e-6) {
                 const ang0 = Math.atan2(center.y - a.y, center.x - a.x);
                 const ang1 = Math.atan2(target.y - a.y, target.x - a.x);
-                const delta = ang1 - ang0;
+                let delta = ang1 - ang0;
+                // Soft-Snap auf 15°-Schritte (innerhalb ±3°).
+                const STEP = Math.PI / 12; // 15°
+                const TOL = (3 * Math.PI) / 180;
+                const targetRot = doc.rotationRad + delta;
+                const nearest = Math.round(targetRot / STEP) * STEP;
+                if (Math.abs(targetRot - nearest) < TOL) {
+                  delta = nearest - doc.rotationRad;
+                }
                 doc.rotationRad = doc.rotationRad + delta;
                 const cs = Math.cos(delta), sn = Math.sin(delta);
                 const cx = a.x + (center.x - a.x) * cs - (center.y - a.y) * sn;
@@ -2379,7 +2387,12 @@ export class SelectTool {
             if (r0 > 1e-6) {
               const ang0 = Math.atan2(center.y - a.y, center.x - a.x);
               const ang1 = Math.atan2(target.y - a.y, target.x - a.x);
-              const delta = ang1 - ang0;
+              let delta = ang1 - ang0;
+              const STEP = Math.PI / 12;
+              const TOL = (3 * Math.PI) / 180;
+              const targetRot = doc.rotationRad + delta;
+              const nearest = Math.round(targetRot / STEP) * STEP;
+              if (Math.abs(targetRot - nearest) < TOL) delta = nearest - doc.rotationRad;
               const cs = Math.cos(delta), sn = Math.sin(delta);
               const cx = a.x + (center.x - a.x) * cs - (center.y - a.y) * sn;
               const cy = a.y + (center.x - a.x) * sn + (center.y - a.y) * cs;

@@ -940,11 +940,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
         {/* Raster / Undo / Redo / Pipette */}
         <div className="flex flex-col items-center gap-0.5 p-1.5">
           <button
-            onClick={() => {
-              setGridEnabled((e) => !e);
-              setGridPanelOpen(true);
-            }}
-            title={`Raster ${gridEnabled ? "aus" : "ein"}schalten — Einstellungen`}
+            onClick={() => setGridPanelOpen((o) => !o)}
+            title="Raster-Einstellungen — ein/ausschalten im Panel"
             className={`cad-rail-btn ${gridPanelOpen || gridEnabled ? "active" : ""}`}
           >
             <Grid3x3 size={18} />
@@ -1206,8 +1203,29 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               title="Position auf Wand (m ab Wandanfang)"
             />
             <span className="text-[10px] opacity-60">m</span>
+            <button
+              type="button"
+              title="Fenster/Tür löschen"
+              onClick={() => {
+                const app = appRef.current;
+                if (!app || !doorHub.doorId) return;
+                const d = app.scene.doors.find((x: any) => x.id === doorHub.doorId);
+                if (d) {
+                  app.scene.removeDoor(d);
+                  app.clearSelection?.();
+                  app.doorTool.hideHub();
+                  app.refreshLabelUI?.();
+                }
+              }}
+              className="cad-toolbar-btn h-7 w-7 justify-center px-0"
+              style={{ color: "hsl(0 65% 50%)" }}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
           </div>
         )}
+
+
 
         {/* Document Hub — Anker · Verschieben · Drehen · Skalieren (öffnet beim Klick auf Eckpunkt) */}
         {measureFinishHub.visible && (
@@ -1259,6 +1277,25 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               }}
             >
               <Move className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              title="Maßkette löschen"
+              onClick={() => {
+                const app = appRef.current;
+                if (!app || !dimHub.dimensionId) return;
+                const dim = app.scene.dimensions.find((d: any) => d.id === dimHub.dimensionId);
+                if (dim) {
+                  app.scene.removeDimension(dim);
+                  app.clearSelection?.();
+                  app.dimensionHubState = { visible: false, screenX: 0, screenY: 0, dimensionId: null };
+                  app.refreshLabelUI?.();
+                }
+              }}
+              className="cad-toolbar-btn h-7 w-7 justify-center px-0"
+              style={{ color: "hsl(0 65% 50%)" }}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
             </button>
           </div>
         )}

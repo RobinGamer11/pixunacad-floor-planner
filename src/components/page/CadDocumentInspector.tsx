@@ -144,12 +144,19 @@ export function CadDocumentInspector({ engine }: Props) {
 
       <button
         type="button"
-        onClick={() => (engine as any).documentTool?.beginScaleTwoPoints(sel.id)}
+        onClick={() => {
+          const tool: any = (engine as any).documentTool;
+          if (tool?.isScaling?.() && tool.scaleTargetDocId === sel.id) tool.cancel();
+          else tool?.beginScaleTwoPoints(sel.id);
+        }}
         className="w-full h-7 rounded-md border text-[11px] flex items-center justify-start gap-1.5 px-2 hover:bg-muted"
-        style={{ borderColor: "hsl(var(--hairline))" }}
-        title="Über zwei Snap-Punkte und eine Soll-Länge skalieren"
+        style={{
+          borderColor: scaling ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
+          background: scaling ? "hsl(var(--accent-gold) / 0.12)" : undefined,
+        }}
+        title="Über zwei Snap-Punkte und eine Soll-Länge skalieren — erneut klicken zum Abbrechen"
       >
-        <Maximize2 size={12} /> Skalieren (2 Punkte)
+        <Maximize2 size={12} /> {scaling ? "Skalieren abbrechen" : "Skalieren (2 Punkte)"}
       </button>
 
       <button
@@ -178,7 +185,7 @@ export function CadDocumentInspector({ engine }: Props) {
         <div className="flex items-center gap-1.5">
           <input
             type="range"
-            min={10}
+            min={1}
             max={400}
             step={1}
             value={Math.round(scalePct)}
@@ -187,13 +194,13 @@ export function CadDocumentInspector({ engine }: Props) {
           />
           <input
             type="number"
-            min={10}
+            min={1}
             max={400}
             step={1}
             value={Math.round(scalePct)}
             onChange={(e) => {
               const v = Number(e.target.value);
-              if (Number.isFinite(v)) applyScale(Math.max(10, Math.min(400, v)));
+              if (Number.isFinite(v)) applyScale(Math.max(1, Math.min(400, v)));
             }}
             className="w-12 h-6 px-1 text-[11px] rounded border tabular-nums text-right"
             style={{ borderColor: "hsl(var(--hairline))" }}
