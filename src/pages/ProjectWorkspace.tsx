@@ -1875,6 +1875,7 @@ function PageCanvas({
   toolSettings: ToolSettings;
   onCommitTool: () => void;
   onSelect: (id?: string, opts?: { shift?: boolean }) => void;
+  onMultiSelect?: (ids: string[]) => void;
   onCadSelectionChange: (info: MiniCadSelectionInfo | null, count?: number) => void;
   onCadEngineReady?: (api: { setSelectedSegmentSnap: (opts: { midpointSnap?: boolean; divisionSnap?: number | null }) => void; duplicateSelectedSegments: (offsetMm?: number) => number; engine: import("@/cad/embed/MiniCad").MiniCad }) => void;
   hatchDrawMode?: HatchDrawMode;
