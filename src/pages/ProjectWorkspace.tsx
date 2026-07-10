@@ -77,6 +77,7 @@ import { CadDocumentInspector } from "@/components/page/CadDocumentInspector";
 import { CadIdPanelHost } from "@/components/page/CadIdPanelHost";
 import { PdfPageView } from "@/components/page/PdfPageView";
 import { importFile, type ImportedPage } from "@/cad/documentImport";
+import { base64ToBytes, popPendingSheetPdf } from "@/lib/sheetPdfExport";
 import type { MiniCadSelectionInfo } from "@/cad/embed/MiniCad";
 import type { HatchDrawMode } from "@/cad/HatchTool";
 import { FreeDrawSettingsPanel } from "@/components/cad/FreeDrawSettingsPanel";
