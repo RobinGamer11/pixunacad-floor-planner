@@ -2060,6 +2060,28 @@ function PageCanvas({
           onMouseDown={handlePageMouseDown}
           onMouseMove={handlePageMouseMove}
         >
+        {/* Marquee-Overlay (Rahmen-Auswahl). Farbe je nach Modus:
+            touch=orange (Crossing), enclose=blau (Window) — Archicad-Konvention. */}
+        {marquee && (() => {
+          const rx1 = Math.min(marquee.x1, marquee.x2);
+          const ry1 = Math.min(marquee.y1, marquee.y2);
+          const rx2 = Math.max(marquee.x1, marquee.x2);
+          const ry2 = Math.max(marquee.y1, marquee.y2);
+          const stroke = marqueeMode === "enclose" ? "hsl(210 90% 55%)" : "hsl(28 95% 55%)";
+          const fill = marqueeMode === "enclose" ? "hsl(210 90% 55% / 0.10)" : "hsl(28 95% 55% / 0.10)";
+          const dash = marqueeMode === "enclose" ? "none" : "6 4";
+          return (
+            <div
+              className="absolute pointer-events-none"
+              style={{
+                left: `${rx1}%`, top: `${ry1}%`,
+                width: `${rx2 - rx1}%`, height: `${ry2 - ry1}%`,
+                background: fill,
+                outline: `1px ${dash === "none" ? "solid" : "dashed"} ${stroke}`,
+              }}
+            />
+          );
+        })()}
         {/* Margin overlay (light grey ring) */}
         {marginPx > 0 && (
           <div
