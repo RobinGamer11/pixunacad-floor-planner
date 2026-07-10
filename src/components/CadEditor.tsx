@@ -1222,6 +1222,10 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             >
               <Trash2 className="h-3.5 w-3.5" />
             </button>
+          </div>
+        )}
+
+
 
         {/* Document Hub — Anker · Verschieben · Drehen · Skalieren (öffnet beim Klick auf Eckpunkt) */}
         {measureFinishHub.visible && (
