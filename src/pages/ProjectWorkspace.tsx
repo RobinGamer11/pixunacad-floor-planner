@@ -3362,7 +3362,7 @@ function ToolsTab({
 
       {/* Per-tool settings */}
 
-      {!activeTool && (
+      {!settingsTool && (
         <SelectSettings
           settings={toolSettings.select}
           onChange={(p) => updateToolSettings("select", p)}
