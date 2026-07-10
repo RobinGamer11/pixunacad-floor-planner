@@ -552,20 +552,7 @@ export default function ProjectWorkspace() {
         mode="workspace"
         zoomPercent={Math.round(zoom)}
         canDelete={selectedElementIds.length > 0 || cadSelectionCount > 0}
-        onDelete={() => {
-          // Seiten-Elemente löschen (falls markiert)
-          if (activePage && selectedElementIds.length > 0) {
-            for (const id of selectedElementIds) {
-              projectStore.deleteElement(project.id, activePage.id, id);
-            }
-            setSelectedElementIds([]);
-          }
-          // Eingebettete CAD-Auswahl löschen (falls vorhanden)
-          const eng = cadEngineApiRef.current?.engine;
-          if (eng && (eng as any).hasDeletableSelection?.()) {
-            (eng as any).deleteSelection?.();
-          }
-        }}
+        onDelete={runDeleteSelection}
         onPresent={() => setPresenting(true)}
         onShare={() => {}}
         onExport={() => setPrintMode((v) => !v)}
