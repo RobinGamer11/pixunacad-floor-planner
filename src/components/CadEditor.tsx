@@ -61,6 +61,8 @@ export interface CadEditorHandle {
   openExportPanel: () => void;
   deleteSelection: () => void;
   hasDeletableSelection: () => boolean;
+  /** CSS-Pixel pro Welt-Meter (camera.scale). */
+  getCameraScale: () => number;
 }
 
 interface CadEditorProps {
