@@ -361,7 +361,7 @@ export default function ProjectWorkspace() {
 
   // Per-tool settings (live in workspace state; persist could come later).
   const [toolSettings, setToolSettings] = useState({
-    select: { multi: false },
+    select: { multi: false, marqueeMode: "touch" },
     guide: { color: "#7DD3FC", strokeWidth: 1, locked: false },
     line: { color: "#111111", thicknessMm: 0.5, alpha: 100 },
     text: {
