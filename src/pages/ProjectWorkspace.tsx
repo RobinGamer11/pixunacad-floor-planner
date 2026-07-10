@@ -4131,7 +4131,7 @@ function CadToolSection({
                       ))}
                       <option value="frei">frei…</option>
                     </select>
-                  </button>
+                  </div>
                   {isActive && (
                     <div className="grid grid-cols-2 gap-1 pl-2">
                       <button
