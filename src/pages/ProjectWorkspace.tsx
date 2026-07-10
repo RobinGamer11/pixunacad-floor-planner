@@ -143,9 +143,9 @@ export default function ProjectWorkspace() {
   const [docImporting, setDocImporting] = useState(false);
   const [docPickerPages, setDocPickerPages] = useState<ImportedPage[] | null>(null);
   const [docPickerSelected, setDocPickerSelected] = useState<Set<number>>(new Set());
-  const [scaleDialogPages, setScaleDialogPages] = useState<ImportedPage[] | null>(null);
-  const [scaleChoice, setScaleChoice] = useState<string>("100");
-  const [scaleCustom, setScaleCustom] = useState<string>("100");
+  // Ausgabemaßstab für neu importierte Dokumente. Wird rechts im
+  // "Dokument"-Werkzeug-Panel als Dropdown ausgewählt (wie beim CAD-Blatt).
+  const [docScale, setDocScale] = useState<string>("1:100");
   const [selectedElementIds, setSelectedElementIds] = useState<string[]>([]);
   // `selectedElementId` ist das ZULETZT angeklickte Element — alle bestehenden
   // Lese-Stellen (Inspector etc.) benutzen es weiterhin. Bei Multi-Auswahl
@@ -387,6 +387,55 @@ export default function ProjectWorkspace() {
   const selectedElement = activePage?.elements.find((e) => e.id === selectedElementId);
   const bgPage = bgOverlay.pageId ? project?.pages.find((p) => p.id === bgOverlay.pageId) : undefined;
 
+  // Legt die importierten Seiten mit dem aktuell im rechten Panel
+  // gewählten Maßstab (docScale, z. B. "1:100") direkt im Modellbereich ab.
+  // Kein Modal mehr — der Nutzer wählt den Maßstab wie beim CAD-Blatt vor
+  // dem Import rechts über das Dropdown.
+  const placeImportedPages = (pages: ImportedPage[]) => {
+    const engine = cadEngineApiRef.current?.engine;
+    if (!engine || pages.length === 0) return;
+    const m = docScale.match(/^1\s*:\s*(\d+(?:[.,]\d+)?)$/);
+    const parsed = m ? parseFloat(m[1].replace(",", ".")) : NaN;
+    const denom = Number.isFinite(parsed) && parsed > 0 ? parsed : 100;
+    const [first, ...rest] = pages;
+    const firstW = first.widthM * denom;
+    const firstH = first.heightM * denom;
+    setActiveToolAndTab("document");
+    engine.beginDocumentPlacement({
+      src: first.src,
+      widthM: firstW,
+      heightM: firstH,
+      pixelWidth: first.pixelWidth,
+      pixelHeight: first.pixelHeight,
+      name: first.name,
+      kind: first.kind,
+      pageIndex: first.pageIndex,
+      importScaleDenom: denom,
+      pdfSourceB64: first.pdfSourceB64 || null,
+    });
+    let offX = firstW + 0.5;
+    for (const p of rest) {
+      const pw = p.widthM * denom;
+      const ph = p.heightM * denom;
+      engine.scene.createDocument({
+        name: p.name,
+        kind: p.kind,
+        src: p.src,
+        pageIndex: p.pageIndex,
+        position: { x: offX, y: 0 },
+        widthM: pw,
+        heightM: ph,
+        pixelWidth: p.pixelWidth,
+        pixelHeight: p.pixelHeight,
+        labelId: engine.activeDrawLabelId,
+        importScaleDenom: denom,
+        pdfSourceB64: p.pdfSourceB64 || null,
+      });
+      offX += pw + 0.5;
+    }
+    engine.refreshLabelUI();
+  };
+
   const handleDocumentFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     e.target.value = "";
@@ -396,9 +445,7 @@ export default function ProjectWorkspace() {
       const pages = await importFile(f);
       if (pages.length === 0) { window.alert("Keine Seiten gefunden."); return; }
       if (pages.length === 1) {
-        setScaleChoice(pages[0].kind === "pdf-page" ? "100" : "1");
-        setScaleCustom("100");
-        setScaleDialogPages(pages);
+        placeImportedPages(pages);
       } else {
         const all = new Set<number>();
         pages.forEach((_, i) => all.add(i));
@@ -457,56 +504,9 @@ export default function ProjectWorkspace() {
     setDocPickerPages(null);
     setDocPickerSelected(new Set());
     if (selected.length === 0) return;
-    setScaleChoice(selected[0].kind === "pdf-page" ? "100" : "1");
-    setScaleCustom("100");
-    setScaleDialogPages(selected);
+    placeImportedPages(selected);
   };
 
-  const confirmDocumentScale = () => {
-    const pages = scaleDialogPages;
-    const engine = cadEngineApiRef.current?.engine;
-    if (!pages || !engine) return;
-    const parsed = scaleChoice === "custom" ? parseFloat(scaleCustom.replace(",", ".")) : parseFloat(scaleChoice);
-    const denom = Number.isFinite(parsed) && parsed > 0 ? parsed : 100;
-    const [first, ...rest] = pages;
-    const firstW = first.widthM * denom;
-    const firstH = first.heightM * denom;
-    setActiveToolAndTab("document");
-    engine.beginDocumentPlacement({
-      src: first.src,
-      widthM: firstW,
-      heightM: firstH,
-      pixelWidth: first.pixelWidth,
-      pixelHeight: first.pixelHeight,
-      name: first.name,
-      kind: first.kind,
-      pageIndex: first.pageIndex,
-      importScaleDenom: denom,
-      pdfSourceB64: first.pdfSourceB64 || null,
-    });
-    let offX = firstW + 0.5;
-    for (const p of rest) {
-      const pw = p.widthM * denom;
-      const ph = p.heightM * denom;
-      engine.scene.createDocument({
-        name: p.name,
-        kind: p.kind,
-        src: p.src,
-        pageIndex: p.pageIndex,
-        position: { x: offX, y: 0 },
-        widthM: pw,
-        heightM: ph,
-        pixelWidth: p.pixelWidth,
-        pixelHeight: p.pixelHeight,
-        labelId: engine.activeDrawLabelId,
-        importScaleDenom: denom,
-        pdfSourceB64: p.pdfSourceB64 || null,
-      });
-      offX += pw + 0.5;
-    }
-    engine.refreshLabelUI();
-    setScaleDialogPages(null);
-  };
 
   // Merkt sich das zuletzt eingepasste Layout — verhindert erneutes Recenter
   // beim Umschalten der aktiven Seite innerhalb desselben Verbunds.
@@ -778,16 +778,9 @@ export default function ProjectWorkspace() {
             onConfirm={confirmDocumentPagePicker}
           />
         )}
-        {scaleDialogPages && (
-          <DocumentScaleDialog
-            choice={scaleChoice}
-            custom={scaleCustom}
-            onChoice={setScaleChoice}
-            onCustom={setScaleCustom}
-            onCancel={() => setScaleDialogPages(null)}
-            onConfirm={confirmDocumentScale}
-          />
-        )}
+        {/* Maßstab-Modal entfernt — Maßstab wird jetzt rechts im "Dokument"-
+            Werkzeug-Panel per Dropdown vor dem Import gewählt. */}
+
         <ToolRailButton icon={<TableIcon size={18} />} label="Tabelle" disabled />
         <ToolRailButton icon={<StickyNote size={18} />} label="Notiz" disabled />
         <ToolRailButton icon={<Clock size={18} />} label="Zeitstrahl" disabled />
@@ -1445,6 +1438,8 @@ export default function ProjectWorkspace() {
               cadSelectedLineSnap={cadSelectedLineSnap}
               documentImporting={docImporting}
               onDocumentImport={() => documentFileInputRef.current?.click()}
+              docScale={docScale}
+              onDocScaleChange={setDocScale}
               onCadLineSnapChange={(patch) => {
                 cadEngineApiRef.current?.setSelectedSegmentSnap(patch);
                 setCadSelectedLineSnap((prev) => prev ? {
@@ -2779,6 +2774,8 @@ function RightInspector({
   cadSelectedLineSnap,
   documentImporting,
   onDocumentImport,
+  docScale,
+  onDocScaleChange,
   onCadLineSnapChange,
   onCadDuplicateSegments,
   updateToolSettings,
@@ -2804,6 +2801,8 @@ function RightInspector({
   cadSelectedLineSnap?: { midpoint: boolean; division: number | null; isGuide: boolean } | null;
   documentImporting?: boolean;
   onDocumentImport?: () => void;
+  docScale?: string;
+  onDocScaleChange?: (s: string) => void;
   onCadLineSnapChange?: (patch: { midpointSnap?: boolean; divisionSnap?: number | null }) => void;
   onCadDuplicateSegments?: () => void;
   updateToolSettings: <K extends keyof ToolSettings>(k: K, patch: Partial<ToolSettings[K]>) => void;
@@ -2859,6 +2858,8 @@ function RightInspector({
             cadSelectedLineSnap={cadSelectedLineSnap}
             documentImporting={documentImporting}
             onDocumentImport={onDocumentImport}
+            docScale={docScale}
+            onDocScaleChange={onDocScaleChange}
             onCadLineSnapChange={onCadLineSnapChange}
             onCadDuplicateSegments={onCadDuplicateSegments}
             updateToolSettings={updateToolSettings}
@@ -3237,6 +3238,8 @@ function ToolsTab({
   cadSelectedLineSnap,
   documentImporting,
   onDocumentImport,
+  docScale,
+  onDocScaleChange,
   onCadLineSnapChange,
   onCadDuplicateSegments,
   updateToolSettings,
@@ -3258,6 +3261,8 @@ function ToolsTab({
   cadSelectedLineSnap?: { midpoint: boolean; division: number | null; isGuide: boolean } | null;
   documentImporting?: boolean;
   onDocumentImport?: () => void;
+  docScale?: string;
+  onDocScaleChange?: (s: string) => void;
   onCadLineSnapChange?: (patch: { midpointSnap?: boolean; divisionSnap?: number | null }) => void;
   onCadDuplicateSegments?: () => void;
   updateToolSettings: <K extends keyof ToolSettings>(k: K, patch: Partial<ToolSettings[K]>) => void;
@@ -3331,7 +3336,7 @@ function ToolsTab({
         />
       )}
       {settingsTool === "document" && (
-        <DocumentToolSettings importing={!!documentImporting} onImport={onDocumentImport} />
+        <DocumentToolSettings importing={!!documentImporting} onImport={onDocumentImport} scale={docScale ?? "1:100"} onScaleChange={onDocScaleChange} />
       )}
 
       {/* CAD section */}
@@ -3409,9 +3414,48 @@ function EbeneSelect({ engine }: { engine: import("@/cad/embed/MiniCad").MiniCad
   );
 }
 
-function DocumentToolSettings({ importing, onImport }: { importing: boolean; onImport?: () => void }) {
+function DocumentToolSettings({
+  importing,
+  onImport,
+  scale,
+  onScaleChange,
+}: {
+  importing: boolean;
+  onImport?: () => void;
+  scale: string;
+  onScaleChange?: (s: string) => void;
+}) {
+  const selectValue = PAGE_PLAN_SCALES.includes(scale) ? scale : "__other__";
   return (
     <SettingsBlock title="DOKUMENT IMPORTIEREN">
+      {/* Maßstab-Dropdown — wie beim CAD-Blatt: legt fest, in welchem
+          Ausgabemaßstab das importierte Dokument (A4/A3/A2 …) im
+          Modellbereich abgelegt wird. Modell selbst bleibt 1:1. */}
+      <Row label="Maßstab">
+        <select
+          value={selectValue}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (v === "frei") {
+              const picked = askPlanScale(scale);
+              if (picked) onScaleChange?.(picked);
+            } else if (v !== "__other__") {
+              onScaleChange?.(v);
+            }
+          }}
+          className="w-full h-8 px-2 rounded border bg-transparent text-sm"
+          style={{ borderColor: "hsl(var(--hairline))" }}
+        >
+          {!PAGE_PLAN_SCALES.includes(scale) && (
+            <option value="__other__">{scale}</option>
+          )}
+          {PAGE_PLAN_SCALES.map((sc) => (
+            <option key={sc} value={sc}>{sc}</option>
+          ))}
+          <option value="frei">frei…</option>
+        </select>
+      </Row>
+
       <button
         type="button"
         disabled={importing}
@@ -3425,12 +3469,13 @@ function DocumentToolSettings({ importing, onImport }: { importing: boolean; onI
       </button>
 
       <div className="text-[11px] leading-relaxed text-muted-foreground pt-2 border-t" style={{ borderColor: "hsl(var(--hairline))" }}>
-        <div>PDF, JPG, PNG werden mit 96 DPI / 72 pt importiert.</div>
+        <div>Import erfolgt im gewählten Maßstab (z. B. {scale}) auf A4/A3/A2 …</div>
         <div>Zum Skalieren, Drehen oder Zuschneiden: <strong>Auswahl-Werkzeug</strong> → Dokument anklicken.</div>
       </div>
     </SettingsBlock>
   );
 }
+
 
 function SelectSettings({
   selectedCount,
