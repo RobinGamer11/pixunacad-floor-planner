@@ -178,7 +178,7 @@ export function CadDocumentInspector({ engine }: Props) {
         <div className="flex items-center gap-1.5">
           <input
             type="range"
-            min={10}
+            min={1}
             max={400}
             step={1}
             value={Math.round(scalePct)}
@@ -187,13 +187,13 @@ export function CadDocumentInspector({ engine }: Props) {
           />
           <input
             type="number"
-            min={10}
+            min={1}
             max={400}
             step={1}
             value={Math.round(scalePct)}
             onChange={(e) => {
               const v = Number(e.target.value);
-              if (Number.isFinite(v)) applyScale(Math.max(10, Math.min(400, v)));
+              if (Number.isFinite(v)) applyScale(Math.max(1, Math.min(400, v)));
             }}
             className="w-12 h-6 px-1 text-[11px] rounded border tabular-nums text-right"
             style={{ borderColor: "hsl(var(--hairline))" }}
