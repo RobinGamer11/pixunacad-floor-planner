@@ -28,7 +28,6 @@ import {
   Share2,
   Play,
   Move,
-  Maximize2,
   Pencil,
   Check,
   X,
