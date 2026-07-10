@@ -19,11 +19,13 @@ interface Props {
   docId: string;
   /** Re-render-Trigger aus dem Polling. */
   sig: string;
+  /** „Hintergrund entfernen"-Abschnitt anzeigen. Default: true. */
+  showBgRemove?: boolean;
 }
 
 const MODE_OPTIONS: DocumentFilterMode[] = ["adjust", "bw", "grayscale", "tint", "free"];
 
-export function DocumentFilterPanel({ app, docId, sig }: Props) {
+export function DocumentFilterPanel({ app, docId, sig, showBgRemove }: Props) {
   // Doc bei jedem Render frisch lesen (sig erzwingt Re-Render via parent state).
   void sig;
   const doc: any = app?.scene.getDocumentById(docId) || null;
