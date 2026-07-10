@@ -181,6 +181,10 @@ export class SelectTool {
     this.dragAreaLabelHatchId = null;
     this.dragAreaLabelGrabOffsetWorld = null;
     this.dragAreaLabelStartOffset = null;
+    this.marqueeStart = null;
+    this.marqueeCurrent = null;
+    this.marqueeActive = false;
+    this.marqueeSelectedIds = [];
   }
 
   /** Welt-Position des Rotate-Handles über der Top-Edge-Mitte einer TextBox. */
