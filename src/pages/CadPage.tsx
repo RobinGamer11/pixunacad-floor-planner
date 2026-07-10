@@ -101,17 +101,30 @@ const CadPage = () => {
     const paperWmm = (worldWm * 1000) / scaleValue;
     const paperHmm = (worldHm * 1000) / scaleValue;
 
+    // PNG-Snapshot des Ausschnitts (für verknüpfte cad-view-Ansicht).
+    const tmp = document.createElement("canvas");
+    tmp.width = Math.max(1, Math.round(pxRect.w));
+    tmp.height = Math.max(1, Math.round(pxRect.h));
+    const tctx = tmp.getContext("2d")!;
+    tctx.fillStyle = "#ffffff";
+    tctx.fillRect(0, 0, tmp.width, tmp.height);
+    tctx.drawImage(canvas, pxRect.x, pxRect.y, pxRect.w, pxRect.h, 0, 0, tmp.width, tmp.height);
+    const snapshotPng = tmp.toDataURL("image/png");
+
     setBusy(true);
     try {
       const bytes = await canvasRegionToPdfBytes(canvas, pxRect, paperWmm, paperHmm);
       stashPendingSheetPdf({
         projectId,
-        returnPageId: "",
+        returnPageId: sheetPdfPageId ?? "",
         sheetId: sheetPdfId,
         sheetName: sheet?.name || "CAD-Blatt",
         mode: sheetPdfMode,
         pdfBase64: bytesToBase64(bytes),
         sheetScale: effectiveScale,
+        paperWidthMm: paperWmm,
+        paperHeightMm: paperHmm,
+        snapshotPng,
       });
       navigate(`/project/${projectId}`);
     } catch (err: any) {
@@ -123,6 +136,7 @@ const CadPage = () => {
 
   const cancelSheetPdf = () => {
     if (!projectId) return;
+
     navigate(`/project/${projectId}`);
   };
 
