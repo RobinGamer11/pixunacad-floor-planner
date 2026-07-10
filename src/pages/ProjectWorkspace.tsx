@@ -172,6 +172,7 @@ export default function ProjectWorkspace() {
   } | null>(null);
   // Force-re-render der ToolsTab, sobald die Engine bereit ist (für Panel-Wiring).
   const [, forceEngineTick] = useState(0);
+  const [presenting, setPresenting] = useState(false);
 
 
 
