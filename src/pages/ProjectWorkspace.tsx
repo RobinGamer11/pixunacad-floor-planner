@@ -2259,6 +2259,7 @@ function ElementView({
   const dragRef = useRef<{ x: number; y: number } | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const rotateRef = useRef<HTMLDivElement | null>(null);
+  const rotateMovedRef = useRef(false);
 
   const startDrag = (e: React.MouseEvent) => {
     if (readOnly) return;
@@ -2287,6 +2288,11 @@ function ElementView({
     // Don't start a drag when the user clicks an interactive control inside the hub.
     const t = e.target as HTMLElement;
     if (t.closest("[data-hub-control]")) return;
+    if (el.kind === "cad-view") {
+      e.stopPropagation();
+      onSelect?.({ shift: e.shiftKey });
+      return;
+    }
     startDrag(e);
   };
 
@@ -2301,7 +2307,9 @@ function ElementView({
     const cy = rect.top + rect.height / 2;
     const startAngle = Math.atan2(e.clientY - cy, e.clientX - cx);
     const startRot = el.rotation ?? 0;
+    rotateMovedRef.current = false;
     const handleMove = (ev: MouseEvent) => {
+      if (Math.hypot(ev.clientX - e.clientX, ev.clientY - e.clientY) > 3) rotateMovedRef.current = true;
       const a = Math.atan2(ev.clientY - cy, ev.clientX - cx);
       let deg = startRot + ((a - startAngle) * 180) / Math.PI;
       if (ev.shiftKey) deg = Math.round(deg / 15) * 15;
@@ -2432,7 +2440,7 @@ function ElementView({
               />
             </>
           )}
-          {/* Hub action bar — CAD-Blatt und PDF haben dieselben Aktionen. */}
+          {/* Hub action bar — CAD-Blatt-Funktionen laufen nur über die Symbole. */}
           <div
             data-hub-control
             className="absolute flex items-center gap-1 rounded-md shadow-md"
@@ -2449,10 +2457,12 @@ function ElementView({
           >
             {isCadView && (
               <button
+                type="button"
                 data-hub-control
                 onMouseDown={(e) => startDrag(e)}
+                onClick={(e) => e.stopPropagation()}
                 title="Verschieben"
-                className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
+                className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))] cursor-grab active:cursor-grabbing"
                 style={{ color: hubBlue }}
               >
                 <Move size={14} />
@@ -2460,10 +2470,16 @@ function ElementView({
             )}
             {isCadView ? (
               <button
+                type="button"
                 data-hub-control
                 onMouseDown={handleRotateStart}
-                title="Drehen (ziehen)"
-                className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (!rotateMovedRef.current) onRotate?.(15);
+                  rotateMovedRef.current = false;
+                }}
+                title="Drehen (klicken oder ziehen)"
+                className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))] cursor-grab active:cursor-grabbing"
                 style={{ color: hubBlue }}
               >
                 <RotateCw size={14} />
@@ -2480,29 +2496,18 @@ function ElementView({
             )}
             {isCadView ? (
               <button
+                type="button"
                 data-hub-control
                 onMouseDown={(e) => {
                   e.stopPropagation();
                   e.preventDefault();
-                  let last = { x: e.clientX, y: e.clientY };
-                  const move = (ev: MouseEvent) => {
-                    const dx = ev.clientX - last.x;
-                    const dy = ev.clientY - last.y;
-                    last = { x: ev.clientX, y: ev.clientY };
-                    onCornerDrag?.("br", dx, dy, ev.shiftKey);
-                  };
-                  const up = () => {
-                    window.removeEventListener("mousemove", move);
-                    window.removeEventListener("mouseup", up);
-                  };
-                  window.addEventListener("mousemove", move);
-                  window.addEventListener("mouseup", up);
                 }}
-                title="Skalieren (ziehen)"
+                onClick={(e) => { e.stopPropagation(); onDelete?.(); }}
+                title="Löschen"
                 className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
-                style={{ color: hubBlue }}
+                style={{ color: "hsl(0 65% 50%)" }}
               >
-                <Maximize2 size={14} />
+                <Trash2 size={14} />
               </button>
             ) : (
               <>
@@ -2528,7 +2533,7 @@ function ElementView({
           </div>
 
           {/* Edge-Drag-Handles — Farbe passt zum Hub */}
-          {(["top", "right", "bottom", "left"] as const).map((edge) => {
+          {!isCadView && (["top", "right", "bottom", "left"] as const).map((edge) => {
             const isHor = edge === "top" || edge === "bottom";
             const startEdgeDrag = (e: React.MouseEvent) => {
               if (!onEdgeDrag) return;
@@ -2579,7 +2584,7 @@ function ElementView({
           })}
 
           {/* Ecken-Handles: quadratisch + blau bei CAD-Blatt, sonst rund + gold */}
-          {onCornerDrag && (["tl", "tr", "bl", "br"] as const).map((corner) => {
+          {!isCadView && onCornerDrag && (["tl", "tr", "bl", "br"] as const).map((corner) => {
             const startCornerDrag = (e: React.MouseEvent) => {
               e.stopPropagation();
               e.preventDefault();
