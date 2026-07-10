@@ -1278,6 +1278,25 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             >
               <Move className="h-4 w-4" />
             </button>
+            <button
+              type="button"
+              title="Maßkette löschen"
+              onClick={() => {
+                const app = appRef.current;
+                if (!app || !dimHub.dimensionId) return;
+                const dim = app.scene.dimensions.find((d: any) => d.id === dimHub.dimensionId);
+                if (dim) {
+                  app.scene.removeDimension(dim);
+                  app.clearSelection?.();
+                  app.dimensionHubState = { visible: false, screenX: 0, screenY: 0, dimensionId: null };
+                  app.refreshLabelUI?.();
+                }
+              }}
+              className="cad-toolbar-btn h-7 w-7 justify-center px-0"
+              style={{ color: "hsl(0 65% 50%)" }}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
           </div>
         )}
 
