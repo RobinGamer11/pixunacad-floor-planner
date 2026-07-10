@@ -1680,7 +1680,7 @@ type ToolSettings = {
 };
 
 const DEFAULT_TOOL_SETTINGS: ToolSettings = {
-  select: { multi: false },
+  select: { multi: false, marqueeMode: "touch" },
   guide: { color: "#7DD3FC", strokeWidth: 1, locked: false },
   line: { color: "#111111", thicknessMm: 0.5, alpha: 100 },
   text: {
