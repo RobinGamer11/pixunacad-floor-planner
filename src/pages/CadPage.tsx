@@ -102,6 +102,7 @@ const CadPage = () => {
         sheetName: sheet?.name || "CAD-Blatt",
         mode: sheetPdfMode,
         pdfBase64: bytesToBase64(bytes),
+        sheetScale: sheet?.scale,
       });
       navigate(`/project/${projectId}`);
     } catch (err: any) {
