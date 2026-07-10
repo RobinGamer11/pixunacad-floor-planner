@@ -1,46 +1,46 @@
+## Ziel
 
-## 01 — Mülltonne-Button im Kopf (links neben Undo/Redo)
+„CAD-Blatt einfügen" komplett aus dem Dokument-Werkzeug ins CAD-Blatt-Werkzeug verschieben, dessen rechtes Einstellungsfenster auf „Darstellung" reduzieren und den Maßstab prüfen.
 
-Ein neuer Button (`Trash2`) im `WorkspaceHeader` links vor Undo. Verhalten wie die `Entf`-Taste — löscht alle aktuell ausgewählten Objekte in Projektmappe oder CAD-Oberfläche.
+## 1) CAD-Blatt einfügen verschieben
 
-- **Header (`src/components/workspace/WorkspaceHeader.tsx`):** Neue Props `canDelete: boolean`, `onDelete?: () => void`. Button ist ausgegraut (disabled) wenn `canDelete=false`.
-- **Projektmappe (`src/pages/ProjectWorkspace.tsx`):**
-  - `canDelete` = `!!selectedElementId` **oder** ein CAD-Dokument im eingebetteten Engine ist selektiert.
-  - `onDelete`: identisches Verhalten wie der bestehende Keyboard-Handler bei `Delete/Backspace` (Zeile ~1822) — dieselbe Funktion herausziehen und wiederverwenden.
-- **CAD-Oberfläche (`src/pages/CadPage.tsx`):**
-  - `canDelete` aus `app.selection` (Wand, Dokument, Textbox, Maßkette, Tür/Fenster, Sticker …) via kleines Polling/Abo wie es der Header schon für Undo/Redo hat.
-  - `onDelete`: ruft die bestehende CAD-Delete-Route auf (dieselbe, die `Entf` triggert — vermutlich `app.deleteSelection()` oder Äquivalent; wird beim Umsetzen im Code verifiziert).
+**Aus `DocumentToolSettings` entfernen** (`src/pages/ProjectWorkspace.tsx`, Zeilen 3612–3671):
+- gesamten Block „CAD-Blatt einfügen" (Dropdown mit Blattliste + Buttons „Ansicht"/„Rahmen") löschen
+- Dokument-Werkzeug bleibt sonst 1:1 unverändert (nur „Datei importieren" + Hinweistext)
 
-## 02 — Dokumenten-Werkzeug: „CAD-Zeichenblatt als PDF einfügen“
+**In `CadToolSection` einbauen** (Zeilen 4075–4237, linker Panel wenn Werkzeug „CAD-Blatt" aktiv):
+- neuer Abschnitt „CAD-BLATT ALS PDF EINFÜGEN" (oder als zweite Aktion neben „ZEICHENBLATT WÄHLEN")
+- gleiche Bedienung wie bisher: Blatt auswählen → Buttons `Ansicht` / `Rahmen` → `navigate('/project/:id/cad?sheetPdf=<id>&mode=<...>')`
+- die vorhandenen Aufnehmer-Logik in `CadPage.tsx` + `sessionStorage`-Pickup in `ProjectWorkspace` bleiben unverändert
 
-Neuer Menüpunkt im Dokumenten-Panel der Projektmappe (neben dem bestehenden Datei-Import-Button). Klick öffnet ein Dropdown mit den Zeichenblättern des Projekts (aus `cadEngine.sheetManager`). Nach Auswahl eines Zeichenblatts erscheint ein zweites Dropdown mit **Ausschnitt-Modus**:
+**Import-Cleanup:** `Compass`-Import in `DocumentToolSettings` entfernen falls dort nicht mehr benötigt.
 
-1. **Gesamtes Zeichenblatt** — direkt exportieren.
-2. **Aktuell ausgewählte Ansicht** — nutzt den aktiven Viewport / Sheet-Ausschnitt in der CAD-Oberfläche.
-3. **Rahmen** — wechselt in die CAD-Oberfläche mit aktivem Rahmen-Werkzeug; Bestätigen per Häkchen-Symbol im Hub, dann Rückkehr zur Projektmappe.
+## 2) Rechtes Einstellungsfenster für CAD-Blatt-Werkzeug auf „Darstellung" reduzieren
 
-In allen drei Fällen wird das Ergebnis identisch zu einem normalen PDF-Import behandelt (gleicher Maßstabs-Dialog, gleiche Nachbearbeitung: Skalieren, Anker, Drehen, Filter, Auflösen).
+Betrifft den `ElementInspector` (Zeilen ~4239–4430) im Fall `element.kind === "cad-view"`:
+- **behalten:** Zeile „Transparenz" (= Darstellung), plus Titel/Thumbnail
+- **entfernen:** Position (X/Y), Größe (B/H), Maßstab-Eingabe, „Im CAD öffnen"-Button, „Element löschen"-Button (Löschen läuft ohnehin über den Papierkorb im Kopf + Entf-Taste)
+- Rotation-/Ebene-/Snap-Rows (falls für cad-view sichtbar) ebenfalls raus
 
-### Technischer Ablauf
+Der linke `CadToolSection`-Panel („Zeichenblatt wählen" + Liste „Auf dieser Seite") bleibt, weil er die eigentliche Werkzeug-Bedienung ist.
 
-- **Erzeugung des PDFs im Speicher:** eine Ein-Seiten-Variante von `exportPlansToPdf` (`src/cad/PlanPdfExport.ts`) — neue Funktion `exportSheetRegionToPdf(sheetId, region)` mit `region = "full" | "activeView" | { x, y, w, h }`. Rendert nur das eine Blatt anhand des vorhandenen `flattenSheetSnapshot` + `drawProjectionToPdf`-Codes und liefert `Uint8Array`.
-- **Übergabe an den Importer:** Uint8Array → `File`-Objekt (`new File([bytes], "Zeichenblatt XY.pdf", { type: "application/pdf" })`) → bestehende `importFile()`-Pipeline (`src/cad/documentImport.ts`) → gleicher `scaleDialogPages`-Flow wie beim Datei-Upload. Kein neuer Import-Code, keine Sonderbehandlung.
-- **Rahmen-Modus (Cross-Page-Handoff):**
-  - Beim Klick auf „Rahmen“ speichert die Projektmappe eine Absicht im `projectStore` bzw. `sessionStorage`: `{ kind: "sheet-crop", projectId, sheetId, returnTo: pageId }`.
-  - Navigation zu `/project/:id/cad` mit URL-Param `?crop=<sheetId>`.
-  - `CadPage` erkennt den Param, wechselt zum bestehenden CAD-Rahmen-/Ausschnitts-Werkzeug (falls nicht vorhanden: ein leichter Rechteck-Picker analog `MeasureTool`), und blendet einen kleinen Hub mit Häkchen (Bestätigen) + X (Abbrechen) ein.
-  - Häkchen → Rechteck in Sheet-Koordinaten wird an die Absicht angehängt → Rück-Navigation `/project/:id` → Projektmappe liest die Absicht, ruft `exportSheetRegionToPdf` und startet den normalen Import-Flow.
+## 3) Maßstab prüfen
 
-### Neue / geänderte Dateien
+Aktuelle Rechnung in `CadPage.confirmSheetPdf`:
 
-- `src/components/workspace/WorkspaceHeader.tsx` — Trash-Button + Props.
-- `src/pages/ProjectWorkspace.tsx` — Header-Props, Delete-Handler wiederverwenden, Dokumenten-Panel um Dropdown erweitern, Rahmen-Handoff-Auswertung.
-- `src/pages/CadPage.tsx` — Header-Props, `?crop=` erkennen und Rahmen-Werkzeug starten, Häkchen-Rückkehr.
-- `src/cad/PlanPdfExport.ts` — neue `exportSheetRegionToPdf`-Funktion.
-- Ggf. kleines neues Modul `src/cad/SheetCropTool.ts` (nur falls kein bestehendes Rahmen-Werkzeug wiederverwendbar ist — wird im Build-Modus geprüft; wenn `SelectTool` / `MeasureTool` reichen, entfällt es).
-- `src/lib/projectStore.ts` — falls die Absicht dort persistiert wird (alternativ nur `sessionStorage`, keine Store-Änderung nötig).
+```text
+worldMeter = cssPixel / cameraScale        // camScale = CSS-px pro Welt-m
+paperMm    = worldMeter * 1000 / scaleZahl // z.B. 5 m @ 1:100 → 50 mm
+```
 
-### Offene Detailfragen, die beim Umsetzen entschieden werden
+Für 1:100 → 1 cm Papier = 1 m real ✓ (deckt sich mit deiner Erläuterung).
 
-- Ob „aktuell ausgewählte Ansicht“ = aktiver Kamera-Ausschnitt in `CadPage` oder = selektierter `PlanProjection`/Viewport. Standard-Annahme: aktive Kamera (WYSIWYG „was du gerade siehst“). Wenn Sie den anderen Fall wollen, bitte kurz sagen.
-- Ob der Rahmen fest im Sheet-Koordinatensystem (mm) oder in Weltkoordinaten gespeichert wird — plane in Sheet-mm, weil `exportSheetRegionToPdf` ohnehin sheet-basiert arbeitet.
+Zu verifizieren / ggf. korrigieren:
+- **PDF-Import-Pipeline in Projektmappe:** sicherstellen, dass das erzeugte PDF mit seiner physischen Seitengröße (mm über `MM_TO_PT` in `canvasRegionToPdfBytes`) importiert wird — nicht mit 96 DPI-Bitmap-Interpretation. Falls `importFile` PDFs generell mit 72 pt = 1 pt/px behandelt, greifen wir für den Sheet-PDF-Pfad direkt auf `paperWmm`/`paperHmm` zurück und setzen die Element-Breite/Höhe des importierten Elements explizit (`w = paperWmm/10 cm`, `h = paperHmm/10 cm`) über `projectStore.updateElement` beim Pickup in `ProjectWorkspace`.
+- **Testfall:** 1:100-Blatt, Rahmen um bekannte 5 m-Wand → im Projektsheet soll die eingefügte PDF exakt 5,0 cm breit sein. Falls die Messung abweicht, wird die Elementgröße beim Pickup korrigiert.
+
+## Betroffene Dateien
+
+- `src/pages/ProjectWorkspace.tsx` (nur Umbau der beiden Panels + optional Größenkorrektur beim Pickup)
+
+Keine Änderungen an `sheetPdfExport.ts`, `CadPage.tsx` oder `WorkspaceHeader.tsx` nötig.

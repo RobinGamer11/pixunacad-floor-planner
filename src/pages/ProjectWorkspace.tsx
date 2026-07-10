@@ -427,8 +427,12 @@ export default function ProjectWorkspace() {
         const file = new File([ab], `${pending.sheetName}.pdf`, { type: "application/pdf" });
         const pages = await importFile(file);
         if (pages.length === 0) return;
-        setScaleChoice(pages[0].kind === "pdf-page" ? "100" : "1");
-        setScaleCustom("100");
+        // CAD-Blatt-PDF: Maßstab ist bekannt → Dialog überspringen, damit
+        // 1cm-Papier = z.B. 1m real (bei 1:100) exakt eingehalten wird.
+        const m = String(pending.sheetScale || "1:100").match(/1\s*:\s*(\d+(?:[.,]\d+)?)/);
+        const denom = m ? parseFloat(m[1].replace(",", ".")) : 100;
+        setScaleChoice(String(denom));
+        setScaleCustom(String(denom));
         setScaleDialogPages(pages);
       } catch (err: any) {
         window.alert("Import des CAD-Blatts fehlgeschlagen: " + (err?.message || err));
@@ -3580,21 +3584,6 @@ function EbeneSelect({ engine }: { engine: import("@/cad/embed/MiniCad").MiniCad
 }
 
 function DocumentToolSettings({ importing, onImport }: { importing: boolean; onImport?: () => void }) {
-  const navigate = useNavigate();
-  const { projectId } = useParams();
-  const project = useProject(projectId);
-  const [sheetsOpen, setSheetsOpen] = React.useState(false);
-  const [pickedSheet, setPickedSheet] = React.useState<string | null>(null);
-  const sheets = project?.sheets ?? [];
-  // Aktuell aktive Seite der Projektmappe → wird für die Rückkehr benötigt.
-  // (Der Handler in CadPage schreibt das PDF in sessionStorage und navigiert
-  // dann zurück nach /project/:id, wo die Projektmappe es aufnimmt.)
-  const goCadForSheetPdf = (sheetId: string, mode: "full" | "view" | "frame") => {
-    if (!projectId) return;
-    const returnPageId = window.location.hash || ""; // nicht verwendet
-    void returnPageId;
-    navigate(`/project/${projectId}/cad?sheetPdf=${encodeURIComponent(sheetId)}&mode=${mode}`);
-  };
   return (
     <SettingsBlock title="DOKUMENT IMPORTIEREN">
       <button
@@ -3608,67 +3597,6 @@ function DocumentToolSettings({ importing, onImport }: { importing: boolean; onI
         <FileImage size={14} />
         {importing ? "Importiere…" : "Datei importieren"}
       </button>
-
-      {/* CAD-Blatt als PDF einfügen */}
-      <div className="pt-2 mt-2 border-t" style={{ borderColor: "hsl(var(--hairline))" }}>
-        <button
-          type="button"
-          onClick={() => setSheetsOpen((v) => !v)}
-          className="w-full h-9 rounded-md border text-xs flex items-center justify-between gap-2 px-2"
-          style={{ borderColor: "hsl(var(--hairline))" }}
-          title="Ein Zeichenblatt aus der CAD-Oberfläche als PDF einfügen"
-        >
-          <span className="flex items-center gap-2"><Compass size={14} /> CAD-Blatt einfügen</span>
-          <span className="text-muted-foreground">{sheetsOpen ? "▴" : "▾"}</span>
-        </button>
-        {sheetsOpen && (
-          <div className="mt-1 rounded-md border p-1.5 space-y-1" style={{ borderColor: "hsl(var(--hairline))" }}>
-            {sheets.length === 0 && (
-              <div className="text-[11px] text-muted-foreground px-1 py-2">
-                Noch keine Zeichenblätter. In der CAD-Oberfläche anlegen.
-              </div>
-            )}
-            {sheets.map((s) => {
-              const isActive = pickedSheet === s.id;
-              return (
-                <div key={s.id} className="space-y-1">
-                  <button
-                    type="button"
-                    onClick={() => setPickedSheet(isActive ? null : s.id)}
-                    className="w-full h-7 rounded-md text-[11px] flex items-center justify-between px-2 hover:bg-muted"
-                    style={{ background: isActive ? "hsl(var(--surface-strong))" : undefined }}
-                  >
-                    <span className="truncate">{s.name}</span>
-                    <span className="text-muted-foreground">{s.scale}</span>
-                  </button>
-                  {isActive && (
-                    <div className="grid grid-cols-2 gap-1 pl-2">
-                      <button
-                        type="button"
-                        onClick={() => goCadForSheetPdf(s.id, "view")}
-                        className="h-7 rounded-md border text-[10px] hover:bg-muted"
-                        style={{ borderColor: "hsl(var(--hairline))" }}
-                        title="Aktuell sichtbaren Ausschnitt im richtigen Maßstab einfügen"
-                      >
-                        Ansicht
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => goCadForSheetPdf(s.id, "frame")}
-                        className="h-7 rounded-md border text-[10px] hover:bg-muted"
-                        style={{ borderColor: "hsl(var(--hairline))" }}
-                        title="Rahmen in CAD-Oberfläche aufziehen (mit Häkchen bestätigen)"
-                      >
-                        Rahmen
-                      </button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
 
       <div className="text-[11px] leading-relaxed text-muted-foreground pt-2 border-t" style={{ borderColor: "hsl(var(--hairline))" }}>
         <div>PDF, JPG, PNG werden mit 96 DPI / 72 pt importiert.</div>
@@ -4087,9 +4015,17 @@ function CadToolSection({
   setSelectedElementId: (id?: string) => void;
   onJumpCad: (sheetId?: string) => void;
 }) {
+  const navigate = useNavigate();
   const page = project.pages.find((p) => p.id === pageId);
   const placed = (page?.elements ?? []).filter((e) => e.kind === "cad-view");
   const [chosenSheet, setChosenSheet] = useState<string>("");
+  const [pdfOpen, setPdfOpen] = useState<boolean>(false);
+  const [pdfPickedSheet, setPdfPickedSheet] = useState<string | null>(null);
+
+  const goCadForSheetPdf = (sheetId: string, mode: "view" | "frame") => {
+    if (!projectId) return;
+    navigate(`/project/${projectId}/cad?sheetPdf=${encodeURIComponent(sheetId)}&mode=${mode}`);
+  };
 
   const placeSheet = () => {
     if (!pageId || !chosenSheet) return;
@@ -4146,6 +4082,69 @@ function CadToolSection({
           </div>
         )}
       </div>
+
+      {/* CAD-Blatt als PDF einfügen (verschoben aus dem Dokument-Werkzeug). */}
+      <div>
+        <button
+          type="button"
+          onClick={() => setPdfOpen((v) => !v)}
+          className="w-full h-9 rounded-md border text-xs flex items-center justify-between gap-2 px-2"
+          style={{ borderColor: "hsl(var(--hairline))" }}
+          title="Ein Zeichenblatt aus der CAD-Oberfläche als PDF einfügen"
+        >
+          <span className="flex items-center gap-2"><CompassIcon size={14} /> CAD-Blatt als PDF einfügen</span>
+          <span className="text-muted-foreground">{pdfOpen ? "▴" : "▾"}</span>
+        </button>
+        {pdfOpen && (
+          <div className="mt-1 rounded-md border p-1.5 space-y-1" style={{ borderColor: "hsl(var(--hairline))" }}>
+            {project.sheets.length === 0 && (
+              <div className="text-[11px] text-muted-foreground px-1 py-2">
+                Noch keine Zeichenblätter. In der CAD-Oberfläche anlegen.
+              </div>
+            )}
+            {project.sheets.map((s) => {
+              const isActive = pdfPickedSheet === s.id;
+              return (
+                <div key={s.id} className="space-y-1">
+                  <button
+                    type="button"
+                    onClick={() => setPdfPickedSheet(isActive ? null : s.id)}
+                    className="w-full h-7 rounded-md text-[11px] flex items-center justify-between px-2 hover:bg-muted"
+                    style={{ background: isActive ? "hsl(var(--surface-strong))" : undefined }}
+                  >
+                    <span className="truncate">{s.name}</span>
+                    <span className="text-muted-foreground">{s.scale}</span>
+                  </button>
+                  {isActive && (
+                    <div className="grid grid-cols-2 gap-1 pl-2">
+                      <button
+                        type="button"
+                        onClick={() => goCadForSheetPdf(s.id, "view")}
+                        className="h-7 rounded-md border text-[10px] hover:bg-muted"
+                        style={{ borderColor: "hsl(var(--hairline))" }}
+                        title="Aktuell sichtbaren Ausschnitt im richtigen Maßstab einfügen"
+                      >
+                        Ansicht
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => goCadForSheetPdf(s.id, "frame")}
+                        className="h-7 rounded-md border text-[10px] hover:bg-muted"
+                        style={{ borderColor: "hsl(var(--hairline))" }}
+                        title="Rahmen in CAD-Oberfläche aufziehen (mit Häkchen bestätigen)"
+                      >
+                        Rahmen
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+
 
       {placed.length > 0 && (
         <div>
@@ -4279,42 +4278,46 @@ function ElementInspector({
       <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-1">
         {element.kind.toUpperCase()}
       </div>
-      <Row label="Breite">
-        <input
-          type="number"
-          value={Math.round(element.w)}
-          onChange={(e) => update({ w: Number(e.target.value) })}
-          className="w-full h-8 px-2 rounded bg-transparent border text-sm"
-          style={{ borderColor: "hsl(var(--hairline))" }}
-        />
-      </Row>
-      <Row label="Höhe">
-        <input
-          type="number"
-          value={Math.round(element.h)}
-          onChange={(e) => update({ h: Number(e.target.value) })}
-          className="w-full h-8 px-2 rounded bg-transparent border text-sm"
-          style={{ borderColor: "hsl(var(--hairline))" }}
-        />
-      </Row>
-      <Row label="Position X">
-        <input
-          type="number"
-          value={Math.round(element.x)}
-          onChange={(e) => update({ x: Number(e.target.value) })}
-          className="w-full h-8 px-2 rounded bg-transparent border text-sm"
-          style={{ borderColor: "hsl(var(--hairline))" }}
-        />
-      </Row>
-      <Row label="Position Y">
-        <input
-          type="number"
-          value={Math.round(element.y)}
-          onChange={(e) => update({ y: Number(e.target.value) })}
-          className="w-full h-8 px-2 rounded bg-transparent border text-sm"
-          style={{ borderColor: "hsl(var(--hairline))" }}
-        />
-      </Row>
+      {element.kind !== "cad-view" && (
+        <>
+          <Row label="Breite">
+            <input
+              type="number"
+              value={Math.round(element.w)}
+              onChange={(e) => update({ w: Number(e.target.value) })}
+              className="w-full h-8 px-2 rounded bg-transparent border text-sm"
+              style={{ borderColor: "hsl(var(--hairline))" }}
+            />
+          </Row>
+          <Row label="Höhe">
+            <input
+              type="number"
+              value={Math.round(element.h)}
+              onChange={(e) => update({ h: Number(e.target.value) })}
+              className="w-full h-8 px-2 rounded bg-transparent border text-sm"
+              style={{ borderColor: "hsl(var(--hairline))" }}
+            />
+          </Row>
+          <Row label="Position X">
+            <input
+              type="number"
+              value={Math.round(element.x)}
+              onChange={(e) => update({ x: Number(e.target.value) })}
+              className="w-full h-8 px-2 rounded bg-transparent border text-sm"
+              style={{ borderColor: "hsl(var(--hairline))" }}
+            />
+          </Row>
+          <Row label="Position Y">
+            <input
+              type="number"
+              value={Math.round(element.y)}
+              onChange={(e) => update({ y: Number(e.target.value) })}
+              className="w-full h-8 px-2 rounded bg-transparent border text-sm"
+              style={{ borderColor: "hsl(var(--hairline))" }}
+            />
+          </Row>
+        </>
+      )}
 
       {element.kind === "text" && (
         <>
@@ -4399,33 +4402,15 @@ function ElementInspector({
         />
       </Row>
 
-      {element.kind === "cad-view" && (
-        <>
-          <Row label="Maßstab">
-            <input
-              value={element.scale ?? "1:100"}
-              onChange={(e) => update({ scale: e.target.value })}
-              className="w-full h-8 px-2 rounded bg-transparent border text-sm"
-              style={{ borderColor: "hsl(var(--hairline))" }}
-            />
-          </Row>
-          <button
-            onClick={() => onJumpCad(element.sheetId)}
-            className="w-full h-9 rounded-md text-sm font-medium flex items-center justify-center gap-2"
-            style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
-          >
-            <ExternalLink size={14} /> Im CAD öffnen
-          </button>
-        </>
+      {element.kind !== "cad-view" && (
+        <button
+          onClick={() => projectStore.deleteElement(projectId, pageId, element.id)}
+          className="w-full h-9 rounded-md text-sm border flex items-center justify-center gap-2 mt-2"
+          style={{ borderColor: "hsl(var(--hairline))", color: "hsl(0 60% 50%)" }}
+        >
+          <Trash2 size={14} /> Element löschen
+        </button>
       )}
-
-      <button
-        onClick={() => projectStore.deleteElement(projectId, pageId, element.id)}
-        className="w-full h-9 rounded-md text-sm border flex items-center justify-center gap-2 mt-2"
-        style={{ borderColor: "hsl(var(--hairline))", color: "hsl(0 60% 50%)" }}
-      >
-        <Trash2 size={14} /> Element löschen
-      </button>
     </div>
   );
 }
