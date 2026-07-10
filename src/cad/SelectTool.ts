@@ -2734,4 +2734,192 @@ export class SelectTool {
     const s = cam.worldToScreen(this.snap.world.x, this.snap.world.y);
     drawSnapDot(ctx, s.x, s.y, { ring: true });
   }
+
+  // ── Marquee helpers ──────────────────────────────────────────────────────
+
+  private _marqueeRectWorld(): { minX: number; minY: number; maxX: number; maxY: number } | null {
+    if (!this.marqueeStart || !this.marqueeCurrent) return null;
+    const a = this.app.camera.screenToWorld(this.marqueeStart.x, this.marqueeStart.y);
+    const b = this.app.camera.screenToWorld(this.marqueeCurrent.x, this.marqueeCurrent.y);
+    return {
+      minX: Math.min(a.x, b.x),
+      minY: Math.min(a.y, b.y),
+      maxX: Math.max(a.x, b.x),
+      maxY: Math.max(a.y, b.y),
+    };
+  }
+
+  private _pointsAabb(pts: Vec2[]): { minX: number; minY: number; maxX: number; maxY: number } | null {
+    if (!pts || !pts.length) return null;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const p of pts) {
+      if (p.x < minX) minX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y > maxY) maxY = p.y;
+    }
+    return { minX, minY, maxX, maxY };
+  }
+
+  /** Repräsentative Weltpunkte je Element-Kind (für Enclose/AABB-Test). */
+  private _elementPoints(kind: string, obj: any): Vec2[] {
+    try {
+      switch (kind) {
+        case "segment":  return [obj.a, obj.b];
+        case "wall":     return obj.corners || [];
+        case "hatch":    return obj.points || [];
+        case "freeStroke": return obj.points || [];
+        case "dimension": {
+          const g = getDimensionGeometry(obj);
+          return [obj.p1, obj.p2, g.d1, g.d2];
+        }
+        case "textbox":  return boxCornersWorld(obj);
+        case "document": return documentCornersWorld(obj);
+        case "sticker":  return instanceBoundingCornersWorld(obj.items, obj.position, obj.rotationRad, obj.scale);
+        default: return [];
+      }
+    } catch { return []; }
+  }
+
+  private _rectsOverlap(
+    a: { minX: number; minY: number; maxX: number; maxY: number },
+    b: { minX: number; minY: number; maxX: number; maxY: number }
+  ): boolean {
+    return !(a.maxX < b.minX || a.minX > b.maxX || a.maxY < b.minY || a.minY > b.maxY);
+  }
+
+  private _allPointsInside(
+    pts: Vec2[],
+    r: { minX: number; minY: number; maxX: number; maxY: number }
+  ): boolean {
+    if (!pts.length) return false;
+    for (const p of pts) {
+      if (p.x < r.minX || p.x > r.maxX || p.y < r.minY || p.y > r.maxY) return false;
+    }
+    return true;
+  }
+
+  /** Iteriert alle testbaren Scene-Elemente. */
+  private *_iterElements(): Generator<{ kind: string; id: string; obj: any }> {
+    const s = this.app.scene as any;
+    for (const o of s.segments || [])         yield { kind: "segment",    id: o.id, obj: o };
+    for (const o of s.walls || [])            yield { kind: "wall",       id: o.id, obj: o };
+    for (const o of s.hatches || [])          yield { kind: "hatch",      id: o.id, obj: o };
+    for (const o of s.freeStrokes || [])      yield { kind: "freeStroke", id: o.id, obj: o };
+    for (const o of s.dimensions || [])       yield { kind: "dimension",  id: o.id, obj: o };
+    for (const o of s.textBoxes || [])        yield { kind: "textbox",    id: o.id, obj: o };
+    for (const o of s.documents || [])        yield { kind: "document",   id: o.id, obj: o };
+    for (const o of s.stickerInstances || []) yield { kind: "sticker",    id: o.id, obj: o };
+  }
+
+  private _commitMarquee() {
+    const rect = this._marqueeRectWorld();
+    if (!rect || (rect.maxX - rect.minX) < 1e-6 || (rect.maxY - rect.minY) < 1e-6) {
+      this.marqueeSelectedIds = [];
+      return;
+    }
+    const hits: { kind: string; id: string }[] = [];
+    for (const { kind, id, obj } of this._iterElements()) {
+      const pts = this._elementPoints(kind, obj);
+      if (!pts.length) continue;
+      const aabb = this._pointsAabb(pts);
+      if (!aabb) continue;
+      if (this.marqueeMode === "enclose") {
+        if (this._allPointsInside(pts, rect)) hits.push({ kind, id });
+      } else {
+        if (this._rectsOverlap(aabb, rect)) hits.push({ kind, id });
+      }
+    }
+    this.marqueeSelectedIds = hits;
+  }
+
+  /** Löscht alle per Marquee ausgewählten Elemente. Wird aus CadApp Delete-Handler aufgerufen. */
+  deleteMarqueeSelection(): boolean {
+    if (!this.marqueeSelectedIds.length) return false;
+    const scene = this.app.scene;
+    for (const { kind, id } of this.marqueeSelectedIds) {
+      try {
+        switch (kind) {
+          case "segment":    { const o = scene.getSegmentById(id);         if (o) scene.removeSegment(o); break; }
+          case "wall":       { const o = scene.getWallById(id);            if (o) scene.removeWall(o); break; }
+          case "hatch":      { const o = scene.getHatchById(id);           if (o) scene.removeHatch(o); break; }
+          case "freeStroke": { const o = scene.getFreeStrokeById(id);      if (o) scene.removeFreeStroke(o); break; }
+          case "dimension":  { const o = scene.getDimensionById(id);       if (o) scene.removeDimension(o); break; }
+          case "textbox":    { const o = scene.getTextBoxById(id);         if (o) scene.removeTextBox(o); break; }
+          case "document":   { const o = scene.getDocumentById(id);        if (o) scene.removeDocument(o); break; }
+          case "sticker":    { const o = scene.getStickerInstanceById(id); if (o) scene.removeStickerInstance(o); break; }
+        }
+      } catch { /* ignore individual failures */ }
+    }
+    this.marqueeSelectedIds = [];
+    try { (this.app as any).refreshLabelUI?.(); } catch {}
+    return true;
+  }
+
+  private _drawMarqueeOverlay(ctx: CanvasRenderingContext2D, cam: any) {
+    // Hervorhebung bereits ausgewählter Elemente (AABB-Rechteck).
+    if (this.marqueeSelectedIds.length) {
+      ctx.save();
+      ctx.strokeStyle = this.marqueeMode === "enclose" ? "rgba(59,130,246,0.95)" : "rgba(249,115,22,0.95)";
+      ctx.fillStyle   = this.marqueeMode === "enclose" ? "rgba(59,130,246,0.10)" : "rgba(249,115,22,0.10)";
+      ctx.lineWidth = 1.25;
+      const seen = new Set<string>();
+      for (const { kind, id } of this.marqueeSelectedIds) {
+        const key = kind + ":" + id;
+        if (seen.has(key)) continue; seen.add(key);
+        const obj = this._getElementById(kind, id);
+        if (!obj) continue;
+        const pts = this._elementPoints(kind, obj);
+        const aabb = this._pointsAabb(pts);
+        if (!aabb) continue;
+        const p0 = cam.worldToScreen(aabb.minX, aabb.minY);
+        const p1 = cam.worldToScreen(aabb.maxX, aabb.maxY);
+        const x = Math.min(p0.x, p1.x) - 2;
+        const y = Math.min(p0.y, p1.y) - 2;
+        const w = Math.abs(p1.x - p0.x) + 4;
+        const h = Math.abs(p1.y - p0.y) + 4;
+        ctx.fillRect(x, y, w, h);
+        ctx.strokeRect(x, y, w, h);
+      }
+      ctx.restore();
+    }
+
+    // Aktives Aufzieh-Rechteck.
+    if (this.marqueeActive && this.marqueeStart && this.marqueeCurrent) {
+      const x = Math.min(this.marqueeStart.x, this.marqueeCurrent.x);
+      const y = Math.min(this.marqueeStart.y, this.marqueeCurrent.y);
+      const w = Math.abs(this.marqueeCurrent.x - this.marqueeStart.x);
+      const h = Math.abs(this.marqueeCurrent.y - this.marqueeStart.y);
+      ctx.save();
+      if (this.marqueeMode === "enclose") {
+        ctx.strokeStyle = "rgba(59,130,246,0.95)";
+        ctx.fillStyle   = "rgba(59,130,246,0.10)";
+        ctx.setLineDash([]);
+      } else {
+        ctx.strokeStyle = "rgba(249,115,22,0.95)";
+        ctx.fillStyle   = "rgba(249,115,22,0.10)";
+        ctx.setLineDash([6, 4]);
+      }
+      ctx.lineWidth = 1.25;
+      ctx.fillRect(x, y, w, h);
+      ctx.strokeRect(x, y, w, h);
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+  }
+
+  private _getElementById(kind: string, id: string): any {
+    const s = this.app.scene as any;
+    switch (kind) {
+      case "segment":    return s.getSegmentById?.(id);
+      case "wall":       return s.getWallById?.(id);
+      case "hatch":      return s.getHatchById?.(id);
+      case "freeStroke": return s.getFreeStrokeById?.(id);
+      case "dimension":  return s.getDimensionById?.(id);
+      case "textbox":    return s.getTextBoxById?.(id);
+      case "document":   return s.getDocumentById?.(id);
+      case "sticker":    return s.getStickerInstanceById?.(id);
+      default: return null;
+    }
+  }
 }
