@@ -60,6 +60,8 @@ import {
   BookOpen,
   Lock as LockIcon,
   Unlock as UnlockIcon,
+  BoxSelect,
+  SquareDashed,
 } from "lucide-react";
 
 import {
@@ -360,8 +362,8 @@ export default function ProjectWorkspace() {
   };
 
   // Per-tool settings (live in workspace state; persist could come later).
-  const [toolSettings, setToolSettings] = useState({
-    select: { multi: false },
+  const [toolSettings, setToolSettings] = useState<ToolSettings>({
+    select: { multi: false, marqueeMode: "touch" },
     guide: { color: "#7DD3FC", strokeWidth: 1, locked: false },
     line: { color: "#111111", thicknessMm: 0.5, alpha: 100 },
     text: {
@@ -1293,6 +1295,7 @@ export default function ProjectWorkspace() {
                       onCommitTool={() => setActiveTool(null)}
                       selectedElementIds={selectedElementIds}
                       onSelect={handleSelect}
+                      onMultiSelect={(ids) => { setSelectedElementIds(ids); setSelectedCadTool(undefined); setRightTab("tools"); }}
                       onCadSelectionChange={handleCadSelection}
                       onCadEngineReady={(api) => { cadEngineApiRef.current = api; forceEngineTick(t => t + 1); }}
                       onJumpCad={(sheetId) => navigate(`/project/${project.id}/cad${sheetId ? `/${sheetId}` : ""}`)}
@@ -1659,7 +1662,7 @@ const PUNCH_PATTERNS: Record<Exclude<PunchPattern, "none">, { label: string; off
 };
 
 type ToolSettings = {
-  select: { multi: boolean };
+  select: { multi: boolean; marqueeMode: "touch" | "enclose" };
   guide: { color: string; strokeWidth: number; locked: boolean };
   line: { color: string; thicknessMm: number; alpha: number };
   text: {
@@ -1680,7 +1683,7 @@ type ToolSettings = {
 };
 
 const DEFAULT_TOOL_SETTINGS: ToolSettings = {
-  select: { multi: false },
+  select: { multi: false, marqueeMode: "touch" },
   guide: { color: "#7DD3FC", strokeWidth: 1, locked: false },
   line: { color: "#111111", thicknessMm: 0.5, alpha: 100 },
   text: {
@@ -1853,6 +1856,7 @@ function PageCanvas({
   toolSettings,
   onCommitTool,
   onSelect,
+  onMultiSelect,
   onCadSelectionChange,
   onCadEngineReady,
   hatchDrawMode,
@@ -1871,6 +1875,7 @@ function PageCanvas({
   toolSettings: ToolSettings;
   onCommitTool: () => void;
   onSelect: (id?: string, opts?: { shift?: boolean }) => void;
+  onMultiSelect?: (ids: string[]) => void;
   onCadSelectionChange: (info: MiniCadSelectionInfo | null, count?: number) => void;
   onCadEngineReady?: (api: { setSelectedSegmentSnap: (opts: { midpointSnap?: boolean; divisionSnap?: number | null }) => void; duplicateSelectedSegments: (offsetMm?: number) => number; engine: import("@/cad/embed/MiniCad").MiniCad }) => void;
   hatchDrawMode?: HatchDrawMode;
@@ -1915,15 +1920,65 @@ function PageCanvas({
   const drawingTool = false;
   const cursorStyle = undefined;
 
+  // Rahmen-Auswahl (Marquee) auf freier Blattfläche — nur wenn Auswahl-
+  // Werkzeug aktiv ist. Modus kommt aus toolSettings.select.marqueeMode:
+  //   "touch"   → alle Objekte, die den Rahmen berühren
+  //   "enclose" → nur Objekte, die vollständig im Rahmen liegen
+  const [marquee, setMarquee] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
+  const marqueeMode = toolSettings.select.marqueeMode;
+
   const handlePageMouseDown = (e: React.MouseEvent) => {
     if (e.target !== e.currentTarget) return;
-    // not drawing: deselect
-    onSelect(undefined);
+    if (activeTool !== null) { onSelect(undefined); return; }
+    if (e.button !== 0) { onSelect(undefined); return; }
+    const start = toPct(e.clientX, e.clientY);
+    setMarquee({ x1: start.x, y1: start.y, x2: start.x, y2: start.y });
+    let dragged = false;
+    const onMove = (ev: MouseEvent) => {
+      const cur = toPct(ev.clientX, ev.clientY);
+      if (Math.abs(cur.x - start.x) > 0.3 || Math.abs(cur.y - start.y) > 0.3) dragged = true;
+      setMarquee({ x1: start.x, y1: start.y, x2: cur.x, y2: cur.y });
+    };
+    const onUp = (ev: MouseEvent) => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      const end = toPct(ev.clientX, ev.clientY);
+      setMarquee(null);
+      if (!dragged) { onSelect(undefined); return; }
+      const rx1 = Math.min(start.x, end.x);
+      const ry1 = Math.min(start.y, end.y);
+      const rx2 = Math.max(start.x, end.x);
+      const ry2 = Math.max(start.y, end.y);
+      const hit: string[] = [];
+      for (const el of page.elements) {
+        // CAD-Layer-Elemente (Linien, Guides, Hatches) sind Engine-verwaltet
+        // und tauchen nicht als React-Auswahl auf.
+        if (el.kind === "line" || el.kind === "guide") continue;
+        const ex1 = (el as any).x ?? 0;
+        const ey1 = (el as any).y ?? 0;
+        const ew = (el as any).w ?? 0;
+        const eh = (el as any).h ?? 0;
+        const ex2 = ex1 + ew;
+        const ey2 = ey1 + eh;
+        if (marqueeMode === "enclose") {
+          if (ex1 >= rx1 && ey1 >= ry1 && ex2 <= rx2 && ey2 <= ry2) hit.push(el.id);
+        } else {
+          // touch / crossing: AABB-Overlap
+          if (ex1 <= rx2 && ex2 >= rx1 && ey1 <= ry2 && ey2 >= ry1) hit.push(el.id);
+        }
+      }
+      if (onMultiSelect) onMultiSelect(hit);
+      else if (hit.length === 1) onSelect(hit[0]);
+      else onSelect(undefined);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
   };
 
   const handlePageMouseMove = (_e: React.MouseEvent) => {
     /* no-op */
   };
+
 
   // Escape cancels pending draw and resets back to the select tool.
   React.useEffect(() => {
@@ -2005,6 +2060,28 @@ function PageCanvas({
           onMouseDown={handlePageMouseDown}
           onMouseMove={handlePageMouseMove}
         >
+        {/* Marquee-Overlay (Rahmen-Auswahl). Farbe je nach Modus:
+            touch=orange (Crossing), enclose=blau (Window) — Archicad-Konvention. */}
+        {marquee && (() => {
+          const rx1 = Math.min(marquee.x1, marquee.x2);
+          const ry1 = Math.min(marquee.y1, marquee.y2);
+          const rx2 = Math.max(marquee.x1, marquee.x2);
+          const ry2 = Math.max(marquee.y1, marquee.y2);
+          const stroke = marqueeMode === "enclose" ? "hsl(210 90% 55%)" : "hsl(28 95% 55%)";
+          const fill = marqueeMode === "enclose" ? "hsl(210 90% 55% / 0.10)" : "hsl(28 95% 55% / 0.10)";
+          const dash = marqueeMode === "enclose" ? "none" : "6 4";
+          return (
+            <div
+              className="absolute pointer-events-none"
+              style={{
+                left: `${rx1}%`, top: `${ry1}%`,
+                width: `${rx2 - rx1}%`, height: `${ry2 - ry1}%`,
+                background: fill,
+                outline: `1px ${dash === "none" ? "solid" : "dashed"} ${stroke}`,
+              }}
+            />
+          );
+        })()}
         {/* Margin overlay (light grey ring) */}
         {marginPx > 0 && (
           <div
@@ -3478,16 +3555,60 @@ function DocumentToolSettings({
 
 
 function SelectSettings({
+  settings,
+  onChange,
   selectedCount,
-
 }: {
   settings: ToolSettings["select"];
   onChange: (p: Partial<ToolSettings["select"]>) => void;
   selectedCount: number;
 }) {
-  void selectedCount;
-  return null;
+  const mode = settings.marqueeMode;
+  return (
+    <SettingsBlock title="AUSWAHL">
+      <Row label="Rahmen-Modus">
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => onChange({ marqueeMode: "touch" })}
+            className="h-8 w-8 rounded-md border flex items-center justify-center"
+            style={{
+              borderColor: mode === "touch" ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
+              background: mode === "touch" ? "hsl(var(--accent-gold-soft))" : "transparent",
+            }}
+            title="Berühren: Objekte werden ausgewählt, sobald sie den Rahmen berühren (Crossing)"
+            aria-label="Rahmen-Modus: Berühren"
+          >
+            <SquareDashed size={14} />
+          </button>
+          <button
+            type="button"
+            onClick={() => onChange({ marqueeMode: "enclose" })}
+            className="h-8 w-8 rounded-md border flex items-center justify-center"
+            style={{
+              borderColor: mode === "enclose" ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
+              background: mode === "enclose" ? "hsl(var(--accent-gold-soft))" : "transparent",
+            }}
+            title="Vollständig einschließen: Nur Objekte, die komplett im Rahmen liegen (Window)"
+            aria-label="Rahmen-Modus: Einschließen"
+          >
+            <BoxSelect size={14} />
+          </button>
+        </div>
+      </Row>
+      <div className="text-[11px] text-muted-foreground leading-relaxed">
+        {mode === "touch"
+          ? "Ziehen Sie mit gedrückter Maustaste auf freier Blattfläche einen Rahmen — alle berührten Objekte werden ausgewählt."
+          : "Ziehen Sie einen Rahmen — nur Objekte, die vollständig im Rahmen liegen, werden ausgewählt."}
+        {" "}Auswahl mit <strong>Entf</strong> löschen.
+      </div>
+      {selectedCount > 0 && (
+        <div className="text-[11px] text-muted-foreground">Aktuell {selectedCount} Objekt(e) ausgewählt.</div>
+      )}
+    </SettingsBlock>
+  );
 }
+
 
 function GuideSettings({
   settings,
