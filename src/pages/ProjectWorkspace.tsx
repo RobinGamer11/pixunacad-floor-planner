@@ -3362,7 +3362,7 @@ function ToolsTab({
 
       {/* Per-tool settings */}
 
-      {!activeTool && (
+      {!settingsTool && (
         <SelectSettings
           settings={toolSettings.select}
           onChange={(p) => updateToolSettings("select", p)}
@@ -3566,44 +3566,50 @@ function SelectSettings({
   const mode = settings.marqueeMode;
   return (
     <SettingsBlock title="AUSWAHL">
-      <Row label="Rahmen-Modus">
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => onChange({ marqueeMode: "touch" })}
-            className="h-8 w-8 rounded-md border flex items-center justify-center"
-            style={{
-              borderColor: mode === "touch" ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
-              background: mode === "touch" ? "hsl(var(--accent-gold-soft))" : "transparent",
-            }}
-            title="Berühren: Objekte werden ausgewählt, sobald sie den Rahmen berühren (Crossing)"
-            aria-label="Rahmen-Modus: Berühren"
-          >
-            <SquareDashed size={14} />
-          </button>
-          <button
-            type="button"
-            onClick={() => onChange({ marqueeMode: "enclose" })}
-            className="h-8 w-8 rounded-md border flex items-center justify-center"
-            style={{
-              borderColor: mode === "enclose" ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
-              background: mode === "enclose" ? "hsl(var(--accent-gold-soft))" : "transparent",
-            }}
-            title="Vollständig einschließen: Nur Objekte, die komplett im Rahmen liegen (Window)"
-            aria-label="Rahmen-Modus: Einschließen"
-          >
-            <BoxSelect size={14} />
-          </button>
-        </div>
-      </Row>
-      <div className="text-[11px] text-muted-foreground leading-relaxed">
-        {mode === "touch"
-          ? "Ziehen Sie mit gedrückter Maustaste auf freier Blattfläche einen Rahmen — alle berührten Objekte werden ausgewählt."
-          : "Ziehen Sie einen Rahmen — nur Objekte, die vollständig im Rahmen liegen, werden ausgewählt."}
-        {" "}Auswahl mit <strong>Entf</strong> löschen.
+      <div className="text-[11px] mb-1 text-muted-foreground">Rahmen-Modus</div>
+      <div className="flex gap-1">
+        <button
+          type="button"
+          onClick={() => onChange({ marqueeMode: "touch" })}
+          className="flex-1 h-9 rounded-md border flex items-center justify-center gap-1.5 text-xs"
+          style={mode === "touch" ? {
+            background: "rgba(249,115,22,0.15)",
+            borderColor: "rgba(249,115,22,0.9)",
+            color: "rgba(249,115,22,1)",
+          } : {
+            borderColor: "hsl(var(--hairline))",
+          }}
+          title="Berühren (Crossing): alles was den Rahmen berührt"
+        >
+          <SquareDashed size={14} />
+          <span>Berühren</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => onChange({ marqueeMode: "enclose" })}
+          className="flex-1 h-9 rounded-md border flex items-center justify-center gap-1.5 text-xs"
+          style={mode === "enclose" ? {
+            background: "rgba(59,130,246,0.15)",
+            borderColor: "rgba(59,130,246,0.9)",
+            color: "rgba(59,130,246,1)",
+          } : {
+            borderColor: "hsl(var(--hairline))",
+          }}
+          title="Umschließen (Window): nur vollständig innen liegende Elemente"
+        >
+          <BoxSelect size={14} />
+          <span>Umschließen</span>
+        </button>
+      </div>
+      <div className="text-[11px] leading-relaxed pt-2 mt-2 text-muted-foreground border-t" style={{ borderColor: "hsl(var(--hairline))" }}>
+        Klick auf Leerraum + ziehen zieht einen Rahmen auf. Im Modus <b>Berühren</b> werden
+        alle Elemente ausgewählt, die den Rahmen schneiden — im Modus <b>Umschließen</b>
+        nur die vollständig innen liegenden. Mit <b>Entf</b> gemeinsam löschen.
       </div>
       {selectedCount > 0 && (
-        <div className="text-[11px] text-muted-foreground">Aktuell {selectedCount} Objekt(e) ausgewählt.</div>
+        <div className="text-[11px] text-muted-foreground pt-1">
+          {selectedCount} Element{selectedCount === 1 ? "" : "e"} ausgewählt.
+        </div>
       )}
     </SettingsBlock>
   );

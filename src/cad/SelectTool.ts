@@ -2865,12 +2865,15 @@ export class SelectTool {
   }
 
   private _drawMarqueeOverlay(ctx: CanvasRenderingContext2D, cam: any) {
-    // Hervorhebung bereits ausgewählter Elemente (AABB-Rechteck).
+    // Hervorhebung bereits ausgewählter Elemente — als blaue Outline entlang
+    // der echten Geometrie (analog zur normalen Einzel-Selektion), keine
+    // sichtbaren AABB-Rechtecke.
     if (this.marqueeSelectedIds.length) {
       ctx.save();
-      ctx.strokeStyle = this.marqueeMode === "enclose" ? "rgba(59,130,246,0.95)" : "rgba(249,115,22,0.95)";
-      ctx.fillStyle   = this.marqueeMode === "enclose" ? "rgba(59,130,246,0.10)" : "rgba(249,115,22,0.10)";
-      ctx.lineWidth = 1.25;
+      ctx.strokeStyle = "rgba(77,163,255,0.95)";
+      ctx.lineWidth = 2;
+      ctx.lineJoin = "round";
+      ctx.lineCap = "round";
       const seen = new Set<string>();
       for (const { kind, id } of this.marqueeSelectedIds) {
         const key = kind + ":" + id;
@@ -2878,16 +2881,17 @@ export class SelectTool {
         const obj = this._getElementById(kind, id);
         if (!obj) continue;
         const pts = this._elementPoints(kind, obj);
-        const aabb = this._pointsAabb(pts);
-        if (!aabb) continue;
-        const p0 = cam.worldToScreen(aabb.minX, aabb.minY);
-        const p1 = cam.worldToScreen(aabb.maxX, aabb.maxY);
-        const x = Math.min(p0.x, p1.x) - 2;
-        const y = Math.min(p0.y, p1.y) - 2;
-        const w = Math.abs(p1.x - p0.x) + 4;
-        const h = Math.abs(p1.y - p0.y) + 4;
-        ctx.fillRect(x, y, w, h);
-        ctx.strokeRect(x, y, w, h);
+        if (!pts || pts.length < 2) continue;
+        const closed = pts.length >= 3 && kind !== "segment" && kind !== "dimension";
+        ctx.beginPath();
+        const p0 = cam.worldToScreen(pts[0].x, pts[0].y);
+        ctx.moveTo(p0.x, p0.y);
+        for (let i = 1; i < pts.length; i++) {
+          const p = cam.worldToScreen(pts[i].x, pts[i].y);
+          ctx.lineTo(p.x, p.y);
+        }
+        if (closed) ctx.closePath();
+        ctx.stroke();
       }
       ctx.restore();
     }
