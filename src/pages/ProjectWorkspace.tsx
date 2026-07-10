@@ -2343,7 +2343,7 @@ function ElementView({
         height: `${el.h}%`,
         outline: outlineStyle,
         outlineOffset: selected && isCadView ? "1px" : undefined,
-        cursor: readOnly ? "default" : "move",
+        cursor: readOnly || isCadView ? "default" : "move",
         opacity: el.opacity ?? 1,
         boxShadow: el.shadow ? "0 8px 24px -8px rgba(0,0,0,0.25)" : undefined,
         border: el.border ? "1px solid hsl(var(--ink))" : undefined,
@@ -2497,10 +2497,6 @@ function ElementView({
               <button
                 type="button"
                 data-hub-control
-                onMouseDown={(e) => {
-                  e.stopPropagation();
-                  e.preventDefault();
-                }}
                 onClick={(e) => { e.stopPropagation(); onDelete?.(); }}
                 title="Löschen"
                 className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
