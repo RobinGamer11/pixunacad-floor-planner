@@ -146,6 +146,9 @@ export default function ProjectWorkspace() {
   const [scaleDialogPages, setScaleDialogPages] = useState<ImportedPage[] | null>(null);
   const [scaleChoice, setScaleChoice] = useState<string>("100");
   const [scaleCustom, setScaleCustom] = useState<string>("100");
+  // Ausgabemaßstab für neu importierte Dokumente. Wird rechts im
+  // "Dokument"-Werkzeug-Panel als Dropdown ausgewählt (wie beim CAD-Blatt).
+  const [docScale, setDocScale] = useState<string>("1:100");
   const [selectedElementIds, setSelectedElementIds] = useState<string[]>([]);
   // `selectedElementId` ist das ZULETZT angeklickte Element — alle bestehenden
   // Lese-Stellen (Inspector etc.) benutzen es weiterhin. Bei Multi-Auswahl
