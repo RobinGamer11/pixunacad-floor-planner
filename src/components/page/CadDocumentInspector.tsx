@@ -126,133 +126,6 @@ export function CadDocumentInspector({ engine }: Props) {
         </div>
       </div>
 
-      {scaling && (
-        <div
-          className="rounded-md p-1.5 text-[10px]"
-          style={{
-            background: "hsl(var(--primary) / 0.12)",
-            border: "1px solid hsl(var(--primary) / 0.4)",
-          }}
-        >
-          {phase === "scale-pick-1" && <span>1. Skalier-Punkt anklicken (Snap aktiv)</span>}
-          {phase === "scale-pick-2" && (
-            <span>2. Punkt setzen · Shift: Ortho · Klick auf m-Anzeige: Distanz tippen</span>
-          )}
-          {phase === "scale-await-input" && <span>Soll-Länge im Hub eingeben + Enter</span>}
-        </div>
-      )}
-
-      <button
-        type="button"
-        onClick={() => {
-          const tool: any = (engine as any).documentTool;
-          if (tool?.isScaling?.() && tool.scaleTargetDocId === sel.id) tool.cancel();
-          else tool?.beginScaleTwoPoints(sel.id);
-        }}
-        className="w-full h-7 rounded-md border text-[11px] flex items-center justify-start gap-1.5 px-2 hover:bg-muted"
-        style={{
-          borderColor: scaling ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
-          background: scaling ? "hsl(var(--accent-gold) / 0.12)" : undefined,
-        }}
-        title="Über zwei Snap-Punkte und eine Soll-Länge skalieren — erneut klicken zum Abbrechen"
-      >
-        <Maximize2 size={12} /> {scaling ? "Skalieren abbrechen" : "Skalieren (2 Punkte)"}
-      </button>
-
-      <button
-        type="button"
-        onClick={() => (engine as any).documentTool?.beginScaleFromLastDimension?.(sel.id)}
-        className="w-full h-7 rounded-md border text-[11px] flex items-center justify-start gap-1.5 px-2 hover:bg-muted"
-        style={{ borderColor: "hsl(var(--hairline))" }}
-        title="Skaliere mit der zuletzt erstellten Maßkette als Referenz"
-      >
-        <RulerIcon size={12} /> Skalieren (Maßkette)
-      </button>
-
-      {/* Freie Skalierung — Slider + %-Feld, ohne Rahmen. */}
-      <div className="space-y-1">
-        <div className="flex items-center justify-between text-[10px] text-muted-foreground px-0.5">
-          <span>Freie Skalierung</span>
-          <button
-            type="button"
-            onClick={() => applyScale(100)}
-            className="hover:underline"
-            title="Zurück auf 100%"
-          >
-            Reset
-          </button>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <input
-            type="range"
-            min={1}
-            max={400}
-            step={1}
-            value={Math.round(scalePct)}
-            onChange={(e) => applyScale(Number(e.target.value))}
-            className="flex-1 accent-foreground"
-          />
-          <input
-            type="number"
-            min={1}
-            max={400}
-            step={1}
-            value={Math.round(scalePct)}
-            onChange={(e) => {
-              const v = Number(e.target.value);
-              if (Number.isFinite(v)) applyScale(Math.max(1, Math.min(400, v)));
-            }}
-            className="w-12 h-6 px-1 text-[11px] rounded border tabular-nums text-right"
-            style={{ borderColor: "hsl(var(--hairline))" }}
-          />
-          <span className="text-[10px] text-muted-foreground">%</span>
-        </div>
-      </div>
-
-      {sel.kind === "pdf-page" && !!sel.pdfSourceB64 && (
-        <button
-          type="button"
-          onClick={async () => {
-            const app: any = engine;
-            if (
-              !window.confirm(
-                `PDF "${sel.name}" in CAD-Objekte auflösen?\n\nLinien, Schraffuren und Texte werden extrahiert; das Original wird entfernt.`,
-              )
-            )
-              return;
-            const res = await app.documentTool?.dissolvePdf(sel.id);
-            if (res) {
-              window.alert(
-                `Auflösen erfolgreich:\n${res.segments} Linien · ${res.hatches} Schraffuren · ${res.texts} Texte`,
-              );
-            }
-          }}
-          className="w-full h-7 rounded-md border text-[11px] flex items-center justify-start gap-1.5 px-2 hover:bg-muted"
-          style={{ borderColor: "hsl(var(--hairline))" }}
-          title="PDF-Vektoren extrahieren und in Linien/Schraffuren/Texte konvertieren"
-        >
-          <FileText size={12} /> Auflösen → CAD-Objekte
-        </button>
-      )}
-
-      <button
-        type="button"
-        onClick={() => {
-          const app: any = engine;
-          const doc = app.scene.getDocumentById(sel.id);
-          if (doc && window.confirm(`Dokument "${doc.name}" löschen?`)) {
-            app.scene.removeDocument(doc);
-            app.clearSelection?.();
-            app.refreshLabelUI?.();
-          }
-        }}
-        className="w-full h-7 rounded-md border text-[11px] flex items-center justify-start gap-1.5 px-2 hover:bg-muted"
-        style={{ borderColor: "hsl(var(--hairline))" }}
-        title="Dokument löschen"
-      >
-        <Trash2 size={12} /> Löschen
-      </button>
-
       <button
         type="button"
         onClick={() => {
@@ -269,12 +142,12 @@ export function CadDocumentInspector({ engine }: Props) {
           borderColor: phase === "anchor-edit" ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
           background: phase === "anchor-edit" ? "hsl(var(--accent-gold) / 0.12)" : undefined,
         }}
-        title="Anker (Fangpunkte) am Dokument setzen — Klick platziert, erneuter Klick auf einen Anker entfernt ihn."
+        title="Anker (Fangpunkte) am Dokument setzen — Klick platziert (mit Snap), erneuter Klick auf einen Anker entfernt ihn."
       >
         <AnchorIcon size={12} /> {phase === "anchor-edit" ? "Anker beenden" : "Anker +/−"}
       </button>
 
-      <DocumentFilterPanel app={engine as any} docId={sel.id} sig={filterSig} />
+      <DocumentFilterPanel app={engine as any} docId={sel.id} sig={filterSig} showBgRemove={false} />
 
       <div
         className="text-[10px] leading-relaxed pt-1.5 text-muted-foreground"
