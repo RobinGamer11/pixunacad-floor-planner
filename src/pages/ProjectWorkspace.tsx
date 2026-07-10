@@ -2858,6 +2858,8 @@ function RightInspector({
             cadSelectedLineSnap={cadSelectedLineSnap}
             documentImporting={documentImporting}
             onDocumentImport={onDocumentImport}
+            docScale={docScale}
+            onDocScaleChange={onDocScaleChange}
             onCadLineSnapChange={onCadLineSnapChange}
             onCadDuplicateSegments={onCadDuplicateSegments}
             updateToolSettings={updateToolSettings}
