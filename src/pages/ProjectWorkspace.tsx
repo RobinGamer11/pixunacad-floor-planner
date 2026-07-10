@@ -3238,6 +3238,8 @@ function ToolsTab({
   cadSelectedLineSnap,
   documentImporting,
   onDocumentImport,
+  docScale,
+  onDocScaleChange,
   onCadLineSnapChange,
   onCadDuplicateSegments,
   updateToolSettings,
