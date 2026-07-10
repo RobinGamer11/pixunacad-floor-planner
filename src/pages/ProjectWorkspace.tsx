@@ -640,9 +640,8 @@ export default function ProjectWorkspace() {
         <ToolRailButton
           icon={<CompassIcon size={18} />}
           label="CAD-Blatt"
-          active={false}
-          onClick={() => {}}
-          disabled
+          active={activeTool === "cad"}
+          onClick={() => setActiveToolAndTab(activeTool === "cad" ? null : "cad")}
           showLabel
         />
 
