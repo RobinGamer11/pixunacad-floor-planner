@@ -4062,9 +4062,10 @@ function CadToolSection({
   const [pickScale, setPickScale] = useState<Record<string, string>>({});
 
   const goCadForSheetPdf = (sheetId: string, mode: "view" | "frame", scale: string) => {
-    if (!projectId) return;
-    navigate(`/project/${projectId}/cad?sheetPdf=${encodeURIComponent(sheetId)}&mode=${mode}&scale=${encodeURIComponent(scale)}`);
+    if (!projectId || !pageId) return;
+    navigate(`/project/${projectId}/cad?sheetPdf=${encodeURIComponent(sheetId)}&mode=${mode}&scale=${encodeURIComponent(scale)}&pageId=${encodeURIComponent(pageId)}`);
   };
+
 
 
 
