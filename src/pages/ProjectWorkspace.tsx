@@ -523,7 +523,7 @@ export default function ProjectWorkspace() {
         
         mode="workspace"
         zoomPercent={Math.round(zoom)}
-        onPresent={() => {}}
+        onPresent={() => setPresenting(true)}
         onShare={() => {}}
         onExport={() => setPrintMode((v) => !v)}
       />
