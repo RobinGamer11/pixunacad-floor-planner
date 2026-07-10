@@ -246,15 +246,29 @@ const CadPage = () => {
           >
             <div className="text-xs">
               <div className="font-semibold">
-                PDF-Export → Projektmappe
+                CAD-Blatt → Projektmappe
               </div>
               <div className="text-muted-foreground">
                 {sheetPdfMode === "view" && "Aktuelle Ansicht wird im richtigen Maßstab übernommen."}
-                {sheetPdfMode === "frame" && (frameRect
-                  ? "Rahmen mit Häkchen bestätigen — oder neu aufziehen."
-                  : "Bitte einen Rahmen aufziehen und mit Häkchen bestätigen.")}
+                {sheetPdfMode === "frame" && (frameArmed
+                  ? "Rahmen aufziehen…"
+                  : (frameRect
+                    ? "Rahmen mit Häkchen bestätigen — oder neu ziehen."
+                    : "Frei bewegen · dann „Rahmen ziehen“ zum Aufziehen."))}
               </div>
             </div>
+            {sheetPdfMode === "frame" && (
+              <button
+                type="button"
+                onClick={() => setFrameArmed(true)}
+                disabled={busy || frameArmed}
+                className="h-8 px-2 rounded-md border text-xs disabled:opacity-50"
+                style={{ borderColor: "hsl(var(--hairline))" }}
+                title="Rahmen ziehen"
+              >
+                Rahmen ziehen
+              </button>
+            )}
             <button
               type="button"
               onClick={confirmSheetPdf}
@@ -265,6 +279,7 @@ const CadPage = () => {
             >
               <Check size={16} />
             </button>
+
             <button
               type="button"
               onClick={cancelSheetPdf}
