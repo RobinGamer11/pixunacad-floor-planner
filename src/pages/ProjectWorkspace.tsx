@@ -4227,15 +4227,59 @@ function ElementInspector({
         />
       </Row>
 
-      {element.kind !== "cad-view" && (
-        <button
-          onClick={() => projectStore.deleteElement(projectId, pageId, element.id)}
-          className="w-full h-9 rounded-md text-sm border flex items-center justify-center gap-2 mt-2"
-          style={{ borderColor: "hsl(var(--hairline))", color: "hsl(0 60% 50%)" }}
-        >
-          <Trash2 size={14} /> Element löschen
-        </button>
-      )}
+      {element.kind === "cad-view" && (() => {
+        const project = projectStore.getState().projects.find((p) => p.id === projectId);
+        const sheet = project?.sheets.find((s) => s.id === element.sheetId);
+        const cur = element.scale ?? sheet?.scale ?? "1:100";
+        return (
+          <>
+            <Row label="Maßstab">
+              <select
+                value={PAGE_PLAN_SCALES.includes(cur) ? cur : "frei"}
+                onChange={(ev) => {
+                  let next = ev.target.value;
+                  if (next === "frei") {
+                    const picked = askPlanScale(cur);
+                    if (!picked) return;
+                    next = picked;
+                  }
+                  update({ scale: next });
+                }}
+                className="w-full h-8 px-2 rounded bg-transparent border text-sm"
+                style={{ borderColor: "hsl(var(--hairline))" }}
+              >
+                {PAGE_PLAN_SCALES.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+                {!PAGE_PLAN_SCALES.includes(cur) && (
+                  <option key={cur} value={cur}>{cur}</option>
+                )}
+                <option value="frei">frei…</option>
+              </select>
+            </Row>
+            <button
+              onClick={() => update({
+                viewSnapshot: sheet?.thumbnail ?? element.viewSnapshot,
+                lastSyncAt: new Date().toISOString(),
+              })}
+              className="w-full h-9 rounded-md text-sm border flex items-center justify-center gap-2 mt-2"
+              style={{ borderColor: "hsl(var(--hairline))" }}
+              title="Aktuelle CAD-Ansicht als Snapshot übernehmen"
+            >
+              <RefreshCw size={14} /> Ansicht aktualisieren
+            </button>
+          </>
+        );
+      })()}
+
+      <button
+        onClick={() => projectStore.deleteElement(projectId, pageId, element.id)}
+        className="w-full h-9 rounded-md text-sm border flex items-center justify-center gap-2 mt-2"
+        style={{ borderColor: "hsl(var(--hairline))", color: "hsl(0 60% 50%)" }}
+      >
+        <Trash2 size={14} /> Element löschen
+      </button>
+
     </div>
   );
 }
