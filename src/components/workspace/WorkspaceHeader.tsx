@@ -8,6 +8,7 @@ import {
   Play,
   FolderKanban,
   Compass,
+  Trash2,
 } from "lucide-react";
 
 export type WorkspaceMode = "workspace" | "cad";
@@ -21,6 +22,8 @@ interface Props {
   canRedo?: boolean;
   onUndo?: () => void;
   onRedo?: () => void;
+  canDelete?: boolean;
+  onDelete?: () => void;
   zoomPercent?: number;          // display-only; may be undefined
   onPresent?: () => void;
   onShare?: () => void;
