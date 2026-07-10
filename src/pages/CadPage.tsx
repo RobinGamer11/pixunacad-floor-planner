@@ -33,12 +33,19 @@ const CadPage = () => {
   const sheetPdfId = params.get("sheetPdf");
   const sheetPdfMode = (params.get("mode") as "view" | "frame" | null) ?? "view";
   const sheetPdfScale = params.get("scale") ?? undefined;
+  const sheetPdfPageId = params.get("pageId") ?? undefined;
   const [busy, setBusy] = useState(false);
 
   // Rahmen-Auswahl (CSS-Pixel im Fenster; wird in Canvas-Koordinaten umgerechnet).
   const [frameStart, setFrameStart] = useState<{ x: number; y: number } | null>(null);
   const [frameRect, setFrameRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const [dragging, setDragging] = useState(false);
+  // Rahmen-Werkzeug ist NICHT dauerhaft aktiv — Nutzer bewegt sich normal
+  // in der CAD-Oberfläche und aktiviert das Aufziehen explizit über einen
+  // Button ("Rahmen ziehen"). Nach dem PointerUp wird das Werkzeug wieder
+  // entwaffnet, damit Pan/Zoom sofort weitergehen.
+  const [frameArmed, setFrameArmed] = useState(false);
+
 
   const handlePresent = () => {
     const el = mainRef.current;
