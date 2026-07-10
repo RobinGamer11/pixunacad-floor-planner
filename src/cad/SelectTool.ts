@@ -2331,10 +2331,19 @@ export class SelectTool {
           // (siehe dimensionHubMode === "move" in input.clicked-Handler).
         }
       } else {
-        // Freihand-Stroke: Klick auf Polylinie selektiert
+        // Freihand-Stroke: Klick auf Polylinie selektiert + startet Drag (Verschieben).
         const freeHit = this._hitFreeStroke(input);
         if (freeHit) {
           this.app.setSelection({ type: SelectionType.FREE_STROKE, freeStrokeId: freeHit.id } as any);
+          if (freeHit.points.length >= 1) {
+            const mouseW0 = v(input.mouse.wx, input.mouse.wy);
+            this.dragFreeStrokeId = freeHit.id;
+            this.dragFreeStrokeGrabOffset = {
+              x: mouseW0.x - freeHit.points[0].x,
+              y: mouseW0.y - freeHit.points[0].y,
+            };
+            this.dragFreeStrokeOrigPoints = freeHit.points.map((p) => ({ x: p.x, y: p.y }));
+          }
           return;
         }
         // Kein Vordergrund-Hit & kein Dokument → Auswahl aufheben.
