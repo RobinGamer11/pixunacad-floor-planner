@@ -3261,6 +3261,8 @@ function ToolsTab({
   cadSelectedLineSnap?: { midpoint: boolean; division: number | null; isGuide: boolean } | null;
   documentImporting?: boolean;
   onDocumentImport?: () => void;
+  docScale?: string;
+  onDocScaleChange?: (s: string) => void;
   onCadLineSnapChange?: (patch: { midpointSnap?: boolean; divisionSnap?: number | null }) => void;
   onCadDuplicateSegments?: () => void;
   updateToolSettings: <K extends keyof ToolSettings>(k: K, patch: Partial<ToolSettings[K]>) => void;
