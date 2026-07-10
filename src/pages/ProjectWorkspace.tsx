@@ -507,56 +507,9 @@ export default function ProjectWorkspace() {
     setDocPickerPages(null);
     setDocPickerSelected(new Set());
     if (selected.length === 0) return;
-    setScaleChoice(selected[0].kind === "pdf-page" ? "100" : "1");
-    setScaleCustom("100");
-    setScaleDialogPages(selected);
+    placeImportedPages(selected);
   };
 
-  const confirmDocumentScale = () => {
-    const pages = scaleDialogPages;
-    const engine = cadEngineApiRef.current?.engine;
-    if (!pages || !engine) return;
-    const parsed = scaleChoice === "custom" ? parseFloat(scaleCustom.replace(",", ".")) : parseFloat(scaleChoice);
-    const denom = Number.isFinite(parsed) && parsed > 0 ? parsed : 100;
-    const [first, ...rest] = pages;
-    const firstW = first.widthM * denom;
-    const firstH = first.heightM * denom;
-    setActiveToolAndTab("document");
-    engine.beginDocumentPlacement({
-      src: first.src,
-      widthM: firstW,
-      heightM: firstH,
-      pixelWidth: first.pixelWidth,
-      pixelHeight: first.pixelHeight,
-      name: first.name,
-      kind: first.kind,
-      pageIndex: first.pageIndex,
-      importScaleDenom: denom,
-      pdfSourceB64: first.pdfSourceB64 || null,
-    });
-    let offX = firstW + 0.5;
-    for (const p of rest) {
-      const pw = p.widthM * denom;
-      const ph = p.heightM * denom;
-      engine.scene.createDocument({
-        name: p.name,
-        kind: p.kind,
-        src: p.src,
-        pageIndex: p.pageIndex,
-        position: { x: offX, y: 0 },
-        widthM: pw,
-        heightM: ph,
-        pixelWidth: p.pixelWidth,
-        pixelHeight: p.pixelHeight,
-        labelId: engine.activeDrawLabelId,
-        importScaleDenom: denom,
-        pdfSourceB64: p.pdfSourceB64 || null,
-      });
-      offX += pw + 0.5;
-    }
-    engine.refreshLabelUI();
-    setScaleDialogPages(null);
-  };
 
   // Merkt sich das zuletzt eingepasste Layout — verhindert erneutes Recenter
   // beim Umschalten der aktiven Seite innerhalb desselben Verbunds.
