@@ -107,6 +107,11 @@ export class SelectTool {
   dragDocGrabOffset: Vec2 | null = null;
   dragDocSnap: Snap | null = null;
 
+  // FreeStroke Drag-State (Verschieben der gesamten Freihand-Linie)
+  dragFreeStrokeId: string | null = null;
+  dragFreeStrokeGrabOffset: Vec2 | null = null; // mouseStart - points[0]
+  dragFreeStrokeOrigPoints: Vec2[] | null = null;
+
   // TextBox Drag/Rotate-State
   dragTextBoxId: string | null = null;
   dragTextBoxGrabOffset: Vec2 | null = null; // mouseStart - center
@@ -152,6 +157,9 @@ export class SelectTool {
     this.dragDocId = null;
     this.dragDocGrabOffset = null;
     this.dragDocSnap = null;
+    this.dragFreeStrokeId = null;
+    this.dragFreeStrokeGrabOffset = null;
+    this.dragFreeStrokeOrigPoints = null;
     this.dragTextBoxId = null;
     this.dragTextBoxGrabOffset = null;
     this.dragTextBoxSnap = null;
