@@ -43,6 +43,8 @@ export function WorkspaceHeader({
   canRedo = false,
   onUndo,
   onRedo,
+  canDelete = false,
+  onDelete,
   zoomPercent,
   onPresent,
   onShare,
