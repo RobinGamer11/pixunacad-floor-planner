@@ -199,7 +199,19 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     undo: () => appRef.current?.undo(),
     redo: () => appRef.current?.redo(),
     exportPdf: () => appRef.current?.printSelectedPlans(),
-    openExportPanel: () => { setPrintOpen(v => !v); },
+    openExportPanel: () => {
+      setRightOpen(true);
+      setRightTab("sheets");
+      // Kleines Delay, damit der Sheets-Tab gerendert ist bevor wir hineinscrollen.
+      setTimeout(() => {
+        const body = planBodyRef.current;
+        // Sicherstellen, dass die Druckpläne-Sektion ausgeklappt ist.
+        if (body && body.classList.contains("collapsed")) {
+          planToggleBtnRef.current?.click();
+        }
+        planPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 40);
+    },
     deleteSelection: () => { appRef.current?.deleteSelection(); },
     hasDeletableSelection: () => appRef.current?.hasDeletableSelection() ?? false,
     getCameraScale: () => appRef.current?.camera.scale ?? 80,
@@ -240,7 +252,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(true);
   const [rightOpen, setRightOpen] = useState<boolean>(true);
   const [rightTab, setRightTab] = useState<"settings" | "sheets" | "layers">("settings");
-  const [printOpen, setPrintOpen] = useState<boolean>(false);
+  
   const [expandedTool, setExpandedTool] = useState<string | null>(null);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
@@ -285,10 +297,9 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const [scaleDialogPages, setScaleDialogPages] = useState<ImportedPage[] | null>(null);
   const [scaleChoice, setScaleChoice] = useState<string>("100"); // "50" | "100" | "200" | "500" | "1" | "custom"
   const [scaleCustom, setScaleCustom] = useState<string>("100");
-  // Zeichnen-Maßstab (Default-Vorauswahl beim PDF-Import)
-  const [drawingScale, setDrawingScale] = useState<number>(100);
-  const [drawingScaleOpen, setDrawingScaleOpen] = useState(false);
-  const [drawingScaleCustom, setDrawingScaleCustom] = useState<string>("100");
+  // Zeichenoberfläche ist immer 1:1 — nur Import-Dialog nutzt den Wert
+  // als Default-Vorauswahl beim PDF-Import.
+  const drawingScale = 1;
 
   // Raster (Hintergrund-Grid) Einstellungen
   const [gridEnabled, setGridEnabled] = useState(true);
@@ -751,28 +762,12 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     return () => clearTimeout(t);
   }, [sidebarCollapsed]);
 
-  // Ansichtsmaßstab: REIN visueller Zoom + visueller Darstellungsfaktor für PDFs.
-  // Verändert KEINE Modellgeometrie und KEINE Dokument-Welt-Maße.
-  // Der Wert wird zusätzlich an die App weitergereicht, damit der Renderer
-  // PDFs visuell mit (importScaleDenom / drawingScale) skalieren kann.
+  // Zeichenoberfläche ist fix 1:1 — App-Wert einmalig setzen.
   useEffect(() => {
     const app = appRef.current;
     if (!app) return;
-    const nextScale = Math.max(0.0001, drawingScale);
-    app.drawingScale = nextScale;
-    const cam = app.camera;
-    const target = 80 * (100 / nextScale);
-    const newScale = Math.max(cam.minScale, Math.min(cam.maxScale, target));
-    if (Math.abs(newScale - cam.scale) < 1e-6) return;
-    const rect = canvasRef.current?.getBoundingClientRect();
-    const pivotSx = rect ? rect.width / 2 : cam.offsetX;
-    const pivotSy = rect ? rect.height / 2 : cam.offsetY;
-    const before = cam.screenToWorld(pivotSx, pivotSy);
-    cam.scale = newScale;
-    const after = cam.screenToWorld(pivotSx, pivotSy);
-    cam.offsetX += (after.x - before.x) * cam.scale;
-    cam.offsetY += (after.y - before.y) * cam.scale;
-  }, [drawingScale]);
+    app.drawingScale = 1;
+  }, []);
 
 
   // Floating Edit-Pencil neben ausgewählter Sticker-Instanz (Polling per RAF).
