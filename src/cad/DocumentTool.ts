@@ -189,6 +189,7 @@ export class DocumentTool {
           (doc as any).anchors = anchors;
         }
       }
+      this.app.renderer.render();
       return;
     }
     if (this.phase === "placing") {
