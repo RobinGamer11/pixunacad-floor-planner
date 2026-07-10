@@ -1524,7 +1524,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               if (!app) return;
               const sel = app.selection;
               const boxId = sel?.textBoxId;
-              app.textEditor?.cancel?.();
+              try { app.textEditor?.commit?.(); } catch {}
               if (boxId) {
                 const box = app.scene.getTextBoxById?.(boxId);
                 if (box) {
