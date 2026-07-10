@@ -158,14 +158,16 @@ export class DocumentTool {
 
   update(input: Input) {
     if (this.phase === "anchor-edit") {
-      // Kein Snap — Anker sitzen frei auf dem Dokument (User-definiert).
-      this.scaleSnap = null;
+      // Snap wie in der CAD-Oberfläche: Ecken, Enden, Kanten, Achsen.
+      const snap = this.app.topology.findBestSnap(v(input.mouse.sx, input.mouse.sy), v(input.mouse.wx, input.mouse.wy));
+      this.scaleSnap = snap;
       if (!input.clicked) return;
       const docId = this.anchorTargetDocId;
       if (!docId) return;
       const doc = this.app.scene.getDocumentById(docId);
       if (!doc) { this.cancel(); return; }
-      const worldPt = v(input.mouse.wx, input.mouse.wy);
+      // Klick-Ort: bevorzugt Snap-Ziel, sonst rohe Mausposition.
+      const worldPt = snap ? snap.world : v(input.mouse.wx, input.mouse.wy);
       // Zuerst: Hit auf existierendem Anker? → entfernen.
       const worldAnchors = documentAnchorsWorld(doc);
       const tolPx = 10;
