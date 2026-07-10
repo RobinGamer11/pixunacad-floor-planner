@@ -202,6 +202,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     openExportPanel: () => { setPrintOpen(v => !v); },
     deleteSelection: () => { appRef.current?.deleteSelection(); },
     hasDeletableSelection: () => appRef.current?.hasDeletableSelection() ?? false,
+    getCameraScale: () => appRef.current?.camera.scale ?? 80,
   }), []);
 
   // Zoom-Anzeige nach oben spiegeln (Camera.scale, 80 = 100%).
