@@ -181,7 +181,7 @@ export function DocumentFilterPanel({ app, docId, sig }: Props) {
       )}
 
       {/* Hintergrund ausschneiden */}
-      <BgRemovePanel app={app} doc={doc} />
+      {showBgRemove !== false && <BgRemovePanel app={app} doc={doc} />}
     </div>
   );
 }
