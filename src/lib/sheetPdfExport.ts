@@ -81,6 +81,9 @@ export interface PendingSheetPdf {
   sheetName: string;
   mode: "full" | "view" | "frame";
   pdfBase64: string;
+  /** Nennmaßstab des Quell-Blatts (z.B. "1:100") — erlaubt exakten Import
+   *  ohne Skalier-Dialog. */
+  sheetScale?: string;
 }
 
 export function pendingSheetPdfKey(projectId: string): string {
