@@ -1856,6 +1856,7 @@ function PageCanvas({
   toolSettings,
   onCommitTool,
   onSelect,
+  onMultiSelect,
   onCadSelectionChange,
   onCadEngineReady,
   hatchDrawMode,
