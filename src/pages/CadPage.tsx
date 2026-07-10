@@ -89,7 +89,8 @@ const CadPage = () => {
     const worldWm = cssRect.w / camScale;
     const worldHm = cssRect.h / camScale;
     const sheet = project?.sheets.find((s) => s.id === sheetPdfId);
-    const scaleValue = parseSheetScale(sheet?.scale);
+    const effectiveScale = sheetPdfScale ?? sheet?.scale;
+    const scaleValue = parseSheetScale(effectiveScale);
     const paperWmm = (worldWm * 1000) / scaleValue;
     const paperHmm = (worldHm * 1000) / scaleValue;
 
@@ -103,7 +104,7 @@ const CadPage = () => {
         sheetName: sheet?.name || "CAD-Blatt",
         mode: sheetPdfMode,
         pdfBase64: bytesToBase64(bytes),
-        sheetScale: sheet?.scale,
+        sheetScale: effectiveScale,
       });
       navigate(`/project/${projectId}`);
     } catch (err: any) {
