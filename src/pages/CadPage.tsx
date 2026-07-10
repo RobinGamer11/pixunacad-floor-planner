@@ -160,8 +160,10 @@ const CadPage = () => {
   const onFramePointerUp = (e: React.PointerEvent) => {
     if (!dragging) return;
     setDragging(false);
+    setFrameArmed(false); // Nach Aufziehen automatisch entwaffnen → Pan/Zoom wieder normal.
     try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch {}
   };
+
 
   useEffect(() => {
     // Beim Moduswechsel Rahmen zurücksetzen.
