@@ -1628,6 +1628,25 @@ function DocumentScaleDialog({
   );
 }
 
+/** Auswahl-Maßstäbe beim Ablegen eines CAD-Blatts in einen Plan. */
+const PAGE_PLAN_SCALES: readonly string[] = ["1:1", "1:20", "1:50", "1:100", "1:200", "1:1000", "1:2000"] as const;
+
+/** Öffnet einen kleinen Prompt-Dialog zur Maßstabs-Wahl. */
+function askPlanScale(current?: string): string | null {
+  const listed = PAGE_PLAN_SCALES.join(", ");
+  const raw = window.prompt(
+    `In welchem Maßstab soll das Blatt eingefügt werden?\n\nAuswahl: ${listed} (oder frei, z.B. "1:75")`,
+    current || "1:100",
+  );
+  if (raw == null) return null;
+  const s = raw.trim();
+  if (!s) return null;
+  // Normalisieren "1 : 75" → "1:75"
+  const m = s.match(/^1\s*:\s*(\d+(?:[.,]\d+)?)$/);
+  if (!m) { window.alert("Ungültiger Maßstab. Bitte im Format 1:100 eingeben."); return null; }
+  return `1:${m[1].replace(",", ".")}`;
+}
+
 const PUNCH_PATTERNS: Record<Exclude<PunchPattern, "none">, { label: string; offsets: number[]; diameter: number }> = {
   // offsets are distances (mm) of each hole center measured from the start of the bound edge (page corner)
   "2-fach": { label: "2-fach (DIN 5005, 80 mm)", offsets: [-40, 40], diameter: 6 },
