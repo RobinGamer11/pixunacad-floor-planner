@@ -143,12 +143,13 @@ const CadPage = () => {
   // Rahmen-Interaktion: nur aktiv im Rahmen-Modus. Ein transparenter Overlay
   // fängt Maus-Events, damit die CAD-Tools nicht mitlaufen.
   const onFramePointerDown = (e: React.PointerEvent) => {
-    if (sheetPdfMode !== "frame") return;
+    if (sheetPdfMode !== "frame" || !frameArmed) return;
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     setFrameStart({ x: e.clientX, y: e.clientY });
     setFrameRect({ x: e.clientX, y: e.clientY, w: 0, h: 0 });
     setDragging(true);
   };
+
   const onFramePointerMove = (e: React.PointerEvent) => {
     if (!dragging || !frameStart) return;
     const x = Math.min(frameStart.x, e.clientX);
