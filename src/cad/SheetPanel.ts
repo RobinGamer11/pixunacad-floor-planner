@@ -1,4 +1,4 @@
-import { SheetManager, SheetOverlayStore, OverlayMode, OverlayColors, SheetDefaults, SheetScales, getSheetScaleValue } from "./SheetManager";
+import { SheetManager, SheetOverlayStore, OverlayMode, OverlayColors } from "./SheetManager";
 
 /**
  * Floating-Panel für Zeichnungs-IDs (Blätter) inkl. Transparentpause.
