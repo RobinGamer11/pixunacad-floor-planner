@@ -513,6 +513,7 @@ export default function ProjectWorkspace() {
   }
 
   return (
+    <>
     <div
       className="flex flex-col h-[100dvh] w-screen overflow-hidden"
       style={{ background: "hsl(var(--surface))", color: "hsl(var(--ink))" }}
