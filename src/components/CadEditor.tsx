@@ -1017,7 +1017,9 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                       const VIcon = v.icon;
                       const vActive = v.kind === "tool"
                         ? activeTool === v.id
-                        : (activeTool === ToolIds.HATCH && hatchDrawMode === v.mode);
+                        : v.kind === "hatch"
+                          ? (activeTool === ToolIds.HATCH && hatchDrawMode === v.mode)
+                          : (activeTool === ToolIds.SELECT && selectMarqueeMode === v.mode);
                       return (
                         <button
                           key={i}
@@ -1026,12 +1028,20 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                               appRef.current?.setTool(v.id);
                               setActiveTool(v.id);
                               setLineVariant(v.id);
-                            } else {
+                            } else if (v.kind === "hatch") {
                               if (activeTool !== ToolIds.HATCH) {
                                 appRef.current?.setTool(ToolIds.HATCH);
                                 setActiveTool(ToolIds.HATCH);
                               }
                               appRef.current?.hatchTool.setDrawMode(v.mode);
+                            } else {
+                              // marquee mode toggle for Select tool
+                              if (activeTool !== ToolIds.SELECT) {
+                                appRef.current?.setTool(ToolIds.SELECT);
+                                setActiveTool(ToolIds.SELECT);
+                              }
+                              if (appRef.current) appRef.current.selectTool.marqueeMode = v.mode;
+                              setSelectMarqueeMode(v.mode);
                             }
                             setExpandedTool(null);
                           }}
