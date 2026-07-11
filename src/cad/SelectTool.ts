@@ -2865,24 +2865,88 @@ export class SelectTool {
   }
 
   private _drawMarqueeOverlay(ctx: CanvasRenderingContext2D, cam: any) {
-    // Hervorhebung bereits ausgewählter Elemente — als blaue Outline entlang
-    // der echten Geometrie (analog zur normalen Einzel-Selektion), keine
-    // sichtbaren AABB-Rechtecke.
+    // Hervorhebung marquee-selektierter Elemente — visuell möglichst identisch
+    // zur normalen Einzel-Selektion:
+    //   • Wände   → gefülltes Wand-Solid (blau, 0.28) mit Kanten-Stroke
+    //   • Hatch   → Polygon in Blau (fill 0.22) + Umriss
+    //   • Sonst   → dicker blauer Umriss entlang der echten Geometrie
     if (this.marqueeSelectedIds.length) {
-      ctx.save();
-      ctx.strokeStyle = "rgba(77,163,255,0.95)";
-      ctx.lineWidth = 2;
-      ctx.lineJoin = "round";
-      ctx.lineCap = "round";
       const seen = new Set<string>();
+      const strokeCol = "rgba(77,163,255,0.95)";
+      const fillCol   = "rgba(77,163,255,0.28)";
+
       for (const { kind, id } of this.marqueeSelectedIds) {
         const key = kind + ":" + id;
         if (seen.has(key)) continue; seen.add(key);
         const obj = this._getElementById(kind, id);
         if (!obj) continue;
+
+        // Wände → gefülltes healed Solid analog Renderer-Selektion.
+        if (kind === "wall") {
+          try {
+            const topo = (this.app.scene as any).getWallTopology?.();
+            const ring = buildHealedWallSolidRing(obj, this.app.scene.walls, topo);
+            if (ring && ring.length >= 3) {
+              ctx.save();
+              ctx.beginPath();
+              const p0 = cam.worldToScreen(ring[0].x, ring[0].y);
+              ctx.moveTo(p0.x, p0.y);
+              for (let i = 1; i < ring.length; i++) {
+                const p = cam.worldToScreen(ring[i].x, ring[i].y);
+                ctx.lineTo(p.x, p.y);
+              }
+              ctx.closePath();
+              ctx.fillStyle = fillCol;
+              ctx.fill();
+              ctx.strokeStyle = strokeCol;
+              ctx.lineWidth = 2;
+              ctx.stroke();
+              ctx.restore();
+            }
+          } catch { /* fall through */ }
+          continue;
+        }
+
+        // Hatch → gefülltes Polygon in Blau.
+        if (kind === "hatch" && Array.isArray(obj.points) && obj.points.length >= 3) {
+          ctx.save();
+          ctx.beginPath();
+          const p0 = cam.worldToScreen(obj.points[0].x, obj.points[0].y);
+          ctx.moveTo(p0.x, p0.y);
+          for (let i = 1; i < obj.points.length; i++) {
+            const p = cam.worldToScreen(obj.points[i].x, obj.points[i].y);
+            ctx.lineTo(p.x, p.y);
+          }
+          ctx.closePath();
+          const holes = obj.holes || [];
+          for (const loop of holes) {
+            if (!loop || loop.length < 3) continue;
+            const h0 = cam.worldToScreen(loop[0].x, loop[0].y);
+            ctx.moveTo(h0.x, h0.y);
+            for (let i = 1; i < loop.length; i++) {
+              const hp = cam.worldToScreen(loop[i].x, loop[i].y);
+              ctx.lineTo(hp.x, hp.y);
+            }
+            ctx.closePath();
+          }
+          ctx.fillStyle = fillCol;
+          ctx.fill("evenodd");
+          ctx.strokeStyle = strokeCol;
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          ctx.restore();
+          continue;
+        }
+
+        // Fallback: dicker blauer Umriss entlang der Geometrie.
         const pts = this._elementPoints(kind, obj);
         if (!pts || pts.length < 2) continue;
         const closed = pts.length >= 3 && kind !== "segment" && kind !== "dimension";
+        ctx.save();
+        ctx.strokeStyle = strokeCol;
+        ctx.lineWidth = 2.5;
+        ctx.lineJoin = "round";
+        ctx.lineCap = "round";
         ctx.beginPath();
         const p0 = cam.worldToScreen(pts[0].x, pts[0].y);
         ctx.moveTo(p0.x, p0.y);
@@ -2892,8 +2956,8 @@ export class SelectTool {
         }
         if (closed) ctx.closePath();
         ctx.stroke();
+        ctx.restore();
       }
-      ctx.restore();
     }
 
     // Aktives Aufzieh-Rechteck.
