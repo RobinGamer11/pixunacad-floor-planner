@@ -644,12 +644,55 @@ export default function ProjectWorkspace() {
 
         <div className="my-1 w-8 border-t" style={{ borderColor: "hsl(var(--hairline))" }} />
 
-        <ToolRailButton
-          icon={<MousePointer2 size={18} />}
-          label="Auswahl"
-          active={activeTool === null}
-          onClick={() => { setLineToolFlyoutOpen(false); setActiveTool(null); }}
-        />
+        <div className="relative w-full flex justify-center">
+          <ToolRailButton
+            icon={<MousePointer2 size={18} />}
+            label="Auswahl"
+            active={activeTool === null}
+            onClick={() => {
+              setLineToolFlyoutOpen(false);
+              setHatchToolFlyoutOpen(false);
+              if (activeTool !== null) {
+                setActiveTool(null);
+                setSelectToolFlyoutOpen(true);
+              } else {
+                setSelectToolFlyoutOpen((open) => !open);
+              }
+            }}
+          />
+          {selectToolFlyoutOpen && (
+            <div
+              className="absolute top-0 left-full ml-1 flex flex-col gap-0.5 p-1 rounded-lg shadow-lg z-40"
+              style={{
+                background: "hsl(var(--surface-card))",
+                border: "1px solid hsl(var(--hairline))",
+              }}
+            >
+              <ToolRailButton
+                icon={<SquareDashed size={18} />}
+                label="Berühren"
+                active={activeTool === null && toolSettings.select.marqueeMode === "touch"}
+                onClick={() => {
+                  updateToolSettings("select", { marqueeMode: "touch" });
+                  setActiveTool(null);
+                  setSelectToolFlyoutOpen(false);
+                }}
+                showLabel
+              />
+              <ToolRailButton
+                icon={<BoxSelect size={18} />}
+                label="Umschließen"
+                active={activeTool === null && toolSettings.select.marqueeMode === "enclose"}
+                onClick={() => {
+                  updateToolSettings("select", { marqueeMode: "enclose" });
+                  setActiveTool(null);
+                  setSelectToolFlyoutOpen(false);
+                }}
+                showLabel
+              />
+            </div>
+          )}
+        </div>
         <ToolRailButton
           icon={<CompassIcon size={18} />}
           label="CAD-Blatt"
