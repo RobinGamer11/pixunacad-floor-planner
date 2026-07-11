@@ -168,6 +168,8 @@ export default function ProjectWorkspace() {
   const [lineToolFlyoutOpen, setLineToolFlyoutOpen] = useState(false);
   const [hatchDrawMode, setHatchDrawMode] = useState<HatchDrawMode>("polygon");
   const [hatchToolFlyoutOpen, setHatchToolFlyoutOpen] = useState(false);
+  // Flyout am Auswahl-Symbol für die Rahmen-Modi (Berühren / Umschließen).
+  const [selectToolFlyoutOpen, setSelectToolFlyoutOpen] = useState(false);
   const cadEngineApiRef = useRef<{
     setSelectedSegmentSnap: (opts: { midpointSnap?: boolean; divisionSnap?: number | null }) => void;
     duplicateSelectedSegments: (offsetMm?: number) => number;
@@ -642,12 +644,55 @@ export default function ProjectWorkspace() {
 
         <div className="my-1 w-8 border-t" style={{ borderColor: "hsl(var(--hairline))" }} />
 
-        <ToolRailButton
-          icon={<MousePointer2 size={18} />}
-          label="Auswahl"
-          active={activeTool === null}
-          onClick={() => { setLineToolFlyoutOpen(false); setActiveTool(null); }}
-        />
+        <div className="relative w-full flex justify-center">
+          <ToolRailButton
+            icon={<MousePointer2 size={18} />}
+            label="Auswahl"
+            active={activeTool === null}
+            onClick={() => {
+              setLineToolFlyoutOpen(false);
+              setHatchToolFlyoutOpen(false);
+              if (activeTool !== null) {
+                setActiveTool(null);
+                setSelectToolFlyoutOpen(true);
+              } else {
+                setSelectToolFlyoutOpen((open) => !open);
+              }
+            }}
+          />
+          {selectToolFlyoutOpen && (
+            <div
+              className="absolute top-0 left-full ml-1 flex flex-col gap-0.5 p-1 rounded-lg shadow-lg z-40"
+              style={{
+                background: "hsl(var(--surface-card))",
+                border: "1px solid hsl(var(--hairline))",
+              }}
+            >
+              <ToolRailButton
+                icon={<SquareDashed size={18} />}
+                label="Berühren"
+                active={activeTool === null && toolSettings.select.marqueeMode === "touch"}
+                onClick={() => {
+                  updateToolSettings("select", { marqueeMode: "touch" });
+                  setActiveTool(null);
+                  setSelectToolFlyoutOpen(false);
+                }}
+                showLabel
+              />
+              <ToolRailButton
+                icon={<BoxSelect size={18} />}
+                label="Umschließen"
+                active={activeTool === null && toolSettings.select.marqueeMode === "enclose"}
+                onClick={() => {
+                  updateToolSettings("select", { marqueeMode: "enclose" });
+                  setActiveTool(null);
+                  setSelectToolFlyoutOpen(false);
+                }}
+                showLabel
+              />
+            </div>
+          )}
+        </div>
         <ToolRailButton
           icon={<CompassIcon size={18} />}
           label="CAD-Blatt"
@@ -1942,31 +1987,39 @@ function PageCanvas({
     const onUp = (ev: MouseEvent) => {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
-      const end = toPct(ev.clientX, ev.clientY);
       setMarquee(null);
       if (!dragged) { onSelect(undefined); return; }
-      const rx1 = Math.min(start.x, end.x);
-      const ry1 = Math.min(start.y, end.y);
-      const rx2 = Math.max(start.x, end.x);
-      const ry2 = Math.max(start.y, end.y);
+
+      // Marquee-Auswahl anhand der TATSÄCHLICHEN DOM-Rects der gerenderten
+      // Elemente auswerten. Damit ist die Auswahl robust gegen unterschiedliche
+      // Einheiten/Rotations-Transforms und liefert "Umschließen" korrekt
+      // (nur vollständig innen liegende Rects), unabhängig davon, wie ein
+      // Element seine Größe intern kodiert.
+      const mx1 = Math.min(e.clientX, ev.clientX);
+      const my1 = Math.min(e.clientY, ev.clientY);
+      const mx2 = Math.max(e.clientX, ev.clientX);
+      const my2 = Math.max(e.clientY, ev.clientY);
+
       const hit: string[] = [];
-      for (const el of page.elements) {
-        // CAD-Layer-Elemente (Linien, Guides, Hatches) sind Engine-verwaltet
-        // und tauchen nicht als React-Auswahl auf.
-        if (el.kind === "line" || el.kind === "guide") continue;
-        const ex1 = (el as any).x ?? 0;
-        const ey1 = (el as any).y ?? 0;
-        const ew = (el as any).w ?? 0;
-        const eh = (el as any).h ?? 0;
-        const ex2 = ex1 + ew;
-        const ey2 = ey1 + eh;
-        if (marqueeMode === "enclose") {
-          if (ex1 >= rx1 && ey1 >= ry1 && ex2 <= rx2 && ey2 <= ry2) hit.push(el.id);
-        } else {
-          // touch / crossing: AABB-Overlap
-          if (ex1 <= rx2 && ex2 >= rx1 && ey1 <= ry2 && ey2 >= ry1) hit.push(el.id);
-        }
+      const root = pageRef.current;
+      if (root) {
+        const nodes = root.querySelectorAll<HTMLElement>("[data-marquee-id]");
+        nodes.forEach((node) => {
+          const id = node.getAttribute("data-marquee-id");
+          if (!id) return;
+          const el = page.elements.find((p) => p.id === id);
+          if (!el) return;
+          if (el.kind === "line" || el.kind === "guide") return;
+          const r = node.getBoundingClientRect();
+          if (r.width <= 0 || r.height <= 0) return;
+          if (marqueeMode === "enclose") {
+            if (r.left >= mx1 && r.top >= my1 && r.right <= mx2 && r.bottom <= my2) hit.push(id);
+          } else {
+            if (r.left <= mx2 && r.right >= mx1 && r.top <= my2 && r.bottom >= my1) hit.push(id);
+          }
+        });
       }
+
       if (onMultiSelect) onMultiSelect(hit);
       else if (hit.length === 1) onSelect(hit[0]);
       else onSelect(undefined);
@@ -2546,6 +2599,7 @@ function ElementView({
   return (
     <div
       ref={rootRef}
+      data-marquee-id={el.id}
       onMouseDown={handleMouseDown}
       className="absolute"
       style={{
@@ -3362,13 +3416,8 @@ function ToolsTab({
 
       {/* Per-tool settings */}
 
-      {!settingsTool && (
-        <SelectSettings
-          settings={toolSettings.select}
-          onChange={(p) => updateToolSettings("select", p)}
-          selectedCount={Math.max(selectedElementIds?.length ?? 0, cadSelectionCount ?? 0)}
-        />
-      )}
+      {/* Rahmen-Modus (Berühren / Umschließen) liegt jetzt als Flyout links am
+          Auswahl-Symbol — kein eigenes Panel mehr in den Werkzeugeinstellungen. */}
       {settingsTool === "guide" && (
         <GuideSettings
           settings={toolSettings.guide}

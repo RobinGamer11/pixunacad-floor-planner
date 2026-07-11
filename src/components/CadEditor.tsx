@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import { CadApp } from "@/cad/CadApp";
 import { ToolIds, PointEditAction } from "@/cad/constants";
-import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Pipette, Sticker as StickerIcon, Pencil, Trash2, Download, Upload, Plus, FileImage, FileText, Maximize2, Ruler as RulerIcon, Eraser, Construction, BrickWall, PaintBucket, Grid3x3, DoorOpen, AppWindow, Move, RotateCw, PanelRightOpen, PanelRightClose, Crosshair, Scaling, Check, Scissors, Anchor as AnchorIcon } from "lucide-react";
+import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Pipette, Sticker as StickerIcon, Pencil, Trash2, Download, Upload, Plus, FileImage, FileText, Maximize2, Ruler as RulerIcon, Eraser, Construction, BrickWall, PaintBucket, Grid3x3, DoorOpen, AppWindow, Move, RotateCw, PanelRightOpen, PanelRightClose, Crosshair, Scaling, Check, Scissors, Anchor as AnchorIcon, SquareDashed, BoxSelect } from "lucide-react";
 import type { HatchDrawMode } from "@/cad/HatchTool";
 import type { StickerDefinition } from "@/cad/StickerManager";
 import { instanceBoundingCornersWorld } from "@/cad/StickerManager";
@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { FreeDrawSettingsPanel } from "@/components/cad/FreeDrawSettingsPanel";
 import { EraserSettingsPanel } from "@/components/cad/EraserSettingsPanel";
 import { WallSettingsPanel } from "@/components/cad/WallSettingsPanel";
-import { SelectSettingsPanel } from "@/components/cad/SelectSettingsPanel";
+
 import { DocumentFilterPanel } from "@/components/cad/DocumentFilterPanel";
 
 const CAD_TOOLS = [
@@ -39,7 +39,8 @@ const LINE_VARIANTS = [
 
 type ToolVariant =
   | { kind: "tool"; id: string; label: string; icon: any }
-  | { kind: "hatch"; mode: HatchDrawMode; label: string; icon: any };
+  | { kind: "hatch"; mode: HatchDrawMode; label: string; icon: any }
+  | { kind: "marquee"; mode: "touch" | "enclose"; label: string; icon: any };
 
 const TOOL_VARIANTS: Record<string, ToolVariant[]> = {
   [ToolIds.LINE]: [
@@ -52,6 +53,10 @@ const TOOL_VARIANTS: Record<string, ToolVariant[]> = {
     { kind: "hatch", mode: "rectangle", label: "Rechteck", icon: RectangleHorizontal },
     { kind: "hatch", mode: "circle", label: "Kreis", icon: Circle },
     { kind: "hatch", mode: "fill", label: "Füllung", icon: PaintBucket },
+  ],
+  [ToolIds.SELECT]: [
+    { kind: "marquee", mode: "touch",   label: "Berühren",    icon: SquareDashed },
+    { kind: "marquee", mode: "enclose", label: "Umschließen", icon: BoxSelect },
   ],
 };
 
@@ -261,6 +266,9 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   // Letzter Zeichen-Modus innerhalb der "Linie"-Variante (Linie/Freihand/Radiergummi).
   // Default = Linie. Bei jedem Wechsel wird gemerkt.
   const [lineVariant, setLineVariant] = useState<string>(ToolIds.LINE);
+  // Marquee-Rahmen-Modus des Auswahl-Werkzeugs (Berühren / Umschließen).
+  // Wird über das Flyout links am Auswahl-Symbol umgeschaltet.
+  const [selectMarqueeMode, setSelectMarqueeMode] = useState<"touch" | "enclose">("touch");
   const [selectedWallId, setSelectedWallId] = useState<string | null>(null);
   const [selectedFreeStrokeId, setSelectedFreeStrokeId] = useState<string | null>(null);
   const [stickers, setStickers] = useState<StickerDefinition[]>([]);
@@ -1009,7 +1017,9 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                       const VIcon = v.icon;
                       const vActive = v.kind === "tool"
                         ? activeTool === v.id
-                        : (activeTool === ToolIds.HATCH && hatchDrawMode === v.mode);
+                        : v.kind === "hatch"
+                          ? (activeTool === ToolIds.HATCH && hatchDrawMode === v.mode)
+                          : (activeTool === ToolIds.SELECT && selectMarqueeMode === v.mode);
                       return (
                         <button
                           key={i}
@@ -1018,12 +1028,20 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                               appRef.current?.setTool(v.id);
                               setActiveTool(v.id);
                               setLineVariant(v.id);
-                            } else {
+                            } else if (v.kind === "hatch") {
                               if (activeTool !== ToolIds.HATCH) {
                                 appRef.current?.setTool(ToolIds.HATCH);
                                 setActiveTool(ToolIds.HATCH);
                               }
                               appRef.current?.hatchTool.setDrawMode(v.mode);
+                            } else {
+                              // marquee mode toggle for Select tool
+                              if (activeTool !== ToolIds.SELECT) {
+                                appRef.current?.setTool(ToolIds.SELECT);
+                                setActiveTool(ToolIds.SELECT);
+                              }
+                              if (appRef.current) appRef.current.selectTool.marqueeMode = v.mode;
+                              setSelectMarqueeMode(v.mode);
                             }
                             setExpandedTool(null);
                           }}
@@ -2383,10 +2401,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             <EraserSettingsPanel app={appRef.current} />
           )}
 
-          {/* Select-Tool-Panel (Marquee-Modus: Berühren / Umschließen) */}
-          {activeTool === ToolIds.SELECT && (
-            <SelectSettingsPanel app={appRef.current} />
-          )}
+          {/* Marquee-Modus des Auswahl-Werkzeugs liegt jetzt als Flyout links
+              am Auswahl-Symbol — kein eigenes Panel mehr in den Werkzeugeinstellungen. */}
 
           {/* Wand-Tool-Panel */}
           {(activeTool === ToolIds.WALL || (activeTool === ToolIds.SELECT && selectedWallId)) && (
