@@ -261,6 +261,9 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   // Letzter Zeichen-Modus innerhalb der "Linie"-Variante (Linie/Freihand/Radiergummi).
   // Default = Linie. Bei jedem Wechsel wird gemerkt.
   const [lineVariant, setLineVariant] = useState<string>(ToolIds.LINE);
+  // Marquee-Rahmen-Modus des Auswahl-Werkzeugs (Berühren / Umschließen).
+  // Wird über das Flyout links am Auswahl-Symbol umgeschaltet.
+  const [selectMarqueeMode, setSelectMarqueeMode] = useState<"touch" | "enclose">("touch");
   const [selectedWallId, setSelectedWallId] = useState<string | null>(null);
   const [selectedFreeStrokeId, setSelectedFreeStrokeId] = useState<string | null>(null);
   const [stickers, setStickers] = useState<StickerDefinition[]>([]);
