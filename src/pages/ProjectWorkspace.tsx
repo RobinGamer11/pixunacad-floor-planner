@@ -3407,13 +3407,8 @@ function ToolsTab({
 
       {/* Per-tool settings */}
 
-      {!settingsTool && (
-        <SelectSettings
-          settings={toolSettings.select}
-          onChange={(p) => updateToolSettings("select", p)}
-          selectedCount={Math.max(selectedElementIds?.length ?? 0, cadSelectionCount ?? 0)}
-        />
-      )}
+      {/* Rahmen-Modus (Berühren / Umschließen) liegt jetzt als Flyout links am
+          Auswahl-Symbol — kein eigenes Panel mehr in den Werkzeugeinstellungen. */}
       {settingsTool === "guide" && (
         <GuideSettings
           settings={toolSettings.guide}
