@@ -2591,6 +2591,7 @@ function ElementView({
   return (
     <div
       ref={rootRef}
+      data-marquee-id={el.id}
       onMouseDown={handleMouseDown}
       className="absolute"
       style={{
