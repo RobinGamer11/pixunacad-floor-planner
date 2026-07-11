@@ -2401,10 +2401,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             <EraserSettingsPanel app={appRef.current} />
           )}
 
-          {/* Select-Tool-Panel (Marquee-Modus: Berühren / Umschließen) */}
-          {activeTool === ToolIds.SELECT && (
-            <SelectSettingsPanel app={appRef.current} />
-          )}
+          {/* Marquee-Modus des Auswahl-Werkzeugs liegt jetzt als Flyout links
+              am Auswahl-Symbol — kein eigenes Panel mehr in den Werkzeugeinstellungen. */}
 
           {/* Wand-Tool-Panel */}
           {(activeTool === ToolIds.WALL || (activeTool === ToolIds.SELECT && selectedWallId)) && (
