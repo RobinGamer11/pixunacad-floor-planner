@@ -39,7 +39,8 @@ const LINE_VARIANTS = [
 
 type ToolVariant =
   | { kind: "tool"; id: string; label: string; icon: any }
-  | { kind: "hatch"; mode: HatchDrawMode; label: string; icon: any };
+  | { kind: "hatch"; mode: HatchDrawMode; label: string; icon: any }
+  | { kind: "marquee"; mode: "touch" | "enclose"; label: string; icon: any };
 
 const TOOL_VARIANTS: Record<string, ToolVariant[]> = {
   [ToolIds.LINE]: [
@@ -52,6 +53,10 @@ const TOOL_VARIANTS: Record<string, ToolVariant[]> = {
     { kind: "hatch", mode: "rectangle", label: "Rechteck", icon: RectangleHorizontal },
     { kind: "hatch", mode: "circle", label: "Kreis", icon: Circle },
     { kind: "hatch", mode: "fill", label: "Füllung", icon: PaintBucket },
+  ],
+  [ToolIds.SELECT]: [
+    { kind: "marquee", mode: "touch",   label: "Berühren",    icon: SquareDashed },
+    { kind: "marquee", mode: "enclose", label: "Umschließen", icon: BoxSelect },
   ],
 };
 
