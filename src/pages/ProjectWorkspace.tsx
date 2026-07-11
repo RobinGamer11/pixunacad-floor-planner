@@ -168,6 +168,8 @@ export default function ProjectWorkspace() {
   const [lineToolFlyoutOpen, setLineToolFlyoutOpen] = useState(false);
   const [hatchDrawMode, setHatchDrawMode] = useState<HatchDrawMode>("polygon");
   const [hatchToolFlyoutOpen, setHatchToolFlyoutOpen] = useState(false);
+  // Flyout am Auswahl-Symbol für die Rahmen-Modi (Berühren / Umschließen).
+  const [selectToolFlyoutOpen, setSelectToolFlyoutOpen] = useState(false);
   const cadEngineApiRef = useRef<{
     setSelectedSegmentSnap: (opts: { midpointSnap?: boolean; divisionSnap?: number | null }) => void;
     duplicateSelectedSegments: (offsetMm?: number) => number;
