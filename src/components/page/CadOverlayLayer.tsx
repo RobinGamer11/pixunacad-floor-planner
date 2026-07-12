@@ -91,6 +91,7 @@ export default function CadOverlayLayer(props: Props) {
     textColor, textFontSizePx, textBold, textItalic, textAlpha, textAlign,
     textBgColor, textBgAlphaPct, textWrap, textAutoSize, textBorderEnabled, textBorderColor, textBorderWidthPx,
     hatchDrawMode,
+    ghostSnapState,
   } = props;
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
