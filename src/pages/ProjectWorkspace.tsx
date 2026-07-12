@@ -2151,7 +2151,7 @@ function PageCanvas({
           return (
             <div
               className="absolute inset-0 pointer-events-none overflow-hidden"
-              style={{ opacity: overlayOpacity, zIndex: 1 }}
+              style={{ opacity: overlayOpacity, zIndex: 0 }}
             >
               {/* CAD-Ebene der Hintergrundseite als read-only Ghost */}
               <div className="absolute inset-0" style={{ pointerEvents: "none" }}>
