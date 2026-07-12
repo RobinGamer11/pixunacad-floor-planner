@@ -247,6 +247,9 @@ export class MiniCad {
   private _extRectLabelId = "__ext_rect__";
   /** Special label-ID for invisible external DocumentObjects (Projektmappen-PDF/Bild). */
   private _extDocLabelId = "__ext_doc__";
+  /** Special label-ID for invisible ghost snap segments from an overlay page. */
+  private _ghostLabelId = "__ghost_snap__";
+  private _ghostInstalled = false;
 
   /** Hub-Box-Zustand für Dokument-Ecken (analog CadApp). Wird von SelectTool gesetzt. */
   documentHubState: { visible: boolean; screenX: number; screenY: number; docId: string | null; cornerIndex: number; anchorWorld: { x: number; y: number } | null; cropSide: "top" | "right" | "bottom" | "left" | null } = {
