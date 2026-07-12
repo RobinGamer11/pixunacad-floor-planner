@@ -2352,6 +2352,7 @@ function PageCanvas({
           hatchDrawMode={hatchDrawMode}
           enabled={activeTool === "line" || activeTool === "text" || activeTool === "guide" || activeTool === "free" || activeTool === "eraser" || activeTool === "hatch" || activeTool === "document" || activeTool === null}
           initialState={page.cadOverlay}
+          ghostSnapState={overlayPage ? overlayPage.cadOverlay : null}
           lineColor={activeTool === "guide" ? toolSettings.guide.color : toolSettings.line.color}
           lineThicknessMm={activeTool === "guide" ? Math.max(0.1, toolSettings.guide.strokeWidth * 0.2) : toolSettings.line.thicknessMm}
           lineAlpha={toolSettings.line.alpha / 100}
