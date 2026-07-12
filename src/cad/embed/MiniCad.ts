@@ -391,7 +391,7 @@ export class MiniCad {
   /* ===== Page-frame snap (invisible segments at page edge + margin edge) ===== */
 
   isFrameSegment(seg: { labelId?: string }): boolean {
-    return seg.labelId === this._frameLabelId || seg.labelId === this._extRectLabelId;
+    return seg.labelId === this._frameLabelId || seg.labelId === this._extRectLabelId || seg.labelId === this._ghostLabelId;
   }
 
   private _installPageFrameSnap() {
