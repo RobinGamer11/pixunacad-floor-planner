@@ -73,6 +73,13 @@ interface Props {
   textBorderWidthPx?: number;
 
   hatchDrawMode?: HatchDrawMode;
+
+  /**
+   * Optionale CAD-State einer Hintergrundseite (Transparenzpause). Deren
+   * Segmente/Freistriche/Hatch-Umrisse werden als unsichtbare Snap-Kanten
+   * in die aktive Engine übernommen, sodass Fangpunkte anvisiert werden können.
+   */
+  ghostSnapState?: any;
 }
 
 export default function CadOverlayLayer(props: Props) {
@@ -84,6 +91,7 @@ export default function CadOverlayLayer(props: Props) {
     textColor, textFontSizePx, textBold, textItalic, textAlpha, textAlign,
     textBgColor, textBgAlphaPct, textWrap, textAutoSize, textBorderEnabled, textBorderColor, textBorderWidthPx,
     hatchDrawMode,
+    ghostSnapState,
   } = props;
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -213,6 +221,13 @@ export default function CadOverlayLayer(props: Props) {
   useEffect(() => {
     if (typeof pageMarginsMm === "number") engineRef.current?.setPageMargins(pageMarginsMm);
   }, [pageMarginsMm]);
+
+  // Ghost-Snap: Segmente/Punkte einer Hintergrundseite als unsichtbare Snap-Kanten.
+  const ghostKey = ghostSnapState ? JSON.stringify(ghostSnapState) : "";
+  useEffect(() => {
+    engineRef.current?.setGhostSnapState(ghostSnapState ?? null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ghostKey]);
 
   // Externe Dokumente (Projektmappen-PDF/Bild) synchronisieren — inkl. Callback.
   const extDocsKey = JSON.stringify(externalDocs ?? []);

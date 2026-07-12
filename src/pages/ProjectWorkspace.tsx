@@ -14,7 +14,6 @@ import {
   Table as TableIcon,
   Clock,
   Layers as LayersIcon,
-  LayoutTemplate,
   Eye,
   EyeOff,
   Settings,
@@ -204,7 +203,7 @@ export default function ProjectWorkspace() {
   const [bgOverlay, setBgOverlay] = useState<{ pageId?: string; opacity: number; visible: boolean; color: string; tintEnabled: boolean }>({
     opacity: 0.45,
     visible: true,
-    color: "#c99a3b",
+    color: "#ffffff",
     tintEnabled: true,
   });
   const [zoom, setZoom] = useState(77);
@@ -833,8 +832,6 @@ export default function ProjectWorkspace() {
         <ToolRailButton icon={<Clock size={18} />} label="Zeitstrahl" disabled />
         <ToolRailButton icon={<Shapes size={18} />} label="Formen" disabled />
         <div className="mt-auto flex flex-col items-center gap-1">
-          <ToolRailButton icon={<LayersIcon size={18} />} label="Ebenen" onClick={() => setRightTab("layers")} />
-          <ToolRailButton icon={<LayoutTemplate size={18} />} label="Vorlagen" />
         </div>
       </aside>
 
@@ -1159,7 +1156,7 @@ export default function ProjectWorkspace() {
                   />
                   <button
                     type="button"
-                    onClick={() => setBgOverlay((o) => ({ ...o, color: "#c99a3b" }))}
+                    onClick={() => setBgOverlay((o) => ({ ...o, color: "#ffffff" }))}
                     className="text-[11px] text-muted-foreground underline"
                     title="Farbe zurücksetzen"
                   >
@@ -2354,6 +2351,7 @@ function PageCanvas({
           hatchDrawMode={hatchDrawMode}
           enabled={activeTool === "line" || activeTool === "text" || activeTool === "guide" || activeTool === "free" || activeTool === "eraser" || activeTool === "hatch" || activeTool === "document" || activeTool === null}
           initialState={page.cadOverlay}
+          ghostSnapState={overlayPage ? overlayPage.cadOverlay : null}
           lineColor={activeTool === "guide" ? toolSettings.guide.color : toolSettings.line.color}
           lineThicknessMm={activeTool === "guide" ? Math.max(0.1, toolSettings.guide.strokeWidth * 0.2) : toolSettings.line.thicknessMm}
           lineAlpha={toolSettings.line.alpha / 100}

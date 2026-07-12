@@ -247,6 +247,9 @@ export class MiniCad {
   private _extRectLabelId = "__ext_rect__";
   /** Special label-ID for invisible external DocumentObjects (Projektmappen-PDF/Bild). */
   private _extDocLabelId = "__ext_doc__";
+  /** Special label-ID for invisible ghost snap segments from an overlay page. */
+  private _ghostLabelId = "__ghost_snap__";
+  private _ghostInstalled = false;
 
   /** Hub-Box-Zustand für Dokument-Ecken (analog CadApp). Wird von SelectTool gesetzt. */
   documentHubState: { visible: boolean; screenX: number; screenY: number; docId: string | null; cornerIndex: number; anchorWorld: { x: number; y: number } | null; cropSide: "top" | "right" | "bottom" | "left" | null } = {
@@ -388,7 +391,7 @@ export class MiniCad {
   /* ===== Page-frame snap (invisible segments at page edge + margin edge) ===== */
 
   isFrameSegment(seg: { labelId?: string }): boolean {
-    return seg.labelId === this._frameLabelId || seg.labelId === this._extRectLabelId;
+    return seg.labelId === this._frameLabelId || seg.labelId === this._extRectLabelId || seg.labelId === this._ghostLabelId;
   }
 
   private _installPageFrameSnap() {
@@ -495,7 +498,70 @@ export class MiniCad {
     this._changeDirty = true;
   }
 
-  /* ===== External DocumentObjects (Projektmappen-PDF/Bild als CAD-Dokument) ===== */
+  /* ===== Ghost snap (Transparenzpause: Snap-Punkte einer Hintergrundseite) ===== */
+
+  private _installGhostSnap() {
+    if (this._ghostInstalled) return;
+    const lm: any = this.labelManager;
+    if (!lm.groups.find((g: any) => g.id === this._ghostLabelId)) {
+      lm.groups.push({ id: this._ghostLabelId, name: "__ghost_snap__", locked: true, visible: true });
+      const origList = lm.list.bind(lm);
+      lm.list = () => origList().filter((g: any) => g.id !== this._ghostLabelId);
+    }
+    this._ghostInstalled = true;
+  }
+
+  /**
+   * Übernimmt die Geometrie einer Hintergrundseite (Transparenzpause) als
+   * unsichtbare Snap-Segmente. Es werden Endpunkte/Kanten aller Segmente,
+   * Free-Strokes und Hatch-Polygone als transparente Snap-Segmente eingefügt.
+   * `null` löscht die Ghost-Snap-Geometrie wieder.
+   */
+  setGhostSnapState(state: any) {
+    this._installGhostSnap();
+    // Vorherige Ghost-Segmente entfernen.
+    this.scene.segments = this.scene.segments.filter((s) => s.labelId !== this._ghostLabelId);
+    if (!state) { this._changeDirty = true; return; }
+    const style = {
+      color: "rgba(0,0,0,0)",
+      thicknessM: 0.00001,
+      labelId: this._ghostLabelId,
+    };
+    const addSeg = (a: { x: number; y: number }, b: { x: number; y: number }) => {
+      if (!a || !b) return;
+      if (Math.abs(a.x - b.x) < 1e-9 && Math.abs(a.y - b.y) < 1e-9) return;
+      try { this.scene.createSegment(a, b, { ...style }); } catch { /* noop */ }
+    };
+    // Segmente 1:1 als Snap-Kanten übernehmen.
+    if (Array.isArray(state.segments)) {
+      for (const s of state.segments) {
+        if (!s?.a || !s?.b) continue;
+        if (s.labelId === this._frameLabelId || s.labelId === this._extRectLabelId || s.labelId === this._ghostLabelId) continue;
+        addSeg(s.a, s.b);
+      }
+    }
+    // Freihand-Striche: Punktkette als Snap-Segmente.
+    if (Array.isArray(state.freeStrokes)) {
+      for (const st of state.freeStrokes) {
+        const pts = Array.isArray(st?.points) ? st.points : [];
+        for (let i = 0; i < pts.length - 1; i++) addSeg(pts[i], pts[i + 1]);
+      }
+    }
+    // Hatch-Polygone: Umrandungs- und Loch-Kanten als Snap-Segmente.
+    if (Array.isArray(state.hatches)) {
+      for (const h of state.hatches) {
+        const rings: any[] = [];
+        if (Array.isArray(h?.points)) rings.push(h.points);
+        if (Array.isArray(h?.holes)) for (const loop of h.holes) rings.push(loop);
+        for (const ring of rings) {
+          if (!Array.isArray(ring) || ring.length < 2) continue;
+          for (let i = 0; i < ring.length; i++) addSeg(ring[i], ring[(i + 1) % ring.length]);
+        }
+      }
+    }
+    this._changeDirty = true;
+  }
+
 
   private _extDocsInstalled = false;
   private _installExtDocLabel() {
@@ -900,7 +966,7 @@ export class MiniCad {
       version: 4,
       labels: this.labelManager.list(),
       segments: this.scene.segments
-        .filter((s) => s.labelId !== this._frameLabelId && s.labelId !== this._extRectLabelId)
+        .filter((s) => s.labelId !== this._frameLabelId && s.labelId !== this._extRectLabelId && s.labelId !== this._ghostLabelId)
         .map((s) => ({
           id: s.id,
           a: { x: s.a.x, y: s.a.y },
@@ -995,7 +1061,7 @@ export class MiniCad {
     const segScale = (data.version ?? 1) >= 3 ? f : 1;
     if (Array.isArray(data.segments)) {
       for (const s of data.segments) {
-        if (s.labelId === this._frameLabelId || s.labelId === this._extRectLabelId) continue;
+        if (s.labelId === this._frameLabelId || s.labelId === this._extRectLabelId || s.labelId === this._ghostLabelId) continue;
         try {
           this.scene.createSegment(
             { x: s.a.x, y: s.a.y },
