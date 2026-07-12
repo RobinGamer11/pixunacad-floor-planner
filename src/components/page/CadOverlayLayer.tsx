@@ -73,6 +73,13 @@ interface Props {
   textBorderWidthPx?: number;
 
   hatchDrawMode?: HatchDrawMode;
+
+  /**
+   * Optionale CAD-State einer Hintergrundseite (Transparenzpause). Deren
+   * Segmente/Freistriche/Hatch-Umrisse werden als unsichtbare Snap-Kanten
+   * in die aktive Engine übernommen, sodass Fangpunkte anvisiert werden können.
+   */
+  ghostSnapState?: any;
 }
 
 export default function CadOverlayLayer(props: Props) {
