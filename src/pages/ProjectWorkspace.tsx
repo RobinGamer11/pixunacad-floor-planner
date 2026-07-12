@@ -14,7 +14,6 @@ import {
   Table as TableIcon,
   Clock,
   Layers as LayersIcon,
-  LayoutTemplate,
   Eye,
   EyeOff,
   Settings,
