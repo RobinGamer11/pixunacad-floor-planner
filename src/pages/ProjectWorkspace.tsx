@@ -1157,7 +1157,7 @@ export default function ProjectWorkspace() {
                   />
                   <button
                     type="button"
-                    onClick={() => setBgOverlay((o) => ({ ...o, color: "#c99a3b" }))}
+                    onClick={() => setBgOverlay((o) => ({ ...o, color: "#ffffff" }))}
                     className="text-[11px] text-muted-foreground underline"
                     title="Farbe zurücksetzen"
                   >
