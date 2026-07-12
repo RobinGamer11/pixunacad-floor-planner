@@ -204,7 +204,7 @@ export default function ProjectWorkspace() {
   const [bgOverlay, setBgOverlay] = useState<{ pageId?: string; opacity: number; visible: boolean; color: string; tintEnabled: boolean }>({
     opacity: 0.45,
     visible: true,
-    color: "#c99a3b",
+    color: "#ffffff",
     tintEnabled: true,
   });
   const [zoom, setZoom] = useState(77);
