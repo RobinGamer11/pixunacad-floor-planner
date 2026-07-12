@@ -1061,7 +1061,7 @@ export class MiniCad {
     const segScale = (data.version ?? 1) >= 3 ? f : 1;
     if (Array.isArray(data.segments)) {
       for (const s of data.segments) {
-        if (s.labelId === this._frameLabelId || s.labelId === this._extRectLabelId) continue;
+        if (s.labelId === this._frameLabelId || s.labelId === this._extRectLabelId || s.labelId === this._ghostLabelId) continue;
         try {
           this.scene.createSegment(
             { x: s.a.x, y: s.a.y },
