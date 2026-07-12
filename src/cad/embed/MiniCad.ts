@@ -966,7 +966,7 @@ export class MiniCad {
       version: 4,
       labels: this.labelManager.list(),
       segments: this.scene.segments
-        .filter((s) => s.labelId !== this._frameLabelId && s.labelId !== this._extRectLabelId)
+        .filter((s) => s.labelId !== this._frameLabelId && s.labelId !== this._extRectLabelId && s.labelId !== this._ghostLabelId)
         .map((s) => ({
           id: s.id,
           a: { x: s.a.x, y: s.a.y },
