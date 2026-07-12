@@ -833,8 +833,6 @@ export default function ProjectWorkspace() {
         <ToolRailButton icon={<Clock size={18} />} label="Zeitstrahl" disabled />
         <ToolRailButton icon={<Shapes size={18} />} label="Formen" disabled />
         <div className="mt-auto flex flex-col items-center gap-1">
-          <ToolRailButton icon={<LayersIcon size={18} />} label="Ebenen" onClick={() => setRightTab("layers")} />
-          <ToolRailButton icon={<LayoutTemplate size={18} />} label="Vorlagen" />
         </div>
       </aside>
 
