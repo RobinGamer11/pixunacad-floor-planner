@@ -348,6 +348,7 @@ export default function ProjectWorkspace() {
     if (isLinePageTool(t)) setLineToolVariant(t);
     if (!isLinePageTool(t)) setLineToolFlyoutOpen(false);
     if (t !== "hatch") setHatchToolFlyoutOpen(false);
+    if (t !== null) setSelectToolFlyoutOpen(false);
     if (t) setSelectedCadTool(undefined);
     if (t) setRightTabState("tools");
   };
@@ -2365,6 +2366,7 @@ function PageCanvas({
           guideColor={toolSettings.guide.color}
           guidesLocked={toolSettings.guide.locked}
           multiSelectMode={toolSettings.select.multi}
+          selectMarqueeMode={toolSettings.select.marqueeMode}
 
           textColor={toolSettings.text.color}
           textFontSizePx={toolSettings.text.fontSize}

@@ -225,6 +225,7 @@ export class MiniCad {
   private _multiSelectMode: boolean = false;
   /** Live Shift-Status; während eines Pointer/Klick-Events read-aktualisiert. */
   private _shiftDown: boolean = false;
+  private _lastMarqueeSelectionCount = 0;
 
 
   // Page geometry.
@@ -691,6 +692,13 @@ export class MiniCad {
           this.clearSelection();
           try { this.pointEditMenu.hide(); } catch {}
         }
+      }
+      const marqueeCount = this.selectTool.marqueeSelectedIds.length;
+      if (marqueeCount !== this._lastMarqueeSelectionCount) {
+        this._lastMarqueeSelectionCount = marqueeCount;
+        const count = this.selections.length || (this.selection ? 1 : 0) || marqueeCount;
+        try { this._onSelectionChange?.(this._selectionInfo(this.selection), count); } catch {}
+        try { this.onSelectionChange?.(); } catch {}
       }
       return result;
     };
@@ -1306,6 +1314,7 @@ export class MiniCad {
 
   /** True, wenn eine Löschung per Entf-Taste etwas entfernen würde. */
   hasDeletableSelection(): boolean {
+    if (this._activeTool === "select" && this.selectTool.marqueeSelectedIds.length > 0) return true;
     if (this.selections && this.selections.length > 0) return true;
     if (this.selection) return true;
     return false;
@@ -1572,6 +1581,20 @@ export class MiniCad {
       if (this.textEditor.isActive()) return;
       const t = e.target as HTMLElement | null;
       if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      if (this._activeTool === "select" && this.selectTool.marqueeSelectedIds.length > 0) {
+        const removed = this.selectTool.deleteMarqueeSelection();
+        if (removed) {
+          this.clearSelection();
+          this.pointEditMenu.hide();
+          this.refreshLabelUI();
+          this._changeDirty = true;
+          this._lastMarqueeSelectionCount = 0;
+          try { this._onSelectionChange?.(null, 0); } catch {}
+          try { this.onSelectionChange?.(); } catch {}
+          e.preventDefault();
+        }
+        return;
+      }
       const sels = this.selections.length > 0 ? this.selections : (this.selection ? [this.selection] : []);
       if (sels.length === 0) return;
       let removed = false;
@@ -1937,22 +1960,29 @@ export class MiniCad {
 
   private _marqueePick(x0: number, y0: number, x1: number, y1: number): Selection[] {
     const inRect = (x: number, y: number) => x >= x0 && x <= x1 && y >= y0 && y <= y1;
+    const rectsOverlap = (a: { minX: number; minY: number; maxX: number; maxY: number }) =>
+      !(a.maxX < x0 || a.minX > x1 || a.maxY < y0 || a.minY > y1);
+    const mode = this.selectTool.marqueeMode;
     const picks: Selection[] = [];
     for (const seg of this.scene.segments) {
       if (this.isFrameSegment(seg)) continue;
       if (seg.isGuide && this._guidesLocked) continue;
-      // Eine Linie ist „getroffen", wenn beide Endpunkte im Rechteck liegen.
-      if (inRect(seg.a.x, seg.a.y) && inRect(seg.b.x, seg.b.y)) {
+      const inside = inRect(seg.a.x, seg.a.y) && inRect(seg.b.x, seg.b.y);
+      const touched = rectsOverlap({ minX: Math.min(seg.a.x, seg.b.x), minY: Math.min(seg.a.y, seg.b.y), maxX: Math.max(seg.a.x, seg.b.x), maxY: Math.max(seg.a.y, seg.b.y) });
+      if (mode === "enclose" ? inside : touched) {
         picks.push({ type: SelectionType.SEGMENT, segmentId: seg.id } as any);
       }
     }
     for (const h of this.scene.hatches) {
-      if (h.points.every((p) => inRect(p.x, p.y))) {
+      const xs = h.points.map((p) => p.x), ys = h.points.map((p) => p.y);
+      if (mode === "enclose" ? h.points.every((p) => inRect(p.x, p.y)) : rectsOverlap({ minX: Math.min(...xs), minY: Math.min(...ys), maxX: Math.max(...xs), maxY: Math.max(...ys) })) {
         picks.push({ type: SelectionType.HATCH, hatchId: h.id, pointIndex: null });
       }
     }
     for (const b of this.scene.textBoxes) {
-      if (inRect(b.center.x, b.center.y)) {
+      const halfW = b.widthM / 2, halfH = b.heightM / 2;
+      const box = { minX: b.center.x - halfW, minY: b.center.y - halfH, maxX: b.center.x + halfW, maxY: b.center.y + halfH };
+      if (mode === "enclose" ? (box.minX >= x0 && box.minY >= y0 && box.maxX <= x1 && box.maxY <= y1) : rectsOverlap(box)) {
         picks.push({ type: SelectionType.TEXTBOX, textBoxId: b.id, handleIndex: null });
       }
     }
@@ -1964,10 +1994,14 @@ export class MiniCad {
     for (const d of this.scene.documents) {
       const cx = d.position.x + d.widthM / 2;
       const cy = d.position.y + d.heightM / 2;
-      if (inRect(cx, cy)) picks.push({ type: SelectionType.DOCUMENT, documentId: d.id } as any);
+      const box = { minX: d.position.x, minY: d.position.y, maxX: d.position.x + d.widthM, maxY: d.position.y + d.heightM };
+      if (mode === "enclose" ? (box.minX >= x0 && box.minY >= y0 && box.maxX <= x1 && box.maxY <= y1) : rectsOverlap(box)) picks.push({ type: SelectionType.DOCUMENT, documentId: d.id } as any);
     }
     for (const f of this.scene.freeStrokes) {
-      if (f.points.length && inRect(f.points[0].x, f.points[0].y)) {
+      if (!f.points.length) continue;
+      const xs = f.points.map((p) => p.x), ys = f.points.map((p) => p.y);
+      const box = { minX: Math.min(...xs), minY: Math.min(...ys), maxX: Math.max(...xs), maxY: Math.max(...ys) };
+      if (mode === "enclose" ? f.points.every((p) => inRect(p.x, p.y)) : rectsOverlap(box)) {
         picks.push({ type: SelectionType.FREE_STROKE, freeStrokeId: f.id } as any);
       }
     }
