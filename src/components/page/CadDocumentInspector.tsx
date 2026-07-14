@@ -7,6 +7,7 @@
  * selektiert ist.
  */
 import { useEffect, useRef, useState } from "react";
+import { Maximize2, Ruler as RulerIcon } from "lucide-react";
 
 import type { MiniCad } from "@/cad/embed/MiniCad";
 import { SelectionType } from "@/cad/constants";
