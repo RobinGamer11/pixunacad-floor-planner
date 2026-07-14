@@ -57,6 +57,7 @@ interface Props {
   guideColor?: string;
   guidesLocked?: boolean;
   multiSelectMode?: boolean;
+  selectMarqueeMode?: "touch" | "enclose";
 
   textColor?: string;
   textFontSizePx?: number;
@@ -87,7 +88,7 @@ export default function CadOverlayLayer(props: Props) {
     pageWidthMm, pageHeightMm, basePxPerMm, pageMarginsMm,
     zoom, activeTool, enabled, initialState, onChange, onSelectionChange, onEngineReady,
     externalDocs, onExternalDocChange, onExternalDocDelete,
-    lineColor, lineThicknessMm, lineAlpha, guideColor, guidesLocked, multiSelectMode,
+    lineColor, lineThicknessMm, lineAlpha, guideColor, guidesLocked, multiSelectMode, selectMarqueeMode,
     textColor, textFontSizePx, textBold, textItalic, textAlpha, textAlign,
     textBgColor, textBgAlphaPct, textWrap, textAutoSize, textBorderEnabled, textBorderColor, textBorderWidthPx,
     hatchDrawMode,
@@ -258,6 +259,11 @@ export default function CadOverlayLayer(props: Props) {
   useEffect(() => {
     engineRef.current?.setMultiSelectMode(!!multiSelectMode);
   }, [multiSelectMode]);
+
+  useEffect(() => {
+    const engine = engineRef.current;
+    if (engine && selectMarqueeMode) engine.selectTool.marqueeMode = selectMarqueeMode;
+  }, [selectMarqueeMode]);
 
   useEffect(() => {
     engineRef.current?.setTextDefaults({
