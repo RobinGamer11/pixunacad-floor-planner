@@ -548,12 +548,19 @@ export default function ProjectWorkspace() {
   const runDeleteSelection = () => {
     if (!project) return;
     let did = false;
-    if (activePage && selectedElementIds.length > 0) {
-      for (const id of selectedElementIds) {
-        projectStore.deleteElement(project.id, activePage.id, id);
+    if (selectedElementIds.length > 0) {
+      const idSet = new Set(selectedElementIds);
+      // Marquee-Auswahl kann Elemente aus mehreren Seiten (Spread) enthalten —
+      // wir suchen die Trägerseite jedes Elements und löschen dort.
+      for (const pg of project.pages) {
+        for (const el of pg.elements) {
+          if (idSet.has(el.id)) {
+            projectStore.deleteElement(project.id, pg.id, el.id);
+            did = true;
+          }
+        }
       }
       setSelectedElementIds([]);
-      did = true;
     }
     const eng = cadEngineApiRef.current?.engine;
     if (eng && (eng as any).hasDeletableSelection?.()) {
