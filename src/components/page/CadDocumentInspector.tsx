@@ -7,6 +7,7 @@
  * selektiert ist.
  */
 import { useEffect, useRef, useState } from "react";
+import { Maximize2, Ruler as RulerIcon } from "lucide-react";
 
 import type { MiniCad } from "@/cad/embed/MiniCad";
 import { SelectionType } from "@/cad/constants";
@@ -126,6 +127,70 @@ export function CadDocumentInspector({ engine }: Props) {
         </div>
       </div>
 
+
+      {scaling && (
+        <div
+          className="rounded-md p-2 text-[11px]"
+          style={{
+            background: "hsl(var(--primary) / 0.12)",
+            border: "1px solid hsl(var(--primary) / 0.4)",
+          }}
+        >
+          {phase === "scale-pick-1" && <span>1. Skalier-Punkt anklicken (Snap aktiv)</span>}
+          {phase === "scale-pick-2" && <span>2. Punkt setzen · Shift: Ortho · Klick auf m-Anzeige: Distanz tippen</span>}
+          {phase === "scale-await-input" && <span>Soll-Länge im Hub eingeben + Enter</span>}
+        </div>
+      )}
+
+      <button
+        type="button"
+        onClick={() => (engine as any).documentTool?.beginScaleTwoPoints?.(sel.id)}
+        className="w-full h-9 rounded-md border text-xs flex items-center justify-start gap-2 px-2 hover:bg-muted"
+        style={{ borderColor: "hsl(var(--hairline))" }}
+        title="Über zwei Snap-Punkte und eine Soll-Länge skalieren"
+      >
+        <Maximize2 className="h-4 w-4" />
+        <span>Skalieren (2 Punkte)</span>
+      </button>
+
+      <button
+        type="button"
+        onClick={() => (engine as any).documentTool?.beginScaleFromLastDimension?.(sel.id)}
+        className="w-full h-9 rounded-md border text-xs flex items-center justify-start gap-2 px-2 hover:bg-muted"
+        style={{ borderColor: "hsl(var(--hairline))" }}
+        title="Skaliere mit der zuletzt erstellten Maßkette als Referenz"
+      >
+        <RulerIcon className="h-4 w-4" />
+        <span>Skalieren (Maßkette)</span>
+      </button>
+
+      <div className="space-y-1">
+        <div className="flex items-center justify-between text-[10px] px-0.5 text-muted-foreground">
+          <span>Freie Skalierung</span>
+          <button
+            type="button"
+            className="hover:underline"
+            title="Zurück auf 100%"
+            onClick={() => applyScale(100)}
+          >
+            Reset
+          </button>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <input
+            type="range"
+            min={10}
+            max={400}
+            step={1}
+            value={Math.round(scalePct)}
+            onChange={(e) => applyScale(parseFloat(e.target.value))}
+            className="flex-1"
+          />
+          <span className="text-[10px] tabular-nums w-10 text-right text-muted-foreground">
+            {Math.round(scalePct)}%
+          </span>
+        </div>
+      </div>
 
       <DocumentFilterPanel app={engine as any} docId={sel.id} sig={filterSig} showBgRemove={false} />
 
