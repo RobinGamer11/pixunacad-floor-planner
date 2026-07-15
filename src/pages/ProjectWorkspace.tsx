@@ -86,13 +86,11 @@ import { EraserSettingsPanel } from "@/components/cad/EraserSettingsPanel";
 import { HatchSettingsPanel } from "@/components/cad/HatchSettingsPanel";
 import { WorkspaceHeader } from "@/components/workspace/WorkspaceHeader";
 
-const FORMAT_SIZES: Record<PageFormat, { w: number; h: number; label: string }> = {
-  "A3-quer": { w: 420, h: 297, label: "A3 Querformat (420 × 297 mm)" },
-  "A3-hoch": { w: 297, h: 420, label: "A3 Hochformat (297 × 420 mm)" },
-  "A4-quer": { w: 297, h: 210, label: "A4 Querformat (297 × 210 mm)" },
-  "A4-hoch": { w: 210, h: 297, label: "A4 Hochformat (210 × 297 mm)" },
-  frei: { w: 400, h: 300, label: "Freies Format" },
-};
+// Papierformate: kanonische Quelle ist src/lib/paper.ts.
+// Für "frei" enthält diese Tabelle nur die Default-Größe; individuelle Werte
+// aus page.customWidthMm/customHeightMm werden dort abgefragt, wo die reale
+// Seitengröße gebraucht wird (getPageSizeMm).
+import { PAPER_FORMATS as FORMAT_SIZES } from "@/lib/paper";
 
 export type PageTool = "guide" | "line" | "free" | "eraser" | "text" | "cad" | "pipette" | "hatch" | "document" | null;
 type LinePageTool = "line" | "free" | "eraser";
