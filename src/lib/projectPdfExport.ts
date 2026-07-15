@@ -231,8 +231,8 @@ export async function exportProjectToPdf(
       await waitFrames(6);
       const canvas = await snapshotPageElement(page.id, dpi);
       applyColorMode(canvas, opts.colorMode, opts.customColor);
-      const fmt = FORMAT_SIZES_MM[page.format];
-      snaps.push({ canvas, wMm: fmt.w, hMm: fmt.h });
+      const size = getPageSizeMm(page);
+      snaps.push({ canvas, wMm: size.wMm, hMm: size.hMm });
     }
     if (snaps.length === 1) {
       await embedPage(pdf, snaps[0].canvas, snaps[0].wMm, snaps[0].hMm);
