@@ -81,12 +81,18 @@ export interface PendingSheetPdf {
   sheetName: string;
   mode: "full" | "view" | "frame";
   pdfBase64: string;
-  /** Nennmaßstab des Quell-Blatts (z.B. "1:100") — erlaubt exakten Import
-   *  ohne Skalier-Dialog. */
+  /** Nennmaßstab des Quell-Blatts (z.B. "1:100") — Legacy-String. */
   sheetScale?: string;
+  /** Maßstabsnenner (100 für 1:100) — kanonische Form. */
+  scaleDen?: number;
   /** Papiergröße (mm) — nötig für Layout des cad-view Elements. */
   paperWidthMm?: number;
   paperHeightMm?: number;
+  /** Modellmittelpunkt (Meter) des sichtbaren Ausschnitts zum Zeitpunkt des
+   *  Einfügens — erlaubt späteres Re-Rendering ohne die CAD-Oberfläche. */
+  modelCenterM?: { x: number; y: number };
+  /** Viewport-Rotation gegenüber dem Papier (Grad). */
+  viewportRotationDeg?: number;
   /** PNG-Snapshot des Ausschnitts (DataURL) — Vorschau des verknüpften Blatts. */
   snapshotPng?: string;
 }

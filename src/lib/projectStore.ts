@@ -45,11 +45,20 @@ export interface PageElement {
   // line / guide: two endpoints in % of page
   points?: { x: number; y: number }[];
   strokeWidth?: number;
-  // cad-view
+  // cad-view (CAD-Viewport auf Papier)
   scale?: string;
+  /** Maßstabsnenner (100 für 1:100). Wird künftig anstelle des Strings geführt. */
+  scaleDen?: number;
+  /** Modell-Mittelpunkt des sichtbaren Ausschnitts, in Metern. */
+  modelCenterM?: { x: number; y: number };
+  /** Viewport-Rotation gegenüber dem Papier, in Grad. */
+  viewportRotationDeg?: number;
+  /** Optionale Layer-Sichtbarkeit (reserviert). */
+  visibleLayers?: string[];
   lastSyncAt?: string;
   /** cad-view: Eingefrorene Vorschau (DataURL) — Snapshot der CAD-Oberfläche
-   *  zum Zeitpunkt des Einfügens bzw. der Aktualisierung. */
+   *  zum Zeitpunkt des Einfügens bzw. der Aktualisierung. Fallback bis der
+   *  Live-Viewport-Renderer greift. */
   viewSnapshot?: string;
   // generic
   nonPrinting?: boolean;
@@ -105,13 +114,18 @@ export interface ProjectPage {
   spreadCollapsed?: boolean;
   /** Nur bei "free"-Modus: Anordnung gesperrt (kein Ziehen, kein Griff sichtbar). */
   spreadLayoutLocked?: boolean;
+  /** Freie Papiergröße (nur bei format === "frei"). Werte in mm. */
+  customWidthMm?: number;
+  customHeightMm?: number;
 }
 
 
 export interface Sheet {
   id: string;
   name: string;
-  scale: string; // e.g. "1:100"
+  scale: string; // e.g. "1:100" (Legacy-String; scaleDen ist die neue kanonische Form)
+  /** Nennmaßstab als Zahl (100 für 1:100). */
+  defaultScaleDen?: number;
   /** Optionales Vorschau-Bild (PNG-DataURL) — wird beim Speichern aus dem
    *  CAD-Editor-Canvas erzeugt und im `cad-view`-Element angezeigt. */
   thumbnail?: string;

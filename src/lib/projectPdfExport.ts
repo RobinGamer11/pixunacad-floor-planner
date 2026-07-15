@@ -10,17 +10,8 @@
 
 import html2canvas from "html2canvas";
 import { PDFDocument } from "pdf-lib";
-import type { Project, ProjectPage, PageFormat } from "./projectStore";
-
-const FORMAT_SIZES_MM: Record<PageFormat, { w: number; h: number }> = {
-  "A3-quer": { w: 420, h: 297 },
-  "A3-hoch": { w: 297, h: 420 },
-  "A4-quer": { w: 297, h: 210 },
-  "A4-hoch": { w: 210, h: 297 },
-  frei: { w: 400, h: 300 },
-};
-
-const MM_PER_INCH = 25.4;
+import type { Project, ProjectPage } from "./projectStore";
+import { getPageSizeMm, MM_PER_INCH } from "./paper";
 
 export type PdfColorMode = "original" | "bw" | "gray" | "custom";
 
@@ -240,8 +231,8 @@ export async function exportProjectToPdf(
       await waitFrames(6);
       const canvas = await snapshotPageElement(page.id, dpi);
       applyColorMode(canvas, opts.colorMode, opts.customColor);
-      const fmt = FORMAT_SIZES_MM[page.format];
-      snaps.push({ canvas, wMm: fmt.w, hMm: fmt.h });
+      const size = getPageSizeMm(page);
+      snaps.push({ canvas, wMm: size.wMm, hMm: size.hMm });
     }
     if (snaps.length === 1) {
       await embedPage(pdf, snaps[0].canvas, snaps[0].wMm, snaps[0].hMm);
