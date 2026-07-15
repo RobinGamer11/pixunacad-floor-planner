@@ -111,6 +111,11 @@ const CadPage = () => {
     tctx.drawImage(canvas, pxRect.x, pxRect.y, pxRect.w, pxRect.h, 0, 0, tmp.width, tmp.height);
     const snapshotPng = tmp.toDataURL("image/png");
 
+    // Modellmittelpunkt (Meter) des Ausschnitts — CSS-Pixel-Mitte relativ zum Canvas.
+    const midCssX = cssRect.x + cssRect.w / 2;
+    const midCssY = cssRect.y + cssRect.h / 2;
+    const modelCenterM = editorRef.current?.screenToWorldM(midCssX, midCssY) ?? { x: 0, y: 0 };
+
     setBusy(true);
     try {
       const bytes = await canvasRegionToPdfBytes(canvas, pxRect, paperWmm, paperHmm);
@@ -122,8 +127,11 @@ const CadPage = () => {
         mode: sheetPdfMode,
         pdfBase64: bytesToBase64(bytes),
         sheetScale: effectiveScale,
+        scaleDen: scaleValue,
         paperWidthMm: paperWmm,
         paperHeightMm: paperHmm,
+        modelCenterM,
+        viewportRotationDeg: 0,
         snapshotPng,
       });
       navigate(`/project/${projectId}`);
