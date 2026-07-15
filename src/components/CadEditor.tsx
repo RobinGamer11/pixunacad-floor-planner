@@ -69,6 +69,8 @@ export interface CadEditorHandle {
   hasDeletableSelection: () => boolean;
   /** CSS-Pixel pro Welt-Meter (camera.scale). */
   getCameraScale: () => number;
+  /** Welt-Koordinaten (Meter) an einer Bildschirm-CSS-Position im Canvas. */
+  screenToWorldM: (cssX: number, cssY: number) => { x: number; y: number };
 }
 
 interface CadEditorProps {
