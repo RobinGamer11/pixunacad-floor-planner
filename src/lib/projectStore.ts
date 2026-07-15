@@ -123,7 +123,9 @@ export interface ProjectPage {
 export interface Sheet {
   id: string;
   name: string;
-  scale: string; // e.g. "1:100"
+  scale: string; // e.g. "1:100" (Legacy-String; scaleDen ist die neue kanonische Form)
+  /** Nennmaßstab als Zahl (100 für 1:100). */
+  defaultScaleDen?: number;
   /** Optionales Vorschau-Bild (PNG-DataURL) — wird beim Speichern aus dem
    *  CAD-Editor-Canvas erzeugt und im `cad-view`-Element angezeigt. */
   thumbnail?: string;
