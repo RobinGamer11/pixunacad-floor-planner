@@ -105,6 +105,9 @@ export interface ProjectPage {
   spreadCollapsed?: boolean;
   /** Nur bei "free"-Modus: Anordnung gesperrt (kein Ziehen, kein Griff sichtbar). */
   spreadLayoutLocked?: boolean;
+  /** Freie Papiergröße (nur bei format === "frei"). Werte in mm. */
+  customWidthMm?: number;
+  customHeightMm?: number;
 }
 
 
