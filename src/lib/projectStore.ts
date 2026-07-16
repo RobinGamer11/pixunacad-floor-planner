@@ -588,12 +588,15 @@ export const projectStore = {
           ? {
               ...p,
               updatedAt: new Date().toISOString(),
-              pages: p.pages.map((pg) => (pg.id === pageId ? { ...pg, ...patch } : pg)),
+              pages: p.pages.map((pg) =>
+                pg.id === pageId ? syncPageElementUnits({ ...pg, ...patch }) : pg
+              ),
             }
           : p
       ),
     }));
   },
+
   deletePage: (projectId: string, pageId: string) => {
     setState((s) => ({
       projects: s.projects.map((p) =>
