@@ -330,8 +330,87 @@ function migrateProject(p: Project): Project {
   if (!Array.isArray(next.files)) next.files = [];
   if (!Array.isArray(next.photos)) next.photos = [];
   if (!next.settings) next.settings = { timelinePosition: "bottom" };
+  // Stufe 2: mm-Koordinaten auf jedem Element sicherstellen.
+  next.pages = next.pages.map((pg) => syncPageElementUnits(pg));
   return next;
 }
+
+/** Hält Prozent- und Millimeter-Koordinaten der Seitenelemente konsistent.
+ *  Regel (Stufe 2, Kompatibilitätsphase):
+ *   – Fehlt `*Mm`, wird es aus % + Seitenformat abgeleitet (einmalige Migration).
+ *   – Weichen % und mm voneinander ab, gewinnt der zuletzt geschriebene Wert:
+ *     Da UI aktuell noch % schreibt, folgen mm dem %-Wert. Wird künftig `xMm`
+ *     direkt geschrieben, so aktualisiert diese Funktion ebenfalls das %-Feld
+ *     (sofern der Aufrufer `x/y/w/h` nicht selbst neu setzt).
+ */
+export function syncPageElementUnits(page: ProjectPage): ProjectPage {
+  const { getPageSizeMm } = paperModule();
+  const { wMm: pageW, hMm: pageH } = getPageSizeMm(page);
+  if (!(pageW > 0 && pageH > 0)) return page;
+  let changed = false;
+  const elements = page.elements.map((el) => {
+    const next = { ...el } as PageElement;
+    let touched = false;
+    // Box: % ↔ mm
+    const hasPct = typeof el.x === "number" && typeof el.y === "number"
+                 && typeof el.w === "number" && typeof el.h === "number";
+    const hasMm = typeof el.xMm === "number" && typeof el.yMm === "number"
+                && typeof el.wMm === "number" && typeof el.hMm === "number";
+    if (hasPct && !hasMm) {
+      next.xMm = (el.x / 100) * pageW;
+      next.yMm = (el.y / 100) * pageH;
+      next.wMm = (el.w / 100) * pageW;
+      next.hMm = (el.h / 100) * pageH;
+      touched = true;
+    } else if (hasPct && hasMm) {
+      // Wenn % geändert wurden (UI-Schreibpfad), mm nachziehen.
+      const nx = (el.x / 100) * pageW;
+      const ny = (el.y / 100) * pageH;
+      const nw = (el.w / 100) * pageW;
+      const nh = (el.h / 100) * pageH;
+      if (Math.abs(nx - (el.xMm ?? nx)) > 1e-4 || Math.abs(ny - (el.yMm ?? ny)) > 1e-4
+       || Math.abs(nw - (el.wMm ?? nw)) > 1e-4 || Math.abs(nh - (el.hMm ?? nh)) > 1e-4) {
+        next.xMm = nx; next.yMm = ny; next.wMm = nw; next.hMm = nh;
+        touched = true;
+      }
+    } else if (!hasPct && hasMm) {
+      next.x = (el.xMm! / pageW) * 100;
+      next.y = (el.yMm! / pageH) * 100;
+      next.w = (el.wMm! / pageW) * 100;
+      next.h = (el.hMm! / pageH) * 100;
+      touched = true;
+    }
+    // Points: % ↔ mm (Linien / Guides)
+    if (Array.isArray(el.points) && el.points.length && !Array.isArray(el.pointsMm)) {
+      next.pointsMm = el.points.map((p) => ({ x: (p.x / 100) * pageW, y: (p.y / 100) * pageH }));
+      touched = true;
+    } else if (Array.isArray(el.points) && Array.isArray(el.pointsMm)
+            && el.points.length === el.pointsMm.length) {
+      // %-Punkte gewinnen (UI schreibt heute %).
+      const derived = el.points.map((p) => ({ x: (p.x / 100) * pageW, y: (p.y / 100) * pageH }));
+      const drift = derived.some((p, i) =>
+        Math.abs(p.x - el.pointsMm![i].x) > 1e-4 || Math.abs(p.y - el.pointsMm![i].y) > 1e-4);
+      if (drift) { next.pointsMm = derived; touched = true; }
+    } else if (!Array.isArray(el.points) && Array.isArray(el.pointsMm) && el.pointsMm.length) {
+      next.points = el.pointsMm.map((p) => ({ x: (p.x / pageW) * 100, y: (p.y / pageH) * 100 }));
+      touched = true;
+    }
+    if (touched) changed = true;
+    return touched ? next : el;
+  });
+  return changed ? { ...page, elements } : page;
+}
+
+// Lazy-Import zur Vermeidung eines Zyklus zwischen paper.ts und projectStore.ts.
+let _paperMod: typeof import("./paper") | null = null;
+function paperModule(): typeof import("./paper") {
+  if (!_paperMod) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    _paperMod = require("./paper");
+  }
+  return _paperMod!;
+}
+
 
 function persist() {
   try {
