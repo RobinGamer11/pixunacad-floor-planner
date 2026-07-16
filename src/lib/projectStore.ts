@@ -20,10 +20,20 @@ export type ElementKind =
 export interface PageElement {
   id: string;
   kind: ElementKind;
+  /* Legacy Prozent-Koordinaten (Paper-Space, in % der Seite).
+   * Bleiben als Kompatibilitätsschicht erhalten, bis alle UI-Pfade auf mm
+   * umgestellt sind. Die kanonische Quelle wird schrittweise `*Mm`. */
   x: number; // % of page
   y: number;
   w: number;
   h: number;
+  /** Kanonisch (Stufe 2): Position/Größe in Papier-Millimetern.
+   *  Wird beim Laden migriert und bei jeder Änderung aus %/Seitenformat
+   *  synchron gehalten. Später (Stufe 8) verschwindet %. */
+  xMm?: number;
+  yMm?: number;
+  wMm?: number;
+  hMm?: number;
   // content payloads — only the fields used per kind are read
   text?: string;
   fontSize?: number;
@@ -44,6 +54,8 @@ export interface PageElement {
   rotation?: number;
   // line / guide: two endpoints in % of page
   points?: { x: number; y: number }[];
+  /** Kanonisch (Stufe 2): Endpunkte in Papier-Millimetern. */
+  pointsMm?: { x: number; y: number }[];
   strokeWidth?: number;
   // cad-view (CAD-Viewport auf Papier)
   scale?: string;
