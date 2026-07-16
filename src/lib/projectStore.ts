@@ -345,7 +345,6 @@ function migrateProject(p: Project): Project {
  *     (sofern der Aufrufer `x/y/w/h` nicht selbst neu setzt).
  */
 export function syncPageElementUnits(page: ProjectPage): ProjectPage {
-  const { getPageSizeMm } = paperModule();
   const { wMm: pageW, hMm: pageH } = getPageSizeMm(page);
   if (!(pageW > 0 && pageH > 0)) return page;
   let changed = false;
@@ -364,7 +363,6 @@ export function syncPageElementUnits(page: ProjectPage): ProjectPage {
       next.hMm = (el.h / 100) * pageH;
       touched = true;
     } else if (hasPct && hasMm) {
-      // Wenn % geändert wurden (UI-Schreibpfad), mm nachziehen.
       const nx = (el.x / 100) * pageW;
       const ny = (el.y / 100) * pageH;
       const nw = (el.w / 100) * pageW;
@@ -387,7 +385,6 @@ export function syncPageElementUnits(page: ProjectPage): ProjectPage {
       touched = true;
     } else if (Array.isArray(el.points) && Array.isArray(el.pointsMm)
             && el.points.length === el.pointsMm.length) {
-      // %-Punkte gewinnen (UI schreibt heute %).
       const derived = el.points.map((p) => ({ x: (p.x / 100) * pageW, y: (p.y / 100) * pageH }));
       const drift = derived.some((p, i) =>
         Math.abs(p.x - el.pointsMm![i].x) > 1e-4 || Math.abs(p.y - el.pointsMm![i].y) > 1e-4);
@@ -402,15 +399,6 @@ export function syncPageElementUnits(page: ProjectPage): ProjectPage {
   return changed ? { ...page, elements } : page;
 }
 
-// Lazy-Import zur Vermeidung eines Zyklus zwischen paper.ts und projectStore.ts.
-let _paperMod: typeof import("./paper") | null = null;
-function paperModule(): typeof import("./paper") {
-  if (!_paperMod) {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    _paperMod = require("./paper");
-  }
-  return _paperMod!;
-}
 
 
 function persist() {
