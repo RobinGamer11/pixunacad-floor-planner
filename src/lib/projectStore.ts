@@ -3,6 +3,7 @@
 // Intentionally framework-free: tiny pub/sub + useSyncExternalStore hook.
 
 import { useSyncExternalStore } from "react";
+import { getPageSizeMm } from "./paper";
 
 export type PageFormat = "A3-quer" | "A4-hoch" | "A4-quer" | "A3-hoch" | "frei";
 export type ElementKind =
