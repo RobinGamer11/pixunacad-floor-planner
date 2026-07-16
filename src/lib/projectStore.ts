@@ -3,6 +3,7 @@
 // Intentionally framework-free: tiny pub/sub + useSyncExternalStore hook.
 
 import { useSyncExternalStore } from "react";
+import { getPageSizeMm } from "./paper";
 
 export type PageFormat = "A3-quer" | "A4-hoch" | "A4-quer" | "A3-hoch" | "frei";
 export type ElementKind =
@@ -20,10 +21,20 @@ export type ElementKind =
 export interface PageElement {
   id: string;
   kind: ElementKind;
+  /* Legacy Prozent-Koordinaten (Paper-Space, in % der Seite).
+   * Bleiben als Kompatibilitätsschicht erhalten, bis alle UI-Pfade auf mm
+   * umgestellt sind. Die kanonische Quelle wird schrittweise `*Mm`. */
   x: number; // % of page
   y: number;
   w: number;
   h: number;
+  /** Kanonisch (Stufe 2): Position/Größe in Papier-Millimetern.
+   *  Wird beim Laden migriert und bei jeder Änderung aus %/Seitenformat
+   *  synchron gehalten. Später (Stufe 8) verschwindet %. */
+  xMm?: number;
+  yMm?: number;
+  wMm?: number;
+  hMm?: number;
   // content payloads — only the fields used per kind are read
   text?: string;
   fontSize?: number;
@@ -44,6 +55,8 @@ export interface PageElement {
   rotation?: number;
   // line / guide: two endpoints in % of page
   points?: { x: number; y: number }[];
+  /** Kanonisch (Stufe 2): Endpunkte in Papier-Millimetern. */
+  pointsMm?: { x: number; y: number }[];
   strokeWidth?: number;
   // cad-view (CAD-Viewport auf Papier)
   scale?: string;
@@ -318,8 +331,75 @@ function migrateProject(p: Project): Project {
   if (!Array.isArray(next.files)) next.files = [];
   if (!Array.isArray(next.photos)) next.photos = [];
   if (!next.settings) next.settings = { timelinePosition: "bottom" };
+  // Stufe 2: mm-Koordinaten auf jedem Element sicherstellen.
+  next.pages = next.pages.map((pg) => syncPageElementUnits(pg));
   return next;
 }
+
+/** Hält Prozent- und Millimeter-Koordinaten der Seitenelemente konsistent.
+ *  Regel (Stufe 2, Kompatibilitätsphase):
+ *   – Fehlt `*Mm`, wird es aus % + Seitenformat abgeleitet (einmalige Migration).
+ *   – Weichen % und mm voneinander ab, gewinnt der zuletzt geschriebene Wert:
+ *     Da UI aktuell noch % schreibt, folgen mm dem %-Wert. Wird künftig `xMm`
+ *     direkt geschrieben, so aktualisiert diese Funktion ebenfalls das %-Feld
+ *     (sofern der Aufrufer `x/y/w/h` nicht selbst neu setzt).
+ */
+export function syncPageElementUnits(page: ProjectPage): ProjectPage {
+  const { wMm: pageW, hMm: pageH } = getPageSizeMm(page);
+  if (!(pageW > 0 && pageH > 0)) return page;
+  let changed = false;
+  const elements = page.elements.map((el) => {
+    const next = { ...el } as PageElement;
+    let touched = false;
+    // Box: % ↔ mm
+    const hasPct = typeof el.x === "number" && typeof el.y === "number"
+                 && typeof el.w === "number" && typeof el.h === "number";
+    const hasMm = typeof el.xMm === "number" && typeof el.yMm === "number"
+                && typeof el.wMm === "number" && typeof el.hMm === "number";
+    if (hasPct && !hasMm) {
+      next.xMm = (el.x / 100) * pageW;
+      next.yMm = (el.y / 100) * pageH;
+      next.wMm = (el.w / 100) * pageW;
+      next.hMm = (el.h / 100) * pageH;
+      touched = true;
+    } else if (hasPct && hasMm) {
+      const nx = (el.x / 100) * pageW;
+      const ny = (el.y / 100) * pageH;
+      const nw = (el.w / 100) * pageW;
+      const nh = (el.h / 100) * pageH;
+      if (Math.abs(nx - (el.xMm ?? nx)) > 1e-4 || Math.abs(ny - (el.yMm ?? ny)) > 1e-4
+       || Math.abs(nw - (el.wMm ?? nw)) > 1e-4 || Math.abs(nh - (el.hMm ?? nh)) > 1e-4) {
+        next.xMm = nx; next.yMm = ny; next.wMm = nw; next.hMm = nh;
+        touched = true;
+      }
+    } else if (!hasPct && hasMm) {
+      next.x = (el.xMm! / pageW) * 100;
+      next.y = (el.yMm! / pageH) * 100;
+      next.w = (el.wMm! / pageW) * 100;
+      next.h = (el.hMm! / pageH) * 100;
+      touched = true;
+    }
+    // Points: % ↔ mm (Linien / Guides)
+    if (Array.isArray(el.points) && el.points.length && !Array.isArray(el.pointsMm)) {
+      next.pointsMm = el.points.map((p) => ({ x: (p.x / 100) * pageW, y: (p.y / 100) * pageH }));
+      touched = true;
+    } else if (Array.isArray(el.points) && Array.isArray(el.pointsMm)
+            && el.points.length === el.pointsMm.length) {
+      const derived = el.points.map((p) => ({ x: (p.x / 100) * pageW, y: (p.y / 100) * pageH }));
+      const drift = derived.some((p, i) =>
+        Math.abs(p.x - el.pointsMm![i].x) > 1e-4 || Math.abs(p.y - el.pointsMm![i].y) > 1e-4);
+      if (drift) { next.pointsMm = derived; touched = true; }
+    } else if (!Array.isArray(el.points) && Array.isArray(el.pointsMm) && el.pointsMm.length) {
+      next.points = el.pointsMm.map((p) => ({ x: (p.x / pageW) * 100, y: (p.y / pageH) * 100 }));
+      touched = true;
+    }
+    if (touched) changed = true;
+    return touched ? next : el;
+  });
+  return changed ? { ...page, elements } : page;
+}
+
+
 
 function persist() {
   try {
@@ -508,12 +588,15 @@ export const projectStore = {
           ? {
               ...p,
               updatedAt: new Date().toISOString(),
-              pages: p.pages.map((pg) => (pg.id === pageId ? { ...pg, ...patch } : pg)),
+              pages: p.pages.map((pg) =>
+                pg.id === pageId ? syncPageElementUnits({ ...pg, ...patch }) : pg
+              ),
             }
           : p
       ),
     }));
   },
+
   deletePage: (projectId: string, pageId: string) => {
     setState((s) => ({
       projects: s.projects.map((p) =>
