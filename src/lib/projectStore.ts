@@ -3,7 +3,7 @@
 // Intentionally framework-free: tiny pub/sub + useSyncExternalStore hook.
 
 import { useSyncExternalStore } from "react";
-import { getPageSizeMm } from "./paper";
+import { getPageSizeMm, parseScaleDen } from "./paper";
 
 export type PageFormat = "A3-quer" | "A4-hoch" | "A4-quer" | "A3-hoch" | "frei";
 export type ElementKind =
@@ -13,10 +13,12 @@ export type ElementKind =
   | "table"
   | "note"
   | "timeline"
-  | "cad-view"
+  | "cad-view"        // Legacy: Bitmap-Snapshot eines CAD-Blatts (bleibt lesbar).
+  | "cad-viewport"    // Stufe 3: echter Live-Viewport auf ein CAD-Sheet.
   | "shape"
   | "line"
   | "guide";
+
 
 export interface PageElement {
   id: string;
@@ -331,10 +333,50 @@ function migrateProject(p: Project): Project {
   if (!Array.isArray(next.files)) next.files = [];
   if (!Array.isArray(next.photos)) next.photos = [];
   if (!next.settings) next.settings = { timelinePosition: "bottom" };
+  // Stufe 3: Sheet.defaultScaleDen aus Legacy-String ableiten.
+  if (Array.isArray(next.sheets)) {
+    next.sheets = next.sheets.map((s) => (
+      typeof s.defaultScaleDen === "number" && s.defaultScaleDen > 0
+        ? s
+        : { ...s, defaultScaleDen: parseScaleDen(s.scale) }
+    ));
+  }
   // Stufe 2: mm-Koordinaten auf jedem Element sicherstellen.
-  next.pages = next.pages.map((pg) => syncPageElementUnits(pg));
+  // Stufe 3: Viewport-Metadaten (scaleDen, modelCenterM, viewportRotationDeg)
+  //          auf jedem cad-view/cad-viewport-Element sicherstellen.
+  next.pages = next.pages.map((pg) => syncPageElementUnits(migratePageViewports(pg)));
   return next;
 }
+
+/** Stufe 3: Legacy `cad-view`-Elemente bekommen die neuen Viewport-Felder
+ *  (scaleDen, modelCenterM, viewportRotationDeg) beim Laden befüllt, damit
+ *  der Stufe-4-Live-Renderer sie ohne Sonderfälle konsumieren kann. Der Kind
+ *  bleibt vorerst `cad-view` (Renderer-Kompat); erst wenn der Live-Renderer
+ *  aktiv ist, wird beim ersten Schreiben auf `cad-viewport` umgestellt. */
+function migratePageViewports(page: ProjectPage): ProjectPage {
+  let changed = false;
+  const elements = page.elements.map((el) => {
+    if (el.kind !== "cad-view" && el.kind !== "cad-viewport") return el;
+    const next: PageElement = { ...el };
+    let touched = false;
+    if (typeof next.scaleDen !== "number" || !(next.scaleDen > 0)) {
+      next.scaleDen = parseScaleDen(el.scale);
+      touched = true;
+    }
+    if (!next.modelCenterM) {
+      next.modelCenterM = { x: 0, y: 0 };
+      touched = true;
+    }
+    if (typeof next.viewportRotationDeg !== "number") {
+      next.viewportRotationDeg = typeof el.rotation === "number" ? el.rotation : 0;
+      touched = true;
+    }
+    if (touched) changed = true;
+    return touched ? next : el;
+  });
+  return changed ? { ...page, elements } : page;
+}
+
 
 /** Hält Prozent- und Millimeter-Koordinaten der Seitenelemente konsistent.
  *  Regel (Stufe 2, Kompatibilitätsphase):
