@@ -13,10 +13,12 @@ export type ElementKind =
   | "table"
   | "note"
   | "timeline"
-  | "cad-view"
+  | "cad-view"        // Legacy: Bitmap-Snapshot eines CAD-Blatts (bleibt lesbar).
+  | "cad-viewport"    // Stufe 3: echter Live-Viewport auf ein CAD-Sheet.
   | "shape"
   | "line"
   | "guide";
+
 
 export interface PageElement {
   id: string;
