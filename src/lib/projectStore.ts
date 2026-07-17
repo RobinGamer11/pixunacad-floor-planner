@@ -919,7 +919,9 @@ export const projectStore = {
               ...p,
               updatedAt: new Date().toISOString(),
               pages: p.pages.map((pg) =>
-                pg.id === pageId ? { ...pg, elements: [...pg.elements, { ...el, id }] } : pg
+                pg.id === pageId
+                  ? syncPageElementUnits({ ...pg, elements: [...pg.elements, { ...el, id }] })
+                  : pg
               ),
             }
           : p
@@ -941,12 +943,12 @@ export const projectStore = {
               updatedAt: new Date().toISOString(),
               pages: p.pages.map((pg) =>
                 pg.id === pageId
-                  ? {
+                  ? syncPageElementUnits({
                       ...pg,
                       elements: pg.elements.map((e) =>
                         e.id === elementId ? { ...e, ...patch } : e
                       ),
-                    }
+                    })
                   : pg
               ),
             }
@@ -954,6 +956,7 @@ export const projectStore = {
       ),
     }));
   },
+
   deleteElement: (projectId: string, pageId: string, elementId: string) => {
     setState((s) => ({
       projects: s.projects.map((p) =>
