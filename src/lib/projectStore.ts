@@ -363,13 +363,34 @@ export function syncPageElementUnits(page: ProjectPage): ProjectPage {
       next.hMm = (el.h / 100) * pageH;
       touched = true;
     } else if (hasPct && hasMm) {
-      const nx = (el.x / 100) * pageW;
-      const ny = (el.y / 100) * pageH;
-      const nw = (el.w / 100) * pageW;
-      const nh = (el.h / 100) * pageH;
-      if (Math.abs(nx - (el.xMm ?? nx)) > 1e-4 || Math.abs(ny - (el.yMm ?? ny)) > 1e-4
-       || Math.abs(nw - (el.wMm ?? nw)) > 1e-4 || Math.abs(nh - (el.hMm ?? nh)) > 1e-4) {
-        next.xMm = nx; next.yMm = ny; next.wMm = nw; next.hMm = nh;
+      // Beide vorhanden: erkennen, welche Achse zuletzt geschrieben wurde.
+      // Wenn %-Wert mit alter mm-Ableitung übereinstimmt → mm wurde neu geschrieben → % nachziehen.
+      // Sonst → % neu → mm nachziehen.
+      const pctFromMm = {
+        x: (el.xMm! / pageW) * 100,
+        y: (el.yMm! / pageH) * 100,
+        w: (el.wMm! / pageW) * 100,
+        h: (el.hMm! / pageH) * 100,
+      };
+      const mmFromPct = {
+        x: (el.x / 100) * pageW,
+        y: (el.y / 100) * pageH,
+        w: (el.w / 100) * pageW,
+        h: (el.h / 100) * pageH,
+      };
+      const pctDrift = Math.abs(pctFromMm.x - el.x) + Math.abs(pctFromMm.y - el.y)
+                     + Math.abs(pctFromMm.w - el.w) + Math.abs(pctFromMm.h - el.h);
+      const mmDrift = Math.abs(mmFromPct.x - el.xMm!) + Math.abs(mmFromPct.y - el.yMm!)
+                    + Math.abs(mmFromPct.w - el.wMm!) + Math.abs(mmFromPct.h - el.hMm!);
+      if (mmDrift < 1e-3 && pctDrift < 1e-3) {
+        // konsistent, nichts zu tun
+      } else if (pctDrift < mmDrift) {
+        // mm ist neu → % aus mm ableiten
+        next.x = pctFromMm.x; next.y = pctFromMm.y; next.w = pctFromMm.w; next.h = pctFromMm.h;
+        touched = true;
+      } else {
+        // % ist neu → mm aus % ableiten
+        next.xMm = mmFromPct.x; next.yMm = mmFromPct.y; next.wMm = mmFromPct.w; next.hMm = mmFromPct.h;
         touched = true;
       }
     } else if (!hasPct && hasMm) {
@@ -379,6 +400,7 @@ export function syncPageElementUnits(page: ProjectPage): ProjectPage {
       next.h = (el.hMm! / pageH) * 100;
       touched = true;
     }
+
     // Points: % ↔ mm (Linien / Guides)
     if (Array.isArray(el.points) && el.points.length && !Array.isArray(el.pointsMm)) {
       next.pointsMm = el.points.map((p) => ({ x: (p.x / 100) * pageW, y: (p.y / 100) * pageH }));
@@ -919,7 +941,9 @@ export const projectStore = {
               ...p,
               updatedAt: new Date().toISOString(),
               pages: p.pages.map((pg) =>
-                pg.id === pageId ? { ...pg, elements: [...pg.elements, { ...el, id }] } : pg
+                pg.id === pageId
+                  ? syncPageElementUnits({ ...pg, elements: [...pg.elements, { ...el, id }] })
+                  : pg
               ),
             }
           : p
@@ -941,12 +965,12 @@ export const projectStore = {
               updatedAt: new Date().toISOString(),
               pages: p.pages.map((pg) =>
                 pg.id === pageId
-                  ? {
+                  ? syncPageElementUnits({
                       ...pg,
                       elements: pg.elements.map((e) =>
                         e.id === elementId ? { ...e, ...patch } : e
                       ),
-                    }
+                    })
                   : pg
               ),
             }
@@ -954,6 +978,7 @@ export const projectStore = {
       ),
     }));
   },
+
   deleteElement: (projectId: string, pageId: string, elementId: string) => {
     setState((s) => ({
       projects: s.projects.map((p) =>
