@@ -3112,6 +3112,35 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
+function FreeDimInput({ value, onCommit }: { value: number; onCommit: (v: number) => void }) {
+  const [text, setText] = React.useState(String(value));
+  const focused = React.useRef(false);
+  React.useEffect(() => { if (!focused.current) setText(String(value)); }, [value]);
+  const commit = () => {
+    const n = Number(text.replace(",", "."));
+    if (Number.isFinite(n)) {
+      const clamped = Math.max(50, Math.min(2000, Math.round(n)));
+      onCommit(clamped);
+      setText(String(clamped));
+    } else {
+      setText(String(value));
+    }
+  };
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      value={text}
+      onFocus={() => { focused.current = true; }}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={() => { focused.current = false; commit(); }}
+      onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+      className="w-full h-8 px-2 rounded bg-transparent border text-sm"
+      style={{ borderColor: "hsl(var(--hairline))" }}
+    />
+  );
+}
+
 function PageSettings({
   projectId,
   page,
