@@ -67,6 +67,7 @@ import {
   projectStore,
   useProject,
   useProjects,
+  useProjectHistory,
   type PageElement,
   type ElementKind,
   type PageFormat,
