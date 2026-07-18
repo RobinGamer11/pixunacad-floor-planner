@@ -4054,7 +4054,7 @@ function CadToolSection({
 }) {
   const navigate = useNavigate();
   const page = project.pages.find((p) => p.id === pageId);
-  const placed = (page?.elements ?? []).filter((e) => e.kind === "cad-view");
+  const placed = (page?.elements ?? []).filter((e) => e.kind === "cad-view" || e.kind === "cad-viewport");
   const [pdfOpen, setPdfOpen] = useState<boolean>(false);
   const [pdfPickedSheet, setPdfPickedSheet] = useState<string | null>(null);
   const [pickScale, setPickScale] = useState<Record<string, string>>({});
