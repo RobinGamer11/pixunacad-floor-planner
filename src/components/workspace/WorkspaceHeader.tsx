@@ -128,7 +128,7 @@ export function WorkspaceHeader({
             title="Tablet-Hilfsrad (Maus/Tastatur-Ersatz)"
             aria-pressed={tabletAidOn}
           >
-            <HelpCircle size={16} />
+            <TabletSmartphone size={16} />
           </button>
         )}
         <button
