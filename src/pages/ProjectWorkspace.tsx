@@ -309,9 +309,21 @@ export default function ProjectWorkspace() {
       if (arr.length < 2) return 0;
       return Math.hypot(arr[0].x - arr[1].x, arr[0].y - arr[1].y);
     };
+    // Wenn Pen-Only aktiv ist, sollen Apple-Pencil-Touches (touchType==="stylus")
+    // KEIN Pan/Zoom im Projektmappen-Viewport auslösen — nur Finger dürfen das.
+    // Analog zur CAD-Oberfläche (Input.ts).
+    const isStylusTouch = (t: Touch) =>
+      typeof (t as any).touchType === "string" && (t as any).touchType === "stylus";
+    const acceptTouch = (t: Touch) => {
+      if ((window as any).__pixunaPenOnly && isStylusTouch(t)) return false;
+      return true;
+    };
     const onTouchStart = (e: TouchEvent) => {
       if ((window as any).__pixunaZoomLock) return;
-      for (const t of Array.from(e.touches)) pts.set(t.identifier, { x: t.clientX, y: t.clientY });
+      for (const t of Array.from(e.touches)) {
+        if (!acceptTouch(t)) continue;
+        pts.set(t.identifier, { x: t.clientX, y: t.clientY });
+      }
       if (pts.size >= 2) {
         const m = midOf();
         mode = "gesture";
@@ -324,10 +336,13 @@ export default function ProjectWorkspace() {
       } else if (pts.size === 1 && (window as any).__pixunaTabletCommit) {
         // Tablet-Hilfsrad aktiv: Ein-Finger-Bewegung schwenkt die Mappe
         // (statt zu zeichnen — Commit passiert nur per Wheel-ENTER/LMB).
-        const t = e.touches[0];
-        pan1Id = t.identifier;
-        pan1Last = { x: t.clientX, y: t.clientY };
-        mode = "pan1";
+        // Im Pen-Only-Modus wurden Stylus-Touches bereits oben ausgefiltert.
+        const t = Array.from(e.touches).find((tt) => pts.has(tt.identifier));
+        if (t) {
+          pan1Id = t.identifier;
+          pan1Last = { x: t.clientX, y: t.clientY };
+          mode = "pan1";
+        }
       }
     };
     let rafPending = 0;
@@ -343,7 +358,10 @@ export default function ProjectWorkspace() {
     };
     const onTouchMove = (e: TouchEvent) => {
       if ((window as any).__pixunaZoomLock) { mode = "idle"; return; }
-      for (const t of Array.from(e.touches)) pts.set(t.identifier, { x: t.clientX, y: t.clientY });
+      for (const t of Array.from(e.touches)) {
+        if (!acceptTouch(t)) continue;
+        pts.set(t.identifier, { x: t.clientX, y: t.clientY });
+      }
       if (mode === "gesture" && pts.size >= 2) {
         const m = midOf();
         const dist = distOf();
