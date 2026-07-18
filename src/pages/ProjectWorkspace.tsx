@@ -1245,6 +1245,7 @@ export default function ProjectWorkspace() {
               className="flex-1 overflow-hidden relative"
               style={{ touchAction: "pan-x pan-y" }}
               onWheel={(e) => {
+                if ((window as any).__pixunaZoomLock) { if (e.cancelable) e.preventDefault(); return; }
                 if (e.shiftKey && !e.altKey) {
                   // Shift alleine = normales horizontales Scrollen zulassen.
                   return;
