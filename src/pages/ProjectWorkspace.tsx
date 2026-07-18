@@ -711,11 +711,22 @@ export default function ProjectWorkspace() {
               }}
             >
               <ToolRailButton
+                icon={<MousePointer2 size={18} />}
+                label="Klick"
+                active={activeTool === null && toolSettings.select.marqueeMode === "click"}
+                onClick={() => {
+                  updateToolSettings("select", { marqueeMode: "click" });
+                  setActiveTool(null);
+                  setSelectToolFlyoutOpen(false);
+                }}
+                showLabel
+              />
+              <ToolRailButton
                 icon={<SquareDashed size={18} />}
                 label="Berühren"
                 active={activeTool === null && toolSettings.select.marqueeMode === "touch"}
                 onClick={() => {
-                  updateToolSettings("select", { marqueeMode: "click" });
+                  updateToolSettings("select", { marqueeMode: "touch" });
                   setActiveTool(null);
                   setSelectToolFlyoutOpen(false);
                 }}
