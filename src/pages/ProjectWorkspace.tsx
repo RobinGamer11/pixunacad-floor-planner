@@ -78,6 +78,8 @@ import CadOverlayLayer from "@/components/page/CadOverlayLayer";
 import { CadDocumentInspector } from "@/components/page/CadDocumentInspector";
 import { CadIdPanelHost } from "@/components/page/CadIdPanelHost";
 import { PdfPageView } from "@/components/page/PdfPageView";
+import { TableElementView } from "@/components/page/TableElementView";
+
 import { CadViewportView } from "@/components/page/CadViewportView";
 import { importFile, type ImportedPage } from "@/cad/documentImport";
 import { popPendingSheetPdf } from "@/lib/sheetPdfExport";
