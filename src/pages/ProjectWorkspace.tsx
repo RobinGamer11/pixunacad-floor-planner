@@ -1559,6 +1559,7 @@ export default function ProjectWorkspace() {
         onSelectPage={(id) => setActivePageId(id)}
       />
     )}
+    {tabletAidOn && <TabletAidWheel />}
     </>
   );
 }
