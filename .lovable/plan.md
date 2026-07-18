@@ -1,54 +1,61 @@
-# Umsetzung – 3 Punkte
+## 1. Freihand-Live-Vorschau
 
-## 1. Auswahl-Werkzeug: Dritter Modus „Klick" (ohne Rahmen)
+Im `FreeDrawSettingsPanel` (rechte Einstellungsleiste) direkt unter dem Titel eine kleine Canvas-Vorschau (Breite 100 %, Höhe ~64 px) einfügen. Die Vorschau zeichnet einen leicht geschwungenen Beispielpfad mit derselben Renderlogik wie das echte Werkzeug (Wiederverwendung der Stroke-Renderer aus `Renderer.ts`, um 1:1-Parität zu wahren). Sie aktualisiert sich live bei Änderungen von Farbe, Dicke, Transparenz, Linienart, Lücke sowie Bildstempel-Parametern.
 
-**Ziel:** Standard nach Aktivierung = reines Einzelklicken. Rahmen (Berühren / Umschließen) nur wenn bewusst gewählt.
+## 2. Startseite: „Dateien" + „Fotos" unter „Dokumente"
 
-- `SelectTool.marqueeMode` erweitert um `"click" | "touch" | "enclose"`. Default = `"click"`.
-- Im `"click"`-Modus: Rahmen-Logik komplett aus (kein Marquee-Aufziehen, kein Marquee-Highlight), nur bisheriger Einzelklick-Pfad.
-- CAD-Toolbar (`CadEditor.tsx`) und Projektmappe (`ProjectWorkspace.tsx`): Flyout links am Auswahl-Symbol bekommt drittes Icon **Klick** (MousePointer2) neben Berühren (SquareDashed) und Umschließen (BoxSelect). Aktiver Modus visuell hervorgehoben wie heute.
-- Gleiche Logik in `MiniCad._marqueePick`: bei `"click"` wird `_marqueeStart` gar nicht erst gesetzt.
+- In `ProjectsHome` / `UebersichtView` die beiden Reiter entfernen und durch einen einzigen Reiter „Dokumente" ersetzen.
+- Innerhalb von „Dokumente" ein Sub-Tabs-Wechsler „Dateien | Fotos" (Segmented Control) einbauen. Bestehende Bereiche werden jeweils darunter gerendert – keine Logikänderung, nur Umgruppierung.
 
-## 2. Enter-Commit für alle Zeichenwerkzeuge im Tablet-Modus
+## 3. Neues Modul „Notiznetz"
 
-**Ziel:** Wenn Hilfsrad aktiv ist, setzt Stift/Finger keinen Punkt beim Aufsetzen/Loslassen. Punkt wird erst gesetzt, wenn im Rad **Enter** oder **LMB** gedrückt wird. Cursor/Vorschau folgt weiter der Bewegung.
+### 3.1 Navigation und Kopf
+- `WorkspaceHeader` bekommt einen dritten Mode-Button „Notiznetz" (Icon `Network`) neben Projektmappe/CAD-Oberfläche.
+- Neue Route `/project/:id/notes`, gerendert von `NotesPage.tsx`. Kopf bleibt identisch (Undo/Redo, Trash, Präsentieren, Exportieren, Tablet-Toggle).
+- Optik greift die CAD-Farbwelt auf (dunkle Sidebar-Töne, Gold-Akzente, `hsl(var(--cad-*))`-Variablen), Body bleibt hell wie Projektmappe.
 
-**Ansatz** (minimal-invasiv statt jedes Tool umzuschreiben):
-
-- Neues globales Flag `window.__pixunaTabletCommit` (gesetzt vom `TabletAidWheel`, wenn das Rad sichtbar ist).
-- Input-Layer (`src/cad/Input.ts` + Seiteneditor-Pointer-Handler): Wenn Flag aktiv, werden echte Pointer-Down/Up-Events **nicht** in `mouse.left`/`clicked`/`doubleClicked` übersetzt. Sie aktualisieren nur Position (Vorschau).
-- `TabletAidWheel` LMB-Button und Enter-Button feuern eine synthetische Sequenz `mouse.left=true; clicked=true` für einen Frame an den aktiven Canvas. Über bereits vorhandenes `virtualInput.ts` ausbauen zu `virtualCommitClick(target)`.
-- Doppelklick-Commit (z.B. Line/Wall Polyline abschließen): Zweimal kurz Enter = doppelter Commit → wir setzen `doubleClicked=true` wenn Enter zweimal innerhalb 260 ms.
-- Rechtsklick-Äquivalent im Rad (RMB) bleibt wie heute.
-
-Dadurch funktionieren **alle** Werkzeuge (Line, Wall, Door, Window, Hatch, Measure, Text-Anker, Sticker, Document-Anker, FreeDraw-Startpunkt) automatisch mit Enter/LMB-Commit, ohne dass jedes einzelne Tool angefasst werden muss. FreeDraw: „Zeichenzustand" wird durch LMB-Down im Rad gestartet und mit LMB-Up (erneuter Klick) beendet — für Tablet-Nutzung praktikabel.
-
-Gleiche Injektion in Projektmappe: `MiniCad`-Instanzen nutzen denselben `Input`, also automatisch abgedeckt. Seiteneditor-eigene Pointer-Handler (Element-Verschieben etc.) werden **nicht** blockiert — Flag greift nur für Zeichen-Canvas.
-
-## 3. Exakte Pointer-Koordinaten überall
-
-**Ursache heute:** In `Input.ts` wird bei `pointerdown` `mouse.sx/sy` nicht neu berechnet — es wird der Wert vom letzten `pointermove` genutzt. Beim ersten Touch/Pen-Kontakt gibt es keinen vorherigen Move → Startpunkt landet auf der letzten Maus-Position.
-
-**Fix:**
-- In `Input._onPointerDown`: `mouse.sx/sy` **vor** dem Setzen von `_clickQueued` aus `e.clientX/Y - rect.left/top` neu berechnen. Auch `wx/wy` sofort via `camera.screenToWorld` aktualisieren (dazu Kamera-Referenz an Input reichen oder Recompute im nächsten `update()` sicherstellen, indem `clicked` erst nach dem nächsten `update` freigegeben wird — bevorzugt: Recompute direkt hier).
-- Gleicher Fix im Projektmappe-Pointer-Handler (`ProjectWorkspace.tsx` Marquee/Move-Start).
-- `getBoundingClientRect()` wird pro Down-Event neu geholt (Scroll/Layout-Änderungen).
-- Zusätzlich: kein initialer `panLast`-Sync aus altem `mouse.sx`, sondern aus dem frischen Wert.
-
-## Änderungen (Dateien)
-
+### 3.2 Layout (nach Referenzbild)
+Drei Spalten, 24/40/36 Aufteilung:
 ```text
-src/cad/SelectTool.ts              +Modus "click", Marquee gate
-src/cad/embed/MiniCad.ts           +Modus "click" in _marqueePick
-src/components/CadEditor.tsx       Flyout: 3. Button "Klick"
-src/pages/ProjectWorkspace.tsx     Flyout: 3. Button, Marquee-Gate, Pointer-Down Recompute
-src/cad/Input.ts                   pointerdown → sx/sy neu, tablet-commit gate
-src/components/TabletAidWheel.tsx  window.__pixunaTabletCommit setzen; LMB/Enter → virtualCommitClick
-src/lib/virtualInput.ts            virtualCommitClick(target) neu
+┌─────────────┬──────────────────────┬─────────────────────┐
+│ Notizliste  │ Detail-/Edit-Panel   │ Interaktives Netz   │
+│ + Filter    │ (Titel, Beschr., …)  │ (Zoom / Navigation) │
+└─────────────┴──────────────────────┴─────────────────────┘
 ```
+Oben rechts im Netzbereich die Tabs „Netz-Ansicht / Liste / Kalender / Kanban".
 
-## Risiken
+### 3.3 Datenmodell (in `projectStore.ts`)
+- `NoteCategory` – frei definierbar, Farbe + Name.
+- `NoteStatus` – `offen | in_bearbeitung | erledigt` (Ampel).
+- `NotePriority` – `niedrig | normal | hoch | info`.
+- `Person` – Name, optional Farbe.
+- `NoteEntry` – Pflicht: id, title, description. Optional: date, time, categoryId, status, priority, ownerId, participantIds[], dueDate, comments[], attachmentIds[], linkedNodeIds[], linkedEntryIds[].
+- `NoteNode` – Hierarchie-Knoten: id, parentId (null=Projekt), label, color, kind (`root|topic|subtopic|leaf`), children implizit über parentId. Notizen hängen per `nodeId` an einem Blatt.
 
-- Enter-Commit-Gate darf Auswahl-Klicks nicht blockieren, sonst wird das Programm mit aktivem Rad unbenutzbar. Gate greift nur wenn Rad aktiv **und** ein Zeichenwerkzeug aktiv ist — SelectTool bleibt Klick-normal.
-- Recompute in `pointerdown` darf `_panning`-Init nicht brechen.
-- Alles hinter einem Feature-Flag → falls es hakt, sofort ausschaltbar.
+Alles im bestehenden Project-Snapshot mitgespeichert (nutzt existierendes Undo/Redo automatisch).
+
+### 3.4 Funktionen
+- Schnellerfassung: „+ Neu" öffnet Detail-Panel mit nur Titel/Beschreibung (Pflicht), Rest optional.
+- Filterchips oben in der Liste (Alle / Offen / In Bearbeitung / Erledigt) + Filter-Icon für Kategorie/Person/Dringlichkeit/Freitextsuche.
+- Detail-Panel mit allen Feldern des Referenzbilds inkl. Verknüpfungs-Chips („Verknüpfungen im Netz").
+- Ansichten: Netz (interaktiv), Liste (Tabelle), Kalender (Monatsraster nach `date`), Kanban (Spalten nach Status).
+
+### 3.5 Netz-Visualisierung
+- Eigenkomponente `NoteGraph` mit SVG + Zoom/Pan (Wheel + Pinch, wiederverwendet Muster aus `Camera.ts`).
+- Radiales Layout: Projekt = Zentrum, Hauptthemen im ersten Ring, Unterthemen im zweiten, Blätter (Notizen/Dateien/Fotos) am Rand. Farben pro Kategorie.
+- Klick auf Knoten = „hineinzoomen" (Fokus wechselt, Kinder werden zum neuen Ring). Breadcrumb-Zurück oben links.
+- Kanten gestrichelt für gleiche Ebene, durchgezogen für Eltern-Kind.
+
+### 3.6 Verknüpfungen zu Dateien / Fotos
+- Ein Notiz-Knoten kann `attachmentIds` referenzieren, die aus dem bestehenden Dokumenten-Store gelesen werden – keine Duplikate.
+
+### 3.7 Tablet-Kompatibilität
+- Alle Interaktionen mit Pointer Events; das bestehende Tablet-Hilfsrad funktioniert automatisch (Header bleibt identisch).
+
+## Technische Notizen
+- Neue Dateien: `src/pages/NotesPage.tsx`, `src/components/notes/NoteList.tsx`, `src/components/notes/NoteDetail.tsx`, `src/components/notes/NoteGraph.tsx`, `src/components/notes/NoteViewTabs.tsx`, `src/lib/notesStore.ts` (Selektoren, dünner Wrapper um `projectStore`).
+- `projectStore.ts` bekommt `notes: { entries, nodes, categories, people }`.
+- Routing in `App.tsx` ergänzen.
+- `WorkspaceHeader` erhält neuen Mode; Mode-Enum wird auf `"workspace" | "cad" | "notes"` erweitert (alle bestehenden Aufrufer bekommen den neuen Button automatisch).
+
+Umfang: rund 1.500 Zeilen neuer Code, keine Änderung an bestehendem CAD-Verhalten.
