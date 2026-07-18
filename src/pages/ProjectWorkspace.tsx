@@ -358,7 +358,10 @@ export default function ProjectWorkspace() {
     };
     const onTouchMove = (e: TouchEvent) => {
       if ((window as any).__pixunaZoomLock) { mode = "idle"; return; }
-      for (const t of Array.from(e.touches)) pts.set(t.identifier, { x: t.clientX, y: t.clientY });
+      for (const t of Array.from(e.touches)) {
+        if (!acceptTouch(t)) continue;
+        pts.set(t.identifier, { x: t.clientX, y: t.clientY });
+      }
       if (mode === "gesture" && pts.size >= 2) {
         const m = midOf();
         const dist = distOf();
