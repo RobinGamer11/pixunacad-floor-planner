@@ -15,8 +15,11 @@ import {
   MoreHorizontal,
   Check,
   X,
+  Network,
+  ExternalLink,
 } from "lucide-react";
 import { useProjects, projectStore, type Project, type Task, type TaskPriority } from "@/lib/projectStore";
+import { notesStore, useNotes, type NoteNode, type NoteStatus, type NotePriority } from "@/lib/notesStore";
 import { WeatherStrip } from "@/components/project/WeatherStrip";
 import { UebersichtView } from "@/components/project/UebersichtView";
 import { FileBrowser } from "@/components/project/FileBrowser";
