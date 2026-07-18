@@ -133,7 +133,7 @@ export class SelectTool {
   // Zwei Modi analog zu Archicad:
   //   "touch"   → Crossing: alle Elemente, die den Rahmen berühren/schneiden
   //   "enclose" → Window: nur Elemente, die vollständig im Rahmen liegen
-  marqueeMode: "touch" | "enclose" = "touch";
+  marqueeMode: "touch" | "enclose" | "click" = "click";
   marqueeStart: Vec2 | null = null;    // Screen-Pixel
   marqueeCurrent: Vec2 | null = null;  // Screen-Pixel
   marqueeActive = false;
