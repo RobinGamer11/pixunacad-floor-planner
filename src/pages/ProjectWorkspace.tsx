@@ -2536,7 +2536,7 @@ function ElementView({
   const rotateRef = useRef<HTMLDivElement | null>(null);
   const rotateMovedRef = useRef(false);
 
-  const isCadView = el.kind === "cad-view";
+  const isCadView = el.kind === "cad-view" || el.kind === "cad-viewport";
   const hubBlue = "hsl(217 91% 60%)";
 
 
