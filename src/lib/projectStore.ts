@@ -1340,11 +1340,23 @@ export function useProject(id: string | undefined): Project | undefined {
 }
 
 /** Reactive Undo/Redo Flags für eine Projekt-ID. */
+const _histSnapCache = new Map<string, { canUndo: boolean; canRedo: boolean }>();
+function _histSnap(id: string | undefined) {
+  if (!id) return { canUndo: false, canRedo: false };
+  const cu = projectStore.canUndo(id);
+  const cr = projectStore.canRedo(id);
+  const prev = _histSnapCache.get(id);
+  if (prev && prev.canUndo === cu && prev.canRedo === cr) return prev;
+  const next = { canUndo: cu, canRedo: cr };
+  _histSnapCache.set(id, next);
+  return next;
+}
 export function useProjectHistory(id: string | undefined): { canUndo: boolean; canRedo: boolean } {
   return useSyncExternalStore(
     (fn) => projectStore.subscribeHistory(fn),
-    () => ({ canUndo: id ? projectStore.canUndo(id) : false, canRedo: id ? projectStore.canRedo(id) : false }),
+    () => _histSnap(id),
     () => ({ canUndo: false, canRedo: false }),
   );
 }
+
 
