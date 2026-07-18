@@ -720,8 +720,55 @@ export class SelectTool {
       } else {
         this.app.hub.hide();
         this.app.hub.bindCommit(null);
-      }
     }
+  }
+
+  /** HUB-Aktion für einen Freihand-Stroke: TRANSLATE / ROTATE / DELETE. */
+  beginFreeStrokeAction(strokeId: string, action: string) {
+    const stroke = this.app.scene.getFreeStrokeById?.(strokeId);
+    if (!stroke || !stroke.points || stroke.points.length < 1) return;
+
+    if (action === PointEditAction.DELETE) {
+      this.app.scene.removeFreeStroke(stroke);
+      this.app.setSelection(null);
+      this.app.pointEditMenu.hide();
+      return;
+    }
+
+    // Pivot/Fixpunkt = geometrischer Mittelpunkt aller Stützpunkte (Centroid).
+    let cx = 0, cy = 0;
+    for (const p of stroke.points) { cx += p.x; cy += p.y; }
+    cx /= stroke.points.length;
+    cy /= stroke.points.length;
+    const center = v(cx, cy);
+
+    // "Anderer" Referenzpunkt für Rotate/Translate: erster Stroke-Punkt.
+    const other = v(stroke.points[0].x, stroke.points[0].y);
+
+    this.editTarget = { kind: "freeStroke", freeStrokeId: strokeId } as any;
+    this.freeStrokePointsOriginal = stroke.points.map((p) => v(p.x, p.y));
+    this.fixedPoint = center;
+    this.otherPointOriginal = other;
+    this.moveHubLocked = false;
+    this.moveHubLengthM = null;
+    this.moveHubAngleDeg = null;
+    this.app.pointEditMenu.hide();
+
+    if (action === PointEditAction.ROTATE) {
+      this.activeEditAction = PointEditAction.ROTATE;
+      const radius = dist(this.fixedPoint, this.otherPointOriginal);
+      const ang = angleDeg(this.fixedPoint, this.otherPointOriginal);
+      this.app.hub.showAt(this.app.input.mouse.sx, this.app.input.mouse.sy);
+      this.app.hub.updateDisplay(radius, ang);
+      this.app.hub.setValues(radius, ang);
+      this.app.hub.enterEditMode();
+    } else {
+      // Default: TRANSLATE (Verschieben / Bewegen der gesamten Linie).
+      this.activeEditAction = PointEditAction.TRANSLATE;
+      this.app.hub.hide();
+      this.app.hub.bindCommit(null);
+    }
+  }
   }
 
   private _applyWallEdgeHubValues(vals: { lengthM: number | null; angleDeg: number | null }) {
