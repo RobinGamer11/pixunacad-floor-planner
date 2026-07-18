@@ -1285,6 +1285,45 @@ export const projectStore = {
       }),
     }));
   },
+  /* ---------- Undo / Redo (public API) ---------- */
+  canUndo: (projectId: string) => (history.get(projectId)?.past.length ?? 0) > 0,
+  canRedo: (projectId: string) => (history.get(projectId)?.future.length ?? 0) > 0,
+  subscribeHistory: (fn: () => void) => {
+    historyListeners.add(fn);
+    return () => historyListeners.delete(fn);
+  },
+  undo: (projectId: string) => {
+    const h = getHist(projectId);
+    if (!h.past.length) return;
+    const cur = state.projects.find((p) => p.id === projectId);
+    if (!cur) return;
+    const prev = h.past.pop()!;
+    h.future.push(cur);
+    _suspendHistory = true;
+    try {
+      state = { projects: state.projects.map((p) => (p.id === projectId ? prev : p)) };
+    } finally {
+      _suspendHistory = false;
+    }
+    notifyHistory();
+    emit();
+  },
+  redo: (projectId: string) => {
+    const h = getHist(projectId);
+    if (!h.future.length) return;
+    const cur = state.projects.find((p) => p.id === projectId);
+    if (!cur) return;
+    const next = h.future.pop()!;
+    h.past.push(cur);
+    _suspendHistory = true;
+    try {
+      state = { projects: state.projects.map((p) => (p.id === projectId ? next : p)) };
+    } finally {
+      _suspendHistory = false;
+    }
+    notifyHistory();
+    emit();
+  },
 };
 
 export function useProjects(): Project[] {
@@ -1299,3 +1338,13 @@ export function useProject(id: string | undefined): Project | undefined {
   const projects = useProjects();
   return projects.find((p) => p.id === id);
 }
+
+/** Reactive Undo/Redo Flags für eine Projekt-ID. */
+export function useProjectHistory(id: string | undefined): { canUndo: boolean; canRedo: boolean } {
+  return useSyncExternalStore(
+    (fn) => projectStore.subscribeHistory(fn),
+    () => ({ canUndo: id ? projectStore.canUndo(id) : false, canRedo: id ? projectStore.canRedo(id) : false }),
+    () => ({ canUndo: false, canRedo: false }),
+  );
+}
+
