@@ -3736,13 +3736,25 @@ function SelectSettings({
           type="button"
           onClick={() => onChange({ marqueeMode: "click" })}
           className="flex-1 h-9 rounded-md border flex items-center justify-center gap-1.5 text-xs"
+          style={mode === "click" ? {
+            background: "rgba(59,130,246,0.15)",
+            borderColor: "rgba(59,130,246,0.9)",
+            color: "rgba(59,130,246,1)",
+          } : { borderColor: "hsl(var(--hairline))" }}
+          title="Klick: einzeln anklicken, kein Rahmen"
+        >
+          <MousePointer2 size={14} />
+          <span>Klick</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => onChange({ marqueeMode: "touch" })}
+          className="flex-1 h-9 rounded-md border flex items-center justify-center gap-1.5 text-xs"
           style={mode === "touch" ? {
             background: "rgba(249,115,22,0.15)",
             borderColor: "rgba(249,115,22,0.9)",
             color: "rgba(249,115,22,1)",
-          } : {
-            borderColor: "hsl(var(--hairline))",
-          }}
+          } : { borderColor: "hsl(var(--hairline))" }}
           title="Berühren (Crossing): alles was den Rahmen berührt"
         >
           <SquareDashed size={14} />
@@ -3756,9 +3768,7 @@ function SelectSettings({
             background: "rgba(59,130,246,0.15)",
             borderColor: "rgba(59,130,246,0.9)",
             color: "rgba(59,130,246,1)",
-          } : {
-            borderColor: "hsl(var(--hairline))",
-          }}
+          } : { borderColor: "hsl(var(--hairline))" }}
           title="Umschließen (Window): nur vollständig innen liegende Elemente"
         >
           <BoxSelect size={14} />
