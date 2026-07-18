@@ -2004,6 +2004,8 @@ export class SelectTool {
         if (document.activeElement !== this.app.hub.lenInputEl && document.activeElement !== this.app.hub.angInputEl) {
           if (this.editTarget?.kind === "wall") {
             this._applyWallRotateHubValues({ lengthM: null, angleDeg: ang });
+          } else if ((this.editTarget as any)?.kind === "freeStroke") {
+            this._applyFreeStrokeRotate(ang);
           } else {
             this._applyMovingPoint(p, this.fixedPoint!);
           }
