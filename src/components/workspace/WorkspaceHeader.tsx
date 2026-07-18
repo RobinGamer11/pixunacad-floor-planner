@@ -53,6 +53,8 @@ export function WorkspaceHeader({
   onPresent,
   onShare,
   onExport,
+  tabletAidOn = false,
+  onToggleTabletAid,
 }: Props) {
   const navigate = useNavigate();
 
