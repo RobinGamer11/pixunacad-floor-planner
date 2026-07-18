@@ -11,6 +11,23 @@ function isPenOnly(): boolean {
 function isZoomLocked(): boolean {
   return typeof window !== "undefined" && !!(window as any).__pixunaZoomLock;
 }
+/**
+ * Tablet-Commit-Gate: Wenn das Tablet-Hilfsrad aktiv ist, sollen echte Stift-
+ * oder Finger-Berührungen im Zeichenwerkzeug NUR die Cursor-Position aktua-
+ * lisieren. Ein Punkt wird erst gesetzt, wenn im Rad "LMB" oder "Enter"
+ * gedrückt wird (das feuert einen `__virtual`-PointerEvent, der hier durch-
+ * gelassen wird). Für das Auswahl-Werkzeug greift der Gate nicht, damit
+ * Objekte weiterhin direkt anklickbar bleiben.
+ */
+function isTabletDrawGate(e: PointerEvent): boolean {
+  if (typeof window === "undefined") return false;
+  if (!(window as any).__pixunaTabletCommit) return false;
+  if ((e as any).__virtual) return false;
+  if (e.pointerType !== "pen" && e.pointerType !== "touch") return false;
+  const t = (window as any).__pixunaActiveTool;
+  if (!t || t === "select" || t === "pipette") return false;
+  return true;
+}
 
 export class Input {
   canvas: HTMLCanvasElement;
