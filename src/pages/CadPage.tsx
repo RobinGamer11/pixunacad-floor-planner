@@ -203,6 +203,8 @@ const CadPage = () => {
         zoomPercent={zoom}
         onPresent={handlePresent}
         onShare={() => {}}
+        tabletAidOn={tabletAidOn}
+        onToggleTabletAid={() => setTabletAidOn((v) => !v)}
         onExport={() => editorRef.current?.openExportPanel()}
       />
       <main ref={mainRef} className="flex-1 relative min-h-0 bg-background">
