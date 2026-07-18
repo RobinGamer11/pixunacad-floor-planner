@@ -1850,6 +1850,8 @@ export class MiniCad {
     const onDown = (e: MouseEvent) => {
       if (e.button !== 0) return;
       if (this._activeTool !== "select" && this._activeTool !== null) return;
+      // Im "click"-Modus keine Marquee — nur einfaches Anklicken.
+      if (this.selectTool.marqueeMode === "click") return;
       const wantMulti = e.shiftKey || this._multiSelectMode;
       if (!wantMulti) return;
       // Nur starten wenn der Klick wirklich in den leeren Raum geht — wir
