@@ -9,7 +9,7 @@ import {
   FolderKanban,
   Compass,
   Trash2,
-  HelpCircle,
+  TabletSmartphone,
 } from "lucide-react";
 
 export type WorkspaceMode = "workspace" | "cad";
