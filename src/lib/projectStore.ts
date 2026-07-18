@@ -478,8 +478,40 @@ function emit() {
   listeners.forEach((fn) => fn());
 }
 
+/* ---------- Undo / Redo ----------
+ * Snapshot-basiert pro Projekt. Vor jedem setState wird pro Projekt-ID der
+ * bisherige Projekt-Snapshot gemerkt; falls sich die Referenz danach ändert
+ * (echte Mutation), wird der alte Snapshot in die `past`-Liste geschoben. */
+type HistoryEntry = { past: Project[]; future: Project[] };
+const HIST_LIMIT = 50;
+const history: Map<string, HistoryEntry> = new Map();
+let _suspendHistory = false;
+const historyListeners = new Set<() => void>();
+function getHist(id: string): HistoryEntry {
+  let h = history.get(id);
+  if (!h) { h = { past: [], future: [] }; history.set(id, h); }
+  return h;
+}
+function notifyHistory() { historyListeners.forEach((fn) => fn()); }
+
 function setState(updater: (s: State) => State) {
+  const prev = state;
+  const prevById = new Map(prev.projects.map((p) => [p.id, p] as const));
   state = updater(state);
+  if (!_suspendHistory) {
+    let anyChange = false;
+    for (const np of state.projects) {
+      const op = prevById.get(np.id);
+      if (op && op !== np) {
+        const h = getHist(np.id);
+        h.past.push(op);
+        if (h.past.length > HIST_LIMIT) h.past.shift();
+        h.future.length = 0;
+        anyChange = true;
+      }
+    }
+    if (anyChange) notifyHistory();
+  }
   emit();
 }
 
