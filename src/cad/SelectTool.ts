@@ -720,6 +720,7 @@ export class SelectTool {
       } else {
         this.app.hub.hide();
         this.app.hub.bindCommit(null);
+      }
     }
   }
 
