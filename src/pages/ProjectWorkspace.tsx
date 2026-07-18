@@ -316,6 +316,17 @@ export default function ProjectWorkspace() {
         e.preventDefault();
       }
     };
+    let rafPending = 0;
+    let pendingNextZoom: number | null = null;
+    let pendingAnchor: ProjectZoomAnchor | null = null;
+    const flush = () => {
+      rafPending = 0;
+      if (pendingNextZoom == null) return;
+      if (pendingAnchor) zoomAnchorRef.current = pendingAnchor;
+      setZoom(pendingNextZoom);
+      pendingNextZoom = null;
+      pendingAnchor = null;
+    };
     const onTouchMove = (e: TouchEvent) => {
       if ((window as any).__pixunaZoomLock) { mode = "idle"; return; }
       for (const t of Array.from(e.touches)) pts.set(t.identifier, { x: t.clientX, y: t.clientY });
@@ -324,14 +335,11 @@ export default function ProjectWorkspace() {
         const dist = distOf();
         if (startDist > 4 && dist > 4) {
           const factor = dist / startDist;
-          const next = clampProjectZoom(startZoom * factor);
-          zoomAnchorRef.current = startAnchor?.kind === "page"
+          pendingNextZoom = clampProjectZoom(startZoom * factor);
+          pendingAnchor = startAnchor?.kind === "page"
             ? { ...startAnchor, clientX: m.x, clientY: m.y }
             : captureZoomAnchor(m.x, m.y);
-          setZoom(next);
-          requestAnimationFrame(() => {
-            applyZoomAnchor();
-          });
+          if (!rafPending) rafPending = requestAnimationFrame(flush);
         }
         e.preventDefault();
       }
