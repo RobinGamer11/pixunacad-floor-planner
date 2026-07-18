@@ -132,21 +132,12 @@ function CenterToggles() {
   const [penOnly, setPenOnly] = useState<boolean>(() => {
     try { return localStorage.getItem("pixuna.penOnly") === "1"; } catch { return false; }
   });
-  const [zoomLock, setZoomLock] = useState<boolean>(() => {
-    try { return localStorage.getItem("pixuna.zoomLock") === "1"; } catch { return false; }
-  });
   useEffect(() => {
     (window as any).__pixunaPenOnly = penOnly;
     try { localStorage.setItem("pixuna.penOnly", penOnly ? "1" : "0"); } catch {}
   }, [penOnly]);
   useEffect(() => {
-    (window as any).__pixunaZoomLock = zoomLock;
-    try { localStorage.setItem("pixuna.zoomLock", zoomLock ? "1" : "0"); } catch {}
-  }, [zoomLock]);
-  useEffect(() => {
     return () => {
-      // Beim Deaktivieren des Hilfsrads Sperren aufheben, damit die normale
-      // Bedienung wiederhergestellt ist.
       (window as any).__pixunaPenOnly = false;
       (window as any).__pixunaZoomLock = false;
     };
@@ -184,17 +175,6 @@ function CenterToggles() {
       >
         <Pencil size={11} />
         Stift
-      </button>
-      <button
-        type="button"
-        title="Zoom fix: aktuelle Ansicht sperren (kein Pan/Zoom)"
-        tabIndex={-1}
-        onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
-        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setZoomLock((v) => !v); }}
-        style={btn(zoomLock)}
-      >
-        <Lock size={11} />
-        Zoom fix
       </button>
     </div>
   );
