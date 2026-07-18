@@ -2522,7 +2522,8 @@ function ElementView({
   readOnly?: boolean;
   elevated?: boolean;
   onSelect?: (opts?: { shift?: boolean }) => void;
-  onDrag?: (dx: number, dy: number) => void;
+  onDrag?: (dx: number, dy: number, alt?: boolean) => void;
+
   onDuplicate?: () => void;
   onDelete?: () => void;
   onRotate?: (deltaDeg: number, absolute?: boolean) => void;
