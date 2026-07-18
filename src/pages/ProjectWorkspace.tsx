@@ -3298,35 +3298,13 @@ function PageSettings({
             </select>
           </Row>
           {page.format === "frei" ? (
-            <>
-              <Row label="Breite (mm)">
-                <FreeDimInput
-                  value={page.customWidthMm ?? 400}
-                  onCommit={(v) => update({ customWidthMm: v })}
-                />
-              </Row>
-              <Row label="Höhe (mm)">
-                <FreeDimInput
-                  value={page.customHeightMm ?? 300}
-                  onCommit={(v) => update({ customHeightMm: v })}
-                />
-              </Row>
-
-              <Row label="Ausrichtung">
-                <button
-                  onClick={() => update({
-                    customWidthMm: page.customHeightMm ?? 300,
-                    customHeightMm: page.customWidthMm ?? 400,
-                  })}
-                  className="h-8 px-3 rounded border text-xs"
-                  style={{ borderColor: "hsl(var(--hairline))" }}
-                  title="Breite und Höhe tauschen"
-                >
-                  Breite ↔ Höhe tauschen
-                </button>
-              </Row>
-            </>
+            <FreeFormatEditor
+              width={page.customWidthMm ?? 400}
+              height={page.customHeightMm ?? 300}
+              onCommit={(w, h) => update({ customWidthMm: w, customHeightMm: h })}
+            />
           ) : (
+
             <Row label="Ausrichtung">
               <div className="flex gap-2">
                 <button
