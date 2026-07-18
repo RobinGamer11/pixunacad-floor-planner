@@ -1589,7 +1589,7 @@ export class SelectTool {
         || this.app.documentHubMode !== "none";
       const blocked = anyDrag || anyEdit || specialMode || input.isPanning || input.keys.space;
 
-      if (input.mouse.left && !blocked) {
+      if (this.marqueeMode !== "click" && input.mouse.left && !blocked) {
         if (!this.marqueeStart) {
           this.marqueeStart = v(input.mouse.sx, input.mouse.sy);
           // Neuer Klick → alte Marquee-Auswahl verwerfen.
