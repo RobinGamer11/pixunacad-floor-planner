@@ -77,6 +77,7 @@ import CadOverlayLayer from "@/components/page/CadOverlayLayer";
 import { CadDocumentInspector } from "@/components/page/CadDocumentInspector";
 import { CadIdPanelHost } from "@/components/page/CadIdPanelHost";
 import { PdfPageView } from "@/components/page/PdfPageView";
+import { CadViewportView } from "@/components/page/CadViewportView";
 import { importFile, type ImportedPage } from "@/cad/documentImport";
 import { popPendingSheetPdf } from "@/lib/sheetPdfExport";
 import type { MiniCadSelectionInfo } from "@/cad/embed/MiniCad";
@@ -2202,7 +2203,7 @@ function PageCanvas({
             onJumpCad={onJumpCad}
 
             selected={selectedElementIds.includes(el.id)}
-            elevated={activeTool === null && el.kind !== "cad-view" && el.kind !== "pdf" && el.kind !== "image"}
+            elevated={activeTool === null && el.kind !== "cad-view" && el.kind !== "cad-viewport" && el.kind !== "pdf" && el.kind !== "image"}
             onSelect={(opts) => onSelect(el.id, opts)}
             onDrag={(dx, dy) => {
               const dxPct = (dx / displayWidth) * 100;
@@ -2536,7 +2537,7 @@ function ElementView({
   const rotateRef = useRef<HTMLDivElement | null>(null);
   const rotateMovedRef = useRef(false);
 
-  const isCadView = el.kind === "cad-view";
+  const isCadView = el.kind === "cad-view" || el.kind === "cad-viewport";
   const hubBlue = "hsl(217 91% 60%)";
 
 
@@ -2597,7 +2598,7 @@ function ElementView({
   };
 
 
-  const hubKinds = new Set(["cad-view", "pdf", "image"]);
+  const hubKinds = new Set(["cad-view", "cad-viewport", "pdf", "image"]);
   const showHub = !readOnly && selected && hubKinds.has(el.kind);
   // CAD-Blatt behält nur die blaue Frame-Optik; Bearbeitung bleibt 1:1 wie PDF.
   const outlineStyle = selected
@@ -2659,7 +2660,9 @@ function ElementView({
           {el.text || "Notiz"}
         </div>
       )}
-      {el.kind === "cad-view" && <CadViewThumb sheetId={el.sheetId} snapshot={el.viewSnapshot} />}
+      {(el.kind === "cad-view" || el.kind === "cad-viewport") && (
+        <CadViewportViewHost element={el} />
+      )}
       {(el.kind === "shape" || el.kind === "line" || el.kind === "table" || el.kind === "pdf" || el.kind === "timeline") && el.kind !== "pdf" && (
         <div
           className="w-full h-full flex items-center justify-center text-xs text-muted-foreground"
@@ -2861,38 +2864,17 @@ function ElementView({
 /** Vorschau-Bild eines CAD-Sheets. Liest live aus dem projectStore und
  *  zeigt den `thumbnail` (PNG aus dem CAD-Editor). Fallback: dezenter
  *  Platzhalter, wenn das Sheet noch nie im CAD geöffnet wurde. */
-function CadViewThumb({ sheetId, snapshot }: { sheetId?: string; snapshot?: string }) {
+function CadViewportViewHost({ element }: { element: PageElement }) {
   const projects = useProjects();
   const sheet = React.useMemo(() => {
-    if (!sheetId) return undefined;
+    if (!element.sheetId) return undefined;
     for (const p of projects) {
-      const s = p.sheets.find((x) => x.id === sheetId);
+      const s = p.sheets.find((x) => x.id === element.sheetId);
       if (s) return s;
     }
     return undefined;
-  }, [projects, sheetId]);
-  // Bevorzugt der eingefrorene Element-Snapshot (Ansicht+Zoom zum Zeitpunkt
-  // des Einfügens). Fallback: Live-Thumbnail des Sheets.
-  const src = snapshot || sheet?.thumbnail;
-  if (src) {
-    return (
-      <img
-        src={src}
-        alt={sheet?.name ?? "CAD-Ansicht"}
-        className="w-full h-full object-contain"
-        style={{ background: "white" }}
-        draggable={false}
-      />
-    );
-  }
-  return (
-    <div
-      className="w-full h-full flex items-center justify-center text-xs text-muted-foreground border-2 border-dashed"
-      style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-muted))" }}
-    >
-      {sheet ? `${sheet.name} — noch keine Vorschau (Sheet im CAD öffnen)` : "Kein Zeichenblatt"}
-    </div>
-  );
+  }, [projects, element.sheetId]);
+  return <CadViewportView element={element} sheet={sheet} />;
 }
 
 function RightInspector({
@@ -4072,7 +4054,7 @@ function CadToolSection({
 }) {
   const navigate = useNavigate();
   const page = project.pages.find((p) => p.id === pageId);
-  const placed = (page?.elements ?? []).filter((e) => e.kind === "cad-view");
+  const placed = (page?.elements ?? []).filter((e) => e.kind === "cad-view" || e.kind === "cad-viewport");
   const [pdfOpen, setPdfOpen] = useState<boolean>(false);
   const [pdfPickedSheet, setPdfPickedSheet] = useState<string | null>(null);
   const [pickScale, setPickScale] = useState<Record<string, string>>({});
@@ -4332,7 +4314,7 @@ function ElementInspector({
       <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-1">
         {element.kind.toUpperCase()}
       </div>
-      {element.kind !== "cad-view" && (
+      {element.kind !== "cad-view" && element.kind !== "cad-viewport" && (
         <>
           <Row label="Breite">
             <input
@@ -4456,7 +4438,7 @@ function ElementInspector({
         />
       </Row>
 
-      {element.kind === "cad-view" && (() => {
+      {(element.kind === "cad-view" || element.kind === "cad-viewport") && (() => {
         const project = projectStore.getState().projects.find((p) => p.id === projectId);
         const sheet = project?.sheets.find((s) => s.id === element.sheetId);
         const cur = element.scale ?? sheet?.scale ?? "1:100";
@@ -4630,6 +4612,7 @@ function LayersTab({
       note: "Notiz",
       timeline: "Zeitstrahl",
       "cad-view": "CAD-Ansicht",
+      "cad-viewport": "CAD-Viewport",
       shape: "Form",
     };
     const base = kindMap[el.kind] ?? el.kind;
