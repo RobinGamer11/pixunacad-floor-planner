@@ -85,6 +85,21 @@ export interface PageElement {
   /** PDF/Bild: Kanten-Crop in Metern (positiv = Inhalt am Rand abgeschnitten). */
   cropM?: { top: number; right: number; bottom: number; left: number };
 
+  /** Tabellen-Datenmodell (kind === "table"). */
+  tableData?: {
+    /** Zeilen × Spalten Raster von Zellinhalten (Rohtext, evtl. Formel "=..."). */
+    cells: string[][];
+    /** Optional pro Spalte in mm; falls fehlend, gleichmäßig verteilt. */
+    colWidths?: number[];
+    /** Optional pro Zeile in mm; falls fehlend, Standardhöhe. */
+    rowHeights?: number[];
+    /** Aktive Filterwerte pro Spaltenindex (nur Zeilen, deren Wert in Liste steht, sichtbar). */
+    filters?: Record<number, string[]>;
+    /** Erste Zeile ist Kopfzeile (fett, filterbar). */
+    headerRow?: boolean;
+  };
+
+
 }
 
 
