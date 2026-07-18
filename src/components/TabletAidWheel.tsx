@@ -41,6 +41,8 @@ export function TabletAidWheel() {
 
   const dragRef = useRef<{ startX: number; startY: number; ox: number; oy: number; pointerId: number } | null>(null);
   const onDragStart = (e: React.PointerEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     dragRef.current = { startX: e.clientX, startY: e.clientY, ox: pos.x, oy: pos.y, pointerId: e.pointerId };
   };
@@ -58,7 +60,15 @@ export function TabletAidWheel() {
 
   return (
     <div
+      data-tablet-aid="true"
       className="fixed z-[60] select-none"
+      onPointerDownCapture={(e) => { e.preventDefault(); e.stopPropagation(); }}
+      onPointerMoveCapture={(e) => { e.preventDefault(); e.stopPropagation(); }}
+      onPointerUpCapture={(e) => { e.preventDefault(); e.stopPropagation(); }}
+      onMouseDownCapture={(e) => { e.preventDefault(); e.stopPropagation(); }}
+      onClickCapture={(e) => { e.stopPropagation(); }}
+      onTouchStartCapture={(e) => { e.preventDefault(); e.stopPropagation(); }}
+      onTouchMoveCapture={(e) => { e.preventDefault(); e.stopPropagation(); }}
       style={{
         left: pos.x,
         top: pos.y,
@@ -168,8 +178,9 @@ function CenterToggles() {
       <button
         type="button"
         title="Stift-Modus: nur Stift zeichnet, Finger = pan/zoom/auswählen"
-        onPointerDown={(e) => { e.stopPropagation(); }}
-        onClick={(e) => { e.stopPropagation(); setPenOnly((v) => !v); }}
+        tabIndex={-1}
+        onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setPenOnly((v) => !v); }}
         style={btn(penOnly)}
       >
         <Pencil size={11} />
@@ -178,8 +189,9 @@ function CenterToggles() {
       <button
         type="button"
         title="Zoom fix: aktuelle Ansicht sperren (kein Pan/Zoom)"
-        onPointerDown={(e) => { e.stopPropagation(); }}
-        onClick={(e) => { e.stopPropagation(); setZoomLock((v) => !v); }}
+        tabIndex={-1}
+        onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setZoomLock((v) => !v); }}
         style={btn(zoomLock)}
       >
         <Lock size={11} />
@@ -203,11 +215,18 @@ function NumberPad({ wheelPos, wheelSize }: { wheelPos: { x: number; y: number }
         setVisible(true);
       }
     };
-    const onFocusOut = () => {
-      // Delay: pointerdown on pad button briefly moves focus.
+    const onFocusOut = (e: FocusEvent) => {
+      const next = e.relatedTarget as Element | null;
+      if (next?.closest('[data-tablet-aid="true"]')) return;
+      // Delay: iOS lässt den Fokus beim Tippen auf virtuelle Buttons kurz los.
       setTimeout(() => {
-        const el = document.activeElement;
-        if (!isField(el)) {
+        const active = document.activeElement;
+        const remembered = lastInputRef.current;
+        if (remembered?.isConnected) {
+          setVisible(true);
+          return;
+        }
+        if (!isField(active)) {
           setVisible(false);
           lastInputRef.current = null;
         }
@@ -238,8 +257,8 @@ function NumberPad({ wheelPos, wheelSize }: { wheelPos: { x: number; y: number }
     if (el && document.activeElement !== el) {
       try { (el as HTMLInputElement).focus({ preventScroll: true }); } catch { el.focus(); }
     }
-    if (k === "⌫") virtualKeyPress("Backspace");
-    else virtualTypeChar(k);
+    if (k === "⌫") virtualKeyPress("Backspace", el);
+    else virtualTypeChar(k, el);
   };
 
   return (
@@ -254,12 +273,13 @@ function NumberPad({ wheelPos, wheelSize }: { wheelPos: { x: number; y: number }
         touchAction: "none",
       }}
       onPointerDown={(e) => { e.preventDefault(); }}
-      onMouseDown={(e) => { e.preventDefault(); }}
+      onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
     >
       {keys.map((k) => (
         <button
           key={k}
           type="button"
+          tabIndex={-1}
           onPointerDown={press(k)}
           onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
           onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
@@ -301,6 +321,7 @@ function WheelButton({
   const isHeld = useRef(false);
 
   const onPointerDown = (e: React.PointerEvent) => {
+    e.preventDefault();
     e.stopPropagation();
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     if (toggleHold) return;
@@ -314,6 +335,7 @@ function WheelButton({
     }, 250);
   };
   const onPointerUp = (e: React.PointerEvent) => {
+    e.preventDefault();
     e.stopPropagation();
     try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch {}
     if (toggleHold) {
@@ -332,6 +354,8 @@ function WheelButton({
     }
   };
   const onPointerCancel = (e: React.PointerEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     if (holdTimer.current) { clearTimeout(holdTimer.current); holdTimer.current = null; }
     if (isHeld.current) {
       isHeld.current = false;
@@ -343,6 +367,8 @@ function WheelButton({
   return (
     <button
       title={tooltip}
+      type="button"
+      tabIndex={-1}
       onPointerDown={onPointerDown}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
