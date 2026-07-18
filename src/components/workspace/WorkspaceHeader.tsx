@@ -93,7 +93,24 @@ export function WorkspaceHeader({
           </>
         )}
 
-        <div className="ml-3 flex items-center gap-1 rounded-md p-0.5"
+        {onToggleTabletAid && (
+          <button
+            onClick={onToggleTabletAid}
+            className="ml-2 h-8 px-2.5 rounded-md flex items-center gap-1.5 text-[11px] font-semibold border transition-colors"
+            style={
+              tabletAidOn
+                ? { background: "hsl(var(--accent-gold))", color: "hsl(var(--surface))", borderColor: "hsl(var(--accent-gold))" }
+                : { background: "hsl(var(--surface))", color: "hsl(var(--ink))", borderColor: "hsl(var(--accent-gold))" }
+            }
+            title="Tablet-Hilfsrad (Maus/Tastatur-Ersatz für Touch-Geräte)"
+            aria-pressed={tabletAidOn}
+          >
+            <TabletSmartphone size={16} />
+            <span className="hidden sm:inline">Tablet</span>
+          </button>
+        )}
+
+        <div className="ml-2 flex items-center gap-1 rounded-md p-0.5"
              style={{ background: "hsl(var(--surface-muted))" }}>
           <ModeButton
             icon={<FolderKanban size={13} />}
@@ -110,6 +127,7 @@ export function WorkspaceHeader({
         </div>
       </div>
 
+
       {/* Right: Undo/Redo · Zoom · Präsentieren · Teilen · Exportieren */}
       <div className="flex items-center gap-1.5 text-muted-foreground">
         <button
@@ -120,17 +138,8 @@ export function WorkspaceHeader({
         >
           <Trash2 size={16} />
         </button>
-        {onToggleTabletAid && (
-          <button
-            onClick={onToggleTabletAid}
-            className="h-8 w-8 rounded-md flex items-center justify-center hover:bg-muted"
-            style={tabletAidOn ? { background: "hsl(var(--accent-gold-soft))", color: "hsl(var(--accent-gold))" } : undefined}
-            title="Tablet-Hilfsrad (Maus/Tastatur-Ersatz)"
-            aria-pressed={tabletAidOn}
-          >
-            <TabletSmartphone size={16} />
-          </button>
-        )}
+        {/* Tablet-Toggle wurde nach links (neben Modus-Umschalter) verlegt. */}
+
         <button
           onClick={onUndo}
           disabled={!canUndo}

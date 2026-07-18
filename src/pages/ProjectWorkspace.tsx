@@ -78,6 +78,8 @@ import CadOverlayLayer from "@/components/page/CadOverlayLayer";
 import { CadDocumentInspector } from "@/components/page/CadDocumentInspector";
 import { CadIdPanelHost } from "@/components/page/CadIdPanelHost";
 import { PdfPageView } from "@/components/page/PdfPageView";
+import { TableElementView } from "@/components/page/TableElementView";
+
 import { CadViewportView } from "@/components/page/CadViewportView";
 import { importFile, type ImportedPage } from "@/cad/documentImport";
 import { popPendingSheetPdf } from "@/lib/sheetPdfExport";
@@ -95,7 +97,7 @@ import { TabletAidWheel } from "@/components/TabletAidWheel";
 // Seitengröße gebraucht wird (getPageSizeMm).
 import { PAPER_FORMATS as FORMAT_SIZES } from "@/lib/paper";
 
-export type PageTool = "guide" | "line" | "free" | "eraser" | "text" | "cad" | "pipette" | "hatch" | "document" | null;
+export type PageTool = "guide" | "line" | "free" | "eraser" | "text" | "cad" | "pipette" | "hatch" | "document" | "table" | null;
 type LinePageTool = "line" | "free" | "eraser";
 
 const LINE_TOOL_VARIANTS: Array<{ id: LinePageTool; label: string; icon: React.ElementType }> = [
@@ -933,10 +935,29 @@ export default function ProjectWorkspace() {
         {/* Maßstab-Modal entfernt — Maßstab wird jetzt rechts im "Dokument"-
             Werkzeug-Panel per Dropdown vor dem Import gewählt. */}
 
-        <ToolRailButton icon={<TableIcon size={18} />} label="Tabelle" disabled />
+        <ToolRailButton
+          icon={<TableIcon size={18} />}
+          label="Tabelle"
+          onClick={() => {
+            const pid = activePage?.id;
+            if (!pid) return;
+            const initialCells: string[][] = [
+              ["Spalte A", "Spalte B", "Spalte C"],
+              ["", "", ""],
+              ["", "", ""],
+              ["", "", "=SUM(C2:C3)"],
+            ];
+            const newId = projectStore.addElement(projectId, pid, {
+              kind: "table",
+              x: 20, y: 20, w: 60, h: 30,
+              tableData: { cells: initialCells, headerRow: true, filters: {} },
+            } as any);
+            setSelectedElementId(newId);
+          }}
+        />
+
         <ToolRailButton icon={<StickyNote size={18} />} label="Notiz" disabled />
-        <ToolRailButton icon={<Clock size={18} />} label="Zeitstrahl" disabled />
-        <ToolRailButton icon={<Shapes size={18} />} label="Formen" disabled />
+
         <div className="mt-auto flex flex-col items-center gap-1">
         </div>
       </aside>
@@ -2805,7 +2826,14 @@ function ElementView({
       {(el.kind === "cad-view" || el.kind === "cad-viewport") && (
         <CadViewportViewHost element={el} />
       )}
-      {(el.kind === "shape" || el.kind === "line" || el.kind === "table" || el.kind === "pdf" || el.kind === "timeline") && el.kind !== "pdf" && (
+      {el.kind === "table" && (
+        <TableElementView
+          element={el}
+          onChange={(patch) => onTransform?.(patch)}
+        />
+      )}
+
+      {(el.kind === "shape" || el.kind === "line" || el.kind === "pdf" || el.kind === "timeline") && el.kind !== "pdf" && (
         <div
           className="w-full h-full flex items-center justify-center text-xs text-muted-foreground"
           style={{ background: "hsl(var(--surface-muted))" }}
@@ -2813,6 +2841,7 @@ function ElementView({
           {el.kind}
         </div>
       )}
+
       {el.kind === "pdf" && (
         el.pdfSourceB64 ? (
           <PdfPageView sourceB64={el.pdfSourceB64} pageIndex={el.pdfPageIndex ?? 0} />
@@ -3240,6 +3269,66 @@ function FreeDimInput({ value, onCommit }: { value: number; onCommit: (v: number
   );
 }
 
+function FreeFormatEditor({ width, height, onCommit }: { width: number; height: number; onCommit: (w: number, h: number) => void }) {
+  const [w, setW] = React.useState(String(width));
+  const [h, setH] = React.useState(String(height));
+  React.useEffect(() => { setW(String(width)); }, [width]);
+  React.useEffect(() => { setH(String(height)); }, [height]);
+  const dirty = Number(w.replace(",", ".")) !== width || Number(h.replace(",", ".")) !== height;
+  const clamp = (n: number) => Math.max(50, Math.min(2000, Math.round(n)));
+  const commit = () => {
+    const wn = Number(w.replace(",", "."));
+    const hn = Number(h.replace(",", "."));
+    if (!Number.isFinite(wn) || !Number.isFinite(hn)) return;
+    const nw = clamp(wn), nh = clamp(hn);
+    setW(String(nw));
+    setH(String(nh));
+    onCommit(nw, nh);
+  };
+  const inputStyle = { borderColor: "hsl(var(--hairline))" } as const;
+  return (
+    <>
+      <Row label="Breite (mm)">
+        <input
+          type="text"
+          inputMode="decimal"
+          value={w}
+          onChange={(e) => setW(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") commit(); }}
+          className="w-full h-8 px-2 rounded bg-transparent border text-sm"
+          style={inputStyle}
+        />
+      </Row>
+      <Row label="Höhe (mm)">
+        <input
+          type="text"
+          inputMode="decimal"
+          value={h}
+          onChange={(e) => setH(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") commit(); }}
+          className="w-full h-8 px-2 rounded bg-transparent border text-sm"
+          style={inputStyle}
+        />
+      </Row>
+      <div className="flex justify-end">
+        <button
+          onClick={commit}
+          disabled={!dirty}
+          className="h-7 px-3 rounded text-[11px] font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+          style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
+          title="Neues Papierformat übernehmen"
+        >
+          Bestätigen
+        </button>
+      </div>
+    </>
+  );
+}
+
+
+
+
+
 function PageSettings({
   projectId,
   page,
@@ -3299,35 +3388,13 @@ function PageSettings({
             </select>
           </Row>
           {page.format === "frei" ? (
-            <>
-              <Row label="Breite (mm)">
-                <FreeDimInput
-                  value={page.customWidthMm ?? 400}
-                  onCommit={(v) => update({ customWidthMm: v })}
-                />
-              </Row>
-              <Row label="Höhe (mm)">
-                <FreeDimInput
-                  value={page.customHeightMm ?? 300}
-                  onCommit={(v) => update({ customHeightMm: v })}
-                />
-              </Row>
-
-              <Row label="Ausrichtung">
-                <button
-                  onClick={() => update({
-                    customWidthMm: page.customHeightMm ?? 300,
-                    customHeightMm: page.customWidthMm ?? 400,
-                  })}
-                  className="h-8 px-3 rounded border text-xs"
-                  style={{ borderColor: "hsl(var(--hairline))" }}
-                  title="Breite und Höhe tauschen"
-                >
-                  Breite ↔ Höhe tauschen
-                </button>
-              </Row>
-            </>
+            <FreeFormatEditor
+              width={page.customWidthMm ?? 400}
+              height={page.customHeightMm ?? 300}
+              onCommit={(w, h) => update({ customWidthMm: w, customHeightMm: h })}
+            />
           ) : (
+
             <Row label="Ausrichtung">
               <div className="flex gap-2">
                 <button
