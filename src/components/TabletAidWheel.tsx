@@ -1,11 +1,13 @@
 import React, { useEffect, useRef, useState } from "react";
-import { MousePointer2, ArrowBigUp, Trash2 } from "lucide-react";
+import { MousePointer2, ArrowBigUp, Trash2, CornerDownLeft } from "lucide-react";
 import {
   virtualMouseClick,
   virtualMouseHold,
   virtualKeyPress,
   virtualKeyHold,
+  virtualTypeChar,
 } from "@/lib/virtualInput";
+
 
 /**
  * Tablet-Hilfsrad: kreisförmiges Widget mit 5 Knöpfen (LMB, RMB, SHIFT, ESC, ENTF).
