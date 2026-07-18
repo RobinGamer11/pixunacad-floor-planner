@@ -2205,9 +2205,27 @@ function PageCanvas({
             selected={selectedElementIds.includes(el.id)}
             elevated={activeTool === null && el.kind !== "cad-view" && el.kind !== "cad-viewport" && el.kind !== "pdf" && el.kind !== "image"}
             onSelect={(opts) => onSelect(el.id, opts)}
-            onDrag={(dx, dy) => {
+            onDrag={(dx, dy, alt) => {
               const dxPct = (dx / displayWidth) * 100;
               const dyPct = (dy / displayHeight) * 100;
+              // Alt-Drag auf CAD-Viewport: nicht das Papier-Rechteck bewegen,
+              // sondern den Modell-Mittelpunkt hinter dem Papierfenster
+              // verschieben (Paper-Space bleibt fix, Model-Space wandert).
+              if (alt && (el.kind === "cad-view" || el.kind === "cad-viewport")) {
+                const scaleDen = el.scaleDen ?? 100;
+                const dxMmPaper = dx / mmToPx;
+                const dyMmPaper = dy / mmToPx;
+                // paperMm -> modelM: modelM = paperMm * scaleDen / 1000.
+                // Ziehen nach rechts zeigt weiter links liegende Modellinhalte
+                // → modelCenter.x wandert nach links.
+                const dxM = -(dxMmPaper * scaleDen) / 1000;
+                const dyM = -(dyMmPaper * scaleDen) / 1000;
+                const c = el.modelCenterM ?? { x: 0, y: 0 };
+                projectStore.updateElement(projectId, page.id, el.id, {
+                  modelCenterM: { x: c.x + dxM, y: c.y + dyM },
+                });
+                return;
+              }
               // Wenn dieses Element Teil einer Mehrfachauswahl ist, alle
               // ausgewählten Elemente (auch unterschiedlicher Typen) mitziehen.
               const ids = selectedElementIds.includes(el.id) && selectedElementIds.length > 1
@@ -2228,6 +2246,7 @@ function PageCanvas({
                 });
               }
             }}
+
             onRotate={(deg, absolute) => {
               const next = absolute ? deg : (el.rotation ?? 0) + deg;
               projectStore.updateElement(projectId, page.id, el.id, { rotation: next });
