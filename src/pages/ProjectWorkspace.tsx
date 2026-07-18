@@ -2028,6 +2028,8 @@ function PageCanvas({
     if (e.target !== e.currentTarget) return;
     if (activeTool !== null) { onSelect(undefined); return; }
     if (e.button !== 0) { onSelect(undefined); return; }
+    // Klick-Modus: kein Rahmen, nur Deselektion beim Klick ins Leere.
+    if (marqueeMode === "click") { onSelect(undefined); return; }
     const start = toPct(e.clientX, e.clientY);
     setMarquee({ x1: start.x, y1: start.y, x2: start.x, y2: start.y });
     let dragged = false;
