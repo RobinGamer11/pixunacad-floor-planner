@@ -1258,7 +1258,7 @@ function TaskCalendar({
   selectedDate,
   onSelectDate,
 }: {
-  tasks: Task[];
+  tasks: UnifiedTask[];
   selectedDate?: string;
   onSelectDate: (date: string | undefined) => void;
 }) {
