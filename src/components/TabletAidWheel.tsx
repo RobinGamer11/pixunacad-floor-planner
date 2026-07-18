@@ -62,13 +62,12 @@ export function TabletAidWheel() {
     <div
       data-tablet-aid="true"
       className="fixed z-[60] select-none"
-      onPointerDownCapture={(e) => { e.preventDefault(); e.stopPropagation(); }}
-      onPointerMoveCapture={(e) => { e.preventDefault(); e.stopPropagation(); }}
-      onPointerUpCapture={(e) => { e.preventDefault(); e.stopPropagation(); }}
-      onMouseDownCapture={(e) => { e.preventDefault(); e.stopPropagation(); }}
-      onClickCapture={(e) => { e.stopPropagation(); }}
-      onTouchStartCapture={(e) => { e.preventDefault(); e.stopPropagation(); }}
-      onTouchMoveCapture={(e) => { e.preventDefault(); e.stopPropagation(); }}
+      onPointerDownCapture={(e) => { e.preventDefault(); }}
+      onPointerMoveCapture={(e) => { e.preventDefault(); }}
+      onPointerUpCapture={(e) => { e.preventDefault(); }}
+      onMouseDownCapture={(e) => { e.preventDefault(); }}
+      onTouchStartCapture={(e) => { e.preventDefault(); }}
+      onTouchMoveCapture={(e) => { e.preventDefault(); }}
       style={{
         left: pos.x,
         top: pos.y,
@@ -112,7 +111,7 @@ export function TabletAidWheel() {
         onTap={() => {
           const el = document.activeElement as HTMLElement | null;
           const inField = !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || (el as any).isContentEditable);
-          if (inField) virtualKeyPress("Enter");
+          if (inField) virtualKeyPress("Enter", el);
           else virtualMouseClick(0);
         }}
         icon={<CornerDownLeft size={16} />} />
@@ -272,7 +271,7 @@ function NumberPad({ wheelPos, wheelSize }: { wheelPos: { x: number; y: number }
         backdropFilter: "blur(6px)",
         touchAction: "none",
       }}
-      onPointerDown={(e) => { e.preventDefault(); }}
+      onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
       onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
     >
       {keys.map((k) => (
