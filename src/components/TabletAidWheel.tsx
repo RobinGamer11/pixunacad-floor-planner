@@ -183,7 +183,41 @@ function CenterToggles() {
 
 function NumberPad({ wheelPos, wheelSize }: { wheelPos: { x: number; y: number }; wheelSize: number }) {
   const [visible, setVisible] = useState(false);
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    try { return localStorage.getItem("pixuna.numpadCollapsed") === "1"; } catch { return false; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem("pixuna.numpadCollapsed", collapsed ? "1" : "0"); } catch {}
+  }, [collapsed]);
   const lastInputRef = useRef<HTMLElement | null>(null);
+
+  // Solange Rad aktiv: bei allen INPUT/TEXTAREA `inputmode="none"` setzen,
+  // damit auf iPad KEINE OS-Tastatur aufgeht.
+  useEffect(() => {
+    const prev = new WeakMap<HTMLElement, string | null>();
+    const patch = (el: HTMLElement) => {
+      if (prev.has(el)) return;
+      prev.set(el, el.getAttribute("inputmode"));
+      el.setAttribute("inputmode", "none");
+    };
+    const onFocusInGlobal = (e: FocusEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (!t) return;
+      if (t.tagName === "INPUT" || t.tagName === "TEXTAREA") patch(t);
+    };
+    document.querySelectorAll<HTMLElement>("input, textarea").forEach(patch);
+    document.addEventListener("focusin", onFocusInGlobal);
+    return () => {
+      document.removeEventListener("focusin", onFocusInGlobal);
+      document.querySelectorAll<HTMLElement>("input, textarea").forEach((el) => {
+        if (!prev.has(el)) return;
+        const p = prev.get(el);
+        if (p == null) el.removeAttribute("inputmode");
+        else el.setAttribute("inputmode", p);
+      });
+    };
+  }, []);
+
   useEffect(() => {
     const isField = (el: Element | null): el is HTMLElement =>
       !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || (el as HTMLElement).isContentEditable);
@@ -220,9 +254,9 @@ function NumberPad({ wheelPos, wheelSize }: { wheelPos: { x: number; y: number }
   }, []);
   if (!visible) return null;
 
-  const keys = ["1","2","3","4","5","6","7","8","9",",",".","⌫"];
-  const padWidth = 156;
-  const padHeight = 220;
+  const keys = ["1","2","3","4","5","6","7","8","9",",","0","⌫"];
+  const padWidth = collapsed ? 64 : 156;
+  const padHeight = collapsed ? 40 : 220;
   let left = wheelSize / 2 - padWidth / 2;
   let top = wheelSize + 8;
   if (typeof window !== "undefined" && wheelPos.y + wheelSize + padHeight + 16 > window.innerHeight) {
@@ -242,7 +276,7 @@ function NumberPad({ wheelPos, wheelSize }: { wheelPos: { x: number; y: number }
 
   return (
     <div
-      className="absolute z-[61] rounded-xl p-2 grid grid-cols-3 gap-1.5 select-none"
+      className="absolute z-[61] rounded-xl p-2 select-none"
       style={{
         left, top, width: padWidth,
         background: "hsla(var(--surface-card), 0.96)",
@@ -254,25 +288,45 @@ function NumberPad({ wheelPos, wheelSize }: { wheelPos: { x: number; y: number }
       onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
       onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
     >
-      {keys.map((k) => (
+      <div className="flex justify-end mb-1">
         <button
-          key={k}
           type="button"
           tabIndex={-1}
-          onPointerDown={press(k)}
-          onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
-          onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
-          className="h-10 rounded-md text-sm font-semibold border"
+          onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); setCollapsed((v) => !v); }}
+          className="h-6 px-2 rounded text-[10px] font-semibold border"
           style={{
             borderColor: "hsl(var(--hairline))",
             background: "hsl(var(--surface))",
             color: "hsl(var(--ink))",
-            touchAction: "none",
           }}
+          title={collapsed ? "Zahlenfeld ausklappen" : "Zahlenfeld einklappen"}
         >
-          {k}
+          {collapsed ? "123 ▸" : "▾"}
         </button>
-      ))}
+      </div>
+      {!collapsed && (
+        <div className="grid grid-cols-3 gap-1.5">
+          {keys.map((k) => (
+            <button
+              key={k}
+              type="button"
+              tabIndex={-1}
+              onPointerDown={press(k)}
+              onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+              className="h-10 rounded-md text-sm font-semibold border"
+              style={{
+                borderColor: "hsl(var(--hairline))",
+                background: "hsl(var(--surface))",
+                color: "hsl(var(--ink))",
+                touchAction: "none",
+              }}
+            >
+              {k}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
