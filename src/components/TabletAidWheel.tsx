@@ -74,13 +74,9 @@ export function TabletAidWheel() {
           cursor: "grab",
         }}
       />
-      {/* Zentraler Label */}
-      <div
-        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-[10px] uppercase tracking-widest pointer-events-none"
-        style={{ color: "hsl(var(--ink-soft))" }}
-      >
-        Tablet
-      </div>
+      {/* Zentrum: TABLET-Label + Toggles für Stift-Modus und Zoom-Sperre */}
+      <CenterToggles />
+
 
       {/* 6 Buttons kreisförmig (60°-Schritte) */}
       <WheelButton angle={-90} size={size} label="LMB" tooltip="Linke Maustaste (Tap = Klick, Halten = gedrückt halten)"
