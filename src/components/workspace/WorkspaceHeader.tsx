@@ -126,6 +126,13 @@ export function WorkspaceHeader({
             active={mode === "cad"}
             onClick={goCad}
           />
+          <ModeButton
+            icon={<Network size={13} />}
+            label="Notiznetz"
+            active={mode === "notes"}
+            onClick={goNotes}
+          />
+
         </div>
       </div>
 
