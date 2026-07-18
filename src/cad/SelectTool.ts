@@ -1077,6 +1077,13 @@ export class SelectTool {
         const orig = this.wallPointsOriginal[i];
         wall.corners[i] = v(orig.x + delta.x, orig.y + delta.y);
       }
+    } else if (this.editTarget.kind === "freeStroke") {
+      const stroke = this.app.scene.getFreeStrokeById?.((this.editTarget as any).freeStrokeId);
+      if (!stroke || !this.freeStrokePointsOriginal) return;
+      for (let i = 0; i < stroke.points.length && i < this.freeStrokePointsOriginal.length; i++) {
+        const o = this.freeStrokePointsOriginal[i];
+        stroke.points[i] = v(o.x + delta.x, o.y + delta.y);
+      }
     }
   }
 
