@@ -19,16 +19,23 @@ function isZoomLocked(): boolean {
  * gelassen wird). Für das Auswahl-Werkzeug greift der Gate nicht, damit
  * Objekte weiterhin direkt anklickbar bleiben.
  */
+// Modulweiter Zustand für den "erster Klick fließt durch"-Bypass.
+let _prevTabletCommit = false;
+let _lastToolForGate: any = null;
+let _firstDrawConsumed = false;
 function isTabletDrawGate(e: PointerEvent): boolean {
   if (typeof window === "undefined") return false;
-  if (!(window as any).__pixunaTabletCommit) return false;
+  const commit = !!(window as any).__pixunaTabletCommit;
+  // Beim Einschalten des Hilfsrads oder Werkzeugwechsel wird der erste
+  // reale Klick wieder freigegeben (setzt Startpunkt exakt am Stift/Finger).
+  if (commit && !_prevTabletCommit) _firstDrawConsumed = false;
+  _prevTabletCommit = commit;
+  if (!commit) return false;
   if ((e as any).__virtual) return false;
-  // Wenn das Tablet-Hilfsrad aktiv ist, greift der Gate für JEDEN echten
-  // Zeiger (pen/touch/mouse). Nur virtuelle Events (LMB/ENTER-Knopf im Rad)
-  // dürfen einen Punkt setzen. So werden auch Tablets, die Finger als
-  // "mouse" melden, korrekt gegated.
   const t = (window as any).__pixunaActiveTool;
   if (t === "select" || t === "pipette") return false;
+  if (t !== _lastToolForGate) { _lastToolForGate = t; _firstDrawConsumed = false; }
+  if (!_firstDrawConsumed) { _firstDrawConsumed = true; return false; }
   return true;
 }
 
