@@ -57,7 +57,7 @@ interface Props {
   guideColor?: string;
   guidesLocked?: boolean;
   multiSelectMode?: boolean;
-  selectMarqueeMode?: "touch" | "enclose";
+  selectMarqueeMode?: "touch" | "enclose" | "click";
 
   textColor?: string;
   textFontSizePx?: number;
