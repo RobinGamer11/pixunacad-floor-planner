@@ -305,6 +305,7 @@ export default function ProjectWorkspace() {
       return Math.hypot(arr[0].x - arr[1].x, arr[0].y - arr[1].y);
     };
     const onTouchStart = (e: TouchEvent) => {
+      if ((window as any).__pixunaZoomLock) return;
       for (const t of Array.from(e.touches)) pts.set(t.identifier, { x: t.clientX, y: t.clientY });
       if (pts.size >= 2) {
         const m = midOf();
@@ -316,6 +317,7 @@ export default function ProjectWorkspace() {
       }
     };
     const onTouchMove = (e: TouchEvent) => {
+      if ((window as any).__pixunaZoomLock) { mode = "idle"; return; }
       for (const t of Array.from(e.touches)) pts.set(t.identifier, { x: t.clientX, y: t.clientY });
       if (mode === "gesture" && pts.size >= 2) {
         const m = midOf();
@@ -1245,6 +1247,7 @@ export default function ProjectWorkspace() {
               className="flex-1 overflow-hidden relative"
               style={{ touchAction: "pan-x pan-y" }}
               onWheel={(e) => {
+                if ((window as any).__pixunaZoomLock) { if (e.cancelable) e.preventDefault(); return; }
                 if (e.shiftKey && !e.altKey) {
                   // Shift alleine = normales horizontales Scrollen zulassen.
                   return;
