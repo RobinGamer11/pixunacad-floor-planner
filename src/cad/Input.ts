@@ -1,5 +1,17 @@
 import { Camera } from "./Camera";
 
+/**
+ * Globale Flags aus dem Tablet-Hilfsrad:
+ *  - __pixunaPenOnly:  true  → nur Stift zeichnet, Finger dient zum Pan/Pinch/Auswählen
+ *  - __pixunaZoomLock: true  → Kamera ist eingefroren (kein Pan, kein Zoom)
+ */
+function isPenOnly(): boolean {
+  return typeof window !== "undefined" && !!(window as any).__pixunaPenOnly;
+}
+function isZoomLocked(): boolean {
+  return typeof window !== "undefined" && !!(window as any).__pixunaZoomLock;
+}
+
 export class Input {
   canvas: HTMLCanvasElement;
   mouse = { sx: 0, sy: 0, wx: 0, wy: 0, left: false, mid: false, right: false };
@@ -22,8 +34,16 @@ export class Input {
   private _panLast = { x: 0, y: 0 };
   private _cleanups: (() => void)[] = [];
 
+  // Multi-Touch (iPad-Gesten)
+  private _touches = new Map<number, { x: number; y: number }>();
+  private _pinchLastDist = 0;
+  private _pinchLastCenter = { x: 0, y: 0 };
+  private _touchPanId: number | null = null;
+
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
+    // Verhindert iOS-Default-Gesten (Pinch, Doppeltipp-Zoom, Scroll).
+    try { canvas.style.touchAction = "none"; } catch {}
     this._bind();
   }
 
@@ -46,19 +66,56 @@ export class Input {
       window.removeEventListener("keyup", onKeyUp);
     });
 
-    // Aktive Touch-Pointer zählen, damit Ein-Finger-Drag als Klick/Draw wirkt,
-    // aber Multi-Touch (Pinch/Pan) an höhere Handler durchgereicht wird.
-    const activePointers = new Set<number>();
-
     const onPointerMove = (e: PointerEvent) => {
       const r = c.getBoundingClientRect();
       this.mouse.sx = e.clientX - r.left;
       this.mouse.sy = e.clientY - r.top;
+
+      // Multi-Touch: Pinch/Two-Finger-Pan
+      if (e.pointerType === "touch" && this._touches.has(e.pointerId)) {
+        this._touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (this._touches.size >= 2) {
+          const pts = Array.from(this._touches.values()).slice(0, 2);
+          const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+          const center = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 };
+          if (this._pinchLastDist > 0 && !isZoomLocked()) {
+            // Zwei-Finger-Pan (Center-Bewegung)
+            const dx = center.x - this._pinchLastCenter.x;
+            const dy = center.y - this._pinchLastCenter.y;
+            this.panDX += dx;
+            this.panDY += dy;
+            this.isPanning = true;
+            // Pinch-Zoom als Wheel-Delta emulieren (Vorzeichen wie MouseWheel)
+            const ratio = dist / this._pinchLastDist;
+            // wheelDelta positiv = herauszoomen; Camera.zoomAt nutzt Math.pow(1.0015,-delta)
+            const delta = -Math.log(ratio) / Math.log(1.0015);
+            this.wheelDelta += delta;
+            // Pivot auf Pinch-Center (relativ zu Canvas) setzen — hierfür sx/sy überschreiben.
+            const rect = c.getBoundingClientRect();
+            this.mouse.sx = center.x - rect.left;
+            this.mouse.sy = center.y - rect.top;
+          }
+          this._pinchLastDist = dist;
+          this._pinchLastCenter = center;
+          return;
+        }
+        // Ein-Finger-Pan (Pen-Only-Modus)
+        if (this._touchPanId === e.pointerId && this._panning) {
+          this.panDX = this.mouse.sx - this._panLast.x;
+          this.panDY = this.mouse.sy - this._panLast.y;
+          this._panLast.x = this.mouse.sx;
+          this._panLast.y = this.mouse.sy;
+          if (isZoomLocked()) { this.panDX = 0; this.panDY = 0; }
+        }
+        return;
+      }
+
       if (this._panning) {
         this.panDX = this.mouse.sx - this._panLast.x;
         this.panDY = this.mouse.sy - this._panLast.y;
         this._panLast.x = this.mouse.sx;
         this._panLast.y = this.mouse.sy;
+        if (isZoomLocked()) { this.panDX = 0; this.panDY = 0; }
       }
     };
     c.addEventListener("pointermove", onPointerMove);
@@ -66,6 +123,7 @@ export class Input {
 
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
+      if (isZoomLocked()) return;
       this.wheelDelta += e.deltaY;
     };
     c.addEventListener("wheel", onWheel, { passive: false });
@@ -76,19 +134,43 @@ export class Input {
     this._cleanups.push(() => c.removeEventListener("contextmenu", onCtx));
 
     const onPointerDown = (e: PointerEvent) => {
-      // Zwei-Finger-Geste: an Pinch/Pan-Handler abgeben.
+      // ---- Touch (Finger) ----
       if (e.pointerType === "touch") {
-        activePointers.add(e.pointerId);
-        if (activePointers.size > 1) {
-          // Wenn bereits ein Ein-Finger-Drag lief, abbrechen.
+        this._touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        try { c.setPointerCapture(e.pointerId); } catch {}
+
+        // Zweiter Finger → Pinch/Pan-Modus starten, ggf. laufenden Draw abbrechen.
+        if (this._touches.size >= 2) {
           this.mouse.left = false;
           this._clickQueued = false;
           this._dblQueued = false;
+          if (this._touchPanId !== null) {
+            this._panning = false;
+            this.isPanning = false;
+            this._touchPanId = null;
+          }
+          const pts = Array.from(this._touches.values()).slice(0, 2);
+          this._pinchLastDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+          this._pinchLastCenter = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 };
           return;
         }
+
+        // Ein Finger im Pen-Only-Modus → pannen statt zeichnen.
+        if (isPenOnly()) {
+          this._touchPanId = e.pointerId;
+          this._panning = true;
+          this.isPanning = true;
+          this._panLast.x = this.mouse.sx;
+          this._panLast.y = this.mouse.sy;
+          this.panDX = 0;
+          this.panDY = 0;
+          return;
+        }
+        // Sonst: normale "linke Maustaste"-Emulation (fällt in Block unten).
       }
+
       try { c.setPointerCapture(e.pointerId); } catch {}
-      if (e.button === 0 || (e.pointerType === "touch" && e.button === -1)) {
+      if (e.button === 0 || (e.pointerType === "touch" && e.button === -1) || e.pointerType === "pen") {
         this.mouse.left = true;
         const now = performance.now();
         if (now - this._lastClickT <= this._doubleMs) {
@@ -118,8 +200,18 @@ export class Input {
     this._cleanups.push(() => c.removeEventListener("pointerdown", onPointerDown));
 
     const onPointerUp = (e: PointerEvent) => {
-      if (e.pointerType === "touch") activePointers.delete(e.pointerId);
-      if (e.button === 0 || e.pointerType === "touch") this.mouse.left = false;
+      if (e.pointerType === "touch") {
+        this._touches.delete(e.pointerId);
+        if (this._touches.size < 2) {
+          this._pinchLastDist = 0;
+        }
+        if (this._touchPanId === e.pointerId) {
+          this._touchPanId = null;
+          this._panning = false;
+          this.isPanning = false;
+        }
+      }
+      if (e.button === 0 || e.pointerType === "touch" || e.pointerType === "pen") this.mouse.left = false;
       if (e.button === 1) {
         this.mouse.mid = false;
         this._panning = false;

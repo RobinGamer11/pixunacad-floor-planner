@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { MousePointer2, ArrowBigUp, Trash2, CornerDownLeft } from "lucide-react";
+import { MousePointer2, ArrowBigUp, Trash2, CornerDownLeft, Pencil, Lock } from "lucide-react";
 import {
   virtualMouseClick,
   virtualMouseHold,
@@ -7,6 +7,7 @@ import {
   virtualKeyHold,
   virtualTypeChar,
 } from "@/lib/virtualInput";
+
 
 
 /**
@@ -73,13 +74,9 @@ export function TabletAidWheel() {
           cursor: "grab",
         }}
       />
-      {/* Zentraler Label */}
-      <div
-        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-[10px] uppercase tracking-widest pointer-events-none"
-        style={{ color: "hsl(var(--ink-soft))" }}
-      >
-        Tablet
-      </div>
+      {/* Zentrum: TABLET-Label + Toggles für Stift-Modus und Zoom-Sperre */}
+      <CenterToggles />
+
 
       {/* 6 Buttons kreisförmig (60°-Schritte) */}
       <WheelButton angle={-90} size={size} label="LMB" tooltip="Linke Maustaste (Tap = Klick, Halten = gedrückt halten)"
@@ -108,6 +105,77 @@ export function TabletAidWheel() {
     </div>
   );
 }
+
+function CenterToggles() {
+  const [penOnly, setPenOnly] = useState<boolean>(() => {
+    try { return localStorage.getItem("pixuna.penOnly") === "1"; } catch { return false; }
+  });
+  const [zoomLock, setZoomLock] = useState<boolean>(() => {
+    try { return localStorage.getItem("pixuna.zoomLock") === "1"; } catch { return false; }
+  });
+  useEffect(() => {
+    (window as any).__pixunaPenOnly = penOnly;
+    try { localStorage.setItem("pixuna.penOnly", penOnly ? "1" : "0"); } catch {}
+  }, [penOnly]);
+  useEffect(() => {
+    (window as any).__pixunaZoomLock = zoomLock;
+    try { localStorage.setItem("pixuna.zoomLock", zoomLock ? "1" : "0"); } catch {}
+  }, [zoomLock]);
+  useEffect(() => {
+    return () => {
+      // Beim Deaktivieren des Hilfsrads Sperren aufheben, damit die normale
+      // Bedienung wiederhergestellt ist.
+      (window as any).__pixunaPenOnly = false;
+      (window as any).__pixunaZoomLock = false;
+    };
+  }, []);
+
+
+  const btn = (active: boolean): React.CSSProperties => ({
+    width: 46,
+    height: 22,
+    borderRadius: 6,
+    fontSize: 9,
+    fontWeight: 700,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 3,
+    border: "1px solid hsl(var(--hairline))",
+    background: active ? "hsl(var(--accent-gold))" : "hsl(var(--surface))",
+    color: active ? "hsl(var(--surface))" : "hsl(var(--ink))",
+    cursor: "pointer",
+  });
+
+  return (
+    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-1">
+      <div className="text-[10px] uppercase tracking-widest pointer-events-none" style={{ color: "hsl(var(--ink-soft))" }}>
+        Tablet
+      </div>
+      <button
+        type="button"
+        title="Stift-Modus: nur Stift zeichnet, Finger = pan/zoom/auswählen"
+        onPointerDown={(e) => { e.stopPropagation(); }}
+        onClick={(e) => { e.stopPropagation(); setPenOnly((v) => !v); }}
+        style={btn(penOnly)}
+      >
+        <Pencil size={11} />
+        Stift
+      </button>
+      <button
+        type="button"
+        title="Zoom fix: aktuelle Ansicht sperren (kein Pan/Zoom)"
+        onPointerDown={(e) => { e.stopPropagation(); }}
+        onClick={(e) => { e.stopPropagation(); setZoomLock((v) => !v); }}
+        style={btn(zoomLock)}
+      >
+        <Lock size={11} />
+        Zoom fix
+      </button>
+    </div>
+  );
+}
+
 
 function NumberPad({ wheelPos, wheelSize }: { wheelPos: { x: number; y: number }; wheelSize: number }) {
   const [visible, setVisible] = useState(false);
