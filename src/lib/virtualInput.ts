@@ -130,7 +130,7 @@ function keyTarget(target?: EventTarget | null): EventTarget {
   return target
     ?? ((document.activeElement && document.activeElement !== document.body)
     ? document.activeElement
-    : (document.querySelector("main canvas") ?? document);
+    : (document.querySelector("main canvas") ?? document));
 }
 
 /** Einmaliger Tastendruck (down+up). */
