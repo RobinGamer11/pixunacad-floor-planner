@@ -10,9 +10,10 @@ import {
   Compass,
   Trash2,
   TabletSmartphone,
+  Network,
 } from "lucide-react";
 
-export type WorkspaceMode = "workspace" | "cad";
+export type WorkspaceMode = "workspace" | "cad" | "notes";
 
 interface Props {
   projectId?: string;
