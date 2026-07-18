@@ -292,10 +292,12 @@ export default function ProjectWorkspace() {
   useEffect(() => {
     const el = canvasViewportRef.current;
     if (!el) return;
-    let mode: "idle" | "gesture" = "idle";
+    let mode: "idle" | "gesture" | "pan1" = "idle";
     let startDist = 0;
     let startZoom = 1;
     let startAnchor: ProjectZoomAnchor | null = null;
+    let pan1Last: { x: number; y: number } | null = null;
+    let pan1Id: number | null = null;
     const pts = new Map<number, { x: number; y: number }>();
     const midOf = () => {
       const arr = [...pts.values()];
@@ -316,7 +318,16 @@ export default function ProjectWorkspace() {
         startDist = distOf();
         startZoom = zoomRef.current;
         startAnchor = captureZoomAnchor(m.x, m.y);
+        pan1Last = null;
+        pan1Id = null;
         e.preventDefault();
+      } else if (pts.size === 1 && (window as any).__pixunaTabletCommit) {
+        // Tablet-Hilfsrad aktiv: Ein-Finger-Bewegung schwenkt die Mappe
+        // (statt zu zeichnen — Commit passiert nur per Wheel-ENTER/LMB).
+        const t = e.touches[0];
+        pan1Id = t.identifier;
+        pan1Last = { x: t.clientX, y: t.clientY };
+        mode = "pan1";
       }
     };
     let rafPending = 0;
@@ -345,11 +356,21 @@ export default function ProjectWorkspace() {
           if (!rafPending) rafPending = requestAnimationFrame(flush);
         }
         e.preventDefault();
+      } else if (mode === "pan1" && pan1Id !== null && pan1Last) {
+        const t = Array.from(e.touches).find((tt) => tt.identifier === pan1Id);
+        if (!t) return;
+        const dx = t.clientX - pan1Last.x;
+        const dy = t.clientY - pan1Last.y;
+        pan1Last = { x: t.clientX, y: t.clientY };
+        el.scrollLeft -= dx;
+        el.scrollTop -= dy;
+        e.preventDefault();
       }
     };
     const onTouchEnd = (e: TouchEvent) => {
       for (const t of Array.from(e.changedTouches)) pts.delete(t.identifier);
-      if (pts.size < 2) mode = "idle";
+      if (pts.size < 2) mode = pts.size === 1 && (window as any).__pixunaTabletCommit ? "pan1" : "idle";
+      if (mode === "pan1" && pts.size === 0) { mode = "idle"; pan1Id = null; pan1Last = null; }
     };
     el.addEventListener("touchstart", onTouchStart, { passive: false });
     el.addEventListener("touchmove", onTouchMove, { passive: false });
