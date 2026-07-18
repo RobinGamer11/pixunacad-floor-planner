@@ -2552,7 +2552,7 @@ function ElementView({
       if (!dragRef.current) return;
       const dx = ev.clientX - dragRef.current.x;
       const dy = ev.clientY - dragRef.current.y;
-      onDrag?.(dx, dy);
+      onDrag?.(dx, dy, ev.altKey);
     };
     const handleUp = () => {
       dragRef.current = null;
