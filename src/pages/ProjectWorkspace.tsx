@@ -935,7 +935,27 @@ export default function ProjectWorkspace() {
         {/* Maßstab-Modal entfernt — Maßstab wird jetzt rechts im "Dokument"-
             Werkzeug-Panel per Dropdown vor dem Import gewählt. */}
 
-        <ToolRailButton icon={<TableIcon size={18} />} label="Tabelle" active={activeTool === "table"} onClick={() => setActiveTool(activeTool === "table" ? null : "table")} />
+        <ToolRailButton
+          icon={<TableIcon size={18} />}
+          label="Tabelle"
+          onClick={() => {
+            const pid = activePage?.id;
+            if (!pid) return;
+            const initialCells: string[][] = [
+              ["Spalte A", "Spalte B", "Spalte C"],
+              ["", "", ""],
+              ["", "", ""],
+              ["", "", "=SUM(C2:C3)"],
+            ];
+            const newId = projectStore.addElement(projectId, pid, {
+              kind: "table",
+              x: 20, y: 20, w: 60, h: 30,
+              tableData: { cells: initialCells, headerRow: true, filters: {} },
+            } as any);
+            setSelectedElementId(newId);
+          }}
+        />
+
         <ToolRailButton icon={<StickyNote size={18} />} label="Notiz" disabled />
 
         <div className="mt-auto flex flex-col items-center gap-1">
