@@ -28,7 +28,7 @@ function isTabletDrawGate(e: PointerEvent): boolean {
   // dürfen einen Punkt setzen. So werden auch Tablets, die Finger als
   // "mouse" melden, korrekt gegated.
   const t = (window as any).__pixunaActiveTool;
-  if (!t || t === "select" || t === "pipette") return false;
+  if (t === "select" || t === "pipette") return false;
   return true;
 }
 

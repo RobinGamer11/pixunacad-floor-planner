@@ -467,6 +467,7 @@ export class CadApp {
     this.wallTool = new WallTool(this);
     this.doorTool = new DoorTool(this);
     this.activeTool = this.selectTool;
+    try { (window as any).__pixunaActiveTool = ToolIds.SELECT; } catch {}
 
     this.idPanel = new IdPanel(this, idPanelRoot, idPanelBody, idPanelList, idPanelAddBtn, idPanelToggleBtn);
 
