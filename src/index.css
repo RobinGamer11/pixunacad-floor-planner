@@ -150,15 +150,17 @@
     /* Verhindert 100vh-Bug in Safari iOS. */
     height: 100%;
   }
-  /* Toolbars/Panels: kein Text-Auswahl-Hover auf iPad. */
-  aside, header, nav, .cad-toolbar-btn {
+  /* Toolbars/Panels/Canvas: kein Text-Auswahl-Hover auf iPad, kein iOS-Callout. */
+  aside, header, nav, main, canvas, .cad-toolbar-btn {
     -webkit-user-select: none;
     user-select: none;
+    -webkit-touch-callout: none;
   }
   /* Explizit erlauben, wo Eingabe stattfindet. */
   input, textarea, [contenteditable="true"], .allow-select {
     -webkit-user-select: text;
     user-select: text;
+    -webkit-touch-callout: default;
   }
 }
 
