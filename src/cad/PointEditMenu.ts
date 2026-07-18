@@ -99,6 +99,7 @@ export class PointEditMenu {
     this.root.classList.add("hidden");
     this.root.style.display = "";
     resetHubUserMoved(this.root);
+    try { (window as any).__pixunaSkipFirstDraw = false; } catch {}
     // Alle Buttons wieder einblenden für nächsten Aufruf.
     for (const action of this.actions) {
       const btn = this.buttonsByAction[action];
