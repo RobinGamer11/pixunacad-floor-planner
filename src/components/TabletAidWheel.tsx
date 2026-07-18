@@ -98,8 +98,13 @@ export function TabletAidWheel() {
       <WheelButton angle={30} size={size} label="ENTF" tooltip="Entf-Taste"
         onTap={() => virtualKeyPress("Delete")}
         icon={<Trash2 size={16} />} />
-      <WheelButton angle={90} size={size} label="ENTER" tooltip="Enter-Taste"
-        onTap={() => virtualKeyPress("Enter")}
+      <WheelButton angle={90} size={size} label="ENTER" tooltip="Bestätigen: setzt Punkt am Cursor (bzw. Enter-Taste in Eingabefeldern)"
+        onTap={() => {
+          const el = document.activeElement as HTMLElement | null;
+          const inField = !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || (el as any).isContentEditable);
+          if (inField) virtualKeyPress("Enter");
+          else virtualMouseClick(0);
+        }}
         icon={<CornerDownLeft size={16} />} />
       <WheelButton angle={150} size={size} label="ESC" tooltip="Esc-Taste"
         onTap={() => virtualKeyPress("Escape")}
