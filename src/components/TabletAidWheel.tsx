@@ -31,6 +31,14 @@ export function TabletAidWheel() {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(pos)); } catch {}
   }, [pos]);
 
+  // Solange das Rad sichtbar ist: Tablet-Commit-Gate aktivieren, damit reale
+  // Stift-/Finger-Kontakte in Zeichenwerkzeugen NICHT sofort einen Punkt setzen.
+  // Der Commit erfolgt erst über den LMB- oder ENTER-Knopf am Rad.
+  useEffect(() => {
+    (window as any).__pixunaTabletCommit = true;
+    return () => { (window as any).__pixunaTabletCommit = false; };
+  }, []);
+
   const dragRef = useRef<{ startX: number; startY: number; ox: number; oy: number; pointerId: number } | null>(null);
   const onDragStart = (e: React.PointerEvent) => {
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
