@@ -151,6 +151,18 @@ export class Input {
     this._cleanups.push(() => c.removeEventListener("contextmenu", onCtx));
 
     const onPointerDown = (e: PointerEvent) => {
+      // ── Exakte Startposition: `sx`/`sy` DIREKT aus dem Down-Event ableiten.
+      // Ohne diesen Recompute nutzt Input.ts noch die alte Position vom letzten
+      // pointermove. Beim ersten Touch/Pen-Kontakt gab es aber keinen vorherigen
+      // Move — der Startpunkt landete an der letzten Maus-Position. Damit
+      // starten Werkzeuge jetzt exakt dort, wo Stift/Finger den Bildschirm
+      // berühren.
+      {
+        const r = c.getBoundingClientRect();
+        this.mouse.sx = e.clientX - r.left;
+        this.mouse.sy = e.clientY - r.top;
+      }
+
       // ---- Touch (Finger) ----
       if (e.pointerType === "touch") {
         this._touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -184,6 +196,12 @@ export class Input {
           return;
         }
         // Sonst: normale "linke Maustaste"-Emulation (fällt in Block unten).
+      }
+
+      // ── Tablet-Commit-Gate: keine automatische Klick-Emission.
+      if (isTabletDrawGate(e)) {
+        try { c.setPointerCapture(e.pointerId); } catch {}
+        return;
       }
 
       try { c.setPointerCapture(e.pointerId); } catch {}
