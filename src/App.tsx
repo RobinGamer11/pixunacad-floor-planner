@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import ProjectsHome from "./pages/ProjectsHome";
 import ProjectWorkspace from "./pages/ProjectWorkspace";
 import CadPage from "./pages/CadPage";
+import NotesPage from "./pages/NotesPage";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -21,6 +22,8 @@ const App = () => (
           <Route path="/project/:projectId" element={<ProjectWorkspace />} />
           <Route path="/project/:projectId/cad" element={<CadPage />} />
           <Route path="/project/:projectId/cad/:sheetId" element={<CadPage />} />
+          <Route path="/project/:projectId/notes" element={<NotesPage />} />
+          <Route path="/cad" element={<CadPage />} />
           <Route path="/cad" element={<CadPage />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

@@ -29,7 +29,8 @@ const Pixuna = () => (
   </span>
 );
 
-type Tab = "uebersicht" | "seiten" | "aufgaben" | "dateien" | "fotos" | "infos" | "team";
+type Tab = "uebersicht" | "seiten" | "aufgaben" | "dokumente" | "infos" | "team";
+type DokumenteSubTab = "dateien" | "fotos";
 
 export default function ProjectsHome() {
   const projects = useProjects();
@@ -42,6 +43,7 @@ export default function ProjectsHome() {
   const [selectedId, setSelectedId] = useState<string | undefined>(visibleProjects[0]?.id);
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<Tab>("uebersicht");
+  const [dokumenteSubTab, setDokumenteSubTab] = useState<DokumenteSubTab>("dateien");
   const [leftOpen, setLeftOpen] = useState(true);
   const [titleMenuOpen, setTitleMenuOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
@@ -383,8 +385,7 @@ export default function ProjectsHome() {
                   ["uebersicht", "Übersicht"],
                   ["seiten", "Mappen"],
                   ["aufgaben", "Aufgaben"],
-                  ["dateien", "Dateien"],
-                  ["fotos", "Fotos"],
+                  ["dokumente", "Dokumente"],
                   ["infos", "Infos"],
                   ["team", "Team"],
                 ] as const
@@ -420,22 +421,41 @@ export default function ProjectsHome() {
               <SeitenView project={selected} onAddPage={handleAddPage} />
             )}
             {tab === "aufgaben" && <AufgabenView project={selected} />}
-            {tab === "dateien" && (
-              <FileBrowser
-                project={selected}
-                kind="files"
-                accept=".pdf,.dwg,.dxf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,application/pdf"
-                emptyHint="Noch keine Dateien. Lade PDFs, DWG/DXF oder Dokumente hoch oder lege einen Ordner an."
-              />
-            )}
-            {tab === "fotos" && (
-              <FileBrowser
-                project={selected}
-                kind="photos"
-                accept="image/png,image/jpeg,image/webp,.jpg,.jpeg,.png,.webp"
-                emptyHint="Noch keine Fotos. Lade JPG/PNG-Dateien hoch oder lege einen Ordner an."
-                photoMode
-              />
+            {tab === "dokumente" && (
+              <div className="mt-4">
+                <div className="inline-flex items-center gap-1 rounded-md p-0.5 mb-4"
+                     style={{ background: "hsl(var(--surface-muted))" }}>
+                  {(["dateien", "fotos"] as const).map((sub) => (
+                    <button
+                      key={sub}
+                      onClick={() => setDokumenteSubTab(sub)}
+                      className="h-7 px-3 rounded-[5px] text-[12px] font-medium transition-colors"
+                      style={{
+                        background: dokumenteSubTab === sub ? "hsl(var(--accent-gold))" : "transparent",
+                        color: dokumenteSubTab === sub ? "hsl(var(--surface))" : "hsl(var(--ink-soft))",
+                      }}
+                    >
+                      {sub === "dateien" ? "Dateien" : "Fotos"}
+                    </button>
+                  ))}
+                </div>
+                {dokumenteSubTab === "dateien" ? (
+                  <FileBrowser
+                    project={selected}
+                    kind="files"
+                    accept=".pdf,.dwg,.dxf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,application/pdf"
+                    emptyHint="Noch keine Dateien. Lade PDFs, DWG/DXF oder Dokumente hoch oder lege einen Ordner an."
+                  />
+                ) : (
+                  <FileBrowser
+                    project={selected}
+                    kind="photos"
+                    accept="image/png,image/jpeg,image/webp,.jpg,.jpeg,.png,.webp"
+                    emptyHint="Noch keine Fotos. Lade JPG/PNG-Dateien hoch oder lege einen Ordner an."
+                    photoMode
+                  />
+                )}
+              </div>
             )}
             {tab === "infos" && <InfosView project={selected} />}
             {tab === "team" && (

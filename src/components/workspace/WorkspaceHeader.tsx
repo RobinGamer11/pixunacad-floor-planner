@@ -10,9 +10,10 @@ import {
   Compass,
   Trash2,
   TabletSmartphone,
+  Network,
 } from "lucide-react";
 
-export type WorkspaceMode = "workspace" | "cad";
+export type WorkspaceMode = "workspace" | "cad" | "notes";
 
 interface Props {
   projectId?: string;
@@ -60,6 +61,7 @@ export function WorkspaceHeader({
 
   const goWorkspace = () => projectId && navigate(`/project/${projectId}`);
   const goCad = () => projectId && navigate(`/project/${projectId}/cad`);
+  const goNotes = () => projectId && navigate(`/project/${projectId}/notes`);
 
   return (
     <header
@@ -124,6 +126,13 @@ export function WorkspaceHeader({
             active={mode === "cad"}
             onClick={goCad}
           />
+          <ModeButton
+            icon={<Network size={13} />}
+            label="Notiznetz"
+            active={mode === "notes"}
+            onClick={goNotes}
+          />
+
         </div>
       </div>
 
