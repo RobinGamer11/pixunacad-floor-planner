@@ -15,13 +15,18 @@ export function makeHubDraggable(el: HTMLElement, opts?: { positionMode?: "fixed
   let startLeft = 0;
   let startTop = 0;
   let userMoved = false;
+  let activePointerId: number | null = null;
 
-  const onMouseDown = (e: MouseEvent) => {
+  el.dataset.hubControl = "true";
+
+  const onPointerDown = (e: PointerEvent) => {
     const target = e.target as HTMLElement;
     if (target.closest("button, input, select, textarea, a")) return;
     e.preventDefault();
     e.stopPropagation();
     dragging = true;
+    activePointerId = e.pointerId;
+    try { el.setPointerCapture(e.pointerId); } catch {}
     el.classList.add("dragging");
     startX = e.clientX;
     startY = e.clientY;
@@ -35,12 +40,14 @@ export function makeHubDraggable(el: HTMLElement, opts?: { positionMode?: "fixed
       startLeft = cs;
       startTop = ct;
     }
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseup", onMouseUp);
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp);
+    window.addEventListener("pointercancel", onPointerUp);
   };
 
-  const onMouseMove = (e: MouseEvent) => {
+  const onPointerMove = (e: PointerEvent) => {
     if (!dragging) return;
+    if (activePointerId !== null && e.pointerId !== activePointerId) return;
     const dx = e.clientX - startX;
     const dy = e.clientY - startY;
     el.style.left = `${startLeft + dx}px`;
@@ -49,19 +56,24 @@ export function makeHubDraggable(el: HTMLElement, opts?: { positionMode?: "fixed
     (el as any).__hubUserMoved = true;
   };
 
-  const onMouseUp = () => {
+  const onPointerUp = (e?: PointerEvent) => {
+    if (e && activePointerId !== null && e.pointerId !== activePointerId) return;
     dragging = false;
+    if (e) { try { el.releasePointerCapture(e.pointerId); } catch {} }
+    activePointerId = null;
     el.classList.remove("dragging");
-    window.removeEventListener("mousemove", onMouseMove);
-    window.removeEventListener("mouseup", onMouseUp);
+    window.removeEventListener("pointermove", onPointerMove);
+    window.removeEventListener("pointerup", onPointerUp);
+    window.removeEventListener("pointercancel", onPointerUp);
   };
 
-  el.addEventListener("mousedown", onMouseDown);
+  el.addEventListener("pointerdown", onPointerDown);
 
   return () => {
-    el.removeEventListener("mousedown", onMouseDown);
-    window.removeEventListener("mousemove", onMouseMove);
-    window.removeEventListener("mouseup", onMouseUp);
+    el.removeEventListener("pointerdown", onPointerDown);
+    window.removeEventListener("pointermove", onPointerMove);
+    window.removeEventListener("pointerup", onPointerUp);
+    window.removeEventListener("pointercancel", onPointerUp);
     void userMoved;
   };
 }

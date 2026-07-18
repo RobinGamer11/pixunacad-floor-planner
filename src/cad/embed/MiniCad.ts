@@ -1756,10 +1756,12 @@ export class MiniCad {
       this._groupMoveSnap = { primarySel: primary, primaryAnchor: { x: anchor.x, y: anchor.y }, extras };
     };
     const onUp = () => { this._groupMoveSnap = null; };
-    c.addEventListener("mousedown", onDown);
-    window.addEventListener("mouseup", onUp);
-    this._coordCleanups.push(() => c.removeEventListener("mousedown", onDown));
-    this._coordCleanups.push(() => window.removeEventListener("mouseup", onUp));
+    c.addEventListener("pointerdown", onDown);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+    this._coordCleanups.push(() => c.removeEventListener("pointerdown", onDown));
+    this._coordCleanups.push(() => window.removeEventListener("pointerup", onUp));
+    this._coordCleanups.push(() => window.removeEventListener("pointercancel", onUp));
   }
 
   private _applyGroupTranslate() {
@@ -1841,13 +1843,13 @@ export class MiniCad {
 
   private _installMarquee() {
     const c = this.dom.canvas;
-    const screenToWorld = (e: MouseEvent) => {
+    const screenToWorld = (e: PointerEvent) => {
       const r = c.getBoundingClientRect();
       const sx = (e.clientX - r.left) * (c.width / r.width);
       const sy = (e.clientY - r.top) * (c.height / r.height);
       return this.camera.screenToWorld(sx, sy);
     };
-    const onDown = (e: MouseEvent) => {
+    const onDown = (e: PointerEvent) => {
       if (e.button !== 0) return;
       if (this._activeTool !== "select" && this._activeTool !== null) return;
       // Im "click"-Modus keine Marquee — nur einfaches Anklicken.
@@ -1863,12 +1865,12 @@ export class MiniCad {
       this._marqueeEnd = { x: w.x, y: w.y };
       this._installMarqueeOverlay();
     };
-    const onMove = (e: MouseEvent) => {
+    const onMove = (e: PointerEvent) => {
       if (!this._marqueeActive) return;
       const w = screenToWorld(e);
       this._marqueeEnd = { x: w.x, y: w.y };
     };
-    const onUp = (_e: MouseEvent) => {
+    const onUp = (_e: PointerEvent) => {
       if (!this._marqueeActive) return;
       this._marqueeActive = false;
       this._suppressSetSelection = true;
@@ -1899,12 +1901,14 @@ export class MiniCad {
         this.renderer.overlay = null;
       }
     };
-    c.addEventListener("mousedown", onDown);
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
-    this._coordCleanups.push(() => c.removeEventListener("mousedown", onDown));
-    this._coordCleanups.push(() => window.removeEventListener("mousemove", onMove));
-    this._coordCleanups.push(() => window.removeEventListener("mouseup", onUp));
+    c.addEventListener("pointerdown", onDown);
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+    this._coordCleanups.push(() => c.removeEventListener("pointerdown", onDown));
+    this._coordCleanups.push(() => window.removeEventListener("pointermove", onMove));
+    this._coordCleanups.push(() => window.removeEventListener("pointerup", onUp));
+    this._coordCleanups.push(() => window.removeEventListener("pointercancel", onUp));
   }
 
   private _installMarqueeOverlay() {

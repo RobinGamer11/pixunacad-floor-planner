@@ -17,6 +17,28 @@ export class LineHub {
     this.lenInputEl = lenInputEl;
     this.angInputEl = angInputEl;
 
+    this.root.dataset.hubControl = "true";
+    this.root.classList.add("cad-hub");
+    this.lenInputEl.dataset.hubControl = "true";
+    this.angInputEl.dataset.hubControl = "true";
+
+    const prepareInput = (input: HTMLInputElement, index: number) => {
+      const activate = (e?: Event) => {
+        e?.stopPropagation();
+        if (!this.visible) return;
+        this._activeIndex = index;
+        this.enterEditMode();
+      };
+      const onPointerDown = (e: PointerEvent) => activate(e);
+      const onFocus = () => activate();
+      input.addEventListener("pointerdown", onPointerDown);
+      input.addEventListener("focus", onFocus);
+      this._cleanups.push(() => input.removeEventListener("pointerdown", onPointerDown));
+      this._cleanups.push(() => input.removeEventListener("focus", onFocus));
+    };
+    prepareInput(this.lenInputEl, 0);
+    prepareInput(this.angInputEl, 1);
+
     const onKeyDown = (e: KeyboardEvent) => {
       if (!this.visible) return;
 

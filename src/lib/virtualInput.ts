@@ -3,31 +3,56 @@
 // verwenden können. Die App-Handler prüfen isTrusted nicht, daher genügen
 // künstliche Events.
 
-/** Findet das aktuell sinnvolle Ziel für Maus-Events: bevorzugt ein <canvas>
- * im aktiven <main>-Container, sonst das Element unter der letzten bekannten
- * Zeigerposition, sonst body. */
+function isIgnoredTabletTarget(target: EventTarget | null): boolean {
+  const el = target instanceof Element ? target : null;
+  return !!el?.closest(
+    '[data-tablet-aid="true"], [data-hub-control], .cad-hub, .cad-point-menu, .cad-toolbar-btn, header, aside, nav, button, input, select, textarea',
+  );
+}
+
+function visibleCanvasFromPoint(x: number, y: number): HTMLCanvasElement | null {
+  const stack = typeof document.elementsFromPoint === "function" ? document.elementsFromPoint(x, y) : [];
+  for (const el of stack) {
+    if (el instanceof HTMLCanvasElement && el.closest("main")) return el;
+  }
+  const canvases = Array.from(document.querySelectorAll("main canvas")) as HTMLCanvasElement[];
+  return canvases.find((canvas) => {
+    const r = canvas.getBoundingClientRect();
+    return r.width > 1 && r.height > 1 && x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+  }) ?? null;
+}
+
+/** Findet das aktuell sinnvolle Ziel für Maus-Events: bevorzugt das <canvas>
+ * unter der zuletzt echten Canvas-Position, sonst ein sichtbares Canvas im
+ * aktiven <main>-Container, sonst body. */
 function pickTarget(): { el: Element; x: number; y: number } {
-  const canvas = document.querySelector("main canvas") as HTMLCanvasElement | null;
+  const p = _lastPointer;
+  const pointedCanvas = p ? visibleCanvasFromPoint(p.x, p.y) : null;
+  const canvas = pointedCanvas ?? (document.querySelector("main canvas") as HTMLCanvasElement | null);
   if (canvas) {
     const r = canvas.getBoundingClientRect();
-    const p = _lastPointer;
     const inside = p && p.x >= r.left && p.x <= r.right && p.y >= r.top && p.y <= r.bottom;
     return inside
       ? { el: canvas, x: p!.x, y: p!.y }
       : { el: canvas, x: r.left + r.width / 2, y: r.top + r.height / 2 };
   }
-  const p = _lastPointer ?? { x: window.innerWidth / 2, y: window.innerHeight / 2 };
-  const el = document.elementFromPoint(p.x, p.y) ?? document.body;
-  return { el, x: p.x, y: p.y };
+  const fallback = _lastPointer ?? { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+  const el = document.elementFromPoint(fallback.x, fallback.y) ?? document.body;
+  return { el, x: fallback.x, y: fallback.y };
 }
 
 let _lastPointer: { x: number; y: number } | null = null;
 if (typeof window !== "undefined") {
-  window.addEventListener("pointermove", (e) => {
+  const rememberPointer = (e: PointerEvent) => {
     // Nur echte User-Bewegungen tracken, nicht unsere eigenen synthetischen.
     if ((e as any).__virtual) return;
+    // Rad/HUB/UI nie als Zielposition übernehmen — sonst setzt LMB/ENTER den
+    // Punkt unter dem Hilfsrad statt an der zuletzt berührten Zeichenfläche.
+    if (isIgnoredTabletTarget(e.target)) return;
     _lastPointer = { x: e.clientX, y: e.clientY };
-  }, true);
+  };
+  window.addEventListener("pointerdown", rememberPointer, true);
+  window.addEventListener("pointermove", rememberPointer, true);
 }
 
 function dispatchPointer(
@@ -101,16 +126,17 @@ const KEYS: Record<string, KeyDef> = {
   Backspace: { key: "Backspace", code: "Backspace", keyCode: 8 },
 };
 
-function keyTarget(): EventTarget {
-  return (document.activeElement && document.activeElement !== document.body)
+function keyTarget(target?: EventTarget | null): EventTarget {
+  return target
+    ?? ((document.activeElement && document.activeElement !== document.body)
     ? document.activeElement
-    : (document.querySelector("main canvas") ?? document);
+    : (document.querySelector("main canvas") ?? document));
 }
 
 /** Einmaliger Tastendruck (down+up). */
-export function virtualKeyPress(name: "Escape" | "Delete" | "Enter" | "Backspace") {
+export function virtualKeyPress(name: "Escape" | "Delete" | "Enter" | "Backspace", target?: HTMLElement | null) {
   const def = KEYS[name];
-  const t = keyTarget();
+  const t = keyTarget(target);
   const mk = (type: "keydown" | "keyup") =>
     new KeyboardEvent(type, { key: def.key, code: def.code, keyCode: def.keyCode, which: def.keyCode, bubbles: true, cancelable: true });
   const down = mk("keydown"); (down as any).__virtual = true;
@@ -123,8 +149,8 @@ export function virtualKeyPress(name: "Escape" | "Delete" | "Enter" | "Backspace
     (t as HTMLInputElement).blur();
   }
   // Für Backspace: Zeichen im Input löschen.
-  if (name === "Backspace" && t instanceof HTMLInputElement) {
-    const el = t as HTMLInputElement;
+  if (name === "Backspace" && (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement)) {
+    const el = t as HTMLInputElement | HTMLTextAreaElement;
     const s = el.selectionStart ?? el.value.length;
     const e = el.selectionEnd ?? s;
     if (s === e && s > 0) {
@@ -151,12 +177,12 @@ function setNativeValue(el: HTMLInputElement | HTMLTextAreaElement, value: strin
   else el.value = value;
 }
 
-/** Tippt ein einzelnes Zeichen in den fokussierten Input (für Ziffernblock). */
-export function virtualTypeChar(ch: string) {
-  const el = document.activeElement as HTMLElement | null;
+/** Tippt ein einzelnes Zeichen in ein Eingabefeld (für Ziffernblock). */
+export function virtualTypeChar(ch: string, target?: HTMLElement | null) {
+  const el = (target ?? document.activeElement) as HTMLElement | null;
   if (!el || (el.tagName !== "INPUT" && el.tagName !== "TEXTAREA" && !(el as HTMLElement).isContentEditable)) return;
   if (el.tagName === "INPUT" || el.tagName === "TEXTAREA") {
-    const inp = el as HTMLInputElement;
+    const inp = el as HTMLInputElement | HTMLTextAreaElement;
     const s = inp.selectionStart ?? inp.value.length;
     const e = inp.selectionEnd ?? s;
     setNativeValue(inp, inp.value.slice(0, s) + ch + inp.value.slice(e));

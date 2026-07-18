@@ -371,6 +371,7 @@ export default function CadOverlayLayer(props: Props) {
         {/* Document Hub: Anker · Verschieben · Drehen · Skalieren — analog CadEditor */}
         {docHub.visible && (
           <div
+            data-hub-control
             style={{
               position: "absolute",
               left: Math.max(8, docHub.screenX + 12),
@@ -386,7 +387,6 @@ export default function CadOverlayLayer(props: Props) {
               zIndex: 55,
               pointerEvents: "auto",
             }}
-            onMouseDown={(e) => e.stopPropagation()}
             onPointerDown={(e) => e.stopPropagation()}
           >
             {/* „Anker wechseln" wurde entfernt (Wunsch: erste HUB-Funktion raus). */}
@@ -401,9 +401,11 @@ export default function CadOverlayLayer(props: Props) {
             {docHub.mode === "move" && (
               <>
                 <input type="text" value={docHubDx} onChange={(e) => setDocHubDx(e.target.value)}
+                  data-hub-control
                   onKeyDown={(e) => { if (e.key === "Enter") applyMove(); else if (e.key === "Escape") closeDocHub(); }}
                   style={hubInputStyle} title="Δx (m)" placeholder="Δx" />
                 <input type="text" value={docHubDy} onChange={(e) => setDocHubDy(e.target.value)}
+                  data-hub-control
                   onKeyDown={(e) => { if (e.key === "Enter") applyMove(); else if (e.key === "Escape") closeDocHub(); }}
                   style={hubInputStyle} title="Δy (m)" placeholder="Δy" />
                 <span style={{ fontSize: 10, opacity: 0.6 }}>m</span>
@@ -427,6 +429,7 @@ export default function CadOverlayLayer(props: Props) {
             {docHub.mode === "rotate" && (
               <>
                 <input type="text" value={docHubRot} onChange={(e) => setDocHubRot(e.target.value)}
+                  data-hub-control
                   onKeyDown={(e) => { if (e.key === "Enter") applyRotate(); else if (e.key === "Escape") closeDocHub(); }}
                   style={{ ...hubInputStyle, width: 64 }} title="Drehwinkel absolut (°)" placeholder="°" />
                 <span style={{ fontSize: 10, opacity: 0.6 }}>°</span>
@@ -443,6 +446,7 @@ export default function CadOverlayLayer(props: Props) {
             {docHub.mode === "scale" && (
               <>
                 <input type="text" value={docHubScale} onChange={(e) => setDocHubScale(e.target.value)}
+                  data-hub-control
                   onKeyDown={(e) => { if (e.key === "Enter") applyScale(); else if (e.key === "Escape") closeDocHub(); }}
                   style={{ ...hubInputStyle, width: 64 }} title="Skalierungsfaktor (× um Zentrum)" placeholder="×" />
                 <span style={{ fontSize: 10, opacity: 0.6 }}>×</span>
@@ -471,6 +475,7 @@ export default function CadOverlayLayer(props: Props) {
         {/* LineHub */}
         <div
           ref={hubRef}
+          data-hub-control
           className="hidden"
           style={{
             position: "absolute",
@@ -483,14 +488,15 @@ export default function CadOverlayLayer(props: Props) {
             zIndex: 50,
           }}
         >
-          <input ref={hubLenRef} type="text" readOnly
+          <input ref={hubLenRef} data-hub-control type="text" readOnly
             style={{ width: 72, fontSize: 11, padding: "2px 4px", border: "1px solid hsl(var(--hairline))", borderRadius: 4 }} />
-          <input ref={hubAngRef} type="text" readOnly
+          <input ref={hubAngRef} data-hub-control type="text" readOnly
             style={{ width: 56, fontSize: 11, padding: "2px 4px", border: "1px solid hsl(var(--hairline))", borderRadius: 4 }} />
         </div>
         {/* PointEditMenu */}
         <div
           ref={peRef}
+          data-hub-control
           className="hidden"
           style={{
             position: "absolute",
@@ -503,13 +509,13 @@ export default function CadOverlayLayer(props: Props) {
             zIndex: 50,
           }}
         >
-          <button ref={peMoveRef} style={pointEditBtn} title="Verschieben">↔</button>
-          <button ref={peTranslateRef} style={pointEditBtn} title="Translation">⇄</button>
-          <button ref={peRotateRef} style={pointEditBtn} title="Drehen">⟳</button>
-          <button ref={peOffsetRef} style={pointEditBtn} title="Offset">±</button>
-          <button ref={peResizeRef} style={pointEditBtn} title="Box vergrößern/verkleinern">⤡</button>
-          <button ref={peDuplicateRef} style={pointEditBtn} title="Duplizieren">⎘</button>
-          <button ref={peDeleteRef} style={pointEditBtn} title="Löschen">✕</button>
+          <button ref={peMoveRef} data-hub-control style={pointEditBtn} title="Verschieben">↔</button>
+          <button ref={peTranslateRef} data-hub-control style={pointEditBtn} title="Translation">⇄</button>
+          <button ref={peRotateRef} data-hub-control style={pointEditBtn} title="Drehen">⟳</button>
+          <button ref={peOffsetRef} data-hub-control style={pointEditBtn} title="Offset">±</button>
+          <button ref={peResizeRef} data-hub-control style={pointEditBtn} title="Box vergrößern/verkleinern">⤡</button>
+          <button ref={peDuplicateRef} data-hub-control style={pointEditBtn} title="Duplizieren">⎘</button>
+          <button ref={peDeleteRef} data-hub-control style={pointEditBtn} title="Löschen">✕</button>
         </div>
         {/* TextEditor (contenteditable) + toolbar */}
         <div ref={teEditorRef} className="hidden" style={{ zIndex: 60 }} />
