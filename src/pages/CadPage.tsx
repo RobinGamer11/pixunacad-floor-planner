@@ -311,6 +311,7 @@ const CadPage = () => {
           </div>
         )}
       </main>
+      {tabletAidOn && <TabletAidWheel />}
     </div>
   );
 };
