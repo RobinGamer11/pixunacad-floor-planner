@@ -2659,7 +2659,9 @@ function ElementView({
           {el.text || "Notiz"}
         </div>
       )}
-      {el.kind === "cad-view" && <CadViewThumb sheetId={el.sheetId} snapshot={el.viewSnapshot} />}
+      {(el.kind === "cad-view" || el.kind === "cad-viewport") && (
+        <CadViewportViewHost element={el} />
+      )}
       {(el.kind === "shape" || el.kind === "line" || el.kind === "table" || el.kind === "pdf" || el.kind === "timeline") && el.kind !== "pdf" && (
         <div
           className="w-full h-full flex items-center justify-center text-xs text-muted-foreground"
