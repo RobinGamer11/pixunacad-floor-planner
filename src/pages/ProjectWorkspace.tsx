@@ -3173,33 +3173,18 @@ function PageSettings({
           {page.format === "frei" ? (
             <>
               <Row label="Breite (mm)">
-                <input
-                  type="number"
-                  min={50}
-                  max={2000}
+                <FreeDimInput
                   value={page.customWidthMm ?? 400}
-                  onChange={(e) => {
-                    const v = Math.max(50, Math.min(2000, Number(e.target.value) || 0));
-                    update({ customWidthMm: v });
-                  }}
-                  className="w-full h-8 px-2 rounded bg-transparent border text-sm"
-                  style={{ borderColor: "hsl(var(--hairline))" }}
+                  onCommit={(v) => update({ customWidthMm: v })}
                 />
               </Row>
               <Row label="Höhe (mm)">
-                <input
-                  type="number"
-                  min={50}
-                  max={2000}
+                <FreeDimInput
                   value={page.customHeightMm ?? 300}
-                  onChange={(e) => {
-                    const v = Math.max(50, Math.min(2000, Number(e.target.value) || 0));
-                    update({ customHeightMm: v });
-                  }}
-                  className="w-full h-8 px-2 rounded bg-transparent border text-sm"
-                  style={{ borderColor: "hsl(var(--hairline))" }}
+                  onCommit={(v) => update({ customHeightMm: v })}
                 />
               </Row>
+
               <Row label="Ausrichtung">
                 <button
                   onClick={() => update({
