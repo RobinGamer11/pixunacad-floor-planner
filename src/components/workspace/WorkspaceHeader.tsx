@@ -120,6 +120,17 @@ export function WorkspaceHeader({
         >
           <Trash2 size={16} />
         </button>
+        {onToggleTabletAid && (
+          <button
+            onClick={onToggleTabletAid}
+            className="h-8 w-8 rounded-md flex items-center justify-center hover:bg-muted"
+            style={tabletAidOn ? { background: "hsl(var(--accent-gold-soft))", color: "hsl(var(--accent-gold))" } : undefined}
+            title="Tablet-Hilfsrad (Maus/Tastatur-Ersatz)"
+            aria-pressed={tabletAidOn}
+          >
+            <HelpCircle size={16} />
+          </button>
+        )}
         <button
           onClick={onUndo}
           disabled={!canUndo}
