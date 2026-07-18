@@ -2611,28 +2611,32 @@ function ElementView({
   const hubBlue = "hsl(217 91% 60%)";
 
 
-  const startDrag = (e: React.MouseEvent) => {
+  const startDrag = (e: React.PointerEvent) => {
     if (readOnly) return;
     e.stopPropagation();
     e.preventDefault();
+    try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
     onSelect?.({ shift: e.shiftKey });
     dragRef.current = { x: e.clientX, y: e.clientY };
-    const handleMove = (ev: MouseEvent) => {
+    const handleMove = (ev: PointerEvent) => {
       if (!dragRef.current) return;
       const dx = ev.clientX - dragRef.current.x;
       const dy = ev.clientY - dragRef.current.y;
       onDrag?.(dx, dy, ev.altKey);
     };
-    const handleUp = () => {
+    const handleUp = (ev: PointerEvent) => {
       dragRef.current = null;
-      window.removeEventListener("mousemove", handleMove);
-      window.removeEventListener("mouseup", handleUp);
+      try { (e.currentTarget as HTMLElement).releasePointerCapture(ev.pointerId); } catch {}
+      window.removeEventListener("pointermove", handleMove);
+      window.removeEventListener("pointerup", handleUp);
+      window.removeEventListener("pointercancel", handleUp);
     };
-    window.addEventListener("mousemove", handleMove);
-    window.addEventListener("mouseup", handleUp);
+    window.addEventListener("pointermove", handleMove);
+    window.addEventListener("pointerup", handleUp);
+    window.addEventListener("pointercancel", handleUp);
   };
 
-  const handleMouseDown = (e: React.MouseEvent) => {
+  const handlePointerDown = (e: React.PointerEvent) => {
     if (readOnly) return;
     // Don't start a drag when the user clicks an interactive control inside the hub.
     const t = e.target as HTMLElement;
@@ -2640,10 +2644,11 @@ function ElementView({
     startDrag(e);
   };
 
-  const handleRotateStart = (e: React.MouseEvent) => {
+  const handleRotateStart = (e: React.PointerEvent) => {
     if (readOnly || !onRotate) return;
     e.stopPropagation();
     e.preventDefault();
+    try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
     const node = rootRef.current;
     if (!node) return;
     const rect = node.getBoundingClientRect();
@@ -2652,19 +2657,22 @@ function ElementView({
     const startAngle = Math.atan2(e.clientY - cy, e.clientX - cx);
     const startRot = el.rotation ?? 0;
     rotateMovedRef.current = false;
-    const handleMove = (ev: MouseEvent) => {
+    const handleMove = (ev: PointerEvent) => {
       if (Math.hypot(ev.clientX - e.clientX, ev.clientY - e.clientY) > 3) rotateMovedRef.current = true;
       const a = Math.atan2(ev.clientY - cy, ev.clientX - cx);
       let deg = startRot + ((a - startAngle) * 180) / Math.PI;
       if (ev.shiftKey) deg = Math.round(deg / 15) * 15;
       onRotate(deg, true);
     };
-    const handleUp = () => {
-      window.removeEventListener("mousemove", handleMove);
-      window.removeEventListener("mouseup", handleUp);
+    const handleUp = (ev: PointerEvent) => {
+      try { (e.currentTarget as HTMLElement).releasePointerCapture(ev.pointerId); } catch {}
+      window.removeEventListener("pointermove", handleMove);
+      window.removeEventListener("pointerup", handleUp);
+      window.removeEventListener("pointercancel", handleUp);
     };
-    window.addEventListener("mousemove", handleMove);
-    window.addEventListener("mouseup", handleUp);
+    window.addEventListener("pointermove", handleMove);
+    window.addEventListener("pointerup", handleUp);
+    window.addEventListener("pointercancel", handleUp);
   };
 
 
@@ -2679,7 +2687,7 @@ function ElementView({
     <div
       ref={rootRef}
       data-marquee-id={el.id}
-      onMouseDown={handleMouseDown}
+      onPointerDown={handlePointerDown}
       className="absolute"
       style={{
         left: `${el.x}%`,
@@ -2695,6 +2703,7 @@ function ElementView({
         transform: el.rotation ? `rotate(${el.rotation}deg)` : undefined,
         transformOrigin: "center center",
         zIndex: isCadView ? (showHub ? 90 : 40) : (showHub ? 80 : (elevated ? 30 : undefined)),
+        touchAction: "none",
       }}
     >
 
@@ -2755,7 +2764,7 @@ function ElementView({
           <div
             ref={rotateRef}
             data-hub-control
-            onMouseDown={handleRotateStart}
+            onPointerDown={handleRotateStart}
             title="Drehen (ziehen)"
             className="absolute"
             style={{
@@ -2796,6 +2805,7 @@ function ElementView({
               zIndex: 10,
             }}
             onMouseDown={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
           >
             <button
               data-hub-control
@@ -2830,22 +2840,27 @@ function ElementView({
           {/* Edge-Drag-Handles */}
           {(["top", "right", "bottom", "left"] as const).map((edge) => {
             const isHor = edge === "top" || edge === "bottom";
-            const startEdgeDrag = (e: React.MouseEvent) => {
+            const startEdgeDrag = (e: React.PointerEvent) => {
               if (!onEdgeDrag) return;
               e.stopPropagation();
               e.preventDefault();
+              try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
               let last = { x: e.clientX, y: e.clientY };
-              const move = (ev: MouseEvent) => {
+              const move = (ev: PointerEvent) => {
                 const dx = ev.clientX - last.x;
                 const dy = ev.clientY - last.y;
                 onEdgeDrag(edge, dx, dy);
+                last = { x: ev.clientX, y: ev.clientY };
               };
-              const up = () => {
-                window.removeEventListener("mousemove", move);
-                window.removeEventListener("mouseup", up);
+              const up = (ev: PointerEvent) => {
+                try { (e.currentTarget as HTMLElement).releasePointerCapture(ev.pointerId); } catch {}
+                window.removeEventListener("pointermove", move);
+                window.removeEventListener("pointerup", up);
+                window.removeEventListener("pointercancel", up);
               };
-              window.addEventListener("mousemove", move);
-              window.addEventListener("mouseup", up);
+              window.addEventListener("pointermove", move);
+              window.addEventListener("pointerup", up);
+              window.addEventListener("pointercancel", up);
             };
             const baseStyle: React.CSSProperties = {
               position: "absolute",
@@ -2861,7 +2876,7 @@ function ElementView({
               <div
                 key={edge}
                 data-hub-control
-                onMouseDown={startEdgeDrag}
+                onPointerDown={startEdgeDrag}
                 title={`Kante ${edge} ziehen`}
                 style={{ ...baseStyle, ...sizeStyle }}
               >
@@ -2879,22 +2894,27 @@ function ElementView({
 
           {/* Ecken-Handles: quadratisch + blau bei CAD-Blatt, sonst rund + gold */}
           {onCornerDrag && (["tl", "tr", "bl", "br"] as const).map((corner) => {
-            const startCornerDrag = (e: React.MouseEvent) => {
+            const startCornerDrag = (e: React.PointerEvent) => {
               e.stopPropagation();
               e.preventDefault();
+              try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
               if (!onCornerDrag) return;
               let last = { x: e.clientX, y: e.clientY };
-              const move = (ev: MouseEvent) => {
+              const move = (ev: PointerEvent) => {
                 const dx = ev.clientX - last.x;
                 const dy = ev.clientY - last.y;
                 onCornerDrag(corner, dx, dy, ev.shiftKey);
+                last = { x: ev.clientX, y: ev.clientY };
               };
-              const up = () => {
-                window.removeEventListener("mousemove", move);
-                window.removeEventListener("mouseup", up);
+              const up = (ev: PointerEvent) => {
+                try { (e.currentTarget as HTMLElement).releasePointerCapture(ev.pointerId); } catch {}
+                window.removeEventListener("pointermove", move);
+                window.removeEventListener("pointerup", up);
+                window.removeEventListener("pointercancel", up);
               };
-              window.addEventListener("mousemove", move);
-              window.addEventListener("mouseup", up);
+              window.addEventListener("pointermove", move);
+              window.addEventListener("pointerup", up);
+              window.addEventListener("pointercancel", up);
             };
             const isTop = corner === "tl" || corner === "tr";
             const isLeft = corner === "tl" || corner === "bl";
@@ -2905,7 +2925,7 @@ function ElementView({
               <div
                 key={corner}
                 data-hub-control
-                onMouseDown={startCornerDrag}
+                onPointerDown={startCornerDrag}
                 title={`Ecke skalieren (Shift: proportional)`}
                 className="absolute"
                 style={{
