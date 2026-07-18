@@ -4612,6 +4612,7 @@ function LayersTab({
       note: "Notiz",
       timeline: "Zeitstrahl",
       "cad-view": "CAD-Ansicht",
+      "cad-viewport": "CAD-Viewport",
       shape: "Form",
     };
     const base = kindMap[el.kind] ?? el.kind;
