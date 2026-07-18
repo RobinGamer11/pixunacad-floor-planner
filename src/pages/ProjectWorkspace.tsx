@@ -933,10 +933,9 @@ export default function ProjectWorkspace() {
         {/* Maßstab-Modal entfernt — Maßstab wird jetzt rechts im "Dokument"-
             Werkzeug-Panel per Dropdown vor dem Import gewählt. */}
 
-        <ToolRailButton icon={<TableIcon size={18} />} label="Tabelle" disabled />
+        <ToolRailButton icon={<TableIcon size={18} />} label="Tabelle" active={activeTool === "table"} onClick={() => setActiveTool(activeTool === "table" ? null : "table")} />
         <ToolRailButton icon={<StickyNote size={18} />} label="Notiz" disabled />
-        <ToolRailButton icon={<Clock size={18} />} label="Zeitstrahl" disabled />
-        <ToolRailButton icon={<Shapes size={18} />} label="Formen" disabled />
+
         <div className="mt-auto flex flex-col items-center gap-1">
         </div>
       </aside>
