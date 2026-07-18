@@ -55,6 +55,7 @@ const TOOL_VARIANTS: Record<string, ToolVariant[]> = {
     { kind: "hatch", mode: "fill", label: "Füllung", icon: PaintBucket },
   ],
   [ToolIds.SELECT]: [
+    { kind: "marquee", mode: "click",   label: "Klick",       icon: MousePointer2 },
     { kind: "marquee", mode: "touch",   label: "Berühren",    icon: SquareDashed },
     { kind: "marquee", mode: "enclose", label: "Umschließen", icon: BoxSelect },
   ],
