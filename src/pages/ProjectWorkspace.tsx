@@ -2202,7 +2202,7 @@ function PageCanvas({
             onJumpCad={onJumpCad}
 
             selected={selectedElementIds.includes(el.id)}
-            elevated={activeTool === null && el.kind !== "cad-view" && el.kind !== "pdf" && el.kind !== "image"}
+            elevated={activeTool === null && el.kind !== "cad-view" && el.kind !== "cad-viewport" && el.kind !== "pdf" && el.kind !== "image"}
             onSelect={(opts) => onSelect(el.id, opts)}
             onDrag={(dx, dy) => {
               const dxPct = (dx / displayWidth) * 100;
