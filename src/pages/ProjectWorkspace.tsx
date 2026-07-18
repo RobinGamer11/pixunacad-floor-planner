@@ -622,11 +622,17 @@ export default function ProjectWorkspace() {
         
         mode="workspace"
         zoomPercent={Math.round(zoom)}
+        canUndo={hist.canUndo}
+        canRedo={hist.canRedo}
+        onUndo={() => projectStore.undo(project.id)}
+        onRedo={() => projectStore.redo(project.id)}
         canDelete={selectedElementIds.length > 0 || cadSelectionCount > 0}
         onDelete={runDeleteSelection}
         onPresent={() => setPresenting(true)}
         onShare={() => {}}
         onExport={() => setPrintMode((v) => !v)}
+        tabletAidOn={tabletAidOn}
+        onToggleTabletAid={() => setTabletAidOn((v) => !v)}
       />
       <div className="flex-1 flex min-h-0">
       {/* Far-left tool rail */}
