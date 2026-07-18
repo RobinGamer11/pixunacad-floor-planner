@@ -23,7 +23,10 @@ function isTabletDrawGate(e: PointerEvent): boolean {
   if (typeof window === "undefined") return false;
   if (!(window as any).__pixunaTabletCommit) return false;
   if ((e as any).__virtual) return false;
-  if (e.pointerType !== "pen" && e.pointerType !== "touch") return false;
+  // Wenn das Tablet-Hilfsrad aktiv ist, greift der Gate für JEDEN echten
+  // Zeiger (pen/touch/mouse). Nur virtuelle Events (LMB/ENTER-Knopf im Rad)
+  // dürfen einen Punkt setzen. So werden auch Tablets, die Finger als
+  // "mouse" melden, korrekt gegated.
   const t = (window as any).__pixunaActiveTool;
   if (!t || t === "select" || t === "pipette") return false;
   return true;
