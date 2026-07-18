@@ -2597,7 +2597,7 @@ function ElementView({
   };
 
 
-  const hubKinds = new Set(["cad-view", "pdf", "image"]);
+  const hubKinds = new Set(["cad-view", "cad-viewport", "pdf", "image"]);
   const showHub = !readOnly && selected && hubKinds.has(el.kind);
   // CAD-Blatt behält nur die blaue Frame-Optik; Bearbeitung bleibt 1:1 wie PDF.
   const outlineStyle = selected
