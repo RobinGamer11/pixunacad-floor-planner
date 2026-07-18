@@ -1083,8 +1083,10 @@ export class SelectTool {
       for (let i = 0; i < stroke.points.length && i < this.freeStrokePointsOriginal.length; i++) {
         const o = this.freeStrokePointsOriginal[i];
         stroke.points[i] = v(o.x + delta.x, o.y + delta.y);
+      }
     }
   }
+
 
   /** Rotate ALL points of the currently edited free-stroke around `fixedPoint`
    *  to the absolute angle `newAngleDeg` (relative to the original first point). */
