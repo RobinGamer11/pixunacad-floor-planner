@@ -31,6 +31,14 @@ export function TabletAidWheel() {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(pos)); } catch {}
   }, [pos]);
 
+  // Solange das Rad sichtbar ist: Tablet-Commit-Gate aktivieren, damit reale
+  // Stift-/Finger-Kontakte in Zeichenwerkzeugen NICHT sofort einen Punkt setzen.
+  // Der Commit erfolgt erst über den LMB- oder ENTER-Knopf am Rad.
+  useEffect(() => {
+    (window as any).__pixunaTabletCommit = true;
+    return () => { (window as any).__pixunaTabletCommit = false; };
+  }, []);
+
   const dragRef = useRef<{ startX: number; startY: number; ox: number; oy: number; pointerId: number } | null>(null);
   const onDragStart = (e: React.PointerEvent) => {
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
@@ -90,8 +98,13 @@ export function TabletAidWheel() {
       <WheelButton angle={30} size={size} label="ENTF" tooltip="Entf-Taste"
         onTap={() => virtualKeyPress("Delete")}
         icon={<Trash2 size={16} />} />
-      <WheelButton angle={90} size={size} label="ENTER" tooltip="Enter-Taste"
-        onTap={() => virtualKeyPress("Enter")}
+      <WheelButton angle={90} size={size} label="ENTER" tooltip="Bestätigen: setzt Punkt am Cursor (bzw. Enter-Taste in Eingabefeldern)"
+        onTap={() => {
+          const el = document.activeElement as HTMLElement | null;
+          const inField = !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || (el as any).isContentEditable);
+          if (inField) virtualKeyPress("Enter");
+          else virtualMouseClick(0);
+        }}
         icon={<CornerDownLeft size={16} />} />
       <WheelButton angle={150} size={size} label="ESC" tooltip="Esc-Taste"
         onTap={() => virtualKeyPress("Escape")}

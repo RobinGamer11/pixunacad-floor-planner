@@ -11,6 +11,23 @@ function isPenOnly(): boolean {
 function isZoomLocked(): boolean {
   return typeof window !== "undefined" && !!(window as any).__pixunaZoomLock;
 }
+/**
+ * Tablet-Commit-Gate: Wenn das Tablet-Hilfsrad aktiv ist, sollen echte Stift-
+ * oder Finger-Berührungen im Zeichenwerkzeug NUR die Cursor-Position aktua-
+ * lisieren. Ein Punkt wird erst gesetzt, wenn im Rad "LMB" oder "Enter"
+ * gedrückt wird (das feuert einen `__virtual`-PointerEvent, der hier durch-
+ * gelassen wird). Für das Auswahl-Werkzeug greift der Gate nicht, damit
+ * Objekte weiterhin direkt anklickbar bleiben.
+ */
+function isTabletDrawGate(e: PointerEvent): boolean {
+  if (typeof window === "undefined") return false;
+  if (!(window as any).__pixunaTabletCommit) return false;
+  if ((e as any).__virtual) return false;
+  if (e.pointerType !== "pen" && e.pointerType !== "touch") return false;
+  const t = (window as any).__pixunaActiveTool;
+  if (!t || t === "select" || t === "pipette") return false;
+  return true;
+}
 
 export class Input {
   canvas: HTMLCanvasElement;
@@ -134,6 +151,18 @@ export class Input {
     this._cleanups.push(() => c.removeEventListener("contextmenu", onCtx));
 
     const onPointerDown = (e: PointerEvent) => {
+      // ── Exakte Startposition: `sx`/`sy` DIREKT aus dem Down-Event ableiten.
+      // Ohne diesen Recompute nutzt Input.ts noch die alte Position vom letzten
+      // pointermove. Beim ersten Touch/Pen-Kontakt gab es aber keinen vorherigen
+      // Move — der Startpunkt landete an der letzten Maus-Position. Damit
+      // starten Werkzeuge jetzt exakt dort, wo Stift/Finger den Bildschirm
+      // berühren.
+      {
+        const r = c.getBoundingClientRect();
+        this.mouse.sx = e.clientX - r.left;
+        this.mouse.sy = e.clientY - r.top;
+      }
+
       // ---- Touch (Finger) ----
       if (e.pointerType === "touch") {
         this._touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -167,6 +196,12 @@ export class Input {
           return;
         }
         // Sonst: normale "linke Maustaste"-Emulation (fällt in Block unten).
+      }
+
+      // ── Tablet-Commit-Gate: keine automatische Klick-Emission.
+      if (isTabletDrawGate(e)) {
+        try { c.setPointerCapture(e.pointerId); } catch {}
+        return;
       }
 
       try { c.setPointerCapture(e.pointerId); } catch {}

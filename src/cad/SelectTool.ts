@@ -133,7 +133,7 @@ export class SelectTool {
   // Zwei Modi analog zu Archicad:
   //   "touch"   → Crossing: alle Elemente, die den Rahmen berühren/schneiden
   //   "enclose" → Window: nur Elemente, die vollständig im Rahmen liegen
-  marqueeMode: "touch" | "enclose" = "touch";
+  marqueeMode: "touch" | "enclose" | "click" = "click";
   marqueeStart: Vec2 | null = null;    // Screen-Pixel
   marqueeCurrent: Vec2 | null = null;  // Screen-Pixel
   marqueeActive = false;
@@ -1589,7 +1589,7 @@ export class SelectTool {
         || this.app.documentHubMode !== "none";
       const blocked = anyDrag || anyEdit || specialMode || input.isPanning || input.keys.space;
 
-      if (input.mouse.left && !blocked) {
+      if (this.marqueeMode !== "click" && input.mouse.left && !blocked) {
         if (!this.marqueeStart) {
           this.marqueeStart = v(input.mouse.sx, input.mouse.sy);
           // Neuer Klick → alte Marquee-Auswahl verwerfen.

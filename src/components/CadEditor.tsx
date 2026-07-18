@@ -40,7 +40,7 @@ const LINE_VARIANTS = [
 type ToolVariant =
   | { kind: "tool"; id: string; label: string; icon: any }
   | { kind: "hatch"; mode: HatchDrawMode; label: string; icon: any }
-  | { kind: "marquee"; mode: "touch" | "enclose"; label: string; icon: any };
+  | { kind: "marquee"; mode: "touch" | "enclose" | "click"; label: string; icon: any };
 
 const TOOL_VARIANTS: Record<string, ToolVariant[]> = {
   [ToolIds.LINE]: [
@@ -55,6 +55,7 @@ const TOOL_VARIANTS: Record<string, ToolVariant[]> = {
     { kind: "hatch", mode: "fill", label: "Füllung", icon: PaintBucket },
   ],
   [ToolIds.SELECT]: [
+    { kind: "marquee", mode: "click",   label: "Klick",       icon: MousePointer2 },
     { kind: "marquee", mode: "touch",   label: "Berühren",    icon: SquareDashed },
     { kind: "marquee", mode: "enclose", label: "Umschließen", icon: BoxSelect },
   ],
@@ -275,7 +276,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const [lineVariant, setLineVariant] = useState<string>(ToolIds.LINE);
   // Marquee-Rahmen-Modus des Auswahl-Werkzeugs (Berühren / Umschließen).
   // Wird über das Flyout links am Auswahl-Symbol umgeschaltet.
-  const [selectMarqueeMode, setSelectMarqueeMode] = useState<"touch" | "enclose">("touch");
+  const [selectMarqueeMode, setSelectMarqueeMode] = useState<"touch" | "enclose" | "click">("click");
   const [selectedWallId, setSelectedWallId] = useState<string | null>(null);
   const [selectedFreeStrokeId, setSelectedFreeStrokeId] = useState<string | null>(null);
   const [stickers, setStickers] = useState<StickerDefinition[]>([]);
