@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { MousePointer2, ArrowBigUp, Trash2, CornerDownLeft } from "lucide-react";
+import { MousePointer2, ArrowBigUp, Trash2, CornerDownLeft, Pencil, Lock } from "lucide-react";
 import {
   virtualMouseClick,
   virtualMouseHold,
@@ -7,6 +7,7 @@ import {
   virtualKeyHold,
   virtualTypeChar,
 } from "@/lib/virtualInput";
+
 
 
 /**
