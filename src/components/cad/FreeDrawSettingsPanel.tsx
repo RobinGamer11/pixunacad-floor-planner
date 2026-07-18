@@ -284,3 +284,189 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app }) => {
     </div>
   );
 };
+
+interface PreviewProps {
+  color: string;
+  thickness: number;
+  opacity: number;
+  style: LineStyle;
+  gap: number;
+  imageSrc: string | null;
+  imgSpacing: number;
+  imgRotate: boolean;
+}
+
+const FreeDrawPreview: React.FC<PreviewProps> = (props) => {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [imgEl, setImgEl] = useState<HTMLImageElement | null>(null);
+
+  useEffect(() => {
+    if (!props.imageSrc) { setImgEl(null); return; }
+    const img = new Image();
+    img.onload = () => setImgEl(img);
+    img.src = props.imageSrc;
+  }, [props.imageSrc]);
+
+  useEffect(() => {
+    const c = canvasRef.current;
+    if (!c) return;
+    const dpr = window.devicePixelRatio || 1;
+    const w = c.clientWidth || 220;
+    const h = 68;
+    c.width = Math.round(w * dpr);
+    c.height = Math.round(h * dpr);
+    const ctx = c.getContext("2d");
+    if (!ctx) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // Hintergrund
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = "hsl(var(--border))";
+    ctx.strokeRect(0.5, 0.5, w - 1, h - 1);
+
+    // Beispielpfad: sanfte Sinuskurve
+    const pad = 14;
+    const N = 120;
+    const pts: { x: number; y: number }[] = [];
+    for (let i = 0; i < N; i++) {
+      const t = i / (N - 1);
+      const x = pad + t * (w - pad * 2);
+      const y = h / 2 + Math.sin(t * Math.PI * 2.2) * (h * 0.28);
+      pts.push({ x, y });
+    }
+
+    // Pixel-Breite: 1 m ≈ 100 px in Vorschau
+    const pxPerM = 100;
+    const widthPx = Math.max(0.6, props.thickness * pxPerM);
+    const gapPx = Math.max(2, props.gap * pxPerM);
+    const spacingPx = Math.max(4, props.imgSpacing * pxPerM);
+
+    ctx.globalAlpha = props.opacity;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = props.color;
+    ctx.fillStyle = props.color;
+    ctx.lineWidth = widthPx;
+
+    const drawPath = () => {
+      ctx.beginPath();
+      pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+    };
+
+    const style = props.style;
+    if (style === "solid") {
+      drawPath(); ctx.setLineDash([]); ctx.stroke();
+    } else if (style === "dashed") {
+      drawPath(); ctx.setLineDash([Math.max(4, widthPx * 3), gapPx]); ctx.stroke();
+    } else if (style === "dotted") {
+      drawPath(); ctx.setLineDash([0.1, Math.max(3, gapPx * 0.6)]); ctx.stroke();
+    } else if (style === "dashdot") {
+      drawPath(); ctx.setLineDash([Math.max(6, widthPx * 4), gapPx, 0.1, gapPx]); ctx.stroke();
+    } else if (style === "blob") {
+      let acc = 0;
+      for (let i = 1; i < pts.length; i++) {
+        const dx = pts[i].x - pts[i - 1].x, dy = pts[i].y - pts[i - 1].y;
+        const d = Math.hypot(dx, dy);
+        acc += d;
+        if (acc >= gapPx) {
+          acc = 0;
+          ctx.beginPath();
+          ctx.arc(pts[i].x, pts[i].y, widthPx * 0.9, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    } else if (style === "pencil") {
+      // Grainy: Pfad mehrfach mit leichtem Jitter
+      for (let pass = 0; pass < 3; pass++) {
+        ctx.globalAlpha = props.opacity * (0.28 + pass * 0.08);
+        ctx.beginPath();
+        pts.forEach((p, i) => {
+          const jx = (Math.sin(i * 12.9 + pass) * 0.5);
+          const jy = (Math.cos(i * 7.1 + pass) * 0.5);
+          i ? ctx.lineTo(p.x + jx, p.y + jy) : ctx.moveTo(p.x + jx, p.y + jy);
+        });
+        ctx.lineWidth = widthPx * (0.7 + pass * 0.15);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = props.opacity;
+    } else if (style === "marker") {
+      const prev = ctx.globalCompositeOperation;
+      ctx.globalCompositeOperation = "multiply";
+      ctx.globalAlpha = Math.min(1, props.opacity * 0.5);
+      ctx.lineWidth = widthPx * 1.4;
+      drawPath(); ctx.setLineDash([]); ctx.stroke();
+      ctx.globalCompositeOperation = prev;
+      ctx.globalAlpha = props.opacity;
+    } else if (style === "brush") {
+      // Variable Dicke entlang des Pfades
+      for (let i = 1; i < pts.length; i++) {
+        const t = i / (pts.length - 1);
+        const w2 = widthPx * (0.6 + Math.abs(Math.sin(t * Math.PI)) * 0.7);
+        ctx.lineWidth = w2;
+        ctx.beginPath();
+        ctx.moveTo(pts[i - 1].x, pts[i - 1].y);
+        ctx.lineTo(pts[i].x, pts[i].y);
+        ctx.stroke();
+      }
+    } else if (style === "calligraphy") {
+      // Feste Ribbon-Achse 45°
+      const ang = -Math.PI / 4;
+      const dx = Math.cos(ang) * widthPx * 0.5;
+      const dy = Math.sin(ang) * widthPx * 0.5;
+      ctx.beginPath();
+      for (let i = 0; i < pts.length; i++) {
+        const p = pts[i];
+        i ? ctx.lineTo(p.x + dx, p.y + dy) : ctx.moveTo(p.x + dx, p.y + dy);
+      }
+      for (let i = pts.length - 1; i >= 0; i--) {
+        const p = pts[i];
+        ctx.lineTo(p.x - dx, p.y - dy);
+      }
+      ctx.closePath();
+      ctx.fill();
+    } else if (style === "spray") {
+      const density = 6;
+      const r = widthPx * 1.4;
+      for (let i = 0; i < pts.length; i++) {
+        for (let k = 0; k < density; k++) {
+          const a = (i * 91 + k * 37) % 360 * (Math.PI / 180);
+          const rr = ((i * 13 + k * 29) % 100) / 100 * r;
+          ctx.beginPath();
+          ctx.arc(pts[i].x + Math.cos(a) * rr, pts[i].y + Math.sin(a) * rr, 0.6, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    } else if (style === "image" && imgEl) {
+      const size = Math.max(6, widthPx);
+      let acc = spacingPx;
+      for (let i = 1; i < pts.length; i++) {
+        const dx = pts[i].x - pts[i - 1].x, dy = pts[i].y - pts[i - 1].y;
+        const d = Math.hypot(dx, dy);
+        acc += d;
+        if (acc >= spacingPx) {
+          acc = 0;
+          const ang = props.imgRotate ? Math.atan2(dy, dx) : 0;
+          ctx.save();
+          ctx.translate(pts[i].x, pts[i].y);
+          ctx.rotate(ang);
+          ctx.drawImage(imgEl, -size / 2, -size / 2, size, size);
+          ctx.restore();
+        }
+      }
+    } else if (style === "image") {
+      ctx.fillStyle = "hsl(var(--cad-toolbar-muted))";
+      ctx.font = "11px system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText("Bild laden für Vorschau", w / 2, h / 2 + 4);
+    }
+    ctx.globalAlpha = 1;
+    ctx.setLineDash([]);
+  }, [props, imgEl]);
+
+  return (
+    <div className="mb-3">
+      <canvas ref={canvasRef} style={{ width: "100%", height: 68, display: "block", borderRadius: 4 }} />
+    </div>
+  );
+};
+
