@@ -3239,6 +3239,62 @@ function FreeDimInput({ value, onCommit }: { value: number; onCommit: (v: number
   );
 }
 
+function FreeFormatEditor({ width, height, onCommit }: { width: number; height: number; onCommit: (w: number, h: number) => void }) {
+  const [w, setW] = React.useState(String(width));
+  const [h, setH] = React.useState(String(height));
+  React.useEffect(() => { setW(String(width)); }, [width]);
+  React.useEffect(() => { setH(String(height)); }, [height]);
+  const dirty = Number(w.replace(",", ".")) !== width || Number(h.replace(",", ".")) !== height;
+  const clamp = (n: number) => Math.max(50, Math.min(2000, Math.round(n)));
+  const commit = () => {
+    const wn = Number(w.replace(",", "."));
+    const hn = Number(h.replace(",", "."));
+    if (!Number.isFinite(wn) || !Number.isFinite(hn)) return;
+    const nw = clamp(wn), nh = clamp(hn);
+    setW(String(nw));
+    setH(String(nh));
+    onCommit(nw, nh);
+  };
+  const inputStyle = { borderColor: "hsl(var(--hairline))" } as const;
+  return (
+    <>
+      <Row label="Breite (mm)">
+        <input
+          type="text"
+          inputMode="decimal"
+          value={w}
+          onChange={(e) => setW(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") commit(); }}
+          className="w-full h-8 px-2 rounded bg-transparent border text-sm"
+          style={inputStyle}
+        />
+      </Row>
+      <Row label="Höhe (mm)">
+        <input
+          type="text"
+          inputMode="decimal"
+          value={h}
+          onChange={(e) => setH(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") commit(); }}
+          className="w-full h-8 px-2 rounded bg-transparent border text-sm"
+          style={inputStyle}
+        />
+      </Row>
+      <div className="flex justify-end">
+        <button
+          onClick={commit}
+          disabled={!dirty}
+          className="h-7 px-3 rounded text-[11px] font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+          style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
+          title="Neues Papierformat übernehmen"
+        >
+          Bestätigen
+        </button>
+      </div>
+    </>
+  );
+
+
 function PageSettings({
   projectId,
   page,
