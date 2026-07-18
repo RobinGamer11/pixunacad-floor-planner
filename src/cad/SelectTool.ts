@@ -1106,7 +1106,7 @@ export class SelectTool {
     }
   }
 
-  }
+
 
   /** Apply parallel offset to selected hatch edge. Adjacent endpoints slide along their adjacent edges. */
   private _applyHatchEdgeOffset(offsetM: number) {
