@@ -373,7 +373,7 @@ export default function ProjectWorkspace() {
 
   // Per-tool settings (live in workspace state; persist could come later).
   const [toolSettings, setToolSettings] = useState<ToolSettings>({
-    select: { multi: false, marqueeMode: "touch" },
+    select: { multi: false, marqueeMode: "click" },
     guide: { color: "#7DD3FC", strokeWidth: 1, locked: false },
     line: { color: "#111111", thicknessMm: 0.5, alpha: 100 },
     text: {
@@ -715,7 +715,7 @@ export default function ProjectWorkspace() {
                 label="Berühren"
                 active={activeTool === null && toolSettings.select.marqueeMode === "touch"}
                 onClick={() => {
-                  updateToolSettings("select", { marqueeMode: "touch" });
+                  updateToolSettings("select", { marqueeMode: "click" });
                   setActiveTool(null);
                   setSelectToolFlyoutOpen(false);
                 }}
@@ -1748,7 +1748,7 @@ const PUNCH_PATTERNS: Record<Exclude<PunchPattern, "none">, { label: string; off
 };
 
 type ToolSettings = {
-  select: { multi: boolean; marqueeMode: "touch" | "enclose" };
+  select: { multi: boolean; marqueeMode: "touch" | "enclose" | "click" };
   guide: { color: string; strokeWidth: number; locked: boolean };
   line: { color: string; thicknessMm: number; alpha: number };
   text: {
@@ -1769,7 +1769,7 @@ type ToolSettings = {
 };
 
 const DEFAULT_TOOL_SETTINGS: ToolSettings = {
-  select: { multi: false, marqueeMode: "touch" },
+  select: { multi: false, marqueeMode: "click" },
   guide: { color: "#7DD3FC", strokeWidth: 1, locked: false },
   line: { color: "#111111", thicknessMm: 0.5, alpha: 100 },
   text: {
@@ -3734,7 +3734,7 @@ function SelectSettings({
       <div className="flex gap-1">
         <button
           type="button"
-          onClick={() => onChange({ marqueeMode: "touch" })}
+          onClick={() => onChange({ marqueeMode: "click" })}
           className="flex-1 h-9 rounded-md border flex items-center justify-center gap-1.5 text-xs"
           style={mode === "touch" ? {
             background: "rgba(249,115,22,0.15)",
