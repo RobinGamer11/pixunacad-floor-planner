@@ -61,6 +61,7 @@ export function WorkspaceHeader({
 
   const goWorkspace = () => projectId && navigate(`/project/${projectId}`);
   const goCad = () => projectId && navigate(`/project/${projectId}/cad`);
+  const goNotes = () => projectId && navigate(`/project/${projectId}/notes`);
 
   return (
     <header
