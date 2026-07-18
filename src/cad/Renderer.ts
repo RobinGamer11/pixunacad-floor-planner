@@ -2362,15 +2362,46 @@ export class Renderer {
       this._drawFreeStrokeImage(s);
       return;
     }
+    if (s.lineStyle === "spray" && colorOverride === null) {
+      this._drawFreeStrokeSpray(s);
+      return;
+    }
+    if (s.lineStyle === "brush" && colorOverride === null) {
+      this._drawFreeStrokeBrush(s);
+      return;
+    }
+    if (s.lineStyle === "calligraphy" && colorOverride === null) {
+      this._drawFreeStrokeCalligraphy(s);
+      return;
+    }
     const ctx = this.ctx;
     const cam = this.camera;
     const pts = this._renderPointsForFreeStroke(s);
     ctx.save();
-    ctx.strokeStyle = colorOverride || rgbaFromHex(s.color, s.opacity);
-    ctx.lineWidth = widthOverridePx != null ? widthOverridePx : this.segStrokePx(s.thicknessM);
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    ctx.setLineDash(this._dashForFreeStroke(s));
+    // Stil-spezifische Overrides für Marker/Bleistift.
+    let strokeColor = colorOverride || rgbaFromHex(s.color, s.opacity);
+    let strokeWidth = widthOverridePx != null ? widthOverridePx : this.segStrokePx(s.thicknessM);
+    if (colorOverride === null && s.lineStyle === "marker") {
+      // Textmarker: dick, flach, halbtransparent (multiply).
+      strokeColor = rgbaFromHex(s.color, Math.min(s.opacity, 0.4));
+      (ctx as any).globalCompositeOperation = "multiply";
+      ctx.lineCap = "butt";
+      ctx.lineJoin = "miter";
+    } else if (colorOverride === null && s.lineStyle === "pencil") {
+      // Bleistift: dünner, körnig-transparent — kurze Dashes für Graphit-Look.
+      strokeColor = rgbaFromHex(s.color, Math.min(s.opacity, 0.7));
+      strokeWidth = Math.max(0.6, strokeWidth * 0.6);
+      const px = cam.scale;
+      ctx.setLineDash([Math.max(1.5, 0.008 * px), Math.max(0.8, 0.004 * px)]);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+    } else {
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.setLineDash(this._dashForFreeStroke(s));
+    }
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = strokeWidth;
     const p0 = cam.worldToScreen(pts[0].x, pts[0].y);
     ctx.beginPath();
     ctx.moveTo(p0.x, p0.y);
@@ -2380,6 +2411,108 @@ export class Renderer {
     }
     ctx.stroke();
     ctx.setLineDash([]);
+    ctx.restore();
+  }
+
+  /** Sprühdose: zufällige Punkte innerhalb Radius entlang Pfad. */
+  private _drawFreeStrokeSpray(s: FreeStroke) {
+    const ctx = this.ctx;
+    const cam = this.camera;
+    const pts = this._renderPointsForFreeStroke(s);
+    if (pts.length < 2) return;
+    const radiusPx = Math.max(2, (s.thicknessM / 2) * cam.scale);
+    const spacingPx = Math.max(1.5, radiusPx * 0.35);
+    const density = 6; // Punkte pro Sample
+    // Deterministischer PRNG basierend auf Stroke-ID, damit sich das Rauschen nicht bei Re-Render ändert.
+    let seed = 0;
+    for (let i = 0; i < s.id.length; i++) seed = (seed * 31 + s.id.charCodeAt(i)) >>> 0;
+    const rand = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 0xffffffff; };
+    ctx.save();
+    ctx.fillStyle = rgbaFromHex(s.color, Math.min(s.opacity, 0.5));
+    let acc = 0;
+    let prev = cam.worldToScreen(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) {
+      const cur = cam.worldToScreen(pts[i].x, pts[i].y);
+      const dx = cur.x - prev.x, dy = cur.y - prev.y;
+      const segLen = Math.hypot(dx, dy);
+      if (segLen < 1e-3) { prev = cur; continue; }
+      let used = 0;
+      while (acc + (segLen - used) >= spacingPx) {
+        const need = spacingPx - acc;
+        used += need;
+        const t = used / segLen;
+        const cx = prev.x + dx * t;
+        const cy = prev.y + dy * t;
+        for (let k = 0; k < density; k++) {
+          const a = rand() * Math.PI * 2;
+          const r = Math.sqrt(rand()) * radiusPx;
+          ctx.beginPath();
+          ctx.arc(cx + Math.cos(a) * r, cy + Math.sin(a) * r, 0.7, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        acc = 0;
+      }
+      acc += segLen - used;
+      prev = cur;
+    }
+    ctx.restore();
+  }
+
+  /** Pinsel: variable Breite (Taper an Enden), weiche Rundungen. */
+  private _drawFreeStrokeBrush(s: FreeStroke) {
+    const ctx = this.ctx;
+    const cam = this.camera;
+    const pts = this._renderPointsForFreeStroke(s);
+    if (pts.length < 2) return;
+    const baseW = this.segStrokePx(s.thicknessM);
+    const n = pts.length;
+    ctx.save();
+    ctx.strokeStyle = rgbaFromHex(s.color, s.opacity);
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    for (let i = 1; i < n; i++) {
+      const a = cam.worldToScreen(pts[i - 1].x, pts[i - 1].y);
+      const b = cam.worldToScreen(pts[i].x, pts[i].y);
+      // Taper: an Enden dünner, in der Mitte voll.
+      const tMid = (i - 0.5) / (n - 1);
+      const taper = Math.sin(Math.PI * tMid); // 0..1..0
+      ctx.lineWidth = Math.max(0.5, baseW * (0.25 + 0.75 * taper));
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  /** Kalligrafie: rechteckige Stempel entlang Pfad in fester Feder-Neigung (45°). */
+  private _drawFreeStrokeCalligraphy(s: FreeStroke) {
+    const ctx = this.ctx;
+    const cam = this.camera;
+    const pts = this._renderPointsForFreeStroke(s);
+    if (pts.length < 2) return;
+    const nibW = this.segStrokePx(s.thicknessM);
+    const nibH = Math.max(1, nibW * 0.35);
+    const nibAngle = -Math.PI / 4; // 45° Feder-Neigung
+    const cosA = Math.cos(nibAngle), sinA = Math.sin(nibAngle);
+    ctx.save();
+    ctx.fillStyle = rgbaFromHex(s.color, s.opacity);
+    // Kontinuierliches Band: pro Segment Trapez aus 4 versetzten Ecken.
+    const offX = (nibW / 2) * cosA;
+    const offY = (nibW / 2) * sinA;
+    const offX2 = (nibH / 2) * -sinA;
+    const offY2 = (nibH / 2) * cosA;
+    for (let i = 1; i < pts.length; i++) {
+      const a = cam.worldToScreen(pts[i - 1].x, pts[i - 1].y);
+      const b = cam.worldToScreen(pts[i].x, pts[i].y);
+      ctx.beginPath();
+      ctx.moveTo(a.x + offX - offX2, a.y + offY - offY2);
+      ctx.lineTo(a.x - offX + offX2, a.y - offY + offY2);
+      ctx.lineTo(b.x - offX + offX2, b.y - offY + offY2);
+      ctx.lineTo(b.x + offX - offX2, b.y + offY - offY2);
+      ctx.closePath();
+      ctx.fill();
+    }
     ctx.restore();
   }
 

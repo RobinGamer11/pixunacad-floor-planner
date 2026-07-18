@@ -413,7 +413,7 @@ export class DocumentObject {
   }
 }
 
-export type FreeLineStyle = "solid" | "dashed" | "dotted" | "dashdot" | "blob" | "image";
+export type FreeLineStyle = "solid" | "dashed" | "dotted" | "dashdot" | "blob" | "image" | "pencil" | "marker" | "brush" | "spray" | "calligraphy";
 
 export class FreeStroke {
   id: string;
