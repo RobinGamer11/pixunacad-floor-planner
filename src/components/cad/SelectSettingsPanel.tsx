@@ -12,7 +12,7 @@ interface Props { app: CadApp | MiniCad | null; }
  *   - "enclose" → Window   (nur Elemente, die vollständig im Rahmen liegen)
  */
 export const SelectSettingsPanel: React.FC<Props> = ({ app }) => {
-  const [mode, setMode] = useState<"touch" | "enclose">("touch");
+  const [mode, setMode] = useState<"touch" | "enclose" | "click">("touch");
   const [count, setCount] = useState(0);
 
   useEffect(() => {
@@ -32,7 +32,7 @@ export const SelectSettingsPanel: React.FC<Props> = ({ app }) => {
 
   if (!app) return null;
 
-  const setBoth = (m: "touch" | "enclose") => {
+  const setBoth = (m: "touch" | "enclose" | "click") => {
     app.selectTool.marqueeMode = m;
     setMode(m);
   };
