@@ -3128,7 +3128,18 @@ function PageSettings({
           <Row label="Format">
             <select
               value={page.format}
-              onChange={(e) => update({ format: e.target.value as PageFormat })}
+              onChange={(e) => {
+                const next = e.target.value as PageFormat;
+                if (next === "frei") {
+                  update({
+                    format: next,
+                    customWidthMm: page.customWidthMm ?? 400,
+                    customHeightMm: page.customHeightMm ?? 300,
+                  });
+                } else {
+                  update({ format: next });
+                }
+              }}
               className="w-full h-8 px-2 rounded bg-transparent border text-sm"
               style={{ borderColor: "hsl(var(--hairline))" }}
             >
@@ -3141,26 +3152,72 @@ function PageSettings({
               )}
             </select>
           </Row>
-          <Row label="Ausrichtung">
-            <div className="flex gap-2">
-              <button
-                onClick={() => update({ format: page.format.includes("hoch") ? (page.format.replace("hoch", "quer") as PageFormat) : page.format })}
-                className="h-8 w-8 rounded border flex items-center justify-center"
-                style={{ borderColor: "hsl(var(--hairline))" }}
-                title="Querformat"
-              >
-                ▭
-              </button>
-              <button
-                onClick={() => update({ format: page.format.includes("quer") ? (page.format.replace("quer", "hoch") as PageFormat) : page.format })}
-                className="h-8 w-8 rounded border flex items-center justify-center"
-                style={{ borderColor: "hsl(var(--hairline))" }}
-                title="Hochformat"
-              >
-                ▯
-              </button>
-            </div>
-          </Row>
+          {page.format === "frei" ? (
+            <>
+              <Row label="Breite (mm)">
+                <input
+                  type="number"
+                  min={50}
+                  max={2000}
+                  value={page.customWidthMm ?? 400}
+                  onChange={(e) => {
+                    const v = Math.max(50, Math.min(2000, Number(e.target.value) || 0));
+                    update({ customWidthMm: v });
+                  }}
+                  className="w-full h-8 px-2 rounded bg-transparent border text-sm"
+                  style={{ borderColor: "hsl(var(--hairline))" }}
+                />
+              </Row>
+              <Row label="Höhe (mm)">
+                <input
+                  type="number"
+                  min={50}
+                  max={2000}
+                  value={page.customHeightMm ?? 300}
+                  onChange={(e) => {
+                    const v = Math.max(50, Math.min(2000, Number(e.target.value) || 0));
+                    update({ customHeightMm: v });
+                  }}
+                  className="w-full h-8 px-2 rounded bg-transparent border text-sm"
+                  style={{ borderColor: "hsl(var(--hairline))" }}
+                />
+              </Row>
+              <Row label="Ausrichtung">
+                <button
+                  onClick={() => update({
+                    customWidthMm: page.customHeightMm ?? 300,
+                    customHeightMm: page.customWidthMm ?? 400,
+                  })}
+                  className="h-8 px-3 rounded border text-xs"
+                  style={{ borderColor: "hsl(var(--hairline))" }}
+                  title="Breite und Höhe tauschen"
+                >
+                  Breite ↔ Höhe tauschen
+                </button>
+              </Row>
+            </>
+          ) : (
+            <Row label="Ausrichtung">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => update({ format: page.format.includes("hoch") ? (page.format.replace("hoch", "quer") as PageFormat) : page.format })}
+                  className="h-8 w-8 rounded border flex items-center justify-center"
+                  style={{ borderColor: "hsl(var(--hairline))" }}
+                  title="Querformat"
+                >
+                  ▭
+                </button>
+                <button
+                  onClick={() => update({ format: page.format.includes("quer") ? (page.format.replace("quer", "hoch") as PageFormat) : page.format })}
+                  className="h-8 w-8 rounded border flex items-center justify-center"
+                  style={{ borderColor: "hsl(var(--hairline))" }}
+                  title="Hochformat"
+                >
+                  ▯
+                </button>
+              </div>
+            </Row>
+          )}
           <Row label="Ränder">
             <div className="flex items-center gap-2 w-full">
               <input
