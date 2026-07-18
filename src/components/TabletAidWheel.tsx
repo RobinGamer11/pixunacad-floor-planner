@@ -192,18 +192,32 @@ function CenterToggles() {
 
 function NumberPad({ wheelPos, wheelSize }: { wheelPos: { x: number; y: number }; wheelSize: number }) {
   const [visible, setVisible] = useState(false);
+  const lastInputRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
-    const check = () => {
-      const el = document.activeElement as HTMLElement | null;
-      const ok = !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || (el as HTMLElement).isContentEditable);
-      setVisible(ok);
+    const isField = (el: Element | null): el is HTMLElement =>
+      !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || (el as HTMLElement).isContentEditable);
+    const onFocusIn = (e: FocusEvent) => {
+      const t = e.target as Element | null;
+      if (isField(t)) {
+        lastInputRef.current = t;
+        setVisible(true);
+      }
     };
-    check();
-    document.addEventListener("focusin", check);
-    document.addEventListener("focusout", check);
+    const onFocusOut = () => {
+      // Delay: pointerdown on pad button briefly moves focus.
+      setTimeout(() => {
+        const el = document.activeElement;
+        if (!isField(el)) {
+          setVisible(false);
+          lastInputRef.current = null;
+        }
+      }, 60);
+    };
+    document.addEventListener("focusin", onFocusIn);
+    document.addEventListener("focusout", onFocusOut);
     return () => {
-      document.removeEventListener("focusin", check);
-      document.removeEventListener("focusout", check);
+      document.removeEventListener("focusin", onFocusIn);
+      document.removeEventListener("focusout", onFocusOut);
     };
   }, []);
   if (!visible) return null;
@@ -213,12 +227,17 @@ function NumberPad({ wheelPos, wheelSize }: { wheelPos: { x: number; y: number }
   const padHeight = 220;
   let left = wheelSize / 2 - padWidth / 2;
   let top = wheelSize + 8;
-  // Absolut in Wheel-Container: bei Bildschirmrand nach oben klappen.
   if (typeof window !== "undefined" && wheelPos.y + wheelSize + padHeight + 16 > window.innerHeight) {
     top = -(padHeight + 8);
   }
   const press = (k: string) => (e: React.PointerEvent) => {
     e.preventDefault();
+    e.stopPropagation();
+    // Focus zurück auf letztes Eingabefeld, damit virtualTypeChar/Backspace es trifft.
+    const el = lastInputRef.current;
+    if (el && document.activeElement !== el) {
+      try { (el as HTMLInputElement).focus({ preventScroll: true }); } catch { el.focus(); }
+    }
     if (k === "⌫") virtualKeyPress("Backspace");
     else virtualTypeChar(k);
   };
@@ -234,17 +253,22 @@ function NumberPad({ wheelPos, wheelSize }: { wheelPos: { x: number; y: number }
         backdropFilter: "blur(6px)",
         touchAction: "none",
       }}
-      onPointerDown={(e) => e.preventDefault()}
+      onPointerDown={(e) => { e.preventDefault(); }}
+      onMouseDown={(e) => { e.preventDefault(); }}
     >
       {keys.map((k) => (
         <button
           key={k}
+          type="button"
           onPointerDown={press(k)}
+          onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
           className="h-10 rounded-md text-sm font-semibold border"
           style={{
             borderColor: "hsl(var(--hairline))",
             background: "hsl(var(--surface))",
             color: "hsl(var(--ink))",
+            touchAction: "none",
           }}
         >
           {k}
@@ -253,6 +277,7 @@ function NumberPad({ wheelPos, wheelSize }: { wheelPos: { x: number; y: number }
     </div>
   );
 }
+
 
 function WheelButton({
   angle, size, label, tooltip, icon, onTap, onHold, toggleHold,
