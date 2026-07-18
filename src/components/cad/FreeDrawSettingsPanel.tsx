@@ -133,6 +133,17 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app }) => {
   return (
     <div className="cad-settings-panel mb-2">
       <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Freihand</div>
+      <FreeDrawPreview
+        color={color}
+        thickness={thickness}
+        opacity={opacity}
+        style={style}
+        gap={gap}
+        imageSrc={imageSrc}
+        imgSpacing={imgSpacing}
+        imgRotate={imgRotate}
+      />
+
       <div className="space-y-3">
         <label className="block text-xs">
           <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Ebene{selectedStrokeId ? " (Auswahl)" : ""}</span>
