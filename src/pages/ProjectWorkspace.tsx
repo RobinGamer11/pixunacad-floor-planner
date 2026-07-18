@@ -67,6 +67,7 @@ import {
   projectStore,
   useProject,
   useProjects,
+  useProjectHistory,
   type PageElement,
   type ElementKind,
   type PageFormat,
@@ -86,6 +87,7 @@ import { FreeDrawSettingsPanel } from "@/components/cad/FreeDrawSettingsPanel";
 import { EraserSettingsPanel } from "@/components/cad/EraserSettingsPanel";
 import { HatchSettingsPanel } from "@/components/cad/HatchSettingsPanel";
 import { WorkspaceHeader } from "@/components/workspace/WorkspaceHeader";
+import { TabletAidWheel } from "@/components/TabletAidWheel";
 
 // Papierformate: kanonische Quelle ist src/lib/paper.ts.
 // Für "frei" enthält diese Tabelle nur die Default-Größe; individuelle Werte
@@ -176,6 +178,13 @@ export default function ProjectWorkspace() {
   // Force-re-render der ToolsTab, sobald die Engine bereit ist (für Panel-Wiring).
   const [, forceEngineTick] = useState(0);
   const [presenting, setPresenting] = useState(false);
+  const [tabletAidOn, setTabletAidOn] = useState<boolean>(() => {
+    try { return localStorage.getItem("pixuna.tabletAid") === "1"; } catch { return false; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem("pixuna.tabletAid", tabletAidOn ? "1" : "0"); } catch {}
+  }, [tabletAidOn]);
+  const hist = useProjectHistory(project?.id);
 
 
 
@@ -595,6 +604,22 @@ export default function ProjectWorkspace() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedElementIds, cadSelectionCount, activePage?.id, project?.id]);
 
+  // Undo / Redo Shortcuts (Ctrl/Cmd+Z, Ctrl+Shift+Z / Ctrl+Y).
+  useEffect(() => {
+    if (!project?.id) return;
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      const mod = e.ctrlKey || e.metaKey;
+      if (!mod) return;
+      const k = e.key.toLowerCase();
+      if (k === "z" && !e.shiftKey) { e.preventDefault(); projectStore.undo(project.id); }
+      else if ((k === "z" && e.shiftKey) || k === "y") { e.preventDefault(); projectStore.redo(project.id); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [project?.id]);
+
 
   if (!project) {
     return (
@@ -621,11 +646,17 @@ export default function ProjectWorkspace() {
         
         mode="workspace"
         zoomPercent={Math.round(zoom)}
+        canUndo={hist.canUndo}
+        canRedo={hist.canRedo}
+        onUndo={() => projectStore.undo(project.id)}
+        onRedo={() => projectStore.redo(project.id)}
         canDelete={selectedElementIds.length > 0 || cadSelectionCount > 0}
         onDelete={runDeleteSelection}
         onPresent={() => setPresenting(true)}
         onShare={() => {}}
         onExport={() => setPrintMode((v) => !v)}
+        tabletAidOn={tabletAidOn}
+        onToggleTabletAid={() => setTabletAidOn((v) => !v)}
       />
       <div className="flex-1 flex min-h-0">
       {/* Far-left tool rail */}
@@ -1544,6 +1575,7 @@ export default function ProjectWorkspace() {
         onSelectPage={(id) => setActivePageId(id)}
       />
     )}
+    {tabletAidOn && <TabletAidWheel />}
     </>
   );
 }
@@ -3114,7 +3146,18 @@ function PageSettings({
           <Row label="Format">
             <select
               value={page.format}
-              onChange={(e) => update({ format: e.target.value as PageFormat })}
+              onChange={(e) => {
+                const next = e.target.value as PageFormat;
+                if (next === "frei") {
+                  update({
+                    format: next,
+                    customWidthMm: page.customWidthMm ?? 400,
+                    customHeightMm: page.customHeightMm ?? 300,
+                  });
+                } else {
+                  update({ format: next });
+                }
+              }}
               className="w-full h-8 px-2 rounded bg-transparent border text-sm"
               style={{ borderColor: "hsl(var(--hairline))" }}
             >
@@ -3127,26 +3170,72 @@ function PageSettings({
               )}
             </select>
           </Row>
-          <Row label="Ausrichtung">
-            <div className="flex gap-2">
-              <button
-                onClick={() => update({ format: page.format.includes("hoch") ? (page.format.replace("hoch", "quer") as PageFormat) : page.format })}
-                className="h-8 w-8 rounded border flex items-center justify-center"
-                style={{ borderColor: "hsl(var(--hairline))" }}
-                title="Querformat"
-              >
-                ▭
-              </button>
-              <button
-                onClick={() => update({ format: page.format.includes("quer") ? (page.format.replace("quer", "hoch") as PageFormat) : page.format })}
-                className="h-8 w-8 rounded border flex items-center justify-center"
-                style={{ borderColor: "hsl(var(--hairline))" }}
-                title="Hochformat"
-              >
-                ▯
-              </button>
-            </div>
-          </Row>
+          {page.format === "frei" ? (
+            <>
+              <Row label="Breite (mm)">
+                <input
+                  type="number"
+                  min={50}
+                  max={2000}
+                  value={page.customWidthMm ?? 400}
+                  onChange={(e) => {
+                    const v = Math.max(50, Math.min(2000, Number(e.target.value) || 0));
+                    update({ customWidthMm: v });
+                  }}
+                  className="w-full h-8 px-2 rounded bg-transparent border text-sm"
+                  style={{ borderColor: "hsl(var(--hairline))" }}
+                />
+              </Row>
+              <Row label="Höhe (mm)">
+                <input
+                  type="number"
+                  min={50}
+                  max={2000}
+                  value={page.customHeightMm ?? 300}
+                  onChange={(e) => {
+                    const v = Math.max(50, Math.min(2000, Number(e.target.value) || 0));
+                    update({ customHeightMm: v });
+                  }}
+                  className="w-full h-8 px-2 rounded bg-transparent border text-sm"
+                  style={{ borderColor: "hsl(var(--hairline))" }}
+                />
+              </Row>
+              <Row label="Ausrichtung">
+                <button
+                  onClick={() => update({
+                    customWidthMm: page.customHeightMm ?? 300,
+                    customHeightMm: page.customWidthMm ?? 400,
+                  })}
+                  className="h-8 px-3 rounded border text-xs"
+                  style={{ borderColor: "hsl(var(--hairline))" }}
+                  title="Breite und Höhe tauschen"
+                >
+                  Breite ↔ Höhe tauschen
+                </button>
+              </Row>
+            </>
+          ) : (
+            <Row label="Ausrichtung">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => update({ format: page.format.includes("hoch") ? (page.format.replace("hoch", "quer") as PageFormat) : page.format })}
+                  className="h-8 w-8 rounded border flex items-center justify-center"
+                  style={{ borderColor: "hsl(var(--hairline))" }}
+                  title="Querformat"
+                >
+                  ▭
+                </button>
+                <button
+                  onClick={() => update({ format: page.format.includes("quer") ? (page.format.replace("quer", "hoch") as PageFormat) : page.format })}
+                  className="h-8 w-8 rounded border flex items-center justify-center"
+                  style={{ borderColor: "hsl(var(--hairline))" }}
+                  title="Hochformat"
+                >
+                  ▯
+                </button>
+              </div>
+            </Row>
+          )}
           <Row label="Ränder">
             <div className="flex items-center gap-2 w-full">
               <input

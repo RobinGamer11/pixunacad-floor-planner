@@ -9,6 +9,7 @@ import {
   FolderKanban,
   Compass,
   Trash2,
+  HelpCircle,
 } from "lucide-react";
 
 export type WorkspaceMode = "workspace" | "cad";
@@ -28,6 +29,9 @@ interface Props {
   onPresent?: () => void;
   onShare?: () => void;
   onExport?: () => void;
+  /** Tablet-Hilfsrad (LMB/RMB/SHIFT/ESC/ENTF) einblenden. */
+  tabletAidOn?: boolean;
+  onToggleTabletAid?: () => void;
 }
 
 /**
@@ -49,6 +53,8 @@ export function WorkspaceHeader({
   onPresent,
   onShare,
   onExport,
+  tabletAidOn = false,
+  onToggleTabletAid,
 }: Props) {
   const navigate = useNavigate();
 
@@ -114,6 +120,17 @@ export function WorkspaceHeader({
         >
           <Trash2 size={16} />
         </button>
+        {onToggleTabletAid && (
+          <button
+            onClick={onToggleTabletAid}
+            className="h-8 w-8 rounded-md flex items-center justify-center hover:bg-muted"
+            style={tabletAidOn ? { background: "hsl(var(--accent-gold-soft))", color: "hsl(var(--accent-gold))" } : undefined}
+            title="Tablet-Hilfsrad (Maus/Tastatur-Ersatz)"
+            aria-pressed={tabletAidOn}
+          >
+            <HelpCircle size={16} />
+          </button>
+        )}
         <button
           onClick={onUndo}
           disabled={!canUndo}

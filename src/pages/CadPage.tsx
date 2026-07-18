@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import CadEditor, { type CadEditorHandle } from "@/components/CadEditor";
 import { useProject } from "@/lib/projectStore";
 import { WorkspaceHeader } from "@/components/workspace/WorkspaceHeader";
+import { TabletAidWheel } from "@/components/TabletAidWheel";
 import { Check, X } from "lucide-react";
 import { bytesToBase64, canvasRegionToPdfBytes, stashPendingSheetPdf } from "@/lib/sheetPdfExport";
 
@@ -26,6 +27,12 @@ const CadPage = () => {
   const [canRedo, setCanRedo] = useState(false);
   const [canDelete, setCanDelete] = useState(false);
   const [zoom, setZoom] = useState<number | undefined>(undefined);
+  const [tabletAidOn, setTabletAidOn] = useState<boolean>(() => {
+    try { return localStorage.getItem("pixuna.tabletAid") === "1"; } catch { return false; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem("pixuna.tabletAid", tabletAidOn ? "1" : "0"); } catch {}
+  }, [tabletAidOn]);
 
   // "PDF aus CAD-Blatt einfügen": Wenn Query-Parameter gesetzt sind,
   // eine kleine Bestätigungsleiste einblenden.
@@ -196,6 +203,8 @@ const CadPage = () => {
         zoomPercent={zoom}
         onPresent={handlePresent}
         onShare={() => {}}
+        tabletAidOn={tabletAidOn}
+        onToggleTabletAid={() => setTabletAidOn((v) => !v)}
         onExport={() => editorRef.current?.openExportPanel()}
       />
       <main ref={mainRef} className="flex-1 relative min-h-0 bg-background">
@@ -302,6 +311,7 @@ const CadPage = () => {
           </div>
         )}
       </main>
+      {tabletAidOn && <TabletAidWheel />}
     </div>
   );
 };

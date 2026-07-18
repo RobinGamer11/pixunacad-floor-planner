@@ -1,106 +1,99 @@
-
-## Ist-Zustand (kurz)
-
-- **CAD-Modell**: bereits 1:1 in Welt-Metern gespeichert (`Camera.scale` ist nur px/m fürs Zeichnen). ✅ passt konzeptionell, muss nur unangetastet bleiben.
-- **Seiten**: `ProjectPage.format` ist ein Label (`"A3-quer"`), das erst zur Renderzeit über `FORMAT_SIZES` in mm aufgelöst wird. Element-Koordinaten (`x/y/w/h`) sind in **Prozent der Seite**, nicht in mm.
-- **CAD-Blatt-Einfügen**: erzeugt ein `cad-view`-Element mit `viewSnapshot` (PNG) + `scale`-String. Kein echter Viewport (kein Modellmittelpunkt, keine Rotation, keine Layer, kein Live-Ausschnitt) — beim Maßstabswechsel wird nur das Bild neu skaliert bzw. neu exportiert.
-- **PDF-Export der Projektmappe** (`projectPdfExport.ts`): rastert die Seite über `pxPerMm` und packt sie in ein mm-PDF. Größe stimmt zwar, aber Vektor-CAD-Inhalt wird als Bitmap ausgegeben, und die Viewport-Skala steckt nur im vorab erzeugten Snapshot.
-- **Bildschirmdarstellung**: `pxPerMm = (1100 / refFmt.w) * (zoom/100)` — Bildschirmzoom und mm sind zwar getrennt, aber Elemente rechnen intern in %.
-
-Damit erfüllt das Projekt die geforderte Trennung nur teilweise: Paper-Maßstab wirkt heute als *Snapshot-Skalierung*, nicht als lebender Viewport.
-
 ## Ziel
 
-Layout-/Paper-Space-Verhalten wie in Archicad/AutoCAD:
+Drei Erweiterungen für Projektmappe & CAD-Oberfläche:
 
-1. Seiten & alle Seitenelemente intern in **Papier-mm**.
-2. CAD-Blätter als **echte Viewports** mit `{xMm, yMm, wMm, hMm, scaleDen, modelCenter{xM,yM}, rotationDeg, visibleLayers?}`.
-3. Maßstab **nur** zwischen Papier-mm und Modell-m (`modelLenM = paperLenMm * scaleDen / 1000`).
-4. Bildschirmzoom (`pxPerMm`) rein für die Darstellung; ändert den CAD-Maßstab nie.
-5. PDF-Export in echten mm; Viewport rendert sein Modell-Fenster direkt (kein globales Canvas-Scale).
-6. Maßstab ändern → Viewport-Rahmen bleibt auf Papier gleich groß, sichtbarer Modellausschnitt ändert sich um Mittelpunkt.
+1. **Undo/Redo für alle Aktionen** in Projektmappe (CAD hat bereits eigene History).
+2. **Freies Papierformat** in Seiteneinstellung mit individueller Breite/Höhe (mm).
+3. **Tablet-Hilfsrad**: umschaltbares On-Screen-Bedienrad mit RMB, LMB, SHIFT, ESC, ENTF — als Ersatz für fehlende Maus/Tastatur.
 
-## Umsetzung (in dieser Reihenfolge, jede Stufe unabhängig lauffähig)
+---
 
-### Stufe 1 — Papierformat & mm-Basis konsolidieren
+## 1) Undo / Redo (Projektmappe)
 
-- `src/lib/paper.ts` (neu): kanonische Formatliste (`A0–A4`, hoch/quer, `frei`), `getPageSizeMm(page) → {wMm, hMm}` inkl. `page.customWidthMm/customHeightMm` für `"frei"`. `ProjectPage` bekommt optional `customWidthMm/customHeightMm`.
-- `FORMAT_SIZES` in `ProjectWorkspace.tsx` und `projectPdfExport.ts` durch diese eine Quelle ersetzen.
-- **Kein** Schema-Bruch für bestehende Seiten: Alt-Format-Labels bleiben gültig.
+**Ort:** `src/lib/projectStore.ts`
 
-### Stufe 2 — Elementkoordinaten in mm (mit Migration)
+- Neben `state` einen History-Stack pro Projekt: `history: { past: Project[]; future: Project[] }` (in-memory Map, nicht persistiert; letzte ~50 Zustände).
+- Vor jedem projektspezifischen `setState`, das ein `Project` mutiert (updateProject, alle Seiten-/Element-/Sheets-/Mappen-Mutationen), aktuellen `Project`-Snapshot in `past` pushen und `future` leeren.
+- Neue API:
+  - `projectStore.undo(projectId)` — pop `past` → aktueller Zustand in `future`.
+  - `projectStore.redo(projectId)`
+  - `projectStore.canUndo(projectId) / canRedo(projectId)`
+- Ausnahmen: reine UI-/Selection-Toggles (activeMappeId Wechsel, timelinePosition-Preview) NICHT in History.
 
-- `PageElement` bekommt kanonisch `xMm, yMm, wMm, hMm` (Nummer). Legacy `x/y/w/h` (%) bleiben lesbar.
-- Loader-Migration in `projectStore`: fehlt `xMm`, aus (`x%`, `format`) einmalig berechnen und in-place speichern. Danach schreibt UI nur noch mm.
-- Alle Lese-/Schreibstellen in `ProjectWorkspace.tsx` (Drag, Resize, Selection-Marquee, Snap-Rechnungen, Guides, `runDeleteSelection`, Punch-Layout) auf mm umstellen. `pxPerMm` bleibt nur der Bildschirm-Transformer.
+**Ort:** `src/pages/ProjectWorkspace.tsx`
 
-### Stufe 3 — CAD-Viewport-Datenmodell
+- `WorkspaceHeader` bekommt echte `canUndo/canRedo/onUndo/onRedo` (heute Dummy).
+- Keyboard-Shortcuts: `Ctrl/Cmd+Z`, `Ctrl+Shift+Z` / `Ctrl+Y` — nur wenn Fokus nicht in Input/Textarea/contentEditable.
 
-- Neuer Elementtyp `"cad-viewport"` (in `ElementKind`) mit Feldern:
-  ```ts
-  scaleDen: number;              // 100 für 1:100
-  modelCenter: { xM: number; yM: number };
-  rotationDeg: number;
-  visibleLayers?: string[];      // reserviert
-  sheetId: string;               // welches CAD-Blatt/Scene
-  ```
-  Legacy `"cad-view"`-Elemente werden beim Laden gemappt (Snapshot bleibt als Fallback-Thumbnail erhalten, `scale`-String → `scaleDen`; `modelCenter` aus Snapshot-Metadaten bzw. Scene-Bounds).
-- `Sheet` erhält optional `defaultScaleDen` (aus altem `scale`-String migriert).
+**CAD-Oberfläche:** bereits vorhanden, nichts ändern.
 
-### Stufe 4 — Live-Renderer für Viewports (Bildschirm)
+---
 
-- `src/components/page/CadViewportView.tsx` (neu, ersetzt in Stufe 5 das PNG-basierte `cad-view`-Rendering):
-  - Berechnet sichtbaren Modellbereich: `modelWm = wMm * scaleDen / 1000`, `modelHm = hMm * scaleDen / 1000`.
-  - Rendert die Scene direkt in ein Offscreen-Canvas der Größe `wMm * pxPerMm × hMm * pxPerMm` mittels bestehender Renderer-Bausteine (`Renderer`, `Scene`) — Kamera wird pro Viewport aus `modelCenter`, `scaleDen` und Ziel-Canvas-Größe abgeleitet, **nicht** aus dem Editor-Zustand.
-  - Kein CSS-Transform-Zoom; Änderungen am Seitenzoom triggern nur neues Rendern mit anderem `pxPerMm`.
-- Übergangs-Fallback: fehlt die Scene, wird der bisherige `viewSnapshot` als Bild angezeigt.
+## 2) Freies Papierformat mit Breite/Höhe
 
-### Stufe 5 — Interaktionen am Viewport
+**Ort:** `src/pages/ProjectWorkspace.tsx` (Seiteneinstellung, ab Zeile ~3114 `Row label="Format"`).
 
-- **Rahmen skalieren** (Drag am Handle): ändert `wMm/hMm`, nicht `scaleDen`. Modellausschnitt wächst/schrumpft entsprechend.
-- **Maßstab ändern** (Inspector-Dropdown): ändert nur `scaleDen`; `modelCenter` bleibt; `wMm/hMm` bleiben. Vorschau/PDF zeigen sofort neuen Ausschnitt.
-- **Pan innerhalb des Viewports** (Alt-Drag oder eigener Handle): verschiebt `modelCenter`. Klare UX-Trennung zu „Viewport auf Seite verschieben“.
-- Rotation: bestehender `rotation`-Griff schreibt `rotationDeg`.
+- Wenn `page.format === "frei"`: unter Format-Dropdown zwei Zahlfelder erscheinen lassen:
+  - „Breite (mm)" → `page.customWidthMm`
+  - „Höhe (mm)" → `page.customHeightMm`
+- Beim ersten Umschalten auf „frei" Defaults aus `paper.ts` (400×300) übernehmen falls leer.
+- Ausrichtungs-Buttons (hoch/quer) für „frei" durch einen Tausch-Button ersetzen (W↔H).
+- `FORMAT_SIZES["frei"]` bleibt Fallback; überall wo `FORMAT_SIZES[page.format]` verwendet wird, stattdessen `getPageSizeMm(page)` aus `paper.ts` nutzen (bereits vorhanden). Vorkommen in `ProjectWorkspace.tsx` (`FORMAT_SIZES[...]`) migrieren.
 
-### Stufe 6 — Aus CAD-Oberfläche einfügen (Ersatz für Snapshot-Pipeline)
+---
 
-- `CadPage.confirmSheetPdf`: statt `canvasRegionToPdfBytes` + PNG-Snapshot künftig `stashPendingSheetPdf({ mode, viewportSpec: { xMm, yMm, wMm, hMm, scaleDen, modelCenter, rotationDeg } })`.
-  - Für `mode: "view"`: `wMm/hMm` aus aktueller Canvas-CSS-Größe und Kamera-Maßstab → Papier-mm; `modelCenter` aus Kamera-Offset.
-  - Für `mode: "frame"`: analog aus dem aufgezogenen Rahmen.
-- `ProjectWorkspace.tsx` Import-Pipeline (~Zeile 480) legt statt `cad-view`-PNG ein `cad-viewport`-Element an. PNG-Snapshot bleibt optional als Vorschau, bis der Live-Renderer greift.
+## 3) Tablet-Hilfsrad
 
-### Stufe 7 — PDF-Export in echten mm
+### 3a) Toggle-Button im Header
 
-- `projectPdfExport.ts`:
-  - Seitenpapier aus Stufe 1 (mm).
-  - Elemente nach Kind:
-    - Text/Shape/Line/Guide: direkt in mm-Koordinaten via pdf-lib (kein Bitmap-Detour).
-    - Bild/PDF: `drawImage`/eingebettete PDF-Seite in mm-Box.
-    - `cad-viewport`: rendert Scene in `wMm × hMm` mit hoher DPI (z. B. 300 dpi = `wMm/25.4*300` px) und bettet als Bitmap ein — oder ideal via Vector-Draw ins PDF, falls Renderer eine PDF-Ausgabe unterstützt (kann in einem Folgeschritt kommen).
-  - Kein `fit to page`, keine Nachskalierung. Jede Seite wird als exakt `wMm × hMm` PDF-Seite ausgegeben (bereits vorhandenes MM_TO_PT bleibt).
-- Druckhinweis in der Print-Dialog-UI: „Skalierung: Tatsächliche Größe (100 %)".
+**Ort:** `src/components/workspace/WorkspaceHeader.tsx`
 
-### Stufe 8 — Aufräumen
+- Neuer Button links neben Mülltonne: `HelpCircle` (lucide) mit Tooltip „Tablet-Hilfsrad".
+- Aktiv-Zustand visuell markiert (Gold-Hintergrund).
+- Props: `tabletAidOn`, `onToggleTabletAid`.
+- Auf CAD- und Projektmappen-Seite State im Page-Component halten (persistiert in localStorage per `projectStore` optional).
 
-- Alten `cad-view`-Renderpfad entfernen, sobald Migration + Live-Renderer stabil.
-- README / Memory: „Alle Seiten- und Viewport-Koordinaten sind in Papier-mm; Maßstab nur zwischen Papier-mm und Modell-m; Bildschirmzoom ist reine Darstellung."
+### 3b) Das Rad (neue Komponente)
 
-## Technische Kernformeln
+**Datei:** `src/components/TabletAidWheel.tsx`
 
-```text
-modelLenM   = paperLenMm * scaleDen / 1000
-paperLenMm  = modelLenM * 1000 / scaleDen
-viewport.modelWm = viewport.wMm * scaleDen / 1000
-screenPx    = mm * pxPerMm             // nur Darstellung
-pdfPt       = mm * 72 / 25.4           // Export
-```
+- Fixed positionierter runder Container (default unten-links, ~180 px). Per Pointer-Drag am Rand verschiebbar; Position in localStorage.
+- 5 Buttons kreisförmig angeordnet mit Icons + Labels:
+  - **LMB** (`MousePointer2`) — simuliert linke Maustaste
+  - **RMB** (`MousePointer2` gespiegelt / Kontextmenu-Icon)
+  - **SHIFT** (`ArrowBigUp`)
+  - **ESC** (Text)
+  - **ENTF** (`Trash2` oder Text "DEL")
+- Verhalten:
+  - Zwei Modi je Button: **Tap** = einmaliger Event, **Long-Press** oder aktives Halten = „gedrückt halten" (sticky). Zwei-Hände-Betrieb: Nutzer hält z. B. SHIFT-Symbol mit Finger A, zeichnet mit Finger B im Canvas.
+  - Solange ein Modifier gedrückt gehalten wird, Button visuell aktiv.
 
-## Nicht im Scope
+### 3c) Event-Injektion
 
-- Änderungen an der CAD-Oberfläche selbst (bleibt 1:1 in Metern).
-- Neue Layer-Verwaltung (`visibleLayers` nur Feld reserviert).
-- Vektor-PDF-Ausgabe der CAD-Szene (Stufe 7 nutzt zunächst hochaufgelöste Bitmap-Einbettung im mm-Rahmen — messbar korrekt, nur nicht selektierbar).
+**Neues Utility:** `src/lib/virtualInput.ts`
 
-## Offene Frage vor Umsetzung
+- `pressKey(code)`: dispatched synthetisches `KeyboardEvent('keydown'/'keyup')` an `document.activeElement || document`. Für ESC (`Escape`), ENTF (`Delete`).
+- `holdKey(code, on: boolean)`: für SHIFT — hält `keydown` ohne `keyup` bis release.
+- `pressMouseButton(button, on)`: dispatched `pointerdown/pointerup/contextmenu` an dem Element unter dem letzten CAD-/Canvas-Zeiger. Da CAD/Projektmappe pointer-basierte Tools haben, echte `PointerEvent`s mit `bubbles: true, pointerType: 'touch', button` auslösen.
+- Für RMB: auf CAD-Canvas ein `contextmenu`-Event feuern (Input.ts liest `mouse.right`); Halten setzt `mouse.right = true` per patchbarer Bridge. Einfachste Variante: `document.dispatchEvent(new MouseEvent('contextmenu', {...}))` genügt für die aktuellen Rechtsklick-Handler.
+- Da Input.ts native `pointerdown/pointerup` mit `button: 2` liest, synthetisieren wir diese direkt auf das aktuelle Canvas (Ziel via `document.querySelector('canvas')` im aktiven `<main>`).
 
-Migration bestehender Projekte: Sollen alte `cad-view`-PNG-Snapshots erhalten bleiben (als Fallback-Vorschau bis der Live-Viewport erstmals rendert), oder beim ersten Öffnen automatisch durch echte Viewports ersetzt und der Snapshot verworfen werden? Empfehlung: Snapshot behalten, bis Nutzer den Viewport interaktiv anfasst.
+### 3d) Einbindung
+
+- `CadPage.tsx` und `ProjectWorkspace.tsx`: `useState` für `aidOn`, Header-Toggle verdrahten, `<TabletAidWheel />` conditional rendern.
+
+---
+
+## Technische Details
+
+- History-Deep-Clone via `structuredClone(project)`.
+- Undo-Kappung: 50 Einträge, dann `past.shift()`.
+- `page.customWidthMm/customHeightMm` sind bereits im Type vorhanden (`paper.ts` nutzt sie). Grenzen: 50–2000 mm.
+- Virtual-Input-Events müssen `isTrusted=false` erlauben — unsere Handler prüfen das nicht, also OK.
+- Kein neues npm-Paket nötig.
+
+## Reihenfolge der Umsetzung
+
+1. Freies Format (isoliert, klein).
+2. Undo/Redo (Store + Header + Shortcuts).
+3. Tablet-Hilfsrad (Komponente + virtualInput + Einbindung in beide Seiten).
