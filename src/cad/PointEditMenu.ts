@@ -22,6 +22,7 @@ export class PointEditMenu {
       btn.addEventListener("click", () => {
         this.index = this.actions.indexOf(action);
         this._sync();
+        try { (window as any).__pixunaSkipFirstDraw = true; } catch {}
         this._onActivate && this._onActivate(action);
       });
     }
