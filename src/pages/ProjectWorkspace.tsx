@@ -3293,6 +3293,10 @@ function FreeFormatEditor({ width, height, onCommit }: { width: number; height: 
       </div>
     </>
   );
+}
+
+
+
 
 
 function PageSettings({
