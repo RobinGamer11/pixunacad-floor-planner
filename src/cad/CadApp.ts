@@ -496,6 +496,10 @@ export class CadApp {
         this.selectTool.beginWallEdgeAction((sel as any).wallId, (sel as any).edgeIndex, action);
         return;
       }
+      if (sel && sel.type === SelectionType.FREE_STROKE && (sel as any).freeStrokeId) {
+        this.selectTool.beginFreeStrokeAction((sel as any).freeStrokeId, action);
+        return;
+      }
       this.selectTool.beginPointEdit(action);
     });
 
