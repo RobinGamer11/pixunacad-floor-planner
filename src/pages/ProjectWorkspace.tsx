@@ -2804,7 +2804,13 @@ function ElementView({
       {(el.kind === "cad-view" || el.kind === "cad-viewport") && (
         <CadViewportViewHost element={el} />
       )}
-      {(el.kind === "shape" || el.kind === "line" || el.kind === "table" || el.kind === "pdf" || el.kind === "timeline") && el.kind !== "pdf" && (
+      {el.kind === "table" && (
+        <TableElementView
+          element={el}
+          onChange={(patch) => projectStore.updateElement(projectId, page.id, el.id, patch)}
+        />
+      )}
+      {(el.kind === "shape" || el.kind === "line" || el.kind === "pdf" || el.kind === "timeline") && el.kind !== "pdf" && (
         <div
           className="w-full h-full flex items-center justify-center text-xs text-muted-foreground"
           style={{ background: "hsl(var(--surface-muted))" }}
@@ -2812,6 +2818,7 @@ function ElementView({
           {el.kind}
         </div>
       )}
+
       {el.kind === "pdf" && (
         el.pdfSourceB64 ? (
           <PdfPageView sourceB64={el.pdfSourceB64} pageIndex={el.pdfPageIndex ?? 0} />
