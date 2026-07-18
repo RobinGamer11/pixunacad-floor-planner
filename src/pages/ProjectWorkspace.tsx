@@ -4438,7 +4438,7 @@ function ElementInspector({
         />
       </Row>
 
-      {element.kind === "cad-view" && (() => {
+      {(element.kind === "cad-view" || element.kind === "cad-viewport") && (() => {
         const project = projectStore.getState().projects.find((p) => p.id === projectId);
         const sheet = project?.sheets.find((s) => s.id === element.sheetId);
         const cur = element.scale ?? sheet?.scale ?? "1:100";
