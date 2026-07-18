@@ -87,6 +87,7 @@ import { FreeDrawSettingsPanel } from "@/components/cad/FreeDrawSettingsPanel";
 import { EraserSettingsPanel } from "@/components/cad/EraserSettingsPanel";
 import { HatchSettingsPanel } from "@/components/cad/HatchSettingsPanel";
 import { WorkspaceHeader } from "@/components/workspace/WorkspaceHeader";
+import { TabletAidWheel } from "@/components/TabletAidWheel";
 
 // Papierformate: kanonische Quelle ist src/lib/paper.ts.
 // Für "frei" enthält diese Tabelle nur die Default-Größe; individuelle Werte
