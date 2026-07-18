@@ -18,3 +18,4 @@ Roadmap: Zuerst funktionaler CAD-Editor, Benutzerregistrierung und Projektspeich
 - [Hatch Tool](mem://features/hatch-tool) — Polygon-Erstellung/Bearbeitung (H) mit Farben, verschiebbarem m²-Label und Punktbearbeitung
 - [Undo/Redo](mem://features/undo-redo) — JSON-Snapshot-History mit Polling, Strg+Z/Y
 - [Clipboard & Pipette](mem://features/clipboard-pipette) — Strg+C/V (Vorschau am Cursor) und Pipette (P, Stil+ID, Shift=nur Stil)
+- [Notiznetz](mem://features/notiznetz) — Route `/project/:id/notes`, hierarchische Knoten in `notesStore` (localStorage), 3-Spalten-Layout: Liste/Editor/Radial-Graph
