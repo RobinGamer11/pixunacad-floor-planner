@@ -31,9 +31,11 @@ export function TableElementView({
 
   const updateCells = (mutator: (draft: string[][]) => string[][] | void) => {
     const clone = cells.map((row) => row.slice());
-    const next = mutator(clone) ?? clone;
+    const result = mutator(clone);
+    const next: string[][] = result ?? clone;
     onChange({ tableData: { ...data, cells: next } });
   };
+
 
   const setCell = (r: number, c: number, v: string) => {
     updateCells((d) => { d[r][c] = v; });
