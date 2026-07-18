@@ -4314,7 +4314,7 @@ function ElementInspector({
       <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-1">
         {element.kind.toUpperCase()}
       </div>
-      {element.kind !== "cad-view" && (
+      {element.kind !== "cad-view" && element.kind !== "cad-viewport" && (
         <>
           <Row label="Breite">
             <input
