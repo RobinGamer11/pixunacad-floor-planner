@@ -177,6 +177,13 @@ export default function ProjectWorkspace() {
   // Force-re-render der ToolsTab, sobald die Engine bereit ist (für Panel-Wiring).
   const [, forceEngineTick] = useState(0);
   const [presenting, setPresenting] = useState(false);
+  const [tabletAidOn, setTabletAidOn] = useState<boolean>(() => {
+    try { return localStorage.getItem("pixuna.tabletAid") === "1"; } catch { return false; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem("pixuna.tabletAid", tabletAidOn ? "1" : "0"); } catch {}
+  }, [tabletAidOn]);
+  const hist = useProjectHistory(project?.id);
 
 
 
