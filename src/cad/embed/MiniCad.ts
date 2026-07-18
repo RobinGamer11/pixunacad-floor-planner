@@ -364,6 +364,10 @@ export class MiniCad {
         this.selectTool.beginTextBoxHandleEdit((sel as any).textBoxId, sel.handleIndex, action);
         return;
       }
+      if (sel && sel.type === SelectionType.FREE_STROKE && (sel as any).freeStrokeId) {
+        (this.selectTool as any).beginFreeStrokeAction?.((sel as any).freeStrokeId, action);
+        return;
+      }
       this.selectTool.beginPointEdit(action);
     });
 

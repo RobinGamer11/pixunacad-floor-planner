@@ -111,6 +111,8 @@ export class SelectTool {
   dragFreeStrokeId: string | null = null;
   dragFreeStrokeGrabOffset: Vec2 | null = null; // mouseStart - points[0]
   dragFreeStrokeOrigPoints: Vec2[] | null = null;
+  // FreeStroke Edit-State (HUB-Action TRANSLATE / ROTATE)
+  freeStrokePointsOriginal: Vec2[] | null = null;
 
   // TextBox Drag/Rotate-State
   dragTextBoxId: string | null = null;
@@ -722,6 +724,54 @@ export class SelectTool {
     }
   }
 
+  /** HUB-Aktion für einen Freihand-Stroke: TRANSLATE / ROTATE / DELETE. */
+  beginFreeStrokeAction(strokeId: string, action: string) {
+    const stroke = this.app.scene.getFreeStrokeById?.(strokeId);
+    if (!stroke || !stroke.points || stroke.points.length < 1) return;
+
+    if (action === PointEditAction.DELETE) {
+      this.app.scene.removeFreeStroke(stroke);
+      this.app.setSelection(null);
+      this.app.pointEditMenu.hide();
+      return;
+    }
+
+    // Pivot/Fixpunkt = geometrischer Mittelpunkt aller Stützpunkte (Centroid).
+    let cx = 0, cy = 0;
+    for (const p of stroke.points) { cx += p.x; cy += p.y; }
+    cx /= stroke.points.length;
+    cy /= stroke.points.length;
+    const center = v(cx, cy);
+
+    // "Anderer" Referenzpunkt für Rotate/Translate: erster Stroke-Punkt.
+    const other = v(stroke.points[0].x, stroke.points[0].y);
+
+    this.editTarget = { kind: "freeStroke", freeStrokeId: strokeId } as any;
+    this.freeStrokePointsOriginal = stroke.points.map((p) => v(p.x, p.y));
+    this.fixedPoint = center;
+    this.otherPointOriginal = other;
+    this.moveHubLocked = false;
+    this.moveHubLengthM = null;
+    this.moveHubAngleDeg = null;
+    this.app.pointEditMenu.hide();
+
+    if (action === PointEditAction.ROTATE) {
+      this.activeEditAction = PointEditAction.ROTATE;
+      const radius = dist(this.fixedPoint, this.otherPointOriginal);
+      const ang = angleDeg(this.fixedPoint, this.otherPointOriginal);
+      this.app.hub.showAt(this.app.input.mouse.sx, this.app.input.mouse.sy);
+      this.app.hub.updateDisplay(radius, ang);
+      this.app.hub.setValues(radius, ang);
+      this.app.hub.enterEditMode();
+    } else {
+      // Default: TRANSLATE (Verschieben / Bewegen der gesamten Linie).
+      this.activeEditAction = PointEditAction.TRANSLATE;
+      this.app.hub.hide();
+      this.app.hub.bindCommit(null);
+    }
+  }
+
+
   private _applyWallEdgeHubValues(vals: { lengthM: number | null; angleDeg: number | null }) {
     if (this.activeEditAction !== PointEditAction.OFFSET || !this.editTarget) return;
     if (this.editTarget.kind !== "wallEdge") return;
@@ -1027,8 +1077,36 @@ export class SelectTool {
         const orig = this.wallPointsOriginal[i];
         wall.corners[i] = v(orig.x + delta.x, orig.y + delta.y);
       }
+    } else if ((this.editTarget as any).kind === "freeStroke") {
+      const stroke = this.app.scene.getFreeStrokeById?.((this.editTarget as any).freeStrokeId);
+      if (!stroke || !this.freeStrokePointsOriginal) return;
+      for (let i = 0; i < stroke.points.length && i < this.freeStrokePointsOriginal.length; i++) {
+        const o = this.freeStrokePointsOriginal[i];
+        stroke.points[i] = v(o.x + delta.x, o.y + delta.y);
+      }
     }
   }
+
+
+  /** Rotate ALL points of the currently edited free-stroke around `fixedPoint`
+   *  to the absolute angle `newAngleDeg` (relative to the original first point). */
+  private _applyFreeStrokeRotate(newAngleDeg: number) {
+    if (!this.editTarget || (this.editTarget as any).kind !== "freeStroke") return;
+    if (!this.freeStrokePointsOriginal || !this.fixedPoint || !this.otherPointOriginal) return;
+    const stroke = this.app.scene.getFreeStrokeById?.((this.editTarget as any).freeStrokeId);
+    if (!stroke) return;
+    const baseAng = angleDeg(this.fixedPoint, this.otherPointOriginal);
+    const dRad = ((newAngleDeg - baseAng) * Math.PI) / 180;
+    const c = Math.cos(dRad), s = Math.sin(dRad);
+    for (let i = 0; i < stroke.points.length && i < this.freeStrokePointsOriginal.length; i++) {
+      const o = this.freeStrokePointsOriginal[i];
+      const dx = o.x - this.fixedPoint.x;
+      const dy = o.y - this.fixedPoint.y;
+      stroke.points[i] = v(this.fixedPoint.x + dx * c - dy * s, this.fixedPoint.y + dx * s + dy * c);
+    }
+  }
+
+
 
   /** Apply parallel offset to selected hatch edge. Adjacent endpoints slide along their adjacent edges. */
   private _applyHatchEdgeOffset(offsetM: number) {
@@ -1175,6 +1253,7 @@ export class SelectTool {
     this.moveHubAngleDeg = null;
     this.editGuideAnchors = [];
     this.wallPointsOriginal = null;
+    this.freeStrokePointsOriginal = null;
     this.wallPreviewPoint = null;
     this.wallPreviewDelta = null;
 
@@ -1947,6 +2026,8 @@ export class SelectTool {
         if (document.activeElement !== this.app.hub.lenInputEl && document.activeElement !== this.app.hub.angInputEl) {
           if (this.editTarget?.kind === "wall") {
             this._applyWallRotateHubValues({ lengthM: null, angleDeg: ang });
+          } else if ((this.editTarget as any)?.kind === "freeStroke") {
+            this._applyFreeStrokeRotate(ang);
           } else {
             this._applyMovingPoint(p, this.fixedPoint!);
           }
@@ -2415,6 +2496,12 @@ export class SelectTool {
             };
             this.dragFreeStrokeOrigPoints = freeHit.points.map((p) => ({ x: p.x, y: p.y }));
           }
+          // HUB mit Aktionen anzeigen (analog zur normalen "Linie").
+          this.app.pointEditMenu.showAt(input.mouse.sx, input.mouse.sy, [
+            PointEditAction.TRANSLATE,
+            PointEditAction.ROTATE,
+            PointEditAction.DELETE,
+          ]);
           return;
         }
         // Kein Vordergrund-Hit & kein Dokument → Auswahl aufheben.
