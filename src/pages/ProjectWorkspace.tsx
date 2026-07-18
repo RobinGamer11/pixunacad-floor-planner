@@ -95,7 +95,7 @@ import { TabletAidWheel } from "@/components/TabletAidWheel";
 // Seitengröße gebraucht wird (getPageSizeMm).
 import { PAPER_FORMATS as FORMAT_SIZES } from "@/lib/paper";
 
-export type PageTool = "guide" | "line" | "free" | "eraser" | "text" | "cad" | "pipette" | "hatch" | "document" | null;
+export type PageTool = "guide" | "line" | "free" | "eraser" | "text" | "cad" | "pipette" | "hatch" | "document" | "table" | null;
 type LinePageTool = "line" | "free" | "eraser";
 
 const LINE_TOOL_VARIANTS: Array<{ id: LinePageTool; label: string; icon: React.ElementType }> = [
