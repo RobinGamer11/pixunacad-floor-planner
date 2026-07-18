@@ -36,9 +36,9 @@ function pickTarget(): { el: Element; x: number; y: number } {
       ? { el: canvas, x: p!.x, y: p!.y }
       : { el: canvas, x: r.left + r.width / 2, y: r.top + r.height / 2 };
   }
-  const p = _lastPointer ?? { x: window.innerWidth / 2, y: window.innerHeight / 2 };
-  const el = document.elementFromPoint(p.x, p.y) ?? document.body;
-  return { el, x: p.x, y: p.y };
+  const fallback = _lastPointer ?? { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+  const el = document.elementFromPoint(fallback.x, fallback.y) ?? document.body;
+  return { el, x: fallback.x, y: fallback.y };
 }
 
 let _lastPointer: { x: number; y: number } | null = null;
@@ -126,16 +126,17 @@ const KEYS: Record<string, KeyDef> = {
   Backspace: { key: "Backspace", code: "Backspace", keyCode: 8 },
 };
 
-function keyTarget(): EventTarget {
-  return (document.activeElement && document.activeElement !== document.body)
+function keyTarget(target?: EventTarget | null): EventTarget {
+  return target
+    ?? ((document.activeElement && document.activeElement !== document.body)
     ? document.activeElement
     : (document.querySelector("main canvas") ?? document);
 }
 
 /** Einmaliger Tastendruck (down+up). */
-export function virtualKeyPress(name: "Escape" | "Delete" | "Enter" | "Backspace") {
+export function virtualKeyPress(name: "Escape" | "Delete" | "Enter" | "Backspace", target?: HTMLElement | null) {
   const def = KEYS[name];
-  const t = keyTarget();
+  const t = keyTarget(target);
   const mk = (type: "keydown" | "keyup") =>
     new KeyboardEvent(type, { key: def.key, code: def.code, keyCode: def.keyCode, which: def.keyCode, bubbles: true, cancelable: true });
   const down = mk("keydown"); (down as any).__virtual = true;
@@ -148,8 +149,8 @@ export function virtualKeyPress(name: "Escape" | "Delete" | "Enter" | "Backspace
     (t as HTMLInputElement).blur();
   }
   // Für Backspace: Zeichen im Input löschen.
-  if (name === "Backspace" && t instanceof HTMLInputElement) {
-    const el = t as HTMLInputElement;
+  if (name === "Backspace" && (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement)) {
+    const el = t as HTMLInputElement | HTMLTextAreaElement;
     const s = el.selectionStart ?? el.value.length;
     const e = el.selectionEnd ?? s;
     if (s === e && s > 0) {
