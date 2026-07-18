@@ -604,6 +604,22 @@ export default function ProjectWorkspace() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedElementIds, cadSelectionCount, activePage?.id, project?.id]);
 
+  // Undo / Redo Shortcuts (Ctrl/Cmd+Z, Ctrl+Shift+Z / Ctrl+Y).
+  useEffect(() => {
+    if (!project?.id) return;
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      const mod = e.ctrlKey || e.metaKey;
+      if (!mod) return;
+      const k = e.key.toLowerCase();
+      if (k === "z" && !e.shiftKey) { e.preventDefault(); projectStore.undo(project.id); }
+      else if ((k === "z" && e.shiftKey) || k === "y") { e.preventDefault(); projectStore.redo(project.id); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [project?.id]);
+
 
   if (!project) {
     return (
