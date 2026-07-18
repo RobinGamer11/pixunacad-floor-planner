@@ -2863,38 +2863,17 @@ function ElementView({
 /** Vorschau-Bild eines CAD-Sheets. Liest live aus dem projectStore und
  *  zeigt den `thumbnail` (PNG aus dem CAD-Editor). Fallback: dezenter
  *  Platzhalter, wenn das Sheet noch nie im CAD geöffnet wurde. */
-function CadViewThumb({ sheetId, snapshot }: { sheetId?: string; snapshot?: string }) {
+function CadViewportViewHost({ element }: { element: PageElement }) {
   const projects = useProjects();
   const sheet = React.useMemo(() => {
-    if (!sheetId) return undefined;
+    if (!element.sheetId) return undefined;
     for (const p of projects) {
-      const s = p.sheets.find((x) => x.id === sheetId);
+      const s = p.sheets.find((x) => x.id === element.sheetId);
       if (s) return s;
     }
     return undefined;
-  }, [projects, sheetId]);
-  // Bevorzugt der eingefrorene Element-Snapshot (Ansicht+Zoom zum Zeitpunkt
-  // des Einfügens). Fallback: Live-Thumbnail des Sheets.
-  const src = snapshot || sheet?.thumbnail;
-  if (src) {
-    return (
-      <img
-        src={src}
-        alt={sheet?.name ?? "CAD-Ansicht"}
-        className="w-full h-full object-contain"
-        style={{ background: "white" }}
-        draggable={false}
-      />
-    );
-  }
-  return (
-    <div
-      className="w-full h-full flex items-center justify-center text-xs text-muted-foreground border-2 border-dashed"
-      style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-muted))" }}
-    >
-      {sheet ? `${sheet.name} — noch keine Vorschau (Sheet im CAD öffnen)` : "Kein Zeichenblatt"}
-    </div>
-  );
+  }, [projects, element.sheetId]);
+  return <CadViewportView element={element} sheet={sheet} />;
 }
 
 function RightInspector({
