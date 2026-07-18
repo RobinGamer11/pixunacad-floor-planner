@@ -283,6 +283,9 @@ export default function ProjectWorkspace() {
   // Aktueller Zoom als Ref, damit iPad-Touch-Handler ihn ohne Rerender lesen.
   const zoomRef = useRef(zoom);
   useEffect(() => { zoomRef.current = zoom; }, [zoom]);
+  const wheelAccumRef = useRef(1);
+  const wheelAnchorRef = useRef<{ x: number; y: number } | null>(null);
+  const wheelRafRef = useRef(0);
 
   // iPad: Zwei-Finger-Pinch = Zoom, Zwei-Finger-Drag = Pan. Ein Finger auf
   // dem Canvas bleibt der aktiven CAD-/Werkzeug-Interaktion vorbehalten.
