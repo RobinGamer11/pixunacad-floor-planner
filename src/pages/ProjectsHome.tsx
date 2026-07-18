@@ -951,51 +951,53 @@ function AufgabenView({ project }: { project: Project }) {
         <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-3">
           NEUE AUFGABE (im Notiznetz)
         </div>
-        <div className="grid grid-cols-[1fr_140px_110px_130px_140px_auto] gap-2">
+        <div className="flex flex-col gap-2">
           <input
             value={draft.title}
             onChange={(e) => setDraft({ ...draft, title: e.target.value })}
             onKeyDown={(e) => e.key === "Enter" && addTask()}
             placeholder="Titel der Aufgabe…"
-            className="h-9 px-3 rounded-md border bg-transparent text-sm outline-none"
+            className="h-9 px-3 rounded-md border bg-transparent text-sm outline-none w-full"
             style={{ borderColor: "hsl(var(--hairline))" }}
           />
-          <input
-            type="date"
-            value={draft.date}
-            onChange={(e) => setDraft({ ...draft, date: e.target.value })}
-            className="h-9 px-2 rounded-md border bg-transparent text-sm outline-none"
-            style={{ borderColor: "hsl(var(--hairline))" }}
-          />
-          <input
-            type="time"
-            value={draft.time}
-            onChange={(e) => setDraft({ ...draft, time: e.target.value })}
-            className="h-9 px-2 rounded-md border bg-transparent text-sm outline-none"
-            style={{ borderColor: "hsl(var(--hairline))" }}
-          />
-          <select
-            value={draft.priority}
-            onChange={(e) => setDraft({ ...draft, priority: e.target.value as TaskPriority })}
-            className="h-9 px-2 rounded-md border bg-transparent text-sm outline-none"
-            style={{ borderColor: "hsl(var(--hairline))" }}
-          >
-            <option value="low">Niedrig</option>
-            <option value="medium">Mittel</option>
-            <option value="high">Hoch</option>
-          </select>
-          <select
-            value={draft.category}
-            onChange={(e) => setDraft({ ...draft, category: e.target.value })}
-            className="h-9 px-2 rounded-md border bg-transparent text-sm outline-none"
-            style={{ borderColor: "hsl(var(--hairline))" }}
-          >
-            <option value="">Kategorie…</option>
-            {notes.categories.map((c) => <option key={c} value={c}>{c}</option>)}
-          </select>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <input
+              type="date"
+              value={draft.date}
+              onChange={(e) => setDraft({ ...draft, date: e.target.value })}
+              className="h-9 min-w-0 px-2 rounded-md border bg-transparent text-sm outline-none"
+              style={{ borderColor: "hsl(var(--hairline))" }}
+            />
+            <input
+              type="time"
+              value={draft.time}
+              onChange={(e) => setDraft({ ...draft, time: e.target.value })}
+              className="h-9 min-w-0 px-2 rounded-md border bg-transparent text-sm outline-none"
+              style={{ borderColor: "hsl(var(--hairline))" }}
+            />
+            <select
+              value={draft.priority}
+              onChange={(e) => setDraft({ ...draft, priority: e.target.value as TaskPriority })}
+              className="h-9 min-w-0 px-2 rounded-md border bg-transparent text-sm outline-none"
+              style={{ borderColor: "hsl(var(--hairline))" }}
+            >
+              <option value="low">Niedrig</option>
+              <option value="medium">Mittel</option>
+              <option value="high">Hoch</option>
+            </select>
+            <select
+              value={draft.category}
+              onChange={(e) => setDraft({ ...draft, category: e.target.value })}
+              className="h-9 min-w-0 px-2 rounded-md border bg-transparent text-sm outline-none"
+              style={{ borderColor: "hsl(var(--hairline))" }}
+            >
+              <option value="">Kategorie…</option>
+              {notes.categories.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
           <button
             onClick={addTask}
-            className="h-9 px-4 rounded-md text-sm font-medium flex items-center gap-1"
+            className="h-9 px-4 rounded-md text-sm font-medium flex items-center justify-center gap-1 self-end"
             style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
           >
             <Plus size={14} /> Hinzufügen
