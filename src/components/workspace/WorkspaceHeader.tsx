@@ -29,6 +29,9 @@ interface Props {
   onPresent?: () => void;
   onShare?: () => void;
   onExport?: () => void;
+  /** Tablet-Hilfsrad (LMB/RMB/SHIFT/ESC/ENTF) einblenden. */
+  tabletAidOn?: boolean;
+  onToggleTabletAid?: () => void;
 }
 
 /**
