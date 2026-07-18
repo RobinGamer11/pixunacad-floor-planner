@@ -2012,7 +2012,7 @@ export class MiniCad {
   private _installCoordRemap() {
     const c = this.dom.canvas;
 
-    const remap = (e: MouseEvent) => {
+    const remap = (e: PointerEvent | MouseEvent) => {
       const r = c.getBoundingClientRect();
       if (r.width <= 0 || r.height <= 0) return;
       const sxScale = c.width / r.width;
@@ -2020,10 +2020,12 @@ export class MiniCad {
       this.input.mouse.sx = (e.clientX - r.left) * sxScale;
       this.input.mouse.sy = (e.clientY - r.top) * syScale;
     };
-    c.addEventListener("mousemove", remap);
-    c.addEventListener("mousedown", remap);
-    this._coordCleanups.push(() => c.removeEventListener("mousemove", remap));
-    this._coordCleanups.push(() => c.removeEventListener("mousedown", remap));
+    // Pointer-Events (touch- & pen-tauglich) statt Mouse-Only. Löst das
+    // "Startpunkt liegt an der letzten Mausposition"-Problem auf Tablets.
+    c.addEventListener("pointermove", remap as any);
+    c.addEventListener("pointerdown", remap as any);
+    this._coordCleanups.push(() => c.removeEventListener("pointermove", remap as any));
+    this._coordCleanups.push(() => c.removeEventListener("pointerdown", remap as any));
   }
 
   private _tick = () => {
