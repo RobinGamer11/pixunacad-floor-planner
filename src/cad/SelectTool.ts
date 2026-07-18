@@ -770,7 +770,7 @@ export class SelectTool {
       this.app.hub.bindCommit(null);
     }
   }
-  }
+
 
   private _applyWallEdgeHubValues(vals: { lengthM: number | null; angleDeg: number | null }) {
     if (this.activeEditAction !== PointEditAction.OFFSET || !this.editTarget) return;
