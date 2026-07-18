@@ -97,6 +97,8 @@ const KEYS: Record<string, KeyDef> = {
   Escape: { key: "Escape", code: "Escape", keyCode: 27 },
   Delete: { key: "Delete", code: "Delete", keyCode: 46 },
   Shift:  { key: "Shift",  code: "ShiftLeft", keyCode: 16 },
+  Enter:  { key: "Enter",  code: "Enter", keyCode: 13 },
+  Backspace: { key: "Backspace", code: "Backspace", keyCode: 8 },
 };
 
 function keyTarget(): EventTarget {
@@ -106,21 +108,66 @@ function keyTarget(): EventTarget {
 }
 
 /** Einmaliger Tastendruck (down+up). */
-export function virtualKeyPress(name: "Escape" | "Delete") {
+export function virtualKeyPress(name: "Escape" | "Delete" | "Enter" | "Backspace") {
   const def = KEYS[name];
   const t = keyTarget();
-  const down = new KeyboardEvent("keydown", { key: def.key, code: def.code, keyCode: def.keyCode, which: def.keyCode, bubbles: true, cancelable: true });
-  const up = new KeyboardEvent("keyup", { key: def.key, code: def.code, keyCode: def.keyCode, which: def.keyCode, bubbles: true, cancelable: true });
-  (down as any).__virtual = true;
-  (up as any).__virtual = true;
+  const mk = (type: "keydown" | "keyup") =>
+    new KeyboardEvent(type, { key: def.key, code: def.code, keyCode: def.keyCode, which: def.keyCode, bubbles: true, cancelable: true });
+  const down = mk("keydown"); (down as any).__virtual = true;
+  const up = mk("keyup"); (up as any).__virtual = true;
   t.dispatchEvent(down);
-  // Auch am window/document nachfeuern (viele App-Handler hängen dort).
   window.dispatchEvent(down);
+
+  // Für Enter: falls Ziel ein Formular-Input ist, blur → Commit auslösen.
+  if (name === "Enter" && t instanceof HTMLElement && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) {
+    (t as HTMLInputElement).blur();
+  }
+  // Für Backspace: Zeichen im Input löschen.
+  if (name === "Backspace" && t instanceof HTMLInputElement) {
+    const el = t as HTMLInputElement;
+    const s = el.selectionStart ?? el.value.length;
+    const e = el.selectionEnd ?? s;
+    if (s === e && s > 0) {
+      setNativeValue(el, el.value.slice(0, s - 1) + el.value.slice(e));
+      el.setSelectionRange(s - 1, s - 1);
+    } else if (s !== e) {
+      setNativeValue(el, el.value.slice(0, s) + el.value.slice(e));
+      el.setSelectionRange(s, s);
+    }
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+
   setTimeout(() => {
     t.dispatchEvent(up);
     window.dispatchEvent(up);
   }, 20);
 }
+
+/** Setzt Input-Value über React's nativen Setter, damit React onChange sieht. */
+function setNativeValue(el: HTMLInputElement | HTMLTextAreaElement, value: string) {
+  const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+  const setter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
+  if (setter) setter.call(el, value);
+  else el.value = value;
+}
+
+/** Tippt ein einzelnes Zeichen in den fokussierten Input (für Ziffernblock). */
+export function virtualTypeChar(ch: string) {
+  const el = document.activeElement as HTMLElement | null;
+  if (!el || (el.tagName !== "INPUT" && el.tagName !== "TEXTAREA" && !(el as HTMLElement).isContentEditable)) return;
+  if (el.tagName === "INPUT" || el.tagName === "TEXTAREA") {
+    const inp = el as HTMLInputElement;
+    const s = inp.selectionStart ?? inp.value.length;
+    const e = inp.selectionEnd ?? s;
+    setNativeValue(inp, inp.value.slice(0, s) + ch + inp.value.slice(e));
+    try { inp.setSelectionRange(s + ch.length, s + ch.length); } catch {}
+    inp.dispatchEvent(new Event("input", { bubbles: true }));
+  } else {
+    document.execCommand("insertText", false, ch);
+  }
+}
+
+
 
 const _heldKeys = new Set<string>();
 /** Modifier gedrückt halten (für SHIFT beim Zeichnen). */

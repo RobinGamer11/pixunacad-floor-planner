@@ -1,11 +1,13 @@
 import React, { useEffect, useRef, useState } from "react";
-import { MousePointer2, ArrowBigUp, Trash2 } from "lucide-react";
+import { MousePointer2, ArrowBigUp, Trash2, CornerDownLeft } from "lucide-react";
 import {
   virtualMouseClick,
   virtualMouseHold,
   virtualKeyPress,
   virtualKeyHold,
+  virtualTypeChar,
 } from "@/lib/virtualInput";
+
 
 /**
  * Tablet-Hilfsrad: kreisförmiges Widget mit 5 Knöpfen (LMB, RMB, SHIFT, ESC, ENTF).
@@ -79,25 +81,94 @@ export function TabletAidWheel() {
         Tablet
       </div>
 
-      {/* 5 Buttons kreisförmig */}
+      {/* 6 Buttons kreisförmig (60°-Schritte) */}
       <WheelButton angle={-90} size={size} label="LMB" tooltip="Linke Maustaste (Tap = Klick, Halten = gedrückt halten)"
         onTap={() => virtualMouseClick(0)}
         onHold={(on) => virtualMouseHold(0, on)}
         icon={<MousePointer2 size={16} />} />
-      <WheelButton angle={-18} size={size} label="RMB" tooltip="Rechte Maustaste"
+      <WheelButton angle={-30} size={size} label="RMB" tooltip="Rechte Maustaste"
         onTap={() => virtualMouseClick(2)}
         onHold={(on) => virtualMouseHold(2, on)}
         icon={<MousePointer2 size={16} style={{ transform: "scaleX(-1)" }} />} />
-      <WheelButton angle={54} size={size} label="ENTF" tooltip="Entf-Taste"
+      <WheelButton angle={30} size={size} label="ENTF" tooltip="Entf-Taste"
         onTap={() => virtualKeyPress("Delete")}
         icon={<Trash2 size={16} />} />
-      <WheelButton angle={126} size={size} label="ESC" tooltip="Esc-Taste"
+      <WheelButton angle={90} size={size} label="ENTER" tooltip="Enter-Taste"
+        onTap={() => virtualKeyPress("Enter")}
+        icon={<CornerDownLeft size={16} />} />
+      <WheelButton angle={150} size={size} label="ESC" tooltip="Esc-Taste"
         onTap={() => virtualKeyPress("Escape")}
         icon={<span className="text-[10px] font-bold">ESC</span>} />
-      <WheelButton angle={198} size={size} label="SHIFT" tooltip="Shift halten (2-Hand-Bedienung)"
+      <WheelButton angle={210} size={size} label="SHIFT" tooltip="Shift halten (2-Hand-Bedienung)"
         onHold={(on) => virtualKeyHold("Shift", on)}
         toggleHold
         icon={<ArrowBigUp size={16} />} />
+      {/* Ziffernblock: erscheint, sobald ein Textfeld fokussiert ist. */}
+      <NumberPad wheelPos={pos} wheelSize={size} />
+    </div>
+  );
+}
+
+function NumberPad({ wheelPos, wheelSize }: { wheelPos: { x: number; y: number }; wheelSize: number }) {
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const check = () => {
+      const el = document.activeElement as HTMLElement | null;
+      const ok = !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || (el as HTMLElement).isContentEditable);
+      setVisible(ok);
+    };
+    check();
+    document.addEventListener("focusin", check);
+    document.addEventListener("focusout", check);
+    return () => {
+      document.removeEventListener("focusin", check);
+      document.removeEventListener("focusout", check);
+    };
+  }, []);
+  if (!visible) return null;
+
+  const keys = ["1","2","3","4","5","6","7","8","9",",",".","⌫"];
+  const padWidth = 156;
+  const padHeight = 220;
+  let left = wheelSize / 2 - padWidth / 2;
+  let top = wheelSize + 8;
+  // Absolut in Wheel-Container: bei Bildschirmrand nach oben klappen.
+  if (typeof window !== "undefined" && wheelPos.y + wheelSize + padHeight + 16 > window.innerHeight) {
+    top = -(padHeight + 8);
+  }
+  const press = (k: string) => (e: React.PointerEvent) => {
+    e.preventDefault();
+    if (k === "⌫") virtualKeyPress("Backspace");
+    else virtualTypeChar(k);
+  };
+
+  return (
+    <div
+      className="absolute z-[61] rounded-xl p-2 grid grid-cols-3 gap-1.5 select-none"
+      style={{
+        left, top, width: padWidth,
+        background: "hsla(var(--surface-card), 0.96)",
+        border: "1px solid hsl(var(--hairline))",
+        boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
+        backdropFilter: "blur(6px)",
+        touchAction: "none",
+      }}
+      onPointerDown={(e) => e.preventDefault()}
+    >
+      {keys.map((k) => (
+        <button
+          key={k}
+          onPointerDown={press(k)}
+          className="h-10 rounded-md text-sm font-semibold border"
+          style={{
+            borderColor: "hsl(var(--hairline))",
+            background: "hsl(var(--surface))",
+            color: "hsl(var(--ink))",
+          }}
+        >
+          {k}
+        </button>
+      ))}
     </div>
   );
 }
