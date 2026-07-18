@@ -3,14 +3,34 @@
 // verwenden können. Die App-Handler prüfen isTrusted nicht, daher genügen
 // künstliche Events.
 
-/** Findet das aktuell sinnvolle Ziel für Maus-Events: bevorzugt ein <canvas>
- * im aktiven <main>-Container, sonst das Element unter der letzten bekannten
- * Zeigerposition, sonst body. */
+function isIgnoredTabletTarget(target: EventTarget | null): boolean {
+  const el = target instanceof Element ? target : null;
+  return !!el?.closest(
+    '[data-tablet-aid="true"], [data-hub-control], .cad-hub, .cad-point-menu, .cad-toolbar-btn, header, aside, nav, button, input, select, textarea',
+  );
+}
+
+function visibleCanvasFromPoint(x: number, y: number): HTMLCanvasElement | null {
+  const stack = typeof document.elementsFromPoint === "function" ? document.elementsFromPoint(x, y) : [];
+  for (const el of stack) {
+    if (el instanceof HTMLCanvasElement && el.closest("main")) return el;
+  }
+  const canvases = Array.from(document.querySelectorAll("main canvas")) as HTMLCanvasElement[];
+  return canvases.find((canvas) => {
+    const r = canvas.getBoundingClientRect();
+    return r.width > 1 && r.height > 1 && x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+  }) ?? null;
+}
+
+/** Findet das aktuell sinnvolle Ziel für Maus-Events: bevorzugt das <canvas>
+ * unter der zuletzt echten Canvas-Position, sonst ein sichtbares Canvas im
+ * aktiven <main>-Container, sonst body. */
 function pickTarget(): { el: Element; x: number; y: number } {
-  const canvas = document.querySelector("main canvas") as HTMLCanvasElement | null;
+  const p = _lastPointer;
+  const pointedCanvas = p ? visibleCanvasFromPoint(p.x, p.y) : null;
+  const canvas = pointedCanvas ?? (document.querySelector("main canvas") as HTMLCanvasElement | null);
   if (canvas) {
     const r = canvas.getBoundingClientRect();
-    const p = _lastPointer;
     const inside = p && p.x >= r.left && p.x <= r.right && p.y >= r.top && p.y <= r.bottom;
     return inside
       ? { el: canvas, x: p!.x, y: p!.y }
@@ -23,11 +43,16 @@ function pickTarget(): { el: Element; x: number; y: number } {
 
 let _lastPointer: { x: number; y: number } | null = null;
 if (typeof window !== "undefined") {
-  window.addEventListener("pointermove", (e) => {
+  const rememberPointer = (e: PointerEvent) => {
     // Nur echte User-Bewegungen tracken, nicht unsere eigenen synthetischen.
     if ((e as any).__virtual) return;
+    // Rad/HUB/UI nie als Zielposition übernehmen — sonst setzt LMB/ENTER den
+    // Punkt unter dem Hilfsrad statt an der zuletzt berührten Zeichenfläche.
+    if (isIgnoredTabletTarget(e.target)) return;
     _lastPointer = { x: e.clientX, y: e.clientY };
-  }, true);
+  };
+  window.addEventListener("pointerdown", rememberPointer, true);
+  window.addEventListener("pointermove", rememberPointer, true);
 }
 
 function dispatchPointer(
@@ -151,12 +176,12 @@ function setNativeValue(el: HTMLInputElement | HTMLTextAreaElement, value: strin
   else el.value = value;
 }
 
-/** Tippt ein einzelnes Zeichen in den fokussierten Input (für Ziffernblock). */
-export function virtualTypeChar(ch: string) {
-  const el = document.activeElement as HTMLElement | null;
+/** Tippt ein einzelnes Zeichen in ein Eingabefeld (für Ziffernblock). */
+export function virtualTypeChar(ch: string, target?: HTMLElement | null) {
+  const el = (target ?? document.activeElement) as HTMLElement | null;
   if (!el || (el.tagName !== "INPUT" && el.tagName !== "TEXTAREA" && !(el as HTMLElement).isContentEditable)) return;
   if (el.tagName === "INPUT" || el.tagName === "TEXTAREA") {
-    const inp = el as HTMLInputElement;
+    const inp = el as HTMLInputElement | HTMLTextAreaElement;
     const s = inp.selectionStart ?? inp.value.length;
     const e = inp.selectionEnd ?? s;
     setNativeValue(inp, inp.value.slice(0, s) + ch + inp.value.slice(e));
