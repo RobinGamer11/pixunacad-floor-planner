@@ -1083,8 +1083,27 @@ export class SelectTool {
       for (let i = 0; i < stroke.points.length && i < this.freeStrokePointsOriginal.length; i++) {
         const o = this.freeStrokePointsOriginal[i];
         stroke.points[i] = v(o.x + delta.x, o.y + delta.y);
-      }
     }
+  }
+
+  /** Rotate ALL points of the currently edited free-stroke around `fixedPoint`
+   *  to the absolute angle `newAngleDeg` (relative to the original first point). */
+  private _applyFreeStrokeRotate(newAngleDeg: number) {
+    if (!this.editTarget || (this.editTarget as any).kind !== "freeStroke") return;
+    if (!this.freeStrokePointsOriginal || !this.fixedPoint || !this.otherPointOriginal) return;
+    const stroke = this.app.scene.getFreeStrokeById?.((this.editTarget as any).freeStrokeId);
+    if (!stroke) return;
+    const baseAng = angleDeg(this.fixedPoint, this.otherPointOriginal);
+    const dRad = ((newAngleDeg - baseAng) * Math.PI) / 180;
+    const c = Math.cos(dRad), s = Math.sin(dRad);
+    for (let i = 0; i < stroke.points.length && i < this.freeStrokePointsOriginal.length; i++) {
+      const o = this.freeStrokePointsOriginal[i];
+      const dx = o.x - this.fixedPoint.x;
+      const dy = o.y - this.fixedPoint.y;
+      stroke.points[i] = v(this.fixedPoint.x + dx * c - dy * s, this.fixedPoint.y + dx * s + dy * c);
+    }
+  }
+
   }
 
   /** Apply parallel offset to selected hatch edge. Adjacent endpoints slide along their adjacent edges. */
