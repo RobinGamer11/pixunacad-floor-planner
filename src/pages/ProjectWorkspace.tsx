@@ -1275,12 +1275,13 @@ export default function ProjectWorkspace() {
                 setZoom(next);
                 if (e.cancelable) e.preventDefault();
               }}
-              onMouseDown={(e) => {
+              onPointerDown={(e) => {
                 // Pan nur via Mittelmaus oder Alt+Links — sonst würde ein Links-Klick
                 // im Auswahlmodus die Auswahl der eingebetteten CAD-Engine abfangen.
                 const isMiddle = e.button === 1 || (e.button === 0 && (e as any).altKey);
                 if (!isMiddle) return;
                 e.preventDefault();
+                try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
                 const container = e.currentTarget as HTMLDivElement;
                 const startX = e.clientX;
                 const startY = e.clientY;
@@ -1288,17 +1289,20 @@ export default function ProjectWorkspace() {
                 const startScrollT = container.scrollTop;
                 const prevCursor = container.style.cursor;
                 container.style.cursor = "grabbing";
-                const onMove = (ev: MouseEvent) => {
+                const onMove = (ev: PointerEvent) => {
                   container.scrollLeft = startScrollL - (ev.clientX - startX);
                   container.scrollTop = startScrollT - (ev.clientY - startY);
                 };
-                const onUp = () => {
+                const onUp = (ev: PointerEvent) => {
+                  try { container.releasePointerCapture(ev.pointerId); } catch {}
                   container.style.cursor = prevCursor;
-                  window.removeEventListener("mousemove", onMove);
-                  window.removeEventListener("mouseup", onUp);
+                  window.removeEventListener("pointermove", onMove);
+                  window.removeEventListener("pointerup", onUp);
+                  window.removeEventListener("pointercancel", onUp);
                 };
-                window.addEventListener("mousemove", onMove);
-                window.addEventListener("mouseup", onUp);
+                window.addEventListener("pointermove", onMove);
+                window.addEventListener("pointerup", onUp);
+                window.addEventListener("pointercancel", onUp);
               }}
             >
 
@@ -2027,7 +2031,7 @@ function PageCanvas({
   const [marquee, setMarquee] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
   const marqueeMode = toolSettings.select.marqueeMode;
 
-  const handlePageMouseDown = (e: React.MouseEvent) => {
+  const handlePagePointerDown = (e: React.PointerEvent) => {
     if (e.target !== e.currentTarget) return;
     if (activeTool !== null) { onSelect(undefined); return; }
     if (e.button !== 0) { onSelect(undefined); return; }
@@ -2036,14 +2040,15 @@ function PageCanvas({
     const start = toPct(e.clientX, e.clientY);
     setMarquee({ x1: start.x, y1: start.y, x2: start.x, y2: start.y });
     let dragged = false;
-    const onMove = (ev: MouseEvent) => {
+    const onMove = (ev: PointerEvent) => {
       const cur = toPct(ev.clientX, ev.clientY);
       if (Math.abs(cur.x - start.x) > 0.3 || Math.abs(cur.y - start.y) > 0.3) dragged = true;
       setMarquee({ x1: start.x, y1: start.y, x2: cur.x, y2: cur.y });
     };
-    const onUp = (ev: MouseEvent) => {
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
+    const onUp = (ev: PointerEvent) => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
       setMarquee(null);
       if (!dragged) { onSelect(undefined); return; }
 
@@ -2081,11 +2086,12 @@ function PageCanvas({
       else if (hit.length === 1) onSelect(hit[0]);
       else onSelect(undefined);
     };
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
   };
 
-  const handlePageMouseMove = (_e: React.MouseEvent) => {
+  const handlePagePointerMove = (_e: React.PointerEvent) => {
     /* no-op */
   };
 
@@ -2167,8 +2173,8 @@ function PageCanvas({
             border: "1px solid hsl(var(--hairline))",
             cursor: cursorStyle,
           }}
-          onMouseDown={handlePageMouseDown}
-          onMouseMove={handlePageMouseMove}
+          onPointerDown={handlePagePointerDown}
+          onPointerMove={handlePagePointerMove}
         >
         {/* Marquee-Overlay (Rahmen-Auswahl). Farbe je nach Modus:
             touch=orange (Crossing), enclose=blau (Window) — Archicad-Konvention. */}
