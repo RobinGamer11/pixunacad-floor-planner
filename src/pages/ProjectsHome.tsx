@@ -830,32 +830,84 @@ function SeitenInhaltGrid({ project, onAddPage }: { project: Project; onAddPage:
   );
 }
 
+/**
+ * Vereinheitlichte Aufgabenzeile für Kalender/Liste — vereint klassische
+ * `project.tasks` und Notiznetz-Knoten (kind === "task").
+ */
+type UnifiedTask = {
+  id: string;
+  source: "legacy" | "note";
+  title: string;
+  date?: string;
+  time?: string;
+  priority: TaskPriority;
+  done: boolean;
+  category?: string;
+  status?: NoteStatus;
+  nodeParentId?: string | null; // nur bei source === "note"
+};
+
+function noteToUnified(n: NoteNode): UnifiedTask {
+  const prio: TaskPriority =
+    n.priority === "urgent" || n.priority === "high" ? "high"
+      : n.priority === "low" ? "low" : "medium";
+  return {
+    id: n.id,
+    source: "note",
+    title: n.title,
+    date: n.date || n.dueDate,
+    time: n.time,
+    priority: prio,
+    done: n.status === "done",
+    category: n.category,
+    status: n.status,
+    nodeParentId: n.parentId,
+  };
+}
+
 function AufgabenView({ project }: { project: Project }) {
+  const navigate = useNavigate();
+  const notes = useNotes(project.id);
   const [selectedDate, setSelectedDate] = useState<string | undefined>(undefined);
-  const [draft, setDraft] = useState<{ title: string; date: string; time: string; priority: TaskPriority }>({
+  const [draft, setDraft] = useState<{ title: string; date: string; time: string; priority: TaskPriority; category: string }>({
     title: "",
     date: "",
     time: "",
     priority: "medium",
+    category: "",
   });
 
-  const tasks = [...project.tasks].sort((a, b) => {
-    const da = `${a.date ?? "9999-99-99"} ${a.time ?? "99:99"}`;
-    const db = `${b.date ?? "9999-99-99"} ${b.time ?? "99:99"}`;
-    return da.localeCompare(db);
-  });
+  // Notiznetz-Tasks + klassische Tasks zusammenführen.
+  const combined: UnifiedTask[] = useMemo(() => {
+    const legacy: UnifiedTask[] = project.tasks.map((t) => ({
+      id: t.id, source: "legacy", title: t.title, date: t.date, time: t.time,
+      priority: t.priority ?? "medium", done: t.done,
+    }));
+    const noteTasks = notes.nodes
+      .filter((n) => n.kind === "task")
+      .map(noteToUnified);
+    return [...legacy, ...noteTasks].sort((a, b) => {
+      const da = `${a.date ?? "9999-99-99"} ${a.time ?? "99:99"}`;
+      const db = `${b.date ?? "9999-99-99"} ${b.time ?? "99:99"}`;
+      return da.localeCompare(db);
+    });
+  }, [project.tasks, notes.nodes]);
 
-  const filtered = selectedDate ? tasks.filter((t) => t.date === selectedDate) : tasks;
+  const filtered = selectedDate ? combined.filter((t) => t.date === selectedDate) : combined;
 
   const addTask = () => {
     if (!draft.title.trim()) return;
-    projectStore.addTask(project.id, {
+    // Quick-Create landet direkt im Notiznetz (Root-Ebene).
+    const prio: NotePriority = draft.priority === "high" ? "high" : draft.priority === "low" ? "low" : "normal";
+    notesStore.addNode(project.id, null, "task", {
       title: draft.title.trim(),
       date: draft.date || undefined,
       time: draft.time || undefined,
-      priority: draft.priority,
+      priority: prio,
+      status: "open",
+      category: draft.category || undefined,
     });
-    setDraft({ title: "", date: selectedDate ?? "", time: "", priority: "medium" });
+    setDraft({ title: "", date: selectedDate ?? "", time: "", priority: "medium", category: draft.category });
   };
 
   return (
@@ -865,11 +917,21 @@ function AufgabenView({ project }: { project: Project }) {
         className="rounded-2xl p-5"
         style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
       >
-        <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-3">
-          KALENDER
+        <div className="flex items-center justify-between mb-3">
+          <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">
+            KALENDER
+          </div>
+          <button
+            onClick={() => navigate(`/project/${project.id}/notes`)}
+            className="h-7 px-2.5 rounded-md text-[11px] font-medium flex items-center gap-1.5"
+            style={{ background: "hsl(var(--accent-gold-soft))", color: "hsl(var(--accent-gold))" }}
+            title="Notiznetz öffnen"
+          >
+            <Network size={13} /> Notiznetz
+          </button>
         </div>
         <TaskCalendar
-          tasks={project.tasks}
+          tasks={combined}
           selectedDate={selectedDate}
           onSelectDate={(d) => {
             setSelectedDate(d);
@@ -877,7 +939,7 @@ function AufgabenView({ project }: { project: Project }) {
           }}
         />
         <div className="mt-3 text-[11px] text-muted-foreground">
-          Tipp: Tag im Kalender klicken, dann unten Aufgabe für diesen Tag hinzufügen.
+          Tipp: Neue Aufgaben werden automatisch mit dem Notiznetz verknüpft und dort auf der Projekt-Ebene erstellt.
         </div>
       </div>
 
@@ -887,9 +949,9 @@ function AufgabenView({ project }: { project: Project }) {
         style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
       >
         <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-3">
-          NEUE AUFGABE
+          NEUE AUFGABE (im Notiznetz)
         </div>
-        <div className="grid grid-cols-[1fr_140px_110px_130px_auto] gap-2">
+        <div className="grid grid-cols-[1fr_140px_110px_130px_140px_auto] gap-2">
           <input
             value={draft.title}
             onChange={(e) => setDraft({ ...draft, title: e.target.value })}
@@ -921,6 +983,15 @@ function AufgabenView({ project }: { project: Project }) {
             <option value="low">Niedrig</option>
             <option value="medium">Mittel</option>
             <option value="high">Hoch</option>
+          </select>
+          <select
+            value={draft.category}
+            onChange={(e) => setDraft({ ...draft, category: e.target.value })}
+            className="h-9 px-2 rounded-md border bg-transparent text-sm outline-none"
+            style={{ borderColor: "hsl(var(--hairline))" }}
+          >
+            <option value="">Kategorie…</option>
+            {notes.categories.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
           <button
             onClick={addTask}
@@ -979,7 +1050,7 @@ function AufgabenView({ project }: { project: Project }) {
             </div>
           )}
           {filtered.map((t) => (
-            <TaskRow key={t.id} task={t} projectId={project.id} />
+            <UnifiedTaskRow key={`${t.source}:${t.id}`} task={t} projectId={project.id} onOpenInNotes={() => navigate(`/project/${project.id}/notes`)} />
           ))}
         </div>
       </div>
@@ -988,6 +1059,77 @@ function AufgabenView({ project }: { project: Project }) {
     </div>
   );
 }
+
+function UnifiedTaskRow({
+  task, projectId, onOpenInNotes,
+}: { task: UnifiedTask; projectId: string; onOpenInNotes: () => void }) {
+  const prio = task.priority;
+  const prioColor =
+    prio === "high" ? "hsl(0 70% 55%)"
+    : prio === "medium" ? "hsl(var(--accent-gold))"
+    : "hsl(140 35% 55%)";
+
+  const toggle = () => {
+    if (task.source === "legacy") {
+      projectStore.toggleTask(projectId, task.id);
+    } else {
+      notesStore.updateNode(projectId, task.id, { status: task.done ? "open" : "done" });
+    }
+  };
+  const remove = () => {
+    if (task.source === "legacy") projectStore.deleteTask(projectId, task.id);
+    else notesStore.deleteNode(projectId, task.id);
+  };
+
+  return (
+    <div className="flex items-center gap-3 py-2.5">
+      <input
+        type="checkbox"
+        checked={task.done}
+        onChange={toggle}
+        className="accent-foreground"
+      />
+      <span
+        className="w-2 h-2 rounded-full shrink-0"
+        style={{ background: prioColor }}
+        title={`Priorität: ${prio}`}
+      />
+      <div className="flex-1 min-w-0">
+        <div className={`text-sm truncate flex items-center gap-2 ${task.done ? "line-through text-muted-foreground" : ""}`}>
+          {task.title}
+          {task.source === "note" && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded shrink-0"
+              style={{ background: "hsl(var(--accent-gold-soft))", color: "hsl(var(--accent-gold))" }}>
+              Netz
+            </span>
+          )}
+          {task.category && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded shrink-0"
+              style={{ background: "hsl(var(--surface-muted))", color: "hsl(var(--ink-soft))" }}>
+              {task.category}
+            </span>
+          )}
+        </div>
+        <div className="text-[11px] text-muted-foreground">
+          {task.date
+            ? new Date(task.date).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" })
+            : "Ohne Datum"}
+          {task.time ? ` · ${task.time}` : ""}
+        </div>
+      </div>
+      {task.source === "note" && (
+        <button onClick={onOpenInNotes} title="Im Notiznetz öffnen"
+          className="text-muted-foreground hover:text-foreground">
+          <ExternalLink size={14} />
+        </button>
+      )}
+      <button onClick={remove} title="Löschen" className="text-muted-foreground hover:text-foreground">
+        <Trash2 size={14} />
+      </button>
+    </div>
+  );
+}
+
 
 function TaskRow({ task, projectId }: { task: Task; projectId: string }) {
   const [editing, setEditing] = useState(false);
