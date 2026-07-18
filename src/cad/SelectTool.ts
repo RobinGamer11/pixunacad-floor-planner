@@ -2495,6 +2495,12 @@ export class SelectTool {
             };
             this.dragFreeStrokeOrigPoints = freeHit.points.map((p) => ({ x: p.x, y: p.y }));
           }
+          // HUB mit Aktionen anzeigen (analog zur normalen "Linie").
+          this.app.pointEditMenu.showAt(input.mouse.sx, input.mouse.sy, [
+            PointEditAction.TRANSLATE,
+            PointEditAction.ROTATE,
+            PointEditAction.DELETE,
+          ]);
           return;
         }
         // Kein Vordergrund-Hit & kein Dokument → Auswahl aufheben.
