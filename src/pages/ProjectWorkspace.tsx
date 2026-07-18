@@ -484,7 +484,9 @@ export default function ProjectWorkspace() {
       const xPct = Math.max(0, (100 - wPct) / 2);
       const yPct = Math.max(0, (100 - hPct) / 2);
       projectStore.addElement(projectId, targetPageId, {
-        kind: "cad-view",
+        // Stufe 6: neue Einfügungen sind echte Paper-Space-Viewports
+        // (Legacy-Datensätze mit kind "cad-view" bleiben rückwärtskompatibel).
+        kind: "cad-viewport",
         sheetId: pending.sheetId,
         scale: pending.sheetScale,
         scaleDen: pending.scaleDen,
