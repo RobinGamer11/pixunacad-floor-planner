@@ -764,6 +764,7 @@ export class MiniCad {
       this.documentTool.activate();
       this.activeTool = this.documentTool as any;
     }
+    try { (window as any).__pixunaActiveTool = tool; } catch {}
   }
 
   /** Alias für `setActiveTool` — DocumentTool ruft `app.setTool(...)`. */
