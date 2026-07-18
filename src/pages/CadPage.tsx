@@ -27,6 +27,12 @@ const CadPage = () => {
   const [canRedo, setCanRedo] = useState(false);
   const [canDelete, setCanDelete] = useState(false);
   const [zoom, setZoom] = useState<number | undefined>(undefined);
+  const [tabletAidOn, setTabletAidOn] = useState<boolean>(() => {
+    try { return localStorage.getItem("pixuna.tabletAid.on") === "1"; } catch { return false; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem("pixuna.tabletAid.on", tabletAidOn ? "1" : "0"); } catch {}
+  }, [tabletAidOn]);
 
   // "PDF aus CAD-Blatt einfügen": Wenn Query-Parameter gesetzt sind,
   // eine kleine Bestätigungsleiste einblenden.
