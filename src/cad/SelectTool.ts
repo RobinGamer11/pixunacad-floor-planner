@@ -111,6 +111,8 @@ export class SelectTool {
   dragFreeStrokeId: string | null = null;
   dragFreeStrokeGrabOffset: Vec2 | null = null; // mouseStart - points[0]
   dragFreeStrokeOrigPoints: Vec2[] | null = null;
+  // FreeStroke Edit-State (HUB-Action TRANSLATE / ROTATE)
+  freeStrokePointsOriginal: Vec2[] | null = null;
 
   // TextBox Drag/Rotate-State
   dragTextBoxId: string | null = null;
