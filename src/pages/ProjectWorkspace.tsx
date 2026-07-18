@@ -283,6 +283,9 @@ export default function ProjectWorkspace() {
   // Aktueller Zoom als Ref, damit iPad-Touch-Handler ihn ohne Rerender lesen.
   const zoomRef = useRef(zoom);
   useEffect(() => { zoomRef.current = zoom; }, [zoom]);
+  const wheelAccumRef = useRef(1);
+  const wheelAnchorRef = useRef<{ x: number; y: number } | null>(null);
+  const wheelRafRef = useRef(0);
 
   // iPad: Zwei-Finger-Pinch = Zoom, Zwei-Finger-Drag = Pan. Ein Finger auf
   // dem Canvas bleibt der aktiven CAD-/Werkzeug-Interaktion vorbehalten.
@@ -316,6 +319,17 @@ export default function ProjectWorkspace() {
         e.preventDefault();
       }
     };
+    let rafPending = 0;
+    let pendingNextZoom: number | null = null;
+    let pendingAnchor: ProjectZoomAnchor | null = null;
+    const flush = () => {
+      rafPending = 0;
+      if (pendingNextZoom == null) return;
+      if (pendingAnchor) zoomAnchorRef.current = pendingAnchor;
+      setZoom(pendingNextZoom);
+      pendingNextZoom = null;
+      pendingAnchor = null;
+    };
     const onTouchMove = (e: TouchEvent) => {
       if ((window as any).__pixunaZoomLock) { mode = "idle"; return; }
       for (const t of Array.from(e.touches)) pts.set(t.identifier, { x: t.clientX, y: t.clientY });
@@ -324,14 +338,11 @@ export default function ProjectWorkspace() {
         const dist = distOf();
         if (startDist > 4 && dist > 4) {
           const factor = dist / startDist;
-          const next = clampProjectZoom(startZoom * factor);
-          zoomAnchorRef.current = startAnchor?.kind === "page"
+          pendingNextZoom = clampProjectZoom(startZoom * factor);
+          pendingAnchor = startAnchor?.kind === "page"
             ? { ...startAnchor, clientX: m.x, clientY: m.y }
             : captureZoomAnchor(m.x, m.y);
-          setZoom(next);
-          requestAnimationFrame(() => {
-            applyZoomAnchor();
-          });
+          if (!rafPending) rafPending = requestAnimationFrame(flush);
         }
         e.preventDefault();
       }
@@ -1249,13 +1260,9 @@ export default function ProjectWorkspace() {
               onWheel={(e) => {
                 if ((window as any).__pixunaZoomLock) { if (e.cancelable) e.preventDefault(); return; }
                 if (e.shiftKey && !e.altKey) {
-                  // Shift alleine = normales horizontales Scrollen zulassen.
                   return;
                 }
                 const container = e.currentTarget as HTMLDivElement;
-                // Hoch-Delta-Dämpfer: sehr große Wheel-Ticks (Trackpad) werden
-                // logarithmisch begrenzt, damit ein einzelner „Kick" nicht
-                // 30 %-Sprünge erzeugt.
                 let dy = e.deltaY;
                 if (e.deltaMode === 1) dy *= 16;
                 if (e.deltaMode === 2) dy *= container.clientHeight;
@@ -1263,16 +1270,27 @@ export default function ProjectWorkspace() {
                   const sign = dy < 0 ? -1 : 1;
                   dy = sign * (60 + Math.log2(Math.abs(dy) / 60 + 1) * 40);
                 }
-                // Feiner, kontinuierlicher Zoom: normale Wheel-Ticks liegen nur
-                // bei ca. 4–5 %, Trackpads/Pinch laufen entsprechend weicher.
                 let sensitivity = 0.00055;
                 if (e.altKey) sensitivity = 0.0012;
                 else if (e.ctrlKey || e.metaKey) sensitivity = 0.00042;
                 const factor = Math.exp(-dy * sensitivity);
-                const next = clampProjectZoom(zoom * factor);
-                if (Math.abs(next - zoom) < 0.005) { if (e.cancelable) e.preventDefault(); return; }
-                zoomAnchorRef.current = captureZoomAnchor(e.clientX, e.clientY);
-                setZoom(next);
+                // rAF-coalescing: mehrere Wheel-Ticks pro Frame in EINE
+                // Zoom-Aktualisierung zusammenfassen (verhindert Ruckeln).
+                wheelAccumRef.current *= factor;
+                wheelAnchorRef.current = { x: e.clientX, y: e.clientY };
+                if (!wheelRafRef.current) {
+                  wheelRafRef.current = requestAnimationFrame(() => {
+                    wheelRafRef.current = 0;
+                    const f = wheelAccumRef.current;
+                    wheelAccumRef.current = 1;
+                    const a = wheelAnchorRef.current;
+                    const current = zoomRef.current;
+                    const next = clampProjectZoom(current * f);
+                    if (Math.abs(next - current) < 0.002) return;
+                    if (a) zoomAnchorRef.current = captureZoomAnchor(a.x, a.y);
+                    setZoom(next);
+                  });
+                }
                 if (e.cancelable) e.preventDefault();
               }}
               onPointerDown={(e) => {
