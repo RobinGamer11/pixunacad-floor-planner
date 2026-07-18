@@ -121,6 +121,15 @@ function CenterToggles() {
     (window as any).__pixunaZoomLock = zoomLock;
     try { localStorage.setItem("pixuna.zoomLock", zoomLock ? "1" : "0"); } catch {}
   }, [zoomLock]);
+  useEffect(() => {
+    return () => {
+      // Beim Deaktivieren des Hilfsrads Sperren aufheben, damit die normale
+      // Bedienung wiederhergestellt ist.
+      (window as any).__pixunaPenOnly = false;
+      (window as any).__pixunaZoomLock = false;
+    };
+  }, []);
+
 
   const btn = (active: boolean): React.CSSProperties => ({
     width: 46,
