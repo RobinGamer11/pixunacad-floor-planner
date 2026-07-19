@@ -146,6 +146,8 @@ export default function NotesPage() {
         onRedo={hist.redo}
         canDelete={!!selected}
         onDelete={() => selected && (notesStore.deleteNode(projectId, selected.id), setSelectedId(null))}
+        tabletAidOn={tabletAidOn}
+        onToggleTabletAid={() => setTabletAidOn((v) => !v)}
       />
       <main
         className="flex-1 min-h-0 grid transition-[grid-template-columns] duration-200"
