@@ -845,6 +845,7 @@ type UnifiedTask = {
   category?: string;
   status?: NoteStatus;
   nodeParentId?: string | null; // nur bei source === "note"
+  mappeId?: string;
 };
 
 function noteToUnified(n: NoteNode): UnifiedTask {
