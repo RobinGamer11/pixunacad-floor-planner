@@ -30,6 +30,8 @@ export interface NoteNode {
   order?: number;
   /** Neu erstellte Aufgabe/Notiz aus Startseite – bis zum ersten Öffnen im Netz hellblau markiert. */
   unseen?: boolean;
+  /** Zuordnung zu einer Projektmappe (id). Für Aufgaben-Übersicht/Filter. */
+  mappeId?: string;
 }
 
 export interface NotesState {
@@ -169,6 +171,7 @@ export const notesStore = {
       updatedAt: now,
       order: siblingsMaxOrder(s, parentId) + 1,
       unseen: patch.unseen,
+      mappeId: patch.mappeId,
 
     };
     commit(projectId, { ...s, nodes: [...s.nodes, node] });

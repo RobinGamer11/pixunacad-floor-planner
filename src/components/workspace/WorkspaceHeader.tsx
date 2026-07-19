@@ -120,15 +120,17 @@ export function WorkspaceHeader({
             active={mode === "workspace"}
             onClick={goWorkspace}
           />
+          <ModeDivider />
           <ModeButton
             icon={<Compass size={13} />}
             label="CAD-Oberfläche"
             active={mode === "cad"}
             onClick={goCad}
           />
+          <ModeDivider />
           <ModeButton
             icon={<Network size={13} />}
-            label="Notiznetz"
+            label="Board"
             active={mode === "notes"}
             onClick={goNotes}
           />
@@ -228,5 +230,15 @@ function ModeButton({
       {icon}
       {label}
     </button>
+  );
+}
+
+function ModeDivider() {
+  return (
+    <span
+      aria-hidden
+      className="mx-0.5 inline-block h-4 w-px"
+      style={{ background: "hsl(var(--hairline))" }}
+    />
   );
 }

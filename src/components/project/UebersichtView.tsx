@@ -2,6 +2,7 @@ import React, { useState, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus, Pencil, Check, X, Trash2, Settings2, GripVertical } from "lucide-react";
 import { projectStore, type Project, type Task } from "@/lib/projectStore";
+import { notesStore, useNotes } from "@/lib/notesStore";
 
 interface Props {
   project: Project;
@@ -306,7 +307,28 @@ function TaskTimeline({ project }: { project: Project }) {
 /* ============================================================ Aufgaben-Mini */
 
 function AufgabenMini({ project }: { project: Project }) {
-  const open = project.tasks.filter((t) => !t.done).slice(0, 8);
+  const notes = useNotes(project.id);
+  const mappen = project.mappen ?? [];
+  const mappeName = (id?: string) => (id ? (mappen.find((m) => m.id === id)?.name ?? "") : "");
+  type Row = { key: string; source: "legacy" | "note"; id: string; title: string; done: boolean; date?: string; mappeId?: string };
+  const rows: Row[] = useMemo(() => {
+    const legacy: Row[] = project.tasks.map((t) => ({
+      key: `legacy:${t.id}`, source: "legacy", id: t.id, title: t.title, done: t.done, date: t.date,
+    }));
+    const noteTasks: Row[] = notes.nodes
+      .filter((n) => n.kind === "task")
+      .map((n) => ({
+        key: `note:${n.id}`, source: "note", id: n.id, title: n.title,
+        done: n.status === "done", date: n.date || n.dueDate, mappeId: n.mappeId,
+      }));
+    return [...legacy, ...noteTasks]
+      .sort((a, b) => (a.done === b.done ? 0 : a.done ? 1 : -1));
+  }, [project.tasks, notes.nodes]);
+  const open = rows.filter((r) => !r.done).slice(0, 8);
+  const toggle = (r: Row) => {
+    if (r.source === "legacy") projectStore.toggleTask(project.id, r.id);
+    else notesStore.updateNode(project.id, r.id, { status: r.done ? "open" : "done" });
+  };
   return (
     <section
       className="rounded-2xl p-5"
@@ -316,26 +338,35 @@ function AufgabenMini({ project }: { project: Project }) {
         <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">AUFGABEN</div>
         <div className="text-[10px] text-muted-foreground">Bearbeiten im Reiter „Aufgaben"</div>
       </div>
-      {project.tasks.length === 0 ? (
+      {rows.length === 0 ? (
         <div className="text-xs text-muted-foreground italic">Keine Aufgaben.</div>
       ) : open.length === 0 ? (
         <div className="text-xs text-muted-foreground italic">Alles erledigt 🎉</div>
       ) : (
         <div className="divide-y" style={{ borderColor: "hsl(var(--hairline))" }}>
-          {open.map((t) => (
-            <label key={t.id} className="flex items-center gap-2 py-2 text-sm cursor-pointer">
-              <input
-                type="checkbox"
-                checked={t.done}
-                onChange={() => projectStore.toggleTask(project.id, t.id)}
-                className="accent-foreground"
-              />
-              <span className={`flex-1 truncate ${t.done ? "line-through text-muted-foreground" : ""}`}>{t.title}</span>
-              <span className="text-[11px] text-muted-foreground shrink-0">
-                {t.date ? new Date(t.date).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" }) : ""}
-              </span>
-            </label>
-          ))}
+          {open.map((t) => {
+            const mn = mappeName(t.mappeId);
+            return (
+              <label key={t.key} className="flex items-center gap-2 py-2 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={t.done}
+                  onChange={() => toggle(t)}
+                  className="accent-foreground"
+                />
+                <span className={`flex-1 truncate ${t.done ? "line-through text-muted-foreground" : ""}`}>{t.title}</span>
+                {mn && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded shrink-0"
+                    style={{ background: "hsl(var(--surface-muted))", color: "hsl(var(--ink-soft))" }}>
+                    {mn}
+                  </span>
+                )}
+                <span className="text-[11px] text-muted-foreground shrink-0">
+                  {t.date ? new Date(t.date).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" }) : ""}
+                </span>
+              </label>
+            );
+          })}
         </div>
       )}
     </section>

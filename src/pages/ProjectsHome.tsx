@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Plus,
@@ -845,6 +845,7 @@ type UnifiedTask = {
   category?: string;
   status?: NoteStatus;
   nodeParentId?: string | null; // nur bei source === "note"
+  mappeId?: string;
 };
 
 function noteToUnified(n: NoteNode): UnifiedTask {
@@ -868,18 +869,25 @@ function noteToUnified(n: NoteNode): UnifiedTask {
 function AufgabenView({ project }: { project: Project }) {
   const navigate = useNavigate();
   const notes = useNotes(project.id);
+  const mappen = project.mappen ?? [];
+  const defaultMappeId = project.activeMappeId ?? mappen[0]?.id ?? "";
   const [selectedDate, setSelectedDate] = useState<string | undefined>(undefined);
-  const [draft, setDraft] = useState<{ title: string; description: string; date: string; time: string; priority: TaskPriority; category: string }>({
+  const [draft, setDraft] = useState<{ title: string; description: string; date: string; time: string; priority: TaskPriority; category: string; mappeId: string }>({
     title: "",
     description: "",
     date: "",
     time: "",
     priority: "medium",
     category: "",
+    mappeId: defaultMappeId,
   });
 
+  const mappeName = useCallback(
+    (id?: string) => (id ? (mappen.find((m) => m.id === id)?.name ?? "") : ""),
+    [mappen]
+  );
 
-  // Notiznetz-Tasks + klassische Tasks zusammenführen.
+  // Board-Tasks + klassische Tasks zusammenführen.
   const combined: UnifiedTask[] = useMemo(() => {
     const legacy: UnifiedTask[] = project.tasks.map((t) => ({
       id: t.id, source: "legacy", title: t.title, date: t.date, time: t.time,
@@ -887,7 +895,7 @@ function AufgabenView({ project }: { project: Project }) {
     }));
     const noteTasks = notes.nodes
       .filter((n) => n.kind === "task")
-      .map(noteToUnified);
+      .map((n) => ({ ...noteToUnified(n), mappeId: n.mappeId }));
     const prioRank: Record<TaskPriority, number> = { high: 0, medium: 1, low: 2 };
     return [...legacy, ...noteTasks].sort((a, b) => {
       // Offene zuerst, dann nach Dringlichkeit, dann nach Datum/Zeit.
@@ -914,9 +922,10 @@ function AufgabenView({ project }: { project: Project }) {
       priority: prio,
       status: "open",
       category: draft.category || undefined,
+      mappeId: draft.mappeId || undefined,
       unseen: true,
     });
-    setDraft({ title: "", description: "", date: selectedDate ?? "", time: "", priority: "medium", category: draft.category });
+    setDraft({ title: "", description: "", date: selectedDate ?? "", time: "", priority: "medium", category: draft.category, mappeId: draft.mappeId });
   };
 
   return (
@@ -934,9 +943,9 @@ function AufgabenView({ project }: { project: Project }) {
             onClick={() => navigate(`/project/${project.id}/notes`)}
             className="h-7 px-2.5 rounded-md text-[11px] font-medium flex items-center gap-1.5"
             style={{ background: "hsl(var(--accent-gold-soft))", color: "hsl(var(--accent-gold))" }}
-            title="Notiznetz öffnen"
+            title="Board öffnen"
           >
-            <Network size={13} /> Notiznetz
+            <Network size={13} /> Board
           </button>
         </div>
         <TaskCalendar
@@ -948,7 +957,7 @@ function AufgabenView({ project }: { project: Project }) {
           }}
         />
         <div className="mt-3 text-[11px] text-muted-foreground">
-          Tipp: Neue Aufgaben werden automatisch mit dem Notiznetz verknüpft und dort auf der Projekt-Ebene erstellt.
+          Tipp: Neue Aufgaben werden automatisch mit dem Board verknüpft und dort auf der Projekt-Ebene erstellt.
         </div>
       </div>
 
@@ -958,7 +967,7 @@ function AufgabenView({ project }: { project: Project }) {
         style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
       >
         <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-3">
-          NEUE AUFGABE (im Notiznetz)
+          NEUE AUFGABE (im Board)
         </div>
         <div className="flex flex-col gap-2">
           <input
@@ -1012,6 +1021,17 @@ function AufgabenView({ project }: { project: Project }) {
               {notes.categories.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
+          {mappen.length > 0 && (
+            <select
+              value={draft.mappeId}
+              onChange={(e) => setDraft({ ...draft, mappeId: e.target.value })}
+              className="h-9 px-2 rounded-md border bg-transparent text-sm outline-none"
+              style={{ borderColor: "hsl(var(--hairline))" }}
+              title="Projektmappe zuordnen"
+            >
+              {mappen.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+            </select>
+          )}
           <button
             onClick={addTask}
             className="h-9 px-4 rounded-md text-sm font-medium flex items-center justify-center gap-1 self-end"
@@ -1049,7 +1069,7 @@ function AufgabenView({ project }: { project: Project }) {
             </div>
           )}
           {filtered.map((t) => (
-            <UnifiedTaskRow key={`${t.source}:${t.id}`} task={t} projectId={project.id} onOpenInNotes={() => navigate(`/project/${project.id}/notes`)} />
+            <UnifiedTaskRow key={`${t.source}:${t.id}`} task={t} projectId={project.id} mappeName={mappeName(t.mappeId)} onOpenInNotes={() => navigate(`/project/${project.id}/notes`)} />
           ))}
         </div>
       </div>
@@ -1060,8 +1080,8 @@ function AufgabenView({ project }: { project: Project }) {
 }
 
 function UnifiedTaskRow({
-  task, projectId, onOpenInNotes,
-}: { task: UnifiedTask; projectId: string; onOpenInNotes: () => void }) {
+  task, projectId, onOpenInNotes, mappeName,
+}: { task: UnifiedTask; projectId: string; onOpenInNotes: () => void; mappeName?: string }) {
   const prio = task.priority;
   const prioColor =
     prio === "high" ? "hsl(0 70% 55%)"
@@ -1099,7 +1119,13 @@ function UnifiedTaskRow({
           {task.source === "note" && (
             <span className="text-[10px] px-1.5 py-0.5 rounded shrink-0"
               style={{ background: "hsl(var(--accent-gold-soft))", color: "hsl(var(--accent-gold))" }}>
-              Netz
+              Board
+            </span>
+          )}
+          {mappeName && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded shrink-0"
+              style={{ background: "hsl(var(--surface-muted))", color: "hsl(var(--ink-soft))" }}>
+              {mappeName}
             </span>
           )}
           {task.category && (
@@ -1117,7 +1143,7 @@ function UnifiedTaskRow({
         </div>
       </div>
       {task.source === "note" && (
-        <button onClick={onOpenInNotes} title="Im Notiznetz öffnen"
+        <button onClick={onOpenInNotes} title="Im Board öffnen"
           className="text-muted-foreground hover:text-foreground">
           <ExternalLink size={14} />
         </button>

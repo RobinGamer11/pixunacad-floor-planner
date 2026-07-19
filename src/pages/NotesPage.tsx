@@ -121,9 +121,9 @@ export default function NotesPage() {
   if (!projectId) return null;
 
   const gridCols = [
-    leftOpen ? "240px" : "0px",
+    ...(leftOpen ? ["240px"] : []),
     "1fr",
-    rightOpen ? "460px" : "0px",
+    ...(rightOpen ? ["460px"] : []),
   ].join(" ");
 
   return (
@@ -131,7 +131,7 @@ export default function NotesPage() {
       <WorkspaceHeader
         projectId={projectId}
         projectName={project?.name}
-        contextLabel="Notiznetz"
+        contextLabel="Board"
         mode="notes"
         canUndo={hist.canUndo}
         canRedo={hist.canRedo}
@@ -301,7 +301,7 @@ function LeftPanel({
       <div className="p-2 border-b space-y-2" style={{ borderColor: "hsl(var(--hairline))" }}>
         <div className="flex items-center gap-1">
           <div className="text-[11px] font-semibold uppercase tracking-wider flex-1"
-               style={{ color: "hsl(var(--ink-soft))" }}>Notiznetz</div>
+               style={{ color: "hsl(var(--ink-soft))" }}>Board</div>
           <button onClick={onCollapse}
             className="h-6 w-6 rounded flex items-center justify-center hover:bg-muted"
             title="Liste einklappen">
