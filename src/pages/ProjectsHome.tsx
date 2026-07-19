@@ -869,13 +869,15 @@ function AufgabenView({ project }: { project: Project }) {
   const navigate = useNavigate();
   const notes = useNotes(project.id);
   const [selectedDate, setSelectedDate] = useState<string | undefined>(undefined);
-  const [draft, setDraft] = useState<{ title: string; date: string; time: string; priority: TaskPriority; category: string }>({
+  const [draft, setDraft] = useState<{ title: string; description: string; date: string; time: string; priority: TaskPriority; category: string }>({
     title: "",
+    description: "",
     date: "",
     time: "",
     priority: "medium",
     category: "",
   });
+
 
   // Notiznetz-Tasks + klassische Tasks zusammenführen.
   const combined: UnifiedTask[] = useMemo(() => {
@@ -886,28 +888,35 @@ function AufgabenView({ project }: { project: Project }) {
     const noteTasks = notes.nodes
       .filter((n) => n.kind === "task")
       .map(noteToUnified);
+    const prioRank: Record<TaskPriority, number> = { high: 0, medium: 1, low: 2 };
     return [...legacy, ...noteTasks].sort((a, b) => {
+      // Offene zuerst, dann nach Dringlichkeit, dann nach Datum/Zeit.
+      if (!!a.done !== !!b.done) return a.done ? 1 : -1;
+      const pr = prioRank[a.priority] - prioRank[b.priority];
+      if (pr !== 0) return pr;
       const da = `${a.date ?? "9999-99-99"} ${a.time ?? "99:99"}`;
       const db = `${b.date ?? "9999-99-99"} ${b.time ?? "99:99"}`;
       return da.localeCompare(db);
     });
   }, [project.tasks, notes.nodes]);
 
+
   const filtered = selectedDate ? combined.filter((t) => t.date === selectedDate) : combined;
 
   const addTask = () => {
     if (!draft.title.trim()) return;
-    // Quick-Create landet direkt im Notiznetz (Root-Ebene).
     const prio: NotePriority = draft.priority === "high" ? "high" : draft.priority === "low" ? "low" : "normal";
     notesStore.addNode(project.id, null, "task", {
       title: draft.title.trim(),
+      description: draft.description.trim() || undefined,
       date: draft.date || undefined,
       time: draft.time || undefined,
       priority: prio,
       status: "open",
       category: draft.category || undefined,
+      unseen: true,
     });
-    setDraft({ title: "", date: selectedDate ?? "", time: "", priority: "medium", category: draft.category });
+    setDraft({ title: "", description: "", date: selectedDate ?? "", time: "", priority: "medium", category: draft.category });
   };
 
   return (
@@ -960,6 +969,14 @@ function AufgabenView({ project }: { project: Project }) {
             className="h-9 px-3 rounded-md border bg-transparent text-sm outline-none w-full"
             style={{ borderColor: "hsl(var(--hairline))" }}
           />
+          <textarea
+            value={draft.description}
+            onChange={(e) => setDraft({ ...draft, description: e.target.value })}
+            placeholder="Beschreibung (optional)…"
+            rows={2}
+            className="px-3 py-2 rounded-md border bg-transparent text-sm outline-none w-full resize-none"
+            style={{ borderColor: "hsl(var(--hairline))" }}
+          />
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <input
               type="date"
@@ -1003,29 +1020,9 @@ function AufgabenView({ project }: { project: Project }) {
             <Plus size={14} /> Hinzufügen
           </button>
         </div>
-        {/* Zeitstrahl-Position (Übersichts-Tab) */}
-        <div className="mt-4 pt-3 flex items-center gap-3 text-xs" style={{ borderTop: "1px solid hsl(var(--hairline))" }}>
-          <span className="text-muted-foreground">Zeitstrahl in Übersicht:</span>
-          {(["top", "bottom"] as const).map((pos) => {
-            const active = (project.settings?.timelinePosition ?? "bottom") === pos;
-            return (
-              <button
-                key={pos}
-                onClick={() => projectStore.updateProjectSettings(project.id, { timelinePosition: pos })}
-                className="h-7 px-3 rounded-md border"
-                style={{
-                  borderColor: active ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
-                  background: active ? "hsl(var(--accent-gold) / 0.12)" : "transparent",
-                  color: active ? "hsl(var(--ink))" : "hsl(var(--ink-soft))",
-                  fontWeight: active ? 600 : 400,
-                }}
-              >
-                {pos === "top" ? "Oben (über Projektmappen)" : "Unten (Standard)"}
-              </button>
-            );
-          })}
-        </div>
       </div>
+
+
 
       {/* Aufgabenliste */}
       <div

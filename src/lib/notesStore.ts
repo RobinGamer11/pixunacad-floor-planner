@@ -28,6 +28,8 @@ export interface NoteNode {
   updatedAt: number;
   /** Sortierindex innerhalb des Elternteils (für Drag&Drop). */
   order?: number;
+  /** Neu erstellte Aufgabe/Notiz aus Startseite – bis zum ersten Öffnen im Netz hellblau markiert. */
+  unseen?: boolean;
 }
 
 export interface NotesState {
@@ -36,6 +38,7 @@ export interface NotesState {
   priorities: NotePriorityDef[];
   nodes: NoteNode[];
 }
+
 
 const DEFAULT_STATUSES: NoteStatusDef[] = [
   { id: "open", label: "Offen", color: "#ef4444" },
@@ -165,6 +168,8 @@ export const notesStore = {
       createdAt: now,
       updatedAt: now,
       order: siblingsMaxOrder(s, parentId) + 1,
+      unseen: patch.unseen,
+
     };
     commit(projectId, { ...s, nodes: [...s.nodes, node] });
     return node;
@@ -218,11 +223,29 @@ export const notesStore = {
     if (!name.trim() || s.categories.includes(name)) return;
     commit(projectId, { ...s, categories: [...s.categories, name] });
   },
+  removeCategory(projectId: string, name: string) {
+    const s = getState(projectId);
+    if (!s.categories.includes(name)) return;
+    commit(projectId, {
+      ...s,
+      categories: s.categories.filter((c) => c !== name),
+      nodes: s.nodes.map((n) => n.category === name ? { ...n, category: undefined, updatedAt: Date.now() } : n),
+    });
+  },
   addStatus(projectId: string, label: string, color: string) {
     const s = getState(projectId);
     if (!label.trim()) return;
     if (s.statuses.some((x) => x.label === label)) return;
     commit(projectId, { ...s, statuses: [...s.statuses, { id: uid(), label, color }] });
+  },
+  removeStatus(projectId: string, id: string) {
+    const s = getState(projectId);
+    if (!s.statuses.some((x) => x.id === id)) return;
+    commit(projectId, {
+      ...s,
+      statuses: s.statuses.filter((x) => x.id !== id),
+      nodes: s.nodes.map((n) => n.status === id ? { ...n, status: undefined, updatedAt: Date.now() } : n),
+    });
   },
   addPriority(projectId: string, label: string, color: string) {
     const s = getState(projectId);
@@ -230,6 +253,26 @@ export const notesStore = {
     if (s.priorities.some((x) => x.label === label)) return;
     commit(projectId, { ...s, priorities: [...s.priorities, { id: uid(), label, color }] });
   },
+  removePriority(projectId: string, id: string) {
+    const s = getState(projectId);
+    if (!s.priorities.some((x) => x.id === id)) return;
+    commit(projectId, {
+      ...s,
+      priorities: s.priorities.filter((x) => x.id !== id),
+      nodes: s.nodes.map((n) => n.priority === id ? { ...n, priority: undefined, updatedAt: Date.now() } : n),
+    });
+  },
+  markSeen(projectId: string, id: string) {
+    const s = getState(projectId);
+    const node = s.nodes.find((n) => n.id === id);
+    if (!node || !node.unseen) return;
+    // Nicht in History – "gesehen" ist reine UI-Markierung.
+    persist(projectId, {
+      ...s,
+      nodes: s.nodes.map((n) => n.id === id ? { ...n, unseen: false } : n),
+    });
+  },
+
   addComment(projectId: string, nodeId: string, text: string) {
     const s = getState(projectId);
     const node = s.nodes.find((n) => n.id === nodeId);

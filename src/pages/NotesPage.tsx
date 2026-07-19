@@ -95,6 +95,13 @@ export default function NotesPage() {
     setSelectedId(n.id);
   };
 
+  // Auswahl markiert neu erstellte Aufgaben/Notizen als „gesehen" (hebt hellblauen Rahmen auf).
+  const selectAndMarkSeen = useCallback((id: string) => {
+    setSelectedId(id);
+    if (projectId) notesStore.markSeen(projectId, id);
+  }, [projectId]);
+
+
   const selectRoot = () => { setSelectedId(null); setFocusToken((v) => v + 1); };
 
   // Keyboard: Ctrl/Cmd+Z / Ctrl+Y — nur außerhalb Text-Eingaben
@@ -148,7 +155,7 @@ export default function NotesPage() {
             filterCat={filterCat} setFilterCat={setFilterCat}
             filterStatus={filterStatus} setFilterStatus={setFilterStatus}
             filterPriority={filterPriority} setFilterPriority={setFilterPriority}
-            selectedId={selectedId} setSelectedId={setSelectedId}
+            selectedId={selectedId} setSelectedId={selectAndMarkSeen}
             selectRoot={selectRoot}
             expanded={expanded} toggleExpand={toggleExpand}
             childrenOf={childrenOf}
@@ -184,7 +191,7 @@ export default function NotesPage() {
               statuses={state.statuses}
               priorities={state.priorities}
               nodes={state.nodes}
-              onSelect={setSelectedId}
+              onSelect={selectAndMarkSeen}
               onDelete={() => { notesStore.deleteNode(projectId, selected.id); setSelectedId(null); }}
             />
           ) : (
@@ -201,13 +208,14 @@ export default function NotesPage() {
             state={state}
             statusMap={statusMap}
             selectedId={selectedId}
-            setSelectedId={setSelectedId}
+            setSelectedId={selectAndMarkSeen}
             mode={rightMode}
             setMode={setRightMode}
             onCollapse={() => setRightOpen(false)}
             focusToken={focusToken}
           />
         )}
+
       </main>
     </div>
   );
@@ -317,6 +325,12 @@ function LeftPanel({
             {state.categories.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
           <IconBtn onClick={addCategory} title="Kategorie hinzufügen"><Plus size={12} /></IconBtn>
+          <ManageMenu
+            title="Kategorien verwalten"
+            items={state.categories.map((c) => ({ id: c, label: c, color: "hsl(var(--ink-soft))" }))}
+            onDelete={(id) => notesStore.removeCategory(projectId, id)}
+            onAfterDelete={(id) => { if (filterCat === id) setFilterCat(""); }}
+          />
         </FilterRow>
 
         <FilterRow>
@@ -327,6 +341,12 @@ function LeftPanel({
             {state.statuses.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
           </select>
           <IconBtn onClick={addStatus} title="Status hinzufügen"><Plus size={12} /></IconBtn>
+          <ManageMenu
+            title="Status verwalten"
+            items={state.statuses.map((s) => ({ id: s.id, label: s.label, color: s.color }))}
+            onDelete={(id) => notesStore.removeStatus(projectId, id)}
+            onAfterDelete={(id) => { if (filterStatus === id) setFilterStatus(""); }}
+          />
         </FilterRow>
 
         <FilterRow>
@@ -337,7 +357,14 @@ function LeftPanel({
             {state.priorities.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
           </select>
           <IconBtn onClick={addPriority} title="Dringlichkeit hinzufügen"><Plus size={12} /></IconBtn>
+          <ManageMenu
+            title="Dringlichkeiten verwalten"
+            items={state.priorities.map((p) => ({ id: p.id, label: p.label, color: p.color }))}
+            onDelete={(id) => notesStore.removePriority(projectId, id)}
+            onAfterDelete={(id) => { if (filterPriority === id) setFilterPriority(""); }}
+          />
         </FilterRow>
+
 
         <button onClick={() => addChild(null, "topic")}
           className="w-full h-7 rounded-md text-[11px] font-medium flex items-center justify-center gap-1"
@@ -400,6 +427,59 @@ function IconBtn({ onClick, title, children }: { onClick: () => void; title: str
   );
 }
 
+function ManageMenu({
+  title, items, onDelete, onAfterDelete,
+}: {
+  title: string;
+  items: { id: string; label: string; color: string }[];
+  onDelete: (id: string) => void;
+  onAfterDelete?: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+  return (
+    <div className="relative shrink-0" ref={ref}>
+      <button onClick={() => setOpen((v) => !v)} title={title}
+        className="h-7 w-7 rounded-md border flex items-center justify-center hover:bg-muted"
+        style={{ borderColor: "hsl(var(--hairline))" }}>
+        <ChevronDown size={12} />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 z-30 min-w-[180px] max-h-[220px] overflow-auto rounded-md border shadow-md py-1"
+             style={{ background: "hsl(var(--surface))", borderColor: "hsl(var(--hairline))" }}>
+          {items.length === 0 && (
+            <div className="px-3 py-1.5 text-[11px]" style={{ color: "hsl(var(--ink-soft))" }}>Keine Einträge</div>
+          )}
+          {items.map((it) => (
+            <div key={it.id} className="flex items-center gap-2 px-2 py-1 hover:bg-muted text-[11px]">
+              <span className="w-2 h-2 rounded-full shrink-0" style={{ background: it.color }} />
+              <span className="flex-1 truncate">{it.label}</span>
+              <button
+                onClick={() => {
+                  if (confirm(`„${it.label}" wirklich löschen?`)) {
+                    onDelete(it.id);
+                    onAfterDelete?.(it.id);
+                  }
+                }}
+                className="h-6 w-6 rounded flex items-center justify-center hover:bg-background"
+                title="Löschen">
+                <Trash2 size={11} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 function TreeList({
   projectId, nodes, depth, selectedId, onSelect, expanded, toggleExpand,
   childrenOf, addChild, visibleIds, statusMap, priorityMap,
@@ -429,13 +509,22 @@ function TreeList({
         const isDragOver = dragOverId === n.id;
         return (
           <li key={n.id}>
-            <div
-              draggable
+            <TreeRow
+              node={n}
+              depth={depth}
+              isSel={isSel}
+              hasKids={hasKids}
+              isOpen={isOpen}
+              isDragOver={isDragOver}
+              statusDef={st}
+              priorityDef={pr}
+              onToggleExpand={() => toggleExpand(n.id)}
+              onSelect={() => onSelect(n.id)}
               onDragStart={(e) => {
                 // 2 Payloads: „link" (Editor-Drop-Zone) und „move" (Reparent)
                 e.dataTransfer.setData("application/x-note-id", n.id);
                 e.dataTransfer.setData("application/x-note-move", n.id);
-                e.dataTransfer.effectAllowed = "copyMove";
+                e.dataTransfer.effectAllowed = "all";
               }}
               onDragOver={(e) => {
                 if (e.dataTransfer.types.includes("application/x-note-move")) {
@@ -453,41 +542,18 @@ function TreeList({
                   notesStore.moveNode(projectId, id, n.id);
                 }
               }}
-              onClick={() => onSelect(n.id)}
-              className="group flex items-center gap-1 pr-1.5 py-1 cursor-pointer border-l-2"
-              style={{
-                paddingLeft: 6 + depth * 12,
-                background: isSel
-                  ? "hsl(var(--surface-muted))"
-                  : isDragOver ? "hsl(var(--accent-gold-soft))" : "transparent",
-                borderColor: isSel ? "hsl(var(--accent-gold))" : "transparent",
-              }}
-            >
-              <button
-                onClick={(e) => { e.stopPropagation(); if (hasKids) toggleExpand(n.id); }}
-                className="h-4 w-4 flex items-center justify-center shrink-0"
-                style={{ visibility: hasKids ? "visible" : "hidden" }}>
-                {isOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
-              </button>
-              <GripVertical size={10} className="opacity-0 group-hover:opacity-40 shrink-0" />
-              <span style={{ color: kindColor(n.kind) }} className="shrink-0">{kindIcon(n.kind)}</span>
-              <span className="text-[11px] font-medium truncate flex-1" title={n.title}>{n.title}</span>
-              {st && <span className="w-2 h-2 rounded-full shrink-0" style={{ background: st.color }} title={st.label} />}
-              {pr && n.priority !== "normal" && (
-                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: pr.color }} title={pr.label} />
-              )}
-              {n.priority === "urgent" && <AlertTriangle size={10} className="text-red-500 shrink-0" />}
-            </div>
+            />
 
             {isSel && (
-              <div className="flex gap-1 py-1 pr-2" style={{ paddingLeft: 26 + depth * 12 }}>
+              <div className="flex flex-wrap gap-1 py-1 pr-1" style={{ paddingLeft: 20 + depth * 12 }}>
+                <MiniAddBtn onClick={() => addChild(n.id, "task")} label="Aufgabe" />
+                <MiniAddBtn onClick={() => addChild(n.id, "note")} label="Notiz" />
                 {n.kind === "topic" && (
                   <MiniAddBtn onClick={() => addChild(n.id, "topic")} label="Unterthema" />
                 )}
-                <MiniAddBtn onClick={() => addChild(n.id, "note")} label="Notiz" />
-                <MiniAddBtn onClick={() => addChild(n.id, "task")} label="Aufgabe" />
               </div>
             )}
+
 
             {hasKids && isOpen && (
               <TreeList
@@ -507,6 +573,68 @@ function TreeList({
   );
 }
 
+function TreeRow({
+  node, depth, isSel, hasKids, isOpen, isDragOver, statusDef, priorityDef,
+  onToggleExpand, onSelect, onDragStart, onDragOver, onDragLeave, onDrop,
+}: {
+  node: NoteNode;
+  depth: number;
+  isSel: boolean;
+  hasKids: boolean;
+  isOpen: boolean;
+  isDragOver: boolean;
+  statusDef?: NoteStatusDef;
+  priorityDef?: NotePriorityDef;
+  onToggleExpand: () => void;
+  onSelect: () => void;
+  onDragStart: (e: React.DragEvent) => void;
+  onDragOver: (e: React.DragEvent) => void;
+  onDragLeave: () => void;
+  onDrop: (e: React.DragEvent) => void;
+}) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (isSel && ref.current) ref.current.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [isSel]);
+  const isUnseen = !!node.unseen;
+  return (
+    <div
+      ref={ref}
+      draggable
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+      onClick={onSelect}
+      className="group flex items-center gap-1 pr-1.5 py-1 cursor-pointer border-l-2"
+      style={{
+        paddingLeft: 6 + depth * 12,
+        background: isSel
+          ? "hsl(var(--surface-muted))"
+          : isDragOver
+          ? "hsl(var(--accent-gold-soft))"
+          : isUnseen ? "rgba(56,189,248,0.18)" : "transparent",
+        borderColor: isSel ? "hsl(var(--accent-gold))" : isUnseen ? "#38bdf8" : "transparent",
+      }}
+    >
+      <button
+        onClick={(e) => { e.stopPropagation(); if (hasKids) onToggleExpand(); }}
+        className="h-4 w-4 flex items-center justify-center shrink-0"
+        style={{ visibility: hasKids ? "visible" : "hidden" }}>
+        {isOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+      </button>
+      <GripVertical size={10} className="opacity-0 group-hover:opacity-40 shrink-0" />
+      <span style={{ color: kindColor(node.kind) }} className="shrink-0">{kindIcon(node.kind)}</span>
+      <span className="text-[11px] font-medium truncate flex-1" title={node.title}>{node.title}</span>
+      {statusDef && <span className="w-2 h-2 rounded-full shrink-0" style={{ background: statusDef.color }} title={statusDef.label} />}
+      {priorityDef && node.priority !== "normal" && (
+        <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: priorityDef.color }} title={priorityDef.label} />
+      )}
+      {node.priority === "urgent" && <AlertTriangle size={10} className="text-red-500 shrink-0" />}
+    </div>
+  );
+}
+
 function MiniAddBtn({ onClick, label }: { onClick: () => void; label: string }) {
   return (
     <button onClick={onClick}
@@ -516,6 +644,8 @@ function MiniAddBtn({ onClick, label }: { onClick: () => void; label: string }) 
     </button>
   );
 }
+
+
 
 // -------------------------------------------------------------
 // MIDDLE – Editor
@@ -1043,16 +1173,23 @@ function ProjectGraph({
                                        : kindColor(n.kind);
             return (
               <g key={ln.id} style={{ cursor: "pointer" }} onClick={(e) => { e.stopPropagation(); onSelect(n.id); }}>
+                {n.unseen && (
+                  <circle cx={ln.x} cy={ln.y} r={ln.r + 5}
+                    fill="none" stroke="#38bdf8" strokeWidth={2} opacity={0.9}>
+                    <animate attributeName="opacity" values="0.4;1;0.4" dur="1.6s" repeatCount="indefinite" />
+                  </circle>
+                )}
                 <circle cx={ln.x} cy={ln.y} r={ln.r + (isSel ? 3 : 0)}
-                  fill={isTopic ? "hsl(var(--accent-gold))" : "hsl(var(--surface-card))"}
-                  stroke={isSel ? "hsl(var(--accent-gold))" : statusCol}
-                  strokeWidth={isSel ? 3 : 1.8} />
+                  fill={isTopic ? "hsl(var(--accent-gold))" : n.unseen ? "#e0f2fe" : "hsl(var(--surface-card))"}
+                  stroke={isSel ? "hsl(var(--accent-gold))" : n.unseen ? "#38bdf8" : statusCol}
+                  strokeWidth={isSel ? 3 : n.unseen ? 2.2 : 1.8} />
                 <text x={ln.x} y={ln.y + 3} textAnchor="middle" fontSize={9} fontWeight={600}
                   fill={isTopic ? "hsl(var(--surface))" : "hsl(var(--ink))"}>
                   {n.title.length > 10 ? n.title.slice(0, 10) + "…" : n.title}
                 </text>
               </g>
             );
+
           })}
         </g>
       </svg>
