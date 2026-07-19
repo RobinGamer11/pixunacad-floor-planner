@@ -174,47 +174,42 @@ export function TableElementView({
                   </td>
                 );
               })}
-              {!readOnly && (
-                <td className="border-0 pl-1 align-middle" style={{ width: 28 }}>
-                  <button
-                    onClick={() => delRow(r)}
-                    disabled={rows <= 1 || (headerRow && r === 0)}
-                    className="w-6 h-6 flex items-center justify-center rounded hover:bg-muted disabled:opacity-30"
-                    title="Zeile löschen"
-                  ><Minus size={12} /></button>
+              {modifyOn && (
+                <td className="border-0 pl-1 align-middle" style={{ width: 44 }}>
+                  <div className="flex items-center gap-0.5">
+                    <button
+                      onClick={() => delRow(r)}
+                      disabled={rows <= 1 || (headerRow && r === 0)}
+                      className="w-4 h-4 flex items-center justify-center rounded bg-destructive/10 text-destructive hover:bg-destructive/20 disabled:opacity-30"
+                      title="Zeile löschen"
+                    ><Minus size={9} /></button>
+                    <button
+                      onClick={() => updateCells((d) => { const nr = Array(cols).fill(""); d.splice(r + 1, 0, nr); })}
+                      className="w-4 h-4 flex items-center justify-center rounded bg-primary/10 text-primary hover:bg-primary/20"
+                      title="Zeile unten einfügen"
+                    ><Plus size={9} /></button>
+                  </div>
                 </td>
               )}
             </tr>
           ))}
         </tbody>
       </table>
-      {!readOnly && (
+      {modifyOn && (
         <div className="flex gap-1 p-1">
           <button
-            onClick={addRow}
-            className="h-7 px-2 text-[11px] rounded border flex items-center gap-1"
-            style={{ borderColor: "hsl(var(--hairline))" }}
-          ><Plus size={11} /> Zeile</button>
-          <button
-            onClick={addCol}
-            className="h-7 px-2 text-[11px] rounded border flex items-center gap-1"
-            style={{ borderColor: "hsl(var(--hairline))" }}
-          ><Plus size={11} /> Spalte</button>
-          <button
             onClick={() => {
-              // Insert =SUM formula in currently editing cell, else in last row/last col.
               const r = editing?.r ?? rows - 1;
               const c = editing?.c ?? cols - 1;
-              // Sum column above r within same column.
               const startR = headerRow ? 1 : 0;
               if (r <= startR) return;
               const colLetter = colLabel(c);
               setCell(r, c, `=SUM(${colLetter}${startR + 1}:${colLetter}${r})`);
             }}
-            className="h-7 px-2 text-[11px] rounded border flex items-center gap-1"
+            className="h-6 px-2 text-[10px] rounded border flex items-center gap-1"
             style={{ borderColor: "hsl(var(--hairline))" }}
             title="Summenformel in aktive Zelle einfügen"
-          ><Sigma size={11} /> Summe</button>
+          ><Sigma size={10} /> Summe</button>
         </div>
       )}
     </div>
