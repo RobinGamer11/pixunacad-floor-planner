@@ -138,7 +138,7 @@ export default function NotesPage() {
       <WorkspaceHeader
         projectId={projectId}
         projectName={project?.name}
-        contextLabel="Board"
+        
         mode="notes"
         canUndo={hist.canUndo}
         canRedo={hist.canRedo}
