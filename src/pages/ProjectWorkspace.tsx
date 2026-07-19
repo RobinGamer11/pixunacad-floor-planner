@@ -693,6 +693,7 @@ export default function ProjectWorkspace() {
   }
 
   return (
+    <TableModifyContext.Provider value={tableModifyMode}>
     <>
     <div
       className="flex flex-col h-[100dvh] w-screen overflow-hidden"
