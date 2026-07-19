@@ -43,6 +43,12 @@ export default function NotesPage() {
   const [rightOpen, setRightOpen] = useState(true);
   const [rightMode, setRightMode] = useState<"graph" | "links" | "timeline">("graph");
   const [focusToken, setFocusToken] = useState(0);
+  const [tabletAidOn, setTabletAidOn] = useState<boolean>(() => {
+    try { return localStorage.getItem("pixuna.tabletAid") === "1"; } catch { return false; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem("pixuna.tabletAid", tabletAidOn ? "1" : "0"); } catch {}
+  }, [tabletAidOn]);
 
   const statusMap = useMemo(() => {
     const m = new Map<string, NoteStatusDef>();
