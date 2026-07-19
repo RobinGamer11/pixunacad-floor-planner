@@ -3809,7 +3809,7 @@ function ToolsTab({
       )}
 
       {/* Tabellen-Werkzeug — Placement-Preview + Modifikation */}
-      {settingsTool === "table" && pageId && (
+      {pageId && (settingsTool === "table" || (!activeTool && element?.kind === "table")) && (
         <TableToolSettings
           projectId={projectId}
           pageId={pageId}
