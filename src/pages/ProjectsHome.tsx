@@ -1722,17 +1722,20 @@ function NavIcon({
   label,
   active,
   onClick,
+  disabled,
 }: {
   icon: React.ReactNode;
   label: string;
   active?: boolean;
   onClick?: () => void;
+  disabled?: boolean;
 }) {
   return (
     <button
       title={label}
       onClick={onClick}
-      className="w-9 h-9 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground"
+      disabled={disabled}
+      className={`w-9 h-9 rounded-lg flex items-center justify-center text-muted-foreground ${disabled ? "opacity-40 cursor-not-allowed" : "hover:text-foreground"}`}
       style={{
         background: active ? "hsl(var(--surface-muted))" : "transparent",
         color: active ? "hsl(var(--ink))" : undefined,
