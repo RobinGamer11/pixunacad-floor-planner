@@ -98,19 +98,19 @@ export function WorkspaceHeader({
         {onToggleTabletAid && (
           <button
             onClick={onToggleTabletAid}
-            className="ml-2 h-8 px-2.5 rounded-md flex items-center gap-1.5 text-[11px] font-semibold border transition-colors"
+            className="ml-1 h-8 w-8 rounded-md flex items-center justify-center border transition-colors"
             style={
               tabletAidOn
                 ? { background: "hsl(var(--accent-gold))", color: "hsl(var(--surface))", borderColor: "hsl(var(--accent-gold))" }
-                : { background: "hsl(var(--surface))", color: "hsl(var(--ink))", borderColor: "hsl(var(--accent-gold))" }
+                : { background: "transparent", color: "hsl(var(--ink-soft))", borderColor: "transparent" }
             }
             title="Tablet-Hilfsrad (Maus/Tastatur-Ersatz für Touch-Geräte)"
             aria-pressed={tabletAidOn}
           >
             <TabletSmartphone size={16} />
-            <span className="hidden sm:inline">Tablet</span>
           </button>
         )}
+
 
         <div className="ml-2 flex items-center gap-1 rounded-md p-0.5"
              style={{ background: "hsl(var(--surface-muted))" }}>
@@ -168,15 +168,8 @@ export function WorkspaceHeader({
           <Redo2 size={16} />
         </button>
 
-        {typeof zoomPercent === "number" && (
-          <span
-            className="text-xs px-2 tabular-nums"
-            style={{ color: "hsl(var(--ink-soft))" }}
-            title="Aktueller Zoom"
-          >
-            {Math.round(zoomPercent)}%
-          </span>
-        )}
+
+
 
         <button
           onClick={onPresent}
