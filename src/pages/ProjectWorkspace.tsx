@@ -3738,6 +3738,11 @@ function ToolsTab({
 
   onJumpCad: (sheetId?: string) => void;
   cadEngine?: import("@/cad/embed/MiniCad").MiniCad | null;
+  pendingTableId?: string | null;
+  tableModifyMode?: boolean;
+  setTableModifyMode?: (v: boolean) => void;
+  onConfirmTable?: () => void;
+  onCancelTable?: () => void;
 }) {
 
   const settingsTool = activeTool ?? selectedCadTool ?? null;
