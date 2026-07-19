@@ -79,6 +79,7 @@ import { CadDocumentInspector } from "@/components/page/CadDocumentInspector";
 import { CadIdPanelHost } from "@/components/page/CadIdPanelHost";
 import { PdfPageView } from "@/components/page/PdfPageView";
 import { TableElementView } from "@/components/page/TableElementView";
+import { TableToolSettings } from "@/components/page/TableToolSettings";
 
 import { CadViewportView } from "@/components/page/CadViewportView";
 import { importFile, type ImportedPage } from "@/cad/documentImport";
