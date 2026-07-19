@@ -1069,7 +1069,7 @@ function AufgabenView({ project }: { project: Project }) {
             </div>
           )}
           {filtered.map((t) => (
-            <UnifiedTaskRow key={`${t.source}:${t.id}`} task={t} projectId={project.id} onOpenInNotes={() => navigate(`/project/${project.id}/notes`)} />
+            <UnifiedTaskRow key={`${t.source}:${t.id}`} task={t} projectId={project.id} mappeName={mappeName(t.mappeId)} onOpenInNotes={() => navigate(`/project/${project.id}/notes`)} />
           ))}
         </div>
       </div>
