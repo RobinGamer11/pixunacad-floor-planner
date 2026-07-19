@@ -325,6 +325,12 @@ function LeftPanel({
             {state.categories.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
           <IconBtn onClick={addCategory} title="Kategorie hinzufügen"><Plus size={12} /></IconBtn>
+          <ManageMenu
+            title="Kategorien verwalten"
+            items={state.categories.map((c) => ({ id: c, label: c, color: "hsl(var(--ink-soft))" }))}
+            onDelete={(id) => notesStore.removeCategory(projectId, id)}
+            onAfterDelete={(id) => { if (filterCat === id) setFilterCat(""); }}
+          />
         </FilterRow>
 
         <FilterRow>
@@ -335,6 +341,12 @@ function LeftPanel({
             {state.statuses.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
           </select>
           <IconBtn onClick={addStatus} title="Status hinzufügen"><Plus size={12} /></IconBtn>
+          <ManageMenu
+            title="Status verwalten"
+            items={state.statuses.map((s) => ({ id: s.id, label: s.label, color: s.color }))}
+            onDelete={(id) => notesStore.removeStatus(projectId, id)}
+            onAfterDelete={(id) => { if (filterStatus === id) setFilterStatus(""); }}
+          />
         </FilterRow>
 
         <FilterRow>
@@ -345,7 +357,14 @@ function LeftPanel({
             {state.priorities.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
           </select>
           <IconBtn onClick={addPriority} title="Dringlichkeit hinzufügen"><Plus size={12} /></IconBtn>
+          <ManageMenu
+            title="Dringlichkeiten verwalten"
+            items={state.priorities.map((p) => ({ id: p.id, label: p.label, color: p.color }))}
+            onDelete={(id) => notesStore.removePriority(projectId, id)}
+            onAfterDelete={(id) => { if (filterPriority === id) setFilterPriority(""); }}
+          />
         </FilterRow>
+
 
         <button onClick={() => addChild(null, "topic")}
           className="w-full h-7 rounded-md text-[11px] font-medium flex items-center justify-center gap-1"
