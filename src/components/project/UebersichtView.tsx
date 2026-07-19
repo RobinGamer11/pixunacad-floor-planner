@@ -2,6 +2,7 @@ import React, { useState, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus, Pencil, Check, X, Trash2, Settings2, GripVertical } from "lucide-react";
 import { projectStore, type Project, type Task } from "@/lib/projectStore";
+import { notesStore, useNotes } from "@/lib/notesStore";
 
 interface Props {
   project: Project;
