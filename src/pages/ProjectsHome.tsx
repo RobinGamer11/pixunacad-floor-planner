@@ -868,18 +868,25 @@ function noteToUnified(n: NoteNode): UnifiedTask {
 function AufgabenView({ project }: { project: Project }) {
   const navigate = useNavigate();
   const notes = useNotes(project.id);
+  const mappen = project.mappen ?? [];
+  const defaultMappeId = project.activeMappeId ?? mappen[0]?.id ?? "";
   const [selectedDate, setSelectedDate] = useState<string | undefined>(undefined);
-  const [draft, setDraft] = useState<{ title: string; description: string; date: string; time: string; priority: TaskPriority; category: string }>({
+  const [draft, setDraft] = useState<{ title: string; description: string; date: string; time: string; priority: TaskPriority; category: string; mappeId: string }>({
     title: "",
     description: "",
     date: "",
     time: "",
     priority: "medium",
     category: "",
+    mappeId: defaultMappeId,
   });
 
+  const mappeName = useCallback(
+    (id?: string) => (id ? (mappen.find((m) => m.id === id)?.name ?? "") : ""),
+    [mappen]
+  );
 
-  // Notiznetz-Tasks + klassische Tasks zusammenführen.
+  // Board-Tasks + klassische Tasks zusammenführen.
   const combined: UnifiedTask[] = useMemo(() => {
     const legacy: UnifiedTask[] = project.tasks.map((t) => ({
       id: t.id, source: "legacy", title: t.title, date: t.date, time: t.time,
@@ -887,7 +894,7 @@ function AufgabenView({ project }: { project: Project }) {
     }));
     const noteTasks = notes.nodes
       .filter((n) => n.kind === "task")
-      .map(noteToUnified);
+      .map((n) => ({ ...noteToUnified(n), mappeId: n.mappeId }));
     const prioRank: Record<TaskPriority, number> = { high: 0, medium: 1, low: 2 };
     return [...legacy, ...noteTasks].sort((a, b) => {
       // Offene zuerst, dann nach Dringlichkeit, dann nach Datum/Zeit.
@@ -914,9 +921,10 @@ function AufgabenView({ project }: { project: Project }) {
       priority: prio,
       status: "open",
       category: draft.category || undefined,
+      mappeId: draft.mappeId || undefined,
       unseen: true,
     });
-    setDraft({ title: "", description: "", date: selectedDate ?? "", time: "", priority: "medium", category: draft.category });
+    setDraft({ title: "", description: "", date: selectedDate ?? "", time: "", priority: "medium", category: draft.category, mappeId: draft.mappeId });
   };
 
   return (
