@@ -3808,6 +3808,20 @@ function ToolsTab({
         <DocumentToolSettings importing={!!documentImporting} onImport={onDocumentImport} scale={docScale ?? "1:100"} onScaleChange={onDocScaleChange} />
       )}
 
+      {/* Tabellen-Werkzeug — Placement-Preview + Modifikation */}
+      {settingsTool === "table" && pageId && (
+        <TableToolSettings
+          projectId={projectId}
+          pageId={pageId}
+          tableElement={element?.kind === "table" ? element : undefined}
+          isPending={!!pendingTableId && element?.id === pendingTableId}
+          modifyMode={!!tableModifyMode}
+          setModifyMode={(v) => setTableModifyMode?.(v)}
+          onConfirm={() => onConfirmTable?.()}
+          onCancel={() => onCancelTable?.()}
+        />
+      )}
+
       {/* CAD section */}
       {activeTool === "cad" && (
         <CadToolSection
