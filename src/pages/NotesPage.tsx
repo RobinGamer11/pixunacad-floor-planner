@@ -301,7 +301,7 @@ function LeftPanel({
       <div className="p-2 border-b space-y-2" style={{ borderColor: "hsl(var(--hairline))" }}>
         <div className="flex items-center gap-1">
           <div className="text-[11px] font-semibold uppercase tracking-wider flex-1"
-               style={{ color: "hsl(var(--ink-soft))" }}>Notiznetz</div>
+               style={{ color: "hsl(var(--ink-soft))" }}>Board</div>
           <button onClick={onCollapse}
             className="h-6 w-6 rounded flex items-center justify-center hover:bg-muted"
             title="Liste einklappen">
