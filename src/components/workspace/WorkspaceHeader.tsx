@@ -82,14 +82,17 @@ export function WorkspaceHeader({
         </button>
 
         {projectName && (
-          <div className="text-sm font-semibold truncate max-w-[220px]" title={projectName}>
+          <div
+            className="text-sm font-semibold truncate max-w-[180px]"
+            title={projectName}
+          >
             {projectName}
           </div>
         )}
         {contextLabel && (
           <>
             <span className="text-xs text-muted-foreground">›</span>
-            <div className="text-sm truncate max-w-[220px]" title={contextLabel}>
+            <div className="text-sm truncate max-w-[160px]" title={contextLabel}>
               {contextLabel}
             </div>
           </>
