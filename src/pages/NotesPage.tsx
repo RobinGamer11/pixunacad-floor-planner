@@ -427,6 +427,59 @@ function IconBtn({ onClick, title, children }: { onClick: () => void; title: str
   );
 }
 
+function ManageMenu({
+  title, items, onDelete, onAfterDelete,
+}: {
+  title: string;
+  items: { id: string; label: string; color: string }[];
+  onDelete: (id: string) => void;
+  onAfterDelete?: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+  return (
+    <div className="relative shrink-0" ref={ref}>
+      <button onClick={() => setOpen((v) => !v)} title={title}
+        className="h-7 w-7 rounded-md border flex items-center justify-center hover:bg-muted"
+        style={{ borderColor: "hsl(var(--hairline))" }}>
+        <ChevronDown size={12} />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 z-30 min-w-[180px] max-h-[220px] overflow-auto rounded-md border shadow-md py-1"
+             style={{ background: "hsl(var(--surface))", borderColor: "hsl(var(--hairline))" }}>
+          {items.length === 0 && (
+            <div className="px-3 py-1.5 text-[11px]" style={{ color: "hsl(var(--ink-soft))" }}>Keine Einträge</div>
+          )}
+          {items.map((it) => (
+            <div key={it.id} className="flex items-center gap-2 px-2 py-1 hover:bg-muted text-[11px]">
+              <span className="w-2 h-2 rounded-full shrink-0" style={{ background: it.color }} />
+              <span className="flex-1 truncate">{it.label}</span>
+              <button
+                onClick={() => {
+                  if (confirm(`„${it.label}" wirklich löschen?`)) {
+                    onDelete(it.id);
+                    onAfterDelete?.(it.id);
+                  }
+                }}
+                className="h-6 w-6 rounded flex items-center justify-center hover:bg-background"
+                title="Löschen">
+                <Trash2 size={11} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 function TreeList({
   projectId, nodes, depth, selectedId, onSelect, expanded, toggleExpand,
   childrenOf, addChild, visibleIds, statusMap, priorityMap,
