@@ -120,15 +120,17 @@ export function WorkspaceHeader({
             active={mode === "workspace"}
             onClick={goWorkspace}
           />
+          <ModeDivider />
           <ModeButton
             icon={<Compass size={13} />}
             label="CAD-Oberfläche"
             active={mode === "cad"}
             onClick={goCad}
           />
+          <ModeDivider />
           <ModeButton
             icon={<Network size={13} />}
-            label="Notiznetz"
+            label="Board"
             active={mode === "notes"}
             onClick={goNotes}
           />
