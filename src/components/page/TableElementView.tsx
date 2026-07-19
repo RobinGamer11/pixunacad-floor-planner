@@ -2,13 +2,18 @@ import React from "react";
 import { Filter, Plus, Minus, Sigma } from "lucide-react";
 import type { PageElement } from "@/lib/projectStore";
 
+/** Kontext, mit dem die Projektmappe der Tabelle mitteilt, dass gerade
+ *  „Tabelle modifizieren" aktiv ist. Nur dann werden inline +/-–Knöpfe
+ *  zwischen Spalten / Zeilen eingeblendet. */
+export const TableModifyContext = React.createContext<boolean>(false);
+
 /** Tabellen-Element für die Projektmappe.
  *  - Editierbare Zellen (Tap/Click → Edit).
  *  - Formeln: "=SUM(A1:B3)", "=AVG(...)", "=A1+B2*2".
- *  - +Zeile/+Spalte, Zeile/Spalte löschen (Header-Menü).
+ *  - Modus „Tabelle modifizieren" (via Kontext) blendet +/- zwischen
+ *    Spalten / Zeilen ein.
  *  - Pro-Spalte Filter (Dropdown mit eindeutigen Werten, Checkboxen).
- *  - Wenn Kopfzeile aktiv (Default), erste Zeile ist Filter-/Sortierbasis.
- *  - Touch-freundlich: min 32px Zellhöhe, große Klickziele.
+ *  - Modernes, schlichtes Default-Layout auf 11pt-Text abgestimmt.
  */
 export function TableElementView({
   element,
