@@ -941,21 +941,40 @@ export default function ProjectWorkspace() {
         <ToolRailButton
           icon={<TableIcon size={18} />}
           label="Tabelle"
+          active={activeTool === "table"}
           onClick={() => {
             const pid = activePage?.id;
             if (!pid) return;
-            const initialCells: string[][] = [
-              ["Spalte A", "Spalte B", "Spalte C"],
-              ["", "", ""],
-              ["", "", ""],
-              ["", "", "=SUM(C2:C3)"],
-            ];
+            // Abschalten während Placement: aktives Element löschen & Tool abwählen.
+            if (activeTool === "table" && pendingTableId) {
+              projectStore.deleteElement(projectId, pid, pendingTableId);
+              setPendingTableId(null);
+              setActiveTool(null);
+              setTableModifyMode(false);
+              return;
+            }
+            const defRows = 3;
+            const defCols = 3;
+            const initialCells: string[][] = Array.from({ length: defRows }, (_, r) =>
+              Array.from({ length: defCols }, (__, c) => (r === 0 ? `Spalte ${String.fromCharCode(65 + c)}` : ""))
+            );
+            // Default-Maße: klein, schlicht, an 11pt-Text angepasst (~7mm Zeile, ~26mm Spalte).
+            const cellW = 26, cellH = 7;
+            const w = cellW * defCols;
+            const h = cellH * defRows;
+            const fmt = FORMAT_SIZES[activePage!.format];
+            const pageW = activePage!.customWidthMm ?? fmt.w;
+            const pageH = activePage!.customHeightMm ?? fmt.h;
+            const x = Math.max(5, (pageW - w) / 2);
+            const y = Math.max(5, (pageH - h) / 2);
             const newId = projectStore.addElement(projectId, pid, {
               kind: "table",
-              x: 20, y: 20, w: 60, h: 30,
+              x, y, w, h,
               tableData: { cells: initialCells, headerRow: true, filters: {} },
             } as any);
+            setPendingTableId(newId);
             setSelectedElementId(newId);
+            setActiveToolAndTab("table");
           }}
         />
 
