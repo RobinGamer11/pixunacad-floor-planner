@@ -509,13 +509,22 @@ function TreeList({
         const isDragOver = dragOverId === n.id;
         return (
           <li key={n.id}>
-            <div
-              draggable
+            <TreeRow
+              node={n}
+              depth={depth}
+              isSel={isSel}
+              hasKids={hasKids}
+              isOpen={isOpen}
+              isDragOver={isDragOver}
+              statusDef={st}
+              priorityDef={pr}
+              onToggleExpand={() => toggleExpand(n.id)}
+              onSelect={() => onSelect(n.id)}
               onDragStart={(e) => {
                 // 2 Payloads: „link" (Editor-Drop-Zone) und „move" (Reparent)
                 e.dataTransfer.setData("application/x-note-id", n.id);
                 e.dataTransfer.setData("application/x-note-move", n.id);
-                e.dataTransfer.effectAllowed = "copyMove";
+                e.dataTransfer.effectAllowed = "all";
               }}
               onDragOver={(e) => {
                 if (e.dataTransfer.types.includes("application/x-note-move")) {
@@ -533,41 +542,18 @@ function TreeList({
                   notesStore.moveNode(projectId, id, n.id);
                 }
               }}
-              onClick={() => onSelect(n.id)}
-              className="group flex items-center gap-1 pr-1.5 py-1 cursor-pointer border-l-2"
-              style={{
-                paddingLeft: 6 + depth * 12,
-                background: isSel
-                  ? "hsl(var(--surface-muted))"
-                  : isDragOver ? "hsl(var(--accent-gold-soft))" : "transparent",
-                borderColor: isSel ? "hsl(var(--accent-gold))" : "transparent",
-              }}
-            >
-              <button
-                onClick={(e) => { e.stopPropagation(); if (hasKids) toggleExpand(n.id); }}
-                className="h-4 w-4 flex items-center justify-center shrink-0"
-                style={{ visibility: hasKids ? "visible" : "hidden" }}>
-                {isOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
-              </button>
-              <GripVertical size={10} className="opacity-0 group-hover:opacity-40 shrink-0" />
-              <span style={{ color: kindColor(n.kind) }} className="shrink-0">{kindIcon(n.kind)}</span>
-              <span className="text-[11px] font-medium truncate flex-1" title={n.title}>{n.title}</span>
-              {st && <span className="w-2 h-2 rounded-full shrink-0" style={{ background: st.color }} title={st.label} />}
-              {pr && n.priority !== "normal" && (
-                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: pr.color }} title={pr.label} />
-              )}
-              {n.priority === "urgent" && <AlertTriangle size={10} className="text-red-500 shrink-0" />}
-            </div>
+            />
 
             {isSel && (
-              <div className="flex gap-1 py-1 pr-2" style={{ paddingLeft: 26 + depth * 12 }}>
+              <div className="flex flex-wrap gap-1 py-1 pr-1" style={{ paddingLeft: 20 + depth * 12 }}>
+                <MiniAddBtn onClick={() => addChild(n.id, "task")} label="Aufgabe" />
+                <MiniAddBtn onClick={() => addChild(n.id, "note")} label="Notiz" />
                 {n.kind === "topic" && (
                   <MiniAddBtn onClick={() => addChild(n.id, "topic")} label="Unterthema" />
                 )}
-                <MiniAddBtn onClick={() => addChild(n.id, "note")} label="Notiz" />
-                <MiniAddBtn onClick={() => addChild(n.id, "task")} label="Aufgabe" />
               </div>
             )}
+
 
             {hasKids && isOpen && (
               <TreeList
