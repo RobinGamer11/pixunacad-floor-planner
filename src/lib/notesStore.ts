@@ -1,11 +1,12 @@
 // Zentraler Store für das Notiznetz. Persistiert projektbezogen in localStorage.
-// Datenmodell: hierarchische Knoten (Thema / Notiz / Aufgabe).
+// Datenmodell: hierarchische Knoten (Thema / Notiz / Aufgabe) + History (Undo/Redo).
 
 export type NoteKind = "topic" | "note" | "task" | "file" | "photo";
-export type NoteStatus = string; // id aus NotesState.statuses (default: open|wip|done)
-export type NotePriority = "low" | "normal" | "high" | "urgent";
+export type NoteStatus = string;   // id aus NotesState.statuses
+export type NotePriority = string; // id aus NotesState.priorities
 
 export interface NoteStatusDef { id: string; label: string; color: string }
+export interface NotePriorityDef { id: string; label: string; color: string }
 
 export interface NoteNode {
   id: string;
@@ -25,11 +26,14 @@ export interface NoteNode {
   linkedIds?: string[];
   createdAt: number;
   updatedAt: number;
+  /** Sortierindex innerhalb des Elternteils (für Drag&Drop). */
+  order?: number;
 }
 
 export interface NotesState {
   categories: string[];
   statuses: NoteStatusDef[];
+  priorities: NotePriorityDef[];
   nodes: NoteNode[];
 }
 
@@ -39,7 +43,15 @@ const DEFAULT_STATUSES: NoteStatusDef[] = [
   { id: "done", label: "Erledigt", color: "#10b981" },
 ];
 
+const DEFAULT_PRIORITIES: NotePriorityDef[] = [
+  { id: "low", label: "Niedrig", color: "#94a3b8" },
+  { id: "normal", label: "Normal", color: "#3b82f6" },
+  { id: "high", label: "Hoch", color: "#f59e0b" },
+  { id: "urgent", label: "Dringend", color: "#ef4444" },
+];
+
 const KEY = (projectId: string) => `pixuna.notes.${projectId}`;
+const HISTORY_LIMIT = 100;
 
 function loadState(projectId: string): NotesState {
   try {
@@ -49,19 +61,30 @@ function loadState(projectId: string): NotesState {
       return {
         categories: parsed.categories ?? ["Elektro", "Sanitär", "Trockenbau", "Material"],
         statuses: parsed.statuses ?? DEFAULT_STATUSES,
-        nodes: parsed.nodes ?? [],
+        priorities: parsed.priorities ?? DEFAULT_PRIORITIES,
+        nodes: (parsed.nodes ?? []).map((n, i) => ({ ...n, order: n.order ?? i })),
       };
     }
   } catch {}
   return {
     categories: ["Elektro", "Sanitär", "Trockenbau", "Material"],
     statuses: DEFAULT_STATUSES,
+    priorities: DEFAULT_PRIORITIES,
     nodes: [],
   };
 }
 
+interface HistoryEntry { past: NotesState[]; future: NotesState[] }
+
 const listeners = new Map<string, Set<() => void>>();
 const cache = new Map<string, NotesState>();
+const history = new Map<string, HistoryEntry>();
+
+function getHistory(projectId: string): HistoryEntry {
+  let h = history.get(projectId);
+  if (!h) { h = { past: [], future: [] }; history.set(projectId, h); }
+  return h;
+}
 
 function getState(projectId: string): NotesState {
   let s = cache.get(projectId);
@@ -69,10 +92,19 @@ function getState(projectId: string): NotesState {
   return s;
 }
 
-function commit(projectId: string, next: NotesState) {
+function persist(projectId: string, next: NotesState) {
   cache.set(projectId, next);
   try { localStorage.setItem(KEY(projectId), JSON.stringify(next)); } catch {}
   listeners.get(projectId)?.forEach((fn) => fn());
+}
+
+function commit(projectId: string, next: NotesState) {
+  const prev = getState(projectId);
+  const h = getHistory(projectId);
+  h.past.push(prev);
+  if (h.past.length > HISTORY_LIMIT) h.past.shift();
+  h.future = [];
+  persist(projectId, next);
 }
 
 function subscribe(projectId: string, fn: () => void): () => void {
@@ -84,9 +116,33 @@ function subscribe(projectId: string, fn: () => void): () => void {
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
+function siblingsMaxOrder(state: NotesState, parentId: string | null): number {
+  let max = -1;
+  state.nodes.forEach((n) => {
+    if (n.parentId === parentId && (n.order ?? 0) > max) max = n.order ?? 0;
+  });
+  return max;
+}
+
 export const notesStore = {
   getState,
   subscribe,
+  canUndo: (projectId: string) => getHistory(projectId).past.length > 0,
+  canRedo: (projectId: string) => getHistory(projectId).future.length > 0,
+  undo(projectId: string) {
+    const h = getHistory(projectId);
+    const prev = h.past.pop();
+    if (!prev) return;
+    h.future.push(getState(projectId));
+    persist(projectId, prev);
+  },
+  redo(projectId: string) {
+    const h = getHistory(projectId);
+    const next = h.future.pop();
+    if (!next) return;
+    h.past.push(getState(projectId));
+    persist(projectId, next);
+  },
   addNode(projectId: string, parentId: string | null, kind: NoteKind, patch: Partial<NoteNode> = {}): NoteNode {
     const s = getState(projectId);
     const now = Date.now();
@@ -108,6 +164,7 @@ export const notesStore = {
       linkedIds: patch.linkedIds ?? [],
       createdAt: now,
       updatedAt: now,
+      order: siblingsMaxOrder(s, parentId) + 1,
     };
     commit(projectId, { ...s, nodes: [...s.nodes, node] });
     return node;
@@ -127,13 +184,34 @@ export const notesStore = {
       s.nodes.filter((c) => c.parentId === nid).forEach((c) => collect(c.id));
     };
     collect(id);
-    // Aus allen linkedIds entfernen
     const nextNodes = s.nodes
       .filter((n) => !toRemove.has(n.id))
       .map((n) => n.linkedIds?.some((x) => toRemove.has(x))
         ? { ...n, linkedIds: n.linkedIds.filter((x) => !toRemove.has(x)) }
         : n);
     commit(projectId, { ...s, nodes: nextNodes });
+  },
+  /** Verschiebt einen Knoten unter ein neues Elternteil (oder Root, wenn null). */
+  moveNode(projectId: string, id: string, newParentId: string | null) {
+    const s = getState(projectId);
+    const node = s.nodes.find((n) => n.id === id);
+    if (!node) return;
+    if (newParentId === id) return;
+    // Verhindern, dass ein Knoten in einen eigenen Nachfahren verschoben wird
+    const isDescendant = (candidate: string | null): boolean => {
+      if (!candidate) return false;
+      if (candidate === id) return true;
+      const p = s.nodes.find((n) => n.id === candidate);
+      return p ? isDescendant(p.parentId) : false;
+    };
+    if (isDescendant(newParentId)) return;
+    if (node.parentId === newParentId) return;
+    const nextOrder = siblingsMaxOrder(s, newParentId) + 1;
+    commit(projectId, {
+      ...s,
+      nodes: s.nodes.map((n) =>
+        n.id === id ? { ...n, parentId: newParentId, order: nextOrder, updatedAt: Date.now() } : n),
+    });
   },
   addCategory(projectId: string, name: string) {
     const s = getState(projectId);
@@ -144,21 +222,32 @@ export const notesStore = {
     const s = getState(projectId);
     if (!label.trim()) return;
     if (s.statuses.some((x) => x.label === label)) return;
-    const id = uid();
-    commit(projectId, { ...s, statuses: [...s.statuses, { id, label, color }] });
+    commit(projectId, { ...s, statuses: [...s.statuses, { id: uid(), label, color }] });
+  },
+  addPriority(projectId: string, label: string, color: string) {
+    const s = getState(projectId);
+    if (!label.trim()) return;
+    if (s.priorities.some((x) => x.label === label)) return;
+    commit(projectId, { ...s, priorities: [...s.priorities, { id: uid(), label, color }] });
   },
   addComment(projectId: string, nodeId: string, text: string) {
     const s = getState(projectId);
     const node = s.nodes.find((n) => n.id === nodeId);
     if (!node || !text.trim()) return;
     const c = { id: uid(), text: text.trim(), ts: Date.now() };
-    notesStore.updateNode(projectId, nodeId, { comments: [...(node.comments ?? []), c] });
+    commit(projectId, {
+      ...s,
+      nodes: s.nodes.map((n) => n.id === nodeId
+        ? { ...n, comments: [...(n.comments ?? []), c], updatedAt: Date.now() } : n),
+    });
   },
   removeComment(projectId: string, nodeId: string, commentId: string) {
     const s = getState(projectId);
-    const node = s.nodes.find((n) => n.id === nodeId);
-    if (!node) return;
-    notesStore.updateNode(projectId, nodeId, { comments: (node.comments ?? []).filter((c) => c.id !== commentId) });
+    commit(projectId, {
+      ...s,
+      nodes: s.nodes.map((n) => n.id === nodeId
+        ? { ...n, comments: (n.comments ?? []).filter((c) => c.id !== commentId), updatedAt: Date.now() } : n),
+    });
   },
   linkNodes(projectId: string, aId: string, bId: string) {
     if (aId === bId) return;
@@ -166,11 +255,14 @@ export const notesStore = {
     const a = s.nodes.find((n) => n.id === aId);
     const b = s.nodes.find((n) => n.id === bId);
     if (!a || !b) return;
-    const patchA = a.linkedIds?.includes(bId) ? null : { linkedIds: [...(a.linkedIds ?? []), bId] };
-    const patchB = b.linkedIds?.includes(aId) ? null : { linkedIds: [...(b.linkedIds ?? []), aId] };
-    let next = s.nodes;
-    if (patchA) next = next.map((n) => n.id === aId ? { ...n, ...patchA, updatedAt: Date.now() } : n);
-    if (patchB) next = next.map((n) => n.id === bId ? { ...n, ...patchB, updatedAt: Date.now() } : n);
+    if (a.linkedIds?.includes(bId) && b.linkedIds?.includes(aId)) return;
+    const next = s.nodes.map((n) => {
+      if (n.id === aId && !(n.linkedIds ?? []).includes(bId))
+        return { ...n, linkedIds: [...(n.linkedIds ?? []), bId], updatedAt: Date.now() };
+      if (n.id === bId && !(n.linkedIds ?? []).includes(aId))
+        return { ...n, linkedIds: [...(n.linkedIds ?? []), aId], updatedAt: Date.now() };
+      return n;
+    });
     commit(projectId, { ...s, nodes: next });
   },
   unlinkNodes(projectId: string, aId: string, bId: string) {
@@ -185,10 +277,26 @@ export const notesStore = {
 };
 
 import { useSyncExternalStore } from "react";
+const EMPTY: NotesState = { categories: [], statuses: DEFAULT_STATUSES, priorities: DEFAULT_PRIORITIES, nodes: [] };
 export function useNotes(projectId: string | undefined): NotesState {
   return useSyncExternalStore(
     (fn) => (projectId ? subscribe(projectId, fn) : () => {}),
-    () => (projectId ? getState(projectId) : { categories: [], statuses: DEFAULT_STATUSES, nodes: [] }),
-    () => (projectId ? getState(projectId) : { categories: [], statuses: DEFAULT_STATUSES, nodes: [] }),
+    () => (projectId ? getState(projectId) : EMPTY),
+    () => (projectId ? getState(projectId) : EMPTY),
   );
+}
+
+/** Zwingt Rerender wenn sich die Undo/Redo-Verfügbarkeit ändert (subscribed am gleichen Store). */
+export function useNotesHistory(projectId: string | undefined) {
+  useSyncExternalStore(
+    (fn) => (projectId ? subscribe(projectId, fn) : () => {}),
+    () => (projectId ? getHistory(projectId).past.length * 1000 + getHistory(projectId).future.length : 0),
+    () => 0,
+  );
+  return {
+    canUndo: projectId ? notesStore.canUndo(projectId) : false,
+    canRedo: projectId ? notesStore.canRedo(projectId) : false,
+    undo: () => projectId && notesStore.undo(projectId),
+    redo: () => projectId && notesStore.redo(projectId),
+  };
 }
