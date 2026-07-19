@@ -31,6 +31,8 @@ export function TableElementView({
   const filters = data.filters ?? {};
   const headerRow = data.headerRow !== false;
 
+  const modifyOn = React.useContext(TableModifyContext) && !readOnly;
+
   const [editing, setEditing] = React.useState<{ r: number; c: number } | null>(null);
   const [openFilter, setOpenFilter] = React.useState<number | null>(null);
 
