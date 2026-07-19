@@ -95,6 +95,13 @@ export default function NotesPage() {
     setSelectedId(n.id);
   };
 
+  // Auswahl markiert neu erstellte Aufgaben/Notizen als „gesehen" (hebt hellblauen Rahmen auf).
+  const selectAndMarkSeen = useCallback((id: string) => {
+    setSelectedId(id);
+    if (projectId) notesStore.markSeen(projectId, id);
+  }, [projectId]);
+
+
   const selectRoot = () => { setSelectedId(null); setFocusToken((v) => v + 1); };
 
   // Keyboard: Ctrl/Cmd+Z / Ctrl+Y — nur außerhalb Text-Eingaben
