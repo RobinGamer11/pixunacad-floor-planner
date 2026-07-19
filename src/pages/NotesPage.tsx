@@ -573,15 +573,69 @@ function TreeList({
   );
 }
 
-function MiniAddBtn({ onClick, label }: { onClick: () => void; label: string }) {
+function TreeRow({
+  node, depth, isSel, hasKids, isOpen, isDragOver, statusDef, priorityDef,
+  onToggleExpand, onSelect, onDragStart, onDragOver, onDragLeave, onDrop,
+}: {
+  node: NoteNode;
+  depth: number;
+  isSel: boolean;
+  hasKids: boolean;
+  isOpen: boolean;
+  isDragOver: boolean;
+  statusDef?: NoteStatusDef;
+  priorityDef?: NotePriorityDef;
+  onToggleExpand: () => void;
+  onSelect: () => void;
+  onDragStart: (e: React.DragEvent) => void;
+  onDragOver: (e: React.DragEvent) => void;
+  onDragLeave: () => void;
+  onDrop: (e: React.DragEvent) => void;
+}) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (isSel && ref.current) ref.current.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [isSel]);
+  const isUnseen = !!node.unseen;
   return (
-    <button onClick={onClick}
-      className="h-6 px-2 rounded-md text-[10px] font-medium border flex items-center gap-1 hover:bg-muted"
-      style={{ borderColor: "hsl(var(--hairline))" }}>
-      <Plus size={10} /> {label}
-    </button>
+    <div
+      ref={ref}
+      draggable
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+      onClick={onSelect}
+      className="group flex items-center gap-1 pr-1.5 py-1 cursor-pointer border-l-2"
+      style={{
+        paddingLeft: 6 + depth * 12,
+        background: isSel
+          ? "hsl(var(--surface-muted))"
+          : isDragOver
+          ? "hsl(var(--accent-gold-soft))"
+          : isUnseen ? "rgba(56,189,248,0.18)" : "transparent",
+        borderColor: isSel ? "hsl(var(--accent-gold))" : isUnseen ? "#38bdf8" : "transparent",
+      }}
+    >
+      <button
+        onClick={(e) => { e.stopPropagation(); if (hasKids) onToggleExpand(); }}
+        className="h-4 w-4 flex items-center justify-center shrink-0"
+        style={{ visibility: hasKids ? "visible" : "hidden" }}>
+        {isOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+      </button>
+      <GripVertical size={10} className="opacity-0 group-hover:opacity-40 shrink-0" />
+      <span style={{ color: kindColor(node.kind) }} className="shrink-0">{kindIcon(node.kind)}</span>
+      <span className="text-[11px] font-medium truncate flex-1" title={node.title}>{node.title}</span>
+      {statusDef && <span className="w-2 h-2 rounded-full shrink-0" style={{ background: statusDef.color }} title={statusDef.label} />}
+      {priorityDef && node.priority !== "normal" && (
+        <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: priorityDef.color }} title={priorityDef.label} />
+      )}
+      {node.priority === "urgent" && <AlertTriangle size={10} className="text-red-500 shrink-0" />}
+    </div>
   );
 }
+
+
 
 // -------------------------------------------------------------
 // MIDDLE – Editor
