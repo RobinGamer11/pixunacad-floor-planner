@@ -226,6 +226,7 @@ export default function NotesPage() {
         )}
 
       </main>
+      {tabletAidOn && <TabletAidWheel />}
     </div>
   );
 }
