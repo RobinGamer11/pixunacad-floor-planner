@@ -888,12 +888,18 @@ function AufgabenView({ project }: { project: Project }) {
     const noteTasks = notes.nodes
       .filter((n) => n.kind === "task")
       .map(noteToUnified);
+    const prioRank: Record<TaskPriority, number> = { high: 0, medium: 1, low: 2 };
     return [...legacy, ...noteTasks].sort((a, b) => {
+      // Offene zuerst, dann nach Dringlichkeit, dann nach Datum/Zeit.
+      if (!!a.done !== !!b.done) return a.done ? 1 : -1;
+      const pr = prioRank[a.priority] - prioRank[b.priority];
+      if (pr !== 0) return pr;
       const da = `${a.date ?? "9999-99-99"} ${a.time ?? "99:99"}`;
       const db = `${b.date ?? "9999-99-99"} ${b.time ?? "99:99"}`;
       return da.localeCompare(db);
     });
   }, [project.tasks, notes.nodes]);
+
 
   const filtered = selectedDate ? combined.filter((t) => t.date === selectedDate) : combined;
 
