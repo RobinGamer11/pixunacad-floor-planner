@@ -3155,6 +3155,12 @@ function RightInspector({
   onCadDuplicateSegments?: () => void;
   updateToolSettings: <K extends keyof ToolSettings>(k: K, patch: Partial<ToolSettings[K]>) => void;
 
+  pendingTableId?: string | null;
+  tableModifyMode?: boolean;
+  setTableModifyMode?: (v: boolean) => void;
+  onConfirmTable?: () => void;
+  onCancelTable?: () => void;
+
   onJumpCad: (sheetId?: string) => void;
   onCollapse?: () => void;
   cadEngine?: import("@/cad/embed/MiniCad").MiniCad | null;
