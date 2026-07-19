@@ -28,6 +28,8 @@ export interface NoteNode {
   updatedAt: number;
   /** Sortierindex innerhalb des Elternteils (für Drag&Drop). */
   order?: number;
+  /** Neu erstellte Aufgabe/Notiz aus Startseite – bis zum ersten Öffnen im Netz hellblau markiert. */
+  unseen?: boolean;
 }
 
 export interface NotesState {
@@ -36,6 +38,7 @@ export interface NotesState {
   priorities: NotePriorityDef[];
   nodes: NoteNode[];
 }
+
 
 const DEFAULT_STATUSES: NoteStatusDef[] = [
   { id: "open", label: "Offen", color: "#ef4444" },
