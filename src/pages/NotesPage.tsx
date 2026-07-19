@@ -635,6 +635,16 @@ function TreeRow({
   );
 }
 
+function MiniAddBtn({ onClick, label }: { onClick: () => void; label: string }) {
+  return (
+    <button onClick={onClick}
+      className="h-6 px-2 rounded-md text-[10px] font-medium border flex items-center gap-1 hover:bg-muted"
+      style={{ borderColor: "hsl(var(--hairline))" }}>
+      <Plus size={10} /> {label}
+    </button>
+  );
+}
+
 
 
 // -------------------------------------------------------------
