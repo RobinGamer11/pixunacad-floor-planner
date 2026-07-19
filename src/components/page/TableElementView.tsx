@@ -83,10 +83,30 @@ export function TableElementView({
 
   return (
     <div
-      className="w-full h-full overflow-auto text-[12px]"
+      className="w-full h-full overflow-auto text-[11px]"
       style={{ background: "hsl(var(--surface))", color: "hsl(var(--ink))" }}
       onPointerDown={(e) => e.stopPropagation()}
     >
+      {modifyOn && (
+        <div className="flex gap-0.5 px-1 pt-1">
+          {cells[0]?.map((_, c) => (
+            <div key={c} className="flex items-center gap-0.5" style={{ flex: 1 }}>
+              <button
+                onClick={() => delCol(c)}
+                disabled={cols <= 1}
+                className="w-4 h-4 flex items-center justify-center rounded bg-destructive/10 text-destructive hover:bg-destructive/20 disabled:opacity-30"
+                title="Spalte löschen"
+              ><Minus size={9} /></button>
+              <div className="flex-1" />
+              <button
+                onClick={() => updateCells((d) => d.map((row) => { const nr = [...row]; nr.splice(c + 1, 0, ""); return nr; }))}
+                className="w-4 h-4 flex items-center justify-center rounded bg-primary/10 text-primary hover:bg-primary/20"
+                title="Spalte rechts einfügen"
+              ><Plus size={9} /></button>
+            </div>
+          ))}
+        </div>
+      )}
       <table className="border-collapse w-full">
         <tbody>
           {visibleRows.map((r) => (
