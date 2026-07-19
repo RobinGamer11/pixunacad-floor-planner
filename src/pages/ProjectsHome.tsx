@@ -1017,7 +1017,6 @@ function AufgabenView({ project }: { project: Project }) {
       </div>
 
 
-      </div>
 
       {/* Aufgabenliste */}
       <div
