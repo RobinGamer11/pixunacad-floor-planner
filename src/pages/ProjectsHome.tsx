@@ -104,7 +104,7 @@ export default function ProjectsHome() {
             className="w-9 h-9 rounded-lg flex items-center justify-center text-sm font-semibold"
             style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
           >
-            A
+            P
           </div>
           <NavIcon
             icon={<FolderKanban size={18} />}
@@ -125,15 +125,20 @@ export default function ProjectsHome() {
             }}
           />
           <NavIcon icon={<Star size={18} />} label="Favoriten" />
-          <NavIcon icon={<Users size={18} />} label="Geteilt" />
-          <NavIcon icon={<Trash2 size={18} />} label="Papierkorb" />
+          <NavIcon icon={<Users size={18} />} label="Geteilt (bald verfügbar)" disabled />
+          <NavIcon icon={<Trash2 size={18} />} label="Papierkorb (bald verfügbar)" disabled />
         </div>
         <div className="flex flex-col items-center gap-3">
           <div
-            className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-200 to-amber-400"
-            title="Profil"
+            className="w-8 h-8 rounded-full opacity-40"
+            style={{ background: "hsl(var(--surface-muted))", border: "1px solid hsl(var(--hairline))" }}
+            title="Profil (bald verfügbar)"
           />
-          <button className="text-muted-foreground hover:text-foreground" title="Einstellungen">
+          <button
+            className="text-muted-foreground opacity-40 cursor-not-allowed"
+            title="Einstellungen (bald verfügbar)"
+            disabled
+          >
             <Settings size={18} />
           </button>
         </div>
