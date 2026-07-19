@@ -3529,16 +3529,15 @@ function PageSettings({
                   <Link2 size={12} /> {nextPage?.spreadId ? "an nächsten Verbund" : "nächste"}
                 </button>
               </div>
-              <Row label="Musterübernahme">
-                <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <input
-                    type="checkbox"
-                    checked={!page.spreadExcluded}
-                    onChange={(e) => update({ spreadExcluded: !e.target.checked })}
-                  />
-                  Diese Seite beim „Für alle übernehmen" berücksichtigen
-                </label>
-              </Row>
+              <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={!page.spreadExcluded}
+                  onChange={(e) => update({ spreadExcluded: !e.target.checked })}
+                />
+                Diese Seite berücksichtigen
+              </label>
+
             </>
           ) : (
             <>
