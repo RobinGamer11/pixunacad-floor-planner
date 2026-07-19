@@ -1173,16 +1173,23 @@ function ProjectGraph({
                                        : kindColor(n.kind);
             return (
               <g key={ln.id} style={{ cursor: "pointer" }} onClick={(e) => { e.stopPropagation(); onSelect(n.id); }}>
+                {n.unseen && (
+                  <circle cx={ln.x} cy={ln.y} r={ln.r + 5}
+                    fill="none" stroke="#38bdf8" strokeWidth={2} opacity={0.9}>
+                    <animate attributeName="opacity" values="0.4;1;0.4" dur="1.6s" repeatCount="indefinite" />
+                  </circle>
+                )}
                 <circle cx={ln.x} cy={ln.y} r={ln.r + (isSel ? 3 : 0)}
-                  fill={isTopic ? "hsl(var(--accent-gold))" : "hsl(var(--surface-card))"}
-                  stroke={isSel ? "hsl(var(--accent-gold))" : statusCol}
-                  strokeWidth={isSel ? 3 : 1.8} />
+                  fill={isTopic ? "hsl(var(--accent-gold))" : n.unseen ? "#e0f2fe" : "hsl(var(--surface-card))"}
+                  stroke={isSel ? "hsl(var(--accent-gold))" : n.unseen ? "#38bdf8" : statusCol}
+                  strokeWidth={isSel ? 3 : n.unseen ? 2.2 : 1.8} />
                 <text x={ln.x} y={ln.y + 3} textAnchor="middle" fontSize={9} fontWeight={600}
                   fill={isTopic ? "hsl(var(--surface))" : "hsl(var(--ink))"}>
                   {n.title.length > 10 ? n.title.slice(0, 10) + "…" : n.title}
                 </text>
               </g>
             );
+
           })}
         </g>
       </svg>
