@@ -172,6 +172,9 @@ export default function ProjectWorkspace() {
   const [hatchToolFlyoutOpen, setHatchToolFlyoutOpen] = useState(false);
   // Flyout am Auswahl-Symbol für die Rahmen-Modi (Berühren / Umschließen).
   const [selectToolFlyoutOpen, setSelectToolFlyoutOpen] = useState(false);
+  // Tabellen-Werkzeug: Placement-Preview vor Bestätigen.
+  const [pendingTableId, setPendingTableId] = useState<string | null>(null);
+  const [tableModifyMode, setTableModifyMode] = useState(false);
   const cadEngineApiRef = useRef<{
     setSelectedSegmentSnap: (opts: { midpointSnap?: boolean; divisionSnap?: number | null }) => void;
     duplicateSelectedSegments: (offsetMm?: number) => number;
