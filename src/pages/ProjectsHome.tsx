@@ -1080,8 +1080,8 @@ function AufgabenView({ project }: { project: Project }) {
 }
 
 function UnifiedTaskRow({
-  task, projectId, onOpenInNotes,
-}: { task: UnifiedTask; projectId: string; onOpenInNotes: () => void }) {
+  task, projectId, onOpenInNotes, mappeName,
+}: { task: UnifiedTask; projectId: string; onOpenInNotes: () => void; mappeName?: string }) {
   const prio = task.priority;
   const prioColor =
     prio === "high" ? "hsl(0 70% 55%)"
