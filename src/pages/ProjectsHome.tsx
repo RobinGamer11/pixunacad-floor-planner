@@ -869,13 +869,15 @@ function AufgabenView({ project }: { project: Project }) {
   const navigate = useNavigate();
   const notes = useNotes(project.id);
   const [selectedDate, setSelectedDate] = useState<string | undefined>(undefined);
-  const [draft, setDraft] = useState<{ title: string; date: string; time: string; priority: TaskPriority; category: string }>({
+  const [draft, setDraft] = useState<{ title: string; description: string; date: string; time: string; priority: TaskPriority; category: string }>({
     title: "",
+    description: "",
     date: "",
     time: "",
     priority: "medium",
     category: "",
   });
+
 
   // Notiznetz-Tasks + klassische Tasks zusammenführen.
   const combined: UnifiedTask[] = useMemo(() => {
