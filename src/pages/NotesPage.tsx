@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { WorkspaceHeader } from "@/components/workspace/WorkspaceHeader";
+import { TabletAidWheel } from "@/components/TabletAidWheel";
 import { useProject } from "@/lib/projectStore";
 import {
   notesStore, useNotes, useNotesHistory,
