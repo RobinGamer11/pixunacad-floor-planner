@@ -2,13 +2,18 @@ import React from "react";
 import { Filter, Plus, Minus, Sigma } from "lucide-react";
 import type { PageElement } from "@/lib/projectStore";
 
+/** Kontext, mit dem die Projektmappe der Tabelle mitteilt, dass gerade
+ *  „Tabelle modifizieren" aktiv ist. Nur dann werden inline +/-–Knöpfe
+ *  zwischen Spalten / Zeilen eingeblendet. */
+export const TableModifyContext = React.createContext<boolean>(false);
+
 /** Tabellen-Element für die Projektmappe.
  *  - Editierbare Zellen (Tap/Click → Edit).
  *  - Formeln: "=SUM(A1:B3)", "=AVG(...)", "=A1+B2*2".
- *  - +Zeile/+Spalte, Zeile/Spalte löschen (Header-Menü).
+ *  - Modus „Tabelle modifizieren" (via Kontext) blendet +/- zwischen
+ *    Spalten / Zeilen ein.
  *  - Pro-Spalte Filter (Dropdown mit eindeutigen Werten, Checkboxen).
- *  - Wenn Kopfzeile aktiv (Default), erste Zeile ist Filter-/Sortierbasis.
- *  - Touch-freundlich: min 32px Zellhöhe, große Klickziele.
+ *  - Modernes, schlichtes Default-Layout auf 11pt-Text abgestimmt.
  */
 export function TableElementView({
   element,
@@ -25,6 +30,8 @@ export function TableElementView({
   const cols = cells[0]?.length ?? 0;
   const filters = data.filters ?? {};
   const headerRow = data.headerRow !== false;
+
+  const modifyOn = React.useContext(TableModifyContext) && !readOnly;
 
   const [editing, setEditing] = React.useState<{ r: number; c: number } | null>(null);
   const [openFilter, setOpenFilter] = React.useState<number | null>(null);
@@ -76,10 +83,30 @@ export function TableElementView({
 
   return (
     <div
-      className="w-full h-full overflow-auto text-[12px]"
+      className="w-full h-full overflow-auto text-[11px]"
       style={{ background: "hsl(var(--surface))", color: "hsl(var(--ink))" }}
       onPointerDown={(e) => e.stopPropagation()}
     >
+      {modifyOn && (
+        <div className="flex gap-0.5 px-1 pt-1">
+          {cells[0]?.map((_, c) => (
+            <div key={c} className="flex items-center gap-0.5" style={{ flex: 1 }}>
+              <button
+                onClick={() => delCol(c)}
+                disabled={cols <= 1}
+                className="w-4 h-4 flex items-center justify-center rounded bg-destructive/10 text-destructive hover:bg-destructive/20 disabled:opacity-30"
+                title="Spalte löschen"
+              ><Minus size={9} /></button>
+              <div className="flex-1" />
+              <button
+                onClick={() => updateCells((d) => d.map((row) => { const nr = [...row]; nr.splice(c + 1, 0, ""); return nr; }))}
+                className="w-4 h-4 flex items-center justify-center rounded bg-primary/10 text-primary hover:bg-primary/20"
+                title="Spalte rechts einfügen"
+              ><Plus size={9} /></button>
+            </div>
+          ))}
+        </div>
+      )}
       <table className="border-collapse w-full">
         <tbody>
           {visibleRows.map((r) => (
@@ -147,47 +174,42 @@ export function TableElementView({
                   </td>
                 );
               })}
-              {!readOnly && (
-                <td className="border-0 pl-1 align-middle" style={{ width: 28 }}>
-                  <button
-                    onClick={() => delRow(r)}
-                    disabled={rows <= 1 || (headerRow && r === 0)}
-                    className="w-6 h-6 flex items-center justify-center rounded hover:bg-muted disabled:opacity-30"
-                    title="Zeile löschen"
-                  ><Minus size={12} /></button>
+              {modifyOn && (
+                <td className="border-0 pl-1 align-middle" style={{ width: 44 }}>
+                  <div className="flex items-center gap-0.5">
+                    <button
+                      onClick={() => delRow(r)}
+                      disabled={rows <= 1 || (headerRow && r === 0)}
+                      className="w-4 h-4 flex items-center justify-center rounded bg-destructive/10 text-destructive hover:bg-destructive/20 disabled:opacity-30"
+                      title="Zeile löschen"
+                    ><Minus size={9} /></button>
+                    <button
+                      onClick={() => updateCells((d) => { const nr = Array(cols).fill(""); d.splice(r + 1, 0, nr); })}
+                      className="w-4 h-4 flex items-center justify-center rounded bg-primary/10 text-primary hover:bg-primary/20"
+                      title="Zeile unten einfügen"
+                    ><Plus size={9} /></button>
+                  </div>
                 </td>
               )}
             </tr>
           ))}
         </tbody>
       </table>
-      {!readOnly && (
+      {modifyOn && (
         <div className="flex gap-1 p-1">
           <button
-            onClick={addRow}
-            className="h-7 px-2 text-[11px] rounded border flex items-center gap-1"
-            style={{ borderColor: "hsl(var(--hairline))" }}
-          ><Plus size={11} /> Zeile</button>
-          <button
-            onClick={addCol}
-            className="h-7 px-2 text-[11px] rounded border flex items-center gap-1"
-            style={{ borderColor: "hsl(var(--hairline))" }}
-          ><Plus size={11} /> Spalte</button>
-          <button
             onClick={() => {
-              // Insert =SUM formula in currently editing cell, else in last row/last col.
               const r = editing?.r ?? rows - 1;
               const c = editing?.c ?? cols - 1;
-              // Sum column above r within same column.
               const startR = headerRow ? 1 : 0;
               if (r <= startR) return;
               const colLetter = colLabel(c);
               setCell(r, c, `=SUM(${colLetter}${startR + 1}:${colLetter}${r})`);
             }}
-            className="h-7 px-2 text-[11px] rounded border flex items-center gap-1"
+            className="h-6 px-2 text-[10px] rounded border flex items-center gap-1"
             style={{ borderColor: "hsl(var(--hairline))" }}
             title="Summenformel in aktive Zelle einfügen"
-          ><Sigma size={11} /> Summe</button>
+          ><Sigma size={10} /> Summe</button>
         </div>
       )}
     </div>

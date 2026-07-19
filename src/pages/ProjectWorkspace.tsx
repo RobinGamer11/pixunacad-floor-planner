@@ -78,7 +78,8 @@ import CadOverlayLayer from "@/components/page/CadOverlayLayer";
 import { CadDocumentInspector } from "@/components/page/CadDocumentInspector";
 import { CadIdPanelHost } from "@/components/page/CadIdPanelHost";
 import { PdfPageView } from "@/components/page/PdfPageView";
-import { TableElementView } from "@/components/page/TableElementView";
+import { TableElementView, TableModifyContext } from "@/components/page/TableElementView";
+import { TableToolSettings } from "@/components/page/TableToolSettings";
 
 import { CadViewportView } from "@/components/page/CadViewportView";
 import { importFile, type ImportedPage } from "@/cad/documentImport";
@@ -172,6 +173,9 @@ export default function ProjectWorkspace() {
   const [hatchToolFlyoutOpen, setHatchToolFlyoutOpen] = useState(false);
   // Flyout am Auswahl-Symbol für die Rahmen-Modi (Berühren / Umschließen).
   const [selectToolFlyoutOpen, setSelectToolFlyoutOpen] = useState(false);
+  // Tabellen-Werkzeug: Placement-Preview vor Bestätigen.
+  const [pendingTableId, setPendingTableId] = useState<string | null>(null);
+  const [tableModifyMode, setTableModifyMode] = useState(false);
   const cadEngineApiRef = useRef<{
     setSelectedSegmentSnap: (opts: { midpointSnap?: boolean; divisionSnap?: number | null }) => void;
     duplicateSelectedSegments: (offsetMm?: number) => number;
@@ -689,6 +693,7 @@ export default function ProjectWorkspace() {
   }
 
   return (
+    <TableModifyContext.Provider value={tableModifyMode}>
     <>
     <div
       className="flex flex-col h-[100dvh] w-screen overflow-hidden"
@@ -938,21 +943,40 @@ export default function ProjectWorkspace() {
         <ToolRailButton
           icon={<TableIcon size={18} />}
           label="Tabelle"
+          active={activeTool === "table"}
           onClick={() => {
             const pid = activePage?.id;
             if (!pid) return;
-            const initialCells: string[][] = [
-              ["Spalte A", "Spalte B", "Spalte C"],
-              ["", "", ""],
-              ["", "", ""],
-              ["", "", "=SUM(C2:C3)"],
-            ];
+            // Abschalten während Placement: aktives Element löschen & Tool abwählen.
+            if (activeTool === "table" && pendingTableId) {
+              projectStore.deleteElement(projectId, pid, pendingTableId);
+              setPendingTableId(null);
+              setActiveTool(null);
+              setTableModifyMode(false);
+              return;
+            }
+            const defRows = 3;
+            const defCols = 3;
+            const initialCells: string[][] = Array.from({ length: defRows }, (_, r) =>
+              Array.from({ length: defCols }, (__, c) => (r === 0 ? `Spalte ${String.fromCharCode(65 + c)}` : ""))
+            );
+            // Default-Maße: klein, schlicht, an 11pt-Text angepasst (~7mm Zeile, ~26mm Spalte).
+            const cellW = 26, cellH = 7;
+            const w = cellW * defCols;
+            const h = cellH * defRows;
+            const fmt = FORMAT_SIZES[activePage!.format];
+            const pageW = activePage!.customWidthMm ?? fmt.w;
+            const pageH = activePage!.customHeightMm ?? fmt.h;
+            const x = Math.max(5, (pageW - w) / 2);
+            const y = Math.max(5, (pageH - h) / 2);
             const newId = projectStore.addElement(projectId, pid, {
               kind: "table",
-              x: 20, y: 20, w: 60, h: 30,
+              x, y, w, h,
               tableData: { cells: initialCells, headerRow: true, filters: {} },
             } as any);
+            setPendingTableId(newId);
             setSelectedElementId(newId);
+            setActiveToolAndTab("table");
           }}
         />
 
@@ -1637,6 +1661,23 @@ export default function ProjectWorkspace() {
 
               updateToolSettings={updateToolSettings}
 
+              pendingTableId={pendingTableId}
+              tableModifyMode={tableModifyMode}
+              setTableModifyMode={setTableModifyMode}
+              onConfirmTable={() => {
+                setPendingTableId(null);
+                setActiveTool(null);
+              }}
+              onCancelTable={() => {
+                if (activePage && pendingTableId) {
+                  projectStore.deleteElement(project.id, activePage.id, pendingTableId);
+                }
+                setPendingTableId(null);
+                setSelectedElementId(undefined);
+                setActiveTool(null);
+                setTableModifyMode(false);
+              }}
+
               onJumpCad={(sheetId) => navigate(`/project/${project.id}/cad${sheetId ? `/${sheetId}` : ""}`)}
               onCollapse={() => setRightOpen(false)}
             />
@@ -1673,6 +1714,7 @@ export default function ProjectWorkspace() {
     )}
     {tabletAidOn && <TabletAidWheel />}
     </>
+    </TableModifyContext.Provider>
   );
 }
 
@@ -3083,6 +3125,12 @@ function RightInspector({
   onCadDuplicateSegments,
   updateToolSettings,
 
+  pendingTableId,
+  tableModifyMode,
+  setTableModifyMode,
+  onConfirmTable,
+  onCancelTable,
+
   onJumpCad,
   onCollapse,
   cadEngine,
@@ -3109,6 +3157,12 @@ function RightInspector({
   onCadLineSnapChange?: (patch: { midpointSnap?: boolean; divisionSnap?: number | null }) => void;
   onCadDuplicateSegments?: () => void;
   updateToolSettings: <K extends keyof ToolSettings>(k: K, patch: Partial<ToolSettings[K]>) => void;
+
+  pendingTableId?: string | null;
+  tableModifyMode?: boolean;
+  setTableModifyMode?: (v: boolean) => void;
+  onConfirmTable?: () => void;
+  onCancelTable?: () => void;
 
   onJumpCad: (sheetId?: string) => void;
   onCollapse?: () => void;
@@ -3168,8 +3222,11 @@ function RightInspector({
             updateToolSettings={updateToolSettings}
             onJumpCad={onJumpCad}
             cadEngine={cadEngine ?? null}
-
-
+            pendingTableId={pendingTableId ?? null}
+            tableModifyMode={!!tableModifyMode}
+            setTableModifyMode={setTableModifyMode}
+            onConfirmTable={onConfirmTable}
+            onCancelTable={onCancelTable}
           />
         )}
         {tab === "layers" && page && (
@@ -3655,6 +3712,11 @@ function ToolsTab({
   updateToolSettings,
   onJumpCad,
   cadEngine,
+  pendingTableId,
+  tableModifyMode,
+  setTableModifyMode,
+  onConfirmTable,
+  onCancelTable,
 }: {
   projectId: string;
   pageId?: string;
@@ -3679,6 +3741,11 @@ function ToolsTab({
 
   onJumpCad: (sheetId?: string) => void;
   cadEngine?: import("@/cad/embed/MiniCad").MiniCad | null;
+  pendingTableId?: string | null;
+  tableModifyMode?: boolean;
+  setTableModifyMode?: (v: boolean) => void;
+  onConfirmTable?: () => void;
+  onCancelTable?: () => void;
 }) {
 
   const settingsTool = activeTool ?? selectedCadTool ?? null;
@@ -3742,6 +3809,20 @@ function ToolsTab({
       )}
       {settingsTool === "document" && (
         <DocumentToolSettings importing={!!documentImporting} onImport={onDocumentImport} scale={docScale ?? "1:100"} onScaleChange={onDocScaleChange} />
+      )}
+
+      {/* Tabellen-Werkzeug — Placement-Preview + Modifikation */}
+      {pageId && (settingsTool === "table" || (!activeTool && element?.kind === "table")) && (
+        <TableToolSettings
+          projectId={projectId}
+          pageId={pageId}
+          tableElement={element?.kind === "table" ? element : undefined}
+          isPending={!!pendingTableId && element?.id === pendingTableId}
+          modifyMode={!!tableModifyMode}
+          setModifyMode={(v) => setTableModifyMode?.(v)}
+          onConfirm={() => onConfirmTable?.()}
+          onCancel={() => onCancelTable?.()}
+        />
       )}
 
       {/* CAD section */}

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { WorkspaceHeader } from "@/components/workspace/WorkspaceHeader";
+import { TabletAidWheel } from "@/components/TabletAidWheel";
 import { useProject } from "@/lib/projectStore";
 import {
   notesStore, useNotes, useNotesHistory,
@@ -42,6 +43,12 @@ export default function NotesPage() {
   const [rightOpen, setRightOpen] = useState(true);
   const [rightMode, setRightMode] = useState<"graph" | "links" | "timeline">("graph");
   const [focusToken, setFocusToken] = useState(0);
+  const [tabletAidOn, setTabletAidOn] = useState<boolean>(() => {
+    try { return localStorage.getItem("pixuna.tabletAid") === "1"; } catch { return false; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem("pixuna.tabletAid", tabletAidOn ? "1" : "0"); } catch {}
+  }, [tabletAidOn]);
 
   const statusMap = useMemo(() => {
     const m = new Map<string, NoteStatusDef>();
@@ -139,6 +146,8 @@ export default function NotesPage() {
         onRedo={hist.redo}
         canDelete={!!selected}
         onDelete={() => selected && (notesStore.deleteNode(projectId, selected.id), setSelectedId(null))}
+        tabletAidOn={tabletAidOn}
+        onToggleTabletAid={() => setTabletAidOn((v) => !v)}
       />
       <main
         className="flex-1 min-h-0 grid transition-[grid-template-columns] duration-200"
@@ -217,6 +226,7 @@ export default function NotesPage() {
         )}
 
       </main>
+      {tabletAidOn && <TabletAidWheel />}
     </div>
   );
 }

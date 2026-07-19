@@ -82,14 +82,17 @@ export function WorkspaceHeader({
         </button>
 
         {projectName && (
-          <div className="text-sm font-semibold truncate max-w-[220px]" title={projectName}>
+          <div
+            className="text-sm font-semibold truncate max-w-[180px]"
+            title={projectName}
+          >
             {projectName}
           </div>
         )}
         {contextLabel && (
           <>
             <span className="text-xs text-muted-foreground">›</span>
-            <div className="text-sm truncate max-w-[220px]" title={contextLabel}>
+            <div className="text-sm truncate max-w-[160px]" title={contextLabel}>
               {contextLabel}
             </div>
           </>
@@ -98,16 +101,25 @@ export function WorkspaceHeader({
         {onToggleTabletAid && (
           <button
             onClick={onToggleTabletAid}
-            className="ml-1 h-8 w-8 rounded-md flex items-center justify-center border transition-colors"
+            className="ml-1 h-8 px-2 rounded-md flex items-center gap-1.5 border text-[11px] font-medium transition-colors"
             style={
               tabletAidOn
-                ? { background: "hsl(var(--accent-gold))", color: "hsl(var(--surface))", borderColor: "hsl(var(--accent-gold))" }
-                : { background: "transparent", color: "hsl(var(--ink-soft))", borderColor: "transparent" }
+                ? {
+                    background: "hsl(var(--accent-gold))",
+                    color: "hsl(var(--surface))",
+                    borderColor: "hsl(var(--accent-gold))",
+                  }
+                : {
+                    background: "hsl(var(--surface-muted))",
+                    color: "hsl(var(--ink-soft))",
+                    borderColor: "hsl(var(--hairline))",
+                  }
             }
             title="Tablet-Hilfsrad (Maus/Tastatur-Ersatz für Touch-Geräte)"
             aria-pressed={tabletAidOn}
           >
             <TabletSmartphone size={16} />
+            <span>Tablet</span>
           </button>
         )}
 
