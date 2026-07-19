@@ -3122,6 +3122,12 @@ function RightInspector({
   onCadDuplicateSegments,
   updateToolSettings,
 
+  pendingTableId,
+  tableModifyMode,
+  setTableModifyMode,
+  onConfirmTable,
+  onCancelTable,
+
   onJumpCad,
   onCollapse,
   cadEngine,
