@@ -155,7 +155,7 @@ export default function NotesPage() {
             filterCat={filterCat} setFilterCat={setFilterCat}
             filterStatus={filterStatus} setFilterStatus={setFilterStatus}
             filterPriority={filterPriority} setFilterPriority={setFilterPriority}
-            selectedId={selectedId} setSelectedId={setSelectedId}
+            selectedId={selectedId} setSelectedId={selectAndMarkSeen}
             selectRoot={selectRoot}
             expanded={expanded} toggleExpand={toggleExpand}
             childrenOf={childrenOf}
@@ -191,7 +191,7 @@ export default function NotesPage() {
               statuses={state.statuses}
               priorities={state.priorities}
               nodes={state.nodes}
-              onSelect={setSelectedId}
+              onSelect={selectAndMarkSeen}
               onDelete={() => { notesStore.deleteNode(projectId, selected.id); setSelectedId(null); }}
             />
           ) : (
@@ -208,13 +208,14 @@ export default function NotesPage() {
             state={state}
             statusMap={statusMap}
             selectedId={selectedId}
-            setSelectedId={setSelectedId}
+            setSelectedId={selectAndMarkSeen}
             mode={rightMode}
             setMode={setRightMode}
             onCollapse={() => setRightOpen(false)}
             focusToken={focusToken}
           />
         )}
+
       </main>
     </div>
   );
