@@ -232,3 +232,13 @@ function ModeButton({
     </button>
   );
 }
+
+function ModeDivider() {
+  return (
+    <span
+      aria-hidden
+      className="mx-0.5 inline-block h-4 w-px"
+      style={{ background: "hsl(var(--hairline))" }}
+    />
+  );
+}
