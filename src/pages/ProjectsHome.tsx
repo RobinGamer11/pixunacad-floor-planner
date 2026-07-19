@@ -934,9 +934,9 @@ function AufgabenView({ project }: { project: Project }) {
             onClick={() => navigate(`/project/${project.id}/notes`)}
             className="h-7 px-2.5 rounded-md text-[11px] font-medium flex items-center gap-1.5"
             style={{ background: "hsl(var(--accent-gold-soft))", color: "hsl(var(--accent-gold))" }}
-            title="Notiznetz öffnen"
+            title="Board öffnen"
           >
-            <Network size={13} /> Notiznetz
+            <Network size={13} /> Board
           </button>
         </div>
         <TaskCalendar
@@ -948,7 +948,7 @@ function AufgabenView({ project }: { project: Project }) {
           }}
         />
         <div className="mt-3 text-[11px] text-muted-foreground">
-          Tipp: Neue Aufgaben werden automatisch mit dem Notiznetz verknüpft und dort auf der Projekt-Ebene erstellt.
+          Tipp: Neue Aufgaben werden automatisch mit dem Board verknüpft und dort auf der Projekt-Ebene erstellt.
         </div>
       </div>
 
@@ -958,7 +958,7 @@ function AufgabenView({ project }: { project: Project }) {
         style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
       >
         <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-3">
-          NEUE AUFGABE (im Notiznetz)
+          NEUE AUFGABE (im Board)
         </div>
         <div className="flex flex-col gap-2">
           <input
@@ -1117,7 +1117,7 @@ function UnifiedTaskRow({
         </div>
       </div>
       {task.source === "note" && (
-        <button onClick={onOpenInNotes} title="Im Notiznetz öffnen"
+        <button onClick={onOpenInNotes} title="Im Board öffnen"
           className="text-muted-foreground hover:text-foreground">
           <ExternalLink size={14} />
         </button>
