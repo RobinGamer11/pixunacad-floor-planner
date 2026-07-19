@@ -3219,8 +3219,11 @@ function RightInspector({
             updateToolSettings={updateToolSettings}
             onJumpCad={onJumpCad}
             cadEngine={cadEngine ?? null}
-
-
+            pendingTableId={pendingTableId ?? null}
+            tableModifyMode={!!tableModifyMode}
+            setTableModifyMode={setTableModifyMode}
+            onConfirmTable={onConfirmTable}
+            onCancelTable={onCancelTable}
           />
         )}
         {tab === "layers" && page && (
