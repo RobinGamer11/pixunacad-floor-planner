@@ -479,9 +479,8 @@ function HeroErlaeuterungPanel({
       style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
     >
       <div>
-        <div className="flex items-center justify-between text-xs text-muted-foreground mb-3">
+        <div className="flex items-center text-xs text-muted-foreground mb-3">
           <span>Projekttitelbild</span>
-          <span>Geändert: {new Date(project.updatedAt).toLocaleDateString("de-DE")}</span>
         </div>
         <div className="rounded-xl overflow-hidden aspect-[16/9] relative group" style={{ background: "hsl(var(--surface-muted))" }}>
           <img src={project.thumbnail} alt="" className="w-full h-full object-cover" />
