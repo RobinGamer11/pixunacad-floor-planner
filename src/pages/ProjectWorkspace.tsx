@@ -1659,6 +1659,23 @@ export default function ProjectWorkspace() {
 
               updateToolSettings={updateToolSettings}
 
+              pendingTableId={pendingTableId}
+              tableModifyMode={tableModifyMode}
+              setTableModifyMode={setTableModifyMode}
+              onConfirmTable={() => {
+                setPendingTableId(null);
+                setActiveTool(null);
+              }}
+              onCancelTable={() => {
+                if (activePage && pendingTableId) {
+                  projectStore.deleteElement(project.id, activePage.id, pendingTableId);
+                }
+                setPendingTableId(null);
+                setSelectedElementId(undefined);
+                setActiveTool(null);
+                setTableModifyMode(false);
+              }}
+
               onJumpCad={(sheetId) => navigate(`/project/${project.id}/cad${sheetId ? `/${sheetId}` : ""}`)}
               onCollapse={() => setRightOpen(false)}
             />
