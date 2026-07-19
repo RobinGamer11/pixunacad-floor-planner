@@ -168,6 +168,8 @@ export const notesStore = {
       createdAt: now,
       updatedAt: now,
       order: siblingsMaxOrder(s, parentId) + 1,
+      unseen: patch.unseen,
+
     };
     commit(projectId, { ...s, nodes: [...s.nodes, node] });
     return node;
