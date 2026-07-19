@@ -1714,6 +1714,7 @@ export default function ProjectWorkspace() {
     )}
     {tabletAidOn && <TabletAidWheel />}
     </>
+    </TableModifyContext.Provider>
   );
 }
 
