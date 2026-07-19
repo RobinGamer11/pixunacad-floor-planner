@@ -168,15 +168,8 @@ export function WorkspaceHeader({
           <Redo2 size={16} />
         </button>
 
-        {typeof zoomPercent === "number" && (
-          <span
-            className="text-xs px-2 tabular-nums"
-            style={{ color: "hsl(var(--ink-soft))" }}
-            title="Aktueller Zoom"
-          >
-            {Math.round(zoomPercent)}%
-          </span>
-        )}
+
+
 
         <button
           onClick={onPresent}
