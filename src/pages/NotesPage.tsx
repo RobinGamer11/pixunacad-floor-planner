@@ -121,9 +121,9 @@ export default function NotesPage() {
   if (!projectId) return null;
 
   const gridCols = [
-    leftOpen ? "240px" : "0px",
+    ...(leftOpen ? ["240px"] : []),
     "1fr",
-    rightOpen ? "460px" : "0px",
+    ...(rightOpen ? ["460px"] : []),
   ].join(" ");
 
   return (
