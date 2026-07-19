@@ -3709,6 +3709,11 @@ function ToolsTab({
   updateToolSettings,
   onJumpCad,
   cadEngine,
+  pendingTableId,
+  tableModifyMode,
+  setTableModifyMode,
+  onConfirmTable,
+  onCancelTable,
 }: {
   projectId: string;
   pageId?: string;
