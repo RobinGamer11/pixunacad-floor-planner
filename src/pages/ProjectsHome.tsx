@@ -1119,7 +1119,13 @@ function UnifiedTaskRow({
           {task.source === "note" && (
             <span className="text-[10px] px-1.5 py-0.5 rounded shrink-0"
               style={{ background: "hsl(var(--accent-gold-soft))", color: "hsl(var(--accent-gold))" }}>
-              Netz
+              Board
+            </span>
+          )}
+          {mappeName && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded shrink-0"
+              style={{ background: "hsl(var(--surface-muted))", color: "hsl(var(--ink-soft))" }}>
+              {mappeName}
             </span>
           )}
           {task.category && (
