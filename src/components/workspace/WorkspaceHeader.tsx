@@ -68,14 +68,14 @@ export function WorkspaceHeader({
   return (
     <header
       ref={headerRef}
-      className="h-16 flex items-center justify-between px-3 border-b shrink-0 overflow-x-auto no-scrollbar touch-pan-x"
+      className="h-16 flex items-center px-3 border-b shrink-0 overflow-x-auto no-scrollbar touch-pan-x whitespace-nowrap"
       style={{
         borderColor: "hsl(var(--hairline))",
         background: "hsl(var(--surface-card))",
       }}
     >
       {/* Left: Zurück + Titel + Modus-Umschalter */}
-      <div className="flex items-center gap-2 min-w-0">
+      <div className="flex items-center gap-2 shrink-0">
         <button
           onClick={() => navigate("/")}
           className="h-8 w-8 rounded-md flex items-center justify-center hover:bg-muted"
@@ -127,8 +127,9 @@ export function WorkspaceHeader({
         )}
 
 
-        <div className="ml-2 flex items-center gap-1 rounded-md p-0.5"
+        <div className="ml-2 flex items-center gap-1 rounded-md p-0.5 shrink-0"
              style={{ background: "hsl(var(--surface-muted))" }}>
+
           <ModeButton
             icon={<FolderKanban size={13} />}
             label="Projektmappe"
@@ -154,8 +155,10 @@ export function WorkspaceHeader({
       </div>
 
 
+      <div className="flex-1 min-w-4" />
       {/* Right: Undo/Redo · Zoom · Präsentieren · Teilen · Exportieren */}
-      <div className="flex items-center gap-1.5 text-muted-foreground">
+      <div className="flex items-center gap-1.5 text-muted-foreground shrink-0 pl-2">
+
         <button
           onClick={onDelete}
           disabled={!canDelete}
