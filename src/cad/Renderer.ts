@@ -1966,6 +1966,17 @@ export class Renderer {
     const tickOffsetPx = (dim.tickLengthM || Defaults.measureTickLengthM) * cam.scale;
     const textOffsetPx = Math.max(fontPx * 0.95, tickOffsetPx * 0.9 + fontPx * 0.35);
 
+    // Determine which side of the dimension line the placement point (i.e. the
+    // side the user pulled the measurement out toward) is on, in screen space,
+    // so the text sits opposite the wall — mirrored automatically when the
+    // dimension is placed on the other side.
+    const placementScreen = cam.worldToScreen(dim.placementPoint.x, dim.placementPoint.y);
+    const localYx = -Math.sin(normalizedAngle);
+    const localYy = Math.cos(normalizedAngle);
+    const dotPlacementY =
+      (placementScreen.x - mid.x) * localYx + (placementScreen.y - mid.y) * localYy;
+    const textSideSign = dotPlacementY > 0 ? 1 : -1;
+
     ctx.translate(mid.x, mid.y);
     ctx.rotate(normalizedAngle);
 
@@ -1986,7 +1997,7 @@ export class Renderer {
     const textHeight = ascent + descent;
     const padX = Math.max(4, fontPx * 0.45);
     const padY = Math.max(2, fontPx * 0.22);
-    const textY = -textOffsetPx;
+    const textY = textSideSign * textOffsetPx;
 
     if (dim.textBgEnabled) {
       ctx.fillStyle = hexToRgba(dim.textBgColor || Defaults.measureTextBgColor, dim.textBgAlpha ?? Defaults.measureTextBgAlpha);
