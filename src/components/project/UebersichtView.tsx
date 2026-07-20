@@ -7,8 +7,8 @@ import { AufgabenView } from "@/pages/ProjectsHome";
 
 interface Props {
   project: Project;
-  activeMappeId: string | undefined;
-  onSelectMappe: (id: string) => void;
+  activeMappeId?: string;
+  onSelectMappe?: (id: string) => void;
 }
 
 /**
@@ -17,29 +17,67 @@ interface Props {
  *   Rechts: Titelbild + Erläuterung Gesamtprojekt + Erläuterung ausgewählte Mappe.
  * Reihenfolge Zeitstrahl vs. Aufgaben/Kalender per Setting (default: Zeitstrahl unten).
  */
-export function UebersichtView({ project, activeMappeId, onSelectMappe }: Props) {
-  const timelinePos = project.settings?.timelinePosition ?? "bottom";
-  const mappen = project.mappen ?? [];
-  const activeMappe = mappen.find((m) => m.id === activeMappeId) ?? mappen[0];
-
+export function UebersichtView({ project }: Props) {
   return (
     <div className="mt-6 space-y-5">
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)] gap-6 items-start">
-        {/* Linke Spalte (schmal) */}
-        <div className="space-y-5 min-w-0">
-          <MappenPanel project={project} activeId={activeMappe?.id} onSelect={onSelectMappe} />
-          <ProjektinfoPanel project={project} />
-        </div>
-
-        {/* Rechte Spalte (dominant): Titelbild + Erläuterungen zusammen */}
-        <div className="min-w-0">
-          <HeroErlaeuterungPanel project={project} mappe={activeMappe} />
-        </div>
-      </div>
-
-      {/* Aufgaben + Kalender identisch wie im Reiter „Aufgaben" (inkl. Zeitstrahl) */}
-      <AufgabenView project={project} />
+      {/* 1. Projekttitelbild */}
+      <HeroPanel project={project} />
+      {/* 2. Konzept (nur Text) */}
+      <KonzeptPanel project={project} />
+      {/* 3. Projektinfos */}
+      <ProjektinfoPanel project={project} />
     </div>
+  );
+}
+
+/* ============================================================ Hero (nur Bild) */
+function HeroPanel({ project }: { project: Project }) {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const handleThumb = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = () => projectStore.updateProject(project.id, { thumbnail: String(r.result) });
+    r.readAsDataURL(f);
+  };
+  return (
+    <section
+      className="rounded-2xl p-5"
+      style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
+    >
+      <div className="text-[10px] font-semibold tracking-[0.18em] text-muted-foreground mb-3">
+        PROJEKTTITELBILD
+      </div>
+      <div className="rounded-xl overflow-hidden aspect-[16/9] relative group" style={{ background: "hsl(var(--surface-muted))" }}>
+        <img src={project.thumbnail} alt="" className="w-full h-full object-cover" />
+        <button
+          onClick={() => inputRef.current?.click()}
+          title="Titelbild ändern"
+          className="absolute top-3 right-3 h-8 w-8 rounded-full flex items-center justify-center shadow"
+          style={{ background: "hsl(var(--surface))", color: "hsl(var(--ink))" }}
+        >
+          <Pencil size={14} />
+        </button>
+        <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={handleThumb} />
+      </div>
+    </section>
+  );
+}
+
+/* ============================================================ Konzept (nur Text) */
+function KonzeptPanel({ project }: { project: Project }) {
+  return (
+    <section
+      className="rounded-2xl p-5"
+      style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
+    >
+      <InlineEditableText
+        title="KONZEPT"
+        value={project.konzept ?? ""}
+        placeholder="Konzept, Leitgedanke oder kurze Beschreibung des Projekts…"
+        onSave={(v) => projectStore.updateProject(project.id, { konzept: v })}
+      />
+    </section>
   );
 }
 

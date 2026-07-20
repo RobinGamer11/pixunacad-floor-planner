@@ -24,7 +24,12 @@ import {
   Circle,
   Coins,
   ShoppingBag,
+  ListChecks,
+  Play,
+  Image as ImageIcon,
 } from "lucide-react";
+
+
 import {
   useProjects,
   projectStore,
@@ -61,6 +66,7 @@ export default function ProjectsHome() {
     () => projects.filter((p) => (mode === "templates" ? p.isTemplate : !p.isTemplate)),
     [projects, mode]
   );
+  const [showAllTasks, setShowAllTasks] = useState(false);
   const [selectedId, setSelectedId] = useState<string | undefined>(visibleProjects[0]?.id);
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<Tab>("uebersicht");
@@ -201,37 +207,62 @@ export default function ProjectsHome() {
           <Plus size={18} /> Projekt
         </button>
 
+        {/* Globale Aufgaben-Übersicht */}
+        <button
+          onClick={() => { setShowAllTasks((v) => !v); }}
+          title="Alle Aufgaben aller Projekte"
+          className="h-12 w-12 rounded-lg flex items-center justify-center border transition"
+          style={{
+            borderColor: "hsl(var(--hairline))",
+            background: showAllTasks ? "hsl(var(--surface-muted))" : "hsl(var(--surface))",
+            color: showAllTasks ? "hsl(var(--ink))" : "hsl(var(--ink-soft))",
+          }}
+        >
+          <ListChecks size={20} strokeWidth={1.6} />
+        </button>
+
         <div className="ml-3 flex items-center gap-1">
           <NavIcon
-            icon={<FolderKanban size={19} />}
+            icon={<FolderKanban size={18} strokeWidth={1.5} />}
             label="Projekte"
-            active={mode === "projects"}
+            active={mode === "projects" && !showAllTasks}
             onClick={() => {
+              setShowAllTasks(false);
               setMode("projects");
               setSelectedId(projects.find((p) => !p.isTemplate)?.id);
             }}
           />
           <NavIcon
-            icon={<LayoutTemplate size={19} />}
+            icon={<LayoutTemplate size={18} strokeWidth={1.5} />}
             label="Vorlagen"
-            active={mode === "templates"}
+            active={mode === "templates" && !showAllTasks}
             onClick={() => {
+              setShowAllTasks(false);
               setMode("templates");
               setSelectedId(projects.find((p) => p.isTemplate)?.id);
             }}
           />
-          <NavIcon icon={<Star size={19} />} label="Favoriten" />
-          <NavIcon icon={<Users size={19} />} label="Geteilt (bald verfügbar)" disabled />
-          <NavIcon icon={<Trash2 size={19} />} label="Papierkorb (bald verfügbar)" disabled />
+          <NavIcon icon={<Star size={18} strokeWidth={1.5} />} label="Favoriten" />
+          <NavIcon icon={<Users size={18} strokeWidth={1.5} />} label="Geteilt (bald verfügbar)" disabled />
+          <NavIcon icon={<Trash2 size={18} strokeWidth={1.5} />} label="Papierkorb (bald verfügbar)" disabled />
         </div>
 
         <div className="flex-1" />
 
-        {/* Währung + Shop (bald verfügbar) */}
-        <div className="flex items-center gap-1 mr-2">
-          <NavIcon icon={<Coins size={19} />} label="Währung (bald verfügbar)" disabled />
-          <NavIcon icon={<ShoppingBag size={19} />} label="Shop (bald verfügbar)" disabled />
+        {/* Währung + Shop (bald verfügbar) — heller Pill ohne dunklen Hintergrund */}
+        <div
+          className="mr-3 flex items-center gap-2 h-10 px-3 rounded-full border opacity-50 cursor-not-allowed"
+          style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface))" }}
+          title="Bald verfügbar"
+        >
+          <div className="flex items-center gap-1.5">
+            <Coins size={16} strokeWidth={1.5} className="text-muted-foreground" />
+            <span className="text-sm font-semibold text-muted-foreground">26</span>
+          </div>
+          <span className="w-px h-4" style={{ background: "hsl(var(--hairline))" }} />
+          <ShoppingBag size={16} strokeWidth={1.5} className="text-muted-foreground" />
         </div>
+
 
         {/* Profil oben rechts */}
         <div className="relative" ref={profileRef}>
@@ -260,7 +291,29 @@ export default function ProjectsHome() {
               style={{ background: "hsl(var(--surface))", borderColor: "hsl(var(--hairline))" }}
             >
               <div className="flex items-center gap-4">
-                <ProfileAvatar profile={profile} count={projectCount} max={MAX_PROJECTS} size={72} large />
+                <div className="relative">
+                  <ProfileAvatar profile={profile} count={projectCount} max={MAX_PROJECTS} size={72} large />
+                  <label
+                    className="absolute -bottom-1 -right-1 h-7 w-7 rounded-full border shadow flex items-center justify-center cursor-pointer"
+                    style={{ background: "hsl(var(--surface))", borderColor: "hsl(var(--hairline))" }}
+                    title="Profilbild ändern"
+                  >
+                    <ImageIcon size={13} className="text-muted-foreground" />
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (!f) return;
+                        const r = new FileReader();
+                        r.onload = () => projectStore.updateProfile({ avatarUrl: String(r.result) });
+                        r.readAsDataURL(f);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                </div>
                 <div className="flex-1 min-w-0">
                   <input
                     value={profile.name}
@@ -275,6 +328,14 @@ export default function ProjectsHome() {
                     className="mt-2 w-full bg-transparent text-xs text-muted-foreground outline-none border-b pb-1"
                     style={{ borderColor: "hsl(var(--hairline))" }}
                   />
+                  {profile.avatarUrl && (
+                    <button
+                      onClick={() => projectStore.updateProfile({ avatarUrl: undefined })}
+                      className="mt-2 text-[10px] text-muted-foreground hover:text-foreground"
+                    >
+                      Bild entfernen
+                    </button>
+                  )}
                 </div>
               </div>
               <div className="mt-4">
@@ -539,7 +600,9 @@ export default function ProjectsHome() {
 
         {/* Center */}
         <main className="flex-1 overflow-y-auto">
-          {selected && (
+          {showAllTasks ? (
+            <AllTasksView projects={projects} />
+          ) : selected && (
             <div className="px-10 py-7">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -670,6 +733,18 @@ export default function ProjectsHome() {
               {/* Wetter für Projektort */}
               <WeatherStrip ort={selected.ort} />
 
+              {/* Großer "Projekt bearbeiten"-Button (führt in die Projektmappe) */}
+              <button
+                onClick={() => navigate(`/project/${selected.id}`)}
+                className="mt-5 w-full h-14 rounded-xl flex items-center justify-between px-6 text-base font-semibold transition hover:opacity-90"
+                style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
+              >
+                <span className="flex items-center gap-3">
+                  <Play size={18} fill="currentColor" /> Projekt bearbeiten
+                </span>
+                <ChevronRight size={18} />
+              </button>
+
               {/* Tabs */}
               <div
                 className="mt-5 flex items-center gap-7 text-sm border-b overflow-x-auto"
@@ -677,25 +752,30 @@ export default function ProjectsHome() {
               >
                 {(
                   [
-                    ["uebersicht", "Übersicht"],
-                    ["seiten", "Mappen"],
-                    ["aufgaben", "Aufgaben"],
-                    ["dokumente", "Dokumente"],
-                    ["infos", "Infos"],
-                    ["team", "Team"],
+                    ["uebersicht", "Übersicht", false],
+                    ["seiten", "Mappen", false],
+                    ["aufgaben", "Aufgaben", false],
+                    ["dokumente", "Dokumente", false],
+                    ["infos", "Infos", false],
+                    ["team", "Team", true],
                   ] as const
-                ).map(([key, label]) => (
+                ).map(([key, label, disabled]) => (
                   <button
                     key={key}
-                    onClick={() => setTab(key)}
-                    className="py-3 relative whitespace-nowrap"
+                    onClick={() => !disabled && setTab(key as Tab)}
+                    disabled={disabled}
+                    title={disabled ? "Bald verfügbar" : undefined}
+                    className="py-3 relative whitespace-nowrap disabled:cursor-not-allowed"
                     style={{
-                      color: tab === key ? "hsl(var(--ink))" : "hsl(var(--ink-soft))",
+                      color: disabled
+                        ? "hsl(var(--ink-soft) / 0.5)"
+                        : tab === key ? "hsl(var(--ink))" : "hsl(var(--ink-soft))",
                       fontWeight: tab === key ? 600 : 400,
+                      opacity: disabled ? 0.5 : 1,
                     }}
                   >
                     {label}
-                    {tab === key && (
+                    {tab === key && !disabled && (
                       <span
                         className="absolute left-0 right-0 -bottom-px h-[2px]"
                         style={{ background: "hsl(var(--accent-gold))" }}
@@ -705,13 +785,7 @@ export default function ProjectsHome() {
                 ))}
               </div>
 
-              {tab === "uebersicht" && (
-                <UebersichtView
-                  project={selected}
-                  activeMappeId={selected.activeMappeId}
-                  onSelectMappe={(id) => projectStore.setActiveMappe(selected.id, id)}
-                />
-              )}
+              {tab === "uebersicht" && <UebersichtView project={selected} />}
               {tab === "seiten" && (
                 <SeitenView project={selected} onAddPage={handleAddPage} />
               )}
@@ -753,11 +827,6 @@ export default function ProjectsHome() {
                 </div>
               )}
               {tab === "infos" && <InfosView project={selected} />}
-              {tab === "team" && (
-                <div className="mt-6 text-sm text-muted-foreground">
-                  Team-Verwaltung folgt.
-                </div>
-              )}
             </div>
           )}
         </main>
@@ -2260,6 +2329,214 @@ function MiniCalendar({ events }: { events: string[] }) {
                   className="absolute -bottom-0 w-1 h-1 rounded-full"
                   style={{ background: "hsl(var(--accent-gold))" }}
                 />
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* -------- AllTasksView: globale Aufgabenübersicht aller Projekte -------- */
+function projectColor(id: string): string {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) % 360;
+  return `hsl(${h} 65% 55%)`;
+}
+
+function AllTasksView({ projects }: { projects: Project[] }) {
+  const navigate = useNavigate();
+  const [activeIds, setActiveIds] = useState<Set<string>>(() => new Set(projects.map((p) => p.id)));
+  useEffect(() => {
+    setActiveIds((prev) => {
+      const next = new Set(prev);
+      projects.forEach((p) => next.add(p.id));
+      return next;
+    });
+  }, [projects]);
+
+  const toggle = (id: string) =>
+    setActiveIds((prev) => {
+      const n = new Set(prev);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
+    });
+
+  // Alle Aufgaben (legacy + board.task) über alle Projekte
+  type GTask = { id: string; projectId: string; projectName: string; title: string; date?: string; time?: string; priority: TaskPriority; done?: boolean; color: string };
+  const gTasks: GTask[] = useMemo(() => {
+    const out: GTask[] = [];
+    projects.forEach((p) => {
+      const color = projectColor(p.id);
+      p.tasks?.forEach((t) =>
+        out.push({ id: t.id, projectId: p.id, projectName: p.name, title: t.title, date: t.date, time: t.time, priority: t.priority ?? "medium", done: t.done, color })
+      );
+      try {
+        const notes = notesStore.getState(p.id);
+        notes.nodes.filter((n) => n.kind === "task").forEach((n) =>
+          out.push({ id: n.id, projectId: p.id, projectName: p.name, title: n.title, date: n.dueDate ?? n.date, time: n.time, priority: (n.priority === "high" || n.priority === "urgent") ? "high" : n.priority === "low" ? "low" : "medium", done: n.status === "done", color })
+        );
+      } catch {}
+    });
+    const prio: Record<TaskPriority, number> = { high: 0, medium: 1, low: 2 };
+    return out.sort((a, b) => {
+      if (!!a.done !== !!b.done) return a.done ? 1 : -1;
+      const pr = prio[a.priority] - prio[b.priority];
+      if (pr !== 0) return pr;
+      return `${a.date ?? "9999"} ${a.time ?? "99:99"}`.localeCompare(`${b.date ?? "9999"} ${b.time ?? "99:99"}`);
+    });
+  }, [projects]);
+
+  const [selectedDate, setSelectedDate] = useState<string | undefined>();
+  const visible = gTasks.filter((t) => activeIds.has(t.projectId) && (!selectedDate || t.date === selectedDate));
+
+  return (
+    <div className="px-10 py-7">
+      <div className="flex items-center gap-3 mb-6">
+        <h1 className="text-2xl font-semibold tracking-tight">Alle Aufgaben</h1>
+        <span className="text-sm text-muted-foreground">projektübergreifend</span>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
+        {/* Aufgaben-Liste */}
+        <div className="rounded-xl border overflow-hidden" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface))" }}>
+          <div className="px-4 py-3 border-b text-xs font-semibold tracking-widest text-muted-foreground flex items-center justify-between" style={{ borderColor: "hsl(var(--hairline))" }}>
+            <span>AUFGABEN {selectedDate ? `· ${selectedDate}` : `· ${visible.length}`}</span>
+            {selectedDate && (
+              <button onClick={() => setSelectedDate(undefined)} className="text-[11px] font-normal hover:text-foreground">Filter zurücksetzen</button>
+            )}
+          </div>
+          {visible.length === 0 ? (
+            <div className="p-6 text-sm text-muted-foreground">Keine Aufgaben.</div>
+          ) : (
+            <ul className="divide-y" style={{ borderColor: "hsl(var(--hairline))" }}>
+              {visible.map((t) => (
+                <li
+                  key={`${t.projectId}:${t.id}`}
+                  onClick={() => navigate(`/project/${t.projectId}`)}
+                  className="px-4 py-3 flex items-center gap-3 hover:bg-muted/40 cursor-pointer"
+                >
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ background: t.color }} />
+                  <div className="flex-1 min-w-0">
+                    <div className={`text-sm truncate ${t.done ? "line-through text-muted-foreground" : ""}`}>{t.title}</div>
+                    <div className="text-[11px] text-muted-foreground truncate">
+                      {t.projectName}{t.date ? ` · ${t.date}` : ""}{t.time ? ` · ${t.time}` : ""}
+                    </div>
+                  </div>
+                  <span
+                    className="text-[10px] px-2 py-0.5 rounded-full"
+                    style={{
+                      background: t.priority === "high" ? "hsl(0 70% 50% / 0.15)" : t.priority === "low" ? "hsl(var(--surface-muted))" : "hsl(45 90% 50% / 0.15)",
+                      color: t.priority === "high" ? "hsl(0 70% 40%)" : t.priority === "low" ? "hsl(var(--ink-soft))" : "hsl(35 80% 35%)",
+                    }}
+                  >
+                    {t.priority === "high" ? "Hoch" : t.priority === "low" ? "Niedrig" : "Mittel"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {/* Kalender + Projekt-Filter */}
+        <div className="space-y-4">
+          <div className="rounded-xl border p-4" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface))" }}>
+            <div className="text-xs font-semibold tracking-widest text-muted-foreground mb-3">PROJEKTE</div>
+            <div className="space-y-1.5">
+              {projects.map((p) => {
+                const color = projectColor(p.id);
+                const active = activeIds.has(p.id);
+                return (
+                  <label key={p.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input type="checkbox" checked={active} onChange={() => toggle(p.id)} className="accent-current" />
+                    <span className="w-3 h-3 rounded-sm" style={{ background: color }} />
+                    <span className={`truncate ${active ? "" : "text-muted-foreground"}`}>{p.name}</span>
+                  </label>
+                );
+              })}
+              {projects.length === 0 && <div className="text-sm text-muted-foreground">Keine Projekte.</div>}
+            </div>
+          </div>
+
+          <GlobalCalendar
+            tasks={gTasks.filter((t) => activeIds.has(t.projectId))}
+            selectedDate={selectedDate}
+            onSelect={(d) => setSelectedDate((prev) => (prev === d ? undefined : d))}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function GlobalCalendar({
+  tasks,
+  selectedDate,
+  onSelect,
+}: {
+  tasks: { date?: string; color: string }[];
+  selectedDate?: string;
+  onSelect: (d: string) => void;
+}) {
+  const [cursor, setCursor] = useState(() => {
+    const d = new Date();
+    return { y: d.getFullYear(), m: d.getMonth() };
+  });
+  const first = new Date(cursor.y, cursor.m, 1);
+  const days = new Date(cursor.y, cursor.m + 1, 0).getDate();
+  const startWeekday = (first.getDay() + 6) % 7;
+  const cells: (number | null)[] = [
+    ...Array(startWeekday).fill(null),
+    ...Array.from({ length: days }, (_, i) => i + 1),
+  ];
+  const today = new Date();
+  const todayStr = today.toISOString().slice(0, 10);
+  const dateStr = (d: number) => `${cursor.y}-${String(cursor.m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+
+  const colorsForDate = (d: number): string[] => {
+    const s = dateStr(d);
+    const cols = new Set<string>();
+    tasks.forEach((t) => { if (t.date === s) cols.add(t.color); });
+    return Array.from(cols).slice(0, 4);
+  };
+
+  const monthName = first.toLocaleString("de-DE", { month: "long", year: "numeric" });
+
+  return (
+    <div className="rounded-xl border p-4" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface))" }}>
+      <div className="flex items-center justify-between mb-3">
+        <button onClick={() => setCursor((c) => ({ y: c.m === 0 ? c.y - 1 : c.y, m: (c.m + 11) % 12 }))} className="text-muted-foreground hover:text-foreground text-sm">‹</button>
+        <div className="text-sm font-semibold capitalize">{monthName}</div>
+        <button onClick={() => setCursor((c) => ({ y: c.m === 11 ? c.y + 1 : c.y, m: (c.m + 1) % 12 }))} className="text-muted-foreground hover:text-foreground text-sm">›</button>
+      </div>
+      <div className="grid grid-cols-7 gap-1 text-[10px] text-muted-foreground mb-1 text-center">
+        {["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"].map((d) => (<div key={d}>{d}</div>))}
+      </div>
+      <div className="grid grid-cols-7 gap-1 text-[11px]">
+        {cells.map((c, i) => {
+          const s = c ? dateStr(c) : undefined;
+          const isSelected = s && s === selectedDate;
+          const isToday = s === todayStr;
+          const cols = c ? colorsForDate(c) : [];
+          return (
+            <div
+              key={i}
+              onClick={() => s && onSelect(s)}
+              className={`relative h-8 rounded-md flex items-center justify-center ${c ? "cursor-pointer hover:bg-muted/60" : ""}`}
+              style={{
+                background: isSelected ? "hsl(var(--accent-gold) / 0.2)" : "transparent",
+                border: isSelected ? "1px solid hsl(var(--accent-gold))" : isToday ? "1px solid hsl(var(--hairline))" : "1px solid transparent",
+                fontWeight: isToday ? 600 : 400,
+              }}
+            >
+              {c ?? ""}
+              {cols.length > 0 && (
+                <div className="absolute bottom-0.5 flex gap-0.5">
+                  {cols.map((col, idx) => (
+                    <span key={idx} className="w-1 h-1 rounded-full" style={{ background: col }} />
+                  ))}
+                </div>
               )}
             </div>
           );
