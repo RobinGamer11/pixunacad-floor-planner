@@ -413,50 +413,55 @@ export default function ProjectsHome() {
       <div className="flex flex-1 overflow-hidden">
         {leftOpen ? (
           <aside
-            className="w-[300px] shrink-0 flex flex-col border-r relative"
-            style={{ borderColor: "hsl(var(--hairline))" }}
+            className="w-[300px] shrink-0 flex flex-col relative"
+            style={{
+              background: "#0B0D10",
+              color: "#E6E8EB",
+              borderRight: "1px solid rgba(255,255,255,0.06)",
+            }}
           >
-            <button
-              onClick={() => setLeftOpen(false)}
-              title="Projekte einklappen"
-              className="absolute top-3 right-3 text-muted-foreground hover:text-foreground"
-            >
-              <PanelLeftClose size={16} />
-            </button>
-            <div className="px-4 pt-4 pb-3">
-              <div className="mb-2">
-                <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">
-                  {mode === "templates" ? "VORLAGEN" : "PROJEKTE"}
+            <div className="px-5 pt-5 pb-3">
+              <div className="flex items-center justify-between mb-3">
+                <div className="text-[11px] font-semibold tracking-[0.22em]" style={{ color: "#8A9099" }}>
+                  PROJEKTE
                 </div>
+                <button
+                  onClick={() => setLeftOpen(false)}
+                  title="Projekte einklappen"
+                  className="hover:opacity-100 opacity-70"
+                  style={{ color: "#8A9099" }}
+                >
+                  <PanelLeftClose size={15} />
+                </button>
               </div>
               <div
                 className="flex items-center gap-2 h-9 rounded-md px-2.5"
-                style={{ background: "hsl(var(--surface-muted))" }}
+                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.05)" }}
               >
-                <Search size={14} className="text-muted-foreground" />
+                <Search size={14} style={{ color: "#8A9099" }} />
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder={mode === "templates" ? "Vorlagen suchen..." : "Projekte suchen..."}
-                  className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                  placeholder="Projekte suchen..."
+                  className="flex-1 bg-transparent text-sm outline-none"
+                  style={{ color: "#E6E8EB" }}
                 />
-              </div>
-              {mode === "projects" && !creatingFolder && (
                 <button
                   onClick={() => {
                     setCreatingFolder(true);
                     setNewFolderName("");
                   }}
-                  className="mt-2 text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1"
                   title="Ordner anlegen"
+                  className="hover:opacity-100 opacity-70"
+                  style={{ color: "#8A9099" }}
                 >
-                  <FolderPlus size={12} /> Ordner
+                  <FolderPlus size={14} />
                 </button>
-              )}
+              </div>
               {creatingFolder && (
                 <div
                   className="flex items-center gap-1 mt-2 rounded-md px-2 py-1"
-                  style={{ background: "hsl(var(--surface-muted))" }}
+                  style={{ background: "rgba(255,255,255,0.05)" }}
                 >
                   <FolderIcon size={13} style={{ color: "hsl(var(--accent-gold))" }} />
                   <input
@@ -469,14 +474,15 @@ export default function ProjectsHome() {
                     }}
                     placeholder="Ordnername"
                     className="flex-1 bg-transparent text-xs outline-none"
+                    style={{ color: "#E6E8EB" }}
                   />
-                  <button onClick={commitNewFolder} title="Anlegen" className="text-muted-foreground hover:text-foreground">
+                  <button onClick={commitNewFolder} title="Anlegen" style={{ color: "#8A9099" }}>
                     <Check size={12} />
                   </button>
                   <button
                     onClick={() => { setCreatingFolder(false); setNewFolderName(""); }}
                     title="Abbrechen"
-                    className="text-muted-foreground hover:text-foreground"
+                    style={{ color: "#8A9099" }}
                   >
                     <X size={12} />
                   </button>
@@ -484,10 +490,15 @@ export default function ProjectsHome() {
               )}
             </div>
 
+            {folders.length > 0 && (
+              <div className="px-5 pb-2 text-[11px] font-semibold tracking-[0.22em]" style={{ color: "#8A9099" }}>
+                ORDNER
+              </div>
+            )}
 
-            <div className="flex-1 overflow-y-auto px-2 pb-4 space-y-1">
+            <div className="flex-1 overflow-y-auto px-3 pb-4 space-y-1">
               {/* Ordner */}
-              {mode === "projects" && folders.map((f) => {
+              {folders.map((f) => {
                 const inside = projectsByFolder.get(f.id) ?? [];
                 const collapsed = f.collapsed;
                 const isRenaming = renamingFolderId === f.id;
@@ -498,18 +509,19 @@ export default function ProjectsHome() {
                       onDragOver={(e) => { e.preventDefault(); setDragOverFolder(f.id); }}
                       onDragLeave={() => setDragOverFolder((v) => (v === f.id ? null : v))}
                       onDrop={() => handleDropOnFolder(f.id)}
-                      className="group flex items-center gap-1 h-8 px-2 rounded-md hover:bg-muted/40"
+                      className="group flex items-center gap-1.5 h-8 px-2 rounded-md"
                       style={{
-                        background: dragOver ? "hsl(var(--accent-gold) / 0.12)" : undefined,
+                        background: dragOver ? "hsl(var(--accent-gold) / 0.14)" : undefined,
+                        color: "#B7BCC2",
                       }}
                     >
                       <button
                         onClick={() => projectStore.toggleProjectFolderCollapsed(f.id)}
-                        className="text-muted-foreground hover:text-foreground"
+                        style={{ color: "#8A9099" }}
                       >
                         {collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
                       </button>
-                      <FolderIcon size={13} style={{ color: "hsl(var(--accent-gold))" }} />
+                      <FolderIcon size={13} style={{ color: "#B7BCC2" }} />
                       {isRenaming ? (
                         <input
                           autoFocus
@@ -527,7 +539,7 @@ export default function ProjectsHome() {
                             if (e.key === "Escape") setRenamingFolderId(null);
                           }}
                           className="flex-1 bg-transparent text-xs outline-none border-b"
-                          style={{ borderColor: "hsl(var(--hairline))" }}
+                          style={{ borderColor: "rgba(255,255,255,0.1)", color: "#E6E8EB" }}
                         />
                       ) : (
                         <button
@@ -537,10 +549,11 @@ export default function ProjectsHome() {
                           {f.name}
                         </button>
                       )}
-                      <span className="text-[10px] text-muted-foreground">{inside.length}</span>
+                      <span className="text-[10px]" style={{ color: "#8A9099" }}>{inside.length}</span>
                       <button
                         onClick={() => { setRenamingFolderId(f.id); setRenameFolderDraft(f.name); }}
-                        className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground"
+                        className="opacity-0 group-hover:opacity-100"
+                        style={{ color: "#8A9099" }}
                         title="Umbenennen"
                       >
                         <Pencil size={10} />
@@ -551,7 +564,8 @@ export default function ProjectsHome() {
                             projectStore.deleteProjectFolder(f.id);
                           }
                         }}
-                        className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground"
+                        className="opacity-0 group-hover:opacity-100"
+                        style={{ color: "#8A9099" }}
                         title="Löschen"
                       >
                         <Trash2 size={10} />
@@ -560,7 +574,7 @@ export default function ProjectsHome() {
                     {!collapsed && (
                       <div className="pl-4 space-y-1 mt-1">
                         {inside.length === 0 ? (
-                          <div className="text-[10px] text-muted-foreground italic px-2 py-1">
+                          <div className="text-[10px] italic px-2 py-1" style={{ color: "#8A9099" }}>
                             Projekt hierher ziehen
                           </div>
                         ) : (
@@ -568,8 +582,8 @@ export default function ProjectsHome() {
                             <ProjectCard
                               key={p.id}
                               project={p}
-                              active={selected?.id === p.id}
-                              onSelect={() => setSelectedId(p.id)}
+                              active={mode === "projects" && !showAllTasks && selected?.id === p.id}
+                              onSelect={() => { setMode("projects"); setShowAllTasks(false); setSelectedId(p.id); }}
                               onOpen={() => navigate(`/project/${p.id}`)}
                               onDragStart={() => setDragProjectId(p.id)}
                               onDragEnd={() => setDragProjectId(null)}
@@ -598,8 +612,8 @@ export default function ProjectsHome() {
                   <ProjectCard
                     key={p.id}
                     project={p}
-                    active={selected?.id === p.id}
-                    onSelect={() => setSelectedId(p.id)}
+                    active={mode === "projects" && !showAllTasks && selected?.id === p.id}
+                    onSelect={() => { setMode("projects"); setShowAllTasks(false); setSelectedId(p.id); }}
                     onOpen={() => navigate(`/project/${p.id}`)}
                     onDragStart={() => setDragProjectId(p.id)}
                     onDragEnd={() => setDragProjectId(null)}
@@ -607,27 +621,39 @@ export default function ProjectsHome() {
                 ))}
               </div>
             </div>
+            {/* Fuß-Zeile mit Einstellungen-Icon */}
             <div
-              className="px-4 py-2.5 text-[11px] text-muted-foreground border-t flex items-center justify-between"
-              style={{ borderColor: "hsl(var(--hairline))" }}
+              className="px-4 py-3 flex items-center justify-between"
+              style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}
             >
-              <span>{projectCount} / {MAX_PROJECTS} Projekte</span>
+              <button
+                disabled
+                className="h-9 w-9 rounded-full flex items-center justify-center opacity-50 cursor-not-allowed"
+                style={{ background: "rgba(255,255,255,0.05)", color: "#B7BCC2" }}
+                title="Einstellungen (bald verfügbar)"
+              >
+                <Settings size={15} />
+              </button>
+              <span className="text-[10px]" style={{ color: "#8A9099" }}>
+                {projectCount} / {MAX_PROJECTS}
+              </span>
             </div>
           </aside>
         ) : (
           <div
-            className="w-8 shrink-0 border-r flex items-start justify-center pt-4"
-            style={{ borderColor: "hsl(var(--hairline))" }}
+            className="w-8 shrink-0 flex items-start justify-center pt-4"
+            style={{ background: "#0B0D10", borderRight: "1px solid rgba(255,255,255,0.06)" }}
           >
             <button
               onClick={() => setLeftOpen(true)}
               title="Projekte ausklappen"
-              className="text-muted-foreground hover:text-foreground"
+              style={{ color: "#8A9099" }}
             >
               <PanelLeftOpen size={16} />
             </button>
           </div>
         )}
+
 
         {/* Center */}
         <main className="flex-1 overflow-y-auto">
