@@ -554,7 +554,7 @@ function notifyHistory() { historyListeners.forEach((fn) => fn()); }
 function setState(updater: (s: State) => Partial<State>) {
   const prev = state;
   const prevById = new Map(prev.projects.map((p) => [p.id, p] as const));
-  state = updater(state);
+  state = { ...state, ...updater(state) };
   if (!_suspendHistory) {
     let anyChange = false;
     for (const np of state.projects) {
