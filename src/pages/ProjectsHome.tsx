@@ -239,15 +239,8 @@ export default function ProjectsHome() {
         className="h-16 shrink-0 flex items-center gap-4 px-6 border-b overflow-x-auto no-scrollbar touch-pan-x"
         style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
       >
-        {/* Wortmarke */}
-        <div
-          className="text-xl font-black tracking-[0.18em] select-none"
-          style={{ color: "hsl(var(--ink))", fontFamily: "'Space Grotesk', 'Inter', system-ui, sans-serif" }}
-        >
-          PIXUNACAD
-        </div>
+        <div className="relative" ref={newProjectRef}>
 
-        <div className="relative ml-2" ref={newProjectRef}>
           <button
             onClick={() => {
               // Toggle: erneuter Klick schließt das Fenster wieder
@@ -348,7 +341,7 @@ export default function ProjectsHome() {
 
 
         {/* Nav-Icons mit feinen vertikalen Trennstrichen */}
-        <div className="ml-4 flex items-center h-10">
+        <div className="ml-2 flex items-center h-10">
           <NavIcon
             icon={<Home size={18} strokeWidth={1.5} />}
             label="Hauptseite"
@@ -402,7 +395,7 @@ export default function ProjectsHome() {
         </button>
 
         {/* Profil oben rechts (ohne Rahmen, Text innerhalb Avatar-Höhe) */}
-        <div className="relative ml-4" ref={profileRef}>
+        <div className="relative ml-2" ref={profileRef}>
           <button
             onClick={() => setProfileOpen((v) => !v)}
             className="flex items-center gap-3 h-14 pl-1 pr-2 rounded-full hover:bg-muted/40 transition"
