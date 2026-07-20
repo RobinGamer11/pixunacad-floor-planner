@@ -71,6 +71,7 @@
     --surface: 36 33% 97%;
     --surface-muted: 36 25% 93%;
     --surface-card: 0 0% 100%;
+    --beige-soft: 34 45% 86%;
     --ink: 222 20% 12%;
     --ink-soft: 222 12% 38%;
     --accent-gold: 32 55% 52%;
@@ -962,3 +963,6 @@
 .tabs-scroll::-webkit-scrollbar-track { background: transparent; }
 .tabs-scroll::-webkit-scrollbar-thumb { background: hsl(var(--hairline)); border-radius: 2px; }
 .tabs-scroll::-webkit-scrollbar-thumb:hover { background: hsl(var(--accent-gold) / 0.4); }
+
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }

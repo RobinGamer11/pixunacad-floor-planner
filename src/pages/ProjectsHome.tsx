@@ -46,6 +46,7 @@ import {
   type ProjectFolder,
   type ProfileStatus,
 } from "@/lib/projectStore";
+import { useDragScroll } from "@/hooks/use-drag-scroll";
 import { notesStore, useNotes, type NoteNode, type NoteStatus, type NotePriority } from "@/lib/notesStore";
 import { WeatherStrip } from "@/components/project/WeatherStrip";
 import { UebersichtView } from "@/components/project/UebersichtView";
@@ -79,6 +80,8 @@ export default function ProjectsHome() {
   const [selectedId, setSelectedId] = useState<string | undefined>(visibleProjects[0]?.id);
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<Tab>("uebersicht");
+  const headerScrollRef = useDragScroll<HTMLElement>();
+  const tabsScrollRef = useDragScroll<HTMLDivElement>();
   const [dokumenteSubTab, setDokumenteSubTab] = useState<DokumenteSubTab>("dateien");
   const [leftOpen, setLeftOpen] = useState(true);
   const [titleMenuOpen, setTitleMenuOpen] = useState(false);
@@ -232,7 +235,8 @@ export default function ProjectsHome() {
     >
       {/* ============= TOP HEADER ============= */}
       <header
-        className="h-16 shrink-0 flex items-center gap-4 px-6 border-b"
+        ref={headerScrollRef}
+        className="h-16 shrink-0 flex items-center gap-4 px-6 border-b overflow-x-auto no-scrollbar touch-pan-x"
         style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
       >
         {/* Wortmarke */}
@@ -787,7 +791,7 @@ export default function ProjectsHome() {
                 <button
                   onClick={() => setSaveAsTplOpen((v) => !v)}
                   className="h-12 px-5 rounded-lg flex items-center gap-2 text-base font-semibold shadow-sm hover:opacity-90 border"
-                  style={{ background: "hsl(var(--surface-muted))", color: "hsl(var(--ink))", borderColor: "hsl(var(--hairline))" }}
+                  style={{ background: "hsl(var(--beige-soft))", color: "hsl(var(--ink))", borderColor: "hsl(var(--hairline))" }}
                   title="Projekt als Vorlage speichern"
                 >
                   <Plus size={18} /> Vorlage
@@ -979,13 +983,13 @@ export default function ProjectsHome() {
 
               {/* Große Aktion links + Reiter rechts (eine Zeile, Reiter am Unterrand des Buttons ausgerichtet) */}
               <div
-                className="mt-4 flex items-end gap-4 border-b"
+                className="mt-4 flex flex-col lg:flex-row lg:items-end gap-4 border-b"
                 style={{ borderColor: "hsl(var(--hairline))" }}
               >
                 <button
                   onClick={() => navigate(`/project/${selected.id}`)}
-                  className="h-11 rounded-lg flex items-center gap-3 pl-3 pr-4 text-sm font-semibold transition hover:opacity-90 shrink-0 -mb-px border"
-                  style={{ background: "hsl(var(--surface-muted))", color: "hsl(var(--ink))", borderColor: "hsl(var(--hairline))" }}
+                  className="h-11 rounded-lg flex items-center gap-3 pl-3 pr-4 text-sm font-semibold transition hover:opacity-90 shrink-0 self-start lg:-mb-px border"
+                  style={{ background: "hsl(var(--beige-soft))", color: "hsl(var(--ink))", borderColor: "hsl(var(--hairline))" }}
                 >
                   <span
                     className="h-6 w-6 rounded-full flex items-center justify-center"
@@ -997,7 +1001,10 @@ export default function ProjectsHome() {
                   <ChevronRight size={16} />
                 </button>
 
-                <div className="flex flex-wrap items-end gap-x-8 gap-y-1 text-sm flex-1 min-w-0 tabs-scroll">
+                <div
+                  ref={tabsScrollRef}
+                  className="flex items-end gap-x-8 gap-y-1 text-sm flex-1 min-w-0 overflow-x-auto no-scrollbar touch-pan-x"
+                >
                   {(
                     [
                       ["uebersicht", "Übersicht", false],
