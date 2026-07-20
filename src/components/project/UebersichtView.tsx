@@ -45,7 +45,8 @@ function HeroPanel({ project }: { project: Project }) {
       className="rounded-2xl p-3"
       style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
     >
-      <div className="rounded-xl overflow-hidden aspect-[16/9] relative group" style={{ background: "hsl(var(--surface-muted))" }}>
+      <div className="rounded-xl overflow-hidden aspect-[21/9] max-w-3xl relative group" style={{ background: "hsl(var(--surface-muted))" }}>
+
         <img src={project.thumbnail} alt="" className="w-full h-full object-cover" />
         <button
           onClick={() => inputRef.current?.click()}
