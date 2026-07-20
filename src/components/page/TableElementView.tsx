@@ -47,13 +47,35 @@ export function TableElementView({
   const [pickStep, setPickStep] = React.useState<"target" | "start" | "end">("target");
   const [pickTarget, setPickTarget] = React.useState<{ r: number; c: number } | null>(null);
   const [pickStart, setPickStart] = React.useState<{ r: number; c: number } | null>(null);
+  const [pickHover, setPickHover] = React.useState<{ r: number; c: number } | null>(null);
 
   React.useEffect(() => {
     // Reset picker whenever activation toggles.
     setPickStep("target");
     setPickTarget(null);
     setPickStart(null);
+    setPickHover(null);
   }, [pickFn]);
+
+  // Live-Vorschau der Formel, während im Picker-Modus Start/Endzelle gewählt werden.
+  const previewFormula = React.useMemo(() => {
+    if (!pickFn || !pickTarget) return null;
+    const anchor = pickStep === "end" ? pickStart : pickHover;
+    const cursor = pickStep === "end" ? pickHover : null;
+    if (!anchor) return null;
+    const end = cursor ?? anchor;
+    const r1 = Math.min(anchor.r, end.r), r2 = Math.max(anchor.r, end.r);
+    const c1 = Math.min(anchor.c, end.c), c2 = Math.max(anchor.c, end.c);
+    const a = `${colLabel(c1)}${r1 + 1}`;
+    const b = `${colLabel(c2)}${r2 + 1}`;
+    const range = a === b ? a : `${a}:${b}`;
+    const expr = `=${pickFn}(${range})`;
+    // Temporäre Zellenmatrix mit Vorschauformel in Zielzelle für Live-Berechnung.
+    const tmp = cells.map((row) => row.slice());
+    tmp[pickTarget.r][pickTarget.c] = expr;
+    const value = evalCell(tmp, pickTarget.r, pickTarget.c);
+    return { expr, value: String(value), r1, r2, c1, c2 };
+  }, [pickFn, pickTarget, pickStart, pickHover, pickStep, cells]);
 
   const updateCells = (mutator: (draft: string[][]) => string[][] | void) => {
     const clone = cells.map((row) => row.slice());
