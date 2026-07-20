@@ -27,7 +27,11 @@ import {
   ListChecks,
   Play,
   Image as ImageIcon,
+  Home,
+  LogOut,
+  PlusCircle,
 } from "lucide-react";
+
 
 
 import {
