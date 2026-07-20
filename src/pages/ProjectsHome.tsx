@@ -243,15 +243,105 @@ export default function ProjectsHome() {
           PIXUNACAD
         </div>
 
-        <button
-          onClick={createProject}
-          disabled={!canCreateProject}
-          className="ml-2 h-12 px-5 rounded-lg flex items-center gap-2 text-base font-semibold disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
-          style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
-          title={canCreateProject ? "Neues Projekt anlegen" : `Maximal ${MAX_PROJECTS} Projekte`}
-        >
-          <Plus size={18} /> Projekt
-        </button>
+        <div className="relative ml-2" ref={newProjectRef}>
+          <button
+            onClick={() => {
+              // Toggle: erneuter Klick schließt das Fenster wieder
+              setNewProjectOpen((v) => {
+                const next = !v;
+                if (!next) setNewProjectMode("choice");
+                return next;
+              });
+              setNewProjectMode("choice");
+            }}
+            disabled={!canCreateProject}
+            className="h-12 px-5 rounded-lg flex items-center gap-2 text-base font-semibold disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+            style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
+            title={canCreateProject ? "Neues Projekt anlegen" : `Maximal ${MAX_PROJECTS} Projekte`}
+          >
+            <Plus size={18} /> Projekt
+          </button>
+
+          {newProjectOpen && (
+            <div
+              className="absolute left-0 top-full mt-2 w-72 rounded-xl border shadow-lg z-30 p-3"
+              style={{ background: "hsl(var(--surface))", borderColor: "hsl(var(--hairline))" }}
+            >
+              {newProjectMode === "choice" ? (
+                <div className="flex flex-col gap-2">
+                  <div className="text-[11px] font-semibold tracking-[0.16em] uppercase px-1 pb-1" style={{ color: "hsl(var(--ink-soft))" }}>
+                    Neues Projekt
+                  </div>
+                  <button
+                    onClick={() => {
+                      createProject();
+                      setNewProjectOpen(false);
+                      setNewProjectMode("choice");
+                    }}
+                    className="h-10 rounded-md flex items-center gap-2 px-3 text-sm font-medium hover:opacity-90"
+                    style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
+                  >
+                    <Plus size={14} /> Neu
+                  </button>
+                  <button
+                    onClick={() => setNewProjectMode("fromTemplate")}
+                    className="h-10 rounded-md flex items-center gap-2 px-3 text-sm font-medium border hover:bg-muted"
+                    style={{ borderColor: "hsl(var(--hairline))" }}
+                  >
+                    <LayoutTemplate size={14} /> Vorlage
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  <div className="text-[11px] font-semibold tracking-[0.16em] uppercase px-1 pb-1" style={{ color: "hsl(var(--ink-soft))" }}>
+                    Aus Vorlage
+                  </div>
+                  {(() => {
+                    const tpls = projects.filter((p) => p.isTemplate);
+                    if (tpls.length === 0) {
+                      return (
+                        <div className="text-xs text-muted-foreground p-3 rounded-md border" style={{ borderColor: "hsl(var(--hairline))" }}>
+                          Noch keine Vorlagen vorhanden.
+                        </div>
+                      );
+                    }
+                    return (
+                      <select
+                        autoFocus
+                        defaultValue=""
+                        onChange={(e) => {
+                          const tid = e.target.value;
+                          if (!tid) return;
+                          const id = projectStore.createFromTemplate(tid);
+                          if (id) {
+                            setMode("projects");
+                            setSelectedId(id);
+                          }
+                          setNewProjectOpen(false);
+                          setNewProjectMode("choice");
+                        }}
+                        className="h-10 rounded-md border px-2 text-sm bg-transparent"
+                        style={{ borderColor: "hsl(var(--hairline))" }}
+                      >
+                        <option value="" disabled>Vorlage wählen…</option>
+                        {tpls.map((t) => (
+                          <option key={t.id} value={t.id}>{t.name}</option>
+                        ))}
+                      </select>
+                    );
+                  })()}
+                  <button
+                    onClick={() => setNewProjectMode("choice")}
+                    className="h-8 text-xs text-muted-foreground hover:text-foreground text-left px-1"
+                  >
+                    ← Zurück
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
 
         {/* Nav-Icons mit feinen vertikalen Trennstrichen */}
         <div className="ml-4 flex items-center h-10">
