@@ -1389,6 +1389,39 @@ export const projectStore = {
     notifyHistory();
     emit();
   },
+
+  /* ---------- Folders ---------- */
+  addFolder: (name: string) => {
+    const id = `f-${Date.now().toString(36)}`;
+    setState((s) => ({ folders: [...s.folders, { id, name: name.trim() || "Neuer Ordner" }] }));
+    return id;
+  },
+  renameFolder: (id: string, name: string) => {
+    setState((s) => ({
+      folders: s.folders.map((f) => (f.id === id ? { ...f, name: name.trim() || f.name } : f)),
+    }));
+  },
+  deleteFolder: (id: string) => {
+    setState((s) => ({
+      folders: s.folders.filter((f) => f.id !== id),
+      projects: s.projects.map((p) => (p.folderId === id ? { ...p, folderId: null } : p)),
+    }));
+  },
+  toggleFolderCollapsed: (id: string) => {
+    setState((s) => ({
+      folders: s.folders.map((f) => (f.id === id ? { ...f, collapsed: !f.collapsed } : f)),
+    }));
+  },
+  moveProjectToFolder: (projectId: string, folderId: string | null) => {
+    setState((s) => ({
+      projects: s.projects.map((p) => (p.id === projectId ? { ...p, folderId } : p)),
+    }));
+  },
+
+  /* ---------- Profile ---------- */
+  updateProfile: (patch: Partial<UserProfile>) => {
+    setState((s) => ({ profile: { ...s.profile, ...patch } }));
+  },
 };
 
 export function useProjects(): Project[] {
@@ -1423,5 +1456,22 @@ export function useProjectHistory(id: string | undefined): { canUndo: boolean; c
     () => ({ canUndo: false, canRedo: false }),
   );
 }
+
+export function useFolders(): ProjectFolder[] {
+  return useSyncExternalStore(
+    projectStore.subscribe,
+    () => projectStore.getState().folders,
+    () => projectStore.getState().folders,
+  );
+}
+
+export function useProfile(): UserProfile {
+  return useSyncExternalStore(
+    projectStore.subscribe,
+    () => projectStore.getState().profile,
+    () => projectStore.getState().profile,
+  );
+}
+
 
 
