@@ -979,6 +979,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     <div className="flex w-full h-full overflow-hidden" style={{ background: "hsl(var(--surface))" }}>
       {/* Left Sidebar — im Präsentationsmodus ausgeblendet */}
       <aside
+        ref={leftSidebarRef}
         className="relative shrink-0 flex flex-col border-r"
         style={{
           width: 56,
