@@ -19,13 +19,13 @@ interface Props {
  */
 export function UebersichtView({ project }: Props) {
   return (
-    <div className="mt-6 space-y-5">
+    <div className="mt-3 space-y-2">
       {/* 1. Projekttitelbild */}
       <HeroPanel project={project} />
-      {/* 2. Konzept (nur Text) */}
-      <KonzeptPanel project={project} />
-      {/* 3. Projektinfos */}
+      {/* 2. Projektinfos (oben) */}
       <ProjektinfoPanel project={project} />
+      {/* 3. Konzept (nur Text) */}
+      <KonzeptPanel project={project} />
     </div>
   );
 }
