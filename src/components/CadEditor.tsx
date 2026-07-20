@@ -1054,7 +1054,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                               if (appRef.current) appRef.current.selectTool.marqueeMode = v.mode;
                               setSelectMarqueeMode(v.mode);
                             }
-                            setExpandedTool(null);
+                            // Flyout bewusst offen lassen – schließt erst durch
+                            // Klick außerhalb (Outside-Click-Listener unten).
                           }}
                           title={v.label}
                           className={`cad-rail-btn ${vActive ? "active" : ""}`}
