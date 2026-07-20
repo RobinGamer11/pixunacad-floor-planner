@@ -240,11 +240,10 @@ export default function ProjectsHome() {
             onClick={() => {
               setShowAllTasks(false);
               setMode("templates");
-              setSelectedId(projects.find((p) => p.isTemplate)?.id);
+              const firstTpl = projects.find((p) => p.isTemplate);
+              if (firstTpl) setSelectedId(firstTpl.id);
             }}
           />
-          <HeaderDivider />
-          <NavIcon icon={<Star size={18} strokeWidth={1.5} />} label="Favoriten" />
           <HeaderDivider />
           <NavIcon icon={<Users size={18} strokeWidth={1.5} />} label="Geteilt (bald verfügbar)" disabled />
           <HeaderDivider />
@@ -269,65 +268,45 @@ export default function ProjectsHome() {
           </span>
         </div>
 
-        {/* Shop separat (bald verfügbar) */}
+        {/* Shop (näher am Münzenfenster, ohne Rahmen) */}
         <button
           disabled
-          className="ml-2 h-9 w-9 rounded-full border flex items-center justify-center opacity-50 cursor-not-allowed"
-          style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface))" }}
+          className="ml-1 h-8 w-8 flex items-center justify-center opacity-50 cursor-not-allowed"
           title="Shop (bald verfügbar)"
         >
-          <ShoppingBag size={16} strokeWidth={1.5} className="text-muted-foreground" />
+          <ShoppingBag size={18} strokeWidth={1.5} className="text-muted-foreground" />
         </button>
 
-        {/* Profil oben rechts */}
-        <div className="relative ml-3" ref={profileRef}>
+        {/* Profil oben rechts (ohne Rahmen, Text innerhalb Avatar-Höhe) */}
+        <div className="relative ml-4" ref={profileRef}>
           <button
             onClick={() => setProfileOpen((v) => !v)}
-            className="flex items-center gap-3 h-14 pl-1.5 pr-4 rounded-full border hover:bg-muted transition shadow-sm"
-            style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface))" }}
+            className="flex items-center gap-3 h-14 pl-1 pr-2 rounded-full hover:bg-muted/40 transition"
             title="Profil"
           >
             <ProfileAvatar
               profile={profile}
               count={projectCount}
               max={MAX_PROJECTS}
-              size={44}
+              size={52}
             />
-            <div className="hidden md:flex flex-col items-start leading-tight">
-              <span className="text-sm font-semibold">{profile.name}</span>
-              <span className="text-[11px] text-muted-foreground">{profile.role}</span>
-              <span className="text-[11px] flex items-center gap-1" style={{ color: statusColor(profile.status) }}>
-                <span
-                  className="inline-block h-1.5 w-1.5 rounded-full"
-                  style={{ background: statusColor(profile.status) }}
-                />
+            <div className="hidden md:flex flex-col justify-center leading-tight text-left" style={{ height: 52, maxWidth: 160 }}>
+              <span className="text-sm font-semibold truncate">{profile.name}</span>
+              <span className="text-[11px] text-muted-foreground truncate">{profile.role}</span>
+              <span
+                className="text-[11px] font-medium truncate"
+                style={{ color: statusColor(profile.status) }}
+              >
                 {statusLabel(profile.status)}
               </span>
             </div>
           </button>
-        </div>
 
-        {/* Logout */}
-        <button
-          onClick={() => {
-            try { sessionStorage.removeItem("pixuna.loggedIn"); } catch {}
-            navigate("/login");
-          }}
-          className="ml-2 h-10 w-10 rounded-full border flex items-center justify-center hover:bg-muted transition"
-          style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface))" }}
-          title="Abmelden"
-        >
-          <LogOut size={16} strokeWidth={1.5} />
-        </button>
-
-        {/* Profil-Dropdown (re-anchor) */}
-        <div className="absolute right-0 top-full" />
-        {profileOpen && (
-          <div
-            className="absolute right-24 top-[76px] w-80 rounded-xl border shadow-lg z-30 p-4"
-            style={{ background: "hsl(var(--surface))", borderColor: "hsl(var(--hairline))" }}
-          >
-
+          {profileOpen && (
+            <div
+              className="absolute right-0 top-full mt-2 w-80 rounded-xl border shadow-lg z-30 p-4"
+              style={{ background: "hsl(var(--surface))", borderColor: "hsl(var(--hairline))" }}
+            >
               <div className="flex items-center gap-4">
                 <div className="relative">
                   <ProfileAvatar profile={profile} count={projectCount} max={MAX_PROJECTS} size={72} large />
@@ -413,7 +392,21 @@ export default function ProjectsHome() {
               </div>
             </div>
           )}
+        </div>
+
+        {/* Logout (ohne Rahmen) */}
+        <button
+          onClick={() => {
+            try { sessionStorage.removeItem("pixuna.loggedIn"); } catch {}
+            navigate("/login");
+          }}
+          className="ml-2 h-9 w-9 flex items-center justify-center text-muted-foreground hover:text-foreground transition"
+          title="Abmelden"
+        >
+          <LogOut size={16} strokeWidth={1.5} />
+        </button>
       </header>
+
 
 
       {/* ============= BODY (Left panel + Main) ============= */}
