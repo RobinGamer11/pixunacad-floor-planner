@@ -955,3 +955,10 @@
   background: hsl(var(--accent-gold) / 0.5);
 }
 .mappen-scroll { scrollbar-width: thin; scrollbar-color: hsl(var(--hairline)) transparent; }
+
+/* Schlanke horizontale Scrollbar für Reiter-Zeile */
+.tabs-scroll { overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; scrollbar-color: hsl(var(--hairline)) transparent; }
+.tabs-scroll::-webkit-scrollbar { height: 4px; }
+.tabs-scroll::-webkit-scrollbar-track { background: transparent; }
+.tabs-scroll::-webkit-scrollbar-thumb { background: hsl(var(--hairline)); border-radius: 2px; }
+.tabs-scroll::-webkit-scrollbar-thumb:hover { background: hsl(var(--accent-gold) / 0.4); }
