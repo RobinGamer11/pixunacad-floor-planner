@@ -655,6 +655,44 @@ export const projectStore = {
     setState((s) => ({ projects: [tpl, ...s.projects] }));
     return newId;
   },
+  /**
+   * Erzeugt aus einer Vorlage ein neues eigenständiges Projekt.
+   * IDs von Seiten/Elementen/Tasks/Events werden neu vergeben; `isTemplate` wird entfernt.
+   */
+  createFromTemplate: (templateId: string) => {
+    const src = state.projects.find((p) => p.id === templateId);
+    if (!src) return undefined;
+    const newId = `p-${Date.now().toString(36)}`;
+    const newPages = src.pages.map((pg) => ({
+      ...pg,
+      id: `${newId}-${pg.id}`,
+      elements: pg.elements.map((el) => ({ ...el, id: `${newId}-${el.id}` })),
+    }));
+    const oldToNewPage = new Map(src.pages.map((pg, i) => [pg.id, newPages[i].id] as const));
+    const newMappen = (src.mappen ?? []).map((m) => ({
+      ...m,
+      id: `m-${newId}-${m.id}`,
+      pageIds: m.pageIds.map((pid) => oldToNewPage.get(pid) ?? pid),
+    }));
+    const proj: Project = {
+      ...src,
+      id: newId,
+      name: src.name.replace(/\s*\(Vorlage\)\s*$/, "") || "Neues Projekt",
+      isTemplate: false,
+      favorite: false,
+      updatedAt: new Date().toISOString(),
+      pages: newPages,
+      mappen: newMappen,
+      activeMappeId: newMappen[0]?.id,
+      sheets: src.sheets.map((s) => ({ ...s })),
+      tasks: src.tasks.map((t) => ({ ...t, id: `${newId}-${t.id}`, done: false })),
+      events: src.events.map((e) => ({ ...e, id: `${newId}-${e.id}` })),
+      customFields: src.customFields?.map((f) => ({ ...f })),
+    };
+    setState((s) => ({ projects: [proj, ...s.projects] }));
+    return newId;
+  },
+
   resetTemplate: (id: string) => {
     setState((s) => ({
       projects: s.projects.map((p) => {
