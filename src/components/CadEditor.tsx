@@ -1619,7 +1619,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
         {/* Maßstab der Zeichenoberfläche ist fix 1:1 — kein UI mehr. */}
       </div>
       {/* Right Tab Panel */}
-      {rightOpen ? (
+      {rightOpen && !presenting ? (
       <aside className="shrink-0 w-[280px] h-full flex-col border-l flex" style={{ background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" }}>
         <div className="grid grid-cols-[1fr_1fr_1fr_auto] shrink-0 border-b items-stretch" style={{ borderColor: "hsl(var(--hairline))" }}>
           {([
