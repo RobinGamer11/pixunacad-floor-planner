@@ -332,26 +332,38 @@ export default function ProjectsHome() {
               <PanelLeftClose size={16} />
             </button>
             <div className="px-4 pt-4 pb-3">
-              <div className="flex items-center justify-between mb-2">
+              <div className="mb-2">
                 <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">
                   {mode === "templates" ? "VORLAGEN" : "PROJEKTE"}
                 </div>
-                {mode === "projects" && !creatingFolder && (
-                  <button
-                    onClick={() => {
-                      setCreatingFolder(true);
-                      setNewFolderName("");
-                    }}
-                    className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1"
-                    title="Ordner anlegen"
-                  >
-                    <FolderPlus size={12} /> Ordner
-                  </button>
-                )}
               </div>
+              <div
+                className="flex items-center gap-2 h-9 rounded-md px-2.5"
+                style={{ background: "hsl(var(--surface-muted))" }}
+              >
+                <Search size={14} className="text-muted-foreground" />
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder={mode === "templates" ? "Vorlagen suchen..." : "Projekte suchen..."}
+                  className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                />
+              </div>
+              {mode === "projects" && !creatingFolder && (
+                <button
+                  onClick={() => {
+                    setCreatingFolder(true);
+                    setNewFolderName("");
+                  }}
+                  className="mt-2 text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1"
+                  title="Ordner anlegen"
+                >
+                  <FolderPlus size={12} /> Ordner
+                </button>
+              )}
               {creatingFolder && (
                 <div
-                  className="flex items-center gap-1 mb-2 rounded-md px-2 py-1"
+                  className="flex items-center gap-1 mt-2 rounded-md px-2 py-1"
                   style={{ background: "hsl(var(--surface-muted))" }}
                 >
                   <FolderIcon size={13} style={{ color: "hsl(var(--accent-gold))" }} />
@@ -378,19 +390,8 @@ export default function ProjectsHome() {
                   </button>
                 </div>
               )}
-              <div
-                className="flex items-center gap-2 h-9 rounded-md px-2.5"
-                style={{ background: "hsl(var(--surface-muted))" }}
-              >
-                <Search size={14} className="text-muted-foreground" />
-                <input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder={mode === "templates" ? "Vorlagen suchen..." : "Projekte suchen..."}
-                  className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-                />
-              </div>
             </div>
+
 
             <div className="flex-1 overflow-y-auto px-2 pb-4 space-y-1">
               {/* Ordner */}
