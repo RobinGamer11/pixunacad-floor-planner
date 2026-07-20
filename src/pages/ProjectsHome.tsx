@@ -17,8 +17,24 @@ import {
   X,
   Network,
   ExternalLink,
+  ChevronRight,
+  ChevronDown,
+  Folder as FolderIcon,
+  FolderPlus,
+  Circle,
 } from "lucide-react";
-import { useProjects, projectStore, type Project, type Task, type TaskPriority } from "@/lib/projectStore";
+import {
+  useProjects,
+  projectStore,
+  useFolders,
+  useProfile,
+  MAX_PROJECTS,
+  type Project,
+  type Task,
+  type TaskPriority,
+  type ProjectFolder,
+  type ProfileStatus,
+} from "@/lib/projectStore";
 import { notesStore, useNotes, type NoteNode, type NoteStatus, type NotePriority } from "@/lib/notesStore";
 import { WeatherStrip } from "@/components/project/WeatherStrip";
 import { UebersichtView } from "@/components/project/UebersichtView";
