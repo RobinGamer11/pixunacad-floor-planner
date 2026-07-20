@@ -143,6 +143,35 @@ export default function ProjectsHome() {
     return () => document.removeEventListener("mousedown", onDoc);
   }, [profileOpen]);
 
+  // "+ Projekt"-Popup (Neu / Vorlage)
+  const [newProjectOpen, setNewProjectOpen] = useState(false);
+  const [newProjectMode, setNewProjectMode] = useState<"choice" | "fromTemplate">("choice");
+  const newProjectRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!newProjectOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (!newProjectRef.current?.contains(e.target as Node)) {
+        setNewProjectOpen(false);
+        setNewProjectMode("choice");
+      }
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [newProjectOpen]);
+
+  // "Vorlage +"-Popup im Vorlagen-Hub
+  const [saveAsTplOpen, setSaveAsTplOpen] = useState(false);
+  const saveAsTplRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!saveAsTplOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (!saveAsTplRef.current?.contains(e.target as Node)) setSaveAsTplOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [saveAsTplOpen]);
+
+
   // Drag & Drop von Projekten in Ordner
   const [dragProjectId, setDragProjectId] = useState<string | null>(null);
   const [dragOverFolder, setDragOverFolder] = useState<string | "root" | null>(null);
@@ -214,15 +243,105 @@ export default function ProjectsHome() {
           PIXUNACAD
         </div>
 
-        <button
-          onClick={createProject}
-          disabled={!canCreateProject}
-          className="ml-2 h-12 px-5 rounded-lg flex items-center gap-2 text-base font-semibold disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
-          style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
-          title={canCreateProject ? "Neues Projekt anlegen" : `Maximal ${MAX_PROJECTS} Projekte`}
-        >
-          <Plus size={18} /> Projekt
-        </button>
+        <div className="relative ml-2" ref={newProjectRef}>
+          <button
+            onClick={() => {
+              // Toggle: erneuter Klick schließt das Fenster wieder
+              setNewProjectOpen((v) => {
+                const next = !v;
+                if (!next) setNewProjectMode("choice");
+                return next;
+              });
+              setNewProjectMode("choice");
+            }}
+            disabled={!canCreateProject}
+            className="h-12 px-5 rounded-lg flex items-center gap-2 text-base font-semibold disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+            style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
+            title={canCreateProject ? "Neues Projekt anlegen" : `Maximal ${MAX_PROJECTS} Projekte`}
+          >
+            <Plus size={18} /> Projekt
+          </button>
+
+          {newProjectOpen && (
+            <div
+              className="absolute left-0 top-full mt-2 w-72 rounded-xl border shadow-lg z-30 p-3"
+              style={{ background: "hsl(var(--surface))", borderColor: "hsl(var(--hairline))" }}
+            >
+              {newProjectMode === "choice" ? (
+                <div className="flex flex-col gap-2">
+                  <div className="text-[11px] font-semibold tracking-[0.16em] uppercase px-1 pb-1" style={{ color: "hsl(var(--ink-soft))" }}>
+                    Neues Projekt
+                  </div>
+                  <button
+                    onClick={() => {
+                      createProject();
+                      setNewProjectOpen(false);
+                      setNewProjectMode("choice");
+                    }}
+                    className="h-10 rounded-md flex items-center gap-2 px-3 text-sm font-medium hover:opacity-90"
+                    style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
+                  >
+                    <Plus size={14} /> Neu
+                  </button>
+                  <button
+                    onClick={() => setNewProjectMode("fromTemplate")}
+                    className="h-10 rounded-md flex items-center gap-2 px-3 text-sm font-medium border hover:bg-muted"
+                    style={{ borderColor: "hsl(var(--hairline))" }}
+                  >
+                    <LayoutTemplate size={14} /> Vorlage
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  <div className="text-[11px] font-semibold tracking-[0.16em] uppercase px-1 pb-1" style={{ color: "hsl(var(--ink-soft))" }}>
+                    Aus Vorlage
+                  </div>
+                  {(() => {
+                    const tpls = projects.filter((p) => p.isTemplate);
+                    if (tpls.length === 0) {
+                      return (
+                        <div className="text-xs text-muted-foreground p-3 rounded-md border" style={{ borderColor: "hsl(var(--hairline))" }}>
+                          Noch keine Vorlagen vorhanden.
+                        </div>
+                      );
+                    }
+                    return (
+                      <select
+                        autoFocus
+                        defaultValue=""
+                        onChange={(e) => {
+                          const tid = e.target.value;
+                          if (!tid) return;
+                          const id = projectStore.createFromTemplate(tid);
+                          if (id) {
+                            setMode("projects");
+                            setSelectedId(id);
+                          }
+                          setNewProjectOpen(false);
+                          setNewProjectMode("choice");
+                        }}
+                        className="h-10 rounded-md border px-2 text-sm bg-transparent"
+                        style={{ borderColor: "hsl(var(--hairline))" }}
+                      >
+                        <option value="" disabled>Vorlage wählen…</option>
+                        {tpls.map((t) => (
+                          <option key={t.id} value={t.id}>{t.name}</option>
+                        ))}
+                      </select>
+                    );
+                  })()}
+                  <button
+                    onClick={() => setNewProjectMode("choice")}
+                    className="h-8 text-xs text-muted-foreground hover:text-foreground text-left px-1"
+                  >
+                    ← Zurück
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
 
         {/* Nav-Icons mit feinen vertikalen Trennstrichen */}
         <div className="ml-4 flex items-center h-10">
@@ -240,10 +359,11 @@ export default function ProjectsHome() {
             onClick={() => {
               setShowAllTasks(false);
               setMode("templates");
-              const firstTpl = projects.find((p) => p.isTemplate);
-              if (firstTpl) setSelectedId(firstTpl.id);
+              // Kein Template vorauswählen — Vorlagen-Hub wird gezeigt
+              setSelectedId(undefined);
             }}
           />
+
           <HeaderDivider />
           <NavIcon icon={<Users size={18} strokeWidth={1.5} />} label="Geteilt (bald verfügbar)" disabled />
           <HeaderDivider />
@@ -657,7 +777,91 @@ export default function ProjectsHome() {
         <main className="flex-1 overflow-y-auto">
           {showAllTasks ? (
             <AllTasksView projects={projects} />
+          ) : mode === "templates" && !selected ? (
+            <div className="px-10 py-7">
+              <div className="flex items-center gap-3">
+                <h1 className="text-2xl font-semibold tracking-tight">Vorlagen</h1>
+              </div>
+
+              <div className="mt-5 relative" ref={saveAsTplRef}>
+                <button
+                  onClick={() => setSaveAsTplOpen((v) => !v)}
+                  className="h-12 px-5 rounded-lg flex items-center gap-2 text-base font-semibold shadow-sm hover:opacity-90"
+                  style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
+                  title="Projekt als Vorlage speichern"
+                >
+                  <Plus size={18} /> Vorlage
+                </button>
+
+                {saveAsTplOpen && (
+                  <div
+                    className="absolute left-0 top-full mt-2 w-80 rounded-xl border shadow-lg z-30 p-3"
+                    style={{ background: "hsl(var(--surface))", borderColor: "hsl(var(--hairline))" }}
+                  >
+                    <div className="text-[11px] font-semibold tracking-[0.16em] uppercase px-1 pb-2" style={{ color: "hsl(var(--ink-soft))" }}>
+                      Projekt als Vorlage speichern
+                    </div>
+                    {(() => {
+                      const src = projects.filter((p) => !p.isTemplate);
+                      if (src.length === 0) {
+                        return (
+                          <div className="text-xs text-muted-foreground p-3 rounded-md border" style={{ borderColor: "hsl(var(--hairline))" }}>
+                            Kein Projekt zum Übernehmen vorhanden.
+                          </div>
+                        );
+                      }
+                      return (
+                        <select
+                          autoFocus
+                          defaultValue=""
+                          onChange={(e) => {
+                            const pid = e.target.value;
+                            if (!pid) return;
+                            const id = projectStore.duplicateAsTemplate(pid);
+                            if (id) setSelectedId(id);
+                            setSaveAsTplOpen(false);
+                          }}
+                          className="h-10 w-full rounded-md border px-2 text-sm bg-transparent"
+                          style={{ borderColor: "hsl(var(--hairline))" }}
+                        >
+                          <option value="" disabled>Projekt wählen…</option>
+                          {src.map((p) => (
+                            <option key={p.id} value={p.id}>{p.name}</option>
+                          ))}
+                        </select>
+                      );
+                    })()}
+                  </div>
+                )}
+              </div>
+
+              {/* Vorlagen-Liste */}
+              <div className="mt-8 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {projects.filter((p) => p.isTemplate).map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => setSelectedId(t.id)}
+                    className="text-left rounded-xl border overflow-hidden hover:shadow-md transition"
+                    style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
+                  >
+                    <div className="aspect-[16/9] overflow-hidden" style={{ background: "hsl(var(--surface-muted))" }}>
+                      <img src={t.thumbnail} alt="" className="w-full h-full object-cover" />
+                    </div>
+                    <div className="px-4 py-3">
+                      <div className="text-sm font-semibold truncate">{t.name}</div>
+                      <div className="text-[11px] text-muted-foreground mt-0.5">Vorlage</div>
+                    </div>
+                  </button>
+                ))}
+                {projects.filter((p) => p.isTemplate).length === 0 && (
+                  <div className="col-span-full text-sm text-muted-foreground py-10 text-center rounded-xl border" style={{ borderColor: "hsl(var(--hairline))" }}>
+                    Noch keine Vorlagen. Speichere ein Projekt als Vorlage über den Button oben.
+                  </div>
+                )}
+              </div>
+            </div>
           ) : selected && (
+
             <div className="px-10 py-7">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -793,7 +997,7 @@ export default function ProjectsHome() {
                   <ChevronRight size={16} />
                 </button>
 
-                <div className="flex items-end gap-4 text-sm flex-1 min-w-0 tabs-scroll">
+                <div className="flex flex-wrap items-end gap-x-8 gap-y-1 text-sm flex-1 min-w-0 tabs-scroll">
                   {(
                     [
                       ["uebersicht", "Übersicht", false],
@@ -827,19 +1031,8 @@ export default function ProjectsHome() {
                       )}
                     </button>
                   ))}
-                  {!selected.isTemplate && (
-                    <button
-                      onClick={() => {
-                        const id = projectStore.duplicateAsTemplate(selected.id);
-                        if (id) { setMode("templates"); setSelectedId(id); }
-                      }}
-                      title="Als Vorlage speichern"
-                      className="ml-auto pb-2 text-[12px] text-muted-foreground hover:text-foreground whitespace-nowrap flex items-center gap-1"
-                    >
-                      Vorlage <Plus size={12} />
-                    </button>
-                  )}
                 </div>
+
               </div>
 
 
