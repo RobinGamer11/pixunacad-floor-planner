@@ -908,28 +908,34 @@ function ProjectCard({
   onDragStart: () => void;
   onDragEnd: () => void;
 }) {
+  const drawings = (p.pages ?? []).reduce(
+    (n, pg: any) => n + ((pg?.elements ?? []).filter((e: any) => e?.type === "cad-view").length || 0),
+    0
+  );
   return (
-    <button
+    <div
       draggable
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
       onClick={onSelect}
       onDoubleClick={onOpen}
-      className="w-full text-left rounded-lg p-2 flex gap-2.5 transition border"
+      className="w-full text-left rounded-lg p-2 flex gap-2.5 transition cursor-pointer"
       style={{
-        background: active ? "hsl(var(--surface-card))" : "hsl(var(--surface))",
-        borderColor: active ? "hsl(var(--accent-gold) / 0.4)" : "transparent",
+        background: active ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.02)",
+        border: `1px solid ${active ? "hsl(var(--accent-gold) / 0.55)" : "rgba(255,255,255,0.04)"}`,
       }}
     >
-      <img
-        src={p.thumbnail}
-        alt=""
-        className="w-12 h-12 rounded-md object-cover shrink-0"
-        style={{ background: "hsl(var(--surface-muted))" }}
-      />
+      <div
+        className="w-12 h-12 rounded-md shrink-0 overflow-hidden"
+        style={{ background: "#151719" }}
+      >
+        {p.thumbnail && (
+          <img src={p.thumbnail} alt="" className="w-full h-full object-cover" />
+        )}
+      </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1">
-          <span className="text-xs font-semibold truncate">{p.name}</span>
+          <span className="text-xs font-semibold truncate" style={{ color: "#E6E8EB" }}>{p.name}</span>
           {p.favorite && (
             <Star
               size={10}
@@ -939,14 +945,22 @@ function ProjectCard({
             />
           )}
         </div>
-        <div className="text-[10px] text-muted-foreground truncate">{p.ort || "—"}</div>
-        <div className="text-[10px] text-muted-foreground">
-          {p.pages.length} Seiten
+        <div className="text-[10px] truncate" style={{ color: "#8A9099" }}>
+          {p.pages.length} {p.pages.length === 1 ? "Seite" : "Seiten"} · {drawings} {drawings === 1 ? "Zeichnung" : "Zeichnungen"}
         </div>
       </div>
-    </button>
+      <button
+        onClick={(e) => { e.stopPropagation(); onOpen(); }}
+        className="opacity-60 hover:opacity-100 self-start"
+        style={{ color: "#8A9099" }}
+        title="Öffnen"
+      >
+        <MoreHorizontal size={14} />
+      </button>
+    </div>
   );
 }
+
 
 /* -------- ProfileAvatar (with progress ring) -------- */
 function ProfileAvatar({
