@@ -27,7 +27,11 @@ import {
   ListChecks,
   Play,
   Image as ImageIcon,
+  Home,
+  LogOut,
+  PlusCircle,
 } from "lucide-react";
+
 
 
 import {
@@ -197,41 +201,33 @@ export default function ProjectsHome() {
         className="h-20 shrink-0 flex items-center gap-4 px-6 border-b"
         style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
       >
+        {/* Wortmarke */}
+        <div
+          className="text-xl font-black tracking-[0.18em] select-none"
+          style={{ color: "hsl(var(--ink))", fontFamily: "'Space Grotesk', 'Inter', system-ui, sans-serif" }}
+        >
+          PIXUNACAD
+        </div>
+
         <button
           onClick={createProject}
           disabled={!canCreateProject}
-          className="h-12 px-5 rounded-lg flex items-center gap-2 text-base font-semibold disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+          className="ml-2 h-12 px-5 rounded-lg flex items-center gap-2 text-base font-semibold disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
           style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
           title={canCreateProject ? "Neues Projekt anlegen" : `Maximal ${MAX_PROJECTS} Projekte`}
         >
           <Plus size={18} /> Projekt
         </button>
 
-        {/* Globale Aufgaben-Übersicht */}
-        <button
-          onClick={() => { setShowAllTasks((v) => !v); }}
-          title="Alle Aufgaben aller Projekte"
-          className="h-12 w-12 rounded-lg flex items-center justify-center border transition"
-          style={{
-            borderColor: "hsl(var(--hairline))",
-            background: showAllTasks ? "hsl(var(--surface-muted))" : "hsl(var(--surface))",
-            color: showAllTasks ? "hsl(var(--ink))" : "hsl(var(--ink-soft))",
-          }}
-        >
-          <ListChecks size={20} strokeWidth={1.6} />
-        </button>
-
-        <div className="ml-3 flex items-center gap-1">
+        {/* Nav-Icons mit feinen vertikalen Trennstrichen */}
+        <div className="ml-4 flex items-center h-10">
           <NavIcon
-            icon={<FolderKanban size={18} strokeWidth={1.5} />}
-            label="Projekte"
-            active={mode === "projects" && !showAllTasks}
-            onClick={() => {
-              setShowAllTasks(false);
-              setMode("projects");
-              setSelectedId(projects.find((p) => !p.isTemplate)?.id);
-            }}
+            icon={<Home size={18} strokeWidth={1.5} />}
+            label="Hauptseite"
+            active={showAllTasks}
+            onClick={() => setShowAllTasks((v) => !v)}
           />
+          <HeaderDivider />
           <NavIcon
             icon={<LayoutTemplate size={18} strokeWidth={1.5} />}
             label="Vorlagen"
@@ -242,30 +238,44 @@ export default function ProjectsHome() {
               setSelectedId(projects.find((p) => p.isTemplate)?.id);
             }}
           />
+          <HeaderDivider />
           <NavIcon icon={<Star size={18} strokeWidth={1.5} />} label="Favoriten" />
+          <HeaderDivider />
           <NavIcon icon={<Users size={18} strokeWidth={1.5} />} label="Geteilt (bald verfügbar)" disabled />
+          <HeaderDivider />
           <NavIcon icon={<Trash2 size={18} strokeWidth={1.5} />} label="Papierkorb (bald verfügbar)" disabled />
         </div>
 
         <div className="flex-1" />
 
-        {/* Währung + Shop (bald verfügbar) — heller Pill ohne dunklen Hintergrund */}
+        {/* Münzen-Pill (kompakt) mit + zum Kauf */}
         <div
-          className="mr-3 flex items-center gap-2 h-10 px-3 rounded-full border opacity-50 cursor-not-allowed"
+          className="flex items-center gap-1.5 h-9 pl-3 pr-1 rounded-full border opacity-60 cursor-not-allowed"
           style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface))" }}
-          title="Bald verfügbar"
+          title="Münzen — Kauf bald verfügbar"
         >
-          <div className="flex items-center gap-1.5">
-            <Coins size={16} strokeWidth={1.5} className="text-muted-foreground" />
-            <span className="text-sm font-semibold text-muted-foreground">26</span>
-          </div>
-          <span className="w-px h-4" style={{ background: "hsl(var(--hairline))" }} />
-          <ShoppingBag size={16} strokeWidth={1.5} className="text-muted-foreground" />
+          <Coins size={15} strokeWidth={1.5} className="text-muted-foreground" />
+          <span className="text-sm font-semibold text-muted-foreground">26</span>
+          <span
+            className="ml-1 h-6 w-6 rounded-full border flex items-center justify-center"
+            style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-muted))" }}
+          >
+            <Plus size={12} strokeWidth={2} className="text-muted-foreground" />
+          </span>
         </div>
 
+        {/* Shop separat (bald verfügbar) */}
+        <button
+          disabled
+          className="ml-2 h-9 w-9 rounded-full border flex items-center justify-center opacity-50 cursor-not-allowed"
+          style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface))" }}
+          title="Shop (bald verfügbar)"
+        >
+          <ShoppingBag size={16} strokeWidth={1.5} className="text-muted-foreground" />
+        </button>
 
         {/* Profil oben rechts */}
-        <div className="relative" ref={profileRef}>
+        <div className="relative ml-3" ref={profileRef}>
           <button
             onClick={() => setProfileOpen((v) => !v)}
             className="flex items-center gap-3 h-14 pl-1.5 pr-4 rounded-full border hover:bg-muted transition shadow-sm"
@@ -276,20 +286,43 @@ export default function ProjectsHome() {
               profile={profile}
               count={projectCount}
               max={MAX_PROJECTS}
-              size={48}
+              size={44}
             />
             <div className="hidden md:flex flex-col items-start leading-tight">
               <span className="text-sm font-semibold">{profile.name}</span>
-              <span className="text-[11px]" style={{ color: statusColor(profile.status) }}>
+              <span className="text-[11px] text-muted-foreground">{profile.role}</span>
+              <span className="text-[11px] flex items-center gap-1" style={{ color: statusColor(profile.status) }}>
+                <span
+                  className="inline-block h-1.5 w-1.5 rounded-full"
+                  style={{ background: statusColor(profile.status) }}
+                />
                 {statusLabel(profile.status)}
               </span>
             </div>
           </button>
-          {profileOpen && (
-            <div
-              className="absolute right-0 top-full mt-2 w-80 rounded-xl border shadow-lg z-30 p-4"
-              style={{ background: "hsl(var(--surface))", borderColor: "hsl(var(--hairline))" }}
-            >
+        </div>
+
+        {/* Logout */}
+        <button
+          onClick={() => {
+            try { sessionStorage.removeItem("pixuna.loggedIn"); } catch {}
+            navigate("/login");
+          }}
+          className="ml-2 h-10 w-10 rounded-full border flex items-center justify-center hover:bg-muted transition"
+          style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface))" }}
+          title="Abmelden"
+        >
+          <LogOut size={16} strokeWidth={1.5} />
+        </button>
+
+        {/* Profil-Dropdown (re-anchor) */}
+        <div className="absolute right-0 top-full" />
+        {profileOpen && (
+          <div
+            className="absolute right-24 top-[76px] w-80 rounded-xl border shadow-lg z-30 p-4"
+            style={{ background: "hsl(var(--surface))", borderColor: "hsl(var(--hairline))" }}
+          >
+
               <div className="flex items-center gap-4">
                 <div className="relative">
                   <ProfileAvatar profile={profile} count={projectCount} max={MAX_PROJECTS} size={72} large />
@@ -375,8 +408,8 @@ export default function ProjectsHome() {
               </div>
             </div>
           )}
-        </div>
       </header>
+
 
       {/* ============= BODY (Left panel + Main) ============= */}
       <div className="flex flex-1 overflow-hidden">
@@ -2245,6 +2278,17 @@ function NavIcon({
     </button>
   );
 }
+
+function HeaderDivider() {
+  return (
+    <span
+      aria-hidden
+      className="mx-1 inline-block h-5 w-px"
+      style={{ background: "hsl(var(--hairline))" }}
+    />
+  );
+}
+
 
 function Card({
   title,
