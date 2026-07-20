@@ -155,8 +155,10 @@ export function WorkspaceHeader({
       </div>
 
 
+      <div className="flex-1 min-w-4" />
       {/* Right: Undo/Redo · Zoom · Präsentieren · Teilen · Exportieren */}
-      <div className="flex items-center gap-1.5 text-muted-foreground">
+      <div className="flex items-center gap-1.5 text-muted-foreground shrink-0 pl-2">
+
         <button
           onClick={onDelete}
           disabled={!canDelete}
