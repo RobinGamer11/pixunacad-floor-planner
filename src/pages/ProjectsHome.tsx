@@ -2279,6 +2279,17 @@ function NavIcon({
   );
 }
 
+function HeaderDivider() {
+  return (
+    <span
+      aria-hidden
+      className="mx-1 inline-block h-5 w-px"
+      style={{ background: "hsl(var(--hairline))" }}
+    />
+  );
+}
+
+
 function Card({
   title,
   action,
