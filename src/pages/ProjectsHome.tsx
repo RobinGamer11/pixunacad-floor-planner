@@ -341,7 +341,7 @@ export default function ProjectsHome() {
 
 
         {/* Nav-Icons mit feinen vertikalen Trennstrichen */}
-        <div className="ml-4 flex items-center h-10">
+        <div className="ml-2 flex items-center h-10">
           <NavIcon
             icon={<Home size={18} strokeWidth={1.5} />}
             label="Hauptseite"
