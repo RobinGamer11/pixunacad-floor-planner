@@ -42,6 +42,31 @@ export default function NotesPage() {
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
   const [rightMode, setRightMode] = useState<"graph" | "links" | "timeline">("graph");
+  const [presenting, setPresenting] = useState(false);
+  const notesMainRef = useRef<HTMLDivElement>(null);
+  const handlePresent = () => {
+    const el = notesMainRef.current;
+    if (!el) return;
+    if (presenting) {
+      setPresenting(false);
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    } else {
+      setPresenting(true);
+      setRightMode("graph");
+      setRightOpen(true);
+      el.requestFullscreen?.().catch(() => {});
+    }
+  };
+  useEffect(() => {
+    const onFs = () => { if (!document.fullscreenElement) setPresenting(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && presenting) setPresenting(false); };
+    document.addEventListener("fullscreenchange", onFs);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("fullscreenchange", onFs);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [presenting]);
   const [focusToken, setFocusToken] = useState(0);
   const [tabletAidOn, setTabletAidOn] = useState<boolean>(() => {
     try { return localStorage.getItem("pixuna.tabletAid") === "1"; } catch { return false; }
