@@ -954,11 +954,12 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 // RIGHT PANEL
 // -------------------------------------------------------------
 function RightPanel({
-  projectName, state, statusMap, selectedId, setSelectedId, mode, setMode, onCollapse, focusToken,
+  projectName, state, statusMap, priorityMap, selectedId, setSelectedId, mode, setMode, onCollapse, focusToken,
 }: {
   projectName: string;
   state: ReturnType<typeof useNotes>;
   statusMap: Map<string, NoteStatusDef>;
+  priorityMap: Map<string, NotePriorityDef>;
   selectedId: string | null;
   setSelectedId: (id: string) => void;
   mode: "graph" | "links" | "timeline";
@@ -988,7 +989,8 @@ function RightPanel({
       <div className="flex-1 min-h-0">
         {mode === "graph" && (
           <ProjectGraph projectName={projectName} nodes={state.nodes}
-            statusMap={statusMap} selectedId={selectedId} onSelect={setSelectedId}
+            statusMap={statusMap} priorityMap={priorityMap}
+            selectedId={selectedId} onSelect={setSelectedId}
             focusToken={focusToken} />
         )}
         {mode === "links" && (
