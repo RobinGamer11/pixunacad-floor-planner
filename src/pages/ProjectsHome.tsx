@@ -239,15 +239,8 @@ export default function ProjectsHome() {
         className="h-16 shrink-0 flex items-center gap-4 px-6 border-b overflow-x-auto no-scrollbar touch-pan-x"
         style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
       >
-        {/* Wortmarke */}
-        <div
-          className="text-xl font-black tracking-[0.18em] select-none"
-          style={{ color: "hsl(var(--ink))", fontFamily: "'Space Grotesk', 'Inter', system-ui, sans-serif" }}
-        >
-          PIXUNACAD
-        </div>
+        <div className="relative" ref={newProjectRef}>
 
-        <div className="relative ml-2" ref={newProjectRef}>
           <button
             onClick={() => {
               // Toggle: erneuter Klick schließt das Fenster wieder
