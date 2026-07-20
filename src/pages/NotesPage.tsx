@@ -247,6 +247,7 @@ export default function NotesPage() {
             projectName={project?.name ?? "Projekt"}
             state={state}
             statusMap={statusMap}
+            priorityMap={priorityMap}
             selectedId={selectedId}
             setSelectedId={selectAndMarkSeen}
             mode={rightMode}
