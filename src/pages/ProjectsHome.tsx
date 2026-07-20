@@ -984,8 +984,8 @@ export default function ProjectsHome() {
               >
                 <button
                   onClick={() => navigate(`/project/${selected.id}`)}
-                  className="h-11 rounded-lg flex items-center gap-3 pl-3 pr-4 text-sm font-semibold transition hover:opacity-90 shrink-0 -mb-px"
-                  style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
+                  className="h-11 rounded-lg flex items-center gap-3 pl-3 pr-4 text-sm font-semibold transition hover:opacity-90 shrink-0 -mb-px border"
+                  style={{ background: "hsl(var(--surface-muted))", color: "hsl(var(--ink))", borderColor: "hsl(var(--hairline))" }}
                 >
                   <span
                     className="h-6 w-6 rounded-full flex items-center justify-center"
