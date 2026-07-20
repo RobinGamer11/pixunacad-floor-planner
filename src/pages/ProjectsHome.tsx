@@ -395,7 +395,7 @@ export default function ProjectsHome() {
         </button>
 
         {/* Profil oben rechts (ohne Rahmen, Text innerhalb Avatar-Höhe) */}
-        <div className="relative ml-4" ref={profileRef}>
+        <div className="relative ml-2" ref={profileRef}>
           <button
             onClick={() => setProfileOpen((v) => !v)}
             className="flex items-center gap-3 h-14 pl-1 pr-2 rounded-full hover:bg-muted/40 transition"
