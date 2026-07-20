@@ -14,6 +14,11 @@ export function useDragScroll<T extends HTMLElement>(axis: "x" | "y" | "both" = 
     const el = ref.current;
     if (!el) return;
 
+    const previousTouchAction = el.style.touchAction;
+    const previousOverscrollBehavior = el.style.overscrollBehavior;
+    el.style.touchAction = "none";
+    el.style.overscrollBehavior = "contain";
+
     const THRESHOLD = 5;
     let isDown = false;
     let moved = false;
@@ -35,6 +40,7 @@ export function useDragScroll<T extends HTMLElement>(axis: "x" | "y" | "both" = 
       moved = false;
       startX = e.clientX; startY = e.clientY;
       startSL = el.scrollLeft; startST = el.scrollTop;
+      try { el.setPointerCapture(e.pointerId); } catch {}
     };
     const onMove = (e: PointerEvent) => {
       if (!isDown) return;
@@ -47,7 +53,12 @@ export function useDragScroll<T extends HTMLElement>(axis: "x" | "y" | "both" = 
         e.preventDefault();
       }
     };
-    const onUp = () => { isDown = false; };
+    const onUp = (e: PointerEvent) => {
+      if (isDown) {
+        try { el.releasePointerCapture(e.pointerId); } catch {}
+      }
+      isDown = false;
+    };
     // Nach einem echten Drag den anschließenden Klick unterdrücken,
     // damit Buttons im Header/Panel nicht aus Versehen ausgelöst werden.
     const onClickCapture = (e: MouseEvent) => {
@@ -69,6 +80,8 @@ export function useDragScroll<T extends HTMLElement>(axis: "x" | "y" | "both" = 
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onUp);
       el.removeEventListener("click", onClickCapture, true);
+      el.style.touchAction = previousTouchAction;
+      el.style.overscrollBehavior = previousOverscrollBehavior;
     };
   }, [axis]);
 
