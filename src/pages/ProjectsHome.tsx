@@ -787,7 +787,7 @@ export default function ProjectsHome() {
                 <button
                   onClick={() => setSaveAsTplOpen((v) => !v)}
                   className="h-12 px-5 rounded-lg flex items-center gap-2 text-base font-semibold shadow-sm hover:opacity-90 border"
-                  style={{ background: "hsl(var(--surface-muted))", color: "hsl(var(--ink))", borderColor: "hsl(var(--hairline))" }}
+                  style={{ background: "hsl(var(--beige-soft))", color: "hsl(var(--ink))", borderColor: "hsl(var(--hairline))" }}
                   title="Projekt als Vorlage speichern"
                 >
                   <Plus size={18} /> Vorlage
@@ -985,7 +985,7 @@ export default function ProjectsHome() {
                 <button
                   onClick={() => navigate(`/project/${selected.id}`)}
                   className="h-11 rounded-lg flex items-center gap-3 pl-3 pr-4 text-sm font-semibold transition hover:opacity-90 shrink-0 -mb-px border"
-                  style={{ background: "hsl(var(--surface-muted))", color: "hsl(var(--ink))", borderColor: "hsl(var(--hairline))" }}
+                  style={{ background: "hsl(var(--beige-soft))", color: "hsl(var(--ink))", borderColor: "hsl(var(--hairline))" }}
                 >
                   <span
                     className="h-6 w-6 rounded-full flex items-center justify-center"
