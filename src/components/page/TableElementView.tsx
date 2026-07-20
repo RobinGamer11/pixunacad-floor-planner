@@ -47,13 +47,35 @@ export function TableElementView({
   const [pickStep, setPickStep] = React.useState<"target" | "start" | "end">("target");
   const [pickTarget, setPickTarget] = React.useState<{ r: number; c: number } | null>(null);
   const [pickStart, setPickStart] = React.useState<{ r: number; c: number } | null>(null);
+  const [pickHover, setPickHover] = React.useState<{ r: number; c: number } | null>(null);
 
   React.useEffect(() => {
     // Reset picker whenever activation toggles.
     setPickStep("target");
     setPickTarget(null);
     setPickStart(null);
+    setPickHover(null);
   }, [pickFn]);
+
+  // Live-Vorschau der Formel, während im Picker-Modus Start/Endzelle gewählt werden.
+  const previewFormula = React.useMemo(() => {
+    if (!pickFn || !pickTarget) return null;
+    const anchor = pickStep === "end" ? pickStart : pickHover;
+    const cursor = pickStep === "end" ? pickHover : null;
+    if (!anchor) return null;
+    const end = cursor ?? anchor;
+    const r1 = Math.min(anchor.r, end.r), r2 = Math.max(anchor.r, end.r);
+    const c1 = Math.min(anchor.c, end.c), c2 = Math.max(anchor.c, end.c);
+    const a = `${colLabel(c1)}${r1 + 1}`;
+    const b = `${colLabel(c2)}${r2 + 1}`;
+    const range = a === b ? a : `${a}:${b}`;
+    const expr = `=${pickFn}(${range})`;
+    // Temporäre Zellenmatrix mit Vorschauformel in Zielzelle für Live-Berechnung.
+    const tmp = cells.map((row) => row.slice());
+    tmp[pickTarget.r][pickTarget.c] = expr;
+    const value = evalCell(tmp, pickTarget.r, pickTarget.c);
+    return { expr, value: String(value), r1, r2, c1, c2 };
+  }, [pickFn, pickTarget, pickStart, pickHover, pickStep, cells]);
 
   const updateCells = (mutator: (draft: string[][]) => string[][] | void) => {
     const clone = cells.map((row) => row.slice());
@@ -124,12 +146,11 @@ export function TableElementView({
   const isCellHighlighted = (r: number, c: number): string | undefined => {
     if (!pickFn) return undefined;
     if (pickTarget && pickTarget.r === r && pickTarget.c === c) return "hsl(var(--accent-gold) / 0.35)";
-    if (pickStart && pickStep === "end") {
-      // Preview range from pickStart to hovered — cannot know hover cheaply; only mark start
-      if (pickStart.r === r && pickStart.c === c) return "hsl(var(--primary) / 0.25)";
-    } else if (pickStart) {
-      if (pickStart.r === r && pickStart.c === c) return "hsl(var(--primary) / 0.25)";
+    if (previewFormula) {
+      const { r1, r2, c1, c2 } = previewFormula;
+      if (r >= r1 && r <= r2 && c >= c1 && c <= c2) return "hsl(var(--primary) / 0.20)";
     }
+    if (pickStart && pickStart.r === r && pickStart.c === c) return "hsl(var(--primary) / 0.25)";
     return undefined;
   };
 
@@ -144,8 +165,13 @@ export function TableElementView({
           className="sticky top-0 z-20 flex items-center justify-between gap-1 px-2 py-1 text-[10px] font-medium"
           style={{ background: "hsl(var(--accent-gold) / 0.15)", borderBottom: `1px solid ${borderColor}` }}
         >
-          <span>
+          <span className="truncate">
             {pickFn}: {pickStep === "target" ? "Zielzelle wählen" : pickStep === "start" ? "Startzelle wählen" : "Endzelle wählen"}
+            {previewFormula && (
+              <span className="ml-2 opacity-70 font-mono">
+                {previewFormula.expr} = {previewFormula.value}
+              </span>
+            )}
           </span>
           <button
             onClick={() => formulaCtx?.setFn(null)}
@@ -181,7 +207,11 @@ export function TableElementView({
               {cells[r].map((_, c) => {
                 const isHeader = headerRow && r === 0;
                 const value = cells[r][c];
-                const display = value.startsWith("=") ? String(evalCell(cells, r, c)) : value;
+                const isPickTarget = pickFn && pickTarget && pickTarget.r === r && pickTarget.c === c;
+                const showPreviewValue = isPickTarget && previewFormula;
+                const display = showPreviewValue
+                  ? previewFormula!.value
+                  : value.startsWith("=") ? String(evalCell(cells, r, c)) : value;
                 const isEditing = editing?.r === r && editing?.c === c;
                 const highlight = isCellHighlighted(r, c);
                 return (
@@ -196,6 +226,7 @@ export function TableElementView({
                       cursor: pickFn ? "crosshair" : undefined,
                     }}
                     onDoubleClick={() => !readOnly && !pickFn && setEditing({ r, c })}
+                    onMouseEnter={() => { if (pickFn) setPickHover({ r, c }); }}
                     onClick={(e) => {
                       if ((e as any).pointerType === "touch") { handleCellClick(r, c); return; }
                     }}
@@ -218,7 +249,10 @@ export function TableElementView({
                         style={{ minHeight: 32 }}
                         onClick={() => handleCellClick(r, c)}
                       >
-                        <span className="truncate">{display}</span>
+                        <span
+                          className="truncate"
+                          style={showPreviewValue ? { color: "hsl(var(--primary))", fontStyle: "italic" } : undefined}
+                        >{display}</span>
                         {isHeader && !readOnly && !pickFn && (
                           <button
                             onClick={(e) => { e.stopPropagation(); setOpenFilter(openFilter === c ? null : c); }}
