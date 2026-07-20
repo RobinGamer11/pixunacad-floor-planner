@@ -356,10 +356,8 @@ export default function ProjectsHome() {
                 </div>
               </div>
               <div className="mt-4">
-                <div className="text-[10px] font-semibold tracking-widest text-muted-foreground mb-2">
-                  STATUS
-                </div>
                 <div className="flex gap-2">
+
                   {(["online", "busy", "offline"] as ProfileStatus[]).map((s) => (
                     <button
                       key={s}
