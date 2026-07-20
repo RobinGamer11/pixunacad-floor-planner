@@ -78,7 +78,7 @@ function KonzeptPanel({ project }: { project: Project }) {
 
   return (
     <section
-      className="rounded-2xl p-5"
+      className="rounded-2xl p-4"
       style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
     >
       <div className="flex items-center gap-2">
