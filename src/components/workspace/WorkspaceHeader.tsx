@@ -65,7 +65,7 @@ export function WorkspaceHeader({
 
   return (
     <header
-      className="h-12 flex items-center justify-between px-3 border-b shrink-0"
+      className="h-16 flex items-center justify-between px-3 border-b shrink-0"
       style={{
         borderColor: "hsl(var(--hairline))",
         background: "hsl(var(--surface-card))",
