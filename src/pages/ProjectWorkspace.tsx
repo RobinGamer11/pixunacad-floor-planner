@@ -3835,6 +3835,8 @@ function ToolsTab({
           isPending={!!pendingTableId && element?.id === pendingTableId}
           modifyMode={!!tableModifyMode}
           setModifyMode={(v) => setTableModifyMode?.(v)}
+          formulaFn={tableFormulaFn ?? null}
+          setFormulaFn={(f) => setTableFormulaFn?.(f)}
           onConfirm={() => onConfirmTable?.()}
           onCancel={() => onCancelTable?.()}
         />
