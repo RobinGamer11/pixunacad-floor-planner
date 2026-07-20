@@ -96,13 +96,13 @@ export default function ProjectsHome() {
 
   const filtered = useMemo(
     () =>
-      visibleProjects.filter(
+      sidebarProjects.filter(
         (p) =>
           !search ||
           p.name.toLowerCase().includes(search.toLowerCase()) ||
           p.ort.toLowerCase().includes(search.toLowerCase())
       ),
-    [visibleProjects, search]
+    [sidebarProjects, search]
   );
 
   const selected =
