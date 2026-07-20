@@ -246,12 +246,30 @@ export interface Project {
   /** Projektmappen (falls fehlend, wird beim Laden eine "Hauptmappe" erzeugt). */
   mappen?: Mappe[];
   activeMappeId?: string;
+  /** Zuordnung zu einem benutzerdefinierten Ordner (siehe ProjectFolder). */
+  folderId?: string | null;
   /** Dateien-Reiter (dwg/dxf/pdf/…) — flache Liste mit parentId für Ordnerbaum. */
   files?: FileNode[];
   /** Fotos-Reiter (jpg/png/…). */
   photos?: FileNode[];
   settings?: ProjectSettings;
 }
+
+export interface ProjectFolder {
+  id: string;
+  name: string;
+  collapsed?: boolean;
+}
+
+export type ProfileStatus = "online" | "offline" | "busy";
+export interface UserProfile {
+  name: string;
+  role: string;
+  avatarUrl?: string;
+  status: ProfileStatus;
+}
+
+export const MAX_PROJECTS = 10;
 
 const STORAGE_KEY = "pixuna.projects.v3";
 
@@ -312,7 +330,15 @@ function demoProjects(): Project[] {
 
 interface State {
   projects: Project[];
+  folders: ProjectFolder[];
+  profile: UserProfile;
 }
+
+const DEFAULT_PROFILE: UserProfile = {
+  name: "Architekt:in",
+  role: "PixunaCAD Nutzer:in",
+  status: "online",
+};
 
 let state: State = load();
 const listeners = new Set<() => void>();
@@ -323,13 +349,21 @@ function load(): State {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && Array.isArray(parsed.projects) && parsed.projects.length) {
-        return { projects: parsed.projects.map(migrateProject) };
+        return {
+          projects: parsed.projects.map(migrateProject),
+          folders: Array.isArray(parsed.folders) ? parsed.folders : [],
+          profile: parsed.profile ? { ...DEFAULT_PROFILE, ...parsed.profile } : DEFAULT_PROFILE,
+        };
       }
     }
   } catch {
     /* ignore */
   }
-  return { projects: demoProjects().map(migrateProject) };
+  return {
+    projects: demoProjects().map(migrateProject),
+    folders: [],
+    profile: DEFAULT_PROFILE,
+  };
 }
 
 /** Stellt sicher, dass jedes Projekt mindestens eine Mappe + Files/Photos-Arrays hat. */
@@ -517,10 +551,10 @@ function getHist(id: string): HistoryEntry {
 }
 function notifyHistory() { historyListeners.forEach((fn) => fn()); }
 
-function setState(updater: (s: State) => State) {
+function setState(updater: (s: State) => Partial<State>) {
   const prev = state;
   const prevById = new Map(prev.projects.map((p) => [p.id, p] as const));
-  state = updater(state);
+  state = { ...state, ...updater(state) };
   if (!_suspendHistory) {
     let anyChange = false;
     for (const np of state.projects) {
@@ -1332,7 +1366,7 @@ export const projectStore = {
     h.future.push(cur);
     _suspendHistory = true;
     try {
-      state = { projects: state.projects.map((p) => (p.id === projectId ? prev : p)) };
+      state = { ...state, projects: state.projects.map((p) => (p.id === projectId ? prev : p)) };
     } finally {
       _suspendHistory = false;
     }
@@ -1348,12 +1382,45 @@ export const projectStore = {
     h.past.push(cur);
     _suspendHistory = true;
     try {
-      state = { projects: state.projects.map((p) => (p.id === projectId ? next : p)) };
+      state = { ...state, projects: state.projects.map((p) => (p.id === projectId ? next : p)) };
     } finally {
       _suspendHistory = false;
     }
     notifyHistory();
     emit();
+  },
+
+  /* ---------- Projekt-Ordner (Sidebar) ---------- */
+  addProjectFolder: (name: string) => {
+    const id = `f-${Date.now().toString(36)}`;
+    setState((s) => ({ folders: [...s.folders, { id, name: name.trim() || "Neuer Ordner" }] }));
+    return id;
+  },
+  renameProjectFolder: (id: string, name: string) => {
+    setState((s) => ({
+      folders: s.folders.map((f) => (f.id === id ? { ...f, name: name.trim() || f.name } : f)),
+    }));
+  },
+  deleteProjectFolder: (id: string) => {
+    setState((s) => ({
+      folders: s.folders.filter((f) => f.id !== id),
+      projects: s.projects.map((p) => (p.folderId === id ? { ...p, folderId: null } : p)),
+    }));
+  },
+  toggleProjectFolderCollapsed: (id: string) => {
+    setState((s) => ({
+      folders: s.folders.map((f) => (f.id === id ? { ...f, collapsed: !f.collapsed } : f)),
+    }));
+  },
+  moveProjectToFolder: (projectId: string, folderId: string | null) => {
+    setState((s) => ({
+      projects: s.projects.map((p) => (p.id === projectId ? { ...p, folderId } : p)),
+    }));
+  },
+
+  /* ---------- Profile ---------- */
+  updateProfile: (patch: Partial<UserProfile>) => {
+    setState((s) => ({ profile: { ...s.profile, ...patch } }));
   },
 };
 
@@ -1389,5 +1456,22 @@ export function useProjectHistory(id: string | undefined): { canUndo: boolean; c
     () => ({ canUndo: false, canRedo: false }),
   );
 }
+
+export function useFolders(): ProjectFolder[] {
+  return useSyncExternalStore(
+    projectStore.subscribe,
+    () => projectStore.getState().folders,
+    () => projectStore.getState().folders,
+  );
+}
+
+export function useProfile(): UserProfile {
+  return useSyncExternalStore(
+    projectStore.subscribe,
+    () => projectStore.getState().profile,
+    () => projectStore.getState().profile,
+  );
+}
+
 
 
