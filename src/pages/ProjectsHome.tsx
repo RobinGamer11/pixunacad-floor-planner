@@ -756,7 +756,7 @@ export default function ProjectsHome() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  {selected.isTemplate ? (
+                  {selected.isTemplate && (
                     <button
                       onClick={() => {
                         if (confirm("Vorlage zurücksetzen? Alle projektspezifischen Inhalte (Texte, Seiteninhalte, Termine) werden geleert.")) {
@@ -767,21 +767,6 @@ export default function ProjectsHome() {
                       style={{ borderColor: "hsl(var(--hairline))" }}
                     >
                       Reset
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => {
-                        const id = projectStore.duplicateAsTemplate(selected.id);
-                        if (id) {
-                          setMode("templates");
-                          setSelectedId(id);
-                        }
-                      }}
-                      className="h-9 px-3 rounded-md border text-sm flex items-center gap-2"
-                      style={{ borderColor: "hsl(var(--hairline))" }}
-                      title="Als Vorlage speichern"
-                    >
-                      <LayoutTemplate size={14} /> Vorlage+
                     </button>
                   )}
                 </div>
