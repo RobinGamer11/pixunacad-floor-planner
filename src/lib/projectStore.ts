@@ -1366,7 +1366,7 @@ export const projectStore = {
     h.future.push(cur);
     _suspendHistory = true;
     try {
-      state = { projects: state.projects.map((p) => (p.id === projectId ? prev : p)) };
+      state = { ...state, projects: state.projects.map((p) => (p.id === projectId ? prev : p)) };
     } finally {
       _suspendHistory = false;
     }
@@ -1382,7 +1382,7 @@ export const projectStore = {
     h.past.push(cur);
     _suspendHistory = true;
     try {
-      state = { projects: state.projects.map((p) => (p.id === projectId ? next : p)) };
+      state = { ...state, projects: state.projects.map((p) => (p.id === projectId ? next : p)) };
     } finally {
       _suspendHistory = false;
     }
