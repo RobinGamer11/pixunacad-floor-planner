@@ -54,15 +54,28 @@ const CadPage = () => {
   const [frameArmed, setFrameArmed] = useState(false);
 
 
+  const [presenting, setPresenting] = useState(false);
   const handlePresent = () => {
     const el = mainRef.current;
     if (!el) return;
-    if (document.fullscreenElement) {
-      document.exitFullscreen().catch(() => {});
+    if (presenting) {
+      setPresenting(false);
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
     } else {
+      setPresenting(true);
       el.requestFullscreen?.().catch(() => {});
     }
   };
+  useEffect(() => {
+    const onFs = () => { if (!document.fullscreenElement) setPresenting(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && presenting) setPresenting(false); };
+    document.addEventListener("fullscreenchange", onFs);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("fullscreenchange", onFs);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [presenting]);
 
   const getCanvas = (): HTMLCanvasElement | null =>
     (mainRef.current?.querySelector("canvas") as HTMLCanvasElement | null) ?? null;
