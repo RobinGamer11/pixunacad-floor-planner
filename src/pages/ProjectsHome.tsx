@@ -46,6 +46,7 @@ import {
   type ProjectFolder,
   type ProfileStatus,
 } from "@/lib/projectStore";
+import { useDragScroll } from "@/hooks/use-drag-scroll";
 import { notesStore, useNotes, type NoteNode, type NoteStatus, type NotePriority } from "@/lib/notesStore";
 import { WeatherStrip } from "@/components/project/WeatherStrip";
 import { UebersichtView } from "@/components/project/UebersichtView";
@@ -79,6 +80,8 @@ export default function ProjectsHome() {
   const [selectedId, setSelectedId] = useState<string | undefined>(visibleProjects[0]?.id);
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<Tab>("uebersicht");
+  const headerScrollRef = useDragScroll<HTMLElement>();
+  const tabsScrollRef = useDragScroll<HTMLDivElement>();
   const [dokumenteSubTab, setDokumenteSubTab] = useState<DokumenteSubTab>("dateien");
   const [leftOpen, setLeftOpen] = useState(true);
   const [titleMenuOpen, setTitleMenuOpen] = useState(false);
