@@ -232,7 +232,7 @@ export default function ProjectsHome() {
     >
       {/* ============= TOP HEADER ============= */}
       <header
-        className="h-20 shrink-0 flex items-center gap-4 px-6 border-b"
+        className="h-16 shrink-0 flex items-center gap-4 px-6 border-b"
         style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
       >
         {/* Wortmarke */}
