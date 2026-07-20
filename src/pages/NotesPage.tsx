@@ -152,11 +152,13 @@ export default function NotesPage() {
 
   if (!projectId) return null;
 
-  const gridCols = [
-    ...(leftOpen ? ["240px"] : []),
-    "1fr",
-    ...(rightOpen ? ["460px"] : []),
-  ].join(" ");
+  const gridCols = presenting
+    ? "1fr"
+    : [
+        ...(leftOpen ? ["240px"] : []),
+        "1fr",
+        ...(rightOpen ? ["460px"] : []),
+      ].join(" ");
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden">
@@ -173,12 +175,14 @@ export default function NotesPage() {
         onDelete={() => selected && (notesStore.deleteNode(projectId, selected.id), setSelectedId(null))}
         tabletAidOn={tabletAidOn}
         onToggleTabletAid={() => setTabletAidOn((v) => !v)}
+        onPresent={handlePresent}
       />
       <main
-        className="flex-1 min-h-0 grid transition-[grid-template-columns] duration-200"
+        ref={notesMainRef}
+        className="flex-1 min-h-0 grid transition-[grid-template-columns] duration-200 relative"
         style={{ gridTemplateColumns: gridCols, background: "hsl(var(--surface-muted))" }}
       >
-        {leftOpen && (
+        {leftOpen && !presenting && (
           <LeftPanel
             projectId={projectId}
             projectName={project?.name ?? "Projekt"}
@@ -198,45 +202,47 @@ export default function NotesPage() {
           />
         )}
 
-        <section className="min-h-0 overflow-auto relative">
-          <div className="sticky top-0 z-10 flex items-center gap-1 px-3 py-1.5 border-b"
-               style={{ background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" }}>
-            {!leftOpen && (
-              <button onClick={() => setLeftOpen(true)}
-                className="h-7 w-7 rounded flex items-center justify-center hover:bg-muted"
-                title="Liste einblenden">
-                <PanelLeftOpen size={15} />
-              </button>
-            )}
-            <div className="flex-1" />
-            {!rightOpen && (
-              <button onClick={() => setRightOpen(true)}
-                className="h-7 w-7 rounded flex items-center justify-center hover:bg-muted"
-                title="Netz einblenden">
-                <PanelRightOpen size={15} />
-              </button>
-            )}
-          </div>
-          {selected ? (
-            <NoteEditor
-              projectId={projectId}
-              node={selected}
-              categories={state.categories}
-              statuses={state.statuses}
-              priorities={state.priorities}
-              nodes={state.nodes}
-              onSelect={selectAndMarkSeen}
-              onDelete={() => { notesStore.deleteNode(projectId, selected.id); setSelectedId(null); }}
-            />
-          ) : (
-            <div className="h-[calc(100%-40px)] flex items-center justify-center text-sm"
-                 style={{ color: "hsl(var(--ink-soft))" }}>
-              Wähle links einen Eintrag oder lege ein neues Thema an.
+        {!presenting && (
+          <section className="min-h-0 overflow-auto relative">
+            <div className="sticky top-0 z-10 flex items-center gap-1 px-3 py-1.5 border-b"
+                 style={{ background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" }}>
+              {!leftOpen && (
+                <button onClick={() => setLeftOpen(true)}
+                  className="h-7 w-7 rounded flex items-center justify-center hover:bg-muted"
+                  title="Liste einblenden">
+                  <PanelLeftOpen size={15} />
+                </button>
+              )}
+              <div className="flex-1" />
+              {!rightOpen && (
+                <button onClick={() => setRightOpen(true)}
+                  className="h-7 w-7 rounded flex items-center justify-center hover:bg-muted"
+                  title="Netz einblenden">
+                  <PanelRightOpen size={15} />
+                </button>
+              )}
             </div>
-          )}
-        </section>
+            {selected ? (
+              <NoteEditor
+                projectId={projectId}
+                node={selected}
+                categories={state.categories}
+                statuses={state.statuses}
+                priorities={state.priorities}
+                nodes={state.nodes}
+                onSelect={selectAndMarkSeen}
+                onDelete={() => { notesStore.deleteNode(projectId, selected.id); setSelectedId(null); }}
+              />
+            ) : (
+              <div className="h-[calc(100%-40px)] flex items-center justify-center text-sm"
+                   style={{ color: "hsl(var(--ink-soft))" }}>
+                Wähle links einen Eintrag oder lege ein neues Thema an.
+              </div>
+            )}
+          </section>
+        )}
 
-        {rightOpen && (
+        {(rightOpen || presenting) && (
           <RightPanel
             projectName={project?.name ?? "Projekt"}
             state={state}
@@ -245,9 +251,20 @@ export default function NotesPage() {
             setSelectedId={selectAndMarkSeen}
             mode={rightMode}
             setMode={setRightMode}
-            onCollapse={() => setRightOpen(false)}
+            onCollapse={() => !presenting && setRightOpen(false)}
             focusToken={focusToken}
           />
+        )}
+
+        {presenting && (
+          <button
+            onClick={() => { setPresenting(false); if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); }}
+            className="absolute top-3 right-3 z-[60] h-9 px-3 rounded-full text-xs font-medium"
+            style={{ background: "rgba(0,0,0,0.55)", color: "#fff", backdropFilter: "blur(6px)" }}
+            title="Präsentation beenden (ESC)"
+          >
+            ✕ Präsentation beenden
+          </button>
         )}
 
       </main>
