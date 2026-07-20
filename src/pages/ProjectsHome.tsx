@@ -235,7 +235,8 @@ export default function ProjectsHome() {
     >
       {/* ============= TOP HEADER ============= */}
       <header
-        className="h-16 shrink-0 flex items-center gap-4 px-6 border-b"
+        ref={headerScrollRef}
+        className="h-16 shrink-0 flex items-center gap-4 px-6 border-b overflow-x-auto no-scrollbar touch-pan-x"
         style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
       >
         {/* Wortmarke */}
@@ -982,12 +983,12 @@ export default function ProjectsHome() {
 
               {/* Große Aktion links + Reiter rechts (eine Zeile, Reiter am Unterrand des Buttons ausgerichtet) */}
               <div
-                className="mt-4 flex items-end gap-4 border-b"
+                className="mt-4 flex flex-col lg:flex-row lg:items-end gap-4 border-b"
                 style={{ borderColor: "hsl(var(--hairline))" }}
               >
                 <button
                   onClick={() => navigate(`/project/${selected.id}`)}
-                  className="h-11 rounded-lg flex items-center gap-3 pl-3 pr-4 text-sm font-semibold transition hover:opacity-90 shrink-0 -mb-px border"
+                  className="h-11 rounded-lg flex items-center gap-3 pl-3 pr-4 text-sm font-semibold transition hover:opacity-90 shrink-0 self-start lg:-mb-px border"
                   style={{ background: "hsl(var(--beige-soft))", color: "hsl(var(--ink))", borderColor: "hsl(var(--hairline))" }}
                 >
                   <span
@@ -1000,7 +1001,10 @@ export default function ProjectsHome() {
                   <ChevronRight size={16} />
                 </button>
 
-                <div className="flex flex-wrap items-end gap-x-8 gap-y-1 text-sm flex-1 min-w-0 tabs-scroll">
+                <div
+                  ref={tabsScrollRef}
+                  className="flex items-end gap-x-8 gap-y-1 text-sm flex-1 min-w-0 overflow-x-auto no-scrollbar touch-pan-x"
+                >
                   {(
                     [
                       ["uebersicht", "Übersicht", false],
