@@ -143,6 +143,35 @@ export default function ProjectsHome() {
     return () => document.removeEventListener("mousedown", onDoc);
   }, [profileOpen]);
 
+  // "+ Projekt"-Popup (Neu / Vorlage)
+  const [newProjectOpen, setNewProjectOpen] = useState(false);
+  const [newProjectMode, setNewProjectMode] = useState<"choice" | "fromTemplate">("choice");
+  const newProjectRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!newProjectOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (!newProjectRef.current?.contains(e.target as Node)) {
+        setNewProjectOpen(false);
+        setNewProjectMode("choice");
+      }
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [newProjectOpen]);
+
+  // "Vorlage +"-Popup im Vorlagen-Hub
+  const [saveAsTplOpen, setSaveAsTplOpen] = useState(false);
+  const saveAsTplRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!saveAsTplOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (!saveAsTplRef.current?.contains(e.target as Node)) setSaveAsTplOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [saveAsTplOpen]);
+
+
   // Drag & Drop von Projekten in Ordner
   const [dragProjectId, setDragProjectId] = useState<string | null>(null);
   const [dragOverFolder, setDragOverFolder] = useState<string | "root" | null>(null);
