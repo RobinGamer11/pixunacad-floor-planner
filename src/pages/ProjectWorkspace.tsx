@@ -2115,7 +2115,8 @@ function PageCanvas({
 }) {
 
 
-  const fmt = FORMAT_SIZES[page.format];
+  const _pageSize = getPageSizeMm(page);
+  const fmt = { w: _pageSize.wMm, h: _pageSize.hMm, label: FORMAT_SIZES[page.format]?.label ?? "" };
   const aspect = fmt.w / fmt.h;
   // The sheet is rendered at a FIXED real size (mm-defined). Zoom is a pure
   // view transform applied via CSS scale, like PowerPoint / CAD — page, holes,
