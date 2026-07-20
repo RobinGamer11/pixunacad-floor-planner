@@ -146,12 +146,11 @@ export function TableElementView({
   const isCellHighlighted = (r: number, c: number): string | undefined => {
     if (!pickFn) return undefined;
     if (pickTarget && pickTarget.r === r && pickTarget.c === c) return "hsl(var(--accent-gold) / 0.35)";
-    if (pickStart && pickStep === "end") {
-      // Preview range from pickStart to hovered — cannot know hover cheaply; only mark start
-      if (pickStart.r === r && pickStart.c === c) return "hsl(var(--primary) / 0.25)";
-    } else if (pickStart) {
-      if (pickStart.r === r && pickStart.c === c) return "hsl(var(--primary) / 0.25)";
+    if (previewFormula) {
+      const { r1, r2, c1, c2 } = previewFormula;
+      if (r >= r1 && r <= r2 && c >= c1 && c <= c2) return "hsl(var(--primary) / 0.20)";
     }
+    if (pickStart && pickStart.r === r && pickStart.c === c) return "hsl(var(--primary) / 0.25)";
     return undefined;
   };
 
