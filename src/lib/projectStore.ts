@@ -335,8 +335,8 @@ interface State {
 }
 
 const DEFAULT_PROFILE: UserProfile = {
-  name: "Architekt:in",
-  role: "PixunaCAD Nutzer:in",
+  name: "Benutzer",
+  role: "PixunaCAD Benutzer",
   status: "online",
 };
 
