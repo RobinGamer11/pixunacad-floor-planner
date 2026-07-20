@@ -19,13 +19,13 @@ interface Props {
  */
 export function UebersichtView({ project }: Props) {
   return (
-    <div className="mt-6 space-y-5">
+    <div className="mt-3 space-y-2">
       {/* 1. Projekttitelbild */}
       <HeroPanel project={project} />
-      {/* 2. Konzept (nur Text) */}
-      <KonzeptPanel project={project} />
-      {/* 3. Projektinfos */}
+      {/* 2. Projektinfos (oben) */}
       <ProjektinfoPanel project={project} />
+      {/* 3. Konzept (nur Text) */}
+      <KonzeptPanel project={project} />
     </div>
   );
 }
@@ -78,7 +78,7 @@ function KonzeptPanel({ project }: { project: Project }) {
 
   return (
     <section
-      className="rounded-2xl p-5"
+      className="rounded-2xl p-4"
       style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
     >
       <div className="flex items-center gap-2">

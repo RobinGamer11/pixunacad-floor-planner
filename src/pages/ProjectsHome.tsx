@@ -356,10 +356,8 @@ export default function ProjectsHome() {
                 </div>
               </div>
               <div className="mt-4">
-                <div className="text-[10px] font-semibold tracking-widest text-muted-foreground mb-2">
-                  STATUS
-                </div>
                 <div className="flex gap-2">
+
                   {(["online", "busy", "offline"] as ProfileStatus[]).map((s) => (
                     <button
                       key={s}
@@ -775,9 +773,9 @@ export default function ProjectsHome() {
               {/* Wetter für Projektort */}
               <WeatherStrip ort={selected.ort} />
 
-              {/* Große Aktion links + Reiter rechts (eine Zeile) */}
+              {/* Große Aktion links + Reiter rechts (eine Zeile, Reiter am Unterrand des Buttons ausgerichtet) */}
               <div
-                className="mt-5 flex items-center gap-6 border-b"
+                className="mt-4 flex items-end gap-4 border-b"
                 style={{ borderColor: "hsl(var(--hairline))" }}
               >
                 <button
@@ -795,7 +793,7 @@ export default function ProjectsHome() {
                   <ChevronRight size={16} />
                 </button>
 
-                <div className="flex items-center gap-7 text-sm overflow-x-auto flex-1 min-w-0">
+                <div className="flex items-end gap-4 text-sm flex-1 min-w-0 tabs-scroll">
                   {(
                     [
                       ["uebersicht", "Übersicht", false],
@@ -811,7 +809,7 @@ export default function ProjectsHome() {
                       onClick={() => !disabled && setTab(key as Tab)}
                       disabled={disabled}
                       title={disabled ? "Bald verfügbar" : undefined}
-                      className="py-3 relative whitespace-nowrap disabled:cursor-not-allowed"
+                      className="pb-2 relative whitespace-nowrap disabled:cursor-not-allowed"
                       style={{
                         color: disabled
                           ? "hsl(var(--ink-soft) / 0.5)"
@@ -836,13 +834,14 @@ export default function ProjectsHome() {
                         if (id) { setMode("templates"); setSelectedId(id); }
                       }}
                       title="Als Vorlage speichern"
-                      className="ml-auto py-3 text-[12px] text-muted-foreground hover:text-foreground whitespace-nowrap flex items-center gap-1"
+                      className="ml-auto pb-2 text-[12px] text-muted-foreground hover:text-foreground whitespace-nowrap flex items-center gap-1"
                     >
                       Vorlage <Plus size={12} />
                     </button>
                   )}
                 </div>
               </div>
+
 
 
               {tab === "uebersicht" && <UebersichtView project={selected} />}
@@ -1069,37 +1068,20 @@ function SeitenView({ project, onAddPage }: { project: Project; onAddPage: () =>
   const isLandscape = (selectedPage?.format ?? "A3-quer").includes("quer");
 
   return (
-    <div className="mt-6 space-y-4">
-      {/* Mappen-Selector */}
-      <div
-        className="rounded-2xl px-4 py-2.5 flex items-center gap-3 flex-wrap"
-        style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
-      >
-        <span className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">MAPPE</span>
-        {mappen.length === 0 ? (
-          <span className="text-sm text-muted-foreground italic">Keine Mappe vorhanden.</span>
-        ) : (
-          <select
-            value={activeMappe?.id ?? ""}
-            onChange={(e) => projectStore.setActiveMappe(project.id, e.target.value)}
-            className="h-8 px-2 rounded-md border bg-transparent text-sm outline-none"
-            style={{ borderColor: "hsl(var(--hairline))" }}
-          >
-            {mappen.map((m) => (
-              <option key={m.id} value={m.id}>{m.name} ({m.pageIds.length})</option>
-            ))}
-          </select>
-        )}
-        <span className="flex-1" />
+    <div className="mt-4 space-y-4">
+      {/* Präsentieren-Button (verknüpft mit Projektmappe-Präsentation) */}
+      <div className="flex items-center justify-end">
         <button
-          onClick={() => navigate(`/project/${project.id}`)}
-          className="h-8 px-3 rounded-md text-xs font-medium flex items-center gap-1.5"
+          onClick={() => navigate(`/project/${project.id}?present=1`)}
+          disabled={mappen.length === 0}
+          className="h-9 px-3 rounded-md text-xs font-medium flex items-center gap-1.5 disabled:opacity-40"
           style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
-          title="Projektmappe bearbeiten"
+          title="Präsentieren"
         >
-          <Pencil size={13} /> Bearbeiten
+          <Play size={13} fill="currentColor" /> Präsentieren
         </button>
       </div>
+
 
       <div className="grid grid-cols-[220px_1fr] gap-6">
         <div
