@@ -75,7 +75,7 @@ export function WorkspaceHeader({
       }}
     >
       {/* Left: Zurück + Titel + Modus-Umschalter */}
-      <div className="flex items-center gap-2 min-w-0">
+      <div className="flex items-center gap-2 shrink-0">
         <button
           onClick={() => navigate("/")}
           className="h-8 w-8 rounded-md flex items-center justify-center hover:bg-muted"
