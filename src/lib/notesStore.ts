@@ -132,6 +132,14 @@ function siblingsMaxOrder(state: NotesState, parentId: string | null): number {
 export const notesStore = {
   getState,
   subscribe,
+  /** Alle Board-Daten eines Projekts vollständig entfernen (Cache, Historie, localStorage). */
+  deleteProject(projectId: string) {
+    cache.delete(projectId);
+    history.delete(projectId);
+    try { localStorage.removeItem(KEY(projectId)); } catch {}
+    listeners.get(projectId)?.forEach((fn) => fn());
+    listeners.delete(projectId);
+  },
   canUndo: (projectId: string) => getHistory(projectId).past.length > 0,
   canRedo: (projectId: string) => getHistory(projectId).future.length > 0,
   undo(projectId: string) {
