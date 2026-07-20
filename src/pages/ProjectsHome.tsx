@@ -359,10 +359,11 @@ export default function ProjectsHome() {
             onClick={() => {
               setShowAllTasks(false);
               setMode("templates");
-              const firstTpl = projects.find((p) => p.isTemplate);
-              if (firstTpl) setSelectedId(firstTpl.id);
+              // Kein Template vorauswählen — Vorlagen-Hub wird gezeigt
+              setSelectedId(undefined);
             }}
           />
+
           <HeaderDivider />
           <NavIcon icon={<Users size={18} strokeWidth={1.5} />} label="Geteilt (bald verfügbar)" disabled />
           <HeaderDivider />
