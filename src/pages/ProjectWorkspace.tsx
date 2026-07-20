@@ -3133,6 +3133,8 @@ function RightInspector({
   pendingTableId,
   tableModifyMode,
   setTableModifyMode,
+  tableFormulaFn,
+  setTableFormulaFn,
   onConfirmTable,
   onCancelTable,
 
@@ -3166,6 +3168,8 @@ function RightInspector({
   pendingTableId?: string | null;
   tableModifyMode?: boolean;
   setTableModifyMode?: (v: boolean) => void;
+  tableFormulaFn?: FormulaFn | null;
+  setTableFormulaFn?: (f: FormulaFn | null) => void;
   onConfirmTable?: () => void;
   onCancelTable?: () => void;
 
@@ -3230,6 +3234,8 @@ function RightInspector({
             pendingTableId={pendingTableId ?? null}
             tableModifyMode={!!tableModifyMode}
             setTableModifyMode={setTableModifyMode}
+            tableFormulaFn={tableFormulaFn ?? null}
+            setTableFormulaFn={setTableFormulaFn}
             onConfirmTable={onConfirmTable}
             onCancelTable={onCancelTable}
           />
@@ -3720,6 +3726,8 @@ function ToolsTab({
   pendingTableId,
   tableModifyMode,
   setTableModifyMode,
+  tableFormulaFn,
+  setTableFormulaFn,
   onConfirmTable,
   onCancelTable,
 }: {
@@ -3749,6 +3757,8 @@ function ToolsTab({
   pendingTableId?: string | null;
   tableModifyMode?: boolean;
   setTableModifyMode?: (v: boolean) => void;
+  tableFormulaFn?: FormulaFn | null;
+  setTableFormulaFn?: (f: FormulaFn | null) => void;
   onConfirmTable?: () => void;
   onCancelTable?: () => void;
 }) {
