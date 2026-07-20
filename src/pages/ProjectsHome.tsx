@@ -777,7 +777,91 @@ export default function ProjectsHome() {
         <main className="flex-1 overflow-y-auto">
           {showAllTasks ? (
             <AllTasksView projects={projects} />
+          ) : mode === "templates" && !selected ? (
+            <div className="px-10 py-7">
+              <div className="flex items-center gap-3">
+                <h1 className="text-2xl font-semibold tracking-tight">Vorlagen</h1>
+              </div>
+
+              <div className="mt-5 relative" ref={saveAsTplRef}>
+                <button
+                  onClick={() => setSaveAsTplOpen((v) => !v)}
+                  className="h-12 px-5 rounded-lg flex items-center gap-2 text-base font-semibold shadow-sm hover:opacity-90"
+                  style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
+                  title="Projekt als Vorlage speichern"
+                >
+                  <Plus size={18} /> Vorlage
+                </button>
+
+                {saveAsTplOpen && (
+                  <div
+                    className="absolute left-0 top-full mt-2 w-80 rounded-xl border shadow-lg z-30 p-3"
+                    style={{ background: "hsl(var(--surface))", borderColor: "hsl(var(--hairline))" }}
+                  >
+                    <div className="text-[11px] font-semibold tracking-[0.16em] uppercase px-1 pb-2" style={{ color: "hsl(var(--ink-soft))" }}>
+                      Projekt als Vorlage speichern
+                    </div>
+                    {(() => {
+                      const src = projects.filter((p) => !p.isTemplate);
+                      if (src.length === 0) {
+                        return (
+                          <div className="text-xs text-muted-foreground p-3 rounded-md border" style={{ borderColor: "hsl(var(--hairline))" }}>
+                            Kein Projekt zum Übernehmen vorhanden.
+                          </div>
+                        );
+                      }
+                      return (
+                        <select
+                          autoFocus
+                          defaultValue=""
+                          onChange={(e) => {
+                            const pid = e.target.value;
+                            if (!pid) return;
+                            const id = projectStore.duplicateAsTemplate(pid);
+                            if (id) setSelectedId(id);
+                            setSaveAsTplOpen(false);
+                          }}
+                          className="h-10 w-full rounded-md border px-2 text-sm bg-transparent"
+                          style={{ borderColor: "hsl(var(--hairline))" }}
+                        >
+                          <option value="" disabled>Projekt wählen…</option>
+                          {src.map((p) => (
+                            <option key={p.id} value={p.id}>{p.name}</option>
+                          ))}
+                        </select>
+                      );
+                    })()}
+                  </div>
+                )}
+              </div>
+
+              {/* Vorlagen-Liste */}
+              <div className="mt-8 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {projects.filter((p) => p.isTemplate).map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => setSelectedId(t.id)}
+                    className="text-left rounded-xl border overflow-hidden hover:shadow-md transition"
+                    style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
+                  >
+                    <div className="aspect-[16/9] overflow-hidden" style={{ background: "hsl(var(--surface-muted))" }}>
+                      <img src={t.thumbnail} alt="" className="w-full h-full object-cover" />
+                    </div>
+                    <div className="px-4 py-3">
+                      <div className="text-sm font-semibold truncate">{t.name}</div>
+                      <div className="text-[11px] text-muted-foreground mt-0.5">Vorlage</div>
+                    </div>
+                  </button>
+                ))}
+                {projects.filter((p) => p.isTemplate).length === 0 && (
+                  <div className="col-span-full text-sm text-muted-foreground py-10 text-center rounded-xl border" style={{ borderColor: "hsl(var(--hairline))" }}>
+                    Noch keine Vorlagen. Speichere ein Projekt als Vorlage über den Button oben.
+                  </div>
+                )}
+              </div>
+            </div>
           ) : selected && (
+
             <div className="px-10 py-7">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
