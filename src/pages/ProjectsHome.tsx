@@ -997,7 +997,7 @@ export default function ProjectsHome() {
                   <ChevronRight size={16} />
                 </button>
 
-                <div className="flex items-end gap-4 text-sm flex-1 min-w-0 tabs-scroll">
+                <div className="flex flex-wrap items-end gap-x-8 gap-y-1 text-sm flex-1 min-w-0 tabs-scroll">
                   {(
                     [
                       ["uebersicht", "Übersicht", false],
@@ -1031,19 +1031,8 @@ export default function ProjectsHome() {
                       )}
                     </button>
                   ))}
-                  {!selected.isTemplate && (
-                    <button
-                      onClick={() => {
-                        const id = projectStore.duplicateAsTemplate(selected.id);
-                        if (id) { setMode("templates"); setSelectedId(id); }
-                      }}
-                      title="Als Vorlage speichern"
-                      className="ml-auto pb-2 text-[12px] text-muted-foreground hover:text-foreground whitespace-nowrap flex items-center gap-1"
-                    >
-                      Vorlage <Plus size={12} />
-                    </button>
-                  )}
                 </div>
+
               </div>
 
 
