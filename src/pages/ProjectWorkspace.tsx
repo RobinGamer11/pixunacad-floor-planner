@@ -591,7 +591,7 @@ export default function ProjectWorkspace() {
     if (!activePage || !canvasViewportRef.current) return;
     // Innerhalb eines Verbunds identifiziert die spreadId das gemeinsame Layout;
     // Einzelseiten werden per pageId identifiziert.
-    const fitKey = `${activePage.spreadId ?? activePage.id}|${activePage.format}`;
+    const fitKey = `${activePage.spreadId ?? activePage.id}|${activePage.format}|${activePage.customWidthMm ?? ""}x${activePage.customHeightMm ?? ""}`;
     if (lastFitKeyRef.current === fitKey) return;
     lastFitKeyRef.current = fitKey;
     const fitPage = () => {
