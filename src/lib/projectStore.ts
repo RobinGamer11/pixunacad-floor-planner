@@ -1390,24 +1390,24 @@ export const projectStore = {
     emit();
   },
 
-  /* ---------- Folders ---------- */
-  addFolder: (name: string) => {
+  /* ---------- Projekt-Ordner (Sidebar) ---------- */
+  addProjectFolder: (name: string) => {
     const id = `f-${Date.now().toString(36)}`;
     setState((s) => ({ folders: [...s.folders, { id, name: name.trim() || "Neuer Ordner" }] }));
     return id;
   },
-  renameFolder: (id: string, name: string) => {
+  renameProjectFolder: (id: string, name: string) => {
     setState((s) => ({
       folders: s.folders.map((f) => (f.id === id ? { ...f, name: name.trim() || f.name } : f)),
     }));
   },
-  deleteFolder: (id: string) => {
+  deleteProjectFolder: (id: string) => {
     setState((s) => ({
       folders: s.folders.filter((f) => f.id !== id),
       projects: s.projects.map((p) => (p.folderId === id ? { ...p, folderId: null } : p)),
     }));
   },
-  toggleFolderCollapsed: (id: string) => {
+  toggleProjectFolderCollapsed: (id: string) => {
     setState((s) => ({
       folders: s.folders.map((f) => (f.id === id ? { ...f, collapsed: !f.collapsed } : f)),
     }));
