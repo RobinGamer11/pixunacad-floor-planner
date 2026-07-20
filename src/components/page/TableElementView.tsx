@@ -165,8 +165,13 @@ export function TableElementView({
           className="sticky top-0 z-20 flex items-center justify-between gap-1 px-2 py-1 text-[10px] font-medium"
           style={{ background: "hsl(var(--accent-gold) / 0.15)", borderBottom: `1px solid ${borderColor}` }}
         >
-          <span>
+          <span className="truncate">
             {pickFn}: {pickStep === "target" ? "Zielzelle wählen" : pickStep === "start" ? "Startzelle wählen" : "Endzelle wählen"}
+            {previewFormula && (
+              <span className="ml-2 opacity-70 font-mono">
+                {previewFormula.expr} = {previewFormula.value}
+              </span>
+            )}
           </span>
           <button
             onClick={() => formulaCtx?.setFn(null)}
