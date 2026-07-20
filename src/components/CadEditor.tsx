@@ -2909,8 +2909,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             </div>
           )}
         </div>
-        </div>
-        <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-2" style={{ display: rightTab === "sheets" ? "block" : "none" }}>
+        </DragScrollDiv>
+        <DragScrollDiv axis="y" className="flex-1 min-h-0 overflow-y-auto p-2 space-y-2" style={{ display: rightTab === "sheets" ? "block" : "none" }}>
           {/* Zeichnungs-ID Panel (Blätter + Transparentpause) */}
           <div ref={sheetPanelRef} className="cad-id-panel w-full">
             <div className="id-head">
