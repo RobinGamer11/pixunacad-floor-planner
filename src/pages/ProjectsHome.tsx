@@ -2348,7 +2348,7 @@ function projectColor(id: string): string {
 function AllTasksView({ projects }: { projects: Project[] }) {
   const navigate = useNavigate();
   const [activeIds, setActiveIds] = useState<Set<string>>(() => new Set(projects.map((p) => p.id)));
-  React.useEffect(() => {
+  useEffect(() => {
     setActiveIds((prev) => {
       const next = new Set(prev);
       projects.forEach((p) => next.add(p.id));
