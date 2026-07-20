@@ -97,6 +97,14 @@ export interface PageElement {
     filters?: Record<number, string[]>;
     /** Erste Zeile ist Kopfzeile (fett, filterbar). */
     headerRow?: boolean;
+    /** Rahmenfarbe (CSS-Farbe / hsl-Referenz). */
+    borderColor?: string;
+    /** Rahmenbreite in px (0 = kein Rahmen). */
+    borderWidthPx?: number;
+    /** Hintergrundfarbe der Tabelle. */
+    background?: string;
+    /** Optionale Hintergrundfarbe der Kopfzeile. */
+    headerBackground?: string;
   };
 
 
