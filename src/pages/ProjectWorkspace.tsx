@@ -1516,8 +1516,8 @@ export default function ProjectWorkspace() {
                 const isFree = layoutMode === "free";
                 // Einheitlicher px/mm-Faktor für alle Free-Layout-Offsets, damit
                 // Kanten benachbarter Seiten wirklich passgenau snappen.
-                const refFmt = FORMAT_SIZES[pages[0].format];
-                const pxPerMm = (1100 / refFmt.w) * (zoom / 100);
+                const refFmt = getPageSizeMm(pages[0]);
+                const pxPerMm = (1100 / refFmt.wMm) * (zoom / 100);
                 return (
                   <div
                     className="min-h-full flex items-start justify-center"
