@@ -22,6 +22,8 @@ import {
   Folder as FolderIcon,
   FolderPlus,
   Circle,
+  Coins,
+  ShoppingBag,
 } from "lucide-react";
 import {
   useProjects,
@@ -186,30 +188,22 @@ export default function ProjectsHome() {
     >
       {/* ============= TOP HEADER ============= */}
       <header
-        className="h-14 shrink-0 flex items-center gap-3 px-4 border-b"
+        className="h-20 shrink-0 flex items-center gap-4 px-6 border-b"
         style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
       >
-        <div
-          className="w-9 h-9 rounded-lg flex items-center justify-center text-sm font-semibold shrink-0"
-          style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
-        >
-          P
-        </div>
-        <Pixuna />
-
         <button
           onClick={createProject}
           disabled={!canCreateProject}
-          className="ml-3 h-9 px-3.5 rounded-md flex items-center gap-1.5 text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+          className="h-12 px-5 rounded-lg flex items-center gap-2 text-base font-semibold disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
           style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
           title={canCreateProject ? "Neues Projekt anlegen" : `Maximal ${MAX_PROJECTS} Projekte`}
         >
-          <Plus size={15} /> Projekt
+          <Plus size={18} /> Projekt
         </button>
 
-        <div className="ml-2 flex items-center gap-1">
+        <div className="ml-3 flex items-center gap-1">
           <NavIcon
-            icon={<FolderKanban size={17} />}
+            icon={<FolderKanban size={19} />}
             label="Projekte"
             active={mode === "projects"}
             onClick={() => {
@@ -218,7 +212,7 @@ export default function ProjectsHome() {
             }}
           />
           <NavIcon
-            icon={<LayoutTemplate size={17} />}
+            icon={<LayoutTemplate size={19} />}
             label="Vorlagen"
             active={mode === "templates"}
             onClick={() => {
@@ -226,29 +220,36 @@ export default function ProjectsHome() {
               setSelectedId(projects.find((p) => p.isTemplate)?.id);
             }}
           />
-          <NavIcon icon={<Star size={17} />} label="Favoriten" />
-          <NavIcon icon={<Users size={17} />} label="Geteilt (bald verfügbar)" disabled />
-          <NavIcon icon={<Trash2 size={17} />} label="Papierkorb (bald verfügbar)" disabled />
+          <NavIcon icon={<Star size={19} />} label="Favoriten" />
+          <NavIcon icon={<Users size={19} />} label="Geteilt (bald verfügbar)" disabled />
+          <NavIcon icon={<Trash2 size={19} />} label="Papierkorb (bald verfügbar)" disabled />
         </div>
 
         <div className="flex-1" />
+
+        {/* Währung + Shop (bald verfügbar) */}
+        <div className="flex items-center gap-1 mr-2">
+          <NavIcon icon={<Coins size={19} />} label="Währung (bald verfügbar)" disabled />
+          <NavIcon icon={<ShoppingBag size={19} />} label="Shop (bald verfügbar)" disabled />
+        </div>
 
         {/* Profil oben rechts */}
         <div className="relative" ref={profileRef}>
           <button
             onClick={() => setProfileOpen((v) => !v)}
-            className="flex items-center gap-2.5 h-10 pl-1 pr-3 rounded-full hover:bg-muted transition"
+            className="flex items-center gap-3 h-14 pl-1.5 pr-4 rounded-full border hover:bg-muted transition shadow-sm"
+            style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface))" }}
             title="Profil"
           >
             <ProfileAvatar
               profile={profile}
               count={projectCount}
               max={MAX_PROJECTS}
-              size={36}
+              size={48}
             />
             <div className="hidden md:flex flex-col items-start leading-tight">
-              <span className="text-sm font-medium">{profile.name}</span>
-              <span className="text-[10px]" style={{ color: statusColor(profile.status) }}>
+              <span className="text-sm font-semibold">{profile.name}</span>
+              <span className="text-[11px]" style={{ color: statusColor(profile.status) }}>
                 {statusLabel(profile.status)}
               </span>
             </div>
@@ -331,26 +332,38 @@ export default function ProjectsHome() {
               <PanelLeftClose size={16} />
             </button>
             <div className="px-4 pt-4 pb-3">
-              <div className="flex items-center justify-between mb-2">
+              <div className="mb-2">
                 <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">
                   {mode === "templates" ? "VORLAGEN" : "PROJEKTE"}
                 </div>
-                {mode === "projects" && !creatingFolder && (
-                  <button
-                    onClick={() => {
-                      setCreatingFolder(true);
-                      setNewFolderName("");
-                    }}
-                    className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1"
-                    title="Ordner anlegen"
-                  >
-                    <FolderPlus size={12} /> Ordner
-                  </button>
-                )}
               </div>
+              <div
+                className="flex items-center gap-2 h-9 rounded-md px-2.5"
+                style={{ background: "hsl(var(--surface-muted))" }}
+              >
+                <Search size={14} className="text-muted-foreground" />
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder={mode === "templates" ? "Vorlagen suchen..." : "Projekte suchen..."}
+                  className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                />
+              </div>
+              {mode === "projects" && !creatingFolder && (
+                <button
+                  onClick={() => {
+                    setCreatingFolder(true);
+                    setNewFolderName("");
+                  }}
+                  className="mt-2 text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1"
+                  title="Ordner anlegen"
+                >
+                  <FolderPlus size={12} /> Ordner
+                </button>
+              )}
               {creatingFolder && (
                 <div
-                  className="flex items-center gap-1 mb-2 rounded-md px-2 py-1"
+                  className="flex items-center gap-1 mt-2 rounded-md px-2 py-1"
                   style={{ background: "hsl(var(--surface-muted))" }}
                 >
                   <FolderIcon size={13} style={{ color: "hsl(var(--accent-gold))" }} />
@@ -377,19 +390,8 @@ export default function ProjectsHome() {
                   </button>
                 </div>
               )}
-              <div
-                className="flex items-center gap-2 h-9 rounded-md px-2.5"
-                style={{ background: "hsl(var(--surface-muted))" }}
-              >
-                <Search size={14} className="text-muted-foreground" />
-                <input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder={mode === "templates" ? "Vorlagen suchen..." : "Projekte suchen..."}
-                  className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-                />
-              </div>
             </div>
+
 
             <div className="flex-1 overflow-y-auto px-2 pb-4 space-y-1">
               {/* Ordner */}
