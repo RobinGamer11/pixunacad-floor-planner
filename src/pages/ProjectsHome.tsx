@@ -790,57 +790,75 @@ export default function ProjectsHome() {
               {/* Wetter für Projektort */}
               <WeatherStrip ort={selected.ort} />
 
-              {/* Großer "Projekt bearbeiten"-Button (führt in die Projektmappe) */}
-              <button
-                onClick={() => navigate(`/project/${selected.id}`)}
-                className="mt-5 w-full h-14 rounded-xl flex items-center justify-between px-6 text-base font-semibold transition hover:opacity-90"
-                style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
-              >
-                <span className="flex items-center gap-3">
-                  <Play size={18} fill="currentColor" /> Projekt bearbeiten
-                </span>
-                <ChevronRight size={18} />
-              </button>
-
-              {/* Tabs */}
+              {/* Große Aktion links + Reiter rechts (eine Zeile) */}
               <div
-                className="mt-5 flex items-center gap-7 text-sm border-b overflow-x-auto"
+                className="mt-5 flex items-center gap-6 border-b"
                 style={{ borderColor: "hsl(var(--hairline))" }}
               >
-                {(
-                  [
-                    ["uebersicht", "Übersicht", false],
-                    ["seiten", "Mappen", false],
-                    ["aufgaben", "Aufgaben", false],
-                    ["dokumente", "Dokumente", false],
-                    ["infos", "Infos", false],
-                    ["team", "Team", true],
-                  ] as const
-                ).map(([key, label, disabled]) => (
-                  <button
-                    key={key}
-                    onClick={() => !disabled && setTab(key as Tab)}
-                    disabled={disabled}
-                    title={disabled ? "Bald verfügbar" : undefined}
-                    className="py-3 relative whitespace-nowrap disabled:cursor-not-allowed"
-                    style={{
-                      color: disabled
-                        ? "hsl(var(--ink-soft) / 0.5)"
-                        : tab === key ? "hsl(var(--ink))" : "hsl(var(--ink-soft))",
-                      fontWeight: tab === key ? 600 : 400,
-                      opacity: disabled ? 0.5 : 1,
-                    }}
+                <button
+                  onClick={() => navigate(`/project/${selected.id}`)}
+                  className="h-11 rounded-lg flex items-center gap-3 pl-3 pr-4 text-sm font-semibold transition hover:opacity-90 shrink-0 -mb-px"
+                  style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
+                >
+                  <span
+                    className="h-6 w-6 rounded-full flex items-center justify-center"
+                    style={{ background: "hsl(var(--accent-gold))", color: "hsl(var(--ink))" }}
                   >
-                    {label}
-                    {tab === key && !disabled && (
-                      <span
-                        className="absolute left-0 right-0 -bottom-px h-[2px]"
-                        style={{ background: "hsl(var(--accent-gold))" }}
-                      />
-                    )}
-                  </button>
-                ))}
+                    <Play size={12} fill="currentColor" />
+                  </span>
+                  Projekt bearbeiten
+                  <ChevronRight size={16} />
+                </button>
+
+                <div className="flex items-center gap-7 text-sm overflow-x-auto flex-1 min-w-0">
+                  {(
+                    [
+                      ["uebersicht", "Übersicht", false],
+                      ["seiten", "Mappe", false],
+                      ["aufgaben", "Aufgaben", false],
+                      ["dokumente", "Dokumente", false],
+                      ["infos", "Informationen", false],
+                      ["team", "Team", true],
+                    ] as const
+                  ).map(([key, label, disabled]) => (
+                    <button
+                      key={key}
+                      onClick={() => !disabled && setTab(key as Tab)}
+                      disabled={disabled}
+                      title={disabled ? "Bald verfügbar" : undefined}
+                      className="py-3 relative whitespace-nowrap disabled:cursor-not-allowed"
+                      style={{
+                        color: disabled
+                          ? "hsl(var(--ink-soft) / 0.5)"
+                          : tab === key ? "hsl(var(--ink))" : "hsl(var(--ink-soft))",
+                        fontWeight: tab === key ? 600 : 400,
+                        opacity: disabled ? 0.5 : 1,
+                      }}
+                    >
+                      {label}
+                      {tab === key && !disabled && (
+                        <span
+                          className="absolute left-0 right-0 -bottom-px h-[2px]"
+                          style={{ background: "hsl(var(--accent-gold))" }}
+                        />
+                      )}
+                    </button>
+                  ))}
+                  {!selected.isTemplate && (
+                    <button
+                      onClick={() => {
+                        const id = projectStore.duplicateAsTemplate(selected.id);
+                        if (id) { setMode("templates"); setSelectedId(id); }
+                      }}
+                      title="Als Vorlage speichern"
+                      className="ml-auto py-3 text-[12px] text-muted-foreground hover:text-foreground whitespace-nowrap flex items-center gap-1"
+                    >
+                      Vorlage <Plus size={12} />
+                    </button>
+                  )}
+                </div>
               </div>
+
 
               {tab === "uebersicht" && <UebersichtView project={selected} />}
               {tab === "seiten" && (
