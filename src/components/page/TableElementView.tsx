@@ -207,7 +207,11 @@ export function TableElementView({
               {cells[r].map((_, c) => {
                 const isHeader = headerRow && r === 0;
                 const value = cells[r][c];
-                const display = value.startsWith("=") ? String(evalCell(cells, r, c)) : value;
+                const isPickTarget = pickFn && pickTarget && pickTarget.r === r && pickTarget.c === c;
+                const showPreviewValue = isPickTarget && previewFormula;
+                const display = showPreviewValue
+                  ? previewFormula!.value
+                  : value.startsWith("=") ? String(evalCell(cells, r, c)) : value;
                 const isEditing = editing?.r === r && editing?.c === c;
                 const highlight = isCellHighlighted(r, c);
                 return (
@@ -222,6 +226,7 @@ export function TableElementView({
                       cursor: pickFn ? "crosshair" : undefined,
                     }}
                     onDoubleClick={() => !readOnly && !pickFn && setEditing({ r, c })}
+                    onMouseEnter={() => { if (pickFn) setPickHover({ r, c }); }}
                     onClick={(e) => {
                       if ((e as any).pointerType === "touch") { handleCellClick(r, c); return; }
                     }}
@@ -244,7 +249,10 @@ export function TableElementView({
                         style={{ minHeight: 32 }}
                         onClick={() => handleCellClick(r, c)}
                       >
-                        <span className="truncate">{display}</span>
+                        <span
+                          className="truncate"
+                          style={showPreviewValue ? { color: "hsl(var(--primary))", fontStyle: "italic" } : undefined}
+                        >{display}</span>
                         {isHeader && !readOnly && !pickFn && (
                           <button
                             onClick={(e) => { e.stopPropagation(); setOpenFilter(openFilter === c ? null : c); }}
