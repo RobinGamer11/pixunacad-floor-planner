@@ -775,9 +775,9 @@ export default function ProjectsHome() {
               {/* Wetter für Projektort */}
               <WeatherStrip ort={selected.ort} />
 
-              {/* Große Aktion links + Reiter rechts (eine Zeile) */}
+              {/* Große Aktion links + Reiter rechts (eine Zeile, Reiter am Unterrand des Buttons ausgerichtet) */}
               <div
-                className="mt-5 flex items-center gap-6 border-b"
+                className="mt-4 flex items-end gap-4 border-b"
                 style={{ borderColor: "hsl(var(--hairline))" }}
               >
                 <button
@@ -795,7 +795,7 @@ export default function ProjectsHome() {
                   <ChevronRight size={16} />
                 </button>
 
-                <div className="flex items-center gap-7 text-sm overflow-x-auto flex-1 min-w-0">
+                <div className="flex items-end gap-4 text-sm flex-1 min-w-0 tabs-scroll">
                   {(
                     [
                       ["uebersicht", "Übersicht", false],
@@ -811,7 +811,7 @@ export default function ProjectsHome() {
                       onClick={() => !disabled && setTab(key as Tab)}
                       disabled={disabled}
                       title={disabled ? "Bald verfügbar" : undefined}
-                      className="py-3 relative whitespace-nowrap disabled:cursor-not-allowed"
+                      className="pb-2 relative whitespace-nowrap disabled:cursor-not-allowed"
                       style={{
                         color: disabled
                           ? "hsl(var(--ink-soft) / 0.5)"
@@ -836,13 +836,14 @@ export default function ProjectsHome() {
                         if (id) { setMode("templates"); setSelectedId(id); }
                       }}
                       title="Als Vorlage speichern"
-                      className="ml-auto py-3 text-[12px] text-muted-foreground hover:text-foreground whitespace-nowrap flex items-center gap-1"
+                      className="ml-auto pb-2 text-[12px] text-muted-foreground hover:text-foreground whitespace-nowrap flex items-center gap-1"
                     >
                       Vorlage <Plus size={12} />
                     </button>
                   )}
                 </div>
               </div>
+
 
 
               {tab === "uebersicht" && <UebersichtView project={selected} />}
