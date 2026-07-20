@@ -1666,7 +1666,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           </button>
         </div>
 
-        <DragScrollDiv axis="y" className="flex-1 min-h-0 overflow-y-auto p-2" style={{ display: rightTab === "settings" ? "block" : "none" }}>
+        <DragScrollDiv axis="both" className="flex-1 min-h-0 overflow-auto p-2 cursor-grab active:cursor-grabbing" style={{ display: rightTab === "settings" ? "block" : "none" }}>
         {/* Settings area (scrollable) */}
         <div className="flex-1 min-h-0 p-2">
           {/* Raster-Einstellungen */}
@@ -2910,7 +2910,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           )}
         </div>
         </DragScrollDiv>
-        <DragScrollDiv axis="y" className="flex-1 min-h-0 overflow-y-auto p-2 space-y-2" style={{ display: rightTab === "sheets" ? "block" : "none" }}>
+        <DragScrollDiv axis="both" className="flex-1 min-h-0 overflow-auto p-2 space-y-2 cursor-grab active:cursor-grabbing" style={{ display: rightTab === "sheets" ? "block" : "none" }}>
           {/* Zeichnungs-ID Panel (Blätter + Transparentpause) */}
           <div ref={sheetPanelRef} className="cad-id-panel w-full">
             <div className="id-head">
@@ -2955,7 +2955,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             </div>
           </div>
         </DragScrollDiv>
-        <DragScrollDiv axis="y" className="flex-1 min-h-0 overflow-y-auto p-2 space-y-2" style={{ display: rightTab === "layers" ? "block" : "none" }}>
+        <DragScrollDiv axis="both" className="flex-1 min-h-0 overflow-auto p-2 space-y-2 cursor-grab active:cursor-grabbing" style={{ display: rightTab === "layers" ? "block" : "none" }}>
           <div ref={idPanelRef} className="cad-id-panel w-full">
             <div className="id-head">
               <div className="id-title">Bezeichnungs-ID</div>

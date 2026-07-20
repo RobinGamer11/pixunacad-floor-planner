@@ -3223,7 +3223,7 @@ function RightInspector({
         </button>
       </div>
 
-      <DragScrollDiv axis="y" className="flex-1 overflow-y-auto p-2 space-y-2">
+      <DragScrollDiv axis="both" className="flex-1 min-h-0 overflow-auto p-2 space-y-2 cursor-grab active:cursor-grabbing">
 
 
         {tab === "settings" && page && <PageSettings projectId={projectId} page={page} />}
@@ -5287,7 +5287,7 @@ function PrintPanel({
         </button>
       </div>
 
-      <DragScrollDiv axis="y" className="flex-1 overflow-y-auto p-4 space-y-5">
+      <DragScrollDiv axis="both" className="flex-1 min-h-0 overflow-auto p-4 space-y-5 cursor-grab active:cursor-grabbing">
         <section>
           <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-2">
             SEITEN

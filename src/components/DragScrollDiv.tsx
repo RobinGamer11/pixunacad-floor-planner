@@ -12,7 +12,7 @@ export const DragScrollDiv = React.forwardRef<HTMLDivElement, Props>(
     return (
       <div
         ref={ref}
-        className={`no-scrollbar overscroll-contain ${className ?? ""}`}
+        className={`no-scrollbar scrollbarless-panel overscroll-contain ${className ?? ""}`}
         style={{ touchAction: "none", ...style }}
         {...rest}
       >
