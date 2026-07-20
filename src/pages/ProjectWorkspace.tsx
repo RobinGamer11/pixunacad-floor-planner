@@ -544,11 +544,13 @@ export default function ProjectWorkspace() {
       const targetPageId = pending.returnPageId || project?.pages[0]?.id;
       if (!targetPageId) return;
       const targetPage = project?.pages.find((p) => p.id === targetPageId);
-      const fmt = targetPage ? FORMAT_SIZES[targetPage.format] : FORMAT_SIZES["A3-quer"];
+      const fmt = targetPage
+        ? getPageSizeMm(targetPage)
+        : { wMm: FORMAT_SIZES["A3-quer"].w, hMm: FORMAT_SIZES["A3-quer"].h };
       const paperW = pending.paperWidthMm ?? 100;
       const paperH = pending.paperHeightMm ?? 100;
-      const wPct = Math.max(2, Math.min(95, (paperW / fmt.w) * 100));
-      const hPct = Math.max(2, Math.min(95, (paperH / fmt.h) * 100));
+      const wPct = Math.max(2, Math.min(95, (paperW / fmt.wMm) * 100));
+      const hPct = Math.max(2, Math.min(95, (paperH / fmt.hMm) * 100));
       const xPct = Math.max(0, (100 - wPct) / 2);
       const yPct = Math.max(0, (100 - hPct) / 2);
       projectStore.addElement(projectId, targetPageId, {
