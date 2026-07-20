@@ -3277,7 +3277,7 @@ function RightInspector({
             />
           </div>
         )}
-      </div>
+      </DragScrollDiv>
     </aside>
   );
 }
@@ -5398,7 +5398,7 @@ function PrintPanel({
             </label>
           </section>
         )}
-      </div>
+      </DragScrollDiv>
 
       {progress && (
         <div
