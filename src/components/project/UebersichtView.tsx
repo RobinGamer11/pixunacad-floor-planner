@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Pencil, Check, X, Trash2, Settings2, GripVertical } from "lucide-react";
+import { Plus, Pencil, Check, X, Trash2, Settings2, GripVertical, ChevronDown, ChevronRight } from "lucide-react";
 import { projectStore, type Project, type Task } from "@/lib/projectStore";
 import { notesStore, useNotes } from "@/lib/notesStore";
 import { AufgabenView } from "@/pages/ProjectsHome";
@@ -30,7 +30,7 @@ export function UebersichtView({ project }: Props) {
   );
 }
 
-/* ============================================================ Hero (nur Bild) */
+/* ============================================================ Hero (nur Bild, ohne Label) */
 function HeroPanel({ project }: { project: Project }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const handleThumb = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -42,12 +42,9 @@ function HeroPanel({ project }: { project: Project }) {
   };
   return (
     <section
-      className="rounded-2xl p-5"
+      className="rounded-2xl p-3"
       style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
     >
-      <div className="text-[10px] font-semibold tracking-[0.18em] text-muted-foreground mb-3">
-        PROJEKTTITELBILD
-      </div>
       <div className="rounded-xl overflow-hidden aspect-[16/9] relative group" style={{ background: "hsl(var(--surface-muted))" }}>
         <img src={project.thumbnail} alt="" className="w-full h-full object-cover" />
         <button
@@ -64,19 +61,108 @@ function HeroPanel({ project }: { project: Project }) {
   );
 }
 
-/* ============================================================ Konzept (nur Text) */
+/* ============================================================ Konzept (einklappbar, umbenennbar) */
 function KonzeptPanel({ project }: { project: Project }) {
+  const collapsed = !!project.konzeptCollapsed;
+  const title = project.konzeptTitle ?? "Konzept";
+  const [renaming, setRenaming] = useState(false);
+  const [titleDraft, setTitleDraft] = useState(title);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(project.konzept ?? "");
+
+  const saveTitle = () => {
+    const v = titleDraft.trim() || "Konzept";
+    projectStore.updateProject(project.id, { konzeptTitle: v });
+    setRenaming(false);
+  };
+
   return (
     <section
       className="rounded-2xl p-5"
       style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
     >
-      <InlineEditableText
-        title="KONZEPT"
-        value={project.konzept ?? ""}
-        placeholder="Konzept, Leitgedanke oder kurze Beschreibung des Projekts…"
-        onSave={(v) => projectStore.updateProject(project.id, { konzept: v })}
-      />
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => projectStore.updateProject(project.id, { konzeptCollapsed: !collapsed })}
+          className="h-6 w-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted"
+          title={collapsed ? "Aufklappen" : "Einklappen"}
+        >
+          {collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+        </button>
+        {renaming ? (
+          <input
+            autoFocus
+            value={titleDraft}
+            onChange={(e) => setTitleDraft(e.target.value)}
+            onBlur={saveTitle}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") saveTitle();
+              if (e.key === "Escape") { setTitleDraft(title); setRenaming(false); }
+            }}
+            className="flex-1 text-xs font-semibold tracking-[0.18em] uppercase bg-transparent border-b outline-none"
+            style={{ borderColor: "hsl(var(--hairline))", color: "hsl(var(--accent-gold))" }}
+          />
+        ) : (
+          <div
+            className="flex-1 text-xs font-semibold tracking-[0.18em] uppercase cursor-text"
+            style={{ color: "hsl(var(--accent-gold))" }}
+            onDoubleClick={() => { setTitleDraft(title); setRenaming(true); }}
+            title="Doppelklick zum Umbenennen"
+          >
+            {title}
+          </div>
+        )}
+        <button
+          onClick={() => { setTitleDraft(title); setRenaming(true); }}
+          className="h-6 w-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted"
+          title="Titel umbenennen"
+        >
+          <Pencil size={12} />
+        </button>
+        {!collapsed && !editing && (
+          <button
+            onClick={() => { setDraft(project.konzept ?? ""); setEditing(true); }}
+            className="h-6 w-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted"
+            title="Text bearbeiten"
+          >
+            <Pencil size={12} />
+          </button>
+        )}
+      </div>
+
+      {!collapsed && (
+        editing ? (
+          <div className="mt-3 space-y-2">
+            <textarea
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              rows={6}
+              className="w-full text-sm rounded-md border p-2 bg-transparent outline-none"
+              style={{ borderColor: "hsl(var(--hairline))" }}
+            />
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setEditing(false)}
+                className="h-8 px-3 rounded-md border text-xs flex items-center gap-1"
+                style={{ borderColor: "hsl(var(--hairline))" }}
+              >
+                <X size={12} /> Abbrechen
+              </button>
+              <button
+                onClick={() => { projectStore.updateProject(project.id, { konzept: draft }); setEditing(false); }}
+                className="h-8 px-3 rounded-md text-xs font-medium flex items-center gap-1"
+                style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
+              >
+                <Check size={12} /> Speichern
+              </button>
+            </div>
+          </div>
+        ) : (
+          <p className="mt-3 text-sm leading-relaxed text-muted-foreground whitespace-pre-wrap min-h-[3em]">
+            {project.konzept || `${title}, Leitgedanke oder kurze Beschreibung des Projekts…`}
+          </p>
+        )
+      )}
     </section>
   );
 }

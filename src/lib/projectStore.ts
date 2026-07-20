@@ -241,6 +241,10 @@ export interface Project {
   tasks: Task[];
   events: CalendarEvent[];
   konzept?: string;
+  /** Anzeigename für den Konzept-Abschnitt (default: "Konzept"). */
+  konzeptTitle?: string;
+  /** Ist der Konzept-Abschnitt aufgeklappt? Default: true. */
+  konzeptCollapsed?: boolean;
   customFields?: CustomField[];
   isTemplate?: boolean;
   /** Projektmappen (falls fehlend, wird beim Laden eine "Hauptmappe" erzeugt). */
