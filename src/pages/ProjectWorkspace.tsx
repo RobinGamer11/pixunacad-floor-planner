@@ -2338,7 +2338,8 @@ function PageCanvas({
           />
         )}
         {overlayPage && (() => {
-          const ofmt = FORMAT_SIZES[overlayPage.format];
+          const _ofs = getPageSizeMm(overlayPage);
+          const ofmt = { w: _ofs.wMm, h: _ofs.hMm };
           const tint = overlayColor;
           return (
             <div
