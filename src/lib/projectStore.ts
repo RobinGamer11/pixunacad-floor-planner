@@ -551,7 +551,7 @@ function getHist(id: string): HistoryEntry {
 }
 function notifyHistory() { historyListeners.forEach((fn) => fn()); }
 
-function setState(updater: (s: State) => State) {
+function setState(updater: (s: State) => Partial<State>) {
   const prev = state;
   const prevById = new Map(prev.projects.map((p) => [p.id, p] as const));
   state = updater(state);
