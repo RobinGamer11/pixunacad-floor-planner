@@ -963,3 +963,6 @@
 .tabs-scroll::-webkit-scrollbar-track { background: transparent; }
 .tabs-scroll::-webkit-scrollbar-thumb { background: hsl(var(--hairline)); border-radius: 2px; }
 .tabs-scroll::-webkit-scrollbar-thumb:hover { background: hsl(var(--accent-gold) / 0.4); }
+
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
