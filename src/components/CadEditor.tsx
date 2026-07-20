@@ -270,6 +270,19 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const [rightTab, setRightTab] = useState<"settings" | "sheets" | "layers">("settings");
   
   const [expandedTool, setExpandedTool] = useState<string | null>(null);
+  const leftSidebarRef = useRef<HTMLElement>(null);
+  // Outside-Klick schließt das Werkzeug-Flyout (Freihand/Radiergummi/Schraffur-Varianten …).
+  useEffect(() => {
+    if (!expandedTool) return;
+    const onDown = (e: MouseEvent | PointerEvent) => {
+      const el = leftSidebarRef.current;
+      if (!el) return;
+      if (el.contains(e.target as Node)) return;
+      setExpandedTool(null);
+    };
+    document.addEventListener("pointerdown", onDown, true);
+    return () => document.removeEventListener("pointerdown", onDown, true);
+  }, [expandedTool]);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [hatchDrawMode, setHatchDrawMode] = useState<HatchDrawMode>("polygon");
