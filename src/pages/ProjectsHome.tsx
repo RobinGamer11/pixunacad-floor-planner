@@ -22,6 +22,8 @@ import {
   Folder as FolderIcon,
   FolderPlus,
   Circle,
+  Coins,
+  ShoppingBag,
 } from "lucide-react";
 import {
   useProjects,
