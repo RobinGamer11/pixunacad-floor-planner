@@ -127,8 +127,9 @@ export function WorkspaceHeader({
         )}
 
 
-        <div className="ml-2 flex items-center gap-1 rounded-md p-0.5"
+        <div className="ml-2 flex items-center gap-1 rounded-md p-0.5 shrink-0"
              style={{ background: "hsl(var(--surface-muted))" }}>
+
           <ModeButton
             icon={<FolderKanban size={13} />}
             label="Projektmappe"
