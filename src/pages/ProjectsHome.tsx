@@ -105,25 +105,111 @@ export default function ProjectsHome() {
     navigate(`/project/${selected.id}?page=${pageId}`);
   };
 
+  const folders = useFolders();
+  const profile = useProfile();
+
+  // Ordner-Anlage (Name eingeben vor Erstellung)
+  const [creatingFolder, setCreatingFolder] = useState(false);
+  const [newFolderName, setNewFolderName] = useState("");
+  const [renamingFolderId, setRenamingFolderId] = useState<string | null>(null);
+  const [renameFolderDraft, setRenameFolderDraft] = useState("");
+
+  // Profil-Dropdown
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!profileOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (!profileRef.current?.contains(e.target as Node)) setProfileOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [profileOpen]);
+
+  // Drag & Drop von Projekten in Ordner
+  const [dragProjectId, setDragProjectId] = useState<string | null>(null);
+  const [dragOverFolder, setDragOverFolder] = useState<string | "root" | null>(null);
+
+  const projectsByFolder = useMemo(() => {
+    const map = new Map<string | null, Project[]>();
+    for (const p of filtered) {
+      const key = p.folderId ?? null;
+      const arr = map.get(key) ?? [];
+      arr.push(p);
+      map.set(key, arr);
+    }
+    return map;
+  }, [filtered]);
+
+  const rootProjects = projectsByFolder.get(null) ?? [];
+  const projectCount = projects.filter((p) => !p.isTemplate).length;
+  const canCreateProject = projectCount < MAX_PROJECTS;
+
+  const createProject = () => {
+    if (!canCreateProject) {
+      alert(`Maximal ${MAX_PROJECTS} Projekte möglich. Lösche zuerst ein bestehendes Projekt.`);
+      return;
+    }
+    const id = projectStore.createProject();
+    setSelectedId(id);
+  };
+
+  const commitNewFolder = () => {
+    const name = newFolderName.trim();
+    if (!name) {
+      setCreatingFolder(false);
+      setNewFolderName("");
+      return;
+    }
+    projectStore.addProjectFolder(name);
+    setCreatingFolder(false);
+    setNewFolderName("");
+  };
+
+  const handleDropOnFolder = (folderId: string | null) => {
+    if (dragProjectId) {
+      projectStore.moveProjectToFolder(dragProjectId, folderId);
+    }
+    setDragProjectId(null);
+    setDragOverFolder(null);
+  };
+
+  const statusColor = (s: ProfileStatus) =>
+    s === "online" ? "hsl(140 60% 45%)" : s === "busy" ? "hsl(0 70% 55%)" : "hsl(0 0% 65%)";
+  const statusLabel = (s: ProfileStatus) =>
+    s === "online" ? "Online" : s === "busy" ? "Beschäftigt" : "Offline";
+
   return (
     <div
-      className="flex h-screen w-screen overflow-hidden"
+      className="flex flex-col h-screen w-screen overflow-hidden"
       style={{ background: "hsl(var(--surface))", color: "hsl(var(--ink))" }}
     >
-      {/* Far-left nav rail */}
-      <aside
-        className="flex flex-col items-center justify-between py-4 w-14 shrink-0 border-r"
-        style={{ borderColor: "hsl(var(--hairline))" }}
+      {/* ============= TOP HEADER ============= */}
+      <header
+        className="h-14 shrink-0 flex items-center gap-3 px-4 border-b"
+        style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
       >
-        <div className="flex flex-col items-center gap-5">
-          <div
-            className="w-9 h-9 rounded-lg flex items-center justify-center text-sm font-semibold"
-            style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
-          >
-            P
-          </div>
+        <div
+          className="w-9 h-9 rounded-lg flex items-center justify-center text-sm font-semibold shrink-0"
+          style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
+        >
+          P
+        </div>
+        <Pixuna />
+
+        <button
+          onClick={createProject}
+          disabled={!canCreateProject}
+          className="ml-3 h-9 px-3.5 rounded-md flex items-center gap-1.5 text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+          style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
+          title={canCreateProject ? "Neues Projekt anlegen" : `Maximal ${MAX_PROJECTS} Projekte`}
+        >
+          <Plus size={15} /> Projekt
+        </button>
+
+        <div className="ml-2 flex items-center gap-1">
           <NavIcon
-            icon={<FolderKanban size={18} />}
+            icon={<FolderKanban size={17} />}
             label="Projekte"
             active={mode === "projects"}
             onClick={() => {
@@ -132,7 +218,7 @@ export default function ProjectsHome() {
             }}
           />
           <NavIcon
-            icon={<LayoutTemplate size={18} />}
+            icon={<LayoutTemplate size={17} />}
             label="Vorlagen"
             active={mode === "templates"}
             onClick={() => {
@@ -140,357 +226,683 @@ export default function ProjectsHome() {
               setSelectedId(projects.find((p) => p.isTemplate)?.id);
             }}
           />
-          <NavIcon icon={<Star size={18} />} label="Favoriten" />
-          <NavIcon icon={<Users size={18} />} label="Geteilt (bald verfügbar)" disabled />
-          <NavIcon icon={<Trash2 size={18} />} label="Papierkorb (bald verfügbar)" disabled />
+          <NavIcon icon={<Star size={17} />} label="Favoriten" />
+          <NavIcon icon={<Users size={17} />} label="Geteilt (bald verfügbar)" disabled />
+          <NavIcon icon={<Trash2 size={17} />} label="Papierkorb (bald verfügbar)" disabled />
         </div>
-        <div className="flex flex-col items-center gap-3">
-          <div
-            className="w-8 h-8 rounded-full opacity-40"
-            style={{ background: "hsl(var(--surface-muted))", border: "1px solid hsl(var(--hairline))" }}
-            title="Profil (bald verfügbar)"
-          />
-          <button
-            className="text-muted-foreground opacity-40 cursor-not-allowed"
-            title="Einstellungen (bald verfügbar)"
-            disabled
-          >
-            <Settings size={18} />
-          </button>
-        </div>
-      </aside>
 
-      {/* Left projects column (collapsible) */}
-      {leftOpen ? (
-        <aside
-          className="w-[300px] shrink-0 flex flex-col border-r relative"
-          style={{ borderColor: "hsl(var(--hairline))" }}
-        >
+        <div className="flex-1" />
+
+        {/* Profil oben rechts */}
+        <div className="relative" ref={profileRef}>
           <button
-            onClick={() => setLeftOpen(false)}
-            title="Projekte einklappen"
-            className="absolute top-4 right-3 text-muted-foreground hover:text-foreground"
+            onClick={() => setProfileOpen((v) => !v)}
+            className="flex items-center gap-2.5 h-10 pl-1 pr-3 rounded-full hover:bg-muted transition"
+            title="Profil"
           >
-            <PanelLeftClose size={16} />
-          </button>
-          <div className="px-5 pt-5 pb-3">
-            <Pixuna />
-            <div className="mt-5 text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">
-              {mode === "templates" ? "VORLAGEN" : "PROJEKTE"}
+            <ProfileAvatar
+              profile={profile}
+              count={projectCount}
+              max={MAX_PROJECTS}
+              size={36}
+            />
+            <div className="hidden md:flex flex-col items-start leading-tight">
+              <span className="text-sm font-medium">{profile.name}</span>
+              <span className="text-[10px]" style={{ color: statusColor(profile.status) }}>
+                {statusLabel(profile.status)}
+              </span>
             </div>
-            {mode === "projects" && (
-              <button
-                onClick={() => {
-                  const id = projectStore.createProject();
-                  setSelectedId(id);
-                }}
-                className="mt-3 w-full h-10 rounded-lg flex items-center justify-center gap-2 text-sm font-medium"
-                style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
-              >
-                <Plus size={15} /> Neues Projekt
-              </button>
-            )}
+          </button>
+          {profileOpen && (
             <div
-              className="mt-3 flex items-center gap-2 h-9 rounded-md px-2.5"
-              style={{ background: "hsl(var(--surface-muted))" }}
+              className="absolute right-0 top-full mt-2 w-80 rounded-xl border shadow-lg z-30 p-4"
+              style={{ background: "hsl(var(--surface))", borderColor: "hsl(var(--hairline))" }}
             >
-              <Search size={14} className="text-muted-foreground" />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder={mode === "templates" ? "Vorlagen suchen..." : "Projekte suchen..."}
-                className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-              />
-            </div>
-          </div>
-          <div className="flex-1 overflow-y-auto px-3 pb-4 space-y-2">
-            {filtered.map((p) => {
-              const active = selected?.id === p.id;
-              return (
-                <button
-                  key={p.id}
-                  onClick={() => setSelectedId(p.id)}
-                  onDoubleClick={() => navigate(`/project/${p.id}`)}
-                  className="w-full text-left rounded-xl p-2.5 flex gap-3 transition border"
-                  style={{
-                    background: active ? "hsl(var(--surface-card))" : "hsl(var(--surface))",
-                    borderColor: active ? "hsl(var(--accent-gold) / 0.4)" : "transparent",
-                    boxShadow: active ? "0 1px 0 hsl(var(--accent-gold) / 0.1)" : "none",
-                  }}
-                >
-                  <img
-                    src={p.thumbnail}
-                    alt=""
-                    className="w-16 h-16 rounded-lg object-cover shrink-0"
-                    style={{ background: "hsl(var(--surface-muted))" }}
+              <div className="flex items-center gap-4">
+                <ProfileAvatar profile={profile} count={projectCount} max={MAX_PROJECTS} size={72} large />
+                <div className="flex-1 min-w-0">
+                  <input
+                    value={profile.name}
+                    onChange={(e) => projectStore.updateProfile({ name: e.target.value })}
+                    className="w-full bg-transparent text-sm font-semibold outline-none border-b pb-1"
+                    style={{ borderColor: "hsl(var(--hairline))" }}
                   />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-sm font-semibold truncate">{p.name}</span>
-                      {p.favorite && (
-                        <Star
-                          size={12}
-                          className="shrink-0"
-                          fill="hsl(var(--accent-gold))"
-                          stroke="hsl(var(--accent-gold))"
-                        />
-                      )}
-                    </div>
-                    <div className="text-xs text-muted-foreground truncate">{p.ort}</div>
-                    <div className="text-[11px] text-muted-foreground mt-1">
-                      {p.pages.length} Seiten · {p.sheets.length} Zeichnungen
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-          <div
-            className="px-5 py-3 text-[11px] text-muted-foreground border-t"
-            style={{ borderColor: "hsl(var(--hairline))" }}
-          >
-            {projects.length} Projekte
-          </div>
-        </aside>
-      ) : (
-        <div
-          className="w-8 shrink-0 border-r flex items-start justify-center pt-4"
-          style={{ borderColor: "hsl(var(--hairline))" }}
-        >
-          <button
-            onClick={() => setLeftOpen(true)}
-            title="Projekte ausklappen"
-            className="text-muted-foreground hover:text-foreground"
-          >
-            <PanelLeftOpen size={16} />
-          </button>
-        </div>
-      )}
-
-      {/* Center */}
-      <main className="flex-1 overflow-y-auto">
-        {selected && (
-          <div className="px-10 py-7">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                {renaming ? (
-                  <div className="flex items-center gap-2">
-                    <input
-                      autoFocus
-                      value={nameDraft}
-                      onChange={(e) => setNameDraft(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          projectStore.updateProject(selected.id, { name: nameDraft.trim() || selected.name });
-                          setRenaming(false);
-                        } else if (e.key === "Escape") {
-                          setRenaming(false);
-                        }
-                      }}
-                      className="text-2xl font-semibold tracking-tight bg-transparent border-b outline-none"
-                      style={{ borderColor: "hsl(var(--hairline))" }}
-                    />
-                    <button
-                      onClick={() => {
-                        projectStore.updateProject(selected.id, { name: nameDraft.trim() || selected.name });
-                        setRenaming(false);
-                      }}
-                      className="text-muted-foreground hover:text-foreground"
-                      title="Speichern"
-                    >
-                      <Check size={16} />
-                    </button>
-                    <button
-                      onClick={() => setRenaming(false)}
-                      className="text-muted-foreground hover:text-foreground"
-                      title="Abbrechen"
-                    >
-                      <X size={16} />
-                    </button>
-                  </div>
-                ) : (
-                  <h1 className="text-2xl font-semibold tracking-tight">{selected.name}</h1>
-                )}
-                <Star
-                  size={18}
-                  fill={selected.favorite ? "hsl(var(--accent-gold))" : "none"}
-                  stroke="hsl(var(--accent-gold))"
-                  className="cursor-pointer"
-                  onClick={() =>
-                    projectStore.updateProject(selected.id, { favorite: !selected.favorite })
-                  }
-                />
-                <div className="relative" ref={titleMenuRef}>
-                  <button
-                    onClick={() => setTitleMenuOpen((v) => !v)}
-                    className="text-muted-foreground hover:text-foreground h-7 w-7 rounded-md flex items-center justify-center"
-                    title="Mehr"
-                  >
-                    <MoreHorizontal size={18} />
-                  </button>
-                  {titleMenuOpen && (
-                    <div
-                      className="absolute left-0 top-full mt-1 z-20 min-w-[180px] rounded-md border shadow-md py-1 text-sm"
-                      style={{ background: "hsl(var(--surface))", borderColor: "hsl(var(--hairline))" }}
-                    >
-                      <button
-                        onClick={() => {
-                          setNameDraft(selected.name);
-                          setRenaming(true);
-                          setTitleMenuOpen(false);
-                        }}
-                        className="w-full px-3 py-1.5 flex items-center gap-2 hover:bg-muted text-left"
-                      >
-                        <Pencil size={14} /> Umbenennen
-                      </button>
-                      <button
-                        onClick={() => {
-                          const label = selected.isTemplate ? "Vorlage" : "Projektmappe";
-                          const msg = `${label} „${selected.name}" wirklich löschen?\n\nAlle Inhalte werden endgültig entfernt:\n• Seiten & Zeichenblätter\n• CAD-Elemente & Bemaßungen\n• Board-Themen, Aufgaben & Notizen\n• Dateien & Fotos\n\nDieser Vorgang kann nicht rückgängig gemacht werden.`;
-                          if (confirm(msg)) {
-                            projectStore.deleteProject(selected.id);
-                            setTitleMenuOpen(false);
-                            const next = projects.find(
-                              (p) => p.id !== selected.id && !!p.isTemplate === !!selected.isTemplate
-                            );
-                            setSelectedId(next?.id);
-                          }
-                        }}
-                        className="w-full px-3 py-1.5 flex items-center gap-2 hover:bg-muted text-left"
-                        style={{ color: "hsl(0 70% 50%)" }}
-                      >
-                        <Trash2 size={14} /> Löschen
-                      </button>
-                    </div>
-                  )}
+                  <input
+                    value={profile.role}
+                    onChange={(e) => projectStore.updateProfile({ role: e.target.value })}
+                    placeholder="Funktion / Status"
+                    className="mt-2 w-full bg-transparent text-xs text-muted-foreground outline-none border-b pb-1"
+                    style={{ borderColor: "hsl(var(--hairline))" }}
+                  />
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                {selected.isTemplate ? (
-                  <button
-                    onClick={() => {
-                      if (confirm("Vorlage zurücksetzen? Alle projektspezifischen Inhalte (Texte, Seiteninhalte, Termine) werden geleert.")) {
-                        projectStore.resetTemplate(selected.id);
-                      }
-                    }}
-                    className="h-9 px-3 rounded-md border text-sm flex items-center gap-2"
-                    style={{ borderColor: "hsl(var(--hairline))" }}
-                  >
-                    Reset
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => {
-                      const id = projectStore.duplicateAsTemplate(selected.id);
-                      if (id) {
-                        setMode("templates");
-                        setSelectedId(id);
-                      }
-                    }}
-                    className="h-9 px-3 rounded-md border text-sm flex items-center gap-2"
-                    style={{ borderColor: "hsl(var(--hairline))" }}
-                    title="Als Vorlage speichern"
-                  >
-                    <LayoutTemplate size={14} /> Vorlage+
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Wetter für Projektort */}
-            <WeatherStrip ort={selected.ort} />
-
-            {/* Tabs */}
-            <div
-              className="mt-5 flex items-center gap-7 text-sm border-b overflow-x-auto"
-              style={{ borderColor: "hsl(var(--hairline))" }}
-            >
-              {(
-                [
-                  ["uebersicht", "Übersicht"],
-                  ["seiten", "Mappen"],
-                  ["aufgaben", "Aufgaben"],
-                  ["dokumente", "Dokumente"],
-                  ["infos", "Infos"],
-                  ["team", "Team"],
-                ] as const
-              ).map(([key, label]) => (
-                <button
-                  key={key}
-                  onClick={() => setTab(key)}
-                  className="py-3 relative whitespace-nowrap"
-                  style={{
-                    color: tab === key ? "hsl(var(--ink))" : "hsl(var(--ink-soft))",
-                    fontWeight: tab === key ? 600 : 400,
-                  }}
-                >
-                  {label}
-                  {tab === key && (
-                    <span
-                      className="absolute left-0 right-0 -bottom-px h-[2px]"
-                      style={{ background: "hsl(var(--accent-gold))" }}
-                    />
-                  )}
-                </button>
-              ))}
-            </div>
-
-            {tab === "uebersicht" && (
-              <UebersichtView
-                project={selected}
-                activeMappeId={selected.activeMappeId}
-                onSelectMappe={(id) => projectStore.setActiveMappe(selected.id, id)}
-              />
-            )}
-            {tab === "seiten" && (
-              <SeitenView project={selected} onAddPage={handleAddPage} />
-            )}
-            {tab === "aufgaben" && <AufgabenView project={selected} />}
-            {tab === "dokumente" && (
               <div className="mt-4">
-                <div className="inline-flex items-center gap-1 rounded-md p-0.5 mb-4"
-                     style={{ background: "hsl(var(--surface-muted))" }}>
-                  {(["dateien", "fotos"] as const).map((sub) => (
+                <div className="text-[10px] font-semibold tracking-widest text-muted-foreground mb-2">
+                  STATUS
+                </div>
+                <div className="flex gap-2">
+                  {(["online", "busy", "offline"] as ProfileStatus[]).map((s) => (
                     <button
-                      key={sub}
-                      onClick={() => setDokumenteSubTab(sub)}
-                      className="h-7 px-3 rounded-[5px] text-[12px] font-medium transition-colors"
+                      key={s}
+                      onClick={() => projectStore.updateProfile({ status: s })}
+                      className="flex-1 h-8 rounded-md border text-xs flex items-center justify-center gap-1.5"
                       style={{
-                        background: dokumenteSubTab === sub ? "hsl(var(--accent-gold))" : "transparent",
-                        color: dokumenteSubTab === sub ? "hsl(var(--surface))" : "hsl(var(--ink-soft))",
+                        borderColor:
+                          profile.status === s ? statusColor(s) : "hsl(var(--hairline))",
+                        background:
+                          profile.status === s ? `${statusColor(s)}20` : "transparent",
                       }}
                     >
-                      {sub === "dateien" ? "Dateien" : "Fotos"}
+                      <span
+                        className="w-2 h-2 rounded-full"
+                        style={{ background: statusColor(s) }}
+                      />
+                      {statusLabel(s)}
                     </button>
                   ))}
                 </div>
-                {dokumenteSubTab === "dateien" ? (
-                  <FileBrowser
-                    project={selected}
-                    kind="files"
-                    accept=".pdf,.dwg,.dxf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,application/pdf"
-                    emptyHint="Noch keine Dateien. Lade PDFs, DWG/DXF oder Dokumente hoch oder lege einen Ordner an."
-                  />
-                ) : (
-                  <FileBrowser
-                    project={selected}
-                    kind="photos"
-                    accept="image/png,image/jpeg,image/webp,.jpg,.jpeg,.png,.webp"
-                    emptyHint="Noch keine Fotos. Lade JPG/PNG-Dateien hoch oder lege einen Ordner an."
-                    photoMode
-                  />
+              </div>
+              <div
+                className="mt-4 rounded-lg p-3 text-xs flex items-center justify-between"
+                style={{ background: "hsl(var(--surface-muted))" }}
+              >
+                <span className="text-muted-foreground">Projekte</span>
+                <span className="font-semibold">
+                  {projectCount} / {MAX_PROJECTS}
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+      </header>
+
+      {/* ============= BODY (Left panel + Main) ============= */}
+      <div className="flex flex-1 overflow-hidden">
+        {leftOpen ? (
+          <aside
+            className="w-[300px] shrink-0 flex flex-col border-r relative"
+            style={{ borderColor: "hsl(var(--hairline))" }}
+          >
+            <button
+              onClick={() => setLeftOpen(false)}
+              title="Projekte einklappen"
+              className="absolute top-3 right-3 text-muted-foreground hover:text-foreground"
+            >
+              <PanelLeftClose size={16} />
+            </button>
+            <div className="px-4 pt-4 pb-3">
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">
+                  {mode === "templates" ? "VORLAGEN" : "PROJEKTE"}
+                </div>
+                {mode === "projects" && !creatingFolder && (
+                  <button
+                    onClick={() => {
+                      setCreatingFolder(true);
+                      setNewFolderName("");
+                    }}
+                    className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1"
+                    title="Ordner anlegen"
+                  >
+                    <FolderPlus size={12} /> Ordner
+                  </button>
                 )}
               </div>
-            )}
-            {tab === "infos" && <InfosView project={selected} />}
-            {tab === "team" && (
-              <div className="mt-6 text-sm text-muted-foreground">
-                Team-Verwaltung folgt.
+              {creatingFolder && (
+                <div
+                  className="flex items-center gap-1 mb-2 rounded-md px-2 py-1"
+                  style={{ background: "hsl(var(--surface-muted))" }}
+                >
+                  <FolderIcon size={13} style={{ color: "hsl(var(--accent-gold))" }} />
+                  <input
+                    autoFocus
+                    value={newFolderName}
+                    onChange={(e) => setNewFolderName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") commitNewFolder();
+                      if (e.key === "Escape") { setCreatingFolder(false); setNewFolderName(""); }
+                    }}
+                    placeholder="Ordnername"
+                    className="flex-1 bg-transparent text-xs outline-none"
+                  />
+                  <button onClick={commitNewFolder} title="Anlegen" className="text-muted-foreground hover:text-foreground">
+                    <Check size={12} />
+                  </button>
+                  <button
+                    onClick={() => { setCreatingFolder(false); setNewFolderName(""); }}
+                    title="Abbrechen"
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              )}
+              <div
+                className="flex items-center gap-2 h-9 rounded-md px-2.5"
+                style={{ background: "hsl(var(--surface-muted))" }}
+              >
+                <Search size={14} className="text-muted-foreground" />
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder={mode === "templates" ? "Vorlagen suchen..." : "Projekte suchen..."}
+                  className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                />
               </div>
-            )}
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-2 pb-4 space-y-1">
+              {/* Ordner */}
+              {mode === "projects" && folders.map((f) => {
+                const inside = projectsByFolder.get(f.id) ?? [];
+                const collapsed = f.collapsed;
+                const isRenaming = renamingFolderId === f.id;
+                const dragOver = dragOverFolder === f.id;
+                return (
+                  <div key={f.id}>
+                    <div
+                      onDragOver={(e) => { e.preventDefault(); setDragOverFolder(f.id); }}
+                      onDragLeave={() => setDragOverFolder((v) => (v === f.id ? null : v))}
+                      onDrop={() => handleDropOnFolder(f.id)}
+                      className="group flex items-center gap-1 h-8 px-2 rounded-md hover:bg-muted/40"
+                      style={{
+                        background: dragOver ? "hsl(var(--accent-gold) / 0.12)" : undefined,
+                      }}
+                    >
+                      <button
+                        onClick={() => projectStore.toggleProjectFolderCollapsed(f.id)}
+                        className="text-muted-foreground hover:text-foreground"
+                      >
+                        {collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
+                      </button>
+                      <FolderIcon size={13} style={{ color: "hsl(var(--accent-gold))" }} />
+                      {isRenaming ? (
+                        <input
+                          autoFocus
+                          value={renameFolderDraft}
+                          onChange={(e) => setRenameFolderDraft(e.target.value)}
+                          onBlur={() => {
+                            projectStore.renameProjectFolder(f.id, renameFolderDraft);
+                            setRenamingFolderId(null);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              projectStore.renameProjectFolder(f.id, renameFolderDraft);
+                              setRenamingFolderId(null);
+                            }
+                            if (e.key === "Escape") setRenamingFolderId(null);
+                          }}
+                          className="flex-1 bg-transparent text-xs outline-none border-b"
+                          style={{ borderColor: "hsl(var(--hairline))" }}
+                        />
+                      ) : (
+                        <button
+                          onClick={() => projectStore.toggleProjectFolderCollapsed(f.id)}
+                          className="flex-1 text-left text-xs font-medium truncate"
+                        >
+                          {f.name}
+                        </button>
+                      )}
+                      <span className="text-[10px] text-muted-foreground">{inside.length}</span>
+                      <button
+                        onClick={() => { setRenamingFolderId(f.id); setRenameFolderDraft(f.name); }}
+                        className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground"
+                        title="Umbenennen"
+                      >
+                        <Pencil size={10} />
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (confirm(`Ordner „${f.name}" löschen? Projekte bleiben erhalten.`)) {
+                            projectStore.deleteProjectFolder(f.id);
+                          }
+                        }}
+                        className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground"
+                        title="Löschen"
+                      >
+                        <Trash2 size={10} />
+                      </button>
+                    </div>
+                    {!collapsed && (
+                      <div className="pl-4 space-y-1 mt-1">
+                        {inside.length === 0 ? (
+                          <div className="text-[10px] text-muted-foreground italic px-2 py-1">
+                            Projekt hierher ziehen
+                          </div>
+                        ) : (
+                          inside.map((p) => (
+                            <ProjectCard
+                              key={p.id}
+                              project={p}
+                              active={selected?.id === p.id}
+                              onSelect={() => setSelectedId(p.id)}
+                              onOpen={() => navigate(`/project/${p.id}`)}
+                              onDragStart={() => setDragProjectId(p.id)}
+                              onDragEnd={() => setDragProjectId(null)}
+                            />
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              {/* Root-Projekte (ohne Ordner) */}
+              <div
+                onDragOver={(e) => { e.preventDefault(); setDragOverFolder("root"); }}
+                onDragLeave={() => setDragOverFolder((v) => (v === "root" ? null : v))}
+                onDrop={() => handleDropOnFolder(null)}
+                className="pt-1 space-y-1"
+                style={{
+                  background:
+                    dragOverFolder === "root" ? "hsl(var(--accent-gold) / 0.06)" : undefined,
+                  borderRadius: 6,
+                }}
+              >
+                {rootProjects.map((p) => (
+                  <ProjectCard
+                    key={p.id}
+                    project={p}
+                    active={selected?.id === p.id}
+                    onSelect={() => setSelectedId(p.id)}
+                    onOpen={() => navigate(`/project/${p.id}`)}
+                    onDragStart={() => setDragProjectId(p.id)}
+                    onDragEnd={() => setDragProjectId(null)}
+                  />
+                ))}
+              </div>
+            </div>
+            <div
+              className="px-4 py-2.5 text-[11px] text-muted-foreground border-t flex items-center justify-between"
+              style={{ borderColor: "hsl(var(--hairline))" }}
+            >
+              <span>{projectCount} / {MAX_PROJECTS} Projekte</span>
+            </div>
+          </aside>
+        ) : (
+          <div
+            className="w-8 shrink-0 border-r flex items-start justify-center pt-4"
+            style={{ borderColor: "hsl(var(--hairline))" }}
+          >
+            <button
+              onClick={() => setLeftOpen(true)}
+              title="Projekte ausklappen"
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <PanelLeftOpen size={16} />
+            </button>
           </div>
         )}
-      </main>
+
+        {/* Center */}
+        <main className="flex-1 overflow-y-auto">
+          {selected && (
+            <div className="px-10 py-7">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  {renaming ? (
+                    <div className="flex items-center gap-2">
+                      <input
+                        autoFocus
+                        value={nameDraft}
+                        onChange={(e) => setNameDraft(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            projectStore.updateProject(selected.id, { name: nameDraft.trim() || selected.name });
+                            setRenaming(false);
+                          } else if (e.key === "Escape") {
+                            setRenaming(false);
+                          }
+                        }}
+                        className="text-2xl font-semibold tracking-tight bg-transparent border-b outline-none"
+                        style={{ borderColor: "hsl(var(--hairline))" }}
+                      />
+                      <button
+                        onClick={() => {
+                          projectStore.updateProject(selected.id, { name: nameDraft.trim() || selected.name });
+                          setRenaming(false);
+                        }}
+                        className="text-muted-foreground hover:text-foreground"
+                        title="Speichern"
+                      >
+                        <Check size={16} />
+                      </button>
+                      <button
+                        onClick={() => setRenaming(false)}
+                        className="text-muted-foreground hover:text-foreground"
+                        title="Abbrechen"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ) : (
+                    <h1 className="text-2xl font-semibold tracking-tight">{selected.name}</h1>
+                  )}
+                  <Star
+                    size={18}
+                    fill={selected.favorite ? "hsl(var(--accent-gold))" : "none"}
+                    stroke="hsl(var(--accent-gold))"
+                    className="cursor-pointer"
+                    onClick={() =>
+                      projectStore.updateProject(selected.id, { favorite: !selected.favorite })
+                    }
+                  />
+                  <div className="relative" ref={titleMenuRef}>
+                    <button
+                      onClick={() => setTitleMenuOpen((v) => !v)}
+                      className="text-muted-foreground hover:text-foreground h-7 w-7 rounded-md flex items-center justify-center"
+                      title="Mehr"
+                    >
+                      <MoreHorizontal size={18} />
+                    </button>
+                    {titleMenuOpen && (
+                      <div
+                        className="absolute left-0 top-full mt-1 z-20 min-w-[180px] rounded-md border shadow-md py-1 text-sm"
+                        style={{ background: "hsl(var(--surface))", borderColor: "hsl(var(--hairline))" }}
+                      >
+                        <button
+                          onClick={() => {
+                            setNameDraft(selected.name);
+                            setRenaming(true);
+                            setTitleMenuOpen(false);
+                          }}
+                          className="w-full px-3 py-1.5 flex items-center gap-2 hover:bg-muted text-left"
+                        >
+                          <Pencil size={14} /> Umbenennen
+                        </button>
+                        <button
+                          onClick={() => {
+                            const label = selected.isTemplate ? "Vorlage" : "Projektmappe";
+                            const msg = `${label} „${selected.name}" wirklich löschen?\n\nAlle Inhalte werden endgültig entfernt:\n• Seiten & Zeichenblätter\n• CAD-Elemente & Bemaßungen\n• Board-Themen, Aufgaben & Notizen\n• Dateien & Fotos\n\nDieser Vorgang kann nicht rückgängig gemacht werden.`;
+                            if (confirm(msg)) {
+                              projectStore.deleteProject(selected.id);
+                              setTitleMenuOpen(false);
+                              const next = projects.find(
+                                (p) => p.id !== selected.id && !!p.isTemplate === !!selected.isTemplate
+                              );
+                              setSelectedId(next?.id);
+                            }
+                          }}
+                          className="w-full px-3 py-1.5 flex items-center gap-2 hover:bg-muted text-left"
+                          style={{ color: "hsl(0 70% 50%)" }}
+                        >
+                          <Trash2 size={14} /> Löschen
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {selected.isTemplate ? (
+                    <button
+                      onClick={() => {
+                        if (confirm("Vorlage zurücksetzen? Alle projektspezifischen Inhalte (Texte, Seiteninhalte, Termine) werden geleert.")) {
+                          projectStore.resetTemplate(selected.id);
+                        }
+                      }}
+                      className="h-9 px-3 rounded-md border text-sm flex items-center gap-2"
+                      style={{ borderColor: "hsl(var(--hairline))" }}
+                    >
+                      Reset
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        const id = projectStore.duplicateAsTemplate(selected.id);
+                        if (id) {
+                          setMode("templates");
+                          setSelectedId(id);
+                        }
+                      }}
+                      className="h-9 px-3 rounded-md border text-sm flex items-center gap-2"
+                      style={{ borderColor: "hsl(var(--hairline))" }}
+                      title="Als Vorlage speichern"
+                    >
+                      <LayoutTemplate size={14} /> Vorlage+
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Wetter für Projektort */}
+              <WeatherStrip ort={selected.ort} />
+
+              {/* Tabs */}
+              <div
+                className="mt-5 flex items-center gap-7 text-sm border-b overflow-x-auto"
+                style={{ borderColor: "hsl(var(--hairline))" }}
+              >
+                {(
+                  [
+                    ["uebersicht", "Übersicht"],
+                    ["seiten", "Mappen"],
+                    ["aufgaben", "Aufgaben"],
+                    ["dokumente", "Dokumente"],
+                    ["infos", "Infos"],
+                    ["team", "Team"],
+                  ] as const
+                ).map(([key, label]) => (
+                  <button
+                    key={key}
+                    onClick={() => setTab(key)}
+                    className="py-3 relative whitespace-nowrap"
+                    style={{
+                      color: tab === key ? "hsl(var(--ink))" : "hsl(var(--ink-soft))",
+                      fontWeight: tab === key ? 600 : 400,
+                    }}
+                  >
+                    {label}
+                    {tab === key && (
+                      <span
+                        className="absolute left-0 right-0 -bottom-px h-[2px]"
+                        style={{ background: "hsl(var(--accent-gold))" }}
+                      />
+                    )}
+                  </button>
+                ))}
+              </div>
+
+              {tab === "uebersicht" && (
+                <UebersichtView
+                  project={selected}
+                  activeMappeId={selected.activeMappeId}
+                  onSelectMappe={(id) => projectStore.setActiveMappe(selected.id, id)}
+                />
+              )}
+              {tab === "seiten" && (
+                <SeitenView project={selected} onAddPage={handleAddPage} />
+              )}
+              {tab === "aufgaben" && <AufgabenView project={selected} />}
+              {tab === "dokumente" && (
+                <div className="mt-4">
+                  <div className="inline-flex items-center gap-1 rounded-md p-0.5 mb-4"
+                       style={{ background: "hsl(var(--surface-muted))" }}>
+                    {(["dateien", "fotos"] as const).map((sub) => (
+                      <button
+                        key={sub}
+                        onClick={() => setDokumenteSubTab(sub)}
+                        className="h-7 px-3 rounded-[5px] text-[12px] font-medium transition-colors"
+                        style={{
+                          background: dokumenteSubTab === sub ? "hsl(var(--accent-gold))" : "transparent",
+                          color: dokumenteSubTab === sub ? "hsl(var(--surface))" : "hsl(var(--ink-soft))",
+                        }}
+                      >
+                        {sub === "dateien" ? "Dateien" : "Fotos"}
+                      </button>
+                    ))}
+                  </div>
+                  {dokumenteSubTab === "dateien" ? (
+                    <FileBrowser
+                      project={selected}
+                      kind="files"
+                      accept=".pdf,.dwg,.dxf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,application/pdf"
+                      emptyHint="Noch keine Dateien. Lade PDFs, DWG/DXF oder Dokumente hoch oder lege einen Ordner an."
+                    />
+                  ) : (
+                    <FileBrowser
+                      project={selected}
+                      kind="photos"
+                      accept="image/png,image/jpeg,image/webp,.jpg,.jpeg,.png,.webp"
+                      emptyHint="Noch keine Fotos. Lade JPG/PNG-Dateien hoch oder lege einen Ordner an."
+                      photoMode
+                    />
+                  )}
+                </div>
+              )}
+              {tab === "infos" && <InfosView project={selected} />}
+              {tab === "team" && (
+                <div className="mt-6 text-sm text-muted-foreground">
+                  Team-Verwaltung folgt.
+                </div>
+              )}
+            </div>
+          )}
+        </main>
+      </div>
+    </div>
+  );
+}
+
+/* -------- ProjectCard (sidebar) -------- */
+function ProjectCard({
+  project: p,
+  active,
+  onSelect,
+  onOpen,
+  onDragStart,
+  onDragEnd,
+}: {
+  project: Project;
+  active: boolean;
+  onSelect: () => void;
+  onOpen: () => void;
+  onDragStart: () => void;
+  onDragEnd: () => void;
+}) {
+  return (
+    <button
+      draggable
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      onClick={onSelect}
+      onDoubleClick={onOpen}
+      className="w-full text-left rounded-lg p-2 flex gap-2.5 transition border"
+      style={{
+        background: active ? "hsl(var(--surface-card))" : "hsl(var(--surface))",
+        borderColor: active ? "hsl(var(--accent-gold) / 0.4)" : "transparent",
+      }}
+    >
+      <img
+        src={p.thumbnail}
+        alt=""
+        className="w-12 h-12 rounded-md object-cover shrink-0"
+        style={{ background: "hsl(var(--surface-muted))" }}
+      />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1">
+          <span className="text-xs font-semibold truncate">{p.name}</span>
+          {p.favorite && (
+            <Star
+              size={10}
+              className="shrink-0"
+              fill="hsl(var(--accent-gold))"
+              stroke="hsl(var(--accent-gold))"
+            />
+          )}
+        </div>
+        <div className="text-[10px] text-muted-foreground truncate">{p.ort || "—"}</div>
+        <div className="text-[10px] text-muted-foreground">
+          {p.pages.length} Seiten
+        </div>
+      </div>
+    </button>
+  );
+}
+
+/* -------- ProfileAvatar (with progress ring) -------- */
+function ProfileAvatar({
+  profile,
+  count,
+  max,
+  size,
+  large,
+}: {
+  profile: { name: string; avatarUrl?: string; status: ProfileStatus };
+  count: number;
+  max: number;
+  size: number;
+  large?: boolean;
+}) {
+  const ratio = Math.min(1, count / max);
+  const stroke = large ? 4 : 2.5;
+  const r = size / 2 - stroke;
+  const c = 2 * Math.PI * r;
+  const initial = (profile.name?.[0] ?? "?").toUpperCase();
+  const statusColor =
+    profile.status === "online"
+      ? "hsl(140 60% 45%)"
+      : profile.status === "busy"
+        ? "hsl(0 70% 55%)"
+        : "hsl(0 0% 65%)";
+  return (
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="absolute inset-0 -rotate-90">
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          stroke="hsl(var(--hairline))"
+          strokeWidth={stroke}
+          fill="none"
+        />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          stroke="hsl(var(--accent-gold))"
+          strokeWidth={stroke}
+          fill="none"
+          strokeDasharray={c}
+          strokeDashoffset={c * (1 - ratio)}
+          strokeLinecap="round"
+        />
+      </svg>
+      <div
+        className="absolute rounded-full flex items-center justify-center font-semibold overflow-hidden"
+        style={{
+          inset: stroke + 2,
+          background: "hsl(var(--surface-muted))",
+          color: "hsl(var(--ink))",
+          fontSize: size * 0.36,
+        }}
+      >
+        {profile.avatarUrl ? (
+          <img src={profile.avatarUrl} alt="" className="w-full h-full object-cover" />
+        ) : (
+          initial
+        )}
+      </div>
+      <div
+        className="absolute rounded-full border-2"
+        style={{
+          width: size * 0.28,
+          height: size * 0.28,
+          right: 0,
+          bottom: 0,
+          background: statusColor,
+          borderColor: "hsl(var(--surface-card))",
+        }}
+        title={profile.status}
+      />
+      {large && (
+        <div
+          className="absolute left-1/2 -translate-x-1/2 text-[10px] font-semibold whitespace-nowrap"
+          style={{ top: "100%", marginTop: 6, color: "hsl(var(--ink-soft))" }}
+        >
+          {count} / {max}
+        </div>
+      )}
     </div>
   );
 }
