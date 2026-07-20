@@ -70,6 +70,11 @@ export default function ProjectsHome() {
     () => projects.filter((p) => (mode === "templates" ? p.isTemplate : !p.isTemplate)),
     [projects, mode]
   );
+  // Sidebar zeigt IMMER die Projekte (nicht Vorlagen), egal welche Center-Ansicht aktiv ist
+  const sidebarProjects = useMemo(
+    () => projects.filter((p) => !p.isTemplate),
+    [projects]
+  );
   const [showAllTasks, setShowAllTasks] = useState(false);
   const [selectedId, setSelectedId] = useState<string | undefined>(visibleProjects[0]?.id);
   const [search, setSearch] = useState("");
