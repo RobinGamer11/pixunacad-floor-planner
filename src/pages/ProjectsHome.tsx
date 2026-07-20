@@ -983,8 +983,7 @@ export default function ProjectsHome() {
 
               {/* Große Aktion links + Reiter rechts (eine Zeile, Reiter am Unterrand des Buttons ausgerichtet) */}
               <div
-                className="mt-4 flex flex-col lg:flex-row lg:items-end gap-4 border-b"
-                style={{ borderColor: "hsl(var(--hairline))" }}
+                className="mt-4 flex flex-col lg:flex-row lg:items-end gap-4"
               >
                 <button
                   onClick={() => navigate(`/project/${selected.id}`)}
