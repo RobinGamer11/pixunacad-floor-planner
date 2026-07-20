@@ -79,8 +79,10 @@ interface CadEditorProps {
   onHistoryChange?: (canUndo: boolean, canRedo: boolean) => void;
   onZoomChange?: (percent: number) => void;
   onCanDeleteChange?: (canDelete: boolean) => void;
+  /** Präsentations-Modus: blendet linke Werkzeug- und rechte Einstellungsleiste aus. */
+  presenting?: boolean;
 }
-const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId, onHistoryChange, onZoomChange, onCanDeleteChange }, ref) => {
+const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId, onHistoryChange, onZoomChange, onCanDeleteChange, presenting }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const hubRef = useRef<HTMLDivElement>(null);
@@ -268,6 +270,19 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const [rightTab, setRightTab] = useState<"settings" | "sheets" | "layers">("settings");
   
   const [expandedTool, setExpandedTool] = useState<string | null>(null);
+  const leftSidebarRef = useRef<HTMLElement>(null);
+  // Outside-Klick schließt das Werkzeug-Flyout (Freihand/Radiergummi/Schraffur-Varianten …).
+  useEffect(() => {
+    if (!expandedTool) return;
+    const onDown = (e: MouseEvent | PointerEvent) => {
+      const el = leftSidebarRef.current;
+      if (!el) return;
+      if (el.contains(e.target as Node)) return;
+      setExpandedTool(null);
+    };
+    document.addEventListener("pointerdown", onDown, true);
+    return () => document.removeEventListener("pointerdown", onDown, true);
+  }, [expandedTool]);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [hatchDrawMode, setHatchDrawMode] = useState<HatchDrawMode>("polygon");
@@ -962,13 +977,15 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
 
   return (
     <div className="flex w-full h-full overflow-hidden" style={{ background: "hsl(var(--surface))" }}>
-      {/* Left Sidebar */}
+      {/* Left Sidebar — im Präsentationsmodus ausgeblendet */}
       <aside
+        ref={leftSidebarRef}
         className="relative shrink-0 flex flex-col border-r"
         style={{
           width: 56,
           background: "hsl(var(--surface-card))",
           borderColor: "hsl(var(--hairline))",
+          display: presenting ? "none" : undefined,
         }}
       >
         {/* Raster / Undo / Redo / Pipette */}
@@ -1051,7 +1068,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                               if (appRef.current) appRef.current.selectTool.marqueeMode = v.mode;
                               setSelectMarqueeMode(v.mode);
                             }
-                            setExpandedTool(null);
+                            // Flyout bewusst offen lassen – schließt erst durch
+                            // Klick außerhalb (Outside-Click-Listener unten).
                           }}
                           title={v.label}
                           className={`cad-rail-btn ${vActive ? "active" : ""}`}
@@ -1616,7 +1634,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
         {/* Maßstab der Zeichenoberfläche ist fix 1:1 — kein UI mehr. */}
       </div>
       {/* Right Tab Panel */}
-      {rightOpen ? (
+      {rightOpen && !presenting ? (
       <aside className="shrink-0 w-[280px] h-full flex-col border-l flex" style={{ background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" }}>
         <div className="grid grid-cols-[1fr_1fr_1fr_auto] shrink-0 border-b items-stretch" style={{ borderColor: "hsl(var(--hairline))" }}>
           {([

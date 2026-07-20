@@ -54,15 +54,28 @@ const CadPage = () => {
   const [frameArmed, setFrameArmed] = useState(false);
 
 
+  const [presenting, setPresenting] = useState(false);
   const handlePresent = () => {
     const el = mainRef.current;
     if (!el) return;
-    if (document.fullscreenElement) {
-      document.exitFullscreen().catch(() => {});
+    if (presenting) {
+      setPresenting(false);
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
     } else {
+      setPresenting(true);
       el.requestFullscreen?.().catch(() => {});
     }
   };
+  useEffect(() => {
+    const onFs = () => { if (!document.fullscreenElement) setPresenting(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && presenting) setPresenting(false); };
+    document.addEventListener("fullscreenchange", onFs);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("fullscreenchange", onFs);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [presenting]);
 
   const getCanvas = (): HTMLCanvasElement | null =>
     (mainRef.current?.querySelector("canvas") as HTMLCanvasElement | null) ?? null;
@@ -214,7 +227,18 @@ const CadPage = () => {
           onHistoryChange={(u, r) => { setCanUndo(u); setCanRedo(r); }}
           onZoomChange={setZoom}
           onCanDeleteChange={setCanDelete}
+          presenting={presenting}
         />
+        {presenting && (
+          <button
+            onClick={() => { setPresenting(false); if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); }}
+            className="absolute top-3 right-3 z-[60] h-9 px-3 rounded-full text-xs font-medium"
+            style={{ background: "rgba(0,0,0,0.55)", color: "#fff", backdropFilter: "blur(6px)" }}
+            title="Präsentation beenden (ESC)"
+          >
+            ✕ Präsentation beenden
+          </button>
+        )}
 
         {/* Rahmen-Overlay: Standardmäßig transparent für Pointer-Events, damit
             der Nutzer sich frei in der CAD-Oberfläche bewegen kann (Pan/Zoom).

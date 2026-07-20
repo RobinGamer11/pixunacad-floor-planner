@@ -5484,8 +5484,12 @@ function PresenterOverlay({
     return () => window.removeEventListener("keydown", onKey);
   }, [index, pages.length]);
 
-  // Pointer drag / swipe
+  // Pointer drag / swipe — nur wenn Karussell nicht offen ist.
   const onPointerDown = (e: React.PointerEvent) => {
+    if (carousel) return;
+    // Interaktionen mit Chrome-Buttons (Navigations-/Beenden-Buttons) nicht abfangen.
+    const target = e.target as HTMLElement | null;
+    if (target && target.closest("[data-presenter-chrome]")) return;
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     setDrag({ startX: e.clientX, startY: e.clientY, dx: 0, dy: 0 });
   };
@@ -5499,8 +5503,10 @@ function PresenterOverlay({
     setDrag(null);
     const absX = Math.abs(dx), absY = Math.abs(dy);
     const H_THRESH = Math.min(160, viewport.w * 0.15);
-    const V_THRESH = Math.min(120, viewport.h * 0.15);
-    if (absY > absX && absY > V_THRESH) {
+    // Vertikal deutlich strenger: Nur ein sehr klares Hoch/Runter-Wischen
+    // aktiviert Karussell (unten) bzw. beendet die Präsentation (oben).
+    const V_THRESH = Math.min(240, viewport.h * 0.30);
+    if (absY > absX * 1.4 && absY > V_THRESH) {
       if (dy < 0) doExit(); else setCarousel(true);
       return;
     }
@@ -5587,12 +5593,37 @@ function PresenterOverlay({
 
       {/* Chrome: Seitenzähler + Hinweis */}
       <div
-        className="absolute bottom-4 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-full text-[11px]"
+        data-presenter-chrome
+        className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 px-2 py-1.5 rounded-full text-[11px]"
         style={{ background: "rgba(255,255,255,0.10)", color: "#fff", backdropFilter: "blur(6px)" }}
       >
-        {index + 1} / {pages.length} · ← → Navigation · ↓ Karussell · ESC beenden
+        <button
+          data-presenter-chrome
+          onClick={() => goto(index - 1)}
+          disabled={index <= 0}
+          className="h-7 w-7 rounded-full flex items-center justify-center disabled:opacity-30"
+          style={{ background: "rgba(255,255,255,0.12)", color: "#fff" }}
+          title="Vorherige Seite (←)"
+        >‹</button>
+        <span className="px-1 tabular-nums">{index + 1} / {pages.length}</span>
+        <button
+          data-presenter-chrome
+          onClick={() => goto(index + 1)}
+          disabled={index >= pages.length - 1}
+          className="h-7 w-7 rounded-full flex items-center justify-center disabled:opacity-30"
+          style={{ background: "rgba(255,255,255,0.12)", color: "#fff" }}
+          title="Nächste Seite (→)"
+        >›</button>
+        <button
+          data-presenter-chrome
+          onClick={() => setCarousel(true)}
+          className="ml-1 h-7 px-2 rounded-full text-[11px]"
+          style={{ background: "rgba(255,255,255,0.12)", color: "#fff" }}
+          title="Karussell (↓)"
+        >Karussell</button>
       </div>
       <button
+        data-presenter-chrome
         onClick={doExit}
         title="Beenden (ESC)"
         className="absolute top-4 right-4 h-9 w-9 rounded-full flex items-center justify-center"
