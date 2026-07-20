@@ -329,8 +329,9 @@ export default function ProjectsHome() {
                       </button>
                       <button
                         onClick={() => {
-                          const label = selected.isTemplate ? "Vorlage" : "Projekt";
-                          if (confirm(`${label} "${selected.name}" wirklich löschen?`)) {
+                          const label = selected.isTemplate ? "Vorlage" : "Projektmappe";
+                          const msg = `${label} „${selected.name}" wirklich löschen?\n\nAlle Inhalte werden endgültig entfernt:\n• Seiten & Zeichenblätter\n• CAD-Elemente & Bemaßungen\n• Board-Themen, Aufgaben & Notizen\n• Dateien & Fotos\n\nDieser Vorgang kann nicht rückgängig gemacht werden.`;
+                          if (confirm(msg)) {
                             projectStore.deleteProject(selected.id);
                             setTitleMenuOpen(false);
                             const next = projects.find(

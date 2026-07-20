@@ -578,6 +578,14 @@ export const projectStore = {
   },
   deleteProject: (id: string) => {
     setState((s) => ({ projects: s.projects.filter((p) => p.id !== id) }));
+    // Sämtliche projektbezogenen Nebenstores mitleeren, damit gelöschte Projekte
+    // keinerlei Inhalte zurücklassen (Board-Themen, ausstehende PDF-Uploads …).
+    try {
+      // Board-/Notiznetz-Daten
+      import("./notesStore").then((m) => m.notesStore.deleteProject(id)).catch(() => {});
+      // Ausstehende Sheet-PDF-Übernahme
+      localStorage.removeItem(`pixuna.pendingSheetPdf.${id}`);
+    } catch {}
   },
   duplicateAsTemplate: (id: string) => {
     const src = state.projects.find((p) => p.id === id);

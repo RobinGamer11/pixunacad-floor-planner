@@ -247,6 +247,7 @@ export default function NotesPage() {
             projectName={project?.name ?? "Projekt"}
             state={state}
             statusMap={statusMap}
+            priorityMap={priorityMap}
             selectedId={selectedId}
             setSelectedId={selectAndMarkSeen}
             mode={rightMode}
@@ -598,11 +599,11 @@ function TreeList({
 
             {isSel && (
               <div className="flex flex-wrap gap-1 py-1 pr-1" style={{ paddingLeft: 20 + depth * 12 }}>
-                <MiniAddBtn onClick={() => addChild(n.id, "task")} label="Aufgabe" />
-                <MiniAddBtn onClick={() => addChild(n.id, "note")} label="Notiz" />
                 {n.kind === "topic" && (
                   <MiniAddBtn onClick={() => addChild(n.id, "topic")} label="Unterthema" />
                 )}
+                <MiniAddBtn onClick={() => addChild(n.id, "task")} label="Aufgabe" />
+                <MiniAddBtn onClick={() => addChild(n.id, "note")} label="Notiz" />
               </div>
             )}
 
@@ -953,11 +954,12 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 // RIGHT PANEL
 // -------------------------------------------------------------
 function RightPanel({
-  projectName, state, statusMap, selectedId, setSelectedId, mode, setMode, onCollapse, focusToken,
+  projectName, state, statusMap, priorityMap, selectedId, setSelectedId, mode, setMode, onCollapse, focusToken,
 }: {
   projectName: string;
   state: ReturnType<typeof useNotes>;
   statusMap: Map<string, NoteStatusDef>;
+  priorityMap: Map<string, NotePriorityDef>;
   selectedId: string | null;
   setSelectedId: (id: string) => void;
   mode: "graph" | "links" | "timeline";
@@ -987,7 +989,8 @@ function RightPanel({
       <div className="flex-1 min-h-0">
         {mode === "graph" && (
           <ProjectGraph projectName={projectName} nodes={state.nodes}
-            statusMap={statusMap} selectedId={selectedId} onSelect={setSelectedId}
+            statusMap={statusMap} priorityMap={priorityMap}
+            selectedId={selectedId} onSelect={setSelectedId}
             focusToken={focusToken} />
         )}
         {mode === "links" && (
@@ -1104,61 +1107,168 @@ function useZoomPan() {
 }
 
 // -------------------------------------------------------------
-// Radial Graph
+// Radial + Tree Graph
 // -------------------------------------------------------------
-interface LayoutNode { id: string; x: number; y: number; r: number; node: NoteNode | null; parent: string | null }
+interface LayoutNode {
+  id: string;
+  x: number;
+  y: number;
+  r: number;          // Radius (Kreisdarstellung)
+  w: number;          // Breite (Rechteckdarstellung)
+  h: number;          // Höhe  (Rechteckdarstellung)
+  node: NoteNode | null;
+  parent: string | null;
+}
+type GraphLayout = "radial" | "tree";
+type GraphCardStyle = "circle" | "rect";
 
-function layoutRadial(nodes: NoteNode[], rootLabel: string) {
+const CARD_W = 150;
+const CARD_H = 64;
+
+function layoutRadial(nodes: NoteNode[], rootLabel: string, cardStyle: GraphCardStyle) {
   const byParent = new Map<string | null, NoteNode[]>();
   nodes.forEach((n) => {
     const arr = byParent.get(n.parentId) ?? [];
     arr.push(n);
     byParent.set(n.parentId, arr);
   });
-  // stabile Reihenfolge nach order
   byParent.forEach((arr) => arr.sort((a, b) => (a.order ?? 0) - (b.order ?? 0)));
 
   const out: LayoutNode[] = [];
   const edges: { from: string; to: string }[] = [];
   const ROOT_ID = "__root__";
-  out.push({ id: ROOT_ID, x: 0, y: 0, r: 38, node: null, parent: null });
+  out.push({ id: ROOT_ID, x: 0, y: 0, r: 38, w: CARD_W + 20, h: CARD_H, node: null, parent: null });
+
+  // Rechtecke brauchen weiter auseinanderliegende Ringe.
+  const ringStep = cardStyle === "rect" ? 150 : 78;
+  const baseRadius = cardStyle === "rect" ? 170 : 92;
 
   const place = (
     parentId: string | null, parentPos: { x: number; y: number },
     parentAngle: number, spread: number, ring: number,
-    baseRadius: number,
   ) => {
     const kids = byParent.get(parentId) ?? [];
     if (!kids.length) return;
-    // Kompaktere Ringe
-    const radius = baseRadius + ring * 78;
+    const radius = baseRadius + ring * ringStep;
     const step = spread / kids.length;
     kids.forEach((k, i) => {
       const ang = parentAngle - spread / 2 + step * (i + 0.5);
       const x = parentPos.x + Math.cos(ang) * radius;
       const y = parentPos.y + Math.sin(ang) * radius;
       const r = k.kind === "topic" ? 22 - Math.min(ring, 3) * 2 : 15 - Math.min(ring, 3) * 1.5;
-      out.push({ id: k.id, x, y, r: Math.max(9, r), node: k, parent: parentId ?? ROOT_ID });
+      out.push({
+        id: k.id, x, y,
+        r: Math.max(9, r),
+        w: CARD_W, h: CARD_H,
+        node: k, parent: parentId ?? ROOT_ID,
+      });
       edges.push({ from: parentId ?? ROOT_ID, to: k.id });
       const childSpread = ring === 0 ? Math.PI / 2.4 : Math.PI / 2;
-      place(k.id, { x, y }, ang, childSpread, ring + 1, 0);
+      place(k.id, { x, y }, ang, childSpread, ring + 1);
     });
   };
-  place(null, { x: 0, y: 0 }, -Math.PI / 2, Math.PI * 2, 0, 92);
+  place(null, { x: 0, y: 0 }, -Math.PI / 2, Math.PI * 2, 0);
+
+  return { nodes: out, edges, rootLabel };
+}
+
+/**
+ * Baumlayout (von oben nach unten). Nutzt einen einfachen Leaf-Counter:
+ * jedes Blatt bekommt eine fortlaufende x-Position, innere Knoten sitzen
+ * mittig über ihren Kindern. Anschließend werden alle x-Werte so verschoben,
+ * dass der linke Rand bei 0 liegt und um `unit` skaliert.
+ */
+function layoutTree(nodes: NoteNode[], rootLabel: string, cardStyle: GraphCardStyle) {
+  const byParent = new Map<string | null, NoteNode[]>();
+  nodes.forEach((n) => {
+    const arr = byParent.get(n.parentId) ?? [];
+    arr.push(n);
+    byParent.set(n.parentId, arr);
+  });
+  byParent.forEach((arr) => arr.sort((a, b) => (a.order ?? 0) - (b.order ?? 0)));
+
+  const ROOT_ID = "__root__";
+  const xUnits = new Map<string, number>();
+  const depthOf = new Map<string, number>();
+  let leafCounter = 0;
+
+  const walk = (id: string | null, depth: number): number => {
+    const kids = byParent.get(id) ?? [];
+    if (!kids.length) {
+      const x = leafCounter++;
+      if (id !== null) { xUnits.set(id, x); depthOf.set(id, depth); }
+      return x;
+    }
+    const xs: number[] = kids.map((k) => walk(k.id, depth + 1));
+    const mid = (xs[0] + xs[xs.length - 1]) / 2;
+    if (id !== null) { xUnits.set(id, mid); depthOf.set(id, depth); }
+    return mid;
+  };
+  const rootX = walk(null, 0);
+  xUnits.set(ROOT_ID, rootX);
+  depthOf.set(ROOT_ID, 0);
+
+  const allX = Array.from(xUnits.values());
+  const minX = allX.length ? Math.min(...allX) : 0;
+
+  const unitX = cardStyle === "rect" ? CARD_W + 24 : 90;
+  const unitY = cardStyle === "rect" ? CARD_H + 46 : 90;
+
+  const out: LayoutNode[] = [];
+  const edges: { from: string; to: string }[] = [];
+
+  out.push({
+    id: ROOT_ID,
+    x: ((xUnits.get(ROOT_ID) ?? 0) - minX) * unitX,
+    y: 0,
+    r: 38,
+    w: CARD_W + 20, h: CARD_H,
+    node: null, parent: null,
+  });
+
+  nodes.forEach((n) => {
+    const xu = xUnits.get(n.id);
+    const d = depthOf.get(n.id);
+    if (xu === undefined || d === undefined) return;
+    out.push({
+      id: n.id,
+      x: (xu - minX) * unitX,
+      y: (d + 1) * unitY, // +1 damit Hauptprojekt oben in y=0 sitzt
+      r: n.kind === "topic" ? 20 : 14,
+      w: CARD_W, h: CARD_H,
+      node: n, parent: n.parentId ?? ROOT_ID,
+    });
+    edges.push({ from: n.parentId ?? ROOT_ID, to: n.id });
+  });
 
   return { nodes: out, edges, rootLabel };
 }
 
 function ProjectGraph({
-  projectName, nodes, statusMap, selectedId, onSelect, focusToken,
+  projectName, nodes, statusMap, priorityMap, selectedId, onSelect, focusToken,
 }: {
   projectName: string; nodes: NoteNode[];
   statusMap: Map<string, NoteStatusDef>;
+  priorityMap: Map<string, NotePriorityDef>;
   selectedId: string | null; onSelect: (id: string) => void;
   focusToken: number;
 }) {
   const zp = useZoomPan();
-  const layout = useMemo(() => layoutRadial(nodes, projectName), [nodes, projectName]);
+  const [layoutMode, setLayoutMode] = useState<GraphLayout>(() => {
+    try { return (localStorage.getItem("pixuna.board.graphLayout") as GraphLayout) || "tree"; }
+    catch { return "tree"; }
+  });
+  const [cardStyle, setCardStyle] = useState<GraphCardStyle>(() => {
+    try { return (localStorage.getItem("pixuna.board.graphCard") as GraphCardStyle) || "rect"; }
+    catch { return "rect"; }
+  });
+  useEffect(() => { try { localStorage.setItem("pixuna.board.graphLayout", layoutMode); } catch {} }, [layoutMode]);
+  useEffect(() => { try { localStorage.setItem("pixuna.board.graphCard", cardStyle); } catch {} }, [cardStyle]);
+
+  const layout = useMemo(
+    () => (layoutMode === "tree" ? layoutTree(nodes, projectName, cardStyle) : layoutRadial(nodes, projectName, cardStyle)),
+    [nodes, projectName, layoutMode, cardStyle],
+  );
   const [size, setSize] = useState({ w: 400, h: 500 });
   useEffect(() => {
     const el = zp.wrap.current;
@@ -1171,20 +1281,37 @@ function ProjectGraph({
     return () => ro.disconnect();
   }, [zp.wrap]);
 
-  const cx = size.w / 2;
-  const cy = size.h / 2;
+  // Beim Baumlayout sitzen Knoten ausgehend von (0,0) links oben – wir
+  // schieben sie so, dass sie mittig im Viewport erscheinen.
+  const bounds = useMemo(() => {
+    if (!layout.nodes.length) return { minX: 0, maxX: 0, minY: 0, maxY: 0 };
+    const xs = layout.nodes.map((n) => n.x);
+    const ys = layout.nodes.map((n) => n.y);
+    return { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) };
+  }, [layout]);
+  const contentW = bounds.maxX - bounds.minX;
+  const contentH = bounds.maxY - bounds.minY;
+  const cx = size.w / 2 - (bounds.minX + contentW / 2);
+  const cy = layoutMode === "tree"
+    ? Math.max(60, 40 - bounds.minY)         // oben andocken
+    : size.h / 2 - (bounds.minY + contentH / 2);
 
-  // Auf ausgewählten Knoten fokussieren (oder Root, wenn null)
+  // Auf ausgewählten Knoten fokussieren
   useEffect(() => {
     const targetId = selectedId ?? "__root__";
     const ln = layout.nodes.find((n) => n.id === targetId);
     if (!ln) return;
-    // Themen näher heranzoomen für Übersicht der Untergeordneten
-    const targetK = selectedId ? (ln.node?.kind === "topic" ? 1.4 : 1.6) : 1;
-    // Ziel: cx + t.x + ln.x*k = cx  →  t.x = -ln.x*k
-    zp.setView(-ln.x * targetK, -ln.y * targetK, targetK);
+    const targetK = selectedId ? (ln.node?.kind === "topic" ? 1.3 : 1.5) : 1;
+    // Zielposition: cx + t.x + ln.x*k = size.w/2  →  t.x = size.w/2 - cx - ln.x*k
+    zp.setView(size.w / 2 - cx - ln.x * targetK, size.h / 2 - cy - ln.y * targetK, targetK);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [focusToken, layout]);
+  }, [focusToken, layout, layoutMode, cardStyle]);
+
+  const fmtDate = (d?: string) => {
+    if (!d) return "";
+    try { return new Date(d).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "2-digit" }); }
+    catch { return d; }
+  };
 
   return (
     <div ref={zp.wrap} className="w-full h-full relative overflow-hidden touch-none"
@@ -1192,25 +1319,125 @@ function ProjectGraph({
          onPointerDown={zp.onPointerDown} onPointerMove={zp.onPointerMove}
          onPointerUp={zp.onPointerUp} onPointerCancel={zp.onPointerUp}
          onTouchStart={zp.onTouchStart} onTouchMove={zp.onTouchMove} onTouchEnd={zp.onTouchEnd}>
+      {/* Ansichts-Umschalter */}
+      <div className="absolute top-2 left-2 z-10 flex gap-1">
+        <div className="flex rounded-md border overflow-hidden bg-background/80 backdrop-blur"
+             style={{ borderColor: "hsl(var(--hairline))" }}>
+          <GraphToggleBtn active={layoutMode === "tree"} onClick={() => setLayoutMode("tree")} title="Baum von oben nach unten">Baum</GraphToggleBtn>
+          <GraphToggleBtn active={layoutMode === "radial"} onClick={() => setLayoutMode("radial")} title="Radial in alle Richtungen">Radial</GraphToggleBtn>
+        </div>
+        <div className="flex rounded-md border overflow-hidden bg-background/80 backdrop-blur"
+             style={{ borderColor: "hsl(var(--hairline))" }}>
+          <GraphToggleBtn active={cardStyle === "rect"} onClick={() => setCardStyle("rect")} title="Karten mit Details">Karte</GraphToggleBtn>
+          <GraphToggleBtn active={cardStyle === "circle"} onClick={() => setCardStyle("circle")} title="Kompakte Kreise">Kreis</GraphToggleBtn>
+        </div>
+      </div>
       <button onClick={zp.reset}
         className="absolute top-2 right-2 z-10 h-7 px-2 rounded-md text-[10px] border bg-background/80 backdrop-blur"
         style={{ borderColor: "hsl(var(--hairline))" }}>Ansicht zurücksetzen</button>
+
       <svg width={size.w} height={size.h} className="absolute inset-0">
         <g transform={`translate(${cx + zp.t.x}, ${cy + zp.t.y}) scale(${zp.t.k})`}>
           {layout.edges.map((e, i) => {
             const a = layout.nodes.find((n) => n.id === e.from)!;
             const b = layout.nodes.find((n) => n.id === e.to)!;
+            if (!a || !b) return null;
+            // Baum + Rechteck: orthogonale Verbindungslinien (wie im Referenzbild).
+            if (layoutMode === "tree" && cardStyle === "rect") {
+              const ay = a.y + a.h / 2;
+              const by = b.y - b.h / 2;
+              const midY = (ay + by) / 2;
+              return (
+                <path key={i}
+                  d={`M ${a.x} ${ay} L ${a.x} ${midY} L ${b.x} ${midY} L ${b.x} ${by}`}
+                  stroke="hsl(var(--hairline))" strokeWidth={1.4 / zp.t.k} fill="none" />
+              );
+            }
             return <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y}
               stroke="hsl(var(--hairline))" strokeWidth={1.2 / zp.t.k} />;
           })}
           {layout.nodes.map((ln) => {
-            if (!ln.node) {
-              const isRootSel = selectedId === null;
+            const isRoot = !ln.node;
+            const n = ln.node;
+            const isSel = isRoot ? selectedId === null : n!.id === selectedId;
+            const isTopic = !isRoot && n!.kind === "topic";
+            const statusCol = !isRoot && n!.status
+              ? statusMap.get(n!.status)?.color ?? "hsl(var(--hairline))"
+              : (isRoot ? "hsl(var(--ink))" : kindColor(n!.kind));
+            const onClick = (e: React.MouseEvent) => {
+              e.stopPropagation();
+              if (isRoot) onSelect("" as unknown as string); // Root-Auswahl über LeftPanel; hier nur Fokus
+              else onSelect(n!.id);
+            };
+
+            // --- Rechteckdarstellung ---
+            if (cardStyle === "rect") {
+              const w = ln.w, h = ln.h;
+              const x = ln.x - w / 2, y = ln.y - h / 2;
+              const bg = isRoot ? "hsl(var(--ink))"
+                       : isTopic ? "hsl(var(--surface-card))"
+                       : n!.unseen ? "#e0f2fe" : "hsl(var(--surface-card))";
+              const fg = isRoot ? "hsl(var(--surface))" : "hsl(var(--ink))";
+              const priCol = !isRoot && n!.priority ? priorityMap.get(n!.priority)?.color : undefined;
+              const title = isRoot ? layout.rootLabel : n!.title;
+              return (
+                <g key={ln.id} style={{ cursor: "pointer" }} onClick={onClick}>
+                  {!isRoot && n!.unseen && (
+                    <rect x={x - 4} y={y - 4} width={w + 8} height={h + 8} rx={10}
+                      fill="none" stroke="#38bdf8" strokeWidth={2} opacity={0.9}>
+                      <animate attributeName="opacity" values="0.4;1;0.4" dur="1.6s" repeatCount="indefinite" />
+                    </rect>
+                  )}
+                  <rect x={x} y={y} width={w} height={h} rx={8}
+                    fill={bg}
+                    stroke={isSel ? "hsl(var(--accent-gold))" : statusCol}
+                    strokeWidth={isSel ? 2.4 : isTopic ? 2 : 1.4} />
+                  {/* Kind-Icon-Punkt links */}
+                  {!isRoot && (
+                    <circle cx={x + 10} cy={y + 12} r={4} fill={statusCol} />
+                  )}
+                  {/* Titel */}
+                  <text x={x + (isRoot ? w / 2 : 20)} y={y + 16}
+                        textAnchor={isRoot ? "middle" : "start"}
+                        fontSize={11} fontWeight={700} fill={fg}>
+                    {title.length > 20 ? title.slice(0, 19) + "…" : title}
+                  </text>
+                  {/* Zeile 2: Kind-Label / Dringlichkeit */}
+                  {!isRoot && (
+                    <>
+                      <text x={x + 20} y={y + 30} fontSize={9} fill="hsl(var(--ink-soft))">
+                        {n!.kind === "topic" ? "Thema" : n!.kind === "task" ? "Aufgabe" : "Notiz"}
+                      </text>
+                      {priCol && (
+                        <>
+                          <circle cx={x + w - 12} cy={y + 12} r={4} fill={priCol} />
+                        </>
+                      )}
+                      {/* Datum */}
+                      {(n!.dueDate || n!.date) && (
+                        <text x={x + 8} y={y + h - 18} fontSize={9} fill="hsl(var(--ink-soft))">
+                          {fmtDate(n!.dueDate || n!.date)}
+                        </text>
+                      )}
+                      {/* Verantwortlich */}
+                      {n!.responsible && (
+                        <text x={x + 8} y={y + h - 6} fontSize={9} fontWeight={600} fill="hsl(var(--ink))">
+                          {n!.responsible.length > 20 ? n!.responsible.slice(0, 19) + "…" : n!.responsible}
+                        </text>
+                      )}
+                    </>
+                  )}
+                </g>
+              );
+            }
+
+            // --- Kreisdarstellung (Legacy) ---
+            if (isRoot) {
               return (
                 <g key={ln.id} style={{ cursor: "pointer" }}>
-                  <circle cx={ln.x} cy={ln.y} r={ln.r + (isRootSel ? 3 : 0)}
+                  <circle cx={ln.x} cy={ln.y} r={ln.r + (isSel ? 3 : 0)}
                     fill="hsl(var(--ink))"
-                    stroke={isRootSel ? "hsl(var(--accent-gold))" : "none"} strokeWidth={3} />
+                    stroke={isSel ? "hsl(var(--accent-gold))" : "none"} strokeWidth={3} />
                   <text x={ln.x} y={ln.y + 4} textAnchor="middle" fontSize={10}
                         fontWeight={600} fill="hsl(var(--surface))">
                     {layout.rootLabel.length > 12 ? layout.rootLabel.slice(0, 12) + "…" : layout.rootLabel}
@@ -1218,30 +1445,24 @@ function ProjectGraph({
                 </g>
               );
             }
-            const n = ln.node;
-            const isSel = n.id === selectedId;
-            const isTopic = n.kind === "topic";
-            const statusCol = n.status ? statusMap.get(n.status)?.color ?? "hsl(var(--hairline))"
-                                       : kindColor(n.kind);
             return (
-              <g key={ln.id} style={{ cursor: "pointer" }} onClick={(e) => { e.stopPropagation(); onSelect(n.id); }}>
-                {n.unseen && (
+              <g key={ln.id} style={{ cursor: "pointer" }} onClick={onClick}>
+                {n!.unseen && (
                   <circle cx={ln.x} cy={ln.y} r={ln.r + 5}
                     fill="none" stroke="#38bdf8" strokeWidth={2} opacity={0.9}>
                     <animate attributeName="opacity" values="0.4;1;0.4" dur="1.6s" repeatCount="indefinite" />
                   </circle>
                 )}
                 <circle cx={ln.x} cy={ln.y} r={ln.r + (isSel ? 3 : 0)}
-                  fill={isTopic ? "hsl(var(--accent-gold))" : n.unseen ? "#e0f2fe" : "hsl(var(--surface-card))"}
-                  stroke={isSel ? "hsl(var(--accent-gold))" : n.unseen ? "#38bdf8" : statusCol}
-                  strokeWidth={isSel ? 3 : n.unseen ? 2.2 : 1.8} />
+                  fill={isTopic ? "hsl(var(--accent-gold))" : n!.unseen ? "#e0f2fe" : "hsl(var(--surface-card))"}
+                  stroke={isSel ? "hsl(var(--accent-gold))" : n!.unseen ? "#38bdf8" : statusCol}
+                  strokeWidth={isSel ? 3 : n!.unseen ? 2.2 : 1.8} />
                 <text x={ln.x} y={ln.y + 3} textAnchor="middle" fontSize={9} fontWeight={600}
                   fill={isTopic ? "hsl(var(--surface))" : "hsl(var(--ink))"}>
-                  {n.title.length > 10 ? n.title.slice(0, 10) + "…" : n.title}
+                  {n!.title.length > 10 ? n!.title.slice(0, 10) + "…" : n!.title}
                 </text>
               </g>
             );
-
           })}
         </g>
       </svg>
@@ -1254,6 +1475,21 @@ function ProjectGraph({
     </div>
   );
 }
+
+function GraphToggleBtn({ active, onClick, title, children }:
+  { active: boolean; onClick: () => void; title: string; children: React.ReactNode }) {
+  return (
+    <button onClick={onClick} title={title}
+      className="h-7 px-2.5 text-[10px] font-medium transition-colors"
+      style={{
+        background: active ? "hsl(var(--ink))" : "transparent",
+        color: active ? "hsl(var(--surface))" : "hsl(var(--ink-soft))",
+      }}>
+      {children}
+    </button>
+  );
+}
+
 
 // -------------------------------------------------------------
 // Verknüpfungen-Ansicht
