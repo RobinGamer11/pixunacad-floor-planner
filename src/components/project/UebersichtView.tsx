@@ -31,7 +31,6 @@ export function UebersichtView({ project, activeMappeId, onSelectMappe }: Props)
         <div className="space-y-5 min-w-0">
           <MappenPanel project={project} activeId={activeMappe?.id} onSelect={onSelectMappe} />
           <ProjektinfoPanel project={project} />
-          <AufgabenMini project={project} />
         </div>
 
         {/* Rechte Spalte (dominant): Titelbild + Erläuterungen zusammen */}
@@ -40,7 +39,9 @@ export function UebersichtView({ project, activeMappeId, onSelectMappe }: Props)
         </div>
       </div>
 
-      <KalenderMini project={project} />
+      {/* Aufgaben + Kalender identisch wie im Reiter „Aufgaben" */}
+      <AufgabenView project={project} />
+
       {timelinePos === "bottom" && <TaskTimeline project={project} />}
     </div>
   );
