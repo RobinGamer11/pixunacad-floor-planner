@@ -1052,6 +1052,8 @@ function useZoomPan() {
 
   const onPointerDown = (e: React.PointerEvent) => {
     if (e.button !== 0 && e.pointerType === "mouse") return;
+    const target = e.target as HTMLElement;
+    if (target.closest("button,a,input,select,textarea,[role='button']")) return;
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     state.current.dragging = true;
     state.current.sx = e.clientX - state.current.x;
