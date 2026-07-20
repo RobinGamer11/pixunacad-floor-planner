@@ -598,11 +598,11 @@ function TreeList({
 
             {isSel && (
               <div className="flex flex-wrap gap-1 py-1 pr-1" style={{ paddingLeft: 20 + depth * 12 }}>
-                <MiniAddBtn onClick={() => addChild(n.id, "task")} label="Aufgabe" />
-                <MiniAddBtn onClick={() => addChild(n.id, "note")} label="Notiz" />
                 {n.kind === "topic" && (
                   <MiniAddBtn onClick={() => addChild(n.id, "topic")} label="Unterthema" />
                 )}
+                <MiniAddBtn onClick={() => addChild(n.id, "task")} label="Aufgabe" />
+                <MiniAddBtn onClick={() => addChild(n.id, "note")} label="Notiz" />
               </div>
             )}
 
