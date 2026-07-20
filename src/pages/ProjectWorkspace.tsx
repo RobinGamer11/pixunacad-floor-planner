@@ -595,9 +595,9 @@ export default function ProjectWorkspace() {
     if (lastFitKeyRef.current === fitKey) return;
     lastFitKeyRef.current = fitKey;
     const fitPage = () => {
-      const fmt = FORMAT_SIZES[activePage.format];
+      const fmt = getPageSizeMm(activePage);
       const baseWidth = 1100;
-      const baseHeight = baseWidth / (fmt.w / fmt.h);
+      const baseHeight = baseWidth / (fmt.wMm / fmt.hMm);
       const box = canvasViewportRef.current!;
       const nextZoom = Math.max(10, Math.min(100, Math.floor(Math.min(
         ((box.clientWidth - 96) / baseWidth) * 100,
