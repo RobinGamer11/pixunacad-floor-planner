@@ -2972,7 +2972,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               <div ref={idListRef} className="id-list" />
             </div>
           </div>
-        </div>
+        </DragScrollDiv>
       </aside>
       ) : (
         <div
