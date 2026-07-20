@@ -964,13 +964,14 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
 
   return (
     <div className="flex w-full h-full overflow-hidden" style={{ background: "hsl(var(--surface))" }}>
-      {/* Left Sidebar */}
+      {/* Left Sidebar — im Präsentationsmodus ausgeblendet */}
       <aside
         className="relative shrink-0 flex flex-col border-r"
         style={{
           width: 56,
           background: "hsl(var(--surface-card))",
           borderColor: "hsl(var(--hairline))",
+          display: presenting ? "none" : undefined,
         }}
       >
         {/* Raster / Undo / Redo / Pipette */}
