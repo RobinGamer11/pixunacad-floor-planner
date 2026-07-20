@@ -1178,21 +1178,25 @@ export class Renderer {
     const maxY = Math.ceil(Math.max(tl.y, br.y) / size) * size;
 
     const pxPerCell = cam.scale * size;
-    const skip = pxPerCell < 18 ? 4 : pxPerCell < 35 ? 2 : 1;
+    // Keep the labelled grid cell (e.g. 1 m) constant. When cells become tiny
+    // we fade them out via opacity instead of doubling their world spacing —
+    // otherwise the "1 m" raster silently turns into 2 m / 4 m on zoom-out.
+    const baseAlpha = this.gridSettings.opacity ?? 0.06;
+    let alpha = baseAlpha;
+    if (pxPerCell < 6) alpha = baseAlpha * Math.max(0, (pxPerCell - 2) / 4);
+    if (pxPerCell < 2) return;
 
     ctx.save();
     ctx.lineWidth = 1;
-    ctx.strokeStyle = hexToRgba(this.gridSettings.color || "#000000", this.gridSettings.opacity ?? 0.06);
+    ctx.strokeStyle = hexToRgba(this.gridSettings.color || "#000000", alpha);
 
     ctx.beginPath();
-    for (let i = 0; i * size + minX <= maxX; i += skip) {
-      const x = minX + i * size;
+    for (let x = minX; x <= maxX; x += size) {
       const s = cam.worldToScreen(x, 0);
       ctx.moveTo(s.x, 0);
       ctx.lineTo(s.x, this.vh);
     }
-    for (let i = 0; i * size + minY <= maxY; i += skip) {
-      const y = minY + i * size;
+    for (let y = minY; y <= maxY; y += size) {
       const s = cam.worldToScreen(0, y);
       ctx.moveTo(0, s.y);
       ctx.lineTo(this.vw, s.y);
@@ -1962,6 +1966,17 @@ export class Renderer {
     const tickOffsetPx = (dim.tickLengthM || Defaults.measureTickLengthM) * cam.scale;
     const textOffsetPx = Math.max(fontPx * 0.95, tickOffsetPx * 0.9 + fontPx * 0.35);
 
+    // Determine which side of the dimension line the placement point (i.e. the
+    // side the user pulled the measurement out toward) is on, in screen space,
+    // so the text sits opposite the wall — mirrored automatically when the
+    // dimension is placed on the other side.
+    const placementScreen = cam.worldToScreen(dim.placementPoint.x, dim.placementPoint.y);
+    const localYx = -Math.sin(normalizedAngle);
+    const localYy = Math.cos(normalizedAngle);
+    const dotPlacementY =
+      (placementScreen.x - mid.x) * localYx + (placementScreen.y - mid.y) * localYy;
+    const textSideSign = dotPlacementY > 0 ? 1 : -1;
+
     ctx.translate(mid.x, mid.y);
     ctx.rotate(normalizedAngle);
 
@@ -1982,7 +1997,7 @@ export class Renderer {
     const textHeight = ascent + descent;
     const padX = Math.max(4, fontPx * 0.45);
     const padY = Math.max(2, fontPx * 0.22);
-    const textY = -textOffsetPx;
+    const textY = textSideSign * textOffsetPx;
 
     if (dim.textBgEnabled) {
       ctx.fillStyle = hexToRgba(dim.textBgColor || Defaults.measureTextBgColor, dim.textBgAlpha ?? Defaults.measureTextBgAlpha);
