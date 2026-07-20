@@ -12,12 +12,13 @@ export const DragScrollDiv = React.forwardRef<HTMLDivElement, Props>(
     return (
       <div
         ref={ref}
-        className={className}
+        className={`no-scrollbar ${className ?? ""}`}
         style={{ touchAction: axis === "y" ? "pan-y" : axis === "x" ? "pan-x" : "pan-x pan-y", ...style }}
         {...rest}
       >
         {children}
       </div>
+
     );
   }
 );
