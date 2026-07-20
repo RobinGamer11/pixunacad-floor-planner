@@ -5484,8 +5484,12 @@ function PresenterOverlay({
     return () => window.removeEventListener("keydown", onKey);
   }, [index, pages.length]);
 
-  // Pointer drag / swipe
+  // Pointer drag / swipe — nur wenn Karussell nicht offen ist.
   const onPointerDown = (e: React.PointerEvent) => {
+    if (carousel) return;
+    // Interaktionen mit Chrome-Buttons (Navigations-/Beenden-Buttons) nicht abfangen.
+    const target = e.target as HTMLElement | null;
+    if (target && target.closest("[data-presenter-chrome]")) return;
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     setDrag({ startX: e.clientX, startY: e.clientY, dx: 0, dy: 0 });
   };
@@ -5499,8 +5503,10 @@ function PresenterOverlay({
     setDrag(null);
     const absX = Math.abs(dx), absY = Math.abs(dy);
     const H_THRESH = Math.min(160, viewport.w * 0.15);
-    const V_THRESH = Math.min(120, viewport.h * 0.15);
-    if (absY > absX && absY > V_THRESH) {
+    // Vertikal deutlich strenger: Nur ein sehr klares Hoch/Runter-Wischen
+    // aktiviert Karussell (unten) bzw. beendet die Präsentation (oben).
+    const V_THRESH = Math.min(240, viewport.h * 0.30);
+    if (absY > absX * 1.4 && absY > V_THRESH) {
       if (dy < 0) doExit(); else setCarousel(true);
       return;
     }
