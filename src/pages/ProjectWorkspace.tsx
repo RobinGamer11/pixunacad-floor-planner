@@ -184,7 +184,22 @@ export default function ProjectWorkspace() {
   } | null>(null);
   // Force-re-render der ToolsTab, sobald die Engine bereit ist (für Panel-Wiring).
   const [, forceEngineTick] = useState(0);
-  const [presenting, setPresenting] = useState(false);
+  const [presenting, setPresenting] = useState(() => {
+    try { return new URLSearchParams(window.location.search).get("present") === "1"; } catch { return false; }
+  });
+  // Wenn Präsentation via ?present=1 automatisch gestartet wird, Param nach Aktivierung aus der URL entfernen.
+  useEffect(() => {
+    if (!presenting) return;
+    try {
+      const url = new URL(window.location.href);
+      if (url.searchParams.has("present")) {
+        url.searchParams.delete("present");
+        window.history.replaceState({}, "", url.toString());
+      }
+    } catch {}
+    // Nur einmal beim Mount interessant.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [tabletAidOn, setTabletAidOn] = useState<boolean>(() => {
     try { return localStorage.getItem("pixuna.tabletAid") === "1"; } catch { return false; }
   });
