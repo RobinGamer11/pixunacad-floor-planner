@@ -78,7 +78,7 @@ import CadOverlayLayer from "@/components/page/CadOverlayLayer";
 import { CadDocumentInspector } from "@/components/page/CadDocumentInspector";
 import { CadIdPanelHost } from "@/components/page/CadIdPanelHost";
 import { PdfPageView } from "@/components/page/PdfPageView";
-import { TableElementView, TableModifyContext } from "@/components/page/TableElementView";
+import { TableElementView, TableModifyContext, TableFormulaPickContext, type FormulaFn } from "@/components/page/TableElementView";
 import { TableToolSettings } from "@/components/page/TableToolSettings";
 
 import { CadViewportView } from "@/components/page/CadViewportView";
@@ -176,6 +176,7 @@ export default function ProjectWorkspace() {
   // Tabellen-Werkzeug: Placement-Preview vor Bestätigen.
   const [pendingTableId, setPendingTableId] = useState<string | null>(null);
   const [tableModifyMode, setTableModifyMode] = useState(false);
+  const [tableFormulaFn, setTableFormulaFn] = useState<FormulaFn | null>(null);
   const cadEngineApiRef = useRef<{
     setSelectedSegmentSnap: (opts: { midpointSnap?: boolean; divisionSnap?: number | null }) => void;
     duplicateSelectedSegments: (offsetMm?: number) => number;
@@ -694,6 +695,7 @@ export default function ProjectWorkspace() {
 
   return (
     <TableModifyContext.Provider value={tableModifyMode}>
+    <TableFormulaPickContext.Provider value={{ fn: tableFormulaFn, setFn: setTableFormulaFn }}>
     <>
     <div
       className="flex flex-col h-[100dvh] w-screen overflow-hidden"
@@ -1664,6 +1666,8 @@ export default function ProjectWorkspace() {
               pendingTableId={pendingTableId}
               tableModifyMode={tableModifyMode}
               setTableModifyMode={setTableModifyMode}
+              tableFormulaFn={tableFormulaFn}
+              setTableFormulaFn={setTableFormulaFn}
               onConfirmTable={() => {
                 setPendingTableId(null);
                 setActiveTool(null);
@@ -1714,6 +1718,7 @@ export default function ProjectWorkspace() {
     )}
     {tabletAidOn && <TabletAidWheel />}
     </>
+    </TableFormulaPickContext.Provider>
     </TableModifyContext.Provider>
   );
 }
@@ -3128,6 +3133,8 @@ function RightInspector({
   pendingTableId,
   tableModifyMode,
   setTableModifyMode,
+  tableFormulaFn,
+  setTableFormulaFn,
   onConfirmTable,
   onCancelTable,
 
@@ -3161,6 +3168,8 @@ function RightInspector({
   pendingTableId?: string | null;
   tableModifyMode?: boolean;
   setTableModifyMode?: (v: boolean) => void;
+  tableFormulaFn?: FormulaFn | null;
+  setTableFormulaFn?: (f: FormulaFn | null) => void;
   onConfirmTable?: () => void;
   onCancelTable?: () => void;
 
@@ -3225,6 +3234,8 @@ function RightInspector({
             pendingTableId={pendingTableId ?? null}
             tableModifyMode={!!tableModifyMode}
             setTableModifyMode={setTableModifyMode}
+            tableFormulaFn={tableFormulaFn ?? null}
+            setTableFormulaFn={setTableFormulaFn}
             onConfirmTable={onConfirmTable}
             onCancelTable={onCancelTable}
           />
@@ -3715,6 +3726,8 @@ function ToolsTab({
   pendingTableId,
   tableModifyMode,
   setTableModifyMode,
+  tableFormulaFn,
+  setTableFormulaFn,
   onConfirmTable,
   onCancelTable,
 }: {
@@ -3744,6 +3757,8 @@ function ToolsTab({
   pendingTableId?: string | null;
   tableModifyMode?: boolean;
   setTableModifyMode?: (v: boolean) => void;
+  tableFormulaFn?: FormulaFn | null;
+  setTableFormulaFn?: (f: FormulaFn | null) => void;
   onConfirmTable?: () => void;
   onCancelTable?: () => void;
 }) {
@@ -3820,6 +3835,8 @@ function ToolsTab({
           isPending={!!pendingTableId && element?.id === pendingTableId}
           modifyMode={!!tableModifyMode}
           setModifyMode={(v) => setTableModifyMode?.(v)}
+          formulaFn={tableFormulaFn ?? null}
+          setFormulaFn={(f) => setTableFormulaFn?.(f)}
           onConfirm={() => onConfirmTable?.()}
           onCancel={() => onCancelTable?.()}
         />

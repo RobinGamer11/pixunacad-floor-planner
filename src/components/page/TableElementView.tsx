@@ -1,5 +1,5 @@
 import React from "react";
-import { Filter, Plus, Minus, Sigma } from "lucide-react";
+import { Filter, Plus, Minus, Sigma, X as XIcon } from "lucide-react";
 import type { PageElement } from "@/lib/projectStore";
 
 /** Kontext, mit dem die Projektmappe der Tabelle mitteilt, dass gerade
@@ -7,14 +7,15 @@ import type { PageElement } from "@/lib/projectStore";
  *  zwischen Spalten / Zeilen eingeblendet. */
 export const TableModifyContext = React.createContext<boolean>(false);
 
-/** Tabellen-Element für die Projektmappe.
- *  - Editierbare Zellen (Tap/Click → Edit).
- *  - Formeln: "=SUM(A1:B3)", "=AVG(...)", "=A1+B2*2".
- *  - Modus „Tabelle modifizieren" (via Kontext) blendet +/- zwischen
- *    Spalten / Zeilen ein.
- *  - Pro-Spalte Filter (Dropdown mit eindeutigen Werten, Checkboxen).
- *  - Modernes, schlichtes Default-Layout auf 11pt-Text abgestimmt.
- */
+/** Formel-Picker: welche Aggregations-Funktion gerade platziert werden soll. */
+export type FormulaFn = "SUM" | "AVG" | "MIN" | "MAX" | "COUNT";
+/** Kontext zum Aktivieren/Steuern des Formel-Klick-Modus (Etappe 3). */
+export const TableFormulaPickContext = React.createContext<{
+  fn: FormulaFn | null;
+  setFn: (f: FormulaFn | null) => void;
+} | null>(null);
+
+/** Tabellen-Element für die Projektmappe. */
 export function TableElementView({
   element,
   readOnly,
@@ -30,20 +31,36 @@ export function TableElementView({
   const cols = cells[0]?.length ?? 0;
   const filters = data.filters ?? {};
   const headerRow = data.headerRow !== false;
+  const borderColor = data.borderColor ?? "hsl(var(--hairline))";
+  const borderWidthPx = data.borderWidthPx ?? 1;
+  const background = data.background ?? "hsl(var(--surface))";
+  const headerBackground = data.headerBackground ?? "hsl(var(--surface-muted))";
 
   const modifyOn = React.useContext(TableModifyContext) && !readOnly;
+  const formulaCtx = React.useContext(TableFormulaPickContext);
+  const pickFn = !readOnly ? formulaCtx?.fn ?? null : null;
 
   const [editing, setEditing] = React.useState<{ r: number; c: number } | null>(null);
   const [openFilter, setOpenFilter] = React.useState<number | null>(null);
+
+  // Formel-Picker Zustand: Zielzelle → Startzelle → Endzelle
+  const [pickStep, setPickStep] = React.useState<"target" | "start" | "end">("target");
+  const [pickTarget, setPickTarget] = React.useState<{ r: number; c: number } | null>(null);
+  const [pickStart, setPickStart] = React.useState<{ r: number; c: number } | null>(null);
+
+  React.useEffect(() => {
+    // Reset picker whenever activation toggles.
+    setPickStep("target");
+    setPickTarget(null);
+    setPickStart(null);
+  }, [pickFn]);
 
   const updateCells = (mutator: (draft: string[][]) => string[][] | void) => {
     const clone = cells.map((row) => row.slice());
     const result = mutator(clone);
     const next: string[][] = Array.isArray(result) ? result : clone;
-
     onChange({ tableData: { ...data, cells: next } });
   };
-
 
   const setCell = (r: number, c: number, v: string) => {
     updateCells((d) => { d[r][c] = v; });
@@ -81,12 +98,62 @@ export function TableElementView({
     if (ok) visibleRows.push(r);
   }
 
+  const handleCellClick = (r: number, c: number) => {
+    if (readOnly) return;
+    if (pickFn) {
+      if (pickStep === "target") {
+        setPickTarget({ r, c });
+        setPickStep("start");
+      } else if (pickStep === "start") {
+        setPickStart({ r, c });
+        setPickStep("end");
+      } else if (pickStep === "end" && pickTarget && pickStart) {
+        const r1 = Math.min(pickStart.r, r), r2 = Math.max(pickStart.r, r);
+        const c1 = Math.min(pickStart.c, c), c2 = Math.max(pickStart.c, c);
+        const a = `${colLabel(c1)}${r1 + 1}`;
+        const b = `${colLabel(c2)}${r2 + 1}`;
+        const range = a === b ? a : `${a}:${b}`;
+        setCell(pickTarget.r, pickTarget.c, `=${pickFn}(${range})`);
+        formulaCtx?.setFn(null);
+      }
+      return;
+    }
+    setEditing({ r, c });
+  };
+
+  const isCellHighlighted = (r: number, c: number): string | undefined => {
+    if (!pickFn) return undefined;
+    if (pickTarget && pickTarget.r === r && pickTarget.c === c) return "hsl(var(--accent-gold) / 0.35)";
+    if (pickStart && pickStep === "end") {
+      // Preview range from pickStart to hovered — cannot know hover cheaply; only mark start
+      if (pickStart.r === r && pickStart.c === c) return "hsl(var(--primary) / 0.25)";
+    } else if (pickStart) {
+      if (pickStart.r === r && pickStart.c === c) return "hsl(var(--primary) / 0.25)";
+    }
+    return undefined;
+  };
+
   return (
     <div
-      className="w-full h-full overflow-auto text-[11px]"
-      style={{ background: "hsl(var(--surface))", color: "hsl(var(--ink))" }}
+      className="w-full h-full overflow-auto text-[11px] relative"
+      style={{ background, color: "hsl(var(--ink))" }}
       onPointerDown={(e) => e.stopPropagation()}
     >
+      {pickFn && (
+        <div
+          className="sticky top-0 z-20 flex items-center justify-between gap-1 px-2 py-1 text-[10px] font-medium"
+          style={{ background: "hsl(var(--accent-gold) / 0.15)", borderBottom: `1px solid ${borderColor}` }}
+        >
+          <span>
+            {pickFn}: {pickStep === "target" ? "Zielzelle wählen" : pickStep === "start" ? "Startzelle wählen" : "Endzelle wählen"}
+          </span>
+          <button
+            onClick={() => formulaCtx?.setFn(null)}
+            className="w-4 h-4 flex items-center justify-center rounded hover:bg-black/10"
+            title="Abbrechen"
+          ><XIcon size={10} /></button>
+        </div>
+      )}
       {modifyOn && (
         <div className="flex gap-0.5 px-1 pt-1">
           {cells[0]?.map((_, c) => (
@@ -116,20 +183,21 @@ export function TableElementView({
                 const value = cells[r][c];
                 const display = value.startsWith("=") ? String(evalCell(cells, r, c)) : value;
                 const isEditing = editing?.r === r && editing?.c === c;
+                const highlight = isCellHighlighted(r, c);
                 return (
                   <td
                     key={c}
-                    className="border align-top relative"
+                    className="align-top relative"
                     style={{
-                      borderColor: "hsl(var(--hairline))",
+                      border: borderWidthPx > 0 ? `${borderWidthPx}px solid ${borderColor}` : "none",
                       minWidth: 64,
-                      background: isHeader ? "hsl(var(--surface-muted))" : undefined,
+                      background: highlight ?? (isHeader ? headerBackground : undefined),
                       fontWeight: isHeader ? 600 : undefined,
+                      cursor: pickFn ? "crosshair" : undefined,
                     }}
-                    onDoubleClick={() => !readOnly && setEditing({ r, c })}
+                    onDoubleClick={() => !readOnly && !pickFn && setEditing({ r, c })}
                     onClick={(e) => {
-                      // Touch: single tap enters edit for existing cell.
-                      if ((e as any).pointerType === "touch" && !readOnly) setEditing({ r, c });
+                      if ((e as any).pointerType === "touch") { handleCellClick(r, c); return; }
                     }}
                   >
                     {isEditing ? (
@@ -148,10 +216,10 @@ export function TableElementView({
                       <div
                         className="px-1.5 py-1 flex items-center justify-between gap-1"
                         style={{ minHeight: 32 }}
-                        onClick={() => !readOnly && setEditing({ r, c })}
+                        onClick={() => handleCellClick(r, c)}
                       >
                         <span className="truncate">{display}</span>
-                        {isHeader && !readOnly && (
+                        {isHeader && !readOnly && !pickFn && (
                           <button
                             onClick={(e) => { e.stopPropagation(); setOpenFilter(openFilter === c ? null : c); }}
                             className="opacity-60 hover:opacity-100"
@@ -307,7 +375,6 @@ export function evalCell(cells: string[][], r: number, c: number, seen: Set<stri
   seen.add(key);
   try {
     const expr = raw.slice(1);
-    // Ersetze Bereichsfunktionen SUM/AVG/MIN/MAX/COUNT.
     const substituted = expr.replace(/(SUM|AVG|AVERAGE|MIN|MAX|COUNT)\(([^)]+)\)/gi, (_m, fn, arg) => {
       const nums: number[] = [];
       for (const part of arg.split(",")) {
@@ -342,14 +409,12 @@ export function evalCell(cells: string[][], r: number, c: number, seen: Set<stri
       if (up === "COUNT") return String(nums.length);
       return "0";
     });
-    // Ersetze einfache Zellreferenzen.
     const withRefs = substituted.replace(/[A-Z]+\d+/g, (ref) => {
       const p = parseRef(ref);
       if (!p) return ref;
       const v = evalCell(cells, p.r, p.c, new Set(seen));
       return typeof v === "number" ? String(v) : "0";
     });
-    // Sicherer Auswerter — nur Zahlen und + - * / ( ) . erlaubt.
     if (!/^[-+*/().\d\s]*$/.test(withRefs)) return "#ERR";
     // eslint-disable-next-line no-new-func
     const val = Function(`"use strict"; return (${withRefs || 0});`)();
