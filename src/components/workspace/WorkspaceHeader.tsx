@@ -68,10 +68,11 @@ export function WorkspaceHeader({
   return (
     <header
       ref={headerRef}
-      className="h-16 flex items-center px-3 border-b shrink-0 overflow-x-auto no-scrollbar touch-pan-x whitespace-nowrap"
+      className="h-16 flex items-center gap-2 px-3 border-b shrink-0 overflow-x-auto overflow-y-hidden no-scrollbar whitespace-nowrap cursor-grab active:cursor-grabbing"
       style={{
         borderColor: "hsl(var(--hairline))",
         background: "hsl(var(--surface-card))",
+        touchAction: "none",
       }}
     >
       {/* Left: Zurück + Titel + Modus-Umschalter */}
@@ -155,7 +156,7 @@ export function WorkspaceHeader({
       </div>
 
 
-      <div className="flex-1 min-w-4" />
+      <div className="shrink-0 w-8 md:flex-1 md:min-w-8" />
       {/* Right: Undo/Redo · Zoom · Präsentieren · Teilen · Exportieren */}
       <div className="flex items-center gap-1.5 text-muted-foreground shrink-0 pl-2">
 
@@ -232,7 +233,7 @@ function ModeButton({
   return (
     <button
       onClick={onClick}
-      className="h-7 px-2.5 rounded-[5px] flex items-center gap-1.5 text-[11px] font-medium transition-colors"
+      className="h-7 px-2.5 rounded-[5px] flex items-center gap-1.5 text-[11px] font-medium transition-colors shrink-0"
       style={{
         background: active ? "hsl(var(--accent-gold))" : "transparent",
         color: active ? "hsl(var(--surface))" : "hsl(var(--ink-soft))",

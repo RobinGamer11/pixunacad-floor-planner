@@ -966,3 +966,12 @@
 
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
+.scrollbarless-panel,
+.scrollbarless-panel * {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbarless-panel::-webkit-scrollbar,
+.scrollbarless-panel *::-webkit-scrollbar {
+  display: none;
+}

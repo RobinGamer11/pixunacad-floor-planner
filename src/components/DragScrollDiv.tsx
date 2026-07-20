@@ -5,15 +5,15 @@ type Props = React.HTMLAttributes<HTMLDivElement> & {
   axis?: "x" | "y" | "both";
 };
 
-/** Div-Wrapper mit Drag-/Wisch-Scroll auf leerer Fläche. */
+/** Div-Wrapper mit Drag-/Wisch-Scroll ohne sichtbare Scrollbars. */
 export const DragScrollDiv = React.forwardRef<HTMLDivElement, Props>(
   ({ axis = "y", className, style, children, ...rest }, _ignored) => {
     const ref = useDragScroll<HTMLDivElement>(axis);
     return (
       <div
         ref={ref}
-        className={`no-scrollbar ${className ?? ""}`}
-        style={{ touchAction: axis === "y" ? "pan-y" : axis === "x" ? "pan-x" : "pan-x pan-y", ...style }}
+        className={`no-scrollbar scrollbarless-panel overscroll-contain ${className ?? ""}`}
+        style={{ touchAction: "none", ...style }}
         {...rest}
       >
         {children}
