@@ -1,19 +1,14 @@
 import React from "react";
-import { Plus, Minus, Check, X, Pencil } from "lucide-react";
+import { Plus, Minus, Check, X, Pencil, Sigma } from "lucide-react";
 import { projectStore } from "@/lib/projectStore";
 import type { PageElement } from "@/lib/projectStore";
+import type { FormulaFn } from "./TableElementView";
 
 /**
  * Werkzeug-Einstellungen für das Tabellen-Werkzeug (Projektmappe).
- *
- * Etappe 1:
- *  - Placement-Preview: Tabelle wird direkt beim Aktivieren des Werkzeugs
- *    mittig auf der Seite platziert; Zeilen/Spalten sind hier live einstellbar.
- *  - "Tabelle modifizieren"-Schalter aktiviert die Inline-+/-–Bedienknöpfe
- *    an der Tabelle selbst (siehe TableElementView).
- *  - "Bestätigen" schließt den Placement-Modus; "Abbrechen" verwirft.
- *
- * Weitere Etappen (Filter, Rahmen, Hintergrund, HUB, Formel-Klick) folgen.
+ * Etappe 1: Placement-Preview, Zeilen/Spalten, „modifizieren".
+ * Etappe 2: Rahmen (Breite/Farbe) + Hintergrund + Kopfzeilen-Hintergrund.
+ * Etappe 3: Formel-Klick-Picker (SUM/AVG/MIN/MAX/COUNT).
  */
 export function TableToolSettings({
   projectId,
@@ -22,6 +17,8 @@ export function TableToolSettings({
   isPending,
   modifyMode,
   setModifyMode,
+  formulaFn,
+  setFormulaFn,
   onConfirm,
   onCancel,
 }: {
@@ -31,6 +28,8 @@ export function TableToolSettings({
   isPending: boolean;
   modifyMode: boolean;
   setModifyMode: (v: boolean) => void;
+  formulaFn?: FormulaFn | null;
+  setFormulaFn?: (f: FormulaFn | null) => void;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
@@ -49,10 +48,14 @@ export function TableToolSettings({
   const rows = data.cells.length;
   const cols = data.cells[0]?.length ?? 1;
 
-  // Zellgrößen für automatische Anpassung der Element-Maße (in mm).
-  // 11pt Fließtext ≈ 3,9 mm — Zellhöhe 7 mm, Spaltenbreite 26 mm passt gut.
   const CELL_W_MM = 26;
   const CELL_H_MM = 7;
+
+  const patchTable = (patch: Partial<NonNullable<PageElement["tableData"]>>) => {
+    projectStore.updateElement(projectId, pageId, tableElement.id, {
+      tableData: { ...data, ...patch },
+    } as any);
+  };
 
   const resize = (nextRows: number, nextCols: number) => {
     const R = Math.max(1, Math.min(64, Math.round(nextRows)));
@@ -75,30 +78,69 @@ export function TableToolSettings({
     } as any);
   };
 
+  const borderWidthPx = data.borderWidthPx ?? 1;
+  const borderColor = data.borderColor ?? "#d4d4d4";
+  const background = data.background ?? "#ffffff";
+  const headerBackground = data.headerBackground ?? "#f4f4f4";
+
+  const fns: FormulaFn[] = ["SUM", "AVG", "MIN", "MAX", "COUNT"];
+
   return (
     <div className="space-y-3">
-      <div
-        className="rounded-md border p-2 space-y-2"
-        style={{ borderColor: "hsl(var(--hairline))" }}
-      >
+      <div className="rounded-md border p-2 space-y-2" style={{ borderColor: "hsl(var(--hairline))" }}>
         <div className="text-[11px] font-semibold text-muted-foreground">Tabelle</div>
 
         <RowColStepper label="Spalten" value={cols} min={1} max={24} onChange={(v) => resize(rows, v)} />
         <RowColStepper label="Zeilen"  value={rows} min={1} max={64} onChange={(v) => resize(v, cols)} />
 
         <label className="flex items-center gap-2 text-[11px] cursor-pointer pt-1">
-          <input
-            type="checkbox"
-            checked={modifyMode}
-            onChange={(e) => setModifyMode(e.target.checked)}
-          />
+          <input type="checkbox" checked={modifyMode} onChange={(e) => setModifyMode(e.target.checked)} />
           <Pencil size={11} />
           <span>Tabelle modifizieren</span>
         </label>
-        <div className="text-[10px] text-muted-foreground leading-snug">
-          Blendet +/- an Spalten- und Zeilenrändern ein, um live zu ergänzen oder zu entfernen.
-        </div>
       </div>
+
+      <div className="rounded-md border p-2 space-y-2" style={{ borderColor: "hsl(var(--hairline))" }}>
+        <div className="text-[11px] font-semibold text-muted-foreground">Rahmen &amp; Hintergrund</div>
+
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[11px] text-muted-foreground">Rahmenbreite</span>
+          <div className="flex items-center rounded-md border" style={{ borderColor: "hsl(var(--hairline))" }}>
+            <button onClick={() => patchTable({ borderWidthPx: Math.max(0, borderWidthPx - 1) })} className="h-7 w-7 flex items-center justify-center hover:bg-muted"><Minus size={11} /></button>
+            <div className="w-8 text-center text-[11px]">{borderWidthPx}px</div>
+            <button onClick={() => patchTable({ borderWidthPx: Math.min(6, borderWidthPx + 1) })} className="h-7 w-7 flex items-center justify-center hover:bg-muted"><Plus size={11} /></button>
+          </div>
+        </div>
+
+        <ColorRow label="Rahmenfarbe" value={borderColor} onChange={(v) => patchTable({ borderColor: v })} />
+        <ColorRow label="Hintergrund" value={background} onChange={(v) => patchTable({ background: v })} />
+        <ColorRow label="Kopfzeile" value={headerBackground} onChange={(v) => patchTable({ headerBackground: v })} />
+      </div>
+
+      {setFormulaFn && (
+        <div className="rounded-md border p-2 space-y-2" style={{ borderColor: "hsl(var(--hairline))" }}>
+          <div className="flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground">
+            <Sigma size={11} /> Formel per Klick
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {fns.map((f) => (
+              <button
+                key={f}
+                onClick={() => setFormulaFn(formulaFn === f ? null : f)}
+                className="h-6 px-2 text-[10px] rounded border"
+                style={{
+                  borderColor: "hsl(var(--hairline))",
+                  background: formulaFn === f ? "hsl(var(--accent-gold))" : undefined,
+                  color: formulaFn === f ? "hsl(var(--surface))" : undefined,
+                }}
+              >{f}</button>
+            ))}
+          </div>
+          <div className="text-[10px] text-muted-foreground leading-snug">
+            Aktiviere eine Funktion, tippe dann in der Tabelle: Zielzelle → Startzelle → Endzelle.
+          </div>
+        </div>
+      )}
 
       {isPending && (
         <div className="flex items-center gap-1.5">
@@ -122,6 +164,23 @@ export function TableToolSettings({
   );
 }
 
+function ColorRow({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  // <input type=color> braucht Hex; hsl-Referenzen werden als Fallback ignoriert.
+  const hex = /^#[0-9a-fA-F]{6}$/.test(value) ? value : "#ffffff";
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <span className="text-[11px] text-muted-foreground">{label}</span>
+      <input
+        type="color"
+        value={hex}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-7 w-10 rounded border cursor-pointer"
+        style={{ borderColor: "hsl(var(--hairline))" }}
+      />
+    </div>
+  );
+}
+
 function RowColStepper({
   label,
   value,
@@ -138,10 +197,7 @@ function RowColStepper({
   return (
     <div className="flex items-center justify-between gap-2">
       <span className="text-[11px] text-muted-foreground">{label}</span>
-      <div
-        className="flex items-center rounded-md border"
-        style={{ borderColor: "hsl(var(--hairline))" }}
-      >
+      <div className="flex items-center rounded-md border" style={{ borderColor: "hsl(var(--hairline))" }}>
         <button
           onClick={() => onChange(Math.max(min, value - 1))}
           disabled={value <= min}
