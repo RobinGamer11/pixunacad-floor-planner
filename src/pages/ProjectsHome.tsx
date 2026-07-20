@@ -786,8 +786,8 @@ export default function ProjectsHome() {
               <div className="mt-5 relative" ref={saveAsTplRef}>
                 <button
                   onClick={() => setSaveAsTplOpen((v) => !v)}
-                  className="h-12 px-5 rounded-lg flex items-center gap-2 text-base font-semibold shadow-sm hover:opacity-90"
-                  style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
+                  className="h-12 px-5 rounded-lg flex items-center gap-2 text-base font-semibold shadow-sm hover:opacity-90 border"
+                  style={{ background: "hsl(var(--surface-muted))", color: "hsl(var(--ink))", borderColor: "hsl(var(--hairline))" }}
                   title="Projekt als Vorlage speichern"
                 >
                   <Plus size={18} /> Vorlage
