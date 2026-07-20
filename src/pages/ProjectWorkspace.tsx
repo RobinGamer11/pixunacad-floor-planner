@@ -96,7 +96,7 @@ import { TabletAidWheel } from "@/components/TabletAidWheel";
 // Für "frei" enthält diese Tabelle nur die Default-Größe; individuelle Werte
 // aus page.customWidthMm/customHeightMm werden dort abgefragt, wo die reale
 // Seitengröße gebraucht wird (getPageSizeMm).
-import { PAPER_FORMATS as FORMAT_SIZES } from "@/lib/paper";
+import { PAPER_FORMATS as FORMAT_SIZES, getPageSizeMm } from "@/lib/paper";
 
 export type PageTool = "guide" | "line" | "free" | "eraser" | "text" | "cad" | "pipette" | "hatch" | "document" | "table" | null;
 type LinePageTool = "line" | "free" | "eraser";
@@ -544,11 +544,13 @@ export default function ProjectWorkspace() {
       const targetPageId = pending.returnPageId || project?.pages[0]?.id;
       if (!targetPageId) return;
       const targetPage = project?.pages.find((p) => p.id === targetPageId);
-      const fmt = targetPage ? FORMAT_SIZES[targetPage.format] : FORMAT_SIZES["A3-quer"];
+      const fmt = targetPage
+        ? getPageSizeMm(targetPage)
+        : { wMm: FORMAT_SIZES["A3-quer"].w, hMm: FORMAT_SIZES["A3-quer"].h };
       const paperW = pending.paperWidthMm ?? 100;
       const paperH = pending.paperHeightMm ?? 100;
-      const wPct = Math.max(2, Math.min(95, (paperW / fmt.w) * 100));
-      const hPct = Math.max(2, Math.min(95, (paperH / fmt.h) * 100));
+      const wPct = Math.max(2, Math.min(95, (paperW / fmt.wMm) * 100));
+      const hPct = Math.max(2, Math.min(95, (paperH / fmt.hMm) * 100));
       const xPct = Math.max(0, (100 - wPct) / 2);
       const yPct = Math.max(0, (100 - hPct) / 2);
       projectStore.addElement(projectId, targetPageId, {
@@ -591,13 +593,13 @@ export default function ProjectWorkspace() {
     if (!activePage || !canvasViewportRef.current) return;
     // Innerhalb eines Verbunds identifiziert die spreadId das gemeinsame Layout;
     // Einzelseiten werden per pageId identifiziert.
-    const fitKey = `${activePage.spreadId ?? activePage.id}|${activePage.format}`;
+    const fitKey = `${activePage.spreadId ?? activePage.id}|${activePage.format}|${activePage.customWidthMm ?? ""}x${activePage.customHeightMm ?? ""}`;
     if (lastFitKeyRef.current === fitKey) return;
     lastFitKeyRef.current = fitKey;
     const fitPage = () => {
-      const fmt = FORMAT_SIZES[activePage.format];
+      const fmt = getPageSizeMm(activePage);
       const baseWidth = 1100;
-      const baseHeight = baseWidth / (fmt.w / fmt.h);
+      const baseHeight = baseWidth / (fmt.wMm / fmt.hMm);
       const box = canvasViewportRef.current!;
       const nextZoom = Math.max(10, Math.min(100, Math.floor(Math.min(
         ((box.clientWidth - 96) / baseWidth) * 100,
@@ -1516,8 +1518,8 @@ export default function ProjectWorkspace() {
                 const isFree = layoutMode === "free";
                 // Einheitlicher px/mm-Faktor für alle Free-Layout-Offsets, damit
                 // Kanten benachbarter Seiten wirklich passgenau snappen.
-                const refFmt = FORMAT_SIZES[pages[0].format];
-                const pxPerMm = (1100 / refFmt.w) * (zoom / 100);
+                const refFmt = getPageSizeMm(pages[0]);
+                const pxPerMm = (1100 / refFmt.wMm) * (zoom / 100);
                 return (
                   <div
                     className="min-h-full flex items-start justify-center"
@@ -2115,7 +2117,8 @@ function PageCanvas({
 }) {
 
 
-  const fmt = FORMAT_SIZES[page.format];
+  const _pageSize = getPageSizeMm(page);
+  const fmt = { w: _pageSize.wMm, h: _pageSize.hMm, label: FORMAT_SIZES[page.format]?.label ?? "" };
   const aspect = fmt.w / fmt.h;
   // The sheet is rendered at a FIXED real size (mm-defined). Zoom is a pure
   // view transform applied via CSS scale, like PowerPoint / CAD — page, holes,
@@ -2337,7 +2340,8 @@ function PageCanvas({
           />
         )}
         {overlayPage && (() => {
-          const ofmt = FORMAT_SIZES[overlayPage.format];
+          const _ofs = getPageSizeMm(overlayPage);
+          const ofmt = { w: _ofs.wMm, h: _ofs.hMm };
           const tint = overlayColor;
           return (
             <div

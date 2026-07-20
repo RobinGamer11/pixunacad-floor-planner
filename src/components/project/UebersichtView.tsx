@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Plus, Pencil, Check, X, Trash2, Settings2, GripVertical } from "lucide-react";
 import { projectStore, type Project, type Task } from "@/lib/projectStore";
 import { notesStore, useNotes } from "@/lib/notesStore";
+import { AufgabenView } from "@/pages/ProjectsHome";
 
 interface Props {
   project: Project;
@@ -23,14 +24,11 @@ export function UebersichtView({ project, activeMappeId, onSelectMappe }: Props)
 
   return (
     <div className="mt-6 space-y-5">
-      {timelinePos === "top" && <TaskTimeline project={project} />}
-
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)] gap-6 items-start">
         {/* Linke Spalte (schmal) */}
         <div className="space-y-5 min-w-0">
           <MappenPanel project={project} activeId={activeMappe?.id} onSelect={onSelectMappe} />
           <ProjektinfoPanel project={project} />
-          <AufgabenMini project={project} />
         </div>
 
         {/* Rechte Spalte (dominant): Titelbild + Erläuterungen zusammen */}
@@ -39,8 +37,8 @@ export function UebersichtView({ project, activeMappeId, onSelectMappe }: Props)
         </div>
       </div>
 
-      <KalenderMini project={project} />
-      {timelinePos === "bottom" && <TaskTimeline project={project} />}
+      {/* Aufgaben + Kalender identisch wie im Reiter „Aufgaben" (inkl. Zeitstrahl) */}
+      <AufgabenView project={project} />
     </div>
   );
 }
