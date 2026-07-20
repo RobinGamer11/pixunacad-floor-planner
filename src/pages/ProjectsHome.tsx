@@ -408,8 +408,8 @@ export default function ProjectsHome() {
               </div>
             </div>
           )}
-        </div>
       </header>
+
 
       {/* ============= BODY (Left panel + Main) ============= */}
       <div className="flex flex-1 overflow-hidden">
