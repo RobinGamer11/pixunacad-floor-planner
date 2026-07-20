@@ -871,7 +871,7 @@ function noteToUnified(n: NoteNode): UnifiedTask {
   };
 }
 
-function AufgabenView({ project }: { project: Project }) {
+export function AufgabenView({ project }: { project: Project }) {
   const navigate = useNavigate();
   const notes = useNotes(project.id);
   const mappen = project.mappen ?? [];
