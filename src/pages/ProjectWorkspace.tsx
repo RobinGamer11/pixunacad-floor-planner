@@ -3223,45 +3223,44 @@ function RightInspector({
         </button>
       </div>
 
-      <DragScrollDiv axis="both" className="flex-1 min-h-0 overflow-auto p-2 space-y-2 cursor-grab active:cursor-grabbing">
-
-
-        {tab === "settings" && page && <PageSettings projectId={projectId} page={page} />}
-        {tab === "tools" && (
-          <ToolsTab
-            projectId={projectId}
-            pageId={page?.id}
-            element={element}
-            project={project}
-            activeTool={activeTool}
-            setActiveTool={setActiveTool}
-            selectedCadTool={selectedCadTool}
-            selectedElementId={selectedElementId}
-            selectedElementIds={selectedElementIds}
-            setSelectedElementId={setSelectedElementId}
-            toolSettings={toolSettings}
-            cadSelectionCount={cadSelectionCount}
-            cadSelectedLineSnap={cadSelectedLineSnap}
-            documentImporting={documentImporting}
-            onDocumentImport={onDocumentImport}
-            docScale={docScale}
-            onDocScaleChange={onDocScaleChange}
-            onCadLineSnapChange={onCadLineSnapChange}
-            onCadDuplicateSegments={onCadDuplicateSegments}
-            updateToolSettings={updateToolSettings}
-            onJumpCad={onJumpCad}
-            cadEngine={cadEngine ?? null}
-            pendingTableId={pendingTableId ?? null}
-            tableModifyMode={!!tableModifyMode}
-            setTableModifyMode={setTableModifyMode}
-            tableFormulaFn={tableFormulaFn ?? null}
-            setTableFormulaFn={setTableFormulaFn}
-            onConfirmTable={onConfirmTable}
-            onCancelTable={onCancelTable}
-          />
-        )}
-        {tab === "layers" && page && (
-          <div className="space-y-4">
+      <DragScrollDiv axis="both" className="flex-1 min-h-0 overflow-auto p-2 cursor-grab active:cursor-grabbing">
+        <div className="min-w-[320px] space-y-2">
+          {tab === "settings" && page && <PageSettings projectId={projectId} page={page} />}
+          {tab === "tools" && (
+            <ToolsTab
+              projectId={projectId}
+              pageId={page?.id}
+              element={element}
+              project={project}
+              activeTool={activeTool}
+              setActiveTool={setActiveTool}
+              selectedCadTool={selectedCadTool}
+              selectedElementId={selectedElementId}
+              selectedElementIds={selectedElementIds}
+              setSelectedElementId={setSelectedElementId}
+              toolSettings={toolSettings}
+              cadSelectionCount={cadSelectionCount}
+              cadSelectedLineSnap={cadSelectedLineSnap}
+              documentImporting={documentImporting}
+              onDocumentImport={onDocumentImport}
+              docScale={docScale}
+              onDocScaleChange={onDocScaleChange}
+              onCadLineSnapChange={onCadLineSnapChange}
+              onCadDuplicateSegments={onCadDuplicateSegments}
+              updateToolSettings={updateToolSettings}
+              onJumpCad={onJumpCad}
+              cadEngine={cadEngine ?? null}
+              pendingTableId={pendingTableId ?? null}
+              tableModifyMode={!!tableModifyMode}
+              setTableModifyMode={setTableModifyMode}
+              tableFormulaFn={tableFormulaFn ?? null}
+              setTableFormulaFn={setTableFormulaFn}
+              onConfirmTable={onConfirmTable}
+              onCancelTable={onCancelTable}
+            />
+          )}
+          {tab === "layers" && page && (
+            <div className="space-y-4">
             {/* CAD-Ebenen (Bezeichnungs-ID) — 1:1 wie in der CAD-Oberfläche.
                 Verwaltet alle CAD-Objekte (Linien, Schraffuren, Texte,
                 Freihand, Dokumente, Wände, Maßketten) per Layer/Sichtbarkeit. */}
@@ -3269,14 +3268,15 @@ function RightInspector({
 
             {/* Projektmappen-Elemente (Notizen, Bilder, CAD-Blätter, …) —
                 Z-Order + Sichtbarkeit auf React-Ebene. */}
-            <LayersTab
-              projectId={projectId}
-              page={page}
-              selectedElementId={selectedElementId}
-              setSelectedElementId={setSelectedElementId}
-            />
-          </div>
-        )}
+              <LayersTab
+                projectId={projectId}
+                page={page}
+                selectedElementId={selectedElementId}
+                setSelectedElementId={setSelectedElementId}
+              />
+            </div>
+          )}
+        </div>
       </DragScrollDiv>
     </aside>
   );
@@ -5287,7 +5287,8 @@ function PrintPanel({
         </button>
       </div>
 
-      <DragScrollDiv axis="both" className="flex-1 min-h-0 overflow-auto p-4 space-y-5 cursor-grab active:cursor-grabbing">
+      <DragScrollDiv axis="both" className="flex-1 min-h-0 overflow-auto p-4 cursor-grab active:cursor-grabbing">
+        <div className="min-w-[320px] space-y-5">
         <section>
           <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-2">
             SEITEN
@@ -5398,6 +5399,7 @@ function PrintPanel({
             </label>
           </section>
         )}
+        </div>
       </DragScrollDiv>
 
       {progress && (

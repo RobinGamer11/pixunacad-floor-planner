@@ -1668,7 +1668,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
 
         <DragScrollDiv axis="both" className="flex-1 min-h-0 overflow-auto p-2 cursor-grab active:cursor-grabbing" style={{ display: rightTab === "settings" ? "block" : "none" }}>
         {/* Settings area (scrollable) */}
-        <div className="flex-1 min-h-0 p-2">
+        <div className="flex-1 min-h-0 p-2 min-w-[320px]">
           {/* Raster-Einstellungen */}
           {gridPanelOpen && (
             <div className="cad-settings-panel mb-2">
@@ -2912,7 +2912,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
         </DragScrollDiv>
         <DragScrollDiv axis="both" className="flex-1 min-h-0 overflow-auto p-2 space-y-2 cursor-grab active:cursor-grabbing" style={{ display: rightTab === "sheets" ? "block" : "none" }}>
           {/* Zeichnungs-ID Panel (Blätter + Transparentpause) */}
-          <div ref={sheetPanelRef} className="cad-id-panel w-full">
+          <div ref={sheetPanelRef} className="cad-id-panel w-full min-w-[320px]">
             <div className="id-head">
               <div className="id-title">Zeichnungs-ID</div>
               <div className="id-head-actions">
@@ -2930,7 +2930,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           </div>
 
           {/* Druckpläne — direkt im Sheets-Tab, unterhalb der Zeichenblätter. */}
-          <div ref={planPanelRef} className="cad-id-panel w-full">
+          <div ref={planPanelRef} className="cad-id-panel w-full min-w-[320px]">
             <div className="id-head">
               <div className="id-title">Druckpläne</div>
               <div className="id-head-actions">
@@ -2956,7 +2956,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           </div>
         </DragScrollDiv>
         <DragScrollDiv axis="both" className="flex-1 min-h-0 overflow-auto p-2 space-y-2 cursor-grab active:cursor-grabbing" style={{ display: rightTab === "layers" ? "block" : "none" }}>
-          <div ref={idPanelRef} className="cad-id-panel w-full">
+          <div ref={idPanelRef} className="cad-id-panel w-full min-w-[320px]">
             <div className="id-head">
               <div className="id-title">Bezeichnungs-ID</div>
               <div className="id-head-actions">
