@@ -246,12 +246,30 @@ export interface Project {
   /** Projektmappen (falls fehlend, wird beim Laden eine "Hauptmappe" erzeugt). */
   mappen?: Mappe[];
   activeMappeId?: string;
+  /** Zuordnung zu einem benutzerdefinierten Ordner (siehe ProjectFolder). */
+  folderId?: string | null;
   /** Dateien-Reiter (dwg/dxf/pdf/…) — flache Liste mit parentId für Ordnerbaum. */
   files?: FileNode[];
   /** Fotos-Reiter (jpg/png/…). */
   photos?: FileNode[];
   settings?: ProjectSettings;
 }
+
+export interface ProjectFolder {
+  id: string;
+  name: string;
+  collapsed?: boolean;
+}
+
+export type ProfileStatus = "online" | "offline" | "busy";
+export interface UserProfile {
+  name: string;
+  role: string;
+  avatarUrl?: string;
+  status: ProfileStatus;
+}
+
+export const MAX_PROJECTS = 10;
 
 const STORAGE_KEY = "pixuna.projects.v3";
 
@@ -312,7 +330,15 @@ function demoProjects(): Project[] {
 
 interface State {
   projects: Project[];
+  folders: ProjectFolder[];
+  profile: UserProfile;
 }
+
+const DEFAULT_PROFILE: UserProfile = {
+  name: "Architekt:in",
+  role: "PixunaCAD Nutzer:in",
+  status: "online",
+};
 
 let state: State = load();
 const listeners = new Set<() => void>();
@@ -323,13 +349,21 @@ function load(): State {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && Array.isArray(parsed.projects) && parsed.projects.length) {
-        return { projects: parsed.projects.map(migrateProject) };
+        return {
+          projects: parsed.projects.map(migrateProject),
+          folders: Array.isArray(parsed.folders) ? parsed.folders : [],
+          profile: parsed.profile ? { ...DEFAULT_PROFILE, ...parsed.profile } : DEFAULT_PROFILE,
+        };
       }
     }
   } catch {
     /* ignore */
   }
-  return { projects: demoProjects().map(migrateProject) };
+  return {
+    projects: demoProjects().map(migrateProject),
+    folders: [],
+    profile: DEFAULT_PROFILE,
+  };
 }
 
 /** Stellt sicher, dass jedes Projekt mindestens eine Mappe + Files/Photos-Arrays hat. */
