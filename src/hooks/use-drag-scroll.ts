@@ -6,7 +6,7 @@ import * as React from "react";
  * (Buttons, Links, Inputs) werden nicht blockiert — nur echte Drag-Gesten
  * auf leerer Fläche verschieben den Scrollbereich.
  */
-export function useDragScroll<T extends HTMLElement>() {
+export function useDragScroll<T extends HTMLElement>(axis: "x" | "y" | "both" = "x") {
   const ref = React.useRef<T | null>(null);
 
   React.useEffect(() => {
@@ -15,25 +15,26 @@ export function useDragScroll<T extends HTMLElement>() {
 
     let isDown = false;
     let moved = false;
-    let startX = 0;
-    let startScroll = 0;
+    let startX = 0, startY = 0;
+    let startSL = 0, startST = 0;
 
     const onDown = (e: PointerEvent) => {
-      // Nur mit Primärtaste oder Touch/Pen. Buttons/Inputs nicht kapern.
       if (e.button !== 0 && e.pointerType === "mouse") return;
       const target = e.target as HTMLElement;
-      if (target.closest("button,a,input,select,textarea,[role='button']")) return;
+      if (target.closest("button,a,input,select,textarea,label,[role='button'],[role='slider'],[contenteditable='true']")) return;
       isDown = true;
       moved = false;
-      startX = e.clientX;
-      startScroll = el.scrollLeft;
+      startX = e.clientX; startY = e.clientY;
+      startSL = el.scrollLeft; startST = el.scrollTop;
     };
     const onMove = (e: PointerEvent) => {
       if (!isDown) return;
       const dx = e.clientX - startX;
-      if (Math.abs(dx) > 3) moved = true;
+      const dy = e.clientY - startY;
+      if (!moved && Math.hypot(dx, dy) > 4) moved = true;
       if (moved) {
-        el.scrollLeft = startScroll - dx;
+        if (axis !== "y") el.scrollLeft = startSL - dx;
+        if (axis !== "x") el.scrollTop = startST - dy;
         e.preventDefault();
       }
     };
@@ -49,7 +50,7 @@ export function useDragScroll<T extends HTMLElement>() {
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onUp);
     };
-  }, []);
+  }, [axis]);
 
   return ref;
 }

@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useRef, useEffect, useLayoutEffect } from "react";
+import { DragScrollDiv } from "@/components/DragScrollDiv";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ChevronLeft,
@@ -3222,7 +3223,7 @@ function RightInspector({
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-2 space-y-2">
+      <DragScrollDiv axis="y" className="flex-1 overflow-y-auto p-2 space-y-2">
 
 
         {tab === "settings" && page && <PageSettings projectId={projectId} page={page} />}
@@ -3276,7 +3277,7 @@ function RightInspector({
             />
           </div>
         )}
-      </div>
+      </DragScrollDiv>
     </aside>
   );
 }
@@ -5286,7 +5287,7 @@ function PrintPanel({
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-5">
+      <DragScrollDiv axis="y" className="flex-1 overflow-y-auto p-4 space-y-5">
         <section>
           <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-2">
             SEITEN
@@ -5397,7 +5398,7 @@ function PrintPanel({
             </label>
           </section>
         )}
-      </div>
+      </DragScrollDiv>
 
       {progress && (
         <div

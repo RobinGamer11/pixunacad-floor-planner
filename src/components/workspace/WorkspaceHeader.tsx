@@ -1,5 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
+import { useDragScroll } from "@/hooks/use-drag-scroll";
 import {
   ChevronLeft,
   Undo2,
@@ -58,6 +59,7 @@ export function WorkspaceHeader({
   onToggleTabletAid,
 }: Props) {
   const navigate = useNavigate();
+  const headerRef = useDragScroll<HTMLElement>("x");
 
   const goWorkspace = () => projectId && navigate(`/project/${projectId}`);
   const goCad = () => projectId && navigate(`/project/${projectId}/cad`);
@@ -65,7 +67,8 @@ export function WorkspaceHeader({
 
   return (
     <header
-      className="h-16 flex items-center justify-between px-3 border-b shrink-0"
+      ref={headerRef}
+      className="h-16 flex items-center justify-between px-3 border-b shrink-0 overflow-x-auto no-scrollbar touch-pan-x"
       style={{
         borderColor: "hsl(var(--hairline))",
         background: "hsl(var(--surface-card))",
