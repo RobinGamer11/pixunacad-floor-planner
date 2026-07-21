@@ -2540,6 +2540,131 @@ export class Renderer {
     ctx.restore();
   }
 
+  /** Tinte: taperende Enden, volle Mitte. */
+  private _drawFreeStrokeInk(s: FreeStroke) {
+    const ctx = this.ctx;
+    const cam = this.camera;
+    const pts = this._renderPointsForFreeStroke(s);
+    if (pts.length < 2) return;
+    const baseW = this.segStrokePx(s.thicknessM);
+    const n = pts.length;
+    ctx.save();
+    ctx.strokeStyle = rgbaFromHex(s.color, s.opacity);
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    for (let i = 1; i < n; i++) {
+      const a = cam.worldToScreen(pts[i - 1].x, pts[i - 1].y);
+      const b = cam.worldToScreen(pts[i].x, pts[i].y);
+      const tMid = (i - 0.5) / (n - 1);
+      const taper = Math.min(1, Math.min(tMid, 1 - tMid) * 6);
+      ctx.lineWidth = Math.max(0.4, baseW * (0.15 + 0.85 * taper));
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  /** Bleistift: mehrere körnige Passes mit Jitter. */
+  private _drawFreeStrokePencil(s: FreeStroke) {
+    const ctx = this.ctx;
+    const cam = this.camera;
+    const pts = this._renderPointsForFreeStroke(s);
+    if (pts.length < 2) return;
+    const baseW = this.segStrokePx(s.thicknessM);
+    const passes = 4;
+    ctx.save();
+    ctx.strokeStyle = rgbaFromHex(s.color, s.opacity);
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    const prevAlpha = ctx.globalAlpha;
+    for (let pass = 0; pass < passes; pass++) {
+      ctx.globalAlpha = s.opacity * 0.22;
+      ctx.lineWidth = Math.max(0.5, baseW * (0.55 + pass * 0.12));
+      ctx.beginPath();
+      for (let i = 0; i < pts.length; i++) {
+        const p = cam.worldToScreen(pts[i].x, pts[i].y);
+        const jx = Math.sin(i * 12.9 + pass * 3.1) * 0.6 + Math.cos(i * 2.3 + pass) * 0.4;
+        const jy = Math.cos(i * 7.1 + pass * 4.7) * 0.6 + Math.sin(i * 3.7 + pass) * 0.4;
+        i ? ctx.lineTo(p.x + jx, p.y + jy) : ctx.moveTo(p.x + jx, p.y + jy);
+      }
+      ctx.stroke();
+    }
+    ctx.globalAlpha = prevAlpha;
+    ctx.restore();
+  }
+
+  /** Wachsmal: 3 versetzte Multiply-Passes, leicht körnig. */
+  private _drawFreeStrokeCrayon(s: FreeStroke) {
+    const ctx = this.ctx;
+    const cam = this.camera;
+    const pts = this._renderPointsForFreeStroke(s);
+    if (pts.length < 2) return;
+    const baseW = this.segStrokePx(s.thicknessM);
+    ctx.save();
+    ctx.strokeStyle = rgbaFromHex(s.color, 1);
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    const prevComp = ctx.globalCompositeOperation;
+    (ctx as any).globalCompositeOperation = "multiply";
+    for (let pass = 0; pass < 3; pass++) {
+      ctx.globalAlpha = s.opacity * 0.35;
+      ctx.lineWidth = baseW * (0.9 + pass * 0.15);
+      ctx.beginPath();
+      for (let i = 0; i < pts.length; i++) {
+        const p = cam.worldToScreen(pts[i].x, pts[i].y);
+        const jx = Math.sin(i * 5.3 + pass * 2.1) * 0.9;
+        const jy = Math.cos(i * 4.7 + pass * 1.9) * 0.9;
+        i ? ctx.lineTo(p.x + jx, p.y + jy) : ctx.moveTo(p.x + jx, p.y + jy);
+      }
+      ctx.stroke();
+    }
+    (ctx as any).globalCompositeOperation = prevComp;
+    ctx.globalAlpha = s.opacity;
+    ctx.restore();
+  }
+
+  /** Kreide: körniges Rauschen entlang des Pfades. */
+  private _drawFreeStrokeChalk(s: FreeStroke) {
+    const ctx = this.ctx;
+    const cam = this.camera;
+    const pts = this._renderPointsForFreeStroke(s);
+    if (pts.length < 2) return;
+    const baseW = this.segStrokePx(s.thicknessM);
+    const density = 6;
+    const r = baseW * 0.6;
+    let seed = 0;
+    for (let i = 0; i < s.id.length; i++) seed = (seed * 31 + s.id.charCodeAt(i)) >>> 0;
+    const rand = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 0xffffffff; };
+    ctx.save();
+    ctx.fillStyle = rgbaFromHex(s.color, 1);
+    // Punkte entlang der Pfad-Länge sampeln.
+    let prev = cam.worldToScreen(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) {
+      const cur = cam.worldToScreen(pts[i].x, pts[i].y);
+      const dx = cur.x - prev.x, dy = cur.y - prev.y;
+      const segLen = Math.hypot(dx, dy);
+      const steps = Math.max(1, Math.ceil(segLen / Math.max(1, baseW * 0.4)));
+      for (let k = 0; k < steps; k++) {
+        const t = k / steps;
+        const cx = prev.x + dx * t;
+        const cy = prev.y + dy * t;
+        for (let d = 0; d < density; d++) {
+          const a = rand() * Math.PI * 2;
+          const rr = Math.sqrt(rand()) * r;
+          ctx.globalAlpha = s.opacity * (0.3 + rand() * 0.4);
+          ctx.beginPath();
+          ctx.arc(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr, Math.max(0.3, baseW * 0.18), 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      prev = cur;
+    }
+    ctx.globalAlpha = s.opacity;
+    ctx.restore();
+  }
+
   private _drawFreeStrokesForLabel(labelId: string) {
     for (const s of this._freeStrokesForLabel(labelId)) this._drawSingleFreeStroke(s);
   }
