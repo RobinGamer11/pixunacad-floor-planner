@@ -383,16 +383,17 @@ const FreeDrawPreview: React.FC<PreviewProps> = (props) => {
         }
       }
     } else if (style === "pencil") {
-      // Grainy: Pfad mehrfach mit leichtem Jitter
-      for (let pass = 0; pass < 3; pass++) {
-        ctx.globalAlpha = props.opacity * (0.28 + pass * 0.08);
+      // Bleistift: mehrere körnige Passes mit Jitter, keine Dashes.
+      const passes = 4;
+      for (let pass = 0; pass < passes; pass++) {
+        ctx.globalAlpha = props.opacity * 0.22;
         ctx.beginPath();
         pts.forEach((p, i) => {
-          const jx = (Math.sin(i * 12.9 + pass) * 0.5);
-          const jy = (Math.cos(i * 7.1 + pass) * 0.5);
+          const jx = Math.sin(i * 12.9 + pass * 3.1) * 0.6 + Math.cos(i * 2.3 + pass) * 0.4;
+          const jy = Math.cos(i * 7.1 + pass * 4.7) * 0.6 + Math.sin(i * 3.7 + pass) * 0.4;
           i ? ctx.lineTo(p.x + jx, p.y + jy) : ctx.moveTo(p.x + jx, p.y + jy);
         });
-        ctx.lineWidth = widthPx * (0.7 + pass * 0.15);
+        ctx.lineWidth = Math.max(0.5, widthPx * (0.55 + pass * 0.12));
         ctx.stroke();
       }
       ctx.globalAlpha = props.opacity;
