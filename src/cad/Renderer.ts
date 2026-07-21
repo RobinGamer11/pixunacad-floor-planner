@@ -2389,6 +2389,22 @@ export class Renderer {
       this._drawFreeStrokeCalligraphy(s);
       return;
     }
+    if (s.lineStyle === "ink" && colorOverride === null) {
+      this._drawFreeStrokeInk(s);
+      return;
+    }
+    if (s.lineStyle === "crayon" && colorOverride === null) {
+      this._drawFreeStrokeCrayon(s);
+      return;
+    }
+    if (s.lineStyle === "chalk" && colorOverride === null) {
+      this._drawFreeStrokeChalk(s);
+      return;
+    }
+    if (s.lineStyle === "pencil" && colorOverride === null) {
+      this._drawFreeStrokePencil(s);
+      return;
+    }
     const ctx = this.ctx;
     const cam = this.camera;
     const pts = this._renderPointsForFreeStroke(s);
