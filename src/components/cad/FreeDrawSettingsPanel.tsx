@@ -2,17 +2,20 @@ import React, { useEffect, useRef, useState } from "react";
 import type { CadApp } from "@/cad/CadApp";
 import type { MiniCad } from "@/cad/embed/MiniCad";
 
-type LineStyle = "solid" | "dashed" | "dotted" | "dashdot" | "blob" | "image" | "pencil" | "marker" | "brush" | "spray" | "calligraphy";
+type LineStyle = "solid" | "dashed" | "dotted" | "dashdot" | "blob" | "image" | "pencil" | "marker" | "brush" | "spray" | "calligraphy" | "ink" | "crayon" | "chalk";
 
 const STYLE_OPTIONS: { value: LineStyle; label: string }[] = [
   { value: "solid", label: "Linie" },
   { value: "dashed", label: "Gestrichelt" },
   { value: "dashdot", label: "Punkt-Strich" },
   { value: "dotted", label: "Punkte" },
+  { value: "ink", label: "Tinte" },
   { value: "pencil", label: "Bleistift" },
   { value: "brush", label: "Pinsel" },
   { value: "marker", label: "Marker" },
   { value: "calligraphy", label: "Kalligrafie" },
+  { value: "crayon", label: "Wachsmal" },
+  { value: "chalk", label: "Kreide" },
   { value: "spray", label: "Sprühdose" },
   { value: "blob", label: "Klekse" },
   { value: "image", label: "Bild-Stempel" },
