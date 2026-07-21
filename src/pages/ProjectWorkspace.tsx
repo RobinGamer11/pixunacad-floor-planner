@@ -237,7 +237,8 @@ export default function ProjectWorkspace() {
     color: "#ffffff",
     tintEnabled: true,
   });
-  const [zoom, setZoom] = useState(77);
+  const [zoom, setZoom] = useState(60);
+  const didAutoFitRef = useRef(false);
   const canvasViewportRef = useRef<HTMLDivElement>(null);
   // Zoom-Anker: merkt sich den echten Punkt auf der Seite unter Maus/Fingern.
   // Dadurch bleibt der Zielpunkt auch bei großen Mappe-Paddings und Spreads stabil.
