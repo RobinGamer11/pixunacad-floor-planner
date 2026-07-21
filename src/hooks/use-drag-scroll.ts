@@ -40,13 +40,19 @@ export function useDragScroll<T extends HTMLElement>(axis: "x" | "y" | "both" = 
       moved = false;
       startX = e.clientX; startY = e.clientY;
       startSL = el.scrollLeft; startST = el.scrollTop;
-      try { el.setPointerCapture(e.pointerId); } catch {}
+      // WICHTIG: Pointer-Capture NICHT sofort setzen, sonst gehen Klicks
+      // auf Buttons im Container verloren (pointerup wird umgeleitet).
     };
     const onMove = (e: PointerEvent) => {
       if (!isDown) return;
       const dx = e.clientX - startX;
       const dy = e.clientY - startY;
-      if (!moved && Math.hypot(dx, dy) > THRESHOLD) moved = true;
+      if (!moved && Math.hypot(dx, dy) > THRESHOLD) {
+        moved = true;
+        // Erst nach echtem Drag: Pointer-Capture aktivieren, damit
+        // kurze Taps auf Buttons weiterhin ganz normal klickbar bleiben.
+        try { el.setPointerCapture(e.pointerId); } catch {}
+      }
       if (moved) {
         if (axis !== "y") el.scrollLeft = startSL - dx;
         if (axis !== "x") el.scrollTop = startST - dy;
