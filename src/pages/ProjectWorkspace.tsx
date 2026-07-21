@@ -237,7 +237,8 @@ export default function ProjectWorkspace() {
     color: "#ffffff",
     tintEnabled: true,
   });
-  const [zoom, setZoom] = useState(77);
+  const [zoom, setZoom] = useState(60);
+  const didAutoFitRef = useRef(false);
   const canvasViewportRef = useRef<HTMLDivElement>(null);
   // Zoom-Anker: merkt sich den echten Punkt auf der Seite unter Maus/Fingern.
   // Dadurch bleibt der Zielpunkt auch bei großen Mappe-Paddings und Spreads stabil.
@@ -302,6 +303,10 @@ export default function ProjectWorkspace() {
   useLayoutEffect(() => {
     applyZoomAnchor();
   }, [zoom]);
+
+  // Auto-Fit siehe unten (nach activePage-Definition).
+
+
 
   // Aktueller Zoom als Ref, damit iPad-Touch-Handler ihn ohne Rerender lesen.
   const zoomRef = useRef(zoom);
@@ -473,6 +478,29 @@ export default function ProjectWorkspace() {
   const activePage = project?.pages.find((p) => p.id === activePageId) ?? project?.pages[0];
   const selectedElement = activePage?.elements.find((e) => e.id === selectedElementId);
   const bgPage = bgOverlay.pageId ? project?.pages.find((p) => p.id === bgOverlay.pageId) : undefined;
+
+  // Beim ersten Anzeigen: komplettes Blatt mittig, leicht rausgezoomt.
+  useLayoutEffect(() => {
+    if (didAutoFitRef.current) return;
+    const vp = canvasViewportRef.current;
+    if (!vp || !activePage) return;
+    const w = vp.clientWidth, h = vp.clientHeight;
+    if (w < 80 || h < 80) return;
+    const fmt = getPageSizeMm(activePage);
+    const aspect = fmt.wMm / fmt.hMm;
+    const pageW = 1100;
+    const pageH = pageW / aspect;
+    const fit = Math.min(w / pageW, h / pageH) * 100 * 0.88;
+    setZoom(clampProjectZoom(fit));
+    didAutoFitRef.current = true;
+    requestAnimationFrame(() => {
+      const v = canvasViewportRef.current;
+      if (!v) return;
+      v.scrollLeft = Math.max(0, (v.scrollWidth - v.clientWidth) / 2);
+      v.scrollTop = Math.max(0, (v.scrollHeight - v.clientHeight) / 2);
+    });
+  });
+
 
   // Legt die importierten Seiten mit dem aktuell im rechten Panel
   // gewählten Maßstab (docScale, z. B. "1:100") direkt im Modellbereich ab.

@@ -2,17 +2,20 @@ import React, { useEffect, useRef, useState } from "react";
 import type { CadApp } from "@/cad/CadApp";
 import type { MiniCad } from "@/cad/embed/MiniCad";
 
-type LineStyle = "solid" | "dashed" | "dotted" | "dashdot" | "blob" | "image" | "pencil" | "marker" | "brush" | "spray" | "calligraphy";
+type LineStyle = "solid" | "dashed" | "dotted" | "dashdot" | "blob" | "image" | "pencil" | "marker" | "brush" | "spray" | "calligraphy" | "ink" | "crayon" | "chalk";
 
 const STYLE_OPTIONS: { value: LineStyle; label: string }[] = [
   { value: "solid", label: "Linie" },
   { value: "dashed", label: "Gestrichelt" },
   { value: "dashdot", label: "Punkt-Strich" },
   { value: "dotted", label: "Punkte" },
+  { value: "ink", label: "Tinte" },
   { value: "pencil", label: "Bleistift" },
   { value: "brush", label: "Pinsel" },
   { value: "marker", label: "Marker" },
   { value: "calligraphy", label: "Kalligrafie" },
+  { value: "crayon", label: "Wachsmal" },
+  { value: "chalk", label: "Kreide" },
   { value: "spray", label: "Sprühdose" },
   { value: "blob", label: "Klekse" },
   { value: "image", label: "Bild-Stempel" },
@@ -192,8 +195,12 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app }) => {
         </label>
 
         <label className="block text-xs">
-          <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>{style === "image" ? "Stempel-Größe (m)" : "Dicke (m)"}: {thickness.toFixed(3)}</span>
-          <input type="range" min={0.005} max={style === "image" ? 2 : 0.5} step={style === "image" ? 0.01 : 0.005} value={thickness}
+          <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>{style === "image" ? "Stempel-Größe (m)" : `Dicke (m): ${thickness.toFixed(4)}`}</span>
+          <input type="range"
+            min={style === "image" ? 0.02 : 0.0005}
+            max={style === "image" ? 2 : 0.3}
+            step={style === "image" ? 0.01 : 0.0005}
+            value={thickness}
             onChange={(e) => {
               const v = parseFloat(e.target.value); setThickness(v);
               if (selectedStrokeId) applyToStroke((s) => { s.thicknessM = v; });
@@ -376,16 +383,17 @@ const FreeDrawPreview: React.FC<PreviewProps> = (props) => {
         }
       }
     } else if (style === "pencil") {
-      // Grainy: Pfad mehrfach mit leichtem Jitter
-      for (let pass = 0; pass < 3; pass++) {
-        ctx.globalAlpha = props.opacity * (0.28 + pass * 0.08);
+      // Bleistift: mehrere körnige Passes mit Jitter, keine Dashes.
+      const passes = 4;
+      for (let pass = 0; pass < passes; pass++) {
+        ctx.globalAlpha = props.opacity * 0.22;
         ctx.beginPath();
         pts.forEach((p, i) => {
-          const jx = (Math.sin(i * 12.9 + pass) * 0.5);
-          const jy = (Math.cos(i * 7.1 + pass) * 0.5);
+          const jx = Math.sin(i * 12.9 + pass * 3.1) * 0.6 + Math.cos(i * 2.3 + pass) * 0.4;
+          const jy = Math.cos(i * 7.1 + pass * 4.7) * 0.6 + Math.sin(i * 3.7 + pass) * 0.4;
           i ? ctx.lineTo(p.x + jx, p.y + jy) : ctx.moveTo(p.x + jx, p.y + jy);
         });
-        ctx.lineWidth = widthPx * (0.7 + pass * 0.15);
+        ctx.lineWidth = Math.max(0.5, widthPx * (0.55 + pass * 0.12));
         ctx.stroke();
       }
       ctx.globalAlpha = props.opacity;
@@ -436,6 +444,51 @@ const FreeDrawPreview: React.FC<PreviewProps> = (props) => {
           ctx.fill();
         }
       }
+    } else if (style === "ink") {
+      // Tinte: sanft taperende Enden, volle Mitte, weiche Rundungen.
+      const n = pts.length;
+      for (let i = 1; i < n; i++) {
+        const tMid = (i - 0.5) / (n - 1);
+        // Nur an den Enden dünner, sonst 100 %.
+        const taper = Math.min(1, Math.min(tMid, 1 - tMid) * 6);
+        ctx.lineWidth = Math.max(0.4, widthPx * (0.15 + 0.85 * taper));
+        ctx.beginPath();
+        ctx.moveTo(pts[i - 1].x, pts[i - 1].y);
+        ctx.lineTo(pts[i].x, pts[i].y);
+        ctx.stroke();
+      }
+    } else if (style === "crayon") {
+      // Wachsmal: 3 leicht versetzte, körnige Passes mit Multiply-Optik.
+      const prev = ctx.globalCompositeOperation;
+      ctx.globalCompositeOperation = "multiply";
+      for (let pass = 0; pass < 3; pass++) {
+        ctx.globalAlpha = props.opacity * 0.35;
+        ctx.lineWidth = widthPx * (0.9 + pass * 0.15);
+        ctx.beginPath();
+        pts.forEach((p, i) => {
+          const jx = Math.sin(i * 5.3 + pass * 2.1) * 0.9;
+          const jy = Math.cos(i * 4.7 + pass * 1.9) * 0.9;
+          i ? ctx.lineTo(p.x + jx, p.y + jy) : ctx.moveTo(p.x + jx, p.y + jy);
+        });
+        ctx.stroke();
+      }
+      ctx.globalCompositeOperation = prev;
+      ctx.globalAlpha = props.opacity;
+    } else if (style === "chalk") {
+      // Kreide: körniges Rauschen entlang des Pfades, keine durchgezogene Linie.
+      const density = 5;
+      const r = widthPx * 0.6;
+      for (let i = 0; i < pts.length; i++) {
+        for (let k = 0; k < density; k++) {
+          const a = ((i * 53 + k * 91) % 360) * (Math.PI / 180);
+          const rr = (((i * 17 + k * 41) % 100) / 100) * r;
+          ctx.globalAlpha = props.opacity * (0.35 + ((k * 7) % 30) / 100);
+          ctx.beginPath();
+          ctx.arc(pts[i].x + Math.cos(a) * rr, pts[i].y + Math.sin(a) * rr, Math.max(0.3, widthPx * 0.18), 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      ctx.globalAlpha = props.opacity;
     } else if (style === "image" && imgEl) {
       const size = Math.max(6, widthPx);
       let acc = spacingPx;

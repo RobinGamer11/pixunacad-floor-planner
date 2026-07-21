@@ -79,7 +79,7 @@ export const Defaults = {
 
   // FreeDraw defaults
   freeColor: "#111111",
-  freeThicknessM: 0.03,
+  freeThicknessM: 0.012,
   freeOpacity: 1.0,
   freeLineStyle: "solid" as "solid" | "dashed" | "dotted" | "dashdot" | "blob" | "image",
   freeGapM: 0.08,
