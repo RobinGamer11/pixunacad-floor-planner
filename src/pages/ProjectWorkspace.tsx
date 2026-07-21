@@ -304,28 +304,8 @@ export default function ProjectWorkspace() {
     applyZoomAnchor();
   }, [zoom]);
 
-  // Beim ersten Anzeigen: gesamte Seite mittig anzeigen, leicht rausgezoomt.
-  useLayoutEffect(() => {
-    if (didAutoFitRef.current) return;
-    const vp = canvasViewportRef.current;
-    if (!vp || !activePage) return;
-    const w = vp.clientWidth, h = vp.clientHeight;
-    if (w < 80 || h < 80) return;
-    const fmt = getPageSizeMm(activePage);
-    const aspect = fmt.wMm / fmt.hMm;
-    const pageW = 1100;
-    const pageH = pageW / aspect;
-    // 88 % des verfügbaren Platzes → sichtbarer Randabstand rund um das Blatt.
-    const fit = Math.min(w / pageW, h / pageH) * 100 * 0.88;
-    setZoom(clampProjectZoom(fit));
-    didAutoFitRef.current = true;
-    requestAnimationFrame(() => {
-      const v = canvasViewportRef.current;
-      if (!v) return;
-      v.scrollLeft = Math.max(0, (v.scrollWidth - v.clientWidth) / 2);
-      v.scrollTop = Math.max(0, (v.scrollHeight - v.clientHeight) / 2);
-    });
-  });
+  // Auto-Fit siehe unten (nach activePage-Definition).
+
 
 
   // Aktueller Zoom als Ref, damit iPad-Touch-Handler ihn ohne Rerender lesen.
