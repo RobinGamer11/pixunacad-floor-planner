@@ -2418,14 +2418,7 @@ export class Renderer {
       (ctx as any).globalCompositeOperation = "multiply";
       ctx.lineCap = "butt";
       ctx.lineJoin = "miter";
-    } else if (colorOverride === null && s.lineStyle === "pencil") {
-      // Bleistift: dünner, körnig-transparent — kurze Dashes für Graphit-Look.
-      strokeColor = rgbaFromHex(s.color, Math.min(s.opacity, 0.7));
-      strokeWidth = Math.max(0.6, strokeWidth * 0.6);
-      const px = cam.scale;
-      ctx.setLineDash([Math.max(1.5, 0.008 * px), Math.max(0.8, 0.004 * px)]);
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
+      strokeWidth = strokeWidth * 1.4;
     } else {
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
