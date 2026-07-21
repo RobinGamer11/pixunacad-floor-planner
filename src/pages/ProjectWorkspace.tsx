@@ -479,6 +479,29 @@ export default function ProjectWorkspace() {
   const selectedElement = activePage?.elements.find((e) => e.id === selectedElementId);
   const bgPage = bgOverlay.pageId ? project?.pages.find((p) => p.id === bgOverlay.pageId) : undefined;
 
+  // Beim ersten Anzeigen: komplettes Blatt mittig, leicht rausgezoomt.
+  useLayoutEffect(() => {
+    if (didAutoFitRef.current) return;
+    const vp = canvasViewportRef.current;
+    if (!vp || !activePage) return;
+    const w = vp.clientWidth, h = vp.clientHeight;
+    if (w < 80 || h < 80) return;
+    const fmt = getPageSizeMm(activePage);
+    const aspect = fmt.wMm / fmt.hMm;
+    const pageW = 1100;
+    const pageH = pageW / aspect;
+    const fit = Math.min(w / pageW, h / pageH) * 100 * 0.88;
+    setZoom(clampProjectZoom(fit));
+    didAutoFitRef.current = true;
+    requestAnimationFrame(() => {
+      const v = canvasViewportRef.current;
+      if (!v) return;
+      v.scrollLeft = Math.max(0, (v.scrollWidth - v.clientWidth) / 2);
+      v.scrollTop = Math.max(0, (v.scrollHeight - v.clientHeight) / 2);
+    });
+  });
+
+
   // Legt die importierten Seiten mit dem aktuell im rechten Panel
   // gewählten Maßstab (docScale, z. B. "1:100") direkt im Modellbereich ab.
   // Kein Modal mehr — der Nutzer wählt den Maßstab wie beim CAD-Blatt vor
