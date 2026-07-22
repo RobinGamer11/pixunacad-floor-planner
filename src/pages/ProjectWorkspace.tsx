@@ -4924,7 +4924,6 @@ function ElementInspector({
             </Row>
             <button
               onClick={() => update({
-                viewSnapshot: sheet?.thumbnail ?? element.viewSnapshot,
                 lastSyncAt: new Date().toISOString(),
               })}
               className="w-full h-9 rounded-md text-sm border flex items-center justify-center gap-2 mt-2"
