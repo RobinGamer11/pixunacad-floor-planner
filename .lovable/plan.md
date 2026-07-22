@@ -1,61 +1,53 @@
-## 1. Freihand-Live-Vorschau
+# CAD-Blatt: Default-Sheet + Live-Referenz mit exaktem Maßstab
 
-Im `FreeDrawSettingsPanel` (rechte Einstellungsleiste) direkt unter dem Titel eine kleine Canvas-Vorschau (Breite 100 %, Höhe ~64 px) einfügen. Die Vorschau zeichnet einen leicht geschwungenen Beispielpfad mit derselben Renderlogik wie das echte Werkzeug (Wiederverwendung der Stroke-Renderer aus `Renderer.ts`, um 1:1-Parität zu wahren). Sie aktualisiert sich live bei Änderungen von Farbe, Dicke, Transparenz, Linienart, Lücke sowie Bildstempel-Parametern.
+## Ziel
+Das Werkzeug „CAD-Blatt" in der Projektmappe soll (a) auch das Default-Zeichenblatt anbieten und (b) eine **lebende Referenz** auf die Original-Vektorgeometrie sein – ohne Bitmap-Zwischenschritt, ohne Fit-to-Frame, mit mathematisch exaktem Maßstab.
 
-## 2. Startseite: „Dateien" + „Fotos" unter „Dokumente"
+## Änderungen
 
-- In `ProjectsHome` / `UebersichtView` die beiden Reiter entfernen und durch einen einzigen Reiter „Dokumente" ersetzen.
-- Innerhalb von „Dokumente" ein Sub-Tabs-Wechsler „Dateien | Fotos" (Segmented Control) einbauen. Bestehende Bereiche werden jeweils darunter gerendert – keine Logikänderung, nur Umgruppierung.
+### 1. Default-Sheet freigeben
+`src/components/CadEditor.tsx` (Zeile 680) filtert `s.id !== "default-sheet"` beim Sync in `projectStore`. Dieser Filter wird entfernt, damit auch das Default-Blatt in `project.sheets` landet und im „CAD-Blatt"-Dropdown auswählbar wird. Der Löschschutz bleibt in `SheetManager.deleteSheet` (mindestens ein Blatt erforderlich) unverändert.
 
-## 3. Neues Modul „Notiznetz"
+### 2. Live-Scene-Persistenz statt Snapshot
+Bisher wird pro Sheet nur ein JPEG-`thumbnail` in `project.sheets[i].thumbnail` gespeichert; das `cad-viewport`-Element hält `viewSnapshot` als DataURL und `CadViewportView` skaliert dieses Bild via `object-contain` in den Rahmen → dadurch entsteht die falsche Skalierung.
 
-### 3.1 Navigation und Kopf
-- `WorkspaceHeader` bekommt einen dritten Mode-Button „Notiznetz" (Icon `Network`) neben Projektmappe/CAD-Oberfläche.
-- Neue Route `/project/:id/notes`, gerendert von `NotesPage.tsx`. Kopf bleibt identisch (Undo/Redo, Trash, Präsentieren, Exportieren, Tablet-Toggle).
-- Optik greift die CAD-Farbwelt auf (dunkle Sidebar-Töne, Gold-Akzente, `hsl(var(--cad-*))`-Variablen), Body bleibt hell wie Projektmappe.
+Neu:
+- `Sheet` in `src/lib/projectStore.ts` bekommt ein Feld `sceneJson?: string` (serialisierte Szene aus `CadApp._serializeScene`), das bei jedem `persist()` in `CadEditor` mitgeschrieben wird.
+- Das Thumbnail bleibt nur noch als optionale UI-Preview für Listen (SheetPanel, Blatt-Auswahl); es wird **nie** für den Viewport-Render verwendet.
+- `PageElement` (kind `cad-viewport`) speichert ausschließlich Referenzdaten: `sheetId`, `scaleDen`, `modelCenterM`, `viewportRotationDeg`, `visibleLayers`, `lastSyncAt`. `viewSnapshot` wird für neue Elemente nicht mehr geschrieben (Legacy-Feld bleibt lesbar für Altdaten).
 
-### 3.2 Layout (nach Referenzbild)
-Drei Spalten, 24/40/36 Aufteilung:
-```text
-┌─────────────┬──────────────────────┬─────────────────────┐
-│ Notizliste  │ Detail-/Edit-Panel   │ Interaktives Netz   │
-│ + Filter    │ (Titel, Beschr., …)  │ (Zoom / Navigation) │
-└─────────────┴──────────────────────┴─────────────────────┘
-```
-Oben rechts im Netzbereich die Tabs „Netz-Ansicht / Liste / Kalender / Kanban".
+### 3. Exakte Maßstabsberechnung im Viewport
+`src/components/page/CadViewportView.tsx` wird umgebaut:
+- Ermittelt Rahmengröße in **Papier-mm** aus `element.wMm/hMm` (Fallback aus `w/h` × Seitenformat).
+- Berechnet den sichtbaren Modellausschnitt exakt: `modelWmm = wMm * scaleDen`, `modelHmm = hMm * scaleDen` (entspricht `wMm/1000 * scaleDen` in Metern).
+- Rendert die Szene über eine neue Funktion `renderSceneRegionToCanvas(sceneJson, centerM, modelWm, modelHm, rotationDeg, pxPerMm)` in ein Offscreen-Canvas. Die Pixelauflösung dient nur der Bildschirmdarstellung – der Weltausschnitt ist unabhängig davon.
+- Kein `object-contain`, kein `background-size: contain`; der Renderer füllt den Rahmen 1:1.
 
-### 3.3 Datenmodell (in `projectStore.ts`)
-- `NoteCategory` – frei definierbar, Farbe + Name.
-- `NoteStatus` – `offen | in_bearbeitung | erledigt` (Ampel).
-- `NotePriority` – `niedrig | normal | hoch | info`.
-- `Person` – Name, optional Farbe.
-- `NoteEntry` – Pflicht: id, title, description. Optional: date, time, categoryId, status, priority, ownerId, participantIds[], dueDate, comments[], attachmentIds[], linkedNodeIds[], linkedEntryIds[].
-- `NoteNode` – Hierarchie-Knoten: id, parentId (null=Projekt), label, color, kind (`root|topic|subtopic|leaf`), children implizit über parentId. Notizen hängen per `nodeId` an einem Blatt.
+### 4. Renderer-Hilfsroutine
+Neue Datei `src/cad/SceneRegionRenderer.ts`:
+- Lädt/Deserialisiert `sceneJson` in eine transiente `Scene`.
+- Instanziert einen `Renderer` mit einer virtuellen Kamera, die zentrum + Weltmaße + Rotation exakt abbildet (nutzt die vorhandenen Layer-Zeichenroutinen aus `Renderer.ts`).
+- Zeichnet in ein `HTMLCanvasElement`, das `CadViewportView` per `useEffect` in einem `<canvas ref>` ausgibt.
+- Ergebnis wird gecached pro (sheetId, sceneHash, viewport-params) und bei `lastSyncAt`-Änderung invalidiert.
 
-Alles im bestehenden Project-Snapshot mitgespeichert (nutzt existierendes Undo/Redo automatisch).
+### 5. Manuelle & automatische Aktualisierung
+- Der „Aktualisieren"-Button (Refresh-Icon in `CadToolSection`) setzt nur noch `lastSyncAt = now()` und triggert damit den Re-Render (kein Snapshot-Kopieren mehr).
+- Optional automatisch: wenn `project.sheets[i].sceneJson` sich ändert, invalidiert der Renderer-Cache und alle Viewports auf dieses Sheet werden neu gezeichnet.
 
-### 3.4 Funktionen
-- Schnellerfassung: „+ Neu" öffnet Detail-Panel mit nur Titel/Beschreibung (Pflicht), Rest optional.
-- Filterchips oben in der Liste (Alle / Offen / In Bearbeitung / Erledigt) + Filter-Icon für Kategorie/Person/Dringlichkeit/Freitextsuche.
-- Detail-Panel mit allen Feldern des Referenzbilds inkl. Verknüpfungs-Chips („Verknüpfungen im Netz").
-- Ansichten: Netz (interaktiv), Liste (Tabelle), Kalender (Monatsraster nach `date`), Kanban (Spalten nach Status).
+### 6. Skalen-Nachbearbeitung
+Das Maßstab-Dropdown im rechten Panel schreibt weiterhin `scale`/`scaleDen` in das Element. Da der Viewport den Maßstab live aus diesen Feldern berechnet, wirkt jede Änderung sofort ohne erneuten Import. Rahmen-Ecken-Handles verändern nur `wMm/hMm` (Papier-Ausschnittsgröße), niemals `scaleDen` – dadurch bleibt „1 mm Papier = scaleDen mm Modell" invariant.
 
-### 3.5 Netz-Visualisierung
-- Eigenkomponente `NoteGraph` mit SVG + Zoom/Pan (Wheel + Pinch, wiederverwendet Muster aus `Camera.ts`).
-- Radiales Layout: Projekt = Zentrum, Hauptthemen im ersten Ring, Unterthemen im zweiten, Blätter (Notizen/Dateien/Fotos) am Rand. Farben pro Kategorie.
-- Klick auf Knoten = „hineinzoomen" (Fokus wechselt, Kinder werden zum neuen Ring). Breadcrumb-Zurück oben links.
-- Kanten gestrichelt für gleiche Ebene, durchgezogen für Eltern-Kind.
+### 7. PDF-Export
+`src/lib/projectPdfExport.ts` und `sheetPdfExport.ts` rendern CAD-Viewports über dieselbe `renderSceneRegionToCanvas`-Route mit einer sehr hohen `pxPerMm`-Auflösung – jedoch weiterhin ohne „Fit-to-Page". Die Ziel-mm-Fläche wird 1:1 in die PDF-mm-Fläche übernommen. Kein `scale`-Flag beim Einbetten, keine Seitenskalierung.
 
-### 3.6 Verknüpfungen zu Dateien / Fotos
-- Ein Notiz-Knoten kann `attachmentIds` referenzieren, die aus dem bestehenden Dokumenten-Store gelesen werden – keine Duplikate.
+## Technisches Detail
 
-### 3.7 Tablet-Kompatibilität
-- Alle Interaktionen mit Pointer Events; das bestehende Tablet-Hilfsrad funktioniert automatisch (Header bleibt identisch).
+- **Kernformel:** `paperMm * scaleDen = modelMm` (bzw. `modelM = paperMm * scaleDen / 1000`). Diese ist bereits an einigen Stellen implementiert und wird zur alleinigen Wahrheit gemacht.
+- **Bitmap-Verbot:** `viewSnapshot` wird bei neuen Elementen nicht mehr gesetzt; `CadViewportView` verwendet es nur, wenn `sceneJson` fehlt (Altdaten-Fallback) – und markiert dann sichtbar „Legacy-Snapshot".
+- **Cache-Key:** Hash aus `sceneJson.length + updatedAt`, damit große Szenen nicht bei jedem Frame neu serialisiert werden.
+- **Rotation:** Vor dem Zeichnen der Szene in Renderer-Koordinaten (nicht per CSS-Transform des Ausgabe-Canvas), damit auch beim PDF-Export exakt.
+- **Kein Fit-to-Page:** Alle Aufrufer der PDF-Engine setzen explizit `fit: false` / entfernen `scale`-Parameter für CAD-Viewport-Elemente.
 
-## Technische Notizen
-- Neue Dateien: `src/pages/NotesPage.tsx`, `src/components/notes/NoteList.tsx`, `src/components/notes/NoteDetail.tsx`, `src/components/notes/NoteGraph.tsx`, `src/components/notes/NoteViewTabs.tsx`, `src/lib/notesStore.ts` (Selektoren, dünner Wrapper um `projectStore`).
-- `projectStore.ts` bekommt `notes: { entries, nodes, categories, people }`.
-- Routing in `App.tsx` ergänzen.
-- `WorkspaceHeader` erhält neuen Mode; Mode-Enum wird auf `"workspace" | "cad" | "notes"` erweitert (alle bestehenden Aufrufer bekommen den neuen Button automatisch).
-
-Umfang: rund 1.500 Zeilen neuer Code, keine Änderung an bestehendem CAD-Verhalten.
+## Nicht im Umfang
+- Layer-Sichtbarkeitsschalter im Viewport-Inspektor (Feld `visibleLayers` wird nur vorbereitet).
+- Migration bestehender `cad-view`-Bitmap-Elemente (bleiben mit Legacy-Fallback lesbar).
