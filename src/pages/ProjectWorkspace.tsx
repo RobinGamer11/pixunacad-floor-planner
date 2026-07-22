@@ -3151,7 +3151,14 @@ function CadViewportViewHost({ element }: { element: PageElement }) {
     }
     return undefined;
   }, [projects, element.sheetId]);
-  return <CadViewportView element={element} sheet={sheet} />;
+  return (
+    <CadViewportView
+      element={element}
+      sheet={sheet}
+      paperWmm={element.wMm}
+      paperHmm={element.hMm}
+    />
+  );
 }
 
 function RightInspector({
