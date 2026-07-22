@@ -3151,7 +3151,14 @@ function CadViewportViewHost({ element }: { element: PageElement }) {
     }
     return undefined;
   }, [projects, element.sheetId]);
-  return <CadViewportView element={element} sheet={sheet} />;
+  return (
+    <CadViewportView
+      element={element}
+      sheet={sheet}
+      paperWmm={element.wMm}
+      paperHmm={element.hMm}
+    />
+  );
 }
 
 function RightInspector({
@@ -4649,8 +4656,10 @@ function CadToolSection({
                       onClick={(e) => {
                         e.stopPropagation();
                         if (!pageId) return;
+                        // Live-Referenz: nur den Sync-Zeitstempel bumpen, damit
+                        // der Viewport-Renderer re-executed und die aktuellste
+                        // Vektor-Szene des Sheets zeichnet. Kein Bitmap-Kopieren.
                         projectStore.updateElement(projectId, pageId, el.id, {
-                          viewSnapshot: sheet?.thumbnail,
                           lastSyncAt: new Date().toISOString(),
                         });
                       }}
@@ -4915,7 +4924,6 @@ function ElementInspector({
             </Row>
             <button
               onClick={() => update({
-                viewSnapshot: sheet?.thumbnail ?? element.viewSnapshot,
                 lastSyncAt: new Date().toISOString(),
               })}
               className="w-full h-9 rounded-md text-sm border flex items-center justify-center gap-2 mt-2"

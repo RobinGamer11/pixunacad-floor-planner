@@ -164,9 +164,19 @@ export interface Sheet {
   scale: string; // e.g. "1:100" (Legacy-String; scaleDen ist die neue kanonische Form)
   /** Nennmaßstab als Zahl (100 für 1:100). */
   defaultScaleDen?: number;
-  /** Optionales Vorschau-Bild (PNG-DataURL) — wird beim Speichern aus dem
-   *  CAD-Editor-Canvas erzeugt und im `cad-view`-Element angezeigt. */
+  /** Optionales Vorschau-Bild (PNG-DataURL) — wird nur für Listen-Miniaturen
+   *  in Panels/Dropdowns verwendet. Der Projektmappe-Viewport rendert die
+   *  Szene stattdessen live aus `sceneJson`, damit der Maßstab exakt bleibt. */
   thumbnail?: string;
+  /** Live-Referenz: serialisierte Vektor-Szene dieses Blatts (JSON-String,
+   *  Format `CadApp._serializeOneScene`). Wird bei jedem CAD-Persist mit
+   *  geschrieben und vom `cad-viewport`-Element in Papier-mm-Genauigkeit
+   *  gerendert — niemals als Bitmap skaliert. */
+  sceneJson?: string;
+  /** Label-/Layer-Definitionen der CAD-Zeichnung (JSON-String). Wird zusammen
+   *  mit `sceneJson` gespeichert, damit der Live-Viewport die Sichtbarkeits-
+   *  und Reihenfolge-Regeln 1:1 abbilden kann. */
+  labelsJson?: string;
 }
 
 export type TaskPriority = "low" | "medium" | "high";
