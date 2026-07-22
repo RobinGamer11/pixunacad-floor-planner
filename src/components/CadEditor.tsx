@@ -676,15 +676,33 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             const prevSheets: import("@/lib/projectStore").Sheet[] =
               projectStore.getState().projects.find((p) => p.id === projectId)?.sheets ?? [];
             const prevById = new Map(prevSheets.map((s) => [s.id, s] as const));
+            const scenesById = (data && typeof data.scenesById === "object") ? data.scenesById : {};
+            const labelsJsonStr = Array.isArray(data.labels) ? JSON.stringify(data.labels) : undefined;
             const sheets = list
-              .filter((s: any) => s && s.id && s.id !== "default-sheet")
+              // Default-Sheet ist ein regulär auswählbares Blatt in der Projektmappe.
+              .filter((s: any) => s && s.id)
               .map((s: any) => {
                 const prev = prevById.get(s.id);
+                // Per-Sheet-Szene aus scenesById (Fallback: aktive Scene-Felder).
+                let sceneObj: any = scenesById[s.id];
+                if (!sceneObj && s.id === activeSheetId) {
+                  sceneObj = {
+                    segments: data.segments, hatches: data.hatches, walls: data.walls,
+                    dimensions: data.dimensions, textBoxes: data.textBoxes,
+                    stickerInstances: data.stickerInstances, documents: data.documents,
+                    freeStrokes: data.freeStrokes, rulerGuide: data.rulerGuide, doors: data.doors,
+                  };
+                }
+                let sceneJson: string | undefined;
+                try { sceneJson = sceneObj ? JSON.stringify(sceneObj) : prev?.sceneJson; }
+                catch { sceneJson = prev?.sceneJson; }
                 return {
                   id: s.id,
                   name: s.name || "Sheet",
                   scale: typeof s.scaleValue === "number" ? `1:${s.scaleValue}` : (s.scaleKey || "1:100"),
                   thumbnail: s.id === activeSheetId && activeThumb ? activeThumb : prev?.thumbnail,
+                  sceneJson,
+                  labelsJson: labelsJsonStr ?? prev?.labelsJson,
                 };
               });
             projectStore.updateProject(projectId, { sheets });
