@@ -4656,8 +4656,10 @@ function CadToolSection({
                       onClick={(e) => {
                         e.stopPropagation();
                         if (!pageId) return;
+                        // Live-Referenz: nur den Sync-Zeitstempel bumpen, damit
+                        // der Viewport-Renderer re-executed und die aktuellste
+                        // Vektor-Szene des Sheets zeichnet. Kein Bitmap-Kopieren.
                         projectStore.updateElement(projectId, pageId, el.id, {
-                          viewSnapshot: sheet?.thumbnail,
                           lastSyncAt: new Date().toISOString(),
                         });
                       }}
