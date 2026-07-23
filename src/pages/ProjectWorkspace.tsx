@@ -3165,6 +3165,8 @@ function CadViewportViewHost({ element }: { element: PageElement }) {
       paperWmm={element.wMm}
       paperHmm={element.hMm}
       autoUpdate={autoUpdate}
+      showScaleCheck={false}
+
     />
   );
 }
