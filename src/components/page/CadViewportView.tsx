@@ -154,7 +154,7 @@ export function CadViewportView({
         color: "hsl(var(--ink-soft))",
         border: "1px solid hsl(var(--hairline))",
       }}
-      title="Automatische Aktualisierung ist deaktiviert — via „Ansicht aktualisieren" neu laden."
+      title={'Automatische Aktualisierung ist deaktiviert — via „Ansicht aktualisieren" neu laden.'}
     >
       manuell
     </div>
