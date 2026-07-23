@@ -3143,13 +3143,20 @@ function ElementView({
  *  Platzhalter, wenn das Sheet noch nie im CAD geöffnet wurde. */
 function CadViewportViewHost({ element }: { element: PageElement }) {
   const projects = useProjects();
-  const sheet = React.useMemo(() => {
-    if (!element.sheetId) return undefined;
-    for (const p of projects) {
-      const s = p.sheets.find((x) => x.id === element.sheetId);
-      if (s) return s;
+  const { sheet, autoUpdate } = React.useMemo(() => {
+    let s: import("@/lib/projectStore").Sheet | undefined;
+    let auto = true;
+    if (element.sheetId) {
+      for (const p of projects) {
+        const hit = p.sheets.find((x) => x.id === element.sheetId);
+        if (hit) {
+          s = hit;
+          auto = p.settings?.cadAutoUpdate !== false;
+          break;
+        }
+      }
     }
-    return undefined;
+    return { sheet: s, autoUpdate: auto };
   }, [projects, element.sheetId]);
   return (
     <CadViewportView
@@ -3157,6 +3164,7 @@ function CadViewportViewHost({ element }: { element: PageElement }) {
       sheet={sheet}
       paperWmm={element.wMm}
       paperHmm={element.hMm}
+      autoUpdate={autoUpdate}
     />
   );
 }
