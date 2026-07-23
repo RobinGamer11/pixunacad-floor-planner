@@ -8,11 +8,21 @@
  *     modelWm  = modelWmm / 1000
  *
  * Dadurch entspricht 1 mm Papier immer exakt `scaleDen` mm Modell — sowohl
- * am Bildschirm als auch beim späteren PDF-Export. Der Bildschirm-Zoom
- * beeinflusst ausschließlich die Pixel-Auflösung des Offscreen-Canvas,
- * niemals den Maßstab.
+ * am Bildschirm als auch beim späteren PDF-Export.
+ *
+ * Auto-Update:
+ *   - `autoUpdate` (Standard: true) → Viewport re-rendert bei jeder Änderung
+ *     des Sheets `sceneJson`.
+ *   - `autoUpdate` = false → Viewport friert die zuletzt gerenderte Szene
+ *     ein und aktualisiert erst, wenn `element.lastSyncAt` bumpt (via
+ *     „Ansicht aktualisieren"-Button).
+ *
+ * Maßstabs-Check:
+ *   Ein kleines Overlay unten links zeigt die mm-zu-mm Referenz an
+ *   („10 mm Papier ≙ 1000 mm Modell") — als sichtbare Garantie, dass der
+ *   Ausdruck exakt der gewählten Skalierung entspricht.
  */
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import type { PageElement, Sheet } from "@/lib/projectStore";
 import { parseScaleDen } from "@/lib/paper";
 import { renderSceneRegionToCanvas } from "@/cad/SceneRegionRenderer";
@@ -24,12 +34,30 @@ export interface CadViewportViewProps {
   paperWmm?: number;
   /** Papier-Höhe des Viewport-Rahmens in mm. */
   paperHmm?: number;
+  /** Live-Aktualisierung ein/aus. Default: true. */
+  autoUpdate?: boolean;
+  /** Maßstabs-Check-Pille anzeigen. Default: true. */
+  showScaleCheck?: boolean;
 }
 
 /** Ziel-Pixel-Dichte für den Offscreen-Render (px pro Papier-mm). */
 const RENDER_PX_PER_MM = 4;
 
-export function CadViewportView({ element, sheet, paperWmm, paperHmm }: CadViewportViewProps) {
+/** Formatiert einen Modell-Millimeterwert als „5000 mm" / „5 m" o.ä. */
+function formatModelMm(mm: number): string {
+  if (mm >= 1000) return `${(mm / 1000).toLocaleString("de-DE", { maximumFractionDigits: 2 })} m`;
+  if (mm >= 10) return `${Math.round(mm)} mm`;
+  return `${mm.toLocaleString("de-DE", { maximumFractionDigits: 1 })} mm`;
+}
+
+export function CadViewportView({
+  element,
+  sheet,
+  paperWmm,
+  paperHmm,
+  autoUpdate = true,
+  showScaleCheck = true,
+}: CadViewportViewProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
 
@@ -38,12 +66,24 @@ export function CadViewportView({ element, sheet, paperWmm, paperHmm }: CadViewp
   const centerM = element.modelCenterM ?? { x: 0, y: 0 };
   const rotationDeg = element.viewportRotationDeg ?? 0;
 
-  const sceneJson = sheet?.sceneJson;
-  const labelsJson = sheet?.labelsJson;
+  const liveSceneJson = sheet?.sceneJson;
+  const liveLabelsJson = sheet?.labelsJson;
 
-  // Bei fehlender Rahmengröße: Fallback aus DOM-Layout (nicht ideal, aber
-  // verhindert leeren Render). Der Aufrufer sollte immer paperWmm/paperHmm
-  // aus dem Papier-Element (wMm/hMm) durchreichen.
+  // Wenn autoUpdate=false, frieren wir die zuletzt gerenderte Szene ein und
+  // aktualisieren erst bei Änderung von element.lastSyncAt.
+  const [frozen, setFrozen] = useState<{ sceneJson?: string; labelsJson?: string }>(
+    () => ({ sceneJson: liveSceneJson, labelsJson: liveLabelsJson })
+  );
+  useEffect(() => {
+    if (autoUpdate) return;
+    // Bei manuellem Modus: bei lastSyncAt-Bump oder Toggle-Wechsel Snapshot ziehen.
+    setFrozen({ sceneJson: liveSceneJson, labelsJson: liveLabelsJson });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoUpdate, element.lastSyncAt]);
+
+  const sceneJson = autoUpdate ? liveSceneJson : frozen.sceneJson;
+  const labelsJson = autoUpdate ? liveLabelsJson : frozen.labelsJson;
+
   const effWmm = paperWmm && paperWmm > 0 ? paperWmm : undefined;
   const effHmm = paperHmm && paperHmm > 0 ? paperHmm : undefined;
 
@@ -83,14 +123,47 @@ export function CadViewportView({ element, sheet, paperWmm, paperHmm }: CadViewp
 
   const label = sheet?.name ?? "CAD-Ansicht";
 
-  // Legacy-Fallback: Alt-Elemente ohne sceneJson zeigen den eingefrorenen
-  // Bitmap-Snapshot (mit sichtbarem Hinweis, dass es sich um Legacy handelt).
+  // Maßstabs-Check: eine „runde" Papier-Referenz wählen (10 mm bevorzugt).
+  const paperRefMm = 10;
+  const modelRefMm = paperRefMm * scaleDen;
+  const scaleCheckText = `${paperRefMm} mm Papier ≙ ${formatModelMm(modelRefMm)} Modell · 1:${Math.round(scaleDen)}`;
+
+  // Legacy-Fallback für Alt-Elemente ohne sceneJson.
   const legacySnapshot = !sceneJson ? (element.viewSnapshot || sheet?.thumbnail) : null;
+
+  const ScaleCheckPill = showScaleCheck ? (
+    <div
+      className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded text-[9px] tabular-nums pointer-events-none select-none"
+      style={{
+        background: "hsl(var(--surface) / 0.9)",
+        color: "hsl(var(--ink-soft))",
+        border: "1px solid hsl(var(--hairline))",
+        fontVariantNumeric: "tabular-nums",
+      }}
+      title={`Maßstabs-Check: ${scaleCheckText}`}
+    >
+      {scaleCheckText}
+    </div>
+  ) : null;
+
+  const StaleBadge = !autoUpdate ? (
+    <div
+      className="absolute top-1 right-1 px-1.5 py-0.5 rounded text-[9px] pointer-events-none select-none"
+      style={{
+        background: "hsl(var(--surface) / 0.9)",
+        color: "hsl(var(--ink-soft))",
+        border: "1px solid hsl(var(--hairline))",
+      }}
+      title="Automatische Aktualisierung ist deaktiviert — via „Ansicht aktualisieren" neu laden."
+    >
+      manuell
+    </div>
+  ) : null;
 
   if (!sceneJson && !legacySnapshot) {
     return (
       <div
-        className="w-full h-full flex items-center justify-center text-xs text-muted-foreground border-2 border-dashed"
+        className="w-full h-full flex items-center justify-center text-xs text-muted-foreground border-2 border-dashed relative"
         style={{
           borderColor: "hsl(var(--hairline))",
           background: "hsl(var(--surface-muted))",
@@ -100,6 +173,7 @@ export function CadViewportView({ element, sheet, paperWmm, paperHmm }: CadViewp
           ? `${label} — noch keine Zeichnung (Sheet im CAD öffnen)`
           : "Kein Zeichenblatt"}
         <span className="sr-only">Maßstab 1:{scaleDen}</span>
+        {ScaleCheckPill}
       </div>
     );
   }
@@ -120,6 +194,8 @@ export function CadViewportView({ element, sheet, paperWmm, paperHmm }: CadViewp
           draggable={false}
           style={{ pointerEvents: "none" }}
         />
+        {ScaleCheckPill}
+        {StaleBadge}
       </div>
     );
   }
@@ -141,6 +217,8 @@ export function CadViewportView({ element, sheet, paperWmm, paperHmm }: CadViewp
           imageRendering: "auto",
         }}
       />
+      {ScaleCheckPill}
+      {StaleBadge}
     </div>
   );
 }
