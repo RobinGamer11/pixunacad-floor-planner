@@ -3143,13 +3143,20 @@ function ElementView({
  *  Platzhalter, wenn das Sheet noch nie im CAD geöffnet wurde. */
 function CadViewportViewHost({ element }: { element: PageElement }) {
   const projects = useProjects();
-  const sheet = React.useMemo(() => {
-    if (!element.sheetId) return undefined;
-    for (const p of projects) {
-      const s = p.sheets.find((x) => x.id === element.sheetId);
-      if (s) return s;
+  const { sheet, autoUpdate } = React.useMemo(() => {
+    let s: import("@/lib/projectStore").Sheet | undefined;
+    let auto = true;
+    if (element.sheetId) {
+      for (const p of projects) {
+        const hit = p.sheets.find((x) => x.id === element.sheetId);
+        if (hit) {
+          s = hit;
+          auto = p.settings?.cadAutoUpdate !== false;
+          break;
+        }
+      }
     }
-    return undefined;
+    return { sheet: s, autoUpdate: auto };
   }, [projects, element.sheetId]);
   return (
     <CadViewportView
@@ -3157,6 +3164,7 @@ function CadViewportViewHost({ element }: { element: PageElement }) {
       sheet={sheet}
       paperWmm={element.wMm}
       paperHmm={element.hMm}
+      autoUpdate={autoUpdate}
     />
   );
 }
@@ -4519,8 +4527,27 @@ function CadToolSection({
 
 
 
+  const autoUpdate = project.settings?.cadAutoUpdate !== false;
+
   return (
     <div className="space-y-3">
+
+      {/* Live-Aktualisierung: sofort ODER erst auf Klick sichtbar. */}
+      <label
+        className="flex items-center justify-between gap-2 px-2 h-9 rounded-md border cursor-pointer"
+        style={{ borderColor: "hsl(var(--hairline))" }}
+        title={'Wenn aus: CAD-Viewports zeigen den letzten Snapshot, bis „Ansicht aktualisieren" geklickt wird.'}
+      >
+        <span className="text-xs">Automatisch aktualisieren</span>
+        <input
+          type="checkbox"
+          checked={autoUpdate}
+          onChange={(e) => projectStore.updateProjectSettings(projectId, { cadAutoUpdate: e.target.checked })}
+          className="h-4 w-4"
+        />
+      </label>
+
+
 
 
 

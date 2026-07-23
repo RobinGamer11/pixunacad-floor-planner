@@ -233,6 +233,10 @@ export interface FileNode {
 export interface ProjectSettings {
   /** Position des Zeitstrahls im Übersichts-Tab. Default: "bottom". */
   timelinePosition?: "top" | "bottom";
+  /** Wenn true (Default), rendern CAD-Viewports in der Projektmappe live aus
+   *  der aktuellsten Szene des referenzierten Zeichenblatts. Wenn false,
+   *  werden Änderungen erst nach Klick auf „Ansicht aktualisieren" sichtbar. */
+  cadAutoUpdate?: boolean;
 }
 
 export interface Project {
