@@ -4536,7 +4536,7 @@ function CadToolSection({
       <label
         className="flex items-center justify-between gap-2 px-2 h-9 rounded-md border cursor-pointer"
         style={{ borderColor: "hsl(var(--hairline))" }}
-        title="Wenn aus: CAD-Viewports zeigen den letzten Snapshot, bis „Ansicht aktualisieren" geklickt wird."
+        title={'Wenn aus: CAD-Viewports zeigen den letzten Snapshot, bis „Ansicht aktualisieren" geklickt wird.'}
       >
         <span className="text-xs">Automatisch aktualisieren</span>
         <input
