@@ -485,10 +485,15 @@ export default function ProjectWorkspace() {
   // Panel mehr.
   useEffect(() => {
     if (!selectedElement) return;
-    if (selectedElement.kind === "cad-view" || selectedElement.kind === "cad-viewport") {
+    const isCadViewport = selectedElement.kind === "cad-view" || selectedElement.kind === "cad-viewport";
+    if (isCadViewport) {
       if (activeTool !== "cad") setActiveTool("cad");
       setPrintMode(false);
       setRightTabState("settings");
+    } else if (activeTool === "cad") {
+      // Wechsel zu Nicht-CAD-Element → CAD-Blatt-Werkzeug schließen,
+      // damit der normale Element-Inspektor wieder erscheint.
+      setActiveTool(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedElement?.id, selectedElement?.kind]);
