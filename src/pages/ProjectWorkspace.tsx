@@ -479,6 +479,20 @@ export default function ProjectWorkspace() {
   const selectedElement = activePage?.elements.find((e) => e.id === selectedElementId);
   const bgPage = bgOverlay.pageId ? project?.pages.find((p) => p.id === bgOverlay.pageId) : undefined;
 
+  // Auto-open das „CAD-Blatt"-Werkzeug, sobald ein platziertes CAD-Blatt
+  // (cad-view / cad-viewport) angeklickt wird. Maßstab, Aktualisieren usw.
+  // werden ausschließlich dort verwaltet — kein separates Viewport-Inspektor-
+  // Panel mehr.
+  useEffect(() => {
+    if (!selectedElement) return;
+    if (selectedElement.kind === "cad-view" || selectedElement.kind === "cad-viewport") {
+      if (activeTool !== "cad") setActiveTool("cad");
+      setPrintMode(false);
+      setRightTabState("settings");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedElement?.id, selectedElement?.kind]);
+
   // Beim ersten Anzeigen: komplettes Blatt mittig, leicht rausgezoomt.
   useLayoutEffect(() => {
     if (didAutoFitRef.current) return;
