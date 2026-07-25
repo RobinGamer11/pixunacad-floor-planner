@@ -4935,67 +4935,10 @@ function ElementInspector({
         />
       </Row>
 
-      {(element.kind === "cad-view" || element.kind === "cad-viewport") && (() => {
-        const project = projectStore.getState().projects.find((p) => p.id === projectId);
-        const sheet = project?.sheets.find((s) => s.id === element.sheetId);
-        const cur = element.scale ?? sheet?.scale ?? "1:100";
-        const scaleDen = element.scaleDen ?? (parseInt(String(cur).split(":")[1], 10) || 100);
-        const paperRefMm = 10;
-        const modelRefMm = paperRefMm * scaleDen;
-        const modelRefText = modelRefMm >= 1000
-          ? `${(modelRefMm / 1000).toLocaleString("de-DE", { maximumFractionDigits: 2 })} m`
-          : `${Math.round(modelRefMm)} mm`;
-        return (
-          <>
-            <Row label="Maßstab">
-              <select
-                value={PAGE_PLAN_SCALES.includes(cur) ? cur : "frei"}
-                onChange={(ev) => {
-                  let next = ev.target.value;
-                  if (next === "frei") {
-                    const picked = askPlanScale(cur);
-                    if (!picked) return;
-                    next = picked;
-                  }
-                  update({ scale: next });
-                }}
-                className="w-full h-8 px-2 rounded bg-transparent border text-sm"
-                style={{ borderColor: "hsl(var(--hairline))" }}
-              >
-                {PAGE_PLAN_SCALES.map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-                {!PAGE_PLAN_SCALES.includes(cur) && (
-                  <option key={cur} value={cur}>{cur}</option>
-                )}
-                <option value="frei">frei…</option>
-              </select>
-            </Row>
-            <div
-              className="w-full px-2 py-1.5 rounded text-[11px] tabular-nums mt-1"
-              style={{
-                background: "hsl(var(--surface-muted))",
-                color: "hsl(var(--ink-soft))",
-                border: "1px solid hsl(var(--hairline))",
-                fontVariantNumeric: "tabular-nums",
-              }}
-              title="Maßstabs-Check"
-            >
-              Maßstabs-Check: {paperRefMm} mm Papier ≙ {modelRefText} Modell · 1:{Math.round(scaleDen)}
-            </div>
-            <button
-              onClick={() => update({
-                lastSyncAt: new Date().toISOString(),
-              })}
-              className="w-full h-9 rounded-md text-sm border flex items-center justify-center gap-2 mt-2"
-              style={{ borderColor: "hsl(var(--hairline))" }}
-              title="Aktuelle CAD-Ansicht als Snapshot übernehmen"
-            >
-              <RefreshCw size={14} /> Ansicht aktualisieren
-            </button>
-          </>
-        );
-      })()}
+      {/* CAD-Viewport-Inspektor entfernt: Maßstab, Aktualisieren und Löschen
+          für platzierte CAD-Blätter liegen ausschließlich im „CAD-Blatt"-
+          Werkzeug (Auto-Open bei Auswahl). */}
+
 
 
       <button
