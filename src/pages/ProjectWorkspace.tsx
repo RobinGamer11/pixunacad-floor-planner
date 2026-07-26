@@ -3070,7 +3070,7 @@ function ElementView({
         boxShadow: el.shadow ? "0 8px 24px -8px rgba(0,0,0,0.25)" : undefined,
         border: el.border ? "1px solid hsl(var(--ink))" : undefined,
         transform: previewTransform,
-        transformOrigin: "center center",
+        transformOrigin: previewTransformOrigin ?? "center center",
         zIndex: isCadView ? (showHub ? 90 : 40) : (showHub ? 80 : (elevated ? 30 : undefined)),
         touchAction: "none",
       }}
