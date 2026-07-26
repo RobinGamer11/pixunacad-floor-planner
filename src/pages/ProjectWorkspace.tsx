@@ -3812,6 +3812,8 @@ function RightInspector({
   onDocumentImport?: () => void;
   docScale?: string;
   onDocScaleChange?: (s: string) => void;
+  docFreePlace?: boolean;
+  onDocFreePlaceChange?: (v: boolean) => void;
   onCadLineSnapChange?: (patch: { midpointSnap?: boolean; divisionSnap?: number | null }) => void;
   onCadDuplicateSegments?: () => void;
   updateToolSettings: <K extends keyof ToolSettings>(k: K, patch: Partial<ToolSettings[K]>) => void;
