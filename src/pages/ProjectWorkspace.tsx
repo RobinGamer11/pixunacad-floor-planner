@@ -1743,6 +1743,8 @@ export default function ProjectWorkspace() {
               onDocumentImport={() => documentFileInputRef.current?.click()}
               docScale={docScale}
               onDocScaleChange={setDocScale}
+              docFreePlace={docFreePlace}
+              onDocFreePlaceChange={setDocFreePlace}
               onCadLineSnapChange={(patch) => {
                 cadEngineApiRef.current?.setSelectedSegmentSnap(patch);
                 setCadSelectedLineSnap((prev) => prev ? {
