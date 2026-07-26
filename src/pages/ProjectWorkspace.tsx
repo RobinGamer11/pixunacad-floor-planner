@@ -5404,6 +5404,24 @@ function CadToolSection({
                       <Trash2 size={13} className="text-muted-foreground" />
                     </button>
                   </div>
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="text-[11px] text-muted-foreground shrink-0">Bez.-ID</span>
+                    <input
+                      type="text"
+                      defaultValue={el.layerName ?? ""}
+                      placeholder={sheet?.name ?? "CAD-Ansicht"}
+                      onClick={(ev) => ev.stopPropagation()}
+                      onBlur={(ev) => {
+                        if (!pageId) return;
+                        const v = ev.target.value.trim();
+                        projectStore.updateElement(projectId, pageId, el.id, { layerName: v || undefined });
+                      }}
+                      onKeyDown={(ev) => { if (ev.key === "Enter") (ev.target as HTMLInputElement).blur(); }}
+                      className="flex-1 h-7 px-2 rounded bg-transparent border text-sm"
+                      style={{ borderColor: "hsl(var(--hairline))" }}
+                      title="Bezeichnungs-ID (Ebenenname) für die Ebenen-Ansicht."
+                    />
+                  </div>
                 </div>
               );
             })}
