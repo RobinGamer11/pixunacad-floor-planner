@@ -2830,6 +2830,14 @@ function ElementView({
   }>({ dxPx: 0, dyPx: 0, deltaDeg: 0, anchorFrac: { x: 0.5, y: 0.5 } });
   const previewRef = useRef(preview);
   previewRef.current = preview;
+  // Edge-Trim: reine Vorschau (dxPx/dyPx). Commit erst bei Pointerup bzw.
+  // — bei aktivem Tablet-Hilfsrad — beim Klick auf das Häkchen.
+  const [edgeTrim, setEdgeTrim] = useState<{
+    edge: "top" | "right" | "bottom" | "left";
+    dxPx: number; dyPx: number;
+  } | null>(null);
+  const edgeTrimRef = useRef(edgeTrim);
+  edgeTrimRef.current = edgeTrim;
   const [tabletActive, setTabletActive] = useState<boolean>(
     () => typeof window !== "undefined" && !!(window as any).__pixunaTabletCommit
   );
