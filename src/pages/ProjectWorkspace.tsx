@@ -2989,6 +2989,7 @@ function ElementView({
     anchorFracRef.current = { fx, fy, key };
     if ((isCadView && selected) || hubMode || edgeTrim) {
       onSelect?.({ shift: e.shiftKey });
+      if (!key.startsWith("edge-")) setActiveEdge(null);
       return;
     }
     startDrag(e);
