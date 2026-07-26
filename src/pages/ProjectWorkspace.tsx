@@ -3775,6 +3775,8 @@ function RightInspector({
   onDocumentImport,
   docScale,
   onDocScaleChange,
+  docFreePlace,
+  onDocFreePlaceChange,
   onCadLineSnapChange,
   onCadDuplicateSegments,
   updateToolSettings,
