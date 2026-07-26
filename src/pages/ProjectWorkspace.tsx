@@ -542,8 +542,21 @@ export default function ProjectWorkspace() {
     if (!engine || pages.length === 0) return;
     const m = docScale.match(/^1\s*:\s*(\d+(?:[.,]\d+)?)$/);
     const parsed = m ? parseFloat(m[1].replace(",", ".")) : NaN;
-    const denom = Number.isFinite(parsed) && parsed > 0 ? parsed : 100;
+    let denom = Number.isFinite(parsed) && parsed > 0 ? parsed : 100;
     const [first, ...rest] = pages;
+    // "Frei platzieren": Maßstab so berechnen, dass die erste Seite mit ~30 %
+    // Rand auf die aktive Seite passt. Wirkt für den gesamten Batch.
+    if (docFreePlace && activePage) {
+      const fmt = getPageSizeMm(activePage);
+      const pageWm = (activePage.customWidthMm ?? fmt.wMm) / 1000;
+      const pageHm = (activePage.customHeightMm ?? fmt.hMm) / 1000;
+      const targetWm = pageWm * 0.7;
+      const targetHm = pageHm * 0.7;
+      const scaleW = first.widthM > 0 ? targetWm / first.widthM : denom;
+      const scaleH = first.heightM > 0 ? targetHm / first.heightM : denom;
+      const fit = Math.min(scaleW, scaleH);
+      if (Number.isFinite(fit) && fit > 0) denom = fit;
+    }
     const firstW = first.widthM * denom;
     const firstH = first.heightM * denom;
     setActiveToolAndTab("document");
