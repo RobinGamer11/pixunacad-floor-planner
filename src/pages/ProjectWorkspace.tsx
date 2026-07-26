@@ -156,6 +156,10 @@ export default function ProjectWorkspace() {
   // Ausgabemaßstab für neu importierte Dokumente. Wird rechts im
   // "Dokument"-Werkzeug-Panel als Dropdown ausgewählt (wie beim CAD-Blatt).
   const [docScale, setDocScale] = useState<string>("1:100");
+  // "Frei platzieren": Bei aktivem Toggle wird der Import-Maßstab beim Import
+  // automatisch so gewählt, dass das Dokument vollständig mit reichlich Rand
+  // auf der aktiven Seite liegt (überschreibt docScale nur für diesen Import).
+  const [docFreePlace, setDocFreePlace] = useState<boolean>(false);
   const [selectedElementIds, setSelectedElementIds] = useState<string[]>([]);
   // `selectedElementId` ist das ZULETZT angeklickte Element — alle bestehenden
   // Lese-Stellen (Inspector etc.) benutzen es weiterhin. Bei Multi-Auswahl
