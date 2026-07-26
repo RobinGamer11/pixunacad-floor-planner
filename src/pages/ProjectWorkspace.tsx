@@ -3929,8 +3929,8 @@ function RightInspector({
         </button>
       </div>
 
-      <DragScrollDiv axis="both" className="flex-1 min-h-0 overflow-auto p-2 cursor-grab active:cursor-grabbing">
-        <div className="min-w-[320px] space-y-2">
+      <DragScrollDiv axis="y" className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-2 cursor-grab active:cursor-grabbing">
+        <div className="min-w-0 space-y-2">
           {tab === "settings" && page && <PageSettings projectId={projectId} page={page} />}
           {tab === "tools" && (
             <ToolsTab
