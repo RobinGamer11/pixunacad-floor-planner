@@ -5898,6 +5898,58 @@ function ElementInspector({
   );
 }
 
+function WarpInspectorControls({
+  elementId,
+  hasWarp,
+  onReset,
+}: {
+  elementId: string;
+  hasWarp: boolean;
+  onReset: () => void;
+}) {
+  const active = useWarpTarget();
+  const isActive = active === elementId;
+  // Beim Unmount (z. B. Element abgewählt) den globalen Warp-Modus aufheben.
+  useEffect(() => {
+    return () => {
+      if (_isSelfActive()) setWarpTarget(null);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  function _isSelfActive() {
+    // Re-check via Store, weil `active` in Closure veraltet sein kann.
+    return (typeof window !== "undefined") && (active === elementId);
+  }
+  return (
+    <div className="space-y-1.5">
+      <button
+        type="button"
+        onClick={() => setWarpTarget(isActive ? null : elementId)}
+        className="w-full h-8 rounded-md text-[11px] border flex items-center justify-center gap-2"
+        style={{
+          borderColor: isActive ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
+          background: isActive ? "hsl(var(--accent-gold-soft))" : "transparent",
+          color: "hsl(var(--ink))",
+        }}
+        title="Ecken- und Kanten-Punkte einblenden und frei ziehen"
+      >
+        {isActive ? "Verzerren beenden" : "Verzerren"}
+      </button>
+      {hasWarp && (
+        <button
+          type="button"
+          onClick={onReset}
+          className="w-full h-7 rounded-md text-[11px] border text-muted-foreground hover:text-foreground"
+          style={{ borderColor: "hsl(var(--hairline))" }}
+        >
+          Verzerrung zurücksetzen
+        </button>
+      )}
+    </div>
+  );
+}
+
+
 
 function TasksTab({ project }: { project: import("@/lib/projectStore").Project }) {
   const [draft, setDraft] = useState("");
