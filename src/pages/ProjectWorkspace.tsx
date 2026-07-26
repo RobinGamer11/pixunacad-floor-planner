@@ -5882,7 +5882,9 @@ function ElementInspector({
         <WarpInspectorControls
           elementId={element.id}
           hasWarp={isWarped(element.warpCorners)}
-          onReset={() => update({ warpCorners: undefined })}
+          axis={element.warpAxis ?? "free"}
+          onAxisChange={(a) => update({ warpAxis: a })}
+          onReset={() => update({ warpCorners: undefined, warpAxis: undefined })}
         />
       )}
 
