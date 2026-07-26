@@ -3002,18 +3002,20 @@ function WarpHandles({
 function WarpTargetHandles({
   elementId,
   corners,
+  axis,
   containerRef,
   onCommit,
 }: {
   elementId: string;
   corners?: WarpCorners;
+  axis?: "free" | "x" | "y";
   containerRef: React.RefObject<HTMLElement>;
   onCommit: (next: WarpCorners) => void;
 }) {
   const active = useWarpTarget();
   if (active !== elementId) return null;
   const c = (corners && corners.length === 4 ? corners : IDENTITY_WARP) as WarpCorners;
-  return <WarpHandles corners={c} containerRef={containerRef} onCommit={onCommit} />;
+  return <WarpHandles corners={c} containerRef={containerRef} onCommit={onCommit} axis={axis ?? "free"} />;
 }
 
 
