@@ -3309,22 +3309,23 @@ function ElementView({
             const isLeft = corner === "tl" || corner === "bl";
             const cursor =
               corner === "tl" || corner === "br" ? "nwse-resize" : "nesw-resize";
-            const size = isCadView ? 10 : 12;
+            const size = 12;
             return (
               <div
                 key={corner}
                 data-hub-control
                 onPointerDown={startCornerDrag}
-                title={`Ecke skalieren (Shift: proportional)`}
+                title={isCadView ? "Ecke ziehen: Kante trimmen/erweitern" : "Ecke skalieren (Shift: proportional)"}
                 className="absolute"
                 style={{
                   [isTop ? "top" : "bottom"]: -Math.floor(size / 2),
                   [isLeft ? "left" : "right"]: -Math.floor(size / 2),
                   width: size,
                   height: size,
-                  borderRadius: isCadView ? 2 : 999,
+                  borderRadius: 999,
                   background: "white",
-                  border: `2px solid ${"hsl(var(--accent-gold))"}`,
+                  border: `2px solid hsl(var(--accent-gold))`,
+
                   boxShadow: "0 1px 3px rgba(0,0,0,0.25)",
                   cursor,
                   zIndex: 6,
