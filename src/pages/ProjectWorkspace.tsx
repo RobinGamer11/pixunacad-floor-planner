@@ -2897,10 +2897,21 @@ function ElementView({
     // Don't start a drag when the user clicks an interactive control inside the hub.
     const t = e.target as HTMLElement;
     if (t.closest("[data-hub-control]")) return;
-    // Klickpunkt als Anker merken — HUB Move/Rotate orientiert sich daran.
-    anchorPtRef.current = { clientX: e.clientX, clientY: e.clientY };
+    // Anker als Fraktion INNERHALB des Elements speichern.
+    // Zusätzlich Snap-Key (tl/tr/bl/br/mid-*) bestimmen, falls Klick nahe einer Ecke/Kante liegt.
+    const rect = (rootRef.current ?? (e.currentTarget as HTMLElement)).getBoundingClientRect();
+    const fx = Math.max(0, Math.min(1, (e.clientX - rect.left) / Math.max(1, rect.width)));
+    const fy = Math.max(0, Math.min(1, (e.clientY - rect.top) / Math.max(1, rect.height)));
+    const nearX = fx < 0.12 ? "l" : fx > 0.88 ? "r" : "m";
+    const nearY = fy < 0.12 ? "t" : fy > 0.88 ? "b" : "m";
+    let key = "interior";
+    if (nearX !== "m" && nearY !== "m") key = `corner-${nearY}${nearX}`;
+    else if (nearX === "m" && nearY !== "m") key = nearY === "t" ? "edge-top" : "edge-bottom";
+    else if (nearY === "m" && nearX !== "m") key = nearX === "l" ? "edge-left" : "edge-right";
+    anchorFracRef.current = { fx, fy, key };
     startDrag(e);
   };
+
 
   const handleRotateStart = (e: React.PointerEvent) => {
     if (readOnly || !onRotate) return;
