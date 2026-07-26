@@ -3290,9 +3290,9 @@ function ElementView({
 
       {showHub && (
         <>
-          {!tabletCommitOnly && (
+          {!tabletCommitOnly && !isCadView && (
             <>
-              {/* Rotation stem */}
+              {/* Rotation stem — bei CAD-Blatt ausgeblendet: Drehen läuft nur über die HUB-Box. */}
               <div
                 ref={rotateRef}
                 data-hub-control
