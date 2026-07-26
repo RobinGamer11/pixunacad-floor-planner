@@ -2850,6 +2850,151 @@ function ZoomBar({ zoom, setZoom }: { zoom: number; setZoom: (v: number) => void
   );
 }
 
+// -----------------------------------------------------------------------------
+// Warp/Verzerren-Hülle: rendert Kinder mit CSS-matrix3d gemäß warpCorners.
+// Bei Identität (keine echte Verzerrung) wird die Hülle transparent — keine
+// Transformation, kein Overflow-Impact. Übergeordnete Container-Größe bleibt
+// stabil (el.w × el.h), damit Selektion/Handles unverändert positioniert sind.
+function WarpedContent({
+  corners,
+  children,
+}: {
+  corners?: WarpCorners;
+  children: React.ReactNode;
+}) {
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const [size, setSize] = useState({ w: 0, h: 0 });
+  useLayoutEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const measure = () => {
+      const r = el.getBoundingClientRect();
+      setSize({ w: r.width, h: r.height });
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const active = isWarped(corners) && size.w > 0 && size.h > 0;
+  const matrix = active ? computeWarpMatrix3d(size.w, size.h, corners!) : "";
+  return (
+    <div
+      ref={wrapRef}
+      style={{
+        position: "absolute",
+        inset: 0,
+        overflow: active ? "visible" : "hidden",
+      }}
+    >
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          transformOrigin: "0 0",
+          transform: active ? matrix : undefined,
+          willChange: active ? "transform" : undefined,
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// Handles für den „Verzerren"-Modus: 4 Ecken + 4 Kanten-Mittelpunkte.
+// Ziehen ändert warpCorners in Fraktionen (0..1). Rotationskompensation ist
+// nicht enthalten — bei rotierten Elementen wird die Verzerrung noch relativ
+// zur unrotierten Achse berechnet.
+function WarpHandles({
+  corners,
+  containerRef,
+  onCommit,
+}: {
+  corners: WarpCorners;
+  containerRef: React.RefObject<HTMLElement>;
+  onCommit: (next: WarpCorners) => void;
+}) {
+  const mids = edgeMidpoints(corners);
+  const startDrag = (kind: "corner" | "edge", idx: number, e: React.PointerEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const target = e.currentTarget as HTMLElement;
+    target.setPointerCapture(e.pointerId);
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect || rect.width <= 0 || rect.height <= 0) return;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startCorners = corners.map((c) => ({ ...c })) as WarpCorners;
+    const onMove = (ev: PointerEvent) => {
+      const dx = (ev.clientX - startX) / rect.width;
+      const dy = (ev.clientY - startY) / rect.height;
+      const next = startCorners.map((c) => ({ ...c })) as WarpCorners;
+      if (kind === "corner") {
+        next[idx] = {
+          x: Math.max(-0.5, Math.min(1.5, startCorners[idx].x + dx)),
+          y: Math.max(-0.5, Math.min(1.5, startCorners[idx].y + dy)),
+        };
+      } else {
+        // Kante idx=0 top (TL,TR), 1 right (TR,BR), 2 bottom (BR,BL), 3 left (BL,TL)
+        const pair: [number, number] =
+          idx === 0 ? [0, 1] : idx === 1 ? [1, 2] : idx === 2 ? [2, 3] : [3, 0];
+        for (const p of pair) {
+          next[p] = {
+            x: Math.max(-0.5, Math.min(1.5, startCorners[p].x + dx)),
+            y: Math.max(-0.5, Math.min(1.5, startCorners[p].y + dy)),
+          };
+        }
+      }
+      onCommit(next);
+    };
+    const onUp = (ev: PointerEvent) => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      try { target.releasePointerCapture(ev.pointerId); } catch {}
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
+  const handleStyle = (frac: { x: number; y: number }, isEdge: boolean): React.CSSProperties => ({
+    position: "absolute",
+    left: `${frac.x * 100}%`,
+    top: `${frac.y * 100}%`,
+    width: isEdge ? 10 : 12,
+    height: isEdge ? 10 : 12,
+    marginLeft: isEdge ? -5 : -6,
+    marginTop: isEdge ? -5 : -6,
+    background: isEdge ? "hsl(var(--accent-gold-soft))" : "hsl(var(--accent-gold))",
+    border: "1.5px solid white",
+    boxShadow: "0 1px 3px rgba(0,0,0,0.35)",
+    borderRadius: isEdge ? 999 : 2,
+    cursor: "grab",
+    touchAction: "none",
+    zIndex: 120,
+  });
+  return (
+    <>
+      {corners.map((c, i) => (
+        <div
+          key={`c${i}`}
+          data-hub-control
+          onPointerDown={(e) => startDrag("corner", i, e)}
+          style={handleStyle(c, false)}
+        />
+      ))}
+      {mids.map((c, i) => (
+        <div
+          key={`m${i}`}
+          data-hub-control
+          onPointerDown={(e) => startDrag("edge", i, e)}
+          style={handleStyle(c, true)}
+        />
+      ))}
+    </>
+  );
+}
+
+
 function ElementView({
   el,
   selected,
