@@ -3204,7 +3204,7 @@ function ElementView({
                   data-hub-control
                   onClick={(e) => {
                     e.stopPropagation();
-                    setPreview({ dxPct: 0, dyPct: 0, rotDeg: el.rotation ?? 0 });
+                    setPreview({ dxPx: 0, dyPx: 0, deltaDeg: 0, anchorFrac: { x: 0.5, y: 0.5 } });
                     setHubMode((m) => (m === "rotate" ? null : "rotate"));
                   }}
                   title="Drehen — Maus bewegen (Shift = 90°-Fang), dann klicken zum Setzen"
