@@ -5909,15 +5909,18 @@ function ElementInspector({
 function WarpInspectorControls({
   elementId,
   hasWarp,
+  axis,
+  onAxisChange,
   onReset,
 }: {
   elementId: string;
   hasWarp: boolean;
+  axis: "free" | "x" | "y";
+  onAxisChange: (a: "free" | "x" | "y") => void;
   onReset: () => void;
 }) {
   const active = useWarpTarget();
   const isActive = active === elementId;
-  // Beim Unmount (z. B. Element abgewählt) den globalen Warp-Modus aufheben.
   useEffect(() => {
     return () => {
       if (_isSelfActive()) setWarpTarget(null);
@@ -5925,11 +5928,29 @@ function WarpInspectorControls({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   function _isSelfActive() {
-    // Re-check via Store, weil `active` in Closure veraltet sein kann.
     return (typeof window !== "undefined") && (active === elementId);
   }
   return (
-    <div className="space-y-1.5">
+    <div
+      className="space-y-1.5 rounded-md border p-2"
+      style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
+    >
+      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+        Verzerren
+      </div>
+      <Row label="Achse">
+        <select
+          value={axis}
+          onChange={(e) => onAxisChange(e.target.value as "free" | "x" | "y")}
+          className="w-full h-8 px-2 rounded bg-transparent border text-[11px]"
+          style={{ borderColor: "hsl(var(--hairline))" }}
+          title="Beschränkt die Ziehrichtung der Ecken-/Kanten-Handles"
+        >
+          <option value="free">Frei (X + Y)</option>
+          <option value="x">Nur X (horizontal)</option>
+          <option value="y">Nur Y (vertikal)</option>
+        </select>
+      </Row>
       <button
         type="button"
         onClick={() => setWarpTarget(isActive ? null : elementId)}
@@ -5939,9 +5960,9 @@ function WarpInspectorControls({
           background: isActive ? "hsl(var(--accent-gold-soft))" : "transparent",
           color: "hsl(var(--ink))",
         }}
-        title="Ecken- und Kanten-Punkte einblenden und frei ziehen"
+        title="Ecken- und Kanten-Punkte einblenden und ziehen"
       >
-        {isActive ? "Verzerren beenden" : "Verzerren"}
+        {isActive ? "Verzerren beenden" : "Verzerren aktivieren"}
       </button>
       {hasWarp && (
         <button
