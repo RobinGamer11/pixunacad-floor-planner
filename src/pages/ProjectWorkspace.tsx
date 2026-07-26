@@ -3470,6 +3470,7 @@ function ElementView({
             const cursor =
               corner === "tl" || corner === "br" ? "nwse-resize" : "nesw-resize";
             const size = 12;
+            const glow = hoveredSnapKey === `corner-${corner}`;
             return (
               <div
                 key={corner}
@@ -3478,21 +3479,24 @@ function ElementView({
                 title={isCadView ? "Ecke ziehen: Kante trimmen/erweitern" : "Ecke skalieren (Shift: proportional)"}
                 className="absolute"
                 style={{
-                  [isTop ? "top" : "bottom"]: -Math.floor(size / 2),
-                  [isLeft ? "left" : "right"]: -Math.floor(size / 2),
-                  width: size,
-                  height: size,
+                  [isTop ? "top" : "bottom"]: -Math.floor((glow ? size + 4 : size) / 2),
+                  [isLeft ? "left" : "right"]: -Math.floor((glow ? size + 4 : size) / 2),
+                  width: glow ? size + 4 : size,
+                  height: glow ? size + 4 : size,
                   borderRadius: 999,
-                  background: "white",
+                  background: glow ? "hsl(var(--accent-gold))" : "white",
                   border: `2px solid hsl(var(--accent-gold))`,
-
-                  boxShadow: "0 1px 3px rgba(0,0,0,0.25)",
+                  boxShadow: glow
+                    ? "0 0 0 3px hsl(var(--accent-gold) / 0.35), 0 0 10px hsl(var(--accent-gold))"
+                    : "0 1px 3px rgba(0,0,0,0.25)",
+                  transition: "width 90ms, height 90ms, background 90ms, box-shadow 90ms",
                   cursor,
                   zIndex: 6,
                 } as React.CSSProperties}
               />
             );
           })}
+
         </>
 
       )}
