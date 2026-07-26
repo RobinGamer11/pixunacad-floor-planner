@@ -2903,6 +2903,16 @@ function ElementView({
   }>({ dxPx: 0, dyPx: 0, deltaDeg: 0, anchorFrac: { x: 0.5, y: 0.5 } });
   const previewRef = useRef(preview);
   previewRef.current = preview;
+  // "Carrying" = Objekt folgt aktiv der Maus. Linksklick während einer HUB-
+  // Aktion togglet diesen Zustand: dropt das Objekt an aktueller Preview-
+  // Position (carrying=false) bzw. nimmt es wieder auf (carrying=true).
+  // Commit passiert ausschließlich per ENTER oder Häkchen (Tablet).
+  const [carrying, setCarrying] = useState<boolean>(true);
+  const carryingRef = useRef(true);
+  carryingRef.current = carrying;
+  // Rechtsklick-Hilfslinien während einer HUB-Aktion (nur Preview, werden
+  // beim Commit/Cancel wieder verworfen). Koordinaten in Prozent der Seite.
+  const [guides, setGuides] = useState<Array<{ id: number; xPct: number; yPct: number }>>([]);
   // Edge-Trim: reine Vorschau (dxPx/dyPx). Commit erst bei Pointerup bzw.
   // — bei aktivem Tablet-Hilfsrad — beim Klick auf das Häkchen.
   const [edgeTrim, setEdgeTrim] = useState<{
