@@ -1198,9 +1198,28 @@ export const projectStore = {
                 pg.id === pageId
                   ? syncPageElementUnits({
                       ...pg,
-                      elements: pg.elements.map((e) =>
-                        e.id === elementId ? { ...e, ...patch } : e
-                      ),
+                      elements: pg.elements.map((e) => {
+                        if (e.id !== elementId) return e;
+                        const next: PageElement = { ...e, ...patch };
+                        const { wMm: pageW, hMm: pageH } = getPageSizeMm(pg);
+                        const patchWritesPct =
+                          typeof patch.x === "number" ||
+                          typeof patch.y === "number" ||
+                          typeof patch.w === "number" ||
+                          typeof patch.h === "number";
+                        const patchWritesMm =
+                          typeof patch.xMm === "number" ||
+                          typeof patch.yMm === "number" ||
+                          typeof patch.wMm === "number" ||
+                          typeof patch.hMm === "number";
+                        if (patchWritesPct && !patchWritesMm && pageW > 0 && pageH > 0) {
+                          if (typeof next.x === "number") next.xMm = (next.x / 100) * pageW;
+                          if (typeof next.y === "number") next.yMm = (next.y / 100) * pageH;
+                          if (typeof next.w === "number") next.wMm = (next.w / 100) * pageW;
+                          if (typeof next.h === "number") next.hMm = (next.h / 100) * pageH;
+                        }
+                        return next;
+                      }),
                     })
                   : pg
               ),
