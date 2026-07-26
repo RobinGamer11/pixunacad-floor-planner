@@ -3130,22 +3130,80 @@ function ElementView({
               right: 0,
               top: -36,
               background: "white",
-              border: `1px solid ${isCadView ? hubBlue : "hsl(var(--hairline))"}`,
+              border: `1px solid hsl(var(--hairline))`,
               padding: 3,
               zIndex: 10,
             }}
             onMouseDown={(e) => e.stopPropagation()}
             onPointerDown={(e) => e.stopPropagation()}
           >
-            <button
-              data-hub-control
-              onClick={(e) => { e.stopPropagation(); onRotate?.(15); }}
-              title="Drehen +15°"
-              className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
-              style={isCadView ? { color: hubBlue } : undefined}
-            >
-              <RotateCw size={14} />
-            </button>
+            {isCadView ? (
+              <>
+                <button
+                  data-hub-control
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setPreview({ dxPct: 0, dyPct: 0, rotDeg: el.rotation ?? 0 });
+                    setHubMode((m) => (m === "move" ? null : "move"));
+                  }}
+                  title="Verschieben — Maus bewegen, dann klicken zum Setzen (ESC bricht ab)"
+                  className={`h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))] ${hubMode === "move" ? "bg-[hsl(var(--surface-muted))]" : ""}`}
+                  style={{ color: hubMode === "move" ? "hsl(var(--accent-gold))" : undefined }}
+                >
+                  <Move size={14} />
+                </button>
+                <button
+                  data-hub-control
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setPreview({ dxPct: 0, dyPct: 0, rotDeg: el.rotation ?? 0 });
+                    setHubMode((m) => (m === "rotate" ? null : "rotate"));
+                  }}
+                  title="Drehen — Maus bewegen (Shift = 90°-Fang), dann klicken zum Setzen"
+                  className={`h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))] ${hubMode === "rotate" ? "bg-[hsl(var(--surface-muted))]" : ""}`}
+                  style={{ color: hubMode === "rotate" ? "hsl(var(--accent-gold))" : undefined }}
+                >
+                  <RotateCw size={14} />
+                </button>
+                {hubMode && tabletActive && (
+                  <button
+                    data-hub-control
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // Commit via synthetischen Klick — nutzt dieselbe Logik im Effect.
+                      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
+                    }}
+                    title="Bestätigen (Tablet)"
+                    className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
+                    style={{ color: "hsl(140 60% 40%)" }}
+                  >
+                    <Check size={14} />
+                  </button>
+                )}
+                {hubMode && (
+                  <button
+                    data-hub-control
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+                    }}
+                    title="Abbrechen"
+                    className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </>
+            ) : (
+              <button
+                data-hub-control
+                onClick={(e) => { e.stopPropagation(); onRotate?.(15); }}
+                title="Drehen +15°"
+                className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
+              >
+                <RotateCw size={14} />
+              </button>
+            )}
             {!isCadView && (
               <button
                 data-hub-control
@@ -3166,6 +3224,7 @@ function ElementView({
               <Trash2 size={14} />
             </button>
           </div>
+
 
           {/* Edge-Drag-Handles */}
           {(["top", "right", "bottom", "left"] as const).map((edge) => {
