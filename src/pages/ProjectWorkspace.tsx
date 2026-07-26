@@ -2808,6 +2808,53 @@ function ElementView({
   const isCadView = el.kind === "cad-view" || el.kind === "cad-viewport";
   const hubBlue = "hsl(217 91% 60%)";
 
+  // Explizite HUB-Modi für CAD-Blatt: erst nach Klick auf das Symbol wird
+  // Bewegen / Drehen aktiv. Preview läuft mit Fadenkreuz-Cursor; ein weiterer
+  // Klick auf der Seite commited an aktueller Position. Bei aktivem
+  // Tablet-Hilfsrad erscheint ein Häkchen-Button, der ebenfalls commited.
+  const [hubMode, setHubMode] = useState<null | "move" | "rotate">(null);
+  const [preview, setPreview] = useState<{ dxPct: number; dyPct: number; rotDeg: number }>(
+    { dxPct: 0, dyPct: 0, rotDeg: 0 }
+  );
+  const previewRef = useRef(preview);
+  previewRef.current = preview;
+  const [tabletActive, setTabletActive] = useState<boolean>(
+    () => typeof window !== "undefined" && !!(window as any).__pixunaTabletCommit
+  );
+  useEffect(() => {
+    const t = setInterval(() => {
+      setTabletActive(!!(window as any).__pixunaTabletCommit);
+    }, 300);
+    return () => clearInterval(t);
+  }, []);
+
+  // Snap-Ziele publizieren: Ecken + Kanten-Mittelpunkte in Prozent der Seite.
+  // Andere Werkzeuge im Seiteneditor können via window.__pixunaPageSnap
+  // konsumieren, um an diesen Punkten zu fangen.
+  useEffect(() => {
+    if (readOnly) return;
+    const w = window as any;
+    if (!w.__pixunaPageSnap) w.__pixunaPageSnap = new Map();
+    const corners = [
+      { x: el.x, y: el.y, type: "corner" as const },
+      { x: el.x + el.w, y: el.y, type: "corner" as const },
+      { x: el.x, y: el.y + el.h, type: "corner" as const },
+      { x: el.x + el.w, y: el.y + el.h, type: "corner" as const },
+    ];
+    const edges = [
+      { x: el.x + el.w / 2, y: el.y, type: "edge-mid" as const },
+      { x: el.x + el.w / 2, y: el.y + el.h, type: "edge-mid" as const },
+      { x: el.x, y: el.y + el.h / 2, type: "edge-mid" as const },
+      { x: el.x + el.w, y: el.y + el.h / 2, type: "edge-mid" as const },
+    ];
+    w.__pixunaPageSnap.set(el.id, { kind: el.kind, points: [...corners, ...edges] });
+    return () => {
+      try { w.__pixunaPageSnap?.delete(el.id); } catch {}
+    };
+  }, [el.id, el.kind, el.x, el.y, el.w, el.h, readOnly]);
+
+
+
 
   const startDrag = (e: React.PointerEvent) => {
     if (readOnly) return;
