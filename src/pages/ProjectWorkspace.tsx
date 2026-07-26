@@ -3320,30 +3320,51 @@ function ElementView({
           </div>
 
 
-          {/* Edge-Drag-Handles */}
+          {/* Edge-Drag-Handles: Preview beim Ziehen, Commit erst bei Pointerup
+             (bzw. Tablet-Häkchen). onEdgeDrag wird nur EINMAL mit dem Gesamt-
+             Delta gerufen — kein jitterndes Store-Update während der Bewegung. */}
           {(["top", "right", "bottom", "left"] as const).map((edge) => {
             const isHor = edge === "top" || edge === "bottom";
+            const isActive = edgeTrim?.edge === edge;
             const startEdgeDrag = (e: React.PointerEvent) => {
               if (!onEdgeDrag) return;
               e.stopPropagation();
               e.preventDefault();
               try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
-              let last = { x: e.clientX, y: e.clientY };
+              const start = { x: e.clientX, y: e.clientY };
+              setEdgeTrim({ edge, dxPx: 0, dyPx: 0 });
               const move = (ev: PointerEvent) => {
-                const dx = ev.clientX - last.x;
-                const dy = ev.clientY - last.y;
-                onEdgeDrag(edge, dx, dy);
-                last = { x: ev.clientX, y: ev.clientY };
+                setEdgeTrim({ edge, dxPx: ev.clientX - start.x, dyPx: ev.clientY - start.y });
+              };
+              const commit = () => {
+                const p = edgeTrimRef.current;
+                if (p && (p.dxPx !== 0 || p.dyPx !== 0)) {
+                  onEdgeDrag!(edge, p.dxPx, p.dyPx);
+                }
+                setEdgeTrim(null);
               };
               const up = (ev: PointerEvent) => {
                 try { (e.currentTarget as HTMLElement).releasePointerCapture(ev.pointerId); } catch {}
                 window.removeEventListener("pointermove", move);
                 window.removeEventListener("pointerup", up);
-                window.removeEventListener("pointercancel", up);
+                window.removeEventListener("pointercancel", cancelListener);
+                window.removeEventListener("keydown", key);
+                // Tablet-Modus: nicht sofort committen — auf Häkchen warten.
+                if ((window as any).__pixunaTabletCommit) {
+                  (window as any).__pixunaTabletCommit = commit;
+                  return;
+                }
+                commit();
+              };
+              const cancelListener = () => { setEdgeTrim(null); window.removeEventListener("pointermove", move); };
+              const key = (ev: KeyboardEvent) => {
+                if (ev.key === "Escape") { setEdgeTrim(null); window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); window.removeEventListener("keydown", key); }
+                else if (ev.key === "Enter") { commit(); window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); window.removeEventListener("keydown", key); }
               };
               window.addEventListener("pointermove", move);
               window.addEventListener("pointerup", up);
-              window.addEventListener("pointercancel", up);
+              window.addEventListener("pointercancel", cancelListener);
+              window.addEventListener("keydown", key);
             };
             const baseStyle: React.CSSProperties = {
               position: "absolute",
@@ -3356,6 +3377,7 @@ function ElementView({
               : { top: 0, bottom: 0, width: 8, [edge === "left" ? "left" : "right"]: -4 };
             const edgeStroke = "hsl(var(--accent-gold))";
             const EdgeSymbol = isHor ? ChevronsUpDown : ChevronsLeftRight;
+            const hoverGlow = hoveredSnapKey === `edge-mid-${edge}` || hoveredSnapKey === `edge-line-${edge}`;
             return (
               <div
                 key={edge}
@@ -3371,13 +3393,13 @@ function ElementView({
                   className="absolute"
                   style={
                     isHor
-                      ? { left: 0, right: 0, top: "50%", height: 2, transform: "translateY(-50%)", background: edgeStroke, opacity: 0.7 }
-                      : { top: 0, bottom: 0, left: "50%", width: 2, transform: "translateX(-50%)", background: edgeStroke, opacity: 0.7 }
+                      ? { left: 0, right: 0, top: "50%", height: hoverGlow || isActive ? 3 : 2, transform: "translateY(-50%)", background: edgeStroke, opacity: hoverGlow || isActive ? 1 : 0.7, boxShadow: hoverGlow ? `0 0 8px ${edgeStroke}` : undefined }
+                      : { top: 0, bottom: 0, left: "50%", width: hoverGlow || isActive ? 3 : 2, transform: "translateX(-50%)", background: edgeStroke, opacity: hoverGlow || isActive ? 1 : 0.7, boxShadow: hoverGlow ? `0 0 8px ${edgeStroke}` : undefined }
                   }
                 />
                 {isCadView && (
                   <div
-                    className="absolute flex items-center justify-center rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                    className={`absolute flex items-center justify-center rounded-full transition-opacity ${isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
                     style={{
                       width: 18,
                       height: 18,
@@ -3396,6 +3418,28 @@ function ElementView({
               </div>
             );
           })}
+
+          {/* Edge-Trim-Preview: gestricheltes Rechteck des künftigen Rahmens.
+             Wird nur beim aktiven Ziehen angezeigt und in Pixel-Deltas relativ
+             zum Element-Rand positioniert. */}
+          {edgeTrim && (() => {
+            const insetLeft   = edgeTrim.edge === "left"   ?  edgeTrim.dxPx : 0;
+            const insetRight  = edgeTrim.edge === "right"  ? -edgeTrim.dxPx : 0;
+            const insetTop    = edgeTrim.edge === "top"    ?  edgeTrim.dyPx : 0;
+            const insetBottom = edgeTrim.edge === "bottom" ? -edgeTrim.dyPx : 0;
+            return (
+              <div
+                className="absolute pointer-events-none"
+                style={{
+                  left: insetLeft, right: insetRight, top: insetTop, bottom: insetBottom,
+                  border: "1.5px dashed hsl(var(--accent-gold))",
+                  background: "hsl(var(--accent-gold) / 0.06)",
+                  zIndex: 7,
+                }}
+              />
+            );
+          })()}
+
 
           {/* Ecken-Handles: quadratisch + blau bei CAD-Blatt, sonst rund + gold */}
           {onCornerDrag && (["tl", "tr", "bl", "br"] as const).map((corner) => {
