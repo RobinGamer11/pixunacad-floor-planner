@@ -3594,7 +3594,7 @@ function ElementView({
 
           {/* Ecken-Handles: quadratisch + blau bei CAD-Blatt, sonst rund + gold */}
           {!tabletCommitOnly && (["tl", "tr", "bl", "br"] as const).map((corner) => {
-            // Bei CAD-Blatt: Ecken sind reine Snap-Marker (kein Trim/Resize).
+            // Bei CAD-Blatt: Ecken sind Snap-Marker + Anker-Setzer (kein Trim/Resize).
             // Bei anderen Elementen (image/pdf): Ecken skalieren wie gehabt.
             const cornerDraggable = !isCadView && !!onCornerDrag;
             const startCornerDrag = (e: React.PointerEvent) => {
@@ -3619,35 +3619,45 @@ function ElementView({
               window.addEventListener("pointerup", up);
               window.addEventListener("pointercancel", up);
             };
+            const cornerClickCad = (e: React.PointerEvent) => {
+              // Nur Anker setzen — kein Drag, keine Deselektion.
+              e.stopPropagation();
+              e.preventDefault();
+              const fx = corner === "tl" || corner === "bl" ? 0 : 1;
+              const fy = corner === "tl" || corner === "tr" ? 0 : 1;
+              anchorFracRef.current = { fx, fy, key: `corner-${corner}` };
+              onSelect?.({ shift: e.shiftKey });
+            };
             const isTop = corner === "tl" || corner === "tr";
             const isLeft = corner === "tl" || corner === "bl";
             const cursor = cornerDraggable
               ? (corner === "tl" || corner === "br" ? "nwse-resize" : "nesw-resize")
-              : "default";
+              : (isCadView ? "crosshair" : "default");
             const size = 12;
             const glow = hoveredSnapKey === `corner-${corner}`;
+            const isAnchor = isCadView && anchorFracRef.current?.key === `corner-${corner}`;
             return (
               <div
                 key={corner}
                 data-hub-control
-                onPointerDown={cornerDraggable ? startCornerDrag : undefined}
-                title={isCadView ? "Ecken-Fangpunkt" : "Ecke skalieren (Shift: proportional)"}
+                onPointerDown={cornerDraggable ? startCornerDrag : (isCadView ? cornerClickCad : undefined)}
+                title={isCadView ? "Fangpunkt / Anker für Verschieben & Drehen" : "Ecke skalieren (Shift: proportional)"}
                 className="absolute"
                 style={{
-                  [isTop ? "top" : "bottom"]: -Math.floor((glow ? size + 4 : size) / 2),
-                  [isLeft ? "left" : "right"]: -Math.floor((glow ? size + 4 : size) / 2),
-                  width: glow ? size + 4 : size,
-                  height: glow ? size + 4 : size,
+                  [isTop ? "top" : "bottom"]: -Math.floor(((glow || isAnchor) ? size + 4 : size) / 2),
+                  [isLeft ? "left" : "right"]: -Math.floor(((glow || isAnchor) ? size + 4 : size) / 2),
+                  width: (glow || isAnchor) ? size + 4 : size,
+                  height: (glow || isAnchor) ? size + 4 : size,
                   borderRadius: 999,
-                  background: glow ? "hsl(var(--accent-gold))" : "white",
+                  background: (glow || isAnchor) ? "hsl(var(--accent-gold))" : "white",
                   border: `2px solid hsl(var(--accent-gold))`,
-                  boxShadow: glow
+                  boxShadow: (glow || isAnchor)
                     ? "0 0 0 3px hsl(var(--accent-gold) / 0.35), 0 0 10px hsl(var(--accent-gold))"
                     : "0 1px 3px rgba(0,0,0,0.25)",
                   transition: "width 90ms, height 90ms, background 90ms, box-shadow 90ms",
                   cursor,
-                  pointerEvents: cornerDraggable ? "auto" : "none",
-                  zIndex: 6,
+                  pointerEvents: (cornerDraggable || isCadView) ? "auto" : "none",
+                  zIndex: 12,
                 } as React.CSSProperties}
               />
             );
