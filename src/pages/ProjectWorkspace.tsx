@@ -2810,8 +2810,10 @@ function ElementView({
   const rootRef = useRef<HTMLDivElement | null>(null);
   const rotateRef = useRef<HTMLDivElement | null>(null);
   const rotateMovedRef = useRef(false);
-  /** Zuletzt geklickter Punkt am Element (client-Koords) — Anker für Move/Rotate. */
-  const anchorPtRef = useRef<{ clientX: number; clientY: number } | null>(null);
+  /** Zuletzt geklickter Punkt — als Fraktion (0..1) INNERHALB des Elements.
+   *  Bleibt bei Zoom/Pan stabil, da wir clientX/Y erst zur Commit-/Move-Zeit
+   *  aus dem aktuellen Element-Rect ableiten. */
+  const anchorFracRef = useRef<{ fx: number; fy: number; key: string } | null>(null);
 
   const isCadView = el.kind === "cad-view" || el.kind === "cad-viewport";
   const hubBlue = "hsl(217 91% 60%)";
