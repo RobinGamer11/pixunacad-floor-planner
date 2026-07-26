@@ -2994,7 +2994,7 @@ function ElementView({
     if (nearX !== "m" && nearY !== "m") key = `corner-${nearY}${nearX}`;
     else if (nearX === "m" && nearY !== "m") key = nearY === "t" ? "edge-top" : "edge-bottom";
     else if (nearY === "m" && nearX !== "m") key = nearX === "l" ? "edge-left" : "edge-right";
-    anchorFracRef.current = { fx, fy, key };
+    setAnchor({ fx, fy, key });
     if ((isCadView && selected) || hubMode || edgeTrim) {
       onSelect?.({ shift: e.shiftKey });
       if (!key.startsWith("edge-")) setActiveEdge(null);
