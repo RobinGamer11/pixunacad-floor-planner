@@ -3290,37 +3290,41 @@ function ElementView({
 
       {showHub && (
         <>
-          {/* Rotation stem */}
-          <div
-            ref={rotateRef}
-            data-hub-control
-            onPointerDown={handleRotateStart}
-            title="Drehen (ziehen)"
-            className="absolute"
-            style={{
-              left: "50%",
-              top: -28,
-              transform: "translateX(-50%)",
-              width: 14,
-              height: 14,
-              borderRadius: 999,
-              background: "hsl(var(--accent-gold))",
-              border: "2px solid white",
-              boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
-              cursor: "grab",
-            }}
-          />
-          <div
-            className="absolute pointer-events-none"
-            style={{
-              left: "50%",
-              top: -14,
-              width: 1,
-              height: 14,
-              background: "hsl(var(--accent-gold))",
-              transform: "translateX(-50%)",
-            }}
-          />
+          {!tabletCommitOnly && (
+            <>
+              {/* Rotation stem */}
+              <div
+                ref={rotateRef}
+                data-hub-control
+                onPointerDown={handleRotateStart}
+                title="Drehen (ziehen)"
+                className="absolute"
+                style={{
+                  left: "50%",
+                  top: -28,
+                  transform: "translateX(-50%)",
+                  width: 14,
+                  height: 14,
+                  borderRadius: 999,
+                  background: "hsl(var(--accent-gold))",
+                  border: "2px solid white",
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
+                  cursor: "grab",
+                }}
+              />
+              <div
+                className="absolute pointer-events-none"
+                style={{
+                  left: "50%",
+                  top: -14,
+                  width: 1,
+                  height: 14,
+                  background: "hsl(var(--accent-gold))",
+                  transform: "translateX(-50%)",
+                }}
+              />
+            </>
+          )}
 
           {/* Hub action bar */}
           <div
@@ -3337,13 +3341,29 @@ function ElementView({
             onMouseDown={(e) => e.stopPropagation()}
             onPointerDown={(e) => e.stopPropagation()}
           >
-            {isCadView ? (
+            {tabletCommitOnly ? (
+              <button
+                data-hub-control
+                onClick={(e) => {
+                  e.stopPropagation();
+                  actionCommitRef.current?.();
+                }}
+                title="Bestätigen"
+                className="h-8 w-8 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
+                style={{ color: "hsl(140 60% 40%)" }}
+              >
+                <Check size={16} />
+              </button>
+            ) : isCadView ? (
               <>
                 <button
                   data-hub-control
                   onClick={(e) => {
                     e.stopPropagation();
+                    modeStartClientRef.current = { x: e.clientX, y: e.clientY };
                     setPreview({ dxPx: 0, dyPx: 0, deltaDeg: 0, anchorFrac: { x: 0.5, y: 0.5 } });
+                    setEdgeTrim(null);
+                    setActiveEdge(null);
                     setHubMode((m) => (m === "move" ? null : "move"));
                   }}
                   title="Verschieben — Maus bewegen, dann klicken zum Setzen (ESC bricht ab)"
@@ -3356,7 +3376,10 @@ function ElementView({
                   data-hub-control
                   onClick={(e) => {
                     e.stopPropagation();
+                    modeStartClientRef.current = { x: e.clientX, y: e.clientY };
                     setPreview({ dxPx: 0, dyPx: 0, deltaDeg: 0, anchorFrac: { x: 0.5, y: 0.5 } });
+                    setEdgeTrim(null);
+                    setActiveEdge(null);
                     setHubMode((m) => (m === "rotate" ? null : "rotate"));
                   }}
                   title="Drehen — Maus bewegen (Shift = 90°-Fang), dann klicken zum Setzen"
@@ -3370,8 +3393,7 @@ function ElementView({
                     data-hub-control
                     onClick={(e) => {
                       e.stopPropagation();
-                      // Commit via synthetischen Klick — nutzt dieselbe Logik im Effect.
-                      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
+                      actionCommitRef.current?.();
                     }}
                     title="Bestätigen (Tablet)"
                     className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
@@ -3385,7 +3407,7 @@ function ElementView({
                     data-hub-control
                     onClick={(e) => {
                       e.stopPropagation();
-                      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+                      actionCancelRef.current?.();
                     }}
                     title="Abbrechen"
                     className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
