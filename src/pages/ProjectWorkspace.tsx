@@ -3524,8 +3524,8 @@ function ElementView({
               zIndex: 5,
             };
             const sizeStyle: React.CSSProperties = isHor
-              ? { left: 0, right: 0, height: 8, [edge === "top" ? "top" : "bottom"]: -4 }
-              : { top: 0, bottom: 0, width: 8, [edge === "left" ? "left" : "right"]: -4 };
+              ? { left: 14, right: 14, height: 8, [edge === "top" ? "top" : "bottom"]: -4 }
+              : { top: 14, bottom: 14, width: 8, [edge === "left" ? "left" : "right"]: -4 };
             const edgeStroke = "hsl(var(--accent-gold))";
             const EdgeSymbol = isHor ? ChevronsUpDown : ChevronsLeftRight;
             const hoverGlow = hoveredSnapKey === `edge-mid-${edge}` || hoveredSnapKey === `edge-line-${edge}`;
