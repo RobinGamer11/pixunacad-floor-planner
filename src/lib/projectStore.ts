@@ -430,11 +430,12 @@ function migrateProject(p: Project): Project {
 }
 
 /** Stufe 3: Legacy `cad-view`-Elemente bekommen die neuen Viewport-Felder
- *  (scaleDen, modelCenterM, viewportRotationDeg) beim Laden befüllt, damit
- *  der Stufe-4-Live-Renderer sie ohne Sonderfälle konsumieren kann. Der Kind
- *  bleibt vorerst `cad-view` (Renderer-Kompat); erst wenn der Live-Renderer
- *  aktiv ist, wird beim ersten Schreiben auf `cad-viewport` umgestellt. */
+ *  (scaleDen, modelCenterM, viewportRotationDeg) beim Laden befüllt. Zusätzlich
+ *  wird — falls basePaperMm/baseScaleDen vorhanden — der Rahmen (wMm/hMm) aus
+ *  dem aktuellen scaleDen automatisch neu berechnet, damit veraltete Größen
+ *  aus Legacy-Datenständen nicht zu falschen Papier-Ausschnitten führen. */
 function migratePageViewports(page: ProjectPage): ProjectPage {
+  const { wMm: pageW, hMm: pageH } = getPageSizeMm(page);
   let changed = false;
   const elements = page.elements.map((el) => {
     if (el.kind !== "cad-view" && el.kind !== "cad-viewport") return el;
@@ -451,6 +452,35 @@ function migratePageViewports(page: ProjectPage): ProjectPage {
     if (typeof next.viewportRotationDeg !== "number") {
       next.viewportRotationDeg = typeof el.rotation === "number" ? el.rotation : 0;
       touched = true;
+    }
+    // Basis-Referenz für Rahmenberechnung: fehlt sie (Legacy), aus aktuellen
+    // Werten stempeln — künftige Maßstabsänderungen bleiben dann konsistent.
+    if (!next.basePaperMm && pageW > 0 && pageH > 0
+        && typeof el.w === "number" && typeof el.h === "number") {
+      next.basePaperMm = {
+        w: (el.w / 100) * pageW,
+        h: (el.h / 100) * pageH,
+      };
+      touched = true;
+    }
+    if (typeof next.baseScaleDen !== "number" || !(next.baseScaleDen > 0)) {
+      next.baseScaleDen = next.scaleDen;
+      touched = true;
+    }
+    // Auto-Recompute Rahmen: aktueller Papier-Ausschnitt = basePaperMm * baseScaleDen / scaleDen.
+    if (next.basePaperMm && next.baseScaleDen && next.scaleDen
+        && pageW > 0 && pageH > 0) {
+      const targetWmm = next.basePaperMm.w * (next.baseScaleDen / next.scaleDen);
+      const targetHmm = next.basePaperMm.h * (next.baseScaleDen / next.scaleDen);
+      const currentWmm = (typeof el.w === "number") ? (el.w / 100) * pageW : 0;
+      const currentHmm = (typeof el.h === "number") ? (el.h / 100) * pageH : 0;
+      if (Math.abs(targetWmm - currentWmm) > 0.25 || Math.abs(targetHmm - currentHmm) > 0.25) {
+        next.w = Math.max(0.5, Math.min(400, (targetWmm / pageW) * 100));
+        next.h = Math.max(0.5, Math.min(400, (targetHmm / pageH) * 100));
+        next.wMm = targetWmm;
+        next.hMm = targetHmm;
+        touched = true;
+      }
     }
     if (touched) changed = true;
     return touched ? next : el;
