@@ -3144,6 +3144,8 @@ function ElementView({
       setPreview({ dxPx: 0, dyPx: 0, deltaDeg: 0, anchorFrac: { x: 0.5, y: 0.5 } });
       setHubMode(null);
       setActiveEdge(null);
+      setGuides([]);
+      setCarrying(true);
       actionCommitRef.current = null;
       actionCancelRef.current = null;
       modeStartClientRef.current = null;
@@ -3153,6 +3155,8 @@ function ElementView({
       setPreview({ dxPx: 0, dyPx: 0, deltaDeg: 0, anchorFrac: { x: 0.5, y: 0.5 } });
       setHubMode(null);
       setActiveEdge(null);
+      setGuides([]);
+      setCarrying(true);
       actionCommitRef.current = null;
       actionCancelRef.current = null;
       modeStartClientRef.current = null;
