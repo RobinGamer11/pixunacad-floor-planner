@@ -4724,9 +4724,28 @@ function CadToolSection({
                       onCommit={(next) => {
                         if (!pageId) return;
                         const den = parseScaleDen(next);
+                        // Alten Nenner konsistent aus dem Element (oder scale-String) ableiten.
+                        const prevDen = el.scaleDen ?? parseScaleDen(el.scale ?? sheet?.scale ?? "1:100");
+                        if (!(den > 0) || prevDen === den) {
+                          // Trotzdem scale/scaleDen synchron halten (falls sie gedriftet waren).
+                          projectStore.updateElement(projectId, pageId, el.id, {
+                            scale: `1:${den}`,
+                            scaleDen: den,
+                            lastSyncAt: new Date().toISOString(),
+                          });
+                          return;
+                        }
+                        // Der Rahmen des platzierten CAD-Blatts entspricht dem Papier­ausschnitt.
+                        // Da paperMm = modelM * 1000 / scaleDen konstant für dieselbe Modellfläche gilt,
+                        // skaliert die Rahmengröße mit dem Verhältnis prevDen / den.
+                        const ratio = prevDen / den;
+                        const nextW = Math.max(0.5, Math.min(400, (el.w ?? 0) * ratio));
+                        const nextH = Math.max(0.5, Math.min(400, (el.h ?? 0) * ratio));
                         projectStore.updateElement(projectId, pageId, el.id, {
                           scale: `1:${den}`,
                           scaleDen: den,
+                          w: nextW,
+                          h: nextH,
                           lastSyncAt: new Date().toISOString(),
                         });
                       }}
