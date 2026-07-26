@@ -3440,7 +3440,7 @@ function ElementView({
                 <Copy size={14} />
               </button>
             )}
-            {!tabletCommitOnly && (
+            {!tabletCommitOnly && !hasActiveCadAction && (
               <button
                 data-hub-control
                 onClick={(e) => { e.stopPropagation(); onDelete?.(); }}
