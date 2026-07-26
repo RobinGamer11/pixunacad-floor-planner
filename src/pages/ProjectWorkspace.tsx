@@ -2951,30 +2951,28 @@ function ElementView({
   const outlineStyle = selected ? "2px solid hsl(var(--accent-gold))" : "none";
 
   // Preview-Interaktion (Move/Rotate) — startet bei aktivem hubMode.
-  // Anker = zuletzt geklickter Punkt (anchorPtRef); fällt auf Element-Mitte
-  // zurück, wenn keiner gesetzt ist. Move: Element folgt der Maus so, dass
-  // der Anker unter dem Cursor bleibt. Rotate: Drehung um den Anker.
+  // Anker = zuletzt geklickte Fraktion (anchorFracRef) INNERHALB des Elements.
+  // Wichtig: clientX/Y des Ankers werden bei jedem Event NEU aus dem aktuellen
+  // Element-Rect berechnet, damit Zoom/Pan des Workspaces den Bezug nicht kippen.
   useEffect(() => {
     if (!hubMode) return;
     const parent = rootRef.current?.parentElement as HTMLElement | null;
-    const parentRect = parent?.getBoundingClientRect();
-    const rect = rootRef.current?.getBoundingClientRect();
-    if (!parent || !parentRect || !rect) return;
-    const anchor = anchorPtRef.current ?? {
-      clientX: rect.left + rect.width / 2,
-      clientY: rect.top + rect.height / 2,
-    };
-    const anchorFrac = {
-      x: Math.max(0, Math.min(1, (anchor.clientX - rect.left) / Math.max(1, rect.width))),
-      y: Math.max(0, Math.min(1, (anchor.clientY - rect.top) / Math.max(1, rect.height))),
-    };
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
+    if (!parent) return;
+    const frac = anchorFracRef.current ?? { fx: 0.5, fy: 0.5, key: "interior" };
+    const anchorFrac = { x: frac.fx, y: frac.fy };
     const startRot = el.rotation ?? 0;
     let startAngle: number | null = null;
+    let downClient: { x: number; y: number } | null = null;
+
+    const liveAnchor = () => {
+      const r = rootRef.current!.getBoundingClientRect();
+      return { clientX: r.left + frac.fx * r.width, clientY: r.top + frac.fy * r.height, rect: r };
+    };
 
     const commit = () => {
       const p = previewRef.current;
+      const parentRect = parent.getBoundingClientRect();
+      const { clientX: ax, clientY: ay, rect } = liveAnchor();
       if (hubMode === "move") {
         const dxPct = (p.dxPx / Math.max(1, parentRect.width)) * 100;
         const dyPct = (p.dyPx / Math.max(1, parentRect.height)) * 100;
@@ -2983,18 +2981,17 @@ function ElementView({
           y: Math.max(0, Math.min(100 - (el.h ?? 0), el.y + dyPct)),
         });
       } else if (hubMode === "rotate") {
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
         const deltaRad = (p.deltaDeg * Math.PI) / 180;
-        // Neuer Mittelpunkt = Anker + R(δ) * (alterMittelpunkt - Anker)
-        const ox = centerX - anchor.clientX;
-        const oy = centerY - anchor.clientY;
+        const ox = centerX - ax;
+        const oy = centerY - ay;
         const cos = Math.cos(deltaRad);
         const sin = Math.sin(deltaRad);
-        const newCx = anchor.clientX + ox * cos - oy * sin;
-        const newCy = anchor.clientY + ox * sin + oy * cos;
-        const halfWpx = rect.width / 2;
-        const halfHpx = rect.height / 2;
-        const newLeftPx = newCx - halfWpx;
-        const newTopPx = newCy - halfHpx;
+        const newCx = ax + ox * cos - oy * sin;
+        const newCy = ay + ox * sin + oy * cos;
+        const newLeftPx = newCx - rect.width / 2;
+        const newTopPx = newCy - rect.height / 2;
         const newXPct = ((newLeftPx - parentRect.left) / Math.max(1, parentRect.width)) * 100;
         const newYPct = ((newTopPx - parentRect.top) / Math.max(1, parentRect.height)) * 100;
         onTransform?.({
@@ -3012,12 +3009,11 @@ function ElementView({
     };
 
     const onMove = (ev: PointerEvent) => {
+      const { clientX: ax, clientY: ay } = liveAnchor();
       if (hubMode === "move") {
-        const dxPx = ev.clientX - anchor.clientX;
-        const dyPx = ev.clientY - anchor.clientY;
-        setPreview({ dxPx, dyPx, deltaDeg: 0, anchorFrac });
+        setPreview({ dxPx: ev.clientX - ax, dyPx: ev.clientY - ay, deltaDeg: 0, anchorFrac });
       } else if (hubMode === "rotate") {
-        const a = (Math.atan2(ev.clientY - anchor.clientY, ev.clientX - anchor.clientX) * 180) / Math.PI;
+        const a = (Math.atan2(ev.clientY - ay, ev.clientX - ax) * 180) / Math.PI;
         if (startAngle === null) startAngle = a;
         let delta = a - startAngle;
         if (ev.shiftKey) {
@@ -3027,9 +3023,14 @@ function ElementView({
         setPreview({ dxPx: 0, dyPx: 0, deltaDeg: delta, anchorFrac });
       }
     };
+    const onDown = (ev: PointerEvent) => { downClient = { x: ev.clientX, y: ev.clientY }; };
     const onClick = (ev: MouseEvent) => {
       const t = ev.target as HTMLElement | null;
       if (t?.closest("[data-hub-control]")) return;
+      if (downClient && Math.hypot(ev.clientX - downClient.x, ev.clientY - downClient.y) > 4) {
+        downClient = null;
+        return;
+      }
       ev.preventDefault();
       ev.stopPropagation();
       commit();
@@ -3038,15 +3039,18 @@ function ElementView({
       if (ev.key === "Escape") cancel();
       else if (ev.key === "Enter") commit();
     };
+    window.addEventListener("pointerdown", onDown, true);
     window.addEventListener("pointermove", onMove);
     window.addEventListener("click", onClick, true);
     window.addEventListener("keydown", onKey);
     return () => {
+      window.removeEventListener("pointerdown", onDown, true);
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("click", onClick, true);
       window.removeEventListener("keydown", onKey);
     };
   }, [hubMode, el.x, el.y, el.w, el.h, el.rotation, onTransform]);
+
 
   const previewTransform = (() => {
     const parts: string[] = [];
