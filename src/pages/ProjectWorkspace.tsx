@@ -97,7 +97,7 @@ import { TabletAidWheel } from "@/components/TabletAidWheel";
 // Für "frei" enthält diese Tabelle nur die Default-Größe; individuelle Werte
 // aus page.customWidthMm/customHeightMm werden dort abgefragt, wo die reale
 // Seitengröße gebraucht wird (getPageSizeMm).
-import { PAPER_FORMATS as FORMAT_SIZES, getPageSizeMm } from "@/lib/paper";
+import { PAPER_FORMATS as FORMAT_SIZES, getPageSizeMm, parseScaleDen } from "@/lib/paper";
 
 export type PageTool = "guide" | "line" | "free" | "eraser" | "text" | "cad" | "pipette" | "hatch" | "document" | "table" | null;
 type LinePageTool = "line" | "free" | "eraser";
