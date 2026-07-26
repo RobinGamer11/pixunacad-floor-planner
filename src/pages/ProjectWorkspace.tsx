@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useRef, useEffect, useLayoutEffect } from "react";
+import { createPortal } from "react-dom";
 import { DragScrollDiv } from "@/components/DragScrollDiv";
 import { useNavigate, useParams } from "react-router-dom";
 import {
@@ -80,7 +81,8 @@ import {
 } from "@/lib/projectStore";
 import CadOverlayLayer from "@/components/page/CadOverlayLayer";
 import { CadDocumentInspector } from "@/components/page/CadDocumentInspector";
-import { CadIdPanelHost } from "@/components/page/CadIdPanelHost";
+// CadIdPanelHost bewusst entfernt — CAD-Blätter laufen jetzt regulär über
+// den LayersTab (Bezeichnungs-ID via layerName).
 import { PdfPageView } from "@/components/page/PdfPageView";
 import { TableElementView, TableModifyContext, TableFormulaPickContext, type FormulaFn } from "@/components/page/TableElementView";
 import { TableToolSettings } from "@/components/page/TableToolSettings";
@@ -2721,7 +2723,13 @@ function PageCanvas({
           onSelectionChange={onCadSelectionChange}
           onEngineReady={onCadEngineReady}
           externalDocs={page.elements
-            .filter((e) => e.kind === "pdf" || e.kind === "image" || e.kind === "cad-view" || e.kind === "cad-viewport")
+            // CAD-Blatt (cad-view/cad-viewport) NICHT als externalDoc an die
+            // Engine übergeben — sonst rendert die Engine eigene blaue Snap-
+            // Marker über den ElementView-Handles und blockiert deren Klicks.
+            // Die Snap-Ziele der CAD-Blätter werden ausschließlich über
+            // pageSnap (buildRectSnapEntry) publiziert und durch die
+            // (nun blau gestylten) ElementView-Handles visuell dargestellt.
+            .filter((e) => e.kind === "pdf" || e.kind === "image")
             .map((e) => ({
               id: e.id,
               xMM: ((e.x ?? 0) / 100) * fmt.w,
@@ -2897,6 +2905,16 @@ function ElementView({
   }>({ dxPx: 0, dyPx: 0, deltaDeg: 0, anchorFrac: { x: 0.5, y: 0.5 } });
   const previewRef = useRef(preview);
   previewRef.current = preview;
+  // "Carrying" = Objekt folgt aktiv der Maus. Linksklick während einer HUB-
+  // Aktion togglet diesen Zustand: dropt das Objekt an aktueller Preview-
+  // Position (carrying=false) bzw. nimmt es wieder auf (carrying=true).
+  // Commit passiert ausschließlich per ENTER oder Häkchen (Tablet).
+  const [carrying, setCarrying] = useState<boolean>(true);
+  const carryingRef = useRef(true);
+  carryingRef.current = carrying;
+  // Rechtsklick-Hilfslinien während einer HUB-Aktion (nur Preview, werden
+  // beim Commit/Cancel wieder verworfen). Koordinaten in Prozent der Seite.
+  const [guides, setGuides] = useState<Array<{ id: number; xPct: number; yPct: number }>>([]);
   // Edge-Trim: reine Vorschau (dxPx/dyPx). Commit erst bei Pointerup bzw.
   // — bei aktivem Tablet-Hilfsrad — beim Klick auf das Häkchen.
   const [edgeTrim, setEdgeTrim] = useState<{
@@ -3128,6 +3146,8 @@ function ElementView({
       setPreview({ dxPx: 0, dyPx: 0, deltaDeg: 0, anchorFrac: { x: 0.5, y: 0.5 } });
       setHubMode(null);
       setActiveEdge(null);
+      setGuides([]);
+      setCarrying(true);
       actionCommitRef.current = null;
       actionCancelRef.current = null;
       modeStartClientRef.current = null;
@@ -3137,6 +3157,8 @@ function ElementView({
       setPreview({ dxPx: 0, dyPx: 0, deltaDeg: 0, anchorFrac: { x: 0.5, y: 0.5 } });
       setHubMode(null);
       setActiveEdge(null);
+      setGuides([]);
+      setCarrying(true);
       actionCommitRef.current = null;
       actionCancelRef.current = null;
       modeStartClientRef.current = null;
@@ -3150,15 +3172,13 @@ function ElementView({
 
 
     const onMove = (ev: PointerEvent) => {
+      if (!carryingRef.current) return; // Objekt abgelegt — Preview eingefroren.
       const { clientX: ax, clientY: ay } = liveAnchor();
       const reg = getPageSnapRegistry();
       const pageRect = parent.getBoundingClientRect();
       if (hubMode === "move") {
         let dxPx = startClient ? ev.clientX - startClient.x : ev.clientX - ax;
         let dyPx = startClient ? ev.clientY - startClient.y : ev.clientY - ay;
-        // Snap: der Anker (also der zuletzt gewählte Punkt) sucht Fangpunkte
-        // aller ANDEREN Seiten-Elemente. Wenn im Toleranzbereich, wird der
-        // Delta so korrigiert, dass Anker exakt auf dem Snap-Ziel landet.
         const targetX = ax + dxPx;
         const targetY = ay + dyPx;
         const m = reg.queryNearest(targetX, targetY, pageRect, 10, [el.id]);
@@ -3188,25 +3208,53 @@ function ElementView({
     const onClick = (ev: MouseEvent) => {
       const t = ev.target as HTMLElement | null;
       if (t?.closest("[data-hub-control]")) return;
-      // Klicks während Move/Rotate NICHT committen und NICHT deselektieren.
-      // Setzen erst per Enter oder Häkchen-Symbol.
+      // Linksklick während Move/Rotate NICHT committen. Stattdessen
+      // togglen wir "carrying": Objekt bleibt an aktueller Preview-Position
+      // liegen bzw. wird wieder aufgenommen und folgt der Maus.
       ev.preventDefault();
       ev.stopPropagation();
+      if (hubMode === "move") {
+        if (carryingRef.current) {
+          // Ablegen: Preview einfrieren.
+          setCarrying(false);
+        } else {
+          // Wieder aufnehmen: startClient neu setzen, damit Anker exakt am Cursor sitzt.
+          modeStartClientRef.current = null;
+          setCarrying(true);
+        }
+      } else {
+        // Rotate: Klick bricht nicht ab und commited nicht.
+      }
       downClient = null;
     };
+    const onContext = (ev: MouseEvent) => {
+      // Rechtsklick während HUB-Aktion legt eine Hilfslinie durch den Punkt.
+      // Snap auf beliebige Ziele anderer Elemente wenn im Toleranzbereich.
+      const t = ev.target as HTMLElement | null;
+      if (t?.closest("[data-hub-control]")) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      const pageRect = parent.getBoundingClientRect();
+      const m = getPageSnapRegistry().queryNearest(ev.clientX, ev.clientY, pageRect, 12, [el.id]);
+      const xPct = m ? m.x : ((ev.clientX - pageRect.left) / Math.max(1, pageRect.width)) * 100;
+      const yPct = m ? m.y : ((ev.clientY - pageRect.top) / Math.max(1, pageRect.height)) * 100;
+      setGuides((g) => [...g, { id: Date.now() + Math.random(), xPct, yPct }]);
+    };
     const onKey = (ev: KeyboardEvent) => {
-      if (ev.key === "Escape") cancel();
-      else if (ev.key === "Enter") commit();
+      if (ev.key === "Escape") { ev.stopPropagation(); cancel(); }
+      else if (ev.key === "Enter") { ev.stopPropagation(); commit(); }
     };
     window.addEventListener("pointerdown", onDown, true);
     window.addEventListener("pointermove", onMove);
     window.addEventListener("click", onClick, true);
-    window.addEventListener("keydown", onKey);
+    window.addEventListener("contextmenu", onContext, true);
+    window.addEventListener("keydown", onKey, true);
     return () => {
       window.removeEventListener("pointerdown", onDown, true);
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("click", onClick, true);
-      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("contextmenu", onContext, true);
+      window.removeEventListener("keydown", onKey, true);
       if (actionCommitRef.current === commit) actionCommitRef.current = null;
       if (actionCancelRef.current === cancel) actionCancelRef.current = null;
     };
@@ -3577,7 +3625,7 @@ function ElementView({
             const sizeStyle: React.CSSProperties = isHor
               ? { left: 14, right: 14, height: 8, [edge === "top" ? "top" : "bottom"]: -4 }
               : { top: 14, bottom: 14, width: 8, [edge === "left" ? "left" : "right"]: -4 };
-            const edgeStroke = "hsl(var(--accent-gold))";
+            const edgeStroke = isCadView ? hubBlue : "hsl(var(--accent-gold))";
             const EdgeSymbol = isHor ? ChevronsUpDown : ChevronsLeftRight;
             const hoverGlow = hoveredSnapKey === `edge-mid-${edge}` || hoveredSnapKey === `edge-line-${edge}`;
             return (
@@ -3684,9 +3732,16 @@ function ElementView({
             const cursor = cornerDraggable
               ? (corner === "tl" || corner === "br" ? "nwse-resize" : "nesw-resize")
               : (isCadView ? "crosshair" : "default");
-            const size = 12;
+            const size = isCadView ? 14 : 12;
             const glow = hoveredSnapKey === `corner-${corner}`;
             const isAnchor = isCadView && anchorFracState?.key === `corner-${corner}`;
+            const stroke = isCadView ? hubBlue : "hsl(var(--accent-gold))";
+            const fill = isCadView
+              ? ((glow || isAnchor) ? hubBlue : "white")
+              : ((glow || isAnchor) ? "hsl(var(--accent-gold))" : "white");
+            const shadowActive = isCadView
+              ? `0 0 0 3px ${hubBlue}40, 0 0 10px ${hubBlue}`
+              : "0 0 0 3px hsl(var(--accent-gold) / 0.35), 0 0 10px hsl(var(--accent-gold))";
             return (
               <div
                 key={corner}
@@ -3699,16 +3754,14 @@ function ElementView({
                   [isLeft ? "left" : "right"]: -Math.floor(((glow || isAnchor) ? size + 4 : size) / 2),
                   width: (glow || isAnchor) ? size + 4 : size,
                   height: (glow || isAnchor) ? size + 4 : size,
-                  borderRadius: 999,
-                  background: (glow || isAnchor) ? "hsl(var(--accent-gold))" : "white",
-                  border: `2px solid hsl(var(--accent-gold))`,
-                  boxShadow: (glow || isAnchor)
-                    ? "0 0 0 3px hsl(var(--accent-gold) / 0.35), 0 0 10px hsl(var(--accent-gold))"
-                    : "0 1px 3px rgba(0,0,0,0.25)",
+                  borderRadius: isCadView ? 3 : 999,
+                  background: fill,
+                  border: `2px solid ${stroke}`,
+                  boxShadow: (glow || isAnchor) ? shadowActive : "0 1px 3px rgba(0,0,0,0.25)",
                   transition: "width 90ms, height 90ms, background 90ms, box-shadow 90ms",
                   cursor,
                   pointerEvents: (cornerDraggable || isCadView) ? "auto" : "none",
-                  zIndex: 12,
+                  zIndex: 15,
                 } as React.CSSProperties}
               />
             );
@@ -3716,6 +3769,27 @@ function ElementView({
 
         </>
 
+      )}
+
+      {/* Rechtsklick-Hilfslinien während einer HUB-Aktion. Werden per Portal
+         in das Seiten-Parent gerendert, damit sie über das gesamte Blatt
+         verlaufen. Werden beim Commit/Cancel automatisch geleert. */}
+      {isCadView && hubMode && guides.length > 0 && rootRef.current?.parentElement && createPortal(
+        <>
+          {guides.map((g) => (
+            <React.Fragment key={g.id}>
+              <div
+                className="absolute pointer-events-none"
+                style={{ left: 0, right: 0, top: `${g.yPct}%`, height: 0, borderTop: `1px dashed ${hubBlue}`, opacity: 0.7, zIndex: 900 }}
+              />
+              <div
+                className="absolute pointer-events-none"
+                style={{ top: 0, bottom: 0, left: `${g.xPct}%`, width: 0, borderLeft: `1px dashed ${hubBlue}`, opacity: 0.7, zIndex: 900 }}
+              />
+            </React.Fragment>
+          ))}
+        </>,
+        rootRef.current.parentElement,
       )}
     </div>
   );
@@ -3895,21 +3969,12 @@ function RightInspector({
             />
           )}
           {tab === "layers" && page && (
-            <div className="space-y-4">
-            {/* CAD-Ebenen (Bezeichnungs-ID) — 1:1 wie in der CAD-Oberfläche.
-                Verwaltet alle CAD-Objekte (Linien, Schraffuren, Texte,
-                Freihand, Dokumente, Wände, Maßketten) per Layer/Sichtbarkeit. */}
-            {cadEngine && <CadIdPanelHost engine={cadEngine} />}
-
-            {/* Projektmappen-Elemente (Notizen, Bilder, CAD-Blätter, …) —
-                Z-Order + Sichtbarkeit auf React-Ebene. */}
-              <LayersTab
-                projectId={projectId}
-                page={page}
-                selectedElementId={selectedElementId}
-                setSelectedElementId={setSelectedElementId}
-              />
-            </div>
+            <LayersTab
+              projectId={projectId}
+              page={page}
+              selectedElementId={selectedElementId}
+              setSelectedElementId={setSelectedElementId}
+            />
           )}
         </div>
       </DragScrollDiv>
@@ -5339,6 +5404,24 @@ function CadToolSection({
                     >
                       <Trash2 size={13} className="text-muted-foreground" />
                     </button>
+                  </div>
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="text-[11px] text-muted-foreground shrink-0">Bez.-ID</span>
+                    <input
+                      type="text"
+                      defaultValue={el.layerName ?? ""}
+                      placeholder={sheet?.name ?? "CAD-Ansicht"}
+                      onClick={(ev) => ev.stopPropagation()}
+                      onBlur={(ev) => {
+                        if (!pageId) return;
+                        const v = ev.target.value.trim();
+                        projectStore.updateElement(projectId, pageId, el.id, { layerName: v || undefined });
+                      }}
+                      onKeyDown={(ev) => { if (ev.key === "Enter") (ev.target as HTMLInputElement).blur(); }}
+                      className="flex-1 h-7 px-2 rounded bg-transparent border text-sm"
+                      style={{ borderColor: "hsl(var(--hairline))" }}
+                      title="Bezeichnungs-ID (Ebenenname) für die Ebenen-Ansicht."
+                    />
                   </div>
                 </div>
               );
