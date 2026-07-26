@@ -2994,6 +2994,27 @@ function WarpHandles({
   );
 }
 
+// Subscribed Wrapper: rendert die Warp-Handles nur, wenn dieses Element im
+// globalen Warp-Store als aktiv markiert ist (Toggle im ElementInspector).
+function WarpTargetHandles({
+  elementId,
+  corners,
+  containerRef,
+  onCommit,
+}: {
+  elementId: string;
+  corners?: WarpCorners;
+  containerRef: React.RefObject<HTMLElement>;
+  onCommit: (next: WarpCorners) => void;
+}) {
+  const active = useWarpTarget();
+  if (active !== elementId) return null;
+  const c = (corners && corners.length === 4 ? corners : IDENTITY_WARP) as WarpCorners;
+  return <WarpHandles corners={c} containerRef={containerRef} onCommit={onCommit} />;
+}
+
+
+
 
 function ElementView({
   el,
