@@ -5340,27 +5340,6 @@ function CadToolSection({
                       <Trash2 size={13} className="text-muted-foreground" />
                     </button>
                   </div>
-                  <div className="flex items-center gap-2 mt-2">
-                    <span className="text-[11px] text-muted-foreground">Ebene</span>
-                    <input
-                      type="text"
-                      defaultValue={el.layerName ?? ""}
-                      placeholder="z. B. Grundriss"
-                      onClick={(e) => e.stopPropagation()}
-                      onBlur={(e) => {
-                        if (!pageId) return;
-                        const v = e.target.value.trim();
-                        if (v === (el.layerName ?? "")) return;
-                        projectStore.updateElement(projectId, pageId, el.id, { layerName: v || undefined });
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-                      }}
-                      className="flex-1 h-7 px-2 rounded bg-transparent border text-sm"
-                      style={{ borderColor: "hsl(var(--hairline))" }}
-                      title="Ebenenname zur Gruppierung — CAD-Blätter derselben Ebene können später gemeinsam gesteuert werden."
-                    />
-                  </div>
                 </div>
               );
             })}
