@@ -1684,9 +1684,9 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           </button>
         </div>
 
-        <DragScrollDiv axis="both" className="flex-1 min-h-0 overflow-auto p-2 cursor-grab active:cursor-grabbing" style={{ display: rightTab === "settings" ? "block" : "none" }}>
-        {/* Settings area (scrollable) */}
-        <div className="flex-1 min-h-0 p-2 min-w-[320px]">
+        <DragScrollDiv axis="y" className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-2 cursor-grab active:cursor-grabbing" style={{ display: rightTab === "settings" ? "block" : "none" }}>
+        {/* Settings area (scrollable) — kompakter, keine horizontale Overflow-Falle. */}
+        <div className="flex-1 min-h-0 p-2 w-full">
           {/* Raster-Einstellungen */}
           {gridPanelOpen && (
             <div className="cad-settings-panel mb-2">
