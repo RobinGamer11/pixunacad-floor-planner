@@ -3016,8 +3016,27 @@ function ElementView({
 
     const onMove = (ev: PointerEvent) => {
       const { clientX: ax, clientY: ay } = liveAnchor();
+      const reg = getPageSnapRegistry();
+      const pageRect = parent.getBoundingClientRect();
       if (hubMode === "move") {
-        setPreview({ dxPx: ev.clientX - ax, dyPx: ev.clientY - ay, deltaDeg: 0, anchorFrac });
+        let dxPx = ev.clientX - ax;
+        let dyPx = ev.clientY - ay;
+        // Snap: der Anker (also der zuletzt gewählte Punkt) sucht Fangpunkte
+        // aller ANDEREN Seiten-Elemente. Wenn im Toleranzbereich, wird der
+        // Delta so korrigiert, dass Anker exakt auf dem Snap-Ziel landet.
+        const targetX = ev.clientX;
+        const targetY = ev.clientY;
+        const m = reg.queryNearest(targetX, targetY, pageRect, 10, [el.id]);
+        if (m) {
+          const snapPx = pageRect.left + (m.x / 100) * pageRect.width;
+          const snapPy = pageRect.top + (m.y / 100) * pageRect.height;
+          dxPx = snapPx - ax;
+          dyPx = snapPy - ay;
+          reg.setHover(m);
+        } else {
+          reg.setHover(null);
+        }
+        setPreview({ dxPx, dyPx, deltaDeg: 0, anchorFrac });
       } else if (hubMode === "rotate") {
         const a = (Math.atan2(ev.clientY - ay, ev.clientX - ax) * 180) / Math.PI;
         if (startAngle === null) startAngle = a;
@@ -3029,6 +3048,7 @@ function ElementView({
         setPreview({ dxPx: 0, dyPx: 0, deltaDeg: delta, anchorFrac });
       }
     };
+
     const onDown = (ev: PointerEvent) => { downClient = { x: ev.clientX, y: ev.clientY }; };
     const onClick = (ev: MouseEvent) => {
       const t = ev.target as HTMLElement | null;
