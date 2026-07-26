@@ -3929,8 +3929,8 @@ function RightInspector({
         </button>
       </div>
 
-      <DragScrollDiv axis="both" className="flex-1 min-h-0 overflow-auto p-2 cursor-grab active:cursor-grabbing">
-        <div className="min-w-[320px] space-y-2">
+      <DragScrollDiv axis="y" className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-2 cursor-grab active:cursor-grabbing">
+        <div className="min-w-0 space-y-2">
           {tab === "settings" && page && <PageSettings projectId={projectId} page={page} />}
           {tab === "tools" && (
             <ToolsTab
@@ -4025,9 +4025,9 @@ function TabButton({
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-[110px_1fr] items-center gap-3 text-sm">
-      <span className="text-muted-foreground">{label}</span>
-      <div>{children}</div>
+    <div className="grid grid-cols-[80px_minmax(0,1fr)] items-center gap-2 text-[11px]">
+      <span className="text-muted-foreground truncate">{label}</span>
+      <div className="min-w-0">{children}</div>
     </div>
   );
 }
@@ -4493,7 +4493,8 @@ function ToolsTab({
 
   const settingsTool = activeTool ?? selectedCadTool ?? null;
   return (
-    <div className="space-y-5">
+    <div className="space-y-3">
+
       {/* "Aktives Werkzeug"-Kopfzeile entfernt — der Nutzer weiß, welches
           Werkzeug er in der Rail angeklickt hat. */}
 
