@@ -3590,12 +3590,15 @@ function ElementView({
 
 
           {/* Ecken-Handles: quadratisch + blau bei CAD-Blatt, sonst rund + gold */}
-          {!tabletCommitOnly && onCornerDrag && (["tl", "tr", "bl", "br"] as const).map((corner) => {
+          {!tabletCommitOnly && (["tl", "tr", "bl", "br"] as const).map((corner) => {
+            // Bei CAD-Blatt: Ecken sind reine Snap-Marker (kein Trim/Resize).
+            // Bei anderen Elementen (image/pdf): Ecken skalieren wie gehabt.
+            const cornerDraggable = !isCadView && !!onCornerDrag;
             const startCornerDrag = (e: React.PointerEvent) => {
+              if (!cornerDraggable || !onCornerDrag) return;
               e.stopPropagation();
               e.preventDefault();
               try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
-              if (!onCornerDrag) return;
               let last = { x: e.clientX, y: e.clientY };
               const move = (ev: PointerEvent) => {
                 const dx = ev.clientX - last.x;
@@ -3615,16 +3618,17 @@ function ElementView({
             };
             const isTop = corner === "tl" || corner === "tr";
             const isLeft = corner === "tl" || corner === "bl";
-            const cursor =
-              corner === "tl" || corner === "br" ? "nwse-resize" : "nesw-resize";
+            const cursor = cornerDraggable
+              ? (corner === "tl" || corner === "br" ? "nwse-resize" : "nesw-resize")
+              : "default";
             const size = 12;
             const glow = hoveredSnapKey === `corner-${corner}`;
             return (
               <div
                 key={corner}
                 data-hub-control
-                onPointerDown={startCornerDrag}
-                title={isCadView ? "Ecke ziehen: Kante trimmen/erweitern" : "Ecke skalieren (Shift: proportional)"}
+                onPointerDown={cornerDraggable ? startCornerDrag : undefined}
+                title={isCadView ? "Ecken-Fangpunkt" : "Ecke skalieren (Shift: proportional)"}
                 className="absolute"
                 style={{
                   [isTop ? "top" : "bottom"]: -Math.floor((glow ? size + 4 : size) / 2),
@@ -3639,6 +3643,7 @@ function ElementView({
                     : "0 1px 3px rgba(0,0,0,0.25)",
                   transition: "width 90ms, height 90ms, background 90ms, box-shadow 90ms",
                   cursor,
+                  pointerEvents: cornerDraggable ? "auto" : "none",
                   zIndex: 6,
                 } as React.CSSProperties}
               />
