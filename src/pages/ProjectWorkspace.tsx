@@ -4493,7 +4493,8 @@ function ToolsTab({
 
   const settingsTool = activeTool ?? selectedCadTool ?? null;
   return (
-    <div className="space-y-5">
+    <div className="space-y-3">
+
       {/* "Aktives Werkzeug"-Kopfzeile entfernt — der Nutzer weiß, welches
           Werkzeug er in der Rail angeklickt hat. */}
 
