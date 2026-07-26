@@ -488,7 +488,11 @@ export default function ProjectWorkspace() {
   // werden ausschließlich dort verwaltet — kein separates Viewport-Inspektor-
   // Panel mehr.
   useEffect(() => {
-    if (!selectedElement) return;
+    if (!selectedElement) {
+      // Deselektiert → wenn CAD-Blatt-Werkzeug offen war, zurück auf Auswahl.
+      if (activeTool === "cad") setActiveTool(null);
+      return;
+    }
     const isCadViewport = selectedElement.kind === "cad-view" || selectedElement.kind === "cad-viewport";
     if (isCadViewport) {
       if (activeTool !== "cad") setActiveTool("cad");
