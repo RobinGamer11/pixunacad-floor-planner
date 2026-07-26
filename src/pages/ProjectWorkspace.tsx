@@ -2698,7 +2698,7 @@ function PageCanvas({
           onSelectionChange={onCadSelectionChange}
           onEngineReady={onCadEngineReady}
           externalDocs={page.elements
-            .filter((e) => e.kind === "pdf" || e.kind === "image")
+            .filter((e) => e.kind === "pdf" || e.kind === "image" || e.kind === "cad-view" || e.kind === "cad-viewport")
             .map((e) => ({
               id: e.id,
               xMM: ((e.x ?? 0) / 100) * fmt.w,
