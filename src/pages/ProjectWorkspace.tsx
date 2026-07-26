@@ -2977,6 +2977,7 @@ function WarpHandles({
     borderRadius: isEdge ? 999 : 2,
     cursor: "grab",
     touchAction: "none",
+    pointerEvents: "auto",
     zIndex: 120,
   });
   return (
