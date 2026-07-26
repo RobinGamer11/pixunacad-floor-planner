@@ -5872,6 +5872,14 @@ function ElementInspector({
         />
       </Row>
 
+      {(element.kind === "image" || element.kind === "pdf") && (
+        <WarpInspectorControls
+          elementId={element.id}
+          hasWarp={isWarped(element.warpCorners)}
+          onReset={() => update({ warpCorners: undefined })}
+        />
+      )}
+
       {/* CAD-Viewport-Inspektor entfernt: Maßstab, Aktualisieren und Löschen
           für platzierte CAD-Blätter liegen ausschließlich im „CAD-Blatt"-
           Werkzeug (Auto-Open bei Auswahl). */}
