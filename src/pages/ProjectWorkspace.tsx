@@ -3170,15 +3170,13 @@ function ElementView({
 
 
     const onMove = (ev: PointerEvent) => {
+      if (!carryingRef.current) return; // Objekt abgelegt — Preview eingefroren.
       const { clientX: ax, clientY: ay } = liveAnchor();
       const reg = getPageSnapRegistry();
       const pageRect = parent.getBoundingClientRect();
       if (hubMode === "move") {
         let dxPx = startClient ? ev.clientX - startClient.x : ev.clientX - ax;
         let dyPx = startClient ? ev.clientY - startClient.y : ev.clientY - ay;
-        // Snap: der Anker (also der zuletzt gewählte Punkt) sucht Fangpunkte
-        // aller ANDEREN Seiten-Elemente. Wenn im Toleranzbereich, wird der
-        // Delta so korrigiert, dass Anker exakt auf dem Snap-Ziel landet.
         const targetX = ax + dxPx;
         const targetY = ay + dyPx;
         const m = reg.queryNearest(targetX, targetY, pageRect, 10, [el.id]);
@@ -3208,25 +3206,53 @@ function ElementView({
     const onClick = (ev: MouseEvent) => {
       const t = ev.target as HTMLElement | null;
       if (t?.closest("[data-hub-control]")) return;
-      // Klicks während Move/Rotate NICHT committen und NICHT deselektieren.
-      // Setzen erst per Enter oder Häkchen-Symbol.
+      // Linksklick während Move/Rotate NICHT committen. Stattdessen
+      // togglen wir "carrying": Objekt bleibt an aktueller Preview-Position
+      // liegen bzw. wird wieder aufgenommen und folgt der Maus.
       ev.preventDefault();
       ev.stopPropagation();
+      if (hubMode === "move") {
+        if (carryingRef.current) {
+          // Ablegen: Preview einfrieren.
+          setCarrying(false);
+        } else {
+          // Wieder aufnehmen: startClient neu setzen, damit Anker exakt am Cursor sitzt.
+          modeStartClientRef.current = null;
+          setCarrying(true);
+        }
+      } else {
+        // Rotate: Klick bricht nicht ab und commited nicht.
+      }
       downClient = null;
     };
+    const onContext = (ev: MouseEvent) => {
+      // Rechtsklick während HUB-Aktion legt eine Hilfslinie durch den Punkt.
+      // Snap auf beliebige Ziele anderer Elemente wenn im Toleranzbereich.
+      const t = ev.target as HTMLElement | null;
+      if (t?.closest("[data-hub-control]")) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      const pageRect = parent.getBoundingClientRect();
+      const m = getPageSnapRegistry().queryNearest(ev.clientX, ev.clientY, pageRect, 12, [el.id]);
+      const xPct = m ? m.x : ((ev.clientX - pageRect.left) / Math.max(1, pageRect.width)) * 100;
+      const yPct = m ? m.y : ((ev.clientY - pageRect.top) / Math.max(1, pageRect.height)) * 100;
+      setGuides((g) => [...g, { id: Date.now() + Math.random(), xPct, yPct }]);
+    };
     const onKey = (ev: KeyboardEvent) => {
-      if (ev.key === "Escape") cancel();
-      else if (ev.key === "Enter") commit();
+      if (ev.key === "Escape") { ev.stopPropagation(); cancel(); }
+      else if (ev.key === "Enter") { ev.stopPropagation(); commit(); }
     };
     window.addEventListener("pointerdown", onDown, true);
     window.addEventListener("pointermove", onMove);
     window.addEventListener("click", onClick, true);
-    window.addEventListener("keydown", onKey);
+    window.addEventListener("contextmenu", onContext, true);
+    window.addEventListener("keydown", onKey, true);
     return () => {
       window.removeEventListener("pointerdown", onDown, true);
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("click", onClick, true);
-      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("contextmenu", onContext, true);
+      window.removeEventListener("keydown", onKey, true);
       if (actionCommitRef.current === commit) actionCommitRef.current = null;
       if (actionCancelRef.current === cancel) actionCancelRef.current = null;
     };
