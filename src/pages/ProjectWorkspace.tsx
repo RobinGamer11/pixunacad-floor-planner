@@ -2524,20 +2524,55 @@ function PageCanvas({
               const dyPct = (dy / displayHeight) * 100;
               const patch: Partial<PageElement> = {};
               const minPct = 2;
+              const scaleDen = el.scaleDen ?? parseScaleDen(el.scale) ?? 100;
+              const center = el.modelCenterM ?? { x: 0, y: 0 };
+              let x = el.x;
+              let y = el.y;
+              let w = el.w;
+              let h = el.h;
               if (edge === "left") {
-                const newX = Math.max(0, el.x + dxPct);
-                const newW = Math.max(minPct, el.w - (newX - el.x));
-                patch.x = newX;
-                patch.w = newW;
+                const maxX = el.x + el.w - minPct;
+                const newX = Math.max(0, Math.min(maxX, el.x + dxPct));
+                x = newX;
+                w = Math.max(minPct, el.w - (newX - el.x));
               } else if (edge === "right") {
-                patch.w = Math.max(minPct, Math.min(100 - el.x, el.w + dxPct));
+                w = Math.max(minPct, Math.min(100 - el.x, el.w + dxPct));
               } else if (edge === "top") {
-                const newY = Math.max(0, el.y + dyPct);
-                const newH = Math.max(minPct, el.h - (newY - el.y));
-                patch.y = newY;
-                patch.h = newH;
+                const maxY = el.y + el.h - minPct;
+                const newY = Math.max(0, Math.min(maxY, el.y + dyPct));
+                y = newY;
+                h = Math.max(minPct, el.h - (newY - el.y));
               } else if (edge === "bottom") {
-                patch.h = Math.max(minPct, Math.min(100 - el.y, el.h + dyPct));
+                h = Math.max(minPct, Math.min(100 - el.y, el.h + dyPct));
+              }
+              patch.x = x;
+              patch.y = y;
+              patch.w = w;
+              patch.h = h;
+              if (el.kind === "cad-view" || el.kind === "cad-viewport") {
+                const oldLeftMm = (el.x / 100) * fmt.w;
+                const oldRightMm = ((el.x + el.w) / 100) * fmt.w;
+                const oldTopMm = (el.y / 100) * fmt.h;
+                const oldBottomMm = ((el.y + el.h) / 100) * fmt.h;
+                const newLeftMm = (x / 100) * fmt.w;
+                const newRightMm = ((x + w) / 100) * fmt.w;
+                const newTopMm = (y / 100) * fmt.h;
+                const newBottomMm = ((y + h) / 100) * fmt.h;
+                const deltaCenterMmX = ((newLeftMm + newRightMm) - (oldLeftMm + oldRightMm)) / 2;
+                const deltaCenterMmY = ((newTopMm + newBottomMm) - (oldTopMm + oldBottomMm)) / 2;
+                const nextWMm = (w / 100) * fmt.w;
+                const nextHMm = (h / 100) * fmt.h;
+                patch.modelCenterM = {
+                  x: center.x + (deltaCenterMmX * scaleDen) / 1000,
+                  y: center.y + (deltaCenterMmY * scaleDen) / 1000,
+                };
+                patch.basePaperMm = { w: nextWMm, h: nextHMm };
+                patch.baseScaleDen = scaleDen;
+                patch.wMm = nextWMm;
+                patch.hMm = nextHMm;
+                patch.xMm = (x / 100) * fmt.w;
+                patch.yMm = (y / 100) * fmt.h;
+                patch.lastSyncAt = new Date().toISOString();
               }
               projectStore.updateElement(projectId, page.id, el.id, patch);
             }}
@@ -2811,6 +2846,7 @@ function ElementView({
   const rootRef = useRef<HTMLDivElement | null>(null);
   const rotateRef = useRef<HTMLDivElement | null>(null);
   const rotateMovedRef = useRef(false);
+  const modeStartClientRef = useRef<{ x: number; y: number } | null>(null);
   /** Zuletzt geklickter Punkt — als Fraktion (0..1) INNERHALB des Elements.
    *  Bleibt bei Zoom/Pan stabil, da wir clientX/Y erst zur Commit-/Move-Zeit
    *  aus dem aktuellen Element-Rect ableiten. */
@@ -2838,6 +2874,9 @@ function ElementView({
   } | null>(null);
   const edgeTrimRef = useRef(edgeTrim);
   edgeTrimRef.current = edgeTrim;
+  const actionCommitRef = useRef<(() => void) | null>(null);
+  const actionCancelRef = useRef<(() => void) | null>(null);
+  const [activeEdge, setActiveEdge] = useState<"top" | "right" | "bottom" | "left" | null>(null);
   const [tabletActive, setTabletActive] = useState<boolean>(
     () => typeof window !== "undefined" && !!(window as any).__pixunaTabletCommit
   );
@@ -2869,6 +2908,38 @@ function ElementView({
     return () => window.removeEventListener("pixuna:page-snap-hover", onHover as EventListener);
   }, [el.id]);
 
+  useEffect(() => {
+    if (selected) return;
+    setHubMode(null);
+    setEdgeTrim(null);
+    setActiveEdge(null);
+    actionCommitRef.current = null;
+    actionCancelRef.current = null;
+    modeStartClientRef.current = null;
+    try { getPageSnapRegistry().setHover(null); } catch {}
+  }, [selected]);
+
+  useEffect(() => {
+    if (!edgeTrim) return;
+    const onKey = (ev: KeyboardEvent) => {
+      if (ev.key === "Escape") actionCancelRef.current?.();
+      else if (ev.key === "Enter") actionCommitRef.current?.();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [edgeTrim]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const active = !!hubMode || !!edgeTrim;
+    (window as any).__pixunaSkipFirstDraw = active;
+    return () => {
+      if ((window as any).__pixunaSkipFirstDraw === active) {
+        (window as any).__pixunaSkipFirstDraw = false;
+      }
+    };
+  }, [hubMode, edgeTrim]);
+
 
 
 
@@ -2885,6 +2956,7 @@ function ElementView({
       const dx = ev.clientX - dragRef.current.x;
       const dy = ev.clientY - dragRef.current.y;
       onDrag?.(dx, dy, ev.altKey);
+      dragRef.current = { x: ev.clientX, y: ev.clientY };
     };
     const handleUp = (ev: PointerEvent) => {
       dragRef.current = null;
@@ -2915,6 +2987,11 @@ function ElementView({
     else if (nearX === "m" && nearY !== "m") key = nearY === "t" ? "edge-top" : "edge-bottom";
     else if (nearY === "m" && nearX !== "m") key = nearX === "l" ? "edge-left" : "edge-right";
     anchorFracRef.current = { fx, fy, key };
+    if ((isCadView && selected) || hubMode || edgeTrim) {
+      onSelect?.({ shift: e.shiftKey });
+      if (!key.startsWith("edge-")) setActiveEdge(null);
+      return;
+    }
     startDrag(e);
   };
 
@@ -2967,11 +3044,22 @@ function ElementView({
     const frac = anchorFracRef.current ?? { fx: 0.5, fy: 0.5, key: "interior" };
     const anchorFrac = { x: frac.fx, y: frac.fy };
     const startRot = el.rotation ?? 0;
+    const startClient = modeStartClientRef.current;
     let startAngle: number | null = null;
     let downClient: { x: number; y: number } | null = null;
 
+    const baseRect = () => {
+      const pr = parent.getBoundingClientRect();
+      return {
+        left: pr.left + (el.x / 100) * pr.width,
+        top: pr.top + (el.y / 100) * pr.height,
+        width: (el.w / 100) * pr.width,
+        height: (el.h / 100) * pr.height,
+      };
+    };
+
     const liveAnchor = () => {
-      const r = rootRef.current!.getBoundingClientRect();
+      const r = baseRect();
       return { clientX: r.left + frac.fx * r.width, clientY: r.top + frac.fy * r.height, rect: r };
     };
 
@@ -3008,13 +3096,24 @@ function ElementView({
       }
       setPreview({ dxPx: 0, dyPx: 0, deltaDeg: 0, anchorFrac: { x: 0.5, y: 0.5 } });
       setHubMode(null);
+      setActiveEdge(null);
+      actionCommitRef.current = null;
+      actionCancelRef.current = null;
+      modeStartClientRef.current = null;
       try { getPageSnapRegistry().setHover(null); } catch {}
     };
     const cancel = () => {
       setPreview({ dxPx: 0, dyPx: 0, deltaDeg: 0, anchorFrac: { x: 0.5, y: 0.5 } });
       setHubMode(null);
+      setActiveEdge(null);
+      actionCommitRef.current = null;
+      actionCancelRef.current = null;
+      modeStartClientRef.current = null;
       try { getPageSnapRegistry().setHover(null); } catch {}
     };
+
+    actionCommitRef.current = commit;
+    actionCancelRef.current = cancel;
 
 
     const onMove = (ev: PointerEvent) => {
@@ -3022,13 +3121,13 @@ function ElementView({
       const reg = getPageSnapRegistry();
       const pageRect = parent.getBoundingClientRect();
       if (hubMode === "move") {
-        let dxPx = ev.clientX - ax;
-        let dyPx = ev.clientY - ay;
+        let dxPx = startClient ? ev.clientX - startClient.x : ev.clientX - ax;
+        let dyPx = startClient ? ev.clientY - startClient.y : ev.clientY - ay;
         // Snap: der Anker (also der zuletzt gewählte Punkt) sucht Fangpunkte
         // aller ANDEREN Seiten-Elemente. Wenn im Toleranzbereich, wird der
         // Delta so korrigiert, dass Anker exakt auf dem Snap-Ziel landet.
-        const targetX = ev.clientX;
-        const targetY = ev.clientY;
+        const targetX = ax + dxPx;
+        const targetY = ay + dyPx;
         const m = reg.queryNearest(targetX, targetY, pageRect, 10, [el.id]);
         if (m) {
           const snapPx = pageRect.left + (m.x / 100) * pageRect.width;
@@ -3077,6 +3176,8 @@ function ElementView({
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("click", onClick, true);
       window.removeEventListener("keydown", onKey);
+      if (actionCommitRef.current === commit) actionCommitRef.current = null;
+      if (actionCancelRef.current === cancel) actionCancelRef.current = null;
     };
   }, [hubMode, el.x, el.y, el.w, el.h, el.rotation, onTransform]);
 
@@ -3100,6 +3201,8 @@ function ElementView({
   const previewTransformOrigin: string | undefined = hubMode === "rotate"
     ? `${preview.anchorFrac.x * 100}% ${preview.anchorFrac.y * 100}%`
     : undefined;
+  const tabletCommitOnly = isCadView && tabletActive && (!!hubMode || !!edgeTrim);
+  const hasActiveCadAction = !!hubMode || !!edgeTrim;
 
   return (
     <div
@@ -3187,60 +3290,80 @@ function ElementView({
 
       {showHub && (
         <>
-          {/* Rotation stem */}
-          <div
-            ref={rotateRef}
-            data-hub-control
-            onPointerDown={handleRotateStart}
-            title="Drehen (ziehen)"
-            className="absolute"
-            style={{
-              left: "50%",
-              top: -28,
-              transform: "translateX(-50%)",
-              width: 14,
-              height: 14,
-              borderRadius: 999,
-              background: "hsl(var(--accent-gold))",
-              border: "2px solid white",
-              boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
-              cursor: "grab",
-            }}
-          />
-          <div
-            className="absolute pointer-events-none"
-            style={{
-              left: "50%",
-              top: -14,
-              width: 1,
-              height: 14,
-              background: "hsl(var(--accent-gold))",
-              transform: "translateX(-50%)",
-            }}
-          />
+          {!tabletCommitOnly && (
+            <>
+              {/* Rotation stem */}
+              <div
+                ref={rotateRef}
+                data-hub-control
+                onPointerDown={handleRotateStart}
+                title="Drehen (ziehen)"
+                className="absolute"
+                style={{
+                  left: "50%",
+                  top: -28,
+                  transform: "translateX(-50%)",
+                  width: 14,
+                  height: 14,
+                  borderRadius: 999,
+                  background: "hsl(var(--accent-gold))",
+                  border: "2px solid white",
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
+                  cursor: "grab",
+                }}
+              />
+              <div
+                className="absolute pointer-events-none"
+                style={{
+                  left: "50%",
+                  top: -14,
+                  width: 1,
+                  height: 14,
+                  background: "hsl(var(--accent-gold))",
+                  transform: "translateX(-50%)",
+                }}
+              />
+            </>
+          )}
 
           {/* Hub action bar */}
           <div
             data-hub-control
-            className="absolute flex items-center gap-1 rounded-md shadow-md"
+            className={`absolute flex items-center gap-1 rounded-md ${tabletCommitOnly ? "" : "shadow-md"}`}
             style={{
               right: 0,
               top: -36,
-              background: "white",
-              border: `1px solid hsl(var(--hairline))`,
-              padding: 3,
+              background: tabletCommitOnly ? "transparent" : "white",
+              border: tabletCommitOnly ? "none" : `1px solid hsl(var(--hairline))`,
+              padding: tabletCommitOnly ? 0 : 3,
               zIndex: 10,
             }}
             onMouseDown={(e) => e.stopPropagation()}
             onPointerDown={(e) => e.stopPropagation()}
           >
-            {isCadView ? (
+            {tabletCommitOnly ? (
+              <button
+                data-hub-control
+                onClick={(e) => {
+                  e.stopPropagation();
+                  actionCommitRef.current?.();
+                }}
+                title="Bestätigen"
+                className="h-9 w-9 inline-flex items-center justify-center rounded-full shadow-md hover:bg-[hsl(var(--surface-muted))]"
+                style={{ color: "hsl(140 60% 40%)", background: "white", border: "1px solid hsl(var(--hairline))" }}
+              >
+                <Check size={16} />
+              </button>
+            ) : isCadView ? (
               <>
                 <button
                   data-hub-control
                   onClick={(e) => {
                     e.stopPropagation();
+                    modeStartClientRef.current = { x: e.clientX, y: e.clientY };
                     setPreview({ dxPx: 0, dyPx: 0, deltaDeg: 0, anchorFrac: { x: 0.5, y: 0.5 } });
+                    setEdgeTrim(null);
+                    setActiveEdge(null);
                     setHubMode((m) => (m === "move" ? null : "move"));
                   }}
                   title="Verschieben — Maus bewegen, dann klicken zum Setzen (ESC bricht ab)"
@@ -3253,7 +3376,10 @@ function ElementView({
                   data-hub-control
                   onClick={(e) => {
                     e.stopPropagation();
+                    modeStartClientRef.current = { x: e.clientX, y: e.clientY };
                     setPreview({ dxPx: 0, dyPx: 0, deltaDeg: 0, anchorFrac: { x: 0.5, y: 0.5 } });
+                    setEdgeTrim(null);
+                    setActiveEdge(null);
                     setHubMode((m) => (m === "rotate" ? null : "rotate"));
                   }}
                   title="Drehen — Maus bewegen (Shift = 90°-Fang), dann klicken zum Setzen"
@@ -3267,8 +3393,7 @@ function ElementView({
                     data-hub-control
                     onClick={(e) => {
                       e.stopPropagation();
-                      // Commit via synthetischen Klick — nutzt dieselbe Logik im Effect.
-                      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
+                      actionCommitRef.current?.();
                     }}
                     title="Bestätigen (Tablet)"
                     className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
@@ -3282,7 +3407,7 @@ function ElementView({
                     data-hub-control
                     onClick={(e) => {
                       e.stopPropagation();
-                      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+                      actionCancelRef.current?.();
                     }}
                     title="Abbrechen"
                     className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
@@ -3301,7 +3426,7 @@ function ElementView({
                 <RotateCw size={14} />
               </button>
             )}
-            {!isCadView && (
+            {!tabletCommitOnly && !isCadView && (
               <button
                 data-hub-control
                 onClick={(e) => { e.stopPropagation(); onDuplicate?.(); }}
@@ -3311,31 +3436,40 @@ function ElementView({
                 <Copy size={14} />
               </button>
             )}
-            <button
-              data-hub-control
-              onClick={(e) => { e.stopPropagation(); onDelete?.(); }}
-              title="Löschen"
-              className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
-              style={{ color: "hsl(0 65% 50%)" }}
-            >
-              <Trash2 size={14} />
-            </button>
+            {!tabletCommitOnly && (
+              <button
+                data-hub-control
+                onClick={(e) => { e.stopPropagation(); onDelete?.(); }}
+                title="Löschen"
+                className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
+                style={{ color: "hsl(0 65% 50%)" }}
+              >
+                <Trash2 size={14} />
+              </button>
+            )}
           </div>
 
 
           {/* Edge-Drag-Handles: Preview beim Ziehen, Commit erst bei Pointerup
              (bzw. Tablet-Häkchen). onEdgeDrag wird nur EINMAL mit dem Gesamt-
              Delta gerufen — kein jitterndes Store-Update während der Bewegung. */}
-          {(["top", "right", "bottom", "left"] as const).map((edge) => {
+          {!tabletCommitOnly && (["top", "right", "bottom", "left"] as const).map((edge) => {
             const isHor = edge === "top" || edge === "bottom";
             const isActive = edgeTrim?.edge === edge;
+            const edgeReady = activeEdge === edge;
             const startEdgeDrag = (e: React.PointerEvent) => {
               if (!onEdgeDrag) return;
               e.stopPropagation();
               e.preventDefault();
+              if (isCadView && activeEdge !== edge && !edgeTrim) {
+                setActiveEdge(edge);
+                return;
+              }
               try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
               const start = { x: e.clientX, y: e.clientY };
               setEdgeTrim({ edge, dxPx: 0, dyPx: 0 });
+              setHubMode(null);
+              setActiveEdge(edge);
               const move = (ev: PointerEvent) => {
                 setEdgeTrim({ edge, dxPx: ev.clientX - start.x, dyPx: ev.clientY - start.y });
               };
@@ -3345,29 +3479,36 @@ function ElementView({
                   onEdgeDrag!(edge, p.dxPx, p.dyPx);
                 }
                 setEdgeTrim(null);
+                setActiveEdge(null);
+                actionCommitRef.current = null;
+                actionCancelRef.current = null;
               };
-              const up = (ev: PointerEvent) => {
+              const cancel = () => {
+                setEdgeTrim(null);
+                setActiveEdge(null);
+                actionCommitRef.current = null;
+                actionCancelRef.current = null;
+                window.removeEventListener("pointermove", move);
+                window.removeEventListener("pointerup", up);
+                window.removeEventListener("pointercancel", cancel);
+              };
+              actionCommitRef.current = commit;
+              actionCancelRef.current = cancel;
+              let up: (ev: PointerEvent) => void;
+              up = (ev: PointerEvent) => {
                 try { (e.currentTarget as HTMLElement).releasePointerCapture(ev.pointerId); } catch {}
                 window.removeEventListener("pointermove", move);
                 window.removeEventListener("pointerup", up);
-                window.removeEventListener("pointercancel", cancelListener);
-                window.removeEventListener("keydown", key);
+                window.removeEventListener("pointercancel", cancel);
                 // Tablet-Modus: nicht sofort committen — auf Häkchen warten.
                 if ((window as any).__pixunaTabletCommit) {
-                  (window as any).__pixunaTabletCommit = commit;
                   return;
                 }
                 commit();
               };
-              const cancelListener = () => { setEdgeTrim(null); window.removeEventListener("pointermove", move); };
-              const key = (ev: KeyboardEvent) => {
-                if (ev.key === "Escape") { setEdgeTrim(null); window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); window.removeEventListener("keydown", key); }
-                else if (ev.key === "Enter") { commit(); window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); window.removeEventListener("keydown", key); }
-              };
               window.addEventListener("pointermove", move);
               window.addEventListener("pointerup", up);
-              window.addEventListener("pointercancel", cancelListener);
-              window.addEventListener("keydown", key);
+              window.addEventListener("pointercancel", cancel);
             };
             const baseStyle: React.CSSProperties = {
               position: "absolute",
@@ -3396,13 +3537,13 @@ function ElementView({
                   className="absolute"
                   style={
                     isHor
-                      ? { left: 0, right: 0, top: "50%", height: hoverGlow || isActive ? 3 : 2, transform: "translateY(-50%)", background: edgeStroke, opacity: hoverGlow || isActive ? 1 : 0.7, boxShadow: hoverGlow ? `0 0 8px ${edgeStroke}` : undefined }
-                      : { top: 0, bottom: 0, left: "50%", width: hoverGlow || isActive ? 3 : 2, transform: "translateX(-50%)", background: edgeStroke, opacity: hoverGlow || isActive ? 1 : 0.7, boxShadow: hoverGlow ? `0 0 8px ${edgeStroke}` : undefined }
+                      ? { left: 0, right: 0, top: "50%", height: hoverGlow || isActive || edgeReady ? 3 : 2, transform: "translateY(-50%)", background: edgeStroke, opacity: hoverGlow || isActive || edgeReady ? 1 : 0.45, boxShadow: hoverGlow || edgeReady ? `0 0 8px ${edgeStroke}` : undefined }
+                      : { top: 0, bottom: 0, left: "50%", width: hoverGlow || isActive || edgeReady ? 3 : 2, transform: "translateX(-50%)", background: edgeStroke, opacity: hoverGlow || isActive || edgeReady ? 1 : 0.45, boxShadow: hoverGlow || edgeReady ? `0 0 8px ${edgeStroke}` : undefined }
                   }
                 />
                 {isCadView && (
                   <div
-                    className={`absolute flex items-center justify-center rounded-full transition-opacity ${isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
+                    className={`absolute flex items-center justify-center rounded-full transition-opacity ${isActive || edgeReady ? "opacity-100" : "opacity-0"}`}
                     style={{
                       width: 18,
                       height: 18,
@@ -3445,7 +3586,7 @@ function ElementView({
 
 
           {/* Ecken-Handles: quadratisch + blau bei CAD-Blatt, sonst rund + gold */}
-          {onCornerDrag && (["tl", "tr", "bl", "br"] as const).map((corner) => {
+          {!tabletCommitOnly && onCornerDrag && (["tl", "tr", "bl", "br"] as const).map((corner) => {
             const startCornerDrag = (e: React.PointerEvent) => {
               e.stopPropagation();
               e.preventDefault();
