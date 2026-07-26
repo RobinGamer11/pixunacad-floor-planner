@@ -5787,7 +5787,35 @@ function TasksTab({ project }: { project: import("@/lib/projectStore").Project }
   );
 }
 
-function LayersTab({
+/**
+ * Bridge: registriert einen `externalLabelCounter`-Callback am CAD-Engine,
+ * der PageElements mit `labelId` in die Bezeichnungs-ID-Zeilen einzählt.
+ * Kein separates Ebenen-Panel — ein einziges System für alles.
+ */
+function PageElementLabelCounterBridge({
+  engine,
+  page,
+}: {
+  engine: import("@/cad/embed/MiniCad").MiniCad;
+  page: import("@/lib/projectStore").ProjectPage;
+}) {
+  useEffect(() => {
+    const counts = new Map<string, number>();
+    for (const el of page.elements) {
+      if (!el.labelId) continue;
+      counts.set(el.labelId, (counts.get(el.labelId) ?? 0) + 1);
+    }
+    engine.externalLabelCounter = (labelId: string) => counts.get(labelId) ?? 0;
+    try { engine.refreshLabelUI(); } catch {}
+    return () => {
+      engine.externalLabelCounter = null;
+      try { engine.refreshLabelUI(); } catch {}
+    };
+  }, [engine, page.elements]);
+  return null;
+}
+
+
   projectId,
   page,
   selectedElementId,
