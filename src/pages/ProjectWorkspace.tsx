@@ -2910,10 +2910,12 @@ function WarpHandles({
   corners,
   containerRef,
   onCommit,
+  axis = "free",
 }: {
   corners: WarpCorners;
   containerRef: React.RefObject<HTMLElement>;
   onCommit: (next: WarpCorners) => void;
+  axis?: "free" | "x" | "y";
 }) {
   const mids = edgeMidpoints(corners);
   const startDrag = (kind: "corner" | "edge", idx: number, e: React.PointerEvent) => {
@@ -2927,8 +2929,10 @@ function WarpHandles({
     const startY = e.clientY;
     const startCorners = corners.map((c) => ({ ...c })) as WarpCorners;
     const onMove = (ev: PointerEvent) => {
-      const dx = (ev.clientX - startX) / rect.width;
-      const dy = (ev.clientY - startY) / rect.height;
+      let dx = (ev.clientX - startX) / rect.width;
+      let dy = (ev.clientY - startY) / rect.height;
+      if (axis === "x") dy = 0;
+      else if (axis === "y") dx = 0;
       const next = startCorners.map((c) => ({ ...c })) as WarpCorners;
       if (kind === "corner") {
         next[idx] = {
@@ -2936,7 +2940,6 @@ function WarpHandles({
           y: Math.max(-0.5, Math.min(1.5, startCorners[idx].y + dy)),
         };
       } else {
-        // Kante idx=0 top (TL,TR), 1 right (TR,BR), 2 bottom (BR,BL), 3 left (BL,TL)
         const pair: [number, number] =
           idx === 0 ? [0, 1] : idx === 1 ? [1, 2] : idx === 2 ? [2, 3] : [3, 0];
         for (const p of pair) {
