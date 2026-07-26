@@ -3023,6 +3023,24 @@ function WarpTargetHandles({
   return <WarpHandles corners={c} containerRef={containerRef} onCommit={onCommit} axis={axis ?? "free"} />;
 }
 
+// Kleiner Toggle-Button für die HUB-Actionbar: schaltet den Verzerren-Modus
+// für dieses Element ein/aus, ohne Umweg über den Inspector.
+function WarpHubButton({ elementId }: { elementId: string }) {
+  const active = useWarpTarget();
+  const isActive = active === elementId;
+  return (
+    <button
+      data-hub-control
+      onClick={(e) => { e.stopPropagation(); setWarpTarget(isActive ? null : elementId); }}
+      title={isActive ? "Verzerren beenden" : "Verzerren aktivieren"}
+      className={`h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))] ${isActive ? "bg-[hsl(var(--accent-gold-soft))]" : ""}`}
+      style={{ color: isActive ? "hsl(var(--accent-gold))" : undefined }}
+    >
+      <Spline size={14} />
+    </button>
+  );
+}
+
 
 
 
