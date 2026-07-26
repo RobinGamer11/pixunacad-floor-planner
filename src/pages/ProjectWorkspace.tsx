@@ -3333,18 +3333,33 @@ function ElementView({
             </>
           )}
 
-          {/* Hub action bar */}
+          {/* Hub action bar — bei CAD-Blatt am zuletzt gewählten Anker,
+             sonst wie gehabt oben rechts. */}
+          {(() => {
+            const anchored = isCadView && anchorFracState && anchorFracState.key !== "interior";
+            const hubStyle: React.CSSProperties = anchored
+              ? {
+                  left: `${anchorFracState!.fx * 100}%`,
+                  top: `${anchorFracState!.fy * 100}%`,
+                  transform: `translate(-50%, calc(-100% - 12px))`,
+                  background: tabletCommitOnly ? "transparent" : "white",
+                  border: tabletCommitOnly ? "none" : `1px solid hsl(var(--hairline))`,
+                  padding: tabletCommitOnly ? 0 : 3,
+                  zIndex: 10,
+                }
+              : {
+                  right: 0,
+                  top: -36,
+                  background: tabletCommitOnly ? "transparent" : "white",
+                  border: tabletCommitOnly ? "none" : `1px solid hsl(var(--hairline))`,
+                  padding: tabletCommitOnly ? 0 : 3,
+                  zIndex: 10,
+                };
+            return (
           <div
             data-hub-control
             className={`absolute flex items-center gap-1 rounded-md ${tabletCommitOnly ? "" : "shadow-md"}`}
-            style={{
-              right: 0,
-              top: -36,
-              background: tabletCommitOnly ? "transparent" : "white",
-              border: tabletCommitOnly ? "none" : `1px solid hsl(var(--hairline))`,
-              padding: tabletCommitOnly ? 0 : 3,
-              zIndex: 10,
-            }}
+            style={hubStyle}
             onMouseDown={(e) => e.stopPropagation()}
             onPointerDown={(e) => e.stopPropagation()}
           >
