@@ -103,6 +103,15 @@ import { TabletAidWheel } from "@/components/TabletAidWheel";
 // Seitengröße gebraucht wird (getPageSizeMm).
 import { PAPER_FORMATS as FORMAT_SIZES, getPageSizeMm, parseScaleDen } from "@/lib/paper";
 import { getPageSnapRegistry, buildRectSnapEntry } from "@/lib/pageSnap";
+import {
+  IDENTITY_WARP,
+  computeWarpMatrix3d,
+  edgeMidpoints,
+  isWarped,
+  setWarpTarget,
+  useWarpTarget,
+  type WarpCorners,
+} from "@/lib/warpMatrix";
 
 export type PageTool = "guide" | "line" | "free" | "eraser" | "text" | "cad" | "pipette" | "hatch" | "document" | "table" | null;
 type LinePageTool = "line" | "free" | "eraser";
