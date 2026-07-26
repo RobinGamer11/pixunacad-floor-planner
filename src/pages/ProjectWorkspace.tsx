@@ -5780,17 +5780,32 @@ function LayersTab({
   page,
   selectedElementId,
   setSelectedElementId,
+  cadEngine,
 }: {
   projectId: string;
   page: import("@/lib/projectStore").ProjectPage;
   selectedElementId?: string;
   setSelectedElementId: (id?: string) => void;
+  cadEngine?: import("@/cad/embed/MiniCad").MiniCad | null;
 }) {
   const [multi, setMulti] = useState<Set<string>>(new Set());
+  // 300ms-Refresh, damit umbenannte Bezeichnungs-IDs aus dem Panel hier durchschlagen.
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!cadEngine) return;
+    const id = window.setInterval(() => setTick((t) => t + 1), 400);
+    return () => window.clearInterval(id);
+  }, [cadEngine]);
   const groups = page.groups ?? [];
   const els = page.elements;
+  const labelGroups = cadEngine?.labelManager?.list?.() ?? [];
 
   const layerLabel = (el: PageElement) => {
+    // Bevorzugt der zugeordnete Bezeichnungs-ID-Name aus dem Engine-LabelManager.
+    if (el.labelId) {
+      const g = labelGroups.find((lg) => lg.id === el.labelId);
+      if (g) return g.name;
+    }
     if (el.layerName) return el.layerName;
     const kindMap: Record<string, string> = {
       text: "Text",
