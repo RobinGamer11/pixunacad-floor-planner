@@ -2921,16 +2921,19 @@ function WarpHandles({
   const startDrag = (kind: "corner" | "edge", idx: number, e: React.PointerEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    const target = e.currentTarget as HTMLElement;
-    target.setPointerCapture(e.pointerId);
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect || rect.width <= 0 || rect.height <= 0) return;
     const startX = e.clientX;
     const startY = e.clientY;
     const startCorners = corners.map((c) => ({ ...c })) as WarpCorners;
+    // Bewusst KEIN setPointerCapture auf dem Handle: React ersetzt das
+    // DOM-Element beim Re-Render nach onCommit — die Capture ginge verloren.
+    // document-Listener (capture-Phase) sind resilient dagegen.
+    const w = rect.width, h = rect.height;
     const onMove = (ev: PointerEvent) => {
-      let dx = (ev.clientX - startX) / rect.width;
-      let dy = (ev.clientY - startY) / rect.height;
+      ev.preventDefault();
+      let dx = (ev.clientX - startX) / w;
+      let dy = (ev.clientY - startY) / h;
       if (axis === "x") dy = 0;
       else if (axis === "y") dx = 0;
       const next = startCorners.map((c) => ({ ...c })) as WarpCorners;
@@ -2951,13 +2954,14 @@ function WarpHandles({
       }
       onCommit(next);
     };
-    const onUp = (ev: PointerEvent) => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-      try { target.releasePointerCapture(ev.pointerId); } catch {}
+    const onUp = () => {
+      document.removeEventListener("pointermove", onMove, true);
+      document.removeEventListener("pointerup", onUp, true);
+      document.removeEventListener("pointercancel", onUp, true);
     };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
+    document.addEventListener("pointermove", onMove, true);
+    document.addEventListener("pointerup", onUp, true);
+    document.addEventListener("pointercancel", onUp, true);
   };
   const handleStyle = (frac: { x: number; y: number }, isEdge: boolean): React.CSSProperties => ({
     position: "absolute",
@@ -2973,6 +2977,7 @@ function WarpHandles({
     borderRadius: isEdge ? 999 : 2,
     cursor: "grab",
     touchAction: "none",
+    pointerEvents: "auto",
     zIndex: 120,
   });
   return (
@@ -3016,6 +3021,24 @@ function WarpTargetHandles({
   if (active !== elementId) return null;
   const c = (corners && corners.length === 4 ? corners : IDENTITY_WARP) as WarpCorners;
   return <WarpHandles corners={c} containerRef={containerRef} onCommit={onCommit} axis={axis ?? "free"} />;
+}
+
+// Kleiner Toggle-Button für die HUB-Actionbar: schaltet den Verzerren-Modus
+// für dieses Element ein/aus, ohne Umweg über den Inspector.
+function WarpHubButton({ elementId }: { elementId: string }) {
+  const active = useWarpTarget();
+  const isActive = active === elementId;
+  return (
+    <button
+      data-hub-control
+      onClick={(e) => { e.stopPropagation(); setWarpTarget(isActive ? null : elementId); }}
+      title={isActive ? "Verzerren beenden" : "Verzerren aktivieren"}
+      className={`h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))] ${isActive ? "bg-[hsl(var(--accent-gold-soft))]" : ""}`}
+      style={{ color: isActive ? "hsl(var(--accent-gold))" : undefined }}
+    >
+      <Spline size={14} />
+    </button>
+  );
 }
 
 
@@ -3716,14 +3739,19 @@ function ElementView({
                 )}
               </>
             ) : (
-              <button
-                data-hub-control
-                onClick={(e) => { e.stopPropagation(); onRotate?.(15); }}
-                title="Drehen +15°"
-                className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
-              >
-                <RotateCw size={14} />
-              </button>
+              <>
+                <button
+                  data-hub-control
+                  onClick={(e) => { e.stopPropagation(); onRotate?.(15); }}
+                  title="Drehen +15°"
+                  className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
+                >
+                  <RotateCw size={14} />
+                </button>
+                {(el.kind === "image" || el.kind === "pdf") && (
+                  <WarpHubButton elementId={el.id} />
+                )}
+              </>
             )}
             {!tabletCommitOnly && !isCadView && (
               <button
