@@ -489,7 +489,7 @@ export default function ProjectWorkspace() {
     if (isCadViewport) {
       if (activeTool !== "cad") setActiveTool("cad");
       setPrintMode(false);
-      setRightTabState("settings");
+      setRightTabState("tools");
     } else if (activeTool === "cad") {
       // Wechsel zu Nicht-CAD-Element → CAD-Blatt-Werkzeug schließen,
       // damit der normale Element-Inspektor wieder erscheint.
@@ -4724,9 +4724,28 @@ function CadToolSection({
                       onCommit={(next) => {
                         if (!pageId) return;
                         const den = parseScaleDen(next);
+                        // Alten Nenner konsistent aus dem Element (oder scale-String) ableiten.
+                        const prevDen = el.scaleDen ?? parseScaleDen(el.scale ?? sheet?.scale ?? "1:100");
+                        if (!(den > 0) || prevDen === den) {
+                          // Trotzdem scale/scaleDen synchron halten (falls sie gedriftet waren).
+                          projectStore.updateElement(projectId, pageId, el.id, {
+                            scale: `1:${den}`,
+                            scaleDen: den,
+                            lastSyncAt: new Date().toISOString(),
+                          });
+                          return;
+                        }
+                        // Der Rahmen des platzierten CAD-Blatts entspricht dem Papier­ausschnitt.
+                        // Da paperMm = modelM * 1000 / scaleDen konstant für dieselbe Modellfläche gilt,
+                        // skaliert die Rahmengröße mit dem Verhältnis prevDen / den.
+                        const ratio = prevDen / den;
+                        const nextW = Math.max(0.5, Math.min(400, (el.w ?? 0) * ratio));
+                        const nextH = Math.max(0.5, Math.min(400, (el.h ?? 0) * ratio));
                         projectStore.updateElement(projectId, pageId, el.id, {
                           scale: `1:${den}`,
                           scaleDen: den,
+                          w: nextW,
+                          h: nextH,
                           lastSyncAt: new Date().toISOString(),
                         });
                       }}
@@ -4755,34 +4774,60 @@ function CadToolSection({
 }
 
 /** Freie Maßstabs-Eingabe für ein platziertes CAD-Blatt.
- *  Akzeptiert Formate wie "1:50", "50" oder "1/50". Default: 1:100. */
+ *  Akzeptiert ausschließlich Formate wie "1:50" (auch "50" oder "1/50" werden zu "1:50" normalisiert).
+ *  Zeigt bei ungültiger Eingabe eine schlichte Fehlermeldung unterhalb des Feldes. Default: 1:100. */
 function PlacedScaleInput({ value, onCommit }: { value: string; onCommit: (next: string) => void }) {
   const [draft, setDraft] = React.useState<string>(value);
-  React.useEffect(() => { setDraft(value); }, [value]);
-  const commit = () => {
-    const raw = (draft || "").trim();
-    if (!raw) { setDraft(value); return; }
-    const den = parseScaleDen(raw);
-    const normalized = `1:${den}`;
-    setDraft(normalized);
-    if (normalized !== value) onCommit(normalized);
+  const [error, setError] = React.useState<string | null>(null);
+  React.useEffect(() => { setDraft(value); setError(null); }, [value]);
+
+  // Erlaubt: "1:50", "1 : 50", "50", "1/50". Nenner 1..10000, Komma/Punkt zulässig.
+  type ValidateResult =
+    | { ok: true; normalized: string; den: number; message?: undefined }
+    | { ok: false; message: string; normalized?: undefined; den?: undefined };
+  const validate = (raw: string): ValidateResult => {
+    const s = (raw || "").trim();
+    if (!s) return { ok: false, message: "Bitte einen Maßstab eingeben, z. B. 1:100." };
+    const m = s.match(/^\s*(?:1\s*[:\/]\s*)?(\d+(?:[.,]\d+)?)\s*$/);
+    if (!m) return { ok: false, message: 'Ungültiges Format. Erlaubt: „1:50", „50" oder „1/50".' };
+    const den = parseFloat(m[1].replace(",", "."));
+    if (!(den > 0)) return { ok: false, message: "Nenner muss größer als 0 sein." };
+    if (den > 10000) return { ok: false, message: "Nenner ist zu groß (max. 10000)." };
+    const denStr = den % 1 === 0 ? String(den) : den.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+    return { ok: true, normalized: `1:${denStr}`, den };
   };
+
+  const commit = () => {
+    const res = validate(draft);
+    if (!res.ok) { setError(res.message ?? "Ungültige Eingabe."); return; }
+    setError(null);
+    setDraft(res.normalized!);
+    if (res.normalized !== value) onCommit(res.normalized!);
+  };
+
   return (
-    <input
-      type="text"
-      value={draft}
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={commit}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") { e.preventDefault(); (e.target as HTMLInputElement).blur(); }
-        if (e.key === "Escape") { setDraft(value); (e.target as HTMLInputElement).blur(); }
-      }}
-      onClick={(e) => e.stopPropagation()}
-      placeholder="1:100"
-      className="flex-1 h-7 px-2 rounded bg-transparent border text-sm tabular-nums"
-      style={{ borderColor: "hsl(var(--hairline))" }}
-      title='Maßstab frei eingeben, z. B. "1:50", "50" oder "1/75". Default 1:100.'
-    />
+    <div className="flex-1 flex flex-col gap-0.5" onClick={(e) => e.stopPropagation()}>
+      <input
+        type="text"
+        value={draft}
+        onChange={(e) => { setDraft(e.target.value); if (error) setError(null); }}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") { e.preventDefault(); (e.target as HTMLInputElement).blur(); }
+          if (e.key === "Escape") { setDraft(value); setError(null); (e.target as HTMLInputElement).blur(); }
+        }}
+        placeholder="1:100"
+        aria-invalid={!!error}
+        className="h-7 px-2 rounded bg-transparent border text-sm tabular-nums"
+        style={{ borderColor: error ? "hsl(var(--destructive, 0 84% 60%))" : "hsl(var(--hairline))" }}
+        title='Maßstab frei eingeben, z. B. "1:50", "50" oder "1/75". Default 1:100.'
+      />
+      {error && (
+        <span className="text-[10px] leading-tight" style={{ color: "hsl(var(--destructive, 0 84% 60%))" }}>
+          {error}
+        </span>
+      )}
+    </div>
   );
 }
 
