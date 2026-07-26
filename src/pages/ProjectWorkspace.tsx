@@ -4782,7 +4782,10 @@ function PlacedScaleInput({ value, onCommit }: { value: string; onCommit: (next:
   React.useEffect(() => { setDraft(value); setError(null); }, [value]);
 
   // Erlaubt: "1:50", "1 : 50", "50", "1/50". Nenner 1..10000, Komma/Punkt zulässig.
-  const validate = (raw: string): { ok: true; normalized: string; den: number } | { ok: false; message: string } => {
+  type ValidateResult =
+    | { ok: true; normalized: string; den: number; message?: undefined }
+    | { ok: false; message: string; normalized?: undefined; den?: undefined };
+  const validate = (raw: string): ValidateResult => {
     const s = (raw || "").trim();
     if (!s) return { ok: false, message: "Bitte einen Maßstab eingeben, z. B. 1:100." };
     const m = s.match(/^\s*(?:1\s*[:\/]\s*)?(\d+(?:[.,]\d+)?)\s*$/);
@@ -4790,15 +4793,16 @@ function PlacedScaleInput({ value, onCommit }: { value: string; onCommit: (next:
     const den = parseFloat(m[1].replace(",", "."));
     if (!(den > 0)) return { ok: false, message: "Nenner muss größer als 0 sein." };
     if (den > 10000) return { ok: false, message: "Nenner ist zu groß (max. 10000)." };
-    return { ok: true, normalized: `1:${den % 1 === 0 ? den : den.toFixed(2).replace(/0+$/, "").replace(/\.$/, "")}`, den };
+    const denStr = den % 1 === 0 ? String(den) : den.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+    return { ok: true, normalized: `1:${denStr}`, den };
   };
 
   const commit = () => {
     const res = validate(draft);
-    if (!res.ok) { setError(res.message); return; }
+    if (!res.ok) { setError(res.message ?? "Ungültige Eingabe."); return; }
     setError(null);
-    setDraft(res.normalized);
-    if (res.normalized !== value) onCommit(res.normalized);
+    setDraft(res.normalized!);
+    if (res.normalized !== value) onCommit(res.normalized!);
   };
 
   return (
