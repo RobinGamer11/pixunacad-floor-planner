@@ -2818,9 +2818,10 @@ function ElementView({
   // Klick auf der Seite commited an aktueller Position. Bei aktivem
   // Tablet-Hilfsrad erscheint ein Häkchen-Button, der ebenfalls commited.
   const [hubMode, setHubMode] = useState<null | "move" | "rotate">(null);
-  const [preview, setPreview] = useState<{ dxPct: number; dyPct: number; rotDeg: number }>(
-    { dxPct: 0, dyPct: 0, rotDeg: 0 }
-  );
+  const [preview, setPreview] = useState<{
+    dxPx: number; dyPx: number; deltaDeg: number;
+    anchorFrac: { x: number; y: number };
+  }>({ dxPx: 0, dyPx: 0, deltaDeg: 0, anchorFrac: { x: 0.5, y: 0.5 } });
   const previewRef = useRef(preview);
   previewRef.current = preview;
   const [tabletActive, setTabletActive] = useState<boolean>(
