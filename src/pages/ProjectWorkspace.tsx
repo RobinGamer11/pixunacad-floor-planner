@@ -3494,7 +3494,8 @@ function ElementView({
               };
               actionCommitRef.current = commit;
               actionCancelRef.current = cancel;
-              const up = (ev: PointerEvent) => {
+              let up: (ev: PointerEvent) => void;
+              up = (ev: PointerEvent) => {
                 try { (e.currentTarget as HTMLElement).releasePointerCapture(ev.pointerId); } catch {}
                 window.removeEventListener("pointermove", move);
                 window.removeEventListener("pointerup", up);
