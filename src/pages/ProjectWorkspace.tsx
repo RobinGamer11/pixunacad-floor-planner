@@ -3457,7 +3457,7 @@ function ElementView({
           {/* Edge-Drag-Handles: Preview beim Ziehen, Commit erst bei Pointerup
              (bzw. Tablet-Häkchen). onEdgeDrag wird nur EINMAL mit dem Gesamt-
              Delta gerufen — kein jitterndes Store-Update während der Bewegung. */}
-          {!tabletCommitOnly && (["top", "right", "bottom", "left"] as const).map((edge) => {
+          {!tabletCommitOnly && !hubMode && (["top", "right", "bottom", "left"] as const).map((edge) => {
             const isHor = edge === "top" || edge === "bottom";
             const isActive = edgeTrim?.edge === edge;
             const edgeReady = activeEdge === edge;
