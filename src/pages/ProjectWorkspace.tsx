@@ -4482,7 +4482,7 @@ function ToolsTab({
         />
       )}
       {settingsTool === "document" && (
-        <DocumentToolSettings importing={!!documentImporting} onImport={onDocumentImport} scale={docScale ?? "1:100"} onScaleChange={onDocScaleChange} />
+        <DocumentToolSettings importing={!!documentImporting} onImport={onDocumentImport} scale={docScale ?? "1:100"} onScaleChange={onDocScaleChange} freePlace={!!docFreePlace} onFreePlaceChange={onDocFreePlaceChange} />
       )}
 
       {/* Tabellen-Werkzeug — Placement-Preview + Modifikation */}
