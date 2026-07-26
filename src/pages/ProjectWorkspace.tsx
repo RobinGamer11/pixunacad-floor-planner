@@ -3690,9 +3690,16 @@ function ElementView({
             const cursor = cornerDraggable
               ? (corner === "tl" || corner === "br" ? "nwse-resize" : "nesw-resize")
               : (isCadView ? "crosshair" : "default");
-            const size = 12;
+            const size = isCadView ? 14 : 12;
             const glow = hoveredSnapKey === `corner-${corner}`;
             const isAnchor = isCadView && anchorFracState?.key === `corner-${corner}`;
+            const stroke = isCadView ? hubBlue : "hsl(var(--accent-gold))";
+            const fill = isCadView
+              ? ((glow || isAnchor) ? hubBlue : "white")
+              : ((glow || isAnchor) ? "hsl(var(--accent-gold))" : "white");
+            const shadowActive = isCadView
+              ? `0 0 0 3px ${hubBlue}40, 0 0 10px ${hubBlue}`
+              : "0 0 0 3px hsl(var(--accent-gold) / 0.35), 0 0 10px hsl(var(--accent-gold))";
             return (
               <div
                 key={corner}
@@ -3705,16 +3712,14 @@ function ElementView({
                   [isLeft ? "left" : "right"]: -Math.floor(((glow || isAnchor) ? size + 4 : size) / 2),
                   width: (glow || isAnchor) ? size + 4 : size,
                   height: (glow || isAnchor) ? size + 4 : size,
-                  borderRadius: 999,
-                  background: (glow || isAnchor) ? "hsl(var(--accent-gold))" : "white",
-                  border: `2px solid hsl(var(--accent-gold))`,
-                  boxShadow: (glow || isAnchor)
-                    ? "0 0 0 3px hsl(var(--accent-gold) / 0.35), 0 0 10px hsl(var(--accent-gold))"
-                    : "0 1px 3px rgba(0,0,0,0.25)",
+                  borderRadius: isCadView ? 3 : 999,
+                  background: fill,
+                  border: `2px solid ${stroke}`,
+                  boxShadow: (glow || isAnchor) ? shadowActive : "0 1px 3px rgba(0,0,0,0.25)",
                   transition: "width 90ms, height 90ms, background 90ms, box-shadow 90ms",
                   cursor,
                   pointerEvents: (cornerDraggable || isCadView) ? "auto" : "none",
-                  zIndex: 12,
+                  zIndex: 15,
                 } as React.CSSProperties}
               />
             );
