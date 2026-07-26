@@ -2456,7 +2456,7 @@ function PageCanvas({
             key={el.id}
             el={el}
             onJumpCad={onJumpCad}
-
+            toolActive={activeTool !== null}
             selected={selectedElementIds.includes(el.id)}
             elevated={activeTool === null && el.kind !== "cad-view" && el.kind !== "cad-viewport" && el.kind !== "pdf" && el.kind !== "image"}
             onSelect={(opts) => onSelect(el.id, opts)}
@@ -2816,6 +2816,7 @@ function ElementView({
   selected,
   readOnly,
   elevated,
+  toolActive,
   onSelect,
   onDrag,
   onDuplicate,
@@ -2830,6 +2831,7 @@ function ElementView({
   selected?: boolean;
   readOnly?: boolean;
   elevated?: boolean;
+  toolActive?: boolean;
   onSelect?: (opts?: { shift?: boolean }) => void;
   onDrag?: (dx: number, dy: number, alt?: boolean) => void;
 
@@ -2849,8 +2851,14 @@ function ElementView({
   const modeStartClientRef = useRef<{ x: number; y: number } | null>(null);
   /** Zuletzt geklickter Punkt — als Fraktion (0..1) INNERHALB des Elements.
    *  Bleibt bei Zoom/Pan stabil, da wir clientX/Y erst zur Commit-/Move-Zeit
-   *  aus dem aktuellen Element-Rect ableiten. */
+   *  aus dem aktuellen Element-Rect ableiten. Als State, damit HUB neu
+   *  positioniert wird, wenn ein anderer Anker gewählt wurde. */
+  const [anchorFracState, setAnchorFracState] = useState<{ fx: number; fy: number; key: string } | null>(null);
   const anchorFracRef = useRef<{ fx: number; fy: number; key: string } | null>(null);
+  const setAnchor = (a: { fx: number; fy: number; key: string } | null) => {
+    anchorFracRef.current = a;
+    setAnchorFracState(a);
+  };
 
   const isCadView = el.kind === "cad-view" || el.kind === "cad-viewport";
   const hubBlue = "hsl(217 91% 60%)";
@@ -2986,7 +2994,7 @@ function ElementView({
     if (nearX !== "m" && nearY !== "m") key = `corner-${nearY}${nearX}`;
     else if (nearX === "m" && nearY !== "m") key = nearY === "t" ? "edge-top" : "edge-bottom";
     else if (nearY === "m" && nearX !== "m") key = nearX === "l" ? "edge-left" : "edge-right";
-    anchorFracRef.current = { fx, fy, key };
+    setAnchor({ fx, fy, key });
     if ((isCadView && selected) || hubMode || edgeTrim) {
       onSelect?.({ shift: e.shiftKey });
       if (!key.startsWith("edge-")) setActiveEdge(null);
@@ -3155,13 +3163,11 @@ function ElementView({
     const onClick = (ev: MouseEvent) => {
       const t = ev.target as HTMLElement | null;
       if (t?.closest("[data-hub-control]")) return;
-      if (downClient && Math.hypot(ev.clientX - downClient.x, ev.clientY - downClient.y) > 4) {
-        downClient = null;
-        return;
-      }
+      // Klicks während Move/Rotate NICHT committen und NICHT deselektieren.
+      // Setzen erst per Enter oder Häkchen-Symbol.
       ev.preventDefault();
       ev.stopPropagation();
-      commit();
+      downClient = null;
     };
     const onKey = (ev: KeyboardEvent) => {
       if (ev.key === "Escape") cancel();
@@ -3225,6 +3231,7 @@ function ElementView({
         transformOrigin: previewTransformOrigin ?? "center center",
         zIndex: isCadView ? (showHub ? 90 : 40) : (showHub ? 80 : (elevated ? 30 : undefined)),
         touchAction: "none",
+        pointerEvents: (isCadView && !selected && toolActive) ? "none" : undefined,
       }}
     >
 
@@ -3326,18 +3333,33 @@ function ElementView({
             </>
           )}
 
-          {/* Hub action bar */}
+          {/* Hub action bar — bei CAD-Blatt am zuletzt gewählten Anker,
+             sonst wie gehabt oben rechts. */}
+          {(() => {
+            const anchored = isCadView && anchorFracState && anchorFracState.key !== "interior";
+            const hubStyle: React.CSSProperties = anchored
+              ? {
+                  left: `${anchorFracState!.fx * 100}%`,
+                  top: `${anchorFracState!.fy * 100}%`,
+                  transform: `translate(-50%, calc(-100% - 12px))`,
+                  background: tabletCommitOnly ? "transparent" : "white",
+                  border: tabletCommitOnly ? "none" : `1px solid hsl(var(--hairline))`,
+                  padding: tabletCommitOnly ? 0 : 3,
+                  zIndex: 10,
+                }
+              : {
+                  right: 0,
+                  top: -36,
+                  background: tabletCommitOnly ? "transparent" : "white",
+                  border: tabletCommitOnly ? "none" : `1px solid hsl(var(--hairline))`,
+                  padding: tabletCommitOnly ? 0 : 3,
+                  zIndex: 10,
+                };
+            return (
           <div
             data-hub-control
             className={`absolute flex items-center gap-1 rounded-md ${tabletCommitOnly ? "" : "shadow-md"}`}
-            style={{
-              right: 0,
-              top: -36,
-              background: tabletCommitOnly ? "transparent" : "white",
-              border: tabletCommitOnly ? "none" : `1px solid hsl(var(--hairline))`,
-              padding: tabletCommitOnly ? 0 : 3,
-              zIndex: 10,
-            }}
+            style={hubStyle}
             onMouseDown={(e) => e.stopPropagation()}
             onPointerDown={(e) => e.stopPropagation()}
           >
@@ -3452,6 +3474,10 @@ function ElementView({
               </button>
             )}
           </div>
+            );
+          })()}
+
+
 
 
           {/* Edge-Drag-Handles: Preview beim Ziehen, Commit erst bei Pointerup
@@ -3521,8 +3547,8 @@ function ElementView({
               zIndex: 5,
             };
             const sizeStyle: React.CSSProperties = isHor
-              ? { left: 0, right: 0, height: 8, [edge === "top" ? "top" : "bottom"]: -4 }
-              : { top: 0, bottom: 0, width: 8, [edge === "left" ? "left" : "right"]: -4 };
+              ? { left: 14, right: 14, height: 8, [edge === "top" ? "top" : "bottom"]: -4 }
+              : { top: 14, bottom: 14, width: 8, [edge === "left" ? "left" : "right"]: -4 };
             const edgeStroke = "hsl(var(--accent-gold))";
             const EdgeSymbol = isHor ? ChevronsUpDown : ChevronsLeftRight;
             const hoverGlow = hoveredSnapKey === `edge-mid-${edge}` || hoveredSnapKey === `edge-line-${edge}`;
@@ -3591,7 +3617,7 @@ function ElementView({
 
           {/* Ecken-Handles: quadratisch + blau bei CAD-Blatt, sonst rund + gold */}
           {!tabletCommitOnly && (["tl", "tr", "bl", "br"] as const).map((corner) => {
-            // Bei CAD-Blatt: Ecken sind reine Snap-Marker (kein Trim/Resize).
+            // Bei CAD-Blatt: Ecken sind Snap-Marker + Anker-Setzer (kein Trim/Resize).
             // Bei anderen Elementen (image/pdf): Ecken skalieren wie gehabt.
             const cornerDraggable = !isCadView && !!onCornerDrag;
             const startCornerDrag = (e: React.PointerEvent) => {
@@ -3616,35 +3642,45 @@ function ElementView({
               window.addEventListener("pointerup", up);
               window.addEventListener("pointercancel", up);
             };
+            const cornerClickCad = (e: React.PointerEvent) => {
+              // Nur Anker setzen — kein Drag, keine Deselektion.
+              e.stopPropagation();
+              e.preventDefault();
+              const fx = corner === "tl" || corner === "bl" ? 0 : 1;
+              const fy = corner === "tl" || corner === "tr" ? 0 : 1;
+              setAnchor({ fx, fy, key: `corner-${corner}` });
+              onSelect?.({ shift: e.shiftKey });
+            };
             const isTop = corner === "tl" || corner === "tr";
             const isLeft = corner === "tl" || corner === "bl";
             const cursor = cornerDraggable
               ? (corner === "tl" || corner === "br" ? "nwse-resize" : "nesw-resize")
-              : "default";
+              : (isCadView ? "crosshair" : "default");
             const size = 12;
             const glow = hoveredSnapKey === `corner-${corner}`;
+            const isAnchor = isCadView && anchorFracState?.key === `corner-${corner}`;
             return (
               <div
                 key={corner}
                 data-hub-control
-                onPointerDown={cornerDraggable ? startCornerDrag : undefined}
-                title={isCadView ? "Ecken-Fangpunkt" : "Ecke skalieren (Shift: proportional)"}
+                onPointerDown={cornerDraggable ? startCornerDrag : (isCadView ? cornerClickCad : undefined)}
+                title={isCadView ? "Fangpunkt / Anker für Verschieben & Drehen" : "Ecke skalieren (Shift: proportional)"}
                 className="absolute"
                 style={{
-                  [isTop ? "top" : "bottom"]: -Math.floor((glow ? size + 4 : size) / 2),
-                  [isLeft ? "left" : "right"]: -Math.floor((glow ? size + 4 : size) / 2),
-                  width: glow ? size + 4 : size,
-                  height: glow ? size + 4 : size,
+                  [isTop ? "top" : "bottom"]: -Math.floor(((glow || isAnchor) ? size + 4 : size) / 2),
+                  [isLeft ? "left" : "right"]: -Math.floor(((glow || isAnchor) ? size + 4 : size) / 2),
+                  width: (glow || isAnchor) ? size + 4 : size,
+                  height: (glow || isAnchor) ? size + 4 : size,
                   borderRadius: 999,
-                  background: glow ? "hsl(var(--accent-gold))" : "white",
+                  background: (glow || isAnchor) ? "hsl(var(--accent-gold))" : "white",
                   border: `2px solid hsl(var(--accent-gold))`,
-                  boxShadow: glow
+                  boxShadow: (glow || isAnchor)
                     ? "0 0 0 3px hsl(var(--accent-gold) / 0.35), 0 0 10px hsl(var(--accent-gold))"
                     : "0 1px 3px rgba(0,0,0,0.25)",
                   transition: "width 90ms, height 90ms, background 90ms, box-shadow 90ms",
                   cursor,
-                  pointerEvents: cornerDraggable ? "auto" : "none",
-                  zIndex: 6,
+                  pointerEvents: (cornerDraggable || isCadView) ? "auto" : "none",
+                  zIndex: 12,
                 } as React.CSSProperties}
               />
             );
@@ -5263,6 +5299,27 @@ function CadToolSection({
                     >
                       <Trash2 size={13} className="text-muted-foreground" />
                     </button>
+                  </div>
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="text-[11px] text-muted-foreground">Ebene</span>
+                    <input
+                      type="text"
+                      defaultValue={el.layerName ?? ""}
+                      placeholder="z. B. Grundriss"
+                      onClick={(e) => e.stopPropagation()}
+                      onBlur={(e) => {
+                        if (!pageId) return;
+                        const v = e.target.value.trim();
+                        if (v === (el.layerName ?? "")) return;
+                        projectStore.updateElement(projectId, pageId, el.id, { layerName: v || undefined });
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                      }}
+                      className="flex-1 h-7 px-2 rounded bg-transparent border text-sm"
+                      style={{ borderColor: "hsl(var(--hairline))" }}
+                      title="Ebenenname zur Gruppierung — CAD-Blätter derselben Ebene können später gemeinsam gesteuert werden."
+                    />
                   </div>
                 </div>
               );
