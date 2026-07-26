@@ -2923,10 +2923,86 @@ function ElementView({
 
   const hubKinds = new Set(["cad-view", "cad-viewport", "pdf", "image"]);
   const showHub = !readOnly && selected && hubKinds.has(el.kind);
-  // CAD-Blatt behält nur die blaue Frame-Optik; Bearbeitung bleibt 1:1 wie PDF.
-  const outlineStyle = selected
-    ? (isCadView ? `2px dashed ${hubBlue}` : "2px solid hsl(var(--accent-gold))")
-    : "none";
+  // Optik: CAD-Blatt schlicht wie andere Werkzeuge (goldener Auswahlrahmen).
+  const outlineStyle = selected ? "2px solid hsl(var(--accent-gold))" : "none";
+
+  // Preview-Interaktion (Move/Rotate) — startet bei aktivem hubMode.
+  useEffect(() => {
+    if (!hubMode) return;
+    const parent = rootRef.current?.parentElement as HTMLElement | null;
+    const parentRect = parent?.getBoundingClientRect();
+    const rect = rootRef.current?.getBoundingClientRect();
+    if (!parent || !parentRect || !rect) return;
+    const startCx = rect.left + rect.width / 2;
+    const startCy = rect.top + rect.height / 2;
+    const startRot = el.rotation ?? 0;
+
+    const commit = () => {
+      const p = previewRef.current;
+      if (hubMode === "move") {
+        onTransform?.({
+          x: Math.max(0, Math.min(95, el.x + p.dxPct)),
+          y: Math.max(0, Math.min(95, el.y + p.dyPct)),
+        });
+      } else if (hubMode === "rotate") {
+        onTransform?.({ rotation: p.rotDeg });
+      }
+      setPreview({ dxPct: 0, dyPct: 0, rotDeg: 0 });
+      setHubMode(null);
+    };
+    const cancel = () => {
+      setPreview({ dxPct: 0, dyPct: 0, rotDeg: 0 });
+      setHubMode(null);
+    };
+
+    const onMove = (ev: PointerEvent) => {
+      if (hubMode === "move") {
+        const dxPct = ((ev.clientX - startCx) / parentRect.width) * 100;
+        const dyPct = ((ev.clientY - startCy) / parentRect.height) * 100;
+        setPreview({ dxPct, dyPct, rotDeg: startRot });
+      } else if (hubMode === "rotate") {
+        const a = Math.atan2(ev.clientY - startCy, ev.clientX - startCx) * 180 / Math.PI;
+        let deg = a + 90;
+        if (ev.shiftKey) deg = Math.round(deg / 90) * 90;
+        setPreview({ dxPct: 0, dyPct: 0, rotDeg: deg });
+      }
+    };
+    const onClick = (ev: MouseEvent) => {
+      const t = ev.target as HTMLElement | null;
+      if (t?.closest("[data-hub-control]")) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      commit();
+    };
+    const onKey = (ev: KeyboardEvent) => {
+      if (ev.key === "Escape") cancel();
+      else if (ev.key === "Enter") commit();
+    };
+    window.addEventListener("pointermove", onMove);
+    // 'click' im Capture, damit wir vor Selektions-Handlern feuern.
+    window.addEventListener("click", onClick, true);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("click", onClick, true);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [hubMode, el.x, el.y, el.rotation, onTransform]);
+
+  const previewTransform = (() => {
+    const parts: string[] = [];
+    if (preview.dxPct !== 0 || preview.dyPct !== 0) {
+      const parent = rootRef.current?.parentElement as HTMLElement | null;
+      if (parent) {
+        const pxDx = (preview.dxPct / 100) * parent.clientWidth;
+        const pxDy = (preview.dyPct / 100) * parent.clientHeight;
+        parts.push(`translate(${pxDx}px, ${pxDy}px)`);
+      }
+    }
+    const rot = hubMode === "rotate" ? preview.rotDeg : (el.rotation ?? 0);
+    if (rot) parts.push(`rotate(${rot}deg)`);
+    return parts.length ? parts.join(" ") : undefined;
+  })();
 
   return (
     <div
@@ -2940,17 +3016,18 @@ function ElementView({
         width: `${el.w}%`,
         height: `${el.h}%`,
         outline: outlineStyle,
-        outlineOffset: selected && isCadView ? "1px" : undefined,
-        cursor: readOnly || isCadView ? "default" : "move",
-        opacity: el.opacity ?? 1,
+        outlineOffset: selected ? "1px" : undefined,
+        cursor: readOnly ? "default" : (hubMode ? "crosshair" : (isCadView ? "default" : "move")),
+        opacity: hubMode ? 0.7 : (el.opacity ?? 1),
         boxShadow: el.shadow ? "0 8px 24px -8px rgba(0,0,0,0.25)" : undefined,
         border: el.border ? "1px solid hsl(var(--ink))" : undefined,
-        transform: el.rotation ? `rotate(${el.rotation}deg)` : undefined,
+        transform: previewTransform,
         transformOrigin: "center center",
         zIndex: isCadView ? (showHub ? 90 : 40) : (showHub ? 80 : (elevated ? 30 : undefined)),
         touchAction: "none",
       }}
     >
+
 
       {el.kind === "text" && (
         <div
