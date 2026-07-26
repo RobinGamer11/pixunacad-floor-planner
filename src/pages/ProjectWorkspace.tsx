@@ -3456,13 +3456,20 @@ function ElementView({
           {(["top", "right", "bottom", "left"] as const).map((edge) => {
             const isHor = edge === "top" || edge === "bottom";
             const isActive = edgeTrim?.edge === edge;
+            const edgeReady = activeEdge === edge;
             const startEdgeDrag = (e: React.PointerEvent) => {
               if (!onEdgeDrag) return;
               e.stopPropagation();
               e.preventDefault();
+              if (isCadView && activeEdge !== edge && !edgeTrim) {
+                setActiveEdge(edge);
+                return;
+              }
               try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
               const start = { x: e.clientX, y: e.clientY };
               setEdgeTrim({ edge, dxPx: 0, dyPx: 0 });
+              setHubMode(null);
+              setActiveEdge(edge);
               const move = (ev: PointerEvent) => {
                 setEdgeTrim({ edge, dxPx: ev.clientX - start.x, dyPx: ev.clientY - start.y });
               };
@@ -3472,29 +3479,35 @@ function ElementView({
                   onEdgeDrag!(edge, p.dxPx, p.dyPx);
                 }
                 setEdgeTrim(null);
+                setActiveEdge(null);
+                actionCommitRef.current = null;
+                actionCancelRef.current = null;
               };
+              const cancel = () => {
+                setEdgeTrim(null);
+                setActiveEdge(null);
+                actionCommitRef.current = null;
+                actionCancelRef.current = null;
+                window.removeEventListener("pointermove", move);
+                window.removeEventListener("pointerup", up);
+                window.removeEventListener("pointercancel", cancel);
+              };
+              actionCommitRef.current = commit;
+              actionCancelRef.current = cancel;
               const up = (ev: PointerEvent) => {
                 try { (e.currentTarget as HTMLElement).releasePointerCapture(ev.pointerId); } catch {}
                 window.removeEventListener("pointermove", move);
                 window.removeEventListener("pointerup", up);
-                window.removeEventListener("pointercancel", cancelListener);
-                window.removeEventListener("keydown", key);
+                window.removeEventListener("pointercancel", cancel);
                 // Tablet-Modus: nicht sofort committen — auf Häkchen warten.
                 if ((window as any).__pixunaTabletCommit) {
-                  (window as any).__pixunaTabletCommit = commit;
                   return;
                 }
                 commit();
               };
-              const cancelListener = () => { setEdgeTrim(null); window.removeEventListener("pointermove", move); };
-              const key = (ev: KeyboardEvent) => {
-                if (ev.key === "Escape") { setEdgeTrim(null); window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); window.removeEventListener("keydown", key); }
-                else if (ev.key === "Enter") { commit(); window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); window.removeEventListener("keydown", key); }
-              };
               window.addEventListener("pointermove", move);
               window.addEventListener("pointerup", up);
-              window.addEventListener("pointercancel", cancelListener);
-              window.addEventListener("keydown", key);
+              window.addEventListener("pointercancel", cancel);
             };
             const baseStyle: React.CSSProperties = {
               position: "absolute",
@@ -3523,13 +3536,13 @@ function ElementView({
                   className="absolute"
                   style={
                     isHor
-                      ? { left: 0, right: 0, top: "50%", height: hoverGlow || isActive ? 3 : 2, transform: "translateY(-50%)", background: edgeStroke, opacity: hoverGlow || isActive ? 1 : 0.7, boxShadow: hoverGlow ? `0 0 8px ${edgeStroke}` : undefined }
-                      : { top: 0, bottom: 0, left: "50%", width: hoverGlow || isActive ? 3 : 2, transform: "translateX(-50%)", background: edgeStroke, opacity: hoverGlow || isActive ? 1 : 0.7, boxShadow: hoverGlow ? `0 0 8px ${edgeStroke}` : undefined }
+                      ? { left: 0, right: 0, top: "50%", height: hoverGlow || isActive || edgeReady ? 3 : 2, transform: "translateY(-50%)", background: edgeStroke, opacity: hoverGlow || isActive || edgeReady ? 1 : 0.45, boxShadow: hoverGlow || edgeReady ? `0 0 8px ${edgeStroke}` : undefined }
+                      : { top: 0, bottom: 0, left: "50%", width: hoverGlow || isActive || edgeReady ? 3 : 2, transform: "translateX(-50%)", background: edgeStroke, opacity: hoverGlow || isActive || edgeReady ? 1 : 0.45, boxShadow: hoverGlow || edgeReady ? `0 0 8px ${edgeStroke}` : undefined }
                   }
                 />
                 {isCadView && (
                   <div
-                    className={`absolute flex items-center justify-center rounded-full transition-opacity ${isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
+                    className={`absolute flex items-center justify-center rounded-full transition-opacity ${isActive || edgeReady ? "opacity-100" : "opacity-0"}`}
                     style={{
                       width: 18,
                       height: 18,
