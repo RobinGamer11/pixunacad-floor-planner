@@ -61,6 +61,9 @@ import {
   Lock as LockIcon,
   Unlock as UnlockIcon,
   BoxSelect,
+  Scissors,
+  ChevronsUpDown,
+  ChevronsLeftRight,
   SquareDashed,
 } from "lucide-react";
 
