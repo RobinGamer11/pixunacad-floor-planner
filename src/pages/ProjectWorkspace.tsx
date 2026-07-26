@@ -3312,12 +3312,16 @@ function ElementView({
               ? { left: 0, right: 0, height: 8, [edge === "top" ? "top" : "bottom"]: -4 }
               : { top: 0, bottom: 0, width: 8, [edge === "left" ? "left" : "right"]: -4 };
             const edgeStroke = "hsl(var(--accent-gold))";
+            const EdgeSymbol = isHor ? ChevronsUpDown : ChevronsLeftRight;
             return (
               <div
                 key={edge}
                 data-hub-control
                 onPointerDown={startEdgeDrag}
-                title={`Kante ${edge} ziehen`}
+                title={isCadView
+                  ? `Kante ${edge}: nach außen ziehen erweitert den Ausschnitt, nach innen ziehen schneidet ab`
+                  : `Kante ${edge} ziehen`}
+                className="group"
                 style={{ ...baseStyle, ...sizeStyle }}
               >
                 <div
@@ -3328,6 +3332,24 @@ function ElementView({
                       : { top: 0, bottom: 0, left: "50%", width: 2, transform: "translateX(-50%)", background: edgeStroke, opacity: 0.7 }
                   }
                 />
+                {isCadView && (
+                  <div
+                    className="absolute flex items-center justify-center rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                    style={{
+                      width: 18,
+                      height: 18,
+                      background: "white",
+                      border: `1.5px solid ${edgeStroke}`,
+                      boxShadow: "0 1px 3px rgba(0,0,0,0.25)",
+                      color: edgeStroke,
+                      ...(isHor
+                        ? { left: "50%", top: "50%", transform: "translate(-50%, -50%)" }
+                        : { top: "50%", left: "50%", transform: "translate(-50%, -50%)" }),
+                    }}
+                  >
+                    <EdgeSymbol size={12} />
+                  </div>
+                )}
               </div>
             );
           })}
