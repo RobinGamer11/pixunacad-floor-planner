@@ -98,6 +98,9 @@ export interface PageElement {
    *  Vier Punkte in Fraktionen 0..1, Reihenfolge TL, TR, BR, BL.
    *  Fehlt = keine Verzerrung (Identität). */
   warpCorners?: { x: number; y: number }[];
+  /** Verzerr-Achse: `'free'` = beide Achsen frei, `'x'` = nur horizontal
+   *  (dx wirkt, dy = 0), `'y'` = nur vertikal. Default `'free'`. */
+  warpAxis?: "free" | "x" | "y";
 
   /** Tabellen-Datenmodell (kind === "table"). */
   tableData?: {
