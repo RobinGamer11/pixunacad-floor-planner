@@ -3629,7 +3629,7 @@ function ElementView({
               e.preventDefault();
               const fx = corner === "tl" || corner === "bl" ? 0 : 1;
               const fy = corner === "tl" || corner === "tr" ? 0 : 1;
-              anchorFracRef.current = { fx, fy, key: `corner-${corner}` };
+              setAnchor({ fx, fy, key: `corner-${corner}` });
               onSelect?.({ shift: e.shiftKey });
             };
             const isTop = corner === "tl" || corner === "tr";
