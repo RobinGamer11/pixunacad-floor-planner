@@ -156,6 +156,10 @@ export default function ProjectWorkspace() {
   // Ausgabemaßstab für neu importierte Dokumente. Wird rechts im
   // "Dokument"-Werkzeug-Panel als Dropdown ausgewählt (wie beim CAD-Blatt).
   const [docScale, setDocScale] = useState<string>("1:100");
+  // "Frei platzieren": Bei aktivem Toggle wird der Import-Maßstab beim Import
+  // automatisch so gewählt, dass das Dokument vollständig mit reichlich Rand
+  // auf der aktiven Seite liegt (überschreibt docScale nur für diesen Import).
+  const [docFreePlace, setDocFreePlace] = useState<boolean>(false);
   const [selectedElementIds, setSelectedElementIds] = useState<string[]>([]);
   // `selectedElementId` ist das ZULETZT angeklickte Element — alle bestehenden
   // Lese-Stellen (Inspector etc.) benutzen es weiterhin. Bei Multi-Auswahl
@@ -488,7 +492,11 @@ export default function ProjectWorkspace() {
   // werden ausschließlich dort verwaltet — kein separates Viewport-Inspektor-
   // Panel mehr.
   useEffect(() => {
-    if (!selectedElement) return;
+    if (!selectedElement) {
+      // Deselektiert → wenn CAD-Blatt-Werkzeug offen war, zurück auf Auswahl.
+      if (activeTool === "cad") setActiveTool(null);
+      return;
+    }
     const isCadViewport = selectedElement.kind === "cad-view" || selectedElement.kind === "cad-viewport";
     if (isCadViewport) {
       if (activeTool !== "cad") setActiveTool("cad");
@@ -534,8 +542,21 @@ export default function ProjectWorkspace() {
     if (!engine || pages.length === 0) return;
     const m = docScale.match(/^1\s*:\s*(\d+(?:[.,]\d+)?)$/);
     const parsed = m ? parseFloat(m[1].replace(",", ".")) : NaN;
-    const denom = Number.isFinite(parsed) && parsed > 0 ? parsed : 100;
+    let denom = Number.isFinite(parsed) && parsed > 0 ? parsed : 100;
     const [first, ...rest] = pages;
+    // "Frei platzieren": Maßstab so berechnen, dass die erste Seite mit ~30 %
+    // Rand auf die aktive Seite passt. Wirkt für den gesamten Batch.
+    if (docFreePlace && activePage) {
+      const fmt = getPageSizeMm(activePage);
+      const pageWm = (activePage.customWidthMm ?? fmt.wMm) / 1000;
+      const pageHm = (activePage.customHeightMm ?? fmt.hMm) / 1000;
+      const targetWm = pageWm * 0.7;
+      const targetHm = pageHm * 0.7;
+      const scaleW = first.widthM > 0 ? targetWm / first.widthM : denom;
+      const scaleH = first.heightM > 0 ? targetHm / first.heightM : denom;
+      const fit = Math.min(scaleW, scaleH);
+      if (Number.isFinite(fit) && fit > 0) denom = fit;
+    }
     const firstW = first.widthM * denom;
     const firstH = first.heightM * denom;
     setActiveToolAndTab("document");
@@ -1722,6 +1743,8 @@ export default function ProjectWorkspace() {
               onDocumentImport={() => documentFileInputRef.current?.click()}
               docScale={docScale}
               onDocScaleChange={setDocScale}
+              docFreePlace={docFreePlace}
+              onDocFreePlaceChange={setDocFreePlace}
               onCadLineSnapChange={(patch) => {
                 cadEngineApiRef.current?.setSelectedSegmentSnap(patch);
                 setCadSelectedLineSnap((prev) => prev ? {
@@ -3118,6 +3141,8 @@ function ElementView({
       actionCancelRef.current = null;
       modeStartClientRef.current = null;
       try { getPageSnapRegistry().setHover(null); } catch {}
+      // Abbruch → Objekt deselektieren, damit automatisch das Auswahl-Werkzeug greift.
+      onSelect?.(undefined);
     };
 
     actionCommitRef.current = commit;
@@ -3383,13 +3408,16 @@ function ElementView({
                     data-hub-control
                     onClick={(e) => {
                       e.stopPropagation();
-                      modeStartClientRef.current = { x: e.clientX, y: e.clientY };
+                      // WICHTIG: kein Start-Client setzen → Delta = Maus - Anker.
+                      // Dadurch klebt der zuletzt gewählte Fangpunkt/Anker exakt
+                      // unter dem Mauszeiger, sobald "Verschieben" aktiv ist.
+                      modeStartClientRef.current = null;
                       setPreview({ dxPx: 0, dyPx: 0, deltaDeg: 0, anchorFrac: { x: 0.5, y: 0.5 } });
                       setEdgeTrim(null);
                       setActiveEdge(null);
                       setHubMode((m) => (m === "move" ? null : "move"));
                     }}
-                    title="Verschieben — Maus bewegen, dann klicken zum Setzen (ESC bricht ab)"
+                    title="Verschieben — Anker folgt der Maus, klicken zum Setzen (ESC bricht ab)"
                     className={`h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))] ${hubMode === "move" ? "bg-[hsl(var(--surface-muted))]" : ""}`}
                     style={{ color: hubMode === "move" ? "hsl(var(--accent-gold))" : undefined }}
                   >
@@ -3747,6 +3775,8 @@ function RightInspector({
   onDocumentImport,
   docScale,
   onDocScaleChange,
+  docFreePlace,
+  onDocFreePlaceChange,
   onCadLineSnapChange,
   onCadDuplicateSegments,
   updateToolSettings,
@@ -3782,6 +3812,8 @@ function RightInspector({
   onDocumentImport?: () => void;
   docScale?: string;
   onDocScaleChange?: (s: string) => void;
+  docFreePlace?: boolean;
+  onDocFreePlaceChange?: (v: boolean) => void;
   onCadLineSnapChange?: (patch: { midpointSnap?: boolean; divisionSnap?: number | null }) => void;
   onCadDuplicateSegments?: () => void;
   updateToolSettings: <K extends keyof ToolSettings>(k: K, patch: Partial<ToolSettings[K]>) => void;
@@ -3846,6 +3878,8 @@ function RightInspector({
               onDocumentImport={onDocumentImport}
               docScale={docScale}
               onDocScaleChange={onDocScaleChange}
+              docFreePlace={docFreePlace}
+              onDocFreePlaceChange={onDocFreePlaceChange}
               onCadLineSnapChange={onCadLineSnapChange}
               onCadDuplicateSegments={onCadDuplicateSegments}
               updateToolSettings={updateToolSettings}
@@ -4339,6 +4373,8 @@ function ToolsTab({
   onDocumentImport,
   docScale,
   onDocScaleChange,
+  docFreePlace,
+  onDocFreePlaceChange,
   onCadLineSnapChange,
   onCadDuplicateSegments,
   updateToolSettings,
@@ -4369,6 +4405,8 @@ function ToolsTab({
   onDocumentImport?: () => void;
   docScale?: string;
   onDocScaleChange?: (s: string) => void;
+  docFreePlace?: boolean;
+  onDocFreePlaceChange?: (v: boolean) => void;
   onCadLineSnapChange?: (patch: { midpointSnap?: boolean; divisionSnap?: number | null }) => void;
   onCadDuplicateSegments?: () => void;
   updateToolSettings: <K extends keyof ToolSettings>(k: K, patch: Partial<ToolSettings[K]>) => void;
@@ -4444,7 +4482,7 @@ function ToolsTab({
         />
       )}
       {settingsTool === "document" && (
-        <DocumentToolSettings importing={!!documentImporting} onImport={onDocumentImport} scale={docScale ?? "1:100"} onScaleChange={onDocScaleChange} />
+        <DocumentToolSettings importing={!!documentImporting} onImport={onDocumentImport} scale={docScale ?? "1:100"} onScaleChange={onDocScaleChange} freePlace={!!docFreePlace} onFreePlaceChange={onDocFreePlaceChange} />
       )}
 
       {/* Tabellen-Werkzeug — Placement-Preview + Modifikation */}
@@ -4543,42 +4581,40 @@ function DocumentToolSettings({
   onImport,
   scale,
   onScaleChange,
+  freePlace,
+  onFreePlaceChange,
 }: {
   importing: boolean;
   onImport?: () => void;
   scale: string;
   onScaleChange?: (s: string) => void;
+  freePlace?: boolean;
+  onFreePlaceChange?: (v: boolean) => void;
 }) {
-  const selectValue = PAGE_PLAN_SCALES.includes(scale) ? scale : "__other__";
   return (
     <SettingsBlock title="DOKUMENT IMPORTIEREN">
-      {/* Maßstab-Dropdown — wie beim CAD-Blatt: legt fest, in welchem
-          Ausgabemaßstab das importierte Dokument (A4/A3/A2 …) im
-          Modellbereich abgelegt wird. Modell selbst bleibt 1:1. */}
+      {/* Freie Maßstabs-Eingabe wie beim CAD-Blatt — legt fest, in welchem
+          Ausgabemaßstab das importierte Dokument (A4/A3/A2 …) im Modellbereich
+          abgelegt wird. Modell selbst bleibt 1:1. Bei aktivem „Frei platzieren"
+          wird der Maßstab beim Import automatisch berechnet. */}
       <Row label="Maßstab">
-        <select
-          value={selectValue}
-          onChange={(e) => {
-            const v = e.target.value;
-            if (v === "frei") {
-              const picked = askPlanScale(scale);
-              if (picked) onScaleChange?.(picked);
-            } else if (v !== "__other__") {
-              onScaleChange?.(v);
-            }
-          }}
-          className="w-full h-8 px-2 rounded border bg-transparent text-sm"
-          style={{ borderColor: "hsl(var(--hairline))" }}
-        >
-          {!PAGE_PLAN_SCALES.includes(scale) && (
-            <option value="__other__">{scale}</option>
-          )}
-          {PAGE_PLAN_SCALES.map((sc) => (
-            <option key={sc} value={sc}>{sc}</option>
-          ))}
-          <option value="frei">frei…</option>
-        </select>
+        <PlacedScaleInput
+          value={scale}
+          onCommit={(next) => onScaleChange?.(next)}
+        />
       </Row>
+
+      <label
+        className="flex items-center gap-2 text-xs cursor-pointer select-none px-1 py-1"
+        title="Skaliert das Dokument beim Import automatisch so, dass es vollständig mit Rand auf der aktiven Seite liegt."
+      >
+        <input
+          type="checkbox"
+          checked={!!freePlace}
+          onChange={(e) => onFreePlaceChange?.(e.target.checked)}
+        />
+        <span>Frei platzieren <span className="text-muted-foreground">(auto-fit auf Seite)</span></span>
+      </label>
 
       <button
         type="button"
@@ -4593,7 +4629,11 @@ function DocumentToolSettings({
       </button>
 
       <div className="text-[11px] leading-relaxed text-muted-foreground pt-2 border-t" style={{ borderColor: "hsl(var(--hairline))" }}>
-        <div>Import erfolgt im gewählten Maßstab (z. B. {scale}) auf A4/A3/A2 …</div>
+        {freePlace ? (
+          <div>„Frei platzieren" aktiv — Dokument wird automatisch auf die Seite skaliert.</div>
+        ) : (
+          <div>Import erfolgt im gewählten Maßstab (z. B. {scale}) auf A4/A3/A2 …</div>
+        )}
         <div>Zum Skalieren, Drehen oder Zuschneiden: <strong>Auswahl-Werkzeug</strong> → Dokument anklicken.</div>
       </div>
     </SettingsBlock>
