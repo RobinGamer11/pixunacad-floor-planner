@@ -3389,13 +3389,16 @@ function ElementView({
                     data-hub-control
                     onClick={(e) => {
                       e.stopPropagation();
-                      modeStartClientRef.current = { x: e.clientX, y: e.clientY };
+                      // WICHTIG: kein Start-Client setzen → Delta = Maus - Anker.
+                      // Dadurch klebt der zuletzt gewählte Fangpunkt/Anker exakt
+                      // unter dem Mauszeiger, sobald "Verschieben" aktiv ist.
+                      modeStartClientRef.current = null;
                       setPreview({ dxPx: 0, dyPx: 0, deltaDeg: 0, anchorFrac: { x: 0.5, y: 0.5 } });
                       setEdgeTrim(null);
                       setActiveEdge(null);
                       setHubMode((m) => (m === "move" ? null : "move"));
                     }}
-                    title="Verschieben — Maus bewegen, dann klicken zum Setzen (ESC bricht ab)"
+                    title="Verschieben — Anker folgt der Maus, klicken zum Setzen (ESC bricht ab)"
                     className={`h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))] ${hubMode === "move" ? "bg-[hsl(var(--surface-muted))]" : ""}`}
                     style={{ color: hubMode === "move" ? "hsl(var(--accent-gold))" : undefined }}
                   >
