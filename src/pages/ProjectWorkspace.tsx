@@ -3769,6 +3769,27 @@ function ElementView({
         </>
 
       )}
+
+      {/* Rechtsklick-Hilfslinien während einer HUB-Aktion. Werden per Portal
+         in das Seiten-Parent gerendert, damit sie über das gesamte Blatt
+         verlaufen. Werden beim Commit/Cancel automatisch geleert. */}
+      {isCadView && hubMode && guides.length > 0 && rootRef.current?.parentElement && createPortal(
+        <>
+          {guides.map((g) => (
+            <React.Fragment key={g.id}>
+              <div
+                className="absolute pointer-events-none"
+                style={{ left: 0, right: 0, top: `${g.yPct}%`, height: 0, borderTop: `1px dashed ${hubBlue}`, opacity: 0.7, zIndex: 900 }}
+              />
+              <div
+                className="absolute pointer-events-none"
+                style={{ top: 0, bottom: 0, left: `${g.xPct}%`, width: 0, borderLeft: `1px dashed ${hubBlue}`, opacity: 0.7, zIndex: 900 }}
+              />
+            </React.Fragment>
+          ))}
+        </>,
+        rootRef.current.parentElement,
+      )}
     </div>
   );
 }
