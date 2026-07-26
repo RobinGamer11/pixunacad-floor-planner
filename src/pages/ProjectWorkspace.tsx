@@ -2808,6 +2808,53 @@ function ElementView({
   const isCadView = el.kind === "cad-view" || el.kind === "cad-viewport";
   const hubBlue = "hsl(217 91% 60%)";
 
+  // Explizite HUB-Modi für CAD-Blatt: erst nach Klick auf das Symbol wird
+  // Bewegen / Drehen aktiv. Preview läuft mit Fadenkreuz-Cursor; ein weiterer
+  // Klick auf der Seite commited an aktueller Position. Bei aktivem
+  // Tablet-Hilfsrad erscheint ein Häkchen-Button, der ebenfalls commited.
+  const [hubMode, setHubMode] = useState<null | "move" | "rotate">(null);
+  const [preview, setPreview] = useState<{ dxPct: number; dyPct: number; rotDeg: number }>(
+    { dxPct: 0, dyPct: 0, rotDeg: 0 }
+  );
+  const previewRef = useRef(preview);
+  previewRef.current = preview;
+  const [tabletActive, setTabletActive] = useState<boolean>(
+    () => typeof window !== "undefined" && !!(window as any).__pixunaTabletCommit
+  );
+  useEffect(() => {
+    const t = setInterval(() => {
+      setTabletActive(!!(window as any).__pixunaTabletCommit);
+    }, 300);
+    return () => clearInterval(t);
+  }, []);
+
+  // Snap-Ziele publizieren: Ecken + Kanten-Mittelpunkte in Prozent der Seite.
+  // Andere Werkzeuge im Seiteneditor können via window.__pixunaPageSnap
+  // konsumieren, um an diesen Punkten zu fangen.
+  useEffect(() => {
+    if (readOnly) return;
+    const w = window as any;
+    if (!w.__pixunaPageSnap) w.__pixunaPageSnap = new Map();
+    const corners = [
+      { x: el.x, y: el.y, type: "corner" as const },
+      { x: el.x + el.w, y: el.y, type: "corner" as const },
+      { x: el.x, y: el.y + el.h, type: "corner" as const },
+      { x: el.x + el.w, y: el.y + el.h, type: "corner" as const },
+    ];
+    const edges = [
+      { x: el.x + el.w / 2, y: el.y, type: "edge-mid" as const },
+      { x: el.x + el.w / 2, y: el.y + el.h, type: "edge-mid" as const },
+      { x: el.x, y: el.y + el.h / 2, type: "edge-mid" as const },
+      { x: el.x + el.w, y: el.y + el.h / 2, type: "edge-mid" as const },
+    ];
+    w.__pixunaPageSnap.set(el.id, { kind: el.kind, points: [...corners, ...edges] });
+    return () => {
+      try { w.__pixunaPageSnap?.delete(el.id); } catch {}
+    };
+  }, [el.id, el.kind, el.x, el.y, el.w, el.h, readOnly]);
+
+
+
 
   const startDrag = (e: React.PointerEvent) => {
     if (readOnly) return;
@@ -2876,10 +2923,86 @@ function ElementView({
 
   const hubKinds = new Set(["cad-view", "cad-viewport", "pdf", "image"]);
   const showHub = !readOnly && selected && hubKinds.has(el.kind);
-  // CAD-Blatt behält nur die blaue Frame-Optik; Bearbeitung bleibt 1:1 wie PDF.
-  const outlineStyle = selected
-    ? (isCadView ? `2px dashed ${hubBlue}` : "2px solid hsl(var(--accent-gold))")
-    : "none";
+  // Optik: CAD-Blatt schlicht wie andere Werkzeuge (goldener Auswahlrahmen).
+  const outlineStyle = selected ? "2px solid hsl(var(--accent-gold))" : "none";
+
+  // Preview-Interaktion (Move/Rotate) — startet bei aktivem hubMode.
+  useEffect(() => {
+    if (!hubMode) return;
+    const parent = rootRef.current?.parentElement as HTMLElement | null;
+    const parentRect = parent?.getBoundingClientRect();
+    const rect = rootRef.current?.getBoundingClientRect();
+    if (!parent || !parentRect || !rect) return;
+    const startCx = rect.left + rect.width / 2;
+    const startCy = rect.top + rect.height / 2;
+    const startRot = el.rotation ?? 0;
+
+    const commit = () => {
+      const p = previewRef.current;
+      if (hubMode === "move") {
+        onTransform?.({
+          x: Math.max(0, Math.min(95, el.x + p.dxPct)),
+          y: Math.max(0, Math.min(95, el.y + p.dyPct)),
+        });
+      } else if (hubMode === "rotate") {
+        onTransform?.({ rotation: p.rotDeg });
+      }
+      setPreview({ dxPct: 0, dyPct: 0, rotDeg: 0 });
+      setHubMode(null);
+    };
+    const cancel = () => {
+      setPreview({ dxPct: 0, dyPct: 0, rotDeg: 0 });
+      setHubMode(null);
+    };
+
+    const onMove = (ev: PointerEvent) => {
+      if (hubMode === "move") {
+        const dxPct = ((ev.clientX - startCx) / parentRect.width) * 100;
+        const dyPct = ((ev.clientY - startCy) / parentRect.height) * 100;
+        setPreview({ dxPct, dyPct, rotDeg: startRot });
+      } else if (hubMode === "rotate") {
+        const a = Math.atan2(ev.clientY - startCy, ev.clientX - startCx) * 180 / Math.PI;
+        let deg = a + 90;
+        if (ev.shiftKey) deg = Math.round(deg / 90) * 90;
+        setPreview({ dxPct: 0, dyPct: 0, rotDeg: deg });
+      }
+    };
+    const onClick = (ev: MouseEvent) => {
+      const t = ev.target as HTMLElement | null;
+      if (t?.closest("[data-hub-control]")) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      commit();
+    };
+    const onKey = (ev: KeyboardEvent) => {
+      if (ev.key === "Escape") cancel();
+      else if (ev.key === "Enter") commit();
+    };
+    window.addEventListener("pointermove", onMove);
+    // 'click' im Capture, damit wir vor Selektions-Handlern feuern.
+    window.addEventListener("click", onClick, true);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("click", onClick, true);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [hubMode, el.x, el.y, el.rotation, onTransform]);
+
+  const previewTransform = (() => {
+    const parts: string[] = [];
+    if (preview.dxPct !== 0 || preview.dyPct !== 0) {
+      const parent = rootRef.current?.parentElement as HTMLElement | null;
+      if (parent) {
+        const pxDx = (preview.dxPct / 100) * parent.clientWidth;
+        const pxDy = (preview.dyPct / 100) * parent.clientHeight;
+        parts.push(`translate(${pxDx}px, ${pxDy}px)`);
+      }
+    }
+    const rot = hubMode === "rotate" ? preview.rotDeg : (el.rotation ?? 0);
+    if (rot) parts.push(`rotate(${rot}deg)`);
+    return parts.length ? parts.join(" ") : undefined;
+  })();
 
   return (
     <div
@@ -2893,17 +3016,18 @@ function ElementView({
         width: `${el.w}%`,
         height: `${el.h}%`,
         outline: outlineStyle,
-        outlineOffset: selected && isCadView ? "1px" : undefined,
-        cursor: readOnly || isCadView ? "default" : "move",
-        opacity: el.opacity ?? 1,
+        outlineOffset: selected ? "1px" : undefined,
+        cursor: readOnly ? "default" : (hubMode ? "crosshair" : (isCadView ? "default" : "move")),
+        opacity: hubMode ? 0.7 : (el.opacity ?? 1),
         boxShadow: el.shadow ? "0 8px 24px -8px rgba(0,0,0,0.25)" : undefined,
         border: el.border ? "1px solid hsl(var(--ink))" : undefined,
-        transform: el.rotation ? `rotate(${el.rotation}deg)` : undefined,
+        transform: previewTransform,
         transformOrigin: "center center",
         zIndex: isCadView ? (showHub ? 90 : 40) : (showHub ? 80 : (elevated ? 30 : undefined)),
         touchAction: "none",
       }}
     >
+
 
       {el.kind === "text" && (
         <div
@@ -2980,7 +3104,7 @@ function ElementView({
               width: 14,
               height: 14,
               borderRadius: 999,
-              background: isCadView ? hubBlue : "hsl(var(--accent-gold))",
+              background: "hsl(var(--accent-gold))",
               border: "2px solid white",
               boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
               cursor: "grab",
@@ -2993,7 +3117,7 @@ function ElementView({
               top: -14,
               width: 1,
               height: 14,
-              background: isCadView ? hubBlue : "hsl(var(--accent-gold))",
+              background: "hsl(var(--accent-gold))",
               transform: "translateX(-50%)",
             }}
           />
@@ -3006,22 +3130,80 @@ function ElementView({
               right: 0,
               top: -36,
               background: "white",
-              border: `1px solid ${isCadView ? hubBlue : "hsl(var(--hairline))"}`,
+              border: `1px solid hsl(var(--hairline))`,
               padding: 3,
               zIndex: 10,
             }}
             onMouseDown={(e) => e.stopPropagation()}
             onPointerDown={(e) => e.stopPropagation()}
           >
-            <button
-              data-hub-control
-              onClick={(e) => { e.stopPropagation(); onRotate?.(15); }}
-              title="Drehen +15°"
-              className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
-              style={isCadView ? { color: hubBlue } : undefined}
-            >
-              <RotateCw size={14} />
-            </button>
+            {isCadView ? (
+              <>
+                <button
+                  data-hub-control
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setPreview({ dxPct: 0, dyPct: 0, rotDeg: el.rotation ?? 0 });
+                    setHubMode((m) => (m === "move" ? null : "move"));
+                  }}
+                  title="Verschieben — Maus bewegen, dann klicken zum Setzen (ESC bricht ab)"
+                  className={`h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))] ${hubMode === "move" ? "bg-[hsl(var(--surface-muted))]" : ""}`}
+                  style={{ color: hubMode === "move" ? "hsl(var(--accent-gold))" : undefined }}
+                >
+                  <Move size={14} />
+                </button>
+                <button
+                  data-hub-control
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setPreview({ dxPct: 0, dyPct: 0, rotDeg: el.rotation ?? 0 });
+                    setHubMode((m) => (m === "rotate" ? null : "rotate"));
+                  }}
+                  title="Drehen — Maus bewegen (Shift = 90°-Fang), dann klicken zum Setzen"
+                  className={`h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))] ${hubMode === "rotate" ? "bg-[hsl(var(--surface-muted))]" : ""}`}
+                  style={{ color: hubMode === "rotate" ? "hsl(var(--accent-gold))" : undefined }}
+                >
+                  <RotateCw size={14} />
+                </button>
+                {hubMode && tabletActive && (
+                  <button
+                    data-hub-control
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // Commit via synthetischen Klick — nutzt dieselbe Logik im Effect.
+                      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
+                    }}
+                    title="Bestätigen (Tablet)"
+                    className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
+                    style={{ color: "hsl(140 60% 40%)" }}
+                  >
+                    <Check size={14} />
+                  </button>
+                )}
+                {hubMode && (
+                  <button
+                    data-hub-control
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+                    }}
+                    title="Abbrechen"
+                    className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </>
+            ) : (
+              <button
+                data-hub-control
+                onClick={(e) => { e.stopPropagation(); onRotate?.(15); }}
+                title="Drehen +15°"
+                className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
+              >
+                <RotateCw size={14} />
+              </button>
+            )}
             {!isCadView && (
               <button
                 data-hub-control
@@ -3042,6 +3224,7 @@ function ElementView({
               <Trash2 size={14} />
             </button>
           </div>
+
 
           {/* Edge-Drag-Handles */}
           {(["top", "right", "bottom", "left"] as const).map((edge) => {
@@ -3077,7 +3260,7 @@ function ElementView({
             const sizeStyle: React.CSSProperties = isHor
               ? { left: 0, right: 0, height: 8, [edge === "top" ? "top" : "bottom"]: -4 }
               : { top: 0, bottom: 0, width: 8, [edge === "left" ? "left" : "right"]: -4 };
-            const edgeStroke = isCadView ? hubBlue : "hsl(var(--accent-gold))";
+            const edgeStroke = "hsl(var(--accent-gold))";
             return (
               <div
                 key={edge}
@@ -3126,22 +3309,23 @@ function ElementView({
             const isLeft = corner === "tl" || corner === "bl";
             const cursor =
               corner === "tl" || corner === "br" ? "nwse-resize" : "nesw-resize";
-            const size = isCadView ? 10 : 12;
+            const size = 12;
             return (
               <div
                 key={corner}
                 data-hub-control
                 onPointerDown={startCornerDrag}
-                title={`Ecke skalieren (Shift: proportional)`}
+                title={isCadView ? "Ecke ziehen: Kante trimmen/erweitern" : "Ecke skalieren (Shift: proportional)"}
                 className="absolute"
                 style={{
                   [isTop ? "top" : "bottom"]: -Math.floor(size / 2),
                   [isLeft ? "left" : "right"]: -Math.floor(size / 2),
                   width: size,
                   height: size,
-                  borderRadius: isCadView ? 2 : 999,
+                  borderRadius: 999,
                   background: "white",
-                  border: `2px solid ${isCadView ? hubBlue : "hsl(var(--accent-gold))"}`,
+                  border: `2px solid hsl(var(--accent-gold))`,
+
                   boxShadow: "0 1px 3px rgba(0,0,0,0.25)",
                   cursor,
                   zIndex: 6,

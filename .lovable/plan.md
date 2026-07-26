@@ -1,53 +1,46 @@
-# CAD-Blatt: Default-Sheet + Live-Referenz mit exaktem Maßstab
+# CAD-Blatt-Objekt: Rahmen, Snapping, HUB & Kanten-Trim
 
-## Ziel
-Das Werkzeug „CAD-Blatt" in der Projektmappe soll (a) auch das Default-Zeichenblatt anbieten und (b) eine **lebende Referenz** auf die Original-Vektorgeometrie sein – ohne Bitmap-Zwischenschritt, ohne Fit-to-Frame, mit mathematisch exaktem Maßstab.
+Diese Änderungen betreffen nur das in der **Projektmappe** platzierte CAD-Blatt-Objekt (`kind: "cad-view" | "cad-viewport"`). Die CAD-Oberfläche bleibt unverändert.
 
-## Änderungen
+## 1) Optik: schlichter Rahmen wie andere Werkzeuge
+- In `CadViewportView` den Border zu `1px solid hsl(var(--border))` vereinheitlichen, dezenter Shadow im Selected-Zustand (analog Text/Bild).
+- Auswahlrahmen im Selected-Zustand: gestrichelte Akzentlinie außenherum (wie bei anderen Elementen).
 
-### 1. Default-Sheet freigeben
-`src/components/CadEditor.tsx` (Zeile 680) filtert `s.id !== "default-sheet"` beim Sync in `projectStore`. Dieser Filter wird entfernt, damit auch das Default-Blatt in `project.sheets` landet und im „CAD-Blatt"-Dropdown auswählbar wird. Der Löschschutz bleibt in `SheetManager.deleteSheet` (mindestens ein Blatt erforderlich) unverändert.
+## 2) Fangpunkte an Ecken + fangbare Kanten
+- In `ElementView`/Wrapper für `cad-view` beim Selected-Zustand vier Corner-Handles (kleine gefüllte Punkte, ~8px) rendern.
+- Snap-Registry pro Seite erweitern: `page.elements` iterieren, für jedes CAD-Blatt vier Corner-Points und vier Edge-Segments in eine gemeinsame Snap-Quelle einspeisen, die von anderen Werkzeugen im Seiteneditor (Linie, Freihand, Text, Tabelle-Placement) beim Ziehen abgefragt wird.
+- Snap-Toleranz: 8 px auf Bildschirm; Prioritäten: Corner > Edge-Midpoint > Edge-Line.
+- Umgekehrt: beim HUB-Move/Rotate/Edge-Trim des CAD-Blatts die vorhandenen Snap-Quellen aller anderen Elemente konsumieren (Corners, Kanten, Guide-Linien).
 
-### 2. Live-Scene-Persistenz statt Snapshot
-Bisher wird pro Sheet nur ein JPEG-`thumbnail` in `project.sheets[i].thumbnail` gespeichert; das `cad-viewport`-Element hält `viewSnapshot` als DataURL und `CadViewportView` skaliert dieses Bild via `object-contain` in den Rahmen → dadurch entsteht die falsche Skalierung.
+## 3) HUB-Box am Klickpunkt
+- Neue Komponente `CadViewportHub.tsx` (fixed positioniert am Klickpunkt in Viewport-Koordinaten), draggable via `makeHubDraggable`.
+- Öffnet nur bei aktivem Klick INS Innere eines bereits ausgewählten CAD-Blatts (nicht auf Kante/Corner).
+- Symbole:
+  - **Verschieben** (Move-Icon): startet Move-Preview-Modus. Maus bewegt Ghost-Rahmen mit Snapping. Ein weiterer Klick commited an aktuelle Position. Bei aktivem Tablet-Hilfsrad (`window.__pixunaTabletCommit`) erscheint zusätzlich Häkchen-Symbol in HUB, das den Commit auslöst.
+  - **Drehen** (Rotate-Icon): startet Rotate-Preview um Objekt-Center. Freies Drehen; mit Shift Fang auf 0/90/180/270 (Toleranz ±3°). Commit wie bei Move.
+- Funktionen greifen nur, wenn ihr Symbol vorher explizit angeklickt wurde (Modus-Flag `hubMode: "move" | "rotate" | null`). Ohne Modus tut Mausbewegung nichts.
+- ESC bricht Preview ab (Reset auf Ausgangszustand).
 
-Neu:
-- `Sheet` in `src/lib/projectStore.ts` bekommt ein Feld `sceneJson?: string` (serialisierte Szene aus `CadApp._serializeScene`), das bei jedem `persist()` in `CadEditor` mitgeschrieben wird.
-- Das Thumbnail bleibt nur noch als optionale UI-Preview für Listen (SheetPanel, Blatt-Auswahl); es wird **nie** für den Viewport-Render verwendet.
-- `PageElement` (kind `cad-viewport`) speichert ausschließlich Referenzdaten: `sheetId`, `scaleDen`, `modelCenterM`, `viewportRotationDeg`, `visibleLayers`, `lastSyncAt`. `viewSnapshot` wird für neue Elemente nicht mehr geschrieben (Legacy-Feld bleibt lesbar für Altdaten).
+## 4) Kanten-Trim (Rein/Rausziehen)
+- Klick auf eine der vier Kanten (Toleranz 6 px) → kleines Doppelpfeil-Symbol an der Kante.
+- Ziehen an der Kante ändert die Papier-Ausschnittsgröße dieser Seite:
+  - Nach INNEN ziehen = Ausschnitt verkleinern (schneidet Papierbereich weg, Modell-Center-Verschiebung bleibt, Rahmen wird kleiner).
+  - Nach AUSSEN ziehen = mehr Papier zeigen (Rahmen wird größer, mehr Modell sichtbar).
+- Umsetzung: Kante links/rechts/oben/unten passt `w` bzw. `h` in Papier-mm an; um den Modell-Inhalt an seiner Weltposition zu belassen, wird `x` bzw. `y` gegenläufig verschoben und `modelCenterM` entsprechend kompensiert.
+- Snapping wirkt auch hier auf andere Objekt-Kanten/Corners.
+- Commit bei Loslassen; im Tablet-Modus mit Häkchen bestätigen.
 
-### 3. Exakte Maßstabsberechnung im Viewport
-`src/components/page/CadViewportView.tsx` wird umgebaut:
-- Ermittelt Rahmengröße in **Papier-mm** aus `element.wMm/hMm` (Fallback aus `w/h` × Seitenformat).
-- Berechnet den sichtbaren Modellausschnitt exakt: `modelWmm = wMm * scaleDen`, `modelHmm = hMm * scaleDen` (entspricht `wMm/1000 * scaleDen` in Metern).
-- Rendert die Szene über eine neue Funktion `renderSceneRegionToCanvas(sceneJson, centerM, modelWm, modelHm, rotationDeg, pxPerMm)` in ein Offscreen-Canvas. Die Pixelauflösung dient nur der Bildschirmdarstellung – der Weltausschnitt ist unabhängig davon.
-- Kein `object-contain`, kein `background-size: contain`; der Renderer füllt den Rahmen 1:1.
+## Technische Details
 
-### 4. Renderer-Hilfsroutine
-Neue Datei `src/cad/SceneRegionRenderer.ts`:
-- Lädt/Deserialisiert `sceneJson` in eine transiente `Scene`.
-- Instanziert einen `Renderer` mit einer virtuellen Kamera, die zentrum + Weltmaße + Rotation exakt abbildet (nutzt die vorhandenen Layer-Zeichenroutinen aus `Renderer.ts`).
-- Zeichnet in ein `HTMLCanvasElement`, das `CadViewportView` per `useEffect` in einem `<canvas ref>` ausgibt.
-- Ergebnis wird gecached pro (sheetId, sceneHash, viewport-params) und bei `lastSyncAt`-Änderung invalidiert.
+**Betroffene Dateien**
+- `src/components/page/CadViewportView.tsx` — Rahmen-Look, Corner-Handles, Edge-Hitzones.
+- `src/components/page/CadViewportHub.tsx` — neu, HUB-Box mit Modi und Preview-State.
+- `src/pages/ProjectWorkspace.tsx` — Integration in `ElementView` (Klick-Analyse Corner/Edge/Interior), Snap-Provider für Seiten-Objekte, Preview-Overlay, Commit über `projectStore.updateElement`.
+- `src/lib/pageSnap.ts` — neu, gemeinsame Snap-Quelle (Corners/Edges aller Seiten-Elemente inkl. CAD-Blätter, Text, Bilder, Tabellen) für Move/Rotate/Trim des CAD-Blatts.
 
-### 5. Manuelle & automatische Aktualisierung
-- Der „Aktualisieren"-Button (Refresh-Icon in `CadToolSection`) setzt nur noch `lastSyncAt = now()` und triggert damit den Re-Render (kein Snapshot-Kopieren mehr).
-- Optional automatisch: wenn `project.sheets[i].sceneJson` sich ändert, invalidiert der Renderer-Cache und alle Viewports auf dieses Sheet werden neu gezeichnet.
+**Preview-Modell**
+- Preview-State lebt lokal in `CadViewportHub` bzw. auf dem `ElementView`-Wrapper; erst Commit schreibt in den Store (History-freundlich).
+- Beim Trim wird `w`, `h`, `x`, `y`, `modelCenterM` in einem einzigen `updateElement`-Call gesetzt.
 
-### 6. Skalen-Nachbearbeitung
-Das Maßstab-Dropdown im rechten Panel schreibt weiterhin `scale`/`scaleDen` in das Element. Da der Viewport den Maßstab live aus diesen Feldern berechnet, wirkt jede Änderung sofort ohne erneuten Import. Rahmen-Ecken-Handles verändern nur `wMm/hMm` (Papier-Ausschnittsgröße), niemals `scaleDen` – dadurch bleibt „1 mm Papier = scaleDen mm Modell" invariant.
-
-### 7. PDF-Export
-`src/lib/projectPdfExport.ts` und `sheetPdfExport.ts` rendern CAD-Viewports über dieselbe `renderSceneRegionToCanvas`-Route mit einer sehr hohen `pxPerMm`-Auflösung – jedoch weiterhin ohne „Fit-to-Page". Die Ziel-mm-Fläche wird 1:1 in die PDF-mm-Fläche übernommen. Kein `scale`-Flag beim Einbetten, keine Seitenskalierung.
-
-## Technisches Detail
-
-- **Kernformel:** `paperMm * scaleDen = modelMm` (bzw. `modelM = paperMm * scaleDen / 1000`). Diese ist bereits an einigen Stellen implementiert und wird zur alleinigen Wahrheit gemacht.
-- **Bitmap-Verbot:** `viewSnapshot` wird bei neuen Elementen nicht mehr gesetzt; `CadViewportView` verwendet es nur, wenn `sceneJson` fehlt (Altdaten-Fallback) – und markiert dann sichtbar „Legacy-Snapshot".
-- **Cache-Key:** Hash aus `sceneJson.length + updatedAt`, damit große Szenen nicht bei jedem Frame neu serialisiert werden.
-- **Rotation:** Vor dem Zeichnen der Szene in Renderer-Koordinaten (nicht per CSS-Transform des Ausgabe-Canvas), damit auch beim PDF-Export exakt.
-- **Kein Fit-to-Page:** Alle Aufrufer der PDF-Engine setzen explizit `fit: false` / entfernen `scale`-Parameter für CAD-Viewport-Elemente.
-
-## Nicht im Umfang
-- Layer-Sichtbarkeitsschalter im Viewport-Inspektor (Feld `visibleLayers` wird nur vorbereitet).
-- Migration bestehender `cad-view`-Bitmap-Elemente (bleiben mit Legacy-Fallback lesbar).
+**Tablet-Integration**
+- Präsenz von `window.__pixunaTabletCommit` schaltet Häkchen-Icon frei; Klick auf Häkchen ruft dieselbe Commit-Funktion wie ein regulärer Zweitklick.
