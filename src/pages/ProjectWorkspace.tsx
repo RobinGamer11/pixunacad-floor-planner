@@ -2910,10 +2910,12 @@ function WarpHandles({
   corners,
   containerRef,
   onCommit,
+  axis = "free",
 }: {
   corners: WarpCorners;
   containerRef: React.RefObject<HTMLElement>;
   onCommit: (next: WarpCorners) => void;
+  axis?: "free" | "x" | "y";
 }) {
   const mids = edgeMidpoints(corners);
   const startDrag = (kind: "corner" | "edge", idx: number, e: React.PointerEvent) => {
@@ -2927,8 +2929,10 @@ function WarpHandles({
     const startY = e.clientY;
     const startCorners = corners.map((c) => ({ ...c })) as WarpCorners;
     const onMove = (ev: PointerEvent) => {
-      const dx = (ev.clientX - startX) / rect.width;
-      const dy = (ev.clientY - startY) / rect.height;
+      let dx = (ev.clientX - startX) / rect.width;
+      let dy = (ev.clientY - startY) / rect.height;
+      if (axis === "x") dy = 0;
+      else if (axis === "y") dx = 0;
       const next = startCorners.map((c) => ({ ...c })) as WarpCorners;
       if (kind === "corner") {
         next[idx] = {
@@ -2936,7 +2940,6 @@ function WarpHandles({
           y: Math.max(-0.5, Math.min(1.5, startCorners[idx].y + dy)),
         };
       } else {
-        // Kante idx=0 top (TL,TR), 1 right (TR,BR), 2 bottom (BR,BL), 3 left (BL,TL)
         const pair: [number, number] =
           idx === 0 ? [0, 1] : idx === 1 ? [1, 2] : idx === 2 ? [2, 3] : [3, 0];
         for (const p of pair) {
@@ -2999,18 +3002,20 @@ function WarpHandles({
 function WarpTargetHandles({
   elementId,
   corners,
+  axis,
   containerRef,
   onCommit,
 }: {
   elementId: string;
   corners?: WarpCorners;
+  axis?: "free" | "x" | "y";
   containerRef: React.RefObject<HTMLElement>;
   onCommit: (next: WarpCorners) => void;
 }) {
   const active = useWarpTarget();
   if (active !== elementId) return null;
   const c = (corners && corners.length === 4 ? corners : IDENTITY_WARP) as WarpCorners;
-  return <WarpHandles corners={c} containerRef={containerRef} onCommit={onCommit} />;
+  return <WarpHandles corners={c} containerRef={containerRef} onCommit={onCommit} axis={axis ?? "free"} />;
 }
 
 
@@ -3553,6 +3558,7 @@ function ElementView({
         <WarpTargetHandles
           elementId={el.id}
           corners={el.warpCorners}
+          axis={el.warpAxis ?? "free"}
           containerRef={rootRef}
           onCommit={(next) => onTransform?.({ warpCorners: next } as any)}
         />
@@ -5876,7 +5882,9 @@ function ElementInspector({
         <WarpInspectorControls
           elementId={element.id}
           hasWarp={isWarped(element.warpCorners)}
-          onReset={() => update({ warpCorners: undefined })}
+          axis={element.warpAxis ?? "free"}
+          onAxisChange={(a) => update({ warpAxis: a })}
+          onReset={() => update({ warpCorners: undefined, warpAxis: undefined })}
         />
       )}
 
@@ -5901,15 +5909,18 @@ function ElementInspector({
 function WarpInspectorControls({
   elementId,
   hasWarp,
+  axis,
+  onAxisChange,
   onReset,
 }: {
   elementId: string;
   hasWarp: boolean;
+  axis: "free" | "x" | "y";
+  onAxisChange: (a: "free" | "x" | "y") => void;
   onReset: () => void;
 }) {
   const active = useWarpTarget();
   const isActive = active === elementId;
-  // Beim Unmount (z. B. Element abgewählt) den globalen Warp-Modus aufheben.
   useEffect(() => {
     return () => {
       if (_isSelfActive()) setWarpTarget(null);
@@ -5917,11 +5928,29 @@ function WarpInspectorControls({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   function _isSelfActive() {
-    // Re-check via Store, weil `active` in Closure veraltet sein kann.
     return (typeof window !== "undefined") && (active === elementId);
   }
   return (
-    <div className="space-y-1.5">
+    <div
+      className="space-y-1.5 rounded-md border p-2"
+      style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
+    >
+      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+        Verzerren
+      </div>
+      <Row label="Achse">
+        <select
+          value={axis}
+          onChange={(e) => onAxisChange(e.target.value as "free" | "x" | "y")}
+          className="w-full h-8 px-2 rounded bg-transparent border text-[11px]"
+          style={{ borderColor: "hsl(var(--hairline))" }}
+          title="Beschränkt die Ziehrichtung der Ecken-/Kanten-Handles"
+        >
+          <option value="free">Frei (X + Y)</option>
+          <option value="x">Nur X (horizontal)</option>
+          <option value="y">Nur Y (vertikal)</option>
+        </select>
+      </Row>
       <button
         type="button"
         onClick={() => setWarpTarget(isActive ? null : elementId)}
@@ -5931,9 +5960,9 @@ function WarpInspectorControls({
           background: isActive ? "hsl(var(--accent-gold-soft))" : "transparent",
           color: "hsl(var(--ink))",
         }}
-        title="Ecken- und Kanten-Punkte einblenden und frei ziehen"
+        title="Ecken- und Kanten-Punkte einblenden und ziehen"
       >
-        {isActive ? "Verzerren beenden" : "Verzerren"}
+        {isActive ? "Verzerren beenden" : "Verzerren aktivieren"}
       </button>
       {hasWarp && (
         <button

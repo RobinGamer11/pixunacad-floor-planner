@@ -194,12 +194,99 @@ export function CadDocumentInspector({ engine }: Props) {
 
       <DocumentFilterPanel app={engine as any} docId={sel.id} sig={filterSig} showBgRemove={false} />
 
+      <WarpSection engine={engine} docId={sel.id} />
+
       <div
         className="text-[10px] leading-relaxed pt-1.5 text-muted-foreground"
         style={{ borderTop: "1px solid hsl(var(--hairline))" }}
       >
         Drag: verschieben (Snap aktiv) · Entf: löschen
       </div>
+    </div>
+  );
+}
+
+/** Verzerren-Sektion für die CAD-Oberfläche.
+ *  UI-parität mit der Projektmappe (Achse + Toggle + Reset).
+ *  Persistiert `warpCorners` und `warpAxis` direkt auf dem Scene-Dokument,
+ *  damit spätere Renderer-Updates die Werte konsumieren können. */
+function WarpSection({ engine, docId }: { engine: MiniCad; docId: string }) {
+  const [, force] = useState(0);
+  const doc: any = (engine as any).scene?.getDocumentById?.(docId);
+  const axis: "free" | "x" | "y" = (doc?.warpAxis ?? "free") as any;
+  const hasWarp: boolean = Array.isArray(doc?.warpCorners) && doc.warpCorners.length === 4;
+  const setAxis = (a: "free" | "x" | "y") => {
+    if (!doc) return;
+    doc.warpAxis = a;
+    (engine as any).scene?.markDirty?.();
+    force((n) => n + 1);
+  };
+  const toggle = () => {
+    if (!doc) return;
+    if (hasWarp) {
+      delete doc.warpCorners;
+    } else {
+      doc.warpCorners = [
+        { x: 0, y: 0 },
+        { x: 1, y: 0 },
+        { x: 1, y: 1 },
+        { x: 0, y: 1 },
+      ];
+    }
+    (engine as any).scene?.markDirty?.();
+    force((n) => n + 1);
+  };
+  const reset = () => {
+    if (!doc) return;
+    delete doc.warpCorners;
+    delete doc.warpAxis;
+    (engine as any).scene?.markDirty?.();
+    force((n) => n + 1);
+  };
+  return (
+    <div
+      className="rounded-md border p-2 space-y-1.5"
+      style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
+    >
+      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+        Verzerren
+      </div>
+      <div className="flex items-center gap-1.5">
+        <span className="text-[10px] text-muted-foreground w-14">Achse</span>
+        <select
+          value={axis}
+          onChange={(e) => setAxis(e.target.value as any)}
+          className="flex-1 h-8 px-2 rounded bg-transparent border text-[11px]"
+          style={{ borderColor: "hsl(var(--hairline))" }}
+          title="Beschränkt die Ziehrichtung der Verzerr-Handles"
+        >
+          <option value="free">Frei (X + Y)</option>
+          <option value="x">Nur X (horizontal)</option>
+          <option value="y">Nur Y (vertikal)</option>
+        </select>
+      </div>
+      <button
+        type="button"
+        onClick={toggle}
+        className="w-full h-8 rounded-md text-[11px] border flex items-center justify-center gap-2"
+        style={{
+          borderColor: hasWarp ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
+          background: hasWarp ? "hsl(var(--accent-gold-soft))" : "transparent",
+        }}
+        title="Ecken-/Kanten-Verzerrung für dieses Dokument"
+      >
+        {hasWarp ? "Verzerren beenden" : "Verzerren aktivieren"}
+      </button>
+      {hasWarp && (
+        <button
+          type="button"
+          onClick={reset}
+          className="w-full h-7 rounded-md text-[11px] border text-muted-foreground hover:text-foreground"
+          style={{ borderColor: "hsl(var(--hairline))" }}
+        >
+          Verzerrung zurücksetzen
+        </button>
+      )}
     </div>
   );
 }
