@@ -70,3 +70,24 @@ export function edgeMidpoints(corners: WarpCorners): WarpCorners {
     { x: (corners[3].x + corners[0].x) / 2, y: (corners[3].y + corners[0].y) / 2 }, // left
   ];
 }
+
+// -----------------------------------------------------------------------------
+// Kleiner externer Store, um zu tracken, welches Element gerade im
+// „Verzerren"-Modus ist. So bleibt der ElementInspector-Button ohne globales
+// Context-Provider-Setup mit dem ElementView synchronisiert.
+
+import { useSyncExternalStore } from "react";
+
+let _warpTargetId: string | null = null;
+const _listeners = new Set<() => void>();
+export function setWarpTarget(id: string | null) {
+  _warpTargetId = id;
+  _listeners.forEach((l) => l());
+}
+export function useWarpTarget(): string | null {
+  return useSyncExternalStore(
+    (cb) => { _listeners.add(cb); return () => { _listeners.delete(cb); }; },
+    () => _warpTargetId,
+    () => _warpTargetId,
+  );
+}
