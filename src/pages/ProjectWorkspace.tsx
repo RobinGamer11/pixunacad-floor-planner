@@ -3558,6 +3558,7 @@ function ElementView({
         <WarpTargetHandles
           elementId={el.id}
           corners={el.warpCorners}
+          axis={el.warpAxis ?? "free"}
           containerRef={rootRef}
           onCommit={(next) => onTransform?.({ warpCorners: next } as any)}
         />
