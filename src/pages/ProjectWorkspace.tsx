@@ -2456,7 +2456,7 @@ function PageCanvas({
             key={el.id}
             el={el}
             onJumpCad={onJumpCad}
-
+            toolActive={activeTool !== null}
             selected={selectedElementIds.includes(el.id)}
             elevated={activeTool === null && el.kind !== "cad-view" && el.kind !== "cad-viewport" && el.kind !== "pdf" && el.kind !== "image"}
             onSelect={(opts) => onSelect(el.id, opts)}
