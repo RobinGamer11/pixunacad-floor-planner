@@ -2891,6 +2891,8 @@ function ElementView({
     // Don't start a drag when the user clicks an interactive control inside the hub.
     const t = e.target as HTMLElement;
     if (t.closest("[data-hub-control]")) return;
+    // Klickpunkt als Anker merken — HUB Move/Rotate orientiert sich daran.
+    anchorPtRef.current = { clientX: e.clientX, clientY: e.clientY };
     startDrag(e);
   };
 
