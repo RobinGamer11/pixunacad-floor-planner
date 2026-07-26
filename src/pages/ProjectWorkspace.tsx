@@ -81,8 +81,7 @@ import {
 } from "@/lib/projectStore";
 import CadOverlayLayer from "@/components/page/CadOverlayLayer";
 import { CadDocumentInspector } from "@/components/page/CadDocumentInspector";
-// CadIdPanelHost bewusst entfernt — CAD-Blätter laufen jetzt regulär über
-// den LayersTab (Bezeichnungs-ID via layerName).
+import { CadIdPanelHost } from "@/components/page/CadIdPanelHost";
 import { PdfPageView } from "@/components/page/PdfPageView";
 import { TableElementView, TableModifyContext, TableFormulaPickContext, type FormulaFn } from "@/components/page/TableElementView";
 import { TableToolSettings } from "@/components/page/TableToolSettings";
@@ -3969,12 +3968,22 @@ function RightInspector({
             />
           )}
           {tab === "layers" && page && (
-            <LayersTab
-              projectId={projectId}
-              page={page}
-              selectedElementId={selectedElementId}
-              setSelectedElementId={setSelectedElementId}
-            />
+            <div className="space-y-4">
+              {/* CAD-Ebenen (Bezeichnungs-ID) — 1:1 wie in der CAD-Oberfläche.
+                  Verwaltet alle CAD-Objekte (Linien, Schraffuren, Texte,
+                  Freihand, Dokumente, Wände, Maßketten) per Layer/Sichtbarkeit. */}
+              {cadEngine && <CadIdPanelHost engine={cadEngine} />}
+
+              {/* Projektmappen-Elemente (Notizen, Bilder, CAD-Blätter, …) —
+                  Z-Order + Sichtbarkeit auf React-Ebene. */}
+              <LayersTab
+                projectId={projectId}
+                page={page}
+                selectedElementId={selectedElementId}
+                setSelectedElementId={setSelectedElementId}
+                cadEngine={cadEngine ?? null}
+              />
+            </div>
           )}
         </div>
       </DragScrollDiv>
@@ -4575,6 +4584,7 @@ function ToolsTab({
           selectedElementId={selectedElementId}
           setSelectedElementId={setSelectedElementId}
           onJumpCad={onJumpCad}
+          cadEngine={cadEngine ?? null}
         />
       )}
 
@@ -5167,6 +5177,7 @@ function CadToolSection({
   selectedElementId,
   setSelectedElementId,
   onJumpCad,
+  cadEngine,
 }: {
   project: import("@/lib/projectStore").Project;
   projectId: string;
@@ -5174,8 +5185,17 @@ function CadToolSection({
   selectedElementId?: string;
   setSelectedElementId: (id?: string) => void;
   onJumpCad: (sheetId?: string) => void;
+  cadEngine?: import("@/cad/embed/MiniCad").MiniCad | null;
 }) {
   const navigate = useNavigate();
+  // Kleiner Ticker, damit neue/umbenannte Bezeichnungs-IDs im Dropdown erscheinen.
+  const [, setLabelTick] = useState(0);
+  useEffect(() => {
+    if (!cadEngine) return;
+    const id = window.setInterval(() => setLabelTick((t) => t + 1), 400);
+    return () => window.clearInterval(id);
+  }, [cadEngine]);
+  const labelGroups = cadEngine?.labelManager?.list?.() ?? [];
   const page = project.pages.find((p) => p.id === pageId);
   const placed = (page?.elements ?? []).filter((e) => e.kind === "cad-view" || e.kind === "cad-viewport");
   const [pdfOpen, setPdfOpen] = useState<boolean>(false);
@@ -5407,21 +5427,27 @@ function CadToolSection({
                   </div>
                   <div className="flex items-center gap-2 mt-2">
                     <span className="text-[11px] text-muted-foreground shrink-0">Bez.-ID</span>
-                    <input
-                      type="text"
-                      defaultValue={el.layerName ?? ""}
-                      placeholder={sheet?.name ?? "CAD-Ansicht"}
+                    <select
+                      value={el.labelId ?? ""}
                       onClick={(ev) => ev.stopPropagation()}
-                      onBlur={(ev) => {
+                      onChange={(ev) => {
                         if (!pageId) return;
-                        const v = ev.target.value.trim();
-                        projectStore.updateElement(projectId, pageId, el.id, { layerName: v || undefined });
+                        const v = ev.target.value;
+                        projectStore.updateElement(projectId, pageId, el.id, {
+                          labelId: v || undefined,
+                        });
+                        try { cadEngine?.refreshLabelUI?.(); } catch {}
                       }}
-                      onKeyDown={(ev) => { if (ev.key === "Enter") (ev.target as HTMLInputElement).blur(); }}
+                      disabled={!cadEngine || labelGroups.length === 0}
                       className="flex-1 h-7 px-2 rounded bg-transparent border text-sm"
                       style={{ borderColor: "hsl(var(--hairline))" }}
-                      title="Bezeichnungs-ID (Ebenenname) für die Ebenen-Ansicht."
-                    />
+                      title="Bezeichnungs-ID (Ebene) — identisch zur CAD-Oberfläche."
+                    >
+                      <option value="">— keine —</option>
+                      {labelGroups.map((g) => (
+                        <option key={g.id} value={g.id}>{g.name}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
               );
@@ -5771,17 +5797,32 @@ function LayersTab({
   page,
   selectedElementId,
   setSelectedElementId,
+  cadEngine,
 }: {
   projectId: string;
   page: import("@/lib/projectStore").ProjectPage;
   selectedElementId?: string;
   setSelectedElementId: (id?: string) => void;
+  cadEngine?: import("@/cad/embed/MiniCad").MiniCad | null;
 }) {
   const [multi, setMulti] = useState<Set<string>>(new Set());
+  // 300ms-Refresh, damit umbenannte Bezeichnungs-IDs aus dem Panel hier durchschlagen.
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!cadEngine) return;
+    const id = window.setInterval(() => setTick((t) => t + 1), 400);
+    return () => window.clearInterval(id);
+  }, [cadEngine]);
   const groups = page.groups ?? [];
   const els = page.elements;
+  const labelGroups = cadEngine?.labelManager?.list?.() ?? [];
 
   const layerLabel = (el: PageElement) => {
+    // Bevorzugt der zugeordnete Bezeichnungs-ID-Name aus dem Engine-LabelManager.
+    if (el.labelId) {
+      const g = labelGroups.find((lg) => lg.id === el.labelId);
+      if (g) return g.name;
+    }
     if (el.layerName) return el.layerName;
     const kindMap: Record<string, string> = {
       text: "Text",

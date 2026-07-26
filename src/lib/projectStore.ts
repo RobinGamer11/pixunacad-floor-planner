@@ -86,6 +86,10 @@ export interface PageElement {
   // layer / group
   groupId?: string;
   layerName?: string;
+  /** Bezeichnungs-ID des Engine-`LabelManager` (identisch zu CAD-Oberfläche).
+   *  Wird für cad-viewport-Elemente in der Projektmappe verwendet, um die
+   *  Sichtbarkeit/Anzeige über das gemeinsame Bezeichnungs-ID-Panel zu steuern. */
+  labelId?: string;
   /** PDF/Bild: Welche Kanten zeigen unendliche Hilfslinien (Toggle per Klick auf Kante im CAD-Layer). */
   guideEdges?: { top: boolean; right: boolean; bottom: boolean; left: boolean };
   /** PDF/Bild: Kanten-Crop in Metern (positiv = Inhalt am Rand abgeschnitten). */
