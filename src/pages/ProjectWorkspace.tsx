@@ -3721,14 +3721,19 @@ function ElementView({
                 )}
               </>
             ) : (
-              <button
-                data-hub-control
-                onClick={(e) => { e.stopPropagation(); onRotate?.(15); }}
-                title="Drehen +15°"
-                className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
-              >
-                <RotateCw size={14} />
-              </button>
+              <>
+                <button
+                  data-hub-control
+                  onClick={(e) => { e.stopPropagation(); onRotate?.(15); }}
+                  title="Drehen +15°"
+                  className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
+                >
+                  <RotateCw size={14} />
+                </button>
+                {(el.kind === "image" || el.kind === "pdf") && (
+                  <WarpHubButton elementId={el.id} />
+                )}
+              </>
             )}
             {!tabletCommitOnly && !isCadView && (
               <button
