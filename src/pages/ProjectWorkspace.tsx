@@ -631,6 +631,9 @@ export default function ProjectWorkspace() {
         y: yPct,
         w: wPct,
         h: hPct,
+        // Referenz für automatische Rahmen-Recompute nach Maßstabs­änderungen.
+        basePaperMm: { w: paperW, h: paperH },
+        baseScaleDen: pending.scaleDen,
       });
       setActivePageId(targetPageId);
     } catch (err: any) {
