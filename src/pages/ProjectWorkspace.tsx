@@ -489,7 +489,7 @@ export default function ProjectWorkspace() {
     if (isCadViewport) {
       if (activeTool !== "cad") setActiveTool("cad");
       setPrintMode(false);
-      setRightTabState("settings");
+      setRightTabState("tools");
     } else if (activeTool === "cad") {
       // Wechsel zu Nicht-CAD-Element → CAD-Blatt-Werkzeug schließen,
       // damit der normale Element-Inspektor wieder erscheint.
