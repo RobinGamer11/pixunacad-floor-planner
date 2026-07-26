@@ -5427,21 +5427,27 @@ function CadToolSection({
                   </div>
                   <div className="flex items-center gap-2 mt-2">
                     <span className="text-[11px] text-muted-foreground shrink-0">Bez.-ID</span>
-                    <input
-                      type="text"
-                      defaultValue={el.layerName ?? ""}
-                      placeholder={sheet?.name ?? "CAD-Ansicht"}
+                    <select
+                      value={el.labelId ?? ""}
                       onClick={(ev) => ev.stopPropagation()}
-                      onBlur={(ev) => {
+                      onChange={(ev) => {
                         if (!pageId) return;
-                        const v = ev.target.value.trim();
-                        projectStore.updateElement(projectId, pageId, el.id, { layerName: v || undefined });
+                        const v = ev.target.value;
+                        projectStore.updateElement(projectId, pageId, el.id, {
+                          labelId: v || undefined,
+                        });
+                        try { cadEngine?.refreshLabelUI?.(); } catch {}
                       }}
-                      onKeyDown={(ev) => { if (ev.key === "Enter") (ev.target as HTMLInputElement).blur(); }}
+                      disabled={!cadEngine || labelGroups.length === 0}
                       className="flex-1 h-7 px-2 rounded bg-transparent border text-sm"
                       style={{ borderColor: "hsl(var(--hairline))" }}
-                      title="Bezeichnungs-ID (Ebenenname) für die Ebenen-Ansicht."
-                    />
+                      title="Bezeichnungs-ID (Ebene) — identisch zur CAD-Oberfläche."
+                    >
+                      <option value="">— keine —</option>
+                      {labelGroups.map((g) => (
+                        <option key={g.id} value={g.id}>{g.name}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
               );
