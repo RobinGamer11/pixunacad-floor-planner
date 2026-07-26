@@ -3356,38 +3356,42 @@ function ElementView({
               </button>
             ) : isCadView ? (
               <>
-                <button
-                  data-hub-control
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    modeStartClientRef.current = { x: e.clientX, y: e.clientY };
-                    setPreview({ dxPx: 0, dyPx: 0, deltaDeg: 0, anchorFrac: { x: 0.5, y: 0.5 } });
-                    setEdgeTrim(null);
-                    setActiveEdge(null);
-                    setHubMode((m) => (m === "move" ? null : "move"));
-                  }}
-                  title="Verschieben — Maus bewegen, dann klicken zum Setzen (ESC bricht ab)"
-                  className={`h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))] ${hubMode === "move" ? "bg-[hsl(var(--surface-muted))]" : ""}`}
-                  style={{ color: hubMode === "move" ? "hsl(var(--accent-gold))" : undefined }}
-                >
-                  <Move size={14} />
-                </button>
-                <button
-                  data-hub-control
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    modeStartClientRef.current = { x: e.clientX, y: e.clientY };
-                    setPreview({ dxPx: 0, dyPx: 0, deltaDeg: 0, anchorFrac: { x: 0.5, y: 0.5 } });
-                    setEdgeTrim(null);
-                    setActiveEdge(null);
-                    setHubMode((m) => (m === "rotate" ? null : "rotate"));
-                  }}
-                  title="Drehen — Maus bewegen (Shift = 90°-Fang), dann klicken zum Setzen"
-                  className={`h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))] ${hubMode === "rotate" ? "bg-[hsl(var(--surface-muted))]" : ""}`}
-                  style={{ color: hubMode === "rotate" ? "hsl(var(--accent-gold))" : undefined }}
-                >
-                  <RotateCw size={14} />
-                </button>
+                {hubMode !== "rotate" && (
+                  <button
+                    data-hub-control
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      modeStartClientRef.current = { x: e.clientX, y: e.clientY };
+                      setPreview({ dxPx: 0, dyPx: 0, deltaDeg: 0, anchorFrac: { x: 0.5, y: 0.5 } });
+                      setEdgeTrim(null);
+                      setActiveEdge(null);
+                      setHubMode((m) => (m === "move" ? null : "move"));
+                    }}
+                    title="Verschieben — Maus bewegen, dann klicken zum Setzen (ESC bricht ab)"
+                    className={`h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))] ${hubMode === "move" ? "bg-[hsl(var(--surface-muted))]" : ""}`}
+                    style={{ color: hubMode === "move" ? "hsl(var(--accent-gold))" : undefined }}
+                  >
+                    <Move size={14} />
+                  </button>
+                )}
+                {hubMode !== "move" && (
+                  <button
+                    data-hub-control
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      modeStartClientRef.current = { x: e.clientX, y: e.clientY };
+                      setPreview({ dxPx: 0, dyPx: 0, deltaDeg: 0, anchorFrac: { x: 0.5, y: 0.5 } });
+                      setEdgeTrim(null);
+                      setActiveEdge(null);
+                      setHubMode((m) => (m === "rotate" ? null : "rotate"));
+                    }}
+                    title="Drehen — Maus bewegen (Shift = 90°-Fang), dann klicken zum Setzen"
+                    className={`h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))] ${hubMode === "rotate" ? "bg-[hsl(var(--surface-muted))]" : ""}`}
+                    style={{ color: hubMode === "rotate" ? "hsl(var(--accent-gold))" : undefined }}
+                  >
+                    <RotateCw size={14} />
+                  </button>
+                )}
                 {hubMode && tabletActive && (
                   <button
                     data-hub-control
