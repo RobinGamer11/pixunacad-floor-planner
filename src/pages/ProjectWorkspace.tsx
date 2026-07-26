@@ -3157,13 +3157,11 @@ function ElementView({
     const onClick = (ev: MouseEvent) => {
       const t = ev.target as HTMLElement | null;
       if (t?.closest("[data-hub-control]")) return;
-      if (downClient && Math.hypot(ev.clientX - downClient.x, ev.clientY - downClient.y) > 4) {
-        downClient = null;
-        return;
-      }
+      // Klicks während Move/Rotate NICHT committen und NICHT deselektieren.
+      // Setzen erst per Enter oder Häkchen-Symbol.
       ev.preventDefault();
       ev.stopPropagation();
-      commit();
+      downClient = null;
     };
     const onKey = (ev: KeyboardEvent) => {
       if (ev.key === "Escape") cancel();
