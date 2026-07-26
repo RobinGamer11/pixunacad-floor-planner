@@ -4581,42 +4581,40 @@ function DocumentToolSettings({
   onImport,
   scale,
   onScaleChange,
+  freePlace,
+  onFreePlaceChange,
 }: {
   importing: boolean;
   onImport?: () => void;
   scale: string;
   onScaleChange?: (s: string) => void;
+  freePlace?: boolean;
+  onFreePlaceChange?: (v: boolean) => void;
 }) {
-  const selectValue = PAGE_PLAN_SCALES.includes(scale) ? scale : "__other__";
   return (
     <SettingsBlock title="DOKUMENT IMPORTIEREN">
-      {/* Maßstab-Dropdown — wie beim CAD-Blatt: legt fest, in welchem
-          Ausgabemaßstab das importierte Dokument (A4/A3/A2 …) im
-          Modellbereich abgelegt wird. Modell selbst bleibt 1:1. */}
+      {/* Freie Maßstabs-Eingabe wie beim CAD-Blatt — legt fest, in welchem
+          Ausgabemaßstab das importierte Dokument (A4/A3/A2 …) im Modellbereich
+          abgelegt wird. Modell selbst bleibt 1:1. Bei aktivem „Frei platzieren"
+          wird der Maßstab beim Import automatisch berechnet. */}
       <Row label="Maßstab">
-        <select
-          value={selectValue}
-          onChange={(e) => {
-            const v = e.target.value;
-            if (v === "frei") {
-              const picked = askPlanScale(scale);
-              if (picked) onScaleChange?.(picked);
-            } else if (v !== "__other__") {
-              onScaleChange?.(v);
-            }
-          }}
-          className="w-full h-8 px-2 rounded border bg-transparent text-sm"
-          style={{ borderColor: "hsl(var(--hairline))" }}
-        >
-          {!PAGE_PLAN_SCALES.includes(scale) && (
-            <option value="__other__">{scale}</option>
-          )}
-          {PAGE_PLAN_SCALES.map((sc) => (
-            <option key={sc} value={sc}>{sc}</option>
-          ))}
-          <option value="frei">frei…</option>
-        </select>
+        <PlacedScaleInput
+          value={scale}
+          onCommit={(next) => onScaleChange?.(next)}
+        />
       </Row>
+
+      <label
+        className="flex items-center gap-2 text-xs cursor-pointer select-none px-1 py-1"
+        title="Skaliert das Dokument beim Import automatisch so, dass es vollständig mit Rand auf der aktiven Seite liegt."
+      >
+        <input
+          type="checkbox"
+          checked={!!freePlace}
+          onChange={(e) => onFreePlaceChange?.(e.target.checked)}
+        />
+        <span>Frei platzieren <span className="text-muted-foreground">(auto-fit auf Seite)</span></span>
+      </label>
 
       <button
         type="button"
@@ -4631,7 +4629,11 @@ function DocumentToolSettings({
       </button>
 
       <div className="text-[11px] leading-relaxed text-muted-foreground pt-2 border-t" style={{ borderColor: "hsl(var(--hairline))" }}>
-        <div>Import erfolgt im gewählten Maßstab (z. B. {scale}) auf A4/A3/A2 …</div>
+        {freePlace ? (
+          <div>„Frei platzieren" aktiv — Dokument wird automatisch auf die Seite skaliert.</div>
+        ) : (
+          <div>Import erfolgt im gewählten Maßstab (z. B. {scale}) auf A4/A3/A2 …</div>
+        )}
         <div>Zum Skalieren, Drehen oder Zuschneiden: <strong>Auswahl-Werkzeug</strong> → Dokument anklicken.</div>
       </div>
     </SettingsBlock>
