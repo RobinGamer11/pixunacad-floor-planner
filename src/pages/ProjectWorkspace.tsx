@@ -2851,8 +2851,14 @@ function ElementView({
   const modeStartClientRef = useRef<{ x: number; y: number } | null>(null);
   /** Zuletzt geklickter Punkt — als Fraktion (0..1) INNERHALB des Elements.
    *  Bleibt bei Zoom/Pan stabil, da wir clientX/Y erst zur Commit-/Move-Zeit
-   *  aus dem aktuellen Element-Rect ableiten. */
+   *  aus dem aktuellen Element-Rect ableiten. Als State, damit HUB neu
+   *  positioniert wird, wenn ein anderer Anker gewählt wurde. */
+  const [anchorFracState, setAnchorFracState] = useState<{ fx: number; fy: number; key: string } | null>(null);
   const anchorFracRef = useRef<{ fx: number; fy: number; key: string } | null>(null);
+  const setAnchor = (a: { fx: number; fy: number; key: string } | null) => {
+    anchorFracRef.current = a;
+    setAnchorFracState(a);
+  };
 
   const isCadView = el.kind === "cad-view" || el.kind === "cad-viewport";
   const hubBlue = "hsl(217 91% 60%)";
