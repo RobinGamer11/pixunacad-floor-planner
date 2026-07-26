@@ -2839,30 +2839,27 @@ function ElementView({
     return () => clearInterval(t);
   }, []);
 
-  // Snap-Ziele publizieren: Ecken + Kanten-Mittelpunkte in Prozent der Seite.
-  // Andere Werkzeuge im Seiteneditor können via window.__pixunaPageSnap
-  // konsumieren, um an diesen Punkten zu fangen.
+  // Snap-Ziele publizieren: Ecken + Kanten-Mittelpunkte + Kanten-Segmente.
+  // Andere Werkzeuge greifen via getPageSnapRegistry().queryNearest(...) drauf zu.
   useEffect(() => {
     if (readOnly) return;
-    const w = window as any;
-    if (!w.__pixunaPageSnap) w.__pixunaPageSnap = new Map();
-    const corners = [
-      { x: el.x, y: el.y, type: "corner" as const },
-      { x: el.x + el.w, y: el.y, type: "corner" as const },
-      { x: el.x, y: el.y + el.h, type: "corner" as const },
-      { x: el.x + el.w, y: el.y + el.h, type: "corner" as const },
-    ];
-    const edges = [
-      { x: el.x + el.w / 2, y: el.y, type: "edge-mid" as const },
-      { x: el.x + el.w / 2, y: el.y + el.h, type: "edge-mid" as const },
-      { x: el.x, y: el.y + el.h / 2, type: "edge-mid" as const },
-      { x: el.x + el.w, y: el.y + el.h / 2, type: "edge-mid" as const },
-    ];
-    w.__pixunaPageSnap.set(el.id, { kind: el.kind, points: [...corners, ...edges] });
-    return () => {
-      try { w.__pixunaPageSnap?.delete(el.id); } catch {}
-    };
+    const reg = getPageSnapRegistry();
+    reg.publish(el.id, buildRectSnapEntry(el.kind, el.x, el.y, el.w, el.h));
+    return () => { try { reg.unpublish(el.id); } catch {} };
   }, [el.id, el.kind, el.x, el.y, el.w, el.h, readOnly]);
+
+  // Hover-Highlight: welcher Snap-Handle dieses Elements ist gerade „gefangen"?
+  const [hoveredSnapKey, setHoveredSnapKey] = useState<string | null>(null);
+  useEffect(() => {
+    const onHover = (ev: Event) => {
+      const m = (ev as CustomEvent).detail as { elementId?: string; key?: string } | null;
+      if (!m || m.elementId !== el.id) { setHoveredSnapKey((k) => (k ? null : k)); return; }
+      setHoveredSnapKey(m.key ?? null);
+    };
+    window.addEventListener("pixuna:page-snap-hover", onHover as EventListener);
+    return () => window.removeEventListener("pixuna:page-snap-hover", onHover as EventListener);
+  }, [el.id]);
+
 
 
 
