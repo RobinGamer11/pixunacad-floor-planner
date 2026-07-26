@@ -68,6 +68,12 @@ export interface PageElement {
   modelCenterM?: { x: number; y: number };
   /** Viewport-Rotation gegenüber dem Papier, in Grad. */
   viewportRotationDeg?: number;
+  /** Papier-Ausschnittsgröße (mm) beim Platzieren — Referenz für automatische
+   *  Rahmenberechnung nach Maßstabs­änderungen. */
+  basePaperMm?: { w: number; h: number };
+  /** Maßstabsnenner zum Zeitpunkt der Platzierung — zusammen mit basePaperMm
+   *  Grundlage für Recompute des Rahmens. */
+  baseScaleDen?: number;
   /** Optionale Layer-Sichtbarkeit (reserviert). */
   visibleLayers?: string[];
   lastSyncAt?: string;
