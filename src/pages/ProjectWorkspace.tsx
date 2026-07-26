@@ -3008,11 +3008,14 @@ function ElementView({
       }
       setPreview({ dxPx: 0, dyPx: 0, deltaDeg: 0, anchorFrac: { x: 0.5, y: 0.5 } });
       setHubMode(null);
+      try { getPageSnapRegistry().setHover(null); } catch {}
     };
     const cancel = () => {
       setPreview({ dxPx: 0, dyPx: 0, deltaDeg: 0, anchorFrac: { x: 0.5, y: 0.5 } });
       setHubMode(null);
+      try { getPageSnapRegistry().setHover(null); } catch {}
     };
+
 
     const onMove = (ev: PointerEvent) => {
       const { clientX: ax, clientY: ay } = liveAnchor();
