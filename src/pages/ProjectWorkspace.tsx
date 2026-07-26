@@ -2721,7 +2721,13 @@ function PageCanvas({
           onSelectionChange={onCadSelectionChange}
           onEngineReady={onCadEngineReady}
           externalDocs={page.elements
-            .filter((e) => e.kind === "pdf" || e.kind === "image" || e.kind === "cad-view" || e.kind === "cad-viewport")
+            // CAD-Blatt (cad-view/cad-viewport) NICHT als externalDoc an die
+            // Engine übergeben — sonst rendert die Engine eigene blaue Snap-
+            // Marker über den ElementView-Handles und blockiert deren Klicks.
+            // Die Snap-Ziele der CAD-Blätter werden ausschließlich über
+            // pageSnap (buildRectSnapEntry) publiziert und durch die
+            // (nun blau gestylten) ElementView-Handles visuell dargestellt.
+            .filter((e) => e.kind === "pdf" || e.kind === "image")
             .map((e) => ({
               id: e.id,
               xMM: ((e.x ?? 0) / 100) * fmt.w,
