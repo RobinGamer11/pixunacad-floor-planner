@@ -81,8 +81,7 @@ import {
 } from "@/lib/projectStore";
 import CadOverlayLayer from "@/components/page/CadOverlayLayer";
 import { CadDocumentInspector } from "@/components/page/CadDocumentInspector";
-// CadIdPanelHost bewusst entfernt — CAD-Blätter laufen jetzt regulär über
-// den LayersTab (Bezeichnungs-ID via layerName).
+import { CadIdPanelHost } from "@/components/page/CadIdPanelHost";
 import { PdfPageView } from "@/components/page/PdfPageView";
 import { TableElementView, TableModifyContext, TableFormulaPickContext, type FormulaFn } from "@/components/page/TableElementView";
 import { TableToolSettings } from "@/components/page/TableToolSettings";
