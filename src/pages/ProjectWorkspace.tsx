@@ -3479,12 +3479,14 @@ function ElementView({
         </div>
       )}
       {el.kind === "image" && (
-        <img
-          src={el.imageUrl}
-          alt=""
-          className="w-full h-full object-cover"
-          style={{ background: "hsl(var(--surface-muted))" }}
-        />
+        <WarpedContent corners={el.warpCorners}>
+          <img
+            src={el.imageUrl}
+            alt=""
+            className="w-full h-full object-cover"
+            style={{ background: "hsl(var(--surface-muted))" }}
+          />
+        </WarpedContent>
       )}
       {el.kind === "note" && (
         <div
@@ -3514,12 +3516,27 @@ function ElementView({
       )}
 
       {el.kind === "pdf" && (
-        el.pdfSourceB64 ? (
-          <PdfPageView sourceB64={el.pdfSourceB64} pageIndex={el.pdfPageIndex ?? 0} />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground" style={{ background: "hsl(var(--surface-muted))" }}>PDF</div>
-        )
+        <WarpedContent corners={el.warpCorners}>
+          {el.pdfSourceB64 ? (
+            <PdfPageView sourceB64={el.pdfSourceB64} pageIndex={el.pdfPageIndex ?? 0} />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground" style={{ background: "hsl(var(--surface-muted))" }}>PDF</div>
+          )}
+        </WarpedContent>
       )}
+
+      {/* Photoshop-artige Ecken-/Kanten-Verzerrung: aktive Handles nur, wenn
+          Bild/PDF selektiert ist UND der Nutzer im Inspector „Verzerren" an
+          hat. Andere Werkzeug-Handles bleiben aktiv (kein Modal-Modus). */}
+      {selected && (el.kind === "image" || el.kind === "pdf") && (
+        <WarpTargetHandles
+          elementId={el.id}
+          corners={el.warpCorners}
+          containerRef={rootRef}
+          onCommit={(next) => onTransform?.({ warpCorners: next } as any)}
+        />
+      )}
+
 
       {showHub && (
         <>
