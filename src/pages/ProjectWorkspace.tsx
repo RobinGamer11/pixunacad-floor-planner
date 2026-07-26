@@ -3329,13 +3329,13 @@ function ElementView({
           {/* Hub action bar */}
           <div
             data-hub-control
-            className="absolute flex items-center gap-1 rounded-md shadow-md"
+            className={`absolute flex items-center gap-1 rounded-md ${tabletCommitOnly ? "" : "shadow-md"}`}
             style={{
               right: 0,
               top: -36,
-              background: "white",
-              border: `1px solid hsl(var(--hairline))`,
-              padding: 3,
+              background: tabletCommitOnly ? "transparent" : "white",
+              border: tabletCommitOnly ? "none" : `1px solid hsl(var(--hairline))`,
+              padding: tabletCommitOnly ? 0 : 3,
               zIndex: 10,
             }}
             onMouseDown={(e) => e.stopPropagation()}
@@ -3349,8 +3349,8 @@ function ElementView({
                   actionCommitRef.current?.();
                 }}
                 title="Bestätigen"
-                className="h-8 w-8 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
-                style={{ color: "hsl(140 60% 40%)" }}
+                className="h-9 w-9 inline-flex items-center justify-center rounded-full shadow-md hover:bg-[hsl(var(--surface-muted))]"
+                style={{ color: "hsl(140 60% 40%)", background: "white", border: "1px solid hsl(var(--hairline))" }}
               >
                 <Check size={16} />
               </button>
@@ -3453,7 +3453,7 @@ function ElementView({
           {/* Edge-Drag-Handles: Preview beim Ziehen, Commit erst bei Pointerup
              (bzw. Tablet-Häkchen). onEdgeDrag wird nur EINMAL mit dem Gesamt-
              Delta gerufen — kein jitterndes Store-Update während der Bewegung. */}
-          {(["top", "right", "bottom", "left"] as const).map((edge) => {
+          {!tabletCommitOnly && (["top", "right", "bottom", "left"] as const).map((edge) => {
             const isHor = edge === "top" || edge === "bottom";
             const isActive = edgeTrim?.edge === edge;
             const edgeReady = activeEdge === edge;
@@ -3586,7 +3586,7 @@ function ElementView({
 
 
           {/* Ecken-Handles: quadratisch + blau bei CAD-Blatt, sonst rund + gold */}
-          {onCornerDrag && (["tl", "tr", "bl", "br"] as const).map((corner) => {
+          {!tabletCommitOnly && onCornerDrag && (["tl", "tr", "bl", "br"] as const).map((corner) => {
             const startCornerDrag = (e: React.PointerEvent) => {
               e.stopPropagation();
               e.preventDefault();
