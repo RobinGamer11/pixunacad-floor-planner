@@ -3122,6 +3122,8 @@ function ElementView({
       actionCancelRef.current = null;
       modeStartClientRef.current = null;
       try { getPageSnapRegistry().setHover(null); } catch {}
+      // Abbruch → Objekt deselektieren, damit automatisch das Auswahl-Werkzeug greift.
+      onSelect?.(undefined);
     };
 
     actionCommitRef.current = commit;
