@@ -3901,21 +3901,12 @@ function RightInspector({
             />
           )}
           {tab === "layers" && page && (
-            <div className="space-y-4">
-            {/* CAD-Ebenen (Bezeichnungs-ID) — 1:1 wie in der CAD-Oberfläche.
-                Verwaltet alle CAD-Objekte (Linien, Schraffuren, Texte,
-                Freihand, Dokumente, Wände, Maßketten) per Layer/Sichtbarkeit. */}
-            {cadEngine && <CadIdPanelHost engine={cadEngine} />}
-
-            {/* Projektmappen-Elemente (Notizen, Bilder, CAD-Blätter, …) —
-                Z-Order + Sichtbarkeit auf React-Ebene. */}
-              <LayersTab
-                projectId={projectId}
-                page={page}
-                selectedElementId={selectedElementId}
-                setSelectedElementId={setSelectedElementId}
-              />
-            </div>
+            <LayersTab
+              projectId={projectId}
+              page={page}
+              selectedElementId={selectedElementId}
+              setSelectedElementId={setSelectedElementId}
+            />
           )}
         </div>
       </DragScrollDiv>
