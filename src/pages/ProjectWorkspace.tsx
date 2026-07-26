@@ -3104,7 +3104,7 @@ function ElementView({
               width: 14,
               height: 14,
               borderRadius: 999,
-              background: isCadView ? hubBlue : "hsl(var(--accent-gold))",
+              background: "hsl(var(--accent-gold))",
               border: "2px solid white",
               boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
               cursor: "grab",
@@ -3117,7 +3117,7 @@ function ElementView({
               top: -14,
               width: 1,
               height: 14,
-              background: isCadView ? hubBlue : "hsl(var(--accent-gold))",
+              background: "hsl(var(--accent-gold))",
               transform: "translateX(-50%)",
             }}
           />
@@ -3260,7 +3260,7 @@ function ElementView({
             const sizeStyle: React.CSSProperties = isHor
               ? { left: 0, right: 0, height: 8, [edge === "top" ? "top" : "bottom"]: -4 }
               : { top: 0, bottom: 0, width: 8, [edge === "left" ? "left" : "right"]: -4 };
-            const edgeStroke = isCadView ? hubBlue : "hsl(var(--accent-gold))";
+            const edgeStroke = "hsl(var(--accent-gold))";
             return (
               <div
                 key={edge}
@@ -3324,7 +3324,7 @@ function ElementView({
                   height: size,
                   borderRadius: isCadView ? 2 : 999,
                   background: "white",
-                  border: `2px solid ${isCadView ? hubBlue : "hsl(var(--accent-gold))"}`,
+                  border: `2px solid ${"hsl(var(--accent-gold))"}`,
                   boxShadow: "0 1px 3px rgba(0,0,0,0.25)",
                   cursor,
                   zIndex: 6,
