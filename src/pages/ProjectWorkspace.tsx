@@ -101,6 +101,7 @@ import { TabletAidWheel } from "@/components/TabletAidWheel";
 // aus page.customWidthMm/customHeightMm werden dort abgefragt, wo die reale
 // Seitengröße gebraucht wird (getPageSizeMm).
 import { PAPER_FORMATS as FORMAT_SIZES, getPageSizeMm, parseScaleDen } from "@/lib/paper";
+import { getPageSnapRegistry, buildRectSnapEntry } from "@/lib/pageSnap";
 
 export type PageTool = "guide" | "line" | "free" | "eraser" | "text" | "cad" | "pipette" | "hatch" | "document" | "table" | null;
 type LinePageTool = "line" | "free" | "eraser";
@@ -2810,8 +2811,10 @@ function ElementView({
   const rootRef = useRef<HTMLDivElement | null>(null);
   const rotateRef = useRef<HTMLDivElement | null>(null);
   const rotateMovedRef = useRef(false);
-  /** Zuletzt geklickter Punkt am Element (client-Koords) — Anker für Move/Rotate. */
-  const anchorPtRef = useRef<{ clientX: number; clientY: number } | null>(null);
+  /** Zuletzt geklickter Punkt — als Fraktion (0..1) INNERHALB des Elements.
+   *  Bleibt bei Zoom/Pan stabil, da wir clientX/Y erst zur Commit-/Move-Zeit
+   *  aus dem aktuellen Element-Rect ableiten. */
+  const anchorFracRef = useRef<{ fx: number; fy: number; key: string } | null>(null);
 
   const isCadView = el.kind === "cad-view" || el.kind === "cad-viewport";
   const hubBlue = "hsl(217 91% 60%)";
@@ -2827,6 +2830,14 @@ function ElementView({
   }>({ dxPx: 0, dyPx: 0, deltaDeg: 0, anchorFrac: { x: 0.5, y: 0.5 } });
   const previewRef = useRef(preview);
   previewRef.current = preview;
+  // Edge-Trim: reine Vorschau (dxPx/dyPx). Commit erst bei Pointerup bzw.
+  // — bei aktivem Tablet-Hilfsrad — beim Klick auf das Häkchen.
+  const [edgeTrim, setEdgeTrim] = useState<{
+    edge: "top" | "right" | "bottom" | "left";
+    dxPx: number; dyPx: number;
+  } | null>(null);
+  const edgeTrimRef = useRef(edgeTrim);
+  edgeTrimRef.current = edgeTrim;
   const [tabletActive, setTabletActive] = useState<boolean>(
     () => typeof window !== "undefined" && !!(window as any).__pixunaTabletCommit
   );
@@ -2837,30 +2848,27 @@ function ElementView({
     return () => clearInterval(t);
   }, []);
 
-  // Snap-Ziele publizieren: Ecken + Kanten-Mittelpunkte in Prozent der Seite.
-  // Andere Werkzeuge im Seiteneditor können via window.__pixunaPageSnap
-  // konsumieren, um an diesen Punkten zu fangen.
+  // Snap-Ziele publizieren: Ecken + Kanten-Mittelpunkte + Kanten-Segmente.
+  // Andere Werkzeuge greifen via getPageSnapRegistry().queryNearest(...) drauf zu.
   useEffect(() => {
     if (readOnly) return;
-    const w = window as any;
-    if (!w.__pixunaPageSnap) w.__pixunaPageSnap = new Map();
-    const corners = [
-      { x: el.x, y: el.y, type: "corner" as const },
-      { x: el.x + el.w, y: el.y, type: "corner" as const },
-      { x: el.x, y: el.y + el.h, type: "corner" as const },
-      { x: el.x + el.w, y: el.y + el.h, type: "corner" as const },
-    ];
-    const edges = [
-      { x: el.x + el.w / 2, y: el.y, type: "edge-mid" as const },
-      { x: el.x + el.w / 2, y: el.y + el.h, type: "edge-mid" as const },
-      { x: el.x, y: el.y + el.h / 2, type: "edge-mid" as const },
-      { x: el.x + el.w, y: el.y + el.h / 2, type: "edge-mid" as const },
-    ];
-    w.__pixunaPageSnap.set(el.id, { kind: el.kind, points: [...corners, ...edges] });
-    return () => {
-      try { w.__pixunaPageSnap?.delete(el.id); } catch {}
-    };
+    const reg = getPageSnapRegistry();
+    reg.publish(el.id, buildRectSnapEntry(el.kind, el.x, el.y, el.w, el.h));
+    return () => { try { reg.unpublish(el.id); } catch {} };
   }, [el.id, el.kind, el.x, el.y, el.w, el.h, readOnly]);
+
+  // Hover-Highlight: welcher Snap-Handle dieses Elements ist gerade „gefangen"?
+  const [hoveredSnapKey, setHoveredSnapKey] = useState<string | null>(null);
+  useEffect(() => {
+    const onHover = (ev: Event) => {
+      const m = (ev as CustomEvent).detail as { elementId?: string; key?: string } | null;
+      if (!m || m.elementId !== el.id) { setHoveredSnapKey((k) => (k ? null : k)); return; }
+      setHoveredSnapKey(m.key ?? null);
+    };
+    window.addEventListener("pixuna:page-snap-hover", onHover as EventListener);
+    return () => window.removeEventListener("pixuna:page-snap-hover", onHover as EventListener);
+  }, [el.id]);
+
 
 
 
@@ -2895,10 +2903,21 @@ function ElementView({
     // Don't start a drag when the user clicks an interactive control inside the hub.
     const t = e.target as HTMLElement;
     if (t.closest("[data-hub-control]")) return;
-    // Klickpunkt als Anker merken — HUB Move/Rotate orientiert sich daran.
-    anchorPtRef.current = { clientX: e.clientX, clientY: e.clientY };
+    // Anker als Fraktion INNERHALB des Elements speichern.
+    // Zusätzlich Snap-Key (tl/tr/bl/br/mid-*) bestimmen, falls Klick nahe einer Ecke/Kante liegt.
+    const rect = (rootRef.current ?? (e.currentTarget as HTMLElement)).getBoundingClientRect();
+    const fx = Math.max(0, Math.min(1, (e.clientX - rect.left) / Math.max(1, rect.width)));
+    const fy = Math.max(0, Math.min(1, (e.clientY - rect.top) / Math.max(1, rect.height)));
+    const nearX = fx < 0.12 ? "l" : fx > 0.88 ? "r" : "m";
+    const nearY = fy < 0.12 ? "t" : fy > 0.88 ? "b" : "m";
+    let key = "interior";
+    if (nearX !== "m" && nearY !== "m") key = `corner-${nearY}${nearX}`;
+    else if (nearX === "m" && nearY !== "m") key = nearY === "t" ? "edge-top" : "edge-bottom";
+    else if (nearY === "m" && nearX !== "m") key = nearX === "l" ? "edge-left" : "edge-right";
+    anchorFracRef.current = { fx, fy, key };
     startDrag(e);
   };
+
 
   const handleRotateStart = (e: React.PointerEvent) => {
     if (readOnly || !onRotate) return;
@@ -2938,30 +2957,28 @@ function ElementView({
   const outlineStyle = selected ? "2px solid hsl(var(--accent-gold))" : "none";
 
   // Preview-Interaktion (Move/Rotate) — startet bei aktivem hubMode.
-  // Anker = zuletzt geklickter Punkt (anchorPtRef); fällt auf Element-Mitte
-  // zurück, wenn keiner gesetzt ist. Move: Element folgt der Maus so, dass
-  // der Anker unter dem Cursor bleibt. Rotate: Drehung um den Anker.
+  // Anker = zuletzt geklickte Fraktion (anchorFracRef) INNERHALB des Elements.
+  // Wichtig: clientX/Y des Ankers werden bei jedem Event NEU aus dem aktuellen
+  // Element-Rect berechnet, damit Zoom/Pan des Workspaces den Bezug nicht kippen.
   useEffect(() => {
     if (!hubMode) return;
     const parent = rootRef.current?.parentElement as HTMLElement | null;
-    const parentRect = parent?.getBoundingClientRect();
-    const rect = rootRef.current?.getBoundingClientRect();
-    if (!parent || !parentRect || !rect) return;
-    const anchor = anchorPtRef.current ?? {
-      clientX: rect.left + rect.width / 2,
-      clientY: rect.top + rect.height / 2,
-    };
-    const anchorFrac = {
-      x: Math.max(0, Math.min(1, (anchor.clientX - rect.left) / Math.max(1, rect.width))),
-      y: Math.max(0, Math.min(1, (anchor.clientY - rect.top) / Math.max(1, rect.height))),
-    };
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
+    if (!parent) return;
+    const frac = anchorFracRef.current ?? { fx: 0.5, fy: 0.5, key: "interior" };
+    const anchorFrac = { x: frac.fx, y: frac.fy };
     const startRot = el.rotation ?? 0;
     let startAngle: number | null = null;
+    let downClient: { x: number; y: number } | null = null;
+
+    const liveAnchor = () => {
+      const r = rootRef.current!.getBoundingClientRect();
+      return { clientX: r.left + frac.fx * r.width, clientY: r.top + frac.fy * r.height, rect: r };
+    };
 
     const commit = () => {
       const p = previewRef.current;
+      const parentRect = parent.getBoundingClientRect();
+      const { clientX: ax, clientY: ay, rect } = liveAnchor();
       if (hubMode === "move") {
         const dxPct = (p.dxPx / Math.max(1, parentRect.width)) * 100;
         const dyPct = (p.dyPx / Math.max(1, parentRect.height)) * 100;
@@ -2970,18 +2987,17 @@ function ElementView({
           y: Math.max(0, Math.min(100 - (el.h ?? 0), el.y + dyPct)),
         });
       } else if (hubMode === "rotate") {
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
         const deltaRad = (p.deltaDeg * Math.PI) / 180;
-        // Neuer Mittelpunkt = Anker + R(δ) * (alterMittelpunkt - Anker)
-        const ox = centerX - anchor.clientX;
-        const oy = centerY - anchor.clientY;
+        const ox = centerX - ax;
+        const oy = centerY - ay;
         const cos = Math.cos(deltaRad);
         const sin = Math.sin(deltaRad);
-        const newCx = anchor.clientX + ox * cos - oy * sin;
-        const newCy = anchor.clientY + ox * sin + oy * cos;
-        const halfWpx = rect.width / 2;
-        const halfHpx = rect.height / 2;
-        const newLeftPx = newCx - halfWpx;
-        const newTopPx = newCy - halfHpx;
+        const newCx = ax + ox * cos - oy * sin;
+        const newCy = ay + ox * sin + oy * cos;
+        const newLeftPx = newCx - rect.width / 2;
+        const newTopPx = newCy - rect.height / 2;
         const newXPct = ((newLeftPx - parentRect.left) / Math.max(1, parentRect.width)) * 100;
         const newYPct = ((newTopPx - parentRect.top) / Math.max(1, parentRect.height)) * 100;
         onTransform?.({
@@ -2992,19 +3008,40 @@ function ElementView({
       }
       setPreview({ dxPx: 0, dyPx: 0, deltaDeg: 0, anchorFrac: { x: 0.5, y: 0.5 } });
       setHubMode(null);
+      try { getPageSnapRegistry().setHover(null); } catch {}
     };
     const cancel = () => {
       setPreview({ dxPx: 0, dyPx: 0, deltaDeg: 0, anchorFrac: { x: 0.5, y: 0.5 } });
       setHubMode(null);
+      try { getPageSnapRegistry().setHover(null); } catch {}
     };
 
+
     const onMove = (ev: PointerEvent) => {
+      const { clientX: ax, clientY: ay } = liveAnchor();
+      const reg = getPageSnapRegistry();
+      const pageRect = parent.getBoundingClientRect();
       if (hubMode === "move") {
-        const dxPx = ev.clientX - anchor.clientX;
-        const dyPx = ev.clientY - anchor.clientY;
+        let dxPx = ev.clientX - ax;
+        let dyPx = ev.clientY - ay;
+        // Snap: der Anker (also der zuletzt gewählte Punkt) sucht Fangpunkte
+        // aller ANDEREN Seiten-Elemente. Wenn im Toleranzbereich, wird der
+        // Delta so korrigiert, dass Anker exakt auf dem Snap-Ziel landet.
+        const targetX = ev.clientX;
+        const targetY = ev.clientY;
+        const m = reg.queryNearest(targetX, targetY, pageRect, 10, [el.id]);
+        if (m) {
+          const snapPx = pageRect.left + (m.x / 100) * pageRect.width;
+          const snapPy = pageRect.top + (m.y / 100) * pageRect.height;
+          dxPx = snapPx - ax;
+          dyPx = snapPy - ay;
+          reg.setHover(m);
+        } else {
+          reg.setHover(null);
+        }
         setPreview({ dxPx, dyPx, deltaDeg: 0, anchorFrac });
       } else if (hubMode === "rotate") {
-        const a = (Math.atan2(ev.clientY - anchor.clientY, ev.clientX - anchor.clientX) * 180) / Math.PI;
+        const a = (Math.atan2(ev.clientY - ay, ev.clientX - ax) * 180) / Math.PI;
         if (startAngle === null) startAngle = a;
         let delta = a - startAngle;
         if (ev.shiftKey) {
@@ -3014,9 +3051,15 @@ function ElementView({
         setPreview({ dxPx: 0, dyPx: 0, deltaDeg: delta, anchorFrac });
       }
     };
+
+    const onDown = (ev: PointerEvent) => { downClient = { x: ev.clientX, y: ev.clientY }; };
     const onClick = (ev: MouseEvent) => {
       const t = ev.target as HTMLElement | null;
       if (t?.closest("[data-hub-control]")) return;
+      if (downClient && Math.hypot(ev.clientX - downClient.x, ev.clientY - downClient.y) > 4) {
+        downClient = null;
+        return;
+      }
       ev.preventDefault();
       ev.stopPropagation();
       commit();
@@ -3025,15 +3068,18 @@ function ElementView({
       if (ev.key === "Escape") cancel();
       else if (ev.key === "Enter") commit();
     };
+    window.addEventListener("pointerdown", onDown, true);
     window.addEventListener("pointermove", onMove);
     window.addEventListener("click", onClick, true);
     window.addEventListener("keydown", onKey);
     return () => {
+      window.removeEventListener("pointerdown", onDown, true);
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("click", onClick, true);
       window.removeEventListener("keydown", onKey);
     };
   }, [hubMode, el.x, el.y, el.w, el.h, el.rotation, onTransform]);
+
 
   const previewTransform = (() => {
     const parts: string[] = [];
@@ -3277,30 +3323,51 @@ function ElementView({
           </div>
 
 
-          {/* Edge-Drag-Handles */}
+          {/* Edge-Drag-Handles: Preview beim Ziehen, Commit erst bei Pointerup
+             (bzw. Tablet-Häkchen). onEdgeDrag wird nur EINMAL mit dem Gesamt-
+             Delta gerufen — kein jitterndes Store-Update während der Bewegung. */}
           {(["top", "right", "bottom", "left"] as const).map((edge) => {
             const isHor = edge === "top" || edge === "bottom";
+            const isActive = edgeTrim?.edge === edge;
             const startEdgeDrag = (e: React.PointerEvent) => {
               if (!onEdgeDrag) return;
               e.stopPropagation();
               e.preventDefault();
               try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
-              let last = { x: e.clientX, y: e.clientY };
+              const start = { x: e.clientX, y: e.clientY };
+              setEdgeTrim({ edge, dxPx: 0, dyPx: 0 });
               const move = (ev: PointerEvent) => {
-                const dx = ev.clientX - last.x;
-                const dy = ev.clientY - last.y;
-                onEdgeDrag(edge, dx, dy);
-                last = { x: ev.clientX, y: ev.clientY };
+                setEdgeTrim({ edge, dxPx: ev.clientX - start.x, dyPx: ev.clientY - start.y });
+              };
+              const commit = () => {
+                const p = edgeTrimRef.current;
+                if (p && (p.dxPx !== 0 || p.dyPx !== 0)) {
+                  onEdgeDrag!(edge, p.dxPx, p.dyPx);
+                }
+                setEdgeTrim(null);
               };
               const up = (ev: PointerEvent) => {
                 try { (e.currentTarget as HTMLElement).releasePointerCapture(ev.pointerId); } catch {}
                 window.removeEventListener("pointermove", move);
                 window.removeEventListener("pointerup", up);
-                window.removeEventListener("pointercancel", up);
+                window.removeEventListener("pointercancel", cancelListener);
+                window.removeEventListener("keydown", key);
+                // Tablet-Modus: nicht sofort committen — auf Häkchen warten.
+                if ((window as any).__pixunaTabletCommit) {
+                  (window as any).__pixunaTabletCommit = commit;
+                  return;
+                }
+                commit();
+              };
+              const cancelListener = () => { setEdgeTrim(null); window.removeEventListener("pointermove", move); };
+              const key = (ev: KeyboardEvent) => {
+                if (ev.key === "Escape") { setEdgeTrim(null); window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); window.removeEventListener("keydown", key); }
+                else if (ev.key === "Enter") { commit(); window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); window.removeEventListener("keydown", key); }
               };
               window.addEventListener("pointermove", move);
               window.addEventListener("pointerup", up);
-              window.addEventListener("pointercancel", up);
+              window.addEventListener("pointercancel", cancelListener);
+              window.addEventListener("keydown", key);
             };
             const baseStyle: React.CSSProperties = {
               position: "absolute",
@@ -3313,6 +3380,7 @@ function ElementView({
               : { top: 0, bottom: 0, width: 8, [edge === "left" ? "left" : "right"]: -4 };
             const edgeStroke = "hsl(var(--accent-gold))";
             const EdgeSymbol = isHor ? ChevronsUpDown : ChevronsLeftRight;
+            const hoverGlow = hoveredSnapKey === `edge-mid-${edge}` || hoveredSnapKey === `edge-line-${edge}`;
             return (
               <div
                 key={edge}
@@ -3328,13 +3396,13 @@ function ElementView({
                   className="absolute"
                   style={
                     isHor
-                      ? { left: 0, right: 0, top: "50%", height: 2, transform: "translateY(-50%)", background: edgeStroke, opacity: 0.7 }
-                      : { top: 0, bottom: 0, left: "50%", width: 2, transform: "translateX(-50%)", background: edgeStroke, opacity: 0.7 }
+                      ? { left: 0, right: 0, top: "50%", height: hoverGlow || isActive ? 3 : 2, transform: "translateY(-50%)", background: edgeStroke, opacity: hoverGlow || isActive ? 1 : 0.7, boxShadow: hoverGlow ? `0 0 8px ${edgeStroke}` : undefined }
+                      : { top: 0, bottom: 0, left: "50%", width: hoverGlow || isActive ? 3 : 2, transform: "translateX(-50%)", background: edgeStroke, opacity: hoverGlow || isActive ? 1 : 0.7, boxShadow: hoverGlow ? `0 0 8px ${edgeStroke}` : undefined }
                   }
                 />
                 {isCadView && (
                   <div
-                    className="absolute flex items-center justify-center rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                    className={`absolute flex items-center justify-center rounded-full transition-opacity ${isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
                     style={{
                       width: 18,
                       height: 18,
@@ -3353,6 +3421,28 @@ function ElementView({
               </div>
             );
           })}
+
+          {/* Edge-Trim-Preview: gestricheltes Rechteck des künftigen Rahmens.
+             Wird nur beim aktiven Ziehen angezeigt und in Pixel-Deltas relativ
+             zum Element-Rand positioniert. */}
+          {edgeTrim && (() => {
+            const insetLeft   = edgeTrim.edge === "left"   ?  edgeTrim.dxPx : 0;
+            const insetRight  = edgeTrim.edge === "right"  ? -edgeTrim.dxPx : 0;
+            const insetTop    = edgeTrim.edge === "top"    ?  edgeTrim.dyPx : 0;
+            const insetBottom = edgeTrim.edge === "bottom" ? -edgeTrim.dyPx : 0;
+            return (
+              <div
+                className="absolute pointer-events-none"
+                style={{
+                  left: insetLeft, right: insetRight, top: insetTop, bottom: insetBottom,
+                  border: "1.5px dashed hsl(var(--accent-gold))",
+                  background: "hsl(var(--accent-gold) / 0.06)",
+                  zIndex: 7,
+                }}
+              />
+            );
+          })()}
+
 
           {/* Ecken-Handles: quadratisch + blau bei CAD-Blatt, sonst rund + gold */}
           {onCornerDrag && (["tl", "tr", "bl", "br"] as const).map((corner) => {
@@ -3383,6 +3473,7 @@ function ElementView({
             const cursor =
               corner === "tl" || corner === "br" ? "nwse-resize" : "nesw-resize";
             const size = 12;
+            const glow = hoveredSnapKey === `corner-${corner}`;
             return (
               <div
                 key={corner}
@@ -3391,21 +3482,24 @@ function ElementView({
                 title={isCadView ? "Ecke ziehen: Kante trimmen/erweitern" : "Ecke skalieren (Shift: proportional)"}
                 className="absolute"
                 style={{
-                  [isTop ? "top" : "bottom"]: -Math.floor(size / 2),
-                  [isLeft ? "left" : "right"]: -Math.floor(size / 2),
-                  width: size,
-                  height: size,
+                  [isTop ? "top" : "bottom"]: -Math.floor((glow ? size + 4 : size) / 2),
+                  [isLeft ? "left" : "right"]: -Math.floor((glow ? size + 4 : size) / 2),
+                  width: glow ? size + 4 : size,
+                  height: glow ? size + 4 : size,
                   borderRadius: 999,
-                  background: "white",
+                  background: glow ? "hsl(var(--accent-gold))" : "white",
                   border: `2px solid hsl(var(--accent-gold))`,
-
-                  boxShadow: "0 1px 3px rgba(0,0,0,0.25)",
+                  boxShadow: glow
+                    ? "0 0 0 3px hsl(var(--accent-gold) / 0.35), 0 0 10px hsl(var(--accent-gold))"
+                    : "0 1px 3px rgba(0,0,0,0.25)",
+                  transition: "width 90ms, height 90ms, background 90ms, box-shadow 90ms",
                   cursor,
                   zIndex: 6,
                 } as React.CSSProperties}
               />
             );
           })}
+
         </>
 
       )}
