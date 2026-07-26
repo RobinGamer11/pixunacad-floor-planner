@@ -2935,44 +2935,80 @@ function ElementView({
   const outlineStyle = selected ? "2px solid hsl(var(--accent-gold))" : "none";
 
   // Preview-Interaktion (Move/Rotate) — startet bei aktivem hubMode.
+  // Anker = zuletzt geklickter Punkt (anchorPtRef); fällt auf Element-Mitte
+  // zurück, wenn keiner gesetzt ist. Move: Element folgt der Maus so, dass
+  // der Anker unter dem Cursor bleibt. Rotate: Drehung um den Anker.
   useEffect(() => {
     if (!hubMode) return;
     const parent = rootRef.current?.parentElement as HTMLElement | null;
     const parentRect = parent?.getBoundingClientRect();
     const rect = rootRef.current?.getBoundingClientRect();
     if (!parent || !parentRect || !rect) return;
-    const startCx = rect.left + rect.width / 2;
-    const startCy = rect.top + rect.height / 2;
+    const anchor = anchorPtRef.current ?? {
+      clientX: rect.left + rect.width / 2,
+      clientY: rect.top + rect.height / 2,
+    };
+    const anchorFrac = {
+      x: Math.max(0, Math.min(1, (anchor.clientX - rect.left) / Math.max(1, rect.width))),
+      y: Math.max(0, Math.min(1, (anchor.clientY - rect.top) / Math.max(1, rect.height))),
+    };
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
     const startRot = el.rotation ?? 0;
+    let startAngle: number | null = null;
 
     const commit = () => {
       const p = previewRef.current;
       if (hubMode === "move") {
+        const dxPct = (p.dxPx / Math.max(1, parentRect.width)) * 100;
+        const dyPct = (p.dyPx / Math.max(1, parentRect.height)) * 100;
         onTransform?.({
-          x: Math.max(0, Math.min(95, el.x + p.dxPct)),
-          y: Math.max(0, Math.min(95, el.y + p.dyPct)),
+          x: Math.max(0, Math.min(100 - (el.w ?? 0), el.x + dxPct)),
+          y: Math.max(0, Math.min(100 - (el.h ?? 0), el.y + dyPct)),
         });
       } else if (hubMode === "rotate") {
-        onTransform?.({ rotation: p.rotDeg });
+        const deltaRad = (p.deltaDeg * Math.PI) / 180;
+        // Neuer Mittelpunkt = Anker + R(δ) * (alterMittelpunkt - Anker)
+        const ox = centerX - anchor.clientX;
+        const oy = centerY - anchor.clientY;
+        const cos = Math.cos(deltaRad);
+        const sin = Math.sin(deltaRad);
+        const newCx = anchor.clientX + ox * cos - oy * sin;
+        const newCy = anchor.clientY + ox * sin + oy * cos;
+        const halfWpx = rect.width / 2;
+        const halfHpx = rect.height / 2;
+        const newLeftPx = newCx - halfWpx;
+        const newTopPx = newCy - halfHpx;
+        const newXPct = ((newLeftPx - parentRect.left) / Math.max(1, parentRect.width)) * 100;
+        const newYPct = ((newTopPx - parentRect.top) / Math.max(1, parentRect.height)) * 100;
+        onTransform?.({
+          x: Math.max(-50, Math.min(150, newXPct)),
+          y: Math.max(-50, Math.min(150, newYPct)),
+          rotation: startRot + p.deltaDeg,
+        });
       }
-      setPreview({ dxPct: 0, dyPct: 0, rotDeg: 0 });
+      setPreview({ dxPx: 0, dyPx: 0, deltaDeg: 0, anchorFrac: { x: 0.5, y: 0.5 } });
       setHubMode(null);
     };
     const cancel = () => {
-      setPreview({ dxPct: 0, dyPct: 0, rotDeg: 0 });
+      setPreview({ dxPx: 0, dyPx: 0, deltaDeg: 0, anchorFrac: { x: 0.5, y: 0.5 } });
       setHubMode(null);
     };
 
     const onMove = (ev: PointerEvent) => {
       if (hubMode === "move") {
-        const dxPct = ((ev.clientX - startCx) / parentRect.width) * 100;
-        const dyPct = ((ev.clientY - startCy) / parentRect.height) * 100;
-        setPreview({ dxPct, dyPct, rotDeg: startRot });
+        const dxPx = ev.clientX - anchor.clientX;
+        const dyPx = ev.clientY - anchor.clientY;
+        setPreview({ dxPx, dyPx, deltaDeg: 0, anchorFrac });
       } else if (hubMode === "rotate") {
-        const a = Math.atan2(ev.clientY - startCy, ev.clientX - startCx) * 180 / Math.PI;
-        let deg = a + 90;
-        if (ev.shiftKey) deg = Math.round(deg / 90) * 90;
-        setPreview({ dxPct: 0, dyPct: 0, rotDeg: deg });
+        const a = (Math.atan2(ev.clientY - anchor.clientY, ev.clientX - anchor.clientX) * 180) / Math.PI;
+        if (startAngle === null) startAngle = a;
+        let delta = a - startAngle;
+        if (ev.shiftKey) {
+          const absTarget = Math.round((startRot + delta) / 90) * 90;
+          delta = absTarget - startRot;
+        }
+        setPreview({ dxPx: 0, dyPx: 0, deltaDeg: delta, anchorFrac });
       }
     };
     const onClick = (ev: MouseEvent) => {
@@ -2987,7 +3023,6 @@ function ElementView({
       else if (ev.key === "Enter") commit();
     };
     window.addEventListener("pointermove", onMove);
-    // 'click' im Capture, damit wir vor Selektions-Handlern feuern.
     window.addEventListener("click", onClick, true);
     window.addEventListener("keydown", onKey);
     return () => {
@@ -2995,22 +3030,27 @@ function ElementView({
       window.removeEventListener("click", onClick, true);
       window.removeEventListener("keydown", onKey);
     };
-  }, [hubMode, el.x, el.y, el.rotation, onTransform]);
+  }, [hubMode, el.x, el.y, el.w, el.h, el.rotation, onTransform]);
 
   const previewTransform = (() => {
     const parts: string[] = [];
-    if (preview.dxPct !== 0 || preview.dyPct !== 0) {
-      const parent = rootRef.current?.parentElement as HTMLElement | null;
-      if (parent) {
-        const pxDx = (preview.dxPct / 100) * parent.clientWidth;
-        const pxDy = (preview.dyPct / 100) * parent.clientHeight;
-        parts.push(`translate(${pxDx}px, ${pxDy}px)`);
-      }
+    if (hubMode === "move" && (preview.dxPx !== 0 || preview.dyPx !== 0)) {
+      parts.push(`translate(${preview.dxPx}px, ${preview.dyPx}px)`);
     }
-    const rot = hubMode === "rotate" ? preview.rotDeg : (el.rotation ?? 0);
-    if (rot) parts.push(`rotate(${rot}deg)`);
+    // Basis-Rotation immer um den Anker (falls Preview läuft) bzw. sonst Center.
+    if (hubMode === "rotate") {
+      const totalDeg = (el.rotation ?? 0) + preview.deltaDeg;
+      if (totalDeg) parts.push(`rotate(${totalDeg}deg)`);
+    } else {
+      const rot = el.rotation ?? 0;
+      if (rot) parts.push(`rotate(${rot}deg)`);
+    }
     return parts.length ? parts.join(" ") : undefined;
   })();
+
+  const previewTransformOrigin: string | undefined = hubMode === "rotate"
+    ? `${preview.anchorFrac.x * 100}% ${preview.anchorFrac.y * 100}%`
+    : undefined;
 
   return (
     <div
