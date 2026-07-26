@@ -5177,6 +5177,7 @@ function CadToolSection({
   selectedElementId,
   setSelectedElementId,
   onJumpCad,
+  cadEngine,
 }: {
   project: import("@/lib/projectStore").Project;
   projectId: string;
@@ -5184,8 +5185,17 @@ function CadToolSection({
   selectedElementId?: string;
   setSelectedElementId: (id?: string) => void;
   onJumpCad: (sheetId?: string) => void;
+  cadEngine?: import("@/cad/embed/MiniCad").MiniCad | null;
 }) {
   const navigate = useNavigate();
+  // Kleiner Ticker, damit neue/umbenannte Bezeichnungs-IDs im Dropdown erscheinen.
+  const [, setLabelTick] = useState(0);
+  useEffect(() => {
+    if (!cadEngine) return;
+    const id = window.setInterval(() => setLabelTick((t) => t + 1), 400);
+    return () => window.clearInterval(id);
+  }, [cadEngine]);
+  const labelGroups = cadEngine?.labelManager?.list?.() ?? [];
   const page = project.pages.find((p) => p.id === pageId);
   const placed = (page?.elements ?? []).filter((e) => e.kind === "cad-view" || e.kind === "cad-viewport");
   const [pdfOpen, setPdfOpen] = useState<boolean>(false);
