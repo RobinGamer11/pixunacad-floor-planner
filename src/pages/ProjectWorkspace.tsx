@@ -3008,7 +3008,6 @@ function ElementView({
     const cy = rect.top + rect.height / 2;
     const startAngle = Math.atan2(e.clientY - cy, e.clientX - cx);
     const startRot = el.rotation ?? 0;
-    const startClient = modeStartClientRef.current;
     rotateMovedRef.current = false;
     const handleMove = (ev: PointerEvent) => {
       if (Math.hypot(ev.clientX - e.clientX, ev.clientY - e.clientY) > 3) rotateMovedRef.current = true;
