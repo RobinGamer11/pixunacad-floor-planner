@@ -94,6 +94,10 @@ export interface PageElement {
   guideEdges?: { top: boolean; right: boolean; bottom: boolean; left: boolean };
   /** PDF/Bild: Kanten-Crop in Metern (positiv = Inhalt am Rand abgeschnitten). */
   cropM?: { top: number; right: number; bottom: number; left: number };
+  /** Photoshop-artige Ecken-Verzerrung für PDF/JPG/PNG.
+   *  Vier Punkte in Fraktionen 0..1, Reihenfolge TL, TR, BR, BL.
+   *  Fehlt = keine Verzerrung (Identität). */
+  warpCorners?: { x: number; y: number }[];
 
   /** Tabellen-Datenmodell (kind === "table"). */
   tableData?: {

@@ -103,6 +103,15 @@ import { TabletAidWheel } from "@/components/TabletAidWheel";
 // Seitengröße gebraucht wird (getPageSizeMm).
 import { PAPER_FORMATS as FORMAT_SIZES, getPageSizeMm, parseScaleDen } from "@/lib/paper";
 import { getPageSnapRegistry, buildRectSnapEntry } from "@/lib/pageSnap";
+import {
+  IDENTITY_WARP,
+  computeWarpMatrix3d,
+  edgeMidpoints,
+  isWarped,
+  setWarpTarget,
+  useWarpTarget,
+  type WarpCorners,
+} from "@/lib/warpMatrix";
 
 export type PageTool = "guide" | "line" | "free" | "eraser" | "text" | "cad" | "pipette" | "hatch" | "document" | "table" | null;
 type LinePageTool = "line" | "free" | "eraser";
@@ -2841,6 +2850,172 @@ function ZoomBar({ zoom, setZoom }: { zoom: number; setZoom: (v: number) => void
   );
 }
 
+// -----------------------------------------------------------------------------
+// Warp/Verzerren-Hülle: rendert Kinder mit CSS-matrix3d gemäß warpCorners.
+// Bei Identität (keine echte Verzerrung) wird die Hülle transparent — keine
+// Transformation, kein Overflow-Impact. Übergeordnete Container-Größe bleibt
+// stabil (el.w × el.h), damit Selektion/Handles unverändert positioniert sind.
+function WarpedContent({
+  corners,
+  children,
+}: {
+  corners?: WarpCorners;
+  children: React.ReactNode;
+}) {
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const [size, setSize] = useState({ w: 0, h: 0 });
+  useLayoutEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const measure = () => {
+      const r = el.getBoundingClientRect();
+      setSize({ w: r.width, h: r.height });
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const active = isWarped(corners) && size.w > 0 && size.h > 0;
+  const matrix = active ? computeWarpMatrix3d(size.w, size.h, corners!) : "";
+  return (
+    <div
+      ref={wrapRef}
+      style={{
+        position: "absolute",
+        inset: 0,
+        overflow: active ? "visible" : "hidden",
+      }}
+    >
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          transformOrigin: "0 0",
+          transform: active ? matrix : undefined,
+          willChange: active ? "transform" : undefined,
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// Handles für den „Verzerren"-Modus: 4 Ecken + 4 Kanten-Mittelpunkte.
+// Ziehen ändert warpCorners in Fraktionen (0..1). Rotationskompensation ist
+// nicht enthalten — bei rotierten Elementen wird die Verzerrung noch relativ
+// zur unrotierten Achse berechnet.
+function WarpHandles({
+  corners,
+  containerRef,
+  onCommit,
+}: {
+  corners: WarpCorners;
+  containerRef: React.RefObject<HTMLElement>;
+  onCommit: (next: WarpCorners) => void;
+}) {
+  const mids = edgeMidpoints(corners);
+  const startDrag = (kind: "corner" | "edge", idx: number, e: React.PointerEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const target = e.currentTarget as HTMLElement;
+    target.setPointerCapture(e.pointerId);
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect || rect.width <= 0 || rect.height <= 0) return;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startCorners = corners.map((c) => ({ ...c })) as WarpCorners;
+    const onMove = (ev: PointerEvent) => {
+      const dx = (ev.clientX - startX) / rect.width;
+      const dy = (ev.clientY - startY) / rect.height;
+      const next = startCorners.map((c) => ({ ...c })) as WarpCorners;
+      if (kind === "corner") {
+        next[idx] = {
+          x: Math.max(-0.5, Math.min(1.5, startCorners[idx].x + dx)),
+          y: Math.max(-0.5, Math.min(1.5, startCorners[idx].y + dy)),
+        };
+      } else {
+        // Kante idx=0 top (TL,TR), 1 right (TR,BR), 2 bottom (BR,BL), 3 left (BL,TL)
+        const pair: [number, number] =
+          idx === 0 ? [0, 1] : idx === 1 ? [1, 2] : idx === 2 ? [2, 3] : [3, 0];
+        for (const p of pair) {
+          next[p] = {
+            x: Math.max(-0.5, Math.min(1.5, startCorners[p].x + dx)),
+            y: Math.max(-0.5, Math.min(1.5, startCorners[p].y + dy)),
+          };
+        }
+      }
+      onCommit(next);
+    };
+    const onUp = (ev: PointerEvent) => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      try { target.releasePointerCapture(ev.pointerId); } catch {}
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
+  const handleStyle = (frac: { x: number; y: number }, isEdge: boolean): React.CSSProperties => ({
+    position: "absolute",
+    left: `${frac.x * 100}%`,
+    top: `${frac.y * 100}%`,
+    width: isEdge ? 10 : 12,
+    height: isEdge ? 10 : 12,
+    marginLeft: isEdge ? -5 : -6,
+    marginTop: isEdge ? -5 : -6,
+    background: isEdge ? "hsl(var(--accent-gold-soft))" : "hsl(var(--accent-gold))",
+    border: "1.5px solid white",
+    boxShadow: "0 1px 3px rgba(0,0,0,0.35)",
+    borderRadius: isEdge ? 999 : 2,
+    cursor: "grab",
+    touchAction: "none",
+    zIndex: 120,
+  });
+  return (
+    <>
+      {corners.map((c, i) => (
+        <div
+          key={`c${i}`}
+          data-hub-control
+          onPointerDown={(e) => startDrag("corner", i, e)}
+          style={handleStyle(c, false)}
+        />
+      ))}
+      {mids.map((c, i) => (
+        <div
+          key={`m${i}`}
+          data-hub-control
+          onPointerDown={(e) => startDrag("edge", i, e)}
+          style={handleStyle(c, true)}
+        />
+      ))}
+    </>
+  );
+}
+
+// Subscribed Wrapper: rendert die Warp-Handles nur, wenn dieses Element im
+// globalen Warp-Store als aktiv markiert ist (Toggle im ElementInspector).
+function WarpTargetHandles({
+  elementId,
+  corners,
+  containerRef,
+  onCommit,
+}: {
+  elementId: string;
+  corners?: WarpCorners;
+  containerRef: React.RefObject<HTMLElement>;
+  onCommit: (next: WarpCorners) => void;
+}) {
+  const active = useWarpTarget();
+  if (active !== elementId) return null;
+  const c = (corners && corners.length === 4 ? corners : IDENTITY_WARP) as WarpCorners;
+  return <WarpHandles corners={c} containerRef={containerRef} onCommit={onCommit} />;
+}
+
+
+
+
 function ElementView({
   el,
   selected,
@@ -3325,12 +3500,14 @@ function ElementView({
         </div>
       )}
       {el.kind === "image" && (
-        <img
-          src={el.imageUrl}
-          alt=""
-          className="w-full h-full object-cover"
-          style={{ background: "hsl(var(--surface-muted))" }}
-        />
+        <WarpedContent corners={el.warpCorners}>
+          <img
+            src={el.imageUrl}
+            alt=""
+            className="w-full h-full object-cover"
+            style={{ background: "hsl(var(--surface-muted))" }}
+          />
+        </WarpedContent>
       )}
       {el.kind === "note" && (
         <div
@@ -3360,12 +3537,27 @@ function ElementView({
       )}
 
       {el.kind === "pdf" && (
-        el.pdfSourceB64 ? (
-          <PdfPageView sourceB64={el.pdfSourceB64} pageIndex={el.pdfPageIndex ?? 0} />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground" style={{ background: "hsl(var(--surface-muted))" }}>PDF</div>
-        )
+        <WarpedContent corners={el.warpCorners}>
+          {el.pdfSourceB64 ? (
+            <PdfPageView sourceB64={el.pdfSourceB64} pageIndex={el.pdfPageIndex ?? 0} />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground" style={{ background: "hsl(var(--surface-muted))" }}>PDF</div>
+          )}
+        </WarpedContent>
       )}
+
+      {/* Photoshop-artige Ecken-/Kanten-Verzerrung: aktive Handles nur, wenn
+          Bild/PDF selektiert ist UND der Nutzer im Inspector „Verzerren" an
+          hat. Andere Werkzeug-Handles bleiben aktiv (kein Modal-Modus). */}
+      {selected && (el.kind === "image" || el.kind === "pdf") && (
+        <WarpTargetHandles
+          elementId={el.id}
+          corners={el.warpCorners}
+          containerRef={rootRef}
+          onCommit={(next) => onTransform?.({ warpCorners: next } as any)}
+        />
+      )}
+
 
       {showHub && (
         <>
@@ -5680,6 +5872,14 @@ function ElementInspector({
         />
       </Row>
 
+      {(element.kind === "image" || element.kind === "pdf") && (
+        <WarpInspectorControls
+          elementId={element.id}
+          hasWarp={isWarped(element.warpCorners)}
+          onReset={() => update({ warpCorners: undefined })}
+        />
+      )}
+
       {/* CAD-Viewport-Inspektor entfernt: Maßstab, Aktualisieren und Löschen
           für platzierte CAD-Blätter liegen ausschließlich im „CAD-Blatt"-
           Werkzeug (Auto-Open bei Auswahl). */}
@@ -5697,6 +5897,58 @@ function ElementInspector({
     </div>
   );
 }
+
+function WarpInspectorControls({
+  elementId,
+  hasWarp,
+  onReset,
+}: {
+  elementId: string;
+  hasWarp: boolean;
+  onReset: () => void;
+}) {
+  const active = useWarpTarget();
+  const isActive = active === elementId;
+  // Beim Unmount (z. B. Element abgewählt) den globalen Warp-Modus aufheben.
+  useEffect(() => {
+    return () => {
+      if (_isSelfActive()) setWarpTarget(null);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  function _isSelfActive() {
+    // Re-check via Store, weil `active` in Closure veraltet sein kann.
+    return (typeof window !== "undefined") && (active === elementId);
+  }
+  return (
+    <div className="space-y-1.5">
+      <button
+        type="button"
+        onClick={() => setWarpTarget(isActive ? null : elementId)}
+        className="w-full h-8 rounded-md text-[11px] border flex items-center justify-center gap-2"
+        style={{
+          borderColor: isActive ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
+          background: isActive ? "hsl(var(--accent-gold-soft))" : "transparent",
+          color: "hsl(var(--ink))",
+        }}
+        title="Ecken- und Kanten-Punkte einblenden und frei ziehen"
+      >
+        {isActive ? "Verzerren beenden" : "Verzerren"}
+      </button>
+      {hasWarp && (
+        <button
+          type="button"
+          onClick={onReset}
+          className="w-full h-7 rounded-md text-[11px] border text-muted-foreground hover:text-foreground"
+          style={{ borderColor: "hsl(var(--hairline))" }}
+        >
+          Verzerrung zurücksetzen
+        </button>
+      )}
+    </div>
+  );
+}
+
 
 
 function TasksTab({ project }: { project: import("@/lib/projectStore").Project }) {
