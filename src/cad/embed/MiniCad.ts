@@ -1363,6 +1363,11 @@ export class MiniCad {
     this.textEditor.beginEdit(box);
   }
 
+  /** Optionale externe Objektzähler pro Bezeichnungs-ID (z.B. Projektmappen-PageElements).
+   *  Wird vom IdPanel zu den Scene-Zählern addiert, damit CAD-Blatt-Viewports & Co.
+   *  in der jeweiligen ID-Zeile mitgezählt werden — kein Parallelsystem nötig. */
+  externalLabelCounter: ((labelId: string) => number) | null = null;
+
   refreshLabelUI() {
     this._changeDirty = true;
     try { this.idPanel?.render(); } catch {}

@@ -122,7 +122,9 @@ export class IdPanel {
       const textCount = this.app.scene.getTextBoxesByLabelId(group.id).length;
       const freeCount = this.app.scene.getFreeStrokesByLabelId(group.id).length;
       const wallCount = this.app.scene.getWallsByLabelId(group.id).length;
-      const count = segCount + hatchCount + dimCount + textCount + freeCount + wallCount;
+      let extraCount = 0;
+      try { extraCount = (this.app as any).externalLabelCounter?.(group.id) ?? 0; } catch {}
+      const count = segCount + hatchCount + dimCount + textCount + freeCount + wallCount + extraCount;
       const row = document.createElement("div");
       row.className = "id-row";
       row.dataset.id = group.id;

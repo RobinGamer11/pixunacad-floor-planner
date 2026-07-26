@@ -3969,20 +3969,15 @@ function RightInspector({
           )}
           {tab === "layers" && page && (
             <div className="space-y-4">
-              {/* CAD-Ebenen (Bezeichnungs-ID) — 1:1 wie in der CAD-Oberfläche.
-                  Verwaltet alle CAD-Objekte (Linien, Schraffuren, Texte,
-                  Freihand, Dokumente, Wände, Maßketten) per Layer/Sichtbarkeit. */}
+              {/* Ein einziges Ebenen-/Bezeichnungs-ID-System — identisch zur
+                 CAD-Oberfläche. CAD-Blätter, Dokumente, Notizen, Tabellen
+                 usw. werden über den `externalLabelCounter`-Hook direkt in
+                 die jeweilige ID-Zeile eingezählt (siehe useEffect unten),
+                 damit es kein Parallel-Panel gibt. */}
               {cadEngine && <CadIdPanelHost engine={cadEngine} />}
-
-              {/* Projektmappen-Elemente (Notizen, Bilder, CAD-Blätter, …) —
-                  Z-Order + Sichtbarkeit auf React-Ebene. */}
-              <LayersTab
-                projectId={projectId}
-                page={page}
-                selectedElementId={selectedElementId}
-                setSelectedElementId={setSelectedElementId}
-                cadEngine={cadEngine ?? null}
-              />
+              {cadEngine && (
+                <PageElementLabelCounterBridge engine={cadEngine} page={page} />
+              )}
             </div>
           )}
         </div>
@@ -5792,6 +5787,39 @@ function TasksTab({ project }: { project: import("@/lib/projectStore").Project }
   );
 }
 
+/**
+ * Bridge: registriert einen `externalLabelCounter`-Callback am CAD-Engine,
+ * der PageElements mit `labelId` in die Bezeichnungs-ID-Zeilen einzählt.
+ * Kein separates Ebenen-Panel — ein einziges System für alles.
+ */
+function PageElementLabelCounterBridge({
+  engine,
+  page,
+}: {
+  engine: import("@/cad/embed/MiniCad").MiniCad;
+  page: import("@/lib/projectStore").ProjectPage;
+}) {
+  useEffect(() => {
+    const counts = new Map<string, number>();
+    for (const el of page.elements) {
+      if (!el.labelId) continue;
+      counts.set(el.labelId, (counts.get(el.labelId) ?? 0) + 1);
+    }
+    engine.externalLabelCounter = (labelId: string) => counts.get(labelId) ?? 0;
+    try { engine.refreshLabelUI(); } catch {}
+    return () => {
+      engine.externalLabelCounter = null;
+      try { engine.refreshLabelUI(); } catch {}
+    };
+  }, [engine, page.elements]);
+  return null;
+}
+
+
+// LayersTab bleibt als Komponente vorhanden, wird aktuell aber nicht mehr
+// eingebunden — das Bezeichnungs-ID-Panel (CadIdPanelHost) ist die einzige
+// Ebenen-Quelle. Verbleibt hier, falls wir künftig eine Detailansicht darunter
+// re-aktivieren wollen (dann aber verschmolzen mit dem oberen Panel).
 function LayersTab({
   projectId,
   page,
