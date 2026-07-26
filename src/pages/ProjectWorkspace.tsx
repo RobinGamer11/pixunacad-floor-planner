@@ -2816,6 +2816,7 @@ function ElementView({
   selected,
   readOnly,
   elevated,
+  toolActive,
   onSelect,
   onDrag,
   onDuplicate,
@@ -2830,6 +2831,7 @@ function ElementView({
   selected?: boolean;
   readOnly?: boolean;
   elevated?: boolean;
+  toolActive?: boolean;
   onSelect?: (opts?: { shift?: boolean }) => void;
   onDrag?: (dx: number, dy: number, alt?: boolean) => void;
 
