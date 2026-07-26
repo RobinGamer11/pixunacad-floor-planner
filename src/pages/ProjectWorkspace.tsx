@@ -5816,6 +5816,11 @@ function PageElementLabelCounterBridge({
 }
 
 
+// LayersTab bleibt als Komponente vorhanden, wird aktuell aber nicht mehr
+// eingebunden — das Bezeichnungs-ID-Panel (CadIdPanelHost) ist die einzige
+// Ebenen-Quelle. Verbleibt hier, falls wir künftig eine Detailansicht darunter
+// re-aktivieren wollen (dann aber verschmolzen mit dem oberen Panel).
+function LayersTab({
   projectId,
   page,
   selectedElementId,
