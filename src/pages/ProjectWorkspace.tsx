@@ -3969,20 +3969,15 @@ function RightInspector({
           )}
           {tab === "layers" && page && (
             <div className="space-y-4">
-              {/* CAD-Ebenen (Bezeichnungs-ID) — 1:1 wie in der CAD-Oberfläche.
-                  Verwaltet alle CAD-Objekte (Linien, Schraffuren, Texte,
-                  Freihand, Dokumente, Wände, Maßketten) per Layer/Sichtbarkeit. */}
+              {/* Ein einziges Ebenen-/Bezeichnungs-ID-System — identisch zur
+                 CAD-Oberfläche. CAD-Blätter, Dokumente, Notizen, Tabellen
+                 usw. werden über den `externalLabelCounter`-Hook direkt in
+                 die jeweilige ID-Zeile eingezählt (siehe useEffect unten),
+                 damit es kein Parallel-Panel gibt. */}
               {cadEngine && <CadIdPanelHost engine={cadEngine} />}
-
-              {/* Projektmappen-Elemente (Notizen, Bilder, CAD-Blätter, …) —
-                  Z-Order + Sichtbarkeit auf React-Ebene. */}
-              <LayersTab
-                projectId={projectId}
-                page={page}
-                selectedElementId={selectedElementId}
-                setSelectedElementId={setSelectedElementId}
-                cadEngine={cadEngine ?? null}
-              />
+              {cadEngine && (
+                <PageElementLabelCounterBridge engine={cadEngine} page={page} />
+              )}
             </div>
           )}
         </div>
