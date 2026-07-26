@@ -3874,6 +3874,8 @@ function RightInspector({
               onDocumentImport={onDocumentImport}
               docScale={docScale}
               onDocScaleChange={onDocScaleChange}
+              docFreePlace={docFreePlace}
+              onDocFreePlaceChange={onDocFreePlaceChange}
               onCadLineSnapChange={onCadLineSnapChange}
               onCadDuplicateSegments={onCadDuplicateSegments}
               updateToolSettings={updateToolSettings}
