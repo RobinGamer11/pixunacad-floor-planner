@@ -4719,37 +4719,18 @@ function CadToolSection({
                   </div>
                   <div className="flex items-center gap-2 mt-2">
                     <span className="text-[11px] text-muted-foreground">Maßstab</span>
-                    <select
-                      value={(() => {
-                        const cur = el.scale ?? sheet?.scale ?? "1:100";
-                        return PAGE_PLAN_SCALES.includes(cur) ? cur : "frei";
-                      })()}
-                      onChange={(ev) => {
+                    <PlacedScaleInput
+                      value={el.scale ?? sheet?.scale ?? "1:100"}
+                      onCommit={(next) => {
                         if (!pageId) return;
-                        let next = ev.target.value;
-                        if (next === "frei") {
-                          const picked = askPlanScale(el.scale ?? sheet?.scale ?? "1:100");
-                          if (!picked) return;
-                          next = picked;
-                        }
-                        projectStore.updateElement(projectId, pageId, el.id, { scale: next });
+                        const den = parseScaleDen(next);
+                        projectStore.updateElement(projectId, pageId, el.id, {
+                          scale: `1:${den}`,
+                          scaleDen: den,
+                          lastSyncAt: new Date().toISOString(),
+                        });
                       }}
-                      onClick={(ev) => ev.stopPropagation()}
-                      className="flex-1 h-7 px-2 rounded bg-transparent border text-sm"
-                      style={{ borderColor: "hsl(var(--hairline))" }}
-                    >
-                      {PAGE_PLAN_SCALES.map((s) => (
-                        <option key={s} value={s}>{s}</option>
-                      ))}
-                      {(() => {
-                        const cur = el.scale ?? sheet?.scale ?? "1:100";
-                        if (!PAGE_PLAN_SCALES.includes(cur)) {
-                          return <option key={cur} value={cur}>{cur}</option>;
-                        }
-                        return null;
-                      })()}
-                      <option value="frei">frei…</option>
-                    </select>
+                    />
                     <button
                       onClick={(ev) => {
                         ev.stopPropagation();
@@ -4770,6 +4751,38 @@ function CadToolSection({
         </div>
       )}
     </div>
+  );
+}
+
+/** Freie Maßstabs-Eingabe für ein platziertes CAD-Blatt.
+ *  Akzeptiert Formate wie "1:50", "50" oder "1/50". Default: 1:100. */
+function PlacedScaleInput({ value, onCommit }: { value: string; onCommit: (next: string) => void }) {
+  const [draft, setDraft] = React.useState<string>(value);
+  React.useEffect(() => { setDraft(value); }, [value]);
+  const commit = () => {
+    const raw = (draft || "").trim();
+    if (!raw) { setDraft(value); return; }
+    const den = parseScaleDen(raw);
+    const normalized = `1:${den}`;
+    setDraft(normalized);
+    if (normalized !== value) onCommit(normalized);
+  };
+  return (
+    <input
+      type="text"
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") { e.preventDefault(); (e.target as HTMLInputElement).blur(); }
+        if (e.key === "Escape") { setDraft(value); (e.target as HTMLInputElement).blur(); }
+      }}
+      onClick={(e) => e.stopPropagation()}
+      placeholder="1:100"
+      className="flex-1 h-7 px-2 rounded bg-transparent border text-sm tabular-nums"
+      style={{ borderColor: "hsl(var(--hairline))" }}
+      title='Maßstab frei eingeben, z. B. "1:50", "50" oder "1/75". Default 1:100.'
+    />
   );
 }
 
