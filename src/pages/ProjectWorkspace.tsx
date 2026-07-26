@@ -3474,6 +3474,10 @@ function ElementView({
               </button>
             )}
           </div>
+            );
+          })()}
+
+
 
 
           {/* Edge-Drag-Handles: Preview beim Ziehen, Commit erst bei Pointerup
