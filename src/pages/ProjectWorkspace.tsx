@@ -4584,6 +4584,7 @@ function ToolsTab({
           selectedElementId={selectedElementId}
           setSelectedElementId={setSelectedElementId}
           onJumpCad={onJumpCad}
+          cadEngine={cadEngine ?? null}
         />
       )}
 
