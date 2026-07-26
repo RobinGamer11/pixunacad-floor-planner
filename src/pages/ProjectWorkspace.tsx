@@ -3639,7 +3639,7 @@ function ElementView({
               : (isCadView ? "crosshair" : "default");
             const size = 12;
             const glow = hoveredSnapKey === `corner-${corner}`;
-            const isAnchor = isCadView && anchorFracRef.current?.key === `corner-${corner}`;
+            const isAnchor = isCadView && anchorFracState?.key === `corner-${corner}`;
             return (
               <div
                 key={corner}
