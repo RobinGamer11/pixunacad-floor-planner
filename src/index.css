@@ -266,26 +266,29 @@
   }
 
   .cad-settings-panel {
-    @apply rounded-lg p-3 space-y-3;
+    @apply rounded-lg p-2 space-y-2;
     background: transparent;
     border: none;
     color: hsl(var(--cad-toolbar-foreground));
+    max-width: 100%;
+    overflow: hidden;
   }
 
   .cad-settings-panel label {
-    @apply text-xs font-medium block mb-1;
+    @apply text-[11px] font-medium block mb-1;
     color: hsl(var(--cad-toolbar-muted));
     letter-spacing: 0.02em;
   }
 
   .cad-settings-panel input[type="text"],
   .cad-settings-panel input[type="number"] {
-    @apply text-xs px-2 py-1 rounded border w-full;
+    @apply text-[11px] px-2 py-1 rounded border w-full min-w-0;
     background: hsl(var(--cad-toolbar-hover));
     border-color: hsl(var(--cad-hub-border));
     color: hsl(var(--cad-toolbar-foreground));
     font-family: 'JetBrains Mono', monospace;
   }
+
 
   .cad-settings-panel input:focus {
     @apply outline-none ring-1;
@@ -293,13 +296,19 @@
   }
 
   .cad-settings-select {
-    @apply text-xs px-2 py-1 rounded border w-full;
+    @apply text-[11px] px-2 py-1 rounded border w-full min-w-0;
     background: hsl(var(--cad-toolbar-hover));
     border-color: hsl(var(--cad-hub-border));
     color: hsl(var(--cad-toolbar-foreground));
     appearance: none;
     -webkit-appearance: none;
   }
+
+  /* Kompaktere Toolbar-Buttons in den rechten Werkzeugeinstellungen. */
+  .cad-settings-panel .cad-toolbar-btn {
+    @apply px-2 py-1 text-[11px] gap-1;
+  }
+
 
   .cad-settings-select:focus {
     @apply outline-none ring-1;
