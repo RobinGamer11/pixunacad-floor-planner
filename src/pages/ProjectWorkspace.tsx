@@ -3426,7 +3426,7 @@ function ElementView({
                 <RotateCw size={14} />
               </button>
             )}
-            {!isCadView && (
+            {!tabletCommitOnly && !isCadView && (
               <button
                 data-hub-control
                 onClick={(e) => { e.stopPropagation(); onDuplicate?.(); }}
@@ -3436,15 +3436,17 @@ function ElementView({
                 <Copy size={14} />
               </button>
             )}
-            <button
-              data-hub-control
-              onClick={(e) => { e.stopPropagation(); onDelete?.(); }}
-              title="Löschen"
-              className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
-              style={{ color: "hsl(0 65% 50%)" }}
-            >
-              <Trash2 size={14} />
-            </button>
+            {!tabletCommitOnly && (
+              <button
+                data-hub-control
+                onClick={(e) => { e.stopPropagation(); onDelete?.(); }}
+                title="Löschen"
+                className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
+                style={{ color: "hsl(0 65% 50%)" }}
+              >
+                <Trash2 size={14} />
+              </button>
+            )}
           </div>
 
 
