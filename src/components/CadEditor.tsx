@@ -1361,6 +1361,23 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             </button>
             <button
               type="button"
+              title="Maßkette spiegeln (Tick-/Textausrichtung invertieren, Position bleibt)"
+              className="cad-toolbar-btn h-7 w-7 justify-center px-0"
+              onClick={() => {
+                const app = appRef.current;
+                if (!app || !dimHub.dimensionId) return;
+                const dim = app.scene.dimensions.find((d: any) => d.id === dimHub.dimensionId);
+                if (!dim) return;
+                const tmp = dim.p1; dim.p1 = dim.p2; dim.p2 = tmp;
+                if (dim.refDir) dim.refDir = { x: -dim.refDir.x, y: -dim.refDir.y };
+                app.requestRender?.();
+                app.refreshLabelUI?.();
+              }}
+            >
+              <FlipHorizontal2 className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
               title="Maßkette löschen"
               onClick={() => {
                 const app = appRef.current;
