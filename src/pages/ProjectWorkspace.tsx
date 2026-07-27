@@ -2396,12 +2396,12 @@ function PageCanvas({
       <div
         ref={pageRef}
         data-page-id={page.id}
-          className="relative shadow-xl"
+          className={`relative ${bare ? "" : "shadow-xl"} page-sheet`}
           style={{
             width: displayWidth,
             height: displayHeight,
             background: "white",
-            border: "1px solid hsl(var(--hairline))",
+            border: bare ? "none" : "1px solid hsl(var(--hairline))",
             cursor: cursorStyle,
           }}
           onPointerDown={handlePagePointerDown}
