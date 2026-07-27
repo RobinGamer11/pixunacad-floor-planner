@@ -1085,7 +1085,7 @@ export default function ProjectWorkspace() {
           }}
         />
 
-        <ToolRailButton icon={<StickyNote size={18} />} label="Notiz" disabled />
+        
 
         <div className="mt-auto flex flex-col items-center gap-1">
         </div>
