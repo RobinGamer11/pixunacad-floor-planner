@@ -1370,7 +1370,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 if (!dim) return;
                 const tmp = dim.p1; dim.p1 = dim.p2; dim.p2 = tmp;
                 if (dim.refDir) dim.refDir = { x: -dim.refDir.x, y: -dim.refDir.y };
-                app.requestRender?.();
+                app.renderer.render();
                 app.refreshLabelUI?.();
               }}
             >
