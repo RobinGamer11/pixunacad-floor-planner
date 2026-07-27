@@ -984,3 +984,8 @@
 .scrollbarless-panel *::-webkit-scrollbar {
   display: none;
 }
+
+/* Beim Drucken: Papier ohne grauen Rand/Schatten */
+@media print {
+  .page-sheet { border: none !important; box-shadow: none !important; }
+}

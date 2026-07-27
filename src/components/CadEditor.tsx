@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState, useCallback } from "react";
 import { DragScrollDiv } from "@/components/DragScrollDiv";
 import { CadApp } from "@/cad/CadApp";
 import { ToolIds, PointEditAction } from "@/cad/constants";
-import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Pipette, Sticker as StickerIcon, Pencil, Trash2, Download, Upload, Plus, FileImage, FileText, Maximize2, Ruler as RulerIcon, Eraser, Construction, BrickWall, PaintBucket, Grid3x3, DoorOpen, AppWindow, Move, RotateCw, PanelRightOpen, PanelRightClose, Crosshair, Scaling, Check, Scissors, Anchor as AnchorIcon, SquareDashed, BoxSelect } from "lucide-react";
+import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Pipette, Sticker as StickerIcon, Pencil, Trash2, Download, Upload, Plus, FileImage, FileText, Maximize2, Ruler as RulerIcon, Eraser, Construction, BrickWall, PaintBucket, Grid3x3, DoorOpen, AppWindow, Move, RotateCw, PanelRightOpen, PanelRightClose, Crosshair, Scaling, Check, Scissors, Anchor as AnchorIcon, SquareDashed, BoxSelect, FlipHorizontal2 } from "lucide-react";
 import type { HatchDrawMode } from "@/cad/HatchTool";
 import type { StickerDefinition } from "@/cad/StickerManager";
 import { instanceBoundingCornersWorld } from "@/cad/StickerManager";
@@ -1358,6 +1358,23 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               }}
             >
               <Move className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              title="Maßkette spiegeln (Tick-/Textausrichtung invertieren, Position bleibt)"
+              className="cad-toolbar-btn h-7 w-7 justify-center px-0"
+              onClick={() => {
+                const app = appRef.current;
+                if (!app || !dimHub.dimensionId) return;
+                const dim = app.scene.dimensions.find((d: any) => d.id === dimHub.dimensionId);
+                if (!dim) return;
+                const tmp = dim.p1; dim.p1 = dim.p2; dim.p2 = tmp;
+                if (dim.refDir) dim.refDir = { x: -dim.refDir.x, y: -dim.refDir.y };
+                app.renderer.render();
+                app.refreshLabelUI?.();
+              }}
+            >
+              <FlipHorizontal2 className="h-4 w-4" />
             </button>
             <button
               type="button"
