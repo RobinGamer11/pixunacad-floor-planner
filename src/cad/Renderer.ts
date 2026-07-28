@@ -1958,28 +1958,40 @@ export class Renderer {
     const baseSize = dim.textSizePx || Defaults.measureTextSizePx;
     const fontPx = Math.max(1, baseSize * zoomFactor);
 
+    // Architekturkonvention für die Textlage:
+    //  - Waagerechte Maßketten (|dx| >= |dy|): Text von unten lesbar (Winkel in (-π/2, π/2]).
+    //  - Senkrechte Maßketten (|dy| >  |dx|): Text von rechts lesbar (Winkel = -π/2),
+    //    damit die Zahlen niemals auf dem Kopf stehen.
     const screenAngle = Math.atan2(d2.y - d1.y, d2.x - d1.x);
-    const normalizedAngle = (screenAngle > Math.PI / 2 || screenAngle < -Math.PI / 2)
-      ? screenAngle + Math.PI
-      : screenAngle;
+    let normalizedAngle = screenAngle;
+    if (normalizedAngle >= Math.PI / 2) normalizedAngle -= Math.PI;
+    else if (normalizedAngle < -Math.PI / 2) normalizedAngle += Math.PI;
 
     const tickOffsetPx = (dim.tickLengthM || Defaults.measureTickLengthM) * cam.scale;
     const textOffsetPx = Math.max(fontPx * 0.95, tickOffsetPx * 0.9 + fontPx * 0.35);
 
-    // Textseite: einmalig aus PlacementPoint ableiten und auf dem Objekt
-    // cachen ("_textSideBase"), damit späteres Verschieben des Platzierungs-
-    // punkts die Textseite NICHT mehr automatisch umschlägt. Nur das
-    // "spiegeln"-Flag (dim.mirror) invertiert die Seite.
-    const placementScreen = cam.worldToScreen(dim.placementPoint.x, dim.placementPoint.y);
+    // Textseite: einmalig in WORLD-Koordinaten aus dem PlacementPoint ableiten
+    // (angle-invariant), damit späteres Verschieben des Platzierungspunkts die
+    // Textseite NICHT mehr automatisch umschlägt. Nur das "spiegeln"-Flag
+    // (dim.mirror) invertiert die Seite. Der Text landet dadurch immer
+    // AUßERHALB des bemaßten Objekts (auf der Placement-Seite).
+    const anyDim = dim as any;
+    const dotPlacementN =
+      (dim.placementPoint.x - g.mid.x) * g.n.x + (dim.placementPoint.y - g.mid.y) * g.n.y;
+    if (anyDim._textSideBaseWorld !== 1 && anyDim._textSideBaseWorld !== -1) {
+      anyDim._textSideBaseWorld = dotPlacementN >= 0 ? 1 : -1;
+    }
+    // World-Normale in die aktuelle rotierte Screen-Local-Y-Achse projizieren.
+    const nScreenA = cam.worldToScreen(g.mid.x, g.mid.y);
+    const nScreenB = cam.worldToScreen(g.mid.x + g.n.x, g.mid.y + g.n.y);
+    const nsx = nScreenB.x - nScreenA.x;
+    const nsy = nScreenB.y - nScreenA.y;
     const localYx = -Math.sin(normalizedAngle);
     const localYy = Math.cos(normalizedAngle);
-    const dotPlacementY =
-      (placementScreen.x - mid.x) * localYx + (placementScreen.y - mid.y) * localYy;
-    const anyDim = dim as any;
-    if (anyDim._textSideBase !== 1 && anyDim._textSideBase !== -1) {
-      anyDim._textSideBase = dotPlacementY >= 0 ? 1 : -1;
-    }
-    const textSideSign = anyDim._textSideBase * (anyDim.mirror ? -1 : 1);
+    const nLocalY = nsx * localYx + nsy * localYy;
+    const worldToLocalSign = nLocalY >= 0 ? 1 : -1;
+    const textSideSign =
+      anyDim._textSideBaseWorld * worldToLocalSign * (anyDim.mirror ? -1 : 1);
 
     ctx.translate(mid.x, mid.y);
     ctx.rotate(normalizedAngle);
