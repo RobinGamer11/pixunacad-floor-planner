@@ -1979,7 +1979,7 @@ export class Renderer {
     if (anyDim._textSideBase !== 1 && anyDim._textSideBase !== -1) {
       anyDim._textSideBase = dotPlacementY >= 0 ? 1 : -1;
     }
-    const textSideSign = anyDim._textSideBase * (dim.mirror ? -1 : 1);
+    const textSideSign = anyDim._textSideBase * (anyDim.mirror ? -1 : 1);
 
     ctx.translate(mid.x, mid.y);
     ctx.rotate(normalizedAngle);
