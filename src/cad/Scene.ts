@@ -131,6 +131,8 @@ export interface DimensionStyle {
   /** Einheit für die Anzeige der Maßzahl (intern bleiben die Werte in m). */
   unit?: "mm" | "cm" | "m";
   labelId?: string;
+  /** Wenn true: Textseite und Text-Orientierung werden an der Bezugslinie gespiegelt. */
+  mirror?: boolean;
 }
 
 export class Dimension {
