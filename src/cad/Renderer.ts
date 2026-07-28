@@ -1966,16 +1966,20 @@ export class Renderer {
     const tickOffsetPx = (dim.tickLengthM || Defaults.measureTickLengthM) * cam.scale;
     const textOffsetPx = Math.max(fontPx * 0.95, tickOffsetPx * 0.9 + fontPx * 0.35);
 
-    // Determine which side of the dimension line the placement point (i.e. the
-    // side the user pulled the measurement out toward) is on, in screen space,
-    // so the text sits opposite the wall — mirrored automatically when the
-    // dimension is placed on the other side.
+    // Textseite: einmalig aus PlacementPoint ableiten und auf dem Objekt
+    // cachen ("_textSideBase"), damit späteres Verschieben des Platzierungs-
+    // punkts die Textseite NICHT mehr automatisch umschlägt. Nur das
+    // "spiegeln"-Flag (dim.mirror) invertiert die Seite.
     const placementScreen = cam.worldToScreen(dim.placementPoint.x, dim.placementPoint.y);
     const localYx = -Math.sin(normalizedAngle);
     const localYy = Math.cos(normalizedAngle);
     const dotPlacementY =
       (placementScreen.x - mid.x) * localYx + (placementScreen.y - mid.y) * localYy;
-    const textSideSign = dotPlacementY > 0 ? 1 : -1;
+    const anyDim = dim as any;
+    if (anyDim._textSideBase !== 1 && anyDim._textSideBase !== -1) {
+      anyDim._textSideBase = dotPlacementY >= 0 ? 1 : -1;
+    }
+    const textSideSign = anyDim._textSideBase * (dim.mirror ? -1 : 1);
 
     ctx.translate(mid.x, mid.y);
     ctx.rotate(normalizedAngle);
