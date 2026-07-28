@@ -211,6 +211,7 @@ export class Dimension {
     this.unit = (s.unit === "mm" || s.unit === "cm" || s.unit === "m") ? s.unit : Defaults.measureUnit;
     this.labelId = labelId || s.labelId || Defaults.defaultLabelId;
     this.doorRefId = doorRefId || null;
+    this.mirror = !!s.mirror;
     this._stickerEditOwnerId = null;
   }
 }
