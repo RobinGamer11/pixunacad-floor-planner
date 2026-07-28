@@ -172,6 +172,8 @@ export class Dimension {
   /** Optional: Referenz auf eine Tür/ein Fenster, wenn das Maß die Öffnungsbreite misst.
    *  Wenn gesetzt, wird unterhalb der Maßlinie die Höhe und die Brüstungshöhe (BRH) ergänzt. */
   doorRefId: string | null;
+  /** Wenn true: Text sitzt auf der gegenüberliegenden Seite der Maßlinie. */
+  mirror: boolean;
   _stickerEditOwnerId?: string | null;
 
   constructor({ id, p1, p2, placementPoint, mode, refDir, style, labelId, doorRefId }: {
