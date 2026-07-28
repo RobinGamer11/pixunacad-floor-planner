@@ -1361,15 +1361,20 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             </button>
             <button
               type="button"
-              title="Maßkette spiegeln (Tick-/Textausrichtung invertieren, Position bleibt)"
-              className="cad-toolbar-btn h-7 w-7 justify-center px-0"
+              title="Maßkette spiegeln (Text auf gegenüberliegende Seite; nur aktiv wenn Häkchen gesetzt)"
+              className={`cad-toolbar-btn h-7 w-7 justify-center px-0 ${(() => {
+                const app = appRef.current;
+                const dim = app?.scene.dimensions.find((d: any) => d.id === dimHub.dimensionId);
+                return dim?.mirror ? "active" : "";
+              })()}`}
               onClick={() => {
                 const app = appRef.current;
                 if (!app || !dimHub.dimensionId) return;
+                const sel = app.selection as any;
+                if (!sel || sel.type !== "dimension" || sel.dimensionId !== dimHub.dimensionId) return;
                 const dim = app.scene.dimensions.find((d: any) => d.id === dimHub.dimensionId);
                 if (!dim) return;
-                const tmp = dim.p1; dim.p1 = dim.p2; dim.p2 = tmp;
-                if (dim.refDir) dim.refDir = { x: -dim.refDir.x, y: -dim.refDir.y };
+                dim.mirror = !dim.mirror;
                 app.renderer.render();
                 app.refreshLabelUI?.();
               }}
