@@ -131,6 +131,8 @@ export interface DimensionStyle {
   /** Einheit für die Anzeige der Maßzahl (intern bleiben die Werte in m). */
   unit?: "mm" | "cm" | "m";
   labelId?: string;
+  /** Wenn true: Textseite und Text-Orientierung werden an der Bezugslinie gespiegelt. */
+  mirror?: boolean;
 }
 
 export class Dimension {
@@ -170,6 +172,8 @@ export class Dimension {
   /** Optional: Referenz auf eine Tür/ein Fenster, wenn das Maß die Öffnungsbreite misst.
    *  Wenn gesetzt, wird unterhalb der Maßlinie die Höhe und die Brüstungshöhe (BRH) ergänzt. */
   doorRefId: string | null;
+  /** Wenn true: Text sitzt auf der gegenüberliegenden Seite der Maßlinie. */
+  mirror: boolean;
   _stickerEditOwnerId?: string | null;
 
   constructor({ id, p1, p2, placementPoint, mode, refDir, style, labelId, doorRefId }: {
@@ -207,6 +211,7 @@ export class Dimension {
     this.unit = (s.unit === "mm" || s.unit === "cm" || s.unit === "m") ? s.unit : Defaults.measureUnit;
     this.labelId = labelId || s.labelId || Defaults.defaultLabelId;
     this.doorRefId = doorRefId || null;
+    this.mirror = !!s.mirror;
     this._stickerEditOwnerId = null;
   }
 }

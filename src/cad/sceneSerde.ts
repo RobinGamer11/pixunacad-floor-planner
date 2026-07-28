@@ -99,8 +99,9 @@ export function restoreOneScene(scene: Scene, data: SerializedScene | null | und
       textBgEnabled: d.textBgEnabled, textBgColor: d.textBgColor, textBgAlpha: d.textBgAlpha,
       extensionStyle: d.extensionStyle, extensionColor: d.extensionColor, extensionAlpha: d.extensionAlpha,
       freeTextBold: d.freeTextBold, freeTextItalic: d.freeTextItalic, freeTextColor: d.freeTextColor,
-      labelId: d.labelId,
+      labelId: d.labelId, mirror: d.mirror,
     }, d.doorRefId || null);
+    if (typeof d._textSideBase === "number") (dim as any)._textSideBase = d._textSideBase;
     if (d._stickerEditOwnerId) (dim as any)._stickerEditOwnerId = d._stickerEditOwnerId;
   }
   for (const t of data.textBoxes || []) {
