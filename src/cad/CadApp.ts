@@ -562,6 +562,8 @@ export class CadApp {
         freeTextBold: d.freeTextBold, freeTextItalic: d.freeTextItalic, freeTextColor: d.freeTextColor,
         labelId: d.labelId,
         doorRefId: d.doorRefId || null,
+        mirror: !!d.mirror,
+        _textSideBase: (d as any)._textSideBase ?? null,
         _stickerEditOwnerId: d._stickerEditOwnerId || null,
       })),
 
