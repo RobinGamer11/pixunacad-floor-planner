@@ -569,6 +569,8 @@ export class CadApp {
         labelId: d.labelId,
         doorRefId: d.doorRefId || null,
         mirror: !!d.mirror,
+        textGapPx: d.textGapPx,
+        doorHeightText: d.doorHeightText,
         _textSideBase: (d as any)._textSideBase ?? null,
         _stickerEditOwnerId: d._stickerEditOwnerId || null,
       })),
