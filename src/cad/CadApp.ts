@@ -302,6 +302,8 @@ export class CadApp {
     freeTextColor: Defaults.measureFreeTextColor,
     showUnit: Defaults.measureShowUnit,
     unit: Defaults.measureUnit,
+    textGapPx: Defaults.measureTextGapPx,
+    doorHeightText: Defaults.measureDoorHeightText,
   };
 
   // Drag state for parallel-shifting a selected dimension
