@@ -2555,6 +2555,22 @@ export class CadApp {
       if (sel) sel.unit = val;
     });
 
+    if (r.textGap) r.textGap.addEventListener("input", () => {
+      const v = parseFloat((r.textGap!.value || "").replace(",", "."));
+      if (!Number.isFinite(v)) return;
+      const c = clamp(v, 0, 200);
+      this.measureSettings.textGapPx = c;
+      const sel = this.getSelectedDimension();
+      if (sel) sel.textGapPx = c;
+    });
+
+    if (r.doorHeightText) r.doorHeightText.addEventListener("input", () => {
+      const val = r.doorHeightText!.value;
+      this.measureSettings.doorHeightText = val;
+      const sel = this.getSelectedDimension();
+      if (sel) sel.doorHeightText = val;
+    });
+
     this._syncMeasureSettingsFromContext();
   }
 
