@@ -729,6 +729,8 @@ export class CadApp {
         textBgEnabled: d.textBgEnabled, textBgColor: d.textBgColor, textBgAlpha: d.textBgAlpha,
         extensionStyle: d.extensionStyle, extensionColor: d.extensionColor, extensionAlpha: d.extensionAlpha,
         freeTextBold: d.freeTextBold, freeTextItalic: d.freeTextItalic, freeTextColor: d.freeTextColor,
+        textGapPx: d.textGapPx, doorHeightText: d.doorHeightText,
+        mirror: !!d.mirror,
         labelId: d.labelId,
       }, d.doorRefId || null);
       if (d._stickerEditOwnerId) dim._stickerEditOwnerId = d._stickerEditOwnerId;
