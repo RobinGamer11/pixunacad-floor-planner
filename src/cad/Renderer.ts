@@ -2012,7 +2012,8 @@ export class Renderer {
     ctx.fillStyle = mainTextColor;
     ctx.fillText(text, 0, textY);
 
-    // Tür-/Fenster-Referenz: Höhe + BRH unterhalb der Maßlinie anzeigen.
+    // Tür-/Fenster-Referenz: Höhe (in Haupt-Textgröße) + BRH (kleiner) auf der
+    // gegenüberliegenden Seite der Maßlinie anzeigen (unterhalb, wenn Haupttext oben).
     if (dim.doorRefId) {
       const door = this.scene.getDoorById(dim.doorRefId);
       if (door) {
@@ -2024,26 +2025,44 @@ export class Renderer {
           const t = (m * factor).toFixed(dec);
           return showUnit ? `${t} ${unit}` : t;
         };
-        const lines: string[] = [];
-        lines.push(fmt(door.heightM));
-        if (door.breakHeightVisible) {
-          lines.push(`BRH: ${fmt(door.breakHeightM)}`);
+        const overrideText = (dim as any).doorHeightText as string | undefined;
+        const heightLine = (typeof overrideText === "string" && overrideText.trim().length > 0)
+          ? overrideText
+          : fmt(door.heightM);
+        // Höhen-Text bekommt die Haupt-Textgröße (fontPx). BRH bleibt kleiner (0.78x).
+        const brhFont = Math.max(1, baseSize * zoomFactor * 0.78);
+        // Auf der gegenüberliegenden Seite (unterhalb bei Standard-Ausrichtung).
+        const oppSign = -textSideSign;
+        let y = oppSign * (textHeight / 2 + Math.max(0, gapPx));
+
+        // Zeile 1: Höhe (Haupt-Textgröße)
+        ctx.font = `${fontPx}px system-ui, Arial, sans-serif`;
+        const m1 = ctx.measureText(heightLine);
+        const h1 = fontPx;
+        y = oppSign * (h1 / 2 + Math.max(0, gapPx));
+        if (dim.textBgEnabled) {
+          const pX = Math.max(4, fontPx * 0.4);
+          const pY = Math.max(2, fontPx * 0.2);
+          ctx.fillStyle = hexToRgba(dim.textBgColor || Defaults.measureTextBgColor, dim.textBgAlpha ?? Defaults.measureTextBgAlpha);
+          ctx.fillRect(-m1.width / 2 - pX, y - h1 / 2 - pY, m1.width + pX * 2, h1 + pY * 2);
         }
-        const subFont = Math.max(1, baseSize * zoomFactor * 0.78);
-        ctx.font = `${subFont}px system-ui, Arial, sans-serif`;
-        // Näher an die Maßkettenlinie heranrücken (kurzer Abstand unter Tick).
-        let y = tickOffsetPx * 0.55 + subFont * 0.55;
-        for (const line of lines) {
+        ctx.fillStyle = dim.textColor || Defaults.measureTextColor;
+        ctx.fillText(heightLine, 0, y);
+
+        // Zeile 2: BRH (kleiner)
+        if (door.breakHeightVisible) {
+          const brhLine = `BRH: ${fmt(door.breakHeightM)}`;
+          ctx.font = `${brhFont}px system-ui, Arial, sans-serif`;
+          y += oppSign * (h1 / 2 + brhFont * 0.6);
           if (dim.textBgEnabled) {
-            const m = ctx.measureText(line);
-            const pX = Math.max(4, subFont * 0.4);
-            const pY = Math.max(2, subFont * 0.2);
+            const m2 = ctx.measureText(brhLine);
+            const pX = Math.max(4, brhFont * 0.4);
+            const pY = Math.max(2, brhFont * 0.2);
             ctx.fillStyle = hexToRgba(dim.textBgColor || Defaults.measureTextBgColor, dim.textBgAlpha ?? Defaults.measureTextBgAlpha);
-            ctx.fillRect(-m.width / 2 - pX, y - subFont / 2 - pY, m.width + pX * 2, subFont + pY * 2);
+            ctx.fillRect(-m2.width / 2 - pX, y - brhFont / 2 - pY, m2.width + pX * 2, brhFont + pY * 2);
           }
           ctx.fillStyle = dim.textColor || Defaults.measureTextColor;
-          ctx.fillText(line, 0, y);
-          y += subFont * 1.02;
+          ctx.fillText(brhLine, 0, y);
         }
       }
     }
