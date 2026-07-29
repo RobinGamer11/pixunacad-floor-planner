@@ -88,6 +88,8 @@ export interface MeasureSettings {
   freeTextColor: string;
   showUnit: boolean;
   unit: "mm" | "cm" | "m";
+  textGapPx: number;
+  doorHeightText: string;
 }
 
 
