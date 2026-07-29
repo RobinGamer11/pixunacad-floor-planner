@@ -172,6 +172,11 @@ export class Dimension {
   showUnit: boolean;
   unit: "mm" | "cm" | "m";
 
+  /** Abstand (px) zwischen Maßlinie und Text-Kante. */
+  textGapPx: number;
+  /** Freier Text, der die berechnete Höhen-/BRH-Zeile überschreibt. */
+  doorHeightText: string;
+
   labelId: string;
   /** Optional: Referenz auf eine Tür/ein Fenster, wenn das Maß die Öffnungsbreite misst.
    *  Wenn gesetzt, wird unterhalb der Maßlinie die Höhe und die Brüstungshöhe (BRH) ergänzt. */
@@ -210,9 +215,10 @@ export class Dimension {
     this.freeTextBold = !!(s.freeTextBold ?? Defaults.measureFreeTextBold);
     this.freeTextItalic = !!(s.freeTextItalic ?? Defaults.measureFreeTextItalic);
     this.freeTextColor = s.freeTextColor || Defaults.measureFreeTextColor;
-    this.freeTextColor = s.freeTextColor || Defaults.measureFreeTextColor;
     this.showUnit = (typeof s.showUnit === "boolean") ? s.showUnit : Defaults.measureShowUnit;
     this.unit = (s.unit === "mm" || s.unit === "cm" || s.unit === "m") ? s.unit : Defaults.measureUnit;
+    this.textGapPx = (typeof s.textGapPx === "number" && s.textGapPx >= 0) ? s.textGapPx : Defaults.measureTextGapPx;
+    this.doorHeightText = (typeof s.doorHeightText === "string") ? s.doorHeightText : Defaults.measureDoorHeightText;
     this.labelId = labelId || s.labelId || Defaults.defaultLabelId;
     this.doorRefId = doorRefId || null;
     this.mirror = !!s.mirror;
