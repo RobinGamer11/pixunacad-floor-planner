@@ -165,6 +165,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const measureTextColorRef = useRef<HTMLInputElement>(null);
   const measureTextColorPreviewRef = useRef<HTMLDivElement>(null);
   const measureTextSizeRef = useRef<HTMLInputElement>(null);
+  const measureTextGapRef = useRef<HTMLInputElement>(null);
+  const measureDoorHeightTextRef = useRef<HTMLInputElement>(null);
   const measureDecimalsRef = useRef<HTMLInputElement>(null);
   const measureTextBgToggleRef = useRef<HTMLInputElement>(null);
   const measureTextBgGroupRef = useRef<HTMLDivElement>(null);
@@ -596,6 +598,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
         tickLength: measureTickLengthRef.current,
         showUnit: measureShowUnitRef.current!,
         unit: measureUnitRef.current!,
+        textGap: measureTextGapRef.current || undefined,
+        doorHeightText: measureDoorHeightTextRef.current || undefined,
       },
       {
         panel: textSettingsRef.current,
@@ -2196,6 +2200,14 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               <div>
                 <label>Textgröße (px)</label>
                 <input ref={measureTextSizeRef} type="text" defaultValue="11" />
+              </div>
+              <div>
+                <label>Text-Abstand zur Maßlinie (px)</label>
+                <input ref={measureTextGapRef} type="text" defaultValue="2" />
+              </div>
+              <div>
+                <label>Höhentext (frei, ersetzt Türhöhe)</label>
+                <input ref={measureDoorHeightTextRef} type="text" placeholder="z. B. 2,10 m OK" />
               </div>
               <div>
                 <label>Kommastellen (0–6)</label>

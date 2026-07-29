@@ -49,6 +49,10 @@ export const Defaults = {
   measureShowExtensions: false,
   measureUseFreeText: false,
   measureFreeText: "",
+  /** Abstand (px) zwischen Maßlinie und Text-Kante. Klein = näher an Maßlinie. */
+  measureTextGapPx: 2,
+  /** Optionaler freier Text, der die berechnete Höhen-/BRH-Zeile einer türreferenzierten Maßkette ersetzt. */
+  measureDoorHeightText: "",
   measureTextBgEnabled: false,
   measureTextBgColor: "#ffffff",
   measureTextBgAlpha: 0.8,

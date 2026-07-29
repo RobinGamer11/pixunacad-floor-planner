@@ -88,6 +88,8 @@ export interface MeasureSettings {
   freeTextColor: string;
   showUnit: boolean;
   unit: "mm" | "cm" | "m";
+  textGapPx: number;
+  doorHeightText: string;
 }
 
 
@@ -128,6 +130,8 @@ export interface MeasureSettingsRefs {
   tickLength: HTMLInputElement;
   showUnit: HTMLInputElement;
   unit: HTMLSelectElement;
+  textGap?: HTMLInputElement;
+  doorHeightText?: HTMLInputElement;
 }
 
 export class CadApp {
@@ -300,6 +304,8 @@ export class CadApp {
     freeTextColor: Defaults.measureFreeTextColor,
     showUnit: Defaults.measureShowUnit,
     unit: Defaults.measureUnit,
+    textGapPx: Defaults.measureTextGapPx,
+    doorHeightText: Defaults.measureDoorHeightText,
   };
 
   // Drag state for parallel-shifting a selected dimension
@@ -563,6 +569,8 @@ export class CadApp {
         labelId: d.labelId,
         doorRefId: d.doorRefId || null,
         mirror: !!d.mirror,
+        textGapPx: d.textGapPx,
+        doorHeightText: d.doorHeightText,
         _textSideBase: (d as any)._textSideBase ?? null,
         _stickerEditOwnerId: d._stickerEditOwnerId || null,
       })),
@@ -721,6 +729,8 @@ export class CadApp {
         textBgEnabled: d.textBgEnabled, textBgColor: d.textBgColor, textBgAlpha: d.textBgAlpha,
         extensionStyle: d.extensionStyle, extensionColor: d.extensionColor, extensionAlpha: d.extensionAlpha,
         freeTextBold: d.freeTextBold, freeTextItalic: d.freeTextItalic, freeTextColor: d.freeTextColor,
+        textGapPx: d.textGapPx, doorHeightText: d.doorHeightText,
+        mirror: !!d.mirror,
         labelId: d.labelId,
       }, d.doorRefId || null);
       if (d._stickerEditOwnerId) dim._stickerEditOwnerId = d._stickerEditOwnerId;
@@ -2545,6 +2555,22 @@ export class CadApp {
       if (sel) sel.unit = val;
     });
 
+    if (r.textGap) r.textGap.addEventListener("input", () => {
+      const v = parseFloat((r.textGap!.value || "").replace(",", "."));
+      if (!Number.isFinite(v)) return;
+      const c = clamp(v, 0, 200);
+      this.measureSettings.textGapPx = c;
+      const sel = this.getSelectedDimension();
+      if (sel) sel.textGapPx = c;
+    });
+
+    if (r.doorHeightText) r.doorHeightText.addEventListener("input", () => {
+      const val = r.doorHeightText!.value;
+      this.measureSettings.doorHeightText = val;
+      const sel = this.getSelectedDimension();
+      if (sel) sel.doorHeightText = val;
+    });
+
     this._syncMeasureSettingsFromContext();
   }
 
@@ -2562,6 +2588,7 @@ export class CadApp {
       extensionStyle: sel.extensionStyle, extensionColor: sel.extensionColor, extensionAlpha: sel.extensionAlpha,
       freeTextBold: sel.freeTextBold, freeTextItalic: sel.freeTextItalic, freeTextColor: sel.freeTextColor,
       showUnit: sel.showUnit, unit: sel.unit,
+      textGapPx: sel.textGapPx, doorHeightText: sel.doorHeightText,
     } : { ...this.measureSettings, labelId: this.activeDrawLabelId };
 
     r.orientation.value = s.orientation;
@@ -2596,6 +2623,8 @@ export class CadApp {
     r.tickLength.value = String(s.tickLengthM);
     if (r.showUnit) r.showUnit.checked = !!s.showUnit;
     if (r.unit) r.unit.value = s.unit || "m";
+    if (r.textGap) r.textGap.value = String((s as any).textGapPx ?? Defaults.measureTextGapPx);
+    if (r.doorHeightText) r.doorHeightText.value = (s as any).doorHeightText ?? "";
     const labelForDisplay =
       (this.selectedLabelId && this.labelManager.getById(this.selectedLabelId)) ? this.selectedLabelId
         : (s.labelId && this.labelManager.getById(s.labelId)) ? s.labelId

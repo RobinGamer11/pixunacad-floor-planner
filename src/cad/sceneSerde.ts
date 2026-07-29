@@ -99,6 +99,7 @@ export function restoreOneScene(scene: Scene, data: SerializedScene | null | und
       textBgEnabled: d.textBgEnabled, textBgColor: d.textBgColor, textBgAlpha: d.textBgAlpha,
       extensionStyle: d.extensionStyle, extensionColor: d.extensionColor, extensionAlpha: d.extensionAlpha,
       freeTextBold: d.freeTextBold, freeTextItalic: d.freeTextItalic, freeTextColor: d.freeTextColor,
+      textGapPx: d.textGapPx, doorHeightText: d.doorHeightText,
       labelId: d.labelId, mirror: d.mirror,
     }, d.doorRefId || null);
     if (typeof d._textSideBase === "number") (dim as any)._textSideBase = d._textSideBase;

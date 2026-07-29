@@ -1968,30 +1968,13 @@ export class Renderer {
     else if (normalizedAngle < -Math.PI / 2) normalizedAngle += Math.PI;
 
     const tickOffsetPx = (dim.tickLengthM || Defaults.measureTickLengthM) * cam.scale;
-    const textOffsetPx = Math.max(fontPx * 0.95, tickOffsetPx * 0.9 + fontPx * 0.35);
 
-    // Textseite: einmalig in WORLD-Koordinaten aus dem PlacementPoint ableiten
-    // (angle-invariant), damit späteres Verschieben des Platzierungspunkts die
-    // Textseite NICHT mehr automatisch umschlägt. Nur das "spiegeln"-Flag
-    // (dim.mirror) invertiert die Seite. Der Text landet dadurch immer
-    // AUßERHALB des bemaßten Objekts (auf der Placement-Seite).
-    const anyDim = dim as any;
-    const dotPlacementN =
-      (dim.placementPoint.x - g.mid.x) * g.n.x + (dim.placementPoint.y - g.mid.y) * g.n.y;
-    if (anyDim._textSideBaseWorld !== 1 && anyDim._textSideBaseWorld !== -1) {
-      anyDim._textSideBaseWorld = dotPlacementN >= 0 ? 1 : -1;
-    }
-    // World-Normale in die aktuelle rotierte Screen-Local-Y-Achse projizieren.
-    const nScreenA = cam.worldToScreen(g.mid.x, g.mid.y);
-    const nScreenB = cam.worldToScreen(g.mid.x + g.n.x, g.mid.y + g.n.y);
-    const nsx = nScreenB.x - nScreenA.x;
-    const nsy = nScreenB.y - nScreenA.y;
-    const localYx = -Math.sin(normalizedAngle);
-    const localYy = Math.cos(normalizedAngle);
-    const nLocalY = nsx * localYx + nsy * localYy;
-    const worldToLocalSign = nLocalY >= 0 ? 1 : -1;
-    const textSideSign =
-      anyDim._textSideBaseWorld * worldToLocalSign * (anyDim.mirror ? -1 : 1);
+    // Textseite: Architekturkonvention — Text sitzt IMMER oberhalb der Maßlinie
+    // (im lokalen, rotierten Reader-Koordinatensystem: negatives Y = "oben").
+    // Der Placement-Punkt bestimmt weiterhin, auf welcher Seite des Objekts die
+    // Maßlinie liegt; der Text liegt jedoch stets über dieser Linie.
+    // Das mirror-Flag flippt die Seite explizit auf Wunsch.
+    const textSideSign = ((dim as any).mirror ? 1 : -1);
 
     ctx.translate(mid.x, mid.y);
     ctx.rotate(normalizedAngle);
@@ -2013,6 +1996,9 @@ export class Renderer {
     const textHeight = ascent + descent;
     const padX = Math.max(4, fontPx * 0.45);
     const padY = Math.max(2, fontPx * 0.22);
+    // Konfigurierbarer Abstand (px) zwischen Maßlinie und Text-Kante.
+    const gapPx = ((dim as any).textGapPx ?? Defaults.measureTextGapPx) * zoomFactor;
+    const textOffsetPx = textHeight / 2 + Math.max(0, gapPx);
     const textY = textSideSign * textOffsetPx;
 
     if (dim.textBgEnabled) {
@@ -2026,7 +2012,8 @@ export class Renderer {
     ctx.fillStyle = mainTextColor;
     ctx.fillText(text, 0, textY);
 
-    // Tür-/Fenster-Referenz: Höhe + BRH unterhalb der Maßlinie anzeigen.
+    // Tür-/Fenster-Referenz: Höhe (in Haupt-Textgröße) + BRH (kleiner) auf der
+    // gegenüberliegenden Seite der Maßlinie anzeigen (unterhalb, wenn Haupttext oben).
     if (dim.doorRefId) {
       const door = this.scene.getDoorById(dim.doorRefId);
       if (door) {
@@ -2038,26 +2025,44 @@ export class Renderer {
           const t = (m * factor).toFixed(dec);
           return showUnit ? `${t} ${unit}` : t;
         };
-        const lines: string[] = [];
-        lines.push(fmt(door.heightM));
-        if (door.breakHeightVisible) {
-          lines.push(`BRH: ${fmt(door.breakHeightM)}`);
+        const overrideText = (dim as any).doorHeightText as string | undefined;
+        const heightLine = (typeof overrideText === "string" && overrideText.trim().length > 0)
+          ? overrideText
+          : fmt(door.heightM);
+        // Höhen-Text bekommt die Haupt-Textgröße (fontPx). BRH bleibt kleiner (0.78x).
+        const brhFont = Math.max(1, baseSize * zoomFactor * 0.78);
+        // Auf der gegenüberliegenden Seite (unterhalb bei Standard-Ausrichtung).
+        const oppSign = -textSideSign;
+        let y = oppSign * (textHeight / 2 + Math.max(0, gapPx));
+
+        // Zeile 1: Höhe (Haupt-Textgröße)
+        ctx.font = `${fontPx}px system-ui, Arial, sans-serif`;
+        const m1 = ctx.measureText(heightLine);
+        const h1 = fontPx;
+        y = oppSign * (h1 / 2 + Math.max(0, gapPx));
+        if (dim.textBgEnabled) {
+          const pX = Math.max(4, fontPx * 0.4);
+          const pY = Math.max(2, fontPx * 0.2);
+          ctx.fillStyle = hexToRgba(dim.textBgColor || Defaults.measureTextBgColor, dim.textBgAlpha ?? Defaults.measureTextBgAlpha);
+          ctx.fillRect(-m1.width / 2 - pX, y - h1 / 2 - pY, m1.width + pX * 2, h1 + pY * 2);
         }
-        const subFont = Math.max(1, baseSize * zoomFactor * 0.78);
-        ctx.font = `${subFont}px system-ui, Arial, sans-serif`;
-        // Näher an die Maßkettenlinie heranrücken (kurzer Abstand unter Tick).
-        let y = tickOffsetPx * 0.55 + subFont * 0.55;
-        for (const line of lines) {
+        ctx.fillStyle = dim.textColor || Defaults.measureTextColor;
+        ctx.fillText(heightLine, 0, y);
+
+        // Zeile 2: BRH (kleiner)
+        if (door.breakHeightVisible) {
+          const brhLine = `BRH: ${fmt(door.breakHeightM)}`;
+          ctx.font = `${brhFont}px system-ui, Arial, sans-serif`;
+          y += oppSign * (h1 / 2 + brhFont * 0.6);
           if (dim.textBgEnabled) {
-            const m = ctx.measureText(line);
-            const pX = Math.max(4, subFont * 0.4);
-            const pY = Math.max(2, subFont * 0.2);
+            const m2 = ctx.measureText(brhLine);
+            const pX = Math.max(4, brhFont * 0.4);
+            const pY = Math.max(2, brhFont * 0.2);
             ctx.fillStyle = hexToRgba(dim.textBgColor || Defaults.measureTextBgColor, dim.textBgAlpha ?? Defaults.measureTextBgAlpha);
-            ctx.fillRect(-m.width / 2 - pX, y - subFont / 2 - pY, m.width + pX * 2, subFont + pY * 2);
+            ctx.fillRect(-m2.width / 2 - pX, y - brhFont / 2 - pY, m2.width + pX * 2, brhFont + pY * 2);
           }
           ctx.fillStyle = dim.textColor || Defaults.measureTextColor;
-          ctx.fillText(line, 0, y);
-          y += subFont * 1.02;
+          ctx.fillText(brhLine, 0, y);
         }
       }
     }
