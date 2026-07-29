@@ -1968,30 +1968,13 @@ export class Renderer {
     else if (normalizedAngle < -Math.PI / 2) normalizedAngle += Math.PI;
 
     const tickOffsetPx = (dim.tickLengthM || Defaults.measureTickLengthM) * cam.scale;
-    const textOffsetPx = Math.max(fontPx * 0.95, tickOffsetPx * 0.9 + fontPx * 0.35);
 
-    // Textseite: einmalig in WORLD-Koordinaten aus dem PlacementPoint ableiten
-    // (angle-invariant), damit späteres Verschieben des Platzierungspunkts die
-    // Textseite NICHT mehr automatisch umschlägt. Nur das "spiegeln"-Flag
-    // (dim.mirror) invertiert die Seite. Der Text landet dadurch immer
-    // AUßERHALB des bemaßten Objekts (auf der Placement-Seite).
-    const anyDim = dim as any;
-    const dotPlacementN =
-      (dim.placementPoint.x - g.mid.x) * g.n.x + (dim.placementPoint.y - g.mid.y) * g.n.y;
-    if (anyDim._textSideBaseWorld !== 1 && anyDim._textSideBaseWorld !== -1) {
-      anyDim._textSideBaseWorld = dotPlacementN >= 0 ? 1 : -1;
-    }
-    // World-Normale in die aktuelle rotierte Screen-Local-Y-Achse projizieren.
-    const nScreenA = cam.worldToScreen(g.mid.x, g.mid.y);
-    const nScreenB = cam.worldToScreen(g.mid.x + g.n.x, g.mid.y + g.n.y);
-    const nsx = nScreenB.x - nScreenA.x;
-    const nsy = nScreenB.y - nScreenA.y;
-    const localYx = -Math.sin(normalizedAngle);
-    const localYy = Math.cos(normalizedAngle);
-    const nLocalY = nsx * localYx + nsy * localYy;
-    const worldToLocalSign = nLocalY >= 0 ? 1 : -1;
-    const textSideSign =
-      anyDim._textSideBaseWorld * worldToLocalSign * (anyDim.mirror ? -1 : 1);
+    // Textseite: Architekturkonvention — Text sitzt IMMER oberhalb der Maßlinie
+    // (im lokalen, rotierten Reader-Koordinatensystem: negatives Y = "oben").
+    // Der Placement-Punkt bestimmt weiterhin, auf welcher Seite des Objekts die
+    // Maßlinie liegt; der Text liegt jedoch stets über dieser Linie.
+    // Das mirror-Flag flippt die Seite explizit auf Wunsch.
+    const textSideSign = (dim.mirror ? 1 : -1);
 
     ctx.translate(mid.x, mid.y);
     ctx.rotate(normalizedAngle);
@@ -2013,6 +1996,9 @@ export class Renderer {
     const textHeight = ascent + descent;
     const padX = Math.max(4, fontPx * 0.45);
     const padY = Math.max(2, fontPx * 0.22);
+    // Konfigurierbarer Abstand (px) zwischen Maßlinie und Text-Kante.
+    const gapPx = ((dim as any).textGapPx ?? Defaults.measureTextGapPx) * zoomFactor;
+    const textOffsetPx = textHeight / 2 + Math.max(0, gapPx);
     const textY = textSideSign * textOffsetPx;
 
     if (dim.textBgEnabled) {
