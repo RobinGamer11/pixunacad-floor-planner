@@ -130,6 +130,10 @@ export interface DimensionStyle {
   showUnit?: boolean;
   /** Einheit für die Anzeige der Maßzahl (intern bleiben die Werte in m). */
   unit?: "mm" | "cm" | "m";
+  /** Abstand (px) zwischen Maßlinie und Text-Kante. */
+  textGapPx?: number;
+  /** Freier Text, der die berechnete Höhen-/BRH-Zeile einer türreferenzierten Maßkette ersetzt. */
+  doorHeightText?: string;
   labelId?: string;
   /** Wenn true: Textseite und Text-Orientierung werden an der Bezugslinie gespiegelt. */
   mirror?: boolean;
