@@ -2623,6 +2623,8 @@ export class CadApp {
     r.tickLength.value = String(s.tickLengthM);
     if (r.showUnit) r.showUnit.checked = !!s.showUnit;
     if (r.unit) r.unit.value = s.unit || "m";
+    if (r.textGap) r.textGap.value = String((s as any).textGapPx ?? Defaults.measureTextGapPx);
+    if (r.doorHeightText) r.doorHeightText.value = (s as any).doorHeightText ?? "";
     const labelForDisplay =
       (this.selectedLabelId && this.labelManager.getById(this.selectedLabelId)) ? this.selectedLabelId
         : (s.labelId && this.labelManager.getById(s.labelId)) ? s.labelId
