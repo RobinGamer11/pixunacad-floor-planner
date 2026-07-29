@@ -2588,6 +2588,7 @@ export class CadApp {
       extensionStyle: sel.extensionStyle, extensionColor: sel.extensionColor, extensionAlpha: sel.extensionAlpha,
       freeTextBold: sel.freeTextBold, freeTextItalic: sel.freeTextItalic, freeTextColor: sel.freeTextColor,
       showUnit: sel.showUnit, unit: sel.unit,
+      textGapPx: sel.textGapPx, doorHeightText: sel.doorHeightText,
     } : { ...this.measureSettings, labelId: this.activeDrawLabelId };
 
     r.orientation.value = s.orientation;
