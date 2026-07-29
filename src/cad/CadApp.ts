@@ -130,6 +130,8 @@ export interface MeasureSettingsRefs {
   tickLength: HTMLInputElement;
   showUnit: HTMLInputElement;
   unit: HTMLSelectElement;
+  textGap?: HTMLInputElement;
+  doorHeightText?: HTMLInputElement;
 }
 
 export class CadApp {
