@@ -1974,7 +1974,7 @@ export class Renderer {
     // Der Placement-Punkt bestimmt weiterhin, auf welcher Seite des Objekts die
     // Maßlinie liegt; der Text liegt jedoch stets über dieser Linie.
     // Das mirror-Flag flippt die Seite explizit auf Wunsch.
-    const textSideSign = (dim.mirror ? 1 : -1);
+    const textSideSign = ((dim as any).mirror ? 1 : -1);
 
     ctx.translate(mid.x, mid.y);
     ctx.rotate(normalizedAngle);
