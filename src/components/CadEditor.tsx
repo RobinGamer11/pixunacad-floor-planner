@@ -598,6 +598,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
         tickLength: measureTickLengthRef.current,
         showUnit: measureShowUnitRef.current!,
         unit: measureUnitRef.current!,
+        textGap: measureTextGapRef.current || undefined,
+        doorHeightText: measureDoorHeightTextRef.current || undefined,
       },
       {
         panel: textSettingsRef.current,
