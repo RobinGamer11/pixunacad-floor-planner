@@ -182,7 +182,12 @@ export class SelectTool {
     this.dragTextBoxId = null;
     this.dragTextBoxGrabOffset = null;
     this.dragTextBoxSnap = null;
-    this.rotateTextBoxId = null;
+    if (this.rotateTextBoxId) {
+      // ESC während des freien Drehens: Ausgangsrotation wiederherstellen.
+      const rb = this.app.scene.getTextBoxById(this.rotateTextBoxId);
+      if (rb) rb.rotationRad = this.rotateTextBoxOriginalRot;
+      this.rotateTextBoxId = null;
+    }
     this.dragAreaLabelHatchId = null;
     this.dragAreaLabelGrabOffsetWorld = null;
     this.dragAreaLabelStartOffset = null;
