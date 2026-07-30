@@ -1241,6 +1241,17 @@ export class SelectTool {
     return null;
   }
 
+  /** ESC-Abbruch: Textbox-Geometrie auf den Zustand bei Edit-Beginn zurücksetzen. */
+  _restoreTextBoxEdit() {
+    if (this.editTarget?.kind !== "textboxHandle") return;
+    const box = this.app.scene.getTextBoxById((this.editTarget as any).textBoxId);
+    if (!box || !this.textBoxCenterOriginal) return;
+    box.center = v(this.textBoxCenterOriginal.x, this.textBoxCenterOriginal.y);
+    box.rotationRad = this.textBoxRotationOriginal;
+    if (this.textBoxWidthOriginal > 0) box.widthM = this.textBoxWidthOriginal;
+    if (this.textBoxHeightOriginal > 0) box.heightM = this.textBoxHeightOriginal;
+  }
+
   _clearEditState() {
     // Nach Wand-Mutationen: erst Auto-Trim der betroffenen Wand-Endpunkte an
     // Nachbar-Bezugslinien, dann Topologie-Wartung (Auto-Split / Auto-Merge).
