@@ -941,6 +941,30 @@ export class SelectTool {
       const h = this.textBoxHeightOriginal;
       const handleIndex = this.editTarget.handleIndex;
 
+      if (this.textBoxRotatePivotMode && this.activeEditAction === PointEditAction.ROTATE
+          && this.textBoxCornerOriginal && this.textBoxCenterOriginal) {
+        // Drehung exakt um den angeklickten Fangpunkt (Pivot = Ecke).
+        const pivot = this.textBoxCornerOriginal;
+        const c0 = this.textBoxCenterOriginal;
+        const baseAng = Math.atan2(c0.y - pivot.y, c0.x - pivot.x);
+        const curAng = Math.atan2(newPoint.y - pivot.y, newPoint.x - pivot.x);
+        let delta = curAng - baseAng;
+        if (this.app.input?.keys?.shift) {
+          // Shift: absolute Box-Rotation auf 15°-Raster fangen (0°, 90°, ...).
+          const step = Math.PI / 12;
+          const snapped = Math.round((this.textBoxRotationOriginal + delta) / step) * step;
+          delta = snapped - this.textBoxRotationOriginal;
+        }
+        const cs = Math.cos(delta), sn = Math.sin(delta);
+        const dx = c0.x - pivot.x, dy = c0.y - pivot.y;
+        box.center = v(pivot.x + dx * cs - dy * sn, pivot.y + dx * sn + dy * cs);
+        box.rotationRad = this.textBoxRotationOriginal + delta;
+        box.widthM = w;
+        box.heightM = h;
+        return;
+      }
+
+
       if ((this as any)._textBoxResizeMode) {
         // RESIZE: Rotation bleibt fix, gegenüberliegende Ecke bleibt fix,
         // Box-Breite/Höhe folgen der Maus (Textgröße bleibt unverändert).
