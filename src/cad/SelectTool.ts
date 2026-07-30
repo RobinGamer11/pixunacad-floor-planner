@@ -166,6 +166,7 @@ export class SelectTool {
   }
 
   cancel() {
+    this._restoreTextBoxEdit();
     this._clearEditState();
     this.app.pointEditMenu.hide();
     this.app.hub.hide();
