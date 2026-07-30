@@ -59,6 +59,8 @@ export class SelectTool {
   textBoxHeightOriginal = 0;
   textBoxCenterOriginal: Vec2 | null = null;
   textBoxCornerOriginal: Vec2 | null = null;   // moving (clicked) corner world pos at edit start
+  /** Wenn true: ROTATE dreht die Box um den angeklickten Fangpunkt (Pivot = Ecke). */
+  textBoxRotatePivotMode = false;
 
   // AreaLabel handle (corner) edit state
   areaLabelOriginalRotation = 0;
