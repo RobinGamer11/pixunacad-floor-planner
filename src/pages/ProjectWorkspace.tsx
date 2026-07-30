@@ -3253,30 +3253,73 @@ function ElementView({
     e.preventDefault();
     try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
     const node = rootRef.current;
-    if (!node) return;
+    const parent = node?.parentElement as HTMLElement | null;
+    if (!node || !parent) return;
     const rect = node.getBoundingClientRect();
-    const cx = rect.left + rect.width / 2;
-    const cy = rect.top + rect.height / 2;
-    const startAngle = Math.atan2(e.clientY - cy, e.clientX - cx);
+    // Pivot = zuletzt angeklickter Fangpunkt (Anker) — sonst Mittelpunkt.
+    const frac = anchorFracRef.current ?? { fx: 0.5, fy: 0.5, key: "interior" };
+    const px = rect.left + frac.fx * rect.width;
+    const py = rect.top + frac.fy * rect.height;
+    const cx0 = rect.left + rect.width / 2;
+    const cy0 = rect.top + rect.height / 2;
+    const parentRect = parent.getBoundingClientRect();
+    const startAngle = Math.atan2(e.clientY - py, e.clientX - px);
     const startRot = el.rotation ?? 0;
+    const startX = el.x;
+    const startY = el.y;
     rotateMovedRef.current = false;
-    const handleMove = (ev: PointerEvent) => {
-      if (Math.hypot(ev.clientX - e.clientX, ev.clientY - e.clientY) > 3) rotateMovedRef.current = true;
-      const a = Math.atan2(ev.clientY - cy, ev.clientX - cx);
-      let deg = startRot + ((a - startAngle) * 180) / Math.PI;
-      if (ev.shiftKey) deg = Math.round(deg / 15) * 15;
-      onRotate(deg, true);
+
+    const apply = (deltaDeg: number) => {
+      const rad = (deltaDeg * Math.PI) / 180;
+      const cos = Math.cos(rad), sin = Math.sin(rad);
+      const ox = cx0 - px, oy = cy0 - py;
+      const newCx = px + ox * cos - oy * sin;
+      const newCy = py + ox * sin + oy * cos;
+      const newXPct = ((newCx - rect.width / 2 - parentRect.left) / Math.max(1, parentRect.width)) * 100;
+      const newYPct = ((newCy - rect.height / 2 - parentRect.top) / Math.max(1, parentRect.height)) * 100;
+      if (onTransform) {
+        onTransform({ x: newXPct, y: newYPct, rotation: startRot + deltaDeg });
+      } else {
+        onRotate(startRot + deltaDeg, true);
+      }
     };
-    const handleUp = (ev: PointerEvent) => {
-      try { (e.currentTarget as HTMLElement).releasePointerCapture(ev.pointerId); } catch {}
+
+    const cleanup = () => {
       window.removeEventListener("pointermove", handleMove);
       window.removeEventListener("pointerup", handleUp);
       window.removeEventListener("pointercancel", handleUp);
+      window.removeEventListener("keydown", handleKey, true);
+    };
+    const handleMove = (ev: PointerEvent) => {
+      if (Math.hypot(ev.clientX - e.clientX, ev.clientY - e.clientY) > 3) rotateMovedRef.current = true;
+      const a = Math.atan2(ev.clientY - py, ev.clientX - px);
+      let delta = ((a - startAngle) * 180) / Math.PI;
+      if (ev.shiftKey) {
+        // Shift: absolute Rotation auf 90°/0°-Raster fangen.
+        const absTarget = Math.round((startRot + delta) / 90) * 90;
+        delta = absTarget - startRot;
+      }
+      apply(delta);
+    };
+    const handleUp = (ev: PointerEvent) => {
+      try { (e.currentTarget as HTMLElement).releasePointerCapture(ev.pointerId); } catch {}
+      cleanup();
+    };
+    const handleKey = (ev: KeyboardEvent) => {
+      if (ev.key !== "Escape") return;
+      ev.stopPropagation();
+      ev.preventDefault();
+      // Abbruch: Ausgangszustand wiederherstellen.
+      if (onTransform) onTransform({ x: startX, y: startY, rotation: startRot });
+      else onRotate(startRot, true);
+      cleanup();
     };
     window.addEventListener("pointermove", handleMove);
     window.addEventListener("pointerup", handleUp);
     window.addEventListener("pointercancel", handleUp);
+    window.addEventListener("keydown", handleKey, true);
   };
+
 
 
   const hubKinds = new Set(["cad-view", "cad-viewport", "pdf", "image"]);

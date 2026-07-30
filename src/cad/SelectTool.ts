@@ -59,6 +59,8 @@ export class SelectTool {
   textBoxHeightOriginal = 0;
   textBoxCenterOriginal: Vec2 | null = null;
   textBoxCornerOriginal: Vec2 | null = null;   // moving (clicked) corner world pos at edit start
+  /** Wenn true: ROTATE dreht die Box um den angeklickten Fangpunkt (Pivot = Ecke). */
+  textBoxRotatePivotMode = false;
 
   // AreaLabel handle (corner) edit state
   areaLabelOriginalRotation = 0;
@@ -164,6 +166,7 @@ export class SelectTool {
   }
 
   cancel() {
+    this._restoreTextBoxEdit();
     this._clearEditState();
     this.app.pointEditMenu.hide();
     this.app.hub.hide();
@@ -179,7 +182,12 @@ export class SelectTool {
     this.dragTextBoxId = null;
     this.dragTextBoxGrabOffset = null;
     this.dragTextBoxSnap = null;
-    this.rotateTextBoxId = null;
+    if (this.rotateTextBoxId) {
+      // ESC während des freien Drehens: Ausgangsrotation wiederherstellen.
+      const rb = this.app.scene.getTextBoxById(this.rotateTextBoxId);
+      if (rb) rb.rotationRad = this.rotateTextBoxOriginalRot;
+      this.rotateTextBoxId = null;
+    }
     this.dragAreaLabelHatchId = null;
     this.dragAreaLabelGrabOffsetWorld = null;
     this.dragAreaLabelStartOffset = null;
@@ -513,8 +521,16 @@ export class SelectTool {
     this.textBoxCornerOriginal = v(corners[handleIndex].x, corners[handleIndex].y);
     this.textBoxOppositeOriginal = v(corners[(handleIndex + 2) % 4].x, corners[(handleIndex + 2) % 4].y);
 
-    this.fixedPoint = v(this.textBoxOppositeOriginal.x, this.textBoxOppositeOriginal.y);
-    this.otherPointOriginal = v(this.textBoxCornerOriginal.x, this.textBoxCornerOriginal.y);
+    // ROTATE: Drehung erfolgt um den angeklickten Fangpunkt selbst (nicht um die
+    // gegenüberliegende Ecke). Referenzpunkt für Winkel/Hub ist das Box-Zentrum.
+    this.textBoxRotatePivotMode = action === PointEditAction.ROTATE;
+    if (this.textBoxRotatePivotMode) {
+      this.fixedPoint = v(this.textBoxCornerOriginal.x, this.textBoxCornerOriginal.y);
+      this.otherPointOriginal = v(this.textBoxCenterOriginal.x, this.textBoxCenterOriginal.y);
+    } else {
+      this.fixedPoint = v(this.textBoxOppositeOriginal.x, this.textBoxOppositeOriginal.y);
+      this.otherPointOriginal = v(this.textBoxCornerOriginal.x, this.textBoxCornerOriginal.y);
+    }
 
     this.moveHubLocked = false;
     this.moveHubLengthM = null;
@@ -931,6 +947,30 @@ export class SelectTool {
       const h = this.textBoxHeightOriginal;
       const handleIndex = this.editTarget.handleIndex;
 
+      if (this.textBoxRotatePivotMode && this.activeEditAction === PointEditAction.ROTATE
+          && this.textBoxCornerOriginal && this.textBoxCenterOriginal) {
+        // Drehung exakt um den angeklickten Fangpunkt (Pivot = Ecke).
+        const pivot = this.textBoxCornerOriginal;
+        const c0 = this.textBoxCenterOriginal;
+        const baseAng = Math.atan2(c0.y - pivot.y, c0.x - pivot.x);
+        const curAng = Math.atan2(newPoint.y - pivot.y, newPoint.x - pivot.x);
+        let delta = curAng - baseAng;
+        if (this.app.input?.keys?.shift) {
+          // Shift: absolute Box-Rotation auf 15°-Raster fangen (0°, 90°, ...).
+          const step = Math.PI / 12;
+          const snapped = Math.round((this.textBoxRotationOriginal + delta) / step) * step;
+          delta = snapped - this.textBoxRotationOriginal;
+        }
+        const cs = Math.cos(delta), sn = Math.sin(delta);
+        const dx = c0.x - pivot.x, dy = c0.y - pivot.y;
+        box.center = v(pivot.x + dx * cs - dy * sn, pivot.y + dx * sn + dy * cs);
+        box.rotationRad = this.textBoxRotationOriginal + delta;
+        box.widthM = w;
+        box.heightM = h;
+        return;
+      }
+
+
       if ((this as any)._textBoxResizeMode) {
         // RESIZE: Rotation bleibt fix, gegenüberliegende Ecke bleibt fix,
         // Box-Breite/Höhe folgen der Maus (Textgröße bleibt unverändert).
@@ -1206,6 +1246,17 @@ export class SelectTool {
     return null;
   }
 
+  /** ESC-Abbruch: Textbox-Geometrie auf den Zustand bei Edit-Beginn zurücksetzen. */
+  _restoreTextBoxEdit() {
+    if (this.editTarget?.kind !== "textboxHandle") return;
+    const box = this.app.scene.getTextBoxById((this.editTarget as any).textBoxId);
+    if (!box || !this.textBoxCenterOriginal) return;
+    box.center = v(this.textBoxCenterOriginal.x, this.textBoxCenterOriginal.y);
+    box.rotationRad = this.textBoxRotationOriginal;
+    if (this.textBoxWidthOriginal > 0) box.widthM = this.textBoxWidthOriginal;
+    if (this.textBoxHeightOriginal > 0) box.heightM = this.textBoxHeightOriginal;
+  }
+
   _clearEditState() {
     // Nach Wand-Mutationen: erst Auto-Trim der betroffenen Wand-Endpunkte an
     // Nachbar-Bezugslinien, dann Topologie-Wartung (Auto-Split / Auto-Merge).
@@ -1242,6 +1293,7 @@ export class SelectTool {
     this.textBoxHeightOriginal = 0;
     this.textBoxCenterOriginal = null;
     this.textBoxCornerOriginal = null;
+    this.textBoxRotatePivotMode = false;
     this.areaLabelOriginalRotation = 0;
     this.areaLabelOriginalScale = 1;
     this.areaLabelOriginalOffset = null;
