@@ -1288,6 +1288,7 @@ export class SelectTool {
     this.textBoxHeightOriginal = 0;
     this.textBoxCenterOriginal = null;
     this.textBoxCornerOriginal = null;
+    this.textBoxRotatePivotMode = false;
     this.areaLabelOriginalRotation = 0;
     this.areaLabelOriginalScale = 1;
     this.areaLabelOriginalOffset = null;
