@@ -515,8 +515,16 @@ export class SelectTool {
     this.textBoxCornerOriginal = v(corners[handleIndex].x, corners[handleIndex].y);
     this.textBoxOppositeOriginal = v(corners[(handleIndex + 2) % 4].x, corners[(handleIndex + 2) % 4].y);
 
-    this.fixedPoint = v(this.textBoxOppositeOriginal.x, this.textBoxOppositeOriginal.y);
-    this.otherPointOriginal = v(this.textBoxCornerOriginal.x, this.textBoxCornerOriginal.y);
+    // ROTATE: Drehung erfolgt um den angeklickten Fangpunkt selbst (nicht um die
+    // gegenüberliegende Ecke). Referenzpunkt für Winkel/Hub ist das Box-Zentrum.
+    this.textBoxRotatePivotMode = action === PointEditAction.ROTATE;
+    if (this.textBoxRotatePivotMode) {
+      this.fixedPoint = v(this.textBoxCornerOriginal.x, this.textBoxCornerOriginal.y);
+      this.otherPointOriginal = v(this.textBoxCenterOriginal.x, this.textBoxCenterOriginal.y);
+    } else {
+      this.fixedPoint = v(this.textBoxOppositeOriginal.x, this.textBoxOppositeOriginal.y);
+      this.otherPointOriginal = v(this.textBoxCornerOriginal.x, this.textBoxCornerOriginal.y);
+    }
 
     this.moveHubLocked = false;
     this.moveHubLengthM = null;
