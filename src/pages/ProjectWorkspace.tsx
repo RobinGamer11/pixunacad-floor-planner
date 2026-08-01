@@ -3456,7 +3456,10 @@ function ElementView({
       ev.preventDefault();
       ev.stopPropagation();
       // Erneuter Klick auf den gewählten Fangpunkt (Anker) → Aktion bestätigen.
-      const { clientX: ax, clientY: ay } = liveAnchor();
+      const { clientX: ax0, clientY: ay0 } = liveAnchor();
+      const p = previewRef.current;
+      const ax = ax0 + (hubMode === "move" ? p.dxPx : 0);
+      const ay = ay0 + (hubMode === "move" ? p.dyPx : 0);
       const nearAnchor = Math.hypot(ev.clientX - ax, ev.clientY - ay) <= 12;
       if (nearAnchor) {
         downClient = null;
