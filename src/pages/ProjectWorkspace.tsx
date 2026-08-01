@@ -3453,11 +3453,17 @@ function ElementView({
     const onClick = (ev: MouseEvent) => {
       const t = ev.target as HTMLElement | null;
       if (t?.closest("[data-hub-control]")) return;
-      // Linksklick während Move/Rotate NICHT committen. Stattdessen
-      // togglen wir "carrying": Objekt bleibt an aktueller Preview-Position
-      // liegen bzw. wird wieder aufgenommen und folgt der Maus.
       ev.preventDefault();
       ev.stopPropagation();
+      // Erneuter Klick auf den gewählten Fangpunkt (Anker) → Aktion bestätigen.
+      const { clientX: ax, clientY: ay } = liveAnchor();
+      const nearAnchor = Math.hypot(ev.clientX - ax, ev.clientY - ay) <= 12;
+      if (nearAnchor) {
+        downClient = null;
+        commit();
+        return;
+      }
+      // Sonst: NICHT committen — nur "carrying" togglen (ablegen/aufnehmen).
       if (hubMode === "move") {
         if (carryingRef.current) {
           // Ablegen: Preview einfrieren.
