@@ -1303,7 +1303,11 @@ function ProjectGraph({
     ? Math.max(60, 40 - bounds.minY)         // oben andocken
     : size.h / 2 - (bounds.minY + contentH / 2);
 
+  // Zoom-Pivot am Transform-Ursprung ausrichten (sonst driftet der Zoom).
+  useEffect(() => { zp.setOrigin(cx, cy); }, [cx, cy, zp.setOrigin]);
+
   // Auf ausgewählten Knoten fokussieren
+
   useEffect(() => {
     const targetId = selectedId ?? "__root__";
     const ln = layout.nodes.find((n) => n.id === targetId);
