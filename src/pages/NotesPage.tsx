@@ -1396,7 +1396,7 @@ function ProjectGraph({
               const priCol = !isRoot && n!.priority ? priorityMap.get(n!.priority)?.color : undefined;
               const title = isRoot ? layout.rootLabel : n!.title;
               return (
-                <g key={ln.id} style={{ cursor: "pointer" }} onClick={onClick}>
+                <g key={ln.id} data-graph-node style={{ cursor: "pointer" }} onClick={onClick}>
                   {!isRoot && n!.unseen && (
                     <rect x={x - 4} y={y - 4} width={w + 8} height={h + 8} rx={10}
                       fill="none" stroke="#38bdf8" strokeWidth={2} opacity={0.9}>
@@ -1461,7 +1461,7 @@ function ProjectGraph({
               );
             }
             return (
-              <g key={ln.id} style={{ cursor: "pointer" }} onClick={onClick}>
+              <g key={ln.id} data-graph-node style={{ cursor: "pointer" }} onClick={onClick}>
                 {n!.unseen && (
                   <circle cx={ln.x} cy={ln.y} r={ln.r + 5}
                     fill="none" stroke="#38bdf8" strokeWidth={2} opacity={0.9}>
@@ -1560,7 +1560,7 @@ function LinksGraph({
               return (
                 <g key={n.id}>
                   <line x1={0} y1={0} x2={x} y2={y} stroke="hsl(var(--hairline))" strokeDasharray="4 3" />
-                  <g style={{ cursor: "pointer" }} onClick={() => onSelect(n.id)}>
+                  <g data-graph-node style={{ cursor: "pointer" }} onClick={() => onSelect(n.id)}>
                     <circle cx={x} cy={y} r={20}
                       fill={n.kind === "topic" ? "hsl(var(--accent-gold))" : "hsl(var(--surface-card))"}
                       stroke={st} strokeWidth={2} />
