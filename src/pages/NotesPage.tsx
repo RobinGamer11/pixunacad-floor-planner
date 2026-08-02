@@ -1266,6 +1266,8 @@ function ProjectGraph({
   focusToken: number;
 }) {
   const zp = useZoomPan();
+  // Hover-Vorschau: zeigt vor dem Klick, welcher Knoten der Zoom-/Fangpunkt wäre.
+  const [hoverId, setHoverId] = useState<string | null>(null);
   const [layoutMode, setLayoutMode] = useState<GraphLayout>(() => {
     try { return (localStorage.getItem("pixuna.board.graphLayout") as GraphLayout) || "tree"; }
     catch { return "tree"; }
@@ -1396,7 +1398,19 @@ function ProjectGraph({
               const priCol = !isRoot && n!.priority ? priorityMap.get(n!.priority)?.color : undefined;
               const title = isRoot ? layout.rootLabel : n!.title;
               return (
-                <g key={ln.id} data-graph-node style={{ cursor: "pointer" }} onClick={onClick}>
+                <g key={ln.id} data-graph-node style={{ cursor: "pointer" }} onClick={onClick}
+                   onPointerEnter={() => setHoverId(ln.id)}
+                   onPointerLeave={() => setHoverId((h) => (h === ln.id ? null : h))}>
+                  {hoverId === ln.id && !isSel && (
+                    <rect x={x - 5} y={y - 5} width={w + 10} height={h + 10} rx={11}
+                      fill="hsl(var(--accent-gold))" fillOpacity={0.07}
+                      stroke="hsl(var(--accent-gold))" strokeOpacity={0.55}
+                      strokeWidth={1.2} strokeDasharray="4 3" pointerEvents="none" />
+                  )}
+                  {hoverId === ln.id && (
+                    <circle cx={ln.x} cy={ln.y} r={3.5} fill="hsl(var(--accent-gold))"
+                      opacity={0.75} pointerEvents="none" />
+                  )}
                   {!isRoot && n!.unseen && (
                     <rect x={x - 4} y={y - 4} width={w + 8} height={h + 8} rx={10}
                       fill="none" stroke="#38bdf8" strokeWidth={2} opacity={0.9}>
@@ -1461,7 +1475,19 @@ function ProjectGraph({
               );
             }
             return (
-              <g key={ln.id} data-graph-node style={{ cursor: "pointer" }} onClick={onClick}>
+              <g key={ln.id} data-graph-node style={{ cursor: "pointer" }} onClick={onClick}
+                 onPointerEnter={() => setHoverId(ln.id)}
+                 onPointerLeave={() => setHoverId((h) => (h === ln.id ? null : h))}>
+                {hoverId === ln.id && !isSel && (
+                  <circle cx={ln.x} cy={ln.y} r={ln.r + 6}
+                    fill="hsl(var(--accent-gold))" fillOpacity={0.07}
+                    stroke="hsl(var(--accent-gold))" strokeOpacity={0.55}
+                    strokeWidth={1.2} strokeDasharray="4 3" pointerEvents="none" />
+                )}
+                {hoverId === ln.id && (
+                  <circle cx={ln.x} cy={ln.y} r={3} fill="hsl(var(--accent-gold))"
+                    opacity={0.75} pointerEvents="none" />
+                )}
                 {n!.unseen && (
                   <circle cx={ln.x} cy={ln.y} r={ln.r + 5}
                     fill="none" stroke="#38bdf8" strokeWidth={2} opacity={0.9}>
