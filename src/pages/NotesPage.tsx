@@ -1266,6 +1266,8 @@ function ProjectGraph({
   focusToken: number;
 }) {
   const zp = useZoomPan();
+  // Hover-Vorschau: zeigt vor dem Klick, welcher Knoten der Zoom-/Fangpunkt wäre.
+  const [hoverId, setHoverId] = useState<string | null>(null);
   const [layoutMode, setLayoutMode] = useState<GraphLayout>(() => {
     try { return (localStorage.getItem("pixuna.board.graphLayout") as GraphLayout) || "tree"; }
     catch { return "tree"; }
