@@ -1529,6 +1529,8 @@ function LinksGraph({
   const cx = size.w / 2;
   const cy = size.h / 2;
   const R = 110;
+  useEffect(() => { zp.setOrigin(cx, cy); }, [cx, cy, zp.setOrigin]);
+
 
   return (
     <div ref={zp.wrap} className="w-full h-full relative overflow-hidden touch-none"
