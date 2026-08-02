@@ -1093,14 +1093,9 @@ function useZoomPan() {
         if (prevDist > 0) {
           const el = wrap.current!;
           const rect = el.getBoundingClientRect();
-          const px = (a.clientX + b.clientX) / 2 - rect.left - rect.width / 2;
-          const py = (a.clientY + b.clientY) / 2 - rect.top - rect.height / 2;
-          const cur = state.current;
-          const factor = dist / prevDist;
-          const newK = Math.min(6, Math.max(0.2, cur.k * factor));
-          const nx = px - (px - cur.x) * (newK / cur.k);
-          const ny = py - (py - cur.y) * (newK / cur.k);
-          setT({ x: nx, y: ny, k: newK });
+          const px = (a.clientX + b.clientX) / 2 - rect.left;
+          const py = (a.clientY + b.clientY) / 2 - rect.top;
+          zoomAt(px, py, dist / prevDist);
         }
       }
       touches.current.set(a.identifier, { x: a.clientX, y: a.clientY });
@@ -1114,7 +1109,8 @@ function useZoomPan() {
   const reset = () => setT({ x: 0, y: 0, k: 1 });
   const setView = (x: number, y: number, k: number) => setT({ x, y, k });
 
-  return { wrap, t, onPointerDown, onPointerMove, onPointerUp, onTouchStart, onTouchMove, onTouchEnd, reset, setView };
+  return { wrap, t, onPointerDown, onPointerMove, onPointerUp, onTouchStart, onTouchMove, onTouchEnd, reset, setView, setOrigin };
+
 }
 
 // -------------------------------------------------------------
