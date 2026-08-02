@@ -1343,9 +1343,8 @@ function ProjectGraph({
           <GraphToggleBtn active={cardStyle === "circle"} onClick={() => setCardStyle("circle")} title="Kompakte Kreise">Kreis</GraphToggleBtn>
         </div>
       </div>
-      <button onClick={zp.reset}
-        className="absolute top-2 right-2 z-10 h-7 px-2 rounded-md text-[10px] border bg-background/80 backdrop-blur"
-        style={{ borderColor: "hsl(var(--hairline))" }}>Ansicht zurücksetzen</button>
+
+
 
       <svg width={size.w} height={size.h} className="absolute inset-0">
         <g transform={`translate(${cx + zp.t.x}, ${cy + zp.t.y}) scale(${zp.t.k})`}>
