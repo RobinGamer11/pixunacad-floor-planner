@@ -1027,8 +1027,23 @@ function useZoomPan() {
   const wrap = useRef<HTMLDivElement | null>(null);
   const [t, setT] = useState({ x: 0, y: 0, k: 1 });
   const state = useRef({ x: 0, y: 0, k: 1, dragging: false, sx: 0, sy: 0 });
+  /** Ursprung des SVG-Transforms in Container-Pixeln (translate(origin + t)). */
+  const origin = useRef({ x: 0, y: 0 });
+  const setOrigin = useCallback((x: number, y: number) => { origin.current = { x, y }; }, []);
 
   useEffect(() => { state.current.x = t.x; state.current.y = t.y; state.current.k = t.k; }, [t]);
+
+  /** Zoomt so, dass der Punkt (px,py) in Container-Pixeln ortsfest bleibt. */
+  const zoomAt = useCallback((px: number, py: number, factor: number) => {
+    const cur = state.current;
+    const newK = Math.min(6, Math.max(0.2, cur.k * factor));
+    if (newK === cur.k) return;
+    const ratio = newK / cur.k;
+    // Bildschirmpunkt = origin + t + k * world  →  t' = (px - origin) - ((px - origin) - t) * ratio
+    const ox = px - origin.current.x;
+    const oy = py - origin.current.y;
+    setT({ x: ox - (ox - cur.x) * ratio, y: oy - (oy - cur.y) * ratio, k: newK });
+  }, []);
 
   useEffect(() => {
     const el = wrap.current;
@@ -1036,19 +1051,13 @@ function useZoomPan() {
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       const rect = el.getBoundingClientRect();
-      // Pivot relativ zum Element-Zentrum (SVG-Transform ist translate(cx+t.x, cy+t.y))
-      const px = e.clientX - rect.left - rect.width / 2;
-      const py = e.clientY - rect.top - rect.height / 2;
-      const cur = state.current;
-      const factor = Math.pow(1.0015, -e.deltaY);
-      const newK = Math.min(6, Math.max(0.2, cur.k * factor));
-      const nx = px - (px - cur.x) * (newK / cur.k);
-      const ny = py - (py - cur.y) * (newK / cur.k);
-      setT({ x: nx, y: ny, k: newK });
+      const dy = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 100 : 1);
+      zoomAt(e.clientX - rect.left, e.clientY - rect.top, Math.exp(-dy * 0.0015));
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
-  }, []);
+  }, [zoomAt]);
+
 
   const onPointerDown = (e: React.PointerEvent) => {
     if (e.button !== 0 && e.pointerType === "mouse") return;
