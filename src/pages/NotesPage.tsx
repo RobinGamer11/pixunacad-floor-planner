@@ -1061,9 +1061,14 @@ function useZoomPan() {
 
   const onPointerDown = (e: React.PointerEvent) => {
     if (e.button !== 0 && e.pointerType === "mouse") return;
-    const target = e.target as HTMLElement;
-    if (target.closest("button,a,input,select,textarea,[role='button']")) return;
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    const target = e.target as Element;
+    if (target.closest?.("button,a,input,select,textarea,[role='button']")) return;
+    // Auf Graph-Knoten kein Pointer-Capture setzen — sonst landet der Klick
+    // beim Container statt beim Knoten und die Auswahl greift nicht.
+    if (!target.closest?.("[data-graph-node]")) {
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    }
+
     state.current.dragging = true;
     state.current.sx = e.clientX - state.current.x;
     state.current.sy = e.clientY - state.current.y;
