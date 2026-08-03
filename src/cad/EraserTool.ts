@@ -188,16 +188,55 @@ export class EraserTool {
     return a / 2;
   }
 
+  /** Ring ohne Glättung (Auto-Glättung deaktiviert). */
+  private _rawRing(ring: number[][]): Vec2[] {
+    const pts = ring.map((p) => v(p[0], p[1]));
+    if (pts.length > 1 && dist(pts[0], pts[pts.length - 1]) < 1e-9) pts.pop();
+    return pts;
+  }
+
+  /**
+   * Entfernt Ausreißer/Spikes auf den radierten Kanten: sehr kurze Zacken und
+   * spitze Winkel zwischen neuen Punkten werden verworfen.
+   */
+  private _despike(pts: Vec2[], isOrig: boolean[], tol: number): { pts: Vec2[]; isOrig: boolean[] } {
+    const outP: Vec2[] = [];
+    const outF: boolean[] = [];
+    const n = pts.length;
+    for (let i = 0; i < n; i++) {
+      if (isOrig[i]) { outP.push(pts[i]); outF.push(true); continue; }
+      const prev = outP.length ? outP[outP.length - 1] : pts[(i - 1 + n) % n];
+      const next = pts[(i + 1) % n];
+      const d1 = dist(prev, pts[i]);
+      const d2 = dist(pts[i], next);
+      if (d1 < tol && d2 < tol) continue;                       // Mikro-Zacke
+      const ax = pts[i].x - prev.x, ay = pts[i].y - prev.y;
+      const bx = next.x - pts[i].x, by = next.y - pts[i].y;
+      const la = Math.hypot(ax, ay), lb = Math.hypot(bx, by);
+      if (la > 1e-9 && lb > 1e-9) {
+        const cosang = (ax * bx + ay * by) / (la * lb);
+        // Richtungsumkehr (Spike) bei kurzen Kanten → weglassen
+        if (cosang < -0.5 && Math.min(la, lb) < tol * 4) continue;
+      }
+      outP.push(pts[i]); outF.push(false);
+    }
+    return outP.length > 3 ? { pts: outP, isOrig: outF } : { pts, isOrig };
+  }
+
   /**
    * Glättet ausschließlich die neu entstandenen Radier-Kanten (Chaikin),
    * Original-Ecken der Schraffur bleiben exakt erhalten.
    */
-  private _smoothCutRing(ring: number[][], origKeys: Set<string>, passes = 2): Vec2[] {
+  private _smoothCutRing(ring: number[][], origKeys: Set<string>, passes = 3): Vec2[] {
     let pts = ring.map((p) => v(p[0], p[1]));
     // Doppelten Endpunkt entfernen (polygon-clipping schließt Ringe).
     if (pts.length > 1 && dist(pts[0], pts[pts.length - 1]) < 1e-9) pts.pop();
     if (pts.length < 4) return pts;
     let isOrig = pts.map((p) => origKeys.has(this._key(p.x, p.y)));
+    const tol = Math.max(0.001, this.app.defaultEraserRadiusM * 0.06);
+    ({ pts, isOrig } = this._despike(pts, isOrig, tol));
+    if (pts.length < 4) return pts;
+
     for (let pass = 0; pass < passes; pass++) {
       const out: Vec2[] = [];
       const flags: boolean[] = [];
