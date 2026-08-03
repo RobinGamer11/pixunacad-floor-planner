@@ -6,6 +6,7 @@ import { smoothChaikin } from "./freeGeom";
 import { LabelManager } from "./LabelManager";
 import { getDimensionGeometry, type DimensionLike } from "./dimensionGeometry";
 import { boxCornersWorld } from "./textGeometry";
+import { getDocWarp, drawWarpedImage } from "./documentWarp";
 import { drawRichTextBox } from "./textRichRenderer";
 import { transformedInstanceItems, instanceBoundingCornersWorld } from "./StickerManager";
 import { documentCornersWorld, documentCenterWorld, documentVisibleCornersWorld, documentAnchorsWorld } from "./documentGeometry";
