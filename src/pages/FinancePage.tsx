@@ -152,7 +152,7 @@ export default function FinancePage() {
           </aside>
         )}
 
-        <section className="min-h-0 overflow-auto">
+        <section className="flex-1 min-w-0 min-h-0 overflow-auto">
           <div className="sticky top-0 z-10 flex items-center gap-1 px-3 py-1.5 border-b"
                style={{ background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" }}>
             {!leftOpen && (
