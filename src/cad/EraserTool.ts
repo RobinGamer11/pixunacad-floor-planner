@@ -81,7 +81,7 @@ export class EraserTool {
       } else {
         // Sample entlang der Bewegung (in r/2-Schritten)
         const r = this.app.defaultEraserRadiusM;
-        const stepM = Math.max(r * 0.5, 0.01);
+        const stepM = Math.max(r * 0.25, 0.005);
         const last = this._lastWorld!;
         const d = dist(last, projW);
         if (d > stepM) {
@@ -135,6 +135,7 @@ export class EraserTool {
       eraser = parts.map((p) => p);
     }
     if (!eraser || !eraser.length) return;
+    const minArea = Math.pow(Math.max(0.002, stamps[0].r * 0.05), 2);
     for (const hatch of scene.hatches.slice()) {
       if (!this.app.labelManager.isVisible(hatch.labelId)) continue;
       if (!this._polyNearStamps(hatch.points, stamps)) continue;
@@ -154,18 +155,72 @@ export class EraserTool {
         fillAlphaPct: hatch.fillAlphaPct, strokeWidthPx: hatch.strokeWidthPx,
         labelId: hatch.labelId, areaLabel: hatch.areaLabel,
       };
+      // Original-Ecken merken → nur die neuen (radierten) Kanten werden geglättet.
+      const origKeys = new Set<string>();
+      for (const p of hatch.points) origKeys.add(this._key(p.x, p.y));
+      for (const h of hatch.holes || []) for (const p of h) origKeys.add(this._key(p.x, p.y));
+
       scene.removeHatch(hatch);
       if (this.app.selection && (this.app.selection as any).hatchId === hatch.id) this.app.setSelection(null);
       for (const poly of result || []) {
-        const rings = poly.map((ring: number[][]) => ring.map((p) => v(p[0], p[1])));
+        const rings = poly
+          .map((ring: number[][]) => this._smoothCutRing(ring, origKeys))
+          .filter((ring: Vec2[]) => ring.length > 2 && Math.abs(this._ringArea(ring)) > minArea);
         const outer = rings[0];
         if (!outer || outer.length < 3) continue;
-        scene.createHatch(outer, { ...style, holes: rings.slice(1).filter((r: Vec2[]) => r.length > 2) });
+        scene.createHatch(outer, { ...style, holes: rings.slice(1) });
       }
     }
   }
 
-  private _circleRing(c: Vec2, r: number, n = 32): number[][] {
+  private _key(x: number, y: number) {
+    return `${x.toFixed(5)}|${y.toFixed(5)}`;
+  }
+
+  private _ringArea(ring: Vec2[]): number {
+    let a = 0;
+    for (let i = 0; i < ring.length; i++) {
+      const p = ring[i], q = ring[(i + 1) % ring.length];
+      a += p.x * q.y - q.x * p.y;
+    }
+    return a / 2;
+  }
+
+  /**
+   * Glättet ausschließlich die neu entstandenen Radier-Kanten (Chaikin),
+   * Original-Ecken der Schraffur bleiben exakt erhalten.
+   */
+  private _smoothCutRing(ring: number[][], origKeys: Set<string>, passes = 2): Vec2[] {
+    let pts = ring.map((p) => v(p[0], p[1]));
+    // Doppelten Endpunkt entfernen (polygon-clipping schließt Ringe).
+    if (pts.length > 1 && dist(pts[0], pts[pts.length - 1]) < 1e-9) pts.pop();
+    if (pts.length < 4) return pts;
+    let isOrig = pts.map((p) => origKeys.has(this._key(p.x, p.y)));
+    for (let pass = 0; pass < passes; pass++) {
+      const out: Vec2[] = [];
+      const flags: boolean[] = [];
+      const n = pts.length;
+      for (let i = 0; i < n; i++) {
+        const a = pts[i], b = pts[(i + 1) % n];
+        if (isOrig[i]) { out.push(a); flags.push(true); }
+        if (!isOrig[i] || !isOrig[(i + 1) % n]) {
+          // Kante berührt eine radierte Ecke → Chaikin-Schnitt einfügen.
+          out.push(v(a.x * 0.75 + b.x * 0.25, a.y * 0.75 + b.y * 0.25));
+          flags.push(false);
+          out.push(v(a.x * 0.25 + b.x * 0.75, a.y * 0.25 + b.y * 0.75));
+          flags.push(false);
+        } else if (!isOrig[i]) {
+          out.push(a); flags.push(false);
+        }
+      }
+      pts = out;
+      isOrig = flags;
+      if (pts.length > 4000) break;
+    }
+    return pts;
+  }
+
+  private _circleRing(c: Vec2, r: number, n = 64): number[][] {
     const ring: number[][] = [];
     for (let i = 0; i <= n; i++) {
       const a = (i / n) * Math.PI * 2;
@@ -186,6 +241,7 @@ export class EraserTool {
       [a.x + nx, a.y + ny],
     ];
   }
+
 
 
   private _polyNearStamps(pts: Vec2[], stamps: Array<{ c: Vec2; r: number }>): boolean {
@@ -379,6 +435,36 @@ export class EraserTool {
     const mode = this.app.defaultEraserMode ?? "hard";
     const soft = Math.max(0.05, Math.min(1, this.app.defaultEraserSoftness ?? 0.5));
     ctx.save();
+
+    // Live-Anzeige: bereits radierter Bereich des laufenden Zuges als
+    // zusammenhängende Fläche (Kreise + Bänder in einem Pfad → keine Nähte).
+    if (this._erasing && this._hatchStamps.length) {
+      const path = new Path2D();
+      for (let i = 0; i < this._hatchStamps.length; i++) {
+        const s = this._hatchStamps[i];
+        const p = cam.worldToScreen(s.c.x, s.c.y);
+        const rr = Math.max(1, s.r * cam.scale);
+        path.moveTo(p.x + rr, p.y);
+        path.arc(p.x, p.y, rr, 0, Math.PI * 2);
+        if (i > 0) {
+          const q = cam.worldToScreen(this._hatchStamps[i - 1].c.x, this._hatchStamps[i - 1].c.y);
+          const dx = p.x - q.x, dy = p.y - q.y;
+          const len = Math.hypot(dx, dy);
+          if (len > 0.01) {
+            const nx = (-dy / len) * rr, ny = (dx / len) * rr;
+            path.moveTo(q.x + nx, q.y + ny);
+            path.lineTo(p.x + nx, p.y + ny);
+            path.lineTo(p.x - nx, p.y - ny);
+            path.lineTo(q.x - nx, q.y - ny);
+            path.closePath();
+          }
+        }
+      }
+      ctx.fillStyle = "rgba(255,255,255,0.92)";
+      ctx.fill(path);
+    }
+
+
 
 
 
