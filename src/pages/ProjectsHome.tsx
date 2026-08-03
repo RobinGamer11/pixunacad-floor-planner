@@ -2641,43 +2641,78 @@ function projectColor(id: string): string {
 
 function ProjectCarousel({ projects, onOpen }: { projects: Project[]; onOpen: (id: string) => void }) {
   const [offset, setOffset] = useState(0);
+  const [paused, setPaused] = useState(false);
+
   useEffect(() => {
-    if (projects.length <= 1) return;
-    const t = setInterval(() => setOffset((o) => (o + 1) % projects.length), 3000);
+    if (projects.length <= 1 || paused) return;
+    const t = setInterval(() => setOffset((o) => (o + 1) % projects.length), 5000);
     return () => clearInterval(t);
-  }, [projects.length]);
+  }, [projects.length, paused]);
 
   if (projects.length === 0) return null;
 
-  const ordered = projects.map((_, i) => projects[(i + offset) % projects.length]);
+  // Max. 5 sichtbare Karten: Slots -2 .. +2, Mitte im Vordergrund
+  const n = projects.length;
+  const slots = [-2, -1, 0, 1, 2].filter((s) => Math.abs(s) <= Math.floor((Math.min(n, 5) - 1) / 2) || n > 2 * Math.abs(s));
+  const visible = slots
+    .filter((s) => Math.abs(s) < Math.max(1, Math.ceil(n / 2)) || n >= 5)
+    .slice(0, Math.min(n, 5))
+    .map((s) => ({ slot: s, project: projects[(((offset + s) % n) + n) % n] }));
 
   return (
-    <div className="mb-6 overflow-hidden">
-      <div className="flex gap-4 transition-transform duration-500">
-        {ordered.map((p) => (
-          <button
-            key={p.id}
-            onClick={() => onOpen(p.id)}
-            className="shrink-0 w-40 group text-left animate-fade-in"
-            title={p.name}
-          >
-            <div
-              className="w-40 h-24 rounded-lg overflow-hidden border flex items-center justify-center transition-transform duration-200 group-hover:scale-105"
-              style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--beige-soft))" }}
+    <div
+      className="mb-6 select-none"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onFocusCapture={() => setPaused(true)}
+      onBlurCapture={() => setPaused(false)}
+    >
+      <div
+        className="relative h-44 flex items-center justify-center"
+        style={{ perspective: "1000px", perspectiveOrigin: "50% 50%" }}
+      >
+        {visible.map(({ slot, project: p }) => {
+          const abs = Math.abs(slot);
+          const translateX = slot * 130;
+          const translateZ = -abs * 170;
+          const rotateY = slot === 0 ? 0 : slot > 0 ? -38 : 38;
+          const scale = 1 - abs * 0.08;
+          const opacity = abs >= 2 ? 0.45 : abs === 1 ? 0.8 : 1;
+          return (
+            <button
+              key={p.id}
+              onClick={() => onOpen(p.id)}
+              title={p.name}
+              className="absolute group outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg"
+              style={{
+                transform: `translateX(${translateX}px) translateZ(${translateZ}px) rotateY(${rotateY}deg) scale(${scale})`,
+                transformStyle: "preserve-3d",
+                transition: "transform 700ms cubic-bezier(0.22,1,0.36,1), opacity 700ms ease",
+                opacity,
+                zIndex: 10 - abs,
+              }}
             >
-              {p.thumbnail ? (
-                <img src={p.thumbnail} alt={`Projektbild ${p.name}`} className="w-full h-full object-cover" />
-              ) : (
-                <span className="text-xl font-semibold text-muted-foreground">{p.name.slice(0, 2).toUpperCase()}</span>
-              )}
-            </div>
-            <div className="mt-1.5 text-xs font-medium truncate text-center">{p.name}</div>
-          </button>
-        ))}
+              <div
+                className="w-44 h-28 rounded-lg overflow-hidden border flex items-center justify-center shadow-lg"
+                style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--beige-soft))" }}
+              >
+                {p.thumbnail ? (
+                  <img src={p.thumbnail} alt={`Projektbild ${p.name}`} className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-xl font-semibold text-muted-foreground">{p.name.slice(0, 2).toUpperCase()}</span>
+                )}
+              </div>
+              <div className={`mt-1.5 text-xs truncate text-center max-w-44 ${slot === 0 ? "font-semibold" : "text-muted-foreground"}`}>
+                {p.name}
+              </div>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
 }
+
 
 
 function AllTasksView({ projects }: { projects: Project[] }) {
