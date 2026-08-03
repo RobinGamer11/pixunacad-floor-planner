@@ -988,4 +988,8 @@
 /* Beim Drucken: Papier ohne grauen Rand/Schatten */
 @media print {
   .page-sheet { border: none !important; box-shadow: none !important; }
+  [data-page-margin-overlay] { display: none !important; }
 }
+
+/* Während PDF-Export: Seitenränder-Overlay ausblenden */
+.pixuna-exporting [data-page-margin-overlay] { display: none !important; }

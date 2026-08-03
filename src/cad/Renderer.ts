@@ -18,6 +18,7 @@ import { computeHealedWallLines } from "./wallHeal";
 import { getWallUnionGroups } from "./wallUnion";
 import { buildHealedWallSolidRing, buildWallSolidRing, ringToPCPolygon } from "./wallSolid";
 import { drawDoor } from "./doorGeom";
+import { isExportMode } from "@/lib/printExport";
 import { type MultiPolygon } from "polygon-clipping";
 
 export interface Selection {
@@ -188,8 +189,10 @@ export class Renderer {
     // sie im Hintergrund liegen.
     const order = this.labels.list();
     const rank = new Map(order.map((g, i) => [g.id, i]));
+    const hideGuides = isExportMode();
     return [...this.scene.segments]
       .filter(s => this.labels.isVisible(s.labelId))
+      .filter(s => !(hideGuides && s.isGuide))
       .sort((a, b) => {
         const ga = a.isGuide ? 1 : 0;
         const gb = b.isGuide ? 1 : 0;
