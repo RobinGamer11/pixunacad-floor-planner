@@ -6735,17 +6735,27 @@ function PrintPanel({
 
   // Modus steuert die Auswahl-Checkboxen direkt: "Alle Seiten" hakt alle an,
   // "Nur aktuelle Seite" genau die aktive, "Bereich" den gewählten Bereich.
+  // WICHTIG: Während eines laufenden Exports darf hier nichts nachgeführt
+  // werden — der Export schaltet die aktive Seite selbst um; ein State-Update
+  // würde die Seiten-Komponenten (inkl. CAD-Layer) mitten im Snapshot neu
+  // rendern und die PDF-Seiten leer/weiß machen.
   useEffect(() => {
-    if (pageMode === "all") {
-      setSelectedIds(new Set(project.pages.map((p) => p.id)));
-    } else if (pageMode === "current") {
-      setSelectedIds(new Set(activePageId ? [activePageId] : []));
-    } else {
-      const from = Math.max(1, Math.min(project.pages.length, rangeStart)) - 1;
-      const to = Math.max(1, Math.min(project.pages.length, rangeEnd));
-      setSelectedIds(new Set(project.pages.slice(from, to).map((p) => p.id)));
-    }
-  }, [pageMode, activePageId, rangeStart, rangeEnd, project.pages]);
+    if (exporting) return;
+    const next =
+      pageMode === "all"
+        ? project.pages.map((p) => p.id)
+        : pageMode === "current"
+          ? (activePageId ? [activePageId] : [])
+          : (() => {
+              const from = Math.max(1, Math.min(project.pages.length, rangeStart)) - 1;
+              const to = Math.max(1, Math.min(project.pages.length, rangeEnd));
+              return project.pages.slice(from, to).map((p) => p.id);
+            })();
+    setSelectedIds((prev) => {
+      if (prev.size === next.length && next.every((id) => prev.has(id))) return prev;
+      return new Set(next);
+    });
+  }, [pageMode, activePageId, rangeStart, rangeEnd, project.pages, exporting]);
 
   // Aktiv gefilterte Seiten anhand Modus (Alle / Aktuell / Bereich) und Auswahl.
   const resolveExportIds = (): string[] => {
