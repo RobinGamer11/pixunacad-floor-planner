@@ -85,10 +85,72 @@ export class EraserTool {
         this._lastWorld = v(projW.x, projW.y);
       }
     } else {
+      if (this._erasing) {
+        // Maus losgelassen → Schraffur-Pfad ausstanzen und History-Schritt setzen.
+        this._commitHatchErase();
+        (this.app as any).commitHistorySnapshot?.();
+        (this.app as any).onEraseStrokeEnd?.();
+      }
       this._erasing = false;
       this._lastWorld = null;
+      this._acc.clear();
     }
   }
+
+  /**
+   * Stanzt den kompletten Radier-Pfad (Kreis-Sweep) boolesch aus allen
+   * getroffenen Schraffuren aus. Ränder werden echt beschnitten, es entstehen
+   * keine neuen Flächen; leere Ergebnisse löschen die Schraffur.
+   */
+  private _commitHatchErase() {
+    const stamps = this._hatchStamps;
+    this._hatchStamps = [];
+    if (!stamps.length) return;
+    const scene = this.app.scene;
+    const eraser: any = stamps.map((s) => [this._circleRing(s.c, s.r)]);
+    for (const hatch of scene.hatches.slice()) {
+      if (!this.app.labelManager.isVisible(hatch.labelId)) continue;
+      if (!this._polyNearStamps(hatch.points, stamps)) continue;
+      const subject: any = [[
+        hatch.points.map((p) => [p.x, p.y]),
+        ...(hatch.holes || []).filter((h) => h.length > 2).map((h) => h.map((p) => [p.x, p.y])),
+      ]];
+      let result: any;
+      try {
+        result = polygonClipping.difference(subject, eraser);
+      } catch {
+        continue;
+      }
+      const style = {
+        fillColor: hatch.fillColor, strokeColor: hatch.strokeColor,
+        fillAlphaPct: hatch.fillAlphaPct, strokeWidthPx: hatch.strokeWidthPx,
+        labelId: hatch.labelId, areaLabel: hatch.areaLabel,
+      };
+      scene.removeHatch(hatch);
+      if (this.app.selection && (this.app.selection as any).hatchId === hatch.id) this.app.setSelection(null);
+      for (const poly of result || []) {
+        const rings = poly.map((ring: number[][]) => ring.map((p) => v(p[0], p[1])));
+        const outer = rings[0];
+        if (!outer || outer.length < 3) continue;
+        scene.createHatch(outer, { ...style, holes: rings.slice(1).filter((r: Vec2[]) => r.length > 2) });
+      }
+    }
+  }
+
+  private _circleRing(c: Vec2, r: number, n = 32): number[][] {
+    const ring: number[][] = [];
+    for (let i = 0; i <= n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      ring.push([c.x + Math.cos(a) * r, c.y + Math.sin(a) * r]);
+    }
+    return ring;
+  }
+
+  private _polyNearStamps(pts: Vec2[], stamps: Array<{ c: Vec2; r: number }>): boolean {
+    for (const s of stamps) if (this._strokeNearCircle(pts, s.c, s.r)) return true;
+    return false;
+  }
+
 
   /**
    * Effektiver Schnittradius für Vektorobjekte.
