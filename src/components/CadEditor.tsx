@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { FreeDrawSettingsPanel } from "@/components/cad/FreeDrawSettingsPanel";
 import { EraserSettingsPanel } from "@/components/cad/EraserSettingsPanel";
+import { ProjectFilePickerDialog } from "@/components/cad/ProjectFilePickerDialog";
 import { WallSettingsPanel } from "@/components/cad/WallSettingsPanel";
 
 import { DocumentFilterPanel } from "@/components/cad/DocumentFilterPanel";
@@ -1165,26 +1166,24 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
 
 
 
-        {/* PDF Page Picker Dialog */}
+        {/* PDF Page Picker: eine Seite ODER gesamtes Dokument (gestapelt) */}
         <Dialog open={!!docPickerPages} onOpenChange={(o) => { if (!o) setDocPickerPages(null); }}>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
-              <DialogTitle>Seiten auswählen</DialogTitle>
+              <DialogTitle>Seite auswählen</DialogTitle>
             </DialogHeader>
+            <p className="text-[11px] text-muted-foreground -mt-2">
+              Dieses PDF hat {docPickerPages?.length ?? 0} Seiten. Wähle genau eine Seite — oder
+              importiere das gesamte Dokument: alle Seiten werden leicht versetzt übereinander abgelegt.
+            </p>
             <div className="max-h-[60vh] overflow-y-auto grid grid-cols-3 gap-3 p-1">
               {docPickerPages?.map((p, i) => {
-                const checked = docPickerSelected.has(i);
+                const checked = (docPickerSelected.values().next().value ?? 0) === i;
                 return (
                   <button
                     key={i}
                     type="button"
-                    onClick={() => {
-                      setDocPickerSelected(prev => {
-                        const next = new Set(prev);
-                        if (next.has(i)) next.delete(i); else next.add(i);
-                        return next;
-                      });
-                    }}
+                    onClick={() => setDocPickerSelected(new Set([i]))}
                     className={`relative rounded-md border-2 transition-all overflow-hidden ${checked ? "border-primary" : "border-border"}`}
                   >
                     <img src={p.src} alt={p.name} className="w-full h-32 object-contain bg-muted" />
@@ -1197,18 +1196,23 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               })}
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => { setDocPickerSelected(new Set()); }}>Keine</Button>
-              <Button variant="outline" onClick={() => {
-                const all = new Set<number>();
-                docPickerPages?.forEach((_, i) => all.add(i));
-                setDocPickerSelected(all);
-              }}>Alle</Button>
-              <Button onClick={handleDocPickerConfirm} disabled={docPickerSelected.size === 0}>
-                {docPickerSelected.size} importieren
+              <Button variant="outline" onClick={() => handleDocPickerConfirm("all")}>
+                Gesamtes Dokument ({docPickerPages?.length ?? 0} Seiten)
+              </Button>
+              <Button onClick={() => handleDocPickerConfirm("single")}>
+                Seite {(docPickerSelected.values().next().value ?? 0) + 1} importieren
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {docLibraryOpen && projectId && (
+          <ProjectFilePickerDialog
+            projectId={projectId}
+            onCancel={() => setDocLibraryOpen(false)}
+            onPick={(f) => { setDocLibraryOpen(false); void importPickedFile(f); }}
+          />
+        )}
 
         {/* Maßstab-Dialog vor Platzierung */}
         <Dialog open={!!scaleDialogPages} onOpenChange={(o) => { if (!o) setScaleDialogPages(null); }}>
@@ -2509,6 +2513,17 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                   className="hidden"
                   onChange={handleDocFileChange}
                 />
+
+                <button
+                  type="button"
+                  disabled={docImporting}
+                  onClick={() => setDocLibraryOpen(true)}
+                  className="cad-toolbar-btn w-full justify-center h-9 disabled:opacity-50"
+                  title="Dokumente & Fotos aus der Projekt-Ablage (Startseite) einfügen"
+                >
+                  <FolderOpen className="h-4 w-4" />
+                  <span className="text-xs">Aus Projekt-Ablage</span>
+                </button>
 
                 <label
                   className="flex items-center gap-2 text-[11px] cursor-pointer select-none px-0.5"
