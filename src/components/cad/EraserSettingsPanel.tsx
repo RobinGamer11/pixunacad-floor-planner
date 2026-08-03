@@ -28,7 +28,7 @@ const makeScale = (min: number, mid: number, max: number) => ({
   },
 });
 
-export const EraserSettingsPanel: React.FC<Props> = ({ app, variant = "workspace" }) => {
+export const EraserSettingsPanel: React.FC<Props> = ({ app, variant = "workspace", rasterSelection = null }) => {
   const isCad = variant === "cad";
   const scale = isCad ? makeScale(CAD_R_MIN, CAD_R_MID, CAD_R_MAX) : makeScale(R_MIN, R_MID, R_MAX);
   const [radius, setRadius] = useState(isCad ? 0.2 : 0.03);
@@ -36,6 +36,8 @@ export const EraserSettingsPanel: React.FC<Props> = ({ app, variant = "workspace
   const [mode, setMode] = useState<"hard" | "smooth">("hard");
   const [softness, setSoftness] = useState(0.5);
   const [hasRuler, setHasRuler] = useState(false);
+  /** Auswahl im CAD: nur Rasterbilder (PNG/JPG) erlauben den Smooth-Modus. */
+  const [docRaster, setDocRaster] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (!app) return;
@@ -45,6 +47,38 @@ export const EraserSettingsPanel: React.FC<Props> = ({ app, variant = "workspace
     setSoftness(app.defaultEraserSoftness ?? 0.5);
     setHasRuler(!!app.scene.rulerGuide);
   }, [app]);
+
+  // Auswahl beobachten (leichtgewichtiges Polling — die Engine feuert je nach
+  // Editor unterschiedliche Events).
+  useEffect(() => {
+    if (!app) return;
+    const check = () => {
+      const sel: any = app.selection;
+      if (!sel) { setDocRaster(null); return; }
+      if (sel.type === "document" && sel.documentId) {
+        const doc = app.scene.getDocumentById(sel.documentId);
+        setDocRaster(doc ? doc.kind === "image" : null);
+      } else {
+        setDocRaster(false);
+      }
+    };
+    check();
+    const t = window.setInterval(check, 400);
+    return () => window.clearInterval(t);
+  }, [app]);
+
+  const rasterOk = rasterSelection !== null ? rasterSelection : docRaster;
+  // Smooth ist nur verfügbar, wenn kein Nicht-Bild ausgewählt ist.
+  const smoothAllowed = rasterOk !== false;
+
+  useEffect(() => {
+    if (!app) return;
+    if (!smoothAllowed && mode === "smooth") {
+      setMode("hard");
+      app.defaultEraserMode = "hard";
+    }
+  }, [smoothAllowed, mode, app]);
+
 
 
   if (!app) return null;
