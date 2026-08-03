@@ -3972,7 +3972,10 @@ function ElementView({
         transformOrigin: previewTransformOrigin ?? "center center",
         zIndex: isCadView ? (showHub ? 90 : 40) : (showHub ? 80 : (elevated ? 30 : undefined)),
         touchAction: "none",
-        pointerEvents: (((isCadView || el.kind === "pdf" || el.kind === "image") && !selected && toolActive) ? "none" : undefined),
+        // PDF/Bild dürfen bei aktivem Zeichenwerkzeug auch dann keinen Pointer
+        // abfangen, wenn sie zuvor ausgewählt waren. Sonst erreicht gerade der
+        // Radiergummi die darüberliegende CAD-Eingabeschicht nicht.
+        pointerEvents: (((el.kind === "pdf" || el.kind === "image") && toolActive) || (isCadView && !selected && toolActive) ? "none" : undefined),
       }}
     >
 
