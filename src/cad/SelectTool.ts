@@ -2653,6 +2653,10 @@ export class SelectTool {
     // ── Marquee-Rechteck + hervorgehobene Auswahl ──────────────────────
     this._drawMarqueeOverlay(ctx, cam);
 
+    // ── Winkel-Hilfslinie / Grad-Anzeige beim Drehen ───────────────────
+    this._drawRotateGuide(ctx, cam);
+
+
     // PDF/Bild-Hub: Live-Vorschau (Ghost) während aktivem Move/Rotate/Scale.
     {
       const mode = this.app.documentHubMode;
