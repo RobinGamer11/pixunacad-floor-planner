@@ -802,6 +802,34 @@ export default function ProjectWorkspace() {
     return () => window.removeEventListener("keydown", onKey);
   }, [project?.id]);
 
+  // Gesten-Grenzen für die Historie: jede abgeschlossene Interaktion (Maus/Stift
+  // losgelassen, Enter/Escape/Entf, Werkzeugwechsel) versiegelt den aktuellen
+  // Undo-Schritt. So ergibt jede einzelne Aktion – auch Text, Trim und
+  // Move/Rotate über mehrere Frames – genau einen sauberen Undo-Eintrag.
+  useEffect(() => {
+    if (!project?.id) return;
+    const pid = project.id;
+    const seal = () => projectStore.sealHistory(pid);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Enter" || e.key === "Escape" || e.key === "Delete") seal();
+    };
+    window.addEventListener("pointerup", seal, true);
+    window.addEventListener("pointercancel", seal, true);
+    window.addEventListener("keyup", onKey, true);
+    window.addEventListener("blur", seal);
+    return () => {
+      window.removeEventListener("pointerup", seal, true);
+      window.removeEventListener("pointercancel", seal, true);
+      window.removeEventListener("keyup", onKey, true);
+      window.removeEventListener("blur", seal);
+    };
+  }, [project?.id]);
+
+  // Werkzeugwechsel beendet ebenfalls die laufende Geste.
+  useEffect(() => {
+    if (project?.id) projectStore.sealHistory(project.id);
+  }, [activeTool, project?.id]);
+
 
   if (!project) {
     return (
@@ -1065,45 +1093,8 @@ export default function ProjectWorkspace() {
         {/* Maßstab-Modal entfernt — Maßstab wird jetzt rechts im "Dokument"-
             Werkzeug-Panel per Dropdown vor dem Import gewählt. */}
 
-        <ToolRailButton
-          icon={<TableIcon size={18} />}
-          label="Tabelle"
-          active={activeTool === "table"}
-          onClick={() => {
-            const pid = activePage?.id;
-            if (!pid) return;
-            // Abschalten während Placement: aktives Element löschen & Tool abwählen.
-            if (activeTool === "table" && pendingTableId) {
-              projectStore.deleteElement(projectId, pid, pendingTableId);
-              setPendingTableId(null);
-              setActiveTool(null);
-              setTableModifyMode(false);
-              return;
-            }
-            const defRows = 3;
-            const defCols = 3;
-            const initialCells: string[][] = Array.from({ length: defRows }, (_, r) =>
-              Array.from({ length: defCols }, (__, c) => (r === 0 ? `Spalte ${String.fromCharCode(65 + c)}` : ""))
-            );
-            // Default-Maße: klein, schlicht, an 11pt-Text angepasst (~7mm Zeile, ~26mm Spalte).
-            const cellW = 26, cellH = 7;
-            const w = cellW * defCols;
-            const h = cellH * defRows;
-            const fmt = FORMAT_SIZES[activePage!.format];
-            const pageW = activePage!.customWidthMm ?? fmt.w;
-            const pageH = activePage!.customHeightMm ?? fmt.h;
-            const x = Math.max(5, (pageW - w) / 2);
-            const y = Math.max(5, (pageH - h) / 2);
-            const newId = projectStore.addElement(projectId, pid, {
-              kind: "table",
-              x, y, w, h,
-              tableData: { cells: initialCells, headerRow: true, filters: {} },
-            } as any);
-            setPendingTableId(newId);
-            setSelectedElementId(newId);
-            setActiveToolAndTab("table");
-          }}
-        />
+        {/* Tabellen-Werkzeug in der Projektmappe entfernt. */}
+
 
         
 
