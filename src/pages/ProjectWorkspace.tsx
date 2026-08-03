@@ -3720,6 +3720,9 @@ function ElementView({
           const absTarget = Math.round((startRot + delta) / 90) * 90;
           delta = absTarget - startRot;
         }
+        // Ref synchron mitschreiben: ein Linksklick kann committen, bevor der
+        // React-State-Update-Zyklus durch ist — sonst ginge die Drehung verloren.
+        previewRef.current = { dxPx: 0, dyPx: 0, deltaDeg: delta, anchorFrac };
         setPreview({ dxPx: 0, dyPx: 0, deltaDeg: delta, anchorFrac });
         // CAD-Blatt: Der Cursor wird optisch auf der Linie durch die beiden
         // oberen Fangpunkte fixiert — dadurch ist die Drehung exakt ablesbar.
