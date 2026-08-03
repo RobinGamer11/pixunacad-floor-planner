@@ -2115,6 +2115,7 @@ export class SelectTool {
           this._clearEditState();
           this.app.hub.hide();
           this.app.renderer.setHoverSegmentId(null);
+          (this.app as any).commitHistorySnapshot?.();
         }
         return;
       }
