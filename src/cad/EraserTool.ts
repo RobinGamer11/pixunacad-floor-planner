@@ -116,9 +116,25 @@ export class EraserTool {
   private _commitHatchErase() {
     const stamps = this._hatchStamps;
     this._hatchStamps = [];
-    if (!stamps.length) return;
+    if (!stamps.length || !pc?.difference) return;
     const scene = this.app.scene;
-    const eraser: any = stamps.map((s) => [this._circleRing(s.c, s.r)]);
+    // Ein einziger zusammenhängender Radierbereich: Kreise + Verbindungsbänder
+    // zwischen aufeinanderfolgenden Positionen, zu einer Fläche vereinigt.
+    const parts: any[] = [];
+    for (let i = 0; i < stamps.length; i++) {
+      parts.push([this._circleRing(stamps[i].c, stamps[i].r)]);
+      if (i > 0) {
+        const band = this._capsuleBand(stamps[i - 1].c, stamps[i].c, Math.min(stamps[i - 1].r, stamps[i].r));
+        if (band) parts.push([band]);
+      }
+    }
+    let eraser: any;
+    try {
+      eraser = parts.length > 1 ? pc.union(...parts) : parts[0] ? [parts[0]] : null;
+    } catch {
+      eraser = parts.map((p) => p);
+    }
+    if (!eraser || !eraser.length) return;
     for (const hatch of scene.hatches.slice()) {
       if (!this.app.labelManager.isVisible(hatch.labelId)) continue;
       if (!this._polyNearStamps(hatch.points, stamps)) continue;
@@ -128,10 +144,11 @@ export class EraserTool {
       ]];
       let result: any;
       try {
-        result = polygonClipping.difference(subject, eraser);
+        result = pc.difference(subject, eraser);
       } catch {
         continue;
       }
+
       const style = {
         fillColor: hatch.fillColor, strokeColor: hatch.strokeColor,
         fillAlphaPct: hatch.fillAlphaPct, strokeWidthPx: hatch.strokeWidthPx,
