@@ -1134,14 +1134,21 @@ function ProjectCard({
         border: `1px solid ${active ? "hsl(var(--accent-gold) / 0.55)" : "rgba(255,255,255,0.04)"}`,
       }}
     >
-      <div
-        className="w-12 h-12 rounded-md shrink-0 overflow-hidden"
-        style={{ background: "#151719" }}
-      >
-        {p.thumbnail && (
-          <img src={p.thumbnail} alt="" className="w-full h-full object-cover" />
-        )}
+      <div className="w-12 h-12 shrink-0 group/thumb" style={{ perspective: "300px" }}>
+        <div
+          className="w-full h-full rounded-md overflow-hidden shadow-lg transition-transform duration-500 group-hover/thumb:[transform:rotateY(0deg)_scale(1.05)]"
+          style={{
+            background: "#151719",
+            transform: "rotateY(-18deg) rotateX(6deg)",
+            transformStyle: "preserve-3d",
+          }}
+        >
+          {p.thumbnail && (
+            <img src={p.thumbnail} alt="" className="w-full h-full object-cover" />
+          )}
+        </div>
       </div>
+
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1">
           <span className="text-xs font-semibold truncate" style={{ color: "#E6E8EB" }}>{p.name}</span>
