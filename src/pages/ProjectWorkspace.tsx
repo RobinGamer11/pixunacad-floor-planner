@@ -3551,6 +3551,8 @@ function ElementView({
 
     actionCommitRef.current = commit;
     actionCancelRef.current = cancel;
+    // ENTF/ESC global: laufende HUB-Vorschau sofort verwerfen.
+    const unregisterHubAbort = registerAbort(() => cancel());
 
 
     const onMove = (ev: PointerEvent) => {
