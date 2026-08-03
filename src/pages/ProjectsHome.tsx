@@ -2639,6 +2639,47 @@ function projectColor(id: string): string {
   return `hsl(${h} 65% 55%)`;
 }
 
+function ProjectCarousel({ projects, onOpen }: { projects: Project[]; onOpen: (id: string) => void }) {
+  const [offset, setOffset] = useState(0);
+  useEffect(() => {
+    if (projects.length <= 1) return;
+    const t = setInterval(() => setOffset((o) => (o + 1) % projects.length), 3000);
+    return () => clearInterval(t);
+  }, [projects.length]);
+
+  if (projects.length === 0) return null;
+
+  const ordered = projects.map((_, i) => projects[(i + offset) % projects.length]);
+
+  return (
+    <div className="mb-6 overflow-hidden">
+      <div className="flex gap-4 transition-transform duration-500">
+        {ordered.map((p) => (
+          <button
+            key={p.id}
+            onClick={() => onOpen(p.id)}
+            className="shrink-0 w-40 group text-left animate-fade-in"
+            title={p.name}
+          >
+            <div
+              className="w-40 h-24 rounded-lg overflow-hidden border flex items-center justify-center transition-transform duration-200 group-hover:scale-105"
+              style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--beige-soft))" }}
+            >
+              {p.thumbnail ? (
+                <img src={p.thumbnail} alt={`Projektbild ${p.name}`} className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-xl font-semibold text-muted-foreground">{p.name.slice(0, 2).toUpperCase()}</span>
+              )}
+            </div>
+            <div className="mt-1.5 text-xs font-medium truncate text-center">{p.name}</div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+
 function AllTasksView({ projects }: { projects: Project[] }) {
   const navigate = useNavigate();
   const [activeIds, setActiveIds] = useState<Set<string>>(() => new Set(projects.map((p) => p.id)));
@@ -2687,10 +2728,13 @@ function AllTasksView({ projects }: { projects: Project[] }) {
 
   return (
     <div className="px-10 py-7">
+      <ProjectCarousel projects={projects} onOpen={(id) => navigate(`/project/${id}`)} />
+
       <div className="flex items-center gap-3 mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">Alle Aufgaben</h1>
         <span className="text-sm text-muted-foreground">projektübergreifend</span>
       </div>
+
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
         {/* Aufgaben-Liste */}
