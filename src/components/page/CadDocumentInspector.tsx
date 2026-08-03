@@ -192,9 +192,9 @@ export function CadDocumentInspector({ engine }: Props) {
         </div>
       </div>
 
-      <DocumentFilterPanel app={engine as any} docId={sel.id} sig={filterSig} showBgRemove={false} />
-
       <WarpSection engine={engine} docId={sel.id} />
+
+      <DocumentFilterPanel app={engine as any} docId={sel.id} sig={filterSig} showBgRemove={false} />
 
       <div
         className="text-[10px] leading-relaxed pt-1.5 text-muted-foreground"
