@@ -5334,7 +5334,7 @@ function ToolsTab({
       )}
       {settingsTool === "eraser" && cadEngine && (
         <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
-          <EraserSettingsPanel app={cadEngine} rasterSelection={selectedElement ? selectedElement.kind === "image" : null} />
+          <EraserSettingsPanel app={cadEngine} rasterSelection={element ? element.kind === "image" : null} />
         </div>
       )}
       {settingsTool === "hatch" && cadEngine && (
