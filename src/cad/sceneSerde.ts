@@ -139,6 +139,9 @@ export function restoreOneScene(scene: Scene, data: SerializedScene | null | und
       activeFilterId: d.activeFilterId || null,
       bgRemoval: d.bgRemoval || undefined,
       anchors: Array.isArray(d.anchors) ? d.anchors : undefined,
+      warpCorners: Array.isArray(d.warpCorners) ? d.warpCorners : null,
+      flipX: !!d.flipX,
+      flipY: !!d.flipY,
     });
     if (d.id) (doc as any).id = d.id;
   }
