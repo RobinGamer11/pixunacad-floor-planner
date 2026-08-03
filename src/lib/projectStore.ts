@@ -615,6 +615,9 @@ function getHist(id: string): HistoryEntry {
   return h;
 }
 function notifyHistory() { historyListeners.forEach((fn) => fn()); }
+/** Hört auf Undo/Redo-Wiederherstellungen (für eingebettete Engines). */
+const restoreListeners = new Set<() => void>();
+function notifyRestore() { restoreListeners.forEach((fn) => fn()); }
 /** Vergleicht zwei Projekt-Snapshots inhaltlich – `updatedAt` wird ignoriert,
  *  damit reine Zeitstempel-Änderungen keinen Undo-Schritt erzeugen. */
 function sameProjectContent(a: Project, b: Project): boolean {
@@ -1539,6 +1542,11 @@ export const projectStore = {
   /* ---------- Undo / Redo (public API) ---------- */
   /** Schließt die laufende Geste ab: die nächste Änderung startet garantiert
    *  einen neuen Undo-Schritt (Pointer-Up, Enter, Abbruch, Werkzeugwechsel). */
+  /** Feuert nach jedem Undo/Redo — eingebettete CAD-Engines laden dann neu. */
+  subscribeHistoryRestore: (fn: () => void) => {
+    restoreListeners.add(fn);
+    return () => restoreListeners.delete(fn);
+  },
   sealHistory: (projectId: string) => {
     lastPushAt.delete(projectId);
     lastSig.delete(projectId);
@@ -1566,6 +1574,7 @@ export const projectStore = {
     }
     notifyHistory();
     emit();
+    notifyRestore();
   },
   redo: (projectId: string) => {
     const h = getHist(projectId);
@@ -1583,6 +1592,7 @@ export const projectStore = {
     }
     notifyHistory();
     emit();
+    notifyRestore();
   },
 
   /* ---------- Projekt-Ordner (Sidebar) ---------- */

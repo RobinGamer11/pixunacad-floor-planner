@@ -10,6 +10,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Move, RotateCw, Scaling, Scissors, Trash2 } from "lucide-react";
 import { MiniCad, type MiniTool } from "@/cad/embed/MiniCad";
+import { projectStore } from "@/lib/projectStore";
 import type { MiniCadSelectionInfo } from "@/cad/embed/MiniCad";
 import type { HatchDrawMode } from "@/cad/HatchTool";
 import { PointEditAction } from "@/cad/constants";
@@ -30,6 +31,11 @@ interface Props {
   activeTool: MiniTool;
   enabled: boolean;
   initialState?: any;
+  /**
+   * Zähler, der bei jedem externen Szenen-Reset (Undo/Redo aus der Projekt-
+   * Historie) erhöht wird. Ändert er sich, lädt die Engine `initialState` neu.
+   */
+  restoreToken?: number;
   onChange: (state: any) => void;
   onSelectionChange?: (info: MiniCadSelectionInfo | null, count?: number) => void;
   onEngineReady?: (api: {
@@ -86,7 +92,7 @@ interface Props {
 export default function CadOverlayLayer(props: Props) {
   const {
     pageWidthMm, pageHeightMm, basePxPerMm, pageMarginsMm,
-    zoom, activeTool, enabled, initialState, onChange, onSelectionChange, onEngineReady,
+    zoom, activeTool, enabled, initialState, restoreToken, onChange, onSelectionChange, onEngineReady,
     externalDocs, onExternalDocChange, onExternalDocDelete,
     lineColor, lineThicknessMm, lineAlpha, guideColor, guidesLocked, multiSelectMode, selectMarqueeMode,
     textColor, textFontSizePx, textBold, textItalic, textAlpha, textAlign,
@@ -209,6 +215,27 @@ export default function CadOverlayLayer(props: Props) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageWidthMm, pageHeightMm, basePxPerMm]);
+
+  // Externer Szenen-Reset (Undo/Redo): aktuellen Stand in die Engine laden.
+  const initialStateRef = useRef(initialState);
+  initialStateRef.current = initialState;
+  const lastRestoreRef = useRef<number | undefined>(restoreToken);
+  useEffect(() => {
+    if (restoreToken === undefined) return;
+    if (lastRestoreRef.current === restoreToken) return;
+    lastRestoreRef.current = restoreToken;
+    engineRef.current?.loadState(initialStateRef.current ?? null);
+  }, [restoreToken]);
+
+  // Undo/Redo aus der Projekt-Historie: Tick setzen, damit der Effekt unten
+  // NACH dem Re-Render (also mit dem wiederhergestellten initialState) läuft.
+  const [restoreTick, setRestoreTick] = useState(0);
+  useEffect(() => projectStore.subscribeHistoryRestore(() => setRestoreTick((t) => t + 1)), []);
+  const firstRestoreTick = useRef(true);
+  useEffect(() => {
+    if (firstRestoreTick.current) { firstRestoreTick.current = false; return; }
+    engineRef.current?.loadState(initialStateRef.current ?? null);
+  }, [restoreTick]);
 
   useEffect(() => { engineRef.current?.applyZoom(zoom); }, [zoom]);
   useEffect(() => { engineRef.current?.setActiveTool(activeTool); }, [activeTool]);

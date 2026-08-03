@@ -1317,7 +1317,28 @@ export class MiniCad {
     this._applyPrimary(null, []);
   }
 
-  /** True, wenn eine Löschung per Entf-Taste etwas entfernen würde. */
+  /**
+   * Lädt einen extern gelieferten Szenen-Stand (z. B. nach Undo/Redo aus der
+   * Projekt-Historie) in die laufende Engine. Interne Hilfsobjekte
+   * (Seitenrahmen, Ghost-Snap, externe Dokument-Platzhalter) bleiben erhalten.
+   * Löst bewusst KEIN onChange aus, damit kein neuer Undo-Schritt entsteht.
+   */
+  loadState(data: any) {
+    try { this.clearSelection(); } catch {}
+    const keepSeg = (s: any) =>
+      s.labelId === this._frameLabelId || s.labelId === this._extRectLabelId || s.labelId === this._ghostLabelId;
+    const keepDoc = (d: any) => !!(d as any)._snapOnly || d.labelId === this._extDocLabelId;
+    this.scene.segments = this.scene.segments.filter(keepSeg);
+    this.scene.textBoxes = [];
+    this.scene.freeStrokes = [];
+    this.scene.hatches = [];
+    this.scene.documents = this.scene.documents.filter(keepDoc);
+    try { this._restore(data); } catch (e) { console.error("MiniCad loadState:", e); }
+    this._changeDirty = false;
+    this._lastSig = this._sceneSignature();
+  }
+
+
   hasDeletableSelection(): boolean {
     if (this._activeTool === "select" && this.selectTool.marqueeSelectedIds.length > 0) return true;
     if (this.selections && this.selections.length > 0) return true;
