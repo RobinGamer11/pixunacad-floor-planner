@@ -3649,6 +3649,9 @@ function ElementView({
     const handleClickLike = (ev: MouseEvent | PointerEvent) => {
       if (settled) return;
       if ((ev as MouseEvent).button !== undefined && (ev as MouseEvent).button !== 0) return;
+      // Nur reagieren, wenn der Klick NACH dem Start der HUB-Aktion begonnen hat
+      // (sonst würde das Pointerup der Aktivierungs-Geste sofort committen).
+      if (!downClient) return;
       if (downClient && Math.hypot(ev.clientX - downClient.x, ev.clientY - downClient.y) > 6) {
         downClient = null;
         return;
