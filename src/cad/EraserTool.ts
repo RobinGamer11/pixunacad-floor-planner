@@ -339,28 +339,8 @@ export class EraserTool {
         const same = chunks[0].every((p, i) => p.x === stroke.points[i].x && p.y === stroke.points[i].y);
         if (same) continue;
       }
-      if (vecMode === "smooth") {
+      scene.replaceFreeStrokeWithChunks(stroke, chunks);
 
-        // Randbereich (zwischen Schnittradius und Pinselradius) wird schwächer
-        // gezeichnet → weicher Auslauf statt harter Kante.
-        scene.removeFreeStroke(stroke);
-        for (const ch of chunks) {
-          for (const piece of this._splitFringe(ch, centerW, r)) {
-            if (piece.pts.length < 2) continue;
-            scene.createFreeStroke(piece.pts, {
-              color: stroke.color, thicknessM: stroke.thicknessM,
-              opacity: piece.fringe ? Math.max(0.05, stroke.opacity * 0.35) : stroke.opacity,
-              lineStyle: stroke.lineStyle, gapM: stroke.gapM,
-              blobSpacingM: stroke.blobSpacingM, blobSizeM: stroke.blobSizeM,
-              smoothing: stroke.smoothing, labelId: stroke.labelId,
-              imageSrc: stroke.imageSrc, imageSizeM: stroke.imageSizeM,
-              imageSpacingM: stroke.imageSpacingM, imageRotateAlongPath: stroke.imageRotateAlongPath,
-            });
-          }
-        }
-      } else {
-        scene.replaceFreeStrokeWithChunks(stroke, chunks);
-      }
     }
 
     // Linien-Segmente splitten
