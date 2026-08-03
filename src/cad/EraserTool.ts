@@ -99,7 +99,7 @@ export class EraserTool {
    */
   private _effRadius(objId: string, r: number, mode: "hard" | "smooth", softness: number, strength: number): number {
     if (mode === "hard") return r;
-    const soft = Math.max(0.05, Math.min(0.95, softness));
+    const soft = Math.max(0.05, Math.min(1, softness));
     const core = Math.max(0.0002, r * (1 - soft));
     const prev = this._acc.get(objId) ?? 0;
     const next = Math.min(1, prev + 0.06 * Math.max(0.1, strength));
@@ -111,7 +111,7 @@ export class EraserTool {
     const r = this.app.defaultEraserRadiusM;
     const strength = this.app.defaultEraserStrength;
     const mode = this.app.defaultEraserMode ?? "hard";
-    const softness = Math.max(0.05, Math.min(0.95, this.app.defaultEraserSoftness ?? 0.5));
+    const softness = Math.max(0.05, Math.min(1, this.app.defaultEraserSoftness ?? 0.5));
     const scene = this.app.scene;
 
     // Dokument-Pixelmasken radieren

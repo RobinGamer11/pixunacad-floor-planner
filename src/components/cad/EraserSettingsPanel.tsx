@@ -90,7 +90,7 @@ export const EraserSettingsPanel: React.FC<Props> = ({ app }) => {
         {mode === "smooth" && (
           <label className="block text-xs">
             <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Weichheit: {Math.round(softness * 100)}%</span>
-            <input type="range" min={0.05} max={0.95} step={0.05} value={softness}
+            <input type="range" min={0.05} max={1} step={0.05} value={softness}
               onChange={(e) => { const v = parseFloat(e.target.value); setSoftness(v); app.defaultEraserSoftness = v; }}
               className="w-full" />
           </label>
