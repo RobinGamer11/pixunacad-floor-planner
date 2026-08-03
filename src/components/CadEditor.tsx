@@ -957,6 +957,18 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       });
       offX += pw + 0.5;
     }
+    // "Frei platzieren": maßhaltig 1:1 (1 m im PDF = 1 m in der CAD-Oberfläche),
+    // dafür wird die Ansicht so gezoomt, dass die Seite ~70 % der Oberfläche füllt.
+    if (docFreePlace && firstW > 0 && firstH > 0) {
+      const rect = app.canvas.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        const fit = Math.min((rect.width * 0.7) / firstW, (rect.height * 0.7) / firstH);
+        if (Number.isFinite(fit) && fit > 0) {
+          app.camera.scale = Math.max(app.camera.minScale, Math.min(app.camera.maxScale, fit));
+          app.camera.center(rect);
+        }
+      }
+    }
   }, [docFreePlace, docImportScale]);
 
   const handleDocFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -2928,8 +2940,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                   <div className="flex items-center gap-1.5">
                     <input
                       type="range"
-                      min={10}
-                      max={400}
+                      min={1}
+                      max={2000}
                       step={1}
                       value={Math.round(docFreeScalePct)}
                       onChange={(e) => {
@@ -2943,14 +2955,14 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                     />
                     <input
                       type="number"
-                      min={10}
-                      max={400}
+                      min={1}
+                      max={2000}
                       step={1}
                       value={Math.round(docFreeScalePct)}
                       onChange={(e) => {
                         const v = Number(e.target.value);
                         if (!Number.isFinite(v)) return;
-                        const pct = Math.max(10, Math.min(400, v));
+                        const pct = Math.max(1, Math.min(2000, v));
                         const base = docFreeScaleBaseRef.current;
                         if (!base) return;
                         setDocFreeScalePct(pct);

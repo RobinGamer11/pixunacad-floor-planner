@@ -179,8 +179,8 @@ export function CadDocumentInspector({ engine }: Props) {
         <div className="flex items-center gap-1.5">
           <input
             type="range"
-            min={10}
-            max={400}
+            min={1}
+            max={2000}
             step={1}
             value={Math.round(scalePct)}
             onChange={(e) => applyScale(parseFloat(e.target.value))}
