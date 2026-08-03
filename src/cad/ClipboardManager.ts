@@ -140,9 +140,11 @@ export function translatedItems(items: ClipboardItem[], dx: number, dy: number):
     if (it.kind === "segment") return translatedSegment(it, dx, dy);
     if (it.kind === "hatch") return translatedHatch(it, dx, dy);
     if (it.kind === "dimension") return translatedDim(it, dx, dy);
+    if (it.kind === "wall") return { ...it, corners: it.corners.map(p => ({ x: p.x + dx, y: p.y + dy })) };
     return translatedText(it, dx, dy);
   });
 }
+
 
 /**
  * Commit clipboard (translated) into the scene. Returns count of created objects.
