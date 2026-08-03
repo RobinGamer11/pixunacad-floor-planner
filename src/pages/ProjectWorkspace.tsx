@@ -697,7 +697,7 @@ export default function ProjectWorkspace() {
       const hPct = Math.max(2, Math.min(95, (paperH / fmt.hMm) * 100));
       const xPct = Math.max(0, (100 - wPct) / 2);
       const yPct = Math.max(0, (100 - hPct) / 2);
-      projectStore.addElement(projectId, targetPageId, {
+      const newElId = projectStore.addElement(projectId, targetPageId, {
         // Stufe 6: neue Einfügungen sind echte Paper-Space-Viewports
         // (Legacy-Datensätze mit kind "cad-view" bleiben rückwärtskompatibel).
         kind: "cad-viewport",
@@ -715,8 +715,12 @@ export default function ProjectWorkspace() {
         // Referenz für automatische Rahmen-Recompute nach Maßstabs­änderungen.
         basePaperMm: { w: paperW, h: paperH },
         baseScaleDen: pending.scaleDen,
+        // Neue CAD-Blätter landen zunächst auf der Ebene "Default".
+        labelId: Defaults.defaultLabelId,
       });
       setActivePageId(targetPageId);
+      // Direkt zur Weiterbearbeitung auswählen (Werkzeug-Einstellungen öffnen sich).
+      if (newElId) setSelectedElementIds([newElId]);
     } catch (err: any) {
       window.alert("Einfügen des CAD-Blatts fehlgeschlagen: " + (err?.message || err));
     }
