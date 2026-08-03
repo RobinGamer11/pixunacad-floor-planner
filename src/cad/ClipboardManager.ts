@@ -28,7 +28,15 @@ interface TextBoxSnap {
   labelId: string;
 }
 
-export type ClipboardItem = SegmentSnap | HatchSnap | DimensionSnap | TextBoxSnap;
+/** Wand-Snapshot (Bezugspolylinie + Körper-Parameter). Wird u. a. von Stickern genutzt. */
+export interface WallSnap {
+  kind: "wall"; corners: Vec2[];
+  wallKind: string; thicknessM: number; referenceSide: string;
+  color: string; fillColor: string; priority: number; labelId: string;
+}
+
+export type ClipboardItem = SegmentSnap | HatchSnap | DimensionSnap | TextBoxSnap | WallSnap;
+
 
 export interface Clipboard {
   items: ClipboardItem[];
