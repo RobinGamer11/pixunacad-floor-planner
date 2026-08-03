@@ -1102,6 +1102,13 @@ export class CadApp {
             textBgEnabled: it.textBgEnabled, textBgColor: it.textBgColor, textBgAlpha: it.textBgAlpha,
             labelId: it.labelId,
           });
+        } else if (it.kind === "wall") {
+          this.scene.createWall({
+            kind: it.wallKind as any, thicknessM: it.thicknessM,
+            referenceSide: it.referenceSide as any,
+            corners: it.corners, color: it.color, fillColor: it.fillColor,
+            priority: it.priority, labelId: it.labelId,
+          });
         } else if (it.kind === "textbox") {
           this.scene.createTextBox(it.center, it.widthM, it.heightM, { ...(it.style || {}), labelId: it.labelId }, it.html || "", it.rotationRad || 0);
         }
