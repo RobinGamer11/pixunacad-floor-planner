@@ -57,11 +57,20 @@ function snapTextBox(t: TextBox): ClipboardItem {
     html: t.html, style: { ...t.style }, labelId: t.labelId,
   };
 }
+function snapWall(w: Wall): ClipboardItem {
+  return {
+    kind: "wall",
+    corners: w.corners.map(p => v(p.x, p.y)),
+    wallKind: w.kind, thicknessM: w.thicknessM, referenceSide: w.referenceSide,
+    color: w.color, fillColor: w.fillColor, priority: w.priority, labelId: w.labelId,
+  };
+}
 
 function itemCenter(it: ClipboardItem): Vec2 {
   if (it.kind === "segment") return { x: (it.a.x + it.b.x) / 2, y: (it.a.y + it.b.y) / 2 };
   if (it.kind === "hatch") return polygonCentroid(it.points);
   if (it.kind === "dimension") return { x: (it.p1.x + it.p2.x) / 2, y: (it.p1.y + it.p2.y) / 2 };
+  if (it.kind === "wall") return polygonCentroid(it.corners);
   return v(it.center.x, it.center.y);
 }
 
@@ -75,6 +84,7 @@ function itemsCentroid(items: ClipboardItem[]): Vec2 {
 function translateItem(it: ClipboardItem, dx: number, dy: number): ClipboardItem {
   if (it.kind === "segment") return { ...it, a: { x: it.a.x + dx, y: it.a.y + dy }, b: { x: it.b.x + dx, y: it.b.y + dy } };
   if (it.kind === "hatch") return { ...it, points: it.points.map(p => ({ x: p.x + dx, y: p.y + dy })) };
+  if (it.kind === "wall") return { ...it, corners: it.corners.map(p => ({ x: p.x + dx, y: p.y + dy })) };
   if (it.kind === "dimension") return {
     ...it,
     p1: { x: it.p1.x + dx, y: it.p1.y + dy },
@@ -94,6 +104,7 @@ function rotateItem(it: ClipboardItem, angleRad: number): ClipboardItem {
   const cs = Math.cos(angleRad), sn = Math.sin(angleRad);
   if (it.kind === "segment") return { ...it, a: rotPt(it.a, cs, sn), b: rotPt(it.b, cs, sn) };
   if (it.kind === "hatch") return { ...it, points: it.points.map(p => rotPt(p, cs, sn)) };
+  if (it.kind === "wall") return { ...it, corners: it.corners.map(p => rotPt(p, cs, sn)) };
   if (it.kind === "dimension") {
     return {
       ...it,
@@ -110,6 +121,7 @@ function rotateItem(it: ClipboardItem, angleRad: number): ClipboardItem {
     rotationRad: (it.rotationRad || 0) + angleRad,
   };
 }
+
 
 /* ---- Build sticker from current selection or label-group ---- */
 export function buildStickerFromSelection(app: CadApp, name: string): StickerDefinition | null {
