@@ -1518,11 +1518,17 @@ function SeitenInhaltGrid({ project, onAddPage }: { project: Project; onAddPage:
           <span>Projekttitelbild</span>
           <span>Geändert: {new Date(project.updatedAt).toLocaleString("de-DE")}</span>
         </div>
+        <div className="mt-3 group" style={{ perspective: "1200px" }}>
         <div
-          className="mt-3 rounded-xl overflow-hidden aspect-[16/9] relative group"
-          style={{ background: "hsl(var(--surface-muted))" }}
+          className="rounded-xl overflow-hidden aspect-[16/9] relative shadow-xl transition-transform duration-700 group-hover:[transform:rotateY(0deg)_rotateX(0deg)_scale(1.01)]"
+          style={{
+            background: "hsl(var(--surface-muted))",
+            transform: "rotateY(-8deg) rotateX(4deg)",
+            transformStyle: "preserve-3d",
+          }}
         >
           <img src={project.thumbnail} alt="" className="w-full h-full object-cover" />
+
           <button
             onClick={() => thumbInput.current?.click()}
             title="Titelbild ändern"
