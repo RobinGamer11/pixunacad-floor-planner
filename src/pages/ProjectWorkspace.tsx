@@ -5039,7 +5039,7 @@ function ToolsTab({
 
       {/* CAD-Dokument-Inspector: erscheint, sobald ein CAD-Dokument
           (scene.documents) im Auswahl-Tool selektiert ist. */}
-      {!activeTool && cadEngine && (
+      {(!activeTool || settingsTool === "document") && cadEngine && (
         <CadDocumentInspector engine={cadEngine} />
       )}
     </div>
