@@ -181,6 +181,8 @@ export default function ProjectWorkspace() {
   const [docImporting, setDocImporting] = useState(false);
   const [docPickerPages, setDocPickerPages] = useState<ImportedPage[] | null>(null);
   const [docPickerSelected, setDocPickerSelected] = useState<Set<number>>(new Set());
+  // Zugriff auf die Projekt-Ablage (Startseite: Dokumente & Fotos).
+  const [docLibraryOpen, setDocLibraryOpen] = useState(false);
   // Ausgabemaßstab für neu importierte Dokumente. Wird rechts im
   // "Dokument"-Werkzeug-Panel als Dropdown ausgewählt (wie beim CAD-Blatt).
   const [docScale, setDocScale] = useState<string>("1:100");
