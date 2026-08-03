@@ -179,6 +179,8 @@ export class CadApp {
   defaultHatchStrokeColor = Defaults.hatchStrokeColor;
   defaultHatchStrokeWidthPx = Defaults.hatchStrokePx;
   defaultHatchFillAlphaPct = Defaults.hatchFillAlphaPct;
+  /** Radierte Schraffur-Kanten automatisch glätten. */
+  defaultHatchAutoSmooth = true;
   defaultAreaShow = Defaults.areaShow;
   defaultAreaBorderEnabled = Defaults.areaBorderEnabled;
   defaultAreaBorderColor = Defaults.areaBorderColor;
