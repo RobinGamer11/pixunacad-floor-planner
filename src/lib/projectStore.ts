@@ -626,13 +626,16 @@ function sameProjectContent(a: Project, b: Project): boolean {
   }
 }
 
-/** Zusammenhängende Änderungen (z. B. Drag-Frames) zu einem Undo-Schritt bündeln.
- *  Gebündelt wird nur, wenn direkt hintereinander (< 500 ms) *dieselbe* Signatur
- *  geändert wird — so bekommt jede eigenständige Aktion (neues Objekt, Löschen,
- *  Werkzeug-Einsatz) einen eigenen Undo-Schritt. */
-const HIST_COALESCE_MS = 500;
+/** Zusammenhängende Änderungen (z. B. Drag-Frames einer Geste) werden zu genau
+ *  einem Undo-Schritt gebündelt. Gebündelt wird nur, solange *dieselbe* Signatur
+ *  geändert wird UND die Geste nicht via `sealHistory()` (Pointer-Up, Enter,
+ *  Abbruch, Werkzeugwechsel) abgeschlossen wurde. Dadurch bekommt jede einzelne
+ *  Aktion (Text, Trim, Move/Rotate, Zeichnen, Löschen) genau einen Schritt —
+ *  auch wenn sie länger als ein Zeitfenster dauert. */
+const HIST_COALESCE_MS = 4000;
 const lastPushAt: Map<string, number> = new Map();
 const lastSig: Map<string, string> = new Map();
+
 
 /** Grobe Signatur der geänderten Objekte (Seiten-/Element-IDs, Anzahl). */
 function changeSignature(a: Project, b: Project): string {
