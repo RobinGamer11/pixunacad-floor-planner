@@ -216,8 +216,11 @@ function scaleItem(it: ClipboardItem, s: number): ClipboardItem {
     p2: { x: it.p2.x * s, y: it.p2.y * s },
     placementPoint: { x: it.placementPoint.x * s, y: it.placementPoint.y * s },
   };
+  // Wand: Bezugslinie skalieren, Dicke bleibt maßstabsgetreu mitskaliert.
+  if (it.kind === "wall") return { ...it, corners: it.corners.map(p => ({ x: p.x * s, y: p.y * s })), thicknessM: it.thicknessM * s };
   // textbox: skaliere center + Box-Dimensionen (Textgröße bleibt fix)
   return { ...it, center: { x: it.center.x * s, y: it.center.y * s }, widthM: it.widthM * s, heightM: it.heightM * s };
+
 }
 
 /** AABB der lokalen Items (für Bounding-Box-Größe; transformierbar via pos/rot/scale). */
