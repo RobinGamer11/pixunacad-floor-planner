@@ -1,12 +1,13 @@
 /**
- * CSS-Maske für radierte Seiten-Elemente (z. B. CAD-Blatt).
+ * CSS-Maske für radierte Seiten-Elemente (z. B. CAD-Blatt, PDF, Bild).
  *
  * Die Radier-Kreise werden als SVG-Maske serialisiert: weiße Fläche = sichtbar,
- * schwarze Kreise = radiert. Im Smooth-Modus bekommen die Kreise einen
- * Gauß-Weichzeichner, sodass der Rand nebelartig ausläuft statt hart zu
- * schneiden.
+ * schwarze Kreise = radiert. Im Smooth-Modus wird jeder Stempel mit einer
+ * Deckkraft < 1 und einem weichen Verlauf gezeichnet — dadurch akkumulieren
+ * überlappende Stempel (längeres Verweilen = vollständig radiert) und der Rand
+ * läuft nebelartig aus.
  */
-export type EraseCircle = { x: number; y: number; r: number; s: number };
+export type EraseCircle = { x: number; y: number; r: number; s: number; a?: number };
 
 export function buildEraseMaskCss(
   circles: EraseCircle[] | undefined,
@@ -14,19 +15,30 @@ export function buildEraseMaskCss(
   hMm: number,
 ): React.CSSProperties {
   if (!circles || circles.length === 0 || wMm <= 0 || hMm <= 0) return {};
-  // Filter in SVG-Data-URI-Masken werden insbesondere in Safari und teils in
-  // Chromium verworfen. Radiale Verläufe liefern denselben weichen Übergang,
-  // bleiben aber als CSS mask-image zuverlässig renderbar.
   const gradients = circles
     .map((c, i) => {
-      const softness = Math.max(0, Math.min(0.95, c.s));
+      const softness = Math.max(0, Math.min(1, c.s));
       if (softness <= 0.01) return "";
-      const core = Math.max(0, Math.min(99, (1 - softness) * 100));
-      return `<radialGradient id="g${i}"><stop offset="0%" stop-color="black"/><stop offset="${core.toFixed(1)}%" stop-color="black"/><stop offset="100%" stop-color="white"/></radialGradient>`;
+      // Stärkere Weichheit: bei 100 % beginnt der Auslauf direkt in der Mitte.
+      const core = Math.max(0, Math.min(99, Math.pow(1 - softness, 1.6) * 100));
+      return (
+        `<radialGradient id="g${i}">` +
+        `<stop offset="0%" stop-color="black" stop-opacity="1"/>` +
+        `<stop offset="${core.toFixed(1)}%" stop-color="black" stop-opacity="1"/>` +
+        `<stop offset="100%" stop-color="black" stop-opacity="0"/>` +
+        `</radialGradient>`
+      );
     })
     .join("");
   const holes = circles
-    .map((c, i) => `<circle cx="${c.x.toFixed(3)}" cy="${c.y.toFixed(3)}" r="${Math.max(0.01, c.r).toFixed(3)}" fill="${c.s > 0.01 ? `url(#g${i})` : "black"}"/>`)
+    .map((c, i) => {
+      const soft = c.s > 0.01;
+      const alpha = Math.max(0.02, Math.min(1, c.a ?? (soft ? 0.35 : 1)));
+      return (
+        `<circle cx="${c.x.toFixed(3)}" cy="${c.y.toFixed(3)}" r="${Math.max(0.01, c.r).toFixed(3)}" ` +
+        `fill="${soft ? `url(#g${i})` : "black"}" fill-opacity="${alpha.toFixed(3)}"/>`
+      );
+    })
     .join("");
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" width="${wMm}" height="${hMm}" viewBox="0 0 ${wMm} ${hMm}">` +
