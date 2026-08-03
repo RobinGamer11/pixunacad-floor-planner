@@ -4176,6 +4176,33 @@ function ElementView({
         </>,
         rootRef.current.parentElement,
       )}
+
+      {/* Rechtsklick-Strahlen: Orientierungs-/Fanglinie vom gewählten Fremd-
+         Fangpunkt bis zum aktiven Fangpunkt dieses Elements. */}
+      {rayGuides.length > 0 && rootRef.current?.parentElement && createPortal(
+        <svg
+          className="absolute inset-0 pointer-events-none"
+          style={{ width: "100%", height: "100%", zIndex: 910 }}
+          viewBox="0 0 100 100"
+          preserveAspectRatio="none"
+        >
+          {rayGuides.map((g) => (
+            <g key={g.id}>
+              <line
+                x1={g.ax} y1={g.ay} x2={g.bx} y2={g.by}
+                stroke={hubBlue}
+                strokeWidth={0.12}
+                strokeDasharray="0.9 0.7"
+                vectorEffect="non-scaling-stroke"
+                opacity={0.85}
+              />
+              <circle cx={g.ax} cy={g.ay} r={0.5} fill={hubBlue} />
+            </g>
+          ))}
+        </svg>,
+        rootRef.current.parentElement,
+      )}
+
     </div>
   );
 }
