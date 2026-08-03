@@ -2072,11 +2072,16 @@ export class MiniCad {
 
 
       // Geometry change → persist (cover segments AND text boxes AND edits).
+      // Während eines aktiven Punkt-Edits (Verschieben/Drehen einer Textbox)
+      // bleibt das Objekt im Vorschau-Modus: erst nach dem Setzen wird
+      // persistiert → genau ein Undo/Redo-Schritt im Kopf.
+      const editingPreview = !!this.selectTool?.isEditing?.();
       const sig = this._sceneSignature();
       if (sig !== this._lastSig) {
         this._lastSig = sig;
-        this._onChange?.();
-      } else if (this._changeDirty) {
+        if (editingPreview) this._changeDirty = true;
+        else this._onChange?.();
+      } else if (this._changeDirty && !editingPreview) {
         this._changeDirty = false;
         this._onChange?.();
       }
