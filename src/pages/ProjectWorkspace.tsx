@@ -3766,7 +3766,21 @@ function ElementView({
     const onDown = (ev: PointerEvent) => {
       if (ev.button !== 0) return;
       hubDownClientRef.current = { x: ev.clientX, y: ev.clientY };
+      // Drehen: Ein Linksklick setzt das Objekt sofort in der aktuellen
+      // Drehstellung — schon beim Pointerdown, damit kein anderes Handling
+      // (Canvas-Drag, Neuauswahl) dazwischenkommt.
+      const wheelActiveNow = !!(window as any).__pixunaTabletCommit;
+      if (hubMode === "rotate" && !wheelActiveNow && !hubSettledRef.current && startAngle !== null) {
+        const t0 = ev.target as HTMLElement | null;
+        if (t0?.closest("[data-hub-control]")) return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        hubSettledRef.current = true;
+        hubDownClientRef.current = null;
+        commit();
+      }
     };
+
     // Linksklick-Abschluss: der CAD-Canvas verschluckt teilweise das native
     // "click"-Event (preventDefault auf pointerdown), deshalb hören wir
     // zusätzlich auf pointerup und behandeln beides identisch (mit Guard,
@@ -4486,17 +4500,6 @@ function ElementView({
           />
           
         </svg>
-        <div
-          className="absolute pointer-events-none rounded-md border border-border bg-card/95 px-2 py-0.5 text-[11px] font-medium tabular-nums text-foreground shadow-sm"
-          style={{
-            left: `${rotAxis.mx}%`,
-            top: `${rotAxis.my}%`,
-            transform: "translate(12px, -140%)",
-            zIndex: 916,
-          }}
-        >
-          {rotAxis.deg.toFixed(1)}°
-        </div>
         </>,
         rootRef.current.parentElement,
       )}
