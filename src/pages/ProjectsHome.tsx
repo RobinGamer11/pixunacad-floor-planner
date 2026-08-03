@@ -1299,7 +1299,9 @@ function SeitenView({ project, onAddPage }: { project: Project; onAddPage: () =>
                       borderColor: active ? "hsl(var(--accent-gold) / 0.4)" : "transparent",
                     }}
                   >
-                    <div className="w-10 h-10 rounded bg-white border shrink-0" style={{ borderColor: "hsl(var(--hairline))" }} />
+                    <div className="w-10 h-10 rounded bg-white border shrink-0 overflow-hidden flex items-center justify-center" style={{ borderColor: "hsl(var(--hairline))" }}>
+                      <PageThumb page={pg} className="w-full" />
+                    </div>
                     <div className="flex-1 text-sm truncate">{pg.title}</div>
                   </button>
                 );
