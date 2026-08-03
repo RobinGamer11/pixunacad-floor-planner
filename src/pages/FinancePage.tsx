@@ -485,3 +485,57 @@ const ChildList: React.FC<{
     </div>
   );
 };
+
+/* ------------------------------------------------------- Filter-Trefferliste */
+
+const FilterResults: React.FC<{
+  hits: { pos: FinancePosition; label: string; path: string; nodeId: string }[];
+  onOpen: (nodeId: string) => void;
+}> = ({ hits, onOpen }) => {
+  const sum = hits.reduce(
+    (s, h) => s + (h.pos.type === "supplement" && h.pos.supplementKind === "minus" ? -(h.pos.amount || 0) : (h.pos.amount || 0)),
+    0,
+  );
+  return (
+    <div className="rounded-xl border overflow-hidden"
+         style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}>
+      <div className="flex items-center gap-2 px-4 py-3 border-b" style={{ borderColor: "hsl(var(--hairline))" }}>
+        <div className="text-sm font-semibold flex-1">Filterergebnis</div>
+        <div className="text-xs" style={{ color: "hsl(var(--ink-soft))" }}>
+          {hits.length} {hits.length === 1 ? "Position" : "Positionen"} · {formatEur(sum)}
+        </div>
+      </div>
+
+      <div className="grid items-center px-3 py-2 border-b text-[11px] font-semibold uppercase tracking-wider"
+           style={{ gridTemplateColumns: "1.2fr 1.6fr 1fr 1.2fr 1fr 32px", borderColor: "hsl(var(--hairline))", color: "hsl(var(--ink-soft))" }}>
+        <span>Typ</span><span>Ordner</span><span>Datum</span><span>Nummer</span><span>Betrag</span><span />
+      </div>
+
+      {hits.length === 0 ? (
+        <div className="px-4 py-6 text-xs" style={{ color: "hsl(var(--ink-soft))" }}>
+          Keine Positionen gefunden.
+        </div>
+      ) : hits.map((h) => {
+        const isMinus = h.pos.type === "supplement" && h.pos.supplementKind === "minus";
+        const isPlus = h.pos.type === "supplement" && h.pos.supplementKind === "plus";
+        return (
+          <div key={h.pos.id} className="grid items-center px-3 py-2 border-b text-sm"
+               style={{ gridTemplateColumns: "1.2fr 1.6fr 1fr 1.2fr 1fr 32px", borderColor: "hsl(var(--hairline))" }}>
+            <span className="font-medium truncate">{h.label}</span>
+            <span className="truncate text-xs" style={{ color: "hsl(var(--ink-soft))" }}>{h.path}</span>
+            <span className="text-xs" style={{ color: "hsl(var(--ink-soft))" }}>{h.pos.date}</span>
+            <span className="text-xs truncate" style={{ color: "hsl(var(--ink-soft))" }}>{h.pos.number}</span>
+            <span className="tabular-nums font-medium"
+                  style={{ color: isPlus ? "hsl(24 95% 50%)" : isMinus ? "hsl(142 70% 34%)" : undefined }}>
+              {isMinus ? "−" : ""}{formatEur(h.pos.amount)}
+            </span>
+            <button data-export-hide onClick={() => onOpen(h.nodeId)}
+              className="h-7 w-7 rounded flex items-center justify-center hover:bg-muted" title="Aktion öffnen">
+              <ArrowRight size={14} style={{ color: "hsl(var(--ink-soft))" }} />
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
