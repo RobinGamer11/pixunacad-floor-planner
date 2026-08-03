@@ -103,6 +103,7 @@ import { TabletAidWheel } from "@/components/TabletAidWheel";
 // Seitengröße gebraucht wird (getPageSizeMm).
 import { PAPER_FORMATS as FORMAT_SIZES, getPageSizeMm, parseScaleDen } from "@/lib/paper";
 import { getPageSnapRegistry, buildRectSnapEntry } from "@/lib/pageSnap";
+import { registerCadEngineSnap, queryCadEngineSnap } from "@/lib/cadEngineSnap";
 import {
   IDENTITY_WARP,
   computeWarpMatrix3d,
