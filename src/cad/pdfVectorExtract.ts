@@ -215,8 +215,12 @@ export async function extractPdfPageVectors(sourceB64: string, pageIndex: number
   for (let k = 0; k < fns.length; k++) {
     const fn = fns[k];
     const a = args[k] || [];
-    if (fn === OPS.save) ctmStack.push({ ...ctm });
-    else if (fn === OPS.restore) { if (ctmStack.length) ctm = ctmStack.pop()!; }
+    if (fn === OPS.save) { ctmStack.push({ ...ctm }); colorStack.push({ fill: fillColor, stroke: strokeColor, lw: lineWidth }); }
+    else if (fn === OPS.restore) {
+      if (ctmStack.length) ctm = ctmStack.pop()!;
+      const c = colorStack.pop();
+      if (c) { fillColor = c.fill; strokeColor = c.stroke; lineWidth = c.lw; }
+    }
     else if (fn === OPS.transform) {
       const [aa, bb, cc, dd, ee, ff] = a;
       ctm = mul(ctm, { a: aa, b: bb, c: cc, d: dd, e: ee, f: ff });
