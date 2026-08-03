@@ -24,6 +24,8 @@ export class EraserTool {
   private _rulerDrag!: RulerDragController;
   /** Weicher Modus: pro Objekt akkumulierte Abtragung (0..1) innerhalb eines Striches. */
   private _acc = new Map<string, number>();
+  /** Gesammelter Radier-Pfad des aktuellen Striches (Preview + Schraffur-Schnitt). */
+  private _hatchStamps: Array<{ c: Vec2; r: number }> = [];
 
   constructor(app: CadApp) {
     this.app = app;
@@ -34,6 +36,7 @@ export class EraserTool {
     this._erasing = false;
     this._lastWorld = null;
     this._acc.clear();
+    this._hatchStamps = [];
     this._rulerDrag.reset();
     this.app.hub.hide();
     this.app.pointEditMenu.hide();
@@ -45,7 +48,9 @@ export class EraserTool {
     this._erasing = false;
     this._lastWorld = null;
     this._acc.clear();
+    this._hatchStamps = [];
   }
+
 
   finish() { this.cancel(); }
   getCursor() {
