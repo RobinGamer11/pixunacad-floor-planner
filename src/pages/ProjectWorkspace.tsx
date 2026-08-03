@@ -103,6 +103,8 @@ import { TabletAidWheel } from "@/components/TabletAidWheel";
 // Seitengröße gebraucht wird (getPageSizeMm).
 import { PAPER_FORMATS as FORMAT_SIZES, getPageSizeMm, parseScaleDen } from "@/lib/paper";
 import { getPageSnapRegistry, buildRectSnapEntry } from "@/lib/pageSnap";
+import { registerCadEngineSnap, queryCadEngineSnap } from "@/lib/cadEngineSnap";
+import { Defaults } from "@/cad/constants";
 import {
   IDENTITY_WARP,
   computeWarpMatrix3d,
@@ -218,6 +220,36 @@ export default function ProjectWorkspace() {
   } | null>(null);
   // Force-re-render der ToolsTab, sobald die Engine bereit ist (für Panel-Wiring).
   const [, forceEngineTick] = useState(0);
+  /** Engine übernehmen + Fangpunkt-Brücke registrieren (Linien, Texte,
+   *  Freihand, Schraffuren, Dokumente werden so auch für CAD-Blätter fangbar). */
+  const attachCadEngine = (api: {
+    setSelectedSegmentSnap: (opts: { midpointSnap?: boolean; divisionSnap?: number | null }) => void;
+    duplicateSelectedSegments: (offsetMm?: number) => number;
+    engine: import("@/cad/embed/MiniCad").MiniCad;
+  }) => {
+    cadEngineApiRef.current = api;
+    registerCadEngineSnap((clientX, clientY, pageRect, tol = 12) => {
+      const engine = cadEngineApiRef.current?.engine as any;
+      if (!engine?.canvas || !engine.camera || !engine.topology) return null;
+      const cr = engine.canvas.getBoundingClientRect();
+      const sx = clientX - cr.left;
+      const sy = clientY - cr.top;
+      const w = engine.camera.screenToWorld(sx, sy);
+      const snap = engine.topology.findBestSnap({ x: sx, y: sy }, w);
+      if (!snap?.world) return null;
+      const s = engine.camera.worldToScreen(snap.world.x, snap.world.y);
+      const cx = cr.left + s.x;
+      const cy = cr.top + s.y;
+      if (Math.hypot(cx - clientX, cy - clientY) > tol) return null;
+      return {
+        x: ((cx - pageRect.left) / Math.max(1, pageRect.width)) * 100,
+        y: ((cy - pageRect.top) / Math.max(1, pageRect.height)) * 100,
+      };
+    });
+    forceEngineTick((t) => t + 1);
+  };
+  useEffect(() => () => registerCadEngineSnap(null), []);
+
   const [presenting, setPresenting] = useState(() => {
     try { return new URLSearchParams(window.location.search).get("present") === "1"; } catch { return false; }
   });
@@ -666,7 +698,7 @@ export default function ProjectWorkspace() {
       const hPct = Math.max(2, Math.min(95, (paperH / fmt.hMm) * 100));
       const xPct = Math.max(0, (100 - wPct) / 2);
       const yPct = Math.max(0, (100 - hPct) / 2);
-      projectStore.addElement(projectId, targetPageId, {
+      const newElId = projectStore.addElement(projectId, targetPageId, {
         // Stufe 6: neue Einfügungen sind echte Paper-Space-Viewports
         // (Legacy-Datensätze mit kind "cad-view" bleiben rückwärtskompatibel).
         kind: "cad-viewport",
@@ -684,8 +716,12 @@ export default function ProjectWorkspace() {
         // Referenz für automatische Rahmen-Recompute nach Maßstabs­änderungen.
         basePaperMm: { w: paperW, h: paperH },
         baseScaleDen: pending.scaleDen,
+        // Neue CAD-Blätter landen zunächst auf der Ebene "Default".
+        labelId: Defaults.defaultLabelId,
       });
       setActivePageId(targetPageId);
+      // Direkt zur Weiterbearbeitung auswählen (Werkzeug-Einstellungen öffnen sich).
+      if (newElId) setSelectedElementIds([newElId]);
     } catch (err: any) {
       window.alert("Einfügen des CAD-Blatts fehlgeschlagen: " + (err?.message || err));
     }
@@ -1618,7 +1654,7 @@ export default function ProjectWorkspace() {
                       onSelect={handleSelect}
                       onMultiSelect={(ids) => { setSelectedElementIds(ids); setSelectedCadTool(undefined); setRightTab("tools"); }}
                       onCadSelectionChange={handleCadSelection}
-                      onCadEngineReady={(api) => { cadEngineApiRef.current = api; forceEngineTick(t => t + 1); }}
+                      onCadEngineReady={(api) => attachCadEngine(api)}
                       onJumpCad={(sheetId) => navigate(`/project/${project.id}/cad${sheetId ? `/${sheetId}` : ""}`)}
                     />
 
@@ -1718,7 +1754,7 @@ export default function ProjectWorkspace() {
                               onSelect={handleSelect}
                               onCadSelectionChange={isActiveMember ? handleCadSelection : () => {}}
                               onCadEngineReady={isActiveMember
-                                ? (api) => { cadEngineApiRef.current = api; forceEngineTick(t => t + 1); }
+                                ? (api) => attachCadEngine(api)
                                 : undefined}
                               bare
                               onJumpCad={(sheetId) => navigate(`/project/${project.id}/cad${sheetId ? `/${sheetId}` : ""}`)}
@@ -3152,6 +3188,16 @@ function ElementView({
     return best;
   };
 
+  /** Fangpunkt-Suche über BEIDE Quellen: Seiten-Elemente (pageSnap) und die
+   *  eingebettete CAD-Engine (Linien, Freihand, Texte, Schraffuren, Dokumente). */
+  const findSnap = (cx: number, cy: number, pageRect: DOMRect, tol = 12) => {
+    const m = getPageSnapRegistry().queryNearest(cx, cy, pageRect, tol, [el.id]);
+    if (m) return { x: m.x, y: m.y, match: m };
+    const e = queryCadEngineSnap(cx, cy, pageRect, tol);
+    if (e) return { x: e.x, y: e.y, match: null };
+    return null;
+  };
+
   // Edge-Trim: reine Vorschau (dxPx/dyPx). Commit erst bei Pointerup bzw.
   // — bei aktivem Tablet-Hilfsrad — beim Klick auf das Häkchen.
   const [edgeTrim, setEdgeTrim] = useState<{
@@ -3214,7 +3260,7 @@ function ElementView({
       ) return;
       ev.preventDefault();
       ev.stopPropagation();
-      const m = getPageSnapRegistry().queryNearest(ev.clientX, ev.clientY, pageRect, 14, [el.id]);
+      const m = findSnap(ev.clientX, ev.clientY, pageRect, 14);
       const ax = m ? m.x : ((ev.clientX - pageRect.left) / Math.max(1, pageRect.width)) * 100;
       const ay = m ? m.y : ((ev.clientY - pageRect.top) / Math.max(1, pageRect.height)) * 100;
       const frac = anchorFracRef.current ?? { fx: 0.5, fy: 0.5, key: "interior" };
@@ -3561,13 +3607,13 @@ function ElementView({
         let dyPx = startClient ? ev.clientY - startClient.y : ev.clientY - ay;
         const targetX = ax + dxPx;
         const targetY = ay + dyPx;
-        const m = reg.queryNearest(targetX, targetY, pageRect, 10, [el.id]);
+        const m = findSnap(targetX, targetY, pageRect, 12);
         if (m) {
           const snapPx = pageRect.left + (m.x / 100) * pageRect.width;
           const snapPy = pageRect.top + (m.y / 100) * pageRect.height;
           dxPx = snapPx - ax;
           dyPx = snapPy - ay;
-          reg.setHover(m);
+          reg.setHover(m.match);
         } else {
           reg.setHover(null);
           const snapped = snapToRayGuides(targetX, targetY, pageRect);
@@ -3578,11 +3624,11 @@ function ElementView({
         // Zielpunkt anvisieren: Fangpunkte anderer Objekte und Rechtsklick-
         // Hilfslinien ziehen den Rotations-Strahl exakt auf den Punkt.
         let tx = ev.clientX, ty = ev.clientY;
-        const mR = reg.queryNearest(tx, ty, pageRect, 12, [el.id]);
+        const mR = findSnap(tx, ty, pageRect, 12);
         if (mR) {
           tx = pageRect.left + (mR.x / 100) * pageRect.width;
           ty = pageRect.top + (mR.y / 100) * pageRect.height;
-          reg.setHover(mR);
+          reg.setHover(mR.match);
         } else {
           reg.setHover(null);
           const snapped = snapToRayGuides(tx, ty, pageRect);
@@ -3599,8 +3645,22 @@ function ElementView({
       }
     };
 
+    let settled = false;
     const onDown = (ev: PointerEvent) => { downClient = { x: ev.clientX, y: ev.clientY }; };
-    const onClick = (ev: MouseEvent) => {
+    // Linksklick-Abschluss: der CAD-Canvas verschluckt teilweise das native
+    // "click"-Event (preventDefault auf pointerdown), deshalb hören wir
+    // zusätzlich auf pointerup und behandeln beides identisch (mit Guard,
+    // damit nicht doppelt commited wird).
+    const handleClickLike = (ev: MouseEvent | PointerEvent) => {
+      if (settled) return;
+      if ((ev as MouseEvent).button !== undefined && (ev as MouseEvent).button !== 0) return;
+      // Nur reagieren, wenn der Klick NACH dem Start der HUB-Aktion begonnen hat
+      // (sonst würde das Pointerup der Aktivierungs-Geste sofort committen).
+      if (!downClient) return;
+      if (downClient && Math.hypot(ev.clientX - downClient.x, ev.clientY - downClient.y) > 6) {
+        downClient = null;
+        return;
+      }
       const t = ev.target as HTMLElement | null;
       if (t?.closest("[data-hub-control]")) return;
       ev.preventDefault();
@@ -3615,6 +3675,7 @@ function ElementView({
       if (nearAnchor || !wheelActive) {
         // Ohne Tablet-Hilfsrad setzt ein einfacher Linksklick das CAD-Blatt.
         downClient = null;
+        settled = true;
         commit();
         return;
       }
@@ -3643,7 +3704,7 @@ function ElementView({
       ev.preventDefault();
       ev.stopPropagation();
       const pageRect = parent.getBoundingClientRect();
-      const m = getPageSnapRegistry().queryNearest(ev.clientX, ev.clientY, pageRect, 14, [el.id]);
+      const m = findSnap(ev.clientX, ev.clientY, pageRect, 14);
       const xPct = m ? m.x : ((ev.clientX - pageRect.left) / Math.max(1, pageRect.width)) * 100;
       const yPct = m ? m.y : ((ev.clientY - pageRect.top) / Math.max(1, pageRect.height)) * 100;
       setGuides((g) => [...g, { id: Date.now() + Math.random(), xPct, yPct }]);
@@ -3660,14 +3721,18 @@ function ElementView({
       if (ev.key === "Escape" || ev.key === "Delete") { ev.stopPropagation(); ev.preventDefault(); cancel(); }
       else if (ev.key === "Enter") { ev.stopPropagation(); commit(); }
     };
+    const onClick = (ev: MouseEvent) => handleClickLike(ev);
+    const onUp = (ev: PointerEvent) => handleClickLike(ev);
     window.addEventListener("pointerdown", onDown, true);
     window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp, true);
     window.addEventListener("click", onClick, true);
     window.addEventListener("contextmenu", onContext, true);
     window.addEventListener("keydown", onKey, true);
     return () => {
       window.removeEventListener("pointerdown", onDown, true);
       window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp, true);
       window.removeEventListener("click", onClick, true);
       window.removeEventListener("contextmenu", onContext, true);
       window.removeEventListener("keydown", onKey, true);
@@ -5891,7 +5956,7 @@ function CadToolSection({
                     </button>
                   </div>
                   <div className="flex items-center gap-2 mt-2">
-                    <span className="text-[11px] text-muted-foreground shrink-0">Bez.-ID</span>
+                    <span className="text-[11px] text-muted-foreground shrink-0">Ebene</span>
                     <select
                       value={el.labelId ?? ""}
                       onClick={(ev) => ev.stopPropagation()}
@@ -5906,7 +5971,7 @@ function CadToolSection({
                       disabled={!cadEngine || labelGroups.length === 0}
                       className="flex-1 h-7 px-2 rounded bg-transparent border text-sm"
                       style={{ borderColor: "hsl(var(--hairline))" }}
-                      title="Bezeichnungs-ID (Ebene) — identisch zur CAD-Oberfläche."
+                      title="Ebene — identisch zur CAD-Oberfläche."
                     >
                       <option value="">— keine —</option>
                       {labelGroups.map((g) => (
