@@ -114,23 +114,23 @@ export const FinanceSummaryCard: React.FC<Props> = ({ totals, onEstimateChange, 
         <div className={cellCls}>
           <div className="text-[11px] font-semibold uppercase tracking-wider mb-1"
                style={{ color: "hsl(var(--ink-soft))" }}>Kontrolle</div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <div className="text-[11px]" style={{ color: "hsl(var(--ink-soft))" }}>Schätzung vs. Angebot</div>
-              <div className="text-sm font-semibold" style={{ color: deltaColor(cOffer.delta) }}>
-                {cOffer.delta > 0 ? "+" : ""}{formatEur(cOffer.delta)}
-              </div>
-              <div className="text-xs" style={{ color: "hsl(var(--ink-soft))" }}>{formatPct(cOffer.pct)}</div>
-            </div>
-            <div>
-              <div className="text-[11px]" style={{ color: "hsl(var(--ink-soft))" }}>Schätzung vs. Rechnungen</div>
-              <div className="text-sm font-semibold" style={{ color: deltaColor(cInvoice.delta) }}>
-                {cInvoice.delta > 0 ? "+" : ""}{formatEur(cInvoice.delta)}
-              </div>
-              <div className="text-xs" style={{ color: "hsl(var(--ink-soft))" }}>{formatPct(cInvoice.pct)}</div>
-            </div>
+          <select value={mode} onChange={(e) => setMode(e.target.value as ControlMode)}
+            className="mb-1 w-full bg-transparent text-[11px] outline-none border rounded px-1 py-0.5"
+            style={{ borderColor: "hsl(var(--hairline))" }}>
+            {(Object.keys(CONTROL_LABEL) as ControlMode[]).map((m) => (
+              <option key={m} value={m}>{CONTROL_LABEL[m]}</option>
+            ))}
+          </select>
+          <div className="font-semibold whitespace-nowrap"
+               style={{ color: deltaColor(c.delta), fontSize: amountSize }}>
+            {c.delta > 0 ? "+" : ""}{formatEur(c.delta)}
+          </div>
+          <div className="text-xs" style={{ color: "hsl(var(--ink-soft))" }}>
+            {formatPct(c.pct)}
+            {c.pct !== null && ` (${c.pct - 100 > 0 ? "+" : "−"}${formatPct(Math.abs(c.pct - 100))})`}
           </div>
         </div>
+
       </div>
 
       {showDetails && invoiceDetails && (
