@@ -11,8 +11,8 @@ interface Props {
 
 /** Nichtlineare Größen-Skala. Projektmappe: 0,2 mm … 80 mm (Mitte) … 200 mm. */
 const R_MIN = 0.0002, R_MID = 0.08, R_MAX = 0.2;
-/** CAD-Blatt: 2 mm … 1000 mm (Mitte) … 2000 mm. */
-const CAD_R_MIN = 0.002, CAD_R_MID = 1, CAD_R_MAX = 2;
+/** CAD-Blatt: 5 mm … 5 m (Mitte) … 25 m. */
+const CAD_R_MIN = 0.005, CAD_R_MID = 5, CAD_R_MAX = 25;
 
 const makeScale = (min: number, mid: number, max: number) => ({
   toRadius: (t: number) =>
