@@ -776,6 +776,10 @@ export class Renderer {
     ctx.save();
     ctx.translate(cs.x, cs.y);
     if (doc.rotationRad) ctx.rotate(doc.rotationRad);
+    // Spiegeln (links/rechts bzw. oben/unten)
+    const fx = (doc as any).flipX ? -1 : 1;
+    const fy = (doc as any).flipY ? -1 : 1;
+    if (fx < 0 || fy < 0) ctx.scale(fx, fy);
     // Opacity
     const op = typeof doc.opacity === "number" ? doc.opacity : 1;
     if (op < 1) ctx.globalAlpha = ctx.globalAlpha * op;
@@ -798,19 +802,25 @@ export class Renderer {
     const prevQuality = (ctx as any).imageSmoothingQuality;
     ctx.imageSmoothingEnabled = true;
     (ctx as any).imageSmoothingQuality = "high";
+    const warp = getDocWarp(doc);
     if (adaptive) {
       // Zuerst die Low-Res-Fallback-Vollseite zeichnen — nie leere Fläche beim Panning/Zoomen.
       const baseW = adaptive.width, baseH = adaptive.height;
       const filtered = this._getFilteredBitmap(doc, adaptive, baseW, baseH, `adp:${baseW}`);
-      ctx.drawImage(filtered || adaptive, -wPx / 2, -hPx / 2, wPx, hPx);
-      // Darüber das scharfe Viewport-Tile (nur wenn vorhanden) — Adobe-ähnliche Schärfe.
-      const tile = this._getDocPdfTile(doc, wPx, hPx);
-      if (tile) {
-        const tx = -wPx / 2 + tile.u0 * wPx;
-        const ty = -hPx / 2 + tile.v0 * hPx;
-        const tw = (tile.u1 - tile.u0) * wPx;
-        const th = (tile.v1 - tile.v0) * hPx;
-        ctx.drawImage(tile.canvas, tx, ty, tw, th);
+      const srcAdp: CanvasImageSource = (filtered || adaptive) as CanvasImageSource;
+      if (warp) {
+        drawWarpedImage(ctx, srcAdp, baseW, baseH, wPx, hPx, warp);
+      } else {
+        ctx.drawImage(srcAdp, -wPx / 2, -hPx / 2, wPx, hPx);
+        // Darüber das scharfe Viewport-Tile (nur wenn vorhanden) — Adobe-ähnliche Schärfe.
+        const tile = this._getDocPdfTile(doc, wPx, hPx);
+        if (tile) {
+          const tx = -wPx / 2 + tile.u0 * wPx;
+          const ty = -hPx / 2 + tile.v0 * hPx;
+          const tw = (tile.u1 - tile.u0) * wPx;
+          const th = (tile.v1 - tile.v0) * hPx;
+          ctx.drawImage(tile.canvas, tx, ty, tw, th);
+        }
       }
     } else if (img) {
       const composite = this._getDocComposite(doc, img);
@@ -818,7 +828,12 @@ export class Renderer {
       const baseW = (composite ? composite.width : (img.naturalWidth || img.width));
       const baseH = (composite ? composite.height : (img.naturalHeight || img.height));
       const filtered = this._getFilteredBitmap(doc, drawSrc, baseW, baseH, composite ? `cmp:${baseW}` : `img:${img.src.length}`);
-      ctx.drawImage(filtered || drawSrc, -wPx / 2, -hPx / 2, wPx, hPx);
+      const finalSrc: CanvasImageSource = (filtered || drawSrc) as CanvasImageSource;
+      if (warp) {
+        drawWarpedImage(ctx, finalSrc, baseW, baseH, wPx, hPx, warp);
+      } else {
+        ctx.drawImage(finalSrc, -wPx / 2, -hPx / 2, wPx, hPx);
+      }
     } else {
       ctx.fillStyle = "rgba(180,180,180,0.3)";
       ctx.fillRect(-wPx / 2, -hPx / 2, wPx, hPx);
