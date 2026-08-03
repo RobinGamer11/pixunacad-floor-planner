@@ -192,9 +192,9 @@ export function CadDocumentInspector({ engine }: Props) {
         </div>
       </div>
 
-      <DocumentFilterPanel app={engine as any} docId={sel.id} sig={filterSig} showBgRemove={false} />
-
       <WarpSection engine={engine} docId={sel.id} />
+
+      <DocumentFilterPanel app={engine as any} docId={sel.id} sig={filterSig} showBgRemove={false} />
 
       <div
         className="text-[10px] leading-relaxed pt-1.5 text-muted-foreground"
@@ -251,21 +251,18 @@ function WarpSection({ engine, docId }: { engine: MiniCad; docId: string }) {
         Verzerren &amp; Spiegeln
       </div>
 
-      <div className="flex items-center gap-1.5">
-        <span className="text-[10px] text-muted-foreground w-14">Spiegeln</span>
-        <select
-          value={flipValue}
-          onChange={(e) => setFlip(e.target.value)}
-          className="flex-1 h-8 px-2 rounded bg-transparent border text-[11px]"
-          style={{ borderColor: "hsl(var(--hairline))" }}
-          title="Dokument spiegeln"
-        >
-          <option value="none">Keine</option>
-          <option value="x">Links ↔ Rechts</option>
-          <option value="y">Oben ↔ Unten</option>
-          <option value="both">Beides</option>
-        </select>
-      </div>
+      <button
+        type="button"
+        onClick={toggle}
+        className="w-full h-8 rounded-md text-[11px] border flex items-center justify-center gap-2"
+        style={{
+          borderColor: active ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
+          background: active ? "hsl(var(--accent-gold-soft))" : "transparent",
+        }}
+        title="Vier Eckpunkte frei ziehen (perspektivische Verzerrung)"
+      >
+        {active ? "Verzerren beenden" : "Verzerren"}
+      </button>
 
       <div className="flex items-center gap-1.5">
         <span className="text-[10px] text-muted-foreground w-14">Achse</span>
@@ -282,18 +279,21 @@ function WarpSection({ engine, docId }: { engine: MiniCad; docId: string }) {
         </select>
       </div>
 
-      <button
-        type="button"
-        onClick={toggle}
-        className="w-full h-8 rounded-md text-[11px] border flex items-center justify-center gap-2"
-        style={{
-          borderColor: active ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
-          background: active ? "hsl(var(--accent-gold-soft))" : "transparent",
-        }}
-        title="Vier Eckpunkte frei ziehen (perspektivische Verzerrung)"
-      >
-        {active ? "Verzerren beenden" : "Verzerren"}
-      </button>
+      <div className="flex items-center gap-1.5">
+        <span className="text-[10px] text-muted-foreground w-14">Spiegeln</span>
+        <select
+          value={flipValue}
+          onChange={(e) => setFlip(e.target.value)}
+          className="flex-1 h-8 px-2 rounded bg-transparent border text-[11px]"
+          style={{ borderColor: "hsl(var(--hairline))" }}
+          title="Dokument spiegeln"
+        >
+          <option value="none">Keine</option>
+          <option value="x">Links ↔ Rechts</option>
+          <option value="y">Oben ↔ Unten</option>
+          <option value="both">Beides</option>
+        </select>
+      </div>
 
       {active && (
         <div className="text-[10px] text-muted-foreground leading-relaxed">
