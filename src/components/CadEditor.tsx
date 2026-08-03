@@ -309,6 +309,10 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const [docPickerPages, setDocPickerPages] = useState<ImportedPage[] | null>(null);
   const [docPickerSelected, setDocPickerSelected] = useState<Set<number>>(new Set());
   const [docImporting, setDocImporting] = useState(false);
+  // Dokumentenwerkzeug (identisch zur Projektmappe): ohne Häkchen wird frei
+  // platziert (Originalgröße), mit Häkchen greift der eingestellte Maßstab.
+  const [docFreePlace, setDocFreePlace] = useState(true);
+  const [docImportScale, setDocImportScale] = useState("1:100");
   const [docSelected, setDocSelected] = useState<{ id: string; name: string; widthM: number; heightM: number; importScaleDenom: number; kind: "image" | "pdf-page"; pdfSourceB64: string | null } | null>(null);
   const [docFilterSig, setDocFilterSig] = useState<string>("");
   const [docScalePopoverOpen, setDocScalePopoverOpen] = useState(false);
