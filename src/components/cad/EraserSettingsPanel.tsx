@@ -7,7 +7,10 @@ interface Props {
   app: CadApp | MiniCad | null;
   /** "cad" = große Dimensionierung (Mitte 1000 mm, max 2000 mm) mit Prozentanzeige. */
   variant?: "cad" | "workspace";
+  /** Optional: true, wenn das aktuell gewählte Objekt ein Rasterbild (PNG/JPG) ist. */
+  rasterSelection?: boolean | null;
 }
+
 
 /** Nichtlineare Größen-Skala. Projektmappe: 0,2 mm … 80 mm (Mitte) … 200 mm. */
 const R_MIN = 0.0002, R_MID = 0.08, R_MAX = 0.2;
