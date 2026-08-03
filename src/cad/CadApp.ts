@@ -2063,10 +2063,14 @@ export class CadApp {
           return;
         }
         if (this.activeTool === this.selectTool) { this.selectTool.cancel(); this.clearSelection(); this.setSelectedLabelId(null); this.pointEditMenu.hide(); return; }
+        // Jedes andere Werkzeug (z. B. Radiergummi): abbrechen und zurück zur Auswahl.
         this.activeTool.cancel();
         this.clearSelection();
         this.setSelectedLabelId(null);
+        this.setTool(ToolIds.SELECT);
+        return;
       }
+
 
       if (e.key === "Delete" || e.key === "Backspace") {
         // Läuft gerade eine Bearbeitung (Verschieben/Drehen/Resize)? Dann bricht
