@@ -17,7 +17,9 @@ function useFinance(projectId?: string): FinanceState {
   useEffect(() => {
     if (!projectId) return;
     setState(financeStore.get(projectId));
-    return financeStore.subscribe(() => setState(financeStore.get(projectId)));
+    const unsub = financeStore.subscribe(() => setState(financeStore.get(projectId)));
+    return () => { unsub(); };
+
   }, [projectId]);
   return state;
 }
