@@ -35,6 +35,12 @@ export default function FinancePage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [leftOpen, setLeftOpen] = useState(true);
+  const [tabletAidOn, setTabletAidOn] = useState<boolean>(() => {
+    try { return localStorage.getItem("pixuna.tabletAid") === "1"; } catch { return false; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem("pixuna.tabletAid", tabletAidOn ? "1" : "0"); } catch { /* ignore */ }
+  }, [tabletAidOn]);
 
   const selected = useMemo(
     () => (selectedId ? state.nodes.find((n) => n.id === selectedId) ?? null : null),
