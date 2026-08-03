@@ -161,14 +161,17 @@ export class EraserTool {
 
       scene.removeHatch(hatch);
       if (this.app.selection && (this.app.selection as any).hatchId === hatch.id) this.app.setSelection(null);
+      const autoSmooth = (this.app as any).defaultHatchAutoSmooth !== false;
       for (const poly of result || []) {
         const rings = poly
-          .map((ring: number[][]) => this._smoothCutRing(ring, origKeys))
+          .map((ring: number[][]) =>
+            autoSmooth ? this._smoothCutRing(ring, origKeys) : this._rawRing(ring))
           .filter((ring: Vec2[]) => ring.length > 2 && Math.abs(this._ringArea(ring)) > minArea);
         const outer = rings[0];
         if (!outer || outer.length < 3) continue;
         scene.createHatch(outer, { ...style, holes: rings.slice(1) });
       }
+
     }
   }
 
