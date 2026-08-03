@@ -8,7 +8,10 @@ interface Props {
   className?: string;
   /** Projektmappe: PDF erst nach einer laufenden Viewport-Zoomgeste neu rastern. */
   deferDuringWorkspaceZoom?: boolean;
+  /** Radier-Maske (CSS mask-image) – wird direkt auf Canvas/Hintergrund gelegt. */
+  maskStyle?: React.CSSProperties;
 }
+
 
 let workspaceZoomActive = false;
 const workspaceZoomListeners = new Set<() => void>();
