@@ -174,6 +174,20 @@ export class EraserTool {
     return ring;
   }
 
+  /** Rechteck-Band zwischen zwei Kreismittelpunkten (Breite = 2r). */
+  private _capsuleBand(a: Vec2, b: Vec2, r: number): number[][] | null {
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const len = Math.hypot(dx, dy);
+    if (len < 1e-9) return null;
+    const nx = (-dy / len) * r, ny = (dx / len) * r;
+    return [
+      [a.x + nx, a.y + ny], [b.x + nx, b.y + ny],
+      [b.x - nx, b.y - ny], [a.x - nx, a.y - ny],
+      [a.x + nx, a.y + ny],
+    ];
+  }
+
+
   private _polyNearStamps(pts: Vec2[], stamps: Array<{ c: Vec2; r: number }>): boolean {
     for (const s of stamps) if (this._strokeNearCircle(pts, s.c, s.r)) return true;
     return false;
