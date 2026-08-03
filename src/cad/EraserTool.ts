@@ -339,7 +339,8 @@ export class EraserTool {
         const same = chunks[0].every((p, i) => p.x === stroke.points[i].x && p.y === stroke.points[i].y);
         if (same) continue;
       }
-      if (mode === "smooth") {
+      if (vecMode === "smooth") {
+
         // Randbereich (zwischen Schnittradius und Pinselradius) wird schwächer
         // gezeichnet → weicher Auslauf statt harter Kante.
         scene.removeFreeStroke(stroke);
