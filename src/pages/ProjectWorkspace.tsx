@@ -3581,10 +3581,23 @@ function ElementView({
       };
     };
 
+    // Sichtbarer Anker: Der Fangpunkt liegt nach einer bestehenden Rotation
+    // nicht mehr an der unrotierten Rect-Position — deshalb um das Zentrum
+    // mitdrehen. Nur so bleibt der Fangpunkt beim Drehen exakt an Ort.
+    const rotAbout = (px: number, py: number, cx: number, cy: number, deg: number) => {
+      const rad = (deg * Math.PI) / 180;
+      const c = Math.cos(rad), s = Math.sin(rad);
+      const ox = px - cx, oy = py - cy;
+      return { x: cx + ox * c - oy * s, y: cy + ox * s + oy * c };
+    };
     const liveAnchor = () => {
       const r = baseRect();
-      return { clientX: r.left + frac.fx * r.width, clientY: r.top + frac.fy * r.height, rect: r };
+      const cx = r.left + r.width / 2;
+      const cy = r.top + r.height / 2;
+      const a = rotAbout(r.left + frac.fx * r.width, r.top + frac.fy * r.height, cx, cy, startRot);
+      return { clientX: a.x, clientY: a.y, rect: r };
     };
+
 
     const commit = () => {
       const p = previewRef.current;
