@@ -47,10 +47,11 @@ import {
   type ProfileStatus,
 } from "@/lib/projectStore";
 import { useDragScroll } from "@/hooks/use-drag-scroll";
-import { notesStore, useNotes, type NoteNode, type NoteStatus, type NotePriority } from "@/lib/notesStore";
+import { notesStore, useNotes, QUICK_CATEGORY, type NoteNode, type NoteStatus, type NotePriority } from "@/lib/notesStore";
 import { WeatherStrip } from "@/components/project/WeatherStrip";
 import { UebersichtView } from "@/components/project/UebersichtView";
 import { FileBrowser } from "@/components/project/FileBrowser";
+import { PageThumb } from "@/components/project/PageThumb";
 import { geocodeSearch, type GeoHit } from "@/lib/weather";
 
 const Pixuna = () => (
@@ -1299,7 +1300,9 @@ function SeitenView({ project, onAddPage }: { project: Project; onAddPage: () =>
                       borderColor: active ? "hsl(var(--accent-gold) / 0.4)" : "transparent",
                     }}
                   >
-                    <div className="w-10 h-10 rounded bg-white border shrink-0" style={{ borderColor: "hsl(var(--hairline))" }} />
+                    <div className="w-10 h-10 rounded bg-white border shrink-0 overflow-hidden flex items-center justify-center" style={{ borderColor: "hsl(var(--hairline))" }}>
+                      <PageThumb page={pg} className="w-full" />
+                    </div>
                     <div className="flex-1 text-sm truncate">{pg.title}</div>
                   </button>
                 );
@@ -1321,14 +1324,16 @@ function SeitenView({ project, onAddPage }: { project: Project; onAddPage: () =>
                 <span>{selectedPage.format}</span>
               </div>
               <div
-                className="bg-white border shadow-sm"
+                className="bg-white border shadow-sm overflow-hidden"
                 style={{
                   borderColor: "hsl(var(--hairline))",
                   width: isLandscape ? "100%" : "70%",
-                  aspectRatio: isLandscape ? "1.414 / 1" : "1 / 1.414",
                   maxWidth: "100%",
                 }}
-              />
+              >
+                {/* Livevorschau des tatsächlichen Seiteninhalts */}
+                <PageThumb page={selectedPage} className="w-full" />
+              </div>
             </>
           ) : (
             <div className="text-sm text-muted-foreground italic">
@@ -1631,9 +1636,16 @@ export function AufgabenView({ project }: { project: Project }) {
     date: "",
     time: "",
     priority: "medium",
-    category: "",
+    // Schnellablage ist die Standardkategorie für neue Aufgaben.
+    category: QUICK_CATEGORY,
     mappeId: defaultMappeId,
   });
+
+  // Die aktuell in der Projektmappe ausgewählte Mappe ist immer vorbelegt —
+  // wechselt der Nutzer die Mappe, zieht die Auswahl automatisch nach.
+  useEffect(() => {
+    setDraft((d) => (d.mappeId === defaultMappeId ? d : { ...d, mappeId: defaultMappeId }));
+  }, [defaultMappeId]);
 
   const mappeName = useCallback(
     (id?: string) => (id ? (mappen.find((m) => m.id === id)?.name ?? "") : ""),

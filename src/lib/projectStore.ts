@@ -1522,6 +1522,31 @@ export const projectStore = {
       ),
     }));
   },
+  /** Verschiebt einen Knoten in der Reihenfolge seiner Geschwister nach
+   *  oben/unten (nur Sortierung, Elternzuordnung bleibt unverändert). */
+  moveNodeOrder: (projectId: string, kind: "files" | "photos", nodeId: string, dir: -1 | 1) => {
+    setState((s) => ({
+      projects: s.projects.map((p) => {
+        if (p.id !== projectId) return p;
+        const arr = [...(p[kind] ?? [])];
+        const node = arr.find((n) => n.id === nodeId);
+        if (!node) return p;
+        // Indizes der Geschwister mit gleichem Typ (Ordner bleiben unter sich).
+        const sibIdx = arr
+          .map((n, i) => ({ n, i }))
+          .filter(({ n }) => n.parentId === node.parentId && n.kind === node.kind)
+          .map(({ i }) => i);
+        const pos = sibIdx.indexOf(arr.indexOf(node));
+        const target = pos + dir;
+        if (pos < 0 || target < 0 || target >= sibIdx.length) return p;
+        const a = sibIdx[pos];
+        const b = sibIdx[target];
+        [arr[a], arr[b]] = [arr[b], arr[a]];
+        return { ...p, [kind]: arr } as Project;
+      }),
+    }));
+  },
+
   deleteNode: (projectId: string, kind: "files" | "photos", nodeId: string) => {
     setState((s) => ({
       projects: s.projects.map((p) => {

@@ -58,13 +58,23 @@ const DEFAULT_PRIORITIES: NotePriorityDef[] = [
 const KEY = (projectId: string) => `pixuna.notes.${projectId}`;
 const HISTORY_LIMIT = 100;
 
+/** "Schnellablage" ist die Standardkategorie und steht immer an erster Stelle. */
+export const QUICK_CATEGORY = "Schnellablage";
+const DEFAULT_CATEGORIES = [QUICK_CATEGORY, "Elektro", "Sanitär", "Trockenbau", "Material"];
+
+/** Stellt sicher, dass "Schnellablage" existiert und ganz vorne steht. */
+function withQuickCategory(list: string[]): string[] {
+  const rest = list.filter((c) => c !== QUICK_CATEGORY);
+  return [QUICK_CATEGORY, ...rest];
+}
+
 function loadState(projectId: string): NotesState {
   try {
     const raw = localStorage.getItem(KEY(projectId));
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<NotesState>;
       return {
-        categories: parsed.categories ?? ["Elektro", "Sanitär", "Trockenbau", "Material"],
+        categories: withQuickCategory(parsed.categories ?? DEFAULT_CATEGORIES),
         statuses: parsed.statuses ?? DEFAULT_STATUSES,
         priorities: parsed.priorities ?? DEFAULT_PRIORITIES,
         nodes: (parsed.nodes ?? []).map((n, i) => ({ ...n, order: n.order ?? i })),
@@ -72,7 +82,7 @@ function loadState(projectId: string): NotesState {
     }
   } catch {}
   return {
-    categories: ["Elektro", "Sanitär", "Trockenbau", "Material"],
+    categories: [...DEFAULT_CATEGORIES],
     statuses: DEFAULT_STATUSES,
     priorities: DEFAULT_PRIORITIES,
     nodes: [],
@@ -236,6 +246,8 @@ export const notesStore = {
   },
   removeCategory(projectId: string, name: string) {
     const s = getState(projectId);
+    // Die Schnellablage ist die Standardkategorie und bleibt bestehen.
+    if (name === QUICK_CATEGORY) return;
     if (!s.categories.includes(name)) return;
     commit(projectId, {
       ...s,
