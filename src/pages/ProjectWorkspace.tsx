@@ -3675,6 +3675,7 @@ function ElementView({
           const snapped = snapToRayGuides(targetX, targetY, pageRect);
           if (snapped) { dxPx = snapped.x - ax; dyPx = snapped.y - ay; }
         }
+        previewRef.current = { dxPx, dyPx, deltaDeg: 0, anchorFrac };
         setPreview({ dxPx, dyPx, deltaDeg: 0, anchorFrac });
       } else if (hubMode === "rotate") {
         // Zielpunkt anvisieren: Fangpunkte anderer Objekte und Rechtsklick-
