@@ -321,12 +321,15 @@ const ChildList: React.FC<{
                 onClick={() => financeStore.updateNode(projectId, n.id, { enabled: !n.enabled })}>
                 {n.enabled ? <ToggleRight size={16} style={{ color: "hsl(var(--accent-gold))" }} /> : <ToggleLeft size={16} />}
               </button>
-              <button className="flex items-center gap-1.5 min-w-0 text-left" onClick={() => onSelect(n.id)}>
-                {deep && kids.length > 0 && (
-                  <span onClick={(e) => { e.stopPropagation(); setOpen((o) => ({ ...o, [n.id]: !o[n.id] })); }}>
-                    {isOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-                  </span>
-                )}
+              <button
+                className="flex items-center gap-1.5 min-w-0 text-left"
+                title={kids.length > 0 ? "Unterpunkte ein-/ausklappen" : "Öffnen"}
+                onClick={() => kids.length > 0
+                  ? setOpen((o) => ({ ...o, [n.id]: !o[n.id] }))
+                  : onSelect(n.id)}>
+                {kids.length > 0
+                  ? (isOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />)
+                  : <span className="w-[13px]" />}
                 {n.type === "overview" ? <Folder size={14} /> : <Building2 size={14} />}
                 <span className="truncate font-medium">{n.name}</span>
               </button>
@@ -336,9 +339,10 @@ const ChildList: React.FC<{
               <span className="text-xs" style={{ color: "hsl(var(--ink-soft))" }}>
                 {formatPct(cO.pct)} / {formatPct(cI.pct)}
               </span>
-              <button onClick={() => financeStore.deleteNode(projectId, n.id)}
-                className="h-7 w-7 rounded flex items-center justify-center hover:bg-muted" title="Löschen">
-                <Trash2 size={14} style={{ color: "hsl(var(--ink-soft))" }} />
+              <button onClick={() => onSelect(n.id)}
+                className="h-7 w-7 rounded flex items-center justify-center hover:bg-muted"
+                title={n.type === "overview" ? "Übersicht öffnen" : "Aktion öffnen"}>
+                <ArrowRight size={14} style={{ color: "hsl(var(--ink-soft))" }} />
               </button>
             </div>
             {deep && isOpen && kids.length > 0 && (
