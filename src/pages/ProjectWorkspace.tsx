@@ -2766,7 +2766,7 @@ function PageCanvas({
             // Welt-Meter → Papier-mm; trifft CAD-Blatt-Elemente auf dieser Seite.
             const mmX = c.x * 1000, mmY = c.y * 1000, rMm = rM * 1000;
             for (const el of page.elements) {
-              if (el.kind !== "cad-view" && el.kind !== "cad-viewport") continue;
+              if (el.kind !== "cad-view" && el.kind !== "cad-viewport" && el.kind !== "pdf" && el.kind !== "image") continue;
               const ex = el.xMm ?? 0, ey = el.yMm ?? 0;
               const ew = el.wMm ?? 0, eh = el.hMm ?? 0;
               if (ew <= 0 || eh <= 0) continue;
