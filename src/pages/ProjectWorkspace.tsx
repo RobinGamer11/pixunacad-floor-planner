@@ -1649,7 +1649,7 @@ export default function ProjectWorkspace() {
                       onSelect={handleSelect}
                       onMultiSelect={(ids) => { setSelectedElementIds(ids); setSelectedCadTool(undefined); setRightTab("tools"); }}
                       onCadSelectionChange={handleCadSelection}
-                      onCadEngineReady={(api) => { cadEngineApiRef.current = api; forceEngineTick(t => t + 1); }}
+                      onCadEngineReady={(api) => attachCadEngine(api)}
                       onJumpCad={(sheetId) => navigate(`/project/${project.id}/cad${sheetId ? `/${sheetId}` : ""}`)}
                     />
 
@@ -1749,7 +1749,7 @@ export default function ProjectWorkspace() {
                               onSelect={handleSelect}
                               onCadSelectionChange={isActiveMember ? handleCadSelection : () => {}}
                               onCadEngineReady={isActiveMember
-                                ? (api) => { cadEngineApiRef.current = api; forceEngineTick(t => t + 1); }
+                                ? (api) => attachCadEngine(api)
                                 : undefined}
                               bare
                               onJumpCad={(sheetId) => navigate(`/project/${project.id}/cad${sheetId ? `/${sheetId}` : ""}`)}
