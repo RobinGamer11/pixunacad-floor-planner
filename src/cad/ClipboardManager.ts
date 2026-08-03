@@ -176,6 +176,16 @@ export function commitClipboardAt(app: CadApp, clip: Clipboard, mouseW: Vec2): n
           textBgEnabled: it.textBgEnabled, textBgColor: it.textBgColor, textBgAlpha: it.textBgAlpha,
           labelId: it.labelId });
       count++;
+    } else if (it.kind === "wall") {
+      app.scene.createWall({
+        kind: it.wallKind as any,
+        thicknessM: it.thicknessM,
+        referenceSide: it.referenceSide as any,
+        corners: it.corners.map(p => ({ x: p.x + dx, y: p.y + dy })),
+        color: it.color, fillColor: it.fillColor,
+        priority: it.priority, labelId: it.labelId,
+      });
+      count++;
     } else {
       app.scene.createTextBox(
         { x: it.center.x + dx, y: it.center.y + dy },
@@ -184,6 +194,7 @@ export function commitClipboardAt(app: CadApp, clip: Clipboard, mouseW: Vec2): n
         it.html, it.rotationRad);
       count++;
     }
+
   }
   return count;
 }
