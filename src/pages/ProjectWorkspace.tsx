@@ -184,7 +184,7 @@ export default function ProjectWorkspace() {
   // "Frei platzieren": Bei aktivem Toggle wird der Import-Maßstab beim Import
   // automatisch so gewählt, dass das Dokument vollständig mit reichlich Rand
   // auf der aktiven Seite liegt (überschreibt docScale nur für diesen Import).
-  const [docFreePlace, setDocFreePlace] = useState<boolean>(false);
+  const [docFreePlace, setDocFreePlace] = useState<boolean>(true);
   const [selectedElementIds, setSelectedElementIds] = useState<string[]>([]);
   // `selectedElementId` ist das ZULETZT angeklickte Element — alle bestehenden
   // Lese-Stellen (Inspector etc.) benutzen es weiterhin. Bei Multi-Auswahl
