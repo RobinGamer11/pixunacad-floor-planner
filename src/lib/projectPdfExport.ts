@@ -67,10 +67,17 @@ function buildUnits(
 
 /** Nimmt DOM-Snapshot einer bereits gerenderten Seite anhand data-page-id. */
 async function snapshotPageElement(pageId: string, dpi: number): Promise<HTMLCanvasElement> {
-  // Kurz warten, damit React + CAD-Engine gerendert haben.
-  await waitFrames(4);
-  const el = document.querySelector<HTMLElement>(`[data-page-id="${pageId}"]`);
+  // Warten, bis genau diese Seite im DOM steht (Seitenwechsel + React-Render)
+  // und die CAD-Engine mindestens einen Frame gezeichnet hat.
+  let el: HTMLElement | null = null;
+  for (let i = 0; i < 60; i++) {
+    el = document.querySelector<HTMLElement>(`[data-page-id="${pageId}"]`);
+    if (el && el.getBoundingClientRect().width > 1) break;
+    await waitFrames(2);
+  }
   if (!el) throw new Error(`Seite ${pageId} ist im DOM nicht sichtbar.`);
+  await waitFrames(6);
+
   const rectPx = el.getBoundingClientRect();
   // html2canvas skaliert intern; wir wählen scale so, dass Ausgabewert der
   // physikalischen DPI entspricht (Seite ist in CSS-px, aber ihre reale
