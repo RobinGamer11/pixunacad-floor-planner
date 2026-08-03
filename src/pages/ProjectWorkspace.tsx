@@ -3117,6 +3117,30 @@ function ElementView({
   // Rechtsklick-Hilfslinien während einer HUB-Aktion (nur Preview, werden
   // beim Commit/Cancel wieder verworfen). Koordinaten in Prozent der Seite.
   const [guides, setGuides] = useState<Array<{ id: number; xPct: number; yPct: number }>>([]);
+  /** Rechtsklick-Strahlen: Hilfslinie vom angeklickten (Fremd-)Fangpunkt zum
+   *  aktuell gewählten Fangpunkt dieses Elements. Alle Werte in Prozent der Seite. */
+  const [rayGuides, setRayGuides] = useState<Array<{ id: number; ax: number; ay: number; bx: number; by: number }>>([]);
+  const rayGuidesRef = useRef(rayGuides);
+  rayGuidesRef.current = rayGuides;
+  /** Projiziert einen Client-Punkt auf die nächstgelegene Hilfslinie (Toleranz 10px). */
+  const snapToRayGuides = (cx: number, cy: number, pageRect: DOMRect) => {
+    let best: { x: number; y: number; d: number } | null = null;
+    for (const g of rayGuidesRef.current) {
+      const ax = pageRect.left + (g.ax / 100) * pageRect.width;
+      const ay = pageRect.top + (g.ay / 100) * pageRect.height;
+      const bx = pageRect.left + (g.bx / 100) * pageRect.width;
+      const by = pageRect.top + (g.by / 100) * pageRect.height;
+      const vx = bx - ax, vy = by - ay;
+      const len2 = vx * vx + vy * vy;
+      if (len2 < 1e-6) continue;
+      const t = ((cx - ax) * vx + (cy - ay) * vy) / len2;
+      const px = ax + vx * t, py = ay + vy * t;
+      const d = Math.hypot(cx - px, cy - py);
+      if (d <= 10 && (!best || d < best.d)) best = { x: px, y: py, d };
+    }
+    return best;
+  };
+
   // Edge-Trim: reine Vorschau (dxPx/dyPx). Commit erst bei Pointerup bzw.
   // — bei aktivem Tablet-Hilfsrad — beim Klick auf das Häkchen.
   const [edgeTrim, setEdgeTrim] = useState<{
@@ -3159,21 +3183,59 @@ function ElementView({
     return () => window.removeEventListener("pixuna:page-snap-hover", onHover as EventListener);
   }, [el.id]);
 
+  // Rechtsklick auf einen (fremden) Fangpunkt → Hilfslinie von diesem Punkt
+  // zum aktuell gewählten Fangpunkt dieses Elements. Dient als Orientierungs-
+  // und Fanglinie beim Verschieben/Drehen. ESC/ENTF verwerfen die Linien.
+  useEffect(() => {
+    if (readOnly || !selected) return;
+    const onContext = (ev: MouseEvent) => {
+      const parent = rootRef.current?.parentElement as HTMLElement | null;
+      if (!parent) return;
+      const t = ev.target as HTMLElement | null;
+      if (t?.closest("[data-hub-control]")) return;
+      const pageRect = parent.getBoundingClientRect();
+      if (
+        ev.clientX < pageRect.left || ev.clientX > pageRect.right ||
+        ev.clientY < pageRect.top || ev.clientY > pageRect.bottom
+      ) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      const m = getPageSnapRegistry().queryNearest(ev.clientX, ev.clientY, pageRect, 14, [el.id]);
+      const ax = m ? m.x : ((ev.clientX - pageRect.left) / Math.max(1, pageRect.width)) * 100;
+      const ay = m ? m.y : ((ev.clientY - pageRect.top) / Math.max(1, pageRect.height)) * 100;
+      const frac = anchorFracRef.current ?? { fx: 0.5, fy: 0.5, key: "interior" };
+      const bx = el.x + frac.fx * el.w;
+      const by = el.y + frac.fy * el.h;
+      setRayGuides((g) => [...g.slice(-3), { id: Date.now() + Math.random(), ax, ay, bx, by }]);
+    };
+    const onKey = (ev: KeyboardEvent) => {
+      if (ev.key === "Escape" || ev.key === "Delete") setRayGuides([]);
+    };
+    window.addEventListener("contextmenu", onContext, true);
+    window.addEventListener("keydown", onKey, true);
+    return () => {
+      window.removeEventListener("contextmenu", onContext, true);
+      window.removeEventListener("keydown", onKey, true);
+    };
+  }, [readOnly, selected, el.id, el.x, el.y, el.w, el.h]);
+
   useEffect(() => {
     if (selected) return;
     setHubMode(null);
     setEdgeTrim(null);
     setActiveEdge(null);
+    setRayGuides([]);
     actionCommitRef.current = null;
     actionCancelRef.current = null;
     modeStartClientRef.current = null;
     try { getPageSnapRegistry().setHover(null); } catch {}
   }, [selected]);
 
+
   useEffect(() => {
     if (!edgeTrim) return;
     const onKey = (ev: KeyboardEvent) => {
-      if (ev.key === "Escape") actionCancelRef.current?.();
+      if (ev.key === "Escape" || ev.key === "Delete") actionCancelRef.current?.();
       else if (ev.key === "Enter") actionCommitRef.current?.();
     };
     window.addEventListener("keydown", onKey);
@@ -3201,25 +3263,69 @@ function ElementView({
     e.preventDefault();
     try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
     onSelect?.({ shift: e.shiftKey });
+    const node = rootRef.current;
+    const parent = node?.parentElement as HTMLElement | null;
+    const startX = e.clientX, startY = e.clientY;
+    const frac = anchorFracRef.current ?? { fx: 0.5, fy: 0.5, key: "interior" };
+    const rect0 = node?.getBoundingClientRect();
+    const anchor0 = rect0
+      ? { x: rect0.left + frac.fx * rect0.width, y: rect0.top + frac.fy * rect0.height }
+      : { x: startX, y: startY };
+    const baseTransform = node?.style.transform ?? "";
+    let tdx = 0, tdy = 0;
+    let raf = 0;
     dragRef.current = { x: e.clientX, y: e.clientY };
+
+    const paint = () => {
+      raf = 0;
+      if (node) node.style.transform = `translate(${tdx}px, ${tdy}px) ${baseTransform}`.trim();
+    };
+
     const handleMove = (ev: PointerEvent) => {
       if (!dragRef.current) return;
-      const dx = ev.clientX - dragRef.current.x;
-      const dy = ev.clientY - dragRef.current.y;
-      onDrag?.(dx, dy, ev.altKey);
-      dragRef.current = { x: ev.clientX, y: ev.clientY };
+      tdx = ev.clientX - startX;
+      tdy = ev.clientY - startY;
+      // Fangen: Registry-Punkte anderer Elemente + Rechtsklick-Hilfslinien.
+      const pageRect = parent?.getBoundingClientRect();
+      if (pageRect) {
+        const tx = anchor0.x + tdx, ty = anchor0.y + tdy;
+        const m = getPageSnapRegistry().queryNearest(tx, ty, pageRect, 10, [el.id]);
+        if (m) {
+          tdx = pageRect.left + (m.x / 100) * pageRect.width - anchor0.x;
+          tdy = pageRect.top + (m.y / 100) * pageRect.height - anchor0.y;
+        } else {
+          const snapped = snapToRayGuides(tx, ty, pageRect);
+          if (snapped) { tdx = snapped.x - anchor0.x; tdy = snapped.y - anchor0.y; }
+        }
+      }
+      if (!raf) raf = requestAnimationFrame(paint);
     };
-    const handleUp = (ev: PointerEvent) => {
+    const finish = (commit: boolean, ev?: PointerEvent) => {
       dragRef.current = null;
-      try { (e.currentTarget as HTMLElement).releasePointerCapture(ev.pointerId); } catch {}
+      if (raf) { cancelAnimationFrame(raf); raf = 0; }
+      if (node) node.style.transform = baseTransform;
+      try { if (ev) (e.currentTarget as HTMLElement).releasePointerCapture(ev.pointerId); } catch {}
       window.removeEventListener("pointermove", handleMove);
       window.removeEventListener("pointerup", handleUp);
       window.removeEventListener("pointercancel", handleUp);
+      window.removeEventListener("keydown", handleKey, true);
+      if (commit && (tdx !== 0 || tdy !== 0)) onDrag?.(tdx, tdy, ev?.altKey);
+    };
+    const handleUp = (ev: PointerEvent) => finish(true, ev);
+    const handleKey = (ev: KeyboardEvent) => {
+      // ESC oder ENTF brechen das Verschieben ab (Ausgangslage bleibt erhalten).
+      if (ev.key !== "Escape" && ev.key !== "Delete") return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      finish(false);
+      setRayGuides([]);
     };
     window.addEventListener("pointermove", handleMove);
     window.addEventListener("pointerup", handleUp);
     window.addEventListener("pointercancel", handleUp);
+    window.addEventListener("keydown", handleKey, true);
   };
+
 
   const handlePointerDown = (e: React.PointerEvent) => {
     if (readOnly) return;
@@ -3306,7 +3412,7 @@ function ElementView({
       cleanup();
     };
     const handleKey = (ev: KeyboardEvent) => {
-      if (ev.key !== "Escape") return;
+      if (ev.key !== "Escape" && ev.key !== "Delete") return;
       ev.stopPropagation();
       ev.preventDefault();
       // Abbruch: Ausgangszustand wiederherstellen.
@@ -3435,6 +3541,8 @@ function ElementView({
           reg.setHover(m);
         } else {
           reg.setHover(null);
+          const snapped = snapToRayGuides(targetX, targetY, pageRect);
+          if (snapped) { dxPx = snapped.x - ax; dyPx = snapped.y - ay; }
         }
         setPreview({ dxPx, dyPx, deltaDeg: 0, anchorFrac });
       } else if (hubMode === "rotate") {
@@ -3495,7 +3603,7 @@ function ElementView({
       setGuides((g) => [...g, { id: Date.now() + Math.random(), xPct, yPct }]);
     };
     const onKey = (ev: KeyboardEvent) => {
-      if (ev.key === "Escape") { ev.stopPropagation(); cancel(); }
+      if (ev.key === "Escape" || ev.key === "Delete") { ev.stopPropagation(); ev.preventDefault(); cancel(); }
       else if (ev.key === "Enter") { ev.stopPropagation(); commit(); }
     };
     window.addEventListener("pointerdown", onDown, true);
@@ -4068,6 +4176,33 @@ function ElementView({
         </>,
         rootRef.current.parentElement,
       )}
+
+      {/* Rechtsklick-Strahlen: Orientierungs-/Fanglinie vom gewählten Fremd-
+         Fangpunkt bis zum aktiven Fangpunkt dieses Elements. */}
+      {rayGuides.length > 0 && rootRef.current?.parentElement && createPortal(
+        <svg
+          className="absolute inset-0 pointer-events-none"
+          style={{ width: "100%", height: "100%", zIndex: 910 }}
+          viewBox="0 0 100 100"
+          preserveAspectRatio="none"
+        >
+          {rayGuides.map((g) => (
+            <g key={g.id}>
+              <line
+                x1={g.ax} y1={g.ay} x2={g.bx} y2={g.by}
+                stroke={hubBlue}
+                strokeWidth={0.12}
+                strokeDasharray="0.9 0.7"
+                vectorEffect="non-scaling-stroke"
+                opacity={0.85}
+              />
+              <circle cx={g.ax} cy={g.ay} r={0.5} fill={hubBlue} />
+            </g>
+          ))}
+        </svg>,
+        rootRef.current.parentElement,
+      )}
+
     </div>
   );
 }
