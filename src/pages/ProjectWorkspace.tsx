@@ -6732,6 +6732,9 @@ function PrintPanel({
   const [spreadCombined, setSpreadCombined] = useState<boolean>(hasSpreads);
   const [exporting, setExporting] = useState(false);
   const [progress, setProgress] = useState<{ current: number; total: number; label: string } | null>(null);
+  // Browser-Vorschau des fertigen PDFs (Blob-URL) vor dem eigentlichen Export.
+  const [preview, setPreview] = useState<{ url: string; bytes: Uint8Array; name: string; pages: number } | null>(null);
+  useEffect(() => () => { if (preview) URL.revokeObjectURL(preview.url); }, [preview]);
 
   // Modus steuert die Auswahl-Checkboxen direkt: "Alle Seiten" hakt alle an,
   // "Nur aktuelle Seite" genau die aktive, "Bereich" den gewählten Bereich.
