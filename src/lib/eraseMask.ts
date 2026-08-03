@@ -38,7 +38,8 @@ export function buildEraseMaskCss(
   const holes = circles
     .map((c, i) => {
       const soft = c.s > 0.01;
-      const alpha = Math.max(0.02, Math.min(1, c.a ?? (soft ? 0.35 * (1 - 0.6 * Math.min(1, c.s)) : 1)));
+      const alpha = Math.max(0.015, Math.min(1, c.a ?? (soft ? 0.14 * (1 - 0.8 * Math.min(1, c.s)) : 1)));
+
       return (
         `<circle cx="${c.x.toFixed(3)}" cy="${c.y.toFixed(3)}" r="${Math.max(0.01, c.r).toFixed(3)}" ` +
         `fill="${soft ? `url(#g${i})` : "black"}" fill-opacity="${alpha.toFixed(3)}"/>`
