@@ -1649,6 +1649,16 @@ export class SelectTool {
   }
 
   private _previewRotateAngle(input: Input) {
+    // Textbox-Drehung: andere Objekte können über ihre Fangpunkte anvisiert
+    // werden (Orientierungshilfe). Der Radius bleibt fix — die Maus ist damit
+    // hart auf der Höhe/Distanz des gewählten Fangpunkts gebunden.
+    if (this.editTarget?.kind === "textboxHandle") {
+      const snap = this._findPreviewSnapForEdit(input);
+      const target = (snap && snap.world)
+        ? v(snap.world.x, snap.world.y)
+        : v(input.mouse.wx, input.mouse.wy);
+      return angleDeg(this.fixedPoint!, target);
+    }
     return angleDeg(this.fixedPoint!, v(input.mouse.wx, input.mouse.wy));
   }
 
