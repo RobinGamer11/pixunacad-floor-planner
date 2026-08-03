@@ -3183,6 +3183,16 @@ function ElementView({
     return best;
   };
 
+  /** Fangpunkt-Suche über BEIDE Quellen: Seiten-Elemente (pageSnap) und die
+   *  eingebettete CAD-Engine (Linien, Freihand, Texte, Schraffuren, Dokumente). */
+  const findSnap = (cx: number, cy: number, pageRect: DOMRect, tol = 12) => {
+    const m = getPageSnapRegistry().queryNearest(cx, cy, pageRect, tol, [el.id]);
+    if (m) return { x: m.x, y: m.y, match: m };
+    const e = queryCadEngineSnap(cx, cy, pageRect, tol);
+    if (e) return { x: e.x, y: e.y, match: null };
+    return null;
+  };
+
   // Edge-Trim: reine Vorschau (dxPx/dyPx). Commit erst bei Pointerup bzw.
   // — bei aktivem Tablet-Hilfsrad — beim Klick auf das Häkchen.
   const [edgeTrim, setEdgeTrim] = useState<{
@@ -3245,7 +3255,7 @@ function ElementView({
       ) return;
       ev.preventDefault();
       ev.stopPropagation();
-      const m = getPageSnapRegistry().queryNearest(ev.clientX, ev.clientY, pageRect, 14, [el.id]);
+      const m = findSnap(ev.clientX, ev.clientY, pageRect, 14);
       const ax = m ? m.x : ((ev.clientX - pageRect.left) / Math.max(1, pageRect.width)) * 100;
       const ay = m ? m.y : ((ev.clientY - pageRect.top) / Math.max(1, pageRect.height)) * 100;
       const frac = anchorFracRef.current ?? { fx: 0.5, fy: 0.5, key: "interior" };
@@ -3592,13 +3602,13 @@ function ElementView({
         let dyPx = startClient ? ev.clientY - startClient.y : ev.clientY - ay;
         const targetX = ax + dxPx;
         const targetY = ay + dyPx;
-        const m = reg.queryNearest(targetX, targetY, pageRect, 10, [el.id]);
+        const m = findSnap(targetX, targetY, pageRect, 12);
         if (m) {
           const snapPx = pageRect.left + (m.x / 100) * pageRect.width;
           const snapPy = pageRect.top + (m.y / 100) * pageRect.height;
           dxPx = snapPx - ax;
           dyPx = snapPy - ay;
-          reg.setHover(m);
+          reg.setHover(m.match);
         } else {
           reg.setHover(null);
           const snapped = snapToRayGuides(targetX, targetY, pageRect);
@@ -3609,11 +3619,11 @@ function ElementView({
         // Zielpunkt anvisieren: Fangpunkte anderer Objekte und Rechtsklick-
         // Hilfslinien ziehen den Rotations-Strahl exakt auf den Punkt.
         let tx = ev.clientX, ty = ev.clientY;
-        const mR = reg.queryNearest(tx, ty, pageRect, 12, [el.id]);
+        const mR = findSnap(tx, ty, pageRect, 12);
         if (mR) {
           tx = pageRect.left + (mR.x / 100) * pageRect.width;
           ty = pageRect.top + (mR.y / 100) * pageRect.height;
-          reg.setHover(mR);
+          reg.setHover(mR.match);
         } else {
           reg.setHover(null);
           const snapped = snapToRayGuides(tx, ty, pageRect);
@@ -3674,7 +3684,7 @@ function ElementView({
       ev.preventDefault();
       ev.stopPropagation();
       const pageRect = parent.getBoundingClientRect();
-      const m = getPageSnapRegistry().queryNearest(ev.clientX, ev.clientY, pageRect, 14, [el.id]);
+      const m = findSnap(ev.clientX, ev.clientY, pageRect, 14);
       const xPct = m ? m.x : ((ev.clientX - pageRect.left) / Math.max(1, pageRect.width)) * 100;
       const yPct = m ? m.y : ((ev.clientY - pageRect.top) / Math.max(1, pageRect.height)) * 100;
       setGuides((g) => [...g, { id: Date.now() + Math.random(), xPct, yPct }]);
