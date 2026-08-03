@@ -3215,7 +3215,7 @@ function ElementView({
   /** CAD-Blatt-Drehen: Achse durch die beiden oberen Fangpunkte + fixierte
    *  Cursor-Position auf dieser Achse. Alle Werte in Prozent der Seite. */
   const [rotAxis, setRotAxis] = useState<
-    { ax: number; ay: number; bx: number; by: number; mx: number; my: number } | null
+    { ax: number; ay: number; bx: number; by: number; mx: number; my: number; deg: number } | null
   >(null);
 
   /** Projiziert einen Client-Punkt auf die nächstgelegene Hilfslinie (Toleranz 10px). */
@@ -3690,6 +3690,8 @@ function ElementView({
           const snapped = snapToRayGuides(tx, ty, pageRect);
           if (snapped) { tx = snapped.x; ty = snapped.y; }
         }
+        // Zu nah am Drehpunkt → Winkel wäre extrem sprunghaft, daher ignorieren.
+        if (Math.hypot(ty - ay, tx - ax) < 24) return;
         const a = (Math.atan2(ty - ay, tx - ax) * 180) / Math.PI;
         if (startAngle === null) startAngle = a;
         let delta = a - startAngle;
@@ -3711,13 +3713,13 @@ function ElementView({
           const tl = rot(r.left, r.top);
           const tr = rot(r.left + r.width, r.top);
           const vx = tr.x - tl.x, vy = tr.y - tl.y;
-          const len2 = vx * vx + vy * vy;
-          let mx = ev.clientX, my = ev.clientY;
-          if (len2 > 1e-6) {
-            const t = ((ev.clientX - tl.x) * vx + (ev.clientY - tl.y) * vy) / len2;
-            mx = tl.x + vx * t;
-            my = tl.y + vy * t;
-          }
+          // Cursor hart auf Höhe des ausgewählten Fangpunkts fixieren: der
+          // Marker sitzt exakt auf dem weiter entfernten oberen Fangpunkt,
+          // die Achse verläuft durch beide oberen Fangpunkte.
+          const dTl = Math.hypot(tl.x - ax, tl.y - ay);
+          const dTr = Math.hypot(tr.x - ax, tr.y - ay);
+          const ref = dTr >= dTl ? tr : tl;
+          const mx = ref.x, my = ref.y;
           const toPct = (cx: number, cy: number) => ({
             x: ((cx - pageRect.left) / Math.max(1, pageRect.width)) * 100,
             y: ((cy - pageRect.top) / Math.max(1, pageRect.height)) * 100,
@@ -3727,7 +3729,8 @@ function ElementView({
           const A = toPct(tl.x - vx * ext, tl.y - vy * ext);
           const B = toPct(tr.x + vx * ext, tr.y + vy * ext);
           const M = toPct(mx, my);
-          setRotAxis({ ax: A.x, ay: A.y, bx: B.x, by: B.y, mx: M.x, my: M.y });
+          const shown = ((startRot + delta) % 360 + 360) % 360;
+          setRotAxis({ ax: A.x, ay: A.y, bx: B.x, by: B.y, mx: M.x, my: M.y, deg: shown });
         }
       }
 
@@ -4439,6 +4442,7 @@ function ElementView({
       {/* CAD-Blatt drehen: Achse durch die beiden oberen Fangpunkte, der
          Cursor sitzt fixiert auf dieser Linie. Linksklick setzt das Blatt. */}
       {rotAxis && rootRef.current?.parentElement && createPortal(
+        <>
         <svg
           className="absolute inset-0 pointer-events-none"
           style={{ width: "100%", height: "100%", zIndex: 915 }}
@@ -4454,7 +4458,19 @@ function ElementView({
             opacity={0.9}
           />
           <circle cx={rotAxis.mx} cy={rotAxis.my} r={0.55} fill="hsl(var(--accent-gold))" />
-        </svg>,
+        </svg>
+        <div
+          className="absolute pointer-events-none rounded-md border border-border bg-card/95 px-2 py-0.5 text-[11px] font-medium tabular-nums text-foreground shadow-sm"
+          style={{
+            left: `${rotAxis.mx}%`,
+            top: `${rotAxis.my}%`,
+            transform: "translate(12px, -140%)",
+            zIndex: 916,
+          }}
+        >
+          {rotAxis.deg.toFixed(1)}°
+        </div>
+        </>,
         rootRef.current.parentElement,
       )}
 
