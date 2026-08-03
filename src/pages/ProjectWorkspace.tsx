@@ -3711,13 +3711,13 @@ function ElementView({
           const tl = rot(r.left, r.top);
           const tr = rot(r.left + r.width, r.top);
           const vx = tr.x - tl.x, vy = tr.y - tl.y;
-          const len2 = vx * vx + vy * vy;
-          let mx = ev.clientX, my = ev.clientY;
-          if (len2 > 1e-6) {
-            const t = ((ev.clientX - tl.x) * vx + (ev.clientY - tl.y) * vy) / len2;
-            mx = tl.x + vx * t;
-            my = tl.y + vy * t;
-          }
+          // Cursor hart auf Höhe des ausgewählten Fangpunkts fixieren: der
+          // Marker sitzt exakt auf dem weiter entfernten oberen Fangpunkt,
+          // die Achse verläuft durch beide oberen Fangpunkte.
+          const dTl = Math.hypot(tl.x - ax, tl.y - ay);
+          const dTr = Math.hypot(tr.x - ax, tr.y - ay);
+          const ref = dTr >= dTl ? tr : tl;
+          const mx = ref.x, my = ref.y;
           const toPct = (cx: number, cy: number) => ({
             x: ((cx - pageRect.left) / Math.max(1, pageRect.width)) * 100,
             y: ((cy - pageRect.top) / Math.max(1, pageRect.height)) * 100,
@@ -3727,7 +3727,8 @@ function ElementView({
           const A = toPct(tl.x - vx * ext, tl.y - vy * ext);
           const B = toPct(tr.x + vx * ext, tr.y + vy * ext);
           const M = toPct(mx, my);
-          setRotAxis({ ax: A.x, ay: A.y, bx: B.x, by: B.y, mx: M.x, my: M.y });
+          const shown = ((startRot + delta) % 360 + 360) % 360;
+          setRotAxis({ ax: A.x, ay: A.y, bx: B.x, by: B.y, mx: M.x, my: M.y, deg: shown });
         }
       }
 
