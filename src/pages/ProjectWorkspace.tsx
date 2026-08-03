@@ -691,8 +691,14 @@ export default function ProjectWorkspace() {
       importScaleDenom: denom,
       pdfSourceB64: first.pdfSourceB64 || null,
     });
-    let offX = firstW + 0.5;
+    // "Gesamt": alle Seiten leicht versetzt übereinander stapeln, damit sie
+    // anschließend einzeln verschoben/positioniert werden können.
+    const step = stacked ? Math.max(0.02, firstW * 0.04) : 0;
+    let offX = stacked ? step : firstW + 0.5;
+    let offY = 0;
+    let i = 0;
     for (const p of rest) {
+      i++;
       const pw = p.widthM * denom;
       const ph = p.heightM * denom;
       engine.scene.createDocument({
@@ -700,7 +706,7 @@ export default function ProjectWorkspace() {
         kind: p.kind,
         src: p.src,
         pageIndex: p.pageIndex,
-        position: { x: offX, y: 0 },
+        position: { x: offX, y: offY },
         widthM: pw,
         heightM: ph,
         pixelWidth: p.pixelWidth,
@@ -709,15 +715,13 @@ export default function ProjectWorkspace() {
         importScaleDenom: denom,
         pdfSourceB64: p.pdfSourceB64 || null,
       });
-      offX += pw + 0.5;
+      if (stacked) { offX = step * (i + 1); offY = step * (i + 1); }
+      else offX += pw + 0.5;
     }
     engine.refreshLabelUI();
   };
 
-  const handleDocumentFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    e.target.value = "";
-    if (!f) return;
+  const importPickedFile = async (f: File) => {
     setDocImporting(true);
     try {
       const pages = await importFile(f);
@@ -725,9 +729,7 @@ export default function ProjectWorkspace() {
       if (pages.length === 1) {
         placeImportedPages(pages);
       } else {
-        const all = new Set<number>();
-        pages.forEach((_, i) => all.add(i));
-        setDocPickerSelected(all);
+        setDocPickerSelected(new Set([0]));
         setDocPickerPages(pages);
       }
     } catch (err: any) {
@@ -735,6 +737,13 @@ export default function ProjectWorkspace() {
     } finally {
       setDocImporting(false);
     }
+  };
+
+  const handleDocumentFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    e.target.value = "";
+    if (!f) return;
+    await importPickedFile(f);
   };
 
   // Nach Rückkehr aus der CAD-Oberfläche: falls dort ein Zeichenblatt
