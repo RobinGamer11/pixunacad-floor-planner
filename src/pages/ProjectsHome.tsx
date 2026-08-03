@@ -262,7 +262,8 @@ export default function ProjectsHome() {
 
           {newProjectOpen && (
             <div
-              className="absolute left-0 top-full mt-2 w-72 rounded-xl border shadow-lg z-30 p-3"
+              /* fixed, damit die horizontal scrollbare Kopfzeile nicht abschneidet */
+              className="fixed left-6 top-16 mt-2 w-72 rounded-xl border shadow-lg z-50 p-3"
               style={{ background: "hsl(var(--surface))", borderColor: "hsl(var(--hairline))" }}
             >
               {newProjectMode === "choice" ? (
@@ -422,7 +423,9 @@ export default function ProjectsHome() {
 
           {profileOpen && (
             <div
-              className="absolute right-0 top-full mt-2 w-80 rounded-xl border shadow-lg z-30 p-4"
+              /* fixed statt absolute: die Kopfzeile scrollt horizontal
+                 (overflow-x-auto) und würde ein absolutes Panel abschneiden. */
+              className="fixed right-6 top-16 mt-2 w-80 rounded-xl border shadow-lg z-50 p-4"
               style={{ background: "hsl(var(--surface))", borderColor: "hsl(var(--hairline))" }}
             >
               <div className="flex items-center gap-4">
