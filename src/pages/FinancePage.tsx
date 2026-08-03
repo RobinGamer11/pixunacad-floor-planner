@@ -7,7 +7,7 @@ import { exportElementToA4Pdf } from "@/lib/financePdfExport";
 import {
   financeStore, childrenOf, positionsOf, nodeTotals, projectTotals, actionTotals,
   control, formatEur, formatPct,
-  type FinanceNode, type FinanceState, type FinanceTotals,
+  type FinanceNode, type FinanceState, type FinanceTotals, type FinancePosition,
 } from "@/lib/financeStore";
 import { FinanceSummaryCard } from "@/components/finance/FinanceSummaryCard";
 import { FinancePositionsTable } from "@/components/finance/FinancePositionsTable";
