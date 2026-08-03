@@ -2818,7 +2818,8 @@ function PageCanvas({
               if (lx + rMm < 0 || lx - rMm > ew || ly + rMm < 0 || ly - rMm > eh) continue;
               const prev = el.eraseCircles ?? [];
               const last = prev[prev.length - 1];
-              const smooth = mode === "smooth";
+              // Smooth wirkt nur auf Rasterbilder (PNG/JPG).
+              const smooth = mode === "smooth" && el.kind === "image";
               const s = smooth ? soft : 0;
               const str = Math.max(0.1, Math.min(1, strength ?? 1));
               // Smooth: pro Stempel nur minimal abtragen → Verweilen radiert voll.
@@ -5333,7 +5334,7 @@ function ToolsTab({
       )}
       {settingsTool === "eraser" && cadEngine && (
         <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
-          <EraserSettingsPanel app={cadEngine} />
+          <EraserSettingsPanel app={cadEngine} rasterSelection={selectedElement ? selectedElement.kind === "image" : null} />
         </div>
       )}
       {settingsTool === "hatch" && cadEngine && (
