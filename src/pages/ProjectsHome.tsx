@@ -1786,17 +1786,21 @@ export function AufgabenView({ project }: { project: Project }) {
               {notes.categories.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
-          {mappen.length > 0 && (
-            <select
-              value={draft.mappeId}
-              onChange={(e) => setDraft({ ...draft, mappeId: e.target.value })}
-              className="h-9 px-2 rounded-md border bg-transparent text-sm outline-none"
-              style={{ borderColor: "hsl(var(--hairline))" }}
-              title="Projektmappe zuordnen"
-            >
-              {mappen.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-            </select>
-          )}
+          {/* Zielprojekt: standardmäßig das aktuell geöffnete Projekt. Wird ein
+              anderes Projekt gewählt, landet die Aufgabe dort in der Schnellablage. */}
+          <select
+            value={draft.projectId}
+            onChange={(e) => setDraft({ ...draft, projectId: e.target.value })}
+            className="h-9 px-2 rounded-md border bg-transparent text-sm outline-none"
+            style={{ borderColor: "hsl(var(--hairline))" }}
+            title="Projekt zuordnen"
+          >
+            {allProjects.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}{p.id === project.id ? " (aktuell)" : ""}
+              </option>
+            ))}
+          </select>
           <button
             onClick={addTask}
             className="h-9 px-4 rounded-md text-sm font-medium flex items-center justify-center gap-1 self-end"
