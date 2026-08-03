@@ -2036,10 +2036,20 @@ export class CadApp {
       if (e.key === "Delete" || e.key === "Backspace") {
         // Läuft gerade eine Bearbeitung (Verschieben/Drehen/Resize)? Dann bricht
         // ENTF diese Aktion ab (wie ESC) statt etwas zu löschen.
-        if (this.activeTool === this.selectTool && (this.selectTool as any).editTarget) {
+        const st: any = this.selectTool as any;
+        if (this.activeTool === this.selectTool &&
+            (st.editTarget || st.rotateTextBoxId || st.dragTextBoxId || st.dragDocId || st.dragFreeStrokeId || st.dragDimId)) {
           e.preventDefault();
+          e.stopPropagation();
           this.selectTool.cancel();
           this.pointEditMenu.hide();
+          return;
+        }
+        // Textwerkzeug mit laufender Platzierung: Vorschau verwerfen.
+        if (this.activeTool === this.textTool && (this.textTool as any).phase !== undefined
+            && (this.textTool as any).phase !== "idle") {
+          e.preventDefault();
+          this.textTool.cancel();
           return;
         }
         // Marquee-Auswahl hat Vorrang: mehrere Elemente in einem Rutsch löschen.
