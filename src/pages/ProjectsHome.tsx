@@ -429,7 +429,8 @@ export default function ProjectsHome() {
               style={{ background: "hsl(var(--surface))", borderColor: "hsl(var(--hairline))" }}
             >
               <div className="flex items-center gap-4">
-                <div className="relative">
+                <div className="flex flex-col items-center">
+                  <div className="relative">
                   <ProfileAvatar profile={profile} count={projectCount} max={MAX_PROJECTS} size={72} large />
                   <label
                     className="absolute -bottom-1 -right-1 h-7 w-7 rounded-full border shadow flex items-center justify-center cursor-pointer"
@@ -451,6 +452,10 @@ export default function ProjectsHome() {
                       }}
                     />
                   </label>
+                  </div>
+                  <div className="mt-1.5 text-[10px] font-semibold whitespace-nowrap" style={{ color: "hsl(var(--ink-soft))" }}>
+                    {projectCount} / {MAX_PROJECTS}
+                  </div>
                 </div>
                 <div className="flex-1 min-w-0">
                   <input
@@ -1235,14 +1240,6 @@ function ProfileAvatar({
         }}
         title={profile.status}
       />
-      {large && (
-        <div
-          className="absolute left-1/2 -translate-x-1/2 text-[10px] font-semibold whitespace-nowrap"
-          style={{ top: "100%", marginTop: 6, color: "hsl(var(--ink-soft))" }}
-        >
-          {count} / {max}
-        </div>
-      )}
     </div>
   );
 }
