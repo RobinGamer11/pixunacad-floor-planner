@@ -61,7 +61,7 @@ const Pixuna = () => (
   </span>
 );
 
-type Tab = "uebersicht" | "seiten" | "aufgaben" | "dokumente" | "infos" | "team";
+type Tab = "uebersicht" | "seiten" | "aufgaben" | "finanzen" | "dokumente" | "infos" | "team";
 type DokumenteSubTab = "dateien" | "fotos";
 
 export default function ProjectsHome() {
