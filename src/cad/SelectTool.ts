@@ -1659,17 +1659,28 @@ export class SelectTool {
   private _previewRotateAngle(input: Input) {
     // Drehen: Fangpunkte anderer Objekte werden nicht nur anvisiert, sondern
     // wirklich gefangen — der Winkel zeigt exakt auf den Fangpunkt.
-    // Shift rastet zusätzlich auf 45°-Schritte (0/45/90/…).
+    // Shift rastet zusätzlich auf exakte 45°-Schritte (0/45/90/135/…).
+    const shift = !!(input.keys?.shift || (this.app as any).input?.keys?.shift);
     let target = v(input.mouse.wx, input.mouse.wy);
-    const snap = this._findPreviewSnapForEdit(input);
-    if (snap && snap.world) target = v(snap.world.x, snap.world.y);
+    if (!shift) {
+      const snap = this._findPreviewSnapForEdit(input);
+      if (snap && snap.world) target = v(snap.world.x, snap.world.y);
+    }
 
     let ang = angleDeg(this.fixedPoint!, target);
-    if (input.keys?.shift) {
+    if (shift) {
+      // Absolutes Raster: gilt über beliebig viele Drehintervalle hinweg.
       ang = ((Math.round(ang / 45) * 45) % 360 + 360) % 360;
     }
+    this.rotateGuide = {
+      pivot: v(this.fixedPoint!.x, this.fixedPoint!.y),
+      radius: dist(this.fixedPoint!, this.otherPointOriginal || target),
+      angleDeg: ang,
+      snapped: shift,
+    };
     return ang;
   }
+
 
 
 
