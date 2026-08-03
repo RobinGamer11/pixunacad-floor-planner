@@ -1513,6 +1513,7 @@ export const projectStore = {
     if (!cur) return;
     const prev = h.past.pop()!;
     h.future.push(cur);
+    lastPushAt.delete(projectId);
     _suspendHistory = true;
     try {
       state = { ...state, projects: state.projects.map((p) => (p.id === projectId ? prev : p)) };
@@ -1529,6 +1530,7 @@ export const projectStore = {
     if (!cur) return;
     const next = h.future.pop()!;
     h.past.push(cur);
+    lastPushAt.delete(projectId);
     _suspendHistory = true;
     try {
       state = { ...state, projects: state.projects.map((p) => (p.id === projectId ? next : p)) };
