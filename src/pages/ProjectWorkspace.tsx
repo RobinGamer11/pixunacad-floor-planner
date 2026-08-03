@@ -321,11 +321,14 @@ export default function ProjectWorkspace() {
 
     if (pageEl) {
       const r = pageEl.getBoundingClientRect();
+      // Freier Zoom: Ratios werden NICHT auf das Blatt geklemmt. Liegt der
+      // Cursor außerhalb der Seite (graue Fläche), bleibt trotzdem exakt der
+      // Punkt unter der Maus stehen, statt an die Blattkante zu springen.
       return {
         kind: "page",
         pageId: pageEl.dataset.pageId ?? "",
-        xRatio: r.width > 0 ? clampUnit((clientX - r.left) / r.width) : 0.5,
-        yRatio: r.height > 0 ? clampUnit((clientY - r.top) / r.height) : 0.5,
+        xRatio: r.width > 0 ? (clientX - r.left) / r.width : 0.5,
+        yRatio: r.height > 0 ? (clientY - r.top) / r.height : 0.5,
         clientX,
         clientY,
       };
@@ -342,6 +345,7 @@ export default function ProjectWorkspace() {
       my,
     };
   };
+
 
   const applyZoomAnchor = () => {
     const viewport = canvasViewportRef.current;
