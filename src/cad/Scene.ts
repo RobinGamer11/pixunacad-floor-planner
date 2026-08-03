@@ -433,6 +433,11 @@ export class DocumentObject {
       ? anchors
           .map((a) => ({ x: Math.max(0, Math.min(1, a?.x ?? 0)), y: Math.max(0, Math.min(1, a?.y ?? 0)) }))
       : [];
+    this.warpCorners = Array.isArray(warpCorners) && warpCorners.length === 4
+      ? warpCorners.map((c) => ({ x: Number(c?.x) || 0, y: Number(c?.y) || 0 }))
+      : null;
+    this.flipX = !!flipX;
+    this.flipY = !!flipY;
   }
 }
 
