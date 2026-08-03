@@ -1964,30 +1964,30 @@ function ToolRailButton({
 
 function DocumentPagePickerDialog({
   pages,
-  selected,
-  onToggle,
-  onSelectAll,
-  onSelectNone,
+  selectedIndex,
+  onSelect,
   onCancel,
   onConfirm,
 }: {
   pages: ImportedPage[];
-  selected: Set<number>;
-  onToggle: (index: number) => void;
-  onSelectAll: () => void;
-  onSelectNone: () => void;
+  selectedIndex: number;
+  onSelect: (index: number) => void;
   onCancel: () => void;
-  onConfirm: () => void;
+  onConfirm: (mode: "single" | "all") => void;
 }) {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-6" style={{ background: "hsl(var(--ink) / 0.32)" }}>
       <div className="w-full max-w-2xl rounded-md border p-4 shadow-xl" style={{ background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" }}>
-        <div className="text-sm font-semibold mb-3">Seiten auswählen</div>
+        <div className="text-sm font-semibold mb-1">Seite auswählen</div>
+        <p className="text-[11px] text-muted-foreground mb-3">
+          Dieses PDF hat {pages.length} Seiten. Wähle genau eine Seite — oder importiere das
+          gesamte Dokument: alle Seiten werden leicht versetzt übereinander abgelegt.
+        </p>
         <div className="max-h-[60vh] overflow-y-auto grid grid-cols-3 gap-3 p-1">
           {pages.map((p, i) => {
-            const checked = selected.has(i);
+            const checked = selectedIndex === i;
             return (
-              <button key={`${p.name}-${i}`} type="button" onClick={() => onToggle(i)} className="relative rounded-md border-2 overflow-hidden" style={{ borderColor: checked ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))" }}>
+              <button key={`${p.name}-${i}`} type="button" onClick={() => onSelect(i)} className="relative rounded-md border-2 overflow-hidden" style={{ borderColor: checked ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))" }}>
                 <img src={p.src} alt={p.name} className="w-full h-32 object-contain" style={{ background: "hsl(var(--surface-muted))" }} />
                 <div className="text-[10px] p-1 text-center truncate" style={{ background: "hsl(var(--surface-muted))" }}>Seite {i + 1}</div>
                 {checked && <div className="absolute top-1 right-1 w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold" style={{ background: "hsl(var(--accent-gold))", color: "hsl(var(--surface-card))" }}>✓</div>}
@@ -1996,10 +1996,9 @@ function DocumentPagePickerDialog({
           })}
         </div>
         <div className="flex justify-end gap-2 pt-4">
-          <button type="button" onClick={onSelectNone} className="h-8 px-3 rounded-md border text-xs" style={{ borderColor: "hsl(var(--hairline))" }}>Keine</button>
-          <button type="button" onClick={onSelectAll} className="h-8 px-3 rounded-md border text-xs" style={{ borderColor: "hsl(var(--hairline))" }}>Alle</button>
           <button type="button" onClick={onCancel} className="h-8 px-3 rounded-md border text-xs" style={{ borderColor: "hsl(var(--hairline))" }}>Abbrechen</button>
-          <button type="button" onClick={onConfirm} disabled={selected.size === 0} className="h-8 px-3 rounded-md text-xs font-semibold disabled:opacity-50" style={{ background: "hsl(var(--accent-gold))", color: "hsl(var(--surface-card))" }}>{selected.size} importieren</button>
+          <button type="button" onClick={() => onConfirm("all")} className="h-8 px-3 rounded-md border text-xs" style={{ borderColor: "hsl(var(--hairline))" }}>Gesamtes Dokument ({pages.length} Seiten)</button>
+          <button type="button" onClick={() => onConfirm("single")} className="h-8 px-3 rounded-md text-xs font-semibold" style={{ background: "hsl(var(--accent-gold))", color: "hsl(var(--surface-card))" }}>Seite {selectedIndex + 1} importieren</button>
         </div>
       </div>
     </div>
