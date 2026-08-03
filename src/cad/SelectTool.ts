@@ -1657,23 +1657,20 @@ export class SelectTool {
   }
 
   private _previewRotateAngle(input: Input) {
-    // Textbox- und Wand-Drehung: andere Objekte können über ihre Fangpunkte
-    // anvisiert werden (Orientierungshilfe, inkl. Rechtsklick-Hilfslinien).
-    // Der Radius bleibt fix — die Maus ist damit hart auf der Höhe/Distanz
-    // des gewählten Fangpunkts gebunden.
-    const useSnapTarget = this.editTarget?.kind === "textboxHandle" || this.editTarget?.kind === "wall";
+    // Drehen: Fangpunkte anderer Objekte werden nicht nur anvisiert, sondern
+    // wirklich gefangen — der Winkel zeigt exakt auf den Fangpunkt.
+    // Shift rastet zusätzlich auf 45°-Schritte (0/45/90/…).
     let target = v(input.mouse.wx, input.mouse.wy);
-    if (useSnapTarget) {
-      const snap = this._findPreviewSnapForEdit(input);
-      if (snap && snap.world) target = v(snap.world.x, snap.world.y);
-    }
+    const snap = this._findPreviewSnapForEdit(input);
+    if (snap && snap.world) target = v(snap.world.x, snap.world.y);
+
     let ang = angleDeg(this.fixedPoint!, target);
-    // Wand: Shift fängt auf 45°-Raster (0/45/90/…).
-    if (this.editTarget?.kind === "wall" && input.keys?.shift) {
-      ang = Math.round(ang / 45) * 45;
+    if (input.keys?.shift) {
+      ang = ((Math.round(ang / 45) * 45) % 360 + 360) % 360;
     }
     return ang;
   }
+
 
 
   update(input: Input) {
