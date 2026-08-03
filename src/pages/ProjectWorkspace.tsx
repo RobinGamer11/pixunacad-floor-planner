@@ -3235,7 +3235,7 @@ function ElementView({
   useEffect(() => {
     if (!edgeTrim) return;
     const onKey = (ev: KeyboardEvent) => {
-      if (ev.key === "Escape") actionCancelRef.current?.();
+      if (ev.key === "Escape" || ev.key === "Delete") actionCancelRef.current?.();
       else if (ev.key === "Enter") actionCommitRef.current?.();
     };
     window.addEventListener("keydown", onKey);
@@ -3412,7 +3412,7 @@ function ElementView({
       cleanup();
     };
     const handleKey = (ev: KeyboardEvent) => {
-      if (ev.key !== "Escape") return;
+      if (ev.key !== "Escape" && ev.key !== "Delete") return;
       ev.stopPropagation();
       ev.preventDefault();
       // Abbruch: Ausgangszustand wiederherstellen.
@@ -3541,6 +3541,8 @@ function ElementView({
           reg.setHover(m);
         } else {
           reg.setHover(null);
+          const snapped = snapToRayGuides(targetX, targetY, pageRect);
+          if (snapped) { dxPx = snapped.x - ax; dyPx = snapped.y - ay; }
         }
         setPreview({ dxPx, dyPx, deltaDeg: 0, anchorFrac });
       } else if (hubMode === "rotate") {
@@ -3601,7 +3603,7 @@ function ElementView({
       setGuides((g) => [...g, { id: Date.now() + Math.random(), xPct, yPct }]);
     };
     const onKey = (ev: KeyboardEvent) => {
-      if (ev.key === "Escape") { ev.stopPropagation(); cancel(); }
+      if (ev.key === "Escape" || ev.key === "Delete") { ev.stopPropagation(); ev.preventDefault(); cancel(); }
       else if (ev.key === "Enter") { ev.stopPropagation(); commit(); }
     };
     window.addEventListener("pointerdown", onDown, true);
