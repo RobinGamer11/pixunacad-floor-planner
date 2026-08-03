@@ -4005,13 +4005,16 @@ function ElementView({
 
       {el.kind === "pdf" && (
         <WarpedContent corners={el.warpCorners}>
-          {el.pdfSourceB64 ? (
-            <PdfPageView sourceB64={el.pdfSourceB64} pageIndex={el.pdfPageIndex ?? 0} />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground" style={{ background: "hsl(var(--surface-muted))" }}>PDF</div>
-          )}
+          <div className="w-full h-full" style={buildEraseMaskCss(el.eraseCircles, el.wMm ?? 0, el.hMm ?? 0)}>
+            {el.pdfSourceB64 ? (
+              <PdfPageView sourceB64={el.pdfSourceB64} pageIndex={el.pdfPageIndex ?? 0} />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground" style={{ background: "hsl(var(--surface-muted))" }}>PDF</div>
+            )}
+          </div>
         </WarpedContent>
       )}
+
 
       {/* Photoshop-artige Ecken-/Kanten-Verzerrung: aktive Handles nur, wenn
           Bild/PDF selektiert ist UND der Nutzer im Inspector „Verzerren" an
