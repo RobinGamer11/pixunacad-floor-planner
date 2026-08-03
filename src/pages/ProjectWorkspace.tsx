@@ -799,13 +799,14 @@ export default function ProjectWorkspace() {
   }, [projectId]);
 
 
-  const confirmDocumentPagePicker = () => {
+  const confirmDocumentPagePicker = (mode: "single" | "all") => {
     if (!docPickerPages) return;
-    const selected = docPickerPages.filter((_, i) => docPickerSelected.has(i));
+    const all = docPickerPages;
+    const idx = docPickerSelected.values().next().value ?? 0;
     setDocPickerPages(null);
     setDocPickerSelected(new Set());
-    if (selected.length === 0) return;
-    placeImportedPages(selected);
+    if (mode === "all") placeImportedPages(all, true);
+    else placeImportedPages([all[idx]]);
   };
 
 
