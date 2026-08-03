@@ -4442,6 +4442,7 @@ function ElementView({
       {/* CAD-Blatt drehen: Achse durch die beiden oberen Fangpunkte, der
          Cursor sitzt fixiert auf dieser Linie. Linksklick setzt das Blatt. */}
       {rotAxis && rootRef.current?.parentElement && createPortal(
+        <>
         <svg
           className="absolute inset-0 pointer-events-none"
           style={{ width: "100%", height: "100%", zIndex: 915 }}
