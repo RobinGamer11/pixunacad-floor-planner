@@ -118,8 +118,7 @@ export class EraserTool {
     this._hatchStamps = [];
     if (!stamps.length || !pc?.difference) return;
     const scene = this.app.scene;
-    // Ein einziger zusammenhängender Radierbereich: Kreise + Verbindungsbänder
-    // zwischen aufeinanderfolgenden Positionen, zu einer Fläche vereinigt.
+
     const parts: any[] = [];
     for (let i = 0; i < stamps.length; i++) {
       parts.push([this._circleRing(stamps[i].c, stamps[i].r)]);
