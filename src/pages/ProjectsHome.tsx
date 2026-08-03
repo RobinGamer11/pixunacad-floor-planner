@@ -78,8 +78,9 @@ export default function ProjectsHome() {
     () => projects.filter((p) => !p.isTemplate),
     [projects]
   );
-  const [showAllTasks, setShowAllTasks] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | undefined>(visibleProjects[0]?.id);
+  // Startseite öffnet zuerst die projektübergreifende Aufgabenübersicht.
+  const [showAllTasks, setShowAllTasks] = useState(true);
+  const [selectedId, setSelectedId] = useState<string | undefined>(undefined);
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<Tab>("uebersicht");
   const headerScrollRef = useDragScroll<HTMLElement>();
