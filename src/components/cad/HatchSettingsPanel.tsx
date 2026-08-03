@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Spline, RectangleHorizontal, Circle, PaintBucket } from "lucide-react";
+import { Spline, RectangleHorizontal, Circle, PaintBucket, Waves } from "lucide-react";
 import type { CadApp } from "@/cad/CadApp";
 import type { MiniCad } from "@/cad/embed/MiniCad";
 import type { HatchDrawMode } from "@/cad/HatchTool";
