@@ -2898,8 +2898,9 @@ function PageCanvas({
   if (bare) return inner;
   return (
     <div
-      className="min-h-full flex items-start justify-center"
-      style={{ padding: "100vh 100vw" }}
+      className="min-h-full flex items-start justify-start"
+      style={{ padding: "200vh 200vw" }}
+
     >
       {inner}
     </div>
