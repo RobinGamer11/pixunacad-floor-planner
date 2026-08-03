@@ -766,9 +766,13 @@ export default function ProjectWorkspace() {
   // per Tastatur bedienbar (Projektmappe und CAD gleichermaßen).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Delete") return;
+      if (e.key !== "Delete" && e.key !== "Escape") return;
       const t = e.target as HTMLElement | null;
       if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      // Läuft eine Vorschau-Aktion (Verschieben/Drehen/Trimmen)? Dann bricht
+      // ENTF/ESC diese immer sofort ab und verwirft alle Vorschau-Änderungen.
+      if (runActiveAborts()) { e.preventDefault(); e.stopPropagation(); return; }
+      if (e.key !== "Delete") return;
       if (selectedElementIds.length === 0 && cadSelectionCount === 0) return;
       // Wenn ausschließlich CAD-Auswahl existiert, überlassen wir es dem
       // MiniCad-eigenen Handler (der bereits den passenden Scene-Kontext hat).
@@ -776,8 +780,9 @@ export default function ProjectWorkspace() {
       e.preventDefault();
       runDeleteSelection();
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedElementIds, cadSelectionCount, activePage?.id, project?.id]);
 
