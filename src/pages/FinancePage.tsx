@@ -12,7 +12,7 @@ import { FinanceSummaryCard } from "@/components/finance/FinanceSummaryCard";
 import { FinancePositionsTable } from "@/components/finance/FinancePositionsTable";
 import {
   Plus, PanelLeftClose, PanelLeftOpen, ChevronRight, ChevronDown,
-  Folder, Building2, ArrowRight, ToggleLeft, ToggleRight, Home,
+  Folder, Building2, ArrowRight, ToggleLeft, ToggleRight, Home, Trash2,
 } from "lucide-react";
 
 function useFinance(projectId?: string): FinanceState {
@@ -88,10 +88,16 @@ export default function FinancePage() {
               : <Building2 size={13} style={{ color: "hsl(var(--ink-soft))" }} />}
             <span className="truncate flex-1">{n.name}</span>
             <button
-              title={n.enabled ? "In Summen berücksichtigt" : "Nicht in Summen"}
-              onClick={(e) => { e.stopPropagation(); financeStore.updateNode(pid, n.id, { enabled: !n.enabled }); }}
-              className="opacity-0 group-hover:opacity-100 shrink-0">
-              {n.enabled ? <ToggleRight size={14} /> : <ToggleLeft size={14} />}
+              title={n.type === "overview" ? "Übersicht löschen" : "Aktion löschen"}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!confirm(`„${n.name}" wirklich löschen?`)) return;
+                financeStore.deleteNode(pid, n.id);
+                setSelectedId((cur) => (cur === n.id ? null : cur));
+              }}
+              className="opacity-0 group-hover:opacity-100 shrink-0"
+              style={{ color: "hsl(var(--ink-soft))" }}>
+              <Trash2 size={13} />
             </button>
           </div>
           {open && kids.length > 0 && renderTree(n.id, depth + 1)}
@@ -166,6 +172,19 @@ export default function FinancePage() {
                  style={{ color: "hsl(var(--ink-soft))" }}>
               {selected ? (selected.type === "action" ? "Aktion" : "Übersicht") : "Projekt"}
             </div>
+            <div className="flex-1" />
+            {selected && (
+              <button
+                onClick={() => {
+                  if (!confirm(`„${selected.name}" wirklich löschen?`)) return;
+                  financeStore.deleteNode(pid, selected.id);
+                  setSelectedId(null);
+                }}
+                className="h-7 w-7 rounded flex items-center justify-center opacity-40 hover:opacity-100 hover:bg-muted"
+                title={selected.type === "action" ? "Aktion löschen" : "Übersicht löschen"}>
+                <Trash2 size={14} />
+              </button>
+            )}
           </div>
 
           <div className="p-4 space-y-4">

@@ -52,6 +52,7 @@ import { WeatherStrip } from "@/components/project/WeatherStrip";
 import { UebersichtView } from "@/components/project/UebersichtView";
 import { FileBrowser } from "@/components/project/FileBrowser";
 import { PageThumb } from "@/components/project/PageThumb";
+import { FinanceProjectOverview } from "@/components/finance/FinanceProjectOverview";
 import { geocodeSearch, type GeoHit } from "@/lib/weather";
 
 const Pixuna = () => (
@@ -61,7 +62,7 @@ const Pixuna = () => (
   </span>
 );
 
-type Tab = "uebersicht" | "seiten" | "aufgaben" | "dokumente" | "infos" | "team";
+type Tab = "uebersicht" | "seiten" | "aufgaben" | "finanzen" | "dokumente" | "infos" | "team";
 type DokumenteSubTab = "dateien" | "fotos";
 
 export default function ProjectsHome() {
@@ -1009,9 +1010,10 @@ export default function ProjectsHome() {
                   {(
                     [
                       ["uebersicht", "Übersicht", false],
-                      ["seiten", "Mappe", false],
                       ["aufgaben", "Aufgaben", false],
+                      ["finanzen", "Finanzen", false],
                       ["dokumente", "Dokumente", false],
+                      ["seiten", "Mappe", false],
                       ["infos", "Informationen", false],
                       ["team", "Team", true],
                     ] as const
@@ -1050,6 +1052,9 @@ export default function ProjectsHome() {
                 <SeitenView project={selected} onAddPage={handleAddPage} />
               )}
               {tab === "aufgaben" && <AufgabenView project={selected} />}
+              {tab === "finanzen" && (
+                <FinanceProjectOverview projectId={selected.id} projectName={selected.name} />
+              )}
               {tab === "dokumente" && (
                 <div className="mt-4">
                   <div className="inline-flex items-center gap-1 rounded-md p-0.5 mb-4"
