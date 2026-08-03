@@ -2487,8 +2487,10 @@ function PageCanvas({
         {/* Margin overlay (light grey ring) */}
         {marginPx > 0 && (
           <div
+            data-page-margin-overlay=""
             className="absolute inset-0 pointer-events-none"
             style={{
+
               borderTop: `${marginPx}px solid hsl(0 0% 92%)`,
               borderBottom: `${marginPx}px solid hsl(0 0% 92%)`,
               borderLeft: `${marginPx}px solid hsl(0 0% 92%)`,
