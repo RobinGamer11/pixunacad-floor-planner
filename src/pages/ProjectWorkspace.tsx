@@ -2766,7 +2766,7 @@ function PageCanvas({
             // Welt-Meter → Papier-mm; trifft CAD-Blatt-Elemente auf dieser Seite.
             const mmX = c.x * 1000, mmY = c.y * 1000, rMm = rM * 1000;
             for (const el of page.elements) {
-              if (el.kind !== "cad-view" && el.kind !== "cad-viewport") continue;
+              if (el.kind !== "cad-view" && el.kind !== "cad-viewport" && el.kind !== "pdf" && el.kind !== "image") continue;
               const ex = el.xMm ?? 0, ey = el.yMm ?? 0;
               const ew = el.wMm ?? 0, eh = el.hMm ?? 0;
               if (ew <= 0 || eh <= 0) continue;
@@ -3965,10 +3965,11 @@ function ElementView({
             src={el.imageUrl}
             alt=""
             className="w-full h-full object-cover"
-            style={{ background: "hsl(var(--surface-muted))" }}
+            style={{ background: "hsl(var(--surface-muted))", ...buildEraseMaskCss(el.eraseCircles, el.wMm ?? 0, el.hMm ?? 0) }}
           />
         </WarpedContent>
       )}
+
       {el.kind === "note" && (
         <div
           className="w-full h-full p-3 text-sm"
@@ -4004,13 +4005,16 @@ function ElementView({
 
       {el.kind === "pdf" && (
         <WarpedContent corners={el.warpCorners}>
-          {el.pdfSourceB64 ? (
-            <PdfPageView sourceB64={el.pdfSourceB64} pageIndex={el.pdfPageIndex ?? 0} />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground" style={{ background: "hsl(var(--surface-muted))" }}>PDF</div>
-          )}
+          <div className="w-full h-full" style={buildEraseMaskCss(el.eraseCircles, el.wMm ?? 0, el.hMm ?? 0)}>
+            {el.pdfSourceB64 ? (
+              <PdfPageView sourceB64={el.pdfSourceB64} pageIndex={el.pdfPageIndex ?? 0} />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground" style={{ background: "hsl(var(--surface-muted))" }}>PDF</div>
+            )}
+          </div>
         </WarpedContent>
       )}
+
 
       {/* Photoshop-artige Ecken-/Kanten-Verzerrung: aktive Handles nur, wenn
           Bild/PDF selektiert ist UND der Nutzer im Inspector „Verzerren" an
