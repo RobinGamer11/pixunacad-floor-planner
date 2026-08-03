@@ -51,6 +51,35 @@ function colorArrayToHex(arr: any): string {
   return "#000000";
 }
 
+/** Grauwert (0..1) → Hex. */
+function grayToHex(v: any): string {
+  const g = Math.max(0, Math.min(255, Math.round((typeof v === "number" ? v : 0) * 255)));
+  const h = g.toString(16).padStart(2, "0");
+  return `#${h}${h}${h}`;
+}
+
+/** CMYK (0..1) → Hex. */
+function cmykToHex(c: any, m: any, y: any, k: any): string {
+  const f = (v: any) => (typeof v === "number" ? Math.max(0, Math.min(1, v)) : 0);
+  const cc = f(c), mm = f(m), yy = f(y), kk = f(k);
+  const h = (v: number) => Math.max(0, Math.min(255, Math.round(255 * (1 - v) * (1 - kk)))).toString(16).padStart(2, "0");
+  return `#${h(cc)}${h(mm)}${h(yy)}`;
+}
+
+/** Generische Farb-Args (setFillColor/setFillColorN) → Hex, sonst null. */
+function genericColorToHex(a: any[]): string | null {
+  if (!a) return null;
+  const nums = a.filter((v) => typeof v === "number");
+  if (nums.length === 1) return grayToHex(nums[0]);
+  if (nums.length === 3) {
+    // 0..1 oder 0..255 heuristisch unterscheiden.
+    const scale = nums.every((v) => v <= 1) ? 255 : 1;
+    return colorArrayToHex(nums.map((v) => v * scale));
+  }
+  if (nums.length === 4) return cmykToHex(nums[0], nums[1], nums[2], nums[3]);
+  return null;
+}
+
 /**
  * Extrahiert Vektor-Inhalte einer PDF-Seite. Koordinaten bleiben im
  * PDF-User-Space (bottom-left, Punkte). Der Caller mappt sie in Welt-m.
