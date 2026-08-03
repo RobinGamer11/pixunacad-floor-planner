@@ -77,21 +77,22 @@ export const FinancePositionsTable: React.FC<Props> = ({ projectId, nodeId, posi
               <GripVertical size={14} style={{ color: "hsl(var(--ink-soft))" }} />
             </span>
 
-            <div className="flex items-center gap-1.5 min-w-0 pr-2">
-              <FileText size={14} style={{ color: isPlus ? "hsl(24 95% 50%)" : isMinus ? "hsl(142 70% 34%)" : "hsl(var(--ink-soft))" }} />
+            <div className="flex items-center gap-1 min-w-0 pr-2">
+              <FileText size={14} className="shrink-0" style={{ color: isPlus ? "hsl(24 95% 50%)" : isMinus ? "hsl(142 70% 34%)" : "hsl(var(--ink-soft))" }} />
               {p.type === "supplement" ? (
                 <select
                   value={p.supplementKind ?? "plus"}
                   onChange={(e) => upd(p.id, { supplementKind: e.target.value as "plus" | "minus" })}
-                  className="bg-transparent text-sm outline-none border rounded px-1 py-0.5 max-w-full"
+                  title={isMinus ? "Mindernachtrag" : "Mehrnachtrag"}
+                  className="bg-transparent text-[11px] outline-none border rounded px-0.5 py-0.5 min-w-0 flex-1 truncate"
                   style={{ borderColor: "hsl(var(--hairline))" }}>
-                  <option value="plus">Mehrnachtrag</option>
-                  <option value="minus">Mindernachtrag</option>
+                  <option value="plus">Mehrnachtr.</option>
+                  <option value="minus">Mindernachtr.</option>
                 </select>
               ) : (
-                <span className="truncate">{TYPE_LABEL[p.type]}</span>
+                <span className="truncate flex-1">{TYPE_LABEL[p.type]}</span>
               )}
-              <span className="text-sm tabular-nums" style={{ color: "hsl(var(--ink-soft))" }}>
+              <span className="text-xs tabular-nums shrink-0" style={{ color: "hsl(var(--ink-soft))" }}>
                 {numberOf.get(p.id)}
               </span>
             </div>
