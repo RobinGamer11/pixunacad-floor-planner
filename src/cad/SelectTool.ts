@@ -120,6 +120,8 @@ export class SelectTool {
   dragTextBoxId: string | null = null;
   dragTextBoxGrabOffset: Vec2 | null = null; // mouseStart - center
   dragTextBoxSnap: Snap | null = null;
+  /** Winkel-Hilfslinie beim Drehen (Overlay-Anzeige inkl. Grad). */
+  rotateGuide: { pivot: { x: number; y: number }; radius: number; angleDeg: number; snapped: boolean } | null = null;
   rotateTextBoxId: string | null = null;
   rotateTextBoxStartAngle = 0; // initial mouse angle (rad) at rotate-begin
   rotateTextBoxOriginalRot = 0; // box.rotationRad at rotate-begin
