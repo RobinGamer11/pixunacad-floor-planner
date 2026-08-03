@@ -101,6 +101,10 @@ export interface PageElement {
   /** Verzerr-Achse: `'free'` = beide Achsen frei, `'x'` = nur horizontal
    *  (dx wirkt, dy = 0), `'y'` = nur vertikal. Default `'free'`. */
   warpAxis?: "free" | "x" | "y";
+  /** Radiergummi-Spuren auf dem Element (CAD-Blatt/Bild/PDF).
+   *  x/y/r in Element-lokalen Papier-Millimetern, s = Weichheit 0..1. */
+  eraseCircles?: { x: number; y: number; r: number; s: number }[];
+
 
   /** Tabellen-Datenmodell (kind === "table"). */
   tableData?: {

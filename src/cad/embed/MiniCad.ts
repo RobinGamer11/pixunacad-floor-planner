@@ -185,6 +185,10 @@ export class MiniCad {
   defaultEraserStrength: number = Defaults.eraserStrength;
   defaultEraserMode: "hard" | "smooth" = Defaults.eraserMode;
   defaultEraserSoftness: number = Defaults.eraserSoftness;
+  /** Hook: wird bei jedem Radier-Stempel aufgerufen (Welt-m). Erlaubt externen
+   *  Objekten (z. B. CAD-Blatt in der Projektmappe) mitzuradieren. */
+  onEraseStroke: ((centerM: { x: number; y: number }, radiusM: number, mode: "hard" | "smooth", softness: number, strength: number) => void) | null = null;
+
 
   // Schraffur-Defaults (analog CadApp).
   defaultHatchFillColor: string = Defaults.hatchFillColor;
