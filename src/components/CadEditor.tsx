@@ -16,6 +16,7 @@ import { EraserSettingsPanel } from "@/components/cad/EraserSettingsPanel";
 import { WallSettingsPanel } from "@/components/cad/WallSettingsPanel";
 
 import { DocumentFilterPanel } from "@/components/cad/DocumentFilterPanel";
+import { WarpSection } from "@/components/page/CadDocumentInspector";
 
 const CAD_TOOLS = [
   { id: ToolIds.SELECT, label: "Auswahl", key: "V", icon: MousePointer2 },
@@ -2867,7 +2868,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           )}
 
           {/* Document-Eigenschaften: nur im Auswahl-Tool, wenn Dokument selektiert */}
-          {!!docSelected && (activeTool === ToolIds.SELECT || (activeTool === ToolIds.DOCUMENT && (docToolPhase === "scale-pick-1" || docToolPhase === "scale-pick-2" || docToolPhase === "scale-await-input"))) && (
+          {!!docSelected && (activeTool === ToolIds.SELECT || (activeTool === ToolIds.DOCUMENT && (docToolPhase === "scale-pick-1" || docToolPhase === "scale-pick-2" || docToolPhase === "scale-await-input" || docToolPhase === "warp"))) && (
             <div className="cad-settings-panel mb-2">
               <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Dokument-Eigenschaften</div>
               <div className="space-y-3">
@@ -3013,6 +3014,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                   <AnchorIcon className="h-4 w-4" />
                   <span className="text-xs">Anker +/−</span>
                 </button>
+
+                <WarpSection engine={appRef.current} docId={docSelected.id} />
 
                 <DocumentFilterPanel app={appRef.current} docId={docSelected.id} sig={docFilterSig} />
 
