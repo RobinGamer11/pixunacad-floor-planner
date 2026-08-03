@@ -248,7 +248,7 @@ function WarpSection({ engine, docId }: { engine: MiniCad; docId: string }) {
       style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
     >
       <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-        Verzerren &amp; Spiegeln
+        Bild verzerren
       </div>
 
       <button
