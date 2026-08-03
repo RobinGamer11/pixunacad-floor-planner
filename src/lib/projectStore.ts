@@ -673,6 +673,7 @@ function changeSignature(a: Project, b: Project): string {
 }
 
 function setState(updater: (s: State) => Partial<State>) {
+  if ((globalThis as any).__pxDbg) console.trace('[pxDbg setState]');
   const prev = state;
   const prevById = new Map(prev.projects.map((p) => [p.id, p] as const));
   state = { ...state, ...updater(state) };
