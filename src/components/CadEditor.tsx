@@ -2548,7 +2548,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
 
           {/* Eraser-Tool-Panel */}
           {activeTool === ToolIds.ERASER && (
-            <EraserSettingsPanel app={appRef.current} />
+            <EraserSettingsPanel app={appRef.current} variant="cad" />
           )}
 
           {/* Marquee-Modus des Auswahl-Werkzeugs liegt jetzt als Flyout links

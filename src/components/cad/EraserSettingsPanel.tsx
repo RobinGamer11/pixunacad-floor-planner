@@ -3,22 +3,32 @@ import type { CadApp } from "@/cad/CadApp";
 import type { MiniCad } from "@/cad/embed/MiniCad";
 import { resetDocMask } from "@/cad/documentMask";
 
-interface Props { app: CadApp | MiniCad | null; }
+interface Props {
+  app: CadApp | MiniCad | null;
+  /** "cad" = große Dimensionierung (Mitte 1000 mm, max 2000 mm) mit Prozentanzeige. */
+  variant?: "cad" | "workspace";
+}
 
-/** Nichtlineare Größen-Skala: 0.2 mm … 80 mm (Mitte) … 200 mm. */
+/** Nichtlineare Größen-Skala. Projektmappe: 0,2 mm … 80 mm (Mitte) … 200 mm. */
 const R_MIN = 0.0002, R_MID = 0.08, R_MAX = 0.2;
-const sliderToRadius = (t: number) =>
-  t <= 0.5 ? R_MIN * Math.pow(R_MID / R_MIN, t / 0.5) : R_MID * Math.pow(R_MAX / R_MID, (t - 0.5) / 0.5);
-const radiusToSlider = (r: number) => {
-  const v = Math.max(R_MIN, Math.min(R_MAX, r));
-  return v <= R_MID
-    ? 0.5 * (Math.log(v / R_MIN) / Math.log(R_MID / R_MIN))
-    : 0.5 + 0.5 * (Math.log(v / R_MID) / Math.log(R_MAX / R_MID));
-};
+/** CAD-Blatt: 2 mm … 1000 mm (Mitte) … 2000 mm. */
+const CAD_R_MIN = 0.002, CAD_R_MID = 1, CAD_R_MAX = 2;
 
+const makeScale = (min: number, mid: number, max: number) => ({
+  toRadius: (t: number) =>
+    t <= 0.5 ? min * Math.pow(mid / min, t / 0.5) : mid * Math.pow(max / mid, (t - 0.5) / 0.5),
+  toSlider: (r: number) => {
+    const v = Math.max(min, Math.min(max, r));
+    return v <= mid
+      ? 0.5 * (Math.log(v / min) / Math.log(mid / min))
+      : 0.5 + 0.5 * (Math.log(v / mid) / Math.log(max / mid));
+  },
+});
 
-export const EraserSettingsPanel: React.FC<Props> = ({ app }) => {
-  const [radius, setRadius] = useState(0.03);
+export const EraserSettingsPanel: React.FC<Props> = ({ app, variant = "workspace" }) => {
+  const isCad = variant === "cad";
+  const scale = isCad ? makeScale(CAD_R_MIN, CAD_R_MID, CAD_R_MAX) : makeScale(R_MIN, R_MID, R_MAX);
+  const [radius, setRadius] = useState(isCad ? 0.2 : 0.03);
   const [strength, setStrength] = useState(1);
   const [mode, setMode] = useState<"hard" | "smooth">("hard");
   const [softness, setSoftness] = useState(0.5);
@@ -32,6 +42,7 @@ export const EraserSettingsPanel: React.FC<Props> = ({ app }) => {
     setSoftness(app.defaultEraserSoftness ?? 0.5);
     setHasRuler(!!app.scene.rulerGuide);
   }, [app]);
+
 
   if (!app) return null;
 
@@ -65,12 +76,15 @@ export const EraserSettingsPanel: React.FC<Props> = ({ app }) => {
       <div className="space-y-3">
         <label className="block text-xs">
           <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
-            Größe: {(radius * 1000).toFixed(radius * 1000 < 1 ? 2 : radius * 1000 < 10 ? 1 : 0)} mm
+            {isCad
+              ? `Größe: ${Math.round(scale.toSlider(radius) * 100)} %`
+              : `Größe: ${(radius * 1000).toFixed(radius * 1000 < 1 ? 2 : radius * 1000 < 10 ? 1 : 0)} mm`}
           </span>
-          <input type="range" min={0} max={1} step={0.001} value={radiusToSlider(radius)}
-            onChange={(e) => { const v = sliderToRadius(parseFloat(e.target.value)); setRadius(v); app.defaultEraserRadiusM = v; }}
+          <input type="range" min={0} max={1} step={0.001} value={scale.toSlider(radius)}
+            onChange={(e) => { const v = scale.toRadius(parseFloat(e.target.value)); setRadius(v); app.defaultEraserRadiusM = v; }}
             className="w-full" />
         </label>
+
 
 
         <div className="text-xs">
