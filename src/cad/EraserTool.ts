@@ -1,3 +1,4 @@
+import * as polygonClipping from "polygon-clipping";
 import { Defaults, SelectionType } from "./constants";
 import { Vec2, v, dist, projectPointToSegment, pointInPolygon } from "./geometry";
 import type { CadApp } from "./CadApp";
@@ -6,6 +7,7 @@ import type { Segment, FreeStroke } from "./Scene";
 import { splitPolylineByCircle, splitSegmentByCircle, projectPointToInfiniteLineFromTwoPoints } from "./freeGeom";
 import { eraseDocCircle } from "./documentMask";
 import { RulerDragController } from "./rulerInteraction";
+
 
 /**
  * Radiergummi-Werkzeug (Hotkey: E).
