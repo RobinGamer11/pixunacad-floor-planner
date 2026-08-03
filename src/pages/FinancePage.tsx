@@ -289,7 +289,7 @@ const ProjectView: React.FC<{ projectId: string; state: FinanceState; projectNam
 const ChildList: React.FC<{
   projectId: string; state: FinanceState; nodes: FinanceNode[];
   onSelect: (id: string) => void; deep?: boolean;
-}> = ({ projectId, state, nodes, onSelect, deep }) => {
+}> = ({ projectId, state, nodes, onSelect }) => {
   const [open, setOpen] = useState<Record<string, boolean>>({});
   if (nodes.length === 0) {
     return (
