@@ -1547,42 +1547,6 @@ export default function ProjectWorkspace() {
               ref={canvasViewportRef}
               className="flex-1 overflow-hidden relative"
               style={{ touchAction: "pan-x pan-y" }}
-              onWheel={(e) => {
-                if ((window as any).__pixunaZoomLock) { if (e.cancelable) e.preventDefault(); return; }
-                if (e.shiftKey && !e.altKey) {
-                  return;
-                }
-                const container = e.currentTarget as HTMLDivElement;
-                let dy = e.deltaY;
-                if (e.deltaMode === 1) dy *= 16;
-                if (e.deltaMode === 2) dy *= container.clientHeight;
-                if (Math.abs(dy) > 60) {
-                  const sign = dy < 0 ? -1 : 1;
-                  dy = sign * (60 + Math.log2(Math.abs(dy) / 60 + 1) * 40);
-                }
-                let sensitivity = 0.00055;
-                if (e.altKey) sensitivity = 0.0012;
-                else if (e.ctrlKey || e.metaKey) sensitivity = 0.00042;
-                const factor = Math.exp(-dy * sensitivity);
-                // rAF-coalescing: mehrere Wheel-Ticks pro Frame in EINE
-                // Zoom-Aktualisierung zusammenfassen (verhindert Ruckeln).
-                wheelAccumRef.current *= factor;
-                wheelAnchorRef.current = { x: e.clientX, y: e.clientY };
-                if (!wheelRafRef.current) {
-                  wheelRafRef.current = requestAnimationFrame(() => {
-                    wheelRafRef.current = 0;
-                    const f = wheelAccumRef.current;
-                    wheelAccumRef.current = 1;
-                    const a = wheelAnchorRef.current;
-                    const current = zoomRef.current;
-                    const next = clampProjectZoom(current * f);
-                    if (Math.abs(next - current) < 0.002) return;
-                    if (a) zoomAnchorRef.current = captureZoomAnchor(a.x, a.y);
-                    setZoom(next);
-                  });
-                }
-                if (e.cancelable) e.preventDefault();
-              }}
               onPointerDown={(e) => {
                 // Pan nur via Mittelmaus oder Alt+Links — sonst würde ein Links-Klick
                 // im Auswahlmodus die Auswahl der eingebetteten CAD-Engine abfangen.
