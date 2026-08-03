@@ -67,6 +67,41 @@ export default function FinancePage() {
   );
   const pid = projectId ?? "";
 
+  /* ---- Filter (linkes Fenster, Treffer im obersten Projektordner) ---- */
+  const [filterQuery, setFilterQuery] = useState("");
+  const [filterTypes, setFilterTypes] = useState<FilterKey[]>([]);
+  const filterActive = filterQuery.trim() !== "" || filterTypes.length > 0;
+  // Sobald gefiltert wird, öffnet sich automatisch der oberste Projektordner.
+  useEffect(() => { if (filterActive) setSelectedId(null); }, [filterActive, filterQuery, filterTypes]);
+
+  const filterHits = useMemo(() => {
+    if (!filterActive) return [];
+    const q = filterQuery.trim().toLowerCase();
+    const nodeById = new Map(state.nodes.map((n) => [n.id, n]));
+    const pathOf = (nodeId: string): string => {
+      const parts: string[] = [];
+      let cur = nodeById.get(nodeId);
+      while (cur) { parts.unshift(cur.name); cur = cur.parentId ? nodeById.get(cur.parentId) : undefined; }
+      return parts.join(" › ");
+    };
+    const hits: { pos: typeof state.positions[number]; label: string; path: string; nodeId: string }[] = [];
+    for (const node of state.nodes) {
+      const counters: Record<string, number> = {};
+      for (const p of positionsOf(state, node.id)) {
+        const k = keyOf(p);
+        counters[k] = (counters[k] ?? 0) + 1;
+        const label = `${FILTER_LABEL[k]} ${String(counters[k]).padStart(2, "0")}`;
+        if (filterTypes.length > 0 && !filterTypes.includes(k)) continue;
+        if (q) {
+          const hay = [label, p.number, p.note, node.name, node.note].join(" ").toLowerCase();
+          if (!hay.includes(q)) continue;
+        }
+        hits.push({ pos: p, label, path: pathOf(node.id), nodeId: node.id });
+      }
+    }
+    return hits;
+  }, [state, filterActive, filterQuery, filterTypes]);
+
   /* ---- PDF-Export des rechten Detailfensters (DIN A4) ---- */
   const exportRef = useRef<HTMLDivElement | null>(null);
   const [exporting, setExporting] = useState(false);
