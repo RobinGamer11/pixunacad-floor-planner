@@ -16,7 +16,7 @@ import { applyBgRemovalToCanvas, bgRemovalSignature } from "./documentBgRemove";
 
 import { computeHealedWallLines } from "./wallHeal";
 import { getWallUnionGroups } from "./wallUnion";
-import { buildHealedWallSolidRing, ringToPCPolygon } from "./wallSolid";
+import { buildHealedWallSolidRing, buildWallSolidRing, ringToPCPolygon } from "./wallSolid";
 import { drawDoor } from "./doorGeom";
 import { type MultiPolygon } from "polygon-clipping";
 
@@ -1086,6 +1086,27 @@ export class Renderer {
           ctx.stroke();
         }
         ctx.restore();
+      } else if (it.kind === "wall") {
+        const ring = buildWallSolidRing({
+          corners: it.corners, thicknessM: it.thicknessM, referenceSide: it.referenceSide,
+        } as any);
+        if (ring.length >= 3) {
+          ctx.save();
+          ctx.beginPath();
+          const r0 = cam.worldToScreen(ring[0].x, ring[0].y);
+          ctx.moveTo(r0.x, r0.y);
+          for (let i = 1; i < ring.length; i++) {
+            const rp = cam.worldToScreen(ring[i].x, ring[i].y);
+            ctx.lineTo(rp.x, rp.y);
+          }
+          ctx.closePath();
+          ctx.fillStyle = it.fillColor || Defaults.wallFillColorOuter;
+          ctx.fill();
+          ctx.strokeStyle = it.color || Defaults.lineColor;
+          ctx.lineWidth = this._scaledStrokePx(1);
+          ctx.stroke();
+          ctx.restore();
+        }
       } else if (it.kind === "dimension") {
         this._drawSingleDimension(ctx, cam, it as any, false);
       } else if (it.kind === "textbox") {

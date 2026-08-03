@@ -33,6 +33,7 @@ export class StickerTool {
   selHatchIds = new Set<string>();
   selDimensionIds = new Set<string>();
   selTextBoxIds = new Set<string>();
+  selWallIds = new Set<string>();
 
   /** Callback to UI to refresh count display etc. */
   onSelectionChange?: () => void;
@@ -83,7 +84,7 @@ export class StickerTool {
   }
 
   getSelectionCount(): number {
-    return this.selSegmentIds.size + this.selHatchIds.size + this.selDimensionIds.size + this.selTextBoxIds.size;
+    return this.selSegmentIds.size + this.selHatchIds.size + this.selDimensionIds.size + this.selTextBoxIds.size + this.selWallIds.size;
   }
 
   /** Speichert die aktuelle Multi-Select-Sammlung als neuen Sticker. */
@@ -93,6 +94,7 @@ export class StickerTool {
       hatchIds: this.selHatchIds,
       dimensionIds: this.selDimensionIds,
       textBoxIds: this.selTextBoxIds,
+      wallIds: this.selWallIds,
     }, name);
     if (def) {
       this._clearSelectionSets();
@@ -107,6 +109,7 @@ export class StickerTool {
     this.selHatchIds.clear();
     this.selDimensionIds.clear();
     this.selTextBoxIds.clear();
+    this.selWallIds.clear();
   }
 
   /** Wird aus CadApp aufgerufen, wenn ein Sticker aus der Library zur Platzierung gewählt wird. */
@@ -318,6 +321,7 @@ export class StickerTool {
     else if (hit.kind === "hatch") this._toggleSet(this.selHatchIds, hit.id);
     else if (hit.kind === "dimension") this._toggleSet(this.selDimensionIds, hit.id);
     else if (hit.kind === "textbox") this._toggleSet(this.selTextBoxIds, hit.id);
+    else if (hit.kind === "wall") this._toggleSet(this.selWallIds, hit.id);
     this.onSelectionChange?.();
   }
 
@@ -326,7 +330,7 @@ export class StickerTool {
   }
 
   /** Hit-Test über alle Objekttypen (vereinfachte Variante des SelectTool). */
-  private _hitTestAny(input: Input): { kind: "segment" | "hatch" | "dimension" | "textbox"; id: string } | null {
+  private _hitTestAny(input: Input): { kind: "segment" | "hatch" | "dimension" | "textbox" | "wall"; id: string } | null {
     const mouseW = v(input.mouse.wx, input.mouse.wy);
     const mouseS = v(input.mouse.sx, input.mouse.sy);
     const cam = this.app.camera;
@@ -356,6 +360,22 @@ export class StickerTool {
       if (px <= Defaults.hitPx && px < bestScore) {
         bestScore = px;
         best = { kind: "dimension", id: dim.id };
+      }
+    }
+
+    // Wände: Treffer auf der Bezugspolylinie (Toleranz = halbe Wanddicke).
+    for (const wall of this.app.scene.walls) {
+      if (!this.app.labelManager.isVisible(wall.labelId)) continue;
+      if (!wall.corners || wall.corners.length < 2) continue;
+      for (let i = 0; i + 1 < wall.corners.length; i++) {
+        const proj = projectPointToSegment(mouseW, wall.corners[i], wall.corners[i + 1]);
+        const distM = Math.hypot(proj.q.x - mouseW.x, proj.q.y - mouseW.y);
+        const px = distPxToWorldPoint(proj.q);
+        const insideBody = distM <= wall.thicknessM;
+        if ((insideBody || px <= Defaults.hitPx) && px < bestScore) {
+          bestScore = insideBody ? 0 : px;
+          best = { kind: "wall", id: wall.id };
+        }
       }
     }
 
@@ -512,6 +532,16 @@ export class StickerTool {
       const b = cam.worldToScreen(g.d2.x, g.d2.y);
       ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
     }
+    for (const id of this.selWallIds) {
+      const w = this.app.scene.getWallById(id);
+      if (!w || !w.corners || w.corners.length < 2) continue;
+      ctx.beginPath();
+      for (let i = 0; i < w.corners.length; i++) {
+        const p = cam.worldToScreen(w.corners[i].x, w.corners[i].y);
+        if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+      }
+      ctx.stroke();
+    }
     for (const id of this.selTextBoxIds) {
       const t = this.app.scene.getTextBoxById(id);
       if (!t) continue;
@@ -558,6 +588,16 @@ export class StickerTool {
         const a = cam.worldToScreen(g.d1.x, g.d1.y);
         const b = cam.worldToScreen(g.d2.x, g.d2.y);
         ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      }
+    } else if (hit.kind === "wall") {
+      const w = this.app.scene.getWallById(hit.id);
+      if (w && w.corners && w.corners.length >= 2) {
+        ctx.beginPath();
+        for (let i = 0; i < w.corners.length; i++) {
+          const p = cam.worldToScreen(w.corners[i].x, w.corners[i].y);
+          if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+        }
+        ctx.stroke();
       }
     } else if (hit.kind === "textbox") {
       const t = this.app.scene.getTextBoxById(hit.id);
@@ -609,6 +649,18 @@ export class StickerTool {
           if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
         }
         ctx.closePath(); ctx.stroke();
+        ctx.restore();
+      } else if (it.kind === "wall") {
+        ctx.save();
+        ctx.strokeStyle = it.color || "#111111";
+        ctx.lineWidth = Math.max(1, it.thicknessM * cam.scale);
+        ctx.globalAlpha = (ctx.globalAlpha) * 0.6;
+        ctx.beginPath();
+        for (let i = 0; i < it.corners.length; i++) {
+          const p = cam.worldToScreen(it.corners[i].x, it.corners[i].y);
+          if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+        }
+        ctx.stroke();
         ctx.restore();
       } else if (it.kind === "dimension") {
         const a = cam.worldToScreen(it.p1.x, it.p1.y);

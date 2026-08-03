@@ -28,7 +28,15 @@ interface TextBoxSnap {
   labelId: string;
 }
 
-export type ClipboardItem = SegmentSnap | HatchSnap | DimensionSnap | TextBoxSnap;
+/** Wand-Snapshot (Bezugspolylinie + Körper-Parameter). Wird u. a. von Stickern genutzt. */
+export interface WallSnap {
+  kind: "wall"; corners: Vec2[];
+  wallKind: string; thicknessM: number; referenceSide: string;
+  color: string; fillColor: string; priority: number; labelId: string;
+}
+
+export type ClipboardItem = SegmentSnap | HatchSnap | DimensionSnap | TextBoxSnap | WallSnap;
+
 
 export interface Clipboard {
   items: ClipboardItem[];
@@ -69,8 +77,10 @@ function itemCenter(it: ClipboardItem): Vec2 {
   if (it.kind === "segment") return { x: (it.a.x + it.b.x) / 2, y: (it.a.y + it.b.y) / 2 };
   if (it.kind === "hatch") return polygonCentroid(it.points);
   if (it.kind === "dimension") return { x: (it.p1.x + it.p2.x) / 2, y: (it.p1.y + it.p2.y) / 2 };
+  if (it.kind === "wall") return polygonCentroid(it.corners);
   return v(it.center.x, it.center.y);
 }
+
 
 function itemsAnchor(items: ClipboardItem[]): Vec2 {
   if (items.length === 0) return v(0, 0);
@@ -130,9 +140,11 @@ export function translatedItems(items: ClipboardItem[], dx: number, dy: number):
     if (it.kind === "segment") return translatedSegment(it, dx, dy);
     if (it.kind === "hatch") return translatedHatch(it, dx, dy);
     if (it.kind === "dimension") return translatedDim(it, dx, dy);
+    if (it.kind === "wall") return { ...it, corners: it.corners.map(p => ({ x: p.x + dx, y: p.y + dy })) };
     return translatedText(it, dx, dy);
   });
 }
+
 
 /**
  * Commit clipboard (translated) into the scene. Returns count of created objects.
@@ -164,6 +176,16 @@ export function commitClipboardAt(app: CadApp, clip: Clipboard, mouseW: Vec2): n
           textBgEnabled: it.textBgEnabled, textBgColor: it.textBgColor, textBgAlpha: it.textBgAlpha,
           labelId: it.labelId });
       count++;
+    } else if (it.kind === "wall") {
+      app.scene.createWall({
+        kind: it.wallKind as any,
+        thicknessM: it.thicknessM,
+        referenceSide: it.referenceSide as any,
+        corners: it.corners.map(p => ({ x: p.x + dx, y: p.y + dy })),
+        color: it.color, fillColor: it.fillColor,
+        priority: it.priority, labelId: it.labelId,
+      });
+      count++;
     } else {
       app.scene.createTextBox(
         { x: it.center.x + dx, y: it.center.y + dy },
@@ -172,6 +194,7 @@ export function commitClipboardAt(app: CadApp, clip: Clipboard, mouseW: Vec2): n
         it.html, it.rotationRad);
       count++;
     }
+
   }
   return count;
 }

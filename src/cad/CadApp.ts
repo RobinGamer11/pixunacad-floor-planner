@@ -1102,6 +1102,13 @@ export class CadApp {
             textBgEnabled: it.textBgEnabled, textBgColor: it.textBgColor, textBgAlpha: it.textBgAlpha,
             labelId: it.labelId,
           });
+        } else if (it.kind === "wall") {
+          this.scene.createWall({
+            kind: it.wallKind as any, thicknessM: it.thicknessM,
+            referenceSide: it.referenceSide as any,
+            corners: it.corners, color: it.color, fillColor: it.fillColor,
+            priority: it.priority, labelId: it.labelId,
+          });
         } else if (it.kind === "textbox") {
           this.scene.createTextBox(it.center, it.widthM, it.heightM, { ...(it.style || {}), labelId: it.labelId }, it.html || "", it.rotationRad || 0);
         }
@@ -1132,9 +1139,10 @@ export class CadApp {
     const ownedHatches = this.scene.hatches.filter(h => h._stickerEditOwnerId === editId);
     const ownedDims = this.scene.dimensions.filter(d => d._stickerEditOwnerId === editId);
     const ownedTexts = this.scene.textBoxes.filter(t => t._stickerEditOwnerId === editId);
+    const ownedWalls = this.scene.walls.filter(w => w._stickerEditOwnerId === editId);
 
     // Wenn alles gelöscht wurde: Edit-Mode beenden, Instanz nicht wiederherstellen.
-    const totalCount = ownedSegs.length + ownedHatches.length + ownedDims.length + ownedTexts.length;
+    const totalCount = ownedSegs.length + ownedHatches.length + ownedDims.length + ownedTexts.length + ownedWalls.length;
     if (totalCount === 0) {
       this._stickerEditInstanceId = null;
       this._stickerEditSnapshot = null;
@@ -1152,6 +1160,11 @@ export class CadApp {
     }
     for (const d of ownedDims) { sx += (d.p1.x + d.p2.x) / 2; sy += (d.p1.y + d.p2.y) / 2; n++; }
     for (const t of ownedTexts) { sx += t.center.x; sy += t.center.y; n++; }
+    for (const w of ownedWalls) {
+      let cx = 0, cy = 0;
+      for (const p of w.corners) { cx += p.x; cy += p.y; }
+      sx += cx / w.corners.length; sy += cy / w.corners.length; n++;
+    }
     const newPos = (n > 0) ? { x: sx / n, y: sy / n } : { x: snap.position.x, y: snap.position.y };
 
     // Neue Items in lokalen Koordinaten = Translation zurück um newPos (Rotation/Scale = identity, da User die Geometrie direkt bearbeitet hat).
@@ -1196,7 +1209,17 @@ export class CadApp {
       });
     }
 
+    for (const w of ownedWalls) {
+      newItems.push({
+        kind: "wall",
+        corners: w.corners.map(p => ({ x: p.x - newPos.x, y: p.y - newPos.y })),
+        wallKind: w.kind, thicknessM: w.thicknessM, referenceSide: w.referenceSide,
+        color: w.color, fillColor: w.fillColor, priority: w.priority, labelId: w.labelId,
+      });
+    }
+
     // Owner-Objekte aus Scene entfernen.
+    for (const w of ownedWalls) this.scene.removeWall(w);
     this.scene.removeSegmentsByIds(ownedSegs.map(s => s.id));
     this.scene.removeHatchesByIds(ownedHatches.map(h => h.id));
     this.scene.removeDimensionsByIds(ownedDims.map(d => d.id));
@@ -1230,6 +1253,10 @@ export class CadApp {
     for (const t of this.scene.textBoxes) if (t._stickerEditOwnerId === editId) {
       const w2 = t.widthM / 2, h2 = t.heightM / 2;
       acc(t.center.x - w2, t.center.y - h2); acc(t.center.x + w2, t.center.y + h2);
+    }
+    for (const w of this.scene.walls) if (w._stickerEditOwnerId === editId) {
+      const t2 = w.thicknessM / 2;
+      for (const p of w.corners) { acc(p.x - t2, p.y - t2); acc(p.x + t2, p.y + t2); }
     }
     if (!isFinite(minX)) return null;
     // Etwas Padding (Welt-Einheiten) damit "Klick außerhalb" nicht direkt am Rand triggert.

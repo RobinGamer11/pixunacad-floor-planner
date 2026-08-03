@@ -1657,18 +1657,24 @@ export class SelectTool {
   }
 
   private _previewRotateAngle(input: Input) {
-    // Textbox-Drehung: andere Objekte können über ihre Fangpunkte anvisiert
-    // werden (Orientierungshilfe). Der Radius bleibt fix — die Maus ist damit
-    // hart auf der Höhe/Distanz des gewählten Fangpunkts gebunden.
-    if (this.editTarget?.kind === "textboxHandle") {
+    // Textbox- und Wand-Drehung: andere Objekte können über ihre Fangpunkte
+    // anvisiert werden (Orientierungshilfe, inkl. Rechtsklick-Hilfslinien).
+    // Der Radius bleibt fix — die Maus ist damit hart auf der Höhe/Distanz
+    // des gewählten Fangpunkts gebunden.
+    const useSnapTarget = this.editTarget?.kind === "textboxHandle" || this.editTarget?.kind === "wall";
+    let target = v(input.mouse.wx, input.mouse.wy);
+    if (useSnapTarget) {
       const snap = this._findPreviewSnapForEdit(input);
-      const target = (snap && snap.world)
-        ? v(snap.world.x, snap.world.y)
-        : v(input.mouse.wx, input.mouse.wy);
-      return angleDeg(this.fixedPoint!, target);
+      if (snap && snap.world) target = v(snap.world.x, snap.world.y);
     }
-    return angleDeg(this.fixedPoint!, v(input.mouse.wx, input.mouse.wy));
+    let ang = angleDeg(this.fixedPoint!, target);
+    // Wand: Shift fängt auf 45°-Raster (0/45/90/…).
+    if (this.editTarget?.kind === "wall" && input.keys?.shift) {
+      ang = Math.round(ang / 45) * 45;
+    }
+    return ang;
   }
+
 
   update(input: Input) {
     this.app.topology.priorityWallId = this.getPriorityWallId();

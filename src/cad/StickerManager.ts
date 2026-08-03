@@ -1,7 +1,7 @@
 import { Vec2, v, polygonCentroid } from "./geometry";
 import type { CadApp } from "./CadApp";
 import type { ClipboardItem } from "./ClipboardManager";
-import type { Segment, Hatch, Dimension, TextBox } from "./Scene";
+import type { Segment, Hatch, Dimension, TextBox, Wall } from "./Scene";
 
 /**
  * Sticker = wiederverwendbare Sammlung von Objekt-Snapshots, gespeichert
@@ -57,11 +57,20 @@ function snapTextBox(t: TextBox): ClipboardItem {
     html: t.html, style: { ...t.style }, labelId: t.labelId,
   };
 }
+function snapWall(w: Wall): ClipboardItem {
+  return {
+    kind: "wall",
+    corners: w.corners.map(p => v(p.x, p.y)),
+    wallKind: w.kind, thicknessM: w.thicknessM, referenceSide: w.referenceSide,
+    color: w.color, fillColor: w.fillColor, priority: w.priority, labelId: w.labelId,
+  };
+}
 
 function itemCenter(it: ClipboardItem): Vec2 {
   if (it.kind === "segment") return { x: (it.a.x + it.b.x) / 2, y: (it.a.y + it.b.y) / 2 };
   if (it.kind === "hatch") return polygonCentroid(it.points);
   if (it.kind === "dimension") return { x: (it.p1.x + it.p2.x) / 2, y: (it.p1.y + it.p2.y) / 2 };
+  if (it.kind === "wall") return polygonCentroid(it.corners);
   return v(it.center.x, it.center.y);
 }
 
@@ -75,6 +84,7 @@ function itemsCentroid(items: ClipboardItem[]): Vec2 {
 function translateItem(it: ClipboardItem, dx: number, dy: number): ClipboardItem {
   if (it.kind === "segment") return { ...it, a: { x: it.a.x + dx, y: it.a.y + dy }, b: { x: it.b.x + dx, y: it.b.y + dy } };
   if (it.kind === "hatch") return { ...it, points: it.points.map(p => ({ x: p.x + dx, y: p.y + dy })) };
+  if (it.kind === "wall") return { ...it, corners: it.corners.map(p => ({ x: p.x + dx, y: p.y + dy })) };
   if (it.kind === "dimension") return {
     ...it,
     p1: { x: it.p1.x + dx, y: it.p1.y + dy },
@@ -94,6 +104,7 @@ function rotateItem(it: ClipboardItem, angleRad: number): ClipboardItem {
   const cs = Math.cos(angleRad), sn = Math.sin(angleRad);
   if (it.kind === "segment") return { ...it, a: rotPt(it.a, cs, sn), b: rotPt(it.b, cs, sn) };
   if (it.kind === "hatch") return { ...it, points: it.points.map(p => rotPt(p, cs, sn)) };
+  if (it.kind === "wall") return { ...it, corners: it.corners.map(p => rotPt(p, cs, sn)) };
   if (it.kind === "dimension") {
     return {
       ...it,
@@ -110,6 +121,7 @@ function rotateItem(it: ClipboardItem, angleRad: number): ClipboardItem {
     rotationRad: (it.rotationRad || 0) + angleRad,
   };
 }
+
 
 /* ---- Build sticker from current selection or label-group ---- */
 export function buildStickerFromSelection(app: CadApp, name: string): StickerDefinition | null {
@@ -140,6 +152,7 @@ export interface StickerIdSet {
   hatchIds?: Set<string> | string[];
   dimensionIds?: Set<string> | string[];
   textBoxIds?: Set<string> | string[];
+  wallIds?: Set<string> | string[];
 }
 export function buildStickerFromIds(app: CadApp, ids: StickerIdSet, name: string): StickerDefinition | null {
   const items: ClipboardItem[] = [];
@@ -152,6 +165,7 @@ export function buildStickerFromIds(app: CadApp, ids: StickerIdSet, name: string
   for (const id of hatchIds) { const h = app.scene.getHatchById(id); if (h) items.push(snapHatch(h)); }
   for (const id of dimIds) { const d = app.scene.getDimensionById(id); if (d) items.push(snapDimension(d)); }
   for (const id of tbIds) { const t = app.scene.getTextBoxById(id); if (t) items.push(snapTextBox(t)); }
+  for (const id of Array.from(ids.wallIds || [])) { const w = app.scene.getWallById(id); if (w) items.push(snapWall(w)); }
 
   return _finalizeSticker(items, name);
 }
@@ -204,8 +218,11 @@ function scaleItem(it: ClipboardItem, s: number): ClipboardItem {
     p2: { x: it.p2.x * s, y: it.p2.y * s },
     placementPoint: { x: it.placementPoint.x * s, y: it.placementPoint.y * s },
   };
+  // Wand: Bezugslinie skalieren, Dicke bleibt maßstabsgetreu mitskaliert.
+  if (it.kind === "wall") return { ...it, corners: it.corners.map(p => ({ x: p.x * s, y: p.y * s })), thicknessM: it.thicknessM * s };
   // textbox: skaliere center + Box-Dimensionen (Textgröße bleibt fix)
   return { ...it, center: { x: it.center.x * s, y: it.center.y * s }, widthM: it.widthM * s, heightM: it.heightM * s };
+
 }
 
 /** AABB der lokalen Items (für Bounding-Box-Größe; transformierbar via pos/rot/scale). */
@@ -216,6 +233,7 @@ export function localItemsBounds(items: ClipboardItem[]): { minX: number; minY: 
     if (it.kind === "segment") { acc(it.a.x, it.a.y); acc(it.b.x, it.b.y); }
     else if (it.kind === "hatch") { for (const p of it.points) acc(p.x, p.y); }
     else if (it.kind === "dimension") { acc(it.p1.x, it.p1.y); acc(it.p2.x, it.p2.y); }
+    else if (it.kind === "wall") { const t = it.thicknessM / 2; for (const p of it.corners) { acc(p.x - t, p.y - t); acc(p.x + t, p.y + t); } }
     else if (it.kind === "textbox") {
       const w2 = it.widthM / 2, h2 = it.heightM / 2;
       acc(it.center.x - w2, it.center.y - h2);
