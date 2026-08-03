@@ -3154,6 +3154,11 @@ function ElementView({
   }>({ dxPx: 0, dyPx: 0, deltaDeg: 0, anchorFrac: { x: 0.5, y: 0.5 } });
   const previewRef = useRef(preview);
   previewRef.current = preview;
+  // Pointer-Geste bleibt über Re-Renders (z. B. Ankerwechsel bei pointerdown)
+  // erhalten. Lokale Variablen gingen dabei verloren und blockierten den
+  // anschließenden Linksklick-Commit.
+  const hubDownClientRef = useRef<{ x: number; y: number } | null>(null);
+  const hubSettledRef = useRef(false);
   // "Carrying" = Objekt folgt aktiv der Maus. Linksklick während einer HUB-
   // Aktion togglet diesen Zustand: dropt das Objekt an aktueller Preview-
   // Position (carrying=false) bzw. nimmt es wieder auf (carrying=true).
@@ -3248,6 +3253,8 @@ function ElementView({
   useEffect(() => {
     if (readOnly || !selected) return;
     const onContext = (ev: MouseEvent) => {
+      // Für CAD-Blätter gibt es bewusst keine Rechtsklick-Hilfslinien.
+      if (isCadView) return;
       if (hubModeRef.current) return; // während HUB-Aktion übernimmt der Hub-Handler
       const parent = rootRef.current?.parentElement as HTMLElement | null;
       if (!parent) return;
@@ -3277,7 +3284,7 @@ function ElementView({
       window.removeEventListener("contextmenu", onContext, true);
       window.removeEventListener("keydown", onKey, true);
     };
-  }, [readOnly, selected, el.id, el.x, el.y, el.w, el.h]);
+  }, [readOnly, selected, isCadView, el.id, el.x, el.y, el.w, el.h]);
 
   useEffect(() => {
     if (selected) return;
@@ -3517,7 +3524,8 @@ function ElementView({
     const startRot = el.rotation ?? 0;
     const startClient = modeStartClientRef.current;
     let startAngle: number | null = null;
-    let downClient: { x: number; y: number } | null = null;
+    hubDownClientRef.current = null;
+    hubSettledRef.current = false;
 
     const baseRect = () => {
       const pr = parent.getBoundingClientRect();
@@ -3645,20 +3653,23 @@ function ElementView({
       }
     };
 
-    let settled = false;
-    const onDown = (ev: PointerEvent) => { downClient = { x: ev.clientX, y: ev.clientY }; };
+    const onDown = (ev: PointerEvent) => {
+      if (ev.button !== 0) return;
+      hubDownClientRef.current = { x: ev.clientX, y: ev.clientY };
+    };
     // Linksklick-Abschluss: der CAD-Canvas verschluckt teilweise das native
     // "click"-Event (preventDefault auf pointerdown), deshalb hören wir
     // zusätzlich auf pointerup und behandeln beides identisch (mit Guard,
     // damit nicht doppelt commited wird).
     const handleClickLike = (ev: MouseEvent | PointerEvent) => {
-      if (settled) return;
+      if (hubSettledRef.current) return;
       if ((ev as MouseEvent).button !== undefined && (ev as MouseEvent).button !== 0) return;
       // Nur reagieren, wenn der Klick NACH dem Start der HUB-Aktion begonnen hat
       // (sonst würde das Pointerup der Aktivierungs-Geste sofort committen).
+      const downClient = hubDownClientRef.current;
       if (!downClient) return;
-      if (downClient && Math.hypot(ev.clientX - downClient.x, ev.clientY - downClient.y) > 6) {
-        downClient = null;
+      if (Math.hypot(ev.clientX - downClient.x, ev.clientY - downClient.y) > 6) {
+        hubDownClientRef.current = null;
         return;
       }
       const t = ev.target as HTMLElement | null;
@@ -3674,8 +3685,8 @@ function ElementView({
       const wheelActive = !!(window as any).__pixunaTabletCommit;
       if (nearAnchor || !wheelActive) {
         // Ohne Tablet-Hilfsrad setzt ein einfacher Linksklick das CAD-Blatt.
-        downClient = null;
-        settled = true;
+        hubDownClientRef.current = null;
+        hubSettledRef.current = true;
         commit();
         return;
       }
@@ -3693,9 +3704,11 @@ function ElementView({
         // Rotate: Klick bricht nicht ab und commited nicht.
       }
 
-      downClient = null;
+      hubDownClientRef.current = null;
     };
     const onContext = (ev: MouseEvent) => {
+      // Rechtsklick-Fangen/Hilfslinien sind beim CAD-Blatt entfernt.
+      if (isCadView) return;
       // Rechtsklick während HUB-Aktion: Fangpunkt eines anderen Objekts anvisieren.
       // Es entsteht eine Hilfslinie (Kreuz + Strahl zum aktiven Anker), auf die
       // beim Verschieben/Drehen gefangen wird.
@@ -3736,11 +3749,12 @@ function ElementView({
       window.removeEventListener("click", onClick, true);
       window.removeEventListener("contextmenu", onContext, true);
       window.removeEventListener("keydown", onKey, true);
+      hubDownClientRef.current = null;
       unregisterHubAbort();
       if (actionCommitRef.current === commit) actionCommitRef.current = null;
       if (actionCancelRef.current === cancel) actionCancelRef.current = null;
     };
-  }, [hubMode, el.x, el.y, el.w, el.h, el.rotation, onTransform]);
+  }, [hubMode, isCadView, el.x, el.y, el.w, el.h, el.rotation, onTransform]);
 
 
   const previewTransform = (() => {
@@ -4228,12 +4242,23 @@ function ElementView({
               window.addEventListener("pointercancel", up);
             };
             const cornerClickCad = (e: React.PointerEvent) => {
+              const key = `corner-${corner}`;
+              // Ein zweiter Linksklick auf den bereits aktiven Fangpunkt setzt
+              // die laufende CAD-Blatt-Vorschau sofort ab. Der Handle ist als
+              // HUB-Control markiert und würde sonst vom globalen Commit-Handler
+              // bewusst übersprungen.
+              if (hubMode && anchorFracRef.current?.key === key) {
+                e.stopPropagation();
+                e.preventDefault();
+                actionCommitRef.current?.();
+                return;
+              }
               // Nur Anker setzen — kein Drag, keine Deselektion.
               e.stopPropagation();
               e.preventDefault();
               const fx = corner === "tl" || corner === "bl" ? 0 : 1;
               const fy = corner === "tl" || corner === "tr" ? 0 : 1;
-              setAnchor({ fx, fy, key: `corner-${corner}` });
+              setAnchor({ fx, fy, key });
               onSelect?.({ shift: e.shiftKey });
             };
             const isTop = corner === "tl" || corner === "tr";
