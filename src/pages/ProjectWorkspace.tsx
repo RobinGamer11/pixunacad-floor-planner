@@ -3212,6 +3212,12 @@ function ElementView({
   const [rayGuides, setRayGuides] = useState<Array<{ id: number; ax: number; ay: number; bx: number; by: number }>>([]);
   const rayGuidesRef = useRef(rayGuides);
   rayGuidesRef.current = rayGuides;
+  /** CAD-Blatt-Drehen: Achse durch die beiden oberen Fangpunkte + fixierte
+   *  Cursor-Position auf dieser Achse. Alle Werte in Prozent der Seite. */
+  const [rotAxis, setRotAxis] = useState<
+    { ax: number; ay: number; bx: number; by: number; mx: number; my: number } | null
+  >(null);
+
   /** Projiziert einen Client-Punkt auf die nächstgelegene Hilfslinie (Toleranz 10px). */
   const snapToRayGuides = (cx: number, cy: number, pageRect: DOMRect) => {
     let best: { x: number; y: number; d: number } | null = null;
