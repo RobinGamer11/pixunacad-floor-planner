@@ -378,13 +378,18 @@ export class EraserTool {
       }
     }
 
-    // Schraffuren: Radier-Pfad nur sammeln (Preview). Der echte boolesche
-    // Schnitt passiert erst beim Loslassen der Maus (_commitHatchErase).
+    // Schraffuren: Radier-Pfad sammeln und laufend (in kurzen Abschnitten)
+    // wirklich boolesch ausschneiden — dadurch sieht man sofort das Endergebnis.
     const lastStamp = this._hatchStamps[this._hatchStamps.length - 1];
     if (!lastStamp || dist(lastStamp.c, centerW) > r * 0.25) {
       this._hatchStamps.push({ c: v(centerW.x, centerW.y), r });
-      if (this._hatchStamps.length > 4000) this._hatchStamps.shift();
+      if (this._hatchStamps.length >= 8) {
+        const tail = this._hatchStamps[this._hatchStamps.length - 1];
+        this._commitHatchErase();
+        this._hatchStamps = [tail];
+      }
     }
+
 
 
     // Textboxen: werden entfernt, sobald der Pinsel sie trifft (Smooth = mit
