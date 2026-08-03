@@ -172,6 +172,19 @@ export default function FinancePage() {
                  style={{ color: "hsl(var(--ink-soft))" }}>
               {selected ? (selected.type === "action" ? "Aktion" : "Übersicht") : "Projekt"}
             </div>
+            <div className="flex-1" />
+            {selected && (
+              <button
+                onClick={() => {
+                  if (!confirm(`„${selected.name}" wirklich löschen?`)) return;
+                  financeStore.deleteNode(pid, selected.id);
+                  setSelectedId(null);
+                }}
+                className="h-7 w-7 rounded flex items-center justify-center opacity-40 hover:opacity-100 hover:bg-muted"
+                title={selected.type === "action" ? "Aktion löschen" : "Übersicht löschen"}>
+                <Trash2 size={14} />
+              </button>
+            )}
           </div>
 
           <div className="p-4 space-y-4">
