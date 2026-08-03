@@ -3523,6 +3523,7 @@ function ElementView({
       setHubMode(null);
       setActiveEdge(null);
       setGuides([]);
+      setRayGuides([]);
       setCarrying(true);
       actionCommitRef.current = null;
       actionCancelRef.current = null;
@@ -3534,6 +3535,7 @@ function ElementView({
       setHubMode(null);
       setActiveEdge(null);
       setGuides([]);
+      setRayGuides([]);
       setCarrying(true);
       actionCommitRef.current = null;
       actionCancelRef.current = null;
