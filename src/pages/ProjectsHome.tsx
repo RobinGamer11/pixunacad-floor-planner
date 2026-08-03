@@ -1134,14 +1134,21 @@ function ProjectCard({
         border: `1px solid ${active ? "hsl(var(--accent-gold) / 0.55)" : "rgba(255,255,255,0.04)"}`,
       }}
     >
-      <div
-        className="w-12 h-12 rounded-md shrink-0 overflow-hidden"
-        style={{ background: "#151719" }}
-      >
-        {p.thumbnail && (
-          <img src={p.thumbnail} alt="" className="w-full h-full object-cover" />
-        )}
+      <div className="w-12 h-12 shrink-0 group/thumb" style={{ perspective: "300px" }}>
+        <div
+          className="w-full h-full rounded-md overflow-hidden shadow-lg transition-transform duration-500 group-hover/thumb:[transform:rotateY(0deg)_scale(1.05)]"
+          style={{
+            background: "#151719",
+            transform: "rotateY(-18deg) rotateX(6deg)",
+            transformStyle: "preserve-3d",
+          }}
+        >
+          {p.thumbnail && (
+            <img src={p.thumbnail} alt="" className="w-full h-full object-cover" />
+          )}
+        </div>
       </div>
+
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1">
           <span className="text-xs font-semibold truncate" style={{ color: "#E6E8EB" }}>{p.name}</span>
@@ -1511,11 +1518,17 @@ function SeitenInhaltGrid({ project, onAddPage }: { project: Project; onAddPage:
           <span>Projekttitelbild</span>
           <span>Geändert: {new Date(project.updatedAt).toLocaleString("de-DE")}</span>
         </div>
+        <div className="mt-3 group" style={{ perspective: "1200px" }}>
         <div
-          className="mt-3 rounded-xl overflow-hidden aspect-[16/9] relative group"
-          style={{ background: "hsl(var(--surface-muted))" }}
+          className="rounded-xl overflow-hidden aspect-[16/9] relative shadow-xl transition-transform duration-700 group-hover:[transform:rotateY(0deg)_rotateX(0deg)_scale(1.01)]"
+          style={{
+            background: "hsl(var(--surface-muted))",
+            transform: "rotateY(-8deg) rotateX(4deg)",
+            transformStyle: "preserve-3d",
+          }}
         >
           <img src={project.thumbnail} alt="" className="w-full h-full object-cover" />
+
           <button
             onClick={() => thumbInput.current?.click()}
             title="Titelbild ändern"
@@ -1532,6 +1545,8 @@ function SeitenInhaltGrid({ project, onAddPage }: { project: Project; onAddPage:
             onChange={handleThumb}
           />
         </div>
+        </div>
+
         <div className="mt-5">
           <div className="flex items-center justify-between">
             <div
