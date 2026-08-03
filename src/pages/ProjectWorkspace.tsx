@@ -3951,7 +3951,7 @@ function ElementView({
         transformOrigin: previewTransformOrigin ?? "center center",
         zIndex: isCadView ? (showHub ? 90 : 40) : (showHub ? 80 : (elevated ? 30 : undefined)),
         touchAction: "none",
-        pointerEvents: (isCadView && !selected && toolActive) ? "none" : undefined,
+        pointerEvents: (((isCadView || el.kind === "pdf" || el.kind === "image") && !selected && toolActive) ? "none" : undefined),
       }}
     >
 
