@@ -1006,7 +1006,20 @@ export class SelectTool {
         return;
       }
 
-      // MOVE/ROTATE (original): Box width/height stay constant; rotation +
+      // MOVE (Verschieben): Die Box bleibt starr (Größe + Rotation unverändert)
+      // und wird so verschoben, dass der angeklickte Fangpunkt exakt (hart fix)
+      // am Mauszeiger bzw. am gefangenen Punkt klebt.
+      if (this.activeEditAction === PointEditAction.MOVE && this.textBoxCornerOriginal && this.textBoxCenterOriginal) {
+        const dx = newPoint.x - this.textBoxCornerOriginal.x;
+        const dy = newPoint.y - this.textBoxCornerOriginal.y;
+        box.center = v(this.textBoxCenterOriginal.x + dx, this.textBoxCenterOriginal.y + dy);
+        box.rotationRad = this.textBoxRotationOriginal;
+        box.widthM = w;
+        box.heightM = h;
+        return;
+      }
+
+      // ROTATE (original): Box width/height stay constant; rotation +
       // center are recomputed so that opposite stays put and moving handle
       // reaches newPoint.
       const diagLen = Math.hypot(w, h);
