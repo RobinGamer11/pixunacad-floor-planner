@@ -183,6 +183,8 @@ export class MiniCad {
   // Radiergummi-Defaults.
   defaultEraserRadiusM: number = Defaults.eraserRadiusM;
   defaultEraserStrength: number = Defaults.eraserStrength;
+  defaultEraserMode: "hard" | "smooth" = Defaults.eraserMode;
+  defaultEraserSoftness: number = Defaults.eraserSoftness;
 
   // Schraffur-Defaults (analog CadApp).
   defaultHatchFillColor: string = Defaults.hatchFillColor;

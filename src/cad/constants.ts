@@ -96,8 +96,10 @@ export const Defaults = {
   freeImageRotate: true,
 
   // Eraser defaults
-  eraserRadiusM: 0.12,
+  eraserRadiusM: 0.03,
   eraserStrength: 1.0,
+  eraserMode: "hard" as "hard" | "smooth",
+  eraserSoftness: 0.5,
   eraserOpacity: 1.0,
   eraserUseRuler: false,
   // Auflösungs-Cap (px Kantenlänge) für persistente Dokument-Radiermaske
