@@ -5104,31 +5104,11 @@ function DocumentToolSettings({
   freePlace?: boolean;
   onFreePlaceChange?: (v: boolean) => void;
 }) {
+  // Der Maßstab greift erst, wenn "Maßstab anwenden" gesetzt ist —
+  // ohne Häkchen wird das Dokument frei (auto-fit) platziert.
+  const useScale = !freePlace;
   return (
     <SettingsBlock title="DOKUMENT IMPORTIEREN">
-      {/* Freie Maßstabs-Eingabe wie beim CAD-Blatt — legt fest, in welchem
-          Ausgabemaßstab das importierte Dokument (A4/A3/A2 …) im Modellbereich
-          abgelegt wird. Modell selbst bleibt 1:1. Bei aktivem „Frei platzieren"
-          wird der Maßstab beim Import automatisch berechnet. */}
-      <Row label="Maßstab">
-        <PlacedScaleInput
-          value={scale}
-          onCommit={(next) => onScaleChange?.(next)}
-        />
-      </Row>
-
-      <label
-        className="flex items-center gap-2 text-xs cursor-pointer select-none px-1 py-1"
-        title="Skaliert das Dokument beim Import automatisch so, dass es vollständig mit Rand auf der aktiven Seite liegt."
-      >
-        <input
-          type="checkbox"
-          checked={!!freePlace}
-          onChange={(e) => onFreePlaceChange?.(e.target.checked)}
-        />
-        <span>Frei platzieren <span className="text-muted-foreground">(auto-fit auf Seite)</span></span>
-      </label>
-
       <button
         type="button"
         disabled={importing}
@@ -5141,13 +5121,32 @@ function DocumentToolSettings({
         {importing ? "Importiere…" : "Datei importieren"}
       </button>
 
-      <div className="text-[11px] leading-relaxed text-muted-foreground pt-2 border-t" style={{ borderColor: "hsl(var(--hairline))" }}>
-        {freePlace ? (
-          <div>„Frei platzieren" aktiv — Dokument wird automatisch auf die Seite skaliert.</div>
-        ) : (
-          <div>Import erfolgt im gewählten Maßstab (z. B. {scale}) auf A4/A3/A2 …</div>
-        )}
-        <div>Zum Skalieren, Drehen oder Zuschneiden: <strong>Auswahl-Werkzeug</strong> → Dokument anklicken.</div>
+      <label
+        className="flex items-center gap-2 text-[11px] cursor-pointer select-none px-1 pt-2"
+        title="Ohne Häkchen wird das Dokument frei platziert (Originalgröße/auto-fit)."
+      >
+        <input
+          type="checkbox"
+          checked={useScale}
+          onChange={(e) => onFreePlaceChange?.(!e.target.checked)}
+        />
+        <span>Maßstab anwenden</span>
+      </label>
+
+      <div className={useScale ? "" : "opacity-50 pointer-events-none"}>
+        <Row label="Maßstab">
+          <PlacedScaleInput
+            value={scale}
+            onCommit={(next) => onScaleChange?.(next)}
+          />
+        </Row>
+      </div>
+
+      <div className="text-[10px] leading-relaxed text-muted-foreground pt-2 border-t" style={{ borderColor: "hsl(var(--hairline))" }}>
+        {useScale
+          ? <div>Import im gewählten Maßstab (z. B. {scale}).</div>
+          : <div>Freie Platzierung — Maßstab kann nachträglich gesetzt werden.</div>}
+        <div>Bearbeiten (Skalieren, Drehen, Verzerren, Spiegeln): <strong>Auswahl-Werkzeug</strong> → Dokument anklicken.</div>
       </div>
     </SettingsBlock>
   );
