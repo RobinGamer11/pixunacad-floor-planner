@@ -2687,10 +2687,13 @@ function AllTasksView({ projects }: { projects: Project[] }) {
 
   return (
     <div className="px-10 py-7">
+      <ProjectCarousel projects={projects} onOpen={(id) => navigate(`/project/${id}`)} />
+
       <div className="flex items-center gap-3 mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">Alle Aufgaben</h1>
         <span className="text-sm text-muted-foreground">projektübergreifend</span>
       </div>
+
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
         {/* Aufgaben-Liste */}
