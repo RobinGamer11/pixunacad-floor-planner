@@ -950,9 +950,16 @@ export class SelectTool {
       if (this.textBoxRotatePivotMode && this.activeEditAction === PointEditAction.ROTATE
           && this.textBoxCornerOriginal && this.textBoxCenterOriginal) {
         // Drehung exakt um den angeklickten Fangpunkt (Pivot = Ecke).
+        // Referenzrichtung = Kantenlinie durch den Pivot und die horizontal
+        // benachbarte Ecke (z. B. oben-links -> oben-rechts). Dadurch liegt die
+        // Maus beim Drehen exakt auf der Höhe/Linie dieser beiden Fangpunkte.
         const pivot = this.textBoxCornerOriginal;
         const c0 = this.textBoxCenterOriginal;
-        const baseAng = Math.atan2(c0.y - pivot.y, c0.x - pivot.x);
+        const cosR = Math.cos(this.textBoxRotationOriginal), sinR = Math.sin(this.textBoxRotationOriginal);
+        const lPivot = this._textBoxLocalCornerForIndex(handleIndex, w, h);
+        const lNeigh = this._textBoxLocalCornerForIndex(handleIndex ^ 1, w, h);
+        const eLx = lNeigh.x - lPivot.x, eLy = lNeigh.y - lPivot.y;
+        const baseAng = Math.atan2(eLx * sinR + eLy * cosR, eLx * cosR - eLy * sinR);
         const curAng = Math.atan2(newPoint.y - pivot.y, newPoint.x - pivot.x);
         let delta = curAng - baseAng;
         if (this.app.input?.keys?.shift) {
@@ -969,6 +976,7 @@ export class SelectTool {
         box.heightM = h;
         return;
       }
+
 
 
       if ((this as any)._textBoxResizeMode) {
