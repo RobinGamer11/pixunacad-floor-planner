@@ -355,10 +355,10 @@ const ChildList: React.FC<{
         const kids = childrenOf(state, n.id);
         const isOpen = !!open[n.id];
         return (
-          <div key={n.id}>
+          <div key={n.id} {...(n.enabled ? {} : { "data-export-hide": true })}>
             <div className="grid items-center px-3 py-2 border-b text-sm"
                  style={{ gridTemplateColumns: "28px 1.6fr 1fr 1fr 1fr 1.2fr 32px", borderColor: "hsl(var(--hairline))", opacity: n.enabled ? 1 : 0.45 }}>
-              <button title={n.enabled ? "Wird berücksichtigt" : "Wird nicht berücksichtigt"}
+              <button data-export-hide title={n.enabled ? "Wird berücksichtigt" : "Wird nicht berücksichtigt"}
                 onClick={() => financeStore.updateNode(projectId, n.id, { enabled: !n.enabled })}>
                 {n.enabled ? <ToggleRight size={16} style={{ color: "hsl(var(--accent-gold))" }} /> : <ToggleLeft size={16} />}
               </button>
