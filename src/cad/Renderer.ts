@@ -16,7 +16,7 @@ import { applyBgRemovalToCanvas, bgRemovalSignature } from "./documentBgRemove";
 
 import { computeHealedWallLines } from "./wallHeal";
 import { getWallUnionGroups } from "./wallUnion";
-import { buildHealedWallSolidRing, ringToPCPolygon } from "./wallSolid";
+import { buildHealedWallSolidRing, buildWallSolidRing, ringToPCPolygon } from "./wallSolid";
 import { drawDoor } from "./doorGeom";
 import { type MultiPolygon } from "polygon-clipping";
 
