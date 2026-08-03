@@ -4484,7 +4484,7 @@ function ElementView({
             vectorEffect="non-scaling-stroke"
             opacity={0.9}
           />
-          <circle cx={rotAxis.mx} cy={rotAxis.my} r={0.55} fill="hsl(var(--accent-gold))" />
+          
         </svg>
         <div
           className="absolute pointer-events-none rounded-md border border-border bg-card/95 px-2 py-0.5 text-[11px] font-medium tabular-nums text-foreground shadow-sm"
