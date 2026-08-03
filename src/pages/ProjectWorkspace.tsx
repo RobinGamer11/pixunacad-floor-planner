@@ -2777,8 +2777,11 @@ function PageCanvas({
             const mmX = c.x * 1000, mmY = c.y * 1000, rMm = rM * 1000;
             for (const el of page.elements) {
               if (el.kind !== "cad-view" && el.kind !== "cad-viewport" && el.kind !== "pdf" && el.kind !== "image") continue;
-              const ex = el.xMm ?? 0, ey = el.yMm ?? 0;
-              const ew = el.wMm ?? 0, eh = el.hMm ?? 0;
+              // Fallback: Dokumente/Bilder liegen teils nur in %-Geometrie vor.
+              const ex = typeof el.xMm === "number" ? el.xMm : ((el.x ?? 0) / 100) * fmt.w;
+              const ey = typeof el.yMm === "number" ? el.yMm : ((el.y ?? 0) / 100) * fmt.h;
+              const ew = typeof el.wMm === "number" && el.wMm > 0 ? el.wMm : ((el.w ?? 0) / 100) * fmt.w;
+              const eh = typeof el.hMm === "number" && el.hMm > 0 ? el.hMm : ((el.h ?? 0) / 100) * fmt.h;
               if (ew <= 0 || eh <= 0) continue;
               // Inverse Rotation um den Elementmittelpunkt.
               const rot = ((el.rotation ?? 0) * Math.PI) / 180;
@@ -2794,6 +2797,9 @@ function PageCanvas({
               // Sehr dichte Stempel zusammenfassen (Performance/Storage).
               if (last && Math.hypot(last.x - lx, last.y - ly) < rMm * 0.4 && Math.abs(last.r - rMm) < 0.01) continue;
               projectStore.updateElement(projectId, page.id, el.id, {
+                // mm-Geometrie sicherstellen, damit die Maske exakt im selben
+                // Koordinatenraum gerendert wird wie die Radier-Kreise.
+                xMm: ex, yMm: ey, wMm: ew, hMm: eh,
                 eraseCircles: [...prev.slice(-400), { x: lx, y: ly, r: rMm, s }],
               });
             }
@@ -3948,7 +3954,7 @@ function ElementView({
         transformOrigin: previewTransformOrigin ?? "center center",
         zIndex: isCadView ? (showHub ? 90 : 40) : (showHub ? 80 : (elevated ? 30 : undefined)),
         touchAction: "none",
-        pointerEvents: (isCadView && !selected && toolActive) ? "none" : undefined,
+        pointerEvents: (((isCadView || el.kind === "pdf" || el.kind === "image") && !selected && toolActive) ? "none" : undefined),
       }}
     >
 
