@@ -127,16 +127,31 @@ export const EraserSettingsPanel: React.FC<Props> = ({ app, variant = "workspace
         <div className="text-xs">
           <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Modus</span>
           <div className="grid grid-cols-2 gap-1">
-            {(["hard", "smooth"] as const).map((m) => (
-              <button key={m} type="button"
-                onClick={() => { setMode(m); app.defaultEraserMode = m; }}
-                className="cad-toolbar-btn justify-center h-8"
-                style={mode === m ? { background: "hsl(var(--cad-accent) / 0.18)", borderColor: "hsl(var(--cad-accent))" } : undefined}>
-                <span className="text-xs">{m === "hard" ? "Hart" : "Smooth"}</span>
-              </button>
-            ))}
+            {(["hard", "smooth"] as const).map((m) => {
+              const disabled = m === "smooth" && !smoothAllowed;
+              return (
+                <button key={m} type="button" disabled={disabled}
+                  title={disabled ? "Weicher Modus ist nur für Bilder (PNG/JPG) verfügbar." : undefined}
+                  onClick={() => { if (disabled) return; setMode(m); app.defaultEraserMode = m; }}
+                  className="cad-toolbar-btn justify-center h-8"
+                  style={{
+                    ...(mode === m && !disabled ? { background: "hsl(var(--cad-accent) / 0.18)", borderColor: "hsl(var(--cad-accent))" } : {}),
+                    ...(disabled ? { opacity: 0.45, cursor: "not-allowed" } : {}),
+                  }}>
+                  <span className="text-xs">{m === "hard" ? "Hart" : "Smooth"}</span>
+                </button>
+              );
+            })}
           </div>
+          {!smoothAllowed && (
+            <div className="mt-1.5 text-[11px] leading-relaxed rounded px-2 py-1.5"
+              style={{ color: "hsl(var(--cad-toolbar-muted))", background: "hsl(var(--muted) / 0.5)", border: "1px solid hsl(var(--border))" }}>
+              Weicher Modus ist nur für Bilder (PNG/JPG) verfügbar. Das gewählte Objekt
+              wird immer hart radiert.
+            </div>
+          )}
         </div>
+
 
         {mode === "smooth" && (
           <>
