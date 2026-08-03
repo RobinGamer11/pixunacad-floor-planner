@@ -1,4 +1,8 @@
-import * as polygonClipping from "polygon-clipping";
+import polygonClippingDefault from "polygon-clipping";
+const pc: any = (polygonClippingDefault as any)?.difference
+  ? (polygonClippingDefault as any)
+  : (polygonClippingDefault as any)?.default;
+
 import { Defaults, SelectionType } from "./constants";
 import { Vec2, v, dist, projectPointToSegment, pointInPolygon } from "./geometry";
 import type { CadApp } from "./CadApp";
@@ -112,9 +116,25 @@ export class EraserTool {
   private _commitHatchErase() {
     const stamps = this._hatchStamps;
     this._hatchStamps = [];
-    if (!stamps.length) return;
+    if (!stamps.length || !pc?.difference) return;
     const scene = this.app.scene;
-    const eraser: any = stamps.map((s) => [this._circleRing(s.c, s.r)]);
+    // Ein einziger zusammenhängender Radierbereich: Kreise + Verbindungsbänder
+    // zwischen aufeinanderfolgenden Positionen, zu einer Fläche vereinigt.
+    const parts: any[] = [];
+    for (let i = 0; i < stamps.length; i++) {
+      parts.push([this._circleRing(stamps[i].c, stamps[i].r)]);
+      if (i > 0) {
+        const band = this._capsuleBand(stamps[i - 1].c, stamps[i].c, Math.min(stamps[i - 1].r, stamps[i].r));
+        if (band) parts.push([band]);
+      }
+    }
+    let eraser: any;
+    try {
+      eraser = parts.length > 1 ? pc.union(...parts) : parts[0] ? [parts[0]] : null;
+    } catch {
+      eraser = parts.map((p) => p);
+    }
+    if (!eraser || !eraser.length) return;
     for (const hatch of scene.hatches.slice()) {
       if (!this.app.labelManager.isVisible(hatch.labelId)) continue;
       if (!this._polyNearStamps(hatch.points, stamps)) continue;
@@ -124,10 +144,11 @@ export class EraserTool {
       ]];
       let result: any;
       try {
-        result = polygonClipping.difference(subject, eraser);
+        result = pc.difference(subject, eraser);
       } catch {
         continue;
       }
+
       const style = {
         fillColor: hatch.fillColor, strokeColor: hatch.strokeColor,
         fillAlphaPct: hatch.fillAlphaPct, strokeWidthPx: hatch.strokeWidthPx,
@@ -152,6 +173,20 @@ export class EraserTool {
     }
     return ring;
   }
+
+  /** Rechteck-Band zwischen zwei Kreismittelpunkten (Breite = 2r). */
+  private _capsuleBand(a: Vec2, b: Vec2, r: number): number[][] | null {
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const len = Math.hypot(dx, dy);
+    if (len < 1e-9) return null;
+    const nx = (-dy / len) * r, ny = (dx / len) * r;
+    return [
+      [a.x + nx, a.y + ny], [b.x + nx, b.y + ny],
+      [b.x - nx, b.y - ny], [a.x - nx, a.y - ny],
+      [a.x + nx, a.y + ny],
+    ];
+  }
+
 
   private _polyNearStamps(pts: Vec2[], stamps: Array<{ c: Vec2; r: number }>): boolean {
     for (const s of stamps) if (this._strokeNearCircle(pts, s.c, s.r)) return true;
@@ -344,16 +379,8 @@ export class EraserTool {
     const mode = this.app.defaultEraserMode ?? "hard";
     const soft = Math.max(0.05, Math.min(1, this.app.defaultEraserSoftness ?? 0.5));
     ctx.save();
-    // Preview des laufenden Radier-Pfades (Schraffur-Ausschnitt).
-    if (this._hatchStamps.length) {
-      ctx.fillStyle = "rgba(77,163,255,0.22)";
-      for (const s of this._hatchStamps) {
-        const p = cam.worldToScreen(s.c.x, s.c.y);
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, Math.max(2, s.r * cam.scale), 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
+
+
 
     if (mode === "smooth") {
       const g = ctx.createRadialGradient(c.x, c.y, r * (1 - soft), c.x, c.y, r);
