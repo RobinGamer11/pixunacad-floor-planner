@@ -1051,6 +1051,9 @@ export default function ProjectsHome() {
                 <SeitenView project={selected} onAddPage={handleAddPage} />
               )}
               {tab === "aufgaben" && <AufgabenView project={selected} />}
+              {tab === "finanzen" && (
+                <FinanceProjectOverview projectId={selected.id} projectName={selected.name} />
+              )}
               {tab === "dokumente" && (
                 <div className="mt-4">
                   <div className="inline-flex items-center gap-1 rounded-md p-0.5 mb-4"
