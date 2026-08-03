@@ -2649,6 +2649,64 @@ export class SelectTool {
     );
   }
 
+  /** Zeichnet beim Drehen eine Winkel-Hilfslinie + Grad-Anzeige (Shift = eingerastet). */
+  _drawRotateGuide(ctx: CanvasRenderingContext2D, cam: any) {
+    const g = this.rotateGuide;
+    if (!g || this.activeEditAction !== PointEditAction.ROTATE) return;
+    const pivot = cam.worldToScreen(g.pivot.x, g.pivot.y);
+    const rad = (g.angleDeg * Math.PI) / 180;
+    const p1 = cam.worldToScreen(
+      g.pivot.x + Math.cos(rad) * Math.max(g.radius, 0.001),
+      g.pivot.y + Math.sin(rad) * Math.max(g.radius, 0.001),
+    );
+    const rPx = Math.max(28, Math.min(400, Math.hypot(p1.x - pivot.x, p1.y - pivot.y)));
+    const col = g.snapped ? "rgba(212,175,55,0.98)" : "rgba(120,180,255,0.85)";
+
+    ctx.save();
+    ctx.lineWidth = g.snapped ? 1.8 : 1.2;
+    ctx.strokeStyle = col;
+
+    // Referenz-Achse (0°) + Winkelbogen
+    ctx.setLineDash([3, 4]);
+    ctx.beginPath();
+    ctx.moveTo(pivot.x, pivot.y);
+    ctx.lineTo(pivot.x + rPx, pivot.y);
+    ctx.stroke();
+    ctx.beginPath();
+    const scrRad = Math.atan2(p1.y - pivot.y, p1.x - pivot.x);
+    ctx.arc(pivot.x, pivot.y, rPx * 0.45, 0, scrRad, scrRad < 0);
+    ctx.stroke();
+
+    // Aktuelle Winkel-Hilfslinie (über den Punkt hinaus verlängert)
+    ctx.setLineDash(g.snapped ? [] : [6, 5]);
+    ctx.beginPath();
+    ctx.moveTo(pivot.x, pivot.y);
+    ctx.lineTo(pivot.x + Math.cos(scrRad) * (rPx + 60), pivot.y + Math.sin(scrRad) * (rPx + 60));
+    ctx.stroke();
+
+    // Pivot-Marker
+    ctx.setLineDash([]);
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.arc(pivot.x, pivot.y, 3.2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Grad-Anzeige
+    const label = `${g.angleDeg.toFixed(g.snapped ? 0 : 1)}°`;
+    const lx = pivot.x + Math.cos(scrRad) * (rPx * 0.62) + 10;
+    const ly = pivot.y + Math.sin(scrRad) * (rPx * 0.62) - 10;
+    ctx.font = "600 12px ui-sans-serif, system-ui, sans-serif";
+    const tw = ctx.measureText(label).width;
+    ctx.fillStyle = "rgba(18,18,20,0.85)";
+    ctx.fillRect(lx - 5, ly - 13, tw + 10, 19);
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(lx - 5, ly - 13, tw + 10, 19);
+    ctx.fillStyle = g.snapped ? "#f4d47c" : "#dbeafe";
+    ctx.fillText(label, lx, ly + 1);
+    ctx.restore();
+  }
+
   _drawOverlay(ctx: CanvasRenderingContext2D, cam: any) {
     // ── Marquee-Rechteck + hervorgehobene Auswahl ──────────────────────
     this._drawMarqueeOverlay(ctx, cam);
