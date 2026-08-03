@@ -926,11 +926,15 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
    */
   const placeImportedPages = useCallback((pages: ImportedPage[]) => {
     const app = appRef.current; if (!app || pages.length === 0) return;
+    const [firstPage] = pages;
     let denom = 1;
     if (!docFreePlace) {
       const m = docImportScale.match(/^\s*1\s*:\s*(\d+(?:[.,]\d+)?)\s*$/);
       const v = m ? parseFloat(m[1].replace(",", ".")) : parseFloat(docImportScale.replace(",", "."));
       denom = Number.isFinite(v) && v > 0 ? v : 100;
+    } else if (firstPage && firstPage.widthM > 0) {
+      // Frei platzieren: Standardgröße = 10 m Breite (am Raster messbar).
+      denom = 10 / firstPage.widthM;
     }
     const [first, ...rest] = pages;
     const firstW = first.widthM * denom;
@@ -957,18 +961,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       });
       offX += pw + 0.5;
     }
-    // "Frei platzieren": maßhaltig 1:1 (1 m im PDF = 1 m in der CAD-Oberfläche),
-    // dafür wird die Ansicht so gezoomt, dass die Seite ~70 % der Oberfläche füllt.
-    if (docFreePlace && firstW > 0 && firstH > 0) {
-      const rect = app.canvas.getBoundingClientRect();
-      if (rect.width > 0 && rect.height > 0) {
-        const fit = Math.min((rect.width * 0.7) / firstW, (rect.height * 0.7) / firstH);
-        if (Number.isFinite(fit) && fit > 0) {
-          app.camera.scale = Math.max(app.camera.minScale, Math.min(app.camera.maxScale, fit));
-          app.camera.center(rect);
-        }
-      }
-    }
+    // "Frei platzieren": Standardbreite 10 m — Ansicht bleibt unverändert.
+
   }, [docFreePlace, docImportScale]);
 
   const handleDocFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {

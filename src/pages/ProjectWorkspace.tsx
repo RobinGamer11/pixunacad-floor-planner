@@ -3570,7 +3570,20 @@ function ElementView({
         }
         setPreview({ dxPx, dyPx, deltaDeg: 0, anchorFrac });
       } else if (hubMode === "rotate") {
-        const a = (Math.atan2(ev.clientY - ay, ev.clientX - ax) * 180) / Math.PI;
+        // Zielpunkt anvisieren: Fangpunkte anderer Objekte und Rechtsklick-
+        // Hilfslinien ziehen den Rotations-Strahl exakt auf den Punkt.
+        let tx = ev.clientX, ty = ev.clientY;
+        const mR = reg.queryNearest(tx, ty, pageRect, 12, [el.id]);
+        if (mR) {
+          tx = pageRect.left + (mR.x / 100) * pageRect.width;
+          ty = pageRect.top + (mR.y / 100) * pageRect.height;
+          reg.setHover(mR);
+        } else {
+          reg.setHover(null);
+          const snapped = snapToRayGuides(tx, ty, pageRect);
+          if (snapped) { tx = snapped.x; ty = snapped.y; }
+        }
+        const a = (Math.atan2(ty - ay, tx - ax) * 180) / Math.PI;
         if (startAngle === null) startAngle = a;
         let delta = a - startAngle;
         if (ev.shiftKey) {
@@ -3593,12 +3606,14 @@ function ElementView({
       const ax = ax0 + (hubMode === "move" ? p.dxPx : 0);
       const ay = ay0 + (hubMode === "move" ? p.dyPx : 0);
       const nearAnchor = Math.hypot(ev.clientX - ax, ev.clientY - ay) <= 12;
-      if (nearAnchor) {
+      const wheelActive = !!(window as any).__pixunaTabletCommit;
+      if (nearAnchor || !wheelActive) {
+        // Ohne Tablet-Hilfsrad setzt ein einfacher Linksklick das CAD-Blatt.
         downClient = null;
         commit();
         return;
       }
-      // Sonst: NICHT committen — nur "carrying" togglen (ablegen/aufnehmen).
+      // Mit Tablet-Hilfsrad: NICHT committen — nur "carrying" togglen.
       if (hubMode === "move") {
         if (carryingRef.current) {
           // Ablegen: Preview einfrieren.
@@ -3611,6 +3626,7 @@ function ElementView({
       } else {
         // Rotate: Klick bricht nicht ab und commited nicht.
       }
+
       downClient = null;
     };
     const onContext = (ev: MouseEvent) => {
@@ -4146,16 +4162,14 @@ function ElementView({
             const cursor = cornerDraggable
               ? (corner === "tl" || corner === "br" ? "nwse-resize" : "nesw-resize")
               : (isCadView ? "crosshair" : "default");
-            const size = isCadView ? 14 : 12;
+            // Einheitliche Optik: alle Fangpunkte rund + gold (auch CAD-Blatt).
+            const size = 12;
             const glow = hoveredSnapKey === `corner-${corner}`;
             const isAnchor = isCadView && anchorFracState?.key === `corner-${corner}`;
-            const stroke = isCadView ? hubBlue : "hsl(var(--accent-gold))";
-            const fill = isCadView
-              ? ((glow || isAnchor) ? hubBlue : "white")
-              : ((glow || isAnchor) ? "hsl(var(--accent-gold))" : "white");
-            const shadowActive = isCadView
-              ? `0 0 0 3px ${hubBlue}40, 0 0 10px ${hubBlue}`
-              : "0 0 0 3px hsl(var(--accent-gold) / 0.35), 0 0 10px hsl(var(--accent-gold))";
+            const stroke = "hsl(var(--accent-gold))";
+            const fill = (glow || isAnchor) ? "hsl(var(--accent-gold))" : "white";
+            const shadowActive = "0 0 0 3px hsl(var(--accent-gold) / 0.35), 0 0 10px hsl(var(--accent-gold))";
+
             return (
               <div
                 key={corner}
@@ -4168,7 +4182,7 @@ function ElementView({
                   [isLeft ? "left" : "right"]: -Math.floor(((glow || isAnchor) ? size + 4 : size) / 2),
                   width: (glow || isAnchor) ? size + 4 : size,
                   height: (glow || isAnchor) ? size + 4 : size,
-                  borderRadius: isCadView ? 3 : 999,
+                  borderRadius: 999,
                   background: fill,
                   border: `2px solid ${stroke}`,
                   boxShadow: (glow || isAnchor) ? shadowActive : "0 1px 3px rgba(0,0,0,0.25)",
