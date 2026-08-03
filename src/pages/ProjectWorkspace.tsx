@@ -3694,7 +3694,39 @@ function ElementView({
           delta = absTarget - startRot;
         }
         setPreview({ dxPx: 0, dyPx: 0, deltaDeg: delta, anchorFrac });
+        // CAD-Blatt: Der Cursor wird optisch auf der Linie durch die beiden
+        // oberen Fangpunkte fixiert — dadurch ist die Drehung exakt ablesbar.
+        if (isCadView) {
+          const r = baseRect();
+          const rad = ((startRot + delta) * Math.PI) / 180;
+          const cos = Math.cos(rad), sin = Math.sin(rad);
+          const rot = (px: number, py: number) => {
+            const ox = px - ax, oy = py - ay;
+            return { x: ax + ox * cos - oy * sin, y: ay + ox * sin + oy * cos };
+          };
+          const tl = rot(r.left, r.top);
+          const tr = rot(r.left + r.width, r.top);
+          const vx = tr.x - tl.x, vy = tr.y - tl.y;
+          const len2 = vx * vx + vy * vy;
+          let mx = ev.clientX, my = ev.clientY;
+          if (len2 > 1e-6) {
+            const t = ((ev.clientX - tl.x) * vx + (ev.clientY - tl.y) * vy) / len2;
+            mx = tl.x + vx * t;
+            my = tl.y + vy * t;
+          }
+          const toPct = (cx: number, cy: number) => ({
+            x: ((cx - pageRect.left) / Math.max(1, pageRect.width)) * 100,
+            y: ((cy - pageRect.top) / Math.max(1, pageRect.height)) * 100,
+          });
+          // Achse über die Blattbreite hinaus verlängern (Orientierungshilfe).
+          const ext = 0.6;
+          const A = toPct(tl.x - vx * ext, tl.y - vy * ext);
+          const B = toPct(tr.x + vx * ext, tr.y + vy * ext);
+          const M = toPct(mx, my);
+          setRotAxis({ ax: A.x, ay: A.y, bx: B.x, by: B.y, mx: M.x, my: M.y });
+        }
       }
+
     };
 
     const onDown = (ev: PointerEvent) => {
