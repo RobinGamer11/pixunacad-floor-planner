@@ -4166,7 +4166,7 @@ function ElementView({
                   [isLeft ? "left" : "right"]: -Math.floor(((glow || isAnchor) ? size + 4 : size) / 2),
                   width: (glow || isAnchor) ? size + 4 : size,
                   height: (glow || isAnchor) ? size + 4 : size,
-                  borderRadius: isCadView ? 3 : 999,
+                  borderRadius: 999,
                   background: fill,
                   border: `2px solid ${stroke}`,
                   boxShadow: (glow || isAnchor) ? shadowActive : "0 1px 3px rgba(0,0,0,0.25)",
