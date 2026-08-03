@@ -3117,6 +3117,30 @@ function ElementView({
   // Rechtsklick-Hilfslinien während einer HUB-Aktion (nur Preview, werden
   // beim Commit/Cancel wieder verworfen). Koordinaten in Prozent der Seite.
   const [guides, setGuides] = useState<Array<{ id: number; xPct: number; yPct: number }>>([]);
+  /** Rechtsklick-Strahlen: Hilfslinie vom angeklickten (Fremd-)Fangpunkt zum
+   *  aktuell gewählten Fangpunkt dieses Elements. Alle Werte in Prozent der Seite. */
+  const [rayGuides, setRayGuides] = useState<Array<{ id: number; ax: number; ay: number; bx: number; by: number }>>([]);
+  const rayGuidesRef = useRef(rayGuides);
+  rayGuidesRef.current = rayGuides;
+  /** Projiziert einen Client-Punkt auf die nächstgelegene Hilfslinie (Toleranz 10px). */
+  const snapToRayGuides = (cx: number, cy: number, pageRect: DOMRect) => {
+    let best: { x: number; y: number; d: number } | null = null;
+    for (const g of rayGuidesRef.current) {
+      const ax = pageRect.left + (g.ax / 100) * pageRect.width;
+      const ay = pageRect.top + (g.ay / 100) * pageRect.height;
+      const bx = pageRect.left + (g.bx / 100) * pageRect.width;
+      const by = pageRect.top + (g.by / 100) * pageRect.height;
+      const vx = bx - ax, vy = by - ay;
+      const len2 = vx * vx + vy * vy;
+      if (len2 < 1e-6) continue;
+      const t = ((cx - ax) * vx + (cy - ay) * vy) / len2;
+      const px = ax + vx * t, py = ay + vy * t;
+      const d = Math.hypot(cx - px, cy - py);
+      if (d <= 10 && (!best || d < best.d)) best = { x: px, y: py, d };
+    }
+    return best;
+  };
+
   // Edge-Trim: reine Vorschau (dxPx/dyPx). Commit erst bei Pointerup bzw.
   // — bei aktivem Tablet-Hilfsrad — beim Klick auf das Häkchen.
   const [edgeTrim, setEdgeTrim] = useState<{
