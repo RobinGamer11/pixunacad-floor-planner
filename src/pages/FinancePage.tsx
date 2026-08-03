@@ -12,7 +12,7 @@ import { FinanceSummaryCard } from "@/components/finance/FinanceSummaryCard";
 import { FinancePositionsTable } from "@/components/finance/FinancePositionsTable";
 import {
   Plus, PanelLeftClose, PanelLeftOpen, ChevronRight, ChevronDown,
-  Folder, Building2, Trash2, ToggleLeft, ToggleRight, Home,
+  Folder, Building2, ArrowRight, ToggleLeft, ToggleRight, Home,
 } from "lucide-react";
 
 function useFinance(projectId?: string): FinanceState {
