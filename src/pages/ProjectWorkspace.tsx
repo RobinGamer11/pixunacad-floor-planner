@@ -218,6 +218,36 @@ export default function ProjectWorkspace() {
   } | null>(null);
   // Force-re-render der ToolsTab, sobald die Engine bereit ist (für Panel-Wiring).
   const [, forceEngineTick] = useState(0);
+  /** Engine übernehmen + Fangpunkt-Brücke registrieren (Linien, Texte,
+   *  Freihand, Schraffuren, Dokumente werden so auch für CAD-Blätter fangbar). */
+  const attachCadEngine = (api: {
+    setSelectedSegmentSnap: (opts: { midpointSnap?: boolean; divisionSnap?: number | null }) => void;
+    duplicateSelectedSegments: (offsetMm?: number) => number;
+    engine: import("@/cad/embed/MiniCad").MiniCad;
+  }) => {
+    cadEngineApiRef.current = api;
+    registerCadEngineSnap((clientX, clientY, pageRect, tol = 12) => {
+      const engine = cadEngineApiRef.current?.engine as any;
+      if (!engine?.canvas || !engine.camera || !engine.topology) return null;
+      const cr = engine.canvas.getBoundingClientRect();
+      const sx = clientX - cr.left;
+      const sy = clientY - cr.top;
+      const w = engine.camera.screenToWorld(sx, sy);
+      const snap = engine.topology.findBestSnap({ x: sx, y: sy }, w);
+      if (!snap?.world) return null;
+      const s = engine.camera.worldToScreen(snap.world.x, snap.world.y);
+      const cx = cr.left + s.x;
+      const cy = cr.top + s.y;
+      if (Math.hypot(cx - clientX, cy - clientY) > tol) return null;
+      return {
+        x: ((cx - pageRect.left) / Math.max(1, pageRect.width)) * 100,
+        y: ((cy - pageRect.top) / Math.max(1, pageRect.height)) * 100,
+      };
+    });
+    forceEngineTick((t) => t + 1);
+  };
+  useEffect(() => () => registerCadEngineSnap(null), []);
+
   const [presenting, setPresenting] = useState(() => {
     try { return new URLSearchParams(window.location.search).get("present") === "1"; } catch { return false; }
   });
