@@ -76,12 +76,15 @@ export const EraserSettingsPanel: React.FC<Props> = ({ app, variant = "workspace
       <div className="space-y-3">
         <label className="block text-xs">
           <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
-            Größe: {(radius * 1000).toFixed(radius * 1000 < 1 ? 2 : radius * 1000 < 10 ? 1 : 0)} mm
+            {isCad
+              ? `Größe: ${Math.round(scale.toSlider(radius) * 100)} %`
+              : `Größe: ${(radius * 1000).toFixed(radius * 1000 < 1 ? 2 : radius * 1000 < 10 ? 1 : 0)} mm`}
           </span>
-          <input type="range" min={0} max={1} step={0.001} value={radiusToSlider(radius)}
-            onChange={(e) => { const v = sliderToRadius(parseFloat(e.target.value)); setRadius(v); app.defaultEraserRadiusM = v; }}
+          <input type="range" min={0} max={1} step={0.001} value={scale.toSlider(radius)}
+            onChange={(e) => { const v = scale.toRadius(parseFloat(e.target.value)); setRadius(v); app.defaultEraserRadiusM = v; }}
             className="w-full" />
         </label>
+
 
 
         <div className="text-xs">
