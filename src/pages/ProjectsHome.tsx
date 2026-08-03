@@ -1324,14 +1324,16 @@ function SeitenView({ project, onAddPage }: { project: Project; onAddPage: () =>
                 <span>{selectedPage.format}</span>
               </div>
               <div
-                className="bg-white border shadow-sm"
+                className="bg-white border shadow-sm overflow-hidden"
                 style={{
                   borderColor: "hsl(var(--hairline))",
                   width: isLandscape ? "100%" : "70%",
-                  aspectRatio: isLandscape ? "1.414 / 1" : "1 / 1.414",
                   maxWidth: "100%",
                 }}
-              />
+              >
+                {/* Livevorschau des tatsächlichen Seiteninhalts */}
+                <PageThumb page={selectedPage} className="w-full" />
+              </div>
             </>
           ) : (
             <div className="text-sm text-muted-foreground italic">
