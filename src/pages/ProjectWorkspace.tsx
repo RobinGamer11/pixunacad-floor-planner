@@ -4008,17 +4008,20 @@ function ElementView({
                 actionCommitRef.current = null;
                 actionCancelRef.current = null;
               };
+              let unregisterTrimAbort: (() => void) | null = null;
               const cancel = () => {
                 setEdgeTrim(null);
                 setActiveEdge(null);
                 actionCommitRef.current = null;
                 actionCancelRef.current = null;
+                unregisterTrimAbort?.(); unregisterTrimAbort = null;
                 window.removeEventListener("pointermove", move);
                 window.removeEventListener("pointerup", up);
                 window.removeEventListener("pointercancel", cancel);
               };
               actionCommitRef.current = commit;
               actionCancelRef.current = cancel;
+              unregisterTrimAbort = registerAbort(() => cancel());
               let up: (ev: PointerEvent) => void;
               up = (ev: PointerEvent) => {
                 try { (e.currentTarget as HTMLElement).releasePointerCapture(ev.pointerId); } catch {}
