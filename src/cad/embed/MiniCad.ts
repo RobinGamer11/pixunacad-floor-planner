@@ -1591,6 +1591,18 @@ export class MiniCad {
       if (this.textEditor.isActive()) return;
       const t = e.target as HTMLElement | null;
       if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      // Läuft gerade eine Bearbeitung (Verschieben/Drehen/Resize, z. B. Textwerkzeug)?
+      // Dann bricht ENTF diese Aktion sofort ab und verwirft alle Vorschau-Änderungen.
+      const st: any = this.selectTool as any;
+      if (this._activeTool === "select" &&
+          (st.editTarget || st.rotateTextBoxId || st.dragTextBoxId || st.dragDocId || st.dragFreeStrokeId || st.dragDimId)) {
+        e.preventDefault();
+        e.stopPropagation();
+        this.selectTool.cancel();
+        this.pointEditMenu.hide();
+        try { this.onSelectionChange?.(); } catch {}
+        return;
+      }
       if (this._activeTool === "select" && this.selectTool.marqueeSelectedIds.length > 0) {
         const removed = this.selectTool.deleteMarqueeSelection();
         if (removed) {

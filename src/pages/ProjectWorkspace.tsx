@@ -132,6 +132,21 @@ const HATCH_MODE_VARIANTS: Array<{ id: HatchDrawMode; label: string; icon: React
 const isLinePageTool = (tool: PageTool): tool is LinePageTool =>
   tool === "line" || tool === "free" || tool === "eraser";
 
+/** Registry laufender HUB-/Transform-Aktionen. ENTF/ESC brechen darüber jede
+ *  aktive Vorschau (Verschieben, Drehen, Trimmen) sofort ab und verwerfen sie. */
+const activeAborts = new Set<() => void>();
+function registerAbort(fn: () => void): () => void {
+  activeAborts.add(fn);
+  return () => { activeAborts.delete(fn); };
+}
+function runActiveAborts(): boolean {
+  if (!activeAborts.size) return false;
+  const list = Array.from(activeAborts);
+  activeAborts.clear();
+  for (const fn of list) { try { fn(); } catch { /* ignore */ } }
+  return true;
+}
+
 const PROJECT_ZOOM_MIN = 10;
 const PROJECT_ZOOM_MAX = 1600;
 const PROJECT_ZOOM_SLIDER_STEPS = 1000;
@@ -751,9 +766,13 @@ export default function ProjectWorkspace() {
   // per Tastatur bedienbar (Projektmappe und CAD gleichermaßen).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Delete") return;
+      if (e.key !== "Delete" && e.key !== "Escape") return;
       const t = e.target as HTMLElement | null;
       if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      // Läuft eine Vorschau-Aktion (Verschieben/Drehen/Trimmen)? Dann bricht
+      // ENTF/ESC diese immer sofort ab und verwirft alle Vorschau-Änderungen.
+      if (runActiveAborts()) { e.preventDefault(); e.stopPropagation(); return; }
+      if (e.key !== "Delete") return;
       if (selectedElementIds.length === 0 && cadSelectionCount === 0) return;
       // Wenn ausschließlich CAD-Auswahl existiert, überlassen wir es dem
       // MiniCad-eigenen Handler (der bereits den passenden Scene-Kontext hat).
@@ -761,8 +780,9 @@ export default function ProjectWorkspace() {
       e.preventDefault();
       runDeleteSelection();
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedElementIds, cadSelectionCount, activePage?.id, project?.id]);
 
@@ -3300,6 +3320,7 @@ function ElementView({
       }
       if (!raf) raf = requestAnimationFrame(paint);
     };
+    let unregisterAbort: (() => void) | null = null;
     const finish = (commit: boolean, ev?: PointerEvent) => {
       dragRef.current = null;
       if (raf) { cancelAnimationFrame(raf); raf = 0; }
@@ -3309,22 +3330,25 @@ function ElementView({
       window.removeEventListener("pointerup", handleUp);
       window.removeEventListener("pointercancel", handleUp);
       window.removeEventListener("keydown", handleKey, true);
+      unregisterAbort?.(); unregisterAbort = null;
       if (commit && (tdx !== 0 || tdy !== 0)) onDrag?.(tdx, tdy, ev?.altKey);
     };
     const handleUp = (ev: PointerEvent) => finish(true, ev);
+    const abort = () => { finish(false); setRayGuides([]); };
     const handleKey = (ev: KeyboardEvent) => {
       // ESC oder ENTF brechen das Verschieben ab (Ausgangslage bleibt erhalten).
       if (ev.key !== "Escape" && ev.key !== "Delete") return;
       ev.preventDefault();
-      ev.stopPropagation();
-      finish(false);
-      setRayGuides([]);
+      ev.stopImmediatePropagation();
+      abort();
     };
+    unregisterAbort = registerAbort(abort);
     window.addEventListener("pointermove", handleMove);
     window.addEventListener("pointerup", handleUp);
     window.addEventListener("pointercancel", handleUp);
     window.addEventListener("keydown", handleKey, true);
   };
+
 
 
   const handlePointerDown = (e: React.PointerEvent) => {
@@ -3390,11 +3414,13 @@ function ElementView({
       }
     };
 
+    let unregisterAbort: (() => void) | null = null;
     const cleanup = () => {
       window.removeEventListener("pointermove", handleMove);
       window.removeEventListener("pointerup", handleUp);
       window.removeEventListener("pointercancel", handleUp);
       window.removeEventListener("keydown", handleKey, true);
+      unregisterAbort?.(); unregisterAbort = null;
     };
     const handleMove = (ev: PointerEvent) => {
       if (Math.hypot(ev.clientX - e.clientX, ev.clientY - e.clientY) > 3) rotateMovedRef.current = true;
@@ -3411,20 +3437,25 @@ function ElementView({
       try { (e.currentTarget as HTMLElement).releasePointerCapture(ev.pointerId); } catch {}
       cleanup();
     };
-    const handleKey = (ev: KeyboardEvent) => {
-      if (ev.key !== "Escape" && ev.key !== "Delete") return;
-      ev.stopPropagation();
-      ev.preventDefault();
-      // Abbruch: Ausgangszustand wiederherstellen.
+    // Abbruch: Ausgangszustand wiederherstellen, Vorschau verwerfen.
+    const abort = () => {
       if (onTransform) onTransform({ x: startX, y: startY, rotation: startRot });
       else onRotate(startRot, true);
       cleanup();
     };
+    const handleKey = (ev: KeyboardEvent) => {
+      if (ev.key !== "Escape" && ev.key !== "Delete") return;
+      ev.stopImmediatePropagation();
+      ev.preventDefault();
+      abort();
+    };
+    unregisterAbort = registerAbort(abort);
     window.addEventListener("pointermove", handleMove);
     window.addEventListener("pointerup", handleUp);
     window.addEventListener("pointercancel", handleUp);
     window.addEventListener("keydown", handleKey, true);
   };
+
 
 
 
@@ -3520,6 +3551,8 @@ function ElementView({
 
     actionCommitRef.current = commit;
     actionCancelRef.current = cancel;
+    // ENTF/ESC global: laufende HUB-Vorschau sofort verwerfen.
+    const unregisterHubAbort = registerAbort(() => cancel());
 
 
     const onMove = (ev: PointerEvent) => {
@@ -3617,6 +3650,7 @@ function ElementView({
       window.removeEventListener("click", onClick, true);
       window.removeEventListener("contextmenu", onContext, true);
       window.removeEventListener("keydown", onKey, true);
+      unregisterHubAbort();
       if (actionCommitRef.current === commit) actionCommitRef.current = null;
       if (actionCancelRef.current === cancel) actionCancelRef.current = null;
     };
@@ -3973,18 +4007,22 @@ function ElementView({
                 setActiveEdge(null);
                 actionCommitRef.current = null;
                 actionCancelRef.current = null;
+                unregisterTrimAbort?.(); unregisterTrimAbort = null;
               };
+              let unregisterTrimAbort: (() => void) | null = null;
               const cancel = () => {
                 setEdgeTrim(null);
                 setActiveEdge(null);
                 actionCommitRef.current = null;
                 actionCancelRef.current = null;
+                unregisterTrimAbort?.(); unregisterTrimAbort = null;
                 window.removeEventListener("pointermove", move);
                 window.removeEventListener("pointerup", up);
                 window.removeEventListener("pointercancel", cancel);
               };
               actionCommitRef.current = commit;
               actionCancelRef.current = cancel;
+              unregisterTrimAbort = registerAbort(() => cancel());
               let up: (ev: PointerEvent) => void;
               up = (ev: PointerEvent) => {
                 try { (e.currentTarget as HTMLElement).releasePointerCapture(ev.pointerId); } catch {}

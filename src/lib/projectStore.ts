@@ -626,9 +626,41 @@ function sameProjectContent(a: Project, b: Project): boolean {
   }
 }
 
-/** Zusammenhängende Änderungen (z. B. Drag-Frames) zu einem Undo-Schritt bündeln. */
+/** Zusammenhängende Änderungen (z. B. Drag-Frames) zu einem Undo-Schritt bündeln.
+ *  Gebündelt wird nur, wenn direkt hintereinander (< 500 ms) *dieselbe* Signatur
+ *  geändert wird — so bekommt jede eigenständige Aktion (neues Objekt, Löschen,
+ *  Werkzeug-Einsatz) einen eigenen Undo-Schritt. */
 const HIST_COALESCE_MS = 500;
 const lastPushAt: Map<string, number> = new Map();
+const lastSig: Map<string, string> = new Map();
+
+/** Grobe Signatur der geänderten Objekte (Seiten-/Element-IDs, Anzahl). */
+function changeSignature(a: Project, b: Project): string {
+  try {
+    const parts: string[] = [];
+    const ap = a.pages ?? [], bp = b.pages ?? [];
+    if (ap.length !== bp.length) parts.push(`pages:${ap.length}->${bp.length}`);
+    const aById = new Map(ap.map((p) => [p.id, p] as const));
+    for (const pg of bp) {
+      const op = aById.get(pg.id);
+      if (!op) { parts.push(`page+${pg.id}`); continue; }
+      if (op === pg) continue;
+      const ael = op.elements ?? [], bel = pg.elements ?? [];
+      if (ael.length !== bel.length) { parts.push(`page~${pg.id}:count`); continue; }
+      const aEl = new Map(ael.map((el) => [el.id, el] as const));
+      for (const el of bel) {
+        const oe = aEl.get(el.id);
+        if (!oe) { parts.push(`el+${el.id}`); }
+        else if (oe !== el && JSON.stringify(oe) !== JSON.stringify(el)) parts.push(`el~${el.id}`);
+      }
+      if (!parts.length) parts.push(`page~${pg.id}`);
+    }
+    if (!parts.length) parts.push("other");
+    return parts.sort().join("|");
+  } catch {
+    return "other";
+  }
+}
 
 function setState(updater: (s: State) => Partial<State>) {
   const prev = state;
@@ -643,9 +675,9 @@ function setState(updater: (s: State) => Partial<State>) {
         if (sameProjectContent(op, np)) continue;
         const h = getHist(np.id);
         const last = lastPushAt.get(np.id) ?? 0;
-        // Innerhalb des Coalesce-Fensters keinen zusätzlichen Schritt anlegen,
-        // der bereits gespeicherte ältere Zustand bleibt der Undo-Zielpunkt.
-        if (h.past.length && now - last < HIST_COALESCE_MS) {
+        const sig = changeSignature(op, np);
+        // Nur identische Folge-Änderungen (Drag-Frames) werden gebündelt.
+        if (h.past.length && now - last < HIST_COALESCE_MS && lastSig.get(np.id) === sig) {
           lastPushAt.set(np.id, now);
           h.future.length = 0;
           anyChange = true;
@@ -653,6 +685,7 @@ function setState(updater: (s: State) => Partial<State>) {
         }
         h.past.push(op);
         lastPushAt.set(np.id, now);
+        lastSig.set(np.id, sig);
         if (h.past.length > HIST_LIMIT) h.past.shift();
         h.future.length = 0;
         anyChange = true;
@@ -662,6 +695,7 @@ function setState(updater: (s: State) => Partial<State>) {
   }
   emit();
 }
+
 
 
 export const projectStore = {
@@ -1513,7 +1547,7 @@ export const projectStore = {
     if (!cur) return;
     const prev = h.past.pop()!;
     h.future.push(cur);
-    lastPushAt.delete(projectId);
+    lastPushAt.delete(projectId); lastSig.delete(projectId);
     _suspendHistory = true;
     try {
       state = { ...state, projects: state.projects.map((p) => (p.id === projectId ? prev : p)) };
@@ -1530,7 +1564,7 @@ export const projectStore = {
     if (!cur) return;
     const next = h.future.pop()!;
     h.past.push(cur);
-    lastPushAt.delete(projectId);
+    lastPushAt.delete(projectId); lastSig.delete(projectId);
     _suspendHistory = true;
     try {
       state = { ...state, projects: state.projects.map((p) => (p.id === projectId ? next : p)) };
