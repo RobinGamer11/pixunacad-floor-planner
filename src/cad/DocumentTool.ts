@@ -189,7 +189,7 @@ export class DocumentTool {
   scaleUniformAbsolute(docId: string, factor: number, baseW: number, baseH: number) {
     const doc = this.app.scene.getDocumentById(docId);
     if (!doc) return;
-    const clamped = Math.max(0.01, Math.min(20, factor));
+    const clamped = Math.max(0.001, Math.min(500, factor));
     const targetW = Math.max(0.001, baseW * clamped);
     const currentW = Math.max(0.001, doc.widthM);
     const rel = targetW / currentW;
