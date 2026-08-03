@@ -50,6 +50,26 @@ export default function FinancePage() {
   );
   const pid = projectId ?? "";
 
+  /* ---- PDF-Export des rechten Detailfensters (DIN A4) ---- */
+  const exportRef = useRef<HTMLDivElement | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const handleExport = async () => {
+    const el = exportRef.current;
+    if (!el || exporting) return;
+    setExporting(true);
+    el.classList.add("finance-exporting");
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    try {
+      const title = selected?.name ?? project?.name ?? "Finanzen";
+      await exportElementToA4Pdf(el, `${title}.pdf`);
+    } catch (e) {
+      console.error("Finanz-Export fehlgeschlagen", e);
+    } finally {
+      el.classList.remove("finance-exporting");
+      setExporting(false);
+    }
+  };
+
   const toggleExpand = (id: string) =>
     setExpanded((e) => ({ ...e, [id]: !(e[id] ?? true) }));
 
