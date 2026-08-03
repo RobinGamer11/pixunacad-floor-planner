@@ -150,7 +150,7 @@ function runActiveAborts(): boolean {
   return true;
 }
 
-const PROJECT_ZOOM_MIN = 10;
+const PROJECT_ZOOM_MIN = 5;
 const PROJECT_ZOOM_MAX = 1600;
 const PROJECT_ZOOM_SLIDER_STEPS = 1000;
 const clampProjectZoom = (v: number) => Math.max(PROJECT_ZOOM_MIN, Math.min(PROJECT_ZOOM_MAX, v));
@@ -1702,7 +1702,7 @@ export default function ProjectWorkspace() {
                 return (
                   <div
                     className="min-h-full flex items-start justify-center"
-                    style={{ padding: "60vh 60vw" }}
+                    style={{ padding: "100vh 100vw" }}
                   >
                     <div
                       className={isFree ? "relative" : "flex items-start"}
@@ -2897,7 +2897,7 @@ function PageCanvas({
   return (
     <div
       className="min-h-full flex items-start justify-center"
-      style={{ padding: "60vh 60vw" }}
+      style={{ padding: "100vh 100vw" }}
     >
       {inner}
     </div>
