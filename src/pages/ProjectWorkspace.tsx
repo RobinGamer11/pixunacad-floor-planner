@@ -104,6 +104,7 @@ import { TabletAidWheel } from "@/components/TabletAidWheel";
 import { PAPER_FORMATS as FORMAT_SIZES, getPageSizeMm, parseScaleDen } from "@/lib/paper";
 import { getPageSnapRegistry, buildRectSnapEntry } from "@/lib/pageSnap";
 import { registerCadEngineSnap, queryCadEngineSnap } from "@/lib/cadEngineSnap";
+import { Defaults } from "@/cad/constants";
 import {
   IDENTITY_WARP,
   computeWarpMatrix3d,
