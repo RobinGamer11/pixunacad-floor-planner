@@ -134,6 +134,7 @@ export default function FinancePage() {
         mode="finance"
         tabletAidOn={tabletAidOn}
         onToggleTabletAid={() => setTabletAidOn((v) => !v)}
+        onExport={handleExport}
         canDelete={!!selected}
         onDelete={() => {
           if (!selected) return;
