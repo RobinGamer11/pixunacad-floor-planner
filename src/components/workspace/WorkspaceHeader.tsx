@@ -135,14 +135,14 @@ export function WorkspaceHeader({
 
           <ModeButton
             icon={<FolderKanban size={13} />}
-            label="Projektmappe"
+            label="Mappe"
             active={mode === "workspace"}
             onClick={goWorkspace}
           />
           <ModeDivider />
           <ModeButton
             icon={<Compass size={13} />}
-            label="CAD-Oberfläche"
+            label="CAD"
             active={mode === "cad"}
             onClick={goCad}
           />
