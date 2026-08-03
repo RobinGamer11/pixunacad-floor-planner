@@ -71,14 +71,15 @@ export const FinanceSummaryCard: React.FC<Props> = ({ totals, onEstimateChange, 
                 if (e.key === "Enter") { onEstimateChange(parseEur(draft)); setEditEstimate(false); }
                 if (e.key === "Escape") setEditEstimate(false);
               }}
-              className="w-full bg-transparent border rounded px-2 py-1 text-lg font-semibold outline-none"
-              style={{ borderColor: "hsl(var(--hairline))" }}
+              className="w-full bg-transparent border rounded px-2 py-1 font-semibold outline-none"
+              style={{ borderColor: "hsl(var(--hairline))", fontSize: amountSize }}
             />
           ) : (
             <button type="button"
               disabled={!onEstimateChange}
               onClick={() => { setDraft(String(totals.estimate || "")); setEditEstimate(true); }}
-              className="flex items-center gap-2 text-lg font-semibold">
+              className="flex items-center gap-2 font-semibold whitespace-nowrap"
+              style={{ fontSize: amountSize }}>
               {formatEur(totals.estimate)}
               {onEstimateChange && <Pencil size={13} style={{ color: "hsl(var(--ink-soft))" }} />}
             </button>
@@ -88,7 +89,8 @@ export const FinanceSummaryCard: React.FC<Props> = ({ totals, onEstimateChange, 
         <div className={cellCls}>
           <div className="text-[11px] font-semibold uppercase tracking-wider mb-1"
                style={{ color: "hsl(var(--ink-soft))" }}>Angebote</div>
-          <div className="text-lg font-semibold" style={{ color: "hsl(var(--accent-strong, 24 95% 50%))" }}>
+          <div className="font-semibold whitespace-nowrap"
+               style={{ color: "hsl(var(--accent-strong, 24 95% 50%))", fontSize: amountSize }}>
             {formatEur(totals.offers)}
           </div>
         </div>
@@ -105,7 +107,8 @@ export const FinanceSummaryCard: React.FC<Props> = ({ totals, onEstimateChange, 
               </button>
             )}
           </div>
-          <div className="text-lg font-semibold">{formatEur(totals.invoices)}</div>
+          <div className="font-semibold whitespace-nowrap" style={{ fontSize: amountSize }}>{formatEur(totals.invoices)}</div>
+
           <div className="text-xs mt-0.5" style={{ color: "hsl(var(--ink-soft))" }}>
             Nachträge: {totals.supplements < 0 ? "−" : "+"} {formatEur(Math.abs(totals.supplements))}
           </div>
