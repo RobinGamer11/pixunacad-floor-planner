@@ -104,6 +104,8 @@ export default function FinancePage() {
         projectId={projectId}
         projectName={project?.name}
         mode="finance"
+        tabletAidOn={tabletAidOn}
+        onToggleTabletAid={() => setTabletAidOn((v) => !v)}
         canDelete={!!selected}
         onDelete={() => {
           if (!selected) return;
@@ -112,10 +114,9 @@ export default function FinancePage() {
         }}
       />
 
-      <main className="flex-1 min-h-0 grid transition-[grid-template-columns] duration-200"
-            style={{ gridTemplateColumns: leftOpen ? "280px 1fr" : "0px 1fr" }}>
+      <main className="flex-1 min-h-0 flex">
         {leftOpen && (
-          <aside className="min-h-0 flex flex-col border-r overflow-hidden"
+          <aside className="w-[280px] shrink-0 min-h-0 flex flex-col border-r overflow-hidden"
                  style={{ background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" }}>
             <div className="flex items-center gap-1 px-3 py-2 border-b" style={{ borderColor: "hsl(var(--hairline))" }}>
               <div className="text-[11px] font-semibold uppercase tracking-wider flex-1"
