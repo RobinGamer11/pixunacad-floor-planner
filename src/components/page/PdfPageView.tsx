@@ -59,11 +59,16 @@ export function PdfPageView({ sourceB64, pageIndex, className }: Props) {
     const schedule = () => {
       if (!el) return;
       if (debounceTimer.current) window.clearTimeout(debounceTimer.current);
+      // Träge genug, damit ein Zoom-Gesten-Burst (Wheel/Pinch) keinen
+      // teuren PDF-Re-Render pro Frame auslöst → flüssiges Zoomen.
       debounceTimer.current = window.setTimeout(() => {
         const w = el.getBoundingClientRect().width;
-        doRender(w);
-      }, 80);
+        const idle = (window as any).requestIdleCallback as undefined | ((cb: () => void, o?: any) => number);
+        if (idle) idle(() => doRender(w), { timeout: 600 });
+        else doRender(w);
+      }, 320);
     };
+
 
     schedule();
     const ro = new ResizeObserver(schedule);
