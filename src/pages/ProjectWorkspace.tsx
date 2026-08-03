@@ -3013,7 +3013,11 @@ function WarpedContent({
     if (!el) return;
     const measure = () => {
       const r = el.getBoundingClientRect();
-      setSize({ w: r.width, h: r.height });
+      const w = Math.round(r.width * 100) / 100;
+      const h = Math.round(r.height * 100) / 100;
+      // Nur bei echter Änderung setzen — sonst löst der ResizeObserver mit
+      // Subpixel-Schwankungen eine Endlos-Renderschleife aus (React #185).
+      setSize((cur) => (cur.w === w && cur.h === h ? cur : { w, h }));
     };
     measure();
     const ro = new ResizeObserver(measure);
