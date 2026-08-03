@@ -3183,16 +3183,54 @@ function ElementView({
     return () => window.removeEventListener("pixuna:page-snap-hover", onHover as EventListener);
   }, [el.id]);
 
+  // Rechtsklick auf einen (fremden) Fangpunkt → Hilfslinie von diesem Punkt
+  // zum aktuell gewählten Fangpunkt dieses Elements. Dient als Orientierungs-
+  // und Fanglinie beim Verschieben/Drehen. ESC/ENTF verwerfen die Linien.
+  useEffect(() => {
+    if (readOnly || !selected) return;
+    const onContext = (ev: MouseEvent) => {
+      const parent = rootRef.current?.parentElement as HTMLElement | null;
+      if (!parent) return;
+      const t = ev.target as HTMLElement | null;
+      if (t?.closest("[data-hub-control]")) return;
+      const pageRect = parent.getBoundingClientRect();
+      if (
+        ev.clientX < pageRect.left || ev.clientX > pageRect.right ||
+        ev.clientY < pageRect.top || ev.clientY > pageRect.bottom
+      ) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      const m = getPageSnapRegistry().queryNearest(ev.clientX, ev.clientY, pageRect, 14, [el.id]);
+      const ax = m ? m.x : ((ev.clientX - pageRect.left) / Math.max(1, pageRect.width)) * 100;
+      const ay = m ? m.y : ((ev.clientY - pageRect.top) / Math.max(1, pageRect.height)) * 100;
+      const frac = anchorFracRef.current ?? { fx: 0.5, fy: 0.5, key: "interior" };
+      const bx = el.x + frac.fx * el.w;
+      const by = el.y + frac.fy * el.h;
+      setRayGuides((g) => [...g.slice(-3), { id: Date.now() + Math.random(), ax, ay, bx, by }]);
+    };
+    const onKey = (ev: KeyboardEvent) => {
+      if (ev.key === "Escape" || ev.key === "Delete") setRayGuides([]);
+    };
+    window.addEventListener("contextmenu", onContext, true);
+    window.addEventListener("keydown", onKey, true);
+    return () => {
+      window.removeEventListener("contextmenu", onContext, true);
+      window.removeEventListener("keydown", onKey, true);
+    };
+  }, [readOnly, selected, el.id, el.x, el.y, el.w, el.h]);
+
   useEffect(() => {
     if (selected) return;
     setHubMode(null);
     setEdgeTrim(null);
     setActiveEdge(null);
+    setRayGuides([]);
     actionCommitRef.current = null;
     actionCancelRef.current = null;
     modeStartClientRef.current = null;
     try { getPageSnapRegistry().setHover(null); } catch {}
   }, [selected]);
+
 
   useEffect(() => {
     if (!edgeTrim) return;
