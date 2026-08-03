@@ -622,6 +622,9 @@ export class CadApp {
           activeFilterId: (d as any).activeFilterId || null,
           bgRemoval: bgClone,
           anchors: ((d as any).anchors || []).map((a: any) => ({ x: a.x, y: a.y })),
+          warpCorners: (d as any).warpCorners ? (d as any).warpCorners.map((c: any) => ({ x: c.x, y: c.y })) : null,
+          flipX: !!(d as any).flipX,
+          flipY: !!(d as any).flipY,
         };
       }),
 
@@ -765,6 +768,9 @@ export class CadApp {
         activeFilterId: d.activeFilterId || null,
         bgRemoval: d.bgRemoval || undefined,
         anchors: Array.isArray(d.anchors) ? d.anchors : undefined,
+        warpCorners: Array.isArray((d as any).warpCorners) ? (d as any).warpCorners : null,
+        flipX: !!(d as any).flipX,
+        flipY: !!(d as any).flipY,
       });
       if (d.id) (doc as any).id = d.id;
     }
