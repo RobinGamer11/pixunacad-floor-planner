@@ -25,7 +25,7 @@ export function buildEraseMaskCss(
     `<svg xmlns="http://www.w3.org/2000/svg" width="${wMm}" height="${hMm}" viewBox="0 0 ${wMm} ${hMm}">` +
     `<defs><filter id="b" x="-50%" y="-50%" width="200%" height="200%">` +
     `<feGaussianBlur stdDeviation="${blur.toFixed(3)}"/></filter>` +
-    `<mask id="m" maskUnits="userSpaceOnUse" x="0" y="0" width="${wMm}" height="${hMm}">` +
+    `<mask id="m" maskUnits="userSpaceOnUse" mask-type="luminance" style="mask-type:luminance" x="0" y="0" width="${wMm}" height="${hMm}">` +
     `<rect width="${wMm}" height="${hMm}" fill="white"/>${holes}</mask></defs>` +
     `<rect width="${wMm}" height="${hMm}" fill="black" mask="url(#m)"/></svg>`;
   const url = `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}")`;
@@ -36,5 +36,8 @@ export function buildEraseMaskCss(
     maskSize: "100% 100%",
     WebkitMaskRepeat: "no-repeat",
     maskRepeat: "no-repeat",
+    WebkitMaskPosition: "0 0",
+    maskPosition: "0 0",
+    maskMode: "luminance",
   } as React.CSSProperties;
 }

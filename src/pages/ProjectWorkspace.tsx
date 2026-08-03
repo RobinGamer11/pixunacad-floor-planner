@@ -82,7 +82,7 @@ import {
 import CadOverlayLayer from "@/components/page/CadOverlayLayer";
 import { CadDocumentInspector } from "@/components/page/CadDocumentInspector";
 import { CadIdPanelHost } from "@/components/page/CadIdPanelHost";
-import { PdfPageView } from "@/components/page/PdfPageView";
+import { PdfPageView, setWorkspacePdfZoomActive } from "@/components/page/PdfPageView";
 import { TableElementView, TableModifyContext, TableFormulaPickContext, type FormulaFn } from "@/components/page/TableElementView";
 import { TableToolSettings } from "@/components/page/TableToolSettings";
 
@@ -380,6 +380,7 @@ export default function ProjectWorkspace() {
   const wheelAccumRef = useRef(1);
   const wheelAnchorRef = useRef<{ x: number; y: number } | null>(null);
   const wheelRafRef = useRef(0);
+  const wheelEndTimerRef = useRef<number | null>(null);
 
   // iPad: Zwei-Finger-Pinch = Zoom, Zwei-Finger-Drag = Pan. Ein Finger auf
   // dem Canvas bleibt der aktiven CAD-/Werkzeug-Interaktion vorbehalten.
@@ -508,6 +509,12 @@ export default function ProjectWorkspace() {
       e.stopPropagation();
       if ((window as any).__pixunaZoomLock) return;
       if (e.shiftKey && !e.altKey) return;
+      setWorkspacePdfZoomActive(true);
+      if (wheelEndTimerRef.current !== null) window.clearTimeout(wheelEndTimerRef.current);
+      wheelEndTimerRef.current = window.setTimeout(() => {
+        wheelEndTimerRef.current = null;
+        setWorkspacePdfZoomActive(false);
+      }, 240);
       let dy = e.deltaY;
       if (e.deltaMode === 1) dy *= 16;
       if (e.deltaMode === 2) dy *= el.clientHeight;
@@ -539,6 +546,8 @@ export default function ProjectWorkspace() {
     return () => {
       el.removeEventListener("wheel", onWheel, { capture: true } as any);
       if (wheelRafRef.current) { cancelAnimationFrame(wheelRafRef.current); wheelRafRef.current = 0; }
+      if (wheelEndTimerRef.current !== null) window.clearTimeout(wheelEndTimerRef.current);
+      setWorkspacePdfZoomActive(false);
     };
   }, []);
 
@@ -4023,7 +4032,7 @@ function ElementView({
         <WarpedContent corners={el.warpCorners}>
           <div className="w-full h-full" style={buildEraseMaskCss(el.eraseCircles, el.wMm ?? 0, el.hMm ?? 0)}>
             {el.pdfSourceB64 ? (
-              <PdfPageView sourceB64={el.pdfSourceB64} pageIndex={el.pdfPageIndex ?? 0} />
+              <PdfPageView sourceB64={el.pdfSourceB64} pageIndex={el.pdfPageIndex ?? 0} deferDuringWorkspaceZoom />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground" style={{ background: "hsl(var(--surface-muted))" }}>PDF</div>
             )}
