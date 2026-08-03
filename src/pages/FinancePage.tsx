@@ -156,6 +156,39 @@ export default function FinancePage() {
               </button>
             </div>
 
+            {/* Filter: Text (Nummern, Namen, Notizen) + Typ-Chips (mehrfach wählbar) */}
+            <div className="px-3 py-2 border-b space-y-1.5" style={{ borderColor: "hsl(var(--hairline))" }}>
+              <div className="flex items-center gap-1.5 h-7 rounded-md border px-2"
+                   style={{ borderColor: "hsl(var(--hairline))" }}>
+                <Search size={12} style={{ color: "hsl(var(--ink-soft))" }} />
+                <input value={filterQuery} onChange={(e) => setFilterQuery(e.target.value)}
+                  placeholder="Nr., Name, Notiz…"
+                  className="flex-1 min-w-0 bg-transparent text-[11px] outline-none" />
+                {filterActive && (
+                  <button title="Filter zurücksetzen"
+                    onClick={() => { setFilterQuery(""); setFilterTypes([]); }}>
+                    <X size={12} style={{ color: "hsl(var(--ink-soft))" }} />
+                  </button>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {FILTER_CHIPS.map(([key, label]) => {
+                  const on = filterTypes.includes(key);
+                  return (
+                    <button key={key}
+                      onClick={() => setFilterTypes((t) => on ? t.filter((x) => x !== key) : [...t, key])}
+                      className="h-6 px-2 rounded-full border text-[10px] font-medium"
+                      style={{
+                        borderColor: on ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
+                        background: on ? "hsl(var(--accent-gold) / 0.14)" : undefined,
+                      }}>
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             <div className="flex gap-1.5 px-3 py-2 border-b" style={{ borderColor: "hsl(var(--hairline))" }}>
               <button onClick={() => addNode("overview")}
                 className="flex-1 h-7 rounded-md border text-[11px] font-medium flex items-center justify-center gap-1 hover:bg-muted"
