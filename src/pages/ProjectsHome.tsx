@@ -1009,9 +1009,10 @@ export default function ProjectsHome() {
                   {(
                     [
                       ["uebersicht", "Übersicht", false],
-                      ["seiten", "Mappe", false],
                       ["aufgaben", "Aufgaben", false],
+                      ["finanzen", "Finanzen", false],
                       ["dokumente", "Dokumente", false],
+                      ["seiten", "Mappe", false],
                       ["infos", "Informationen", false],
                       ["team", "Team", true],
                     ] as const
