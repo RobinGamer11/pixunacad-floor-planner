@@ -2055,6 +2055,7 @@ export class SelectTool {
           }
           this._clearEditState();
           this.app.hub.hide();
+          (this.app as any).commitHistorySnapshot?.();
         }
         return;
       }
