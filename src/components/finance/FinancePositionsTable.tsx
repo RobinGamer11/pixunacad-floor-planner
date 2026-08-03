@@ -85,19 +85,19 @@ export const FinancePositionsTable: React.FC<Props> = ({ projectId, nodeId, posi
                   onChange={(e) => upd(p.id, { supplementKind: e.target.value as "plus" | "minus" })}
                   className="bg-transparent text-sm outline-none border rounded px-1 py-0.5 max-w-full"
                   style={{ borderColor: "hsl(var(--hairline))" }}>
-                  <option value="plus">Nachtrag (Mehrnachtrag)</option>
-                  <option value="minus">Nachtrag (Mindernachtrag)</option>
+                  <option value="plus">Mehrnachtrag</option>
+                  <option value="minus">Mindernachtrag</option>
                 </select>
               ) : (
                 <span className="truncate">{TYPE_LABEL[p.type]}</span>
               )}
+              <span className="text-sm tabular-nums" style={{ color: "hsl(var(--ink-soft))" }}>
+                {numberOf.get(p.id)}
+              </span>
             </div>
 
-            <div className="flex items-center gap-1.5 pr-2">
-              <Calendar size={13} style={{ color: "hsl(var(--ink-soft))" }} />
-              <input type="date" value={p.date} onChange={(e) => upd(p.id, { date: e.target.value })}
-                className="bg-transparent text-sm outline-none w-full" />
-            </div>
+            <DateCell value={p.date} onChange={(v) => upd(p.id, { date: v })} />
+
 
             <input value={p.number} placeholder={NUMBER_PLACEHOLDER[p.type]}
               onChange={(e) => upd(p.id, { number: e.target.value })}
