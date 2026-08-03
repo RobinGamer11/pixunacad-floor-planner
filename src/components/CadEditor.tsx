@@ -309,6 +309,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const docFileInputRef = useRef<HTMLInputElement>(null);
   const [docPickerPages, setDocPickerPages] = useState<ImportedPage[] | null>(null);
   const [docPickerSelected, setDocPickerSelected] = useState<Set<number>>(new Set());
+  const [docLibraryOpen, setDocLibraryOpen] = useState(false);
   const [docImporting, setDocImporting] = useState(false);
   // Dokumentenwerkzeug (identisch zur Projektmappe): ohne Häkchen wird frei
   // platziert (Originalgröße), mit Häkchen greift der eingestellte Maßstab.
@@ -924,7 +925,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
    * Platziert importierte Seiten direkt — Maßstab kommt aus dem
    * Dokumentenwerkzeug-Panel (Häkchen „Maßstab anwenden").
    */
-  const placeImportedPages = useCallback((pages: ImportedPage[]) => {
+  const placeImportedPages = useCallback((pages: ImportedPage[], stacked = false) => {
     const app = appRef.current; if (!app || pages.length === 0) return;
     const [firstPage] = pages;
     let denom = 1;
@@ -947,28 +948,31 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       importScaleDenom: denom,
       pdfSourceB64: first.pdfSourceB64 || null,
     });
-    let offX = firstW + 0.5;
+    // "Gesamt": alle Seiten leicht versetzt übereinander stapeln.
+    const step = stacked ? Math.max(0.05, firstW * 0.04) : 0;
+    let offX = stacked ? step : firstW + 0.5;
+    let offY = 0;
+    let i = 0;
     for (const p of rest) {
+      i++;
       const pw = p.widthM * denom;
       const ph = p.heightM * denom;
       app.scene.createDocument({
         name: p.name, kind: p.kind, src: p.src, pageIndex: p.pageIndex,
-        position: { x: offX, y: 0 }, widthM: pw, heightM: ph,
+        position: { x: offX, y: offY }, widthM: pw, heightM: ph,
         pixelWidth: p.pixelWidth, pixelHeight: p.pixelHeight,
         labelId: app.activeDrawLabelId,
         importScaleDenom: denom,
         pdfSourceB64: p.pdfSourceB64 || null,
       });
-      offX += pw + 0.5;
+      if (stacked) { offX = step * (i + 1); offY = step * (i + 1); }
+      else offX += pw + 0.5;
     }
     // "Frei platzieren": Standardbreite 10 m — Ansicht bleibt unverändert.
 
   }, [docFreePlace, docImportScale]);
 
-  const handleDocFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    e.target.value = "";
-    if (!f) return;
+  const importPickedFile = useCallback(async (f: File) => {
     setDocImporting(true);
     try {
       const pages = await importFile(f);
@@ -976,10 +980,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       if (pages.length === 1) {
         placeImportedPages(pages);
       } else {
-        // PDF mit mehreren Seiten → Page-Picker
-        const all = new Set<number>();
-        pages.forEach((_, i) => all.add(i));
-        setDocPickerSelected(all);
+        // PDF mit mehreren Seiten → eine Seite wählen oder gesamtes Dokument
+        setDocPickerSelected(new Set([0]));
         setDocPickerPages(pages);
       }
     } catch (err: any) {
@@ -989,13 +991,21 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     }
   }, [placeImportedPages]);
 
-  const handleDocPickerConfirm = useCallback(() => {
+  const handleDocFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    e.target.value = "";
+    if (!f) return;
+    await importPickedFile(f);
+  }, [importPickedFile]);
+
+  const handleDocPickerConfirm = useCallback((mode: "single" | "all") => {
     if (!docPickerPages) return;
-    const selectedPages = docPickerPages.filter((_, i) => docPickerSelected.has(i));
+    const all = docPickerPages;
+    const idx = docPickerSelected.values().next().value ?? 0;
     setDocPickerPages(null);
     setDocPickerSelected(new Set());
-    if (selectedPages.length === 0) return;
-    placeImportedPages(selectedPages);
+    if (mode === "all") placeImportedPages(all, true);
+    else placeImportedPages([all[idx]]);
   }, [docPickerPages, docPickerSelected, placeImportedPages]);
 
 
