@@ -12,6 +12,7 @@ import html2canvas from "html2canvas";
 import { PDFDocument } from "pdf-lib";
 import type { Project, ProjectPage } from "./projectStore";
 import { getPageSizeMm, MM_PER_INCH } from "./paper";
+import { setExportMode } from "./printExport";
 
 export type PdfColorMode = "original" | "bw" | "gray" | "custom";
 
@@ -218,6 +219,10 @@ export async function exportProjectToPdf(
   let step = 0;
   const total = units.reduce((s, u) => s + u.length, 0);
 
+  // Ränder-Overlay und Hilfslinien während des Exports ausblenden.
+  setExportMode(true);
+  await waitFrames(3);
+  try {
   for (const unit of units) {
     const snaps: { canvas: HTMLCanvasElement; wMm: number; hMm: number }[] = [];
     for (const page of unit) {
@@ -244,6 +249,9 @@ export async function exportProjectToPdf(
 
   onProgress?.({ current: total, total, label: "PDF wird finalisiert…" });
   return await pdf.save();
+  } finally {
+    setExportMode(false);
+  }
 }
 
 /** Löst einen Browser-Download aus. */
