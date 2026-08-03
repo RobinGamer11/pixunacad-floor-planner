@@ -2034,7 +2034,16 @@ export class CadApp {
       }
 
       if (e.key === "Delete" || e.key === "Backspace") {
+        // Läuft gerade eine Bearbeitung (Verschieben/Drehen/Resize)? Dann bricht
+        // ENTF diese Aktion ab (wie ESC) statt etwas zu löschen.
+        if (this.activeTool === this.selectTool && (this.selectTool as any).editTarget) {
+          e.preventDefault();
+          this.selectTool.cancel();
+          this.pointEditMenu.hide();
+          return;
+        }
         // Marquee-Auswahl hat Vorrang: mehrere Elemente in einem Rutsch löschen.
+
         if (this.activeTool === this.selectTool && this.selectTool.marqueeSelectedIds.length > 0) {
           this.selectTool.deleteMarqueeSelection();
           return;
