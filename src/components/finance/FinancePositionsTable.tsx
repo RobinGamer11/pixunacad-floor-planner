@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { GripVertical, Trash2, FileText, Calendar } from "lucide-react";
 import {
   financeStore, formatEur, parseEur,
@@ -28,6 +28,18 @@ export const FinancePositionsTable: React.FC<Props> = ({ projectId, nodeId, posi
 
   const upd = (id: string, patch: Partial<FinancePosition>) =>
     financeStore.updatePosition(projectId, id, patch);
+
+  // Fortlaufende Nummerierung von oben nach unten, je Typ (Nachträge zusätzlich
+  // nach Mehr-/Mindernachtrag getrennt).
+  const counters: Record<string, number> = {};
+  const numberOf = new Map<string, string>();
+  for (const p of positions) {
+    const key = p.type === "supplement" ? `s-${p.supplementKind ?? "plus"}` : p.type;
+    counters[key] = (counters[key] ?? 0) + 1;
+    numberOf.set(p.id, String(counters[key]).padStart(2, "0"));
+  }
+
+
 
   return (
     <div className="rounded-xl border overflow-hidden"
@@ -73,19 +85,19 @@ export const FinancePositionsTable: React.FC<Props> = ({ projectId, nodeId, posi
                   onChange={(e) => upd(p.id, { supplementKind: e.target.value as "plus" | "minus" })}
                   className="bg-transparent text-sm outline-none border rounded px-1 py-0.5 max-w-full"
                   style={{ borderColor: "hsl(var(--hairline))" }}>
-                  <option value="plus">Nachtrag (Mehrnachtrag)</option>
-                  <option value="minus">Nachtrag (Mindernachtrag)</option>
+                  <option value="plus">Mehrnachtrag</option>
+                  <option value="minus">Mindernachtrag</option>
                 </select>
               ) : (
                 <span className="truncate">{TYPE_LABEL[p.type]}</span>
               )}
+              <span className="text-sm tabular-nums" style={{ color: "hsl(var(--ink-soft))" }}>
+                {numberOf.get(p.id)}
+              </span>
             </div>
 
-            <div className="flex items-center gap-1.5 pr-2">
-              <Calendar size={13} style={{ color: "hsl(var(--ink-soft))" }} />
-              <input type="date" value={p.date} onChange={(e) => upd(p.id, { date: e.target.value })}
-                className="bg-transparent text-sm outline-none w-full" />
-            </div>
+            <DateCell value={p.date} onChange={(v) => upd(p.id, { date: v })} />
+
 
             <input value={p.number} placeholder={NUMBER_PLACEHOLDER[p.type]}
               onChange={(e) => upd(p.id, { number: e.target.value })}
@@ -108,6 +120,28 @@ export const FinancePositionsTable: React.FC<Props> = ({ projectId, nodeId, posi
     </div>
   );
 };
+
+/** Datum mit Kalendersymbol als Auslöser; natives Icon wird ausgeblendet. */
+const DateCell: React.FC<{ value: string; onChange: (v: string) => void }> = ({ value, onChange }) => {
+  const ref = useRef<HTMLInputElement>(null);
+  const open = () => {
+    const el = ref.current as (HTMLInputElement & { showPicker?: () => void }) | null;
+    if (!el) return;
+    el.focus();
+    try { el.showPicker?.(); } catch { /* not supported */ }
+  };
+  return (
+    <div className="flex items-center gap-1.5 pr-2">
+      <button type="button" onClick={open} title="Kalender öffnen"
+        className="h-6 w-6 rounded flex items-center justify-center hover:bg-muted shrink-0">
+        <Calendar size={13} style={{ color: "hsl(var(--ink-soft))" }} />
+      </button>
+      <input ref={ref} type="date" value={value} onChange={(e) => onChange(e.target.value)}
+        className="bg-transparent text-sm outline-none w-full [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none" />
+    </div>
+  );
+};
+
 
 const AmountInput: React.FC<{ value: number; color?: string; negative?: boolean; onCommit: (v: number) => void }> =
 ({ value, color, negative, onCommit }) => {
