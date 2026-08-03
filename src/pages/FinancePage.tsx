@@ -88,10 +88,16 @@ export default function FinancePage() {
               : <Building2 size={13} style={{ color: "hsl(var(--ink-soft))" }} />}
             <span className="truncate flex-1">{n.name}</span>
             <button
-              title={n.enabled ? "In Summen berücksichtigt" : "Nicht in Summen"}
-              onClick={(e) => { e.stopPropagation(); financeStore.updateNode(pid, n.id, { enabled: !n.enabled }); }}
-              className="opacity-0 group-hover:opacity-100 shrink-0">
-              {n.enabled ? <ToggleRight size={14} /> : <ToggleLeft size={14} />}
+              title={n.type === "overview" ? "Übersicht löschen" : "Aktion löschen"}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!confirm(`„${n.name}" wirklich löschen?`)) return;
+                financeStore.deleteNode(pid, n.id);
+                setSelectedId((cur) => (cur === n.id ? null : cur));
+              }}
+              className="opacity-0 group-hover:opacity-100 shrink-0"
+              style={{ color: "hsl(var(--ink-soft))" }}>
+              <Trash2 size={13} />
             </button>
           </div>
           {open && kids.length > 0 && renderTree(n.id, depth + 1)}
