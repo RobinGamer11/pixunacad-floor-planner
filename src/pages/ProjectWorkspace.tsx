@@ -3693,8 +3693,29 @@ function ElementView({
         // Zu nah am Drehpunkt → Winkel wäre extrem sprunghaft, daher ignorieren.
         if (Math.hypot(ty - ay, tx - ax) < 24) return;
         const a = (Math.atan2(ty - ay, tx - ax) * 180) / Math.PI;
-        if (startAngle === null) startAngle = a;
+        if (startAngle === null) {
+          // Referenzwinkel = Richtung der Fangpunkt-Achse (durch die beiden
+          // oberen Fangpunkte) im Ausgangszustand. Dadurch folgt die Achse ab
+          // der ersten Bewegung exakt dem Cursor: die Maus liegt immer auf
+          // Höhe des gewählten Fangpunkts, das Drehen ist 1:1 ablesbar.
+          const r0 = baseRect();
+          const rad0 = (startRot * Math.PI) / 180;
+          const c0 = Math.cos(rad0), s0 = Math.sin(rad0);
+          const rot0 = (px: number, py: number) => {
+            const ox = px - ax, oy = py - ay;
+            return { x: ax + ox * c0 - oy * s0, y: ay + ox * s0 + oy * c0 };
+          };
+          const tl0 = rot0(r0.left, r0.top);
+          const tr0 = rot0(r0.left + r0.width, r0.top);
+          const d0l = Math.hypot(tl0.x - ax, tl0.y - ay);
+          const d0r = Math.hypot(tr0.x - ax, tr0.y - ay);
+          const ref0 = d0r >= d0l ? tr0 : tl0;
+          startAngle = (Math.atan2(ref0.y - ay, ref0.x - ax) * 180) / Math.PI;
+        }
         let delta = a - startAngle;
+        // Kürzesten Weg wählen, damit kein 360°-Sprung entsteht.
+        while (delta > 180) delta -= 360;
+        while (delta < -180) delta += 360;
         if (ev.shiftKey) {
           const absTarget = Math.round((startRot + delta) / 90) * 90;
           delta = absTarget - startRot;
@@ -3713,13 +3734,15 @@ function ElementView({
           const tl = rot(r.left, r.top);
           const tr = rot(r.left + r.width, r.top);
           const vx = tr.x - tl.x, vy = tr.y - tl.y;
-          // Cursor hart auf Höhe des ausgewählten Fangpunkts fixieren: der
-          // Marker sitzt exakt auf dem weiter entfernten oberen Fangpunkt,
-          // die Achse verläuft durch beide oberen Fangpunkte.
-          const dTl = Math.hypot(tl.x - ax, tl.y - ay);
-          const dTr = Math.hypot(tr.x - ax, tr.y - ay);
-          const ref = dTr >= dTl ? tr : tl;
-          const mx = ref.x, my = ref.y;
+          const len2 = vx * vx + vy * vy;
+          // Maus hart auf die Fangpunkt-Achse projizieren (bleibt exakt auf
+          // Höhe des gewählten Fangpunkts).
+          let mx = tx, my = ty;
+          if (len2 > 1e-6) {
+            const t = ((tx - tl.x) * vx + (ty - tl.y) * vy) / len2;
+            mx = tl.x + vx * t;
+            my = tl.y + vy * t;
+          }
           const toPct = (cx: number, cy: number) => ({
             x: ((cx - pageRect.left) / Math.max(1, pageRect.width)) * 100,
             y: ((cy - pageRect.top) / Math.max(1, pageRect.height)) * 100,
