@@ -1235,14 +1235,6 @@ function ProfileAvatar({
         }}
         title={profile.status}
       />
-      {large && (
-        <div
-          className="absolute left-1/2 -translate-x-1/2 text-[10px] font-semibold whitespace-nowrap"
-          style={{ top: "100%", marginTop: 6, color: "hsl(var(--ink-soft))" }}
-        >
-          {count} / {max}
-        </div>
-      )}
     </div>
   );
 }
