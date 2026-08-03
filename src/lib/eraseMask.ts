@@ -19,21 +19,25 @@ export function buildEraseMaskCss(
     .map((c, i) => {
       const softness = Math.max(0, Math.min(1, c.s));
       if (softness <= 0.01) return "";
-      // Stärkere Weichheit: bei 100 % beginnt der Auslauf direkt in der Mitte.
-      const core = Math.max(0, Math.min(99, Math.pow(1 - softness, 1.6) * 100));
+      // Stärkere Weichheit: bei 100 % beginnt der Auslauf direkt in der Mitte
+      // und die Deckkraft bleibt niedrig — nur längeres Verweilen radiert voll.
+      const core = Math.max(0, Math.min(99, Math.pow(1 - softness, 2.2) * 100));
+      const mid = Math.max(0.08, 1 - 0.6 * softness).toFixed(3);
       return (
         `<radialGradient id="g${i}">` +
         `<stop offset="0%" stop-color="black" stop-opacity="1"/>` +
-        `<stop offset="${core.toFixed(1)}%" stop-color="black" stop-opacity="1"/>` +
+        `<stop offset="${core.toFixed(1)}%" stop-color="black" stop-opacity="${mid}"/>` +
+        `<stop offset="${Math.min(99, core + (100 - core) * 0.55).toFixed(1)}%" stop-color="black" stop-opacity="${(0.35 * (1 - 0.7 * softness)).toFixed(3)}"/>` +
         `<stop offset="100%" stop-color="black" stop-opacity="0"/>` +
         `</radialGradient>`
       );
+
     })
     .join("");
   const holes = circles
     .map((c, i) => {
       const soft = c.s > 0.01;
-      const alpha = Math.max(0.02, Math.min(1, c.a ?? (soft ? 0.35 : 1)));
+      const alpha = Math.max(0.02, Math.min(1, c.a ?? (soft ? 0.35 * (1 - 0.6 * Math.min(1, c.s)) : 1)));
       return (
         `<circle cx="${c.x.toFixed(3)}" cy="${c.y.toFixed(3)}" r="${Math.max(0.01, c.r).toFixed(3)}" ` +
         `fill="${soft ? `url(#g${i})` : "black"}" fill-opacity="${alpha.toFixed(3)}"/>`

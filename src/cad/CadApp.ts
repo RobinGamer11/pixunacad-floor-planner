@@ -2063,16 +2063,29 @@ export class CadApp {
           return;
         }
         if (this.activeTool === this.selectTool) { this.selectTool.cancel(); this.clearSelection(); this.setSelectedLabelId(null); this.pointEditMenu.hide(); return; }
+        // Jedes andere Werkzeug (z. B. Radiergummi): abbrechen und zurück zur Auswahl.
         this.activeTool.cancel();
         this.clearSelection();
         this.setSelectedLabelId(null);
+        this.setTool(ToolIds.SELECT);
+        return;
       }
+
 
       if (e.key === "Delete" || e.key === "Backspace") {
         // Läuft gerade eine Bearbeitung (Verschieben/Drehen/Resize)? Dann bricht
         // ENTF diese Aktion ab (wie ESC) statt etwas zu löschen.
+        // Radiergummi: ENTF hebt das Werkzeug auf (zurück zur Auswahl).
+        if (this.activeTool === this.eraserTool) {
+          e.preventDefault();
+          e.stopPropagation();
+          this.eraserTool.cancel();
+          this.setTool(ToolIds.SELECT);
+          return;
+        }
         const st: any = this.selectTool as any;
         if (this.activeTool === this.selectTool &&
+
             (st.editTarget || st.rotateTextBoxId || st.dragTextBoxId || st.dragDocId || st.dragFreeStrokeId || st.dragDimId)) {
           e.preventDefault();
           e.stopPropagation();
