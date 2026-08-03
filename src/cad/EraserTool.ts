@@ -246,22 +246,14 @@ export class EraserTool {
       }
     }
 
-    // Schraffuren: Kreis als Loch ausstanzen
-    for (const hatch of scene.hatches.slice()) {
-      if (!this.app.labelManager.isVisible(hatch.labelId)) continue;
-      if (!this._polyNearCircle(hatch.points, centerW, r)) continue;
-      const rH = this._effRadius(hatch.id, r, mode, softness, strength);
-      // Nur stanzen, wenn der Kreis die Fläche wirklich trifft.
-      const touches = pointInPolygon(centerW, hatch.points) || this._polyEdgeNear(hatch.points, centerW, rH);
-      if (!touches) continue;
-      // Doppelstempel an nahezu identischer Stelle vermeiden.
-      const last = hatch.holes[hatch.holes.length - 1];
-      if (last && last.length > 2) {
-        const c = this._polyCenter(last);
-        if (dist(c, centerW) < rH * 0.35) { hatch.holes[hatch.holes.length - 1] = this._circlePoly(centerW, rH); continue; }
-      }
-      hatch.holes.push(this._circlePoly(centerW, rH));
+    // Schraffuren: Radier-Pfad nur sammeln (Preview). Der echte boolesche
+    // Schnitt passiert erst beim Loslassen der Maus (_commitHatchErase).
+    const lastStamp = this._hatchStamps[this._hatchStamps.length - 1];
+    if (!lastStamp || dist(lastStamp.c, centerW) > r * 0.25) {
+      this._hatchStamps.push({ c: v(centerW.x, centerW.y), r });
+      if (this._hatchStamps.length > 4000) this._hatchStamps.shift();
     }
+
 
     // Textboxen: werden entfernt, sobald der Pinsel sie trifft (Smooth = mit
     // Verweildauer, damit ein Streifen am Rand nicht sofort alles löscht).
