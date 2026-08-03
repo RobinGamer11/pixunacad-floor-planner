@@ -380,7 +380,7 @@ const ChildList: React.FC<{
               <span className="text-xs" style={{ color: "hsl(var(--ink-soft))" }}>
                 {formatPct(cO.pct)} / {formatPct(cI.pct)}
               </span>
-              <button onClick={() => onSelect(n.id)}
+              <button data-export-hide onClick={() => onSelect(n.id)}
                 className="h-7 w-7 rounded flex items-center justify-center hover:bg-muted"
                 title={n.type === "overview" ? "Übersicht öffnen" : "Aktion öffnen"}>
                 <ArrowRight size={14} style={{ color: "hsl(var(--ink-soft))" }} />
