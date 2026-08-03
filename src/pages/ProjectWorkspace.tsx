@@ -1189,20 +1189,17 @@ export default function ProjectWorkspace() {
         {docPickerPages && (
           <DocumentPagePickerDialog
             pages={docPickerPages}
-            selected={docPickerSelected}
-            onToggle={(i) => setDocPickerSelected((prev) => {
-              const next = new Set(prev);
-              if (next.has(i)) next.delete(i); else next.add(i);
-              return next;
-            })}
-            onSelectAll={() => {
-              const all = new Set<number>();
-              docPickerPages.forEach((_, i) => all.add(i));
-              setDocPickerSelected(all);
-            }}
-            onSelectNone={() => setDocPickerSelected(new Set())}
+            selectedIndex={docPickerSelected.values().next().value ?? 0}
+            onSelect={(i) => setDocPickerSelected(new Set([i]))}
             onCancel={() => setDocPickerPages(null)}
             onConfirm={confirmDocumentPagePicker}
+          />
+        )}
+        {docLibraryOpen && projectId && (
+          <ProjectFilePickerDialog
+            projectId={projectId}
+            onCancel={() => setDocLibraryOpen(false)}
+            onPick={(f) => { setDocLibraryOpen(false); void importPickedFile(f); }}
           />
         )}
         {/* Maßstab-Modal entfernt — Maßstab wird jetzt rechts im "Dokument"-
