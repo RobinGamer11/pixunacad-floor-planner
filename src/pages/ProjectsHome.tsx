@@ -429,13 +429,9 @@ export default function ProjectsHome() {
               style={{ background: "hsl(var(--surface))", borderColor: "hsl(var(--hairline))" }}
             >
               <div className="flex items-center gap-4">
-                <div className="relative flex flex-col items-center">
+                <div className="flex flex-col items-center">
+                  <div className="relative">
                   <ProfileAvatar profile={profile} count={projectCount} max={MAX_PROJECTS} size={72} large />
-                  <div className="mt-1.5 text-[10px] font-semibold whitespace-nowrap" style={{ color: "hsl(var(--ink-soft))" }}>
-                    {projectCount} / {MAX_PROJECTS}
-                  </div>
-                </div>
-                <div className="hidden" />
                   <label
                     className="absolute -bottom-1 -right-1 h-7 w-7 rounded-full border shadow flex items-center justify-center cursor-pointer"
                     style={{ background: "hsl(var(--surface))", borderColor: "hsl(var(--hairline))" }}
