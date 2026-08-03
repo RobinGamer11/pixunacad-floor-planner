@@ -198,33 +198,39 @@
     @apply w-12 h-12 rounded-lg flex flex-col items-center justify-center gap-0.5 text-[9px] font-medium leading-none;
     color: hsl(var(--ink-soft, var(--cad-toolbar-muted)));
     background: transparent;
-    transform-style: preserve-3d;
-    transform: perspective(420px) translateZ(0) rotateX(0deg);
-    transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 180ms ease,
+    transform: translateY(0);
+    box-shadow: none;
+    text-rendering: geometricPrecision;
+    -webkit-font-smoothing: antialiased;
+    transition: transform 160ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 160ms ease,
       background-color 150ms ease, color 150ms ease;
   }
   .cad-rail-btn:hover:not(:disabled) {
     background: hsl(var(--surface-muted));
     color: hsl(var(--ink, var(--cad-toolbar-foreground)));
-    transform: perspective(420px) translateY(-2px) translateZ(10px) rotateX(8deg) scale(1.06);
-    box-shadow: 0 8px 16px -8px hsl(var(--ink, 222 40% 10%) / 0.35);
+    transform: translateY(-1px);
+    box-shadow: 0 3px 6px -4px hsl(var(--ink, 222 40% 10%) / 0.28);
   }
   .cad-rail-btn:active:not(:disabled) {
-    transform: perspective(420px) translateY(0) translateZ(2px) rotateX(2deg) scale(0.98);
+    transform: translateY(0);
+    box-shadow: none;
   }
   .cad-rail-btn.active,
   .cad-rail-btn[data-active="true"] {
     background: hsl(var(--surface-muted));
     color: hsl(var(--accent-gold));
-    transform: perspective(420px) translateY(-3px) translateZ(16px) rotateX(10deg) scale(1.08);
-    box-shadow: 0 10px 20px -10px hsl(var(--accent-gold) / 0.55),
-      inset 0 1px 0 hsl(0 0% 100% / 0.35);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px -6px hsl(var(--accent-gold) / 0.5),
+      inset 0 1px 0 hsl(0 0% 100% / 0.3);
   }
   .cad-rail-btn.active:hover:not(:disabled),
   .cad-rail-btn[data-active="true"]:hover:not(:disabled) {
     color: hsl(var(--accent-gold));
-    transform: perspective(420px) translateY(-4px) translateZ(20px) rotateX(12deg) scale(1.12);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 14px -6px hsl(var(--accent-gold) / 0.6),
+      inset 0 1px 0 hsl(0 0% 100% / 0.3);
   }
+
 
 
   .cad-hub {
