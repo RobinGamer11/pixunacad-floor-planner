@@ -919,6 +919,45 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     setExpandedTool(TOOL_VARIANTS[id] ? id : null);
   }, [lineVariant]);
 
+  /**
+   * Platziert importierte Seiten direkt — Maßstab kommt aus dem
+   * Dokumentenwerkzeug-Panel (Häkchen „Maßstab anwenden").
+   */
+  const placeImportedPages = useCallback((pages: ImportedPage[]) => {
+    const app = appRef.current; if (!app || pages.length === 0) return;
+    let denom = 1;
+    if (!docFreePlace) {
+      const m = docImportScale.match(/^\s*1\s*:\s*(\d+(?:[.,]\d+)?)\s*$/);
+      const v = m ? parseFloat(m[1].replace(",", ".")) : parseFloat(docImportScale.replace(",", "."));
+      denom = Number.isFinite(v) && v > 0 ? v : 100;
+    }
+    const [first, ...rest] = pages;
+    const firstW = first.widthM * denom;
+    const firstH = first.heightM * denom;
+    app.setTool(ToolIds.DOCUMENT);
+    app.documentTool.beginPlacement({
+      src: first.src, widthM: firstW, heightM: firstH,
+      pixelWidth: first.pixelWidth, pixelHeight: first.pixelHeight,
+      name: first.name, kind: first.kind, pageIndex: first.pageIndex,
+      importScaleDenom: denom,
+      pdfSourceB64: first.pdfSourceB64 || null,
+    });
+    let offX = firstW + 0.5;
+    for (const p of rest) {
+      const pw = p.widthM * denom;
+      const ph = p.heightM * denom;
+      app.scene.createDocument({
+        name: p.name, kind: p.kind, src: p.src, pageIndex: p.pageIndex,
+        position: { x: offX, y: 0 }, widthM: pw, heightM: ph,
+        pixelWidth: p.pixelWidth, pixelHeight: p.pixelHeight,
+        labelId: app.activeDrawLabelId,
+        importScaleDenom: denom,
+        pdfSourceB64: p.pdfSourceB64 || null,
+      });
+      offX += pw + 0.5;
+    }
+  }, [docFreePlace, docImportScale]);
+
   const handleDocFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     e.target.value = "";
@@ -928,13 +967,9 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       const pages = await importFile(f);
       if (pages.length === 0) { window.alert("Keine Seiten gefunden."); return; }
       if (pages.length === 1) {
-        // Direkt zum Maßstab-Dialog – Default = aktueller Zeichen-Maßstab
-        const def = pages[0].kind === "pdf-page" ? String(drawingScale) : "1";
-        setScaleChoice(def);
-        setScaleCustom(String(drawingScale));
-        setScaleDialogPages(pages);
+        placeImportedPages(pages);
       } else {
-        // PDF mit mehreren Seiten → erst Page-Picker
+        // PDF mit mehreren Seiten → Page-Picker
         const all = new Set<number>();
         pages.forEach((_, i) => all.add(i));
         setDocPickerSelected(all);
@@ -945,19 +980,17 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     } finally {
       setDocImporting(false);
     }
-  }, [drawingScale]);
+  }, [placeImportedPages]);
 
   const handleDocPickerConfirm = useCallback(() => {
     if (!docPickerPages) return;
     const selectedPages = docPickerPages.filter((_, i) => docPickerSelected.has(i));
-    if (selectedPages.length === 0) { setDocPickerPages(null); return; }
-    // → Maßstab-Dialog (Default = aktueller Zeichen-Maßstab)
-    setScaleChoice(selectedPages[0].kind === "pdf-page" ? String(drawingScale) : "1");
-    setScaleCustom(String(drawingScale));
     setDocPickerPages(null);
     setDocPickerSelected(new Set());
-    setScaleDialogPages(selectedPages);
-  }, [docPickerPages, docPickerSelected]);
+    if (selectedPages.length === 0) return;
+    placeImportedPages(selectedPages);
+  }, [docPickerPages, docPickerSelected, placeImportedPages]);
+
 
   /**
    * Maßstab anwenden. Import-Faktor = importScaleDenom:
