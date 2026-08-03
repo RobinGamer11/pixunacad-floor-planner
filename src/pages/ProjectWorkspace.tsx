@@ -1943,6 +1943,7 @@ function ToolRailButton({
       onClick={disabled ? undefined : onClick}
       title={disabled ? `${label} — noch nicht verfügbar` : label}
       disabled={disabled}
+      data-active={active ? "true" : undefined}
       className="cad-rail-btn"
       style={{
         background: active ? "hsl(var(--surface-muted))" : "transparent",
