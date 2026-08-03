@@ -1537,7 +1537,14 @@ export const projectStore = {
     }));
   },
   /* ---------- Undo / Redo (public API) ---------- */
+  /** Schließt die laufende Geste ab: die nächste Änderung startet garantiert
+   *  einen neuen Undo-Schritt (Pointer-Up, Enter, Abbruch, Werkzeugwechsel). */
+  sealHistory: (projectId: string) => {
+    lastPushAt.delete(projectId);
+    lastSig.delete(projectId);
+  },
   canUndo: (projectId: string) => (history.get(projectId)?.past.length ?? 0) > 0,
+
   canRedo: (projectId: string) => (history.get(projectId)?.future.length ?? 0) > 0,
   subscribeHistory: (fn: () => void) => {
     historyListeners.add(fn);
