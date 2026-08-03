@@ -128,58 +128,92 @@ export function FileBrowser({ project, kind, accept, emptyHint, photoMode }: Pro
       ) : (
         <div className="mt-4 space-y-4">
           {folders.length > 0 && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-              {folders.map((n) => (
+            /* Ordner werden untereinander als Verzweigungsbaum gelistet:
+             * links eine durchgehende Stammlinie, je Ordner ein Abzweig. */
+            <div
+              className="rounded-2xl p-3"
+              style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
+            >
+              <div className="relative pl-6">
+                {/* Stammlinie – endet an der letzten Verzweigung */}
                 <div
-                  key={n.id}
-                  className="rounded-xl p-3 flex items-center gap-3 group cursor-pointer transition"
-                  style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
-                  onDoubleClick={() => setCurrentFolder(n.id)}
-                >
-                  <button
-                    onClick={() => setCurrentFolder(n.id)}
-                    className="flex items-center gap-3 flex-1 min-w-0 text-left"
-                  >
-                    <Folder size={18} style={{ color: "hsl(var(--accent-gold))" }} />
-                    {renamingId === n.id ? (
-                      <input
-                        autoFocus
-                        value={renameDraft}
-                        onChange={(e) => setRenameDraft(e.target.value)}
-                        onClick={(e) => e.stopPropagation()}
-                        onBlur={() => { projectStore.renameNode(project.id, kind, n.id, renameDraft.trim() || n.name); setRenamingId(null); }}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") { projectStore.renameNode(project.id, kind, n.id, renameDraft.trim() || n.name); setRenamingId(null); }
-                          if (e.key === "Escape") setRenamingId(null);
+                  className="absolute left-2 top-0"
+                  style={{ width: 1, background: "hsl(var(--hairline))", bottom: 20 }}
+                />
+                {folders.map((n, i) => (
+                  <div key={n.id} className="relative">
+                    {/* Abzweig zur Ordnerkarte */}
+                    <div
+                      className="absolute"
+                      style={{ left: -16, top: 20, width: 14, height: 1, background: "hsl(var(--hairline))" }}
+                    />
+                    <div
+                      className="rounded-xl px-3 py-2.5 mb-2 flex items-center gap-3 group cursor-pointer transition w-full"
+                      style={{ background: "hsl(var(--surface))", border: "1px solid hsl(var(--hairline))" }}
+                      onDoubleClick={() => setCurrentFolder(n.id)}
+                    >
+                      <button
+                        onClick={() => setCurrentFolder(n.id)}
+                        className="flex items-center gap-3 flex-1 min-w-0 text-left"
+                      >
+                        <Folder size={18} className="shrink-0" style={{ color: "hsl(var(--accent-gold))" }} />
+                        {renamingId === n.id ? (
+                          <input
+                            autoFocus
+                            value={renameDraft}
+                            onChange={(e) => setRenameDraft(e.target.value)}
+                            onClick={(e) => e.stopPropagation()}
+                            onBlur={() => { projectStore.renameNode(project.id, kind, n.id, renameDraft.trim() || n.name); setRenamingId(null); }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") { projectStore.renameNode(project.id, kind, n.id, renameDraft.trim() || n.name); setRenamingId(null); }
+                              if (e.key === "Escape") setRenamingId(null);
+                            }}
+                            className="text-sm bg-transparent border-b outline-none flex-1 min-w-0"
+                            style={{ borderColor: "hsl(var(--hairline))" }}
+                          />
+                        ) : (
+                          <span className="text-sm flex-1 min-w-0 break-words">{n.name}</span>
+                        )}
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); projectStore.moveNodeOrder(project.id, kind, n.id, -1); }}
+                        disabled={i === 0}
+                        className="opacity-0 group-hover:opacity-100 disabled:opacity-20 text-muted-foreground hover:text-foreground"
+                        title="Nach oben schieben"
+                      >
+                        <ChevronUp size={14} />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); projectStore.moveNodeOrder(project.id, kind, n.id, 1); }}
+                        disabled={i === folders.length - 1}
+                        className="opacity-0 group-hover:opacity-100 disabled:opacity-20 text-muted-foreground hover:text-foreground"
+                        title="Nach unten schieben"
+                      >
+                        <ChevronDown size={14} />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setRenamingId(n.id); setRenameDraft(n.name); }}
+                        className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground"
+                        title="Umbenennen"
+                      >
+                        <Pencil size={12} />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm(`Ordner "${n.name}" und Inhalte löschen?`)) {
+                            projectStore.deleteNode(project.id, kind, n.id);
+                          }
                         }}
-                        className="text-sm bg-transparent border-b outline-none flex-1"
-                        style={{ borderColor: "hsl(var(--hairline))" }}
-                      />
-                    ) : (
-                      <span className="text-sm truncate">{n.name}</span>
-                    )}
-                  </button>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setRenamingId(n.id); setRenameDraft(n.name); }}
-                    className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground"
-                    title="Umbenennen"
-                  >
-                    <Pencil size={12} />
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (confirm(`Ordner "${n.name}" und Inhalte löschen?`)) {
-                        projectStore.deleteNode(project.id, kind, n.id);
-                      }
-                    }}
-                    className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground"
-                    title="Löschen"
-                  >
-                    <Trash2 size={12} />
-                  </button>
-                </div>
-              ))}
+                        className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground"
+                        title="Löschen"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
