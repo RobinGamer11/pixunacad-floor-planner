@@ -345,7 +345,7 @@ const ChildList: React.FC<{
                 <ArrowRight size={14} style={{ color: "hsl(var(--ink-soft))" }} />
               </button>
             </div>
-            {deep && isOpen && kids.length > 0 && (
+            {isOpen && kids.length > 0 && (
               <div className="pl-6 border-b" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-muted))" }}>
                 <ChildList projectId={projectId} state={state} nodes={kids} onSelect={onSelect} deep />
               </div>
