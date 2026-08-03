@@ -51,6 +51,35 @@ function colorArrayToHex(arr: any): string {
   return "#000000";
 }
 
+/** Grauwert (0..1) → Hex. */
+function grayToHex(v: any): string {
+  const g = Math.max(0, Math.min(255, Math.round((typeof v === "number" ? v : 0) * 255)));
+  const h = g.toString(16).padStart(2, "0");
+  return `#${h}${h}${h}`;
+}
+
+/** CMYK (0..1) → Hex. */
+function cmykToHex(c: any, m: any, y: any, k: any): string {
+  const f = (v: any) => (typeof v === "number" ? Math.max(0, Math.min(1, v)) : 0);
+  const cc = f(c), mm = f(m), yy = f(y), kk = f(k);
+  const h = (v: number) => Math.max(0, Math.min(255, Math.round(255 * (1 - v) * (1 - kk)))).toString(16).padStart(2, "0");
+  return `#${h(cc)}${h(mm)}${h(yy)}`;
+}
+
+/** Generische Farb-Args (setFillColor/setFillColorN) → Hex, sonst null. */
+function genericColorToHex(a: any[]): string | null {
+  if (!a) return null;
+  const nums = a.filter((v) => typeof v === "number");
+  if (nums.length === 1) return grayToHex(nums[0]);
+  if (nums.length === 3) {
+    // 0..1 oder 0..255 heuristisch unterscheiden.
+    const scale = nums.every((v) => v <= 1) ? 255 : 1;
+    return colorArrayToHex(nums.map((v) => v * scale));
+  }
+  if (nums.length === 4) return cmykToHex(nums[0], nums[1], nums[2], nums[3]);
+  return null;
+}
+
 /**
  * Extrahiert Vektor-Inhalte einer PDF-Seite. Koordinaten bleiben im
  * PDF-User-Space (bottom-left, Punkte). Der Caller mappt sie in Welt-m.
@@ -71,6 +100,7 @@ export async function extractPdfPageVectors(sourceB64: string, pageIndex: number
 
   let ctm: Mat2x3 = { ...ID };
   const ctmStack: Mat2x3[] = [];
+  const colorStack: { fill: string; stroke: string; lw: number }[] = [];
   let currentPath: { x: number; y: number }[][] = []; // Subpaths (transformed to PDF user space)
   let currentSub: { x: number; y: number }[] = [];
   let fillColor = "#000000";
@@ -186,8 +216,12 @@ export async function extractPdfPageVectors(sourceB64: string, pageIndex: number
   for (let k = 0; k < fns.length; k++) {
     const fn = fns[k];
     const a = args[k] || [];
-    if (fn === OPS.save) ctmStack.push({ ...ctm });
-    else if (fn === OPS.restore) { if (ctmStack.length) ctm = ctmStack.pop()!; }
+    if (fn === OPS.save) { ctmStack.push({ ...ctm }); colorStack.push({ fill: fillColor, stroke: strokeColor, lw: lineWidth }); }
+    else if (fn === OPS.restore) {
+      if (ctmStack.length) ctm = ctmStack.pop()!;
+      const c = colorStack.pop();
+      if (c) { fillColor = c.fill; strokeColor = c.stroke; lineWidth = c.lw; }
+    }
     else if (fn === OPS.transform) {
       const [aa, bb, cc, dd, ee, ff] = a;
       ctm = mul(ctm, { a: aa, b: bb, c: cc, d: dd, e: ee, f: ff });
@@ -213,6 +247,12 @@ export async function extractPdfPageVectors(sourceB64: string, pageIndex: number
     else if (fn === OPS.endPath) clearPath();
     else if (fn === OPS.setFillRGBColor) fillColor = colorArrayToHex(a);
     else if (fn === OPS.setStrokeRGBColor) strokeColor = colorArrayToHex(a);
+    else if (fn === OPS.setFillGray) fillColor = grayToHex(a[0]);
+    else if (fn === OPS.setStrokeGray) strokeColor = grayToHex(a[0]);
+    else if (fn === OPS.setFillCMYKColor) fillColor = cmykToHex(a[0], a[1], a[2], a[3]);
+    else if (fn === OPS.setStrokeCMYKColor) strokeColor = cmykToHex(a[0], a[1], a[2], a[3]);
+    else if (fn === OPS.setFillColor || fn === OPS.setFillColorN) { const c = genericColorToHex(a); if (c) fillColor = c; }
+    else if (fn === OPS.setStrokeColor || fn === OPS.setStrokeColorN) { const c = genericColorToHex(a); if (c) strokeColor = c; }
     else if (fn === OPS.setLineWidth) lineWidth = typeof a[0] === "number" ? a[0] : lineWidth;
     else if (
       fn === OPS.showText ||

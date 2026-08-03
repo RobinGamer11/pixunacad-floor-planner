@@ -3197,9 +3197,12 @@ function ElementView({
   // Rechtsklick auf einen (fremden) Fangpunkt → Hilfslinie von diesem Punkt
   // zum aktuell gewählten Fangpunkt dieses Elements. Dient als Orientierungs-
   // und Fanglinie beim Verschieben/Drehen. ESC/ENTF verwerfen die Linien.
+  const hubModeRef = useRef<null | "move" | "rotate">(null);
+  hubModeRef.current = hubMode;
   useEffect(() => {
     if (readOnly || !selected) return;
     const onContext = (ev: MouseEvent) => {
+      if (hubModeRef.current) return; // während HUB-Aktion übernimmt der Hub-Handler
       const parent = rootRef.current?.parentElement as HTMLElement | null;
       if (!parent) return;
       const t = ev.target as HTMLElement | null;
@@ -3520,6 +3523,7 @@ function ElementView({
       setHubMode(null);
       setActiveEdge(null);
       setGuides([]);
+      setRayGuides([]);
       setCarrying(true);
       actionCommitRef.current = null;
       actionCancelRef.current = null;
@@ -3531,6 +3535,7 @@ function ElementView({
       setHubMode(null);
       setActiveEdge(null);
       setGuides([]);
+      setRayGuides([]);
       setCarrying(true);
       actionCommitRef.current = null;
       actionCancelRef.current = null;
@@ -3630,17 +3635,26 @@ function ElementView({
       downClient = null;
     };
     const onContext = (ev: MouseEvent) => {
-      // Rechtsklick während HUB-Aktion legt eine Hilfslinie durch den Punkt.
-      // Snap auf beliebige Ziele anderer Elemente wenn im Toleranzbereich.
+      // Rechtsklick während HUB-Aktion: Fangpunkt eines anderen Objekts anvisieren.
+      // Es entsteht eine Hilfslinie (Kreuz + Strahl zum aktiven Anker), auf die
+      // beim Verschieben/Drehen gefangen wird.
       const t = ev.target as HTMLElement | null;
       if (t?.closest("[data-hub-control]")) return;
       ev.preventDefault();
       ev.stopPropagation();
       const pageRect = parent.getBoundingClientRect();
-      const m = getPageSnapRegistry().queryNearest(ev.clientX, ev.clientY, pageRect, 12, [el.id]);
+      const m = getPageSnapRegistry().queryNearest(ev.clientX, ev.clientY, pageRect, 14, [el.id]);
       const xPct = m ? m.x : ((ev.clientX - pageRect.left) / Math.max(1, pageRect.width)) * 100;
       const yPct = m ? m.y : ((ev.clientY - pageRect.top) / Math.max(1, pageRect.height)) * 100;
       setGuides((g) => [...g, { id: Date.now() + Math.random(), xPct, yPct }]);
+      // Strahl vom anvisierten Punkt zum aktuellen (Preview-)Anker dieses Elements.
+      const p = previewRef.current;
+      const { clientX: ax0, clientY: ay0 } = liveAnchor();
+      const ax = ax0 + (hubMode === "move" ? p.dxPx : 0);
+      const ay = ay0 + (hubMode === "move" ? p.dyPx : 0);
+      const bx = ((ax - pageRect.left) / Math.max(1, pageRect.width)) * 100;
+      const by = ((ay - pageRect.top) / Math.max(1, pageRect.height)) * 100;
+      setRayGuides((g) => [...g.slice(-3), { id: Date.now() + Math.random(), ax: xPct, ay: yPct, bx, by }]);
     };
     const onKey = (ev: KeyboardEvent) => {
       if (ev.key === "Escape" || ev.key === "Delete") { ev.stopPropagation(); ev.preventDefault(); cancel(); }
