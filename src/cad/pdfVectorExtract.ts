@@ -247,6 +247,12 @@ export async function extractPdfPageVectors(sourceB64: string, pageIndex: number
     else if (fn === OPS.endPath) clearPath();
     else if (fn === OPS.setFillRGBColor) fillColor = colorArrayToHex(a);
     else if (fn === OPS.setStrokeRGBColor) strokeColor = colorArrayToHex(a);
+    else if (fn === OPS.setFillGray) fillColor = grayToHex(a[0]);
+    else if (fn === OPS.setStrokeGray) strokeColor = grayToHex(a[0]);
+    else if (fn === OPS.setFillCMYKColor) fillColor = cmykToHex(a[0], a[1], a[2], a[3]);
+    else if (fn === OPS.setStrokeCMYKColor) strokeColor = cmykToHex(a[0], a[1], a[2], a[3]);
+    else if (fn === OPS.setFillColor || fn === OPS.setFillColorN) { const c = genericColorToHex(a); if (c) fillColor = c; }
+    else if (fn === OPS.setStrokeColor || fn === OPS.setStrokeColorN) { const c = genericColorToHex(a); if (c) strokeColor = c; }
     else if (fn === OPS.setLineWidth) lineWidth = typeof a[0] === "number" ? a[0] : lineWidth;
     else if (
       fn === OPS.showText ||
