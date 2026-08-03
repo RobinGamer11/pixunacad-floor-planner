@@ -312,49 +312,35 @@ export class EraserTool {
     const r = this.app.defaultEraserRadiusM;
     const strength = this.app.defaultEraserStrength;
     const mode = this.app.defaultEraserMode ?? "hard";
+    // Der Smooth-Modus ist nur für Rasterbilder (PNG/JPG) sinnvoll — Vektor-
+    // objekte werden immer hart geschnitten.
+    const vecMode: "hard" | "smooth" = "hard";
     const softness = Math.max(0.05, Math.min(1, this.app.defaultEraserSoftness ?? 0.5));
     const scene = this.app.scene;
 
-    // Dokument-Pixelmasken radieren
+    // Dokument-Pixelmasken radieren (Smooth nur bei echten Bildern)
     for (const doc of scene.documents) {
       if (!this.app.labelManager.isVisible(doc.labelId)) continue;
-      eraseDocCircle(doc, centerW, r, strength, mode, softness);
+      const docMode = doc.kind === "image" ? mode : "hard";
+      eraseDocCircle(doc, centerW, r, strength, docMode, softness);
     }
 
     // Externe Objekte (z. B. CAD-Blatt in der Projektmappe) radieren
     (this.app as any).onEraseStroke?.(v(centerW.x, centerW.y), r, mode, softness, strength);
 
-    // FreeStrokes splitten (im Smooth-Modus zusätzlich mit ausgedünntem Rand)
+    // FreeStrokes splitten
     const freeStrokesCopy = scene.freeStrokes.slice();
     for (const stroke of freeStrokesCopy) {
       if (!this._strokeNearCircle(stroke.points, centerW, r)) continue;
-      const rVec = this._effRadius(stroke.id, r, mode, softness, strength);
+      const rVec = this._effRadius(stroke.id, r, vecMode, softness, strength);
+
       const chunks = splitPolylineByCircle(stroke.points, centerW, rVec, 0.02);
       if (chunks.length === 1 && chunks[0].length === stroke.points.length) {
         const same = chunks[0].every((p, i) => p.x === stroke.points[i].x && p.y === stroke.points[i].y);
         if (same) continue;
       }
-      if (mode === "smooth") {
-        // Randbereich (zwischen Schnittradius und Pinselradius) wird schwächer
-        // gezeichnet → weicher Auslauf statt harter Kante.
-        scene.removeFreeStroke(stroke);
-        for (const ch of chunks) {
-          for (const piece of this._splitFringe(ch, centerW, r)) {
-            if (piece.pts.length < 2) continue;
-            scene.createFreeStroke(piece.pts, {
-              color: stroke.color, thicknessM: stroke.thicknessM,
-              opacity: piece.fringe ? Math.max(0.05, stroke.opacity * 0.35) : stroke.opacity,
-              lineStyle: stroke.lineStyle, gapM: stroke.gapM,
-              blobSpacingM: stroke.blobSpacingM, blobSizeM: stroke.blobSizeM,
-              smoothing: stroke.smoothing, labelId: stroke.labelId,
-              imageSrc: stroke.imageSrc, imageSizeM: stroke.imageSizeM,
-              imageSpacingM: stroke.imageSpacingM, imageRotateAlongPath: stroke.imageRotateAlongPath,
-            });
-          }
-        }
-      } else {
-        scene.replaceFreeStrokeWithChunks(stroke, chunks);
-      }
+      scene.replaceFreeStrokeWithChunks(stroke, chunks);
+
     }
 
     // Linien-Segmente splitten
@@ -364,7 +350,7 @@ export class EraserTool {
       const pa = seg.a, pb = seg.b;
       const proj = projectPointToSegment(centerW, pa, pb);
       if (dist(proj.q, centerW) > r) continue;
-      const rVec = this._effRadius(seg.id, r, mode, softness, strength);
+      const rVec = this._effRadius(seg.id, r, vecMode, softness, strength);
       const subs = splitSegmentByCircle(pa, pb, centerW, rVec);
       if (subs.length === 1 && dist(subs[0].a, pa) < 1e-9 && dist(subs[0].b, pb) < 1e-9) continue;
       const style = { color: seg.color, thicknessM: seg.thicknessM, labelId: seg.labelId };
@@ -398,7 +384,7 @@ export class EraserTool {
       if (!this.app.labelManager.isVisible(box.labelId)) continue;
       const d = this._distToBox(centerW, box.center, box.widthM, box.heightM, box.rotationRad);
       if (d > r) continue;
-      const rT = this._effRadius(box.id, r, mode, softness, strength);
+      const rT = this._effRadius(box.id, r, vecMode, softness, strength);
       if (d > rT) continue;
       scene.removeTextBox(box);
       if (this.app.selection && (this.app.selection as any).textBoxId === box.id) this.app.setSelection(null);

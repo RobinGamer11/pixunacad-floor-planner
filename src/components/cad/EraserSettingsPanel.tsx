@@ -7,7 +7,10 @@ interface Props {
   app: CadApp | MiniCad | null;
   /** "cad" = große Dimensionierung (Mitte 1000 mm, max 2000 mm) mit Prozentanzeige. */
   variant?: "cad" | "workspace";
+  /** Optional: true, wenn das aktuell gewählte Objekt ein Rasterbild (PNG/JPG) ist. */
+  rasterSelection?: boolean | null;
 }
+
 
 /** Nichtlineare Größen-Skala. Projektmappe: 0,2 mm … 80 mm (Mitte) … 200 mm. */
 const R_MIN = 0.0002, R_MID = 0.08, R_MAX = 0.2;
@@ -25,7 +28,7 @@ const makeScale = (min: number, mid: number, max: number) => ({
   },
 });
 
-export const EraserSettingsPanel: React.FC<Props> = ({ app, variant = "workspace" }) => {
+export const EraserSettingsPanel: React.FC<Props> = ({ app, variant = "workspace", rasterSelection = null }) => {
   const isCad = variant === "cad";
   const scale = isCad ? makeScale(CAD_R_MIN, CAD_R_MID, CAD_R_MAX) : makeScale(R_MIN, R_MID, R_MAX);
   const [radius, setRadius] = useState(isCad ? 0.2 : 0.03);
@@ -33,6 +36,8 @@ export const EraserSettingsPanel: React.FC<Props> = ({ app, variant = "workspace
   const [mode, setMode] = useState<"hard" | "smooth">("hard");
   const [softness, setSoftness] = useState(0.5);
   const [hasRuler, setHasRuler] = useState(false);
+  /** Auswahl im CAD: nur Rasterbilder (PNG/JPG) erlauben den Smooth-Modus. */
+  const [docRaster, setDocRaster] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (!app) return;
@@ -42,6 +47,38 @@ export const EraserSettingsPanel: React.FC<Props> = ({ app, variant = "workspace
     setSoftness(app.defaultEraserSoftness ?? 0.5);
     setHasRuler(!!app.scene.rulerGuide);
   }, [app]);
+
+  // Auswahl beobachten (leichtgewichtiges Polling — die Engine feuert je nach
+  // Editor unterschiedliche Events).
+  useEffect(() => {
+    if (!app) return;
+    const check = () => {
+      const sel: any = app.selection;
+      if (!sel) { setDocRaster(null); return; }
+      if (sel.type === "document" && sel.documentId) {
+        const doc = app.scene.getDocumentById(sel.documentId);
+        setDocRaster(doc ? doc.kind === "image" : null);
+      } else {
+        setDocRaster(false);
+      }
+    };
+    check();
+    const t = window.setInterval(check, 400);
+    return () => window.clearInterval(t);
+  }, [app]);
+
+  const rasterOk = rasterSelection !== null ? rasterSelection : docRaster;
+  // Smooth ist nur verfügbar, wenn kein Nicht-Bild ausgewählt ist.
+  const smoothAllowed = rasterOk !== false;
+
+  useEffect(() => {
+    if (!app) return;
+    if (!smoothAllowed && mode === "smooth") {
+      setMode("hard");
+      app.defaultEraserMode = "hard";
+    }
+  }, [smoothAllowed, mode, app]);
+
 
 
   if (!app) return null;
@@ -90,16 +127,31 @@ export const EraserSettingsPanel: React.FC<Props> = ({ app, variant = "workspace
         <div className="text-xs">
           <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Modus</span>
           <div className="grid grid-cols-2 gap-1">
-            {(["hard", "smooth"] as const).map((m) => (
-              <button key={m} type="button"
-                onClick={() => { setMode(m); app.defaultEraserMode = m; }}
-                className="cad-toolbar-btn justify-center h-8"
-                style={mode === m ? { background: "hsl(var(--cad-accent) / 0.18)", borderColor: "hsl(var(--cad-accent))" } : undefined}>
-                <span className="text-xs">{m === "hard" ? "Hart" : "Smooth"}</span>
-              </button>
-            ))}
+            {(["hard", "smooth"] as const).map((m) => {
+              const disabled = m === "smooth" && !smoothAllowed;
+              return (
+                <button key={m} type="button" disabled={disabled}
+                  title={disabled ? "Weicher Modus ist nur für Bilder (PNG/JPG) verfügbar." : undefined}
+                  onClick={() => { if (disabled) return; setMode(m); app.defaultEraserMode = m; }}
+                  className="cad-toolbar-btn justify-center h-8"
+                  style={{
+                    ...(mode === m && !disabled ? { background: "hsl(var(--cad-accent) / 0.18)", borderColor: "hsl(var(--cad-accent))" } : {}),
+                    ...(disabled ? { opacity: 0.45, cursor: "not-allowed" } : {}),
+                  }}>
+                  <span className="text-xs">{m === "hard" ? "Hart" : "Smooth"}</span>
+                </button>
+              );
+            })}
           </div>
+          {!smoothAllowed && (
+            <div className="mt-1.5 text-[11px] leading-relaxed rounded px-2 py-1.5"
+              style={{ color: "hsl(var(--cad-toolbar-muted))", background: "hsl(var(--muted) / 0.5)", border: "1px solid hsl(var(--border))" }}>
+              Weicher Modus ist nur für Bilder (PNG/JPG) verfügbar. Das gewählte Objekt
+              wird immer hart radiert.
+            </div>
+          )}
         </div>
+
 
         {mode === "smooth" && (
           <>
