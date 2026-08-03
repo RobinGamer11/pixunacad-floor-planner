@@ -1636,9 +1636,16 @@ export function AufgabenView({ project }: { project: Project }) {
     date: "",
     time: "",
     priority: "medium",
-    category: "",
+    // Schnellablage ist die Standardkategorie für neue Aufgaben.
+    category: QUICK_CATEGORY,
     mappeId: defaultMappeId,
   });
+
+  // Die aktuell in der Projektmappe ausgewählte Mappe ist immer vorbelegt —
+  // wechselt der Nutzer die Mappe, zieht die Auswahl automatisch nach.
+  useEffect(() => {
+    setDraft((d) => (d.mappeId === defaultMappeId ? d : { ...d, mappeId: defaultMappeId }));
+  }, [defaultMappeId]);
 
   const mappeName = useCallback(
     (id?: string) => (id ? (mappen.find((m) => m.id === id)?.name ?? "") : ""),
