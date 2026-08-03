@@ -6,14 +6,18 @@ import { resetDocMask } from "@/cad/documentMask";
 interface Props { app: CadApp | MiniCad | null; }
 
 export const EraserSettingsPanel: React.FC<Props> = ({ app }) => {
-  const [radius, setRadius] = useState(0.12);
+  const [radius, setRadius] = useState(0.03);
   const [strength, setStrength] = useState(1);
+  const [mode, setMode] = useState<"hard" | "smooth">("hard");
+  const [softness, setSoftness] = useState(0.5);
   const [hasRuler, setHasRuler] = useState(false);
 
   useEffect(() => {
     if (!app) return;
     setRadius(app.defaultEraserRadiusM);
     setStrength(app.defaultEraserStrength);
+    setMode(app.defaultEraserMode ?? "hard");
+    setSoftness(app.defaultEraserSoftness ?? 0.5);
     setHasRuler(!!app.scene.rulerGuide);
   }, [app]);
 
@@ -48,11 +52,36 @@ export const EraserSettingsPanel: React.FC<Props> = ({ app }) => {
       <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Radiergummi</div>
       <div className="space-y-3">
         <label className="block text-xs">
-          <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Größe (m): {radius.toFixed(3)}</span>
-          <input type="range" min={0.02} max={1.5} step={0.01} value={radius}
+          <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+            Größe: {(radius * 1000).toFixed(radius < 0.01 ? 1 : 0)} mm
+          </span>
+          <input type="range" min={0.001} max={1.5} step={0.001} value={radius}
             onChange={(e) => { const v = parseFloat(e.target.value); setRadius(v); app.defaultEraserRadiusM = v; }}
             className="w-full" />
         </label>
+
+        <div className="text-xs">
+          <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Modus</span>
+          <div className="grid grid-cols-2 gap-1">
+            {(["hard", "smooth"] as const).map((m) => (
+              <button key={m} type="button"
+                onClick={() => { setMode(m); app.defaultEraserMode = m; }}
+                className="cad-toolbar-btn justify-center h-8"
+                style={mode === m ? { background: "hsl(var(--cad-accent) / 0.18)", borderColor: "hsl(var(--cad-accent))" } : undefined}>
+                <span className="text-xs">{m === "hard" ? "Hart" : "Smooth"}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {mode === "smooth" && (
+          <label className="block text-xs">
+            <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Weichheit: {Math.round(softness * 100)}%</span>
+            <input type="range" min={0.05} max={0.95} step={0.05} value={softness}
+              onChange={(e) => { const v = parseFloat(e.target.value); setSoftness(v); app.defaultEraserSoftness = v; }}
+              className="w-full" />
+          </label>
+        )}
 
         <label className="block text-xs">
           <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Stärke: {Math.round(strength * 100)}%</span>

@@ -116,12 +116,11 @@ import {
 } from "@/lib/warpMatrix";
 
 export type PageTool = "guide" | "line" | "free" | "eraser" | "text" | "cad" | "pipette" | "hatch" | "document" | "table" | null;
-type LinePageTool = "line" | "free" | "eraser";
+type LinePageTool = "line" | "free";
 
 const LINE_TOOL_VARIANTS: Array<{ id: LinePageTool; label: string; icon: React.ElementType }> = [
   { id: "line", label: "Linie", icon: Minus },
   { id: "free", label: "Freihand", icon: Pencil },
-  { id: "eraser", label: "Radiergummi", icon: Eraser },
 ];
 
 const HATCH_MODE_VARIANTS: Array<{ id: HatchDrawMode; label: string; icon: React.ElementType }> = [
@@ -132,7 +131,7 @@ const HATCH_MODE_VARIANTS: Array<{ id: HatchDrawMode; label: string; icon: React
 ];
 
 const isLinePageTool = (tool: PageTool): tool is LinePageTool =>
-  tool === "line" || tool === "free" || tool === "eraser";
+  tool === "line" || tool === "free";
 
 /** Registry laufender HUB-/Transform-Aktionen. ENTF/ESC brechen darüber jede
  *  aktive Vorschau (Verschieben, Drehen, Trimmen) sofort ab und verwerfen sie. */
@@ -922,6 +921,13 @@ export default function ProjectWorkspace() {
           label="Hilfslinie"
           active={activeTool === "guide"}
           onClick={() => setActiveToolAndTab(activeTool === "guide" ? null : "guide")}
+          showLabel
+        />
+        <ToolRailButton
+          icon={<Eraser size={18} />}
+          label="Radiergummi"
+          active={activeTool === "eraser"}
+          onClick={() => setActiveToolAndTab(activeTool === "eraser" ? null : "eraser")}
           showLabel
         />
         <ToolRailButton
