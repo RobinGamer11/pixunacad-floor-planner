@@ -1627,10 +1627,11 @@ function noteToUnified(n: NoteNode): UnifiedTask {
 export function AufgabenView({ project }: { project: Project }) {
   const navigate = useNavigate();
   const notes = useNotes(project.id);
+  const allProjects = useProjects();
   const mappen = project.mappen ?? [];
   const defaultMappeId = project.activeMappeId ?? mappen[0]?.id ?? "";
   const [selectedDate, setSelectedDate] = useState<string | undefined>(undefined);
-  const [draft, setDraft] = useState<{ title: string; description: string; date: string; time: string; priority: TaskPriority; category: string; mappeId: string }>({
+  const [draft, setDraft] = useState<{ title: string; description: string; date: string; time: string; priority: TaskPriority; category: string; mappeId: string; projectId: string }>({
     title: "",
     description: "",
     date: "",
@@ -1639,13 +1640,13 @@ export function AufgabenView({ project }: { project: Project }) {
     // Schnellablage ist die Standardkategorie für neue Aufgaben.
     category: QUICK_CATEGORY,
     mappeId: defaultMappeId,
+    projectId: project.id,
   });
 
-  // Die aktuell in der Projektmappe ausgewählte Mappe ist immer vorbelegt —
-  // wechselt der Nutzer die Mappe, zieht die Auswahl automatisch nach.
+  // Das aktuell geöffnete Projekt (und dessen aktive Mappe) ist immer vorbelegt.
   useEffect(() => {
-    setDraft((d) => (d.mappeId === defaultMappeId ? d : { ...d, mappeId: defaultMappeId }));
-  }, [defaultMappeId]);
+    setDraft((d) => ({ ...d, projectId: project.id, mappeId: defaultMappeId }));
+  }, [project.id, defaultMappeId]);
 
   const mappeName = useCallback(
     (id?: string) => (id ? (mappen.find((m) => m.id === id)?.name ?? "") : ""),
@@ -1679,18 +1680,30 @@ export function AufgabenView({ project }: { project: Project }) {
   const addTask = () => {
     if (!draft.title.trim()) return;
     const prio: NotePriority = draft.priority === "high" ? "high" : draft.priority === "low" ? "low" : "normal";
-    notesStore.addNode(project.id, null, "task", {
+    const targetProjectId = draft.projectId || project.id;
+    const isForeign = targetProjectId !== project.id;
+    notesStore.addNode(targetProjectId, null, "task", {
       title: draft.title.trim(),
       description: draft.description.trim() || undefined,
       date: draft.date || undefined,
       time: draft.time || undefined,
       priority: prio,
       status: "open",
-      category: draft.category || undefined,
-      mappeId: draft.mappeId || undefined,
+      // In einem fremden Projekt landet die Aufgabe immer in der Schnellablage.
+      category: isForeign ? QUICK_CATEGORY : (draft.category || undefined),
+      mappeId: isForeign ? undefined : (draft.mappeId || undefined),
       unseen: true,
     });
-    setDraft({ title: "", description: "", date: selectedDate ?? "", time: "", priority: "medium", category: draft.category, mappeId: draft.mappeId });
+    setDraft({
+      title: "",
+      description: "",
+      date: selectedDate ?? "",
+      time: "",
+      priority: "medium",
+      category: draft.category,
+      mappeId: draft.mappeId,
+      projectId: draft.projectId,
+    });
   };
 
   return (
