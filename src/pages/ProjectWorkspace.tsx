@@ -2781,7 +2781,7 @@ function PageCanvas({
           enabled={activeTool === "line" || activeTool === "text" || activeTool === "guide" || activeTool === "free" || activeTool === "eraser" || activeTool === "hatch" || activeTool === "document" || activeTool === null}
           initialState={page.cadOverlay}
           ghostSnapState={overlayPage ? overlayPage.cadOverlay : null}
-          onEraseWorld={(c, rM, mode, soft) => {
+          onEraseWorld={(c, rM, mode, soft, strength) => {
             // Welt-Meter → Papier-mm; trifft CAD-Blatt-Elemente auf dieser Seite.
             const mmX = c.x * 1000, mmY = c.y * 1000, rMm = rM * 1000;
             for (const el of page.elements) {
@@ -2802,17 +2802,23 @@ function PageCanvas({
               if (lx + rMm < 0 || lx - rMm > ew || ly + rMm < 0 || ly - rMm > eh) continue;
               const prev = el.eraseCircles ?? [];
               const last = prev[prev.length - 1];
-              const s = mode === "smooth" ? soft : 0;
-              // Sehr dichte Stempel zusammenfassen (Performance/Storage).
-              if (last && Math.hypot(last.x - lx, last.y - ly) < rMm * 0.4 && Math.abs(last.r - rMm) < 0.01) continue;
+              const smooth = mode === "smooth";
+              const s = smooth ? soft : 0;
+              const str = Math.max(0.1, Math.min(1, strength ?? 1));
+              // Smooth: pro Stempel nur teilweise abtragen → Verweilen radiert voll.
+              const a = smooth ? Math.max(0.05, 0.30 * str) : 1;
+              // Nur exakte Doppelstempel überspringen; Überlappung darf akkumulieren.
+              const minStep = smooth ? rMm * 0.08 : rMm * 0.4;
+              if (last && Math.hypot(last.x - lx, last.y - ly) < minStep && Math.abs(last.r - rMm) < 0.01) continue;
               projectStore.updateElement(projectId, page.id, el.id, {
                 // mm-Geometrie sicherstellen, damit die Maske exakt im selben
                 // Koordinatenraum gerendert wird wie die Radier-Kreise.
                 xMm: ex, yMm: ey, wMm: ew, hMm: eh,
-                eraseCircles: [...prev.slice(-400), { x: lx, y: ly, r: rMm, s }],
+                eraseCircles: [...prev.slice(-600), { x: lx, y: ly, r: rMm, s, a }],
               });
             }
           }}
+
 
           lineColor={activeTool === "guide" ? toolSettings.guide.color : toolSettings.line.color}
           lineThicknessMm={activeTool === "guide" ? Math.max(0.1, toolSettings.guide.strokeWidth * 0.2) : toolSettings.line.thicknessMm}
@@ -4042,13 +4048,19 @@ function ElementView({
 
       {el.kind === "pdf" && (
         <WarpedContent corners={el.warpCorners}>
-          <div className="w-full h-full" style={buildEraseMaskCss(el.eraseCircles, el.wMm ?? 0, el.hMm ?? 0)}>
+          <div className="w-full h-full">
             {el.pdfSourceB64 ? (
-              <PdfPageView sourceB64={el.pdfSourceB64} pageIndex={el.pdfPageIndex ?? 0} deferDuringWorkspaceZoom />
+              <PdfPageView
+                sourceB64={el.pdfSourceB64}
+                pageIndex={el.pdfPageIndex ?? 0}
+                deferDuringWorkspaceZoom
+                maskStyle={buildEraseMaskCss(el.eraseCircles, el.wMm ?? 0, el.hMm ?? 0)}
+              />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground" style={{ background: "hsl(var(--surface-muted))" }}>PDF</div>
             )}
           </div>
+
         </WarpedContent>
       )}
 

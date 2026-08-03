@@ -8,7 +8,10 @@ interface Props {
   className?: string;
   /** Projektmappe: PDF erst nach einer laufenden Viewport-Zoomgeste neu rastern. */
   deferDuringWorkspaceZoom?: boolean;
+  /** Radier-Maske (CSS mask-image) – wird direkt auf Canvas/Hintergrund gelegt. */
+  maskStyle?: React.CSSProperties;
 }
+
 
 let workspaceZoomActive = false;
 const workspaceZoomListeners = new Set<() => void>();
@@ -25,7 +28,7 @@ export function setWorkspacePdfZoomActive(active: boolean) {
  * auf ein <canvas> und re-rendert adaptiv bei Größenänderung (Zoom),
  * damit beim Reinzoomen kein Bitmap-Geblurre entsteht.
  */
-export function PdfPageView({ sourceB64, pageIndex, className, deferDuringWorkspaceZoom = false }: Props) {
+export function PdfPageView({ sourceB64, pageIndex, className, deferDuringWorkspaceZoom = false, maskStyle }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [error, setError] = useState<string | null>(null);
@@ -99,14 +102,17 @@ export function PdfPageView({ sourceB64, pageIndex, className, deferDuringWorksp
   }, [sourceB64, pageIndex, deferDuringWorkspaceZoom]);
 
   return (
-    <div ref={containerRef} className={className} style={{ width: "100%", height: "100%", background: "white", overflow: "hidden", pointerEvents: "none", contain: "strict" }}>
+    <div ref={containerRef} className={className} style={{ width: "100%", height: "100%", overflow: "hidden", pointerEvents: "none" }}>
       {error ? (
         <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground p-2">
           PDF: {error}
         </div>
       ) : (
-        <canvas ref={canvasRef} style={{ width: "100%", height: "100%", display: "block", pointerEvents: "none" }} />
+        <div style={{ width: "100%", height: "100%", background: "white", ...(maskStyle ?? {}) }}>
+          <canvas ref={canvasRef} style={{ width: "100%", height: "100%", display: "block", pointerEvents: "none" }} />
+        </div>
       )}
+
     </div>
   );
 }
