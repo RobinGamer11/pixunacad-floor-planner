@@ -29,6 +29,18 @@ export const FinancePositionsTable: React.FC<Props> = ({ projectId, nodeId, posi
   const upd = (id: string, patch: Partial<FinancePosition>) =>
     financeStore.updatePosition(projectId, id, patch);
 
+  // Fortlaufende Nummerierung von oben nach unten, je Typ (Nachträge zusätzlich
+  // nach Mehr-/Mindernachtrag getrennt).
+  const counters: Record<string, number> = {};
+  const numberOf = new Map<string, string>();
+  for (const p of positions) {
+    const key = p.type === "supplement" ? `s-${p.supplementKind ?? "plus"}` : p.type;
+    counters[key] = (counters[key] ?? 0) + 1;
+    numberOf.set(p.id, String(counters[key]).padStart(2, "0"));
+  }
+
+
+
   return (
     <div className="rounded-xl border overflow-hidden"
          style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}>
