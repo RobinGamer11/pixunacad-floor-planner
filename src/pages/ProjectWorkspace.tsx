@@ -802,6 +802,34 @@ export default function ProjectWorkspace() {
     return () => window.removeEventListener("keydown", onKey);
   }, [project?.id]);
 
+  // Gesten-Grenzen für die Historie: jede abgeschlossene Interaktion (Maus/Stift
+  // losgelassen, Enter/Escape/Entf, Werkzeugwechsel) versiegelt den aktuellen
+  // Undo-Schritt. So ergibt jede einzelne Aktion – auch Text, Trim und
+  // Move/Rotate über mehrere Frames – genau einen sauberen Undo-Eintrag.
+  useEffect(() => {
+    if (!project?.id) return;
+    const pid = project.id;
+    const seal = () => projectStore.sealHistory(pid);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Enter" || e.key === "Escape" || e.key === "Delete") seal();
+    };
+    window.addEventListener("pointerup", seal, true);
+    window.addEventListener("pointercancel", seal, true);
+    window.addEventListener("keyup", onKey, true);
+    window.addEventListener("blur", seal);
+    return () => {
+      window.removeEventListener("pointerup", seal, true);
+      window.removeEventListener("pointercancel", seal, true);
+      window.removeEventListener("keyup", onKey, true);
+      window.removeEventListener("blur", seal);
+    };
+  }, [project?.id]);
+
+  // Werkzeugwechsel beendet ebenfalls die laufende Geste.
+  useEffect(() => {
+    if (project?.id) projectStore.sealHistory(project.id);
+  }, [activeTool, project?.id]);
+
 
   if (!project) {
     return (
