@@ -2651,13 +2651,11 @@ function ProjectCarousel({ projects, onOpen }: { projects: Project[]; onOpen: (i
 
   if (projects.length === 0) return null;
 
-  // Max. 5 sichtbare Karten: Slots -2 .. +2, Mitte im Vordergrund
+  // Immer 5 Slots: 2 links, Mitte im Vordergrund, 2 rechts (bei wenigen Projekten wird wiederholt)
   const n = projects.length;
-  const count = Math.min(n, 5);
-  const half = Math.floor((count - 1) / 2);
-  const slots: number[] = [];
-  for (let s = -half; slots.length < count; s++) slots.push(s);
+  const slots = [-2, -1, 0, 1, 2];
   const visible = slots.map((s) => ({ slot: s, project: projects[(((offset + s) % n) + n) % n] }));
+
 
 
   return (
