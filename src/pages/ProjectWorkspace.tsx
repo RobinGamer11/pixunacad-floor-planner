@@ -3215,7 +3215,7 @@ function ElementView({
   /** CAD-Blatt-Drehen: Achse durch die beiden oberen Fangpunkte + fixierte
    *  Cursor-Position auf dieser Achse. Alle Werte in Prozent der Seite. */
   const [rotAxis, setRotAxis] = useState<
-    { ax: number; ay: number; bx: number; by: number; mx: number; my: number } | null
+    { ax: number; ay: number; bx: number; by: number; mx: number; my: number; deg: number } | null
   >(null);
 
   /** Projiziert einen Client-Punkt auf die nächstgelegene Hilfslinie (Toleranz 10px). */
