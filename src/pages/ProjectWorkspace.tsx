@@ -1701,8 +1701,9 @@ export default function ProjectWorkspace() {
                 const pxPerMm = (1100 / refFmt.wMm) * (zoom / 100);
                 return (
                   <div
-                    className="min-h-full flex items-start justify-center"
-                    style={{ padding: "100vh 100vw" }}
+                    className="min-h-full flex items-start justify-start"
+                    style={{ padding: "200vh 200vw" }}
+
                   >
                     <div
                       className={isFree ? "relative" : "flex items-start"}
