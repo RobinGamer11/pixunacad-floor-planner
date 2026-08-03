@@ -350,7 +350,7 @@ export class EraserTool {
       const pa = seg.a, pb = seg.b;
       const proj = projectPointToSegment(centerW, pa, pb);
       if (dist(proj.q, centerW) > r) continue;
-      const rVec = this._effRadius(seg.id, r, mode, softness, strength);
+      const rVec = this._effRadius(seg.id, r, vecMode, softness, strength);
       const subs = splitSegmentByCircle(pa, pb, centerW, rVec);
       if (subs.length === 1 && dist(subs[0].a, pa) < 1e-9 && dist(subs[0].b, pb) < 1e-9) continue;
       const style = { color: seg.color, thicknessM: seg.thicknessM, labelId: seg.labelId };
@@ -384,7 +384,7 @@ export class EraserTool {
       if (!this.app.labelManager.isVisible(box.labelId)) continue;
       const d = this._distToBox(centerW, box.center, box.widthM, box.heightM, box.rotationRad);
       if (d > r) continue;
-      const rT = this._effRadius(box.id, r, mode, softness, strength);
+      const rT = this._effRadius(box.id, r, vecMode, softness, strength);
       if (d > rT) continue;
       scene.removeTextBox(box);
       if (this.app.selection && (this.app.selection as any).textBoxId === box.id) this.app.setSelection(null);
