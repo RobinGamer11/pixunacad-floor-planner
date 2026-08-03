@@ -3414,11 +3414,13 @@ function ElementView({
       }
     };
 
+    let unregisterAbort: (() => void) | null = null;
     const cleanup = () => {
       window.removeEventListener("pointermove", handleMove);
       window.removeEventListener("pointerup", handleUp);
       window.removeEventListener("pointercancel", handleUp);
       window.removeEventListener("keydown", handleKey, true);
+      unregisterAbort?.(); unregisterAbort = null;
     };
     const handleMove = (ev: PointerEvent) => {
       if (Math.hypot(ev.clientX - e.clientX, ev.clientY - e.clientY) > 3) rotateMovedRef.current = true;
@@ -3435,20 +3437,25 @@ function ElementView({
       try { (e.currentTarget as HTMLElement).releasePointerCapture(ev.pointerId); } catch {}
       cleanup();
     };
-    const handleKey = (ev: KeyboardEvent) => {
-      if (ev.key !== "Escape" && ev.key !== "Delete") return;
-      ev.stopPropagation();
-      ev.preventDefault();
-      // Abbruch: Ausgangszustand wiederherstellen.
+    // Abbruch: Ausgangszustand wiederherstellen, Vorschau verwerfen.
+    const abort = () => {
       if (onTransform) onTransform({ x: startX, y: startY, rotation: startRot });
       else onRotate(startRot, true);
       cleanup();
     };
+    const handleKey = (ev: KeyboardEvent) => {
+      if (ev.key !== "Escape" && ev.key !== "Delete") return;
+      ev.stopImmediatePropagation();
+      ev.preventDefault();
+      abort();
+    };
+    unregisterAbort = registerAbort(abort);
     window.addEventListener("pointermove", handleMove);
     window.addEventListener("pointerup", handleUp);
     window.addEventListener("pointercancel", handleUp);
     window.addEventListener("keydown", handleKey, true);
   };
+
 
 
 
