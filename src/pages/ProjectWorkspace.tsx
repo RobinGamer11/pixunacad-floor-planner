@@ -3201,25 +3201,69 @@ function ElementView({
     e.preventDefault();
     try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
     onSelect?.({ shift: e.shiftKey });
+    const node = rootRef.current;
+    const parent = node?.parentElement as HTMLElement | null;
+    const startX = e.clientX, startY = e.clientY;
+    const frac = anchorFracRef.current ?? { fx: 0.5, fy: 0.5, key: "interior" };
+    const rect0 = node?.getBoundingClientRect();
+    const anchor0 = rect0
+      ? { x: rect0.left + frac.fx * rect0.width, y: rect0.top + frac.fy * rect0.height }
+      : { x: startX, y: startY };
+    const baseTransform = node?.style.transform ?? "";
+    let tdx = 0, tdy = 0;
+    let raf = 0;
     dragRef.current = { x: e.clientX, y: e.clientY };
+
+    const paint = () => {
+      raf = 0;
+      if (node) node.style.transform = `translate(${tdx}px, ${tdy}px) ${baseTransform}`.trim();
+    };
+
     const handleMove = (ev: PointerEvent) => {
       if (!dragRef.current) return;
-      const dx = ev.clientX - dragRef.current.x;
-      const dy = ev.clientY - dragRef.current.y;
-      onDrag?.(dx, dy, ev.altKey);
-      dragRef.current = { x: ev.clientX, y: ev.clientY };
+      tdx = ev.clientX - startX;
+      tdy = ev.clientY - startY;
+      // Fangen: Registry-Punkte anderer Elemente + Rechtsklick-Hilfslinien.
+      const pageRect = parent?.getBoundingClientRect();
+      if (pageRect) {
+        const tx = anchor0.x + tdx, ty = anchor0.y + tdy;
+        const m = getPageSnapRegistry().queryNearest(tx, ty, pageRect, 10, [el.id]);
+        if (m) {
+          tdx = pageRect.left + (m.x / 100) * pageRect.width - anchor0.x;
+          tdy = pageRect.top + (m.y / 100) * pageRect.height - anchor0.y;
+        } else {
+          const snapped = snapToRayGuides(tx, ty, pageRect);
+          if (snapped) { tdx = snapped.x - anchor0.x; tdy = snapped.y - anchor0.y; }
+        }
+      }
+      if (!raf) raf = requestAnimationFrame(paint);
     };
-    const handleUp = (ev: PointerEvent) => {
+    const finish = (commit: boolean, ev?: PointerEvent) => {
       dragRef.current = null;
-      try { (e.currentTarget as HTMLElement).releasePointerCapture(ev.pointerId); } catch {}
+      if (raf) { cancelAnimationFrame(raf); raf = 0; }
+      if (node) node.style.transform = baseTransform;
+      try { if (ev) (e.currentTarget as HTMLElement).releasePointerCapture(ev.pointerId); } catch {}
       window.removeEventListener("pointermove", handleMove);
       window.removeEventListener("pointerup", handleUp);
       window.removeEventListener("pointercancel", handleUp);
+      window.removeEventListener("keydown", handleKey, true);
+      if (commit && (tdx !== 0 || tdy !== 0)) onDrag?.(tdx, tdy, ev?.altKey);
+    };
+    const handleUp = (ev: PointerEvent) => finish(true, ev);
+    const handleKey = (ev: KeyboardEvent) => {
+      // ESC oder ENTF brechen das Verschieben ab (Ausgangslage bleibt erhalten).
+      if (ev.key !== "Escape" && ev.key !== "Delete") return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      finish(false);
+      setRayGuides([]);
     };
     window.addEventListener("pointermove", handleMove);
     window.addEventListener("pointerup", handleUp);
     window.addEventListener("pointercancel", handleUp);
+    window.addEventListener("keydown", handleKey, true);
   };
+
 
   const handlePointerDown = (e: React.PointerEvent) => {
     if (readOnly) return;
