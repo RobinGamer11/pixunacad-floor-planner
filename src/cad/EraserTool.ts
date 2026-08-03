@@ -88,20 +88,25 @@ export class EraserTool {
   private _eraseAt(centerW: Vec2) {
     const r = this.app.defaultEraserRadiusM;
     const strength = this.app.defaultEraserStrength;
+    const mode = this.app.defaultEraserMode ?? "hard";
+    const softness = this.app.defaultEraserSoftness ?? 0.5;
+    // Vektorobjekte (Linien/Freihand) kennen keine Teiltransparenz: im
+    // Smooth-Modus wird nur der harte Kern geschnitten.
+    const rVec = mode === "smooth" ? Math.max(0.001, r * (1 - Math.max(0.05, Math.min(0.95, softness)))) : r;
     const scene = this.app.scene;
 
     // Dokument-Pixelmasken radieren
     for (const doc of scene.documents) {
       if (!this.app.labelManager.isVisible(doc.labelId)) continue;
-      eraseDocCircle(doc, centerW, r, strength);
+      eraseDocCircle(doc, centerW, r, strength, mode, softness);
     }
 
     // FreeStrokes splitten
     const freeStrokesCopy = scene.freeStrokes.slice();
     for (const stroke of freeStrokesCopy) {
       // Bounding-Box Test
-      if (!this._strokeNearCircle(stroke.points, centerW, r)) continue;
-      const chunks = splitPolylineByCircle(stroke.points, centerW, r, 0.02);
+      if (!this._strokeNearCircle(stroke.points, centerW, rVec)) continue;
+      const chunks = splitPolylineByCircle(stroke.points, centerW, rVec, 0.02);
       // Wenn unverändert (nichts geschnitten), übergehen
       if (chunks.length === 1 && chunks[0].length === stroke.points.length) {
         const same = chunks[0].every((p, i) => p.x === stroke.points[i].x && p.y === stroke.points[i].y);
@@ -117,8 +122,8 @@ export class EraserTool {
       // Quick reject
       const pa = seg.a, pb = seg.b;
       const proj = projectPointToSegment(centerW, pa, pb);
-      if (dist(proj.q, centerW) > r) continue;
-      const subs = splitSegmentByCircle(pa, pb, centerW, r);
+      if (dist(proj.q, centerW) > rVec) continue;
+      const subs = splitSegmentByCircle(pa, pb, centerW, rVec);
       if (subs.length === 1 && dist(subs[0].a, pa) < 1e-9 && dist(subs[0].b, pb) < 1e-9) continue;
       const style = { color: seg.color, thicknessM: seg.thicknessM, labelId: seg.labelId };
       scene.removeSegment(seg);
@@ -145,9 +150,18 @@ export class EraserTool {
 
   private _drawOverlay(ctx: CanvasRenderingContext2D, cam: any) {
     const c = cam.worldToScreen(this.app.input.mouse.wx, this.app.input.mouse.wy);
-    const r = Math.max(4, this.app.defaultEraserRadiusM * cam.scale);
+    const r = Math.max(3, this.app.defaultEraserRadiusM * cam.scale);
+    const mode = this.app.defaultEraserMode ?? "hard";
+    const soft = Math.max(0.05, Math.min(1, this.app.defaultEraserSoftness ?? 0.5));
     ctx.save();
-    ctx.fillStyle = `rgba(77,163,255,${Math.min(1, Math.max(0.05, this.app.defaultEraserStrength)) * 0.18})`;
+    if (mode === "smooth") {
+      const g = ctx.createRadialGradient(c.x, c.y, r * (1 - soft), c.x, c.y, r);
+      g.addColorStop(0, "rgba(77,163,255,0.28)");
+      g.addColorStop(1, "rgba(77,163,255,0)");
+      ctx.fillStyle = g;
+    } else {
+      ctx.fillStyle = `rgba(77,163,255,${Math.min(1, Math.max(0.05, this.app.defaultEraserStrength)) * 0.18})`;
+    }
     ctx.strokeStyle = "rgba(77,163,255,0.65)";
     ctx.lineWidth = 1.5;
     ctx.beginPath();

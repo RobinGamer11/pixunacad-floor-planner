@@ -68,7 +68,7 @@ export function getOrCreateDocMask(doc: DocumentObject, onLoaded?: () => void): 
  * Berücksichtigt Position + Rotation des Dokuments.
  * Gibt true zurück, wenn etwas in den Bounds gestempelt wurde.
  */
-export function eraseDocCircle(doc: DocumentObject, centerW: Vec2, radiusM: number, strength = 1): boolean {
+export function eraseDocCircle(doc: DocumentObject, centerW: Vec2, radiusM: number, strength = 1, mode: "hard" | "smooth" = "hard", softness = 0.5): boolean {
   if (radiusM <= 0) return false;
   // Welt → lokale (unrotierte) Doc-Koords
   const c = documentCenterWorld(doc);
@@ -94,11 +94,20 @@ export function eraseDocCircle(doc: DocumentObject, centerW: Vec2, radiusM: numb
   ctx.save();
   ctx.globalCompositeOperation = "destination-out";
   // Weicher Rand für sanftes Radieren
-  const grad = ctx.createRadialGradient(px, py, pr * 0.7, px, py, pr);
   const a = Math.max(0.05, Math.min(1, strength));
-  grad.addColorStop(0, `rgba(0,0,0,${a})`);
-  grad.addColorStop(1, "rgba(0,0,0,0)");
-  ctx.fillStyle = grad;
+  if (mode === "hard") {
+    // Harte Kante: alles innerhalb des Radius wird voll radiert.
+    ctx.fillStyle = `rgba(0,0,0,${a})`;
+  } else {
+    // Vignette: Kern hart, nach außen nebelartig ausblendend.
+    const soft = Math.max(0.05, Math.min(1, softness));
+    const core = pr * (1 - soft);
+    const grad = ctx.createRadialGradient(px, py, Math.max(0, core), px, py, Math.max(core + 0.01, pr));
+    grad.addColorStop(0, `rgba(0,0,0,${a})`);
+    grad.addColorStop(0.55, `rgba(0,0,0,${a * 0.45})`);
+    grad.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = grad;
+  }
   ctx.beginPath();
   ctx.arc(px, py, pr, 0, Math.PI * 2);
   ctx.fill();
