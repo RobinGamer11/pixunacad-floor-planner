@@ -3640,8 +3640,19 @@ function ElementView({
       }
     };
 
+    let settled = false;
     const onDown = (ev: PointerEvent) => { downClient = { x: ev.clientX, y: ev.clientY }; };
-    const onClick = (ev: MouseEvent) => {
+    // Linksklick-Abschluss: der CAD-Canvas verschluckt teilweise das native
+    // "click"-Event (preventDefault auf pointerdown), deshalb hören wir
+    // zusätzlich auf pointerup und behandeln beides identisch (mit Guard,
+    // damit nicht doppelt commited wird).
+    const handleClickLike = (ev: MouseEvent | PointerEvent) => {
+      if (settled) return;
+      if ((ev as MouseEvent).button !== undefined && (ev as MouseEvent).button !== 0) return;
+      if (downClient && Math.hypot(ev.clientX - downClient.x, ev.clientY - downClient.y) > 6) {
+        downClient = null;
+        return;
+      }
       const t = ev.target as HTMLElement | null;
       if (t?.closest("[data-hub-control]")) return;
       ev.preventDefault();
@@ -3656,6 +3667,7 @@ function ElementView({
       if (nearAnchor || !wheelActive) {
         // Ohne Tablet-Hilfsrad setzt ein einfacher Linksklick das CAD-Blatt.
         downClient = null;
+        settled = true;
         commit();
         return;
       }
@@ -3701,14 +3713,18 @@ function ElementView({
       if (ev.key === "Escape" || ev.key === "Delete") { ev.stopPropagation(); ev.preventDefault(); cancel(); }
       else if (ev.key === "Enter") { ev.stopPropagation(); commit(); }
     };
+    const onClick = (ev: MouseEvent) => handleClickLike(ev);
+    const onUp = (ev: PointerEvent) => handleClickLike(ev);
     window.addEventListener("pointerdown", onDown, true);
     window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp, true);
     window.addEventListener("click", onClick, true);
     window.addEventListener("contextmenu", onContext, true);
     window.addEventListener("keydown", onKey, true);
     return () => {
       window.removeEventListener("pointerdown", onDown, true);
       window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp, true);
       window.removeEventListener("click", onClick, true);
       window.removeEventListener("contextmenu", onContext, true);
       window.removeEventListener("keydown", onKey, true);
