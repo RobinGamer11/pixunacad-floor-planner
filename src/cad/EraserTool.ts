@@ -436,6 +436,36 @@ export class EraserTool {
     const soft = Math.max(0.05, Math.min(1, this.app.defaultEraserSoftness ?? 0.5));
     ctx.save();
 
+    // Live-Anzeige: bereits radierter Bereich des laufenden Zuges als
+    // zusammenhängende Fläche (Kreise + Bänder in einem Pfad → keine Nähte).
+    if (this._erasing && this._hatchStamps.length) {
+      const path = new Path2D();
+      for (let i = 0; i < this._hatchStamps.length; i++) {
+        const s = this._hatchStamps[i];
+        const p = cam.worldToScreen(s.c.x, s.c.y);
+        const rr = Math.max(1, s.r * cam.scale);
+        path.moveTo(p.x + rr, p.y);
+        path.arc(p.x, p.y, rr, 0, Math.PI * 2);
+        if (i > 0) {
+          const q = cam.worldToScreen(this._hatchStamps[i - 1].c.x, this._hatchStamps[i - 1].c.y);
+          const dx = p.x - q.x, dy = p.y - q.y;
+          const len = Math.hypot(dx, dy);
+          if (len > 0.01) {
+            const nx = (-dy / len) * rr, ny = (dx / len) * rr;
+            path.moveTo(q.x + nx, q.y + ny);
+            path.lineTo(p.x + nx, p.y + ny);
+            path.lineTo(p.x - nx, p.y - ny);
+            path.lineTo(q.x - nx, q.y - ny);
+            path.closePath();
+          }
+        }
+      }
+      ctx.fillStyle = "rgba(255,255,255,0.92)";
+      ctx.fill(path);
+    }
+
+
+
 
 
     if (mode === "smooth") {
