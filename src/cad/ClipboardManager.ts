@@ -77,8 +77,10 @@ function itemCenter(it: ClipboardItem): Vec2 {
   if (it.kind === "segment") return { x: (it.a.x + it.b.x) / 2, y: (it.a.y + it.b.y) / 2 };
   if (it.kind === "hatch") return polygonCentroid(it.points);
   if (it.kind === "dimension") return { x: (it.p1.x + it.p2.x) / 2, y: (it.p1.y + it.p2.y) / 2 };
+  if (it.kind === "wall") return polygonCentroid(it.corners);
   return v(it.center.x, it.center.y);
 }
+
 
 function itemsAnchor(items: ClipboardItem[]): Vec2 {
   if (items.length === 0) return v(0, 0);
