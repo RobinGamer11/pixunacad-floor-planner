@@ -4007,6 +4007,7 @@ function ElementView({
                 setActiveEdge(null);
                 actionCommitRef.current = null;
                 actionCancelRef.current = null;
+                unregisterTrimAbort?.(); unregisterTrimAbort = null;
               };
               let unregisterTrimAbort: (() => void) | null = null;
               const cancel = () => {
