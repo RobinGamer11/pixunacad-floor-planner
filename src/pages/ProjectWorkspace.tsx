@@ -4436,6 +4436,30 @@ function ElementView({
         rootRef.current.parentElement,
       )}
 
+      {/* CAD-Blatt drehen: Achse durch die beiden oberen Fangpunkte, der
+         Cursor sitzt fixiert auf dieser Linie. Linksklick setzt das Blatt. */}
+      {rotAxis && rootRef.current?.parentElement && createPortal(
+        <svg
+          className="absolute inset-0 pointer-events-none"
+          style={{ width: "100%", height: "100%", zIndex: 915 }}
+          viewBox="0 0 100 100"
+          preserveAspectRatio="none"
+        >
+          <line
+            x1={rotAxis.ax} y1={rotAxis.ay} x2={rotAxis.bx} y2={rotAxis.by}
+            stroke="hsl(var(--accent-gold))"
+            strokeWidth={0.12}
+            strokeDasharray="1.2 0.8"
+            vectorEffect="non-scaling-stroke"
+            opacity={0.9}
+          />
+          <circle cx={rotAxis.mx} cy={rotAxis.my} r={0.55} fill="hsl(var(--accent-gold))" />
+        </svg>,
+        rootRef.current.parentElement,
+      )}
+
+
+
     </div>
   );
 }
