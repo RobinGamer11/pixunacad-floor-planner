@@ -118,8 +118,7 @@ export class EraserTool {
     this._hatchStamps = [];
     if (!stamps.length || !pc?.difference) return;
     const scene = this.app.scene;
-    // Ein einziger zusammenhängender Radierbereich: Kreise + Verbindungsbänder
-    // zwischen aufeinanderfolgenden Positionen, zu einer Fläche vereinigt.
+
     const parts: any[] = [];
     for (let i = 0; i < stamps.length; i++) {
       parts.push([this._circleRing(stamps[i].c, stamps[i].r)]);
@@ -162,14 +161,17 @@ export class EraserTool {
 
       scene.removeHatch(hatch);
       if (this.app.selection && (this.app.selection as any).hatchId === hatch.id) this.app.setSelection(null);
+      const autoSmooth = (this.app as any).defaultHatchAutoSmooth !== false;
       for (const poly of result || []) {
         const rings = poly
-          .map((ring: number[][]) => this._smoothCutRing(ring, origKeys))
+          .map((ring: number[][]) =>
+            autoSmooth ? this._smoothCutRing(ring, origKeys) : this._rawRing(ring))
           .filter((ring: Vec2[]) => ring.length > 2 && Math.abs(this._ringArea(ring)) > minArea);
         const outer = rings[0];
         if (!outer || outer.length < 3) continue;
         scene.createHatch(outer, { ...style, holes: rings.slice(1) });
       }
+
     }
   }
 
@@ -186,16 +188,55 @@ export class EraserTool {
     return a / 2;
   }
 
+  /** Ring ohne Glättung (Auto-Glättung deaktiviert). */
+  private _rawRing(ring: number[][]): Vec2[] {
+    const pts = ring.map((p) => v(p[0], p[1]));
+    if (pts.length > 1 && dist(pts[0], pts[pts.length - 1]) < 1e-9) pts.pop();
+    return pts;
+  }
+
+  /**
+   * Entfernt Ausreißer/Spikes auf den radierten Kanten: sehr kurze Zacken und
+   * spitze Winkel zwischen neuen Punkten werden verworfen.
+   */
+  private _despike(pts: Vec2[], isOrig: boolean[], tol: number): { pts: Vec2[]; isOrig: boolean[] } {
+    const outP: Vec2[] = [];
+    const outF: boolean[] = [];
+    const n = pts.length;
+    for (let i = 0; i < n; i++) {
+      if (isOrig[i]) { outP.push(pts[i]); outF.push(true); continue; }
+      const prev = outP.length ? outP[outP.length - 1] : pts[(i - 1 + n) % n];
+      const next = pts[(i + 1) % n];
+      const d1 = dist(prev, pts[i]);
+      const d2 = dist(pts[i], next);
+      if (d1 < tol && d2 < tol) continue;                       // Mikro-Zacke
+      const ax = pts[i].x - prev.x, ay = pts[i].y - prev.y;
+      const bx = next.x - pts[i].x, by = next.y - pts[i].y;
+      const la = Math.hypot(ax, ay), lb = Math.hypot(bx, by);
+      if (la > 1e-9 && lb > 1e-9) {
+        const cosang = (ax * bx + ay * by) / (la * lb);
+        // Richtungsumkehr (Spike) bei kurzen Kanten → weglassen
+        if (cosang < -0.5 && Math.min(la, lb) < tol * 4) continue;
+      }
+      outP.push(pts[i]); outF.push(false);
+    }
+    return outP.length > 3 ? { pts: outP, isOrig: outF } : { pts, isOrig };
+  }
+
   /**
    * Glättet ausschließlich die neu entstandenen Radier-Kanten (Chaikin),
    * Original-Ecken der Schraffur bleiben exakt erhalten.
    */
-  private _smoothCutRing(ring: number[][], origKeys: Set<string>, passes = 2): Vec2[] {
+  private _smoothCutRing(ring: number[][], origKeys: Set<string>, passes = 3): Vec2[] {
     let pts = ring.map((p) => v(p[0], p[1]));
     // Doppelten Endpunkt entfernen (polygon-clipping schließt Ringe).
     if (pts.length > 1 && dist(pts[0], pts[pts.length - 1]) < 1e-9) pts.pop();
     if (pts.length < 4) return pts;
     let isOrig = pts.map((p) => origKeys.has(this._key(p.x, p.y)));
+    const tol = Math.max(0.001, this.app.defaultEraserRadiusM * 0.06);
+    ({ pts, isOrig } = this._despike(pts, isOrig, tol));
+    if (pts.length < 4) return pts;
+
     for (let pass = 0; pass < passes; pass++) {
       const out: Vec2[] = [];
       const flags: boolean[] = [];
@@ -337,13 +378,18 @@ export class EraserTool {
       }
     }
 
-    // Schraffuren: Radier-Pfad nur sammeln (Preview). Der echte boolesche
-    // Schnitt passiert erst beim Loslassen der Maus (_commitHatchErase).
+    // Schraffuren: Radier-Pfad sammeln und laufend (in kurzen Abschnitten)
+    // wirklich boolesch ausschneiden — dadurch sieht man sofort das Endergebnis.
     const lastStamp = this._hatchStamps[this._hatchStamps.length - 1];
     if (!lastStamp || dist(lastStamp.c, centerW) > r * 0.25) {
       this._hatchStamps.push({ c: v(centerW.x, centerW.y), r });
-      if (this._hatchStamps.length > 4000) this._hatchStamps.shift();
+      if (this._hatchStamps.length >= 8) {
+        const tail = this._hatchStamps[this._hatchStamps.length - 1];
+        this._commitHatchErase();
+        this._hatchStamps = [tail];
+      }
     }
+
 
 
     // Textboxen: werden entfernt, sobald der Pinsel sie trifft (Smooth = mit
@@ -436,33 +482,8 @@ export class EraserTool {
     const soft = Math.max(0.05, Math.min(1, this.app.defaultEraserSoftness ?? 0.5));
     ctx.save();
 
-    // Live-Anzeige: bereits radierter Bereich des laufenden Zuges als
-    // zusammenhängende Fläche (Kreise + Bänder in einem Pfad → keine Nähte).
-    if (this._erasing && this._hatchStamps.length) {
-      const path = new Path2D();
-      for (let i = 0; i < this._hatchStamps.length; i++) {
-        const s = this._hatchStamps[i];
-        const p = cam.worldToScreen(s.c.x, s.c.y);
-        const rr = Math.max(1, s.r * cam.scale);
-        path.moveTo(p.x + rr, p.y);
-        path.arc(p.x, p.y, rr, 0, Math.PI * 2);
-        if (i > 0) {
-          const q = cam.worldToScreen(this._hatchStamps[i - 1].c.x, this._hatchStamps[i - 1].c.y);
-          const dx = p.x - q.x, dy = p.y - q.y;
-          const len = Math.hypot(dx, dy);
-          if (len > 0.01) {
-            const nx = (-dy / len) * rr, ny = (dx / len) * rr;
-            path.moveTo(q.x + nx, q.y + ny);
-            path.lineTo(p.x + nx, p.y + ny);
-            path.lineTo(p.x - nx, p.y - ny);
-            path.lineTo(q.x - nx, q.y - ny);
-            path.closePath();
-          }
-        }
-      }
-      ctx.fillStyle = "rgba(255,255,255,0.92)";
-      ctx.fill(path);
-    }
+    // Keine Vorschau-Fläche: der Schnitt wird laufend echt ausgeführt.
+
 
 
 

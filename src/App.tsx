@@ -16,6 +16,7 @@ import Login from "./pages/Login";
 import ProjectWorkspace from "./pages/ProjectWorkspace";
 import CadPage from "./pages/CadPage";
 import NotesPage from "./pages/NotesPage";
+import FinancePage from "./pages/FinancePage";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -33,6 +34,7 @@ const App = () => (
           <Route path="/project/:projectId/cad" element={<RequireAuth><CadPage /></RequireAuth>} />
           <Route path="/project/:projectId/cad/:sheetId" element={<RequireAuth><CadPage /></RequireAuth>} />
           <Route path="/project/:projectId/notes" element={<RequireAuth><NotesPage /></RequireAuth>} />
+          <Route path="/project/:projectId/finance" element={<RequireAuth><FinancePage /></RequireAuth>} />
           <Route path="/cad" element={<RequireAuth><CadPage /></RequireAuth>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

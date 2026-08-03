@@ -12,9 +12,10 @@ import {
   Trash2,
   TabletSmartphone,
   Network,
+  Wallet,
 } from "lucide-react";
 
-export type WorkspaceMode = "workspace" | "cad" | "notes";
+export type WorkspaceMode = "workspace" | "cad" | "notes" | "finance";
 
 interface Props {
   projectId?: string;
@@ -64,6 +65,7 @@ export function WorkspaceHeader({
   const goWorkspace = () => projectId && navigate(`/project/${projectId}`);
   const goCad = () => projectId && navigate(`/project/${projectId}/cad`);
   const goNotes = () => projectId && navigate(`/project/${projectId}/notes`);
+  const goFinance = () => projectId && navigate(`/project/${projectId}/finance`);
 
   return (
     <header
@@ -150,6 +152,13 @@ export function WorkspaceHeader({
             label="Board"
             active={mode === "notes"}
             onClick={goNotes}
+          />
+          <ModeDivider />
+          <ModeButton
+            icon={<Wallet size={13} />}
+            label="Finanzen"
+            active={mode === "finance"}
+            onClick={goFinance}
           />
 
         </div>

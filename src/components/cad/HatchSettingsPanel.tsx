@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Spline, RectangleHorizontal, Circle, PaintBucket } from "lucide-react";
+import { Spline, RectangleHorizontal, Circle, PaintBucket, Waves } from "lucide-react";
 import type { CadApp } from "@/cad/CadApp";
 import type { MiniCad } from "@/cad/embed/MiniCad";
 import type { HatchDrawMode } from "@/cad/HatchTool";
@@ -165,7 +165,38 @@ export const HatchSettingsPanel: React.FC<Props> = ({ app }) => {
         />
       </label>
 
+      <button
+        type="button"
+        onClick={() => {
+          if (!app) return;
+          (app as any).defaultHatchAutoSmooth = !((app as any).defaultHatchAutoSmooth !== false);
+          force((x) => x + 1);
+        }}
+        className="w-full flex items-center justify-between gap-2 rounded border px-2 py-1.5 text-[11px] transition-colors hover:bg-muted"
+        style={{ borderColor: "hsl(var(--hairline))" }}
+        aria-pressed={(app as any)?.defaultHatchAutoSmooth !== false}
+      >
+        <span className="flex items-center gap-1.5">
+          <Waves size={13} />
+          Kanten nach Radieren glätten
+        </span>
+        <span
+          className="rounded px-1.5 py-0.5 text-[10px] font-medium"
+          style={
+            (app as any)?.defaultHatchAutoSmooth !== false
+              ? { background: "hsl(var(--accent-gold-soft))", color: "hsl(var(--accent-gold))" }
+              : { background: "hsl(var(--surface-muted))", color: "hsl(var(--ink-soft))" }
+          }
+        >
+          {(app as any)?.defaultHatchAutoSmooth !== false ? "An" : "Aus"}
+        </span>
+      </button>
+      <div className="text-[10px] leading-relaxed" style={{ color: "hsl(var(--ink-soft))" }}>
+        Glättet automatisch die radierten Kanten und entfernt Ausreißer/Zacken bei Schwüngen.
+      </div>
+
       <div className="text-[10px] text-muted-foreground leading-relaxed">
+
         {mode === "polygon" && "Punkte klicken · Doppelklick beendet."}
         {mode === "rectangle" && "Zwei Klicks für die erste Seite, dritter Klick für Breite."}
         {mode === "circle" && "Zentrum → Radius → Doppelklick beendet."}

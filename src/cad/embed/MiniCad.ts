@@ -195,6 +195,8 @@ export class MiniCad {
   defaultHatchStrokeColor: string = Defaults.hatchStrokeColor;
   defaultHatchStrokeWidthPx: number = Defaults.hatchStrokePx;
   defaultHatchFillAlphaPct: number = Defaults.hatchFillAlphaPct;
+  /** Radierte Schraffur-Kanten automatisch glätten. */
+  defaultHatchAutoSmooth: boolean = true;
   defaultAreaShow: boolean = Defaults.areaShow;
 
   /** Optionaler Callback für React-Panels (Bezeichnungen/Ausgewählter-Stroke-Refresh). */
