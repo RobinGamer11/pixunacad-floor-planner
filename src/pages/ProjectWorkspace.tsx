@@ -66,6 +66,7 @@ import {
   ChevronsUpDown,
   ChevronsLeftRight,
   SquareDashed,
+  FolderOpen,
 } from "lucide-react";
 
 import {
