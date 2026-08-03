@@ -3320,6 +3320,7 @@ function ElementView({
       }
       if (!raf) raf = requestAnimationFrame(paint);
     };
+    let unregisterAbort: (() => void) | null = null;
     const finish = (commit: boolean, ev?: PointerEvent) => {
       dragRef.current = null;
       if (raf) { cancelAnimationFrame(raf); raf = 0; }
@@ -3329,22 +3330,25 @@ function ElementView({
       window.removeEventListener("pointerup", handleUp);
       window.removeEventListener("pointercancel", handleUp);
       window.removeEventListener("keydown", handleKey, true);
+      unregisterAbort?.(); unregisterAbort = null;
       if (commit && (tdx !== 0 || tdy !== 0)) onDrag?.(tdx, tdy, ev?.altKey);
     };
     const handleUp = (ev: PointerEvent) => finish(true, ev);
+    const abort = () => { finish(false); setRayGuides([]); };
     const handleKey = (ev: KeyboardEvent) => {
       // ESC oder ENTF brechen das Verschieben ab (Ausgangslage bleibt erhalten).
       if (ev.key !== "Escape" && ev.key !== "Delete") return;
       ev.preventDefault();
-      ev.stopPropagation();
-      finish(false);
-      setRayGuides([]);
+      ev.stopImmediatePropagation();
+      abort();
     };
+    unregisterAbort = registerAbort(abort);
     window.addEventListener("pointermove", handleMove);
     window.addEventListener("pointerup", handleUp);
     window.addEventListener("pointercancel", handleUp);
     window.addEventListener("keydown", handleKey, true);
   };
+
 
 
   const handlePointerDown = (e: React.PointerEvent) => {
