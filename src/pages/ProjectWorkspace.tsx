@@ -132,6 +132,21 @@ const HATCH_MODE_VARIANTS: Array<{ id: HatchDrawMode; label: string; icon: React
 const isLinePageTool = (tool: PageTool): tool is LinePageTool =>
   tool === "line" || tool === "free" || tool === "eraser";
 
+/** Registry laufender HUB-/Transform-Aktionen. ENTF/ESC brechen darüber jede
+ *  aktive Vorschau (Verschieben, Drehen, Trimmen) sofort ab und verwerfen sie. */
+const activeAborts = new Set<() => void>();
+function registerAbort(fn: () => void): () => void {
+  activeAborts.add(fn);
+  return () => { activeAborts.delete(fn); };
+}
+function runActiveAborts(): boolean {
+  if (!activeAborts.size) return false;
+  const list = Array.from(activeAborts);
+  activeAborts.clear();
+  for (const fn of list) { try { fn(); } catch { /* ignore */ } }
+  return true;
+}
+
 const PROJECT_ZOOM_MIN = 10;
 const PROJECT_ZOOM_MAX = 1600;
 const PROJECT_ZOOM_SLIDER_STEPS = 1000;
