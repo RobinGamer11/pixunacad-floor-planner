@@ -3965,10 +3965,11 @@ function ElementView({
             src={el.imageUrl}
             alt=""
             className="w-full h-full object-cover"
-            style={{ background: "hsl(var(--surface-muted))" }}
+            style={{ background: "hsl(var(--surface-muted))", ...buildEraseMaskCss(el.eraseCircles, el.wMm ?? 0, el.hMm ?? 0) }}
           />
         </WarpedContent>
       )}
+
       {el.kind === "note" && (
         <div
           className="w-full h-full p-3 text-sm"
