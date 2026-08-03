@@ -87,6 +87,8 @@ import { TableElementView, TableModifyContext, TableFormulaPickContext, type For
 import { TableToolSettings } from "@/components/page/TableToolSettings";
 
 import { CadViewportView } from "@/components/page/CadViewportView";
+import { buildEraseMaskCss } from "@/lib/eraseMask";
+
 import { importFile, type ImportedPage } from "@/cad/documentImport";
 import { popPendingSheetPdf } from "@/lib/sheetPdfExport";
 import type { MiniCadSelectionInfo } from "@/cad/embed/MiniCad";
