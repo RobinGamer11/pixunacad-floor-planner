@@ -28,7 +28,7 @@ export function setWorkspacePdfZoomActive(active: boolean) {
  * auf ein <canvas> und re-rendert adaptiv bei Größenänderung (Zoom),
  * damit beim Reinzoomen kein Bitmap-Geblurre entsteht.
  */
-export function PdfPageView({ sourceB64, pageIndex, className, deferDuringWorkspaceZoom = false }: Props) {
+export function PdfPageView({ sourceB64, pageIndex, className, deferDuringWorkspaceZoom = false, maskStyle }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [error, setError] = useState<string | null>(null);
