@@ -7,14 +7,31 @@ import { exportElementToA4Pdf } from "@/lib/financePdfExport";
 import {
   financeStore, childrenOf, positionsOf, nodeTotals, projectTotals, actionTotals,
   control, formatEur, formatPct,
-  type FinanceNode, type FinanceState, type FinanceTotals,
+  type FinanceNode, type FinanceState, type FinanceTotals, type FinancePosition,
 } from "@/lib/financeStore";
 import { FinanceSummaryCard } from "@/components/finance/FinanceSummaryCard";
 import { FinancePositionsTable } from "@/components/finance/FinancePositionsTable";
 import {
   Plus, PanelLeftClose, PanelLeftOpen, ChevronRight, ChevronDown,
-  Folder, Building2, ArrowRight, ToggleLeft, ToggleRight, Home, Trash2,
+  Folder, Building2, ArrowRight, ToggleLeft, ToggleRight, Home, Trash2, Search, X,
 } from "lucide-react";
+
+/** Filterbare Positionsarten (mehrfach kombinierbar). */
+type FilterKey = "offer" | "invoice" | "plus" | "minus";
+const FILTER_CHIPS: [FilterKey, string][] = [
+  ["offer", "Angebots-Nr."],
+  ["invoice", "Rechnungs-Nr."],
+  ["plus", "Mehrnachträge"],
+  ["minus", "Mindernachträge"],
+];
+const FILTER_LABEL: Record<FilterKey, string> = {
+  offer: "Angebot",
+  invoice: "Rechnung",
+  plus: "Mehrnachtrag",
+  minus: "Mindernachtrag",
+};
+const keyOf = (p: { type: string; supplementKind?: string }): FilterKey =>
+  p.type === "supplement" ? ((p.supplementKind ?? "plus") as FilterKey) : (p.type as FilterKey);
 
 function useFinance(projectId?: string): FinanceState {
   const [state, setState] = useState<FinanceState>(() =>
@@ -49,6 +66,41 @@ export default function FinancePage() {
     [state.nodes, selectedId],
   );
   const pid = projectId ?? "";
+
+  /* ---- Filter (linkes Fenster, Treffer im obersten Projektordner) ---- */
+  const [filterQuery, setFilterQuery] = useState("");
+  const [filterTypes, setFilterTypes] = useState<FilterKey[]>([]);
+  const filterActive = filterQuery.trim() !== "" || filterTypes.length > 0;
+  // Sobald gefiltert wird, öffnet sich automatisch der oberste Projektordner.
+  useEffect(() => { if (filterActive) setSelectedId(null); }, [filterActive, filterQuery, filterTypes]);
+
+  const filterHits = useMemo(() => {
+    if (!filterActive) return [];
+    const q = filterQuery.trim().toLowerCase();
+    const nodeById = new Map(state.nodes.map((n) => [n.id, n]));
+    const pathOf = (nodeId: string): string => {
+      const parts: string[] = [];
+      let cur = nodeById.get(nodeId);
+      while (cur) { parts.unshift(cur.name); cur = cur.parentId ? nodeById.get(cur.parentId) : undefined; }
+      return parts.join(" › ");
+    };
+    const hits: { pos: typeof state.positions[number]; label: string; path: string; nodeId: string }[] = [];
+    for (const node of state.nodes) {
+      const counters: Record<string, number> = {};
+      for (const p of positionsOf(state, node.id)) {
+        const k = keyOf(p);
+        counters[k] = (counters[k] ?? 0) + 1;
+        const label = `${FILTER_LABEL[k]} ${String(counters[k]).padStart(2, "0")}`;
+        if (filterTypes.length > 0 && !filterTypes.includes(k)) continue;
+        if (q) {
+          const hay = [label, p.number, p.note, node.name, node.note].join(" ").toLowerCase();
+          if (!hay.includes(q)) continue;
+        }
+        hits.push({ pos: p, label, path: pathOf(node.id), nodeId: node.id });
+      }
+    }
+    return hits;
+  }, [state, filterActive, filterQuery, filterTypes]);
 
   /* ---- PDF-Export des rechten Detailfensters (DIN A4) ---- */
   const exportRef = useRef<HTMLDivElement | null>(null);
@@ -156,6 +208,39 @@ export default function FinancePage() {
               </button>
             </div>
 
+            {/* Filter: Text (Nummern, Namen, Notizen) + Typ-Chips (mehrfach wählbar) */}
+            <div className="px-3 py-2 border-b space-y-1.5" style={{ borderColor: "hsl(var(--hairline))" }}>
+              <div className="flex items-center gap-1.5 h-7 rounded-md border px-2"
+                   style={{ borderColor: "hsl(var(--hairline))" }}>
+                <Search size={12} style={{ color: "hsl(var(--ink-soft))" }} />
+                <input value={filterQuery} onChange={(e) => setFilterQuery(e.target.value)}
+                  placeholder="Nr., Name, Notiz…"
+                  className="flex-1 min-w-0 bg-transparent text-[11px] outline-none" />
+                {filterActive && (
+                  <button title="Filter zurücksetzen"
+                    onClick={() => { setFilterQuery(""); setFilterTypes([]); }}>
+                    <X size={12} style={{ color: "hsl(var(--ink-soft))" }} />
+                  </button>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {FILTER_CHIPS.map(([key, label]) => {
+                  const on = filterTypes.includes(key);
+                  return (
+                    <button key={key}
+                      onClick={() => setFilterTypes((t) => on ? t.filter((x) => x !== key) : [...t, key])}
+                      className="h-6 px-2 rounded-full border text-[10px] font-medium"
+                      style={{
+                        borderColor: on ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
+                        background: on ? "hsl(var(--accent-gold) / 0.14)" : undefined,
+                      }}>
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             <div className="flex gap-1.5 px-3 py-2 border-b" style={{ borderColor: "hsl(var(--hairline))" }}>
               <button onClick={() => addNode("overview")}
                 className="flex-1 h-7 rounded-md border text-[11px] font-medium flex items-center justify-center gap-1 hover:bg-muted"
@@ -210,7 +295,10 @@ export default function FinancePage() {
           </div>
 
           <div ref={exportRef} className="p-4 space-y-4" style={{ background: "hsl(var(--surface-app))" }}>
-            {!selected && (
+            {filterActive && (
+              <FilterResults hits={filterHits} onOpen={(id) => { setFilterQuery(""); setFilterTypes([]); setSelectedId(id); }} />
+            )}
+            {!selected && !filterActive && (
               <ProjectView projectId={pid} state={state} projectName={project?.name ?? "Projekt"}
                            onSelect={setSelectedId} />
             )}
@@ -391,6 +479,60 @@ const ChildList: React.FC<{
                 <ChildList projectId={projectId} state={state} nodes={kids} onSelect={onSelect} deep />
               </div>
             )}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+/* ------------------------------------------------------- Filter-Trefferliste */
+
+const FilterResults: React.FC<{
+  hits: { pos: FinancePosition; label: string; path: string; nodeId: string }[];
+  onOpen: (nodeId: string) => void;
+}> = ({ hits, onOpen }) => {
+  const sum = hits.reduce(
+    (s, h) => s + (h.pos.type === "supplement" && h.pos.supplementKind === "minus" ? -(h.pos.amount || 0) : (h.pos.amount || 0)),
+    0,
+  );
+  return (
+    <div className="rounded-xl border overflow-hidden"
+         style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}>
+      <div className="flex items-center gap-2 px-4 py-3 border-b" style={{ borderColor: "hsl(var(--hairline))" }}>
+        <div className="text-sm font-semibold flex-1">Filterergebnis</div>
+        <div className="text-xs" style={{ color: "hsl(var(--ink-soft))" }}>
+          {hits.length} {hits.length === 1 ? "Position" : "Positionen"} · {formatEur(sum)}
+        </div>
+      </div>
+
+      <div className="grid items-center px-3 py-2 border-b text-[11px] font-semibold uppercase tracking-wider"
+           style={{ gridTemplateColumns: "1.2fr 1.6fr 1fr 1.2fr 1fr 32px", borderColor: "hsl(var(--hairline))", color: "hsl(var(--ink-soft))" }}>
+        <span>Typ</span><span>Ordner</span><span>Datum</span><span>Nummer</span><span>Betrag</span><span />
+      </div>
+
+      {hits.length === 0 ? (
+        <div className="px-4 py-6 text-xs" style={{ color: "hsl(var(--ink-soft))" }}>
+          Keine Positionen gefunden.
+        </div>
+      ) : hits.map((h) => {
+        const isMinus = h.pos.type === "supplement" && h.pos.supplementKind === "minus";
+        const isPlus = h.pos.type === "supplement" && h.pos.supplementKind === "plus";
+        return (
+          <div key={h.pos.id} className="grid items-center px-3 py-2 border-b text-sm"
+               style={{ gridTemplateColumns: "1.2fr 1.6fr 1fr 1.2fr 1fr 32px", borderColor: "hsl(var(--hairline))" }}>
+            <span className="font-medium truncate">{h.label}</span>
+            <span className="truncate text-xs" style={{ color: "hsl(var(--ink-soft))" }}>{h.path}</span>
+            <span className="text-xs" style={{ color: "hsl(var(--ink-soft))" }}>{h.pos.date}</span>
+            <span className="text-xs truncate" style={{ color: "hsl(var(--ink-soft))" }}>{h.pos.number}</span>
+            <span className="tabular-nums font-medium"
+                  style={{ color: isPlus ? "hsl(24 95% 50%)" : isMinus ? "hsl(142 70% 34%)" : undefined }}>
+              {isMinus ? "−" : ""}{formatEur(h.pos.amount)}
+            </span>
+            <button data-export-hide onClick={() => onOpen(h.nodeId)}
+              className="h-7 w-7 rounded flex items-center justify-center hover:bg-muted" title="Aktion öffnen">
+              <ArrowRight size={14} style={{ color: "hsl(var(--ink-soft))" }} />
+            </button>
           </div>
         );
       })}
