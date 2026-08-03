@@ -1,36 +1,52 @@
-## Ziel
-Bezeichnungs-ID-Panel identisch zur CAD-Oberfläche in der Projektmappe wiederherstellen. **CAD-Blätter UND Dokumente (PDF/Bild)** darüber zuordbar machen. Andere Werkzeuge (Linie, Schraffur, Text) bleiben nachweislich weiter angebunden.
+# Radiergummi-Smoothmodus + Finanzen-Oberfläche (Vollausbau)
 
-## Bestandsaufnahme (bereits geprüft)
-- `engine.activeDrawLabelId` existiert und wird bereits beim Import gesetzt: `handleDocumentFileChange` → `engine.scene.createDocument({ …, labelId: engine.activeDrawLabelId })` (`ProjectWorkspace.tsx:591`). Neue Linien / Text / Schraffuren aus dem CAD-Overlay verwenden denselben Default — die Anbindung ist bereits vorhanden.
-- `CadIdPanelHost` mountet das imperative Engine-`IdPanel` (Anlegen / Umbenennen / Sichtbarkeit / Reihenfolge / Löschen). In der aktuellen Version wurde es aus dem Layers-Tab entfernt — das ist der eigentliche Regress.
-- `PageElement` (workspace-native, u. a. `cad-viewport`) hat kein `labelId`; das zuletzt eingeführte `layerName`-Freitextfeld ersetzt die Panel-Integration nicht.
+## Teil 1: Smoothmodus nur bei PNG/JPG
 
-## Umsetzung
+- Der Smoothmodus wird kontextabhängig: sobald der Radierer über ein Objekt geführt wird, das kein Rasterbild (PNG/JPG) ist (Vektorlinien, Schraffuren, PDF-Vektorinhalt, CAD-Objekte), fällt die Radierung automatisch auf „Hart" zurück.
+- Im Radiergummi-Panel (Projektmappe und CAD) wird der Smooth-Button deaktiviert (ausgegraut), wenn die aktuelle Auswahl bzw. das Zielobjekt kein Rasterbild ist, mit Hinweistext: „Weicher Modus ist nur für Bilder (PNG/JPG) verfügbar."
+- Ist nichts ausgewählt, bleibt Smooth wählbar, greift aber nur auf Rasterbildern; die Weichheits-Optionen werden nur bei aktivem, nutzbarem Smoothmodus angezeigt.
 
-### 1. Panel wiederherstellen (identisch zur CAD-Oberfläche)
-- Import und Mount von `<CadIdPanelHost engine={engine} />` im Layers-Tab / `RightInspector` von `src/pages/ProjectWorkspace.tsx` reaktivieren. Dieselben imperativen Handles wie im CAD-Editor — keine parallele UI, keine Duplikation.
+## Teil 2: Finanzen-Oberfläche neu aufbauen
 
-### 2. „Bez.-ID"-Freitextfeld entfernen
-- Das kürzlich hinzugefügte Text-Input im CAD-Blatt-Inspector (~Zeile 5407) wird ersatzlos entfernt. `layerName` wird nicht mehr geschrieben (bleibt lesbarer Legacy-Fallback für ältere Projekte).
+Die bestehende Finanzen-Seite (Budget/Einnahmen/Ausgaben-Liste) wird durch die gezeigte Struktur ersetzt. Kopfzeile und linkes Panel bleiben optisch identisch zu Board.
 
-### 3. CAD-Blatt einer Bezeichnungs-ID zuordnen
-- `PageElement` erhält Feld `labelId?: string` in `src/lib/projectStore.ts`.
-- Im CAD-Blatt-Inspector unterhalb der Maßstabs-Zeile: **Dropdown „ID"**, Quelle `engine.labelManager.list()`. Auswahl → `projectStore.updateElement(..., { labelId })`. Default beim Anlegen: `Defaults.defaultLabelId`.
-- `ElementView` blendet CAD-Blatt aus, wenn `!engine.labelManager.isVisible(el.labelId)` — konsistent mit Engine-Sichtbarkeit.
+### Ordnerstruktur links
+- Oberster Eintrag: das Projekt selbst als Hauptordner.
+- Zwei Anlage-Buttons: „+ Übersicht" (Ordner, z. B. „01 Rohbau") und „+ Aktion" (Unterordner = Unternehmen/Gewerk).
+- Übersichten können Aktionen enthalten; Baum ist auf-/zuklappbar, umbenennbar, löschbar, per Kontextmenü sortierbar.
+- Suche + Filter oben, „+ Neuer Ordner"-Button unten, wie in den Bildern.
 
-### 4. Dokumente (PDF / JPG / PNG) einer Bezeichnungs-ID zuordnen
-- **Neuimporte**: bleiben wie bisher an `activeDrawLabelId` gebunden (`createDocument({ labelId })`) — kein Codepfad-Wechsel nötig.
-- **Nachträgliche Zuordnung**: gleiches Dropdown „ID" wird im **Dokumenten-Werkzeug-Inspector** unter dem Maßstabsfeld ergänzt. Auswahl ruft eine Engine-API auf, die `labelId` auf dem existierenden `DocElement` in der Engine-Szene setzt (`engine.scene.setDocumentLabel(docId, labelId)` — falls nicht vorhanden, minimaler Wrapper hinzufügen, der die vorhandene `labelId`-Property des DocElements schreibt und `engine.refreshLabelUI()` / Redraw auslöst). Sichtbarkeit ergibt sich automatisch aus der Engine-Layer-Logik.
+### Aktion (Unternehmen) – rechtes Fenster
+- Titel (freier Text, inline editierbar) + Notizfeld darunter.
+- Karte „Gesamt": Kostenschätzung (Eingabefeld), Angebote (Summe aller Angebote), Rechnungen (Summe aller Rechnungen, direkt darunter „Nachträge: + x €"), Kontrolle (Differenz + Prozent). Angebote und Rechnungen stehen auf gleicher Höhe.
+- Kontrolle zeigt zwei Werte mit Prozent: Schätzung vs. Angebot und Schätzung vs. Rechnungen. Angebot = 100 %-Basis für die Rechnungs-Prozentanzeige.
+- Kleines „i" neben Rechnungen: klappt die vollständige Rechnungsaufstellung inkl. Nachträge auf.
+- Buttons „+ Angebot", „+ Rechnung", „+ Nachtrag" darunter.
+- Positionstabelle mit Spalten: Typ | Datum | Nummer (Angebots-/Rechnungs-/Nachtrags-Nr.) | Betrag | Notiz | Löschen-Symbol. Ganz links Drag-Griff (drei Punkte) zum Umsortieren.
+- Nachtrag-Zeilen haben vorne ein Dropdown: „Mehrnachtrag" (Betrag orange) oder „Mindernachtrag" (Betrag grün, negativ).
+- Nachträge werden summiert (Mehr minus Minder) und zur Rechnungssumme addiert.
+- Farben: orange ausschließlich für Mehrnachträge (und Angebotssumme wie im Bild), grün ausschließlich für Mindernachträge.
 
-### 5. Linie / Schraffur / Text — Verifikation (kein Codeeingriff geplant)
-- Diese Werkzeuge erzeugen Engine-Primitive. Vor Abschluss wird per Suche (`rg -n "createSegment|createHatch|createTextBox" src/cad`) und Blick in die jeweiligen Create-Pfade bestätigt, dass sie weiterhin `labelId: this.activeDrawLabelId ?? Defaults.defaultLabelId` setzen und `engine.refreshLabelUI()` triggern. Falls ein Pfad das nicht tut → in derselben Runde nachziehen (kleiner, gezielter Fix, keine breite Refaktorierung).
+### Übersicht (Gewerk-Ordner) – rechtes Fenster
+- Gleicher Aufbau wie Aktion, aber ohne Anlegen von Positionen.
+- Oben „Gesamt" mit eingebbarer Kostenschätzung, automatisch summierten Angeboten, Rechnungen (inkl. Nachträge) und Kontrolle.
+- Darunter Tabelle aller enthaltenen Aktionen (Unternehmen) mit deren Einzelsummen.
 
-## Nicht enthalten
-- Workspace-native Elemente ohne Engine-Repräsentation (z. B. `note`, `table`, `shape`, `timeline`) — diese hängen nicht am Engine-Layer-System und werden hier nicht angefasst.
+### Projekt-Hauptordner – rechtes Fenster
+- Alle Übersichten untereinander gegliedert, jede Zeile auf-/zuklappbar zur Detailanzeige der enthaltenen Aktionen.
+- Links neben dem Namen ein Schalter zum Ein-/Ausschalten einer Übersicht; ausgeschaltete Zeilen fließen nicht mehr in die Gesamtbeträge ein.
+- Abschlusszeile mit Gesamtsumme („7 Gewerke / 14 Unternehmen").
 
-## Technische Details
-- Dateien:
-  - `src/pages/ProjectWorkspace.tsx`: `CadIdPanelHost`-Mount, CAD-Blatt-Inspector-Block (Freitext raus, Dropdown rein), Dokument-Inspector-Block (Dropdown rein), Render-Filter in `ElementView` für Sichtbarkeit.
-  - `src/lib/projectStore.ts`: optionales Feld `labelId?: string` auf `PageElement`.
-  - ggf. `src/cad/embed/MiniCad.ts` (oder Scene-API): kleiner Setter für Dokument-`labelId` inkl. UI-Refresh, falls noch nicht vorhanden.
+## Technische Umsetzung
+
+- `src/lib/financeStore.ts` wird neu modelliert: `FinanceNode` (Typ `overview` | `action`, `parentId`, `order`, `name`, `note`, `estimate`, `enabled`) und `FinancePosition` (`nodeId`, `type: offer|invoice|supplement`, `supplementKind: plus|minus`, `date`, `number`, `amount`, `note`, `order`). Persistenz weiterhin projektbezogen in localStorage, mit Migration/Reset des alten Formats.
+- Reine Berechnungs-Helfer (Summen, Nachtragssaldo, Kontroll-Prozente, rekursive Aggregation entlang des Baums unter Beachtung von `enabled`) liegen im Store, nicht in der View.
+- `src/pages/FinancePage.tsx` wird neu geschrieben und in Komponenten unter `src/components/finance/` zerlegt: `FinanceTree`, `FinanceSummaryCard`, `FinancePositionsTable`, `FinanceOverviewTable`, `FinanceProjectTable`.
+- Sortierung per HTML5-Drag&Drop auf dem Zeilen-Griff; Zahlenformat über das bestehende `formatEur`.
+- Nur Design-Tokens verwenden; orange/grün über bestehende Akzent-Tokens.
+
+## Reihenfolge
+1. Radiergummi-Smoothmodus.
+2. Store-Neumodellierung + Ordnerbaum links.
+3. Aktions-Ansicht mit Positionstabelle und Nachtragslogik.
+4. Übersichts- und Projektansicht mit Aggregation und Ein-/Ausschaltern.
