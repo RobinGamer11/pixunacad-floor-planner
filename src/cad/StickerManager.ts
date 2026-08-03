@@ -1,7 +1,7 @@
 import { Vec2, v, polygonCentroid } from "./geometry";
 import type { CadApp } from "./CadApp";
 import type { ClipboardItem } from "./ClipboardManager";
-import type { Segment, Hatch, Dimension, TextBox } from "./Scene";
+import type { Segment, Hatch, Dimension, TextBox, Wall } from "./Scene";
 
 /**
  * Sticker = wiederverwendbare Sammlung von Objekt-Snapshots, gespeichert
@@ -152,6 +152,7 @@ export interface StickerIdSet {
   hatchIds?: Set<string> | string[];
   dimensionIds?: Set<string> | string[];
   textBoxIds?: Set<string> | string[];
+  wallIds?: Set<string> | string[];
 }
 export function buildStickerFromIds(app: CadApp, ids: StickerIdSet, name: string): StickerDefinition | null {
   const items: ClipboardItem[] = [];
@@ -164,6 +165,7 @@ export function buildStickerFromIds(app: CadApp, ids: StickerIdSet, name: string
   for (const id of hatchIds) { const h = app.scene.getHatchById(id); if (h) items.push(snapHatch(h)); }
   for (const id of dimIds) { const d = app.scene.getDimensionById(id); if (d) items.push(snapDimension(d)); }
   for (const id of tbIds) { const t = app.scene.getTextBoxById(id); if (t) items.push(snapTextBox(t)); }
+  for (const id of Array.from(ids.wallIds || [])) { const w = app.scene.getWallById(id); if (w) items.push(snapWall(w)); }
 
   return _finalizeSticker(items, name);
 }
@@ -231,6 +233,7 @@ export function localItemsBounds(items: ClipboardItem[]): { minX: number; minY: 
     if (it.kind === "segment") { acc(it.a.x, it.a.y); acc(it.b.x, it.b.y); }
     else if (it.kind === "hatch") { for (const p of it.points) acc(p.x, p.y); }
     else if (it.kind === "dimension") { acc(it.p1.x, it.p1.y); acc(it.p2.x, it.p2.y); }
+    else if (it.kind === "wall") { const t = it.thicknessM / 2; for (const p of it.corners) { acc(p.x - t, p.y - t); acc(p.x + t, p.y + t); } }
     else if (it.kind === "textbox") {
       const w2 = it.widthM / 2, h2 = it.heightM / 2;
       acc(it.center.x - w2, it.center.y - h2);
