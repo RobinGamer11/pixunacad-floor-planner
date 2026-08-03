@@ -6770,7 +6770,9 @@ function PrintPanel({
     return base.filter((id) => selectedIds.has(id));
   };
 
-  const handleExport = async () => {
+  // Erzeugt das PDF exakt wie beim Export – je nach Modus wird es dann
+  // heruntergeladen ("download") oder nur im Browser angezeigt ("preview").
+  const buildPdf = async (mode: "download" | "preview") => {
     const ids = resolveExportIds();
     if (ids.length === 0) return;
     setExporting(true);
@@ -6788,8 +6790,17 @@ function PrintPanel({
         (p) => setProgress(p),
       );
       const safeName = (project.name || "projektmappe").replace(/[^\w-]+/g, "_");
-      downloadPdf(bytes, `${safeName}.pdf`);
-      onClose();
+      if (mode === "download") {
+        downloadPdf(bytes, `${safeName}.pdf`);
+        onClose();
+      } else {
+        const copy = new Uint8Array(bytes);
+        const blob = new Blob([copy.buffer as ArrayBuffer], { type: "application/pdf" });
+        setPreview((prev) => {
+          if (prev) URL.revokeObjectURL(prev.url);
+          return { url: URL.createObjectURL(blob), bytes: copy, name: `${safeName}.pdf`, pages: ids.length };
+        });
+      }
     } catch (err) {
       console.error("PDF-Export fehlgeschlagen:", err);
       alert("PDF-Export fehlgeschlagen. Details in der Konsole.");
@@ -6798,6 +6809,17 @@ function PrintPanel({
       setProgress(null);
     }
   };
+
+  const handleExport = () => buildPdf("download");
+  const handlePreview = () => buildPdf("preview");
+
+  const closePreview = () => {
+    setPreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev.url);
+      return null;
+    });
+  };
+
 
 
   const toggleId = (id: string) => setSelectedIds(prev => {
