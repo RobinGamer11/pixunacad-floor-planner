@@ -3197,9 +3197,12 @@ function ElementView({
   // Rechtsklick auf einen (fremden) Fangpunkt → Hilfslinie von diesem Punkt
   // zum aktuell gewählten Fangpunkt dieses Elements. Dient als Orientierungs-
   // und Fanglinie beim Verschieben/Drehen. ESC/ENTF verwerfen die Linien.
+  const hubModeRef = useRef<null | "move" | "rotate">(null);
+  hubModeRef.current = hubMode;
   useEffect(() => {
     if (readOnly || !selected) return;
     const onContext = (ev: MouseEvent) => {
+      if (hubModeRef.current) return; // während HUB-Aktion übernimmt der Hub-Handler
       const parent = rootRef.current?.parentElement as HTMLElement | null;
       if (!parent) return;
       const t = ev.target as HTMLElement | null;
