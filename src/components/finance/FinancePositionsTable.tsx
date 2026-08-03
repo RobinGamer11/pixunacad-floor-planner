@@ -121,6 +121,28 @@ export const FinancePositionsTable: React.FC<Props> = ({ projectId, nodeId, posi
   );
 };
 
+/** Datum mit Kalendersymbol als Auslöser; natives Icon wird ausgeblendet. */
+const DateCell: React.FC<{ value: string; onChange: (v: string) => void }> = ({ value, onChange }) => {
+  const ref = useRef<HTMLInputElement>(null);
+  const open = () => {
+    const el = ref.current as (HTMLInputElement & { showPicker?: () => void }) | null;
+    if (!el) return;
+    el.focus();
+    try { el.showPicker?.(); } catch { /* not supported */ }
+  };
+  return (
+    <div className="flex items-center gap-1.5 pr-2">
+      <button type="button" onClick={open} title="Kalender öffnen"
+        className="h-6 w-6 rounded flex items-center justify-center hover:bg-muted shrink-0">
+        <Calendar size={13} style={{ color: "hsl(var(--ink-soft))" }} />
+      </button>
+      <input ref={ref} type="date" value={value} onChange={(e) => onChange(e.target.value)}
+        className="bg-transparent text-sm outline-none w-full [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none" />
+    </div>
+  );
+};
+
+
 const AmountInput: React.FC<{ value: number; color?: string; negative?: boolean; onCommit: (v: number) => void }> =
 ({ value, color, negative, onCommit }) => {
   const [focused, setFocused] = useState(false);
