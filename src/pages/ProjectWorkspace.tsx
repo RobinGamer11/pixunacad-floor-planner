@@ -3622,6 +3622,8 @@ function ElementView({
       setActiveEdge(null);
       setGuides([]);
       setRayGuides([]);
+      setRotAxis(null);
+
       setCarrying(true);
       actionCommitRef.current = null;
       actionCancelRef.current = null;
