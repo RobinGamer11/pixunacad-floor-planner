@@ -656,7 +656,7 @@ export default function ProjectWorkspace() {
   // gewählten Maßstab (docScale, z. B. "1:100") direkt im Modellbereich ab.
   // Kein Modal mehr — der Nutzer wählt den Maßstab wie beim CAD-Blatt vor
   // dem Import rechts über das Dropdown.
-  const placeImportedPages = (pages: ImportedPage[]) => {
+  const placeImportedPages = (pages: ImportedPage[], stacked = false) => {
     const engine = cadEngineApiRef.current?.engine;
     if (!engine || pages.length === 0) return;
     const m = docScale.match(/^1\s*:\s*(\d+(?:[.,]\d+)?)$/);
