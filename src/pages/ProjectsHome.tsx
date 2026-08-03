@@ -1545,6 +1545,8 @@ function SeitenInhaltGrid({ project, onAddPage }: { project: Project; onAddPage:
             onChange={handleThumb}
           />
         </div>
+        </div>
+
         <div className="mt-5">
           <div className="flex items-center justify-between">
             <div
