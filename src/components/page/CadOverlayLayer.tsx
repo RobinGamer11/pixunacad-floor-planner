@@ -230,7 +230,10 @@ export default function CadOverlayLayer(props: Props) {
   // Undo/Redo aus der Projekt-Historie: Tick setzen, damit der Effekt unten
   // NACH dem Re-Render (also mit dem wiederhergestellten initialState) läuft.
   const [restoreTick, setRestoreTick] = useState(0);
-  useEffect(() => projectStore.subscribeHistoryRestore(() => setRestoreTick((t) => t + 1)), []);
+  useEffect(() => {
+    const unsub = projectStore.subscribeHistoryRestore(() => setRestoreTick((t) => t + 1));
+    return () => { unsub?.(); };
+  }, []);
   const firstRestoreTick = useRef(true);
   useEffect(() => {
     if (firstRestoreTick.current) { firstRestoreTick.current = false; return; }

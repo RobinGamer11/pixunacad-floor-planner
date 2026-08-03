@@ -206,51 +206,67 @@ export function CadDocumentInspector({ engine }: Props) {
   );
 }
 
-/** Verzerren-Sektion für die CAD-Oberfläche.
- *  UI-parität mit der Projektmappe (Achse + Toggle + Reset).
- *  Persistiert `warpCorners` und `warpAxis` direkt auf dem Scene-Dokument,
- *  damit spätere Renderer-Updates die Werte konsumieren können. */
+/** Verzerren + Spiegeln für ein Dokument (identisch in Projektmappe & CAD-Oberfläche). */
 function WarpSection({ engine, docId }: { engine: MiniCad; docId: string }) {
   const [, force] = useState(0);
-  const doc: any = (engine as any).scene?.getDocumentById?.(docId);
-  const axis: "free" | "x" | "y" = (doc?.warpAxis ?? "free") as any;
+  const app: any = engine as any;
+  const doc: any = app.scene?.getDocumentById?.(docId);
+  const tool: any = app.documentTool;
+  const active: boolean = !!tool && tool.phase === "warp" && tool.warpTargetDocId === docId;
+  const axis: "free" | "x" | "y" = (tool?.warpAxis ?? "free") as any;
   const hasWarp: boolean = Array.isArray(doc?.warpCorners) && doc.warpCorners.length === 4;
+
+  const flipValue = doc?.flipX && doc?.flipY ? "both" : doc?.flipX ? "x" : doc?.flipY ? "y" : "none";
+
   const setAxis = (a: "free" | "x" | "y") => {
-    if (!doc) return;
-    doc.warpAxis = a;
-    (engine as any).scene?.markDirty?.();
+    if (tool) tool.warpAxis = a;
     force((n) => n + 1);
   };
   const toggle = () => {
-    if (!doc) return;
-    if (hasWarp) {
-      delete doc.warpCorners;
+    if (!tool) return;
+    if (active) {
+      tool.cancel?.();
+      app.setTool?.("select");
+      app.setSelection?.({ type: SelectionType.DOCUMENT, documentId: docId });
     } else {
-      doc.warpCorners = [
-        { x: 0, y: 0 },
-        { x: 1, y: 0 },
-        { x: 1, y: 1 },
-        { x: 0, y: 1 },
-      ];
+      tool.beginWarp?.(docId);
     }
-    (engine as any).scene?.markDirty?.();
     force((n) => n + 1);
   };
   const reset = () => {
-    if (!doc) return;
-    delete doc.warpCorners;
-    delete doc.warpAxis;
-    (engine as any).scene?.markDirty?.();
+    tool?.resetWarp?.(docId);
     force((n) => n + 1);
   };
+  const setFlip = (val: string) => {
+    tool?.setDocFlip?.(docId, val === "x" || val === "both", val === "y" || val === "both");
+    force((n) => n + 1);
+  };
+
   return (
     <div
       className="rounded-md border p-2 space-y-1.5"
       style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
     >
       <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-        Verzerren
+        Verzerren &amp; Spiegeln
       </div>
+
+      <div className="flex items-center gap-1.5">
+        <span className="text-[10px] text-muted-foreground w-14">Spiegeln</span>
+        <select
+          value={flipValue}
+          onChange={(e) => setFlip(e.target.value)}
+          className="flex-1 h-8 px-2 rounded bg-transparent border text-[11px]"
+          style={{ borderColor: "hsl(var(--hairline))" }}
+          title="Dokument spiegeln"
+        >
+          <option value="none">Keine</option>
+          <option value="x">Links ↔ Rechts</option>
+          <option value="y">Oben ↔ Unten</option>
+          <option value="both">Beides</option>
+        </select>
+      </div>
+
       <div className="flex items-center gap-1.5">
         <span className="text-[10px] text-muted-foreground w-14">Achse</span>
         <select
@@ -265,18 +281,26 @@ function WarpSection({ engine, docId }: { engine: MiniCad; docId: string }) {
           <option value="y">Nur Y (vertikal)</option>
         </select>
       </div>
+
       <button
         type="button"
         onClick={toggle}
         className="w-full h-8 rounded-md text-[11px] border flex items-center justify-center gap-2"
         style={{
-          borderColor: hasWarp ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
-          background: hasWarp ? "hsl(var(--accent-gold-soft))" : "transparent",
+          borderColor: active ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
+          background: active ? "hsl(var(--accent-gold-soft))" : "transparent",
         }}
-        title="Ecken-/Kanten-Verzerrung für dieses Dokument"
+        title="Vier Eckpunkte frei ziehen (perspektivische Verzerrung)"
       >
-        {hasWarp ? "Verzerren beenden" : "Verzerren aktivieren"}
+        {active ? "Verzerren beenden" : "Verzerren"}
       </button>
+
+      {active && (
+        <div className="text-[10px] text-muted-foreground leading-relaxed">
+          Eckpunkte am Dokument ziehen · Snap aktiv · Fertig über „Verzerren beenden“.
+        </div>
+      )}
+
       {hasWarp && (
         <button
           type="button"

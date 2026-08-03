@@ -12,7 +12,8 @@ type Phase =
   | "scale-pick-1"     // wartet auf 1. Punkt (Start Ist-Strecke)
   | "scale-pick-2"     // wartet auf 2. Punkt (Ende Ist-Strecke; definiert auch Richtung)
   | "scale-pick-3"     // Ist-Strecke fix, wartet auf 3. Punkt entlang derselben Richtung (= Soll-Länge ab P1)
-  | "anchor-edit";     // Anker (Fangpunkte) am Dokument setzen/entfernen
+  | "anchor-edit"      // Anker (Fangpunkte) am Dokument setzen/entfernen
+  | "warp";            // Perspektivische Verzerrung: 4 Eckpunkte frei ziehen
 
 /**
  * DocumentTool: PDF/JPG/PNG-Import & Maßstabs-Skalierung.
@@ -41,6 +42,12 @@ export class DocumentTool {
   /** Ziel-Dokument für die Anker-Bearbeitung. */
   anchorTargetDocId: string | null = null;
 
+  /** Ziel-Dokument für die Verzerrung + aktiv gezogene Ecke. */
+  warpTargetDocId: string | null = null;
+  warpDragIdx = -1;
+  /** Achsen-Beschränkung beim Ziehen: frei | nur X | nur Y. */
+  warpAxis: "free" | "x" | "y" = "free";
+
   onPhaseChange?: () => void;
 
   constructor(app: CadApp) { this.app = app; }
@@ -61,6 +68,8 @@ export class DocumentTool {
     this.scalePoint3 = null;
     this.scaleSnap = null;
     this.anchorTargetDocId = null;
+    this.warpTargetDocId = null;
+    this.warpDragIdx = -1;
     this.app.hub.bindCommit(null);
     this.app.hub.angInputEl.readOnly = true;
     this.onPhaseChange?.();
@@ -83,6 +92,65 @@ export class DocumentTool {
   }
 
   isAnchorEditing() { return this.phase === "anchor-edit"; }
+
+  // ---------------- Verzerren ----------------
+
+  /** Startet die perspektivische Verzerrung eines Dokuments. */
+  beginWarp(docId: string) {
+    const doc = this.app.scene.getDocumentById(docId);
+    if (!doc) return;
+    if (this.app.activeTool !== this) this.app.setTool("document");
+    if (!Array.isArray((doc as any).warpCorners) || (doc as any).warpCorners.length !== 4) {
+      (doc as any).warpCorners = [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }];
+    }
+    this.warpTargetDocId = docId;
+    this.warpDragIdx = -1;
+    this.phase = "warp";
+    this.app.hub.hide();
+    this.app.setSelection({ type: SelectionType.DOCUMENT, documentId: docId } as any);
+    this.onPhaseChange?.();
+    this.app.renderer.render();
+  }
+
+  isWarping() { return this.phase === "warp"; }
+
+  /** Setzt die Verzerrung eines Dokuments zurück. */
+  resetWarp(docId: string) {
+    const doc = this.app.scene.getDocumentById(docId);
+    if (!doc) return;
+    (doc as any).warpCorners = null;
+    this.app.renderer.render();
+  }
+
+  /** Spiegelt ein Dokument (Achse: "x" = links/rechts, "y" = oben/unten). */
+  setDocFlip(docId: string, flipX: boolean, flipY: boolean) {
+    const doc = this.app.scene.getDocumentById(docId);
+    if (!doc) return;
+    (doc as any).flipX = !!flipX;
+    (doc as any).flipY = !!flipY;
+    this.app.renderer.render();
+  }
+
+  /** Welt-Position einer Warp-Ecke (berücksichtigt Rotation + Doc-Box). */
+  private _warpCornerWorld(doc: any, idx: number): Vec2 {
+    const c = (doc.warpCorners || [])[idx] || { x: 0, y: 0 };
+    const center = documentCenterWorld(doc);
+    const lx = (c.x - 0.5) * doc.widthM;
+    const ly = (c.y - 0.5) * doc.heightM;
+    const a = doc.rotationRad || 0;
+    const ca = Math.cos(a), sa = Math.sin(a);
+    return v(center.x + lx * ca - ly * sa, center.y + lx * sa + ly * ca);
+  }
+
+  private _worldToWarpUV(doc: any, p: Vec2): { x: number; y: number } {
+    const center = documentCenterWorld(doc);
+    const a = -(doc.rotationRad || 0);
+    const ca = Math.cos(a), sa = Math.sin(a);
+    const dx = p.x - center.x, dy = p.y - center.y;
+    const lx = dx * ca - dy * sa;
+    const ly = dx * sa + dy * ca;
+    return { x: lx / Math.max(1e-6, doc.widthM) + 0.5, y: ly / Math.max(1e-6, doc.heightM) + 0.5 };
+  }
 
   /** Externe API: nach erfolgreichem Datei-Import wird das Dokument zur Maus-Platzierung übergeben. */
   beginPlacement(opts: { src: string; widthM: number; heightM: number; pixelWidth: number; pixelHeight: number; name: string; kind: "image" | "pdf-page"; pageIndex: number; importScaleDenom: number; pdfSourceB64?: string | null }) {
@@ -194,6 +262,41 @@ export class DocumentTool {
       this.app.renderer.render();
       return;
     }
+    if (this.phase === "warp") {
+      const doc: any = this.warpTargetDocId ? this.app.scene.getDocumentById(this.warpTargetDocId) : null;
+      if (!doc) { this.cancel(); return; }
+      const snap = this.app.topology.findBestSnap(v(input.mouse.sx, input.mouse.sy), v(input.mouse.wx, input.mouse.wy));
+      this.scaleSnap = snap;
+      const mouseS = v(input.mouse.sx, input.mouse.sy);
+      if (input.mouse.left) {
+        if (this.warpDragIdx < 0) {
+          // Ecke greifen
+          let best = -1, bestD = 16;
+          for (let i = 0; i < 4; i++) {
+            const w = this._warpCornerWorld(doc, i);
+            const sp = this.app.camera.worldToScreen(w.x, w.y);
+            const d = Math.hypot(sp.x - mouseS.x, sp.y - mouseS.y);
+            if (d < bestD) { bestD = d; best = i; }
+          }
+          this.warpDragIdx = best;
+        }
+        if (this.warpDragIdx >= 0) {
+          const target = snap ? snap.world : v(input.mouse.wx, input.mouse.wy);
+          const uv = this._worldToWarpUV(doc, target);
+          const cur = doc.warpCorners[this.warpDragIdx];
+          const next = { x: uv.x, y: uv.y };
+          if (this.warpAxis === "x") next.y = cur.y;
+          if (this.warpAxis === "y") next.x = cur.x;
+          doc.warpCorners[this.warpDragIdx] = next;
+          this.app.renderer.render();
+        }
+      } else if (this.warpDragIdx >= 0) {
+        this.warpDragIdx = -1;
+        this.app.renderer.render();
+      }
+      return;
+    }
+
     if (this.phase === "placing") {
       const snap = this.app.topology.findBestSnap(v(input.mouse.sx, input.mouse.sy), v(input.mouse.wx, input.mouse.wy));
       this.scaleSnap = snap;
@@ -392,6 +495,38 @@ export class DocumentTool {
       ctx.textBaseline = "bottom";
       ctx.fillText(this.pendingDoc.name, tl.x + 6, tl.y - 4);
       ctx.restore();
+    }
+
+    // Verzerren: Quad + Eck-Handles
+    if (this.phase === "warp" && this.warpTargetDocId) {
+      const doc: any = this.app.scene.getDocumentById(this.warpTargetDocId);
+      if (doc && Array.isArray(doc.warpCorners)) {
+        const pts = [0, 1, 2, 3].map(i => {
+          const w = this._warpCornerWorld(doc, i);
+          return cam.worldToScreen(w.x, w.y);
+        });
+        ctx.save();
+        ctx.strokeStyle = "rgba(212,175,55,0.95)";
+        ctx.lineWidth = 1.6;
+        ctx.setLineDash([6, 4]);
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < 4; i++) ctx.lineTo(pts[i].x, pts[i].y);
+        ctx.closePath();
+        ctx.stroke();
+        ctx.setLineDash([]);
+        for (let i = 0; i < 4; i++) {
+          const p = pts[i];
+          ctx.fillStyle = i === this.warpDragIdx ? "#d4af37" : "#fff";
+          ctx.strokeStyle = "#d4af37";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.rect(p.x - 6, p.y - 6, 12, 12);
+          ctx.fill();
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
     }
 
     // Snap-Indikator

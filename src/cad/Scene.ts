@@ -370,9 +370,14 @@ export class DocumentObject {
    *  relativ zu widthM/heightM). Werden über alle Werkzeuge fangbar; per
    *  Anker-Werkzeug am Dokument platziert. */
   anchors: { x: number; y: number }[];
+  /** Perspektivische Verzerrung: 4 Eckpunkte in UV (0..1) [TL,TR,BR,BL]. null = keine. */
+  warpCorners?: { x: number; y: number }[] | null;
+  /** Spiegelung links/rechts bzw. oben/unten. */
+  flipX?: boolean;
+  flipY?: boolean;
 
 
-  constructor({ id, name, kind, src, pageIndex, position, widthM, heightM, rotationRad, pixelWidth, pixelHeight, labelId, importScaleDenom, eraseMaskDataUrl, pdfSourceB64, guideEdges, cropM, opacity, filters, activeFilterId, bgRemoval, anchors }: {
+  constructor({ id, name, kind, src, pageIndex, position, widthM, heightM, rotationRad, pixelWidth, pixelHeight, labelId, importScaleDenom, eraseMaskDataUrl, pdfSourceB64, guideEdges, cropM, opacity, filters, activeFilterId, bgRemoval, anchors, warpCorners, flipX, flipY }: {
     id: string; name?: string; kind?: "image" | "pdf-page"; src: string;
     pageIndex?: number; position: Vec2; widthM: number; heightM: number;
     rotationRad?: number; pixelWidth?: number; pixelHeight?: number; labelId?: string;
@@ -385,6 +390,9 @@ export class DocumentObject {
     activeFilterId?: string | null;
     bgRemoval?: import("./documentBgRemove").BgRemoval;
     anchors?: { x: number; y: number }[];
+    warpCorners?: { x: number; y: number }[] | null;
+    flipX?: boolean;
+    flipY?: boolean;
   }) {
     this.id = id;
     this.name = name || "Dokument";
@@ -425,6 +433,11 @@ export class DocumentObject {
       ? anchors
           .map((a) => ({ x: Math.max(0, Math.min(1, a?.x ?? 0)), y: Math.max(0, Math.min(1, a?.y ?? 0)) }))
       : [];
+    this.warpCorners = Array.isArray(warpCorners) && warpCorners.length === 4
+      ? warpCorners.map((c) => ({ x: Number(c?.x) || 0, y: Number(c?.y) || 0 }))
+      : null;
+    this.flipX = !!flipX;
+    this.flipY = !!flipY;
   }
 }
 
@@ -786,6 +799,9 @@ export class Scene {
     activeFilterId?: string | null;
     bgRemoval?: import("./documentBgRemove").BgRemoval;
     anchors?: { x: number; y: number }[];
+    warpCorners?: { x: number; y: number }[] | null;
+    flipX?: boolean;
+    flipY?: boolean;
   }): DocumentObject {
     const doc = new DocumentObject({ id: this._makeId(), ...opts });
     this.documents.push(doc);

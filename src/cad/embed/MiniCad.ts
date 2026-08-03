@@ -1059,6 +1059,9 @@ export class MiniCad {
           activeFilterId: d.activeFilterId,
           bgRemoval: d.bgRemoval,
           anchors: (d.anchors || []).map((a) => ({ x: a.x, y: a.y })),
+          warpCorners: (d as any).warpCorners ? (d as any).warpCorners.map((c: any) => ({ x: c.x, y: c.y })) : null,
+          flipX: !!(d as any).flipX,
+          flipY: !!(d as any).flipY,
         })),
     };
   }
@@ -1157,6 +1160,9 @@ export class MiniCad {
             activeFilterId: d.activeFilterId,
             bgRemoval: d.bgRemoval,
             anchors: Array.isArray(d.anchors) ? d.anchors : undefined,
+            warpCorners: Array.isArray((d as any).warpCorners) ? (d as any).warpCorners : null,
+            flipX: !!(d as any).flipX,
+            flipY: !!(d as any).flipY,
           });
         } catch (e) { console.error("MiniCad restore document:", e); }
       }
