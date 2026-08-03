@@ -5951,7 +5951,7 @@ function CadToolSection({
                     </button>
                   </div>
                   <div className="flex items-center gap-2 mt-2">
-                    <span className="text-[11px] text-muted-foreground shrink-0">Bez.-ID</span>
+                    <span className="text-[11px] text-muted-foreground shrink-0">Ebene</span>
                     <select
                       value={el.labelId ?? ""}
                       onClick={(ev) => ev.stopPropagation()}
@@ -5966,7 +5966,7 @@ function CadToolSection({
                       disabled={!cadEngine || labelGroups.length === 0}
                       className="flex-1 h-7 px-2 rounded bg-transparent border text-sm"
                       style={{ borderColor: "hsl(var(--hairline))" }}
-                      title="Bezeichnungs-ID (Ebene) — identisch zur CAD-Oberfläche."
+                      title="Ebene — identisch zur CAD-Oberfläche."
                     >
                       <option value="">— keine —</option>
                       {labelGroups.map((g) => (
