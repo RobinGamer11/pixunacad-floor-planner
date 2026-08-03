@@ -1006,7 +1006,20 @@ export class SelectTool {
         return;
       }
 
-      // MOVE/ROTATE (original): Box width/height stay constant; rotation +
+      // MOVE (Verschieben): Die Box bleibt starr (Größe + Rotation unverändert)
+      // und wird so verschoben, dass der angeklickte Fangpunkt exakt (hart fix)
+      // am Mauszeiger bzw. am gefangenen Punkt klebt.
+      if (this.activeEditAction === PointEditAction.MOVE && this.textBoxCornerOriginal && this.textBoxCenterOriginal) {
+        const dx = newPoint.x - this.textBoxCornerOriginal.x;
+        const dy = newPoint.y - this.textBoxCornerOriginal.y;
+        box.center = v(this.textBoxCenterOriginal.x + dx, this.textBoxCenterOriginal.y + dy);
+        box.rotationRad = this.textBoxRotationOriginal;
+        box.widthM = w;
+        box.heightM = h;
+        return;
+      }
+
+      // ROTATE (original): Box width/height stay constant; rotation +
       // center are recomputed so that opposite stays put and moving handle
       // reaches newPoint.
       const diagLen = Math.hypot(w, h);
@@ -1636,6 +1649,16 @@ export class SelectTool {
   }
 
   private _previewRotateAngle(input: Input) {
+    // Textbox-Drehung: andere Objekte können über ihre Fangpunkte anvisiert
+    // werden (Orientierungshilfe). Der Radius bleibt fix — die Maus ist damit
+    // hart auf der Höhe/Distanz des gewählten Fangpunkts gebunden.
+    if (this.editTarget?.kind === "textboxHandle") {
+      const snap = this._findPreviewSnapForEdit(input);
+      const target = (snap && snap.world)
+        ? v(snap.world.x, snap.world.y)
+        : v(input.mouse.wx, input.mouse.wy);
+      return angleDeg(this.fixedPoint!, target);
+    }
     return angleDeg(this.fixedPoint!, v(input.mouse.wx, input.mouse.wy));
   }
 
@@ -2032,6 +2055,7 @@ export class SelectTool {
           }
           this._clearEditState();
           this.app.hub.hide();
+          (this.app as any).commitHistorySnapshot?.();
         }
         return;
       }
@@ -2091,6 +2115,7 @@ export class SelectTool {
           this._clearEditState();
           this.app.hub.hide();
           this.app.renderer.setHoverSegmentId(null);
+          (this.app as any).commitHistorySnapshot?.();
         }
         return;
       }

@@ -2072,11 +2072,16 @@ export class MiniCad {
 
 
       // Geometry change → persist (cover segments AND text boxes AND edits).
+      // Während eines aktiven Punkt-Edits (Verschieben/Drehen einer Textbox)
+      // bleibt das Objekt im Vorschau-Modus: erst nach dem Setzen wird
+      // persistiert → genau ein Undo/Redo-Schritt im Kopf.
+      const editingPreview = !!this.selectTool?.isEditing?.();
       const sig = this._sceneSignature();
       if (sig !== this._lastSig) {
         this._lastSig = sig;
-        this._onChange?.();
-      } else if (this._changeDirty) {
+        if (editingPreview) this._changeDirty = true;
+        else this._onChange?.();
+      } else if (this._changeDirty && !editingPreview) {
         this._changeDirty = false;
         this._onChange?.();
       }
@@ -2103,6 +2108,9 @@ export class MiniCad {
     let h = 0;
     for (const t of this.scene.textBoxes) {
       h = (h * 31 + (t.html?.length || 0) + Math.round(t.center.x * 1000) + Math.round(t.center.y * 1000)) | 0;
+      // Rotation + Größe mit aufnehmen — sonst landen Drehungen/Resize nicht
+      // im Undo/Redo-Verlauf der Projektmappe.
+      h = (h * 31 + Math.round((t.rotationRad || 0) * 10000) + Math.round((t.widthM || 0) * 1000) + Math.round((t.heightM || 0) * 1000)) | 0;
     }
     for (const s of this.scene.freeStrokes) {
       h = (h * 31 + s.points.length + (s.color?.length || 0)) | 0;
