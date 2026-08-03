@@ -1784,6 +1784,7 @@ export default function ProjectWorkspace() {
             printMode ? (
               <PrintPanel
                 project={project}
+                activePageId={activePage?.id ?? project.pages[0]?.id ?? ""}
                 setActivePageId={setActivePageId}
                 onClose={() => setPrintMode(false)}
               />
@@ -6712,10 +6713,12 @@ type PrintPageMode = "all" | "range" | "current";
 
 function PrintPanel({
   project,
+  activePageId,
   setActivePageId,
   onClose,
 }: {
   project: import("@/lib/projectStore").Project;
+  activePageId: string;
   setActivePageId: (id: string) => void;
   onClose: () => void;
 }) {
@@ -6730,11 +6733,25 @@ function PrintPanel({
   const [exporting, setExporting] = useState(false);
   const [progress, setProgress] = useState<{ current: number; total: number; label: string } | null>(null);
 
+  // Modus steuert die Auswahl-Checkboxen direkt: "Alle Seiten" hakt alle an,
+  // "Nur aktuelle Seite" genau die aktive, "Bereich" den gewählten Bereich.
+  useEffect(() => {
+    if (pageMode === "all") {
+      setSelectedIds(new Set(project.pages.map((p) => p.id)));
+    } else if (pageMode === "current") {
+      setSelectedIds(new Set(activePageId ? [activePageId] : []));
+    } else {
+      const from = Math.max(1, Math.min(project.pages.length, rangeStart)) - 1;
+      const to = Math.max(1, Math.min(project.pages.length, rangeEnd));
+      setSelectedIds(new Set(project.pages.slice(from, to).map((p) => p.id)));
+    }
+  }, [pageMode, activePageId, rangeStart, rangeEnd, project.pages]);
+
   // Aktiv gefilterte Seiten anhand Modus (Alle / Aktuell / Bereich) und Auswahl.
   const resolveExportIds = (): string[] => {
     let base: string[] = [];
     if (pageMode === "all") base = project.pages.map((p) => p.id);
-    else if (pageMode === "current") base = project.pages.slice(0, 1).map((p) => p.id);
+    else if (pageMode === "current") base = project.pages.filter((p) => p.id === activePageId).map((p) => p.id);
     else {
       const from = Math.max(1, Math.min(project.pages.length, rangeStart)) - 1;
       const to = Math.max(1, Math.min(project.pages.length, rangeEnd));
