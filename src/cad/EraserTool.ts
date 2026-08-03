@@ -344,6 +344,17 @@ export class EraserTool {
     const mode = this.app.defaultEraserMode ?? "hard";
     const soft = Math.max(0.05, Math.min(1, this.app.defaultEraserSoftness ?? 0.5));
     ctx.save();
+    // Preview des laufenden Radier-Pfades (Schraffur-Ausschnitt).
+    if (this._hatchStamps.length) {
+      ctx.fillStyle = "rgba(77,163,255,0.22)";
+      for (const s of this._hatchStamps) {
+        const p = cam.worldToScreen(s.c.x, s.c.y);
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, Math.max(2, s.r * cam.scale), 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
     if (mode === "smooth") {
       const g = ctx.createRadialGradient(c.x, c.y, r * (1 - soft), c.x, c.y, r);
       g.addColorStop(0, "rgba(77,163,255,0.28)");
