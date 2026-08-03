@@ -47,7 +47,7 @@ import {
   type ProfileStatus,
 } from "@/lib/projectStore";
 import { useDragScroll } from "@/hooks/use-drag-scroll";
-import { notesStore, useNotes, type NoteNode, type NoteStatus, type NotePriority } from "@/lib/notesStore";
+import { notesStore, useNotes, QUICK_CATEGORY, type NoteNode, type NoteStatus, type NotePriority } from "@/lib/notesStore";
 import { WeatherStrip } from "@/components/project/WeatherStrip";
 import { UebersichtView } from "@/components/project/UebersichtView";
 import { FileBrowser } from "@/components/project/FileBrowser";
