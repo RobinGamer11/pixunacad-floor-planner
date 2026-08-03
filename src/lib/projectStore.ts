@@ -615,6 +615,20 @@ function getHist(id: string): HistoryEntry {
   return h;
 }
 function notifyHistory() { historyListeners.forEach((fn) => fn()); }
+/** Vergleicht zwei Projekt-Snapshots inhaltlich – `updatedAt` wird ignoriert,
+ *  damit reine Zeitstempel-Änderungen keinen Undo-Schritt erzeugen. */
+function sameProjectContent(a: Project, b: Project): boolean {
+  try {
+    const strip = (p: Project) => JSON.stringify({ ...p, updatedAt: "" });
+    return strip(a) === strip(b);
+  } catch {
+    return false;
+  }
+}
+
+/** Zusammenhängende Änderungen (z. B. Drag-Frames) zu einem Undo-Schritt bündeln. */
+const HIST_COALESCE_MS = 500;
+const lastPushAt: Map<string, number> = new Map();
 
 function setState(updater: (s: State) => Partial<State>) {
   const prev = state;
@@ -622,11 +636,23 @@ function setState(updater: (s: State) => Partial<State>) {
   state = { ...state, ...updater(state) };
   if (!_suspendHistory) {
     let anyChange = false;
+    const now = Date.now();
     for (const np of state.projects) {
       const op = prevById.get(np.id);
       if (op && op !== np) {
+        if (sameProjectContent(op, np)) continue;
         const h = getHist(np.id);
+        const last = lastPushAt.get(np.id) ?? 0;
+        // Innerhalb des Coalesce-Fensters keinen zusätzlichen Schritt anlegen,
+        // der bereits gespeicherte ältere Zustand bleibt der Undo-Zielpunkt.
+        if (h.past.length && now - last < HIST_COALESCE_MS) {
+          lastPushAt.set(np.id, now);
+          h.future.length = 0;
+          anyChange = true;
+          continue;
+        }
         h.past.push(op);
+        lastPushAt.set(np.id, now);
         if (h.past.length > HIST_LIMIT) h.past.shift();
         h.future.length = 0;
         anyChange = true;
@@ -636,6 +662,7 @@ function setState(updater: (s: State) => Partial<State>) {
   }
   emit();
 }
+
 
 export const projectStore = {
   getState: () => state,
@@ -1486,6 +1513,7 @@ export const projectStore = {
     if (!cur) return;
     const prev = h.past.pop()!;
     h.future.push(cur);
+    lastPushAt.delete(projectId);
     _suspendHistory = true;
     try {
       state = { ...state, projects: state.projects.map((p) => (p.id === projectId ? prev : p)) };
@@ -1502,6 +1530,7 @@ export const projectStore = {
     if (!cur) return;
     const next = h.future.pop()!;
     h.past.push(cur);
+    lastPushAt.delete(projectId);
     _suspendHistory = true;
     try {
       state = { ...state, projects: state.projects.map((p) => (p.id === projectId ? next : p)) };
