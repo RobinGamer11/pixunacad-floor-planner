@@ -246,6 +246,8 @@ export const notesStore = {
   },
   removeCategory(projectId: string, name: string) {
     const s = getState(projectId);
+    // Die Schnellablage ist die Standardkategorie und bleibt bestehen.
+    if (name === QUICK_CATEGORY) return;
     if (!s.categories.includes(name)) return;
     commit(projectId, {
       ...s,
