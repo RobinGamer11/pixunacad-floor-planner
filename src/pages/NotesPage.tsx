@@ -1289,7 +1289,9 @@ function ProjectGraph({
     if (!el) return;
     const ro = new ResizeObserver(() => {
       const r = el.getBoundingClientRect();
-      setSize({ w: r.width, h: r.height });
+      const w = Math.round(r.width * 100) / 100;
+      const h = Math.round(r.height * 100) / 100;
+      setSize((cur) => (cur.w === w && cur.h === h ? cur : { w, h }));
     });
     ro.observe(el);
     return () => ro.disconnect();
