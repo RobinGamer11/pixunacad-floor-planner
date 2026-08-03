@@ -103,7 +103,7 @@ export interface PageElement {
   warpAxis?: "free" | "x" | "y";
   /** Radiergummi-Spuren auf dem Element (CAD-Blatt/Bild/PDF).
    *  x/y/r in Element-lokalen Papier-Millimetern, s = Weichheit 0..1. */
-  eraseCircles?: { x: number; y: number; r: number; s: number }[];
+  eraseCircles?: { x: number; y: number; r: number; s: number; a?: number }[];
 
 
   /** Tabellen-Datenmodell (kind === "table"). */
