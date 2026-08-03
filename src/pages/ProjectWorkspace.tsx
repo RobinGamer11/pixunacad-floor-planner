@@ -4500,17 +4500,6 @@ function ElementView({
           />
           
         </svg>
-        <div
-          className="absolute pointer-events-none rounded-md border border-border bg-card/95 px-2 py-0.5 text-[11px] font-medium tabular-nums text-foreground shadow-sm"
-          style={{
-            left: `${rotAxis.mx}%`,
-            top: `${rotAxis.my}%`,
-            transform: "translate(12px, -140%)",
-            zIndex: 916,
-          }}
-        >
-          {rotAxis.deg.toFixed(1)}°
-        </div>
         </>,
         rootRef.current.parentElement,
       )}
