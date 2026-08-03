@@ -2974,7 +2974,15 @@ function WarpedContent({
 }) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
+  const warped = isWarped(corners);
   useLayoutEffect(() => {
+    // Unverzerrte Dokumente brauchen keinerlei Größen-/Pointer-Tracking.
+    // Insbesondere beim Projektmappen-Zoom würde der ResizeObserver sonst für
+    // jede PDF-/Bildseite einen zusätzlichen React-Render pro Zoomframe auslösen.
+    if (!warped) {
+      setSize((current) => current.w === 0 && current.h === 0 ? current : { w: 0, h: 0 });
+      return;
+    }
     const el = wrapRef.current;
     if (!el) return;
     const measure = () => {
@@ -2985,8 +2993,8 @@ function WarpedContent({
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
-  const active = isWarped(corners) && size.w > 0 && size.h > 0;
+  }, [warped]);
+  const active = warped && size.w > 0 && size.h > 0;
   const matrix = active ? computeWarpMatrix3d(size.w, size.h, corners!) : "";
   return (
     <div
@@ -3004,6 +3012,7 @@ function WarpedContent({
           transformOrigin: "0 0",
           transform: active ? matrix : undefined,
           willChange: active ? "transform" : undefined,
+          pointerEvents: "none",
         }}
       >
         {children}
