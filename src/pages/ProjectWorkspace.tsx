@@ -6732,6 +6732,9 @@ function PrintPanel({
   const [spreadCombined, setSpreadCombined] = useState<boolean>(hasSpreads);
   const [exporting, setExporting] = useState(false);
   const [progress, setProgress] = useState<{ current: number; total: number; label: string } | null>(null);
+  // Browser-Vorschau des fertigen PDFs (Blob-URL) vor dem eigentlichen Export.
+  const [preview, setPreview] = useState<{ url: string; bytes: Uint8Array; name: string; pages: number } | null>(null);
+  useEffect(() => () => { if (preview) URL.revokeObjectURL(preview.url); }, [preview]);
 
   // Modus steuert die Auswahl-Checkboxen direkt: "Alle Seiten" hakt alle an,
   // "Nur aktuelle Seite" genau die aktive, "Bereich" den gewählten Bereich.
@@ -6770,7 +6773,9 @@ function PrintPanel({
     return base.filter((id) => selectedIds.has(id));
   };
 
-  const handleExport = async () => {
+  // Erzeugt das PDF exakt wie beim Export – je nach Modus wird es dann
+  // heruntergeladen ("download") oder nur im Browser angezeigt ("preview").
+  const buildPdf = async (mode: "download" | "preview") => {
     const ids = resolveExportIds();
     if (ids.length === 0) return;
     setExporting(true);
@@ -6788,8 +6793,17 @@ function PrintPanel({
         (p) => setProgress(p),
       );
       const safeName = (project.name || "projektmappe").replace(/[^\w-]+/g, "_");
-      downloadPdf(bytes, `${safeName}.pdf`);
-      onClose();
+      if (mode === "download") {
+        downloadPdf(bytes, `${safeName}.pdf`);
+        onClose();
+      } else {
+        const copy = new Uint8Array(bytes);
+        const blob = new Blob([copy.buffer as ArrayBuffer], { type: "application/pdf" });
+        setPreview((prev) => {
+          if (prev) URL.revokeObjectURL(prev.url);
+          return { url: URL.createObjectURL(blob), bytes: copy, name: `${safeName}.pdf`, pages: ids.length };
+        });
+      }
     } catch (err) {
       console.error("PDF-Export fehlgeschlagen:", err);
       alert("PDF-Export fehlgeschlagen. Details in der Konsole.");
@@ -6798,6 +6812,17 @@ function PrintPanel({
       setProgress(null);
     }
   };
+
+  const handleExport = () => buildPdf("download");
+  const handlePreview = () => buildPdf("preview");
+
+  const closePreview = () => {
+    setPreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev.url);
+      return null;
+    });
+  };
+
 
 
   const toggleId = (id: string) => setSelectedIds(prev => {
@@ -6957,26 +6982,86 @@ function PrintPanel({
         </div>
       )}
       <div
-        className="border-t p-3 flex gap-2"
+        className="border-t p-3 space-y-2"
         style={{ borderColor: "hsl(var(--hairline))" }}
       >
         <button
-          onClick={onClose}
+          onClick={handlePreview}
           disabled={exporting}
-          className="flex-1 h-9 rounded-md text-sm border disabled:opacity-50"
+          className="w-full h-9 rounded-md text-sm border disabled:opacity-50"
           style={{ borderColor: "hsl(var(--hairline))", color: "hsl(var(--ink))" }}
         >
-          Abbrechen
+          {exporting ? "Erstelle…" : "Vorschau anzeigen"}
         </button>
-        <button
-          onClick={handleExport}
-          disabled={exporting}
-          className="flex-1 h-9 rounded-md text-sm font-medium disabled:opacity-50"
-          style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
-        >
-          {exporting ? "Erstelle…" : "PDF erstellen"}
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={onClose}
+            disabled={exporting}
+            className="flex-1 h-9 rounded-md text-sm border disabled:opacity-50"
+            style={{ borderColor: "hsl(var(--hairline))", color: "hsl(var(--ink))" }}
+          >
+            Abbrechen
+          </button>
+          <button
+            onClick={handleExport}
+            disabled={exporting}
+            className="flex-1 h-9 rounded-md text-sm font-medium disabled:opacity-50"
+            style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
+          >
+            {exporting ? "Erstelle…" : "PDF erstellen"}
+          </button>
+        </div>
       </div>
+
+      {preview && (
+        <div
+          className="fixed inset-0 z-[200] flex flex-col"
+          style={{ background: "rgba(12,12,14,0.82)" }}
+          onClick={closePreview}
+        >
+          <div
+            className="m-auto w-[min(1100px,94vw)] h-[92vh] rounded-lg overflow-hidden flex flex-col shadow-2xl"
+            style={{ background: "hsl(var(--surface))" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              className="flex items-center gap-2 px-4 h-12 border-b shrink-0"
+              style={{ borderColor: "hsl(var(--hairline))" }}
+            >
+              <span className="text-sm font-medium" style={{ color: "hsl(var(--ink))" }}>
+                PDF-Vorschau
+              </span>
+              <span className="text-[11px] text-muted-foreground">
+                {preview.pages} {preview.pages === 1 ? "Seite" : "Seiten"} · {preview.name}
+              </span>
+              <div className="flex-1" />
+              <button
+                onClick={async () => {
+                  const { downloadPdf } = await import("@/lib/projectPdfExport");
+                  downloadPdf(preview.bytes, preview.name);
+                }}
+                className="h-8 px-3 rounded-md text-xs font-medium"
+                style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
+              >
+                Herunterladen
+              </button>
+              <button
+                onClick={closePreview}
+                className="h-8 px-3 rounded-md text-xs border"
+                style={{ borderColor: "hsl(var(--hairline))", color: "hsl(var(--ink))" }}
+              >
+                Schließen
+              </button>
+            </div>
+            <iframe
+              src={preview.url}
+              title="PDF-Vorschau"
+              className="flex-1 w-full"
+              style={{ border: "none", background: "#525659" }}
+            />
+          </div>
+        </div>
+      )}
     </aside>
   );
 }
