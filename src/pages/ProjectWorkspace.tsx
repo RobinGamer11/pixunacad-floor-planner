@@ -3675,6 +3675,7 @@ function ElementView({
           const snapped = snapToRayGuides(targetX, targetY, pageRect);
           if (snapped) { dxPx = snapped.x - ax; dyPx = snapped.y - ay; }
         }
+        previewRef.current = { dxPx, dyPx, deltaDeg: 0, anchorFrac };
         setPreview({ dxPx, dyPx, deltaDeg: 0, anchorFrac });
       } else if (hubMode === "rotate") {
         // Zielpunkt anvisieren: Fangpunkte anderer Objekte und Rechtsklick-
@@ -3720,6 +3721,9 @@ function ElementView({
           const absTarget = Math.round((startRot + delta) / 90) * 90;
           delta = absTarget - startRot;
         }
+        // Ref synchron mitschreiben: ein Linksklick kann committen, bevor der
+        // React-State-Update-Zyklus durch ist — sonst ginge die Drehung verloren.
+        previewRef.current = { dxPx: 0, dyPx: 0, deltaDeg: delta, anchorFrac };
         setPreview({ dxPx: 0, dyPx: 0, deltaDeg: delta, anchorFrac });
         // CAD-Blatt: Der Cursor wird optisch auf der Linie durch die beiden
         // oberen Fangpunkte fixiert — dadurch ist die Drehung exakt ablesbar.
@@ -4480,7 +4484,7 @@ function ElementView({
             vectorEffect="non-scaling-stroke"
             opacity={0.9}
           />
-          <circle cx={rotAxis.mx} cy={rotAxis.my} r={0.55} fill="hsl(var(--accent-gold))" />
+          
         </svg>
         <div
           className="absolute pointer-events-none rounded-md border border-border bg-card/95 px-2 py-0.5 text-[11px] font-medium tabular-nums text-foreground shadow-sm"
