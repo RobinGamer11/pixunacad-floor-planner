@@ -66,6 +66,7 @@ import {
   ChevronsUpDown,
   ChevronsLeftRight,
   SquareDashed,
+  FolderOpen,
 } from "lucide-react";
 
 import {
@@ -95,6 +96,7 @@ import type { MiniCadSelectionInfo } from "@/cad/embed/MiniCad";
 import type { HatchDrawMode } from "@/cad/HatchTool";
 import { FreeDrawSettingsPanel } from "@/components/cad/FreeDrawSettingsPanel";
 import { EraserSettingsPanel } from "@/components/cad/EraserSettingsPanel";
+import { ProjectFilePickerDialog } from "@/components/cad/ProjectFilePickerDialog";
 import { HatchSettingsPanel } from "@/components/cad/HatchSettingsPanel";
 import { WorkspaceHeader } from "@/components/workspace/WorkspaceHeader";
 import { TabletAidWheel } from "@/components/TabletAidWheel";
@@ -181,6 +183,8 @@ export default function ProjectWorkspace() {
   const [docImporting, setDocImporting] = useState(false);
   const [docPickerPages, setDocPickerPages] = useState<ImportedPage[] | null>(null);
   const [docPickerSelected, setDocPickerSelected] = useState<Set<number>>(new Set());
+  // Zugriff auf die Projekt-Ablage (Startseite: Dokumente & Fotos).
+  const [docLibraryOpen, setDocLibraryOpen] = useState(false);
   // Ausgabemaßstab für neu importierte Dokumente. Wird rechts im
   // "Dokument"-Werkzeug-Panel als Dropdown ausgewählt (wie beim CAD-Blatt).
   const [docScale, setDocScale] = useState<string>("1:100");
@@ -654,7 +658,7 @@ export default function ProjectWorkspace() {
   // gewählten Maßstab (docScale, z. B. "1:100") direkt im Modellbereich ab.
   // Kein Modal mehr — der Nutzer wählt den Maßstab wie beim CAD-Blatt vor
   // dem Import rechts über das Dropdown.
-  const placeImportedPages = (pages: ImportedPage[]) => {
+  const placeImportedPages = (pages: ImportedPage[], stacked = false) => {
     const engine = cadEngineApiRef.current?.engine;
     if (!engine || pages.length === 0) return;
     const m = docScale.match(/^1\s*:\s*(\d+(?:[.,]\d+)?)$/);
@@ -689,8 +693,14 @@ export default function ProjectWorkspace() {
       importScaleDenom: denom,
       pdfSourceB64: first.pdfSourceB64 || null,
     });
-    let offX = firstW + 0.5;
+    // "Gesamt": alle Seiten leicht versetzt übereinander stapeln, damit sie
+    // anschließend einzeln verschoben/positioniert werden können.
+    const step = stacked ? Math.max(0.02, firstW * 0.04) : 0;
+    let offX = stacked ? step : firstW + 0.5;
+    let offY = 0;
+    let i = 0;
     for (const p of rest) {
+      i++;
       const pw = p.widthM * denom;
       const ph = p.heightM * denom;
       engine.scene.createDocument({
@@ -698,7 +708,7 @@ export default function ProjectWorkspace() {
         kind: p.kind,
         src: p.src,
         pageIndex: p.pageIndex,
-        position: { x: offX, y: 0 },
+        position: { x: offX, y: offY },
         widthM: pw,
         heightM: ph,
         pixelWidth: p.pixelWidth,
@@ -707,15 +717,13 @@ export default function ProjectWorkspace() {
         importScaleDenom: denom,
         pdfSourceB64: p.pdfSourceB64 || null,
       });
-      offX += pw + 0.5;
+      if (stacked) { offX = step * (i + 1); offY = step * (i + 1); }
+      else offX += pw + 0.5;
     }
     engine.refreshLabelUI();
   };
 
-  const handleDocumentFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    e.target.value = "";
-    if (!f) return;
+  const importPickedFile = async (f: File) => {
     setDocImporting(true);
     try {
       const pages = await importFile(f);
@@ -723,9 +731,7 @@ export default function ProjectWorkspace() {
       if (pages.length === 1) {
         placeImportedPages(pages);
       } else {
-        const all = new Set<number>();
-        pages.forEach((_, i) => all.add(i));
-        setDocPickerSelected(all);
+        setDocPickerSelected(new Set([0]));
         setDocPickerPages(pages);
       }
     } catch (err: any) {
@@ -733,6 +739,13 @@ export default function ProjectWorkspace() {
     } finally {
       setDocImporting(false);
     }
+  };
+
+  const handleDocumentFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    e.target.value = "";
+    if (!f) return;
+    await importPickedFile(f);
   };
 
   // Nach Rückkehr aus der CAD-Oberfläche: falls dort ein Zeichenblatt
@@ -788,13 +801,14 @@ export default function ProjectWorkspace() {
   }, [projectId]);
 
 
-  const confirmDocumentPagePicker = () => {
+  const confirmDocumentPagePicker = (mode: "single" | "all") => {
     if (!docPickerPages) return;
-    const selected = docPickerPages.filter((_, i) => docPickerSelected.has(i));
+    const all = docPickerPages;
+    const idx = docPickerSelected.values().next().value ?? 0;
     setDocPickerPages(null);
     setDocPickerSelected(new Set());
-    if (selected.length === 0) return;
-    placeImportedPages(selected);
+    if (mode === "all") placeImportedPages(all, true);
+    else placeImportedPages([all[idx]]);
   };
 
 
@@ -1177,20 +1191,17 @@ export default function ProjectWorkspace() {
         {docPickerPages && (
           <DocumentPagePickerDialog
             pages={docPickerPages}
-            selected={docPickerSelected}
-            onToggle={(i) => setDocPickerSelected((prev) => {
-              const next = new Set(prev);
-              if (next.has(i)) next.delete(i); else next.add(i);
-              return next;
-            })}
-            onSelectAll={() => {
-              const all = new Set<number>();
-              docPickerPages.forEach((_, i) => all.add(i));
-              setDocPickerSelected(all);
-            }}
-            onSelectNone={() => setDocPickerSelected(new Set())}
+            selectedIndex={docPickerSelected.values().next().value ?? 0}
+            onSelect={(i) => setDocPickerSelected(new Set([i]))}
             onCancel={() => setDocPickerPages(null)}
             onConfirm={confirmDocumentPagePicker}
+          />
+        )}
+        {docLibraryOpen && projectId && (
+          <ProjectFilePickerDialog
+            projectId={projectId}
+            onCancel={() => setDocLibraryOpen(false)}
+            onPick={(f) => { setDocLibraryOpen(false); void importPickedFile(f); }}
           />
         )}
         {/* Maßstab-Modal entfernt — Maßstab wird jetzt rechts im "Dokument"-
@@ -1831,6 +1842,7 @@ export default function ProjectWorkspace() {
               cadSelectedLineSnap={cadSelectedLineSnap}
               documentImporting={docImporting}
               onDocumentImport={() => documentFileInputRef.current?.click()}
+              onDocumentLibrary={() => setDocLibraryOpen(true)}
               docScale={docScale}
               onDocScaleChange={setDocScale}
               docFreePlace={docFreePlace}
@@ -1955,30 +1967,30 @@ function ToolRailButton({
 
 function DocumentPagePickerDialog({
   pages,
-  selected,
-  onToggle,
-  onSelectAll,
-  onSelectNone,
+  selectedIndex,
+  onSelect,
   onCancel,
   onConfirm,
 }: {
   pages: ImportedPage[];
-  selected: Set<number>;
-  onToggle: (index: number) => void;
-  onSelectAll: () => void;
-  onSelectNone: () => void;
+  selectedIndex: number;
+  onSelect: (index: number) => void;
   onCancel: () => void;
-  onConfirm: () => void;
+  onConfirm: (mode: "single" | "all") => void;
 }) {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-6" style={{ background: "hsl(var(--ink) / 0.32)" }}>
       <div className="w-full max-w-2xl rounded-md border p-4 shadow-xl" style={{ background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" }}>
-        <div className="text-sm font-semibold mb-3">Seiten auswählen</div>
+        <div className="text-sm font-semibold mb-1">Seite auswählen</div>
+        <p className="text-[11px] text-muted-foreground mb-3">
+          Dieses PDF hat {pages.length} Seiten. Wähle genau eine Seite — oder importiere das
+          gesamte Dokument: alle Seiten werden leicht versetzt übereinander abgelegt.
+        </p>
         <div className="max-h-[60vh] overflow-y-auto grid grid-cols-3 gap-3 p-1">
           {pages.map((p, i) => {
-            const checked = selected.has(i);
+            const checked = selectedIndex === i;
             return (
-              <button key={`${p.name}-${i}`} type="button" onClick={() => onToggle(i)} className="relative rounded-md border-2 overflow-hidden" style={{ borderColor: checked ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))" }}>
+              <button key={`${p.name}-${i}`} type="button" onClick={() => onSelect(i)} className="relative rounded-md border-2 overflow-hidden" style={{ borderColor: checked ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))" }}>
                 <img src={p.src} alt={p.name} className="w-full h-32 object-contain" style={{ background: "hsl(var(--surface-muted))" }} />
                 <div className="text-[10px] p-1 text-center truncate" style={{ background: "hsl(var(--surface-muted))" }}>Seite {i + 1}</div>
                 {checked && <div className="absolute top-1 right-1 w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold" style={{ background: "hsl(var(--accent-gold))", color: "hsl(var(--surface-card))" }}>✓</div>}
@@ -1987,10 +1999,9 @@ function DocumentPagePickerDialog({
           })}
         </div>
         <div className="flex justify-end gap-2 pt-4">
-          <button type="button" onClick={onSelectNone} className="h-8 px-3 rounded-md border text-xs" style={{ borderColor: "hsl(var(--hairline))" }}>Keine</button>
-          <button type="button" onClick={onSelectAll} className="h-8 px-3 rounded-md border text-xs" style={{ borderColor: "hsl(var(--hairline))" }}>Alle</button>
           <button type="button" onClick={onCancel} className="h-8 px-3 rounded-md border text-xs" style={{ borderColor: "hsl(var(--hairline))" }}>Abbrechen</button>
-          <button type="button" onClick={onConfirm} disabled={selected.size === 0} className="h-8 px-3 rounded-md text-xs font-semibold disabled:opacity-50" style={{ background: "hsl(var(--accent-gold))", color: "hsl(var(--surface-card))" }}>{selected.size} importieren</button>
+          <button type="button" onClick={() => onConfirm("all")} className="h-8 px-3 rounded-md border text-xs" style={{ borderColor: "hsl(var(--hairline))" }}>Gesamtes Dokument ({pages.length} Seiten)</button>
+          <button type="button" onClick={() => onConfirm("single")} className="h-8 px-3 rounded-md text-xs font-semibold" style={{ background: "hsl(var(--accent-gold))", color: "hsl(var(--surface-card))" }}>Seite {selectedIndex + 1} importieren</button>
         </div>
       </div>
     </div>
@@ -4636,6 +4647,7 @@ function RightInspector({
   cadSelectedLineSnap,
   documentImporting,
   onDocumentImport,
+  onDocumentLibrary,
   docScale,
   onDocScaleChange,
   docFreePlace,
@@ -4673,6 +4685,7 @@ function RightInspector({
   cadSelectedLineSnap?: { midpoint: boolean; division: number | null; isGuide: boolean } | null;
   documentImporting?: boolean;
   onDocumentImport?: () => void;
+  onDocumentLibrary?: () => void;
   docScale?: string;
   onDocScaleChange?: (s: string) => void;
   docFreePlace?: boolean;
@@ -4739,6 +4752,7 @@ function RightInspector({
               cadSelectedLineSnap={cadSelectedLineSnap}
               documentImporting={documentImporting}
               onDocumentImport={onDocumentImport}
+              onDocumentLibrary={onDocumentLibrary}
               docScale={docScale}
               onDocScaleChange={onDocScaleChange}
               docFreePlace={docFreePlace}
@@ -5230,6 +5244,7 @@ function ToolsTab({
   cadSelectedLineSnap,
   documentImporting,
   onDocumentImport,
+  onDocumentLibrary,
   docScale,
   onDocScaleChange,
   docFreePlace,
@@ -5262,6 +5277,7 @@ function ToolsTab({
   cadSelectedLineSnap?: { midpoint: boolean; division: number | null; isGuide: boolean } | null;
   documentImporting?: boolean;
   onDocumentImport?: () => void;
+  onDocumentLibrary?: () => void;
   docScale?: string;
   onDocScaleChange?: (s: string) => void;
   docFreePlace?: boolean;
@@ -5342,7 +5358,7 @@ function ToolsTab({
         />
       )}
       {settingsTool === "document" && (
-        <DocumentToolSettings importing={!!documentImporting} onImport={onDocumentImport} scale={docScale ?? "1:100"} onScaleChange={onDocScaleChange} freePlace={!!docFreePlace} onFreePlaceChange={onDocFreePlaceChange} />
+        <DocumentToolSettings importing={!!documentImporting} onImport={onDocumentImport} onOpenLibrary={onDocumentLibrary} scale={docScale ?? "1:100"} onScaleChange={onDocScaleChange} freePlace={!!docFreePlace} onFreePlaceChange={onDocFreePlaceChange} />
       )}
 
       {/* Tabellen-Werkzeug — Placement-Preview + Modifikation */}
@@ -5440,6 +5456,7 @@ function EbeneSelect({ engine }: { engine: import("@/cad/embed/MiniCad").MiniCad
 function DocumentToolSettings({
   importing,
   onImport,
+  onOpenLibrary,
   scale,
   onScaleChange,
   freePlace,
@@ -5447,6 +5464,7 @@ function DocumentToolSettings({
 }: {
   importing: boolean;
   onImport?: () => void;
+  onOpenLibrary?: () => void;
   scale: string;
   onScaleChange?: (s: string) => void;
   freePlace?: boolean;
@@ -5467,6 +5485,18 @@ function DocumentToolSettings({
       >
         <FileImage size={14} />
         {importing ? "Importiere…" : "Datei importieren"}
+      </button>
+
+      <button
+        type="button"
+        disabled={importing}
+        onClick={onOpenLibrary}
+        className="w-full h-9 mt-1.5 rounded-md border text-xs flex items-center justify-center gap-2 disabled:opacity-50"
+        style={{ borderColor: "hsl(var(--hairline))" }}
+        title="Dokumente & Fotos aus der Projekt-Ablage (Startseite) einfügen"
+      >
+        <FolderOpen size={14} />
+        Aus Projekt-Ablage
       </button>
 
       <label
