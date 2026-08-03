@@ -206,8 +206,8 @@ export function CadDocumentInspector({ engine }: Props) {
   );
 }
 
-/** Verzerren + Spiegeln für ein Dokument (identisch in Projektmappe & CAD-Oberfläche). */
-function WarpSection({ engine, docId }: { engine: MiniCad; docId: string }) {
+/** Bild verzerren + Spiegeln (identisch in Projektmappe & CAD-Oberfläche). */
+export function WarpSection({ engine, docId }: { engine: MiniCad | any; docId: string }) {
   const [, force] = useState(0);
   const app: any = engine as any;
   const doc: any = app.scene?.getDocumentById?.(docId);
@@ -248,7 +248,7 @@ function WarpSection({ engine, docId }: { engine: MiniCad; docId: string }) {
       style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
     >
       <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-        Verzerren &amp; Spiegeln
+        Bild verzerren
       </div>
 
       <button

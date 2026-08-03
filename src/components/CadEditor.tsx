@@ -16,6 +16,7 @@ import { EraserSettingsPanel } from "@/components/cad/EraserSettingsPanel";
 import { WallSettingsPanel } from "@/components/cad/WallSettingsPanel";
 
 import { DocumentFilterPanel } from "@/components/cad/DocumentFilterPanel";
+import { WarpSection } from "@/components/page/CadDocumentInspector";
 
 const CAD_TOOLS = [
   { id: ToolIds.SELECT, label: "Auswahl", key: "V", icon: MousePointer2 },
@@ -309,6 +310,10 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const [docPickerPages, setDocPickerPages] = useState<ImportedPage[] | null>(null);
   const [docPickerSelected, setDocPickerSelected] = useState<Set<number>>(new Set());
   const [docImporting, setDocImporting] = useState(false);
+  // Dokumentenwerkzeug (identisch zur Projektmappe): ohne Häkchen wird frei
+  // platziert (Originalgröße), mit Häkchen greift der eingestellte Maßstab.
+  const [docFreePlace, setDocFreePlace] = useState(true);
+  const [docImportScale, setDocImportScale] = useState("1:100");
   const [docSelected, setDocSelected] = useState<{ id: string; name: string; widthM: number; heightM: number; importScaleDenom: number; kind: "image" | "pdf-page"; pdfSourceB64: string | null } | null>(null);
   const [docFilterSig, setDocFilterSig] = useState<string>("");
   const [docScalePopoverOpen, setDocScalePopoverOpen] = useState(false);
@@ -915,6 +920,45 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     setExpandedTool(TOOL_VARIANTS[id] ? id : null);
   }, [lineVariant]);
 
+  /**
+   * Platziert importierte Seiten direkt — Maßstab kommt aus dem
+   * Dokumentenwerkzeug-Panel (Häkchen „Maßstab anwenden").
+   */
+  const placeImportedPages = useCallback((pages: ImportedPage[]) => {
+    const app = appRef.current; if (!app || pages.length === 0) return;
+    let denom = 1;
+    if (!docFreePlace) {
+      const m = docImportScale.match(/^\s*1\s*:\s*(\d+(?:[.,]\d+)?)\s*$/);
+      const v = m ? parseFloat(m[1].replace(",", ".")) : parseFloat(docImportScale.replace(",", "."));
+      denom = Number.isFinite(v) && v > 0 ? v : 100;
+    }
+    const [first, ...rest] = pages;
+    const firstW = first.widthM * denom;
+    const firstH = first.heightM * denom;
+    app.setTool(ToolIds.DOCUMENT);
+    app.documentTool.beginPlacement({
+      src: first.src, widthM: firstW, heightM: firstH,
+      pixelWidth: first.pixelWidth, pixelHeight: first.pixelHeight,
+      name: first.name, kind: first.kind, pageIndex: first.pageIndex,
+      importScaleDenom: denom,
+      pdfSourceB64: first.pdfSourceB64 || null,
+    });
+    let offX = firstW + 0.5;
+    for (const p of rest) {
+      const pw = p.widthM * denom;
+      const ph = p.heightM * denom;
+      app.scene.createDocument({
+        name: p.name, kind: p.kind, src: p.src, pageIndex: p.pageIndex,
+        position: { x: offX, y: 0 }, widthM: pw, heightM: ph,
+        pixelWidth: p.pixelWidth, pixelHeight: p.pixelHeight,
+        labelId: app.activeDrawLabelId,
+        importScaleDenom: denom,
+        pdfSourceB64: p.pdfSourceB64 || null,
+      });
+      offX += pw + 0.5;
+    }
+  }, [docFreePlace, docImportScale]);
+
   const handleDocFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     e.target.value = "";
@@ -924,13 +968,9 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       const pages = await importFile(f);
       if (pages.length === 0) { window.alert("Keine Seiten gefunden."); return; }
       if (pages.length === 1) {
-        // Direkt zum Maßstab-Dialog – Default = aktueller Zeichen-Maßstab
-        const def = pages[0].kind === "pdf-page" ? String(drawingScale) : "1";
-        setScaleChoice(def);
-        setScaleCustom(String(drawingScale));
-        setScaleDialogPages(pages);
+        placeImportedPages(pages);
       } else {
-        // PDF mit mehreren Seiten → erst Page-Picker
+        // PDF mit mehreren Seiten → Page-Picker
         const all = new Set<number>();
         pages.forEach((_, i) => all.add(i));
         setDocPickerSelected(all);
@@ -941,19 +981,17 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     } finally {
       setDocImporting(false);
     }
-  }, [drawingScale]);
+  }, [placeImportedPages]);
 
   const handleDocPickerConfirm = useCallback(() => {
     if (!docPickerPages) return;
     const selectedPages = docPickerPages.filter((_, i) => docPickerSelected.has(i));
-    if (selectedPages.length === 0) { setDocPickerPages(null); return; }
-    // → Maßstab-Dialog (Default = aktueller Zeichen-Maßstab)
-    setScaleChoice(selectedPages[0].kind === "pdf-page" ? String(drawingScale) : "1");
-    setScaleCustom(String(drawingScale));
     setDocPickerPages(null);
     setDocPickerSelected(new Set());
-    setScaleDialogPages(selectedPages);
-  }, [docPickerPages, docPickerSelected]);
+    if (selectedPages.length === 0) return;
+    placeImportedPages(selectedPages);
+  }, [docPickerPages, docPickerSelected, placeImportedPages]);
+
 
   /**
    * Maßstab anwenden. Import-Faktor = importScaleDenom:
@@ -2456,6 +2494,31 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                   onChange={handleDocFileChange}
                 />
 
+                <label
+                  className="flex items-center gap-2 text-[11px] cursor-pointer select-none px-0.5"
+                  title="Ohne Häkchen wird das Dokument frei platziert (Originalgröße)."
+                >
+                  <input
+                    type="checkbox"
+                    checked={!docFreePlace}
+                    onChange={(e) => setDocFreePlace(!e.target.checked)}
+                  />
+                  <span>Maßstab anwenden</span>
+                </label>
+
+                <div className={docFreePlace ? "opacity-50 pointer-events-none" : ""}>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[11px] w-14" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Maßstab</span>
+                    <input
+                      value={docImportScale}
+                      onChange={(e) => setDocImportScale(e.target.value)}
+                      placeholder="1:100"
+                      className="flex-1 h-8 px-2 rounded border bg-transparent text-xs"
+                      style={{ borderColor: "hsl(var(--border))" }}
+                    />
+                  </div>
+                </div>
+
                 {docToolPhase === "placing" && (
                   <div className="rounded-md p-2 text-xs" style={{ background: "hsl(var(--primary) / 0.12)", border: "1px solid hsl(var(--primary) / 0.4)" }}>
                     Klick auf Canvas: Dokument absetzen · Esc: abbrechen
@@ -2463,8 +2526,10 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 )}
 
                 <div className="text-[11px] leading-relaxed pt-2" style={{ color: "hsl(var(--cad-toolbar-muted))", borderTop: "1px solid hsl(var(--border))" }}>
-                  <div>PDF, JPG, PNG werden mit 96 DPI / 72 pt importiert.</div>
-                  <div>Zum Skalieren: <strong>Auswahl-Tool</strong> (V) → Dokument anklicken.</div>
+                  {docFreePlace
+                    ? <div>Freie Platzierung — Maßstab kann nachträglich gesetzt werden.</div>
+                    : <div>Import im Maßstab {docImportScale}.</div>}
+                  <div>Bearbeiten (Skalieren, Drehen, Bild verzerren, Spiegeln): <strong>Auswahl-Werkzeug</strong> (V) → Dokument anklicken.</div>
                 </div>
               </div>
             </div>
@@ -2803,7 +2868,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           )}
 
           {/* Document-Eigenschaften: nur im Auswahl-Tool, wenn Dokument selektiert */}
-          {!!docSelected && (activeTool === ToolIds.SELECT || (activeTool === ToolIds.DOCUMENT && (docToolPhase === "scale-pick-1" || docToolPhase === "scale-pick-2" || docToolPhase === "scale-await-input"))) && (
+          {!!docSelected && (activeTool === ToolIds.SELECT || (activeTool === ToolIds.DOCUMENT && (docToolPhase === "scale-pick-1" || docToolPhase === "scale-pick-2" || docToolPhase === "scale-await-input" || docToolPhase === "warp"))) && (
             <div className="cad-settings-panel mb-2">
               <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Dokument-Eigenschaften</div>
               <div className="space-y-3">
@@ -2949,6 +3014,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                   <AnchorIcon className="h-4 w-4" />
                   <span className="text-xs">Anker +/−</span>
                 </button>
+
+                <WarpSection engine={appRef.current} docId={docSelected.id} />
 
                 <DocumentFilterPanel app={appRef.current} docId={docSelected.id} sig={docFilterSig} />
 
