@@ -1841,6 +1841,7 @@ export default function ProjectWorkspace() {
               cadSelectedLineSnap={cadSelectedLineSnap}
               documentImporting={docImporting}
               onDocumentImport={() => documentFileInputRef.current?.click()}
+              onDocumentLibrary={() => setDocLibraryOpen(true)}
               docScale={docScale}
               onDocScaleChange={setDocScale}
               docFreePlace={docFreePlace}
@@ -4645,6 +4646,7 @@ function RightInspector({
   cadSelectedLineSnap,
   documentImporting,
   onDocumentImport,
+  onDocumentLibrary,
   docScale,
   onDocScaleChange,
   docFreePlace,
@@ -4682,6 +4684,7 @@ function RightInspector({
   cadSelectedLineSnap?: { midpoint: boolean; division: number | null; isGuide: boolean } | null;
   documentImporting?: boolean;
   onDocumentImport?: () => void;
+  onDocumentLibrary?: () => void;
   docScale?: string;
   onDocScaleChange?: (s: string) => void;
   docFreePlace?: boolean;
@@ -4748,6 +4751,7 @@ function RightInspector({
               cadSelectedLineSnap={cadSelectedLineSnap}
               documentImporting={documentImporting}
               onDocumentImport={onDocumentImport}
+              onDocumentLibrary={onDocumentLibrary}
               docScale={docScale}
               onDocScaleChange={onDocScaleChange}
               docFreePlace={docFreePlace}
@@ -5239,6 +5243,7 @@ function ToolsTab({
   cadSelectedLineSnap,
   documentImporting,
   onDocumentImport,
+  onDocumentLibrary,
   docScale,
   onDocScaleChange,
   docFreePlace,
@@ -5271,6 +5276,7 @@ function ToolsTab({
   cadSelectedLineSnap?: { midpoint: boolean; division: number | null; isGuide: boolean } | null;
   documentImporting?: boolean;
   onDocumentImport?: () => void;
+  onDocumentLibrary?: () => void;
   docScale?: string;
   onDocScaleChange?: (s: string) => void;
   docFreePlace?: boolean;
@@ -5351,7 +5357,7 @@ function ToolsTab({
         />
       )}
       {settingsTool === "document" && (
-        <DocumentToolSettings importing={!!documentImporting} onImport={onDocumentImport} scale={docScale ?? "1:100"} onScaleChange={onDocScaleChange} freePlace={!!docFreePlace} onFreePlaceChange={onDocFreePlaceChange} />
+        <DocumentToolSettings importing={!!documentImporting} onImport={onDocumentImport} onOpenLibrary={onDocumentLibrary} scale={docScale ?? "1:100"} onScaleChange={onDocScaleChange} freePlace={!!docFreePlace} onFreePlaceChange={onDocFreePlaceChange} />
       )}
 
       {/* Tabellen-Werkzeug — Placement-Preview + Modifikation */}
@@ -5449,6 +5455,7 @@ function EbeneSelect({ engine }: { engine: import("@/cad/embed/MiniCad").MiniCad
 function DocumentToolSettings({
   importing,
   onImport,
+  onOpenLibrary,
   scale,
   onScaleChange,
   freePlace,
@@ -5456,6 +5463,7 @@ function DocumentToolSettings({
 }: {
   importing: boolean;
   onImport?: () => void;
+  onOpenLibrary?: () => void;
   scale: string;
   onScaleChange?: (s: string) => void;
   freePlace?: boolean;
@@ -5476,6 +5484,18 @@ function DocumentToolSettings({
       >
         <FileImage size={14} />
         {importing ? "Importiere…" : "Datei importieren"}
+      </button>
+
+      <button
+        type="button"
+        disabled={importing}
+        onClick={onOpenLibrary}
+        className="w-full h-9 mt-1.5 rounded-md border text-xs flex items-center justify-center gap-2 disabled:opacity-50"
+        style={{ borderColor: "hsl(var(--hairline))" }}
+        title="Dokumente & Fotos aus der Projekt-Ablage (Startseite) einfügen"
+      >
+        <FolderOpen size={14} />
+        Aus Projekt-Ablage
       </button>
 
       <label
