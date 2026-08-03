@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { WorkspaceHeader } from "@/components/workspace/WorkspaceHeader";
+import { TabletAidWheel } from "@/components/TabletAidWheel";
 import { useProject } from "@/lib/projectStore";
 import {
   financeStore, childrenOf, positionsOf, nodeTotals, projectTotals, actionTotals,
@@ -11,7 +12,7 @@ import { FinanceSummaryCard } from "@/components/finance/FinanceSummaryCard";
 import { FinancePositionsTable } from "@/components/finance/FinancePositionsTable";
 import {
   Plus, PanelLeftClose, PanelLeftOpen, ChevronRight, ChevronDown,
-  Folder, Building2, Trash2, ToggleLeft, ToggleRight, Home,
+  Folder, Building2, ArrowRight, ToggleLeft, ToggleRight, Home,
 } from "lucide-react";
 
 function useFinance(projectId?: string): FinanceState {
@@ -35,6 +36,12 @@ export default function FinancePage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [leftOpen, setLeftOpen] = useState(true);
+  const [tabletAidOn, setTabletAidOn] = useState<boolean>(() => {
+    try { return localStorage.getItem("pixuna.tabletAid") === "1"; } catch { return false; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem("pixuna.tabletAid", tabletAidOn ? "1" : "0"); } catch { /* ignore */ }
+  }, [tabletAidOn]);
 
   const selected = useMemo(
     () => (selectedId ? state.nodes.find((n) => n.id === selectedId) ?? null : null),
@@ -98,6 +105,8 @@ export default function FinancePage() {
         projectId={projectId}
         projectName={project?.name}
         mode="finance"
+        tabletAidOn={tabletAidOn}
+        onToggleTabletAid={() => setTabletAidOn((v) => !v)}
         canDelete={!!selected}
         onDelete={() => {
           if (!selected) return;
@@ -106,10 +115,9 @@ export default function FinancePage() {
         }}
       />
 
-      <main className="flex-1 min-h-0 grid transition-[grid-template-columns] duration-200"
-            style={{ gridTemplateColumns: leftOpen ? "280px 1fr" : "0px 1fr" }}>
+      <main className="flex-1 min-h-0 flex">
         {leftOpen && (
-          <aside className="min-h-0 flex flex-col border-r overflow-hidden"
+          <aside className="w-[280px] shrink-0 min-h-0 flex flex-col border-r overflow-hidden"
                  style={{ background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" }}>
             <div className="flex items-center gap-1 px-3 py-2 border-b" style={{ borderColor: "hsl(var(--hairline))" }}>
               <div className="text-[11px] font-semibold uppercase tracking-wider flex-1"
@@ -145,7 +153,7 @@ export default function FinancePage() {
           </aside>
         )}
 
-        <section className="min-h-0 overflow-auto">
+        <section className="flex-1 min-w-0 min-h-0 overflow-auto">
           <div className="sticky top-0 z-10 flex items-center gap-1 px-3 py-1.5 border-b"
                style={{ background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" }}>
             {!leftOpen && (
@@ -174,6 +182,7 @@ export default function FinancePage() {
           </div>
         </section>
       </main>
+      {tabletAidOn && <TabletAidWheel />}
     </div>
   );
 }
@@ -280,7 +289,7 @@ const ProjectView: React.FC<{ projectId: string; state: FinanceState; projectNam
 const ChildList: React.FC<{
   projectId: string; state: FinanceState; nodes: FinanceNode[];
   onSelect: (id: string) => void; deep?: boolean;
-}> = ({ projectId, state, nodes, onSelect, deep }) => {
+}> = ({ projectId, state, nodes, onSelect }) => {
   const [open, setOpen] = useState<Record<string, boolean>>({});
   if (nodes.length === 0) {
     return (
@@ -312,12 +321,15 @@ const ChildList: React.FC<{
                 onClick={() => financeStore.updateNode(projectId, n.id, { enabled: !n.enabled })}>
                 {n.enabled ? <ToggleRight size={16} style={{ color: "hsl(var(--accent-gold))" }} /> : <ToggleLeft size={16} />}
               </button>
-              <button className="flex items-center gap-1.5 min-w-0 text-left" onClick={() => onSelect(n.id)}>
-                {deep && kids.length > 0 && (
-                  <span onClick={(e) => { e.stopPropagation(); setOpen((o) => ({ ...o, [n.id]: !o[n.id] })); }}>
-                    {isOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-                  </span>
-                )}
+              <button
+                className="flex items-center gap-1.5 min-w-0 text-left"
+                title={kids.length > 0 ? "Unterpunkte ein-/ausklappen" : "Öffnen"}
+                onClick={() => kids.length > 0
+                  ? setOpen((o) => ({ ...o, [n.id]: !o[n.id] }))
+                  : onSelect(n.id)}>
+                {kids.length > 0
+                  ? (isOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />)
+                  : <span className="w-[13px]" />}
                 {n.type === "overview" ? <Folder size={14} /> : <Building2 size={14} />}
                 <span className="truncate font-medium">{n.name}</span>
               </button>
@@ -327,12 +339,13 @@ const ChildList: React.FC<{
               <span className="text-xs" style={{ color: "hsl(var(--ink-soft))" }}>
                 {formatPct(cO.pct)} / {formatPct(cI.pct)}
               </span>
-              <button onClick={() => financeStore.deleteNode(projectId, n.id)}
-                className="h-7 w-7 rounded flex items-center justify-center hover:bg-muted" title="Löschen">
-                <Trash2 size={14} style={{ color: "hsl(var(--ink-soft))" }} />
+              <button onClick={() => onSelect(n.id)}
+                className="h-7 w-7 rounded flex items-center justify-center hover:bg-muted"
+                title={n.type === "overview" ? "Übersicht öffnen" : "Aktion öffnen"}>
+                <ArrowRight size={14} style={{ color: "hsl(var(--ink-soft))" }} />
               </button>
             </div>
-            {deep && isOpen && kids.length > 0 && (
+            {isOpen && kids.length > 0 && (
               <div className="pl-6 border-b" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-muted))" }}>
                 <ChildList projectId={projectId} state={state} nodes={kids} onSelect={onSelect} deep />
               </div>
