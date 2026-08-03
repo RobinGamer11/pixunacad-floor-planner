@@ -102,14 +102,17 @@ export function PdfPageView({ sourceB64, pageIndex, className, deferDuringWorksp
   }, [sourceB64, pageIndex, deferDuringWorkspaceZoom]);
 
   return (
-    <div ref={containerRef} className={className} style={{ width: "100%", height: "100%", background: "white", overflow: "hidden", pointerEvents: "none", contain: "strict" }}>
+    <div ref={containerRef} className={className} style={{ width: "100%", height: "100%", overflow: "hidden", pointerEvents: "none" }}>
       {error ? (
         <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground p-2">
           PDF: {error}
         </div>
       ) : (
-        <canvas ref={canvasRef} style={{ width: "100%", height: "100%", display: "block", pointerEvents: "none" }} />
+        <div style={{ width: "100%", height: "100%", background: "white", ...(maskStyle ?? {}) }}>
+          <canvas ref={canvasRef} style={{ width: "100%", height: "100%", display: "block", pointerEvents: "none" }} />
+        </div>
       )}
+
     </div>
   );
 }
