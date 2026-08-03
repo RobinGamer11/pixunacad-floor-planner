@@ -295,7 +295,10 @@ export default function FinancePage() {
           </div>
 
           <div ref={exportRef} className="p-4 space-y-4" style={{ background: "hsl(var(--surface-app))" }}>
-            {!selected && (
+            {filterActive && (
+              <FilterResults hits={filterHits} onOpen={(id) => { setFilterQuery(""); setFilterTypes([]); setSelectedId(id); }} />
+            )}
+            {!selected && !filterActive && (
               <ProjectView projectId={pid} state={state} projectName={project?.name ?? "Projekt"}
                            onSelect={setSelectedId} />
             )}
