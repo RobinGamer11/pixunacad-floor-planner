@@ -103,13 +103,14 @@ export function eraseDocCircle(doc: DocumentObject, centerW: Vec2, radiusM: numb
     // Höhere Weichheit = kleinerer Kern, flacherer Verlauf und geringere
     // Deckkraft pro Strich (mehrfaches Verweilen radiert erst voll aus).
     const soft = Math.max(0.05, Math.min(1, softness));
-    const core = pr * Math.pow(1 - soft, 2.2);
-    const aSoft = a * (1 - 0.75 * soft);
+    const core = pr * Math.pow(1 - soft, 3.5);
+    const aSoft = a * (1 - 0.93 * soft);
     const grad = ctx.createRadialGradient(px, py, Math.max(0, core), px, py, Math.max(core + 0.01, pr));
     grad.addColorStop(0, `rgba(0,0,0,${aSoft})`);
-    grad.addColorStop(0.4, `rgba(0,0,0,${aSoft * (1 - 0.55 * soft)})`);
-    grad.addColorStop(0.75, `rgba(0,0,0,${aSoft * 0.18 * (1 - soft * 0.8)})`);
+    grad.addColorStop(0.35, `rgba(0,0,0,${aSoft * (1 - 0.8 * soft)})`);
+    grad.addColorStop(0.7, `rgba(0,0,0,${aSoft * 0.1 * (1 - soft * 0.9)})`);
     grad.addColorStop(1, "rgba(0,0,0,0)");
+
     ctx.fillStyle = grad;
 
   }

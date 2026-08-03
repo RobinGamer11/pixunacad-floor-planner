@@ -1,3 +1,4 @@
+import * as polygonClipping from "polygon-clipping";
 import { Defaults, SelectionType } from "./constants";
 import { Vec2, v, dist, projectPointToSegment, pointInPolygon } from "./geometry";
 import type { CadApp } from "./CadApp";
@@ -6,6 +7,7 @@ import type { Segment, FreeStroke } from "./Scene";
 import { splitPolylineByCircle, splitSegmentByCircle, projectPointToInfiniteLineFromTwoPoints } from "./freeGeom";
 import { eraseDocCircle } from "./documentMask";
 import { RulerDragController } from "./rulerInteraction";
+
 
 /**
  * Radiergummi-Werkzeug (Hotkey: E).
@@ -22,6 +24,8 @@ export class EraserTool {
   private _rulerDrag!: RulerDragController;
   /** Weicher Modus: pro Objekt akkumulierte Abtragung (0..1) innerhalb eines Striches. */
   private _acc = new Map<string, number>();
+  /** Gesammelter Radier-Pfad des aktuellen Striches (Preview + Schraffur-Schnitt). */
+  private _hatchStamps: Array<{ c: Vec2; r: number }> = [];
 
   constructor(app: CadApp) {
     this.app = app;
@@ -32,6 +36,7 @@ export class EraserTool {
     this._erasing = false;
     this._lastWorld = null;
     this._acc.clear();
+    this._hatchStamps = [];
     this._rulerDrag.reset();
     this.app.hub.hide();
     this.app.pointEditMenu.hide();
@@ -43,7 +48,9 @@ export class EraserTool {
     this._erasing = false;
     this._lastWorld = null;
     this._acc.clear();
+    this._hatchStamps = [];
   }
+
 
   finish() { this.cancel(); }
   getCursor() {
@@ -85,10 +92,72 @@ export class EraserTool {
         this._lastWorld = v(projW.x, projW.y);
       }
     } else {
+      if (this._erasing) {
+        // Maus losgelassen → Schraffur-Pfad ausstanzen und History-Schritt setzen.
+        this._commitHatchErase();
+        (this.app as any).commitHistorySnapshot?.();
+        (this.app as any).onEraseStrokeEnd?.();
+      }
       this._erasing = false;
       this._lastWorld = null;
+      this._acc.clear();
     }
   }
+
+  /**
+   * Stanzt den kompletten Radier-Pfad (Kreis-Sweep) boolesch aus allen
+   * getroffenen Schraffuren aus. Ränder werden echt beschnitten, es entstehen
+   * keine neuen Flächen; leere Ergebnisse löschen die Schraffur.
+   */
+  private _commitHatchErase() {
+    const stamps = this._hatchStamps;
+    this._hatchStamps = [];
+    if (!stamps.length) return;
+    const scene = this.app.scene;
+    const eraser: any = stamps.map((s) => [this._circleRing(s.c, s.r)]);
+    for (const hatch of scene.hatches.slice()) {
+      if (!this.app.labelManager.isVisible(hatch.labelId)) continue;
+      if (!this._polyNearStamps(hatch.points, stamps)) continue;
+      const subject: any = [[
+        hatch.points.map((p) => [p.x, p.y]),
+        ...(hatch.holes || []).filter((h) => h.length > 2).map((h) => h.map((p) => [p.x, p.y])),
+      ]];
+      let result: any;
+      try {
+        result = polygonClipping.difference(subject, eraser);
+      } catch {
+        continue;
+      }
+      const style = {
+        fillColor: hatch.fillColor, strokeColor: hatch.strokeColor,
+        fillAlphaPct: hatch.fillAlphaPct, strokeWidthPx: hatch.strokeWidthPx,
+        labelId: hatch.labelId, areaLabel: hatch.areaLabel,
+      };
+      scene.removeHatch(hatch);
+      if (this.app.selection && (this.app.selection as any).hatchId === hatch.id) this.app.setSelection(null);
+      for (const poly of result || []) {
+        const rings = poly.map((ring: number[][]) => ring.map((p) => v(p[0], p[1])));
+        const outer = rings[0];
+        if (!outer || outer.length < 3) continue;
+        scene.createHatch(outer, { ...style, holes: rings.slice(1).filter((r: Vec2[]) => r.length > 2) });
+      }
+    }
+  }
+
+  private _circleRing(c: Vec2, r: number, n = 32): number[][] {
+    const ring: number[][] = [];
+    for (let i = 0; i <= n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      ring.push([c.x + Math.cos(a) * r, c.y + Math.sin(a) * r]);
+    }
+    return ring;
+  }
+
+  private _polyNearStamps(pts: Vec2[], stamps: Array<{ c: Vec2; r: number }>): boolean {
+    for (const s of stamps) if (this._strokeNearCircle(pts, s.c, s.r)) return true;
+    return false;
+  }
+
 
   /**
    * Effektiver Schnittradius für Vektorobjekte.
@@ -177,22 +246,14 @@ export class EraserTool {
       }
     }
 
-    // Schraffuren: Kreis als Loch ausstanzen
-    for (const hatch of scene.hatches.slice()) {
-      if (!this.app.labelManager.isVisible(hatch.labelId)) continue;
-      if (!this._polyNearCircle(hatch.points, centerW, r)) continue;
-      const rH = this._effRadius(hatch.id, r, mode, softness, strength);
-      // Nur stanzen, wenn der Kreis die Fläche wirklich trifft.
-      const touches = pointInPolygon(centerW, hatch.points) || this._polyEdgeNear(hatch.points, centerW, rH);
-      if (!touches) continue;
-      // Doppelstempel an nahezu identischer Stelle vermeiden.
-      const last = hatch.holes[hatch.holes.length - 1];
-      if (last && last.length > 2) {
-        const c = this._polyCenter(last);
-        if (dist(c, centerW) < rH * 0.35) { hatch.holes[hatch.holes.length - 1] = this._circlePoly(centerW, rH); continue; }
-      }
-      hatch.holes.push(this._circlePoly(centerW, rH));
+    // Schraffuren: Radier-Pfad nur sammeln (Preview). Der echte boolesche
+    // Schnitt passiert erst beim Loslassen der Maus (_commitHatchErase).
+    const lastStamp = this._hatchStamps[this._hatchStamps.length - 1];
+    if (!lastStamp || dist(lastStamp.c, centerW) > r * 0.25) {
+      this._hatchStamps.push({ c: v(centerW.x, centerW.y), r });
+      if (this._hatchStamps.length > 4000) this._hatchStamps.shift();
     }
+
 
     // Textboxen: werden entfernt, sobald der Pinsel sie trifft (Smooth = mit
     // Verweildauer, damit ein Streifen am Rand nicht sofort alles löscht).
@@ -283,6 +344,17 @@ export class EraserTool {
     const mode = this.app.defaultEraserMode ?? "hard";
     const soft = Math.max(0.05, Math.min(1, this.app.defaultEraserSoftness ?? 0.5));
     ctx.save();
+    // Preview des laufenden Radier-Pfades (Schraffur-Ausschnitt).
+    if (this._hatchStamps.length) {
+      ctx.fillStyle = "rgba(77,163,255,0.22)";
+      for (const s of this._hatchStamps) {
+        const p = cam.worldToScreen(s.c.x, s.c.y);
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, Math.max(2, s.r * cam.scale), 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
     if (mode === "smooth") {
       const g = ctx.createRadialGradient(c.x, c.y, r * (1 - soft), c.x, c.y, r);
       g.addColorStop(0, "rgba(77,163,255,0.28)");

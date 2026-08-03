@@ -2809,8 +2809,9 @@ function PageCanvas({
               const smooth = mode === "smooth";
               const s = smooth ? soft : 0;
               const str = Math.max(0.1, Math.min(1, strength ?? 1));
-              // Smooth: pro Stempel nur teilweise abtragen → Verweilen radiert voll.
-              const a = smooth ? Math.max(0.05, 0.30 * str) : 1;
+              // Smooth: pro Stempel nur minimal abtragen → Verweilen radiert voll.
+              const a = smooth ? Math.max(0.015, 0.12 * str * (1 - 0.7 * s)) : 1;
+
               // Nur exakte Doppelstempel überspringen; Überlappung darf akkumulieren.
               const minStep = smooth ? rMm * 0.08 : rMm * 0.4;
               if (last && Math.hypot(last.x - lx, last.y - ly) < minStep && Math.abs(last.r - rMm) < 0.01) continue;
