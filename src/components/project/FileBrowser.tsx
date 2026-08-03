@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { Folder, FolderPlus, FileText, Upload, ChevronRight, Pencil, Trash2, Download } from "lucide-react";
+import { Folder, FolderPlus, FileText, Upload, ChevronRight, ChevronUp, ChevronDown, Pencil, Trash2, Download } from "lucide-react";
 import { projectStore, type FileNode, type Project } from "@/lib/projectStore";
 
 interface Props {
