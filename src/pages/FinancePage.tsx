@@ -181,6 +181,7 @@ export default function FinancePage() {
           </div>
         </section>
       </main>
+      {tabletAidOn && <TabletAidWheel />}
     </div>
   );
 }
