@@ -209,6 +209,8 @@ export class CadApp {
   // Eraser-Defaults
   defaultEraserRadiusM = Defaults.eraserRadiusM;
   defaultEraserStrength = Defaults.eraserStrength;
+  defaultEraserMode: "hard" | "smooth" = Defaults.eraserMode;
+  defaultEraserSoftness = Defaults.eraserSoftness;
 
   camera: Camera;
   scene: Scene;
