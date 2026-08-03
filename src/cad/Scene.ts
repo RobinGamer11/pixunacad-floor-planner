@@ -799,6 +799,9 @@ export class Scene {
     activeFilterId?: string | null;
     bgRemoval?: import("./documentBgRemove").BgRemoval;
     anchors?: { x: number; y: number }[];
+    warpCorners?: { x: number; y: number }[] | null;
+    flipX?: boolean;
+    flipY?: boolean;
   }): DocumentObject {
     const doc = new DocumentObject({ id: this._makeId(), ...opts });
     this.documents.push(doc);
