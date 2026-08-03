@@ -95,6 +95,7 @@ import type { MiniCadSelectionInfo } from "@/cad/embed/MiniCad";
 import type { HatchDrawMode } from "@/cad/HatchTool";
 import { FreeDrawSettingsPanel } from "@/components/cad/FreeDrawSettingsPanel";
 import { EraserSettingsPanel } from "@/components/cad/EraserSettingsPanel";
+import { ProjectFilePickerDialog } from "@/components/cad/ProjectFilePickerDialog";
 import { HatchSettingsPanel } from "@/components/cad/HatchSettingsPanel";
 import { WorkspaceHeader } from "@/components/workspace/WorkspaceHeader";
 import { TabletAidWheel } from "@/components/TabletAidWheel";
