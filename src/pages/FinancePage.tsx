@@ -13,8 +13,25 @@ import { FinanceSummaryCard } from "@/components/finance/FinanceSummaryCard";
 import { FinancePositionsTable } from "@/components/finance/FinancePositionsTable";
 import {
   Plus, PanelLeftClose, PanelLeftOpen, ChevronRight, ChevronDown,
-  Folder, Building2, ArrowRight, ToggleLeft, ToggleRight, Home, Trash2,
+  Folder, Building2, ArrowRight, ToggleLeft, ToggleRight, Home, Trash2, Search, X,
 } from "lucide-react";
+
+/** Filterbare Positionsarten (mehrfach kombinierbar). */
+type FilterKey = "offer" | "invoice" | "plus" | "minus";
+const FILTER_CHIPS: [FilterKey, string][] = [
+  ["offer", "Angebots-Nr."],
+  ["invoice", "Rechnungs-Nr."],
+  ["plus", "Mehrnachträge"],
+  ["minus", "Mindernachträge"],
+];
+const FILTER_LABEL: Record<FilterKey, string> = {
+  offer: "Angebot",
+  invoice: "Rechnung",
+  plus: "Mehrnachtrag",
+  minus: "Mindernachtrag",
+};
+const keyOf = (p: { type: string; supplementKind?: string }): FilterKey =>
+  p.type === "supplement" ? ((p.supplementKind ?? "plus") as FilterKey) : (p.type as FilterKey);
 
 function useFinance(projectId?: string): FinanceState {
   const [state, setState] = useState<FinanceState>(() =>
