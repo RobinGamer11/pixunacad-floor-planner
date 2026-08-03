@@ -1673,8 +1673,12 @@ export function useProject(id: string | undefined): Project | undefined {
 
 /** Reactive Undo/Redo Flags für eine Projekt-ID. */
 const _histSnapCache = new Map<string, { canUndo: boolean; canRedo: boolean }>();
+// Stabile Referenz für „keine Historie" — sonst liefert getSnapshot bei jedem
+// Aufruf ein neues Objekt und useSyncExternalStore läuft in eine Endlosschleife
+// (React-Fehler #185), z. B. solange die Projekt-ID noch nicht geladen ist.
+const _histEmpty: { canUndo: boolean; canRedo: boolean } = { canUndo: false, canRedo: false };
 function _histSnap(id: string | undefined) {
-  if (!id) return { canUndo: false, canRedo: false };
+  if (!id) return _histEmpty;
   const cu = projectStore.canUndo(id);
   const cr = projectStore.canRedo(id);
   const prev = _histSnapCache.get(id);
@@ -1687,7 +1691,7 @@ export function useProjectHistory(id: string | undefined): { canUndo: boolean; c
   return useSyncExternalStore(
     (fn) => projectStore.subscribeHistory(fn),
     () => _histSnap(id),
-    () => ({ canUndo: false, canRedo: false }),
+    () => _histEmpty,
   );
 }
 
