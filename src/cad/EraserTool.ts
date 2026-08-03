@@ -81,7 +81,7 @@ export class EraserTool {
       } else {
         // Sample entlang der Bewegung (in r/2-Schritten)
         const r = this.app.defaultEraserRadiusM;
-        const stepM = Math.max(r * 0.5, 0.01);
+        const stepM = Math.max(r * 0.25, 0.005);
         const last = this._lastWorld!;
         const d = dist(last, projW);
         if (d > stepM) {
