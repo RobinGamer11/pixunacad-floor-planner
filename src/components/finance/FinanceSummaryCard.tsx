@@ -15,15 +15,37 @@ interface Props {
 
 const cellCls = "px-4 py-3 flex-1 min-w-0";
 
+type ControlMode = "est-offer" | "est-invoice" | "offer-invoice";
+
+const CONTROL_LABEL: Record<ControlMode, string> = {
+  "est-offer": "Schätzung vs. Angebot",
+  "est-invoice": "Schätzung vs. Rechnung",
+  "offer-invoice": "Angebot vs. Rechnung",
+};
+
+/** Einheitliche Schriftgröße für alle Beträge – richtet sich nach dem längsten. */
+function amountFontSize(values: number[]): number {
+  const len = Math.max(...values.map((v) => formatEur(v).length), 1);
+  if (len <= 11) return 18;
+  if (len <= 13) return 16;
+  if (len <= 15) return 14;
+  if (len <= 18) return 12.5;
+  return 11;
+}
+
 export const FinanceSummaryCard: React.FC<Props> = ({ totals, onEstimateChange, invoiceDetails, subtitle }) => {
   const [editEstimate, setEditEstimate] = useState(false);
   const [draft, setDraft] = useState("");
   const [showDetails, setShowDetails] = useState(false);
+  const [mode, setMode] = useState<ControlMode>("est-offer");
 
-  const cOffer = control(totals.estimate, totals.offers);
-  const cInvoice = control(totals.estimate, totals.invoices);
+  const base = mode === "offer-invoice" ? totals.offers : totals.estimate;
+  const value = mode === "est-offer" ? totals.offers : totals.invoices;
+  const c = control(base, value);
+  const amountSize = amountFontSize([totals.estimate, totals.offers, totals.invoices]);
 
   const deltaColor = (d: number) => (d > 0 ? "hsl(var(--destructive))" : "hsl(142 70% 34%)");
+
 
   return (
     <div className="rounded-xl border overflow-hidden"
