@@ -3650,6 +3650,7 @@ function ElementView({
       window.removeEventListener("click", onClick, true);
       window.removeEventListener("contextmenu", onContext, true);
       window.removeEventListener("keydown", onKey, true);
+      unregisterHubAbort();
       if (actionCommitRef.current === commit) actionCommitRef.current = null;
       if (actionCancelRef.current === cancel) actionCancelRef.current = null;
     };
