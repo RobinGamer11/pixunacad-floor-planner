@@ -3690,6 +3690,8 @@ function ElementView({
           const snapped = snapToRayGuides(tx, ty, pageRect);
           if (snapped) { tx = snapped.x; ty = snapped.y; }
         }
+        // Zu nah am Drehpunkt → Winkel wäre extrem sprunghaft, daher ignorieren.
+        if (Math.hypot(ty - ay, tx - ax) < 24) return;
         const a = (Math.atan2(ty - ay, tx - ax) * 180) / Math.PI;
         if (startAngle === null) startAngle = a;
         let delta = a - startAngle;
