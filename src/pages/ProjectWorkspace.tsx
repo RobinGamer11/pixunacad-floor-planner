@@ -4048,13 +4048,19 @@ function ElementView({
 
       {el.kind === "pdf" && (
         <WarpedContent corners={el.warpCorners}>
-          <div className="w-full h-full" style={buildEraseMaskCss(el.eraseCircles, el.wMm ?? 0, el.hMm ?? 0)}>
+          <div className="w-full h-full">
             {el.pdfSourceB64 ? (
-              <PdfPageView sourceB64={el.pdfSourceB64} pageIndex={el.pdfPageIndex ?? 0} deferDuringWorkspaceZoom />
+              <PdfPageView
+                sourceB64={el.pdfSourceB64}
+                pageIndex={el.pdfPageIndex ?? 0}
+                deferDuringWorkspaceZoom
+                maskStyle={buildEraseMaskCss(el.eraseCircles, el.wMm ?? 0, el.hMm ?? 0)}
+              />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground" style={{ background: "hsl(var(--surface-muted))" }}>PDF</div>
             )}
           </div>
+
         </WarpedContent>
       )}
 
