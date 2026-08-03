@@ -3873,8 +3873,14 @@ function ElementView({
         </div>
       )}
       {(el.kind === "cad-view" || el.kind === "cad-viewport") && (
-        <CadViewportViewHost element={el} />
+        <div
+          className="w-full h-full"
+          style={buildEraseMaskCss(el.eraseCircles, el.wMm ?? 0, el.hMm ?? 0)}
+        >
+          <CadViewportViewHost element={el} />
+        </div>
       )}
+
       {el.kind === "table" && (
         <TableElementView
           element={el}
