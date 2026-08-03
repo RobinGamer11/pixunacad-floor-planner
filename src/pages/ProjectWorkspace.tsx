@@ -2797,6 +2797,9 @@ function PageCanvas({
               // Sehr dichte Stempel zusammenfassen (Performance/Storage).
               if (last && Math.hypot(last.x - lx, last.y - ly) < rMm * 0.4 && Math.abs(last.r - rMm) < 0.01) continue;
               projectStore.updateElement(projectId, page.id, el.id, {
+                // mm-Geometrie sicherstellen, damit die Maske exakt im selben
+                // Koordinatenraum gerendert wird wie die Radier-Kreise.
+                xMm: ex, yMm: ey, wMm: ew, hMm: eh,
                 eraseCircles: [...prev.slice(-400), { x: lx, y: ly, r: rMm, s }],
               });
             }
