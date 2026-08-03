@@ -6,6 +6,18 @@ interface Props {
   pageIndex: number;
   /** Anzeige-Pixelbreite im DOM (nicht skaliert). Höhe wird über das Seitenverhältnis bestimmt. */
   className?: string;
+  /** Projektmappe: PDF erst nach einer laufenden Viewport-Zoomgeste neu rastern. */
+  deferDuringWorkspaceZoom?: boolean;
+}
+
+let workspaceZoomActive = false;
+const workspaceZoomListeners = new Set<() => void>();
+
+/** Entkoppelt den Projektmappen-Zoom vom teuren PDF.js-Raster-Render. */
+export function setWorkspacePdfZoomActive(active: boolean) {
+  if (workspaceZoomActive === active) return;
+  workspaceZoomActive = active;
+  if (!active) workspaceZoomListeners.forEach((listener) => listener());
 }
 
 /**
@@ -13,7 +25,7 @@ interface Props {
  * auf ein <canvas> und re-rendert adaptiv bei Größenänderung (Zoom),
  * damit beim Reinzoomen kein Bitmap-Geblurre entsteht.
  */
-export function PdfPageView({ sourceB64, pageIndex, className }: Props) {
+export function PdfPageView({ sourceB64, pageIndex, className, deferDuringWorkspaceZoom = false }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [error, setError] = useState<string | null>(null);
@@ -62,6 +74,9 @@ export function PdfPageView({ sourceB64, pageIndex, className }: Props) {
       // Träge genug, damit ein Zoom-Gesten-Burst (Wheel/Pinch) keinen
       // teuren PDF-Re-Render pro Frame auslöst → flüssiges Zoomen.
       debounceTimer.current = window.setTimeout(() => {
+        // Während die Projektmappe zoomt bleibt das bereits gerasterte Canvas
+        // eine reine GPU-skalierte Bitmap. PDF.js wird erst nach Gestenende aktiv.
+        if (deferDuringWorkspaceZoom && workspaceZoomActive) return;
         const w = el.getBoundingClientRect().width;
         const idle = (window as any).requestIdleCallback as undefined | ((cb: () => void, o?: any) => number);
         if (idle) idle(() => doRender(w), { timeout: 600 });
@@ -71,23 +86,26 @@ export function PdfPageView({ sourceB64, pageIndex, className }: Props) {
 
 
     schedule();
+    const onWorkspaceZoomEnd = () => schedule();
+    if (deferDuringWorkspaceZoom) workspaceZoomListeners.add(onWorkspaceZoomEnd);
     const ro = new ResizeObserver(schedule);
     ro.observe(el);
     return () => {
       ro.disconnect();
+      workspaceZoomListeners.delete(onWorkspaceZoomEnd);
       if (debounceTimer.current) window.clearTimeout(debounceTimer.current);
       renderToken.current++;
     };
-  }, [sourceB64, pageIndex]);
+  }, [sourceB64, pageIndex, deferDuringWorkspaceZoom]);
 
   return (
-    <div ref={containerRef} className={className} style={{ width: "100%", height: "100%", background: "white", overflow: "hidden" }}>
+    <div ref={containerRef} className={className} style={{ width: "100%", height: "100%", background: "white", overflow: "hidden", pointerEvents: "none", contain: "strict" }}>
       {error ? (
         <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground p-2">
           PDF: {error}
         </div>
       ) : (
-        <canvas ref={canvasRef} style={{ width: "100%", height: "100%", display: "block" }} />
+        <canvas ref={canvasRef} style={{ width: "100%", height: "100%", display: "block", pointerEvents: "none" }} />
       )}
     </div>
   );
