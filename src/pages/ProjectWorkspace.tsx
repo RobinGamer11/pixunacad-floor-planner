@@ -87,6 +87,8 @@ import { TableElementView, TableModifyContext, TableFormulaPickContext, type For
 import { TableToolSettings } from "@/components/page/TableToolSettings";
 
 import { CadViewportView } from "@/components/page/CadViewportView";
+import { buildEraseMaskCss } from "@/lib/eraseMask";
+
 import { importFile, type ImportedPage } from "@/cad/documentImport";
 import { popPendingSheetPdf } from "@/lib/sheetPdfExport";
 import type { MiniCadSelectionInfo } from "@/cad/embed/MiniCad";
@@ -2757,6 +2759,33 @@ function PageCanvas({
           enabled={activeTool === "line" || activeTool === "text" || activeTool === "guide" || activeTool === "free" || activeTool === "eraser" || activeTool === "hatch" || activeTool === "document" || activeTool === null}
           initialState={page.cadOverlay}
           ghostSnapState={overlayPage ? overlayPage.cadOverlay : null}
+          onEraseWorld={(c, rM, mode, soft) => {
+            // Welt-Meter → Papier-mm; trifft CAD-Blatt-Elemente auf dieser Seite.
+            const mmX = c.x * 1000, mmY = c.y * 1000, rMm = rM * 1000;
+            for (const el of page.elements) {
+              if (el.kind !== "cad-view" && el.kind !== "cad-viewport") continue;
+              const ex = el.xMm ?? 0, ey = el.yMm ?? 0;
+              const ew = el.wMm ?? 0, eh = el.hMm ?? 0;
+              if (ew <= 0 || eh <= 0) continue;
+              // Inverse Rotation um den Elementmittelpunkt.
+              const rot = ((el.rotation ?? 0) * Math.PI) / 180;
+              const cx = ex + ew / 2, cy = ey + eh / 2;
+              const dx = mmX - cx, dy = mmY - cy;
+              const cos = Math.cos(-rot), sin = Math.sin(-rot);
+              const lx = dx * cos - dy * sin + ew / 2;
+              const ly = dx * sin + dy * cos + eh / 2;
+              if (lx + rMm < 0 || lx - rMm > ew || ly + rMm < 0 || ly - rMm > eh) continue;
+              const prev = el.eraseCircles ?? [];
+              const last = prev[prev.length - 1];
+              const s = mode === "smooth" ? soft : 0;
+              // Sehr dichte Stempel zusammenfassen (Performance/Storage).
+              if (last && Math.hypot(last.x - lx, last.y - ly) < rMm * 0.4 && Math.abs(last.r - rMm) < 0.01) continue;
+              projectStore.updateElement(projectId, page.id, el.id, {
+                eraseCircles: [...prev.slice(-400), { x: lx, y: ly, r: rMm, s }],
+              });
+            }
+          }}
+
           lineColor={activeTool === "guide" ? toolSettings.guide.color : toolSettings.line.color}
           lineThicknessMm={activeTool === "guide" ? Math.max(0.1, toolSettings.guide.strokeWidth * 0.2) : toolSettings.line.thicknessMm}
           lineAlpha={toolSettings.line.alpha / 100}
@@ -3846,8 +3875,14 @@ function ElementView({
         </div>
       )}
       {(el.kind === "cad-view" || el.kind === "cad-viewport") && (
-        <CadViewportViewHost element={el} />
+        <div
+          className="w-full h-full"
+          style={buildEraseMaskCss(el.eraseCircles, el.wMm ?? 0, el.hMm ?? 0)}
+        >
+          <CadViewportViewHost element={el} />
+        </div>
       )}
+
       {el.kind === "table" && (
         <TableElementView
           element={el}

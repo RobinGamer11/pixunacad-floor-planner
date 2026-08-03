@@ -87,6 +87,16 @@ interface Props {
    * in die aktive Engine übernommen, sodass Fangpunkte anvisiert werden können.
    */
   ghostSnapState?: any;
+
+  /** Radier-Hook: Zentrum/Radius in Welt-Metern (= Papier-mm / 1000). */
+  onEraseWorld?: (
+    center: { x: number; y: number },
+    radiusM: number,
+    mode: "hard" | "smooth",
+    softness: number,
+    strength: number,
+  ) => void;
+
 }
 
 export default function CadOverlayLayer(props: Props) {
@@ -242,6 +252,15 @@ export default function CadOverlayLayer(props: Props) {
 
   useEffect(() => { engineRef.current?.applyZoom(zoom); }, [zoom]);
   useEffect(() => { engineRef.current?.setActiveTool(activeTool); }, [activeTool]);
+  // Radier-Hook: externe Seiten-Objekte (CAD-Blatt) mitradieren.
+  const onEraseWorldRef = useRef(props.onEraseWorld);
+  onEraseWorldRef.current = props.onEraseWorld;
+  useEffect(() => {
+    const e: any = engineRef.current;
+    if (e) e.onEraseStroke = (c: any, r: number, mode: any, soft: number, strength: number) =>
+      onEraseWorldRef.current?.(c, r, mode, soft, strength);
+  });
+
   useEffect(() => {
     const engine: any = engineRef.current;
     if (engine) engine.documentHubMode = docHub.mode;

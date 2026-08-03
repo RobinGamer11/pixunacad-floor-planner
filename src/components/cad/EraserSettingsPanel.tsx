@@ -5,6 +5,18 @@ import { resetDocMask } from "@/cad/documentMask";
 
 interface Props { app: CadApp | MiniCad | null; }
 
+/** Nichtlineare Größen-Skala: 0.2 mm … 80 mm (Mitte) … 200 mm. */
+const R_MIN = 0.0002, R_MID = 0.08, R_MAX = 0.2;
+const sliderToRadius = (t: number) =>
+  t <= 0.5 ? R_MIN * Math.pow(R_MID / R_MIN, t / 0.5) : R_MID * Math.pow(R_MAX / R_MID, (t - 0.5) / 0.5);
+const radiusToSlider = (r: number) => {
+  const v = Math.max(R_MIN, Math.min(R_MAX, r));
+  return v <= R_MID
+    ? 0.5 * (Math.log(v / R_MIN) / Math.log(R_MID / R_MIN))
+    : 0.5 + 0.5 * (Math.log(v / R_MID) / Math.log(R_MAX / R_MID));
+};
+
+
 export const EraserSettingsPanel: React.FC<Props> = ({ app }) => {
   const [radius, setRadius] = useState(0.03);
   const [strength, setStrength] = useState(1);
@@ -53,12 +65,13 @@ export const EraserSettingsPanel: React.FC<Props> = ({ app }) => {
       <div className="space-y-3">
         <label className="block text-xs">
           <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
-            Größe: {(radius * 1000).toFixed(radius < 0.01 ? 1 : 0)} mm
+            Größe: {(radius * 1000).toFixed(radius * 1000 < 1 ? 2 : radius * 1000 < 10 ? 1 : 0)} mm
           </span>
-          <input type="range" min={0.001} max={1.5} step={0.001} value={radius}
-            onChange={(e) => { const v = parseFloat(e.target.value); setRadius(v); app.defaultEraserRadiusM = v; }}
+          <input type="range" min={0} max={1} step={0.001} value={radiusToSlider(radius)}
+            onChange={(e) => { const v = sliderToRadius(parseFloat(e.target.value)); setRadius(v); app.defaultEraserRadiusM = v; }}
             className="w-full" />
         </label>
+
 
         <div className="text-xs">
           <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Modus</span>

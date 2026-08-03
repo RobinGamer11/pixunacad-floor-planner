@@ -20,6 +20,8 @@ export class EraserTool {
   private _erasing = false;
   private _lastWorld: Vec2 | null = null;
   private _rulerDrag!: RulerDragController;
+  /** Weicher Modus: pro Objekt akkumulierte Abtragung (0..1) innerhalb eines Striches. */
+  private _acc = new Map<string, number>();
 
   constructor(app: CadApp) {
     this.app = app;
@@ -29,6 +31,7 @@ export class EraserTool {
   activate() {
     this._erasing = false;
     this._lastWorld = null;
+    this._acc.clear();
     this._rulerDrag.reset();
     this.app.hub.hide();
     this.app.pointEditMenu.hide();
@@ -39,6 +42,7 @@ export class EraserTool {
   cancel() {
     this._erasing = false;
     this._lastWorld = null;
+    this._acc.clear();
   }
 
   finish() { this.cancel(); }
@@ -46,6 +50,7 @@ export class EraserTool {
     const c = this._rulerDrag.hoverCursor(this.app.input);
     return c || "none";
   }
+
 
   update(input: Input) {
     if (this._rulerDrag.update(input)) {
@@ -85,14 +90,28 @@ export class EraserTool {
     }
   }
 
+  /**
+   * Effektiver Schnittradius für Vektorobjekte.
+   * - Hart: voller Radius.
+   * - Smooth: startet beim harten Kern und wächst mit der Verweildauer über
+   *   dem Objekt bis zum vollen Radius — dadurch wird nicht sofort hart
+   *   abgeschnitten, sondern die Kante "frisst" sich weich nach außen.
+   */
+  private _effRadius(objId: string, r: number, mode: "hard" | "smooth", softness: number, strength: number): number {
+    if (mode === "hard") return r;
+    const soft = Math.max(0.05, Math.min(0.95, softness));
+    const core = Math.max(0.0002, r * (1 - soft));
+    const prev = this._acc.get(objId) ?? 0;
+    const next = Math.min(1, prev + 0.06 * Math.max(0.1, strength));
+    this._acc.set(objId, next);
+    return core + (r - core) * next;
+  }
+
   private _eraseAt(centerW: Vec2) {
     const r = this.app.defaultEraserRadiusM;
     const strength = this.app.defaultEraserStrength;
     const mode = this.app.defaultEraserMode ?? "hard";
-    const softness = this.app.defaultEraserSoftness ?? 0.5;
-    // Vektorobjekte (Linien/Freihand) kennen keine Teiltransparenz: im
-    // Smooth-Modus wird nur der harte Kern geschnitten.
-    const rVec = mode === "smooth" ? Math.max(0.001, r * (1 - Math.max(0.05, Math.min(0.95, softness)))) : r;
+    const softness = Math.max(0.05, Math.min(0.95, this.app.defaultEraserSoftness ?? 0.5));
     const scene = this.app.scene;
 
     // Dokument-Pixelmasken radieren
@@ -101,33 +120,54 @@ export class EraserTool {
       eraseDocCircle(doc, centerW, r, strength, mode, softness);
     }
 
-    // FreeStrokes splitten
+    // Externe Objekte (z. B. CAD-Blatt in der Projektmappe) radieren
+    (this.app as any).onEraseStroke?.(v(centerW.x, centerW.y), r, mode, softness, strength);
+
+    // FreeStrokes splitten (im Smooth-Modus zusätzlich mit ausgedünntem Rand)
     const freeStrokesCopy = scene.freeStrokes.slice();
     for (const stroke of freeStrokesCopy) {
-      // Bounding-Box Test
-      if (!this._strokeNearCircle(stroke.points, centerW, rVec)) continue;
+      if (!this._strokeNearCircle(stroke.points, centerW, r)) continue;
+      const rVec = this._effRadius(stroke.id, r, mode, softness, strength);
       const chunks = splitPolylineByCircle(stroke.points, centerW, rVec, 0.02);
-      // Wenn unverändert (nichts geschnitten), übergehen
       if (chunks.length === 1 && chunks[0].length === stroke.points.length) {
         const same = chunks[0].every((p, i) => p.x === stroke.points[i].x && p.y === stroke.points[i].y);
         if (same) continue;
       }
-      scene.replaceFreeStrokeWithChunks(stroke, chunks);
+      if (mode === "smooth") {
+        // Randbereich (zwischen Schnittradius und Pinselradius) wird schwächer
+        // gezeichnet → weicher Auslauf statt harter Kante.
+        scene.removeFreeStroke(stroke);
+        for (const ch of chunks) {
+          for (const piece of this._splitFringe(ch, centerW, r)) {
+            if (piece.pts.length < 2) continue;
+            scene.createFreeStroke(piece.pts, {
+              color: stroke.color, thicknessM: stroke.thicknessM,
+              opacity: piece.fringe ? Math.max(0.05, stroke.opacity * 0.35) : stroke.opacity,
+              lineStyle: stroke.lineStyle, gapM: stroke.gapM,
+              blobSpacingM: stroke.blobSpacingM, blobSizeM: stroke.blobSizeM,
+              smoothing: stroke.smoothing, labelId: stroke.labelId,
+              imageSrc: stroke.imageSrc, imageSizeM: stroke.imageSizeM,
+              imageSpacingM: stroke.imageSpacingM, imageRotateAlongPath: stroke.imageRotateAlongPath,
+            });
+          }
+        }
+      } else {
+        scene.replaceFreeStrokeWithChunks(stroke, chunks);
+      }
     }
 
     // Linien-Segmente splitten
     const segsCopy = scene.segments.slice();
     for (const seg of segsCopy) {
       if (!this.app.labelManager.isVisible(seg.labelId)) continue;
-      // Quick reject
       const pa = seg.a, pb = seg.b;
       const proj = projectPointToSegment(centerW, pa, pb);
-      if (dist(proj.q, centerW) > rVec) continue;
+      if (dist(proj.q, centerW) > r) continue;
+      const rVec = this._effRadius(seg.id, r, mode, softness, strength);
       const subs = splitSegmentByCircle(pa, pb, centerW, rVec);
       if (subs.length === 1 && dist(subs[0].a, pa) < 1e-9 && dist(subs[0].b, pb) < 1e-9) continue;
       const style = { color: seg.color, thicknessM: seg.thicknessM, labelId: seg.labelId };
       scene.removeSegment(seg);
-      // Selektion bereinigen, falls dieses Segment ausgewählt war
       if (this.app.selection && (this.app.selection as any).segmentId === seg.id) {
         this.app.setSelection(null);
       }
@@ -136,7 +176,96 @@ export class EraserTool {
         scene.createSegment(s.a, s.b, style);
       }
     }
+
+    // Schraffuren: Kreis als Loch ausstanzen
+    for (const hatch of scene.hatches.slice()) {
+      if (!this.app.labelManager.isVisible(hatch.labelId)) continue;
+      if (!this._polyNearCircle(hatch.points, centerW, r)) continue;
+      const rH = this._effRadius(hatch.id, r, mode, softness, strength);
+      // Nur stanzen, wenn der Kreis die Fläche wirklich trifft.
+      const touches = pointInPolygon(centerW, hatch.points) || this._polyEdgeNear(hatch.points, centerW, rH);
+      if (!touches) continue;
+      // Doppelstempel an nahezu identischer Stelle vermeiden.
+      const last = hatch.holes[hatch.holes.length - 1];
+      if (last && last.length > 2) {
+        const c = this._polyCenter(last);
+        if (dist(c, centerW) < rH * 0.35) { hatch.holes[hatch.holes.length - 1] = this._circlePoly(centerW, rH); continue; }
+      }
+      hatch.holes.push(this._circlePoly(centerW, rH));
+    }
+
+    // Textboxen: werden entfernt, sobald der Pinsel sie trifft (Smooth = mit
+    // Verweildauer, damit ein Streifen am Rand nicht sofort alles löscht).
+    for (const box of scene.textBoxes.slice()) {
+      if (!this.app.labelManager.isVisible(box.labelId)) continue;
+      const d = this._distToBox(centerW, box.center, box.widthM, box.heightM, box.rotationRad);
+      if (d > r) continue;
+      const rT = this._effRadius(box.id, r, mode, softness, strength);
+      if (d > rT) continue;
+      scene.removeTextBox(box);
+      if (this.app.selection && (this.app.selection as any).textBoxId === box.id) this.app.setSelection(null);
+    }
   }
+
+  /** Teilt eine Polylinie in Stücke innerhalb (fringe) / außerhalb des Radius. */
+  private _splitFringe(pts: Vec2[], center: Vec2, r: number): Array<{ pts: Vec2[]; fringe: boolean }> {
+    const out: Array<{ pts: Vec2[]; fringe: boolean }> = [];
+    if (!pts.length) return out;
+    let cur: Vec2[] = [pts[0]];
+    let curFringe = dist(pts[0], center) <= r;
+    for (let i = 1; i < pts.length; i++) {
+      const f = dist(pts[i], center) <= r;
+      if (f !== curFringe) {
+        cur.push(pts[i]);
+        out.push({ pts: cur, fringe: curFringe });
+        cur = [pts[i]];
+        curFringe = f;
+      } else {
+        cur.push(pts[i]);
+      }
+    }
+    out.push({ pts: cur, fringe: curFringe });
+    return out;
+  }
+
+  private _circlePoly(c: Vec2, r: number, n = 16): Vec2[] {
+    const pts: Vec2[] = [];
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      pts.push(v(c.x + Math.cos(a) * r, c.y + Math.sin(a) * r));
+    }
+    return pts;
+  }
+
+  private _polyCenter(pts: Vec2[]): Vec2 {
+    let x = 0, y = 0;
+    for (const p of pts) { x += p.x; y += p.y; }
+    return v(x / pts.length, y / pts.length);
+  }
+
+  private _polyNearCircle(pts: Vec2[], center: Vec2, r: number): boolean {
+    return this._strokeNearCircle(pts, center, r);
+  }
+
+  private _polyEdgeNear(pts: Vec2[], center: Vec2, r: number): boolean {
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[i], b = pts[(i + 1) % pts.length];
+      if (dist(projectPointToSegment(center, a, b).q, center) <= r) return true;
+    }
+    return false;
+  }
+
+  /** Abstand eines Weltpunkts zu einem rotierten Rechteck (0 = innerhalb). */
+  private _distToBox(p: Vec2, center: Vec2, w: number, h: number, rot: number): number {
+    const dx = p.x - center.x, dy = p.y - center.y;
+    const cos = Math.cos(-rot), sin = Math.sin(-rot);
+    const lx = Math.abs(dx * cos - dy * sin) - w / 2;
+    const ly = Math.abs(dx * sin + dy * cos) - h / 2;
+    if (lx <= 0 && ly <= 0) return 0;
+    return Math.hypot(Math.max(0, lx), Math.max(0, ly));
+  }
+
+
 
   private _strokeNearCircle(points: Vec2[], center: Vec2, r: number): boolean {
     if (!points.length) return false;
