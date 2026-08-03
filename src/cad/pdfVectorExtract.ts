@@ -100,6 +100,7 @@ export async function extractPdfPageVectors(sourceB64: string, pageIndex: number
 
   let ctm: Mat2x3 = { ...ID };
   const ctmStack: Mat2x3[] = [];
+  const colorStack: { fill: string; stroke: string; lw: number }[] = [];
   let currentPath: { x: number; y: number }[][] = []; // Subpaths (transformed to PDF user space)
   let currentSub: { x: number; y: number }[] = [];
   let fillColor = "#000000";
