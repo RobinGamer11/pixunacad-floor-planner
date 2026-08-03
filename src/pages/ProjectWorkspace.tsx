@@ -3897,8 +3897,12 @@ function ElementView({
     if (hubMode === "move" && (preview.dxPx !== 0 || preview.dyPx !== 0)) {
       parts.push(`translate(${preview.dxPx}px, ${preview.dyPx}px)`);
     }
-    // Basis-Rotation immer um den Anker (falls Preview läuft) bzw. sonst Center.
+    // Drehen: Rotation um das Zentrum + Zentrumsversatz — identisch zur
+    // Commit-Mathematik, damit der Fangpunkt exakt an Ort bleibt.
     if (hubMode === "rotate") {
+      if (preview.dxPx !== 0 || preview.dyPx !== 0) {
+        parts.push(`translate(${preview.dxPx}px, ${preview.dyPx}px)`);
+      }
       const totalDeg = (el.rotation ?? 0) + preview.deltaDeg;
       if (totalDeg) parts.push(`rotate(${totalDeg}deg)`);
     } else {
@@ -3908,9 +3912,8 @@ function ElementView({
     return parts.length ? parts.join(" ") : undefined;
   })();
 
-  const previewTransformOrigin: string | undefined = hubMode === "rotate"
-    ? `${preview.anchorFrac.x * 100}% ${preview.anchorFrac.y * 100}%`
-    : undefined;
+  const previewTransformOrigin: string | undefined = undefined;
+
   const tabletCommitOnly = isCadView && tabletActive && (!!hubMode || !!edgeTrim);
   const hasActiveCadAction = !!hubMode || !!edgeTrim;
 
