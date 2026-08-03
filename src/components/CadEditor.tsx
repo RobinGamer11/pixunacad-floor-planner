@@ -926,11 +926,15 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
    */
   const placeImportedPages = useCallback((pages: ImportedPage[]) => {
     const app = appRef.current; if (!app || pages.length === 0) return;
+    const [firstPage] = pages;
     let denom = 1;
     if (!docFreePlace) {
       const m = docImportScale.match(/^\s*1\s*:\s*(\d+(?:[.,]\d+)?)\s*$/);
       const v = m ? parseFloat(m[1].replace(",", ".")) : parseFloat(docImportScale.replace(",", "."));
       denom = Number.isFinite(v) && v > 0 ? v : 100;
+    } else if (firstPage && firstPage.widthM > 0) {
+      // Frei platzieren: Standardgröße = 10 m Breite (am Raster messbar).
+      denom = 10 / firstPage.widthM;
     }
     const [first, ...rest] = pages;
     const firstW = first.widthM * denom;
