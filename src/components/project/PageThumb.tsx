@@ -23,7 +23,7 @@ export function PageThumb({ page, className }: { page: ProjectPage; className?: 
     return () => ro.disconnect();
   }, []);
 
-  const size = getPageSizeMm(page.format, page.customWMm, page.customHMm);
+  const size = getPageSizeMm(page);
   const aspect = size.wMm / size.hMm;
   // Die Projektmappe rendert eine Referenzseite mit 1100 px Breite bei 100 %
   // Zoom — daraus leitet sich der Maßstabsfaktor für Schrift-/Strichgrößen ab.
