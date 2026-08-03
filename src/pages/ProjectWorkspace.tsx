@@ -4242,12 +4242,23 @@ function ElementView({
               window.addEventListener("pointercancel", up);
             };
             const cornerClickCad = (e: React.PointerEvent) => {
+              const key = `corner-${corner}`;
+              // Ein zweiter Linksklick auf den bereits aktiven Fangpunkt setzt
+              // die laufende CAD-Blatt-Vorschau sofort ab. Der Handle ist als
+              // HUB-Control markiert und würde sonst vom globalen Commit-Handler
+              // bewusst übersprungen.
+              if (hubMode && anchorFracRef.current?.key === key) {
+                e.stopPropagation();
+                e.preventDefault();
+                actionCommitRef.current?.();
+                return;
+              }
               // Nur Anker setzen — kein Drag, keine Deselektion.
               e.stopPropagation();
               e.preventDefault();
               const fx = corner === "tl" || corner === "bl" ? 0 : 1;
               const fy = corner === "tl" || corner === "tr" ? 0 : 1;
-              setAnchor({ fx, fy, key: `corner-${corner}` });
+              setAnchor({ fx, fy, key });
               onSelect?.({ shift: e.shiftKey });
             };
             const isTop = corner === "tl" || corner === "tr";
