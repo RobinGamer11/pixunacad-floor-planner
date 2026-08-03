@@ -208,7 +208,7 @@ export default function FinancePage() {
             )}
           </div>
 
-          <div className="p-4 space-y-4">
+          <div ref={exportRef} className="p-4 space-y-4" style={{ background: "hsl(var(--surface-app))" }}>
             {!selected && (
               <ProjectView projectId={pid} state={state} projectName={project?.name ?? "Projekt"}
                            onSelect={setSelectedId} />
