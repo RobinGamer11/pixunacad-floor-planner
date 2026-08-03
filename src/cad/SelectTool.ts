@@ -1281,6 +1281,7 @@ export class SelectTool {
   }
 
   _clearEditState() {
+    this.rotateGuide = null;
     // Nach Wand-Mutationen: erst Auto-Trim der betroffenen Wand-Endpunkte an
     // Nachbar-Bezugslinien, dann Topologie-Wartung (Auto-Split / Auto-Merge).
     const wasWallEdit = !!this.editTarget && (
