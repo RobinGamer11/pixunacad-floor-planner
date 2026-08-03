@@ -4146,16 +4146,14 @@ function ElementView({
             const cursor = cornerDraggable
               ? (corner === "tl" || corner === "br" ? "nwse-resize" : "nesw-resize")
               : (isCadView ? "crosshair" : "default");
-            const size = isCadView ? 14 : 12;
+            // Einheitliche Optik: alle Fangpunkte rund + gold (auch CAD-Blatt).
+            const size = 12;
             const glow = hoveredSnapKey === `corner-${corner}`;
             const isAnchor = isCadView && anchorFracState?.key === `corner-${corner}`;
-            const stroke = isCadView ? hubBlue : "hsl(var(--accent-gold))";
-            const fill = isCadView
-              ? ((glow || isAnchor) ? hubBlue : "white")
-              : ((glow || isAnchor) ? "hsl(var(--accent-gold))" : "white");
-            const shadowActive = isCadView
-              ? `0 0 0 3px ${hubBlue}40, 0 0 10px ${hubBlue}`
-              : "0 0 0 3px hsl(var(--accent-gold) / 0.35), 0 0 10px hsl(var(--accent-gold))";
+            const stroke = "hsl(var(--accent-gold))";
+            const fill = (glow || isAnchor) ? "hsl(var(--accent-gold))" : "white";
+            const shadowActive = "0 0 0 3px hsl(var(--accent-gold) / 0.35), 0 0 10px hsl(var(--accent-gold))";
+
             return (
               <div
                 key={corner}
