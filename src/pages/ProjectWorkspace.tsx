@@ -3581,10 +3581,23 @@ function ElementView({
       };
     };
 
+    // Sichtbarer Anker: Der Fangpunkt liegt nach einer bestehenden Rotation
+    // nicht mehr an der unrotierten Rect-Position — deshalb um das Zentrum
+    // mitdrehen. Nur so bleibt der Fangpunkt beim Drehen exakt an Ort.
+    const rotAbout = (px: number, py: number, cx: number, cy: number, deg: number) => {
+      const rad = (deg * Math.PI) / 180;
+      const c = Math.cos(rad), s = Math.sin(rad);
+      const ox = px - cx, oy = py - cy;
+      return { x: cx + ox * c - oy * s, y: cy + ox * s + oy * c };
+    };
     const liveAnchor = () => {
       const r = baseRect();
-      return { clientX: r.left + frac.fx * r.width, clientY: r.top + frac.fy * r.height, rect: r };
+      const cx = r.left + r.width / 2;
+      const cy = r.top + r.height / 2;
+      const a = rotAbout(r.left + frac.fx * r.width, r.top + frac.fy * r.height, cx, cy, startRot);
+      return { clientX: a.x, clientY: a.y, rect: r };
     };
+
 
     const commit = () => {
       const p = previewRef.current;
@@ -3696,18 +3709,11 @@ function ElementView({
         const a = (Math.atan2(ty - ay, tx - ax) * 180) / Math.PI;
         if (startAngle === null) {
           // Referenzwinkel = Richtung der Fangpunkt-Achse (durch die beiden
-          // oberen Fangpunkte) im Ausgangszustand. Dadurch folgt die Achse ab
-          // der ersten Bewegung exakt dem Cursor: die Maus liegt immer auf
-          // Höhe des gewählten Fangpunkts, das Drehen ist 1:1 ablesbar.
+          // oberen Fangpunkte) im Ausgangszustand.
           const r0 = baseRect();
-          const rad0 = (startRot * Math.PI) / 180;
-          const c0 = Math.cos(rad0), s0 = Math.sin(rad0);
-          const rot0 = (px: number, py: number) => {
-            const ox = px - ax, oy = py - ay;
-            return { x: ax + ox * c0 - oy * s0, y: ay + ox * s0 + oy * c0 };
-          };
-          const tl0 = rot0(r0.left, r0.top);
-          const tr0 = rot0(r0.left + r0.width, r0.top);
+          const c0x = r0.left + r0.width / 2, c0y = r0.top + r0.height / 2;
+          const tl0 = rotAbout(r0.left, r0.top, c0x, c0y, startRot);
+          const tr0 = rotAbout(r0.left + r0.width, r0.top, c0x, c0y, startRot);
           const d0l = Math.hypot(tl0.x - ax, tl0.y - ay);
           const d0r = Math.hypot(tr0.x - ax, tr0.y - ay);
           const ref0 = d0r >= d0l ? tr0 : tl0;
@@ -3721,22 +3727,26 @@ function ElementView({
           const absTarget = Math.round((startRot + delta) / 90) * 90;
           delta = absTarget - startRot;
         }
+        // Zentrumsversatz, damit der gewählte Fangpunkt exakt an Ort bleibt:
+        // Rotation um den Anker = Rotation um das Zentrum + Verschiebung.
+        const rc = baseRect();
+        const cX = rc.left + rc.width / 2, cY = rc.top + rc.height / 2;
+        const newC = rotAbout(cX, cY, ax, ay, delta);
+        const dCx = newC.x - cX, dCy = newC.y - cY;
         // Ref synchron mitschreiben: ein Linksklick kann committen, bevor der
         // React-State-Update-Zyklus durch ist — sonst ginge die Drehung verloren.
-        previewRef.current = { dxPx: 0, dyPx: 0, deltaDeg: delta, anchorFrac };
-        setPreview({ dxPx: 0, dyPx: 0, deltaDeg: delta, anchorFrac });
+        previewRef.current = { dxPx: dCx, dyPx: dCy, deltaDeg: delta, anchorFrac };
+        setPreview({ dxPx: dCx, dyPx: dCy, deltaDeg: delta, anchorFrac });
         // CAD-Blatt: Der Cursor wird optisch auf der Linie durch die beiden
         // oberen Fangpunkte fixiert — dadurch ist die Drehung exakt ablesbar.
         if (isCadView) {
-          const r = baseRect();
-          const rad = ((startRot + delta) * Math.PI) / 180;
-          const cos = Math.cos(rad), sin = Math.sin(rad);
-          const rot = (px: number, py: number) => {
-            const ox = px - ax, oy = py - ay;
-            return { x: ax + ox * cos - oy * sin, y: ay + ox * sin + oy * cos };
+          const total = startRot + delta;
+          const map = (px: number, py: number) => {
+            const q = rotAbout(px, py, cX, cY, total);
+            return { x: q.x + dCx, y: q.y + dCy };
           };
-          const tl = rot(r.left, r.top);
-          const tr = rot(r.left + r.width, r.top);
+          const tl = map(rc.left, rc.top);
+          const tr = map(rc.left + rc.width, rc.top);
           const vx = tr.x - tl.x, vy = tr.y - tl.y;
           const len2 = vx * vx + vy * vy;
           // Maus hart auf die Fangpunkt-Achse projizieren (bleibt exakt auf
@@ -3745,6 +3755,7 @@ function ElementView({
           if (len2 > 1e-6) {
             const t = ((tx - tl.x) * vx + (ty - tl.y) * vy) / len2;
             mx = tl.x + vx * t;
+
             my = tl.y + vy * t;
           }
           const toPct = (cx: number, cy: number) => ({
@@ -3886,8 +3897,12 @@ function ElementView({
     if (hubMode === "move" && (preview.dxPx !== 0 || preview.dyPx !== 0)) {
       parts.push(`translate(${preview.dxPx}px, ${preview.dyPx}px)`);
     }
-    // Basis-Rotation immer um den Anker (falls Preview läuft) bzw. sonst Center.
+    // Drehen: Rotation um das Zentrum + Zentrumsversatz — identisch zur
+    // Commit-Mathematik, damit der Fangpunkt exakt an Ort bleibt.
     if (hubMode === "rotate") {
+      if (preview.dxPx !== 0 || preview.dyPx !== 0) {
+        parts.push(`translate(${preview.dxPx}px, ${preview.dyPx}px)`);
+      }
       const totalDeg = (el.rotation ?? 0) + preview.deltaDeg;
       if (totalDeg) parts.push(`rotate(${totalDeg}deg)`);
     } else {
@@ -3897,9 +3912,8 @@ function ElementView({
     return parts.length ? parts.join(" ") : undefined;
   })();
 
-  const previewTransformOrigin: string | undefined = hubMode === "rotate"
-    ? `${preview.anchorFrac.x * 100}% ${preview.anchorFrac.y * 100}%`
-    : undefined;
+  const previewTransformOrigin: string | undefined = undefined;
+
   const tabletCommitOnly = isCadView && tabletActive && (!!hubMode || !!edgeTrim);
   const hasActiveCadAction = !!hubMode || !!edgeTrim;
 
