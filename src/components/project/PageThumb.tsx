@@ -38,7 +38,7 @@ export function PageThumb({ page, className }: { page: ProjectPage; className?: 
       style={{
         position: "relative",
         overflow: "hidden",
-        background: page.background || "#ffffff",
+        background: "#ffffff",
         aspectRatio: `${aspect}`,
       }}
     >
