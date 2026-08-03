@@ -312,23 +312,28 @@ export class EraserTool {
     const r = this.app.defaultEraserRadiusM;
     const strength = this.app.defaultEraserStrength;
     const mode = this.app.defaultEraserMode ?? "hard";
+    // Der Smooth-Modus ist nur für Rasterbilder (PNG/JPG) sinnvoll — Vektor-
+    // objekte werden immer hart geschnitten.
+    const vecMode: "hard" | "smooth" = "hard";
     const softness = Math.max(0.05, Math.min(1, this.app.defaultEraserSoftness ?? 0.5));
     const scene = this.app.scene;
 
-    // Dokument-Pixelmasken radieren
+    // Dokument-Pixelmasken radieren (Smooth nur bei echten Bildern)
     for (const doc of scene.documents) {
       if (!this.app.labelManager.isVisible(doc.labelId)) continue;
-      eraseDocCircle(doc, centerW, r, strength, mode, softness);
+      const docMode = doc.kind === "image" ? mode : "hard";
+      eraseDocCircle(doc, centerW, r, strength, docMode, softness);
     }
 
     // Externe Objekte (z. B. CAD-Blatt in der Projektmappe) radieren
     (this.app as any).onEraseStroke?.(v(centerW.x, centerW.y), r, mode, softness, strength);
 
-    // FreeStrokes splitten (im Smooth-Modus zusätzlich mit ausgedünntem Rand)
+    // FreeStrokes splitten
     const freeStrokesCopy = scene.freeStrokes.slice();
     for (const stroke of freeStrokesCopy) {
       if (!this._strokeNearCircle(stroke.points, centerW, r)) continue;
-      const rVec = this._effRadius(stroke.id, r, mode, softness, strength);
+      const rVec = this._effRadius(stroke.id, r, vecMode, softness, strength);
+
       const chunks = splitPolylineByCircle(stroke.points, centerW, rVec, 0.02);
       if (chunks.length === 1 && chunks[0].length === stroke.points.length) {
         const same = chunks[0].every((p, i) => p.x === stroke.points[i].x && p.y === stroke.points[i].y);
