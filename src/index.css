@@ -993,3 +993,8 @@
 
 /* Während PDF-Export: Seitenränder-Overlay ausblenden */
 .pixuna-exporting [data-page-margin-overlay] { display: none !important; }
+
+/* Finanzen-PDF-Export: Bedienelemente ausblenden, Ersatztexte einblenden */
+[data-export-only] { display: none; }
+.finance-exporting [data-export-hide] { display: none !important; }
+.finance-exporting [data-export-only] { display: block !important; }

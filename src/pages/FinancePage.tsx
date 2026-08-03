@@ -1,8 +1,9 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { WorkspaceHeader } from "@/components/workspace/WorkspaceHeader";
 import { TabletAidWheel } from "@/components/TabletAidWheel";
 import { useProject } from "@/lib/projectStore";
+import { exportElementToA4Pdf } from "@/lib/financePdfExport";
 import {
   financeStore, childrenOf, positionsOf, nodeTotals, projectTotals, actionTotals,
   control, formatEur, formatPct,
@@ -48,6 +49,26 @@ export default function FinancePage() {
     [state.nodes, selectedId],
   );
   const pid = projectId ?? "";
+
+  /* ---- PDF-Export des rechten Detailfensters (DIN A4) ---- */
+  const exportRef = useRef<HTMLDivElement | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const handleExport = async () => {
+    const el = exportRef.current;
+    if (!el || exporting) return;
+    setExporting(true);
+    el.classList.add("finance-exporting");
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    try {
+      const title = selected?.name ?? project?.name ?? "Finanzen";
+      await exportElementToA4Pdf(el, `${title}.pdf`);
+    } catch (e) {
+      console.error("Finanz-Export fehlgeschlagen", e);
+    } finally {
+      el.classList.remove("finance-exporting");
+      setExporting(false);
+    }
+  };
 
   const toggleExpand = (id: string) =>
     setExpanded((e) => ({ ...e, [id]: !(e[id] ?? true) }));
@@ -113,6 +134,7 @@ export default function FinancePage() {
         mode="finance"
         tabletAidOn={tabletAidOn}
         onToggleTabletAid={() => setTabletAidOn((v) => !v)}
+        onExport={handleExport}
         canDelete={!!selected}
         onDelete={() => {
           if (!selected) return;
@@ -187,7 +209,7 @@ export default function FinancePage() {
             )}
           </div>
 
-          <div className="p-4 space-y-4">
+          <div ref={exportRef} className="p-4 space-y-4" style={{ background: "hsl(var(--surface-app))" }}>
             {!selected && (
               <ProjectView projectId={pid} state={state} projectName={project?.name ?? "Projekt"}
                            onSelect={setSelectedId} />
@@ -333,10 +355,10 @@ const ChildList: React.FC<{
         const kids = childrenOf(state, n.id);
         const isOpen = !!open[n.id];
         return (
-          <div key={n.id}>
+          <div key={n.id} {...(n.enabled ? {} : { "data-export-hide": true })}>
             <div className="grid items-center px-3 py-2 border-b text-sm"
                  style={{ gridTemplateColumns: "28px 1.6fr 1fr 1fr 1fr 1.2fr 32px", borderColor: "hsl(var(--hairline))", opacity: n.enabled ? 1 : 0.45 }}>
-              <button title={n.enabled ? "Wird berücksichtigt" : "Wird nicht berücksichtigt"}
+              <button data-export-hide title={n.enabled ? "Wird berücksichtigt" : "Wird nicht berücksichtigt"}
                 onClick={() => financeStore.updateNode(projectId, n.id, { enabled: !n.enabled })}>
                 {n.enabled ? <ToggleRight size={16} style={{ color: "hsl(var(--accent-gold))" }} /> : <ToggleLeft size={16} />}
               </button>
@@ -358,7 +380,7 @@ const ChildList: React.FC<{
               <span className="text-xs" style={{ color: "hsl(var(--ink-soft))" }}>
                 {formatPct(cO.pct)} / {formatPct(cI.pct)}
               </span>
-              <button onClick={() => onSelect(n.id)}
+              <button data-export-hide onClick={() => onSelect(n.id)}
                 className="h-7 w-7 rounded flex items-center justify-center hover:bg-muted"
                 title={n.type === "overview" ? "Übersicht öffnen" : "Aktion öffnen"}>
                 <ArrowRight size={14} style={{ color: "hsl(var(--ink-soft))" }} />

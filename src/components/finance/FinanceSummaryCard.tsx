@@ -118,12 +118,17 @@ export const FinanceSummaryCard: React.FC<Props> = ({ totals, onEstimateChange, 
           <div className="text-[11px] font-semibold uppercase tracking-wider mb-1"
                style={{ color: "hsl(var(--ink-soft))" }}>Kontrolle</div>
           <select value={mode} onChange={(e) => setMode(e.target.value as ControlMode)}
+            data-export-hide
             className="mb-1 w-full bg-transparent text-[11px] outline-none border rounded px-1 py-0.5"
             style={{ borderColor: "hsl(var(--hairline))" }}>
             {(Object.keys(CONTROL_LABEL) as ControlMode[]).map((m) => (
               <option key={m} value={m}>{CONTROL_LABEL[m]}</option>
             ))}
           </select>
+          {/* Im Export wird das Drop-Down durch den vollständigen Text ersetzt. */}
+          <div data-export-only className="mb-1 text-[11px] whitespace-nowrap font-medium">
+            {CONTROL_LABEL[mode]}
+          </div>
           <div className="font-semibold whitespace-nowrap"
                style={{ color: deltaColor(c.delta), fontSize: amountSize }}>
             {c.delta > 0 ? "+" : ""}{formatEur(c.delta)}
