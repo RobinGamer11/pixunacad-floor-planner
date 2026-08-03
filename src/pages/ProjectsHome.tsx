@@ -452,6 +452,10 @@ export default function ProjectsHome() {
                       }}
                     />
                   </label>
+                  </div>
+                  <div className="mt-1.5 text-[10px] font-semibold whitespace-nowrap" style={{ color: "hsl(var(--ink-soft))" }}>
+                    {projectCount} / {MAX_PROJECTS}
+                  </div>
                 </div>
                 <div className="flex-1 min-w-0">
                   <input
