@@ -51,6 +51,7 @@ import { notesStore, useNotes, type NoteNode, type NoteStatus, type NotePriority
 import { WeatherStrip } from "@/components/project/WeatherStrip";
 import { UebersichtView } from "@/components/project/UebersichtView";
 import { FileBrowser } from "@/components/project/FileBrowser";
+import { PageThumb } from "@/components/project/PageThumb";
 import { geocodeSearch, type GeoHit } from "@/lib/weather";
 
 const Pixuna = () => (
