@@ -1,4 +1,8 @@
-import * as polygonClipping from "polygon-clipping";
+import polygonClippingDefault from "polygon-clipping";
+const pc: any = (polygonClippingDefault as any)?.difference
+  ? (polygonClippingDefault as any)
+  : (polygonClippingDefault as any)?.default;
+
 import { Defaults, SelectionType } from "./constants";
 import { Vec2, v, dist, projectPointToSegment, pointInPolygon } from "./geometry";
 import type { CadApp } from "./CadApp";
