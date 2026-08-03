@@ -3212,6 +3212,12 @@ function ElementView({
   const [rayGuides, setRayGuides] = useState<Array<{ id: number; ax: number; ay: number; bx: number; by: number }>>([]);
   const rayGuidesRef = useRef(rayGuides);
   rayGuidesRef.current = rayGuides;
+  /** CAD-Blatt-Drehen: Achse durch die beiden oberen Fangpunkte + fixierte
+   *  Cursor-Position auf dieser Achse. Alle Werte in Prozent der Seite. */
+  const [rotAxis, setRotAxis] = useState<
+    { ax: number; ay: number; bx: number; by: number; mx: number; my: number } | null
+  >(null);
+
   /** Projiziert einen Client-Punkt auf die nächstgelegene Hilfslinie (Toleranz 10px). */
   const snapToRayGuides = (cx: number, cy: number, pageRect: DOMRect) => {
     let best: { x: number; y: number; d: number } | null = null;
@@ -3616,6 +3622,8 @@ function ElementView({
       setActiveEdge(null);
       setGuides([]);
       setRayGuides([]);
+      setRotAxis(null);
+
       setCarrying(true);
       actionCommitRef.current = null;
       actionCancelRef.current = null;
@@ -3628,6 +3636,8 @@ function ElementView({
       setActiveEdge(null);
       setGuides([]);
       setRayGuides([]);
+      setRotAxis(null);
+
       setCarrying(true);
       actionCommitRef.current = null;
       actionCancelRef.current = null;
@@ -3688,7 +3698,39 @@ function ElementView({
           delta = absTarget - startRot;
         }
         setPreview({ dxPx: 0, dyPx: 0, deltaDeg: delta, anchorFrac });
+        // CAD-Blatt: Der Cursor wird optisch auf der Linie durch die beiden
+        // oberen Fangpunkte fixiert — dadurch ist die Drehung exakt ablesbar.
+        if (isCadView) {
+          const r = baseRect();
+          const rad = ((startRot + delta) * Math.PI) / 180;
+          const cos = Math.cos(rad), sin = Math.sin(rad);
+          const rot = (px: number, py: number) => {
+            const ox = px - ax, oy = py - ay;
+            return { x: ax + ox * cos - oy * sin, y: ay + ox * sin + oy * cos };
+          };
+          const tl = rot(r.left, r.top);
+          const tr = rot(r.left + r.width, r.top);
+          const vx = tr.x - tl.x, vy = tr.y - tl.y;
+          const len2 = vx * vx + vy * vy;
+          let mx = ev.clientX, my = ev.clientY;
+          if (len2 > 1e-6) {
+            const t = ((ev.clientX - tl.x) * vx + (ev.clientY - tl.y) * vy) / len2;
+            mx = tl.x + vx * t;
+            my = tl.y + vy * t;
+          }
+          const toPct = (cx: number, cy: number) => ({
+            x: ((cx - pageRect.left) / Math.max(1, pageRect.width)) * 100,
+            y: ((cy - pageRect.top) / Math.max(1, pageRect.height)) * 100,
+          });
+          // Achse über die Blattbreite hinaus verlängern (Orientierungshilfe).
+          const ext = 0.6;
+          const A = toPct(tl.x - vx * ext, tl.y - vy * ext);
+          const B = toPct(tr.x + vx * ext, tr.y + vy * ext);
+          const M = toPct(mx, my);
+          setRotAxis({ ax: A.x, ay: A.y, bx: B.x, by: B.y, mx: M.x, my: M.y });
+        }
       }
+
     };
 
     const onDown = (ev: PointerEvent) => {
@@ -4393,6 +4435,30 @@ function ElementView({
         </svg>,
         rootRef.current.parentElement,
       )}
+
+      {/* CAD-Blatt drehen: Achse durch die beiden oberen Fangpunkte, der
+         Cursor sitzt fixiert auf dieser Linie. Linksklick setzt das Blatt. */}
+      {rotAxis && rootRef.current?.parentElement && createPortal(
+        <svg
+          className="absolute inset-0 pointer-events-none"
+          style={{ width: "100%", height: "100%", zIndex: 915 }}
+          viewBox="0 0 100 100"
+          preserveAspectRatio="none"
+        >
+          <line
+            x1={rotAxis.ax} y1={rotAxis.ay} x2={rotAxis.bx} y2={rotAxis.by}
+            stroke="hsl(var(--accent-gold))"
+            strokeWidth={0.12}
+            strokeDasharray="1.2 0.8"
+            vectorEffect="non-scaling-stroke"
+            opacity={0.9}
+          />
+          <circle cx={rotAxis.mx} cy={rotAxis.my} r={0.55} fill="hsl(var(--accent-gold))" />
+        </svg>,
+        rootRef.current.parentElement,
+      )}
+
+
 
     </div>
   );
