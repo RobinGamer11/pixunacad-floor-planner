@@ -21,16 +21,17 @@ export function buildEraseMaskCss(
       if (softness <= 0.01) return "";
       // Stärkere Weichheit: bei 100 % beginnt der Auslauf direkt in der Mitte
       // und die Deckkraft bleibt niedrig — nur längeres Verweilen radiert voll.
-      const core = Math.max(0, Math.min(99, Math.pow(1 - softness, 2.2) * 100));
-      const mid = Math.max(0.08, 1 - 0.6 * softness).toFixed(3);
+      const core = Math.max(0, Math.min(99, Math.pow(1 - softness, 3.5) * 100));
+      const mid = Math.max(0.04, 1 - 0.85 * softness).toFixed(3);
       return (
         `<radialGradient id="g${i}">` +
         `<stop offset="0%" stop-color="black" stop-opacity="1"/>` +
         `<stop offset="${core.toFixed(1)}%" stop-color="black" stop-opacity="${mid}"/>` +
-        `<stop offset="${Math.min(99, core + (100 - core) * 0.55).toFixed(1)}%" stop-color="black" stop-opacity="${(0.35 * (1 - 0.7 * softness)).toFixed(3)}"/>` +
+        `<stop offset="${Math.min(99, core + (100 - core) * 0.45).toFixed(1)}%" stop-color="black" stop-opacity="${(0.18 * (1 - 0.85 * softness)).toFixed(3)}"/>` +
         `<stop offset="100%" stop-color="black" stop-opacity="0"/>` +
         `</radialGradient>`
       );
+
 
     })
     .join("");
