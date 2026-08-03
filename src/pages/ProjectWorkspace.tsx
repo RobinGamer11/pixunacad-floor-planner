@@ -3570,7 +3570,20 @@ function ElementView({
         }
         setPreview({ dxPx, dyPx, deltaDeg: 0, anchorFrac });
       } else if (hubMode === "rotate") {
-        const a = (Math.atan2(ev.clientY - ay, ev.clientX - ax) * 180) / Math.PI;
+        // Zielpunkt anvisieren: Fangpunkte anderer Objekte und Rechtsklick-
+        // Hilfslinien ziehen den Rotations-Strahl exakt auf den Punkt.
+        let tx = ev.clientX, ty = ev.clientY;
+        const mR = reg.queryNearest(tx, ty, pageRect, 12, [el.id]);
+        if (mR) {
+          tx = pageRect.left + (mR.x / 100) * pageRect.width;
+          ty = pageRect.top + (mR.y / 100) * pageRect.height;
+          reg.setHover(mR);
+        } else {
+          reg.setHover(null);
+          const snapped = snapToRayGuides(tx, ty, pageRect);
+          if (snapped) { tx = snapped.x; ty = snapped.y; }
+        }
+        const a = (Math.atan2(ty - ay, tx - ax) * 180) / Math.PI;
         if (startAngle === null) startAngle = a;
         let delta = a - startAngle;
         if (ev.shiftKey) {
@@ -3593,12 +3606,14 @@ function ElementView({
       const ax = ax0 + (hubMode === "move" ? p.dxPx : 0);
       const ay = ay0 + (hubMode === "move" ? p.dyPx : 0);
       const nearAnchor = Math.hypot(ev.clientX - ax, ev.clientY - ay) <= 12;
-      if (nearAnchor) {
+      const wheelActive = !!(window as any).__pixunaTabletCommit;
+      if (nearAnchor || !wheelActive) {
+        // Ohne Tablet-Hilfsrad setzt ein einfacher Linksklick das CAD-Blatt.
         downClient = null;
         commit();
         return;
       }
-      // Sonst: NICHT committen — nur "carrying" togglen (ablegen/aufnehmen).
+      // Mit Tablet-Hilfsrad: NICHT committen — nur "carrying" togglen.
       if (hubMode === "move") {
         if (carryingRef.current) {
           // Ablegen: Preview einfrieren.
@@ -3611,6 +3626,7 @@ function ElementView({
       } else {
         // Rotate: Klick bricht nicht ab und commited nicht.
       }
+
       downClient = null;
     };
     const onContext = (ev: MouseEvent) => {
