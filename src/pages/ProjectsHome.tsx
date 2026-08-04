@@ -784,7 +784,7 @@ export default function ProjectsHome() {
         {/* Center */}
         <main className="flex-1 overflow-y-auto">
           {showAllTasks ? (
-            <AllTasksView projects={projects} />
+            <AllTasksView projects={projects} onOpenProject={(id) => { setMode("projects"); setShowAllTasks(false); setSelectedId(id); }} />
           ) : mode === "templates" && !selected ? (
             <div className="px-10 py-7">
               <div className="flex items-center gap-3">
@@ -2730,7 +2730,7 @@ function ProjectCarousel({ projects, onOpen }: { projects: Project[]; onOpen: (i
 
 
 
-function AllTasksView({ projects }: { projects: Project[] }) {
+function AllTasksView({ projects, onOpenProject }: { projects: Project[]; onOpenProject: (id: string) => void }) {
   const navigate = useNavigate();
   const [activeIds, setActiveIds] = useState<Set<string>>(() => new Set(projects.map((p) => p.id)));
   useEffect(() => {
@@ -2778,7 +2778,7 @@ function AllTasksView({ projects }: { projects: Project[] }) {
 
   return (
     <div className="px-10 py-7">
-      <ProjectCarousel projects={projects} onOpen={(id) => navigate(`/project/${id}`)} />
+      <ProjectCarousel projects={projects} onOpen={onOpenProject} />
 
       <div className="flex items-center gap-3 mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">Alle Aufgaben</h1>
