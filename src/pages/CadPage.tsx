@@ -27,6 +27,27 @@ const CadPage = () => {
   const [canRedo, setCanRedo] = useState(false);
   const [canDelete, setCanDelete] = useState(false);
   const [zoom, setZoom] = useState<number | undefined>(undefined);
+  const [canPaste, setCanPaste] = useState(false);
+
+  const doCopy = () => {
+    const ok = editorRef.current?.copySelection() ?? false;
+    if (ok) setCanPaste(true);
+    return ok;
+  };
+  const doPaste = () => editorRef.current?.pasteClipboard() ?? false;
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      const k = e.key.toLowerCase();
+      if (k === "c") { if (doCopy()) e.preventDefault(); }
+      else if (k === "v") { if (doPaste()) e.preventDefault(); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
   const [tabletAidOn, setTabletAidOn] = useState<boolean>(() => {
     try { return localStorage.getItem("pixuna.tabletAid") === "1"; } catch { return false; }
   });
@@ -213,6 +234,10 @@ const CadPage = () => {
         onRedo={() => editorRef.current?.redo()}
         canDelete={canDelete}
         onDelete={() => editorRef.current?.deleteSelection()}
+        canCopy={canDelete}
+        onCopy={doCopy}
+        canPaste={canPaste}
+        onPaste={doPaste}
         zoomPercent={zoom}
         onPresent={handlePresent}
         onShare={() => {}}
