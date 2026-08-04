@@ -1970,6 +1970,13 @@ export class CadApp {
 
       if ((tag === "input" || tag === "textarea" || tag === "select") && !isHubInput) return;
 
+      // Copy / Paste — Shift+C / Shift+V (zusätzlich zu Strg+C/V)
+      if (e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const k = e.key.toLowerCase();
+        if (k === "c" && this.copySelection()) { e.preventDefault(); return; }
+        if (k === "v" && this.startPastePreview()) { e.preventDefault(); return; }
+      }
+
       // Copy / Paste (after early-return for inputs)
       if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
         const k = e.key.toLowerCase();

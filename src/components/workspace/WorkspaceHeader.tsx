@@ -10,6 +10,8 @@ import {
   FolderKanban,
   Compass,
   Trash2,
+  Copy,
+  ClipboardPaste,
   TabletSmartphone,
   Network,
   Wallet,
@@ -28,6 +30,10 @@ interface Props {
   onRedo?: () => void;
   canDelete?: boolean;
   onDelete?: () => void;
+  canCopy?: boolean;
+  onCopy?: () => void;
+  canPaste?: boolean;
+  onPaste?: () => void;
   zoomPercent?: number;          // display-only; may be undefined
   onPresent?: () => void;
   onShare?: () => void;
@@ -52,6 +58,10 @@ export function WorkspaceHeader({
   onRedo,
   canDelete = false,
   onDelete,
+  canCopy = false,
+  onCopy,
+  canPaste = false,
+  onPaste,
   zoomPercent,
   onPresent,
   onShare,
@@ -168,6 +178,23 @@ export function WorkspaceHeader({
       <div className="shrink-0 w-8 md:flex-1 md:min-w-8" />
       {/* Right: Undo/Redo · Zoom · Präsentieren · Teilen · Exportieren */}
       <div className="flex items-center gap-1.5 text-muted-foreground shrink-0 pl-2">
+
+        <button
+          onClick={onCopy}
+          disabled={!canCopy || !onCopy}
+          className="h-8 w-8 rounded-md flex items-center justify-center hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed"
+          title="Kopieren (Shift+C / Strg+C)"
+        >
+          <Copy size={16} />
+        </button>
+        <button
+          onClick={onPaste}
+          disabled={!canPaste || !onPaste}
+          className="h-8 w-8 rounded-md flex items-center justify-center hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed"
+          title="Einfügen (Shift+V / Strg+V)"
+        >
+          <ClipboardPaste size={16} />
+        </button>
 
         <button
           onClick={onDelete}

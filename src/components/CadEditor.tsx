@@ -71,6 +71,9 @@ export interface CadEditorHandle {
   openExportPanel: () => void;
   deleteSelection: () => void;
   hasDeletableSelection: () => boolean;
+  copySelection: () => boolean;
+  pasteClipboard: () => boolean;
+  hasClipboard: () => boolean;
   /** CSS-Pixel pro Welt-Meter (camera.scale). */
   getCameraScale: () => number;
   /** Welt-Koordinaten (Meter) an einer Bildschirm-CSS-Position im Canvas. */
@@ -229,6 +232,9 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       }, 40);
     },
     deleteSelection: () => { appRef.current?.deleteSelection(); },
+    copySelection: () => appRef.current?.copySelection() ?? false,
+    pasteClipboard: () => appRef.current?.startPastePreview() ?? false,
+    hasClipboard: () => !!appRef.current?.clipboard,
     hasDeletableSelection: () => appRef.current?.hasDeletableSelection() ?? false,
     getCameraScale: () => appRef.current?.camera.scale ?? 80,
     screenToWorldM: (cssX, cssY) => {

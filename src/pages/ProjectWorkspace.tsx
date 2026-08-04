@@ -871,6 +871,66 @@ export default function ProjectWorkspace() {
     return did;
   };
 
+  // ---- Kopieren / Einfügen von Seiten-Elementen -------------------------
+  const elementClipboardRef = useRef<any[]>([]);
+  const [canPasteElements, setCanPasteElements] = useState(false);
+
+  const runCopySelection = () => {
+    if (!project || selectedElementIds.length === 0) return false;
+    const idSet = new Set(selectedElementIds);
+    const snaps: any[] = [];
+    for (const pg of project.pages) {
+      for (const el of pg.elements) {
+        if (idSet.has(el.id)) snaps.push(JSON.parse(JSON.stringify(el)));
+      }
+    }
+    if (snaps.length === 0) return false;
+    elementClipboardRef.current = snaps;
+    setCanPasteElements(true);
+    return true;
+  };
+
+  const runPasteClipboard = () => {
+    if (!project || !activePage) return false;
+    const snaps = elementClipboardRef.current;
+    if (!snaps || snaps.length === 0) return false;
+    const newIds: string[] = [];
+    for (const snap of snaps) {
+      const { id: _omit, ...rest } = snap as any;
+      const clone: any = { ...rest };
+      if (typeof clone.x === "number") clone.x = Math.max(0, Math.min(98, clone.x + 2));
+      if (typeof clone.y === "number") clone.y = Math.max(0, Math.min(98, clone.y + 2));
+      if (Array.isArray(clone.points)) {
+        clone.points = clone.points.map((pt: any) =>
+          pt && typeof pt === "object"
+            ? { ...pt, x: (pt.x ?? 0) + 2, y: (pt.y ?? 0) + 2 }
+            : pt
+        );
+      }
+      const nid = projectStore.addElement(project.id, activePage.id, clone);
+      if (nid) newIds.push(nid);
+    }
+    if (newIds.length > 0) setSelectedElementIds(newIds);
+    return newIds.length > 0;
+  };
+
+  // Shift+C / Shift+V (und Strg+C / Strg+V) für Seiten-Elemente.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.altKey) return;
+      const mod = e.shiftKey !== (e.ctrlKey || e.metaKey); // genau eine Variante
+      if (!mod) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      const k = e.key.toLowerCase();
+      if (k === "c") { if (runCopySelection()) e.preventDefault(); }
+      else if (k === "v") { if (runPasteClipboard()) e.preventDefault(); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedElementIds, activePage?.id, project?.id]);
+
   // Entf-Shortcut auf Fenster-Ebene: nur reagieren, wenn kein Textfeld fokussiert
   // ist und tatsächlich etwas ausgewählt ist. So bleibt der Trash-Button 1:1
   // per Tastatur bedienbar (Projektmappe und CAD gleichermaßen).
@@ -974,6 +1034,10 @@ export default function ProjectWorkspace() {
         onRedo={() => projectStore.redo(project.id)}
         canDelete={selectedElementIds.length > 0 || cadSelectionCount > 0}
         onDelete={runDeleteSelection}
+        canCopy={selectedElementIds.length > 0}
+        onCopy={runCopySelection}
+        canPaste={canPasteElements}
+        onPaste={runPasteClipboard}
         onPresent={() => setPresenting(true)}
         onShare={() => {}}
         onExport={() => setPrintMode((v) => !v)}
