@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react";
-import { GripVertical, Trash2, FileText, Calendar } from "lucide-react";
+import { GripVertical, Trash2, Calendar } from "lucide-react";
 import {
   financeStore, formatEur, parseEur,
   type FinancePosition, type FinancePositionType,
