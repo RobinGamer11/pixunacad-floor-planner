@@ -1042,7 +1042,7 @@ export default function ProjectWorkspace() {
         onRedo={() => projectStore.redo(project.id)}
         canDelete={selectedElementIds.length > 0 || cadSelectionCount > 0}
         onDelete={runDeleteSelection}
-        canCopy={selectedElementIds.length > 0}
+        canCopy={selectedElementIds.length > 0 || cadSelectionCount > 0}
         onCopy={runCopySelection}
         canPaste={canPasteElements}
         onPaste={runPasteClipboard}
