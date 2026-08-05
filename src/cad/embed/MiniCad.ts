@@ -1368,6 +1368,109 @@ export class MiniCad {
     return true;
   }
 
+  /* ===== Kopieren / Einfügen von CAD-Objekten (Mappe) ===================== */
+  private _miniClipboard: { kind: string; data: any }[] = [];
+  private _miniPasteRound = 0;
+
+  hasCopyableSelection(): boolean { return this.hasDeletableSelection(); }
+  hasClipboard(): boolean { return this._miniClipboard.length > 0; }
+
+  /** Sammelt IDs der aktuellen Auswahl (Marquee + Einzel/Mehrfach). */
+  private _selectedRefs(): { kind: string; id: string }[] {
+    const out: { kind: string; id: string }[] = [];
+    const push = (kind: string, id?: string | null) => {
+      if (!id) return;
+      if (!out.some((o) => o.kind === kind && o.id === id)) out.push({ kind, id });
+    };
+    if (this._activeTool === "select") {
+      for (const m of this.selectTool.marqueeSelectedIds) push(m.kind, m.id);
+    }
+    const list: any[] = (this.selections?.length ? this.selections : (this.selection ? [this.selection] : []));
+    for (const s of list) {
+      push("segment", s.segmentId);
+      push("hatch", s.hatchId);
+      push("textBox", s.textBoxId);
+      push("freeStroke", s.freeStrokeId);
+      push("dimension", s.dimensionId);
+    }
+    return out;
+  }
+
+  copySelection(): boolean {
+    const refs = this._selectedRefs();
+    const clip: { kind: string; data: any }[] = [];
+    const clone = (o: any) => JSON.parse(JSON.stringify(o));
+    for (const { kind, id } of refs) {
+      try {
+        if (kind === "segment") {
+          const s = this.scene.getSegmentById(id); if (!s) continue;
+          clip.push({ kind, data: { a: clone(s.a), b: clone(s.b), color: s.color, thicknessM: s.thicknessM, labelId: s.labelId } });
+        } else if (kind === "hatch") {
+          const h = this.scene.getHatchById(id); if (!h) continue;
+          clip.push({ kind, data: { points: clone(h.points), holes: clone(h.holes ?? []), fillColor: h.fillColor,
+            strokeColor: h.strokeColor, fillAlphaPct: h.fillAlphaPct, strokeWidthPx: h.strokeWidthPx,
+            labelId: h.labelId, areaLabel: clone(h.areaLabel) } });
+        } else if (kind === "textBox") {
+          const t = this.scene.getTextBoxById(id); if (!t) continue;
+          clip.push({ kind, data: { center: clone(t.center), widthM: t.widthM, heightM: t.heightM,
+            rotationRad: t.rotationRad, html: t.html, style: { ...clone(t.style), labelId: t.labelId } } });
+        } else if (kind === "freeStroke") {
+          const f = this.scene.getFreeStrokeById(id); if (!f) continue;
+          clip.push({ kind, data: { points: clone(f.points), color: f.color, thicknessM: f.thicknessM,
+            opacity: f.opacity, lineStyle: f.lineStyle, gapM: f.gapM, blobSpacingM: f.blobSpacingM,
+            blobSizeM: f.blobSizeM, smoothing: f.smoothing, labelId: f.labelId, imageSrc: f.imageSrc,
+            imageSizeM: f.imageSizeM, imageSpacingM: f.imageSpacingM, imageRotateAlongPath: f.imageRotateAlongPath } });
+        } else if (kind === "dimension") {
+          const d: any = (this.scene as any).getDimensionById?.(id); if (!d) continue;
+          clip.push({ kind, data: clone({
+            p1: d.p1, p2: d.p2, placementPoint: d.placementPoint, mode: d.mode, refDir: d.refDir,
+            style: { textColor: d.textColor, textSizePx: d.textSizePx, lineColor: d.lineColor,
+              decimals: d.decimals, tickLengthM: d.tickLengthM, showExtensions: d.showExtensions,
+              useFreeText: d.useFreeText, freeText: d.freeText, textBgEnabled: d.textBgEnabled,
+              textBgColor: d.textBgColor, textBgAlpha: d.textBgAlpha, labelId: d.labelId } }) });
+        }
+      } catch { /* einzelne Objekte überspringen */ }
+    }
+    if (clip.length === 0) return false;
+    this._miniClipboard = clip;
+    this._miniPasteRound = 0;
+    return true;
+  }
+
+  /** Fügt die Zwischenablage leicht versetzt ein. */
+  pasteClipboard(): boolean {
+    if (this._miniClipboard.length === 0) return false;
+    this._miniPasteRound += 1;
+    const d = 0.25 * this._miniPasteRound;
+    const mv = (p: any) => ({ x: p.x + d, y: p.y + d });
+    for (const it of this._miniClipboard) {
+      const o = it.data;
+      try {
+        if (it.kind === "segment") {
+          this.scene.createSegment(mv(o.a), mv(o.b), { color: o.color, thicknessM: o.thicknessM, labelId: o.labelId });
+        } else if (it.kind === "hatch") {
+          this.scene.createHatch(o.points.map(mv), {
+            holes: (o.holes ?? []).map((h: any[]) => h.map(mv)),
+            fillColor: o.fillColor, strokeColor: o.strokeColor, fillAlphaPct: o.fillAlphaPct,
+            strokeWidthPx: o.strokeWidthPx, labelId: o.labelId, areaLabel: o.areaLabel });
+        } else if (it.kind === "textBox") {
+          this.scene.createTextBox(mv(o.center), o.widthM, o.heightM, o.style, o.html, o.rotationRad);
+        } else if (it.kind === "freeStroke") {
+          const { points, ...style } = o;
+          this.scene.createFreeStroke(points.map(mv), style);
+        } else if (it.kind === "dimension") {
+          this.scene.createDimension(mv(o.p1), mv(o.p2), mv(o.placementPoint), o.mode, o.refDir, o.style);
+        }
+      } catch { /* einzelne Objekte überspringen */ }
+    }
+    this._changeDirty = true;
+    try { this._onChange?.(); } catch {}
+    try { this.refreshLabelUI(); } catch {}
+    try { (this.renderer as any).requestDraw?.(); } catch {}
+    return true;
+  }
+
+
   /** API: wird vom React-Layer aus dem "Einzel/Mehrfach"-Toggle bedient. */
   setMultiSelectMode(on: boolean) {
     this._multiSelectMode = !!on;

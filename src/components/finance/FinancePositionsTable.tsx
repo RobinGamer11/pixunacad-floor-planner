@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react";
-import { GripVertical, Trash2, FileText, Calendar } from "lucide-react";
+import { GripVertical, Trash2, Calendar } from "lucide-react";
 import {
   financeStore, formatEur, parseEur,
   type FinancePosition, type FinancePositionType,
@@ -78,7 +78,7 @@ export const FinancePositionsTable: React.FC<Props> = ({ projectId, nodeId, posi
             </span>
 
             <div className="flex items-center gap-1 min-w-0 pr-2">
-              <FileText size={14} className="shrink-0" style={{ color: isPlus ? "hsl(24 95% 50%)" : isMinus ? "hsl(142 70% 34%)" : "hsl(var(--ink-soft))" }} />
+
               {p.type === "supplement" ? (
                 <select
                   value={p.supplementKind ?? "plus"}
