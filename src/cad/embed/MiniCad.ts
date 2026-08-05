@@ -1466,7 +1466,7 @@ export class MiniCad {
     this._changeDirty = true;
     try { this._onChange?.(); } catch {}
     try { this.refreshLabelUI(); } catch {}
-    try { this.renderer.requestDraw?.(); } catch {}
+    try { (this.renderer as any).requestDraw?.(); } catch {}
     return true;
   }
 
