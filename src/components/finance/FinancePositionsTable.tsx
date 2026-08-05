@@ -78,24 +78,24 @@ export const FinancePositionsTable: React.FC<Props> = ({ projectId, nodeId, posi
             </span>
 
             <div className="flex items-center gap-1 min-w-0 pr-2">
-
               {p.type === "supplement" ? (
                 <select
                   value={p.supplementKind ?? "plus"}
                   onChange={(e) => upd(p.id, { supplementKind: e.target.value as "plus" | "minus" })}
                   title={isMinus ? "Mindernachtrag" : "Mehrnachtrag"}
-                  className="bg-transparent text-[11px] outline-none border rounded px-0.5 py-0.5 min-w-0 flex-1 truncate"
+                  className="bg-transparent text-[11px] outline-none border rounded px-0.5 py-0.5 min-w-0 truncate"
                   style={{ borderColor: "hsl(var(--hairline))" }}>
                   <option value="plus">Mehrnachtr.</option>
                   <option value="minus">Mindernachtr.</option>
                 </select>
               ) : (
-                <span className="truncate flex-1">{TYPE_LABEL[p.type]}</span>
+                <span className="truncate">{TYPE_LABEL[p.type]}</span>
               )}
               <span className="text-xs tabular-nums shrink-0" style={{ color: "hsl(var(--ink-soft))" }}>
                 {numberOf.get(p.id)}
               </span>
             </div>
+
 
             <DateCell value={p.date} onChange={(v) => upd(p.id, { date: v })} />
 
