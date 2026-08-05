@@ -876,6 +876,11 @@ export default function ProjectWorkspace() {
   const [canPasteElements, setCanPasteElements] = useState(false);
 
   const runCopySelection = () => {
+    const eng = cadEngineApiRef.current?.engine as any;
+    if (eng?.hasCopyableSelection?.() && eng.copySelection?.()) {
+      setCanPasteElements(true);
+      return true;
+    }
     if (!project || selectedElementIds.length === 0) return false;
     const idSet = new Set(selectedElementIds);
     const snaps: any[] = [];
@@ -891,6 +896,8 @@ export default function ProjectWorkspace() {
   };
 
   const runPasteClipboard = () => {
+    const eng = cadEngineApiRef.current?.engine as any;
+    if (eng?.hasClipboard?.() && eng.pasteClipboard?.()) return true;
     if (!project || !activePage) return false;
     const snaps = elementClipboardRef.current;
     if (!snaps || snaps.length === 0) return false;
@@ -913,6 +920,7 @@ export default function ProjectWorkspace() {
     if (newIds.length > 0) setSelectedElementIds(newIds);
     return newIds.length > 0;
   };
+
 
   // Shift+C / Shift+V (und Strg+C / Strg+V) für Seiten-Elemente.
   useEffect(() => {
