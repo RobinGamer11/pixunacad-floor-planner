@@ -14,6 +14,7 @@ import { computeWallLines } from "./wallGeom";
 import { buildWallSolidRing, buildHealedWallSolidRing } from "./wallSolid";
 import { runWallTopologyMaintenance } from "./wallTopologyMaintenance";
 import { trimWallEndpointsToNeighbors } from "./wallConnect";
+import { rotateGroup, translateGroup, groupCentroid } from "./groupTransform";
 
 type EditTarget =
   | { kind: "segment"; segmentId: string; pointIndex: number }
@@ -148,6 +149,18 @@ export class SelectTool {
   private _marqueeAdditive = false;
   private _marqueePrev: { kind: string; id: string }[] = [];
 
+  // ── Gruppen-Transformation (Mehrfachauswahl verschieben/drehen) ──────────
+  groupDragActive = false;
+  private _groupDragLast: Vec2 | null = null;
+  private _groupDragMoved = false;
+  groupRotateActive = false;
+  private _groupRotCenter: Vec2 | null = null;
+  private _groupRotLastAngle = 0;
+  /** Gesamt angewandter Winkel (für Anzeige / Abbruch). */
+  groupRotApplied = 0;
+
+
+
 
 
   constructor(app: CadApp) {
@@ -200,8 +213,51 @@ export class SelectTool {
     this.marqueeStart = null;
     this.marqueeCurrent = null;
     this.marqueeActive = false;
+    this.cancelGroupTransform(true);
     this.marqueeSelectedIds = [];
   }
+
+  /** Bricht laufendes Gruppen-Verschieben/-Drehen ab (optional mit Rücksetzen). */
+  cancelGroupTransform(revert = true) {
+    if (this.groupRotateActive && revert && this._groupRotCenter && this.groupRotApplied) {
+      rotateGroup(this.app, this.marqueeSelectedIds, -this.groupRotApplied, this._groupRotCenter);
+    }
+    this.groupRotateActive = false;
+    this._groupRotCenter = null;
+    this.groupRotApplied = 0;
+    this.groupDragActive = false;
+    this._groupDragLast = null;
+    this._groupDragMoved = false;
+  }
+
+  /** Startet das Drehen der Mehrfachauswahl um deren Schwerpunkt. */
+  startGroupRotate(): boolean {
+    if (!this.marqueeSelectedIds.length) return false;
+    const c = groupCentroid(this.app, this.marqueeSelectedIds);
+    if (!c) return false;
+    this._groupRotCenter = c;
+    this.groupRotApplied = 0;
+    this._groupRotLastAngle = Math.atan2(this.app.input.mouse.wy - c.y, this.app.input.mouse.wx - c.x);
+    this.groupRotateActive = true;
+    return true;
+  }
+
+  /** Liegt der Weltpunkt auf einem Objekt der Mehrfachauswahl? */
+  private _hitsGroupSelection(wx: number, wy: number, tolPx = 8): boolean {
+    if (!this.marqueeSelectedIds.length) return false;
+    const tol = tolPx / (this.app.camera?.scale || 80);
+    for (const { kind, id } of this.marqueeSelectedIds) {
+      const obj = this._getElementById(kind, id);
+      if (!obj) continue;
+      const pts = this._elementPoints(kind, obj);
+      const aabb = this._pointsAabb(pts);
+      if (!aabb) continue;
+      if (wx >= aabb.minX - tol && wx <= aabb.maxX + tol
+        && wy >= aabb.minY - tol && wy <= aabb.maxY + tol) return true;
+    }
+    return false;
+  }
+
 
   /** Welt-Position des Rotate-Handles über der Top-Edge-Mitte einer TextBox. */
   private _textBoxRotateHandleWorld(box: TextBox): Vec2 {
@@ -1758,6 +1814,80 @@ export class SelectTool {
     }
 
 
+    // ── Gruppen-Drehen (Mehrfachauswahl) ─────────────────────────────────
+    if (this.groupRotateActive) {
+      const c = this._groupRotCenter;
+      if (!c || !this.marqueeSelectedIds.length) {
+        this.cancelGroupTransform(false);
+      } else {
+        const a = Math.atan2(input.mouse.wy - c.y, input.mouse.wx - c.x);
+        let d = a - this._groupRotLastAngle;
+        while (d > Math.PI) d -= Math.PI * 2;
+        while (d < -Math.PI) d += Math.PI * 2;
+        if (input.keys?.shift) {
+          // Shift → 15°-Raster relativ zum Startwinkel.
+          const step = Math.PI / 12;
+          const target = Math.round((this.groupRotApplied + d) / step) * step;
+          d = target - this.groupRotApplied;
+        }
+        if (d) {
+          rotateGroup(this.app, this.marqueeSelectedIds, d, c);
+          this.groupRotApplied += d;
+        }
+        this._groupRotLastAngle = a;
+        if (input.clicked) {
+          this.groupRotateActive = false;
+          this._groupRotCenter = null;
+          this.groupRotApplied = 0;
+          (this.app as any).commitHistorySnapshot?.();
+          input.clicked = false;
+        }
+        this.snap = null;
+        return;
+      }
+    }
+
+    // ── Gruppen-Verschieben (Mehrfachauswahl ziehen) ─────────────────────
+    {
+      const busy = !!(this.dragStickerId || this.dragDocId || this.dragFreeStrokeId
+        || this.dragTextBoxId || this.dragDimId || this.dragAreaLabelHatchId
+        || this.rotateTextBoxId || this.isEditing() || input.isPanning || input.keys.space);
+      const mouseW = v(input.mouse.wx, input.mouse.wy);
+      if (this.groupDragActive) {
+        if (input.mouse.left && this._groupDragLast) {
+          const dx = mouseW.x - this._groupDragLast.x;
+          const dy = mouseW.y - this._groupDragLast.y;
+          if (dx || dy) {
+            translateGroup(this.app, this.marqueeSelectedIds, dx, dy);
+            this._groupDragMoved = true;
+          }
+          this._groupDragLast = mouseW;
+          this.snap = null;
+          return;
+        }
+        this.groupDragActive = false;
+        this._groupDragLast = null;
+        if (this._groupDragMoved) {
+          (this.app as any).commitHistorySnapshot?.();
+          input.clicked = false;
+          input.doubleClicked = false;
+        }
+        this._groupDragMoved = false;
+        return;
+      }
+      if (!busy && input.mouse.left && !input.keys?.shift && this.marqueeSelectedIds.length > 1
+        && !this.marqueeActive && this._hitsGroupSelection(mouseW.x, mouseW.y)) {
+        this.groupDragActive = true;
+        this._groupDragMoved = false;
+        this._groupDragLast = mouseW;
+        this.marqueeStart = null;
+        this.marqueeCurrent = null;
+        if (this.app.selection) this.app.setSelection(null);
+        this.snap = null;
+        return;
+      }
+    }
+
     // ── Marquee-Rahmen-Auswahl ───────────────────────────────────────────
     // Nur aktiv, wenn nichts anderes läuft (kein Drag, kein Edit, keine
     // Sonder-Modi, kein Pan). Wird beim Aufziehen aus der Leerraum-Situation
@@ -3261,6 +3391,35 @@ export class SelectTool {
         ctx.stroke();
         ctx.restore();
       }
+    }
+
+    // Gruppen-Drehen: Achse vom Schwerpunkt zum Cursor + Winkelanzeige.
+    if (this.groupRotateActive && this._groupRotCenter) {
+      const c = cam.worldToScreen(this._groupRotCenter.x, this._groupRotCenter.y);
+      const m = { x: this.app.input.mouse.sx, y: this.app.input.mouse.sy };
+      ctx.save();
+      ctx.strokeStyle = "rgba(234,179,8,0.95)";
+      ctx.lineWidth = 1.25;
+      ctx.setLineDash([5, 4]);
+      ctx.beginPath();
+      ctx.moveTo(c.x, c.y);
+      ctx.lineTo(m.x, m.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.arc(c.x, c.y, 4, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(234,179,8,0.95)";
+      ctx.fill();
+      let deg = (this.groupRotApplied * 180) / Math.PI;
+      deg = ((deg % 360) + 360) % 360;
+      const label = `${deg.toFixed(1)}°`;
+      ctx.font = "12px ui-sans-serif, system-ui, sans-serif";
+      const w = ctx.measureText(label).width + 10;
+      ctx.fillStyle = "rgba(17,24,39,0.9)";
+      ctx.fillRect(m.x + 12, m.y - 24, w, 18);
+      ctx.fillStyle = "#fde68a";
+      ctx.fillText(label, m.x + 17, m.y - 11);
+      ctx.restore();
     }
 
     // Aktives Aufzieh-Rechteck.
