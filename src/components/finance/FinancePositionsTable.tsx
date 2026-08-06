@@ -134,7 +134,8 @@ const DateCell: React.FC<{ value: string; onChange: (v: string) => void }> = ({ 
   return (
     <div className="flex items-center gap-1 pr-2 min-w-0">
       <input ref={ref} type="date" value={value} onChange={(e) => onChange(e.target.value)}
-        className="bg-transparent text-sm outline-none min-w-0 flex-1 [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none" />
+        className="bg-transparent text-[11px] tabular-nums outline-none min-w-0 flex-1 [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none" />
+
       <button type="button" onClick={open} title="Kalender öffnen"
         className="h-6 w-6 rounded flex items-center justify-center hover:bg-muted shrink-0">
         <Calendar size={13} style={{ color: "hsl(var(--ink-soft))" }} />
