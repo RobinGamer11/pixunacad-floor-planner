@@ -1813,6 +1813,21 @@ export class SelectTool {
       }
     }
 
+    // Shift-Klick → Mehrfachauswahl: Element hinzufügen/entfernen.
+    if (input.clicked && input.keys?.shift && !this.isEditing()
+        && !this.dragStickerId && !this.dragDocId && !this.dragTextBoxId
+        && !this.dragFreeStrokeId && !this.dragDimId && !this.rotateTextBoxId) {
+      // Einzel-Selektion in Mehrfachauswahl überführen.
+      if (this.toggleSelectionAt(input.mouse.wx, input.mouse.wy)) {
+        if (this.app.selection) this.app.setSelection(null);
+        input.clicked = false;
+        input.doubleClicked = false;
+        return;
+      }
+    }
+
+
+
 
 
     // Tür-Klick → in Door-Tool (nur Edit-Modus) wechseln & selektieren.
