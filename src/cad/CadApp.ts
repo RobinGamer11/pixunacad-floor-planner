@@ -2047,7 +2047,18 @@ export class CadApp {
         }
       }
 
+      // "R" → Mehrfachauswahl um ihren Schwerpunkt drehen.
+      if ((e.key === "r" || e.key === "R") && !e.ctrlKey && !e.metaKey && !e.altKey
+          && this.activeTool === this.selectTool
+          && this.selectTool.marqueeSelectedIds.length > 0
+          && !this.selectTool.groupRotateActive) {
+        if (this.selectTool.startGroupRotate()) { e.preventDefault(); return; }
+      }
+
       if (e.key === "Escape") {
+        if (this.selectTool.groupRotateActive || this.selectTool.groupDragActive) {
+          e.preventDefault(); this.selectTool.cancelGroupTransform(true); return;
+        }
         if (this.isStickerEditing()) { this.exitStickerEdit(); this.clearSelection(); return; }
         if (this.pastePreviewActive) { this.cancelPastePreview(); return; }
         if (this.activeTool === this.lineTool) { this.lineTool.cancel(); this.clearSelection(); this.setSelectedLabelId(null); this.setTool(ToolIds.SELECT); return; }
