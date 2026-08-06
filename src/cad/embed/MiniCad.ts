@@ -1724,6 +1724,34 @@ export class MiniCad {
   private _installDeleteKey() {
     const onKey = (e: KeyboardEvent) => {
       if (this._destroyed) return;
+      const tgt = e.target as HTMLElement | null;
+      const inField = !!(tgt && (tgt.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(tgt.tagName)));
+
+      // Gruppen-Drehen der Mehrfachauswahl: R starten, Enter bestätigen, Esc abbrechen.
+      if (!inField && !this.textEditor.isActive() && this._activeTool === "select") {
+        if ((e.key === "r" || e.key === "R") && !e.ctrlKey && !e.metaKey && !e.altKey
+            && this.selectTool.marqueeSelectedIds.length > 0 && !this.selectTool.groupRotateActive) {
+          if (this.selectTool.startGroupRotate()) { e.preventDefault(); return; }
+        }
+        if (e.key === "Enter" && this.selectTool.groupRotateActive) {
+          e.preventDefault();
+          this.selectTool.cancelGroupTransform(false);
+          this._changeDirty = true;
+          return;
+        }
+        if (e.key === "Escape" && (this.selectTool.groupRotateActive || this.selectTool.groupDragActive)) {
+          e.preventDefault();
+          this.selectTool.cancelGroupTransform(true);
+          return;
+        }
+        if ((e.key === "Delete" || e.key === "Backspace")
+            && (this.selectTool.groupRotateActive || this.selectTool.groupDragActive)) {
+          e.preventDefault();
+          this.selectTool.cancelGroupTransform(true);
+          return;
+        }
+      }
+
       if (e.key !== "Delete" && e.key !== "Backspace") return;
       // Niemals löschen, während Text bearbeitet wird.
       if (this.textEditor.isActive()) return;
