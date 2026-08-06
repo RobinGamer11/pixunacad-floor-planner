@@ -2047,6 +2047,14 @@ export class CadApp {
         }
       }
 
+      // Enter bestätigt eine laufende Gruppen-Drehung.
+      if (e.key === "Enter" && this.selectTool.groupRotateActive) {
+        e.preventDefault();
+        this.selectTool.cancelGroupTransform(false);
+        this.commitHistorySnapshot();
+        return;
+      }
+
       // "R" → Mehrfachauswahl um ihren Schwerpunkt drehen.
       if ((e.key === "r" || e.key === "R") && !e.ctrlKey && !e.metaKey && !e.altKey
           && this.activeTool === this.selectTool
