@@ -102,15 +102,35 @@ export function buildClipboardFromSelection(app: CadApp, anchorOverride?: Vec2 |
   const dim = app.getSelectedDimension();
   const tb = app.getSelectedTextBox();
 
-  if (seg) items.push(snapSegment(seg));
-  else if (hatch) items.push(snapHatch(hatch));
-  else if (dim) items.push(snapDimension(dim));
-  else if (tb) items.push(snapTextBox(tb));
-  else if (app.selectedLabelId) {
-    for (const s of app.scene.getSegmentsByLabelId(app.selectedLabelId)) items.push(snapSegment(s));
-    for (const h of app.scene.getHatchesByLabelId(app.selectedLabelId)) items.push(snapHatch(h));
-    for (const d of app.scene.getDimensionsByLabelId(app.selectedLabelId)) items.push(snapDimension(d));
-    for (const t of app.scene.getTextBoxesByLabelId(app.selectedLabelId)) items.push(snapTextBox(t));
+  // Mehrfachauswahl (Marquee/Shift) hat Vorrang – alles zusammen kopieren.
+  const multi: { kind: string; id: string }[] = (app as any).selectTool?.marqueeSelectedIds || [];
+  if (multi.length > 0) {
+    for (const { kind, id } of multi) {
+      const s = app.scene as any;
+      if (kind === "segment") { const o = s.getSegmentById?.(id); if (o) items.push(snapSegment(o)); }
+      else if (kind === "hatch") { const o = s.getHatchById?.(id); if (o) items.push(snapHatch(o)); }
+      else if (kind === "dimension") { const o = s.getDimensionById?.(id); if (o) items.push(snapDimension(o)); }
+      else if (kind === "textbox") { const o = s.getTextBoxById?.(id); if (o) items.push(snapTextBox(o)); }
+      else if (kind === "wall") {
+        const o = s.getWallById?.(id);
+        if (o) items.push({ kind: "wall", corners: o.corners.map((p: Vec2) => v(p.x, p.y)),
+          wallKind: o.kind, thicknessM: o.thicknessM, referenceSide: o.referenceSide,
+          color: o.color, fillColor: o.fillColor, priority: o.priority, labelId: o.labelId });
+      }
+    }
+  }
+
+  if (items.length === 0) {
+    if (seg) items.push(snapSegment(seg));
+    else if (hatch) items.push(snapHatch(hatch));
+    else if (dim) items.push(snapDimension(dim));
+    else if (tb) items.push(snapTextBox(tb));
+    else if (app.selectedLabelId) {
+      for (const s of app.scene.getSegmentsByLabelId(app.selectedLabelId)) items.push(snapSegment(s));
+      for (const h of app.scene.getHatchesByLabelId(app.selectedLabelId)) items.push(snapHatch(h));
+      for (const d of app.scene.getDimensionsByLabelId(app.selectedLabelId)) items.push(snapDimension(d));
+      for (const t of app.scene.getTextBoxesByLabelId(app.selectedLabelId)) items.push(snapTextBox(t));
+    }
   }
 
   if (items.length === 0) return null;
