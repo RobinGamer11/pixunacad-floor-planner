@@ -1814,6 +1814,80 @@ export class SelectTool {
     }
 
 
+    // ── Gruppen-Drehen (Mehrfachauswahl) ─────────────────────────────────
+    if (this.groupRotateActive) {
+      const c = this._groupRotCenter;
+      if (!c || !this.marqueeSelectedIds.length) {
+        this.cancelGroupTransform(false);
+      } else {
+        const a = Math.atan2(input.mouse.wy - c.y, input.mouse.wx - c.x);
+        let d = a - this._groupRotLastAngle;
+        while (d > Math.PI) d -= Math.PI * 2;
+        while (d < -Math.PI) d += Math.PI * 2;
+        if (input.keys?.shift) {
+          // Shift → 15°-Raster relativ zum Startwinkel.
+          const step = Math.PI / 12;
+          const target = Math.round((this.groupRotApplied + d) / step) * step;
+          d = target - this.groupRotApplied;
+        }
+        if (d) {
+          rotateGroup(this.app, this.marqueeSelectedIds, d, c);
+          this.groupRotApplied += d;
+        }
+        this._groupRotLastAngle = a;
+        if (input.clicked) {
+          this.groupRotateActive = false;
+          this._groupRotCenter = null;
+          this.groupRotApplied = 0;
+          (this.app as any).commitHistorySnapshot?.();
+          input.clicked = false;
+        }
+        this.snap = null;
+        return;
+      }
+    }
+
+    // ── Gruppen-Verschieben (Mehrfachauswahl ziehen) ─────────────────────
+    {
+      const busy = !!(this.dragStickerId || this.dragDocId || this.dragFreeStrokeId
+        || this.dragTextBoxId || this.dragDimId || this.dragAreaLabelHatchId
+        || this.rotateTextBoxId || this.isEditing() || input.isPanning || input.keys.space);
+      const mouseW = v(input.mouse.wx, input.mouse.wy);
+      if (this.groupDragActive) {
+        if (input.mouse.left && this._groupDragLast) {
+          const dx = mouseW.x - this._groupDragLast.x;
+          const dy = mouseW.y - this._groupDragLast.y;
+          if (dx || dy) {
+            translateGroup(this.app, this.marqueeSelectedIds, dx, dy);
+            this._groupDragMoved = true;
+          }
+          this._groupDragLast = mouseW;
+          this.snap = null;
+          return;
+        }
+        this.groupDragActive = false;
+        this._groupDragLast = null;
+        if (this._groupDragMoved) {
+          (this.app as any).commitHistorySnapshot?.();
+          input.clicked = false;
+          input.doubleClicked = false;
+        }
+        this._groupDragMoved = false;
+        return;
+      }
+      if (!busy && input.mouse.left && !input.keys?.shift && this.marqueeSelectedIds.length > 1
+        && !this.marqueeActive && this._hitsGroupSelection(mouseW.x, mouseW.y)) {
+        this.groupDragActive = true;
+        this._groupDragMoved = false;
+        this._groupDragLast = mouseW;
+        this.marqueeStart = null;
+        this.marqueeCurrent = null;
+        if (this.app.selection) this.app.setSelection(null);
+        this.snap = null;
+        return;
+      }
+    }
+
     // ── Marquee-Rahmen-Auswahl ───────────────────────────────────────────
     // Nur aktiv, wenn nichts anderes läuft (kein Drag, kein Edit, keine
     // Sonder-Modi, kein Pan). Wird beim Aufziehen aus der Leerraum-Situation
