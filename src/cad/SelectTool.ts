@@ -3393,6 +3393,35 @@ export class SelectTool {
       }
     }
 
+    // Gruppen-Drehen: Achse vom Schwerpunkt zum Cursor + Winkelanzeige.
+    if (this.groupRotateActive && this._groupRotCenter) {
+      const c = cam.worldToScreen(this._groupRotCenter.x, this._groupRotCenter.y);
+      const m = { x: this.app.input.mouse.sx, y: this.app.input.mouse.sy };
+      ctx.save();
+      ctx.strokeStyle = "rgba(234,179,8,0.95)";
+      ctx.lineWidth = 1.25;
+      ctx.setLineDash([5, 4]);
+      ctx.beginPath();
+      ctx.moveTo(c.x, c.y);
+      ctx.lineTo(m.x, m.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.arc(c.x, c.y, 4, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(234,179,8,0.95)";
+      ctx.fill();
+      let deg = (this.groupRotApplied * 180) / Math.PI;
+      deg = ((deg % 360) + 360) % 360;
+      const label = `${deg.toFixed(1)}°`;
+      ctx.font = "12px ui-sans-serif, system-ui, sans-serif";
+      const w = ctx.measureText(label).width + 10;
+      ctx.fillStyle = "rgba(17,24,39,0.9)";
+      ctx.fillRect(m.x + 12, m.y - 24, w, 18);
+      ctx.fillStyle = "#fde68a";
+      ctx.fillText(label, m.x + 17, m.y - 11);
+      ctx.restore();
+    }
+
     // Aktives Aufzieh-Rechteck.
     if (this.marqueeActive && this.marqueeStart && this.marqueeCurrent) {
       const x = Math.min(this.marqueeStart.x, this.marqueeCurrent.x);
