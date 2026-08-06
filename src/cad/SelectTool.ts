@@ -144,6 +144,10 @@ export class SelectTool {
   marqueeCurrent: Vec2 | null = null;  // Screen-Pixel
   marqueeActive = false;
   marqueeSelectedIds: { kind: string; id: string }[] = [];
+  /** Shift-Mehrfachauswahl: Rahmen ergänzt die bestehende Auswahl. */
+  private _marqueeAdditive = false;
+  private _marqueePrev: { kind: string; id: string }[] = [];
+
 
 
   constructor(app: CadApp) {
