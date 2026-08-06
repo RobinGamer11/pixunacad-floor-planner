@@ -2101,6 +2101,12 @@ export class CadApp {
 
 
       if (e.key === "Delete" || e.key === "Backspace") {
+        // Laufende Gruppen-Transformation → abbrechen statt löschen.
+        if (this.selectTool.groupRotateActive || this.selectTool.groupDragActive) {
+          e.preventDefault();
+          this.selectTool.cancelGroupTransform(true);
+          return;
+        }
         // Läuft gerade eine Bearbeitung (Verschieben/Drehen/Resize)? Dann bricht
         // ENTF diese Aktion ab (wie ESC) statt etwas zu löschen.
         // Radiergummi: ENTF hebt das Werkzeug auf (zurück zur Auswahl).
