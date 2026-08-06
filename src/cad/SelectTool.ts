@@ -1768,12 +1768,16 @@ export class SelectTool {
         || this.app.documentHubMode !== "none";
       const blocked = anyDrag || anyEdit || specialMode || input.isPanning || input.keys.space;
 
-      if (this.marqueeMode !== "click" && input.mouse.left && !blocked) {
+      const shiftAdd = !!input.keys?.shift;
+      if ((this.marqueeMode !== "click" || shiftAdd) && input.mouse.left && !blocked) {
         if (!this.marqueeStart) {
           this.marqueeStart = v(input.mouse.sx, input.mouse.sy);
-          // Neuer Klick → alte Marquee-Auswahl verwerfen.
-          if (this.marqueeSelectedIds.length) this.marqueeSelectedIds = [];
+          this._marqueeAdditive = shiftAdd;
+          this._marqueePrev = shiftAdd ? this.marqueeSelectedIds.slice() : [];
+          // Neuer Klick ohne Shift → alte Marquee-Auswahl verwerfen.
+          if (!shiftAdd && this.marqueeSelectedIds.length) this.marqueeSelectedIds = [];
         }
+
         const dx = input.mouse.sx - this.marqueeStart.x;
         const dy = input.mouse.sy - this.marqueeStart.y;
         if (this.marqueeActive || Math.hypot(dx, dy) > 6) {
