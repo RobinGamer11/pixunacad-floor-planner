@@ -14,6 +14,7 @@ import { computeWallLines } from "./wallGeom";
 import { buildWallSolidRing, buildHealedWallSolidRing } from "./wallSolid";
 import { runWallTopologyMaintenance } from "./wallTopologyMaintenance";
 import { trimWallEndpointsToNeighbors } from "./wallConnect";
+import { rotateGroup, translateGroup, groupCentroid } from "./groupTransform";
 
 type EditTarget =
   | { kind: "segment"; segmentId: string; pointIndex: number }
