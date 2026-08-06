@@ -3072,24 +3072,62 @@ export class SelectTool {
 
   private _commitMarquee() {
     const rect = this._marqueeRectWorld();
+    const prev = this._marqueeAdditive ? this._marqueePrev : [];
+    this._marqueeAdditive = false;
+    this._marqueePrev = [];
     if (!rect || (rect.maxX - rect.minX) < 1e-6 || (rect.maxY - rect.minY) < 1e-6) {
-      this.marqueeSelectedIds = [];
+      this.marqueeSelectedIds = prev;
       return;
     }
     const hits: { kind: string; id: string }[] = [];
+    const seen = new Set<string>();
+    for (const e of prev) { seen.add(e.kind + ":" + e.id); hits.push(e); }
+    // Im "click"-Modus (Shift-Rahmen) wie Crossing behandeln.
+    const enclose = this.marqueeMode === "enclose";
     for (const { kind, id, obj } of this._iterElements()) {
       const pts = this._elementPoints(kind, obj);
       if (!pts.length) continue;
       const aabb = this._pointsAabb(pts);
       if (!aabb) continue;
-      if (this.marqueeMode === "enclose") {
-        if (this._allPointsInside(pts, rect)) hits.push({ kind, id });
-      } else {
-        if (this._rectsOverlap(aabb, rect)) hits.push({ kind, id });
-      }
+      const hit = enclose ? this._allPointsInside(pts, rect) : this._rectsOverlap(aabb, rect);
+      if (!hit) continue;
+      const key = kind + ":" + id;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      hits.push({ kind, id });
     }
     this.marqueeSelectedIds = hits;
   }
+
+  /** Element unter dem Cursor (Weltkoordinaten) für Shift-Mehrfachauswahl. */
+  private _pickElementAt(wx: number, wy: number, tolWorld: number): { kind: string; id: string } | null {
+    let best: { kind: string; id: string } | null = null;
+    let bestArea = Infinity;
+    for (const { kind, id, obj } of this._iterElements()) {
+      const pts = this._elementPoints(kind, obj);
+      if (!pts.length) continue;
+      const aabb = this._pointsAabb(pts);
+      if (!aabb) continue;
+      if (wx < aabb.minX - tolWorld || wx > aabb.maxX + tolWorld
+        || wy < aabb.minY - tolWorld || wy > aabb.maxY + tolWorld) continue;
+      const area = (aabb.maxX - aabb.minX + tolWorld) * (aabb.maxY - aabb.minY + tolWorld);
+      if (area < bestArea) { bestArea = area; best = { kind, id }; }
+    }
+    return best;
+  }
+
+  /** Shift-Klick: Element zur Mehrfachauswahl hinzufügen bzw. entfernen. */
+  toggleSelectionAt(wx: number, wy: number, tolPx = 8): boolean {
+    const tol = tolPx / (this.app.camera?.scale || 80);
+    const hit = this._pickElementAt(wx, wy, tol);
+    if (!hit) return false;
+    const key = hit.kind + ":" + hit.id;
+    const idx = this.marqueeSelectedIds.findIndex((e) => e.kind + ":" + e.id === key);
+    if (idx >= 0) this.marqueeSelectedIds.splice(idx, 1);
+    else this.marqueeSelectedIds = [...this.marqueeSelectedIds, hit];
+    return true;
+  }
+
 
   /** Löscht alle per Marquee ausgewählten Elemente. Wird aus CadApp Delete-Handler aufgerufen. */
   deleteMarqueeSelection(): boolean {
