@@ -148,6 +148,18 @@ export class SelectTool {
   private _marqueeAdditive = false;
   private _marqueePrev: { kind: string; id: string }[] = [];
 
+  // ── Gruppen-Transformation (Mehrfachauswahl verschieben/drehen) ──────────
+  groupDragActive = false;
+  private _groupDragLast: Vec2 | null = null;
+  private _groupDragMoved = false;
+  groupRotateActive = false;
+  private _groupRotCenter: Vec2 | null = null;
+  private _groupRotLastAngle = 0;
+  /** Gesamt angewandter Winkel (für Anzeige / Abbruch). */
+  groupRotApplied = 0;
+
+
+
 
 
   constructor(app: CadApp) {
