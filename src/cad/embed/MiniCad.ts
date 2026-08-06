@@ -1373,6 +1373,10 @@ export class MiniCad {
   private _miniPasteRound = 0;
 
   hasCopyableSelection(): boolean { return this.hasDeletableSelection(); }
+
+  /** Wird vom SelectTool nach Gruppen-Verschieben/-Drehen aufgerufen. */
+  commitHistorySnapshot(): void { this._changeDirty = true; }
+
   hasClipboard(): boolean { return this._miniClipboard.length > 0; }
 
   /** Sammelt IDs der aktuellen Auswahl (Marquee + Einzel/Mehrfach). */
