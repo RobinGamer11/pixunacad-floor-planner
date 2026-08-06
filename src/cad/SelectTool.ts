@@ -212,8 +212,51 @@ export class SelectTool {
     this.marqueeStart = null;
     this.marqueeCurrent = null;
     this.marqueeActive = false;
+    this.cancelGroupTransform(true);
     this.marqueeSelectedIds = [];
   }
+
+  /** Bricht laufendes Gruppen-Verschieben/-Drehen ab (optional mit Rücksetzen). */
+  cancelGroupTransform(revert = true) {
+    if (this.groupRotateActive && revert && this._groupRotCenter && this.groupRotApplied) {
+      rotateGroup(this.app, this.marqueeSelectedIds, -this.groupRotApplied, this._groupRotCenter);
+    }
+    this.groupRotateActive = false;
+    this._groupRotCenter = null;
+    this.groupRotApplied = 0;
+    this.groupDragActive = false;
+    this._groupDragLast = null;
+    this._groupDragMoved = false;
+  }
+
+  /** Startet das Drehen der Mehrfachauswahl um deren Schwerpunkt. */
+  startGroupRotate(): boolean {
+    if (!this.marqueeSelectedIds.length) return false;
+    const c = groupCentroid(this.app, this.marqueeSelectedIds);
+    if (!c) return false;
+    this._groupRotCenter = c;
+    this.groupRotApplied = 0;
+    this._groupRotLastAngle = Math.atan2(this.app.input.mouse.wy - c.y, this.app.input.mouse.wx - c.x);
+    this.groupRotateActive = true;
+    return true;
+  }
+
+  /** Liegt der Weltpunkt auf einem Objekt der Mehrfachauswahl? */
+  private _hitsGroupSelection(wx: number, wy: number, tolPx = 8): boolean {
+    if (!this.marqueeSelectedIds.length) return false;
+    const tol = tolPx / (this.app.camera?.scale || 80);
+    for (const { kind, id } of this.marqueeSelectedIds) {
+      const obj = this._getElementById(kind, id);
+      if (!obj) continue;
+      const pts = this._elementPoints(kind, obj);
+      const aabb = this._pointsAabb(pts);
+      if (!aabb) continue;
+      if (wx >= aabb.minX - tol && wx <= aabb.maxX + tol
+        && wy >= aabb.minY - tol && wy <= aabb.maxY + tol) return true;
+    }
+    return false;
+  }
+
 
   /** Welt-Position des Rotate-Handles über der Top-Edge-Mitte einer TextBox. */
   private _textBoxRotateHandleWorld(box: TextBox): Vec2 {
