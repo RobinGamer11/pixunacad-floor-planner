@@ -861,12 +861,7 @@ export default function ProjectWorkspace() {
         ((box.clientHeight - 96) / baseHeight) * 100,
       ))));
       setZoom(nextZoom);
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          box.scrollLeft = Math.max(0, (box.scrollWidth - box.clientWidth) / 2);
-          box.scrollTop = Math.max(0, (box.scrollHeight - box.clientHeight) / 2);
-        });
-      });
+      centerActiveSheetSoon();
     };
     fitPage();
   }, [activePage?.id, activePage?.spreadId, activePage?.format]);
