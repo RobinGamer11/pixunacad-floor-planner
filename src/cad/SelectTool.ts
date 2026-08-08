@@ -1900,6 +1900,58 @@ export class SelectTool {
       }
     }
 
+    // ── Gruppen-Fangpunkt: Shift-Klick auf einen Fangpunkt der Auswahl ───
+    // Danach hängt die gesamte Auswahl an diesem Punkt (Verschieben), und
+    // ein Drehen (R) nutzt ihn als Drehmittelpunkt.
+    if (this.groupAnchorActive && this.groupAnchor) {
+      if (!this.marqueeSelectedIds.length) {
+        this.cancelGroupTransform(false);
+      } else {
+        let target = v(input.mouse.wx, input.mouse.wy);
+        try {
+          const s = (this.app as any).topology?.findBestSnap?.(
+            v(input.mouse.sx, input.mouse.sy), v(input.mouse.wx, input.mouse.wy));
+          if (s?.world) target = v(s.world.x, s.world.y);
+        } catch { /* kein Snap verfügbar */ }
+        const dx = target.x - this.groupAnchor.x;
+        const dy = target.y - this.groupAnchor.y;
+        if (dx || dy) {
+          translateGroup(this.app, this.marqueeSelectedIds, dx, dy);
+          this.groupAnchor.x = target.x;
+          this.groupAnchor.y = target.y;
+          this._groupAnchorDx += dx;
+          this._groupAnchorDy += dy;
+        }
+        if (input.clicked) {
+          input.clicked = false;
+          input.doubleClicked = false;
+          if (this._pasteBtnHit(input.mouse.sx, input.mouse.sy) || !input.keys?.shift) {
+            this.groupAnchorActive = false;
+            this._groupAnchorDx = 0;
+            this._groupAnchorDy = 0;
+            (this.app as any).commitHistorySnapshot?.();
+          }
+        }
+        this.snap = null;
+        return;
+      }
+    }
+
+    if (input.clicked && input.keys?.shift && this.marqueeSelectedIds.length >= 1
+        && !this.isEditing() && !this.marqueeActive) {
+      const gp = this._findGroupSnapPoint(input.mouse.wx, input.mouse.wy, 12);
+      if (gp) {
+        this.groupAnchor = gp;
+        this.groupAnchorActive = true;
+        this._groupAnchorDx = 0;
+        this._groupAnchorDy = 0;
+        if (this.app.selection) this.app.setSelection(null);
+        input.clicked = false;
+        input.doubleClicked = false;
+        this.snap = null;
+        return;
+      }
+    }
 
     // ── Gruppen-Drehen (Mehrfachauswahl) ─────────────────────────────────
     if (this.groupRotateActive) {
