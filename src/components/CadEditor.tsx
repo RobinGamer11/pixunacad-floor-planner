@@ -2106,6 +2106,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 <label>Transparenz (0–100%)</label>
                 <input ref={hatchAlphaRef} type="text" defaultValue="35" />
               </div>
+              <HatchPatternControls app={appRef.current} />
+
               <div className="flex items-center gap-2 mt-1">
                 <input
                   ref={areaShowRef}
