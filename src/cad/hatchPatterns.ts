@@ -26,7 +26,7 @@ export const HATCH_PATTERNS: { id: HatchPatternId; label: string }[] = [
 ];
 
 /** Basis-Kachelgröße in Metern (bei patternScale = 1). */
-export const PATTERN_BASE_TILE_M = 0.5;
+export const PATTERN_BASE_TILE_M = 0.1;
 
 function line(ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number) {
   ctx.beginPath();
@@ -169,7 +169,8 @@ export function fillWithHatchPattern(
   const k = tilePx / RENDER_PX;
   // Linienstärke im Kachelraum so wählen, dass sie nach Skalierung
   // konstante Bildschirmstärke ergibt.
-  const lwTile = Math.max(0.35, Math.min(RENDER_PX / 12, opt.lineWidthPx / Math.max(1e-6, k)));
+  const lwRaw = Math.max(0.35, Math.min(RENDER_PX / 12, opt.lineWidthPx / Math.max(1e-6, k)));
+  const lwTile = Math.round(lwRaw * 4) / 4; // quantisiert -> stabiler Kachel-Cache
   const tile = getPatternTile(opt.patternId, RENDER_PX, opt.color, lwTile);
   const pat = ctx.createPattern(tile, "repeat");
   if (!pat) return;
