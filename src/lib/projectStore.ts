@@ -1246,7 +1246,7 @@ export const projectStore = {
     }));
   },
   addElement: (projectId: string, pageId: string, el: Omit<PageElement, "id">) => {
-    const id = `el-${Date.now().toString(36)}`;
+    const id = `el-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
     setState((s) => ({
       projects: s.projects.map((p) =>
         p.id === projectId

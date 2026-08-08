@@ -468,7 +468,7 @@ export class SelectTool {
     return null;
   }
 
-  isEditing() { return !!this.activeEditAction; }
+  isEditing() { return !!this.activeEditAction || this.groupRotateActive || this.groupDragActive; }
 
   getPriorityWallId(): string | null {
     if (this.editTarget) {
