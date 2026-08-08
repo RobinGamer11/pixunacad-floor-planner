@@ -92,6 +92,7 @@ import { buildEraseMaskCss } from "@/lib/eraseMask";
 
 import { importFile, type ImportedPage } from "@/cad/documentImport";
 import { popPendingSheetPdf } from "@/lib/sheetPdfExport";
+import { setExportMode } from "@/lib/printExport";
 import type { MiniCadSelectionInfo } from "@/cad/embed/MiniCad";
 import type { HatchDrawMode } from "@/cad/HatchTool";
 import { FreeDrawSettingsPanel } from "@/components/cad/FreeDrawSettingsPanel";
@@ -271,6 +272,12 @@ export default function ProjectWorkspace() {
     // Nur einmal beim Mount interessant.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // Während der Präsentation gelten dieselben Regeln wie beim Drucken/Export:
+  // Seitenränder-Overlay und CAD-Hilfslinien werden ausgeblendet.
+  useEffect(() => {
+    setExportMode(presenting);
+    return () => setExportMode(false);
+  }, [presenting]);
   const [tabletAidOn, setTabletAidOn] = useState<boolean>(() => {
     try { return localStorage.getItem("pixuna.tabletAid") === "1"; } catch { return false; }
   });
@@ -631,6 +638,33 @@ export default function ProjectWorkspace() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedElement?.id, selectedElement?.kind]);
 
+  // Zentriert das Blatt exakt im Viewport (misst das gerenderte Blatt, damit
+  // Zoom-Änderungen im selben Frame korrekt berücksichtigt werden).
+  const centerActiveSheet = () => {
+    const v = canvasViewportRef.current;
+    if (!v) return;
+    const el = v.querySelector("[data-page-id]") as HTMLElement | null;
+    if (el) {
+      const vr = v.getBoundingClientRect();
+      const er = el.getBoundingClientRect();
+      v.scrollLeft = Math.max(0, v.scrollLeft + (er.left + er.width / 2) - (vr.left + vr.width / 2));
+      v.scrollTop = Math.max(0, v.scrollTop + (er.top + er.height / 2) - (vr.top + vr.height / 2));
+    } else {
+      v.scrollLeft = Math.max(0, (v.scrollWidth - v.clientWidth) / 2);
+      v.scrollTop = Math.max(0, (v.scrollHeight - v.clientHeight) / 2);
+    }
+  };
+  /** Zentriert über mehrere Frames — Layout/Zoom brauchen ein bis zwei Ticks. */
+  const centerActiveSheetSoon = () => {
+    requestAnimationFrame(() => {
+      centerActiveSheet();
+      requestAnimationFrame(() => {
+        centerActiveSheet();
+        setTimeout(centerActiveSheet, 60);
+      });
+    });
+  };
+
   // Beim ersten Anzeigen: komplettes Blatt mittig, leicht rausgezoomt.
   useLayoutEffect(() => {
     if (didAutoFitRef.current) return;
@@ -645,12 +679,7 @@ export default function ProjectWorkspace() {
     const fit = Math.min(w / pageW, h / pageH) * 100 * 0.88;
     setZoom(clampProjectZoom(fit));
     didAutoFitRef.current = true;
-    requestAnimationFrame(() => {
-      const v = canvasViewportRef.current;
-      if (!v) return;
-      v.scrollLeft = Math.max(0, (v.scrollWidth - v.clientWidth) / 2);
-      v.scrollTop = Math.max(0, (v.scrollHeight - v.clientHeight) / 2);
-    });
+    centerActiveSheetSoon();
   });
 
 
@@ -832,12 +861,7 @@ export default function ProjectWorkspace() {
         ((box.clientHeight - 96) / baseHeight) * 100,
       ))));
       setZoom(nextZoom);
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          box.scrollLeft = Math.max(0, (box.scrollWidth - box.clientWidth) / 2);
-          box.scrollTop = Math.max(0, (box.scrollHeight - box.clientHeight) / 2);
-        });
-      });
+      centerActiveSheetSoon();
     };
     fitPage();
   }, [activePage?.id, activePage?.spreadId, activePage?.format]);
