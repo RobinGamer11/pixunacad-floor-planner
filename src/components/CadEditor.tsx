@@ -216,6 +216,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const textEditorSymbolRef = useRef<HTMLSelectElement>(null);
 
   const appRef = useRef<CadApp | null>(null);
+  const [cadApp, setCadApp] = useState<CadApp | null>(null);
 
   React.useImperativeHandle(ref, () => ({
     undo: () => appRef.current?.undo(),
@@ -814,6 +815,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     }
 
     appRef.current = app;
+    setCadApp(app);
 
     const onResize = () => app.resize();
     window.addEventListener("resize", onResize);
@@ -824,6 +826,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       try { persist(); } catch {}
       app.destroy();
       appRef.current = null;
+      setCadApp(null);
     };
   }, []);
 
@@ -2108,7 +2111,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 <label>Transparenz (0–100%)</label>
                 <input ref={hatchAlphaRef} type="text" defaultValue="35" />
               </div>
-              <HatchPatternControls app={appRef.current} />
+              <HatchPatternControls app={cadApp} />
 
               <div className="flex items-center gap-2 mt-1">
                 <input
