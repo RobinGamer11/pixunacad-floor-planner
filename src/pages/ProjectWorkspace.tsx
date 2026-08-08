@@ -4876,6 +4876,7 @@ function RightInspector({
               onCancelTable={onCancelTable}
             />
           )}
+          {tab === "tools" && <ToolHelpNotes toolId={activeTool ?? "select"} />}
           {tab === "layers" && page && (
             <div className="space-y-4">
               {/* Ein einziges Ebenen-/Bezeichnungs-ID-System — identisch zur
