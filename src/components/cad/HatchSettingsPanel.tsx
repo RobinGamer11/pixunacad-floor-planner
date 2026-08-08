@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { Spline, RectangleHorizontal, Circle, PaintBucket, Waves } from "lucide-react";
+import { Spline, RectangleHorizontal, Circle, PaintBucket, Waves, Grid2X2, Check } from "lucide-react";
+import { HATCH_PATTERNS } from "@/cad/hatchPatterns";
 import type { CadApp } from "@/cad/CadApp";
 import type { MiniCad } from "@/cad/embed/MiniCad";
 import type { HatchDrawMode } from "@/cad/HatchTool";
@@ -21,6 +22,11 @@ export const HatchSettingsPanel: React.FC<Props> = ({ app }) => {
   const [strokeColor, setStrokeColor] = useState("#111111");
   const [strokeWidthPx, setStrokeWidthPx] = useState(1);
   const [fillAlphaPct, setFillAlphaPct] = useState(35);
+  const [patternEnabled, setPatternEnabled] = useState(false);
+  const [patternId, setPatternId] = useState("mauerwerk");
+  const [patternScale, setPatternScale] = useState(1);
+  const [patternAngleDeg, setPatternAngleDeg] = useState(0);
+  const [patternSkewDeg, setPatternSkewDeg] = useState(0);
   const [, force] = useState(0);
 
   const sync = () => {
@@ -33,11 +39,21 @@ export const HatchSettingsPanel: React.FC<Props> = ({ app }) => {
       setStrokeColor(sel.strokeColor || (app as any).defaultHatchStrokeColor);
       setStrokeWidthPx(typeof sel.strokeWidthPx === "number" ? sel.strokeWidthPx : (app as any).defaultHatchStrokeWidthPx);
       setFillAlphaPct(sel.fillAlphaPct ?? (app as any).defaultHatchFillAlphaPct);
+      setPatternEnabled(!!sel.patternEnabled);
+      setPatternId(sel.patternId || (app as any).defaultHatchPatternId || "mauerwerk");
+      setPatternScale(sel.patternScale ?? 1);
+      setPatternAngleDeg(sel.patternAngleDeg ?? 0);
+      setPatternSkewDeg(sel.patternSkewDeg ?? 0);
     } else {
       setFillColor((app as any).defaultHatchFillColor);
       setStrokeColor((app as any).defaultHatchStrokeColor);
       setStrokeWidthPx((app as any).defaultHatchStrokeWidthPx);
       setFillAlphaPct((app as any).defaultHatchFillAlphaPct);
+      setPatternEnabled(!!(app as any).defaultHatchPatternEnabled);
+      setPatternId((app as any).defaultHatchPatternId || "mauerwerk");
+      setPatternScale((app as any).defaultHatchPatternScale ?? 1);
+      setPatternAngleDeg((app as any).defaultHatchPatternAngleDeg ?? 0);
+      setPatternSkewDeg((app as any).defaultHatchPatternSkewDeg ?? 0);
     }
   };
 
