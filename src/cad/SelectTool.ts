@@ -2064,6 +2064,13 @@ export class SelectTool {
               this._groupDragAnchor.x += dx;
               this._groupDragAnchor.y += dy;
             }
+            // Shift-Anker wandert mit der Gruppe mit und bleibt Referenz-/
+            // Drehmittelpunkt für nachfolgende Aktionen.
+            if (this.groupAnchor) {
+              this.groupAnchor.x += dx;
+              this.groupAnchor.y += dy;
+            }
+
           }
           this._groupDragLast = mouseW;
           this.snap = null;
