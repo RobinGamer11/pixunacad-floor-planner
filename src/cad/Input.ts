@@ -229,6 +229,7 @@ export class Input {
       try { c.setPointerCapture(e.pointerId); } catch {}
       if (e.button === 0 || (e.pointerType === "touch" && e.button === -1) || e.pointerType === "pen") {
         this.mouse.left = true;
+        this._drawPointerId = e.pointerId;
         const now = performance.now();
         if (now - this._lastClickT <= this._doubleMs) {
           this._dblQueued = true;
@@ -257,6 +258,11 @@ export class Input {
     this._cleanups.push(() => c.removeEventListener("pointerdown", onPointerDown));
 
     const onPointerUp = (e: PointerEvent) => {
+      // Kontakte, die auf dem Tablet-Hilfsrad (oder anderer Overlay-UI) enden,
+      // dürfen einen laufenden Stift-Strich nicht abbrechen.
+      const tgt = e.target as Element | null;
+      if (tgt && typeof tgt.closest === "function" && tgt.closest('[data-tablet-aid="true"]')) return;
+
       if (e.pointerType === "touch") {
         this._touches.delete(e.pointerId);
         if (this._touches.size < 2) {
@@ -268,7 +274,14 @@ export class Input {
           this.isPanning = false;
         }
       }
-      if (e.button === 0 || e.pointerType === "touch" || e.pointerType === "pen") this.mouse.left = false;
+      // Nur der Pointer, der die "linke Maustaste" hält, darf sie loslassen —
+      // sonst beendet ein zweiter Finger den laufenden Stift-Strich.
+      const isDrawRelease =
+        this._drawPointerId === null || this._drawPointerId === e.pointerId || !!(e as any).__virtual;
+      if (isDrawRelease && (e.button === 0 || e.pointerType === "touch" || e.pointerType === "pen")) {
+        this.mouse.left = false;
+        this._drawPointerId = null;
+      }
       if (e.button === 1) {
         this.mouse.mid = false;
         this._panning = false;
