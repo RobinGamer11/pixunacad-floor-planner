@@ -1973,12 +1973,44 @@ export class SelectTool {
       }
     }
 
+    // Menü am gewählten Gruppen-Fangpunkt: Verschieben / Drehen.
+    if (this.groupAnchorMenu && this.groupAnchor) {
+      if (!this.marqueeSelectedIds.length) {
+        this.groupAnchorMenu = false;
+        this._groupMenuRects = null;
+      } else {
+        const hit = this._groupMenuHit(input.mouse.sx, input.mouse.sy);
+        if (hit && this.app.canvas) this.app.canvas.style.cursor = "pointer";
+        if (input.clicked && hit) {
+          input.clicked = false;
+          input.doubleClicked = false;
+          this.groupAnchorMenu = false;
+          this._groupMenuRects = null;
+          if (hit === "move") {
+            this.groupAnchorActive = true;
+            this._groupAnchorDx = 0;
+            this._groupAnchorDy = 0;
+          } else {
+            this.startGroupRotate();
+          }
+          this.snap = null;
+          return;
+        }
+        if (input.clicked && !input.keys?.shift) {
+          // Klick daneben schließt das Menü (Anker bleibt Referenzpunkt).
+          this.groupAnchorMenu = false;
+          this._groupMenuRects = null;
+        }
+      }
+    }
+
     if (input.clicked && input.keys?.shift && this.marqueeSelectedIds.length >= 1
         && !this.isEditing() && !this.marqueeActive) {
       const gp = this._findGroupSnapPoint(input.mouse.wx, input.mouse.wy, 12);
       if (gp) {
         this.groupAnchor = gp;
-        this.groupAnchorActive = true;
+        this.groupAnchorActive = false;
+        this.groupAnchorMenu = true;
         this._groupAnchorDx = 0;
         this._groupAnchorDy = 0;
         if (this.app.selection) this.app.setSelection(null);
@@ -1988,6 +2020,7 @@ export class SelectTool {
         return;
       }
     }
+
 
     // ── Gruppen-Drehen (Mehrfachauswahl) ─────────────────────────────────
     if (this.groupRotateActive) {
