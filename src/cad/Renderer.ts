@@ -1340,6 +1340,64 @@ export class Renderer {
     }
   }
 
+  /**
+   * Zeichnet die Baustoff-Schraffur einer Wand in ihren Wandkörper.
+   * Die Musterdichte skaliert mit der Wanddicke (wie im Architektur-CAD),
+   * die Ausrichtung folgt der Wandrichtung.
+   */
+  private _paintWallPattern(wall: any) {
+    const ctx = this.ctx;
+    const cam = this.camera;
+    const ring = buildHealedWallSolidRing(wall, this.scene.walls, this.scene.getWallTopology());
+    if (!ring || ring.length < 3) return;
+
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    const pts = ring.map((p: any) => {
+      const sp = cam.worldToScreen(p.x, p.y);
+      if (sp.x < minX) minX = sp.x;
+      if (sp.y < minY) minY = sp.y;
+      if (sp.x > maxX) maxX = sp.x;
+      if (sp.y > maxY) maxY = sp.y;
+      return sp;
+    });
+    if (!Number.isFinite(minX)) return;
+
+    const origin = cam.worldToScreen(0, 0);
+    const pxPerMeter = Math.abs(cam.worldToScreen(1, 0).x - origin.x) || 1;
+
+    // Musterkachel ≈ 1/3 der Wanddicke → dünne Wände bekommen feineres Muster.
+    const tileM = Math.max(0.02, wall.thicknessM / 3) * Math.max(0.1, wall.patternScale ?? 1);
+    const scale = tileM / PATTERN_BASE_TILE_M;
+
+    // Ausrichtung: erste Wandachse
+    const a = wall.corners[0], b = wall.corners[1];
+    const angleDeg = -(Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.closePath();
+    ctx.clip();
+    fillWithHatchPattern(
+      ctx,
+      { x: minX - 2, y: minY - 2, w: (maxX - minX) + 4, h: (maxY - minY) + 4 },
+      origin, pxPerMeter,
+      {
+        patternId: wall.patternId as HatchPatternId,
+        scale,
+        angleDeg,
+        skewDeg: 0,
+        stretch: 1,
+        color: wall.color || Defaults.lineColor,
+        alpha: 0.9,
+        lineWidthPx: 0.8,
+      },
+    );
+    ctx.restore();
+  }
+
+
   private _drawWallsForLabel(labelId: string) {
     if (!this.scene.walls || this.scene.walls.length === 0) return;
     const ctx = this.ctx;
