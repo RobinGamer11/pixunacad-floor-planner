@@ -159,6 +159,38 @@ export class SelectTool {
   /** Gesamt angewandter Winkel (für Anzeige / Abbruch). */
   groupRotApplied = 0;
 
+  // ── Einfüge-Modus („schwebende“ Kopie) ───────────────────────────────────
+  /** Nach Strg+V: Kopie liegt exakt auf dem Original, ist ausgewählt und
+   *  verschiebbar. Bestätigt wird per Häkchen-Symbol oder Enter. */
+  pasteFloatActive = false;
+  private _pasteBtnRect: { x: number; y: number; w: number; h: number } | null = null;
+
+  /** Startet den Einfüge-Modus für die frisch erzeugten Objekte. */
+  beginPasteFloat(ids: { kind: string; id: string }[]) {
+    if (!ids.length) return;
+    this.marqueeSelectedIds = ids.slice();
+    this.pasteFloatActive = true;
+    this._pasteBtnRect = null;
+  }
+
+  /** Bestätigt die eingefügte Kopie (Häkchen / Enter). */
+  confirmPasteFloat(): boolean {
+    if (!this.pasteFloatActive) return false;
+    this.pasteFloatActive = false;
+    this._pasteBtnRect = null;
+    this.marqueeSelectedIds = [];
+    this.cancelGroupTransform(false);
+    (this.app as any).commitHistorySnapshot?.();
+    return true;
+  }
+
+  private _pasteBtnHit(sx: number, sy: number): boolean {
+    const r = this._pasteBtnRect;
+    if (!r) return false;
+    return sx >= r.x && sx <= r.x + r.w && sy >= r.y && sy <= r.y + r.h;
+  }
+
+
 
 
 
