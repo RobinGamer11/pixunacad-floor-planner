@@ -1144,6 +1144,7 @@ export class MiniCad {
             fillAlphaPct: h.fillAlphaPct, strokeWidthPx: h.strokeWidthPx,
             labelId: h.labelId || Defaults.defaultLabelId,
             areaLabel: h.areaLabel,
+            patternEnabled: h.patternEnabled, patternId: h.patternId, patternScale: h.patternScale, patternAngleDeg: h.patternAngleDeg, patternSkewDeg: h.patternSkewDeg,
           });
         } catch (e) { console.error("MiniCad restore hatch:", e); }
       }
@@ -1464,7 +1465,8 @@ export class MiniCad {
           const n = this.scene.createHatch(o.points.map(mv), {
             holes: (o.holes ?? []).map((h: any[]) => h.map(mv)),
             fillColor: o.fillColor, strokeColor: o.strokeColor, fillAlphaPct: o.fillAlphaPct,
-            strokeWidthPx: o.strokeWidthPx, labelId: o.labelId, areaLabel: o.areaLabel });
+            strokeWidthPx: o.strokeWidthPx, labelId: o.labelId, areaLabel: o.areaLabel,
+            patternEnabled: o.patternEnabled, patternId: o.patternId, patternScale: o.patternScale, patternAngleDeg: o.patternAngleDeg, patternSkewDeg: o.patternSkewDeg, });
           if (n) created.push({ kind: "hatch", id: n.id });
         } else if (it.kind === "textBox") {
           const n = this.scene.createTextBox(mv(o.center), o.widthM, o.heightM, o.style, o.html, o.rotationRad);

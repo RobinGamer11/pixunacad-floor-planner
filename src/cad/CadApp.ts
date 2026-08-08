@@ -717,6 +717,7 @@ export class CadApp {
         fillAlphaPct: h.fillAlphaPct, strokeWidthPx: h.strokeWidthPx,
         labelId: h.labelId, areaLabel: h.areaLabel,
         holes: h.holes || [],
+        patternEnabled: h.patternEnabled, patternId: h.patternId, patternScale: h.patternScale, patternAngleDeg: h.patternAngleDeg, patternSkewDeg: h.patternSkewDeg,
       });
       if (h._stickerEditOwnerId) hatch._stickerEditOwnerId = h._stickerEditOwnerId;
     }
@@ -1105,6 +1106,7 @@ export class CadApp {
             fillColor: it.fillColor, strokeColor: it.strokeColor,
             fillAlphaPct: it.fillAlphaPct, strokeWidthPx: it.strokeWidthPx,
             labelId: it.labelId, areaLabel: it.areaLabel,
+            patternEnabled: it.patternEnabled, patternId: it.patternId, patternScale: it.patternScale, patternAngleDeg: it.patternAngleDeg, patternSkewDeg: it.patternSkewDeg,
           });
         } else if (it.kind === "dimension") {
           this.scene.createDimension(it.p1, it.p2, it.placementPoint, it.mode, it.refDir, {

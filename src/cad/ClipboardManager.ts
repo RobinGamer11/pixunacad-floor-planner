@@ -182,7 +182,8 @@ export function commitClipboardAt(app: CadApp, clip: Clipboard, mouseW: Vec2): {
       const o = app.scene.createHatch(it.points.map(p => ({ x: p.x + dx, y: p.y + dy })),
         { fillColor: it.fillColor, strokeColor: it.strokeColor,
           fillAlphaPct: it.fillAlphaPct, strokeWidthPx: it.strokeWidthPx,
-          labelId: it.labelId, areaLabel: it.areaLabel });
+          labelId: it.labelId, areaLabel: it.areaLabel,
+          patternEnabled: it.patternEnabled, patternId: it.patternId, patternScale: it.patternScale, patternAngleDeg: it.patternAngleDeg, patternSkewDeg: it.patternSkewDeg, });
       if (o) created.push({ kind: "hatch", id: o.id });
     } else if (it.kind === "dimension") {
       const o = app.scene.createDimension(
