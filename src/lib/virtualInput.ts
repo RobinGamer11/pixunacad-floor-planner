@@ -202,6 +202,9 @@ export function virtualKeyHold(name: "Shift", on: boolean) {
   if (on) {
     if (_heldKeys.has(name)) return;
     _heldKeys.add(name);
+    // Globales Sticky-Flag: wird von der CAD-Eingabe zusätzlich gelesen, damit
+    // Shift auch während eines laufenden Stift-Strichs sicher aktiv bleibt.
+    (window as any).__pixunaVirtualShift = true;
     const ev = new KeyboardEvent("keydown", { key: def.key, code: def.code, keyCode: def.keyCode, which: def.keyCode, shiftKey: true, bubbles: true, cancelable: true });
     (ev as any).__virtual = true;
     window.dispatchEvent(ev);
@@ -209,9 +212,11 @@ export function virtualKeyHold(name: "Shift", on: boolean) {
   } else {
     if (!_heldKeys.has(name)) return;
     _heldKeys.delete(name);
+    (window as any).__pixunaVirtualShift = false;
     const ev = new KeyboardEvent("keyup", { key: def.key, code: def.code, keyCode: def.keyCode, which: def.keyCode, shiftKey: false, bubbles: true, cancelable: true });
     (ev as any).__virtual = true;
     window.dispatchEvent(ev);
     document.dispatchEvent(ev);
   }
 }
+
