@@ -2011,11 +2011,23 @@ export class SelectTool {
       const mouseW = v(input.mouse.wx, input.mouse.wy);
       if (this.groupDragActive) {
         if (input.mouse.left && this._groupDragLast) {
-          const dx = mouseW.x - this._groupDragLast.x;
-          const dy = mouseW.y - this._groupDragLast.y;
+          let dx = mouseW.x - this._groupDragLast.x;
+          let dy = mouseW.y - this._groupDragLast.y;
+          // Fangverhalten wie beim normalen Verschieben: der nächstgelegene
+          // Fangpunkt der Auswahl rastet auf fremde Fangpunkte ein.
+          if (this._groupDragAnchor) {
+            const want = v(this._groupDragAnchor.x + dx, this._groupDragAnchor.y + dy);
+            const snapped = this._snapWorldPoint(want);
+            dx = snapped.x - this._groupDragAnchor.x;
+            dy = snapped.y - this._groupDragAnchor.y;
+          }
           if (dx || dy) {
             translateGroup(this.app, this.marqueeSelectedIds, dx, dy);
             this._groupDragMoved = true;
+            if (this._groupDragAnchor) {
+              this._groupDragAnchor.x += dx;
+              this._groupDragAnchor.y += dy;
+            }
           }
           this._groupDragLast = mouseW;
           this.snap = null;
@@ -2023,6 +2035,7 @@ export class SelectTool {
         }
         this.groupDragActive = false;
         this._groupDragLast = null;
+        this._groupDragAnchor = null;
         if (this._groupDragMoved) {
           if (!this.pasteFloatActive) (this.app as any).commitHistorySnapshot?.();
           input.clicked = false;
@@ -2037,12 +2050,16 @@ export class SelectTool {
         this.groupDragActive = true;
         this._groupDragMoved = false;
         this._groupDragLast = mouseW;
+        // Nächstgelegener Fangpunkt der Auswahl wird zum Fang-Anker.
+        this._groupDragAnchor = this._findGroupSnapPoint(mouseW.x, mouseW.y, 80)
+          || this._nearestGroupPoint(mouseW.x, mouseW.y);
         this.marqueeStart = null;
         this.marqueeCurrent = null;
         if (this.app.selection) this.app.setSelection(null);
         this.snap = null;
         return;
       }
+
     }
 
 
