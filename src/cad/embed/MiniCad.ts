@@ -1787,7 +1787,10 @@ export class MiniCad {
         try { if (this.textEditor.isActive()) this.textEditor.commit(); } catch {}
         try { (this.selectTool as any).pasteFloatActive = false; } catch {}
         try { this.selectTool.cancelGroupTransform(true); } catch {}
-        try { (this._activeToolObj as any)?.cancel?.(); } catch {}
+        try { (this.activeTool as any)?.cancel?.(); } catch {}
+        try { (this.lineTool as any)?.cancel?.(); (this.hatchTool as any)?.cancel?.();
+              (this.freeDrawTool as any)?.cancel?.(); (this.eraserTool as any)?.cancel?.();
+              (this.documentTool as any)?.cancel?.(); } catch {}
         try { this.selectTool.cancel(); } catch {}
         try { this.clearSelection(); } catch {}
         try { this.pointEditMenu.hide(); } catch {}
