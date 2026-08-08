@@ -287,6 +287,7 @@ export class SelectTool {
     this.pasteFloatActive = false;
     this._pasteBtnRect = null;
     this.marqueeSelectedIds = [];
+    this.groupAnchor = null;
 
   }
 
@@ -554,7 +555,7 @@ export class SelectTool {
     return null;
   }
 
-  isEditing() { return !!this.activeEditAction || this.groupRotateActive || this.groupDragActive; }
+  isEditing() { return !!this.activeEditAction || this.groupRotateActive || this.groupDragActive || this.groupAnchorActive; }
 
   getPriorityWallId(): string | null {
     if (this.editTarget) {
