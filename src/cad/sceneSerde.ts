@@ -93,6 +93,7 @@ export function restoreOneScene(scene: Scene, data: SerializedScene | null | und
       priority: w.priority,
       patternId: w.patternId,
       patternScale: w.patternScale,
+      patternAlignToWall: !!w.patternAlignToWall,
     });
     if (w.id) (wall as any).id = w.id;
     if (w._stickerEditOwnerId) (wall as any)._stickerEditOwnerId = w._stickerEditOwnerId;
