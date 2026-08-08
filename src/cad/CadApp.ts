@@ -2087,6 +2087,7 @@ export class CadApp {
         this.documentHubMode = "none";
         this.bgRemoveInteraction = null;
         this.measureFinishHubState = { visible: false, screenX: 0, screenY: 0 };
+        this.globalGuides.clear();
         try { this.hub?.hide?.(); } catch {}
         try { this.pointEditMenu?.hide?.(); } catch {}
         if (this.selectTool.pasteFloatActive) {
