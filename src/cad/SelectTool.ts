@@ -295,6 +295,16 @@ export class SelectTool {
     if (this.groupRotateActive && revert && this._groupRotCenter && this.groupRotApplied) {
       rotateGroup(this.app, this.marqueeSelectedIds, -this.groupRotApplied, this._groupRotCenter);
     }
+    if (this.groupAnchorActive && revert && (this._groupAnchorDx || this._groupAnchorDy)) {
+      translateGroup(this.app, this.marqueeSelectedIds, -this._groupAnchorDx, -this._groupAnchorDy);
+      if (this.groupAnchor) {
+        this.groupAnchor.x -= this._groupAnchorDx;
+        this.groupAnchor.y -= this._groupAnchorDy;
+      }
+    }
+    this.groupAnchorActive = false;
+    this._groupAnchorDx = 0;
+    this._groupAnchorDy = 0;
     this.groupRotateActive = false;
     this._groupRotCenter = null;
     this.groupRotApplied = 0;
@@ -303,11 +313,14 @@ export class SelectTool {
     this._groupDragMoved = false;
   }
 
-  /** Startet das Drehen der Mehrfachauswahl um deren Schwerpunkt. */
+  /** Startet das Drehen der Mehrfachauswahl um deren Schwerpunkt — oder um den
+   *  per Shift gewählten Fangpunkt, falls einer gesetzt ist. */
   startGroupRotate(): boolean {
     if (!this.marqueeSelectedIds.length) return false;
-    const c = groupCentroid(this.app, this.marqueeSelectedIds);
+    const c = this.groupAnchor ? v(this.groupAnchor.x, this.groupAnchor.y)
+      : groupCentroid(this.app, this.marqueeSelectedIds);
     if (!c) return false;
+    this.groupAnchorActive = false;
     this._groupRotCenter = c;
     this.groupRotApplied = 0;
     this._groupRotLastAngle = Math.atan2(this.app.input.mouse.wy - c.y, this.app.input.mouse.wx - c.x);
