@@ -3561,9 +3561,28 @@ export class SelectTool {
       }
     }
 
-    // Einfüge-Modus: Häkchen-Button oben rechts an der Auswahl.
+    // Fangpunkte aller Objekte der Mehrfachauswahl anzeigen (Gruppieren).
+    if (this.marqueeSelectedIds.length) {
+      const seenPt = new Set<string>();
+      for (const { kind, id } of this.marqueeSelectedIds) {
+        const obj = this._getElementById(kind, id);
+        if (!obj) continue;
+        for (const p of this._elementPoints(kind, obj) || []) {
+          const key = p.x.toFixed(4) + "|" + p.y.toFixed(4);
+          if (seenPt.has(key)) continue; seenPt.add(key);
+          const s = cam.worldToScreen(p.x, p.y);
+          const isAnchor = !!this.groupAnchor
+            && Math.abs(this.groupAnchor.x - p.x) < 1e-6 && Math.abs(this.groupAnchor.y - p.y) < 1e-6;
+          drawSnapDot(ctx, s.x, s.y, isAnchor
+            ? { color: "rgba(234,179,8,0.95)", ring: true, radius: 4.5 }
+            : { radius: 3.2 });
+        }
+      }
+    }
+
+    // Häkchen-Button oben rechts an der Auswahl (Einfügen / Gruppen-Aktion).
     this._pasteBtnRect = null;
-    if (this.pasteFloatActive && this.marqueeSelectedIds.length && !this.groupDragActive) {
+    if ((this.pasteFloatActive || this.groupAnchorActive) && this.marqueeSelectedIds.length && !this.groupDragActive) {
       let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
       for (const { kind, id } of this.marqueeSelectedIds) {
         const obj = this._getElementById(kind, id);
@@ -3576,25 +3595,43 @@ export class SelectTool {
         }
       }
       if (Number.isFinite(minX)) {
+        // Optik identisch zum Häkchen-Hub der anderen Werkzeuge:
+        // weißer, abgerundeter Hub mit dezentem Rand + dunklem Haken.
         const size = 30;
-        const bx = maxX + 12, by = minY - size - 12;
+        const bx = maxX + 14, by = minY - size - 12;
         this._pasteBtnRect = { x: bx, y: by, w: size, h: size };
+        const r = 6;
         ctx.save();
         ctx.beginPath();
-        ctx.arc(bx + size / 2, by + size / 2, size / 2, 0, Math.PI * 2);
-        ctx.fillStyle = "rgba(22,163,74,0.95)";
+        ctx.moveTo(bx + r, by);
+        ctx.lineTo(bx + size - r, by);
+        ctx.quadraticCurveTo(bx + size, by, bx + size, by + r);
+        ctx.lineTo(bx + size, by + size - r);
+        ctx.quadraticCurveTo(bx + size, by + size, bx + size - r, by + size);
+        ctx.lineTo(bx + r, by + size);
+        ctx.quadraticCurveTo(bx, by + size, bx, by + size - r);
+        ctx.lineTo(bx, by + r);
+        ctx.quadraticCurveTo(bx, by, bx + r, by);
+        ctx.closePath();
+        ctx.shadowColor = "rgba(0,0,0,0.18)";
+        ctx.shadowBlur = 12;
+        ctx.shadowOffsetY = 4;
+        ctx.fillStyle = "#ffffff";
         ctx.fill();
-        ctx.strokeStyle = "rgba(255,255,255,0.9)";
-        ctx.lineWidth = 1.5;
+        ctx.shadowColor = "transparent";
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetY = 0;
+        ctx.strokeStyle = "rgba(0,0,0,0.12)";
+        ctx.lineWidth = 1;
         ctx.stroke();
         ctx.beginPath();
-        ctx.strokeStyle = "#ffffff";
-        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = "#1f2937";
+        ctx.lineWidth = 2;
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
-        ctx.moveTo(bx + 8, by + size / 2);
-        ctx.lineTo(bx + 13, by + size - 9);
-        ctx.lineTo(bx + size - 7, by + 9);
+        ctx.moveTo(bx + 9, by + size / 2);
+        ctx.lineTo(bx + 13, by + size - 10);
+        ctx.lineTo(bx + size - 8, by + 10);
         ctx.stroke();
         ctx.restore();
       }
