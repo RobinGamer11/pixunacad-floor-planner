@@ -46,7 +46,13 @@ function isTabletDrawGate(e: PointerEvent): boolean {
 export class Input {
   canvas: HTMLCanvasElement;
   mouse = { sx: 0, sy: 0, wx: 0, wy: 0, left: false, mid: false, right: false };
-  keys = { shift: false, space: false };
+  private _keys = { shift: false, space: false };
+  /** Shift/Space — das Tablet-Hilfsrad kann Shift sticky halten (globales Flag). */
+  get keys() {
+    const virtualShift = typeof window !== "undefined" && !!(window as any).__pixunaVirtualShift;
+    return { shift: this._keys.shift || virtualShift, space: this._keys.space };
+  }
+
 
   clicked = false;
   rightClicked = false;
@@ -82,12 +88,12 @@ export class Input {
     const c = this.canvas;
 
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Shift") this.keys.shift = true;
-      if (e.code === "Space") this.keys.space = true;
+      if (e.key === "Shift") this._keys.shift = true;
+      if (e.code === "Space") this._keys.space = true;
     };
     const onKeyUp = (e: KeyboardEvent) => {
-      if (e.key === "Shift") this.keys.shift = false;
-      if (e.code === "Space") this.keys.space = false;
+      if (e.key === "Shift") this._keys.shift = false;
+      if (e.code === "Space") this._keys.space = false;
     };
 
     window.addEventListener("keydown", onKeyDown);

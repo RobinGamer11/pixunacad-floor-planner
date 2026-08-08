@@ -61,7 +61,7 @@ export function TabletAidWheel() {
   return (
     <div
       data-tablet-aid="true"
-      className="fixed z-[60] select-none"
+      className="fixed select-none"
       onPointerDownCapture={(e) => { e.preventDefault(); }}
       onPointerMoveCapture={(e) => { e.preventDefault(); }}
       onPointerUpCapture={(e) => { e.preventDefault(); }}
@@ -74,8 +74,13 @@ export function TabletAidWheel() {
         width: size,
         height: size,
         touchAction: "none",
+        // Immer im Vordergrund — über Panels, Hubs, Dialogen und Overlays.
+        zIndex: 2147483000,
+        pointerEvents: "auto",
+        isolation: "isolate",
       }}
     >
+
       {/* Rand = Drag-Griff */}
       <div
         onPointerDown={onDragStart}
@@ -352,13 +357,13 @@ function WheelButton({
   const [active, setActive] = useState(false);
   const holdTimer = useRef<number | null>(null);
   const isHeld = useRef(false);
+  // Verhindert Doppel-Auslösung, wenn iPadOS zusätzlich Touch-Events feuert.
+  const lastDown = useRef(0);
+  const downPointer = useRef<number | null>(null);
 
-  const onPointerDown = (e: React.PointerEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  const begin = () => {
     if (toggleHold) return;
-    // Long-Press erkennen (250ms).
+    if (holdTimer.current) { clearTimeout(holdTimer.current); }
     holdTimer.current = window.setTimeout(() => {
       if (onHold) {
         isHeld.current = true;
@@ -367,10 +372,7 @@ function WheelButton({
       }
     }, 250);
   };
-  const onPointerUp = (e: React.PointerEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch {}
+  const end = () => {
     if (toggleHold) {
       const next = !active;
       setActive(next);
@@ -386,15 +388,54 @@ function WheelButton({
       onTap?.();
     }
   };
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Jeder Finger/Stift wird unabhängig behandelt — auch wenn woanders
+    // gerade gezeichnet wird (Zwei-Hand-Bedienung am Tablet).
+    if (downPointer.current !== null) return;
+    downPointer.current = e.pointerId;
+    lastDown.current = Date.now();
+    try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
+    begin();
+  };
+  const onPointerUp = (e: React.PointerEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (downPointer.current !== null && downPointer.current !== e.pointerId) return;
+    downPointer.current = null;
+    try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch {}
+    end();
+  };
   const onPointerCancel = (e: React.PointerEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    downPointer.current = null;
     if (holdTimer.current) { clearTimeout(holdTimer.current); holdTimer.current = null; }
     if (isHeld.current) {
       isHeld.current = false;
       setActive(false);
       onHold?.(false);
     }
+  };
+
+  // Touch-Fallback: falls iPadOS während eines aktiven Stift-Kontakts keine
+  // Pointer-Events an dieses Element liefert, greifen die Touch-Events.
+  const onTouchStart = (e: React.TouchEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (downPointer.current !== null || Date.now() - lastDown.current < 400) return;
+    downPointer.current = -1;
+    lastDown.current = Date.now();
+    begin();
+  };
+  const onTouchEnd = (e: React.TouchEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (downPointer.current !== -1) return;
+    downPointer.current = null;
+    end();
   };
 
   return (
@@ -405,6 +446,8 @@ function WheelButton({
       onPointerDown={onPointerDown}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
       className="absolute h-11 w-11 rounded-full flex flex-col items-center justify-center gap-0.5 text-[9px] font-semibold border transition-colors"
       style={{
         left: cx,
@@ -413,6 +456,8 @@ function WheelButton({
         background: active ? "hsl(var(--accent-gold))" : "hsl(var(--surface))",
         color: active ? "hsl(var(--surface))" : "hsl(var(--ink))",
         touchAction: "none",
+        pointerEvents: "auto",
+        zIndex: 2,
       }}
     >
       {icon}
@@ -420,3 +465,4 @@ function WheelButton({
     </button>
   );
 }
+
