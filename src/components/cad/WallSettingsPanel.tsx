@@ -114,6 +114,11 @@ export const WallSettingsPanel: React.FC<Props> = ({ app }) => {
     else update({ patternScale: val } as any);
   };
 
+  const setPatternAlign = (val: boolean) => {
+    if (selectedWall) updateSelected(() => { (selectedWall as any).patternAlignToWall = val; });
+    else update({ patternAlignToWall: val } as any);
+  };
+
   const setLabel = (labelId: string) => {
     if (selectedWall) {
       updateSelected(() => { selectedWall.labelId = labelId; });
@@ -130,6 +135,7 @@ export const WallSettingsPanel: React.FC<Props> = ({ app }) => {
   const labelId = (get("labelId") as string) || Defaults.defaultLabelId;
   const patternId = (selectedWall ? (selectedWall as any).patternId : (s as any).patternId) || "none";
   const patternScale = (selectedWall ? (selectedWall as any).patternScale : (s as any).patternScale) ?? 1;
+  const patternAlign = !!(selectedWall ? (selectedWall as any).patternAlignToWall : (s as any).patternAlignToWall);
   const thicknessValue = selectedWall
     ? selectedWall.thicknessM
     : (s.thicknessOverrideM ?? (s.kind === "outer" ? s.thicknessOuterM : s.thicknessInnerM));
