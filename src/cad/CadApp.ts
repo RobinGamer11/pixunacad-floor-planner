@@ -6,6 +6,7 @@ import { Scene, AreaLabel, DimensionStyle, TextBoxStyle, TextBox } from "./Scene
 import { autoSizeTextBox } from "./textAutoSize";
 import { LabelManager } from "./LabelManager";
 import { TopologyEngine } from "./TopologyEngine";
+import { GlobalGuides } from "./globalGuides";
 import { Renderer, Selection } from "./Renderer";
 import { LineHub } from "./LineHub";
 import { PointEditMenu } from "./PointEditMenu";
