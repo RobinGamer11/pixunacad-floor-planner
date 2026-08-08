@@ -8,7 +8,7 @@ import { getDimensionGeometry, type DimensionLike } from "./dimensionGeometry";
 import { boxCornersWorld } from "./textGeometry";
 import { getDocWarp, drawWarpedImage } from "./documentWarp";
 import { drawRichTextBox } from "./textRichRenderer";
-import { fillWithHatchPattern, type HatchPatternId } from "./hatchPatterns";
+import { fillWithHatchPattern, PATTERN_BASE_TILE_M, type HatchPatternId } from "./hatchPatterns";
 import { transformedInstanceItems, instanceBoundingCornersWorld } from "./StickerManager";
 import { documentCornersWorld, documentCenterWorld, documentVisibleCornersWorld, documentAnchorsWorld } from "./documentGeometry";
 import { getOrCreateDocMask } from "./documentMask";
