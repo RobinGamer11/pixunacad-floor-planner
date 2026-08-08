@@ -2047,6 +2047,13 @@ export class CadApp {
         }
       }
 
+      // Enter bestätigt eine laufende Gruppen-Aktion am Fangpunkt.
+      if (e.key === "Enter" && this.selectTool.groupAnchorActive) {
+        e.preventDefault();
+        this.selectTool.confirmGroupAction();
+        return;
+      }
+
       // Enter bestätigt eine laufende Gruppen-Drehung.
       if (e.key === "Enter" && this.selectTool.groupRotateActive) {
         e.preventDefault();
@@ -2069,6 +2076,14 @@ export class CadApp {
       }
 
       if (e.key === "Escape") {
+        // ESC bricht ALLES ab — unabhängig von Werkzeug und Objekt:
+        // laufende Hub-Interaktionen, Sonder-Modi und Rahmen-Auswahl.
+        this.dimensionHubMode = "none";
+        this.documentHubMode = "none";
+        this.bgRemoveInteraction = null;
+        this.measureFinishHubState = { visible: false, screenX: 0, screenY: 0 };
+        try { this.hub?.hide?.(); } catch {}
+        try { this.pointEditMenu?.hide?.(); } catch {}
         if (this.selectTool.pasteFloatActive) {
           e.preventDefault();
           this.selectTool.cancelGroupTransform(true);
@@ -2076,7 +2091,8 @@ export class CadApp {
           this.selectTool.pasteFloatActive = false;
           return;
         }
-        if (this.selectTool.groupRotateActive || this.selectTool.groupDragActive) {
+        if (this.selectTool.groupRotateActive || this.selectTool.groupDragActive
+            || this.selectTool.groupAnchorActive) {
           e.preventDefault(); this.selectTool.cancelGroupTransform(true); return;
         }
 

@@ -159,6 +159,14 @@ export class SelectTool {
   /** Gesamt angewandter Winkel (für Anzeige / Abbruch). */
   groupRotApplied = 0;
 
+  // ── Gruppen-Fangpunkt-Modus (Shift-Klick auf einen Fangpunkt der Auswahl) ─
+  /** Gewählter Fangpunkt: dient als Bezugs-/Drehpunkt der gesamten Auswahl. */
+  groupAnchor: Vec2 | null = null;
+  /** Anker wird gerade mit der Maus mitgeführt (gesamte Gruppe im Schlepptau). */
+  groupAnchorActive = false;
+  private _groupAnchorDx = 0;
+  private _groupAnchorDy = 0;
+
   // ── Einfüge-Modus („schwebende“ Kopie) ───────────────────────────────────
   /** Nach Strg+V: Kopie liegt exakt auf dem Original, ist ausgewählt und
    *  verschiebbar. Bestätigt wird per Häkchen-Symbol oder Enter. */
@@ -184,11 +192,41 @@ export class SelectTool {
     return true;
   }
 
+  /** Bestätigt eine laufende Gruppen-Aktion (Anker-Verschieben / Drehen). */
+  confirmGroupAction(): boolean {
+    if (this.pasteFloatActive) return this.confirmPasteFloat();
+    if (this.groupAnchorActive || this.groupRotateActive || this.groupDragActive) {
+      this.cancelGroupTransform(false);
+      (this.app as any).commitHistorySnapshot?.();
+      return true;
+    }
+    return false;
+  }
+
   private _pasteBtnHit(sx: number, sy: number): boolean {
     const r = this._pasteBtnRect;
     if (!r) return false;
     return sx >= r.x && sx <= r.x + r.w && sy >= r.y && sy <= r.y + r.h;
   }
+
+  /** Nächstgelegener Fangpunkt aller Objekte der Mehrfachauswahl. */
+  private _findGroupSnapPoint(wx: number, wy: number, tolPx = 12): Vec2 | null {
+    if (!this.marqueeSelectedIds.length) return null;
+    const scale = this.app.camera?.scale || 80;
+    const tol = tolPx / scale;
+    let best: Vec2 | null = null;
+    let bestD = tol;
+    for (const { kind, id } of this.marqueeSelectedIds) {
+      const obj = this._getElementById(kind, id);
+      if (!obj) continue;
+      for (const p of this._elementPoints(kind, obj) || []) {
+        const d = Math.hypot(p.x - wx, p.y - wy);
+        if (d <= bestD) { bestD = d; best = v(p.x, p.y); }
+      }
+    }
+    return best;
+  }
+
 
 
 
@@ -249,6 +287,7 @@ export class SelectTool {
     this.pasteFloatActive = false;
     this._pasteBtnRect = null;
     this.marqueeSelectedIds = [];
+    this.groupAnchor = null;
 
   }
 
@@ -257,6 +296,16 @@ export class SelectTool {
     if (this.groupRotateActive && revert && this._groupRotCenter && this.groupRotApplied) {
       rotateGroup(this.app, this.marqueeSelectedIds, -this.groupRotApplied, this._groupRotCenter);
     }
+    if (this.groupAnchorActive && revert && (this._groupAnchorDx || this._groupAnchorDy)) {
+      translateGroup(this.app, this.marqueeSelectedIds, -this._groupAnchorDx, -this._groupAnchorDy);
+      if (this.groupAnchor) {
+        this.groupAnchor.x -= this._groupAnchorDx;
+        this.groupAnchor.y -= this._groupAnchorDy;
+      }
+    }
+    this.groupAnchorActive = false;
+    this._groupAnchorDx = 0;
+    this._groupAnchorDy = 0;
     this.groupRotateActive = false;
     this._groupRotCenter = null;
     this.groupRotApplied = 0;
@@ -265,11 +314,14 @@ export class SelectTool {
     this._groupDragMoved = false;
   }
 
-  /** Startet das Drehen der Mehrfachauswahl um deren Schwerpunkt. */
+  /** Startet das Drehen der Mehrfachauswahl um deren Schwerpunkt — oder um den
+   *  per Shift gewählten Fangpunkt, falls einer gesetzt ist. */
   startGroupRotate(): boolean {
     if (!this.marqueeSelectedIds.length) return false;
-    const c = groupCentroid(this.app, this.marqueeSelectedIds);
+    const c = this.groupAnchor ? v(this.groupAnchor.x, this.groupAnchor.y)
+      : groupCentroid(this.app, this.marqueeSelectedIds);
     if (!c) return false;
+    this.groupAnchorActive = false;
     this._groupRotCenter = c;
     this.groupRotApplied = 0;
     this._groupRotLastAngle = Math.atan2(this.app.input.mouse.wy - c.y, this.app.input.mouse.wx - c.x);
@@ -503,7 +555,7 @@ export class SelectTool {
     return null;
   }
 
-  isEditing() { return !!this.activeEditAction || this.groupRotateActive || this.groupDragActive; }
+  isEditing() { return !!this.activeEditAction || this.groupRotateActive || this.groupDragActive || this.groupAnchorActive; }
 
   getPriorityWallId(): string | null {
     if (this.editTarget) {
@@ -1848,6 +1900,58 @@ export class SelectTool {
       }
     }
 
+    // ── Gruppen-Fangpunkt: Shift-Klick auf einen Fangpunkt der Auswahl ───
+    // Danach hängt die gesamte Auswahl an diesem Punkt (Verschieben), und
+    // ein Drehen (R) nutzt ihn als Drehmittelpunkt.
+    if (this.groupAnchorActive && this.groupAnchor) {
+      if (!this.marqueeSelectedIds.length) {
+        this.cancelGroupTransform(false);
+      } else {
+        let target = v(input.mouse.wx, input.mouse.wy);
+        try {
+          const s = (this.app as any).topology?.findBestSnap?.(
+            v(input.mouse.sx, input.mouse.sy), v(input.mouse.wx, input.mouse.wy));
+          if (s?.world) target = v(s.world.x, s.world.y);
+        } catch { /* kein Snap verfügbar */ }
+        const dx = target.x - this.groupAnchor.x;
+        const dy = target.y - this.groupAnchor.y;
+        if (dx || dy) {
+          translateGroup(this.app, this.marqueeSelectedIds, dx, dy);
+          this.groupAnchor.x = target.x;
+          this.groupAnchor.y = target.y;
+          this._groupAnchorDx += dx;
+          this._groupAnchorDy += dy;
+        }
+        if (input.clicked) {
+          input.clicked = false;
+          input.doubleClicked = false;
+          if (this._pasteBtnHit(input.mouse.sx, input.mouse.sy) || !input.keys?.shift) {
+            this.groupAnchorActive = false;
+            this._groupAnchorDx = 0;
+            this._groupAnchorDy = 0;
+            (this.app as any).commitHistorySnapshot?.();
+          }
+        }
+        this.snap = null;
+        return;
+      }
+    }
+
+    if (input.clicked && input.keys?.shift && this.marqueeSelectedIds.length >= 1
+        && !this.isEditing() && !this.marqueeActive) {
+      const gp = this._findGroupSnapPoint(input.mouse.wx, input.mouse.wy, 12);
+      if (gp) {
+        this.groupAnchor = gp;
+        this.groupAnchorActive = true;
+        this._groupAnchorDx = 0;
+        this._groupAnchorDy = 0;
+        if (this.app.selection) this.app.setSelection(null);
+        input.clicked = false;
+        input.doubleClicked = false;
+        this.snap = null;
+        return;
+      }
+    }
 
     // ── Gruppen-Drehen (Mehrfachauswahl) ─────────────────────────────────
     if (this.groupRotateActive) {
@@ -3457,9 +3561,28 @@ export class SelectTool {
       }
     }
 
-    // Einfüge-Modus: Häkchen-Button oben rechts an der Auswahl.
+    // Fangpunkte aller Objekte der Mehrfachauswahl anzeigen (Gruppieren).
+    if (this.marqueeSelectedIds.length) {
+      const seenPt = new Set<string>();
+      for (const { kind, id } of this.marqueeSelectedIds) {
+        const obj = this._getElementById(kind, id);
+        if (!obj) continue;
+        for (const p of this._elementPoints(kind, obj) || []) {
+          const key = p.x.toFixed(4) + "|" + p.y.toFixed(4);
+          if (seenPt.has(key)) continue; seenPt.add(key);
+          const s = cam.worldToScreen(p.x, p.y);
+          const isAnchor = !!this.groupAnchor
+            && Math.abs(this.groupAnchor.x - p.x) < 1e-6 && Math.abs(this.groupAnchor.y - p.y) < 1e-6;
+          drawSnapDot(ctx, s.x, s.y, isAnchor
+            ? { color: "rgba(234,179,8,0.95)", ring: true, radius: 4.5 }
+            : { radius: 3.2 });
+        }
+      }
+    }
+
+    // Häkchen-Button oben rechts an der Auswahl (Einfügen / Gruppen-Aktion).
     this._pasteBtnRect = null;
-    if (this.pasteFloatActive && this.marqueeSelectedIds.length && !this.groupDragActive) {
+    if ((this.pasteFloatActive || this.groupAnchorActive) && this.marqueeSelectedIds.length && !this.groupDragActive) {
       let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
       for (const { kind, id } of this.marqueeSelectedIds) {
         const obj = this._getElementById(kind, id);
@@ -3472,25 +3595,43 @@ export class SelectTool {
         }
       }
       if (Number.isFinite(minX)) {
+        // Optik identisch zum Häkchen-Hub der anderen Werkzeuge:
+        // weißer, abgerundeter Hub mit dezentem Rand + dunklem Haken.
         const size = 30;
-        const bx = maxX + 12, by = minY - size - 12;
+        const bx = maxX + 14, by = minY - size - 12;
         this._pasteBtnRect = { x: bx, y: by, w: size, h: size };
+        const r = 6;
         ctx.save();
         ctx.beginPath();
-        ctx.arc(bx + size / 2, by + size / 2, size / 2, 0, Math.PI * 2);
-        ctx.fillStyle = "rgba(22,163,74,0.95)";
+        ctx.moveTo(bx + r, by);
+        ctx.lineTo(bx + size - r, by);
+        ctx.quadraticCurveTo(bx + size, by, bx + size, by + r);
+        ctx.lineTo(bx + size, by + size - r);
+        ctx.quadraticCurveTo(bx + size, by + size, bx + size - r, by + size);
+        ctx.lineTo(bx + r, by + size);
+        ctx.quadraticCurveTo(bx, by + size, bx, by + size - r);
+        ctx.lineTo(bx, by + r);
+        ctx.quadraticCurveTo(bx, by, bx + r, by);
+        ctx.closePath();
+        ctx.shadowColor = "rgba(0,0,0,0.18)";
+        ctx.shadowBlur = 12;
+        ctx.shadowOffsetY = 4;
+        ctx.fillStyle = "#ffffff";
         ctx.fill();
-        ctx.strokeStyle = "rgba(255,255,255,0.9)";
-        ctx.lineWidth = 1.5;
+        ctx.shadowColor = "transparent";
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetY = 0;
+        ctx.strokeStyle = "rgba(0,0,0,0.12)";
+        ctx.lineWidth = 1;
         ctx.stroke();
         ctx.beginPath();
-        ctx.strokeStyle = "#ffffff";
-        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = "#1f2937";
+        ctx.lineWidth = 2;
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
-        ctx.moveTo(bx + 8, by + size / 2);
-        ctx.lineTo(bx + 13, by + size - 9);
-        ctx.lineTo(bx + size - 7, by + 9);
+        ctx.moveTo(bx + 9, by + size / 2);
+        ctx.lineTo(bx + 13, by + size - 10);
+        ctx.lineTo(bx + size - 8, by + 10);
         ctx.stroke();
         ctx.restore();
       }
