@@ -74,11 +74,20 @@ export class Hatch {
   strokeWidthPx: number;
   labelId: string;
   areaLabel: AreaLabel;
+  /** CAD-Schraffurmuster (Mauerwerk, Stahlbeton, …) */
+  patternEnabled: boolean;
+  patternId: string;
+  patternScale: number;
+  patternAngleDeg: number;
+  patternSkewDeg: number;
   _stickerEditOwnerId?: string | null;
 
-  constructor({ id, points, holes, fillColor, strokeColor, fillAlphaPct, strokeWidthPx, labelId, areaLabel }: {
+  constructor({ id, points, holes, fillColor, strokeColor, fillAlphaPct, strokeWidthPx, labelId, areaLabel,
+    patternEnabled, patternId, patternScale, patternAngleDeg, patternSkewDeg }: {
     id: string; points: Vec2[]; holes?: Vec2[][]; fillColor?: string; strokeColor?: string;
     fillAlphaPct?: number; strokeWidthPx?: number; labelId?: string; areaLabel?: Partial<AreaLabel>;
+    patternEnabled?: boolean; patternId?: string; patternScale?: number;
+    patternAngleDeg?: number; patternSkewDeg?: number;
   }) {
     this.id = id;
     this.points = points.map(p => v(p.x, p.y));
@@ -88,6 +97,12 @@ export class Hatch {
     this.fillAlphaPct = clamp(fillAlphaPct ?? Defaults.hatchFillAlphaPct, 0, 100);
     this.strokeWidthPx = (typeof strokeWidthPx === "number" && strokeWidthPx >= 0) ? strokeWidthPx : Defaults.hatchStrokePx;
     this.labelId = labelId || Defaults.defaultLabelId;
+    this.patternEnabled = !!patternEnabled;
+    this.patternId = patternId || "mauerwerk";
+    this.patternScale = Number.isFinite(patternScale) ? clamp(patternScale!, 0.05, 20) : 1;
+    this.patternAngleDeg = Number.isFinite(patternAngleDeg) ? patternAngleDeg! : 0;
+    this.patternSkewDeg = Number.isFinite(patternSkewDeg) ? clamp(patternSkewDeg!, -70, 70) : 0;
+
     this.areaLabel = {
       show: !!(areaLabel?.show ?? Defaults.areaShow),
       textColor: areaLabel?.textColor || Defaults.areaTextColor,
