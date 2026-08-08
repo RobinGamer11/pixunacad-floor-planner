@@ -120,23 +120,78 @@ function drawTile(ctx: CanvasRenderingContext2D, id: HatchPatternId, s: number, 
       break;
     }
     case "holzdielen": {
-      const h = s / 2;
-      line(ctx, 0, 0, s, 0);
-      line(ctx, 0, h, s, h);
+      // Enge, durchgezogene, vertikale Dielenfugen
+      for (let i = 0; i < 5; i++) line(ctx, (i / 5) * s, 0, (i / 5) * s, s);
+      break;
+    }
+    case "erdreich": {
+      // Diagonale Bänder mit Sprossen (klassische Erdreich-Schraffur)
+      const d = s * 0.5; // Bandabstand entlang der Diagonalen
+      for (let b = -2; b <= 4; b += 1) {
+        const base = b * d;
+        line(ctx, 0, base, s, base - s);                     // Bandkante 1
+        line(ctx, 0, base + d * 0.45, s, base + d * 0.45 - s); // Bandkante 2
+        ctx.save();
+        ctx.lineWidth = lw * 0.8;
+        for (let x = -s; x <= s * 2; x += d * 0.5) {
+          line(ctx, x, base - x, x, base + d * 0.45 - x);
+        }
+        ctx.restore();
+      }
+      break;
+    }
+    case "daemmung_weich": {
+      // Weiche Dämmung: aneinandergereihte Schlaufen
+      const w = s / 3;
+      for (let i = -1; i <= 3; i++) {
+        const cx = i * w;
+        ctx.beginPath();
+        ctx.moveTo(cx, s);
+        ctx.bezierCurveTo(cx - w * 0.35, s * 0.45, cx + w * 0.1, 0, cx + w * 0.5, 0);
+        ctx.bezierCurveTo(cx + w * 0.9, 0, cx + w * 1.35, s * 0.45, cx + w, s);
+        ctx.stroke();
+      }
+      break;
+    }
+    case "daemmung_hart": {
+      // Harte Dämmung: Zickzacklinien
+      const rows = 3;
+      const zig = s / 6;
+      for (let r = 0; r <= rows; r++) {
+        const y0 = (r / rows) * s;
+        ctx.beginPath();
+        for (let i = 0; i <= 6; i++) {
+          const x = i * zig;
+          const y = y0 + (i % 2 === 0 ? 0 : zig * 0.8);
+          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      }
+      break;
+    }
+    case "xps": {
+      // Enges Raster aus aneinanderliegenden Vierecken
+      const n = 4;
+      for (let i = 0; i <= n; i++) {
+        const p = (i / n) * s;
+        line(ctx, p, 0, p, s);
+        line(ctx, 0, p, s, p);
+      }
+      break;
+    }
+    case "abdichtung": {
+      // Abwechselnd weißes und schwarzes Rechteck
+      const h = s * 0.4;
+      const y = (s - h) / 2;
+      ctx.fillRect(0, y, s * 0.5, h);
       ctx.save();
-      ctx.lineWidth = lw * 0.6;
-      ctx.beginPath();
-      ctx.moveTo(0, h * 0.4);
-      ctx.bezierCurveTo(s * 0.35, h * 0.2, s * 0.65, h * 0.7, s, h * 0.35);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(0, h * 1.55);
-      ctx.bezierCurveTo(s * 0.3, h * 1.8, s * 0.7, h * 1.25, s, h * 1.6);
-      ctx.stroke();
+      ctx.lineWidth = lw * 0.8;
+      ctx.strokeRect(s * 0.5, y, s * 0.5, h);
       ctx.restore();
       break;
     }
   }
+
 }
 
 const tileCache = new Map<string, HTMLCanvasElement>();
