@@ -13,7 +13,12 @@ export type HatchPatternId =
   | "kies"
   | "sand"
   | "ziegelverband"
-  | "holzdielen";
+  | "holzdielen"
+  | "erdreich"
+  | "daemmung_weich"
+  | "daemmung_hart"
+  | "xps"
+  | "abdichtung";
 
 export const HATCH_PATTERNS: { id: HatchPatternId; label: string }[] = [
   { id: "mauerwerk", label: "Mauerwerk" },
@@ -23,10 +28,16 @@ export const HATCH_PATTERNS: { id: HatchPatternId; label: string }[] = [
   { id: "sand", label: "Sand" },
   { id: "ziegelverband", label: "Ziegelverband" },
   { id: "holzdielen", label: "Holzdielen" },
+  { id: "erdreich", label: "Erdreich" },
+  { id: "daemmung_weich", label: "Wärmedämmung weich" },
+  { id: "daemmung_hart", label: "Wärmedämmung hart" },
+  { id: "xps", label: "XPS-Dämmung" },
+  { id: "abdichtung", label: "Abdichtung" },
 ];
 
 /** Basis-Kachelgröße in Metern (bei patternScale = 1). */
-export const PATTERN_BASE_TILE_M = 0.1;
+export const PATTERN_BASE_TILE_M = 0.1 / 15;
+
 
 function line(ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number) {
   ctx.beginPath();
@@ -55,21 +66,30 @@ function drawTile(ctx: CanvasRenderingContext2D, id: HatchPatternId, s: number, 
       break;
     }
     case "stahlbeton": {
+      // Durchgezogene 45°-Linien, dazwischen jeweils eine gestrichelte
       for (const o of [-1, 0, 1]) line(ctx, o * s, s, (o + 1) * s, 0);
-      for (const o of [-1, 0, 1]) line(ctx, o * s, 0, (o + 1) * s, s);
-      dot(ctx, s * 0.5, s * 0.5, Math.max(lw * 0.7, s * 0.035));
+      ctx.save();
+      ctx.setLineDash([s * 0.09, s * 0.07]);
+      for (const o of [-1, 0, 1]) line(ctx, o * s, s * 0.5, (o + 0.5) * s, 0);
+      for (const o of [-1, 0, 1]) line(ctx, (o + 0.5) * s, s, (o + 1) * s, s * 0.5);
+      ctx.restore();
       break;
     }
     case "holz": {
-      // Hirnholz: konzentrische Bögen um einen versetzten Mittelpunkt
-      const cx = -s * 0.25, cy = s * 0.5;
-      for (let i = 1; i <= 6; i++) {
+      // Maserung: leicht wellige, diagonal verlaufende Linien
+      const steps = 24;
+      for (let b = -2; b <= 4; b += 0.5) {
         ctx.beginPath();
-        ctx.arc(cx, cy, (i / 6) * s * 1.15, -Math.PI / 2.2, Math.PI / 2.2);
+        for (let i = 0; i <= steps; i++) {
+          const x = (i / steps) * s;
+          const y = b * s - x + Math.sin((x / s) * Math.PI * 2) * s * 0.05;
+          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
         ctx.stroke();
       }
       break;
     }
+
     case "kies": {
       const blobs: [number, number, number][] = [
         [0.2, 0.22, 0.11], [0.62, 0.18, 0.08], [0.85, 0.45, 0.1],
@@ -100,23 +120,78 @@ function drawTile(ctx: CanvasRenderingContext2D, id: HatchPatternId, s: number, 
       break;
     }
     case "holzdielen": {
-      const h = s / 2;
-      line(ctx, 0, 0, s, 0);
-      line(ctx, 0, h, s, h);
+      // Enge, durchgezogene, vertikale Dielenfugen
+      for (let i = 0; i < 5; i++) line(ctx, (i / 5) * s, 0, (i / 5) * s, s);
+      break;
+    }
+    case "erdreich": {
+      // Diagonale Bänder mit Sprossen (klassische Erdreich-Schraffur)
+      const d = s * 0.5; // Bandabstand entlang der Diagonalen
+      for (let b = -2; b <= 4; b += 1) {
+        const base = b * d;
+        line(ctx, 0, base, s, base - s);                     // Bandkante 1
+        line(ctx, 0, base + d * 0.45, s, base + d * 0.45 - s); // Bandkante 2
+        ctx.save();
+        ctx.lineWidth = lw * 0.8;
+        for (let x = -s; x <= s * 2; x += d * 0.5) {
+          line(ctx, x, base - x, x, base + d * 0.45 - x);
+        }
+        ctx.restore();
+      }
+      break;
+    }
+    case "daemmung_weich": {
+      // Weiche Dämmung: aneinandergereihte Schlaufen
+      const w = s / 3;
+      for (let i = -1; i <= 3; i++) {
+        const cx = i * w;
+        ctx.beginPath();
+        ctx.moveTo(cx, s);
+        ctx.bezierCurveTo(cx - w * 0.35, s * 0.45, cx + w * 0.1, 0, cx + w * 0.5, 0);
+        ctx.bezierCurveTo(cx + w * 0.9, 0, cx + w * 1.35, s * 0.45, cx + w, s);
+        ctx.stroke();
+      }
+      break;
+    }
+    case "daemmung_hart": {
+      // Harte Dämmung: Zickzacklinien
+      const rows = 3;
+      const zig = s / 6;
+      for (let r = 0; r <= rows; r++) {
+        const y0 = (r / rows) * s;
+        ctx.beginPath();
+        for (let i = 0; i <= 6; i++) {
+          const x = i * zig;
+          const y = y0 + (i % 2 === 0 ? 0 : zig * 0.8);
+          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      }
+      break;
+    }
+    case "xps": {
+      // Enges Raster aus aneinanderliegenden Vierecken
+      const n = 4;
+      for (let i = 0; i <= n; i++) {
+        const p = (i / n) * s;
+        line(ctx, p, 0, p, s);
+        line(ctx, 0, p, s, p);
+      }
+      break;
+    }
+    case "abdichtung": {
+      // Abwechselnd weißes und schwarzes Rechteck
+      const h = s * 0.4;
+      const y = (s - h) / 2;
+      ctx.fillRect(0, y, s * 0.5, h);
       ctx.save();
-      ctx.lineWidth = lw * 0.6;
-      ctx.beginPath();
-      ctx.moveTo(0, h * 0.4);
-      ctx.bezierCurveTo(s * 0.35, h * 0.2, s * 0.65, h * 0.7, s, h * 0.35);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(0, h * 1.55);
-      ctx.bezierCurveTo(s * 0.3, h * 1.8, s * 0.7, h * 1.25, s, h * 1.6);
-      ctx.stroke();
+      ctx.lineWidth = lw * 0.8;
+      ctx.strokeRect(s * 0.5, y, s * 0.5, h);
       ctx.restore();
       break;
     }
   }
+
 }
 
 const tileCache = new Map<string, HTMLCanvasElement>();
