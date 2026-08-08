@@ -100,7 +100,7 @@ export class Hatch {
     this.labelId = labelId || Defaults.defaultLabelId;
     this.patternEnabled = !!patternEnabled;
     this.patternId = patternId || "mauerwerk";
-    this.patternScale = Number.isFinite(patternScale) ? clamp(patternScale!, 0.05, 20) : 1;
+    this.patternScale = Number.isFinite(patternScale) ? clamp(patternScale!, 0.05, 20) : 2;
     this.patternAngleDeg = Number.isFinite(patternAngleDeg) ? patternAngleDeg! : 0;
     this.patternSkewDeg = Number.isFinite(patternSkewDeg) ? clamp(patternSkewDeg!, -70, 70) : 0;
     this.patternStretch = Number.isFinite(patternStretch) ? clamp(patternStretch!, 0.1, 10) : 1;
@@ -574,7 +574,7 @@ export class Wall {
     this.labelId = opts.labelId || Defaults.defaultLabelId;
     this.priority = opts.priority ?? (opts.kind === "outer" ? 200 : 100);
     this.patternId = opts.patternId || "none";
-    this.patternScale = Math.max(0.1, Math.min(10, opts.patternScale ?? 1));
+    this.patternScale = Math.max(0.1, Math.min(10, opts.patternScale ?? 2));
     this.patternAlignToWall = !!opts.patternAlignToWall;
     this._stickerEditOwnerId = null;
   }
