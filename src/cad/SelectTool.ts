@@ -159,6 +159,14 @@ export class SelectTool {
   /** Gesamt angewandter Winkel (für Anzeige / Abbruch). */
   groupRotApplied = 0;
 
+  // ── Gruppen-Fangpunkt-Modus (Shift-Klick auf einen Fangpunkt der Auswahl) ─
+  /** Gewählter Fangpunkt: dient als Bezugs-/Drehpunkt der gesamten Auswahl. */
+  groupAnchor: Vec2 | null = null;
+  /** Anker wird gerade mit der Maus mitgeführt (gesamte Gruppe im Schlepptau). */
+  groupAnchorActive = false;
+  private _groupAnchorDx = 0;
+  private _groupAnchorDy = 0;
+
   // ── Einfüge-Modus („schwebende“ Kopie) ───────────────────────────────────
   /** Nach Strg+V: Kopie liegt exakt auf dem Original, ist ausgewählt und
    *  verschiebbar. Bestätigt wird per Häkchen-Symbol oder Enter. */
@@ -184,11 +192,41 @@ export class SelectTool {
     return true;
   }
 
+  /** Bestätigt eine laufende Gruppen-Aktion (Anker-Verschieben / Drehen). */
+  confirmGroupAction(): boolean {
+    if (this.pasteFloatActive) return this.confirmPasteFloat();
+    if (this.groupAnchorActive || this.groupRotateActive || this.groupDragActive) {
+      this.cancelGroupTransform(false);
+      (this.app as any).commitHistorySnapshot?.();
+      return true;
+    }
+    return false;
+  }
+
   private _pasteBtnHit(sx: number, sy: number): boolean {
     const r = this._pasteBtnRect;
     if (!r) return false;
     return sx >= r.x && sx <= r.x + r.w && sy >= r.y && sy <= r.y + r.h;
   }
+
+  /** Nächstgelegener Fangpunkt aller Objekte der Mehrfachauswahl. */
+  private _findGroupSnapPoint(wx: number, wy: number, tolPx = 12): Vec2 | null {
+    if (!this.marqueeSelectedIds.length) return null;
+    const scale = this.app.camera?.scale || 80;
+    const tol = tolPx / scale;
+    let best: Vec2 | null = null;
+    let bestD = tol;
+    for (const { kind, id } of this.marqueeSelectedIds) {
+      const obj = this._getElementById(kind, id);
+      if (!obj) continue;
+      for (const p of this._elementPoints(kind, obj) || []) {
+        const d = Math.hypot(p.x - wx, p.y - wy);
+        if (d <= bestD) { bestD = d; best = v(p.x, p.y); }
+      }
+    }
+    return best;
+  }
+
 
 
 
