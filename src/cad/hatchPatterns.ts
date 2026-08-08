@@ -66,21 +66,30 @@ function drawTile(ctx: CanvasRenderingContext2D, id: HatchPatternId, s: number, 
       break;
     }
     case "stahlbeton": {
+      // Durchgezogene 45°-Linien, dazwischen jeweils eine gestrichelte
       for (const o of [-1, 0, 1]) line(ctx, o * s, s, (o + 1) * s, 0);
-      for (const o of [-1, 0, 1]) line(ctx, o * s, 0, (o + 1) * s, s);
-      dot(ctx, s * 0.5, s * 0.5, Math.max(lw * 0.7, s * 0.035));
+      ctx.save();
+      ctx.setLineDash([s * 0.09, s * 0.07]);
+      for (const o of [-1, 0, 1]) line(ctx, o * s, s * 0.5, (o + 0.5) * s, 0);
+      for (const o of [-1, 0, 1]) line(ctx, (o + 0.5) * s, s, (o + 1) * s, s * 0.5);
+      ctx.restore();
       break;
     }
     case "holz": {
-      // Hirnholz: konzentrische Bögen um einen versetzten Mittelpunkt
-      const cx = -s * 0.25, cy = s * 0.5;
-      for (let i = 1; i <= 6; i++) {
+      // Maserung: leicht wellige, diagonal verlaufende Linien
+      const steps = 24;
+      for (let b = -1; b <= 2; b++) {
         ctx.beginPath();
-        ctx.arc(cx, cy, (i / 6) * s * 1.15, -Math.PI / 2.2, Math.PI / 2.2);
+        for (let i = 0; i <= steps; i++) {
+          const x = (i / steps) * s;
+          const y = b * s - x + Math.sin((x / s) * Math.PI * 2) * s * 0.05;
+          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
         ctx.stroke();
       }
       break;
     }
+
     case "kies": {
       const blobs: [number, number, number][] = [
         [0.2, 0.22, 0.11], [0.62, 0.18, 0.08], [0.85, 0.45, 0.1],
