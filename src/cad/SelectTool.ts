@@ -608,7 +608,7 @@ export class SelectTool {
     return null;
   }
 
-  isEditing() { return !!this.activeEditAction || this.groupRotateActive || this.groupDragActive || this.groupAnchorActive; }
+  isEditing() { return !!this.activeEditAction || this.groupRotateActive || this.groupDragActive || this.groupAnchorActive || this.groupAnchorMenu; }
 
   getPriorityWallId(): string | null {
     if (this.editTarget) {
