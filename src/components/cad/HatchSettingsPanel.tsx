@@ -186,7 +186,7 @@ export const HatchSettingsPanel: React.FC<Props> = ({ app }) => {
             <label className="flex items-center justify-between gap-2">
               <span className="text-[10px] text-muted-foreground">Skalierung</span>
               <input
-                type="range" min={0.1} max={4} step={0.05} value={patternScale}
+                type="range" min={0.2} max={20} step={0.1} value={patternScale}
                 onChange={(e) => {
                   const val = parseFloat(e.target.value);
                   setPatternScale(val);
