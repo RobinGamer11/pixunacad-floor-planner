@@ -88,12 +88,12 @@ export class Input {
     const c = this.canvas;
 
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Shift") this.keys.shift = true;
-      if (e.code === "Space") this.keys.space = true;
+      if (e.key === "Shift") this._keys.shift = true;
+      if (e.code === "Space") this._keys.space = true;
     };
     const onKeyUp = (e: KeyboardEvent) => {
-      if (e.key === "Shift") this.keys.shift = false;
-      if (e.code === "Space") this.keys.space = false;
+      if (e.key === "Shift") this._keys.shift = false;
+      if (e.code === "Space") this._keys.space = false;
     };
 
     window.addEventListener("keydown", onKeyDown);
