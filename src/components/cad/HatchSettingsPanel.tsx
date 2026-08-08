@@ -56,6 +56,7 @@ export const HatchSettingsPanel: React.FC<Props> = ({ app }) => {
   const [patternScale, setPatternScale] = useState(1);
   const [patternAngleDeg, setPatternAngleDeg] = useState(0);
   const [patternSkewDeg, setPatternSkewDeg] = useState(0);
+  const [patternStretch, setPatternStretch] = useState(1);
   const [, force] = useState(0);
 
   const sync = () => {
@@ -73,6 +74,7 @@ export const HatchSettingsPanel: React.FC<Props> = ({ app }) => {
       setPatternScale(sel.patternScale ?? 1);
       setPatternAngleDeg(sel.patternAngleDeg ?? 0);
       setPatternSkewDeg(sel.patternSkewDeg ?? 0);
+      setPatternStretch(sel.patternStretch ?? 1);
     } else {
       setFillColor((app as any).defaultHatchFillColor);
       setStrokeColor((app as any).defaultHatchStrokeColor);
@@ -83,6 +85,7 @@ export const HatchSettingsPanel: React.FC<Props> = ({ app }) => {
       setPatternScale((app as any).defaultHatchPatternScale ?? 1);
       setPatternAngleDeg((app as any).defaultHatchPatternAngleDeg ?? 0);
       setPatternSkewDeg((app as any).defaultHatchPatternSkewDeg ?? 0);
+      setPatternStretch((app as any).defaultHatchPatternStretch ?? 1);
     }
   };
 
