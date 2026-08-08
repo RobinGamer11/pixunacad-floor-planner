@@ -1757,7 +1757,19 @@ export class MiniCad {
           this._changeDirty = true;
           return;
         }
-        if (e.key === "Escape" && (this.selectTool.groupRotateActive || this.selectTool.groupDragActive)) {
+        if (e.key === "Enter" && this.selectTool.groupAnchorActive) {
+          e.preventDefault();
+          this.selectTool.confirmGroupAction();
+          this._changeDirty = true;
+          return;
+        }
+        if (e.key === "Escape" && (this.selectTool.groupRotateActive || this.selectTool.groupDragActive
+            || this.selectTool.groupAnchorActive)) {
+          e.preventDefault();
+          this.selectTool.cancelGroupTransform(true);
+          return;
+        }
+        if ((e.key === "Delete" || e.key === "Backspace") && this.selectTool.groupAnchorActive) {
           e.preventDefault();
           this.selectTool.cancelGroupTransform(true);
           return;
@@ -1768,6 +1780,19 @@ export class MiniCad {
           this.selectTool.cancelGroupTransform(true);
           return;
         }
+      }
+
+      // ESC bricht ALLES ab — egal welches Werkzeug, egal welches Objekt.
+      if (e.key === "Escape" && !inField) {
+        try { if (this.textEditor.isActive()) this.textEditor.commit(); } catch {}
+        try { (this.selectTool as any).pasteFloatActive = false; } catch {}
+        try { this.selectTool.cancelGroupTransform(true); } catch {}
+        try { (this._activeToolObj as any)?.cancel?.(); } catch {}
+        try { this.selectTool.cancel(); } catch {}
+        try { this.clearSelection(); } catch {}
+        try { this.pointEditMenu.hide(); } catch {}
+        try { this.onSelectionChange?.(); } catch {}
+        return;
       }
 
       if (e.key !== "Delete" && e.key !== "Backspace") return;
