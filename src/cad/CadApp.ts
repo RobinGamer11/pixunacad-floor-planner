@@ -439,6 +439,8 @@ export class CadApp {
     this.input = new Input(canvas);
     this.labelManager = new LabelManager();
     this.topology = new TopologyEngine(this.scene, this.camera, this.labelManager);
+    this.globalGuides = new GlobalGuides();
+    this.topology.guides = this.globalGuides;
     this.renderer = new Renderer(this.ctx, this.camera, this.scene, this.labelManager);
 
     // Plan-Modus Controller (Step 4): Drop, Selektion, Drag, HUB.
