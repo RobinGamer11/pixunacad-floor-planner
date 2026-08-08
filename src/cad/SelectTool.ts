@@ -2086,9 +2086,12 @@ export class SelectTool {
         this.groupDragActive = true;
         this._groupDragMoved = false;
         this._groupDragLast = mouseW;
-        // Nächstgelegener Fangpunkt der Auswahl wird zum Fang-Anker.
-        this._groupDragAnchor = this._findGroupSnapPoint(mouseW.x, mouseW.y, 80)
-          || this._nearestGroupPoint(mouseW.x, mouseW.y);
+        // Ein per Shift gesetzter Gruppen-Ankerpunkt bleibt IMMER der
+        // Referenzpunkt — auch beim normalen Verschieben der Auswahl.
+        this._groupDragAnchor = this.groupAnchor
+          ? v(this.groupAnchor.x, this.groupAnchor.y)
+          : (this._findGroupSnapPoint(mouseW.x, mouseW.y, 80) || this._nearestGroupPoint(mouseW.x, mouseW.y));
+
         this.marqueeStart = null;
         this.marqueeCurrent = null;
         if (this.app.selection) this.app.setSelection(null);
