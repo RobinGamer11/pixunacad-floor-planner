@@ -197,6 +197,11 @@ export class MiniCad {
   defaultHatchFillAlphaPct: number = Defaults.hatchFillAlphaPct;
   /** Radierte Schraffur-Kanten automatisch glätten. */
   defaultHatchAutoSmooth: boolean = true;
+  defaultHatchPatternEnabled: boolean = false;
+  defaultHatchPatternId: string = "mauerwerk";
+  defaultHatchPatternScale: number = 1;
+  defaultHatchPatternAngleDeg: number = 0;
+  defaultHatchPatternSkewDeg: number = 0;
   defaultAreaShow: boolean = Defaults.areaShow;
 
   /** Optionaler Callback für React-Panels (Bezeichnungen/Ausgewählter-Stroke-Refresh). */
@@ -1631,6 +1636,11 @@ export class MiniCad {
         strokeColor: sel.strokeColor || this.defaultHatchStrokeColor,
         fillAlphaPct: sel.fillAlphaPct ?? this.defaultHatchFillAlphaPct,
         strokeWidthPx: (typeof sel.strokeWidthPx === "number") ? sel.strokeWidthPx : this.defaultHatchStrokeWidthPx,
+        patternEnabled: !!sel.patternEnabled,
+        patternId: sel.patternId || this.defaultHatchPatternId,
+        patternScale: sel.patternScale ?? this.defaultHatchPatternScale,
+        patternAngleDeg: sel.patternAngleDeg ?? this.defaultHatchPatternAngleDeg,
+        patternSkewDeg: sel.patternSkewDeg ?? this.defaultHatchPatternSkewDeg,
         labelId: sel.labelId || Defaults.defaultLabelId,
         areaLabel: {
           show: !!sel.areaLabel?.show,
@@ -1648,6 +1658,11 @@ export class MiniCad {
       strokeColor: this.defaultHatchStrokeColor,
       fillAlphaPct: this.defaultHatchFillAlphaPct,
       strokeWidthPx: this.defaultHatchStrokeWidthPx,
+      patternEnabled: this.defaultHatchPatternEnabled,
+      patternId: this.defaultHatchPatternId,
+      patternScale: this.defaultHatchPatternScale,
+      patternAngleDeg: this.defaultHatchPatternAngleDeg,
+      patternSkewDeg: this.defaultHatchPatternSkewDeg,
       labelId: this.activeDrawLabelId || Defaults.defaultLabelId,
       areaLabel: {
         show: this.defaultAreaShow, textColor: Defaults.areaTextColor, fontSizePx: Defaults.areaFontSizePx,

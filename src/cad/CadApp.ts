@@ -182,6 +182,11 @@ export class CadApp {
   defaultHatchFillAlphaPct = Defaults.hatchFillAlphaPct;
   /** Radierte Schraffur-Kanten automatisch glätten. */
   defaultHatchAutoSmooth = true;
+  defaultHatchPatternEnabled = false;
+  defaultHatchPatternId = "mauerwerk";
+  defaultHatchPatternScale = 1;
+  defaultHatchPatternAngleDeg = 0;
+  defaultHatchPatternSkewDeg = 0;
   defaultAreaShow = Defaults.areaShow;
   defaultAreaBorderEnabled = Defaults.areaBorderEnabled;
   defaultAreaBorderColor = Defaults.areaBorderColor;
@@ -1458,6 +1463,11 @@ export class CadApp {
         strokeColor: selected.strokeColor || this.defaultHatchStrokeColor,
         fillAlphaPct: selected.fillAlphaPct ?? this.defaultHatchFillAlphaPct,
         strokeWidthPx: (typeof selected.strokeWidthPx === "number") ? selected.strokeWidthPx : this.defaultHatchStrokeWidthPx,
+        patternEnabled: !!selected.patternEnabled,
+        patternId: selected.patternId || this.defaultHatchPatternId,
+        patternScale: selected.patternScale ?? this.defaultHatchPatternScale,
+        patternAngleDeg: selected.patternAngleDeg ?? this.defaultHatchPatternAngleDeg,
+        patternSkewDeg: selected.patternSkewDeg ?? this.defaultHatchPatternSkewDeg,
         labelId: selected.labelId || Defaults.defaultLabelId,
         areaLabel: {
           show: !!selected.areaLabel?.show,
@@ -1478,6 +1488,11 @@ export class CadApp {
         strokeColor: ref.strokeColor || this.defaultHatchStrokeColor,
         fillAlphaPct: ref.fillAlphaPct ?? this.defaultHatchFillAlphaPct,
         strokeWidthPx: (typeof ref.strokeWidthPx === "number") ? ref.strokeWidthPx : this.defaultHatchStrokeWidthPx,
+        patternEnabled: !!ref.patternEnabled,
+        patternId: ref.patternId || this.defaultHatchPatternId,
+        patternScale: ref.patternScale ?? this.defaultHatchPatternScale,
+        patternAngleDeg: ref.patternAngleDeg ?? this.defaultHatchPatternAngleDeg,
+        patternSkewDeg: ref.patternSkewDeg ?? this.defaultHatchPatternSkewDeg,
         labelId: ref.labelId || Defaults.defaultLabelId,
         areaLabel: {
           show: !!ref.areaLabel?.show,
@@ -1495,6 +1510,11 @@ export class CadApp {
       strokeColor: this.defaultHatchStrokeColor,
       fillAlphaPct: this.defaultHatchFillAlphaPct,
       strokeWidthPx: this.defaultHatchStrokeWidthPx,
+      patternEnabled: this.defaultHatchPatternEnabled,
+      patternId: this.defaultHatchPatternId,
+      patternScale: this.defaultHatchPatternScale,
+      patternAngleDeg: this.defaultHatchPatternAngleDeg,
+      patternSkewDeg: this.defaultHatchPatternSkewDeg,
       labelId: this.activeDrawLabelId || Defaults.defaultLabelId,
       areaLabel: {
         show: this.defaultAreaShow, textColor: Defaults.areaTextColor, fontSizePx: Defaults.areaFontSizePx,
