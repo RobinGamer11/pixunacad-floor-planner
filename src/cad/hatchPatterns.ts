@@ -219,10 +219,13 @@ export interface HatchPatternOptions {
   angleDeg: number;
   /** Scherung/Verzerrung in Grad (-60..60). */
   skewDeg: number;
+  /** Längung: Streckung in Y-Richtung (1 = quadratisch). */
+  stretch?: number;
   color: string;
   alpha: number;
   lineWidthPx: number;
 }
+
 
 /**
  * Füllt den aktuellen (bereits geclippten) Bereich mit dem Muster.
