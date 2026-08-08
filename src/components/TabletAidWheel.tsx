@@ -61,7 +61,7 @@ export function TabletAidWheel() {
   return (
     <div
       data-tablet-aid="true"
-      className="fixed z-[60] select-none"
+      className="fixed select-none"
       onPointerDownCapture={(e) => { e.preventDefault(); }}
       onPointerMoveCapture={(e) => { e.preventDefault(); }}
       onPointerUpCapture={(e) => { e.preventDefault(); }}
@@ -74,8 +74,13 @@ export function TabletAidWheel() {
         width: size,
         height: size,
         touchAction: "none",
+        // Immer im Vordergrund — über Panels, Hubs, Dialogen und Overlays.
+        zIndex: 2147483000,
+        pointerEvents: "auto",
+        isolation: "isolate",
       }}
     >
+
       {/* Rand = Drag-Griff */}
       <div
         onPointerDown={onDragStart}
