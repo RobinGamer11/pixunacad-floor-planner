@@ -153,7 +153,11 @@ export class EraserTool {
         fillColor: hatch.fillColor, strokeColor: hatch.strokeColor,
         fillAlphaPct: hatch.fillAlphaPct, strokeWidthPx: hatch.strokeWidthPx,
         labelId: hatch.labelId, areaLabel: hatch.areaLabel,
+        patternEnabled: hatch.patternEnabled, patternId: hatch.patternId,
+        patternScale: hatch.patternScale, patternAngleDeg: hatch.patternAngleDeg,
+        patternSkewDeg: hatch.patternSkewDeg,
       };
+
       // Original-Ecken merken → nur die neuen (radierten) Kanten werden geglättet.
       const origKeys = new Set<string>();
       for (const p of hatch.points) origKeys.add(this._key(p.x, p.y));
