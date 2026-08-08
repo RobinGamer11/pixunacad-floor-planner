@@ -134,7 +134,7 @@ function drawTile(ctx: CanvasRenderingContext2D, id: HatchPatternId, s: number, 
         line(ctx, -s, base + bw + s, s * 2, base + bw - s * 2);
         ctx.save();
         ctx.lineWidth = lw * 0.8;
-        for (let x = -s; x <= s * 2; x += bw * 0.75) {
+        for (let x = -s; x <= s * 2; x += bw * 0.45) {
           line(ctx, x, base - x, x + bw / 2, base - x + bw / 2);
         }
         ctx.restore();
