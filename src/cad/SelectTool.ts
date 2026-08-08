@@ -167,8 +167,23 @@ export class SelectTool {
   groupAnchor: Vec2 | null = null;
   /** Anker wird gerade mit der Maus mitgeführt (gesamte Gruppe im Schlepptau). */
   groupAnchorActive = false;
+  /** Menü am Ankerpunkt (Verschieben / Drehen) ist sichtbar. */
+  groupAnchorMenu = false;
+  private _groupMenuRects: { move: { x: number; y: number; w: number; h: number }; rotate: { x: number; y: number; w: number; h: number } } | null = null;
   private _groupAnchorDx = 0;
   private _groupAnchorDy = 0;
+
+  /** Trefferprüfung für das Anker-Menü. */
+  private _groupMenuHit(sx: number, sy: number): "move" | "rotate" | null {
+    const r = this._groupMenuRects;
+    if (!r) return null;
+    const inside = (b: { x: number; y: number; w: number; h: number }) =>
+      sx >= b.x && sx <= b.x + b.w && sy >= b.y && sy <= b.y + b.h;
+    if (inside(r.move)) return "move";
+    if (inside(r.rotate)) return "rotate";
+    return null;
+  }
+
 
   // ── Einfüge-Modus („schwebende“ Kopie) ───────────────────────────────────
   /** Nach Strg+V: Kopie liegt exakt auf dem Original, ist ausgewählt und
