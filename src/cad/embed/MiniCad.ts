@@ -202,6 +202,7 @@ export class MiniCad {
   defaultHatchPatternScale: number = 1;
   defaultHatchPatternAngleDeg: number = 0;
   defaultHatchPatternSkewDeg: number = 0;
+  defaultHatchPatternStretch: number = 1;
   defaultAreaShow: boolean = Defaults.areaShow;
 
   /** Optionaler Callback für React-Panels (Bezeichnungen/Ausgewählter-Stroke-Refresh). */

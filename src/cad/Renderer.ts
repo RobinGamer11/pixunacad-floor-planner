@@ -1573,6 +1573,7 @@ export class Renderer {
         scale: hatch.patternScale ?? 1,
         angleDeg: hatch.patternAngleDeg ?? 0,
         skewDeg: hatch.patternSkewDeg ?? 0,
+        stretch: hatch.patternStretch ?? 1,
         color: hatch.strokeColor || Defaults.hatchStrokeColor,
         alpha: 1,
         lineWidthPx: Math.max(0.6, this._scaledStrokePx(hatch.strokeWidthPx ?? Defaults.hatchStrokePx)),

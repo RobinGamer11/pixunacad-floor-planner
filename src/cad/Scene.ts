@@ -80,10 +80,11 @@ export class Hatch {
   patternScale: number;
   patternAngleDeg: number;
   patternSkewDeg: number;
+  patternStretch: number;
   _stickerEditOwnerId?: string | null;
 
   constructor({ id, points, holes, fillColor, strokeColor, fillAlphaPct, strokeWidthPx, labelId, areaLabel,
-    patternEnabled, patternId, patternScale, patternAngleDeg, patternSkewDeg }: {
+    patternEnabled, patternId, patternScale, patternAngleDeg, patternSkewDeg, patternStretch }: {
     id: string; points: Vec2[]; holes?: Vec2[][]; fillColor?: string; strokeColor?: string;
     fillAlphaPct?: number; strokeWidthPx?: number; labelId?: string; areaLabel?: Partial<AreaLabel>;
     patternEnabled?: boolean; patternId?: string; patternScale?: number;
@@ -102,6 +103,7 @@ export class Hatch {
     this.patternScale = Number.isFinite(patternScale) ? clamp(patternScale!, 0.05, 20) : 1;
     this.patternAngleDeg = Number.isFinite(patternAngleDeg) ? patternAngleDeg! : 0;
     this.patternSkewDeg = Number.isFinite(patternSkewDeg) ? clamp(patternSkewDeg!, -70, 70) : 0;
+    this.patternStretch = Number.isFinite(patternStretch) ? clamp(patternStretch!, 0.1, 10) : 1;
 
     this.areaLabel = {
       show: !!(areaLabel?.show ?? Defaults.areaShow),

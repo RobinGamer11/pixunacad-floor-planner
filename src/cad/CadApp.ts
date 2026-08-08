@@ -187,6 +187,7 @@ export class CadApp {
   defaultHatchPatternScale = 1;
   defaultHatchPatternAngleDeg = 0;
   defaultHatchPatternSkewDeg = 0;
+  defaultHatchPatternStretch = 1;
   defaultAreaShow = Defaults.areaShow;
   defaultAreaBorderEnabled = Defaults.areaBorderEnabled;
   defaultAreaBorderColor = Defaults.areaBorderColor;
