@@ -15,6 +15,7 @@ import { FreeDrawSettingsPanel } from "@/components/cad/FreeDrawSettingsPanel";
 import { EraserSettingsPanel } from "@/components/cad/EraserSettingsPanel";
 import { ProjectFilePickerDialog } from "@/components/cad/ProjectFilePickerDialog";
 import { WallSettingsPanel } from "@/components/cad/WallSettingsPanel";
+import { ToolHelpNotes } from "@/components/cad/ToolHelpNotes";
 
 import { DocumentFilterPanel } from "@/components/cad/DocumentFilterPanel";
 import { WarpSection } from "@/components/page/CadDocumentInspector";
