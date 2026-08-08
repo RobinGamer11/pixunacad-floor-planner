@@ -246,7 +246,10 @@ export class SelectTool {
     this.marqueeCurrent = null;
     this.marqueeActive = false;
     this.cancelGroupTransform(true);
+    this.pasteFloatActive = false;
+    this._pasteBtnRect = null;
     this.marqueeSelectedIds = [];
+
   }
 
   /** Bricht laufendes Gruppen-Verschieben/-Drehen ab (optional mit Rücksetzen). */
