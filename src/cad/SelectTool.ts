@@ -3454,6 +3454,47 @@ export class SelectTool {
       }
     }
 
+    // Einfüge-Modus: Häkchen-Button oben rechts an der Auswahl.
+    this._pasteBtnRect = null;
+    if (this.pasteFloatActive && this.marqueeSelectedIds.length && !this.groupDragActive) {
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const { kind, id } of this.marqueeSelectedIds) {
+        const obj = this._getElementById(kind, id);
+        if (!obj) continue;
+        const pts = this._elementPoints(kind, obj) || [];
+        for (const p of pts) {
+          const s = cam.worldToScreen(p.x, p.y);
+          if (s.x < minX) minX = s.x; if (s.x > maxX) maxX = s.x;
+          if (s.y < minY) minY = s.y; if (s.y > maxY) maxY = s.y;
+        }
+      }
+      if (Number.isFinite(minX)) {
+        const size = 30;
+        const bx = maxX + 12, by = minY - size - 12;
+        this._pasteBtnRect = { x: bx, y: by, w: size, h: size };
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(bx + size / 2, by + size / 2, size / 2, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(22,163,74,0.95)";
+        ctx.fill();
+        ctx.strokeStyle = "rgba(255,255,255,0.9)";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 2.5;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.moveTo(bx + 8, by + size / 2);
+        ctx.lineTo(bx + 13, by + size - 9);
+        ctx.lineTo(bx + size - 7, by + 9);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+
+
+
     // Gruppen-Drehen: Achse vom Schwerpunkt zum Cursor + Winkelanzeige.
     if (this.groupRotateActive && this._groupRotCenter) {
       const c = cam.worldToScreen(this._groupRotCenter.x, this._groupRotCenter.y);
