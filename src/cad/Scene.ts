@@ -1047,13 +1047,19 @@ export class Scene {
     fillColor?: string; strokeColor?: string; fillAlphaPct?: number;
     strokeWidthPx?: number; labelId?: string; areaLabel?: Partial<AreaLabel>;
     holes?: Vec2[][];
+    patternEnabled?: boolean; patternId?: string; patternScale?: number;
+    patternAngleDeg?: number; patternSkewDeg?: number;
   } = {}) {
     const hatch = new Hatch({
       id: this._makeId(), points, holes: style.holes,
       fillColor: style.fillColor, strokeColor: style.strokeColor,
       fillAlphaPct: style.fillAlphaPct, strokeWidthPx: style.strokeWidthPx,
       labelId: style.labelId, areaLabel: style.areaLabel,
+      patternEnabled: style.patternEnabled, patternId: style.patternId,
+      patternScale: style.patternScale, patternAngleDeg: style.patternAngleDeg,
+      patternSkewDeg: style.patternSkewDeg,
     });
+
     hatch._stickerEditOwnerId = this._currentEditOwnerId;
     this.hatches.push(hatch);
     this._rebuildHatchIdMap();
