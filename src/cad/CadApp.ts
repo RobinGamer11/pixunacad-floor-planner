@@ -1469,7 +1469,7 @@ export class CadApp {
         patternId: selected.patternId || this.defaultHatchPatternId,
         patternScale: selected.patternScale ?? this.defaultHatchPatternScale,
         patternAngleDeg: selected.patternAngleDeg ?? this.defaultHatchPatternAngleDeg,
-        patternSkewDeg: selected.patternSkewDeg, patternStretch: selected.patternStretch ?? this.defaultHatchPatternSkewDeg,
+        patternSkewDeg: selected.patternSkewDeg ?? this.defaultHatchPatternSkewDeg, patternStretch: selected.patternStretch ?? this.defaultHatchPatternStretch,
         labelId: selected.labelId || Defaults.defaultLabelId,
         areaLabel: {
           show: !!selected.areaLabel?.show,
@@ -1494,7 +1494,7 @@ export class CadApp {
         patternId: ref.patternId || this.defaultHatchPatternId,
         patternScale: ref.patternScale ?? this.defaultHatchPatternScale,
         patternAngleDeg: ref.patternAngleDeg ?? this.defaultHatchPatternAngleDeg,
-        patternSkewDeg: ref.patternSkewDeg, patternStretch: ref.patternStretch ?? this.defaultHatchPatternSkewDeg,
+        patternSkewDeg: ref.patternSkewDeg ?? this.defaultHatchPatternSkewDeg, patternStretch: ref.patternStretch ?? this.defaultHatchPatternStretch,
         labelId: ref.labelId || Defaults.defaultLabelId,
         areaLabel: {
           show: !!ref.areaLabel?.show,
@@ -1516,7 +1516,7 @@ export class CadApp {
       patternId: this.defaultHatchPatternId,
       patternScale: this.defaultHatchPatternScale,
       patternAngleDeg: this.defaultHatchPatternAngleDeg,
-      patternSkewDeg: this.defaultHatchPatternSkewDeg,
+      patternSkewDeg: this.defaultHatchPatternSkewDeg, patternStretch: this.defaultHatchPatternStretch,
       labelId: this.activeDrawLabelId || Defaults.defaultLabelId,
       areaLabel: {
         show: this.defaultAreaShow, textColor: Defaults.areaTextColor, fontSizePx: Defaults.areaFontSizePx,

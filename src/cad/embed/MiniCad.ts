@@ -1642,7 +1642,7 @@ export class MiniCad {
         patternId: sel.patternId || this.defaultHatchPatternId,
         patternScale: sel.patternScale ?? this.defaultHatchPatternScale,
         patternAngleDeg: sel.patternAngleDeg ?? this.defaultHatchPatternAngleDeg,
-        patternSkewDeg: sel.patternSkewDeg, patternStretch: sel.patternStretch ?? this.defaultHatchPatternSkewDeg,
+        patternSkewDeg: sel.patternSkewDeg ?? this.defaultHatchPatternSkewDeg, patternStretch: sel.patternStretch ?? this.defaultHatchPatternStretch,
         labelId: sel.labelId || Defaults.defaultLabelId,
         areaLabel: {
           show: !!sel.areaLabel?.show,
@@ -1664,7 +1664,7 @@ export class MiniCad {
       patternId: this.defaultHatchPatternId,
       patternScale: this.defaultHatchPatternScale,
       patternAngleDeg: this.defaultHatchPatternAngleDeg,
-      patternSkewDeg: this.defaultHatchPatternSkewDeg,
+      patternSkewDeg: this.defaultHatchPatternSkewDeg, patternStretch: this.defaultHatchPatternStretch,
       labelId: this.activeDrawLabelId || Defaults.defaultLabelId,
       areaLabel: {
         show: this.defaultAreaShow, textColor: Defaults.areaTextColor, fontSizePx: Defaults.areaFontSizePx,
