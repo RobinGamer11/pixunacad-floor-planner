@@ -574,7 +574,7 @@ export class Wall {
     this.labelId = opts.labelId || Defaults.defaultLabelId;
     this.priority = opts.priority ?? (opts.kind === "outer" ? 200 : 100);
     this.patternId = opts.patternId || "none";
-    this.patternScale = Math.max(0.1, Math.min(10, opts.patternScale ?? 1));
+    this.patternScale = Math.max(0.1, Math.min(10, opts.patternScale ?? 2));
     this.patternAlignToWall = !!opts.patternAlignToWall;
     this._stickerEditOwnerId = null;
   }
