@@ -78,7 +78,7 @@ function drawTile(ctx: CanvasRenderingContext2D, id: HatchPatternId, s: number, 
     case "holz": {
       // Maserung: leicht wellige, diagonal verlaufende Linien
       const steps = 24;
-      for (let b = -1; b <= 2; b++) {
+      for (let b = -2; b <= 4; b += 0.5) {
         ctx.beginPath();
         for (let i = 0; i <= steps; i++) {
           const x = (i / steps) * s;
