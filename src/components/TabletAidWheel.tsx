@@ -39,6 +39,9 @@ export function TabletAidWheel() {
     return () => { (window as any).__pixunaTabletCommit = false; };
   }, []);
 
+  // Zentrale Verteilung aller realen Kontakte an die Rad-Knöpfe (iPadOS-fest).
+  useWheelTouchRouter();
+
   const dragRef = useRef<{ startX: number; startY: number; ox: number; oy: number; pointerId: number } | null>(null);
   const onDragStart = (e: React.PointerEvent) => {
     e.preventDefault();
