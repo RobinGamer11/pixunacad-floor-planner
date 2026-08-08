@@ -71,7 +71,11 @@ export function restoreOneScene(scene: Scene, data: SerializedScene | null | und
       fillAlphaPct: h.fillAlphaPct, strokeWidthPx: h.strokeWidthPx,
       labelId: h.labelId, areaLabel: h.areaLabel,
       holes: h.holes || [],
+      patternEnabled: h.patternEnabled, patternId: h.patternId,
+      patternScale: h.patternScale, patternAngleDeg: h.patternAngleDeg,
+      patternSkewDeg: h.patternSkewDeg,
     });
+
     if (h._stickerEditOwnerId) (hatch as any)._stickerEditOwnerId = h._stickerEditOwnerId;
   }
   for (const w of data.walls || []) {
