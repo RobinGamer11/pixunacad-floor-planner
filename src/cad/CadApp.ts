@@ -717,7 +717,7 @@ export class CadApp {
         fillAlphaPct: h.fillAlphaPct, strokeWidthPx: h.strokeWidthPx,
         labelId: h.labelId, areaLabel: h.areaLabel,
         holes: h.holes || [],
-        patternEnabled: h.patternEnabled, patternId: h.patternId, patternScale: h.patternScale, patternAngleDeg: h.patternAngleDeg, patternSkewDeg: h.patternSkewDeg,
+        patternEnabled: h.patternEnabled, patternId: h.patternId, patternScale: h.patternScale, patternAngleDeg: h.patternAngleDeg, patternSkewDeg: h.patternSkewDeg, patternStretch: h.patternStretch,
       });
       if (h._stickerEditOwnerId) hatch._stickerEditOwnerId = h._stickerEditOwnerId;
     }
@@ -1106,7 +1106,7 @@ export class CadApp {
             fillColor: it.fillColor, strokeColor: it.strokeColor,
             fillAlphaPct: it.fillAlphaPct, strokeWidthPx: it.strokeWidthPx,
             labelId: it.labelId, areaLabel: it.areaLabel,
-            patternEnabled: (it as any).patternEnabled, patternId: (it as any).patternId, patternScale: (it as any).patternScale, patternAngleDeg: (it as any).patternAngleDeg, patternSkewDeg: (it as any).patternSkewDeg,
+            patternEnabled: (it as any).patternEnabled, patternId: (it as any).patternId, patternScale: (it as any).patternScale, patternAngleDeg: (it as any).patternAngleDeg, patternSkewDeg: (it as any).patternSkewDeg, patternStretch: (it as any).patternStretch,
           });
         } else if (it.kind === "dimension") {
           this.scene.createDimension(it.p1, it.p2, it.placementPoint, it.mode, it.refDir, {
@@ -1469,7 +1469,7 @@ export class CadApp {
         patternId: selected.patternId || this.defaultHatchPatternId,
         patternScale: selected.patternScale ?? this.defaultHatchPatternScale,
         patternAngleDeg: selected.patternAngleDeg ?? this.defaultHatchPatternAngleDeg,
-        patternSkewDeg: selected.patternSkewDeg ?? this.defaultHatchPatternSkewDeg,
+        patternSkewDeg: selected.patternSkewDeg, patternStretch: selected.patternStretch ?? this.defaultHatchPatternSkewDeg,
         labelId: selected.labelId || Defaults.defaultLabelId,
         areaLabel: {
           show: !!selected.areaLabel?.show,
@@ -1494,7 +1494,7 @@ export class CadApp {
         patternId: ref.patternId || this.defaultHatchPatternId,
         patternScale: ref.patternScale ?? this.defaultHatchPatternScale,
         patternAngleDeg: ref.patternAngleDeg ?? this.defaultHatchPatternAngleDeg,
-        patternSkewDeg: ref.patternSkewDeg ?? this.defaultHatchPatternSkewDeg,
+        patternSkewDeg: ref.patternSkewDeg, patternStretch: ref.patternStretch ?? this.defaultHatchPatternSkewDeg,
         labelId: ref.labelId || Defaults.defaultLabelId,
         areaLabel: {
           show: !!ref.areaLabel?.show,

@@ -87,7 +87,7 @@ export class Hatch {
     id: string; points: Vec2[]; holes?: Vec2[][]; fillColor?: string; strokeColor?: string;
     fillAlphaPct?: number; strokeWidthPx?: number; labelId?: string; areaLabel?: Partial<AreaLabel>;
     patternEnabled?: boolean; patternId?: string; patternScale?: number;
-    patternAngleDeg?: number; patternSkewDeg?: number;
+    patternAngleDeg?: number; patternSkewDeg?: number; patternStretch?: number;
   }) {
     this.id = id;
     this.points = points.map(p => v(p.x, p.y));
@@ -1048,7 +1048,7 @@ export class Scene {
     strokeWidthPx?: number; labelId?: string; areaLabel?: Partial<AreaLabel>;
     holes?: Vec2[][];
     patternEnabled?: boolean; patternId?: string; patternScale?: number;
-    patternAngleDeg?: number; patternSkewDeg?: number;
+    patternAngleDeg?: number; patternSkewDeg?: number; patternStretch?: number;
   } = {}) {
     const hatch = new Hatch({
       id: this._makeId(), points, holes: style.holes,
@@ -1057,7 +1057,7 @@ export class Scene {
       labelId: style.labelId, areaLabel: style.areaLabel,
       patternEnabled: style.patternEnabled, patternId: style.patternId,
       patternScale: style.patternScale, patternAngleDeg: style.patternAngleDeg,
-      patternSkewDeg: style.patternSkewDeg,
+      patternSkewDeg: style.patternSkewDeg, patternStretch: style.patternStretch,
     });
 
     hatch._stickerEditOwnerId = this._currentEditOwnerId;
