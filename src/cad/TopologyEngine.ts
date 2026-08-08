@@ -47,6 +47,8 @@ export class TopologyEngine {
   labels: LabelManager;
   /** Read-only Snap-Quellen aus anderen Blättern (Transparentpause). */
   overlayScenes: Scene[] = [];
+  /** Globale Hilfslinien (Rechtsklick-Anker), werkzeugübergreifend. */
+  guides: import("./globalGuides").GlobalGuides | null = null;
   /** Wand-ID mit Snap-Vorrang (z. B. aktuell selektierte Wand) — deren Eckpunkte gewinnen Ties. */
   priorityWallId: string | null = null;
   /** Wenn true, werden zusätzlich Sub-Linien-Eckpunkte/-Kanten anderer Wände
