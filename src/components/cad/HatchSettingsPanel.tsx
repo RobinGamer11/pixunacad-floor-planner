@@ -12,9 +12,38 @@ const MODES: { value: HatchDrawMode; label: string; Icon: React.ElementType }[] 
   { value: "fill", label: "Füllung", Icon: PaintBucket },
 ];
 
+/** Regler + Zahlenfeld: grob per Slider, fein per Eingabe/Pfeiltasten. */
+const SliderRow: React.FC<{
+  label: string; min: number; max: number; step: number; decimals: number;
+  value: number; onChange: (v: number) => void;
+}> = ({ label, min, max, step, decimals, value, onChange }) => {
+  const clamp = (v: number) => Math.max(min, Math.min(max, v));
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <span className="w-20 shrink-0 text-[10px] text-muted-foreground">{label}</span>
+      <input
+        type="range" min={min} max={max} step={step} value={value}
+        onChange={(e) => onChange(clamp(parseFloat(e.target.value)))}
+        className="h-4 min-w-0 flex-1 cursor-pointer accent-[hsl(var(--accent-gold))]"
+      />
+      <input
+        type="number" min={min} max={max} step={step}
+        value={Number(value.toFixed(decimals))}
+        onChange={(e) => {
+          const v = parseFloat(e.target.value);
+          if (Number.isFinite(v)) onChange(clamp(v));
+        }}
+        className="w-14 shrink-0 rounded border bg-transparent px-1 py-0.5 text-right text-[10px] tabular-nums"
+        style={{ borderColor: "hsl(var(--hairline))" }}
+      />
+    </div>
+  );
+};
+
 interface Props {
   app: CadApp | MiniCad | null;
 }
+
 
 export const HatchSettingsPanel: React.FC<Props> = ({ app }) => {
   const [mode, setMode] = useState<HatchDrawMode>("polygon");
@@ -27,6 +56,7 @@ export const HatchSettingsPanel: React.FC<Props> = ({ app }) => {
   const [patternScale, setPatternScale] = useState(1);
   const [patternAngleDeg, setPatternAngleDeg] = useState(0);
   const [patternSkewDeg, setPatternSkewDeg] = useState(0);
+  const [patternStretch, setPatternStretch] = useState(1);
   const [, force] = useState(0);
 
   const sync = () => {
@@ -44,6 +74,7 @@ export const HatchSettingsPanel: React.FC<Props> = ({ app }) => {
       setPatternScale(sel.patternScale ?? 1);
       setPatternAngleDeg(sel.patternAngleDeg ?? 0);
       setPatternSkewDeg(sel.patternSkewDeg ?? 0);
+      setPatternStretch(sel.patternStretch ?? 1);
     } else {
       setFillColor((app as any).defaultHatchFillColor);
       setStrokeColor((app as any).defaultHatchStrokeColor);
@@ -54,6 +85,7 @@ export const HatchSettingsPanel: React.FC<Props> = ({ app }) => {
       setPatternScale((app as any).defaultHatchPatternScale ?? 1);
       setPatternAngleDeg((app as any).defaultHatchPatternAngleDeg ?? 0);
       setPatternSkewDeg((app as any).defaultHatchPatternSkewDeg ?? 0);
+      setPatternStretch((app as any).defaultHatchPatternStretch ?? 1);
     }
   };
 
@@ -183,47 +215,38 @@ export const HatchSettingsPanel: React.FC<Props> = ({ app }) => {
               ))}
             </select>
 
-            <label className="flex items-center justify-between gap-2">
-              <span className="text-[10px] text-muted-foreground">Skalierung</span>
-              <input
-                type="range" min={0.2} max={20} step={0.1} value={patternScale}
-                onChange={(e) => {
-                  const val = parseFloat(e.target.value);
-                  setPatternScale(val);
-                  apply((h) => { h.patternScale = val; }, () => { if (app) (app as any).defaultHatchPatternScale = val; });
-                }}
-                className="w-28"
-              />
-              <span className="w-9 text-right text-[10px] tabular-nums">{patternScale.toFixed(2)}</span>
-            </label>
+            <SliderRow
+              label="Skalierung" min={0.05} max={20} step={0.01} decimals={2} value={patternScale}
+              onChange={(val) => {
+                setPatternScale(val);
+                apply((h) => { h.patternScale = val; }, () => { if (app) (app as any).defaultHatchPatternScale = val; });
+              }}
+            />
 
-            <label className="flex items-center justify-between gap-2">
-              <span className="text-[10px] text-muted-foreground">Drehung (°)</span>
-              <input
-                type="range" min={-90} max={90} step={1} value={patternAngleDeg}
-                onChange={(e) => {
-                  const val = parseFloat(e.target.value);
-                  setPatternAngleDeg(val);
-                  apply((h) => { h.patternAngleDeg = val; }, () => { if (app) (app as any).defaultHatchPatternAngleDeg = val; });
-                }}
-                className="w-28"
-              />
-              <span className="w-9 text-right text-[10px] tabular-nums">{Math.round(patternAngleDeg)}</span>
-            </label>
+            <SliderRow
+              label="Länge (Streckung)" min={0.1} max={10} step={0.01} decimals={2} value={patternStretch}
+              onChange={(val) => {
+                setPatternStretch(val);
+                apply((h) => { h.patternStretch = val; }, () => { if (app) (app as any).defaultHatchPatternStretch = val; });
+              }}
+            />
 
-            <label className="flex items-center justify-between gap-2">
-              <span className="text-[10px] text-muted-foreground">Verzerrung (°)</span>
-              <input
-                type="range" min={-60} max={60} step={1} value={patternSkewDeg}
-                onChange={(e) => {
-                  const val = parseFloat(e.target.value);
-                  setPatternSkewDeg(val);
-                  apply((h) => { h.patternSkewDeg = val; }, () => { if (app) (app as any).defaultHatchPatternSkewDeg = val; });
-                }}
-                className="w-28"
-              />
-              <span className="w-9 text-right text-[10px] tabular-nums">{Math.round(patternSkewDeg)}</span>
-            </label>
+            <SliderRow
+              label="Drehung (°)" min={-180} max={180} step={0.5} decimals={1} value={patternAngleDeg}
+              onChange={(val) => {
+                setPatternAngleDeg(val);
+                apply((h) => { h.patternAngleDeg = val; }, () => { if (app) (app as any).defaultHatchPatternAngleDeg = val; });
+              }}
+            />
+
+            <SliderRow
+              label="Verzerrung (°)" min={-70} max={70} step={0.5} decimals={1} value={patternSkewDeg}
+              onChange={(val) => {
+                setPatternSkewDeg(val);
+                apply((h) => { h.patternSkewDeg = val; }, () => { if (app) (app as any).defaultHatchPatternSkewDeg = val; });
+              }}
+            />
+
           </div>
         )}
       </div>

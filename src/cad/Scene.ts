@@ -80,14 +80,15 @@ export class Hatch {
   patternScale: number;
   patternAngleDeg: number;
   patternSkewDeg: number;
+  patternStretch: number;
   _stickerEditOwnerId?: string | null;
 
   constructor({ id, points, holes, fillColor, strokeColor, fillAlphaPct, strokeWidthPx, labelId, areaLabel,
-    patternEnabled, patternId, patternScale, patternAngleDeg, patternSkewDeg }: {
+    patternEnabled, patternId, patternScale, patternAngleDeg, patternSkewDeg, patternStretch }: {
     id: string; points: Vec2[]; holes?: Vec2[][]; fillColor?: string; strokeColor?: string;
     fillAlphaPct?: number; strokeWidthPx?: number; labelId?: string; areaLabel?: Partial<AreaLabel>;
     patternEnabled?: boolean; patternId?: string; patternScale?: number;
-    patternAngleDeg?: number; patternSkewDeg?: number;
+    patternAngleDeg?: number; patternSkewDeg?: number; patternStretch?: number;
   }) {
     this.id = id;
     this.points = points.map(p => v(p.x, p.y));
@@ -102,6 +103,7 @@ export class Hatch {
     this.patternScale = Number.isFinite(patternScale) ? clamp(patternScale!, 0.05, 20) : 1;
     this.patternAngleDeg = Number.isFinite(patternAngleDeg) ? patternAngleDeg! : 0;
     this.patternSkewDeg = Number.isFinite(patternSkewDeg) ? clamp(patternSkewDeg!, -70, 70) : 0;
+    this.patternStretch = Number.isFinite(patternStretch) ? clamp(patternStretch!, 0.1, 10) : 1;
 
     this.areaLabel = {
       show: !!(areaLabel?.show ?? Defaults.areaShow),
@@ -1048,7 +1050,7 @@ export class Scene {
     strokeWidthPx?: number; labelId?: string; areaLabel?: Partial<AreaLabel>;
     holes?: Vec2[][];
     patternEnabled?: boolean; patternId?: string; patternScale?: number;
-    patternAngleDeg?: number; patternSkewDeg?: number;
+    patternAngleDeg?: number; patternSkewDeg?: number; patternStretch?: number;
   } = {}) {
     const hatch = new Hatch({
       id: this._makeId(), points, holes: style.holes,
@@ -1057,7 +1059,7 @@ export class Scene {
       labelId: style.labelId, areaLabel: style.areaLabel,
       patternEnabled: style.patternEnabled, patternId: style.patternId,
       patternScale: style.patternScale, patternAngleDeg: style.patternAngleDeg,
-      patternSkewDeg: style.patternSkewDeg,
+      patternSkewDeg: style.patternSkewDeg, patternStretch: style.patternStretch,
     });
 
     hatch._stickerEditOwnerId = this._currentEditOwnerId;

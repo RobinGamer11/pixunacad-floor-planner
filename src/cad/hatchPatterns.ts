@@ -125,34 +125,36 @@ function drawTile(ctx: CanvasRenderingContext2D, id: HatchPatternId, s: number, 
       break;
     }
     case "erdreich": {
-      // Diagonale Bänder mit Sprossen (klassische Erdreich-Schraffur)
-      const d = s * 0.5; // Bandabstand entlang der Diagonalen
+      // Diagonale Bänder mit senkrechten Sprossen (klassische Erdreich-Schraffur)
+      const d = s;              // Bandraster (Y-Achsenabschnitt)
+      const bw = d * 0.42;      // Bandbreite
       for (let b = -2; b <= 4; b += 1) {
         const base = b * d;
-        line(ctx, 0, base, s, base - s);                     // Bandkante 1
-        line(ctx, 0, base + d * 0.45, s, base + d * 0.45 - s); // Bandkante 2
+        line(ctx, -s, base + s, s * 2, base - s * 2);
+        line(ctx, -s, base + bw + s, s * 2, base + bw - s * 2);
         ctx.save();
         ctx.lineWidth = lw * 0.8;
-        for (let x = -s; x <= s * 2; x += d * 0.5) {
-          line(ctx, x, base - x, x, base + d * 0.45 - x);
+        for (let x = -s; x <= s * 2; x += bw * 0.45) {
+          line(ctx, x, base - x, x + bw / 2, base - x + bw / 2);
         }
         ctx.restore();
       }
       break;
     }
     case "daemmung_weich": {
-      // Weiche Dämmung: aneinandergereihte Schlaufen
-      const w = s / 3;
-      for (let i = -1; i <= 3; i++) {
+      // Weiche Dämmung: aneinandergereihte, bauchige Schlaufen
+      const w = s / 2;
+      for (let i = -1; i <= 2; i++) {
         const cx = i * w;
         ctx.beginPath();
         ctx.moveTo(cx, s);
-        ctx.bezierCurveTo(cx - w * 0.35, s * 0.45, cx + w * 0.1, 0, cx + w * 0.5, 0);
-        ctx.bezierCurveTo(cx + w * 0.9, 0, cx + w * 1.35, s * 0.45, cx + w, s);
+        ctx.bezierCurveTo(cx + w * 0.02, s * 0.4, cx + w * 0.12, 0, cx + w * 0.5, 0);
+        ctx.bezierCurveTo(cx + w * 0.88, 0, cx + w * 0.98, s * 0.4, cx + w, s);
         ctx.stroke();
       }
       break;
     }
+
     case "daemmung_hart": {
       // Harte Dämmung: Zickzacklinien
       const rows = 3;
@@ -219,10 +221,13 @@ export interface HatchPatternOptions {
   angleDeg: number;
   /** Scherung/Verzerrung in Grad (-60..60). */
   skewDeg: number;
+  /** Längung: Streckung in Y-Richtung (1 = quadratisch). */
+  stretch?: number;
   color: string;
   alpha: number;
   lineWidthPx: number;
 }
+
 
 /**
  * Füllt den aktuellen (bereits geclippten) Bereich mit dem Muster.
@@ -239,12 +244,14 @@ export function fillWithHatchPattern(
   // Kachelgröße rein in CAD-Einheiten (Meter) -> Bildschirm; zoom-konsistent.
   const tilePx = PATTERN_BASE_TILE_M * Math.max(0.02, opt.scale) * pxPerMeter;
   if (!(tilePx > 0.5) || !Number.isFinite(tilePx)) return;
+  const stretch = Math.max(0.1, Math.min(10, opt.stretch ?? 1));
   // Feste Render-Auflösung der Kachel: kein Umschalten/Runden beim Zoomen.
   const RENDER_PX = 128;
   const k = tilePx / RENDER_PX;
   // Linienstärke im Kachelraum so wählen, dass sie nach Skalierung
   // konstante Bildschirmstärke ergibt.
-  const lwRaw = Math.max(0.35, Math.min(RENDER_PX / 12, opt.lineWidthPx / Math.max(1e-6, k)));
+  const kAvg = k * Math.sqrt(stretch);
+  const lwRaw = Math.max(0.35, Math.min(RENDER_PX / 12, opt.lineWidthPx / Math.max(1e-6, kAvg)));
   const lwTile = Math.round(lwRaw * 4) / 4; // quantisiert -> stabiler Kachel-Cache
   const tile = getPatternTile(opt.patternId, RENDER_PX, opt.color, lwTile);
   const pat = ctx.createPattern(tile, "repeat");
@@ -254,9 +261,10 @@ export function fillWithHatchPattern(
       .translateSelf(originScreen.x, originScreen.y)
       .rotateSelf(opt.angleDeg || 0)
       .skewXSelf(Math.max(-70, Math.min(70, opt.skewDeg || 0)))
-      .scaleSelf(k, k);
+      .scaleSelf(k, k * stretch);
     (pat as any).setTransform?.(m);
   } catch { /* ältere Engine: ohne Transform zeichnen */ }
+
   ctx.save();
   ctx.globalAlpha = opt.alpha;
   ctx.fillStyle = pat;

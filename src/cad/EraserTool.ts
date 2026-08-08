@@ -155,7 +155,7 @@ export class EraserTool {
         labelId: hatch.labelId, areaLabel: hatch.areaLabel,
         patternEnabled: hatch.patternEnabled, patternId: hatch.patternId,
         patternScale: hatch.patternScale, patternAngleDeg: hatch.patternAngleDeg,
-        patternSkewDeg: hatch.patternSkewDeg,
+        patternSkewDeg: hatch.patternSkewDeg, patternStretch: hatch.patternStretch,
       };
 
       // Original-Ecken merken → nur die neuen (radierten) Kanten werden geglättet.

@@ -73,7 +73,7 @@ export function restoreOneScene(scene: Scene, data: SerializedScene | null | und
       holes: h.holes || [],
       patternEnabled: h.patternEnabled, patternId: h.patternId,
       patternScale: h.patternScale, patternAngleDeg: h.patternAngleDeg,
-      patternSkewDeg: h.patternSkewDeg,
+      patternSkewDeg: h.patternSkewDeg, patternStretch: h.patternStretch,
     });
 
     if (h._stickerEditOwnerId) (hatch as any)._stickerEditOwnerId = h._stickerEditOwnerId;
