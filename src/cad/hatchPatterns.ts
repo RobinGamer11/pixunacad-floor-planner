@@ -13,7 +13,12 @@ export type HatchPatternId =
   | "kies"
   | "sand"
   | "ziegelverband"
-  | "holzdielen";
+  | "holzdielen"
+  | "erdreich"
+  | "daemmung_weich"
+  | "daemmung_hart"
+  | "xps"
+  | "abdichtung";
 
 export const HATCH_PATTERNS: { id: HatchPatternId; label: string }[] = [
   { id: "mauerwerk", label: "Mauerwerk" },
@@ -23,10 +28,16 @@ export const HATCH_PATTERNS: { id: HatchPatternId; label: string }[] = [
   { id: "sand", label: "Sand" },
   { id: "ziegelverband", label: "Ziegelverband" },
   { id: "holzdielen", label: "Holzdielen" },
+  { id: "erdreich", label: "Erdreich" },
+  { id: "daemmung_weich", label: "Wärmedämmung weich" },
+  { id: "daemmung_hart", label: "Wärmedämmung hart" },
+  { id: "xps", label: "XPS-Dämmung" },
+  { id: "abdichtung", label: "Abdichtung" },
 ];
 
 /** Basis-Kachelgröße in Metern (bei patternScale = 1). */
-export const PATTERN_BASE_TILE_M = 0.1;
+export const PATTERN_BASE_TILE_M = 0.1 / 15;
+
 
 function line(ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number) {
   ctx.beginPath();
