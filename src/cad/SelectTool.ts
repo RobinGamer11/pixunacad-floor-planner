@@ -212,7 +212,38 @@ export class SelectTool {
     return sx >= r.x && sx <= r.x + r.w && sy >= r.y && sy <= r.y + r.h;
   }
 
+  /** Beliebiger (auch entfernter) Punkt der Auswahl, der der Maus am nächsten liegt. */
+  private _nearestGroupPoint(wx: number, wy: number): Vec2 | null {
+    let best: Vec2 | null = null;
+    let bestD = Infinity;
+    for (const { kind, id } of this.marqueeSelectedIds) {
+      const obj = this._getElementById(kind, id);
+      if (!obj) continue;
+      for (const p of this._elementPoints(kind, obj) || []) {
+        const d = Math.hypot(p.x - wx, p.y - wy);
+        if (d < bestD) { bestD = d; best = v(p.x, p.y); }
+      }
+    }
+    return best;
+  }
+
+  /** Fangt einen Welt-Punkt auf fremde Fangpunkte (eigene Auswahl wird ignoriert). */
+  private _snapWorldPoint(p: Vec2): Vec2 {
+    try {
+      const cam = this.app.camera;
+      const s = cam?.worldToScreen(p.x, p.y);
+      const hit = (this.app as any).topology?.findBestSnap?.(v(s?.x ?? 0, s?.y ?? 0), v(p.x, p.y));
+      if (hit?.world) {
+        // Eigene Auswahl-Punkte nicht als Fangziel verwenden.
+        const own = this._findGroupSnapPoint(hit.world.x, hit.world.y, 1);
+        if (!own) return v(hit.world.x, hit.world.y);
+      }
+    } catch { /* kein Snap verfügbar */ }
+    return v(p.x, p.y);
+  }
+
   /** Nächstgelegener Fangpunkt aller Objekte der Mehrfachauswahl. */
+
   private _findGroupSnapPoint(wx: number, wy: number, tolPx = 12): Vec2 | null {
     if (!this.marqueeSelectedIds.length) return null;
     const scale = this.app.camera?.scale || 80;
