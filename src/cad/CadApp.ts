@@ -568,6 +568,8 @@ export class CadApp {
         fillColor: w.fillColor,
         labelId: w.labelId,
         priority: w.priority,
+        patternId: w.patternId,
+        patternScale: w.patternScale,
         _stickerEditOwnerId: w._stickerEditOwnerId || null,
       })),
       dimensions: scene.dimensions.map(d => ({

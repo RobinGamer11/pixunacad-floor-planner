@@ -210,6 +210,7 @@ export function commitClipboardAt(app: CadApp, clip: Clipboard, mouseW: Vec2): {
         corners: it.corners.map(p => ({ x: p.x + dx, y: p.y + dy })),
         color: it.color, fillColor: it.fillColor,
         priority: it.priority, labelId: it.labelId,
+        patternId: it.patternId, patternScale: it.patternScale,
       });
       if (o) created.push({ kind: "wall", id: o.id });
     } else {

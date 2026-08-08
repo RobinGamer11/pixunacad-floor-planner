@@ -26,6 +26,9 @@ export interface WallToolSettings {
   fillColorAuto: boolean;
   inputMode: WallInputMode;
   labelId: string;
+  /** Baustoff-Schraffur ("none" = keine). */
+  patternId: string;
+  patternScale: number;
 }
 
 interface GuideAnchor {
@@ -92,6 +95,8 @@ export class WallTool {
     fillColorAuto: true,
     inputMode: "chain",
     labelId: Defaults.defaultLabelId,
+    patternId: "none",
+    patternScale: 1,
   };
 
   constructor(app: CadApp) {
@@ -191,6 +196,8 @@ export class WallTool {
       color: this.settings.color,
       fillColor: this.settings.fillColor,
       labelId,
+      patternId: this.settings.patternId,
+      patternScale: this.settings.patternScale,
     });
     this._runConnectionPipeline(newWall);
     this.app.refreshLabelUI?.();
