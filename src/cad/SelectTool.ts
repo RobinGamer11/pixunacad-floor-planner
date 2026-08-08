@@ -2022,7 +2022,7 @@ export class SelectTool {
     }
 
     if (input.clicked && input.keys?.shift && this.marqueeSelectedIds.length >= 1
-        && !this.isEditing() && !this.marqueeActive) {
+        && (!this.isEditing() || this.groupAnchorMenu) && !this.marqueeActive) {
       const gp = this._findGroupSnapPoint(input.mouse.wx, input.mouse.wy, 12);
       if (gp) {
         this.groupAnchor = gp;
