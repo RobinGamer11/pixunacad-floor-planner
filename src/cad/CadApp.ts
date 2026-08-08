@@ -1996,7 +1996,12 @@ export class CadApp {
         if ((k === "z" && e.shiftKey) || k === "y") { e.preventDefault(); this.redo(); return; }
       }
 
-      if ((tag === "input" || tag === "textarea" || tag === "select") && !isHubInput) return;
+      if ((tag === "input" || tag === "textarea" || tag === "select") && !isHubInput) {
+        // ESC wirkt immer: Eingabefeld verlassen und Abbruch-Logik ausführen.
+        if (e.key === "Escape") { try { (document.activeElement as HTMLElement)?.blur?.(); } catch {} }
+        else return;
+      }
+
 
       // Copy / Paste — Shift+C / Shift+V (zusätzlich zu Strg+C/V)
       if (e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
