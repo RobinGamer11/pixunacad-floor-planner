@@ -1356,6 +1356,17 @@ export class Renderer {
       this._drawWallMulti(group.multi, group.fillColor, group.strokeColor, 1.5);
     }
 
+    // Baustoff-Schraffur pro Wand (Mauerwerk, Stahlbeton …), an die
+    // Wanddicke angepasst und in Wandrichtung ausgerichtet.
+    for (const wall of this.scene.walls) {
+      if (wall.labelId !== labelId) continue;
+      if (!this.labels.isVisible(wall.labelId)) continue;
+      if (!wall.patternId || wall.patternId === "none") continue;
+      if (wall.corners.length < 2) continue;
+      this._paintWallPattern(wall);
+    }
+
+
     // 3. Selektion / Helpers / Bezugslinien — pro Wand
     // Eine Wand gilt als selektiert, sobald die Selection eine wallId trägt —
     // egal ob direkt (SelectionType.WALL) oder via Eckpunkt (SelectionType.POINT).
