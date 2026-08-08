@@ -1371,7 +1371,9 @@ export class Renderer {
 
     // Ausrichtung: erste Wandachse
     const a = wall.corners[0], b = wall.corners[1];
-    const angleDeg = -(Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
+    const angleDeg = wall.patternAlignToWall
+      ? -(Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI
+      : 0;
 
     ctx.save();
     ctx.beginPath();

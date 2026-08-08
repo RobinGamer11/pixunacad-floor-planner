@@ -546,6 +546,8 @@ export class Wall {
   patternId: string;
   /** Feinjustierung der Musterdichte (1 = automatisch an Wanddicke angepasst). */
   patternScale: number;
+  /** Muster an Wandrichtung ausrichten (false = einheitliche Richtung bei allen Wänden). */
+  patternAlignToWall: boolean;
   _stickerEditOwnerId?: string | null;
 
   constructor(opts: {
@@ -553,7 +555,7 @@ export class Wall {
     corners: Vec2[]; customName?: string; color?: string; fillColor?: string; labelId?: string;
     priority?: number; hiddenCornerIndices?: number[];
     cornerAnchors?: (WallCornerAnchor | null)[];
-    patternId?: string; patternScale?: number;
+    patternId?: string; patternScale?: number; patternAlignToWall?: boolean;
   }) {
     this.id = opts.id;
     this.kind = opts.kind;
@@ -573,6 +575,7 @@ export class Wall {
     this.priority = opts.priority ?? (opts.kind === "outer" ? 200 : 100);
     this.patternId = opts.patternId || "none";
     this.patternScale = Math.max(0.1, Math.min(10, opts.patternScale ?? 1));
+    this.patternAlignToWall = !!opts.patternAlignToWall;
     this._stickerEditOwnerId = null;
   }
 }
@@ -1180,7 +1183,7 @@ export class Scene {
     corners: Vec2[]; customName?: string; color?: string; fillColor?: string; labelId?: string;
     priority?: number; hiddenCornerIndices?: number[];
     cornerAnchors?: (WallCornerAnchor | null)[];
-    patternId?: string; patternScale?: number;
+    patternId?: string; patternScale?: number; patternAlignToWall?: boolean;
   }) {
     const w = new Wall({ id: this._makeId(), ...opts });
     w._stickerEditOwnerId = this._currentEditOwnerId;

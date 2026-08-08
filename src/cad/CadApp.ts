@@ -570,6 +570,7 @@ export class CadApp {
         priority: w.priority,
         patternId: w.patternId,
         patternScale: w.patternScale,
+        patternAlignToWall: !!w.patternAlignToWall,
         _stickerEditOwnerId: w._stickerEditOwnerId || null,
       })),
       dimensions: scene.dimensions.map(d => ({

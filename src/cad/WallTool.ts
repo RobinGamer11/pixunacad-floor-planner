@@ -29,6 +29,7 @@ export interface WallToolSettings {
   /** Baustoff-Schraffur ("none" = keine). */
   patternId: string;
   patternScale: number;
+  patternAlignToWall: boolean;
 }
 
 interface GuideAnchor {
@@ -97,6 +98,7 @@ export class WallTool {
     labelId: Defaults.defaultLabelId,
     patternId: "none",
     patternScale: 1,
+    patternAlignToWall: false,
   };
 
   constructor(app: CadApp) {
@@ -198,6 +200,7 @@ export class WallTool {
       labelId,
       patternId: this.settings.patternId,
       patternScale: this.settings.patternScale,
+      patternAlignToWall: this.settings.patternAlignToWall,
     });
     this._runConnectionPipeline(newWall);
     this.app.refreshLabelUI?.();
