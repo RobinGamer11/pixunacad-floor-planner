@@ -2797,6 +2797,23 @@ export class CadApp {
       if (this.input.wheelDelta !== 0) this.camera.zoomAt(this.input.wheelDelta, this.input.mouse.sx, this.input.mouse.sy);
       this.input.update(this.camera);
 
+      // Rechtsklick auf einen Fangpunkt setzt/entfernt eine globale Hilfslinie —
+      // werkzeugübergreifend. Linien-/Wandwerkzeug und der Punkt-Edit des
+      // Auswahlwerkzeugs bringen eigene Hilfslinien mit und bleiben unberührt.
+      if (this.input.rightClicked) {
+        const ownGuides = this.activeTool === this.lineTool || this.activeTool === this.wallTool
+          || (this.activeTool === this.selectTool && this.selectTool.isEditing());
+        if (!ownGuides) {
+          const mS = { x: this.input.mouse.sx, y: this.input.mouse.sy };
+          const mW = { x: this.input.mouse.wx, y: this.input.mouse.wy };
+          const snap = this.topology.findBestSnap(mS, mW);
+          if (snap?.world && (snap.type === "POINT" || snap.type === "GUIDE_POINT")) {
+            this.globalGuides.toggleAt(snap.world);
+            this.input.rightClicked = false;
+          }
+        }
+      }
+
       if (this.activePlanId) {
         // Plan-Modus: PlanController bekommt Vorrang (Selektion / Drag / HUB),
         // Werkzeuge bleiben aber zusätzlich nutzbar (Annotation auf dem Plan).
