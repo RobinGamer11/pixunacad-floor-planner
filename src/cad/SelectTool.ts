@@ -1879,6 +1879,23 @@ export class SelectTool {
       }
     }
 
+    // ── Einfüge-Modus: Häkchen-Button bestätigt die Kopie ────────────────
+    if (this.pasteFloatActive) {
+      if (!this.marqueeSelectedIds.length) {
+        this.pasteFloatActive = false;
+        this._pasteBtnRect = null;
+      } else if (this._pasteBtnHit(input.mouse.sx, input.mouse.sy)) {
+        this.app.canvas && (this.app.canvas.style.cursor = "pointer");
+        if (input.clicked || input.mouse.left) {
+          this.confirmPasteFloat();
+          input.clicked = false;
+          input.doubleClicked = false;
+        }
+        this.snap = null;
+        return;
+      }
+    }
+
     // ── Gruppen-Verschieben (Mehrfachauswahl ziehen) ─────────────────────
     {
       const busy = !!(this.dragStickerId || this.dragDocId || this.dragFreeStrokeId
@@ -1900,14 +1917,15 @@ export class SelectTool {
         this.groupDragActive = false;
         this._groupDragLast = null;
         if (this._groupDragMoved) {
-          (this.app as any).commitHistorySnapshot?.();
+          if (!this.pasteFloatActive) (this.app as any).commitHistorySnapshot?.();
           input.clicked = false;
           input.doubleClicked = false;
         }
         this._groupDragMoved = false;
         return;
       }
-      if (!busy && input.mouse.left && !input.keys?.shift && this.marqueeSelectedIds.length > 1
+      const dragMin = this.pasteFloatActive ? 1 : 2;
+      if (!busy && input.mouse.left && !input.keys?.shift && this.marqueeSelectedIds.length >= dragMin
         && !this.marqueeActive && this._hitsGroupSelection(mouseW.x, mouseW.y)) {
         this.groupDragActive = true;
         this._groupDragMoved = false;
@@ -1919,6 +1937,7 @@ export class SelectTool {
         return;
       }
     }
+
 
     // ── Marquee-Rahmen-Auswahl ───────────────────────────────────────────
     // Nur aktiv, wenn nichts anderes läuft (kein Drag, kein Edit, keine
