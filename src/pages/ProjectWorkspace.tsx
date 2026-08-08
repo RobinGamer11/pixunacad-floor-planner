@@ -873,11 +873,13 @@ export default function ProjectWorkspace() {
 
   // ---- Kopieren / Einfügen von Seiten-Elementen -------------------------
   const elementClipboardRef = useRef<any[]>([]);
+  const clipSourceRef = useRef<"cad" | "elements" | null>(null);
   const [canPasteElements, setCanPasteElements] = useState(false);
 
   const runCopySelection = () => {
     const eng = cadEngineApiRef.current?.engine as any;
     if (eng?.hasCopyableSelection?.() && eng.copySelection?.()) {
+      clipSourceRef.current = "cad";
       setCanPasteElements(true);
       return true;
     }
@@ -891,13 +893,14 @@ export default function ProjectWorkspace() {
     }
     if (snaps.length === 0) return false;
     elementClipboardRef.current = snaps;
+    clipSourceRef.current = "elements";
     setCanPasteElements(true);
     return true;
   };
 
   const runPasteClipboard = () => {
     const eng = cadEngineApiRef.current?.engine as any;
-    if (eng?.hasClipboard?.() && eng.pasteClipboard?.()) return true;
+    if (clipSourceRef.current !== "elements" && eng?.hasClipboard?.() && eng.pasteClipboard?.()) return true;
     if (!project || !activePage) return false;
     const snaps = elementClipboardRef.current;
     if (!snaps || snaps.length === 0) return false;
