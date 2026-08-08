@@ -2063,10 +2063,23 @@ export class CadApp {
         if (this.selectTool.startGroupRotate()) { e.preventDefault(); return; }
       }
 
+      // Enter → eingefügte Kopie festsetzen.
+      if (e.key === "Enter" && this.selectTool.pasteFloatActive) {
+        e.preventDefault(); this.selectTool.confirmPasteFloat(); return;
+      }
+
       if (e.key === "Escape") {
+        if (this.selectTool.pasteFloatActive) {
+          e.preventDefault();
+          this.selectTool.cancelGroupTransform(true);
+          this.selectTool.deleteMarqueeSelection();
+          this.selectTool.pasteFloatActive = false;
+          return;
+        }
         if (this.selectTool.groupRotateActive || this.selectTool.groupDragActive) {
           e.preventDefault(); this.selectTool.cancelGroupTransform(true); return;
         }
+
         if (this.isStickerEditing()) { this.exitStickerEdit(); this.clearSelection(); return; }
         if (this.pastePreviewActive) { this.cancelPastePreview(); return; }
         if (this.activeTool === this.lineTool) { this.lineTool.cancel(); this.clearSelection(); this.setSelectedLabelId(null); this.setTool(ToolIds.SELECT); return; }
