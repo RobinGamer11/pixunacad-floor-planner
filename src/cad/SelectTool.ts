@@ -2007,6 +2007,16 @@ export class SelectTool {
       }
     }
 
+    // Klick ohne Shift außerhalb der Gruppe → Mehrfachauswahl aufheben,
+    // damit keine blau markierten „Geister“ zurückbleiben.
+    if (input.clicked && !input.keys?.shift && !this.isEditing() && !this.pasteFloatActive
+        && this.marqueeSelectedIds.length && !this.marqueeActive
+        && !this.dragStickerId && !this.dragDocId && !this.dragTextBoxId
+        && !this.dragFreeStrokeId && !this.dragDimId && !this.rotateTextBoxId) {
+      this.marqueeSelectedIds = [];
+    }
+
+
 
 
 
