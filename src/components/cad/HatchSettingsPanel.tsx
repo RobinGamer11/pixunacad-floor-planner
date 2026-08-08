@@ -12,9 +12,38 @@ const MODES: { value: HatchDrawMode; label: string; Icon: React.ElementType }[] 
   { value: "fill", label: "Füllung", Icon: PaintBucket },
 ];
 
+/** Regler + Zahlenfeld: grob per Slider, fein per Eingabe/Pfeiltasten. */
+const SliderRow: React.FC<{
+  label: string; min: number; max: number; step: number; decimals: number;
+  value: number; onChange: (v: number) => void;
+}> = ({ label, min, max, step, decimals, value, onChange }) => {
+  const clamp = (v: number) => Math.max(min, Math.min(max, v));
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <span className="w-20 shrink-0 text-[10px] text-muted-foreground">{label}</span>
+      <input
+        type="range" min={min} max={max} step={step} value={value}
+        onChange={(e) => onChange(clamp(parseFloat(e.target.value)))}
+        className="h-4 min-w-0 flex-1 cursor-pointer accent-[hsl(var(--accent-gold))]"
+      />
+      <input
+        type="number" min={min} max={max} step={step}
+        value={Number(value.toFixed(decimals))}
+        onChange={(e) => {
+          const v = parseFloat(e.target.value);
+          if (Number.isFinite(v)) onChange(clamp(v));
+        }}
+        className="w-14 shrink-0 rounded border bg-transparent px-1 py-0.5 text-right text-[10px] tabular-nums"
+        style={{ borderColor: "hsl(var(--hairline))" }}
+      />
+    </div>
+  );
+};
+
 interface Props {
   app: CadApp | MiniCad | null;
 }
+
 
 export const HatchSettingsPanel: React.FC<Props> = ({ app }) => {
   const [mode, setMode] = useState<HatchDrawMode>("polygon");
