@@ -23,3 +23,7 @@ Shift = Ortho gegenüber Mittelpunkt (im Kreis-Modus). Tab öffnet/fokussiert Hu
 Erstellte Schraffuren sind danach normale Polygon-Hatches und identisch editierbar (Punkte verschieben, löschen, Edge-Insert via Doppelklick im SelectTool, Flächenlabel etc.).
 
 Geometriehilfsfunktion: `buildCircleOrSectorPoints(center, radius, startDeg, endDeg, segments=96)` in `geometry.ts`.
+
+## Schraffurmuster (2D-CAD)
+Checkbox „Muster“ unter der Füllfarbe aktiviert ein CAD-Muster (Mauerwerk, Stahlbeton, Holz, Kies, Sand, Ziegelverband, Holzdielen) aus `src/cad/hatchPatterns.ts`.
+Darunter: Skalierung, Drehung (°) und Verzerrung/Scherung (°). Felder am Hatch: `patternEnabled`, `patternId`, `patternScale`, `patternAngleDeg`, `patternSkewDeg` (in Serde, Clipboard und Radiergummi mitgeführt).

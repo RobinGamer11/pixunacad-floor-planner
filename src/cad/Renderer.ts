@@ -8,6 +8,7 @@ import { getDimensionGeometry, type DimensionLike } from "./dimensionGeometry";
 import { boxCornersWorld } from "./textGeometry";
 import { getDocWarp, drawWarpedImage } from "./documentWarp";
 import { drawRichTextBox } from "./textRichRenderer";
+import { fillWithHatchPattern, type HatchPatternId } from "./hatchPatterns";
 import { transformedInstanceItems, instanceBoundingCornersWorld } from "./StickerManager";
 import { documentCornersWorld, documentCenterWorld, documentVisibleCornersWorld, documentAnchorsWorld } from "./documentGeometry";
 import { getOrCreateDocMask } from "./documentMask";
@@ -1082,6 +1083,7 @@ export class Renderer {
         ctx.closePath();
         ctx.fillStyle = rgbaFromHex(it.fillColor || Defaults.hatchFillColor, fillAlpha);
         ctx.fill();
+        this._paintHatchPattern(ctx, cam, it);
         const strokePx = this._scaledStrokePx(it.strokeWidthPx ?? Defaults.hatchStrokePx);
         if (strokePx > 0) {
           ctx.strokeStyle = it.strokeColor || Defaults.hatchStrokeColor;
@@ -1546,6 +1548,39 @@ export class Renderer {
     }
   }
 
+  /** Legt das CAD-Schraffurmuster über die aktuell aufgebaute (geclippte) Fläche. */
+  private _paintHatchPattern(ctx: CanvasRenderingContext2D, cam: Camera, hatch: any) {
+    if (!hatch?.patternEnabled || !hatch.points?.length) return;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const p of hatch.points) {
+      const sp = cam.worldToScreen(p.x, p.y);
+      if (sp.x < minX) minX = sp.x;
+      if (sp.y < minY) minY = sp.y;
+      if (sp.x > maxX) maxX = sp.x;
+      if (sp.y > maxY) maxY = sp.y;
+    }
+    if (!Number.isFinite(minX)) return;
+    const origin = cam.worldToScreen(0, 0);
+    const pxPerMeter = Math.abs(cam.worldToScreen(1, 0).x - origin.x) || 1;
+    ctx.save();
+    ctx.clip("evenodd");
+    fillWithHatchPattern(
+      ctx,
+      { x: minX - 2, y: minY - 2, w: (maxX - minX) + 4, h: (maxY - minY) + 4 },
+      origin, pxPerMeter,
+      {
+        patternId: (hatch.patternId || "mauerwerk") as HatchPatternId,
+        scale: hatch.patternScale ?? 1,
+        angleDeg: hatch.patternAngleDeg ?? 0,
+        skewDeg: hatch.patternSkewDeg ?? 0,
+        color: hatch.strokeColor || Defaults.hatchStrokeColor,
+        alpha: 1,
+        lineWidthPx: Math.max(0.6, this._scaledStrokePx(hatch.strokeWidthPx ?? Defaults.hatchStrokePx)),
+      },
+    );
+    ctx.restore();
+  }
+
   private _drawSingleHatch(hatch: Hatch) {
     if (hatch.points.length < 3) return;
     const ctx = this.ctx;
@@ -1584,6 +1619,8 @@ export class Renderer {
 
     ctx.fillStyle = fillCol;
     ctx.fill("evenodd");
+
+    this._paintHatchPattern(ctx, cam, hatch);
 
     if (strokePx > 0) {
       ctx.strokeStyle = strokeCol;

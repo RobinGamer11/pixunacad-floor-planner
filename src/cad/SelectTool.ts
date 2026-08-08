@@ -243,7 +243,11 @@ export class SelectTool {
   }
 
   /** Fangt einen Welt-Punkt auf fremde Fangpunkte (eigene Auswahl wird ignoriert). */
+  /** Letzter Fang-Treffer beim Gruppen-Verschieben (für die Anzeige). */
+  private _lastGroupSnap: any = null;
+
   private _snapWorldPoint(p: Vec2): Vec2 {
+    this._lastGroupSnap = null;
     try {
       const cam = this.app.camera;
       const s = cam?.worldToScreen(p.x, p.y);
@@ -251,7 +255,10 @@ export class SelectTool {
       if (hit?.world) {
         // Eigene Auswahl-Punkte nicht als Fangziel verwenden.
         const own = this._findGroupSnapPoint(hit.world.x, hit.world.y, 1);
-        if (!own) return v(hit.world.x, hit.world.y);
+        if (!own) {
+          this._lastGroupSnap = hit;
+          return v(hit.world.x, hit.world.y);
+        }
       }
     } catch { /* kein Snap verfügbar */ }
     return v(p.x, p.y);
@@ -1960,12 +1967,7 @@ export class SelectTool {
       if (!this.marqueeSelectedIds.length) {
         this.cancelGroupTransform(false);
       } else {
-        let target = v(input.mouse.wx, input.mouse.wy);
-        try {
-          const s = (this.app as any).topology?.findBestSnap?.(
-            v(input.mouse.sx, input.mouse.sy), v(input.mouse.wx, input.mouse.wy));
-          if (s?.world) target = v(s.world.x, s.world.y);
-        } catch { /* kein Snap verfügbar */ }
+        const target = this._snapWorldPoint(v(input.mouse.wx, input.mouse.wy));
         const dx = target.x - this.groupAnchor.x;
         const dy = target.y - this.groupAnchor.y;
         if (dx || dy) {
@@ -1985,7 +1987,7 @@ export class SelectTool {
             (this.app as any).commitHistorySnapshot?.();
           }
         }
-        this.snap = null;
+        this.snap = this._lastGroupSnap;
         return;
       }
     }
@@ -2123,7 +2125,8 @@ export class SelectTool {
 
           }
           this._groupDragLast = mouseW;
-          this.snap = null;
+          // Fremde Fangpunkte werden beim Gruppen-Verschieben angezeigt.
+          this.snap = this._lastGroupSnap;
           return;
         }
         this.groupDragActive = false;

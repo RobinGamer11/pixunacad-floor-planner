@@ -197,6 +197,11 @@ export class MiniCad {
   defaultHatchFillAlphaPct: number = Defaults.hatchFillAlphaPct;
   /** Radierte Schraffur-Kanten automatisch glätten. */
   defaultHatchAutoSmooth: boolean = true;
+  defaultHatchPatternEnabled: boolean = false;
+  defaultHatchPatternId: string = "mauerwerk";
+  defaultHatchPatternScale: number = 1;
+  defaultHatchPatternAngleDeg: number = 0;
+  defaultHatchPatternSkewDeg: number = 0;
   defaultAreaShow: boolean = Defaults.areaShow;
 
   /** Optionaler Callback für React-Panels (Bezeichnungen/Ausgewählter-Stroke-Refresh). */
@@ -1139,6 +1144,7 @@ export class MiniCad {
             fillAlphaPct: h.fillAlphaPct, strokeWidthPx: h.strokeWidthPx,
             labelId: h.labelId || Defaults.defaultLabelId,
             areaLabel: h.areaLabel,
+            patternEnabled: h.patternEnabled, patternId: h.patternId, patternScale: h.patternScale, patternAngleDeg: h.patternAngleDeg, patternSkewDeg: h.patternSkewDeg,
           });
         } catch (e) { console.error("MiniCad restore hatch:", e); }
       }
@@ -1459,7 +1465,8 @@ export class MiniCad {
           const n = this.scene.createHatch(o.points.map(mv), {
             holes: (o.holes ?? []).map((h: any[]) => h.map(mv)),
             fillColor: o.fillColor, strokeColor: o.strokeColor, fillAlphaPct: o.fillAlphaPct,
-            strokeWidthPx: o.strokeWidthPx, labelId: o.labelId, areaLabel: o.areaLabel });
+            strokeWidthPx: o.strokeWidthPx, labelId: o.labelId, areaLabel: o.areaLabel,
+            patternEnabled: o.patternEnabled, patternId: o.patternId, patternScale: o.patternScale, patternAngleDeg: o.patternAngleDeg, patternSkewDeg: o.patternSkewDeg, });
           if (n) created.push({ kind: "hatch", id: n.id });
         } else if (it.kind === "textBox") {
           const n = this.scene.createTextBox(mv(o.center), o.widthM, o.heightM, o.style, o.html, o.rotationRad);
@@ -1631,6 +1638,11 @@ export class MiniCad {
         strokeColor: sel.strokeColor || this.defaultHatchStrokeColor,
         fillAlphaPct: sel.fillAlphaPct ?? this.defaultHatchFillAlphaPct,
         strokeWidthPx: (typeof sel.strokeWidthPx === "number") ? sel.strokeWidthPx : this.defaultHatchStrokeWidthPx,
+        patternEnabled: !!sel.patternEnabled,
+        patternId: sel.patternId || this.defaultHatchPatternId,
+        patternScale: sel.patternScale ?? this.defaultHatchPatternScale,
+        patternAngleDeg: sel.patternAngleDeg ?? this.defaultHatchPatternAngleDeg,
+        patternSkewDeg: sel.patternSkewDeg ?? this.defaultHatchPatternSkewDeg,
         labelId: sel.labelId || Defaults.defaultLabelId,
         areaLabel: {
           show: !!sel.areaLabel?.show,
@@ -1648,6 +1660,11 @@ export class MiniCad {
       strokeColor: this.defaultHatchStrokeColor,
       fillAlphaPct: this.defaultHatchFillAlphaPct,
       strokeWidthPx: this.defaultHatchStrokeWidthPx,
+      patternEnabled: this.defaultHatchPatternEnabled,
+      patternId: this.defaultHatchPatternId,
+      patternScale: this.defaultHatchPatternScale,
+      patternAngleDeg: this.defaultHatchPatternAngleDeg,
+      patternSkewDeg: this.defaultHatchPatternSkewDeg,
       labelId: this.activeDrawLabelId || Defaults.defaultLabelId,
       areaLabel: {
         show: this.defaultAreaShow, textColor: Defaults.areaTextColor, fontSizePx: Defaults.areaFontSizePx,

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { Spline, RectangleHorizontal, Circle, PaintBucket, Waves } from "lucide-react";
+import { Spline, RectangleHorizontal, Circle, PaintBucket, Waves, Grid2X2, Check } from "lucide-react";
+import { HATCH_PATTERNS } from "@/cad/hatchPatterns";
 import type { CadApp } from "@/cad/CadApp";
 import type { MiniCad } from "@/cad/embed/MiniCad";
 import type { HatchDrawMode } from "@/cad/HatchTool";
@@ -21,6 +22,11 @@ export const HatchSettingsPanel: React.FC<Props> = ({ app }) => {
   const [strokeColor, setStrokeColor] = useState("#111111");
   const [strokeWidthPx, setStrokeWidthPx] = useState(1);
   const [fillAlphaPct, setFillAlphaPct] = useState(35);
+  const [patternEnabled, setPatternEnabled] = useState(false);
+  const [patternId, setPatternId] = useState("mauerwerk");
+  const [patternScale, setPatternScale] = useState(1);
+  const [patternAngleDeg, setPatternAngleDeg] = useState(0);
+  const [patternSkewDeg, setPatternSkewDeg] = useState(0);
   const [, force] = useState(0);
 
   const sync = () => {
@@ -33,11 +39,21 @@ export const HatchSettingsPanel: React.FC<Props> = ({ app }) => {
       setStrokeColor(sel.strokeColor || (app as any).defaultHatchStrokeColor);
       setStrokeWidthPx(typeof sel.strokeWidthPx === "number" ? sel.strokeWidthPx : (app as any).defaultHatchStrokeWidthPx);
       setFillAlphaPct(sel.fillAlphaPct ?? (app as any).defaultHatchFillAlphaPct);
+      setPatternEnabled(!!sel.patternEnabled);
+      setPatternId(sel.patternId || (app as any).defaultHatchPatternId || "mauerwerk");
+      setPatternScale(sel.patternScale ?? 1);
+      setPatternAngleDeg(sel.patternAngleDeg ?? 0);
+      setPatternSkewDeg(sel.patternSkewDeg ?? 0);
     } else {
       setFillColor((app as any).defaultHatchFillColor);
       setStrokeColor((app as any).defaultHatchStrokeColor);
       setStrokeWidthPx((app as any).defaultHatchStrokeWidthPx);
       setFillAlphaPct((app as any).defaultHatchFillAlphaPct);
+      setPatternEnabled(!!(app as any).defaultHatchPatternEnabled);
+      setPatternId((app as any).defaultHatchPatternId || "mauerwerk");
+      setPatternScale((app as any).defaultHatchPatternScale ?? 1);
+      setPatternAngleDeg((app as any).defaultHatchPatternAngleDeg ?? 0);
+      setPatternSkewDeg((app as any).defaultHatchPatternSkewDeg ?? 0);
     }
   };
 
@@ -124,6 +140,94 @@ export const HatchSettingsPanel: React.FC<Props> = ({ app }) => {
           />
         </label>
       </div>
+
+      {/* ── Schraffurmuster ─────────────────────────────────────── */}
+      <div className="space-y-2 rounded border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
+        <button
+          type="button"
+          onClick={() => {
+            const next = !patternEnabled;
+            setPatternEnabled(next);
+            apply((h) => { h.patternEnabled = next; }, () => { if (app) (app as any).defaultHatchPatternEnabled = next; });
+          }}
+          className="flex w-full items-center gap-2 text-[11px]"
+          aria-pressed={patternEnabled}
+        >
+          <span
+            className="flex h-4 w-4 items-center justify-center rounded border"
+            style={{
+              borderColor: "hsl(var(--hairline))",
+              background: patternEnabled ? "hsl(var(--accent-gold-soft))" : "transparent",
+              color: "hsl(var(--accent-gold))",
+            }}
+          >
+            {patternEnabled && <Check size={11} />}
+          </span>
+          <span className="flex items-center gap-1.5"><Grid2X2 size={13} /> Muster</span>
+        </button>
+
+        {patternEnabled && (
+          <div className="space-y-2">
+            <select
+              value={patternId}
+              onChange={(e) => {
+                const val = e.target.value;
+                setPatternId(val);
+                apply((h) => { h.patternId = val; }, () => { if (app) (app as any).defaultHatchPatternId = val; });
+              }}
+              className="w-full rounded border bg-transparent px-1.5 py-1 text-[11px]"
+              style={{ borderColor: "hsl(var(--hairline))" }}
+            >
+              {HATCH_PATTERNS.map((p) => (
+                <option key={p.id} value={p.id}>{p.label}</option>
+              ))}
+            </select>
+
+            <label className="flex items-center justify-between gap-2">
+              <span className="text-[10px] text-muted-foreground">Skalierung</span>
+              <input
+                type="range" min={0.1} max={5} step={0.05} value={patternScale}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value);
+                  setPatternScale(val);
+                  apply((h) => { h.patternScale = val; }, () => { if (app) (app as any).defaultHatchPatternScale = val; });
+                }}
+                className="w-28"
+              />
+              <span className="w-9 text-right text-[10px] tabular-nums">{patternScale.toFixed(2)}</span>
+            </label>
+
+            <label className="flex items-center justify-between gap-2">
+              <span className="text-[10px] text-muted-foreground">Drehung (°)</span>
+              <input
+                type="range" min={-90} max={90} step={1} value={patternAngleDeg}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value);
+                  setPatternAngleDeg(val);
+                  apply((h) => { h.patternAngleDeg = val; }, () => { if (app) (app as any).defaultHatchPatternAngleDeg = val; });
+                }}
+                className="w-28"
+              />
+              <span className="w-9 text-right text-[10px] tabular-nums">{Math.round(patternAngleDeg)}</span>
+            </label>
+
+            <label className="flex items-center justify-between gap-2">
+              <span className="text-[10px] text-muted-foreground">Verzerrung (°)</span>
+              <input
+                type="range" min={-60} max={60} step={1} value={patternSkewDeg}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value);
+                  setPatternSkewDeg(val);
+                  apply((h) => { h.patternSkewDeg = val; }, () => { if (app) (app as any).defaultHatchPatternSkewDeg = val; });
+                }}
+                className="w-28"
+              />
+              <span className="w-9 text-right text-[10px] tabular-nums">{Math.round(patternSkewDeg)}</span>
+            </label>
+          </div>
+        )}
+      </div>
+
 
       <label className="flex items-center justify-between gap-2">
         <span className="text-[10px] text-muted-foreground">Linienstärke (px)</span>
