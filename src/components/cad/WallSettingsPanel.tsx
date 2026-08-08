@@ -265,14 +265,27 @@ export const WallSettingsPanel: React.FC<Props> = ({ app }) => {
             ))}
           </select>
           {patternId !== "none" && (
-            <div className="mt-2">
-              <label>Musterdichte (1 = auto, an Wanddicke)</label>
-              <input
-                type="number" step="0.05" min="0.1" max="10"
-                value={patternScale}
-                onChange={e => setPatternScale(parseFloat(e.target.value) || 1)}
-              />
-            </div>
+            <>
+              <div className="mt-2">
+                <label>Musterdichte (1 = auto, an Wanddicke)</label>
+                <input
+                  type="number" step="0.05" min="0.1" max="10"
+                  value={patternScale}
+                  onChange={e => setPatternScale(parseFloat(e.target.value) || 1)}
+                />
+              </div>
+              <label className="mt-2 flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={patternAlign}
+                  onChange={e => setPatternAlign(e.target.checked)}
+                />
+                <span className="text-[11px]">Muster an Wandrichtung drehen</span>
+              </label>
+              <div className="text-[10px] mt-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+                Aus = einheitliche Musterrichtung bei allen Wänden.
+              </div>
+            </>
           )}
         </div>
 
