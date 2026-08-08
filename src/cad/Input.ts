@@ -76,6 +76,8 @@ export class Input {
   private _pinchLastDist = 0;
   private _pinchLastCenter = { x: 0, y: 0 };
   private _touchPanId: number | null = null;
+  /** Pointer, der aktuell die "linke Maustaste" hält (Stift/Finger/Maus). */
+  private _drawPointerId: number | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
