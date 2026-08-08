@@ -12,6 +12,8 @@ interface HatchSnap {
   fillColor: string; strokeColor: string;
   fillAlphaPct: number; strokeWidthPx: number;
   labelId: string; areaLabel: AreaLabel;
+  patternEnabled?: boolean; patternId?: string; patternScale?: number;
+  patternAngleDeg?: number; patternSkewDeg?: number;
 }
 interface DimensionSnap {
   kind: "dimension"; p1: Vec2; p2: Vec2; placementPoint: Vec2;
@@ -52,7 +54,10 @@ function snapHatch(h: Hatch): HatchSnap {
   return { kind: "hatch", points: h.points.map(p => v(p.x, p.y)),
     fillColor: h.fillColor, strokeColor: h.strokeColor,
     fillAlphaPct: h.fillAlphaPct, strokeWidthPx: h.strokeWidthPx,
-    labelId: h.labelId, areaLabel: { ...h.areaLabel } };
+    labelId: h.labelId, areaLabel: { ...h.areaLabel },
+    patternEnabled: h.patternEnabled, patternId: h.patternId,
+    patternScale: h.patternScale, patternAngleDeg: h.patternAngleDeg,
+    patternSkewDeg: h.patternSkewDeg };
 }
 function snapDimension(d: Dimension): DimensionSnap {
   return { kind: "dimension",
