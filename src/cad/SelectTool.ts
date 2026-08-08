@@ -153,6 +153,9 @@ export class SelectTool {
   groupDragActive = false;
   private _groupDragLast: Vec2 | null = null;
   private _groupDragMoved = false;
+  /** Fang-Anker der Gruppe beim Verschieben/Einfügen (Welt-Koordinate). */
+  private _groupDragAnchor: Vec2 | null = null;
+
   groupRotateActive = false;
   private _groupRotCenter: Vec2 | null = null;
   private _groupRotLastAngle = 0;
