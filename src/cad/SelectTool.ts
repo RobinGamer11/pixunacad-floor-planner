@@ -345,7 +345,9 @@ export class SelectTool {
     this.groupRotApplied = 0;
     this.groupDragActive = false;
     this._groupDragLast = null;
+    this._groupDragAnchor = null;
     this._groupDragMoved = false;
+
   }
 
   /** Startet das Drehen der Mehrfachauswahl um deren Schwerpunkt — oder um den
