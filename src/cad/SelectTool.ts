@@ -353,6 +353,8 @@ export class SelectTool {
       }
     }
     this.groupAnchorActive = false;
+    this.groupAnchorMenu = false;
+    this._groupMenuRects = null;
     this._groupAnchorDx = 0;
     this._groupAnchorDy = 0;
     this.groupRotateActive = false;
