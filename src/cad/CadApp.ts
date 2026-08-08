@@ -2063,10 +2063,23 @@ export class CadApp {
         if (this.selectTool.startGroupRotate()) { e.preventDefault(); return; }
       }
 
+      // Enter → eingefügte Kopie festsetzen.
+      if (e.key === "Enter" && this.selectTool.pasteFloatActive) {
+        e.preventDefault(); this.selectTool.confirmPasteFloat(); return;
+      }
+
       if (e.key === "Escape") {
+        if (this.selectTool.pasteFloatActive) {
+          e.preventDefault();
+          this.selectTool.cancelGroupTransform(true);
+          this.selectTool.deleteMarqueeSelection();
+          this.selectTool.pasteFloatActive = false;
+          return;
+        }
         if (this.selectTool.groupRotateActive || this.selectTool.groupDragActive) {
           e.preventDefault(); this.selectTool.cancelGroupTransform(true); return;
         }
+
         if (this.isStickerEditing()) { this.exitStickerEdit(); this.clearSelection(); return; }
         if (this.pastePreviewActive) { this.cancelPastePreview(); return; }
         if (this.activeTool === this.lineTool) { this.lineTool.cancel(); this.clearSelection(); this.setSelectedLabelId(null); this.setTool(ToolIds.SELECT); return; }
@@ -2226,10 +2239,14 @@ export class CadApp {
     return true;
   }
 
+  /**
+   * Fügt die Zwischenablage exakt an der Ursprungsposition ein. Die Kopie ist
+   * sofort als Gruppe ausgewählt, frei verschiebbar und wird per Häkchen-
+   * Symbol (oder Enter) gesetzt.
+   */
   startPastePreview(): boolean {
     if (!this.clipboard || this.clipboard.items.length === 0) return false;
     if (this.textEditor?.isActive()) return false;
-    // Switch to select tool but stay in a paste-overlay mode
     if (this.activeTool !== this.selectTool) {
       this._toolBeforePaste = (this.activeTool as any).id || ToolIds.SELECT;
       this.setTool(ToolIds.SELECT);
@@ -2239,9 +2256,17 @@ export class CadApp {
     this.clearSelection();
     this.setSelectedLabelId(null);
     this.pointEditMenu.hide();
-    this.pastePreviewActive = true;
-    this.canvas.style.cursor = "copy";
+    this.pastePreviewActive = false;
+    const created = commitClipboardAt(this, this.clipboard, v(this.clipboard.anchor.x, this.clipboard.anchor.y));
+    if (!created.length) return false;
+    this.selectTool.beginPasteFloat(created);
+    this.refreshLabelUI();
     return true;
+  }
+
+  /** Häkchen / Enter: eingefügte Kopie festsetzen. */
+  confirmPasteFloat(): boolean {
+    return this.selectTool.confirmPasteFloat();
   }
 
   cancelPastePreview() {

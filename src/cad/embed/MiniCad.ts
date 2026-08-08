@@ -1441,31 +1441,45 @@ export class MiniCad {
     return true;
   }
 
-  /** Fügt die Zwischenablage leicht versetzt ein. */
+  /**
+   * Fügt die Zwischenablage exakt an der Ursprungsposition ein. Die Kopie ist
+   * sofort als Gruppe ausgewählt, verschiebbar und wird per Häkchen bestätigt.
+   */
   pasteClipboard(): boolean {
     if (this._miniClipboard.length === 0) return false;
-    this._miniPasteRound += 1;
-    const d = 0.25 * this._miniPasteRound;
-    const mv = (p: any) => ({ x: p.x + d, y: p.y + d });
+    const mv = (p: any) => ({ x: p.x, y: p.y });
+    const created: { kind: string; id: string }[] = [];
     for (const it of this._miniClipboard) {
       const o = it.data;
       try {
         if (it.kind === "segment") {
-          this.scene.createSegment(mv(o.a), mv(o.b), { color: o.color, thicknessM: o.thicknessM, labelId: o.labelId });
+          const n = this.scene.createSegment(mv(o.a), mv(o.b), { color: o.color, thicknessM: o.thicknessM, labelId: o.labelId });
+          if (n) created.push({ kind: "segment", id: n.id });
         } else if (it.kind === "hatch") {
-          this.scene.createHatch(o.points.map(mv), {
+          const n = this.scene.createHatch(o.points.map(mv), {
             holes: (o.holes ?? []).map((h: any[]) => h.map(mv)),
             fillColor: o.fillColor, strokeColor: o.strokeColor, fillAlphaPct: o.fillAlphaPct,
             strokeWidthPx: o.strokeWidthPx, labelId: o.labelId, areaLabel: o.areaLabel });
+          if (n) created.push({ kind: "hatch", id: n.id });
         } else if (it.kind === "textBox") {
-          this.scene.createTextBox(mv(o.center), o.widthM, o.heightM, o.style, o.html, o.rotationRad);
+          const n = this.scene.createTextBox(mv(o.center), o.widthM, o.heightM, o.style, o.html, o.rotationRad);
+          if (n) created.push({ kind: "textbox", id: n.id });
         } else if (it.kind === "freeStroke") {
           const { points, ...style } = o;
-          this.scene.createFreeStroke(points.map(mv), style);
+          const n = this.scene.createFreeStroke(points.map(mv), style);
+          if (n) created.push({ kind: "freeStroke", id: (n as any).id });
         } else if (it.kind === "dimension") {
-          this.scene.createDimension(mv(o.p1), mv(o.p2), mv(o.placementPoint), o.mode, o.refDir, o.style);
+          const n = this.scene.createDimension(mv(o.p1), mv(o.p2), mv(o.placementPoint), o.mode, o.refDir, o.style);
+          if (n) created.push({ kind: "dimension", id: n.id });
         }
       } catch { /* einzelne Objekte überspringen */ }
+    }
+    if (created.length) {
+      try {
+        if (this._activeTool !== "select") this.setTool("select");
+        this.clearSelection?.();
+        this.selectTool.beginPasteFloat(created);
+      } catch { /* Auswahl optional */ }
     }
     this._changeDirty = true;
     try { this._onChange?.(); } catch {}

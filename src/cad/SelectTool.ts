@@ -159,6 +159,38 @@ export class SelectTool {
   /** Gesamt angewandter Winkel (für Anzeige / Abbruch). */
   groupRotApplied = 0;
 
+  // ── Einfüge-Modus („schwebende“ Kopie) ───────────────────────────────────
+  /** Nach Strg+V: Kopie liegt exakt auf dem Original, ist ausgewählt und
+   *  verschiebbar. Bestätigt wird per Häkchen-Symbol oder Enter. */
+  pasteFloatActive = false;
+  private _pasteBtnRect: { x: number; y: number; w: number; h: number } | null = null;
+
+  /** Startet den Einfüge-Modus für die frisch erzeugten Objekte. */
+  beginPasteFloat(ids: { kind: string; id: string }[]) {
+    if (!ids.length) return;
+    this.marqueeSelectedIds = ids.slice();
+    this.pasteFloatActive = true;
+    this._pasteBtnRect = null;
+  }
+
+  /** Bestätigt die eingefügte Kopie (Häkchen / Enter). */
+  confirmPasteFloat(): boolean {
+    if (!this.pasteFloatActive) return false;
+    this.pasteFloatActive = false;
+    this._pasteBtnRect = null;
+    this.marqueeSelectedIds = [];
+    this.cancelGroupTransform(false);
+    (this.app as any).commitHistorySnapshot?.();
+    return true;
+  }
+
+  private _pasteBtnHit(sx: number, sy: number): boolean {
+    const r = this._pasteBtnRect;
+    if (!r) return false;
+    return sx >= r.x && sx <= r.x + r.w && sy >= r.y && sy <= r.y + r.h;
+  }
+
+
 
 
 
@@ -214,7 +246,10 @@ export class SelectTool {
     this.marqueeCurrent = null;
     this.marqueeActive = false;
     this.cancelGroupTransform(true);
+    this.pasteFloatActive = false;
+    this._pasteBtnRect = null;
     this.marqueeSelectedIds = [];
+
   }
 
   /** Bricht laufendes Gruppen-Verschieben/-Drehen ab (optional mit Rücksetzen). */
@@ -1847,6 +1882,23 @@ export class SelectTool {
       }
     }
 
+    // ── Einfüge-Modus: Häkchen-Button bestätigt die Kopie ────────────────
+    if (this.pasteFloatActive) {
+      if (!this.marqueeSelectedIds.length) {
+        this.pasteFloatActive = false;
+        this._pasteBtnRect = null;
+      } else if (this._pasteBtnHit(input.mouse.sx, input.mouse.sy)) {
+        this.app.canvas && (this.app.canvas.style.cursor = "pointer");
+        if (input.clicked || input.mouse.left) {
+          this.confirmPasteFloat();
+          input.clicked = false;
+          input.doubleClicked = false;
+        }
+        this.snap = null;
+        return;
+      }
+    }
+
     // ── Gruppen-Verschieben (Mehrfachauswahl ziehen) ─────────────────────
     {
       const busy = !!(this.dragStickerId || this.dragDocId || this.dragFreeStrokeId
@@ -1868,14 +1920,15 @@ export class SelectTool {
         this.groupDragActive = false;
         this._groupDragLast = null;
         if (this._groupDragMoved) {
-          (this.app as any).commitHistorySnapshot?.();
+          if (!this.pasteFloatActive) (this.app as any).commitHistorySnapshot?.();
           input.clicked = false;
           input.doubleClicked = false;
         }
         this._groupDragMoved = false;
         return;
       }
-      if (!busy && input.mouse.left && !input.keys?.shift && this.marqueeSelectedIds.length > 1
+      const dragMin = this.pasteFloatActive ? 1 : 2;
+      if (!busy && input.mouse.left && !input.keys?.shift && this.marqueeSelectedIds.length >= dragMin
         && !this.marqueeActive && this._hitsGroupSelection(mouseW.x, mouseW.y)) {
         this.groupDragActive = true;
         this._groupDragMoved = false;
@@ -1887,6 +1940,7 @@ export class SelectTool {
         return;
       }
     }
+
 
     // ── Marquee-Rahmen-Auswahl ───────────────────────────────────────────
     // Nur aktiv, wenn nichts anderes läuft (kein Drag, kein Edit, keine
@@ -1955,6 +2009,16 @@ export class SelectTool {
         return;
       }
     }
+
+    // Klick ohne Shift außerhalb der Gruppe → Mehrfachauswahl aufheben,
+    // damit keine blau markierten „Geister“ zurückbleiben.
+    if (input.clicked && !input.keys?.shift && !this.isEditing() && !this.pasteFloatActive
+        && this.marqueeSelectedIds.length && !this.marqueeActive
+        && !this.dragStickerId && !this.dragDocId && !this.dragTextBoxId
+        && !this.dragFreeStrokeId && !this.dragDimId && !this.rotateTextBoxId) {
+      this.marqueeSelectedIds = [];
+    }
+
 
 
 
@@ -3392,6 +3456,47 @@ export class SelectTool {
         ctx.restore();
       }
     }
+
+    // Einfüge-Modus: Häkchen-Button oben rechts an der Auswahl.
+    this._pasteBtnRect = null;
+    if (this.pasteFloatActive && this.marqueeSelectedIds.length && !this.groupDragActive) {
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const { kind, id } of this.marqueeSelectedIds) {
+        const obj = this._getElementById(kind, id);
+        if (!obj) continue;
+        const pts = this._elementPoints(kind, obj) || [];
+        for (const p of pts) {
+          const s = cam.worldToScreen(p.x, p.y);
+          if (s.x < minX) minX = s.x; if (s.x > maxX) maxX = s.x;
+          if (s.y < minY) minY = s.y; if (s.y > maxY) maxY = s.y;
+        }
+      }
+      if (Number.isFinite(minX)) {
+        const size = 30;
+        const bx = maxX + 12, by = minY - size - 12;
+        this._pasteBtnRect = { x: bx, y: by, w: size, h: size };
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(bx + size / 2, by + size / 2, size / 2, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(22,163,74,0.95)";
+        ctx.fill();
+        ctx.strokeStyle = "rgba(255,255,255,0.9)";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 2.5;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.moveTo(bx + 8, by + size / 2);
+        ctx.lineTo(bx + 13, by + size - 9);
+        ctx.lineTo(bx + size - 7, by + 9);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+
+
 
     // Gruppen-Drehen: Achse vom Schwerpunkt zum Cursor + Winkelanzeige.
     if (this.groupRotateActive && this._groupRotCenter) {
