@@ -219,6 +219,8 @@ export class CadApp {
   input: Input;
   labelManager: LabelManager;
   topology: TopologyEngine;
+  /** Globale Hilfslinien (Rechtsklick auf Fangpunkt) — für alle Werkzeuge. */
+  globalGuides: GlobalGuides;
   renderer: Renderer;
 
   /**
