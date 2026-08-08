@@ -2,7 +2,13 @@ import React, { useEffect, useState } from "react";
 import type { CadApp } from "@/cad/CadApp";
 import type { WallToolSettings } from "@/cad/WallTool";
 import { Defaults } from "@/cad/constants";
+import { HATCH_PATTERNS } from "@/cad/hatchPatterns";
 import { runWallTopologyMaintenance } from "@/cad/wallTopologyMaintenance";
+
+/** Typische Wand-Baustoffe (Schraffur skaliert automatisch mit der Wanddicke). */
+const WALL_PATTERNS = HATCH_PATTERNS.filter(p =>
+  ["mauerwerk", "stahlbeton", "ziegelverband", "holz", "daemmung_hart", "daemmung_weich", "xps"].includes(p.id),
+);
 
 interface Props { app: CadApp | null; }
 
@@ -97,6 +103,17 @@ export const WallSettingsPanel: React.FC<Props> = ({ app }) => {
     else update({ fillColor, fillColorAuto: false });
   };
 
+  const setPattern = (patternId: string) => {
+    if (selectedWall) updateSelected(() => { (selectedWall as any).patternId = patternId; });
+    else update({ patternId } as any);
+  };
+
+  const setPatternScale = (patternScale: number) => {
+    const val = Math.max(0.1, Math.min(10, patternScale || 1));
+    if (selectedWall) updateSelected(() => { (selectedWall as any).patternScale = val; });
+    else update({ patternScale: val } as any);
+  };
+
   const setLabel = (labelId: string) => {
     if (selectedWall) {
       updateSelected(() => { selectedWall.labelId = labelId; });
@@ -111,6 +128,8 @@ export const WallSettingsPanel: React.FC<Props> = ({ app }) => {
   const color = get("color") as string;
   const fillColor = get("fillColor") as string;
   const labelId = (get("labelId") as string) || Defaults.defaultLabelId;
+  const patternId = (selectedWall ? (selectedWall as any).patternId : (s as any).patternId) || "none";
+  const patternScale = (selectedWall ? (selectedWall as any).patternScale : (s as any).patternScale) ?? 1;
   const thicknessValue = selectedWall
     ? selectedWall.thicknessM
     : (s.thicknessOverrideM ?? (s.kind === "outer" ? s.thicknessOuterM : s.thicknessInnerM));
@@ -232,6 +251,30 @@ export const WallSettingsPanel: React.FC<Props> = ({ app }) => {
             />
           </div>
         )}
+
+        <div>
+          <label>Baustoff-Schraffur</label>
+          <select
+            value={patternId}
+            onChange={e => setPattern(e.target.value)}
+            className="cad-settings-select w-full"
+          >
+            <option value="none">Ohne (nur Flächenfarbe)</option>
+            {WALL_PATTERNS.map(p => (
+              <option key={p.id} value={p.id}>{p.label}</option>
+            ))}
+          </select>
+          {patternId !== "none" && (
+            <div className="mt-2">
+              <label>Musterdichte (1 = auto, an Wanddicke)</label>
+              <input
+                type="number" step="0.05" min="0.1" max="10"
+                value={patternScale}
+                onChange={e => setPatternScale(parseFloat(e.target.value) || 1)}
+              />
+            </div>
+          )}
+        </div>
 
         <div>
           <label>Linienfarbe</label>

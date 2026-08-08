@@ -35,6 +35,7 @@ export interface WallSnap {
   kind: "wall"; corners: Vec2[];
   wallKind: string; thicknessM: number; referenceSide: string;
   color: string; fillColor: string; priority: number; labelId: string;
+  patternId?: string; patternScale?: number;
 }
 
 export type ClipboardItem = SegmentSnap | HatchSnap | DimensionSnap | TextBoxSnap | WallSnap;
@@ -120,7 +121,8 @@ export function buildClipboardFromSelection(app: CadApp, anchorOverride?: Vec2 |
         const o = s.getWallById?.(id);
         if (o) items.push({ kind: "wall", corners: o.corners.map((p: Vec2) => v(p.x, p.y)),
           wallKind: o.kind, thicknessM: o.thicknessM, referenceSide: o.referenceSide,
-          color: o.color, fillColor: o.fillColor, priority: o.priority, labelId: o.labelId });
+          color: o.color, fillColor: o.fillColor, priority: o.priority, labelId: o.labelId,
+          patternId: o.patternId, patternScale: o.patternScale });
       }
     }
   }
@@ -210,6 +212,7 @@ export function commitClipboardAt(app: CadApp, clip: Clipboard, mouseW: Vec2): {
         corners: it.corners.map(p => ({ x: p.x + dx, y: p.y + dy })),
         color: it.color, fillColor: it.fillColor,
         priority: it.priority, labelId: it.labelId,
+        patternId: it.patternId, patternScale: it.patternScale,
       });
       if (o) created.push({ kind: "wall", id: o.id });
     } else {

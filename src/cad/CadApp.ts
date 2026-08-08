@@ -568,6 +568,8 @@ export class CadApp {
         fillColor: w.fillColor,
         labelId: w.labelId,
         priority: w.priority,
+        patternId: w.patternId,
+        patternScale: w.patternScale,
         _stickerEditOwnerId: w._stickerEditOwnerId || null,
       })),
       dimensions: scene.dimensions.map(d => ({
@@ -1996,7 +1998,12 @@ export class CadApp {
         if ((k === "z" && e.shiftKey) || k === "y") { e.preventDefault(); this.redo(); return; }
       }
 
-      if ((tag === "input" || tag === "textarea" || tag === "select") && !isHubInput) return;
+      if ((tag === "input" || tag === "textarea" || tag === "select") && !isHubInput) {
+        // ESC wirkt immer: Eingabefeld verlassen und Abbruch-Logik ausführen.
+        if (e.key === "Escape") { try { (document.activeElement as HTMLElement)?.blur?.(); } catch {} }
+        else return;
+      }
+
 
       // Copy / Paste — Shift+C / Shift+V (zusätzlich zu Strg+C/V)
       if (e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {

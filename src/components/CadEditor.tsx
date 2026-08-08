@@ -15,6 +15,8 @@ import { FreeDrawSettingsPanel } from "@/components/cad/FreeDrawSettingsPanel";
 import { EraserSettingsPanel } from "@/components/cad/EraserSettingsPanel";
 import { ProjectFilePickerDialog } from "@/components/cad/ProjectFilePickerDialog";
 import { WallSettingsPanel } from "@/components/cad/WallSettingsPanel";
+import { HatchPatternControls } from "@/components/cad/HatchPatternControls";
+
 import { ToolHelpNotes } from "@/components/cad/ToolHelpNotes";
 
 import { DocumentFilterPanel } from "@/components/cad/DocumentFilterPanel";
@@ -2106,6 +2108,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 <label>Transparenz (0–100%)</label>
                 <input ref={hatchAlphaRef} type="text" defaultValue="35" />
               </div>
+              <HatchPatternControls app={appRef.current} />
+
               <div className="flex items-center gap-2 mt-1">
                 <input
                   ref={areaShowRef}

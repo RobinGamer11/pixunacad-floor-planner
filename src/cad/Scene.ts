@@ -542,6 +542,10 @@ export class Wall {
    * von höheren subtrahiert (kein Überlapp, sauberer T-Stoß).
    */
   priority: number;
+  /** Baustoff-Schraffur der Wandfläche ("none" = nur Flächenfarbe). */
+  patternId: string;
+  /** Feinjustierung der Musterdichte (1 = automatisch an Wanddicke angepasst). */
+  patternScale: number;
   _stickerEditOwnerId?: string | null;
 
   constructor(opts: {
@@ -549,6 +553,7 @@ export class Wall {
     corners: Vec2[]; customName?: string; color?: string; fillColor?: string; labelId?: string;
     priority?: number; hiddenCornerIndices?: number[];
     cornerAnchors?: (WallCornerAnchor | null)[];
+    patternId?: string; patternScale?: number;
   }) {
     this.id = opts.id;
     this.kind = opts.kind;
@@ -566,6 +571,8 @@ export class Wall {
       || (opts.kind === "outer" ? Defaults.wallFillColorOuter : Defaults.wallFillColorInner);
     this.labelId = opts.labelId || Defaults.defaultLabelId;
     this.priority = opts.priority ?? (opts.kind === "outer" ? 200 : 100);
+    this.patternId = opts.patternId || "none";
+    this.patternScale = Math.max(0.1, Math.min(10, opts.patternScale ?? 1));
     this._stickerEditOwnerId = null;
   }
 }
@@ -1173,6 +1180,7 @@ export class Scene {
     corners: Vec2[]; customName?: string; color?: string; fillColor?: string; labelId?: string;
     priority?: number; hiddenCornerIndices?: number[];
     cornerAnchors?: (WallCornerAnchor | null)[];
+    patternId?: string; patternScale?: number;
   }) {
     const w = new Wall({ id: this._makeId(), ...opts });
     w._stickerEditOwnerId = this._currentEditOwnerId;
