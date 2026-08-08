@@ -161,13 +161,18 @@ export function fillWithHatchPattern(
   pxPerMeter: number,
   opt: HatchPatternOptions,
 ): void {
-  const tilePx = PATTERN_BASE_TILE_M * Math.max(0.05, opt.scale) * pxPerMeter;
+  // Kachelgröße rein in CAD-Einheiten (Meter) -> Bildschirm; zoom-konsistent.
+  const tilePx = PATTERN_BASE_TILE_M * Math.max(0.02, opt.scale) * pxPerMeter;
   if (!(tilePx > 0.5) || !Number.isFinite(tilePx)) return;
-  const renderPx = Math.min(256, Math.max(8, tilePx));
-  const tile = getPatternTile(opt.patternId, renderPx, opt.color, opt.lineWidthPx);
+  // Feste Render-Auflösung der Kachel: kein Umschalten/Runden beim Zoomen.
+  const RENDER_PX = 128;
+  const k = tilePx / RENDER_PX;
+  // Linienstärke im Kachelraum so wählen, dass sie nach Skalierung
+  // konstante Bildschirmstärke ergibt.
+  const lwTile = Math.max(0.35, Math.min(RENDER_PX / 12, opt.lineWidthPx / Math.max(1e-6, k)));
+  const tile = getPatternTile(opt.patternId, RENDER_PX, opt.color, lwTile);
   const pat = ctx.createPattern(tile, "repeat");
   if (!pat) return;
-  const k = tilePx / tile.width;
   try {
     const m = new DOMMatrix()
       .translateSelf(originScreen.x, originScreen.y)
