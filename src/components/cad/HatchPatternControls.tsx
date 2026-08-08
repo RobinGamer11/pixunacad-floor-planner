@@ -62,7 +62,7 @@ export const HatchPatternControls: React.FC<Props> = ({ app }) => {
     };
     setEnabled(!!src.patternEnabled);
     setPatternId(src.patternId || "mauerwerk");
-    setScale(src.patternScale ?? 1);
+    setScale(src.patternScale ?? 2);
     setStretch(src.patternStretch ?? 1);
     setAngleDeg(src.patternAngleDeg ?? 0);
     setSkewDeg(src.patternSkewDeg ?? 0);
