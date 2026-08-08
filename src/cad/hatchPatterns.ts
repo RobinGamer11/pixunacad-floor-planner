@@ -242,12 +242,14 @@ export function fillWithHatchPattern(
   // Kachelgröße rein in CAD-Einheiten (Meter) -> Bildschirm; zoom-konsistent.
   const tilePx = PATTERN_BASE_TILE_M * Math.max(0.02, opt.scale) * pxPerMeter;
   if (!(tilePx > 0.5) || !Number.isFinite(tilePx)) return;
+  const stretch = Math.max(0.1, Math.min(10, opt.stretch ?? 1));
   // Feste Render-Auflösung der Kachel: kein Umschalten/Runden beim Zoomen.
   const RENDER_PX = 128;
   const k = tilePx / RENDER_PX;
   // Linienstärke im Kachelraum so wählen, dass sie nach Skalierung
   // konstante Bildschirmstärke ergibt.
-  const lwRaw = Math.max(0.35, Math.min(RENDER_PX / 12, opt.lineWidthPx / Math.max(1e-6, k)));
+  const kAvg = k * Math.sqrt(stretch);
+  const lwRaw = Math.max(0.35, Math.min(RENDER_PX / 12, opt.lineWidthPx / Math.max(1e-6, kAvg)));
   const lwTile = Math.round(lwRaw * 4) / 4; // quantisiert -> stabiler Kachel-Cache
   const tile = getPatternTile(opt.patternId, RENDER_PX, opt.color, lwTile);
   const pat = ctx.createPattern(tile, "repeat");
@@ -257,9 +259,10 @@ export function fillWithHatchPattern(
       .translateSelf(originScreen.x, originScreen.y)
       .rotateSelf(opt.angleDeg || 0)
       .skewXSelf(Math.max(-70, Math.min(70, opt.skewDeg || 0)))
-      .scaleSelf(k, k);
+      .scaleSelf(k, k * stretch);
     (pat as any).setTransform?.(m);
   } catch { /* ältere Engine: ohne Transform zeichnen */ }
+
   ctx.save();
   ctx.globalAlpha = opt.alpha;
   ctx.fillStyle = pat;
