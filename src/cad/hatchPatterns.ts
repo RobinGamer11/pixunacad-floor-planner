@@ -125,34 +125,36 @@ function drawTile(ctx: CanvasRenderingContext2D, id: HatchPatternId, s: number, 
       break;
     }
     case "erdreich": {
-      // Diagonale Bänder mit Sprossen (klassische Erdreich-Schraffur)
-      const d = s * 0.5; // Bandabstand entlang der Diagonalen
+      // Diagonale Bänder mit senkrechten Sprossen (klassische Erdreich-Schraffur)
+      const d = s * 0.5;        // Bandraster (Y-Achsenabschnitt)
+      const bw = d * 0.5;       // Bandbreite
       for (let b = -2; b <= 4; b += 1) {
         const base = b * d;
-        line(ctx, 0, base, s, base - s);                     // Bandkante 1
-        line(ctx, 0, base + d * 0.45, s, base + d * 0.45 - s); // Bandkante 2
+        line(ctx, -s, base + s, s * 2, base - s * 2);
+        line(ctx, -s, base + bw + s, s * 2, base + bw - s * 2);
         ctx.save();
         ctx.lineWidth = lw * 0.8;
-        for (let x = -s; x <= s * 2; x += d * 0.5) {
-          line(ctx, x, base - x, x, base + d * 0.45 - x);
+        for (let x = -s; x <= s * 2; x += bw * 0.6) {
+          line(ctx, x, base - x, x + bw / 2, base - x + bw / 2);
         }
         ctx.restore();
       }
       break;
     }
     case "daemmung_weich": {
-      // Weiche Dämmung: aneinandergereihte Schlaufen
-      const w = s / 3;
-      for (let i = -1; i <= 3; i++) {
+      // Weiche Dämmung: aneinandergereihte, bauchige Schlaufen
+      const w = s / 2;
+      for (let i = -1; i <= 2; i++) {
         const cx = i * w;
         ctx.beginPath();
         ctx.moveTo(cx, s);
-        ctx.bezierCurveTo(cx - w * 0.35, s * 0.45, cx + w * 0.1, 0, cx + w * 0.5, 0);
-        ctx.bezierCurveTo(cx + w * 0.9, 0, cx + w * 1.35, s * 0.45, cx + w, s);
+        ctx.bezierCurveTo(cx - w * 0.5, s * 0.55, cx + w * 0.05, -s * 0.03, cx + w * 0.5, 0);
+        ctx.bezierCurveTo(cx + w * 0.95, -s * 0.03, cx + w * 1.5, s * 0.55, cx + w, s);
         ctx.stroke();
       }
       break;
     }
+
     case "daemmung_hart": {
       // Harte Dämmung: Zickzacklinien
       const rows = 3;
