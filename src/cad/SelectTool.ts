@@ -3595,10 +3595,11 @@ export class SelectTool {
         }
       }
       if (Number.isFinite(minX)) {
-        // Optik identisch zum Häkchen-Hub der anderen Werkzeuge:
-        // weißer, abgerundeter Hub mit dezentem Rand + dunklem Haken.
-        const size = 30;
-        const bx = maxX + 14, by = minY - size - 12;
+        // Optik exakt wie der Häkchen-Hub der anderen Werkzeuge
+        // (weiße Box 28px, Radius 6, 1px Rand, dezenter Schatten, Lucide-Haken)
+        // und direkt an der Auswahl platziert.
+        const size = 28;
+        const bx = Math.round(maxX + 6), by = Math.round(minY - size - 6);
         this._pasteBtnRect = { x: bx, y: by, w: size, h: size };
         const r = 6;
         ctx.save();
@@ -3614,27 +3615,30 @@ export class SelectTool {
         ctx.quadraticCurveTo(bx, by, bx + r, by);
         ctx.closePath();
         ctx.shadowColor = "rgba(0,0,0,0.18)";
-        ctx.shadowBlur = 12;
+        ctx.shadowBlur = 16;
         ctx.shadowOffsetY = 4;
         ctx.fillStyle = "#ffffff";
         ctx.fill();
         ctx.shadowColor = "transparent";
         ctx.shadowBlur = 0;
         ctx.shadowOffsetY = 0;
-        ctx.strokeStyle = "rgba(0,0,0,0.12)";
+        ctx.strokeStyle = "rgba(0,0,0,0.10)";
         ctx.lineWidth = 1;
         ctx.stroke();
+        // Lucide "Check" (16px Icon, zentriert)
+        const cx = bx + size / 2, cy = by + size / 2;
         ctx.beginPath();
-        ctx.strokeStyle = "#1f2937";
+        ctx.strokeStyle = "#0f172a";
         ctx.lineWidth = 2;
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
-        ctx.moveTo(bx + 9, by + size / 2);
-        ctx.lineTo(bx + 13, by + size - 10);
-        ctx.lineTo(bx + size - 8, by + 10);
+        ctx.moveTo(cx - 5.3, cy + 0.3);
+        ctx.lineTo(cx - 1.6, cy + 4);
+        ctx.lineTo(cx + 5.3, cy - 3.6);
         ctx.stroke();
         ctx.restore();
       }
+
     }
 
 
