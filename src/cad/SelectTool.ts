@@ -153,6 +153,9 @@ export class SelectTool {
   groupDragActive = false;
   private _groupDragLast: Vec2 | null = null;
   private _groupDragMoved = false;
+  /** Fang-Anker der Gruppe beim Verschieben/Einfügen (Welt-Koordinate). */
+  private _groupDragAnchor: Vec2 | null = null;
+
   groupRotateActive = false;
   private _groupRotCenter: Vec2 | null = null;
   private _groupRotLastAngle = 0;
@@ -209,7 +212,38 @@ export class SelectTool {
     return sx >= r.x && sx <= r.x + r.w && sy >= r.y && sy <= r.y + r.h;
   }
 
+  /** Beliebiger (auch entfernter) Punkt der Auswahl, der der Maus am nächsten liegt. */
+  private _nearestGroupPoint(wx: number, wy: number): Vec2 | null {
+    let best: Vec2 | null = null;
+    let bestD = Infinity;
+    for (const { kind, id } of this.marqueeSelectedIds) {
+      const obj = this._getElementById(kind, id);
+      if (!obj) continue;
+      for (const p of this._elementPoints(kind, obj) || []) {
+        const d = Math.hypot(p.x - wx, p.y - wy);
+        if (d < bestD) { bestD = d; best = v(p.x, p.y); }
+      }
+    }
+    return best;
+  }
+
+  /** Fangt einen Welt-Punkt auf fremde Fangpunkte (eigene Auswahl wird ignoriert). */
+  private _snapWorldPoint(p: Vec2): Vec2 {
+    try {
+      const cam = this.app.camera;
+      const s = cam?.worldToScreen(p.x, p.y);
+      const hit = (this.app as any).topology?.findBestSnap?.(v(s?.x ?? 0, s?.y ?? 0), v(p.x, p.y));
+      if (hit?.world) {
+        // Eigene Auswahl-Punkte nicht als Fangziel verwenden.
+        const own = this._findGroupSnapPoint(hit.world.x, hit.world.y, 1);
+        if (!own) return v(hit.world.x, hit.world.y);
+      }
+    } catch { /* kein Snap verfügbar */ }
+    return v(p.x, p.y);
+  }
+
   /** Nächstgelegener Fangpunkt aller Objekte der Mehrfachauswahl. */
+
   private _findGroupSnapPoint(wx: number, wy: number, tolPx = 12): Vec2 | null {
     if (!this.marqueeSelectedIds.length) return null;
     const scale = this.app.camera?.scale || 80;
@@ -311,7 +345,9 @@ export class SelectTool {
     this.groupRotApplied = 0;
     this.groupDragActive = false;
     this._groupDragLast = null;
+    this._groupDragAnchor = null;
     this._groupDragMoved = false;
+
   }
 
   /** Startet das Drehen der Mehrfachauswahl um deren Schwerpunkt — oder um den
@@ -2011,11 +2047,23 @@ export class SelectTool {
       const mouseW = v(input.mouse.wx, input.mouse.wy);
       if (this.groupDragActive) {
         if (input.mouse.left && this._groupDragLast) {
-          const dx = mouseW.x - this._groupDragLast.x;
-          const dy = mouseW.y - this._groupDragLast.y;
+          let dx = mouseW.x - this._groupDragLast.x;
+          let dy = mouseW.y - this._groupDragLast.y;
+          // Fangverhalten wie beim normalen Verschieben: der nächstgelegene
+          // Fangpunkt der Auswahl rastet auf fremde Fangpunkte ein.
+          if (this._groupDragAnchor) {
+            const want = v(this._groupDragAnchor.x + dx, this._groupDragAnchor.y + dy);
+            const snapped = this._snapWorldPoint(want);
+            dx = snapped.x - this._groupDragAnchor.x;
+            dy = snapped.y - this._groupDragAnchor.y;
+          }
           if (dx || dy) {
             translateGroup(this.app, this.marqueeSelectedIds, dx, dy);
             this._groupDragMoved = true;
+            if (this._groupDragAnchor) {
+              this._groupDragAnchor.x += dx;
+              this._groupDragAnchor.y += dy;
+            }
           }
           this._groupDragLast = mouseW;
           this.snap = null;
@@ -2023,6 +2071,7 @@ export class SelectTool {
         }
         this.groupDragActive = false;
         this._groupDragLast = null;
+        this._groupDragAnchor = null;
         if (this._groupDragMoved) {
           if (!this.pasteFloatActive) (this.app as any).commitHistorySnapshot?.();
           input.clicked = false;
@@ -2037,12 +2086,16 @@ export class SelectTool {
         this.groupDragActive = true;
         this._groupDragMoved = false;
         this._groupDragLast = mouseW;
+        // Nächstgelegener Fangpunkt der Auswahl wird zum Fang-Anker.
+        this._groupDragAnchor = this._findGroupSnapPoint(mouseW.x, mouseW.y, 80)
+          || this._nearestGroupPoint(mouseW.x, mouseW.y);
         this.marqueeStart = null;
         this.marqueeCurrent = null;
         if (this.app.selection) this.app.setSelection(null);
         this.snap = null;
         return;
       }
+
     }
 
 
@@ -3595,10 +3648,11 @@ export class SelectTool {
         }
       }
       if (Number.isFinite(minX)) {
-        // Optik identisch zum Häkchen-Hub der anderen Werkzeuge:
-        // weißer, abgerundeter Hub mit dezentem Rand + dunklem Haken.
-        const size = 30;
-        const bx = maxX + 14, by = minY - size - 12;
+        // Optik exakt wie der Häkchen-Hub der anderen Werkzeuge
+        // (weiße Box 28px, Radius 6, 1px Rand, dezenter Schatten, Lucide-Haken)
+        // und direkt an der Auswahl platziert.
+        const size = 28;
+        const bx = Math.round(maxX + 6), by = Math.round(minY - size - 6);
         this._pasteBtnRect = { x: bx, y: by, w: size, h: size };
         const r = 6;
         ctx.save();
@@ -3614,27 +3668,30 @@ export class SelectTool {
         ctx.quadraticCurveTo(bx, by, bx + r, by);
         ctx.closePath();
         ctx.shadowColor = "rgba(0,0,0,0.18)";
-        ctx.shadowBlur = 12;
+        ctx.shadowBlur = 16;
         ctx.shadowOffsetY = 4;
         ctx.fillStyle = "#ffffff";
         ctx.fill();
         ctx.shadowColor = "transparent";
         ctx.shadowBlur = 0;
         ctx.shadowOffsetY = 0;
-        ctx.strokeStyle = "rgba(0,0,0,0.12)";
+        ctx.strokeStyle = "rgba(0,0,0,0.10)";
         ctx.lineWidth = 1;
         ctx.stroke();
+        // Lucide "Check" (16px Icon, zentriert)
+        const cx = bx + size / 2, cy = by + size / 2;
         ctx.beginPath();
-        ctx.strokeStyle = "#1f2937";
+        ctx.strokeStyle = "#0f172a";
         ctx.lineWidth = 2;
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
-        ctx.moveTo(bx + 9, by + size / 2);
-        ctx.lineTo(bx + 13, by + size - 10);
-        ctx.lineTo(bx + size - 8, by + 10);
+        ctx.moveTo(cx - 5.3, cy + 0.3);
+        ctx.lineTo(cx - 1.6, cy + 4);
+        ctx.lineTo(cx + 5.3, cy - 3.6);
         ctx.stroke();
         ctx.restore();
       }
+
     }
 
 
