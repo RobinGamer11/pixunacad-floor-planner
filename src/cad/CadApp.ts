@@ -2838,6 +2838,7 @@ export class CadApp {
 
 
       this.renderer.render();
+      this.globalGuides.draw(this.ctx, this.camera, this.renderer.vw, this.renderer.vh);
       if (this.pastePreviewActive) this._drawPastePreview(this.ctx);
       this.input.endFrame();
     } catch (err) {
