@@ -167,25 +167,25 @@ export function translatedItems(items: ClipboardItem[], dx: number, dy: number):
 
 
 /**
- * Commit clipboard (translated) into the scene. Returns count of created objects.
+ * Commit clipboard (translated) into the scene. Returns refs of created objects.
  */
-export function commitClipboardAt(app: CadApp, clip: Clipboard, mouseW: Vec2): number {
+export function commitClipboardAt(app: CadApp, clip: Clipboard, mouseW: Vec2): { kind: string; id: string }[] {
   const dx = mouseW.x - clip.anchor.x;
   const dy = mouseW.y - clip.anchor.y;
-  let count = 0;
+  const created: { kind: string; id: string }[] = [];
   for (const it of clip.items) {
     if (it.kind === "segment") {
-      app.scene.createSegment({ x: it.a.x + dx, y: it.a.y + dy }, { x: it.b.x + dx, y: it.b.y + dy },
+      const o = app.scene.createSegment({ x: it.a.x + dx, y: it.a.y + dy }, { x: it.b.x + dx, y: it.b.y + dy },
         { color: it.color, thicknessM: it.thicknessM, labelId: it.labelId });
-      count++;
+      if (o) created.push({ kind: "segment", id: o.id });
     } else if (it.kind === "hatch") {
-      app.scene.createHatch(it.points.map(p => ({ x: p.x + dx, y: p.y + dy })),
+      const o = app.scene.createHatch(it.points.map(p => ({ x: p.x + dx, y: p.y + dy })),
         { fillColor: it.fillColor, strokeColor: it.strokeColor,
           fillAlphaPct: it.fillAlphaPct, strokeWidthPx: it.strokeWidthPx,
           labelId: it.labelId, areaLabel: it.areaLabel });
-      count++;
+      if (o) created.push({ kind: "hatch", id: o.id });
     } else if (it.kind === "dimension") {
-      app.scene.createDimension(
+      const o = app.scene.createDimension(
         { x: it.p1.x + dx, y: it.p1.y + dy },
         { x: it.p2.x + dx, y: it.p2.y + dy },
         { x: it.placementPoint.x + dx, y: it.placementPoint.y + dy },
@@ -195,9 +195,9 @@ export function commitClipboardAt(app: CadApp, clip: Clipboard, mouseW: Vec2): n
           useFreeText: it.useFreeText, freeText: it.freeText,
           textBgEnabled: it.textBgEnabled, textBgColor: it.textBgColor, textBgAlpha: it.textBgAlpha,
           labelId: it.labelId });
-      count++;
+      if (o) created.push({ kind: "dimension", id: o.id });
     } else if (it.kind === "wall") {
-      app.scene.createWall({
+      const o = app.scene.createWall({
         kind: it.wallKind as any,
         thicknessM: it.thicknessM,
         referenceSide: it.referenceSide as any,
@@ -205,16 +205,16 @@ export function commitClipboardAt(app: CadApp, clip: Clipboard, mouseW: Vec2): n
         color: it.color, fillColor: it.fillColor,
         priority: it.priority, labelId: it.labelId,
       });
-      count++;
+      if (o) created.push({ kind: "wall", id: o.id });
     } else {
-      app.scene.createTextBox(
+      const o = app.scene.createTextBox(
         { x: it.center.x + dx, y: it.center.y + dy },
         it.widthM, it.heightM,
         { ...it.style, labelId: it.labelId },
         it.html, it.rotationRad);
-      count++;
+      if (o) created.push({ kind: "textbox", id: o.id });
     }
 
   }
-  return count;
+  return created;
 }
