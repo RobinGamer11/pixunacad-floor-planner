@@ -47,6 +47,8 @@ export class TopologyEngine {
   labels: LabelManager;
   /** Read-only Snap-Quellen aus anderen Blättern (Transparentpause). */
   overlayScenes: Scene[] = [];
+  /** Globale Hilfslinien (Rechtsklick-Anker), werkzeugübergreifend. */
+  guides: import("./globalGuides").GlobalGuides | null = null;
   /** Wand-ID mit Snap-Vorrang (z. B. aktuell selektierte Wand) — deren Eckpunkte gewinnen Ties. */
   priorityWallId: string | null = null;
   /** Wenn true, werden zusätzlich Sub-Linien-Eckpunkte/-Kanten anderer Wände
@@ -417,7 +419,19 @@ export class TopologyEngine {
       }
     }
 
-    return best;
+    return this._withGuides(best, mouseS, mouseW);
+  }
+
+  /** Globale Hilfslinien (Rechtsklick-Anker) in das Snap-Ergebnis einmischen. */
+  _withGuides(best: Snap | null, mouseS: Vec2, mouseW: Vec2): Snap | null {
+    const g: any = this.guides ? this.guides.findSnap(mouseS, mouseW, this.camera) : null;
+    if (!g) return best;
+    if (!best) return g as Snap;
+    const rank = (s: any) => s.type === SnapType.GUIDE_POINT ? 0 : s.type === SnapType.POINT ? 1 : s.type === SnapType.GUIDE ? 2 : 3;
+    const rb = rank(best), rg = rank(g);
+    if (rg < rb) return g as Snap;
+    if (rb < rg) return best;
+    return (((best as any).px ?? Infinity) <= (g.px ?? Infinity)) ? best : (g as Snap);
   }
 
   findBestSnapExcludingSegment(mouseS: Vec2, mouseW: Vec2, excludedSegmentId: string): Snap | null {

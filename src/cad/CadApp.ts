@@ -6,6 +6,7 @@ import { Scene, AreaLabel, DimensionStyle, TextBoxStyle, TextBox } from "./Scene
 import { autoSizeTextBox } from "./textAutoSize";
 import { LabelManager } from "./LabelManager";
 import { TopologyEngine } from "./TopologyEngine";
+import { GlobalGuides } from "./globalGuides";
 import { Renderer, Selection } from "./Renderer";
 import { LineHub } from "./LineHub";
 import { PointEditMenu } from "./PointEditMenu";
@@ -219,6 +220,8 @@ export class CadApp {
   input: Input;
   labelManager: LabelManager;
   topology: TopologyEngine;
+  /** Globale Hilfslinien (Rechtsklick auf Fangpunkt) — für alle Werkzeuge. */
+  globalGuides: GlobalGuides;
   renderer: Renderer;
 
   /**
@@ -439,6 +442,8 @@ export class CadApp {
     this.input = new Input(canvas);
     this.labelManager = new LabelManager();
     this.topology = new TopologyEngine(this.scene, this.camera, this.labelManager);
+    this.globalGuides = new GlobalGuides();
+    this.topology.guides = this.globalGuides;
     this.renderer = new Renderer(this.ctx, this.camera, this.scene, this.labelManager);
 
     // Plan-Modus Controller (Step 4): Drop, Selektion, Drag, HUB.
@@ -2082,6 +2087,7 @@ export class CadApp {
         this.documentHubMode = "none";
         this.bgRemoveInteraction = null;
         this.measureFinishHubState = { visible: false, screenX: 0, screenY: 0 };
+        this.globalGuides.clear();
         try { this.hub?.hide?.(); } catch {}
         try { this.pointEditMenu?.hide?.(); } catch {}
         if (this.selectTool.pasteFloatActive) {
@@ -2792,6 +2798,23 @@ export class CadApp {
       if (this.input.wheelDelta !== 0) this.camera.zoomAt(this.input.wheelDelta, this.input.mouse.sx, this.input.mouse.sy);
       this.input.update(this.camera);
 
+      // Rechtsklick auf einen Fangpunkt setzt/entfernt eine globale Hilfslinie —
+      // werkzeugübergreifend. Linien-/Wandwerkzeug und der Punkt-Edit des
+      // Auswahlwerkzeugs bringen eigene Hilfslinien mit und bleiben unberührt.
+      if (this.input.rightClicked) {
+        const ownGuides = this.activeTool === this.lineTool || this.activeTool === this.wallTool
+          || (this.activeTool === this.selectTool && this.selectTool.isEditing());
+        if (!ownGuides) {
+          const mS = { x: this.input.mouse.sx, y: this.input.mouse.sy };
+          const mW = { x: this.input.mouse.wx, y: this.input.mouse.wy };
+          const snap = this.topology.findBestSnap(mS, mW);
+          if (snap?.world && (snap.type === "POINT" || snap.type === "GUIDE_POINT")) {
+            this.globalGuides.toggleAt(snap.world);
+            this.input.rightClicked = false;
+          }
+        }
+      }
+
       if (this.activePlanId) {
         // Plan-Modus: PlanController bekommt Vorrang (Selektion / Drag / HUB),
         // Werkzeuge bleiben aber zusätzlich nutzbar (Annotation auf dem Plan).
@@ -2816,6 +2839,7 @@ export class CadApp {
 
 
       this.renderer.render();
+      this.globalGuides.draw(this.ctx, this.camera, this.renderer.vw, this.renderer.vh);
       if (this.pastePreviewActive) this._drawPastePreview(this.ctx);
       this.input.endFrame();
     } catch (err) {

@@ -167,8 +167,23 @@ export class SelectTool {
   groupAnchor: Vec2 | null = null;
   /** Anker wird gerade mit der Maus mitgeführt (gesamte Gruppe im Schlepptau). */
   groupAnchorActive = false;
+  /** Menü am Ankerpunkt (Verschieben / Drehen) ist sichtbar. */
+  groupAnchorMenu = false;
+  private _groupMenuRects: { move: { x: number; y: number; w: number; h: number }; rotate: { x: number; y: number; w: number; h: number } } | null = null;
   private _groupAnchorDx = 0;
   private _groupAnchorDy = 0;
+
+  /** Trefferprüfung für das Anker-Menü. */
+  private _groupMenuHit(sx: number, sy: number): "move" | "rotate" | null {
+    const r = this._groupMenuRects;
+    if (!r) return null;
+    const inside = (b: { x: number; y: number; w: number; h: number }) =>
+      sx >= b.x && sx <= b.x + b.w && sy >= b.y && sy <= b.y + b.h;
+    if (inside(r.move)) return "move";
+    if (inside(r.rotate)) return "rotate";
+    return null;
+  }
+
 
   // ── Einfüge-Modus („schwebende“ Kopie) ───────────────────────────────────
   /** Nach Strg+V: Kopie liegt exakt auf dem Original, ist ausgewählt und
@@ -338,6 +353,8 @@ export class SelectTool {
       }
     }
     this.groupAnchorActive = false;
+    this.groupAnchorMenu = false;
+    this._groupMenuRects = null;
     this._groupAnchorDx = 0;
     this._groupAnchorDy = 0;
     this.groupRotateActive = false;
@@ -591,7 +608,7 @@ export class SelectTool {
     return null;
   }
 
-  isEditing() { return !!this.activeEditAction || this.groupRotateActive || this.groupDragActive || this.groupAnchorActive; }
+  isEditing() { return !!this.activeEditAction || this.groupRotateActive || this.groupDragActive || this.groupAnchorActive || this.groupAnchorMenu; }
 
   getPriorityWallId(): string | null {
     if (this.editTarget) {
@@ -1973,12 +1990,44 @@ export class SelectTool {
       }
     }
 
+    // Menü am gewählten Gruppen-Fangpunkt: Verschieben / Drehen.
+    if (this.groupAnchorMenu && this.groupAnchor) {
+      if (!this.marqueeSelectedIds.length) {
+        this.groupAnchorMenu = false;
+        this._groupMenuRects = null;
+      } else {
+        const hit = this._groupMenuHit(input.mouse.sx, input.mouse.sy);
+        if (hit && this.app.canvas) this.app.canvas.style.cursor = "pointer";
+        if (input.clicked && hit) {
+          input.clicked = false;
+          input.doubleClicked = false;
+          this.groupAnchorMenu = false;
+          this._groupMenuRects = null;
+          if (hit === "move") {
+            this.groupAnchorActive = true;
+            this._groupAnchorDx = 0;
+            this._groupAnchorDy = 0;
+          } else {
+            this.startGroupRotate();
+          }
+          this.snap = null;
+          return;
+        }
+        if (input.clicked && !input.keys?.shift) {
+          // Klick daneben schließt das Menü (Anker bleibt Referenzpunkt).
+          this.groupAnchorMenu = false;
+          this._groupMenuRects = null;
+        }
+      }
+    }
+
     if (input.clicked && input.keys?.shift && this.marqueeSelectedIds.length >= 1
-        && !this.isEditing() && !this.marqueeActive) {
+        && (!this.isEditing() || this.groupAnchorMenu) && !this.marqueeActive) {
       const gp = this._findGroupSnapPoint(input.mouse.wx, input.mouse.wy, 12);
       if (gp) {
         this.groupAnchor = gp;
-        this.groupAnchorActive = true;
+        this.groupAnchorActive = false;
+        this.groupAnchorMenu = true;
         this._groupAnchorDx = 0;
         this._groupAnchorDy = 0;
         if (this.app.selection) this.app.setSelection(null);
@@ -1988,6 +2037,7 @@ export class SelectTool {
         return;
       }
     }
+
 
     // ── Gruppen-Drehen (Mehrfachauswahl) ─────────────────────────────────
     if (this.groupRotateActive) {
@@ -3704,6 +3754,83 @@ export class SelectTool {
 
     }
 
+    // Anker-Menü: Verschieben / Drehen direkt am gewählten Fangpunkt.
+    this._groupMenuRects = null;
+    if (this.groupAnchorMenu && this.groupAnchor && this.marqueeSelectedIds.length) {
+      const a = cam.worldToScreen(this.groupAnchor.x, this.groupAnchor.y);
+      const size = 28, gap = 6;
+      const bx = Math.round(a.x + 12), by = Math.round(a.y - size - 12);
+      const rects = {
+        move: { x: bx, y: by, w: size, h: size },
+        rotate: { x: bx + size + gap, y: by, w: size, h: size },
+      };
+      this._groupMenuRects = rects;
+
+      const box = (r: { x: number; y: number; w: number; h: number }, icon: (cx: number, cy: number) => void) => {
+        const rad = 6;
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(r.x + rad, r.y);
+        ctx.lineTo(r.x + r.w - rad, r.y);
+        ctx.quadraticCurveTo(r.x + r.w, r.y, r.x + r.w, r.y + rad);
+        ctx.lineTo(r.x + r.w, r.y + r.h - rad);
+        ctx.quadraticCurveTo(r.x + r.w, r.y + r.h, r.x + r.w - rad, r.y + r.h);
+        ctx.lineTo(r.x + rad, r.y + r.h);
+        ctx.quadraticCurveTo(r.x, r.y + r.h, r.x, r.y + r.h - rad);
+        ctx.lineTo(r.x, r.y + rad);
+        ctx.quadraticCurveTo(r.x, r.y, r.x + rad, r.y);
+        ctx.closePath();
+        ctx.shadowColor = "rgba(0,0,0,0.18)";
+        ctx.shadowBlur = 16;
+        ctx.shadowOffsetY = 4;
+        ctx.fillStyle = "#ffffff";
+        ctx.fill();
+        ctx.shadowColor = "transparent";
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetY = 0;
+        ctx.strokeStyle = "rgba(0,0,0,0.10)";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.strokeStyle = "#0f172a";
+        ctx.lineWidth = 1.8;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        icon(r.x + r.w / 2, r.y + r.h / 2);
+        ctx.restore();
+      };
+
+      // Icon „Verschieben“ (Vierrichtungs-Pfeil)
+      box(rects.move, (cx, cy) => {
+        const s = 6;
+        ctx.beginPath();
+        ctx.moveTo(cx - s, cy); ctx.lineTo(cx + s, cy);
+        ctx.moveTo(cx, cy - s); ctx.lineTo(cx, cy + s);
+        const t = 2.6;
+        ctx.moveTo(cx - s + t, cy - t); ctx.lineTo(cx - s, cy); ctx.lineTo(cx - s + t, cy + t);
+        ctx.moveTo(cx + s - t, cy - t); ctx.lineTo(cx + s, cy); ctx.lineTo(cx + s - t, cy + t);
+        ctx.moveTo(cx - t, cy - s + t); ctx.lineTo(cx, cy - s); ctx.lineTo(cx + t, cy - s + t);
+        ctx.moveTo(cx - t, cy + s - t); ctx.lineTo(cx, cy + s); ctx.lineTo(cx + t, cy + s - t);
+        ctx.stroke();
+      });
+      // Icon „Drehen“ (Kreisbogen mit Pfeil)
+      box(rects.rotate, (cx, cy) => {
+        ctx.beginPath();
+        ctx.arc(cx, cy, 6, Math.PI * 0.35, Math.PI * 1.9);
+        ctx.stroke();
+        const ax = cx + Math.cos(Math.PI * 0.35) * 6, ay = cy + Math.sin(Math.PI * 0.35) * 6;
+        ctx.beginPath();
+        ctx.moveTo(ax - 3.4, ay - 1.2); ctx.lineTo(ax, ay + 1.6); ctx.lineTo(ax + 2.6, ay - 2.4);
+        ctx.stroke();
+      });
+
+      // Ankerpunkt hervorheben
+      ctx.save();
+      ctx.fillStyle = "rgba(234,179,8,0.95)";
+      ctx.strokeStyle = "#fff";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(a.x, a.y, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.restore();
+    }
 
 
     // Gruppen-Drehen: Achse vom Schwerpunkt zum Cursor + Winkelanzeige.
