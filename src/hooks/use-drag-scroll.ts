@@ -6,12 +6,20 @@ import * as React from "react";
  * Zeigergeste als echtes Ziehen erkannt wird (Schwellwert), wird gescrollt
  * und der nachfolgende Klick unterdrückt. Kurze Klicks/Taps auf Buttons
  * bleiben unverändert nutzbar.
+ *
+ * Rückgabe ist eine Callback-Ref: dadurch werden die Listener auch dann
+ * korrekt gesetzt, wenn der Container erst später erscheint (z. B. Reiter
+ * eines Projekts, das erst nach dem Mount ausgewählt wird).
  */
 export function useDragScroll<T extends HTMLElement>(axis: "x" | "y" | "both" = "x") {
-  const ref = React.useRef<T | null>(null);
+  const cleanupRef = React.useRef<(() => void) | null>(null);
+  const axisRef = React.useRef(axis);
+  axisRef.current = axis;
 
-  React.useEffect(() => {
-    const el = ref.current;
+  const attach = React.useCallback((el: T | null) => {
+    // Alte Bindung lösen (Unmount oder Element-Wechsel).
+    cleanupRef.current?.();
+    cleanupRef.current = null;
     if (!el) return;
 
     const previousTouchAction = el.style.touchAction;
@@ -26,9 +34,9 @@ export function useDragScroll<T extends HTMLElement>(axis: "x" | "y" | "both" = 
     let startSL = 0, startST = 0;
 
     const isFormControl = (t: EventTarget | null) => {
-      const el = t as HTMLElement | null;
-      if (!el || !el.closest) return false;
-      return !!el.closest(
+      const node = t as HTMLElement | null;
+      if (!node || !node.closest) return false;
+      return !!node.closest(
         "input,select,textarea,[contenteditable='true'],[role='slider']"
       );
     };
@@ -40,8 +48,8 @@ export function useDragScroll<T extends HTMLElement>(axis: "x" | "y" | "both" = 
       moved = false;
       startX = e.clientX; startY = e.clientY;
       startSL = el.scrollLeft; startST = el.scrollTop;
-      // WICHTIG: Pointer-Capture NICHT sofort setzen, sonst gehen Klicks
-      // auf Buttons im Container verloren (pointerup wird umgeleitet).
+      // Pointer-Capture NICHT sofort setzen, sonst gehen Klicks auf Buttons
+      // im Container verloren (pointerup wird umgeleitet).
     };
     const onMove = (e: PointerEvent) => {
       if (!isDown) return;
@@ -49,13 +57,12 @@ export function useDragScroll<T extends HTMLElement>(axis: "x" | "y" | "both" = 
       const dy = e.clientY - startY;
       if (!moved && Math.hypot(dx, dy) > THRESHOLD) {
         moved = true;
-        // Erst nach echtem Drag: Pointer-Capture aktivieren, damit
-        // kurze Taps auf Buttons weiterhin ganz normal klickbar bleiben.
         try { el.setPointerCapture(e.pointerId); } catch {}
       }
       if (moved) {
-        if (axis !== "y") el.scrollLeft = startSL - dx;
-        if (axis !== "x") el.scrollTop = startST - dy;
+        const ax = axisRef.current;
+        if (ax !== "y") el.scrollLeft = startSL - dx;
+        if (ax !== "x") el.scrollTop = startST - dy;
         e.preventDefault();
       }
     };
@@ -65,8 +72,7 @@ export function useDragScroll<T extends HTMLElement>(axis: "x" | "y" | "both" = 
       }
       isDown = false;
     };
-    // Nach einem echten Drag den anschließenden Klick unterdrücken,
-    // damit Buttons im Header/Panel nicht aus Versehen ausgelöst werden.
+    // Nach einem echten Drag den anschließenden Klick unterdrücken.
     const onClickCapture = (e: MouseEvent) => {
       if (moved) {
         e.preventDefault();
@@ -74,22 +80,36 @@ export function useDragScroll<T extends HTMLElement>(axis: "x" | "y" | "both" = 
         moved = false;
       }
     };
+    // Mausrad / Trackpad: vertikales Wheel auf horizontale Achse mappen.
+    const onWheel = (e: WheelEvent) => {
+      if (axisRef.current === "y") return;
+      if (el.scrollWidth <= el.clientWidth) return;
+      const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      if (!delta) return;
+      el.scrollLeft += delta;
+      e.preventDefault();
+    };
 
     el.addEventListener("pointerdown", onDown);
     window.addEventListener("pointermove", onMove, { passive: false });
     window.addEventListener("pointerup", onUp);
     window.addEventListener("pointercancel", onUp);
     el.addEventListener("click", onClickCapture, true);
-    return () => {
+    el.addEventListener("wheel", onWheel, { passive: false });
+
+    cleanupRef.current = () => {
       el.removeEventListener("pointerdown", onDown);
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onUp);
       el.removeEventListener("click", onClickCapture, true);
+      el.removeEventListener("wheel", onWheel);
       el.style.touchAction = previousTouchAction;
       el.style.overscrollBehavior = previousOverscrollBehavior;
     };
-  }, [axis]);
+  }, []);
 
-  return ref;
+  React.useEffect(() => () => { cleanupRef.current?.(); }, []);
+
+  return attach;
 }
