@@ -15,6 +15,7 @@ import { FreeDrawSettingsPanel } from "@/components/cad/FreeDrawSettingsPanel";
 import { EraserSettingsPanel } from "@/components/cad/EraserSettingsPanel";
 import { ProjectFilePickerDialog } from "@/components/cad/ProjectFilePickerDialog";
 import { WallSettingsPanel } from "@/components/cad/WallSettingsPanel";
+import { ToolHelpNotes } from "@/components/cad/ToolHelpNotes";
 
 import { DocumentFilterPanel } from "@/components/cad/DocumentFilterPanel";
 import { WarpSection } from "@/components/page/CadDocumentInspector";
@@ -3053,6 +3054,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               </div>
             </div>
           )}
+          <ToolHelpNotes toolId={activeTool} />
         </div>
         </DragScrollDiv>
         <DragScrollDiv axis="both" className="flex-1 min-h-0 overflow-auto p-2 space-y-2 cursor-grab active:cursor-grabbing" style={{ display: rightTab === "sheets" ? "block" : "none" }}>

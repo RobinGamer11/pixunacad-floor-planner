@@ -220,3 +220,29 @@ export function virtualKeyHold(name: "Shift", on: boolean) {
   }
 }
 
+
+/**
+ * Sticky-Shift auch für Handler, die `event.shiftKey` direkt auswerten.
+ * iPadOS liefert keinen echten Shift — daher wird der Getter einmalig so
+ * überschrieben, dass er zusätzlich das globale Rad-Flag berücksichtigt.
+ * (Rein additiv: ohne aktives Flag bleibt das Originalverhalten erhalten.)
+ */
+function patchShiftKeyGetter() {
+  if (typeof window === "undefined") return;
+  if ((window as any).__pixunaShiftPatched) return;
+  (window as any).__pixunaShiftPatched = true;
+  for (const proto of [MouseEvent.prototype, KeyboardEvent.prototype]) {
+    const desc = Object.getOwnPropertyDescriptor(proto, "shiftKey");
+    if (!desc?.get) continue;
+    const orig = desc.get;
+    Object.defineProperty(proto, "shiftKey", {
+      configurable: true,
+      enumerable: desc.enumerable,
+      get(this: Event) {
+        if ((window as any).__pixunaVirtualShift) return true;
+        return orig.call(this);
+      },
+    });
+  }
+}
+if (typeof window !== "undefined") patchShiftKeyGetter();

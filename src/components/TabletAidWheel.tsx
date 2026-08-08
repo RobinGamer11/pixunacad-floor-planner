@@ -39,6 +39,9 @@ export function TabletAidWheel() {
     return () => { (window as any).__pixunaTabletCommit = false; };
   }, []);
 
+  // Zentrale Verteilung aller realen Kontakte an die Rad-Knöpfe (iPadOS-fest).
+  useWheelTouchRouter();
+
   const dragRef = useRef<{ startX: number; startY: number; ox: number; oy: number; pointerId: number } | null>(null);
   const onDragStart = (e: React.PointerEvent) => {
     e.preventDefault();
@@ -337,6 +340,127 @@ function NumberPad({ wheelPos, wheelSize }: { wheelPos: { x: number; y: number }
 }
 
 
+/**
+ * Globale Registry aller Rad-Knöpfe.
+ *
+ * Hintergrund (iPadOS): Sobald der Stift auf dem Canvas zeichnet, hält dieses
+ * Element einen Pointer-Capture und Safari liefert weitere Kontakte teils
+ * umgeleitet oder gar nicht mehr an die eigentlichen Ziel-Elemente. Deshalb
+ * werden alle Rad-Knöpfe zentral über Capture-Phase-Listener auf `window`
+ * per Koordinaten-Hittest bedient — das funktioniert auch bei aktivem
+ * Pointer-Capture eines anderen Elements und bei beliebig vielen parallelen
+ * Kontakten (Stift + Finger).
+ */
+type BtnHandle = {
+  getRect: () => DOMRect | null;
+  begin: () => void;
+  end: () => void;
+  cancel: () => void;
+};
+const WHEEL_BUTTONS = new Set<BtnHandle>();
+
+function hitButton(x: number, y: number): BtnHandle | null {
+  for (const h of WHEEL_BUTTONS) {
+    const r = h.getRect();
+    if (!r || r.width === 0) continue;
+    // Kleine Toleranz für Finger-Treffer.
+    if (x >= r.left - 6 && x <= r.right + 6 && y >= r.top - 6 && y <= r.bottom + 6) return h;
+  }
+  return null;
+}
+
+/** Verteilt alle realen Kontakte per Koordinaten-Hittest an die Rad-Knöpfe. */
+function useWheelTouchRouter() {
+  useEffect(() => {
+    const active = new Map<number | string, BtnHandle>();
+    const recentHits: { t: number; x: number; y: number }[] = [];
+
+    const stop = (e: Event) => {
+      e.preventDefault();
+      e.stopPropagation();
+      (e as any).stopImmediatePropagation?.();
+    };
+
+    const onPointerDown = (e: PointerEvent) => {
+      if ((e as any).__virtual) return;
+      const h = hitButton(e.clientX, e.clientY);
+      if (!h) return;
+      stop(e);
+      active.set(e.pointerId, h);
+      recentHits.push({ t: Date.now(), x: e.clientX, y: e.clientY });
+      h.begin();
+    };
+    const onPointerUp = (e: PointerEvent) => {
+      const h = active.get(e.pointerId);
+      if (!h) return;
+      stop(e);
+      active.delete(e.pointerId);
+      h.end();
+    };
+    const onPointerCancel = (e: PointerEvent) => {
+      const h = active.get(e.pointerId);
+      if (!h) return;
+      active.delete(e.pointerId);
+      h.cancel();
+    };
+
+    // Touch-Fallback: iPadOS unterdrückt während eines aktiven Stiftkontakts
+    // gelegentlich Pointer-Events für zusätzliche Finger.
+    const wasRecent = (x: number, y: number) =>
+      recentHits.some((r) => Date.now() - r.t < 500 && Math.hypot(r.x - x, r.y - y) < 40);
+
+    const onTouchStart = (e: TouchEvent) => {
+      let handled = false;
+      for (const t of Array.from(e.changedTouches)) {
+        if (wasRecent(t.clientX, t.clientY)) { handled = true; continue; }
+        const h = hitButton(t.clientX, t.clientY);
+        if (!h) continue;
+        handled = true;
+        active.set(`t${t.identifier}`, h);
+        h.begin();
+      }
+      if (handled) stop(e);
+    };
+    const onTouchEnd = (e: TouchEvent) => {
+      let handled = false;
+      for (const t of Array.from(e.changedTouches)) {
+        const h = active.get(`t${t.identifier}`);
+        if (!h) continue;
+        handled = true;
+        active.delete(`t${t.identifier}`);
+        h.end();
+      }
+      if (handled) stop(e);
+    };
+    const onTouchCancel = (e: TouchEvent) => {
+      for (const t of Array.from(e.changedTouches)) {
+        const h = active.get(`t${t.identifier}`);
+        if (!h) continue;
+        active.delete(`t${t.identifier}`);
+        h.cancel();
+      }
+    };
+
+    const opts = { capture: true, passive: false } as AddEventListenerOptions;
+    window.addEventListener("pointerdown", onPointerDown, opts);
+    window.addEventListener("pointerup", onPointerUp, opts);
+    window.addEventListener("pointercancel", onPointerCancel, opts);
+    window.addEventListener("touchstart", onTouchStart, opts);
+    window.addEventListener("touchend", onTouchEnd, opts);
+    window.addEventListener("touchcancel", onTouchCancel, opts);
+    return () => {
+      window.removeEventListener("pointerdown", onPointerDown, opts);
+      window.removeEventListener("pointerup", onPointerUp, opts);
+      window.removeEventListener("pointercancel", onPointerCancel, opts);
+      window.removeEventListener("touchstart", onTouchStart, opts);
+      window.removeEventListener("touchend", onTouchEnd, opts);
+      window.removeEventListener("touchcancel", onTouchCancel, opts);
+      for (const h of active.values()) h.cancel();
+      active.clear();
+    };
+  }, []);
+}
+
 function WheelButton({
   angle, size, label, tooltip, icon, onTap, onHold, toggleHold,
 }: {
@@ -355,99 +479,73 @@ function WheelButton({
   const cx = size / 2 + Math.cos(rad) * r - 22;
   const cy = size / 2 + Math.sin(rad) * r - 22;
   const [active, setActive] = useState(false);
+  const activeRef = useRef(false);
+  activeRef.current = active;
+  const elRef = useRef<HTMLButtonElement | null>(null);
   const holdTimer = useRef<number | null>(null);
   const isHeld = useRef(false);
-  // Verhindert Doppel-Auslösung, wenn iPadOS zusätzlich Touch-Events feuert.
-  const lastDown = useRef(0);
-  const downPointer = useRef<number | null>(null);
 
-  const begin = () => {
-    if (toggleHold) return;
-    if (holdTimer.current) { clearTimeout(holdTimer.current); }
-    holdTimer.current = window.setTimeout(() => {
-      if (onHold) {
-        isHeld.current = true;
-        setActive(true);
-        onHold(true);
-      }
-    }, 250);
-  };
-  const end = () => {
-    if (toggleHold) {
-      const next = !active;
-      setActive(next);
-      onHold?.(next);
-      return;
-    }
-    if (holdTimer.current) { clearTimeout(holdTimer.current); holdTimer.current = null; }
-    if (isHeld.current) {
-      isHeld.current = false;
-      setActive(false);
-      onHold?.(false);
-    } else {
-      onTap?.();
-    }
-  };
+  // Callbacks stabil halten, damit die Registry-Registrierung nur einmal läuft.
+  const cbs = useRef({ onTap, onHold, toggleHold });
+  cbs.current = { onTap, onHold, toggleHold };
 
-  const onPointerDown = (e: React.PointerEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    // Jeder Finger/Stift wird unabhängig behandelt — auch wenn woanders
-    // gerade gezeichnet wird (Zwei-Hand-Bedienung am Tablet).
-    if (downPointer.current !== null) return;
-    downPointer.current = e.pointerId;
-    lastDown.current = Date.now();
-    try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
-    begin();
-  };
-  const onPointerUp = (e: React.PointerEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (downPointer.current !== null && downPointer.current !== e.pointerId) return;
-    downPointer.current = null;
-    try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch {}
-    end();
-  };
-  const onPointerCancel = (e: React.PointerEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    downPointer.current = null;
-    if (holdTimer.current) { clearTimeout(holdTimer.current); holdTimer.current = null; }
-    if (isHeld.current) {
-      isHeld.current = false;
-      setActive(false);
-      onHold?.(false);
-    }
-  };
-
-  // Touch-Fallback: falls iPadOS während eines aktiven Stift-Kontakts keine
-  // Pointer-Events an dieses Element liefert, greifen die Touch-Events.
-  const onTouchStart = (e: React.TouchEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (downPointer.current !== null || Date.now() - lastDown.current < 400) return;
-    downPointer.current = -1;
-    lastDown.current = Date.now();
-    begin();
-  };
-  const onTouchEnd = (e: React.TouchEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (downPointer.current !== -1) return;
-    downPointer.current = null;
-    end();
-  };
+  useEffect(() => {
+    const handle: BtnHandle = {
+      getRect: () => elRef.current?.getBoundingClientRect() ?? null,
+      begin: () => {
+        if (cbs.current.toggleHold) return;
+        if (holdTimer.current) clearTimeout(holdTimer.current);
+        holdTimer.current = window.setTimeout(() => {
+          if (cbs.current.onHold) {
+            isHeld.current = true;
+            setActive(true);
+            cbs.current.onHold(true);
+          }
+        }, 250);
+      },
+      end: () => {
+        if (cbs.current.toggleHold) {
+          const next = !activeRef.current;
+          setActive(next);
+          cbs.current.onHold?.(next);
+          return;
+        }
+        if (holdTimer.current) { clearTimeout(holdTimer.current); holdTimer.current = null; }
+        if (isHeld.current) {
+          isHeld.current = false;
+          setActive(false);
+          cbs.current.onHold?.(false);
+        } else {
+          cbs.current.onTap?.();
+        }
+      },
+      cancel: () => {
+        if (holdTimer.current) { clearTimeout(holdTimer.current); holdTimer.current = null; }
+        if (isHeld.current) {
+          isHeld.current = false;
+          setActive(false);
+          cbs.current.onHold?.(false);
+        }
+      },
+    };
+    WHEEL_BUTTONS.add(handle);
+    return () => {
+      WHEEL_BUTTONS.delete(handle);
+      if (holdTimer.current) clearTimeout(holdTimer.current);
+    };
+  }, []);
 
   return (
     <button
+      ref={elRef}
       title={tooltip}
       type="button"
       tabIndex={-1}
-      onPointerDown={onPointerDown}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerCancel}
-      onTouchStart={onTouchStart}
-      onTouchEnd={onTouchEnd}
+      // Reale Kontakte werden zentral über den Router (Capture-Phase) bedient.
+      // Hier nur Defaults unterdrücken (Fokus-Verlust, iOS-Scroll, Ghost-Klicks).
+      onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+      onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+      onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
       className="absolute h-11 w-11 rounded-full flex flex-col items-center justify-center gap-0.5 text-[9px] font-semibold border transition-colors"
       style={{
         left: cx,
@@ -465,4 +563,5 @@ function WheelButton({
     </button>
   );
 }
+
 

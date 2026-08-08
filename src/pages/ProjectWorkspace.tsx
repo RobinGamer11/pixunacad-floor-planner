@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useRef, useEffect, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import { DragScrollDiv } from "@/components/DragScrollDiv";
+import { ToolHelpNotes } from "@/components/cad/ToolHelpNotes";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ChevronLeft,
@@ -4876,6 +4877,7 @@ function RightInspector({
               onCancelTable={onCancelTable}
             />
           )}
+          {tab === "tools" && <ToolHelpNotes toolId={activeTool ?? "select"} />}
           {tab === "layers" && page && (
             <div className="space-y-4">
               {/* Ein einziges Ebenen-/Bezeichnungs-ID-System — identisch zur
