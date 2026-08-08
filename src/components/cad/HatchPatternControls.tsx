@@ -81,6 +81,7 @@ export const HatchPatternControls: React.FC<Props> = ({ app }) => {
     if (!app) return;
     const h = app.getSelectedHatch?.();
     if (h) mutate(h); else def();
+    app.renderer?.render?.();
     app.requestRender?.();
     force((x) => x + 1);
   };
