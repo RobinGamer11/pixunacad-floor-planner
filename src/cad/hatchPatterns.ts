@@ -126,15 +126,15 @@ function drawTile(ctx: CanvasRenderingContext2D, id: HatchPatternId, s: number, 
     }
     case "erdreich": {
       // Diagonale Bänder mit senkrechten Sprossen (klassische Erdreich-Schraffur)
-      const d = s * 0.5;        // Bandraster (Y-Achsenabschnitt)
-      const bw = d * 0.5;       // Bandbreite
+      const d = s;              // Bandraster (Y-Achsenabschnitt)
+      const bw = d * 0.42;      // Bandbreite
       for (let b = -2; b <= 4; b += 1) {
         const base = b * d;
         line(ctx, -s, base + s, s * 2, base - s * 2);
         line(ctx, -s, base + bw + s, s * 2, base + bw - s * 2);
         ctx.save();
         ctx.lineWidth = lw * 0.8;
-        for (let x = -s; x <= s * 2; x += bw * 0.6) {
+        for (let x = -s; x <= s * 2; x += bw * 0.75) {
           line(ctx, x, base - x, x + bw / 2, base - x + bw / 2);
         }
         ctx.restore();
@@ -148,8 +148,8 @@ function drawTile(ctx: CanvasRenderingContext2D, id: HatchPatternId, s: number, 
         const cx = i * w;
         ctx.beginPath();
         ctx.moveTo(cx, s);
-        ctx.bezierCurveTo(cx - w * 0.5, s * 0.55, cx + w * 0.05, -s * 0.03, cx + w * 0.5, 0);
-        ctx.bezierCurveTo(cx + w * 0.95, -s * 0.03, cx + w * 1.5, s * 0.55, cx + w, s);
+        ctx.bezierCurveTo(cx + w * 0.02, s * 0.4, cx + w * 0.12, 0, cx + w * 0.5, 0);
+        ctx.bezierCurveTo(cx + w * 0.88, 0, cx + w * 0.98, s * 0.4, cx + w, s);
         ctx.stroke();
       }
       break;
