@@ -1106,7 +1106,7 @@ export class CadApp {
             fillColor: it.fillColor, strokeColor: it.strokeColor,
             fillAlphaPct: it.fillAlphaPct, strokeWidthPx: it.strokeWidthPx,
             labelId: it.labelId, areaLabel: it.areaLabel,
-            patternEnabled: it.patternEnabled, patternId: it.patternId, patternScale: it.patternScale, patternAngleDeg: it.patternAngleDeg, patternSkewDeg: it.patternSkewDeg,
+            patternEnabled: (it as any).patternEnabled, patternId: (it as any).patternId, patternScale: (it as any).patternScale, patternAngleDeg: (it as any).patternAngleDeg, patternSkewDeg: (it as any).patternSkewDeg,
           });
         } else if (it.kind === "dimension") {
           this.scene.createDimension(it.p1, it.p2, it.placementPoint, it.mode, it.refDir, {
