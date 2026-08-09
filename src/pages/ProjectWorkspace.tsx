@@ -3180,6 +3180,9 @@ function WarpHandles({
     // DOM-Element beim Re-Render nach onCommit — die Capture ginge verloren.
     // document-Listener (capture-Phase) sind resilient dagegen.
     const w = rect.width, h = rect.height;
+    // Tablet-Hilfsrad: Der Griff wird angetippt, folgt danach dem Stift als
+    // Vorschau (auch nach dem Abheben) und wird erst mit ENTER final gesetzt.
+    const tabletMode = !!(window as any).__pixunaTabletCommit;
     const onMove = (ev: PointerEvent) => {
       ev.preventDefault();
       let dx = (ev.clientX - startX) / w;
@@ -3204,14 +3207,25 @@ function WarpHandles({
       }
       onCommit(next);
     };
-    const onUp = () => {
+    const stop = () => {
       document.removeEventListener("pointermove", onMove, true);
       document.removeEventListener("pointerup", onUp, true);
       document.removeEventListener("pointercancel", onUp, true);
+      document.removeEventListener("keydown", onKey, true);
+    };
+    const onKey = (ev: KeyboardEvent) => {
+      if (ev.key === "Enter") { ev.preventDefault(); ev.stopPropagation(); stop(); }
+      else if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); onCommit(startCorners); stop(); }
+    };
+    const onUp = () => {
+      // Ohne Tablet-Hilfsrad beendet das Abheben die Verzerrung wie gewohnt.
+      if (!tabletMode) stop();
     };
     document.addEventListener("pointermove", onMove, true);
     document.addEventListener("pointerup", onUp, true);
     document.addEventListener("pointercancel", onUp, true);
+    if (tabletMode) document.addEventListener("keydown", onKey, true);
+
   };
   const handleStyle = (frac: { x: number; y: number }, isEdge: boolean): React.CSSProperties => ({
     position: "absolute",
