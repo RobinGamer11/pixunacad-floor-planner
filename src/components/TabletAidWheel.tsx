@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { ArrowBigUp, Check, X } from "lucide-react";
+import { ArrowBigUp, Check, X, Pencil } from "lucide-react";
 import {
   virtualMouseClick,
   virtualMouseHold,
