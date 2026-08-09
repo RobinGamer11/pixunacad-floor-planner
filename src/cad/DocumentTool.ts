@@ -159,10 +159,47 @@ export class DocumentTool {
   /** Externe API: nach erfolgreichem Datei-Import wird das Dokument zur Maus-Platzierung übergeben. */
   beginPlacement(opts: { src: string; widthM: number; heightM: number; pixelWidth: number; pixelHeight: number; name: string; kind: "image" | "pdf-page"; pageIndex: number; importScaleDenom: number; pdfSourceB64?: string | null }) {
     this.pendingDoc = opts;
+    this.placedPos = null;
     this.phase = "placing";
     this.app.clearSelection();
     this.onPhaseChange?.();
   }
+
+  /** ENTER: platziert das schwebende Dokument endgültig (Bild/PDF/JPG).
+   *  Ohne vorherigen Linksklick wird die aktuelle Cursor-/Snap-Position genutzt. */
+  finishFromKey(): boolean {
+    if (this.phase !== "placing" || !this.pendingDoc) return false;
+    const pending = this.pendingDoc;
+    const target = this.placedPos
+      ?? (this.scaleSnap ? v(this.scaleSnap.world.x, this.scaleSnap.world.y)
+        : v(this.app.input.mouse.wx, this.app.input.mouse.wy));
+    const doc = this.app.scene.createDocument({
+      name: pending.name,
+      kind: pending.kind,
+      src: pending.src,
+      pageIndex: pending.pageIndex,
+      position: v(target.x - pending.widthM / 2, target.y - pending.heightM / 2),
+      widthM: pending.widthM,
+      heightM: pending.heightM,
+      pixelWidth: pending.pixelWidth,
+      pixelHeight: pending.pixelHeight,
+      labelId: this.app.activeDrawLabelId,
+      importScaleDenom: pending.importScaleDenom,
+      pdfSourceB64: pending.pdfSourceB64 || null,
+    });
+    this.pendingDoc = null;
+    this.placedPos = null;
+    this.phase = "idle";
+    this.scaleSnap = null;
+    this.app.refreshLabelUI();
+    this.onPhaseChange?.();
+    // Direkt weiterbearbeiten: zurück zum Auswahl-Werkzeug.
+    this.app.setTool("select");
+    this.app.setSelection({ type: SelectionType.DOCUMENT, documentId: doc.id } as any);
+    return true;
+  }
+
+
 
 
   /** Externe API: leitet den 3-Punkt-Skaliervorgang für ein bestimmtes Dokument ein. */
