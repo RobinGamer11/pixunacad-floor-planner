@@ -56,6 +56,16 @@ export function TabletAidWheel() {
     return () => { (window as any).__pixunaTabletCommit = false; };
   }, []);
 
+  // "Vorerfasster Punkt": LMB leuchtet, solange ein Stift-Kontakt auf das
+  // Setzen per LMB wartet.
+  const [lmbHint, setLmbHint] = useState(false);
+  useEffect(() => {
+    const on = (e: Event) => setLmbHint(!!(e as CustomEvent).detail);
+    window.addEventListener("pixuna-lmb-hint", on as EventListener);
+    return () => window.removeEventListener("pixuna-lmb-hint", on as EventListener);
+  }, []);
+
+
   // Zentrale Verteilung aller realen Kontakte an die Rad-Knöpfe (iPadOS-fest).
   useWheelTouchRouter();
 
@@ -148,6 +158,7 @@ export function TabletAidWheel() {
         onTap={() => virtualKeyPress("Escape")}
         icon={<X size={18} />} />
       <WheelButton angle={-155} size={size} label="LMB" tooltip="Linke Maustaste (Tap = Klick, Halten = gedrückt halten)"
+        highlight={lmbHint}
         onTap={() => virtualMouseClick(0)}
         onHold={(on) => virtualMouseHold(0, on)}
         icon={<MouseIcon side="left" />} />
@@ -339,7 +350,7 @@ function useWheelTouchRouter() {
 }
 
 function WheelButton({
-  angle, size, label, tooltip, icon, onTap, onHold, toggleHold,
+  angle, size, label, tooltip, icon, onTap, onHold, toggleHold, highlight,
 }: {
   angle: number;
   size: number;
@@ -350,6 +361,8 @@ function WheelButton({
   onHold?: (on: boolean) => void;
   /** Wenn true: Tap togglet dauerhaft an/aus (statt Tap+Long-Press). */
   toggleHold?: boolean;
+  /** Dezentes Leuchten, z. B. wenn ein Punkt auf das Setzen per LMB wartet. */
+  highlight?: boolean;
 }) {
   const r = size / 2 - 26;
   const rad = (angle * Math.PI) / 180;
@@ -427,9 +440,10 @@ function WheelButton({
       style={{
         left: cx,
         top: cy,
-        borderColor: "hsl(var(--hairline))",
+        borderColor: highlight && !active ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
         background: active ? "hsl(var(--accent-gold))" : "hsl(var(--surface))",
         color: active ? "hsl(var(--surface))" : "hsl(var(--ink))",
+        boxShadow: highlight && !active ? "0 0 0 3px hsl(var(--accent-gold) / 0.35)" : undefined,
         touchAction: "none",
         pointerEvents: "auto",
         zIndex: 2,

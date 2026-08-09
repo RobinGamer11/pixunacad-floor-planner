@@ -38,6 +38,20 @@ function isTabletDrawGate(e: PointerEvent): boolean {
   return true;
 }
 
+/**
+ * "Vorerfasster Punkt": Der Stift hat im Tablet-Gate die Fläche berührt, der
+ * Punkt ist aber noch nicht gesetzt. Das Hilfsrad hebt dann LMB hervor.
+ */
+export function setLmbHint(on: boolean) {
+  if (typeof window === "undefined") return;
+  const w = window as any;
+  if (!!w.__pixunaLmbHint === !!on) return;
+  w.__pixunaLmbHint = !!on;
+  try { window.dispatchEvent(new CustomEvent("pixuna-lmb-hint", { detail: !!on })); } catch {}
+}
+
+
+
 
 
 export class Input {
@@ -92,6 +106,7 @@ export class Input {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Shift") this._keys.shift = true;
       if (e.code === "Space") this._keys.space = true;
+      if (e.key === "Escape" || e.key === "Enter") setLmbHint(false);
     };
     const onKeyUp = (e: KeyboardEvent) => {
       if (e.key === "Shift") this._keys.shift = false;
@@ -312,6 +327,8 @@ export class Input {
     this.doubleClicked = false;
     this.tabletTapped = this._tabletTapQueued;
     this._tabletTapQueued = false;
+    // Vorerfasster Punkt: Stift-Kontakt im Gate → LMB im Rad leuchtet.
+    if (this.tabletTapped) setLmbHint(true);
 
     if (this._dblQueued) {
       this.doubleClicked = true;
@@ -325,7 +342,9 @@ export class Input {
       this.rightClicked = true;
       this._rightQueued = false;
     }
+    if (this.clicked || this.doubleClicked) setLmbHint(false);
   }
+
 
   endFrame() {
     this.wheelDelta = 0;
