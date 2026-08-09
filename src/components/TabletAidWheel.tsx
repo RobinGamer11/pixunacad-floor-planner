@@ -158,6 +158,7 @@ export function TabletAidWheel() {
         onTap={() => virtualKeyPress("Escape")}
         icon={<X size={18} />} />
       <WheelButton angle={-155} size={size} label="LMB" tooltip="Linke Maustaste (Tap = Klick, Halten = gedrückt halten)"
+        highlight={lmbHint}
         onTap={() => virtualMouseClick(0)}
         onHold={(on) => virtualMouseHold(0, on)}
         icon={<MouseIcon side="left" />} />
