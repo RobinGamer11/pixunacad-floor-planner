@@ -100,6 +100,32 @@ function worldBounds(app: any, input: RasterInput): { x: number; y: number; w: n
     h: Math.max(1e-4, (b.maxY - b.minY) + padWorld * 2),
   };
 }
+/** Bounding-Box der nicht-transparenten Pixel (für engen PNG-Rahmen). */
+function alphaTrimBox(ctx: CanvasRenderingContext2D, w: number, h: number) {
+  try {
+    const data = ctx.getImageData(0, 0, w, h).data;
+    let minX = w, minY = h, maxX = -1, maxY = -1;
+    for (let y = 0; y < h; y++) {
+      const row = y * w * 4;
+      for (let x = 0; x < w; x++) {
+        if (data[row + x * 4 + 3] > 2) {
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
+    if (maxX < 0) return null;
+    // 1 px Sicherheitsrand gegen angeschnittene Kanten.
+    minX = Math.max(0, minX - 1); minY = Math.max(0, minY - 1);
+    maxX = Math.min(w - 1, maxX + 1); maxY = Math.min(h - 1, maxY + 1);
+    return { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 };
+  } catch {
+    return null;
+  }
+}
+
 
 function pushToScene(scene: Scene, input: RasterInput) {
   if (input.type === "segment") scene.segments.push(input.obj);
