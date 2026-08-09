@@ -2521,7 +2521,28 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           {activeTool === ToolIds.DOCUMENT && (
             <div className="cad-settings-panel mb-2">
               <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Dokument importieren</div>
+              {/* Ebene wie bei allen anderen Werkzeugen ganz oben: bestimmt die
+                  Bezeichnungs-ID, in die das importierte Bild/PDF einsortiert wird. */}
+              <label className="block text-xs mb-3">
+                <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Ebene</span>
+                <select
+                  value={appRef.current?.activeDrawLabelId ?? ""}
+                  onChange={(e) => {
+                    const app = appRef.current;
+                    if (!app) return;
+                    app.setActiveDrawLabelId(e.target.value);
+                    app.refreshLabelUI();
+                    forceRerender?.((x: number) => x + 1);
+                  }}
+                  className="cad-settings-select w-full"
+                >
+                  {(appRef.current?.labelManager.list() ?? []).map((l: any) => (
+                    <option key={l.id} value={l.id}>{l.name}</option>
+                  ))}
+                </select>
+              </label>
               <div className="space-y-3">
+
                 <button
                   type="button"
                   disabled={docImporting}
