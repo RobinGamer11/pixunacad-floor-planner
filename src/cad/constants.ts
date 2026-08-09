@@ -86,7 +86,7 @@ export const Defaults = {
   freeThicknessM: 0.012,
   freeOpacity: 1.0,
   freeLineStyle: "solid" as "solid" | "dashed" | "dotted" | "dashdot" | "blob" | "image",
-  freeGapM: 0.02,
+  freeGapM: 0.01,
   freeSmooth: true,
   freeSampleMinPx: 2.5,
   freeBlobSpacingM: 0.12,

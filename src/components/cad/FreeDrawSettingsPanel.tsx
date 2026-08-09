@@ -9,7 +9,6 @@ const STYLE_OPTIONS: { value: LineStyle; label: string }[] = [
   { value: "dashed", label: "Gestrichelt" },
   { value: "dashdot", label: "Punkt-Strich" },
   { value: "dotted", label: "Punkte" },
-  { value: "ink", label: "Tinte" },
   { value: "pencil", label: "Bleistift" },
   { value: "brush", label: "Pinsel" },
   { value: "marker", label: "Marker" },
@@ -21,9 +20,10 @@ const STYLE_OPTIONS: { value: LineStyle; label: string }[] = [
   { value: "image", label: "Bild-Stempel" },
 ];
 
-interface Props { app: CadApp | MiniCad | null; }
+interface Props { app: CadApp | MiniCad | null; units?: "cm" | "m"; }
 
-export const FreeDrawSettingsPanel: React.FC<Props> = ({ app }) => {
+export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm" }) => {
+
   const [color, setColor] = useState("#111111");
   const [thickness, setThickness] = useState(0.03);
   const [opacity, setOpacity] = useState(1);
@@ -81,6 +81,16 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app }) => {
     app.onSelectionChange = () => { prevSel?.(); syncFromState(); force(x => x + 1); };
     return () => { app.onLabelsChange = prevLabels; app.onSelectionChange = prevSel; };
   }, [app]);
+
+  // CAD-Oberfläche rechnet in Metern: Default-Linienskalierung = 1 m.
+  useEffect(() => {
+    if (!app || units !== "m") return;
+    if ((app.defaultFreeGapM ?? 0) < 0.1) {
+      app.defaultFreeGapM = 1;
+      setGap(1);
+    }
+  }, [app, units]);
+
 
   const selectedStroke = () => app?.getSelectedFreeStroke?.() || null;
   const applyToStroke = (mutate: (s: any) => void) => {
@@ -223,9 +233,13 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app }) => {
         {(style === "dashed" || style === "dotted" || style === "dashdot" || style === "blob") && (
           <label className="block text-xs">
             <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
-              {style === "blob" ? "Klecks-Abstand (cm)" : "Linienskalierung (cm)"}: {(gap * 100).toFixed(1)}
+              {style === "blob" ? `Klecks-Abstand (${units})` : `Linienskalierung (${units})`}: {units === "m" ? gap.toFixed(2) : (gap * 100).toFixed(1)}
             </span>
-            <input type="range" min={0.002} max={0.2} step={0.001} value={gap}
+            <input type="range"
+              min={units === "m" ? 0.1 : 0.001}
+              max={units === "m" ? 1.9 : 0.02}
+              step={units === "m" ? 0.05 : 0.0005}
+              value={gap}
               onChange={(e) => {
                 const v = parseFloat(e.target.value); setGap(v);
                 if (selectedStrokeId) applyToStroke((s) => { s.gapM = v; });
@@ -234,6 +248,7 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app }) => {
               className="w-full" />
           </label>
         )}
+
 
 
         {/* Bild-Stempel-Block */}
@@ -409,32 +424,55 @@ const FreeDrawPreview: React.FC<PreviewProps> = (props) => {
       ctx.globalCompositeOperation = prev;
       ctx.globalAlpha = props.opacity;
     } else if (style === "brush") {
-      // Variable Dicke entlang des Pfades
-      for (let i = 1; i < pts.length; i++) {
-        const t = i / (pts.length - 1);
-        const w2 = widthPx * (0.6 + Math.abs(Math.sin(t * Math.PI)) * 0.7);
-        ctx.lineWidth = w2;
-        ctx.beginPath();
-        ctx.moveTo(pts[i - 1].x, pts[i - 1].y);
-        ctx.lineTo(pts[i].x, pts[i].y);
-        ctx.stroke();
-      }
-    } else if (style === "calligraphy") {
-      // Feste Ribbon-Achse 45°
-      const ang = -Math.PI / 4;
-      const dx = Math.cos(ang) * widthPx * 0.5;
-      const dy = Math.sin(ang) * widthPx * 0.5;
+      // Geschwungenes Band: dünn an den Enden, deutlich dicker in der Mitte.
+      const n = pts.length;
+      const half = pts.map((_, i) => {
+        const t = n > 1 ? i / (n - 1) : 0.5;
+        return Math.max(0.4, widthPx * (0.10 + 1.5 * Math.pow(Math.sin(Math.PI * t), 0.55))) / 2;
+      });
+      const norm = pts.map((_, i) => {
+        const a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)];
+        let dx = b.x - a.x, dy = b.y - a.y;
+        const L = Math.hypot(dx, dy) || 1;
+        return { x: -dy / L, y: dx / L };
+      });
       ctx.beginPath();
-      for (let i = 0; i < pts.length; i++) {
-        const p = pts[i];
-        i ? ctx.lineTo(p.x + dx, p.y + dy) : ctx.moveTo(p.x + dx, p.y + dy);
-      }
-      for (let i = pts.length - 1; i >= 0; i--) {
-        const p = pts[i];
-        ctx.lineTo(p.x - dx, p.y - dy);
+      pts.forEach((p, i) => {
+        const x = p.x + norm[i].x * half[i], y = p.y + norm[i].y * half[i];
+        i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+      });
+      for (let i = n - 1; i >= 0; i--) {
+        ctx.lineTo(pts[i].x - norm[i].x * half[i], pts[i].y - norm[i].y * half[i]);
       }
       ctx.closePath();
       ctx.fill();
+    } else if (style === "calligraphy") {
+      // Feder 45°, Breite abhängig von Laufrichtung + Anschwellen zur Mitte.
+      const ang = -Math.PI / 4;
+      const cosA = Math.cos(ang), sinA = Math.sin(ang);
+      const n = pts.length;
+      const nib = widthPx * 1.25;
+      const halfFor = (i: number) => {
+        const a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)];
+        let dx = b.x - a.x, dy = b.y - a.y;
+        const L = Math.hypot(dx, dy) || 1; dx /= L; dy /= L;
+        const perp = Math.abs(dx * -sinA + dy * cosA);
+        const t = n > 1 ? i / (n - 1) : 0.5;
+        const swell = 0.65 + 0.35 * Math.pow(Math.sin(Math.PI * t), 0.6);
+        return Math.max(0.6, nib * (0.18 + 0.82 * perp) * swell) / 2;
+      };
+      for (let i = 1; i < n; i++) {
+        const a = pts[i - 1], b = pts[i];
+        const ha = halfFor(i - 1), hb = halfFor(i);
+        ctx.beginPath();
+        ctx.moveTo(a.x + cosA * ha, a.y + sinA * ha);
+        ctx.lineTo(a.x - cosA * ha, a.y - sinA * ha);
+        ctx.lineTo(b.x - cosA * hb, b.y - sinA * hb);
+        ctx.lineTo(b.x + cosA * hb, b.y + sinA * hb);
+        ctx.closePath();
+        ctx.fill();
+      }
+
     } else if (style === "spray") {
       const density = 6;
       const r = widthPx * 1.4;
@@ -447,36 +485,42 @@ const FreeDrawPreview: React.FC<PreviewProps> = (props) => {
           ctx.fill();
         }
       }
-    } else if (style === "ink") {
-      // Tinte: sanft taperende Enden, volle Mitte, weiche Rundungen.
-      const n = pts.length;
-      for (let i = 1; i < n; i++) {
-        const tMid = (i - 0.5) / (n - 1);
-        // Nur an den Enden dünner, sonst 100 %.
-        const taper = Math.min(1, Math.min(tMid, 1 - tMid) * 6);
-        ctx.lineWidth = Math.max(0.4, widthPx * (0.15 + 0.85 * taper));
-        ctx.beginPath();
-        ctx.moveTo(pts[i - 1].x, pts[i - 1].y);
-        ctx.lineTo(pts[i].x, pts[i].y);
-        ctx.stroke();
-      }
     } else if (style === "crayon") {
-      // Wachsmal: 3 leicht versetzte, körnige Passes mit Multiply-Optik.
+      // Wachsmal: mehrere versetzte Streifen + grobes Korn.
       const prev = ctx.globalCompositeOperation;
       ctx.globalCompositeOperation = "multiply";
-      for (let pass = 0; pass < 3; pass++) {
-        ctx.globalAlpha = props.opacity * 0.35;
-        ctx.lineWidth = widthPx * (0.9 + pass * 0.15);
+      const n = pts.length;
+      const norm = pts.map((_, i) => {
+        const a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)];
+        let dx = b.x - a.x, dy = b.y - a.y;
+        const L = Math.hypot(dx, dy) || 1;
+        return { x: -dy / L, y: dx / L };
+      });
+      const strands = 7;
+      for (let k = 0; k < strands; k++) {
+        const off = (k / (strands - 1) - 0.5) * widthPx * 0.95;
+        ctx.globalAlpha = props.opacity * (0.18 + ((k * 13) % 20) / 100);
+        ctx.lineWidth = Math.max(0.6, widthPx * 0.2);
         ctx.beginPath();
         pts.forEach((p, i) => {
-          const jx = Math.sin(i * 5.3 + pass * 2.1) * 0.9;
-          const jy = Math.cos(i * 4.7 + pass * 1.9) * 0.9;
-          i ? ctx.lineTo(p.x + jx, p.y + jy) : ctx.moveTo(p.x + jx, p.y + jy);
+          const j = Math.sin(i * (1.7 + k * 0.6) + k * 3.3) * widthPx * 0.09;
+          const x = p.x + norm[i].x * (off + j), y = p.y + norm[i].y * (off + j);
+          i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
         });
         ctx.stroke();
       }
+      for (let i = 0; i < n; i++) {
+        for (let g = 0; g < 4; g++) {
+          const off = ((((i * 31 + g * 17) % 100) / 100) - 0.5) * widthPx * 1.05;
+          ctx.globalAlpha = props.opacity * (0.12 + (((i * 7 + g * 23) % 30) / 100));
+          ctx.beginPath();
+          ctx.arc(pts[i].x + norm[i].x * off, pts[i].y + norm[i].y * off, Math.max(0.35, widthPx * 0.08), 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
       ctx.globalCompositeOperation = prev;
       ctx.globalAlpha = props.opacity;
+
     } else if (style === "chalk") {
       // Kreide: körniges Rauschen entlang des Pfades, keine durchgezogene Linie.
       const density = 5;

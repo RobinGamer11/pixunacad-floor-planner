@@ -24,12 +24,17 @@ function isTabletDrawGate(e: PointerEvent): boolean {
   const commit = !!(window as any).__pixunaTabletCommit;
   if (!commit) return false;
   if ((e as any).__virtual) return false;
-  // Nur während einer laufenden HUB-/Fangpunkt-Aktion (Verschieben/Drehen/…)
-  // darf ein echter Stift-/Finger-Kontakt NICHT committen — bestätigt wird
-  // dann ausschließlich über ENTER im Hilfsrad. In allen anderen Fällen
-  // zeichnen/klicken Stift und Finger ganz normal weiter.
-  return !!(window as any).__pixunaSkipFirstDraw;
+  const tool = String((window as any).__pixunaActiveTool || "");
+  // Freihand & Radiergummi zeichnen direkt mit dem Stift (Strich-Geste).
+  if (tool === "free" || tool === "eraser") return false;
+  // Auswahl-Werkzeug: nur während laufender Fangpunkt-Aktion (Verschieben/
+  // Drehen/…) gaten — sonst bleiben Objekte direkt antippbar.
+  if (tool === "select") return !!(window as any).__pixunaSkipFirstDraw;
+  // Alle Zeichenwerkzeuge: Stift bewegt nur den Cursor, gesetzt wird per
+  // LMB im Hilfsrad, abgeschlossen per ENTER.
+  return true;
 }
+
 
 
 export class Input {

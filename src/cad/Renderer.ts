@@ -2652,63 +2652,106 @@ export class Renderer {
     ctx.restore();
   }
 
-  /** Pinsel: variable Breite (Taper an Enden), weiche Rundungen. */
+  /** Pinsel: geschwungenes Band — dünn an den Enden, deutlich dicker in der Mitte. */
   private _drawFreeStrokeBrush(s: FreeStroke) {
     const ctx = this.ctx;
     const cam = this.camera;
     const pts = this._renderPointsForFreeStroke(s);
     if (pts.length < 2) return;
     const baseW = this.segStrokePx(s.thicknessM);
-    const n = pts.length;
-    ctx.save();
-    ctx.strokeStyle = rgbaFromHex(s.color, s.opacity);
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    for (let i = 1; i < n; i++) {
-      const a = cam.worldToScreen(pts[i - 1].x, pts[i - 1].y);
-      const b = cam.worldToScreen(pts[i].x, pts[i].y);
-      // Taper: an Enden dünner, in der Mitte voll.
-      const tMid = (i - 0.5) / (n - 1);
-      const taper = Math.sin(Math.PI * tMid); // 0..1..0
-      ctx.lineWidth = Math.max(0.5, baseW * (0.25 + 0.75 * taper));
-      ctx.beginPath();
-      ctx.moveTo(a.x, a.y);
-      ctx.lineTo(b.x, b.y);
-      ctx.stroke();
+    const sp = pts.map(p => cam.worldToScreen(p.x, p.y));
+    const n = sp.length;
+    // Breitenprofil: sanft anschwellend, Maximum in der Mitte (~1.6x).
+    const widths: number[] = [];
+    for (let i = 0; i < n; i++) {
+      const t = n > 1 ? i / (n - 1) : 0.5;
+      const swell = Math.pow(Math.sin(Math.PI * t), 0.55);
+      widths.push(Math.max(0.4, baseW * (0.10 + 1.5 * swell)) / 2);
     }
+    ctx.save();
+    ctx.fillStyle = rgbaFromHex(s.color, s.opacity);
+    this._fillVariableRibbon(sp, widths);
     ctx.restore();
   }
 
-  /** Kalligrafie: rechteckige Stempel entlang Pfad in fester Feder-Neigung (45°). */
+  /**
+   * Füllt ein Band mit variabler Halbbreite entlang der Punktfolge.
+   * Nutzt gemittelte Normalen + quadratische Glättung für elegante Schwünge.
+   */
+  private _fillVariableRibbon(sp: { x: number; y: number }[], halfWidths: number[]) {
+    const ctx = this.ctx;
+    const n = sp.length;
+    if (n < 2) return;
+    const nx: number[] = [], ny: number[] = [];
+    for (let i = 0; i < n; i++) {
+      const a = sp[Math.max(0, i - 1)];
+      const b = sp[Math.min(n - 1, i + 1)];
+      let dx = b.x - a.x, dy = b.y - a.y;
+      const L = Math.hypot(dx, dy) || 1;
+      dx /= L; dy /= L;
+      nx.push(-dy); ny.push(dx);
+    }
+    const left = sp.map((p, i) => ({ x: p.x + nx[i] * halfWidths[i], y: p.y + ny[i] * halfWidths[i] }));
+    const right = sp.map((p, i) => ({ x: p.x - nx[i] * halfWidths[i], y: p.y - ny[i] * halfWidths[i] }));
+    const smoothTo = (pts: { x: number; y: number }[]) => {
+      for (let i = 1; i < pts.length - 1; i++) {
+        const mx = (pts[i].x + pts[i + 1].x) / 2;
+        const my = (pts[i].y + pts[i + 1].y) / 2;
+        ctx.quadraticCurveTo(pts[i].x, pts[i].y, mx, my);
+      }
+      const last = pts[pts.length - 1];
+      ctx.lineTo(last.x, last.y);
+    };
+    ctx.beginPath();
+    ctx.moveTo(left[0].x, left[0].y);
+    smoothTo(left);
+    const rev = right.slice().reverse();
+    ctx.lineTo(rev[0].x, rev[0].y);
+    smoothTo(rev);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  /** Kalligrafie: Federband mit fester Neigung, geschwungen und in der Mitte voller. */
   private _drawFreeStrokeCalligraphy(s: FreeStroke) {
     const ctx = this.ctx;
     const cam = this.camera;
     const pts = this._renderPointsForFreeStroke(s);
     if (pts.length < 2) return;
-    const nibW = this.segStrokePx(s.thicknessM);
-    const nibH = Math.max(1, nibW * 0.35);
+    const nibW = this.segStrokePx(s.thicknessM) * 1.25;
+    const nibMin = Math.max(0.6, nibW * 0.14);
     const nibAngle = -Math.PI / 4; // 45° Feder-Neigung
     const cosA = Math.cos(nibAngle), sinA = Math.sin(nibAngle);
+    const sp = pts.map(p => cam.worldToScreen(p.x, p.y));
+    const n = sp.length;
     ctx.save();
     ctx.fillStyle = rgbaFromHex(s.color, s.opacity);
-    // Kontinuierliches Band: pro Segment Trapez aus 4 versetzten Ecken.
-    const offX = (nibW / 2) * cosA;
-    const offY = (nibW / 2) * sinA;
-    const offX2 = (nibH / 2) * -sinA;
-    const offY2 = (nibH / 2) * cosA;
-    for (let i = 1; i < pts.length; i++) {
-      const a = cam.worldToScreen(pts[i - 1].x, pts[i - 1].y);
-      const b = cam.worldToScreen(pts[i].x, pts[i].y);
+    // Breite hängt von Laufrichtung zur Feder ab (klassischer Feder-Effekt)
+    // und schwillt zur Mitte hin an.
+    const halfFor = (i: number) => {
+      const a = sp[Math.max(0, i - 1)], b = sp[Math.min(n - 1, i + 1)];
+      let dx = b.x - a.x, dy = b.y - a.y;
+      const L = Math.hypot(dx, dy) || 1; dx /= L; dy /= L;
+      const perp = Math.abs(dx * -sinA + dy * cosA); // 0 = längs Feder, 1 = quer
+      const t = n > 1 ? i / (n - 1) : 0.5;
+      const swell = 0.65 + 0.35 * Math.pow(Math.sin(Math.PI * t), 0.6);
+      return Math.max(nibMin, nibW * (0.18 + 0.82 * perp) * swell) / 2;
+    };
+    for (let i = 1; i < n; i++) {
+      const a = sp[i - 1], b = sp[i];
+      const ha = halfFor(i - 1), hb = halfFor(i);
+      // Bandachse = Federrichtung (fest), Breite variiert.
       ctx.beginPath();
-      ctx.moveTo(a.x + offX - offX2, a.y + offY - offY2);
-      ctx.lineTo(a.x - offX + offX2, a.y - offY + offY2);
-      ctx.lineTo(b.x - offX + offX2, b.y - offY + offY2);
-      ctx.lineTo(b.x + offX - offX2, b.y + offY - offY2);
+      ctx.moveTo(a.x + cosA * ha, a.y + sinA * ha);
+      ctx.lineTo(a.x - cosA * ha, a.y - sinA * ha);
+      ctx.lineTo(b.x - cosA * hb, b.y - sinA * hb);
+      ctx.lineTo(b.x + cosA * hb, b.y + sinA * hb);
       ctx.closePath();
       ctx.fill();
     }
     ctx.restore();
   }
+
 
   /** Tinte: taperende Enden, volle Mitte. */
   private _drawFreeStrokeInk(s: FreeStroke) {
@@ -2765,35 +2808,64 @@ export class Renderer {
     ctx.restore();
   }
 
-  /** Wachsmal: 3 versetzte Multiply-Passes, leicht körnig. */
+  /** Wachsmal: wachsartig — ausgefranste Kanten, körnige, ungleichmäßige Deckung. */
   private _drawFreeStrokeCrayon(s: FreeStroke) {
     const ctx = this.ctx;
     const cam = this.camera;
     const pts = this._renderPointsForFreeStroke(s);
     if (pts.length < 2) return;
-    const baseW = this.segStrokePx(s.thicknessM);
+    const baseW = this.segStrokePx(s.thicknessM) * 1.15;
+    const sp = pts.map(p => cam.worldToScreen(p.x, p.y));
+    let seed = 0;
+    for (let i = 0; i < s.id.length; i++) seed = (seed * 31 + s.id.charCodeAt(i)) >>> 0;
+    const rand = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 0xffffffff; };
     ctx.save();
-    ctx.strokeStyle = rgbaFromHex(s.color, 1);
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
     const prevComp = ctx.globalCompositeOperation;
     (ctx as any).globalCompositeOperation = "multiply";
-    for (let pass = 0; pass < 3; pass++) {
-      ctx.globalAlpha = s.opacity * 0.35;
-      ctx.lineWidth = baseW * (0.9 + pass * 0.15);
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = rgbaFromHex(s.color, 1);
+    // 1) Mehrere schmale, seitlich versetzte Striche → typische Wachs-Streifen.
+    const strands = 7;
+    for (let k = 0; k < strands; k++) {
+      const off = (k / (strands - 1) - 0.5) * baseW * 0.95;
+      ctx.globalAlpha = s.opacity * (0.16 + rand() * 0.22);
+      ctx.lineWidth = Math.max(0.6, baseW * (0.16 + rand() * 0.12));
       ctx.beginPath();
-      for (let i = 0; i < pts.length; i++) {
-        const p = cam.worldToScreen(pts[i].x, pts[i].y);
-        const jx = Math.sin(i * 5.3 + pass * 2.1) * 0.9;
-        const jy = Math.cos(i * 4.7 + pass * 1.9) * 0.9;
-        i ? ctx.lineTo(p.x + jx, p.y + jy) : ctx.moveTo(p.x + jx, p.y + jy);
+      for (let i = 0; i < sp.length; i++) {
+        const a = sp[Math.max(0, i - 1)], b = sp[Math.min(sp.length - 1, i + 1)];
+        let dx = b.x - a.x, dy = b.y - a.y;
+        const L = Math.hypot(dx, dy) || 1; dx /= L; dy /= L;
+        const jitter = Math.sin(i * (1.7 + k * 0.6) + k * 3.3) * baseW * 0.09;
+        const px = sp[i].x + -dy * (off + jitter);
+        const py = sp[i].y + dx * (off + jitter);
+        i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
       }
       ctx.stroke();
+    }
+    // 2) Grobes Wachs-Korn: Punkte-Cluster über der Strichbreite.
+    ctx.fillStyle = rgbaFromHex(s.color, 1);
+    for (let i = 1; i < sp.length; i++) {
+      const a = sp[i - 1], b = sp[i];
+      let dx = b.x - a.x, dy = b.y - a.y;
+      const L = Math.hypot(dx, dy) || 1; dx /= L; dy /= L;
+      const grains = Math.max(2, Math.round(L * 1.2));
+      for (let g = 0; g < grains; g++) {
+        const t = rand();
+        const off = (rand() - 0.5) * baseW * 1.05;
+        ctx.globalAlpha = s.opacity * (0.12 + rand() * 0.35);
+        const gx = a.x + (b.x - a.x) * t + -dy * off;
+        const gy = a.y + (b.y - a.y) * t + dx * off;
+        ctx.beginPath();
+        ctx.arc(gx, gy, Math.max(0.35, baseW * (0.05 + rand() * 0.1)), 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
     (ctx as any).globalCompositeOperation = prevComp;
     ctx.globalAlpha = s.opacity;
     ctx.restore();
   }
+
 
   /** Kreide: körniges Rauschen entlang des Pfades. */
   private _drawFreeStrokeChalk(s: FreeStroke) {
