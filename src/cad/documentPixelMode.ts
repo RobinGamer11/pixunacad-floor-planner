@@ -20,7 +20,7 @@
  */
 import { Defaults } from "./constants";
 import type { DocumentObject } from "./Scene";
-import { getMaskDimensions, getOrCreateDocMask } from "./documentMask";
+import { getOrCreateDocMask } from "./documentMask";
 
 /** Maximale Kantenlänge des eingebrannten Pixelbildes. */
 const MAX_BAKE_PX = 4096;
