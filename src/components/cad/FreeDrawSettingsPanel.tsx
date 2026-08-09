@@ -485,36 +485,42 @@ const FreeDrawPreview: React.FC<PreviewProps> = (props) => {
           ctx.fill();
         }
       }
-    } else if (style === "ink") {
-      // Tinte: sanft taperende Enden, volle Mitte, weiche Rundungen.
-      const n = pts.length;
-      for (let i = 1; i < n; i++) {
-        const tMid = (i - 0.5) / (n - 1);
-        // Nur an den Enden dünner, sonst 100 %.
-        const taper = Math.min(1, Math.min(tMid, 1 - tMid) * 6);
-        ctx.lineWidth = Math.max(0.4, widthPx * (0.15 + 0.85 * taper));
-        ctx.beginPath();
-        ctx.moveTo(pts[i - 1].x, pts[i - 1].y);
-        ctx.lineTo(pts[i].x, pts[i].y);
-        ctx.stroke();
-      }
     } else if (style === "crayon") {
-      // Wachsmal: 3 leicht versetzte, körnige Passes mit Multiply-Optik.
+      // Wachsmal: mehrere versetzte Streifen + grobes Korn.
       const prev = ctx.globalCompositeOperation;
       ctx.globalCompositeOperation = "multiply";
-      for (let pass = 0; pass < 3; pass++) {
-        ctx.globalAlpha = props.opacity * 0.35;
-        ctx.lineWidth = widthPx * (0.9 + pass * 0.15);
+      const n = pts.length;
+      const norm = pts.map((_, i) => {
+        const a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)];
+        let dx = b.x - a.x, dy = b.y - a.y;
+        const L = Math.hypot(dx, dy) || 1;
+        return { x: -dy / L, y: dx / L };
+      });
+      const strands = 7;
+      for (let k = 0; k < strands; k++) {
+        const off = (k / (strands - 1) - 0.5) * widthPx * 0.95;
+        ctx.globalAlpha = props.opacity * (0.18 + ((k * 13) % 20) / 100);
+        ctx.lineWidth = Math.max(0.6, widthPx * 0.2);
         ctx.beginPath();
         pts.forEach((p, i) => {
-          const jx = Math.sin(i * 5.3 + pass * 2.1) * 0.9;
-          const jy = Math.cos(i * 4.7 + pass * 1.9) * 0.9;
-          i ? ctx.lineTo(p.x + jx, p.y + jy) : ctx.moveTo(p.x + jx, p.y + jy);
+          const j = Math.sin(i * (1.7 + k * 0.6) + k * 3.3) * widthPx * 0.09;
+          const x = p.x + norm[i].x * (off + j), y = p.y + norm[i].y * (off + j);
+          i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
         });
         ctx.stroke();
       }
+      for (let i = 0; i < n; i++) {
+        for (let g = 0; g < 4; g++) {
+          const off = ((((i * 31 + g * 17) % 100) / 100) - 0.5) * widthPx * 1.05;
+          ctx.globalAlpha = props.opacity * (0.12 + (((i * 7 + g * 23) % 30) / 100));
+          ctx.beginPath();
+          ctx.arc(pts[i].x + norm[i].x * off, pts[i].y + norm[i].y * off, Math.max(0.35, widthPx * 0.08), 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
       ctx.globalCompositeOperation = prev;
       ctx.globalAlpha = props.opacity;
+
     } else if (style === "chalk") {
       // Kreide: körniges Rauschen entlang des Pfades, keine durchgezogene Linie.
       const density = 5;
