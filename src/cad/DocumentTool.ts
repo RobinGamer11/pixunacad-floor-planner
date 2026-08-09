@@ -304,35 +304,17 @@ export class DocumentTool {
     if (this.phase === "placing") {
       const snap = this.app.topology.findBestSnap(v(input.mouse.sx, input.mouse.sy), v(input.mouse.wx, input.mouse.wy));
       this.scaleSnap = snap;
+      // Linksklick SETZT die Position (Vorschau friert dort ein) — ein weiterer
+      // Klick verschiebt sie. Erst ENTER platziert das Dokument endgültig.
       if (input.clicked && this.pendingDoc) {
         const target = snap ? snap.world : v(input.mouse.wx, input.mouse.wy);
-        const doc = this.app.scene.createDocument({
-          name: this.pendingDoc.name,
-          kind: this.pendingDoc.kind,
-          src: this.pendingDoc.src,
-          pageIndex: this.pendingDoc.pageIndex,
-          position: v(target.x - this.pendingDoc.widthM / 2, target.y - this.pendingDoc.heightM / 2),
-          widthM: this.pendingDoc.widthM,
-          heightM: this.pendingDoc.heightM,
-          pixelWidth: this.pendingDoc.pixelWidth,
-          pixelHeight: this.pendingDoc.pixelHeight,
-          labelId: this.app.activeDrawLabelId,
-          importScaleDenom: this.pendingDoc.importScaleDenom,
-          pdfSourceB64: this.pendingDoc.pdfSourceB64 || null,
-        });
-        this.pendingDoc = null;
-        this.phase = "idle";
-        this.scaleSnap = null;
-        this.app.refreshLabelUI();
+        this.placedPos = v(target.x, target.y);
         this.onPhaseChange?.();
-        // Nach dem Platzieren automatisch zurück zum Auswahl-Werkzeug wechseln,
-        // damit ein weiterer Canvas-Klick nicht versehentlich das Dokument erneut platziert
-        // und der User direkt via SelectTool das Dokument bearbeiten kann.
-        this.app.setTool("select");
-        this.app.setSelection({ type: SelectionType.DOCUMENT, documentId: doc.id } as any);
+        this.app.renderer.render();
       }
       return;
     }
+
 
     if (this.phase === "scale-pick-1") {
       this.scaleSnap = this.app.topology.findBestSnap(v(input.mouse.sx, input.mouse.sy), v(input.mouse.wx, input.mouse.wy));
