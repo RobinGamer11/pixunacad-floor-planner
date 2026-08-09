@@ -2048,7 +2048,17 @@ export class CadApp {
           this.hatchTool.finishCircleFromKey();
           return;
         }
+        if (this.hatchTool.finishFromKey()) { e.preventDefault(); return; }
       }
+
+      if (e.key === "Enter" && this.activeTool === this.lineTool && !isHubInput) {
+        if (this.lineTool.isDrawing()) { e.preventDefault(); this.lineTool.finish(); return; }
+      }
+
+      if (e.key === "Enter" && this.activeTool === this.wallTool && !isHubInput) {
+        if (this.wallTool.isDrawing?.()) { e.preventDefault(); this.wallTool.finish(); return; }
+      }
+
 
       if (e.key === "Enter" && this.activeTool === this.stickerTool && !isHubInput) {
         if (this.stickerTool.handleEnterKey()) { e.preventDefault(); return; }
