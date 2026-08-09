@@ -36,6 +36,9 @@ export class SelectTool {
   activeEditAction: string | null = null;
   /** Vom Tablet-Hilfsrad (ENTER) angeforderte Bestätigung der laufenden Aktion. */
   enterCommitRequested = false;
+  /** Tablet: Funktion aktiviert, wartet auf erneutes Antippen des Fangpunkts. */
+  tabletArmPending = false;
+  private _prevEditActive = false;
   editTarget: EditTarget | null = null;
 
   // For segment edits: fixed = the other endpoint. originalMoving = the moving endpoint.
@@ -2487,7 +2490,23 @@ export class SelectTool {
       }
     }
 
+    if (!this.isEditing()) {
+      this._prevEditActive = false;
+      this.tabletArmPending = false;
+    }
+
     if (this.isEditing()) {
+      // Tablet-Hilfsrad: Nach dem Aktivieren einer Funktion (Verschieben/Drehen/…)
+      // muss der Fangpunkt ERNEUT angetippt werden, bevor das Objekt dem Stift
+      // folgt. Bis dahin passiert nichts (auch kein Commit).
+      const wheelOn = typeof window !== "undefined" && !!(window as any).__pixunaTabletCommit;
+      if (!this._prevEditActive) this.tabletArmPending = wheelOn;
+      this._prevEditActive = true;
+      if (this.tabletArmPending) {
+        if (input.tabletTapped || input.clicked) this.tabletArmPending = false;
+        this.enterCommitRequested = false;
+        return;
+      }
       // Bestätigung: echter Klick ODER ENTER (Tablet-Hilfsrad).
       const editCommit = input.clicked || this.enterCommitRequested;
       this.enterCommitRequested = false;

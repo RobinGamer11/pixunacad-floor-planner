@@ -56,6 +56,9 @@ export class Input {
 
 
   clicked = false;
+  /** Echter Stift-/Finger-Kontakt, der vom Tablet-Gate abgefangen wurde. */
+  tabletTapped = false;
+  private _tabletTapQueued = false;
   rightClicked = false;
   doubleClicked = false;
   wheelDelta = 0;
@@ -224,6 +227,7 @@ export class Input {
       // ── Tablet-Commit-Gate: keine automatische Klick-Emission.
       if (isTabletDrawGate(e)) {
         try { c.setPointerCapture(e.pointerId); } catch {}
+        this._tabletTapQueued = true;
         return;
       }
 
@@ -310,6 +314,8 @@ export class Input {
     this.clicked = false;
     this.rightClicked = false;
     this.doubleClicked = false;
+    this.tabletTapped = this._tabletTapQueued;
+    this._tabletTapQueued = false;
 
     if (this._dblQueued) {
       this.doubleClicked = true;

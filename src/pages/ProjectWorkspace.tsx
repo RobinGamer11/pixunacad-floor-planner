@@ -3528,6 +3528,16 @@ function ElementView({
     };
   }, [hubMode, edgeTrim]);
 
+  // Tablet-Hilfsrad: Nach dem Aktivieren einer Funktion muss der Fangpunkt
+  // ERNEUT angetippt werden, bevor das Objekt am Stift mitgezogen wird.
+  useEffect(() => {
+    if (!hubMode) return;
+    const wheelOn = typeof window !== "undefined" && !!(window as any).__pixunaTabletCommit;
+    setCarrying(!wheelOn);
+  }, [hubMode]);
+
+
+
 
 
 
@@ -3831,6 +3841,10 @@ function ElementView({
 
 
     const onMove = (ev: PointerEvent) => {
+      // Tablet-Hilfsrad/HUB-Bedienelemente werden für die Positionierung
+      // komplett ignoriert — sonst springt das Objekt zum Rad.
+      const mt = ev.target as HTMLElement | null;
+      if (mt?.closest?.('[data-tablet-aid="true"], [data-hub-control]')) return;
       if (!carryingRef.current) return; // Objekt abgelegt — Preview eingefroren.
       const { clientX: ax, clientY: ay } = liveAnchor();
       const reg = getPageSnapRegistry();
@@ -3940,6 +3954,8 @@ function ElementView({
 
     const onDown = (ev: PointerEvent) => {
       if (ev.button !== 0) return;
+      const td = ev.target as HTMLElement | null;
+      if (td?.closest?.('[data-tablet-aid="true"]')) return;
       hubDownClientRef.current = { x: ev.clientX, y: ev.clientY };
       // Drehen: Ein Linksklick setzt das Objekt sofort in der aktuellen
       // Drehstellung — schon beim Pointerdown, damit kein anderes Handling
@@ -3972,7 +3988,7 @@ function ElementView({
         return;
       }
       const t = ev.target as HTMLElement | null;
-      if (t?.closest("[data-hub-control]")) return;
+      if (t?.closest('[data-hub-control], [data-tablet-aid="true"]')) return;
       ev.preventDefault();
       ev.stopPropagation();
       // Erneuter Klick auf den gewählten Fangpunkt (Anker) → Aktion bestätigen.
