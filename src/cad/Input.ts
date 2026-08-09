@@ -32,12 +32,13 @@ function isTabletDrawGate(e: PointerEvent): boolean {
   _prevTabletCommit = commit;
   if (!commit) return false;
   if ((e as any).__virtual) return false;
+  // Wenn eine HUB-/Fangpunkt-Aktion (Verschieben/Drehen/etc.) aktiv ist, darf
+  // ein echter Stift-/Finger-Kontakt NIE committen — auch nicht im Auswahl-
+  // Werkzeug. Bestätigt wird ausschließlich über ENTER/LMB im Hilfsrad.
+  if ((window as any).__pixunaSkipFirstDraw) return true;
   const t = (window as any).__pixunaActiveTool;
   if (t === "select" || t === "pipette") return false;
-  // Wenn eine HUB-Bearbeitungsaktion (Verschieben/Drehen/etc.) aktiv ist,
-  // greift der "erster Klick fließt durch"-Bypass NICHT — der Nutzer muss
-  // im Rad ENTER/LMB drücken, um zu bestätigen.
-  if ((window as any).__pixunaSkipFirstDraw) return true;
+
   if (t !== _lastToolForGate) { _lastToolForGate = t; _firstDrawConsumed = false; }
   if (!_firstDrawConsumed) { _firstDrawConsumed = true; return false; }
   return true;

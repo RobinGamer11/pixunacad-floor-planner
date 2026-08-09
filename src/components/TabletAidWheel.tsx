@@ -5,6 +5,7 @@ import {
   virtualMouseHold,
   virtualKeyPress,
   virtualKeyHold,
+  primeTabletKeyboard,
 } from "@/lib/virtualInput";
 
 /** Computermaus-Symbol mit hervorgehobener linker bzw. rechter Taste. */
@@ -124,10 +125,17 @@ export function TabletAidWheel() {
         onTap={() => {
           const el = document.activeElement as HTMLElement | null;
           const inField = !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || (el as any).isContentEditable);
-          if (inField) virtualKeyPress("Enter", el);
+          if (inField) { virtualKeyPress("Enter", el); return; }
+          // Textwerkzeug: Tastatur schon in der echten Geste "vorwärmen",
+          // damit sie nach dem Setzen der Textbox automatisch offen ist.
+          if ((window as any).__pixunaActiveTool === "text") primeTabletKeyboard();
+          // Laufende Fangpunkt-Aktion (Verschieben/Drehen …) wird per Enter
+          // final bestätigt — sonst setzt Enter wie bisher einen Punkt.
+          if ((window as any).__pixunaSkipFirstDraw) virtualKeyPress("Enter");
           else virtualMouseClick(0);
         }}
         icon={<Check size={18} />} />
+
       <WheelButton angle={-25} size={size} label="RMB" tooltip="Rechte Maustaste"
         onTap={() => virtualMouseClick(2)}
         onHold={(on) => virtualMouseHold(2, on)}
