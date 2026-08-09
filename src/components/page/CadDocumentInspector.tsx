@@ -12,6 +12,7 @@ import { Maximize2, Ruler as RulerIcon } from "lucide-react";
 import type { MiniCad } from "@/cad/embed/MiniCad";
 import { SelectionType } from "@/cad/constants";
 import { DocumentFilterPanel } from "@/components/cad/DocumentFilterPanel";
+import { DocumentPixelModeToggle } from "@/components/cad/DocumentPixelModeToggle";
 
 interface Props {
   engine: MiniCad | null;
