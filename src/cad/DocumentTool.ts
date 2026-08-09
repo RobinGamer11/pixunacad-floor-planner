@@ -475,14 +475,16 @@ export class DocumentTool {
   private _drawOverlay(ctx: CanvasRenderingContext2D, cam: any) {
     // Pending Dokument als halbtransparentes Rechteck unter dem Cursor zeigen
     if (this.phase === "placing" && this.pendingDoc) {
-      const center = this.scaleSnap ? this.scaleSnap.world : v(this.app.input.mouse.wx, this.app.input.mouse.wy);
+      const center = this.placedPos
+        ? this.placedPos
+        : (this.scaleSnap ? this.scaleSnap.world : v(this.app.input.mouse.wx, this.app.input.mouse.wy));
       const x = center.x - this.pendingDoc.widthM / 2;
       const y = center.y - this.pendingDoc.heightM / 2;
       const tl = cam.worldToScreen(x, y);
       const br = cam.worldToScreen(x + this.pendingDoc.widthM, y + this.pendingDoc.heightM);
       ctx.save();
-      ctx.fillStyle = "rgba(77,163,255,0.15)";
-      ctx.strokeStyle = "rgba(77,163,255,0.85)";
+      ctx.fillStyle = this.placedPos ? "rgba(212,175,55,0.15)" : "rgba(77,163,255,0.15)";
+      ctx.strokeStyle = this.placedPos ? "rgba(212,175,55,0.95)" : "rgba(77,163,255,0.85)";
       ctx.lineWidth = 1.8;
       ctx.setLineDash([6, 4]);
       ctx.beginPath();
@@ -493,9 +495,13 @@ export class DocumentTool {
       ctx.fillStyle = "rgba(0,0,0,0.6)";
       ctx.font = "12px system-ui";
       ctx.textBaseline = "bottom";
-      ctx.fillText(this.pendingDoc.name, tl.x + 6, tl.y - 4);
+      ctx.fillText(
+        this.placedPos ? `${this.pendingDoc.name} — Enter platziert final` : this.pendingDoc.name,
+        tl.x + 6, tl.y - 4,
+      );
       ctx.restore();
     }
+
 
     // Verzerren: Quad + Eck-Handles
     if (this.phase === "warp" && this.warpTargetDocId) {
