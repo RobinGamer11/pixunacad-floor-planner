@@ -38,6 +38,9 @@ export class HatchTool {
 
   drawMode: HatchDrawMode = "polygon";
 
+  /** Letzter Input-Frame — für ENTER-Abschluss mit aktueller Vorschau. */
+  private _lastInput: Input | null = null;
+
   // Polygon mode state
   state: "idle" | "drawing" = "idle";
   points: Vec2[] = [];
