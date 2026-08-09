@@ -3180,6 +3180,9 @@ function WarpHandles({
     // DOM-Element beim Re-Render nach onCommit — die Capture ginge verloren.
     // document-Listener (capture-Phase) sind resilient dagegen.
     const w = rect.width, h = rect.height;
+    // Tablet-Hilfsrad: Der Griff wird angetippt, folgt danach dem Stift als
+    // Vorschau (auch nach dem Abheben) und wird erst mit ENTER final gesetzt.
+    const tabletMode = !!(window as any).__pixunaTabletCommit;
     const onMove = (ev: PointerEvent) => {
       ev.preventDefault();
       let dx = (ev.clientX - startX) / w;
@@ -3204,14 +3207,25 @@ function WarpHandles({
       }
       onCommit(next);
     };
-    const onUp = () => {
+    const stop = () => {
       document.removeEventListener("pointermove", onMove, true);
       document.removeEventListener("pointerup", onUp, true);
       document.removeEventListener("pointercancel", onUp, true);
+      document.removeEventListener("keydown", onKey, true);
+    };
+    const onKey = (ev: KeyboardEvent) => {
+      if (ev.key === "Enter") { ev.preventDefault(); ev.stopPropagation(); stop(); }
+      else if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); onCommit(startCorners); stop(); }
+    };
+    const onUp = () => {
+      // Ohne Tablet-Hilfsrad beendet das Abheben die Verzerrung wie gewohnt.
+      if (!tabletMode) stop();
     };
     document.addEventListener("pointermove", onMove, true);
     document.addEventListener("pointerup", onUp, true);
     document.addEventListener("pointercancel", onUp, true);
+    if (tabletMode) document.addEventListener("keydown", onKey, true);
+
   };
   const handleStyle = (frac: { x: number; y: number }, isEdge: boolean): React.CSSProperties => ({
     position: "absolute",
@@ -4094,7 +4108,11 @@ function ElementView({
 
   const previewTransformOrigin: string | undefined = undefined;
 
-  const tabletCommitOnly = isCadView && tabletActive && (!!hubMode || !!edgeTrim);
+  // Bilder/PDFs bekommen bei aktivem Tablet-Hilfsrad denselben HUB-Ablauf wie
+  // CAD-Blätter: Funktion antippen → Fangpunkt mit dem Stift ziehen (Vorschau)
+  // → ENTER bzw. Häkchen setzt final.
+  const hubCapable = isCadView || (tabletActive && (el.kind === "image" || el.kind === "pdf"));
+  const tabletCommitOnly = hubCapable && tabletActive && (!!hubMode || !!edgeTrim);
   const hasActiveCadAction = !!hubMode || !!edgeTrim;
 
   return (
@@ -4300,7 +4318,7 @@ function ElementView({
               >
                 <Check size={16} />
               </button>
-            ) : isCadView ? (
+            ) : hubCapable ? (
               <>
                 {hubMode !== "rotate" && (
                   <button
@@ -4368,7 +4386,11 @@ function ElementView({
                     <X size={14} />
                   </button>
                 )}
+                {!hubMode && (el.kind === "image" || el.kind === "pdf") && (
+                  <WarpHubButton elementId={el.id} />
+                )}
               </>
+
             ) : (
               <>
                 <button

@@ -20,7 +20,7 @@ export type RasterInput =
   | { type: "text"; obj: TextBox };
 
 /** Maximale Bildgröße in Pixeln (Speicherschutz). */
-const MAX_PIXELS = 16_000_000;
+const MAX_PIXELS = 48_000_000;
 
 /** true, wenn der aktuelle Zeichenmodus Pixel ist. */
 export function isPixelDrawMode(app: any): boolean {
@@ -40,17 +40,22 @@ function boundsOfPoints(pts: { x: number; y: number }[]) {
   return { minX, minY, maxX, maxY };
 }
 
-/** Ziel-Auflösung: aktueller Zoom, mindestens 300 dpi bezogen auf den Plan-Maßstab. */
+/**
+ * Ziel-Auflösung: deutliches Supersampling gegenüber dem Bildschirm, mindestens
+ * 1200 dpi bezogen auf den Plan-Maßstab — damit Pixelobjekte beim Zoomen fast
+ * so scharf wirken wie Vektoren.
+ */
 function targetPxPerM(app: any): number {
   const camScale = Math.max(1, app?.camera?.scale || 80);
+  const dpr = (typeof window !== "undefined" && window.devicePixelRatio) || 1;
   let scaleDenom = 100;
   try {
     const den = app?.getActiveSheetScaleDenom?.() ?? app?.planScaleDenom ?? app?.scaleDenom;
     if (typeof den === "number" && den > 0) scaleDenom = den;
   } catch { /* Default beibehalten */ }
-  // 300 dpi → 11811 px pro Papiermeter; 1 Weltmeter = 1000/scaleDenom mm Papier.
-  const minDpiPxPerM = (300 / 25.4) * (1000 / scaleDenom);
-  return Math.max(camScale, minDpiPxPerM, 120);
+  // 1200 dpi → 47244 px pro Papiermeter; 1 Weltmeter = 1000/scaleDenom mm Papier.
+  const minDpiPxPerM = (1200 / 25.4) * (1000 / scaleDenom);
+  return Math.max(camScale * dpr * 4, minDpiPxPerM, 600);
 }
 
 function worldBounds(app: any, input: RasterInput): { x: number; y: number; w: number; h: number } | null {
@@ -95,6 +100,32 @@ function worldBounds(app: any, input: RasterInput): { x: number; y: number; w: n
     h: Math.max(1e-4, (b.maxY - b.minY) + padWorld * 2),
   };
 }
+/** Bounding-Box der nicht-transparenten Pixel (für engen PNG-Rahmen). */
+function alphaTrimBox(ctx: CanvasRenderingContext2D, w: number, h: number) {
+  try {
+    const data = ctx.getImageData(0, 0, w, h).data;
+    let minX = w, minY = h, maxX = -1, maxY = -1;
+    for (let y = 0; y < h; y++) {
+      const row = y * w * 4;
+      for (let x = 0; x < w; x++) {
+        if (data[row + x * 4 + 3] > 2) {
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
+    if (maxX < 0) return null;
+    // 1 px Sicherheitsrand gegen angeschnittene Kanten.
+    minX = Math.max(0, minX - 1); minY = Math.max(0, minY - 1);
+    maxX = Math.min(w - 1, maxX + 1); maxY = Math.min(h - 1, maxY + 1);
+    return { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 };
+  } catch {
+    return null;
+  }
+}
+
 
 function pushToScene(scene: Scene, input: RasterInput) {
   if (input.type === "segment") scene.segments.push(input.obj);
@@ -140,6 +171,8 @@ export function rasterizeObject(app: any, input: RasterInput): DocumentObject | 
     canvas.height = hPx;
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
 
     const cam = new Camera();
     cam.scale = pxPerM;
@@ -166,7 +199,31 @@ export function rasterizeObject(app: any, input: RasterInput): DocumentObject | 
       (input.obj as any).labelId = origLabel;
     }
 
-    const dataUrl = canvas.toDataURL("image/png");
+    // Transparente Ränder wegschneiden: der PNG-Rahmen liegt danach eng an der
+    // tatsächlichen Kubatur des Objekts an (statt an der weiten Bounding-Box).
+    let outCanvas: HTMLCanvasElement = canvas;
+    let outX = b.x, outY = b.y, outW = b.w, outH = b.h;
+    let outWPx = wPx, outHPx = hPx;
+    const trim = alphaTrimBox(ctx, wPx, hPx);
+    if (trim && (trim.w < wPx || trim.h < hPx)) {
+      const c2 = document.createElement("canvas");
+      c2.width = trim.w;
+      c2.height = trim.h;
+      const c2ctx = c2.getContext("2d");
+      if (c2ctx) {
+        c2ctx.imageSmoothingEnabled = false;
+        c2ctx.drawImage(canvas, trim.x, trim.y, trim.w, trim.h, 0, 0, trim.w, trim.h);
+        outCanvas = c2;
+        outWPx = trim.w;
+        outHPx = trim.h;
+        outX = b.x + trim.x / pxPerM;
+        outY = b.y + trim.y / pxPerM;
+        outW = trim.w / pxPerM;
+        outH = trim.h / pxPerM;
+      }
+    }
+
+    const dataUrl = outCanvas.toDataURL("image/png");
 
     removeFromApp(app, input);
 
@@ -174,11 +231,11 @@ export function rasterizeObject(app: any, input: RasterInput): DocumentObject | 
       name: "Pixelobjekt",
       kind: "image",
       src: dataUrl,
-      position: { x: b.x, y: b.y },
-      widthM: b.w,
-      heightM: b.h,
-      pixelWidth: wPx,
-      pixelHeight: hPx,
+      position: { x: outX, y: outY },
+      widthM: outW,
+      heightM: outH,
+      pixelWidth: outWPx,
+      pixelHeight: outHPx,
       labelId: origLabel || Defaults.defaultLabelId,
       importScaleDenom: 100,
     });

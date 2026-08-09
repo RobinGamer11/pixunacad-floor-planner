@@ -38,6 +38,9 @@ export class HatchTool {
 
   drawMode: HatchDrawMode = "polygon";
 
+  /** Letzter Input-Frame — für ENTER-Abschluss mit aktueller Vorschau. */
+  private _lastInput: Input | null = null;
+
   // Polygon mode state
   state: "idle" | "drawing" = "idle";
   points: Vec2[] = [];
@@ -122,14 +125,29 @@ export class HatchTool {
   }
 
   finish() { this.cancel(); }
-  /** ENTER: laufende Kontur abschließen und Schraffur erzeugen. */
+  /** ENTER: laufende Kontur sofort abschließen und Schraffur erzeugen. */
   finishFromKey(): boolean {
     if (this.drawMode === "polygon" && this.state === "drawing") {
       if (this.points.length >= 3) { this._finishAndCreateHatch(this.points.slice()); return true; }
       this.finish();
       return true;
     }
-    if (this.drawMode === "rectangle" && this.rectState !== "idle") { this.finish(); return true; }
+    if (this.drawMode === "rectangle" && this.rectState !== "idle") {
+      // Im Breiten-Status wird die aktuelle Vorschau direkt platziert.
+      if (this.rectState === "secondSide" && this._lastInput) {
+        const rect = this._getRectPreviewPoints(this._lastInput);
+        if (rect && dist(rect[1], rect[2]) >= Defaults.minSegLenM) {
+          this._finishAndCreateHatch(rect);
+          return true;
+        }
+      }
+      this.finish();
+      return true;
+    }
+    if (this.drawMode === "circle" && this.circleState !== "idle") {
+      this._finishCircle(true);
+      return true;
+    }
     return false;
   }
 
@@ -737,6 +755,7 @@ export class HatchTool {
   /* ---- Update ---- */
 
   update(input: Input) {
+    this._lastInput = input;
     this.snap = this._findHatchToolSnap(input);
     this._refreshHoverHatch();
 
