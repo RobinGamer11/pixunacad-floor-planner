@@ -19,30 +19,18 @@ function isZoomLocked(): boolean {
  * gelassen wird). Für das Auswahl-Werkzeug greift der Gate nicht, damit
  * Objekte weiterhin direkt anklickbar bleiben.
  */
-// Modulweiter Zustand für den "erster Klick fließt durch"-Bypass.
-let _prevTabletCommit = false;
-let _lastToolForGate: any = null;
-let _firstDrawConsumed = false;
 function isTabletDrawGate(e: PointerEvent): boolean {
   if (typeof window === "undefined") return false;
   const commit = !!(window as any).__pixunaTabletCommit;
-  // Beim Einschalten des Hilfsrads oder Werkzeugwechsel wird der erste
-  // reale Klick wieder freigegeben (setzt Startpunkt exakt am Stift/Finger).
-  if (commit && !_prevTabletCommit) _firstDrawConsumed = false;
-  _prevTabletCommit = commit;
   if (!commit) return false;
   if ((e as any).__virtual) return false;
-  // Wenn eine HUB-/Fangpunkt-Aktion (Verschieben/Drehen/etc.) aktiv ist, darf
-  // ein echter Stift-/Finger-Kontakt NIE committen — auch nicht im Auswahl-
-  // Werkzeug. Bestätigt wird ausschließlich über ENTER/LMB im Hilfsrad.
-  if ((window as any).__pixunaSkipFirstDraw) return true;
-  const t = (window as any).__pixunaActiveTool;
-  if (t === "select" || t === "pipette") return false;
-
-  if (t !== _lastToolForGate) { _lastToolForGate = t; _firstDrawConsumed = false; }
-  if (!_firstDrawConsumed) { _firstDrawConsumed = true; return false; }
-  return true;
+  // Nur während einer laufenden HUB-/Fangpunkt-Aktion (Verschieben/Drehen/…)
+  // darf ein echter Stift-/Finger-Kontakt NICHT committen — bestätigt wird
+  // dann ausschließlich über ENTER im Hilfsrad. In allen anderen Fällen
+  // zeichnen/klicken Stift und Finger ganz normal weiter.
+  return !!(window as any).__pixunaSkipFirstDraw;
 }
+
 
 export class Input {
   canvas: HTMLCanvasElement;
