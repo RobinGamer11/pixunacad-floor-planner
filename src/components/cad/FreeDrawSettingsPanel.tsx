@@ -17,7 +17,7 @@ const STYLE_OPTIONS: { value: LineStyle; label: string }[] = [
   { value: "crayon", label: "Wachsmal" },
   { value: "chalk", label: "Kreide" },
   { value: "spray", label: "Sprühdose" },
-  { value: "blob", label: "Klekse" },
+  
   { value: "image", label: "Bild-Stempel" },
 ];
 

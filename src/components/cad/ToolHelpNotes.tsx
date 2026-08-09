@@ -7,12 +7,11 @@ import { ChevronDown, ChevronRight, HelpCircle } from "lucide-react";
  */
 
 const GLOBAL_HINTS: string[] = [
-  "Rechtsklick auf einen Fangpunkt: horizontale/vertikale Hilfslinie erzeugen",
-  "ESC: bricht jede laufende Aktion oder Eingabe ab",
-  "Entf: löscht die aktuelle Auswahl",
-  "Shift+C / Shift+V (auch Strg+C/V): kopieren und einfügen",
-  "Mittlere Maustaste oder Leertaste + Ziehen: Ansicht verschieben · Mausrad: Zoom am Cursor",
-  "Zwei Finger am Tablet: Pan & Pinch-Zoom · Hilfsrad: LMB/RMB/Shift/ESC/Entf",
+  "Nutzung über Tablet oder Handy: „Tablet“-Hilfsrad in der Kopfzeile aktivieren",
+  "Rechtsklick auf einen Fangpunkt: Hilfslinien erscheinen",
+  "Copy/Paste, Löschen sowie Undo/Redo über die Symbole in der Kopfzeile",
+  "ESC: bricht jede laufende Aktion ab",
+  "Shift+Klick oder Shift+Rahmen: mehrere Objekte zur Auswahl hinzufügen",
 ];
 
 const TOOL_HINTS: Record<string, string[]> = {
