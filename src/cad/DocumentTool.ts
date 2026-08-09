@@ -29,8 +29,12 @@ export class DocumentTool {
 
   phase: Phase = "idle";
 
-  /** Pending Dokument (während "placing"), wird beim Klick in die Scene committet. */
+  /** Pending Dokument (während "placing"), wird beim ENTER in die Scene committet. */
   pendingDoc: { src: string; widthM: number; heightM: number; pixelWidth: number; pixelHeight: number; name: string; kind: "image" | "pdf-page"; pageIndex: number; importScaleDenom: number; pdfSourceB64?: string | null } | null = null;
+
+  /** Per Linksklick gesetzte Position (Vorschau friert dort ein). ENTER platziert final. */
+  placedPos: Vec2 | null = null;
+
 
   /** Aktueller Maßstabs-Workflow-State. */
   scaleTargetDocId: string | null = null;
