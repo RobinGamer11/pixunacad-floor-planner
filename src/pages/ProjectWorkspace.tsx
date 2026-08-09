@@ -3831,6 +3831,10 @@ function ElementView({
 
 
     const onMove = (ev: PointerEvent) => {
+      // Tablet-Hilfsrad/HUB-Bedienelemente werden für die Positionierung
+      // komplett ignoriert — sonst springt das Objekt zum Rad.
+      const mt = ev.target as HTMLElement | null;
+      if (mt?.closest?.('[data-tablet-aid="true"], [data-hub-control]')) return;
       if (!carryingRef.current) return; // Objekt abgelegt — Preview eingefroren.
       const { clientX: ax, clientY: ay } = liveAnchor();
       const reg = getPageSnapRegistry();
