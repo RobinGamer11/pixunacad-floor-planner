@@ -156,7 +156,7 @@ export default function Login() {
             className="mt-1 text-[11px] uppercase tracking-[0.22em]"
             style={{ color: "hsl(var(--ink-soft))" }}
           >
-            Visuelle Projektwerkstatt
+            Virtuelle Arbeitswerkstatt
           </div>
         </div>
 
