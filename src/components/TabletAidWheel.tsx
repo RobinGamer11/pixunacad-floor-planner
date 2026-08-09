@@ -1,12 +1,28 @@
 import React, { useEffect, useRef, useState } from "react";
-import { MousePointer2, ArrowBigUp, Trash2, CornerDownLeft, Pencil } from "lucide-react";
+import { ArrowBigUp, Check, X } from "lucide-react";
 import {
   virtualMouseClick,
   virtualMouseHold,
   virtualKeyPress,
   virtualKeyHold,
-  virtualTypeChar,
 } from "@/lib/virtualInput";
+
+/** Computermaus-Symbol mit hervorgehobener linker bzw. rechter Taste. */
+function MouseIcon({ side, size = 18 }: { side: "left" | "right"; size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6}>
+      <rect x="6" y="2.5" width="12" height="19" rx="6" />
+      <line x1="12" y1="2.5" x2="12" y2="11" />
+      <line x1="6" y1="11" x2="18" y2="11" />
+      {side === "left" ? (
+        <path d="M12 3.2 A5.4 5.4 0 0 0 6.6 8.6 V11 H12 Z" fill="currentColor" stroke="none" />
+      ) : (
+        <path d="M12 3.2 A5.4 5.4 0 0 1 17.4 8.6 V11 H12 Z" fill="currentColor" stroke="none" />
+      )}
+    </svg>
+  );
+}
+
 
 
 
