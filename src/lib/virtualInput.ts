@@ -183,6 +183,7 @@ export function primeTabletKeyboard() {
     const inp = document.createElement("input");
     inp.type = "text";
     inp.setAttribute("aria-hidden", "true");
+    inp.setAttribute("data-virtual-primer", "true");
     inp.tabIndex = -1;
     Object.assign(inp.style, {
       position: "fixed",
