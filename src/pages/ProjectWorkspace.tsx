@@ -4094,7 +4094,11 @@ function ElementView({
 
   const previewTransformOrigin: string | undefined = undefined;
 
-  const tabletCommitOnly = isCadView && tabletActive && (!!hubMode || !!edgeTrim);
+  // Bilder/PDFs bekommen bei aktivem Tablet-Hilfsrad denselben HUB-Ablauf wie
+  // CAD-Blätter: Funktion antippen → Fangpunkt mit dem Stift ziehen (Vorschau)
+  // → ENTER bzw. Häkchen setzt final.
+  const hubCapable = isCadView || (tabletActive && (el.kind === "image" || el.kind === "pdf"));
+  const tabletCommitOnly = hubCapable && tabletActive && (!!hubMode || !!edgeTrim);
   const hasActiveCadAction = !!hubMode || !!edgeTrim;
 
   return (
