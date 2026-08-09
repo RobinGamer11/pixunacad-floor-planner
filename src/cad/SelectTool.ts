@@ -34,6 +34,8 @@ export class SelectTool {
   snap: Snap | null = null;
 
   activeEditAction: string | null = null;
+  /** Vom Tablet-Hilfsrad (ENTER) angeforderte Bestätigung der laufenden Aktion. */
+  enterCommitRequested = false;
   editTarget: EditTarget | null = null;
 
   // For segment edits: fixed = the other endpoint. originalMoving = the moving endpoint.
@@ -2479,6 +2481,9 @@ export class SelectTool {
     }
 
     if (this.isEditing()) {
+      // Bestätigung: echter Klick ODER ENTER (Tablet-Hilfsrad).
+      const editCommit = input.clicked || this.enterCommitRequested;
+      this.enterCommitRequested = false;
       // Rechtsklick während Edit: Toggle eines Hilfslinien-Ankers am aktuellen Snap-Punkt.
       if (input.rightClicked) {
         const snap = this._findPreviewSnapForEdit(input);
@@ -2507,7 +2512,7 @@ export class SelectTool {
         this.app.hub.showAt(input.mouse.sx, input.mouse.sy);
         this.app.hub.updateDisplay(metrics.lengthM, metrics.angleDeg);
 
-        if (input.clicked) {
+        if (editCommit) {
           const finalP = this._commitMovePoint(input);
           if (isWallPointEdit) {
             // Jetzt erst einmalig auf die Scene anwenden → genau ein Undo-Schritt.
@@ -2544,7 +2549,7 @@ export class SelectTool {
           this.app.hub.hide();
         }
 
-        if (input.clicked) {
+        if (editCommit) {
           const finalDelta = this._commitTranslateDelta(input);
           this._applyTranslateDelta(finalDelta);
           this._clearEditState();
@@ -2573,7 +2578,7 @@ export class SelectTool {
           this.app.hub.updateDisplay(radius, ang);
         }
 
-        if (input.clicked) {
+        if (editCommit) {
           this._clearEditState();
           this.app.hub.hide();
           this.app.renderer.setHoverSegmentId(null);
@@ -2603,7 +2608,7 @@ export class SelectTool {
           this.app.hub.showAt(input.mouse.sx, input.mouse.sy);
           this.app.hub.updateDisplay(currentOff, 0);
         }
-        if (input.clicked) {
+        if (editCommit) {
           this._clearEditState();
           this.app.hub.hide();
         }
