@@ -424,32 +424,55 @@ const FreeDrawPreview: React.FC<PreviewProps> = (props) => {
       ctx.globalCompositeOperation = prev;
       ctx.globalAlpha = props.opacity;
     } else if (style === "brush") {
-      // Variable Dicke entlang des Pfades
-      for (let i = 1; i < pts.length; i++) {
-        const t = i / (pts.length - 1);
-        const w2 = widthPx * (0.6 + Math.abs(Math.sin(t * Math.PI)) * 0.7);
-        ctx.lineWidth = w2;
-        ctx.beginPath();
-        ctx.moveTo(pts[i - 1].x, pts[i - 1].y);
-        ctx.lineTo(pts[i].x, pts[i].y);
-        ctx.stroke();
-      }
-    } else if (style === "calligraphy") {
-      // Feste Ribbon-Achse 45°
-      const ang = -Math.PI / 4;
-      const dx = Math.cos(ang) * widthPx * 0.5;
-      const dy = Math.sin(ang) * widthPx * 0.5;
+      // Geschwungenes Band: dünn an den Enden, deutlich dicker in der Mitte.
+      const n = pts.length;
+      const half = pts.map((_, i) => {
+        const t = n > 1 ? i / (n - 1) : 0.5;
+        return Math.max(0.4, widthPx * (0.10 + 1.5 * Math.pow(Math.sin(Math.PI * t), 0.55))) / 2;
+      });
+      const norm = pts.map((_, i) => {
+        const a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)];
+        let dx = b.x - a.x, dy = b.y - a.y;
+        const L = Math.hypot(dx, dy) || 1;
+        return { x: -dy / L, y: dx / L };
+      });
       ctx.beginPath();
-      for (let i = 0; i < pts.length; i++) {
-        const p = pts[i];
-        i ? ctx.lineTo(p.x + dx, p.y + dy) : ctx.moveTo(p.x + dx, p.y + dy);
-      }
-      for (let i = pts.length - 1; i >= 0; i--) {
-        const p = pts[i];
-        ctx.lineTo(p.x - dx, p.y - dy);
+      pts.forEach((p, i) => {
+        const x = p.x + norm[i].x * half[i], y = p.y + norm[i].y * half[i];
+        i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+      });
+      for (let i = n - 1; i >= 0; i--) {
+        ctx.lineTo(pts[i].x - norm[i].x * half[i], pts[i].y - norm[i].y * half[i]);
       }
       ctx.closePath();
       ctx.fill();
+    } else if (style === "calligraphy") {
+      // Feder 45°, Breite abhängig von Laufrichtung + Anschwellen zur Mitte.
+      const ang = -Math.PI / 4;
+      const cosA = Math.cos(ang), sinA = Math.sin(ang);
+      const n = pts.length;
+      const nib = widthPx * 1.25;
+      const halfFor = (i: number) => {
+        const a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)];
+        let dx = b.x - a.x, dy = b.y - a.y;
+        const L = Math.hypot(dx, dy) || 1; dx /= L; dy /= L;
+        const perp = Math.abs(dx * -sinA + dy * cosA);
+        const t = n > 1 ? i / (n - 1) : 0.5;
+        const swell = 0.65 + 0.35 * Math.pow(Math.sin(Math.PI * t), 0.6);
+        return Math.max(0.6, nib * (0.18 + 0.82 * perp) * swell) / 2;
+      };
+      for (let i = 1; i < n; i++) {
+        const a = pts[i - 1], b = pts[i];
+        const ha = halfFor(i - 1), hb = halfFor(i);
+        ctx.beginPath();
+        ctx.moveTo(a.x + cosA * ha, a.y + sinA * ha);
+        ctx.lineTo(a.x - cosA * ha, a.y - sinA * ha);
+        ctx.lineTo(b.x - cosA * hb, b.y - sinA * hb);
+        ctx.lineTo(b.x + cosA * hb, b.y + sinA * hb);
+        ctx.closePath();
+        ctx.fill();
+      }
+
     } else if (style === "spray") {
       const density = 6;
       const r = widthPx * 1.4;
