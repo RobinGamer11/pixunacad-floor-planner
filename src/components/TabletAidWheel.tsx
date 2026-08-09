@@ -119,35 +119,31 @@ export function TabletAidWheel() {
       <CenterToggles />
 
 
-      {/* 6 Buttons kreisförmig (60°-Schritte) */}
-      <WheelButton angle={-90} size={size} label="LMB" tooltip="Linke Maustaste (Tap = Klick, Halten = gedrückt halten)"
-        onTap={() => virtualMouseClick(0)}
-        onHold={(on) => virtualMouseHold(0, on)}
-        icon={<MousePointer2 size={16} />} />
-      <WheelButton angle={-30} size={size} label="RMB" tooltip="Rechte Maustaste"
-        onTap={() => virtualMouseClick(2)}
-        onHold={(on) => virtualMouseHold(2, on)}
-        icon={<MousePointer2 size={16} style={{ transform: "scaleX(-1)" }} />} />
-      <WheelButton angle={30} size={size} label="ENTF" tooltip="Entf-Taste"
-        onTap={() => virtualKeyPress("Delete")}
-        icon={<Trash2 size={16} />} />
-      <WheelButton angle={90} size={size} label="ENTER" tooltip="Bestätigen: setzt Punkt am Cursor (bzw. Enter-Taste in Eingabefeldern)"
+      {/* Enter oben, rechts RMB + ESC, links LMB + SHIFT */}
+      <WheelButton angle={-90} size={size} label="ENTER" tooltip="Bestätigen: setzt Punkt am Cursor (bzw. Enter-Taste in Eingabefeldern)"
         onTap={() => {
           const el = document.activeElement as HTMLElement | null;
           const inField = !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || (el as any).isContentEditable);
           if (inField) virtualKeyPress("Enter", el);
           else virtualMouseClick(0);
         }}
-        icon={<CornerDownLeft size={16} />} />
-      <WheelButton angle={150} size={size} label="ESC" tooltip="Esc-Taste"
+        icon={<Check size={18} />} />
+      <WheelButton angle={-25} size={size} label="RMB" tooltip="Rechte Maustaste"
+        onTap={() => virtualMouseClick(2)}
+        onHold={(on) => virtualMouseHold(2, on)}
+        icon={<MouseIcon side="right" />} />
+      <WheelButton angle={40} size={size} label="ESC" tooltip="Esc-Taste"
         onTap={() => virtualKeyPress("Escape")}
-        icon={<span className="text-[10px] font-bold">ESC</span>} />
-      <WheelButton angle={210} size={size} label="SHIFT" tooltip="Shift halten (2-Hand-Bedienung)"
+        icon={<X size={18} />} />
+      <WheelButton angle={-155} size={size} label="LMB" tooltip="Linke Maustaste (Tap = Klick, Halten = gedrückt halten)"
+        onTap={() => virtualMouseClick(0)}
+        onHold={(on) => virtualMouseHold(0, on)}
+        icon={<MouseIcon side="left" />} />
+      <WheelButton angle={140} size={size} label="SHIFT" tooltip="Shift halten (2-Hand-Bedienung)"
         onHold={(on) => virtualKeyHold("Shift", on)}
         toggleHold
         icon={<ArrowBigUp size={16} />} />
-      {/* Ziffernblock: erscheint, sobald ein Textfeld fokussiert ist. */}
-      <NumberPad wheelPos={pos} wheelSize={size} />
+
     </div>
   );
 }
