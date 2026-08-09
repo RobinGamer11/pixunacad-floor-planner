@@ -227,6 +227,7 @@ export class Input {
       // ── Tablet-Commit-Gate: keine automatische Klick-Emission.
       if (isTabletDrawGate(e)) {
         try { c.setPointerCapture(e.pointerId); } catch {}
+        this._tabletTapQueued = true;
         return;
       }
 
