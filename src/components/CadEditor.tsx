@@ -2533,7 +2533,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                     if (!app) return;
                     app.setActiveDrawLabelId(e.target.value);
                     app.refreshLabelUI();
-                    forceRerender?.((x: number) => x + 1);
+                    setDocLabelTick((x) => x + 1);
                   }}
                   className="cad-settings-select w-full"
                 >
