@@ -195,7 +195,7 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app }) => {
         </label>
 
         <label className="block text-xs">
-          <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>{style === "image" ? "Stempel-Größe (m)" : `Dicke (m): ${thickness.toFixed(4)}`}</span>
+          <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>{style === "image" ? `Stempel-Größe (cm): ${(thickness * 100).toFixed(1)}` : `Liniendicke (cm): ${(thickness * 100).toFixed(2)}`}</span>
           <input type="range"
             min={style === "image" ? 0.02 : 0.0005}
             max={style === "image" ? 2 : 0.3}
@@ -222,8 +222,10 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app }) => {
 
         {(style === "dashed" || style === "dotted" || style === "dashdot" || style === "blob") && (
           <label className="block text-xs">
-            <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>{style === "blob" ? "Abstand (m)" : "Lücke (m)"}: {gap.toFixed(3)}</span>
-            <input type="range" min={0.01} max={0.5} step={0.005} value={gap}
+            <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+              {style === "blob" ? "Klecks-Abstand (cm)" : "Linienskalierung (cm)"}: {(gap * 100).toFixed(1)}
+            </span>
+            <input type="range" min={0.002} max={0.2} step={0.001} value={gap}
               onChange={(e) => {
                 const v = parseFloat(e.target.value); setGap(v);
                 if (selectedStrokeId) applyToStroke((s) => { s.gapM = v; });
@@ -232,6 +234,7 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app }) => {
               className="w-full" />
           </label>
         )}
+
 
         {/* Bild-Stempel-Block */}
         <div className="space-y-2 pt-2" style={{ borderTop: "1px solid hsl(var(--border))" }}>
