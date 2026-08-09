@@ -36,6 +36,9 @@ export class SelectTool {
   activeEditAction: string | null = null;
   /** Vom Tablet-Hilfsrad (ENTER) angeforderte Bestätigung der laufenden Aktion. */
   enterCommitRequested = false;
+  /** Tablet: Funktion aktiviert, wartet auf erneutes Antippen des Fangpunkts. */
+  tabletArmPending = false;
+  private _prevEditActive = false;
   editTarget: EditTarget | null = null;
 
   // For segment edits: fixed = the other endpoint. originalMoving = the moving endpoint.
