@@ -350,7 +350,7 @@ function useWheelTouchRouter() {
 }
 
 function WheelButton({
-  angle, size, label, tooltip, icon, onTap, onHold, toggleHold,
+  angle, size, label, tooltip, icon, onTap, onHold, toggleHold, highlight,
 }: {
   angle: number;
   size: number;
@@ -361,6 +361,8 @@ function WheelButton({
   onHold?: (on: boolean) => void;
   /** Wenn true: Tap togglet dauerhaft an/aus (statt Tap+Long-Press). */
   toggleHold?: boolean;
+  /** Dezentes Leuchten, z. B. wenn ein Punkt auf das Setzen per LMB wartet. */
+  highlight?: boolean;
 }) {
   const r = size / 2 - 26;
   const rad = (angle * Math.PI) / 180;
