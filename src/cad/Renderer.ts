@@ -80,6 +80,9 @@ export class Renderer {
   /** Hintergrundfarbe der CAD-Oberfläche (außerhalb des Kartenkreises). */
   backgroundColor: string = "#ffffff";
 
+  /** Wenn true: kein Hintergrund füllen (Offscreen-Rasterisierung mit Alpha). */
+  transparentBackground = false;
+
   /** Optionaler Karten-Hintergrund (siehe mapBackground.ts). Zentriert auf Welt-Ursprung. */
   mapBackground: import("./mapBackground").MapBackground | null = null;
 
@@ -289,10 +292,12 @@ export class Renderer {
         try { this.planOverlayDraw(ctx); } catch (e) { console.error("planOverlayDraw error:", e); }
       }
     } else {
-      ctx.save();
-      ctx.fillStyle = this.backgroundColor || "hsl(0 0% 100%)";
-      ctx.fillRect(0, 0, this.vw, this.vh);
-      ctx.restore();
+      if (!this.transparentBackground) {
+        ctx.save();
+        ctx.fillStyle = this.backgroundColor || "hsl(0 0% 100%)";
+        ctx.fillRect(0, 0, this.vw, this.vh);
+        ctx.restore();
+      }
       if (this.mapBackground) this._drawMapBackground();
       if (this.gridSettings.enabled) this._drawGrid();
     }

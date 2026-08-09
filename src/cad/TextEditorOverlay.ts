@@ -3,6 +3,7 @@ import { autoSizeTextBox } from "./textAutoSize";
 import type { CadApp } from "./CadApp";
 import type { TextBox } from "./Scene";
 import { rgbaFromHex } from "./geometry";
+import { maybeRasterize } from "./rasterize";
 
 /**
  * Inline HTML contenteditable overlay used to edit a TextBox.
@@ -289,6 +290,9 @@ export class TextEditorOverlay {
     autoSizeTextBox(box, (this.app.renderer as any).referencePxPerM);
 
     this.hide();
+
+    // 4) Pixelmodus: fertigen Textkasten in ein Bildobjekt rastern.
+    maybeRasterize(this.app, { type: "text", obj: box });
   }
 
   hide() {

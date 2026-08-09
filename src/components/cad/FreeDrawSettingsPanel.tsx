@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import type { CadApp } from "@/cad/CadApp";
 import type { MiniCad } from "@/cad/embed/MiniCad";
+import { RasterModeToggle } from "@/components/cad/RasterModeToggle";
 
 type LineStyle = "solid" | "dashed" | "dotted" | "dashdot" | "blob" | "image" | "pencil" | "marker" | "brush" | "spray" | "calligraphy" | "ink" | "crayon" | "chalk";
 
@@ -146,6 +147,7 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm" }) =>
   return (
     <div className="cad-settings-panel mb-2">
       <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Freihand</div>
+      <RasterModeToggle app={app} />
       <FreeDrawPreview
         color={color}
         thickness={thickness}

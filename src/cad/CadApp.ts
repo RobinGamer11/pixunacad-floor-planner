@@ -215,6 +215,12 @@ export class CadApp {
   defaultFreeImageRotate = Defaults.freeImageRotate;
   defaultFreeAutoShape = false;
 
+  /** Zeichenmodus: "vector" (parametrisch) oder "pixel" (Objekt wird beim
+   *  Fertigstellen zu einem Bild gerastert — wie in Malprogrammen). */
+  defaultDrawRasterMode: "vector" | "pixel" = "vector";
+
+
+
   // Eraser-Defaults
   defaultEraserRadiusM = Defaults.eraserRadiusM;
   defaultEraserStrength = Defaults.eraserStrength;

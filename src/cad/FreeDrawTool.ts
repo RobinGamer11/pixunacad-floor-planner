@@ -5,6 +5,7 @@ import type { Input } from "./Input";
 import type { FreeLineStyle } from "./Scene";
 import { dedupePoints, projectPointToInfiniteLineFromTwoPoints, autoShapePoints } from "./freeGeom";
 import { RulerDragController } from "./rulerInteraction";
+import { maybeRasterize } from "./rasterize";
 
 /**
  * Freihand-Zeichenwerkzeug (Hotkey: F).
@@ -97,7 +98,8 @@ export class FreeDrawTool {
         this._lastSamplePx = null;
         this.app.hub.hide();
         if (pts.length >= 2 && this._pathLength(pts) > 1e-4) {
-          this.app.scene.createFreeStroke(pts, this._currentStyle());
+          const stroke = this.app.scene.createFreeStroke(pts, this._currentStyle());
+          maybeRasterize(this.app, { type: "free", obj: stroke });
           this.app.refreshLabelUI?.();
         }
       }

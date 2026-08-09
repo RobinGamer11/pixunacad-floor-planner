@@ -180,6 +180,8 @@ export class MiniCad {
   defaultFreeImageSpacingM: number = Defaults.freeImageSpacingM;
   defaultFreeImageRotate: boolean = Defaults.freeImageRotate;
   defaultFreeAutoShape: boolean = false;
+  /** Zeichenmodus: "vector" oder "pixel" (Rasterung beim Fertigstellen). */
+  defaultDrawRasterMode: "vector" | "pixel" = "vector";
   // Radiergummi-Defaults.
   defaultEraserRadiusM: number = Defaults.eraserRadiusM;
   defaultEraserStrength: number = Defaults.eraserStrength;
