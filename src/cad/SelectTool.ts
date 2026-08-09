@@ -617,6 +617,13 @@ export class SelectTool {
     return null;
   }
 
+  /** ENTER (z. B. Tablet-Hilfsrad) bestätigt die laufende Fangpunkt-Aktion. */
+  requestEnterCommit(): boolean {
+    if (!this.activeEditAction) return false;
+    this.enterCommitRequested = true;
+    return true;
+  }
+
   isEditing() { return !!this.activeEditAction || this.groupRotateActive || this.groupDragActive || this.groupAnchorActive || this.groupAnchorMenu; }
 
   getPriorityWallId(): string | null {

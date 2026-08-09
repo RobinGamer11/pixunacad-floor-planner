@@ -2024,6 +2024,13 @@ export class CadApp {
         }
       }
 
+      // ENTER bestätigt eine laufende Fangpunkt-Aktion (Verschieben/Drehen …)
+      // — wichtig für die Tablet-Bedienung über das Hilfsrad.
+      if (e.key === "Enter" && !isHubInput && this.selectTool.requestEnterCommit()) {
+        e.preventDefault();
+        return;
+      }
+
       if (this.activeTool === this.selectTool) {
         if (e.key === "Tab" && this.selectTool.hasPointMenu()) { e.preventDefault(); this.selectTool.cyclePointMenu(); return; }
         if (e.key === "Enter" && this.selectTool.hasPointMenu()) { e.preventDefault(); this.selectTool.activatePointMenu(); return; }
