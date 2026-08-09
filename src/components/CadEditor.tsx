@@ -2005,8 +2005,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 </div>
               </div>
                <div>
-                 <label>Stärke (m)</label>
-                 <input ref={thicknessInputRef} type="text" defaultValue="0.03" />
+                 <label>Liniendicke (cm)</label>
+                 <input ref={thicknessInputRef} type="text" defaultValue="3" />
                </div>
                <div className="pt-2" style={{ borderTop: "1px solid hsl(var(--border))" }}>
                  <label className="block mb-1.5">Pfeilspitzen</label>

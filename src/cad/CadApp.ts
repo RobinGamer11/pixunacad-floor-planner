@@ -1790,7 +1790,8 @@ export class CadApp {
   }
 
   private _applyLineThicknessFromInput() {
-    let value = parseFloat((this.lineThicknessInput.value || "").replace(",", "."));
+    // Eingabe erfolgt in Zentimetern -> intern Meter.
+    let value = parseFloat((this.lineThicknessInput.value || "").replace(",", ".")) / 100;
     if (!Number.isFinite(value) || value <= 0) return;
     value = clamp(value, 0.001, 1);
     const selected = this.getSelectedSegment();
@@ -1804,7 +1805,7 @@ export class CadApp {
     const style = this.getCurrentLineStyle();
     this.lineColorInput.value = this._toHexColor(style.color || Defaults.lineColor);
     this.lineColorPreview.style.background = this.lineColorInput.value;
-    this.lineThicknessInput.value = String((style.thicknessM || Defaults.lineThicknessM).toFixed(3).replace(/0+$/, "").replace(/\.$/, ""));
+    this.lineThicknessInput.value = String(((style.thicknessM || Defaults.lineThicknessM) * 100).toFixed(2).replace(/0+$/, "").replace(/\.$/, ""));
     const labelForDisplay =
       (this.selectedLabelId && this.labelManager.getById(this.selectedLabelId)) ? this.selectedLabelId
         : (style.labelId || this.activeDrawLabelId || Defaults.defaultLabelId);
