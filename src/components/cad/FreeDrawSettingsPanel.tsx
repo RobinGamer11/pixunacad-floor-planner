@@ -223,9 +223,13 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm" }) =>
         {(style === "dashed" || style === "dotted" || style === "dashdot" || style === "blob") && (
           <label className="block text-xs">
             <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
-              {style === "blob" ? "Klecks-Abstand (cm)" : "Linienskalierung (cm)"}: {(gap * 100).toFixed(1)}
+              {style === "blob" ? `Klecks-Abstand (${units})` : `Linienskalierung (${units})`}: {units === "m" ? gap.toFixed(2) : (gap * 100).toFixed(1)}
             </span>
-            <input type="range" min={0.002} max={0.2} step={0.001} value={gap}
+            <input type="range"
+              min={units === "m" ? 0.1 : 0.001}
+              max={units === "m" ? 1.9 : 0.02}
+              step={units === "m" ? 0.05 : 0.0005}
+              value={gap}
               onChange={(e) => {
                 const v = parseFloat(e.target.value); setGap(v);
                 if (selectedStrokeId) applyToStroke((s) => { s.gapM = v; });
@@ -234,6 +238,7 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm" }) =>
               className="w-full" />
           </label>
         )}
+
 
 
         {/* Bild-Stempel-Block */}
