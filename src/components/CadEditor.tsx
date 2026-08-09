@@ -3082,7 +3082,11 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                   <span className="text-xs">Löschen</span>
                 </button>
 
-                {docSelected.kind === "pdf-page" && !!docSelected.pdfSourceB64 && (
+                {!!docSelected.pdfSourceB64 && (
+                  <DocumentPixelModeToggle app={appRef.current} docId={docSelected.id} />
+                )}
+
+                {!!docSelected.pdfSourceB64 && (
                   <div className="rounded-md border p-2 space-y-2" style={{ borderColor: "hsl(var(--hairline))" }}>
                     <div className="text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
                       PDF auflösen
@@ -3091,20 +3095,21 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                       type="button"
                       onClick={async () => {
                         const app = appRef.current; if (!app) return;
-                        if (!window.confirm(`PDF "${docSelected.name}" in CAD-Objekte auflösen?\n\nLinien, Schraffuren und Texte werden in eine neue Ebene "PDF-Import — ${docSelected.name}" extrahiert; das Original wird entfernt.`)) return;
+                        if (!window.confirm(`PDF "${docSelected.name}" in CAD-Objekte auflösen?\n\nLinien, Schraffuren und Texte werden in eine neue Ebene "PDF-Import — ${docSelected.name}" extrahiert; radierte Bereiche bleiben ausgespart.`)) return;
                         const res = await app.documentTool.dissolvePdf(docSelected.id);
                         if (res) {
                           window.alert(`Auflösen erfolgreich:\n${res.segments} Linien · ${res.hatches} Schraffuren · ${res.texts} Texte`);
                         }
                       }}
                       className="cad-toolbar-btn w-full justify-start px-2 h-9"
-                      title="PDF-Vektoren extrahieren und in Linien/Schraffuren/Texte konvertieren"
+                      title="PDF-Vektoren extrahieren und in Linien/Schraffuren/Texte konvertieren (inkl. Radier-Änderungen)"
                     >
                       <FileText className="h-4 w-4" />
                       <span className="text-xs">Auflösen → CAD-Objekte</span>
                     </button>
                   </div>
                 )}
+
 
                 <WarpSection engine={appRef.current} docId={docSelected.id} />
 
