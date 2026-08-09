@@ -3528,6 +3528,16 @@ function ElementView({
     };
   }, [hubMode, edgeTrim]);
 
+  // Tablet-Hilfsrad: Nach dem Aktivieren einer Funktion muss der Fangpunkt
+  // ERNEUT angetippt werden, bevor das Objekt am Stift mitgezogen wird.
+  useEffect(() => {
+    if (!hubMode) return;
+    const wheelOn = typeof window !== "undefined" && !!(window as any).__pixunaTabletCommit;
+    setCarrying(!wheelOn);
+  }, [hubMode]);
+
+
+
 
 
 
