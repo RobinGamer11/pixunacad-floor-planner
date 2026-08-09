@@ -318,6 +318,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const [stickerEditOverlay, setStickerEditOverlay] = useState<{ id: string; x: number; y: number } | null>(null);
 
   // Document import state
+  const [docLabelTick, setDocLabelTick] = useState(0);
   const docFileInputRef = useRef<HTMLInputElement>(null);
   const [docPickerPages, setDocPickerPages] = useState<ImportedPage[] | null>(null);
   const [docPickerSelected, setDocPickerSelected] = useState<Set<number>>(new Set());
