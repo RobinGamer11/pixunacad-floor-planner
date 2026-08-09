@@ -82,6 +82,16 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm" }) =>
     return () => { app.onLabelsChange = prevLabels; app.onSelectionChange = prevSel; };
   }, [app]);
 
+  // CAD-Oberfläche rechnet in Metern: Default-Linienskalierung = 1 m.
+  useEffect(() => {
+    if (!app || units !== "m") return;
+    if ((app.defaultFreeGapM ?? 0) < 0.1) {
+      app.defaultFreeGapM = 1;
+      setGap(1);
+    }
+  }, [app, units]);
+
+
   const selectedStroke = () => app?.getSelectedFreeStroke?.() || null;
   const applyToStroke = (mutate: (s: any) => void) => {
     const s = selectedStroke();
