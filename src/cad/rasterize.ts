@@ -145,6 +145,8 @@ export function rasterizeObject(app: any, input: RasterInput): DocumentObject | 
     canvas.height = hPx;
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
 
     const cam = new Camera();
     cam.scale = pxPerM;
@@ -171,7 +173,31 @@ export function rasterizeObject(app: any, input: RasterInput): DocumentObject | 
       (input.obj as any).labelId = origLabel;
     }
 
-    const dataUrl = canvas.toDataURL("image/png");
+    // Transparente Ränder wegschneiden: der PNG-Rahmen liegt danach eng an der
+    // tatsächlichen Kubatur des Objekts an (statt an der weiten Bounding-Box).
+    let outCanvas: HTMLCanvasElement = canvas;
+    let outX = b.x, outY = b.y, outW = b.w, outH = b.h;
+    let outWPx = wPx, outHPx = hPx;
+    const trim = alphaTrimBox(ctx, wPx, hPx);
+    if (trim && (trim.w < wPx || trim.h < hPx)) {
+      const c2 = document.createElement("canvas");
+      c2.width = trim.w;
+      c2.height = trim.h;
+      const c2ctx = c2.getContext("2d");
+      if (c2ctx) {
+        c2ctx.imageSmoothingEnabled = false;
+        c2ctx.drawImage(canvas, trim.x, trim.y, trim.w, trim.h, 0, 0, trim.w, trim.h);
+        outCanvas = c2;
+        outWPx = trim.w;
+        outHPx = trim.h;
+        outX = b.x + trim.x / pxPerM;
+        outY = b.y + trim.y / pxPerM;
+        outW = trim.w / pxPerM;
+        outH = trim.h / pxPerM;
+      }
+    }
+
+    const dataUrl = outCanvas.toDataURL("image/png");
 
     removeFromApp(app, input);
 
@@ -179,11 +205,11 @@ export function rasterizeObject(app: any, input: RasterInput): DocumentObject | 
       name: "Pixelobjekt",
       kind: "image",
       src: dataUrl,
-      position: { x: b.x, y: b.y },
-      widthM: b.w,
-      heightM: b.h,
-      pixelWidth: wPx,
-      pixelHeight: hPx,
+      position: { x: outX, y: outY },
+      widthM: outW,
+      heightM: outH,
+      pixelWidth: outWPx,
+      pixelHeight: outHPx,
       labelId: origLabel || Defaults.defaultLabelId,
       importScaleDenom: 100,
     });
