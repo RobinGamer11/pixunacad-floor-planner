@@ -263,7 +263,17 @@ export default function CadOverlayLayer(props: Props) {
 
   useEffect(() => {
     const engine: any = engineRef.current;
-    if (engine) engine.documentHubMode = docHub.mode;
+    if (engine) {
+      engine.documentHubMode = docHub.mode;
+      const tabletTransform = docHub.mode !== "none" && !!(window as any).__pixunaTabletCommit;
+      engine.selectTool.documentHubTabletArmed = tabletTransform;
+      (window as any).__pixunaDocumentTransformActive = tabletTransform;
+    }
+    return () => {
+      if ((window as any).__pixunaDocumentTransformActive) {
+        (window as any).__pixunaDocumentTransformActive = false;
+      }
+    };
   }, [docHub.mode]);
   useEffect(() => {
     if (hatchDrawMode) engineRef.current?.hatchTool.setDrawMode(hatchDrawMode);

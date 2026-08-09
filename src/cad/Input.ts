@@ -29,7 +29,10 @@ function isTabletDrawGate(e: PointerEvent): boolean {
   if (tool === "free" || tool === "eraser") return false;
   // Auswahl-Werkzeug: nur während laufender Fangpunkt-Aktion (Verschieben/
   // Drehen/…) gaten — sonst bleiben Objekte direkt antippbar.
-  if (tool === "select") return !!(window as any).__pixunaSkipFirstDraw;
+  if (tool === "select") {
+    return !!(window as any).__pixunaSkipFirstDraw
+      || !!(window as any).__pixunaDocumentTransformActive;
+  }
   // Alle Zeichenwerkzeuge: Stift bewegt nur den Cursor, gesetzt wird per
   // LMB im Hilfsrad, abgeschlossen per ENTER.
   return true;
