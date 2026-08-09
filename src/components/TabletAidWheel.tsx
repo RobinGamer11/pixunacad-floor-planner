@@ -56,6 +56,16 @@ export function TabletAidWheel() {
     return () => { (window as any).__pixunaTabletCommit = false; };
   }, []);
 
+  // "Vorerfasster Punkt": LMB leuchtet, solange ein Stift-Kontakt auf das
+  // Setzen per LMB wartet.
+  const [lmbHint, setLmbHint] = useState(false);
+  useEffect(() => {
+    const on = (e: Event) => setLmbHint(!!(e as CustomEvent).detail);
+    window.addEventListener("pixuna-lmb-hint", on as EventListener);
+    return () => window.removeEventListener("pixuna-lmb-hint", on as EventListener);
+  }, []);
+
+
   // Zentrale Verteilung aller realen Kontakte an die Rad-Knöpfe (iPadOS-fest).
   useWheelTouchRouter();
 
