@@ -102,9 +102,8 @@ export function ToolHelpNotes({
   extra?: string[];
 }) {
   const key = "pixuna.toolHelp.open";
-  const [open, setOpen] = useState<boolean>(() => {
-    try { return localStorage.getItem(key) !== "0"; } catch { return true; }
-  });
+  // Immer zuerst eingeklappt — unabhängig vom letzten Zustand.
+  const [open, setOpen] = useState<boolean>(false);
   const toggle = () => {
     setOpen((v) => {
       const next = !v;
