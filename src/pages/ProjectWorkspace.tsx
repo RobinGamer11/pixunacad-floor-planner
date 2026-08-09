@@ -3978,7 +3978,7 @@ function ElementView({
         return;
       }
       const t = ev.target as HTMLElement | null;
-      if (t?.closest("[data-hub-control]")) return;
+      if (t?.closest('[data-hub-control], [data-tablet-aid="true"]')) return;
       ev.preventDefault();
       ev.stopPropagation();
       // Erneuter Klick auf den gewählten Fangpunkt (Anker) → Aktion bestätigen.
