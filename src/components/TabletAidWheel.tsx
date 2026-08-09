@@ -129,10 +129,10 @@ export function TabletAidWheel() {
           // Textwerkzeug: Tastatur schon in der echten Geste "vorwärmen",
           // damit sie nach dem Setzen der Textbox automatisch offen ist.
           if ((window as any).__pixunaActiveTool === "text") primeTabletKeyboard();
-          // Laufende Fangpunkt-Aktion (Verschieben/Drehen …) wird per Enter
-          // final bestätigt — sonst setzt Enter wie bisher einen Punkt.
-          if ((window as any).__pixunaSkipFirstDraw || (window as any).__pixunaDocumentTransformActive) virtualKeyPress("Enter");
-          else virtualMouseClick(0);
+          // ENTER ist ausschließlich Abschluss/Bestätigung. Neue Zeichenpunkte
+          // werden separat mit LMB gesetzt; so schließt ENTER insbesondere eine
+          // laufende Schraffur immer sofort final ab.
+          virtualKeyPress("Enter");
         }}
         icon={<Check size={18} />} />
 
