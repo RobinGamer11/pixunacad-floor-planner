@@ -38,6 +38,20 @@ function isTabletDrawGate(e: PointerEvent): boolean {
   return true;
 }
 
+/**
+ * "Vorerfasster Punkt": Der Stift hat im Tablet-Gate die Fläche berührt, der
+ * Punkt ist aber noch nicht gesetzt. Das Hilfsrad hebt dann LMB hervor.
+ */
+export function setLmbHint(on: boolean) {
+  if (typeof window === "undefined") return;
+  const w = window as any;
+  if (!!w.__pixunaLmbHint === !!on) return;
+  w.__pixunaLmbHint = !!on;
+  try { window.dispatchEvent(new CustomEvent("pixuna-lmb-hint", { detail: !!on })); } catch {}
+}
+
+
+
 
 
 export class Input {
