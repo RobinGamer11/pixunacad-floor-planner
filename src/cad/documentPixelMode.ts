@@ -54,14 +54,15 @@ function bakeWidthPx(doc: DocumentObject): number {
 }
 
 /**
- * Vektor → Pixel: rendert die PDF-Seite scharf, legt die aktuelle Radiermaske
- * darüber und ersetzt die Bildquelle durch das eingebrannte PNG.
+ * Vektor → Pixel: rendert die PDF-Seite scharf in ein PNG und schaltet das
+ * Dokument auf Bildmodus um. Vorhandene Radierungen (Alpha-Maske) bleiben
+ * erhalten und wirken unverändert weiter — im Pixelmodus zusätzlich mit
+ * Smooth-Radierer.
  */
 export async function convertDocumentToPixel(doc: DocumentObject): Promise<boolean> {
   if (!doc.pdfSourceB64 || doc.kind !== "pdf-page") return false;
   const { renderPdfPageToCanvas } = await import("./documentImport");
-  const targetW = bakeWidthPx(doc);
-  const page = await renderPdfPageToCanvas(doc.pdfSourceB64, doc.pageIndex, targetW);
+  const page = await renderPdfPageToCanvas(doc.pdfSourceB64, doc.pageIndex, bakeWidthPx(doc));
 
   const c = document.createElement("canvas");
   c.width = page.width;
@@ -69,81 +70,63 @@ export async function convertDocumentToPixel(doc: DocumentObject): Promise<boole
   const ctx = c.getContext("2d")!;
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
+  // Weißer Papiergrund, damit das Pixelbild wie ein gescanntes Blatt wirkt.
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, c.width, c.height);
   ctx.drawImage(page, 0, 0, c.width, c.height);
 
-  // Radierungen einbrennen: Maske als Alpha anwenden.
-  if (doc.eraseMaskDataUrl || doc._eraseMask) {
-    const mask = doc._eraseMask ?? getOrCreateDocMask(doc);
-    if (doc.eraseMaskDataUrl && !doc._eraseMask) {
-      // Maske ggf. erst noch aus der DataUrl laden.
-      try {
-        const mi = await loadImage(doc.eraseMaskDataUrl);
-        const mctx = mask.getContext("2d")!;
-        mctx.clearRect(0, 0, mask.width, mask.height);
-        mctx.drawImage(mi, 0, 0, mask.width, mask.height);
-      } catch { /* ohne Maske weiter */ }
-    }
-    ctx.globalCompositeOperation = "destination-in";
-    ctx.drawImage(mask, 0, 0, c.width, c.height);
-    ctx.globalCompositeOperation = "source-over";
+  // Maske vor dem Umschalten sicher materialisieren (bleibt 1:1 erhalten).
+  if (doc.eraseMaskDataUrl && !doc._eraseMask) {
+    try {
+      const mask = getOrCreateDocMask(doc);
+      const mi = await loadImage(doc.eraseMaskDataUrl);
+      const mctx = mask.getContext("2d")!;
+      mctx.clearRect(0, 0, mask.width, mask.height);
+      mctx.drawImage(mi, 0, 0, mask.width, mask.height);
+    } catch { /* ohne Maske weiter */ }
   }
 
   doc.src = c.toDataURL("image/png");
   doc.pixelWidth = c.width;
   doc.pixelHeight = c.height;
   doc.kind = "image";
-  // Maske ist eingebrannt — ab jetzt wird direkt auf den Pixeln radiert.
-  doc.eraseMaskDataUrl = null;
-  doc._eraseMask = null;
-  doc._eraseMaskDirty = false;
+  doc._eraseMaskDirty = true;
   return true;
 }
 
 /**
- * Pixel → Vektor: rendert die PDF-Seite neu (scharfe Vektorbasis) und
- * überträgt die im Pixelbild vorhandenen Radierungen als Alpha-Maske, damit
- * alle Änderungen erhalten bleiben.
+ * Pixel → Vektor: rendert die PDF-Seite wieder als Vektorquelle. Alle im
+ * Pixelmodus vorgenommenen Radierungen bleiben als Alpha-Maske erhalten und
+ * werden zusätzlich aus dem Alpha-Kanal des Pixelbildes übernommen.
  */
 export async function convertDocumentToVector(doc: DocumentObject): Promise<boolean> {
   if (!doc.pdfSourceB64 || doc.kind !== "image") return false;
 
-  // 1) Radierungen aus dem Pixelbild zurückgewinnen: eingebrannter Alpha-Kanal
-  //    kombiniert mit einer evtl. im Pixelmodus entstandenen Radiermaske.
-  let maskCanvas: HTMLCanvasElement | null = null;
+  // 1) Zusätzliche Transparenzen aus dem Pixelbild in die Maske übernehmen.
   try {
     const baked = await loadImage(doc.src);
-    const dims = getMaskDimensions(doc);
-    const mc = document.createElement("canvas");
-    mc.width = Math.max(1, dims.w);
-    mc.height = Math.max(1, dims.h);
-    const mctx = mc.getContext("2d")!;
-    mctx.imageSmoothingEnabled = true;
-    mctx.imageSmoothingQuality = "high";
-    // Weiß dort, wo das Bild noch Deckkraft hat → sichtbar; radierte Stellen transparent.
-    mctx.drawImage(baked, 0, 0, mc.width, mc.height);
-    if (doc.eraseMaskDataUrl || doc._eraseMask) {
-      let live = doc._eraseMask ?? null;
-      if (!live && doc.eraseMaskDataUrl) {
-        try {
-          const mi = await loadImage(doc.eraseMaskDataUrl);
-          const tmp = document.createElement("canvas");
-          tmp.width = mc.width; tmp.height = mc.height;
-          tmp.getContext("2d")!.drawImage(mi, 0, 0, tmp.width, tmp.height);
-          live = tmp;
-        } catch { /* ignore */ }
-      }
-      if (live) {
-        mctx.globalCompositeOperation = "destination-in";
-        mctx.drawImage(live, 0, 0, mc.width, mc.height);
-      }
+    const mask = doc._eraseMask ?? getOrCreateDocMask(doc);
+    const probe = document.createElement("canvas");
+    probe.width = mask.width;
+    probe.height = mask.height;
+    const pctx = probe.getContext("2d")!;
+    pctx.imageSmoothingEnabled = true;
+    pctx.drawImage(baked, 0, 0, probe.width, probe.height);
+    const img = pctx.getImageData(0, 0, probe.width, probe.height);
+    let anyTransparent = false;
+    for (let i = 3; i < img.data.length; i += 4) {
+      if (img.data[i] < 250) { anyTransparent = true; break; }
     }
-    mctx.globalCompositeOperation = "source-in";
-    mctx.fillStyle = "#ffffff";
-    mctx.fillRect(0, 0, mc.width, mc.height);
-    mctx.globalCompositeOperation = "source-over";
-    maskCanvas = mc;
-  } catch { /* ohne Maske weiter */ }
-
+    if (anyTransparent) {
+      const mctx = mask.getContext("2d")!;
+      mctx.globalCompositeOperation = "destination-in";
+      mctx.drawImage(probe, 0, 0, mask.width, mask.height);
+      mctx.globalCompositeOperation = "source-over";
+    }
+    doc._eraseMask = mask;
+    doc.eraseMaskDataUrl = mask.toDataURL("image/png");
+    doc._eraseMaskDirty = true;
+  } catch { /* Maske bleibt wie sie ist */ }
 
   // 2) Frische Vektor-Renderbasis aus dem Original-PDF.
   const { renderPdfPageToCanvas } = await import("./documentImport");
@@ -154,14 +137,9 @@ export async function convertDocumentToVector(doc: DocumentObject): Promise<bool
   doc.src = page.toDataURL("image/png");
   doc.pixelWidth = page.width;
   doc.pixelHeight = page.height;
-
-  if (maskCanvas) {
-    doc._eraseMask = maskCanvas;
-    doc.eraseMaskDataUrl = maskCanvas.toDataURL("image/png");
-    doc._eraseMaskDirty = true;
-  }
   return true;
 }
+
 
 /**
  * Prüft, ob ein Weltpunkt im Dokument wegradiert wurde (Maske transparent).
