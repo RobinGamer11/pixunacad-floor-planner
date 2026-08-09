@@ -1806,6 +1806,16 @@ export class MiniCad {
         }
       }
 
+      // ENTER platziert ein schwebendes Dokument (PNG/JPG/PDF) endgültig.
+      if (e.key === "Enter" && !inField && this._activeTool === "document") {
+        if ((this.documentTool as any).finishFromKey?.()) {
+          e.preventDefault();
+          this._changeDirty = true;
+          try { this.onSelectionChange?.(); } catch {}
+          return;
+        }
+      }
+
       // ESC bricht ALLES ab — egal welches Werkzeug, egal welches Objekt.
       if (e.key === "Escape" && !inField) {
         try { if (this.textEditor.isActive()) this.textEditor.commit(); } catch {}
