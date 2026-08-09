@@ -228,7 +228,7 @@ const CadPage = () => {
   // iPadOS meldet den Apple Pencil je nach Safari-Version teilweise als
   // Touch statt PointerType "pen". touchType="stylus" hält ihn trotzdem vom
   // Finger-Pan getrennt: Pencil zieht den Rahmen, echte Finger navigieren.
-  const stylusTouch = (touches: TouchList): Touch | null => {
+  const stylusTouch = (touches: ArrayLike<Touch>): Touch | null => {
     for (const touch of Array.from(touches)) {
       if ((touch as any).touchType === "stylus") return touch;
     }
