@@ -106,6 +106,7 @@ export class Input {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Shift") this._keys.shift = true;
       if (e.code === "Space") this._keys.space = true;
+      if (e.key === "Escape" || e.key === "Enter") setLmbHint(false);
     };
     const onKeyUp = (e: KeyboardEvent) => {
       if (e.key === "Shift") this._keys.shift = false;
