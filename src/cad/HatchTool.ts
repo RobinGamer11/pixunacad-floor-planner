@@ -10,6 +10,7 @@ import type { CadApp } from "./CadApp";
 import type { Snap } from "./TopologyEngine";
 import type { Input } from "./Input";
 import { findEnclosingFace } from "./hatchFill";
+import { maybeRasterize } from "./rasterize";
 import { toast } from "sonner";
 
 interface GuideAnchor {
@@ -583,7 +584,8 @@ export class HatchTool {
     }
 
     if (!carvedAsHole) {
-      this.app.scene.createHatch(points, this.app.getCurrentHatchStyle());
+      const createdHatch = this.app.scene.createHatch(points, this.app.getCurrentHatchStyle());
+      maybeRasterize(this.app, { type: "hatch", obj: createdHatch });
     }
     this.app.clearSelection();
     this.points = [];
@@ -859,7 +861,8 @@ export class HatchTool {
       });
       return;
     }
-    this.app.scene.createHatch(loop, this.app.getCurrentHatchStyle());
+    const filledHatch = this.app.scene.createHatch(loop, this.app.getCurrentHatchStyle());
+    maybeRasterize(this.app, { type: "hatch", obj: filledHatch });
     this.app.clearSelection();
   }
 

@@ -18,6 +18,7 @@ import { WallSettingsPanel } from "@/components/cad/WallSettingsPanel";
 import { HatchPatternControls } from "@/components/cad/HatchPatternControls";
 
 import { ToolHelpNotes } from "@/components/cad/ToolHelpNotes";
+import { RasterModeToggle } from "@/components/cad/RasterModeToggle";
 
 import { DocumentFilterPanel } from "@/components/cad/DocumentFilterPanel";
 import { WarpSection } from "@/components/page/CadDocumentInspector";
@@ -1992,6 +1993,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
               Linie
             </div>
+            <RasterModeToggle app={appRef.current} />
             <div className="space-y-3">
               <div>
                 <label>Ebene</label>
@@ -2048,6 +2050,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
               Schraffur
             </div>
+            <RasterModeToggle app={appRef.current} />
 
             <div className="flex gap-1 mb-3">
               <button
@@ -2333,6 +2336,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
               Text
             </div>
+            <RasterModeToggle app={appRef.current} />
             <div className="space-y-3">
               <div>
                 <label>Ebene</label>

@@ -8,6 +8,7 @@ import {
 import type { CadApp } from "./CadApp";
 import type { Snap } from "./TopologyEngine";
 import type { Input } from "./Input";
+import { maybeRasterize } from "./rasterize";
 
 interface GuideAnchor {
   key: string;
@@ -445,7 +446,8 @@ export class LineTool {
       return;
     }
     if (dist(this.currentPoint!, point) < Defaults.minSegLenM) return;
-    this.app.scene.createSegment(this.currentPoint!, point, this.app.getCurrentLineStyle());
+    const createdSeg = this.app.scene.createSegment(this.currentPoint!, point, this.app.getCurrentLineStyle());
+    maybeRasterize(this.app, { type: "segment", obj: createdSeg });
     this.app.clearSelection();
     this.currentPoint = v(point.x, point.y);
     this.hubLocked = false;

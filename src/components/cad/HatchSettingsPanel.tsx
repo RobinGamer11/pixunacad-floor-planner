@@ -4,6 +4,7 @@ import { HATCH_PATTERNS } from "@/cad/hatchPatterns";
 import type { CadApp } from "@/cad/CadApp";
 import type { MiniCad } from "@/cad/embed/MiniCad";
 import type { HatchDrawMode } from "@/cad/HatchTool";
+import { RasterModeToggle } from "@/components/cad/RasterModeToggle";
 
 const MODES: { value: HatchDrawMode; label: string; Icon: React.ElementType }[] = [
   { value: "polygon", label: "Polygon", Icon: Spline },
@@ -113,6 +114,7 @@ export const HatchSettingsPanel: React.FC<Props> = ({ app }) => {
 
   return (
     <div className="space-y-3 text-xs">
+      <RasterModeToggle app={app} />
       <div>
         <div className="text-[10px] font-semibold tracking-wider text-muted-foreground mb-1.5">MODUS</div>
         <div className="grid grid-cols-4 gap-1">

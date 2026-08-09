@@ -100,6 +100,7 @@ import { FreeDrawSettingsPanel } from "@/components/cad/FreeDrawSettingsPanel";
 import { EraserSettingsPanel } from "@/components/cad/EraserSettingsPanel";
 import { ProjectFilePickerDialog } from "@/components/cad/ProjectFilePickerDialog";
 import { HatchSettingsPanel } from "@/components/cad/HatchSettingsPanel";
+import { RasterModeToggle } from "@/components/cad/RasterModeToggle";
 import { WorkspaceHeader } from "@/components/workspace/WorkspaceHeader";
 import { TabletAidWheel } from "@/components/TabletAidWheel";
 
@@ -5442,6 +5443,9 @@ function ToolsTab({
           onChange={(p) => updateToolSettings("guide", p)}
         />
       )}
+      {settingsTool === "line" && cadEngine && (
+        <RasterModeToggle app={cadEngine} />
+      )}
       {settingsTool === "line" && (
         <LineSettings
           settings={toolSettings.line}
@@ -5473,6 +5477,9 @@ function ToolsTab({
         />
       )}
 
+      {settingsTool === "text" && cadEngine && (
+        <RasterModeToggle app={cadEngine} />
+      )}
       {settingsTool === "text" && (
         <TextSettings
           settings={toolSettings.text}
