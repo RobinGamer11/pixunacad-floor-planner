@@ -3651,6 +3651,10 @@ function ElementView({
     if ((isCadView && selected) || hubMode || edgeTrim) {
       onSelect?.({ shift: e.shiftKey });
       if (!key.startsWith("edge-")) setActiveEdge(null);
+      if (hubMode && !!(window as any).__pixunaTabletCommit) {
+        modeStartClientRef.current = null;
+        setCarrying(true);
+      }
       return;
     }
     startDrag(e);
@@ -3859,7 +3863,9 @@ function ElementView({
       // Tablet-Hilfsrad/HUB-Bedienelemente werden für die Positionierung
       // komplett ignoriert — sonst springt das Objekt zum Rad.
       const mt = ev.target as HTMLElement | null;
-      if (mt?.closest?.('[data-tablet-aid="true"], [data-hub-control]')) return;
+      const overTabletAid = document.elementsFromPoint(ev.clientX, ev.clientY)
+        .some((node) => (node as HTMLElement).closest?.('[data-tablet-aid="true"]'));
+      if (overTabletAid || mt?.closest?.('[data-tablet-aid="true"], [data-hub-control]')) return;
       if (!carryingRef.current) return; // Objekt abgelegt — Preview eingefroren.
       const { clientX: ax, clientY: ay } = liveAnchor();
       const reg = getPageSnapRegistry();
@@ -4624,6 +4630,10 @@ function ElementView({
               const fy = corner === "tl" || corner === "tr" ? 0 : 1;
               setAnchor({ fx, fy, key });
               onSelect?.({ shift: e.shiftKey });
+              if (hubMode && !!(window as any).__pixunaTabletCommit) {
+                modeStartClientRef.current = null;
+                setCarrying(true);
+              }
             };
             const isTop = corner === "tl" || corner === "tr";
             const isLeft = corner === "tl" || corner === "bl";
@@ -5481,7 +5491,7 @@ function ToolsTab({
       )}
       {settingsTool === "free" && cadEngine && (
         <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
-          <FreeDrawSettingsPanel app={cadEngine} />
+          <FreeDrawSettingsPanel app={cadEngine} projectId={projectId} />
         </div>
       )}
       {settingsTool === "eraser" && cadEngine && (
@@ -5491,7 +5501,7 @@ function ToolsTab({
       )}
       {settingsTool === "hatch" && cadEngine && (
         <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
-          <HatchSettingsPanel app={cadEngine} />
+          <HatchSettingsPanel app={cadEngine} projectId={projectId} />
         </div>
       )}
       {cadSelectedLineSnap && onCadLineSnapChange && (

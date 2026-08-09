@@ -43,10 +43,11 @@ const SliderRow: React.FC<{
 
 interface Props {
   app: CadApp | MiniCad | null;
+  projectId?: string;
 }
 
 
-export const HatchSettingsPanel: React.FC<Props> = ({ app }) => {
+export const HatchSettingsPanel: React.FC<Props> = ({ app, projectId }) => {
   const [mode, setMode] = useState<HatchDrawMode>("polygon");
   const [fillColor, setFillColor] = useState("#4da3ff");
   const [strokeColor, setStrokeColor] = useState("#111111");
@@ -114,7 +115,7 @@ export const HatchSettingsPanel: React.FC<Props> = ({ app }) => {
 
   return (
     <div className="space-y-3 text-xs">
-      <RasterModeToggle app={app} />
+      <RasterModeToggle app={app} projectId={projectId} />
       <div>
         <div className="text-[10px] font-semibold tracking-wider text-muted-foreground mb-1.5">MODUS</div>
         <div className="grid grid-cols-4 gap-1">

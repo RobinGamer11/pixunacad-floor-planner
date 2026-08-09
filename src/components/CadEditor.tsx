@@ -2594,7 +2594,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
 
           {/* Freihand-Tool-Panel */}
           {(activeTool === ToolIds.FREE || (activeTool === ToolIds.SELECT && selectedFreeStrokeId)) && (
-            <FreeDrawSettingsPanel app={appRef.current} units="m" />
+            <FreeDrawSettingsPanel app={appRef.current} units="m" projectId={projectId} />
           )}
 
           {/* Eraser-Tool-Panel */}
