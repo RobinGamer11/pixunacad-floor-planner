@@ -2001,7 +2001,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
               Linie
             </div>
-            <RasterModeToggle app={appRef.current} />
+            <RasterModeToggle app={appRef.current} projectId={projectId} />
             <div className="space-y-3">
               <div>
                 <label>Ebene</label>
@@ -2058,7 +2058,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
               Schraffur
             </div>
-            <RasterModeToggle app={appRef.current} />
+            <RasterModeToggle app={appRef.current} projectId={projectId} />
 
             <div className="flex gap-1 mb-3">
               <button
@@ -2344,7 +2344,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
               Text
             </div>
-            <RasterModeToggle app={appRef.current} />
+            <RasterModeToggle app={appRef.current} projectId={projectId} />
             <div className="space-y-3">
               <div>
                 <label>Ebene</label>
@@ -2594,7 +2594,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
 
           {/* Freihand-Tool-Panel */}
           {(activeTool === ToolIds.FREE || (activeTool === ToolIds.SELECT && selectedFreeStrokeId)) && (
-            <FreeDrawSettingsPanel app={appRef.current} units="m" />
+            <FreeDrawSettingsPanel app={appRef.current} units="m" projectId={projectId} />
           )}
 
           {/* Eraser-Tool-Panel */}

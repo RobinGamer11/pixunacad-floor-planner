@@ -74,6 +74,7 @@ const CadPage = () => {
   // Button ("Rahmen ziehen"). Nach dem PointerUp wird das Werkzeug wieder
   // entwaffnet, damit Pan/Zoom sofort weitergehen.
   const [frameArmed, setFrameArmed] = useState(false);
+  const frameStylusTouchIdRef = useRef<number | null>(null);
 
 
   const [presenting, setPresenting] = useState(false);
@@ -194,6 +195,11 @@ const CadPage = () => {
   // fängt Maus-Events, damit die CAD-Tools nicht mitlaufen.
   const onFramePointerDown = (e: React.PointerEvent) => {
     if (sheetPdfMode !== "frame" || !frameArmed) return;
+    // Im Stift-Modus zeichnet ausschließlich der Pencil den Rahmen. Finger
+    // bleiben für Pan/Pinch auf dem darunterliegenden CAD-Canvas reserviert.
+    if (!!(window as any).__pixunaPenOnly && e.pointerType === "touch") return;
+    e.preventDefault();
+    e.stopPropagation();
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     setFrameStart({ x: e.clientX, y: e.clientY });
     setFrameRect({ x: e.clientX, y: e.clientY, w: 0, h: 0 });
@@ -202,6 +208,8 @@ const CadPage = () => {
 
   const onFramePointerMove = (e: React.PointerEvent) => {
     if (!dragging || !frameStart) return;
+    e.preventDefault();
+    e.stopPropagation();
     const x = Math.min(frameStart.x, e.clientX);
     const y = Math.min(frameStart.y, e.clientY);
     const w = Math.abs(e.clientX - frameStart.x);
@@ -210,9 +218,55 @@ const CadPage = () => {
   };
   const onFramePointerUp = (e: React.PointerEvent) => {
     if (!dragging) return;
+    e.preventDefault();
+    e.stopPropagation();
     setDragging(false);
     setFrameArmed(false); // Nach Aufziehen automatisch entwaffnen → Pan/Zoom wieder normal.
     try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch {}
+  };
+
+  // iPadOS meldet den Apple Pencil je nach Safari-Version teilweise als
+  // Touch statt PointerType "pen". touchType="stylus" hält ihn trotzdem vom
+  // Finger-Pan getrennt: Pencil zieht den Rahmen, echte Finger navigieren.
+  const stylusTouch = (touches: React.TouchList): React.Touch | null => {
+    for (const touch of Array.from(touches)) {
+      if ((touch as any).touchType === "stylus") return touch;
+    }
+    return null;
+  };
+  const onFrameTouchStart = (e: React.TouchEvent) => {
+    if (sheetPdfMode !== "frame" || !frameArmed || !(window as any).__pixunaPenOnly) return;
+    const touch = stylusTouch(e.changedTouches);
+    if (!touch) return;
+    e.preventDefault();
+    e.stopPropagation();
+    frameStylusTouchIdRef.current = touch.identifier;
+    setFrameStart({ x: touch.clientX, y: touch.clientY });
+    setFrameRect({ x: touch.clientX, y: touch.clientY, w: 0, h: 0 });
+    setDragging(true);
+  };
+  const onFrameTouchMove = (e: React.TouchEvent) => {
+    const id = frameStylusTouchIdRef.current;
+    if (id === null || !dragging || !frameStart) return;
+    const touch = Array.from(e.changedTouches).find((item) => item.identifier === id);
+    if (!touch) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setFrameRect({
+      x: Math.min(frameStart.x, touch.clientX),
+      y: Math.min(frameStart.y, touch.clientY),
+      w: Math.abs(touch.clientX - frameStart.x),
+      h: Math.abs(touch.clientY - frameStart.y),
+    });
+  };
+  const onFrameTouchEnd = (e: React.TouchEvent) => {
+    const id = frameStylusTouchIdRef.current;
+    if (id === null || !Array.from(e.changedTouches).some((item) => item.identifier === id)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    frameStylusTouchIdRef.current = null;
+    setDragging(false);
+    setFrameArmed(false);
   };
 
 
@@ -246,7 +300,17 @@ const CadPage = () => {
         onToggleTabletAid={() => setTabletAidOn((v) => !v)}
         onExport={() => editorRef.current?.openExportPanel()}
       />
-      <main ref={mainRef} className="flex-1 relative min-h-0 bg-background">
+      <main
+        ref={mainRef}
+        className="flex-1 relative min-h-0 bg-background"
+        onPointerDownCapture={frameArmed ? onFramePointerDown : undefined}
+        onPointerMoveCapture={frameArmed ? onFramePointerMove : undefined}
+        onPointerUpCapture={frameArmed ? onFramePointerUp : undefined}
+        onTouchStartCapture={frameArmed ? onFrameTouchStart : undefined}
+        onTouchMoveCapture={frameArmed ? onFrameTouchMove : undefined}
+        onTouchEndCapture={frameArmed ? onFrameTouchEnd : undefined}
+        onTouchCancelCapture={frameArmed ? onFrameTouchEnd : undefined}
+      >
         <CadEditor
           ref={editorRef}
           projectId={projectId}
@@ -276,11 +340,8 @@ const CadPage = () => {
             style={{
               cursor: frameArmed ? "crosshair" : "default",
               background: frameArmed ? "rgba(0,0,0,0.02)" : "transparent",
-              pointerEvents: frameArmed ? "auto" : "none",
+               pointerEvents: "none",
             }}
-            onPointerDown={onFramePointerDown}
-            onPointerMove={onFramePointerMove}
-            onPointerUp={onFramePointerUp}
           >
             {frameRect && frameRect.w > 0 && frameRect.h > 0 && (() => {
               const cRect = getCanvas()?.getBoundingClientRect();

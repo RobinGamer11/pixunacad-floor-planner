@@ -182,6 +182,10 @@ export class MiniCad {
   defaultFreeAutoShape: boolean = false;
   /** Zeichenmodus: "vector" oder "pixel" (Rasterung beim Fertigstellen). */
   defaultDrawRasterMode: "vector" | "pixel" = "vector";
+  /** Projektweite Rasterqualität für neu fertiggestellte Pixelobjekte. */
+  pixelRenderDpi: number = 1200;
+  pixelSupersampling: boolean = false;
+  pixelSupersamplingFactor: 2 | 4 = 2;
   // Radiergummi-Defaults.
   defaultEraserRadiusM: number = Defaults.eraserRadiusM;
   defaultEraserStrength: number = Defaults.eraserStrength;

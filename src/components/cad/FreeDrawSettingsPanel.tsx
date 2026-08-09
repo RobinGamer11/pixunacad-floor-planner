@@ -21,9 +21,9 @@ const STYLE_OPTIONS: { value: LineStyle; label: string }[] = [
   { value: "image", label: "Bild-Stempel" },
 ];
 
-interface Props { app: CadApp | MiniCad | null; units?: "cm" | "m"; }
+interface Props { app: CadApp | MiniCad | null; units?: "cm" | "m"; projectId?: string; }
 
-export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm" }) => {
+export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", projectId }) => {
 
   const [color, setColor] = useState("#111111");
   const [thickness, setThickness] = useState(0.03);
@@ -147,7 +147,7 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm" }) =>
   return (
     <div className="cad-settings-panel mb-2">
       <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Freihand</div>
-      <RasterModeToggle app={app} />
+      <RasterModeToggle app={app} projectId={projectId} />
       <FreeDrawPreview
         color={color}
         thickness={thickness}
