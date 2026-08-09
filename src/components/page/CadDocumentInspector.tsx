@@ -192,7 +192,10 @@ export function CadDocumentInspector({ engine }: Props) {
         </div>
       </div>
 
+      <DocumentPixelModeToggle app={engine as any} docId={sel.id} />
+
       <WarpSection engine={engine} docId={sel.id} />
+
 
       <DocumentFilterPanel app={engine as any} docId={sel.id} sig={filterSig} showBgRemove={false} />
 
