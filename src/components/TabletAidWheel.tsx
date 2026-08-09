@@ -440,9 +440,10 @@ function WheelButton({
       style={{
         left: cx,
         top: cy,
-        borderColor: "hsl(var(--hairline))",
+        borderColor: highlight && !active ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
         background: active ? "hsl(var(--accent-gold))" : "hsl(var(--surface))",
         color: active ? "hsl(var(--surface))" : "hsl(var(--ink))",
+        boxShadow: highlight && !active ? "0 0 0 3px hsl(var(--accent-gold) / 0.35)" : undefined,
         touchAction: "none",
         pointerEvents: "auto",
         zIndex: 2,
