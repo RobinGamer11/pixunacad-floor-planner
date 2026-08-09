@@ -709,12 +709,19 @@ export class DocumentTool {
     let nSeg = 0, nH = 0, nT = 0;
     const toWorld = (x: number, y: number) =>
       pdfPointToWorld(x, y, pdfWidthPt, pdfHeightPt, { position: doc.position, widthM: doc.widthM, heightM: doc.heightM, rotationRad: doc.rotationRad });
+    /** PDF-Punkt (y nach oben) → UV im Dokument (y nach unten). */
+    const erasedAt = (x: number, y: number) =>
+      !!isErased && isErased(x / (pdfWidthPt || 1), 1 - y / (pdfHeightPt || 1));
 
     for (const s of result.segments) {
       const a = toWorld(s.a.x, s.a.y);
       const b = toWorld(s.b.x, s.b.y);
       const len = Math.hypot(b.x - a.x, b.y - a.y);
       if (len < 1e-5) continue;
+      // Wegradierte Abschnitte überspringen (Mitte + beide Enden prüfen).
+      if (erasedAt(s.a.x, s.a.y) && erasedAt(s.b.x, s.b.y)) continue;
+      if (erasedAt((s.a.x + s.b.x) / 2, (s.a.y + s.b.y) / 2)
+        && (erasedAt(s.a.x, s.a.y) || erasedAt(s.b.x, s.b.y))) continue;
       // Strichstärke skalieren (PDF-Punkte → Welt-Meter mit Dokument-Skalierungsfaktor).
       const sxFactor = doc.widthM / pdfWidthPt;
       this.app.scene.createSegment(a, b, { color: s.color, thicknessM: Math.max(0.0005, s.thicknessM * sxFactor * 72 / 0.0254), labelId });
@@ -723,6 +730,8 @@ export class DocumentTool {
     for (const h of result.hatches) {
       const pts = h.points.map(p => toWorld(p.x, p.y));
       if (pts.length < 3) continue;
+      // Vollständig wegradierte Flächen nicht wiederherstellen.
+      if (isErased && h.points.every(p => erasedAt(p.x, p.y))) continue;
       this.app.scene.createHatch(pts, { fillColor: h.fillColor, strokeColor: h.strokeColor, labelId, areaLabel: { show: false } });
       nH++;
     }
@@ -731,6 +740,7 @@ export class DocumentTool {
       const PT_PER_M = 72 / 0.0254;
       const widthPt = t.widthM * PT_PER_M;
       const heightPt = t.heightM * PT_PER_M;
+      if (erasedAt(t.x + widthPt / 2, t.y + heightPt / 2)) continue;
       const center = toWorld(t.x + widthPt / 2, t.y + heightPt / 2);
       const sxFactor = doc.widthM / pdfWidthPt;
       const widthWorld = Math.max(0.005, widthPt * sxFactor);
@@ -745,6 +755,7 @@ export class DocumentTool {
       );
       nT++;
     }
+
 
     // Original-PDF als Kopie unter den neuen Objekten liegen lassen (nicht löschen).
     // Dokumente werden ohnehin im Hintergrund (vor Segments/Hatches/Texts) gezeichnet.
