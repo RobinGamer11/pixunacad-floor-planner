@@ -3980,9 +3980,8 @@ function ElementView({
       const p = previewRef.current;
       const ax = ax0 + (hubMode === "move" ? p.dxPx : 0);
       const ay = ay0 + (hubMode === "move" ? p.dyPx : 0);
-      const nearAnchor = Math.hypot(ev.clientX - ax, ev.clientY - ay) <= 12;
       const wheelActive = !!(window as any).__pixunaTabletCommit;
-      if (nearAnchor || !wheelActive) {
+      if (!wheelActive) {
         // Ohne Tablet-Hilfsrad setzt ein einfacher Linksklick das CAD-Blatt.
         hubDownClientRef.current = null;
         hubSettledRef.current = true;
