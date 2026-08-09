@@ -7,17 +7,15 @@ import { ChevronDown, ChevronRight, HelpCircle } from "lucide-react";
  */
 
 const GLOBAL_HINTS: string[] = [
-  "Rechtsklick auf einen Fangpunkt: horizontale/vertikale Hilfslinie erzeugen",
-  "ESC: bricht jede laufende Aktion oder Eingabe ab",
-  "Entf: löscht die aktuelle Auswahl",
-  "Shift+C / Shift+V (auch Strg+C/V): kopieren und einfügen",
-  "Mittlere Maustaste oder Leertaste + Ziehen: Ansicht verschieben · Mausrad: Zoom am Cursor",
-  "Zwei Finger am Tablet: Pan & Pinch-Zoom · Hilfsrad: LMB/RMB/Shift/ESC/Entf",
+  "Nutzung über Tablet oder Handy: „Tablet“-Hilfsrad in der Kopfzeile aktivieren",
+  "Rechtsklick auf einen Fangpunkt: Hilfslinien erscheinen",
+  "Copy/Paste, Löschen sowie Undo/Redo über die Symbole in der Kopfzeile",
+  "ESC: bricht jede laufende Aktion ab",
+  "Shift+Klick oder Shift+Rahmen: mehrere Objekte zur Auswahl hinzufügen",
 ];
 
 const TOOL_HINTS: Record<string, string[]> = {
   select: [
-    "Shift+Klick oder Shift+Rahmen: mehrere Objekte zur Auswahl hinzufügen",
     "Shift+Klick auf einen Fangpunkt der Auswahl: Ankerpunkt setzen — daneben erscheinen Verschieben und Drehen",
     "Gedrehte/verschobene Gruppen rasten am Ankerpunkt an fremder Geometrie ein",
     "R: ausgewähltes Objekt bzw. Gruppe drehen · Häkchen oder Enter bestätigt",
@@ -113,7 +111,12 @@ export function ToolHelpNotes({
   };
 
   const toolHints = (toolId && TOOL_HINTS[toolId]) || TOOL_HINTS.select;
-  const hints = [...(extra ?? []), ...toolHints, ...GLOBAL_HINTS];
+  const specificHints = [...(extra ?? []), ...toolHints].filter(Boolean);
+
+  const listClass =
+    "px-3 pb-2 pt-0.5 space-y-1 text-[10.5px] leading-snug list-disc list-outside ml-3";
+  const listStyle = { color: "hsl(var(--ink-soft))", opacity: 0.85 } as React.CSSProperties;
+  const headingClass = "px-3 pt-2 text-[10px] font-semibold uppercase tracking-[0.12em]";
 
   return (
     <div
@@ -132,13 +135,26 @@ export function ToolHelpNotes({
         <span>Hilfe & Kurzbefehle</span>
       </button>
       {open && (
-        <ul className="px-3 pb-2 pt-0.5 space-y-1 text-[10.5px] leading-snug list-disc list-outside ml-3"
-            style={{ color: "hsl(var(--ink-soft))", opacity: 0.85 }}>
-          {hints.map((h, i) => (
-            <li key={i}>{h}</li>
-          ))}
-        </ul>
+        <div className="pb-1">
+          <div className={headingClass} style={{ color: "hsl(var(--ink-soft))" }}>Allgemeines</div>
+          <ul className={listClass} style={listStyle}>
+            {GLOBAL_HINTS.map((h, i) => (
+              <li key={`g-${i}`}>{h}</li>
+            ))}
+          </ul>
+          {specificHints.length > 0 && (
+            <>
+              <div className={headingClass} style={{ color: "hsl(var(--ink-soft))" }}>Werkzeug</div>
+              <ul className={listClass} style={listStyle}>
+                {specificHints.map((h, i) => (
+                  <li key={`t-${i}`}>{h}</li>
+                ))}
+              </ul>
+            </>
+          )}
+        </div>
       )}
+
     </div>
   );
 }
