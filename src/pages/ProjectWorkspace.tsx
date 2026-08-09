@@ -3944,6 +3944,8 @@ function ElementView({
 
     const onDown = (ev: PointerEvent) => {
       if (ev.button !== 0) return;
+      const td = ev.target as HTMLElement | null;
+      if (td?.closest?.('[data-tablet-aid="true"]')) return;
       hubDownClientRef.current = { x: ev.clientX, y: ev.clientY };
       // Drehen: Ein Linksklick setzt das Objekt sofort in der aktuellen
       // Drehstellung — schon beim Pointerdown, damit kein anderes Handling
