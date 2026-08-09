@@ -2601,7 +2601,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
 
                 {docToolPhase === "placing" && (
                   <div className="rounded-md p-2 text-xs" style={{ background: "hsl(var(--primary) / 0.12)", border: "1px solid hsl(var(--primary) / 0.4)" }}>
-                    Klick auf Canvas: Dokument absetzen · Esc: abbrechen
+                    Linksklick: Position setzen · Enter: final platzieren · Esc: abbrechen
                   </div>
                 )}
 
