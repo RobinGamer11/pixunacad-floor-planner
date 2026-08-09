@@ -3088,6 +3088,9 @@ export class SelectTool {
       // TextBox-Handle-Auswahl: Menü offen halten.
     } else if (!this.isEditing() && this._isWallEdgeSelectionActive()) {
       // Wand-Edge-Auswahl: Menü offen halten.
+    } else if (!this.isEditing() && (this.app.selection as any)?.type === SelectionType.FREE_STROKE) {
+      // Freihand-Stroke ausgewählt: Verschieben/Drehen/Löschen offen halten.
+
     } else {
       this.app.pointEditMenu.hide();
     }
