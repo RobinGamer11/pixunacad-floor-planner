@@ -314,6 +314,8 @@ export class Input {
     this.clicked = false;
     this.rightClicked = false;
     this.doubleClicked = false;
+    this.tabletTapped = this._tabletTapQueued;
+    this._tabletTapQueued = false;
 
     if (this._dblQueued) {
       this.doubleClicked = true;
