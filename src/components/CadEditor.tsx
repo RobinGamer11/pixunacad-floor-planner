@@ -2527,6 +2527,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               <label className="block text-xs mb-3">
                 <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Ebene</span>
                 <select
+                  key={docLabelTick}
                   value={appRef.current?.activeDrawLabelId ?? ""}
                   onChange={(e) => {
                     const app = appRef.current;
