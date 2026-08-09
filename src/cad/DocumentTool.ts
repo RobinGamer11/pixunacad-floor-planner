@@ -670,10 +670,20 @@ export class DocumentTool {
   async dissolvePdf(docId: string): Promise<{ segments: number; hatches: number; texts: number } | null> {
     const doc = this.app.scene.getDocumentById(docId);
     if (!doc) return null;
-    if (doc.kind !== "pdf-page" || !doc.pdfSourceB64) {
+    if (!doc.pdfSourceB64) {
       window.alert("Nur vektorbasierte PDFs können aufgelöst werden.");
       return null;
     }
+    if (doc.kind !== "pdf-page") {
+      // Pixelmodus: erst zurück auf Vektor (inkl. Radier-Änderungen), dann auflösen.
+      const { convertDocumentToVector } = await import("./documentPixelMode");
+      const ok = await convertDocumentToVector(doc);
+      if (!ok) { window.alert("Nur vektorbasierte PDFs können aufgelöst werden."); return null; }
+    }
+    // Radierte Bereiche sollen keine Vektoren mehr erzeugen.
+    const { makeErasedSampler } = await import("./documentPixelMode");
+    const isErased = makeErasedSampler(doc);
+
     const { extractPdfPageVectors, pdfPointToWorld } = await import("./pdfVectorExtract");
     const { loadPdfDocFromB64 } = await import("./documentImport");
     let result;
