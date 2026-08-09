@@ -1,12 +1,28 @@
 import React, { useEffect, useRef, useState } from "react";
-import { MousePointer2, ArrowBigUp, Trash2, CornerDownLeft, Pencil } from "lucide-react";
+import { ArrowBigUp, Check, X, Pencil } from "lucide-react";
 import {
   virtualMouseClick,
   virtualMouseHold,
   virtualKeyPress,
   virtualKeyHold,
-  virtualTypeChar,
 } from "@/lib/virtualInput";
+
+/** Computermaus-Symbol mit hervorgehobener linker bzw. rechter Taste. */
+function MouseIcon({ side, size = 18 }: { side: "left" | "right"; size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6}>
+      <rect x="6" y="2.5" width="12" height="19" rx="6" />
+      <line x1="12" y1="2.5" x2="12" y2="11" />
+      <line x1="6" y1="11" x2="18" y2="11" />
+      {side === "left" ? (
+        <path d="M12 3.2 A5.4 5.4 0 0 0 6.6 8.6 V11 H12 Z" fill="currentColor" stroke="none" />
+      ) : (
+        <path d="M12 3.2 A5.4 5.4 0 0 1 17.4 8.6 V11 H12 Z" fill="currentColor" stroke="none" />
+      )}
+    </svg>
+  );
+}
+
 
 
 
@@ -103,35 +119,31 @@ export function TabletAidWheel() {
       <CenterToggles />
 
 
-      {/* 6 Buttons kreisförmig (60°-Schritte) */}
-      <WheelButton angle={-90} size={size} label="LMB" tooltip="Linke Maustaste (Tap = Klick, Halten = gedrückt halten)"
-        onTap={() => virtualMouseClick(0)}
-        onHold={(on) => virtualMouseHold(0, on)}
-        icon={<MousePointer2 size={16} />} />
-      <WheelButton angle={-30} size={size} label="RMB" tooltip="Rechte Maustaste"
-        onTap={() => virtualMouseClick(2)}
-        onHold={(on) => virtualMouseHold(2, on)}
-        icon={<MousePointer2 size={16} style={{ transform: "scaleX(-1)" }} />} />
-      <WheelButton angle={30} size={size} label="ENTF" tooltip="Entf-Taste"
-        onTap={() => virtualKeyPress("Delete")}
-        icon={<Trash2 size={16} />} />
-      <WheelButton angle={90} size={size} label="ENTER" tooltip="Bestätigen: setzt Punkt am Cursor (bzw. Enter-Taste in Eingabefeldern)"
+      {/* Enter oben, rechts RMB + ESC, links LMB + SHIFT */}
+      <WheelButton angle={-90} size={size} label="ENTER" tooltip="Bestätigen: setzt Punkt am Cursor (bzw. Enter-Taste in Eingabefeldern)"
         onTap={() => {
           const el = document.activeElement as HTMLElement | null;
           const inField = !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || (el as any).isContentEditable);
           if (inField) virtualKeyPress("Enter", el);
           else virtualMouseClick(0);
         }}
-        icon={<CornerDownLeft size={16} />} />
-      <WheelButton angle={150} size={size} label="ESC" tooltip="Esc-Taste"
+        icon={<Check size={18} />} />
+      <WheelButton angle={-25} size={size} label="RMB" tooltip="Rechte Maustaste"
+        onTap={() => virtualMouseClick(2)}
+        onHold={(on) => virtualMouseHold(2, on)}
+        icon={<MouseIcon side="right" />} />
+      <WheelButton angle={40} size={size} label="ESC" tooltip="Esc-Taste"
         onTap={() => virtualKeyPress("Escape")}
-        icon={<span className="text-[10px] font-bold">ESC</span>} />
-      <WheelButton angle={210} size={size} label="SHIFT" tooltip="Shift halten (2-Hand-Bedienung)"
+        icon={<X size={18} />} />
+      <WheelButton angle={-155} size={size} label="LMB" tooltip="Linke Maustaste (Tap = Klick, Halten = gedrückt halten)"
+        onTap={() => virtualMouseClick(0)}
+        onHold={(on) => virtualMouseHold(0, on)}
+        icon={<MouseIcon side="left" />} />
+      <WheelButton angle={140} size={size} label="SHIFT" tooltip="Shift halten (2-Hand-Bedienung)"
         onHold={(on) => virtualKeyHold("Shift", on)}
         toggleHold
         icon={<ArrowBigUp size={16} />} />
-      {/* Ziffernblock: erscheint, sobald ein Textfeld fokussiert ist. */}
-      <NumberPad wheelPos={pos} wheelSize={size} />
+
     </div>
   );
 }
@@ -189,155 +201,8 @@ function CenterToggles() {
 }
 
 
-function NumberPad({ wheelPos, wheelSize }: { wheelPos: { x: number; y: number }; wheelSize: number }) {
-  const [visible, setVisible] = useState(false);
-  const [collapsed, setCollapsed] = useState<boolean>(() => {
-    try { return localStorage.getItem("pixuna.numpadCollapsed") === "1"; } catch { return false; }
-  });
-  useEffect(() => {
-    try { localStorage.setItem("pixuna.numpadCollapsed", collapsed ? "1" : "0"); } catch {}
-  }, [collapsed]);
-  const lastInputRef = useRef<HTMLElement | null>(null);
 
-  // Solange Rad aktiv: bei allen INPUT/TEXTAREA `inputmode="none"` setzen,
-  // damit auf iPad KEINE OS-Tastatur aufgeht.
-  useEffect(() => {
-    const prev = new WeakMap<HTMLElement, string | null>();
-    const patch = (el: HTMLElement) => {
-      if (prev.has(el)) return;
-      prev.set(el, el.getAttribute("inputmode"));
-      el.setAttribute("inputmode", "none");
-    };
-    const onFocusInGlobal = (e: FocusEvent) => {
-      const t = e.target as HTMLElement | null;
-      if (!t) return;
-      if (t.tagName === "INPUT" || t.tagName === "TEXTAREA") patch(t);
-    };
-    document.querySelectorAll<HTMLElement>("input, textarea").forEach(patch);
-    document.addEventListener("focusin", onFocusInGlobal);
-    return () => {
-      document.removeEventListener("focusin", onFocusInGlobal);
-      document.querySelectorAll<HTMLElement>("input, textarea").forEach((el) => {
-        if (!prev.has(el)) return;
-        const p = prev.get(el);
-        if (p == null) el.removeAttribute("inputmode");
-        else el.setAttribute("inputmode", p);
-      });
-    };
-  }, []);
 
-  useEffect(() => {
-    const isField = (el: Element | null): el is HTMLElement =>
-      !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || (el as HTMLElement).isContentEditable);
-    const onFocusIn = (e: FocusEvent) => {
-      const t = e.target as Element | null;
-      if (isField(t)) {
-        lastInputRef.current = t;
-        setVisible(true);
-      }
-    };
-    const onFocusOut = (e: FocusEvent) => {
-      const next = e.relatedTarget as Element | null;
-      if (next?.closest('[data-tablet-aid="true"]')) return;
-      // Delay: iOS lässt den Fokus beim Tippen auf virtuelle Buttons kurz los.
-      setTimeout(() => {
-        const active = document.activeElement;
-        const remembered = lastInputRef.current;
-        if (remembered?.isConnected) {
-          setVisible(true);
-          return;
-        }
-        if (!isField(active)) {
-          setVisible(false);
-          lastInputRef.current = null;
-        }
-      }, 60);
-    };
-    document.addEventListener("focusin", onFocusIn);
-    document.addEventListener("focusout", onFocusOut);
-    return () => {
-      document.removeEventListener("focusin", onFocusIn);
-      document.removeEventListener("focusout", onFocusOut);
-    };
-  }, []);
-  if (!visible) return null;
-
-  const keys = ["1","2","3","4","5","6","7","8","9",",","0","⌫"];
-  const padWidth = collapsed ? 64 : 156;
-  const padHeight = collapsed ? 40 : 220;
-  let left = wheelSize / 2 - padWidth / 2;
-  let top = wheelSize + 8;
-  if (typeof window !== "undefined" && wheelPos.y + wheelSize + padHeight + 16 > window.innerHeight) {
-    top = -(padHeight + 8);
-  }
-  const press = (k: string) => (e: React.PointerEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    // Focus zurück auf letztes Eingabefeld, damit virtualTypeChar/Backspace es trifft.
-    const el = lastInputRef.current;
-    if (el && document.activeElement !== el) {
-      try { (el as HTMLInputElement).focus({ preventScroll: true }); } catch { el.focus(); }
-    }
-    if (k === "⌫") virtualKeyPress("Backspace", el);
-    else virtualTypeChar(k, el);
-  };
-
-  return (
-    <div
-      className="absolute z-[61] rounded-xl p-2 select-none"
-      style={{
-        left, top, width: padWidth,
-        background: "hsla(var(--surface-card), 0.96)",
-        border: "1px solid hsl(var(--hairline))",
-        boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
-        backdropFilter: "blur(6px)",
-        touchAction: "none",
-      }}
-      onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
-      onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
-    >
-      <div className="flex justify-end mb-1">
-        <button
-          type="button"
-          tabIndex={-1}
-          onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); setCollapsed((v) => !v); }}
-          className="h-6 px-2 rounded text-[10px] font-semibold border"
-          style={{
-            borderColor: "hsl(var(--hairline))",
-            background: "hsl(var(--surface))",
-            color: "hsl(var(--ink))",
-          }}
-          title={collapsed ? "Zahlenfeld ausklappen" : "Zahlenfeld einklappen"}
-        >
-          {collapsed ? "123 ▸" : "▾"}
-        </button>
-      </div>
-      {!collapsed && (
-        <div className="grid grid-cols-3 gap-1.5">
-          {keys.map((k) => (
-            <button
-              key={k}
-              type="button"
-              tabIndex={-1}
-              onPointerDown={press(k)}
-              onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
-              className="h-10 rounded-md text-sm font-semibold border"
-              style={{
-                borderColor: "hsl(var(--hairline))",
-                background: "hsl(var(--surface))",
-                color: "hsl(var(--ink))",
-                touchAction: "none",
-              }}
-            >
-              {k}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
 
 
 /**
