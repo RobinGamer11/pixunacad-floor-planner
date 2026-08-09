@@ -124,8 +124,12 @@ export function TabletAidWheel() {
       <WheelButton angle={-90} size={size} label="ENTER" tooltip="Bestätigen: setzt Punkt am Cursor (bzw. Enter-Taste in Eingabefeldern)"
         onTap={() => {
           const el = document.activeElement as HTMLElement | null;
-          const inField = !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || (el as any).isContentEditable);
+          const isPrimer = !!el?.hasAttribute?.("data-virtual-primer");
+          const inField = !isPrimer && !!el &&
+            (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || (el as any).isContentEditable);
           if (inField) { virtualKeyPress("Enter", el); return; }
+          // Fokus in unserem unsichtbaren Primer-Feld darf ENTER nicht schlucken.
+          if (isPrimer) { try { el?.blur(); } catch {} }
           // Textwerkzeug: Tastatur schon in der echten Geste "vorwärmen",
           // damit sie nach dem Setzen der Textbox automatisch offen ist.
           if ((window as any).__pixunaActiveTool === "text") primeTabletKeyboard();
