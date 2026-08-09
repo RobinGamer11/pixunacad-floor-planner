@@ -169,6 +169,39 @@ export function virtualKeyPress(name: "Escape" | "Delete" | "Enter" | "Backspace
   }, 20);
 }
 
+/**
+ * iPadOS öffnet die Tastatur nur, wenn der Fokus INNERHALB einer echten
+ * Nutzer-Geste gesetzt wird. Beim Textwerkzeug entsteht das Eingabefeld aber
+ * erst asynchron (Render-Loop). Deshalb wird hier bereits während des
+ * Rad-Taps ein unsichtbares Eingabefeld fokussiert — die Tastatur öffnet sich
+ * sofort und bleibt offen, wenn der Fokus danach an den Text-Editor übergeht.
+ */
+let _primer: HTMLInputElement | null = null;
+export function primeTabletKeyboard() {
+  if (typeof document === "undefined") return;
+  if (!_primer) {
+    const inp = document.createElement("input");
+    inp.type = "text";
+    inp.setAttribute("aria-hidden", "true");
+    inp.tabIndex = -1;
+    Object.assign(inp.style, {
+      position: "fixed",
+      left: "0px",
+      bottom: "0px",
+      width: "1px",
+      height: "1px",
+      opacity: "0.001",
+      border: "none",
+      padding: "0",
+      fontSize: "16px",
+      zIndex: "-1",
+    } as CSSStyleDeclaration);
+    document.body.appendChild(inp);
+    _primer = inp;
+  }
+  try { _primer.focus({ preventScroll: true }); } catch {}
+}
+
 /** Setzt Input-Value über React's nativen Setter, damit React onChange sieht. */
 function setNativeValue(el: HTMLInputElement | HTMLTextAreaElement, value: string) {
   const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
