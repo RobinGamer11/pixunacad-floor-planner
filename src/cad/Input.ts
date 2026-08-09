@@ -56,6 +56,9 @@ export class Input {
 
 
   clicked = false;
+  /** Echter Stift-/Finger-Kontakt, der vom Tablet-Gate abgefangen wurde. */
+  tabletTapped = false;
+  private _tabletTapQueued = false;
   rightClicked = false;
   doubleClicked = false;
   wheelDelta = 0;
