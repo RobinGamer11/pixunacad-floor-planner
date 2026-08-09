@@ -10,7 +10,6 @@ const STYLE_OPTIONS: { value: LineStyle; label: string }[] = [
   { value: "dashdot", label: "Punkt-Strich" },
   { value: "dotted", label: "Punkte" },
   { value: "pencil", label: "Bleistift" },
-  { value: "pencil", label: "Bleistift" },
   { value: "brush", label: "Pinsel" },
   { value: "marker", label: "Marker" },
   { value: "calligraphy", label: "Kalligrafie" },
@@ -21,9 +20,10 @@ const STYLE_OPTIONS: { value: LineStyle; label: string }[] = [
   { value: "image", label: "Bild-Stempel" },
 ];
 
-interface Props { app: CadApp | MiniCad | null; }
+interface Props { app: CadApp | MiniCad | null; units?: "cm" | "m"; }
 
-export const FreeDrawSettingsPanel: React.FC<Props> = ({ app }) => {
+export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm" }) => {
+
   const [color, setColor] = useState("#111111");
   const [thickness, setThickness] = useState(0.03);
   const [opacity, setOpacity] = useState(1);
