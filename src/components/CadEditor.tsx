@@ -21,6 +21,7 @@ import { ToolHelpNotes } from "@/components/cad/ToolHelpNotes";
 import { RasterModeToggle } from "@/components/cad/RasterModeToggle";
 
 import { DocumentFilterPanel } from "@/components/cad/DocumentFilterPanel";
+import { DocumentPixelModeToggle } from "@/components/cad/DocumentPixelModeToggle";
 import { WarpSection } from "@/components/page/CadDocumentInspector";
 
 const CAD_TOOLS = [
