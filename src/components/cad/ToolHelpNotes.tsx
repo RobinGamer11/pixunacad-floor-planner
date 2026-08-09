@@ -16,7 +16,6 @@ const GLOBAL_HINTS: string[] = [
 
 const TOOL_HINTS: Record<string, string[]> = {
   select: [
-    "Shift+Klick oder Shift+Rahmen: mehrere Objekte zur Auswahl hinzufügen",
     "Shift+Klick auf einen Fangpunkt der Auswahl: Ankerpunkt setzen — daneben erscheinen Verschieben und Drehen",
     "Gedrehte/verschobene Gruppen rasten am Ankerpunkt an fremder Geometrie ein",
     "R: ausgewähltes Objekt bzw. Gruppe drehen · Häkchen oder Enter bestätigt",
