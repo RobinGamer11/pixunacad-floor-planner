@@ -312,6 +312,8 @@ export class Input {
     this.doubleClicked = false;
     this.tabletTapped = this._tabletTapQueued;
     this._tabletTapQueued = false;
+    // Vorerfasster Punkt: Stift-Kontakt im Gate → LMB im Rad leuchtet.
+    if (this.tabletTapped) setLmbHint(true);
 
     if (this._dblQueued) {
       this.doubleClicked = true;
@@ -325,7 +327,9 @@ export class Input {
       this.rightClicked = true;
       this._rightQueued = false;
     }
+    if (this.clicked || this.doubleClicked) setLmbHint(false);
   }
+
 
   endFrame() {
     this.wheelDelta = 0;
