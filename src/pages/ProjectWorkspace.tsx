@@ -5786,7 +5786,7 @@ function LineSettings({
       <Row label="Farbe">
         <ColorInput value={settings.color} onChange={(v) => onChange({ color: v })} />
       </Row>
-      <Row label="Stärke (mm)">
+      <Row label="Liniendicke (mm)">
         <input
           type="number"
           step={0.1}
