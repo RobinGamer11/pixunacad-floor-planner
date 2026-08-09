@@ -2951,7 +2951,30 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           {!!docSelected && (activeTool === ToolIds.SELECT || (activeTool === ToolIds.DOCUMENT && (docToolPhase === "scale-pick-1" || docToolPhase === "scale-pick-2" || docToolPhase === "scale-await-input" || docToolPhase === "warp"))) && (
             <div className="cad-settings-panel mb-2">
               <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Dokument-Eigenschaften</div>
+              {/* Ebene des ausgewählten Bildes/PDFs — wie bei allen anderen Objekten. */}
+              <label className="block text-xs mb-3">
+                <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Ebene (Auswahl)</span>
+                <select
+                  key={docLabelTick}
+                  value={appRef.current?.scene.getDocumentById(docSelected.id)?.labelId ?? ""}
+                  onChange={(e) => {
+                    const app = appRef.current;
+                    const doc = app?.scene.getDocumentById(docSelected.id);
+                    if (!app || !doc) return;
+                    doc.labelId = e.target.value;
+                    app.refreshLabelUI();
+                    app.renderer.render();
+                    setDocLabelTick((x) => x + 1);
+                  }}
+                  className="cad-settings-select w-full"
+                >
+                  {(appRef.current?.labelManager.list() ?? []).map((l: any) => (
+                    <option key={l.id} value={l.id}>{l.name}</option>
+                  ))}
+                </select>
+              </label>
               <div className="space-y-3">
+
                 <div className="text-xs">
                   <div className="font-medium truncate" title={docSelected.name}>{docSelected.name}</div>
                   <div style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
