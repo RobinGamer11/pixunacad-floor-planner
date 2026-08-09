@@ -12,6 +12,7 @@ import { Maximize2, Ruler as RulerIcon } from "lucide-react";
 import type { MiniCad } from "@/cad/embed/MiniCad";
 import { SelectionType } from "@/cad/constants";
 import { DocumentFilterPanel } from "@/components/cad/DocumentFilterPanel";
+import { DocumentPixelModeToggle } from "@/components/cad/DocumentPixelModeToggle";
 
 interface Props {
   engine: MiniCad | null;
@@ -192,7 +193,10 @@ export function CadDocumentInspector({ engine }: Props) {
         </div>
       </div>
 
+      <DocumentPixelModeToggle app={engine as any} docId={sel.id} />
+
       <WarpSection engine={engine} docId={sel.id} />
+
 
       <DocumentFilterPanel app={engine as any} docId={sel.id} sig={filterSig} showBgRemove={false} />
 
