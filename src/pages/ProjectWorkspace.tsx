@@ -4609,6 +4609,11 @@ function ElementView({
               if (hubMode && anchorFracRef.current?.key === key) {
                 e.stopPropagation();
                 e.preventDefault();
+                if (!!(window as any).__pixunaTabletCommit) {
+                  modeStartClientRef.current = null;
+                  setCarrying(true);
+                  return;
+                }
                 actionCommitRef.current?.();
                 return;
               }
@@ -5466,7 +5471,7 @@ function ToolsTab({
         />
       )}
       {settingsTool === "line" && cadEngine && (
-        <RasterModeToggle app={cadEngine} />
+        <RasterModeToggle app={cadEngine} projectId={projectId} />
       )}
       {settingsTool === "line" && (
         <LineSettings
@@ -5500,7 +5505,7 @@ function ToolsTab({
       )}
 
       {settingsTool === "text" && cadEngine && (
-        <RasterModeToggle app={cadEngine} />
+        <RasterModeToggle app={cadEngine} projectId={projectId} />
       )}
       {settingsTool === "text" && (
         <TextSettings

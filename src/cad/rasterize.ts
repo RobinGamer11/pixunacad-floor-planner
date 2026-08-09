@@ -41,9 +41,8 @@ function boundsOfPoints(pts: { x: number; y: number }[]) {
 }
 
 /**
- * Ziel-Auflösung: deutliches Supersampling gegenüber dem Bildschirm, mindestens
- * 1200 dpi bezogen auf den Plan-Maßstab — damit Pixelobjekte beim Zoomen fast
- * so scharf wirken wie Vektoren.
+ * Ziel-Auflösung aus den projektweiten Pixel-Einstellungen. Optionales
+ * Supersampling erhöht die Renderauflösung vor dem verlustfreien PNG-Zuschnitt.
  */
 function targetPxPerM(app: any): number {
   const camScale = Math.max(1, app?.camera?.scale || 80);
@@ -53,9 +52,13 @@ function targetPxPerM(app: any): number {
     const den = app?.getActiveSheetScaleDenom?.() ?? app?.planScaleDenom ?? app?.scaleDenom;
     if (typeof den === "number" && den > 0) scaleDenom = den;
   } catch { /* Default beibehalten */ }
-  // 1200 dpi → 47244 px pro Papiermeter; 1 Weltmeter = 1000/scaleDenom mm Papier.
-  const minDpiPxPerM = (1200 / 25.4) * (1000 / scaleDenom);
-  return Math.max(camScale * dpr * 4, minDpiPxPerM, 600);
+  const configuredDpi = Math.max(600, Math.min(2400, Number(app?.pixelRenderDpi) || 1200));
+  const ss = app?.pixelSupersampling
+    ? (app?.pixelSupersamplingFactor === 4 ? 4 : 2)
+    : 1;
+  // DPI → Pixel pro Papiermeter; 1 Weltmeter = 1000/scaleDenom mm Papier.
+  const dpiPxPerM = (configuredDpi / 25.4) * (1000 / scaleDenom) * ss;
+  return Math.max(camScale * dpr * ss, dpiPxPerM, 600);
 }
 
 function worldBounds(app: any, input: RasterInput): { x: number; y: number; w: number; h: number } | null {

@@ -218,6 +218,10 @@ export class CadApp {
   /** Zeichenmodus: "vector" (parametrisch) oder "pixel" (Objekt wird beim
    *  Fertigstellen zu einem Bild gerastert — wie in Malprogrammen). */
   defaultDrawRasterMode: "vector" | "pixel" = "vector";
+  /** Projektweite Rasterqualität für neu fertiggestellte Pixelobjekte. */
+  pixelRenderDpi = 1200;
+  pixelSupersampling = false;
+  pixelSupersamplingFactor: 2 | 4 = 2;
 
 
 

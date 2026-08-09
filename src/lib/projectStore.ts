@@ -258,6 +258,11 @@ export interface ProjectSettings {
    *  der aktuellsten Szene des referenzierten Zeichenblatts. Wenn false,
    *  werden Änderungen erst nach Klick auf „Ansicht aktualisieren" sichtbar. */
   cadAutoUpdate?: boolean;
+  /** Zielauflösung für neu erzeugte Pixelobjekte. */
+  pixelRenderDpi?: number;
+  /** Optionales zusätzliches Supersampling vor dem PNG-Zuschnitt. */
+  pixelSupersampling?: boolean;
+  pixelSupersamplingFactor?: 2 | 4;
 }
 
 export interface Project {

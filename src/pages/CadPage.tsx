@@ -194,6 +194,11 @@ const CadPage = () => {
   // fängt Maus-Events, damit die CAD-Tools nicht mitlaufen.
   const onFramePointerDown = (e: React.PointerEvent) => {
     if (sheetPdfMode !== "frame" || !frameArmed) return;
+    // Im Stift-Modus zeichnet ausschließlich der Pencil den Rahmen. Finger
+    // bleiben für Pan/Pinch auf dem darunterliegenden CAD-Canvas reserviert.
+    if (!!(window as any).__pixunaPenOnly && e.pointerType === "touch") return;
+    e.preventDefault();
+    e.stopPropagation();
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     setFrameStart({ x: e.clientX, y: e.clientY });
     setFrameRect({ x: e.clientX, y: e.clientY, w: 0, h: 0 });
@@ -202,6 +207,8 @@ const CadPage = () => {
 
   const onFramePointerMove = (e: React.PointerEvent) => {
     if (!dragging || !frameStart) return;
+    e.preventDefault();
+    e.stopPropagation();
     const x = Math.min(frameStart.x, e.clientX);
     const y = Math.min(frameStart.y, e.clientY);
     const w = Math.abs(e.clientX - frameStart.x);
@@ -210,6 +217,8 @@ const CadPage = () => {
   };
   const onFramePointerUp = (e: React.PointerEvent) => {
     if (!dragging) return;
+    e.preventDefault();
+    e.stopPropagation();
     setDragging(false);
     setFrameArmed(false); // Nach Aufziehen automatisch entwaffnen → Pan/Zoom wieder normal.
     try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch {}
@@ -246,7 +255,13 @@ const CadPage = () => {
         onToggleTabletAid={() => setTabletAidOn((v) => !v)}
         onExport={() => editorRef.current?.openExportPanel()}
       />
-      <main ref={mainRef} className="flex-1 relative min-h-0 bg-background">
+      <main
+        ref={mainRef}
+        className="flex-1 relative min-h-0 bg-background"
+        onPointerDownCapture={frameArmed ? onFramePointerDown : undefined}
+        onPointerMoveCapture={frameArmed ? onFramePointerMove : undefined}
+        onPointerUpCapture={frameArmed ? onFramePointerUp : undefined}
+      >
         <CadEditor
           ref={editorRef}
           projectId={projectId}
@@ -276,11 +291,8 @@ const CadPage = () => {
             style={{
               cursor: frameArmed ? "crosshair" : "default",
               background: frameArmed ? "rgba(0,0,0,0.02)" : "transparent",
-              pointerEvents: frameArmed ? "auto" : "none",
+               pointerEvents: "none",
             }}
-            onPointerDown={onFramePointerDown}
-            onPointerMove={onFramePointerMove}
-            onPointerUp={onFramePointerUp}
           >
             {frameRect && frameRect.w > 0 && frameRect.h > 0 && (() => {
               const cRect = getCanvas()?.getBoundingClientRect();
