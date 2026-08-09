@@ -4,6 +4,8 @@
  * Kein API-Key erforderlich.
  */
 
+import { hasExternalContentConsent } from "@/lib/externalContent";
+
 export interface GeocodeResult {
   lat: number;
   lng: number;
@@ -26,6 +28,9 @@ export interface MapBackground {
 const EARTH_C = 40075016.686; // Umfang am Äquator (m)
 
 export async function geocodeAddress(address: string): Promise<GeocodeResult | null> {
+  if (!hasExternalContentConsent()) {
+    throw new Error("Aktiviere Karten- und Wetterdienste in den Datenschutzeinstellungen, um eine Adresse zu suchen.");
+  }
   const q = address.trim();
   if (!q) return null;
   const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q)}`;
@@ -75,6 +80,9 @@ export async function buildMapBackground(
   geo: { lat: number; lng: number; displayName?: string },
   radiusM: number,
 ): Promise<MapBackground> {
+  if (!hasExternalContentConsent()) {
+    throw new Error("Aktiviere Karten- und Wetterdienste in den Datenschutzeinstellungen, um Karteninhalte zu laden.");
+  }
   const targetPx = 768;
   const desiredMppx = (2 * radiusM) / targetPx;
   // Zoom, bei dem mppx ≈ desiredMppx (aufgerundet für höhere Auflösung).

@@ -2134,15 +2134,12 @@ class App{
 
 }
 
-This project was built with [Lovable](https://lovable.dev).
+## Betrieb und Deployment
 
-## Build with Lovable
-
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/19d48151-dcd4-4c45-9cd8-eaae8e5759c1).
-
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
+Die App wird mit dem eigenen Supabase-Projekt und Vercel betrieben. Die
+vollständige Einrichtung inklusive Auth, Umgebungsvariablen, Redirect-URLs,
+Datensynchronisierung und Go-live-Checkliste steht in
+[`docs/SELF_HOSTING_AND_GO_LIVE.md`](docs/SELF_HOSTING_AND_GO_LIVE.md).
 
 ## Development
 

@@ -30,15 +30,29 @@ export interface GeoHit {
   countryCode?: string;
 }
 
+type OpenMeteoGeocodeHit = {
+  latitude: number;
+  longitude: number;
+  name: string;
+  admin1?: string;
+  country?: string;
+  country_code?: string;
+};
+
+type OpenMeteoGeocodeResponse = {
+  results?: OpenMeteoGeocodeHit[];
+};
+
 export async function geocodeSearch(query: string, count = 5): Promise<GeoHit[]> {
   const q = query.trim();
   if (q.length < 2) return [];
   const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=${count}&language=de&format=json`;
   try {
     const res = await fetch(url);
-    const json = await res.json();
+    if (!res.ok) return [];
+    const json = await res.json() as OpenMeteoGeocodeResponse;
     const results = json?.results ?? [];
-    return results.map((hit: any) => ({
+    return results.map((hit) => ({
       lat: hit.latitude,
       lon: hit.longitude,
       name: hit.name,
@@ -86,12 +100,13 @@ async function fetchForecast(ort: string): Promise<WeatherResult | null> {
   return { location: geo.label, days };
 }
 
-export function useWeather(ort: string | undefined) {
+export function useWeather(ort: string | undefined, enabled = true) {
   const [data, setData] = useState<WeatherResult | null>(null);
   const [status, setStatus] = useState<"idle" | "loading" | "ok" | "empty" | "error">("idle");
 
   useEffect(() => {
     const key = (ort || "").trim().toLowerCase();
+    if (!enabled) { setStatus("idle"); setData(null); return; }
     if (!key) { setStatus("idle"); setData(null); return; }
     const cached = wxCache.get(key);
     if (cached && Date.now() - cached.at < 30 * 60 * 1000) {
@@ -111,7 +126,7 @@ export function useWeather(ort: string | undefined) {
       else { setData(r); setStatus("ok"); }
     }).catch(() => alive && setStatus("error"));
     return () => { alive = false; };
-  }, [ort]);
+  }, [enabled, ort]);
 
   return { data, status };
 }

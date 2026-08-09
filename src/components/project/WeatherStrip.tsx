@@ -1,5 +1,6 @@
 import { useWeather, weatherLabel } from "@/lib/weather";
 import { MapPin } from "lucide-react";
+import { setExternalContentConsent, useExternalContentConsent } from "@/lib/externalContent";
 
 interface Props {
   ort: string | undefined;
@@ -10,7 +11,8 @@ interface Props {
  * dezent im Karten-Look, passt zum Gold-Akzent des Projektes.
  */
 export function WeatherStrip({ ort }: Props) {
-  const { data, status } = useWeather(ort);
+  const externalContentEnabled = useExternalContentConsent();
+  const { data, status } = useWeather(ort, externalContentEnabled);
 
   if (!ort?.trim()) {
     return (
@@ -20,6 +22,17 @@ export function WeatherStrip({ ort }: Props) {
       >
         <MapPin size={13} />
         Keine Projektadresse hinterlegt — Wetter wird angezeigt, sobald eine Adresse gesetzt ist.
+      </div>
+    );
+  }
+
+  if (!externalContentEnabled) {
+    return (
+      <div className="mt-4 rounded-xl px-4 py-3 text-xs text-muted-foreground" style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}>
+        <p>Wetter ist aus Datenschutzgründen deaktiviert.</p>
+        <button type="button" onClick={() => setExternalContentConsent(true)} className="mt-2 font-medium underline underline-offset-4">
+          Wetterdienst aktivieren
+        </button>
       </div>
     );
   }

@@ -54,6 +54,8 @@ import { FileBrowser } from "@/components/project/FileBrowser";
 import { PageThumb } from "@/components/project/PageThumb";
 import { FinanceProjectOverview } from "@/components/finance/FinanceProjectOverview";
 import { geocodeSearch, type GeoHit } from "@/lib/weather";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { setExternalContentConsent, useExternalContentConsent } from "@/lib/externalContent";
 
 const Pixuna = () => (
   <span className="font-semibold tracking-tight text-base">
@@ -68,6 +70,7 @@ type DokumenteSubTab = "dateien" | "fotos";
 export default function ProjectsHome() {
   const projects = useProjects();
   const navigate = useNavigate();
+  const { signOut } = useAuth();
   const [mode, setMode] = useState<"projects" | "templates">("projects");
   const visibleProjects = useMemo(
     () => projects.filter((p) => (mode === "templates" ? p.isTemplate : !p.isTemplate)),
@@ -522,9 +525,12 @@ export default function ProjectsHome() {
 
         {/* Logout (ohne Rahmen) */}
         <button
-          onClick={() => {
-            try { sessionStorage.removeItem("pixuna.loggedIn"); } catch {}
-            navigate("/login");
+          onClick={async () => {
+            await signOut();
+            // Store-Module lesen beim Import aus localStorage. Ein Reload verhindert,
+            // dass ein nachfolgender Account noch Daten im Arbeitsspeicher des
+            // vorherigen Accounts sieht.
+            window.location.assign("/login");
           }}
           className="ml-2 h-9 w-9 flex items-center justify-center text-muted-foreground hover:text-foreground transition"
           title="Abmelden"
@@ -2257,6 +2263,7 @@ function InfosView({ project }: { project: Project }) {
 }
 
 function AddressField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const externalContentEnabled = useExternalContentConsent();
   const [query, setQuery] = useState(value);
   const [hits, setHits] = useState<GeoHit[]>([]);
   const [open, setOpen] = useState(false);
@@ -2270,14 +2277,16 @@ function AddressField({ value, onChange }: { value: string; onChange: (v: string
   // Auto-resolve current value to coordinates for the map (once, on mount / value change)
   useEffect(() => {
     let alive = true;
+    if (!externalContentEnabled) { setSelected(null); return; }
     if (!value.trim()) { setSelected(null); return; }
     geocodeSearch(value, 1).then((r) => {
       if (alive && r[0]) setSelected(r[0]);
     });
     return () => { alive = false; };
-  }, [value]);
+  }, [externalContentEnabled, value]);
 
   const runSearch = (q: string) => {
+    if (!externalContentEnabled) return;
     if (debounceRef.current) window.clearTimeout(debounceRef.current);
     debounceRef.current = window.setTimeout(async () => {
       if (q.trim().length < 2) { setHits([]); return; }
@@ -2296,7 +2305,7 @@ function AddressField({ value, onChange }: { value: string; onChange: (v: string
     onChange(h.label);
   };
 
-  const mapSrc = selected
+  const mapSrc = externalContentEnabled && selected
     ? `https://www.openstreetmap.org/export/embed.html?bbox=${selected.lon - 0.02}%2C${selected.lat - 0.01}%2C${selected.lon + 0.02}%2C${selected.lat + 0.01}&layer=mapnik&marker=${selected.lat}%2C${selected.lon}`
     : null;
 
@@ -2305,7 +2314,14 @@ function AddressField({ value, onChange }: { value: string; onChange: (v: string
       <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">
         PROJEKTADRESSE
       </div>
-      <div className="relative mt-1">
+      {!externalContentEnabled ? (
+        <div className="mt-2 rounded-md border px-3 py-3 text-xs text-muted-foreground" style={{ borderColor: "hsl(var(--hairline))" }}>
+          <p>Karten- und Ortssuche sind deaktiviert. Bei Aktivierung werden Adressangaben an Open-Meteo und Karteninhalte an OpenStreetMap übermittelt.</p>
+          <button type="button" onClick={() => setExternalContentConsent(true)} className="mt-2 font-medium underline underline-offset-4">
+            Karten- und Ortssuche aktivieren
+          </button>
+        </div>
+      ) : <div className="relative mt-1">
         <div className="flex items-center gap-2 h-9 rounded-md border px-3 bg-transparent"
              style={{ borderColor: "hsl(var(--hairline))" }}>
           <Search size={14} className="text-muted-foreground shrink-0" />
@@ -2340,7 +2356,7 @@ function AddressField({ value, onChange }: { value: string; onChange: (v: string
             ))}
           </div>
         )}
-      </div>
+      </div>}
       <div
         className="mt-2 rounded-md overflow-hidden border relative"
         style={{ borderColor: "hsl(var(--hairline))", height: 220, background: "hsl(var(--surface-muted))" }}

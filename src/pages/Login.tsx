@@ -1,13 +1,24 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { supabase } from "@/lib/supabase";
 
 export default function Login() {
   const navigate = useNavigate();
-  const [username, setUsername] = useState("");
+  const { configured, loading, session } = useAuth();
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(false);
+  const [mode, setMode] = useState<"signIn" | "signUp" | "reset">("signIn");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    if (session) navigate("/", { replace: true });
+  }, [navigate, session]);
 
   // Animated futuristic background — flowing gradient mesh + drifting particles
   useEffect(() => {
@@ -113,13 +124,47 @@ export default function Login() {
     };
   }, []);
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Auth-Vorbereitung — noch keine echte Prüfung.
+    if (!configured) {
+      setError("Die Anmeldung ist noch nicht konfiguriert.");
+      return;
+    }
+    if (!email.trim()) {
+      setError("Bitte gib deine E-Mail-Adresse ein.");
+      return;
+    }
+    if (mode !== "reset" && password.length < 8) {
+      setError("Das Passwort muss mindestens 8 Zeichen enthalten.");
+      return;
+    }
+
+    setSubmitting(true);
+    setError(null);
+    setNotice(null);
     try {
-      sessionStorage.setItem("pixuna.loggedIn", "1");
-    } catch {}
-    navigate("/", { replace: true });
+      if (mode === "signIn") {
+        await supabase.signInWithPassword(email.trim(), password, remember);
+        navigate("/", { replace: true });
+        return;
+      }
+      if (mode === "signUp") {
+        const result = await supabase.signUp(email.trim(), password, window.location.origin);
+        if (result.requiresEmailConfirmation) {
+          setNotice("Bitte bestätige deine E-Mail-Adresse über den Link, den wir dir gesendet haben.");
+          setMode("signIn");
+        } else {
+          navigate("/", { replace: true });
+        }
+        return;
+      }
+      await supabase.resetPasswordForEmail(email.trim(), `${window.location.origin}/password-reset`);
+      setNotice("Wenn ein Konto für diese E-Mail-Adresse besteht, wurde ein Link zum Zurücksetzen versendet.");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Die Anfrage konnte nicht verarbeitet werden.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -164,22 +209,24 @@ export default function Login() {
         <form onSubmit={submit} className="flex-1 flex flex-col px-10">
           <div className="space-y-3">
             <Field
-              label="Benutzername"
-              value={username}
-              onChange={setUsername}
-              type="text"
+              label="E-Mail-Adresse"
+              value={email}
+              onChange={setEmail}
+              type="email"
               autoComplete="username"
             />
-            <Field
-              label="Passwort"
-              value={password}
-              onChange={setPassword}
-              type="password"
-              autoComplete="current-password"
-            />
+            {mode !== "reset" && (
+              <Field
+                label="Passwort"
+                value={password}
+                onChange={setPassword}
+                type="password"
+                autoComplete={mode === "signUp" ? "new-password" : "current-password"}
+              />
+            )}
           </div>
 
-          <div className="mt-4 flex items-center gap-2">
+          {mode === "signIn" && <div className="mt-4 flex items-center gap-2">
             <input
               id="remember"
               type="checkbox"
@@ -195,19 +242,24 @@ export default function Login() {
             >
               Angemeldet bleiben
             </label>
-          </div>
+          </div>}
+
+          {error && <p role="alert" className="mt-4 text-sm text-destructive">{error}</p>}
+          {notice && <p role="status" className="mt-4 text-sm text-emerald-700">{notice}</p>}
 
           <div className="mt-5">
             <button
               type="submit"
+              disabled={submitting || loading}
               className="h-11 w-11 rounded-full flex items-center justify-center transition-all hover:scale-105 active:scale-95"
               style={{
                 background: "hsl(var(--ink))",
                 color: "hsl(var(--surface))",
                 boxShadow: "0 8px 24px -8px hsl(var(--ink) / 0.35)",
+                opacity: submitting || loading ? 0.6 : 1,
               }}
-              title="Einloggen"
-              aria-label="Einloggen"
+              title={mode === "signIn" ? "Einloggen" : mode === "signUp" ? "Konto erstellen" : "Link anfordern"}
+              aria-label={mode === "signIn" ? "Einloggen" : mode === "signUp" ? "Konto erstellen" : "Link anfordern"}
             >
               <ArrowRight size={18} />
             </button>
@@ -216,6 +268,7 @@ export default function Login() {
           <div className="mt-6 flex flex-col gap-1.5">
             <button
               type="button"
+              onClick={() => { setMode("reset"); setError(null); setNotice(null); }}
               className="text-[11px] uppercase tracking-[0.18em] text-left hover:opacity-70 transition-opacity"
               style={{ color: "hsl(var(--ink-soft))" }}
             >
@@ -223,11 +276,22 @@ export default function Login() {
             </button>
             <button
               type="button"
+              onClick={() => { setMode(mode === "signUp" ? "signIn" : "signUp"); setError(null); setNotice(null); }}
               className="text-[11px] uppercase tracking-[0.18em] text-left hover:opacity-70 transition-opacity"
               style={{ color: "hsl(var(--ink-soft))" }}
             >
-              Konto erstellen
+              {mode === "signUp" ? "Bereits ein Konto? Anmelden" : "Konto erstellen"}
             </button>
+            {mode === "reset" && (
+              <button
+                type="button"
+                onClick={() => { setMode("signIn"); setError(null); setNotice(null); }}
+                className="text-[11px] uppercase tracking-[0.18em] text-left hover:opacity-70 transition-opacity"
+                style={{ color: "hsl(var(--ink-soft))" }}
+              >
+                Zurück zur Anmeldung
+              </button>
+            )}
           </div>
 
           <div className="flex-1" />
@@ -235,7 +299,11 @@ export default function Login() {
             className="pb-6 text-[10px] uppercase tracking-[0.2em]"
             style={{ color: "hsl(var(--ink-soft))", opacity: 0.6 }}
           >
-            © PixunaCAD
+            <span>© PixunaCAD</span>
+            <span className="mx-2">·</span>
+            <Link to="/impressum" className="hover:opacity-70">Impressum</Link>
+            <span className="mx-2">·</span>
+            <Link to="/datenschutz" className="hover:opacity-70">Datenschutz</Link>
           </div>
         </form>
       </div>
