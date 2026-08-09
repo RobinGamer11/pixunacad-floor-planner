@@ -74,6 +74,7 @@ const CadPage = () => {
   // Button ("Rahmen ziehen"). Nach dem PointerUp wird das Werkzeug wieder
   // entwaffnet, damit Pan/Zoom sofort weitergehen.
   const [frameArmed, setFrameArmed] = useState(false);
+  const frameStylusTouchIdRef = useRef<number | null>(null);
 
 
   const [presenting, setPresenting] = useState(false);
@@ -224,6 +225,50 @@ const CadPage = () => {
     try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch {}
   };
 
+  // iPadOS meldet den Apple Pencil je nach Safari-Version teilweise als
+  // Touch statt PointerType "pen". touchType="stylus" hält ihn trotzdem vom
+  // Finger-Pan getrennt: Pencil zieht den Rahmen, echte Finger navigieren.
+  const stylusTouch = (touches: TouchList): Touch | null => {
+    for (const touch of Array.from(touches)) {
+      if ((touch as any).touchType === "stylus") return touch;
+    }
+    return null;
+  };
+  const onFrameTouchStart = (e: React.TouchEvent) => {
+    if (sheetPdfMode !== "frame" || !frameArmed || !(window as any).__pixunaPenOnly) return;
+    const touch = stylusTouch(e.changedTouches);
+    if (!touch) return;
+    e.preventDefault();
+    e.stopPropagation();
+    frameStylusTouchIdRef.current = touch.identifier;
+    setFrameStart({ x: touch.clientX, y: touch.clientY });
+    setFrameRect({ x: touch.clientX, y: touch.clientY, w: 0, h: 0 });
+    setDragging(true);
+  };
+  const onFrameTouchMove = (e: React.TouchEvent) => {
+    const id = frameStylusTouchIdRef.current;
+    if (id === null || !dragging || !frameStart) return;
+    const touch = Array.from(e.changedTouches).find((item) => item.identifier === id);
+    if (!touch) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setFrameRect({
+      x: Math.min(frameStart.x, touch.clientX),
+      y: Math.min(frameStart.y, touch.clientY),
+      w: Math.abs(touch.clientX - frameStart.x),
+      h: Math.abs(touch.clientY - frameStart.y),
+    });
+  };
+  const onFrameTouchEnd = (e: React.TouchEvent) => {
+    const id = frameStylusTouchIdRef.current;
+    if (id === null || !Array.from(e.changedTouches).some((item) => item.identifier === id)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    frameStylusTouchIdRef.current = null;
+    setDragging(false);
+    setFrameArmed(false);
+  };
+
 
   useEffect(() => {
     // Beim Moduswechsel Rahmen zurücksetzen.
@@ -261,6 +306,10 @@ const CadPage = () => {
         onPointerDownCapture={frameArmed ? onFramePointerDown : undefined}
         onPointerMoveCapture={frameArmed ? onFramePointerMove : undefined}
         onPointerUpCapture={frameArmed ? onFramePointerUp : undefined}
+        onTouchStartCapture={frameArmed ? onFrameTouchStart : undefined}
+        onTouchMoveCapture={frameArmed ? onFrameTouchMove : undefined}
+        onTouchEndCapture={frameArmed ? onFrameTouchEnd : undefined}
+        onTouchCancelCapture={frameArmed ? onFrameTouchEnd : undefined}
       >
         <CadEditor
           ref={editorRef}
