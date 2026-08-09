@@ -121,6 +121,17 @@ export class HatchTool {
   }
 
   finish() { this.cancel(); }
+  /** ENTER: laufende Kontur abschließen und Schraffur erzeugen. */
+  finishFromKey(): boolean {
+    if (this.drawMode === "polygon" && this.state === "drawing") {
+      if (this.points.length >= 3) { this._finishAndCreateHatch(this.points.slice()); return true; }
+      this.finish();
+      return true;
+    }
+    if (this.drawMode === "rectangle" && this.rectState !== "idle") { this.finish(); return true; }
+    return false;
+  }
+
   isDrawing() { return this.state === "drawing" || this.rectState !== "idle" || this.circleState !== "idle"; }
   resetGuides() { this.guideAnchors = []; this.parallelGuideSegments = []; }
 
