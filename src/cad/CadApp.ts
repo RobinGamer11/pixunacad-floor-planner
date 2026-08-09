@@ -2900,6 +2900,7 @@ export class CadApp {
       this.renderer.render();
       this.globalGuides.draw(this.ctx, this.camera, this.renderer.vw, this.renderer.vh);
       if (this.pastePreviewActive) this._drawPastePreview(this.ctx);
+      this._drawPendingPointHint(this.ctx);
       this.input.endFrame();
     } catch (err) {
       console.error("CAD tick error:", err);
