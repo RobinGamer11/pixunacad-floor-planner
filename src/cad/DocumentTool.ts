@@ -29,8 +29,12 @@ export class DocumentTool {
 
   phase: Phase = "idle";
 
-  /** Pending Dokument (während "placing"), wird beim Klick in die Scene committet. */
+  /** Pending Dokument (während "placing"), wird beim ENTER in die Scene committet. */
   pendingDoc: { src: string; widthM: number; heightM: number; pixelWidth: number; pixelHeight: number; name: string; kind: "image" | "pdf-page"; pageIndex: number; importScaleDenom: number; pdfSourceB64?: string | null } | null = null;
+
+  /** Per Linksklick gesetzte Position (Vorschau friert dort ein). ENTER platziert final. */
+  placedPos: Vec2 | null = null;
+
 
   /** Aktueller Maßstabs-Workflow-State. */
   scaleTargetDocId: string | null = null;
@@ -62,6 +66,7 @@ export class DocumentTool {
     if (this.phase === "scale-pick-2" || this.phase === "scale-pick-3") this.app.hub.hide();
     this.phase = "idle";
     this.pendingDoc = null;
+    this.placedPos = null;
     this.scaleTargetDocId = null;
     this.scalePoint1 = null;
     this.scalePoint2 = null;
@@ -155,10 +160,47 @@ export class DocumentTool {
   /** Externe API: nach erfolgreichem Datei-Import wird das Dokument zur Maus-Platzierung übergeben. */
   beginPlacement(opts: { src: string; widthM: number; heightM: number; pixelWidth: number; pixelHeight: number; name: string; kind: "image" | "pdf-page"; pageIndex: number; importScaleDenom: number; pdfSourceB64?: string | null }) {
     this.pendingDoc = opts;
+    this.placedPos = null;
     this.phase = "placing";
     this.app.clearSelection();
     this.onPhaseChange?.();
   }
+
+  /** ENTER: platziert das schwebende Dokument endgültig (Bild/PDF/JPG).
+   *  Ohne vorherigen Linksklick wird die aktuelle Cursor-/Snap-Position genutzt. */
+  finishFromKey(): boolean {
+    if (this.phase !== "placing" || !this.pendingDoc) return false;
+    const pending = this.pendingDoc;
+    const target = this.placedPos
+      ?? (this.scaleSnap ? v(this.scaleSnap.world.x, this.scaleSnap.world.y)
+        : v(this.app.input.mouse.wx, this.app.input.mouse.wy));
+    const doc = this.app.scene.createDocument({
+      name: pending.name,
+      kind: pending.kind,
+      src: pending.src,
+      pageIndex: pending.pageIndex,
+      position: v(target.x - pending.widthM / 2, target.y - pending.heightM / 2),
+      widthM: pending.widthM,
+      heightM: pending.heightM,
+      pixelWidth: pending.pixelWidth,
+      pixelHeight: pending.pixelHeight,
+      labelId: this.app.activeDrawLabelId,
+      importScaleDenom: pending.importScaleDenom,
+      pdfSourceB64: pending.pdfSourceB64 || null,
+    });
+    this.pendingDoc = null;
+    this.placedPos = null;
+    this.phase = "idle";
+    this.scaleSnap = null;
+    this.app.refreshLabelUI();
+    this.onPhaseChange?.();
+    // Direkt weiterbearbeiten: zurück zum Auswahl-Werkzeug.
+    this.app.setTool("select");
+    this.app.setSelection({ type: SelectionType.DOCUMENT, documentId: doc.id } as any);
+    return true;
+  }
+
+
 
 
   /** Externe API: leitet den 3-Punkt-Skaliervorgang für ein bestimmtes Dokument ein. */
@@ -300,35 +342,17 @@ export class DocumentTool {
     if (this.phase === "placing") {
       const snap = this.app.topology.findBestSnap(v(input.mouse.sx, input.mouse.sy), v(input.mouse.wx, input.mouse.wy));
       this.scaleSnap = snap;
+      // Linksklick SETZT die Position (Vorschau friert dort ein) — ein weiterer
+      // Klick verschiebt sie. Erst ENTER platziert das Dokument endgültig.
       if (input.clicked && this.pendingDoc) {
         const target = snap ? snap.world : v(input.mouse.wx, input.mouse.wy);
-        const doc = this.app.scene.createDocument({
-          name: this.pendingDoc.name,
-          kind: this.pendingDoc.kind,
-          src: this.pendingDoc.src,
-          pageIndex: this.pendingDoc.pageIndex,
-          position: v(target.x - this.pendingDoc.widthM / 2, target.y - this.pendingDoc.heightM / 2),
-          widthM: this.pendingDoc.widthM,
-          heightM: this.pendingDoc.heightM,
-          pixelWidth: this.pendingDoc.pixelWidth,
-          pixelHeight: this.pendingDoc.pixelHeight,
-          labelId: this.app.activeDrawLabelId,
-          importScaleDenom: this.pendingDoc.importScaleDenom,
-          pdfSourceB64: this.pendingDoc.pdfSourceB64 || null,
-        });
-        this.pendingDoc = null;
-        this.phase = "idle";
-        this.scaleSnap = null;
-        this.app.refreshLabelUI();
+        this.placedPos = v(target.x, target.y);
         this.onPhaseChange?.();
-        // Nach dem Platzieren automatisch zurück zum Auswahl-Werkzeug wechseln,
-        // damit ein weiterer Canvas-Klick nicht versehentlich das Dokument erneut platziert
-        // und der User direkt via SelectTool das Dokument bearbeiten kann.
-        this.app.setTool("select");
-        this.app.setSelection({ type: SelectionType.DOCUMENT, documentId: doc.id } as any);
+        this.app.renderer.render();
       }
       return;
     }
+
 
     if (this.phase === "scale-pick-1") {
       this.scaleSnap = this.app.topology.findBestSnap(v(input.mouse.sx, input.mouse.sy), v(input.mouse.wx, input.mouse.wy));
@@ -475,14 +499,16 @@ export class DocumentTool {
   private _drawOverlay(ctx: CanvasRenderingContext2D, cam: any) {
     // Pending Dokument als halbtransparentes Rechteck unter dem Cursor zeigen
     if (this.phase === "placing" && this.pendingDoc) {
-      const center = this.scaleSnap ? this.scaleSnap.world : v(this.app.input.mouse.wx, this.app.input.mouse.wy);
+      const center = this.placedPos
+        ? this.placedPos
+        : (this.scaleSnap ? this.scaleSnap.world : v(this.app.input.mouse.wx, this.app.input.mouse.wy));
       const x = center.x - this.pendingDoc.widthM / 2;
       const y = center.y - this.pendingDoc.heightM / 2;
       const tl = cam.worldToScreen(x, y);
       const br = cam.worldToScreen(x + this.pendingDoc.widthM, y + this.pendingDoc.heightM);
       ctx.save();
-      ctx.fillStyle = "rgba(77,163,255,0.15)";
-      ctx.strokeStyle = "rgba(77,163,255,0.85)";
+      ctx.fillStyle = this.placedPos ? "rgba(212,175,55,0.15)" : "rgba(77,163,255,0.15)";
+      ctx.strokeStyle = this.placedPos ? "rgba(212,175,55,0.95)" : "rgba(77,163,255,0.85)";
       ctx.lineWidth = 1.8;
       ctx.setLineDash([6, 4]);
       ctx.beginPath();
@@ -493,9 +519,13 @@ export class DocumentTool {
       ctx.fillStyle = "rgba(0,0,0,0.6)";
       ctx.font = "12px system-ui";
       ctx.textBaseline = "bottom";
-      ctx.fillText(this.pendingDoc.name, tl.x + 6, tl.y - 4);
+      ctx.fillText(
+        this.placedPos ? `${this.pendingDoc.name} — Enter platziert final` : this.pendingDoc.name,
+        tl.x + 6, tl.y - 4,
+      );
       ctx.restore();
     }
+
 
     // Verzerren: Quad + Eck-Handles
     if (this.phase === "warp" && this.warpTargetDocId) {

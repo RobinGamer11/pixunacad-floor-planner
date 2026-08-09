@@ -2066,6 +2066,12 @@ export class CadApp {
         if (this.lineTool.isDrawing()) { e.preventDefault(); this.lineTool.finish(); return; }
       }
 
+      // ENTER platziert ein schwebendes Dokument (PNG/JPG/PDF) endgültig.
+      if (e.key === "Enter" && this.activeTool === this.documentTool && !isHubInput) {
+        if (this.documentTool.finishFromKey()) { e.preventDefault(); return; }
+      }
+
+
       if (e.key === "Enter" && this.activeTool === this.wallTool && !isHubInput) {
         if (this.wallTool.isDrawing?.()) { e.preventDefault(); this.wallTool.finish(); return; }
       }

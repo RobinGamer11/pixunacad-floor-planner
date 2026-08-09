@@ -318,6 +318,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const [stickerEditOverlay, setStickerEditOverlay] = useState<{ id: string; x: number; y: number } | null>(null);
 
   // Document import state
+  const [docLabelTick, setDocLabelTick] = useState(0);
   const docFileInputRef = useRef<HTMLInputElement>(null);
   const [docPickerPages, setDocPickerPages] = useState<ImportedPage[] | null>(null);
   const [docPickerSelected, setDocPickerSelected] = useState<Set<number>>(new Set());
@@ -2521,7 +2522,29 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           {activeTool === ToolIds.DOCUMENT && (
             <div className="cad-settings-panel mb-2">
               <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Dokument importieren</div>
+              {/* Ebene wie bei allen anderen Werkzeugen ganz oben: bestimmt die
+                  Bezeichnungs-ID, in die das importierte Bild/PDF einsortiert wird. */}
+              <label className="block text-xs mb-3">
+                <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Ebene</span>
+                <select
+                  key={docLabelTick}
+                  value={appRef.current?.activeDrawLabelId ?? ""}
+                  onChange={(e) => {
+                    const app = appRef.current;
+                    if (!app) return;
+                    app.setActiveDrawLabelId(e.target.value);
+                    app.refreshLabelUI();
+                    setDocLabelTick((x) => x + 1);
+                  }}
+                  className="cad-settings-select w-full"
+                >
+                  {(appRef.current?.labelManager.list() ?? []).map((l: any) => (
+                    <option key={l.id} value={l.id}>{l.name}</option>
+                  ))}
+                </select>
+              </label>
               <div className="space-y-3">
+
                 <button
                   type="button"
                   disabled={docImporting}
@@ -2578,7 +2601,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
 
                 {docToolPhase === "placing" && (
                   <div className="rounded-md p-2 text-xs" style={{ background: "hsl(var(--primary) / 0.12)", border: "1px solid hsl(var(--primary) / 0.4)" }}>
-                    Klick auf Canvas: Dokument absetzen · Esc: abbrechen
+                    Linksklick: Position setzen · Enter: final platzieren · Esc: abbrechen
                   </div>
                 )}
 
@@ -2928,7 +2951,30 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           {!!docSelected && (activeTool === ToolIds.SELECT || (activeTool === ToolIds.DOCUMENT && (docToolPhase === "scale-pick-1" || docToolPhase === "scale-pick-2" || docToolPhase === "scale-await-input" || docToolPhase === "warp"))) && (
             <div className="cad-settings-panel mb-2">
               <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Dokument-Eigenschaften</div>
+              {/* Ebene des ausgewählten Bildes/PDFs — wie bei allen anderen Objekten. */}
+              <label className="block text-xs mb-3">
+                <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Ebene (Auswahl)</span>
+                <select
+                  key={docLabelTick}
+                  value={appRef.current?.scene.getDocumentById(docSelected.id)?.labelId ?? ""}
+                  onChange={(e) => {
+                    const app = appRef.current;
+                    const doc = app?.scene.getDocumentById(docSelected.id);
+                    if (!app || !doc) return;
+                    doc.labelId = e.target.value;
+                    app.refreshLabelUI();
+                    app.renderer.render();
+                    setDocLabelTick((x) => x + 1);
+                  }}
+                  className="cad-settings-select w-full"
+                >
+                  {(appRef.current?.labelManager.list() ?? []).map((l: any) => (
+                    <option key={l.id} value={l.id}>{l.name}</option>
+                  ))}
+                </select>
+              </label>
               <div className="space-y-3">
+
                 <div className="text-xs">
                   <div className="font-medium truncate" title={docSelected.name}>{docSelected.name}</div>
                   <div style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
