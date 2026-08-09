@@ -66,6 +66,7 @@ export class DocumentTool {
     if (this.phase === "scale-pick-2" || this.phase === "scale-pick-3") this.app.hub.hide();
     this.phase = "idle";
     this.pendingDoc = null;
+    this.placedPos = null;
     this.scaleTargetDocId = null;
     this.scalePoint1 = null;
     this.scalePoint2 = null;
