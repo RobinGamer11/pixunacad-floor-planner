@@ -20,7 +20,7 @@ export type RasterInput =
   | { type: "text"; obj: TextBox };
 
 /** Maximale Bildgröße in Pixeln (Speicherschutz). */
-const MAX_PIXELS = 16_000_000;
+const MAX_PIXELS = 48_000_000;
 
 /** true, wenn der aktuelle Zeichenmodus Pixel ist. */
 export function isPixelDrawMode(app: any): boolean {
@@ -40,17 +40,22 @@ function boundsOfPoints(pts: { x: number; y: number }[]) {
   return { minX, minY, maxX, maxY };
 }
 
-/** Ziel-Auflösung: aktueller Zoom, mindestens 300 dpi bezogen auf den Plan-Maßstab. */
+/**
+ * Ziel-Auflösung: deutliches Supersampling gegenüber dem Bildschirm, mindestens
+ * 1200 dpi bezogen auf den Plan-Maßstab — damit Pixelobjekte beim Zoomen fast
+ * so scharf wirken wie Vektoren.
+ */
 function targetPxPerM(app: any): number {
   const camScale = Math.max(1, app?.camera?.scale || 80);
+  const dpr = (typeof window !== "undefined" && window.devicePixelRatio) || 1;
   let scaleDenom = 100;
   try {
     const den = app?.getActiveSheetScaleDenom?.() ?? app?.planScaleDenom ?? app?.scaleDenom;
     if (typeof den === "number" && den > 0) scaleDenom = den;
   } catch { /* Default beibehalten */ }
-  // 300 dpi → 11811 px pro Papiermeter; 1 Weltmeter = 1000/scaleDenom mm Papier.
-  const minDpiPxPerM = (300 / 25.4) * (1000 / scaleDenom);
-  return Math.max(camScale, minDpiPxPerM, 120);
+  // 1200 dpi → 47244 px pro Papiermeter; 1 Weltmeter = 1000/scaleDenom mm Papier.
+  const minDpiPxPerM = (1200 / 25.4) * (1000 / scaleDenom);
+  return Math.max(camScale * dpr * 4, minDpiPxPerM, 600);
 }
 
 function worldBounds(app: any, input: RasterInput): { x: number; y: number; w: number; h: number } | null {
