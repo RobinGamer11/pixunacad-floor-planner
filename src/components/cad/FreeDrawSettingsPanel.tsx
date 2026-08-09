@@ -9,7 +9,7 @@ const STYLE_OPTIONS: { value: LineStyle; label: string }[] = [
   { value: "dashed", label: "Gestrichelt" },
   { value: "dashdot", label: "Punkt-Strich" },
   { value: "dotted", label: "Punkte" },
-  { value: "ink", label: "Tinte" },
+  { value: "pencil", label: "Bleistift" },
   { value: "pencil", label: "Bleistift" },
   { value: "brush", label: "Pinsel" },
   { value: "marker", label: "Marker" },
