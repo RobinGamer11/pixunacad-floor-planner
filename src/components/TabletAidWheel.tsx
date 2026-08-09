@@ -131,7 +131,7 @@ export function TabletAidWheel() {
           if ((window as any).__pixunaActiveTool === "text") primeTabletKeyboard();
           // Laufende Fangpunkt-Aktion (Verschieben/Drehen …) wird per Enter
           // final bestätigt — sonst setzt Enter wie bisher einen Punkt.
-          if ((window as any).__pixunaSkipFirstDraw) virtualKeyPress("Enter");
+          if ((window as any).__pixunaSkipFirstDraw || (window as any).__pixunaDocumentTransformActive) virtualKeyPress("Enter");
           else virtualMouseClick(0);
         }}
         icon={<Check size={18} />} />

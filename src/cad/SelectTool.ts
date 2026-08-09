@@ -38,6 +38,9 @@ export class SelectTool {
   enterCommitRequested = false;
   /** Tablet: Funktion aktiviert, wartet auf erneutes Antippen des Fangpunkts. */
   tabletArmPending = false;
+  /** Tablet: Dokument-Funktion gewählt; der nächste Stift-Tap muss erst einen
+   * Fangpunkt als Transformationsanker wählen. Danach läuft nur die Vorschau. */
+  documentHubTabletArmed = false;
   private _prevEditActive = false;
   editTarget: EditTarget | null = null;
 
@@ -622,9 +625,31 @@ export class SelectTool {
 
   /** ENTER (z. B. Tablet-Hilfsrad) bestätigt die laufende Fangpunkt-Aktion. */
   requestEnterCommit(): boolean {
+    if (this.app.documentHubMode !== "none" && this.app.documentHubState.visible && !this.documentHubTabletArmed) {
+      this.enterCommitRequested = true;
+      return true;
+    }
     if (!this.activeEditAction) return false;
     this.enterCommitRequested = true;
     return true;
+  }
+
+  /** Nächster sichtbarer Dokument-Fangpunkt am Stift. */
+  private _hitDocumentAnchor(doc: any, input: Input, tolPx = 16): Vec2 | null {
+    const candidates = [
+      ...documentCornersWorld(doc),
+      ...documentEdgeMidpointsWorld(doc),
+      ...documentAnchorsWorld(doc),
+      documentCenterWorld(doc),
+    ];
+    let best: Vec2 | null = null;
+    let bestPx = tolPx;
+    for (const p of candidates) {
+      const s = this.app.camera.worldToScreen(p.x, p.y);
+      const d = Math.hypot(s.x - input.mouse.sx, s.y - input.mouse.sy);
+      if (d <= bestPx) { bestPx = d; best = v(p.x, p.y); }
+    }
+    return best;
   }
 
   isEditing() { return !!this.activeEditAction || this.groupRotateActive || this.groupDragActive || this.groupAnchorActive || this.groupAnchorMenu; }
@@ -1909,6 +1934,38 @@ export class SelectTool {
   update(input: Input) {
     this.app.topology.priorityWallId = this.getPriorityWallId();
 
+    // Tablet-Dokumentablauf: Nach Wahl von Verschieben/Drehen/Skalieren muss
+    // zuerst ein Fangpunkt erneut mit dem Stift gewählt werden. Reale Taps
+    // werden vom Input-Gate nur als `tabletTapped` gemeldet und committen nie.
+    if (this.app.documentHubMode !== "none" && this.app.documentHubState.visible) {
+      const sel = this.app.selection as any;
+      const doc = sel?.type === SelectionType.DOCUMENT
+        ? this.app.scene.getDocumentById(sel.documentId)
+        : null;
+      if (this.documentHubTabletArmed) {
+        if (doc && input.tabletTapped) {
+          const anchor = this._hitDocumentAnchor(doc, input);
+          if (anchor) {
+            const sp = this.app.camera.worldToScreen(anchor.x, anchor.y);
+            this.app.documentHubState = {
+              ...this.app.documentHubState,
+              screenX: sp.x,
+              screenY: sp.y,
+              anchorWorld: { x: anchor.x, y: anchor.y },
+            };
+            this.documentHubTabletArmed = false;
+          }
+        }
+        this.enterCommitRequested = false;
+        return;
+      }
+      // ENTER soll denselben finalen Commit-Pfad wie ein Canvas-Klick nutzen.
+      if (this.enterCommitRequested) {
+        input.clicked = true;
+        this.enterCommitRequested = false;
+      }
+    }
+
     // Hintergrund-Ausschnitt-Interaktion (aktiviert via DocumentFilterPanel).
     // Klick = Magic-Wand-Fill; Drag mit gedrückter Maustaste = Pinsel.
     if (this.app.bgRemoveInteraction) {
@@ -2766,8 +2823,11 @@ export class SelectTool {
             }
             // Modus & Hub schließen nach Commit.
             this.app.documentHubMode = "none";
+            this.documentHubTabletArmed = false;
+            try { (window as any).__pixunaDocumentTransformActive = false; } catch {}
             this.app.documentHubFirstClick = null;
             this.app.documentHubState = { visible: false, screenX: 0, screenY: 0, docId: null, cornerIndex: 0, anchorWorld: null, cropSide: null };
+            (this.app as any).commitHistorySnapshot?.();
             return;
           }
         }
@@ -3191,7 +3251,7 @@ export class SelectTool {
       const mode = this.app.documentHubMode;
       const hs = this.app.documentHubState;
       const sel = this.app.selection as any;
-      if (mode !== "none" && hs.visible && sel && sel.type === SelectionType.DOCUMENT && sel.documentId && hs.docId === sel.documentId) {
+      if (mode !== "none" && !this.documentHubTabletArmed && hs.visible && sel && sel.type === SelectionType.DOCUMENT && sel.documentId && hs.docId === sel.documentId) {
         const doc = this.app.scene.getDocumentById(sel.documentId);
         if (doc) {
           const mouseW = v(this.app.input.mouse.wx, this.app.input.mouse.wy);

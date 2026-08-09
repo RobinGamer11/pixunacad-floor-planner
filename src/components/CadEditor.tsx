@@ -418,6 +418,14 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     if (!app) return;
     app.documentHubMode = docHub.mode;
     app.documentHubFirstClick = null;
+    const tabletTransform = docHub.mode !== "none" && !!(window as any).__pixunaTabletCommit;
+    app.selectTool.documentHubTabletArmed = tabletTransform;
+    (window as any).__pixunaDocumentTransformActive = tabletTransform;
+    return () => {
+      if ((window as any).__pixunaDocumentTransformActive) {
+        (window as any).__pixunaDocumentTransformActive = false;
+      }
+    };
   }, [docHub.mode]);
 
   // Dimension-Hub-Modus an CadApp spiegeln.
