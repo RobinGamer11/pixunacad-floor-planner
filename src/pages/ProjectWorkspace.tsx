@@ -4304,7 +4304,7 @@ function ElementView({
               >
                 <Check size={16} />
               </button>
-            ) : isCadView ? (
+            ) : hubCapable ? (
               <>
                 {hubMode !== "rotate" && (
                   <button
