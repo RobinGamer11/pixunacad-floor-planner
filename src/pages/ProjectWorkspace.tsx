@@ -4372,7 +4372,11 @@ function ElementView({
                     <X size={14} />
                   </button>
                 )}
+                {!hubMode && (el.kind === "image" || el.kind === "pdf") && (
+                  <WarpHubButton elementId={el.id} />
+                )}
               </>
+
             ) : (
               <>
                 <button
