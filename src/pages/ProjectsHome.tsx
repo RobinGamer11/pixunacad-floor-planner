@@ -214,6 +214,10 @@ export default function ProjectsHome() {
   }, [filtered]);
 
   const rootProjects = projectsByFolder.get(null) ?? [];
+  const draggedProject = dragProjectId
+    ? projects.find((project) => project.id === dragProjectId)
+    : undefined;
+  const draggingProjectFromFolder = Boolean(draggedProject?.folderId);
   const projectCount = projects.filter((p) => !p.isTemplate).length;
   const canCreateProject = projectCount < MAX_PROJECTS;
 
@@ -265,12 +269,20 @@ export default function ProjectsHome() {
     setNewFolderName("");
   };
 
-  const handleDropOnFolder = (folderId: string | null) => {
-    if (dragProjectId) {
-      projectStore.moveProjectToFolder(dragProjectId, folderId);
-    }
+  const resetProjectDrag = () => {
     setDragProjectId(null);
     setDragOverFolder(null);
+    setDragOverProjectId(null);
+  };
+
+  const handleDropOnFolder = (folderId: string | null) => {
+    if (dragProjectId) {
+      const sourceFolderId = projects.find((project) => project.id === dragProjectId)?.folderId ?? null;
+      if (sourceFolderId !== folderId) {
+        projectStore.moveProjectToFolder(dragProjectId, folderId);
+      }
+    }
+    resetProjectDrag();
   };
 
   const statusColor = (s: ProfileStatus) =>
@@ -550,18 +562,25 @@ export default function ProjectsHome() {
                   className="flex-1 bg-transparent text-sm outline-none"
                   style={{ color: "#E6E8EB" }}
                 />
-                <button
-                  onClick={() => {
-                    setCreatingFolder(true);
-                    setNewFolderName("");
-                  }}
-                  title="Ordner anlegen"
-                  className="hover:opacity-100 opacity-70"
-                  style={{ color: "#8A9099" }}
-                >
-                  <FolderPlus size={14} />
-                </button>
               </div>
+              <button
+                type="button"
+                disabled={creatingFolder}
+                onClick={() => {
+                  setCreatingFolder(true);
+                  setNewFolderName("");
+                }}
+                aria-expanded={creatingFolder}
+                className="mt-2 flex h-9 w-full items-center justify-center gap-2 rounded-md border text-xs font-semibold transition disabled:cursor-default disabled:opacity-50"
+                style={{
+                  background: "hsl(var(--accent-gold) / 0.14)",
+                  borderColor: "hsl(var(--accent-gold) / 0.4)",
+                  color: "#E6E8EB",
+                }}
+              >
+                <FolderPlus size={14} style={{ color: "hsl(var(--accent-gold))" }} />
+                + Ordner
+              </button>
               {creatingFolder && (
                 <div
                   className="flex items-center gap-1 mt-2 rounded-md px-2 py-1"
@@ -719,14 +738,13 @@ export default function ProjectsHome() {
                               onSettings={() => { setHub(null); setMode("projects"); setShowAllTasks(false); setSelectedId(p.id); setSettingsOpen(true); }}
                               onDelete={() => deleteProjectWithConfirm(p)}
                               onDragStart={() => setDragProjectId(p.id)}
-                              onDragEnd={() => { setDragProjectId(null); setDragOverProjectId(null); }}
+                              onDragEnd={resetProjectDrag}
                               onDragOverCard={() => setDragOverProjectId(p.id)}
                               onDropOnCard={() => {
                                 if (dragProjectId && dragProjectId !== p.id) {
                                   projectStore.reorderProject(dragProjectId, p.id, "before");
                                 }
-                                setDragProjectId(null);
-                                setDragOverProjectId(null);
+                                resetProjectDrag();
                               }}
                             />
                           ))
@@ -740,8 +758,15 @@ export default function ProjectsHome() {
               {/* Root-Projekte (ohne Ordner) */}
               <div
                 onDragOver={(e) => { e.preventDefault(); if (!dragFolderId) setDragOverFolder("root"); }}
-                onDragLeave={() => setDragOverFolder((v) => (v === "root" ? null : v))}
-                onDrop={() => { if (!dragFolderId) handleDropOnFolder(null); }}
+                onDragLeave={(e) => {
+                  if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+                  setDragOverFolder((v) => (v === "root" ? null : v));
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (!dragFolderId) handleDropOnFolder(null);
+                }}
                 className="pt-1 space-y-1"
                 style={{
                   background:
@@ -749,6 +774,23 @@ export default function ProjectsHome() {
                   borderRadius: 6,
                 }}
               >
+                {draggingProjectFromFolder && (
+                  <div
+                    className="flex min-h-12 items-center justify-center gap-2 rounded-md border border-dashed px-3 text-center text-[11px] font-medium"
+                    style={{
+                      background: dragOverFolder === "root"
+                        ? "hsl(var(--accent-gold) / 0.16)"
+                        : "rgba(255,255,255,0.03)",
+                      borderColor: dragOverFolder === "root"
+                        ? "hsl(var(--accent-gold) / 0.75)"
+                        : "rgba(255,255,255,0.18)",
+                      color: dragOverFolder === "root" ? "#E6E8EB" : "#B7BCC2",
+                    }}
+                  >
+                    <FolderIcon size={14} style={{ color: "hsl(var(--accent-gold))" }} />
+                    Ohne Ordner ablegen
+                  </div>
+                )}
                 {rootProjects.map((p) => (
                   <ProjectCard
                     key={p.id}
@@ -760,14 +802,13 @@ export default function ProjectsHome() {
                     onSettings={() => { setHub(null); setMode("projects"); setShowAllTasks(false); setSelectedId(p.id); setSettingsOpen(true); }}
                     onDelete={() => deleteProjectWithConfirm(p)}
                     onDragStart={() => setDragProjectId(p.id)}
-                    onDragEnd={() => { setDragProjectId(null); setDragOverProjectId(null); }}
+                    onDragEnd={resetProjectDrag}
                     onDragOverCard={() => setDragOverProjectId(p.id)}
                     onDropOnCard={() => {
                       if (dragProjectId && dragProjectId !== p.id) {
                         projectStore.reorderProject(dragProjectId, p.id, "before");
                       }
-                      setDragProjectId(null);
-                      setDragOverProjectId(null);
+                      resetProjectDrag();
                     }}
                   />
                 ))}
@@ -3138,9 +3179,9 @@ function CoinsPanel({ anchor }: { anchor: React.RefObject<HTMLElement> }) {
 function ShopPanel({ anchor }: { anchor: React.RefObject<HTMLElement> }) {
   const pos = useAnchorPos(anchor, 320);
   const items = [
-    { title: "Pro-Version pro Monat", desc: "10 Projekte · je 5 GB", price: "5 Coins" },
-    { title: "Premium-Version pro Monat", desc: "20 Projekte · je 10 GB", price: "10 Coins" },
-    { title: "+1 Projekt pro Monat", desc: "1 zusätzliches Projekt · 5 GB", price: "1 Coin" },
+    { title: "Pro-Version", desc: "10 Projekte · je 5 GB", price: "5 Coins pro Monat" },
+    { title: "Premium-Version", desc: "20 Projekte · je 10 GB", price: "10 Coins pro Monat" },
+    { title: "+1 Projekt", desc: "1 zusätzliches Projekt · 5 GB", price: "1 Coin pro Monat" },
   ];
   return (
     <div
