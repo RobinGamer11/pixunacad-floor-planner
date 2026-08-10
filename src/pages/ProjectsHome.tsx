@@ -849,7 +849,16 @@ export default function ProjectsHome() {
 
         {/* Center */}
         <main className="flex-1 overflow-y-auto">
-          {showAllTasks ? (
+          {hub === "home" ? (
+            <div className="px-10 py-7">
+              <h1 className="text-2xl font-semibold tracking-tight">Hauptseite</h1>
+              <p className="mt-3 text-sm text-muted-foreground">Inhalte folgen in Kürze.</p>
+            </div>
+          ) : hub === "shared" ? (
+            <SharedView profile={profile} />
+          ) : hub === "trash" ? (
+            <TrashView activeCount={projectCount} />
+          ) : showAllTasks ? (
             <AllTasksView projects={projects} onOpenProject={(id) => { setMode("projects"); setShowAllTasks(false); setSelectedId(id); }} />
           ) : mode === "templates" && !selected ? (
             <div className="px-10 py-7">
