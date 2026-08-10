@@ -3200,3 +3200,186 @@ function GlobalCalendar({
     </div>
   );
 }
+
+/* ---------------- Münzen / Shop / Geteilt / Papierkorb ---------------- */
+
+const panelStyle: React.CSSProperties = {
+  background: "hsl(var(--surface))",
+  border: "1px solid hsl(var(--hairline))",
+  boxShadow: "0 18px 48px rgba(0,0,0,0.18)",
+};
+
+/** Münzen-Popup – Kaufoptionen sind vorbereitet, aber deaktiviert. */
+function CoinsPanel() {
+  return (
+    <div className="absolute right-0 top-11 z-50 w-72 rounded-2xl p-4" style={panelStyle}>
+      <div className="flex items-center gap-2">
+        <Coins size={16} className="text-muted-foreground" />
+        <span className="text-sm font-semibold">Münzen</span>
+        <span className="ml-auto text-sm font-semibold">26</span>
+      </div>
+      <div className="mt-3 opacity-40 pointer-events-none select-none">
+        <button
+          className="w-full h-9 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5"
+          style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
+          disabled
+        >
+          <Plus size={13} /> Coins
+        </button>
+        <div
+          className="mt-3 rounded-xl p-3 text-xs space-y-1"
+          style={{ background: "hsl(var(--surface-muted))", border: "1px solid hsl(var(--hairline))" }}
+        >
+          <div className="font-medium">Währungsumrechner</div>
+          <div className="text-muted-foreground">1 Coin = 1,50 €</div>
+          <div className="text-muted-foreground">10 Coins = 15,00 €</div>
+        </div>
+      </div>
+      <p className="mt-3 text-[11px] text-muted-foreground">Kauf von Coins ist bald verfügbar.</p>
+    </div>
+  );
+}
+
+/** Shop-Popup – Abos und Einzelkapazitäten, vollständig ausgegraut. */
+function ShopPanel() {
+  const items = [
+    { title: "Pro-Version", desc: "10 Projekte · je 5 GB", price: "5 Coins" },
+    { title: "Premium-Version", desc: "20 Projekte · je 10 GB", price: "10 Coins" },
+    { title: "+1 Projekt", desc: "1 zusätzliches Projekt · 5 GB", price: "1 Coin" },
+  ];
+  return (
+    <div className="absolute right-0 top-11 z-50 w-80 rounded-2xl p-4" style={panelStyle}>
+      <div className="flex items-center gap-2">
+        <ShoppingBag size={16} className="text-muted-foreground" />
+        <span className="text-sm font-semibold">Projektkapazitäten</span>
+      </div>
+      <div className="mt-3 space-y-2 opacity-40 pointer-events-none select-none">
+        {items.map((it) => (
+          <div
+            key={it.title}
+            className="rounded-xl p-3 flex items-center gap-3"
+            style={{ background: "hsl(var(--surface-muted))", border: "1px solid hsl(var(--hairline))" }}
+          >
+            <div className="flex-1 min-w-0">
+              <div className="text-xs font-semibold">{it.title}</div>
+              <div className="text-[11px] text-muted-foreground">{it.desc}</div>
+            </div>
+            <span className="text-xs font-semibold whitespace-nowrap">{it.price}</span>
+          </div>
+        ))}
+      </div>
+      <p className="mt-3 text-[11px] text-muted-foreground">Shop ist bald verfügbar.</p>
+    </div>
+  );
+}
+
+/** Geteilt-Ansicht: eigenes Profil oben, Kontakte darunter. */
+function SharedView({ profile }: { profile: UserProfile }) {
+  return (
+    <div className="max-w-3xl">
+      <h1 className="text-2xl font-semibold tracking-tight">Geteilt</h1>
+      <div
+        className="mt-5 rounded-2xl p-4 flex items-center gap-4"
+        style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
+      >
+        <div
+          className="h-14 w-14 rounded-full overflow-hidden shrink-0"
+          style={{ background: "hsl(var(--surface-muted))" }}
+        >
+          {profile.avatarUrl && <img src={profile.avatarUrl} alt="" className="h-full w-full object-cover" />}
+        </div>
+        <div className="min-w-0">
+          <div className="text-sm font-semibold truncate">{profile.name}</div>
+          <div className="text-xs text-muted-foreground truncate">{profile.role}</div>
+        </div>
+        <span className="ml-auto text-[11px] text-muted-foreground">Mein Profil</span>
+      </div>
+
+      <div className="mt-6 flex items-center gap-3">
+        <h2 className="text-sm font-semibold">Kontakte</h2>
+        <button
+          disabled
+          className="h-8 px-3 rounded-md border text-xs flex items-center gap-1.5 opacity-40 cursor-not-allowed"
+          style={{ borderColor: "hsl(var(--hairline))" }}
+        >
+          <Plus size={12} /> Kontakte
+        </button>
+      </div>
+      <div
+        className="mt-3 rounded-2xl p-10 text-center text-sm text-muted-foreground"
+        style={{ background: "hsl(var(--surface-card))", border: "1px dashed hsl(var(--hairline))" }}
+      >
+        Noch keine Kontakte hinterlegt.
+      </div>
+    </div>
+  );
+}
+
+/** Papierkorb: gelöschte Projekte 30 Tage lang wiederherstellbar. */
+function TrashView({ activeCount }: { activeCount: number }) {
+  const trashed = useTrashedProjects();
+  const full = activeCount >= MAX_PROJECTS;
+  return (
+    <div className="max-w-3xl">
+      <h1 className="text-2xl font-semibold tracking-tight">Papierkorb</h1>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Gelöschte Projekte bleiben 30 Tage erhalten und können wiederhergestellt werden.
+      </p>
+      {full && (
+        <div
+          className="mt-4 rounded-xl px-4 py-3 text-xs"
+          style={{ background: "hsl(var(--surface-muted))", border: "1px solid hsl(var(--hairline))" }}
+        >
+          Maximale Projektanzahl ({MAX_PROJECTS}) erreicht – lösche zuerst ein laufendes Projekt.
+        </div>
+      )}
+      {trashed.length === 0 ? (
+        <div
+          className="mt-5 rounded-2xl p-10 text-center text-sm text-muted-foreground"
+          style={{ background: "hsl(var(--surface-card))", border: "1px dashed hsl(var(--hairline))" }}
+        >
+          Der Papierkorb ist leer.
+        </div>
+      ) : (
+        <div
+          className="mt-5 rounded-2xl divide-y overflow-hidden"
+          style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))", borderColor: "hsl(var(--hairline))" }}
+        >
+          {trashed.map((p) => (
+            <div key={p.id} className="flex items-center gap-3 p-3">
+              <div className="h-10 w-10 rounded-md overflow-hidden shrink-0" style={{ background: "hsl(var(--surface-muted))" }}>
+                {p.thumbnail && <img src={p.thumbnail} alt="" className="h-full w-full object-cover" />}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-medium truncate">{p.name}</div>
+                <div className="text-[11px] text-muted-foreground">
+                  Noch {trashDaysLeft(p)} Tage wiederherstellbar
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  if (!projectStore.restoreProject(p.id)) {
+                    alert(`Maximal ${MAX_PROJECTS} Projekte möglich. Lösche zuerst ein bestehendes Projekt.`);
+                  }
+                }}
+                disabled={full}
+                className="h-8 px-3 rounded-md text-xs font-medium disabled:opacity-40"
+                style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
+              >
+                Wiederherstellen
+              </button>
+              <button
+                onClick={() => { if (confirm(`„${p.name}" endgültig löschen?`)) projectStore.purgeProject(p.id); }}
+                className="h-8 px-2 rounded-md border text-xs"
+                style={{ borderColor: "hsl(var(--hairline))" }}
+                title="Endgültig löschen"
+              >
+                <Trash2 size={13} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
