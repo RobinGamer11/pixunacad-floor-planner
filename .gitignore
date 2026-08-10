@@ -12,10 +12,9 @@ dist
 dist-ssr
 *.local
 
-# Umgebungsdateien mit (öffentlichen) Vite-Werten niemals committen.
-.env
-.env.*
-!.env.example
+# Nur .env.local und modusspezifische lokale Dateien ignorieren (können Secrets enthalten).
+.env.local
+.env.*.local
 
 # Editor directories and files
 .vscode/*
