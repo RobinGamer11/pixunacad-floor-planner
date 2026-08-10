@@ -292,6 +292,10 @@ export interface Project {
   activeMappeId?: string;
   /** Zuordnung zu einem benutzerdefinierten Ordner (siehe ProjectFolder). */
   folderId?: string | null;
+  /** Manuelle Sortierposition in der Sidebar (klein = weiter oben). */
+  sortIndex?: number;
+  /** Zeitpunkt der Verschiebung in den Papierkorb (30 Tage Aufbewahrung). */
+  deletedAt?: string;
   /** Dateien-Reiter (dwg/dxf/pdf/…) — flache Liste mit parentId für Ordnerbaum. */
   files?: FileNode[];
   /** Fotos-Reiter (jpg/png/…). */
@@ -303,6 +307,8 @@ export interface ProjectFolder {
   id: string;
   name: string;
   collapsed?: boolean;
+  /** Manuelle Sortierposition der Ordner. */
+  sortIndex?: number;
 }
 
 export type ProfileStatus = "online" | "offline" | "busy";
