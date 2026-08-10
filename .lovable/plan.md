@@ -1,25 +1,38 @@
-# Plan: Supabase-Konfiguration dauerhaft einrichten
+# Plan: Dauerhafte projektbezogene Supabase-Konfiguration
 
 ## Problem
-`.env.local` mit `VITE_SUPABASE_URL` und `VITE_SUPABASE_PUBLISHABLE_KEY` existiert nicht mehr — die Sandbox-Datei überlebt keinen Lovable-Sitzungsneustart. Die Vorschau zeigt wieder „Supabase-Konfiguration fehlt".
+`.env.local` überlebt keinen Lovable-Sitzungsneustart — die Werte verschwinden, die Vorschau zeigt „Supabase-Konfiguration fehlt". Workspace-Build-Secrets scheiden aus, weil künftige Projekte im selben Workspace andere Supabase-Projekte verwenden. Die Runtime-Secret-Verwaltung (`set_secret`) lehnt das `VITE_`-Präfix ab.
 
 ## Lösung
-Beide Werte sind **öffentliche Publishable Keys** (laut `.env.example`: „Öffentliche Browser-Konfiguration — niemals service_role"). Sie werden als **Lovable-Projekt-Environment-Variablen** gespeichert — sitzungsübergreifend persistent, außerhalb des flüchtigen Dateisystems, ohne Änderung am Code.
+Eine **committede `.env`-Datei im Projektroot** mit ausschließlich den beiden öffentlichen Publishable-Werten. Vite liest `.env` automatisch beim Dev-Server- und Build-Start ein und exponiert alle `VITE_*`-Variablen an `import.meta.env`. Da die Datei im Git-Repository liegt, überlebt sie jeden Neustart und jede neue Sitzung — projektabgeschlossen, ohne Workspace-Abhängigkeit.
+
+## Warum das sicher ist
+Beide Werte sind ausdrücklich **öffentlich** (Publishable/`anon` Key, keine Geheimnisse). Supabase selbst dokumentiert, dass der Publishable Key für die Verwendung im Browser bestimmt ist; die Sicherheit wird über Row Level Security in der Datenbank durchgesetzt, nicht über Geheimhaltung des Keys. `service_role` oder andere geheime Schlüssel werden **nicht** verwendet und landen auch nicht in der Datei.
 
 ## Schritte
 
-1. **Werte als Projekt-Secrets speichern** via `secrets--set_secret`:
-   - `VITE_SUPABASE_URL` = `https://xmuyyhhcmbueymyhgfkc.supabase.co`
-   - `VITE_SUPABASE_PUBLISHABLE_KEY` = `sb_publishable_AtWUG-A42zXzMQk-HBx5nQ_1WxkV5GJ`
-   - Diese werden als `process.env`-Variablen im Projekt gesetzt. Vite exponiert alle `VITE_*`-Präfix-Variablen automatisch an `import.meta.env` — die App liest sie bereits in `src/lib/supabase.ts` (Zeile 38–39).
+1. **`.gitignore` anpassen** — die aktuelle Datei (Zeile 15–18) ignoriert `.env` und `.env.*` pauschal. Ersetzen durch:
+   ```gitignore
+   # Nur .env.local und modusspezifische lokale Dateien ignorieren (können Secrets enthalten).
+   .env.local
+   .env.*.local
+   ```
+   Damit wird die neue `.env` committbar, während `.env.local` und alle `*.local`-Dateien weiterhin geschützt bleiben. `.env.example` bleibt unangetastet.
 
-2. **Dev-Server neu starten**, damit der Prozess die neuen Environment-Variablen lädt (kill + Port-Check).
+2. **`.env` erstellen** (neu, im Projektroot) mit ausschließlich:
+   ```dotenv
+   VITE_SUPABASE_URL=https://xmuyyhhcmbueymyhgfkc.supabase.co
+   VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_AtWUG-A42zXzMQk-HBx5nQ_1WxkV5GJ
+   ```
+   Kein `service_role`, kein Secret Key, keine weiteren Werte.
 
-3. **Verifizieren**: Playwright öffnet `http://localhost:8080/` → Weiterleitung nach `/login` → keine „Supabase-Konfiguration fehlt"-Meldung.
+3. **Dev-Server neu starten** (kill + Port-Check), damit der Prozess `.env` neu einliest.
 
-## Fallback (nur falls Schritt 1 die Vorschau nicht erreicht)
-Falls die Projekt-Secrets nicht in den Vite-Dev-Server-Prozess injiziert werden: eine committed `.env`-Datei (nicht `.env.local`) im Repo anlegen — da die Werte öffentliche Publishable Keys sind, ist das sicher. `.gitignore` müsste dafür `.env` nicht mehr ignorieren. In jedem Fall **keine** `service_role`/Secret Keys.
+4. **Verifizieren**: Playwright öffnet `http://localhost:8080/` → Weiterleitung nach `/login` → Login-Seite sichtbar, keine „Supabase-Konfiguration fehlt"-Meldung.
 
 ## Was NICHT geändert wird
-- Kein Code, keine bestehende Funktionalität, keine `.gitignore`-Anpassung (nur im Fallback).
-- Nur die beiden öffentlichen Vite-Werte; keine geheimen Schlüssel.
+- Kein Code (`src/lib/supabase.ts` liest die Werte bereits über `import.meta.env`, keine Anpassung nötig).
+- Keine bestehende Funktionalität.
+- Keine Workspace-Einstellung, kein projektexterner Secret-Safe.
+- `.env.example` und `.env.local` (falls noch vorhanden) bleiben unangetastet.
+- Keine geheimen Schlüssel jeglicher Art.
