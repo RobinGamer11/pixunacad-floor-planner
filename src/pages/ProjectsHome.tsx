@@ -36,15 +36,19 @@ import {
 
 import {
   useProjects,
+  useTrashedProjects,
   projectStore,
   useFolders,
   useProfile,
+  byProjectOrder,
+  trashDaysLeft,
   MAX_PROJECTS,
   type Project,
   type Task,
   type TaskPriority,
   type ProjectFolder,
   type ProfileStatus,
+  type UserProfile,
 } from "@/lib/projectStore";
 import { useDragScroll } from "@/hooks/use-drag-scroll";
 import { notesStore, useNotes, QUICK_CATEGORY, type NoteNode, type NoteStatus, type NotePriority } from "@/lib/notesStore";
