@@ -1135,6 +1135,13 @@ export default function ProjectsHome() {
           )}
         </main>
       </div>
+
+      {newProjectDialogOpen && (
+        <NewProjectSettingsDialog
+          onCancel={() => setNewProjectDialogOpen(false)}
+          onCreate={finishCreateProject}
+        />
+      )}
     </div>
   );
 }
