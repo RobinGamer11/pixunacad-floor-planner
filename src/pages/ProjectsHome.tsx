@@ -1224,14 +1224,37 @@ function ProjectCard({
           {p.pages.length} {p.pages.length === 1 ? "Seite" : "Seiten"} · {drawings} {drawings === 1 ? "Zeichnung" : "Zeichnungen"}
         </div>
       </div>
-      <button
-        onClick={(e) => { e.stopPropagation(); onOpen(); }}
-        className="opacity-60 hover:opacity-100 self-start"
-        style={{ color: "#8A9099" }}
-        title="Öffnen"
-      >
-        <MoreHorizontal size={14} />
-      </button>
+      <div className="relative self-start" ref={menuRef}>
+        <button
+          onClick={(e) => { e.stopPropagation(); setMenuOpen((v) => !v); }}
+          className="opacity-60 hover:opacity-100"
+          style={{ color: "#8A9099" }}
+          title="Mehr"
+        >
+          <MoreHorizontal size={14} />
+        </button>
+        {menuOpen && (
+          <div
+            className="absolute right-0 top-full mt-1 z-40 min-w-[160px] rounded-md border shadow-md py-1 text-sm"
+            style={{ background: "hsl(var(--surface))", borderColor: "hsl(var(--hairline))", color: "hsl(var(--ink))" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => { setMenuOpen(false); onSettings(); }}
+              className="w-full px-3 py-1.5 flex items-center gap-2 hover:bg-muted text-left"
+            >
+              <Settings size={14} /> Einstellungen
+            </button>
+            <button
+              onClick={() => { setMenuOpen(false); onDelete(); }}
+              className="w-full px-3 py-1.5 flex items-center gap-2 hover:bg-muted text-left"
+              style={{ color: "hsl(0 70% 50%)" }}
+            >
+              <Trash2 size={14} /> Löschen
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
