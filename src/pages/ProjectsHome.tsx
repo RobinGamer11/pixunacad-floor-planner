@@ -691,15 +691,37 @@ export default function ProjectsHome() {
                 const collapsed = f.collapsed;
                 const isRenaming = renamingFolderId === f.id;
                 const dragOver = dragOverFolder === f.id;
+                const folderDropLine = dragFolderId && dragOverFolderSlot === f.id;
                 return (
                   <div key={f.id}>
+                    {folderDropLine && (
+                      <div style={{ height: 2, background: "hsl(var(--accent-gold))", borderRadius: 2, margin: "2px 4px" }} />
+                    )}
                     <div
-                      onDragOver={(e) => { e.preventDefault(); setDragOverFolder(f.id); }}
-                      onDragLeave={() => setDragOverFolder((v) => (v === f.id ? null : v))}
-                      onDrop={() => handleDropOnFolder(f.id)}
-                      className="group flex items-center gap-1.5 h-8 px-2 rounded-md"
+                      draggable={!isRenaming}
+                      onDragStart={(e) => { setDragFolderId(f.id); e.dataTransfer.effectAllowed = "move"; }}
+                      onDragEnd={() => { setDragFolderId(null); setDragOverFolderSlot(null); }}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        if (dragFolderId) setDragOverFolderSlot(f.id);
+                        else setDragOverFolder(f.id);
+                      }}
+                      onDragLeave={() => {
+                        setDragOverFolder((v) => (v === f.id ? null : v));
+                        setDragOverFolderSlot((v) => (v === f.id ? null : v));
+                      }}
+                      onDrop={() => {
+                        if (dragFolderId && dragFolderId !== f.id) {
+                          projectStore.reorderProjectFolder(dragFolderId, f.id, "before");
+                          setDragFolderId(null);
+                          setDragOverFolderSlot(null);
+                          return;
+                        }
+                        handleDropOnFolder(f.id);
+                      }}
+                      className="group flex items-center gap-1.5 h-8 px-2 rounded-md cursor-grab active:cursor-grabbing"
                       style={{
-                        background: dragOver ? "hsl(var(--accent-gold) / 0.14)" : undefined,
+                        background: dragOver ? "hsl(var(--accent-gold) / 0.14)" : "rgba(255,255,255,0.03)",
                         color: "#B7BCC2",
                       }}
                     >
@@ -709,7 +731,7 @@ export default function ProjectsHome() {
                       >
                         {collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
                       </button>
-                      <FolderIcon size={13} style={{ color: "#B7BCC2" }} />
+                      <FolderIcon size={13} style={{ color: "hsl(var(--accent-gold))" }} />
                       {isRenaming ? (
                         <input
                           autoFocus
@@ -734,10 +756,9 @@ export default function ProjectsHome() {
                           onClick={() => projectStore.toggleProjectFolderCollapsed(f.id)}
                           className="flex-1 text-left text-xs font-medium truncate"
                         >
-                          {f.name}
+                          {f.name} <span style={{ color: "#8A9099" }}>({inside.length})</span>
                         </button>
                       )}
-                      <span className="text-[10px]" style={{ color: "#8A9099" }}>{inside.length}</span>
                       <button
                         onClick={() => { setRenamingFolderId(f.id); setRenameFolderDraft(f.name); }}
                         className="opacity-0 group-hover:opacity-100"
@@ -760,7 +781,12 @@ export default function ProjectsHome() {
                       </button>
                     </div>
                     {!collapsed && (
-                      <div className="pl-4 space-y-1 mt-1">
+                      <div
+                        className="relative ml-3 pl-4 space-y-1 mt-1 mb-2"
+                        style={{ borderLeft: "1px solid hsl(var(--accent-gold) / 0.35)" }}
+                        onDragOver={(e) => { e.preventDefault(); if (!dragFolderId) setDragOverFolder(f.id); }}
+                        onDrop={() => { if (!dragFolderId) handleDropOnFolder(f.id); }}
+                      >
                         {inside.length === 0 ? (
                           <div className="text-[10px] italic px-2 py-1" style={{ color: "#8A9099" }}>
                             Projekt hierher ziehen
@@ -770,13 +796,22 @@ export default function ProjectsHome() {
                             <ProjectCard
                               key={p.id}
                               project={p}
-                              active={mode === "projects" && !showAllTasks && selected?.id === p.id}
-                              onSelect={() => { setMode("projects"); setShowAllTasks(false); setSelectedId(p.id); }}
+                              active={mode === "projects" && !showAllTasks && !hub && selected?.id === p.id}
+                              dropIndicator={dragProjectId && dragProjectId !== p.id && dragOverProjectId === p.id}
+                              onSelect={() => { setHub(null); setMode("projects"); setShowAllTasks(false); setSelectedId(p.id); }}
                               onOpen={() => navigate(`/project/${p.id}`)}
-                              onSettings={() => { setMode("projects"); setShowAllTasks(false); setSelectedId(p.id); setSettingsOpen(true); }}
+                              onSettings={() => { setHub(null); setMode("projects"); setShowAllTasks(false); setSelectedId(p.id); setSettingsOpen(true); }}
                               onDelete={() => deleteProjectWithConfirm(p)}
                               onDragStart={() => setDragProjectId(p.id)}
-                              onDragEnd={() => setDragProjectId(null)}
+                              onDragEnd={() => { setDragProjectId(null); setDragOverProjectId(null); }}
+                              onDragOverCard={() => setDragOverProjectId(p.id)}
+                              onDropOnCard={() => {
+                                if (dragProjectId && dragProjectId !== p.id) {
+                                  projectStore.reorderProject(dragProjectId, p.id, "before");
+                                }
+                                setDragProjectId(null);
+                                setDragOverProjectId(null);
+                              }}
                             />
                           ))
                         )}
@@ -788,9 +823,9 @@ export default function ProjectsHome() {
 
               {/* Root-Projekte (ohne Ordner) */}
               <div
-                onDragOver={(e) => { e.preventDefault(); setDragOverFolder("root"); }}
+                onDragOver={(e) => { e.preventDefault(); if (!dragFolderId) setDragOverFolder("root"); }}
                 onDragLeave={() => setDragOverFolder((v) => (v === "root" ? null : v))}
-                onDrop={() => handleDropOnFolder(null)}
+                onDrop={() => { if (!dragFolderId) handleDropOnFolder(null); }}
                 className="pt-1 space-y-1"
                 style={{
                   background:
@@ -802,13 +837,22 @@ export default function ProjectsHome() {
                   <ProjectCard
                     key={p.id}
                     project={p}
-                    active={mode === "projects" && !showAllTasks && selected?.id === p.id}
-                    onSelect={() => { setMode("projects"); setShowAllTasks(false); setSelectedId(p.id); }}
+                    active={mode === "projects" && !showAllTasks && !hub && selected?.id === p.id}
+                    dropIndicator={dragProjectId && dragProjectId !== p.id && dragOverProjectId === p.id}
+                    onSelect={() => { setHub(null); setMode("projects"); setShowAllTasks(false); setSelectedId(p.id); }}
                     onOpen={() => navigate(`/project/${p.id}`)}
-                    onSettings={() => { setMode("projects"); setShowAllTasks(false); setSelectedId(p.id); setSettingsOpen(true); }}
+                    onSettings={() => { setHub(null); setMode("projects"); setShowAllTasks(false); setSelectedId(p.id); setSettingsOpen(true); }}
                     onDelete={() => deleteProjectWithConfirm(p)}
                     onDragStart={() => setDragProjectId(p.id)}
-                    onDragEnd={() => setDragProjectId(null)}
+                    onDragEnd={() => { setDragProjectId(null); setDragOverProjectId(null); }}
+                    onDragOverCard={() => setDragOverProjectId(p.id)}
+                    onDropOnCard={() => {
+                      if (dragProjectId && dragProjectId !== p.id) {
+                        projectStore.reorderProject(dragProjectId, p.id, "before");
+                      }
+                      setDragProjectId(null);
+                      setDragOverProjectId(null);
+                    }}
                   />
                 ))}
               </div>
