@@ -83,6 +83,21 @@ export default function ProjectsHome() {
   );
   // Startseite öffnet zuerst die projektübergreifende Aufgabenübersicht.
   const [showAllTasks, setShowAllTasks] = useState(true);
+  /** Zusätzliche Kopf-Ansichten (Hauptseite, Geteilt, Papierkorb). */
+  const [hub, setHub] = useState<null | "home" | "shared" | "trash">(null);
+  const [coinsOpen, setCoinsOpen] = useState(false);
+  const [shopOpen, setShopOpen] = useState(false);
+  const coinsRef = useRef<HTMLDivElement | null>(null);
+  const shopRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!coinsOpen && !shopOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (coinsOpen && !coinsRef.current?.contains(e.target as Node)) setCoinsOpen(false);
+      if (shopOpen && !shopRef.current?.contains(e.target as Node)) setShopOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [coinsOpen, shopOpen]);
   const [selectedId, setSelectedId] = useState<string | undefined>(undefined);
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<Tab>("uebersicht");
