@@ -1,312 +1,773 @@
-import { useMemo, useRef, useState } from "react";
-import { Folder, FolderPlus, FileText, Upload, ChevronRight, ChevronUp, ChevronDown, Pencil, Trash2, Download } from "lucide-react";
-import { projectStore, type FileNode, type Project } from "@/lib/projectStore";
+import {
+  Fragment,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type DragEvent,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+} from "react";
+import {
+  ChevronDown,
+  ChevronRight,
+  ChevronUp,
+  Download,
+  FileImage,
+  FileText,
+  Folder,
+  FolderInput,
+  FolderOpen,
+  GripVertical,
+  Pencil,
+  Trash2,
+} from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { projectStore, type FileKind, type FileNode, type Project } from "@/lib/projectStore";
+
+const DOCUMENT_DRAG_TYPE = "application/x-pixuna-document-node";
+const ACCEPTED_DOCUMENTS = ".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png";
+const DOCUMENT_ACTION_CLASS = "inline-flex h-7 w-7 items-center justify-center rounded hover:bg-muted disabled:opacity-25";
+
+type NodeGroup = {
+  folders: FileNode[];
+  files: FileNode[];
+};
+
+type DropTarget =
+  | { mode: "before"; parentId: string | null; beforeId: string | null; kind: FileKind }
+  | { mode: "inside"; folderId: string };
+
+function sameDropTarget(current: DropTarget | null, next: DropTarget) {
+  if (!current || current.mode !== next.mode) return false;
+  if (current.mode === "inside" && next.mode === "inside") return current.folderId === next.folderId;
+  return current.mode === "before" && next.mode === "before"
+    && current.parentId === next.parentId
+    && current.beforeId === next.beforeId
+    && current.kind === next.kind;
+}
 
 interface Props {
   project: Project;
-  kind: "files" | "photos";
-  /** Erlaubte MIME-Typen bzw. Endungen für den Datei-Upload. */
-  accept: string;
-  /** Fallback-Bezeichnung im leeren Zustand. */
-  emptyHint: string;
-  /** true = Foto-Grid mit Vorschau, false = Listendarstellung. */
-  photoMode?: boolean;
 }
 
-export function FileBrowser({ project, kind, accept, emptyHint, photoMode }: Props) {
-  const nodes = (project[kind] ?? []) as FileNode[];
-  const [currentFolder, setCurrentFolder] = useState<string | null>(null);
+function isPdf(node: FileNode) {
+  return node.mimeType === "application/pdf" || node.name.toLowerCase().endsWith(".pdf");
+}
+
+function isImage(node: FileNode) {
+  const mime = (node.mimeType ?? "").toLowerCase();
+  const name = node.name.toLowerCase();
+  return mime.startsWith("image/") || /\.(jpe?g|png|webp|gif)$/.test(name);
+}
+
+function isAcceptedDocument(file: File) {
+  return /\.(pdf|jpe?g|png)$/i.test(file.name);
+}
+
+function documentMimeType(file: File) {
+  const name = file.name.toLowerCase();
+  if (name.endsWith(".pdf")) return "application/pdf";
+  if (name.endsWith(".png")) return "image/png";
+  if (/\.jpe?g$/.test(name)) return "image/jpeg";
+  return file.type || "application/octet-stream";
+}
+
+function humanSize(bytes?: number) {
+  if (!bytes) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function PdfPreview({ node }: { node: FileNode }) {
+  const source = node.dataUrl ?? "";
+  const [preview, setPreview] = useState<{ source: string; url: string } | null>(null);
+  const [visible, setVisible] = useState(() => typeof IntersectionObserver === "undefined");
+  const containerRef = useRef<HTMLDivElement>(null);
+  const previewUrl = preview?.source === source ? preview.url : "";
+
+  useEffect(() => {
+    const element = containerRef.current;
+    if (!element || visible) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (!entries.some((entry) => entry.isIntersecting)) return;
+      setVisible(true);
+      observer.disconnect();
+    }, { rootMargin: "160px" });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [visible]);
+
+  useEffect(() => {
+    if (!source || !visible) return;
+    let cancelled = false;
+
+    const renderPreview = async () => {
+      try {
+        const base64 = source.includes(",") ? source.slice(source.indexOf(",") + 1) : source;
+        const { renderPdfPageToCanvas } = await import("@/cad/documentImport");
+        const canvas = await renderPdfPageToCanvas(base64, 0, 160);
+        if (!cancelled) setPreview({ source, url: canvas.toDataURL("image/png") });
+      } catch {
+        if (!cancelled) setPreview({ source, url: "" });
+      }
+    };
+
+    void renderPreview();
+    return () => { cancelled = true; };
+  }, [source, visible]);
+
+  return (
+    <div ref={containerRef} className="flex h-full w-full items-center justify-center">
+      {previewUrl ? (
+        <img src={previewUrl} alt="" draggable={false} className="h-full w-full object-contain" />
+      ) : (
+        <FileText size={26} aria-hidden="true" className="text-muted-foreground" />
+      )}
+    </div>
+  );
+}
+
+function DocumentPreview({ node }: { node: FileNode }) {
+  return (
+    <div
+      className="flex h-20 w-28 items-center justify-center overflow-hidden rounded-sm"
+      style={{ background: "hsl(var(--surface-muted))" }}
+      aria-hidden="true"
+    >
+      {isImage(node) && node.dataUrl ? (
+        <img src={node.dataUrl} alt="" draggable={false} className="h-full w-full object-cover" />
+      ) : isPdf(node) ? (
+        <PdfPreview node={node} />
+      ) : (
+        <FileImage size={26} className="text-muted-foreground" />
+      )}
+    </div>
+  );
+}
+
+function DropSlot({
+  active,
+  dragging,
+  label,
+  onDragOver,
+  onDrop,
+}: {
+  active: boolean;
+  dragging: boolean;
+  label: string;
+  onDragOver: (event: DragEvent<HTMLLIElement>) => void;
+  onDrop: (event: DragEvent<HTMLLIElement>) => void;
+}) {
+  return (
+    <li
+      aria-hidden="true"
+      className={`relative transition-[height] ${dragging ? "h-3" : "h-1"}`}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+    >
+      {active && (
+        <div
+          className="absolute inset-x-0 top-1/2 h-0.5 -translate-y-1/2"
+          style={{ background: "hsl(var(--accent-gold))" }}
+        >
+          <span
+            className="absolute right-0 -top-5 rounded px-1.5 py-0.5 text-[10px]"
+            style={{ background: "hsl(var(--accent-gold))", color: "hsl(var(--surface))" }}
+          >
+            {label}
+          </span>
+        </div>
+      )}
+    </li>
+  );
+}
+
+export function FileBrowser({ project }: Props) {
+  const nodes = useMemo(() => project.files ?? [], [project.files]);
+  const [expandedFolderIds, setExpandedFolderIds] = useState<Set<string>>(() => new Set());
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
+  const [movingId, setMovingId] = useState<string | null>(null);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
+  const [announcement, setAnnouncement] = useState("");
   const uploadRef = useRef<HTMLInputElement>(null);
+  const draggingIdRef = useRef<string | null>(null);
+  const moveTriggerRef = useRef<HTMLButtonElement | null>(null);
 
-  const path = useMemo(() => {
-    const trail: FileNode[] = [];
-    let cur = currentFolder;
-    while (cur) {
-      const n = nodes.find((x) => x.id === cur);
-      if (!n) break;
-      trail.unshift(n);
-      cur = n.parentId;
+  const nodesById = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
+  const movingNode = movingId ? nodesById.get(movingId) : undefined;
+  const destinationFolders = useMemo(() => {
+    if (!movingNode) return [];
+    return nodes.filter((candidate) => {
+      if (candidate.kind !== "folder" || candidate.id === movingNode.id) return false;
+      if (movingNode.kind !== "folder") return true;
+
+      const visited = new Set<string>();
+      let current: FileNode | undefined = candidate;
+      while (current) {
+        if (current.id === movingNode.id || visited.has(current.id)) return false;
+        visited.add(current.id);
+        current = current.parentId ? nodesById.get(current.parentId) : undefined;
+      }
+      return true;
+    });
+  }, [movingNode, nodes, nodesById]);
+  const childrenByParent = useMemo(() => {
+    const groups = new Map<string | null, NodeGroup>();
+    for (const node of nodes) {
+      const group = groups.get(node.parentId) ?? { folders: [], files: [] };
+      if (node.kind === "folder") group.folders.push(node);
+      else group.files.push(node);
+      groups.set(node.parentId, group);
     }
-    return trail;
-  }, [nodes, currentFolder]);
+    return groups;
+  }, [nodes]);
 
-  const children = nodes.filter((n) => n.parentId === currentFolder);
-  const folders = children.filter((n) => n.kind === "folder");
-  const files = children.filter((n) => n.kind === "file");
+  const folderPath = (folder: FileNode) => {
+    const names = [folder.name];
+    const visited = new Set([folder.id]);
+    let parentId = folder.parentId;
+    while (parentId && !visited.has(parentId)) {
+      visited.add(parentId);
+      const parent = nodesById.get(parentId);
+      if (!parent) break;
+      names.unshift(parent.name);
+      parentId = parent.parentId;
+    }
+    return names.join(" / ");
+  };
 
-  const addFolder = () => {
-    const id = projectStore.addFolder(project.id, kind, currentFolder, "Neuer Ordner");
+  const activateDropTarget = (next: DropTarget) => {
+    setDropTarget((current) => sameDropTarget(current, next) ? current : next);
+  };
+
+  const startRename = (node: FileNode) => {
+    setRenamingId(node.id);
+    setRenameDraft(node.name);
+  };
+
+  const showPersistenceError = (action: string) => {
+    const message = `${action} konnte nicht dauerhaft gespeichert werden. Der verfügbare Browser-Speicher reicht nicht aus.`;
+    setAnnouncement(message);
+    window.alert(message);
+  };
+
+  const showMoveError = (name: string) => {
+    const message = `${name} konnte nicht verschoben werden. Prüfe Zielordner und verfügbaren Browser-Speicher.`;
+    setAnnouncement(message);
+    window.alert(message);
+  };
+
+  const finishRename = (node: FileNode) => {
+    const renamed = projectStore.renameNode(project.id, "files", node.id, renameDraft.trim() || node.name);
+    if (renamed) projectStore.sealHistory(project.id);
+    else showPersistenceError(`„${node.name}“`);
+    setRenamingId(null);
+  };
+
+  const addFolder = (parentId: string | null) => {
+    const id = projectStore.addFolder(project.id, "files", parentId, "Neuer Ordner");
+    if (!id) {
+      showPersistenceError("Der neue Ordner");
+      return;
+    }
+    if (parentId) {
+      setExpandedFolderIds((current) => new Set(current).add(parentId));
+    }
     setRenamingId(id);
     setRenameDraft("Neuer Ordner");
   };
 
-  const uploadFiles = (fileList: FileList | null) => {
+  const uploadDocuments = (fileList: FileList | null) => {
     if (!fileList) return;
-    Array.from(fileList).forEach((f) => {
+    const files = Array.from(fileList);
+    const rejected = files.filter((file) => !isAcceptedDocument(file));
+
+    for (const file of files) {
+      if (!isAcceptedDocument(file)) continue;
       const reader = new FileReader();
       reader.onload = () => {
-        projectStore.addFile(project.id, kind, currentFolder, {
-          name: f.name,
+        const nodeId = projectStore.addFile(project.id, "files", null, {
+          name: file.name,
           dataUrl: String(reader.result),
-          mimeType: f.type,
-          sizeBytes: f.size,
+          mimeType: documentMimeType(file),
+          sizeBytes: file.size,
         });
+        if (!nodeId) {
+          window.alert(`„${file.name}“ konnte nicht dauerhaft gespeichert werden. Der verfügbare Browser-Speicher reicht nicht aus.`);
+          return;
+        }
+        projectStore.sealHistory(project.id);
       };
-      reader.readAsDataURL(f);
+      reader.readAsDataURL(file);
+    }
+
+    if (rejected.length > 0) {
+      window.alert(`Nicht unterstützt: ${rejected.map((file) => file.name).join(", ")}. Erlaubt sind PDF, JPG und PNG.`);
+    }
+  };
+
+  const toggleFolder = (folderId: string) => {
+    setExpandedFolderIds((current) => {
+      const next = new Set(current);
+      if (next.has(folderId)) next.delete(folderId);
+      else next.add(folderId);
+      return next;
     });
   };
 
-  const humanSize = (b?: number) => {
-    if (!b) return "";
-    if (b < 1024) return `${b} B`;
-    if (b < 1024 * 1024) return `${(b / 1024).toFixed(0)} KB`;
-    return `${(b / 1024 / 1024).toFixed(1)} MB`;
+  const readDraggedId = (event: DragEvent<HTMLElement>) =>
+    event.dataTransfer.getData(DOCUMENT_DRAG_TYPE) || draggingIdRef.current;
+
+  const clearDrag = () => {
+    draggingIdRef.current = null;
+    setDraggingId(null);
+    setDropTarget(null);
   };
 
-  return (
-    <div className="mt-6">
-      {/* Breadcrumb + Aktionen */}
-      <div
-        className="rounded-2xl px-4 py-3 flex items-center gap-2 flex-wrap"
-        style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
-      >
-        <button
-          onClick={() => setCurrentFolder(null)}
-          className="text-sm text-muted-foreground hover:text-foreground"
-        >
-          {kind === "files" ? "Dateien" : "Fotos"}
-        </button>
-        {path.map((n) => (
-          <span key={n.id} className="flex items-center gap-2">
-            <ChevronRight size={12} className="text-muted-foreground" />
-            <button
-              onClick={() => setCurrentFolder(n.id)}
-              className="text-sm text-muted-foreground hover:text-foreground"
-            >
-              {n.name}
-            </button>
-          </span>
-        ))}
-        <div className="flex-1" />
-        <button
-          onClick={addFolder}
-          className="h-8 px-3 rounded-md border text-xs flex items-center gap-1.5 hover:bg-muted"
-          style={{ borderColor: "hsl(var(--hairline))" }}
-        >
-          <FolderPlus size={13} /> Ordner
-        </button>
-        <button
-          onClick={() => uploadRef.current?.click()}
-          className="h-8 px-3 rounded-md text-xs font-medium flex items-center gap-1.5"
-          style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
-        >
-          <Upload size={13} /> Hochladen
-        </button>
-        <input
-          ref={uploadRef}
-          type="file"
-          multiple
-          accept={accept}
-          className="hidden"
-          onChange={(e) => {
-            uploadFiles(e.target.files);
-            e.target.value = "";
-          }}
-        />
-      </div>
+  const dropBefore = (
+    event: DragEvent<HTMLElement>,
+    parentId: string | null,
+    beforeId: string | null,
+    kind: FileKind
+  ) => {
+    const nodeId = readDraggedId(event);
+    const node = nodeId ? nodesById.get(nodeId) : undefined;
+    if (!node || node.kind !== kind) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const moved = projectStore.moveFileNode(project.id, node.id, parentId, beforeId);
+    setAnnouncement(moved ? `${node.name} wurde verschoben.` : `${node.name} kann dort nicht abgelegt werden.`);
+    if (moved) projectStore.sealHistory(project.id);
+    else showMoveError(node.name);
+    clearDrag();
+  };
 
-      {/* Inhalte */}
-      {children.length === 0 ? (
-        <div
-          className="mt-4 rounded-2xl p-10 text-center text-sm text-muted-foreground"
-          style={{ background: "hsl(var(--surface-card))", border: "1px dashed hsl(var(--hairline))" }}
-        >
-          {emptyHint}
-        </div>
-      ) : (
-        <div className="mt-4 space-y-4">
-          {folders.length > 0 && (
-            /* Ordner werden untereinander als Verzweigungsbaum gelistet:
-             * links eine durchgehende Stammlinie, je Ordner ein Abzweig. */
-            <div
-              className="rounded-2xl p-3"
-              style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
-            >
-              <div className="relative pl-6">
-                {/* Stammlinie – endet an der letzten Verzweigung */}
+  const dropInsideFolder = (event: DragEvent<HTMLElement>, folder: FileNode) => {
+    const nodeId = readDraggedId(event);
+    const node = nodeId ? nodesById.get(nodeId) : undefined;
+    if (!node || node.id === folder.id) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const moved = projectStore.moveFileNode(project.id, node.id, folder.id, null);
+    setAnnouncement(moved ? `${node.name} wurde nach ${folder.name} verschoben.` : `${node.name} kann dort nicht abgelegt werden.`);
+    if (moved) {
+      setExpandedFolderIds((current) => new Set(current).add(folder.id));
+      projectStore.sealHistory(project.id);
+    } else showMoveError(node.name);
+    clearDrag();
+  };
+
+  const moveByButton = (node: FileNode, direction: -1 | 1) => {
+    const moved = projectStore.moveNodeOrder(project.id, "files", node.id, direction);
+    setAnnouncement(moved ? `${node.name} wurde verschoben.` : `${node.name} konnte nicht verschoben werden.`);
+    if (moved) projectStore.sealHistory(project.id);
+    else showMoveError(node.name);
+  };
+
+  const closeMoveDialog = () => {
+    const nodeId = movingId;
+    setMovingId(null);
+    window.setTimeout(() => {
+      const currentTrigger = nodeId ? document.getElementById(`document-move-${nodeId}`) : null;
+      (currentTrigger ?? moveTriggerRef.current)?.focus();
+    }, 0);
+  };
+
+  const openMoveDialog = (event: ReactMouseEvent<HTMLButtonElement>, nodeId: string) => {
+    moveTriggerRef.current = event.currentTarget;
+    setMovingId(nodeId);
+  };
+
+  const moveToDestination = (destinationParentId: string | null) => {
+    if (!movingNode) return;
+    const moved = projectStore.moveFileNode(project.id, movingNode.id, destinationParentId);
+    const destinationName = destinationParentId ? nodesById.get(destinationParentId)?.name : "Dokumente ohne Ordner";
+    setAnnouncement(moved
+      ? `${movingNode.name} wurde nach ${destinationName ?? "dem gewählten Ordner"} verschoben.`
+      : `${movingNode.name} kann dort nicht abgelegt werden.`);
+    if (!moved) {
+      showMoveError(movingNode.name);
+      return;
+    }
+    if (destinationParentId) {
+      setExpandedFolderIds((current) => new Set(current).add(destinationParentId));
+    }
+    projectStore.sealHistory(project.id);
+    closeMoveDialog();
+  };
+
+  const renderDropSlot = (
+    parentId: string | null,
+    beforeId: string | null,
+    kind: FileKind,
+    label: string
+  ) => {
+    const active = dropTarget?.mode === "before"
+      && dropTarget.parentId === parentId
+      && dropTarget.beforeId === beforeId
+      && dropTarget.kind === kind;
+
+    return (
+      <DropSlot
+        active={active}
+        dragging={Boolean(draggingId)}
+        label={label}
+        onDragOver={(event) => {
+          const nodeId = draggingIdRef.current;
+          const node = nodeId ? nodesById.get(nodeId) : undefined;
+          if (!node || node.kind !== kind) return;
+          event.preventDefault();
+          event.stopPropagation();
+          event.dataTransfer.dropEffect = "move";
+          activateDropTarget({ mode: "before", parentId, beforeId, kind });
+        }}
+        onDrop={(event) => dropBefore(event, parentId, beforeId, kind)}
+      />
+    );
+  };
+
+  const renderGroup = (parentId: string | null, ancestors: Set<string>, root = false): ReactNode => {
+    const group = childrenByParent.get(parentId) ?? { folders: [], files: [] };
+
+    return (
+      <ul>
+        {group.folders.map((folder, index) => {
+          if (ancestors.has(folder.id)) return null;
+          const expanded = expandedFolderIds.has(folder.id);
+          const folderDropActive = dropTarget?.mode === "inside" && dropTarget.folderId === folder.id;
+          const nextAncestors = new Set(ancestors).add(folder.id);
+
+          return (
+            <Fragment key={folder.id}>
+              {renderDropSlot(parentId, folder.id, "folder", "Ordner hier einsortieren")}
+              <li>
                 <div
-                  className="absolute left-2 top-0"
-                  style={{ width: 1, background: "hsl(var(--hairline))", bottom: 20 }}
-                />
-                {folders.map((n, i) => (
-                  <div key={n.id} className="relative">
-                    {/* Abzweig zur Ordnerkarte */}
-                    <div
-                      className="absolute"
-                      style={{ left: -16, top: 20, width: 14, height: 1, background: "hsl(var(--hairline))" }}
-                    />
-                    <div
-                      className="rounded-xl px-3 py-2.5 mb-2 flex items-center gap-3 group cursor-pointer transition w-full"
-                      style={{ background: "hsl(var(--surface))", border: "1px solid hsl(var(--hairline))" }}
-                      onDoubleClick={() => setCurrentFolder(n.id)}
-                    >
+                  draggable={renamingId !== folder.id}
+                  onDragStart={(event) => {
+                    draggingIdRef.current = folder.id;
+                    setDraggingId(folder.id);
+                    event.dataTransfer.effectAllowed = "move";
+                    event.dataTransfer.setData(DOCUMENT_DRAG_TYPE, folder.id);
+                    event.dataTransfer.setData("text/plain", folder.name);
+                  }}
+                  onDragEnd={clearDrag}
+                  onDragOver={(event) => {
+                    const nodeId = draggingIdRef.current;
+                    if (!nodeId || nodeId === folder.id) return;
+                    event.preventDefault();
+                    event.stopPropagation();
+                    event.dataTransfer.dropEffect = "move";
+                    activateDropTarget({ mode: "inside", folderId: folder.id });
+                  }}
+                  onDrop={(event) => dropInsideFolder(event, folder)}
+                  className="group flex min-h-11 items-center gap-2 py-1.5 transition-colors hover:bg-muted/30"
+                  style={{
+                    background: folderDropActive ? "hsl(var(--accent-gold) / 0.12)" : undefined,
+                    opacity: draggingId === folder.id ? 0.45 : 1,
+                  }}
+                >
+                  <GripVertical size={14} aria-hidden="true" className="shrink-0 cursor-grab text-muted-foreground" />
+                  {renamingId === folder.id ? (
+                    <div className="flex min-w-0 flex-1 items-center gap-2">
                       <button
-                        onClick={() => setCurrentFolder(n.id)}
-                        className="flex items-center gap-3 flex-1 min-w-0 text-left"
+                        type="button"
+                        onClick={() => toggleFolder(folder.id)}
+                        aria-expanded={expanded}
+                        aria-controls={`document-folder-${folder.id}`}
+                        aria-label={`${folder.name} ${expanded ? "einklappen" : "ausklappen"}`}
+                        className="flex shrink-0 items-center gap-2"
                       >
-                        <Folder size={18} className="shrink-0" style={{ color: "hsl(var(--accent-gold))" }} />
-                        {renamingId === n.id ? (
-                          <input
-                            autoFocus
-                            value={renameDraft}
-                            onChange={(e) => setRenameDraft(e.target.value)}
-                            onClick={(e) => e.stopPropagation()}
-                            onBlur={() => { projectStore.renameNode(project.id, kind, n.id, renameDraft.trim() || n.name); setRenamingId(null); }}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") { projectStore.renameNode(project.id, kind, n.id, renameDraft.trim() || n.name); setRenamingId(null); }
-                              if (e.key === "Escape") setRenamingId(null);
-                            }}
-                            className="text-sm bg-transparent border-b outline-none flex-1 min-w-0"
-                            style={{ borderColor: "hsl(var(--hairline))" }}
-                          />
+                        {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+                        {expanded ? (
+                          <FolderOpen size={18} style={{ color: "hsl(var(--accent-gold))" }} />
                         ) : (
-                          <span className="text-sm flex-1 min-w-0 break-words">{n.name}</span>
+                          <Folder size={18} style={{ color: "hsl(var(--accent-gold))" }} />
                         )}
                       </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); projectStore.moveNodeOrder(project.id, kind, n.id, -1); }}
-                        disabled={i === 0}
-                        className="opacity-0 group-hover:opacity-100 disabled:opacity-20 text-muted-foreground hover:text-foreground"
-                        title="Nach oben schieben"
-                      >
-                        <ChevronUp size={14} />
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); projectStore.moveNodeOrder(project.id, kind, n.id, 1); }}
-                        disabled={i === folders.length - 1}
-                        className="opacity-0 group-hover:opacity-100 disabled:opacity-20 text-muted-foreground hover:text-foreground"
-                        title="Nach unten schieben"
-                      >
-                        <ChevronDown size={14} />
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setRenamingId(n.id); setRenameDraft(n.name); }}
-                        className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground"
-                        title="Umbenennen"
-                      >
-                        <Pencil size={12} />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (confirm(`Ordner "${n.name}" und Inhalte löschen?`)) {
-                            projectStore.deleteNode(project.id, kind, n.id);
-                          }
+                      <input
+                        autoFocus
+                        value={renameDraft}
+                        onChange={(event) => setRenameDraft(event.target.value)}
+                        onBlur={() => finishRename(folder)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") finishRename(folder);
+                          if (event.key === "Escape") setRenamingId(null);
                         }}
-                        className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground"
-                        title="Löschen"
-                      >
-                        <Trash2 size={12} />
-                      </button>
+                        className="min-w-0 flex-1 border-b bg-transparent text-sm outline-none"
+                        style={{ borderColor: "hsl(var(--hairline))" }}
+                        aria-label={`${folder.name} umbenennen`}
+                      />
                     </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {files.length > 0 && photoMode ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-              {files.map((n) => (
-                <div
-                  key={n.id}
-                  className="rounded-xl overflow-hidden group relative"
-                  style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
-                >
-                  <div className="aspect-square" style={{ background: "hsl(var(--surface-muted))" }}>
-                    {n.dataUrl && <img src={n.dataUrl} alt={n.name} className="w-full h-full object-cover" />}
-                  </div>
-                  <div className="p-2 flex items-center gap-2">
-                    <span className="flex-1 min-w-0 text-xs truncate">{n.name}</span>
-                    <span className="text-[10px] text-muted-foreground">{humanSize(n.sizeBytes)}</span>
-                  </div>
-                  <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100">
-                    <a
-                      href={n.dataUrl}
-                      download={n.name}
-                      className="h-6 w-6 rounded-md flex items-center justify-center"
-                      style={{ background: "hsl(var(--surface))", color: "hsl(var(--ink))" }}
-                      title="Herunterladen"
-                    >
-                      <Download size={12} />
-                    </a>
+                  ) : (
                     <button
-                      onClick={() => { if (confirm(`"${n.name}" löschen?`)) projectStore.deleteNode(project.id, kind, n.id); }}
-                      className="h-6 w-6 rounded-md flex items-center justify-center"
-                      style={{ background: "hsl(var(--surface))", color: "hsl(0 70% 50%)" }}
+                      type="button"
+                      onClick={() => toggleFolder(folder.id)}
+                      aria-expanded={expanded}
+                      aria-controls={`document-folder-${folder.id}`}
+                      aria-label={`${folder.name} ${expanded ? "einklappen" : "ausklappen"}`}
+                      className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                    >
+                      {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+                      {expanded ? (
+                        <FolderOpen size={18} style={{ color: "hsl(var(--accent-gold))" }} />
+                      ) : (
+                        <Folder size={18} style={{ color: "hsl(var(--accent-gold))" }} />
+                      )}
+                      <span className="min-w-0 flex-1 truncate text-sm font-medium">{folder.name}</span>
+                    </button>
+                  )}
+
+                  {expanded && (
+                    <button
+                      type="button"
+                      onClick={(event) => { event.stopPropagation(); addFolder(folder.id); }}
+                      className="whitespace-nowrap px-1 text-xs font-medium hover:underline"
+                      style={{ color: "hsl(var(--accent-gold))" }}
+                      aria-label={`Unterordner in ${folder.name} erstellen`}
+                    >
+                      + Unterordner
+                    </button>
+                  )}
+
+                  <div className="flex shrink-0 items-center gap-0.5">
+                    <button type="button" disabled={index === 0} onClick={() => moveByButton(folder, -1)} title="Nach oben" aria-label={`${folder.name} nach oben verschieben`} className={DOCUMENT_ACTION_CLASS}>
+                      <ChevronUp size={13} />
+                    </button>
+                    <button type="button" disabled={index === group.folders.length - 1} onClick={() => moveByButton(folder, 1)} title="Nach unten" aria-label={`${folder.name} nach unten verschieben`} className={DOCUMENT_ACTION_CLASS}>
+                      <ChevronDown size={13} />
+                    </button>
+                    <button id={`document-move-${folder.id}`} type="button" onClick={(event) => openMoveDialog(event, folder.id)} title="In einen anderen Ordner verschieben" aria-label={`${folder.name} in einen anderen Ordner verschieben`} className={DOCUMENT_ACTION_CLASS}>
+                      <FolderInput size={13} />
+                    </button>
+                    <button type="button" onClick={() => startRename(folder)} title="Umbenennen" aria-label={`${folder.name} umbenennen`} className={DOCUMENT_ACTION_CLASS}>
+                      <Pencil size={12} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (window.confirm(`Ordner „${folder.name}“ und alle Inhalte löschen?`)) {
+                          const deleted = projectStore.deleteNode(project.id, "files", folder.id);
+                          if (deleted) projectStore.sealHistory(project.id);
+                          else showPersistenceError(`Der Ordner „${folder.name}“`);
+                        }
+                      }}
                       title="Löschen"
+                      aria-label={`${folder.name} löschen`}
+                      className={DOCUMENT_ACTION_CLASS}
                     >
                       <Trash2 size={12} />
                     </button>
                   </div>
                 </div>
-              ))}
-            </div>
-          ) : files.length > 0 ? (
-            <div
-              className="rounded-2xl divide-y overflow-hidden"
-              style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))", borderColor: "hsl(var(--hairline))" }}
-            >
-              {files.map((n) => (
-                <div key={n.id} className="flex items-center gap-3 p-3 group hover:bg-muted/40">
-                  <FileText size={16} className="text-muted-foreground shrink-0" />
-                  {renamingId === n.id ? (
+
+                {expanded && (
+                  <div
+                    id={`document-folder-${folder.id}`}
+                    className="ml-5 border-l pl-3"
+                    style={{ borderColor: "hsl(var(--hairline))" }}
+                  >
+                    {renderGroup(folder.id, nextAncestors)}
+                  </div>
+                )}
+              </li>
+            </Fragment>
+          );
+        })}
+
+        {renderDropSlot(parentId, null, "folder", "Ordner ans Ende verschieben")}
+
+        {root && group.folders.length > 0 && group.files.length > 0 && (
+          <li className="pb-1 pt-5 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+            Dokumente ohne Ordner
+          </li>
+        )}
+
+        {group.files.map((file, index) => (
+          <Fragment key={file.id}>
+            {renderDropSlot(parentId, file.id, "file", "Dokument hier einsortieren")}
+            <li>
+              <div
+                draggable={renamingId !== file.id}
+                onDragStart={(event) => {
+                  draggingIdRef.current = file.id;
+                  setDraggingId(file.id);
+                  event.dataTransfer.effectAllowed = "move";
+                  event.dataTransfer.setData(DOCUMENT_DRAG_TYPE, file.id);
+                  event.dataTransfer.setData("text/plain", file.name);
+                }}
+                onDragEnd={clearDrag}
+                className="group flex items-start gap-3 py-3 hover:bg-muted/20"
+                style={{ opacity: draggingId === file.id ? 0.45 : 1 }}
+              >
+                <GripVertical size={14} aria-hidden="true" className="mt-7 shrink-0 cursor-grab text-muted-foreground" />
+                <div className="w-28 min-w-0">
+                  <DocumentPreview node={file} />
+                  {renamingId === file.id ? (
                     <input
                       autoFocus
                       value={renameDraft}
-                      onChange={(e) => setRenameDraft(e.target.value)}
-                      onBlur={() => { projectStore.renameNode(project.id, kind, n.id, renameDraft.trim() || n.name); setRenamingId(null); }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") { projectStore.renameNode(project.id, kind, n.id, renameDraft.trim() || n.name); setRenamingId(null); }
-                        if (e.key === "Escape") setRenamingId(null);
+                      onChange={(event) => setRenameDraft(event.target.value)}
+                      onBlur={() => finishRename(file)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") finishRename(file);
+                        if (event.key === "Escape") setRenamingId(null);
                       }}
-                      className="text-sm bg-transparent border-b outline-none flex-1"
+                      className="mt-1 w-full border-b bg-transparent text-xs outline-none"
                       style={{ borderColor: "hsl(var(--hairline))" }}
                     />
                   ) : (
-                    <span className="text-sm flex-1 truncate">{n.name}</span>
+                    <div className="mt-1 break-words text-xs leading-4" title={file.name}>{file.name}</div>
                   )}
-                  <span className="text-xs text-muted-foreground">{humanSize(n.sizeBytes)}</span>
-                  <button
-                    onClick={() => { setRenamingId(n.id); setRenameDraft(n.name); }}
-                    className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground"
-                    title="Umbenennen"
-                  >
+                  <div className="mt-0.5 text-[10px] text-muted-foreground">{humanSize(file.sizeBytes)}</div>
+                </div>
+
+                <div className="ml-auto flex shrink-0 items-center gap-0.5">
+                  <button type="button" disabled={index === 0} onClick={() => moveByButton(file, -1)} title="Nach oben" aria-label={`${file.name} nach oben verschieben`} className={DOCUMENT_ACTION_CLASS}>
+                    <ChevronUp size={13} />
+                  </button>
+                  <button type="button" disabled={index === group.files.length - 1} onClick={() => moveByButton(file, 1)} title="Nach unten" aria-label={`${file.name} nach unten verschieben`} className={DOCUMENT_ACTION_CLASS}>
+                    <ChevronDown size={13} />
+                  </button>
+                  <button id={`document-move-${file.id}`} type="button" onClick={(event) => openMoveDialog(event, file.id)} title="In einen Ordner verschieben" aria-label={`${file.name} in einen Ordner verschieben`} className={DOCUMENT_ACTION_CLASS}>
+                    <FolderInput size={13} />
+                  </button>
+                  <button type="button" onClick={() => startRename(file)} title="Umbenennen" aria-label={`${file.name} umbenennen`} className={DOCUMENT_ACTION_CLASS}>
                     <Pencil size={12} />
                   </button>
-                  <a
-                    href={n.dataUrl}
-                    download={n.name}
-                    className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground"
-                    title="Herunterladen"
-                  >
-                    <Download size={12} />
-                  </a>
+                  {file.dataUrl && (
+                    <a href={file.dataUrl} download={file.name} title="Herunterladen" aria-label={`${file.name} herunterladen`} className={DOCUMENT_ACTION_CLASS}>
+                      <Download size={12} />
+                    </a>
+                  )}
                   <button
-                    onClick={() => { if (confirm(`"${n.name}" löschen?`)) projectStore.deleteNode(project.id, kind, n.id); }}
-                    className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground"
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm(`„${file.name}“ löschen?`)) {
+                        const deleted = projectStore.deleteNode(project.id, "files", file.id);
+                        if (deleted) projectStore.sealHistory(project.id);
+                        else showPersistenceError(`„${file.name}“`);
+                      }
+                    }}
                     title="Löschen"
+                    aria-label={`${file.name} löschen`}
+                    className={DOCUMENT_ACTION_CLASS}
                   >
                     <Trash2 size={12} />
                   </button>
                 </div>
+              </div>
+            </li>
+          </Fragment>
+        ))}
+
+        {renderDropSlot(parentId, null, "file", "Dokument ans Ende verschieben")}
+
+        {!root && group.folders.length === 0 && group.files.length === 0 && (
+          <li className="py-2 text-xs text-muted-foreground">Dieser Ordner ist leer.</li>
+        )}
+      </ul>
+    );
+  };
+
+  return (
+    <div className="mt-4">
+      <div className="flex flex-wrap items-center justify-end gap-2 border-b pb-3" style={{ borderColor: "hsl(var(--hairline))" }}>
+        <button
+          type="button"
+          onClick={() => addFolder(null)}
+          className="flex h-8 items-center gap-1.5 px-2 text-xs font-medium hover:underline"
+        >
+          <Folder size={14} /> + Ordner
+        </button>
+        <button
+          type="button"
+          onClick={() => uploadRef.current?.click()}
+          className="flex h-8 items-center gap-1.5 rounded-md px-3 text-xs font-medium"
+          style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
+        >
+          <FileText size={14} /> + Dokument
+        </button>
+        <input
+          ref={uploadRef}
+          type="file"
+          multiple
+          accept={ACCEPTED_DOCUMENTS}
+          className="hidden"
+          onChange={(event) => {
+            uploadDocuments(event.target.files);
+            event.target.value = "";
+          }}
+        />
+      </div>
+
+      <div className="pt-3">
+        {nodes.length === 0 ? (
+          <p className="py-8 text-center text-sm text-muted-foreground">
+            Noch keine Dokumente. Lege einen Ordner an oder füge ein PDF, JPG oder PNG hinzu.
+          </p>
+        ) : (
+          renderGroup(null, new Set(), true)
+        )}
+      </div>
+
+      <Dialog open={Boolean(movingNode)} onOpenChange={(open) => { if (!open) closeMoveDialog(); }}>
+        {movingNode && (
+          <DialogContent className="max-w-md p-4">
+            <DialogHeader>
+              <DialogTitle className="text-sm">„{movingNode.name}“ verschieben</DialogTitle>
+              <DialogDescription className="text-xs">Wähle den Zielordner.</DialogDescription>
+            </DialogHeader>
+
+            <div className="max-h-[50vh] space-y-1 overflow-y-auto">
+              <button
+                type="button"
+                disabled={movingNode.parentId === null}
+                onClick={() => moveToDestination(null)}
+                className="flex h-9 w-full items-center gap-2 rounded-md px-2 text-left text-xs hover:bg-muted disabled:opacity-40"
+              >
+                <Folder size={14} /> Dokumente ohne Ordner
+                {movingNode.parentId === null && <span className="ml-auto text-muted-foreground">Aktuell</span>}
+              </button>
+              {destinationFolders.map((folder) => (
+                <button
+                  key={folder.id}
+                  type="button"
+                  disabled={movingNode.parentId === folder.id}
+                  onClick={() => moveToDestination(folder.id)}
+                  className="flex min-h-9 w-full items-center gap-2 rounded-md px-2 py-2 text-left text-xs hover:bg-muted disabled:opacity-40"
+                >
+                  <Folder size={14} className="shrink-0" />
+                  <span className="min-w-0 flex-1 break-words">{folderPath(folder)}</span>
+                  {movingNode.parentId === folder.id && <span className="text-muted-foreground">Aktuell</span>}
+                </button>
               ))}
             </div>
-          ) : null}
-        </div>
-      )}
+
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={closeMoveDialog}
+                className="h-8 rounded-md border px-3 text-xs"
+                style={{ borderColor: "hsl(var(--hairline))" }}
+              >
+                Abbrechen
+              </button>
+            </div>
+          </DialogContent>
+        )}
+      </Dialog>
+
+      <p className="sr-only" aria-live="polite">{announcement}</p>
     </div>
   );
 }

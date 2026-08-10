@@ -186,7 +186,7 @@ export default function ProjectWorkspace() {
   const [docImporting, setDocImporting] = useState(false);
   const [docPickerPages, setDocPickerPages] = useState<ImportedPage[] | null>(null);
   const [docPickerSelected, setDocPickerSelected] = useState<Set<number>>(new Set());
-  // Zugriff auf die Projekt-Ablage (Startseite: Dokumente & Fotos).
+  // Zugriff auf die Dokumentenablage des Projekts auf der Startseite.
   const [docLibraryOpen, setDocLibraryOpen] = useState(false);
   // Ausgabemaßstab für neu importierte Dokumente. Wird rechts im
   // "Dokument"-Werkzeug-Panel als Dropdown ausgewählt (wie beim CAD-Blatt).
@@ -1285,7 +1285,7 @@ export default function ProjectWorkspace() {
         <input
           ref={documentFileInputRef}
           type="file"
-          accept=".pdf,application/pdf,image/png,image/jpeg,image/webp,image/gif"
+          accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/png,image/jpeg"
           className="hidden"
           onChange={handleDocumentFileChange}
         />
@@ -5659,7 +5659,7 @@ function DocumentToolSettings({
         onClick={onOpenLibrary}
         className="w-full h-9 mt-1.5 rounded-md border text-xs flex items-center justify-center gap-2 disabled:opacity-50"
         style={{ borderColor: "hsl(var(--hairline))" }}
-        title="Dokumente & Fotos aus der Projekt-Ablage (Startseite) einfügen"
+        title="Dokumente aus der Projekt-Ablage (Startseite) einfügen"
       >
         <FolderOpen size={14} />
         Aus Projekt-Ablage

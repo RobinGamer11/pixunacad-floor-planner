@@ -2569,7 +2569,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                   disabled={docImporting}
                   onClick={() => setDocLibraryOpen(true)}
                   className="cad-toolbar-btn w-full justify-center h-9 disabled:opacity-50"
-                  title="Dokumente & Fotos aus der Projekt-Ablage (Startseite) einfügen"
+                  title="Dokumente aus der Projekt-Ablage (Startseite) einfügen"
                 >
                   <FolderOpen className="h-4 w-4" />
                   <span className="text-xs">Aus Projekt-Ablage</span>

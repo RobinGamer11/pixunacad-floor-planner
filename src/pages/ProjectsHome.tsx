@@ -55,7 +55,6 @@ import { notesStore, useNotes, QUICK_CATEGORY, type NoteNode, type NoteStatus, t
 import { WeatherStrip } from "@/components/project/WeatherStrip";
 import { UebersichtView } from "@/components/project/UebersichtView";
 import { FileBrowser } from "@/components/project/FileBrowser";
-import { PageThumb } from "@/components/project/PageThumb";
 import { FinanceProjectOverview } from "@/components/finance/FinanceProjectOverview";
 import { geocodeSearch, type GeoHit } from "@/lib/weather";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -68,8 +67,7 @@ const Pixuna = () => (
   </span>
 );
 
-type Tab = "uebersicht" | "seiten" | "aufgaben" | "finanzen" | "dokumente" | "team";
-type DokumenteSubTab = "dateien" | "fotos";
+type Tab = "uebersicht" | "aufgaben" | "finanzen" | "dokumente" | "team";
 
 export default function ProjectsHome() {
   const projects = useProjects();
@@ -107,7 +105,6 @@ export default function ProjectsHome() {
   const [tab, setTab] = useState<Tab>("uebersicht");
   const headerScrollRef = useDragScroll<HTMLElement>();
   const tabsScrollRef = useDragScroll<HTMLDivElement>();
-  const [dokumenteSubTab, setDokumenteSubTab] = useState<DokumenteSubTab>("dateien");
   const [leftOpen, setLeftOpen] = useState(true);
   const [titleMenuOpen, setTitleMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -145,12 +142,6 @@ export default function ProjectsHome() {
       ),
     [projects]
   );
-
-  const handleAddPage = () => {
-    if (!selected) return;
-    const pageId = projectStore.addPage(selected.id);
-    navigate(`/project/${selected.id}?page=${pageId}`);
-  };
 
   const folders = useFolders();
   const profile = useProfile();
@@ -253,7 +244,7 @@ export default function ProjectsHome() {
 
   const deleteProjectWithConfirm = (p: Project) => {
     const label = p.isTemplate ? "Vorlage" : "Projektmappe";
-    const msg = `${label} „${p.name}" wirklich löschen?\n\nAlle Inhalte werden endgültig entfernt:\n• Seiten & Zeichenblätter\n• CAD-Elemente & Bemaßungen\n• Board-Themen, Aufgaben & Notizen\n• Dateien & Fotos\n\nDieser Vorgang kann nicht rückgängig gemacht werden.`;
+    const msg = `${label} „${p.name}" wirklich löschen?\n\nAlle Inhalte werden endgültig entfernt:\n• Seiten & Zeichenblätter\n• CAD-Elemente & Bemaßungen\n• Board-Themen, Aufgaben & Notizen\n• Dokumente\n\nDieser Vorgang kann nicht rückgängig gemacht werden.`;
     if (!confirm(msg)) return;
     projectStore.deleteProject(p.id);
     if (selectedId === p.id) {
@@ -987,7 +978,7 @@ export default function ProjectsHome() {
                         <button
                           onClick={() => {
                             const label = selected.isTemplate ? "Vorlage" : "Projektmappe";
-                            const msg = `${label} „${selected.name}" wirklich löschen?\n\nAlle Inhalte werden endgültig entfernt:\n• Seiten & Zeichenblätter\n• CAD-Elemente & Bemaßungen\n• Board-Themen, Aufgaben & Notizen\n• Dateien & Fotos\n\nDieser Vorgang kann nicht rückgängig gemacht werden.`;
+                            const msg = `${label} „${selected.name}" wirklich löschen?\n\nAlle Inhalte werden endgültig entfernt:\n• Seiten & Zeichenblätter\n• CAD-Elemente & Bemaßungen\n• Board-Themen, Aufgaben & Notizen\n• Dokumente\n\nDieser Vorgang kann nicht rückgängig gemacht werden.`;
                             if (confirm(msg)) {
                               projectStore.deleteProject(selected.id);
                               setTitleMenuOpen(false);
@@ -1059,8 +1050,6 @@ export default function ProjectsHome() {
                       ["aufgaben", "Aufgaben", false],
                       ["finanzen", "Finanzen", false],
                       ["dokumente", "Dokumente", false],
-                      ["seiten", "Mappe", false],
-                      
                       ["team", "Team", true],
                     ] as const
                   ).map(([key, label, disabled]) => (
@@ -1094,48 +1083,12 @@ export default function ProjectsHome() {
 
 
               {tab === "uebersicht" && <UebersichtView project={selected} />}
-              {tab === "seiten" && (
-                <SeitenView project={selected} onAddPage={handleAddPage} />
-              )}
               {tab === "aufgaben" && <AufgabenView project={selected} />}
               {tab === "finanzen" && (
                 <FinanceProjectOverview projectId={selected.id} projectName={selected.name} />
               )}
               {tab === "dokumente" && (
-                <div className="mt-4">
-                  <div className="inline-flex items-center gap-1 rounded-md p-0.5 mb-4"
-                       style={{ background: "hsl(var(--surface-muted))" }}>
-                    {(["dateien", "fotos"] as const).map((sub) => (
-                      <button
-                        key={sub}
-                        onClick={() => setDokumenteSubTab(sub)}
-                        className="h-7 px-3 rounded-[5px] text-[12px] font-medium transition-colors"
-                        style={{
-                          background: dokumenteSubTab === sub ? "hsl(var(--accent-gold))" : "transparent",
-                          color: dokumenteSubTab === sub ? "hsl(var(--surface))" : "hsl(var(--ink-soft))",
-                        }}
-                      >
-                        {sub === "dateien" ? "Dateien" : "Fotos"}
-                      </button>
-                    ))}
-                  </div>
-                  {dokumenteSubTab === "dateien" ? (
-                    <FileBrowser
-                      project={selected}
-                      kind="files"
-                      accept=".pdf,.dwg,.dxf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,application/pdf"
-                      emptyHint="Noch keine Dateien. Lade PDFs, DWG/DXF oder Dokumente hoch oder lege einen Ordner an."
-                    />
-                  ) : (
-                    <FileBrowser
-                      project={selected}
-                      kind="photos"
-                      accept="image/png,image/jpeg,image/webp,.jpg,.jpeg,.png,.webp"
-                      emptyHint="Noch keine Fotos. Lade JPG/PNG-Dateien hoch oder lege einen Ordner an."
-                      photoMode
-                    />
-                  )}
-                </div>
+                <FileBrowser key={selected.id} project={selected} />
               )}
               
             </div>
@@ -1358,104 +1311,6 @@ function ProfileAvatar({
 /* -------- Tab views -------- */
 
 // UebersichtView wird nun aus @/components/project/UebersichtView importiert.
-
-function SeitenView({ project, onAddPage }: { project: Project; onAddPage: () => void }) {
-  const navigate = useNavigate();
-  const mappen = project.mappen ?? [];
-  const activeMappe = mappen.find((m) => m.id === project.activeMappeId) ?? mappen[0];
-  const mappePages = activeMappe
-    ? project.pages.filter((p) => activeMappe.pageIds.includes(p.id))
-    : [];
-  const [selectedPageId, setSelectedPageId] = useState<string | undefined>(mappePages[0]?.id);
-  const selectedPage =
-    mappePages.find((p) => p.id === selectedPageId) ?? mappePages[0];
-  const isLandscape = (selectedPage?.format ?? "A3-quer").includes("quer");
-
-  return (
-    <div className="mt-4 space-y-4">
-      {/* Präsentieren-Button (verknüpft mit Projektmappe-Präsentation) */}
-      <div className="flex items-center justify-end">
-        <button
-          onClick={() => navigate(`/project/${project.id}?present=1`)}
-          disabled={mappen.length === 0}
-          className="h-9 px-3 rounded-md text-xs font-medium flex items-center gap-1.5 disabled:opacity-40"
-          style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
-          title="Präsentieren"
-        >
-          <Play size={13} fill="currentColor" /> Präsentieren
-        </button>
-      </div>
-
-
-      <div className="grid grid-cols-[220px_1fr] gap-6">
-        <div
-          className="rounded-2xl p-4"
-          style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
-        >
-          <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-3">
-            SEITEN {activeMappe && <span className="normal-case tracking-normal font-normal">· {activeMappe.name}</span>}
-          </div>
-          {mappePages.length === 0 ? (
-            <div className="text-xs text-muted-foreground italic">Diese Mappe enthält noch keine Seiten.</div>
-          ) : (
-            <div className="space-y-2">
-              {mappePages.map((pg) => {
-                const active = pg.id === selectedPage?.id;
-                return (
-                  <button
-                    key={pg.id}
-                    onClick={() => setSelectedPageId(pg.id)}
-                    className="w-full flex items-center gap-3 p-2 rounded-md text-left transition border"
-                    style={{
-                      background: active ? "hsl(var(--surface-muted))" : "hsl(var(--surface))",
-                      borderColor: active ? "hsl(var(--accent-gold) / 0.4)" : "transparent",
-                    }}
-                  >
-                    <div className="w-10 h-10 rounded bg-white border shrink-0 overflow-hidden flex items-center justify-center" style={{ borderColor: "hsl(var(--hairline))" }}>
-                      <PageThumb page={pg} className="w-full" />
-                    </div>
-                    <div className="flex-1 text-sm truncate">{pg.title}</div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        <div
-          className="rounded-2xl p-6 flex flex-col items-center"
-          style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
-        >
-          {selectedPage ? (
-            <>
-              <div className="w-full flex items-center justify-between text-xs text-muted-foreground mb-4">
-                <span className="font-medium text-sm" style={{ color: "hsl(var(--ink))" }}>
-                  {selectedPage.title}
-                </span>
-                <span>{selectedPage.format}</span>
-              </div>
-              <div
-                className="bg-white border shadow-sm overflow-hidden"
-                style={{
-                  borderColor: "hsl(var(--hairline))",
-                  width: isLandscape ? "100%" : "70%",
-                  maxWidth: "100%",
-                }}
-              >
-                {/* Livevorschau des tatsächlichen Seiteninhalts */}
-                <PageThumb page={selectedPage} className="w-full" />
-              </div>
-            </>
-          ) : (
-            <div className="text-sm text-muted-foreground italic">
-              Keine Seite ausgewählt. Wähle oben eine Mappe oder lege eine neue Seite an.
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function TaskTimeline({ project }: { project: Project }) {
   const tasks = [...project.tasks].sort((a, b) =>

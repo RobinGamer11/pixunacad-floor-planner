@@ -296,9 +296,9 @@ export interface Project {
   sortIndex?: number;
   /** Zeitpunkt der Verschiebung in den Papierkorb (30 Tage Aufbewahrung). */
   deletedAt?: string;
-  /** Dateien-Reiter (dwg/dxf/pdf/…) — flache Liste mit parentId für Ordnerbaum. */
+  /** Gemeinsame Dokumentenablage — flache Liste mit parentId für den Ordnerbaum. */
   files?: FileNode[];
-  /** Fotos-Reiter (jpg/png/…). */
+  /** @deprecated Legacy-Fotoablage; wird beim Laden verlustfrei nach `files` migriert. */
   photos?: FileNode[];
   settings?: ProjectSettings;
 }
@@ -419,7 +419,39 @@ function load(): State {
   };
 }
 
-/** Stellt sicher, dass jedes Projekt mindestens eine Mappe + Files/Photos-Arrays hat. */
+function mergeLegacyPhotoNodes(files: FileNode[], photos: FileNode[]): FileNode[] {
+  if (photos.length === 0) return files;
+
+  const usedIds = new Set(files.map((node) => node.id));
+  const migratedIds = new Map<string, string>();
+  const nextPhotoIds: string[] = [];
+
+  for (const node of photos) {
+    let nextId = node.id;
+    if (usedIds.has(nextId)) {
+      const base = `legacy-photo-${nextId}`;
+      nextId = base;
+      let suffix = 2;
+      while (usedIds.has(nextId)) {
+        nextId = `${base}-${suffix}`;
+        suffix += 1;
+      }
+    }
+    if (!migratedIds.has(node.id)) migratedIds.set(node.id, nextId);
+    nextPhotoIds.push(nextId);
+    usedIds.add(nextId);
+  }
+
+  const migratedPhotos = photos.map((node, index) => ({
+    ...node,
+    id: nextPhotoIds[index],
+    parentId: node.parentId ? (migratedIds.get(node.parentId) ?? null) : null,
+  }));
+
+  return [...files, ...migratedPhotos];
+}
+
+/** Stellt sicher, dass jedes Projekt mindestens eine Mappe und eine Dokumentenablage hat. */
 function migrateProject(p: Project): Project {
   const next: Project = { ...p };
   if (!Array.isArray(next.mappen) || next.mappen.length === 0) {
@@ -440,8 +472,10 @@ function migrateProject(p: Project): Project {
   if (orphan.length) {
     next.mappen = next.mappen.map((m, i) => (i === 0 ? { ...m, pageIds: [...m.pageIds, ...orphan] } : m));
   }
-  if (!Array.isArray(next.files)) next.files = [];
-  if (!Array.isArray(next.photos)) next.photos = [];
+  const files = Array.isArray(next.files) ? next.files : [];
+  const legacyPhotos = Array.isArray(next.photos) ? next.photos : [];
+  next.files = mergeLegacyPhotoNodes(files, legacyPhotos);
+  next.photos = [];
   if (!next.settings) next.settings = { timelinePosition: "bottom" };
   // Stufe 3: Sheet.defaultScaleDen aus Legacy-String ableiten.
   if (Array.isArray(next.sheets)) {
@@ -605,16 +639,21 @@ export function syncPageElementUnits(page: ProjectPage): ProjectPage {
 
 
 
-function persist() {
+function persistState(candidate: State) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(candidate));
+    return true;
   } catch {
-    /* ignore */
+    return false;
   }
 }
 
-function emit() {
-  persist();
+function persist() {
+  persistState(state);
+}
+
+function emit(shouldPersist = true) {
+  if (shouldPersist) persist();
   listeners.forEach((fn) => fn());
 }
 
@@ -686,7 +725,7 @@ function changeSignature(a: Project, b: Project): string {
   }
 }
 
-function setState(updater: (s: State) => Partial<State>) {
+function setState(updater: (s: State) => Partial<State>, alreadyPersisted = false) {
   const prev = state;
   const prevById = new Map(prev.projects.map((p) => [p.id, p] as const));
   state = { ...state, ...updater(state) };
@@ -717,7 +756,20 @@ function setState(updater: (s: State) => Partial<State>) {
     }
     if (anyChange) notifyHistory();
   }
-  emit();
+  emit(!alreadyPersisted);
+}
+
+/**
+ * Dokumente liegen als Data-URLs im Browser-Speicher. Deshalb wird eine
+ * Dokumentmutation zuerst vollständig persistiert und erst danach für UI,
+ * Verlauf und Cloud-Snapshot übernommen. Bei ausgeschöpftem Speicher bleibt
+ * der sichtbare Zustand so identisch mit dem dauerhaft gespeicherten Zustand.
+ */
+function commitDocumentProjects(projects: Project[]) {
+  const candidate = { ...state, projects };
+  if (!persistState(candidate)) return false;
+  setState(() => ({ projects }), true);
+  return true;
 }
 
 
@@ -747,7 +799,6 @@ export const projectStore = {
       mappen: [{ id: mappeId, name: "Hauptmappe", konzept: "", pageIds: [firstPageId] }],
       activeMappeId: mappeId,
       files: [],
-      photos: [],
       settings: { timelinePosition: "bottom" },
     };
     setState((s) => ({ projects: [{ ...blank, sortIndex: nextTopIndex(s.projects, null) }, ...s.projects] }));
@@ -1486,16 +1537,16 @@ export const projectStore = {
     }));
   },
 
-  // ---------- Dateien & Fotos ----------
+  // ---------- Dokumentenablage ----------
   addFolder: (projectId: string, kind: "files" | "photos", parentId: string | null, name = "Neuer Ordner") => {
     const id = `n-${Date.now().toString(36)}`;
     const node: FileNode = { id, kind: "folder", name, createdAt: new Date().toISOString(), parentId };
-    setState((s) => ({
-      projects: s.projects.map((p) =>
-        p.id === projectId ? { ...p, [kind]: [...(p[kind] ?? []), node] } as Project : p
-      ),
-    }));
-    return id;
+    const projects = state.projects.map((p) =>
+      p.id === projectId
+        ? { ...p, [kind]: [...(p[kind] ?? []), node], updatedAt: new Date().toISOString() } as Project
+        : p
+    );
+    return commitDocumentProjects(projects) ? id : undefined;
   },
   addFile: (
     projectId: string,
@@ -1514,70 +1565,145 @@ export const projectStore = {
       mimeType: file.mimeType,
       sizeBytes: file.sizeBytes,
     };
-    setState((s) => ({
-      projects: s.projects.map((p) =>
-        p.id === projectId ? ({ ...p, [kind]: [...(p[kind] ?? []), node] } as Project) : p
-      ),
-    }));
-    return id;
+    const projects = state.projects.map((p) =>
+      p.id === projectId
+        ? ({ ...p, [kind]: [...(p[kind] ?? []), node], updatedAt: new Date().toISOString() } as Project)
+        : p
+    );
+    return commitDocumentProjects(projects) ? id : undefined;
   },
   renameNode: (projectId: string, kind: "files" | "photos", nodeId: string, name: string) => {
-    setState((s) => ({
-      projects: s.projects.map((p) =>
-        p.id === projectId
-          ? ({
-              ...p,
-              [kind]: (p[kind] ?? []).map((n) => (n.id === nodeId ? { ...n, name } : n)),
-            } as Project)
-          : p
-      ),
-    }));
+    const projects = state.projects.map((p) =>
+      p.id === projectId
+        ? ({
+            ...p,
+            [kind]: (p[kind] ?? []).map((n) => (n.id === nodeId ? { ...n, name } : n)),
+            updatedAt: new Date().toISOString(),
+          } as Project)
+        : p
+    );
+    return commitDocumentProjects(projects);
   },
   /** Verschiebt einen Knoten in der Reihenfolge seiner Geschwister nach
    *  oben/unten (nur Sortierung, Elternzuordnung bleibt unverändert). */
   moveNodeOrder: (projectId: string, kind: "files" | "photos", nodeId: string, dir: -1 | 1) => {
-    setState((s) => ({
-      projects: s.projects.map((p) => {
-        if (p.id !== projectId) return p;
-        const arr = [...(p[kind] ?? [])];
-        const node = arr.find((n) => n.id === nodeId);
-        if (!node) return p;
-        // Indizes der Geschwister mit gleichem Typ (Ordner bleiben unter sich).
-        const sibIdx = arr
-          .map((n, i) => ({ n, i }))
-          .filter(({ n }) => n.parentId === node.parentId && n.kind === node.kind)
-          .map(({ i }) => i);
-        const pos = sibIdx.indexOf(arr.indexOf(node));
-        const target = pos + dir;
-        if (pos < 0 || target < 0 || target >= sibIdx.length) return p;
-        const a = sibIdx[pos];
-        const b = sibIdx[target];
-        [arr[a], arr[b]] = [arr[b], arr[a]];
-        return { ...p, [kind]: arr } as Project;
-      }),
-    }));
+    let changed = false;
+    const projects = state.projects.map((p) => {
+      if (p.id !== projectId) return p;
+      const arr = [...(p[kind] ?? [])];
+      const node = arr.find((n) => n.id === nodeId);
+      if (!node) return p;
+      // Indizes der Geschwister mit gleichem Typ (Ordner bleiben unter sich).
+      const sibIdx = arr
+        .map((n, i) => ({ n, i }))
+        .filter(({ n }) => n.parentId === node.parentId && n.kind === node.kind)
+        .map(({ i }) => i);
+      const pos = sibIdx.indexOf(arr.indexOf(node));
+      const target = pos + dir;
+      if (pos < 0 || target < 0 || target >= sibIdx.length) return p;
+      const a = sibIdx[pos];
+      const b = sibIdx[target];
+      [arr[a], arr[b]] = [arr[b], arr[a]];
+      changed = true;
+      return { ...p, [kind]: arr, updatedAt: new Date().toISOString() } as Project;
+    });
+    return changed && commitDocumentProjects(projects);
+  },
+
+  /** Verschiebt einen Dokumentenknoten an eine andere Position oder in einen
+   *  anderen Ordner. Ordner können niemals in sich selbst oder einen ihrer
+   *  Nachfahren verschoben werden. `beforeNodeId = null` hängt den Knoten an
+   *  das Ende der gleichartigen Geschwister an. */
+  moveFileNode: (
+    projectId: string,
+    nodeId: string,
+    destinationParentId: string | null,
+    beforeNodeId: string | null = null
+  ) => {
+    const project = state.projects.find((candidate) => candidate.id === projectId);
+    const nodes = project?.files ?? [];
+    const node = nodes.find((candidate) => candidate.id === nodeId);
+    if (!project || !node) return false;
+
+    if (destinationParentId) {
+      const destination = nodes.find((candidate) => candidate.id === destinationParentId);
+      if (!destination || destination.kind !== "folder") return false;
+    }
+
+    if (node.kind === "folder") {
+      const visited = new Set<string>();
+      let ancestorId = destinationParentId;
+      while (ancestorId) {
+        if (ancestorId === nodeId || visited.has(ancestorId)) return false;
+        visited.add(ancestorId);
+        ancestorId = nodes.find((candidate) => candidate.id === ancestorId)?.parentId ?? null;
+      }
+    }
+
+    const beforeNode = beforeNodeId
+      ? nodes.find((candidate) => candidate.id === beforeNodeId)
+      : undefined;
+    if (
+      beforeNodeId &&
+      (!beforeNode || beforeNode.id === nodeId || beforeNode.parentId !== destinationParentId || beforeNode.kind !== node.kind)
+    ) {
+      return false;
+    }
+
+    const remaining = nodes.filter((candidate) => candidate.id !== nodeId);
+    const movedNode = node.parentId === destinationParentId ? node : { ...node, parentId: destinationParentId };
+    let insertAt = remaining.length;
+
+    if (beforeNode) {
+      insertAt = remaining.findIndex((candidate) => candidate.id === beforeNode.id);
+    } else {
+      for (let index = remaining.length - 1; index >= 0; index -= 1) {
+        const candidate = remaining[index];
+        if (candidate.parentId === destinationParentId && candidate.kind === node.kind) {
+          insertAt = index + 1;
+          break;
+        }
+      }
+    }
+
+    remaining.splice(insertAt, 0, movedNode);
+    const unchanged = nodes.every(
+      (candidate, index) =>
+        candidate.id === remaining[index]?.id && candidate.parentId === remaining[index]?.parentId
+    );
+    if (unchanged) return true;
+
+    const projects = state.projects.map((candidate) =>
+      candidate.id === projectId
+        ? { ...candidate, files: remaining, updatedAt: new Date().toISOString() }
+        : candidate
+    );
+    return commitDocumentProjects(projects);
   },
 
   deleteNode: (projectId: string, kind: "files" | "photos", nodeId: string) => {
-    setState((s) => ({
-      projects: s.projects.map((p) => {
-        if (p.id !== projectId) return p;
-        const arr = p[kind] ?? [];
-        // Auch alle Nachfahren löschen.
-        const toDelete = new Set<string>([nodeId]);
-        let changed = true;
-        while (changed) {
-          changed = false;
-          for (const n of arr) {
-            if (n.parentId && toDelete.has(n.parentId) && !toDelete.has(n.id)) {
-              toDelete.add(n.id);
-              changed = true;
-            }
+    let changed = false;
+    const projects = state.projects.map((p) => {
+      if (p.id !== projectId) return p;
+      const arr = p[kind] ?? [];
+      // Auch alle Nachfahren löschen.
+      const toDelete = new Set<string>([nodeId]);
+      let foundDescendant = true;
+      while (foundDescendant) {
+        foundDescendant = false;
+        for (const n of arr) {
+          if (n.parentId && toDelete.has(n.parentId) && !toDelete.has(n.id)) {
+            toDelete.add(n.id);
+            foundDescendant = true;
           }
         }
-        return { ...p, [kind]: arr.filter((n) => !toDelete.has(n.id)) } as Project;
-      }),
-    }));
+      }
+      const next = arr.filter((n) => !toDelete.has(n.id));
+      if (next.length === arr.length) return p;
+      changed = true;
+      return { ...p, [kind]: next, updatedAt: new Date().toISOString() } as Project;
+    });
+    return changed && commitDocumentProjects(projects);
   },
   /* ---------- Undo / Redo (public API) ---------- */
   /** Schließt die laufende Geste ab: die nächste Änderung startet garantiert
@@ -1600,39 +1726,47 @@ export const projectStore = {
   },
   undo: (projectId: string) => {
     const h = getHist(projectId);
-    if (!h.past.length) return;
+    if (!h.past.length) return false;
     const cur = state.projects.find((p) => p.id === projectId);
-    if (!cur) return;
-    const prev = h.past.pop()!;
+    if (!cur) return false;
+    const prev = h.past[h.past.length - 1];
+    const candidate = { ...state, projects: state.projects.map((p) => (p.id === projectId ? prev : p)) };
+    if (!persistState(candidate)) return false;
+    h.past.pop();
     h.future.push(cur);
     lastPushAt.delete(projectId); lastSig.delete(projectId);
     _suspendHistory = true;
     try {
-      state = { ...state, projects: state.projects.map((p) => (p.id === projectId ? prev : p)) };
+      state = candidate;
     } finally {
       _suspendHistory = false;
     }
     notifyHistory();
-    emit();
+    emit(false);
     notifyRestore();
+    return true;
   },
   redo: (projectId: string) => {
     const h = getHist(projectId);
-    if (!h.future.length) return;
+    if (!h.future.length) return false;
     const cur = state.projects.find((p) => p.id === projectId);
-    if (!cur) return;
-    const next = h.future.pop()!;
+    if (!cur) return false;
+    const next = h.future[h.future.length - 1];
+    const candidate = { ...state, projects: state.projects.map((p) => (p.id === projectId ? next : p)) };
+    if (!persistState(candidate)) return false;
+    h.future.pop();
     h.past.push(cur);
     lastPushAt.delete(projectId); lastSig.delete(projectId);
     _suspendHistory = true;
     try {
-      state = { ...state, projects: state.projects.map((p) => (p.id === projectId ? next : p)) };
+      state = candidate;
     } finally {
       _suspendHistory = false;
     }
     notifyHistory();
-    emit();
+    emit(false);
     notifyRestore();
+    return true;
   },
 
   /* ---------- Projekt-Ordner (Sidebar) ---------- */
