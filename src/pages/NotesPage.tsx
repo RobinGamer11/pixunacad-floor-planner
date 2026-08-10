@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useParams } from "react-router-dom";
 import { WorkspaceHeader } from "@/components/workspace/WorkspaceHeader";
 import { TabletAidWheel } from "@/components/TabletAidWheel";
-import { useProject } from "@/lib/projectStore";
+import { projectStore, useProject } from "@/lib/projectStore";
 import {
   notesStore, useNotes, useNotesHistory,
   type NoteKind, type NoteNode, type NotePriority, type NoteStatusDef, type NotePriorityDef,
@@ -74,6 +74,7 @@ export default function NotesPage() {
   useEffect(() => {
     try { localStorage.setItem("pixuna.tabletAid", tabletAidOn ? "1" : "0"); } catch {}
   }, [tabletAidOn]);
+  const mappeHelpOn = project?.settings?.mappeHelpOn ?? true;
 
   const statusMap = useMemo(() => {
     const m = new Map<string, NoteStatusDef>();
@@ -173,6 +174,8 @@ export default function NotesPage() {
         onRedo={hist.redo}
         canDelete={!!selected}
         onDelete={() => selected && (notesStore.deleteNode(projectId, selected.id), setSelectedId(null))}
+        mappeHelpOn={mappeHelpOn}
+        onToggleMappeHelp={() => project && projectStore.setMappeHelpOn(project.id, !mappeHelpOn)}
         tabletAidOn={tabletAidOn}
         onToggleTabletAid={() => setTabletAidOn((v) => !v)}
         onPresent={handlePresent}

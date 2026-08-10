@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import CadEditor, { type CadEditorHandle } from "@/components/CadEditor";
-import { useProject } from "@/lib/projectStore";
+import { projectStore, useProject } from "@/lib/projectStore";
 import { WorkspaceHeader } from "@/components/workspace/WorkspaceHeader";
 import { TabletAidWheel } from "@/components/TabletAidWheel";
 import { Check, X } from "lucide-react";
@@ -55,6 +55,7 @@ const CadPage = () => {
   useEffect(() => {
     try { localStorage.setItem("pixuna.tabletAid", tabletAidOn ? "1" : "0"); } catch {}
   }, [tabletAidOn]);
+  const mappeHelpOn = project?.settings?.mappeHelpOn ?? true;
 
   // "PDF aus CAD-Blatt einfügen": Wenn Query-Parameter gesetzt sind,
   // eine kleine Bestätigungsleiste einblenden.
@@ -296,6 +297,8 @@ const CadPage = () => {
         zoomPercent={zoom}
         onPresent={handlePresent}
         onShare={() => {}}
+        mappeHelpOn={mappeHelpOn}
+        onToggleMappeHelp={() => project && projectStore.setMappeHelpOn(project.id, !mappeHelpOn)}
         tabletAidOn={tabletAidOn}
         onToggleTabletAid={() => setTabletAidOn((v) => !v)}
         onExport={() => editorRef.current?.openExportPanel()}

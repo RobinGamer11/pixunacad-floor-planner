@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { ArrowBigUp, Check, X, Pencil } from "lucide-react";
+import { Keyboard, Pencil } from "lucide-react";
 import {
   virtualMouseClick,
   virtualMouseHold,
@@ -8,18 +8,19 @@ import {
   primeTabletKeyboard,
 } from "@/lib/virtualInput";
 
-/** Computermaus-Symbol mit hervorgehobener linker bzw. rechter Taste. */
-function MouseIcon({ side, size = 18 }: { side: "left" | "right"; size?: number }) {
+/** Maus-Symbol im gleichen Stil wie die eingeblendete Bedienungshilfe. */
+function MouseIcon({ side, size = 29 }: { side: "left" | "right"; size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6}>
-      <rect x="6" y="2.5" width="12" height="19" rx="6" />
-      <line x1="12" y1="2.5" x2="12" y2="11" />
-      <line x1="6" y1="11" x2="18" y2="11" />
+    <svg width={size * 0.8} height={size} viewBox="0 0 32 42" fill="none" aria-hidden="true">
       {side === "left" ? (
-        <path d="M12 3.2 A5.4 5.4 0 0 0 6.6 8.6 V11 H12 Z" fill="currentColor" stroke="none" />
+        <path d="M6 16V13C6 6.7 9.7 3 15 3v13H6Z" fill="currentColor" opacity="0.92" />
       ) : (
-        <path d="M12 3.2 A5.4 5.4 0 0 1 17.4 8.6 V11 H12 Z" fill="currentColor" stroke="none" />
+        <path d="M17 3c5.3 0 9 3.7 9 10v3h-9V3Z" fill="currentColor" opacity="0.92" />
       )}
+      <rect x="5" y="2.5" width="22" height="37" rx="11" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M16 3v13" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M5.8 16.5h20.4" stroke="currentColor" strokeWidth="1.2" />
+      <rect x="13.4" y="6" width="5.2" height="9" rx="2.6" stroke="currentColor" strokeWidth="1.2" />
     </svg>
   );
 }
@@ -119,10 +120,10 @@ export function TabletAidWheel() {
         onPointerCancel={onDragEnd}
         className="absolute inset-0 rounded-full"
         style={{
-          border: "2px solid hsl(var(--accent-gold))",
-          background: "hsla(var(--surface-card), 0.92)",
-          boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
-          backdropFilter: "blur(6px)",
+          border: "1px solid hsl(var(--surface) / 0.28)",
+          background: "hsl(var(--ink) / 0.82)",
+          boxShadow: "0 12px 32px rgba(0,0,0,0.32)",
+          backdropFilter: "blur(10px)",
           cursor: "grab",
         }}
       />
@@ -131,7 +132,7 @@ export function TabletAidWheel() {
 
 
       {/* Enter oben, rechts RMB + ESC, links LMB + SHIFT */}
-      <WheelButton angle={-90} size={size} label="ENTER" tooltip="Bestätigen: setzt Punkt am Cursor (bzw. Enter-Taste in Eingabefeldern)"
+      <WheelButton angle={-90} size={size} label="Enter" description="Objekt setzen" tooltip="Bestätigen: setzt Punkt am Cursor (bzw. Enter-Taste in Eingabefeldern)"
         onTap={() => {
           const el = document.activeElement as HTMLElement | null;
           const isPrimer = !!el?.hasAttribute?.("data-virtual-primer");
@@ -148,24 +149,24 @@ export function TabletAidWheel() {
           // laufende Schraffur immer sofort final ab.
           virtualKeyPress("Enter");
         }}
-        icon={<Check size={18} />} />
+        icon={<Keyboard size={24} strokeWidth={1.45} />} />
 
-      <WheelButton angle={-25} size={size} label="RMB" tooltip="Rechte Maustaste"
+      <WheelButton angle={-25} size={size} label="R-Klick" description="Hilfslinie" tooltip="Rechte Maustaste"
         onTap={() => virtualMouseClick(2)}
         onHold={(on) => virtualMouseHold(2, on)}
         icon={<MouseIcon side="right" />} />
-      <WheelButton angle={40} size={size} label="ESC" tooltip="Esc-Taste"
+      <WheelButton angle={40} size={size} label="ESC" description="Abbrechen" tooltip="Esc-Taste"
         onTap={() => virtualKeyPress("Escape")}
-        icon={<X size={18} />} />
-      <WheelButton angle={-155} size={size} label="LMB" tooltip="Linke Maustaste (Tap = Klick, Halten = gedrückt halten)"
+        icon={<Keyboard size={24} strokeWidth={1.45} />} />
+      <WheelButton angle={-155} size={size} label="L-Klick" description="Auswählen" tooltip="Linke Maustaste (Tap = Klick, Halten = gedrückt halten)"
         highlight={lmbHint}
         onTap={() => virtualMouseClick(0)}
         onHold={(on) => virtualMouseHold(0, on)}
         icon={<MouseIcon side="left" />} />
-      <WheelButton angle={140} size={size} label="SHIFT" tooltip="Shift halten (2-Hand-Bedienung)"
+      <WheelButton angle={140} size={size} label="Shift" description="Mehrfach" tooltip="Shift halten (2-Hand-Bedienung)"
         onHold={(on) => virtualKeyHold("Shift", on)}
         toggleHold
-        icon={<ArrowBigUp size={16} />} />
+        icon={<Keyboard size={24} strokeWidth={1.45} />} />
 
     </div>
   );
@@ -197,15 +198,15 @@ function CenterToggles() {
     alignItems: "center",
     justifyContent: "center",
     gap: 3,
-    border: "1px solid hsl(var(--hairline))",
-    background: active ? "hsl(var(--accent-gold))" : "hsl(var(--surface))",
-    color: active ? "hsl(var(--surface))" : "hsl(var(--ink))",
+    border: active ? "1px solid hsl(var(--accent-gold))" : "1px solid hsl(var(--surface) / 0.28)",
+    background: active ? "hsl(var(--accent-gold))" : "hsl(var(--surface) / 0.12)",
+    color: "hsl(var(--surface))",
     cursor: "pointer",
   });
 
   return (
     <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-1">
-      <div className="text-[10px] uppercase tracking-widest pointer-events-none" style={{ color: "hsl(var(--ink-soft))" }}>
+      <div className="text-[9px] font-semibold uppercase tracking-[0.16em] pointer-events-none" style={{ color: "hsl(var(--surface) / 0.72)" }}>
         Tablet
       </div>
       <button
@@ -350,11 +351,12 @@ function useWheelTouchRouter() {
 }
 
 function WheelButton({
-  angle, size, label, tooltip, icon, onTap, onHold, toggleHold, highlight,
+  angle, size, label, description, tooltip, icon, onTap, onHold, toggleHold, highlight,
 }: {
   angle: number;
   size: number;
   label: string;
+  description: string;
   tooltip: string;
   icon: React.ReactNode;
   onTap?: () => void;
@@ -364,10 +366,11 @@ function WheelButton({
   /** Dezentes Leuchten, z. B. wenn ein Punkt auf das Setzen per LMB wartet. */
   highlight?: boolean;
 }) {
-  const r = size / 2 - 26;
+  const buttonSize = 56;
+  const r = size / 2 - buttonSize / 2 - 2;
   const rad = (angle * Math.PI) / 180;
-  const cx = size / 2 + Math.cos(rad) * r - 22;
-  const cy = size / 2 + Math.sin(rad) * r - 22;
+  const cx = size / 2 + Math.cos(rad) * r - buttonSize / 2;
+  const cy = size / 2 + Math.sin(rad) * r - buttonSize / 2;
   const [active, setActive] = useState(false);
   const activeRef = useRef(false);
   activeRef.current = active;
@@ -436,13 +439,15 @@ function WheelButton({
       onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
       onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
       onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
-      className="absolute h-11 w-11 rounded-full flex flex-col items-center justify-center gap-0.5 text-[9px] font-semibold border transition-colors"
+      className="absolute rounded-full flex flex-col items-center justify-center gap-0.5 border text-center transition-colors"
       style={{
         left: cx,
         top: cy,
-        borderColor: highlight && !active ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
-        background: active ? "hsl(var(--accent-gold))" : "hsl(var(--surface))",
-        color: active ? "hsl(var(--surface))" : "hsl(var(--ink))",
+        width: buttonSize,
+        height: buttonSize,
+        borderColor: active || highlight ? "hsl(var(--accent-gold))" : "hsl(var(--surface) / 0.28)",
+        background: active ? "hsl(var(--accent-gold))" : "hsl(var(--surface) / 0.11)",
+        color: "hsl(var(--surface))",
         boxShadow: highlight && !active ? "0 0 0 3px hsl(var(--accent-gold) / 0.35)" : undefined,
         touchAction: "none",
         pointerEvents: "auto",
@@ -450,9 +455,9 @@ function WheelButton({
       }}
     >
       {icon}
-      <span className="leading-none">{label}</span>
+      <span className="text-[8px] font-semibold leading-none">{label}</span>
+      <span className="max-w-[48px] truncate text-[6px] leading-none opacity-70">{description}</span>
     </button>
   );
 }
-
 

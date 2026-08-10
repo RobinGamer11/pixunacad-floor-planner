@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { WorkspaceHeader } from "@/components/workspace/WorkspaceHeader";
 import { TabletAidWheel } from "@/components/TabletAidWheel";
-import { useProject } from "@/lib/projectStore";
+import { projectStore, useProject } from "@/lib/projectStore";
 import { exportElementToA4Pdf } from "@/lib/financePdfExport";
 import {
   financeStore, childrenOf, positionsOf, nodeTotals, projectTotals, actionTotals,
@@ -60,6 +60,7 @@ export default function FinancePage() {
   useEffect(() => {
     try { localStorage.setItem("pixuna.tabletAid", tabletAidOn ? "1" : "0"); } catch { /* ignore */ }
   }, [tabletAidOn]);
+  const mappeHelpOn = project?.settings?.mappeHelpOn ?? true;
 
   const selected = useMemo(
     () => (selectedId ? state.nodes.find((n) => n.id === selectedId) ?? null : null),
@@ -184,6 +185,8 @@ export default function FinancePage() {
         projectId={projectId}
         projectName={project?.name}
         mode="finance"
+        mappeHelpOn={mappeHelpOn}
+        onToggleMappeHelp={() => project && projectStore.setMappeHelpOn(project.id, !mappeHelpOn)}
         tabletAidOn={tabletAidOn}
         onToggleTabletAid={() => setTabletAidOn((v) => !v)}
         onExport={handleExport}

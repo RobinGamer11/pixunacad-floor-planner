@@ -82,6 +82,7 @@ import {
   type PunchPattern,
   type PunchSide,
 } from "@/lib/projectStore";
+import { EMPTY_WHEEL_ZOOM_BURST, nextSmartWheelZoom } from "@/lib/projectZoom";
 import CadOverlayLayer from "@/components/page/CadOverlayLayer";
 import { CadDocumentInspector } from "@/components/page/CadDocumentInspector";
 import { CadIdPanelHost } from "@/components/page/CadIdPanelHost";
@@ -398,6 +399,7 @@ export default function ProjectWorkspace() {
   const zoomRef = useRef(zoom);
   useEffect(() => { zoomRef.current = zoom; }, [zoom]);
   const wheelStepRef = useRef(0);
+  const wheelBurstRef = useRef({ ...EMPTY_WHEEL_ZOOM_BURST });
   const wheelAnchorRef = useRef<{ x: number; y: number } | null>(null);
   const wheelRafRef = useRef(0);
   const wheelEndTimerRef = useRef<number | null>(null);
@@ -539,9 +541,10 @@ export default function ProjectWorkspace() {
       if (e.deltaMode === 1) dy *= 16;
       if (e.deltaMode === 2) dy *= el.clientHeight;
       if (dy === 0) return;
-      // Pro Renderframe genau ein Prozentpunkt. Dadurch bleiben klassische
-      // Mausrad-Rasten präzise und Trackpads erzeugen keine Sprünge.
-      wheelStepRef.current = dy < 0 ? 1 : -1;
+      const direction = dy < 0 ? 1 : -1;
+      const smartZoom = nextSmartWheelZoom(wheelBurstRef.current, direction, performance.now());
+      wheelBurstRef.current = smartZoom.burst;
+      wheelStepRef.current = smartZoom.step;
       wheelAnchorRef.current = { x: e.clientX, y: e.clientY };
       if (!wheelRafRef.current) {
         wheelRafRef.current = requestAnimationFrame(() => {
@@ -563,6 +566,7 @@ export default function ProjectWorkspace() {
       el.removeEventListener("wheel", onWheel, { capture: true } as any);
       if (wheelRafRef.current) { cancelAnimationFrame(wheelRafRef.current); wheelRafRef.current = 0; }
       wheelStepRef.current = 0;
+      wheelBurstRef.current = { ...EMPTY_WHEEL_ZOOM_BURST };
       wheelAnchorRef.current = null;
       if (wheelEndTimerRef.current !== null) window.clearTimeout(wheelEndTimerRef.current);
       setWorkspacePdfZoomActive(false);
@@ -675,6 +679,7 @@ export default function ProjectWorkspace() {
       wheelRafRef.current = 0;
     }
     wheelStepRef.current = 0;
+    wheelBurstRef.current = { ...EMPTY_WHEEL_ZOOM_BURST };
     wheelAnchorRef.current = null;
     zoomAnchorRef.current = null;
     zoomRef.current = 100;
@@ -7803,4 +7808,3 @@ function PresenterCarousel({
 
 // re-export helpful types
 export type { PageElement, ElementKind };
-

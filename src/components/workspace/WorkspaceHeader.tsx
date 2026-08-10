@@ -42,7 +42,7 @@ interface Props {
   /** Tablet-Hilfsrad (LMB/RMB/SHIFT/ESC/ENTF) einblenden. */
   tabletAidOn?: boolean;
   onToggleTabletAid?: () => void;
-  /** Projektbezogene Schnellhilfe in der Mappe einblenden. */
+  /** Projektbezogene Schnellhilfe ein- oder ausblenden. */
   mappeHelpOn?: boolean;
   onToggleMappeHelp?: () => void;
 }
@@ -127,7 +127,7 @@ export function WorkspaceHeader({
                 active={mappeHelpOn}
                 icon={<HelpCircle size={16} />}
                 label="Hilfe"
-                title="Bedienungshilfe der Mappe ein- oder ausblenden"
+                title="Bedienungshilfe ein- oder ausblenden"
                 onClick={onToggleMappeHelp}
               />
             )}
