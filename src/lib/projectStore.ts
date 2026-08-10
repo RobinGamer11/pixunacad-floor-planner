@@ -757,16 +757,13 @@ export const projectStore = {
       ),
     }));
   },
+  /** Verschiebt das Projekt in den Papierkorb (30 Tage wiederherstellbar). */
   deleteProject: (id: string) => {
-    setState((s) => ({ projects: s.projects.filter((p) => p.id !== id) }));
-    // Sämtliche projektbezogenen Nebenstores mitleeren, damit gelöschte Projekte
-    // keinerlei Inhalte zurücklassen (Board-Themen, ausstehende PDF-Uploads …).
-    try {
-      // Board-/Notiznetz-Daten
-      import("./notesStore").then((m) => m.notesStore.deleteProject(id)).catch(() => {});
-      // Ausstehende Sheet-PDF-Übernahme
-      localStorage.removeItem(`pixuna.pendingSheetPdf.${id}`);
-    } catch {}
+    setState((s) => ({
+      projects: s.projects.map((p) =>
+        p.id === id ? { ...p, deletedAt: new Date().toISOString() } : p
+      ),
+    }));
   },
   duplicateAsTemplate: (id: string) => {
     const src = state.projects.find((p) => p.id === id);
