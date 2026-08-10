@@ -988,6 +988,10 @@ export default function ProjectsHome() {
                 </div>
               </div>
 
+              {settingsOpen && (
+                <ProjectSettingsPanel project={selected} onClose={() => setSettingsOpen(false)} />
+              )}
+
               {/* Wetter für Projektort */}
               <WeatherStrip ort={selected.ort} />
 
