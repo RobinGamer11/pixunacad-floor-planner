@@ -1098,7 +1098,7 @@ export default function ProjectsHome() {
                   )}
                 </div>
               )}
-              {tab === "infos" && <InfosView project={selected} />}
+              
             </div>
           )}
         </main>
