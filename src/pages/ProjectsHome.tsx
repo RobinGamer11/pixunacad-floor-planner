@@ -955,9 +955,7 @@ export default function ProjectsHome() {
                     fill={selected.favorite ? "hsl(var(--accent-gold))" : "none"}
                     stroke="hsl(var(--accent-gold))"
                     className="cursor-pointer"
-                    onClick={() =>
-                      projectStore.updateProject(selected.id, { favorite: !selected.favorite })
-                    }
+                    onClick={() => projectStore.toggleFavorite(selected.id)}
                   />
                   <div className="relative" ref={titleMenuRef}>
                     <button
