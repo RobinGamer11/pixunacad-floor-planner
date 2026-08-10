@@ -87,7 +87,7 @@ export default function ProjectsHome() {
   );
   // Startseite öffnet zuerst die projektübergreifende Aufgabenübersicht.
   const [showAllTasks, setShowAllTasks] = useState(true);
-  /** Zusätzliche Kopf-Ansichten (Hauptseite, Geteilt, Papierkorb). */
+  /** Zusätzliche Kopf-Ansichten (Hauptseite, Netzwerk, Papierkorb). */
   const [hub, setHub] = useState<null | "home" | "shared" | "trash">(null);
   const [coinsOpen, setCoinsOpen] = useState(false);
   const [shopOpen, setShopOpen] = useState(false);
@@ -419,10 +419,11 @@ export default function ProjectsHome() {
           <HeaderDivider />
           <NavIcon
             icon={<Users size={18} strokeWidth={1.5} />}
-            label="Geteilt"
+            label="Netzwerk"
             active={hub === "shared"}
             onClick={() => { setShowAllTasks(false); setHub(hub === "shared" ? null : "shared"); }}
           />
+
           <HeaderDivider />
           <NavIcon
             icon={<Trash2 size={18} strokeWidth={1.5} />}
@@ -451,7 +452,7 @@ export default function ProjectsHome() {
               <Plus size={12} strokeWidth={2} className="text-muted-foreground" />
             </span>
           </button>
-          {coinsOpen && <CoinsPanel />}
+          {coinsOpen && <CoinsPanel anchor={coinsRef} />}
         </div>
 
         {/* Shop (näher am Münzenfenster, ohne Rahmen) */}
@@ -463,7 +464,7 @@ export default function ProjectsHome() {
           >
             <ShoppingBag size={18} strokeWidth={1.5} className="text-muted-foreground" />
           </button>
-          {shopOpen && <ShopPanel />}
+          {shopOpen && <ShopPanel anchor={shopRef} />}
         </div>
 
         {/* Profil oben rechts (ohne Rahmen, Text innerhalb Avatar-Höhe) */}
@@ -498,92 +499,7 @@ export default function ProjectsHome() {
               className="fixed right-6 top-16 mt-2 w-80 rounded-xl border shadow-lg z-50 p-4"
               style={{ background: "hsl(var(--surface))", borderColor: "hsl(var(--hairline))" }}
             >
-              <div className="flex items-center gap-4">
-                <div className="flex flex-col items-center">
-                  <div className="relative">
-                  <ProfileAvatar profile={profile} count={projectCount} max={MAX_PROJECTS} size={72} large />
-                  <label
-                    className="absolute -bottom-1 -right-1 h-7 w-7 rounded-full border shadow flex items-center justify-center cursor-pointer"
-                    style={{ background: "hsl(var(--surface))", borderColor: "hsl(var(--hairline))" }}
-                    title="Profilbild ändern"
-                  >
-                    <ImageIcon size={13} className="text-muted-foreground" />
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => {
-                        const f = e.target.files?.[0];
-                        if (!f) return;
-                        const r = new FileReader();
-                        r.onload = () => projectStore.updateProfile({ avatarUrl: String(r.result) });
-                        r.readAsDataURL(f);
-                        e.target.value = "";
-                      }}
-                    />
-                  </label>
-                  </div>
-                  <div className="mt-1.5 text-[10px] font-semibold whitespace-nowrap" style={{ color: "hsl(var(--ink-soft))" }}>
-                    {projectCount} / {MAX_PROJECTS}
-                  </div>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <input
-                    value={profile.name}
-                    onChange={(e) => projectStore.updateProfile({ name: e.target.value })}
-                    className="w-full bg-transparent text-sm font-semibold outline-none border-b pb-1"
-                    style={{ borderColor: "hsl(var(--hairline))" }}
-                  />
-                  <input
-                    value={profile.role}
-                    onChange={(e) => projectStore.updateProfile({ role: e.target.value })}
-                    placeholder="Funktion / Status"
-                    className="mt-2 w-full bg-transparent text-xs text-muted-foreground outline-none border-b pb-1"
-                    style={{ borderColor: "hsl(var(--hairline))" }}
-                  />
-                  {profile.avatarUrl && (
-                    <button
-                      onClick={() => projectStore.updateProfile({ avatarUrl: undefined })}
-                      className="mt-2 text-[10px] text-muted-foreground hover:text-foreground"
-                    >
-                      Bild entfernen
-                    </button>
-                  )}
-                </div>
-              </div>
-              <div className="mt-4">
-                <div className="flex gap-2">
-
-                  {(["online", "busy", "offline"] as ProfileStatus[]).map((s) => (
-                    <button
-                      key={s}
-                      onClick={() => projectStore.updateProfile({ status: s })}
-                      className="flex-1 h-8 rounded-md border text-xs flex items-center justify-center gap-1.5"
-                      style={{
-                        borderColor:
-                          profile.status === s ? statusColor(s) : "hsl(var(--hairline))",
-                        background:
-                          profile.status === s ? `${statusColor(s)}20` : "transparent",
-                      }}
-                    >
-                      <span
-                        className="w-2 h-2 rounded-full"
-                        style={{ background: statusColor(s) }}
-                      />
-                      {statusLabel(s)}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div
-                className="mt-4 rounded-lg p-3 text-xs flex items-center justify-between"
-                style={{ background: "hsl(var(--surface-muted))" }}
-              >
-                <span className="text-muted-foreground">Projekte</span>
-                <span className="font-semibold">
-                  {projectCount} / {MAX_PROJECTS}
-                </span>
-              </div>
+              <ProfileEditor profile={profile} projectCount={projectCount} />
             </div>
           )}
         </div>
@@ -908,7 +824,7 @@ export default function ProjectsHome() {
               <p className="mt-3 text-sm text-muted-foreground">Inhalte folgen in Kürze.</p>
             </div>
           ) : hub === "shared" ? (
-            <SharedView profile={profile} />
+            <SharedView profile={profile} projectCount={projectCount} />
           ) : hub === "trash" ? (
             <TrashView activeCount={projectCount} />
           ) : showAllTasks ? (
@@ -3201,18 +3117,141 @@ function GlobalCalendar({
   );
 }
 
-/* ---------------- Münzen / Shop / Geteilt / Papierkorb ---------------- */
+/* ---------------- Münzen / Shop / Netzwerk / Papierkorb ---------------- */
 
-const panelStyle: React.CSSProperties = {
+const statusColorOf = (s: ProfileStatus) =>
+  s === "online" ? "hsl(140 60% 45%)" : s === "busy" ? "hsl(0 70% 55%)" : "hsl(0 0% 65%)";
+const statusLabelOf = (s: ProfileStatus) =>
+  s === "online" ? "Online" : s === "busy" ? "Beschäftigt" : "Offline";
+
+/**
+ * Gemeinsamer Profil-Editor für das Kopf-Dropdown und die Netzwerk-Seite.
+ * Beide schreiben in denselben Store, dadurch sind sie immer synchron.
+ */
+function ProfileEditor({ profile, projectCount }: { profile: UserProfile; projectCount: number }) {
+  return (
+    <>
+      <div className="flex items-center gap-4">
+        <div className="flex flex-col items-center">
+          <div className="relative">
+            <ProfileAvatar profile={profile} count={projectCount} max={MAX_PROJECTS} size={72} large />
+            <label
+              className="absolute -bottom-1 -right-1 h-7 w-7 rounded-full border shadow flex items-center justify-center cursor-pointer"
+              style={{ background: "hsl(var(--surface))", borderColor: "hsl(var(--hairline))" }}
+              title="Profilbild ändern"
+            >
+              <ImageIcon size={13} className="text-muted-foreground" />
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (!f) return;
+                  const r = new FileReader();
+                  r.onload = () => projectStore.updateProfile({ avatarUrl: String(r.result) });
+                  r.readAsDataURL(f);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+          </div>
+          <div className="mt-1.5 text-[10px] font-semibold whitespace-nowrap" style={{ color: "hsl(var(--ink-soft))" }}>
+            {projectCount} / {MAX_PROJECTS}
+          </div>
+        </div>
+        <div className="flex-1 min-w-0">
+          <input
+            value={profile.name}
+            onChange={(e) => projectStore.updateProfile({ name: e.target.value })}
+            className="w-full bg-transparent text-sm font-semibold outline-none border-b pb-1"
+            style={{ borderColor: "hsl(var(--hairline))" }}
+          />
+          <input
+            value={profile.role}
+            onChange={(e) => projectStore.updateProfile({ role: e.target.value })}
+            placeholder="Funktion / Status"
+            className="mt-2 w-full bg-transparent text-xs text-muted-foreground outline-none border-b pb-1"
+            style={{ borderColor: "hsl(var(--hairline))" }}
+          />
+          {profile.avatarUrl && (
+            <button
+              onClick={() => projectStore.updateProfile({ avatarUrl: undefined })}
+              className="mt-2 text-[10px] text-muted-foreground hover:text-foreground"
+            >
+              Bild entfernen
+            </button>
+          )}
+        </div>
+      </div>
+      <div className="mt-4 flex gap-2">
+        {(["online", "busy", "offline"] as ProfileStatus[]).map((s) => (
+          <button
+            key={s}
+            onClick={() => projectStore.updateProfile({ status: s })}
+            className="flex-1 h-8 rounded-md border text-xs flex items-center justify-center gap-1.5"
+            style={{
+              borderColor: profile.status === s ? statusColorOf(s) : "hsl(var(--hairline))",
+              background: profile.status === s ? `${statusColorOf(s)}20` : "transparent",
+            }}
+          >
+            <span className="w-2 h-2 rounded-full" style={{ background: statusColorOf(s) }} />
+            {statusLabelOf(s)}
+          </button>
+        ))}
+      </div>
+      <div
+        className="mt-4 rounded-lg p-3 text-xs flex items-center justify-between"
+        style={{ background: "hsl(var(--surface-muted))" }}
+      >
+        <span className="text-muted-foreground">Projekte</span>
+        <span className="font-semibold">
+          {projectCount} / {MAX_PROJECTS}
+        </span>
+      </div>
+    </>
+  );
+}
+
+/**
+ * Positioniert ein Popup fix unterhalb seines Ankers. Nötig, weil die Kopfzeile
+ * horizontal scrollt (overflow-x-auto) und absolute Panels dort abgeschnitten werden.
+ */
+function useAnchorPos(anchor: React.RefObject<HTMLElement>, width: number) {
+  const [pos, setPos] = useState({ top: 68, left: 0 });
+  useEffect(() => {
+    const update = () => {
+      const el = anchor.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const left = Math.min(Math.max(12, r.right - width), window.innerWidth - width - 12);
+      setPos({ top: r.bottom + 8, left });
+    };
+    update();
+    window.addEventListener("resize", update);
+    window.addEventListener("scroll", update, true);
+    return () => {
+      window.removeEventListener("resize", update);
+      window.removeEventListener("scroll", update, true);
+    };
+  }, [anchor, width]);
+  return pos;
+}
+
+const popupStyle: React.CSSProperties = {
   background: "hsl(var(--surface))",
   border: "1px solid hsl(var(--hairline))",
   boxShadow: "0 18px 48px rgba(0,0,0,0.18)",
 };
 
 /** Münzen-Popup – Kaufoptionen sind vorbereitet, aber deaktiviert. */
-function CoinsPanel() {
+function CoinsPanel({ anchor }: { anchor: React.RefObject<HTMLElement> }) {
+  const pos = useAnchorPos(anchor, 288);
   return (
-    <div className="absolute right-0 top-11 z-50 w-72 rounded-2xl p-4" style={panelStyle}>
+    <div
+      className="fixed z-[60] w-72 rounded-xl p-4"
+      style={{ ...popupStyle, top: pos.top, left: pos.left }}
+    >
       <div className="flex items-center gap-2">
         <Coins size={16} className="text-muted-foreground" />
         <span className="text-sm font-semibold">Münzen</span>
@@ -3227,7 +3266,7 @@ function CoinsPanel() {
           <Plus size={13} /> Coins
         </button>
         <div
-          className="mt-3 rounded-xl p-3 text-xs space-y-1"
+          className="mt-3 rounded-lg p-3 text-xs space-y-1"
           style={{ background: "hsl(var(--surface-muted))", border: "1px solid hsl(var(--hairline))" }}
         >
           <div className="font-medium">Währungsumrechner</div>
@@ -3241,14 +3280,18 @@ function CoinsPanel() {
 }
 
 /** Shop-Popup – Abos und Einzelkapazitäten, vollständig ausgegraut. */
-function ShopPanel() {
+function ShopPanel({ anchor }: { anchor: React.RefObject<HTMLElement> }) {
+  const pos = useAnchorPos(anchor, 320);
   const items = [
     { title: "Pro-Version", desc: "10 Projekte · je 5 GB", price: "5 Coins" },
     { title: "Premium-Version", desc: "20 Projekte · je 10 GB", price: "10 Coins" },
     { title: "+1 Projekt", desc: "1 zusätzliches Projekt · 5 GB", price: "1 Coin" },
   ];
   return (
-    <div className="absolute right-0 top-11 z-50 w-80 rounded-2xl p-4" style={panelStyle}>
+    <div
+      className="fixed z-[60] w-80 rounded-xl p-4"
+      style={{ ...popupStyle, top: pos.top, left: pos.left }}
+    >
       <div className="flex items-center gap-2">
         <ShoppingBag size={16} className="text-muted-foreground" />
         <span className="text-sm font-semibold">Projektkapazitäten</span>
@@ -3257,7 +3300,7 @@ function ShopPanel() {
         {items.map((it) => (
           <div
             key={it.title}
-            className="rounded-xl p-3 flex items-center gap-3"
+            className="rounded-lg p-3 flex items-center gap-3"
             style={{ background: "hsl(var(--surface-muted))", border: "1px solid hsl(var(--hairline))" }}
           >
             <div className="flex-1 min-w-0">
@@ -3273,43 +3316,39 @@ function ShopPanel() {
   );
 }
 
-/** Geteilt-Ansicht: eigenes Profil oben, Kontakte darunter. */
-function SharedView({ profile }: { profile: UserProfile }) {
+/** Netzwerk-Ansicht: eigenes Profil oben (identisch zum Kopf-Dropdown), Kontakte darunter. */
+function SharedView({ profile, projectCount }: { profile: UserProfile; projectCount: number }) {
   return (
-    <div className="max-w-3xl">
-      <h1 className="text-2xl font-semibold tracking-tight">Geteilt</h1>
-      <div
-        className="mt-5 rounded-2xl p-4 flex items-center gap-4"
-        style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
-      >
+    <div className="px-10 py-7">
+      <h1 className="text-2xl font-semibold tracking-tight">Netzwerk</h1>
+
+      <div className="mt-5 max-w-xl">
+        <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">MEIN PROFIL</div>
         <div
-          className="h-14 w-14 rounded-full overflow-hidden shrink-0"
-          style={{ background: "hsl(var(--surface-muted))" }}
+          className="mt-2 rounded-xl border p-4"
+          style={{ background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" }}
         >
-          {profile.avatarUrl && <img src={profile.avatarUrl} alt="" className="h-full w-full object-cover" />}
+          <ProfileEditor profile={profile} projectCount={projectCount} />
         </div>
-        <div className="min-w-0">
-          <div className="text-sm font-semibold truncate">{profile.name}</div>
-          <div className="text-xs text-muted-foreground truncate">{profile.role}</div>
-        </div>
-        <span className="ml-auto text-[11px] text-muted-foreground">Mein Profil</span>
       </div>
 
-      <div className="mt-6 flex items-center gap-3">
-        <h2 className="text-sm font-semibold">Kontakte</h2>
-        <button
-          disabled
-          className="h-8 px-3 rounded-md border text-xs flex items-center gap-1.5 opacity-40 cursor-not-allowed"
-          style={{ borderColor: "hsl(var(--hairline))" }}
+      <div className="mt-8 max-w-xl">
+        <div className="flex items-center gap-3">
+          <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">KONTAKTE</div>
+          <button
+            disabled
+            className="h-8 px-3 rounded-md border text-xs flex items-center gap-1.5 opacity-40 cursor-not-allowed"
+            style={{ borderColor: "hsl(var(--hairline))" }}
+          >
+            <Plus size={12} /> Kontakte
+          </button>
+        </div>
+        <div
+          className="mt-2 rounded-xl p-10 text-center text-sm text-muted-foreground"
+          style={{ background: "hsl(var(--surface-card))", border: "1px dashed hsl(var(--hairline))" }}
         >
-          <Plus size={12} /> Kontakte
-        </button>
-      </div>
-      <div
-        className="mt-3 rounded-2xl p-10 text-center text-sm text-muted-foreground"
-        style={{ background: "hsl(var(--surface-card))", border: "1px dashed hsl(var(--hairline))" }}
-      >
-        Noch keine Kontakte hinterlegt.
+          Noch keine Kontakte hinterlegt.
+        </div>
       </div>
     </div>
   );
@@ -3320,66 +3359,68 @@ function TrashView({ activeCount }: { activeCount: number }) {
   const trashed = useTrashedProjects();
   const full = activeCount >= MAX_PROJECTS;
   return (
-    <div className="max-w-3xl">
+    <div className="px-10 py-7">
       <h1 className="text-2xl font-semibold tracking-tight">Papierkorb</h1>
       <p className="mt-1 text-sm text-muted-foreground">
         Gelöschte Projekte bleiben 30 Tage erhalten und können wiederhergestellt werden.
       </p>
-      {full && (
-        <div
-          className="mt-4 rounded-xl px-4 py-3 text-xs"
-          style={{ background: "hsl(var(--surface-muted))", border: "1px solid hsl(var(--hairline))" }}
-        >
-          Maximale Projektanzahl ({MAX_PROJECTS}) erreicht – lösche zuerst ein laufendes Projekt.
-        </div>
-      )}
-      {trashed.length === 0 ? (
-        <div
-          className="mt-5 rounded-2xl p-10 text-center text-sm text-muted-foreground"
-          style={{ background: "hsl(var(--surface-card))", border: "1px dashed hsl(var(--hairline))" }}
-        >
-          Der Papierkorb ist leer.
-        </div>
-      ) : (
-        <div
-          className="mt-5 rounded-2xl divide-y overflow-hidden"
-          style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))", borderColor: "hsl(var(--hairline))" }}
-        >
-          {trashed.map((p) => (
-            <div key={p.id} className="flex items-center gap-3 p-3">
-              <div className="h-10 w-10 rounded-md overflow-hidden shrink-0" style={{ background: "hsl(var(--surface-muted))" }}>
-                {p.thumbnail && <img src={p.thumbnail} alt="" className="h-full w-full object-cover" />}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="text-sm font-medium truncate">{p.name}</div>
-                <div className="text-[11px] text-muted-foreground">
-                  Noch {trashDaysLeft(p)} Tage wiederherstellbar
+      <div className="mt-5 max-w-2xl">
+        {full && (
+          <div
+            className="mb-3 rounded-lg px-4 py-3 text-xs"
+            style={{ background: "hsl(var(--surface-muted))", border: "1px solid hsl(var(--hairline))" }}
+          >
+            Maximale Projektanzahl ({MAX_PROJECTS}) erreicht – lösche zuerst ein laufendes Projekt.
+          </div>
+        )}
+        {trashed.length === 0 ? (
+          <div
+            className="rounded-xl p-10 text-center text-sm text-muted-foreground"
+            style={{ background: "hsl(var(--surface-card))", border: "1px dashed hsl(var(--hairline))" }}
+          >
+            Der Papierkorb ist leer.
+          </div>
+        ) : (
+          <div
+            className="rounded-xl divide-y overflow-hidden border"
+            style={{ background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" }}
+          >
+            {trashed.map((p) => (
+              <div key={p.id} className="flex items-center gap-3 p-3" style={{ borderColor: "hsl(var(--hairline))" }}>
+                <div className="h-10 w-10 rounded-md overflow-hidden shrink-0" style={{ background: "hsl(var(--surface-muted))" }}>
+                  {p.thumbnail && <img src={p.thumbnail} alt="" className="h-full w-full object-cover" />}
                 </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-medium truncate">{p.name}</div>
+                  <div className="text-[11px] text-muted-foreground">
+                    Noch {trashDaysLeft(p)} Tage wiederherstellbar
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    if (!projectStore.restoreProject(p.id)) {
+                      alert(`Maximal ${MAX_PROJECTS} Projekte möglich. Lösche zuerst ein bestehendes Projekt.`);
+                    }
+                  }}
+                  disabled={full}
+                  className="h-8 px-3 rounded-md text-xs font-medium disabled:opacity-40"
+                  style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
+                >
+                  Wiederherstellen
+                </button>
+                <button
+                  onClick={() => { if (confirm(`„${p.name}" endgültig löschen?`)) projectStore.purgeProject(p.id); }}
+                  className="h-8 px-2 rounded-md border text-xs"
+                  style={{ borderColor: "hsl(var(--hairline))" }}
+                  title="Endgültig löschen"
+                >
+                  <Trash2 size={13} />
+                </button>
               </div>
-              <button
-                onClick={() => {
-                  if (!projectStore.restoreProject(p.id)) {
-                    alert(`Maximal ${MAX_PROJECTS} Projekte möglich. Lösche zuerst ein bestehendes Projekt.`);
-                  }
-                }}
-                disabled={full}
-                className="h-8 px-3 rounded-md text-xs font-medium disabled:opacity-40"
-                style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
-              >
-                Wiederherstellen
-              </button>
-              <button
-                onClick={() => { if (confirm(`„${p.name}" endgültig löschen?`)) projectStore.purgeProject(p.id); }}
-                className="h-8 px-2 rounded-md border text-xs"
-                style={{ borderColor: "hsl(var(--hairline))" }}
-                title="Endgültig löschen"
-              >
-                <Trash2 size={13} />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
