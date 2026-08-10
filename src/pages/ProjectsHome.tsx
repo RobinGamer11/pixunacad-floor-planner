@@ -452,7 +452,7 @@ export default function ProjectsHome() {
               <Plus size={12} strokeWidth={2} className="text-muted-foreground" />
             </span>
           </button>
-          {coinsOpen && <CoinsPanel />}
+          {coinsOpen && <CoinsPanel anchor={coinsRef} />}
         </div>
 
         {/* Shop (näher am Münzenfenster, ohne Rahmen) */}
@@ -464,7 +464,7 @@ export default function ProjectsHome() {
           >
             <ShoppingBag size={18} strokeWidth={1.5} className="text-muted-foreground" />
           </button>
-          {shopOpen && <ShopPanel />}
+          {shopOpen && <ShopPanel anchor={shopRef} />}
         </div>
 
         {/* Profil oben rechts (ohne Rahmen, Text innerhalb Avatar-Höhe) */}
@@ -824,7 +824,7 @@ export default function ProjectsHome() {
               <p className="mt-3 text-sm text-muted-foreground">Inhalte folgen in Kürze.</p>
             </div>
           ) : hub === "shared" ? (
-            <SharedView profile={profile} />
+            <SharedView profile={profile} projectCount={projectCount} />
           ) : hub === "trash" ? (
             <TrashView activeCount={projectCount} />
           ) : showAllTasks ? (
