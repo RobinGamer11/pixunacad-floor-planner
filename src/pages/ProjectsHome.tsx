@@ -778,6 +778,8 @@ export default function ProjectsHome() {
                     active={mode === "projects" && !showAllTasks && selected?.id === p.id}
                     onSelect={() => { setMode("projects"); setShowAllTasks(false); setSelectedId(p.id); }}
                     onOpen={() => navigate(`/project/${p.id}`)}
+                    onSettings={() => { setMode("projects"); setShowAllTasks(false); setSelectedId(p.id); setSettingsOpen(true); }}
+                    onDelete={() => deleteProjectWithConfirm(p)}
                     onDragStart={() => setDragProjectId(p.id)}
                     onDragEnd={() => setDragProjectId(null)}
                   />
