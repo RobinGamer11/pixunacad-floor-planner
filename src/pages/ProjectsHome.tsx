@@ -87,7 +87,7 @@ export default function ProjectsHome() {
   );
   // Startseite öffnet zuerst die projektübergreifende Aufgabenübersicht.
   const [showAllTasks, setShowAllTasks] = useState(true);
-  /** Zusätzliche Kopf-Ansichten (Hauptseite, Geteilt, Papierkorb). */
+  /** Zusätzliche Kopf-Ansichten (Hauptseite, Netzwerk, Papierkorb). */
   const [hub, setHub] = useState<null | "home" | "shared" | "trash">(null);
   const [coinsOpen, setCoinsOpen] = useState(false);
   const [shopOpen, setShopOpen] = useState(false);
