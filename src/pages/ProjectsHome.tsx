@@ -1241,21 +1241,27 @@ export default function ProjectsHome() {
 function ProjectCard({
   project: p,
   active,
+  dropIndicator,
   onSelect,
   onOpen,
   onSettings,
   onDelete,
   onDragStart,
   onDragEnd,
+  onDragOverCard,
+  onDropOnCard,
 }: {
   project: Project;
   active: boolean;
+  dropIndicator?: boolean;
   onSelect: () => void;
   onOpen: () => void;
   onSettings: () => void;
   onDelete: () => void;
   onDragStart: () => void;
   onDragEnd: () => void;
+  onDragOverCard?: () => void;
+  onDropOnCard?: () => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -1276,12 +1282,15 @@ function ProjectCard({
       draggable
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
+      onDragOver={(e) => { if (onDragOverCard) { e.preventDefault(); e.stopPropagation(); onDragOverCard(); } }}
+      onDrop={(e) => { if (onDropOnCard) { e.preventDefault(); e.stopPropagation(); onDropOnCard(); } }}
       onClick={onSelect}
       onDoubleClick={onOpen}
       className="w-full text-left rounded-lg p-2 flex gap-2.5 transition cursor-pointer"
       style={{
         background: active ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.02)",
         border: `1px solid ${active ? "hsl(var(--accent-gold) / 0.55)" : "rgba(255,255,255,0.04)"}`,
+        borderTop: dropIndicator ? "2px solid hsl(var(--accent-gold))" : undefined,
       }}
     >
       <div className="w-12 h-12 shrink-0 group/thumb" style={{ perspective: "300px" }}>
