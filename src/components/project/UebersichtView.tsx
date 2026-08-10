@@ -66,15 +66,23 @@ function HeroPanel({ project }: { project: Project }) {
 function KonzeptPanel({ project }: { project: Project }) {
   const collapsed = !!project.konzeptCollapsed;
   const title = project.konzeptTitle ?? "Konzept";
-  const [renaming, setRenaming] = useState(false);
-  const [titleDraft, setTitleDraft] = useState(title);
   const [editing, setEditing] = useState(false);
+  const [titleDraft, setTitleDraft] = useState(title);
   const [draft, setDraft] = useState(project.konzept ?? "");
 
-  const saveTitle = () => {
-    const v = titleDraft.trim() || "Konzept";
-    projectStore.updateProject(project.id, { konzeptTitle: v });
-    setRenaming(false);
+  const startEdit = () => {
+    setTitleDraft(title);
+    setDraft(project.konzept ?? "");
+    if (collapsed) projectStore.updateProject(project.id, { konzeptCollapsed: false });
+    setEditing(true);
+  };
+
+  const save = () => {
+    projectStore.updateProject(project.id, {
+      konzeptTitle: titleDraft.trim() || "Konzept",
+      konzept: draft,
+    });
+    setEditing(false);
   };
 
   return (
@@ -90,15 +98,14 @@ function KonzeptPanel({ project }: { project: Project }) {
         >
           {collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
         </button>
-        {renaming ? (
+        {editing ? (
           <input
             autoFocus
             value={titleDraft}
             onChange={(e) => setTitleDraft(e.target.value)}
-            onBlur={saveTitle}
             onKeyDown={(e) => {
-              if (e.key === "Enter") saveTitle();
-              if (e.key === "Escape") { setTitleDraft(title); setRenaming(false); }
+              if (e.key === "Enter") save();
+              if (e.key === "Escape") setEditing(false);
             }}
             className="flex-1 text-xs font-semibold tracking-[0.18em] uppercase bg-transparent border-b outline-none"
             style={{ borderColor: "hsl(var(--hairline))", color: "hsl(var(--accent-gold))" }}
@@ -107,24 +114,17 @@ function KonzeptPanel({ project }: { project: Project }) {
           <div
             className="flex-1 text-xs font-semibold tracking-[0.18em] uppercase cursor-text"
             style={{ color: "hsl(var(--accent-gold))" }}
-            onDoubleClick={() => { setTitleDraft(title); setRenaming(true); }}
-            title="Doppelklick zum Umbenennen"
+            onDoubleClick={startEdit}
+            title="Doppelklick zum Bearbeiten"
           >
             {title}
           </div>
         )}
-        <button
-          onClick={() => { setTitleDraft(title); setRenaming(true); }}
-          className="h-6 w-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted"
-          title="Titel umbenennen"
-        >
-          <Pencil size={12} />
-        </button>
-        {!collapsed && !editing && (
+        {!editing && (
           <button
-            onClick={() => { setDraft(project.konzept ?? ""); setEditing(true); }}
+            onClick={startEdit}
             className="h-6 w-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted"
-            title="Text bearbeiten"
+            title="Titel & Text bearbeiten"
           >
             <Pencil size={12} />
           </button>
@@ -150,7 +150,7 @@ function KonzeptPanel({ project }: { project: Project }) {
                 <X size={12} /> Abbrechen
               </button>
               <button
-                onClick={() => { projectStore.updateProject(project.id, { konzept: draft }); setEditing(false); }}
+                onClick={save}
                 className="h-8 px-3 rounded-md text-xs font-medium flex items-center gap-1"
                 style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
               >

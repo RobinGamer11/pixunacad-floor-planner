@@ -64,7 +64,7 @@ const Pixuna = () => (
   </span>
 );
 
-type Tab = "uebersicht" | "seiten" | "aufgaben" | "finanzen" | "dokumente" | "infos" | "team";
+type Tab = "uebersicht" | "seiten" | "aufgaben" | "finanzen" | "dokumente" | "team";
 type DokumenteSubTab = "dateien" | "fotos";
 
 export default function ProjectsHome() {
@@ -91,6 +91,8 @@ export default function ProjectsHome() {
   const [dokumenteSubTab, setDokumenteSubTab] = useState<DokumenteSubTab>("dateien");
   const [leftOpen, setLeftOpen] = useState(true);
   const [titleMenuOpen, setTitleMenuOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [newProjectDialogOpen, setNewProjectDialogOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
   const titleMenuRef = useRef<HTMLDivElement | null>(null);
@@ -205,8 +207,35 @@ export default function ProjectsHome() {
       alert(`Maximal ${MAX_PROJECTS} Projekte möglich. Lösche zuerst ein bestehendes Projekt.`);
       return;
     }
+    // Zuerst Einstellungsfenster zeigen – Projekt wird erst danach angelegt.
+    setNewProjectDialogOpen(true);
+  };
+
+  const finishCreateProject = (values: {
+    name: string;
+    bauherr: string;
+    ort: string;
+    projektTyp: string;
+    status: string;
+    erstelltAm: string;
+  }) => {
     const id = projectStore.createProject();
+    projectStore.updateProject(id, values);
+    setNewProjectDialogOpen(false);
+    setMode("projects");
+    setShowAllTasks(false);
     setSelectedId(id);
+  };
+
+  const deleteProjectWithConfirm = (p: Project) => {
+    const label = p.isTemplate ? "Vorlage" : "Projektmappe";
+    const msg = `${label} „${p.name}" wirklich löschen?\n\nAlle Inhalte werden endgültig entfernt:\n• Seiten & Zeichenblätter\n• CAD-Elemente & Bemaßungen\n• Board-Themen, Aufgaben & Notizen\n• Dateien & Fotos\n\nDieser Vorgang kann nicht rückgängig gemacht werden.`;
+    if (!confirm(msg)) return;
+    projectStore.deleteProject(p.id);
+    if (selectedId === p.id) {
+      const next = projects.find((x) => x.id !== p.id && !!x.isTemplate === !!p.isTemplate);
+      setSelectedId(next?.id);
+    }
   };
 
   const commitNewFolder = () => {
@@ -717,6 +746,8 @@ export default function ProjectsHome() {
                               active={mode === "projects" && !showAllTasks && selected?.id === p.id}
                               onSelect={() => { setMode("projects"); setShowAllTasks(false); setSelectedId(p.id); }}
                               onOpen={() => navigate(`/project/${p.id}`)}
+                              onSettings={() => { setMode("projects"); setShowAllTasks(false); setSelectedId(p.id); setSettingsOpen(true); }}
+                              onDelete={() => deleteProjectWithConfirm(p)}
                               onDragStart={() => setDragProjectId(p.id)}
                               onDragEnd={() => setDragProjectId(null)}
                             />
@@ -747,6 +778,8 @@ export default function ProjectsHome() {
                     active={mode === "projects" && !showAllTasks && selected?.id === p.id}
                     onSelect={() => { setMode("projects"); setShowAllTasks(false); setSelectedId(p.id); }}
                     onOpen={() => navigate(`/project/${p.id}`)}
+                    onSettings={() => { setMode("projects"); setShowAllTasks(false); setSelectedId(p.id); setSettingsOpen(true); }}
+                    onDelete={() => deleteProjectWithConfirm(p)}
                     onDragStart={() => setDragProjectId(p.id)}
                     onDragEnd={() => setDragProjectId(null)}
                   />
@@ -941,13 +974,12 @@ export default function ProjectsHome() {
                       >
                         <button
                           onClick={() => {
-                            setNameDraft(selected.name);
-                            setRenaming(true);
+                            setSettingsOpen(true);
                             setTitleMenuOpen(false);
                           }}
                           className="w-full px-3 py-1.5 flex items-center gap-2 hover:bg-muted text-left"
                         >
-                          <Pencil size={14} /> Umbenennen
+                          <Settings size={14} /> Einstellungen
                         </button>
                         <button
                           onClick={() => {
@@ -988,6 +1020,10 @@ export default function ProjectsHome() {
                 </div>
               </div>
 
+              {settingsOpen && (
+                <ProjectSettingsPanel project={selected} onClose={() => setSettingsOpen(false)} />
+              )}
+
               {/* Wetter für Projektort */}
               <WeatherStrip ort={selected.ort} />
 
@@ -1021,7 +1057,7 @@ export default function ProjectsHome() {
                       ["finanzen", "Finanzen", false],
                       ["dokumente", "Dokumente", false],
                       ["seiten", "Mappe", false],
-                      ["infos", "Informationen", false],
+                      
                       ["team", "Team", true],
                     ] as const
                   ).map(([key, label, disabled]) => (
@@ -1098,11 +1134,18 @@ export default function ProjectsHome() {
                   )}
                 </div>
               )}
-              {tab === "infos" && <InfosView project={selected} />}
+              
             </div>
           )}
         </main>
       </div>
+
+      {newProjectDialogOpen && (
+        <NewProjectSettingsDialog
+          onCancel={() => setNewProjectDialogOpen(false)}
+          onCreate={finishCreateProject}
+        />
+      )}
     </div>
   );
 }
@@ -1113,6 +1156,8 @@ function ProjectCard({
   active,
   onSelect,
   onOpen,
+  onSettings,
+  onDelete,
   onDragStart,
   onDragEnd,
 }: {
@@ -1120,9 +1165,21 @@ function ProjectCard({
   active: boolean;
   onSelect: () => void;
   onOpen: () => void;
+  onSettings: () => void;
+  onDelete: () => void;
   onDragStart: () => void;
   onDragEnd: () => void;
 }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [menuOpen]);
   const drawings = (p.pages ?? []).reduce(
     (n, pg: any) => n + ((pg?.elements ?? []).filter((e: any) => e?.type === "cad-view").length || 0),
     0
@@ -1171,14 +1228,37 @@ function ProjectCard({
           {p.pages.length} {p.pages.length === 1 ? "Seite" : "Seiten"} · {drawings} {drawings === 1 ? "Zeichnung" : "Zeichnungen"}
         </div>
       </div>
-      <button
-        onClick={(e) => { e.stopPropagation(); onOpen(); }}
-        className="opacity-60 hover:opacity-100 self-start"
-        style={{ color: "#8A9099" }}
-        title="Öffnen"
-      >
-        <MoreHorizontal size={14} />
-      </button>
+      <div className="relative self-start" ref={menuRef}>
+        <button
+          onClick={(e) => { e.stopPropagation(); setMenuOpen((v) => !v); }}
+          className="opacity-60 hover:opacity-100"
+          style={{ color: "#8A9099" }}
+          title="Mehr"
+        >
+          <MoreHorizontal size={14} />
+        </button>
+        {menuOpen && (
+          <div
+            className="absolute right-0 top-full mt-1 z-40 min-w-[160px] rounded-md border shadow-md py-1 text-sm"
+            style={{ background: "hsl(var(--surface))", borderColor: "hsl(var(--hairline))", color: "hsl(var(--ink))" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => { setMenuOpen(false); onSettings(); }}
+              className="w-full px-3 py-1.5 flex items-center gap-2 hover:bg-muted text-left"
+            >
+              <Settings size={14} /> Einstellungen
+            </button>
+            <button
+              onClick={() => { setMenuOpen(false); onDelete(); }}
+              className="w-full px-3 py-1.5 flex items-center gap-2 hover:bg-muted text-left"
+              style={{ color: "hsl(0 70% 50%)" }}
+            >
+              <Trash2 size={14} /> Löschen
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -2195,17 +2275,16 @@ function TaskCalendar({
   );
 }
 
-function InfosView({ project }: { project: Project }) {
-  const update = (patch: Partial<Project>) => projectStore.updateProject(project.id, patch);
-  const Field = ({
-    label,
-    value,
-    onChange,
-  }: {
-    label: string;
-    value: string;
-    onChange: (v: string) => void;
-  }) => (
+function SettingsField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
     <label className="block">
       <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">
         {label}
@@ -2218,49 +2297,125 @@ function InfosView({ project }: { project: Project }) {
       />
     </label>
   );
+}
+
+/** Einstellungsfenster eines bestehenden Projekts (Name + Informationen). */
+function ProjectSettingsPanel({ project, onClose }: { project: Project; onClose: () => void }) {
+  const update = (patch: Partial<Project>) => projectStore.updateProject(project.id, patch);
 
   return (
     <div
-      className="mt-6 rounded-2xl p-6 grid grid-cols-2 gap-5 max-w-3xl"
+      className="mt-4 rounded-2xl p-6 max-w-3xl"
       style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
     >
-      <Field label="Projektname" value={project.name} onChange={(v) => update({ name: v })} />
-      <Field label="Bauherr" value={project.bauherr ?? ""} onChange={(v) => update({ bauherr: v })} />
-      <div className="col-span-2">
-        <AddressField
-          value={project.ort}
-          onChange={(v) => update({ ort: v })}
-        />
+      <div className="flex items-center justify-between mb-4">
+        <div className="text-[11px] font-semibold tracking-[0.18em] uppercase" style={{ color: "hsl(var(--accent-gold))" }}>
+          Projekteinstellungen
+        </div>
+        <button onClick={onClose} className="text-muted-foreground hover:text-foreground" title="Schließen">
+          <X size={16} />
+        </button>
       </div>
-      <Field
-        label="Projekttyp"
-        value={project.projektTyp ?? ""}
-        onChange={(v) => update({ projektTyp: v })}
-      />
-      <Field
-        label="Status"
-        value={project.status ?? ""}
-        onChange={(v) => update({ status: v })}
-      />
-      <Field
-        label="Erstellt am"
-        value={project.erstelltAm ?? ""}
-        onChange={(v) => update({ erstelltAm: v })}
-      />
+      <div className="grid grid-cols-2 gap-5">
+        <SettingsField label="PROJEKTNAME" value={project.name} onChange={(v) => update({ name: v.trim() || project.name })} />
+        <SettingsField label="BAUHERR" value={project.bauherr ?? ""} onChange={(v) => update({ bauherr: v })} />
+        <div className="col-span-2">
+          <AddressField value={project.ort} onChange={(v) => update({ ort: v })} />
+        </div>
+        <SettingsField label="PROJEKTTYP" value={project.projektTyp ?? ""} onChange={(v) => update({ projektTyp: v })} />
+        <SettingsField label="STATUS" value={project.status ?? ""} onChange={(v) => update({ status: v })} />
+        <SettingsField label="ERSTELLT AM" value={project.erstelltAm ?? ""} onChange={(v) => update({ erstelltAm: v })} />
 
-      {(project.customFields ?? []).map((f) => (
-        <CustomFieldEditor key={f.id} projectId={project.id} field={f} />
-      ))}
+        {(project.customFields ?? []).map((f) => (
+          <CustomFieldEditor key={f.id} projectId={project.id} field={f} />
+        ))}
 
-      <div className="col-span-2 flex items-center justify-between">
-        <AddCustomFieldControl projectId={project.id} />
-        <div className="text-xs text-muted-foreground">
-          Änderungen werden automatisch in der rechten Projektinfo übernommen.
+        <div className="col-span-2 flex items-center justify-between">
+          <AddCustomFieldControl projectId={project.id} />
+          <div className="text-xs text-muted-foreground">
+            Änderungen werden automatisch übernommen.
+          </div>
         </div>
       </div>
     </div>
   );
 }
+
+/** Einstellungsfenster für ein NEUES Projekt – erst nach „Projekt anlegen" wird es erstellt. */
+function NewProjectSettingsDialog({
+  onCancel,
+  onCreate,
+}: {
+  onCancel: () => void;
+  onCreate: (values: {
+    name: string;
+    bauherr: string;
+    ort: string;
+    projektTyp: string;
+    status: string;
+    erstelltAm: string;
+  }) => void;
+}) {
+  const [name, setName] = useState("Neues Projekt");
+  const [bauherr, setBauherr] = useState("");
+  const [ort, setOrt] = useState("");
+  const [projektTyp, setProjektTyp] = useState("");
+  const [status, setStatus] = useState("");
+  const [erstelltAm, setErstelltAm] = useState(new Date().toLocaleDateString("de-DE"));
+
+  return (
+    <div
+      className="fixed inset-0 z-[120] flex items-start justify-center overflow-y-auto p-8"
+      style={{ background: "rgba(0,0,0,0.45)" }}
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel(); }}
+    >
+      <div
+        className="w-full max-w-2xl rounded-2xl p-6 shadow-xl"
+        style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <div className="text-[11px] font-semibold tracking-[0.18em] uppercase" style={{ color: "hsl(var(--accent-gold))" }}>
+            Neues Projekt – Einstellungen
+          </div>
+          <button onClick={onCancel} className="text-muted-foreground hover:text-foreground" title="Abbrechen">
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-5">
+          <SettingsField label="PROJEKTNAME" value={name} onChange={setName} />
+          <SettingsField label="BAUHERR" value={bauherr} onChange={setBauherr} />
+          <div className="col-span-2">
+            <AddressField value={ort} onChange={setOrt} />
+          </div>
+          <SettingsField label="PROJEKTTYP" value={projektTyp} onChange={setProjektTyp} />
+          <SettingsField label="STATUS" value={status} onChange={setStatus} />
+          <SettingsField label="ERSTELLT AM" value={erstelltAm} onChange={setErstelltAm} />
+        </div>
+
+        <div className="mt-6 flex justify-end gap-2">
+          <button
+            onClick={onCancel}
+            className="h-9 px-4 rounded-md border text-sm"
+            style={{ borderColor: "hsl(var(--hairline))" }}
+          >
+            Abbrechen
+          </button>
+          <button
+            onClick={() =>
+              onCreate({ name: name.trim() || "Neues Projekt", bauherr, ort, projektTyp, status, erstelltAm })
+            }
+            className="h-9 px-4 rounded-md text-sm font-semibold"
+            style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
+          >
+            Projekt anlegen
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 function AddressField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const externalContentEnabled = useExternalContentConsent();
