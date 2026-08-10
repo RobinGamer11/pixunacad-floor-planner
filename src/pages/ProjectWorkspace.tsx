@@ -40,6 +40,7 @@ import {
   PanelRightOpen,
   ZoomIn,
   ZoomOut,
+  Crosshair,
   RefreshCw,
   Compass as CompassIcon,
   MousePointer2,
@@ -102,6 +103,7 @@ import { ProjectFilePickerDialog } from "@/components/cad/ProjectFilePickerDialo
 import { HatchSettingsPanel } from "@/components/cad/HatchSettingsPanel";
 import { RasterModeToggle } from "@/components/cad/RasterModeToggle";
 import { WorkspaceHeader } from "@/components/workspace/WorkspaceHeader";
+import { MappeHelpOverlay } from "@/components/workspace/MappeHelpOverlay";
 import { TabletAidWheel } from "@/components/TabletAidWheel";
 
 // Papierformate: kanonische Quelle ist src/lib/paper.ts.
@@ -286,6 +288,7 @@ export default function ProjectWorkspace() {
   useEffect(() => {
     try { localStorage.setItem("pixuna.tabletAid", tabletAidOn ? "1" : "0"); } catch {}
   }, [tabletAidOn]);
+  const mappeHelpOn = project?.settings?.mappeHelpOn ?? true;
   const hist = useProjectHistory(project?.id);
 
 
@@ -394,7 +397,7 @@ export default function ProjectWorkspace() {
   // Aktueller Zoom als Ref, damit iPad-Touch-Handler ihn ohne Rerender lesen.
   const zoomRef = useRef(zoom);
   useEffect(() => { zoomRef.current = zoom; }, [zoom]);
-  const wheelAccumRef = useRef(1);
+  const wheelStepRef = useRef(0);
   const wheelAnchorRef = useRef<{ x: number; y: number } | null>(null);
   const wheelRafRef = useRef(0);
   const wheelEndTimerRef = useRef<number | null>(null);
@@ -535,26 +538,22 @@ export default function ProjectWorkspace() {
       let dy = e.deltaY;
       if (e.deltaMode === 1) dy *= 16;
       if (e.deltaMode === 2) dy *= el.clientHeight;
-      if (Math.abs(dy) > 60) {
-        const sign = dy < 0 ? -1 : 1;
-        dy = sign * (60 + Math.log2(Math.abs(dy) / 60 + 1) * 40);
-      }
-      let sensitivity = 0.00055;
-      if (e.altKey) sensitivity = 0.0012;
-      else if (e.ctrlKey || e.metaKey) sensitivity = 0.00042;
-      const factor = Math.exp(-dy * sensitivity);
-      wheelAccumRef.current *= factor;
+      if (dy === 0) return;
+      // Pro Renderframe genau ein Prozentpunkt. Dadurch bleiben klassische
+      // Mausrad-Rasten präzise und Trackpads erzeugen keine Sprünge.
+      wheelStepRef.current = dy < 0 ? 1 : -1;
       wheelAnchorRef.current = { x: e.clientX, y: e.clientY };
       if (!wheelRafRef.current) {
         wheelRafRef.current = requestAnimationFrame(() => {
           wheelRafRef.current = 0;
-          const f = wheelAccumRef.current;
-          wheelAccumRef.current = 1;
+          const step = wheelStepRef.current;
+          wheelStepRef.current = 0;
           const a = wheelAnchorRef.current;
           const current = zoomRef.current;
-          const next = clampProjectZoom(current * f);
+          const next = clampProjectZoom(current + step);
           if (Math.abs(next - current) < 0.0005) return;
           if (a) zoomAnchorRef.current = captureZoomAnchor(a.x, a.y);
+          zoomRef.current = next;
           setZoom(next);
         });
       }
@@ -563,6 +562,8 @@ export default function ProjectWorkspace() {
     return () => {
       el.removeEventListener("wheel", onWheel, { capture: true } as any);
       if (wheelRafRef.current) { cancelAnimationFrame(wheelRafRef.current); wheelRafRef.current = 0; }
+      wheelStepRef.current = 0;
+      wheelAnchorRef.current = null;
       if (wheelEndTimerRef.current !== null) window.clearTimeout(wheelEndTimerRef.current);
       setWorkspacePdfZoomActive(false);
     };
@@ -645,7 +646,8 @@ export default function ProjectWorkspace() {
   const centerActiveSheet = () => {
     const v = canvasViewportRef.current;
     if (!v) return;
-    const el = v.querySelector("[data-page-id]") as HTMLElement | null;
+    const pages = Array.from(v.querySelectorAll<HTMLElement>("[data-page-id]"));
+    const el = pages.find((page) => page.dataset.pageId === activePage?.id) ?? pages[0] ?? null;
     if (el) {
       const vr = v.getBoundingClientRect();
       const er = el.getBoundingClientRect();
@@ -665,6 +667,19 @@ export default function ProjectWorkspace() {
         setTimeout(centerActiveSheet, 60);
       });
     });
+  };
+
+  const resetZoomAndCenter = () => {
+    if (wheelRafRef.current) {
+      cancelAnimationFrame(wheelRafRef.current);
+      wheelRafRef.current = 0;
+    }
+    wheelStepRef.current = 0;
+    wheelAnchorRef.current = null;
+    zoomAnchorRef.current = null;
+    zoomRef.current = 100;
+    setZoom(100);
+    centerActiveSheetSoon();
   };
 
   // Beim ersten Anzeigen: komplettes Blatt mittig, leicht rausgezoomt.
@@ -1078,6 +1093,8 @@ export default function ProjectWorkspace() {
         onPresent={() => setPresenting(true)}
         onShare={() => {}}
         onExport={() => setPrintMode((v) => !v)}
+        mappeHelpOn={mappeHelpOn}
+        onToggleMappeHelp={() => projectStore.setMappeHelpOn(project.id, !mappeHelpOn)}
         tabletAidOn={tabletAidOn}
         onToggleTabletAid={() => setTabletAidOn((v) => !v)}
       />
@@ -1912,7 +1929,8 @@ export default function ProjectWorkspace() {
                 );
               })()}
             </div>
-            <ZoomBar zoom={zoom} setZoom={setZoomClamped} />
+            {mappeHelpOn && !presenting && !printMode && <MappeHelpOverlay />}
+            <ZoomBar zoom={zoom} setZoom={setZoomClamped} onResetZoom={resetZoomAndCenter} />
           </main>
 
           {/* Right inspector (collapsible) */}
@@ -3022,7 +3040,15 @@ function PageCanvas({
 }
 
 
-function ZoomBar({ zoom, setZoom }: { zoom: number; setZoom: (v: number) => void }) {
+function ZoomBar({
+  zoom,
+  setZoom,
+  onResetZoom,
+}: {
+  zoom: number;
+  setZoom: (v: number) => void;
+  onResetZoom: () => void;
+}) {
   const [draft, setDraft] = useState<string | null>(null);
   const sliderValue = zoomToSliderValue(zoom);
   return (
@@ -3077,10 +3103,13 @@ function ZoomBar({ zoom, setZoom }: { zoom: number; setZoom: (v: number) => void
         <span className="text-xs text-muted-foreground">%</span>
       </div>
       <button
-        onClick={() => setZoom(100)}
-        className="text-xs text-muted-foreground hover:text-foreground ml-2"
-        title="Auf 100 %"
+        type="button"
+        onClick={onResetZoom}
+        className="ml-2 flex h-7 items-center gap-1.5 rounded-md border px-2 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        style={{ borderColor: "hsl(var(--hairline))" }}
+        title="Auf 100 % setzen und Blatt zentrieren"
       >
+        <Crosshair size={14} />
         100 %
       </button>
     </div>

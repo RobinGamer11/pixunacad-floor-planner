@@ -254,6 +254,8 @@ export interface FileNode {
 export interface ProjectSettings {
   /** Position des Zeitstrahls im Übersichts-Tab. Default: "bottom". */
   timelinePosition?: "top" | "bottom";
+  /** Projektbezogene Schnellhilfe in der Mappe. Fehlend bedeutet initial aktiv. */
+  mappeHelpOn?: boolean;
   /** Wenn true (Default), rendern CAD-Viewports in der Projektmappe live aus
    *  der aktuellsten Szene des referenzierten Zeichenblatts. Wenn false,
    *  werden Änderungen erst nach Klick auf „Ansicht aktualisieren" sichtbar. */
@@ -772,6 +774,19 @@ function commitDocumentProjects(projects: Project[]) {
   return true;
 }
 
+/** Persistiert reine Projekt-UI-Einstellungen ohne fachlichen Undo-Schritt. */
+function commitProjectUiProjects(projects: Project[]) {
+  const candidate = { ...state, projects };
+  if (!persistState(candidate)) return false;
+  _suspendHistory = true;
+  try {
+    setState(() => ({ projects }), true);
+  } finally {
+    _suspendHistory = false;
+  }
+  return true;
+}
+
 
 
 export const projectStore = {
@@ -799,7 +814,7 @@ export const projectStore = {
       mappen: [{ id: mappeId, name: "Hauptmappe", konzept: "", pageIds: [firstPageId] }],
       activeMappeId: mappeId,
       files: [],
-      settings: { timelinePosition: "bottom" },
+      settings: { timelinePosition: "bottom", mappeHelpOn: true },
     };
     setState((s) => ({ projects: [{ ...blank, sortIndex: nextTopIndex(s.projects, null) }, ...s.projects] }));
     return id;
@@ -845,6 +860,7 @@ export const projectStore = {
       tasks: src.tasks.map((t) => ({ ...t, id: `${newId}-${t.id}`, done: false })),
       events: src.events.map((e) => ({ ...e, id: `${newId}-${e.id}` })),
       customFields: src.customFields?.map((f) => ({ ...f })),
+      settings: { ...(src.settings ?? {}), mappeHelpOn: true },
     };
     setState((s) => ({ projects: [tpl, ...s.projects] }));
     return newId;
@@ -882,6 +898,7 @@ export const projectStore = {
       tasks: src.tasks.map((t) => ({ ...t, id: `${newId}-${t.id}`, done: false })),
       events: src.events.map((e) => ({ ...e, id: `${newId}-${e.id}` })),
       customFields: src.customFields?.map((f) => ({ ...f })),
+      settings: { ...(src.settings ?? {}), mappeHelpOn: true },
     };
     setState((s) => ({ projects: [proj, ...s.projects] }));
     return newId;
@@ -1535,6 +1552,17 @@ export const projectStore = {
         p.id === projectId ? { ...p, settings: { ...(p.settings ?? {}), ...patch } } : p
       ),
     }));
+  },
+  setMappeHelpOn: (projectId: string, mappeHelpOn: boolean) => {
+    const project = state.projects.find((p) => p.id === projectId);
+    if (!project) return false;
+    if (project.settings?.mappeHelpOn === mappeHelpOn) return true;
+    const projects = state.projects.map((p) =>
+      p.id === projectId
+        ? { ...p, settings: { ...(p.settings ?? {}), mappeHelpOn } }
+        : p
+    );
+    return commitProjectUiProjects(projects);
   },
 
   // ---------- Dokumentenablage ----------

@@ -12,6 +12,7 @@ import {
   Trash2,
   Copy,
   ClipboardPaste,
+  HelpCircle,
   TabletSmartphone,
   Network,
   Wallet,
@@ -41,6 +42,9 @@ interface Props {
   /** Tablet-Hilfsrad (LMB/RMB/SHIFT/ESC/ENTF) einblenden. */
   tabletAidOn?: boolean;
   onToggleTabletAid?: () => void;
+  /** Projektbezogene Schnellhilfe in der Mappe einblenden. */
+  mappeHelpOn?: boolean;
+  onToggleMappeHelp?: () => void;
 }
 
 /**
@@ -68,6 +72,8 @@ export function WorkspaceHeader({
   onExport,
   tabletAidOn = false,
   onToggleTabletAid,
+  mappeHelpOn = false,
+  onToggleMappeHelp,
 }: Props) {
   const navigate = useNavigate();
   const headerRef = useDragScroll<HTMLElement>("x");
@@ -114,29 +120,27 @@ export function WorkspaceHeader({
           </>
         )}
 
-        {onToggleTabletAid && (
-          <button
-            onClick={onToggleTabletAid}
-            className="ml-1 h-8 px-2 rounded-md flex items-center gap-1.5 border text-[11px] font-medium transition-colors"
-            style={
-              tabletAidOn
-                ? {
-                    background: "hsl(var(--accent-gold))",
-                    color: "hsl(var(--surface))",
-                    borderColor: "hsl(var(--accent-gold))",
-                  }
-                : {
-                    background: "hsl(var(--surface-muted))",
-                    color: "hsl(var(--ink-soft))",
-                    borderColor: "hsl(var(--hairline))",
-                  }
-            }
-            title="Tablet-Hilfsrad (Maus/Tastatur-Ersatz für Touch-Geräte)"
-            aria-pressed={tabletAidOn}
-          >
-            <TabletSmartphone size={16} />
-            <span>Tablet</span>
-          </button>
+        {(onToggleMappeHelp || onToggleTabletAid) && (
+          <div className="ml-1 flex items-center gap-1">
+            {onToggleMappeHelp && (
+              <HeaderAidToggle
+                active={mappeHelpOn}
+                icon={<HelpCircle size={16} />}
+                label="Hilfe"
+                title="Bedienungshilfe der Mappe ein- oder ausblenden"
+                onClick={onToggleMappeHelp}
+              />
+            )}
+            {onToggleTabletAid && (
+              <HeaderAidToggle
+                active={tabletAidOn}
+                icon={<TabletSmartphone size={16} />}
+                label="Tablet"
+                title="Tablet-Hilfsrad (Maus/Tastatur-Ersatz für Touch-Geräte)"
+                onClick={onToggleTabletAid}
+              />
+            )}
+          </div>
         )}
 
 
@@ -252,6 +256,46 @@ export function WorkspaceHeader({
         </button>
       </div>
     </header>
+  );
+}
+
+function HeaderAidToggle({
+  active,
+  icon,
+  label,
+  title,
+  onClick,
+}: {
+  active: boolean;
+  icon: React.ReactNode;
+  label: string;
+  title: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="h-8 px-2 rounded-md flex items-center gap-1.5 border text-[11px] font-medium transition-colors"
+      style={
+        active
+          ? {
+              background: "hsl(var(--accent-gold))",
+              color: "hsl(var(--surface))",
+              borderColor: "hsl(var(--accent-gold))",
+            }
+          : {
+              background: "hsl(var(--surface-muted))",
+              color: "hsl(var(--ink-soft))",
+              borderColor: "hsl(var(--hairline))",
+            }
+      }
+      title={title}
+      aria-pressed={active}
+    >
+      {icon}
+      <span>{label}</span>
+    </button>
   );
 }
 
