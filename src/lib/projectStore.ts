@@ -1638,7 +1638,7 @@ export const projectStore = {
   /* ---------- Projekt-Ordner (Sidebar) ---------- */
   addProjectFolder: (name: string) => {
     const id = `f-${Date.now().toString(36)}`;
-    setState((s) => ({ folders: [...s.folders, { id, name: name.trim() || "Neuer Ordner" }] }));
+    setState((s) => ({ folders: [...s.folders, { id, name: name.trim() || "Neuer Ordner", sortIndex: s.folders.length }] }));
     return id;
   },
   renameProjectFolder: (id: string, name: string) => {
