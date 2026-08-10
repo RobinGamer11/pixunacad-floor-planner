@@ -1,6 +1,5 @@
 import { ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { legalConfigIsComplete } from "@/config/legal";
 
 export function LegalLayout({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -18,11 +17,6 @@ export function LegalLayout({ title, children }: { title: string; children: Reac
       </header>
 
       <article className="mx-auto max-w-4xl px-5 py-10 sm:py-14">
-        {!legalConfigIsComplete && (
-          <aside role="alert" className="mb-8 rounded-lg border border-amber-500/40 bg-amber-50 p-4 text-sm text-amber-950 dark:bg-amber-950/20 dark:text-amber-100">
-            <strong>Entwurf – nicht veröffentlichen:</strong> Die rechtlichen Anbieterangaben in <code>src/config/legal.ts</code> sind noch Platzhalter und müssen vor dem Go-live geprüft und ergänzt werden.
-          </aside>
-        )}
         <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{title}</h1>
         <div className="mt-8 space-y-8 leading-7 text-[15px] text-foreground/90">{children}</div>
       </article>

@@ -44,11 +44,6 @@ export default function Impressum() {
           <p>{legalConfig.supervisoryAuthority}</p>
         </LegalSection>
       )}
-
-      <LegalSection title="Verbraucherstreitbeilegung">
-        <p>{legalConfig.consumerDisputeStatement}</p>
-        <p className="text-sm text-muted-foreground">Die frühere EU-OS-Plattform wurde eingestellt und wird daher nicht verlinkt.</p>
-      </LegalSection>
     </LegalLayout>
   );
 }

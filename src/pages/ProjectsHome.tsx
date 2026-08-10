@@ -3283,9 +3283,9 @@ function CoinsPanel({ anchor }: { anchor: React.RefObject<HTMLElement> }) {
 function ShopPanel({ anchor }: { anchor: React.RefObject<HTMLElement> }) {
   const pos = useAnchorPos(anchor, 320);
   const items = [
-    { title: "Pro-Version", desc: "10 Projekte · je 5 GB", price: "5 Coins" },
-    { title: "Premium-Version", desc: "20 Projekte · je 10 GB", price: "10 Coins" },
-    { title: "+1 Projekt", desc: "1 zusätzliches Projekt · 5 GB", price: "1 Coin" },
+    { title: "Pro-Version pro Monat", desc: "10 Projekte · je 5 GB", price: "5 Coins" },
+    { title: "Premium-Version pro Monat", desc: "20 Projekte · je 10 GB", price: "10 Coins" },
+    { title: "+1 Projekt pro Monat", desc: "1 zusätzliches Projekt · 5 GB", price: "1 Coin" },
   ];
   return (
     <div

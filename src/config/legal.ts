@@ -9,7 +9,6 @@ export type LegalConfig = {
   vatId?: string;
   supervisoryAuthority?: string;
   dataProtectionOfficer?: string;
-  consumerDisputeStatement: string;
   privacyAuthority?: {
     name: string;
     address: string[];
@@ -17,10 +16,7 @@ export type LegalConfig = {
   };
 };
 
-/**
- * Öffentliche Anbieterangaben. Vor einem Produktions-Release vollständig
- * ersetzen; die Platzhalter sind absichtlich gut sichtbar.
- */
+/** Zentrale öffentliche Anbieter- und Datenschutzangaben. */
 export const legalConfig: LegalConfig = {
   providerName: "Philipp Minnich",
   // Nur ausfüllen, wenn auf dich bzw. dein Unternehmen zutreffend.
@@ -33,20 +29,9 @@ export const legalConfig: LegalConfig = {
   vatId: undefined,
   supervisoryAuthority: undefined,
   dataProtectionOfficer: undefined,
-  consumerDisputeStatement: "[Erklärung zur Teilnahme an Verbraucherschlichtung gemäß § 36 VSBG ergänzen]",
   privacyAuthority: {
     name: "Landesbeauftragte für Datenschutz und Informationsfreiheit Nordrhein-Westfalen (LDI NRW)",
     address: ["Kavalleriestraße 2–4", "40213 Düsseldorf", "Deutschland"],
     email: "poststelle@ldi.nrw.de",
   },
 };
-
-export const legalConfigIsComplete = ![
-  legalConfig.providerName,
-  ...legalConfig.address,
-  legalConfig.email,
-  legalConfig.consumerDisputeStatement,
-  ...(legalConfig.privacyAuthority
-    ? [legalConfig.privacyAuthority.name, ...legalConfig.privacyAuthority.address, legalConfig.privacyAuthority.email]
-    : ["[Zuständige Datenschutzaufsichtsbehörde am Sitz des Verantwortlichen ergänzen]"]),
-].some((value) => value.includes("["));
