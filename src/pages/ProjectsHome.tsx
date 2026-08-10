@@ -1021,7 +1021,7 @@ export default function ProjectsHome() {
                       ["finanzen", "Finanzen", false],
                       ["dokumente", "Dokumente", false],
                       ["seiten", "Mappe", false],
-                      ["infos", "Informationen", false],
+                      
                       ["team", "Team", true],
                     ] as const
                   ).map(([key, label, disabled]) => (
