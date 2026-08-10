@@ -1152,6 +1152,8 @@ function ProjectCard({
   active,
   onSelect,
   onOpen,
+  onSettings,
+  onDelete,
   onDragStart,
   onDragEnd,
 }: {
@@ -1159,9 +1161,21 @@ function ProjectCard({
   active: boolean;
   onSelect: () => void;
   onOpen: () => void;
+  onSettings: () => void;
+  onDelete: () => void;
   onDragStart: () => void;
   onDragEnd: () => void;
 }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [menuOpen]);
   const drawings = (p.pages ?? []).reduce(
     (n, pg: any) => n + ((pg?.elements ?? []).filter((e: any) => e?.type === "cad-view").length || 0),
     0
