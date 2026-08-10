@@ -207,8 +207,35 @@ export default function ProjectsHome() {
       alert(`Maximal ${MAX_PROJECTS} Projekte möglich. Lösche zuerst ein bestehendes Projekt.`);
       return;
     }
+    // Zuerst Einstellungsfenster zeigen – Projekt wird erst danach angelegt.
+    setNewProjectDialogOpen(true);
+  };
+
+  const finishCreateProject = (values: {
+    name: string;
+    bauherr: string;
+    ort: string;
+    projektTyp: string;
+    status: string;
+    erstelltAm: string;
+  }) => {
     const id = projectStore.createProject();
+    projectStore.updateProject(id, values);
+    setNewProjectDialogOpen(false);
+    setMode("projects");
+    setShowAllTasks(false);
     setSelectedId(id);
+  };
+
+  const deleteProjectWithConfirm = (p: Project) => {
+    const label = p.isTemplate ? "Vorlage" : "Projektmappe";
+    const msg = `${label} „${p.name}" wirklich löschen?\n\nAlle Inhalte werden endgültig entfernt:\n• Seiten & Zeichenblätter\n• CAD-Elemente & Bemaßungen\n• Board-Themen, Aufgaben & Notizen\n• Dateien & Fotos\n\nDieser Vorgang kann nicht rückgängig gemacht werden.`;
+    if (!confirm(msg)) return;
+    projectStore.deleteProject(p.id);
+    if (selectedId === p.id) {
+      const next = projects.find((x) => x.id !== p.id && !!x.isTemplate === !!p.isTemplate);
+      setSelectedId(next?.id);
+    }
   };
 
   const commitNewFolder = () => {
