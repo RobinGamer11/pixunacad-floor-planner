@@ -381,54 +381,66 @@ export default function ProjectsHome() {
           <NavIcon
             icon={<Home size={18} strokeWidth={1.5} />}
             label="Hauptseite"
-            active={showAllTasks}
-            onClick={() => setShowAllTasks((v) => !v)}
+            active={hub === "home"}
+            onClick={() => { setShowAllTasks(false); setHub(hub === "home" ? null : "home"); }}
           />
           <HeaderDivider />
           <NavIcon
-            icon={<LayoutTemplate size={18} strokeWidth={1.5} />}
-            label="Vorlagen"
-            active={mode === "templates" && !showAllTasks}
-            onClick={() => {
-              setShowAllTasks(false);
-              setMode("templates");
-              // Kein Template vorauswählen — Vorlagen-Hub wird gezeigt
-              setSelectedId(undefined);
-            }}
+            icon={<ListChecks size={18} strokeWidth={1.5} />}
+            label="Alle Aufgaben"
+            active={showAllTasks && !hub}
+            onClick={() => { setHub(null); setMode("projects"); setShowAllTasks(true); }}
           />
 
           <HeaderDivider />
-          <NavIcon icon={<Users size={18} strokeWidth={1.5} />} label="Geteilt (bald verfügbar)" disabled />
+          <NavIcon
+            icon={<Users size={18} strokeWidth={1.5} />}
+            label="Geteilt"
+            active={hub === "shared"}
+            onClick={() => { setShowAllTasks(false); setHub(hub === "shared" ? null : "shared"); }}
+          />
           <HeaderDivider />
-          <NavIcon icon={<Trash2 size={18} strokeWidth={1.5} />} label="Papierkorb (bald verfügbar)" disabled />
+          <NavIcon
+            icon={<Trash2 size={18} strokeWidth={1.5} />}
+            label="Papierkorb"
+            active={hub === "trash"}
+            onClick={() => { setShowAllTasks(false); setHub(hub === "trash" ? null : "trash"); }}
+          />
         </div>
 
         <div className="flex-1" />
 
         {/* Münzen-Pill (kompakt) mit + zum Kauf */}
-        <div
-          className="flex items-center gap-1.5 h-9 pl-3 pr-1 rounded-full border opacity-60 cursor-not-allowed"
-          style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface))" }}
-          title="Münzen — Kauf bald verfügbar"
-        >
-          <Coins size={15} strokeWidth={1.5} className="text-muted-foreground" />
-          <span className="text-sm font-semibold text-muted-foreground">26</span>
-          <span
-            className="ml-1 h-6 w-6 rounded-full border flex items-center justify-center"
-            style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-muted))" }}
+        <div className="relative" ref={coinsRef}>
+          <button
+            onClick={() => setCoinsOpen((v) => !v)}
+            className="flex items-center gap-1.5 h-9 pl-3 pr-1 rounded-full border hover:bg-muted/40 transition"
+            style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface))" }}
+            title="Münzen"
           >
-            <Plus size={12} strokeWidth={2} className="text-muted-foreground" />
-          </span>
+            <Coins size={15} strokeWidth={1.5} className="text-muted-foreground" />
+            <span className="text-sm font-semibold">26</span>
+            <span
+              className="ml-1 h-6 w-6 rounded-full border flex items-center justify-center"
+              style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-muted))" }}
+            >
+              <Plus size={12} strokeWidth={2} className="text-muted-foreground" />
+            </span>
+          </button>
+          {coinsOpen && <CoinsPanel />}
         </div>
 
         {/* Shop (näher am Münzenfenster, ohne Rahmen) */}
-        <button
-          disabled
-          className="ml-1 h-8 w-8 flex items-center justify-center opacity-50 cursor-not-allowed"
-          title="Shop (bald verfügbar)"
-        >
-          <ShoppingBag size={18} strokeWidth={1.5} className="text-muted-foreground" />
-        </button>
+        <div className="relative ml-1" ref={shopRef}>
+          <button
+            onClick={() => setShopOpen((v) => !v)}
+            className="h-8 w-8 flex items-center justify-center hover:opacity-80"
+            title="Shop"
+          >
+            <ShoppingBag size={18} strokeWidth={1.5} className="text-muted-foreground" />
+          </button>
+          {shopOpen && <ShopPanel />}
+        </div>
 
         {/* Profil oben rechts (ohne Rahmen, Text innerhalb Avatar-Höhe) */}
         <div className="relative ml-2" ref={profileRef}>
