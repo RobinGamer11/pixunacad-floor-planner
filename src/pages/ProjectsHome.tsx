@@ -419,10 +419,11 @@ export default function ProjectsHome() {
           <HeaderDivider />
           <NavIcon
             icon={<Users size={18} strokeWidth={1.5} />}
-            label="Geteilt"
+            label="Netzwerk"
             active={hub === "shared"}
             onClick={() => { setShowAllTasks(false); setHub(hub === "shared" ? null : "shared"); }}
           />
+
           <HeaderDivider />
           <NavIcon
             icon={<Trash2 size={18} strokeWidth={1.5} />}
