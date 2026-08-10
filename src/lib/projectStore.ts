@@ -1840,12 +1840,17 @@ export function useProjectHistory(id: string | undefined): { canUndo: boolean; c
   );
 }
 
+let _folderCache: { src: ProjectFolder[]; out: ProjectFolder[] } | null = null;
+function sortedFolders(): ProjectFolder[] {
+  const src = projectStore.getState().folders;
+  if (_folderCache && _folderCache.src === src) return _folderCache.out;
+  const out = [...src].sort((a, b) => (a.sortIndex ?? 0) - (b.sortIndex ?? 0));
+  _folderCache = { src, out };
+  return out;
+}
+
 export function useFolders(): ProjectFolder[] {
-  return useSyncExternalStore(
-    projectStore.subscribe,
-    () => projectStore.getState().folders,
-    () => projectStore.getState().folders,
-  );
+  return useSyncExternalStore(projectStore.subscribe, sortedFolders, sortedFolders);
 }
 
 export function useProfile(): UserProfile {
