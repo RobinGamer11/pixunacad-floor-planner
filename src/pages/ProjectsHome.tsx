@@ -2733,57 +2733,121 @@ function projectColor(id: string): string {
   return `hsl(${h} 65% 55%)`;
 }
 
+const PROJECT_CAROUSEL_SLOTS = [-3, -2, -1, 0, 1, 2, 3] as const;
+const PROJECT_CAROUSEL_INTERVAL_MS = 5000;
+const PROJECT_CAROUSEL_CARD_WIDTH = 176;
+const PROJECT_CAROUSEL_MAX_SPACING = 130;
+const PROJECT_CAROUSEL_MIN_SPACING = 40;
+
 function ProjectCarousel({ projects, onOpen }: { projects: Project[]; onOpen: (id: string) => void }) {
   const [offset, setOffset] = useState(0);
-  const [paused, setPaused] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const [focusWithin, setFocusWithin] = useState(false);
+  const [cardSpacing, setCardSpacing] = useState(PROJECT_CAROUSEL_MAX_SPACING);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const [pageVisible, setPageVisible] = useState(() =>
+    typeof document === "undefined" || document.visibilityState === "visible"
+  );
+  const [reducedMotion, setReducedMotion] = useState(() =>
+    typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
+  const hasProjects = projects.length > 0;
+  const paused = hovered || focusWithin;
 
   useEffect(() => {
-    if (projects.length <= 1 || paused) return;
-    const t = setInterval(() => setOffset((o) => (o + 1) % projects.length), 5000);
+    const updateVisibility = () => setPageVisible(document.visibilityState === "visible");
+    document.addEventListener("visibilitychange", updateVisibility);
+    return () => document.removeEventListener("visibilitychange", updateVisibility);
+  }, []);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const updatePreference = () => setReducedMotion(mediaQuery.matches);
+    mediaQuery.addEventListener("change", updatePreference);
+    return () => mediaQuery.removeEventListener("change", updatePreference);
+  }, []);
+
+  useEffect(() => {
+    if (!hasProjects) return;
+    const viewport = viewportRef.current;
+    if (!viewport || typeof ResizeObserver === "undefined") return;
+
+    const updateSpacing = (width: number) => {
+      const fittedSpacing = (width - PROJECT_CAROUSEL_CARD_WIDTH) / 4;
+      const nextSpacing = Math.round(Math.max(
+        PROJECT_CAROUSEL_MIN_SPACING,
+        Math.min(PROJECT_CAROUSEL_MAX_SPACING, fittedSpacing)
+      ));
+      setCardSpacing((current) => current === nextSpacing ? current : nextSpacing);
+    };
+
+    updateSpacing(viewport.clientWidth);
+    const observer = new ResizeObserver(([entry]) => updateSpacing(entry.contentRect.width));
+    observer.observe(viewport);
+    return () => observer.disconnect();
+  }, [hasProjects]);
+
+  useEffect(() => {
+    if (projects.length <= 1 || paused || !pageVisible || reducedMotion) return;
+    const t = window.setInterval(() => setOffset((current) => current + 1), PROJECT_CAROUSEL_INTERVAL_MS);
     return () => clearInterval(t);
-  }, [projects.length, paused]);
+  }, [pageVisible, paused, projects.length, reducedMotion]);
 
-  if (projects.length === 0) return null;
+  if (!hasProjects) return null;
 
-  // Immer 5 Slots: 2 links, Mitte im Vordergrund, 2 rechts (bei wenigen Projekten wird wiederholt)
+  // Fünf sichtbare Karten plus je eine unsichtbare Pufferkarte für einen nahtlosen Umlauf.
   const n = projects.length;
-  const slots = [-2, -1, 0, 1, 2];
-  const visible = slots.map((s) => ({ slot: s, project: projects[(((offset + s) % n) + n) % n] }));
+  const visible = PROJECT_CAROUSEL_SLOTS.map((slot) => {
+    const absoluteIndex = offset + slot;
+    return {
+      absoluteIndex,
+      slot,
+      project: projects[((absoluteIndex % n) + n) % n],
+    };
+  });
 
 
 
   return (
     <div
       className="mb-6 select-none"
-      onMouseEnter={() => setPaused(true)}
-      onMouseLeave={() => setPaused(false)}
-      onFocusCapture={() => setPaused(true)}
-      onBlurCapture={() => setPaused(false)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onFocusCapture={() => setFocusWithin(true)}
+      onBlurCapture={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocusWithin(false);
+      }}
     >
       <div
-        className="relative h-44 flex items-center justify-center"
+        ref={viewportRef}
+        className="relative flex h-44 items-center justify-center overflow-hidden"
         style={{ perspective: "1000px", perspectiveOrigin: "50% 50%" }}
       >
-        {visible.map(({ slot, project: p }) => {
+        {visible.map(({ absoluteIndex, slot, project: p }) => {
           const abs = Math.abs(slot);
-          const translateX = slot * 130;
+          const buffered = abs >= 3;
+          const translateX = slot * cardSpacing;
           const translateZ = -abs * 170;
           const rotateY = slot === 0 ? 0 : slot > 0 ? -38 : 38;
           const scale = 1 - abs * 0.08;
-          const opacity = abs >= 2 ? 0.45 : abs === 1 ? 0.8 : 1;
+          const opacity = buffered ? 0 : abs === 2 ? 0.45 : abs === 1 ? 0.8 : 1;
           return (
             <button
-              key={slot}
-
+              key={absoluteIndex}
               onClick={() => onOpen(p.id)}
               title={p.name}
+              aria-hidden={buffered}
+              tabIndex={buffered ? -1 : 0}
               className="absolute group outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg"
               style={{
                 transform: `translateX(${translateX}px) translateZ(${translateZ}px) rotateY(${rotateY}deg) scale(${scale})`,
                 transformStyle: "preserve-3d",
-                transition: "transform 700ms cubic-bezier(0.22,1,0.36,1), opacity 700ms ease",
+                transition: reducedMotion
+                  ? "none"
+                  : "transform 700ms cubic-bezier(0.22,1,0.36,1), opacity 700ms ease",
                 opacity,
                 zIndex: 10 - abs,
+                pointerEvents: buffered ? "none" : undefined,
               }}
             >
               <div

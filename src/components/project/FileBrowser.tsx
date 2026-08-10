@@ -42,10 +42,12 @@ type NodeGroup = {
 
 type DropTarget =
   | { mode: "before"; parentId: string | null; beforeId: string | null; kind: FileKind }
-  | { mode: "inside"; folderId: string };
+  | { mode: "inside"; folderId: string }
+  | { mode: "root" };
 
 function sameDropTarget(current: DropTarget | null, next: DropTarget) {
   if (!current || current.mode !== next.mode) return false;
+  if (current.mode === "root" && next.mode === "root") return true;
   if (current.mode === "inside" && next.mode === "inside") return current.folderId === next.folderId;
   return current.mode === "before" && next.mode === "before"
     && current.parentId === next.parentId
@@ -204,6 +206,8 @@ export function FileBrowser({ project }: Props) {
   const moveTriggerRef = useRef<HTMLButtonElement | null>(null);
 
   const nodesById = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
+  const draggingNode = draggingId ? nodesById.get(draggingId) : undefined;
+  const draggingFromFolder = Boolean(draggingNode?.parentId);
   const movingNode = movingId ? nodesById.get(movingId) : undefined;
   const destinationFolders = useMemo(() => {
     if (!movingNode) return [];
@@ -364,6 +368,19 @@ export function FileBrowser({ project }: Props) {
       setExpandedFolderIds((current) => new Set(current).add(folder.id));
       projectStore.sealHistory(project.id);
     } else showMoveError(node.name);
+    clearDrag();
+  };
+
+  const dropAtRoot = (event: DragEvent<HTMLElement>) => {
+    const nodeId = readDraggedId(event);
+    const node = nodeId ? nodesById.get(nodeId) : undefined;
+    if (!node?.parentId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const moved = projectStore.moveFileNode(project.id, node.id, null);
+    setAnnouncement(moved ? `${node.name} wurde ohne Ordner abgelegt.` : `${node.name} kann dort nicht abgelegt werden.`);
+    if (moved) projectStore.sealHistory(project.id);
+    else showMoveError(node.name);
     clearDrag();
   };
 
@@ -546,7 +563,7 @@ export function FileBrowser({ project }: Props) {
                     <button type="button" disabled={index === group.folders.length - 1} onClick={() => moveByButton(folder, 1)} title="Nach unten" aria-label={`${folder.name} nach unten verschieben`} className={DOCUMENT_ACTION_CLASS}>
                       <ChevronDown size={13} />
                     </button>
-                    <button id={`document-move-${folder.id}`} type="button" onClick={(event) => openMoveDialog(event, folder.id)} title="In einen anderen Ordner verschieben" aria-label={`${folder.name} in einen anderen Ordner verschieben`} className={DOCUMENT_ACTION_CLASS}>
+                    <button id={`document-move-${folder.id}`} type="button" onClick={(event) => openMoveDialog(event, folder.id)} title="Verschieben" aria-label={`${folder.name} verschieben`} className={DOCUMENT_ACTION_CLASS}>
                       <FolderInput size={13} />
                     </button>
                     <button type="button" onClick={() => startRename(folder)} title="Umbenennen" aria-label={`${folder.name} umbenennen`} className={DOCUMENT_ACTION_CLASS}>
@@ -638,7 +655,7 @@ export function FileBrowser({ project }: Props) {
                   <button type="button" disabled={index === group.files.length - 1} onClick={() => moveByButton(file, 1)} title="Nach unten" aria-label={`${file.name} nach unten verschieben`} className={DOCUMENT_ACTION_CLASS}>
                     <ChevronDown size={13} />
                   </button>
-                  <button id={`document-move-${file.id}`} type="button" onClick={(event) => openMoveDialog(event, file.id)} title="In einen Ordner verschieben" aria-label={`${file.name} in einen Ordner verschieben`} className={DOCUMENT_ACTION_CLASS}>
+                  <button id={`document-move-${file.id}`} type="button" onClick={(event) => openMoveDialog(event, file.id)} title="Verschieben" aria-label={`${file.name} verschieben`} className={DOCUMENT_ACTION_CLASS}>
                     <FolderInput size={13} />
                   </button>
                   <button type="button" onClick={() => startRename(file)} title="Umbenennen" aria-label={`${file.name} umbenennen`} className={DOCUMENT_ACTION_CLASS}>
@@ -711,6 +728,36 @@ export function FileBrowser({ project }: Props) {
       </div>
 
       <div className="pt-3">
+        {draggingFromFolder && (
+          <div
+            onDragOver={(event) => {
+              const nodeId = draggingIdRef.current;
+              const node = nodeId ? nodesById.get(nodeId) : undefined;
+              if (!node?.parentId) return;
+              event.preventDefault();
+              event.stopPropagation();
+              event.dataTransfer.dropEffect = "move";
+              activateDropTarget({ mode: "root" });
+            }}
+            onDragLeave={(event) => {
+              if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+              setDropTarget((current) => current?.mode === "root" ? null : current);
+            }}
+            onDrop={dropAtRoot}
+            className="mb-3 flex min-h-14 items-center justify-center gap-2 rounded-md border border-dashed px-3 text-center text-xs font-medium transition-colors"
+            style={{
+              background: dropTarget?.mode === "root"
+                ? "hsl(var(--accent-gold) / 0.16)"
+                : "hsl(var(--surface-muted) / 0.5)",
+              borderColor: dropTarget?.mode === "root"
+                ? "hsl(var(--accent-gold) / 0.75)"
+                : "hsl(var(--hairline))",
+            }}
+          >
+            <FolderInput size={16} aria-hidden="true" style={{ color: "hsl(var(--accent-gold))" }} />
+            Ohne Ordner ablegen
+          </div>
+        )}
         {nodes.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">
             Noch keine Dokumente. Lege einen Ordner an oder füge ein PDF, JPG oder PNG hinzu.
@@ -725,7 +772,7 @@ export function FileBrowser({ project }: Props) {
           <DialogContent className="max-w-md p-4">
             <DialogHeader>
               <DialogTitle className="text-sm">„{movingNode.name}“ verschieben</DialogTitle>
-              <DialogDescription className="text-xs">Wähle den Zielordner.</DialogDescription>
+              <DialogDescription className="text-xs">Wähle einen Zielordner oder lege das Element ohne Ordner ab.</DialogDescription>
             </DialogHeader>
 
             <div className="max-h-[50vh] space-y-1 overflow-y-auto">
@@ -735,7 +782,7 @@ export function FileBrowser({ project }: Props) {
                 onClick={() => moveToDestination(null)}
                 className="flex h-9 w-full items-center gap-2 rounded-md px-2 text-left text-xs hover:bg-muted disabled:opacity-40"
               >
-                <Folder size={14} /> Dokumente ohne Ordner
+                <Folder size={14} /> Ohne Ordner ablegen
                 {movingNode.parentId === null && <span className="ml-auto text-muted-foreground">Aktuell</span>}
               </button>
               {destinationFolders.map((folder) => (
