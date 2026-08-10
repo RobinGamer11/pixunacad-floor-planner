@@ -292,6 +292,10 @@ export interface Project {
   activeMappeId?: string;
   /** Zuordnung zu einem benutzerdefinierten Ordner (siehe ProjectFolder). */
   folderId?: string | null;
+  /** Manuelle Sortierposition in der Sidebar (klein = weiter oben). */
+  sortIndex?: number;
+  /** Zeitpunkt der Verschiebung in den Papierkorb (30 Tage Aufbewahrung). */
+  deletedAt?: string;
   /** Dateien-Reiter (dwg/dxf/pdf/…) — flache Liste mit parentId für Ordnerbaum. */
   files?: FileNode[];
   /** Fotos-Reiter (jpg/png/…). */
@@ -303,6 +307,8 @@ export interface ProjectFolder {
   id: string;
   name: string;
   collapsed?: boolean;
+  /** Manuelle Sortierposition der Ordner. */
+  sortIndex?: number;
 }
 
 export type ProfileStatus = "online" | "offline" | "busy";
@@ -393,8 +399,11 @@ function load(): State {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && Array.isArray(parsed.projects) && parsed.projects.length) {
+        const cutoff = Date.now() - 30 * 86400000;
         return {
-          projects: parsed.projects.map(migrateProject),
+          projects: parsed.projects
+            .filter((p: Project) => !p.deletedAt || new Date(p.deletedAt).getTime() > cutoff)
+            .map(migrateProject),
           folders: Array.isArray(parsed.folders) ? parsed.folders : [],
           profile: parsed.profile ? { ...DEFAULT_PROFILE, ...parsed.profile } : DEFAULT_PROFILE,
         };
@@ -741,7 +750,7 @@ export const projectStore = {
       photos: [],
       settings: { timelinePosition: "bottom" },
     };
-    setState((s) => ({ projects: [blank, ...s.projects] }));
+    setState((s) => ({ projects: [{ ...blank, sortIndex: nextTopIndex(s.projects, null) }, ...s.projects] }));
     return id;
   },
   updateProject: (id: string, patch: Partial<Project>) => {
@@ -751,16 +760,13 @@ export const projectStore = {
       ),
     }));
   },
+  /** Verschiebt das Projekt in den Papierkorb (30 Tage wiederherstellbar). */
   deleteProject: (id: string) => {
-    setState((s) => ({ projects: s.projects.filter((p) => p.id !== id) }));
-    // Sämtliche projektbezogenen Nebenstores mitleeren, damit gelöschte Projekte
-    // keinerlei Inhalte zurücklassen (Board-Themen, ausstehende PDF-Uploads …).
-    try {
-      // Board-/Notiznetz-Daten
-      import("./notesStore").then((m) => m.notesStore.deleteProject(id)).catch(() => {});
-      // Ausstehende Sheet-PDF-Übernahme
-      localStorage.removeItem(`pixuna.pendingSheetPdf.${id}`);
-    } catch {}
+    setState((s) => ({
+      projects: s.projects.map((p) =>
+        p.id === id ? { ...p, deletedAt: new Date().toISOString() } : p
+      ),
+    }));
   },
   duplicateAsTemplate: (id: string) => {
     const src = state.projects.find((p) => p.id === id);
@@ -1632,7 +1638,7 @@ export const projectStore = {
   /* ---------- Projekt-Ordner (Sidebar) ---------- */
   addProjectFolder: (name: string) => {
     const id = `f-${Date.now().toString(36)}`;
-    setState((s) => ({ folders: [...s.folders, { id, name: name.trim() || "Neuer Ordner" }] }));
+    setState((s) => ({ folders: [...s.folders, { id, name: name.trim() || "Neuer Ordner", sortIndex: s.folders.length }] }));
     return id;
   },
   renameProjectFolder: (id: string, name: string) => {
@@ -1653,8 +1659,93 @@ export const projectStore = {
   },
   moveProjectToFolder: (projectId: string, folderId: string | null) => {
     setState((s) => ({
-      projects: s.projects.map((p) => (p.id === projectId ? { ...p, folderId } : p)),
+      projects: s.projects.map((p) =>
+        p.id === projectId ? { ...p, folderId, sortIndex: nextTopIndex(s.projects, folderId) } : p
+      ),
     }));
+  },
+  reorderProjectFolder: (dragId: string, targetId: string, place: "before" | "after" = "before") => {
+    setState((s) => {
+      const list = [...s.folders].sort(bySortIndex);
+      const from = list.findIndex((f) => f.id === dragId);
+      if (from < 0) return {};
+      const [moved] = list.splice(from, 1);
+      let to = list.findIndex((f) => f.id === targetId);
+      if (to < 0) to = list.length;
+      else if (place === "after") to += 1;
+      list.splice(to, 0, moved);
+      return { folders: list.map((f, i) => ({ ...f, sortIndex: i })) };
+    });
+  },
+  /** Verschiebt ein Projekt innerhalb seiner Sidebar-Liste vor/hinter ein anderes. */
+  reorderProject: (dragId: string, targetId: string, place: "before" | "after" = "before") => {
+    setState((s) => {
+      const drag = s.projects.find((p) => p.id === dragId);
+      const target = s.projects.find((p) => p.id === targetId);
+      if (!drag || !target || dragId === targetId) return {};
+      const folderId = target.folderId ?? null;
+      const group = s.projects
+        .filter((p) => !p.isTemplate && !p.deletedAt && (p.folderId ?? null) === folderId)
+        .sort(byProjectOrder);
+      const from = group.findIndex((p) => p.id === dragId);
+      if (from >= 0) group.splice(from, 1);
+      let to = group.findIndex((p) => p.id === targetId);
+      if (to < 0) to = group.length;
+      else if (place === "after") to += 1;
+      group.splice(to, 0, { ...drag, folderId });
+      const order = new Map(group.map((p, i) => [p.id, i] as const));
+      return {
+        projects: s.projects.map((p) =>
+          order.has(p.id) ? { ...p, folderId, sortIndex: order.get(p.id)! } : p
+        ),
+      };
+    });
+  },
+  /** Favorit umschalten; beim Entfernen rutscht das Projekt direkt unter die Favoriten. */
+  toggleFavorite: (projectId: string) => {
+    setState((s) => {
+      const p = s.projects.find((x) => x.id === projectId);
+      if (!p) return {};
+      const nextFav = !p.favorite;
+      const folderId = p.folderId ?? null;
+      const group = s.projects
+        .filter((x) => !x.isTemplate && !x.deletedAt && (x.folderId ?? null) === folderId && x.id !== projectId)
+        .sort(byProjectOrder);
+      const nonFav = group.filter((x) => !x.favorite);
+      const favs = group.filter((x) => x.favorite);
+      const ordered = nextFav
+        ? [{ ...p, favorite: true }, ...favs, ...nonFav]
+        : [...favs, { ...p, favorite: false }, ...nonFav];
+      const order = new Map(ordered.map((x, i) => [x.id, i] as const));
+      return {
+        projects: s.projects.map((x) =>
+          x.id === projectId
+            ? { ...x, favorite: nextFav, sortIndex: order.get(x.id) ?? 0 }
+            : order.has(x.id)
+              ? { ...x, sortIndex: order.get(x.id)! }
+              : x
+        ),
+      };
+    });
+  },
+
+  /* ---------- Papierkorb (30 Tage) ---------- */
+  restoreProject: (id: string) => {
+    const active = state.projects.filter((p) => !p.isTemplate && !p.deletedAt).length;
+    if (active >= MAX_PROJECTS) return false;
+    setState((s) => ({
+      projects: s.projects.map((p) =>
+        p.id === id ? { ...p, deletedAt: undefined, sortIndex: nextTopIndex(s.projects, p.folderId ?? null) } : p
+      ),
+    }));
+    return true;
+  },
+  purgeProject: (id: string) => {
+    setState((s) => ({ projects: s.projects.filter((p) => p.id !== id) }));
+    try {
+      import("./notesStore").then((m) => m.notesStore.deleteProject(id)).catch(() => {});
+      localStorage.removeItem(`pixuna.pendingSheetPdf.${id}`);
+    } catch {}
   },
 
   /* ---------- Profile ---------- */
@@ -1663,12 +1754,61 @@ export const projectStore = {
   },
 };
 
+function bySortIndex(a: { sortIndex?: number }, b: { sortIndex?: number }) {
+  return (a.sortIndex ?? 0) - (b.sortIndex ?? 0);
+}
+
+/** Favoriten immer oben, danach die manuelle Reihenfolge. */
+export function byProjectOrder(a: Project, b: Project) {
+  const fa = a.favorite ? 0 : 1;
+  const fb = b.favorite ? 0 : 1;
+  if (fa !== fb) return fa - fb;
+  return (a.sortIndex ?? 0) - (b.sortIndex ?? 0);
+}
+
+function nextTopIndex(projects: Project[], folderId: string | null) {
+  const idx = projects
+    .filter((p) => !p.isTemplate && !p.deletedAt && (p.folderId ?? null) === folderId)
+    .map((p) => p.sortIndex ?? 0);
+  return (idx.length ? Math.min(...idx) : 0) - 1;
+}
+
+export const TRASH_RETENTION_DAYS = 30;
+
+/** Verbleibende Tage im Papierkorb. */
+export function trashDaysLeft(p: Project): number {
+  if (!p.deletedAt) return TRASH_RETENTION_DAYS;
+  const ms = Date.now() - new Date(p.deletedAt).getTime();
+  return Math.max(0, TRASH_RETENTION_DAYS - Math.floor(ms / 86400000));
+}
+
+let _activeCache: { src: Project[]; out: Project[] } | null = null;
+function activeProjects(): Project[] {
+  const src = projectStore.getState().projects;
+  if (_activeCache && _activeCache.src === src) return _activeCache.out;
+  const out = src.filter((p) => !p.deletedAt);
+  _activeCache = { src, out };
+  return out;
+}
+
+let _trashCache: { src: Project[]; out: Project[] } | null = null;
+function trashedProjects(): Project[] {
+  const src = projectStore.getState().projects;
+  if (_trashCache && _trashCache.src === src) return _trashCache.out;
+  const out = src
+    .filter((p) => !!p.deletedAt)
+    .sort((a, b) => (b.deletedAt ?? "").localeCompare(a.deletedAt ?? ""));
+  _trashCache = { src, out };
+  return out;
+}
+
 export function useProjects(): Project[] {
-  return useSyncExternalStore(
-    projectStore.subscribe,
-    () => projectStore.getState().projects,
-    () => projectStore.getState().projects
-  );
+  return useSyncExternalStore(projectStore.subscribe, activeProjects, activeProjects);
+}
+
+/** Projekte im Papierkorb (max. 30 Tage). */
+export function useTrashedProjects(): Project[] {
+  return useSyncExternalStore(projectStore.subscribe, trashedProjects, trashedProjects);
 }
 
 export function useProject(id: string | undefined): Project | undefined {
@@ -1700,12 +1840,17 @@ export function useProjectHistory(id: string | undefined): { canUndo: boolean; c
   );
 }
 
+let _folderCache: { src: ProjectFolder[]; out: ProjectFolder[] } | null = null;
+function sortedFolders(): ProjectFolder[] {
+  const src = projectStore.getState().folders;
+  if (_folderCache && _folderCache.src === src) return _folderCache.out;
+  const out = [...src].sort((a, b) => (a.sortIndex ?? 0) - (b.sortIndex ?? 0));
+  _folderCache = { src, out };
+  return out;
+}
+
 export function useFolders(): ProjectFolder[] {
-  return useSyncExternalStore(
-    projectStore.subscribe,
-    () => projectStore.getState().folders,
-    () => projectStore.getState().folders,
-  );
+  return useSyncExternalStore(projectStore.subscribe, sortedFolders, sortedFolders);
 }
 
 export function useProfile(): UserProfile {
