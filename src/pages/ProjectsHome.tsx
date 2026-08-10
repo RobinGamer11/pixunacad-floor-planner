@@ -2195,17 +2195,16 @@ function TaskCalendar({
   );
 }
 
-function InfosView({ project }: { project: Project }) {
-  const update = (patch: Partial<Project>) => projectStore.updateProject(project.id, patch);
-  const Field = ({
-    label,
-    value,
-    onChange,
-  }: {
-    label: string;
-    value: string;
-    onChange: (v: string) => void;
-  }) => (
+function SettingsField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
     <label className="block">
       <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">
         {label}
@@ -2218,49 +2217,125 @@ function InfosView({ project }: { project: Project }) {
       />
     </label>
   );
+}
+
+/** Einstellungsfenster eines bestehenden Projekts (Name + Informationen). */
+function ProjectSettingsPanel({ project, onClose }: { project: Project; onClose: () => void }) {
+  const update = (patch: Partial<Project>) => projectStore.updateProject(project.id, patch);
 
   return (
     <div
-      className="mt-6 rounded-2xl p-6 grid grid-cols-2 gap-5 max-w-3xl"
+      className="mt-4 rounded-2xl p-6 max-w-3xl"
       style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
     >
-      <Field label="Projektname" value={project.name} onChange={(v) => update({ name: v })} />
-      <Field label="Bauherr" value={project.bauherr ?? ""} onChange={(v) => update({ bauherr: v })} />
-      <div className="col-span-2">
-        <AddressField
-          value={project.ort}
-          onChange={(v) => update({ ort: v })}
-        />
+      <div className="flex items-center justify-between mb-4">
+        <div className="text-[11px] font-semibold tracking-[0.18em] uppercase" style={{ color: "hsl(var(--accent-gold))" }}>
+          Projekteinstellungen
+        </div>
+        <button onClick={onClose} className="text-muted-foreground hover:text-foreground" title="Schließen">
+          <X size={16} />
+        </button>
       </div>
-      <Field
-        label="Projekttyp"
-        value={project.projektTyp ?? ""}
-        onChange={(v) => update({ projektTyp: v })}
-      />
-      <Field
-        label="Status"
-        value={project.status ?? ""}
-        onChange={(v) => update({ status: v })}
-      />
-      <Field
-        label="Erstellt am"
-        value={project.erstelltAm ?? ""}
-        onChange={(v) => update({ erstelltAm: v })}
-      />
+      <div className="grid grid-cols-2 gap-5">
+        <SettingsField label="PROJEKTNAME" value={project.name} onChange={(v) => update({ name: v.trim() || project.name })} />
+        <SettingsField label="BAUHERR" value={project.bauherr ?? ""} onChange={(v) => update({ bauherr: v })} />
+        <div className="col-span-2">
+          <AddressField value={project.ort} onChange={(v) => update({ ort: v })} />
+        </div>
+        <SettingsField label="PROJEKTTYP" value={project.projektTyp ?? ""} onChange={(v) => update({ projektTyp: v })} />
+        <SettingsField label="STATUS" value={project.status ?? ""} onChange={(v) => update({ status: v })} />
+        <SettingsField label="ERSTELLT AM" value={project.erstelltAm ?? ""} onChange={(v) => update({ erstelltAm: v })} />
 
-      {(project.customFields ?? []).map((f) => (
-        <CustomFieldEditor key={f.id} projectId={project.id} field={f} />
-      ))}
+        {(project.customFields ?? []).map((f) => (
+          <CustomFieldEditor key={f.id} projectId={project.id} field={f} />
+        ))}
 
-      <div className="col-span-2 flex items-center justify-between">
-        <AddCustomFieldControl projectId={project.id} />
-        <div className="text-xs text-muted-foreground">
-          Änderungen werden automatisch in der rechten Projektinfo übernommen.
+        <div className="col-span-2 flex items-center justify-between">
+          <AddCustomFieldControl projectId={project.id} />
+          <div className="text-xs text-muted-foreground">
+            Änderungen werden automatisch übernommen.
+          </div>
         </div>
       </div>
     </div>
   );
 }
+
+/** Einstellungsfenster für ein NEUES Projekt – erst nach „Projekt anlegen" wird es erstellt. */
+function NewProjectSettingsDialog({
+  onCancel,
+  onCreate,
+}: {
+  onCancel: () => void;
+  onCreate: (values: {
+    name: string;
+    bauherr: string;
+    ort: string;
+    projektTyp: string;
+    status: string;
+    erstelltAm: string;
+  }) => void;
+}) {
+  const [name, setName] = useState("Neues Projekt");
+  const [bauherr, setBauherr] = useState("");
+  const [ort, setOrt] = useState("");
+  const [projektTyp, setProjektTyp] = useState("");
+  const [status, setStatus] = useState("");
+  const [erstelltAm, setErstelltAm] = useState(new Date().toLocaleDateString("de-DE"));
+
+  return (
+    <div
+      className="fixed inset-0 z-[120] flex items-start justify-center overflow-y-auto p-8"
+      style={{ background: "rgba(0,0,0,0.45)" }}
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel(); }}
+    >
+      <div
+        className="w-full max-w-2xl rounded-2xl p-6 shadow-xl"
+        style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <div className="text-[11px] font-semibold tracking-[0.18em] uppercase" style={{ color: "hsl(var(--accent-gold))" }}>
+            Neues Projekt – Einstellungen
+          </div>
+          <button onClick={onCancel} className="text-muted-foreground hover:text-foreground" title="Abbrechen">
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-5">
+          <SettingsField label="PROJEKTNAME" value={name} onChange={setName} />
+          <SettingsField label="BAUHERR" value={bauherr} onChange={setBauherr} />
+          <div className="col-span-2">
+            <AddressField value={ort} onChange={setOrt} />
+          </div>
+          <SettingsField label="PROJEKTTYP" value={projektTyp} onChange={setProjektTyp} />
+          <SettingsField label="STATUS" value={status} onChange={setStatus} />
+          <SettingsField label="ERSTELLT AM" value={erstelltAm} onChange={setErstelltAm} />
+        </div>
+
+        <div className="mt-6 flex justify-end gap-2">
+          <button
+            onClick={onCancel}
+            className="h-9 px-4 rounded-md border text-sm"
+            style={{ borderColor: "hsl(var(--hairline))" }}
+          >
+            Abbrechen
+          </button>
+          <button
+            onClick={() =>
+              onCreate({ name: name.trim() || "Neues Projekt", bauherr, ort, projektTyp, status, erstelltAm })
+            }
+            className="h-9 px-4 rounded-md text-sm font-semibold"
+            style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
+          >
+            Projekt anlegen
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 function AddressField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const externalContentEnabled = useExternalContentConsent();
