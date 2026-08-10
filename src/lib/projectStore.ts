@@ -750,7 +750,7 @@ export const projectStore = {
       photos: [],
       settings: { timelinePosition: "bottom" },
     };
-    setState((s) => ({ projects: [blank, ...s.projects] }));
+    setState((s) => ({ projects: [{ ...blank, sortIndex: nextTopIndex(s.projects, null) }, ...s.projects] }));
     return id;
   },
   updateProject: (id: string, patch: Partial<Project>) => {
