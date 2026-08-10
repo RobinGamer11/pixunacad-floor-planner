@@ -1653,8 +1653,93 @@ export const projectStore = {
   },
   moveProjectToFolder: (projectId: string, folderId: string | null) => {
     setState((s) => ({
-      projects: s.projects.map((p) => (p.id === projectId ? { ...p, folderId } : p)),
+      projects: s.projects.map((p) =>
+        p.id === projectId ? { ...p, folderId, sortIndex: nextTopIndex(s.projects, folderId) } : p
+      ),
     }));
+  },
+  reorderProjectFolder: (dragId: string, targetId: string, place: "before" | "after" = "before") => {
+    setState((s) => {
+      const list = [...s.folders].sort(bySortIndex);
+      const from = list.findIndex((f) => f.id === dragId);
+      if (from < 0) return {};
+      const [moved] = list.splice(from, 1);
+      let to = list.findIndex((f) => f.id === targetId);
+      if (to < 0) to = list.length;
+      else if (place === "after") to += 1;
+      list.splice(to, 0, moved);
+      return { folders: list.map((f, i) => ({ ...f, sortIndex: i })) };
+    });
+  },
+  /** Verschiebt ein Projekt innerhalb seiner Sidebar-Liste vor/hinter ein anderes. */
+  reorderProject: (dragId: string, targetId: string, place: "before" | "after" = "before") => {
+    setState((s) => {
+      const drag = s.projects.find((p) => p.id === dragId);
+      const target = s.projects.find((p) => p.id === targetId);
+      if (!drag || !target || dragId === targetId) return {};
+      const folderId = target.folderId ?? null;
+      const group = s.projects
+        .filter((p) => !p.isTemplate && !p.deletedAt && (p.folderId ?? null) === folderId)
+        .sort(byProjectOrder);
+      const from = group.findIndex((p) => p.id === dragId);
+      if (from >= 0) group.splice(from, 1);
+      let to = group.findIndex((p) => p.id === targetId);
+      if (to < 0) to = group.length;
+      else if (place === "after") to += 1;
+      group.splice(to, 0, { ...drag, folderId });
+      const order = new Map(group.map((p, i) => [p.id, i] as const));
+      return {
+        projects: s.projects.map((p) =>
+          order.has(p.id) ? { ...p, folderId, sortIndex: order.get(p.id)! } : p
+        ),
+      };
+    });
+  },
+  /** Favorit umschalten; beim Entfernen rutscht das Projekt direkt unter die Favoriten. */
+  toggleFavorite: (projectId: string) => {
+    setState((s) => {
+      const p = s.projects.find((x) => x.id === projectId);
+      if (!p) return {};
+      const nextFav = !p.favorite;
+      const folderId = p.folderId ?? null;
+      const group = s.projects
+        .filter((x) => !x.isTemplate && !x.deletedAt && (x.folderId ?? null) === folderId && x.id !== projectId)
+        .sort(byProjectOrder);
+      const nonFav = group.filter((x) => !x.favorite);
+      const favs = group.filter((x) => x.favorite);
+      const ordered = nextFav
+        ? [{ ...p, favorite: true }, ...favs, ...nonFav]
+        : [...favs, { ...p, favorite: false }, ...nonFav];
+      const order = new Map(ordered.map((x, i) => [x.id, i] as const));
+      return {
+        projects: s.projects.map((x) =>
+          x.id === projectId
+            ? { ...x, favorite: nextFav, sortIndex: order.get(x.id) ?? 0 }
+            : order.has(x.id)
+              ? { ...x, sortIndex: order.get(x.id)! }
+              : x
+        ),
+      };
+    });
+  },
+
+  /* ---------- Papierkorb (30 Tage) ---------- */
+  restoreProject: (id: string) => {
+    const active = state.projects.filter((p) => !p.isTemplate && !p.deletedAt).length;
+    if (active >= MAX_PROJECTS) return false;
+    setState((s) => ({
+      projects: s.projects.map((p) =>
+        p.id === id ? { ...p, deletedAt: undefined, sortIndex: nextTopIndex(s.projects, p.folderId ?? null) } : p
+      ),
+    }));
+    return true;
+  },
+  purgeProject: (id: string) => {
+    setState((s) => ({ projects: s.projects.filter((p) => p.id !== id) }));
+    try {
+      import("./notesStore").then((m) => m.notesStore.deleteProject(id)).catch(() => {});
+      localStorage.removeItem(`pixuna.pendingSheetPdf.${id}`);
+    } catch {}
   },
 
   /* ---------- Profile ---------- */
@@ -1662,6 +1747,34 @@ export const projectStore = {
     setState((s) => ({ profile: { ...s.profile, ...patch } }));
   },
 };
+
+function bySortIndex(a: { sortIndex?: number }, b: { sortIndex?: number }) {
+  return (a.sortIndex ?? 0) - (b.sortIndex ?? 0);
+}
+
+/** Favoriten immer oben, danach die manuelle Reihenfolge. */
+export function byProjectOrder(a: Project, b: Project) {
+  const fa = a.favorite ? 0 : 1;
+  const fb = b.favorite ? 0 : 1;
+  if (fa !== fb) return fa - fb;
+  return (a.sortIndex ?? 0) - (b.sortIndex ?? 0);
+}
+
+function nextTopIndex(projects: Project[], folderId: string | null) {
+  const idx = projects
+    .filter((p) => !p.isTemplate && !p.deletedAt && (p.folderId ?? null) === folderId)
+    .map((p) => p.sortIndex ?? 0);
+  return (idx.length ? Math.min(...idx) : 0) - 1;
+}
+
+export const TRASH_RETENTION_DAYS = 30;
+
+/** Verbleibende Tage im Papierkorb. */
+export function trashDaysLeft(p: Project): number {
+  if (!p.deletedAt) return TRASH_RETENTION_DAYS;
+  const ms = Date.now() - new Date(p.deletedAt).getTime();
+  return Math.max(0, TRASH_RETENTION_DAYS - Math.floor(ms / 86400000));
+}
 
 export function useProjects(): Project[] {
   return useSyncExternalStore(
