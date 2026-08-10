@@ -10,7 +10,11 @@ export type LegalConfig = {
   supervisoryAuthority?: string;
   dataProtectionOfficer?: string;
   consumerDisputeStatement: string;
-  privacyAuthority?: string;
+  privacyAuthority?: {
+    name: string;
+    address: string[];
+    email: string;
+  };
 };
 
 /**
@@ -18,11 +22,11 @@ export type LegalConfig = {
  * ersetzen; die Platzhalter sind absichtlich gut sichtbar.
  */
 export const legalConfig: LegalConfig = {
-  providerName: "[Vollständiger Name bzw. Firma ergänzen]",
+  providerName: "Philipp Minnich",
   // Nur ausfüllen, wenn auf dich bzw. dein Unternehmen zutreffend.
   legalForm: undefined,
-  address: ["[Straße und Hausnummer]", "[PLZ und Ort]", "Deutschland"],
-  email: "[E-Mail-Adresse ergänzen]",
+  address: ["Liebfrauenweg 1", "53125 Bonn", "Deutschland"],
+  email: "p.minnich@msoftware-ag.de",
   phone: undefined,
   representatives: undefined,
   register: undefined,
@@ -30,7 +34,11 @@ export const legalConfig: LegalConfig = {
   supervisoryAuthority: undefined,
   dataProtectionOfficer: undefined,
   consumerDisputeStatement: "[Erklärung zur Teilnahme an Verbraucherschlichtung gemäß § 36 VSBG ergänzen]",
-  privacyAuthority: "[Zuständige Datenschutzaufsichtsbehörde am Sitz des Verantwortlichen ergänzen]",
+  privacyAuthority: {
+    name: "Landesbeauftragte für Datenschutz und Informationsfreiheit Nordrhein-Westfalen (LDI NRW)",
+    address: ["Kavalleriestraße 2–4", "40213 Düsseldorf", "Deutschland"],
+    email: "poststelle@ldi.nrw.de",
+  },
 };
 
 export const legalConfigIsComplete = ![
@@ -38,5 +46,7 @@ export const legalConfigIsComplete = ![
   ...legalConfig.address,
   legalConfig.email,
   legalConfig.consumerDisputeStatement,
-  legalConfig.privacyAuthority,
+  ...(legalConfig.privacyAuthority
+    ? [legalConfig.privacyAuthority.name, ...legalConfig.privacyAuthority.address, legalConfig.privacyAuthority.email]
+    : ["[Zuständige Datenschutzaufsichtsbehörde am Sitz des Verantwortlichen ergänzen]"]),
 ].some((value) => value.includes("["));
