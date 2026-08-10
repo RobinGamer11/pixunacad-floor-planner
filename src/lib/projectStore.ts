@@ -1782,12 +1782,33 @@ export function trashDaysLeft(p: Project): number {
   return Math.max(0, TRASH_RETENTION_DAYS - Math.floor(ms / 86400000));
 }
 
+let _activeCache: { src: Project[]; out: Project[] } | null = null;
+function activeProjects(): Project[] {
+  const src = projectStore.getState().projects;
+  if (_activeCache && _activeCache.src === src) return _activeCache.out;
+  const out = src.filter((p) => !p.deletedAt);
+  _activeCache = { src, out };
+  return out;
+}
+
+let _trashCache: { src: Project[]; out: Project[] } | null = null;
+function trashedProjects(): Project[] {
+  const src = projectStore.getState().projects;
+  if (_trashCache && _trashCache.src === src) return _trashCache.out;
+  const out = src
+    .filter((p) => !!p.deletedAt)
+    .sort((a, b) => (b.deletedAt ?? "").localeCompare(a.deletedAt ?? ""));
+  _trashCache = { src, out };
+  return out;
+}
+
 export function useProjects(): Project[] {
-  return useSyncExternalStore(
-    projectStore.subscribe,
-    () => projectStore.getState().projects,
-    () => projectStore.getState().projects
-  );
+  return useSyncExternalStore(projectStore.subscribe, activeProjects, activeProjects);
+}
+
+/** Projekte im Papierkorb (max. 30 Tage). */
+export function useTrashedProjects(): Project[] {
+  return useSyncExternalStore(projectStore.subscribe, trashedProjects, trashedProjects);
 }
 
 export function useProject(id: string | undefined): Project | undefined {
