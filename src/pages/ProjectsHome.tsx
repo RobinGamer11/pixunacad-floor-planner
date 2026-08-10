@@ -201,6 +201,9 @@ export default function ProjectsHome() {
   // Drag & Drop von Projekten in Ordner
   const [dragProjectId, setDragProjectId] = useState<string | null>(null);
   const [dragOverFolder, setDragOverFolder] = useState<string | "root" | null>(null);
+  const [dragOverProjectId, setDragOverProjectId] = useState<string | null>(null);
+  const [dragFolderId, setDragFolderId] = useState<string | null>(null);
+  const [dragOverFolderSlot, setDragOverFolderSlot] = useState<string | null>(null);
 
   const projectsByFolder = useMemo(() => {
     const map = new Map<string | null, Project[]>();
@@ -210,6 +213,8 @@ export default function ProjectsHome() {
       arr.push(p);
       map.set(key, arr);
     }
+    // Favoriten immer oben, danach manuelle Reihenfolge.
+    for (const [k, arr] of map) map.set(k, [...arr].sort(byProjectOrder));
     return map;
   }, [filtered]);
 
