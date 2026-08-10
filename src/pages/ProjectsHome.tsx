@@ -91,6 +91,8 @@ export default function ProjectsHome() {
   const [dokumenteSubTab, setDokumenteSubTab] = useState<DokumenteSubTab>("dateien");
   const [leftOpen, setLeftOpen] = useState(true);
   const [titleMenuOpen, setTitleMenuOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [newProjectDialogOpen, setNewProjectDialogOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
   const titleMenuRef = useRef<HTMLDivElement | null>(null);
