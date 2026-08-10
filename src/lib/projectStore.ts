@@ -399,8 +399,11 @@ function load(): State {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && Array.isArray(parsed.projects) && parsed.projects.length) {
+        const cutoff = Date.now() - 30 * 86400000;
         return {
-          projects: parsed.projects.map(migrateProject),
+          projects: parsed.projects
+            .filter((p: Project) => !p.deletedAt || new Date(p.deletedAt).getTime() > cutoff)
+            .map(migrateProject),
           folders: Array.isArray(parsed.folders) ? parsed.folders : [],
           profile: parsed.profile ? { ...DEFAULT_PROFILE, ...parsed.profile } : DEFAULT_PROFILE,
         };
