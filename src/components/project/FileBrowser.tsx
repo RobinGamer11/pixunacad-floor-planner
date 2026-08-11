@@ -743,20 +743,6 @@ export function FileBrowser({ project }: Props) {
                       {file.dataUrl && (
                         <a href={file.dataUrl} download={file.name} className="hover:underline">Herunterladen</a>
                       )}
-                      {file.parentId && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const moved = projectStore.moveFileNode(project.id, file.id, null);
-                            setAnnouncement(moved ? `${file.name} wurde ohne Ordner abgelegt.` : `${file.name} konnte nicht verschoben werden.`);
-                            if (moved) projectStore.sealHistory(project.id);
-                            else showMoveError(file.name);
-                          }}
-                          className="hover:underline"
-                        >
-                          Aus Ordner nehmen
-                        </button>
-                      )}
                       <button
                         type="button"
                         onClick={() => {
