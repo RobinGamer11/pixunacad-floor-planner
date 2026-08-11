@@ -675,8 +675,8 @@ export function FileBrowser({ project }: Props) {
 
         {group.files.length > 0 && (
           <li>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
-              {group.files.map((file, index) => {
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+              {group.files.map((file) => {
                 const dropActive = dropTarget?.mode === "before"
                   && dropTarget.kind === "file"
                   && dropTarget.parentId === parentId
@@ -693,6 +693,10 @@ export function FileBrowser({ project }: Props) {
                       event.dataTransfer.setData("text/plain", file.name);
                     }}
                     onDragEnd={clearDrag}
+                    onPointerDown={(event) => onFilePointerDown(event, file)}
+                    onPointerMove={onFilePointerMove}
+                    onPointerUp={onFilePointerUp}
+                    onPointerCancel={() => { pointerDragRef.current = null; clearDrag(); }}
                     onDragOver={(event) => {
                       const nodeId = draggingIdRef.current;
                       const dragged = nodeId ? nodesById.get(nodeId) : undefined;
@@ -703,10 +707,10 @@ export function FileBrowser({ project }: Props) {
                       activateDropTarget({ mode: "before", parentId, beforeId: file.id, kind: "file" });
                     }}
                     onDrop={(event) => dropBefore(event, parentId, file.id, "file")}
-                    className="flex flex-col gap-1.5 p-3"
+                    className="flex touch-none flex-col gap-1.5 rounded-md border p-2"
                     style={{
                       opacity: draggingId === file.id ? 0.45 : 1,
-                      borderTop: index >= 4 ? "1px solid hsl(var(--hairline))" : undefined,
+                      borderColor: "hsl(var(--hairline))",
                       boxShadow: dropActive ? "inset 2px 0 0 hsl(var(--accent-gold))" : undefined,
                     }}
                   >
