@@ -6,6 +6,7 @@ import {
   useState,
   type DragEvent,
   type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
 import {
@@ -341,6 +342,67 @@ export function FileBrowser({ project }: Props) {
     setDropTarget(null);
   };
 
+  const moveNodeTo = (node: FileNode, parentId: string | null) => {
+    if ((node.parentId ?? null) === parentId) return;
+    const moved = projectStore.moveFileNode(project.id, node.id, parentId);
+    const target = parentId ? nodesById.get(parentId)?.name : null;
+    setAnnouncement(moved
+      ? `${node.name} wurde ${target ? `nach ${target} verschoben` : "ohne Ordner abgelegt"}.`
+      : `${node.name} kann dort nicht abgelegt werden.`);
+    if (moved) {
+      if (parentId) setExpandedFolderIds((current) => new Set(current).add(parentId));
+      projectStore.sealHistory(project.id);
+    } else showMoveError(node.name);
+  };
+
+  const pointerDragRef = useRef<{ id: string; pointerId: number; x: number; y: number; active: boolean } | null>(null);
+
+  const hitDropZone = (x: number, y: number) => {
+    const el = document.elementFromPoint(x, y) as HTMLElement | null;
+    return el?.closest<HTMLElement>("[data-drop-zone]") ?? null;
+  };
+
+  const onFilePointerDown = (event: ReactPointerEvent<HTMLDivElement>, file: FileNode) => {
+    if (event.button !== 0 || renamingId === file.id) return;
+    if ((event.target as HTMLElement).closest("button, a, input")) return;
+    pointerDragRef.current = { id: file.id, pointerId: event.pointerId, x: event.clientX, y: event.clientY, active: false };
+  };
+
+  const onFilePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = pointerDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    if (!drag.active) {
+      const dx = Math.abs(event.clientX - drag.x);
+      const dy = Math.abs(event.clientY - drag.y);
+      if (Math.hypot(dx, dy) < 10) return;
+      if (event.pointerType === "touch" && dy > dx) { pointerDragRef.current = null; return; }
+      drag.active = true;
+      draggingIdRef.current = drag.id;
+      setDraggingId(drag.id);
+      event.currentTarget.setPointerCapture(event.pointerId);
+    }
+    event.preventDefault();
+    const zone = hitDropZone(event.clientX, event.clientY);
+    if (zone?.dataset.dropZone === "root") activateDropTarget({ mode: "root" });
+    else if (zone?.dataset.dropZone === "folder" && zone.dataset.folderId) {
+      activateDropTarget({ mode: "inside", folderId: zone.dataset.folderId });
+    } else setDropTarget(null);
+  };
+
+  const onFilePointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = pointerDragRef.current;
+    pointerDragRef.current = null;
+    if (!drag || drag.pointerId !== event.pointerId || !drag.active) return;
+    const node = nodesById.get(drag.id);
+    const zone = hitDropZone(event.clientX, event.clientY);
+    if (node) {
+      if (zone?.dataset.dropZone === "root") moveNodeTo(node, null);
+      else if (zone?.dataset.dropZone === "folder" && zone.dataset.folderId) moveNodeTo(node, zone.dataset.folderId);
+    }
+    clearDrag();
+  };
+
+
   const dropBefore = (
     event: DragEvent<HTMLElement>,
     parentId: string | null,
@@ -472,6 +534,8 @@ export function FileBrowser({ project }: Props) {
               {renderDropSlot(parentId, folder.id, "folder", "Ordner hier einsortieren")}
               <li>
                 <div
+                  data-drop-zone="folder"
+                  data-folder-id={folder.id}
                   draggable={renamingId !== folder.id}
                   onDragStart={(event) => {
                     draggingIdRef.current = folder.id;
@@ -614,8 +678,8 @@ export function FileBrowser({ project }: Props) {
 
         {group.files.length > 0 && (
           <li>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
-              {group.files.map((file, index) => {
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+              {group.files.map((file) => {
                 const dropActive = dropTarget?.mode === "before"
                   && dropTarget.kind === "file"
                   && dropTarget.parentId === parentId
@@ -632,6 +696,10 @@ export function FileBrowser({ project }: Props) {
                       event.dataTransfer.setData("text/plain", file.name);
                     }}
                     onDragEnd={clearDrag}
+                    onPointerDown={(event) => onFilePointerDown(event, file)}
+                    onPointerMove={onFilePointerMove}
+                    onPointerUp={onFilePointerUp}
+                    onPointerCancel={() => { pointerDragRef.current = null; clearDrag(); }}
                     onDragOver={(event) => {
                       const nodeId = draggingIdRef.current;
                       const dragged = nodeId ? nodesById.get(nodeId) : undefined;
@@ -642,10 +710,11 @@ export function FileBrowser({ project }: Props) {
                       activateDropTarget({ mode: "before", parentId, beforeId: file.id, kind: "file" });
                     }}
                     onDrop={(event) => dropBefore(event, parentId, file.id, "file")}
-                    className="flex flex-col gap-1.5 p-3"
+                    className="flex flex-col gap-1.5 rounded-md border p-2"
                     style={{
+                      touchAction: "pan-y",
                       opacity: draggingId === file.id ? 0.45 : 1,
-                      borderTop: index >= 4 ? "1px solid hsl(var(--hairline))" : undefined,
+                      borderColor: "hsl(var(--hairline))",
                       boxShadow: dropActive ? "inset 2px 0 0 hsl(var(--accent-gold))" : undefined,
                     }}
                   >
@@ -681,20 +750,6 @@ export function FileBrowser({ project }: Props) {
                       <button type="button" onClick={() => startRename(file)} className="hover:underline">Umbenennen</button>
                       {file.dataUrl && (
                         <a href={file.dataUrl} download={file.name} className="hover:underline">Herunterladen</a>
-                      )}
-                      {file.parentId && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const moved = projectStore.moveFileNode(project.id, file.id, null);
-                            setAnnouncement(moved ? `${file.name} wurde ohne Ordner abgelegt.` : `${file.name} konnte nicht verschoben werden.`);
-                            if (moved) projectStore.sealHistory(project.id);
-                            else showMoveError(file.name);
-                          }}
-                          className="hover:underline"
-                        >
-                          Aus Ordner nehmen
-                        </button>
                       )}
                       <button
                         type="button"
@@ -774,6 +829,7 @@ export function FileBrowser({ project }: Props) {
               if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
               setDropTarget((current) => current?.mode === "root" ? null : current);
             }}
+            data-drop-zone="root"
             onDrop={dropAtRoot}
             className="mb-3 flex min-h-14 items-center justify-center gap-2 rounded-md border border-dashed px-3 text-center text-xs font-medium transition-colors"
             style={{
