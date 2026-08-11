@@ -30,6 +30,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { projectStore, type FileKind, type FileNode, type Project } from "@/lib/projectStore";
+import { DocumentViewer } from "@/components/project/DocumentViewer";
 
 const DOCUMENT_DRAG_TYPE = "application/x-pixuna-document-node";
 const ACCEPTED_DOCUMENTS = ".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png";
@@ -201,6 +202,7 @@ export function FileBrowser({ project }: Props) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
   const [announcement, setAnnouncement] = useState("");
+  const [viewingId, setViewingId] = useState<string | null>(null);
   const uploadRef = useRef<HTMLInputElement>(null);
   const draggingIdRef = useRef<string | null>(null);
   const moveTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -209,6 +211,7 @@ export function FileBrowser({ project }: Props) {
   const draggingNode = draggingId ? nodesById.get(draggingId) : undefined;
   const draggingFromFolder = Boolean(draggingNode?.parentId);
   const movingNode = movingId ? nodesById.get(movingId) : undefined;
+  const viewingNode = viewingId ? nodesById.get(viewingId) : undefined;
   const destinationFolders = useMemo(() => {
     if (!movingNode) return [];
     return nodes.filter((candidate) => {
@@ -609,85 +612,113 @@ export function FileBrowser({ project }: Props) {
           </li>
         )}
 
-        {group.files.map((file, index) => (
-          <Fragment key={file.id}>
-            {renderDropSlot(parentId, file.id, "file", "Dokument hier einsortieren")}
-            <li>
-              <div
-                draggable={renamingId !== file.id}
-                onDragStart={(event) => {
-                  draggingIdRef.current = file.id;
-                  setDraggingId(file.id);
-                  event.dataTransfer.effectAllowed = "move";
-                  event.dataTransfer.setData(DOCUMENT_DRAG_TYPE, file.id);
-                  event.dataTransfer.setData("text/plain", file.name);
-                }}
-                onDragEnd={clearDrag}
-                className="group flex items-start gap-3 py-3 hover:bg-muted/20"
-                style={{ opacity: draggingId === file.id ? 0.45 : 1 }}
-              >
-                <GripVertical size={14} aria-hidden="true" className="mt-7 shrink-0 cursor-grab text-muted-foreground" />
-                <div className="w-28 min-w-0">
-                  <DocumentPreview node={file} />
-                  {renamingId === file.id ? (
-                    <input
-                      autoFocus
-                      value={renameDraft}
-                      onChange={(event) => setRenameDraft(event.target.value)}
-                      onBlur={() => finishRename(file)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") finishRename(file);
-                        if (event.key === "Escape") setRenamingId(null);
-                      }}
-                      className="mt-1 w-full border-b bg-transparent text-xs outline-none"
-                      style={{ borderColor: "hsl(var(--hairline))" }}
-                    />
-                  ) : (
-                    <div className="mt-1 break-words text-xs leading-4" title={file.name}>{file.name}</div>
-                  )}
-                  <div className="mt-0.5 text-[10px] text-muted-foreground">{humanSize(file.sizeBytes)}</div>
-                </div>
-
-                <div className="ml-auto flex shrink-0 items-center gap-0.5">
-                  <button type="button" disabled={index === 0} onClick={() => moveByButton(file, -1)} title="Nach oben" aria-label={`${file.name} nach oben verschieben`} className={DOCUMENT_ACTION_CLASS}>
-                    <ChevronUp size={13} />
-                  </button>
-                  <button type="button" disabled={index === group.files.length - 1} onClick={() => moveByButton(file, 1)} title="Nach unten" aria-label={`${file.name} nach unten verschieben`} className={DOCUMENT_ACTION_CLASS}>
-                    <ChevronDown size={13} />
-                  </button>
-                  <button id={`document-move-${file.id}`} type="button" onClick={(event) => openMoveDialog(event, file.id)} title="Verschieben" aria-label={`${file.name} verschieben`} className={DOCUMENT_ACTION_CLASS}>
-                    <FolderInput size={13} />
-                  </button>
-                  <button type="button" onClick={() => startRename(file)} title="Umbenennen" aria-label={`${file.name} umbenennen`} className={DOCUMENT_ACTION_CLASS}>
-                    <Pencil size={12} />
-                  </button>
-                  {file.dataUrl && (
-                    <a href={file.dataUrl} download={file.name} title="Herunterladen" aria-label={`${file.name} herunterladen`} className={DOCUMENT_ACTION_CLASS}>
-                      <Download size={12} />
-                    </a>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (window.confirm(`„${file.name}“ löschen?`)) {
-                        const deleted = projectStore.deleteNode(project.id, "files", file.id);
-                        if (deleted) projectStore.sealHistory(project.id);
-                        else showPersistenceError(`„${file.name}“`);
-                      }
+        {group.files.length > 0 && (
+          <li>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
+              {group.files.map((file, index) => {
+                const dropActive = dropTarget?.mode === "before"
+                  && dropTarget.kind === "file"
+                  && dropTarget.parentId === parentId
+                  && dropTarget.beforeId === file.id;
+                return (
+                  <div
+                    key={file.id}
+                    draggable={renamingId !== file.id}
+                    onDragStart={(event) => {
+                      draggingIdRef.current = file.id;
+                      setDraggingId(file.id);
+                      event.dataTransfer.effectAllowed = "move";
+                      event.dataTransfer.setData(DOCUMENT_DRAG_TYPE, file.id);
+                      event.dataTransfer.setData("text/plain", file.name);
                     }}
-                    title="Löschen"
-                    aria-label={`${file.name} löschen`}
-                    className={DOCUMENT_ACTION_CLASS}
+                    onDragEnd={clearDrag}
+                    onDragOver={(event) => {
+                      const nodeId = draggingIdRef.current;
+                      const dragged = nodeId ? nodesById.get(nodeId) : undefined;
+                      if (!dragged || dragged.kind !== "file" || dragged.id === file.id) return;
+                      event.preventDefault();
+                      event.stopPropagation();
+                      event.dataTransfer.dropEffect = "move";
+                      activateDropTarget({ mode: "before", parentId, beforeId: file.id, kind: "file" });
+                    }}
+                    onDrop={(event) => dropBefore(event, parentId, file.id, "file")}
+                    className="flex flex-col gap-1.5 p-3"
+                    style={{
+                      opacity: draggingId === file.id ? 0.45 : 1,
+                      borderTop: index >= 4 ? "1px solid hsl(var(--hairline))" : undefined,
+                      boxShadow: dropActive ? "inset 2px 0 0 hsl(var(--accent-gold))" : undefined,
+                    }}
                   >
-                    <Trash2 size={12} />
-                  </button>
-                </div>
-              </div>
-            </li>
-          </Fragment>
-        ))}
+                    <button
+                      type="button"
+                      onClick={() => setViewingId(file.id)}
+                      title={`${file.name} öffnen`}
+                      aria-label={`${file.name} öffnen`}
+                      className="w-full"
+                    >
+                      <DocumentPreview node={file} />
+                    </button>
+
+                    {renamingId === file.id ? (
+                      <input
+                        autoFocus
+                        value={renameDraft}
+                        onChange={(event) => setRenameDraft(event.target.value)}
+                        onBlur={() => finishRename(file)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") finishRename(file);
+                          if (event.key === "Escape") setRenamingId(null);
+                        }}
+                        className="w-full border-b bg-transparent text-xs outline-none"
+                        style={{ borderColor: "hsl(var(--hairline))" }}
+                      />
+                    ) : (
+                      <div className="break-words text-xs leading-4" title={file.name}>{file.name}</div>
+                    )}
+                    <div className="text-[10px] text-muted-foreground">{humanSize(file.sizeBytes)}</div>
+
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+                      <button type="button" onClick={() => startRename(file)} className="hover:underline">Umbenennen</button>
+                      {file.dataUrl && (
+                        <a href={file.dataUrl} download={file.name} className="hover:underline">Herunterladen</a>
+                      )}
+                      {file.parentId && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const moved = projectStore.moveFileNode(project.id, file.id, null);
+                            setAnnouncement(moved ? `${file.name} wurde ohne Ordner abgelegt.` : `${file.name} konnte nicht verschoben werden.`);
+                            if (moved) projectStore.sealHistory(project.id);
+                            else showMoveError(file.name);
+                          }}
+                          className="hover:underline"
+                        >
+                          Aus Ordner nehmen
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (window.confirm(`„${file.name}“ löschen?`)) {
+                            const deleted = projectStore.deleteNode(project.id, "files", file.id);
+                            if (deleted) projectStore.sealHistory(project.id);
+                            else showPersistenceError(`„${file.name}“`);
+                          }
+                        }}
+                        className="hover:underline"
+                      >
+                        Löschen
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </li>
+        )}
 
         {renderDropSlot(parentId, null, "file", "Dokument ans Ende verschieben")}
+
 
         {!root && group.folders.length === 0 && group.files.length === 0 && (
           <li className="py-2 text-xs text-muted-foreground">Dieser Ordner ist leer.</li>
@@ -813,6 +844,8 @@ export function FileBrowser({ project }: Props) {
           </DialogContent>
         )}
       </Dialog>
+
+      {viewingNode && <DocumentViewer node={viewingNode} onClose={() => setViewingId(null)} />}
 
       <p className="sr-only" aria-live="polite">{announcement}</p>
     </div>
