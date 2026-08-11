@@ -341,6 +341,64 @@ export function FileBrowser({ project }: Props) {
     setDropTarget(null);
   };
 
+  const moveNodeTo = (node: FileNode, parentId: string | null) => {
+    if ((node.parentId ?? null) === parentId) return;
+    const moved = projectStore.moveFileNode(project.id, node.id, parentId);
+    const target = parentId ? nodesById.get(parentId)?.name : null;
+    setAnnouncement(moved
+      ? `${node.name} wurde ${target ? `nach ${target} verschoben` : "ohne Ordner abgelegt"}.`
+      : `${node.name} kann dort nicht abgelegt werden.`);
+    if (moved) {
+      if (parentId) setExpandedFolderIds((current) => new Set(current).add(parentId));
+      projectStore.sealHistory(project.id);
+    } else showMoveError(node.name);
+  };
+
+  const pointerDragRef = useRef<{ id: string; pointerId: number; x: number; y: number; active: boolean } | null>(null);
+
+  const hitDropZone = (x: number, y: number) => {
+    const el = document.elementFromPoint(x, y) as HTMLElement | null;
+    return el?.closest<HTMLElement>("[data-drop-zone]") ?? null;
+  };
+
+  const onFilePointerDown = (event: ReactPointerEvent<HTMLDivElement>, file: FileNode) => {
+    if (event.button !== 0 || renamingId === file.id) return;
+    if ((event.target as HTMLElement).closest("button, a, input")) return;
+    pointerDragRef.current = { id: file.id, pointerId: event.pointerId, x: event.clientX, y: event.clientY, active: false };
+  };
+
+  const onFilePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = pointerDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    if (!drag.active) {
+      if (Math.hypot(event.clientX - drag.x, event.clientY - drag.y) < 8) return;
+      drag.active = true;
+      draggingIdRef.current = drag.id;
+      setDraggingId(drag.id);
+      event.currentTarget.setPointerCapture(event.pointerId);
+    }
+    event.preventDefault();
+    const zone = hitDropZone(event.clientX, event.clientY);
+    if (zone?.dataset.dropZone === "root") activateDropTarget({ mode: "root" });
+    else if (zone?.dataset.dropZone === "folder" && zone.dataset.folderId) {
+      activateDropTarget({ mode: "inside", folderId: zone.dataset.folderId });
+    } else setDropTarget(null);
+  };
+
+  const onFilePointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = pointerDragRef.current;
+    pointerDragRef.current = null;
+    if (!drag || drag.pointerId !== event.pointerId || !drag.active) return;
+    const node = nodesById.get(drag.id);
+    const zone = hitDropZone(event.clientX, event.clientY);
+    if (node) {
+      if (zone?.dataset.dropZone === "root") moveNodeTo(node, null);
+      else if (zone?.dataset.dropZone === "folder" && zone.dataset.folderId) moveNodeTo(node, zone.dataset.folderId);
+    }
+    clearDrag();
+  };
+
+
   const dropBefore = (
     event: DragEvent<HTMLElement>,
     parentId: string | null,
