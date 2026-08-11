@@ -472,6 +472,8 @@ export function FileBrowser({ project }: Props) {
               {renderDropSlot(parentId, folder.id, "folder", "Ordner hier einsortieren")}
               <li>
                 <div
+                  data-drop-zone="folder"
+                  data-folder-id={folder.id}
                   draggable={renamingId !== folder.id}
                   onDragStart={(event) => {
                     draggingIdRef.current = folder.id;
