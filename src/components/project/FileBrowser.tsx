@@ -30,6 +30,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { projectStore, type FileKind, type FileNode, type Project } from "@/lib/projectStore";
+import { DocumentViewer } from "@/components/project/DocumentViewer";
 
 const DOCUMENT_DRAG_TYPE = "application/x-pixuna-document-node";
 const ACCEPTED_DOCUMENTS = ".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png";
@@ -201,6 +202,7 @@ export function FileBrowser({ project }: Props) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
   const [announcement, setAnnouncement] = useState("");
+  const [viewingId, setViewingId] = useState<string | null>(null);
   const uploadRef = useRef<HTMLInputElement>(null);
   const draggingIdRef = useRef<string | null>(null);
   const moveTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -209,6 +211,7 @@ export function FileBrowser({ project }: Props) {
   const draggingNode = draggingId ? nodesById.get(draggingId) : undefined;
   const draggingFromFolder = Boolean(draggingNode?.parentId);
   const movingNode = movingId ? nodesById.get(movingId) : undefined;
+  const viewingNode = viewingId ? nodesById.get(viewingId) : undefined;
   const destinationFolders = useMemo(() => {
     if (!movingNode) return [];
     return nodes.filter((candidate) => {
@@ -841,6 +844,8 @@ export function FileBrowser({ project }: Props) {
           </DialogContent>
         )}
       </Dialog>
+
+      {viewingNode && <DocumentViewer node={viewingNode} onClose={() => setViewingId(null)} />}
 
       <p className="sr-only" aria-live="polite">{announcement}</p>
     </div>
