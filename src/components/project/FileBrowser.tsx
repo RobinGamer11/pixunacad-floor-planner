@@ -372,7 +372,10 @@ export function FileBrowser({ project }: Props) {
     const drag = pointerDragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
     if (!drag.active) {
-      if (Math.hypot(event.clientX - drag.x, event.clientY - drag.y) < 8) return;
+      const dx = Math.abs(event.clientX - drag.x);
+      const dy = Math.abs(event.clientY - drag.y);
+      if (Math.hypot(dx, dy) < 10) return;
+      if (event.pointerType === "touch" && dy > dx) { pointerDragRef.current = null; return; }
       drag.active = true;
       draggingIdRef.current = drag.id;
       setDraggingId(drag.id);
@@ -707,8 +710,9 @@ export function FileBrowser({ project }: Props) {
                       activateDropTarget({ mode: "before", parentId, beforeId: file.id, kind: "file" });
                     }}
                     onDrop={(event) => dropBefore(event, parentId, file.id, "file")}
-                    className="flex touch-none flex-col gap-1.5 rounded-md border p-2"
+                    className="flex flex-col gap-1.5 rounded-md border p-2"
                     style={{
+                      touchAction: "pan-y",
                       opacity: draggingId === file.id ? 0.45 : 1,
                       borderColor: "hsl(var(--hairline))",
                       boxShadow: dropActive ? "inset 2px 0 0 hsl(var(--accent-gold))" : undefined,
@@ -825,6 +829,7 @@ export function FileBrowser({ project }: Props) {
               if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
               setDropTarget((current) => current?.mode === "root" ? null : current);
             }}
+            data-drop-zone="root"
             onDrop={dropAtRoot}
             className="mb-3 flex min-h-14 items-center justify-center gap-2 rounded-md border border-dashed px-3 text-center text-xs font-medium transition-colors"
             style={{
