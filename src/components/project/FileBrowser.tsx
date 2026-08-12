@@ -735,7 +735,7 @@ export function FileBrowser({ project }: Props) {
                 return (
                   <div
                     key={file.id}
-                    draggable={renamingId !== file.id}
+                    draggable={false}
                     onDragStart={(event) => {
                       draggingIdRef.current = file.id;
                       setDraggingId(file.id);
