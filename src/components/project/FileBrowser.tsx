@@ -431,11 +431,18 @@ export function FileBrowser({ project }: Props) {
     pointerDragRef.current = null;
     if (!drag || drag.pointerId !== event.pointerId || !drag.active) return;
     const node = nodesById.get(drag.id);
-    const zone = hitDropZone(event.clientX, event.clientY);
-    if (node) {
-      if (zone?.dataset.dropZone === "root") moveNodeTo(node, null);
-      else if (zone?.dataset.dropZone === "folder" && zone.dataset.folderId) moveNodeTo(node, zone.dataset.folderId);
+    const target = resolvePointerTarget(event.clientX, event.clientY, drag.id);
+    if (node && target) {
+      if (target.mode === "root") moveNodeTo(node, null);
+      else if (target.mode === "inside") moveNodeTo(node, target.folderId);
+      else {
+        const moved = projectStore.moveFileNode(project.id, node.id, target.parentId, target.beforeId);
+        setAnnouncement(moved ? `${node.name} wurde verschoben.` : `${node.name} kann dort nicht abgelegt werden.`);
+        if (moved) projectStore.sealHistory(project.id);
+        else showMoveError(node.name);
+      }
     }
+
     clearDrag();
   };
 
