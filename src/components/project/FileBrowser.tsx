@@ -536,15 +536,6 @@ export function FileBrowser({ project }: Props) {
                 <div
                   data-drop-zone="folder"
                   data-folder-id={folder.id}
-                  draggable={renamingId !== folder.id}
-                  onDragStart={(event) => {
-                    draggingIdRef.current = folder.id;
-                    setDraggingId(folder.id);
-                    event.dataTransfer.effectAllowed = "move";
-                    event.dataTransfer.setData(DOCUMENT_DRAG_TYPE, folder.id);
-                    event.dataTransfer.setData("text/plain", folder.name);
-                  }}
-                  onDragEnd={clearDrag}
                   onDragOver={(event) => {
                     const nodeId = draggingIdRef.current;
                     if (!nodeId || nodeId === folder.id) return;
@@ -554,22 +545,62 @@ export function FileBrowser({ project }: Props) {
                     activateDropTarget({ mode: "inside", folderId: folder.id });
                   }}
                   onDrop={(event) => dropInsideFolder(event, folder)}
-                  className="group flex min-h-11 items-center gap-2 py-1.5 transition-colors hover:bg-muted/30"
+                  className="group flex flex-col gap-1 py-1.5 transition-colors hover:bg-muted/30"
                   style={{
                     background: folderDropActive ? "hsl(var(--accent-gold) / 0.12)" : undefined,
                     opacity: draggingId === folder.id ? 0.45 : 1,
                   }}
                 >
-                  <GripVertical size={14} aria-hidden="true" className="shrink-0 cursor-grab text-muted-foreground" />
-                  {renamingId === folder.id ? (
-                    <div className="flex min-w-0 flex-1 items-center gap-2">
+                  <div className="flex min-h-9 items-center gap-2">
+                    <span
+                      onPointerDown={(event) => onNodePointerDown(event, folder)}
+                      onPointerMove={onFilePointerMove}
+                      onPointerUp={onFilePointerUp}
+                      onPointerCancel={() => { pointerDragRef.current = null; clearDrag(); }}
+                      className="shrink-0 cursor-grab touch-none text-muted-foreground"
+                      aria-hidden="true"
+                    >
+                      <GripVertical size={14} />
+                    </span>
+                    {renamingId === folder.id ? (
+                      <div className="flex min-w-0 flex-1 items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => toggleFolder(folder.id)}
+                          aria-expanded={expanded}
+                          aria-controls={`document-folder-${folder.id}`}
+                          aria-label={`${folder.name} ${expanded ? "einklappen" : "ausklappen"}`}
+                          className="flex shrink-0 items-center gap-2"
+                        >
+                          {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+                          {expanded ? (
+                            <FolderOpen size={18} style={{ color: "hsl(var(--accent-gold))" }} />
+                          ) : (
+                            <Folder size={18} style={{ color: "hsl(var(--accent-gold))" }} />
+                          )}
+                        </button>
+                        <input
+                          autoFocus
+                          value={renameDraft}
+                          onChange={(event) => setRenameDraft(event.target.value)}
+                          onBlur={() => finishRename(folder)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") finishRename(folder);
+                            if (event.key === "Escape") setRenamingId(null);
+                          }}
+                          className="min-w-0 flex-1 border-b bg-transparent text-sm outline-none"
+                          style={{ borderColor: "hsl(var(--hairline))" }}
+                          aria-label={`${folder.name} umbenennen`}
+                        />
+                      </div>
+                    ) : (
                       <button
                         type="button"
                         onClick={() => toggleFolder(folder.id)}
                         aria-expanded={expanded}
                         aria-controls={`document-folder-${folder.id}`}
                         aria-label={`${folder.name} ${expanded ? "einklappen" : "ausklappen"}`}
-                        className="flex shrink-0 items-center gap-2"
+                        className="flex min-w-0 flex-1 items-center gap-2 text-left"
                       >
                         {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
                         {expanded ? (
@@ -577,53 +608,21 @@ export function FileBrowser({ project }: Props) {
                         ) : (
                           <Folder size={18} style={{ color: "hsl(var(--accent-gold))" }} />
                         )}
+                        <span className="min-w-0 flex-1 truncate text-sm font-medium">{folder.name}</span>
                       </button>
-                      <input
-                        autoFocus
-                        value={renameDraft}
-                        onChange={(event) => setRenameDraft(event.target.value)}
-                        onBlur={() => finishRename(folder)}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter") finishRename(folder);
-                          if (event.key === "Escape") setRenamingId(null);
-                        }}
-                        className="min-w-0 flex-1 border-b bg-transparent text-sm outline-none"
-                        style={{ borderColor: "hsl(var(--hairline))" }}
-                        aria-label={`${folder.name} umbenennen`}
-                      />
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => toggleFolder(folder.id)}
-                      aria-expanded={expanded}
-                      aria-controls={`document-folder-${folder.id}`}
-                      aria-label={`${folder.name} ${expanded ? "einklappen" : "ausklappen"}`}
-                      className="flex min-w-0 flex-1 items-center gap-2 text-left"
-                    >
-                      {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
-                      {expanded ? (
-                        <FolderOpen size={18} style={{ color: "hsl(var(--accent-gold))" }} />
-                      ) : (
-                        <Folder size={18} style={{ color: "hsl(var(--accent-gold))" }} />
-                      )}
-                      <span className="min-w-0 flex-1 truncate text-sm font-medium">{folder.name}</span>
-                    </button>
-                  )}
+                    )}
+                  </div>
 
-                  {expanded && (
+                  <div className="flex flex-wrap items-center gap-0.5 pl-9">
                     <button
                       type="button"
                       onClick={(event) => { event.stopPropagation(); addFolder(folder.id); }}
-                      className="whitespace-nowrap px-1 text-xs font-medium hover:underline"
+                      className="whitespace-nowrap px-1 text-[11px] font-medium hover:underline"
                       style={{ color: "hsl(var(--accent-gold))" }}
                       aria-label={`Unterordner in ${folder.name} erstellen`}
                     >
                       + Unterordner
                     </button>
-                  )}
-
-                  <div className="flex shrink-0 items-center gap-0.5">
                     <button type="button" disabled={index === 0} onClick={() => moveByButton(folder, -1)} title="Nach oben" aria-label={`${folder.name} nach oben verschieben`} className={DOCUMENT_ACTION_CLASS}>
                       <ChevronUp size={13} />
                     </button>
@@ -653,6 +652,7 @@ export function FileBrowser({ project }: Props) {
                     </button>
                   </div>
                 </div>
+
 
                 {expanded && (
                   <div
