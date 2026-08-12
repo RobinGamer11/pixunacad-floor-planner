@@ -369,7 +369,7 @@ export function FileBrowser({ project }: Props) {
   };
 
 
-  const onFilePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+  const onFilePointerMove = (event: ReactPointerEvent<HTMLElement>) => {
     const drag = pointerDragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
     if (!drag.active) {
@@ -390,7 +390,7 @@ export function FileBrowser({ project }: Props) {
     } else setDropTarget(null);
   };
 
-  const onFilePointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+  const onFilePointerUp = (event: ReactPointerEvent<HTMLElement>) => {
     const drag = pointerDragRef.current;
     pointerDragRef.current = null;
     if (!drag || drag.pointerId !== event.pointerId || !drag.active) return;
@@ -697,7 +697,7 @@ export function FileBrowser({ project }: Props) {
                       event.dataTransfer.setData("text/plain", file.name);
                     }}
                     onDragEnd={clearDrag}
-                    onPointerDown={(event) => onFilePointerDown(event, file)}
+                    onPointerDown={(event) => onNodePointerDown(event, file)}
                     onPointerMove={onFilePointerMove}
                     onPointerUp={onFilePointerUp}
                     onPointerCancel={() => { pointerDragRef.current = null; clearDrag(); }}
