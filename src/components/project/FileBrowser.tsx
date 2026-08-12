@@ -373,6 +373,32 @@ export function FileBrowser({ project }: Props) {
     return el?.closest<HTMLElement>("[data-drop-zone]") ?? null;
   };
 
+  const resolvePointerTarget = (x: number, y: number, draggedId: string): DropTarget | null => {
+    const dragged = nodesById.get(draggedId);
+    if (!dragged) return null;
+    const zone = hitDropZone(x, y);
+    if (!zone) return null;
+    const mode = zone.dataset.dropZone;
+    if (mode === "root") return dragged.parentId ? { mode: "root" } : null;
+    if (mode === "folder") {
+      const folderId = zone.dataset.folderId;
+      if (!folderId || folderId === draggedId) return null;
+      return { mode: "inside", folderId };
+    }
+    if (mode === "before") {
+      const kind = zone.dataset.kind as FileKind | undefined;
+      if (!kind || kind !== dragged.kind) return null;
+      return {
+        mode: "before",
+        parentId: zone.dataset.parentId ? zone.dataset.parentId : null,
+        beforeId: zone.dataset.beforeId ? zone.dataset.beforeId : null,
+        kind,
+      };
+    }
+    return null;
+  };
+
+
   const onNodePointerDown = (event: ReactPointerEvent<HTMLElement>, node: FileNode) => {
     if (event.button !== 0 || renamingId === node.id) return;
     if ((event.target as HTMLElement).closest("button, a, input")) return;
