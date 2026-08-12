@@ -161,22 +161,33 @@ function DropSlot({
   active,
   dragging,
   label,
+  parentId,
+  beforeId,
+  kind,
   onDragOver,
   onDrop,
 }: {
   active: boolean;
   dragging: boolean;
   label: string;
+  parentId: string | null;
+  beforeId: string | null;
+  kind: FileKind;
   onDragOver: (event: DragEvent<HTMLLIElement>) => void;
   onDrop: (event: DragEvent<HTMLLIElement>) => void;
 }) {
   return (
     <li
       aria-hidden="true"
+      data-drop-zone="before"
+      data-parent-id={parentId ?? ""}
+      data-before-id={beforeId ?? ""}
+      data-kind={kind}
       className={`relative transition-[height] ${dragging ? "h-3" : "h-1"}`}
       onDragOver={onDragOver}
       onDrop={onDrop}
     >
+
       {active && (
         <div
           className="absolute inset-x-0 top-1/2 h-0.5 -translate-y-1/2"
@@ -362,13 +373,40 @@ export function FileBrowser({ project }: Props) {
     return el?.closest<HTMLElement>("[data-drop-zone]") ?? null;
   };
 
-  const onFilePointerDown = (event: ReactPointerEvent<HTMLDivElement>, file: FileNode) => {
-    if (event.button !== 0 || renamingId === file.id) return;
-    if ((event.target as HTMLElement).closest("button, a, input")) return;
-    pointerDragRef.current = { id: file.id, pointerId: event.pointerId, x: event.clientX, y: event.clientY, active: false };
+  const resolvePointerTarget = (x: number, y: number, draggedId: string): DropTarget | null => {
+    const dragged = nodesById.get(draggedId);
+    if (!dragged) return null;
+    const zone = hitDropZone(x, y);
+    if (!zone) return null;
+    const mode = zone.dataset.dropZone;
+    if (mode === "root") return dragged.parentId ? { mode: "root" } : null;
+    if (mode === "folder") {
+      const folderId = zone.dataset.folderId;
+      if (!folderId || folderId === draggedId) return null;
+      return { mode: "inside", folderId };
+    }
+    if (mode === "before") {
+      const kind = zone.dataset.kind as FileKind | undefined;
+      if (!kind || kind !== dragged.kind) return null;
+      return {
+        mode: "before",
+        parentId: zone.dataset.parentId ? zone.dataset.parentId : null,
+        beforeId: zone.dataset.beforeId ? zone.dataset.beforeId : null,
+        kind,
+      };
+    }
+    return null;
   };
 
-  const onFilePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+
+  const onNodePointerDown = (event: ReactPointerEvent<HTMLElement>, node: FileNode) => {
+    if (event.button !== 0 || renamingId === node.id) return;
+    if ((event.target as HTMLElement).closest("button, a, input")) return;
+    pointerDragRef.current = { id: node.id, pointerId: event.pointerId, x: event.clientX, y: event.clientY, active: false };
+  };
+
+
+  const onFilePointerMove = (event: ReactPointerEvent<HTMLElement>) => {
     const drag = pointerDragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
     if (!drag.active) {
@@ -382,23 +420,29 @@ export function FileBrowser({ project }: Props) {
       event.currentTarget.setPointerCapture(event.pointerId);
     }
     event.preventDefault();
-    const zone = hitDropZone(event.clientX, event.clientY);
-    if (zone?.dataset.dropZone === "root") activateDropTarget({ mode: "root" });
-    else if (zone?.dataset.dropZone === "folder" && zone.dataset.folderId) {
-      activateDropTarget({ mode: "inside", folderId: zone.dataset.folderId });
-    } else setDropTarget(null);
+    const target = resolvePointerTarget(event.clientX, event.clientY, drag.id);
+    if (target) activateDropTarget(target);
+    else setDropTarget(null);
   };
 
-  const onFilePointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+
+  const onFilePointerUp = (event: ReactPointerEvent<HTMLElement>) => {
     const drag = pointerDragRef.current;
     pointerDragRef.current = null;
     if (!drag || drag.pointerId !== event.pointerId || !drag.active) return;
     const node = nodesById.get(drag.id);
-    const zone = hitDropZone(event.clientX, event.clientY);
-    if (node) {
-      if (zone?.dataset.dropZone === "root") moveNodeTo(node, null);
-      else if (zone?.dataset.dropZone === "folder" && zone.dataset.folderId) moveNodeTo(node, zone.dataset.folderId);
+    const target = resolvePointerTarget(event.clientX, event.clientY, drag.id);
+    if (node && target) {
+      if (target.mode === "root") moveNodeTo(node, null);
+      else if (target.mode === "inside") moveNodeTo(node, target.folderId);
+      else {
+        const moved = projectStore.moveFileNode(project.id, node.id, target.parentId, target.beforeId);
+        setAnnouncement(moved ? `${node.name} wurde verschoben.` : `${node.name} kann dort nicht abgelegt werden.`);
+        if (moved) projectStore.sealHistory(project.id);
+        else showMoveError(node.name);
+      }
     }
+
     clearDrag();
   };
 
@@ -504,6 +548,10 @@ export function FileBrowser({ project }: Props) {
         active={active}
         dragging={Boolean(draggingId)}
         label={label}
+        parentId={parentId}
+        beforeId={beforeId}
+        kind={kind}
+
         onDragOver={(event) => {
           const nodeId = draggingIdRef.current;
           const node = nodeId ? nodesById.get(nodeId) : undefined;
@@ -536,15 +584,6 @@ export function FileBrowser({ project }: Props) {
                 <div
                   data-drop-zone="folder"
                   data-folder-id={folder.id}
-                  draggable={renamingId !== folder.id}
-                  onDragStart={(event) => {
-                    draggingIdRef.current = folder.id;
-                    setDraggingId(folder.id);
-                    event.dataTransfer.effectAllowed = "move";
-                    event.dataTransfer.setData(DOCUMENT_DRAG_TYPE, folder.id);
-                    event.dataTransfer.setData("text/plain", folder.name);
-                  }}
-                  onDragEnd={clearDrag}
                   onDragOver={(event) => {
                     const nodeId = draggingIdRef.current;
                     if (!nodeId || nodeId === folder.id) return;
@@ -554,22 +593,62 @@ export function FileBrowser({ project }: Props) {
                     activateDropTarget({ mode: "inside", folderId: folder.id });
                   }}
                   onDrop={(event) => dropInsideFolder(event, folder)}
-                  className="group flex min-h-11 items-center gap-2 py-1.5 transition-colors hover:bg-muted/30"
+                  className="group flex flex-col gap-1 py-1.5 transition-colors hover:bg-muted/30"
                   style={{
                     background: folderDropActive ? "hsl(var(--accent-gold) / 0.12)" : undefined,
                     opacity: draggingId === folder.id ? 0.45 : 1,
                   }}
                 >
-                  <GripVertical size={14} aria-hidden="true" className="shrink-0 cursor-grab text-muted-foreground" />
-                  {renamingId === folder.id ? (
-                    <div className="flex min-w-0 flex-1 items-center gap-2">
+                  <div className="flex min-h-9 items-center gap-2">
+                    <span
+                      onPointerDown={(event) => onNodePointerDown(event, folder)}
+                      onPointerMove={onFilePointerMove}
+                      onPointerUp={onFilePointerUp}
+                      onPointerCancel={() => { pointerDragRef.current = null; clearDrag(); }}
+                      className="shrink-0 cursor-grab touch-none text-muted-foreground"
+                      aria-hidden="true"
+                    >
+                      <GripVertical size={14} />
+                    </span>
+                    {renamingId === folder.id ? (
+                      <div className="flex min-w-0 flex-1 items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => toggleFolder(folder.id)}
+                          aria-expanded={expanded}
+                          aria-controls={`document-folder-${folder.id}`}
+                          aria-label={`${folder.name} ${expanded ? "einklappen" : "ausklappen"}`}
+                          className="flex shrink-0 items-center gap-2"
+                        >
+                          {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+                          {expanded ? (
+                            <FolderOpen size={18} style={{ color: "hsl(var(--accent-gold))" }} />
+                          ) : (
+                            <Folder size={18} style={{ color: "hsl(var(--accent-gold))" }} />
+                          )}
+                        </button>
+                        <input
+                          autoFocus
+                          value={renameDraft}
+                          onChange={(event) => setRenameDraft(event.target.value)}
+                          onBlur={() => finishRename(folder)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") finishRename(folder);
+                            if (event.key === "Escape") setRenamingId(null);
+                          }}
+                          className="min-w-0 flex-1 border-b bg-transparent text-sm outline-none"
+                          style={{ borderColor: "hsl(var(--hairline))" }}
+                          aria-label={`${folder.name} umbenennen`}
+                        />
+                      </div>
+                    ) : (
                       <button
                         type="button"
                         onClick={() => toggleFolder(folder.id)}
                         aria-expanded={expanded}
                         aria-controls={`document-folder-${folder.id}`}
                         aria-label={`${folder.name} ${expanded ? "einklappen" : "ausklappen"}`}
-                        className="flex shrink-0 items-center gap-2"
+                        className="flex min-w-0 flex-1 items-center gap-2 text-left"
                       >
                         {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
                         {expanded ? (
@@ -577,53 +656,21 @@ export function FileBrowser({ project }: Props) {
                         ) : (
                           <Folder size={18} style={{ color: "hsl(var(--accent-gold))" }} />
                         )}
+                        <span className="min-w-0 flex-1 truncate text-sm font-medium">{folder.name}</span>
                       </button>
-                      <input
-                        autoFocus
-                        value={renameDraft}
-                        onChange={(event) => setRenameDraft(event.target.value)}
-                        onBlur={() => finishRename(folder)}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter") finishRename(folder);
-                          if (event.key === "Escape") setRenamingId(null);
-                        }}
-                        className="min-w-0 flex-1 border-b bg-transparent text-sm outline-none"
-                        style={{ borderColor: "hsl(var(--hairline))" }}
-                        aria-label={`${folder.name} umbenennen`}
-                      />
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => toggleFolder(folder.id)}
-                      aria-expanded={expanded}
-                      aria-controls={`document-folder-${folder.id}`}
-                      aria-label={`${folder.name} ${expanded ? "einklappen" : "ausklappen"}`}
-                      className="flex min-w-0 flex-1 items-center gap-2 text-left"
-                    >
-                      {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
-                      {expanded ? (
-                        <FolderOpen size={18} style={{ color: "hsl(var(--accent-gold))" }} />
-                      ) : (
-                        <Folder size={18} style={{ color: "hsl(var(--accent-gold))" }} />
-                      )}
-                      <span className="min-w-0 flex-1 truncate text-sm font-medium">{folder.name}</span>
-                    </button>
-                  )}
+                    )}
+                  </div>
 
-                  {expanded && (
+                  <div className="flex flex-wrap items-center gap-0.5 pl-9">
                     <button
                       type="button"
                       onClick={(event) => { event.stopPropagation(); addFolder(folder.id); }}
-                      className="whitespace-nowrap px-1 text-xs font-medium hover:underline"
+                      className="whitespace-nowrap px-1 text-[11px] font-medium hover:underline"
                       style={{ color: "hsl(var(--accent-gold))" }}
                       aria-label={`Unterordner in ${folder.name} erstellen`}
                     >
                       + Unterordner
                     </button>
-                  )}
-
-                  <div className="flex shrink-0 items-center gap-0.5">
                     <button type="button" disabled={index === 0} onClick={() => moveByButton(folder, -1)} title="Nach oben" aria-label={`${folder.name} nach oben verschieben`} className={DOCUMENT_ACTION_CLASS}>
                       <ChevronUp size={13} />
                     </button>
@@ -653,6 +700,7 @@ export function FileBrowser({ project }: Props) {
                     </button>
                   </div>
                 </div>
+
 
                 {expanded && (
                   <div
@@ -687,7 +735,7 @@ export function FileBrowser({ project }: Props) {
                 return (
                   <div
                     key={file.id}
-                    draggable={renamingId !== file.id}
+                    draggable={false}
                     onDragStart={(event) => {
                       draggingIdRef.current = file.id;
                       setDraggingId(file.id);
@@ -696,7 +744,7 @@ export function FileBrowser({ project }: Props) {
                       event.dataTransfer.setData("text/plain", file.name);
                     }}
                     onDragEnd={clearDrag}
-                    onPointerDown={(event) => onFilePointerDown(event, file)}
+                    onPointerDown={(event) => onNodePointerDown(event, file)}
                     onPointerMove={onFilePointerMove}
                     onPointerUp={onFilePointerUp}
                     onPointerCancel={() => { pointerDragRef.current = null; clearDrag(); }}
