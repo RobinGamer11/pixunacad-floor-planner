@@ -362,11 +362,12 @@ export function FileBrowser({ project }: Props) {
     return el?.closest<HTMLElement>("[data-drop-zone]") ?? null;
   };
 
-  const onFilePointerDown = (event: ReactPointerEvent<HTMLDivElement>, file: FileNode) => {
-    if (event.button !== 0 || renamingId === file.id) return;
+  const onNodePointerDown = (event: ReactPointerEvent<HTMLElement>, node: FileNode) => {
+    if (event.button !== 0 || renamingId === node.id) return;
     if ((event.target as HTMLElement).closest("button, a, input")) return;
-    pointerDragRef.current = { id: file.id, pointerId: event.pointerId, x: event.clientX, y: event.clientY, active: false };
+    pointerDragRef.current = { id: node.id, pointerId: event.pointerId, x: event.clientX, y: event.clientY, active: false };
   };
+
 
   const onFilePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
     const drag = pointerDragRef.current;
