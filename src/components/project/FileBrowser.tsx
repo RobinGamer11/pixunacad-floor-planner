@@ -516,6 +516,10 @@ export function FileBrowser({ project }: Props) {
         active={active}
         dragging={Boolean(draggingId)}
         label={label}
+        parentId={parentId}
+        beforeId={beforeId}
+        kind={kind}
+
         onDragOver={(event) => {
           const nodeId = draggingIdRef.current;
           const node = nodeId ? nodesById.get(nodeId) : undefined;
