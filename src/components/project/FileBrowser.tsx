@@ -161,22 +161,33 @@ function DropSlot({
   active,
   dragging,
   label,
+  parentId,
+  beforeId,
+  kind,
   onDragOver,
   onDrop,
 }: {
   active: boolean;
   dragging: boolean;
   label: string;
+  parentId: string | null;
+  beforeId: string | null;
+  kind: FileKind;
   onDragOver: (event: DragEvent<HTMLLIElement>) => void;
   onDrop: (event: DragEvent<HTMLLIElement>) => void;
 }) {
   return (
     <li
       aria-hidden="true"
+      data-drop-zone="before"
+      data-parent-id={parentId ?? ""}
+      data-before-id={beforeId ?? ""}
+      data-kind={kind}
       className={`relative transition-[height] ${dragging ? "h-3" : "h-1"}`}
       onDragOver={onDragOver}
       onDrop={onDrop}
     >
+
       {active && (
         <div
           className="absolute inset-x-0 top-1/2 h-0.5 -translate-y-1/2"
