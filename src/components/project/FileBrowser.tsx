@@ -394,12 +394,11 @@ export function FileBrowser({ project }: Props) {
       event.currentTarget.setPointerCapture(event.pointerId);
     }
     event.preventDefault();
-    const zone = hitDropZone(event.clientX, event.clientY);
-    if (zone?.dataset.dropZone === "root") activateDropTarget({ mode: "root" });
-    else if (zone?.dataset.dropZone === "folder" && zone.dataset.folderId) {
-      activateDropTarget({ mode: "inside", folderId: zone.dataset.folderId });
-    } else setDropTarget(null);
+    const target = resolvePointerTarget(event.clientX, event.clientY, drag.id);
+    if (target) activateDropTarget(target);
+    else setDropTarget(null);
   };
+
 
   const onFilePointerUp = (event: ReactPointerEvent<HTMLElement>) => {
     const drag = pointerDragRef.current;
