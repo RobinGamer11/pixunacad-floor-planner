@@ -785,23 +785,32 @@ export function FileBrowser({ project }: Props) {
                       activateDropTarget({ mode: "before", parentId, beforeId: file.id, kind: "file" });
                     }}
                     onDrop={(event) => dropBefore(event, parentId, file.id, "file")}
-                    className="flex flex-col gap-1.5 rounded-md border p-2"
+                    onClick={(event) => {
+                      if (suppressClickRef.current) {
+                        suppressClickRef.current = false;
+                        return;
+                      }
+                      if ((event.target as HTMLElement).closest("button, a, input")) return;
+                      setViewingId(file.id);
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    title={`${file.name} öffnen`}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && event.target === event.currentTarget) setViewingId(file.id);
+                    }}
+                    className="flex cursor-pointer flex-col gap-1.5 rounded-md border p-2"
                     style={{
                       touchAction: "pan-y",
                       opacity: draggingId === file.id ? 0.45 : 1,
-                      borderColor: "hsl(var(--hairline))",
-                      boxShadow: dropActive ? "inset 2px 0 0 hsl(var(--accent-gold))" : undefined,
+                      borderColor: dropActive ? "hsla(38, 45%, 45%, 0.7)" : "hsl(var(--hairline))",
+                      background: dropActive ? "hsla(38, 45%, 70%, 0.25)" : undefined,
                     }}
                   >
-                    <button
-                      type="button"
-                      onClick={() => setViewingId(file.id)}
-                      title={`${file.name} öffnen`}
-                      aria-label={`${file.name} öffnen`}
-                      className="w-full"
-                    >
+                    <div className="w-full" aria-hidden="true">
                       <DocumentPreview node={file} />
-                    </button>
+                    </div>
+
 
                     {renamingId === file.id ? (
                       <input
