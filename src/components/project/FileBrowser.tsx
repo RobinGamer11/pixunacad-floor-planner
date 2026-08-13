@@ -371,6 +371,8 @@ export function FileBrowser({ project }: Props) {
   };
 
   const pointerDragRef = useRef<{ id: string; pointerId: number; x: number; y: number; active: boolean } | null>(null);
+  const suppressClickRef = useRef(false);
+
 
   const PROXIMITY_PX = 70;
 
