@@ -183,27 +183,31 @@ function DropSlot({
       data-parent-id={parentId ?? ""}
       data-before-id={beforeId ?? ""}
       data-kind={kind}
-      className={`relative transition-[height] ${dragging ? "h-3" : "h-1"}`}
+      className={`relative transition-all ${dragging ? "my-1 h-10" : "h-1"}`}
       onDragOver={onDragOver}
       onDrop={onDrop}
     >
-
-      {active && (
+      {dragging && (
         <div
-          className="absolute inset-x-0 top-1/2 h-0.5 -translate-y-1/2"
-          style={{ background: "hsl(var(--accent-gold))" }}
+          className="absolute inset-0 rounded-md transition-all"
+          style={{
+            background: active ? "hsla(38, 45%, 70%, 0.35)" : "hsla(38, 45%, 70%, 0.10)",
+            border: active
+              ? "1px dashed hsla(38, 45%, 45%, 0.7)"
+              : "1px dashed hsla(38, 30%, 55%, 0.25)",
+          }}
         >
-          <span
-            className="absolute right-0 -top-5 rounded px-1.5 py-0.5 text-[10px]"
-            style={{ background: "hsl(var(--accent-gold))", color: "hsl(var(--surface))" }}
-          >
-            {label}
-          </span>
+          {active && (
+            <span className="absolute inset-0 flex items-center justify-center text-[11px] font-medium text-muted-foreground">
+              {label}
+            </span>
+          )}
         </div>
       )}
     </li>
   );
 }
+
 
 export function FileBrowser({ project }: Props) {
   const nodes = useMemo(() => project.files ?? [], [project.files]);
