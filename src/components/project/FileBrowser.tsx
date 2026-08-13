@@ -372,10 +372,29 @@ export function FileBrowser({ project }: Props) {
 
   const pointerDragRef = useRef<{ id: string; pointerId: number; x: number; y: number; active: boolean } | null>(null);
 
+  const PROXIMITY_PX = 70;
+
   const hitDropZone = (x: number, y: number) => {
     const el = document.elementFromPoint(x, y) as HTMLElement | null;
-    return el?.closest<HTMLElement>("[data-drop-zone]") ?? null;
+    const direct = el?.closest<HTMLElement>("[data-drop-zone]") ?? null;
+    if (direct) return direct;
+    // Nähe-Erkennung: nächstgelegene Einfüge-Zone innerhalb eines Toleranzbereichs
+    let best: HTMLElement | null = null;
+    let bestDist = PROXIMITY_PX;
+    document.querySelectorAll<HTMLElement>('[data-drop-zone="before"]').forEach((zone) => {
+      const r = zone.getBoundingClientRect();
+      if (r.width === 0 && r.height === 0) return;
+      const dx = Math.max(r.left - x, 0, x - r.right);
+      const dy = Math.max(r.top - y, 0, y - r.bottom);
+      const dist = Math.hypot(dx, dy);
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = zone;
+      }
+    });
+    return best;
   };
+
 
   const resolvePointerTarget = (x: number, y: number, draggedId: string): DropTarget | null => {
     const dragged = nodesById.get(draggedId);
