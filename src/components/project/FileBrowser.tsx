@@ -453,6 +453,8 @@ export function FileBrowser({ project }: Props) {
     const drag = pointerDragRef.current;
     pointerDragRef.current = null;
     if (!drag || drag.pointerId !== event.pointerId || !drag.active) return;
+    suppressClickRef.current = true;
+
     const node = nodesById.get(drag.id);
     const target = resolvePointerTarget(event.clientX, event.clientY, drag.id);
     if (node && target) {
