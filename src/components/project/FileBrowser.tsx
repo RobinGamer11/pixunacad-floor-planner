@@ -183,27 +183,31 @@ function DropSlot({
       data-parent-id={parentId ?? ""}
       data-before-id={beforeId ?? ""}
       data-kind={kind}
-      className={`relative transition-[height] ${dragging ? "h-3" : "h-1"}`}
+      className={`relative transition-all ${dragging ? "my-1 h-10" : "h-1"}`}
       onDragOver={onDragOver}
       onDrop={onDrop}
     >
-
-      {active && (
+      {dragging && (
         <div
-          className="absolute inset-x-0 top-1/2 h-0.5 -translate-y-1/2"
-          style={{ background: "hsl(var(--accent-gold))" }}
+          className="absolute inset-0 rounded-md transition-all"
+          style={{
+            background: active ? "hsla(38, 45%, 70%, 0.35)" : "hsla(38, 45%, 70%, 0.10)",
+            border: active
+              ? "1px dashed hsla(38, 45%, 45%, 0.7)"
+              : "1px dashed hsla(38, 30%, 55%, 0.25)",
+          }}
         >
-          <span
-            className="absolute right-0 -top-5 rounded px-1.5 py-0.5 text-[10px]"
-            style={{ background: "hsl(var(--accent-gold))", color: "hsl(var(--surface))" }}
-          >
-            {label}
-          </span>
+          {active && (
+            <span className="absolute inset-0 flex items-center justify-center text-[11px] font-medium text-muted-foreground">
+              {label}
+            </span>
+          )}
         </div>
       )}
     </li>
   );
 }
+
 
 export function FileBrowser({ project }: Props) {
   const nodes = useMemo(() => project.files ?? [], [project.files]);
@@ -367,11 +371,32 @@ export function FileBrowser({ project }: Props) {
   };
 
   const pointerDragRef = useRef<{ id: string; pointerId: number; x: number; y: number; active: boolean } | null>(null);
+  const suppressClickRef = useRef(false);
+
+
+  const PROXIMITY_PX = 70;
 
   const hitDropZone = (x: number, y: number) => {
     const el = document.elementFromPoint(x, y) as HTMLElement | null;
-    return el?.closest<HTMLElement>("[data-drop-zone]") ?? null;
+    const direct = el?.closest<HTMLElement>("[data-drop-zone]") ?? null;
+    if (direct) return direct;
+    // Nähe-Erkennung: nächstgelegene Einfüge-Zone innerhalb eines Toleranzbereichs
+    let best: HTMLElement | null = null;
+    let bestDist = PROXIMITY_PX;
+    document.querySelectorAll<HTMLElement>('[data-drop-zone="before"]').forEach((zone) => {
+      const r = zone.getBoundingClientRect();
+      if (r.width === 0 && r.height === 0) return;
+      const dx = Math.max(r.left - x, 0, x - r.right);
+      const dy = Math.max(r.top - y, 0, y - r.bottom);
+      const dist = Math.hypot(dx, dy);
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = zone;
+      }
+    });
+    return best;
   };
+
 
   const resolvePointerTarget = (x: number, y: number, draggedId: string): DropTarget | null => {
     const dragged = nodesById.get(draggedId);
@@ -430,6 +455,8 @@ export function FileBrowser({ project }: Props) {
     const drag = pointerDragRef.current;
     pointerDragRef.current = null;
     if (!drag || drag.pointerId !== event.pointerId || !drag.active) return;
+    suppressClickRef.current = true;
+
     const node = nodesById.get(drag.id);
     const target = resolvePointerTarget(event.clientX, event.clientY, drag.id);
     if (node && target) {
@@ -758,23 +785,32 @@ export function FileBrowser({ project }: Props) {
                       activateDropTarget({ mode: "before", parentId, beforeId: file.id, kind: "file" });
                     }}
                     onDrop={(event) => dropBefore(event, parentId, file.id, "file")}
-                    className="flex flex-col gap-1.5 rounded-md border p-2"
+                    onClick={(event) => {
+                      if (suppressClickRef.current) {
+                        suppressClickRef.current = false;
+                        return;
+                      }
+                      if ((event.target as HTMLElement).closest("button, a, input")) return;
+                      setViewingId(file.id);
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    title={`${file.name} öffnen`}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && event.target === event.currentTarget) setViewingId(file.id);
+                    }}
+                    className="flex cursor-pointer flex-col gap-1.5 rounded-md border p-2"
                     style={{
                       touchAction: "pan-y",
                       opacity: draggingId === file.id ? 0.45 : 1,
-                      borderColor: "hsl(var(--hairline))",
-                      boxShadow: dropActive ? "inset 2px 0 0 hsl(var(--accent-gold))" : undefined,
+                      borderColor: dropActive ? "hsla(38, 45%, 45%, 0.7)" : "hsl(var(--hairline))",
+                      background: dropActive ? "hsla(38, 45%, 70%, 0.25)" : undefined,
                     }}
                   >
-                    <button
-                      type="button"
-                      onClick={() => setViewingId(file.id)}
-                      title={`${file.name} öffnen`}
-                      aria-label={`${file.name} öffnen`}
-                      className="w-full"
-                    >
+                    <div className="w-full" aria-hidden="true">
                       <DocumentPreview node={file} />
-                    </button>
+                    </div>
+
 
                     {renamingId === file.id ? (
                       <input
