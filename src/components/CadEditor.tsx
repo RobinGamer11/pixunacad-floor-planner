@@ -910,8 +910,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     appRef.current?.setTool(targetId);
     setActiveTool(targetId);
     setGridPanelOpen(false);
-    // Flyout: bei Tools mit Varianten ausklappen, sonst schließen
-    setExpandedTool(TOOL_VARIANTS[id] ? id : null);
+    // Flyout: erneuter Klick auf dasselbe Symbol schließt die Variantenauswahl wieder.
+    setExpandedTool(prev => (TOOL_VARIANTS[id] ? (prev === id ? null : id) : null));
   }, [lineVariant]);
 
   /**
