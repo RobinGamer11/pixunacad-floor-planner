@@ -174,7 +174,8 @@ export function TabletAidWheel() {
 
 function CenterToggles() {
   const [penOnly, setPenOnly] = useState<boolean>(() => {
-    try { return localStorage.getItem("pixuna.penOnly") === "1"; } catch { return false; }
+    // Default: Stift-Modus ist beim Einblenden des Rades immer aktiv.
+    try { return localStorage.getItem("pixuna.penOnly") !== "0"; } catch { return true; }
   });
   useEffect(() => {
     (window as any).__pixunaPenOnly = penOnly;
