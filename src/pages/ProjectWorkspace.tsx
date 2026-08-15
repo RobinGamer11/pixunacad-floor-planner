@@ -2604,6 +2604,9 @@ function PageCanvas({
   const inner = (
     <div
       className="relative"
+      // Capture-Wurzel für den PDF-Export: enthält das Papier UND die
+      // darüberliegende CAD-Engine-Ebene (Linien, Texte, Schraffuren).
+      data-page-capture={page.id}
       style={{
         width: displayWidth,
         height: displayHeight,
