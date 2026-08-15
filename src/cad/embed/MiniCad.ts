@@ -962,15 +962,31 @@ export class MiniCad {
     }
   }
 
+  /**
+   * Interner Supersampling-Faktor der Zeichenfläche (nur für PDF-Export).
+   * 1 = normal (CSS-Pixel). Größere Werte erhöhen die Backing-Store-Auflösung,
+   * ohne die CSS-Größe zu verändern — dadurch wird der html2canvas-Snapshot
+   * scharf statt verpixelt.
+   */
+  private _renderScale = 1;
+
+  setRenderScale(k: number) {
+    const v = Math.max(1, Math.min(8, k || 1));
+    if (v === this._renderScale) return;
+    this._renderScale = v;
+    this.applyZoom(this._zoom);
+  }
+
   applyZoom(zoom: number) {
     this._zoom = zoom;
+    const k = this._renderScale;
     const pageW = this.pageWidthMm * this.basePxPerMm * zoom;
     const pageH = this.pageHeightMm * this.basePxPerMm * zoom;
     const cssW = pageW + FRAME_PAD_PX * 2;
     const cssH = pageH + FRAME_PAD_PX * 2;
     const c = this.dom.canvas;
-    const wPx = Math.max(1, Math.round(cssW));
-    const hPx = Math.max(1, Math.round(cssH));
+    const wPx = Math.max(1, Math.round(cssW * k));
+    const hPx = Math.max(1, Math.round(cssH * k));
     if (c.width !== wPx) c.width = wPx;
     if (c.height !== hPx) c.height = hPx;
     c.style.width = `${cssW}px`;
@@ -982,9 +998,9 @@ export class MiniCad {
 
 
     this.renderer.setViewport(c.width, c.height);
-    this.camera.scale = this.basePxPerMm * 1000 * zoom;
-    this.camera.offsetX = FRAME_PAD_PX;
-    this.camera.offsetY = FRAME_PAD_PX;
+    this.camera.scale = this.basePxPerMm * 1000 * zoom * k;
+    this.camera.offsetX = FRAME_PAD_PX * k;
+    this.camera.offsetY = FRAME_PAD_PX * k;
 
     // Re-position any open text editor.
     if (this.textEditor.isActive() && this.selection?.textBoxId) {

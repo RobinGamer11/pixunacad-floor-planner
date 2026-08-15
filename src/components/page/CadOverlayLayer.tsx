@@ -251,6 +251,17 @@ export default function CadOverlayLayer(props: Props) {
   }, [restoreTick]);
 
   useEffect(() => { engineRef.current?.applyZoom(zoom); }, [zoom]);
+
+  // PDF-Export: Backing-Store der CAD-Zeichenfläche temporär hochskalieren,
+  // damit der Snapshot nicht verpixelt.
+  useEffect(() => {
+    const onScale = (ev: Event) => {
+      const k = (ev as CustomEvent<number>).detail ?? 1;
+      engineRef.current?.setRenderScale(k);
+    };
+    window.addEventListener("pixuna:export-render-scale", onScale as EventListener);
+    return () => window.removeEventListener("pixuna:export-render-scale", onScale as EventListener);
+  }, []);
   useEffect(() => { engineRef.current?.setActiveTool(activeTool); }, [activeTool]);
   // Radier-Hook: externe Seiten-Objekte (CAD-Blatt) mitradieren.
   const onEraseWorldRef = useRef(props.onEraseWorld);

@@ -69,7 +69,11 @@ function buildUnits(
  *  Bevorzugt `[data-page-capture]` — dieser Wrapper enthält neben dem Papier
  *  auch die CAD-Engine-Ebene (Linien, Texte, Schraffuren), die als Geschwister-
  *  Element des Papiers liegt. Ohne diesen Wrapper wäre der Export leer. */
-async function snapshotPageElement(pageId: string, dpi: number): Promise<HTMLCanvasElement> {
+async function snapshotPageElement(
+  pageId: string,
+  dpi: number,
+  widthMm: number,
+): Promise<HTMLCanvasElement> {
   // Warten, bis genau diese Seite im DOM steht (Seitenwechsel + React-Render)
   // und die CAD-Engine mindestens einen Frame gezeichnet hat.
   let el: HTMLElement | null = null;
@@ -84,14 +88,21 @@ async function snapshotPageElement(pageId: string, dpi: number): Promise<HTMLCan
   await waitFrames(6);
 
   const rectPx = el.getBoundingClientRect();
-  // html2canvas skaliert intern; wir wählen scale so, dass Ausgabewert der
-  // physikalischen DPI entspricht (Seite ist in CSS-px, aber ihre reale
-  // Zielgröße kennen wir über die Projekt-mm — die Umrechnung passiert später
-  // beim Einbetten in die PDF-Seite).
+  // Ziel: exakt `dpi` auf dem physischen Papier. Die Seite steht in CSS-px auf
+  // dem Bildschirm (abhängig vom Zoom) — der Skalierungsfaktor ergibt sich also
+  // aus dem Verhältnis Ziel-Pixel (mm → dpi) zur aktuellen CSS-Breite.
+  const targetPx = (widthMm / MM_PER_INCH) * dpi;
   const targetPxPerCssPx = Math.min(
-    3, // hard cap: sonst wird das Canvas riesig
-    Math.max(1, dpi / 96),
+    8, // Sicherheitsgrenze gegen extrem große Canvas
+    Math.max(1, targetPx / Math.max(1, rectPx.width)),
   );
+  // CAD-Zeichenfläche (Canvas) mit gleicher Auflösung rendern lassen,
+  // sonst wird sie beim Hochskalieren unscharf.
+  window.dispatchEvent(
+    new CustomEvent("pixuna:export-render-scale", { detail: targetPxPerCssPx }),
+  );
+  await waitFrames(6);
+
   const canvas = await html2canvas(el, {
     backgroundColor: "#ffffff",
     scale: targetPxPerCssPx,
@@ -167,9 +178,9 @@ async function embedPage(
   widthMm: number,
   heightMm: number,
 ): Promise<void> {
-  const jpegDataUrl = canvas.toDataURL("image/jpeg", 0.92);
-  const jpegBytes = dataUrlToBytes(jpegDataUrl);
-  const img = await pdf.embedJpg(jpegBytes);
+  // PNG (verlustfrei) — JPEG erzeugte sichtbare Artefakte an Linien und Text.
+  const pngBytes = dataUrlToBytes(canvas.toDataURL("image/png"));
+  const img = await pdf.embedPng(pngBytes);
   const wPt = (widthMm / MM_PER_INCH) * 72;
   const hPt = (heightMm / MM_PER_INCH) * 72;
   const page = pdf.addPage([wPt, hPt]);
