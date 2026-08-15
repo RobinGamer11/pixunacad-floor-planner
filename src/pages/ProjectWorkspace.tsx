@@ -2886,6 +2886,7 @@ function PageCanvas({
         {holes.map((h, i) => (
           <div
             key={i}
+            data-page-punch-hole=""
             className="absolute rounded-full pointer-events-none"
             style={{
               left: h.left,
