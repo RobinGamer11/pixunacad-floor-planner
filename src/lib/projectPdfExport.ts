@@ -65,13 +65,18 @@ function buildUnits(
   return units;
 }
 
-/** Nimmt DOM-Snapshot einer bereits gerenderten Seite anhand data-page-id. */
+/** Nimmt DOM-Snapshot einer bereits gerenderten Seite.
+ *  Bevorzugt `[data-page-capture]` — dieser Wrapper enthält neben dem Papier
+ *  auch die CAD-Engine-Ebene (Linien, Texte, Schraffuren), die als Geschwister-
+ *  Element des Papiers liegt. Ohne diesen Wrapper wäre der Export leer. */
 async function snapshotPageElement(pageId: string, dpi: number): Promise<HTMLCanvasElement> {
   // Warten, bis genau diese Seite im DOM steht (Seitenwechsel + React-Render)
   // und die CAD-Engine mindestens einen Frame gezeichnet hat.
   let el: HTMLElement | null = null;
   for (let i = 0; i < 60; i++) {
-    el = document.querySelector<HTMLElement>(`[data-page-id="${pageId}"]`);
+    el =
+      document.querySelector<HTMLElement>(`[data-page-capture="${pageId}"]`) ??
+      document.querySelector<HTMLElement>(`[data-page-id="${pageId}"]`);
     if (el && el.getBoundingClientRect().width > 1) break;
     await waitFrames(2);
   }

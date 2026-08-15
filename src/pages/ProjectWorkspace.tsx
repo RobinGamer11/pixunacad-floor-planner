@@ -2604,6 +2604,9 @@ function PageCanvas({
   const inner = (
     <div
       className="relative"
+      // Capture-Wurzel für den PDF-Export: enthält das Papier UND die
+      // darüberliegende CAD-Engine-Ebene (Linien, Texte, Schraffuren).
+      data-page-capture={page.id}
       style={{
         width: displayWidth,
         height: displayHeight,
@@ -2883,6 +2886,7 @@ function PageCanvas({
         {holes.map((h, i) => (
           <div
             key={i}
+            data-page-punch-hole=""
             className="absolute rounded-full pointer-events-none"
             style={{
               left: h.left,

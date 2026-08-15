@@ -1014,8 +1014,10 @@
   [data-page-margin-overlay] { display: none !important; }
 }
 
-/* Während PDF-Export: Seitenränder-Overlay ausblenden */
+/* Während PDF-Export: Seitenränder-Overlay, Lochung und Papierrahmen ausblenden */
 .pixuna-exporting [data-page-margin-overlay] { display: none !important; }
+.pixuna-exporting [data-page-punch-hole] { display: none !important; }
+.pixuna-exporting .page-sheet { border: none !important; box-shadow: none !important; }
 
 /* Finanzen-PDF-Export: Bedienelemente ausblenden, Ersatztexte einblenden */
 [data-export-only] { display: none; }
