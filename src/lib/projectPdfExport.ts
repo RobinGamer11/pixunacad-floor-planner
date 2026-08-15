@@ -69,7 +69,11 @@ function buildUnits(
  *  Bevorzugt `[data-page-capture]` — dieser Wrapper enthält neben dem Papier
  *  auch die CAD-Engine-Ebene (Linien, Texte, Schraffuren), die als Geschwister-
  *  Element des Papiers liegt. Ohne diesen Wrapper wäre der Export leer. */
-async function snapshotPageElement(pageId: string, dpi: number): Promise<HTMLCanvasElement> {
+async function snapshotPageElement(
+  pageId: string,
+  dpi: number,
+  widthMm: number,
+): Promise<HTMLCanvasElement> {
   // Warten, bis genau diese Seite im DOM steht (Seitenwechsel + React-Render)
   // und die CAD-Engine mindestens einen Frame gezeichnet hat.
   let el: HTMLElement | null = null;
