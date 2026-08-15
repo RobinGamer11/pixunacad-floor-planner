@@ -178,9 +178,9 @@ async function embedPage(
   widthMm: number,
   heightMm: number,
 ): Promise<void> {
-  const jpegDataUrl = canvas.toDataURL("image/jpeg", 0.92);
-  const jpegBytes = dataUrlToBytes(jpegDataUrl);
-  const img = await pdf.embedJpg(jpegBytes);
+  // PNG (verlustfrei) — JPEG erzeugte sichtbare Artefakte an Linien und Text.
+  const pngBytes = dataUrlToBytes(canvas.toDataURL("image/png"));
+  const img = await pdf.embedPng(pngBytes);
   const wPt = (widthMm / MM_PER_INCH) * 72;
   const hPt = (heightMm / MM_PER_INCH) * 72;
   const page = pdf.addPage([wPt, hPt]);
