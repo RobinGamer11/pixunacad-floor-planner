@@ -88,14 +88,21 @@ async function snapshotPageElement(
   await waitFrames(6);
 
   const rectPx = el.getBoundingClientRect();
-  // html2canvas skaliert intern; wir wählen scale so, dass Ausgabewert der
-  // physikalischen DPI entspricht (Seite ist in CSS-px, aber ihre reale
-  // Zielgröße kennen wir über die Projekt-mm — die Umrechnung passiert später
-  // beim Einbetten in die PDF-Seite).
+  // Ziel: exakt `dpi` auf dem physischen Papier. Die Seite steht in CSS-px auf
+  // dem Bildschirm (abhängig vom Zoom) — der Skalierungsfaktor ergibt sich also
+  // aus dem Verhältnis Ziel-Pixel (mm → dpi) zur aktuellen CSS-Breite.
+  const targetPx = (widthMm / MM_PER_INCH) * dpi;
   const targetPxPerCssPx = Math.min(
-    3, // hard cap: sonst wird das Canvas riesig
-    Math.max(1, dpi / 96),
+    8, // Sicherheitsgrenze gegen extrem große Canvas
+    Math.max(1, targetPx / Math.max(1, rectPx.width)),
   );
+  // CAD-Zeichenfläche (Canvas) mit gleicher Auflösung rendern lassen,
+  // sonst wird sie beim Hochskalieren unscharf.
+  window.dispatchEvent(
+    new CustomEvent("pixuna:export-render-scale", { detail: targetPxPerCssPx }),
+  );
+  await waitFrames(6);
+
   const canvas = await html2canvas(el, {
     backgroundColor: "#ffffff",
     scale: targetPxPerCssPx,
