@@ -30,6 +30,7 @@ export interface Selection {
   textBoxId?: string;
   stickerInstanceId?: string;
   documentId?: string;
+  freeStrokeId?: string;
   handleIndex?: number | null;
   pointIndex?: number | null;
   /** Bei HATCH-Selection optional: Index der angeklickten Kante (für Edge-Offset-Hub). */
@@ -266,11 +267,13 @@ export class Renderer {
       this._drawTextBoxesForLabel(labelId);
       this._drawStickerInstancesForLabel(labelId);
     }
-    // Fangpunkte der selektierten Wand IMMER ganz oben (über allen Wänden/Hatches),
-    // damit Bewegen/Verschieben/Drehen jederzeit greifbar bleibt.
-    this._drawSelectedWallHandles();
-    // Ruler-Guide (Lineal) immer ganz oben in der aktiven Scene zeichnen.
-    this._drawRulerGuide();
+    if (!isExportMode()) {
+      // Fangpunkte der selektierten Wand IMMER ganz oben (über allen Wänden/Hatches),
+      // damit Bewegen/Verschieben/Drehen jederzeit greifbar bleibt.
+      this._drawSelectedWallHandles();
+      // Ruler-Guide (Lineal) immer ganz oben in der aktiven Scene zeichnen.
+      this._drawRulerGuide();
+    }
   }
 
 
@@ -1235,9 +1238,11 @@ export class Renderer {
   }
 
   private _drawSegmentsForLabel(labelId: string) {
+    const hideGuides = isExportMode();
     for (const seg of this.scene.segments) {
       if (seg.labelId !== labelId) continue;
       if (!this.labels.isVisible(seg.labelId)) continue;
+      if (hideGuides && seg.isGuide) continue;
       this._drawSingleSegment(seg);
     }
   }

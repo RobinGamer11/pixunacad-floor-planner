@@ -348,23 +348,40 @@ export class EraserTool {
     }
 
     // Linien-Segmente splitten
+    const guideLockApp = this.app as CadApp & { areGuidesLocked?: () => boolean };
     const segsCopy = scene.segments.slice();
     for (const seg of segsCopy) {
       if (!this.app.labelManager.isVisible(seg.labelId)) continue;
+      if (seg.isGuide && guideLockApp.areGuidesLocked?.()) continue;
       const pa = seg.a, pb = seg.b;
       const proj = projectPointToSegment(centerW, pa, pb);
       if (dist(proj.q, centerW) > r) continue;
       const rVec = this._effRadius(seg.id, r, vecMode, softness, strength);
       const subs = splitSegmentByCircle(pa, pb, centerW, rVec);
       if (subs.length === 1 && dist(subs[0].a, pa) < 1e-9 && dist(subs[0].b, pb) < 1e-9) continue;
-      const style = { color: seg.color, thicknessM: seg.thicknessM, labelId: seg.labelId };
+      const style = {
+        color: seg.color,
+        thicknessM: seg.thicknessM,
+        labelId: seg.labelId,
+        isGuide: seg.isGuide,
+        midpointSnap: seg.midpointSnap,
+        divisionSnap: seg.divisionSnap,
+        arrowScale: seg.arrowScale,
+      };
       scene.removeSegment(seg);
       if (this.app.selection && (this.app.selection as any).segmentId === seg.id) {
         this.app.setSelection(null);
       }
       for (const s of subs) {
         if (dist(s.a, s.b) < Defaults.minSegLenM) continue;
-        scene.createSegment(s.a, s.b, style);
+        const replacement = scene.createSegment(s.a, s.b, {
+          ...style,
+          // Pfeile bleiben an den ursprünglichen Außenenden; an den neuen
+          // Radierkanten entstehen keine zusätzlichen Pfeilspitzen.
+          arrowStart: !!seg.arrowStart && dist(s.a, pa) < 1e-9,
+          arrowEnd: !!seg.arrowEnd && dist(s.b, pb) < 1e-9,
+        });
+        replacement._stickerEditOwnerId = seg._stickerEditOwnerId ?? null;
       }
     }
 

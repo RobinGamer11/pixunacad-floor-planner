@@ -1047,10 +1047,28 @@ export class Scene {
       return { didSplit: false, point: (t < 0.5 ? seg.a : seg.b), newSegments: [seg] };
     }
     const p = lerp(seg.a, seg.b, t);
-    const style = { color: seg.color, thicknessM: seg.thicknessM, labelId: seg.labelId, isGuide: seg.isGuide };
+    const style = {
+      color: seg.color,
+      thicknessM: seg.thicknessM,
+      labelId: seg.labelId,
+      isGuide: seg.isGuide,
+      midpointSnap: seg.midpointSnap,
+      divisionSnap: seg.divisionSnap,
+      arrowScale: seg.arrowScale,
+    };
     this.removeSegment(seg);
-    const s1 = this.createSegment(seg.a, p, style);
-    const s2 = this.createSegment(p, seg.b, style);
+    const s1 = this.createSegment(seg.a, p, {
+      ...style,
+      arrowStart: seg.arrowStart,
+      arrowEnd: false,
+    });
+    const s2 = this.createSegment(p, seg.b, {
+      ...style,
+      arrowStart: false,
+      arrowEnd: seg.arrowEnd,
+    });
+    s1._stickerEditOwnerId = seg._stickerEditOwnerId ?? null;
+    s2._stickerEditOwnerId = seg._stickerEditOwnerId ?? null;
     return { didSplit: true, point: p, newSegments: [s1, s2] };
   }
 

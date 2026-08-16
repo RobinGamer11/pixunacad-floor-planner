@@ -6,6 +6,7 @@ export class PointEditMenu {
   root: HTMLDivElement;
   buttonsByAction: Record<string, HTMLButtonElement>;
   actions = [PointEditAction.MOVE, PointEditAction.TRANSLATE, PointEditAction.ROTATE, PointEditAction.OFFSET, PointEditAction.RESIZE, PointEditAction.DUPLICATE, PointEditAction.DELETE];
+  private visibleActions: string[] = [];
   index = -1;
   visible = false;
   private _onActivate: ((action: string) => void) | null = null;
@@ -20,7 +21,9 @@ export class PointEditMenu {
       const btn = this.buttonsByAction[action];
       if (!btn) continue;
       btn.addEventListener("click", () => {
-        this.index = this.actions.indexOf(action);
+        const nextIndex = this.visibleActions.indexOf(action);
+        if (nextIndex < 0) return;
+        this.index = nextIndex;
         this._sync();
         try { (window as any).__pixunaSkipFirstDraw = true; } catch {}
         this._onActivate && this._onActivate(action);
@@ -44,12 +47,19 @@ export class PointEditMenu {
 
     // Buttons je nach allowedActions ein-/ausblenden.
     const allow = allowedActions ? new Set(allowedActions) : null;
+    const selectedAction = this.index >= 0 ? this.visibleActions[this.index] : null;
+    this.visibleActions = this.actions.filter((action) => {
+      const btn = this.buttonsByAction[action];
+      return !!btn && (!allow || allow.has(action));
+    });
+    this.index = selectedAction ? this.visibleActions.indexOf(selectedAction) : -1;
     for (const action of this.actions) {
       const btn = this.buttonsByAction[action];
       if (!btn) continue;
       const visible = !allow || allow.has(action);
       btn.style.display = visible ? "" : "none";
     }
+    this._sync();
 
     // Wenn der User die Box bereits manuell verschoben hat und wir nur
     // re-positionieren würden (gleiche Selektion), Position respektieren.
@@ -90,12 +100,12 @@ export class PointEditMenu {
 
     this.root.style.left = `${left}px`;
     this.root.style.top = `${top}px`;
-    this._sync();
   }
 
   hide() {
     this.visible = false;
     this.index = -1;
+    this.visibleActions = [];
     this.root.classList.add("hidden");
     this.root.style.display = "";
     resetHubUserMoved(this.root);
@@ -109,21 +119,24 @@ export class PointEditMenu {
   }
 
   next() {
+    if (this.visibleActions.length === 0) return;
     if (this.index < 0) this.index = 0;
-    else this.index = (this.index + 1) % this.actions.length;
+    else this.index = (this.index + 1) % this.visibleActions.length;
     this._sync();
   }
 
   activateCurrent() {
     if (this.index < 0) return;
-    const action = this.actions[this.index];
+    const action = this.visibleActions[this.index];
+    if (!action) return;
     this._onActivate && this._onActivate(action);
   }
 
   private _sync() {
+    const activeAction = this.index >= 0 ? this.visibleActions[this.index] : null;
     for (const action of this.actions) {
       const btn = this.buttonsByAction[action];
-      if (btn) btn.classList.toggle("active", this.index >= 0 && action === this.actions[this.index]);
+      if (btn) btn.classList.toggle("active", action === activeAction);
     }
   }
 }

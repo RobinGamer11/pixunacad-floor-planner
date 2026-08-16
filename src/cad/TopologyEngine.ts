@@ -40,6 +40,22 @@ export interface Snap {
   doorEndpoint?: "left" | "right" | "center" | null;
 }
 
+export interface SnapExclusions {
+  segmentIds?: ReadonlySet<string>;
+  segmentPoint?: { segmentId: string; pointIndex: 0 | 1 };
+  segmentLineIds?: ReadonlySet<string>;
+  hatchIds?: ReadonlySet<string>;
+  hatchPoint?: { hatchId: string; pointIndex: number; holeIndex?: number | null };
+  hatchEdgeIds?: ReadonlySet<string>;
+  textBoxIds?: ReadonlySet<string>;
+  textBoxCorner?: { textBoxId: string; cornerIndex: number };
+  dimensionIds?: ReadonlySet<string>;
+  documentIds?: ReadonlySet<string>;
+  freeStrokeIds?: ReadonlySet<string>;
+  wallIds?: ReadonlySet<string>;
+  doorIds?: ReadonlySet<string>;
+}
+
 
 export class TopologyEngine {
   scene: Scene;
@@ -128,10 +144,12 @@ export class TopologyEngine {
     mouseS: Vec2,
     mouseW: Vec2,
     register: (candidate: Snap, score: number) => void,
+    excludedWallIds?: ReadonlySet<string>,
   ): void {
-    const visibleWalls = this.scene.walls.filter(w => this.labels.isVisible(w.labelId));
-    if (this.includeWallOffsetSnaps) this._ensureHealCache(visibleWalls);
-    for (const wall of visibleWalls) {
+    const allVisibleWalls = this.scene.walls.filter((wall) => this.labels.isVisible(wall.labelId));
+    const candidateWalls = allVisibleWalls.filter((wall) => !excludedWallIds?.has(wall.id));
+    if (this.includeWallOffsetSnaps) this._ensureHealCache(allVisibleWalls);
+    for (const wall of candidateWalls) {
       const ref = wall.corners;
       if (ref.length < 2) continue;
       const isPriority = !!(this.priorityWallId && wall.id === this.priorityWallId);
@@ -162,7 +180,9 @@ export class TopologyEngine {
       }
 
       if (this.includeWallOffsetSnaps) {
-        const otherVisibleWalls = visibleWalls.filter(w => w !== wall && w.corners.length >= 2);
+        // Ausgeschlossene Wände bleiben Teil des Heilungs-Kontexts, damit die
+        // Fanggeometrie der übrigen Wände exakt der sichtbaren Darstellung folgt.
+        const otherVisibleWalls = allVisibleWalls.filter(w => w !== wall && w.corners.length >= 2);
         const healed = this._getHealed(wall, otherVisibleWalls);
 
         const mainPts = healed.mainCorners;
@@ -214,7 +234,7 @@ export class TopologyEngine {
     }
   }
 
-  findBestSnap(mouseS: Vec2, mouseW: Vec2): Snap | null {
+  findBestSnap(mouseS: Vec2, mouseW: Vec2, exclusions?: SnapExclusions): Snap | null {
     let best: Snap | null = null;
     let bestScore = Infinity;
 
@@ -240,10 +260,14 @@ export class TopologyEngine {
     };
 
     // Segment points
-    const segs = this._segmentsFrontToBack();
+    const segs = this._segmentsFrontToBack().filter((seg) => !exclusions?.segmentIds?.has(seg.id));
     for (const seg of segs) {
-      considerPoint(seg.a, seg, null, 0);
-      considerPoint(seg.b, seg, null, 1);
+      const movingPoint = exclusions?.segmentPoint?.segmentId === seg.id
+        ? exclusions.segmentPoint.pointIndex
+        : null;
+      if (movingPoint !== 0) considerPoint(seg.a, seg, null, 0);
+      if (movingPoint !== 1) considerPoint(seg.b, seg, null, 1);
+      if (movingPoint != null) continue;
       // Mittelpunkt-/Teilungs-Snap-Punkte (vom User pro Linie aktivierbar).
       // pointIndex = -1 markiert sie als "interne" Snap-Punkte ohne Vertex-Index,
       // damit sie nicht als echte Endpunkte (für Hub/Auswahl) interpretiert werden.
@@ -260,29 +284,43 @@ export class TopologyEngine {
     }
 
     // Hatch points (outer + holes)
-    for (const hatch of this._hatchesFrontToBack()) {
+    const hatches = this._hatchesFrontToBack().filter((hatch) => !exclusions?.hatchIds?.has(hatch.id));
+    for (const hatch of hatches) {
       for (let i = 0; i < hatch.points.length; i++) {
+        const excludedPoint = exclusions?.hatchPoint;
+        if (excludedPoint?.hatchId === hatch.id && excludedPoint.holeIndex == null
+            && excludedPoint.pointIndex === i) continue;
         considerPoint(hatch.points[i], null, hatch, i);
       }
       if (hatch.holes) {
-        for (const loop of hatch.holes) {
+        for (let holeIndex = 0; holeIndex < hatch.holes.length; holeIndex++) {
+          const loop = hatch.holes[holeIndex];
           if (!loop) continue;
-          for (const p of loop) considerPoint(p, null, null, -1);
+          for (let pointIndex = 0; pointIndex < loop.length; pointIndex++) {
+            const excludedPoint = exclusions?.hatchPoint;
+            if (excludedPoint?.hatchId === hatch.id && excludedPoint.holeIndex === holeIndex
+                && excludedPoint.pointIndex === pointIndex) continue;
+            considerPoint(loop[pointIndex], null, null, -1);
+          }
         }
       }
     }
     // TextBox corners
     for (const box of this.scene.textBoxes) {
+      if (exclusions?.textBoxIds?.has(box.id)) continue;
       if (!this.labels.isVisible(box.labelId)) continue;
       const corners = boxCornersWorld(box);
-      for (const c of corners) {
-        considerPoint(c, null, null, -1);
+      for (let cornerIndex = 0; cornerIndex < corners.length; cornerIndex++) {
+        if (exclusions?.textBoxCorner?.textBoxId === box.id
+            && exclusions.textBoxCorner.cornerIndex === cornerIndex) continue;
+        considerPoint(corners[cornerIndex], null, null, -1);
       }
     }
     // Dimension endpoints + placement-line endpoints/mid (zum Ausrichten
     // mehrerer Maßketten nebeneinander). Die Maßlinie selbst (d1↔d2) wird
     // weiter unten als Snap-Linie ergänzt.
     for (const dim of this.scene.dimensions) {
+      if (exclusions?.dimensionIds?.has(dim.id)) continue;
       if (!this.labels.isVisible(dim.labelId)) continue;
       considerPoint(dim.p1, null, null, -1);
       considerPoint(dim.p2, null, null, -1);
@@ -295,6 +333,7 @@ export class TopologyEngine {
     }
     // Document corners + edge midpoints
     for (const doc of this.scene.documents) {
+      if (exclusions?.documentIds?.has(doc.id)) continue;
       if (!this.labels.isVisible(doc.labelId)) continue;
       for (const c of documentCornersWorld(doc)) considerPoint(c, null, null, -1);
       for (const m of documentEdgeMidpointsWorld(doc)) considerPoint(m, null, null, -1);
@@ -303,6 +342,7 @@ export class TopologyEngine {
     }
     // Freihand-Stroke Endpunkte (nur erster + letzter Punkt)
     for (const s of this.scene.freeStrokes) {
+      if (exclusions?.freeStrokeIds?.has(s.id)) continue;
       if (!this.labels.isVisible(s.labelId)) continue;
       if (!s.points || s.points.length < 2) continue;
       considerPoint(s.points[0], null, null, -1);
@@ -310,12 +350,14 @@ export class TopologyEngine {
     }
     // Segment lines
     for (const seg of segs) {
+      if (exclusions?.segmentLineIds?.has(seg.id)) continue;
       considerLine(seg.a, seg.b, seg, null);
     }
     // Dimension placement-line (Maßlinie d1↔d2) als Snap-Linie, damit neue
     // oder verschobene Maßketten exakt auf bestehende Maßlinien gelegt werden
     // können ("nebeneinandersetzen").
     for (const dim of this.scene.dimensions) {
+      if (exclusions?.dimensionIds?.has(dim.id)) continue;
       if (!this.labels.isVisible(dim.labelId)) continue;
       try {
         const g = getDimensionGeometry(dim);
@@ -324,11 +366,12 @@ export class TopologyEngine {
     }
     this._addWallSnapsTo(mouseS, mouseW, (cand, score) => {
       if (score < bestScore) { bestScore = score; best = cand; }
-    });
+    }, exclusions?.wallIds);
 
     // Door / Window endpoints (leftEnd, rightEnd, center) — als freie Snap-Punkte
     // mit doorId-Referenz, damit MeasureTool sie der jeweiligen Tür zuordnen kann.
     for (const door of this.scene.doors) {
+      if (exclusions?.doorIds?.has(door.id) || exclusions?.wallIds?.has(door.wallId)) continue;
       if (!this.labels.isVisible(door.labelId)) continue;
       const wall = this.scene.getWallById(door.wallId);
       if (!wall) continue;
@@ -357,11 +400,13 @@ export class TopologyEngine {
 
     // Hatch edges
     for (const edge of this.scene.getHatchEdges()) {
+      if (exclusions?.hatchIds?.has(edge.hatch.id) || exclusions?.hatchEdgeIds?.has(edge.hatch.id)) continue;
       if (!this.labels.isVisible(edge.hatch.labelId)) continue;
       considerLine(edge.a, edge.b, null, edge.hatch, edge.edgeIndex);
     }
     // Hole edges (Snap-Linien — kein insert-on-snap, da Loops keine "edgeIndex" im Scene-Modell haben)
-    for (const hatch of this._hatchesFrontToBack()) {
+    for (const hatch of hatches) {
+      if (exclusions?.hatchEdgeIds?.has(hatch.id)) continue;
       if (!hatch.holes) continue;
       for (const loop of hatch.holes) {
         if (!loop || loop.length < 2) continue;

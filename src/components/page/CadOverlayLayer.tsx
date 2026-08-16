@@ -8,7 +8,7 @@
  * PDFs/Bilder) — analog zur Hub-Box in der CAD-Hauptseite (Move/Rotate).
  */
 import { useEffect, useRef, useState } from "react";
-import { Move, RotateCw, Scaling, Scissors, Trash2 } from "lucide-react";
+import { Move, RotateCw, Scaling, Scissors } from "lucide-react";
 import { MiniCad, type MiniTool } from "@/cad/embed/MiniCad";
 import { projectStore } from "@/lib/projectStore";
 import type { MiniCadSelectionInfo } from "@/cad/embed/MiniCad";
@@ -54,7 +54,7 @@ interface Props {
     id: string,
     t: { xMM: number; yMM: number; wMM: number; hMM: number; rotationDeg: number; guideEdges: { top: boolean; right: boolean; bottom: boolean; left: boolean } },
   ) => void;
-  /** Callback, wenn ein externes Projektmappen-Dokument über die HUB-Box gelöscht wird. */
+  /** Callback, wenn ein externes Projektmappen-Dokument über ENTF/Kopf gelöscht wird. */
   onExternalDocDelete?: (id: string) => void;
 
   lineColor?: string;
@@ -119,7 +119,6 @@ export default function CadOverlayLayer(props: Props) {
   const peMoveRef = useRef<HTMLButtonElement>(null);
   const peTranslateRef = useRef<HTMLButtonElement>(null);
   const peRotateRef = useRef<HTMLButtonElement>(null);
-  const peDeleteRef = useRef<HTMLButtonElement>(null);
   const peOffsetRef = useRef<HTMLButtonElement>(null);
   const peResizeRef = useRef<HTMLButtonElement>(null);
   const peDuplicateRef = useRef<HTMLButtonElement>(null);
@@ -152,7 +151,7 @@ export default function CadOverlayLayer(props: Props) {
     if (
       !canvasRef.current || !hubRef.current || !hubLenRef.current || !hubAngRef.current ||
       !peRef.current || !peMoveRef.current || !peTranslateRef.current ||
-      !peRotateRef.current || !peDeleteRef.current || !peOffsetRef.current ||
+      !peRotateRef.current || !peOffsetRef.current ||
       !teEditorRef.current || !teToolbarRef.current || !teBoldRef.current ||
       !teItalicRef.current || !teColorRef.current || !teSizeRef.current || !teSymbolRef.current
     ) return;
@@ -168,7 +167,6 @@ export default function CadOverlayLayer(props: Props) {
           [PointEditAction.MOVE]: peMoveRef.current,
           [PointEditAction.TRANSLATE]: peTranslateRef.current,
           [PointEditAction.ROTATE]: peRotateRef.current,
-          [PointEditAction.DELETE]: peDeleteRef.current,
           [PointEditAction.OFFSET]: peOffsetRef.current,
           [PointEditAction.RESIZE]: peResizeRef.current!,
           [PointEditAction.DUPLICATE]: peDuplicateRef.current!,
@@ -306,6 +304,7 @@ export default function CadOverlayLayer(props: Props) {
     engineRef.current?.setExternalDocuments(
       externalDocs ?? [],
       (id, t) => onExternalDocChangeRef.current?.(id, t),
+      (id) => onExternalDocDeleteRef.current?.(id),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [extDocsKey]);
@@ -406,21 +405,6 @@ export default function CadOverlayLayer(props: Props) {
         closeDocHub();
       }
     }
-  };
-
-  const applyDelete = () => {
-    const e: any = engineRef.current;
-    if (!e || !docHub.docId) return;
-    const doc = e.scene.getDocumentById(docHub.docId);
-    if (!doc) return;
-    if ((doc as any)._snapOnly) {
-      onExternalDocDeleteRef.current?.(docHub.docId);
-    } else {
-      e.scene.removeDocument(doc);
-      e.clearSelection?.();
-      e._changeDirty = true;
-    }
-    closeDocHub();
   };
 
   // cycleAnchor entfernt — der Hub-Button „Anker wechseln" wurde aus dem UI
@@ -532,14 +516,6 @@ export default function CadOverlayLayer(props: Props) {
                 <Scissors size={14} />
               </button>
             )}
-            <button
-              type="button"
-              title="Dokument löschen"
-              onClick={applyDelete}
-              style={{ ...hubBtnStyle, color: "hsl(0 65% 50%)" }}
-            >
-              <Trash2 size={14} />
-            </button>
           </div>
         )}
         {/* LineHub */}
@@ -579,13 +555,12 @@ export default function CadOverlayLayer(props: Props) {
             zIndex: 50,
           }}
         >
-          <button ref={peMoveRef} data-hub-control style={pointEditBtn} title="Verschieben">↔</button>
-          <button ref={peTranslateRef} data-hub-control style={pointEditBtn} title="Translation">⇄</button>
-          <button ref={peRotateRef} data-hub-control style={pointEditBtn} title="Drehen">⟳</button>
+          <button ref={peMoveRef} type="button" data-hub-control style={pointEditBtn} title="Bewegen" aria-label="Bewegen">↔</button>
+          <button ref={peTranslateRef} type="button" data-hub-control style={pointEditBtn} title="Verschieben" aria-label="Verschieben"><Move size={14} /></button>
+          <button ref={peRotateRef} type="button" data-hub-control style={pointEditBtn} title="Drehen" aria-label="Drehen">⟳</button>
           <button ref={peOffsetRef} data-hub-control style={pointEditBtn} title="Offset">±</button>
           <button ref={peResizeRef} data-hub-control style={pointEditBtn} title="Box vergrößern/verkleinern">⤡</button>
           <button ref={peDuplicateRef} data-hub-control style={pointEditBtn} title="Duplizieren">⎘</button>
-          <button ref={peDeleteRef} data-hub-control style={pointEditBtn} title="Löschen">✕</button>
         </div>
         {/* TextEditor (contenteditable) + toolbar */}
         <div ref={teEditorRef} className="hidden" style={{ zIndex: 60 }} />

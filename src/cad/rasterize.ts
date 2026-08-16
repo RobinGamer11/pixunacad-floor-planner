@@ -152,6 +152,10 @@ function removeFromApp(app: any, input: RasterInput) {
  * dann bleibt das Vektorobjekt unverändert bestehen).
  */
 export function rasterizeObject(app: any, input: RasterInput): DocumentObject | null {
+  // Hilfslinien sind semantische, nicht druckende Vektorobjekte. Ein zuvor
+  // am Linienwerkzeug aktivierter Pixelmodus darf sie deshalb niemals in ein
+  // normales (und damit druckbares) DocumentObject umwandeln.
+  if (input.type === "segment" && input.obj.isGuide) return null;
   if (!app || !app.scene || !app.renderer) return null;
   try {
     const b = worldBounds(app, input);

@@ -60,10 +60,13 @@ export function restoreOneScene(scene: Scene, data: SerializedScene | null | und
   for (const s of data.segments || []) {
     const seg = scene.createSegment(s.a, s.b, {
       color: s.color, thicknessM: s.thicknessM, labelId: s.labelId,
+      isGuide: !!s.isGuide,
+      midpointSnap: !!s.midpointSnap,
+      divisionSnap: s.divisionSnap,
       arrowStart: !!s.arrowStart, arrowEnd: !!s.arrowEnd,
       arrowScale: typeof s.arrowScale === "number" ? s.arrowScale : 1,
     });
-    if (s._stickerEditOwnerId) (seg as any)._stickerEditOwnerId = s._stickerEditOwnerId;
+    if (s._stickerEditOwnerId) seg._stickerEditOwnerId = s._stickerEditOwnerId;
   }
   for (const h of data.hatches || []) {
     const hatch = scene.createHatch(h.points, {

@@ -33,6 +33,7 @@ import { Defaults, SelectionType } from "../constants";
 import type { TextBox, TextBoxStyle, FreeLineStyle } from "../Scene";
 import { drawRichTextBox } from "../textRichRenderer";
 import { autoSizeTextBox } from "../textAutoSize";
+import { isExportMode } from "@/lib/printExport";
 
 
 export interface MiniCadTextEditorDom {
@@ -78,6 +79,14 @@ export interface MiniCadInit {
   /** Initial serialized state. */
   initialState?: any;
 }
+
+type SelectionGeometrySnapshot =
+  | { kind: "segment"; a: { x: number; y: number }; b: { x: number; y: number } }
+  | { kind: "hatch"; pts: { x: number; y: number }[]; holes: { x: number; y: number }[][] | null }
+  | { kind: "textbox"; center: { x: number; y: number } }
+  | { kind: "sticker"; pos: { x: number; y: number } }
+  | { kind: "doc"; pos: { x: number; y: number } }
+  | { kind: "freestroke"; pts: { x: number; y: number }[] };
 
 
 export type MiniTool = "line" | "text" | "select" | "guide" | "free" | "eraser" | "hatch" | "document" | null;
@@ -288,6 +297,7 @@ export class MiniCad {
   private _externalDocs: Map<string, string> = new Map();
   private _externalDocSnapshots: Map<string, string> = new Map();
   private _externalDocChange: ((id: string, t: { xMM: number; yMM: number; wMM: number; hMM: number; rotationDeg: number; guideEdges: { top: boolean; right: boolean; bottom: boolean; left: boolean } }) => void) | null = null;
+  private _externalDocDelete: ((id: string) => void) | null = null;
 
 
   private _activeTool: MiniTool = null;
@@ -614,9 +624,11 @@ export class MiniCad {
   setExternalDocuments(
     docs: Array<{ id: string; xMM: number; yMM: number; wMM: number; hMM: number; rotationRad?: number; guideEdges?: { top: boolean; right: boolean; bottom: boolean; left: boolean } }>,
     onChange?: (id: string, t: { xMM: number; yMM: number; wMM: number; hMM: number; rotationDeg: number; guideEdges: { top: boolean; right: boolean; bottom: boolean; left: boolean } }) => void,
+    onDelete?: (id: string) => void,
   ) {
     this._installExtDocLabel();
     this._externalDocChange = onChange ?? null;
+    this._externalDocDelete = onDelete ?? null;
     const keepIds = new Set(docs.map(d => d.id));
     // Entferne snap-only Docs, die nicht mehr im Input sind.
     this.scene.documents = this.scene.documents.filter(d => !(d as any)._snapOnly || keepIds.has(d.id));
@@ -698,6 +710,32 @@ export class MiniCad {
   }
 
 
+  private _isNonEditableSegmentId(segmentId?: string | null): boolean {
+    if (!segmentId) return false;
+    const segment = this.scene.getSegmentById(segmentId);
+    return !!segment && (this.isFrameSegment(segment) || (segment.isGuide && this._guidesLocked));
+  }
+
+  private _filterNonEditableSegmentSelections(): boolean {
+    const previousMarquee = this.selectTool.marqueeSelectedIds;
+    const nextMarquee = previousMarquee.filter(
+      (ref) => ref.kind !== "segment" || !this._isNonEditableSegmentId(ref.id),
+    );
+    const nextSelections = this.selections.filter(
+      (selection) => !this._isNonEditableSegmentId(selection.segmentId),
+    );
+    const primaryBlocked = this._isNonEditableSegmentId(this.selection?.segmentId);
+    const selectionListChanged = nextSelections.length !== this.selections.length;
+    if (nextMarquee.length !== previousMarquee.length) {
+      this.selectTool.marqueeSelectedIds = nextMarquee;
+    }
+    if (primaryBlocked || selectionListChanged) {
+      const nextPrimary = primaryBlocked ? (nextSelections[0] ?? null) : this.selection;
+      this._applyPrimary(nextPrimary, nextSelections);
+    }
+    return primaryBlocked || selectionListChanged || nextMarquee.length !== previousMarquee.length;
+  }
+
   private _installSelectToolFrameFilter() {
     // Wir filtern Rahmen-Segmente NICHT mehr aus _segmentsFrontToBack heraus,
     // weil dadurch auch das Snapping (findBestSnap nutzt dieselbe Liste) die
@@ -709,13 +747,8 @@ export class MiniCad {
     const origUpdate = this.selectTool.update.bind(this.selectTool);
     (this.selectTool as any).update = (input: any) => {
       const result = origUpdate(input);
-      const sel = this.selection;
-      if (sel && sel.segmentId) {
-        const seg = this.scene.getSegmentById(sel.segmentId);
-        if (seg && (this.isFrameSegment(seg) || (seg.isGuide && this._guidesLocked))) {
-          this.clearSelection();
-          try { this.pointEditMenu.hide(); } catch {}
-        }
+      if (this._filterNonEditableSegmentSelections()) {
+        try { this.pointEditMenu.hide(); } catch {}
       }
       const marqueeCount = this.selectTool.marqueeSelectedIds.length;
       if (marqueeCount !== this._lastMarqueeSelectionCount) {
@@ -810,16 +843,41 @@ export class MiniCad {
   /** Sperrt/entsperrt alle Hilfslinien (Auswahl, Verschieben, Punktedit). */
   setGuidesLocked(locked: boolean) {
     this._guidesLocked = !!locked;
-    // Wenn gerade eine Hilfslinie selektiert ist → Auswahl räumen.
-    const sel = this.selection;
-    if (sel && sel.segmentId) {
-      const seg = this.scene.getSegmentById(sel.segmentId);
-      if (seg?.isGuide && this._guidesLocked) {
-        try { this.clearSelection(); } catch {}
-        try { this.pointEditMenu.hide(); } catch {}
-      }
+    if (!this._guidesLocked) return;
+
+    const pasteContainsGuide = this.selectTool.pasteFloatActive
+      && this.selectTool.marqueeSelectedIds.some((ref) =>
+        ref.kind === "segment" && !!this.scene.getSegmentById(ref.id)?.isGuide,
+      );
+    if (pasteContainsGuide) this.selectTool.cancelPasteFloat();
+
+    const cancelLegacyGroupMove = this._legacyGroupMoveIncludesGuide();
+
+    const editTarget = this.selectTool.editTarget;
+    if (editTarget?.kind === "segment") {
+      const editedSegment = this.scene.getSegmentById(editTarget.segmentId);
+      if (editedSegment?.isGuide) this.selectTool.cancelSegmentEdit(editedSegment.id);
+    }
+
+    const selectedGuideIsInGroup = this.selectTool.marqueeSelectedIds.some((ref) =>
+      ref.kind === "segment" && !!this.scene.getSegmentById(ref.id)?.isGuide,
+    );
+    if (selectedGuideIsInGroup && (
+      this.selectTool.groupAnchorActive || this.selectTool.groupRotateActive || this.selectTool.groupDragActive
+    )) {
+      this.selectTool.cancelGroupTransform(true);
+    }
+    // Der ältere Mehrfachauswahl-Pfad besitzt vollständige Geometrie-Snapshots.
+    // Er wird zuletzt zurückgesetzt, damit sich zwei parallel laufende Preview-
+    // Pfade beim Fixieren nicht gegenseitig überkompensieren.
+    if (cancelLegacyGroupMove) this._cancelLegacyGroupMove(true);
+
+    if (this._filterNonEditableSegmentSelections()) {
+      try { this.pointEditMenu.hide(); } catch {}
     }
   }
+
+  areGuidesLocked(): boolean { return this._guidesLocked; }
 
   /** Setzt die Default-Farbe für neu erzeugte Hilfslinien. */
   setGuideColor(color: string) {
@@ -897,6 +955,9 @@ export class MiniCad {
           isGuide: !!seg.isGuide,
           midpointSnap: !!seg.midpointSnap,
           divisionSnap: seg.divisionSnap,
+          arrowStart: !!seg.arrowStart,
+          arrowEnd: !!seg.arrowEnd,
+          arrowScale: seg.arrowScale,
         },
       );
       newIds.push(copy.id);
@@ -1027,6 +1088,9 @@ export class MiniCad {
           isGuide: !!s.isGuide,
           midpointSnap: !!s.midpointSnap,
           divisionSnap: s.divisionSnap,
+          arrowStart: !!s.arrowStart,
+          arrowEnd: !!s.arrowEnd,
+          arrowScale: s.arrowScale,
         })),
 
       textBoxes: this.scene.textBoxes.map((t) => ({
@@ -1068,6 +1132,12 @@ export class MiniCad {
         strokeWidthPx: h.strokeWidthPx,
         labelId: h.labelId,
         areaLabel: h.areaLabel ? { ...h.areaLabel } : undefined,
+        patternEnabled: h.patternEnabled,
+        patternId: h.patternId,
+        patternScale: h.patternScale,
+        patternAngleDeg: h.patternAngleDeg,
+        patternSkewDeg: h.patternSkewDeg,
+        patternStretch: h.patternStretch,
       })),
 
       documents: this.scene.documents
@@ -1125,6 +1195,9 @@ export class MiniCad {
               isGuide: !!s.isGuide,
               midpointSnap: !!s.midpointSnap,
               divisionSnap: typeof s.divisionSnap === "number" && s.divisionSnap >= 2 ? Math.floor(s.divisionSnap) : undefined,
+              arrowStart: !!s.arrowStart,
+              arrowEnd: !!s.arrowEnd,
+              arrowScale: s.arrowScale,
             },
 
           );
@@ -1221,11 +1294,14 @@ export class MiniCad {
   /* ===== Required CadApp surface for LineTool / TextTool / TextEditor ===== */
 
   getCurrentLineStyle() {
-    const color = applyAlphaToColor(this.defaultLineColor, this.defaultLineAlpha);
+    const color = this._guideMode
+      ? this._guideColor
+      : applyAlphaToColor(this.defaultLineColor, this.defaultLineAlpha);
     return {
       color,
       thicknessM: this.defaultLineThicknessM,
       labelId: this.activeDrawLabelId || Defaults.defaultLabelId,
+      isGuide: this._guideMode,
     };
   }
 
@@ -1406,6 +1482,23 @@ export class MiniCad {
   /** Wird vom SelectTool nach Gruppen-Verschieben/-Drehen aufgerufen. */
   commitHistorySnapshot(): void { this._changeDirty = true; }
 
+  /** Verwirft eine rein lokale Vorschau, ohne einen fachlichen Undo-Schritt
+   *  oder einen Host-Snapshot zu erzeugen. */
+  discardHistoryPreview(): void {
+    this._lastSig = this._sceneSignature();
+    this._changeDirty = false;
+  }
+
+  private _flushHistorySnapshot(): void {
+    try {
+      this._onChange?.();
+      this._lastSig = this._sceneSignature();
+      this._changeDirty = false;
+    } catch {
+      this._changeDirty = true;
+    }
+  }
+
   hasClipboard(): boolean { return this._miniClipboard.length > 0; }
 
   /** Sammelt IDs der aktuellen Auswahl (Marquee + Einzel/Mehrfach). */
@@ -1416,15 +1509,20 @@ export class MiniCad {
       if (!out.some((o) => o.kind === kind && o.id === id)) out.push({ kind, id });
     };
     if (this._activeTool === "select") {
-      for (const m of this.selectTool.marqueeSelectedIds) push(m.kind, m.id);
+      for (const m of this.selectTool.marqueeSelectedIds) {
+        push(m.kind === "textbox" ? "textBox" : m.kind, m.id);
+      }
     }
-    const list: any[] = (this.selections?.length ? this.selections : (this.selection ? [this.selection] : []));
+    const list: Selection[] = this.selections?.length
+      ? this.selections
+      : (this.selection ? [this.selection] : []);
     for (const s of list) {
       push("segment", s.segmentId);
       push("hatch", s.hatchId);
       push("textBox", s.textBoxId);
       push("freeStroke", s.freeStrokeId);
       push("dimension", s.dimensionId);
+      push("document", s.documentId);
     }
     return out;
   }
@@ -1437,12 +1535,19 @@ export class MiniCad {
       try {
         if (kind === "segment") {
           const s = this.scene.getSegmentById(id); if (!s) continue;
-          clip.push({ kind, data: { a: clone(s.a), b: clone(s.b), color: s.color, thicknessM: s.thicknessM, labelId: s.labelId } });
+          if (this.isFrameSegment(s) || (s.isGuide && this._guidesLocked)) continue;
+          clip.push({ kind, data: {
+            a: clone(s.a), b: clone(s.b), color: s.color, thicknessM: s.thicknessM, labelId: s.labelId,
+            isGuide: !!s.isGuide, midpointSnap: !!s.midpointSnap, divisionSnap: s.divisionSnap,
+            arrowStart: !!s.arrowStart, arrowEnd: !!s.arrowEnd, arrowScale: s.arrowScale,
+          } });
         } else if (kind === "hatch") {
           const h = this.scene.getHatchById(id); if (!h) continue;
           clip.push({ kind, data: { points: clone(h.points), holes: clone(h.holes ?? []), fillColor: h.fillColor,
             strokeColor: h.strokeColor, fillAlphaPct: h.fillAlphaPct, strokeWidthPx: h.strokeWidthPx,
-            labelId: h.labelId, areaLabel: clone(h.areaLabel) } });
+            labelId: h.labelId, areaLabel: clone(h.areaLabel), patternEnabled: h.patternEnabled,
+            patternId: h.patternId, patternScale: h.patternScale, patternAngleDeg: h.patternAngleDeg,
+            patternSkewDeg: h.patternSkewDeg, patternStretch: h.patternStretch } });
         } else if (kind === "textBox") {
           const t = this.scene.getTextBoxById(id); if (!t) continue;
           clip.push({ kind, data: { center: clone(t.center), widthM: t.widthM, heightM: t.heightM,
@@ -1460,7 +1565,24 @@ export class MiniCad {
             style: { textColor: d.textColor, textSizePx: d.textSizePx, lineColor: d.lineColor,
               decimals: d.decimals, tickLengthM: d.tickLengthM, showExtensions: d.showExtensions,
               useFreeText: d.useFreeText, freeText: d.freeText, textBgEnabled: d.textBgEnabled,
-              textBgColor: d.textBgColor, textBgAlpha: d.textBgAlpha, labelId: d.labelId } }) });
+              textBgColor: d.textBgColor, textBgAlpha: d.textBgAlpha,
+              extensionStyle: d.extensionStyle, extensionColor: d.extensionColor, extensionAlpha: d.extensionAlpha,
+              freeTextBold: d.freeTextBold, freeTextItalic: d.freeTextItalic, freeTextColor: d.freeTextColor,
+              showUnit: d.showUnit, unit: d.unit, textGapPx: d.textGapPx,
+              doorHeightText: d.doorHeightText, mirror: d.mirror, labelId: d.labelId },
+            doorRefId: d.doorRefId }) });
+        } else if (kind === "document") {
+          const d = this.scene.getDocumentById(id); if (!d || d._snapOnly) continue;
+          clip.push({ kind, data: clone({
+            name: d.name, kind: d.kind, src: d.src, pageIndex: d.pageIndex,
+            position: d.position, widthM: d.widthM, heightM: d.heightM, rotationRad: d.rotationRad,
+            pixelWidth: d.pixelWidth, pixelHeight: d.pixelHeight, labelId: d.labelId,
+            importScaleDenom: d.importScaleDenom, eraseMaskDataUrl: d.eraseMaskDataUrl,
+            pdfSourceB64: d.pdfSourceB64, guideEdges: d.guideEdges, cropM: d.cropM,
+            opacity: d.opacity, filters: d.filters, activeFilterId: d.activeFilterId,
+            bgRemoval: d.bgRemoval, anchors: d.anchors, warpCorners: d.warpCorners,
+            flipX: d.flipX, flipY: d.flipY,
+          }) });
         }
       } catch { /* einzelne Objekte überspringen */ }
     }
@@ -1476,13 +1598,25 @@ export class MiniCad {
    */
   pasteClipboard(): boolean {
     if (this._miniClipboard.length === 0) return false;
+    // Eine bereits schwebende Kopie wird vor dem nächsten Einfügen bestätigt;
+    // sonst würde ihre Auswahl beim Aufbau der neuen Kopie verloren gehen.
+    if (this.selectTool.pasteFloatActive) {
+      this.selectTool.confirmPasteFloat();
+      this._flushHistorySnapshot();
+    }
+    else this.selectTool.cancelGroupTransform?.(true);
     const mv = (p: any) => ({ x: p.x, y: p.y });
     const created: { kind: string; id: string }[] = [];
     for (const it of this._miniClipboard) {
       const o = it.data;
       try {
         if (it.kind === "segment") {
-          const n = this.scene.createSegment(mv(o.a), mv(o.b), { color: o.color, thicknessM: o.thicknessM, labelId: o.labelId });
+          if (o.isGuide && this._guidesLocked) continue;
+          const n = this.scene.createSegment(mv(o.a), mv(o.b), {
+            color: o.color, thicknessM: o.thicknessM, labelId: o.labelId,
+            isGuide: !!o.isGuide, midpointSnap: !!o.midpointSnap, divisionSnap: o.divisionSnap,
+            arrowStart: !!o.arrowStart, arrowEnd: !!o.arrowEnd, arrowScale: o.arrowScale,
+          });
           if (n) created.push({ kind: "segment", id: n.id });
         } else if (it.kind === "hatch") {
           const n = this.scene.createHatch(o.points.map(mv), {
@@ -1499,11 +1633,18 @@ export class MiniCad {
           const n = this.scene.createFreeStroke(points.map(mv), style);
           if (n) created.push({ kind: "freeStroke", id: (n as any).id });
         } else if (it.kind === "dimension") {
-          const n = this.scene.createDimension(mv(o.p1), mv(o.p2), mv(o.placementPoint), o.mode, o.refDir, o.style);
+          const n = this.scene.createDimension(mv(o.p1), mv(o.p2), mv(o.placementPoint), o.mode, o.refDir, o.style, o.doorRefId);
           if (n) created.push({ kind: "dimension", id: n.id });
+        } else if (it.kind === "document") {
+          const data = JSON.parse(JSON.stringify(o));
+          const n = this.scene.createDocument({ ...data, position: mv(o.position) });
+          if (n) created.push({ kind: "document", id: n.id });
         }
       } catch { /* einzelne Objekte überspringen */ }
     }
+    // Eine vor dem Fixieren gefüllte Guide-Zwischenablage wird bewusst
+    // konsumiert, erzeugt aber keine neue, anschließend bewegliche Hilfslinie.
+    if (created.length === 0) return true;
     if (created.length) {
       try {
         if (this._activeTool !== "select") this.setTool("select");
@@ -1512,7 +1653,6 @@ export class MiniCad {
       } catch { /* Auswahl optional */ }
     }
     this._changeDirty = true;
-    try { this._onChange?.(); } catch {}
     try { this.refreshLabelUI(); } catch {}
     try { (this.renderer as any).requestDraw?.(); } catch {}
     return true;
@@ -1717,6 +1857,12 @@ export class MiniCad {
       ctx.save();
       ctx.clearRect(0, 0, this.vw, this.vh);
       try { this._drawByLabelOrder?.(); } catch (e) { console.error(e); }
+      // Im PDF-/Druckmodus bleibt nur die echte Geometrie sichtbar. Selektion,
+      // Fangpunkte, Hub-Vorschauen und Werkzeug-Overlays sind reine Editorhilfen.
+      if (isExportMode()) {
+        ctx.restore();
+        return;
+      }
       // Selection-Highlights 1:1 wie in der CAD-Oberfläche.
       try { this._drawHatchSelection?.(); } catch {}
       try { this._drawSegmentSelection?.(); } catch {}
@@ -1787,6 +1933,12 @@ export class MiniCad {
 
       // Gruppen-Drehen der Mehrfachauswahl: R starten, Enter bestätigen, Esc abbrechen.
       if (!inField && !this.textEditor.isActive() && this._activeTool === "select") {
+        if (e.key === "Enter" && this.selectTool.pasteFloatActive) {
+          e.preventDefault();
+          this.selectTool.confirmPasteFloat();
+          this._changeDirty = true;
+          return;
+        }
         if ((e.key === "r" || e.key === "R") && !e.ctrlKey && !e.metaKey && !e.altKey
             && this.selectTool.marqueeSelectedIds.length > 0 && !this.selectTool.groupRotateActive) {
           if (this.selectTool.startGroupRotate()) { e.preventDefault(); return; }
@@ -1803,7 +1955,8 @@ export class MiniCad {
           this._changeDirty = true;
           return;
         }
-        if (e.key === "Escape" && (this.selectTool.groupRotateActive || this.selectTool.groupDragActive
+        if (e.key === "Escape" && !this.selectTool.pasteFloatActive
+            && (this.selectTool.groupRotateActive || this.selectTool.groupDragActive
             || this.selectTool.groupAnchorActive)) {
           e.preventDefault();
           this.selectTool.cancelGroupTransform(true);
@@ -1812,13 +1965,11 @@ export class MiniCad {
         if ((e.key === "Delete" || e.key === "Backspace") && this.selectTool.groupAnchorActive) {
           e.preventDefault();
           this.selectTool.cancelGroupTransform(true);
-          return;
         }
         if ((e.key === "Delete" || e.key === "Backspace")
             && (this.selectTool.groupRotateActive || this.selectTool.groupDragActive)) {
           e.preventDefault();
           this.selectTool.cancelGroupTransform(true);
-          return;
         }
       }
 
@@ -1835,8 +1986,11 @@ export class MiniCad {
       // ESC bricht ALLES ab — egal welches Werkzeug, egal welches Objekt.
       if (e.key === "Escape" && !inField) {
         try { if (this.textEditor.isActive()) this.textEditor.commit(); } catch {}
-        try { (this.selectTool as any).pasteFloatActive = false; } catch {}
-        try { this.selectTool.cancelGroupTransform(true); } catch {}
+        let pasteCancelled = false;
+        try { pasteCancelled = this.selectTool.cancelPasteFloat(); } catch {}
+        if (!pasteCancelled) {
+          try { this.selectTool.cancelGroupTransform(true); } catch {}
+        }
         try { (this.activeTool as any)?.cancel?.(); } catch {}
         try { (this.lineTool as any)?.cancel?.(); (this.hatchTool as any)?.cancel?.();
               (this.freeDrawTool as any)?.cancel?.(); (this.eraserTool as any)?.cancel?.();
@@ -1853,8 +2007,8 @@ export class MiniCad {
       if (this.textEditor.isActive()) return;
       const t = e.target as HTMLElement | null;
       if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
-      // Läuft gerade eine Bearbeitung (Verschieben/Drehen/Resize, z. B. Textwerkzeug)?
-      // Dann bricht ENTF diese Aktion sofort ab und verwirft alle Vorschau-Änderungen.
+      // Eine laufende Bearbeitung zuerst beenden, danach aber in derselben
+      // Tastaturaktion die weiterhin ausgewählte Geometrie löschen.
       const st: any = this.selectTool as any;
       if (this._activeTool === "select" &&
           (st.editTarget || st.rotateTextBoxId || st.dragTextBoxId || st.dragDocId || st.dragFreeStrokeId || st.dragDimId)) {
@@ -1863,9 +2017,13 @@ export class MiniCad {
         this.selectTool.cancel();
         this.pointEditMenu.hide();
         try { this.onSelectionChange?.(); } catch {}
-        return;
       }
       if (this._activeTool === "select" && this.selectTool.marqueeSelectedIds.length > 0) {
+        for (const ref of this.selectTool.marqueeSelectedIds) {
+          if (ref.kind !== "document") continue;
+          const document = this.scene.getDocumentById(ref.id);
+          if (document?._snapOnly) this._externalDocDelete?.(document.id);
+        }
         const removed = this.selectTool.deleteMarqueeSelection();
         if (removed) {
           this.clearSelection();
@@ -1902,8 +2060,14 @@ export class MiniCad {
           this.scene.removeFreeStrokesByIds([(sel as any).freeStrokeId]);
           removed = true;
         } else if ((sel as any).documentId) {
-          this.scene.removeDocumentsByIds([(sel as any).documentId]);
-          removed = true;
+          const documentId = sel.documentId;
+          if (!documentId) continue;
+          const document = this.scene.getDocumentById(documentId);
+          if (document) {
+            if (document._snapOnly) this._externalDocDelete?.(document.id);
+            this.scene.removeDocumentsByIds([documentId]);
+            removed = true;
+          }
         }
       }
 
@@ -1926,7 +2090,8 @@ export class MiniCad {
   private _groupMoveSnap: null | {
     primarySel: Selection;
     primaryAnchor: { x: number; y: number };
-    extras: Array<{ sel: Selection; snapshot: any }>;
+    primarySnapshot: SelectionGeometrySnapshot;
+    extras: Array<{ sel: Selection; snapshot: SelectionGeometrySnapshot }>;
   } = null;
 
   private _isTranslationSel(s: Selection): boolean {
@@ -1955,19 +2120,19 @@ export class MiniCad {
       if (!b) return null;
       return { x: b.center.x, y: b.center.y };
     }
-    const sid = (s as any).stickerInstanceId;
+    const sid = s.stickerInstanceId;
     if (sid) {
       const i = this.scene.getStickerInstanceById(sid);
       if (!i) return null;
       return { x: i.position.x, y: i.position.y };
     }
-    const did = (s as any).documentId;
+    const did = s.documentId;
     if (did) {
       const d = this.scene.documents.find((x) => x.id === did);
       if (!d) return null;
       return { x: d.position.x, y: d.position.y };
     }
-    const fid = (s as any).freeStrokeId;
+    const fid = s.freeStrokeId;
     if (fid) {
       const f = this.scene.freeStrokes.find((x) => x.id === fid);
       if (!f || !f.points.length) return null;
@@ -1976,7 +2141,7 @@ export class MiniCad {
     return null;
   }
 
-  private _snapshotSelGeometry(s: Selection): any {
+  private _snapshotSelGeometry(s: Selection): SelectionGeometrySnapshot | null {
     if (s.segmentId) {
       const seg = this.scene.getSegmentById(s.segmentId);
       if (!seg) return null;
@@ -1988,7 +2153,7 @@ export class MiniCad {
       return {
         kind: "hatch",
         pts: h.points.map((p) => ({ x: p.x, y: p.y })),
-        holes: (h as any).holes ? (h as any).holes.map((ring: any[]) => ring.map((p: any) => ({ x: p.x, y: p.y }))) : null,
+        holes: h.holes ? h.holes.map((ring) => ring.map((p) => ({ x: p.x, y: p.y }))) : null,
       };
     }
     if (s.textBoxId) {
@@ -1996,25 +2161,95 @@ export class MiniCad {
       if (!b) return null;
       return { kind: "textbox", center: { x: b.center.x, y: b.center.y } };
     }
-    const sid = (s as any).stickerInstanceId;
+    const sid = s.stickerInstanceId;
     if (sid) {
       const i = this.scene.getStickerInstanceById(sid);
       if (!i) return null;
       return { kind: "sticker", pos: { x: i.position.x, y: i.position.y } };
     }
-    const did = (s as any).documentId;
+    const did = s.documentId;
     if (did) {
       const d = this.scene.documents.find((x) => x.id === did);
       if (!d) return null;
       return { kind: "doc", pos: { x: d.position.x, y: d.position.y } };
     }
-    const fid = (s as any).freeStrokeId;
+    const fid = s.freeStrokeId;
     if (fid) {
       const f = this.scene.freeStrokes.find((x) => x.id === fid);
       if (!f) return null;
-      return { kind: "freestroke", pts: f.points.map((p: any) => ({ x: p.x, y: p.y })) };
+      return { kind: "freestroke", pts: f.points.map((p) => ({ x: p.x, y: p.y })) };
     }
     return null;
+  }
+
+  private _applySelectionGeometrySnapshot(s: Selection, snapshot: SelectionGeometrySnapshot, dx = 0, dy = 0) {
+    if (snapshot.kind === "segment" && s.segmentId) {
+      const segment = this.scene.getSegmentById(s.segmentId);
+      if (!segment) return;
+      segment.a.x = snapshot.a.x + dx;
+      segment.a.y = snapshot.a.y + dy;
+      segment.b.x = snapshot.b.x + dx;
+      segment.b.y = snapshot.b.y + dy;
+    } else if (snapshot.kind === "hatch" && s.hatchId) {
+      const hatch = this.scene.getHatchById(s.hatchId);
+      if (!hatch) return;
+      for (let i = 0; i < hatch.points.length && i < snapshot.pts.length; i++) {
+        hatch.points[i].x = snapshot.pts[i].x + dx;
+        hatch.points[i].y = snapshot.pts[i].y + dy;
+      }
+      if (snapshot.holes && hatch.holes) {
+        for (let ringIndex = 0; ringIndex < hatch.holes.length && ringIndex < snapshot.holes.length; ringIndex++) {
+          const ring = hatch.holes[ringIndex];
+          for (let i = 0; i < ring.length && i < snapshot.holes[ringIndex].length; i++) {
+            ring[i].x = snapshot.holes[ringIndex][i].x + dx;
+            ring[i].y = snapshot.holes[ringIndex][i].y + dy;
+          }
+        }
+      }
+    } else if (snapshot.kind === "textbox" && s.textBoxId) {
+      const box = this.scene.getTextBoxById(s.textBoxId);
+      if (!box) return;
+      box.center.x = snapshot.center.x + dx;
+      box.center.y = snapshot.center.y + dy;
+    } else if (snapshot.kind === "sticker") {
+      const sticker = this.scene.getStickerInstanceById(s.stickerInstanceId ?? "");
+      if (!sticker) return;
+      sticker.position.x = snapshot.pos.x + dx;
+      sticker.position.y = snapshot.pos.y + dy;
+    } else if (snapshot.kind === "doc") {
+      const document = this.scene.documents.find((item) => item.id === s.documentId);
+      if (!document) return;
+      document.position.x = snapshot.pos.x + dx;
+      document.position.y = snapshot.pos.y + dy;
+    } else if (snapshot.kind === "freestroke") {
+      const stroke = this.scene.freeStrokes.find((item) => item.id === s.freeStrokeId);
+      if (!stroke) return;
+      for (let i = 0; i < stroke.points.length && i < snapshot.pts.length; i++) {
+        stroke.points[i].x = snapshot.pts[i].x + dx;
+        stroke.points[i].y = snapshot.pts[i].y + dy;
+      }
+    }
+  }
+
+  private _legacyGroupMoveIncludesGuide(): boolean {
+    const move = this._groupMoveSnap;
+    if (!move) return false;
+    return [move.primarySel, ...move.extras.map((entry) => entry.sel)].some((selection) => {
+      if (!selection.segmentId) return false;
+      return !!this.scene.getSegmentById(selection.segmentId)?.isGuide;
+    });
+  }
+
+  private _cancelLegacyGroupMove(revert: boolean) {
+    const move = this._groupMoveSnap;
+    if (!move) return;
+    if (revert) {
+      this._applySelectionGeometrySnapshot(move.primarySel, move.primarySnapshot);
+      for (const entry of move.extras) {
+        this._applySelectionGeometrySnapshot(entry.sel, entry.snapshot);
+      }
+    }
+    this._groupMoveSnap = null;
   }
 
   private _installGroupMove() {
@@ -2030,15 +2265,22 @@ export class MiniCad {
       if (!this._isTranslationSel(primary)) { this._groupMoveSnap = null; return; }
       const anchor = this._getSelAnchor(primary);
       if (!anchor) { this._groupMoveSnap = null; return; }
-      const extras: Array<{ sel: Selection; snapshot: any }> = [];
+      const primarySnapshot = this._snapshotSelGeometry(primary);
+      if (!primarySnapshot) { this._groupMoveSnap = null; return; }
+      const extras: Array<{ sel: Selection; snapshot: SelectionGeometrySnapshot }> = [];
       for (const s of sels) {
         if (s === primary) continue;
         const snap = this._snapshotSelGeometry(s);
         if (snap) extras.push({ sel: s, snapshot: snap });
       }
-      this._groupMoveSnap = { primarySel: primary, primaryAnchor: { x: anchor.x, y: anchor.y }, extras };
+      this._groupMoveSnap = {
+        primarySel: primary,
+        primaryAnchor: { x: anchor.x, y: anchor.y },
+        primarySnapshot,
+        extras,
+      };
     };
-    const onUp = () => { this._groupMoveSnap = null; };
+    const onUp = () => { this._cancelLegacyGroupMove(false); };
     c.addEventListener("pointerdown", onDown);
     window.addEventListener("pointerup", onUp);
     window.addEventListener("pointercancel", onUp);
@@ -2063,52 +2305,7 @@ export class MiniCad {
     const dy = cur.y - snap.primaryAnchor.y;
     if (dx === 0 && dy === 0) return;
     for (const e of snap.extras) {
-      const s = e.sel;
-      const sg = e.snapshot;
-      if (sg.kind === "segment" && s.segmentId) {
-        const seg = this.scene.getSegmentById(s.segmentId);
-        if (!seg) continue;
-        seg.a.x = sg.a.x + dx; seg.a.y = sg.a.y + dy;
-        seg.b.x = sg.b.x + dx; seg.b.y = sg.b.y + dy;
-      } else if (sg.kind === "hatch" && s.hatchId) {
-        const h = this.scene.getHatchById(s.hatchId);
-        if (!h) continue;
-        for (let i = 0; i < h.points.length && i < sg.pts.length; i++) {
-          h.points[i].x = sg.pts[i].x + dx;
-          h.points[i].y = sg.pts[i].y + dy;
-        }
-        if (sg.holes && (h as any).holes) {
-          for (let r = 0; r < (h as any).holes.length && r < sg.holes.length; r++) {
-            const ring = (h as any).holes[r];
-            for (let i = 0; i < ring.length && i < sg.holes[r].length; i++) {
-              ring[i].x = sg.holes[r][i].x + dx;
-              ring[i].y = sg.holes[r][i].y + dy;
-            }
-          }
-        }
-      } else if (sg.kind === "textbox" && s.textBoxId) {
-        const b = this.scene.getTextBoxById(s.textBoxId);
-        if (!b) continue;
-        b.center.x = sg.center.x + dx;
-        b.center.y = sg.center.y + dy;
-      } else if (sg.kind === "sticker") {
-        const i = this.scene.getStickerInstanceById((s as any).stickerInstanceId);
-        if (!i) continue;
-        i.position.x = sg.pos.x + dx;
-        i.position.y = sg.pos.y + dy;
-      } else if (sg.kind === "doc") {
-        const d = this.scene.documents.find((x) => x.id === (s as any).documentId);
-        if (!d) continue;
-        d.position.x = sg.pos.x + dx;
-        d.position.y = sg.pos.y + dy;
-      } else if (sg.kind === "freestroke") {
-        const f = this.scene.freeStrokes.find((x) => x.id === (s as any).freeStrokeId);
-        if (!f) continue;
-        for (let i = 0; i < f.points.length && i < sg.pts.length; i++) {
-          f.points[i].x = sg.pts[i].x + dx;
-          f.points[i].y = sg.pts[i].y + dy;
-        }
-      }
+      this._applySelectionGeometrySnapshot(e.sel, e.snapshot, dx, dy);
     }
   }
 

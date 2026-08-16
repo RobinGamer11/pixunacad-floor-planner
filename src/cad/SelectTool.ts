@@ -2,7 +2,7 @@ import { drawSnapDot } from "./snapDraw";
 import { Defaults, SnapType, SelectionType, PointEditAction } from "./constants";
 import { Vec2, v, sub, add, mul, dot, dist, angleDeg, pointFromLengthAngle, projectPointToSegment, orthoSnapFromA, nearestAngleToReference, pointInPolygon, pointInHatchSolid, polygonCentroid, projectPointToInfiniteLine, lineLineIntersectionInfinite, norm, perpLeft, len } from "./geometry";
 import type { CadApp } from "./CadApp";
-import type { Snap } from "./TopologyEngine";
+import type { Snap, SnapExclusions } from "./TopologyEngine";
 import type { Input } from "./Input";
 import { getDimensionGeometry } from "./dimensionGeometry";
 import { pointInOrientedBox, boxCornersWorld, rotateVector } from "./textGeometry";
@@ -26,7 +26,8 @@ type EditTarget =
   | { kind: "areaLabelHandle"; hatchId: string; handleIndex: number }
   | { kind: "wallPoint"; wallId: string; pointIndex: number }
   | { kind: "wallEdge"; wallId: string; edgeIndex: number }
-  | { kind: "wall"; wallId: string };
+  | { kind: "wall"; wallId: string }
+  | { kind: "freeStroke"; freeStrokeId: string };
 
 export class SelectTool {
   app: CadApp;
@@ -105,6 +106,7 @@ export class SelectTool {
   // Parallel-drag state for dimensions
   dragDimId: string | null = null;
   dragDimOffsetAlongNormal = 0;
+  private dimensionHubGuideOrigin: Vec2 | null = null;
 
   // Sticker-Instanz Drag-State (Translate)
   dragStickerId: string | null = null;
@@ -117,6 +119,8 @@ export class SelectTool {
   dragDocId: string | null = null;
   dragDocGrabOffset: Vec2 | null = null;
   dragDocSnap: Snap | null = null;
+  private dragDocGuideOrigin: Vec2 | null = null;
+  private documentHubGuideSession: string | null = null;
 
   // FreeStroke Drag-State (Verschieben der gesamten Freihand-Linie)
   dragFreeStrokeId: string | null = null;
@@ -143,6 +147,13 @@ export class SelectTool {
   // Hilfslinien-Anker während aktivem Punkt-Edit (per Rechtsklick auf Snap-Punkte gesetzt).
   // Erzeugen vertikale + horizontale Hilfslinien durch jeden Anker, deren Schnittpunkte und Achsen snappen.
   editGuideAnchors: { key: string; point: Vec2 }[] = [];
+  /** Parallele Transform-Hilfslinien (R-Klick auf eine bestehende Kante). */
+  editParallelGuides: { key: string; point: Vec2; dir: Vec2 }[] = [];
+
+  private _clearTransformGuides() {
+    this.editGuideAnchors = [];
+    this.editParallelGuides = [];
+  }
 
   // ── Marquee (Rahmen-Auswahl) ─────────────────────────────────────────────
   // Zwei Modi analog zu Archicad:
@@ -161,6 +172,8 @@ export class SelectTool {
   groupDragActive = false;
   private _groupDragLast: Vec2 | null = null;
   private _groupDragMoved = false;
+  private _groupDragDx = 0;
+  private _groupDragDy = 0;
   /** Fang-Anker der Gruppe beim Verschieben/Einfügen (Welt-Koordinate). */
   private _groupDragAnchor: Vec2 | null = null;
 
@@ -194,17 +207,36 @@ export class SelectTool {
 
 
   // ── Einfüge-Modus („schwebende“ Kopie) ───────────────────────────────────
-  /** Nach Strg+V: Kopie liegt exakt auf dem Original, ist ausgewählt und
-   *  verschiebbar. Bestätigt wird per Häkchen-Symbol oder Enter. */
+  /** Nach Strg+V: Kopie folgt sofort dem Cursor, ist ausgewählt und
+   *  verschiebbar. Bestätigt wird per L-Klick, Häkchen-Symbol oder Enter. */
   pasteFloatActive = false;
   private _pasteBtnRect: { x: number; y: number; w: number; h: number } | null = null;
 
   /** Startet den Einfüge-Modus für die frisch erzeugten Objekte. */
   beginPasteFloat(ids: { kind: string; id: string }[]) {
     if (!ids.length) return;
+    this.cancelGroupTransform(false);
+    this.groupAnchor = null;
+    this._clearTransformGuides();
     this.marqueeSelectedIds = ids.slice();
     this.pasteFloatActive = true;
     this._pasteBtnRect = null;
+    const mouse = this.app.input?.mouse;
+    if (!mouse) return;
+    const cursor = v(mouse.wx, mouse.wy);
+    const anchor = this._nearestGroupPoint(cursor.x, cursor.y)
+      ?? groupCentroid(this.app, this.marqueeSelectedIds);
+    if (!anchor) return;
+    const target = this._snapWorldPoint(cursor);
+    const dx = target.x - anchor.x;
+    const dy = target.y - anchor.y;
+    if (dx || dy) translateGroup(this.app, this.marqueeSelectedIds, dx, dy);
+    this.groupDragActive = true;
+    this._groupDragMoved = !!(dx || dy);
+    this._groupDragDx = dx;
+    this._groupDragDy = dy;
+    this._groupDragLast = cursor;
+    this._groupDragAnchor = target;
   }
 
   /** Bestätigt die eingefügte Kopie (Häkchen / Enter). */
@@ -215,6 +247,22 @@ export class SelectTool {
     this.marqueeSelectedIds = [];
     this.cancelGroupTransform(false);
     (this.app as any).commitHistorySnapshot?.();
+    return true;
+  }
+
+  /** Bricht das schwebende Einfügen ab und entfernt ausschließlich die dabei
+   *  neu erzeugten Kopien. */
+  cancelPasteFloat(): boolean {
+    if (!this.pasteFloatActive) return false;
+    this.pasteFloatActive = false;
+    this._pasteBtnRect = null;
+    this.cancelGroupTransform(false);
+    const removed = this.deleteMarqueeSelection();
+    if (removed) {
+      const discardPreview = (this.app as CadApp & { discardHistoryPreview?: () => void }).discardHistoryPreview;
+      if (typeof discardPreview === "function") discardPreview.call(this.app);
+      else this.app.commitHistorySnapshot();
+    }
     return true;
   }
 
@@ -254,19 +302,54 @@ export class SelectTool {
   /** Letzter Fang-Treffer beim Gruppen-Verschieben (für die Anzeige). */
   private _lastGroupSnap: any = null;
 
+  private _groupSnapExclusions(): SnapExclusions {
+    const segmentIds = new Set<string>();
+    const hatchIds = new Set<string>();
+    const textBoxIds = new Set<string>();
+    const dimensionIds = new Set<string>();
+    const documentIds = new Set<string>();
+    const freeStrokeIds = new Set<string>();
+    const wallIds = new Set<string>();
+    const doorIds = new Set<string>();
+    for (const { kind, id } of this.marqueeSelectedIds) {
+      if (kind === "segment") segmentIds.add(id);
+      else if (kind === "hatch") hatchIds.add(id);
+      else if (kind === "textbox" || kind === "textBox") textBoxIds.add(id);
+      else if (kind === "dimension") dimensionIds.add(id);
+      else if (kind === "document") documentIds.add(id);
+      else if (kind === "freeStroke") freeStrokeIds.add(id);
+      else if (kind === "wall") wallIds.add(id);
+      else if (kind === "door") doorIds.add(id);
+    }
+    return { segmentIds, hatchIds, textBoxIds, dimensionIds, documentIds, freeStrokeIds, wallIds, doorIds };
+  }
+
   private _snapWorldPoint(p: Vec2): Vec2 {
     this._lastGroupSnap = null;
     try {
       const cam = this.app.camera;
       const s = cam?.worldToScreen(p.x, p.y);
-      const hit = (this.app as any).topology?.findBestSnap?.(v(s?.x ?? 0, s?.y ?? 0), v(p.x, p.y));
-      if (hit?.world) {
-        // Eigene Auswahl-Punkte nicht als Fangziel verwenden.
-        const own = this._findGroupSnapPoint(hit.world.x, hit.world.y, 1);
-        if (!own) {
-          this._lastGroupSnap = hit;
-          return v(hit.world.x, hit.world.y);
-        }
+      const hit: Snap | null = this.app.topology.findBestSnap(
+        v(s?.x ?? 0, s?.y ?? 0),
+        v(p.x, p.y),
+        this._groupSnapExclusions(),
+      ) ?? null;
+      const guideHit = this._findEditGuideSnap({
+        mouse: { sx: s?.x ?? 0, sy: s?.y ?? 0, wx: p.x, wy: p.y },
+      } as Input);
+      const rank = (candidate: Snap | null) => {
+        if (!candidate) return 99;
+        if (candidate.type === SnapType.POINT || candidate.type === SnapType.GUIDE_POINT) return 0;
+        if (candidate.type === SnapType.GUIDE) return 1;
+        return 2;
+      };
+      const chosen = rank(guideHit) < rank(hit)
+        || (rank(guideHit) === rank(hit) && (guideHit?.px ?? Infinity) < (hit?.px ?? Infinity))
+        ? guideHit
+        : hit;
+      if (chosen?.world) {
+        this._lastGroupSnap = chosen;
+        return v(chosen.world.x, chosen.world.y);
       }
     } catch { /* kein Snap verfügbar */ }
     return v(p.x, p.y);
@@ -326,9 +409,12 @@ export class SelectTool {
     this.app.renderer.setHoverSegmentId(null);
     this.app.renderer.setHoverTextBoxId(null);
     this.dragDimId = null;
+    this.dimensionHubGuideOrigin = null;
     this.dragDocId = null;
     this.dragDocGrabOffset = null;
     this.dragDocSnap = null;
+    this.dragDocGuideOrigin = null;
+    this.documentHubGuideSession = null;
     this.dragFreeStrokeId = null;
     this.dragFreeStrokeGrabOffset = null;
     this.dragFreeStrokeOrigPoints = null;
@@ -355,6 +441,29 @@ export class SelectTool {
 
   }
 
+  /** Bricht ausschließlich einen laufenden Segment-Punktedit ab und stellt die
+   *  ursprüngliche Geometrie wieder her. Auswahl und Mehrfachauswahl bleiben
+   *  erhalten, damit ein anschließend aktivierter Guide-Lock sauber filtern kann. */
+  cancelSegmentEdit(segmentId: string): boolean {
+    const target = this.editTarget;
+    if (target?.kind !== "segment" || target.segmentId !== segmentId) return false;
+    const segment = this.app.scene.getSegmentById(segmentId);
+    if (segment && this.fixedPoint && this.otherPointOriginal) {
+      if (target.pointIndex === 0) {
+        segment.a = v(this.otherPointOriginal.x, this.otherPointOriginal.y);
+        segment.b = v(this.fixedPoint.x, this.fixedPoint.y);
+      } else {
+        segment.a = v(this.fixedPoint.x, this.fixedPoint.y);
+        segment.b = v(this.otherPointOriginal.x, this.otherPointOriginal.y);
+      }
+    }
+    this._clearEditState();
+    this.app.pointEditMenu.hide();
+    this.app.hub.hide();
+    this.app.renderer.setHoverSegmentId(null);
+    return true;
+  }
+
   /** Bricht laufendes Gruppen-Verschieben/-Drehen ab (optional mit Rücksetzen). */
   cancelGroupTransform(revert = true) {
     if (this.groupRotateActive && revert && this._groupRotCenter && this.groupRotApplied) {
@@ -365,6 +474,13 @@ export class SelectTool {
       if (this.groupAnchor) {
         this.groupAnchor.x -= this._groupAnchorDx;
         this.groupAnchor.y -= this._groupAnchorDy;
+      }
+    }
+    if (this.groupDragActive && revert && (this._groupDragDx || this._groupDragDy)) {
+      translateGroup(this.app, this.marqueeSelectedIds, -this._groupDragDx, -this._groupDragDy);
+      if (this.groupAnchor) {
+        this.groupAnchor.x -= this._groupDragDx;
+        this.groupAnchor.y -= this._groupDragDy;
       }
     }
     this.groupAnchorActive = false;
@@ -379,6 +495,9 @@ export class SelectTool {
     this._groupDragLast = null;
     this._groupDragAnchor = null;
     this._groupDragMoved = false;
+    this._groupDragDx = 0;
+    this._groupDragDy = 0;
+    this._clearTransformGuides();
 
   }
 
@@ -392,7 +511,8 @@ export class SelectTool {
     this.groupAnchorActive = false;
     this._groupRotCenter = c;
     this.groupRotApplied = 0;
-    this._groupRotLastAngle = Math.atan2(this.app.input.mouse.wy - c.y, this.app.input.mouse.wx - c.x);
+    const startTarget = this._snapWorldPoint(v(this.app.input.mouse.wx, this.app.input.mouse.wy));
+    this._groupRotLastAngle = Math.atan2(startTarget.y - c.y, startTarget.x - c.x);
     this.groupRotateActive = true;
     return true;
   }
@@ -561,23 +681,14 @@ export class SelectTool {
 
   private _startDocumentDrag(doc: any, input: Input) {
     const mouseW0 = v(input.mouse.wx, input.mouse.wy);
+    this._clearTransformGuides();
     this.dragDocId = doc.id;
     this.dragDocGrabOffset = { x: mouseW0.x - doc.position.x, y: mouseW0.y - doc.position.y };
     this.dragDocSnap = null;
+    this.dragDocGuideOrigin = v(mouseW0.x, mouseW0.y);
     this.app.setSelection({ type: SelectionType.DOCUMENT, documentId: doc.id } as any);
     this.app.documentHubMode = "none";
     this.app.documentHubState = { visible: false, screenX: 0, screenY: 0, docId: null, cornerIndex: 0, anchorWorld: null, cropSide: null };
-  }
-
-  private _isOwnDocumentSnap(doc: any, snap: Snap | null): boolean {
-    if (!doc || !snap?.world) return false;
-    const eps = 1e-6;
-    const same = (p: Vec2) => Math.hypot(p.x - snap.world.x, p.y - snap.world.y) <= eps;
-    if (same(documentCenterWorld(doc))) return true;
-    for (const p of documentCornersWorld(doc)) if (same(p)) return true;
-    for (const p of documentEdgeMidpointsWorld(doc)) if (same(p)) return true;
-    for (const p of documentAnchorsWorld(doc)) if (same(p)) return true;
-    return false;
   }
 
   /** Hit-Test gegen Freihand-Strokes (Polyline-Abstand in Pixel). */
@@ -690,6 +801,7 @@ export class SelectTool {
       return;
     }
 
+    this._clearTransformGuides();
     this.activeEditAction = action;
     this.editTarget = ctx.target;
 
@@ -756,6 +868,7 @@ export class SelectTool {
     if (!box) return;
     if (action === PointEditAction.DELETE) return;
 
+    this._clearTransformGuides();
     this.activeEditAction = action;
     this.editTarget = { kind: "textboxHandle", textBoxId, handleIndex };
 
@@ -821,6 +934,7 @@ export class SelectTool {
     const layout = (this.app.renderer as any)._getAreaLabelLayout(hatch);
     if (!layout) return;
 
+    this._clearTransformGuides();
     this.activeEditAction = action;
     this.editTarget = { kind: "areaLabelHandle", hatchId, handleIndex };
 
@@ -875,6 +989,7 @@ export class SelectTool {
     const n = loop.length;
     if (n < 3) return;
 
+    this._clearTransformGuides();
     this.activeEditAction = PointEditAction.OFFSET;
     this.editTarget = holeIndex == null
       ? { kind: "hatchEdge", hatchId, edgeIndex }
@@ -927,6 +1042,7 @@ export class SelectTool {
     const wall = this.app.scene.getWallById(wallId);
     if (!wall || wall.corners.length < 2) return;
     if (edgeIndex < 0 || edgeIndex >= wall.corners.length - 1) return;
+    this._clearTransformGuides();
 
     if (action === PointEditAction.OFFSET) {
       this.activeEditAction = PointEditAction.OFFSET;
@@ -998,6 +1114,7 @@ export class SelectTool {
       return;
     }
 
+    this._clearTransformGuides();
     // Pivot/Fixpunkt = geometrischer Mittelpunkt aller Stützpunkte (Centroid).
     let cx = 0, cy = 0;
     for (const p of stroke.points) { cx += p.x; cy += p.y; }
@@ -1008,7 +1125,7 @@ export class SelectTool {
     // "Anderer" Referenzpunkt für Rotate/Translate: erster Stroke-Punkt.
     const other = v(stroke.points[0].x, stroke.points[0].y);
 
-    this.editTarget = { kind: "freeStroke", freeStrokeId: strokeId } as any;
+    this.editTarget = { kind: "freeStroke", freeStrokeId: strokeId };
     this.freeStrokePointsOriginal = stroke.points.map((p) => v(p.x, p.y));
     this.fixedPoint = center;
     this.otherPointOriginal = other;
@@ -1571,7 +1688,7 @@ export class SelectTool {
     this.moveHubLocked = false;
     this.moveHubLengthM = null;
     this.moveHubAngleDeg = null;
-    this.editGuideAnchors = [];
+    this._clearTransformGuides();
     this.wallPointsOriginal = null;
     this.freeStrokePointsOriginal = null;
     this.wallPreviewPoint = null;
@@ -1590,18 +1707,51 @@ export class SelectTool {
     this.app.hub.bindCommit(null);
   }
 
-  /** Snap aus aktiven Edit-Hilfslinien (H/V durch Anker). Null falls keine Anker oder Maus zu weit. */
+  private _editGuideDefinitions(): { point: Vec2; dir: Vec2 }[] {
+    const defs: { point: Vec2; dir: Vec2 }[] = [];
+    for (const anchor of this.editGuideAnchors) {
+      defs.push({ point: anchor.point, dir: v(1, 0) });
+      defs.push({ point: anchor.point, dir: v(0, 1) });
+    }
+    for (const guide of this.editParallelGuides) {
+      defs.push({ point: guide.point, dir: guide.dir });
+    }
+    return defs;
+  }
+
+  /** Rechtsklick-Grundmuster wie beim Zeichnen: Punkt = H/V-Achsen,
+   *  Kante = parallele Hilfslinie durch den aktuellen Transform-Anker. */
+  private _toggleEditGuideFromSnap(snap: Snap | null, parallelOrigin?: Vec2 | null): boolean {
+    if (!snap?.world) return false;
+    if (snap.type === SnapType.POINT || snap.type === SnapType.GUIDE_POINT) {
+      const key = `${snap.world.x.toFixed(6)}_${snap.world.y.toFixed(6)}`;
+      const idx = this.editGuideAnchors.findIndex((a) => a.key === key);
+      if (idx >= 0) this.editGuideAnchors.splice(idx, 1);
+      else this.editGuideAnchors.push({ key, point: v(snap.world.x, snap.world.y) });
+      return true;
+    }
+    if (snap.type !== SnapType.LINE || !parallelOrigin) return false;
+    const a = snap.lineA ?? snap.segment?.a;
+    const b = snap.lineB ?? snap.segment?.b;
+    if (!a || !b) return false;
+    const dir = norm(sub(b, a));
+    if (Math.hypot(dir.x, dir.y) < 1e-9) return false;
+    const sourceKey = snap.segment?.id
+      ?? `${snap.hatch?.id ?? "line"}_${snap.edgeIndex ?? ""}_${dir.x.toFixed(5)}_${dir.y.toFixed(5)}`;
+    const key = `${sourceKey}_${parallelOrigin.x.toFixed(6)}_${parallelOrigin.y.toFixed(6)}`;
+    const idx = this.editParallelGuides.findIndex((g) => g.key === key);
+    if (idx >= 0) this.editParallelGuides.splice(idx, 1);
+    else this.editParallelGuides.push({ key, point: v(parallelOrigin.x, parallelOrigin.y), dir });
+    return true;
+  }
+
+  /** Snap aus aktiven Edit-Hilfslinien. Null falls keine Definition oder Maus zu weit. */
   private _findEditGuideSnap(input: Input): Snap | null {
-    if (this.editGuideAnchors.length === 0) return null;
+    const defs = this._editGuideDefinitions();
+    if (defs.length === 0) return null;
     const mouseS = v(input.mouse.sx, input.mouse.sy);
     const mouseW = v(input.mouse.wx, input.mouse.wy);
     const cam = this.app.camera;
-
-    const defs: { point: Vec2; dir: Vec2 }[] = [];
-    for (const a of this.editGuideAnchors) {
-      defs.push({ point: a.point, dir: v(1, 0) });
-      defs.push({ point: a.point, dir: v(0, 1) });
-    }
 
     let best: Snap | null = null;
     let bestPx = Infinity;
@@ -1636,6 +1786,48 @@ export class SelectTool {
       }
     }
     return best;
+  }
+
+  private _chooseTransformSnap(topologySnap: Snap | null, guideSnap: Snap | null): Snap | null {
+    if (!guideSnap) return topologySnap;
+    if (!topologySnap) return guideSnap;
+    const rank = (snap: Snap) => {
+      if (snap.type === SnapType.POINT || snap.type === SnapType.GUIDE_POINT) return 0;
+      if (snap.type === SnapType.GUIDE) return 2;
+      return 3;
+    };
+    if (rank(topologySnap) < rank(guideSnap)) return topologySnap;
+    if (rank(guideSnap) < rank(topologySnap)) return guideSnap;
+    return ((topologySnap.px ?? Infinity) <= (guideSnap.px ?? Infinity)) ? topologySnap : guideSnap;
+  }
+
+  /** Gemeinsamer Fangpfad für direkte Objekt- und Hub-Transformationen. */
+  private _findTransformSnap(input: Input, exclusions: SnapExclusions = {}): Snap | null {
+    const topologySnap = this.app.topology.findBestSnap(
+      v(input.mouse.sx, input.mouse.sy),
+      v(input.mouse.wx, input.mouse.wy),
+      exclusions,
+    );
+    return this._chooseTransformSnap(topologySnap, this._findEditGuideSnap(input));
+  }
+
+  /** R-Klick-Grundmuster für alle Transformpfade: Fremdfang zuerst, eigene
+   * Fangpunkte als Fallback, danach bereits gesetzte Transform-Hilfslinien. */
+  private _tryToggleTransformGuide(
+    input: Input,
+    exclusions: SnapExclusions,
+    parallelOrigin: Vec2 | null,
+    allowOwnFallback = true,
+  ): boolean {
+    if (!input.rightClicked) return false;
+    const mouseS = v(input.mouse.sx, input.mouse.sy);
+    const mouseW = v(input.mouse.wx, input.mouse.wy);
+    const foreignSnap = this.app.topology.findBestSnap(mouseS, mouseW, exclusions);
+    const ownSnap = allowOwnFallback && !foreignSnap
+      ? this.app.topology.findBestSnap(mouseS, mouseW)
+      : null;
+    const snap = foreignSnap ?? ownSnap ?? this._findEditGuideSnap(input);
+    return this._toggleEditGuideFromSnap(snap, parallelOrigin);
   }
 
   private _hitTestWithForegroundPriority(input: Input) {
@@ -1793,47 +1985,48 @@ export class SelectTool {
   private _findPreviewSnapForEdit(input: Input) {
     if (!this.editTarget) return null;
     this.app.topology.priorityWallId = this.getPriorityWallId();
-    let topoSnap: Snap | null;
-    if (this.editTarget.kind === "segment") {
-      topoSnap = this.app.topology.findBestSnapExcludingSegment(
-        v(input.mouse.sx, input.mouse.sy),
-        v(input.mouse.wx, input.mouse.wy),
-        this.editTarget.segmentId
-      );
-    } else if (this.editTarget.kind === "hatch") {
-      // Bei TRANSLATE/ROTATE bewegen sich ALLE Punkte des Hatches mit –
-      // ohne Self-Exclude würde das Snap-System auf andere Punkte derselben
-      // Schraffur einrasten und beim Verschieben (insb. Kreis-Hatches mit
-      // 96 Stützpunkten) ein Pendeln/Driften erzeugen.
-      const excludeAll =
-        this.activeEditAction === PointEditAction.TRANSLATE ||
-        this.activeEditAction === PointEditAction.ROTATE;
-      topoSnap = this.app.topology.findBestSnapExcludingHatch(
-        v(input.mouse.sx, input.mouse.sy),
-        v(input.mouse.wx, input.mouse.wy),
-        this.editTarget.hatchId,
-        this.editTarget.pointIndex,
-        excludeAll
-      );
-    } else {
-      topoSnap = this.app.topology.findBestSnap(
-        v(input.mouse.sx, input.mouse.sy),
-        v(input.mouse.wx, input.mouse.wy)
-      );
+    const target = this.editTarget;
+    const wholeObject = this.activeEditAction === PointEditAction.TRANSLATE
+      || this.activeEditAction === PointEditAction.ROTATE;
+    const exclusions: SnapExclusions = {};
+    if (target.kind === "segment") {
+      if (wholeObject) exclusions.segmentIds = new Set([target.segmentId]);
+      else {
+        exclusions.segmentPoint = {
+          segmentId: target.segmentId,
+          pointIndex: target.pointIndex === 0 ? 0 : 1,
+        };
+        exclusions.segmentLineIds = new Set([target.segmentId]);
+      }
+    } else if (target.kind === "hatch") {
+      if (wholeObject) exclusions.hatchIds = new Set([target.hatchId]);
+      else {
+        exclusions.hatchPoint = { hatchId: target.hatchId, pointIndex: target.pointIndex };
+        exclusions.hatchEdgeIds = new Set([target.hatchId]);
+      }
+    } else if (target.kind === "hatchHole") {
+      exclusions.hatchPoint = {
+        hatchId: target.hatchId,
+        holeIndex: target.holeIndex,
+        pointIndex: target.pointIndex,
+      };
+      exclusions.hatchEdgeIds = new Set([target.hatchId]);
+    } else if (target.kind === "textboxHandle") {
+      if (wholeObject) exclusions.textBoxIds = new Set([target.textBoxId]);
+      else exclusions.textBoxCorner = { textBoxId: target.textBoxId, cornerIndex: target.handleIndex };
+    } else if (target.kind === "freeStroke") {
+      exclusions.freeStrokeIds = new Set([target.freeStrokeId]);
+    } else if (target.kind === "hatchEdge" || target.kind === "hatchHoleEdge") {
+      exclusions.hatchIds = new Set([target.hatchId]);
+    } else if (target.kind === "wall" || (target.kind === "wallPoint" && wholeObject)) {
+      exclusions.wallIds = new Set([target.wallId]);
     }
-    const guideSnap = this._findEditGuideSnap(input);
-    if (!guideSnap) return topoSnap;
-    if (!topoSnap) return guideSnap;
-    // GUIDE_POINT > POINT > GUIDE > LINE — bevorzuge präzisere; sonst geringerer Pixel-Abstand.
-    const rank = (s: Snap) => {
-      if (s.type === SnapType.POINT) return 0;
-      if (s.type === SnapType.GUIDE_POINT) return 0;
-      if (s.type === SnapType.GUIDE) return 2;
-      return 3;
-    };
-    if (rank(topoSnap) < rank(guideSnap)) return topoSnap;
-    if (rank(guideSnap) < rank(topoSnap)) return guideSnap;
-    return ((topoSnap.px ?? Infinity) <= (guideSnap.px ?? Infinity)) ? topoSnap : guideSnap;
+    const topoSnap = this.app.topology.findBestSnap(
+      v(input.mouse.sx, input.mouse.sy),
+      v(input.mouse.wx, input.mouse.wy),
+      exclusions,
+    );
+    return this._chooseTransformSnap(topoSnap, this._findEditGuideSnap(input));
   }
 
   private _findRotateAssistSegment(input: Input) {
@@ -1934,6 +2127,14 @@ export class SelectTool {
   update(input: Input) {
     this.app.topology.priorityWallId = this.getPriorityWallId();
 
+    const documentHubGuideSession = this.app.documentHubMode !== "none" && this.app.documentHubState.visible
+      ? `${this.app.documentHubState.docId ?? ""}:${this.app.documentHubMode}`
+      : null;
+    if (documentHubGuideSession !== this.documentHubGuideSession) {
+      this._clearTransformGuides();
+      this.documentHubGuideSession = documentHubGuideSession;
+    }
+
     // Tablet-Dokumentablauf: Nach Wahl von Verschieben/Drehen/Skalieren muss
     // zuerst ein Fangpunkt erneut mit dem Stift gewählt werden. Reale Taps
     // werden vom Input-Gate nur als `tabletTapped` gemeldet und committen nie.
@@ -1963,6 +2164,23 @@ export class SelectTool {
       if (this.enterCommitRequested) {
         input.clicked = true;
         this.enterCommitRequested = false;
+      }
+    }
+
+    // Dokument-Hub: Rechtsklick setzt dieselben H/V- bzw. Parallelhilfen wie
+    // beim normalen Zeichnen und bei den Punkt-/Gruppen-Transformationen.
+    if (this.app.documentHubMode !== "none" && this.app.documentHubState.visible && !this.documentHubTabletArmed) {
+      const sel = this.app.selection as any;
+      const doc = sel?.type === SelectionType.DOCUMENT
+        ? this.app.scene.getDocumentById(sel.documentId)
+        : null;
+      if (doc && this.app.documentHubState.docId === doc.id) {
+        const origin = this.app.documentHubState.anchorWorld ?? documentCenterWorld(doc);
+        if (this._tryToggleTransformGuide(
+          input,
+          { documentIds: new Set([doc.id]) },
+          origin,
+        )) return;
       }
     }
 
@@ -2004,29 +2222,60 @@ export class SelectTool {
       if (!dim) {
         this.app.dimensionHubMode = "none";
         this.app.dimensionHubState = { visible: false, screenX: 0, screenY: 0, dimensionId: null };
+        this.dimensionHubGuideOrigin = null;
+        this._clearTransformGuides();
       } else {
-        const mouseS = v(input.mouse.sx, input.mouse.sy);
+        if (!this.dimensionHubGuideOrigin) {
+          this._clearTransformGuides();
+          this.dimensionHubGuideOrigin = v(dim.placementPoint.x, dim.placementPoint.y);
+        }
         const mouseW = v(input.mouse.wx, input.mouse.wy);
-        const snap = this.app.topology.findBestSnap(mouseS, mouseW);
+        const exclusions = {
+          dimensionIds: new Set([dim.id]),
+        };
+        if (this._tryToggleTransformGuide(input, exclusions, this.dimensionHubGuideOrigin)) return;
+        const snap = this._findTransformSnap(input, exclusions);
         // Live-Vorschau: PlacementPoint folgt dem Mauszeiger bzw. Snap.
-        const targetW = snap ? v(snap.world.x, snap.world.y) : mouseW;
-        // Eigene Geometrie nicht auf sich selbst snappen
-        const g0 = getDimensionGeometry(dim);
-        const eq = (a: Vec2, b: Vec2) => Math.hypot(a.x - b.x, a.y - b.y) < 1e-6;
-        const isSelf = snap && (eq(snap.world, dim.p1) || eq(snap.world, dim.p2)
-          || eq(snap.world, g0.d1) || eq(snap.world, g0.d2) || eq(snap.world, g0.mid));
-        dim.placementPoint = (snap && !isSelf) ? v(snap.world.x, snap.world.y) : mouseW;
+        dim.placementPoint = snap ? v(snap.world.x, snap.world.y) : mouseW;
         // Hub-Position aktualisieren, damit sie der Maßlinie folgt
         const g1 = getDimensionGeometry(dim);
         const sp = this.app.camera.worldToScreen(g1.mid.x, g1.mid.y);
         this.app.dimensionHubState = { visible: true, screenX: sp.x, screenY: sp.y, dimensionId: dim.id };
         if (input.clicked) {
           this.app.dimensionHubMode = "none";
+          this.dimensionHubGuideOrigin = null;
+          this._clearTransformGuides();
         }
         // Snap-Indikator zeichnen
         this.snap = snap;
         return;
       }
+    }
+
+    // Kopieren/Mehrfach-Transform: R-Klick-Hilfslinien identisch zum
+    // Einzelobjekt-Edit. Eigene Fangpunkte dürfen als Definition dienen.
+    const groupTransformSession = this.marqueeSelectedIds.length > 0 && (
+      this.pasteFloatActive || this.groupAnchorActive || this.groupRotateActive
+      || this.groupDragActive || this.groupAnchorMenu
+    );
+    if (input.rightClicked && groupTransformSession) {
+      const mouseS = v(input.mouse.sx, input.mouse.sy);
+      const mouseW = v(input.mouse.wx, input.mouse.wy);
+      const filteredSnap = this.app.topology.findBestSnap(
+        mouseS,
+        mouseW,
+        this._groupSnapExclusions(),
+      );
+      const rawSnap = filteredSnap ?? this.app.topology.findBestSnap(
+        mouseS,
+        mouseW,
+      );
+      const snap = rawSnap ?? this._findEditGuideSnap(input);
+      const origin = this.groupAnchor
+        ?? (this.groupRotateActive ? this._groupRotCenter : null)
+        ?? this._groupDragAnchor
+        ?? this._nearestGroupPoint(input.mouse.wx, input.mouse.wy);
+      if (this._toggleEditGuideFromSnap(snap, origin)) return;
     }
 
     // ── Gruppen-Fangpunkt: Shift-Klick auf einen Fangpunkt der Auswahl ───
@@ -2053,7 +2302,8 @@ export class SelectTool {
             this.groupAnchorActive = false;
             this._groupAnchorDx = 0;
             this._groupAnchorDy = 0;
-            (this.app as any).commitHistorySnapshot?.();
+            this.app.commitHistorySnapshot();
+            if (!this.pasteFloatActive) this._clearTransformGuides();
           }
         }
         this.snap = this._lastGroupSnap;
@@ -2088,6 +2338,7 @@ export class SelectTool {
           // Klick daneben schließt das Menü (Anker bleibt Referenzpunkt).
           this.groupAnchorMenu = false;
           this._groupMenuRects = null;
+          if (!this.pasteFloatActive) this._clearTransformGuides();
         }
       }
     }
@@ -2116,7 +2367,8 @@ export class SelectTool {
       if (!c || !this.marqueeSelectedIds.length) {
         this.cancelGroupTransform(false);
       } else {
-        const a = Math.atan2(input.mouse.wy - c.y, input.mouse.wx - c.x);
+        const target = this._snapWorldPoint(v(input.mouse.wx, input.mouse.wy));
+        const a = Math.atan2(target.y - c.y, target.x - c.x);
         let d = a - this._groupRotLastAngle;
         while (d > Math.PI) d -= Math.PI * 2;
         while (d < -Math.PI) d += Math.PI * 2;
@@ -2135,10 +2387,11 @@ export class SelectTool {
           this.groupRotateActive = false;
           this._groupRotCenter = null;
           this.groupRotApplied = 0;
-          (this.app as any).commitHistorySnapshot?.();
+          this.app.commitHistorySnapshot();
+          if (!this.pasteFloatActive) this._clearTransformGuides();
           input.clicked = false;
         }
-        this.snap = null;
+        this.snap = this._lastGroupSnap;
         return;
       }
     }
@@ -2167,7 +2420,7 @@ export class SelectTool {
         || this.rotateTextBoxId || this.isEditing() || input.isPanning || input.keys.space);
       const mouseW = v(input.mouse.wx, input.mouse.wy);
       if (this.groupDragActive) {
-        if (input.mouse.left && this._groupDragLast) {
+        if ((this.pasteFloatActive || input.mouse.left) && this._groupDragLast) {
           let dx = mouseW.x - this._groupDragLast.x;
           let dy = mouseW.y - this._groupDragLast.y;
           // Fangverhalten wie beim normalen Verschieben: der nächstgelegene
@@ -2181,6 +2434,8 @@ export class SelectTool {
           if (dx || dy) {
             translateGroup(this.app, this.marqueeSelectedIds, dx, dy);
             this._groupDragMoved = true;
+            this._groupDragDx += dx;
+            this._groupDragDy += dy;
             if (this._groupDragAnchor) {
               this._groupDragAnchor.x += dx;
               this._groupDragAnchor.y += dy;
@@ -2196,17 +2451,25 @@ export class SelectTool {
           this._groupDragLast = mouseW;
           // Fremde Fangpunkte werden beim Gruppen-Verschieben angezeigt.
           this.snap = this._lastGroupSnap;
+          if (this.pasteFloatActive && input.clicked) {
+            input.clicked = false;
+            input.doubleClicked = false;
+            this.confirmPasteFloat();
+          }
           return;
         }
         this.groupDragActive = false;
         this._groupDragLast = null;
         this._groupDragAnchor = null;
         if (this._groupDragMoved) {
-          if (!this.pasteFloatActive) (this.app as any).commitHistorySnapshot?.();
+          if (!this.pasteFloatActive) this.app.commitHistorySnapshot();
           input.clicked = false;
           input.doubleClicked = false;
         }
+        if (!this.pasteFloatActive) this._clearTransformGuides();
         this._groupDragMoved = false;
+        this._groupDragDx = 0;
+        this._groupDragDy = 0;
         return;
       }
       const dragMin = this.pasteFloatActive ? 1 : 2;
@@ -2214,6 +2477,8 @@ export class SelectTool {
         && !this.marqueeActive && this._hitsGroupSelection(mouseW.x, mouseW.y)) {
         this.groupDragActive = true;
         this._groupDragMoved = false;
+        this._groupDragDx = 0;
+        this._groupDragDy = 0;
         this._groupDragLast = mouseW;
         // Ein per Shift gesetzter Gruppen-Ankerpunkt bleibt IMMER der
         // Referenzpunkt — auch beim normalen Verschieben der Auswahl.
@@ -2340,13 +2605,12 @@ export class SelectTool {
         this.dragStickerMouseStart = null;
         this.dragStickerGrabOffset = null;
         this.dragStickerSnap = null;
+        this._clearTransformGuides();
       } else {
         const mouseW = v(input.mouse.wx, input.mouse.wy);
+        if (this._tryToggleTransformGuide(input, {}, this.dragStickerMouseStart)) return;
         // Snap gegen Scene-Punkte/Linien (Sticker-Instanzen sind dort nicht enthalten).
-        const snap = this.app.topology.findBestSnap(
-          v(input.mouse.sx, input.mouse.sy),
-          mouseW
-        );
+        const snap = this._findTransformSnap(input);
         this.dragStickerSnap = snap;
         // Wir wollen, dass der ursprünglich gegriffene Punkt der Sticker-Instanz an mouseW (oder snap) landet.
         const target = (snap && snap.world) ? snap.world : mouseW;
@@ -2360,6 +2624,7 @@ export class SelectTool {
           this.dragStickerMouseStart = null;
           this.dragStickerGrabOffset = null;
           this.dragStickerSnap = null;
+          this._clearTransformGuides();
         }
         return;
       }
@@ -2372,13 +2637,15 @@ export class SelectTool {
         this.dragDocId = null;
         this.dragDocGrabOffset = null;
         this.dragDocSnap = null;
+        this.dragDocGuideOrigin = null;
+        this._clearTransformGuides();
       } else {
         const mouseW = v(input.mouse.wx, input.mouse.wy);
-        const rawSnap = this.app.topology.findBestSnap(
-          v(input.mouse.sx, input.mouse.sy),
-          mouseW
-        );
-        const snap = this._isOwnDocumentSnap(doc, rawSnap) ? null : rawSnap;
+        const exclusions = { documentIds: new Set([doc.id]) };
+        const guideOrigin = this.dragDocGuideOrigin
+          ?? v(doc.position.x + this.dragDocGrabOffset.x, doc.position.y + this.dragDocGrabOffset.y);
+        if (this._tryToggleTransformGuide(input, exclusions, guideOrigin)) return;
+        const snap = this._findTransformSnap(input, exclusions);
         this.dragDocSnap = snap;
         const target = (snap && snap.world) ? snap.world : mouseW;
         // doc.position ist die Top-Left-Ecke; Greifpunkt-Offset bezieht sich darauf.
@@ -2390,6 +2657,8 @@ export class SelectTool {
           this.dragDocId = null;
           this.dragDocGrabOffset = null;
           this.dragDocSnap = null;
+          this.dragDocGuideOrigin = null;
+          this._clearTransformGuides();
         }
         return;
       }
@@ -2402,12 +2671,16 @@ export class SelectTool {
         this.dragFreeStrokeId = null;
         this.dragFreeStrokeGrabOffset = null;
         this.dragFreeStrokeOrigPoints = null;
+        this._clearTransformGuides();
       } else {
         const mouseW = v(input.mouse.wx, input.mouse.wy);
-        const rawSnap = this.app.topology.findBestSnap(
-          v(input.mouse.sx, input.mouse.sy),
-          mouseW,
+        const exclusions = { freeStrokeIds: new Set([stroke.id]) };
+        const guideOrigin = v(
+          this.dragFreeStrokeOrigPoints[0].x + this.dragFreeStrokeGrabOffset.x,
+          this.dragFreeStrokeOrigPoints[0].y + this.dragFreeStrokeGrabOffset.y,
         );
+        if (this._tryToggleTransformGuide(input, exclusions, guideOrigin)) return;
+        const rawSnap = this._findTransformSnap(input, exclusions);
         const target = (rawSnap && rawSnap.world) ? rawSnap.world : mouseW;
         // Neuer Referenzpunkt (points[0]) = target - grabOffset
         const p0x = target.x - this.dragFreeStrokeGrabOffset.x;
@@ -2422,6 +2695,7 @@ export class SelectTool {
           this.dragFreeStrokeId = null;
           this.dragFreeStrokeGrabOffset = null;
           this.dragFreeStrokeOrigPoints = null;
+          this._clearTransformGuides();
         }
         return;
       }
@@ -2436,22 +2710,26 @@ export class SelectTool {
         this.dragAreaLabelHatchId = null;
         this.dragAreaLabelGrabOffsetWorld = null;
         this.dragAreaLabelStartOffset = null;
+        this._clearTransformGuides();
       } else {
         const mouseW = v(input.mouse.wx, input.mouse.wy);
-        const snap = this.app.topology.findBestSnap(
-          v(input.mouse.sx, input.mouse.sy),
-          mouseW
+        const centroid = polygonCentroid(hatch.points);
+        const guideOrigin = v(
+          centroid.x + this.dragAreaLabelStartOffset.x + this.dragAreaLabelGrabOffsetWorld.x,
+          centroid.y + this.dragAreaLabelStartOffset.y + this.dragAreaLabelGrabOffsetWorld.y,
         );
+        if (this._tryToggleTransformGuide(input, { hatchIds: new Set([hatch.id]) }, guideOrigin)) return;
+        const snap = this._findTransformSnap(input, { hatchIds: new Set([hatch.id]) });
         const target = (snap && snap.world) ? snap.world : mouseW;
         // New label center should be: target - grabOffset
         // Convert to offset relative to polygon centroid:
-        const centroid = polygonCentroid(hatch.points);
         hatch.areaLabel.offsetX = (target.x - this.dragAreaLabelGrabOffsetWorld.x) - centroid.x;
         hatch.areaLabel.offsetY = (target.y - this.dragAreaLabelGrabOffsetWorld.y) - centroid.y;
         if (!input.mouse.left) {
           this.dragAreaLabelHatchId = null;
           this.dragAreaLabelGrabOffsetWorld = null;
           this.dragAreaLabelStartOffset = null;
+          this._clearTransformGuides();
         }
         return;
       }
@@ -2463,12 +2741,16 @@ export class SelectTool {
         this.dragTextBoxId = null;
         this.dragTextBoxGrabOffset = null;
         this.dragTextBoxSnap = null;
+        this._clearTransformGuides();
       } else {
         const mouseW = v(input.mouse.wx, input.mouse.wy);
-        const snap = this.app.topology.findBestSnap(
-          v(input.mouse.sx, input.mouse.sy),
-          mouseW
+        const exclusions = { textBoxIds: new Set([box.id]) };
+        const guideOrigin = v(
+          box.center.x + this.dragTextBoxGrabOffset.x,
+          box.center.y + this.dragTextBoxGrabOffset.y,
         );
+        if (this._tryToggleTransformGuide(input, exclusions, guideOrigin)) return;
+        const snap = this._findTransformSnap(input, exclusions);
         this.dragTextBoxSnap = snap;
         const target = (snap && snap.world) ? snap.world : mouseW;
         box.center = v(target.x - this.dragTextBoxGrabOffset.x, target.y - this.dragTextBoxGrabOffset.y);
@@ -2481,6 +2763,7 @@ export class SelectTool {
           this.dragTextBoxGrabOffset = null;
           this.dragTextBoxSnap = null;
           this.app.hub.hide();
+          this._clearTransformGuides();
         }
         return;
       }
@@ -2491,9 +2774,13 @@ export class SelectTool {
       const box = this.app.scene.getTextBoxById(this.rotateTextBoxId);
       if (!box) {
         this.rotateTextBoxId = null;
+        this._clearTransformGuides();
       } else {
-        const mouseW = v(input.mouse.wx, input.mouse.wy);
-        const curAng = Math.atan2(mouseW.y - box.center.y, mouseW.x - box.center.x);
+        const exclusions = { textBoxIds: new Set([box.id]) };
+        if (this._tryToggleTransformGuide(input, exclusions, box.center)) return;
+        const snap = this._findTransformSnap(input, exclusions);
+        const target = snap?.world ?? v(input.mouse.wx, input.mouse.wy);
+        const curAng = Math.atan2(target.y - box.center.y, target.x - box.center.x);
         let newRot = this.rotateTextBoxOriginalRot + (curAng - this.rotateTextBoxStartAngle);
         if (input.keys.shift) {
           const step = Math.PI / 12; // 15°
@@ -2506,6 +2793,7 @@ export class SelectTool {
         if (!input.mouse.left) {
           this.rotateTextBoxId = null;
           this.app.hub.hide();
+          this._clearTransformGuides();
         }
         return;
       }
@@ -2515,21 +2803,16 @@ export class SelectTool {
       const dim = this.app.scene.getDimensionById(this.dragDimId);
       if (!dim) {
         this.dragDimId = null;
+        this._clearTransformGuides();
       } else {
         const g = getDimensionGeometry(dim);
         const mouseW = v(input.mouse.wx, input.mouse.wy);
         // Snap-Versuch: bestehende Maßlinien/-punkte etc. dürfen die
-        // Platzierung fangen. Eigene Geometrie ausblenden, indem wir die
-        // Snap-Treffer auf "nicht dieses Dimensionsobjekt" filtern.
-        const mouseS = v(input.mouse.sx, input.mouse.sy);
-        const snap = this.app.topology.findBestSnap(mouseS, mouseW);
-        const isSelfSnap = (() => {
-          if (!snap) return false;
-          const eq = (a: Vec2, b: Vec2) => Math.hypot(a.x - b.x, a.y - b.y) < 1e-6;
-          return eq(snap.world, dim.p1) || eq(snap.world, dim.p2)
-            || eq(snap.world, g.d1) || eq(snap.world, g.d2) || eq(snap.world, g.mid);
-        })();
-        if (snap && !isSelfSnap) {
+        // Platzierung fangen; die eigene Maßkette wird als Quelle ausgeschlossen.
+        const exclusions = { dimensionIds: new Set([dim.id]) };
+        if (this._tryToggleTransformGuide(input, exclusions, dim.placementPoint)) return;
+        const snap = this._findTransformSnap(input, exclusions);
+        if (snap) {
           // PlacementPoint exakt auf den Snap-Punkt legen – die
           // Maßlinien-Offset-Geometrie ergibt sich daraus automatisch.
           dim.placementPoint = v(snap.world.x, snap.world.y);
@@ -2542,6 +2825,7 @@ export class SelectTool {
         this.app.hub.hide();
         if (!input.mouse.left) {
           this.dragDimId = null;
+          this._clearTransformGuides();
         }
         return;
       }
@@ -2567,16 +2851,21 @@ export class SelectTool {
       // Bestätigung: echter Klick ODER ENTER (Tablet-Hilfsrad).
       const editCommit = input.clicked || this.enterCommitRequested;
       this.enterCommitRequested = false;
-      // Rechtsklick während Edit: Toggle eines Hilfslinien-Ankers am aktuellen Snap-Punkt.
+      // Rechtsklick während Edit: gleiches Hilfslinien-Grundmuster wie beim
+      // Zeichnen (Punkt = H/V, Kante = parallele Hilfslinie).
       if (input.rightClicked) {
-        const snap = this._findPreviewSnapForEdit(input);
-        if (snap && snap.world && (snap.type === SnapType.POINT || snap.type === SnapType.GUIDE_POINT)) {
-          const key = `${snap.world.x.toFixed(6)}_${snap.world.y.toFixed(6)}`;
-          const idx = this.editGuideAnchors.findIndex(a => a.key === key);
-          if (idx >= 0) this.editGuideAnchors.splice(idx, 1);
-          else this.editGuideAnchors.push({ key, point: v(snap.world.x, snap.world.y) });
-          return;
-        }
+        // Der Roh-Snap darf auch vom eigenen Objekt stammen. So können dessen
+        // Fangpunkte als Hilfsanker genutzt werden, ohne den Live-Move-Snap auf
+        // sich selbst festzukleben.
+        const rawSnap = this.app.topology.findBestSnap(
+          v(input.mouse.sx, input.mouse.sy),
+          v(input.mouse.wx, input.mouse.wy),
+        );
+        const snap = this._findPreviewSnapForEdit(input) ?? rawSnap;
+        const parallelOrigin = this.activeEditAction === PointEditAction.TRANSLATE
+          ? this.otherPointOriginal
+          : this.fixedPoint;
+        if (this._toggleEditGuideFromSnap(snap, parallelOrigin)) return;
       }
 
       if (this.activeEditAction === PointEditAction.MOVE) {
@@ -2636,6 +2925,8 @@ export class SelectTool {
           const finalDelta = this._commitTranslateDelta(input);
           this._applyTranslateDelta(finalDelta);
           this._clearEditState();
+          this.app.hub.hide();
+          this.app.commitHistorySnapshot();
         }
         return;
       }
@@ -2755,7 +3046,9 @@ export class SelectTool {
           const doc = this.app.scene.getDocumentById(sel.documentId);
           if (doc) {
             const mouseW = v(input.mouse.wx, input.mouse.wy);
-            const snap = this.app.topology.findBestSnap(v(input.mouse.sx, input.mouse.sy), mouseW);
+            const snap = this._findTransformSnap(input, {
+              documentIds: new Set([doc.id]),
+            });
             const target = (snap && snap.world) ? snap.world : mouseW;
             const a = hs.anchorWorld;
 
@@ -2827,6 +3120,8 @@ export class SelectTool {
             try { (window as any).__pixunaDocumentTransformActive = false; } catch {}
             this.app.documentHubFirstClick = null;
             this.app.documentHubState = { visible: false, screenX: 0, screenY: 0, docId: null, cornerIndex: 0, anchorWorld: null, cropSide: null };
+            this.documentHubGuideSession = null;
+            this._clearTransformGuides();
             (this.app as any).commitHistorySnapshot?.();
             return;
           }
@@ -2907,6 +3202,7 @@ export class SelectTool {
         if (cornerHit) {
           const inst = this.app.scene.getStickerInstanceById(cornerHit.instId);
           if (inst) {
+            this._clearTransformGuides();
             const corners = instanceBoundingCornersWorld(inst.items as any, inst.position, inst.rotationRad, inst.scale);
             const cornerW = corners[cornerHit.cornerIndex];
             this.dragStickerId = inst.id;
@@ -2921,6 +3217,7 @@ export class SelectTool {
         // Sticker-Instanzen haben höchste Priorität (sie liegen visuell oben)
         const stickerHit = this._hitStickerInstance(input);
         if (stickerHit) {
+          this._clearTransformGuides();
           this.app.setSelection({ type: SelectionType.STICKER_INSTANCE, stickerInstanceId: stickerHit.id });
           // Drag vorbereiten (verschieben, solange Maustaste gedrückt bleibt)
           const mouseW0 = v(input.mouse.wx, input.mouse.wy);
@@ -2971,6 +3268,7 @@ export class SelectTool {
               const ly = dx * sin + dy * cos;
               if (Math.abs(lx) <= layout.boxW / 2 && Math.abs(ly) <= layout.boxH / 2) {
                 const mouseW = v(input.mouse.wx, input.mouse.wy);
+                this._clearTransformGuides();
                 this.dragAreaLabelHatchId = hatch.id;
                 this.dragAreaLabelGrabOffsetWorld = { x: mouseW.x - layout.centerWorld.x, y: mouseW.y - layout.centerWorld.y };
                 this.dragAreaLabelStartOffset = { x: hatch.areaLabel.offsetX || 0, y: hatch.areaLabel.offsetY || 0 };
@@ -3158,6 +3456,7 @@ export class SelectTool {
     // Dimension-Hub-Box: sichtbar, solange genau eine Maßkette selektiert ist
     // (und wir nicht gerade aktiv ziehen). Position folgt der Maßlinien-Mitte.
     if (this.app.dimensionHubMode !== "move") {
+      this.dimensionHubGuideOrigin = null;
       const sel = this.app.selection as any;
       if (sel && sel.type === SelectionType.DIMENSION && sel.dimensionId && !this.dragDimId) {
         const dim = this.app.scene.getDimensionById(sel.dimensionId);
@@ -3255,7 +3554,9 @@ export class SelectTool {
         const doc = this.app.scene.getDocumentById(sel.documentId);
         if (doc) {
           const mouseW = v(this.app.input.mouse.wx, this.app.input.mouse.wy);
-          const snap = this.app.topology.findBestSnap(v(this.app.input.mouse.sx, this.app.input.mouse.sy), mouseW);
+          const snap = this._findTransformSnap(this.app.input, {
+            documentIds: new Set([doc.id]),
+          });
           const target = (snap && snap.world) ? snap.world : mouseW;
           const a = hs.anchorWorld;
           let ghost: any = null;
@@ -3337,17 +3638,27 @@ export class SelectTool {
       }
     }
 
-    // Hilfslinien-Anker während Punkt-Edit
-    if (this.isEditing() && this.editGuideAnchors.length > 0) {
+    // Hilfslinien während Einzel-, Mehrfach- und Copy/Paste-Transformationen.
+    const editGuideDefs = this._editGuideDefinitions();
+    const directTransformActive = this.app.dimensionHubMode === "move"
+      || this.app.documentHubMode !== "none"
+      || !!(this.dragStickerId || this.dragDocId || this.dragFreeStrokeId
+        || this.dragAreaLabelHatchId || this.dragTextBoxId || this.rotateTextBoxId || this.dragDimId);
+    if (editGuideDefs.length > 0 && (this.isEditing() || this.marqueeSelectedIds.length > 0 || directTransformActive)) {
       ctx.save();
       ctx.strokeStyle = "rgba(110,110,110,0.42)";
       ctx.lineWidth = 1;
       ctx.setLineDash([5, 6]);
-      for (const a of this.editGuideAnchors) {
-        const s = cam.worldToScreen(a.point.x, a.point.y);
+      const span = (Math.hypot(this.app.renderer.vw, this.app.renderer.vh) / cam.scale) * 1.5;
+      for (const def of editGuideDefs) {
+        const d = norm(def.dir);
+        const a = sub(def.point, mul(d, span));
+        const b = add(def.point, mul(d, span));
+        const sa = cam.worldToScreen(a.x, a.y);
+        const sb = cam.worldToScreen(b.x, b.y);
         ctx.beginPath();
-        ctx.moveTo(0, s.y); ctx.lineTo(this.app.renderer.vw, s.y);
-        ctx.moveTo(s.x, 0); ctx.lineTo(s.x, this.app.renderer.vh);
+        ctx.moveTo(sa.x, sa.y);
+        ctx.lineTo(sb.x, sb.y);
         ctx.stroke();
       }
       ctx.setLineDash([]);
@@ -3792,7 +4103,8 @@ export class SelectTool {
 
     // Häkchen-Button oben rechts an der Auswahl (Einfügen / Gruppen-Aktion).
     this._pasteBtnRect = null;
-    if ((this.pasteFloatActive || this.groupAnchorActive) && this.marqueeSelectedIds.length && !this.groupDragActive) {
+    if ((this.pasteFloatActive || this.groupAnchorActive) && this.marqueeSelectedIds.length
+        && (!this.groupDragActive || this.pasteFloatActive)) {
       let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
       for (const { kind, id } of this.marqueeSelectedIds) {
         const obj = this._getElementById(kind, id);

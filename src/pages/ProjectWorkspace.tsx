@@ -2778,10 +2778,6 @@ function PageCanvas({
               });
               onSelect(newId);
             }}
-            onDelete={() => {
-              projectStore.deleteElement(projectId, page.id, el.id);
-              onSelect(undefined);
-            }}
             onEdgeDrag={(edge, dx, dy) => {
               const dxPct = (dx / displayWidth) * 100;
               const dyPct = (dy / displayHeight) * 100;
@@ -3366,7 +3362,6 @@ function ElementView({
   onSelect,
   onDrag,
   onDuplicate,
-  onDelete,
   onRotate,
   onEdgeDrag,
   onCornerDrag,
@@ -3382,7 +3377,6 @@ function ElementView({
   onDrag?: (dx: number, dy: number, alt?: boolean) => void;
 
   onDuplicate?: () => void;
-  onDelete?: () => void;
   onRotate?: (deltaDeg: number, absolute?: boolean) => void;
   onEdgeDrag?: (edge: "top" | "right" | "bottom" | "left", dx: number, dy: number) => void;
   onCornerDrag?: (corner: "tl" | "tr" | "bl" | "br", dx: number, dy: number, shift: boolean) => void;
@@ -3525,8 +3519,6 @@ function ElementView({
   useEffect(() => {
     if (readOnly || !selected) return;
     const onContext = (ev: MouseEvent) => {
-      // Für CAD-Blätter gibt es bewusst keine Rechtsklick-Hilfslinien.
-      if (isCadView) return;
       if (hubModeRef.current) return; // während HUB-Aktion übernimmt der Hub-Handler
       const parent = rootRef.current?.parentElement as HTMLElement | null;
       if (!parent) return;
@@ -4091,8 +4083,6 @@ function ElementView({
       hubDownClientRef.current = null;
     };
     const onContext = (ev: MouseEvent) => {
-      // Rechtsklick-Fangen/Hilfslinien sind beim CAD-Blatt entfernt.
-      if (isCadView) return;
       // Rechtsklick während HUB-Aktion: Fangpunkt eines anderen Objekts anvisieren.
       // Es entsteht eine Hilfslinie (Kreuz + Strahl zum aktiven Anker), auf die
       // beim Verschieben/Drehen gefangen wird.
@@ -4168,7 +4158,6 @@ function ElementView({
   // → ENTER bzw. Häkchen setzt final.
   const hubCapable = isCadView || (tabletActive && (el.kind === "image" || el.kind === "pdf"));
   const tabletCommitOnly = hubCapable && tabletActive && (!!hubMode || !!edgeTrim);
-  const hasActiveCadAction = !!hubMode || !!edgeTrim;
 
   return (
     <div
@@ -4470,17 +4459,6 @@ function ElementView({
                 className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
               >
                 <Copy size={14} />
-              </button>
-            )}
-            {!tabletCommitOnly && !hasActiveCadAction && (
-              <button
-                data-hub-control
-                onClick={(e) => { e.stopPropagation(); onDelete?.(); }}
-                title="Löschen"
-                className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))]"
-                style={{ color: "hsl(0 65% 50%)" }}
-              >
-                <Trash2 size={14} />
               </button>
             )}
           </div>
