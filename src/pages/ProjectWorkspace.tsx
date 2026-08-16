@@ -4163,6 +4163,7 @@ function ElementView({
     <div
       ref={rootRef}
       data-marquee-id={el.id}
+      data-element-kind={el.kind}
       onPointerDown={handlePointerDown}
       className="absolute"
       style={{
