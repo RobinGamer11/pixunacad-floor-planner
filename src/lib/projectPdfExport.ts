@@ -274,6 +274,10 @@ export async function exportProjectToPdf(
   return await pdf.save();
   } finally {
     setExportMode(false);
+    // CAD-Zeichenflächen zurück auf Bildschirm-Auflösung.
+    window.dispatchEvent(
+      new CustomEvent("pixuna:export-render-scale", { detail: 1 }),
+    );
   }
 }
 
