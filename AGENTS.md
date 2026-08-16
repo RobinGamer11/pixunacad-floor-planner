@@ -1,5 +1,12 @@
 # AGENTS.md
 
+## 0. Start jeder neuen Aufgabe
+
+Wie ist dein aktueller Stand von `main`? Wenn dein lokaler Stand nicht aktuell
+ist oder du GitHub nicht direkt erreichen kannst, gib mir sofort den fertigen
+sicheren PowerShell-Befehl, mit dem ich den neuesten `main` abrufe. Bitte noch
+nichts ändern, bevor der aktuelle Stand bestätigt ist.
+
 ## Projekt
 
 Projektname: PixunaCAD Floor Planner
