@@ -234,7 +234,7 @@ export async function exportProjectToPdf(
   opts: PdfExportOptions,
   onProgress?: (p: PdfExportProgress) => void,
 ): Promise<Uint8Array> {
-  const dpi = opts.dpi ?? 200;
+  const dpi = opts.dpi ?? 300;
   const units = buildUnits(opts.project, opts.selectedPageIds, opts.spreadCombined);
   if (units.length === 0) throw new Error("Keine Seiten ausgewählt.");
 
@@ -257,9 +257,9 @@ export async function exportProjectToPdf(
       });
       opts.setActivePageId(page.id);
       await waitFrames(6);
-      const canvas = await snapshotPageElement(page.id, dpi);
-      applyColorMode(canvas, opts.colorMode, opts.customColor);
       const size = getPageSizeMm(page);
+      const canvas = await snapshotPageElement(page.id, dpi, size.wMm);
+      applyColorMode(canvas, opts.colorMode, opts.customColor);
       snaps.push({ canvas, wMm: size.wMm, hMm: size.hMm });
     }
     if (snaps.length === 1) {
@@ -274,6 +274,10 @@ export async function exportProjectToPdf(
   return await pdf.save();
   } finally {
     setExportMode(false);
+    // CAD-Zeichenflächen zurück auf Bildschirm-Auflösung.
+    window.dispatchEvent(
+      new CustomEvent("pixuna:export-render-scale", { detail: 1 }),
+    );
   }
 }
 
