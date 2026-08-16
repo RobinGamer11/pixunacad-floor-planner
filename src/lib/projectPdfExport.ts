@@ -257,9 +257,9 @@ export async function exportProjectToPdf(
       });
       opts.setActivePageId(page.id);
       await waitFrames(6);
-      const canvas = await snapshotPageElement(page.id, dpi);
-      applyColorMode(canvas, opts.colorMode, opts.customColor);
       const size = getPageSizeMm(page);
+      const canvas = await snapshotPageElement(page.id, dpi, size.wMm);
+      applyColorMode(canvas, opts.colorMode, opts.customColor);
       snaps.push({ canvas, wMm: size.wMm, hMm: size.hMm });
     }
     if (snaps.length === 1) {
