@@ -5,6 +5,7 @@ import type { CadApp } from "@/cad/CadApp";
 import type { MiniCad } from "@/cad/embed/MiniCad";
 import type { HatchDrawMode } from "@/cad/HatchTool";
 import { RasterModeToggle } from "@/components/cad/RasterModeToggle";
+import { ToolColorPicker } from "@/components/workspace/ToolColorPicker";
 
 const MODES: { value: HatchDrawMode; label: string; Icon: React.ElementType }[] = [
   { value: "polygon", label: "Polygon", Icon: Spline },
@@ -142,38 +143,28 @@ export const HatchSettingsPanel: React.FC<Props> = ({ app, projectId }) => {
       </div>
 
       <div className="grid grid-cols-2 gap-2">
-        <label className="flex flex-col gap-1">
-          <span className="text-[10px] text-muted-foreground">Füllfarbe</span>
-          <input
-            type="color"
-            value={fillColor}
-            onChange={(e) => {
-              const v = e.target.value;
-              setFillColor(v);
-              apply(
-                (h) => { h.fillColor = v; },
-                () => { if (app) (app as any).defaultHatchFillColor = v; },
-              );
-            }}
-            className="h-8 w-full cursor-pointer rounded border-0 p-0 bg-transparent"
-          />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-[10px] text-muted-foreground">Linienfarbe</span>
-          <input
-            type="color"
-            value={strokeColor}
-            onChange={(e) => {
-              const v = e.target.value;
-              setStrokeColor(v);
-              apply(
-                (h) => { h.strokeColor = v; },
-                () => { if (app) (app as any).defaultHatchStrokeColor = v; },
-              );
-            }}
-            className="h-8 w-full cursor-pointer rounded border-0 p-0 bg-transparent"
-          />
-        </label>
+        <ToolColorPicker
+          label="Füllfarbe"
+          value={fillColor}
+          onChange={(value) => {
+            setFillColor(value);
+            apply(
+              (h) => { h.fillColor = value; },
+              () => { if (app) (app as any).defaultHatchFillColor = value; },
+            );
+          }}
+        />
+        <ToolColorPicker
+          label="Linienfarbe"
+          value={strokeColor}
+          onChange={(value) => {
+            setStrokeColor(value);
+            apply(
+              (h) => { h.strokeColor = value; },
+              () => { if (app) (app as any).defaultHatchStrokeColor = value; },
+            );
+          }}
+        />
       </div>
 
       {/* ── Schraffurmuster ─────────────────────────────────────── */}

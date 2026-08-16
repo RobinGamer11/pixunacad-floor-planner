@@ -1,5 +1,5 @@
 import React from "react";
-import { ClipboardPaste, Copy, Keyboard } from "lucide-react";
+import { ClipboardPaste, Copy, Keyboard, Lock, Printer } from "lucide-react";
 
 type MouseHighlight = "wheel" | "left" | "right";
 
@@ -107,14 +107,14 @@ function HeaderActionGlyph({ children }: { children: React.ReactNode }) {
 }
 
 /** Rein visuelle, vollständig durchklickbare Schnellhilfe für die Mappe. */
-export function MappeHelpOverlay() {
+export function MappeHelpOverlay({ guideActive = false }: { guideActive?: boolean }) {
   return (
     <div
       className="pointer-events-none absolute inset-x-0 bottom-14 z-40 flex select-none justify-center px-3"
       aria-hidden="true"
     >
       <div
-        className="flex max-w-full flex-wrap items-stretch justify-center overflow-hidden rounded-xl border shadow-xl backdrop-blur-md"
+        className="flex max-w-[calc(100vw-1.5rem)] flex-nowrap items-stretch justify-center overflow-hidden rounded-xl border shadow-xl backdrop-blur-md"
         style={{
           borderColor: "hsl(var(--surface) / 0.24)",
           background: "hsl(var(--ink) / 0.78)",
@@ -146,6 +146,22 @@ export function MappeHelpOverlay() {
             description="Einfügen"
           />
         </HelpGroup>
+
+        {guideActive && (
+          <HelpGroup title="Hilfslinie" bordered>
+            <HelpItem icon={<ShiftClickGlyph />} shortcut="L-Klick + Shift" description="Gerade zeichnen" />
+            <HelpItem
+              icon={<HeaderActionGlyph><Printer size={17} /></HeaderActionGlyph>}
+              shortcut="Druck"
+              description="Nicht sichtbar"
+            />
+            <HelpItem
+              icon={<HeaderActionGlyph><Lock size={17} /></HeaderActionGlyph>}
+              shortcut="Fixiert"
+              description="Nicht bearbeitbar"
+            />
+          </HelpGroup>
+        )}
       </div>
     </div>
   );

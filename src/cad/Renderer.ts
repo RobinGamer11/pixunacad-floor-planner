@@ -1254,9 +1254,9 @@ export class Renderer {
     ctx.fillStyle = seg.color || Defaults.lineColor;
     ctx.lineWidth = this._segStrokePx(seg.thicknessM);
     if (seg.isGuide) {
-      // Hilfslinie: hellblau gestrichelt, immer dünn (Screen-Pixel), Hintergrund.
+      // Hilfslinie: gestrichelt und mit der frei gewählten Strichbreite.
       ctx.strokeStyle = seg.color || "#7DD3FC";
-      ctx.lineWidth = Math.max(1, Math.min(2, this._segStrokePx(seg.thicknessM)));
+      ctx.lineWidth = this._segStrokePx(seg.thicknessM);
       const dash = Math.max(4, ctx.lineWidth * 4);
       const gap = Math.max(3, ctx.lineWidth * 3);
       ctx.setLineDash([dash, gap]);

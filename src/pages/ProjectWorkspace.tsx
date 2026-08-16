@@ -105,6 +105,7 @@ import { HatchSettingsPanel } from "@/components/cad/HatchSettingsPanel";
 import { RasterModeToggle } from "@/components/cad/RasterModeToggle";
 import { WorkspaceHeader } from "@/components/workspace/WorkspaceHeader";
 import { MappeHelpOverlay } from "@/components/workspace/MappeHelpOverlay";
+import { ToolColorPicker } from "@/components/workspace/ToolColorPicker";
 import { TabletAidWheel } from "@/components/TabletAidWheel";
 
 // Papierformate: kanonische Quelle ist src/lib/paper.ts.
@@ -112,6 +113,12 @@ import { TabletAidWheel } from "@/components/TabletAidWheel";
 // aus page.customWidthMm/customHeightMm werden dort abgefragt, wo die reale
 // Seitengröße gebraucht wird (getPageSizeMm).
 import { PAPER_FORMATS as FORMAT_SIZES, getPageSizeMm, parseScaleDen } from "@/lib/paper";
+import {
+  guideStrokeMmToPx,
+  guideStrokePxToMm,
+  mappePagePxPerMm,
+  MAPPE_PAGE_BASE_WIDTH_PX,
+} from "@/lib/guideStrokeWidth";
 import { getPageSnapRegistry, buildRectSnapEntry } from "@/lib/pageSnap";
 import { registerCadEngineSnap, queryCadEngineSnap } from "@/lib/cadEngineSnap";
 import { Defaults } from "@/cad/constants";
@@ -1934,7 +1941,9 @@ export default function ProjectWorkspace() {
                 );
               })()}
             </div>
-            {mappeHelpOn && !presenting && !printMode && <MappeHelpOverlay />}
+            {mappeHelpOn && !presenting && !printMode && (
+              <MappeHelpOverlay guideActive={activeTool === "guide"} />
+            )}
             <ZoomBar zoom={zoom} setZoom={setZoomClamped} onResetZoom={resetZoomAndCenter} />
           </main>
 
@@ -2442,7 +2451,7 @@ function PageCanvas({
   // The sheet is rendered at a FIXED real size (mm-defined). Zoom is a pure
   // view transform applied via CSS scale, like PowerPoint / CAD — page, holes,
   // margins, frame and strokes all scale together with the view.
-  const baseWidth = 1100;
+  const baseWidth = MAPPE_PAGE_BASE_WIDTH_PX;
   const width = baseWidth;
   const height = width / aspect;
   const scale = zoom / 100;
@@ -2968,7 +2977,9 @@ function PageCanvas({
 
 
           lineColor={activeTool === "guide" ? toolSettings.guide.color : toolSettings.line.color}
-          lineThicknessMm={activeTool === "guide" ? Math.max(0.1, toolSettings.guide.strokeWidth * 0.2) : toolSettings.line.thicknessMm}
+          lineThicknessMm={activeTool === "guide"
+            ? guideStrokePxToMm(toolSettings.guide.strokeWidth, baseWidth / fmt.w)
+            : toolSettings.line.thicknessMm}
           lineAlpha={toolSettings.line.alpha / 100}
           guideColor={toolSettings.guide.color}
           guidesLocked={toolSettings.guide.locked}
@@ -4969,7 +4980,9 @@ function RightInspector({
               onCancelTable={onCancelTable}
             />
           )}
-          {tab === "tools" && <ToolHelpNotes toolId={activeTool ?? "select"} />}
+          {tab === "tools" && activeTool !== "guide" && (
+            <ToolHelpNotes toolId={activeTool ?? "select"} />
+          )}
           {tab === "layers" && page && (
             <div className="space-y-4">
               {/* Ein einziges Ebenen-/Bezeichnungs-ID-System — identisch zur
@@ -5497,6 +5510,11 @@ function ToolsTab({
 }) {
 
   const settingsTool = activeTool ?? selectedCadTool ?? null;
+  const settingsPage = (pageId ? project.pages.find((candidate) => candidate.id === pageId) : undefined)
+    ?? project.pages[0];
+  const guidePxPerMm = settingsPage
+    ? mappePagePxPerMm(getPageSizeMm(settingsPage).wMm)
+    : 1;
   return (
     <div className="space-y-3">
 
@@ -5516,6 +5534,7 @@ function ToolsTab({
       {settingsTool === "guide" && (
         <GuideSettings
           settings={toolSettings.guide}
+          pxPerMm={guidePxPerMm}
           onChange={(p) => updateToolSettings("guide", p)}
         />
       )}
@@ -5808,51 +5827,140 @@ function SelectSettings({
 }
 
 
+const formatGuideMeasure = (value: number, fractionDigits: number) =>
+  Number(value.toFixed(fractionDigits)).toString();
+
+function GuideMeasureInput({
+  label,
+  unit,
+  value,
+  fractionDigits,
+  onChange,
+}: {
+  label: string;
+  unit: "px" | "mm";
+  value: number;
+  fractionDigits: number;
+  onChange: (value: number) => void;
+}) {
+  const [draft, setDraft] = useState(() => formatGuideMeasure(value, fractionDigits));
+  const focusedRef = useRef(false);
+  const cancelBlurRef = useRef(false);
+
+  useEffect(() => {
+    if (!focusedRef.current) setDraft(formatGuideMeasure(value, fractionDigits));
+  }, [fractionDigits, value]);
+
+  const parseDraft = (next: string) => {
+    const parsed = Number(next.trim().replace(",", "."));
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  };
+
+  const restoreOrCommit = () => {
+    const parsed = parseDraft(draft);
+    if (parsed == null) {
+      setDraft(formatGuideMeasure(value, fractionDigits));
+      return;
+    }
+    onChange(parsed);
+    setDraft(formatGuideMeasure(parsed, fractionDigits));
+  };
+
+  return (
+    <label className="min-w-0">
+      <span className="mb-1 block text-[9px] text-muted-foreground">{label}</span>
+      <span className="flex h-8 items-center overflow-hidden rounded-md border" style={{ borderColor: "hsl(var(--hairline))" }}>
+        <input
+          type="text"
+          inputMode="decimal"
+          value={draft}
+          onFocus={() => { focusedRef.current = true; }}
+          onChange={(event) => {
+            const next = event.target.value;
+            setDraft(next);
+            const parsed = parseDraft(next);
+            if (parsed != null) onChange(parsed);
+          }}
+          onBlur={() => {
+            focusedRef.current = false;
+            if (cancelBlurRef.current) {
+              cancelBlurRef.current = false;
+              setDraft(formatGuideMeasure(value, fractionDigits));
+              return;
+            }
+            restoreOrCommit();
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") event.currentTarget.blur();
+            if (event.key === "Escape") {
+              cancelBlurRef.current = true;
+              setDraft(formatGuideMeasure(value, fractionDigits));
+              event.currentTarget.blur();
+            }
+          }}
+          className="h-full min-w-0 flex-1 bg-transparent px-2 text-right text-xs tabular-nums outline-none"
+          aria-label={`${label} in ${unit}`}
+        />
+        <span className="pr-2 text-[10px] text-muted-foreground">{unit}</span>
+      </span>
+    </label>
+  );
+}
+
 function GuideSettings({
   settings,
+  pxPerMm,
   onChange,
 }: {
   settings: ToolSettings["guide"];
+  pxPerMm: number;
   onChange: (p: Partial<ToolSettings["guide"]>) => void;
 }) {
+  const strokeWidthMm = guideStrokePxToMm(settings.strokeWidth, pxPerMm);
+
   return (
     <SettingsBlock title="HILFSLINIE">
-      <Row label="Farbe">
-        <ColorInput value={settings.color} onChange={(v) => onChange({ color: v })} />
-      </Row>
-      <Row label="Strichstärke">
-        <div className="flex items-center gap-2">
-          <input
-            type="range"
-            min={0.5}
-            max={4}
-            step={0.1}
+      <ToolColorPicker
+        label="Farbe"
+        value={settings.color}
+        onChange={(value) => onChange({ color: value })}
+      />
+      <div>
+        <div className="mb-1.5 text-[10px] text-muted-foreground">Strichstärke</div>
+        <div className="grid grid-cols-2 gap-2">
+          <GuideMeasureInput
+            label="Bildschirm"
+            unit="px"
             value={settings.strokeWidth}
-            onChange={(e) => onChange({ strokeWidth: Number(e.target.value) })}
-            className="flex-1 accent-foreground"
+            fractionDigits={2}
+            onChange={(value) => onChange({ strokeWidth: value })}
           />
-          <span className="text-xs tabular-nums w-10 text-right">{settings.strokeWidth.toFixed(1)} px</span>
+          <GuideMeasureInput
+            label="Tatsächliche Größe"
+            unit="mm"
+            value={strokeWidthMm}
+            fractionDigits={3}
+            onChange={(value) => onChange({ strokeWidth: guideStrokeMmToPx(value, pxPerMm) })}
+          />
         </div>
-      </Row>
+      </div>
       <Row label="Fixiert">
         <button
           type="button"
           onClick={() => onChange({ locked: !settings.locked })}
-          className="h-7 px-2 rounded-md border text-xs flex items-center gap-1.5"
+          className="flex h-8 w-8 items-center justify-center rounded-md border transition-colors hover:bg-muted"
           style={{
-            borderColor: "hsl(var(--hairline))",
+            borderColor: settings.locked ? "hsl(var(--ink-soft))" : "hsl(var(--hairline))",
             background: settings.locked ? "hsl(var(--surface-strong))" : "transparent",
+            color: settings.locked ? "hsl(var(--ink))" : "hsl(var(--ink-soft))",
           }}
           title={settings.locked ? "Hilfslinien sind gesperrt — klicken zum Entsperren" : "Klicken um alle Hilfslinien zu sperren"}
+          aria-label={settings.locked ? "Hilfslinien entsperren" : "Hilfslinien fixieren"}
+          aria-pressed={settings.locked}
         >
-          <span aria-hidden>{settings.locked ? "🔒" : "🔓"}</span>
-          <span>{settings.locked ? "Gesperrt" : "Frei"}</span>
+          {settings.locked ? <LockIcon size={15} /> : <UnlockIcon size={15} />}
         </button>
       </Row>
-      <div className="text-[11px] text-muted-foreground">
-        Hilfslinien werden hellblau gestrichelt angezeigt und beim Druck nicht ausgegeben.
-        Bei „Gesperrt" können sie weder ausgewählt, verschoben noch gelöscht werden.
-      </div>
     </SettingsBlock>
   );
 }
