@@ -1,5 +1,7 @@
 import { ReactNode } from "react";
 import { Link } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
+
 
 export function LegalLayout({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -9,12 +11,22 @@ export function LegalLayout({ title, children }: { title: string; children: Reac
           <Link to="/" className="font-semibold tracking-tight text-lg">
             Pixuna<span style={{ color: "hsl(var(--accent-gold))" }}>CAD</span>
           </Link>
-          <nav className="flex gap-4 text-sm text-muted-foreground" aria-label="Rechtliche Navigation">
-            <Link to="/impressum" className="hover:text-foreground">Impressum</Link>
-            <Link to="/datenschutz" className="hover:text-foreground">Datenschutz</Link>
-          </nav>
+          <div className="flex items-center gap-3">
+            <Link
+              to="/"
+              className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium hover:bg-muted"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Zurück zur Startseite
+            </Link>
+            <nav className="hidden sm:flex gap-4 text-sm text-muted-foreground" aria-label="Rechtliche Navigation">
+              <Link to="/impressum" className="hover:text-foreground">Impressum</Link>
+              <Link to="/datenschutz" className="hover:text-foreground">Datenschutz</Link>
+            </nav>
+          </div>
         </div>
       </header>
+
 
       <article className="mx-auto max-w-4xl px-5 py-10 sm:py-14">
         <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{title}</h1>
