@@ -1,10 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Link, Navigate, Outlet, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Outlet, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/components/auth/AuthProvider";
 import { WorkspaceSyncProvider } from "@/lib/workspaceSync";
+import LegalGearButton from "@/components/legal/LegalMenu";
 import ProjectsHome from "./pages/ProjectsHome";
 import Login from "./pages/Login";
 import ProjectWorkspace from "./pages/ProjectWorkspace";
@@ -37,14 +38,7 @@ function RequireAuth() {
   return (
     <WorkspaceSyncProvider>
       <Outlet />
-      <nav
-        aria-label="Rechtliche Hinweise"
-        className="fixed bottom-3 right-3 z-[90] rounded-full border bg-background/95 px-3 py-1.5 text-[11px] shadow-sm backdrop-blur"
-      >
-        <Link to="/impressum" className="hover:underline">Impressum</Link>
-        <span className="px-1.5 text-muted-foreground" aria-hidden>·</span>
-        <Link to="/datenschutz" className="hover:underline">Datenschutz</Link>
-      </nav>
+      <LegalGearButton />
     </WorkspaceSyncProvider>
   );
 }

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { LegalMenuPopover } from "@/components/legal/LegalMenu";
 import { useNavigate } from "react-router-dom";
 import {
   Plus,
@@ -108,6 +109,7 @@ export default function ProjectsHome() {
   const [leftOpen, setLeftOpen] = useState(true);
   const [titleMenuOpen, setTitleMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [legalOpen, setLegalOpen] = useState(false);
   const [newProjectDialogOpen, setNewProjectDialogOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
@@ -819,14 +821,22 @@ export default function ProjectsHome() {
               className="px-4 py-3 flex items-center justify-between"
               style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}
             >
-              <button
-                disabled
-                className="h-9 w-9 rounded-full flex items-center justify-center opacity-50 cursor-not-allowed"
-                style={{ background: "rgba(255,255,255,0.05)", color: "#B7BCC2" }}
-                title="Einstellungen (bald verfügbar)"
-              >
-                <Settings size={15} />
-              </button>
+              <div className="relative">
+                {legalOpen && (
+                  <div className="absolute bottom-11 left-0 z-50">
+                    <LegalMenuPopover onClose={() => setLegalOpen(false)} />
+                  </div>
+                )}
+                <button
+                  onClick={() => setLegalOpen((v) => !v)}
+                  aria-expanded={legalOpen}
+                  className="h-9 w-9 rounded-full flex items-center justify-center"
+                  style={{ background: "rgba(255,255,255,0.05)", color: "#B7BCC2" }}
+                  title="Impressum & Datenschutz"
+                >
+                  <Settings size={15} />
+                </button>
+              </div>
               <span className="text-[10px]" style={{ color: "#8A9099" }}>
                 {projectCount} / {MAX_PROJECTS}
               </span>
