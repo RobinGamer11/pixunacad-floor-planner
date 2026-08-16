@@ -37,14 +37,7 @@ function RequireAuth() {
   return (
     <WorkspaceSyncProvider>
       <Outlet />
-      <nav
-        aria-label="Rechtliche Hinweise"
-        className="fixed bottom-3 right-3 z-[90] rounded-full border bg-background/95 px-3 py-1.5 text-[11px] shadow-sm backdrop-blur"
-      >
-        <Link to="/impressum" className="hover:underline">Impressum</Link>
-        <span className="px-1.5 text-muted-foreground" aria-hidden>·</span>
-        <Link to="/datenschutz" className="hover:underline">Datenschutz</Link>
-      </nav>
+      <LegalGearButton />
     </WorkspaceSyncProvider>
   );
 }
