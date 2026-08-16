@@ -1018,6 +1018,12 @@
 .pixuna-exporting [data-page-margin-overlay] { display: none !important; }
 .pixuna-exporting [data-page-punch-hole] { display: none !important; }
 .pixuna-exporting .page-sheet { border: none !important; box-shadow: none !important; }
+/* … sowie sämtliche Bedien-Overlays: Fangpunkte/HUB-Controls, Hilfslinien-
+   Objekte, Auswahl-Rahmen und Marquee. Nur gesetzte Objekte bleiben sichtbar. */
+.pixuna-exporting [data-hub-control] { display: none !important; }
+.pixuna-exporting [data-element-kind="guide"] { display: none !important; }
+.pixuna-exporting [data-marquee-id] { outline: none !important; }
+.pixuna-exporting [data-page-capture] svg[data-guide-overlay] { display: none !important; }
 
 /* Finanzen-PDF-Export: Bedienelemente ausblenden, Ersatztexte einblenden */
 [data-export-only] { display: none; }
