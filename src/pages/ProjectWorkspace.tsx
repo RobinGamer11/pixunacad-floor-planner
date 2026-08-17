@@ -4712,13 +4712,38 @@ function ElementView({
         <>
           {guides.map((g) => (
             <React.Fragment key={g.id}>
+              {/* Achsen — identisch zur CAD-Oberfläche (GlobalGuides):
+                 1px, gestrichelt 5/6, rgba(77,163,255,0.38). */}
               <div
+                data-guide-overlay
                 className="absolute pointer-events-none"
-                style={{ left: 0, right: 0, top: `${g.yPct}%`, height: 0, borderTop: `1px dashed ${hubBlue}`, opacity: 0.7, zIndex: 900 }}
+                style={{
+                  left: 0, right: 0, top: `${g.yPct}%`, height: 0,
+                  borderTop: "1px dashed rgba(77,163,255,0.38)",
+                  zIndex: 900,
+                }}
               />
               <div
+                data-guide-overlay
                 className="absolute pointer-events-none"
-                style={{ top: 0, bottom: 0, left: `${g.xPct}%`, width: 0, borderLeft: `1px dashed ${hubBlue}`, opacity: 0.7, zIndex: 900 }}
+                style={{
+                  top: 0, bottom: 0, left: `${g.xPct}%`, width: 0,
+                  borderLeft: "1px dashed rgba(77,163,255,0.38)",
+                  zIndex: 900,
+                }}
+              />
+              {/* Anker-Punkt wie im CAD: blauer Kern mit weißem Rand. */}
+              <div
+                data-guide-overlay
+                className="absolute pointer-events-none rounded-full"
+                style={{
+                  left: `${g.xPct}%`, top: `${g.yPct}%`,
+                  width: 9, height: 9, marginLeft: -4.5, marginTop: -4.5,
+                  background: "rgba(77,163,255,0.95)",
+                  border: "1.5px solid rgba(255,255,255,0.95)",
+                  boxSizing: "border-box",
+                  zIndex: 901,
+                }}
               />
             </React.Fragment>
           ))}
@@ -4730,6 +4755,7 @@ function ElementView({
          Fangpunkt bis zum aktiven Fangpunkt dieses Elements. */}
       {rayGuides.length > 0 && rootRef.current?.parentElement && createPortal(
         <svg
+          data-guide-overlay
           className="absolute inset-0 pointer-events-none"
           style={{ width: "100%", height: "100%", zIndex: 910 }}
           viewBox="0 0 100 100"
@@ -4739,18 +4765,38 @@ function ElementView({
             <g key={g.id}>
               <line
                 x1={g.ax} y1={g.ay} x2={g.bx} y2={g.by}
-                stroke={hubBlue}
-                strokeWidth={0.12}
-                strokeDasharray="0.9 0.7"
+                stroke="rgba(77,163,255,0.38)"
+                strokeWidth={1}
+                strokeDasharray="5 6"
                 vectorEffect="non-scaling-stroke"
-                opacity={0.85}
               />
-              <circle cx={g.ax} cy={g.ay} r={0.5} fill={hubBlue} />
             </g>
           ))}
         </svg>,
         rootRef.current.parentElement,
       )}
+      {/* Anker-Punkte der Strahlen (kreisrund, unabhängig vom SVG-Stretch). */}
+      {rayGuides.length > 0 && rootRef.current?.parentElement && createPortal(
+        <>
+          {rayGuides.map((g) => (
+            <div
+              key={`ray-dot-${g.id}`}
+              data-guide-overlay
+              className="absolute pointer-events-none rounded-full"
+              style={{
+                left: `${g.ax}%`, top: `${g.ay}%`,
+                width: 9, height: 9, marginLeft: -4.5, marginTop: -4.5,
+                background: "rgba(77,163,255,0.95)",
+                border: "1.5px solid rgba(255,255,255,0.95)",
+                boxSizing: "border-box",
+                zIndex: 911,
+              }}
+            />
+          ))}
+        </>,
+        rootRef.current.parentElement,
+      )}
+
 
       {/* CAD-Blatt drehen: Achse durch die beiden oberen Fangpunkte, der
          Cursor sitzt fixiert auf dieser Linie. Linksklick setzt das Blatt. */}
