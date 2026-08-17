@@ -604,7 +604,7 @@ export default function ProjectWorkspace() {
   // Per-tool settings (live in workspace state; persist could come later).
   const [toolSettings, setToolSettings] = useState<ToolSettings>({
     select: { multi: false, marqueeMode: "click" },
-    guide: { color: "#7DD3FC", strokeWidth: 1, locked: false },
+    guide: { color: "#4DA3FF", strokeWidth: 1, locked: false },
     line: { color: "#111111", thicknessMm: 0.5, alpha: 100 },
     text: {
       fontSize: 11,
@@ -2243,7 +2243,7 @@ type ToolSettings = {
 
 const DEFAULT_TOOL_SETTINGS: ToolSettings = {
   select: { multi: false, marqueeMode: "click" },
-  guide: { color: "#7DD3FC", strokeWidth: 1, locked: false },
+  guide: { color: "#4DA3FF", strokeWidth: 1, locked: false },
   line: { color: "#111111", thicknessMm: 0.5, alpha: 100 },
   text: {
     fontSize: 11,
@@ -3401,7 +3401,7 @@ function ElementView({
   };
 
   const isCadView = el.kind === "cad-view" || el.kind === "cad-viewport";
-  const hubBlue = "hsl(217 91% 60%)";
+  const hubBlue = "#4da3ff";
 
   // Explizite HUB-Modi für CAD-Blatt: erst nach Klick auf das Symbol wird
   // Bewegen / Drehen aktiv. Preview läuft mit Fadenkreuz-Cursor; ein weiterer
@@ -4383,7 +4383,7 @@ function ElementView({
                     className={`h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))] ${hubMode === "move" ? "bg-[hsl(var(--surface-muted))]" : ""}`}
                     style={{ color: hubMode === "move" ? "hsl(var(--accent-gold))" : undefined }}
                   >
-                    <Move size={14} />
+                    <Move size={14} strokeWidth={1.6} className="shrink-0" />
                   </button>
                 )}
                 {hubMode !== "move" && (
@@ -6744,7 +6744,7 @@ function ElementInspector({
           <Row label="Farbe">
             <input
               type="color"
-              value={element.color ?? (element.kind === "guide" ? "#7DD3FC" : "#1a1a1a")}
+              value={element.color ?? (element.kind === "guide" ? "#4DA3FF" : "#1a1a1a")}
               onChange={(e) => update({ color: e.target.value })}
               className="h-8 w-full rounded border bg-transparent"
               style={{ borderColor: "hsl(var(--hairline))" }}
