@@ -450,7 +450,7 @@ export default function CadOverlayLayer(props: Props) {
               onClick={() => setDocHub(h => ({ ...h, mode: h.mode === "move" ? "none" : "move" }))}
               style={{ ...hubBtnStyle, background: docHub.mode === "move" ? "hsl(var(--accent))" : "white" }}
             >
-              <Move size={14} />
+              <Move size={14} strokeWidth={1.6} className="shrink-0" />
             </button>
             {docHub.mode === "move" && (
               <>
@@ -556,7 +556,7 @@ export default function CadOverlayLayer(props: Props) {
           }}
         >
           <button ref={peMoveRef} type="button" data-hub-control style={pointEditBtn} title="Bewegen" aria-label="Bewegen">↔</button>
-          <button ref={peTranslateRef} type="button" data-hub-control style={pointEditBtn} title="Verschieben" aria-label="Verschieben"><Move size={14} /></button>
+          <button ref={peTranslateRef} type="button" data-hub-control style={pointEditBtn} title="Verschieben" aria-label="Verschieben"><Move size={14} strokeWidth={1.6} className="shrink-0" /></button>
           <button ref={peRotateRef} type="button" data-hub-control style={pointEditBtn} title="Drehen" aria-label="Drehen">⟳</button>
           <button ref={peOffsetRef} data-hub-control style={pointEditBtn} title="Offset">±</button>
           <button ref={peResizeRef} data-hub-control style={pointEditBtn} title="Box vergrößern/verkleinern">⤡</button>

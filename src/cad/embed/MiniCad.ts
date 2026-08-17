@@ -313,7 +313,7 @@ export class MiniCad {
   /** Wenn true, sind alle Hilfslinien-Segmente nicht auswählbar/editierbar. */
   private _guidesLocked: boolean = false;
   /** Default-Farbe für neue Hilfslinien (überschreibt Linienfarbe im Guide-Modus). */
-  private _guideColor: string = "#7DD3FC";
+  private _guideColor: string = "#4DA3FF";
 
   constructor(init: MiniCadInit) {
     this.dom = init.dom;
