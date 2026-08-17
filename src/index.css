@@ -1023,7 +1023,11 @@
 .pixuna-exporting [data-hub-control] { display: none !important; }
 .pixuna-exporting [data-element-kind="guide"] { display: none !important; }
 .pixuna-exporting [data-marquee-id] { outline: none !important; }
-.pixuna-exporting [data-page-capture] svg[data-guide-overlay] { display: none !important; }
+.pixuna-exporting [data-guide-overlay] { display: none !important; }
+@media print {
+  [data-element-kind="guide"] { display: none !important; }
+  [data-guide-overlay] { display: none !important; }
+}
 
 /* Finanzen-PDF-Export: Bedienelemente ausblenden, Ersatztexte einblenden */
 [data-export-only] { display: none; }
