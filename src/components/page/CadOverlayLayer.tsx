@@ -609,14 +609,16 @@ export default function CadOverlayLayer(props: Props) {
 
 
 const pointEditBtn: React.CSSProperties = {
-  width: 24, height: 24, fontSize: 12,
+  width: 24, height: 24, fontSize: 12, padding: 0, lineHeight: 1,
   border: "1px solid hsl(var(--hairline))",
   borderRadius: 4, background: "white", cursor: "pointer",
+  display: "inline-flex", alignItems: "center", justifyContent: "center",
 };
 const toolbarBtn: React.CSSProperties = {
-  width: 26, height: 22, fontSize: 12,
+  width: 26, height: 22, fontSize: 12, padding: 0,
   border: "1px solid hsl(var(--hairline))",
   borderRadius: 4, background: "white", cursor: "pointer", lineHeight: 1,
+  display: "inline-flex", alignItems: "center", justifyContent: "center",
 };
 const hubBtnStyle: React.CSSProperties = {
   width: 28, height: 28,
