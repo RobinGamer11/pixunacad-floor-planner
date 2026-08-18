@@ -218,7 +218,7 @@ export default function ProjectWorkspace() {
     setRightTabState(t);
   };
   const [activeTool, setActiveTool] = useState<PageTool>(null);
-  const [selectedCadTool, setSelectedCadTool] = useState<"line" | "free" | "text" | "hatch" | undefined>();
+  const [selectedCadTool, setSelectedCadTool] = useState<"line" | "free" | "text" | "hatch" | "guide" | undefined>();
   const [cadSelectionCount, setCadSelectionCount] = useState<number>(0);
   const [cadSelectedLineSnap, setCadSelectedLineSnap] = useState<{ midpoint: boolean; division: number | null; isGuide: boolean } | null>(null);
   const [lineToolVariant, setLineToolVariant] = useState<LinePageTool>("line");
@@ -1777,11 +1777,18 @@ export default function ProjectWorkspace() {
                   setSelectedCadTool(info.tool);
                   setRightTab("tools");
                   if (info.tool === "line") {
-                    updateToolSettings("line", {
-                      color: info.color,
-                      thicknessMm: info.thicknessMm,
-                      alpha: info.alpha,
-                    });
+                    if (info.isGuide) {
+                      // Hilfslinien haben ein eigenes Einstellungs-Set — sie dürfen
+                      // die Default-Linienfarbe des Linienwerkzeugs nicht überschreiben.
+                      setSelectedCadTool("guide");
+                      updateToolSettings("guide", { color: info.color });
+                    } else {
+                      updateToolSettings("line", {
+                        color: info.color,
+                        thicknessMm: info.thicknessMm,
+                        alpha: info.alpha,
+                      });
+                    }
                     setCadSelectedLineSnap({
                       midpoint: !!info.midpointSnap,
                       division: typeof info.divisionSnap === "number" ? info.divisionSnap : null,
@@ -2972,7 +2979,9 @@ function PageCanvas({
           }}
 
 
-          lineColor={activeTool === "guide" ? toolSettings.guide.color : toolSettings.line.color}
+          // Hilfslinien beziehen ihre Farbe aus `guideColor` (MiniCad-Guide-Modus).
+          // Die Linien-Default-Farbe darf davon NICHT überschrieben werden.
+          lineColor={toolSettings.line.color}
           lineThicknessMm={activeTool === "guide"
             ? guideStrokePxToMm(toolSettings.guide.strokeWidth, baseWidth / fmt.w)
             : toolSettings.line.thicknessMm}
@@ -4909,7 +4918,7 @@ function RightInspector({
   project: import("@/lib/projectStore").Project;
   activeTool: PageTool;
   setActiveTool: (t: PageTool) => void;
-  selectedCadTool?: "line" | "free" | "text" | "hatch";
+  selectedCadTool?: "line" | "free" | "text" | "hatch" | "guide";
   selectedElementId?: string;
   selectedElementIds?: string[];
   setSelectedElementId: (id?: string) => void;
@@ -5504,7 +5513,7 @@ function ToolsTab({
   project: import("@/lib/projectStore").Project;
   activeTool: PageTool;
   setActiveTool: (t: PageTool) => void;
-  selectedCadTool?: "line" | "free" | "text" | "hatch";
+  selectedCadTool?: "line" | "free" | "text" | "hatch" | "guide";
   selectedElementId?: string;
   selectedElementIds?: string[];
   setSelectedElementId: (id?: string) => void;
