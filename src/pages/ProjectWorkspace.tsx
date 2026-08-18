@@ -218,7 +218,7 @@ export default function ProjectWorkspace() {
     setRightTabState(t);
   };
   const [activeTool, setActiveTool] = useState<PageTool>(null);
-  const [selectedCadTool, setSelectedCadTool] = useState<"line" | "free" | "text" | "hatch" | undefined>();
+  const [selectedCadTool, setSelectedCadTool] = useState<"line" | "free" | "text" | "hatch" | "guide" | undefined>();
   const [cadSelectionCount, setCadSelectionCount] = useState<number>(0);
   const [cadSelectedLineSnap, setCadSelectedLineSnap] = useState<{ midpoint: boolean; division: number | null; isGuide: boolean } | null>(null);
   const [lineToolVariant, setLineToolVariant] = useState<LinePageTool>("line");
@@ -4918,7 +4918,7 @@ function RightInspector({
   project: import("@/lib/projectStore").Project;
   activeTool: PageTool;
   setActiveTool: (t: PageTool) => void;
-  selectedCadTool?: "line" | "free" | "text" | "hatch";
+  selectedCadTool?: "line" | "free" | "text" | "hatch" | "guide";
   selectedElementId?: string;
   selectedElementIds?: string[];
   setSelectedElementId: (id?: string) => void;
@@ -5513,7 +5513,7 @@ function ToolsTab({
   project: import("@/lib/projectStore").Project;
   activeTool: PageTool;
   setActiveTool: (t: PageTool) => void;
-  selectedCadTool?: "line" | "free" | "text" | "hatch";
+  selectedCadTool?: "line" | "free" | "text" | "hatch" | "guide";
   selectedElementId?: string;
   selectedElementIds?: string[];
   setSelectedElementId: (id?: string) => void;
