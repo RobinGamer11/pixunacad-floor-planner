@@ -1777,11 +1777,18 @@ export default function ProjectWorkspace() {
                   setSelectedCadTool(info.tool);
                   setRightTab("tools");
                   if (info.tool === "line") {
-                    updateToolSettings("line", {
-                      color: info.color,
-                      thicknessMm: info.thicknessMm,
-                      alpha: info.alpha,
-                    });
+                    if (info.isGuide) {
+                      // Hilfslinien haben ein eigenes Einstellungs-Set — sie dürfen
+                      // die Default-Linienfarbe des Linienwerkzeugs nicht überschreiben.
+                      setSelectedCadTool("guide");
+                      updateToolSettings("guide", { color: info.color });
+                    } else {
+                      updateToolSettings("line", {
+                        color: info.color,
+                        thicknessMm: info.thicknessMm,
+                        alpha: info.alpha,
+                      });
+                    }
                     setCadSelectedLineSnap({
                       midpoint: !!info.midpointSnap,
                       division: typeof info.divisionSnap === "number" ? info.divisionSnap : null,
