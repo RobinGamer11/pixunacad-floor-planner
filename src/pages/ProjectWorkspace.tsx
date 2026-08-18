@@ -5016,7 +5016,7 @@ function RightInspector({
               onCancelTable={onCancelTable}
             />
           )}
-          {tab === "tools" && activeTool !== "guide" && (
+          {tab === "tools" && activeTool !== "guide" && !isLinePageTool(activeTool) && (
             <ToolHelpNotes toolId={activeTool ?? "select"} />
           )}
           {tab === "layers" && page && (
