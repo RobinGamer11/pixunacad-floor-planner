@@ -5577,6 +5577,12 @@ function ToolsTab({
       {settingsTool === "line" && cadEngine && (
         <RasterModeToggle app={cadEngine} projectId={projectId} />
       )}
+      {(settingsTool === "line" || settingsTool === "free") && (
+        <LineModeSelect
+          value={settingsTool === "free" ? "free" : "line"}
+          onChange={(next) => { if (next !== settingsTool) setActiveTool(next); }}
+        />
+      )}
       {settingsTool === "line" && (
         <LineSettings
           settings={toolSettings.line}
