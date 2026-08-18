@@ -1949,7 +1949,10 @@ export default function ProjectWorkspace() {
               })()}
             </div>
             {mappeHelpOn && !presenting && !printMode && (
-              <MappeHelpOverlay guideActive={activeTool === "guide"} />
+              <MappeHelpOverlay
+                guideActive={activeTool === "guide"}
+                lineActive={isLinePageTool(activeTool)}
+              />
             )}
             <ZoomBar zoom={zoom} setZoom={setZoomClamped} onResetZoom={resetZoomAndCenter} />
           </main>
