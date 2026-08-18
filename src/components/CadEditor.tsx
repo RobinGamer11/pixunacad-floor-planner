@@ -1955,6 +1955,31 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                  <label>Liniendicke (cm)</label>
                  <input ref={thicknessInputRef} type="text" defaultValue="3" />
                </div>
+               <div>
+                 <label>Transparenz</label>
+                 <input
+                   type="range"
+                   min={1}
+                   max={100}
+                   step={1}
+                   value={lineAlpha}
+                   onChange={(e) => applyLineAlpha(Number(e.target.value))}
+                   className="w-full"
+                 />
+                 <div className="flex items-center gap-1 mt-1">
+                   <input
+                     type="number"
+                     min={1}
+                     max={100}
+                     step={1}
+                     value={lineAlpha}
+                     onChange={(e) => applyLineAlpha(Number(e.target.value))}
+                     className="w-16 h-7 px-1 text-right text-[11px] rounded border bg-transparent"
+                     style={{ borderColor: "hsl(var(--hairline))" }}
+                   />
+                   <span className="text-[10px]">%</span>
+                 </div>
+               </div>
                <div className="pt-2" style={{ borderTop: "1px solid hsl(var(--border))" }}>
                  <label className="block mb-1.5">Pfeilspitzen</label>
                  <div className="flex gap-1">
