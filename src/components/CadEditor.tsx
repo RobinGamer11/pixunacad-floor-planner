@@ -3085,7 +3085,24 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               </div>
             </div>
           )}
-          <ToolHelpNotes toolId={activeTool} />
+          {activeTool === ToolIds.LINE ? (
+            <div
+              className="mt-3 rounded-md border p-2 space-y-2"
+              style={{ borderColor: "hsl(var(--border))" }}
+            >
+              <div className="text-[10px] font-semibold tracking-wider" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+                HILFE
+              </div>
+              <div className="text-[10.5px] leading-snug" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+                <div><span className="cad-kbd">L-Klick + Shift</span> Gerade zeichnen</div>
+                <div className="mt-1.5 font-semibold">Objektarten</div>
+                <div>Vektor: Generell bearbeitbar</div>
+                <div>Pixel: Radiergummi bearbeitbar</div>
+              </div>
+            </div>
+          ) : (
+            <ToolHelpNotes toolId={activeTool} />
+          )}
         </div>
         </DragScrollDiv>
         <DragScrollDiv axis="both" className="flex-1 min-h-0 overflow-auto p-2 space-y-2 cursor-grab active:cursor-grabbing" style={{ display: rightTab === "sheets" ? "block" : "none" }}>
