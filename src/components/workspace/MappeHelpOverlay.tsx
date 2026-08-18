@@ -1,5 +1,5 @@
 import React from "react";
-import { ClipboardPaste, Copy, Keyboard, Lock, Printer } from "lucide-react";
+import { ClipboardPaste, Copy, Grid2x2, Keyboard, Lock, PenTool, Printer } from "lucide-react";
 
 type MouseHighlight = "wheel" | "left" | "right";
 
@@ -106,8 +106,23 @@ function HeaderActionGlyph({ children }: { children: React.ReactNode }) {
   );
 }
 
+function ObjectKindGlyph() {
+  return (
+    <div className="flex h-8 items-center justify-center gap-1" aria-hidden="true">
+      <PenTool className="h-5 w-5" strokeWidth={1.5} />
+      <Grid2x2 className="h-5 w-5" strokeWidth={1.5} />
+    </div>
+  );
+}
+
 /** Rein visuelle, vollständig durchklickbare Schnellhilfe für die Mappe. */
-export function MappeHelpOverlay({ guideActive = false }: { guideActive?: boolean }) {
+export function MappeHelpOverlay({
+  guideActive = false,
+  lineActive = false,
+}: {
+  guideActive?: boolean;
+  lineActive?: boolean;
+}) {
   return (
     <div
       className="pointer-events-none absolute inset-x-0 bottom-14 z-40 flex select-none justify-center px-3"
@@ -160,6 +175,18 @@ export function MappeHelpOverlay({ guideActive = false }: { guideActive?: boolea
               shortcut="Fixiert"
               description="Nicht bearbeitbar"
             />
+          </HelpGroup>
+        )}
+
+        {lineActive && (
+          <HelpGroup title="Linie" bordered>
+            <HelpItem icon={<ShiftClickGlyph />} shortcut="L-Klick + Shift" description="Gerade zeichnen" />
+            <div className="flex min-w-[120px] flex-col items-center justify-end px-1.5 py-1 text-center">
+              <div className="mb-1 flex h-8 items-center justify-center"><ObjectKindGlyph /></div>
+              <div className="whitespace-nowrap text-[10px] font-semibold leading-3.5">Objektarten</div>
+              <div className="whitespace-nowrap text-[8px] leading-3 opacity-75">Vektor: Generell bearbeitbar</div>
+              <div className="whitespace-nowrap text-[8px] leading-3 opacity-75">Pixel: Radiergummi bearbeitbar</div>
+            </div>
           </HelpGroup>
         )}
       </div>

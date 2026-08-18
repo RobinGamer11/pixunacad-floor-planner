@@ -1949,7 +1949,10 @@ export default function ProjectWorkspace() {
               })()}
             </div>
             {mappeHelpOn && !presenting && !printMode && (
-              <MappeHelpOverlay guideActive={activeTool === "guide"} />
+              <MappeHelpOverlay
+                guideActive={activeTool === "guide"}
+                lineActive={isLinePageTool(activeTool)}
+              />
             )}
             <ZoomBar zoom={zoom} setZoom={setZoomClamped} onResetZoom={resetZoomAndCenter} />
           </main>
@@ -5013,7 +5016,7 @@ function RightInspector({
               onCancelTable={onCancelTable}
             />
           )}
-          {tab === "tools" && activeTool !== "guide" && (
+          {tab === "tools" && activeTool !== "guide" && !isLinePageTool(activeTool) && (
             <ToolHelpNotes toolId={activeTool ?? "select"} />
           )}
           {tab === "layers" && page && (
@@ -5574,6 +5577,12 @@ function ToolsTab({
       {settingsTool === "line" && cadEngine && (
         <RasterModeToggle app={cadEngine} projectId={projectId} />
       )}
+      {(settingsTool === "line" || settingsTool === "free") && (
+        <LineModeSelect
+          value={settingsTool === "free" ? "free" : "line"}
+          onChange={(next) => { if (next !== settingsTool) setActiveTool(next); }}
+        />
+      )}
       {settingsTool === "line" && (
         <LineSettings
           settings={toolSettings.line}
@@ -5998,6 +6007,38 @@ function GuideSettings({
   );
 }
 
+/** Modus-Auswahl Linie / Freihand — Design analog zum Schraffurwerkzeug. */
+function LineModeSelect({
+  value,
+  onChange,
+}: {
+  value: LinePageTool;
+  onChange: (next: LinePageTool) => void;
+}) {
+  return (
+    <div>
+      <div className="text-[10px] font-semibold tracking-wider text-muted-foreground mb-1.5">MODUS</div>
+      <div className="grid grid-cols-2 gap-1">
+        {LINE_TOOL_VARIANTS.map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            type="button"
+            title={label}
+            onClick={() => onChange(id)}
+            className={`flex flex-col items-center justify-center gap-0.5 rounded border px-1 py-1.5 transition-colors ${
+              value === id ? "bg-accent" : "hover:bg-muted"
+            }`}
+            style={{ borderColor: "hsl(var(--hairline))" }}
+          >
+            <Icon size={14} />
+            <span className="text-[9px] leading-tight">{label}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function LineSettings({
   settings,
   onChange,
@@ -6007,39 +6048,56 @@ function LineSettings({
 }) {
   return (
     <SettingsBlock title="LINIE">
-      <Row label="Farbe">
-        <ColorInput value={settings.color} onChange={(v) => onChange({ color: v })} />
-      </Row>
-      <Row label="Liniendicke (mm)">
-        <input
-          type="number"
-          step={0.1}
-          min={0.1}
-          value={settings.thicknessMm}
-          onChange={(e) => {
-            const v = Number(e.target.value);
-            if (!Number.isNaN(v) && v > 0) onChange({ thicknessMm: v });
-          }}
-          className="w-full h-8 px-2 rounded bg-transparent border text-sm tabular-nums"
-          style={{ borderColor: "hsl(var(--hairline))" }}
-        />
-      </Row>
-      <Row label="Transparenz">
-        <div className="flex items-center gap-2">
+      <ToolColorPicker
+        label="Farbe"
+        value={settings.color}
+        onChange={(value) => onChange({ color: value })}
+      />
+      <div>
+        <div className="mb-1.5 text-[10px] text-muted-foreground">Strichstärke</div>
+        <label className="flex h-8 items-center overflow-hidden rounded-md border" style={{ borderColor: "hsl(var(--hairline))" }}>
           <input
-            type="range"
-            min={0}
+            type="number"
+            step={0.1}
+            min={0.1}
+            value={settings.thicknessMm}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              if (!Number.isNaN(v) && v > 0) onChange({ thicknessMm: v });
+            }}
+            className="h-full min-w-0 flex-1 bg-transparent px-2 text-right text-xs tabular-nums outline-none"
+            aria-label="Strichstärke in mm"
+          />
+          <span className="pr-2 text-[10px] text-muted-foreground">mm</span>
+        </label>
+      </div>
+      <div>
+        <div className="mb-1.5 text-[10px] text-muted-foreground">Transparenz</div>
+        <input
+          type="range"
+          min={1}
+          max={100}
+          step={1}
+          value={Math.max(1, settings.alpha)}
+          onChange={(e) => onChange({ alpha: Number(e.target.value) })}
+          className="w-full accent-foreground"
+        />
+        <label className="mt-1 flex h-7 items-center overflow-hidden rounded-md border" style={{ borderColor: "hsl(var(--hairline))" }}>
+          <input
+            type="number"
+            min={1}
             max={100}
             step={1}
-            value={settings.alpha}
-            onChange={(e) => onChange({ alpha: Number(e.target.value) })}
-            className="flex-1 accent-foreground"
+            value={Math.max(1, settings.alpha)}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              if (Number.isFinite(v)) onChange({ alpha: Math.min(100, Math.max(1, Math.round(v))) });
+            }}
+            className="h-full min-w-0 flex-1 bg-transparent px-2 text-right text-xs tabular-nums outline-none"
+            aria-label="Transparenz in Prozent"
           />
-          <span className="text-xs tabular-nums w-10 text-right">{settings.alpha}%</span>
-        </div>
-      </Row>
-      <div className="text-[11px] text-muted-foreground">
-        Zeichnet 1:1 mit CAD-Engine: Snap, Ortho (Shift), Hub-Eingabe für Länge/Winkel. Snap auch an Seitenränder.
+          <span className="pr-2 text-[10px] text-muted-foreground">%</span>
+        </label>
       </div>
     </SettingsBlock>
   );

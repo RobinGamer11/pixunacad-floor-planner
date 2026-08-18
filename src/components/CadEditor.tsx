@@ -375,6 +375,29 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const [lineArrowStart, setLineArrowStart] = useState<boolean>(false);
   const [lineArrowEnd, setLineArrowEnd] = useState<boolean>(false);
   const [lineArrowScale, setLineArrowScale] = useState<number>(1);
+  // Linien-Transparenz (1–100 %) — wird als rgba() auf die Linienfarbe angewendet.
+  const [lineAlpha, setLineAlpha] = useState<number>(100);
+  function applyLineAlpha(pct: number) {
+    const clamped = Math.min(100, Math.max(1, Math.round(pct)));
+    setLineAlpha(clamped);
+    const app: any = appRef.current;
+    if (!app) return;
+    const hex = colorInputRef.current?.value || app.defaultLineColor || "#111111";
+    const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex.trim());
+    const next = clamped >= 100
+      ? hex
+      : m
+        ? `rgba(${parseInt(m[1], 16)},${parseInt(m[2], 16)},${parseInt(m[3], 16)},${clamped / 100})`
+        : hex;
+    const selected = app.getSelectedSegment?.();
+    if (selected) { selected.color = next; }
+    else {
+      const group = app.getSelectedGroupSegments?.() ?? [];
+      if (group.length > 0) { for (const seg of group) seg.color = next; }
+      else { app.defaultLineColor = next; }
+    }
+    app.requestRender?.();
+  }
 
 
   const [doorSide, setDoorSide] = useState<"inner" | "outer">("inner");
@@ -1862,8 +1885,34 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             </div>
           )}
 
-          {/* Variant switcher: Linie / Freihand / Radiergummi (immer sichtbar in einer dieser Tools) */}
-          {(activeTool === ToolIds.LINE || activeTool === ToolIds.FREE || activeTool === ToolIds.ERASER) && (
+          {/* Modus-Auswahl: Linie / Freihand — Design analog Schraffurwerkzeug.
+              Für den Radiergummi bleibt der klassische Varianten-Umschalter. */}
+          {(activeTool === ToolIds.LINE || activeTool === ToolIds.FREE) && (
+            <div className="cad-settings-panel mb-2">
+              <div className="text-[10px] font-semibold tracking-wider mb-1.5" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+                MODUS
+              </div>
+              <div className="grid grid-cols-2 gap-1">
+                {LINE_VARIANTS.filter(v => v.id !== ToolIds.ERASER).map(v => {
+                  const Icon = v.icon;
+                  const active = activeTool === v.id;
+                  return (
+                    <button
+                      key={v.id}
+                      type="button"
+                      onClick={() => { appRef.current?.setTool(v.id); setActiveTool(v.id); setLineVariant(v.id); }}
+                      title={v.label}
+                      className={`cad-toolbar-btn flex-col justify-center gap-0.5 h-11 ${active ? "active" : ""}`}
+                    >
+                      <Icon className="h-3.5 w-3.5" />
+                      <span className="text-[9px] leading-tight">{v.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          {activeTool === ToolIds.ERASER && (
             <div className="cad-settings-panel mb-2">
               <div className="flex gap-1">
                 {LINE_VARIANTS.map(v => {
@@ -1905,6 +1954,31 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                <div>
                  <label>Liniendicke (cm)</label>
                  <input ref={thicknessInputRef} type="text" defaultValue="3" />
+               </div>
+               <div>
+                 <label>Transparenz</label>
+                 <input
+                   type="range"
+                   min={1}
+                   max={100}
+                   step={1}
+                   value={lineAlpha}
+                   onChange={(e) => applyLineAlpha(Number(e.target.value))}
+                   className="w-full"
+                 />
+                 <div className="flex items-center gap-1 mt-1">
+                   <input
+                     type="number"
+                     min={1}
+                     max={100}
+                     step={1}
+                     value={lineAlpha}
+                     onChange={(e) => applyLineAlpha(Number(e.target.value))}
+                     className="w-16 h-7 px-1 text-right text-[11px] rounded border bg-transparent"
+                     style={{ borderColor: "hsl(var(--hairline))" }}
+                   />
+                   <span className="text-[10px]">%</span>
+                 </div>
                </div>
                <div className="pt-2" style={{ borderTop: "1px solid hsl(var(--border))" }}>
                  <label className="block mb-1.5">Pfeilspitzen</label>
@@ -3011,7 +3085,24 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               </div>
             </div>
           )}
-          <ToolHelpNotes toolId={activeTool} />
+          {activeTool === ToolIds.LINE ? (
+            <div
+              className="mt-3 rounded-md border p-2 space-y-2"
+              style={{ borderColor: "hsl(var(--border))" }}
+            >
+              <div className="text-[10px] font-semibold tracking-wider" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+                HILFE
+              </div>
+              <div className="text-[10.5px] leading-snug" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+                <div><span className="cad-kbd">L-Klick + Shift</span> Gerade zeichnen</div>
+                <div className="mt-1.5 font-semibold">Objektarten</div>
+                <div>Vektor: Generell bearbeitbar</div>
+                <div>Pixel: Radiergummi bearbeitbar</div>
+              </div>
+            </div>
+          ) : (
+            <ToolHelpNotes toolId={activeTool} />
+          )}
         </div>
         </DragScrollDiv>
         <DragScrollDiv axis="both" className="flex-1 min-h-0 overflow-auto p-2 space-y-2 cursor-grab active:cursor-grabbing" style={{ display: rightTab === "sheets" ? "block" : "none" }}>
