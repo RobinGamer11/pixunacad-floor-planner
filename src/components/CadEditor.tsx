@@ -1862,8 +1862,34 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             </div>
           )}
 
-          {/* Variant switcher: Linie / Freihand / Radiergummi (immer sichtbar in einer dieser Tools) */}
-          {(activeTool === ToolIds.LINE || activeTool === ToolIds.FREE || activeTool === ToolIds.ERASER) && (
+          {/* Modus-Auswahl: Linie / Freihand — Design analog Schraffurwerkzeug.
+              Für den Radiergummi bleibt der klassische Varianten-Umschalter. */}
+          {(activeTool === ToolIds.LINE || activeTool === ToolIds.FREE) && (
+            <div className="cad-settings-panel mb-2">
+              <div className="text-[10px] font-semibold tracking-wider mb-1.5" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+                MODUS
+              </div>
+              <div className="grid grid-cols-2 gap-1">
+                {LINE_VARIANTS.filter(v => v.id !== ToolIds.ERASER).map(v => {
+                  const Icon = v.icon;
+                  const active = activeTool === v.id;
+                  return (
+                    <button
+                      key={v.id}
+                      type="button"
+                      onClick={() => { appRef.current?.setTool(v.id); setActiveTool(v.id); setLineVariant(v.id); }}
+                      title={v.label}
+                      className={`cad-toolbar-btn flex-col justify-center gap-0.5 h-11 ${active ? "active" : ""}`}
+                    >
+                      <Icon className="h-3.5 w-3.5" />
+                      <span className="text-[9px] leading-tight">{v.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          {activeTool === ToolIds.ERASER && (
             <div className="cad-settings-panel mb-2">
               <div className="flex gap-1">
                 {LINE_VARIANTS.map(v => {
