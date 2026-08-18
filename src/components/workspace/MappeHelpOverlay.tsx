@@ -177,6 +177,18 @@ export function MappeHelpOverlay({
             />
           </HelpGroup>
         )}
+
+        {lineActive && (
+          <HelpGroup title="Linie" bordered>
+            <HelpItem icon={<ShiftClickGlyph />} shortcut="L-Klick + Shift" description="Gerade zeichnen" />
+            <div className="flex min-w-[120px] flex-col items-center justify-end px-1.5 py-1 text-center">
+              <div className="mb-1 flex h-8 items-center justify-center"><ObjectKindGlyph /></div>
+              <div className="whitespace-nowrap text-[10px] font-semibold leading-3.5">Objektarten</div>
+              <div className="whitespace-nowrap text-[8px] leading-3 opacity-75">Vektor: Generell bearbeitbar</div>
+              <div className="whitespace-nowrap text-[8px] leading-3 opacity-75">Pixel: Radiergummi bearbeitbar</div>
+            </div>
+          </HelpGroup>
+        )}
       </div>
     </div>
   );
