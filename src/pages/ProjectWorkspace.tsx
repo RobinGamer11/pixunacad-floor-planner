@@ -2972,7 +2972,9 @@ function PageCanvas({
           }}
 
 
-          lineColor={activeTool === "guide" ? toolSettings.guide.color : toolSettings.line.color}
+          // Hilfslinien beziehen ihre Farbe aus `guideColor` (MiniCad-Guide-Modus).
+          // Die Linien-Default-Farbe darf davon NICHT überschrieben werden.
+          lineColor={toolSettings.line.color}
           lineThicknessMm={activeTool === "guide"
             ? guideStrokePxToMm(toolSettings.guide.strokeWidth, baseWidth / fmt.w)
             : toolSettings.line.thicknessMm}
