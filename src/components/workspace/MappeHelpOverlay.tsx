@@ -106,8 +106,23 @@ function HeaderActionGlyph({ children }: { children: React.ReactNode }) {
   );
 }
 
+function ObjectKindGlyph() {
+  return (
+    <div className="flex h-8 items-center justify-center gap-1" aria-hidden="true">
+      <PenTool className="h-5 w-5" strokeWidth={1.5} />
+      <Grid2x2 className="h-5 w-5" strokeWidth={1.5} />
+    </div>
+  );
+}
+
 /** Rein visuelle, vollständig durchklickbare Schnellhilfe für die Mappe. */
-export function MappeHelpOverlay({ guideActive = false }: { guideActive?: boolean }) {
+export function MappeHelpOverlay({
+  guideActive = false,
+  lineActive = false,
+}: {
+  guideActive?: boolean;
+  lineActive?: boolean;
+}) {
   return (
     <div
       className="pointer-events-none absolute inset-x-0 bottom-14 z-40 flex select-none justify-center px-3"
