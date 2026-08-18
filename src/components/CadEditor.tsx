@@ -375,6 +375,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const [lineArrowStart, setLineArrowStart] = useState<boolean>(false);
   const [lineArrowEnd, setLineArrowEnd] = useState<boolean>(false);
   const [lineArrowScale, setLineArrowScale] = useState<number>(1);
+  // Linien-Transparenz (1–100 %) — wird als rgba() auf die Linienfarbe angewendet.
+  const [lineAlpha, setLineAlpha] = useState<number>(100);
 
 
   const [doorSide, setDoorSide] = useState<"inner" | "outer">("inner");
