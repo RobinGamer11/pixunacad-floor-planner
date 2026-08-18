@@ -377,6 +377,27 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const [lineArrowScale, setLineArrowScale] = useState<number>(1);
   // Linien-Transparenz (1–100 %) — wird als rgba() auf die Linienfarbe angewendet.
   const [lineAlpha, setLineAlpha] = useState<number>(100);
+  function applyLineAlpha(pct: number) {
+    const clamped = Math.min(100, Math.max(1, Math.round(pct)));
+    setLineAlpha(clamped);
+    const app: any = appRef.current;
+    if (!app) return;
+    const hex = colorInputRef.current?.value || app.defaultLineColor || "#111111";
+    const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex.trim());
+    const next = clamped >= 100
+      ? hex
+      : m
+        ? `rgba(${parseInt(m[1], 16)},${parseInt(m[2], 16)},${parseInt(m[3], 16)},${clamped / 100})`
+        : hex;
+    const selected = app.getSelectedSegment?.();
+    if (selected) { selected.color = next; }
+    else {
+      const group = app.getSelectedGroupSegments?.() ?? [];
+      if (group.length > 0) { for (const seg of group) seg.color = next; }
+      else { app.defaultLineColor = next; }
+    }
+    app.requestRender?.();
+  }
 
 
   const [doorSide, setDoorSide] = useState<"inner" | "outer">("inner");
