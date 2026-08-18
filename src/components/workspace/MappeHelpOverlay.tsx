@@ -1,5 +1,5 @@
 import React from "react";
-import { ClipboardPaste, Copy, Keyboard, Lock, Printer } from "lucide-react";
+import { ClipboardPaste, Copy, Grid2x2, Keyboard, Lock, PenTool, Printer } from "lucide-react";
 
 type MouseHighlight = "wheel" | "left" | "right";
 
