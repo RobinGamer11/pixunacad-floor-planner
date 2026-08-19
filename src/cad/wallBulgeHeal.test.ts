@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Wall, type WallKind } from "./Scene";
-import { v, polygonAreaAbs, dist } from "./geometry";
+import { v, polygonAreaAbs, dist, pointInPolygon } from "./geometry";
 import type { WallReferenceSide } from "./wallGeom";
 import { computeHealedWallLines } from "./wallHeal";
 import { buildHealedWallSolidRing } from "./wallSolid";
