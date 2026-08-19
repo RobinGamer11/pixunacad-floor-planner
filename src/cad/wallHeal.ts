@@ -166,6 +166,16 @@ function healEnd(
   for (const T of ["main", "help", "sub"] as LineType[]) {
     const origin = polysSelf[T][idx];
 
+    if (T !== "main") {
+      const pair = symmetricMiter(T, origin);
+      if (pair) {
+        polysSelf[T][idx] = pair;
+        healedAny = true;
+        continue;
+      }
+    }
+
+
     // Phase 1: ideale Zielposition über alle Kandidaten (gleichnamige Linie).
     // Phase 4: Distanz-Cap (HEAL_MAX_DIST_M) verhindert Ausreißer bei spitzen
     // Winkeln; der gleichnamige Schnitt bestimmt echte Verlängerung/Kürzung.
