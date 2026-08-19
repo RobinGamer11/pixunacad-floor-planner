@@ -220,14 +220,18 @@ export function MappeHelpOverlay({
         )}
         {measureActive && (
           <HelpGroup title="Maßkette" bordered>
-            <div className="flex min-w-[190px] flex-col items-center justify-end px-1.5 py-1 text-center">
-              <div className="mb-1 flex h-8 items-center justify-center"><Ruler className="h-5 w-5" strokeWidth={1.5} /></div>
-              <div className="whitespace-nowrap text-[10px] font-semibold leading-3.5">Maßkette zeichnen</div>
-              <div className="whitespace-nowrap text-[8px] leading-3 opacity-75">1. Gelbe Linie setzen für Richtung</div>
-              <div className="whitespace-nowrap text-[8px] leading-3 opacity-75">2. L-Klick auf Fangpunkte</div>
-              <div className="whitespace-nowrap text-[8px] leading-3 opacity-75">3. Häkchen zum Fertigstellen</div>
+            <div className="flex flex-col justify-end gap-1 px-1.5 py-1 text-left">
+              <div>
+                <div className="whitespace-nowrap text-[10px] font-semibold leading-3">Maßkette zeichnen</div>
+                <div className="whitespace-nowrap text-[8px] leading-[11px] opacity-75">1. Gelbe Linie setzen für Richtung</div>
+                <div className="whitespace-nowrap text-[8px] leading-[11px] opacity-75">2. L-Klick auf Fangpunkte</div>
+                <div className="whitespace-nowrap text-[8px] leading-[11px] opacity-75">3. Häkchen zum Fertigstellen</div>
+              </div>
+              <div>
+                <div className="whitespace-nowrap text-[10px] font-semibold leading-3">Freies Maß</div>
+                <div className="whitespace-nowrap text-[8px] leading-[11px] opacity-75">Keine Fangpunkte benötigt</div>
+              </div>
             </div>
-            <HelpItem icon={<MouseGlyph highlight="left" />} shortcut="Freies Maß" description="Keine Fangpunkte benötigt" />
           </HelpGroup>
         )}
         {textActive && (
