@@ -103,7 +103,32 @@ function healEnd(
   // die optische Wand verlässt die Fangpunkte.
   let maxNeighborThickness = 0;
   for (const c of candidates) maxNeighborThickness = Math.max(maxNeighborThickness, c.thicknessM || 0);
-  const healLimit = (wall.thicknessM + maxNeighborThickness) * 3 + HEAL_TOL_M;
+  // Krümmungsabhängig: bei gewölbten Wänden laufen die End-Tangenten stärker
+  // auseinander, echte Gehrungen liegen dann weiter draußen.
+  const healLimit = (wall.thicknessM + maxNeighborThickness) * 3 * (1 + 2 * endBulgeMag) + HEAL_TOL_M;
+
+  /**
+   * Rückfall-Punkt für Help-/Sublinien: Mittelwert der gleichnamigen rohen
+   * Linien-Endpunkte aller am Knoten hängenden Wände (inkl. eigener). Da alle
+   * beteiligten Wände denselben Mittelwert berechnen, treffen sich die Linien
+   * exakt — auch bei starker Wölbung, wo keine sinnvolle Gehrung existiert.
+   */
+  const nodeMeetPoint = (T: LineType, origin: Vec2): Vec2 | null => {
+    if (!node) return null;
+    let sx = origin.x, sy = origin.y, count = 1;
+    for (const inc of node.incidents) {
+      if (inc.wallId === wall.id) continue;
+      if (inc.kind === "tjunction") continue;
+      const ow = others.find(w => w.id === inc.wallId);
+      if (!ow || ow.corners.length < 2) continue;
+      const isStart = inc.kind === "start";
+      const c = endpointLineCorners(ow, isStart);
+      const p = T === "main" ? c.main : T === "help" ? c.help : c.sub;
+      sx += p.x; sy += p.y; count++;
+    }
+    if (count < 2) return null;
+    return v(sx / count, sy / count);
+  };
 
   for (const T of ["main", "help", "sub"] as LineType[]) {
     const origin = polysSelf[T][idx];
