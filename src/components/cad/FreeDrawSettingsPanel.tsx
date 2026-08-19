@@ -176,6 +176,25 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
     }
   };
 
+  // Mappen-Layout (Papier): Farbe, px/mm-Strichstärke, Transparenz, gerahmte Buttons.
+  const sheetMode = hideChrome;
+  const pxPerMmSafe = Math.max(1e-6, pxPerMm ?? 96 / 25.4);
+  const framedBtn = "w-full flex items-center justify-between gap-2 h-9 px-2 rounded-md border text-xs transition-colors hover:bg-muted";
+  const framedStyle = { borderColor: "hsl(var(--hairline))" } as React.CSSProperties;
+  const thicknessMm = thickness * 1000;
+  const setThicknessMm = (mm: number) => {
+    const v = Math.max(0.0001, mm / 1000);
+    setThickness(v);
+    if (selectedStrokeId) applyToStroke((s) => { s.thicknessM = v; });
+    else app.defaultFreeThicknessM = v;
+  };
+  const rulerSide: "left" | "center" | "right" = (app as any).defaultFreeRulerSide ?? "center";
+  const setRulerSide = (id: "left" | "center" | "right") => {
+    (app as any).defaultFreeRulerSide = id;
+    force((n) => n + 1);
+  };
+
+
   return (
     <div className={hideChrome ? "" : "cad-settings-panel mb-2"}>
       {!hideChrome && (
