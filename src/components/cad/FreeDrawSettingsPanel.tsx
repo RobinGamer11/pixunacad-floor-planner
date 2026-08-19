@@ -218,7 +218,7 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
       />
 
       <div className="space-y-3">
-        <label className={`block text-xs${(hideChrome && !framedCad) ? " hidden" : ""}`}>
+        <label className={`block text-xs${sheetMode ? " hidden" : ""}`}>
           <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Ebene{selectedStrokeId ? " (Auswahl)" : ""}</span>
           <select
             value={labelId || app.activeDrawLabelId}

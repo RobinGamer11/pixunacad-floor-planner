@@ -2717,7 +2717,6 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           {/* Freihand-Tool-Panel */}
           {(activeTool === ToolIds.FREE || (activeTool === ToolIds.SELECT && selectedFreeStrokeId)) && (
             <div className="cad-settings-panel mb-2">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Freihand</div>
               {activeTool !== ToolIds.FREE && (
                 <div className="space-y-3 mb-3">
                   <CadEbeneSelect target={idSelectRef} />
