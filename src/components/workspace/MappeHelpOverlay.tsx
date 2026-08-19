@@ -138,17 +138,44 @@ export function MappeHelpOverlay({
   textActive?: boolean;
   measureActive?: boolean;
 }) {
+  // Die Hilfeleiste skaliert sich automatisch auf die verfügbare Breite herunter
+  // (z.B. Tablet-Ansicht), damit immer alle Gruppen sichtbar bleiben.
+  const outerRef = React.useRef<HTMLDivElement | null>(null);
+  const innerRef = React.useRef<HTMLDivElement | null>(null);
+  const [scale, setScale] = React.useState(1);
+  React.useLayoutEffect(() => {
+    const outer = outerRef.current;
+    const inner = innerRef.current;
+    if (!outer || !inner) return;
+    const measure = () => {
+      const avail = outer.clientWidth;
+      const need = inner.scrollWidth;
+      if (!avail || !need) return;
+      const next = Math.min(1, Math.max(0.45, avail / need));
+      setScale((cur) => (Math.abs(cur - next) < 0.005 ? cur : next));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(outer);
+    ro.observe(inner);
+    return () => ro.disconnect();
+  }, []);
+
   return (
     <div
+      ref={outerRef}
       className="pointer-events-none absolute inset-x-0 bottom-14 z-40 flex select-none justify-center px-3"
       aria-hidden="true"
     >
       <div
-        className="flex max-w-[calc(100vw-1.5rem)] flex-nowrap items-stretch justify-center overflow-hidden rounded-xl border shadow-xl backdrop-blur-md"
+        ref={innerRef}
+        className="flex flex-nowrap items-stretch justify-center overflow-hidden rounded-xl border shadow-xl backdrop-blur-md"
         style={{
           borderColor: "hsl(var(--surface) / 0.24)",
           background: "hsl(var(--ink) / 0.78)",
           color: "hsl(var(--surface))",
+          transform: `scale(${scale})`,
+          transformOrigin: "bottom center",
         }}
       >
         <HelpGroup title="Navigation">
