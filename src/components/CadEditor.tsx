@@ -2304,6 +2304,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               <select ref={measureOrientationRef} defaultValue="parallel">
                 <option value="parallel">Parallel</option>
                 <option value="diagonal">Schräg</option>
+                <option value="arc">Gewölbt</option>
               </select>
               <select ref={measurePointCountRef} defaultValue="multi">
                 <option value="two">Einzelmaß</option>
@@ -2366,6 +2367,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                   options={[
                     { value: "parallel", label: "Parallel" },
                     { value: "diagonal", label: "Schräg" },
+                    { value: "arc", label: "Gewölbt" },
                   ]}
                 />
 
