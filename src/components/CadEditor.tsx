@@ -2748,7 +2748,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
 
           {/* Wand-Tool-Panel */}
           {(activeTool === ToolIds.WALL || (activeTool === ToolIds.SELECT && selectedWallId)) && (
-            <WallSettingsPanel app={appRef.current} />
+            <WallSettingsPanel app={appRef.current} projectId={projectId} />
           )}
 
           {/* Türen/Fenster Panel */}
