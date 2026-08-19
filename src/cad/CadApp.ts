@@ -622,6 +622,7 @@ export class CadApp {
         patternId: w.patternId,
         patternScale: w.patternScale,
         patternAlignToWall: !!w.patternAlignToWall,
+        bulges: [...((w as any).bulges || [])],
         _stickerEditOwnerId: w._stickerEditOwnerId || null,
       })),
       dimensions: scene.dimensions.map(d => ({
@@ -791,6 +792,7 @@ export class CadApp {
         fillColor: w.fillColor,
         labelId: w.labelId,
         priority: w.priority,
+        bulges: Array.isArray(w.bulges) ? w.bulges : undefined,
       });
       if (w.id) (wall as any).id = w.id;
       if (w._stickerEditOwnerId) wall._stickerEditOwnerId = w._stickerEditOwnerId;
