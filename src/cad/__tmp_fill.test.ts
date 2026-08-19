@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Wall } from "@/cad/Scene";
 import { v, pointInPolygon, polygonAreaAbs } from "@/cad/geometry";
-import { findEnclosingFace } from "@/cad/hatchFill";
+import { findEnclosingFace, __debugFaces } from "@/cad/hatchFill";
 import { unionWallSolids } from "@/cad/wallUnion";
 import { WallTopologyGraph } from "@/cad/WallTopologyGraph";
 
@@ -20,6 +20,8 @@ describe("fill curved", () => {
     ];
     const g = new WallTopologyGraph(); g.build(walls as any);
     const scene: any = { segments: [], walls, hatches: [], freeStrokes: [], getWallTopology: () => g };
+    const dbg = (__debugFaces as any)(scene, v(2, 1.5));
+    console.log(dbg);
     const face = findEnclosingFace(scene, v(2, 1.5));
     expect(face).toBeTruthy();
     console.log("area", polygonAreaAbs(face!), "pts", face!.length);
