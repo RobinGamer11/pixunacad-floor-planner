@@ -9,7 +9,7 @@ function mk(id: string, c: any[], bulges: number[]) {
   return new Wall({ id, kind: "outer", thicknessM: 0.3, referenceSide: (globalThis as any).__side, corners: c.map((p:any)=>v(p.x,p.y)), labelId: "L1", bulges } as any);
 }
 describe("fill vs wall", () => {
-  for (const side of ["outer","center","inner"] as any[]) for (const b of [-0.2,-0.4, -0.8, 0.2, 0.4, 0.8]) it(`side ${side} bulge ${b}`, () => {
+  for (const side of ["inner"] as any[]) for (const b of [0.4]) it(`side ${side} bulge ${b}`, () => {
     (globalThis as any).__side = side;
     const walls = [
       mk("a", [{x:0,y:0},{x:4,y:0}], [b]),
@@ -36,6 +36,6 @@ describe("fill vs wall", () => {
       if(face && !pointInPolygon(p, face)) { holes.push([+p.x.toFixed(2),+p.y.toFixed(2)]); continue; }
       stack.push([i+1,j],[i-1,j],[i,j+1],[i,j-1]);
     }
-    console.log(side, "bulge", b, "face?", !!face, "hole cells", holes.length, holes.slice(0,10));
+    console.log(side, "bulge", b, "face?", !!face, "hole cells", holes.length, holes.slice(0,20));
   });
 });
