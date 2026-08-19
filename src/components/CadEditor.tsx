@@ -1927,10 +1927,14 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             </div>
           )}
 
-          {/* Modus-Auswahl: Linie / Freihand — Design analog Schraffurwerkzeug.
-              Für den Radiergummi bleibt der klassische Varianten-Umschalter. */}
+          {/* Reihenfolge identisch zur Projektmappe: Ebene → Modus → Objektart → Rahmen */}
           {(activeTool === ToolIds.LINE || activeTool === ToolIds.FREE) && (
             <div className="cad-settings-panel mb-2">
+              <div className="mb-3">
+                <CadEbeneSelect target={idSelectRef} />
+              </div>
+              <div className="text-[10px] font-semibold tracking-wider mb-1.5" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+
               <div className="text-[10px] font-semibold tracking-wider mb-1.5" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
                 MODUS
               </div>
