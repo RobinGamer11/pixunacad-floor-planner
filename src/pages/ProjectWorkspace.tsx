@@ -2059,6 +2059,7 @@ export default function ProjectWorkspace() {
 
               onJumpCad={(sheetId) => navigate(`/project/${project.id}/cad${sheetId ? `/${sheetId}` : ""}`)}
               onCollapse={() => setRightOpen(false)}
+              helpOn={mappeHelpOn}
             />
             )
 
