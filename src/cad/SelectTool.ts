@@ -1027,6 +1027,14 @@ export class SelectTool {
     t = Math.max(0.02, Math.min(0.98, t));
     const np = v(A.x + dx * t, A.y + dy * t);
     loop.splice(edgeIndex + 1, 0, np);
+    // Wölbungen mitziehen: bestehende Kanten-Wölbung auf beide Teilkanten aufteilen.
+    {
+      const arr = this._bulgeArray(hatch as any, holeIndex);
+      if (arr.length) {
+        const prevBulge = arr[edgeIndex] || 0;
+        arr.splice(edgeIndex, 1, prevBulge * 0.5, prevBulge * 0.5);
+      }
+    }
     this.app.pointEditMenu.hide();
     this.app.setSelection({
       type: SelectionType.POINT, hatchId, pointIndex: edgeIndex + 1, holeIndex,
