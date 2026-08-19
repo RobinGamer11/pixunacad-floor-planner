@@ -69,6 +69,15 @@ import {
   ChevronsLeftRight,
   SquareDashed,
   FolderOpen,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  Bold as BoldIcon,
+  Italic as ItalicIcon,
+  Underline as UnderlineIcon,
+  Strikethrough as StrikethroughIcon,
+  Frame as FrameIcon,
+  Scan as ScanIcon,
 } from "lucide-react";
 
 import {
@@ -617,6 +626,9 @@ export default function ProjectWorkspace() {
       color: "#111111",
       bold: false,
       italic: false,
+      underline: false,
+      strike: false,
+      lineHeightPct: 105,
       alpha: 100,
       align: "left" as "left" | "center" | "right",
       bgColor: "#ffffff",
@@ -1959,6 +1971,7 @@ export default function ProjectWorkspace() {
                 guideActive={activeTool === "guide"}
                 lineActive={isLinePageTool(activeTool)}
                 hatchActive={activeTool === "hatch"}
+                textActive={activeTool === "text"}
               />
             )}
             <ZoomBar zoom={zoom} setZoom={setZoomClamped} onResetZoom={resetZoomAndCenter} />
@@ -2247,6 +2260,9 @@ type ToolSettings = {
     bold: boolean;
     italic: boolean;
     alpha: number;
+    underline: boolean;
+    strike: boolean;
+    lineHeightPct: number;
     align: "left" | "center" | "right";
     bgColor: string;
     bgAlphaPct: number;
@@ -2267,6 +2283,9 @@ const DEFAULT_TOOL_SETTINGS: ToolSettings = {
     color: "#111111",
     bold: false,
     italic: false,
+    underline: false,
+    strike: false,
+    lineHeightPct: 105,
     alpha: 100,
     align: "left",
     bgColor: "#ffffff",
@@ -3005,6 +3024,9 @@ function PageCanvas({
           textFontSizePx={toolSettings.text.fontSize}
           textBold={toolSettings.text.bold}
           textItalic={toolSettings.text.italic}
+          textUnderline={toolSettings.text.underline}
+          textStrike={toolSettings.text.strike}
+          textLineHeightPct={toolSettings.text.lineHeightPct}
           textAlpha={toolSettings.text.alpha / 100}
           textAlign={toolSettings.text.align}
           textBgColor={toolSettings.text.bgColor}
@@ -5575,11 +5597,13 @@ function ToolsTab({
       {/* Rahmen-Modus (Berühren / Umschließen) liegt jetzt als Flyout links am
           Auswahl-Symbol — kein eigenes Panel mehr in den Werkzeugeinstellungen. */}
       {settingsTool === "guide" && (
-        <GuideSettings
-          settings={toolSettings.guide}
-          pxPerMm={guidePxPerMm}
-          onChange={(p) => updateToolSettings("guide", p)}
-        />
+        <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
+          <GuideSettings
+            settings={toolSettings.guide}
+            pxPerMm={guidePxPerMm}
+            onChange={(p) => updateToolSettings("guide", p)}
+          />
+        </div>
       )}
       {(settingsTool === "line" || settingsTool === "free") && (
         <LineModeSelect
@@ -5591,11 +5615,13 @@ function ToolsTab({
         <RasterModeToggle app={cadEngine} projectId={projectId} />
       )}
       {settingsTool === "line" && (
-        <LineSettings
-          settings={toolSettings.line}
-          pxPerMm={guidePxPerMm}
-          onChange={(p) => updateToolSettings("line", p)}
-        />
+        <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
+          <LineSettings
+            settings={toolSettings.line}
+            pxPerMm={guidePxPerMm}
+            onChange={(p) => updateToolSettings("line", p)}
+          />
+        </div>
       )}
       {settingsTool === "free" && cadEngine && (
         <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
@@ -5626,10 +5652,13 @@ function ToolsTab({
         <RasterModeToggle app={cadEngine} projectId={projectId} />
       )}
       {settingsTool === "text" && (
-        <TextSettings
-          settings={toolSettings.text}
-          onChange={(p) => updateToolSettings("text", p)}
-        />
+        <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
+          <TextSettings
+            settings={toolSettings.text}
+            pxPerMm={guidePxPerMm}
+            onChange={(p) => updateToolSettings("text", p)}
+          />
+        </div>
       )}
       {settingsTool === "document" && (
         <DocumentToolSettings importing={!!documentImporting} onImport={onDocumentImport} onOpenLibrary={onDocumentLibrary} scale={docScale ?? "1:100"} onScaleChange={onDocScaleChange} freePlace={!!docFreePlace} onFreePlaceChange={onDocFreePlaceChange} />
