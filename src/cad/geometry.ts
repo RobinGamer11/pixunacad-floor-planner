@@ -344,3 +344,67 @@ export function projectPointToCurvedEdge(p: Vec2, a: Vec2, b: Vec2, bulge?: numb
   }
   return { t: clamp(bestT, 0, 1), q: bestQ };
 }
+
+/* ------------------------------------------------------------------ */
+/* Exaktes Aufschneiden gewölbter Kanten                               */
+/* ------------------------------------------------------------------ */
+export interface BulgeSplitResult {
+  /** Schnittpunkt exakt auf dem Bogen. */
+  point: Vec2;
+  /** Wölbung der Teilkante A→Schnittpunkt. */
+  bulgeA: number;
+  /** Wölbung der Teilkante Schnittpunkt→B. */
+  bulgeB: number;
+  /** Bogenlängen-Parameter des Schnittpunkts (0..1). */
+  t: number;
+}
+
+/**
+ * Schneidet eine (ggf. gewölbte) Kante A→B an der Stelle auf, die dem Punkt `p`
+ * am nächsten liegt. Beide Teilkanten behalten exakt die ursprüngliche
+ * Krümmung — die Gesamtform bleibt nach dem Schnitt unverändert.
+ *
+ * Konvention: `bulge` = Pfeilhöhe / Sehnenlänge, positiv in Richtung
+ * `n = (-dy, dx)` (identisch zu `bulgedEdgePoints`).
+ */
+export function splitBulgedEdge(a: Vec2, b: Vec2, bulge: number | null | undefined, p: Vec2): BulgeSplitResult {
+  const c = dist(a, b);
+  if (!bulge || Math.abs(bulge) < 1e-6 || c < 1e-9) {
+    const pr = projectPointToSegment(p, a, b);
+    return { point: pr.q, bulgeA: 0, bulgeB: 0, t: pr.t };
+  }
+  const dx = (b.x - a.x) / c, dy = (b.y - a.y) / c;
+  const nx = -dy, ny = dx;
+  const h = bulge * c;
+  const R = (c * c / 4 + h * h) / (2 * Math.abs(h));
+  const sgnH = h >= 0 ? 1 : -1;
+  const m = v((a.x + b.x) * 0.5, (a.y + b.y) * 0.5);
+  const center = v(m.x + nx * (h - sgnH * R), m.y + ny * (h - sgnH * R));
+
+  const angOf = (q: Vec2) => Math.atan2(q.y - center.y, q.x - center.x);
+  const angA = angOf(a);
+  const angB = angOf(b);
+  const sweepMag = Math.abs(4 * Math.atan(2 * bulge));
+  const TAU = Math.PI * 2;
+  const dCCW = ((angB - angA) % TAU + TAU) % TAU;
+  const sign = Math.abs(dCCW - sweepMag) <= Math.abs((TAU - dCCW) - sweepMag) ? 1 : -1;
+
+  // Punkt auf den Kreis projizieren.
+  let vx = p.x - center.x, vy = p.y - center.y;
+  const vl = Math.hypot(vx, vy);
+  if (vl < 1e-9) { vx = a.x - center.x; vy = a.y - center.y; }
+  const angS = Math.atan2(vy, vx);
+  let rel = ((angS - angA) * sign % TAU + TAU) % TAU;
+  let t = sweepMag > 1e-9 ? rel / sweepMag : 0;
+  t = clamp(t, 0, 1);
+  const angSplit = angA + sign * sweepMag * t;
+  const point = v(center.x + Math.cos(angSplit) * R, center.y + Math.sin(angSplit) * R);
+
+  const sub = (sw: number) => Math.tan(sw / 4) / 2;
+  return {
+    point,
+    bulgeA: sub(sign * sweepMag * t),
+    bulgeB: sub(sign * sweepMag * (1 - t)),
+    t,
+  };
+}
