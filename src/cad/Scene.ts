@@ -1,5 +1,5 @@
 import { Defaults } from "./constants";
-import { Vec2, v, clamp, lerp } from "./geometry";
+import { Vec2, v, clamp, lerp, splitBulgedEdge, arcFromBulge, projectPointToCurvedEdge } from "./geometry";
 import { WallTopologyGraph } from "./WallTopologyGraph";
 import { offsetPolyline } from "./wallGeom";
 
@@ -1083,7 +1083,19 @@ export class Scene {
     if (t <= Defaults.splitEpsT || t >= 1 - Defaults.splitEpsT) {
       return { didSplit: false, point: (t < 0.5 ? seg.a : seg.b), newSegments: [seg] };
     }
-    const p = lerp(seg.a, seg.b, t);
+    // Bogen-exakter Schnittpunkt: gewölbte Linien bleiben nach dem Schnitt gewölbt.
+    const segBulge = (seg as any).bulge || 0;
+    let p = lerp(seg.a, seg.b, t);
+    let cutA = 0, cutB = 0;
+    if (segBulge) {
+      const arc = arcFromBulge(seg.a, seg.b, segBulge);
+      if (arc) {
+        const ang = arc.angA + arc.sweep * t;
+        const onArc = v(arc.center.x + Math.cos(ang) * arc.radius, arc.center.y + Math.sin(ang) * arc.radius);
+        const cut = splitBulgedEdge(seg.a, seg.b, segBulge, onArc);
+        p = cut.point; cutA = cut.bulgeA; cutB = cut.bulgeB;
+      }
+    }
     const style = {
       color: seg.color,
       thicknessM: seg.thicknessM,
@@ -1098,11 +1110,13 @@ export class Scene {
       ...style,
       arrowStart: seg.arrowStart,
       arrowEnd: false,
+      bulge: cutA,
     });
     const s2 = this.createSegment(p, seg.b, {
       ...style,
       arrowStart: false,
       arrowEnd: seg.arrowEnd,
+      bulge: cutB,
     });
     s1._stickerEditOwnerId = seg._stickerEditOwnerId ?? null;
     s2._stickerEditOwnerId = seg._stickerEditOwnerId ?? null;
@@ -1290,20 +1304,22 @@ export class Scene {
    */
   splitWallAt(wall: Wall, p: Vec2, minSegLenM = 0.01, newLabelIdForB?: string): [Wall, Wall] | null {
     if (wall.corners.length < 2) return null;
+    const wallBulges: number[] = Array.isArray((wall as any).bulges) ? (wall as any).bulges : [];
     let edgeIdx = -1;
     let bestT = 0;
     let bestDist = Infinity;
     for (let i = 0; i < wall.corners.length - 1; i++) {
       const a = wall.corners[i], b = wall.corners[i + 1];
-      const ab = { x: b.x - a.x, y: b.y - a.y };
-      const ab2 = ab.x * ab.x + ab.y * ab.y || 1e-12;
-      const t = ((p.x - a.x) * ab.x + (p.y - a.y) * ab.y) / ab2;
+      const { t, q } = projectPointToCurvedEdge(p, a, b, wallBulges[i] || 0);
       if (t < 0.001 || t > 0.999) continue;
-      const q = { x: a.x + ab.x * t, y: a.y + ab.y * t };
       const d = Math.hypot(q.x - p.x, q.y - p.y);
       if (d < bestDist) { bestDist = d; edgeIdx = i; bestT = t; }
     }
     if (edgeIdx < 0) return null;
+    const cut = splitBulgedEdge(wall.corners[edgeIdx], wall.corners[edgeIdx + 1], wallBulges[edgeIdx] || 0, p);
+    p = cut.point;
+    const bulgesA = wallBulges.slice(0, edgeIdx).concat([cut.bulgeA]);
+    const bulgesB = [cut.bulgeB].concat(wallBulges.slice(edgeIdx + 1));
 
     const cornersA = wall.corners.slice(0, edgeIdx + 1).map(pt => v(pt.x, pt.y));
     cornersA.push(v(p.x, p.y));
@@ -1320,10 +1336,12 @@ export class Scene {
     const wA = new Wall({
       id: this._makeId(), kind: wall.kind, thicknessM: wall.thicknessM, referenceSide: wall.referenceSide,
       corners: cornersA, customName: wall.customName, color: wall.color, fillColor: wall.fillColor, labelId: wall.labelId,
+      bulges: bulgesA,
     });
     const wB = new Wall({
       id: this._makeId(), kind: wall.kind, thicknessM: wall.thicknessM, referenceSide: wall.referenceSide,
       corners: cornersB, customName: "", color: wall.color, fillColor: wall.fillColor, labelId: newLabelIdForB || wall.labelId,
+      bulges: bulgesB,
     });
     wA._stickerEditOwnerId = wall._stickerEditOwnerId;
     wB._stickerEditOwnerId = wall._stickerEditOwnerId;

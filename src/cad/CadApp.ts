@@ -1671,10 +1671,13 @@ export class CadApp {
   }
 
   private _updateSettingsVisibility() {
-    const isMeasureCtx = this.activeTool === this.measureTool || !!this.getSelectedDimension();
-    const isHatchCtx = this.activeTool === this.hatchTool || !!(this.selection && this.selection.hatchId);
-    const isLineCtx = this.activeTool === this.lineTool || !!(this.selection && this.selection.segmentId);
-    const isTextCtx = this.activeTool === this.textTool || !!this.getSelectedTextBox();
+    // Kontext-Panels aus der Auswahl nur, solange das Auswahl-Werkzeug aktiv ist —
+    // beim Wechsel auf ein anderes Werkzeug erscheinen dessen Einstellungen.
+    const selCtx = this.activeTool === this.selectTool;
+    const isMeasureCtx = this.activeTool === this.measureTool || (selCtx && !!this.getSelectedDimension());
+    const isHatchCtx = this.activeTool === this.hatchTool || (selCtx && !!(this.selection && this.selection.hatchId));
+    const isLineCtx = this.activeTool === this.lineTool || (selCtx && !!(this.selection && this.selection.segmentId));
+    const isTextCtx = this.activeTool === this.textTool || (selCtx && !!this.getSelectedTextBox());
     const showLine = isLineCtx || (!!this.selectedLabelId && !isMeasureCtx && !isTextCtx);
     const showHatch = isHatchCtx || (!!this.selectedLabelId && !isMeasureCtx && !isTextCtx);
     const showMeasure = isMeasureCtx;

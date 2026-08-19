@@ -237,23 +237,47 @@ export function bulgedEdgePoints(a: Vec2, b: Vec2, bulge: number, segments = 24)
   const out: Vec2[] = [];
   const chord = dist(a, b);
   if (!Number.isFinite(bulge) || Math.abs(bulge) < 1e-6 || chord < 1e-9) return out;
-  const dx = (b.x - a.x) / chord, dy = (b.y - a.y) / chord;
-  const nx = -dy, ny = dx;
-  const h = bulge * chord; // Pfeilhöhe in Welt-Einheiten
-  const mid = v((a.x + b.x) * 0.5, (a.y + b.y) * 0.5);
-  const apex = v(mid.x + nx * h, mid.y + ny * h);
-  // Quadratische Bezier mit Kontrollpunkt = mid + 2h*n hat ihren Scheitel exakt in `apex`.
-  const cp = v(mid.x + nx * h * 2, mid.y + ny * h * 2);
-  const n = Math.max(4, Math.min(96, segments));
+  const arc = arcFromBulge(a, b, bulge);
+  if (!arc) return out;
+  const n = Math.max(4, Math.min(192, segments));
   for (let i = 1; i < n; i++) {
-    const t = i / n, mt = 1 - t;
-    out.push(v(
-      mt * mt * a.x + 2 * mt * t * cp.x + t * t * b.x,
-      mt * mt * a.y + 2 * mt * t * cp.y + t * t * b.y,
-    ));
+    const t = i / n;
+    const ang = arc.angA + arc.sweep * t;
+    out.push(v(arc.center.x + Math.cos(ang) * arc.radius, arc.center.y + Math.sin(ang) * arc.radius));
   }
-  void apex;
   return out;
+}
+
+export interface BulgeArc {
+  center: Vec2;
+  radius: number;
+  /** Startwinkel (bei A). */
+  angA: number;
+  /** Signierter Öffnungswinkel A→B. */
+  sweep: number;
+}
+
+/**
+ * Echter Kreisbogen zu einer Kante A→B mit `bulge` = Pfeilhöhe / Sehnenlänge.
+ * Positive Werte wölben in Richtung n = (-dy, dx).
+ */
+export function arcFromBulge(a: Vec2, b: Vec2, bulge: number): BulgeArc | null {
+  const c = dist(a, b);
+  if (!Number.isFinite(bulge) || Math.abs(bulge) < 1e-6 || c < 1e-9) return null;
+  const dx = (b.x - a.x) / c, dy = (b.y - a.y) / c;
+  const nx = -dy, ny = dx;
+  const h = bulge * c;
+  const radius = (c * c / 4 + h * h) / (2 * Math.abs(h));
+  const sgnH = h >= 0 ? 1 : -1;
+  const mid = v((a.x + b.x) * 0.5, (a.y + b.y) * 0.5);
+  const center = v(mid.x + nx * (h - sgnH * radius), mid.y + ny * (h - sgnH * radius));
+  const angA = Math.atan2(a.y - center.y, a.x - center.x);
+  const angB = Math.atan2(b.y - center.y, b.x - center.x);
+  const sweepMag = Math.abs(4 * Math.atan(2 * bulge));
+  const TAU = Math.PI * 2;
+  const dCCW = ((angB - angA) % TAU + TAU) % TAU;
+  const sign = Math.abs(dCCW - sweepMag) <= Math.abs((TAU - dCCW) - sweepMag) ? 1 : -1;
+  return { center, radius, angA, sweep: sign * sweepMag };
 }
 
 /** Tesselliert einen Ring/Pfad mit optionalen Kanten-Wölbungen. */
@@ -343,4 +367,61 @@ export function projectPointToCurvedEdge(p: Vec2, a: Vec2, b: Vec2, bulge?: numb
     acc += segLen;
   }
   return { t: clamp(bestT, 0, 1), q: bestQ };
+}
+
+/* ------------------------------------------------------------------ */
+/* Exaktes Aufschneiden gewölbter Kanten                               */
+/* ------------------------------------------------------------------ */
+export interface BulgeSplitResult {
+  /** Schnittpunkt exakt auf dem Bogen. */
+  point: Vec2;
+  /** Wölbung der Teilkante A→Schnittpunkt. */
+  bulgeA: number;
+  /** Wölbung der Teilkante Schnittpunkt→B. */
+  bulgeB: number;
+  /** Bogenlängen-Parameter des Schnittpunkts (0..1). */
+  t: number;
+}
+
+/**
+ * Schneidet eine (ggf. gewölbte) Kante A→B an der Stelle auf, die dem Punkt `p`
+ * am nächsten liegt. Beide Teilkanten behalten exakt die ursprüngliche
+ * Krümmung — die Gesamtform bleibt nach dem Schnitt unverändert.
+ *
+ * Konvention: `bulge` = Pfeilhöhe / Sehnenlänge, positiv in Richtung
+ * `n = (-dy, dx)` (identisch zu `bulgedEdgePoints`).
+ */
+export function splitBulgedEdge(a: Vec2, b: Vec2, bulge: number | null | undefined, p: Vec2): BulgeSplitResult {
+  const c = dist(a, b);
+  if (!bulge || Math.abs(bulge) < 1e-6 || c < 1e-9) {
+    const pr = projectPointToSegment(p, a, b);
+    return { point: pr.q, bulgeA: 0, bulgeB: 0, t: pr.t };
+  }
+  const arc = arcFromBulge(a, b, bulge);
+  if (!arc) {
+    const pr = projectPointToSegment(p, a, b);
+    return { point: pr.q, bulgeA: 0, bulgeB: 0, t: pr.t };
+  }
+  const { center, radius: R, angA, sweep } = arc;
+  const sign = sweep >= 0 ? 1 : -1;
+  const sweepMag = Math.abs(sweep);
+  const TAU = Math.PI * 2;
+
+  // Punkt auf den Kreis projizieren.
+  let vx = p.x - center.x, vy = p.y - center.y;
+  if (Math.hypot(vx, vy) < 1e-9) { vx = a.x - center.x; vy = a.y - center.y; }
+  const angS = Math.atan2(vy, vx);
+  const rel = (((angS - angA) * sign) % TAU + TAU) % TAU;
+  let t = sweepMag > 1e-9 ? rel / sweepMag : 0;
+  t = clamp(t, 0, 1);
+  const angSplit = angA + sweep * t;
+  const point = v(center.x + Math.cos(angSplit) * R, center.y + Math.sin(angSplit) * R);
+
+  const subBulge = (sw: number) => -Math.tan(sw / 4) / 2;
+  return {
+    point,
+    bulgeA: subBulge(sign * sweepMag * t),
+    bulgeB: subBulge(sign * sweepMag * (1 - t)),
+    t,
+  };
 }

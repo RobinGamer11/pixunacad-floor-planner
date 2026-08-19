@@ -1,6 +1,6 @@
 import { Vec2, v, sub, dist } from "./geometry";
 import type { Wall, WallKind } from "./Scene";
-import { computeWallLines } from "./wallGeom";
+import { computeWallLines, wallRefCorners } from "./wallGeom";
 
 /**
  * Toleranzen (in Welt-Metern).
@@ -151,7 +151,7 @@ export function endpointLineCorners(
   wall: Wall,
   atStart: boolean,
 ): { main: Vec2; help: Vec2; sub: Vec2 } {
-  const lines = computeWallLines(wall.corners, wall.thicknessM, wall.referenceSide);
+  const lines = computeWallLines(wallRefCorners(wall as any), wall.thicknessM, wall.referenceSide);
   const idx = atStart ? 0 : lines.mainCorners.length - 1;
   return {
     main: v(lines.mainCorners[idx].x, lines.mainCorners[idx].y),
