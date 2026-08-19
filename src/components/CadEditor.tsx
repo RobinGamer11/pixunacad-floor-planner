@@ -35,7 +35,7 @@ const CAD_TOOLS = [
   { id: ToolIds.HATCH, label: "Schraffur", key: "H", icon: Square },
   { id: ToolIds.MEASURE, label: "Maßkette", key: "M", icon: Ruler },
   { id: ToolIds.TEXT, label: "Text", key: "T", icon: Type },
-  { id: ToolIds.STICKER, label: "Sticker", key: "O", icon: StickerIcon },
+  { id: ToolIds.STICKER, label: "Stempel", key: "O", icon: StickerIcon },
   { id: ToolIds.DOCUMENT, label: "Dokument", key: "D", icon: FileImage },
 ];
 
