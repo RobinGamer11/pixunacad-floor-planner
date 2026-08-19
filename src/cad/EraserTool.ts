@@ -33,7 +33,7 @@ export class EraserTool {
 
   constructor(app: CadApp) {
     this.app = app;
-    this._rulerDrag = new RulerDragController(app);
+    this._rulerDrag = new RulerDragController(app, { handlesOnly: true });
   }
 
   activate() {

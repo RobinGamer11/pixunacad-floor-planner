@@ -51,9 +51,46 @@ interface Props {
   pxPerMm?: number;
   /** Maximale Musterskalierung (CAD nutzt größere Werte als die Mappe). */
   patternScaleMax?: number;
+  /** true = Modus & Objektart werden außerhalb (über dem Rahmen) gerendert. */
+  hideChrome?: boolean;
 }
 
-export const HatchSettingsPanel: React.FC<Props> = ({ app, projectId, pxPerMm = 96 / 25.4, patternScaleMax = 20 }) => {
+/** Modus-Auswahl — kann außerhalb des Einstellungsrahmens platziert werden. */
+export const HatchModeSelect: React.FC<{ app: CadApp | MiniCad | null }> = ({ app }) => {
+  const [mode, setMode] = useState<HatchDrawMode>("polygon");
+  useEffect(() => {
+    if (!app) return;
+    const t = window.setInterval(() => {
+      const m = (app as any).hatchTool?.drawMode as HatchDrawMode | undefined;
+      if (m) setMode(m);
+    }, 300);
+    return () => window.clearInterval(t);
+  }, [app]);
+  return (
+    <div className="mb-2">
+      <div className="mb-1.5 text-[10px] font-semibold tracking-wider text-muted-foreground">MODUS</div>
+      <div className="grid grid-cols-4 gap-1">
+        {MODES.map(({ value, label, Icon }) => (
+          <button
+            key={value}
+            type="button"
+            title={label}
+            onClick={() => { if (!app) return; (app as any).hatchTool?.setDrawMode(value); setMode(value); }}
+            className={`flex flex-col items-center justify-center gap-0.5 rounded border px-1 py-1.5 transition-colors ${
+              mode === value ? "bg-accent" : "hover:bg-muted"
+            }`}
+            style={{ borderColor: HAIRLINE }}
+          >
+            <Icon size={14} />
+            <span className="text-[9px] leading-tight">{label}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+export const HatchSettingsPanel: React.FC<Props> = ({ app, projectId, pxPerMm = 96 / 25.4, patternScaleMax = 20, hideChrome = false }) => {
   const [mode, setMode] = useState<HatchDrawMode>("polygon");
   const [fillColor, setFillColor] = useState("#4da3ff");
   const [strokeColor, setStrokeColor] = useState("#111111");
@@ -112,34 +149,13 @@ export const HatchSettingsPanel: React.FC<Props> = ({ app, projectId, pxPerMm = 
 
   return (
     <div className="space-y-3 text-xs">
-      {/* MODUS ganz oben */}
-      <div>
-        <div className="mb-1.5 text-[10px] font-semibold tracking-wider text-muted-foreground">MODUS</div>
-        <div className="grid grid-cols-4 gap-1">
-          {MODES.map(({ value, label, Icon }) => (
-            <button
-              key={value}
-              type="button"
-              title={label}
-              onClick={() => {
-                if (!app) return;
-                (app as any).hatchTool?.setDrawMode(value);
-                setMode(value);
-              }}
-              className={`flex flex-col items-center justify-center gap-0.5 rounded border px-1 py-1.5 transition-colors ${
-                mode === value ? "bg-accent" : "hover:bg-muted"
-              }`}
-              style={{ borderColor: HAIRLINE }}
-            >
-              <Icon size={14} />
-              <span className="text-[9px] leading-tight">{label}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* OBJEKTART (Vektor / Pixel) */}
-      <RasterModeToggle app={app} projectId={projectId} />
+{!hideChrome && (
+        <>
+          <HatchModeSelect app={app} />
+          {/* OBJEKTART (Vektor / Pixel) */}
+          <RasterModeToggle app={app} projectId={projectId} />
+        </>
+      )}
 
       <div className="grid grid-cols-2 gap-2">
         <ToolColorPicker

@@ -12,7 +12,7 @@ import { projectStore } from "@/lib/projectStore";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { FreeDrawSettingsPanel } from "@/components/cad/FreeDrawSettingsPanel";
-import { EraserSettingsPanel } from "@/components/cad/EraserSettingsPanel";
+import { EraserSettingsPanel, EraserModeSelect } from "@/components/cad/EraserSettingsPanel";
 import { ProjectFilePickerDialog } from "@/components/cad/ProjectFilePickerDialog";
 import { WallSettingsPanel } from "@/components/cad/WallSettingsPanel";
 import { HatchPatternBlock } from "@/components/cad/HatchPatternBlock";
@@ -42,7 +42,6 @@ const CAD_TOOLS = [
 const LINE_VARIANTS = [
   { id: ToolIds.LINE, label: "Linie", icon: Minus },
   { id: ToolIds.FREE, label: "Freihand", icon: Pencil },
-  { id: ToolIds.ERASER, label: "Radiergummi", icon: Eraser },
 ];
 
 type ToolVariant =
@@ -54,7 +53,6 @@ const TOOL_VARIANTS: Record<string, ToolVariant[]> = {
   [ToolIds.LINE]: [
     { kind: "tool", id: ToolIds.LINE, label: "Linie", icon: Minus },
     { kind: "tool", id: ToolIds.FREE, label: "Freihand", icon: Pencil },
-    { kind: "tool", id: ToolIds.ERASER, label: "Radiergummi", icon: Eraser },
   ],
   [ToolIds.HATCH]: [
     { kind: "hatch", mode: "polygon", label: "Polygon", icon: Spline },
@@ -1114,6 +1112,14 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             <span>Raster</span>
           </button>
           <button
+            onClick={() => handleToolClick(ToolIds.ERASER)}
+            title="Radiergummi"
+            className={`cad-rail-btn ${activeTool === ToolIds.ERASER ? "active" : ""}`}
+          >
+            <Eraser size={18} />
+            <span>Radierer</span>
+          </button>
+          <button
             onClick={() => handleToolClick(ToolIds.PIPETTE)}
             title="Pipette (P)"
             className={`cad-rail-btn ${activeTool === ToolIds.PIPETTE ? "active" : ""}`}
@@ -1916,7 +1922,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 MODUS
               </div>
               <div className="grid grid-cols-2 gap-1">
-                {LINE_VARIANTS.filter(v => v.id !== ToolIds.ERASER).map(v => {
+                {LINE_VARIANTS.map(v => {
                   const Icon = v.icon;
                   const active = activeTool === v.id;
                   return (
@@ -1929,27 +1935,6 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                     >
                       <Icon className="h-3.5 w-3.5" />
                       <span className="text-[9px] leading-tight">{v.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-          {activeTool === ToolIds.ERASER && (
-            <div className="cad-settings-panel mb-2">
-              <div className="flex gap-1">
-                {LINE_VARIANTS.map(v => {
-                  const Icon = v.icon;
-                  const active = activeTool === v.id;
-                  return (
-                    <button
-                      key={v.id}
-                      type="button"
-                      onClick={() => { appRef.current?.setTool(v.id); setActiveTool(v.id); setLineVariant(v.id); }}
-                      title={v.label}
-                      className={`cad-toolbar-btn flex-1 justify-center h-9 ${active ? "active" : ""}`}
-                    >
-                      <Icon className="h-4 w-4" />
                     </button>
                   );
                 })}
@@ -2641,9 +2626,15 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             <FreeDrawSettingsPanel app={appRef.current} units="m" projectId={projectId} />
           )}
 
-          {/* Eraser-Tool-Panel */}
+          {/* Eraser-Tool-Panel — Modus liegt über dem Einstellungsrahmen */}
           {activeTool === ToolIds.ERASER && (
-            <EraserSettingsPanel app={appRef.current} variant="cad" />
+            <div className="cad-settings-panel mb-2">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Radiergummi</div>
+              <EraserModeSelect app={appRef.current} />
+              <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
+                <EraserSettingsPanel app={appRef.current} variant="cad" />
+              </div>
+            </div>
           )}
 
           {/* Marquee-Modus des Auswahl-Werkzeugs liegt jetzt als Flyout links
@@ -3193,9 +3184,9 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 <div><span className="cad-kbd">Text beenden</span> Außerhalb Textfeld klicken</div>
               </div>
             </div>
-          ) : (
+          ) : activeTool !== ToolIds.ERASER ? (
             <ToolHelpNotes toolId={activeTool} />
-          )}
+          ) : null}
         </div>
         </DragScrollDiv>
         <DragScrollDiv axis="both" className="flex-1 min-h-0 overflow-auto p-2 space-y-2 cursor-grab active:cursor-grabbing" style={{ display: rightTab === "sheets" ? "block" : "none" }}>

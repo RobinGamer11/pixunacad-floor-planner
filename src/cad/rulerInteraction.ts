@@ -32,7 +32,13 @@ export class RulerDragController {
   private _startA: Vec2 | null = null;
   private _startB: Vec2 | null = null;
 
-  constructor(app: CadApp) { this.app = app; }
+  /** true = nur die beiden Endpunkte lassen sich ziehen (Linie selbst fängt). */
+  handlesOnly: boolean;
+
+  constructor(app: CadApp, opts?: { handlesOnly?: boolean }) {
+    this.app = app;
+    this.handlesOnly = !!opts?.handlesOnly;
+  }
 
   reset() {
     this._mode = null;
@@ -66,7 +72,7 @@ export class RulerDragController {
     // Nicht aktiv: prüfe ob Klick auf Ruler beginnt
     if (input.mouse.left && input.clicked) {
       const hit = hitRulerAtScreen(this.app, input.mouse.sx, input.mouse.sy);
-      if (hit) {
+      if (hit && !(this.handlesOnly && hit.kind === "body")) {
         this._mode = hit.kind;
         this._startMouseW = v(input.mouse.wx, input.mouse.wy);
         this._startA = v(g.a.x, g.a.y);
@@ -82,6 +88,7 @@ export class RulerDragController {
     if (this._mode) return "grabbing";
     const hit = hitRulerAtScreen(this.app, input.mouse.sx, input.mouse.sy);
     if (!hit) return null;
-    return hit.kind === "body" ? "grab" : "move";
+    if (hit.kind === "body") return this.handlesOnly ? null : "grab";
+    return "move";
   }
 }
