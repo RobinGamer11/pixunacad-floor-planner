@@ -210,17 +210,22 @@ export const HatchSettingsPanel: React.FC<Props> = ({ app, projectId, pxPerMm = 
           }}
           className="pixuna-range h-4 w-full cursor-pointer"
         />
-        <input
-          type="number" min={1} max={100}
-          value={fillAlphaPct}
-          onChange={(e) => {
-            const v = Math.max(1, Math.min(100, parseFloat(e.target.value) || 1));
-            setFillAlphaPct(v);
-            apply((h) => { h.fillAlphaPct = v; }, () => { if (app) (app as any).defaultHatchFillAlphaPct = v; });
-          }}
-          className="mt-1 h-8 w-full rounded-md border bg-transparent px-2 text-[11px] tabular-nums"
-          style={{ borderColor: HAIRLINE }}
-        />
+        <span
+          className="mt-1 flex h-8 items-center overflow-hidden rounded-md border"
+          style={{ borderColor: HAIRLINE, backgroundColor: "#fff" }}
+        >
+          <input
+            type="number" min={1} max={100}
+            value={fillAlphaPct}
+            onChange={(e) => {
+              const v = Math.max(1, Math.min(100, parseFloat(e.target.value) || 1));
+              setFillAlphaPct(v);
+              apply((h) => { h.fillAlphaPct = v; }, () => { if (app) (app as any).defaultHatchFillAlphaPct = v; });
+            }}
+            className="h-full min-w-0 flex-1 bg-transparent px-2 text-right text-[11px] tabular-nums outline-none"
+          />
+          <span className="pr-2 text-[9px] text-muted-foreground">%</span>
+        </span>
       </div>
 
       {/* Muster ganz unten */}
