@@ -1,13 +1,22 @@
 import { Vec2, v } from "./geometry";
 import type { Wall, Door } from "./Scene";
-import { perpLeftScreen } from "./wallGeom";
+import { perpLeftScreen, wallRefCorners } from "./wallGeom";
+
+/**
+ * Bezugs-Polylinie einer Wand inklusive Kanten-Wölbungen.
+ * Türen/Fenster laufen dadurch exakt auf der gewölbten Wandachse.
+ */
+function refCorners(wall: Wall): Vec2[] {
+  return wallRefCorners(wall as any);
+}
 
 /** Liefert die kumulierten Längen der Wand-Bezugslinie (corners) und Gesamtlänge. */
 export function wallReferenceLengths(wall: Wall): { lens: number[]; total: number } {
+  const pts = refCorners(wall);
   const lens: number[] = [0];
   let total = 0;
-  for (let i = 1; i < wall.corners.length; i++) {
-    const a = wall.corners[i - 1], b = wall.corners[i];
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1], b = pts[i];
     total += Math.hypot(b.x - a.x, b.y - a.y);
     lens.push(total);
   }
@@ -15,13 +24,14 @@ export function wallReferenceLengths(wall: Wall): { lens: number[]; total: numbe
 }
 
 export function pointOnWallAt(wall: Wall, s: number): { p: Vec2; t: Vec2; n: Vec2; segIndex: number } | null {
-  if (wall.corners.length < 2) return null;
+  const pts = refCorners(wall);
+  if (pts.length < 2) return null;
   const { lens, total } = wallReferenceLengths(wall);
   const sc = Math.max(0, Math.min(total, s));
   let i = 1;
   while (i < lens.length && lens[i] < sc) i++;
   const idx = Math.min(i, lens.length - 1);
-  const a = wall.corners[idx - 1], b = wall.corners[idx];
+  const a = pts[idx - 1], b = pts[idx];
   const segLen = lens[idx] - lens[idx - 1] || 1e-9;
   const t = (sc - lens[idx - 1]) / segLen;
   const p = v(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t);
@@ -33,11 +43,12 @@ export function pointOnWallAt(wall: Wall, s: number): { p: Vec2; t: Vec2; n: Vec
 }
 
 export function projectPointToWall(wall: Wall, p: Vec2): { s: number; dist: number } | null {
-  if (wall.corners.length < 2) return null;
+  const pts = refCorners(wall);
+  if (pts.length < 2) return null;
   const { lens } = wallReferenceLengths(wall);
   let bestS = 0, bestD = Infinity;
-  for (let i = 0; i < wall.corners.length - 1; i++) {
-    const a = wall.corners[i], b = wall.corners[i + 1];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i], b = pts[i + 1];
     const dx = b.x - a.x, dy = b.y - a.y;
     const L2 = dx * dx + dy * dy || 1e-9;
     let t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / L2;
@@ -47,6 +58,57 @@ export function projectPointToWall(wall: Wall, p: Vec2): { s: number; dist: numb
     if (d < bestD) { bestD = d; bestS = lens[i] + t * Math.sqrt(L2); }
   }
   return { s: bestS, dist: bestD };
+}
+
+/** Versatz Bezugslinie → Wand-Mittellinie. */
+function wallHelpOffset(wall: Wall): number {
+  const t = wall.thicknessM;
+  return wall.referenceSide === "inner" ? +t / 2
+    : wall.referenceSide === "center" ? 0
+    : -t / 2;
+}
+
+/**
+ * Punkte der Wand-Mittellinie zwischen den Bogenlängen `sFrom` und `sTo`,
+ * zusätzlich quer um `acrossOff` versetzt. Folgt exakt der Wölbung der Wand.
+ */
+export function wallAxisPolyline(
+  wall: Wall,
+  sFrom: number,
+  sTo: number,
+  acrossOff = 0,
+  segs = 24,
+): Vec2[] {
+  const help = wallHelpOffset(wall) + acrossOff;
+  const out: Vec2[] = [];
+  const n = Math.max(1, segs);
+  for (let i = 0; i <= n; i++) {
+    const s = sFrom + ((sTo - sFrom) * i) / n;
+    const at = pointOnWallAt(wall, s);
+    if (!at) continue;
+    out.push(v(at.p.x + at.n.x * help, at.p.y + at.n.y * help));
+  }
+  return out;
+}
+
+/** Geschlossenes Band entlang der (ggf. gewölbten) Wandachse. */
+export function wallBandPolygon(
+  wall: Wall,
+  sFrom: number,
+  sTo: number,
+  halfAcross: number,
+  acrossShift = 0,
+  segs = 24,
+): Vec2[] {
+  const a = wallAxisPolyline(wall, sFrom, sTo, acrossShift + halfAcross, segs);
+  const b = wallAxisPolyline(wall, sFrom, sTo, acrossShift - halfAcross, segs);
+  return [...a, ...b.reverse()];
+}
+
+/** True, wenn die Wand im Bereich der Öffnung gewölbt ist. */
+export function wallHasBulge(wall: Wall): boolean {
+  const b = (wall as any).bulges;
+  return Array.isArray(b) && b.some((x: number) => !!x);
 }
 
 /**
@@ -100,14 +162,19 @@ export function doorGeometry(wall: Wall, door: Door) {
   const hingeBaseY = center.y + n.y * edgeOff;
   // Hinge is positioned at handSign * (halfW - jambLen) along tan from center.
   const inset = halfW - jambLen;
-  const hinge = v(
-    hingeBaseX + tan.x * handSign * inset,
-    hingeBaseY + tan.y * handSign * inset,
-  );
-  const closedEnd = v(
-    hingeBaseX - tan.x * handSign * inset,
-    hingeBaseY - tan.y * handSign * inset,
-  );
+  // Auf gewölbten Wänden liegen Band- und Schließseite auf der Bogenachse.
+  const onAxis = (s: number, across: number): Vec2 => {
+    const at2 = pointOnWallAt(wall, s);
+    if (!at2) return v(hingeBaseX, hingeBaseY);
+    return v(at2.p.x + at2.n.x * across, at2.p.y + at2.n.y * across);
+  };
+  const acrossHinge = helpOff + edgeOff;
+  const hinge = wallHasBulge(wall)
+    ? onAxis(door.posM + handSign * inset, acrossHinge)
+    : v(hingeBaseX + tan.x * handSign * inset, hingeBaseY + tan.y * handSign * inset);
+  const closedEnd = wallHasBulge(wall)
+    ? onAxis(door.posM - handSign * inset, acrossHinge)
+    : v(hingeBaseX - tan.x * handSign * inset, hingeBaseY - tan.y * handSign * inset);
 
   // Swing direction: leaf goes toward the chosen "side" half-space (+n inner, -n outer).
   const openSign = door.side === "inner" ? +1 : -1;
@@ -138,25 +205,40 @@ export function drawDoor(
   ctx.save();
   ctx.globalAlpha = alpha;
 
-  // 1) White opening fill — cuts wall across full thickness.
-  const halfFull = wall.thicknessM / 2 + 0.01;
-  const cornersOpen = [
-    v(g.leftEnd.x  - g.n.x * halfFull, g.leftEnd.y  - g.n.y * halfFull),
-    v(g.leftEnd.x  + g.n.x * halfFull, g.leftEnd.y  + g.n.y * halfFull),
-    v(g.rightEnd.x + g.n.x * halfFull, g.rightEnd.y + g.n.y * halfFull),
-    v(g.rightEnd.x - g.n.x * halfFull, g.rightEnd.y - g.n.y * halfFull),
-  ];
-  ctx.fillStyle = "#ffffff";
-  ctx.beginPath();
-  {
-    const s0 = cam.worldToScreen(cornersOpen[0].x, cornersOpen[0].y);
+  // Bogenlängen-Bereich der Öffnung entlang der (ggf. gewölbten) Wandachse.
+  const halfW = door.widthM / 2;
+  const sL = door.posM - halfW;
+  const sR = door.posM + halfW;
+  const curved = wallHasBulge(wall);
+  const segs = curved ? 24 : 1;
+
+  const pathPoly = (pts: Vec2[]) => {
+    if (!pts.length) return;
+    ctx.beginPath();
+    const s0 = cam.worldToScreen(pts[0].x, pts[0].y);
     ctx.moveTo(s0.x, s0.y);
-    for (let i = 1; i < cornersOpen.length; i++) {
-      const s = cam.worldToScreen(cornersOpen[i].x, cornersOpen[i].y);
+    for (let i = 1; i < pts.length; i++) {
+      const s = cam.worldToScreen(pts[i].x, pts[i].y);
       ctx.lineTo(s.x, s.y);
     }
-  }
-  ctx.closePath();
+    ctx.closePath();
+  };
+  const strokePolyline = (pts: Vec2[]) => {
+    if (pts.length < 2) return;
+    ctx.beginPath();
+    const s0 = cam.worldToScreen(pts[0].x, pts[0].y);
+    ctx.moveTo(s0.x, s0.y);
+    for (let i = 1; i < pts.length; i++) {
+      const s = cam.worldToScreen(pts[i].x, pts[i].y);
+      ctx.lineTo(s.x, s.y);
+    }
+    ctx.stroke();
+  };
+
+  // 1) White opening fill — cuts wall across full thickness.
+  const halfFull = wall.thicknessM / 2 + 0.01;
+  ctx.fillStyle = "#ffffff";
+  pathPoly(wallBandPolygon(wall, sL, sR, halfFull, 0, segs));
   ctx.fill();
 
   // 2) Jambs (Laibungen) at both ends — optional, configurable thickness.
@@ -170,37 +252,17 @@ export function drawDoor(
         : door.edge === "outer" ? -halfFull + jambHalfT
         : 0)
       : 0;
-    const drawJamb = (endpointRaw: Vec2, inward: number) => {
-      const endpoint = v(
-        endpointRaw.x + g.n.x * acrossShift,
-        endpointRaw.y + g.n.y * acrossShift,
-      );
-      // inward = +1 means jamb extends from endpoint toward door-center.
-      const ax = endpoint.x + g.tan.x * g.jambLen * inward;
-      const ay = endpoint.y + g.tan.y * g.jambLen * inward;
-      const pts = [
-        v(endpoint.x - g.n.x * jambHalfT, endpoint.y - g.n.y * jambHalfT),
-        v(endpoint.x + g.n.x * jambHalfT, endpoint.y + g.n.y * jambHalfT),
-        v(ax + g.n.x * jambHalfT,         ay + g.n.y * jambHalfT),
-        v(ax - g.n.x * jambHalfT,         ay - g.n.y * jambHalfT),
-      ];
-      ctx.beginPath();
-      const s0 = cam.worldToScreen(pts[0].x, pts[0].y);
-      ctx.moveTo(s0.x, s0.y);
-      for (let i = 1; i < pts.length; i++) {
-        const s = cam.worldToScreen(pts[i].x, pts[i].y);
-        ctx.lineTo(s.x, s.y);
-      }
-      ctx.closePath();
+    const drawJamb = (sFrom: number, sTo: number) => {
+      pathPoly(wallBandPolygon(wall, sFrom, sTo, jambHalfT, acrossShift, curved ? 8 : 1));
       ctx.fillStyle = door.jambColor;
       ctx.fill();
       ctx.strokeStyle = "#3a3f46";
       ctx.lineWidth = 1;
       ctx.stroke();
     };
-    // leftEnd: jamb extends toward door center (positive tan direction → +1)
-    drawJamb(g.leftEnd, +1);
-    drawJamb(g.rightEnd, -1);
+    // Laibungen folgen der Wandachse (inkl. Wölbung).
+    drawJamb(sL, sL + g.jambLen);
+    drawJamb(sR - g.jambLen, sR);
   }
 
   // 3) Fenster-Variante: zwei parallele Linien quer durch die Öffnung statt Türblatt.
@@ -217,48 +279,20 @@ export function drawDoor(
     const acrossShiftWin = door.edge === "inner" ? +halfFullW - off
       : door.edge === "outer" ? -halfFullW + off
       : 0;
-    // Linien-Endpunkte: vom leftEnd/rightEnd jeweils um jambLen nach innen verschoben.
-    const innerL = v(
-      g.leftEnd.x  + g.tan.x * g.jambLen + g.n.x * acrossShiftWin,
-      g.leftEnd.y  + g.tan.y * g.jambLen + g.n.y * acrossShiftWin,
-    );
-    const innerR = v(
-      g.rightEnd.x - g.tan.x * g.jambLen + g.n.x * acrossShiftWin,
-      g.rightEnd.y - g.tan.y * g.jambLen + g.n.y * acrossShiftWin,
-    );
+    // Lichte Öffnung entlang der Wandachse (Laibungen abgezogen).
+    const sWinL = sL + g.jambLen;
+    const sWinR = sR - g.jambLen;
     // (a) optionale Füllung zwischen den Linien
     if (door.glassFillColor && door.glassFillColor !== "") {
-      const corners = [
-        v(innerL.x - g.n.x * off, innerL.y - g.n.y * off),
-        v(innerL.x + g.n.x * off, innerL.y + g.n.y * off),
-        v(innerR.x + g.n.x * off, innerR.y + g.n.y * off),
-        v(innerR.x - g.n.x * off, innerR.y - g.n.y * off),
-      ];
       ctx.fillStyle = door.glassFillColor;
-      ctx.beginPath();
-      const s0 = cam.worldToScreen(corners[0].x, corners[0].y);
-      ctx.moveTo(s0.x, s0.y);
-      for (let i = 1; i < corners.length; i++) {
-        const s = cam.worldToScreen(corners[i].x, corners[i].y);
-        ctx.lineTo(s.x, s.y);
-      }
-      ctx.closePath();
+      pathPoly(wallBandPolygon(wall, sWinL, sWinR, off, acrossShiftWin, segs));
       ctx.fill();
     }
-    // (b) die beiden Linien
+    // (b) die beiden Linien — folgen der Wölbung
     ctx.strokeStyle = door.glassColor;
     ctx.lineWidth = 1.5;
     for (const sign of [-1, +1]) {
-      const aX = innerL.x + g.n.x * off * sign;
-      const aY = innerL.y + g.n.y * off * sign;
-      const bX = innerR.x + g.n.x * off * sign;
-      const bY = innerR.y + g.n.y * off * sign;
-      const sa = cam.worldToScreen(aX, aY);
-      const sb = cam.worldToScreen(bX, bY);
-      ctx.beginPath();
-      ctx.moveTo(sa.x, sa.y);
-      ctx.lineTo(sb.x, sb.y);
-      ctx.stroke();
+      strokePolyline(wallAxisPolyline(wall, sWinL, sWinR, acrossShiftWin + off * sign, segs));
     }
   }
 

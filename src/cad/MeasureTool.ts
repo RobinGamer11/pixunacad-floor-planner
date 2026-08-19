@@ -7,6 +7,34 @@ import type { Input } from "./Input";
 import type { DimensionStyle } from "./Scene";
 import { getDimensionGeometry } from "./dimensionGeometry";
 import { computeHealedWallLines } from "./wallHeal";
+import { bulgeFromPoint } from "./geometry";
+
+/**
+ * Ermittelt die Wölbung zwischen zwei Punkten auf einer bereits tessellierten
+ * Polylinie (z. B. Außen-/Innenkante einer gewölbten Wand). Es wird der
+ * tatsächliche Bogenverlauf zwischen den beiden Treffern ausgewertet, damit
+ * Maßketten auch an Sub- und Hilfslinien gewölbt bleiben.
+ */
+function polyBulgeBetween(
+  pts: Vec2[] | null | undefined,
+  a: Vec2,
+  b: Vec2,
+  same: (p: Vec2, q: Vec2) => boolean,
+): number | null {
+  if (!pts || pts.length < 3) return null;
+  let ia = -1, ib = -1;
+  for (let i = 0; i < pts.length; i++) {
+    if (ia < 0 && same(pts[i], a)) { ia = i; continue; }
+    if (ib < 0 && same(pts[i], b)) ib = i;
+  }
+  if (ia < 0 || ib < 0) return null;
+  const lo = Math.min(ia, ib), hi = Math.max(ia, ib);
+  if (hi - lo < 2) return null;
+  const mid = pts[Math.round((lo + hi) / 2)];
+  const bg = bulgeFromPoint(a, b, mid);
+  return Math.abs(bg) < 1e-4 ? null : bg;
+}
+
 
 
 interface CollectedPoint {
@@ -206,8 +234,7 @@ export class MeasureTool {
         try {
           const lines = computeHealedWallLines(w, scene.walls, scene.getWallTopology?.());
           for (const side of [lines.mainCorners, lines.helpCorners, lines.subCorners]) {
-            if (!side || side.length !== w.corners.length) continue;
-            const rr = ringScan(side, bulges, false);
+            const rr = polyBulgeBetween(side, a, b, same);
             if (rr != null) return rr;
           }
         } catch { /* ignore */ }
