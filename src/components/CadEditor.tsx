@@ -2117,10 +2117,11 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             </div>
 
             <div className="space-y-3">
-              <div>
-                <label>Ebene</label>
+              <div className="hidden">
                 <select ref={hatchIdSelectRef} className="cad-settings-select w-full" />
               </div>
+              {activeTool !== ToolIds.HATCH && <CadEbeneSelect target={hatchIdSelectRef} />}
+
               <div className="hidden">
                 <div>
                   <label>Flächenfarbe</label>
