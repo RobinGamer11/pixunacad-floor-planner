@@ -1726,7 +1726,9 @@ export default function ProjectWorkspace() {
           {/* Canvas */}
           <main
             className="flex-1 relative flex flex-col min-w-0"
-            style={{ background: "hsl(var(--surface))" }}
+            // Optik wie in der CAD-Oberfläche beim Plandruck: mittelgrauer
+            // Hintergrund, das weiße Blatt hebt sich per Schatten ab.
+            style={{ background: presenting ? "hsl(var(--surface))" : "hsl(220 9% 46%)" }}
           >
             <div
               ref={canvasViewportRef}
