@@ -2037,14 +2037,27 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           </div>
 
 
-           {/* Hatch Settings */}
-          <div ref={hatchSettingsRef} className={`cad-settings-panel hidden mb-2`}>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
-              Schraffur
+          {/* Schraffur — Design identisch zur Mappe (Modus & Objektart über dem Rahmen) */}
+          {activeTool === ToolIds.HATCH && (
+            <div className="cad-settings-panel mb-2">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+                Schraffur
+              </div>
+              <HatchModeSelect app={appRef.current} />
+              <RasterModeToggle app={appRef.current} projectId={projectId} />
+              <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
+                <HatchSettingsPanel app={appRef.current} projectId={projectId} patternScaleMax={60} hideChrome />
+              </div>
             </div>
-            <RasterModeToggle app={appRef.current} projectId={projectId} />
+          )}
 
-            <div className="flex gap-1 mb-3">
+           {/* Hatch Settings (Legacy-Bindings: Ebene + Flächenanzeige) */}
+          <div ref={hatchSettingsRef} className={`cad-settings-panel hidden mb-2`}>
+            <div className="hidden">
+              <RasterModeToggle app={appRef.current} projectId={projectId} />
+            </div>
+
+            <div className="hidden gap-1 mb-3">
               <button
                 type="button"
                 onClick={() => appRef.current?.hatchTool.setDrawMode("polygon")}
