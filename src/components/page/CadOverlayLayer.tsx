@@ -263,6 +263,9 @@ export default function CadOverlayLayer(props: Props) {
     const onScale = (ev: Event) => {
       const k = (ev as CustomEvent<number>).detail ?? 1;
       engineRef.current?.setRenderScale(k);
+      // Auch bei unverändertem Faktor sicherstellen, dass ein aktueller
+      // Frame auf der Zeichenfläche liegt, bevor der Snapshot entsteht.
+      engineRef.current?.renderNow();
     };
     window.addEventListener("pixuna:export-render-scale", onScale as EventListener);
     return () => window.removeEventListener("pixuna:export-render-scale", onScale as EventListener);
