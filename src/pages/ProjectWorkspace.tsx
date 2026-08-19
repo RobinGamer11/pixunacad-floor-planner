@@ -609,6 +609,15 @@ export default function ProjectWorkspace() {
     if (t) setRightTabState("tools");
   };
 
+  // Werkzeug-Modi links schließen sich automatisch, sobald das jeweilige
+  // Werkzeug nicht mehr aktiv ist (auch bei ESC oder Wechsel von außen).
+  React.useEffect(() => {
+    if (!isLinePageTool(activeTool)) setLineToolFlyoutOpen(false);
+    if (activeTool !== "hatch") setHatchToolFlyoutOpen(false);
+    if (activeTool !== null) setSelectToolFlyoutOpen(false);
+  }, [activeTool]);
+
+
   const activateLineTool = (tool: LinePageTool) => {
     setLineToolVariant(tool);
     setActiveToolAndTab(tool);
@@ -5607,7 +5616,7 @@ function ToolsTab({
 
       {/* Ebenen-Auswahl — bestimmt, in welche Ebene neu gezeichnete Objekte
           landen. Analog zum "Ebene"-Dropdown in der CAD-Oberfläche. */}
-      {cadEngine && settingsTool && settingsTool !== "cad" && (
+      {cadEngine && settingsTool && settingsTool !== "cad" && settingsTool !== "pipette" && (
         <EbeneSelect engine={cadEngine} />
       )}
 

@@ -19,6 +19,7 @@ import { WallSettingsPanel } from "@/components/cad/WallSettingsPanel";
 import { HatchPatternBlock } from "@/components/cad/HatchPatternBlock";
 
 import { ToolHelpNotes } from "@/components/cad/ToolHelpNotes";
+import { MappeHelpOverlay } from "@/components/workspace/MappeHelpOverlay";
 import { RasterModeToggle } from "@/components/cad/RasterModeToggle";
 
 import { DocumentFilterPanel } from "@/components/cad/DocumentFilterPanel";
@@ -1779,6 +1780,16 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
         {/* Canvas */}
         <canvas ref={canvasRef} className="block w-full h-full" />
 
+        {/* Hilfeanzeige wie in der Mappe — werkzeugabhängig. */}
+        {!presenting && (
+          <MappeHelpOverlay
+            guideActive={false}
+            lineActive={activeTool === ToolIds.LINE || activeTool === ToolIds.FREE}
+            hatchActive={activeTool === ToolIds.HATCH}
+            textActive={activeTool === ToolIds.TEXT}
+          />
+        )}
+
         {/* Maßstab der Zeichenoberfläche ist fix 1:1 — kein UI mehr. */}
       </div>
       {/* Right Tab Panel */}
@@ -1786,8 +1797,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       <aside className="shrink-0 w-[280px] h-full flex-col border-l flex" style={{ background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" }}>
         <div className="grid grid-cols-[1fr_1fr_1fr_auto] shrink-0 border-b items-stretch" style={{ borderColor: "hsl(var(--hairline))" }}>
           {([
-            { id: "settings" as const, label: "Werkzeug", Icon: SettingsIcon },
             { id: "sheets" as const, label: "Seiten", Icon: SettingsIcon },
+            { id: "settings" as const, label: "Werkzeug", Icon: SettingsIcon },
             { id: "layers" as const, label: "Ebenen", Icon: LayersIcon },
           ]).map(t => (
             <button
@@ -1942,87 +1953,89 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               </div>
             </div>
           )}
-          {/* Line Settings */}
+          {/* Line Settings — Design analog zum Linien-Werkzeug in der Mappe:
+              Ebene und Objektart stehen über dem Fensterrahmen, alle
+              Zeichen-Eigenschaften liegen im gerahmten Block. */}
           <div ref={settingsRef} className={`cad-settings-panel hidden mb-2`}>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
-              Linie
-            </div>
-            <RasterModeToggle app={appRef.current} projectId={projectId} />
             <div className="space-y-3">
               <div>
                 <label>Ebene</label>
                 <select ref={idSelectRef} className="cad-settings-select w-full" />
               </div>
-              <div>
-                <label>Farbe</label>
-                <div className="flex items-center gap-2">
-                  <div ref={colorPreviewRef} className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))" }} />
-                  <input ref={colorInputRef} type="color" defaultValue="#111111" className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
-                </div>
-              </div>
-               <div>
-                 <label>Liniendicke (cm)</label>
-                 <input ref={thicknessInputRef} type="text" defaultValue="3" />
-               </div>
-               <div>
-                 <label>Transparenz</label>
-                 <input
-                   type="range"
-                   min={1}
-                   max={100}
-                   step={1}
-                   value={lineAlpha}
-                   onChange={(e) => applyLineAlpha(Number(e.target.value))}
-                   className="w-full"
-                 />
-                 <div className="flex items-center gap-1 mt-1">
-                   <input
-                     type="number"
-                     min={1}
-                     max={100}
-                     step={1}
-                     value={lineAlpha}
-                     onChange={(e) => applyLineAlpha(Number(e.target.value))}
-                     className="w-16 h-7 px-1 text-right text-[11px] rounded border bg-transparent"
-                     style={{ borderColor: "hsl(var(--hairline))" }}
-                   />
-                   <span className="text-[10px]">%</span>
-                 </div>
-               </div>
-               <div className="pt-2" style={{ borderTop: "1px solid hsl(var(--border))" }}>
-                 <label className="block mb-1.5">Pfeilspitzen</label>
-                 <div className="flex gap-1">
-                   <button type="button" onClick={() => setLineArrowStart(!lineArrowStart)}
-                     className={`cad-toolbar-btn flex-1 justify-center h-8 text-[11px] ${lineArrowStart ? "active" : ""}`}>
-                     Anfang
-                   </button>
-                   <button type="button" onClick={() => setLineArrowEnd(!lineArrowEnd)}
-                     className={`cad-toolbar-btn flex-1 justify-center h-8 text-[11px] ${lineArrowEnd ? "active" : ""}`}>
-                     Ende
-                   </button>
-                 </div>
-               </div>
-               {(lineArrowStart || lineArrowEnd) && (
-                 <div>
-                   <label>Pfeilgröße (×)</label>
-                   <input
-                     type="number" min={0.2} step={0.1}
-                     value={lineArrowScale}
-                     onChange={(e) => {
-                       const n = parseFloat(e.target.value.replace(",", "."));
-                       if (Number.isFinite(n) && n > 0) setLineArrowScale(n);
-                     }}
-                   />
-                 </div>
-               )}
-             </div>
+              <RasterModeToggle app={appRef.current} projectId={projectId} />
+            </div>
 
-             <div className="mt-3 pt-2 flex flex-wrap gap-1.5" style={{ borderTop: "1px solid hsl(var(--border))" }}>
-               <span className="cad-kbd">Space</span>
-               <span className="cad-kbd">Shift</span>
-               <span className="cad-kbd">Tab</span>
-             </div>
-           </div>
+            <div className="mt-3 rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
+              <div className="text-[10px] font-semibold tracking-wider mb-2" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+                LINIE
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <label>Farbe</label>
+                  <div className="flex items-center gap-2">
+                    <div ref={colorPreviewRef} className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))" }} />
+                    <input ref={colorInputRef} type="color" defaultValue="#111111" className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
+                  </div>
+                </div>
+                <div>
+                  <label>Strichstärke (cm)</label>
+                  <input ref={thicknessInputRef} type="text" defaultValue="1" />
+                </div>
+                <div>
+                  <label>Transparenz</label>
+                  <input
+                    type="range"
+                    min={1}
+                    max={100}
+                    step={1}
+                    value={lineAlpha}
+                    onChange={(e) => applyLineAlpha(Number(e.target.value))}
+                    className="w-full"
+                  />
+                  <div className="flex items-center gap-1 mt-1">
+                    <input
+                      type="number"
+                      min={1}
+                      max={100}
+                      step={1}
+                      value={lineAlpha}
+                      onChange={(e) => applyLineAlpha(Number(e.target.value))}
+                      className="w-16 h-7 px-1 text-right text-[11px] rounded border bg-transparent"
+                      style={{ borderColor: "hsl(var(--hairline))" }}
+                    />
+                    <span className="text-[10px]">%</span>
+                  </div>
+                </div>
+                <div className="pt-2" style={{ borderTop: "1px solid hsl(var(--border))" }}>
+                  <label className="block mb-1.5">Pfeilspitzen</label>
+                  <div className="flex gap-1">
+                    <button type="button" onClick={() => setLineArrowStart(!lineArrowStart)}
+                      className={`cad-toolbar-btn flex-1 justify-center h-8 text-[11px] ${lineArrowStart ? "active" : ""}`}>
+                      Anfang
+                    </button>
+                    <button type="button" onClick={() => setLineArrowEnd(!lineArrowEnd)}
+                      className={`cad-toolbar-btn flex-1 justify-center h-8 text-[11px] ${lineArrowEnd ? "active" : ""}`}>
+                      Ende
+                    </button>
+                  </div>
+                </div>
+                {(lineArrowStart || lineArrowEnd) && (
+                  <div>
+                    <label>Pfeilgröße (×)</label>
+                    <input
+                      type="number" min={0.2} step={0.1}
+                      value={lineArrowScale}
+                      onChange={(e) => {
+                        const n = parseFloat(e.target.value.replace(",", "."));
+                        if (Number.isFinite(n) && n > 0) setLineArrowScale(n);
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
 
            {/* Hatch Settings */}
           <div ref={hatchSettingsRef} className={`cad-settings-panel hidden mb-2`}>
@@ -2624,7 +2637,13 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
 
           {/* Freihand-Tool-Panel */}
           {(activeTool === ToolIds.FREE || (activeTool === ToolIds.SELECT && selectedFreeStrokeId)) && (
-            <FreeDrawSettingsPanel app={appRef.current} units="m" projectId={projectId} />
+            <div className="cad-settings-panel mb-2">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Freihand</div>
+              <RasterModeToggle app={appRef.current} projectId={projectId} />
+              <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
+                <FreeDrawSettingsPanel app={appRef.current} units="m" projectId={projectId} framedCad />
+              </div>
+            </div>
           )}
 
           {/* Eraser-Tool-Panel — Modus liegt über dem Einstellungsrahmen */}
@@ -3193,7 +3212,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 <div><span className="cad-kbd">Text beenden</span> Außerhalb Textfeld klicken</div>
               </div>
             </div>
-          ) : activeTool !== ToolIds.ERASER ? (
+          ) : (activeTool !== ToolIds.ERASER && activeTool !== ToolIds.PIPETTE && activeTool !== ToolIds.SELECT) ? (
             <ToolHelpNotes toolId={activeTool} />
           ) : null}
         </div>
@@ -3202,7 +3221,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           {/* Zeichnungs-ID Panel (Blätter + Transparentpause) */}
           <div ref={sheetPanelRef} className="cad-id-panel w-full">
             <div className="id-head">
-              <div className="id-title">Zeichnungs-ID</div>
+              <div className="id-title">Seiten-ID</div>
               <div className="id-head-actions">
                 <button ref={sheetToggleBtnRef} className="id-head-btn icon-only" title="Ein-/Ausklappen">
                   <span className="id-toggle-chevron" />
@@ -3211,7 +3230,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             </div>
             <div ref={sheetBodyRef} className="id-body">
               <div className="id-add-wrap">
-                <button ref={sheetAddBtnRef} className="id-head-btn id-add-btn">+ Blatt</button>
+                <button ref={sheetAddBtnRef} className="id-head-btn id-add-btn">+ Seite</button>
               </div>
               <div ref={sheetListRef} className="id-list" />
             </div>
