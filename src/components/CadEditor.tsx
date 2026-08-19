@@ -859,6 +859,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     app.setTool(ToolIds.SELECT);
     app.doorTool.onSelectionChange = (id) => {
       setDoorSelectedId(id);
+      if (id && app.activeTool === app.selectTool) setRightTab("settings");
       if (id) {
         const d = app.scene.getDoorById(id);
         if (d) {
