@@ -1200,6 +1200,17 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                                 setActiveTool(ToolIds.HATCH);
                               }
                               appRef.current?.hatchTool.setDrawMode(v.mode);
+                            } else if (v.kind === "door") {
+                              if (activeTool !== ToolIds.DOOR) {
+                                appRef.current?.setTool(ToolIds.DOOR);
+                                setActiveTool(ToolIds.DOOR);
+                              }
+                              setDoorMode(v.mode);
+                              if (!doorSelectedId) {
+                                setDoorHeightM(v.mode === "window" ? 1.2 : 2.1);
+                                setDoorSashEnabled(v.mode === "door");
+                                setDoorJambThickM(v.mode === "window" ? 0.09 : 0.08);
+                              }
                             } else {
                               // marquee mode toggle for Select tool
                               if (activeTool !== ToolIds.SELECT) {
