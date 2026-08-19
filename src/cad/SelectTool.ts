@@ -2315,8 +2315,17 @@ export class SelectTool {
     for (const dim of this.app.scene.dimensions) {
       if (!this.app.labelManager.isVisible(dim.labelId)) continue;
       const g = getDimensionGeometry(dim);
-      const proj = projectPointToSegment(mouseW, g.d1, g.d2);
-      const px = distPxToWorldPoint(proj.q);
+      let nearest = projectPointToSegment(mouseW, g.d1, g.d2).q;
+      if (g.arcPts && g.arcPts.length > 1) {
+        // Gewölbte Maßkette: entlang des Bogens treffen.
+        let bd = Infinity;
+        for (let i = 0; i < g.arcPts.length - 1; i++) {
+          const q = projectPointToSegment(mouseW, g.arcPts[i], g.arcPts[i + 1]).q;
+          const d = dist(mouseW, q);
+          if (d < bd) { bd = d; nearest = q; }
+        }
+      }
+      const px = distPxToWorldPoint(nearest);
       if (px <= Defaults.hitPx) {
         return { type: SelectionType.DIMENSION, dimensionId: dim.id } as any;
       }
