@@ -317,6 +317,26 @@
     font-family: 'JetBrains Mono', monospace;
   }
 
+  /* Eingabefelder, die bereits in einem gerahmten Feld (mit Einheit) sitzen –
+     Look 1:1 wie in der Projektmappe: kein doppelter Rahmen, kein eigener HG. */
+  .cad-settings-panel input[type="text"].bg-transparent,
+  .cad-settings-panel input[type="number"].bg-transparent {
+    @apply rounded-none border-0 py-0;
+    background: transparent;
+    font-family: inherit;
+  }
+
+  /* Häkchen-Felder: Text mittig daneben, ohne Label-Abstand nach unten. */
+  .cad-settings-panel input[type="checkbox"] {
+    @apply h-3.5 w-3.5 shrink-0 cursor-pointer;
+    accent-color: hsl(var(--primary));
+  }
+  .cad-settings-panel input[type="checkbox"] + label {
+    @apply mb-0 inline-flex items-center text-[11px] leading-none;
+  }
+
+
+
 
   .cad-settings-panel input:focus {
     @apply outline-none ring-1;
