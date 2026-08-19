@@ -2098,29 +2098,31 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 <label>Ebene</label>
                 <select ref={hatchIdSelectRef} className="cad-settings-select w-full" />
               </div>
-              <div>
-                <label>Flächenfarbe</label>
-                <div className="flex items-center gap-2">
-                  <div ref={hatchFillPreviewRef} className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))" }} />
-                  <input ref={hatchFillColorRef} type="color" defaultValue="#4da3ff" className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
+              <div className="hidden">
+                <div>
+                  <label>Flächenfarbe</label>
+                  <div className="flex items-center gap-2">
+                    <div ref={hatchFillPreviewRef} className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))" }} />
+                    <input ref={hatchFillColorRef} type="color" defaultValue="#4da3ff" className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
+                  </div>
+                </div>
+                <div>
+                  <label>Polylinienfarbe</label>
+                  <div className="flex items-center gap-2">
+                    <div ref={hatchStrokePreviewRef} className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))" }} />
+                    <input ref={hatchStrokeColorRef} type="color" defaultValue="#111111" className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
+                  </div>
+                </div>
+                <div>
+                  <label>Polyliniendicke</label>
+                  <input ref={hatchStrokeWidthRef} type="text" defaultValue="1" />
+                </div>
+                <div>
+                  <label>Transparenz (0–100%)</label>
+                  <input ref={hatchAlphaRef} type="text" defaultValue="35" />
                 </div>
               </div>
-              <div>
-                <label>Polylinienfarbe</label>
-                <div className="flex items-center gap-2">
-                  <div ref={hatchStrokePreviewRef} className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))" }} />
-                  <input ref={hatchStrokeColorRef} type="color" defaultValue="#111111" className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
-                </div>
-              </div>
-              <div>
-                <label>Polyliniendicke</label>
-                <input ref={hatchStrokeWidthRef} type="text" defaultValue="1" />
-              </div>
-              <div>
-                <label>Transparenz (0–100%)</label>
-                <input ref={hatchAlphaRef} type="text" defaultValue="35" />
-              </div>
-              <HatchPatternBlock app={cadApp} scaleMax={60} />
+
 
               <div className="flex items-center gap-2 mt-1">
                 <input
