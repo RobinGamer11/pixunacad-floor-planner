@@ -437,6 +437,15 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const [lineArrowScale, setLineArrowScale] = useState<number>(1);
   // Linien-Transparenz (1–100 %) — wird als rgba() auf die Linienfarbe angewendet.
   const [lineAlpha, setLineAlpha] = useState<number>(100);
+  // Höhentext nur zeigen, wenn die gewählte Maßkette eine Tür/Fenster-Referenz hat.
+  const [measureHasDoorRef, setMeasureHasDoorRef] = useState(false);
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      const dim: any = (appRef.current as any)?.getSelectedDimension?.();
+      setMeasureHasDoorRef(!!dim?.doorRefId);
+    }, 300);
+    return () => window.clearInterval(id);
+  }, []);
   function applyLineAlpha(pct: number) {
     const clamped = Math.min(100, Math.max(1, Math.round(pct)));
     setLineAlpha(clamped);
