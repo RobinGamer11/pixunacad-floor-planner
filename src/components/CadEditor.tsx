@@ -2370,9 +2370,6 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
 
           {/* Text Settings */}
           <div ref={textSettingsRef} className={`cad-settings-panel hidden`}>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
-              Text
-            </div>
             <div className="space-y-3 mb-3">
               <div className="hidden">
                 <select ref={textIdSelectRef} className="cad-settings-select w-full" />
@@ -2380,13 +2377,19 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               <CadEbeneSelect target={textIdSelectRef} />
               <div>
                 <div className="text-[10px] font-semibold tracking-wider mb-1.5" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>MODUS</div>
+                <div className="hidden">
+                  <button ref={textModeAutoRef} type="button" />
+                  <button ref={textModeFrameRef} type="button" />
+                </div>
                 <div className="grid grid-cols-2 gap-1">
-                  <button ref={textModeAutoRef} type="button" className="cad-toolbar-btn h-9 justify-center text-[11px]" title="Rahmen passt sich an Text an">
-                    Rahmen variabel
-                  </button>
-                  <button ref={textModeFrameRef} type="button" className="cad-toolbar-btn h-9 justify-center text-[11px]" title="Text passt sich an Rahmen an">
-                    Rahmen fix
-                  </button>
+                  <CadToggleProxy target={textModeAutoRef} title="Rahmen passt sich an Text an" className="flex-col gap-0.5 h-auto py-1.5">
+                    <Scan className="h-3.5 w-3.5" />
+                    <span className="text-[9px] leading-tight">Rahmen variabel</span>
+                  </CadToggleProxy>
+                  <CadToggleProxy target={textModeFrameRef} title="Text passt sich an Rahmen an" className="flex-col gap-0.5 h-auto py-1.5">
+                    <Frame className="h-3.5 w-3.5" />
+                    <span className="text-[9px] leading-tight">Rahmen fix</span>
+                  </CadToggleProxy>
                 </div>
               </div>
               <RasterModeToggle app={appRef.current} projectId={projectId} />
@@ -2396,73 +2399,80 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             <div className="space-y-3">
 
               <div>
-                <label>Ausrichtung</label>
-                <div className="flex gap-1">
-                  <button ref={textAlignLeftRef} type="button" className="cad-toolbar-btn flex-1 justify-center h-9" title="Text links">
-                    <AlignLeft className="h-4 w-4" />
-                  </button>
-                  <button ref={textAlignCenterRef} type="button" className="cad-toolbar-btn flex-1 justify-center h-9" title="Text zentriert">
-                    <AlignCenter className="h-4 w-4" />
-                  </button>
-                  <button ref={textAlignRightRef} type="button" className="cad-toolbar-btn flex-1 justify-center h-9" title="Text rechts">
-                    <AlignRight className="h-4 w-4" />
-                  </button>
+                <div className="mb-1.5 text-[10px] text-muted-foreground">Ausrichtung</div>
+                <div className="hidden">
+                  <button ref={textAlignLeftRef} type="button" />
+                  <button ref={textAlignCenterRef} type="button" />
+                  <button ref={textAlignRightRef} type="button" />
+                </div>
+                <div className="grid grid-cols-3 gap-1">
+                  <CadToggleProxy target={textAlignLeftRef} title="Text links"><AlignLeft className="h-4 w-4" /></CadToggleProxy>
+                  <CadToggleProxy target={textAlignCenterRef} title="Text zentriert"><AlignCenter className="h-4 w-4" /></CadToggleProxy>
+                  <CadToggleProxy target={textAlignRightRef} title="Text rechts"><AlignRight className="h-4 w-4" /></CadToggleProxy>
                 </div>
               </div>
               <div>
-                <label>Schriftgröße</label>
-                <div className="grid grid-cols-1 gap-2">
-                  <div>
-                    <div className="text-[9px] mb-0.5" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Punkt (pt)</div>
-                    <input ref={textFontSizePtRef} type="text" defaultValue="11" />
-                  </div>
-                  <div className="hidden">
-                    <input ref={textFontSizeRef} type="text" defaultValue="14.67" />
-                  </div>
+                <div className="mb-1.5 text-[10px] text-muted-foreground">Schriftgröße</div>
+                <div className="hidden">
+                  <input ref={textFontSizePtRef} type="text" defaultValue="11" />
+                  <input ref={textFontSizeRef} type="text" defaultValue="14.67" />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <CadMeasureProxy label="Punkt" unit="pt" target={textFontSizePtRef} factor={1} digits={1} />
+                  <CadMeasureProxy label="Tatsächliche Größe" unit="mm" target={textFontSizePtRef} factor={25.4 / 72} digits={2} />
                 </div>
               </div>
               <div>
-                <label>Stil</label>
-                <div className="flex gap-1">
-                  <button ref={textBoldRef} type="button" className="cad-toolbar-btn flex-1 justify-center h-9 font-bold" title="Fett">B</button>
-                  <button ref={textItalicRef} type="button" className="cad-toolbar-btn flex-1 justify-center h-9 italic" title="Kursiv">I</button>
-                  <button ref={textUnderlineRef} type="button" className="cad-toolbar-btn flex-1 justify-center h-9 underline" title="Unterstrichen">U</button>
-                  <button ref={textStrikeRef} type="button" className="cad-toolbar-btn flex-1 justify-center h-9 line-through" title="Durchgestrichen">S</button>
+                <div className="mb-1.5 text-[10px] text-muted-foreground">Stil</div>
+                <div className="hidden">
+                  <button ref={textBoldRef} type="button" />
+                  <button ref={textItalicRef} type="button" />
+                  <button ref={textUnderlineRef} type="button" />
+                  <button ref={textStrikeRef} type="button" />
+                </div>
+                <div className="grid grid-cols-4 gap-1">
+                  <CadToggleProxy target={textBoldRef} title="Fett"><BoldIcon className="h-4 w-4" /></CadToggleProxy>
+                  <CadToggleProxy target={textItalicRef} title="Kursiv"><ItalicIcon className="h-4 w-4" /></CadToggleProxy>
+                  <CadToggleProxy target={textUnderlineRef} title="Unterstrichen"><UnderlineIcon className="h-4 w-4" /></CadToggleProxy>
+                  <CadToggleProxy target={textStrikeRef} title="Durchgestrichen"><StrikethroughIcon className="h-4 w-4" /></CadToggleProxy>
                 </div>
               </div>
               <div>
-                <label>Absatz</label>
-                <input ref={textLineHeightRangeRef} type="range" min={80} max={300} step={5} defaultValue={105} className="cad-range w-full" />
-                <input ref={textLineHeightNumRef} type="text" defaultValue="105" />
+                <div className="mb-1.5 text-[10px] text-muted-foreground">Absatz</div>
+                <div className="hidden">
+                  <input ref={textLineHeightRangeRef} type="range" min={80} max={300} step={5} defaultValue={105} />
+                  <input ref={textLineHeightNumRef} type="text" defaultValue="105" />
+                </div>
+                <CadRangeProxy target={textLineHeightNumRef} rangeTarget={textLineHeightRangeRef} min={80} max={300} step={5} unit="%" />
+              </div>
+              <div className="hidden">
+                <div ref={textColorPreviewRef} />
+                <input ref={textColorRef} type="color" defaultValue="#111111" />
+                <div ref={textBgColorPreviewRef} />
+                <input ref={textBgColorRef} type="color" defaultValue="#ffffff" />
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label>Textfarbe</label>
-                  <div className="flex items-center gap-2">
-                    <div ref={textColorPreviewRef} className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))" }} />
-                    <input ref={textColorRef} type="color" defaultValue="#111111" className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
-                  </div>
-                </div>
-                <div>
-                  <label>Feldfarbe</label>
-                  <div className="flex items-center gap-2">
-                    <div ref={textBgColorPreviewRef} className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))" }} />
-                    <input ref={textBgColorRef} type="color" defaultValue="#ffffff" className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
-                  </div>
-                </div>
+                <CadColorProxy label="Textfarbe" target={textColorRef} />
+                <CadColorProxy label="Feldfarbe" target={textBgColorRef} />
               </div>
               <div>
-                <label>Transparenz</label>
-                <input ref={textBgAlphaRangeRef} type="range" min={0} max={100} step={1} defaultValue={0} className="cad-range w-full" />
-                <input ref={textBgAlphaRef} type="text" defaultValue="0" />
+                <div className="mb-1.5 text-[10px] text-muted-foreground">Transparenz</div>
+                <div className="hidden">
+                  <input ref={textBgAlphaRangeRef} type="range" min={0} max={100} step={1} defaultValue={0} />
+                  <input ref={textBgAlphaRef} type="text" defaultValue="0" />
+                </div>
+                <CadRangeProxy target={textBgAlphaRef} rangeTarget={textBgAlphaRangeRef} min={0} max={100} step={1} unit="%" />
               </div>
               <div className="flex items-center gap-2 hidden">
                 <input ref={textWrapRef} type="checkbox" className="accent-primary" />
                 <label className="!mb-0 cursor-pointer">Zeilenumbruch</label>
               </div>
-              <div className="flex items-center gap-2">
-                <input ref={textBorderToggleRef} type="checkbox" className="accent-primary" />
-                <label className="!mb-0 cursor-pointer">Rahmen</label>
+              <div>
+                <div className="mb-1.5 text-[10px] text-muted-foreground">Rahmen</div>
+                <div className="hidden">
+                  <input ref={textBorderToggleRef} type="checkbox" />
+                </div>
+                <CadCheckboxProxy target={textBorderToggleRef} label="Rahmen anzeigen" />
               </div>
               <div ref={textBorderGroupRef} className="hidden space-y-2 pt-2" style={{ borderTop: "1px solid hsl(var(--border))" }}>
                 <div>
@@ -2480,6 +2490,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             </div>
             </div>
           </div>
+
 
 
           {/* Stempel-Werkzeug */}
