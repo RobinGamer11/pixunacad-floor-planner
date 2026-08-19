@@ -5616,6 +5616,7 @@ function ToolsTab({
   onConfirmTable?: () => void;
   onCancelTable?: () => void;
 }) {
+  const cadDocSelected = useCadDocumentSelected(cadEngine ?? null);
 
   const settingsTool = activeTool ?? selectedCadTool ?? null;
   const settingsPage = (pageId ? project.pages.find((candidate) => candidate.id === pageId) : undefined)
