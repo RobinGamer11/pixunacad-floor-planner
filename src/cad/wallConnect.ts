@@ -20,7 +20,10 @@ export function trimWallEndpointsToNeighbors(
 ): boolean {
   const all = scene.walls;
   if (wall.corners.length < 2 || all.length < 2) return false;
-  const reach = Math.max(0.08, wall.thicknessM * 1.2);
+  // Bewusst sehr klein: nur wirklich beabsichtigte Anschlüsse dürfen andocken.
+  // Größere Reichweiten führten dazu, dass dicht daneben gezeichnete Wände
+  // ungewollt auf die Nachbarwand gezogen (und damit verbunden) wurden.
+  const reach = Math.max(0.015, wall.thicknessM * 0.25);
   const sides: ("start" | "end")[] = onlyEndpoint ? [onlyEndpoint] : ["start", "end"];
   let changed = false;
 
