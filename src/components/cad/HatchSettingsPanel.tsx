@@ -25,7 +25,7 @@ const MeasureInput: React.FC<{
   useEffect(() => { if (!focused) setDraft(String(Number(value.toFixed(digits)))); }, [value, digits, focused]);
   return (
     <label className="min-w-0">
-      <span className="mb-1 block text-[9px] text-muted-foreground">{label}</span>
+      <span className="mb-1 block whitespace-nowrap text-[9px] leading-tight text-muted-foreground">{label}</span>
       <input
         type="text"
         inputMode="decimal"
