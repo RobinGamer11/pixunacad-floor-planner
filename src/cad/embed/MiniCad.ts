@@ -398,6 +398,16 @@ export class MiniCad {
         (this.selectTool as any).beginFreeStrokeAction?.((sel as any).freeStrokeId, action);
         return;
       }
+      if (sel && sel.type === SelectionType.HATCH && (sel as any).hatchId && (sel as any).edgeIndex != null) {
+        if (action === PointEditAction.INSERT_POINT) {
+          (this.selectTool as any).insertHatchEdgePoint?.((sel as any).hatchId, (sel as any).edgeIndex, (sel as any).holeIndex ?? null);
+          return;
+        }
+        if (action === PointEditAction.OFFSET) {
+          (this.selectTool as any).beginHatchEdgeOffset?.((sel as any).hatchId, (sel as any).edgeIndex, (sel as any).holeIndex ?? null);
+          return;
+        }
+      }
       this.selectTool.beginPointEdit(action);
     });
 
