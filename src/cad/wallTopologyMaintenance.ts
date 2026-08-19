@@ -1,4 +1,4 @@
-import { Vec2, v, sub, norm, dist } from "./geometry";
+import { Vec2, v, sub, norm, dist, projectPointToCurvedEdge, splitBulgedEdge, bulgeEndpointTangent } from "./geometry";
 import type { Scene, Wall } from "./Scene";
 
 
@@ -109,11 +109,20 @@ function runAutoSplit(scene: Scene, focusWalls?: Wall[]): boolean {
           if (dist(c, hit.pos) <= NODE_TOL) { nearExistingCorner = true; break; }
         }
         if (nearExistingCorner) continue;
+        const oldBulge = host.bulges?.[hit.edgeIndex] || 0;
+        const cut = splitBulgedEdge(host.corners[hit.edgeIndex], host.corners[hit.edgeIndex + 1], oldBulge, hit.pos);
         // Split: neuen Corner am Treffpunkt in host.corners einfügen.
         host.corners = [
           ...host.corners.slice(0, hit.edgeIndex + 1),
-          v(hit.pos.x, hit.pos.y),
+          v(cut.point.x, cut.point.y),
           ...host.corners.slice(hit.edgeIndex + 1),
+        ];
+        const oldBulges = host.bulges || [];
+        host.bulges = [
+          ...oldBulges.slice(0, hit.edgeIndex),
+          cut.bulgeA,
+          cut.bulgeB,
+          ...oldBulges.slice(hit.edgeIndex + 1),
         ];
         if (host.cornerAnchors) {
           host.cornerAnchors = [
@@ -130,6 +139,7 @@ function runAutoSplit(scene: Scene, focusWalls?: Wall[]): boolean {
         if (dist(host.corners[hit.edgeIndex], host.corners[hit.edgeIndex + 1]) < MIN_SEG_LEN_M) {
           host.corners.splice(hit.edgeIndex + 1, 1);
           if (host.cornerAnchors) host.cornerAnchors.splice(hit.edgeIndex + 1, 1);
+          host.bulges.splice(hit.edgeIndex, 2, oldBulge);
           host.hiddenCornerIndices = (host.hiddenCornerIndices || [])
             .filter(i => i !== hit.edgeIndex + 1)
             .map(i => i > hit.edgeIndex + 1 ? i - 1 : i);
@@ -176,12 +186,16 @@ function runAutoMerge(scene: Scene): boolean {
     // sauber ist. Ergebnis-Reihenfolge: A's "freie" Seite → join → B's "freie" Seite.
     const cornersA = a.atStart ? [...a.wall.corners].reverse() : [...a.wall.corners];
     const cornersB = b.atStart ? [...b.wall.corners] : [...b.wall.corners].reverse();
+    const reverseBulges = (wall: Wall) => [...(wall.bulges || [])].reverse().map(bg => -bg);
+    const bulgesA = a.atStart ? reverseBulges(a.wall) : [...(a.wall.bulges || [])];
+    const bulgesB = b.atStart ? [...(b.wall.bulges || [])] : reverseBulges(b.wall);
     // cornersA endet am Knoten, cornersB beginnt am Knoten — ersten Punkt von B
     // weglassen, da identisch mit Ende von A.
     const merged = cornersA.concat(cornersB.slice(1)).map(p => v(p.x, p.y));
     if (merged.length < 2) continue;
     // Ursprungs-Wand A behält id und Eigenschaften, B wird entfernt.
     a.wall.corners = merged;
+    a.wall.bulges = bulgesA.concat(bulgesB);
     a.wall.hiddenCornerIndices = [];
     scene.removeWall(b.wall);
     return true; // Nach Mutation neu starten (Cluster-Indizes sind ungültig).
@@ -200,11 +214,10 @@ function findInteriorHit(w: Wall, p: Vec2, tol: number): { edgeIndex: number; t:
   let cum = 0;
   for (let i = 0; i < w.corners.length - 1; i++) {
     const a = w.corners[i], b = w.corners[i + 1];
-    const ab = sub(b, a);
-    const ab2 = ab.x * ab.x + ab.y * ab.y || 1e-12;
-    let t = ((p.x - a.x) * ab.x + (p.y - a.y) * ab.y) / ab2;
+    const projection = projectPointToCurvedEdge(p, a, b, w.bulges?.[i] || 0);
+    const t = projection.t;
     if (t > 0.02 && t < 0.98) {
-      const q = { x: a.x + ab.x * t, y: a.y + ab.y * t };
+      const q = projection.q;
       const d = Math.hypot(q.x - p.x, q.y - p.y);
       if (d <= tol && (!best || d < best.d)) best = { edgeIndex: i, t, pos: v(q.x, q.y), cumStart: cum, total, d };
     }
@@ -265,14 +278,9 @@ function collinearAtJoin(a: { wall: Wall; atStart: boolean }, b: { wall: Wall; a
 function endpointTangent(w: Wall, atStart: boolean, intoNode: boolean): Vec2 | null {
   const n = w.corners.length;
   if (n < 2) return null;
-  let from: Vec2, to: Vec2;
-  if (atStart) {
-    // Knoten = corners[0]
-    from = w.corners[1]; to = w.corners[0];
-  } else {
-    from = w.corners[n - 2]; to = w.corners[n - 1];
-  }
-  const d = norm(sub(to, from));
+  const edge = atStart ? 0 : n - 2;
+  const alongWall = bulgeEndpointTangent(w.corners[edge], w.corners[edge + 1], w.bulges?.[edge] || 0, atStart);
+  const d = atStart ? v(-alongWall.x, -alongWall.y) : alongWall;
   if (d.x === 0 && d.y === 0) return null;
   return intoNode ? d : v(-d.x, -d.y);
 }

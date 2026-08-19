@@ -32,8 +32,8 @@ export function computeHealedWallLines(wallInput: Wall, others: Wall[], graph?: 
   const subCorners = lines.subCorners.map(p => v(p.x, p.y));
   const helpCorners = lines.helpCorners.map(p => v(p.x, p.y));
 
-  const capStart = !healEnd(wall, others, mainCorners, subCorners, helpCorners, true, graph);
-  const capEnd = !healEnd(wall, others, mainCorners, subCorners, helpCorners, false, graph);
+  const capStart = !healEnd(wall, wallInput, others, mainCorners, subCorners, helpCorners, true, graph);
+  const capEnd = !healEnd(wall, wallInput, others, mainCorners, subCorners, helpCorners, false, graph);
 
   // Cleanup-Pass: gleicher Knoten → gleichnamige Linien zusammenführen.
   if (graph) cleanupAtNodes(wall, mainCorners, subCorners, helpCorners, graph, others);
@@ -43,6 +43,7 @@ export function computeHealedWallLines(wallInput: Wall, others: Wall[], graph?: 
 
 function healEnd(
   wall: Wall,
+  sourceWall: Wall,
   others: Wall[],
   mainCorners: Vec2[],
   subCorners: Vec2[],
@@ -55,8 +56,8 @@ function healEnd(
 
   const idx = atStart ? 0 : mainCorners.length - 1;
   const corner = atStart ? wall.corners[0] : wall.corners[n - 1];
-  const originalCorners = wallInput.corners;
-  const originalBulges = wallInput.bulges || [];
+  const originalCorners = sourceWall.corners;
+  const originalBulges = sourceWall.bulges || [];
   const dir = atStart
     ? bulgeEndpointTangent(originalCorners[0], originalCorners[1], originalBulges[0], true)
     : bulgeEndpointTangent(
