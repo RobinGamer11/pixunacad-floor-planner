@@ -9,23 +9,25 @@ const SliderRow: React.FC<{
 }> = ({ label, min, max, step, decimals, value, disabled, onChange }) => {
   const clamp = (v: number) => Math.max(min, Math.min(max, v));
   return (
-    <div className={`flex items-center justify-between gap-2 ${disabled ? "opacity-50" : ""}`}>
-      <span className="w-24 shrink-0 text-[10px] text-muted-foreground">{label}</span>
-      <input
-        type="range" min={min} max={max} step={step} value={value} disabled={disabled}
-        onChange={(e) => onChange(clamp(parseFloat(e.target.value)))}
-        className="pixuna-range h-4 min-w-0 flex-1 cursor-pointer"
-      />
-      <input
-        type="number" min={min} max={max} step={step} disabled={disabled}
-        value={Number(value.toFixed(decimals))}
-        onChange={(e) => {
-          const v = parseFloat(e.target.value);
-          if (Number.isFinite(v)) onChange(clamp(v));
-        }}
-        className="w-14 shrink-0 rounded border bg-transparent px-1 py-0.5 text-right text-[10px] tabular-nums"
-        style={{ borderColor: "hsl(var(--hairline, var(--border)))" }}
-      />
+    <div className={`min-w-0 ${disabled ? "opacity-50" : ""}`}>
+      <span className="mb-1 block text-[10px] text-muted-foreground">{label}</span>
+      <div className="flex min-w-0 items-center gap-2">
+        <input
+          type="range" min={min} max={max} step={step} value={value} disabled={disabled}
+          onChange={(e) => onChange(clamp(parseFloat(e.target.value)))}
+          className="pixuna-range h-4 min-w-0 flex-1 cursor-pointer"
+        />
+        <input
+          type="number" min={min} max={max} step={step} disabled={disabled}
+          value={Number(value.toFixed(decimals))}
+          onChange={(e) => {
+            const v = parseFloat(e.target.value);
+            if (Number.isFinite(v)) onChange(clamp(v));
+          }}
+          className="h-7 w-14 shrink-0 rounded border bg-white px-1 text-right text-[10px] tabular-nums"
+          style={{ borderColor: "hsl(var(--hairline, var(--border)))" }}
+        />
+      </div>
     </div>
   );
 };

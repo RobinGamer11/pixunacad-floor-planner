@@ -25,7 +25,7 @@ const MeasureInput: React.FC<{
   useEffect(() => { if (!focused) setDraft(String(Number(value.toFixed(digits)))); }, [value, digits, focused]);
   return (
     <label className="min-w-0">
-      <span className="mb-1 block text-[9px] text-muted-foreground">{label}</span>
+      <span className="mb-1 block whitespace-nowrap text-[9px] leading-tight text-muted-foreground">{label}</span>
       <input
         type="text"
         inputMode="decimal"
@@ -183,7 +183,7 @@ export const HatchSettingsPanel: React.FC<Props> = ({ app, projectId, pxPerMm = 
         <div className="mb-1.5 text-[10px] text-muted-foreground">Strichstärke</div>
         <div className="grid grid-cols-2 gap-2">
           <MeasureInput label="Bildschirm (px)" value={strokeWidthPx} digits={2} onChange={(v) => setStroke(v)} />
-          <MeasureInput label="Tatsächliche Größe (mm)" value={strokeMm} digits={3} onChange={(v) => setStroke(v * pxPerMm)} />
+          <MeasureInput label="Tatsächl. Größe (mm)" value={strokeMm} digits={3} onChange={(v) => setStroke(v * pxPerMm)} />
         </div>
       </div>
 
