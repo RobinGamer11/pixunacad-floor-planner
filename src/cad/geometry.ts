@@ -400,7 +400,7 @@ export function splitBulgedEdge(a: Vec2, b: Vec2, bulge: number | null | undefin
   const angSplit = angA + sign * sweepMag * t;
   const point = v(center.x + Math.cos(angSplit) * R, center.y + Math.sin(angSplit) * R);
 
-  const subBulge = (sw: number) => Math.tan(sw / 4) / 2;
+  const subBulge = (sw: number) => -Math.tan(sw / 4) / 2;
   return {
     point,
     bulgeA: subBulge(sign * sweepMag * t),
