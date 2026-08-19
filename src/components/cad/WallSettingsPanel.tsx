@@ -16,7 +16,7 @@ const HAIRLINE = "hsl(var(--hairline))";
 interface Props { app: CadApp | null; projectId?: string; }
 
 
-export const WallSettingsPanel: React.FC<Props> = ({ app }) => {
+export const WallSettingsPanel: React.FC<Props> = ({ app, projectId }) => {
   const [, force] = useState(0);
   const rerender = () => force(x => x + 1);
 
