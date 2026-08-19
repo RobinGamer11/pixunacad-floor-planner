@@ -38,6 +38,37 @@ import { DocumentFilterPanel } from "@/components/cad/DocumentFilterPanel";
 import { DocumentPixelModeToggle } from "@/components/cad/DocumentPixelModeToggle";
 import { WarpSection } from "@/components/page/CadDocumentInspector";
 
+/** Maßeingabe (Meter) im Stil der übrigen Werkzeuge: Beschriftung, gerahmtes Feld, Einheit. */
+const DoorNumField: React.FC<{
+  label: string; value: number; min?: number; onChange: (v: number) => void;
+}> = ({ label, value, min = 0, onChange }) => {
+  const [draft, setDraft] = React.useState(String(Number(value.toFixed(3))));
+  const [focused, setFocused] = React.useState(false);
+  React.useEffect(() => { if (!focused) setDraft(String(Number(value.toFixed(3)))); }, [value, focused]);
+  return (
+    <label className="min-w-0">
+      <span className="mb-1 block text-[9px] leading-tight text-muted-foreground">{label}</span>
+      <span className="flex h-8 items-center overflow-hidden rounded-md border bg-white" style={{ borderColor: "hsl(var(--hairline))" }}>
+        <input
+          type="text"
+          inputMode="decimal"
+          value={draft}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            const n = parseFloat(e.target.value.replace(",", "."));
+            if (Number.isFinite(n) && n >= min) onChange(n);
+          }}
+          className="h-full min-w-0 flex-1 bg-transparent px-2 text-right text-[11px] tabular-nums outline-none"
+        />
+        <span className="pr-2 text-[9px] text-muted-foreground">m</span>
+      </span>
+    </label>
+  );
+};
+
+
 const CAD_TOOLS = [
   { id: ToolIds.SELECT, label: "Auswahl", key: "V", icon: MousePointer2 },
   { id: ToolIds.WALL, label: "Wand", key: "W", icon: BrickWall },
