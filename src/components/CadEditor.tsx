@@ -2368,12 +2368,11 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
               Text
             </div>
-            <RasterModeToggle app={appRef.current} projectId={projectId} />
-            <div className="space-y-3">
-              <div>
-                <label>Ebene</label>
+            <div className="space-y-3 mb-3">
+              <div className="hidden">
                 <select ref={textIdSelectRef} className="cad-settings-select w-full" />
               </div>
+              <CadEbeneSelect target={textIdSelectRef} />
               <div>
                 <div className="text-[10px] font-semibold tracking-wider mb-1.5" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>MODUS</div>
                 <div className="grid grid-cols-2 gap-1">
@@ -2385,6 +2384,12 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                   </button>
                 </div>
               </div>
+              <RasterModeToggle app={appRef.current} projectId={projectId} />
+            </div>
+            <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
+            <div className="text-[10px] font-semibold tracking-wider mb-2" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>TEXT</div>
+            <div className="space-y-3">
+
               <div>
                 <label>Ausrichtung</label>
                 <div className="flex gap-1">
