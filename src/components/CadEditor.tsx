@@ -1858,6 +1858,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             lineActive={activeTool === ToolIds.LINE || activeTool === ToolIds.FREE}
             hatchActive={activeTool === ToolIds.HATCH}
             textActive={activeTool === ToolIds.TEXT}
+            measureActive={activeTool === ToolIds.MEASURE}
           />
         )}
 
@@ -2106,15 +2107,20 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 </div>
                 {(lineArrowStart || lineArrowEnd) && (
                   <div>
-                    <label>Pfeilgröße (×)</label>
-                    <input
-                      type="number" min={0.2} step={0.1}
-                      value={lineArrowScale}
-                      onChange={(e) => {
-                        const n = parseFloat(e.target.value.replace(",", "."));
-                        if (Number.isFinite(n) && n > 0) setLineArrowScale(n);
-                      }}
-                    />
+                    <div className="mb-1.5 text-[10px] text-muted-foreground">Pfeilgröße</div>
+                    <label className="flex h-8 items-center overflow-hidden rounded-md border" style={{ borderColor: "hsl(var(--hairline))", backgroundColor: "#fff" }}>
+                      <input
+                        type="number" min={0.2} step={0.1}
+                        value={lineArrowScale}
+                        onChange={(e) => {
+                          const n = parseFloat(e.target.value.replace(",", "."));
+                          if (Number.isFinite(n) && n > 0) setLineArrowScale(n);
+                        }}
+                        className="h-full min-w-0 flex-1 border-0 bg-transparent px-2 text-right text-[11px] tabular-nums outline-none"
+                        aria-label="Pfeilgröße"
+                      />
+                      <span className="pr-2 text-[9px] text-muted-foreground">×</span>
+                    </label>
                   </div>
                 )}
               </div>
@@ -2735,6 +2741,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 >
                   <input
                     type="checkbox"
+                    className="h-4 w-4 shrink-0 accent-primary"
+                    style={{ width: "1rem", minWidth: "1rem" }}
                     checked={!docFreePlace}
                     onChange={(e) => setDocFreePlace(!e.target.checked)}
                   />

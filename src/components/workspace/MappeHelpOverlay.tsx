@@ -1,5 +1,5 @@
 import React from "react";
-import { ClipboardPaste, Copy, Frame, Grid2x2, Keyboard, Lock, PenTool, Printer, Scan } from "lucide-react";
+import { ClipboardPaste, Copy, Frame, Grid2x2, Keyboard, Lock, PenTool, Printer, Ruler, Scan } from "lucide-react";
 
 type MouseHighlight = "wheel" | "left" | "right";
 
@@ -130,11 +130,13 @@ export function MappeHelpOverlay({
   lineActive = false,
   hatchActive = false,
   textActive = false,
+  measureActive = false,
 }: {
   guideActive?: boolean;
   lineActive?: boolean;
   hatchActive?: boolean;
   textActive?: boolean;
+  measureActive?: boolean;
 }) {
   return (
     <div
@@ -214,6 +216,18 @@ export function MappeHelpOverlay({
               <div className="whitespace-nowrap text-[8px] leading-3 opacity-75">Vektor: Generell bearbeitbar</div>
               <div className="whitespace-nowrap text-[8px] leading-3 opacity-75">Pixel: Radiergummi bearbeitbar</div>
             </div>
+          </HelpGroup>
+        )}
+        {measureActive && (
+          <HelpGroup title="Maßkette" bordered>
+            <div className="flex min-w-[190px] flex-col items-center justify-end px-1.5 py-1 text-center">
+              <div className="mb-1 flex h-8 items-center justify-center"><Ruler className="h-5 w-5" strokeWidth={1.5} /></div>
+              <div className="whitespace-nowrap text-[10px] font-semibold leading-3.5">Maßkette zeichnen</div>
+              <div className="whitespace-nowrap text-[8px] leading-3 opacity-75">1. Gelbe Linie setzen für Richtung</div>
+              <div className="whitespace-nowrap text-[8px] leading-3 opacity-75">2. L-Klick auf Fangpunkte</div>
+              <div className="whitespace-nowrap text-[8px] leading-3 opacity-75">3. Häkchen zum Fertigstellen</div>
+            </div>
+            <HelpItem icon={<MouseGlyph highlight="left" />} shortcut="Freies Maß" description="Keine Fangpunkte benötigt" />
           </HelpGroup>
         )}
         {textActive && (
