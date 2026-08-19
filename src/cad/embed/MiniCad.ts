@@ -27,6 +27,7 @@ import { TextEditorOverlay } from "../TextEditorOverlay";
 import { SelectTool } from "../SelectTool";
 import { FreeDrawTool } from "../FreeDrawTool";
 import { EraserTool } from "../EraserTool";
+import { PipetteTool } from "../PipetteTool";
 import { HatchTool, type HatchDrawMode } from "../HatchTool";
 import { DocumentTool } from "../DocumentTool";
 import { Defaults, SelectionType, PointEditAction } from "../constants";
@@ -89,7 +90,7 @@ type SelectionGeometrySnapshot =
   | { kind: "freestroke"; pts: { x: number; y: number }[] };
 
 
-export type MiniTool = "line" | "text" | "select" | "guide" | "free" | "eraser" | "hatch" | "document" | null;
+export type MiniTool = "line" | "text" | "select" | "guide" | "free" | "eraser" | "hatch" | "document" | "pipette" | null;
 export type MiniCadSelectionInfo =
   | {
       tool: "line";
@@ -164,6 +165,7 @@ export class MiniCad {
   readonly selectTool: SelectTool;
   readonly freeDrawTool: FreeDrawTool;
   readonly eraserTool: EraserTool;
+  readonly pipetteTool: PipetteTool;
   readonly hatchTool: HatchTool;
   readonly documentTool: DocumentTool;
 
@@ -200,6 +202,8 @@ export class MiniCad {
   defaultEraserStrength: number = Defaults.eraserStrength;
   defaultEraserMode: "hard" | "smooth" = Defaults.eraserMode;
   defaultEraserSoftness: number = Defaults.eraserSoftness;
+  /** Radierseite relativ zum Lineal: links / mittig / rechts. */
+  defaultEraserRulerSide: "left" | "center" | "right" = "center";
   /** Hook: wird bei jedem Radier-Stempel aufgerufen (Welt-m). Erlaubt externen
    *  Objekten (z. B. CAD-Blatt in der Projektmappe) mitzuradieren. */
   onEraseStroke: ((centerM: { x: number; y: number }, radiusM: number, mode: "hard" | "smooth", softness: number, strength: number) => void) | null = null;
@@ -364,6 +368,7 @@ export class MiniCad {
     this.selectTool = new SelectTool(this as any);
     this.freeDrawTool = new FreeDrawTool(this as any);
     this.eraserTool = new EraserTool(this as any);
+    this.pipetteTool = new PipetteTool(this as any);
     this.hatchTool = new HatchTool(this as any);
     this.documentTool = new DocumentTool(this as any);
 
@@ -809,6 +814,7 @@ export class MiniCad {
     if (this._activeTool === "eraser") this.eraserTool.cancel();
     if (this._activeTool === "hatch") this.hatchTool.cancel();
     if (this._activeTool === "document") this.documentTool.cancel();
+    if (this._activeTool === "pipette") this.pipetteTool.cancel();
     this._activeTool = tool;
     this.activeTool = null;
     // Guide-Modus aktivieren/deaktivieren — wirkt auf den createSegment-Interceptor.
@@ -833,6 +839,9 @@ export class MiniCad {
     } else if (tool === "document") {
       this.documentTool.activate();
       this.activeTool = this.documentTool as any;
+    } else if (tool === "pipette") {
+      this.pipetteTool.activate();
+      this.activeTool = this.pipetteTool as any;
     }
     try { (window as any).__pixunaActiveTool = tool; } catch {}
   }
@@ -2577,6 +2586,7 @@ export class MiniCad {
       else if (this._activeTool === "eraser") this.eraserTool.update(this.input);
       else if (this._activeTool === "hatch") this.hatchTool.update(this.input);
       else if (this._activeTool === "document") this.documentTool.update(this.input);
+      else if (this._activeTool === "pipette") this.pipetteTool.update(this.input);
 
       // Multi-Select Group-Move: nach SelectTool-Update das Delta des Primary
       // auf die Snapshot-Positionen der Extras anwenden.

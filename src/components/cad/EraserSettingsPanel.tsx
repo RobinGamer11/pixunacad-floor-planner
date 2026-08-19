@@ -112,6 +112,7 @@ export const EraserSettingsPanel: React.FC<Props> = ({ app, variant = "workspace
   const [mode, setMode] = useState<"hard" | "smooth">("hard");
   const [softness, setSoftness] = useState(0.5);
   const [hasRuler, setHasRuler] = useState(false);
+  const [rulerSide, setRulerSide] = useState<"left" | "center" | "right">("center");
   /** Aus dem Schraffur-Werkzeug hierher verschoben: Kanten nach Radieren glätten. */
   const [smoothEdges, setSmoothEdges] = useState(true);
   const smoothAllowed = useRasterSelection(app, rasterSelection);
@@ -124,6 +125,7 @@ export const EraserSettingsPanel: React.FC<Props> = ({ app, variant = "workspace
     setSoftness(app.defaultEraserSoftness ?? 0.5);
     setHasRuler(!!app.scene.rulerGuide);
     setSmoothEdges((app as any).defaultHatchAutoSmooth !== false);
+    setRulerSide((app as any).defaultEraserRulerSide ?? "center");
   }, [app]);
 
   // Modus-Wechsel aus der Modus-Leiste oberhalb spiegeln.
@@ -198,6 +200,27 @@ export const EraserSettingsPanel: React.FC<Props> = ({ app, variant = "workspace
       <button type="button" onClick={toggleRuler} className={`${framedBtn} justify-center`} style={framedStyle}>
         <span>{hasRuler ? "Lineal entfernen" : "Lineal hinzufügen"}</span>
       </button>
+
+      <div className={hasRuler ? "" : "opacity-50"}>
+        <div className="mb-1 text-muted-foreground">Radierseite</div>
+        <div className="grid grid-cols-3 gap-1">
+          {([
+            { id: "left" as const, label: "Links" },
+            { id: "center" as const, label: "Mittig" },
+            { id: "right" as const, label: "Rechts" },
+          ]).map(({ id, label }) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => { setRulerSide(id); (app as any).defaultEraserRulerSide = id; }}
+              className={`rounded border px-1 py-1 text-[10px] transition-colors ${rulerSide === id ? "bg-accent" : "hover:bg-muted"}`}
+              style={framedStyle}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       <div className="text-[10px] leading-snug text-muted-foreground">
         Maus gedrückt halten → radieren. Das Lineal lässt sich nur an seinen

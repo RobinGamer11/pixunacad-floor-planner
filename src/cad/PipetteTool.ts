@@ -1,39 +1,81 @@
-import { Defaults, SelectionType } from "./constants";
+import { Defaults } from "./constants";
 import { Vec2, v, projectPointToSegment, pointInPolygon } from "./geometry";
 import type { CadApp } from "./CadApp";
 import type { Input } from "./Input";
-import type { Segment, Hatch, Dimension, TextBox } from "./Scene";
+import type { Segment, Hatch, Dimension, TextBox, FreeStroke } from "./Scene";
 import { getDimensionGeometry } from "./dimensionGeometry";
 import { pointInOrientedBox } from "./textGeometry";
+
+type PickKind = "segment" | "hatch" | "dimension" | "textbox" | "free";
 
 type PickedSource =
   | { kind: "segment"; obj: Segment }
   | { kind: "hatch"; obj: Hatch }
   | { kind: "dimension"; obj: Dimension }
-  | { kind: "textbox"; obj: TextBox };
+  | { kind: "textbox"; obj: TextBox }
+  | { kind: "free"; obj: FreeStroke };
+
+/** Stil-Eigenschaften je Objektart, die die Pipette überträgt. */
+const STYLE_KEYS: Record<PickKind, string[]> = {
+  segment: ["color", "thicknessM", "opacity", "lineStyle", "gapM", "dashLengthM"],
+  hatch: ["fillColor", "strokeColor", "fillAlphaPct", "strokeWidthPx", "pattern", "patternScale",
+          "patternAngleDeg", "patternStretch", "patternSkewDeg", "patternColor"],
+  dimension: ["textColor", "textSizePx", "lineColor", "decimals", "tickLengthM", "showExtensions",
+              "textBgEnabled", "textBgColor", "textBgAlpha"],
+  textbox: ["style"],
+  free: ["color", "thicknessM", "opacity", "lineStyle", "gapM", "blobSpacingM", "blobSizeM", "smoothing"],
+};
+
+const snapshotStyle = (kind: PickKind, obj: any): Record<string, any> => {
+  const out: Record<string, any> = {};
+  for (const k of STYLE_KEYS[kind]) {
+    if (!(k in obj)) continue;
+    const val = obj[k];
+    out[k] = val && typeof val === "object" ? JSON.parse(JSON.stringify(val)) : val;
+  }
+  return out;
+};
+
+const applyStyle = (obj: any, snap: Record<string, any>) => {
+  for (const k of Object.keys(snap)) {
+    const val = snap[k];
+    obj[k] = val && typeof val === "object" ? JSON.parse(JSON.stringify(val)) : val;
+  }
+};
 
 /**
- * Pipette: Klick auf Objekt -> Stil (+ Bezeichnungs-ID) übernehmen.
- * - Wenn aktuell ein passendes Objekt ausgewählt ist: Stil direkt übertragen.
- * - Wenn nichts ausgewählt: Stil + (optional) ID werden zu Tool-Defaults und das passende Werkzeug aktiviert.
- * - Shift gedrückt: Bezeichnungs-ID NICHT übernehmen (nur Stil).
+ * Pipette: erster Klick merkt sich die Quelle, jeder weitere Klick überträgt
+ * deren Stil auf gleichartige Objekte — so lange, bis ESC gedrückt oder ein
+ * anderes Werkzeug gewählt wird. Ein erneuter Klick auf ein bereits
+ * verändertes Objekt setzt es auf seinen Ursprungsstil zurück.
  */
 export class PipetteTool {
   app: CadApp;
   id = "pipette";
   hoverSource: PickedSource | null = null;
-  // Gemerkte Quelle für Quelle→Ziel-Übertragung (wenn keine passende Auswahl vorhanden)
+  /** Gemerkte Quelle für Quelle→Ziel-Übertragung. */
   pickedSource: PickedSource | null = null;
+  private sourceSnap: Record<string, any> | null = null;
+  /** Ursprungsstile der bereits veränderten Ziele (für Rücksetzen). */
+  private originals = new Map<string, Record<string, any>>();
 
   constructor(app: CadApp) {
     this.app = app;
   }
 
+  get hasSource() { return !!this.pickedSource; }
+
+  clearSource() {
+    this.pickedSource = null;
+    this.sourceSnap = null;
+    this.originals.clear();
+  }
+
   activate() {
     this.hoverSource = null;
-    this.pickedSource = null;
-    this.app.hub.hide();
-    this.app.pointEditMenu.hide();
+    this.clearSource();
+    this.app.hub?.hide?.();
+    this.app.pointEditMenu?.hide?.();
     this.app.renderer.setHoverSegmentId(null);
     this.app.renderer.setHoverHatchId(null);
     this.app.renderer.setHoverTextBoxId(null);
@@ -42,7 +84,7 @@ export class PipetteTool {
 
   cancel() {
     this.hoverSource = null;
-    this.pickedSource = null;
+    this.clearSource();
     this.app.renderer.setHoverSegmentId(null);
     this.app.renderer.setHoverHatchId(null);
     this.app.renderer.setHoverTextBoxId(null);
@@ -58,207 +100,104 @@ export class PipetteTool {
     this.app.renderer.setHoverHatchId(this.hoverSource?.kind === "hatch" ? this.hoverSource.obj.id : null);
     this.app.renderer.setHoverTextBoxId(this.hoverSource?.kind === "textbox" ? this.hoverSource.obj.id : null);
 
-    if (input.clicked && this.hoverSource) {
-      const takeLabel = !input.keys.shift;
+    if (!input.clicked || !this.hoverSource) return;
+    const hit = this.hoverSource;
+    const hitId = (hit.obj as any).id as string;
 
-      // Fall 1: passende Auswahl vorhanden -> direkt von Klick-Quelle auf Auswahl übertragen
-      if (this._hasMatchingSelection(this.hoverSource)) {
-        this._applyPick(this.hoverSource, takeLabel);
-        this.pickedSource = null;
-        return;
-      }
+    // 1) Noch keine Quelle → Quelle merken.
+    if (!this.pickedSource || !this.sourceSnap) {
+      this.pickedSource = hit;
+      this.sourceSnap = snapshotStyle(hit.kind, hit.obj);
+      return;
+    }
 
-      // Fall 2: gemerkte Quelle vorhanden und Ziel ist gleichartig & verschieden -> Quelle->Ziel übertragen
-      if (this.pickedSource && this.pickedSource.kind === this.hoverSource.kind &&
-          (this.pickedSource.obj as any).id !== (this.hoverSource.obj as any).id) {
-        this._applySourceToTarget(this.pickedSource, this.hoverSource, takeLabel);
-        this.pickedSource = null;
-        return;
-      }
+    // 2) Klick auf ein bereits verändertes Ziel → Ursprungsstil zurücksetzen.
+    const orig = this.originals.get(hitId);
+    if (orig) {
+      applyStyle(hit.obj, orig);
+      this.originals.delete(hitId);
+      this._touch();
+      return;
+    }
 
-      // Fall 3: keine passende Auswahl, keine (gleichartige) gemerkte Quelle -> Quelle merken
-      this.pickedSource = this.hoverSource;
+    // 3) Gleichartiges, anderes Objekt → Stil übertragen.
+    if (hit.kind === this.pickedSource.kind && hitId !== (this.pickedSource.obj as any).id) {
+      this.originals.set(hitId, snapshotStyle(hit.kind, hit.obj));
+      applyStyle(hit.obj, this.sourceSnap);
+      this._touch();
     }
   }
 
-  private _hasMatchingSelection(src: PickedSource): boolean {
-    if (src.kind === "segment") return !!this.app.getSelectedSegment();
-    if (src.kind === "hatch") return !!this.app.getSelectedHatch();
-    if (src.kind === "dimension") return !!this.app.getSelectedDimension();
-    if (src.kind === "textbox") return !!this.app.getSelectedTextBox();
-    return false;
-  }
-
-  private _applySourceToTarget(src: PickedSource, tgt: PickedSource, takeLabel: boolean) {
-    const labelId = takeLabel ? src.obj.labelId : null;
-    if (src.kind === "segment" && tgt.kind === "segment") {
-      tgt.obj.color = src.obj.color;
-      tgt.obj.thicknessM = src.obj.thicknessM;
-      if (labelId) tgt.obj.labelId = labelId;
-      this.app.setSelection({ type: SelectionType.SEGMENT, segmentId: tgt.obj.id });
-    } else if (src.kind === "hatch" && tgt.kind === "hatch") {
-      tgt.obj.fillColor = src.obj.fillColor;
-      tgt.obj.strokeColor = src.obj.strokeColor;
-      tgt.obj.fillAlphaPct = src.obj.fillAlphaPct;
-      tgt.obj.strokeWidthPx = src.obj.strokeWidthPx;
-      tgt.obj.areaLabel = { ...src.obj.areaLabel, offsetX: tgt.obj.areaLabel.offsetX, offsetY: tgt.obj.areaLabel.offsetY };
-      if (labelId) tgt.obj.labelId = labelId;
-      this.app.setSelection({ type: SelectionType.HATCH, hatchId: tgt.obj.id, pointIndex: null });
-    } else if (src.kind === "dimension" && tgt.kind === "dimension") {
-      const s = src.obj, t = tgt.obj;
-      t.textColor = s.textColor; t.textSizePx = s.textSizePx;
-      t.lineColor = s.lineColor; t.decimals = s.decimals;
-      t.tickLengthM = s.tickLengthM; t.showExtensions = s.showExtensions;
-      t.textBgEnabled = s.textBgEnabled; t.textBgColor = s.textBgColor;
-      t.textBgAlpha = s.textBgAlpha;
-      if (labelId) t.labelId = labelId;
-      this.app.setSelection({ type: SelectionType.DIMENSION, dimensionId: t.id });
-    } else if (src.kind === "textbox" && tgt.kind === "textbox") {
-      tgt.obj.style = { ...src.obj.style };
-      if (labelId) tgt.obj.labelId = labelId;
-      this.app.setSelection({ type: SelectionType.TEXTBOX, textBoxId: tgt.obj.id });
-    }
-    this.app.refreshLabelUI();
+  private _touch() {
+    try { (this.app as any).refreshLabelUI?.(); } catch {}
+    try { (this.app as any)._changeDirty = true; } catch {}
+    try { (this.app as any).pushHistory?.("Pipette"); } catch {}
   }
 
   private _pickAt(input: Input): PickedSource | null {
     const mouseW = v(input.mouse.wx, input.mouse.wy);
     const mouseS = v(input.mouse.sx, input.mouse.sy);
     const cam = this.app.camera;
+    const visible = (labelId: string) => {
+      try { return this.app.labelManager.isVisible(labelId); } catch { return true; }
+    };
     const distPx = (p: Vec2) => {
       const sp = cam.worldToScreen(p.x, p.y);
       return Math.hypot(sp.x - mouseS.x, sp.y - mouseS.y);
     };
 
-    // Text boxes (top of stack first)
+    // Textboxen (oberste zuerst)
     for (let i = this.app.scene.textBoxes.length - 1; i >= 0; i--) {
       const box = this.app.scene.textBoxes[i];
-      if (!this.app.labelManager.isVisible(box.labelId)) continue;
+      if (!visible(box.labelId)) continue;
       if (pointInOrientedBox(mouseW, box)) return { kind: "textbox", obj: box };
     }
 
-    // Segments
+    // Linien
     let bestSeg: Segment | null = null;
     let bestSegPx = Infinity;
     for (const seg of this.app.scene.segments) {
-      if (!this.app.labelManager.isVisible(seg.labelId)) continue;
+      if (!visible(seg.labelId)) continue;
       const proj = projectPointToSegment(mouseW, seg.a, seg.b);
       const px = distPx(proj.q);
       if (px <= Defaults.hitPx && px < bestSegPx) { bestSegPx = px; bestSeg = seg; }
     }
     if (bestSeg) return { kind: "segment", obj: bestSeg };
 
-    // Dimensions (parallel-line hit)
+    // Freihand-Striche
+    let bestFree: FreeStroke | null = null;
+    let bestFreePx = Infinity;
+    for (const stroke of this.app.scene.freeStrokes) {
+      if (!visible(stroke.labelId)) continue;
+      for (let i = 1; i < stroke.points.length; i++) {
+        const proj = projectPointToSegment(mouseW, stroke.points[i - 1], stroke.points[i]);
+        const px = distPx(proj.q);
+        if (px <= Defaults.hitPx && px < bestFreePx) { bestFreePx = px; bestFree = stroke; }
+      }
+    }
+    if (bestFree) return { kind: "free", obj: bestFree };
+
+    // Maßketten
     for (const dim of this.app.scene.dimensions) {
-      if (!this.app.labelManager.isVisible(dim.labelId)) continue;
+      if (!visible(dim.labelId)) continue;
       const g = getDimensionGeometry(dim);
       const proj = projectPointToSegment(mouseW, g.d1, g.d2);
       if (distPx(proj.q) <= Defaults.hitPx) return { kind: "dimension", obj: dim };
     }
 
-    // Hatches (polygon)
+    // Schraffuren
     for (const hatch of this.app.scene.hatches) {
-      if (!this.app.labelManager.isVisible(hatch.labelId)) continue;
+      if (!visible(hatch.labelId)) continue;
       if (hatch.points.length >= 3 && pointInPolygon(mouseW, hatch.points)) return { kind: "hatch", obj: hatch };
     }
 
     return null;
   }
 
-  private _applyPick(src: PickedSource, takeLabel: boolean) {
-    const labelId = takeLabel ? src.obj.labelId : null;
-    if (src.kind === "segment") this._applySegmentStyle(src.obj, labelId);
-    else if (src.kind === "hatch") this._applyHatchStyle(src.obj, labelId);
-    else if (src.kind === "dimension") this._applyDimensionStyle(src.obj, labelId);
-    else if (src.kind === "textbox") this._applyTextBoxStyle(src.obj, labelId);
-
-    this.app.refreshLabelUI();
-  }
-
-  /* ---- Apply per type: write to selected target if it matches type, else set tool defaults + switch tool ---- */
-  private _applySegmentStyle(src: Segment, labelId: string | null) {
-    const target = this.app.getSelectedSegment();
-    if (target) {
-      target.color = src.color;
-      target.thicknessM = src.thicknessM;
-      if (labelId) target.labelId = labelId;
-      this.app.setSelection({ type: SelectionType.SEGMENT, segmentId: target.id });
-      return;
-    }
-    this.app.defaultLineColor = src.color;
-    this.app.defaultLineThicknessM = src.thicknessM;
-    if (labelId) this.app.setActiveDrawLabelId(labelId);
-    this.app.setTool("line");
-  }
-
-  private _applyHatchStyle(src: Hatch, labelId: string | null) {
-    const target = this.app.getSelectedHatch();
-    if (target) {
-      target.fillColor = src.fillColor;
-      target.strokeColor = src.strokeColor;
-      target.fillAlphaPct = src.fillAlphaPct;
-      target.strokeWidthPx = src.strokeWidthPx;
-      target.areaLabel = { ...src.areaLabel, offsetX: target.areaLabel.offsetX, offsetY: target.areaLabel.offsetY };
-      if (labelId) target.labelId = labelId;
-      this.app.setSelection({ type: SelectionType.HATCH, hatchId: target.id, pointIndex: null });
-      return;
-    }
-    this.app.defaultHatchFillColor = src.fillColor;
-    this.app.defaultHatchStrokeColor = src.strokeColor;
-    this.app.defaultHatchFillAlphaPct = src.fillAlphaPct;
-    this.app.defaultHatchStrokeWidthPx = src.strokeWidthPx;
-    if (labelId) this.app.setActiveDrawLabelId(labelId);
-    this.app.setTool("hatch");
-  }
-
-  private _applyDimensionStyle(src: Dimension, labelId: string | null) {
-    const target = this.app.getSelectedDimension();
-    if (target) {
-      target.textColor = src.textColor; target.textSizePx = src.textSizePx;
-      target.lineColor = src.lineColor; target.decimals = src.decimals;
-      target.tickLengthM = src.tickLengthM; target.showExtensions = src.showExtensions;
-      target.textBgEnabled = src.textBgEnabled; target.textBgColor = src.textBgColor;
-      target.textBgAlpha = src.textBgAlpha;
-      if (labelId) target.labelId = labelId;
-      this.app.setSelection({ type: SelectionType.DIMENSION, dimensionId: target.id });
-      return;
-    }
-    const ms = this.app.measureSettings;
-    ms.textColor = src.textColor; ms.textSizePx = src.textSizePx;
-    ms.lineColor = src.lineColor; ms.decimals = src.decimals;
-    ms.tickLengthM = src.tickLengthM; ms.showExtensions = src.showExtensions;
-    ms.textBgEnabled = src.textBgEnabled; ms.textBgColor = src.textBgColor;
-    ms.textBgAlpha = src.textBgAlpha;
-    if (labelId) this.app.setActiveDrawLabelId(labelId);
-    this.app.setTool("measure");
-  }
-
-  private _applyTextBoxStyle(src: TextBox, labelId: string | null) {
-    const target = this.app.getSelectedTextBox();
-    if (target) {
-      target.style = { ...src.style };
-      if (labelId) target.labelId = labelId;
-      this.app.setSelection({ type: SelectionType.TEXTBOX, textBoxId: target.id });
-      return;
-    }
-    this.app.defaultTextColor = src.style.textColor;
-    this.app.defaultTextFontSizePx = src.style.fontSizePx;
-    this.app.defaultTextBgColor = src.style.bgColor;
-    this.app.defaultTextBgAlphaPct = src.style.bgAlphaPct;
-    this.app.defaultTextWrap = src.style.wrap;
-    this.app.defaultTextAlign = src.style.align;
-    this.app.defaultTextBorderEnabled = src.style.borderEnabled;
-    this.app.defaultTextBorderColor = src.style.borderColor;
-    this.app.defaultTextBorderWidthPx = src.style.borderWidthPx;
-    if (labelId) this.app.setActiveDrawLabelId(labelId);
-    this.app.setTool("text");
-  }
-
   private _drawOverlay(ctx: CanvasRenderingContext2D, cam: any) {
     let primary = "#4da3ff";
     try { primary = getComputedStyle(document.documentElement).getPropertyValue("--primary") || primary; } catch {}
 
-    // Gemerkte Quelle (durchgehend)
     if (this.pickedSource) {
       ctx.save();
       ctx.strokeStyle = primary;
@@ -268,7 +207,6 @@ export class PipetteTool {
       ctx.restore();
     }
 
-    // Hover (gestrichelt)
     if (this.hoverSource) {
       ctx.save();
       ctx.strokeStyle = primary;
@@ -284,6 +222,13 @@ export class PipetteTool {
       const a = cam.worldToScreen(src.obj.a.x, src.obj.a.y);
       const b = cam.worldToScreen(src.obj.b.x, src.obj.b.y);
       ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    } else if (src.kind === "free") {
+      ctx.beginPath();
+      src.obj.points.forEach((p, i) => {
+        const sp = cam.worldToScreen(p.x, p.y);
+        if (i === 0) ctx.moveTo(sp.x, sp.y); else ctx.lineTo(sp.x, sp.y);
+      });
+      ctx.stroke();
     } else if (src.kind === "hatch") {
       ctx.beginPath();
       for (let i = 0; i < src.obj.points.length; i++) {
