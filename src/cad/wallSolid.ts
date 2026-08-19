@@ -40,15 +40,26 @@ export function buildHealedWallSolidRing(
   const t = Math.max(0, wall.thicknessM);
   if (t <= 1e-6) return [];
   const lines = computeHealedWallLines(wall, others, graph);
-  return ringFromMainSub(lines.mainCorners, lines.subCorners);
+  const ref = wallRefCorners(wall as any);
+  return ringFromMainSub(lines.mainCorners, lines.subCorners, ref[0], ref[ref.length - 1]);
 }
 
-function ringFromMainSub(main: Vec2[], sub: Vec2[]): Vec2[] {
+function ringFromMainSub(main: Vec2[], sub: Vec2[], refStart?: Vec2, refEnd?: Vec2): Vec2[] {
   const ring: Vec2[] = [];
+  const near = (a: Vec2, b: Vec2) => Math.hypot(a.x - b.x, a.y - b.y) < 1e-9;
   for (const p of main) ring.push({ x: p.x, y: p.y });
+  // Die Bezugs-Endpunkte (= Fangpunkte der Wand) gehören immer zum Wandkörper.
+  // So bleibt die optische Wand exakt an den Fangpunkten und benachbarte
+  // Wandkörper überlappen sich am gemeinsamen Knoten — auch bei Wölbung.
+  if (refEnd && main.length && sub.length && !near(refEnd, main[main.length - 1]) && !near(refEnd, sub[sub.length - 1])) {
+    ring.push({ x: refEnd.x, y: refEnd.y });
+  }
   for (let i = sub.length - 1; i >= 0; i--) {
     const p = sub[i];
     ring.push({ x: p.x, y: p.y });
+  }
+  if (refStart && main.length && sub.length && !near(refStart, main[0]) && !near(refStart, sub[0])) {
+    ring.push({ x: refStart.x, y: refStart.y });
   }
   return ring;
 }
