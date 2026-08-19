@@ -859,6 +859,21 @@ export class SelectTool {
       this._hatchHolesOriginal = (hatch.holes ?? []).map(l => l.map(p => v(p.x, p.y)));
     }
 
+    // Schraffuren drehen sich um den angeklickten Fangpunkt (nicht um den
+    // Schwerpunkt): Pivot = angeklickter Punkt, Referenzpunkt = Schwerpunkt.
+    if (
+      action === PointEditAction.ROTATE &&
+      (ctx.target.kind === "hatch" || ctx.target.kind === "hatchHole") &&
+      this.fixedPoint && this.otherPointOriginal
+    ) {
+      const pivot = this.otherPointOriginal;
+      const ref = this.fixedPoint;
+      if (dist(pivot, ref) > 1e-9) {
+        this.fixedPoint = pivot;
+        this.otherPointOriginal = ref;
+      }
+    }
+
     this.moveHubLocked = false;
     this.moveHubLengthM = null;
     this.moveHubAngleDeg = null;
