@@ -46,6 +46,19 @@ function containsPoint(ring: { x: number; y: number }[], p: { x: number; y: numb
   return ring.some(q => dist(q, p) <= tol);
 }
 
+/** Punkt liegt in mindestens einem Polygon der Union (Löcher berücksichtigt). */
+function coveredByUnion(multi: any, p: { x: number; y: number }): boolean {
+  for (const poly of multi as number[][][][]) {
+    const rings = poly.map(r => r.map(([x, y]) => v(x, y)));
+    if (!rings.length) continue;
+    if (!pointInPolygon(p, rings[0])) continue;
+    let inHole = false;
+    for (let i = 1; i < rings.length; i++) if (pointInPolygon(p, rings[i])) inHole = true;
+    if (!inHole) return true;
+  }
+  return false;
+}
+
 function endPointsOf(wall: Wall, others: Wall[], graph: WallTopologyGraph, atStart: boolean) {
   const l = computeHealedWallLines(wall, others, graph);
   const i = atStart ? 0 : l.mainCorners.length - 1;
