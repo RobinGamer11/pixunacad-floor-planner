@@ -4968,6 +4968,7 @@ function RightInspector({
   onJumpCad,
   onCollapse,
   cadEngine,
+  helpOn,
 }: {
   projectId: string;
   page?: import("@/lib/projectStore").ProjectPage;
