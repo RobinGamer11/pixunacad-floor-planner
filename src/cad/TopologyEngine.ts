@@ -63,6 +63,9 @@ export class TopologyEngine {
   labels: LabelManager;
   /** Read-only Snap-Quellen aus anderen Blättern (Transparentpause). */
   overlayScenes: Scene[] = [];
+  /** Papierrahmen im Plan-(Druck-)Modus in Metern. Ecken, Kantenmitten,
+   * Mittelpunkt und Kanten des Blattrands werden zusätzlich gefangen. */
+  planFrame: { widthM: number; heightM: number } | null = null;
   /** Globale Hilfslinien (Rechtsklick-Anker), werkzeugübergreifend. */
   guides: import("./globalGuides").GlobalGuides | null = null;
   /** Wand-ID mit Snap-Vorrang (z. B. aktuell selektierte Wand) — deren Eckpunkte gewinnen Ties. */
@@ -461,6 +464,20 @@ export class TopologyEngine {
       for (const edge of ovScene.getHatchEdges()) {
         if (!this.labels.isVisible(edge.hatch.labelId)) continue;
         considerLine(edge.a, edge.b, null, null);
+      }
+    }
+
+    // Papierrahmen (Plandruck) — Blattrand fangbar machen.
+    if (this.planFrame) {
+      const hw = this.planFrame.widthM / 2;
+      const hh = this.planFrame.heightM / 2;
+      const corners: Vec2[] = [v(-hw, -hh), v(hw, -hh), v(hw, hh), v(-hw, hh)];
+      for (const c of corners) considerPoint(c, null, null, -1);
+      considerPoint(v(0, 0), null, null, -1);
+      for (let i = 0; i < 4; i++) {
+        const a = corners[i], b = corners[(i + 1) % 4];
+        considerPoint(v((a.x + b.x) / 2, (a.y + b.y) / 2), null, null, -1);
+        considerLine(a, b, null, null);
       }
     }
 
