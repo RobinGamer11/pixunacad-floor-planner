@@ -3089,15 +3089,6 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                   <span className="text-xs">Skalieren (2 Punkte)</span>
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => appRef.current?.documentTool.beginScaleFromLastDimension(docSelected.id)}
-                  className="cad-toolbar-btn w-full justify-start px-2 h-9"
-                  title="Skaliere mit der zuletzt erstellten Maßkette als Referenz"
-                >
-                  <RulerIcon className="h-4 w-4" />
-                  <span className="text-xs">Skalieren (Maßkette)</span>
-                </button>
 
                 {/* Freie Skalierung — Slider (relativ zur Größe bei Auswahl), ohne Rahmen. */}
                 <div className="space-y-1">
