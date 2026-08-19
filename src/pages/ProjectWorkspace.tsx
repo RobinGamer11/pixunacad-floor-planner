@@ -5668,7 +5668,9 @@ function ToolsTab({
         </>
       )}
       {settingsTool === "pipette" && cadEngine && (
-        <PipetteSettingsPanel app={cadEngine} />
+        <SettingsBlock title="PIPETTE">
+          <PipetteSettingsPanel app={cadEngine} />
+        </SettingsBlock>
       )}
       {settingsTool === "hatch" && cadEngine && (
         <>
