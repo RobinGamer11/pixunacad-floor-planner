@@ -29,6 +29,7 @@ import {
   CadToggleProxy,
   CadRangeProxy,
   CadCheckboxProxy,
+  CadSegmentedProxy,
 } from "@/components/cad/CadFieldProxies";
 
 import { MappeHelpOverlay } from "@/components/workspace/MappeHelpOverlay";
