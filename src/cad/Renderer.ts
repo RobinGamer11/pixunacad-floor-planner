@@ -1,5 +1,5 @@
 import { Defaults, SelectionType } from "./constants";
-import { Vec2, v, sub, add, mul, norm, perpLeft, len, clamp, rgbaFromHex, hexToRgba, polygonAreaAbs, polygonCentroid, tessellateWithBulges } from "./geometry";
+import { Vec2, v, sub, add, mul, norm, perpLeft, len, clamp, rgbaFromHex, hexToRgba, polygonAreaAbs, polygonCentroid, tessellateWithBulges, hatchOuterRing, hatchHoleRings } from "./geometry";
 import { Camera } from "./Camera";
 import { Scene, Hatch, Dimension, TextBox, StickerInstance, DocumentObject, FreeStroke } from "./Scene";
 import { smoothChaikin } from "./freeGeom";
@@ -1717,7 +1717,9 @@ export class Renderer {
     const ctx = this.ctx;
     const cam = this.camera;
 
-    const areaM2 = polygonAreaAbs(hatch.points);
+    const outerRing = hatchOuterRing(hatch as any);
+    const holeRings = hatchHoleRings(hatch as any);
+    const areaM2 = Math.max(0, polygonAreaAbs(outerRing) - holeRings.reduce((s, h) => s + polygonAreaAbs(h), 0));
     const text = `${areaM2.toFixed(2)} m²`;
     const scale = Math.max(0.1, hatch.areaLabel.scale ?? 1);
     const baseFontSize = clamp(hatch.areaLabel.fontSizePx ?? Defaults.areaFontSizePx, 6, 72) * scale;
@@ -1734,7 +1736,7 @@ export class Renderer {
     const boxW = textW + padX * 2;
     const boxH = fontSizePx + padY * 2;
 
-    const polyCenter = polygonCentroid(hatch.points);
+    const polyCenter = polygonCentroid(outerRing);
     const centerWorld = v(polyCenter.x + (hatch.areaLabel.offsetX || 0), polyCenter.y + (hatch.areaLabel.offsetY || 0));
     const centerScreen = cam.worldToScreen(centerWorld.x, centerWorld.y);
 

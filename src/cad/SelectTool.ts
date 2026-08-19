@@ -1,6 +1,6 @@
 import { drawSnapDot } from "./snapDraw";
 import { Defaults, SnapType, SelectionType, PointEditAction } from "./constants";
-import { Vec2, v, sub, add, mul, dot, dist, angleDeg, pointFromLengthAngle, projectPointToSegment, orthoSnapFromA, nearestAngleToReference, pointInPolygon, pointInHatchSolid, polygonCentroid, bulgeFromPoint, splitBulgedEdge, tessellateWithBulges, projectPointToInfiniteLine, projectPointToCurvedEdge, lineLineIntersectionInfinite, norm, perpLeft, len } from "./geometry";
+import { Vec2, v, sub, add, mul, dot, dist, angleDeg, pointFromLengthAngle, projectPointToSegment, orthoSnapFromA, nearestAngleToReference, pointInPolygon, pointInHatchSolid, hatchOuterRing, hatchHoleRings, polygonCentroid, bulgeFromPoint, splitBulgedEdge, tessellateWithBulges, projectPointToInfiniteLine, projectPointToCurvedEdge, lineLineIntersectionInfinite, norm, perpLeft, len } from "./geometry";
 import type { CadApp } from "./CadApp";
 import type { Snap, SnapExclusions } from "./TopologyEngine";
 import type { Input } from "./Input";
@@ -2246,7 +2246,7 @@ export class SelectTool {
           if (px <= Defaults.hitPx) return { type: SelectionType.POINT, hatchId: selectedHatch.id, holeIndex: h, pointIndex: i } as any;
         }
       }
-      if (selectedHatch.points.length >= 3 && pointInHatchSolid(mouseW, selectedHatch.points, selectedHatch.holes)) {
+      if (selectedHatch.points.length >= 3 && pointInHatchSolid(mouseW, hatchOuterRing(selectedHatch as any), hatchHoleRings(selectedHatch as any))) {
         return { type: SelectionType.HATCH, hatchId: selectedHatch.id, pointIndex: null };
       }
     }
@@ -2334,7 +2334,7 @@ export class SelectTool {
     // Hatch polygon hit (pointInPolygon)
     for (const hatch of visibleHatches) {
       if (selectedHatch && hatch.id === selectedHatch.id) continue;
-      if (hatch.points.length >= 3 && pointInHatchSolid(mouseW, hatch.points, hatch.holes)) {
+      if (hatch.points.length >= 3 && pointInHatchSolid(mouseW, hatchOuterRing(hatch as any), hatchHoleRings(hatch as any))) {
         return { type: SelectionType.HATCH, hatchId: hatch.id, pointIndex: null };
       }
     }
