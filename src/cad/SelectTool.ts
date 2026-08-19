@@ -176,6 +176,9 @@ export class SelectTool {
   private _groupDragDy = 0;
   /** Fang-Anker der Gruppe beim Verschieben/Einfügen (Welt-Koordinate). */
   private _groupDragAnchor: Vec2 | null = null;
+  /** Referenzwerte beim Start (driftfreies Mitlaufen am Cursor). */
+  private _groupDragMouseStart: Vec2 | null = null;
+  private _groupDragAnchorStart: Vec2 | null = null;
 
   groupRotateActive = false;
   private _groupRotCenter: Vec2 | null = null;
