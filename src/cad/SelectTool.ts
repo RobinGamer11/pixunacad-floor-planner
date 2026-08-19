@@ -499,6 +499,8 @@ export class SelectTool {
     this.groupDragActive = false;
     this._groupDragLast = null;
     this._groupDragAnchor = null;
+    this._groupDragMouseStart = null;
+    this._groupDragAnchorStart = null;
     this._groupDragMoved = false;
     this._groupDragDx = 0;
     this._groupDragDy = 0;
@@ -2499,6 +2501,8 @@ export class SelectTool {
         this.groupDragActive = false;
         this._groupDragLast = null;
         this._groupDragAnchor = null;
+        this._groupDragMouseStart = null;
+        this._groupDragAnchorStart = null;
         if (this._groupDragMoved) {
           if (!this.pasteFloatActive) this.app.commitHistorySnapshot();
           input.clicked = false;
@@ -2523,6 +2527,9 @@ export class SelectTool {
         this._groupDragAnchor = this.groupAnchor
           ? v(this.groupAnchor.x, this.groupAnchor.y)
           : (this._findGroupSnapPoint(mouseW.x, mouseW.y, 80) || this._nearestGroupPoint(mouseW.x, mouseW.y));
+        this._groupDragMouseStart = v(mouseW.x, mouseW.y);
+        this._groupDragAnchorStart = this._groupDragAnchor
+          ? v(this._groupDragAnchor.x, this._groupDragAnchor.y) : null;
 
         this.marqueeStart = null;
         this.marqueeCurrent = null;
