@@ -3171,9 +3171,15 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                   <DocumentPixelModeToggle app={appRef.current} docId={docSelected.id} />
                 )}
 
+                <WarpSection engine={appRef.current} docId={docSelected.id} />
+
+                <FlipSection engine={appRef.current} docId={docSelected.id} />
+
+                <DocumentFilterPanel app={appRef.current} docId={docSelected.id} sig={docFilterSig} />
+
                 {!!docSelected.pdfSourceB64 && (
                   <div className="rounded-md border p-2 space-y-2" style={{ borderColor: "hsl(var(--hairline))" }}>
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-foreground">
                       PDF auflösen
                     </div>
                     <button
@@ -3195,17 +3201,6 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                   </div>
                 )}
 
-
-                <WarpSection engine={appRef.current} docId={docSelected.id} />
-
-
-                <DocumentFilterPanel app={appRef.current} docId={docSelected.id} sig={docFilterSig} />
-
-
-
-                <div className="text-[11px] leading-relaxed pt-2" style={{ color: "hsl(var(--cad-toolbar-muted))", borderTop: "1px solid hsl(var(--border))" }}>
-                  <div>Drag: verschieben (Snap aktiv) · Entf: löschen</div>
-                </div>
               </div>
             </div>
           )}
