@@ -1786,8 +1786,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       <aside className="shrink-0 w-[280px] h-full flex-col border-l flex" style={{ background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" }}>
         <div className="grid grid-cols-[1fr_1fr_1fr_auto] shrink-0 border-b items-stretch" style={{ borderColor: "hsl(var(--hairline))" }}>
           {([
-            { id: "settings" as const, label: "Werkzeug", Icon: SettingsIcon },
             { id: "sheets" as const, label: "Seiten", Icon: SettingsIcon },
+            { id: "settings" as const, label: "Werkzeug", Icon: SettingsIcon },
             { id: "layers" as const, label: "Ebenen", Icon: LayersIcon },
           ]).map(t => (
             <button
