@@ -1,5 +1,5 @@
 import React from "react";
-import { ClipboardPaste, Copy, Grid2x2, Keyboard, Lock, PenTool, Printer } from "lucide-react";
+import { ClipboardPaste, Copy, Frame, Grid2x2, Keyboard, Lock, PenTool, Printer, Scan } from "lucide-react";
 
 type MouseHighlight = "wheel" | "left" | "right";
 
@@ -115,15 +115,26 @@ function ObjectKindGlyph() {
   );
 }
 
+function TextModeGlyph() {
+  return (
+    <div className="flex h-8 items-center justify-center gap-1" aria-hidden="true">
+      <Scan className="h-5 w-5" strokeWidth={1.5} />
+      <Frame className="h-5 w-5" strokeWidth={1.5} />
+    </div>
+  );
+}
+
 /** Rein visuelle, vollständig durchklickbare Schnellhilfe für die Mappe. */
 export function MappeHelpOverlay({
   guideActive = false,
   lineActive = false,
   hatchActive = false,
+  textActive = false,
 }: {
   guideActive?: boolean;
   lineActive?: boolean;
   hatchActive?: boolean;
+  textActive?: boolean;
 }) {
   return (
     <div
@@ -203,6 +214,18 @@ export function MappeHelpOverlay({
               <div className="whitespace-nowrap text-[8px] leading-3 opacity-75">Vektor: Generell bearbeitbar</div>
               <div className="whitespace-nowrap text-[8px] leading-3 opacity-75">Pixel: Radiergummi bearbeitbar</div>
             </div>
+          </HelpGroup>
+        )}
+        {textActive && (
+          <HelpGroup title="Text" bordered>
+            <div className="flex min-w-[150px] flex-col items-center justify-end px-1.5 py-1 text-center">
+              <div className="mb-1 flex h-8 items-center justify-center"><TextModeGlyph /></div>
+              <div className="whitespace-nowrap text-[10px] font-semibold leading-3.5">Modus</div>
+              <div className="whitespace-nowrap text-[8px] leading-3 opacity-75">Rahmen variabel: Rahmen passt sich an Text an</div>
+              <div className="whitespace-nowrap text-[8px] leading-3 opacity-75">Rahmen fix: Text passt sich an Rahmen an</div>
+            </div>
+            <HelpItem icon={<KeyboardGlyph />} shortcut="Enter" description="Absatz setzen" />
+            <HelpItem icon={<MouseGlyph highlight="left" />} shortcut="Text beenden" description="Außerhalb Textfeld klicken" />
           </HelpGroup>
         )}
       </div>

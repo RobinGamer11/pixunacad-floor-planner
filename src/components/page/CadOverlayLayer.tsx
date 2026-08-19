@@ -69,6 +69,9 @@ interface Props {
   textFontSizePx?: number;
   textBold?: boolean;
   textItalic?: boolean;
+  textUnderline?: boolean;
+  textStrike?: boolean;
+  textLineHeightPct?: number;
   textAlpha?: number;
   textAlign?: "left" | "center" | "right";
   textBgColor?: string;
@@ -105,7 +108,7 @@ export default function CadOverlayLayer(props: Props) {
     zoom, activeTool, enabled, initialState, restoreToken, onChange, onSelectionChange, onEngineReady,
     externalDocs, onExternalDocChange, onExternalDocDelete,
     lineColor, lineThicknessMm, lineAlpha, guideColor, guidesLocked, multiSelectMode, selectMarqueeMode,
-    textColor, textFontSizePx, textBold, textItalic, textAlpha, textAlign,
+    textColor, textFontSizePx, textBold, textItalic, textUnderline, textStrike, textLineHeightPct, textAlpha, textAlign,
     textBgColor, textBgAlphaPct, textWrap, textAutoSize, textBorderEnabled, textBorderColor, textBorderWidthPx,
     hatchDrawMode,
     ghostSnapState,
@@ -342,6 +345,9 @@ export default function CadOverlayLayer(props: Props) {
       fontSizePx: textFontSizePx,
       bold: textBold,
       italic: textItalic,
+      underline: textUnderline,
+      strike: textStrike,
+      lineHeightPct: textLineHeightPct,
       alpha: textAlpha,
       align: textAlign,
       bgColor: textBgColor,
@@ -352,7 +358,7 @@ export default function CadOverlayLayer(props: Props) {
       borderColor: textBorderColor,
       borderWidthPx: textBorderWidthPx,
     });
-  }, [textColor, textFontSizePx, textBold, textItalic, textAlpha, textAlign,
+  }, [textColor, textFontSizePx, textBold, textItalic, textUnderline, textStrike, textLineHeightPct, textAlpha, textAlign,
       textBgColor, textBgAlphaPct, textWrap, textAutoSize, textBorderEnabled, textBorderColor, textBorderWidthPx]);
 
   const closeDocHub = () => {
