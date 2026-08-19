@@ -206,3 +206,7 @@ export function findEnclosingFace(scene: Scene, click: Vec2): Vec2[] | null {
   if (best && polygonSignedArea(best) < 0) best = [...best].reverse();
   return best;
 }
+
+export function __debugFaces(scene: Scene, _click: Vec2) {
+  return buildPlanarFaces(subdivideEdges(collectEdges(scene))).faceLoops;
+}
