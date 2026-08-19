@@ -2087,8 +2087,17 @@ export class Renderer {
     ctx.strokeStyle = baseStroke;
     ctx.lineWidth = isPreview ? 1.2 : 1.3;
     ctx.beginPath();
-    ctx.moveTo(d1.x, d1.y);
-    ctx.lineTo(d2.x, d2.y);
+    if (g.arcPts && g.arcPts.length > 2) {
+      const sp0 = cam.worldToScreen(g.arcPts[0].x, g.arcPts[0].y);
+      ctx.moveTo(sp0.x, sp0.y);
+      for (let i = 1; i < g.arcPts.length; i++) {
+        const sp = cam.worldToScreen(g.arcPts[i].x, g.arcPts[i].y);
+        ctx.lineTo(sp.x, sp.y);
+      }
+    } else {
+      ctx.moveTo(d1.x, d1.y);
+      ctx.lineTo(d2.x, d2.y);
+    }
     ctx.stroke();
 
     const tickDir = norm(sub(g.d2, g.d1));

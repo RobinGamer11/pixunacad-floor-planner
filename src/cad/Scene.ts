@@ -141,6 +141,8 @@ export class Hatch {
 }
 
 export interface DimensionStyle {
+  /** Wölbung der gemessenen Kante (Modus "arc"). */
+  bulge?: number;
   textColor?: string;
   textSizePx?: number;
   lineColor?: string;
