@@ -2101,13 +2101,20 @@ export class Renderer {
     ctx.stroke();
 
     const tickDir = norm(sub(g.d2, g.d1));
-    const tickN = perpLeft(tickDir);
     const tickLen = dim.tickLengthM || Defaults.measureTickLengthM;
+    // Gerade Maßketten: Endstriche senkrecht zur Maßlinie.
+    // Gewölbte Maßketten: Endstriche zeigen radial auf die gemessenen Endpunkte.
+    const tickN1 = g.arcPts
+      ? (len(sub(g.d1, g.ext1a)) > 1e-9 ? norm(sub(g.d1, g.ext1a)) : perpLeft(tickDir))
+      : perpLeft(tickDir);
+    const tickN2 = g.arcPts
+      ? (len(sub(g.d2, g.ext2a)) > 1e-9 ? norm(sub(g.d2, g.ext2a)) : perpLeft(tickDir))
+      : perpLeft(tickDir);
 
-    const t1aP = add(g.d1, mul(tickN, tickLen));
-    const t1bP = sub(g.d1, mul(tickN, tickLen));
-    const t2aP = add(g.d2, mul(tickN, tickLen));
-    const t2bP = sub(g.d2, mul(tickN, tickLen));
+    const t1aP = add(g.d1, mul(tickN1, tickLen));
+    const t1bP = sub(g.d1, mul(tickN1, tickLen));
+    const t2aP = add(g.d2, mul(tickN2, tickLen));
+    const t2bP = sub(g.d2, mul(tickN2, tickLen));
     const t1a = cam.worldToScreen(t1aP.x, t1aP.y);
     const t1b = cam.worldToScreen(t1bP.x, t1bP.y);
     const t2a = cam.worldToScreen(t2aP.x, t2aP.y);
