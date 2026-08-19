@@ -8,7 +8,7 @@ function mk(id: string, c: any[], bulges: number[]) {
   return new Wall({ id, kind: "outer", thicknessM: 0.3, referenceSide: "outer", corners: c.map((p:any)=>v(p.x,p.y)), labelId: "L1", bulges } as any);
 }
 describe("fill curved", () => {
-  for (const b of [0, 0.4, -0.4]) it("bulge " + b, () => {
+  for (const b of [0.4]) it("bulge " + b, () => {
     const walls = [
       mk("a", [{x:0,y:0},{x:4,y:0}], [b]),
       mk("b", [{x:4,y:0},{x:4,y:3}], [0]),
@@ -25,6 +25,7 @@ describe("fill curved", () => {
     if (best) {
       const minY = Math.min(...best.map(p=>p.y));
       console.log(" minY", minY.toFixed(3), "pts", best.length);
+      for (const l of hit) console.log(polygonAreaAbs(l).toFixed(3), JSON.stringify(l.map((q:any)=>[+q.x.toFixed(2),+q.y.toFixed(2)])));
     }
   });
 });
