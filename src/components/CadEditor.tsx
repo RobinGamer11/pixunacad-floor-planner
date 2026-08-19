@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState, useCallback } from "react";
 import { DragScrollDiv } from "@/components/DragScrollDiv";
 import { CadApp } from "@/cad/CadApp";
 import { ToolIds, PointEditAction } from "@/cad/constants";
-import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Pipette, Sticker as StickerIcon, Pencil, Trash2, Download, Upload, Plus, FileImage, FileText, Maximize2, Ruler as RulerIcon, Eraser, Construction, BrickWall, PaintBucket, Grid3x3, DoorOpen, AppWindow, Move, RotateCw, PanelRightOpen, PanelRightClose, Crosshair, Scaling, Check, Scissors, Anchor as AnchorIcon, SquareDashed, BoxSelect, FlipHorizontal2, FolderOpen } from "lucide-react";
+import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Pipette, Sticker as StickerIcon, Pencil, Trash2, Download, Upload, Plus, FileImage, FileText, Maximize2, Ruler as RulerIcon, Eraser, Construction, BrickWall, PaintBucket, Grid3x3, DoorOpen, AppWindow, Move, RotateCw, PanelRightOpen, PanelRightClose, Crosshair, Scaling, Check, Scissors, Anchor as AnchorIcon, SquareDashed, BoxSelect, FlipHorizontal2, FolderOpen, Settings as SettingsIcon, Layers as LayersIcon } from "lucide-react";
 import type { HatchDrawMode } from "@/cad/HatchTool";
 import type { StickerDefinition } from "@/cad/StickerManager";
 import { instanceBoundingCornersWorld } from "@/cad/StickerManager";
@@ -1786,21 +1786,21 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       <aside className="shrink-0 w-[280px] h-full flex-col border-l flex" style={{ background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" }}>
         <div className="grid grid-cols-[1fr_1fr_1fr_auto] shrink-0 border-b items-stretch" style={{ borderColor: "hsl(var(--hairline))" }}>
           {([
-            { id: "settings" as const, label: "Werkzeugeinstellung" },
-            { id: "sheets" as const, label: "Zeichenblätter" },
-            { id: "layers" as const, label: "Ebenen" },
+            { id: "settings" as const, label: "Werkzeug", Icon: SettingsIcon },
+            { id: "sheets" as const, label: "Seiten", Icon: SettingsIcon },
+            { id: "layers" as const, label: "Ebenen", Icon: LayersIcon },
           ]).map(t => (
             <button
               key={t.id}
               type="button"
               onClick={() => setRightTab(t.id)}
-              className="min-w-0 truncate px-2 py-2 text-[11px] font-medium transition-colors"
+              className="min-w-0 truncate px-2 py-2 text-[11px] font-medium transition-colors flex items-center justify-center gap-1"
               style={{
                 background: rightTab === t.id ? "hsl(var(--surface-card))" : "hsl(var(--surface-muted))",
                 color: rightTab === t.id ? "hsl(var(--ink))" : "hsl(var(--ink-soft))",
                 borderBottom: rightTab === t.id ? "2px solid hsl(var(--accent-gold))" : "2px solid transparent",
               }}
-            >{t.label}</button>
+            ><t.Icon size={12} /><span className="truncate">{t.label}</span></button>
           ))}
           <button
             type="button"

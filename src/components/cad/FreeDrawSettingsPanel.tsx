@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import type { CadApp } from "@/cad/CadApp";
 import type { MiniCad } from "@/cad/embed/MiniCad";
 import { RasterModeToggle } from "@/components/cad/RasterModeToggle";
+import { ToolColorPicker } from "@/components/workspace/ToolColorPicker";
 
 type LineStyle = "solid" | "dashed" | "dotted" | "dashdot" | "blob" | "image" | "pencil" | "marker" | "brush" | "spray" | "calligraphy" | "ink" | "crayon" | "chalk";
 
@@ -22,10 +23,40 @@ const STYLE_OPTIONS: { value: LineStyle; label: string }[] = [
 ];
 
 interface Props { app: CadApp | MiniCad | null; units?: "cm" | "m"; projectId?: string;
+  /** Bildschirm-Pixel pro Papiermillimeter (Projektmappe). */
+  pxPerMm?: number;
   /** true = Titel, Objektart und Ebene liegen außerhalb (über dem Fensterrahmen). */
   hideChrome?: boolean; }
 
-export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", projectId, hideChrome = false }) => {
+const MeasureInput: React.FC<{
+  label: string; value: number; digits: number; onChange: (v: number) => void;
+}> = ({ label, value, digits, onChange }) => {
+  const [draft, setDraft] = useState(String(Number(value.toFixed(digits))));
+  const [focused, setFocused] = useState(false);
+  useEffect(() => { if (!focused) setDraft(String(Number(value.toFixed(digits)))); }, [value, digits, focused]);
+  return (
+    <label className="min-w-0">
+      <span className="mb-1 block text-[9px] text-muted-foreground">{label}</span>
+      <input
+        type="text"
+        inputMode="decimal"
+        value={draft}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        onChange={(e) => {
+          setDraft(e.target.value);
+          const n = Number(e.target.value.trim().replace(",", "."));
+          if (Number.isFinite(n) && n >= 0) onChange(n);
+        }}
+        className="h-8 w-full rounded-md border bg-transparent px-2 text-[11px] tabular-nums"
+        style={{ borderColor: "hsl(var(--hairline))" }}
+      />
+    </label>
+  );
+};
+
+export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", projectId, pxPerMm, hideChrome = false }) => {
+
 
   const [color, setColor] = useState("#111111");
   const [thickness, setThickness] = useState(0.03);
@@ -146,6 +177,25 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
     }
   };
 
+  // Mappen-Layout (Papier): Farbe, px/mm-Strichstärke, Transparenz, gerahmte Buttons.
+  const sheetMode = hideChrome;
+  const pxPerMmSafe = Math.max(1e-6, pxPerMm ?? 96 / 25.4);
+  const framedBtn = "w-full flex items-center justify-between gap-2 h-9 px-2 rounded-md border text-xs transition-colors hover:bg-muted";
+  const framedStyle = { borderColor: "hsl(var(--hairline))" } as React.CSSProperties;
+  const thicknessMm = thickness * 1000;
+  const setThicknessMm = (mm: number) => {
+    const v = Math.max(0.0001, mm / 1000);
+    setThickness(v);
+    if (selectedStrokeId) applyToStroke((s) => { s.thicknessM = v; });
+    else app.defaultFreeThicknessM = v;
+  };
+  const rulerSide: "left" | "center" | "right" = (app as any).defaultFreeRulerSide ?? "center";
+  const setRulerSide = (id: "left" | "center" | "right") => {
+    (app as any).defaultFreeRulerSide = id;
+    force((n) => n + 1);
+  };
+
+
   return (
     <div className={hideChrome ? "" : "cad-settings-panel mb-2"}>
       {!hideChrome && (
@@ -185,6 +235,153 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
           </select>
         </label>
 
+        {sheetMode ? (
+          <>
+            <label className="block text-xs">
+              <span className="block mb-1 text-muted-foreground">Linienart</span>
+              <select value={style}
+                onChange={(e) => {
+                  const v = e.target.value as LineStyle; setStyle(v);
+                  if (selectedStrokeId) applyToStroke((s) => { s.lineStyle = v; });
+                  else app.defaultFreeLineStyle = v;
+                }}
+                className="w-full h-8 rounded-md border bg-background px-2 text-xs" style={framedStyle}>
+                {STYLE_OPTIONS.map(o => (
+                  <option key={o.value} value={o.value} disabled={o.value === "image" && !imageSrc}>{o.label}{o.value === "image" && !imageSrc ? " (Bild laden)" : ""}</option>
+                ))}
+              </select>
+            </label>
+
+            <ToolColorPicker
+              label="Farbe"
+              value={color}
+              onChange={(v) => {
+                setColor(v);
+                if (selectedStrokeId) applyToStroke((s) => { s.color = v; });
+                else app.defaultFreeColor = v;
+              }}
+            />
+
+            <div>
+              <div className="mb-1.5 text-[10px] text-muted-foreground">Strichstärke</div>
+              <div className="grid grid-cols-2 gap-2">
+                <MeasureInput
+                  label="Bildschirm (px)"
+                  value={thicknessMm * pxPerMmSafe}
+                  digits={2}
+                  onChange={(px) => setThicknessMm(px / pxPerMmSafe)}
+                />
+                <MeasureInput
+                  label="Tatsächliche Größe (mm)"
+                  value={thicknessMm}
+                  digits={3}
+                  onChange={(mm) => setThicknessMm(mm)}
+                />
+              </div>
+            </div>
+
+            <div>
+              <div className="mb-1.5 text-[10px] text-muted-foreground">Transparenz</div>
+              <input type="range" min={1} max={100} step={1} value={Math.round(opacity * 100)}
+                onChange={(e) => {
+                  const v = Math.max(1, Math.min(100, parseInt(e.target.value, 10) || 1)) / 100;
+                  setOpacity(v);
+                  if (selectedStrokeId) applyToStroke((s) => { s.opacity = v; });
+                  else app.defaultFreeOpacity = v;
+                }}
+                className="w-full accent-foreground" />
+              <label className="mt-1 flex h-7 items-center overflow-hidden rounded-md border" style={framedStyle}>
+                <input type="number" min={1} max={100} step={1} value={Math.round(opacity * 100)}
+                  onChange={(e) => {
+                    const n = Number(e.target.value);
+                    if (!Number.isFinite(n)) return;
+                    const v = Math.max(1, Math.min(100, Math.round(n))) / 100;
+                    setOpacity(v);
+                    if (selectedStrokeId) applyToStroke((s) => { s.opacity = v; });
+                    else app.defaultFreeOpacity = v;
+                  }}
+                  className="h-full min-w-0 flex-1 bg-transparent px-2 text-right text-xs tabular-nums outline-none"
+                  aria-label="Transparenz in Prozent" />
+                <span className="pr-2 text-[10px] text-muted-foreground">%</span>
+              </label>
+            </div>
+
+            {(style === "dashed" || style === "dotted" || style === "dashdot" || style === "blob") && (
+              <label className="block text-xs">
+                <span className="block mb-1 text-muted-foreground">
+                  {style === "blob" ? "Klecks-Abstand" : "Linienskalierung"}: {(gap * 1000).toFixed(1)} mm
+                </span>
+                <input type="range" min={0.001} max={0.02} step={0.0005} value={gap}
+                  onChange={(e) => {
+                    const v = parseFloat(e.target.value); setGap(v);
+                    if (selectedStrokeId) applyToStroke((s) => { s.gapM = v; });
+                    else app.defaultFreeGapM = v;
+                  }}
+                  className="w-full" />
+              </label>
+            )}
+
+            <button type="button" onClick={onPickFile} className={framedBtn} style={framedStyle}>
+              <span>Bild laden</span>
+              {imageSrc && (
+                <img src={imageSrc} alt="Stempel" className="h-6 w-6 rounded border object-contain" style={{ background: "#fff" }} />
+              )}
+            </button>
+            {imageSrc && (
+              <button type="button" onClick={clearImage} className={framedBtn} style={framedStyle}>
+                <span>Bild entfernen</span>
+              </button>
+            )}
+            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onFile} />
+
+            {style === "image" && imageSrc && (
+              <label className="flex items-center gap-2 text-xs">
+                <input type="checkbox" checked={imgRotate}
+                  onChange={(e) => { setImgRotate(e.target.checked); app.defaultFreeImageRotate = e.target.checked; }} />
+                <span className="text-muted-foreground">Mit Pfad-Tangente rotieren</span>
+              </label>
+            )}
+
+            <button type="button"
+              onClick={() => { const v = !autoShape; setAutoShape(v); app.defaultFreeAutoShape = v; }}
+              className={framedBtn} style={framedStyle}
+              title="Beim Loslassen werden Geraden geradegezogen und Kreise zu echten Kreisen geformt.">
+              <span>Auto-Form</span>
+              <span className="text-[11px] px-1.5 py-0.5 rounded border"
+                style={{ borderColor: "hsl(var(--hairline))", color: autoShape ? "hsl(var(--cad-accent))" : "hsl(var(--muted-foreground))" }}>
+                {autoShape ? "An" : "Aus"}
+              </span>
+            </button>
+
+            <button type="button" onClick={toggleRuler} className={`${framedBtn} justify-center`} style={framedStyle}>
+              <span>{hasRuler ? "Lineal entfernen" : "Lineal hinzufügen"}</span>
+            </button>
+
+            <div className={hasRuler ? "" : "opacity-50"}>
+              <div className="mb-1 text-muted-foreground">Zeichenseite</div>
+              <div className="grid grid-cols-3 gap-1">
+                {([
+                  { id: "left" as const, label: "Links" },
+                  { id: "center" as const, label: "Mittig" },
+                  { id: "right" as const, label: "Rechts" },
+                ]).map(({ id, label }) => (
+                  <button key={id} type="button"
+                    onClick={() => { setRulerSide(id); (app as any).defaultFreeRulerSide = id; }}
+                    className={`rounded border px-1 py-1 text-[10px] transition-colors ${rulerSide === id ? "bg-accent" : "hover:bg-muted"}`}
+                    style={framedStyle}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="text-[10px] leading-snug text-muted-foreground">
+              Maus gedrückt halten → zeichnen. Das Lineal lässt sich nur an seinen
+              Endpunkten verschieben; an der Linie selbst fängt der Stift.
+            </div>
+          </>
+        ) : (
+        <>
         <label className="block text-xs">
 
           <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Farbe</span>
@@ -311,12 +508,16 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
         </button>
 
         <div className="text-[11px] leading-relaxed pt-2" style={{ color: "hsl(var(--cad-toolbar-muted))", borderTop: "1px solid hsl(var(--border))" }}>
-          Maus gedrückt halten → zeichnen. Lineal: an Endpunkten oder Mitte verschiebbar; Stift folgt der Linie.
+          Maus gedrückt halten → zeichnen. Lineal: nur an den Endpunkten verschiebbar; Stift folgt der Linie.
         </div>
+        </>
+        )}
       </div>
     </div>
   );
 };
+
+
 
 interface PreviewProps {
   color: string;

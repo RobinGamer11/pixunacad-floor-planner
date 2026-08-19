@@ -80,6 +80,7 @@ import {
   Strikethrough as StrikethroughIcon,
   Frame as FrameIcon,
   Scan as ScanIcon,
+  Layers,
 } from "lucide-react";
 
 import {
@@ -1150,7 +1151,7 @@ export default function ProjectWorkspace() {
         />
         <ToolRailButton
           icon={<Eraser size={18} />}
-          label="Radiergummi"
+          label="Radierer"
           active={activeTool === "eraser"}
           onClick={() => setActiveToolAndTab(activeTool === "eraser" ? null : "eraser")}
           showLabel
@@ -2502,6 +2503,8 @@ function PageCanvas({
   const [pendingStart, setPendingStart] = useState<{ x: number; y: number } | null>(null);
   const [hoverPt, setHoverPt] = useState<{ x: number; y: number } | null>(null);
   const pageRef = useRef<HTMLDivElement>(null);
+  /** Lokale Referenz auf die eingebettete CAD-Engine (für ESC-Stufen). */
+  const localEngineRef = useRef<import("@/cad/embed/MiniCad").MiniCad | null>(null);
 
   const toPct = (clientX: number, clientY: number) => {
     const r = pageRef.current?.getBoundingClientRect();
@@ -2590,21 +2593,21 @@ function PageCanvas({
   };
 
 
-  // ESC in zwei Stufen: 1× bricht die laufende Funktion ab (Werkzeug bleibt
-  // aktiv), 2× wechselt zurück zum Auswahl-Werkzeug.
-  const escArmedRef = useRef(false);
-  React.useEffect(() => { escArmedRef.current = false; }, [activeTool]);
+  // ESC in zwei Stufen: Läuft gerade eine Aktion (z. B. Linie im Zeichnen),
+  // bricht ESC nur diese ab — das Werkzeug bleibt aktiv. Läuft nichts, wechselt
+  // ESC zurück zum Auswahl-Werkzeug.
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
       const inField = t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || (t as any).isContentEditable);
       if (e.key === "Escape") {
         if (inField) return;
+        // Capture-Phase: Zustand VOR dem Abbruch durch die CAD-Engine lesen.
+        const busy = !!pendingStart || !!localEngineRef.current?.hasActiveAction();
         setPendingStart(null);
         setHoverPt(null);
+        if (busy) return;
         if (activeTool === null) return;
-        if (!escArmedRef.current) { escArmedRef.current = true; return; }
-        escArmedRef.current = false;
         onCommitTool();
         return;
       }
@@ -2621,12 +2624,9 @@ function PageCanvas({
         onSelect(undefined);
       }
     };
-    const onDown = () => { escArmedRef.current = false; };
-    window.addEventListener("keydown", onKey);
-    window.addEventListener("pointerdown", onDown, true);
+    window.addEventListener("keydown", onKey, true);
     return () => {
-      window.removeEventListener("keydown", onKey);
-      window.removeEventListener("pointerdown", onDown, true);
+      window.removeEventListener("keydown", onKey, true);
     };
   }, [pendingStart, activeTool, selectedElementIds, projectId, page.id]);
 
@@ -3055,7 +3055,7 @@ function PageCanvas({
             projectStore.updatePage(projectId, page.id, { cadOverlay: state })
           }
           onSelectionChange={onCadSelectionChange}
-          onEngineReady={onCadEngineReady}
+          onEngineReady={(api) => { localEngineRef.current = api.engine; onCadEngineReady?.(api); }}
           externalDocs={page.elements
             // CAD-Blatt (cad-view/cad-viewport) NICHT als externalDoc an die
             // Engine übergeben — sonst rendert die Engine eigene blaue Snap-
@@ -5003,12 +5003,13 @@ function RightInspector({
       style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
     >
       <div className="grid grid-cols-[1fr_1fr_1fr_auto] shrink-0 border-b items-stretch" style={{ borderColor: "hsl(var(--hairline))" }}>
-        <TabButton active={tab === "settings"} onClick={() => setTab("settings")} label="Seiteneinstellung" />
-        <TabButton active={tab === "tools"} onClick={() => setTab("tools")} label="Werkzeugeinstellung" />
+        <TabButton active={tab === "settings"} onClick={() => setTab("settings")} label="Seiten" icon={<Settings size={12} />} />
+        <TabButton active={tab === "tools"} onClick={() => setTab("tools")} label="Werkzeug" icon={<Settings size={12} />} />
         <TabButton
           active={tab === "layers"}
           onClick={() => setTab("layers")}
           label="Ebenen"
+          icon={<Layers size={12} />}
           badge={layerCount > 0 ? layerCount : undefined}
         />
         <button
@@ -5088,27 +5089,30 @@ function TabButton({
   onClick,
   label,
   badge,
+  icon,
 }: {
   active: boolean;
   onClick: () => void;
   label: string;
   badge?: number;
+  icon?: React.ReactNode;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="min-w-0 truncate px-2 py-2 text-[11px] font-medium transition-colors relative"
+      className="min-w-0 truncate px-2 py-2 text-[11px] font-medium transition-colors relative flex items-center justify-center gap-1"
       style={{
         background: active ? "hsl(var(--surface-card))" : "hsl(var(--surface-muted))",
         color: active ? "hsl(var(--ink))" : "hsl(var(--ink-soft))",
         borderBottom: active ? "2px solid hsl(var(--accent-gold))" : "2px solid transparent",
       }}
     >
-      {label}
+      {icon}
+      <span className="truncate">{label}</span>
       {badge !== undefined && (
         <span
-          className="ml-1 text-[9px] px-1 py-0.5 rounded-full align-middle"
+          className="text-[9px] px-1 py-0.5 rounded-full align-middle"
           style={{ background: "hsl(var(--accent-gold))", color: "white" }}
         >
           {badge}
@@ -5642,7 +5646,7 @@ function ToolsTab({
         <>
           <RasterModeToggle app={cadEngine} projectId={projectId} />
           <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
-            <FreeDrawSettingsPanel app={cadEngine} projectId={projectId} hideChrome />
+            <FreeDrawSettingsPanel app={cadEngine} projectId={projectId} pxPerMm={guidePxPerMm} hideChrome />
           </div>
         </>
       )}
@@ -5952,7 +5956,7 @@ function GuideMeasureInput({
   onChange,
 }: {
   label: string;
-  unit: "px" | "mm";
+  unit: "px" | "mm" | "pt";
   value: number;
   fractionDigits: number;
   onChange: (value: number) => void;
@@ -6366,16 +6370,15 @@ function TextSettings({
       </div>
 
       <div>
-        <div className="mb-1.5 text-[10px] text-muted-foreground">Schriftstärke</div>
+        <div className="mb-1.5 text-[10px] text-muted-foreground">Schriftgröße</div>
         <div className="grid grid-cols-2 gap-2">
           <GuideMeasureInput
             label="Bildschirm"
-            unit="px"
-            value={fontPx}
+            unit="pt"
+            value={settings.fontSize}
             fractionDigits={1}
             onChange={(value) => {
-              const pt = value * (3 / 4);
-              if (pt > 0) onChange({ fontSize: Math.min(400, Math.max(1, Number(pt.toFixed(2)))) });
+              if (value > 0) onChange({ fontSize: Math.min(400, Math.max(1, Number(value.toFixed(2)))) });
             }}
           />
           <GuideMeasureInput
@@ -6389,10 +6392,8 @@ function TextSettings({
             }}
           />
         </div>
-        <div className="mt-1 text-[9px] text-muted-foreground">
-          Angabe in Punkt (pt) wie in Word: {settings.fontSize} pt ≙ {fontPx.toFixed(1)} px.
-        </div>
       </div>
+
 
       <div>
         <div className="mb-1.5 text-[10px] text-muted-foreground">Stil</div>

@@ -57,6 +57,8 @@ export class EraserTool {
 
 
   finish() { this.cancel(); }
+  /** True, solange aktiv radiert wird (für ESC-Stufe 1). */
+  isDrawing() { return this._erasing; }
   getCursor() {
     const c = this._rulerDrag.hoverCursor(this.app.input);
     return c || "none";

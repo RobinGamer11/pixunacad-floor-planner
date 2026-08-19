@@ -800,6 +800,29 @@ export class MiniCad {
 
   /* ===== Public API ===== */
 
+  /**
+   * True, wenn gerade eine Aktion läuft (Zeichnen, Platzieren, Text-Edit,
+   * Gruppen-Transformation, Einfüge-Vorschau). Steuert die ESC-Stufe 1.
+   */
+  hasActiveAction(): boolean {
+    try {
+      if (this.textEditor?.isActive?.()) return true;
+      const st: any = this.selectTool as any;
+      if (st?.pasteFloatActive || st?.groupRotateActive || st?.groupDragActive || st?.groupAnchorActive) return true;
+      if (this._activeTool === "select" &&
+          (st?.editTarget || st?.rotateTextBoxId || st?.dragTextBoxId || st?.dragDocId
+            || st?.dragFreeStrokeId || st?.dragDimId)) return true;
+      const t: any = this.activeTool as any;
+      if (t && typeof t.isDrawing === "function" && t.isDrawing()) return true;
+      if (this._activeTool === "document" && (this.documentTool as any)?.phase
+          && (this.documentTool as any).phase !== "idle") return true;
+      if (this._activeTool === "pipette" && (this.pipetteTool as any)?.hasSource) return true;
+    } catch {}
+    return false;
+  }
+
+
+
   setActiveTool(tool: MiniTool) {
     if (this._activeTool === tool) return;
     // Deactivate previous.
@@ -2033,14 +2056,22 @@ export class MiniCad {
         }
       }
 
-      // ESC bricht ALLES ab — egal welches Werkzeug, egal welches Objekt.
+      // ESC in zwei Stufen: 1× bricht die laufende Aktion ab (Werkzeug bleibt),
+      // 2× (nichts läuft) räumt Auswahl/Modi auf — der Werkzeugwechsel selbst
+      // passiert in der React-Schicht (PageCanvas).
       if (e.key === "Escape" && !inField) {
-        try { if (this.textEditor.isActive()) this.textEditor.commit(); } catch {}
+        try { if (this.textEditor.isActive()) { this.textEditor.commit(); return; } } catch {}
         let pasteCancelled = false;
         try { pasteCancelled = this.selectTool.cancelPasteFloat(); } catch {}
-        if (!pasteCancelled) {
+        if (pasteCancelled) return;
+        if (this.hasActiveAction()) {
+          try { (this.activeTool as any)?.cancel?.(); } catch {}
           try { this.selectTool.cancelGroupTransform(true); } catch {}
+          try { this.selectTool.cancel(); } catch {}
+          try { this.onSelectionChange?.(); } catch {}
+          return;
         }
+        try { this.selectTool.cancelGroupTransform(true); } catch {}
         try { (this.activeTool as any)?.cancel?.(); } catch {}
         try { (this.lineTool as any)?.cancel?.(); (this.hatchTool as any)?.cancel?.();
               (this.freeDrawTool as any)?.cancel?.(); (this.eraserTool as any)?.cancel?.();
