@@ -37,11 +37,12 @@ export function computeHealedWallLines(wallInput: Wall, others: Wall[], graph?: 
   const startBulge = Math.abs(rawBulges[0] || 0);
   const endBulge = Math.abs(rawBulges[Math.max(0, nRaw - 2)] || 0);
 
-  const capStart = !healEnd(wall, others, mainCorners, subCorners, helpCorners, true, graph, startBulge);
-  const capEnd = !healEnd(wall, others, mainCorners, subCorners, helpCorners, false, graph, endBulge);
+  const symMain = { start: false, end: false };
+  const capStart = !healEnd(wall, others, mainCorners, subCorners, helpCorners, true, graph, startBulge, symMain);
+  const capEnd = !healEnd(wall, others, mainCorners, subCorners, helpCorners, false, graph, endBulge, symMain);
 
   // Cleanup-Pass: gleicher Knoten → gleichnamige Linien zusammenführen.
-  if (graph) cleanupAtNodes(wall, mainCorners, subCorners, helpCorners, graph, others);
+  if (graph) cleanupAtNodes(wall, mainCorners, subCorners, helpCorners, graph, others, symMain);
 
   return { mainCorners, subCorners, helpCorners, capStart, capEnd };
 }
@@ -55,6 +56,7 @@ function healEnd(
   atStart: boolean,
   graph?: WallTopologyGraph,
   endBulgeMag: number = 0,
+  symMain?: { start: boolean; end: boolean },
 ): boolean {
   const n = wall.corners.length;
   if (n < 2) return false;
@@ -166,11 +168,16 @@ function healEnd(
   for (const T of ["main", "help", "sub"] as LineType[]) {
     const origin = polysSelf[T][idx];
 
-    if (T !== "main") {
+    {
+      // Symmetrische Gehrung zuerst — sie liefert für beide Nachbarwände
+      // identische Punkte und schließt damit Lücken auch bei Wölbung.
       const pair = symmetricMiter(T, origin);
       if (pair) {
         polysSelf[T][idx] = pair;
         healedAny = true;
+        if (T === "main" && symMain) {
+          if (atStart) symMain.start = true; else symMain.end = true;
+        }
         continue;
       }
     }
@@ -285,11 +292,14 @@ function cleanupAtNodes(
   helpCorners: Vec2[],
   graph: WallTopologyGraph,
   others: Wall[],
+  symMain?: { start: boolean; end: boolean },
 ) {
   const polys: Record<LineType, Vec2[]> = { main: mainCorners, help: helpCorners, sub: subCorners };
   for (const atStart of [true, false]) {
     const node = graph.getNodeForEndpoint(wall.id, atStart);
     if (!node) continue;
+    // Bereits symmetrisch gemitert → nicht zurück auf Rohpunkte snappen.
+    if (symMain && (atStart ? symMain.start : symMain.end)) continue;
     const idx = atStart ? 0 : mainCorners.length - 1;
     const ownPrio = (T: LineType) => priorityIndex(wall.kind, T);
 
