@@ -256,6 +256,12 @@ export interface TextBoxStyle {
   bgAlphaPct?: number;
   wrap?: boolean;
   align?: "left" | "center" | "right";
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+  strike?: boolean;
+  /** Absatzhöhe (Zeilenabstand) in Prozent der Schriftgröße. */
+  lineHeightPct?: number;
   borderEnabled?: boolean;
   borderColor?: string;
   borderWidthPx?: number;
@@ -293,6 +299,11 @@ export class TextBox {
       bgAlphaPct: clamp(s.bgAlphaPct ?? Defaults.textBgAlphaPct, 0, 100),
       wrap: (typeof s.wrap === "boolean") ? s.wrap : Defaults.textWrap,
       align: s.align || Defaults.textAlign,
+      bold: (typeof s.bold === "boolean") ? s.bold : Defaults.textBold,
+      italic: (typeof s.italic === "boolean") ? s.italic : Defaults.textItalic,
+      underline: (typeof s.underline === "boolean") ? s.underline : Defaults.textUnderline,
+      strike: (typeof s.strike === "boolean") ? s.strike : Defaults.textStrike,
+      lineHeightPct: clamp(s.lineHeightPct ?? Defaults.textLineHeightPct, 60, 400),
       borderEnabled: (typeof s.borderEnabled === "boolean") ? s.borderEnabled : Defaults.textBorderEnabled,
       borderColor: s.borderColor || Defaults.textBorderColor,
       borderWidthPx: clamp(s.borderWidthPx ?? Defaults.textBorderWidthPx, 0, 30),

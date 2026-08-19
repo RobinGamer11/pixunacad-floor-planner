@@ -52,6 +52,16 @@ export interface TextSettingsRefs {
   borderColor: HTMLInputElement;
   borderColorPreview: HTMLDivElement;
   borderWidth: HTMLInputElement;
+  modeAutoBtn?: HTMLButtonElement | null;
+  modeFrameBtn?: HTMLButtonElement | null;
+  boldBtn?: HTMLButtonElement | null;
+  italicBtn?: HTMLButtonElement | null;
+  underlineBtn?: HTMLButtonElement | null;
+  strikeBtn?: HTMLButtonElement | null;
+  lineHeightRange?: HTMLInputElement | null;
+  lineHeightNum?: HTMLInputElement | null;
+  bgAlphaRange?: HTMLInputElement | null;
+  fontSizePt?: HTMLInputElement | null;
 }
 
 export interface TextEditorRefs {
@@ -202,6 +212,13 @@ export class CadApp {
   defaultTextBorderEnabled = Defaults.textBorderEnabled;
   defaultTextBorderColor = Defaults.textBorderColor;
   defaultTextBorderWidthPx = Defaults.textBorderWidthPx;
+  defaultTextBold = Defaults.textBold;
+  defaultTextItalic = Defaults.textItalic;
+  defaultTextUnderline = Defaults.textUnderline;
+  defaultTextStrike = Defaults.textStrike;
+  defaultTextLineHeightPct = Defaults.textLineHeightPct;
+  defaultTextAutoSize = true;
+
 
   // Freihand-Defaults
   defaultFreeColor = Defaults.freeColor;
@@ -1586,6 +1603,10 @@ export class CadApp {
         textColor: sel.style.textColor, fontSizePx: sel.style.fontSizePx,
         bgColor: sel.style.bgColor, bgAlphaPct: sel.style.bgAlphaPct,
         wrap: sel.style.wrap, align: sel.style.align,
+        bold: sel.style.bold, italic: sel.style.italic,
+        underline: sel.style.underline, strike: sel.style.strike,
+        lineHeightPct: sel.style.lineHeightPct,
+        autoSize: (sel.style as any).autoSize !== false,
         borderEnabled: sel.style.borderEnabled, borderColor: sel.style.borderColor,
         borderWidthPx: sel.style.borderWidthPx,
         labelId: sel.labelId,
@@ -1595,6 +1616,10 @@ export class CadApp {
       textColor: this.defaultTextColor, fontSizePx: this.defaultTextFontSizePx,
       bgColor: this.defaultTextBgColor, bgAlphaPct: this.defaultTextBgAlphaPct,
       wrap: this.defaultTextWrap, align: this.defaultTextAlign,
+      bold: this.defaultTextBold, italic: this.defaultTextItalic,
+      underline: this.defaultTextUnderline, strike: this.defaultTextStrike,
+      lineHeightPct: this.defaultTextLineHeightPct,
+      autoSize: this.defaultTextAutoSize,
       borderEnabled: this.defaultTextBorderEnabled, borderColor: this.defaultTextBorderColor,
       borderWidthPx: this.defaultTextBorderWidthPx,
       labelId: this.activeDrawLabelId || Defaults.defaultLabelId,
@@ -1733,6 +1758,74 @@ export class CadApp {
     });
     r.borderWidth.addEventListener("blur", () => this._syncTextSettingsFromContext());
 
+    // --- Modus: Rahmen variabel / Rahmen fix ---
+    const setAutoSize = (auto: boolean) => {
+      const sel = this.getSelectedTextBox();
+      if (sel) {
+        (sel.style as any).autoSize = auto;
+        sel.style.wrap = !auto;
+        autoSizeTextBox(sel);
+      } else {
+        this.defaultTextAutoSize = auto;
+        this.defaultTextWrap = !auto;
+      }
+      this._syncTextSettingsFromContext();
+    };
+    r.modeAutoBtn?.addEventListener("click", () => setAutoSize(true));
+    r.modeFrameBtn?.addEventListener("click", () => setAutoSize(false));
+
+    // --- Stil: Fett / Kursiv / Unterstrichen / Durchgestrichen ---
+    const toggleStyle = (key: "bold" | "italic" | "underline" | "strike") => {
+      const sel = this.getSelectedTextBox();
+      if (sel) {
+        (sel.style as any)[key] = !(sel.style as any)[key];
+        autoSizeTextBox(sel);
+      } else {
+        if (key === "bold") this.defaultTextBold = !this.defaultTextBold;
+        else if (key === "italic") this.defaultTextItalic = !this.defaultTextItalic;
+        else if (key === "underline") this.defaultTextUnderline = !this.defaultTextUnderline;
+        else this.defaultTextStrike = !this.defaultTextStrike;
+      }
+      this._syncTextSettingsFromContext();
+    };
+    r.boldBtn?.addEventListener("click", () => toggleStyle("bold"));
+    r.italicBtn?.addEventListener("click", () => toggleStyle("italic"));
+    r.underlineBtn?.addEventListener("click", () => toggleStyle("underline"));
+    r.strikeBtn?.addEventListener("click", () => toggleStyle("strike"));
+
+    // --- Absatz (Zeilenabstand) ---
+    const setLineHeight = (raw: string) => {
+      let v = parseFloat((raw || "").replace(",", "."));
+      if (!Number.isFinite(v)) return;
+      v = clamp(Math.round(v), 80, 300);
+      const sel = this.getSelectedTextBox();
+      if (sel) { (sel.style as any).lineHeightPct = v; autoSizeTextBox(sel); }
+      else this.defaultTextLineHeightPct = v;
+      this._syncTextSettingsFromContext();
+    };
+    r.lineHeightRange?.addEventListener("input", () => setLineHeight(r.lineHeightRange!.value));
+    r.lineHeightNum?.addEventListener("change", () => setLineHeight(r.lineHeightNum!.value));
+
+    // --- Transparenz-Regler (spiegelt das Zahlenfeld) ---
+    r.bgAlphaRange?.addEventListener("input", () => {
+      const v = clamp(Math.round(parseFloat(r.bgAlphaRange!.value) || 0), 0, 100);
+      const sel = this.getSelectedTextBox();
+      if (sel) sel.style.bgAlphaPct = v;
+      else this.defaultTextBgAlphaPct = v;
+      this._syncTextSettingsFromContext();
+    });
+
+    // --- Schriftstärke in Punkt (Word-Konvention: 1 pt = 4/3 px) ---
+    r.fontSizePt?.addEventListener("change", () => {
+      let pt = parseFloat((r.fontSizePt!.value || "").replace(",", "."));
+      if (!Number.isFinite(pt) || pt <= 0) return;
+      const px = clamp(pt * (4 / 3), 6, 200);
+      const sel = this.getSelectedTextBox();
+      if (sel) { sel.style.fontSizePx = px; autoSizeTextBox(sel); }
+      else this.defaultTextFontSizePx = px;
+      this._syncTextSettingsFromContext();
+    });
+
     this._syncTextSettingsFromContext();
   }
 
@@ -1760,6 +1853,21 @@ export class CadApp {
         : (s.labelId && this.labelManager.getById(s.labelId)) ? s.labelId
         : (this.labelManager.getById(this.activeDrawLabelId) ? this.activeDrawLabelId : Defaults.defaultLabelId);
     r.idSelect.value = labelForDisplay;
+
+    const autoSize = (s as any).autoSize !== false;
+    r.modeAutoBtn?.classList.toggle("active", autoSize);
+    r.modeFrameBtn?.classList.toggle("active", !autoSize);
+    r.boldBtn?.classList.toggle("active", !!(s as any).bold);
+    r.italicBtn?.classList.toggle("active", !!(s as any).italic);
+    r.underlineBtn?.classList.toggle("active", !!(s as any).underline);
+    r.strikeBtn?.classList.toggle("active", !!(s as any).strike);
+    const lh = Math.round((s as any).lineHeightPct ?? Defaults.textLineHeightPct);
+    if (r.lineHeightRange) r.lineHeightRange.value = String(lh);
+    if (r.lineHeightNum) r.lineHeightNum.value = String(lh);
+    if (r.bgAlphaRange) r.bgAlphaRange.value = String(Math.round(s.bgAlphaPct ?? Defaults.textBgAlphaPct));
+    if (r.fontSizePt) {
+      r.fontSizePt.value = String(Math.round((s.fontSizePx ?? Defaults.textFontSizePx) * (3 / 4)));
+    }
   }
 
   /* ---- Line Settings Panel ---- */

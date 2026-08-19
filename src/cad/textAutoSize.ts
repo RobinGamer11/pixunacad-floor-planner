@@ -22,6 +22,13 @@ export function autoSizeTextBox(box: TextBox, pxPerMOverride?: number) {
     : Defaults.measureReferenceScalePxPerM;
   const paddingPx = 1;
   const baseFontPx = box.style.fontSizePx;
+  const baseStyle = {
+    bold: (box.style as any).bold,
+    italic: (box.style as any).italic,
+    underline: (box.style as any).underline,
+    strike: (box.style as any).strike,
+    lineHeightPct: (box.style as any).lineHeightPct,
+  };
   const plainText = (box.html || "")
     .replace(/<br\s*\/?>(?=\s*$)/gi, "")
     .replace(/<[^>]+>/g, "")
@@ -37,10 +44,10 @@ export function autoSizeTextBox(box: TextBox, pxPerMOverride?: number) {
 
   if (box.style.wrap) {
     const innerWidthPx = Math.max(8, box.widthM * pxPerM - paddingPx * 2);
-    const m = measureTextBoxContent(box.html || "", baseFontPx, innerWidthPx, true, paddingPx);
+    const m = measureTextBoxContent(box.html || "", baseFontPx, innerWidthPx, true, paddingPx, baseStyle);
     newHeightM = Math.max(minContentPx, m.heightPx) / pxPerM;
   } else {
-    const m = measureTextBoxContent(box.html || "", baseFontPx, Infinity, false, paddingPx);
+    const m = measureTextBoxContent(box.html || "", baseFontPx, Infinity, false, paddingPx, baseStyle);
     newWidthM = Math.max(minContentPx, m.widthPx) / pxPerM;
     newHeightM = Math.max(minContentPx, m.heightPx) / pxPerM;
   }

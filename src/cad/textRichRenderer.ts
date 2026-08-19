@@ -12,6 +12,8 @@ export interface RichRun {
   text: string;
   bold: boolean;
   italic: boolean;
+  underline: boolean;
+  strike: boolean;
   color: string | null;
   sizeOverridePx: number | null;
 }
@@ -19,8 +21,18 @@ export interface RichRun {
 interface ParseStyle {
   bold: boolean;
   italic: boolean;
+  underline: boolean;
+  strike: boolean;
   color: string | null;
   sizePx: number | null;
+}
+
+/** Basis-Textstil einer Textbox (gilt für alle Runs ohne eigene Auszeichnung). */
+export interface BaseTextStyle {
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+  strike?: boolean;
 }
 
 const FONT_SIZE_TABLE: Record<string, number> = {
@@ -37,8 +49,8 @@ function parseInlineSize(value: string): number | null {
   return num;
 }
 
-function parseInlineStyle(styleAttr: string | null): { color: string | null; sizePx: number | null; bold: boolean; italic: boolean } {
-  const out = { color: null as string | null, sizePx: null as number | null, bold: false, italic: false };
+function parseInlineStyle(styleAttr: string | null): { color: string | null; sizePx: number | null; bold: boolean; italic: boolean; underline: boolean; strike: boolean } {
+  const out = { color: null as string | null, sizePx: null as number | null, bold: false, italic: false, underline: false, strike: false };
   if (!styleAttr) return out;
   for (const part of styleAttr.split(";")) {
     const idx = part.indexOf(":");
@@ -52,6 +64,10 @@ function parseInlineStyle(styleAttr: string | null): { color: string | null; siz
       if (v === "bold" || v === "bolder" || (parseInt(v, 10) >= 600)) out.bold = true;
     } else if (key === "font-style") {
       if (value.toLowerCase() === "italic") out.italic = true;
+    } else if (key === "text-decoration" || key === "text-decoration-line") {
+      const v = value.toLowerCase();
+      if (v.includes("underline")) out.underline = true;
+      if (v.includes("line-through")) out.strike = true;
     }
   }
   return out;
@@ -65,6 +81,8 @@ function walk(node: Node, style: ParseStyle, runs: RichRun[]) {
       text: t,
       bold: style.bold,
       italic: style.italic,
+      underline: style.underline,
+      strike: style.strike,
       color: style.color,
       sizeOverridePx: style.sizePx,
     });
@@ -75,19 +93,21 @@ function walk(node: Node, style: ParseStyle, runs: RichRun[]) {
   const tag = el.tagName.toLowerCase();
 
   if (tag === "br") {
-    runs.push({ text: "\n", bold: style.bold, italic: style.italic, color: style.color, sizeOverridePx: style.sizePx });
+    runs.push({ text: "\n", bold: style.bold, italic: style.italic, underline: style.underline, strike: style.strike, color: style.color, sizeOverridePx: style.sizePx });
     return;
   }
 
   // Block-level → newline before content (unless already at start)
   const isBlock = (tag === "div" || tag === "p");
   if (isBlock && runs.length > 0 && !runs[runs.length - 1].text.endsWith("\n")) {
-    runs.push({ text: "\n", bold: style.bold, italic: style.italic, color: style.color, sizeOverridePx: style.sizePx });
+    runs.push({ text: "\n", bold: style.bold, italic: style.italic, underline: style.underline, strike: style.strike, color: style.color, sizeOverridePx: style.sizePx });
   }
 
   const next: ParseStyle = { ...style };
   if (tag === "b" || tag === "strong") next.bold = true;
   if (tag === "i" || tag === "em") next.italic = true;
+  if (tag === "u" || tag === "ins") next.underline = true;
+  if (tag === "s" || tag === "strike" || tag === "del") next.strike = true;
   if (tag === "font") {
     const color = el.getAttribute("color");
     if (color) next.color = color;
@@ -99,6 +119,8 @@ function walk(node: Node, style: ParseStyle, runs: RichRun[]) {
   if (inline.sizePx != null) next.sizePx = inline.sizePx;
   if (inline.bold) next.bold = true;
   if (inline.italic) next.italic = true;
+  if (inline.underline) next.underline = true;
+  if (inline.strike) next.strike = true;
 
   for (const child of Array.from(el.childNodes)) {
     walk(child, next, runs);
@@ -115,11 +137,18 @@ const _scratchContainer: HTMLDivElement = (() => {
   return d;
 })();
 
-export function htmlToRuns(html: string): RichRun[] {
+export function htmlToRuns(html: string, base?: BaseTextStyle): RichRun[] {
   if (!_scratchContainer.parentNode) document.body.appendChild(_scratchContainer);
   _scratchContainer.innerHTML = html || "";
   const runs: RichRun[] = [];
-  walk(_scratchContainer, { bold: false, italic: false, color: null, sizePx: null }, runs);
+  walk(_scratchContainer, {
+    bold: !!base?.bold,
+    italic: !!base?.italic,
+    underline: !!base?.underline,
+    strike: !!base?.strike,
+    color: null,
+    sizePx: null,
+  }, runs);
   // Trim leading newline produced by leading block-level elements
   if (runs.length && runs[0].text === "\n") runs.shift();
   return runs;
@@ -155,6 +184,7 @@ function layoutLines(
   baseColor: string,
   maxWidthPx: number,
   wrap: boolean,
+  lineFactor = 1.05,
 ): Line[] {
   const positioned: PositionedRun[] = runs.map(r => ({
     ...r,
@@ -168,7 +198,7 @@ function layoutLines(
   const pushLine = () => {
     if (cur.segments.length === 0) {
       // Empty line — give it the base font height
-      cur.height = baseFontSizePx * 1.05;
+      cur.height = baseFontSizePx * lineFactor;
       cur.ascent = baseFontSizePx * 0.86;
     }
     lines.push(cur);
@@ -180,7 +210,7 @@ function layoutLines(
     const w = measureChunk(ctx, run, text);
     cur.segments.push({ run, text, width: w });
     cur.width += w;
-    const lh = run.fontSizePx * 1.05;
+    const lh = run.fontSizePx * lineFactor;
     if (lh > cur.height) cur.height = lh;
     const asc = run.fontSizePx * 0.86;
     if (asc > cur.ascent) cur.ascent = asc;
@@ -247,6 +277,12 @@ export interface DrawTextBoxOptions {
   bgAlpha: number;
   align: "left" | "center" | "right";
   wrap: boolean;
+  baseBold?: boolean;
+  baseItalic?: boolean;
+  baseUnderline?: boolean;
+  baseStrike?: boolean;
+  /** Zeilenabstand in Prozent der Schriftgröße (100 = einzeilig). */
+  lineHeightPct?: number;
   borderEnabled: boolean;
   borderColor: string;
   borderWidthPx: number;
@@ -259,6 +295,11 @@ export function drawRichTextBox(opts: DrawTextBoxOptions) {
     html, baseFontSizePx, baseColor, bgColor, bgAlpha, align, wrap,
     borderEnabled, borderColor, borderWidthPx, paddingPx,
   } = opts;
+  const lineFactor = Math.max(0.6, (opts.lineHeightPct ?? 105) / 100);
+  const baseStyle: BaseTextStyle = {
+    bold: opts.baseBold, italic: opts.baseItalic,
+    underline: opts.baseUnderline, strike: opts.baseStrike,
+  };
 
   ctx.save();
   ctx.translate(centerScreenX, centerScreenY);
@@ -286,8 +327,8 @@ export function drawRichTextBox(opts: DrawTextBoxOptions) {
 
   // Layout
   const innerW = Math.max(1, widthPx - paddingPx * 2);
-  const runs = htmlToRuns(html);
-  const lines = layoutLines(ctx, runs, baseFontSizePx, baseColor, innerW, wrap);
+  const runs = htmlToRuns(html, baseStyle);
+  const lines = layoutLines(ctx, runs, baseFontSizePx, baseColor, innerW, wrap, lineFactor);
 
   // Draw lines
   ctx.textBaseline = "alphabetic";
@@ -304,6 +345,19 @@ export function drawRichTextBox(opts: DrawTextBoxOptions) {
       ctx.font = fontStringFor(seg.run);
       ctx.fillStyle = seg.run.effectiveColor;
       ctx.fillText(seg.text, cx, lineY);
+      if (seg.run.underline || seg.run.strike) {
+        const lw = Math.max(0.6, seg.run.fontSizePx * 0.07);
+        ctx.strokeStyle = seg.run.effectiveColor;
+        ctx.lineWidth = lw;
+        if (seg.run.underline) {
+          const uy = lineY + seg.run.fontSizePx * 0.14;
+          ctx.beginPath(); ctx.moveTo(cx, uy); ctx.lineTo(cx + seg.width, uy); ctx.stroke();
+        }
+        if (seg.run.strike) {
+          const sy = lineY - seg.run.fontSizePx * 0.28;
+          ctx.beginPath(); ctx.moveTo(cx, sy); ctx.lineTo(cx + seg.width, sy); ctx.stroke();
+        }
+      }
       cx += seg.width;
     }
     y += line.height;
@@ -330,10 +384,12 @@ export function measureTextBoxContent(
   maxInnerWidthPx: number,
   wrap: boolean,
   paddingPx: number,
+  base?: BaseTextStyle & { lineHeightPct?: number },
 ): { widthPx: number; heightPx: number } {
   if (!_measureCtx) return { widthPx: 0, heightPx: 0 };
-  const runs = htmlToRuns(html || "");
-  const lines = layoutLines(_measureCtx, runs, baseFontSizePx, "#000", maxInnerWidthPx, wrap);
+  const runs = htmlToRuns(html || "", base);
+  const lineFactor = Math.max(0.6, (base?.lineHeightPct ?? 105) / 100);
+  const lines = layoutLines(_measureCtx, runs, baseFontSizePx, "#000", maxInnerWidthPx, wrap, lineFactor);
   let maxLineW = 0;
   let totalH = 0;
   for (const line of lines) {

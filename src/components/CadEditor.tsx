@@ -208,6 +208,16 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const textBorderColorRef = useRef<HTMLInputElement>(null);
   const textBorderColorPreviewRef = useRef<HTMLDivElement>(null);
   const textBorderWidthRef = useRef<HTMLInputElement>(null);
+  const textModeAutoRef = useRef<HTMLButtonElement>(null);
+  const textModeFrameRef = useRef<HTMLButtonElement>(null);
+  const textBoldRef = useRef<HTMLButtonElement>(null);
+  const textItalicRef = useRef<HTMLButtonElement>(null);
+  const textUnderlineRef = useRef<HTMLButtonElement>(null);
+  const textStrikeRef = useRef<HTMLButtonElement>(null);
+  const textLineHeightRangeRef = useRef<HTMLInputElement>(null);
+  const textLineHeightNumRef = useRef<HTMLInputElement>(null);
+  const textBgAlphaRangeRef = useRef<HTMLInputElement>(null);
+  const textFontSizePtRef = useRef<HTMLInputElement>(null);
 
   // Text editor overlay refs
   const textEditorElRef = useRef<HTMLDivElement>(null);
@@ -641,6 +651,16 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
         borderColor: textBorderColorRef.current,
         borderColorPreview: textBorderColorPreviewRef.current,
         borderWidth: textBorderWidthRef.current,
+        modeAutoBtn: textModeAutoRef.current,
+        modeFrameBtn: textModeFrameRef.current,
+        boldBtn: textBoldRef.current,
+        italicBtn: textItalicRef.current,
+        underlineBtn: textUnderlineRef.current,
+        strikeBtn: textStrikeRef.current,
+        lineHeightRange: textLineHeightRangeRef.current,
+        lineHeightNum: textLineHeightNumRef.current,
+        bgAlphaRange: textBgAlphaRangeRef.current,
+        fontSizePt: textFontSizePtRef.current,
       },
       {
         editor: textEditorElRef.current,
@@ -2316,42 +2336,79 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 <select ref={textIdSelectRef} className="cad-settings-select w-full" />
               </div>
               <div>
-                <label>Textfarbe</label>
-                <div className="flex items-center gap-2">
-                  <div ref={textColorPreviewRef} className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))" }} />
-                  <input ref={textColorRef} type="color" defaultValue="#111111" className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
+                <div className="text-[10px] font-semibold tracking-wider mb-1.5" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>MODUS</div>
+                <div className="grid grid-cols-2 gap-1">
+                  <button ref={textModeAutoRef} type="button" className="cad-toolbar-btn h-9 justify-center text-[11px]" title="Rahmen passt sich an Text an">
+                    Rahmen variabel
+                  </button>
+                  <button ref={textModeFrameRef} type="button" className="cad-toolbar-btn h-9 justify-center text-[11px]" title="Text passt sich an Rahmen an">
+                    Rahmen fix
+                  </button>
                 </div>
-              </div>
-              <div>
-                <label>Schriftgröße (px)</label>
-                <input ref={textFontSizeRef} type="text" defaultValue="16" />
               </div>
               <div>
                 <label>Ausrichtung</label>
                 <div className="flex gap-1">
-                  <button ref={textAlignLeftRef} type="button" className="cad-toolbar-btn flex-1 justify-center h-9" title="Links">
+                  <button ref={textAlignLeftRef} type="button" className="cad-toolbar-btn flex-1 justify-center h-9" title="Text links">
                     <AlignLeft className="h-4 w-4" />
                   </button>
-                  <button ref={textAlignCenterRef} type="button" className="cad-toolbar-btn flex-1 justify-center h-9" title="Mitte">
+                  <button ref={textAlignCenterRef} type="button" className="cad-toolbar-btn flex-1 justify-center h-9" title="Text zentriert">
                     <AlignCenter className="h-4 w-4" />
                   </button>
-                  <button ref={textAlignRightRef} type="button" className="cad-toolbar-btn flex-1 justify-center h-9" title="Rechts">
+                  <button ref={textAlignRightRef} type="button" className="cad-toolbar-btn flex-1 justify-center h-9" title="Text rechts">
                     <AlignRight className="h-4 w-4" />
                   </button>
                 </div>
               </div>
               <div>
-                <label>Hintergrundfarbe</label>
-                <div className="flex items-center gap-2">
-                  <div ref={textBgColorPreviewRef} className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))" }} />
-                  <input ref={textBgColorRef} type="color" defaultValue="#ffffff" className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
+                <label>Schriftstärke</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <div className="text-[9px] mb-0.5" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Punkt (pt)</div>
+                    <input ref={textFontSizePtRef} type="text" defaultValue="12" />
+                  </div>
+                  <div>
+                    <div className="text-[9px] mb-0.5" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Bildschirm (px)</div>
+                    <input ref={textFontSizeRef} type="text" defaultValue="16" />
+                  </div>
                 </div>
               </div>
               <div>
-                <label>HG-Transparenz (0–100%)</label>
+                <label>Stil</label>
+                <div className="flex gap-1">
+                  <button ref={textBoldRef} type="button" className="cad-toolbar-btn flex-1 justify-center h-9 font-bold" title="Fett">B</button>
+                  <button ref={textItalicRef} type="button" className="cad-toolbar-btn flex-1 justify-center h-9 italic" title="Kursiv">I</button>
+                  <button ref={textUnderlineRef} type="button" className="cad-toolbar-btn flex-1 justify-center h-9 underline" title="Unterstrichen">U</button>
+                  <button ref={textStrikeRef} type="button" className="cad-toolbar-btn flex-1 justify-center h-9 line-through" title="Durchgestrichen">S</button>
+                </div>
+              </div>
+              <div>
+                <label>Absatz</label>
+                <input ref={textLineHeightRangeRef} type="range" min={80} max={300} step={5} defaultValue={105} className="cad-range w-full" />
+                <input ref={textLineHeightNumRef} type="text" defaultValue="105" />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label>Textfarbe</label>
+                  <div className="flex items-center gap-2">
+                    <div ref={textColorPreviewRef} className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))" }} />
+                    <input ref={textColorRef} type="color" defaultValue="#111111" className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
+                  </div>
+                </div>
+                <div>
+                  <label>Feldfarbe</label>
+                  <div className="flex items-center gap-2">
+                    <div ref={textBgColorPreviewRef} className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))" }} />
+                    <input ref={textBgColorRef} type="color" defaultValue="#ffffff" className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
+                  </div>
+                </div>
+              </div>
+              <div>
+                <label>Transparenz</label>
+                <input ref={textBgAlphaRangeRef} type="range" min={0} max={100} step={1} defaultValue={0} className="cad-range w-full" />
                 <input ref={textBgAlphaRef} type="text" defaultValue="0" />
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 hidden">
                 <input ref={textWrapRef} type="checkbox" className="accent-primary" />
                 <label className="!mb-0 cursor-pointer">Zeilenumbruch</label>
               </div>
@@ -3118,6 +3175,22 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 <div className="mt-1.5 font-semibold">Objektarten</div>
                 <div>Vektor: Generell bearbeitbar</div>
                 <div>Pixel: Radiergummi bearbeitbar</div>
+              </div>
+            </div>
+          ) : activeTool === ToolIds.TEXT ? (
+            <div
+              className="mt-3 rounded-md border p-2 space-y-2"
+              style={{ borderColor: "hsl(var(--border))" }}
+            >
+              <div className="text-[10px] font-semibold tracking-wider" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+                HILFE
+              </div>
+              <div className="text-[10.5px] leading-snug" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+                <div className="font-semibold">Modus</div>
+                <div>Rahmen variabel: Rahmen passt sich an Text an</div>
+                <div>Rahmen fix: Text passt sich an Rahmen an</div>
+                <div className="mt-1.5"><span className="cad-kbd">Enter</span> Absatz setzen</div>
+                <div><span className="cad-kbd">Text beenden</span> Außerhalb Textfeld klicken</div>
               </div>
             </div>
           ) : (

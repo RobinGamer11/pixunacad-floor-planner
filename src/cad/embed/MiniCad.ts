@@ -238,6 +238,9 @@ export class MiniCad {
   defaultTextBorderWidthPx = Defaults.textBorderWidthPx;
   defaultTextBold = false;
   defaultTextItalic = false;
+  defaultTextUnderline = false;
+  defaultTextStrike = false;
+  defaultTextLineHeightPct = Defaults.textLineHeightPct;
   defaultTextAlpha = 1;
   /** true = Rahmen wächst automatisch (Modus 1). false = fixer Rahmen mit Drag-Create (Modus 2). */
   defaultTextAutoSize = true;
@@ -990,6 +993,9 @@ export class MiniCad {
     fontSizePx?: number;
     bold?: boolean;
     italic?: boolean;
+    underline?: boolean;
+    strike?: boolean;
+    lineHeightPct?: number;
     alpha?: number;
     align?: "left" | "center" | "right";
     bgColor?: string;
@@ -1006,6 +1012,11 @@ export class MiniCad {
     if (typeof opts.fontSizePx === "number" && opts.fontSizePx > 0) this.defaultTextFontSizePx = opts.fontSizePx * (4 / 3);
     if (typeof opts.bold === "boolean") this.defaultTextBold = opts.bold;
     if (typeof opts.italic === "boolean") this.defaultTextItalic = opts.italic;
+    if (typeof opts.underline === "boolean") this.defaultTextUnderline = opts.underline;
+    if (typeof opts.strike === "boolean") this.defaultTextStrike = opts.strike;
+    if (typeof opts.lineHeightPct === "number" && opts.lineHeightPct > 0) {
+      this.defaultTextLineHeightPct = Math.max(60, Math.min(400, opts.lineHeightPct));
+    }
     if (typeof opts.alpha === "number" && opts.alpha >= 0 && opts.alpha <= 1) this.defaultTextAlpha = opts.alpha;
     if (opts.align) this.defaultTextAlign = opts.align;
     if (opts.bgColor) this.defaultTextBgColor = opts.bgColor;
@@ -1023,6 +1034,11 @@ export class MiniCad {
       selected.style.bgAlphaPct = this.defaultTextBgAlphaPct;
       selected.style.wrap = this.defaultTextAutoSize ? this.defaultTextWrap : true;
       selected.style.align = this.defaultTextAlign;
+      selected.style.bold = this.defaultTextBold;
+      selected.style.italic = this.defaultTextItalic;
+      selected.style.underline = this.defaultTextUnderline;
+      selected.style.strike = this.defaultTextStrike;
+      selected.style.lineHeightPct = this.defaultTextLineHeightPct;
       selected.style.borderEnabled = this.defaultTextBorderEnabled;
       selected.style.borderColor = this.defaultTextBorderColor;
       selected.style.borderWidthPx = this.defaultTextBorderWidthPx;
@@ -1325,6 +1341,11 @@ export class MiniCad {
         bgAlphaPct: sel.style.bgAlphaPct,
         wrap: sel.style.wrap,
         align: sel.style.align,
+        bold: sel.style.bold,
+        italic: sel.style.italic,
+        underline: sel.style.underline,
+        strike: sel.style.strike,
+        lineHeightPct: sel.style.lineHeightPct,
         borderEnabled: sel.style.borderEnabled,
         borderColor: sel.style.borderColor,
         borderWidthPx: sel.style.borderWidthPx,
@@ -1339,6 +1360,11 @@ export class MiniCad {
       bgAlphaPct: this.defaultTextBgAlphaPct,
       wrap: this.defaultTextAutoSize ? this.defaultTextWrap : true,
       align: this.defaultTextAlign,
+      bold: this.defaultTextBold,
+      italic: this.defaultTextItalic,
+      underline: this.defaultTextUnderline,
+      strike: this.defaultTextStrike,
+      lineHeightPct: this.defaultTextLineHeightPct,
       borderEnabled: this.defaultTextBorderEnabled,
       borderColor: this.defaultTextBorderColor,
       borderWidthPx: this.defaultTextBorderWidthPx,
@@ -1927,6 +1953,11 @@ export class MiniCad {
         bgAlpha: (box.style.bgAlphaPct || 0) / 100,
         align: box.style.align,
         wrap: box.style.wrap,
+        baseBold: box.style.bold,
+        baseItalic: box.style.italic,
+        baseUnderline: box.style.underline,
+        baseStrike: box.style.strike,
+        lineHeightPct: box.style.lineHeightPct,
         borderEnabled: box.style.borderEnabled,
         borderColor: box.style.borderColor,
         borderWidthPx: box.style.borderWidthPx,
