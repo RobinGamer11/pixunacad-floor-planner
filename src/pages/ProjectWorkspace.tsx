@@ -6042,11 +6042,15 @@ function LineModeSelect({
 
 function LineSettings({
   settings,
+  pxPerMm,
   onChange,
 }: {
   settings: ToolSettings["line"];
+  pxPerMm: number;
   onChange: (p: Partial<ToolSettings["line"]>) => void;
 }) {
+  const thicknessPx = guideStrokeMmToPx(settings.thicknessMm, pxPerMm);
+
   return (
     <SettingsBlock title="LINIE">
       <ToolColorPicker
@@ -6056,21 +6060,22 @@ function LineSettings({
       />
       <div>
         <div className="mb-1.5 text-[10px] text-muted-foreground">Strichstärke</div>
-        <label className="flex h-8 items-center overflow-hidden rounded-md border" style={{ borderColor: "hsl(var(--hairline))" }}>
-          <input
-            type="number"
-            step={0.1}
-            min={0.1}
-            value={settings.thicknessMm}
-            onChange={(e) => {
-              const v = Number(e.target.value);
-              if (!Number.isNaN(v) && v > 0) onChange({ thicknessMm: v });
-            }}
-            className="h-full min-w-0 flex-1 bg-transparent px-2 text-right text-xs tabular-nums outline-none"
-            aria-label="Strichstärke in mm"
+        <div className="grid grid-cols-2 gap-2">
+          <GuideMeasureInput
+            label="Bildschirm"
+            unit="px"
+            value={thicknessPx}
+            fractionDigits={2}
+            onChange={(value) => onChange({ thicknessMm: guideStrokePxToMm(value, pxPerMm) })}
           />
-          <span className="pr-2 text-[10px] text-muted-foreground">mm</span>
-        </label>
+          <GuideMeasureInput
+            label="Tatsächliche Größe"
+            unit="mm"
+            value={settings.thicknessMm}
+            fractionDigits={3}
+            onChange={(value) => onChange({ thicknessMm: value })}
+          />
+        </div>
       </div>
       <div>
         <div className="mb-1.5 text-[10px] text-muted-foreground">Transparenz</div>
