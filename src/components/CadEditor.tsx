@@ -841,6 +841,11 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     app.documentTool.onPhaseChange = () => setDocToolPhase(app.documentTool.phase);
     app.onSelectionChange = () => {
       setSelectedWallId(app.getSelectedWall()?.id || null);
+      // Auswahl-Werkzeug: bestehendes Objekt ausgewählt → automatisch in die
+      // Werkzeugeinstellungen wechseln; ohne Auswahl zurück zu "Seiten".
+      if (app.activeTool === app.selectTool) {
+        setRightTab(app.selection || app.doorTool.selectedDoorId ? "settings" : "sheets");
+      }
       setSelectedFreeStrokeId(app.getSelectedFreeStroke()?.id || null);
       // Pfeil-Einstellungen mit aktueller Auswahl synchronisieren
       try {
@@ -854,6 +859,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     app.setTool(ToolIds.SELECT);
     app.doorTool.onSelectionChange = (id) => {
       setDoorSelectedId(id);
+      if (id && app.activeTool === app.selectTool) setRightTab("settings");
       if (id) {
         const d = app.scene.getDoorById(id);
         if (d) {
@@ -2833,7 +2839,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           )}
 
           {/* Türen/Fenster Panel */}
-          {activeTool === ToolIds.DOOR && (
+          {(activeTool === ToolIds.DOOR || (activeTool === ToolIds.SELECT && doorSelectedId)) && (
             <div className="cad-settings-panel mb-2">
               {/* MODUS — außerhalb des Einstellungsrahmens */}
               <div className="mb-3">

@@ -425,3 +425,17 @@ export function splitBulgedEdge(a: Vec2, b: Vec2, bulge: number | null | undefin
     t,
   };
 }
+
+/* ------------------------------------------------------------------ */
+/* Schraffur-Ringe inkl. Wölbung                                       */
+/* ------------------------------------------------------------------ */
+/** Äußerer Ring einer Schraffur inkl. Wölbungen (für Fläche & Trefferprüfung). */
+export function hatchOuterRing(hatch: { points: Vec2[]; bulges?: number[] | null }): Vec2[] {
+  return tessellateWithBulges(hatch.points || [], hatch.bulges, true, 48);
+}
+
+/** Loch-Ringe einer Schraffur inkl. Wölbungen. */
+export function hatchHoleRings(hatch: { holes?: Vec2[][] | null; holeBulges?: (number[] | null)[] | null }): Vec2[][] {
+  const holes = hatch.holes || [];
+  return holes.map((loop, i) => tessellateWithBulges(loop || [], hatch.holeBulges?.[i], true, 48));
+}
