@@ -2457,8 +2457,14 @@ export class SelectTool {
           let dy = mouseW.y - this._groupDragLast.y;
           // Fangverhalten wie beim normalen Verschieben: der nächstgelegene
           // Fangpunkt der Auswahl rastet auf fremde Fangpunkte ein.
+          // WICHTIG: Der Soll-Ort wird IMMER aus der absoluten Mausbewegung
+          // seit Drag-Start berechnet — so bleibt die Gruppe exakt am Cursor
+          // und driftet nach einem Fang nicht weg.
           if (this._groupDragAnchor) {
-            const want = v(this._groupDragAnchor.x + dx, this._groupDragAnchor.y + dy);
+            const want = (this._groupDragAnchorStart && this._groupDragMouseStart)
+              ? v(this._groupDragAnchorStart.x + (mouseW.x - this._groupDragMouseStart.x),
+                  this._groupDragAnchorStart.y + (mouseW.y - this._groupDragMouseStart.y))
+              : v(this._groupDragAnchor.x + dx, this._groupDragAnchor.y + dy);
             const snapped = this._snapWorldPoint(want);
             dx = snapped.x - this._groupDragAnchor.x;
             dy = snapped.y - this._groupDragAnchor.y;
