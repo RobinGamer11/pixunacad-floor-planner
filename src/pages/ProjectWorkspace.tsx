@@ -5646,7 +5646,7 @@ function ToolsTab({
         <>
           <RasterModeToggle app={cadEngine} projectId={projectId} />
           <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
-            <FreeDrawSettingsPanel app={cadEngine} projectId={projectId} hideChrome />
+            <FreeDrawSettingsPanel app={cadEngine} projectId={projectId} pxPerMm={guidePxPerMm} hideChrome />
           </div>
         </>
       )}
