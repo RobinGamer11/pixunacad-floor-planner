@@ -13,5 +13,7 @@ describe("dbg", () => { it("faces 0.8", () => {
   const scene: any = { segments: [], walls, hatches: [], freeStrokes: [], getWallTopology: () => g };
   const faces = (__debugFaces as any)(scene, v(2,2.5)) as any[][];
   console.log("nfaces", faces.length, faces.map(f=>polygonAreaAbs(f).toFixed(2)).join(","));
+  const big=faces.sort((a,b)=>polygonAreaAbs(b)-polygonAreaAbs(a))[0];
+  console.log(JSON.stringify(big.map((q:any)=>[+q.x.toFixed(2),+q.y.toFixed(2)])));
   console.log("containing", faces.filter(f=>pointInPolygon(v(2,2.5),f)).map(f=>polygonAreaAbs(f).toFixed(2)));
 }); });
