@@ -3255,6 +3255,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             && activeTool !== ToolIds.LINE
             && activeTool !== ToolIds.FREE
             && activeTool !== ToolIds.HATCH
+            && activeTool !== ToolIds.DOCUMENT
+            && activeTool !== ToolIds.WALL
             && activeTool !== ToolIds.TEXT) ? (
             <ToolHelpNotes toolId={activeTool} />
           ) : null}
