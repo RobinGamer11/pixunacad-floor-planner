@@ -75,7 +75,7 @@ export interface TextEditorRefs {
 }
 
 export interface MeasureSettings {
-  orientation: "parallel" | "diagonal";
+  orientation: "parallel" | "diagonal" | "arc";
   /** "free" = Maßkette ohne Fangpunkt-Zwang. */
   pointCount: "two" | "multi" | "free";
   /** Achsen-Richtung der Maßkette. "free" wird aus den ersten zwei Punkten abgeleitet. */
@@ -2745,7 +2745,7 @@ export class CadApp {
     });
 
     r.orientation.addEventListener("change", () => {
-      const val = r.orientation.value as "parallel" | "diagonal";
+      const val = r.orientation.value as "parallel" | "diagonal" | "arc";
       this.measureSettings.orientation = val;
       const sel = this.getSelectedDimension();
       if (sel) sel.mode = val;

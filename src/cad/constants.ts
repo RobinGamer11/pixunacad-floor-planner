@@ -32,7 +32,7 @@ export const Defaults = {
   areaBorderWidthPx: 1,
 
   // Measure (dimension) defaults
-  measureOrientation: "parallel" as "parallel" | "diagonal",
+  measureOrientation: "parallel" as "parallel" | "diagonal" | "arc",
   measurePointCount: "multi" as "two" | "multi" | "free",
   measureDirection: "free" as "horizontal" | "vertical" | "free",
 
