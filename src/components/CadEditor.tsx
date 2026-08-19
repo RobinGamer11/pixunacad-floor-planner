@@ -2280,153 +2280,144 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
 
           {/* Measure Settings */}
           <div ref={measureSettingsRef} className={`cad-settings-panel hidden`}>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
-              Maßkette
+            {/* Engine-Bindings ohne eigene Oberfläche */}
+            <div className="hidden">
+              <select ref={measureOrientationRef} defaultValue="parallel">
+                <option value="parallel">Parallel</option>
+                <option value="diagonal">Schräg</option>
+              </select>
+              <select ref={measurePointCountRef} defaultValue="multi">
+                <option value="two">Einzelmaß</option>
+                <option value="multi">Mehrfachmaß</option>
+                <option value="free">Freies Maß</option>
+              </select>
+              <select ref={measureDirectionRef} defaultValue="free">
+                <option value="horizontal">Horizontal</option>
+                <option value="vertical">Vertikal</option>
+                <option value="free">Frei</option>
+              </select>
+              <select ref={measureEditModeRef} defaultValue="endpoints">
+                <option value="parallel">Parallel verschieben</option>
+                <option value="endpoints">Endpunkte editieren</option>
+              </select>
+              <input ref={measureTextSizeRef} type="text" defaultValue="14.6667" />
+              <input ref={measureTextGapRef} type="text" defaultValue="2" />
+              <input ref={measureDecimalsRef} type="text" defaultValue="2" />
+              <input ref={measureTickLengthRef} type="text" defaultValue="0.15" />
+              <input ref={measureExtAlphaRef} type="text" defaultValue="1" />
+              <input ref={measureTextBgAlphaRef} type="text" defaultValue="0.8" />
+              <input ref={measureTextColorRef} type="color" defaultValue="#000000" />
+              <div ref={measureTextColorPreviewRef} />
+              <input ref={measureLineColorRef} type="color" defaultValue="#2b2b2b" />
+              <div ref={measureLineColorPreviewRef} />
+              <input ref={measureExtColorRef} type="color" defaultValue="#2b2b2b" />
+              <div ref={measureExtColorPreviewRef} />
+              <input ref={measureTextBgColorRef} type="color" defaultValue="#ffffff" />
+              <div ref={measureTextBgColorPreviewRef} />
+              <input ref={measureFreeTextColorRef} type="color" defaultValue="#111111" />
+              <div ref={measureFreeTextColorPreviewRef} />
             </div>
+
             <div className="space-y-3">
-              <div>
-                <label>Ebene</label>
-                <select ref={measureIdSelectRef} className="cad-settings-select w-full" />
-              </div>
-              <div>
-                <label>Richtung</label>
-                <select ref={measureOrientationRef} className="cad-settings-select w-full">
-                  <option value="parallel">Parallel</option>
-                  <option value="diagonal">Schräg</option>
-                </select>
-              </div>
-              <div>
-                <label>Punkte</label>
-                <select ref={measurePointCountRef} className="cad-settings-select w-full" defaultValue="multi">
-                  <option value="two">2 Punkte (Einzelmaß)</option>
-                  <option value="multi">Mehrere Punkte (Kette)</option>
-                </select>
-              </div>
-              <div>
-                <label>Achse / Richtung</label>
-                <select ref={measureDirectionRef} className="cad-settings-select w-full" defaultValue="free">
-                  <option value="horizontal">Horizontal</option>
-                  <option value="vertical">Vertikal</option>
-                  <option value="free">Frei</option>
-                </select>
+              <div className="mb-1">
+                <CadEbeneSelect target={measureIdSelectRef} />
               </div>
 
-              <div>
-                <label>Punktbearbeitung (Auswahl)</label>
-                <select ref={measureEditModeRef} className="cad-settings-select w-full" defaultValue="endpoints">
-                  <option value="parallel">Parallel verschieben</option>
-                  <option value="endpoints">Endpunkte editieren</option>
-                </select>
-              </div>
-              <div className="flex items-center gap-2">
-                <input ref={measureExtRef} type="checkbox" className="accent-primary" />
-                <label className="!mb-0 cursor-pointer">Verlängerungslinien</label>
-              </div>
-              <div ref={measureExtGroupRef} className="hidden space-y-2 pt-2" style={{ borderTop: "1px solid hsl(var(--border))" }}>
-                <div>
-                  <label>Stil</label>
-                  <select ref={measureExtStyleRef} className="cad-settings-select w-full" defaultValue="dashed">
-                    <option value="dashed">Gestrichelt</option>
-                    <option value="solid">Durchgezogen</option>
+              <CadSegmentedProxy
+                label="Modus"
+                target={measurePointCountRef}
+                columns={3}
+                options={[
+                  { value: "two", label: "Einzelmaß" },
+                  { value: "multi", label: "Mehrfachmaß" },
+                  { value: "free", label: "Freies Maß" },
+                ]}
+              />
+
+              <div className="rounded-md border p-2 space-y-3" style={{ borderColor: "hsl(var(--hairline))" }}>
+                <CadSegmentedProxy
+                  label="Ausrichtung"
+                  target={measureOrientationRef}
+                  columns={2}
+                  options={[
+                    { value: "parallel", label: "Parallel" },
+                    { value: "diagonal", label: "Schräg" },
+                  ]}
+                />
+
+                <div className="grid grid-cols-2 gap-2">
+                  <CadMeasureProxy label="Textgröße" unit="pt" target={measureTextSizeRef} factor={0.75} digits={1} />
+                  <CadMeasureProxy label="Text-Kettenabstand" unit="px" target={measureTextGapRef} factor={1} digits={0} />
+                </div>
+
+                <div className={measureHasDoorRef ? "" : "hidden"}>
+                  <div className="mb-1 text-[10px] text-muted-foreground">Höhentext (ersetzt Türhöhe)</div>
+                  <input
+                    ref={measureDoorHeightTextRef}
+                    type="text"
+                    placeholder="z. B. 2,10 m OK"
+                    className="h-8 w-full rounded-md border px-2 text-[11px]"
+                    style={{ borderColor: "hsl(var(--hairline))", backgroundColor: "#fff" }}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <CadMeasureProxy label="Kommastellen" unit="" target={measureDecimalsRef} factor={1} digits={0} />
+                  <CadMeasureProxy label="Endstrichlänge" unit="m" target={measureTickLengthRef} factor={1} digits={2} />
+                </div>
+
+                <div className="flex items-end gap-2">
+                  <div className="flex-1">
+                    <CadCheckboxProxy target={measureShowUnitRef} label="Einheit anzeigen" />
+                  </div>
+                  <select ref={measureUnitRef} className="cad-settings-select h-8 w-20" defaultValue="m">
+                    <option value="mm">mm</option>
+                    <option value="cm">cm</option>
+                    <option value="m">m</option>
                   </select>
                 </div>
-                <div>
-                  <label>Farbe</label>
-                  <div className="flex items-center gap-2">
-                    <div ref={measureExtColorPreviewRef} className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))" }} />
-                    <input ref={measureExtColorRef} type="color" defaultValue="#2b2b2b" className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
+
+                <div className="grid grid-cols-2 gap-2">
+                  <CadColorProxy label="Textfarbe" target={measureTextColorRef} />
+                  <CadColorProxy label="Linienfarbe" target={measureLineColorRef} />
+                </div>
+
+                <CadCheckboxProxy target={measureExtRef} label="Verlängerungslinien" />
+                <div ref={measureExtGroupRef} className="hidden space-y-2">
+                  <div>
+                    <div className="mb-1 text-[10px] text-muted-foreground">Stil</div>
+                    <select ref={measureExtStyleRef} className="cad-settings-select w-full" defaultValue="dashed">
+                      <option value="dashed">Gestrichelt</option>
+                      <option value="solid">Durchgezogen</option>
+                    </select>
                   </div>
+                  <CadColorProxy label="Farbe Verlängerung" target={measureExtColorRef} />
                 </div>
-                <div>
-                  <label>Transparenz (0–1)</label>
-                  <input ref={measureExtAlphaRef} type="text" defaultValue="1" />
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <input ref={measureFreeTextToggleRef} type="checkbox" className="accent-primary" />
-                <label className="!mb-0 cursor-pointer">Freier Text</label>
-              </div>
-              <div>
-                <input ref={measureFreeTextInputRef} type="text" placeholder="Text eingeben" className="hidden" />
-              </div>
-              <div ref={measureFreeTextGroupRef} className="hidden space-y-2 pt-2" style={{ borderTop: "1px solid hsl(var(--border))" }}>
-                <div className="flex gap-1.5">
-                  <button type="button" ref={measureFreeTextBoldRef} className="cad-toolbar-btn h-8 px-3 text-[12px] font-bold">B</button>
-                  <button type="button" ref={measureFreeTextItalicRef} className="cad-toolbar-btn h-8 px-3 text-[12px] italic">I</button>
-                </div>
-                <div>
-                  <label>Textfarbe (Freier Text)</label>
-                  <div className="flex items-center gap-2">
-                    <div ref={measureFreeTextColorPreviewRef} className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))" }} />
-                    <input ref={measureFreeTextColorRef} type="color" defaultValue="#111111" className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
+
+                <CadCheckboxProxy target={measureFreeTextToggleRef} label="Freier Text" />
+                <div ref={measureFreeTextGroupRef} className="hidden space-y-2">
+                  <input
+                    ref={measureFreeTextInputRef}
+                    type="text"
+                    placeholder="Text eingeben"
+                    className="h-8 w-full rounded-md border px-2 text-[11px]"
+                    style={{ borderColor: "hsl(var(--hairline))", backgroundColor: "#fff" }}
+                  />
+                  <div className="grid grid-cols-2 gap-1">
+                    <button type="button" ref={measureFreeTextBoldRef} className="h-9 rounded border text-[12px] font-bold" style={{ borderColor: "hsl(var(--hairline))" }}>B</button>
+                    <button type="button" ref={measureFreeTextItalicRef} className="h-9 rounded border text-[12px] italic" style={{ borderColor: "hsl(var(--hairline))" }}>I</button>
                   </div>
+                  <CadColorProxy label="Farbe freier Text" target={measureFreeTextColorRef} />
                 </div>
-              </div>
-              <div>
-                <label>Textfarbe</label>
-                <div className="flex items-center gap-2">
-                  <div ref={measureTextColorPreviewRef} className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))" }} />
-                  <input ref={measureTextColorRef} type="color" defaultValue="#000000" className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
+
+                <CadCheckboxProxy target={measureTextBgToggleRef} label="Text-Hintergrund" />
+                <div ref={measureTextBgGroupRef} className="hidden space-y-2">
+                  <CadColorProxy label="Hintergrundfarbe" target={measureTextBgColorRef} />
                 </div>
-              </div>
-              <div>
-                <label>Textgröße (px)</label>
-                <input ref={measureTextSizeRef} type="text" defaultValue="11" />
-              </div>
-              <div>
-                <label>Text-Abstand zur Maßlinie (px)</label>
-                <input ref={measureTextGapRef} type="text" defaultValue="2" />
-              </div>
-              <div>
-                <label>Höhentext (frei, ersetzt Türhöhe)</label>
-                <input ref={measureDoorHeightTextRef} type="text" placeholder="z. B. 2,10 m OK" />
-              </div>
-              <div>
-                <label>Kommastellen (0–6)</label>
-                <input ref={measureDecimalsRef} type="text" defaultValue="2" />
-              </div>
-              <div className="flex items-center gap-2">
-                <input ref={measureTextBgToggleRef} type="checkbox" className="accent-primary" />
-                <label className="!mb-0 cursor-pointer">Text-Hintergrund</label>
-              </div>
-              <div ref={measureTextBgGroupRef} className="hidden space-y-2 pt-2" style={{ borderTop: "1px solid hsl(var(--border))" }}>
-                <div>
-                  <label>HG-Farbe</label>
-                  <div className="flex items-center gap-2">
-                    <div ref={measureTextBgColorPreviewRef} className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))" }} />
-                    <input ref={measureTextBgColorRef} type="color" defaultValue="#ffffff" className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
-                  </div>
-                </div>
-                <div>
-                  <label>HG-Transparenz (0–1)</label>
-                  <input ref={measureTextBgAlphaRef} type="text" defaultValue="0.8" />
-                </div>
-              </div>
-              <div>
-                <label>Linienfarbe</label>
-                <div className="flex items-center gap-2">
-                  <div ref={measureLineColorPreviewRef} className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))" }} />
-                  <input ref={measureLineColorRef} type="color" defaultValue="#2b2b2b" className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
-                </div>
-              </div>
-              <div>
-                <label>Endstrich-Länge (m)</label>
-                <input ref={measureTickLengthRef} type="text" defaultValue="0.15" />
-              </div>
-              <div className="flex items-center gap-2">
-                <input ref={measureShowUnitRef} type="checkbox" className="accent-primary" defaultChecked />
-                <label className="!mb-0 cursor-pointer">Einheit anzeigen</label>
-              </div>
-              <div>
-                <label>Einheit</label>
-                <select ref={measureUnitRef} className="cad-settings-select w-full" defaultValue="m">
-                  <option value="mm">mm</option>
-                  <option value="cm">cm</option>
-                  <option value="m">m</option>
-                </select>
               </div>
             </div>
           </div>
+
 
           {/* Text Settings */}
           <div ref={textSettingsRef} className={`cad-settings-panel hidden`}>
