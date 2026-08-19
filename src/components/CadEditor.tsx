@@ -17,6 +17,7 @@ import { EraserSettingsPanel, EraserModeSelect } from "@/components/cad/EraserSe
 import { ProjectFilePickerDialog } from "@/components/cad/ProjectFilePickerDialog";
 import { WallSettingsPanel } from "@/components/cad/WallSettingsPanel";
 import { HatchPatternBlock } from "@/components/cad/HatchPatternBlock";
+import { HatchSettingsPanel, HatchModeSelect } from "@/components/cad/HatchSettingsPanel";
 
 import { ToolHelpNotes } from "@/components/cad/ToolHelpNotes";
 import { MappeHelpOverlay } from "@/components/workspace/MappeHelpOverlay";
@@ -34,7 +35,7 @@ const CAD_TOOLS = [
   { id: ToolIds.HATCH, label: "Schraffur", key: "H", icon: Square },
   { id: ToolIds.MEASURE, label: "Maßkette", key: "M", icon: Ruler },
   { id: ToolIds.TEXT, label: "Text", key: "T", icon: Type },
-  { id: ToolIds.STICKER, label: "Sticker", key: "O", icon: StickerIcon },
+  { id: ToolIds.STICKER, label: "Stempel", key: "O", icon: StickerIcon },
   { id: ToolIds.DOCUMENT, label: "Dokument", key: "D", icon: FileImage },
 ];
 
@@ -1106,7 +1107,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
         {/* Raster / Undo / Redo / Pipette */}
         <div className="flex flex-col items-center gap-0.5 p-1.5">
           <button
-            onClick={() => setGridPanelOpen((o) => !o)}
+            onClick={() => { setGridPanelOpen((o) => !o); setRightTab("settings"); }}
             title="Raster-Einstellungen — ein/ausschalten im Panel"
             className={`cad-rail-btn ${gridPanelOpen || gridEnabled ? "active" : ""}`}
           >
@@ -1826,7 +1827,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
 
         <DragScrollDiv axis="y" className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-2 cursor-grab active:cursor-grabbing" style={{ display: rightTab === "settings" ? "block" : "none" }}>
         {/* Settings area (scrollable) — kompakter, keine horizontale Overflow-Falle. */}
-        <div className="flex-1 min-h-0 p-2 w-full">
+        <div className={`flex-1 min-h-0 p-2 w-full ${gridPanelOpen ? "cad-grid-only" : ""}`}>
           {/* Raster-Einstellungen */}
           {gridPanelOpen && (
             <div className="cad-settings-panel mb-2">
@@ -2037,14 +2038,27 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           </div>
 
 
-           {/* Hatch Settings */}
-          <div ref={hatchSettingsRef} className={`cad-settings-panel hidden mb-2`}>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
-              Schraffur
+          {/* Schraffur — Design identisch zur Mappe (Modus & Objektart über dem Rahmen) */}
+          {activeTool === ToolIds.HATCH && (
+            <div className="cad-settings-panel mb-2">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+                Schraffur
+              </div>
+              <HatchModeSelect app={appRef.current} />
+              <RasterModeToggle app={appRef.current} projectId={projectId} />
+              <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
+                <HatchSettingsPanel app={appRef.current} projectId={projectId} patternScaleMax={60} hideChrome />
+              </div>
             </div>
-            <RasterModeToggle app={appRef.current} projectId={projectId} />
+          )}
 
-            <div className="flex gap-1 mb-3">
+           {/* Hatch Settings (Legacy-Bindings: Ebene + Flächenanzeige) */}
+          <div ref={hatchSettingsRef} className={`cad-settings-panel hidden mb-2`}>
+            <div className="hidden">
+              <RasterModeToggle app={appRef.current} projectId={projectId} />
+            </div>
+
+            <div className="hidden gap-1 mb-3">
               <button
                 type="button"
                 onClick={() => appRef.current?.hatchTool.setDrawMode("polygon")}
@@ -2084,29 +2098,31 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 <label>Ebene</label>
                 <select ref={hatchIdSelectRef} className="cad-settings-select w-full" />
               </div>
-              <div>
-                <label>Flächenfarbe</label>
-                <div className="flex items-center gap-2">
-                  <div ref={hatchFillPreviewRef} className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))" }} />
-                  <input ref={hatchFillColorRef} type="color" defaultValue="#4da3ff" className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
+              <div className="hidden">
+                <div>
+                  <label>Flächenfarbe</label>
+                  <div className="flex items-center gap-2">
+                    <div ref={hatchFillPreviewRef} className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))" }} />
+                    <input ref={hatchFillColorRef} type="color" defaultValue="#4da3ff" className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
+                  </div>
+                </div>
+                <div>
+                  <label>Polylinienfarbe</label>
+                  <div className="flex items-center gap-2">
+                    <div ref={hatchStrokePreviewRef} className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))" }} />
+                    <input ref={hatchStrokeColorRef} type="color" defaultValue="#111111" className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
+                  </div>
+                </div>
+                <div>
+                  <label>Polyliniendicke</label>
+                  <input ref={hatchStrokeWidthRef} type="text" defaultValue="1" />
+                </div>
+                <div>
+                  <label>Transparenz (0–100%)</label>
+                  <input ref={hatchAlphaRef} type="text" defaultValue="35" />
                 </div>
               </div>
-              <div>
-                <label>Polylinienfarbe</label>
-                <div className="flex items-center gap-2">
-                  <div ref={hatchStrokePreviewRef} className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))" }} />
-                  <input ref={hatchStrokeColorRef} type="color" defaultValue="#111111" className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
-                </div>
-              </div>
-              <div>
-                <label>Polyliniendicke</label>
-                <input ref={hatchStrokeWidthRef} type="text" defaultValue="1" />
-              </div>
-              <div>
-                <label>Transparenz (0–100%)</label>
-                <input ref={hatchAlphaRef} type="text" defaultValue="35" />
-              </div>
-              <HatchPatternBlock app={cadApp} scaleMax={60} />
+
 
               <div className="flex items-center gap-2 mt-1">
                 <input
@@ -2360,15 +2376,14 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 </div>
               </div>
               <div>
-                <label>Schriftstärke</label>
-                <div className="grid grid-cols-2 gap-2">
+                <label>Schriftgröße</label>
+                <div className="grid grid-cols-1 gap-2">
                   <div>
                     <div className="text-[9px] mb-0.5" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Punkt (pt)</div>
-                    <input ref={textFontSizePtRef} type="text" defaultValue="12" />
+                    <input ref={textFontSizePtRef} type="text" defaultValue="11" />
                   </div>
-                  <div>
-                    <div className="text-[9px] mb-0.5" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Bildschirm (px)</div>
-                    <input ref={textFontSizeRef} type="text" defaultValue="16" />
+                  <div className="hidden">
+                    <input ref={textFontSizeRef} type="text" defaultValue="14.67" />
                   </div>
                 </div>
               </div>
@@ -2431,112 +2446,129 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             </div>
           </div>
 
-          {/* Sticker Settings */}
+          {/* Stempel-Werkzeug */}
           {activeTool === ToolIds.STICKER && (
             <div className="cad-settings-panel mb-2">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Sticker</div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Stempel</div>
               <div className="space-y-3">
-                {stickerPhase === "selecting" ? (
-                  <>
-                    <div className="rounded-md p-2 text-xs space-y-2" style={{ background: "hsl(var(--primary) / 0.12)", border: "1px solid hsl(var(--primary) / 0.4)" }}>
-                      <div className="font-medium">Auswahl-Modus aktiv</div>
-                      <div style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
-                        Klicke Objekte zum Hinzufügen / Entfernen.<br />
-                        <strong>Enter</strong> oder <strong>Doppelklick</strong> = speichern · <strong>Esc</strong> = abbrechen
-                      </div>
-                      <div className="font-mono text-[11px] pt-1" style={{ borderTop: "1px solid hsl(var(--primary) / 0.3)" }}>
-                        Objekte ausgewählt: <strong>{stickerSelCount}</strong>
-                      </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (stickerPhase === "selecting") appRef.current!.stickerTool.cancel();
+                    else appRef.current!.stickerTool.beginSelectionMode();
+                  }}
+                  className={`cad-toolbar-btn w-full justify-center h-9 ${stickerPhase === "selecting" ? "active" : ""}`}
+                  title="Objekte für einen neuen Stempel auswählen"
+                >
+                  <Plus className="h-4 w-4" /> <span className="text-xs">Stempel</span>
+                </button>
+
+                {stickerPhase === "selecting" && (
+                  <div className="space-y-1.5">
+                    <div
+                      className="flex items-center gap-2 rounded-md border px-2 py-2 text-xs leading-snug"
+                      style={{
+                        borderColor: "hsl(var(--primary))",
+                        background: "hsl(var(--primary) / 0.12)",
+                      }}
+                    >
+                      <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px] font-semibold" style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}>1</span>
+                      <span className="font-medium">Objekte auswählen (L-Klick)</span>
+                      <span className="ml-auto tabular-nums">{stickerSelCount}</span>
                     </div>
-                    <div className="flex gap-1">
-                      <button type="button" disabled={stickerSelCount === 0} onClick={() => {
-                        const name = window.prompt("Name für neuen Sticker:", `Sticker ${appRef.current!.stickers.length + 1}`);
+                    <button
+                      type="button"
+                      disabled={stickerSelCount === 0}
+                      onClick={() => {
+                        const name = window.prompt("Name für neuen Stempel:", `Stempel ${appRef.current!.stickers.length + 1}`);
                         if (!name) return;
                         appRef.current!.stickerTool.commitSelectionAsSticker(name);
-                      }} className="cad-toolbar-btn flex-1 justify-center h-9 disabled:opacity-40 disabled:cursor-not-allowed" title="Auswahl als Sticker speichern">
-                        <Plus className="h-4 w-4" /> <span className="text-xs">Speichern</span>
-                      </button>
-                      <button type="button" onClick={() => { appRef.current!.stickerTool.cancel(); }} className="cad-toolbar-btn h-9 px-3 justify-center" title="Abbrechen">
-                        <span className="text-xs">Abbrechen</span>
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <button type="button" onClick={() => {
-                    appRef.current!.stickerTool.beginSelectionMode();
-                  }} className="cad-toolbar-btn w-full justify-center h-9" title="Mehrere Objekte für neuen Sticker auswählen">
-                    <Plus className="h-4 w-4" /> <span className="text-xs">Auswahl</span>
-                  </button>
+                      }}
+                      className="flex w-full items-center gap-2 rounded-md border px-2 py-2 text-xs leading-snug transition-colors disabled:cursor-not-allowed"
+                      style={
+                        stickerSelCount > 0
+                          ? { borderColor: "hsl(var(--primary))", background: "hsl(var(--primary) / 0.12)" }
+                          : { borderColor: "hsl(var(--hairline))", color: "hsl(var(--muted-foreground))" }
+                      }
+                      title="Auswahl als Stempel speichern"
+                    >
+                      <span
+                        className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px] font-semibold"
+                        style={stickerSelCount > 0
+                          ? { background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }
+                          : { background: "hsl(var(--muted))", color: "hsl(var(--muted-foreground))" }}
+                      >2</span>
+                      <span className={stickerSelCount > 0 ? "font-medium" : undefined}>Sticker erstellen</span>
+                    </button>
+                  </div>
                 )}
 
-                <div className="flex gap-1">
-                  <button type="button" onClick={() => {
-                    const json = appRef.current!.exportStickers();
-                    const blob = new Blob([json], { type: "application/json" });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement("a");
-                    a.href = url; a.download = "sticker-library.json";
-                    document.body.appendChild(a); a.click(); a.remove();
-                    URL.revokeObjectURL(url);
-                  }} className="cad-toolbar-btn flex-1 justify-center h-8 text-xs" title="Exportieren">
-                    <Download className="h-3.5 w-3.5" /> Export
-                  </button>
-                  <button type="button" onClick={() => stickerImportRef.current?.click()} className="cad-toolbar-btn flex-1 justify-center h-8 text-xs" title="Importieren">
-                    <Upload className="h-3.5 w-3.5" /> Import
-                  </button>
-                  <input ref={stickerImportRef} type="file" accept="application/json" className="hidden" onChange={async (e) => {
-                    const f = e.target.files?.[0]; if (!f) return;
-                    const text = await f.text();
-                    try {
-                      const n = appRef.current!.importStickers(text);
-                      if (n === 0) window.alert("Keine gültigen Sticker in der Datei gefunden.");
-                    } catch { window.alert("Datei konnte nicht gelesen werden."); }
-                    e.target.value = "";
-                  }} />
+                <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
+                  <div className="flex gap-1">
+                    <button type="button" onClick={() => {
+                      const json = appRef.current!.exportStickers();
+                      const blob = new Blob([json], { type: "application/json" });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url; a.download = "stempel-bibliothek.json";
+                      document.body.appendChild(a); a.click(); a.remove();
+                      URL.revokeObjectURL(url);
+                    }} className="cad-toolbar-btn flex-1 justify-center h-8 text-xs" title="Exportieren">
+                      <Download className="h-3.5 w-3.5" /> Export
+                    </button>
+                    <button type="button" onClick={() => stickerImportRef.current?.click()} className="cad-toolbar-btn flex-1 justify-center h-8 text-xs" title="Importieren">
+                      <Upload className="h-3.5 w-3.5" /> Import
+                    </button>
+                    <input ref={stickerImportRef} type="file" accept="application/json" className="hidden" onChange={async (e) => {
+                      const f = e.target.files?.[0]; if (!f) return;
+                      const text = await f.text();
+                      try {
+                        const n = appRef.current!.importStickers(text);
+                        if (n === 0) window.alert("Keine gültigen Stempel in der Datei gefunden.");
+                      } catch { window.alert("Datei konnte nicht gelesen werden."); }
+                      e.target.value = "";
+                    }} />
+                  </div>
                 </div>
 
-                <div className="space-y-1 max-h-[300px] overflow-y-auto">
-                  {stickers.length === 0 && (
-                    <div className="text-xs text-center py-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Noch keine Sticker</div>
-                  )}
-                  {stickers.map(s => {
-                    const isActive = appRef.current?.stickerTool.activeDef?.id === s.id;
-                    return (
-                      <div key={s.id} className="flex items-center gap-1">
-                        <button type="button" onClick={() => appRef.current!.beginStickerPlacement(s.id)} className={`cad-toolbar-btn flex-1 justify-start h-8 text-xs ${isActive ? "active" : ""}`} title="Platzieren">
-                          <StickerIcon className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{s.name}</span>
-                        </button>
-                        <button type="button" onClick={() => {
-                          const ok = appRef.current!.openStickerEditByDefId(s.id);
-                          if (!ok) window.alert("Keine platzierte Instanz dieses Stickers gefunden. Platziere ihn zuerst auf dem Canvas.");
-                        }} className="cad-toolbar-btn h-8 w-8 justify-center px-0" title="Sticker-Inhalt bearbeiten (Edit-Mode)" style={{ color: "hsl(var(--primary))" }}>
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
-                        <button type="button" onClick={() => {
-                          const next = window.prompt("Sticker umbenennen:", s.name);
-                          if (next && next.trim()) appRef.current!.renameSticker(s.id, next);
-                        }} className="cad-toolbar-btn h-8 w-8 justify-center px-0" title="Umbenennen">
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
-                        <button type="button" onClick={() => {
-                          if (window.confirm(`Sticker "${s.name}" löschen?`)) appRef.current!.removeSticker(s.id);
-                        }} className="cad-toolbar-btn h-8 w-8 justify-center px-0" title="Löschen">
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <div className="text-[11px] leading-relaxed pt-2" style={{ color: "hsl(var(--cad-toolbar-muted))", borderTop: "1px solid hsl(var(--border))" }}>
-                  <div><strong>Auswahl</strong>: Objekte sammeln · Enter speichert</div>
-                  <div><strong>Klick auf Sticker</strong>: Platzieren-Modus</div>
-                  <div>1. Klick: Position · Maus: Rotation · 2. Klick: bestätigt</div>
-                  <div>SHIFT: 90°-Snap · ENTER: Winkel eingeben</div>
+                <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
+                  <div className="space-y-1 max-h-[300px] overflow-y-auto">
+                    {stickers.length === 0 && (
+                      <div className="text-xs text-center py-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Noch keine Stempel</div>
+                    )}
+                    {stickers.map(s => {
+                      const isActive = appRef.current?.stickerTool.activeDef?.id === s.id;
+                      return (
+                        <div key={s.id} className="flex items-center gap-1">
+                          <button type="button" onClick={() => appRef.current!.beginStickerPlacement(s.id)} className={`cad-toolbar-btn flex-1 justify-start h-8 text-xs ${isActive ? "active" : ""}`} title="Platzieren">
+                            <StickerIcon className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{s.name}</span>
+                          </button>
+                          <button type="button" onClick={() => {
+                            const ok = appRef.current!.openStickerEditByDefId(s.id);
+                            if (!ok) window.alert("Keine platzierte Instanz dieses Stempels gefunden. Platziere ihn zuerst auf dem Canvas.");
+                          }} className="cad-toolbar-btn h-8 w-8 justify-center px-0" title="Stempel-Inhalt bearbeiten (Edit-Mode)" style={{ color: "hsl(var(--primary))" }}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <button type="button" onClick={() => {
+                            const next = window.prompt("Stempel umbenennen:", s.name);
+                            if (next && next.trim()) appRef.current!.renameSticker(s.id, next);
+                          }} className="cad-toolbar-btn h-8 w-8 justify-center px-0" title="Umbenennen">
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <button type="button" onClick={() => {
+                            if (window.confirm(`Stempel "${s.name}" löschen?`)) appRef.current!.removeSticker(s.id);
+                          }} className="cad-toolbar-btn h-8 w-8 justify-center px-0" title="Löschen">
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             </div>
           )}
+
 
           {/* Document-Tool-Panel: nur Import */}
           {activeTool === ToolIds.DOCUMENT && (

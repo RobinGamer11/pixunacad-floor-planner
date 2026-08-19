@@ -288,6 +288,11 @@
     color: hsl(var(--cad-toolbar-active-foreground));
   }
 
+  /* Raster-Werkzeug: zeigt ausschließlich die Raster-Einstellungen. */
+  .cad-grid-only > *:not(:first-child) {
+    display: none !important;
+  }
+
   .cad-settings-panel {
     @apply rounded-lg p-2 space-y-2;
     background: transparent;

@@ -5070,7 +5070,7 @@ function RightInspector({
               onCancelTable={onCancelTable}
             />
           )}
-          {tab === "tools" && activeTool !== "guide" && activeTool !== "text" && activeTool !== "eraser" && activeTool !== null && activeTool !== "pipette" && !isLinePageTool(activeTool) && (
+          {tab === "tools" && activeTool !== "guide" && activeTool !== "text" && activeTool !== "eraser" && activeTool !== null && activeTool !== "pipette" && activeTool !== "document" && activeTool !== "cad" && !isLinePageTool(activeTool) && (
             <ToolHelpNotes toolId={activeTool} />
           )}
           {tab === "layers" && page && (
@@ -5668,7 +5668,9 @@ function ToolsTab({
         </>
       )}
       {settingsTool === "pipette" && cadEngine && (
-        <PipetteSettingsPanel app={cadEngine} />
+        <SettingsBlock title="PIPETTE">
+          <PipetteSettingsPanel app={cadEngine} />
+        </SettingsBlock>
       )}
       {settingsTool === "hatch" && cadEngine && (
         <>
@@ -5871,12 +5873,6 @@ function DocumentToolSettings({
         </Row>
       </div>
 
-      <div className="text-[10px] leading-relaxed text-muted-foreground pt-2 border-t" style={{ borderColor: "hsl(var(--hairline))" }}>
-        {useScale
-          ? <div>Import im gewählten Maßstab (z. B. {scale}).</div>
-          : <div>Freie Platzierung — Maßstab kann nachträglich gesetzt werden.</div>}
-        <div>Bearbeiten (Skalieren, Drehen, Verzerren, Spiegeln): <strong>Auswahl-Werkzeug</strong> → Dokument anklicken.</div>
-      </div>
     </SettingsBlock>
   );
 }
