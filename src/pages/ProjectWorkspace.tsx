@@ -5007,6 +5007,8 @@ function RightInspector({
   onJumpCad: (sheetId?: string) => void;
   onCollapse?: () => void;
   cadEngine?: import("@/cad/embed/MiniCad").MiniCad | null;
+  /** Hilfe-Modus aktiv → Hinweis über der Ebenenliste einblenden. */
+  helpOn?: boolean;
 }) {
 
   const layerCount = page?.elements.length ?? 0;
