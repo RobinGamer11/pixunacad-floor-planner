@@ -2083,7 +2083,6 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               </div>
             </div>
 
-            </div>
           )}
 
            {/* Hatch Settings (Legacy-Bindings: Ebene + Flächenanzeige) */}
