@@ -2158,7 +2158,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               </div>
 
 
-              <div className="flex items-center gap-2 mt-1">
+              <div className="hidden items-center gap-2 mt-1">
                 <input
                   ref={areaShowRef}
                   type="checkbox"
