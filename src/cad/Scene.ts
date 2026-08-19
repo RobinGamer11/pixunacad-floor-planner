@@ -745,6 +745,7 @@ export class Scene {
     for (const w of this.walls) {
       h += "|" + w.id + ":" + w.corners.length + ":" + w.thicknessM + ":" + w.referenceSide;
       for (const c of w.corners) h += "," + c.x.toFixed(3) + "," + c.y.toFixed(3);
+      if (Array.isArray(w.bulges)) h += "#" + w.bulges.map(b => (b || 0).toFixed(4)).join(",");
     }
     if (this._wallTopologyDirty || h !== this._wallTopologyHash) {
       this._wallTopology.build(this.walls);
@@ -1336,12 +1337,14 @@ export class Scene {
     const wA = new Wall({
       id: this._makeId(), kind: wall.kind, thicknessM: wall.thicknessM, referenceSide: wall.referenceSide,
       corners: cornersA, customName: wall.customName, color: wall.color, fillColor: wall.fillColor, labelId: wall.labelId,
-      bulges: bulgesA,
+      priority: wall.priority, patternId: wall.patternId, patternScale: wall.patternScale,
+      patternAlignToWall: wall.patternAlignToWall, bulges: bulgesA,
     });
     const wB = new Wall({
       id: this._makeId(), kind: wall.kind, thicknessM: wall.thicknessM, referenceSide: wall.referenceSide,
       corners: cornersB, customName: "", color: wall.color, fillColor: wall.fillColor, labelId: newLabelIdForB || wall.labelId,
-      bulges: bulgesB,
+      priority: wall.priority, patternId: wall.patternId, patternScale: wall.patternScale,
+      patternAlignToWall: wall.patternAlignToWall, bulges: bulgesB,
     });
     wA._stickerEditOwnerId = wall._stickerEditOwnerId;
     wB._stickerEditOwnerId = wall._stickerEditOwnerId;

@@ -100,7 +100,7 @@ export class WallTopologyGraph {
       for (const w of walls) {
         if (owners.has(w.id)) continue;
         if (w.corners.length < 2) continue;
-        const hit = projectOnPolyline(node.position, w.corners, TJ_TOL);
+        const hit = projectOnPolyline(node.position, wallRefCorners(w), TJ_TOL);
         if (!hit) continue;
         node.incidents.push({
           wallId: w.id,

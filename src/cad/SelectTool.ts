@@ -1264,6 +1264,7 @@ export class SelectTool {
       }
 
       scene.markWallsDirty?.();
+      runWallTopologyMaintenance(scene);
       this.app.setSelection(null);
     }
   }

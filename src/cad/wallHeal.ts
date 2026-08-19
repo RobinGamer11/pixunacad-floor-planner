@@ -1,4 +1,4 @@
-import { Vec2, v, sub, norm, lineLineIntersectionInfinite, dist } from "./geometry";
+import { Vec2, v, sub, norm, lineLineIntersectionInfinite, dist, bulgeEndpointTangent } from "./geometry";
 import { computeWallLines, wallRefCorners } from "./wallGeom";
 import type { Wall } from "./Scene";
 import { WallTopologyGraph, CLEANUP_TOL, endpointLineCorners, priorityIndex } from "./WallTopologyGraph";
@@ -55,9 +55,16 @@ function healEnd(
 
   const idx = atStart ? 0 : mainCorners.length - 1;
   const corner = atStart ? wall.corners[0] : wall.corners[n - 1];
+  const originalCorners = wallInput.corners;
+  const originalBulges = wallInput.bulges || [];
   const dir = atStart
-    ? norm(sub(wall.corners[1], wall.corners[0]))
-    : norm(sub(wall.corners[n - 1], wall.corners[n - 2]));
+    ? bulgeEndpointTangent(originalCorners[0], originalCorners[1], originalBulges[0], true)
+    : bulgeEndpointTangent(
+        originalCorners[originalCorners.length - 2],
+        originalCorners[originalCorners.length - 1],
+        originalBulges[originalCorners.length - 2],
+        false,
+      );
   if (dir.x === 0 && dir.y === 0) return false;
 
   // Kandidaten: aus Graph (nur inzidente Wände am Knoten) — sonst alle nahen anderen.
@@ -70,7 +77,7 @@ function healEnd(
   if (candidates.length === 0) {
     for (const ow of others) {
       if (ow === wall) continue;
-      if (!pointNearPolyline(corner, ow.corners, HEAL_TOL_M + Math.max(ow.thicknessM, wall.thicknessM))) continue;
+      if (!pointNearPolyline(corner, wallRefCorners(ow), HEAL_TOL_M + Math.max(ow.thicknessM, wall.thicknessM))) continue;
       candidates.push(ow);
     }
   }
@@ -82,6 +89,15 @@ function healEnd(
     if (!l) { l = computeWallLines(wallRefCorners(ow as any), ow.thicknessM, ow.referenceSide); cache.set(ow, l); }
     return l;
   };
+
+  // Reine Endpunkt-Knoten gleicher Priorität werden durch die Boolean-Union
+  // vollständiger Wandstreifen sauber verbunden. Paarweises main/sub-Healing
+  // wäre richtungsabhängig und erzeugt bei Bogen-Gerade-Anschlüssen Keile.
+  const isPurePeerEndpointNode = !!node
+    && node.incidents.every(i => i.kind !== "tjunction")
+    && candidates.length > 0
+    && candidates.every(ow => ow.priority === wall.priority);
+  if (isPurePeerEndpointNode) return true;
 
   const polysSelf: Record<LineType, Vec2[]> = {
     main: mainCorners,
