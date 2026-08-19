@@ -741,6 +741,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       setActiveTool(id);
       // Auswahl-Werkzeug → Seiteneinstellungen automatisch öffnen.
       if (id === ToolIds.SELECT) setRightTab("sheets");
+      else setRightTab("settings");
       if (id === ToolIds.LINE || id === ToolIds.FREE || id === ToolIds.ERASER) {
         setLineVariant(id);
       }
@@ -1021,6 +1022,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     appRef.current?.setTool(targetId);
     setActiveTool(targetId);
     if (targetId === ToolIds.SELECT) setRightTab("sheets");
+    else setRightTab("settings");
     setGridPanelOpen(false);
     // Flyout: erneuter Klick auf dasselbe Symbol schließt die Variantenauswahl wieder.
     setExpandedTool(prev => (TOOL_VARIANTS[id] ? (prev === id ? null : id) : null));
