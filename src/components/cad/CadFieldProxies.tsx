@@ -312,3 +312,42 @@ export function CadCheckboxProxy({ target, label }: { target: React.RefObject<HT
     </label>
   );
 }
+
+/** Gerahmte Button-Gruppe (Mappen-Optik), gebunden an ein verstecktes Engine-Select. */
+export function CadSegmentedProxy({
+  label,
+  target,
+  options,
+  columns,
+}: {
+  label?: string;
+  target: React.RefObject<HTMLSelectElement>;
+  options: { value: string; label: string }[];
+  columns?: number;
+}) {
+  const current = usePolled(() => target.current?.value, [target]);
+  const cols = columns ?? options.length;
+  return (
+    <div className="min-w-0">
+      {label ? <div className="mb-1.5 text-[10px] text-muted-foreground">{label}</div> : null}
+      <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
+        {options.map((o) => (
+          <button
+            key={o.value}
+            type="button"
+            onClick={() => {
+              const el = target.current;
+              if (!el) return;
+              el.value = o.value;
+              fire(el);
+            }}
+            className={`h-9 rounded border px-1 text-[11px] transition-colors ${current === o.value ? "bg-accent" : "hover:bg-muted"}`}
+            style={{ borderColor: HAIRLINE }}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}

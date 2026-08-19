@@ -23,26 +23,35 @@ const MeasureInput: React.FC<{
   const [draft, setDraft] = useState(String(Number(value.toFixed(digits))));
   const [focused, setFocused] = useState(false);
   useEffect(() => { if (!focused) setDraft(String(Number(value.toFixed(digits)))); }, [value, digits, focused]);
+  const m = /^(.*?)\s*\(([^()]{1,4})\)\s*$/.exec(label);
+  const text = m ? m[1] : label;
+  const unit = m ? m[2] : null;
   return (
     <label className="min-w-0">
-      <span className="mb-1 block whitespace-nowrap text-[9px] leading-tight text-muted-foreground">{label}</span>
-      <input
-        type="text"
-        inputMode="decimal"
-        value={draft}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
-        onChange={(e) => {
-          setDraft(e.target.value);
-          const n = Number(e.target.value.trim().replace(",", "."));
-          if (Number.isFinite(n) && n >= 0) onChange(n);
-        }}
-        className="h-8 w-full rounded-md border bg-transparent px-2 text-[11px] tabular-nums"
-        style={{ borderColor: HAIRLINE }}
-      />
+      <span className="mb-1 block whitespace-nowrap text-[9px] leading-tight text-muted-foreground">{text}</span>
+      <span
+        className="flex h-8 items-center overflow-hidden rounded-md border"
+        style={{ borderColor: HAIRLINE, backgroundColor: "#fff" }}
+      >
+        <input
+          type="text"
+          inputMode="decimal"
+          value={draft}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            const n = Number(e.target.value.trim().replace(",", "."));
+            if (Number.isFinite(n) && n >= 0) onChange(n);
+          }}
+          className="h-full min-w-0 flex-1 bg-transparent px-2 text-right text-[11px] tabular-nums outline-none"
+        />
+        {unit ? <span className="pr-2 text-[9px] text-muted-foreground">{unit}</span> : null}
+      </span>
     </label>
   );
 };
+
 
 interface Props {
   app: CadApp | MiniCad | null;
