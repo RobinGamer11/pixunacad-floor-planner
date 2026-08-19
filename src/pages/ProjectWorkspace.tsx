@@ -3151,7 +3151,7 @@ function ZoomBar({
   const sliderValue = zoomToSliderValue(zoom);
   return (
     <div
-      className="h-10 shrink-0 border-t flex items-center justify-center gap-3 px-4"
+      className="h-10 shrink-0 border-t flex items-center justify-center gap-2 px-2 sm:gap-3 sm:px-4 overflow-hidden"
       style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
     >
       <button
@@ -3168,7 +3168,7 @@ function ZoomBar({
         step={1}
         value={sliderValue}
         onChange={(e) => setZoom(sliderValueToZoom(Number(e.target.value)))}
-        className="w-64 accent-foreground"
+        className="min-w-[70px] flex-1 max-w-64 accent-foreground"
       />
       <button
         onClick={() => setZoom(clampProjectZoom(zoom * 1.02))}
@@ -3195,7 +3195,7 @@ function ZoomBar({
           onKeyDown={(e) => {
             if (e.key === "Enter") (e.target as HTMLInputElement).blur();
           }}
-          className="w-14 h-7 px-2 rounded border bg-transparent text-sm text-right tabular-nums"
+          className="w-12 sm:w-14 h-7 px-1.5 rounded border bg-transparent text-sm text-right tabular-nums shrink-0"
           style={{ borderColor: "hsl(var(--hairline))" }}
         />
         <span className="text-xs text-muted-foreground">%</span>
@@ -3203,7 +3203,7 @@ function ZoomBar({
       <button
         type="button"
         onClick={onResetZoom}
-        className="ml-2 flex h-7 items-center gap-1.5 rounded-md border px-2 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        className="ml-1 flex h-7 shrink-0 items-center gap-1.5 rounded-md border px-2 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         style={{ borderColor: "hsl(var(--hairline))" }}
         title="Auf 100 % setzen und Blatt zentrieren"
       >
@@ -6758,20 +6758,11 @@ function CadToolSection({
                     </select>
                   </div>
                   {isActive && (
-                    <div className="grid grid-cols-2 gap-1 pl-2">
-                      <button
-                        type="button"
-                        onClick={() => goCadForSheetPdf(s.id, "view", curScale)}
-                        className="h-7 rounded-md border text-[10px] hover:bg-muted"
-                        style={{ borderColor: "hsl(var(--hairline))" }}
-                        title="Aktuell sichtbaren Ausschnitt im richtigen Maßstab einfügen"
-                      >
-                        Ansicht
-                      </button>
+                    <div className="pl-2">
                       <button
                         type="button"
                         onClick={() => goCadForSheetPdf(s.id, "frame", curScale)}
-                        className="h-7 rounded-md border text-[10px] hover:bg-muted"
+                        className="h-7 w-full rounded-md border text-[10px] hover:bg-muted"
                         style={{ borderColor: "hsl(var(--hairline))" }}
                         title="Rahmen in CAD-Oberfläche aufziehen (mit Häkchen bestätigen)"
                       >

@@ -3,7 +3,7 @@ import type { Input } from "./Input";
 import { v, Vec2, dist } from "./geometry";
 import { Defaults } from "./constants";
 import type { Door, DoorHand, DoorSide, DoorEdge, Wall } from "./Scene";
-import { projectPointToWall, doorGeometry, pointOnWallAt, drawDoor } from "./doorGeom";
+import { projectPointToWall, doorGeometry, pointOnWallAt, drawDoor, wallReferenceLengths } from "./doorGeom";
 
 export type DoorMode = "door" | "window";
 
@@ -164,8 +164,7 @@ export class DoorTool {
     const d = this.app.scene.getDoorById(this.selectedDoorId);
     const w = d ? this.app.scene.getWallById(d.wallId) : null;
     if (!d || !w) return;
-    let total = 0;
-    for (let i = 1; i < w.corners.length; i++) total += dist(w.corners[i - 1], w.corners[i]);
+    let total = wallReferenceLengths(w as any).total;
     const half = d.widthM / 2;
     d.posM = Math.max(half, Math.min(total - half, posM));
     this._refreshHub();
@@ -176,8 +175,7 @@ export class DoorTool {
     const d = this.app.scene.getDoorById(this.selectedDoorId);
     const w = d ? this.app.scene.getWallById(d.wallId) : null;
     if (!d || !w) return;
-    let total = 0;
-    for (let i = 1; i < w.corners.length; i++) total += dist(w.corners[i - 1], w.corners[i]);
+    let total = wallReferenceLengths(w as any).total;
     d.widthM = Math.max(0.1, Math.min(total, widthM));
     const half = d.widthM / 2;
     d.posM = Math.max(half, Math.min(total - half, d.posM));
@@ -331,8 +329,7 @@ export class DoorTool {
     const w = this.app.scene.getWallById(d.wallId);
     if (!w) return;
     const { total } = (function() {
-      let total = 0;
-      for (let i = 1; i < w.corners.length; i++) total += dist(w.corners[i - 1], w.corners[i]);
+      let total = wallReferenceLengths(w as any).total;
       return { total };
     })();
     d.kind = this.settings.mode;
@@ -364,8 +361,7 @@ export class DoorTool {
     if (this.placementMode) {
       const hit = this._hitWall(input);
       if (hit) {
-        let total = 0;
-        for (let i = 1; i < hit.wall.corners.length; i++) total += dist(hit.wall.corners[i - 1], hit.wall.corners[i]);
+        let total = wallReferenceLengths(hit.wall as any).total;
         const half = this.settings.widthM / 2;
         const clamped = Math.max(half, Math.min(total - half, hit.posM));
         this._hoverWallId = hit.wall.id;
@@ -380,8 +376,7 @@ export class DoorTool {
       if (d && w) {
         const proj = projectPointToWall(w, v(input.mouse.wx, input.mouse.wy));
         if (proj) {
-          let total = 0;
-          for (let i = 1; i < w.corners.length; i++) total += dist(w.corners[i - 1], w.corners[i]);
+          let total = wallReferenceLengths(w as any).total;
           const half = d.widthM / 2;
           d.posM = Math.max(half, Math.min(total - half, proj.s));
           this._refreshHub();
@@ -401,8 +396,7 @@ export class DoorTool {
       if (d && w) {
         const proj = projectPointToWall(w, v(input.mouse.wx, input.mouse.wy));
         if (proj) {
-          let total = 0;
-          for (let i = 1; i < w.corners.length; i++) total += dist(w.corners[i - 1], w.corners[i]);
+          let total = wallReferenceLengths(w as any).total;
           // Fester Endpunkt = der gegenüberliegende des aktiven Fangpunkts.
           // Fällt _activeEndpoint weg, verhalten wir uns wie zentrum-skaliert.
           const ep = this._activeEndpoint;
@@ -441,8 +435,7 @@ export class DoorTool {
         if (d && w) {
           const proj = projectPointToWall(w, v(input.mouse.wx, input.mouse.wy));
           if (proj) {
-            let total = 0;
-            for (let i = 1; i < w.corners.length; i++) total += dist(w.corners[i - 1], w.corners[i]);
+            let total = wallReferenceLengths(w as any).total;
             const fixedSide = this._dragHandle === "left" ? d.posM + d.widthM / 2 : d.posM - d.widthM / 2;
             const newOther = Math.max(0, Math.min(total, proj.s));
             const newCenter = (fixedSide + newOther) / 2;
@@ -467,8 +460,7 @@ export class DoorTool {
         if (d && w) {
           const proj = projectPointToWall(w, v(input.mouse.wx, input.mouse.wy));
           if (proj) {
-            let total = 0;
-            for (let i = 1; i < w.corners.length; i++) total += dist(w.corners[i - 1], w.corners[i]);
+            let total = wallReferenceLengths(w as any).total;
             const half = d.widthM / 2;
             const target = proj.s - this._dragMoveOffsetM;
             d.posM = Math.max(half, Math.min(total - half, target));

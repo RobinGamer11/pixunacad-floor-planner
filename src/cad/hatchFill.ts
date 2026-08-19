@@ -189,16 +189,20 @@ export function findEnclosingFace(scene: Scene, click: Vec2): Vec2[] | null {
 
   const { faceLoops } = buildPlanarFaces(sub);
 
-  // Wähle finite Faces (positives Signed-Area-Vorzeichen = CCW), die den Klick enthalten.
-  // Das Outer-Face hat negatives signed area (CW, weil es alles umschließt).
+  // Kleinste umschließende Fläche wählen — unabhängig von der Umlauf-
+  // Richtung. Bei stark gewölbten Wänden kann die Traversierung eine
+  // Innenfläche im Uhrzeigersinn liefern; die frühere CCW-Bedingung hat
+  // solche Bereiche fälschlich als "nicht geschlossen" verworfen.
+  // Das unendliche Außen-Face ist immer die flächengrößte Kandidatin und
+  // fällt durch die Minimum-Auswahl automatisch heraus.
   let best: Vec2[] | null = null;
   let bestArea = Infinity;
   for (const loop of faceLoops) {
-    const sArea = polygonSignedArea(loop);
-    if (sArea <= 1e-9) continue; // outer/CW Face oder degeneriert
-    if (!pointInPolygon(click, loop)) continue;
     const a = polygonAreaAbs(loop);
+    if (a <= 1e-9) continue; // degeneriert
+    if (!pointInPolygon(click, loop)) continue;
     if (a < bestArea) { bestArea = a; best = loop; }
   }
+  if (best && polygonSignedArea(best) < 0) best = [...best].reverse();
   return best;
 }
