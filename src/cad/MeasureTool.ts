@@ -233,8 +233,11 @@ export class MeasureTool {
         : this.state === "collect" && this.selectedPoints.length >= 1
           ? this.selectedPoints[this.selectedPoints.length - 1].world
           : null;
-    if (hubAnchor && this.pointSnap) {
-      const cur = this.pointSnap.world;
+    const hubTarget = this.pointSnap
+      ? this.pointSnap.world
+      : (this._isFreePoints() ? v(input.mouse.wx, input.mouse.wy) : null);
+    if (hubAnchor && hubTarget) {
+      const cur = hubTarget;
       const dx = cur.x - hubAnchor.x;
       const dy = cur.y - hubAnchor.y;
       const lengthM = Math.hypot(dx, dy);
