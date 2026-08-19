@@ -6220,104 +6220,220 @@ function LineSnapSettings({
 
 
 
+function TextStyleToggle({
+  active,
+  onClick,
+  title,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      aria-label={title}
+      aria-pressed={active}
+      className="flex h-8 flex-1 items-center justify-center rounded border transition-colors hover:bg-muted"
+      style={{
+        borderColor: "hsl(var(--hairline))",
+        background: active ? "hsl(var(--accent))" : "transparent",
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+const TEXT_MODES = [
+  { id: "auto" as const, label: "Rahmen variabel", icon: ScanIcon },
+  { id: "frame" as const, label: "Rahmen fix", icon: FrameIcon },
+];
+
 function TextSettings({
   settings,
+  pxPerMm,
   onChange,
 }: {
   settings: ToolSettings["text"];
+  pxPerMm: number;
   onChange: (p: Partial<ToolSettings["text"]>) => void;
 }) {
+  // Schriftgrößen werden – wie in Word – in Punkt (pt) geführt.
+  // 1 pt = 4/3 CSS-Pixel; die mm-Angabe ist die reale Höhe auf dem Blatt.
+  const fontPx = settings.fontSize * (4 / 3);
+  const fontMm = guideStrokePxToMm(fontPx, pxPerMm);
+  const mode: "auto" | "frame" = settings.autoSize === false ? "frame" : "auto";
+
   return (
     <SettingsBlock title="TEXT">
-      <Row label="Modus">
-        <select
-          value={settings.autoSize === false ? "frame" : "auto"}
-          onChange={(e) => {
-            if (e.target.value === "frame") onChange({ autoSize: false, wrap: true });
-            else onChange({ autoSize: true, wrap: false });
-          }}
-          className="w-full h-8 px-2 rounded bg-transparent border text-xs"
-          style={{ borderColor: "hsl(var(--hairline))" }}
-        >
-          <option value="auto">Rahmen passt sich an</option>
-          <option value="frame">Rahmen zeichnen</option>
-        </select>
-      </Row>
-      <Row label="Ausrichtung">
-        <div className="flex gap-1">
-          {(["left", "center", "right"] as const).map((a) => (
+      <div>
+        <div className="text-[10px] font-semibold tracking-wider text-muted-foreground mb-1.5">MODUS</div>
+        <div className="grid grid-cols-2 gap-1">
+          {TEXT_MODES.map(({ id, label, icon: Icon }) => (
             <button
-              key={a}
-              onClick={() => onChange({ align: a })}
-              className="h-8 flex-1 rounded border text-xs"
-              style={{
-                borderColor: "hsl(var(--hairline))",
-                background: settings.align === a ? "hsl(var(--accent-gold-soft))" : "transparent",
+              key={id}
+              type="button"
+              title={label}
+              onClick={() => {
+                if (id === "frame") onChange({ autoSize: false, wrap: true });
+                else onChange({ autoSize: true, wrap: false });
               }}
-              title={a === "left" ? "Links" : a === "center" ? "Zentriert" : "Rechts"}
+              className={`flex flex-col items-center justify-center gap-0.5 rounded border px-1 py-1.5 transition-colors ${
+                mode === id ? "bg-accent" : "hover:bg-muted"
+              }`}
+              style={{ borderColor: "hsl(var(--hairline))" }}
             >
-              {a === "left" ? "⯇" : a === "center" ? "≡" : "⯈"}
+              <Icon size={14} />
+              <span className="text-[9px] leading-tight">{label}</span>
             </button>
           ))}
         </div>
-      </Row>
-      <Row label="Schriftgröße">
-        <input
-          type="number"
-          min={1}
-          step={1}
-          value={settings.fontSize}
-          onChange={(e) => {
-            const n = Number(e.target.value);
-            if (Number.isFinite(n) && n > 0) onChange({ fontSize: n });
-          }}
-          className="w-20 h-8 px-2 rounded bg-transparent border text-sm tabular-nums"
-          style={{ borderColor: "hsl(var(--hairline))" }}
-        />
-      </Row>
-      <Row label="Stil">
-        <div className="flex gap-2">
-          <button
-            onClick={() => onChange({ bold: !settings.bold })}
-            className="h-8 w-8 rounded border text-sm font-bold"
-            style={{
-              borderColor: "hsl(var(--hairline))",
-              background: settings.bold ? "hsl(var(--accent-gold-soft))" : "transparent",
-            }}
-            title="Fett"
-          >
-            B
-          </button>
-          <button
-            onClick={() => onChange({ italic: !settings.italic })}
-            className="h-8 w-8 rounded border text-sm italic"
-            style={{
-              borderColor: "hsl(var(--hairline))",
-              background: settings.italic ? "hsl(var(--accent-gold-soft))" : "transparent",
-            }}
-            title="Kursiv"
-          >
-            I
-          </button>
+      </div>
+
+      <div>
+        <div className="mb-1.5 text-[10px] text-muted-foreground">Ausrichtung</div>
+        <div className="flex gap-1">
+          {([
+            { id: "left" as const, label: "Text links", Icon: AlignLeft },
+            { id: "center" as const, label: "Text zentriert", Icon: AlignCenter },
+            { id: "right" as const, label: "Text rechts", Icon: AlignRight },
+          ]).map(({ id, label, Icon }) => (
+            <TextStyleToggle
+              key={id}
+              active={settings.align === id}
+              title={label}
+              onClick={() => onChange({ align: id })}
+            >
+              <Icon size={15} />
+            </TextStyleToggle>
+          ))}
         </div>
-      </Row>
-      <Row label="Farbe">
-        <ColorInput value={settings.color} onChange={(v) => onChange({ color: v })} />
-      </Row>
-      <Row label="Hintergrund">
-        <ColorInput value={settings.bgColor} onChange={(v) => onChange({ bgColor: v })} />
-      </Row>
-      <Row label="Transparenz">
-        <div className="flex items-center gap-2">
-          <input
-            type="range" min={0} max={100} step={1}
-            value={settings.bgAlphaPct}
-            onChange={(e) => onChange({ bgAlphaPct: Number(e.target.value) })}
-            className="flex-1 accent-foreground"
+      </div>
+
+      <div>
+        <div className="mb-1.5 text-[10px] text-muted-foreground">Schriftstärke</div>
+        <div className="grid grid-cols-2 gap-2">
+          <GuideMeasureInput
+            label="Bildschirm"
+            unit="px"
+            value={fontPx}
+            fractionDigits={1}
+            onChange={(value) => {
+              const pt = value * (3 / 4);
+              if (pt > 0) onChange({ fontSize: Math.min(400, Math.max(1, Number(pt.toFixed(2)))) });
+            }}
           />
-          <span className="text-xs tabular-nums w-10 text-right">{settings.bgAlphaPct}%</span>
+          <GuideMeasureInput
+            label="Tatsächliche Größe"
+            unit="mm"
+            value={fontMm}
+            fractionDigits={3}
+            onChange={(value) => {
+              const pt = guideStrokeMmToPx(value, pxPerMm) * (3 / 4);
+              if (pt > 0) onChange({ fontSize: Math.min(400, Math.max(1, Number(pt.toFixed(2)))) });
+            }}
+          />
         </div>
-      </Row>
+        <div className="mt-1 text-[9px] text-muted-foreground">
+          Angabe in Punkt (pt) wie in Word: {settings.fontSize} pt ≙ {fontPx.toFixed(1)} px.
+        </div>
+      </div>
+
+      <div>
+        <div className="mb-1.5 text-[10px] text-muted-foreground">Stil</div>
+        <div className="flex gap-1">
+          <TextStyleToggle active={settings.bold} title="Fett" onClick={() => onChange({ bold: !settings.bold })}>
+            <BoldIcon size={15} />
+          </TextStyleToggle>
+          <TextStyleToggle active={settings.italic} title="Kursiv" onClick={() => onChange({ italic: !settings.italic })}>
+            <ItalicIcon size={15} />
+          </TextStyleToggle>
+          <TextStyleToggle active={settings.underline} title="Unterstrichen" onClick={() => onChange({ underline: !settings.underline })}>
+            <UnderlineIcon size={15} />
+          </TextStyleToggle>
+          <TextStyleToggle active={settings.strike} title="Durchgestrichen" onClick={() => onChange({ strike: !settings.strike })}>
+            <StrikethroughIcon size={15} />
+          </TextStyleToggle>
+        </div>
+      </div>
+
+      <div>
+        <div className="mb-1.5 text-[10px] text-muted-foreground">Absatz</div>
+        <input
+          type="range"
+          min={80}
+          max={300}
+          step={5}
+          value={settings.lineHeightPct}
+          onChange={(e) => onChange({ lineHeightPct: Number(e.target.value) })}
+          className="pixuna-range w-full"
+        />
+        <label className="mt-1 flex h-7 items-center overflow-hidden rounded-md border" style={{ borderColor: "hsl(var(--hairline))" }}>
+          <input
+            type="number"
+            min={80}
+            max={300}
+            step={5}
+            value={settings.lineHeightPct}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              if (Number.isFinite(v)) onChange({ lineHeightPct: Math.min(300, Math.max(80, Math.round(v))) });
+            }}
+            className="h-full min-w-0 flex-1 bg-transparent px-2 text-right text-xs tabular-nums outline-none"
+            aria-label="Absatzhöhe in Prozent"
+          />
+          <span className="pr-2 text-[10px] text-muted-foreground">%</span>
+        </label>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <ToolColorPicker label="Textfarbe" value={settings.color} onChange={(v) => onChange({ color: v })} />
+        <ToolColorPicker
+          label="Feldfarbe"
+          value={settings.bgColor}
+          onChange={(v) => onChange({ bgColor: v, bgAlphaPct: settings.bgAlphaPct > 0 ? settings.bgAlphaPct : 100 })}
+        />
+      </div>
+
+      <div>
+        <div className="mb-1.5 text-[10px] text-muted-foreground">Transparenz</div>
+        <input
+          type="range"
+          min={1}
+          max={100}
+          step={1}
+          value={Math.max(1, settings.alpha)}
+          onChange={(e) => {
+            const v = Number(e.target.value);
+            onChange({ alpha: v, ...(settings.bgAlphaPct > 0 ? { bgAlphaPct: v } : {}) });
+          }}
+          className="pixuna-range w-full"
+        />
+        <label className="mt-1 flex h-7 items-center overflow-hidden rounded-md border" style={{ borderColor: "hsl(var(--hairline))" }}>
+          <input
+            type="number"
+            min={1}
+            max={100}
+            step={1}
+            value={Math.max(1, settings.alpha)}
+            onChange={(e) => {
+              const raw = Number(e.target.value);
+              if (!Number.isFinite(raw)) return;
+              const v = Math.min(100, Math.max(1, Math.round(raw)));
+              onChange({ alpha: v, ...(settings.bgAlphaPct > 0 ? { bgAlphaPct: v } : {}) });
+            }}
+            className="h-full min-w-0 flex-1 bg-transparent px-2 text-right text-xs tabular-nums outline-none"
+            aria-label="Transparenz in Prozent"
+          />
+          <span className="pr-2 text-[10px] text-muted-foreground">%</span>
+        </label>
+      </div>
+
       <Row label="Rahmen">
         <label className="flex items-center gap-2 text-xs">
           <input
@@ -6339,7 +6455,7 @@ function TextSettings({
                 type="range" min={0.5} max={8} step={0.5}
                 value={settings.borderWidthPx}
                 onChange={(e) => onChange({ borderWidthPx: Number(e.target.value) })}
-                className="flex-1 accent-foreground"
+                className="pixuna-range flex-1"
               />
               <span className="text-xs tabular-nums w-10 text-right">{settings.borderWidthPx} px</span>
             </div>
