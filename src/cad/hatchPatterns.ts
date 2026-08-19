@@ -221,7 +221,7 @@ export interface HatchPatternOptions {
   angleDeg: number;
   /** Scherung/Verzerrung in Grad (-60..60). */
   skewDeg: number;
-  /** Längung: Streckung in Y-Richtung (1 = quadratisch). */
+  /** Längung: Streckung in Musterrichtung (X der gedrehten Achse). */
   stretch?: number;
   color: string;
   alpha: number;
@@ -260,8 +260,8 @@ export function fillWithHatchPattern(
     const m = new DOMMatrix()
       .translateSelf(originScreen.x, originScreen.y)
       .rotateSelf(opt.angleDeg || 0)
-      .skewXSelf(Math.max(-70, Math.min(70, opt.skewDeg || 0)))
-      .scaleSelf(k, k * stretch);
+      .scaleSelf(k * stretch, k)
+      .skewXSelf(Math.max(-70, Math.min(70, opt.skewDeg || 0)));
     (pat as any).setTransform?.(m);
   } catch { /* ältere Engine: ohne Transform zeichnen */ }
 

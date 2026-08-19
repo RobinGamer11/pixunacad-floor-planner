@@ -246,6 +246,12 @@ export default function ProjectWorkspace() {
     engine: import("@/cad/embed/MiniCad").MiniCad;
   }) => {
     cadEngineApiRef.current = api;
+    // Modus-Wechsel aus den Werkzeugeinstellungen ins linke Werkzeug-Symbol spiegeln.
+    const ht: any = (api.engine as any)?.hatchTool;
+    if (ht) {
+      const prevMode = ht.onDrawModeChange;
+      ht.onDrawModeChange = (m: HatchDrawMode) => { prevMode?.(m); setHatchDrawMode(m); };
+    }
     registerCadEngineSnap((clientX, clientY, pageRect, tol = 12) => {
       const engine = cadEngineApiRef.current?.engine as any;
       if (!engine?.canvas || !engine.camera || !engine.topology) return null;
@@ -5602,7 +5608,7 @@ function ToolsTab({
       )}
       {settingsTool === "hatch" && cadEngine && (
         <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
-          <HatchSettingsPanel app={cadEngine} projectId={projectId} />
+          <HatchSettingsPanel app={cadEngine} projectId={projectId} pxPerMm={guidePxPerMm} />
         </div>
       )}
       {cadSelectedLineSnap && onCadLineSnapChange && (

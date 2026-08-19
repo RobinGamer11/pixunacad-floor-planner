@@ -1137,7 +1137,7 @@ export class MiniCad {
         patternScale: h.patternScale,
         patternAngleDeg: h.patternAngleDeg,
         patternSkewDeg: h.patternSkewDeg,
-        patternStretch: h.patternStretch,
+        patternStretch: h.patternStretch, patternOffsetX: h.patternOffsetX, patternOffsetY: h.patternOffsetY,
       })),
 
       documents: this.scene.documents
@@ -1240,7 +1240,7 @@ export class MiniCad {
             fillAlphaPct: h.fillAlphaPct, strokeWidthPx: h.strokeWidthPx,
             labelId: h.labelId || Defaults.defaultLabelId,
             areaLabel: h.areaLabel,
-            patternEnabled: h.patternEnabled, patternId: h.patternId, patternScale: h.patternScale, patternAngleDeg: h.patternAngleDeg, patternSkewDeg: h.patternSkewDeg, patternStretch: h.patternStretch,
+            patternEnabled: h.patternEnabled, patternId: h.patternId, patternScale: h.patternScale, patternAngleDeg: h.patternAngleDeg, patternSkewDeg: h.patternSkewDeg, patternStretch: h.patternStretch, patternOffsetX: h.patternOffsetX, patternOffsetY: h.patternOffsetY,
           });
         } catch (e) { console.error("MiniCad restore hatch:", e); }
       }
@@ -1547,7 +1547,7 @@ export class MiniCad {
             strokeColor: h.strokeColor, fillAlphaPct: h.fillAlphaPct, strokeWidthPx: h.strokeWidthPx,
             labelId: h.labelId, areaLabel: clone(h.areaLabel), patternEnabled: h.patternEnabled,
             patternId: h.patternId, patternScale: h.patternScale, patternAngleDeg: h.patternAngleDeg,
-            patternSkewDeg: h.patternSkewDeg, patternStretch: h.patternStretch } });
+            patternSkewDeg: h.patternSkewDeg, patternStretch: h.patternStretch, patternOffsetX: h.patternOffsetX, patternOffsetY: h.patternOffsetY } });
         } else if (kind === "textBox") {
           const t = this.scene.getTextBoxById(id); if (!t) continue;
           clip.push({ kind, data: { center: clone(t.center), widthM: t.widthM, heightM: t.heightM,
@@ -1623,7 +1623,7 @@ export class MiniCad {
             holes: (o.holes ?? []).map((h: any[]) => h.map(mv)),
             fillColor: o.fillColor, strokeColor: o.strokeColor, fillAlphaPct: o.fillAlphaPct,
             strokeWidthPx: o.strokeWidthPx, labelId: o.labelId, areaLabel: o.areaLabel,
-            patternEnabled: o.patternEnabled, patternId: o.patternId, patternScale: o.patternScale, patternAngleDeg: o.patternAngleDeg, patternSkewDeg: o.patternSkewDeg, patternStretch: o.patternStretch, });
+            patternEnabled: o.patternEnabled, patternId: o.patternId, patternScale: o.patternScale, patternAngleDeg: o.patternAngleDeg, patternSkewDeg: o.patternSkewDeg, patternStretch: o.patternStretch, patternOffsetX: o.patternOffsetX, patternOffsetY: o.patternOffsetY, });
           if (n) created.push({ kind: "hatch", id: n.id });
         } else if (it.kind === "textBox") {
           const n = this.scene.createTextBox(mv(o.center), o.widthM, o.heightM, o.style, o.html, o.rotationRad);
@@ -1805,7 +1805,7 @@ export class MiniCad {
         patternId: sel.patternId || this.defaultHatchPatternId,
         patternScale: sel.patternScale ?? this.defaultHatchPatternScale,
         patternAngleDeg: sel.patternAngleDeg ?? this.defaultHatchPatternAngleDeg,
-        patternSkewDeg: sel.patternSkewDeg ?? this.defaultHatchPatternSkewDeg, patternStretch: sel.patternStretch ?? this.defaultHatchPatternStretch,
+        patternSkewDeg: sel.patternSkewDeg ?? this.defaultHatchPatternSkewDeg, patternStretch: sel.patternStretch ?? this.defaultHatchPatternStretch, patternOffsetX: sel.patternOffsetX ?? 0, patternOffsetY: sel.patternOffsetY ?? 0,
         labelId: sel.labelId || Defaults.defaultLabelId,
         areaLabel: {
           show: !!sel.areaLabel?.show,
@@ -1827,7 +1827,7 @@ export class MiniCad {
       patternId: this.defaultHatchPatternId,
       patternScale: this.defaultHatchPatternScale,
       patternAngleDeg: this.defaultHatchPatternAngleDeg,
-      patternSkewDeg: this.defaultHatchPatternSkewDeg, patternStretch: this.defaultHatchPatternStretch,
+      patternSkewDeg: this.defaultHatchPatternSkewDeg, patternStretch: this.defaultHatchPatternStretch, patternOffsetX: 0, patternOffsetY: 0,
       labelId: this.activeDrawLabelId || Defaults.defaultLabelId,
       areaLabel: {
         show: this.defaultAreaShow, textColor: Defaults.areaTextColor, fontSizePx: Defaults.areaFontSizePx,

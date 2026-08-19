@@ -1344,6 +1344,7 @@ export class Renderer {
     const origin = cam.worldToScreen(0, 0);
     const pxPerMeter = Math.abs(cam.worldToScreen(1, 0).x - origin.x) || 1;
 
+
     // Musterkachel ≈ 1/3 der Wanddicke → dünne Wände bekommen feineres Muster.
     const tileM = Math.max(0.02, wall.thicknessM / 3) * Math.max(0.1, wall.patternScale ?? 1);
     const scale = tileM / PATTERN_BASE_TILE_M;
@@ -1610,8 +1611,9 @@ export class Renderer {
       if (sp.y > maxY) maxY = sp.y;
     }
     if (!Number.isFinite(minX)) return;
-    const origin = cam.worldToScreen(0, 0);
-    const pxPerMeter = Math.abs(cam.worldToScreen(1, 0).x - origin.x) || 1;
+    const zero = cam.worldToScreen(0, 0);
+    const pxPerMeter = Math.abs(cam.worldToScreen(1, 0).x - zero.x) || 1;
+    const origin = cam.worldToScreen(hatch.patternOffsetX ?? 0, hatch.patternOffsetY ?? 0);
     ctx.save();
     ctx.clip("evenodd");
     fillWithHatchPattern(
