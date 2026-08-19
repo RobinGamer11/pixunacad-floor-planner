@@ -311,7 +311,7 @@
   .cad-settings-panel input[type="text"],
   .cad-settings-panel input[type="number"] {
     @apply text-[11px] px-2 py-1 rounded border w-full min-w-0;
-    background: hsl(var(--cad-toolbar-hover));
+    background: #ffffff;
     border-color: hsl(var(--cad-hub-border));
     color: hsl(var(--cad-toolbar-foreground));
     font-family: 'JetBrains Mono', monospace;
@@ -325,12 +325,13 @@
 
   .cad-settings-select {
     @apply text-[11px] px-2 py-1 rounded border w-full min-w-0;
-    background: hsl(var(--cad-toolbar-hover));
+    background: #ffffff;
     border-color: hsl(var(--cad-hub-border));
     color: hsl(var(--cad-toolbar-foreground));
     appearance: none;
     -webkit-appearance: none;
   }
+
 
   /* Kompaktere Toolbar-Buttons in den rechten Werkzeugeinstellungen. */
   .cad-settings-panel .cad-toolbar-btn {

@@ -2704,12 +2704,6 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                   </div>
                 )}
 
-                <div className="text-[11px] leading-relaxed pt-2" style={{ color: "hsl(var(--cad-toolbar-muted))", borderTop: "1px solid hsl(var(--border))" }}>
-                  {docFreePlace
-                    ? <div>Freie Platzierung — Maßstab kann nachträglich gesetzt werden.</div>
-                    : <div>Import im Maßstab {docImportScale}.</div>}
-                  <div>Bearbeiten (Skalieren, Drehen, Bild verzerren, Spiegeln): <strong>Auswahl-Werkzeug</strong> (V) → Dokument anklicken.</div>
-                </div>
               </div>
             </div>
           )}
@@ -2754,7 +2748,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
 
           {/* Wand-Tool-Panel */}
           {(activeTool === ToolIds.WALL || (activeTool === ToolIds.SELECT && selectedWallId)) && (
-            <WallSettingsPanel app={appRef.current} />
+            <WallSettingsPanel app={appRef.current} projectId={projectId} />
           )}
 
           {/* Türen/Fenster Panel */}
@@ -3255,6 +3249,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             && activeTool !== ToolIds.LINE
             && activeTool !== ToolIds.FREE
             && activeTool !== ToolIds.HATCH
+            && activeTool !== ToolIds.DOCUMENT
+            && activeTool !== ToolIds.WALL
             && activeTool !== ToolIds.TEXT) ? (
             <ToolHelpNotes toolId={activeTool} />
           ) : null}

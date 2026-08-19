@@ -191,7 +191,7 @@ export function CadMeasureProxy({
   return (
     <label className="min-w-0">
       <span className="mb-1 block text-[9px] text-muted-foreground">{label}</span>
-      <span className="flex h-8 items-center overflow-hidden rounded-md border" style={{ borderColor: HAIRLINE }}>
+      <span className="flex h-8 items-center overflow-hidden rounded-md border" style={{ borderColor: HAIRLINE, backgroundColor: "#fff" }}>
         <input
           type="text"
           inputMode="decimal"
@@ -278,7 +278,7 @@ export function CadRangeProxy({
         onChange={(e) => commit(Number(e.target.value))}
         className="pixuna-range w-full"
       />
-      <label className="mt-1 flex h-7 items-center overflow-hidden rounded-md border" style={{ borderColor: HAIRLINE }}>
+      <label className="mt-1 flex h-7 items-center overflow-hidden rounded-md border" style={{ borderColor: HAIRLINE, backgroundColor: "#fff" }}>
         <input
           type="number"
           min={min}
