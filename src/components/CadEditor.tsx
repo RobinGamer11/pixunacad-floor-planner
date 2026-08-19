@@ -375,6 +375,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const [selectMarqueeMode, setSelectMarqueeMode] = useState<"touch" | "enclose" | "click">("click");
   const [selectedWallId, setSelectedWallId] = useState<string | null>(null);
   const [selectedFreeStrokeId, setSelectedFreeStrokeId] = useState<string | null>(null);
+  const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null);
+  const [selectedHatchId, setSelectedHatchId] = useState<string | null>(null);
   const [stickers, setStickers] = useState<StickerDefinition[]>([]);
   const [stickerSelCount, setStickerSelCount] = useState(0);
   const [stickerPhase, setStickerPhase] = useState<"idle" | "selecting" | "placing" | "rotating">("idle");
@@ -847,6 +849,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
         setRightTab(app.selection || app.doorTool.selectedDoorId ? "settings" : "sheets");
       }
       setSelectedFreeStrokeId(app.getSelectedFreeStroke()?.id || null);
+      setSelectedSegmentId(((app.selection as any)?.segmentId as string) || null);
+      setSelectedHatchId(((app.selection as any)?.hatchId as string) || null);
       // Pfeil-Einstellungen mit aktueller Auswahl synchronisieren
       try {
         const style = app.getCurrentLineStyle() as any;
@@ -2053,7 +2057,13 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           {/* Line Settings — Design analog zum Linien-Werkzeug in der Mappe:
               Ebene, Modus und Objektart stehen über dem Fensterrahmen, alle
               Zeichen-Eigenschaften liegen im gerahmten Block. */}
-          <div ref={settingsRef} className={`cad-settings-panel hidden mb-2`}>
+          <div
+            ref={settingsRef}
+            className={`cad-settings-panel mb-2 ${
+              (activeTool === ToolIds.LINE || activeTool === ToolIds.FREE
+                || (activeTool === ToolIds.SELECT && !!selectedSegmentId)) ? "" : "hidden"
+            }`}
+          >
             <div className="hidden">
               <select ref={idSelectRef} className="cad-settings-select w-full" />
             </div>
@@ -2149,12 +2159,12 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
 
 
           {/* Schraffur — Design identisch zur Mappe (Modus & Objektart über dem Rahmen) */}
-          {activeTool === ToolIds.HATCH && (
+          {(activeTool === ToolIds.HATCH || (activeTool === ToolIds.SELECT && !!selectedHatchId)) && (
             <div className="cad-settings-panel mb-2">
               <div className="mb-3">
                 <CadEbeneSelect target={hatchIdSelectRef} />
               </div>
-              <HatchModeSelect app={appRef.current} />
+              {activeTool === ToolIds.HATCH && <HatchModeSelect app={appRef.current} />}
               <RasterModeToggle app={appRef.current} projectId={projectId} />
 
               <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
