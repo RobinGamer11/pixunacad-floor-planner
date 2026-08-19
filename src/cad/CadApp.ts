@@ -644,7 +644,7 @@ export class CadApp {
         id: d.id,
         p1: { x: d.p1.x, y: d.p1.y }, p2: { x: d.p2.x, y: d.p2.y },
         placementPoint: { x: d.placementPoint.x, y: d.placementPoint.y },
-        mode: d.mode, refDir: d.refDir ? { x: d.refDir.x, y: d.refDir.y } : null,
+        mode: d.mode, refDir: d.refDir ? { x: d.refDir.x, y: d.refDir.y } : null, bulge: (d as any).bulge || 0,
         textColor: d.textColor, textSizePx: d.textSizePx, lineColor: d.lineColor,
         decimals: d.decimals, tickLengthM: d.tickLengthM, showExtensions: d.showExtensions,
         useFreeText: d.useFreeText, freeText: d.freeText,
@@ -822,6 +822,7 @@ export class CadApp {
         freeTextBold: d.freeTextBold, freeTextItalic: d.freeTextItalic, freeTextColor: d.freeTextColor,
         textGapPx: d.textGapPx, doorHeightText: d.doorHeightText,
         mirror: !!d.mirror,
+        bulge: (d as any).bulge || 0,
         labelId: d.labelId,
       }, d.doorRefId || null);
       if (d._stickerEditOwnerId) dim._stickerEditOwnerId = d._stickerEditOwnerId;
@@ -1279,7 +1280,7 @@ export class CadApp {
         p1: { x: d.p1.x - newPos.x, y: d.p1.y - newPos.y },
         p2: { x: d.p2.x - newPos.x, y: d.p2.y - newPos.y },
         placementPoint: { x: d.placementPoint.x - newPos.x, y: d.placementPoint.y - newPos.y },
-        mode: d.mode, refDir: d.refDir ? { x: d.refDir.x, y: d.refDir.y } : null,
+        mode: d.mode, refDir: d.refDir ? { x: d.refDir.x, y: d.refDir.y } : null, bulge: (d as any).bulge || 0,
         textColor: d.textColor, textSizePx: d.textSizePx, lineColor: d.lineColor,
         decimals: d.decimals, tickLengthM: d.tickLengthM, showExtensions: d.showExtensions,
         useFreeText: d.useFreeText, freeText: d.freeText,
