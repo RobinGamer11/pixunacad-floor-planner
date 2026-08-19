@@ -88,6 +88,7 @@ export class TopologyEngine {
     for (const w of visibleWalls) {
       h += "|" + w.id + ":" + w.kind + ":" + w.thicknessM + ":" + w.referenceSide + ":" + w.corners.length;
       for (const c of w.corners) h += "," + c.x.toFixed(3) + "," + c.y.toFixed(3);
+      if (Array.isArray((w as any).bulges)) h += "#" + (w as any).bulges.map((b: number) => (b || 0).toFixed(3)).join(",");
     }
     if (h !== this._healCacheHash) {
       this._healCache.clear();

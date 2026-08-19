@@ -74,6 +74,7 @@ export function getWallUnionGroups(
   for (const w of relevant) {
     h += "|" + w.id + ":" + w.thicknessM.toFixed(4) + ":" + w.referenceSide + ":" + styleKey(w);
     for (const c of w.corners) h += "," + c.x.toFixed(4) + "," + c.y.toFixed(4);
+    if (Array.isArray((w as any).bulges)) h += "#" + (w as any).bulges.map((b: number) => (b || 0).toFixed(4)).join(",");
   }
   const cached = _cache.get(labelId);
   if (cached && cached.hash === h) return cached.result;

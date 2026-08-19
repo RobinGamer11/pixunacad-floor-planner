@@ -79,7 +79,7 @@ function healEnd(
   const cache = new Map<Wall, WallLines>();
   const linesOf = (ow: Wall) => {
     let l = cache.get(ow);
-    if (!l) { l = computeWallLines(ow.corners, ow.thicknessM, ow.referenceSide); cache.set(ow, l); }
+    if (!l) { l = computeWallLines(wallRefCorners(ow as any), ow.thicknessM, ow.referenceSide); cache.set(ow, l); }
     return l;
   };
 
