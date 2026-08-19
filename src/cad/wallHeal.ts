@@ -1,5 +1,5 @@
 import { Vec2, v, sub, norm, lineLineIntersectionInfinite, dist } from "./geometry";
-import { computeWallLines } from "./wallGeom";
+import { computeWallLines, wallRefCorners } from "./wallGeom";
 import type { Wall } from "./Scene";
 import { WallTopologyGraph, CLEANUP_TOL, endpointLineCorners, priorityIndex } from "./WallTopologyGraph";
 
@@ -20,7 +20,11 @@ type WallLines = ReturnType<typeof computeWallLines>;
  * gleichnamigen Linien-Endpunkten am gleichen Knoten werden auf den Endpunkt
  * der höchstpriorisierten inzidenten Wand gesnappt.
  */
-export function computeHealedWallLines(wall: Wall, others: Wall[], graph?: WallTopologyGraph) {
+export function computeHealedWallLines(wallInput: Wall, others: Wall[], graph?: WallTopologyGraph) {
+  const refCorners = wallRefCorners(wallInput as any);
+  const wall: Wall = refCorners === wallInput.corners
+    ? wallInput
+    : (Object.assign(Object.create(Object.getPrototypeOf(wallInput)), wallInput, { corners: refCorners }) as Wall);
   const lines = computeWallLines(wall.corners, wall.thicknessM, wall.referenceSide);
   if (wall.corners.length < 2) return { ...lines, capStart: true, capEnd: true };
 

@@ -1,4 +1,4 @@
-import { Vec2, v, sub, add, mul, norm, lineLineIntersectionInfinite } from "./geometry";
+import { Vec2, v, sub, add, mul, norm, lineLineIntersectionInfinite, tessellateWithBulges } from "./geometry";
 
 /** Linkes Lot relativ zur Zeichenrichtung – im Bildschirm (y nach unten) visuell "links". */
 export function perpLeftScreen(d: Vec2): Vec2 {
@@ -89,4 +89,14 @@ export function computeWallLines(corners: Vec2[], thicknessM: number, side: Wall
     subCorners: offsetPolyline(corners, subOff),
     helpCorners: offsetPolyline(corners, helpOff),
   };
+}
+
+/**
+ * Bezugs-Polylinie einer Wand inkl. Kantenwölbungen (`wall.bulges`).
+ * Ohne Wölbung werden die Original-Eckpunkte zurückgegeben.
+ */
+export function wallRefCorners(wall: { corners: Vec2[]; bulges?: number[] }): Vec2[] {
+  const b = (wall as any).bulges;
+  if (!Array.isArray(b) || !b.some((x: number) => !!x)) return wall.corners;
+  return tessellateWithBulges(wall.corners, b, false, 24);
 }

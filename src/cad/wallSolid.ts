@@ -20,7 +20,7 @@ export function buildWallSolidRing(wall: Wall): Vec2[] {
   if (!wall.corners || wall.corners.length < 2) return [];
   const t = Math.max(0, wall.thicknessM);
   if (t <= 1e-6) return [];
-  const lines = computeWallLines(wall.corners, t, wall.referenceSide);
+  const lines = computeWallLines(wallRefCorners(wall as any), t, wall.referenceSide);
   return ringFromMainSub(lines.mainCorners, lines.subCorners);
 }
 
