@@ -37,7 +37,7 @@ import { RasterModeToggle } from "@/components/cad/RasterModeToggle";
 
 import { DocumentFilterPanel } from "@/components/cad/DocumentFilterPanel";
 import { DocumentPixelModeToggle } from "@/components/cad/DocumentPixelModeToggle";
-import { WarpSection } from "@/components/page/CadDocumentInspector";
+import { WarpSection, FlipSection } from "@/components/page/CadDocumentInspector";
 
 /** Maßeingabe (Meter) im Stil der übrigen Werkzeuge: Beschriftung, gerahmtes Feld, Einheit. */
 const DoorNumField: React.FC<{
@@ -3042,7 +3042,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           )}
 
           {/* Document-Eigenschaften: nur im Auswahl-Tool, wenn Dokument selektiert */}
-          {!!docSelected && (activeTool === ToolIds.SELECT || (activeTool === ToolIds.DOCUMENT && (docToolPhase === "scale-pick-1" || docToolPhase === "scale-pick-2" || docToolPhase === "scale-await-input" || docToolPhase === "warp"))) && (
+          {!!docSelected && (activeTool === ToolIds.SELECT || activeTool === ToolIds.DOCUMENT) && (
             <div className="cad-settings-panel mb-2">
               <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Dokument-Eigenschaften</div>
               {/* Ebene des ausgewählten Bildes/PDFs — wie bei allen anderen Objekten. */}
