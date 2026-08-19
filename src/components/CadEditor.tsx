@@ -20,6 +20,7 @@ import { HatchPatternBlock } from "@/components/cad/HatchPatternBlock";
 import { HatchSettingsPanel, HatchModeSelect } from "@/components/cad/HatchSettingsPanel";
 
 import { ToolHelpNotes } from "@/components/cad/ToolHelpNotes";
+import { ToolColorPicker } from "@/components/workspace/ToolColorPicker";
 import {
   CadEbeneSelect,
   CadThicknessMmInput,
