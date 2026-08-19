@@ -19,7 +19,7 @@ describe("fill vs wall", () => {
     ];
     const g = new WallTopologyGraph(); g.build(walls as any);
     const scene: any = { segments: [], walls, hatches: [], freeStrokes: [], getWallTopology: () => g };
-    const face = findEnclosingFace(scene, v(2, 2.0));
+    const face = findEnclosingFace(scene, v(2, 2.5));
     const multi = unionWallSolids(walls as any, walls as any, g) as any;
     const inWall = (p:any) => multi.some((poly:any) => {
       const rings = poly.map((r:any)=>r.map(([x,y]:any)=>v(x,y)));
@@ -29,7 +29,7 @@ describe("fill vs wall", () => {
     // Grid-Flood vom Raumzentrum über Nicht-Wand-Zellen
     const S=0.05, X0=-3, Y0=-4, NX=Math.round(10/S), NY=Math.round(10/S);
     const key=(i:number,j:number)=>i*10000+j;
-    const seen=new Set<number>(); const stack=[[Math.round((2-X0)/S), Math.round((2.0-Y0)/S)]];
+    const seen=new Set<number>(); const stack=[[Math.round((2-X0)/S), Math.round((2.5-Y0)/S)]];
     const holes:any[]=[];
     while(stack.length){ const [i,j]=stack.pop()!; if(i<0||j<0||i>NX||j>NY) continue; const k=key(i,j); if(seen.has(k))continue; seen.add(k);
       const p=v(X0+i*S, Y0+j*S); if(inWall(p)) continue;
