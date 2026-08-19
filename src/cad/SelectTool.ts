@@ -1177,25 +1177,27 @@ export class SelectTool {
     this.app.hub.hide();
   }
 
-  /** Aktueller Schnittpunkt (auf die gewählte Kante projizierte Maus). */
+  /** Aktueller Schnittpunkt (auf die gewählte — ggf. gewölbte — Kante projizierte Maus). */
   private _computeSplitPoint(input: any): Vec2 | null {
     const t: any = this.editTarget;
     if (!t) return null;
     let A: Vec2 | null = null, B: Vec2 | null = null;
+    let bulge = 0;
     if (t.kind === "segmentSplit") {
       const seg: any = this.app.scene.getSegmentById(t.segmentId);
       if (!seg) return null;
-      A = seg.a; B = seg.b;
+      A = seg.a; B = seg.b; bulge = seg.bulge || 0;
     } else if (t.kind === "wallSplit") {
       const wall: any = this.app.scene.getWallById(t.wallId);
       if (!wall) return null;
       A = wall.corners[t.edgeIndex]; B = wall.corners[t.edgeIndex + 1];
+      bulge = Array.isArray(wall.bulges) ? (wall.bulges[t.edgeIndex] || 0) : 0;
     }
     if (!A || !B) return null;
     const raw = v(input.mouse.wx, input.mouse.wy);
-    const { t: tt, q } = projectPointToSegment(raw, A, B);
-    if (tt < 1e-4 || tt > 1 - 1e-4) return null;
-    return q;
+    const res = splitBulgedEdge(A, B, bulge, raw);
+    if (res.t < 1e-4 || res.t > 1 - 1e-4) return null;
+    return res.point;
   }
 
   /** Führt den Schnitt aus: aus einem Objekt werden zwei verbundene Objekte. */
@@ -1207,15 +1209,17 @@ export class SelectTool {
     if (t.kind === "segmentSplit") {
       const seg: any = scene.getSegmentById(t.segmentId);
       if (!seg) return;
-      const half = (seg.bulge || 0) / 2;
-      scene.createSegment(v(p.x, p.y), v(seg.b.x, seg.b.y), {
+      // Exakter Bogen-Schnitt: beide Teillinien behalten die Originalkrümmung.
+      const cut = splitBulgedEdge(seg.a, seg.b, seg.bulge || 0, p);
+      const sp = cut.point;
+      scene.createSegment(v(sp.x, sp.y), v(seg.b.x, seg.b.y), {
         color: seg.color, thicknessM: seg.thicknessM, labelId: seg.labelId,
         isGuide: seg.isGuide, midpointSnap: seg.midpointSnap, divisionSnap: seg.divisionSnap,
-        arrowStart: false, arrowEnd: seg.arrowEnd, arrowScale: seg.arrowScale, bulge: half,
+        arrowStart: false, arrowEnd: seg.arrowEnd, arrowScale: seg.arrowScale, bulge: cut.bulgeB,
       });
-      seg.b = v(p.x, p.y);
+      seg.b = v(sp.x, sp.y);
       seg.arrowEnd = false;
-      seg.bulge = half;
+      seg.bulge = cut.bulgeA;
       this.app.setSelection(null);
       return;
     }
@@ -1224,12 +1228,13 @@ export class SelectTool {
       const wall: any = scene.getWallById(t.wallId);
       if (!wall) return;
       const ei: number = t.edgeIndex;
+      const bul: number[] = Array.isArray(wall.bulges) ? wall.bulges : [];
+      const cut = splitBulgedEdge(wall.corners[ei], wall.corners[ei + 1], bul[ei] || 0, p);
+      p = cut.point;
       const cornersA = wall.corners.slice(0, ei + 1).map((c: Vec2) => v(c.x, c.y)).concat([v(p.x, p.y)]);
       const cornersB = [v(p.x, p.y)].concat(wall.corners.slice(ei + 1).map((c: Vec2) => v(c.x, c.y)));
-      const bul: number[] = Array.isArray(wall.bulges) ? wall.bulges : [];
-      const half = (bul[ei] || 0) / 2;
-      const bulA = bul.slice(0, ei).concat([half]);
-      const bulB = [half].concat(bul.slice(ei + 1));
+      const bulA = bul.slice(0, ei).concat([cut.bulgeA]);
+      const bulB = [cut.bulgeB].concat(bul.slice(ei + 1));
 
       // Türen/Fenster mitnehmen: Position entlang der Bezugslinie neu zuordnen.
       const lenOf = (pts: Vec2[]) => {
