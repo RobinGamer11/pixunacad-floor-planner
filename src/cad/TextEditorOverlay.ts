@@ -185,7 +185,15 @@ export class TextEditorOverlay {
     const fontPx = box.style.fontSizePx * (cam.scale / refPxPerM);
     this.el.style.fontSize = `${fontPx}px`;
     this.el.style.fontFamily = "system-ui, Arial, sans-serif";
-    this.el.style.lineHeight = "1.05";
+    this.el.style.lineHeight = String(Math.max(0.6, ((box.style as any).lineHeightPct ?? 105) / 100));
+    this.el.style.fontWeight = (box.style as any).bold ? "700" : "400";
+    this.el.style.fontStyle = (box.style as any).italic ? "italic" : "normal";
+    {
+      const deco: string[] = [];
+      if ((box.style as any).underline) deco.push("underline");
+      if ((box.style as any).strike) deco.push("line-through");
+      this.el.style.textDecoration = deco.length ? deco.join(" ") : "none";
+    }
     this.el.style.color = box.style.textColor;
     this.el.style.background = rgbaFromHex(box.style.bgColor, (box.style.bgAlphaPct || 0) / 100);
     this.el.style.textAlign = box.style.align;
