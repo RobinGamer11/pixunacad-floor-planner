@@ -53,6 +53,8 @@ export class SelectTool {
   hatchPointsOriginal: Vec2[] | null = null;
   /** Snapshot aller Loch-Loops beim Edit-Start (für Ganz-Objekt-Rotation). */
   private _hatchHolesOriginal: Vec2[][] | null = null;
+  /** Snapshot der Außenkontur beim Edit-Start (für Ganz-Objekt-Rotation). */
+  private _hatchOuterOriginal: Vec2[] | null = null;
 
   // Hatch-edge-offset state
   hatchEdgeAOriginal: Vec2 | null = null;
@@ -819,6 +821,8 @@ export class SelectTool {
       this.fixedPoint = (ctx.target.pointIndex === 0) ? v(seg.b.x, seg.b.y) : v(seg.a.x, seg.a.y);
       this.otherPointOriginal = (ctx.target.pointIndex === 0) ? v(seg.a.x, seg.a.y) : v(seg.b.x, seg.b.y);
       this.hatchPointsOriginal = null;
+    this._hatchOuterOriginal = null;
+    this._hatchHolesOriginal = null;
     } else if (ctx.target.kind === "hatchHole") {
       const hatch = ctx.hatch!;
       const loop = hatch.holes![ctx.target.holeIndex];
@@ -826,6 +830,8 @@ export class SelectTool {
       this.fixedPoint = polygonCentroid(loop);
       this.otherPointOriginal = v(loop[idx].x, loop[idx].y);
       this.hatchPointsOriginal = loop.map(p => v(p.x, p.y));
+      this._hatchOuterOriginal = hatch.points.map(p => v(p.x, p.y));
+      this._hatchHolesOriginal = (hatch.holes ?? []).map(l => l.map(p => v(p.x, p.y)));
     } else if (ctx.target.kind === "wallPoint") {
       const wall = this.app.scene.getWallById(ctx.target.wallId)!;
       const idx = ctx.target.pointIndex;
@@ -841,6 +847,8 @@ export class SelectTool {
       this.fixedPoint = polygonCentroid(hatch.points);
       this.otherPointOriginal = v(hatch.points[idx].x, hatch.points[idx].y);
       this.hatchPointsOriginal = hatch.points.map(p => v(p.x, p.y));
+      this._hatchOuterOriginal = hatch.points.map(p => v(p.x, p.y));
+      this._hatchHolesOriginal = (hatch.holes ?? []).map(l => l.map(p => v(p.x, p.y)));
     }
 
     this.moveHubLocked = false;
@@ -1555,7 +1563,7 @@ export class SelectTool {
   private _applyHatchRotate(newAngleDeg: number): boolean {
     const t: any = this.editTarget;
     if (!t || (t.kind !== "hatch" && t.kind !== "hatchHole")) return false;
-    if (!this.hatchPointsOriginal || !this.fixedPoint || !this.otherPointOriginal) return false;
+    if (!this._hatchOuterOriginal || !this.fixedPoint || !this.otherPointOriginal) return false;
     const hatch = this.app.scene.getHatchById(t.hatchId);
     if (!hatch) return false;
     const baseAng = angleDeg(this.fixedPoint, this.otherPointOriginal);
@@ -1575,9 +1583,8 @@ export class SelectTool {
         }
       }
     }
-    const outer = t.kind === "hatch" ? hatch.points : hatch.points;
-    for (let i = 0; i < outer.length && i < this.hatchPointsOriginal.length; i++) {
-      outer[i] = rot(this.hatchPointsOriginal[i]);
+    for (let i = 0; i < hatch.points.length && i < this._hatchOuterOriginal.length; i++) {
+      hatch.points[i] = rot(this._hatchOuterOriginal[i]);
     }
     return true;
   }
