@@ -68,7 +68,8 @@ export const Defaults = {
 
   // TextBox defaults
   textColor: "#111111",
-  textFontSizePx: 16,
+  // 11 pt (Word-Standard) = 11 * 4/3 px
+  textFontSizePx: 14.6667,
   textBgColor: "#ffffff",
   textBgAlphaPct: 0,
   textWrap: true,
