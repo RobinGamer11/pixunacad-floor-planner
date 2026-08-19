@@ -679,8 +679,7 @@ export class WallTool {
       }
       const s = cam.worldToScreen(this.snap.world.x, this.snap.world.y);
       drawSnapDot(ctx, s.x, s.y, { ring: true });
-      const sideLabel = this.settings.referenceSide === "outer"
-        ? "Außen" : this.settings.referenceSide === "inner" ? "Innen" : "Mitte";
+      const sideLabel = this._snapSideLabel();
       ctx.save();
       ctx.font = "11px sans-serif";
       ctx.fillStyle = "rgba(20,20,20,0.85)";
