@@ -130,6 +130,39 @@ function healEnd(
     return v(sx / count, sy / count);
   };
 
+  /**
+   * Symmetrische Gehrung für Help-/Sublinien an reinen Endpunkt-Knoten:
+   * Schnitt der beiden End-Tangenten der gleichnamigen Offset-Linien beider
+   * Wände. Beide Nachbarn berechnen exakt dieselbe Geometrie → sie treffen
+   * sich zwangsläufig, auch wenn die Linien gewölbt sind (der einseitige
+   * Strahl-gegen-Kurve-Schnitt liefert dagegen zwei verschiedene Punkte).
+   */
+  const symmetricMiter = (T: LineType, origin: Vec2): Vec2 | null => {
+    if (!node) return null;
+    if (node.incidents.some(i => i.wallId !== wall.id && i.kind === "tjunction")) return null;
+    let best: Vec2 | null = null;
+    let bestAbs = Infinity;
+    for (const inc of node.incidents) {
+      if (inc.wallId === wall.id || inc.kind === "tjunction") continue;
+      const ow = others.find(w => w.id === inc.wallId);
+      if (!ow || ow.corners.length < 2) continue;
+      if (ow.priority < wall.priority) continue;
+      const isStart = inc.kind === "start";
+      const c = endpointLineCorners(ow, isStart);
+      const op = T === "main" ? c.main : T === "help" ? c.help : c.sub;
+      const oc = wallRefCorners(ow as any);
+      const od = isStart
+        ? norm(sub(oc[1], oc[0]))
+        : norm(sub(oc[oc.length - 1], oc[oc.length - 2]));
+      const ip = lineLineIntersectionInfinite(origin, dir, op, od);
+      if (!ip) continue;
+      const a = dist(origin, ip);
+      if (a > healLimit) continue;
+      if (a < bestAbs) { bestAbs = a; best = ip; }
+    }
+    return best || nodeMeetPoint(T, origin);
+  };
+
   for (const T of ["main", "help", "sub"] as LineType[]) {
     const origin = polysSelf[T][idx];
 
