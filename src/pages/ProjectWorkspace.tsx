@@ -6758,20 +6758,11 @@ function CadToolSection({
                     </select>
                   </div>
                   {isActive && (
-                    <div className="grid grid-cols-2 gap-1 pl-2">
-                      <button
-                        type="button"
-                        onClick={() => goCadForSheetPdf(s.id, "view", curScale)}
-                        className="h-7 rounded-md border text-[10px] hover:bg-muted"
-                        style={{ borderColor: "hsl(var(--hairline))" }}
-                        title="Aktuell sichtbaren Ausschnitt im richtigen Maßstab einfügen"
-                      >
-                        Ansicht
-                      </button>
+                    <div className="pl-2">
                       <button
                         type="button"
                         onClick={() => goCadForSheetPdf(s.id, "frame", curScale)}
-                        className="h-7 rounded-md border text-[10px] hover:bg-muted"
+                        className="h-7 w-full rounded-md border text-[10px] hover:bg-muted"
                         style={{ borderColor: "hsl(var(--hairline))" }}
                         title="Rahmen in CAD-Oberfläche aufziehen (mit Häkchen bestätigen)"
                       >
