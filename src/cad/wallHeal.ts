@@ -1,5 +1,5 @@
 import { Vec2, v, sub, norm, lineLineIntersectionInfinite, dist, bulgeEndpointTangent } from "./geometry";
-import { computeWallLines, wallRefCorners } from "./wallGeom";
+import { computeWallLinesForWall, wallRefCorners } from "./wallGeom";
 import type { Wall } from "./Scene";
 import { WallTopologyGraph, CLEANUP_TOL, endpointLineCorners, priorityIndex } from "./WallTopologyGraph";
 
@@ -12,7 +12,7 @@ const HEAL_TOL_M = 0.05;
  */
 const HEAL_MAX_DIST_M = 30.0;
 type LineType = "main" | "help" | "sub";
-type WallLines = ReturnType<typeof computeWallLines>;
+type WallLines = ReturnType<typeof computeWallLinesForWall>;
 
 /**
  * Phase 2: Heal nutzt globalen Topologie-Graph (wenn übergeben), sonst Fallback
@@ -25,7 +25,7 @@ export function computeHealedWallLines(wallInput: Wall, others: Wall[], graph?: 
   const wall: Wall = refCorners === wallInput.corners
     ? wallInput
     : (Object.assign(Object.create(Object.getPrototypeOf(wallInput)), wallInput, { corners: refCorners }) as Wall);
-  const lines = computeWallLines(wall.corners, wall.thicknessM, wall.referenceSide);
+  const lines = computeWallLinesForWall(wallInput);
   if (wall.corners.length < 2) return { ...lines, capStart: true, capEnd: true };
 
   const mainCorners = lines.mainCorners.map(p => v(p.x, p.y));
@@ -87,7 +87,7 @@ function healEnd(
   const cache = new Map<Wall, WallLines>();
   const linesOf = (ow: Wall) => {
     let l = cache.get(ow);
-    if (!l) { l = computeWallLines(wallRefCorners(ow as any), ow.thicknessM, ow.referenceSide); cache.set(ow, l); }
+    if (!l) { l = computeWallLinesForWall(ow); cache.set(ow, l); }
     return l;
   };
 
