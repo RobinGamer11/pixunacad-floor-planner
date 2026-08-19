@@ -6,6 +6,8 @@ import type { Snap } from "./TopologyEngine";
 import type { Input } from "./Input";
 import type { DimensionStyle } from "./Scene";
 import { getDimensionGeometry } from "./dimensionGeometry";
+import { computeHealedWallLines } from "./wallHeal";
+
 
 interface CollectedPoint {
   world: Vec2;
