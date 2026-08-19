@@ -2,35 +2,48 @@ import React, { useEffect, useRef, useState } from "react";
 import { Check, Grid2X2, Move, CheckCheck } from "lucide-react";
 import { HATCH_PATTERNS } from "@/cad/hatchPatterns";
 
+/** Trennt eine Maßeinheit in Klammern vom Beschriftungstext ab. */
+const splitUnit = (label: string): [string, string | null] => {
+  const m = /^(.*?)\s*\(([^()]{1,4})\)\s*$/.exec(label);
+  return m ? [m[1], m[2]] : [label, null];
+};
+
 /** Regler + Zahlenfeld: grob per Slider, fein per Eingabe/Pfeiltasten. */
 const SliderRow: React.FC<{
   label: string; min: number; max: number; step: number; decimals: number;
   value: number; disabled?: boolean; onChange: (v: number) => void;
 }> = ({ label, min, max, step, decimals, value, disabled, onChange }) => {
   const clamp = (v: number) => Math.max(min, Math.min(max, v));
+  const [text, unit] = splitUnit(label);
   return (
     <div className={`min-w-0 ${disabled ? "opacity-50" : ""}`}>
-      <span className="mb-1 block text-[10px] text-muted-foreground">{label}</span>
+      <span className="mb-1 block text-[10px] text-muted-foreground">{text}</span>
       <div className="flex min-w-0 items-center gap-2">
         <input
           type="range" min={min} max={max} step={step} value={value} disabled={disabled}
           onChange={(e) => onChange(clamp(parseFloat(e.target.value)))}
           className="pixuna-range h-4 min-w-0 flex-1 cursor-pointer"
         />
-        <input
-          type="number" min={min} max={max} step={step} disabled={disabled}
-          value={Number(value.toFixed(decimals))}
-          onChange={(e) => {
-            const v = parseFloat(e.target.value);
-            if (Number.isFinite(v)) onChange(clamp(v));
-          }}
-          className="h-7 w-14 shrink-0 rounded border bg-white px-1 text-right text-[10px] tabular-nums"
+        <span
+          className="flex h-7 w-16 shrink-0 items-center overflow-hidden rounded border bg-white"
           style={{ borderColor: "hsl(var(--hairline, var(--border)))" }}
-        />
+        >
+          <input
+            type="number" min={min} max={max} step={step} disabled={disabled}
+            value={Number(value.toFixed(decimals))}
+            onChange={(e) => {
+              const v = parseFloat(e.target.value);
+              if (Number.isFinite(v)) onChange(clamp(v));
+            }}
+            className="h-full min-w-0 flex-1 border-0 bg-transparent px-1 text-right text-[10px] tabular-nums outline-none"
+          />
+          {unit ? <span className="pr-1 text-[9px] text-muted-foreground">{unit}</span> : null}
+        </span>
       </div>
     </div>
   );
 };
+
 
 interface Props {
   /** CadApp oder MiniCad — beide teilen dieselben Default-Felder. */
