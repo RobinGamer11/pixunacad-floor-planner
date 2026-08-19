@@ -1962,7 +1962,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               </div>
                <div>
                  <label>Liniendicke (cm)</label>
-                 <input ref={thicknessInputRef} type="text" defaultValue="3" />
+                 <input ref={thicknessInputRef} type="text" defaultValue="1" />
                </div>
                <div>
                  <label>Transparenz</label>
@@ -3202,7 +3202,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           {/* Zeichnungs-ID Panel (Blätter + Transparentpause) */}
           <div ref={sheetPanelRef} className="cad-id-panel w-full">
             <div className="id-head">
-              <div className="id-title">Zeichnungs-ID</div>
+              <div className="id-title">Seiten-ID</div>
               <div className="id-head-actions">
                 <button ref={sheetToggleBtnRef} className="id-head-btn icon-only" title="Ein-/Ausklappen">
                   <span className="id-toggle-chevron" />
@@ -3211,7 +3211,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             </div>
             <div ref={sheetBodyRef} className="id-body">
               <div className="id-add-wrap">
-                <button ref={sheetAddBtnRef} className="id-head-btn id-add-btn">+ Blatt</button>
+                <button ref={sheetAddBtnRef} className="id-head-btn id-add-btn">+ Seite</button>
               </div>
               <div ref={sheetListRef} className="id-list" />
             </div>

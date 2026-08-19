@@ -3,7 +3,7 @@ export const Defaults = {
   snapPx: 12,
   minSegLenM: 1e-4,
   splitEpsT: 1e-4,
-  lineThicknessM: 0.03,
+  lineThicknessM: 0.01,
   lineColor: "#111111",
   geomEps: 1e-9,
   defaultLabelId: "default-line",
