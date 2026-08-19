@@ -205,12 +205,18 @@ function healEnd(
       }
     }
 
-    // Bevel-Begrenzung: zu weite Gehrungen auf healLimit kürzen.
+    // Bevel-Begrenzung: zu weite Gehrungen nicht stumpf abschneiden, sondern
+    // Help/Sub am Knoten zusammenführen (sonst entsteht dort eine Lücke).
     {
       const tAlong = (ideal.x - origin.x) * dir.x + (ideal.y - origin.y) * dir.y;
       if (Math.abs(tAlong) > healLimit) {
-        const s = tAlong >= 0 ? healLimit : -healLimit;
-        ideal = v(origin.x + dir.x * s, origin.y + dir.y * s);
+        const meet = T !== "main" ? nodeMeetPoint(T, origin) : null;
+        if (meet) {
+          ideal = meet;
+        } else {
+          const s = tAlong >= 0 ? healLimit : -healLimit;
+          ideal = v(origin.x + dir.x * s, origin.y + dir.y * s);
+        }
       }
     }
 
