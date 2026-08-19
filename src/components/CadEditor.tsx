@@ -3281,7 +3281,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 <div><span className="cad-kbd">Text beenden</span> Außerhalb Textfeld klicken</div>
               </div>
             </div>
-          ) : (activeTool !== ToolIds.ERASER && activeTool !== ToolIds.PIPETTE && activeTool !== ToolIds.SELECT) ? (
+          ) : (activeTool !== ToolIds.ERASER && activeTool !== ToolIds.PIPETTE && activeTool !== ToolIds.SELECT && activeTool !== ToolIds.STICKER) ? (
             <ToolHelpNotes toolId={activeTool} />
           ) : null}
         </div>
