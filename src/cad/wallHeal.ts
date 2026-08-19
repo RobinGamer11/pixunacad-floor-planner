@@ -54,6 +54,7 @@ function healEnd(
   helpCorners: Vec2[],
   atStart: boolean,
   graph?: WallTopologyGraph,
+  endBulgeMag: number = 0,
 ): boolean {
   const n = wall.corners.length;
   if (n < 2) return false;
