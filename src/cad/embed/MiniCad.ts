@@ -1108,6 +1108,23 @@ export class MiniCad {
     if (v === this._renderScale) return;
     this._renderScale = v;
     this.applyZoom(this._zoom);
+    // Das Ändern der Backing-Store-Größe leert die Zeichenfläche. Ohne
+    // sofortiges Neuzeichnen bliebe der Export-Snapshot leer, wenn der
+    // rAF-Tick (z.B. in einem Hintergrund-Tab) nicht rechtzeitig läuft.
+    this.renderNow();
+  }
+
+  /** Erzwingt sofort einen Renderdurchlauf (unabhängig vom rAF-Tick). */
+  renderNow() {
+    if (this._destroyed) return;
+    try {
+      this.camera.offsetX = FRAME_PAD_PX;
+      this.camera.offsetY = FRAME_PAD_PX;
+      this.camera.scale = this.basePxPerMm * 1000 * this._zoom;
+      this.renderer.render();
+    } catch (err) {
+      console.error("MiniCad renderNow error:", err);
+    }
   }
 
   applyZoom(zoom: number) {
