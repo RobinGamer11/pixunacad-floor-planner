@@ -1936,7 +1936,6 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 <CadEbeneSelect target={idSelectRef} />
               </div>
               <div className="text-[10px] font-semibold tracking-wider mb-1.5" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
-
                 MODUS
               </div>
               <div className="grid grid-cols-2 gap-1">
@@ -1949,7 +1948,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                       type="button"
                       onClick={() => { appRef.current?.setTool(v.id); setActiveTool(v.id); setLineVariant(v.id); }}
                       title={v.label}
-                      className={`cad-toolbar-btn flex-col justify-center gap-0.5 h-11 ${active ? "active" : ""}`}
+                      className={`flex flex-col items-center justify-center gap-0.5 rounded border px-1 py-1.5 transition-colors ${active ? "bg-accent" : "hover:bg-muted"}`}
+                      style={{ borderColor: "hsl(var(--hairline))" }}
                     >
                       <Icon className="h-3.5 w-3.5" />
                       <span className="text-[9px] leading-tight">{v.label}</span>
@@ -1980,29 +1980,24 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 LINIE
               </div>
               <div className="space-y-3">
-                <div>
-                  <label>Farbe</label>
-                  <div className="flex items-center gap-2">
-                    <div ref={colorPreviewRef} className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))" }} />
-                    <input ref={colorInputRef} type="color" defaultValue="#111111" className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
-                  </div>
+                <div className="hidden">
+                  <div ref={colorPreviewRef} />
+                  <input ref={colorInputRef} type="color" defaultValue="#111111" />
                 </div>
+                <CadColorProxy label="Farbe" target={colorInputRef} />
                 <div>
-                  <div className="mb-1.5 text-[10px]" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Strichstärke</div>
+                  <div className="mb-1.5 text-[10px] text-muted-foreground">Strichstärke</div>
+                  <div className="hidden">
+                    <input ref={thicknessInputRef} type="text" defaultValue="1" />
+                  </div>
                   <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <div className="text-[9px] mb-0.5" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Zentimeter (cm)</div>
-                      <input ref={thicknessInputRef} type="text" defaultValue="1" />
-                    </div>
-                    <div>
-                      <div className="text-[9px] mb-0.5" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Millimeter (mm)</div>
-                      <CadThicknessMmInput target={thicknessInputRef} />
-                    </div>
+                    <CadMeasureProxy label="Zeichnung" unit="cm" target={thicknessInputRef} factor={1} digits={2} />
+                    <CadMeasureProxy label="Tatsächliche Größe" unit="mm" target={thicknessInputRef} factor={10} digits={3} />
                   </div>
                 </div>
 
                 <div>
-                  <label>Transparenz</label>
+                  <div className="mb-1.5 text-[10px] text-muted-foreground">Transparenz</div>
                   <input
                     type="range"
                     min={1}
@@ -2010,9 +2005,9 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                     step={1}
                     value={lineAlpha}
                     onChange={(e) => applyLineAlpha(Number(e.target.value))}
-                    className="w-full"
+                    className="pixuna-range w-full"
                   />
-                  <div className="flex items-center gap-1 mt-1">
+                  <label className="mt-1 flex h-7 items-center overflow-hidden rounded-md border" style={{ borderColor: "hsl(var(--hairline))" }}>
                     <input
                       type="number"
                       min={1}
@@ -2020,21 +2015,23 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                       step={1}
                       value={lineAlpha}
                       onChange={(e) => applyLineAlpha(Number(e.target.value))}
-                      className="w-16 h-7 px-1 text-right text-[11px] rounded border bg-transparent"
-                      style={{ borderColor: "hsl(var(--hairline))" }}
+                      className="h-full min-w-0 flex-1 bg-transparent px-2 text-right text-xs tabular-nums outline-none"
+                      aria-label="Transparenz in Prozent"
                     />
-                    <span className="text-[10px]">%</span>
-                  </div>
+                    <span className="pr-2 text-[10px] text-muted-foreground">%</span>
+                  </label>
                 </div>
-                <div className="pt-2" style={{ borderTop: "1px solid hsl(var(--border))" }}>
-                  <label className="block mb-1.5">Pfeilspitzen</label>
-                  <div className="flex gap-1">
+                <div>
+                  <div className="mb-1.5 text-[10px] text-muted-foreground">Pfeilspitzen</div>
+                  <div className="grid grid-cols-2 gap-1">
                     <button type="button" onClick={() => setLineArrowStart(!lineArrowStart)}
-                      className={`cad-toolbar-btn flex-1 justify-center h-8 text-[11px] ${lineArrowStart ? "active" : ""}`}>
+                      className={`h-9 rounded border text-[11px] transition-colors ${lineArrowStart ? "bg-accent" : "hover:bg-muted"}`}
+                      style={{ borderColor: "hsl(var(--hairline))" }}>
                       Anfang
                     </button>
                     <button type="button" onClick={() => setLineArrowEnd(!lineArrowEnd)}
-                      className={`cad-toolbar-btn flex-1 justify-center h-8 text-[11px] ${lineArrowEnd ? "active" : ""}`}>
+                      className={`h-9 rounded border text-[11px] transition-colors ${lineArrowEnd ? "bg-accent" : "hover:bg-muted"}`}
+                      style={{ borderColor: "hsl(var(--hairline))" }}>
                       Ende
                     </button>
                   </div>
@@ -2055,6 +2052,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               </div>
             </div>
           </div>
+
 
 
           {/* Schraffur — Design identisch zur Mappe (Modus & Objektart über dem Rahmen) */}
