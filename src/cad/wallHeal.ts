@@ -161,8 +161,14 @@ function healEnd(
         : norm(sub(oc[oc.length - 1], oc[oc.length - 2]));
       const ip = lineLineIntersectionInfinite(origin, dir, op, od);
       if (!ip) continue;
-      const a = dist(origin, ip);
-      if (a > healLimit) continue;
+      // Grenzwert symmetrisch bilden: beide Wände müssen dieselbe
+      // Annahme/Verwerfung treffen, sonst reißt eine Seite ab.
+      const ob: number[] = Array.isArray((ow as any).bulges) ? (ow as any).bulges : [];
+      const owBulge = Math.abs((isStart ? ob[0] : ob[Math.max(0, ow.corners.length - 2)]) || 0);
+      const pairLimit = (wall.thicknessM + (ow.thicknessM || 0)) * 3
+        * (1 + 2 * Math.max(endBulgeMag, owBulge)) + HEAL_TOL_M;
+      const a = Math.max(dist(origin, ip), dist(op, ip));
+      if (a > pairLimit) continue;
       if (a < bestAbs) { bestAbs = a; best = ip; }
     }
     return best || nodeMeetPoint(T, origin);
