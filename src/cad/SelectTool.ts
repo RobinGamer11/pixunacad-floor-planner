@@ -1,6 +1,6 @@
 import { drawSnapDot } from "./snapDraw";
 import { Defaults, SnapType, SelectionType, PointEditAction } from "./constants";
-import { Vec2, v, sub, add, mul, dot, dist, angleDeg, pointFromLengthAngle, projectPointToSegment, orthoSnapFromA, nearestAngleToReference, pointInPolygon, pointInHatchSolid, polygonCentroid, projectPointToInfiniteLine, lineLineIntersectionInfinite, norm, perpLeft, len } from "./geometry";
+import { Vec2, v, sub, add, mul, dot, dist, angleDeg, pointFromLengthAngle, projectPointToSegment, orthoSnapFromA, nearestAngleToReference, pointInPolygon, pointInHatchSolid, polygonCentroid, bulgeFromPoint, projectPointToInfiniteLine, lineLineIntersectionInfinite, norm, perpLeft, len } from "./geometry";
 import type { CadApp } from "./CadApp";
 import type { Snap, SnapExclusions } from "./TopologyEngine";
 import type { Input } from "./Input";
@@ -27,6 +27,8 @@ type EditTarget =
   | { kind: "wallPoint"; wallId: string; pointIndex: number }
   | { kind: "wallEdge"; wallId: string; edgeIndex: number }
   | { kind: "wall"; wallId: string }
+  | { kind: "segmentBulge"; segmentId: string }
+  | { kind: "hatchPointBulge"; hatchId: string; holeIndex: number | null; pointIndex: number }
   | { kind: "freeStroke"; freeStrokeId: string };
 
 export class SelectTool {
@@ -65,6 +67,12 @@ export class SelectTool {
   hatchEdgeMidOriginal: Vec2 | null = null;
   hatchEdgeOffsetM = 0;
   hatchEdgeOffsetLocked = false;
+
+  // Bulge (Kanten-Wölbung) state
+  bulgeAOriginal: Vec2 | null = null;
+  bulgeBOriginal: Vec2 | null = null;
+  bulgeValue = 0;
+  bulgeLocked = false;
 
   // TextBox handle (corner) edit state
   textBoxOppositeOriginal: Vec2 | null = null; // world pos of opposite corner at edit start
@@ -1026,6 +1034,130 @@ export class SelectTool {
     (this.app as any).commitHistorySnapshot?.();
   }
 
+  /* ---------------- Kanten-Wölbung (Bulge) ---------------- */
+
+  private _bulgeArray(hatch: any, holeIndex: number | null): number[] {
+    if (holeIndex == null) {
+      if (!Array.isArray(hatch.bulges)) hatch.bulges = [];
+      return hatch.bulges;
+    }
+    if (!Array.isArray(hatch.holeBulges)) hatch.holeBulges = [];
+    if (!Array.isArray(hatch.holeBulges[holeIndex])) hatch.holeBulges[holeIndex] = [];
+    return hatch.holeBulges[holeIndex];
+  }
+
+  /** Startet das Wölben einer Schraffur-/Polygonkante. */
+  beginHatchEdgeBulge(hatchId: string, edgeIndex: number, holeIndex: number | null = null) {
+    const hatch: any = this.app.scene.getHatchById(hatchId);
+    if (!hatch) return;
+    const loop: Vec2[] = holeIndex == null ? hatch.points : (hatch.holes?.[holeIndex] || []);
+    const n = loop.length;
+    if (n < 2) return;
+    this._clearTransformGuides();
+    this.activeEditAction = PointEditAction.BULGE;
+    this.editTarget = holeIndex == null
+      ? { kind: "hatchEdge", hatchId, edgeIndex }
+      : { kind: "hatchHoleEdge", hatchId, holeIndex, edgeIndex };
+    const A = loop[edgeIndex], B = loop[(edgeIndex + 1) % n];
+    this.bulgeAOriginal = v(A.x, A.y);
+    this.bulgeBOriginal = v(B.x, B.y);
+    const arr = this._bulgeArray(hatch, holeIndex);
+    this.bulgeValue = arr[edgeIndex] || 0;
+    this.bulgeLocked = false;
+    this.app.pointEditMenu.hide();
+    this._showBulgeHub();
+  }
+
+  /** Startet das Wölben beider Nachbarkanten eines Schraffur-Punktes. */
+  beginHatchPointBulge(hatchId: string, pointIndex: number, holeIndex: number | null = null) {
+    const hatch: any = this.app.scene.getHatchById(hatchId);
+    if (!hatch) return;
+    const loop: Vec2[] = holeIndex == null ? hatch.points : (hatch.holes?.[holeIndex] || []);
+    const n = loop.length;
+    if (n < 3) return;
+    this._clearTransformGuides();
+    this.activeEditAction = PointEditAction.BULGE;
+    this.editTarget = { kind: "hatchPointBulge", hatchId, holeIndex, pointIndex };
+    const prev = loop[(pointIndex - 1 + n) % n];
+    const next = loop[(pointIndex + 1) % n];
+    this.bulgeAOriginal = v(prev.x, prev.y);
+    this.bulgeBOriginal = v(next.x, next.y);
+    this.bulgeValue = 0;
+    this.bulgeLocked = false;
+    this.app.pointEditMenu.hide();
+    this._showBulgeHub();
+  }
+
+  /** Startet das Wölben einer Linie. */
+  beginSegmentBulge(segmentId: string) {
+    const seg: any = this.app.scene.getSegmentById(segmentId);
+    if (!seg) return;
+    this._clearTransformGuides();
+    this.activeEditAction = PointEditAction.BULGE;
+    this.editTarget = { kind: "segmentBulge", segmentId };
+    this.bulgeAOriginal = v(seg.a.x, seg.a.y);
+    this.bulgeBOriginal = v(seg.b.x, seg.b.y);
+    this.bulgeValue = seg.bulge || 0;
+    this.bulgeLocked = false;
+    this.app.pointEditMenu.hide();
+    this._showBulgeHub();
+  }
+
+  private _bulgeChord(): number {
+    if (!this.bulgeAOriginal || !this.bulgeBOriginal) return 0;
+    return dist(this.bulgeAOriginal, this.bulgeBOriginal);
+  }
+
+  private _showBulgeHub() {
+    const sag = this.bulgeValue * this._bulgeChord();
+    this.app.hub.bindCommit((vals) => {
+      const chord = this._bulgeChord() || 1;
+      const h = vals.lengthM != null ? vals.lengthM : sag;
+      this.bulgeLocked = true;
+      this.bulgeValue = h / chord;
+      this._applyBulge(this.bulgeValue);
+      this.app.hub.setValues(h, 0);
+      this.app.hub.updateDisplay(h, 0);
+    });
+    this.app.hub.showAt(this.app.input.mouse.sx, this.app.input.mouse.sy);
+    this.app.hub.setCompact(true, "◠");
+    this.app.hub.updateDisplay(sag, 0);
+    this.app.hub.setValues(sag, 0);
+    this.app.hub.enterEditMode();
+  }
+
+  /** Schreibt den aktuellen Wölbungswert ins Objekt. */
+  private _applyBulge(bulge: number) {
+    const t = this.editTarget;
+    if (!t) return;
+    if (t.kind === "segmentBulge") {
+      const seg: any = this.app.scene.getSegmentById(t.segmentId);
+      if (seg) seg.bulge = bulge;
+      return;
+    }
+    if (t.kind === "hatchPointBulge") {
+      const hatch: any = this.app.scene.getHatchById(t.hatchId);
+      if (!hatch) return;
+      const arr = this._bulgeArray(hatch, t.holeIndex);
+      const loop: Vec2[] = t.holeIndex == null ? hatch.points : (hatch.holes?.[t.holeIndex] || []);
+      const n = loop.length;
+      while (arr.length < n) arr.push(0);
+      // Beide Nachbarkanten gleichmäßig wölben (Ecke rein-/rauswölben).
+      arr[(t.pointIndex - 1 + n) % n] = bulge;
+      arr[t.pointIndex] = -bulge;
+      return;
+    }
+    if (t.kind === "hatchEdge" || t.kind === "hatchHoleEdge") {
+      const hatch: any = this.app.scene.getHatchById(t.hatchId);
+      if (!hatch) return;
+      const holeIndex = t.kind === "hatchHoleEdge" ? t.holeIndex : null;
+      const arr = this._bulgeArray(hatch, holeIndex);
+      const loop: Vec2[] = holeIndex == null ? hatch.points : (hatch.holes?.[holeIndex] || []);
+      while (arr.length < loop.length) arr.push(0);
+      arr[t.edgeIndex] = bulge;
+    }
+  }
+
   beginHatchEdgeOffset(hatchId: string, edgeIndex: number, holeIndex: number | null = null) {
     const hatch = this.app.scene.getHatchById(hatchId);
     if (!hatch) return;
@@ -1751,6 +1883,10 @@ export class SelectTool {
     this.hatchEdgeMidOriginal = null;
     this.hatchEdgeOffsetM = 0;
     this.hatchEdgeOffsetLocked = false;
+    this.bulgeAOriginal = null;
+    this.bulgeBOriginal = null;
+    this.bulgeValue = 0;
+    this.bulgeLocked = false;
     this.textBoxOppositeOriginal = null;
     this.textBoxRotationOriginal = 0;
     this.textBoxWidthOriginal = 0;
@@ -3053,6 +3189,30 @@ export class SelectTool {
         return;
       }
 
+      if (this.activeEditAction === PointEditAction.BULGE) {
+        const chord = this._bulgeChord();
+        if (!this.bulgeLocked && this.bulgeAOriginal && this.bulgeBOriginal) {
+          const mouseW = v(input.mouse.wx, input.mouse.wy);
+          const bg = bulgeFromPoint(this.bulgeAOriginal, this.bulgeBOriginal, mouseW);
+          this.bulgeValue = bg;
+          this._applyBulge(bg);
+          if (document.activeElement !== this.app.hub.lenInputEl && document.activeElement !== this.app.hub.angInputEl) {
+            this.app.hub.showAt(input.mouse.sx, input.mouse.sy);
+            this.app.hub.updateDisplay(bg * chord, 0);
+            this.app.hub.setValues(bg * chord, 0);
+          }
+        } else {
+          this.app.hub.showAt(input.mouse.sx, input.mouse.sy);
+          this.app.hub.updateDisplay(this.bulgeValue * chord, 0);
+        }
+        if (editCommit) {
+          this._clearEditState();
+          this.app.hub.hide();
+          (this.app as any).commitHistorySnapshot?.();
+        }
+        return;
+      }
+
       if (this.activeEditAction === PointEditAction.OFFSET) {
         const isWallEdge = this.editTarget?.kind === "wallEdge";
         const midOrig = isWallEdge ? this.wallEdgeMidOriginal : this.hatchEdgeMidOriginal;
@@ -3463,7 +3623,7 @@ export class SelectTool {
           const midW = { x: (a.x + b.x) * 0.5, y: (a.y + b.y) * 0.5 };
           const sp = this.app.camera.worldToScreen(midW.x, midW.y);
           this._lastHatchEdgeClickW = v(input.mouse.wx, input.mouse.wy);
-          this.app.pointEditMenu.showAt(sp.x, sp.y, [PointEditAction.OFFSET, PointEditAction.INSERT_POINT]);
+          this.app.pointEditMenu.showAt(sp.x, sp.y, [PointEditAction.OFFSET, PointEditAction.INSERT_POINT, PointEditAction.BULGE]);
           return;
         }
       }
@@ -3497,6 +3657,13 @@ export class SelectTool {
       if (hit) {
         this.app.setSelection(hit);
         if ((hit as any).segmentId) this.app.showLineSettingsPanel(true);
+        if (hit.type === SelectionType.SEGMENT && (hit as any).segmentId) {
+          const bseg: any = this.app.scene.getSegmentById((hit as any).segmentId);
+          if (bseg && !bseg.isGuide) {
+            const bmid = this.app.camera.worldToScreen((bseg.a.x + bseg.b.x) * 0.5, (bseg.a.y + bseg.b.y) * 0.5);
+            this.app.pointEditMenu.showAt(bmid.x, bmid.y, [PointEditAction.BULGE]);
+          }
+        }
         if ((hit as any).hatchId) this.app.showHatchSettingsPanel(true);
         if (hit.type === SelectionType.DIMENSION) {
           // Hinweis: Dimensionen werden bewusst NICHT mehr per Maus-Drag verschoben.
@@ -3527,12 +3694,17 @@ export class SelectTool {
     if (ctx) {
       const p = ctx.point;
       const sp = this.app.camera.worldToScreen(p.x, p.y);
-      this.app.pointEditMenu.showAt(sp.x, sp.y, [
+      const selCtx: any = this.app.selection;
+      const pointActions = [
         PointEditAction.MOVE,
         PointEditAction.TRANSLATE,
         PointEditAction.ROTATE,
         PointEditAction.DELETE,
-      ]);
+      ] as string[];
+      if (selCtx?.hatchId != null && selCtx?.pointIndex != null) pointActions.push(PointEditAction.BULGE);
+      this.app.pointEditMenu.showAt(sp.x, sp.y, pointActions);
+    } else if (!this.isEditing() && (this.app.selection as any)?.type === SelectionType.SEGMENT && (this.app.selection as any)?.segmentId) {
+      // Linien-Auswahl: Wölben-Menü offen halten.
     } else if (!this.isEditing() && this._isHatchEdgeSelectionActive()) {
       // Hatch-Edge-Auswahl: Menü mit Offset offen halten.
     } else if (!this.isEditing() && this._isTextBoxHandleSelectionActive()) {

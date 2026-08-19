@@ -224,3 +224,67 @@ export function polygonCentroid(poly: Vec2[]): Vec2 {
   }
   return { x: cx / (6 * a), y: cy / (6 * a) };
 }
+
+/* ------------------------------------------------------------------ */
+/* Kanten-Wölbung (Bulge)                                              */
+/* ------------------------------------------------------------------ */
+/**
+ * `bulge` = signierte Pfeilhöhe (Sagitta) im Verhältnis zur Sehnenlänge.
+ * 0 = gerade Kante, +/- = rein-/rausgewölbt.
+ * Die Kante wird als Kreisbogen durch A, Scheitel, B tesselliert.
+ */
+export function bulgedEdgePoints(a: Vec2, b: Vec2, bulge: number, segments = 24): Vec2[] {
+  const out: Vec2[] = [];
+  const chord = dist(a, b);
+  if (!Number.isFinite(bulge) || Math.abs(bulge) < 1e-6 || chord < 1e-9) return out;
+  const dx = (b.x - a.x) / chord, dy = (b.y - a.y) / chord;
+  const nx = -dy, ny = dx;
+  const h = bulge * chord; // Pfeilhöhe in Welt-Einheiten
+  const mid = v((a.x + b.x) * 0.5, (a.y + b.y) * 0.5);
+  const apex = v(mid.x + nx * h, mid.y + ny * h);
+  // Quadratische Bezier mit Kontrollpunkt = mid + 2h*n hat ihren Scheitel exakt in `apex`.
+  const cp = v(mid.x + nx * h * 2, mid.y + ny * h * 2);
+  const n = Math.max(4, Math.min(96, segments));
+  for (let i = 1; i < n; i++) {
+    const t = i / n, mt = 1 - t;
+    out.push(v(
+      mt * mt * a.x + 2 * mt * t * cp.x + t * t * b.x,
+      mt * mt * a.y + 2 * mt * t * cp.y + t * t * b.y,
+    ));
+  }
+  void apex;
+  return out;
+}
+
+/** Tesselliert einen Ring/Pfad mit optionalen Kanten-Wölbungen. */
+export function tessellateWithBulges(
+  points: Vec2[],
+  bulges: number[] | null | undefined,
+  closed: boolean,
+  segments = 24
+): Vec2[] {
+  if (!points || points.length < 2) return (points || []).map(p => v(p.x, p.y));
+  if (!bulges || bulges.every(b => !b)) return points.map(p => v(p.x, p.y));
+  const out: Vec2[] = [];
+  const last = closed ? points.length : points.length - 1;
+  for (let i = 0; i < last; i++) {
+    const a = points[i];
+    const b = points[(i + 1) % points.length];
+    out.push(v(a.x, a.y));
+    const bg = bulges[i] || 0;
+    if (bg) out.push(...bulgedEdgePoints(a, b, bg, segments));
+  }
+  if (!closed) out.push(v(points[points.length - 1].x, points[points.length - 1].y));
+  return out;
+}
+
+/** Aktuelle Wölbung aus einem Zielpunkt (z. B. Maus) ableiten. */
+export function bulgeFromPoint(a: Vec2, b: Vec2, p: Vec2): number {
+  const chord = dist(a, b);
+  if (chord < 1e-9) return 0;
+  const dx = (b.x - a.x) / chord, dy = (b.y - a.y) / chord;
+  const nx = -dy, ny = dx;
+  const mid = v((a.x + b.x) * 0.5, (a.y + b.y) * 0.5);
+  const h = (p.x - mid.x) * nx + (p.y - mid.y) * ny;
+  return clamp(h / chord, -4, 4);
+}

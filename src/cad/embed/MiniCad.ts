@@ -406,6 +406,20 @@ export class MiniCad {
         (this.selectTool as any).beginFreeStrokeAction?.((sel as any).freeStrokeId, action);
         return;
       }
+      if (action === PointEditAction.BULGE && sel) {
+        if (sel.type === SelectionType.HATCH && (sel as any).hatchId && (sel as any).edgeIndex != null) {
+          (this.selectTool as any).beginHatchEdgeBulge?.((sel as any).hatchId, (sel as any).edgeIndex, (sel as any).holeIndex ?? null);
+          return;
+        }
+        if ((sel as any).hatchId && (sel as any).pointIndex != null) {
+          (this.selectTool as any).beginHatchPointBulge?.((sel as any).hatchId, (sel as any).pointIndex, (sel as any).holeIndex ?? null);
+          return;
+        }
+        if ((sel as any).segmentId) {
+          (this.selectTool as any).beginSegmentBulge?.((sel as any).segmentId);
+          return;
+        }
+      }
       if (sel && sel.type === SelectionType.HATCH && (sel as any).hatchId && (sel as any).edgeIndex != null) {
         if (action === PointEditAction.INSERT_POINT) {
           (this.selectTool as any).insertHatchEdgePoint?.((sel as any).hatchId, (sel as any).edgeIndex, (sel as any).holeIndex ?? null);
@@ -1149,6 +1163,7 @@ export class MiniCad {
           arrowStart: !!s.arrowStart,
           arrowEnd: !!s.arrowEnd,
           arrowScale: s.arrowScale,
+          bulge: (s as any).bulge || 0,
         })),
 
       textBoxes: this.scene.textBoxes.map((t) => ({
@@ -1196,6 +1211,8 @@ export class MiniCad {
         patternAngleDeg: h.patternAngleDeg,
         patternSkewDeg: h.patternSkewDeg,
         patternStretch: h.patternStretch, patternOffsetX: h.patternOffsetX, patternOffsetY: h.patternOffsetY,
+        bulges: Array.isArray((h as any).bulges) ? [...(h as any).bulges] : undefined,
+        holeBulges: Array.isArray((h as any).holeBulges) ? (h as any).holeBulges.map((l: number[]) => [...l]) : undefined,
       })),
 
       documents: this.scene.documents
@@ -1256,6 +1273,7 @@ export class MiniCad {
               arrowStart: !!s.arrowStart,
               arrowEnd: !!s.arrowEnd,
               arrowScale: s.arrowScale,
+              bulge: s.bulge,
             },
 
           );
@@ -1299,6 +1317,7 @@ export class MiniCad {
             labelId: h.labelId || Defaults.defaultLabelId,
             areaLabel: h.areaLabel,
             patternEnabled: h.patternEnabled, patternId: h.patternId, patternScale: h.patternScale, patternAngleDeg: h.patternAngleDeg, patternSkewDeg: h.patternSkewDeg, patternStretch: h.patternStretch, patternOffsetX: h.patternOffsetX, patternOffsetY: h.patternOffsetY,
+            bulges: h.bulges, holeBulges: h.holeBulges,
           });
         } catch (e) { console.error("MiniCad restore hatch:", e); }
       }
@@ -1607,7 +1626,7 @@ export class MiniCad {
           clip.push({ kind, data: {
             a: clone(s.a), b: clone(s.b), color: s.color, thicknessM: s.thicknessM, labelId: s.labelId,
             isGuide: !!s.isGuide, midpointSnap: !!s.midpointSnap, divisionSnap: s.divisionSnap,
-            arrowStart: !!s.arrowStart, arrowEnd: !!s.arrowEnd, arrowScale: s.arrowScale,
+            arrowStart: !!s.arrowStart, arrowEnd: !!s.arrowEnd, arrowScale: s.arrowScale, bulge: (s as any).bulge || 0,
           } });
         } else if (kind === "hatch") {
           const h = this.scene.getHatchById(id); if (!h) continue;
@@ -1615,7 +1634,9 @@ export class MiniCad {
             strokeColor: h.strokeColor, fillAlphaPct: h.fillAlphaPct, strokeWidthPx: h.strokeWidthPx,
             labelId: h.labelId, areaLabel: clone(h.areaLabel), patternEnabled: h.patternEnabled,
             patternId: h.patternId, patternScale: h.patternScale, patternAngleDeg: h.patternAngleDeg,
-            patternSkewDeg: h.patternSkewDeg, patternStretch: h.patternStretch, patternOffsetX: h.patternOffsetX, patternOffsetY: h.patternOffsetY } });
+            patternSkewDeg: h.patternSkewDeg, patternStretch: h.patternStretch, patternOffsetX: h.patternOffsetX, patternOffsetY: h.patternOffsetY,
+            bulges: Array.isArray((h as any).bulges) ? [...(h as any).bulges] : undefined,
+            holeBulges: Array.isArray((h as any).holeBulges) ? (h as any).holeBulges.map((l: number[]) => [...l]) : undefined } });
         } else if (kind === "textBox") {
           const t = this.scene.getTextBoxById(id); if (!t) continue;
           clip.push({ kind, data: { center: clone(t.center), widthM: t.widthM, heightM: t.heightM,
@@ -1683,7 +1704,7 @@ export class MiniCad {
           const n = this.scene.createSegment(mv(o.a), mv(o.b), {
             color: o.color, thicknessM: o.thicknessM, labelId: o.labelId,
             isGuide: !!o.isGuide, midpointSnap: !!o.midpointSnap, divisionSnap: o.divisionSnap,
-            arrowStart: !!o.arrowStart, arrowEnd: !!o.arrowEnd, arrowScale: o.arrowScale,
+            arrowStart: !!o.arrowStart, arrowEnd: !!o.arrowEnd, arrowScale: o.arrowScale, bulge: o.bulge,
           });
           if (n) created.push({ kind: "segment", id: n.id });
         } else if (it.kind === "hatch") {
@@ -1691,7 +1712,8 @@ export class MiniCad {
             holes: (o.holes ?? []).map((h: any[]) => h.map(mv)),
             fillColor: o.fillColor, strokeColor: o.strokeColor, fillAlphaPct: o.fillAlphaPct,
             strokeWidthPx: o.strokeWidthPx, labelId: o.labelId, areaLabel: o.areaLabel,
-            patternEnabled: o.patternEnabled, patternId: o.patternId, patternScale: o.patternScale, patternAngleDeg: o.patternAngleDeg, patternSkewDeg: o.patternSkewDeg, patternStretch: o.patternStretch, patternOffsetX: o.patternOffsetX, patternOffsetY: o.patternOffsetY, });
+            patternEnabled: o.patternEnabled, patternId: o.patternId, patternScale: o.patternScale, patternAngleDeg: o.patternAngleDeg, patternSkewDeg: o.patternSkewDeg, patternStretch: o.patternStretch, patternOffsetX: o.patternOffsetX, patternOffsetY: o.patternOffsetY,
+            bulges: o.bulges, holeBulges: o.holeBulges, });
           if (n) created.push({ kind: "hatch", id: n.id });
         } else if (it.kind === "textBox") {
           const n = this.scene.createTextBox(mv(o.center), o.widthM, o.heightM, o.style, o.html, o.rotationRad);

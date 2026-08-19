@@ -543,6 +543,20 @@ export class CadApp {
         this.selectTool.insertHatchEdgePoint((sel as any).hatchId, (sel as any).edgeIndex, (sel as any).holeIndex ?? null);
         return;
       }
+      if (action === PointEditAction.BULGE && sel) {
+        if (sel.type === SelectionType.HATCH && (sel as any).hatchId && (sel as any).edgeIndex != null) {
+          this.selectTool.beginHatchEdgeBulge((sel as any).hatchId, (sel as any).edgeIndex, (sel as any).holeIndex ?? null);
+          return;
+        }
+        if ((sel as any).hatchId && (sel as any).pointIndex != null) {
+          this.selectTool.beginHatchPointBulge((sel as any).hatchId, (sel as any).pointIndex, (sel as any).holeIndex ?? null);
+          return;
+        }
+        if ((sel as any).segmentId) {
+          this.selectTool.beginSegmentBulge((sel as any).segmentId);
+          return;
+        }
+      }
       if (action === PointEditAction.OFFSET && sel && sel.type === SelectionType.HATCH && (sel as any).hatchId && (sel as any).edgeIndex != null) {
         this.selectTool.beginHatchEdgeOffset((sel as any).hatchId, (sel as any).edgeIndex, (sel as any).holeIndex ?? null);
         return;
@@ -577,6 +591,7 @@ export class CadApp {
         id: s.id, a: { x: s.a.x, y: s.a.y }, b: { x: s.b.x, y: s.b.y },
         color: s.color, thicknessM: s.thicknessM, labelId: s.labelId,
         arrowStart: !!s.arrowStart, arrowEnd: !!s.arrowEnd, arrowScale: s.arrowScale || 1,
+        bulge: (s as any).bulge || 0,
         _stickerEditOwnerId: s._stickerEditOwnerId || null,
       })),
 
@@ -586,6 +601,8 @@ export class CadApp {
         fillColor: h.fillColor, strokeColor: h.strokeColor,
         fillAlphaPct: h.fillAlphaPct, strokeWidthPx: h.strokeWidthPx,
         labelId: h.labelId, areaLabel: { ...h.areaLabel },
+        bulges: [...((h as any).bulges || [])],
+        holeBulges: ((h as any).holeBulges || []).map((l: number[]) => [...l]),
         _stickerEditOwnerId: h._stickerEditOwnerId || null,
       })),
       walls: scene.walls.map(w => ({
@@ -746,7 +763,7 @@ export class CadApp {
       };
     }
     for (const s of data.segments || []) {
-      const seg = scene.createSegment(s.a, s.b, { color: s.color, thicknessM: s.thicknessM, labelId: s.labelId, arrowStart: !!s.arrowStart, arrowEnd: !!s.arrowEnd, arrowScale: typeof s.arrowScale === "number" ? s.arrowScale : 1 });
+      const seg = scene.createSegment(s.a, s.b, { color: s.color, thicknessM: s.thicknessM, labelId: s.labelId, arrowStart: !!s.arrowStart, arrowEnd: !!s.arrowEnd, arrowScale: typeof s.arrowScale === "number" ? s.arrowScale : 1, bulge: s.bulge });
       if (s._stickerEditOwnerId) seg._stickerEditOwnerId = s._stickerEditOwnerId;
     }
     for (const h of data.hatches || []) {
@@ -756,6 +773,7 @@ export class CadApp {
         labelId: h.labelId, areaLabel: h.areaLabel,
         holes: h.holes || [],
         patternEnabled: h.patternEnabled, patternId: h.patternId, patternScale: h.patternScale, patternAngleDeg: h.patternAngleDeg, patternSkewDeg: h.patternSkewDeg, patternStretch: h.patternStretch, patternOffsetX: h.patternOffsetX, patternOffsetY: h.patternOffsetY,
+        bulges: h.bulges, holeBulges: h.holeBulges,
       });
       if (h._stickerEditOwnerId) hatch._stickerEditOwnerId = h._stickerEditOwnerId;
     }

@@ -1,5 +1,5 @@
 import { Defaults, SelectionType } from "./constants";
-import { Vec2, v, sub, add, mul, norm, perpLeft, clamp, rgbaFromHex, hexToRgba, polygonAreaAbs, polygonCentroid } from "./geometry";
+import { Vec2, v, sub, add, mul, norm, perpLeft, clamp, rgbaFromHex, hexToRgba, polygonAreaAbs, polygonCentroid, tessellateWithBulges } from "./geometry";
 import { Camera } from "./Camera";
 import { Scene, Hatch, Dimension, TextBox, StickerInstance, DocumentObject, FreeStroke } from "./Scene";
 import { smoothChaikin } from "./freeGeom";
@@ -1247,7 +1247,7 @@ export class Renderer {
     }
   }
 
-  private _drawSingleSegment(seg: { a: Vec2; b: Vec2; color?: string; thicknessM: number; labelId: string; isGuide?: boolean; arrowStart?: boolean; arrowEnd?: boolean; arrowScale?: number }) {
+  private _drawSingleSegment(seg: { a: Vec2; b: Vec2; color?: string; thicknessM: number; labelId: string; isGuide?: boolean; arrowStart?: boolean; arrowEnd?: boolean; arrowScale?: number; bulge?: number }) {
     const ctx = this.ctx;
     const cam = this.camera;
     const a = cam.worldToScreen(seg.a.x, seg.a.y);
@@ -1266,9 +1266,17 @@ export class Renderer {
       const gap = Math.max(3, ctx.lineWidth * 3);
       ctx.setLineDash([dash, gap]);
     }
+    const bulgePts = ((seg as any).bulge)
+      ? tessellateWithBulges([seg.a, seg.b], [(seg as any).bulge], false, 32).map(p => cam.worldToScreen(p.x, p.y))
+      : null;
     ctx.beginPath();
-    ctx.moveTo(a.x, a.y);
-    ctx.lineTo(b.x, b.y);
+    if (bulgePts) {
+      ctx.moveTo(bulgePts[0].x, bulgePts[0].y);
+      for (let i = 1; i < bulgePts.length; i++) ctx.lineTo(bulgePts[i].x, bulgePts[i].y);
+    } else {
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+    }
     ctx.stroke();
     ctx.setLineDash([]);
 
@@ -1649,18 +1657,21 @@ export class Renderer {
     ctx.save();
 
     ctx.beginPath();
-    const p0 = cam.worldToScreen(hatch.points[0].x, hatch.points[0].y);
+    const outerPts = tessellateWithBulges(hatch.points, (hatch as any).bulges, true, 32);
+    const p0 = cam.worldToScreen(outerPts[0].x, outerPts[0].y);
     ctx.moveTo(p0.x, p0.y);
-    for (let i = 1; i < hatch.points.length; i++) {
-      const sp = cam.worldToScreen(hatch.points[i].x, hatch.points[i].y);
+    for (let i = 1; i < outerPts.length; i++) {
+      const sp = cam.worldToScreen(outerPts[i].x, outerPts[i].y);
       ctx.lineTo(sp.x, sp.y);
     }
     ctx.closePath();
 
     // Holes (carved-out inner loops) → evenodd Fill schneidet sie aus
     const holes = hatch.holes || [];
-    for (const loop of holes) {
-      if (!loop || loop.length < 3) continue;
+    for (let hi = 0; hi < holes.length; hi++) {
+      const raw = holes[hi];
+      if (!raw || raw.length < 3) continue;
+      const loop = tessellateWithBulges(raw, (hatch as any).holeBulges?.[hi], true, 32);
       const h0 = cam.worldToScreen(loop[0].x, loop[0].y);
       ctx.moveTo(h0.x, h0.y);
       for (let i = 1; i < loop.length; i++) {

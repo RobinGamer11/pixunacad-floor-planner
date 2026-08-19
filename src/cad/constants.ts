@@ -172,4 +172,7 @@ export const PointEditAction = {
   INSERT_POINT: "insertPoint",
   RESIZE: "resize",
   DUPLICATE: "duplicate",
+  /** Kante wölben (rein-/rauswölben) */
+  BULGE: "bulge",
 } as const;
+
