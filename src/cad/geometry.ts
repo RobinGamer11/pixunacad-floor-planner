@@ -397,31 +397,24 @@ export function splitBulgedEdge(a: Vec2, b: Vec2, bulge: number | null | undefin
     const pr = projectPointToSegment(p, a, b);
     return { point: pr.q, bulgeA: 0, bulgeB: 0, t: pr.t };
   }
-  const dx = (b.x - a.x) / c, dy = (b.y - a.y) / c;
-  const nx = -dy, ny = dx;
-  const h = bulge * c;
-  const R = (c * c / 4 + h * h) / (2 * Math.abs(h));
-  const sgnH = h >= 0 ? 1 : -1;
-  const m = v((a.x + b.x) * 0.5, (a.y + b.y) * 0.5);
-  const center = v(m.x + nx * (h - sgnH * R), m.y + ny * (h - sgnH * R));
-
-  const angOf = (q: Vec2) => Math.atan2(q.y - center.y, q.x - center.x);
-  const angA = angOf(a);
-  const angB = angOf(b);
-  const sweepMag = Math.abs(4 * Math.atan(2 * bulge));
+  const arc = arcFromBulge(a, b, bulge);
+  if (!arc) {
+    const pr = projectPointToSegment(p, a, b);
+    return { point: pr.q, bulgeA: 0, bulgeB: 0, t: pr.t };
+  }
+  const { center, radius: R, angA, sweep } = arc;
+  const sign = sweep >= 0 ? 1 : -1;
+  const sweepMag = Math.abs(sweep);
   const TAU = Math.PI * 2;
-  const dCCW = ((angB - angA) % TAU + TAU) % TAU;
-  const sign = Math.abs(dCCW - sweepMag) <= Math.abs((TAU - dCCW) - sweepMag) ? 1 : -1;
 
   // Punkt auf den Kreis projizieren.
   let vx = p.x - center.x, vy = p.y - center.y;
-  const vl = Math.hypot(vx, vy);
-  if (vl < 1e-9) { vx = a.x - center.x; vy = a.y - center.y; }
+  if (Math.hypot(vx, vy) < 1e-9) { vx = a.x - center.x; vy = a.y - center.y; }
   const angS = Math.atan2(vy, vx);
-  let rel = ((angS - angA) * sign % TAU + TAU) % TAU;
+  const rel = (((angS - angA) * sign) % TAU + TAU) % TAU;
   let t = sweepMag > 1e-9 ? rel / sweepMag : 0;
   t = clamp(t, 0, 1);
-  const angSplit = angA + sign * sweepMag * t;
+  const angSplit = angA + sweep * t;
   const point = v(center.x + Math.cos(angSplit) * R, center.y + Math.sin(angSplit) * R);
 
   const subBulge = (sw: number) => -Math.tan(sw / 4) / 2;
