@@ -107,7 +107,7 @@ function healEnd(
   for (const c of candidates) maxNeighborThickness = Math.max(maxNeighborThickness, c.thicknessM || 0);
   // Krümmungsabhängig: bei gewölbten Wänden laufen die End-Tangenten stärker
   // auseinander, echte Gehrungen liegen dann weiter draußen.
-  const healLimit = (wall.thicknessM + maxNeighborThickness) * 3 * (1 + 2 * endBulgeMag) + HEAL_TOL_M;
+  const healLimit = (wall.thicknessM + maxNeighborThickness) * 2 * (1 + endBulgeMag) + HEAL_TOL_M;
 
   /**
    * Rückfall-Punkt für Help-/Sublinien: Mittelwert der gleichnamigen rohen
@@ -165,8 +165,13 @@ function healEnd(
       // Annahme/Verwerfung treffen, sonst reißt eine Seite ab.
       const ob: number[] = Array.isArray((ow as any).bulges) ? (ow as any).bulges : [];
       const owBulge = Math.abs((isStart ? ob[0] : ob[Math.max(0, ow.corners.length - 2)]) || 0);
-      const pairLimit = (wall.thicknessM + (ow.thicknessM || 0)) * 3
-        * (1 + 2 * Math.max(endBulgeMag, owBulge)) + HEAL_TOL_M;
+      // Enger Grenzwert: bei stark gewölbten Nachbarn liegt der Tangenten-
+      // Schnitt weit außerhalb des Knotens. Solche "Ausreißer" würden den
+      // Wandkörper meterweit in den Raum ziehen (Schraffur-Autofüllung
+      // erkennt den Raum dann als Wand). Statt dessen greift der
+      // nodeMeetPoint-Fallback direkt am Knoten.
+      const pairLimit = (wall.thicknessM + (ow.thicknessM || 0)) * 2
+        * (1 + Math.max(endBulgeMag, owBulge)) + HEAL_TOL_M;
       const a = Math.max(dist(origin, ip), dist(op, ip));
       if (a > pairLimit) continue;
       if (a < bestAbs) { bestAbs = a; best = ip; }
