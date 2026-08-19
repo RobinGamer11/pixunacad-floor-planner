@@ -1107,7 +1107,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
         {/* Raster / Undo / Redo / Pipette */}
         <div className="flex flex-col items-center gap-0.5 p-1.5">
           <button
-            onClick={() => setGridPanelOpen((o) => !o)}
+            onClick={() => { setGridPanelOpen((o) => !o); setRightTab("settings"); }}
             title="Raster-Einstellungen — ein/ausschalten im Panel"
             className={`cad-rail-btn ${gridPanelOpen || gridEnabled ? "active" : ""}`}
           >
