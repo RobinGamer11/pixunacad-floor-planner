@@ -32,8 +32,13 @@ export function computeHealedWallLines(wallInput: Wall, others: Wall[], graph?: 
   const subCorners = lines.subCorners.map(p => v(p.x, p.y));
   const helpCorners = lines.helpCorners.map(p => v(p.x, p.y));
 
-  const capStart = !healEnd(wall, others, mainCorners, subCorners, helpCorners, true, graph);
-  const capEnd = !healEnd(wall, others, mainCorners, subCorners, helpCorners, false, graph);
+  const rawBulges: number[] = Array.isArray((wallInput as any).bulges) ? (wallInput as any).bulges : [];
+  const nRaw = wallInput.corners.length;
+  const startBulge = Math.abs(rawBulges[0] || 0);
+  const endBulge = Math.abs(rawBulges[Math.max(0, nRaw - 2)] || 0);
+
+  const capStart = !healEnd(wall, others, mainCorners, subCorners, helpCorners, true, graph, startBulge);
+  const capEnd = !healEnd(wall, others, mainCorners, subCorners, helpCorners, false, graph, endBulge);
 
   // Cleanup-Pass: gleicher Knoten → gleichnamige Linien zusammenführen.
   if (graph) cleanupAtNodes(wall, mainCorners, subCorners, helpCorners, graph, others);
