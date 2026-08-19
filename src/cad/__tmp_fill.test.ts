@@ -25,12 +25,16 @@ describe("fill vs wall", () => {
       if (!rings[0] || !pointInPolygon(p, rings[0])) return false;
       return !rings.slice(1).some((r:any)=>pointInPolygon(p,r));
     });
-    let holes:any[] = [], over:any[] = [];
-    for (let x=-2; x<=6; x+=0.1) for (let y=-3; y<=4; y+=0.1) {
-      const p = v(+x.toFixed(2), +y.toFixed(2));
-      const inFace = face ? pointInPolygon(p, face) : false;
-      if (inFace && inWall(p)) over.push([p.x,p.y]);
+    // Grid-Flood vom Raumzentrum über Nicht-Wand-Zellen
+    const S=0.05, X0=-3, Y0=-4, NX=Math.round(10/S), NY=Math.round(10/S);
+    const key=(i:number,j:number)=>i*10000+j;
+    const seen=new Set<number>(); const stack=[[Math.round((2-X0)/S), Math.round((2.0-Y0)/S)]];
+    const holes:any[]=[];
+    while(stack.length){ const [i,j]=stack.pop()!; if(i<0||j<0||i>NX||j>NY) continue; const k=key(i,j); if(seen.has(k))continue; seen.add(k);
+      const p=v(X0+i*S, Y0+j*S); if(inWall(p)) continue;
+      if(face && !pointInPolygon(p, face)) { holes.push([+p.x.toFixed(2),+p.y.toFixed(2)]); continue; }
+      stack.push([i+1,j],[i-1,j],[i,j+1],[i,j-1]);
     }
-    console.log("bulge", b, "face?", !!face, "fillInsideWall pts", over.length, over.slice(0,8));
+    console.log("bulge", b, "face?", !!face, "hole cells", holes.length, holes.slice(0,10));
   });
 });
