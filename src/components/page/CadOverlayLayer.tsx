@@ -120,6 +120,7 @@ export default function CadOverlayLayer(props: Props) {
   const peTranslateRef = useRef<HTMLButtonElement>(null);
   const peRotateRef = useRef<HTMLButtonElement>(null);
   const peOffsetRef = useRef<HTMLButtonElement>(null);
+  const peInsertPointRef = useRef<HTMLButtonElement>(null);
   const peResizeRef = useRef<HTMLButtonElement>(null);
   const peDuplicateRef = useRef<HTMLButtonElement>(null);
   const teEditorRef = useRef<HTMLDivElement>(null);
@@ -168,6 +169,7 @@ export default function CadOverlayLayer(props: Props) {
           [PointEditAction.TRANSLATE]: peTranslateRef.current,
           [PointEditAction.ROTATE]: peRotateRef.current,
           [PointEditAction.OFFSET]: peOffsetRef.current,
+          [PointEditAction.INSERT_POINT]: peInsertPointRef.current!,
           [PointEditAction.RESIZE]: peResizeRef.current!,
           [PointEditAction.DUPLICATE]: peDuplicateRef.current!,
         },
@@ -558,7 +560,8 @@ export default function CadOverlayLayer(props: Props) {
           <button ref={peMoveRef} type="button" data-hub-control style={pointEditBtn} title="Bewegen" aria-label="Bewegen">↔</button>
           <button ref={peTranslateRef} type="button" data-hub-control style={pointEditBtn} title="Verschieben" aria-label="Verschieben"><Move size={14} strokeWidth={1.6} className="shrink-0" /></button>
           <button ref={peRotateRef} type="button" data-hub-control style={pointEditBtn} title="Drehen" aria-label="Drehen">⟳</button>
-          <button ref={peOffsetRef} data-hub-control style={pointEditBtn} title="Offset">±</button>
+          <button ref={peOffsetRef} data-hub-control style={pointEditBtn} title="Kante rein-/rausziehen">⇆</button>
+          <button ref={peInsertPointRef} data-hub-control style={pointEditBtn} title="Neuen Fangpunkt auf der Kante setzen">＋</button>
           <button ref={peResizeRef} data-hub-control style={pointEditBtn} title="Box vergrößern/verkleinern">⤡</button>
           <button ref={peDuplicateRef} data-hub-control style={pointEditBtn} title="Duplizieren">⎘</button>
         </div>

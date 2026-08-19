@@ -29,7 +29,7 @@ import { FreeDrawTool } from "../FreeDrawTool";
 import { EraserTool } from "../EraserTool";
 import { HatchTool, type HatchDrawMode } from "../HatchTool";
 import { DocumentTool } from "../DocumentTool";
-import { Defaults, SelectionType } from "../constants";
+import { Defaults, SelectionType, PointEditAction } from "../constants";
 import type { TextBox, TextBoxStyle, FreeLineStyle } from "../Scene";
 import { drawRichTextBox } from "../textRichRenderer";
 import { autoSizeTextBox } from "../textAutoSize";

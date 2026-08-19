@@ -105,6 +105,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const pointRotateBtnRef = useRef<HTMLButtonElement>(null);
   const pointDeleteBtnRef = useRef<HTMLButtonElement>(null);
   const pointOffsetBtnRef = useRef<HTMLButtonElement>(null);
+  const pointInsertPointBtnRef = useRef<HTMLButtonElement>(null);
   const settingsRef = useRef<HTMLDivElement>(null);
   const idSelectRef = useRef<HTMLSelectElement>(null);
   const colorInputRef = useRef<HTMLInputElement>(null);
@@ -570,6 +571,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
         [PointEditAction.ROTATE]: pointRotateBtnRef.current,
         [PointEditAction.DELETE]: pointDeleteBtnRef.current,
         [PointEditAction.OFFSET]: pointOffsetBtnRef.current,
+        [PointEditAction.INSERT_POINT]: pointInsertPointBtnRef.current!,
       },
       settingsRef.current, idSelectRef.current,
       colorInputRef.current, colorPreviewRef.current, thicknessInputRef.current,
@@ -1660,7 +1662,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           <button ref={pointMoveBtnRef} title="Bewegen">◉</button>
           <button ref={pointTranslateBtnRef} title="Verschieben">✥</button>
           <button ref={pointRotateBtnRef} title="Drehen">⟳</button>
-          <button ref={pointOffsetBtnRef} title="Kante versetzen">⇆</button>
+          <button ref={pointOffsetBtnRef} title="Kante rein-/rausziehen">⇆</button>
+          <button ref={pointInsertPointBtnRef} title="Neuen Fangpunkt auf der Kante setzen">＋</button>
           <button ref={pointDeleteBtnRef} title="Löschen">🗑</button>
         </div>
 
