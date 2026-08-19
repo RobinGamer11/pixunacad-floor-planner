@@ -2704,12 +2704,6 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                   </div>
                 )}
 
-                <div className="text-[11px] leading-relaxed pt-2" style={{ color: "hsl(var(--cad-toolbar-muted))", borderTop: "1px solid hsl(var(--border))" }}>
-                  {docFreePlace
-                    ? <div>Freie Platzierung — Maßstab kann nachträglich gesetzt werden.</div>
-                    : <div>Import im Maßstab {docImportScale}.</div>}
-                  <div>Bearbeiten (Skalieren, Drehen, Bild verzerren, Spiegeln): <strong>Auswahl-Werkzeug</strong> (V) → Dokument anklicken.</div>
-                </div>
               </div>
             </div>
           )}
