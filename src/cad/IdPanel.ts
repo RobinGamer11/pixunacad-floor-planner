@@ -170,7 +170,17 @@ export class IdPanel {
       eyeBtn.className = "id-icon-btn icon-only eye-btn";
       if (group.visible === false) eyeBtn.classList.add("slash");
       eyeBtn.title = group.visible === false ? "Einblenden" : "Ausblenden";
-      eyeBtn.textContent = "◉";
+      eyeBtn.innerHTML = group.visible === false
+        ? `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+             <path d="M3 3l18 18"/>
+             <path d="M10.58 10.58a2 2 0 102.83 2.83"/>
+             <path d="M9.88 5.09A10.94 10.94 0 0112 4.91c5.52 0 9.27 4.5 10 5.48a1 1 0 010 1.22 17.47 17.47 0 01-4.09 3.98"/>
+             <path d="M6.61 6.61A17.32 17.32 0 002 11.39a1 1 0 000 1.22c.73.98 4.48 5.48 10 5.48 1.53 0 2.96-.35 4.25-.92"/>
+           </svg>`
+        : `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+             <path d="M2 12s3.75-5.5 10-5.5S22 12 22 12s-3.75 5.5-10 5.5S2 12 2 12z"/>
+             <circle cx="12" cy="12" r="2.5"/>
+           </svg>`;
       eyeBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         this.app.labelManager.toggleVisible(group.id);
