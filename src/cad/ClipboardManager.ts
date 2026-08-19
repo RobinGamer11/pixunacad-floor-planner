@@ -19,7 +19,7 @@ interface HatchSnap {
 }
 interface DimensionSnap {
   kind: "dimension"; p1: Vec2; p2: Vec2; placementPoint: Vec2;
-  mode: "parallel" | "diagonal"; refDir: Vec2 | null;
+  mode: "parallel" | "diagonal" | "arc"; refDir: Vec2 | null;
   textColor: string; textSizePx: number; lineColor: string;
   decimals: number; tickLengthM: number; showExtensions: boolean;
   useFreeText: boolean; freeText: string;

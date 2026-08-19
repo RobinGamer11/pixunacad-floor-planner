@@ -97,28 +97,40 @@ export function DocumentFilterPanel({ app, docId, sig, showBgRemove }: Props) {
   if (!doc) return null;
 
   return (
-    <div className="space-y-3" style={{ borderTop: "1px solid hsl(var(--border))", paddingTop: 10 }}>
-      <div className="text-[11px] font-semibold uppercase tracking-[0.14em]" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
-        Darstellung
-      </div>
-
+    <div className="space-y-3">
       {/* Opacity */}
       <div>
-        <div className="flex items-center justify-between text-xs mb-1">
-          <span>Transparenz</span>
-          <span style={{ color: "hsl(var(--cad-toolbar-muted))" }}>{Math.round(opacity * 100)} %</span>
-        </div>
+        <span className="block mb-1 text-[11px] text-foreground">Transparenz</span>
         <input
           type="range" min={0} max={1} step={0.01} value={opacity}
           onChange={(e) => setOpacity(parseFloat(e.target.value))}
-          className="w-full"
+          className="w-full accent-foreground"
         />
+        <label
+          className="mt-1 flex h-7 items-center overflow-hidden rounded-md border"
+          style={{ borderColor: "hsl(var(--hairline))", background: "#fff" }}
+        >
+          <input
+            type="number" min={0} max={100} step={1}
+            value={Math.round(opacity * 100)}
+            onChange={(e) => {
+              const n = Number(e.target.value);
+              if (!Number.isFinite(n)) return;
+              setOpacity(Math.max(0, Math.min(100, Math.round(n))) / 100);
+            }}
+            className="h-full min-w-0 flex-1 bg-transparent px-2 text-right text-xs tabular-nums outline-none"
+            aria-label="Transparenz in Prozent"
+          />
+          <span className="pr-2 text-[10px] text-muted-foreground">%</span>
+        </label>
       </div>
 
+
       {/* Filter-Liste */}
-      <div>
+      <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
         <div className="flex items-center justify-between text-xs mb-2">
-          <span className="font-medium">Bildbearbeitung</span>
+          <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-foreground">Bildbearbeitung</span>
+
           <button
             type="button"
             className="cad-toolbar-btn h-6 px-2 text-[11px]"

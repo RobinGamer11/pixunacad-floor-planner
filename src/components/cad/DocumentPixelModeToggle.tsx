@@ -45,28 +45,18 @@ export function DocumentPixelModeToggle({ app, docId }: Props) {
     }
   };
 
-  const btn = (active: boolean) =>
-    ({
-      borderColor: active ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
-      background: active ? "hsl(var(--accent-gold-soft))" : "transparent",
-    }) as React.CSSProperties;
-
   return (
-    <div
-      className="rounded-md border p-2 space-y-1.5"
-      style={{ borderColor: "hsl(var(--hairline))" }}
-    >
-      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground flex items-center gap-1.5">
-        Darstellung
+    <div className="mb-1">
+      <div className="text-[11px] mb-1.5 flex items-center gap-1.5">
+        Objektart
         {busy && <Loader2 className="h-3 w-3 animate-spin" />}
       </div>
-      <div className="grid grid-cols-2 gap-1.5">
+      <div className="flex gap-1">
         <button
           type="button"
           disabled={busy}
           onClick={() => setMode(false)}
-          className="h-8 rounded-md text-[11px] border disabled:opacity-50"
-          style={btn(!pixel)}
+          className={`cad-toolbar-btn flex-1 justify-center h-8 text-[11px] disabled:opacity-50 ${!pixel ? "active" : ""}`}
           title="PDF bleibt vektorbasiert — scharf bei jedem Zoom, „Auflösen“ möglich"
         >
           Vektor
@@ -75,17 +65,16 @@ export function DocumentPixelModeToggle({ app, docId }: Props) {
           type="button"
           disabled={busy}
           onClick={() => setMode(true)}
-          className="h-8 rounded-md text-[11px] border disabled:opacity-50"
-          style={btn(pixel)}
+          className={`cad-toolbar-btn flex-1 justify-center h-8 text-[11px] disabled:opacity-50 ${pixel ? "active" : ""}`}
           title="PDF als Bild — Radiergummi inkl. Smooth-Modus wie bei PNG/JPG"
         >
           Pixel
         </button>
       </div>
-      <div className="text-[10px] leading-relaxed text-muted-foreground">
+      <div className="text-[10px] leading-tight mt-1.5 text-muted-foreground">
         {pixel
-          ? "Pixelmodus: radieren wie bei PNG/JPG (auch Smooth). Zurück auf „Vektor“ bleiben alle Radier-Änderungen erhalten."
-          : "Vektormodus: scharf bei jedem Zoom. Für weiches Radieren auf „Pixel“ umschalten."}
+          ? "Pixel: radieren wie bei PNG/JPG (auch Smooth). Zurück auf „Vektor“ bleiben alle Radier-Änderungen erhalten."
+          : "Vektor: scharf bei jedem Zoom. Für weiches Radieren auf „Pixel“ umschalten."}
       </div>
     </div>
   );

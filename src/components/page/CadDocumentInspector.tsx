@@ -154,17 +154,6 @@ export function CadDocumentInspector({ engine }: Props) {
         <span>Skalieren (2 Punkte)</span>
       </button>
 
-      <button
-        type="button"
-        onClick={() => (engine as any).documentTool?.beginScaleFromLastDimension?.(sel.id)}
-        className="w-full h-9 rounded-md border text-xs flex items-center justify-start gap-2 px-2 hover:bg-muted"
-        style={{ borderColor: "hsl(var(--hairline))" }}
-        title="Skaliere mit der zuletzt erstellten Maßkette als Referenz"
-      >
-        <RulerIcon className="h-4 w-4" />
-        <span>Skalieren (Maßkette)</span>
-      </button>
-
       <div className="space-y-1">
         <div className="flex items-center justify-between text-[10px] px-0.5 text-muted-foreground">
           <span>Freie Skalierung</span>
@@ -197,8 +186,10 @@ export function CadDocumentInspector({ engine }: Props) {
 
       <WarpSection engine={engine} docId={sel.id} />
 
+      <FlipSection engine={engine} docId={sel.id} />
 
       <DocumentFilterPanel app={engine as any} docId={sel.id} sig={filterSig} showBgRemove={false} />
+
 
       <div
         className="text-[10px] leading-relaxed pt-1.5 text-muted-foreground"
@@ -283,21 +274,6 @@ export function WarpSection({ engine, docId }: { engine: MiniCad | any; docId: s
         </select>
       </div>
 
-      <div className="flex items-center gap-1.5">
-        <span className="text-[10px] text-muted-foreground w-14">Spiegeln</span>
-        <select
-          value={flipValue}
-          onChange={(e) => setFlip(e.target.value)}
-          className="flex-1 h-8 px-2 rounded bg-transparent border text-[11px]"
-          style={{ borderColor: "hsl(var(--hairline))" }}
-          title="Dokument spiegeln"
-        >
-          <option value="none">Keine</option>
-          <option value="x">Links ↔ Rechts</option>
-          <option value="y">Oben ↔ Unten</option>
-          <option value="both">Beides</option>
-        </select>
-      </div>
 
       {active && (
         <div className="text-[10px] text-muted-foreground leading-relaxed">
@@ -313,6 +289,60 @@ export function WarpSection({ engine, docId }: { engine: MiniCad | any; docId: s
           style={{ borderColor: "hsl(var(--hairline))" }}
         >
           Verzerrung zurücksetzen
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** Spiegeln — eigenständiger Block (identisch in Projektmappe & CAD-Oberfläche). */
+export function FlipSection({ engine, docId }: { engine: MiniCad | any; docId: string }) {
+  const [, force] = useState(0);
+  const app: any = engine as any;
+  const doc: any = app.scene?.getDocumentById?.(docId);
+  const tool: any = app.documentTool;
+  const flipX = !!doc?.flipX;
+  const flipY = !!doc?.flipY;
+
+  const setFlip = (x: boolean, y: boolean) => {
+    tool?.setDocFlip?.(docId, x, y);
+    force((n) => n + 1);
+  };
+
+  return (
+    <div
+      className="rounded-md border p-2 space-y-1.5"
+      style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
+    >
+      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+        Spiegeln
+      </div>
+      <div className="flex gap-1">
+        <button
+          type="button"
+          onClick={() => setFlip(!flipX, flipY)}
+          className={`cad-toolbar-btn flex-1 justify-center h-8 text-[11px] ${flipX ? "active" : ""}`}
+          title="Links ↔ Rechts spiegeln"
+        >
+          Links ↔ Rechts
+        </button>
+        <button
+          type="button"
+          onClick={() => setFlip(flipX, !flipY)}
+          className={`cad-toolbar-btn flex-1 justify-center h-8 text-[11px] ${flipY ? "active" : ""}`}
+          title="Oben ↔ Unten spiegeln"
+        >
+          Oben ↔ Unten
+        </button>
+      </div>
+      {(flipX || flipY) && (
+        <button
+          type="button"
+          onClick={() => setFlip(false, false)}
+          className="w-full h-7 rounded-md text-[11px] border text-muted-foreground hover:text-foreground"
+          style={{ borderColor: "hsl(var(--hairline))" }}
+        >
+          Spiegelung zurücksetzen
         </button>
       )}
     </div>

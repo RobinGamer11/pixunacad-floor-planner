@@ -1,6 +1,6 @@
 import { drawSnapDot } from "./snapDraw";
 import { Defaults, SnapType, SelectionType, PointEditAction } from "./constants";
-import { Vec2, v, sub, add, mul, dot, dist, angleDeg, pointFromLengthAngle, projectPointToSegment, orthoSnapFromA, nearestAngleToReference, pointInPolygon, pointInHatchSolid, polygonCentroid, bulgeFromPoint, tessellateWithBulges, projectPointToInfiniteLine, lineLineIntersectionInfinite, norm, perpLeft, len } from "./geometry";
+import { Vec2, v, sub, add, mul, dot, dist, angleDeg, pointFromLengthAngle, projectPointToSegment, orthoSnapFromA, nearestAngleToReference, pointInPolygon, pointInHatchSolid, polygonCentroid, bulgeFromPoint, tessellateWithBulges, projectPointToInfiniteLine, projectPointToCurvedEdge, lineLineIntersectionInfinite, norm, perpLeft, len } from "./geometry";
 import type { CadApp } from "./CadApp";
 import type { Snap, SnapExclusions } from "./TopologyEngine";
 import type { Input } from "./Input";
@@ -26,6 +26,9 @@ type EditTarget =
   | { kind: "areaLabelHandle"; hatchId: string; handleIndex: number }
   | { kind: "wallPoint"; wallId: string; pointIndex: number }
   | { kind: "wallEdge"; wallId: string; edgeIndex: number }
+  | { kind: "wallEdgeBulge"; wallId: string; edgeIndex: number }
+  | { kind: "segmentSplit"; segmentId: string }
+  | { kind: "wallSplit"; wallId: string; edgeIndex: number }
   | { kind: "wall"; wallId: string }
   | { kind: "segmentBulge"; segmentId: string }
   | { kind: "hatchPointBulge"; hatchId: string; holeIndex: number | null; pointIndex: number }
@@ -639,7 +642,7 @@ export class SelectTool {
       if (!this.app.labelManager.isVisible(wall.labelId)) continue;
       for (let i = 0; i < wall.corners.length - 1; i++) {
         const a = wall.corners[i], b = wall.corners[i + 1];
-        const proj = projectPointToSegment(mouseW, a, b);
+        const proj = projectPointToCurvedEdge(mouseW, a, b, (wall as any).bulges?.[i] || 0);
         const sp = cam.worldToScreen(proj.q.x, proj.q.y);
         const px = Math.hypot(sp.x - mouseS.x, sp.y - mouseS.y);
         if (px <= Defaults.hitPx + 4 && px < bestPx) {
@@ -2250,7 +2253,7 @@ export class SelectTool {
       const pxB = distPxToWorldPoint(selectedSeg.b);
       if (pxB <= Defaults.hitPx) return { type: SelectionType.POINT, segmentId: selectedSeg.id, pointIndex: 1 };
 
-      const projSel = projectPointToSegment(mouseW, selectedSeg.a, selectedSeg.b);
+      const projSel = projectPointToCurvedEdge(mouseW, selectedSeg.a, selectedSeg.b, (selectedSeg as any).bulge || 0);
       const pxSel = distPxToWorldPoint(projSel.q);
       if (pxSel <= Defaults.hitPx) return { type: SelectionType.SEGMENT, segmentId: selectedSeg.id };
     }
@@ -2292,7 +2295,7 @@ export class SelectTool {
     // Segment lines
     for (const seg of visibleSegs) {
       if (selectedSeg && seg.id === selectedSeg.id) continue;
-      const proj = projectPointToSegment(mouseW, seg.a, seg.b);
+      const proj = projectPointToCurvedEdge(mouseW, seg.a, seg.b, (seg as any).bulge || 0);
       const px = distPxToWorldPoint(proj.q);
       if (px <= Defaults.hitPx && px < bestScore) {
         bestScore = px;
@@ -2346,7 +2349,8 @@ export class SelectTool {
       for (let i = 0; i < n; i++) {
         const a = pts[i];
         const b = pts[(i + 1) % n];
-        const proj = projectPointToSegment(mouseW, a, b);
+        const bArr = holeIndex == null ? hatch.bulges : (hatch.holeBulges || [])[holeIndex];
+        const proj = projectPointToCurvedEdge(mouseW, a, b, (Array.isArray(bArr) ? bArr[i] : 0) || 0);
         if (proj.t <= Defaults.splitEpsT || proj.t >= 1 - Defaults.splitEpsT) continue;
         const px = distPxToWorldPoint(proj.q);
         if (px <= Defaults.hitPx && px < bestPx) {
