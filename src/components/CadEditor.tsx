@@ -20,6 +20,8 @@ import { HatchPatternBlock } from "@/components/cad/HatchPatternBlock";
 import { HatchSettingsPanel, HatchModeSelect } from "@/components/cad/HatchSettingsPanel";
 
 import { ToolHelpNotes } from "@/components/cad/ToolHelpNotes";
+import { CadEbeneSelect, CadThicknessMmInput } from "@/components/cad/CadFieldProxies";
+
 import { MappeHelpOverlay } from "@/components/workspace/MappeHelpOverlay";
 import { RasterModeToggle } from "@/components/cad/RasterModeToggle";
 
@@ -1927,11 +1929,14 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             </div>
           )}
 
-          {/* Modus-Auswahl: Linie / Freihand — Design analog Schraffurwerkzeug.
-              Für den Radiergummi bleibt der klassische Varianten-Umschalter. */}
+          {/* Reihenfolge identisch zur Projektmappe: Ebene → Modus → Objektart → Rahmen */}
           {(activeTool === ToolIds.LINE || activeTool === ToolIds.FREE) && (
             <div className="cad-settings-panel mb-2">
+              <div className="mb-3">
+                <CadEbeneSelect target={idSelectRef} />
+              </div>
               <div className="text-[10px] font-semibold tracking-wider mb-1.5" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+
                 MODUS
               </div>
               <div className="grid grid-cols-2 gap-1">
@@ -1952,19 +1957,23 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                   );
                 })}
               </div>
+              <div className="mt-3">
+                <RasterModeToggle app={appRef.current} projectId={projectId} />
+              </div>
             </div>
           )}
           {/* Line Settings — Design analog zum Linien-Werkzeug in der Mappe:
-              Ebene und Objektart stehen über dem Fensterrahmen, alle
+              Ebene, Modus und Objektart stehen über dem Fensterrahmen, alle
               Zeichen-Eigenschaften liegen im gerahmten Block. */}
           <div ref={settingsRef} className={`cad-settings-panel hidden mb-2`}>
-            <div className="space-y-3">
-              <div>
-                <label>Ebene</label>
-                <select ref={idSelectRef} className="cad-settings-select w-full" />
-              </div>
-              <RasterModeToggle app={appRef.current} projectId={projectId} />
+            <div className="hidden">
+              <select ref={idSelectRef} className="cad-settings-select w-full" />
             </div>
+            {activeTool !== ToolIds.LINE && activeTool !== ToolIds.FREE && (
+              <div className="mb-3">
+                <CadEbeneSelect target={idSelectRef} />
+              </div>
+            )}
 
             <div className="mt-3 rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
               <div className="text-[10px] font-semibold tracking-wider mb-2" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
@@ -1979,9 +1988,19 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                   </div>
                 </div>
                 <div>
-                  <label>Strichstärke (cm)</label>
-                  <input ref={thicknessInputRef} type="text" defaultValue="1" />
+                  <div className="mb-1.5 text-[10px]" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Strichstärke</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <div className="text-[9px] mb-0.5" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Zentimeter (cm)</div>
+                      <input ref={thicknessInputRef} type="text" defaultValue="1" />
+                    </div>
+                    <div>
+                      <div className="text-[9px] mb-0.5" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Millimeter (mm)</div>
+                      <CadThicknessMmInput target={thicknessInputRef} />
+                    </div>
+                  </div>
                 </div>
+
                 <div>
                   <label>Transparenz</label>
                   <input
@@ -2044,8 +2063,12 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
                 Schraffur
               </div>
+              <div className="mb-3">
+                <CadEbeneSelect target={hatchIdSelectRef} />
+              </div>
               <HatchModeSelect app={appRef.current} />
               <RasterModeToggle app={appRef.current} projectId={projectId} />
+
               <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
                 <HatchSettingsPanel app={appRef.current} projectId={projectId} patternScaleMax={60} hideChrome />
               </div>
@@ -2094,10 +2117,11 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             </div>
 
             <div className="space-y-3">
-              <div>
-                <label>Ebene</label>
+              <div className="hidden">
                 <select ref={hatchIdSelectRef} className="cad-settings-select w-full" />
               </div>
+              {activeTool !== ToolIds.HATCH && <CadEbeneSelect target={hatchIdSelectRef} />}
+
               <div className="hidden">
                 <div>
                   <label>Flächenfarbe</label>
@@ -2344,12 +2368,11 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
               Text
             </div>
-            <RasterModeToggle app={appRef.current} projectId={projectId} />
-            <div className="space-y-3">
-              <div>
-                <label>Ebene</label>
+            <div className="space-y-3 mb-3">
+              <div className="hidden">
                 <select ref={textIdSelectRef} className="cad-settings-select w-full" />
               </div>
+              <CadEbeneSelect target={textIdSelectRef} />
               <div>
                 <div className="text-[10px] font-semibold tracking-wider mb-1.5" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>MODUS</div>
                 <div className="grid grid-cols-2 gap-1">
@@ -2361,6 +2384,12 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                   </button>
                 </div>
               </div>
+              <RasterModeToggle app={appRef.current} projectId={projectId} />
+            </div>
+            <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
+            <div className="text-[10px] font-semibold tracking-wider mb-2" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>TEXT</div>
+            <div className="space-y-3">
+
               <div>
                 <label>Ausrichtung</label>
                 <div className="flex gap-1">
@@ -2444,7 +2473,9 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 </div>
               </div>
             </div>
+            </div>
           </div>
+
 
           {/* Stempel-Werkzeug */}
           {activeTool === ToolIds.STICKER && (
@@ -2671,7 +2702,13 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           {(activeTool === ToolIds.FREE || (activeTool === ToolIds.SELECT && selectedFreeStrokeId)) && (
             <div className="cad-settings-panel mb-2">
               <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Freihand</div>
-              <RasterModeToggle app={appRef.current} projectId={projectId} />
+              {activeTool !== ToolIds.FREE && (
+                <div className="space-y-3 mb-3">
+                  <CadEbeneSelect target={idSelectRef} />
+                  <RasterModeToggle app={appRef.current} projectId={projectId} />
+                </div>
+              )}
+
               <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
                 <FreeDrawSettingsPanel app={appRef.current} units="m" projectId={projectId} framedCad />
               </div>
@@ -3244,7 +3281,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 <div><span className="cad-kbd">Text beenden</span> Außerhalb Textfeld klicken</div>
               </div>
             </div>
-          ) : (activeTool !== ToolIds.ERASER && activeTool !== ToolIds.PIPETTE && activeTool !== ToolIds.SELECT) ? (
+          ) : (activeTool !== ToolIds.ERASER && activeTool !== ToolIds.PIPETTE && activeTool !== ToolIds.SELECT && activeTool !== ToolIds.STICKER) ? (
             <ToolHelpNotes toolId={activeTool} />
           ) : null}
         </div>
