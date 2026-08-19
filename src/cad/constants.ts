@@ -1,6 +1,9 @@
 export const Defaults = {
   hitPx: 10,
   snapPx: 12,
+  /** Deutlich engerer Fangradius für Wandkanten – verhindert ungewollte
+   *  Verbindungen, wenn Wände dicht nebeneinander gezeichnet werden. */
+  wallSnapPx: 6,
   minSegLenM: 1e-4,
   splitEpsT: 1e-4,
   lineThicknessM: 0.01,

@@ -658,6 +658,29 @@ export class WallTool {
     ctx.restore();
   }
 
+  /**
+   * Beschriftung am Snap-Cursor: Hängt der Fangpunkt an einer bestehenden Wand,
+   * wird die tatsächlich getroffene Kante dieser Wand benannt (Außen/Innen/Mitte).
+   * Sonst gilt die eigene Bezugsseite der neu gezeichneten Wand.
+   */
+  private _snapSideLabel(): string {
+    const snap: any = this.snap;
+    const hostId = snap?.wallId as string | undefined;
+    const line = snap?.wallLine as ("main" | "sub" | "help" | undefined);
+    if (hostId && line) {
+      const host = this.app.scene.getWallById(hostId);
+      if (host) {
+        if (line === "help") return "Mitte";
+        if (host.referenceSide === "center") return line === "main" ? "Mitte" : "Kante";
+        const mainIsOuter = host.referenceSide === "outer";
+        const isOuter = line === "main" ? mainIsOuter : !mainIsOuter;
+        return isOuter ? "Außen" : "Innen";
+      }
+    }
+    return this.settings.referenceSide === "outer"
+      ? "Außen" : this.settings.referenceSide === "inner" ? "Innen" : "Mitte";
+  }
+
   private _drawOverlay(ctx: CanvasRenderingContext2D, cam: any) {
     this._drawGuideDefinitions(ctx, cam);
 
@@ -679,8 +702,7 @@ export class WallTool {
       }
       const s = cam.worldToScreen(this.snap.world.x, this.snap.world.y);
       drawSnapDot(ctx, s.x, s.y, { ring: true });
-      const sideLabel = this.settings.referenceSide === "outer"
-        ? "Außen" : this.settings.referenceSide === "inner" ? "Innen" : "Mitte";
+      const sideLabel = this._snapSideLabel();
       ctx.save();
       ctx.font = "11px sans-serif";
       ctx.fillStyle = "rgba(20,20,20,0.85)";

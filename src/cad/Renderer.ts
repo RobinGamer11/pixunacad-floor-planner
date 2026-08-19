@@ -1505,15 +1505,30 @@ export class Renderer {
       // Bezugslinie + Mittellinie als Helper (nur Wand-Tool aktiv ODER selektiert)
       if (this.showWallHelpers || isSelected) {
         const lines = computeHealedWallLines(wall, this.scene.walls, this.scene.getWallTopology());
-        // Bezugslinie (= wall.corners) durchgezogen, dünn
+        // Bezugslinie (= wall.corners inkl. Wölbung). Bei Selektion deutlich
+        // kräftiger, damit sofort erkennbar ist, wo die Bezugslinie liegt.
+        const refPts = tessellateWithBulges(wall.corners, (wall as any).bulges, false, 24);
         ctx.save();
-        ctx.strokeStyle = "rgba(80,80,80,0.85)";
-        ctx.lineWidth = 1;
+        if (isSelected) {
+          ctx.strokeStyle = "rgba(255,255,255,0.9)";
+          ctx.lineWidth = 5;
+          ctx.lineCap = "round";
+          ctx.beginPath();
+          const w0 = cam.worldToScreen(refPts[0].x, refPts[0].y);
+          ctx.moveTo(w0.x, w0.y);
+          for (let i = 1; i < refPts.length; i++) {
+            const p = cam.worldToScreen(refPts[i].x, refPts[i].y);
+            ctx.lineTo(p.x, p.y);
+          }
+          ctx.stroke();
+        }
+        ctx.strokeStyle = isSelected ? "rgba(255,138,0,0.98)" : "rgba(80,80,80,0.85)";
+        ctx.lineWidth = isSelected ? 2.6 : 1;
         ctx.beginPath();
-        const r0 = cam.worldToScreen(wall.corners[0].x, wall.corners[0].y);
+        const r0 = cam.worldToScreen(refPts[0].x, refPts[0].y);
         ctx.moveTo(r0.x, r0.y);
-        for (let i = 1; i < wall.corners.length; i++) {
-          const p = cam.worldToScreen(wall.corners[i].x, wall.corners[i].y);
+        for (let i = 1; i < refPts.length; i++) {
+          const p = cam.worldToScreen(refPts[i].x, refPts[i].y);
           ctx.lineTo(p.x, p.y);
         }
         ctx.stroke();
