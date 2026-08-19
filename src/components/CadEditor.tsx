@@ -141,8 +141,10 @@ interface CadEditorProps {
   onCanDeleteChange?: (canDelete: boolean) => void;
   /** Präsentations-Modus: blendet linke Werkzeug- und rechte Einstellungsleiste aus. */
   presenting?: boolean;
+  /** Hilfe-Modus (Kopfzeilen-Button) — steuert Hilfe-Overlay + Ebenen-Hinweis. */
+  helpOn?: boolean;
 }
-const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId, onHistoryChange, onZoomChange, onCanDeleteChange, presenting }, ref) => {
+const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId, onHistoryChange, onZoomChange, onCanDeleteChange, presenting, helpOn = true }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const hubRef = useRef<HTMLDivElement>(null);
@@ -733,6 +735,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
 
     app.onToolChange = (id) => {
       setActiveTool(id);
+      // Auswahl-Werkzeug → Seiteneinstellungen automatisch öffnen.
+      if (id === ToolIds.SELECT) setRightTab("sheets");
       if (id === ToolIds.LINE || id === ToolIds.FREE || id === ToolIds.ERASER) {
         setLineVariant(id);
       }
@@ -1012,6 +1016,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     const targetId = id === ToolIds.LINE ? lineVariant : id;
     appRef.current?.setTool(targetId);
     setActiveTool(targetId);
+    if (targetId === ToolIds.SELECT) setRightTab("sheets");
     setGridPanelOpen(false);
     // Flyout: erneuter Klick auf dasselbe Symbol schließt die Variantenauswahl wieder.
     setExpandedTool(prev => (TOOL_VARIANTS[id] ? (prev === id ? null : id) : null));
@@ -1852,7 +1857,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
         <canvas ref={canvasRef} className="block w-full h-full" />
 
         {/* Hilfeanzeige wie in der Mappe — werkzeugabhängig. */}
-        {!presenting && (
+        {!presenting && helpOn && (
           <MappeHelpOverlay
             guideActive={false}
             lineActive={activeTool === ToolIds.LINE || activeTool === ToolIds.FREE}
@@ -3268,6 +3273,14 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           </div>
         </DragScrollDiv>
         <DragScrollDiv axis="both" className="flex-1 min-h-0 overflow-auto p-2 space-y-2 cursor-grab active:cursor-grabbing" style={{ display: rightTab === "layers" ? "block" : "none" }}>
+          {helpOn && (
+            <div
+              className="rounded-lg px-3 py-2 text-[11px] font-medium"
+              style={{ background: "hsl(220 18% 16%)", color: "hsl(0 0% 100% / 0.92)" }}
+            >
+              Höchste Ebene = Im Vordergrund
+            </div>
+          )}
           <div ref={idPanelRef} className="cad-id-panel w-full">
             <div className="id-head">
               <div className="id-title">Bezeichnungs-ID</div>

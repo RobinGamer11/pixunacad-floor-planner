@@ -606,7 +606,8 @@ export default function ProjectWorkspace() {
     if (t !== "hatch") setHatchToolFlyoutOpen(false);
     if (t !== null) setSelectToolFlyoutOpen(false);
     if (t) setSelectedCadTool(undefined);
-    if (t) setRightTabState("tools");
+    // Auswahl-Werkzeug (t === null) → Seiteneinstellungen automatisch öffnen.
+    setRightTabState(t ? "tools" : "settings");
   };
 
   // Werkzeug-Modi links schließen sich automatisch, sobald das jeweilige
@@ -1725,7 +1726,9 @@ export default function ProjectWorkspace() {
           {/* Canvas */}
           <main
             className="flex-1 relative flex flex-col min-w-0"
-            style={{ background: "hsl(var(--surface))" }}
+            // Optik wie in der CAD-Oberfläche beim Plandruck: mittelgrauer
+            // Hintergrund, das weiße Blatt hebt sich per Schatten ab.
+            style={{ background: presenting ? "hsl(var(--surface))" : "hsl(220 9% 46%)" }}
           >
             <div
               ref={canvasViewportRef}
@@ -2056,6 +2059,7 @@ export default function ProjectWorkspace() {
 
               onJumpCad={(sheetId) => navigate(`/project/${project.id}/cad${sheetId ? `/${sheetId}` : ""}`)}
               onCollapse={() => setRightOpen(false)}
+              helpOn={mappeHelpOn}
             />
             )
 
@@ -4965,6 +4969,7 @@ function RightInspector({
   onJumpCad,
   onCollapse,
   cadEngine,
+  helpOn,
 }: {
   projectId: string;
   page?: import("@/lib/projectStore").ProjectPage;
@@ -5003,6 +5008,8 @@ function RightInspector({
   onJumpCad: (sheetId?: string) => void;
   onCollapse?: () => void;
   cadEngine?: import("@/cad/embed/MiniCad").MiniCad | null;
+  /** Hilfe-Modus aktiv → Hinweis über der Ebenenliste einblenden. */
+  helpOn?: boolean;
 }) {
 
   const layerCount = page?.elements.length ?? 0;
@@ -5075,6 +5082,14 @@ function RightInspector({
           )}
           {tab === "layers" && page && (
             <div className="space-y-4">
+              {helpOn && (
+                <div
+                  className="rounded-lg px-3 py-2 text-[11px] font-medium"
+                  style={{ background: "hsl(220 18% 16%)", color: "hsl(0 0% 100% / 0.92)" }}
+                >
+                  Höchste Ebene = Im Vordergrund
+                </div>
+              )}
               {/* Ein einziges Ebenen-/Bezeichnungs-ID-System — identisch zur
                  CAD-Oberfläche. CAD-Blätter, Dokumente, Notizen, Tabellen
                  usw. werden über den `externalLabelCounter`-Hook direkt in

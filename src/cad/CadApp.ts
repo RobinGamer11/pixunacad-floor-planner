@@ -3166,6 +3166,8 @@ export class CadApp {
       if (plan) {
         const size = getPlanPaperSize(plan);
         this.renderer.planMode = { widthMm: size.width, heightMm: size.height };
+        // Blattrand des Plans als Snap-Geometrie bereitstellen.
+        this.topology.planFrame = { widthM: size.width / 1000, heightM: size.height / 1000 };
         // Annotation-Scene des Plans als aktive Scene swappen, damit Werkzeuge
         // direkt auf dem Plan zeichnen können.
         const planScene = this._ensurePlanScene(this.activePlanId);
@@ -3223,6 +3225,7 @@ export class CadApp {
       }
     } else {
       this.renderer.planMode = null;
+      this.topology.planFrame = null;
       this.renderer.planTracingLayers = [];
       // Referenz-Skalierung zurück auf Sheet-Default.
       this.renderer.referencePxPerM = Defaults.strokeWidthBaseScale;
