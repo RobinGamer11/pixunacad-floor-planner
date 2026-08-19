@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import type { CadApp } from "@/cad/CadApp";
 import type { MiniCad } from "@/cad/embed/MiniCad";
 import { RasterModeToggle } from "@/components/cad/RasterModeToggle";
+import { ToolColorPicker } from "@/components/workspace/ToolColorPicker";
 
 type LineStyle = "solid" | "dashed" | "dotted" | "dashdot" | "blob" | "image" | "pencil" | "marker" | "brush" | "spray" | "calligraphy" | "ink" | "crayon" | "chalk";
 
