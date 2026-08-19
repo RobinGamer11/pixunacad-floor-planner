@@ -321,6 +321,7 @@ const CadPage = () => {
           onZoomChange={setZoom}
           onCanDeleteChange={setCanDelete}
           presenting={presenting}
+          helpOn={mappeHelpOn}
         />
         {presenting && (
           <button
