@@ -982,6 +982,33 @@ export class SelectTool {
 
 
   /** Begin Hatch-Edge-Offset (parallel shift along edge normal). */
+  /** Zuletzt angeklickter Punkt auf einer Schraffur-Kante (Welt-Koordinaten). */
+  private _lastHatchEdgeClickW: Vec2 | null = null;
+
+  /** Fügt an der angeklickten Stelle der Kante einen neuen Fangpunkt ein. */
+  insertHatchEdgePoint(hatchId: string, edgeIndex: number, holeIndex: number | null = null) {
+    const hatch = this.app.scene.getHatchById(hatchId);
+    if (!hatch) return;
+    const loop: Vec2[] = holeIndex == null ? hatch.points : (hatch.holes?.[holeIndex] || []);
+    const n = loop.length;
+    if (n < 2) return;
+    const A = loop[edgeIndex];
+    const B = loop[(edgeIndex + 1) % n];
+    const click = this._lastHatchEdgeClickW || v((A.x + B.x) * 0.5, (A.y + B.y) * 0.5);
+    // Auf die Kante projizieren, damit die Kontur nicht verspringt.
+    const dx = B.x - A.x, dy = B.y - A.y;
+    const len2 = dx * dx + dy * dy || 1;
+    let t = ((click.x - A.x) * dx + (click.y - A.y) * dy) / len2;
+    t = Math.max(0.02, Math.min(0.98, t));
+    const np = v(A.x + dx * t, A.y + dy * t);
+    loop.splice(edgeIndex + 1, 0, np);
+    this.app.pointEditMenu.hide();
+    this.app.setSelection({
+      type: SelectionType.POINT, hatchId, pointIndex: edgeIndex + 1, holeIndex,
+    } as any);
+    (this.app as any).commitHistorySnapshot?.();
+  }
+
   beginHatchEdgeOffset(hatchId: string, edgeIndex: number, holeIndex: number | null = null) {
     const hatch = this.app.scene.getHatchById(hatchId);
     if (!hatch) return;
@@ -3370,7 +3397,8 @@ export class SelectTool {
           const b = loop[(edgeHit.edgeIndex + 1) % loop.length];
           const midW = { x: (a.x + b.x) * 0.5, y: (a.y + b.y) * 0.5 };
           const sp = this.app.camera.worldToScreen(midW.x, midW.y);
-          this.app.pointEditMenu.showAt(sp.x, sp.y, [PointEditAction.OFFSET]);
+          this._lastHatchEdgeClickW = v(input.mouse.wx, input.mouse.wy);
+          this.app.pointEditMenu.showAt(sp.x, sp.y, [PointEditAction.OFFSET, PointEditAction.INSERT_POINT]);
           return;
         }
       }

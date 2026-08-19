@@ -519,6 +519,10 @@ export class CadApp {
         this.selectTool.beginAreaLabelHandleEdit((sel as any).hatchId, (sel as any).handleIndex, action);
         return;
       }
+      if (action === PointEditAction.INSERT_POINT && sel && sel.type === SelectionType.HATCH && (sel as any).hatchId && (sel as any).edgeIndex != null) {
+        this.selectTool.insertHatchEdgePoint((sel as any).hatchId, (sel as any).edgeIndex, (sel as any).holeIndex ?? null);
+        return;
+      }
       if (action === PointEditAction.OFFSET && sel && sel.type === SelectionType.HATCH && (sel as any).hatchId && (sel as any).edgeIndex != null) {
         this.selectTool.beginHatchEdgeOffset((sel as any).hatchId, (sel as any).edgeIndex, (sel as any).holeIndex ?? null);
         return;

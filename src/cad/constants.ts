@@ -163,6 +163,7 @@ export const PointEditAction = {
   ROTATE: "rotate",
   DELETE: "delete",
   OFFSET: "offset",
+  INSERT_POINT: "insertPoint",
   RESIZE: "resize",
   DUPLICATE: "duplicate",
 } as const;
