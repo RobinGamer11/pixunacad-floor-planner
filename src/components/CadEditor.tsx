@@ -1967,7 +1967,11 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             <div className="hidden">
               <select ref={idSelectRef} className="cad-settings-select w-full" />
             </div>
-
+            {activeTool !== ToolIds.LINE && activeTool !== ToolIds.FREE && (
+              <div className="mb-3">
+                <CadEbeneSelect target={idSelectRef} />
+              </div>
+            )}
 
             <div className="mt-3 rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
               <div className="text-[10px] font-semibold tracking-wider mb-2" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
@@ -1982,9 +1986,19 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                   </div>
                 </div>
                 <div>
-                  <label>Strichstärke (cm)</label>
-                  <input ref={thicknessInputRef} type="text" defaultValue="1" />
+                  <div className="mb-1.5 text-[10px]" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Strichstärke</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <div className="text-[9px] mb-0.5" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Zentimeter (cm)</div>
+                      <input ref={thicknessInputRef} type="text" defaultValue="1" />
+                    </div>
+                    <div>
+                      <div className="text-[9px] mb-0.5" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Millimeter (mm)</div>
+                      <CadThicknessMmInput target={thicknessInputRef} />
+                    </div>
+                  </div>
                 </div>
+
                 <div>
                   <label>Transparenz</label>
                   <input
