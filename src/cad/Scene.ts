@@ -178,8 +178,10 @@ export class Dimension {
   p1: Vec2;
   p2: Vec2;
   placementPoint: Vec2;
-  mode: "parallel" | "diagonal";
+  mode: "parallel" | "diagonal" | "arc";
   refDir: Vec2 | null;
+  /** Wölbung der gemessenen Kante (nur Modus "arc"). */
+  bulge: number;
 
   textColor: string;
   textSizePx: number;
@@ -221,7 +223,7 @@ export class Dimension {
 
   constructor({ id, p1, p2, placementPoint, mode, refDir, style, labelId, doorRefId }: {
     id: string; p1: Vec2; p2: Vec2; placementPoint: Vec2;
-    mode?: "parallel" | "diagonal"; refDir?: Vec2 | null; style?: DimensionStyle; labelId?: string;
+    mode?: "parallel" | "diagonal" | "arc"; refDir?: Vec2 | null; style?: DimensionStyle; labelId?: string;
     doorRefId?: string | null;
   }) {
     this.id = id;
@@ -232,6 +234,7 @@ export class Dimension {
     this.refDir = refDir ? v(refDir.x, refDir.y) : null;
 
     const s = style || {};
+    this.bulge = (typeof (s as any).bulge === "number") ? (s as any).bulge : 0;
     this.textColor = s.textColor || Defaults.measureTextColor;
     this.textSizePx = (typeof s.textSizePx === "number" && s.textSizePx > 0) ? s.textSizePx : Defaults.measureTextSizePx;
     this.lineColor = s.lineColor || Defaults.measureLineColor;
@@ -983,7 +986,7 @@ export class Scene {
   }
 
   // ---- Dimensions ----
-  createDimension(p1: Vec2, p2: Vec2, placementPoint: Vec2, mode: "parallel" | "diagonal", refDir: Vec2 | null, style: DimensionStyle = {}, doorRefId: string | null = null) {
+  createDimension(p1: Vec2, p2: Vec2, placementPoint: Vec2, mode: "parallel" | "diagonal" | "arc", refDir: Vec2 | null, style: DimensionStyle = {}, doorRefId: string | null = null) {
     const dim = new Dimension({ id: this._makeId(), p1, p2, placementPoint, mode, refDir, style, labelId: style.labelId, doorRefId });
     dim._stickerEditOwnerId = this._currentEditOwnerId;
     this.dimensions.push(dim);

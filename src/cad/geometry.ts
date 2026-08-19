@@ -288,3 +288,31 @@ export function bulgeFromPoint(a: Vec2, b: Vec2, p: Vec2): number {
   const h = (p.x - mid.x) * nx + (p.y - mid.y) * ny;
   return clamp(h / chord, -4, 4);
 }
+
+/** Punkte einer gewölbten Kante inkl. Start- und Endpunkt. */
+export function bulgedCurvePoints(a: Vec2, b: Vec2, bulge: number, segments = 48): Vec2[] {
+  if (!bulge) return [v(a.x, a.y), v(b.x, b.y)];
+  return [v(a.x, a.y), ...bulgedEdgePoints(a, b, bulge, segments), v(b.x, b.y)];
+}
+
+/** Länge eines Polygonzugs. */
+export function polylineLength(pts: Vec2[]): number {
+  let L = 0;
+  for (let i = 0; i < pts.length - 1; i++) L += dist(pts[i], pts[i + 1]);
+  return L;
+}
+
+/** Versetzt einen Polygonzug entlang seiner lokalen Normalen (links positiv). */
+export function offsetPolyline(pts: Vec2[], offset: number): Vec2[] {
+  if (pts.length < 2 || !offset) return pts.map(p => v(p.x, p.y));
+  const out: Vec2[] = [];
+  for (let i = 0; i < pts.length; i++) {
+    const prev = pts[Math.max(0, i - 1)];
+    const next = pts[Math.min(pts.length - 1, i + 1)];
+    const t = sub(next, prev);
+    const L = Math.hypot(t.x, t.y) || 1;
+    const nx = -t.y / L, ny = t.x / L;
+    out.push(v(pts[i].x + nx * offset, pts[i].y + ny * offset));
+  }
+  return out;
+}

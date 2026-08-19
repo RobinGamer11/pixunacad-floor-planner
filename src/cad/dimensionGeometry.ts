@@ -1,7 +1,7 @@
 import { Defaults } from "./constants";
 import {
   Vec2, v, add, sub, mul, norm, dot, len, perpLeft,
-  projectPointToInfiniteLine
+  projectPointToInfiniteLine, bulgedCurvePoints, polylineLength, offsetPolyline
 } from "./geometry";
 import type { Dimension } from "./Scene";
 
@@ -18,14 +18,18 @@ export interface DimensionGeometry {
   ext2b: Vec2;
   text: string;
   measureValue: number;
+  /** Gewölbte Maßlinie (nur im Modus "arc"). */
+  arcPts?: Vec2[];
 }
 
 export interface DimensionLike {
   p1: Vec2;
   p2: Vec2;
   placementPoint: Vec2;
-  mode: "parallel" | "diagonal";
+  mode: "parallel" | "diagonal" | "arc";
   refDir: Vec2 | null;
+  /** Wölbung der gemessenen Kante (Modus "arc"). */
+  bulge?: number;
   decimals?: number;
   useFreeText?: boolean;
   freeText?: string;
@@ -35,7 +39,7 @@ export interface DimensionLike {
 }
 
 export function getDimensionBaseDirection(dim: DimensionLike): Vec2 {
-  if (dim.mode === "parallel") {
+  if (dim.mode === "parallel" || dim.mode === "arc") {
     if (dim.refDir && len(dim.refDir) > 1e-9) return norm(dim.refDir);
     const fallback = sub(dim.p2, dim.p1);
     return len(fallback) > 1e-9 ? norm(fallback) : v(1, 0);
@@ -56,6 +60,28 @@ export function getDimensionDisplayText(dim: DimensionLike, distanceValue: numbe
 }
 
 export function getDimensionGeometry(dim: DimensionLike): DimensionGeometry {
+  if (dim.mode === "arc") {
+    const chordDir = (() => {
+      const d = sub(dim.p2, dim.p1);
+      return len(d) > 1e-9 ? norm(d) : v(1, 0);
+    })();
+    const nA = perpLeft(chordDir);
+    const curve = bulgedCurvePoints(dim.p1, dim.p2, dim.bulge || 0, 48);
+    const off = dot(sub(dim.placementPoint, dim.p1), nA);
+    const arcPts = offsetPolyline(curve, off);
+    const d1 = arcPts[0];
+    const d2 = arcPts[arcPts.length - 1];
+    const mid = arcPts[Math.floor(arcPts.length / 2)];
+    const measureValue = polylineLength(curve);
+    return {
+      dir: chordDir, n: nA, offset: off, d1, d2, mid,
+      ext1a: v(dim.p1.x, dim.p1.y), ext1b: v(d1.x, d1.y),
+      ext2a: v(dim.p2.x, dim.p2.y), ext2b: v(d2.x, d2.y),
+      text: getDimensionDisplayText(dim, measureValue),
+      measureValue,
+      arcPts,
+    };
+  }
   const dir = getDimensionBaseDirection(dim);
   const n = perpLeft(dir);
 
