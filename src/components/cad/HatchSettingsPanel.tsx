@@ -53,6 +53,8 @@ interface Props {
   patternScaleMax?: number;
   /** true = Modus & Objektart werden außerhalb (über dem Rahmen) gerendert. */
   hideChrome?: boolean;
+  /** Zusatzfeld direkt unter der Strichstärke (CAD: Flächenanzeige). */
+  afterStroke?: React.ReactNode;
 }
 
 /** Modus-Auswahl — kann außerhalb des Einstellungsrahmens platziert werden. */
@@ -90,7 +92,7 @@ export const HatchModeSelect: React.FC<{ app: CadApp | MiniCad | null }> = ({ ap
   );
 };
 
-export const HatchSettingsPanel: React.FC<Props> = ({ app, projectId, pxPerMm = 96 / 25.4, patternScaleMax = 20, hideChrome = false }) => {
+export const HatchSettingsPanel: React.FC<Props> = ({ app, projectId, pxPerMm = 96 / 25.4, patternScaleMax = 20, hideChrome = false, afterStroke }) => {
   const [mode, setMode] = useState<HatchDrawMode>("polygon");
   const [fillColor, setFillColor] = useState("#4da3ff");
   const [strokeColor, setStrokeColor] = useState("#111111");
@@ -184,6 +186,8 @@ export const HatchSettingsPanel: React.FC<Props> = ({ app, projectId, pxPerMm = 
           <MeasureInput label="Tatsächliche Größe (mm)" value={strokeMm} digits={3} onChange={(v) => setStroke(v * pxPerMm)} />
         </div>
       </div>
+
+      {afterStroke}
 
       {/* Transparenz */}
       <div>

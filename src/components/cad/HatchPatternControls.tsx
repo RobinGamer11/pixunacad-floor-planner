@@ -10,7 +10,7 @@ const SliderRow: React.FC<{
   const clamp = (v: number) => Math.max(min, Math.min(max, v));
   return (
     <div className="flex items-center justify-between gap-2">
-      <span className="w-20 shrink-0 text-[10px]" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>{label}</span>
+      <span className="w-16 shrink-0 text-[10px]" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>{label}</span>
       <input
         type="range" min={min} max={max} step={step} value={value}
         onChange={(e) => onChange(clamp(parseFloat(e.target.value)))}
@@ -23,7 +23,7 @@ const SliderRow: React.FC<{
           const v = parseFloat(e.target.value);
           if (Number.isFinite(v)) onChange(clamp(v));
         }}
-        className="w-14 shrink-0 rounded border bg-transparent px-1 py-0.5 text-right text-[10px] tabular-nums"
+        className="w-12 shrink-0 rounded border bg-transparent px-1 py-0.5 text-right text-[10px] tabular-nums"
         style={{ borderColor: "hsl(var(--border))" }}
       />
     </div>

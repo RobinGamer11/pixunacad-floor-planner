@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState, useCallback } from "react";
 import { DragScrollDiv } from "@/components/DragScrollDiv";
 import { CadApp } from "@/cad/CadApp";
 import { ToolIds, PointEditAction } from "@/cad/constants";
-import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Pipette, Sticker as StickerIcon, Pencil, Trash2, Download, Upload, Plus, FileImage, FileText, Maximize2, Ruler as RulerIcon, Eraser, Construction, BrickWall, PaintBucket, Grid3x3, DoorOpen, AppWindow, Move, RotateCw, PanelRightOpen, PanelRightClose, Crosshair, Scaling, Check, Scissors, Anchor as AnchorIcon, SquareDashed, BoxSelect, FlipHorizontal2, FolderOpen, Settings as SettingsIcon, Layers as LayersIcon } from "lucide-react";
+import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Pipette, Sticker as StickerIcon, Pencil, Trash2, Download, Upload, Plus, FileImage, FileText, Maximize2, Ruler as RulerIcon, Eraser, Construction, BrickWall, PaintBucket, Grid3x3, DoorOpen, AppWindow, Move, RotateCw, PanelRightOpen, PanelRightClose, Crosshair, Scaling, Check, Scissors, Anchor as AnchorIcon, SquareDashed, BoxSelect, FlipHorizontal2, FolderOpen, Settings as SettingsIcon, Layers as LayersIcon, Scan, Frame, Bold as BoldIcon, Italic as ItalicIcon, Underline as UnderlineIcon, Strikethrough as StrikethroughIcon } from "lucide-react";
 import type { HatchDrawMode } from "@/cad/HatchTool";
 import type { StickerDefinition } from "@/cad/StickerManager";
 import { instanceBoundingCornersWorld } from "@/cad/StickerManager";
@@ -20,7 +20,15 @@ import { HatchPatternBlock } from "@/components/cad/HatchPatternBlock";
 import { HatchSettingsPanel, HatchModeSelect } from "@/components/cad/HatchSettingsPanel";
 
 import { ToolHelpNotes } from "@/components/cad/ToolHelpNotes";
-import { CadEbeneSelect, CadThicknessMmInput } from "@/components/cad/CadFieldProxies";
+import {
+  CadEbeneSelect,
+  CadThicknessMmInput,
+  CadColorProxy,
+  CadMeasureProxy,
+  CadToggleProxy,
+  CadRangeProxy,
+  CadCheckboxProxy,
+} from "@/components/cad/CadFieldProxies";
 
 import { MappeHelpOverlay } from "@/components/workspace/MappeHelpOverlay";
 import { RasterModeToggle } from "@/components/cad/RasterModeToggle";
@@ -1936,7 +1944,6 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 <CadEbeneSelect target={idSelectRef} />
               </div>
               <div className="text-[10px] font-semibold tracking-wider mb-1.5" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
-
                 MODUS
               </div>
               <div className="grid grid-cols-2 gap-1">
@@ -1949,7 +1956,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                       type="button"
                       onClick={() => { appRef.current?.setTool(v.id); setActiveTool(v.id); setLineVariant(v.id); }}
                       title={v.label}
-                      className={`cad-toolbar-btn flex-col justify-center gap-0.5 h-11 ${active ? "active" : ""}`}
+                      className={`flex flex-col items-center justify-center gap-0.5 rounded border px-1 py-1.5 transition-colors ${active ? "bg-accent" : "hover:bg-muted"}`}
+                      style={{ borderColor: "hsl(var(--hairline))" }}
                     >
                       <Icon className="h-3.5 w-3.5" />
                       <span className="text-[9px] leading-tight">{v.label}</span>
@@ -1980,29 +1988,24 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 LINIE
               </div>
               <div className="space-y-3">
-                <div>
-                  <label>Farbe</label>
-                  <div className="flex items-center gap-2">
-                    <div ref={colorPreviewRef} className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))" }} />
-                    <input ref={colorInputRef} type="color" defaultValue="#111111" className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
-                  </div>
+                <div className="hidden">
+                  <div ref={colorPreviewRef} />
+                  <input ref={colorInputRef} type="color" defaultValue="#111111" />
                 </div>
+                <CadColorProxy label="Farbe" target={colorInputRef} />
                 <div>
-                  <div className="mb-1.5 text-[10px]" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Strichstärke</div>
+                  <div className="mb-1.5 text-[10px] text-muted-foreground">Strichstärke</div>
+                  <div className="hidden">
+                    <input ref={thicknessInputRef} type="text" defaultValue="1" />
+                  </div>
                   <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <div className="text-[9px] mb-0.5" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Zentimeter (cm)</div>
-                      <input ref={thicknessInputRef} type="text" defaultValue="1" />
-                    </div>
-                    <div>
-                      <div className="text-[9px] mb-0.5" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Millimeter (mm)</div>
-                      <CadThicknessMmInput target={thicknessInputRef} />
-                    </div>
+                    <CadMeasureProxy label="Zeichnung" unit="cm" target={thicknessInputRef} factor={1} digits={2} />
+                    <CadMeasureProxy label="Tatsächliche Größe" unit="mm" target={thicknessInputRef} factor={10} digits={3} />
                   </div>
                 </div>
 
                 <div>
-                  <label>Transparenz</label>
+                  <div className="mb-1.5 text-[10px] text-muted-foreground">Transparenz</div>
                   <input
                     type="range"
                     min={1}
@@ -2010,9 +2013,9 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                     step={1}
                     value={lineAlpha}
                     onChange={(e) => applyLineAlpha(Number(e.target.value))}
-                    className="w-full"
+                    className="pixuna-range w-full"
                   />
-                  <div className="flex items-center gap-1 mt-1">
+                  <label className="mt-1 flex h-7 items-center overflow-hidden rounded-md border" style={{ borderColor: "hsl(var(--hairline))" }}>
                     <input
                       type="number"
                       min={1}
@@ -2020,21 +2023,23 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                       step={1}
                       value={lineAlpha}
                       onChange={(e) => applyLineAlpha(Number(e.target.value))}
-                      className="w-16 h-7 px-1 text-right text-[11px] rounded border bg-transparent"
-                      style={{ borderColor: "hsl(var(--hairline))" }}
+                      className="h-full min-w-0 flex-1 bg-transparent px-2 text-right text-xs tabular-nums outline-none"
+                      aria-label="Transparenz in Prozent"
                     />
-                    <span className="text-[10px]">%</span>
-                  </div>
+                    <span className="pr-2 text-[10px] text-muted-foreground">%</span>
+                  </label>
                 </div>
-                <div className="pt-2" style={{ borderTop: "1px solid hsl(var(--border))" }}>
-                  <label className="block mb-1.5">Pfeilspitzen</label>
-                  <div className="flex gap-1">
+                <div>
+                  <div className="mb-1.5 text-[10px] text-muted-foreground">Pfeilspitzen</div>
+                  <div className="grid grid-cols-2 gap-1">
                     <button type="button" onClick={() => setLineArrowStart(!lineArrowStart)}
-                      className={`cad-toolbar-btn flex-1 justify-center h-8 text-[11px] ${lineArrowStart ? "active" : ""}`}>
+                      className={`h-9 rounded border text-[11px] transition-colors ${lineArrowStart ? "bg-accent" : "hover:bg-muted"}`}
+                      style={{ borderColor: "hsl(var(--hairline))" }}>
                       Anfang
                     </button>
                     <button type="button" onClick={() => setLineArrowEnd(!lineArrowEnd)}
-                      className={`cad-toolbar-btn flex-1 justify-center h-8 text-[11px] ${lineArrowEnd ? "active" : ""}`}>
+                      className={`h-9 rounded border text-[11px] transition-colors ${lineArrowEnd ? "bg-accent" : "hover:bg-muted"}`}
+                      style={{ borderColor: "hsl(var(--hairline))" }}>
                       Ende
                     </button>
                   </div>
@@ -2057,12 +2062,10 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           </div>
 
 
+
           {/* Schraffur — Design identisch zur Mappe (Modus & Objektart über dem Rahmen) */}
           {activeTool === ToolIds.HATCH && (
             <div className="cad-settings-panel mb-2">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
-                Schraffur
-              </div>
               <div className="mb-3">
                 <CadEbeneSelect target={hatchIdSelectRef} />
               </div>
@@ -2070,9 +2073,16 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               <RasterModeToggle app={appRef.current} projectId={projectId} />
 
               <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
-                <HatchSettingsPanel app={appRef.current} projectId={projectId} patternScaleMax={60} hideChrome />
+                <HatchSettingsPanel
+                  app={appRef.current}
+                  projectId={projectId}
+                  patternScaleMax={60}
+                  hideChrome
+                  afterStroke={<CadCheckboxProxy target={areaShowRef} label="Flächenanzeige" />}
+                />
               </div>
             </div>
+
           )}
 
            {/* Hatch Settings (Legacy-Bindings: Ebene + Flächenanzeige) */}
@@ -2148,7 +2158,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               </div>
 
 
-              <div className="flex items-center gap-2 mt-1">
+              <div className="hidden items-center gap-2 mt-1">
                 <input
                   ref={areaShowRef}
                   type="checkbox"
@@ -2205,11 +2215,6 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                   </div>
                 </div>
                </div>
-             </div>
-             <div className="mt-3 pt-2 flex flex-wrap gap-1.5" style={{ borderTop: "1px solid hsl(var(--border))" }}>
-               <span className="cad-kbd">Space</span>
-               <span className="cad-kbd">Shift</span>
-               <span className="cad-kbd">Tab</span>
              </div>
            </div>
 
@@ -2365,9 +2370,6 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
 
           {/* Text Settings */}
           <div ref={textSettingsRef} className={`cad-settings-panel hidden`}>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
-              Text
-            </div>
             <div className="space-y-3 mb-3">
               <div className="hidden">
                 <select ref={textIdSelectRef} className="cad-settings-select w-full" />
@@ -2375,13 +2377,19 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               <CadEbeneSelect target={textIdSelectRef} />
               <div>
                 <div className="text-[10px] font-semibold tracking-wider mb-1.5" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>MODUS</div>
+                <div className="hidden">
+                  <button ref={textModeAutoRef} type="button" />
+                  <button ref={textModeFrameRef} type="button" />
+                </div>
                 <div className="grid grid-cols-2 gap-1">
-                  <button ref={textModeAutoRef} type="button" className="cad-toolbar-btn h-9 justify-center text-[11px]" title="Rahmen passt sich an Text an">
-                    Rahmen variabel
-                  </button>
-                  <button ref={textModeFrameRef} type="button" className="cad-toolbar-btn h-9 justify-center text-[11px]" title="Text passt sich an Rahmen an">
-                    Rahmen fix
-                  </button>
+                  <CadToggleProxy target={textModeAutoRef} title="Rahmen passt sich an Text an" className="flex-col gap-0.5 h-auto py-1.5">
+                    <Scan className="h-3.5 w-3.5" />
+                    <span className="text-[9px] leading-tight">Rahmen variabel</span>
+                  </CadToggleProxy>
+                  <CadToggleProxy target={textModeFrameRef} title="Text passt sich an Rahmen an" className="flex-col gap-0.5 h-auto py-1.5">
+                    <Frame className="h-3.5 w-3.5" />
+                    <span className="text-[9px] leading-tight">Rahmen fix</span>
+                  </CadToggleProxy>
                 </div>
               </div>
               <RasterModeToggle app={appRef.current} projectId={projectId} />
@@ -2391,73 +2399,80 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             <div className="space-y-3">
 
               <div>
-                <label>Ausrichtung</label>
-                <div className="flex gap-1">
-                  <button ref={textAlignLeftRef} type="button" className="cad-toolbar-btn flex-1 justify-center h-9" title="Text links">
-                    <AlignLeft className="h-4 w-4" />
-                  </button>
-                  <button ref={textAlignCenterRef} type="button" className="cad-toolbar-btn flex-1 justify-center h-9" title="Text zentriert">
-                    <AlignCenter className="h-4 w-4" />
-                  </button>
-                  <button ref={textAlignRightRef} type="button" className="cad-toolbar-btn flex-1 justify-center h-9" title="Text rechts">
-                    <AlignRight className="h-4 w-4" />
-                  </button>
+                <div className="mb-1.5 text-[10px] text-muted-foreground">Ausrichtung</div>
+                <div className="hidden">
+                  <button ref={textAlignLeftRef} type="button" />
+                  <button ref={textAlignCenterRef} type="button" />
+                  <button ref={textAlignRightRef} type="button" />
+                </div>
+                <div className="grid grid-cols-3 gap-1">
+                  <CadToggleProxy target={textAlignLeftRef} title="Text links"><AlignLeft className="h-4 w-4" /></CadToggleProxy>
+                  <CadToggleProxy target={textAlignCenterRef} title="Text zentriert"><AlignCenter className="h-4 w-4" /></CadToggleProxy>
+                  <CadToggleProxy target={textAlignRightRef} title="Text rechts"><AlignRight className="h-4 w-4" /></CadToggleProxy>
                 </div>
               </div>
               <div>
-                <label>Schriftgröße</label>
-                <div className="grid grid-cols-1 gap-2">
-                  <div>
-                    <div className="text-[9px] mb-0.5" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Punkt (pt)</div>
-                    <input ref={textFontSizePtRef} type="text" defaultValue="11" />
-                  </div>
-                  <div className="hidden">
-                    <input ref={textFontSizeRef} type="text" defaultValue="14.67" />
-                  </div>
+                <div className="mb-1.5 text-[10px] text-muted-foreground">Schriftgröße</div>
+                <div className="hidden">
+                  <input ref={textFontSizePtRef} type="text" defaultValue="11" />
+                  <input ref={textFontSizeRef} type="text" defaultValue="14.67" />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <CadMeasureProxy label="Punkt" unit="pt" target={textFontSizePtRef} factor={1} digits={1} />
+                  <CadMeasureProxy label="Tatsächliche Größe" unit="mm" target={textFontSizePtRef} factor={25.4 / 72} digits={2} />
                 </div>
               </div>
               <div>
-                <label>Stil</label>
-                <div className="flex gap-1">
-                  <button ref={textBoldRef} type="button" className="cad-toolbar-btn flex-1 justify-center h-9 font-bold" title="Fett">B</button>
-                  <button ref={textItalicRef} type="button" className="cad-toolbar-btn flex-1 justify-center h-9 italic" title="Kursiv">I</button>
-                  <button ref={textUnderlineRef} type="button" className="cad-toolbar-btn flex-1 justify-center h-9 underline" title="Unterstrichen">U</button>
-                  <button ref={textStrikeRef} type="button" className="cad-toolbar-btn flex-1 justify-center h-9 line-through" title="Durchgestrichen">S</button>
+                <div className="mb-1.5 text-[10px] text-muted-foreground">Stil</div>
+                <div className="hidden">
+                  <button ref={textBoldRef} type="button" />
+                  <button ref={textItalicRef} type="button" />
+                  <button ref={textUnderlineRef} type="button" />
+                  <button ref={textStrikeRef} type="button" />
+                </div>
+                <div className="grid grid-cols-4 gap-1">
+                  <CadToggleProxy target={textBoldRef} title="Fett"><BoldIcon className="h-4 w-4" /></CadToggleProxy>
+                  <CadToggleProxy target={textItalicRef} title="Kursiv"><ItalicIcon className="h-4 w-4" /></CadToggleProxy>
+                  <CadToggleProxy target={textUnderlineRef} title="Unterstrichen"><UnderlineIcon className="h-4 w-4" /></CadToggleProxy>
+                  <CadToggleProxy target={textStrikeRef} title="Durchgestrichen"><StrikethroughIcon className="h-4 w-4" /></CadToggleProxy>
                 </div>
               </div>
               <div>
-                <label>Absatz</label>
-                <input ref={textLineHeightRangeRef} type="range" min={80} max={300} step={5} defaultValue={105} className="cad-range w-full" />
-                <input ref={textLineHeightNumRef} type="text" defaultValue="105" />
+                <div className="mb-1.5 text-[10px] text-muted-foreground">Absatz</div>
+                <div className="hidden">
+                  <input ref={textLineHeightRangeRef} type="range" min={80} max={300} step={5} defaultValue={105} />
+                  <input ref={textLineHeightNumRef} type="text" defaultValue="105" />
+                </div>
+                <CadRangeProxy target={textLineHeightNumRef} rangeTarget={textLineHeightRangeRef} min={80} max={300} step={5} unit="%" />
+              </div>
+              <div className="hidden">
+                <div ref={textColorPreviewRef} />
+                <input ref={textColorRef} type="color" defaultValue="#111111" />
+                <div ref={textBgColorPreviewRef} />
+                <input ref={textBgColorRef} type="color" defaultValue="#ffffff" />
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label>Textfarbe</label>
-                  <div className="flex items-center gap-2">
-                    <div ref={textColorPreviewRef} className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))" }} />
-                    <input ref={textColorRef} type="color" defaultValue="#111111" className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
-                  </div>
-                </div>
-                <div>
-                  <label>Feldfarbe</label>
-                  <div className="flex items-center gap-2">
-                    <div ref={textBgColorPreviewRef} className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))" }} />
-                    <input ref={textBgColorRef} type="color" defaultValue="#ffffff" className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
-                  </div>
-                </div>
+                <CadColorProxy label="Textfarbe" target={textColorRef} />
+                <CadColorProxy label="Feldfarbe" target={textBgColorRef} />
               </div>
               <div>
-                <label>Transparenz</label>
-                <input ref={textBgAlphaRangeRef} type="range" min={0} max={100} step={1} defaultValue={0} className="cad-range w-full" />
-                <input ref={textBgAlphaRef} type="text" defaultValue="0" />
+                <div className="mb-1.5 text-[10px] text-muted-foreground">Transparenz</div>
+                <div className="hidden">
+                  <input ref={textBgAlphaRangeRef} type="range" min={0} max={100} step={1} defaultValue={0} />
+                  <input ref={textBgAlphaRef} type="text" defaultValue="0" />
+                </div>
+                <CadRangeProxy target={textBgAlphaRef} rangeTarget={textBgAlphaRangeRef} min={0} max={100} step={1} unit="%" />
               </div>
               <div className="flex items-center gap-2 hidden">
                 <input ref={textWrapRef} type="checkbox" className="accent-primary" />
                 <label className="!mb-0 cursor-pointer">Zeilenumbruch</label>
               </div>
-              <div className="flex items-center gap-2">
-                <input ref={textBorderToggleRef} type="checkbox" className="accent-primary" />
-                <label className="!mb-0 cursor-pointer">Rahmen</label>
+              <div>
+                <div className="mb-1.5 text-[10px] text-muted-foreground">Rahmen</div>
+                <div className="hidden">
+                  <input ref={textBorderToggleRef} type="checkbox" />
+                </div>
+                <CadCheckboxProxy target={textBorderToggleRef} label="Rahmen anzeigen" />
               </div>
               <div ref={textBorderGroupRef} className="hidden space-y-2 pt-2" style={{ borderTop: "1px solid hsl(var(--border))" }}>
                 <div>
@@ -2475,6 +2490,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             </div>
             </div>
           </div>
+
 
 
           {/* Stempel-Werkzeug */}
@@ -2701,7 +2717,6 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           {/* Freihand-Tool-Panel */}
           {(activeTool === ToolIds.FREE || (activeTool === ToolIds.SELECT && selectedFreeStrokeId)) && (
             <div className="cad-settings-panel mb-2">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Freihand</div>
               {activeTool !== ToolIds.FREE && (
                 <div className="space-y-3 mb-3">
                   <CadEbeneSelect target={idSelectRef} />
@@ -3233,57 +3248,17 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               </div>
             </div>
           )}
-          {activeTool === ToolIds.HATCH ? (
-            <div
-              className="mt-3 rounded-md border p-2 space-y-2"
-              style={{ borderColor: "hsl(var(--border))" }}
-            >
-              <div className="text-[10px] font-semibold tracking-wider" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
-                HILFE
-              </div>
-              <div className="text-[10.5px] leading-snug" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
-                <div><span className="cad-kbd">L-Klick + Shift</span> Gerade zeichnen</div>
-                <div><span className="cad-kbd">Doppelklick auf Kante</span> Neuer Fangpunkt</div>
-                <div><span className="cad-kbd">Klick auf Kante + Symbol</span> Kante rein-/rausziehen</div>
-                <div className="mt-1.5 font-semibold">Objektarten</div>
-                <div>Vektor: Generell bearbeitbar</div>
-                <div>Pixel: Radiergummi bearbeitbar</div>
-              </div>
-            </div>
-          ) : activeTool === ToolIds.LINE ? (
-            <div
-              className="mt-3 rounded-md border p-2 space-y-2"
-              style={{ borderColor: "hsl(var(--border))" }}
-            >
-              <div className="text-[10px] font-semibold tracking-wider" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
-                HILFE
-              </div>
-              <div className="text-[10.5px] leading-snug" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
-                <div><span className="cad-kbd">L-Klick + Shift</span> Gerade zeichnen</div>
-                <div className="mt-1.5 font-semibold">Objektarten</div>
-                <div>Vektor: Generell bearbeitbar</div>
-                <div>Pixel: Radiergummi bearbeitbar</div>
-              </div>
-            </div>
-          ) : activeTool === ToolIds.TEXT ? (
-            <div
-              className="mt-3 rounded-md border p-2 space-y-2"
-              style={{ borderColor: "hsl(var(--border))" }}
-            >
-              <div className="text-[10px] font-semibold tracking-wider" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
-                HILFE
-              </div>
-              <div className="text-[10.5px] leading-snug" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
-                <div className="font-semibold">Modus</div>
-                <div>Rahmen variabel: Rahmen passt sich an Text an</div>
-                <div>Rahmen fix: Text passt sich an Rahmen an</div>
-                <div className="mt-1.5"><span className="cad-kbd">Enter</span> Absatz setzen</div>
-                <div><span className="cad-kbd">Text beenden</span> Außerhalb Textfeld klicken</div>
-              </div>
-            </div>
-          ) : (activeTool !== ToolIds.ERASER && activeTool !== ToolIds.PIPETTE && activeTool !== ToolIds.SELECT && activeTool !== ToolIds.STICKER) ? (
+          {(activeTool !== ToolIds.ERASER
+            && activeTool !== ToolIds.PIPETTE
+            && activeTool !== ToolIds.SELECT
+            && activeTool !== ToolIds.STICKER
+            && activeTool !== ToolIds.LINE
+            && activeTool !== ToolIds.FREE
+            && activeTool !== ToolIds.HATCH
+            && activeTool !== ToolIds.TEXT) ? (
             <ToolHelpNotes toolId={activeTool} />
           ) : null}
+
         </div>
         </DragScrollDiv>
         <DragScrollDiv axis="both" className="flex-1 min-h-0 overflow-auto p-2 space-y-2 cursor-grab active:cursor-grabbing" style={{ display: rightTab === "sheets" ? "block" : "none" }}>

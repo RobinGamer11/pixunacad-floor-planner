@@ -218,7 +218,7 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
       />
 
       <div className="space-y-3">
-        <label className={`block text-xs${(hideChrome && !framedCad) ? " hidden" : ""}`}>
+        <label className={`block text-xs${sheetMode ? " hidden" : ""}`}>
           <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Ebene{selectedStrokeId ? " (Auswahl)" : ""}</span>
           <select
             value={labelId || app.activeDrawLabelId}
@@ -386,10 +386,12 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
               </div>
             </div>
 
-            <div className="text-[10px] leading-snug text-muted-foreground">
-              Maus gedrückt halten → zeichnen. Das Lineal lässt sich nur an seinen
-              Endpunkten verschieben; an der Linie selbst fängt der Stift.
-            </div>
+            {!framedCad && (
+              <div className="text-[10px] leading-snug text-muted-foreground">
+                Maus gedrückt halten → zeichnen. Das Lineal lässt sich nur an seinen
+                Endpunkten verschieben; an der Linie selbst fängt der Stift.
+              </div>
+            )}
           </>
         ) : (
         <>
