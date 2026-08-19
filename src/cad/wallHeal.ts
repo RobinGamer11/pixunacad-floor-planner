@@ -170,7 +170,8 @@ function healEnd(
       // Wandkörper meterweit in den Raum ziehen (Schraffur-Autofüllung
       // erkennt den Raum dann als Wand). Statt dessen greift der
       // nodeMeetPoint-Fallback direkt am Knoten.
-      const pairLimit = (wall.thicknessM + (ow.thicknessM || 0)) * 2 + HEAL_TOL_M;
+      const pairLimit = (wall.thicknessM + (ow.thicknessM || 0)) * ((globalThis as any).__F ?? 2)
+        * (1 + 0.5 * Math.max(endBulgeMag, owBulge)) + HEAL_TOL_M;
       const a = Math.max(dist(origin, ip), dist(op, ip));
       if (a > pairLimit) continue;
       if (a < bestAbs) { bestAbs = a; best = ip; }
