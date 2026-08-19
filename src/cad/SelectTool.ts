@@ -1742,6 +1742,8 @@ export class SelectTool {
     this.otherPointOriginal = null;
     this.hatchPointsOriginal = null;
     this.hatchEdgeAOriginal = null;
+    this._hatchOuterOriginal = null;
+    this._hatchHolesOriginal = null;
     this.hatchEdgeBOriginal = null;
     this.hatchEdgePrevOriginal = null;
     this.hatchEdgeNextOriginal = null;
