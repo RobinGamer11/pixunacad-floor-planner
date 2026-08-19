@@ -152,7 +152,15 @@ function healEnd(
         ideal = p;
       }
     }
-    if (!ideal) continue;
+    if (!ideal) {
+      // Kein gleichnamiger Schnitt (z. B. parallele Tangenten bei Wölbung):
+      // Help/Sub am gemeinsamen Knoten zusammenführen statt offen lassen.
+      if (T !== "main") {
+        const meet = nodeMeetPoint(T, origin);
+        if (meet) { polysSelf[T][idx] = meet; healedAny = true; }
+      }
+      continue;
+    }
 
     // Phase 5 (ArchiCAD-Verhalten): Beide Bezugslinien (main UND sub) jeder
     // Nachbarwand sind harte Grenzen — die neue Wand stoppt an der zugewandten
