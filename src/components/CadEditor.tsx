@@ -2063,8 +2063,12 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
                 Schraffur
               </div>
+              <div className="mb-3">
+                <CadEbeneSelect target={hatchIdSelectRef} />
+              </div>
               <HatchModeSelect app={appRef.current} />
               <RasterModeToggle app={appRef.current} projectId={projectId} />
+
               <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
                 <HatchSettingsPanel app={appRef.current} projectId={projectId} patternScaleMax={60} hideChrome />
               </div>
