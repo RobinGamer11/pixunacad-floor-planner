@@ -610,6 +610,19 @@ export default function ProjectWorkspace() {
     setRightTabState(t ? "tools" : "settings");
   };
 
+  // Auswahl eines bestehenden Objekts → automatisch in die Werkzeug-
+  // einstellungen wechseln; ohne Auswahl und ohne aktives Werkzeug zurück
+  // zu den Seiteneinstellungen.
+  React.useEffect(() => {
+    if (selectedElementIds.length > 0) {
+      setPrintMode(false);
+      setRightTabState("tools");
+    } else if (!activeTool && !selectedCadTool) {
+      setRightTabState("settings");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedElementIds.length, selectedCadTool]);
+
   // Werkzeug-Modi links schließen sich automatisch, sobald das jeweilige
   // Werkzeug nicht mehr aktiv ist (auch bei ESC oder Wechsel von außen).
   React.useEffect(() => {
