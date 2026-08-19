@@ -492,6 +492,12 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
         </div>
         </>
         )}
+      </div>
+    </div>
+  );
+};
+
+
 
 interface PreviewProps {
   color: string;
