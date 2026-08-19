@@ -1,7 +1,7 @@
 import { Defaults, SelectionType } from "./constants";
 import { Vec2, v, sub, add, polygonCentroid } from "./geometry";
 import type { CadApp } from "./CadApp";
-import type { Segment, Hatch, Dimension, TextBox, AreaLabel, TextBoxStyle } from "./Scene";
+import type { Segment, Hatch, Dimension, TextBox, AreaLabel, TextBoxStyle, FreeStroke } from "./Scene";
 
 interface SegmentSnap {
   kind: "segment"; a: Vec2; b: Vec2;
@@ -38,7 +38,16 @@ export interface WallSnap {
   patternId?: string; patternScale?: number; patternAlignToWall?: boolean;
 }
 
-export type ClipboardItem = SegmentSnap | HatchSnap | DimensionSnap | TextBoxSnap | WallSnap;
+/** Freihand-Strich (Kopie inkl. Stil). */
+interface FreeSnap {
+  kind: "free"; points: Vec2[];
+  color: string; thicknessM: number; opacity: number; lineStyle: any;
+  gapM: number; blobSpacingM: number; blobSizeM: number; smoothing: boolean;
+  imageSrc: string | null; imageSizeM: number; imageSpacingM: number; imageRotateAlongPath: boolean;
+  labelId: string;
+}
+
+export type ClipboardItem = SegmentSnap | HatchSnap | DimensionSnap | TextBoxSnap | WallSnap | FreeSnap;
 
 
 export interface Clipboard {
@@ -71,6 +80,16 @@ function snapDimension(d: Dimension): DimensionSnap {
     textBgEnabled: d.textBgEnabled, textBgColor: d.textBgColor, textBgAlpha: d.textBgAlpha,
     labelId: d.labelId };
 }
+function snapFree(f: FreeStroke): FreeSnap {
+  return { kind: "free", points: f.points.map(p => v(p.x, p.y)),
+    color: (f as any).color, thicknessM: (f as any).thicknessM, opacity: (f as any).opacity,
+    lineStyle: (f as any).lineStyle, gapM: (f as any).gapM,
+    blobSpacingM: (f as any).blobSpacingM, blobSizeM: (f as any).blobSizeM,
+    smoothing: (f as any).smoothing,
+    imageSrc: (f as any).imageSrc ?? null, imageSizeM: (f as any).imageSizeM,
+    imageSpacingM: (f as any).imageSpacingM, imageRotateAlongPath: (f as any).imageRotateAlongPath,
+    labelId: f.labelId };
+}
 function snapTextBox(t: TextBox): TextBoxSnap {
   return { kind: "textbox",
     center: v(t.center.x, t.center.y),
@@ -84,6 +103,7 @@ function itemCenter(it: ClipboardItem): Vec2 {
   if (it.kind === "hatch") return polygonCentroid(it.points);
   if (it.kind === "dimension") return { x: (it.p1.x + it.p2.x) / 2, y: (it.p1.y + it.p2.y) / 2 };
   if (it.kind === "wall") return polygonCentroid(it.corners);
+  if (it.kind === "free") return polygonCentroid(it.points);
   return v(it.center.x, it.center.y);
 }
 
@@ -117,6 +137,7 @@ export function buildClipboardFromSelection(app: CadApp, anchorOverride?: Vec2 |
       else if (kind === "hatch") { const o = s.getHatchById?.(id); if (o) items.push(snapHatch(o)); }
       else if (kind === "dimension") { const o = s.getDimensionById?.(id); if (o) items.push(snapDimension(o)); }
       else if (kind === "textbox") { const o = s.getTextBoxById?.(id); if (o) items.push(snapTextBox(o)); }
+      else if (kind === "freeStroke" || kind === "free") { const o = s.getFreeStrokeById?.(id); if (o) items.push(snapFree(o)); }
       else if (kind === "wall") {
         const o = s.getWallById?.(id);
         if (o) items.push({ kind: "wall", corners: o.corners.map((p: Vec2) => v(p.x, p.y)),
@@ -132,11 +153,15 @@ export function buildClipboardFromSelection(app: CadApp, anchorOverride?: Vec2 |
     else if (hatch) items.push(snapHatch(hatch));
     else if (dim) items.push(snapDimension(dim));
     else if (tb) items.push(snapTextBox(tb));
+    else if ((app as any).getSelectedFreeStroke?.()) {
+      items.push(snapFree((app as any).getSelectedFreeStroke()));
+    }
     else if (app.selectedLabelId) {
       for (const s of app.scene.getSegmentsByLabelId(app.selectedLabelId)) items.push(snapSegment(s));
       for (const h of app.scene.getHatchesByLabelId(app.selectedLabelId)) items.push(snapHatch(h));
       for (const d of app.scene.getDimensionsByLabelId(app.selectedLabelId)) items.push(snapDimension(d));
       for (const t of app.scene.getTextBoxesByLabelId(app.selectedLabelId)) items.push(snapTextBox(t));
+      for (const f of app.scene.getFreeStrokesByLabelId(app.selectedLabelId)) items.push(snapFree(f));
     }
   }
 
@@ -168,6 +193,7 @@ export function translatedItems(items: ClipboardItem[], dx: number, dy: number):
     if (it.kind === "hatch") return translatedHatch(it, dx, dy);
     if (it.kind === "dimension") return translatedDim(it, dx, dy);
     if (it.kind === "wall") return { ...it, corners: it.corners.map(p => ({ x: p.x + dx, y: p.y + dy })) };
+    if (it.kind === "free") return { ...it, points: it.points.map(p => ({ x: p.x + dx, y: p.y + dy })) };
     return translatedText(it, dx, dy);
   });
 }
@@ -215,6 +241,14 @@ export function commitClipboardAt(app: CadApp, clip: Clipboard, mouseW: Vec2): {
         patternId: it.patternId, patternScale: it.patternScale, patternAlignToWall: it.patternAlignToWall,
       });
       if (o) created.push({ kind: "wall", id: o.id });
+    } else if (it.kind === "free") {
+      const o = app.scene.createFreeStroke(it.points.map(p => ({ x: p.x + dx, y: p.y + dy })), {
+        color: it.color, thicknessM: it.thicknessM, opacity: it.opacity, lineStyle: it.lineStyle,
+        gapM: it.gapM, blobSpacingM: it.blobSpacingM, blobSizeM: it.blobSizeM, smoothing: it.smoothing,
+        imageSrc: it.imageSrc, imageSizeM: it.imageSizeM, imageSpacingM: it.imageSpacingM,
+        imageRotateAlongPath: it.imageRotateAlongPath, labelId: it.labelId,
+      });
+      if (o) created.push({ kind: "freeStroke", id: o.id });
     } else {
       const o = app.scene.createTextBox(
         { x: it.center.x + dx, y: it.center.y + dy },

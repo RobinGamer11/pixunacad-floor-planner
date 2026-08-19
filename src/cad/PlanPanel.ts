@@ -72,7 +72,9 @@ export class PlanPanel {
       this.expandedVisibilityPlanId = null;
       this.overlayStore.setNone(planId);
     } else {
+      // Aktivieren = sofort Transparentpause in Originalfarben anzeigen.
       this.expandedVisibilityPlanId = planId;
+      this.overlayStore.setStamp(planId);
     }
     this.cb.onChange();
   }

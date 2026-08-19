@@ -124,7 +124,9 @@ export class SheetPanel {
       this.expandedVisibilitySheetId = null;
       this.overlayStore.setNone(sheetId);
     } else {
+      // Aktivieren = sofort Transparentpause in Originalfarben anzeigen.
       this.expandedVisibilitySheetId = sheetId;
+      this.overlayStore.setStamp(sheetId);
     }
     this.cb.onChange();
   }
