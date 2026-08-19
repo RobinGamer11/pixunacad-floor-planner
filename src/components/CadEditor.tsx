@@ -20,7 +20,15 @@ import { HatchPatternBlock } from "@/components/cad/HatchPatternBlock";
 import { HatchSettingsPanel, HatchModeSelect } from "@/components/cad/HatchSettingsPanel";
 
 import { ToolHelpNotes } from "@/components/cad/ToolHelpNotes";
-import { CadEbeneSelect, CadThicknessMmInput } from "@/components/cad/CadFieldProxies";
+import {
+  CadEbeneSelect,
+  CadThicknessMmInput,
+  CadColorProxy,
+  CadMeasureProxy,
+  CadToggleProxy,
+  CadRangeProxy,
+  CadCheckboxProxy,
+} from "@/components/cad/CadFieldProxies";
 
 import { MappeHelpOverlay } from "@/components/workspace/MappeHelpOverlay";
 import { RasterModeToggle } from "@/components/cad/RasterModeToggle";
