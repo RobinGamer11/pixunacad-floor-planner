@@ -267,13 +267,7 @@ export async function exportPlansToPdf(
       }
     }
 
-    // Plan-Name unten links als kleine Beschriftung
-    page.drawText(plan.name, {
-      x: 5 * MM_TO_PT,
-      y: 4 * MM_TO_PT,
-      size: 8,
-      color: rgb(0.4, 0.4, 0.4),
-    });
+    // Keine automatische Plan-Beschriftung im PDF (Blatt bleibt sauber).
   }
 
   return await pdf.save();

@@ -87,14 +87,17 @@ async function snapshotPageElement(
   if (!el) throw new Error(`Seite ${pageId} ist im DOM nicht sichtbar.`);
   await waitFrames(6);
 
-  const rectPx = el.getBoundingClientRect();
-  // Ziel: exakt `dpi` auf dem physischen Papier. Die Seite steht in CSS-px auf
-  // dem Bildschirm (abhängig vom Zoom) — der Skalierungsfaktor ergibt sich also
-  // aus dem Verhältnis Ziel-Pixel (mm → dpi) zur aktuellen CSS-Breite.
+  // WICHTIG für 1:1-Ausdruck: NICHT die per Zoom transformierte Bildschirm-
+  // größe verwenden (getBoundingClientRect enthält den CSS-Zoom-Faktor),
+  // sondern die Layout-Größe des Papiers. Nur so entspricht das Bitmap exakt
+  // dem in den Seiteneinstellungen hinterlegten mm-Format.
+  const layoutW = el.offsetWidth || el.getBoundingClientRect().width;
+  const layoutH = el.offsetHeight || el.getBoundingClientRect().height;
+  // Ziel: exakt `dpi` auf dem physischen Papier.
   const targetPx = (widthMm / MM_PER_INCH) * dpi;
   const targetPxPerCssPx = Math.min(
     8, // Sicherheitsgrenze gegen extrem große Canvas
-    Math.max(1, targetPx / Math.max(1, rectPx.width)),
+    Math.max(1, targetPx / Math.max(1, layoutW)),
   );
   // CAD-Zeichenfläche (Canvas) mit gleicher Auflösung rendern lassen,
   // sonst wird sie beim Hochskalieren unscharf.
@@ -108,8 +111,10 @@ async function snapshotPageElement(
     scale: targetPxPerCssPx,
     useCORS: true,
     logging: false,
-    width: rectPx.width,
-    height: rectPx.height,
+    width: layoutW,
+    height: layoutH,
+    windowWidth: document.documentElement.clientWidth,
+    windowHeight: document.documentElement.clientHeight,
   });
   return canvas;
 }
@@ -184,7 +189,16 @@ async function embedPage(
   const wPt = (widthMm / MM_PER_INCH) * 72;
   const hPt = (heightMm / MM_PER_INCH) * 72;
   const page = pdf.addPage([wPt, hPt]);
-  page.drawImage(img, { x: 0, y: 0, width: wPt, height: hPt });
+  // Seitenverhältnis des Bitmaps beibehalten (kein Verzerren) — der Inhalt
+  // wird formatfüllend, aber maßhaltig auf das Blatt gelegt.
+  const imgAspect = img.width / Math.max(1, img.height);
+  const pageAspect = wPt / Math.max(1, hPt);
+  let dw = wPt, dh = hPt;
+  if (Math.abs(imgAspect - pageAspect) > 0.002) {
+    if (imgAspect > pageAspect) { dw = wPt; dh = wPt / imgAspect; }
+    else { dh = hPt; dw = hPt * imgAspect; }
+  }
+  page.drawImage(img, { x: (wPt - dw) / 2, y: (hPt - dh) / 2, width: dw, height: dh });
 }
 
 function dataUrlToBytes(url: string): Uint8Array {
