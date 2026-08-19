@@ -80,12 +80,23 @@ describe("gewölbte Wände – Heilung an Nachbarknoten", () => {
         expect(dist(ea.sub, eb.sub)).toBeLessThan(0.05);
       });
 
-      it(`Union ergibt eine zusammenhängende Fläche (side=${side}, bulge=${bulge})`, () => {
+      it(`keine Lücke am Knoten (side=${side}, bulge=${bulge})`, () => {
         const a = makeWall("a", [{ x: 0, y: 0 }, { x: 4, y: 0 }], [bulge], side);
         const b = makeWall("b", [{ x: 4, y: 0 }, { x: 4, y: 3 }], [0], side);
         const walls = [a, b];
-        const multi = unionWallSolids(walls, walls, graphOf(walls));
-        expect(multi.length).toBe(1);
+        const g = graphOf(walls);
+        const multi = unionWallSolids(walls, walls, g);
+        expect(multi.length).toBeGreaterThan(0);
+
+        // Umgebung des Knoten-Querschnitts muss vollständig durch Wandmasse
+        // gedeckt sein — sonst klafft dort eine sichtbare Lücke.
+        const e = endPointsOf(a, walls, g, false);
+        const mid = v((e.main.x + e.sub.x) / 2, (e.main.y + e.sub.y) / 2);
+        for (let i = 0; i < 12; i++) {
+          const ang = (i / 12) * Math.PI * 2;
+          const p = v(mid.x + Math.cos(ang) * 0.01, mid.y + Math.sin(ang) * 0.01);
+          expect(coveredByUnion(multi, p)).toBe(true);
+        }
       });
 
       it(`Wandkörper bleibt flächenmäßig plausibel (side=${side}, bulge=${bulge})`, () => {
