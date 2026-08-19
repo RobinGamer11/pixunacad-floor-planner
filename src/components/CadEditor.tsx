@@ -1183,7 +1183,9 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                         ? activeTool === v.id
                         : v.kind === "hatch"
                           ? (activeTool === ToolIds.HATCH && hatchDrawMode === v.mode)
-                          : (activeTool === ToolIds.SELECT && selectMarqueeMode === v.mode);
+                          : v.kind === "door"
+                            ? (activeTool === ToolIds.DOOR && doorMode === v.mode)
+                            : (activeTool === ToolIds.SELECT && selectMarqueeMode === v.mode);
                       return (
                         <button
                           key={i}
