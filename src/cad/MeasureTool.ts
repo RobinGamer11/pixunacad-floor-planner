@@ -195,9 +195,23 @@ export class MeasureTool {
       }
     }
     for (const w of scene.walls || []) {
-      const r = ringScan(w.corners, (w as any).bulges, false);
+      const bulges = (w as any).bulges as number[] | undefined;
+      const r = ringScan(w.corners, bulges, false);
       if (r != null) return r;
+      // Auch Außen-/Innenkanten (Main/Help/Sub) prüfen: Offsetbögen haben denselben
+      // Öffnungswinkel und damit exakt dieselbe Wölbung wie die Bezugslinie.
+      if (bulges && bulges.some(b => b)) {
+        try {
+          const lines = computeHealedWallLines(w, scene.walls, scene.getWallTopology?.());
+          for (const side of [lines.mainCorners, lines.helpCorners, lines.subCorners]) {
+            if (!side || side.length !== w.corners.length) continue;
+            const rr = ringScan(side, bulges, false);
+            if (rr != null) return rr;
+          }
+        } catch { /* ignore */ }
+      }
     }
+
     return 0;
   }
 
