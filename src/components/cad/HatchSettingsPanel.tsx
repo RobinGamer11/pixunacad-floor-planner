@@ -183,7 +183,7 @@ export const HatchSettingsPanel: React.FC<Props> = ({ app, projectId, pxPerMm = 
         <div className="mb-1.5 text-[10px] text-muted-foreground">Strichstärke</div>
         <div className="grid grid-cols-2 gap-2">
           <MeasureInput label="Bildschirm (px)" value={strokeWidthPx} digits={2} onChange={(v) => setStroke(v)} />
-          <MeasureInput label="Tatsächliche Größe (mm)" value={strokeMm} digits={3} onChange={(v) => setStroke(v * pxPerMm)} />
+          <MeasureInput label="Tatsächl. Größe (mm)" value={strokeMm} digits={3} onChange={(v) => setStroke(v * pxPerMm)} />
         </div>
       </div>
 
