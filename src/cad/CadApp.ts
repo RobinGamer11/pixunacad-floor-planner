@@ -76,7 +76,8 @@ export interface TextEditorRefs {
 
 export interface MeasureSettings {
   orientation: "parallel" | "diagonal";
-  pointCount: "two" | "multi";
+  /** "free" = Maßkette ohne Fangpunkt-Zwang. */
+  pointCount: "two" | "multi" | "free";
   /** Achsen-Richtung der Maßkette. "free" wird aus den ersten zwei Punkten abgeleitet. */
   direction: "horizontal" | "vertical" | "free";
   editMode: "parallel" | "endpoints";
@@ -2715,7 +2716,7 @@ export class CadApp {
     });
 
     r.pointCount.addEventListener("change", () => {
-      this.measureSettings.pointCount = r.pointCount.value as "two" | "multi";
+      this.measureSettings.pointCount = r.pointCount.value as "two" | "multi" | "free";
     });
 
     r.direction.addEventListener("change", () => {

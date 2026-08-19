@@ -33,12 +33,12 @@ export const Defaults = {
 
   // Measure (dimension) defaults
   measureOrientation: "parallel" as "parallel" | "diagonal",
-  measurePointCount: "multi" as "two" | "multi",
+  measurePointCount: "multi" as "two" | "multi" | "free",
   measureDirection: "free" as "horizontal" | "vertical" | "free",
 
   measureEditMode: "endpoints" as "parallel" | "endpoints",
   measureTextColor: "#000000",
-  measureTextSizePx: 11,
+  measureTextSizePx: 14.6667, // 11 pt
   measureLineColor: "#2b2b2b",
   measureDecimals: 2,
   measureTickLengthM: 0.15,

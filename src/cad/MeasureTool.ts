@@ -97,8 +97,20 @@ export class MeasureTool {
     return this.app.measureSettings.orientation;
   }
 
-  getPointCountMode(): "two" | "multi" {
+  getPointCountMode(): "two" | "multi" | "free" {
     return this.app.measureSettings.pointCount;
+  }
+
+  /** "Freies Maß": Punkte dürfen ohne Fangpunkt gesetzt werden. */
+  private _isFreePoints(): boolean {
+    return this.app.measureSettings.pointCount === "free";
+  }
+
+  /** Aktueller Zielpunkt: Snap wenn vorhanden, im freien Modus sonst die Mausposition. */
+  private _pickPoint(input: Input): Vec2 | null {
+    if (this.pointSnap) return v(this.pointSnap.world.x, this.pointSnap.world.y);
+    if (this._isFreePoints()) return v(input.mouse.wx, input.mouse.wy);
+    return null;
   }
 
   getDirectionMode(): "horizontal" | "vertical" | "free" {
@@ -238,12 +250,15 @@ export class MeasureTool {
         // Doppelklick auf den zweiten Punkt bestätigt die Richtung sofort.
         if (this.finishCollect()) return;
       }
-      if (input.clicked && this.pointSnap) {
-        if (this.freeDirPoints.length >= 2) {
-          // Bereits 2 Punkte – ein weiterer Klick ersetzt den zweiten.
-          this.freeDirPoints[1] = v(this.pointSnap.world.x, this.pointSnap.world.y);
-        } else {
-          this.freeDirPoints.push(v(this.pointSnap.world.x, this.pointSnap.world.y));
+      if (input.clicked) {
+        const p = this._pickPoint(input);
+        if (p) {
+          if (this.freeDirPoints.length >= 2) {
+            // Bereits 2 Punkte – ein weiterer Klick ersetzt den zweiten.
+            this.freeDirPoints[1] = p;
+          } else {
+            this.freeDirPoints.push(p);
+          }
         }
       }
       // Häkchen-Hub zum Bestätigen der Richtung anzeigen, sobald 2 Punkte gesetzt sind.
@@ -258,16 +273,17 @@ export class MeasureTool {
     }
 
     if (this.state === "collect") {
-      if (input.doubleClicked && this.getPointCountMode() === "multi") {
+      if (input.doubleClicked && this.getPointCountMode() !== "two") {
         if (this.finishCollect()) return;
       }
       if (input.clicked) {
-        if (!this.pointSnap) return;
+        const picked = this._pickPoint(input);
+        if (!picked) return;
         const refDir = this._refDirFromSnap(this.pointSnap);
         this.selectedPoints.push({
-          world: v(this.pointSnap.world.x, this.pointSnap.world.y),
+          world: picked,
           refDir,
-          doorId: this.pointSnap.doorId || null,
+          doorId: this.pointSnap?.doorId || null,
         });
         if (this.getPointCountMode() === "two" && this.selectedPoints.length === 2) {
           this.state = "place";
@@ -275,7 +291,7 @@ export class MeasureTool {
       }
       if (
         this.state === "collect" &&
-        this.getPointCountMode() === "multi" &&
+        this.getPointCountMode() !== "two" &&
         this._canStartPlacement()
       ) {
         const last = this.selectedPoints[this.selectedPoints.length - 1].world;
