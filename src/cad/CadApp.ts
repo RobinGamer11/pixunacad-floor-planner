@@ -247,6 +247,8 @@ export class CadApp {
   defaultEraserStrength = Defaults.eraserStrength;
   defaultEraserMode: "hard" | "smooth" = Defaults.eraserMode;
   defaultEraserSoftness = Defaults.eraserSoftness;
+  /** Radierseite relativ zum Lineal: links / mittig / rechts. */
+  defaultEraserRulerSide: "left" | "center" | "right" = "center";
 
   camera: Camera;
   scene: Scene;
@@ -2285,7 +2287,11 @@ export class CadApp {
         if (this.activeTool === this.hatchTool) { this.hatchTool.cancel(); this.clearSelection(); this.setTool(ToolIds.SELECT); return; }
         if (this.activeTool === this.textTool) { this.textTool.cancel(); this.clearSelection(); this.setSelectedLabelId(null); this.setTool(ToolIds.SELECT); return; }
         if (this.activeTool === this.measureTool) { this.measureTool.cancel(); this.clearSelection(); this.setTool(ToolIds.SELECT); return; }
-        if (this.activeTool === this.pipetteTool) { this.pipetteTool.cancel(); this.setTool(ToolIds.SELECT); return; }
+        if (this.activeTool === this.pipetteTool) {
+          // 1. ESC: nur die gemerkte Quelle verwerfen — Werkzeug bleibt aktiv.
+          if (this.pipetteTool.hasSource) { this.pipetteTool.clearSource(); return; }
+          this.pipetteTool.cancel(); this.setTool(ToolIds.SELECT); return;
+        }
         if (this.activeTool === this.wallTool) { this.wallTool.cancel(); this.setTool(ToolIds.SELECT); return; }
         if (this.activeTool === this.doorTool) {
           if (this.doorTool.selectedDoorId) { this.doorTool.selectDoor(null); return; }

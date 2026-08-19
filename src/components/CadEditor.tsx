@@ -12,6 +12,7 @@ import { projectStore } from "@/lib/projectStore";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { FreeDrawSettingsPanel } from "@/components/cad/FreeDrawSettingsPanel";
+import { PipetteSettingsPanel } from "@/components/cad/PipetteSettingsPanel";
 import { EraserSettingsPanel, EraserModeSelect } from "@/components/cad/EraserSettingsPanel";
 import { ProjectFilePickerDialog } from "@/components/cad/ProjectFilePickerDialog";
 import { WallSettingsPanel } from "@/components/cad/WallSettingsPanel";
@@ -2634,6 +2635,14 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
                 <EraserSettingsPanel app={appRef.current} variant="cad" />
               </div>
+            </div>
+          )}
+
+          {/* Pipetten-Panel — schlichte Statusanzeige */}
+          {activeTool === ToolIds.PIPETTE && (
+            <div className="cad-settings-panel mb-2">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Pipette</div>
+              <PipetteSettingsPanel app={appRef.current} />
             </div>
           )}
 

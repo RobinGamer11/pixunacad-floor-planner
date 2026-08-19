@@ -2,6 +2,7 @@ import React, { useMemo, useState, useRef, useEffect, useLayoutEffect } from "re
 import { createPortal } from "react-dom";
 import { DragScrollDiv } from "@/components/DragScrollDiv";
 import { ToolHelpNotes } from "@/components/cad/ToolHelpNotes";
+import { PipetteSettingsPanel } from "@/components/cad/PipetteSettingsPanel";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ChevronLeft,
@@ -22,6 +23,7 @@ import {
   Settings,
   Wrench,
   CheckSquare,
+  Square,
   Trash2,
   Copy,
   RotateCw,
@@ -1281,7 +1283,7 @@ export default function ProjectWorkspace() {
         </div>
         <div className="relative w-full flex justify-center">
           <ToolRailButton
-            icon={<Hash size={18} />}
+            icon={<Square size={18} />}
             label="Schraffur"
             active={activeTool === "hatch"}
             onClick={() => {
@@ -2588,7 +2590,10 @@ function PageCanvas({
   };
 
 
-  // Escape cancels pending draw and resets back to the select tool.
+  // ESC in zwei Stufen: 1× bricht die laufende Funktion ab (Werkzeug bleibt
+  // aktiv), 2× wechselt zurück zum Auswahl-Werkzeug.
+  const escArmedRef = useRef(false);
+  React.useEffect(() => { escArmedRef.current = false; }, [activeTool]);
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
@@ -2597,9 +2602,13 @@ function PageCanvas({
         if (inField) return;
         setPendingStart(null);
         setHoverPt(null);
-        if (activeTool !== null) onCommitTool();
+        if (activeTool === null) return;
+        if (!escArmedRef.current) { escArmedRef.current = true; return; }
+        escArmedRef.current = false;
+        onCommitTool();
         return;
       }
+
       if ((e.key === "Delete" || e.key === "Backspace") && !inField) {
         if (selectedElementIds.length === 0) return;
         // Bei Backspace: nur reagieren wenn KEINE Texteingabe — sonst würde
@@ -2612,8 +2621,13 @@ function PageCanvas({
         onSelect(undefined);
       }
     };
+    const onDown = () => { escArmedRef.current = false; };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("pointerdown", onDown, true);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("pointerdown", onDown, true);
+    };
   }, [pendingStart, activeTool, selectedElementIds, projectId, page.id]);
 
 
@@ -2960,11 +2974,12 @@ function PageCanvas({
             : activeTool === "eraser" ? "eraser"
             : activeTool === "hatch" ? "hatch"
             : activeTool === "document" ? "document"
+            : activeTool === "pipette" ? "pipette"
             : activeTool === null ? "select"
             : null
           }
           hatchDrawMode={hatchDrawMode}
-          enabled={activeTool === "line" || activeTool === "text" || activeTool === "guide" || activeTool === "free" || activeTool === "eraser" || activeTool === "hatch" || activeTool === "document" || activeTool === null}
+          enabled={activeTool === "line" || activeTool === "text" || activeTool === "guide" || activeTool === "free" || activeTool === "eraser" || activeTool === "hatch" || activeTool === "document" || activeTool === "pipette" || activeTool === null}
           initialState={page.cadOverlay}
           ghostSnapState={overlayPage ? overlayPage.cadOverlay : null}
           onEraseWorld={(c, rM, mode, soft, strength) => {
@@ -5045,8 +5060,8 @@ function RightInspector({
               onCancelTable={onCancelTable}
             />
           )}
-          {tab === "tools" && activeTool !== "guide" && activeTool !== "text" && activeTool !== "eraser" && !isLinePageTool(activeTool) && (
-            <ToolHelpNotes toolId={activeTool ?? "select"} />
+          {tab === "tools" && activeTool !== "guide" && activeTool !== "text" && activeTool !== "eraser" && activeTool !== null && activeTool !== "pipette" && !isLinePageTool(activeTool) && (
+            <ToolHelpNotes toolId={activeTool} />
           )}
           {tab === "layers" && page && (
             <div className="space-y-4">
@@ -5638,6 +5653,9 @@ function ToolsTab({
             <EraserSettingsPanel app={cadEngine} rasterSelection={element ? element.kind === "image" : null} />
           </div>
         </>
+      )}
+      {settingsTool === "pipette" && cadEngine && (
+        <PipetteSettingsPanel app={cadEngine} />
       )}
       {settingsTool === "hatch" && cadEngine && (
         <>
