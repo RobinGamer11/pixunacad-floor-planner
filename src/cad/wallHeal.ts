@@ -148,7 +148,10 @@ function healEnd(
       if (inc.wallId === wall.id || inc.kind === "tjunction") continue;
       const ow = others.find(w => w.id === inc.wallId);
       if (!ow || ow.corners.length < 2) continue;
-      if (ow.priority < wall.priority) continue;
+      // Nur die Hauptlinie respektiert die Priorität. Help-/Sublinien MÜSSEN
+      // auf beiden Seiten dieselbe Geometrie berechnen, sonst driften die
+      // gegenüberliegenden Kanten (besonders bei Wölbung) auseinander.
+      if (T === "main" && ow.priority < wall.priority) continue;
       const isStart = inc.kind === "start";
       const c = endpointLineCorners(ow, isStart);
       const op = T === "main" ? c.main : T === "help" ? c.help : c.sub;
