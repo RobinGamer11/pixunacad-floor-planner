@@ -208,5 +208,5 @@ export function __debugFaces(scene: Scene, click: Vec2) {
   const sub = subdivideEdges(raw);
   const { faceLoops } = buildPlanarFaces(sub);
   return faceLoops.map((l) => ({ n: l.length, signed: polygonSignedArea(l), inside: pointInPolygon(click, l) }))
-    .filter((f) => f.inside);
+    ;
 }
