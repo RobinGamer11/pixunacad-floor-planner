@@ -19,6 +19,7 @@ import { WallSettingsPanel } from "@/components/cad/WallSettingsPanel";
 import { HatchPatternBlock } from "@/components/cad/HatchPatternBlock";
 
 import { ToolHelpNotes } from "@/components/cad/ToolHelpNotes";
+import { MappeHelpOverlay } from "@/components/workspace/MappeHelpOverlay";
 import { RasterModeToggle } from "@/components/cad/RasterModeToggle";
 
 import { DocumentFilterPanel } from "@/components/cad/DocumentFilterPanel";
@@ -1779,6 +1780,16 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
         {/* Canvas */}
         <canvas ref={canvasRef} className="block w-full h-full" />
 
+        {/* Hilfeanzeige wie in der Mappe — werkzeugabhängig. */}
+        {!presenting && (
+          <MappeHelpOverlay
+            guideActive={activeTool === ToolIds.SELECT}
+            lineActive={activeTool === ToolIds.LINE || activeTool === ToolIds.FREE}
+            hatchActive={activeTool === ToolIds.HATCH}
+            textActive={activeTool === ToolIds.TEXT}
+          />
+        )}
+
         {/* Maßstab der Zeichenoberfläche ist fix 1:1 — kein UI mehr. */}
       </div>
       {/* Right Tab Panel */}
@@ -2626,7 +2637,13 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
 
           {/* Freihand-Tool-Panel */}
           {(activeTool === ToolIds.FREE || (activeTool === ToolIds.SELECT && selectedFreeStrokeId)) && (
-            <FreeDrawSettingsPanel app={appRef.current} units="m" projectId={projectId} />
+            <div className="cad-settings-panel mb-2">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Freihand</div>
+              <RasterModeToggle app={appRef.current} projectId={projectId} />
+              <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
+                <FreeDrawSettingsPanel app={appRef.current} units="m" projectId={projectId} framedCad />
+              </div>
+            </div>
           )}
 
           {/* Eraser-Tool-Panel — Modus liegt über dem Einstellungsrahmen */}
@@ -3195,7 +3212,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 <div><span className="cad-kbd">Text beenden</span> Außerhalb Textfeld klicken</div>
               </div>
             </div>
-          ) : activeTool !== ToolIds.ERASER ? (
+          ) : (activeTool !== ToolIds.ERASER && activeTool !== ToolIds.PIPETTE && activeTool !== ToolIds.SELECT) ? (
             <ToolHelpNotes toolId={activeTool} />
           ) : null}
         </div>
