@@ -21,7 +21,9 @@ describe("fill curved", () => {
     const g = new WallTopologyGraph(); g.build(walls as any);
     const scene: any = { segments: [], walls, hatches: [], freeStrokes: [], getWallTopology: () => g };
     const dbg = (__debugFaces as any)(scene, v(2, 1.5));
-    console.log(dbg);
+    const big = (dbg as any[]).find(l => Math.abs(polygonAreaAbs(l) - 7.3) < 0.1);
+    console.log(JSON.stringify(big.map((q:any)=>[+q.x.toFixed(3), +q.y.toFixed(3)])));
+    console.log("in?", pointInPolygon(v(2,1.5), big));
     const face = findEnclosingFace(scene, v(2, 1.5));
     expect(face).toBeTruthy();
     console.log("area", polygonAreaAbs(face!), "pts", face!.length);
