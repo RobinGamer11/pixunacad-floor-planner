@@ -4317,20 +4317,23 @@ export class SelectTool {
           continue;
         }
 
-        // Hatch → gefülltes Polygon in Blau.
+        // Hatch → gefülltes Polygon in Blau (folgt Kantenwölbungen).
         if (kind === "hatch" && Array.isArray(obj.points) && obj.points.length >= 3) {
+          const outer = tessellateWithBulges(obj.points, obj.bulges, true, 32);
           ctx.save();
           ctx.beginPath();
-          const p0 = cam.worldToScreen(obj.points[0].x, obj.points[0].y);
+          const p0 = cam.worldToScreen(outer[0].x, outer[0].y);
           ctx.moveTo(p0.x, p0.y);
-          for (let i = 1; i < obj.points.length; i++) {
-            const p = cam.worldToScreen(obj.points[i].x, obj.points[i].y);
+          for (let i = 1; i < outer.length; i++) {
+            const p = cam.worldToScreen(outer[i].x, outer[i].y);
             ctx.lineTo(p.x, p.y);
           }
           ctx.closePath();
           const holes = obj.holes || [];
-          for (const loop of holes) {
-            if (!loop || loop.length < 3) continue;
+          for (let hi = 0; hi < holes.length; hi++) {
+            const raw = holes[hi];
+            if (!raw || raw.length < 3) continue;
+            const loop = tessellateWithBulges(raw, obj.holeBulges?.[hi], true, 32);
             const h0 = cam.worldToScreen(loop[0].x, loop[0].y);
             ctx.moveTo(h0.x, h0.y);
             for (let i = 1; i < loop.length; i++) {
@@ -4349,9 +4352,12 @@ export class SelectTool {
         }
 
         // Fallback: dicker blauer Umriss entlang der Geometrie.
-        const pts = this._elementPoints(kind, obj);
-        if (!pts || pts.length < 2) continue;
-        const closed = pts.length >= 3 && kind !== "segment" && kind !== "dimension";
+        const rawPts = this._elementPoints(kind, obj);
+        if (!rawPts || rawPts.length < 2) continue;
+        const closed = rawPts.length >= 3 && kind !== "segment" && kind !== "dimension";
+        const pts = (kind === "segment" && obj.bulge)
+          ? tessellateWithBulges(rawPts, [obj.bulge], false, 32)
+          : rawPts;
         ctx.save();
         ctx.strokeStyle = strokeCol;
         ctx.lineWidth = 2.5;
