@@ -166,6 +166,15 @@ function healEnd(
       }
     }
 
+    // Bevel-Begrenzung: zu weite Gehrungen auf healLimit kürzen.
+    {
+      const tAlong = (ideal.x - origin.x) * dir.x + (ideal.y - origin.y) * dir.y;
+      if (Math.abs(tAlong) > healLimit) {
+        const s = tAlong >= 0 ? healLimit : -healLimit;
+        ideal = v(origin.x + dir.x * s, origin.y + dir.y * s);
+      }
+    }
+
     polysSelf[T][idx] = ideal;
     healedAny = true;
   }
