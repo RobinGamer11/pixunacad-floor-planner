@@ -576,6 +576,8 @@ export class Wall {
   patternScale: number;
   /** Muster an Wandrichtung ausrichten (false = einheitliche Richtung bei allen Wänden). */
   patternAlignToWall: boolean;
+  /** Kantenwölbung je Bezugs-Segment (index-parallel zu corners[i] → corners[i+1]). */
+  bulges: number[];
   _stickerEditOwnerId?: string | null;
 
   constructor(opts: {
@@ -584,6 +586,7 @@ export class Wall {
     priority?: number; hiddenCornerIndices?: number[];
     cornerAnchors?: (WallCornerAnchor | null)[];
     patternId?: string; patternScale?: number; patternAlignToWall?: boolean;
+    bulges?: number[];
   }) {
     this.id = opts.id;
     this.kind = opts.kind;
@@ -604,6 +607,7 @@ export class Wall {
     this.patternId = opts.patternId || "none";
     this.patternScale = Math.max(0.1, Math.min(10, opts.patternScale ?? 2));
     this.patternAlignToWall = !!opts.patternAlignToWall;
+    this.bulges = Array.isArray(opts.bulges) ? opts.bulges.map(b => (Number.isFinite(b) ? b : 0)) : [];
     this._stickerEditOwnerId = null;
   }
 }
@@ -1232,6 +1236,7 @@ export class Scene {
     priority?: number; hiddenCornerIndices?: number[];
     cornerAnchors?: (WallCornerAnchor | null)[];
     patternId?: string; patternScale?: number; patternAlignToWall?: boolean;
+    bulges?: number[];
   }) {
     const w = new Wall({ id: this._makeId(), ...opts });
     w._stickerEditOwnerId = this._currentEditOwnerId;

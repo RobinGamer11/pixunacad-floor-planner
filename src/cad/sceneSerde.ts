@@ -100,6 +100,7 @@ export function restoreOneScene(scene: Scene, data: SerializedScene | null | und
       patternId: w.patternId,
       patternScale: w.patternScale,
       patternAlignToWall: !!w.patternAlignToWall,
+      bulges: Array.isArray(w.bulges) ? w.bulges : undefined,
     });
     if (w.id) (wall as any).id = w.id;
     if (w._stickerEditOwnerId) (wall as any)._stickerEditOwnerId = w._stickerEditOwnerId;
