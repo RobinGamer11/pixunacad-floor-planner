@@ -26,7 +26,9 @@ interface Props { app: CadApp | MiniCad | null; units?: "cm" | "m"; projectId?: 
   /** Bildschirm-Pixel pro Papiermillimeter (Projektmappe). */
   pxPerMm?: number;
   /** true = Titel, Objektart und Ebene liegen außerhalb (über dem Fensterrahmen). */
-  hideChrome?: boolean; }
+  hideChrome?: boolean;
+  /** CAD-Oberfläche: gleiches Layout wie in der Mappe, aber Ebene sichtbar und cm statt px. */
+  framedCad?: boolean; }
 
 const MeasureInput: React.FC<{
   label: string; value: number; digits: number; onChange: (v: number) => void;
@@ -55,7 +57,7 @@ const MeasureInput: React.FC<{
   );
 };
 
-export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", projectId, pxPerMm, hideChrome = false }) => {
+export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", projectId, pxPerMm, hideChrome = false, framedCad = false }) => {
 
 
   const [color, setColor] = useState("#111111");
@@ -178,7 +180,7 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
   };
 
   // Mappen-Layout (Papier): Farbe, px/mm-Strichstärke, Transparenz, gerahmte Buttons.
-  const sheetMode = hideChrome;
+  const sheetMode = hideChrome || framedCad;
   const pxPerMmSafe = Math.max(1e-6, pxPerMm ?? 96 / 25.4);
   const framedBtn = "w-full flex items-center justify-between gap-2 h-9 px-2 rounded-md border text-xs transition-colors hover:bg-muted";
   const framedStyle = { borderColor: "hsl(var(--hairline))" } as React.CSSProperties;
@@ -216,7 +218,7 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
       />
 
       <div className="space-y-3">
-        <label className={`block text-xs${hideChrome ? " hidden" : ""}`}>
+        <label className={`block text-xs${(hideChrome && !framedCad) ? " hidden" : ""}`}>
           <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Ebene{selectedStrokeId ? " (Auswahl)" : ""}</span>
           <select
             value={labelId || app.activeDrawLabelId}
@@ -265,12 +267,21 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
             <div>
               <div className="mb-1.5 text-[10px] text-muted-foreground">Strichstärke</div>
               <div className="grid grid-cols-2 gap-2">
-                <MeasureInput
-                  label="Bildschirm (px)"
-                  value={thicknessMm * pxPerMmSafe}
-                  digits={2}
-                  onChange={(px) => setThicknessMm(px / pxPerMmSafe)}
-                />
+                {framedCad ? (
+                  <MeasureInput
+                    label="Zeichnung (cm)"
+                    value={thicknessMm / 10}
+                    digits={2}
+                    onChange={(cm) => setThicknessMm(cm * 10)}
+                  />
+                ) : (
+                  <MeasureInput
+                    label="Bildschirm (px)"
+                    value={thicknessMm * pxPerMmSafe}
+                    digits={2}
+                    onChange={(px) => setThicknessMm(px / pxPerMmSafe)}
+                  />
+                )}
                 <MeasureInput
                   label="Tatsächliche Größe (mm)"
                   value={thicknessMm}
