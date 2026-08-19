@@ -611,7 +611,7 @@ export default function ProjectWorkspace() {
   const [toolSettings, setToolSettings] = useState<ToolSettings>({
     select: { multi: false, marqueeMode: "click" },
     guide: { color: "#4DA3FF", strokeWidth: 1, locked: false },
-    line: { color: "#111111", thicknessMm: 0.5, alpha: 100 },
+    line: { color: "#111111", thicknessMm: 0.19, alpha: 100 },
     text: {
       fontSize: 11,
       color: "#111111",
@@ -2260,7 +2260,7 @@ type ToolSettings = {
 const DEFAULT_TOOL_SETTINGS: ToolSettings = {
   select: { multi: false, marqueeMode: "click" },
   guide: { color: "#4DA3FF", strokeWidth: 1, locked: false },
-  line: { color: "#111111", thicknessMm: 0.5, alpha: 100 },
+  line: { color: "#111111", thicknessMm: 0.19, alpha: 100 },
   text: {
     fontSize: 11,
     color: "#111111",
@@ -5580,14 +5580,14 @@ function ToolsTab({
           onChange={(p) => updateToolSettings("guide", p)}
         />
       )}
-      {settingsTool === "line" && cadEngine && (
-        <RasterModeToggle app={cadEngine} projectId={projectId} />
-      )}
       {(settingsTool === "line" || settingsTool === "free") && (
         <LineModeSelect
           value={settingsTool === "free" ? "free" : "line"}
           onChange={(next) => { if (next !== settingsTool) setActiveTool(next); }}
         />
+      )}
+      {settingsTool === "line" && cadEngine && (
+        <RasterModeToggle app={cadEngine} projectId={projectId} />
       )}
       {settingsTool === "line" && (
         <LineSettings
@@ -6179,19 +6179,6 @@ function LineSnapSettings({
           ) : null}
         </div>
       </Row>
-      {onDuplicate && (
-        <Row label="Aktion">
-          <button
-            type="button"
-            onClick={onDuplicate}
-            className="h-7 px-2 rounded-md border text-xs inline-flex items-center gap-1"
-            style={{ borderColor: "hsl(var(--hairline))" }}
-            title="Auswahl duplizieren (leichter Versatz)"
-          >
-            <Copy size={12} /> Duplizieren
-          </button>
-        </Row>
-      )}
       <div className="text-[11px] text-muted-foreground">
         Mittelpunkt = Halbierungs-Snap (50 %). Teilung N (z. B. 3, 4) erzeugt N-1
         zusätzliche Snap-Punkte für gleiche Abschnitte. Beide Optionen sind
