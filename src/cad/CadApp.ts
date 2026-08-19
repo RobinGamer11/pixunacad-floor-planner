@@ -552,10 +552,25 @@ export class CadApp {
           this.selectTool.beginHatchPointBulge((sel as any).hatchId, (sel as any).pointIndex, (sel as any).holeIndex ?? null);
           return;
         }
+        if (sel.type === SelectionType.WALL && (sel as any).wallId && (sel as any).edgeIndex != null) {
+          this.selectTool.beginWallEdgeBulge((sel as any).wallId, (sel as any).edgeIndex);
+          return;
+        }
         if ((sel as any).segmentId) {
           this.selectTool.beginSegmentBulge((sel as any).segmentId);
           return;
         }
+      }
+      if (action === PointEditAction.SPLIT && sel) {
+        if (sel.type === SelectionType.WALL && (sel as any).wallId && (sel as any).edgeIndex != null) {
+          this.selectTool.beginWallSplit((sel as any).wallId, (sel as any).edgeIndex);
+          return;
+        }
+        if ((sel as any).segmentId) {
+          this.selectTool.beginSegmentSplit((sel as any).segmentId);
+          return;
+        }
+        return;
       }
       if (action === PointEditAction.OFFSET && sel && sel.type === SelectionType.HATCH && (sel as any).hatchId && (sel as any).edgeIndex != null) {
         this.selectTool.beginHatchEdgeOffset((sel as any).hatchId, (sel as any).edgeIndex, (sel as any).holeIndex ?? null);
