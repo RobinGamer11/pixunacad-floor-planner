@@ -2288,6 +2288,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           <div ref={measureSettingsRef} className={`cad-settings-panel hidden`}>
             {/* Engine-Bindings ohne eigene Oberfläche */}
             <div className="hidden">
+              <select ref={measureIdSelectRef} />
+
               <select ref={measureOrientationRef} defaultValue="parallel">
                 <option value="parallel">Parallel</option>
                 <option value="diagonal">Schräg</option>
