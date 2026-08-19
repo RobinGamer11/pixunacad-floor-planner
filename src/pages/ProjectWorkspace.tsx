@@ -5081,6 +5081,14 @@ function RightInspector({
           )}
           {tab === "layers" && page && (
             <div className="space-y-4">
+              {helpOn && (
+                <div
+                  className="rounded-lg px-3 py-2 text-[11px] font-medium"
+                  style={{ background: "hsl(220 18% 16%)", color: "hsl(0 0% 100% / 0.92)" }}
+                >
+                  Höchste Ebene = Im Vordergrund
+                </div>
+              )}
               {/* Ein einziges Ebenen-/Bezeichnungs-ID-System — identisch zur
                  CAD-Oberfläche. CAD-Blätter, Dokumente, Notizen, Tabellen
                  usw. werden über den `externalLabelCounter`-Hook direkt in
