@@ -51,6 +51,8 @@ export class SelectTool {
   otherPointOriginal: Vec2 | null = null;
   // Snapshot of all hatch points at edit start (for translate/rotate of full polygon if needed)
   hatchPointsOriginal: Vec2[] | null = null;
+  /** Snapshot aller Loch-Loops beim Edit-Start (für Ganz-Objekt-Rotation). */
+  private _hatchHolesOriginal: Vec2[][] | null = null;
 
   // Hatch-edge-offset state
   hatchEdgeAOriginal: Vec2 | null = null;
@@ -1295,7 +1297,7 @@ export class SelectTool {
     const nextAng = ((vals.angleDeg != null ? vals.angleDeg : angleDeg(this.fixedPoint!, this.otherPointOriginal!)) % 360 + 360) % 360;
 
     const p = pointFromLengthAngle(this.fixedPoint!, nextLen, nextAng);
-    this._applyMovingPoint(p, this.fixedPoint!);
+    if (!this._applyHatchRotate(nextAng)) this._applyMovingPoint(p, this.fixedPoint!);
 
     this.app.hub.setValues(nextLen, nextAng);
     this.app.hub.updateDisplay(nextLen, nextAng);
@@ -1545,6 +1547,40 @@ export class SelectTool {
     }
   }
 
+
+  /** Rotate the WHOLE hatch polygon (inkl. Löcher) around `fixedPoint`
+   *  (= Polygon-Schwerpunkt) auf den absoluten Winkel `newAngleDeg`.
+   *  Ohne diese Sonderbehandlung würde beim Drehen nur der angefasste
+   *  Fangpunkt wandern statt des kompletten Objekts. */
+  private _applyHatchRotate(newAngleDeg: number): boolean {
+    const t: any = this.editTarget;
+    if (!t || (t.kind !== "hatch" && t.kind !== "hatchHole")) return false;
+    if (!this.hatchPointsOriginal || !this.fixedPoint || !this.otherPointOriginal) return false;
+    const hatch = this.app.scene.getHatchById(t.hatchId);
+    if (!hatch) return false;
+    const baseAng = angleDeg(this.fixedPoint, this.otherPointOriginal);
+    const dRad = ((newAngleDeg - baseAng) * Math.PI) / 180;
+    const c = Math.cos(dRad), sn = Math.sin(dRad);
+    const piv = this.fixedPoint;
+    const rot = (o: Vec2): Vec2 => {
+      const dx = o.x - piv.x, dy = o.y - piv.y;
+      return v(piv.x + dx * c - dy * sn, piv.y + dx * sn + dy * c);
+    };
+    if (this._hatchHolesOriginal) {
+      for (let h = 0; h < (hatch.holes?.length ?? 0); h++) {
+        const orig = this._hatchHolesOriginal[h];
+        if (!orig) continue;
+        for (let i = 0; i < hatch.holes![h].length && i < orig.length; i++) {
+          hatch.holes![h][i] = rot(orig[i]);
+        }
+      }
+    }
+    const outer = t.kind === "hatch" ? hatch.points : hatch.points;
+    for (let i = 0; i < outer.length && i < this.hatchPointsOriginal.length; i++) {
+      outer[i] = rot(this.hatchPointsOriginal[i]);
+    }
+    return true;
+  }
 
   /** Rotate ALL points of the currently edited free-stroke around `fixedPoint`
    *  to the absolute angle `newAngleDeg` (relative to the original first point). */
@@ -2990,6 +3026,8 @@ export class SelectTool {
             this._applyWallRotateHubValues({ lengthM: null, angleDeg: ang });
           } else if ((this.editTarget as any)?.kind === "freeStroke") {
             this._applyFreeStrokeRotate(ang);
+          } else if (this._applyHatchRotate(ang)) {
+            // Schraffur wurde als Ganzes gedreht.
           } else {
             this._applyMovingPoint(p, this.fixedPoint!);
           }
