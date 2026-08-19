@@ -353,6 +353,29 @@
   }
 
 
+  /* Icon-only Buttons (quadratisch, ohne Text): Symbol exakt mittig.
+     Ohne diese Regel verschiebt der Flex-Gap bzw. die Standard-Inline-
+     Ausrichtung des SVG das Verschieben-/Drehen-Symbol leicht aus der Mitte. */
+  .cad-toolbar-btn.px-0,
+  button[data-hub-control],
+  .cad-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    padding: 0;
+    line-height: 0;
+  }
+
+  .cad-toolbar-btn.px-0 > svg,
+  button[data-hub-control] > svg,
+  .cad-icon-btn > svg,
+  .cad-point-menu button > svg {
+    display: block;
+    flex: 0 0 auto;
+    margin: 0 auto;
+  }
+
   /* Kompaktere Toolbar-Buttons in den rechten Werkzeugeinstellungen. */
   .cad-settings-panel .cad-toolbar-btn {
     @apply px-2 py-1 text-[11px] gap-1;
