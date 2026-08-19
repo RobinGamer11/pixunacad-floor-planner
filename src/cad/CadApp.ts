@@ -2283,6 +2283,18 @@ export class CadApp {
 
         if (this.isStickerEditing()) { this.exitStickerEdit(); this.clearSelection(); return; }
         if (this.pastePreviewActive) { this.cancelPastePreview(); return; }
+        // Stufe 1: Läuft gerade eine Zeichen-Aktion? Dann NUR diese abbrechen —
+        // das Werkzeug bleibt aktiv. Erst der nächste ESC wechselt zur Auswahl.
+        {
+          const t: any = this.activeTool as any;
+          if (t && t !== this.selectTool && typeof t.isDrawing === "function" && t.isDrawing()) {
+            e.preventDefault();
+            t.cancel();
+            return;
+          }
+          if (t === this.stickerTool && this.stickerTool.phase !== "idle") { e.preventDefault(); this.stickerTool.cancel(); return; }
+          if (t === this.documentTool && this.documentTool.phase !== "idle") { e.preventDefault(); this.documentTool.cancel(); return; }
+        }
         if (this.activeTool === this.lineTool) { this.lineTool.cancel(); this.clearSelection(); this.setSelectedLabelId(null); this.setTool(ToolIds.SELECT); return; }
         if (this.activeTool === this.hatchTool) { this.hatchTool.cancel(); this.clearSelection(); this.setTool(ToolIds.SELECT); return; }
         if (this.activeTool === this.textTool) { this.textTool.cancel(); this.clearSelection(); this.setSelectedLabelId(null); this.setTool(ToolIds.SELECT); return; }

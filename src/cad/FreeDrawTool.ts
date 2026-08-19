@@ -23,7 +23,7 @@ export class FreeDrawTool {
 
   constructor(app: CadApp) {
     this.app = app;
-    this._rulerDrag = new RulerDragController(app);
+    this._rulerDrag = new RulerDragController(app, { handlesOnly: true });
   }
 
   activate() {
@@ -45,6 +45,9 @@ export class FreeDrawTool {
 
   finish() { this.cancel(); }
 
+  /** True, solange ein Strich aktiv gezeichnet wird (für ESC-Stufe 1). */
+  isDrawing() { return this._drawing && this._points.length > 0; }
+
   getCursor() {
     const c = this._rulerDrag.hoverCursor(this.app.input);
     return c || "crosshair";
@@ -59,7 +62,19 @@ export class FreeDrawTool {
     }
     const ruler = this.app.scene.rulerGuide;
     const rawW = v(input.mouse.wx, input.mouse.wy);
-    const projW = ruler ? projectPointToInfiniteLineFromTwoPoints(rawW, ruler.a, ruler.b) : rawW;
+    let projW = ruler ? projectPointToInfiniteLineFromTwoPoints(rawW, ruler.a, ruler.b) : rawW;
+    // Zeichenseite relativ zum Lineal: links / mittig / rechts der Linienführung.
+    const side = (this.app as any).defaultFreeRulerSide ?? "center";
+    if (ruler && side !== "center") {
+      const dx = ruler.b.x - ruler.a.x, dy = ruler.b.y - ruler.a.y;
+      const len = Math.hypot(dx, dy);
+      if (len > 1e-9) {
+        const off = Math.max(1e-6, (this.app.defaultFreeThicknessM ?? 0.01) / 2);
+        const nx = -dy / len, ny = dx / len;
+        const s = side === "left" ? 1 : -1;
+        projW = v(projW.x + nx * off * s, projW.y + ny * off * s);
+      }
+    }
 
     if (!this._drawing && input.mouse.left && input.clicked) {
       this._drawing = true;
