@@ -165,7 +165,7 @@ export class TopologyEngine {
         if (this._isHiddenWallCorner(wall, pi)) continue;
         const p = ref[pi];
         const px = this._worldToMousePx(p, mouseS);
-        if (px > Defaults.snapPx) continue;
+        if (px > Defaults.wallSnapPx) continue;
         register(
           { type: SnapType.POINT, world: v(p.x, p.y), segment: null, hatch: null, pointIndex: -1, edgeIndex: null, t: null, px, wallId: wall.id, wallLine: "main" },
           prioBias + px + MAIN_PEN,
@@ -175,7 +175,7 @@ export class TopologyEngine {
         const a = ref[i], b = ref[i + 1];
         const proj = projectPointToCurvedEdge(mouseW, a, b, (wall as any).bulges?.[i] || 0);
         const px = this._worldToMousePx(proj.q, mouseS);
-        if (px > Defaults.snapPx) continue;
+        if (px > Defaults.wallSnapPx) continue;
         if (proj.t <= Defaults.splitEpsT || proj.t >= 1 - Defaults.splitEpsT) continue;
         register(
           { type: SnapType.LINE, world: v(proj.q.x, proj.q.y), segment: null, hatch: null, pointIndex: null, edgeIndex: i, t: proj.t, px, lineA: a, lineB: b, wallId: wall.id, wallLine: "main" },
@@ -194,7 +194,7 @@ export class TopologyEngine {
           if (this._isHiddenWallCorner(wall, pi)) continue;
           const p = mainPts[pi];
           const px = this._worldToMousePx(p, mouseS);
-          if (px > Defaults.snapPx) continue;
+          if (px > Defaults.wallSnapPx) continue;
           register(
             { type: SnapType.POINT, world: v(p.x, p.y), segment: null, hatch: null, pointIndex: -1, edgeIndex: null, t: null, px, wallId: wall.id, wallLine: "main" },
             prioBias + px + MAIN_PEN,
@@ -204,7 +204,7 @@ export class TopologyEngine {
           const a = mainPts[i], b = mainPts[i + 1];
           const proj = projectPointToSegment(mouseW, a, b);
           const px = this._worldToMousePx(proj.q, mouseS);
-          if (px > Defaults.snapPx) continue;
+          if (px > Defaults.wallSnapPx) continue;
           if (proj.t <= Defaults.splitEpsT || proj.t >= 1 - Defaults.splitEpsT) continue;
           register(
             { type: SnapType.LINE, world: v(proj.q.x, proj.q.y), segment: null, hatch: null, pointIndex: null, edgeIndex: null, t: proj.t, px, lineA: a, lineB: b, wallId: wall.id, wallLine: "main" },
@@ -217,7 +217,7 @@ export class TopologyEngine {
           if (this._isHiddenWallCorner(wall, pi)) continue;
           const p = subPts[pi];
           const px = this._worldToMousePx(p, mouseS);
-          if (px > Defaults.snapPx) continue;
+          if (px > Defaults.wallSnapPx) continue;
           register(
             { type: SnapType.POINT, world: v(p.x, p.y), segment: null, hatch: null, pointIndex: pi, edgeIndex: null, t: null, px, wallId: wall.id, wallLine: "sub" },
             prioBias + px + SUB_PEN,
@@ -227,7 +227,7 @@ export class TopologyEngine {
           const a = subPts[i], b = subPts[i + 1];
           const proj = projectPointToSegment(mouseW, a, b);
           const px = this._worldToMousePx(proj.q, mouseS);
-          if (px > Defaults.snapPx) continue;
+          if (px > Defaults.wallSnapPx) continue;
           if (proj.t <= Defaults.splitEpsT || proj.t >= 1 - Defaults.splitEpsT) continue;
           register(
             { type: SnapType.LINE, world: v(proj.q.x, proj.q.y), segment: null, hatch: null, pointIndex: null, edgeIndex: i, t: proj.t, px, lineA: a, lineB: b, wallId: wall.id, wallLine: "sub" },
