@@ -5873,12 +5873,6 @@ function DocumentToolSettings({
         </Row>
       </div>
 
-      <div className="text-[10px] leading-relaxed text-muted-foreground pt-2 border-t" style={{ borderColor: "hsl(var(--hairline))" }}>
-        {useScale
-          ? <div>Import im gewählten Maßstab (z. B. {scale}).</div>
-          : <div>Freie Platzierung — Maßstab kann nachträglich gesetzt werden.</div>}
-        <div>Bearbeiten (Skalieren, Drehen, Verzerren, Spiegeln): <strong>Auswahl-Werkzeug</strong> → Dokument anklicken.</div>
-      </div>
     </SettingsBlock>
   );
 }
