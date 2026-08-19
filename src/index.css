@@ -1033,3 +1033,8 @@
 [data-export-only] { display: none; }
 .finance-exporting [data-export-hide] { display: none !important; }
 .finance-exporting [data-export-only] { display: block !important; }
+
+/* Blaue Regler im generellen Design (Werkzeugeinstellungen) */
+.pixuna-range {
+  accent-color: hsl(var(--primary));
+}

@@ -15,7 +15,7 @@ import { FreeDrawSettingsPanel } from "@/components/cad/FreeDrawSettingsPanel";
 import { EraserSettingsPanel } from "@/components/cad/EraserSettingsPanel";
 import { ProjectFilePickerDialog } from "@/components/cad/ProjectFilePickerDialog";
 import { WallSettingsPanel } from "@/components/cad/WallSettingsPanel";
-import { HatchPatternControls } from "@/components/cad/HatchPatternControls";
+import { HatchPatternBlock } from "@/components/cad/HatchPatternBlock";
 
 import { ToolHelpNotes } from "@/components/cad/ToolHelpNotes";
 import { RasterModeToggle } from "@/components/cad/RasterModeToggle";
@@ -2084,7 +2084,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 <label>Transparenz (0–100%)</label>
                 <input ref={hatchAlphaRef} type="text" defaultValue="35" />
               </div>
-              <HatchPatternControls app={cadApp} />
+              <HatchPatternBlock app={cadApp} scaleMax={60} />
 
               <div className="flex items-center gap-2 mt-1">
                 <input
