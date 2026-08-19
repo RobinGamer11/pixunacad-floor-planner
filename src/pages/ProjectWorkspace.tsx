@@ -606,7 +606,8 @@ export default function ProjectWorkspace() {
     if (t !== "hatch") setHatchToolFlyoutOpen(false);
     if (t !== null) setSelectToolFlyoutOpen(false);
     if (t) setSelectedCadTool(undefined);
-    if (t) setRightTabState("tools");
+    // Auswahl-Werkzeug (t === null) → Seiteneinstellungen automatisch öffnen.
+    setRightTabState(t ? "tools" : "settings");
   };
 
   // Werkzeug-Modi links schließen sich automatisch, sobald das jeweilige
