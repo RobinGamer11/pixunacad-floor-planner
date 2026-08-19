@@ -93,7 +93,7 @@ export class MeasureTool {
 
 
 
-  getOrientationMode(): "parallel" | "diagonal" {
+  getOrientationMode(): "parallel" | "diagonal" | "arc" {
     return this.app.measureSettings.orientation;
   }
 
@@ -160,12 +160,53 @@ export class MeasureTool {
     return v(anchor.x + axis.x * t, anchor.y + axis.y * t);
   }
 
+  /** Sucht die Wölbung einer bestehenden Kante zwischen zwei Punkten (Linie, Schraffur, Wand). */
+  private _findEdgeBulge(a: Vec2, b: Vec2): number {
+    const tol = 1e-6 + 0.005;
+    const same = (p: Vec2, q: Vec2) => Math.hypot(p.x - q.x, p.y - q.y) <= tol;
+    const scene: any = this.app.scene;
+
+    for (const seg of scene.segments || []) {
+      const bg = (seg as any).bulge || 0;
+      if (!bg) continue;
+      if (same(seg.a, a) && same(seg.b, b)) return bg;
+      if (same(seg.a, b) && same(seg.b, a)) return -bg;
+    }
+    const ringScan = (pts: Vec2[], bulges: number[] | undefined, closed: boolean): number | null => {
+      if (!pts || !bulges) return null;
+      const last = closed ? pts.length : pts.length - 1;
+      for (let i = 0; i < last; i++) {
+        const bg = bulges[i] || 0;
+        if (!bg) continue;
+        const p = pts[i], q = pts[(i + 1) % pts.length];
+        if (same(p, a) && same(q, b)) return bg;
+        if (same(p, b) && same(q, a)) return -bg;
+      }
+      return null;
+    };
+    for (const h of scene.hatches || []) {
+      const r = ringScan(h.points, (h as any).bulges, true);
+      if (r != null) return r;
+      const holes = (h as any).holes || [];
+      const holeBulges = (h as any).holeBulges || [];
+      for (let hi = 0; hi < holes.length; hi++) {
+        const rr = ringScan(holes[hi], holeBulges[hi], true);
+        if (rr != null) return rr;
+      }
+    }
+    for (const w of scene.walls || []) {
+      const r = ringScan(w.corners, (w as any).bulges, false);
+      if (r != null) return r;
+    }
+    return 0;
+  }
+
   private _canStartPlacement() {
     return this.selectedPoints.length >= 2;
   }
 
   private _buildPreviewSpecs(placementPoint: Vec2) {
-    const specs: Array<{ p1: Vec2; p2: Vec2; placementPoint: Vec2; mode: "parallel" | "diagonal"; refDir: Vec2 | null; style: DimensionStyle; doorRefId: string | null }> = [];
+    const specs: Array<{ p1: Vec2; p2: Vec2; placementPoint: Vec2; mode: "parallel" | "diagonal" | "arc"; refDir: Vec2 | null; style: DimensionStyle; doorRefId: string | null }> = [];
     if (this.selectedPoints.length < 2) return specs;
 
     const style = this.app.getCurrentMeasureStyle();
@@ -173,7 +214,23 @@ export class MeasureTool {
     const orientation = this.getOrientationMode();
     // Wenn eine Achse vorgegeben ist (H/V/Frei), erzwingen wir "parallel" damit
     // die gesamte Kette EINE gemeinsame Maßlinie hat.
-    const mode: "parallel" | "diagonal" = orientation;
+    const mode: "parallel" | "diagonal" | "arc" = orientation;
+
+    if (orientation === "arc") {
+      const pts = this.selectedPoints;
+      for (let i = 0; i < pts.length - 1; i++) {
+        const a = pts[i].world, b = pts[i + 1].world;
+        const bulge = this._findEdgeBulge(a, b);
+        specs.push({
+          p1: v(a.x, a.y), p2: v(b.x, b.y), placementPoint,
+          mode: "arc", refDir: null,
+          style: { ...style, bulge },
+          doorRefId: null,
+        });
+        if (this.getPointCountMode() === "two") break;
+      }
+      return specs;
+    }
 
     const axis = this._chainAxis();
     const anchor = this.selectedPoints[0].world;

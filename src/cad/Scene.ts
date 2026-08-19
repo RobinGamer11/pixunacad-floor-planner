@@ -141,6 +141,8 @@ export class Hatch {
 }
 
 export interface DimensionStyle {
+  /** Wölbung der gemessenen Kante (Modus "arc"). */
+  bulge?: number;
   textColor?: string;
   textSizePx?: number;
   lineColor?: string;
@@ -178,8 +180,10 @@ export class Dimension {
   p1: Vec2;
   p2: Vec2;
   placementPoint: Vec2;
-  mode: "parallel" | "diagonal";
+  mode: "parallel" | "diagonal" | "arc";
   refDir: Vec2 | null;
+  /** Wölbung der gemessenen Kante (nur Modus "arc"). */
+  bulge: number;
 
   textColor: string;
   textSizePx: number;
@@ -221,7 +225,7 @@ export class Dimension {
 
   constructor({ id, p1, p2, placementPoint, mode, refDir, style, labelId, doorRefId }: {
     id: string; p1: Vec2; p2: Vec2; placementPoint: Vec2;
-    mode?: "parallel" | "diagonal"; refDir?: Vec2 | null; style?: DimensionStyle; labelId?: string;
+    mode?: "parallel" | "diagonal" | "arc"; refDir?: Vec2 | null; style?: DimensionStyle; labelId?: string;
     doorRefId?: string | null;
   }) {
     this.id = id;
@@ -232,6 +236,7 @@ export class Dimension {
     this.refDir = refDir ? v(refDir.x, refDir.y) : null;
 
     const s = style || {};
+    this.bulge = (typeof (s as any).bulge === "number") ? (s as any).bulge : 0;
     this.textColor = s.textColor || Defaults.measureTextColor;
     this.textSizePx = (typeof s.textSizePx === "number" && s.textSizePx > 0) ? s.textSizePx : Defaults.measureTextSizePx;
     this.lineColor = s.lineColor || Defaults.measureLineColor;
@@ -576,6 +581,8 @@ export class Wall {
   patternScale: number;
   /** Muster an Wandrichtung ausrichten (false = einheitliche Richtung bei allen Wänden). */
   patternAlignToWall: boolean;
+  /** Kantenwölbung je Bezugs-Segment (index-parallel zu corners[i] → corners[i+1]). */
+  bulges: number[];
   _stickerEditOwnerId?: string | null;
 
   constructor(opts: {
@@ -584,6 +591,7 @@ export class Wall {
     priority?: number; hiddenCornerIndices?: number[];
     cornerAnchors?: (WallCornerAnchor | null)[];
     patternId?: string; patternScale?: number; patternAlignToWall?: boolean;
+    bulges?: number[];
   }) {
     this.id = opts.id;
     this.kind = opts.kind;
@@ -604,6 +612,7 @@ export class Wall {
     this.patternId = opts.patternId || "none";
     this.patternScale = Math.max(0.1, Math.min(10, opts.patternScale ?? 2));
     this.patternAlignToWall = !!opts.patternAlignToWall;
+    this.bulges = Array.isArray(opts.bulges) ? opts.bulges.map(b => (Number.isFinite(b) ? b : 0)) : [];
     this._stickerEditOwnerId = null;
   }
 }
@@ -979,7 +988,7 @@ export class Scene {
   }
 
   // ---- Dimensions ----
-  createDimension(p1: Vec2, p2: Vec2, placementPoint: Vec2, mode: "parallel" | "diagonal", refDir: Vec2 | null, style: DimensionStyle = {}, doorRefId: string | null = null) {
+  createDimension(p1: Vec2, p2: Vec2, placementPoint: Vec2, mode: "parallel" | "diagonal" | "arc", refDir: Vec2 | null, style: DimensionStyle = {}, doorRefId: string | null = null) {
     const dim = new Dimension({ id: this._makeId(), p1, p2, placementPoint, mode, refDir, style, labelId: style.labelId, doorRefId });
     dim._stickerEditOwnerId = this._currentEditOwnerId;
     this.dimensions.push(dim);
@@ -1232,6 +1241,7 @@ export class Scene {
     priority?: number; hiddenCornerIndices?: number[];
     cornerAnchors?: (WallCornerAnchor | null)[];
     patternId?: string; patternScale?: number; patternAlignToWall?: boolean;
+    bulges?: number[];
   }) {
     const w = new Wall({ id: this._makeId(), ...opts });
     w._stickerEditOwnerId = this._currentEditOwnerId;

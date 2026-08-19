@@ -100,6 +100,7 @@ export function restoreOneScene(scene: Scene, data: SerializedScene | null | und
       patternId: w.patternId,
       patternScale: w.patternScale,
       patternAlignToWall: !!w.patternAlignToWall,
+      bulges: Array.isArray(w.bulges) ? w.bulges : undefined,
     });
     if (w.id) (wall as any).id = w.id;
     if (w._stickerEditOwnerId) (wall as any)._stickerEditOwnerId = w._stickerEditOwnerId;
@@ -113,7 +114,7 @@ export function restoreOneScene(scene: Scene, data: SerializedScene | null | und
       extensionStyle: d.extensionStyle, extensionColor: d.extensionColor, extensionAlpha: d.extensionAlpha,
       freeTextBold: d.freeTextBold, freeTextItalic: d.freeTextItalic, freeTextColor: d.freeTextColor,
       textGapPx: d.textGapPx, doorHeightText: d.doorHeightText,
-      labelId: d.labelId, mirror: d.mirror,
+      labelId: d.labelId, mirror: d.mirror, bulge: d.bulge,
     }, d.doorRefId || null);
     if (typeof d._textSideBase === "number") (dim as any)._textSideBase = d._textSideBase;
     if (d._stickerEditOwnerId) (dim as any)._stickerEditOwnerId = d._stickerEditOwnerId;

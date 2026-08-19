@@ -75,7 +75,7 @@ export interface TextEditorRefs {
 }
 
 export interface MeasureSettings {
-  orientation: "parallel" | "diagonal";
+  orientation: "parallel" | "diagonal" | "arc";
   /** "free" = Maßkette ohne Fangpunkt-Zwang. */
   pointCount: "two" | "multi" | "free";
   /** Achsen-Richtung der Maßkette. "free" wird aus den ersten zwei Punkten abgeleitet. */
@@ -552,10 +552,25 @@ export class CadApp {
           this.selectTool.beginHatchPointBulge((sel as any).hatchId, (sel as any).pointIndex, (sel as any).holeIndex ?? null);
           return;
         }
+        if (sel.type === SelectionType.WALL && (sel as any).wallId && (sel as any).edgeIndex != null) {
+          this.selectTool.beginWallEdgeBulge((sel as any).wallId, (sel as any).edgeIndex);
+          return;
+        }
         if ((sel as any).segmentId) {
           this.selectTool.beginSegmentBulge((sel as any).segmentId);
           return;
         }
+      }
+      if (action === PointEditAction.SPLIT && sel) {
+        if (sel.type === SelectionType.WALL && (sel as any).wallId && (sel as any).edgeIndex != null) {
+          this.selectTool.beginWallSplit((sel as any).wallId, (sel as any).edgeIndex);
+          return;
+        }
+        if ((sel as any).segmentId) {
+          this.selectTool.beginSegmentSplit((sel as any).segmentId);
+          return;
+        }
+        return;
       }
       if (action === PointEditAction.OFFSET && sel && sel.type === SelectionType.HATCH && (sel as any).hatchId && (sel as any).edgeIndex != null) {
         this.selectTool.beginHatchEdgeOffset((sel as any).hatchId, (sel as any).edgeIndex, (sel as any).holeIndex ?? null);
@@ -622,13 +637,14 @@ export class CadApp {
         patternId: w.patternId,
         patternScale: w.patternScale,
         patternAlignToWall: !!w.patternAlignToWall,
+        bulges: [...((w as any).bulges || [])],
         _stickerEditOwnerId: w._stickerEditOwnerId || null,
       })),
       dimensions: scene.dimensions.map(d => ({
         id: d.id,
         p1: { x: d.p1.x, y: d.p1.y }, p2: { x: d.p2.x, y: d.p2.y },
         placementPoint: { x: d.placementPoint.x, y: d.placementPoint.y },
-        mode: d.mode, refDir: d.refDir ? { x: d.refDir.x, y: d.refDir.y } : null,
+        mode: d.mode, refDir: d.refDir ? { x: d.refDir.x, y: d.refDir.y } : null, bulge: (d as any).bulge || 0,
         textColor: d.textColor, textSizePx: d.textSizePx, lineColor: d.lineColor,
         decimals: d.decimals, tickLengthM: d.tickLengthM, showExtensions: d.showExtensions,
         useFreeText: d.useFreeText, freeText: d.freeText,
@@ -791,6 +807,7 @@ export class CadApp {
         fillColor: w.fillColor,
         labelId: w.labelId,
         priority: w.priority,
+        bulges: Array.isArray(w.bulges) ? w.bulges : undefined,
       });
       if (w.id) (wall as any).id = w.id;
       if (w._stickerEditOwnerId) wall._stickerEditOwnerId = w._stickerEditOwnerId;
@@ -805,6 +822,7 @@ export class CadApp {
         freeTextBold: d.freeTextBold, freeTextItalic: d.freeTextItalic, freeTextColor: d.freeTextColor,
         textGapPx: d.textGapPx, doorHeightText: d.doorHeightText,
         mirror: !!d.mirror,
+        bulge: (d as any).bulge || 0,
         labelId: d.labelId,
       }, d.doorRefId || null);
       if (d._stickerEditOwnerId) dim._stickerEditOwnerId = d._stickerEditOwnerId;
@@ -1262,7 +1280,7 @@ export class CadApp {
         p1: { x: d.p1.x - newPos.x, y: d.p1.y - newPos.y },
         p2: { x: d.p2.x - newPos.x, y: d.p2.y - newPos.y },
         placementPoint: { x: d.placementPoint.x - newPos.x, y: d.placementPoint.y - newPos.y },
-        mode: d.mode, refDir: d.refDir ? { x: d.refDir.x, y: d.refDir.y } : null,
+        mode: d.mode, refDir: d.refDir ? { x: d.refDir.x, y: d.refDir.y } : null, bulge: (d as any).bulge || 0,
         textColor: d.textColor, textSizePx: d.textSizePx, lineColor: d.lineColor,
         decimals: d.decimals, tickLengthM: d.tickLengthM, showExtensions: d.showExtensions,
         useFreeText: d.useFreeText, freeText: d.freeText,
@@ -2727,7 +2745,7 @@ export class CadApp {
     });
 
     r.orientation.addEventListener("change", () => {
-      const val = r.orientation.value as "parallel" | "diagonal";
+      const val = r.orientation.value as "parallel" | "diagonal" | "arc";
       this.measureSettings.orientation = val;
       const sel = this.getSelectedDimension();
       if (sel) sel.mode = val;

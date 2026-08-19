@@ -32,7 +32,7 @@ export const Defaults = {
   areaBorderWidthPx: 1,
 
   // Measure (dimension) defaults
-  measureOrientation: "parallel" as "parallel" | "diagonal",
+  measureOrientation: "parallel" as "parallel" | "diagonal" | "arc",
   measurePointCount: "multi" as "two" | "multi" | "free",
   measureDirection: "free" as "horizontal" | "vertical" | "free",
 
@@ -174,5 +174,7 @@ export const PointEditAction = {
   DUPLICATE: "duplicate",
   /** Kante wölben (rein-/rauswölben) */
   BULGE: "bulge",
+  /** Objekt an einem Punkt aufschneiden (Linie/Wand teilen) */
+  SPLIT: "split",
 } as const;
 

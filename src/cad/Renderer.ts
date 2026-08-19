@@ -1309,8 +1309,13 @@ export class Renderer {
       ctx.strokeStyle = "rgba(77,163,255,0.95)";
       ctx.lineWidth = Math.max(4, this._segStrokePx(seg.thicknessM) + 1.4);
       ctx.beginPath();
-      ctx.moveTo(a.x, a.y);
-      ctx.lineTo(b.x, b.y);
+      if (bulgePts) {
+        ctx.moveTo(bulgePts[0].x, bulgePts[0].y);
+        for (let i = 1; i < bulgePts.length; i++) ctx.lineTo(bulgePts[i].x, bulgePts[i].y);
+      } else {
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+      }
       ctx.stroke();
     }
     ctx.restore();
@@ -1802,44 +1807,48 @@ export class Renderer {
 
     ctx.save();
     if (hatch.points.length >= 3) {
-      // Blue fill: outer minus holes (evenodd)
-      ctx.beginPath();
-      const p0 = cam.worldToScreen(hatch.points[0].x, hatch.points[0].y);
-      ctx.moveTo(p0.x, p0.y);
-      for (let i = 1; i < hatch.points.length; i++) {
-        const sp = cam.worldToScreen(hatch.points[i].x, hatch.points[i].y);
-        ctx.lineTo(sp.x, sp.y);
-      }
-      ctx.closePath();
-      const holes = hatch.holes || [];
-      for (const loop of holes) {
-        if (!loop || loop.length < 3) continue;
-        const h0 = cam.worldToScreen(loop[0].x, loop[0].y);
-        ctx.moveTo(h0.x, h0.y);
-        for (let i = 1; i < loop.length; i++) {
-          const hp = cam.worldToScreen(loop[i].x, loop[i].y);
-          ctx.lineTo(hp.x, hp.y);
+      const outer = tessellateWithBulges(hatch.points, (hatch as any).bulges, true, 32);
+      const holesRaw = hatch.holes || [];
+      const holeLoops = holesRaw.map((loop: any, hi: number) =>
+        (loop && loop.length >= 3) ? tessellateWithBulges(loop, (hatch as any).holeBulges?.[hi], true, 32) : null);
+      const tracePath = () => {
+        ctx.beginPath();
+        const p0 = cam.worldToScreen(outer[0].x, outer[0].y);
+        ctx.moveTo(p0.x, p0.y);
+        for (let i = 1; i < outer.length; i++) {
+          const sp = cam.worldToScreen(outer[i].x, outer[i].y);
+          ctx.lineTo(sp.x, sp.y);
         }
         ctx.closePath();
-      }
+      };
+      const traceHoles = () => {
+        for (const loop of holeLoops) {
+          if (!loop) continue;
+          const h0 = cam.worldToScreen(loop[0].x, loop[0].y);
+          ctx.moveTo(h0.x, h0.y);
+          for (let i = 1; i < loop.length; i++) {
+            const hp = cam.worldToScreen(loop[i].x, loop[i].y);
+            ctx.lineTo(hp.x, hp.y);
+          }
+          ctx.closePath();
+        }
+      };
+
+      // Blue fill: outer minus holes (evenodd)
+      tracePath();
+      traceHoles();
       ctx.fillStyle = "rgba(77,163,255,0.12)";
       ctx.fill("evenodd");
 
       // Outer outline
-      ctx.beginPath();
-      ctx.moveTo(p0.x, p0.y);
-      for (let i = 1; i < hatch.points.length; i++) {
-        const sp = cam.worldToScreen(hatch.points[i].x, hatch.points[i].y);
-        ctx.lineTo(sp.x, sp.y);
-      }
-      ctx.closePath();
+      tracePath();
       ctx.strokeStyle = "rgba(77,163,255,0.95)";
       ctx.lineWidth = Math.max(1.5, scaledStrokePx + 1.6);
       ctx.stroke();
 
       // Hole outlines (sichtbar als Kanten)
-      for (const loop of holes) {
-        if (!loop || loop.length < 3) continue;
+      for (const loop of holeLoops) {
+        if (!loop) continue;
         ctx.beginPath();
         const h0 = cam.worldToScreen(loop[0].x, loop[0].y);
         ctx.moveTo(h0.x, h0.y);
@@ -1907,8 +1916,15 @@ export class Renderer {
     ctx.strokeStyle = "rgba(77,163,255,0.95)";
     ctx.lineWidth = Math.max(segScreenThickness + 1.6, 4);
     ctx.beginPath();
-    ctx.moveTo(a.x, a.y);
-    ctx.lineTo(b.x, b.y);
+    if ((seg as any).bulge) {
+      const bp = tessellateWithBulges([seg.a, seg.b], [(seg as any).bulge], false, 32)
+        .map(p => cam.worldToScreen(p.x, p.y));
+      ctx.moveTo(bp[0].x, bp[0].y);
+      for (let i = 1; i < bp.length; i++) ctx.lineTo(bp[i].x, bp[i].y);
+    } else {
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+    }
     ctx.stroke();
 
     ctx.fillStyle = "rgba(77,163,255,0.12)";
@@ -2071,8 +2087,17 @@ export class Renderer {
     ctx.strokeStyle = baseStroke;
     ctx.lineWidth = isPreview ? 1.2 : 1.3;
     ctx.beginPath();
-    ctx.moveTo(d1.x, d1.y);
-    ctx.lineTo(d2.x, d2.y);
+    if (g.arcPts && g.arcPts.length > 2) {
+      const sp0 = cam.worldToScreen(g.arcPts[0].x, g.arcPts[0].y);
+      ctx.moveTo(sp0.x, sp0.y);
+      for (let i = 1; i < g.arcPts.length; i++) {
+        const sp = cam.worldToScreen(g.arcPts[i].x, g.arcPts[i].y);
+        ctx.lineTo(sp.x, sp.y);
+      }
+    } else {
+      ctx.moveTo(d1.x, d1.y);
+      ctx.lineTo(d2.x, d2.y);
+    }
     ctx.stroke();
 
     const tickDir = norm(sub(g.d2, g.d1));

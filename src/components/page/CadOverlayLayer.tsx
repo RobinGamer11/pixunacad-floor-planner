@@ -125,6 +125,7 @@ export default function CadOverlayLayer(props: Props) {
   const peOffsetRef = useRef<HTMLButtonElement>(null);
   const peInsertPointRef = useRef<HTMLButtonElement>(null);
   const peBulgeRef = useRef<HTMLButtonElement>(null);
+  const peSplitRef = useRef<HTMLButtonElement>(null);
   const peResizeRef = useRef<HTMLButtonElement>(null);
   const peDuplicateRef = useRef<HTMLButtonElement>(null);
   const teEditorRef = useRef<HTMLDivElement>(null);
@@ -175,6 +176,7 @@ export default function CadOverlayLayer(props: Props) {
           [PointEditAction.OFFSET]: peOffsetRef.current,
           [PointEditAction.INSERT_POINT]: peInsertPointRef.current!,
           [PointEditAction.BULGE]: peBulgeRef.current!,
+          [PointEditAction.SPLIT]: peSplitRef.current!,
           [PointEditAction.RESIZE]: peResizeRef.current!,
           [PointEditAction.DUPLICATE]: peDuplicateRef.current!,
         },
@@ -574,6 +576,7 @@ export default function CadOverlayLayer(props: Props) {
           <button ref={peOffsetRef} data-hub-control style={pointEditBtn} title="Kante rein-/rausziehen">⇆</button>
           <button ref={peInsertPointRef} data-hub-control style={pointEditBtn} title="Neuen Fangpunkt auf der Kante setzen">＋</button>
           <button ref={peBulgeRef} data-hub-control style={pointEditBtn} title="Kante wölben (rein-/rauswölben)">◠</button>
+          <button ref={peSplitRef} data-hub-control style={pointEditBtn} title="Aufschneiden (Punkt setzen, teilt in zwei verbundene Objekte)">✂</button>
           <button ref={peResizeRef} data-hub-control style={pointEditBtn} title="Box vergrößern/verkleinern">⤡</button>
           <button ref={peDuplicateRef} data-hub-control style={pointEditBtn} title="Duplizieren">⎘</button>
         </div>

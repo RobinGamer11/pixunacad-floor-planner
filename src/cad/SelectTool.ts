@@ -1,6 +1,6 @@
 import { drawSnapDot } from "./snapDraw";
 import { Defaults, SnapType, SelectionType, PointEditAction } from "./constants";
-import { Vec2, v, sub, add, mul, dot, dist, angleDeg, pointFromLengthAngle, projectPointToSegment, orthoSnapFromA, nearestAngleToReference, pointInPolygon, pointInHatchSolid, polygonCentroid, bulgeFromPoint, projectPointToInfiniteLine, lineLineIntersectionInfinite, norm, perpLeft, len } from "./geometry";
+import { Vec2, v, sub, add, mul, dot, dist, angleDeg, pointFromLengthAngle, projectPointToSegment, orthoSnapFromA, nearestAngleToReference, pointInPolygon, pointInHatchSolid, polygonCentroid, bulgeFromPoint, tessellateWithBulges, projectPointToInfiniteLine, lineLineIntersectionInfinite, norm, perpLeft, len } from "./geometry";
 import type { CadApp } from "./CadApp";
 import type { Snap, SnapExclusions } from "./TopologyEngine";
 import type { Input } from "./Input";
@@ -73,6 +73,9 @@ export class SelectTool {
   bulgeBOriginal: Vec2 | null = null;
   bulgeValue = 0;
   bulgeLocked = false;
+
+  // Split (Linie / Wand aufschneiden) state
+  splitPreview: Vec2 | null = null;
 
   // TextBox handle (corner) edit state
   textBoxOppositeOriginal: Vec2 | null = null; // world pos of opposite corner at edit start
@@ -1126,6 +1129,137 @@ export class SelectTool {
     this._showBulgeHub();
   }
 
+  /** Startet das Wölben einer Wandkante. */
+  beginWallEdgeBulge(wallId: string, edgeIndex: number) {
+    const wall: any = this.app.scene.getWallById(wallId);
+    if (!wall || !wall.corners || wall.corners.length < 2) return;
+    if (edgeIndex < 0 || edgeIndex >= wall.corners.length - 1) return;
+    this._clearTransformGuides();
+    this.activeEditAction = PointEditAction.BULGE;
+    this.editTarget = { kind: "wallEdgeBulge", wallId, edgeIndex };
+    const A = wall.corners[edgeIndex], B = wall.corners[edgeIndex + 1];
+    this.bulgeAOriginal = v(A.x, A.y);
+    this.bulgeBOriginal = v(B.x, B.y);
+    if (!Array.isArray(wall.bulges)) wall.bulges = [];
+    this.bulgeValue = wall.bulges[edgeIndex] || 0;
+    this.bulgeLocked = false;
+    this.app.pointEditMenu.hide();
+    this._showBulgeHub();
+  }
+
+  /* ---------------- Aufschneiden (Split) ---------------- */
+
+  /** Linie aufschneiden: nächster Klick setzt den neuen Fangpunkt. */
+  beginSegmentSplit(segmentId: string) {
+    const seg: any = this.app.scene.getSegmentById(segmentId);
+    if (!seg) return;
+    this._clearTransformGuides();
+    this.activeEditAction = PointEditAction.SPLIT;
+    this.editTarget = { kind: "segmentSplit", segmentId };
+    this.splitPreview = null;
+    this.app.pointEditMenu.hide();
+    this.app.hub.hide();
+  }
+
+  /** Wand aufschneiden: nächster Klick setzt den neuen Fangpunkt auf der Kante. */
+  beginWallSplit(wallId: string, edgeIndex: number) {
+    const wall: any = this.app.scene.getWallById(wallId);
+    if (!wall || !wall.corners || wall.corners.length < 2) return;
+    if (edgeIndex < 0 || edgeIndex >= wall.corners.length - 1) return;
+    this._clearTransformGuides();
+    this.activeEditAction = PointEditAction.SPLIT;
+    this.editTarget = { kind: "wallSplit", wallId, edgeIndex };
+    this.splitPreview = null;
+    this.app.pointEditMenu.hide();
+    this.app.hub.hide();
+  }
+
+  /** Aktueller Schnittpunkt (auf die gewählte Kante projizierte Maus). */
+  private _computeSplitPoint(input: any): Vec2 | null {
+    const t: any = this.editTarget;
+    if (!t) return null;
+    let A: Vec2 | null = null, B: Vec2 | null = null;
+    if (t.kind === "segmentSplit") {
+      const seg: any = this.app.scene.getSegmentById(t.segmentId);
+      if (!seg) return null;
+      A = seg.a; B = seg.b;
+    } else if (t.kind === "wallSplit") {
+      const wall: any = this.app.scene.getWallById(t.wallId);
+      if (!wall) return null;
+      A = wall.corners[t.edgeIndex]; B = wall.corners[t.edgeIndex + 1];
+    }
+    if (!A || !B) return null;
+    const raw = v(input.mouse.wx, input.mouse.wy);
+    const { t: tt, q } = projectPointToSegment(raw, A, B);
+    if (tt < 1e-4 || tt > 1 - 1e-4) return null;
+    return q;
+  }
+
+  /** Führt den Schnitt aus: aus einem Objekt werden zwei verbundene Objekte. */
+  private _commitSplit(p: Vec2) {
+    const t: any = this.editTarget;
+    if (!t) return;
+    const scene: any = this.app.scene;
+
+    if (t.kind === "segmentSplit") {
+      const seg: any = scene.getSegmentById(t.segmentId);
+      if (!seg) return;
+      const half = (seg.bulge || 0) / 2;
+      scene.createSegment(v(p.x, p.y), v(seg.b.x, seg.b.y), {
+        color: seg.color, thicknessM: seg.thicknessM, labelId: seg.labelId,
+        isGuide: seg.isGuide, midpointSnap: seg.midpointSnap, divisionSnap: seg.divisionSnap,
+        arrowStart: false, arrowEnd: seg.arrowEnd, arrowScale: seg.arrowScale, bulge: half,
+      });
+      seg.b = v(p.x, p.y);
+      seg.arrowEnd = false;
+      seg.bulge = half;
+      this.app.setSelection(null);
+      return;
+    }
+
+    if (t.kind === "wallSplit") {
+      const wall: any = scene.getWallById(t.wallId);
+      if (!wall) return;
+      const ei: number = t.edgeIndex;
+      const cornersA = wall.corners.slice(0, ei + 1).map((c: Vec2) => v(c.x, c.y)).concat([v(p.x, p.y)]);
+      const cornersB = [v(p.x, p.y)].concat(wall.corners.slice(ei + 1).map((c: Vec2) => v(c.x, c.y)));
+      const bul: number[] = Array.isArray(wall.bulges) ? wall.bulges : [];
+      const half = (bul[ei] || 0) / 2;
+      const bulA = bul.slice(0, ei).concat([half]);
+      const bulB = [half].concat(bul.slice(ei + 1));
+
+      // Türen/Fenster mitnehmen: Position entlang der Bezugslinie neu zuordnen.
+      const lenOf = (pts: Vec2[]) => {
+        let L = 0;
+        for (let i = 0; i < pts.length - 1; i++) L += dist(pts[i], pts[i + 1]);
+        return L;
+      };
+      const lenA = lenOf(cornersA);
+
+      const newWall = scene.createWall({
+        kind: wall.kind, thicknessM: wall.thicknessM, referenceSide: wall.referenceSide,
+        corners: cornersB, customName: "", color: wall.color, fillColor: wall.fillColor,
+        labelId: wall.labelId, priority: wall.priority,
+        patternId: wall.patternId, patternScale: wall.patternScale,
+        patternAlignToWall: wall.patternAlignToWall,
+        bulges: bulB,
+      });
+
+      wall.corners = cornersA;
+      wall.bulges = bulA;
+      wall.hiddenCornerIndices = (wall.hiddenCornerIndices || []).filter((i: number) => i < cornersA.length);
+      wall.cornerAnchors = new Array(cornersA.length).fill(null);
+
+      for (const d of (scene.doors || [])) {
+        if (d.wallId !== wall.id) continue;
+        if (d.posM > lenA) { d.wallId = newWall.id; d.posM = Math.max(0, d.posM - lenA); }
+      }
+
+      scene.markWallsDirty?.();
+      this.app.setSelection(null);
+    }
+  }
+
   private _bulgeChord(): number {
     if (!this.bulgeAOriginal || !this.bulgeBOriginal) return 0;
     return dist(this.bulgeAOriginal, this.bulgeBOriginal);
@@ -1156,6 +1290,15 @@ export class SelectTool {
     if (t.kind === "segmentBulge") {
       const seg: any = this.app.scene.getSegmentById(t.segmentId);
       if (seg) seg.bulge = bulge;
+      return;
+    }
+    if (t.kind === "wallEdgeBulge") {
+      const wall: any = this.app.scene.getWallById(t.wallId);
+      if (!wall) return;
+      if (!Array.isArray(wall.bulges)) wall.bulges = [];
+      while (wall.bulges.length < Math.max(0, wall.corners.length - 1)) wall.bulges.push(0);
+      wall.bulges[t.edgeIndex] = bulge;
+      this.app.scene.markWallsDirty?.();
       return;
     }
     if (t.kind === "hatchPointBulge") {
@@ -1910,6 +2053,7 @@ export class SelectTool {
     this.bulgeBOriginal = null;
     this.bulgeValue = 0;
     this.bulgeLocked = false;
+    this.splitPreview = null;
     this.textBoxOppositeOriginal = null;
     this.textBoxRotationOriginal = 0;
     this.textBoxWidthOriginal = 0;
@@ -3212,6 +3356,17 @@ export class SelectTool {
         return;
       }
 
+      if (this.activeEditAction === PointEditAction.SPLIT) {
+        this.splitPreview = this._computeSplitPoint(input);
+        if (editCommit) {
+          if (this.splitPreview) this._commitSplit(this.splitPreview);
+          this._clearEditState();
+          this.app.hub.hide();
+          (this.app as any).commitHistorySnapshot?.();
+        }
+        return;
+      }
+
       if (this.activeEditAction === PointEditAction.BULGE) {
         const chord = this._bulgeChord();
         if (!this.bulgeLocked && this.bulgeAOriginal && this.bulgeBOriginal) {
@@ -3610,6 +3765,8 @@ export class SelectTool {
               PointEditAction.OFFSET,
               PointEditAction.TRANSLATE,
               PointEditAction.ROTATE,
+              PointEditAction.BULGE,
+              PointEditAction.SPLIT,
             ]);
           } else {
             this.app.setSelection({ type: SelectionType.WALL, wallId: wallHit.wallId } as any);
@@ -3684,7 +3841,7 @@ export class SelectTool {
           const bseg: any = this.app.scene.getSegmentById((hit as any).segmentId);
           if (bseg && !bseg.isGuide) {
             const bmid = this.app.camera.worldToScreen((bseg.a.x + bseg.b.x) * 0.5, (bseg.a.y + bseg.b.y) * 0.5);
-            this.app.pointEditMenu.showAt(bmid.x, bmid.y, [PointEditAction.BULGE]);
+            this.app.pointEditMenu.showAt(bmid.x, bmid.y, [PointEditAction.BULGE, PointEditAction.SPLIT]);
           }
         }
         if ((hit as any).hatchId) this.app.showHatchSettingsPanel(true);
@@ -3995,6 +4152,30 @@ export class SelectTool {
       if (sn.world) {
         const s = cam.worldToScreen(sn.world.x, sn.world.y);
         drawSnapDot(ctx, s.x, s.y, { ring: true });
+      }
+      return;
+    }
+
+    if (this.activeEditAction === PointEditAction.SPLIT) {
+      const p = this.splitPreview;
+      if (p) {
+        const sp = cam.worldToScreen(p.x, p.y);
+        ctx.save();
+        ctx.fillStyle = "#ffffff";
+        ctx.strokeStyle = "rgba(77,163,255,0.95)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(sp.x, sp.y, 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.font = "600 11px ui-sans-serif, system-ui, sans-serif";
+        ctx.fillStyle = "rgba(18,18,20,0.85)";
+        const label = "Aufschneiden";
+        const tw = ctx.measureText(label).width;
+        ctx.fillRect(sp.x + 10, sp.y - 20, tw + 10, 18);
+        ctx.fillStyle = "#dbeafe";
+        ctx.fillText(label, sp.x + 15, sp.y - 7);
+        ctx.restore();
       }
       return;
     }
@@ -4317,20 +4498,23 @@ export class SelectTool {
           continue;
         }
 
-        // Hatch → gefülltes Polygon in Blau.
+        // Hatch → gefülltes Polygon in Blau (folgt Kantenwölbungen).
         if (kind === "hatch" && Array.isArray(obj.points) && obj.points.length >= 3) {
+          const outer = tessellateWithBulges(obj.points, obj.bulges, true, 32);
           ctx.save();
           ctx.beginPath();
-          const p0 = cam.worldToScreen(obj.points[0].x, obj.points[0].y);
+          const p0 = cam.worldToScreen(outer[0].x, outer[0].y);
           ctx.moveTo(p0.x, p0.y);
-          for (let i = 1; i < obj.points.length; i++) {
-            const p = cam.worldToScreen(obj.points[i].x, obj.points[i].y);
+          for (let i = 1; i < outer.length; i++) {
+            const p = cam.worldToScreen(outer[i].x, outer[i].y);
             ctx.lineTo(p.x, p.y);
           }
           ctx.closePath();
           const holes = obj.holes || [];
-          for (const loop of holes) {
-            if (!loop || loop.length < 3) continue;
+          for (let hi = 0; hi < holes.length; hi++) {
+            const raw = holes[hi];
+            if (!raw || raw.length < 3) continue;
+            const loop = tessellateWithBulges(raw, obj.holeBulges?.[hi], true, 32);
             const h0 = cam.worldToScreen(loop[0].x, loop[0].y);
             ctx.moveTo(h0.x, h0.y);
             for (let i = 1; i < loop.length; i++) {
@@ -4349,9 +4533,12 @@ export class SelectTool {
         }
 
         // Fallback: dicker blauer Umriss entlang der Geometrie.
-        const pts = this._elementPoints(kind, obj);
-        if (!pts || pts.length < 2) continue;
-        const closed = pts.length >= 3 && kind !== "segment" && kind !== "dimension";
+        const rawPts = this._elementPoints(kind, obj);
+        if (!rawPts || rawPts.length < 2) continue;
+        const closed = rawPts.length >= 3 && kind !== "segment" && kind !== "dimension";
+        const pts = (kind === "segment" && obj.bulge)
+          ? tessellateWithBulges(rawPts, [obj.bulge], false, 32)
+          : rawPts;
         ctx.save();
         ctx.strokeStyle = strokeCol;
         ctx.lineWidth = 2.5;

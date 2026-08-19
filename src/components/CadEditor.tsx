@@ -158,6 +158,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const pointOffsetBtnRef = useRef<HTMLButtonElement>(null);
   const pointInsertPointBtnRef = useRef<HTMLButtonElement>(null);
   const pointBulgeBtnRef = useRef<HTMLButtonElement>(null);
+  const pointSplitBtnRef = useRef<HTMLButtonElement>(null);
   const settingsRef = useRef<HTMLDivElement>(null);
   const idSelectRef = useRef<HTMLSelectElement>(null);
   const colorInputRef = useRef<HTMLInputElement>(null);
@@ -644,6 +645,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
         [PointEditAction.OFFSET]: pointOffsetBtnRef.current,
         [PointEditAction.INSERT_POINT]: pointInsertPointBtnRef.current!,
         [PointEditAction.BULGE]: pointBulgeBtnRef.current!,
+        [PointEditAction.SPLIT]: pointSplitBtnRef.current!,
       },
       settingsRef.current, idSelectRef.current,
       colorInputRef.current, colorPreviewRef.current, thicknessInputRef.current,
@@ -1771,6 +1773,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           <button ref={pointOffsetBtnRef} title="Kante rein-/rausziehen">⇆</button>
           <button ref={pointInsertPointBtnRef} title="Neuen Fangpunkt auf der Kante setzen">＋</button>
           <button ref={pointBulgeBtnRef} title="Kante wölben (rein-/rauswölben)">◠</button>
+          <button ref={pointSplitBtnRef} title="Aufschneiden (Punkt setzen, teilt in zwei verbundene Objekte)">✂</button>
           <button ref={pointDeleteBtnRef} title="Löschen">🗑</button>
         </div>
 
@@ -2301,6 +2304,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               <select ref={measureOrientationRef} defaultValue="parallel">
                 <option value="parallel">Parallel</option>
                 <option value="diagonal">Schräg</option>
+                <option value="arc">Gewölbt</option>
               </select>
               <select ref={measurePointCountRef} defaultValue="multi">
                 <option value="two">Einzelmaß</option>
@@ -2363,6 +2367,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                   options={[
                     { value: "parallel", label: "Parallel" },
                     { value: "diagonal", label: "Schräg" },
+                    { value: "arc", label: "Gewölbt" },
                   ]}
                 />
 
