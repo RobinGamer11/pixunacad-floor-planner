@@ -2360,15 +2360,14 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 </div>
               </div>
               <div>
-                <label>Schriftstärke</label>
-                <div className="grid grid-cols-2 gap-2">
+                <label>Schriftgröße</label>
+                <div className="grid grid-cols-1 gap-2">
                   <div>
                     <div className="text-[9px] mb-0.5" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Punkt (pt)</div>
-                    <input ref={textFontSizePtRef} type="text" defaultValue="12" />
+                    <input ref={textFontSizePtRef} type="text" defaultValue="11" />
                   </div>
-                  <div>
-                    <div className="text-[9px] mb-0.5" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Bildschirm (px)</div>
-                    <input ref={textFontSizeRef} type="text" defaultValue="16" />
+                  <div className="hidden">
+                    <input ref={textFontSizeRef} type="text" defaultValue="14.67" />
                   </div>
                 </div>
               </div>
