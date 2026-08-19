@@ -3249,57 +3249,17 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               </div>
             </div>
           )}
-          {activeTool === ToolIds.HATCH ? (
-            <div
-              className="mt-3 rounded-md border p-2 space-y-2"
-              style={{ borderColor: "hsl(var(--border))" }}
-            >
-              <div className="text-[10px] font-semibold tracking-wider" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
-                HILFE
-              </div>
-              <div className="text-[10.5px] leading-snug" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
-                <div><span className="cad-kbd">L-Klick + Shift</span> Gerade zeichnen</div>
-                <div><span className="cad-kbd">Doppelklick auf Kante</span> Neuer Fangpunkt</div>
-                <div><span className="cad-kbd">Klick auf Kante + Symbol</span> Kante rein-/rausziehen</div>
-                <div className="mt-1.5 font-semibold">Objektarten</div>
-                <div>Vektor: Generell bearbeitbar</div>
-                <div>Pixel: Radiergummi bearbeitbar</div>
-              </div>
-            </div>
-          ) : activeTool === ToolIds.LINE ? (
-            <div
-              className="mt-3 rounded-md border p-2 space-y-2"
-              style={{ borderColor: "hsl(var(--border))" }}
-            >
-              <div className="text-[10px] font-semibold tracking-wider" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
-                HILFE
-              </div>
-              <div className="text-[10.5px] leading-snug" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
-                <div><span className="cad-kbd">L-Klick + Shift</span> Gerade zeichnen</div>
-                <div className="mt-1.5 font-semibold">Objektarten</div>
-                <div>Vektor: Generell bearbeitbar</div>
-                <div>Pixel: Radiergummi bearbeitbar</div>
-              </div>
-            </div>
-          ) : activeTool === ToolIds.TEXT ? (
-            <div
-              className="mt-3 rounded-md border p-2 space-y-2"
-              style={{ borderColor: "hsl(var(--border))" }}
-            >
-              <div className="text-[10px] font-semibold tracking-wider" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
-                HILFE
-              </div>
-              <div className="text-[10.5px] leading-snug" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
-                <div className="font-semibold">Modus</div>
-                <div>Rahmen variabel: Rahmen passt sich an Text an</div>
-                <div>Rahmen fix: Text passt sich an Rahmen an</div>
-                <div className="mt-1.5"><span className="cad-kbd">Enter</span> Absatz setzen</div>
-                <div><span className="cad-kbd">Text beenden</span> Außerhalb Textfeld klicken</div>
-              </div>
-            </div>
-          ) : (activeTool !== ToolIds.ERASER && activeTool !== ToolIds.PIPETTE && activeTool !== ToolIds.SELECT && activeTool !== ToolIds.STICKER) ? (
+          {(activeTool !== ToolIds.ERASER
+            && activeTool !== ToolIds.PIPETTE
+            && activeTool !== ToolIds.SELECT
+            && activeTool !== ToolIds.STICKER
+            && activeTool !== ToolIds.LINE
+            && activeTool !== ToolIds.FREE
+            && activeTool !== ToolIds.HATCH
+            && activeTool !== ToolIds.TEXT) ? (
             <ToolHelpNotes toolId={activeTool} />
           ) : null}
+
         </div>
         </DragScrollDiv>
         <DragScrollDiv axis="both" className="flex-1 min-h-0 overflow-auto p-2 space-y-2 cursor-grab active:cursor-grabbing" style={{ display: rightTab === "sheets" ? "block" : "none" }}>
