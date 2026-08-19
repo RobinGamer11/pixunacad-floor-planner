@@ -1,6 +1,6 @@
 import type { Vec2 } from "./geometry";
 import type { Wall } from "./Scene";
-import { computeWallLines, wallRefCorners } from "./wallGeom";
+import { computeWallLinesForWall } from "./wallGeom";
 import { computeHealedWallLines } from "./wallHeal";
 import type { WallTopologyGraph } from "./WallTopologyGraph";
 
@@ -20,7 +20,7 @@ export function buildWallSolidRing(wall: Wall): Vec2[] {
   if (!wall.corners || wall.corners.length < 2) return [];
   const t = Math.max(0, wall.thicknessM);
   if (t <= 1e-6) return [];
-  const lines = computeWallLines(wallRefCorners(wall as any), t, wall.referenceSide);
+  const lines = computeWallLinesForWall(wall);
   return ringFromMainSub(lines.mainCorners, lines.subCorners);
 }
 

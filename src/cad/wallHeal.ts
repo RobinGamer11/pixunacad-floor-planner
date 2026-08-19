@@ -1,5 +1,5 @@
-import { Vec2, v, sub, norm, lineLineIntersectionInfinite, dist } from "./geometry";
-import { computeWallLines, wallRefCorners } from "./wallGeom";
+import { Vec2, v, sub, norm, lineLineIntersectionInfinite, dist, bulgeEndpointTangent } from "./geometry";
+import { computeWallLinesForWall, wallRefCorners } from "./wallGeom";
 import type { Wall } from "./Scene";
 import { WallTopologyGraph, CLEANUP_TOL, endpointLineCorners, priorityIndex } from "./WallTopologyGraph";
 
@@ -12,7 +12,7 @@ const HEAL_TOL_M = 0.05;
  */
 const HEAL_MAX_DIST_M = 30.0;
 type LineType = "main" | "help" | "sub";
-type WallLines = ReturnType<typeof computeWallLines>;
+type WallLines = ReturnType<typeof computeWallLinesForWall>;
 
 /**
  * Phase 2: Heal nutzt globalen Topologie-Graph (wenn übergeben), sonst Fallback
@@ -25,15 +25,15 @@ export function computeHealedWallLines(wallInput: Wall, others: Wall[], graph?: 
   const wall: Wall = refCorners === wallInput.corners
     ? wallInput
     : (Object.assign(Object.create(Object.getPrototypeOf(wallInput)), wallInput, { corners: refCorners }) as Wall);
-  const lines = computeWallLines(wall.corners, wall.thicknessM, wall.referenceSide);
+  const lines = computeWallLinesForWall(wallInput);
   if (wall.corners.length < 2) return { ...lines, capStart: true, capEnd: true };
 
   const mainCorners = lines.mainCorners.map(p => v(p.x, p.y));
   const subCorners = lines.subCorners.map(p => v(p.x, p.y));
   const helpCorners = lines.helpCorners.map(p => v(p.x, p.y));
 
-  const capStart = !healEnd(wall, others, mainCorners, subCorners, helpCorners, true, graph);
-  const capEnd = !healEnd(wall, others, mainCorners, subCorners, helpCorners, false, graph);
+  const capStart = !healEnd(wall, wallInput, others, mainCorners, subCorners, helpCorners, true, graph);
+  const capEnd = !healEnd(wall, wallInput, others, mainCorners, subCorners, helpCorners, false, graph);
 
   // Cleanup-Pass: gleicher Knoten → gleichnamige Linien zusammenführen.
   if (graph) cleanupAtNodes(wall, mainCorners, subCorners, helpCorners, graph, others);
@@ -43,6 +43,7 @@ export function computeHealedWallLines(wallInput: Wall, others: Wall[], graph?: 
 
 function healEnd(
   wall: Wall,
+  sourceWall: Wall,
   others: Wall[],
   mainCorners: Vec2[],
   subCorners: Vec2[],
@@ -55,9 +56,16 @@ function healEnd(
 
   const idx = atStart ? 0 : mainCorners.length - 1;
   const corner = atStart ? wall.corners[0] : wall.corners[n - 1];
+  const originalCorners = sourceWall.corners;
+  const originalBulges = sourceWall.bulges || [];
   const dir = atStart
-    ? norm(sub(wall.corners[1], wall.corners[0]))
-    : norm(sub(wall.corners[n - 1], wall.corners[n - 2]));
+    ? bulgeEndpointTangent(originalCorners[0], originalCorners[1], originalBulges[0], true)
+    : bulgeEndpointTangent(
+        originalCorners[originalCorners.length - 2],
+        originalCorners[originalCorners.length - 1],
+        originalBulges[originalCorners.length - 2],
+        false,
+      );
   if (dir.x === 0 && dir.y === 0) return false;
 
   // Kandidaten: aus Graph (nur inzidente Wände am Knoten) — sonst alle nahen anderen.
@@ -70,7 +78,7 @@ function healEnd(
   if (candidates.length === 0) {
     for (const ow of others) {
       if (ow === wall) continue;
-      if (!pointNearPolyline(corner, ow.corners, HEAL_TOL_M + Math.max(ow.thicknessM, wall.thicknessM))) continue;
+      if (!pointNearPolyline(corner, wallRefCorners(ow), HEAL_TOL_M + Math.max(ow.thicknessM, wall.thicknessM))) continue;
       candidates.push(ow);
     }
   }
@@ -79,9 +87,18 @@ function healEnd(
   const cache = new Map<Wall, WallLines>();
   const linesOf = (ow: Wall) => {
     let l = cache.get(ow);
-    if (!l) { l = computeWallLines(wallRefCorners(ow as any), ow.thicknessM, ow.referenceSide); cache.set(ow, l); }
+    if (!l) { l = computeWallLinesForWall(ow); cache.set(ow, l); }
     return l;
   };
+
+  // Reine Endpunkt-Knoten gleicher Priorität werden durch die Boolean-Union
+  // vollständiger Wandstreifen sauber verbunden. Paarweises main/sub-Healing
+  // wäre richtungsabhängig und erzeugt bei Bogen-Gerade-Anschlüssen Keile.
+  const isPurePeerEndpointNode = !!node
+    && node.incidents.every(i => i.kind !== "tjunction")
+    && candidates.length > 0
+    && candidates.every(ow => ow.priority === wall.priority);
+  if (isPurePeerEndpointNode) return true;
 
   const polysSelf: Record<LineType, Vec2[]> = {
     main: mainCorners,
