@@ -237,23 +237,47 @@ export function bulgedEdgePoints(a: Vec2, b: Vec2, bulge: number, segments = 24)
   const out: Vec2[] = [];
   const chord = dist(a, b);
   if (!Number.isFinite(bulge) || Math.abs(bulge) < 1e-6 || chord < 1e-9) return out;
-  const dx = (b.x - a.x) / chord, dy = (b.y - a.y) / chord;
-  const nx = -dy, ny = dx;
-  const h = bulge * chord; // Pfeilhöhe in Welt-Einheiten
-  const mid = v((a.x + b.x) * 0.5, (a.y + b.y) * 0.5);
-  const apex = v(mid.x + nx * h, mid.y + ny * h);
-  // Quadratische Bezier mit Kontrollpunkt = mid + 2h*n hat ihren Scheitel exakt in `apex`.
-  const cp = v(mid.x + nx * h * 2, mid.y + ny * h * 2);
-  const n = Math.max(4, Math.min(96, segments));
+  const arc = arcFromBulge(a, b, bulge);
+  if (!arc) return out;
+  const n = Math.max(4, Math.min(192, segments));
   for (let i = 1; i < n; i++) {
-    const t = i / n, mt = 1 - t;
-    out.push(v(
-      mt * mt * a.x + 2 * mt * t * cp.x + t * t * b.x,
-      mt * mt * a.y + 2 * mt * t * cp.y + t * t * b.y,
-    ));
+    const t = i / n;
+    const ang = arc.angA + arc.sweep * t;
+    out.push(v(arc.center.x + Math.cos(ang) * arc.radius, arc.center.y + Math.sin(ang) * arc.radius));
   }
-  void apex;
   return out;
+}
+
+export interface BulgeArc {
+  center: Vec2;
+  radius: number;
+  /** Startwinkel (bei A). */
+  angA: number;
+  /** Signierter Öffnungswinkel A→B. */
+  sweep: number;
+}
+
+/**
+ * Echter Kreisbogen zu einer Kante A→B mit `bulge` = Pfeilhöhe / Sehnenlänge.
+ * Positive Werte wölben in Richtung n = (-dy, dx).
+ */
+export function arcFromBulge(a: Vec2, b: Vec2, bulge: number): BulgeArc | null {
+  const c = dist(a, b);
+  if (!Number.isFinite(bulge) || Math.abs(bulge) < 1e-6 || c < 1e-9) return null;
+  const dx = (b.x - a.x) / c, dy = (b.y - a.y) / c;
+  const nx = -dy, ny = dx;
+  const h = bulge * c;
+  const radius = (c * c / 4 + h * h) / (2 * Math.abs(h));
+  const sgnH = h >= 0 ? 1 : -1;
+  const mid = v((a.x + b.x) * 0.5, (a.y + b.y) * 0.5);
+  const center = v(mid.x + nx * (h - sgnH * radius), mid.y + ny * (h - sgnH * radius));
+  const angA = Math.atan2(a.y - center.y, a.x - center.x);
+  const angB = Math.atan2(b.y - center.y, b.x - center.x);
+  const sweepMag = Math.abs(4 * Math.atan(2 * bulge));
+  const TAU = Math.PI * 2;
+  const dCCW = ((angB - angA) % TAU + TAU) % TAU;
+  const sign = Math.abs(dCCW - sweepMag) <= Math.abs((TAU - dCCW) - sweepMag) ? 1 : -1;
+  return { center, radius, angA, sweep: sign * sweepMag };
 }
 
 /** Tesselliert einen Ring/Pfad mit optionalen Kanten-Wölbungen. */
