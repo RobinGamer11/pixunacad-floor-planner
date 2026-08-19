@@ -1955,19 +1955,19 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                   );
                 })}
               </div>
+              <div className="mt-3">
+                <RasterModeToggle app={appRef.current} projectId={projectId} />
+              </div>
             </div>
           )}
           {/* Line Settings — Design analog zum Linien-Werkzeug in der Mappe:
-              Ebene und Objektart stehen über dem Fensterrahmen, alle
+              Ebene, Modus und Objektart stehen über dem Fensterrahmen, alle
               Zeichen-Eigenschaften liegen im gerahmten Block. */}
           <div ref={settingsRef} className={`cad-settings-panel hidden mb-2`}>
-            <div className="space-y-3">
-              <div>
-                <label>Ebene</label>
-                <select ref={idSelectRef} className="cad-settings-select w-full" />
-              </div>
-              <RasterModeToggle app={appRef.current} projectId={projectId} />
+            <div className="hidden">
+              <select ref={idSelectRef} className="cad-settings-select w-full" />
             </div>
+
 
             <div className="mt-3 rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
               <div className="text-[10px] font-semibold tracking-wider mb-2" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
