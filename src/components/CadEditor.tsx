@@ -2473,7 +2473,9 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 </div>
               </div>
             </div>
+            </div>
           </div>
+
 
           {/* Stempel-Werkzeug */}
           {activeTool === ToolIds.STICKER && (
