@@ -90,12 +90,18 @@ export const WallSettingsPanel: React.FC<Props> = ({ app }) => {
   };
 
   const setThickness = (val: number) => {
+    const v = Math.max(0.001, val);
     if (selectedWall) {
-      updateSelected(() => { selectedWall.thicknessM = Math.max(0.001, val); });
+      updateSelected(() => { selectedWall.thicknessM = v; });
     } else {
-      update({ thicknessOverrideM: val > 0 ? val : null });
+      // Eine gemeinsame Eingabe "Wanddicke": schreibt in die Dicke der aktuell
+      // gewählten Wandart und hebt eine alte Override-Dicke auf.
+      update(s.kind === "outer"
+        ? { thicknessOuterM: v, thicknessOverrideM: null }
+        : { thicknessInnerM: v, thicknessOverrideM: null });
     }
   };
+
 
   const setColor = (color: string) => {
     if (selectedWall) updateSelected(() => { selectedWall.color = color; });
