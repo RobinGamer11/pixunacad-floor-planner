@@ -1,6 +1,6 @@
 import type { Vec2 } from "./geometry";
 import type { Wall } from "./Scene";
-import { computeWallLines } from "./wallGeom";
+import { computeWallLines, wallRefCorners } from "./wallGeom";
 import { computeHealedWallLines } from "./wallHeal";
 import type { WallTopologyGraph } from "./WallTopologyGraph";
 
