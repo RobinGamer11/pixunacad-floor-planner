@@ -2066,9 +2066,6 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           {/* Schraffur — Design identisch zur Mappe (Modus & Objektart über dem Rahmen) */}
           {activeTool === ToolIds.HATCH && (
             <div className="cad-settings-panel mb-2">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
-                Schraffur
-              </div>
               <div className="mb-3">
                 <CadEbeneSelect target={hatchIdSelectRef} />
               </div>
@@ -2076,8 +2073,16 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               <RasterModeToggle app={appRef.current} projectId={projectId} />
 
               <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
-                <HatchSettingsPanel app={appRef.current} projectId={projectId} patternScaleMax={60} hideChrome />
+                <HatchSettingsPanel
+                  app={appRef.current}
+                  projectId={projectId}
+                  patternScaleMax={60}
+                  hideChrome
+                  afterStroke={<CadCheckboxProxy target={areaShowRef} label="Flächenanzeige" />}
+                />
               </div>
+            </div>
+
             </div>
           )}
 
