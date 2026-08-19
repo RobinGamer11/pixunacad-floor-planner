@@ -5,7 +5,7 @@ import { makeHubDraggable, resetHubUserMoved, hubWasUserMoved } from "./hubDrag"
 export class PointEditMenu {
   root: HTMLDivElement;
   buttonsByAction: Record<string, HTMLButtonElement>;
-  actions = [PointEditAction.MOVE, PointEditAction.TRANSLATE, PointEditAction.ROTATE, PointEditAction.OFFSET, PointEditAction.INSERT_POINT, PointEditAction.RESIZE, PointEditAction.DUPLICATE, PointEditAction.DELETE];
+  actions = [PointEditAction.MOVE, PointEditAction.TRANSLATE, PointEditAction.ROTATE, PointEditAction.OFFSET, PointEditAction.INSERT_POINT, PointEditAction.RESIZE, PointEditAction.DUPLICATE, PointEditAction.BULGE, PointEditAction.DELETE];
   private visibleActions: string[] = [];
   index = -1;
   visible = false;

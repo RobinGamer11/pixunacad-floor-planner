@@ -24,10 +24,12 @@ export class Segment {
   arrowEnd?: boolean;
   /** Skalierungsfaktor der Pfeilspitze (Multiplikator auf Linienstärke). Default 1. */
   arrowScale?: number;
+  /** Signierte Wölbung der Linie (Sagitta / Sehnenlänge). 0 = gerade. */
+  bulge?: number;
   /** Wenn gesetzt: dieses Objekt gehört zum Edit-Mode der Sticker-Instanz mit dieser ID. */
   _stickerEditOwnerId?: string | null;
 
-  constructor({ id, a, b, color, thicknessM, labelId, isGuide, midpointSnap, divisionSnap, arrowStart, arrowEnd, arrowScale }: { id: string; a: Vec2; b: Vec2; color?: string; thicknessM?: number; labelId?: string; isGuide?: boolean; midpointSnap?: boolean; divisionSnap?: number; arrowStart?: boolean; arrowEnd?: boolean; arrowScale?: number }) {
+  constructor({ id, a, b, color, thicknessM, labelId, isGuide, midpointSnap, divisionSnap, arrowStart, arrowEnd, arrowScale, bulge }: { id: string; a: Vec2; b: Vec2; color?: string; thicknessM?: number; labelId?: string; isGuide?: boolean; midpointSnap?: boolean; divisionSnap?: number; arrowStart?: boolean; arrowEnd?: boolean; arrowScale?: number; bulge?: number }) {
     this.id = id;
     this.a = v(a.x, a.y);
     this.b = v(b.x, b.y);
@@ -40,6 +42,7 @@ export class Segment {
     this.arrowStart = !!arrowStart;
     this.arrowEnd = !!arrowEnd;
     this.arrowScale = (typeof arrowScale === "number" && arrowScale > 0) ? arrowScale : 1;
+    this.bulge = (typeof bulge === "number" && Number.isFinite(bulge)) ? bulge : 0;
     this._stickerEditOwnerId = null;
   }
 }
@@ -83,19 +86,28 @@ export class Hatch {
   patternStretch: number;
   patternOffsetX: number;
   patternOffsetY: number;
+  /** Signierte Kanten-Wölbungen der Außenkontur (Index = Kante i→i+1). */
+  bulges: number[];
+  /** Signierte Kanten-Wölbungen der Löcher. */
+  holeBulges: number[][];
   _stickerEditOwnerId?: string | null;
 
   constructor({ id, points, holes, fillColor, strokeColor, fillAlphaPct, strokeWidthPx, labelId, areaLabel,
     patternEnabled, patternId, patternScale, patternAngleDeg, patternSkewDeg, patternStretch,
-    patternOffsetX, patternOffsetY }: {
+    patternOffsetX, patternOffsetY, bulges, holeBulges }: {
     id: string; points: Vec2[]; holes?: Vec2[][]; fillColor?: string; strokeColor?: string;
     fillAlphaPct?: number; strokeWidthPx?: number; labelId?: string; areaLabel?: Partial<AreaLabel>;
     patternEnabled?: boolean; patternId?: string; patternScale?: number;
     patternAngleDeg?: number; patternSkewDeg?: number; patternStretch?: number; patternOffsetX?: number; patternOffsetY?: number;
+    bulges?: number[]; holeBulges?: number[][];
   }) {
     this.id = id;
     this.points = points.map(p => v(p.x, p.y));
     this.holes = (holes || []).map(loop => loop.map(p => v(p.x, p.y)));
+    this.bulges = Array.isArray(bulges) ? bulges.map(b => (Number.isFinite(b) ? b : 0)) : [];
+    this.holeBulges = Array.isArray(holeBulges)
+      ? holeBulges.map(loop => (Array.isArray(loop) ? loop.map(b => (Number.isFinite(b) ? b : 0)) : []))
+      : [];
     this.fillColor = fillColor || Defaults.hatchFillColor;
     this.strokeColor = strokeColor || Defaults.hatchStrokeColor;
     this.fillAlphaPct = clamp(fillAlphaPct ?? Defaults.hatchFillAlphaPct, 0, 100);
@@ -1012,8 +1024,8 @@ export class Scene {
   }
 
   // ---- Segments ----
-  createSegment(a: Vec2, b: Vec2, style: { color?: string; thicknessM?: number; labelId?: string; isGuide?: boolean; midpointSnap?: boolean; divisionSnap?: number; arrowStart?: boolean; arrowEnd?: boolean; arrowScale?: number } = {}) {
-    const seg = new Segment({ id: this._makeId(), a, b, color: style.color, thicknessM: style.thicknessM, labelId: style.labelId, isGuide: style.isGuide, midpointSnap: style.midpointSnap, divisionSnap: style.divisionSnap, arrowStart: style.arrowStart, arrowEnd: style.arrowEnd, arrowScale: style.arrowScale });
+  createSegment(a: Vec2, b: Vec2, style: { color?: string; thicknessM?: number; labelId?: string; isGuide?: boolean; midpointSnap?: boolean; divisionSnap?: number; arrowStart?: boolean; arrowEnd?: boolean; arrowScale?: number; bulge?: number } = {}) {
+    const seg = new Segment({ id: this._makeId(), a, b, color: style.color, thicknessM: style.thicknessM, labelId: style.labelId, isGuide: style.isGuide, midpointSnap: style.midpointSnap, divisionSnap: style.divisionSnap, arrowStart: style.arrowStart, arrowEnd: style.arrowEnd, arrowScale: style.arrowScale, bulge: style.bulge });
     seg._stickerEditOwnerId = this._currentEditOwnerId;
     this.segments.push(seg);
     this._rebuildSegIdMap();
@@ -1095,9 +1107,11 @@ export class Scene {
     holes?: Vec2[][];
     patternEnabled?: boolean; patternId?: string; patternScale?: number;
     patternAngleDeg?: number; patternSkewDeg?: number; patternStretch?: number; patternOffsetX?: number; patternOffsetY?: number;
+    bulges?: number[]; holeBulges?: number[][];
   } = {}) {
     const hatch = new Hatch({
       id: this._makeId(), points, holes: style.holes,
+      bulges: style.bulges, holeBulges: style.holeBulges,
       fillColor: style.fillColor, strokeColor: style.strokeColor,
       fillAlphaPct: style.fillAlphaPct, strokeWidthPx: style.strokeWidthPx,
       labelId: style.labelId, areaLabel: style.areaLabel,

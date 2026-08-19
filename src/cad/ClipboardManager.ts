@@ -6,6 +6,7 @@ import type { Segment, Hatch, Dimension, TextBox, AreaLabel, TextBoxStyle, FreeS
 interface SegmentSnap {
   kind: "segment"; a: Vec2; b: Vec2;
   color: string; thicknessM: number; labelId: string;
+  bulge?: number;
 }
 interface HatchSnap {
   kind: "hatch"; points: Vec2[];
@@ -14,6 +15,7 @@ interface HatchSnap {
   labelId: string; areaLabel: AreaLabel;
   patternEnabled?: boolean; patternId?: string; patternScale?: number;
   patternAngleDeg?: number; patternSkewDeg?: number; patternStretch?: number; patternOffsetX?: number; patternOffsetY?: number;
+  bulges?: number[]; holeBulges?: number[][];
 }
 interface DimensionSnap {
   kind: "dimension"; p1: Vec2; p2: Vec2; placementPoint: Vec2;
@@ -58,7 +60,7 @@ export interface Clipboard {
 /* ---- Snapshot helpers ---- */
 function snapSegment(s: Segment): SegmentSnap {
   return { kind: "segment", a: v(s.a.x, s.a.y), b: v(s.b.x, s.b.y),
-    color: s.color, thicknessM: s.thicknessM, labelId: s.labelId };
+    color: s.color, thicknessM: s.thicknessM, labelId: s.labelId, bulge: (s as any).bulge || 0 };
 }
 function snapHatch(h: Hatch): HatchSnap {
   return { kind: "hatch", points: h.points.map(p => v(p.x, p.y)),
@@ -67,7 +69,8 @@ function snapHatch(h: Hatch): HatchSnap {
     labelId: h.labelId, areaLabel: { ...h.areaLabel },
     patternEnabled: h.patternEnabled, patternId: h.patternId,
     patternScale: h.patternScale, patternAngleDeg: h.patternAngleDeg,
-    patternSkewDeg: h.patternSkewDeg, patternStretch: h.patternStretch, patternOffsetX: h.patternOffsetX, patternOffsetY: h.patternOffsetY };
+    patternSkewDeg: h.patternSkewDeg, patternStretch: h.patternStretch, patternOffsetX: h.patternOffsetX, patternOffsetY: h.patternOffsetY,
+    bulges: [...((h as any).bulges || [])], holeBulges: ((h as any).holeBulges || []).map((l: number[]) => [...l]) };
 }
 function snapDimension(d: Dimension): DimensionSnap {
   return { kind: "dimension",
@@ -209,14 +212,15 @@ export function commitClipboardAt(app: CadApp, clip: Clipboard, mouseW: Vec2): {
   for (const it of clip.items) {
     if (it.kind === "segment") {
       const o = app.scene.createSegment({ x: it.a.x + dx, y: it.a.y + dy }, { x: it.b.x + dx, y: it.b.y + dy },
-        { color: it.color, thicknessM: it.thicknessM, labelId: it.labelId });
+        { color: it.color, thicknessM: it.thicknessM, labelId: it.labelId, bulge: (it as any).bulge });
       if (o) created.push({ kind: "segment", id: o.id });
     } else if (it.kind === "hatch") {
       const o = app.scene.createHatch(it.points.map(p => ({ x: p.x + dx, y: p.y + dy })),
         { fillColor: it.fillColor, strokeColor: it.strokeColor,
           fillAlphaPct: it.fillAlphaPct, strokeWidthPx: it.strokeWidthPx,
           labelId: it.labelId, areaLabel: it.areaLabel,
-          patternEnabled: it.patternEnabled, patternId: it.patternId, patternScale: it.patternScale, patternAngleDeg: it.patternAngleDeg, patternSkewDeg: it.patternSkewDeg, patternStretch: it.patternStretch, patternOffsetX: it.patternOffsetX, patternOffsetY: it.patternOffsetY, });
+          patternEnabled: it.patternEnabled, patternId: it.patternId, patternScale: it.patternScale, patternAngleDeg: it.patternAngleDeg, patternSkewDeg: it.patternSkewDeg, patternStretch: it.patternStretch, patternOffsetX: it.patternOffsetX, patternOffsetY: it.patternOffsetY,
+          bulges: (it as any).bulges, holeBulges: (it as any).holeBulges, });
       if (o) created.push({ kind: "hatch", id: o.id });
     } else if (it.kind === "dimension") {
       const o = app.scene.createDimension(

@@ -65,6 +65,7 @@ export function restoreOneScene(scene: Scene, data: SerializedScene | null | und
       divisionSnap: s.divisionSnap,
       arrowStart: !!s.arrowStart, arrowEnd: !!s.arrowEnd,
       arrowScale: typeof s.arrowScale === "number" ? s.arrowScale : 1,
+      bulge: typeof s.bulge === "number" ? s.bulge : 0,
     });
     if (s._stickerEditOwnerId) seg._stickerEditOwnerId = s._stickerEditOwnerId;
   }
@@ -77,6 +78,8 @@ export function restoreOneScene(scene: Scene, data: SerializedScene | null | und
       patternEnabled: h.patternEnabled, patternId: h.patternId,
       patternScale: h.patternScale, patternAngleDeg: h.patternAngleDeg,
       patternSkewDeg: h.patternSkewDeg, patternStretch: h.patternStretch, patternOffsetX: h.patternOffsetX, patternOffsetY: h.patternOffsetY,
+      bulges: Array.isArray(h.bulges) ? h.bulges : undefined,
+      holeBulges: Array.isArray(h.holeBulges) ? h.holeBulges : undefined,
     });
 
     if (h._stickerEditOwnerId) (hatch as any)._stickerEditOwnerId = h._stickerEditOwnerId;
