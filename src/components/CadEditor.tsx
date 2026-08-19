@@ -17,6 +17,7 @@ import { EraserSettingsPanel, EraserModeSelect } from "@/components/cad/EraserSe
 import { ProjectFilePickerDialog } from "@/components/cad/ProjectFilePickerDialog";
 import { WallSettingsPanel } from "@/components/cad/WallSettingsPanel";
 import { HatchPatternBlock } from "@/components/cad/HatchPatternBlock";
+import { HatchSettingsPanel, HatchModeSelect } from "@/components/cad/HatchSettingsPanel";
 
 import { ToolHelpNotes } from "@/components/cad/ToolHelpNotes";
 import { MappeHelpOverlay } from "@/components/workspace/MappeHelpOverlay";
