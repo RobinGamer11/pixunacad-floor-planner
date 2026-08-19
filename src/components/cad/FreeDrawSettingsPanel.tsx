@@ -21,9 +21,11 @@ const STYLE_OPTIONS: { value: LineStyle; label: string }[] = [
   { value: "image", label: "Bild-Stempel" },
 ];
 
-interface Props { app: CadApp | MiniCad | null; units?: "cm" | "m"; projectId?: string; }
+interface Props { app: CadApp | MiniCad | null; units?: "cm" | "m"; projectId?: string;
+  /** true = Titel, Objektart und Ebene liegen außerhalb (über dem Fensterrahmen). */
+  hideChrome?: boolean; }
 
-export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", projectId }) => {
+export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", projectId, hideChrome = false }) => {
 
   const [color, setColor] = useState("#111111");
   const [thickness, setThickness] = useState(0.03);
@@ -145,9 +147,13 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
   };
 
   return (
-    <div className="cad-settings-panel mb-2">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Freihand</div>
-      <RasterModeToggle app={app} projectId={projectId} />
+    <div className={hideChrome ? "" : "cad-settings-panel mb-2"}>
+      {!hideChrome && (
+        <>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Freihand</div>
+          <RasterModeToggle app={app} projectId={projectId} />
+        </>
+      )}
       <FreeDrawPreview
         color={color}
         thickness={thickness}
@@ -160,7 +166,7 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
       />
 
       <div className="space-y-3">
-        <label className="block text-xs">
+        <label className={`block text-xs${hideChrome ? " hidden" : ""}`}>
           <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Ebene{selectedStrokeId ? " (Auswahl)" : ""}</span>
           <select
             value={labelId || app.activeDrawLabelId}

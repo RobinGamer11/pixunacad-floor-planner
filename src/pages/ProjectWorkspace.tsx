@@ -108,9 +108,9 @@ import { setExportMode } from "@/lib/printExport";
 import type { MiniCadSelectionInfo } from "@/cad/embed/MiniCad";
 import type { HatchDrawMode } from "@/cad/HatchTool";
 import { FreeDrawSettingsPanel } from "@/components/cad/FreeDrawSettingsPanel";
-import { EraserSettingsPanel } from "@/components/cad/EraserSettingsPanel";
+import { EraserSettingsPanel, EraserModeSelect } from "@/components/cad/EraserSettingsPanel";
 import { ProjectFilePickerDialog } from "@/components/cad/ProjectFilePickerDialog";
-import { HatchSettingsPanel } from "@/components/cad/HatchSettingsPanel";
+import { HatchSettingsPanel, HatchModeSelect } from "@/components/cad/HatchSettingsPanel";
 import { RasterModeToggle } from "@/components/cad/RasterModeToggle";
 import { WorkspaceHeader } from "@/components/workspace/WorkspaceHeader";
 import { MappeHelpOverlay } from "@/components/workspace/MappeHelpOverlay";
@@ -5045,7 +5045,7 @@ function RightInspector({
               onCancelTable={onCancelTable}
             />
           )}
-          {tab === "tools" && activeTool !== "guide" && !isLinePageTool(activeTool) && (
+          {tab === "tools" && activeTool !== "guide" && activeTool !== "text" && activeTool !== "eraser" && !isLinePageTool(activeTool) && (
             <ToolHelpNotes toolId={activeTool ?? "select"} />
           )}
           {tab === "layers" && page && (
@@ -5624,19 +5624,29 @@ function ToolsTab({
         </div>
       )}
       {settingsTool === "free" && cadEngine && (
-        <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
-          <FreeDrawSettingsPanel app={cadEngine} projectId={projectId} />
-        </div>
+        <>
+          <RasterModeToggle app={cadEngine} projectId={projectId} />
+          <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
+            <FreeDrawSettingsPanel app={cadEngine} projectId={projectId} hideChrome />
+          </div>
+        </>
       )}
       {settingsTool === "eraser" && cadEngine && (
-        <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
-          <EraserSettingsPanel app={cadEngine} rasterSelection={element ? element.kind === "image" : null} />
-        </div>
+        <>
+          <EraserModeSelect app={cadEngine} rasterSelection={element ? element.kind === "image" : null} />
+          <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
+            <EraserSettingsPanel app={cadEngine} rasterSelection={element ? element.kind === "image" : null} />
+          </div>
+        </>
       )}
       {settingsTool === "hatch" && cadEngine && (
-        <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
-          <HatchSettingsPanel app={cadEngine} projectId={projectId} pxPerMm={guidePxPerMm} />
-        </div>
+        <>
+          <HatchModeSelect app={cadEngine} />
+          <RasterModeToggle app={cadEngine} projectId={projectId} />
+          <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
+            <HatchSettingsPanel app={cadEngine} projectId={projectId} pxPerMm={guidePxPerMm} hideChrome />
+          </div>
+        </>
       )}
       {cadSelectedLineSnap && onCadLineSnapChange && (
         <LineSnapSettings
@@ -5652,13 +5662,20 @@ function ToolsTab({
         <RasterModeToggle app={cadEngine} projectId={projectId} />
       )}
       {settingsTool === "text" && (
-        <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
-          <TextSettings
+        <>
+          <TextModeSelect
             settings={toolSettings.text}
-            pxPerMm={guidePxPerMm}
             onChange={(p) => updateToolSettings("text", p)}
           />
-        </div>
+          <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
+            <TextSettings
+              settings={toolSettings.text}
+              pxPerMm={guidePxPerMm}
+              onChange={(p) => updateToolSettings("text", p)}
+              hideMode
+            />
+          </div>
+        </>
       )}
       {settingsTool === "document" && (
         <DocumentToolSettings importing={!!documentImporting} onImport={onDocumentImport} onOpenLibrary={onDocumentLibrary} scale={docScale ?? "1:100"} onScaleChange={onDocScaleChange} freePlace={!!docFreePlace} onFreePlaceChange={onDocFreePlaceChange} />
@@ -6254,46 +6271,61 @@ const TEXT_MODES = [
   { id: "frame" as const, label: "Rahmen fix", icon: FrameIcon },
 ];
 
+/** Modus-Auswahl (Rahmen variabel / fix) — liegt über dem Einstellungsrahmen. */
+function TextModeSelect({
+  settings,
+  onChange,
+}: {
+  settings: ToolSettings["text"];
+  onChange: (p: Partial<ToolSettings["text"]>) => void;
+}) {
+  const mode: "auto" | "frame" = settings.autoSize === false ? "frame" : "auto";
+  return (
+    <div className="mb-2">
+      <div className="text-[10px] font-semibold tracking-wider text-muted-foreground mb-1.5">MODUS</div>
+      <div className="grid grid-cols-2 gap-1">
+        {TEXT_MODES.map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            type="button"
+            title={label}
+            onClick={() => {
+              if (id === "frame") onChange({ autoSize: false, wrap: true });
+              else onChange({ autoSize: true, wrap: false });
+            }}
+            className={`flex flex-col items-center justify-center gap-0.5 rounded border px-1 py-1.5 transition-colors ${
+              mode === id ? "bg-accent" : "hover:bg-muted"
+            }`}
+            style={{ borderColor: "hsl(var(--hairline))" }}
+          >
+            <Icon size={14} />
+            <span className="text-[9px] leading-tight">{label}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function TextSettings({
   settings,
   pxPerMm,
   onChange,
+  hideMode = false,
 }: {
   settings: ToolSettings["text"];
   pxPerMm: number;
   onChange: (p: Partial<ToolSettings["text"]>) => void;
+  hideMode?: boolean;
 }) {
   // Schriftgrößen werden – wie in Word – in Punkt (pt) geführt.
   // 1 pt = 4/3 CSS-Pixel; die mm-Angabe ist die reale Höhe auf dem Blatt.
   const fontPx = settings.fontSize * (4 / 3);
   const fontMm = guideStrokePxToMm(fontPx, pxPerMm);
-  const mode: "auto" | "frame" = settings.autoSize === false ? "frame" : "auto";
 
   return (
     <SettingsBlock title="TEXT">
-      <div>
-        <div className="text-[10px] font-semibold tracking-wider text-muted-foreground mb-1.5">MODUS</div>
-        <div className="grid grid-cols-2 gap-1">
-          {TEXT_MODES.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              type="button"
-              title={label}
-              onClick={() => {
-                if (id === "frame") onChange({ autoSize: false, wrap: true });
-                else onChange({ autoSize: true, wrap: false });
-              }}
-              className={`flex flex-col items-center justify-center gap-0.5 rounded border px-1 py-1.5 transition-colors ${
-                mode === id ? "bg-accent" : "hover:bg-muted"
-              }`}
-              style={{ borderColor: "hsl(var(--hairline))" }}
-            >
-              <Icon size={14} />
-              <span className="text-[9px] leading-tight">{label}</span>
-            </button>
-          ))}
-        </div>
-      </div>
+      {!hideMode && <TextModeSelect settings={settings} onChange={onChange} />}
 
       <div>
         <div className="mb-1.5 text-[10px] text-muted-foreground">Ausrichtung</div>
