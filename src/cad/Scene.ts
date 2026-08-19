@@ -1221,13 +1221,13 @@ export class Scene {
     return { didInsert: true, point: p, pointIndex: edgeIndex + 1 };
   }
 
-  getHatchEdges(): { hatch: Hatch; edgeIndex: number; a: Vec2; b: Vec2 }[] {
-    const edges: { hatch: Hatch; edgeIndex: number; a: Vec2; b: Vec2 }[] = [];
+  getHatchEdges(): { hatch: Hatch; edgeIndex: number; a: Vec2; b: Vec2; bulge: number }[] {
+    const edges: { hatch: Hatch; edgeIndex: number; a: Vec2; b: Vec2; bulge: number }[] = [];
     for (const hatch of this.hatches) {
       const n = hatch.points.length;
       if (n < 2) continue;
       for (let i = 0; i < n; i++) {
-        edges.push({ hatch, edgeIndex: i, a: hatch.points[i], b: hatch.points[(i + 1) % n] });
+        edges.push({ hatch, edgeIndex: i, a: hatch.points[i], b: hatch.points[(i + 1) % n], bulge: (hatch.bulges || [])[i] || 0 });
       }
     }
     return edges;

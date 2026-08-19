@@ -5616,6 +5616,7 @@ function ToolsTab({
   onConfirmTable?: () => void;
   onCancelTable?: () => void;
 }) {
+  const cadDocSelected = useCadDocumentSelected(cadEngine ?? null);
 
   const settingsTool = activeTool ?? selectedCadTool ?? null;
   const settingsPage = (pageId ? project.pages.find((candidate) => candidate.id === pageId) : undefined)
@@ -5725,7 +5726,7 @@ function ToolsTab({
           </div>
         </>
       )}
-      {settingsTool === "document" && (
+      {settingsTool === "document" && !cadDocSelected && (
         <DocumentToolSettings importing={!!documentImporting} onImport={onDocumentImport} onOpenLibrary={onDocumentLibrary} scale={docScale ?? "1:100"} onScaleChange={onDocScaleChange} freePlace={!!docFreePlace} onFreePlaceChange={onDocFreePlaceChange} />
       )}
 
@@ -5819,6 +5820,21 @@ function EbeneSelect({ engine }: { engine: import("@/cad/embed/MiniCad").MiniCad
       </select>
     </SettingsBlock>
   );
+}
+
+
+/** Pollt, ob im CAD-Engine gerade ein Dokument (Bild/PDF) selektiert ist. */
+function useCadDocumentSelected(engine: any): boolean {
+  const [sel, setSel] = useState(false);
+  useEffect(() => {
+    if (!engine) { setSel(false); return; }
+    const id = window.setInterval(() => {
+      const s: any = (engine as any).selection;
+      setSel(!!s && s.type === "document");
+    }, 200);
+    return () => window.clearInterval(id);
+  }, [engine]);
+  return sel;
 }
 
 function DocumentToolSettings({

@@ -316,3 +316,31 @@ export function offsetPolyline(pts: Vec2[], offset: number): Vec2[] {
   }
   return out;
 }
+
+/**
+ * Projiziert einen Punkt auf eine (ggf. gewölbte) Kante A→B.
+ * Bei `bulge === 0` identisch zu `projectPointToSegment`.
+ * Der zurückgegebene Parameter `t` entspricht der Bogenlängen-Position
+ * entlang der Wölbung (0 = A, 1 = B).
+ */
+export function projectPointToCurvedEdge(p: Vec2, a: Vec2, b: Vec2, bulge?: number | null) {
+  if (!bulge || Math.abs(bulge) < 1e-6) return projectPointToSegment(p, a, b);
+  const pts = bulgedCurvePoints(a, b, bulge, 48);
+  const total = polylineLength(pts) || 1;
+  let acc = 0;
+  let bestD = Infinity;
+  let bestQ = v(a.x, a.y);
+  let bestT = 0;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const segLen = dist(pts[i], pts[i + 1]);
+    const proj = projectPointToSegment(p, pts[i], pts[i + 1]);
+    const d = dist(p, proj.q);
+    if (d < bestD) {
+      bestD = d;
+      bestQ = proj.q;
+      bestT = (acc + proj.t * segLen) / total;
+    }
+    acc += segLen;
+  }
+  return { t: clamp(bestT, 0, 1), q: bestQ };
+}

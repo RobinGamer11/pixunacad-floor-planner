@@ -1,5 +1,5 @@
 import { Defaults, SnapType } from "./constants";
-import { Vec2, v, projectPointToSegment } from "./geometry";
+import { Vec2, v, projectPointToSegment, projectPointToCurvedEdge } from "./geometry";
 import { Scene, Segment, Hatch } from "./Scene";
 import { Camera } from "./Camera";
 import { LabelManager } from "./LabelManager";
@@ -172,7 +172,7 @@ export class TopologyEngine {
       }
       for (let i = 0; i < ref.length - 1; i++) {
         const a = ref[i], b = ref[i + 1];
-        const proj = projectPointToSegment(mouseW, a, b);
+        const proj = projectPointToCurvedEdge(mouseW, a, b, (wall as any).bulges?.[i] || 0);
         const px = this._worldToMousePx(proj.q, mouseS);
         if (px > Defaults.snapPx) continue;
         if (proj.t <= Defaults.splitEpsT || proj.t >= 1 - Defaults.splitEpsT) continue;
@@ -250,8 +250,8 @@ export class TopologyEngine {
       }
     };
 
-    const considerLine = (a: Vec2, b: Vec2, segment: Segment | null, hatch: Hatch | null, edgeIndex?: number | null) => {
-      const proj = projectPointToSegment(mouseW, a, b);
+    const considerLine = (a: Vec2, b: Vec2, segment: Segment | null, hatch: Hatch | null, edgeIndex?: number | null, bulge?: number) => {
+      const proj = projectPointToCurvedEdge(mouseW, a, b, bulge || 0);
       const px = this._worldToMousePx(proj.q, mouseS);
       if (px > Defaults.snapPx) return;
       if (proj.t <= Defaults.splitEpsT || proj.t >= 1 - Defaults.splitEpsT) return;
@@ -354,7 +354,7 @@ export class TopologyEngine {
     // Segment lines
     for (const seg of segs) {
       if (exclusions?.segmentLineIds?.has(seg.id)) continue;
-      considerLine(seg.a, seg.b, seg, null);
+      considerLine(seg.a, seg.b, seg, null, null, (seg as any).bulge || 0);
     }
     // Dimension placement-line (Maßlinie d1↔d2) als Snap-Linie, damit neue
     // oder verschobene Maßketten exakt auf bestehende Maßlinien gelegt werden
@@ -405,7 +405,7 @@ export class TopologyEngine {
     for (const edge of this.scene.getHatchEdges()) {
       if (exclusions?.hatchIds?.has(edge.hatch.id) || exclusions?.hatchEdgeIds?.has(edge.hatch.id)) continue;
       if (!this.labels.isVisible(edge.hatch.labelId)) continue;
-      considerLine(edge.a, edge.b, null, edge.hatch, edge.edgeIndex);
+      considerLine(edge.a, edge.b, null, edge.hatch, edge.edgeIndex, (edge as any).bulge || 0);
     }
     // Hole edges (Snap-Linien — kein insert-on-snap, da Loops keine "edgeIndex" im Scene-Modell haben)
     for (const hatch of hatches) {
@@ -510,9 +510,9 @@ export class TopologyEngine {
       }
     };
 
-    const considerLine = (a: Vec2, b: Vec2, segment: Segment | null, hatch: Hatch | null) => {
+    const considerLine = (a: Vec2, b: Vec2, segment: Segment | null, hatch: Hatch | null, _edgeIndex?: number | null, bulge?: number) => {
       if (segment && segment.id === excludedSegmentId) return;
-      const proj = projectPointToSegment(mouseW, a, b);
+      const proj = projectPointToCurvedEdge(mouseW, a, b, bulge || 0);
       const px = this._worldToMousePx(proj.q, mouseS);
       if (px > Defaults.snapPx) return;
       if (proj.t <= Defaults.splitEpsT || proj.t >= 1 - Defaults.splitEpsT) return;
@@ -534,10 +534,10 @@ export class TopologyEngine {
       }
     }
     for (const seg of segs) {
-      considerLine(seg.a, seg.b, seg, null);
+      considerLine(seg.a, seg.b, seg, null, null, (seg as any).bulge || 0);
     }
     for (const edge of this.scene.getHatchEdges()) {
-      considerLine(edge.a, edge.b, null, edge.hatch);
+      considerLine(edge.a, edge.b, null, edge.hatch, edge.edgeIndex, (edge as any).bulge || 0);
     }
 
     this._addWallSnapsTo(mouseS, mouseW, (cand, score) => {
@@ -560,9 +560,9 @@ export class TopologyEngine {
       }
     };
 
-    const considerLine = (a: Vec2, b: Vec2, segment: Segment | null, hatch: Hatch | null, edgeIndex?: number) => {
+    const considerLine = (a: Vec2, b: Vec2, segment: Segment | null, hatch: Hatch | null, edgeIndex?: number, bulge?: number) => {
       if (hatch && hatch.id === excludedHatchId) return;
-      const proj = projectPointToSegment(mouseW, a, b);
+      const proj = projectPointToCurvedEdge(mouseW, a, b, bulge || 0);
       const px = this._worldToMousePx(proj.q, mouseS);
       if (px > Defaults.snapPx) return;
       if (proj.t <= Defaults.splitEpsT || proj.t >= 1 - Defaults.splitEpsT) return;
@@ -593,11 +593,11 @@ export class TopologyEngine {
       }
     }
     for (const seg of segs) {
-      considerLine(seg.a, seg.b, seg, null);
+      considerLine(seg.a, seg.b, seg, null, null, (seg as any).bulge || 0);
     }
     for (const edge of this.scene.getHatchEdges()) {
       if (edge.hatch.id === excludedHatchId) continue;
-      considerLine(edge.a, edge.b, null, edge.hatch, edge.edgeIndex);
+      considerLine(edge.a, edge.b, null, edge.hatch, edge.edgeIndex, (edge as any).bulge || 0);
     }
 
     this._addWallSnapsTo(mouseS, mouseW, (cand, score) => {
@@ -612,7 +612,7 @@ export class TopologyEngine {
     let bestPx = Infinity;
 
     for (const seg of this._segmentsFrontToBack()) {
-      const proj = projectPointToSegment(mouseW, seg.a, seg.b);
+      const proj = projectPointToCurvedEdge(mouseW, seg.a, seg.b, (seg as any).bulge || 0);
       const px = this._worldToMousePx(proj.q, mouseS);
       if (px > Defaults.snapPx) continue;
       if (proj.t <= Defaults.splitEpsT || proj.t >= 1 - Defaults.splitEpsT) continue;
