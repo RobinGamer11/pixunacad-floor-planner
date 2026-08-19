@@ -1958,6 +1958,7 @@ export default function ProjectWorkspace() {
               <MappeHelpOverlay
                 guideActive={activeTool === "guide"}
                 lineActive={isLinePageTool(activeTool)}
+                hatchActive={activeTool === "hatch"}
               />
             )}
             <ZoomBar zoom={zoom} setZoom={setZoomClamped} onResetZoom={resetZoomAndCenter} />
