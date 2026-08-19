@@ -1309,8 +1309,13 @@ export class Renderer {
       ctx.strokeStyle = "rgba(77,163,255,0.95)";
       ctx.lineWidth = Math.max(4, this._segStrokePx(seg.thicknessM) + 1.4);
       ctx.beginPath();
-      ctx.moveTo(a.x, a.y);
-      ctx.lineTo(b.x, b.y);
+      if (bulgePts) {
+        ctx.moveTo(bulgePts[0].x, bulgePts[0].y);
+        for (let i = 1; i < bulgePts.length; i++) ctx.lineTo(bulgePts[i].x, bulgePts[i].y);
+      } else {
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+      }
       ctx.stroke();
     }
     ctx.restore();
