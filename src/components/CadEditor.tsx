@@ -2316,6 +2316,11 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               <div ref={measureTextBgColorPreviewRef} />
               <input ref={measureFreeTextColorRef} type="color" defaultValue="#111111" />
               <div ref={measureFreeTextColorPreviewRef} />
+              <input ref={measureShowUnitRef} type="checkbox" defaultChecked />
+              <input ref={measureExtRef} type="checkbox" />
+              <input ref={measureFreeTextToggleRef} type="checkbox" />
+              <input ref={measureTextBgToggleRef} type="checkbox" />
+
             </div>
 
             <div className="space-y-3">
