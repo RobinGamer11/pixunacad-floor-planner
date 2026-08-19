@@ -91,6 +91,14 @@ function healEnd(
 
   let healedAny = false;
 
+  // Phase 6 — gewölbte Wände: Die Gehrung darf nur um ein sinnvolles Maß
+  // (abhängig von den beteiligten Wanddicken) verlängert werden. Sonst
+  // "reißt" die Sub-Linie bei stark gewölbten Wänden weit vom Knoten weg und
+  // die optische Wand verlässt die Fangpunkte.
+  let maxNeighborThickness = 0;
+  for (const c of candidates) maxNeighborThickness = Math.max(maxNeighborThickness, c.thicknessM || 0);
+  const healLimit = (wall.thicknessM + maxNeighborThickness) * 3 + HEAL_TOL_M;
+
   for (const T of ["main", "help", "sub"] as LineType[]) {
     const origin = polysSelf[T][idx];
 
