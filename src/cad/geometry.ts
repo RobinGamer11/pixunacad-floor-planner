@@ -257,25 +257,6 @@ export interface BulgeArc {
   sweep: number;
 }
 
-/** Exakte Einheits-Tangente des Kreisbogens A→B am jeweiligen Endpunkt. */
-export function bulgeEndpointTangent(
-  a: Vec2,
-  b: Vec2,
-  bulge: number | null | undefined,
-  atStart: boolean,
-): Vec2 {
-  const chordDir = norm(sub(b, a));
-  if (!bulge || Math.abs(bulge) < 1e-6) return chordDir;
-  const arc = arcFromBulge(a, b, bulge);
-  if (!arc) return chordDir;
-  const p = atStart ? a : b;
-  const radial = norm(sub(p, arc.center));
-  const tangent = arc.sweep >= 0
-    ? v(-radial.y, radial.x)
-    : v(radial.y, -radial.x);
-  return norm(tangent);
-}
-
 /**
  * Echter Kreisbogen zu einer Kante A→B mit `bulge` = Pfeilhöhe / Sehnenlänge.
  * Positive Werte wölben in Richtung n = (-dy, dx).

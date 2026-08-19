@@ -1,4 +1,4 @@
-import { Vec2, v, sub, add, mul, norm, lineLineIntersectionInfinite, tessellateWithBulges, bulgeEndpointTangent } from "./geometry";
+import { Vec2, v, sub, add, mul, norm, lineLineIntersectionInfinite, tessellateWithBulges } from "./geometry";
 
 /** Linkes Lot relativ zur Zeichenrichtung – im Bildschirm (y nach unten) visuell "links". */
 export function perpLeftScreen(d: Vec2): Vec2 {
@@ -89,41 +89,6 @@ export function computeWallLines(corners: Vec2[], thicknessM: number, side: Wall
     subCorners: offsetPolyline(corners, subOff),
     helpCorners: offsetPolyline(corners, helpOff),
   };
-}
-
-/**
- * Wandlinien inklusive exakter Bogen-Endnormalen. Das verhindert, dass zwei
- * separat tessellierte Teilbögen am gemeinsamen Fangpunkt um wenige Mikrometer
- * auseinanderlaufen und von der Polygon-Union als getrennte Körper gelten.
- */
-export function computeWallLinesForWall(
-  wall: { corners: Vec2[]; bulges?: number[]; thicknessM: number; referenceSide: WallReferenceSide },
-) {
-  const ref = wallRefCorners(wall);
-  const lines = computeWallLines(ref, wall.thicknessM, wall.referenceSide);
-  if (wall.corners.length < 2 || ref.length < 2) return lines;
-
-  const t = Math.max(0, wall.thicknessM);
-  let mainOff = 0, subOff = -t, helpOff = -t / 2;
-  if (wall.referenceSide === "inner") { subOff = t; helpOff = t / 2; }
-  else if (wall.referenceSide === "center") { mainOff = t / 2; subOff = -t / 2; helpOff = 0; }
-
-  const n = wall.corners.length;
-  const setEnd = (atStart: boolean) => {
-    const edge = atStart ? 0 : n - 2;
-    const p = atStart ? wall.corners[0] : wall.corners[n - 1];
-    const tangent = bulgeEndpointTangent(
-      wall.corners[edge], wall.corners[edge + 1], wall.bulges?.[edge] || 0, atStart,
-    );
-    const normal = perpLeftScreen(tangent);
-    const idx = atStart ? 0 : lines.mainCorners.length - 1;
-    lines.mainCorners[idx] = add(p, mul(normal, mainOff));
-    lines.subCorners[idx] = add(p, mul(normal, subOff));
-    lines.helpCorners[idx] = add(p, mul(normal, helpOff));
-  };
-  setEnd(true);
-  setEnd(false);
-  return lines;
 }
 
 /**

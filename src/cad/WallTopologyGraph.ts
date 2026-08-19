@@ -1,6 +1,6 @@
 import { Vec2, v, sub, dist } from "./geometry";
 import type { Wall, WallKind } from "./Scene";
-import { computeWallLinesForWall, wallRefCorners } from "./wallGeom";
+import { computeWallLines, wallRefCorners } from "./wallGeom";
 
 /**
  * Toleranzen (in Welt-Metern).
@@ -100,7 +100,7 @@ export class WallTopologyGraph {
       for (const w of walls) {
         if (owners.has(w.id)) continue;
         if (w.corners.length < 2) continue;
-        const hit = projectOnPolyline(node.position, wallRefCorners(w), TJ_TOL);
+        const hit = projectOnPolyline(node.position, w.corners, TJ_TOL);
         if (!hit) continue;
         node.incidents.push({
           wallId: w.id,
@@ -130,9 +130,7 @@ function projectOnPolyline(p: Vec2, poly: Vec2[], tol: number): { edgeIndex: num
     const ab = sub(b, a);
     const ab2 = ab.x * ab.x + ab.y * ab.y || 1e-12;
     let t = ((p.x - a.x) * ab.x + (p.y - a.y) * ab.y) / ab2;
-    // Nur die globalen Polyline-Enden ausschließen. Interne Tessellierungs-
-    // vertices eines Bogens sind gültige T-Treffpunkte (dort ist t 0 oder 1).
-    if ((i === 0 && t < 0.02) || (i === poly.length - 2 && t > 0.98)) continue;
+    if (t < 0.02 || t > 0.98) continue;
     t = Math.max(0, Math.min(1, t));
     const q = { x: a.x + ab.x * t, y: a.y + ab.y * t };
     const d = Math.hypot(q.x - p.x, q.y - p.y);
@@ -153,7 +151,7 @@ export function endpointLineCorners(
   wall: Wall,
   atStart: boolean,
 ): { main: Vec2; help: Vec2; sub: Vec2 } {
-  const lines = computeWallLinesForWall(wall);
+  const lines = computeWallLines(wallRefCorners(wall as any), wall.thicknessM, wall.referenceSide);
   const idx = atStart ? 0 : lines.mainCorners.length - 1;
   return {
     main: v(lines.mainCorners[idx].x, lines.mainCorners[idx].y),

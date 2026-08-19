@@ -16,7 +16,6 @@ import { applyFilterToCanvas, filterSignature } from "./documentFilters";
 import { applyBgRemovalToCanvas, bgRemovalSignature } from "./documentBgRemove";
 
 import { computeHealedWallLines } from "./wallHeal";
-import { wallRefCorners } from "./wallGeom";
 import { getWallUnionGroups } from "./wallUnion";
 import { buildHealedWallSolidRing, buildWallSolidRing, ringToPCPolygon } from "./wallSolid";
 import { drawDoor } from "./doorGeom";
@@ -1466,19 +1465,18 @@ export class Renderer {
           for (const ow of this.scene.walls) {
             if (ow.id === wall.id || ow.corners.length < 2) continue;
             for (const ep of [selStart, selEnd]) {
-              const owRef = wallRefCorners(ow);
-              const owStart = owRef[0];
-              const owEnd = owRef[owRef.length - 1];
+              const owStart = ow.corners[0];
+              const owEnd = ow.corners[ow.corners.length - 1];
               if (Math.hypot(ep.x - owStart.x, ep.y - owStart.y) <= NODE_TOL) continue;
               if (Math.hypot(ep.x - owEnd.x, ep.y - owEnd.y) <= NODE_TOL) continue;
               let onSel = false;
-                for (let i = 1; i < owRef.length - 1; i++) {
-                  const c = owRef[i];
+              for (let i = 1; i < ow.corners.length - 1; i++) {
+                const c = ow.corners[i];
                 if (Math.hypot(ep.x - c.x, ep.y - c.y) <= NODE_TOL) { onSel = true; break; }
               }
               if (!onSel) {
-                for (let i = 0; i < owRef.length - 1; i++) {
-                  const a = owRef[i], b = owRef[i + 1];
+                for (let i = 0; i < ow.corners.length - 1; i++) {
+                  const a = ow.corners[i], b = ow.corners[i + 1];
                   const abx = b.x - a.x, aby = b.y - a.y;
                   const ab2 = abx * abx + aby * aby || 1e-12;
                   const t = ((ep.x - a.x) * abx + (ep.y - a.y) * aby) / ab2;
@@ -1512,11 +1510,10 @@ export class Renderer {
         ctx.strokeStyle = "rgba(80,80,80,0.85)";
         ctx.lineWidth = 1;
         ctx.beginPath();
-        const refCorners = wallRefCorners(wall);
-        const r0 = cam.worldToScreen(refCorners[0].x, refCorners[0].y);
+        const r0 = cam.worldToScreen(wall.corners[0].x, wall.corners[0].y);
         ctx.moveTo(r0.x, r0.y);
-        for (let i = 1; i < refCorners.length; i++) {
-          const p = cam.worldToScreen(refCorners[i].x, refCorners[i].y);
+        for (let i = 1; i < wall.corners.length; i++) {
+          const p = cam.worldToScreen(wall.corners[i].x, wall.corners[i].y);
           ctx.lineTo(p.x, p.y);
         }
         ctx.stroke();
