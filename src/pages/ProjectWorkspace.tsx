@@ -5616,7 +5616,7 @@ function ToolsTab({
 
       {/* Ebenen-Auswahl — bestimmt, in welche Ebene neu gezeichnete Objekte
           landen. Analog zum "Ebene"-Dropdown in der CAD-Oberfläche. */}
-      {cadEngine && settingsTool && settingsTool !== "cad" && (
+      {cadEngine && settingsTool && settingsTool !== "cad" && settingsTool !== "pipette" && (
         <EbeneSelect engine={cadEngine} />
       )}
 
