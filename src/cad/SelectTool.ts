@@ -240,6 +240,8 @@ export class SelectTool {
     this._groupDragDy = dy;
     this._groupDragLast = cursor;
     this._groupDragAnchor = target;
+    this._groupDragMouseStart = v(cursor.x, cursor.y);
+    this._groupDragAnchorStart = v(anchor.x, anchor.y);
   }
 
   /** Bestätigt die eingefügte Kopie (Häkchen / Enter). */
