@@ -5586,6 +5586,7 @@ function ToolsTab({
       {settingsTool === "line" && (
         <LineSettings
           settings={toolSettings.line}
+          pxPerMm={guidePxPerMm}
           onChange={(p) => updateToolSettings("line", p)}
         />
       )}
