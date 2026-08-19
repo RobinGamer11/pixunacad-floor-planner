@@ -1783,7 +1783,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
         {/* Hilfeanzeige wie in der Mappe — werkzeugabhängig. */}
         {!presenting && (
           <MappeHelpOverlay
-            guideActive={activeTool === ToolIds.SELECT}
+            guideActive={false}
             lineActive={activeTool === ToolIds.LINE || activeTool === ToolIds.FREE}
             hatchActive={activeTool === ToolIds.HATCH}
             textActive={activeTool === ToolIds.TEXT}
