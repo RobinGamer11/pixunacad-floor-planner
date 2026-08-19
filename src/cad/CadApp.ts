@@ -1096,6 +1096,7 @@ export class CadApp {
 
   /** True, wenn eine Löschung per Entf-Taste etwas entfernen würde. */
   hasDeletableSelection(): boolean {
+    if (this.doorTool?.selectedDoorId) return true;
     if (this.activePlanId && (this.planController as any)?.hasSelection?.()) return true;
     if (this.activeTool === this.selectTool && this.selectTool.marqueeSelectedIds.length > 0) return true;
     if (this.selection) return true;
@@ -2403,6 +2404,18 @@ export class CadApp {
           e.preventDefault();
           this.textTool.cancel();
           return;
+        }
+        // Tür/Fenster: ausgewähltes Bauelement löschen.
+        if (this.doorTool?.selectedDoorId) {
+          const door = this.scene.getDoorById(this.doorTool.selectedDoorId);
+          if (door) {
+            e.preventDefault();
+            e.stopPropagation();
+            this.scene.removeDoor(door);
+            this.doorTool.selectDoor(null);
+            this.refreshLabelUI();
+            return;
+          }
         }
         // Marquee-Auswahl hat Vorrang: mehrere Elemente in einem Rutsch löschen.
 
