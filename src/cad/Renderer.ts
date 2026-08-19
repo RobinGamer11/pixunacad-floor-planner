@@ -1912,8 +1912,15 @@ export class Renderer {
     ctx.strokeStyle = "rgba(77,163,255,0.95)";
     ctx.lineWidth = Math.max(segScreenThickness + 1.6, 4);
     ctx.beginPath();
-    ctx.moveTo(a.x, a.y);
-    ctx.lineTo(b.x, b.y);
+    if ((seg as any).bulge) {
+      const bp = tessellateWithBulges([seg.a, seg.b], [(seg as any).bulge], false, 32)
+        .map(p => cam.worldToScreen(p.x, p.y));
+      ctx.moveTo(bp[0].x, bp[0].y);
+      for (let i = 1; i < bp.length; i++) ctx.lineTo(bp[i].x, bp[i].y);
+    } else {
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+    }
     ctx.stroke();
 
     ctx.fillStyle = "rgba(77,163,255,0.12)";
