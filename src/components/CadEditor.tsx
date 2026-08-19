@@ -15,7 +15,7 @@ import { FreeDrawSettingsPanel } from "@/components/cad/FreeDrawSettingsPanel";
 import { EraserSettingsPanel } from "@/components/cad/EraserSettingsPanel";
 import { ProjectFilePickerDialog } from "@/components/cad/ProjectFilePickerDialog";
 import { WallSettingsPanel } from "@/components/cad/WallSettingsPanel";
-import { HatchPatternControls } from "@/components/cad/HatchPatternControls";
+import { HatchPatternBlock } from "@/components/cad/HatchPatternBlock";
 
 import { ToolHelpNotes } from "@/components/cad/ToolHelpNotes";
 import { RasterModeToggle } from "@/components/cad/RasterModeToggle";
@@ -105,6 +105,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const pointRotateBtnRef = useRef<HTMLButtonElement>(null);
   const pointDeleteBtnRef = useRef<HTMLButtonElement>(null);
   const pointOffsetBtnRef = useRef<HTMLButtonElement>(null);
+  const pointInsertPointBtnRef = useRef<HTMLButtonElement>(null);
   const settingsRef = useRef<HTMLDivElement>(null);
   const idSelectRef = useRef<HTMLSelectElement>(null);
   const colorInputRef = useRef<HTMLInputElement>(null);
@@ -570,6 +571,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
         [PointEditAction.ROTATE]: pointRotateBtnRef.current,
         [PointEditAction.DELETE]: pointDeleteBtnRef.current,
         [PointEditAction.OFFSET]: pointOffsetBtnRef.current,
+        [PointEditAction.INSERT_POINT]: pointInsertPointBtnRef.current!,
       },
       settingsRef.current, idSelectRef.current,
       colorInputRef.current, colorPreviewRef.current, thicknessInputRef.current,
@@ -1660,7 +1662,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           <button ref={pointMoveBtnRef} title="Bewegen">◉</button>
           <button ref={pointTranslateBtnRef} title="Verschieben">✥</button>
           <button ref={pointRotateBtnRef} title="Drehen">⟳</button>
-          <button ref={pointOffsetBtnRef} title="Kante versetzen">⇆</button>
+          <button ref={pointOffsetBtnRef} title="Kante rein-/rausziehen">⇆</button>
+          <button ref={pointInsertPointBtnRef} title="Neuen Fangpunkt auf der Kante setzen">＋</button>
           <button ref={pointDeleteBtnRef} title="Löschen">🗑</button>
         </div>
 
@@ -2084,7 +2087,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 <label>Transparenz (0–100%)</label>
                 <input ref={hatchAlphaRef} type="text" defaultValue="35" />
               </div>
-              <HatchPatternControls app={cadApp} />
+              <HatchPatternBlock app={cadApp} scaleMax={60} />
 
               <div className="flex items-center gap-2 mt-1">
                 <input
@@ -3085,7 +3088,24 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               </div>
             </div>
           )}
-          {activeTool === ToolIds.LINE ? (
+          {activeTool === ToolIds.HATCH ? (
+            <div
+              className="mt-3 rounded-md border p-2 space-y-2"
+              style={{ borderColor: "hsl(var(--border))" }}
+            >
+              <div className="text-[10px] font-semibold tracking-wider" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+                HILFE
+              </div>
+              <div className="text-[10.5px] leading-snug" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+                <div><span className="cad-kbd">L-Klick + Shift</span> Gerade zeichnen</div>
+                <div><span className="cad-kbd">Doppelklick auf Kante</span> Neuer Fangpunkt</div>
+                <div><span className="cad-kbd">Klick auf Kante + Symbol</span> Kante rein-/rausziehen</div>
+                <div className="mt-1.5 font-semibold">Objektarten</div>
+                <div>Vektor: Generell bearbeitbar</div>
+                <div>Pixel: Radiergummi bearbeitbar</div>
+              </div>
+            </div>
+          ) : activeTool === ToolIds.LINE ? (
             <div
               className="mt-3 rounded-md border p-2 space-y-2"
               style={{ borderColor: "hsl(var(--border))" }}

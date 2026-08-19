@@ -36,6 +36,8 @@ export const EraserSettingsPanel: React.FC<Props> = ({ app, variant = "workspace
   const [mode, setMode] = useState<"hard" | "smooth">("hard");
   const [softness, setSoftness] = useState(0.5);
   const [hasRuler, setHasRuler] = useState(false);
+  /** Aus dem Schraffur-Werkzeug hierher verschoben: Kanten nach Radieren glätten. */
+  const [smoothEdges, setSmoothEdges] = useState(true);
   /** Auswahl im CAD: nur Rasterbilder (PNG/JPG) erlauben den Smooth-Modus. */
   const [docRaster, setDocRaster] = useState<boolean | null>(null);
 
@@ -46,6 +48,7 @@ export const EraserSettingsPanel: React.FC<Props> = ({ app, variant = "workspace
     setMode(app.defaultEraserMode ?? "hard");
     setSoftness(app.defaultEraserSoftness ?? 0.5);
     setHasRuler(!!app.scene.rulerGuide);
+    setSmoothEdges((app as any).defaultHatchAutoSmooth !== false);
   }, [app]);
 
   // Auswahl beobachten (leichtgewichtiges Polling — die Engine feuert je nach
@@ -175,6 +178,21 @@ export const EraserSettingsPanel: React.FC<Props> = ({ app, variant = "workspace
             onChange={(e) => { const v = parseFloat(e.target.value); setStrength(v); app.defaultEraserStrength = v; }}
             className="w-full" />
         </label>
+
+        <button
+          type="button"
+          onClick={() => { (app as any).defaultHatchAutoSmooth = !((app as any).defaultHatchAutoSmooth !== false); setSmoothEdges((app as any).defaultHatchAutoSmooth !== false); }}
+          aria-pressed={smoothEdges}
+          className="cad-toolbar-btn w-full justify-between h-9"
+        >
+          <span className="text-xs">Kanten nach Radieren glätten</span>
+          <span className="text-[11px]" style={{ color: smoothEdges ? "hsl(var(--cad-accent))" : "hsl(var(--cad-toolbar-muted))" }}>
+            {smoothEdges ? "An" : "Aus"}
+          </span>
+        </button>
+        <div className="text-[10px] leading-relaxed" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+          Glättet die radierten Kanten von Schraffuren und entfernt Zacken bei Schwüngen.
+        </div>
 
         <button type="button" onClick={toggleRuler}
           className="cad-toolbar-btn w-full justify-center h-9">

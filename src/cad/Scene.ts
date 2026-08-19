@@ -81,14 +81,17 @@ export class Hatch {
   patternAngleDeg: number;
   patternSkewDeg: number;
   patternStretch: number;
+  patternOffsetX: number;
+  patternOffsetY: number;
   _stickerEditOwnerId?: string | null;
 
   constructor({ id, points, holes, fillColor, strokeColor, fillAlphaPct, strokeWidthPx, labelId, areaLabel,
-    patternEnabled, patternId, patternScale, patternAngleDeg, patternSkewDeg, patternStretch }: {
+    patternEnabled, patternId, patternScale, patternAngleDeg, patternSkewDeg, patternStretch,
+    patternOffsetX, patternOffsetY }: {
     id: string; points: Vec2[]; holes?: Vec2[][]; fillColor?: string; strokeColor?: string;
     fillAlphaPct?: number; strokeWidthPx?: number; labelId?: string; areaLabel?: Partial<AreaLabel>;
     patternEnabled?: boolean; patternId?: string; patternScale?: number;
-    patternAngleDeg?: number; patternSkewDeg?: number; patternStretch?: number;
+    patternAngleDeg?: number; patternSkewDeg?: number; patternStretch?: number; patternOffsetX?: number; patternOffsetY?: number;
   }) {
     this.id = id;
     this.points = points.map(p => v(p.x, p.y));
@@ -104,6 +107,8 @@ export class Hatch {
     this.patternAngleDeg = Number.isFinite(patternAngleDeg) ? patternAngleDeg! : 0;
     this.patternSkewDeg = Number.isFinite(patternSkewDeg) ? clamp(patternSkewDeg!, -70, 70) : 0;
     this.patternStretch = Number.isFinite(patternStretch) ? clamp(patternStretch!, 0.1, 10) : 1;
+    this.patternOffsetX = Number.isFinite(patternOffsetX) ? patternOffsetX! : 0;
+    this.patternOffsetY = Number.isFinite(patternOffsetY) ? patternOffsetY! : 0;
 
     this.areaLabel = {
       show: !!(areaLabel?.show ?? Defaults.areaShow),
@@ -1078,7 +1083,7 @@ export class Scene {
     strokeWidthPx?: number; labelId?: string; areaLabel?: Partial<AreaLabel>;
     holes?: Vec2[][];
     patternEnabled?: boolean; patternId?: string; patternScale?: number;
-    patternAngleDeg?: number; patternSkewDeg?: number; patternStretch?: number;
+    patternAngleDeg?: number; patternSkewDeg?: number; patternStretch?: number; patternOffsetX?: number; patternOffsetY?: number;
   } = {}) {
     const hatch = new Hatch({
       id: this._makeId(), points, holes: style.holes,
@@ -1087,7 +1092,7 @@ export class Scene {
       labelId: style.labelId, areaLabel: style.areaLabel,
       patternEnabled: style.patternEnabled, patternId: style.patternId,
       patternScale: style.patternScale, patternAngleDeg: style.patternAngleDeg,
-      patternSkewDeg: style.patternSkewDeg, patternStretch: style.patternStretch,
+      patternSkewDeg: style.patternSkewDeg, patternStretch: style.patternStretch, patternOffsetX: style.patternOffsetX, patternOffsetY: style.patternOffsetY,
     });
 
     hatch._stickerEditOwnerId = this._currentEditOwnerId;
