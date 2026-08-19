@@ -4,13 +4,17 @@ import type { WallToolSettings } from "@/cad/WallTool";
 import { Defaults } from "@/cad/constants";
 import { HATCH_PATTERNS } from "@/cad/hatchPatterns";
 import { runWallTopologyMaintenance } from "@/cad/wallTopologyMaintenance";
+import { RasterModeToggle } from "@/components/cad/RasterModeToggle";
 
 /** Typische Wand-Baustoffe (Schraffur skaliert automatisch mit der Wanddicke). */
 const WALL_PATTERNS = HATCH_PATTERNS.filter(p =>
   ["mauerwerk", "stahlbeton", "ziegelverband", "holz", "daemmung_hart", "daemmung_weich", "xps"].includes(p.id),
 );
 
-interface Props { app: CadApp | null; }
+const HAIRLINE = "hsl(var(--hairline))";
+
+interface Props { app: CadApp | null; projectId?: string; }
+
 
 export const WallSettingsPanel: React.FC<Props> = ({ app }) => {
   const [, force] = useState(0);
