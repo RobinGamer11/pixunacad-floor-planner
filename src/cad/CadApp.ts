@@ -202,6 +202,13 @@ export class CadApp {
   defaultTextBorderEnabled = Defaults.textBorderEnabled;
   defaultTextBorderColor = Defaults.textBorderColor;
   defaultTextBorderWidthPx = Defaults.textBorderWidthPx;
+  defaultTextBold = Defaults.textBold;
+  defaultTextItalic = Defaults.textItalic;
+  defaultTextUnderline = Defaults.textUnderline;
+  defaultTextStrike = Defaults.textStrike;
+  defaultTextLineHeightPct = Defaults.textLineHeightPct;
+  defaultTextAutoSize = true;
+
 
   // Freihand-Defaults
   defaultFreeColor = Defaults.freeColor;
