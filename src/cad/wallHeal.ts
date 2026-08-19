@@ -32,11 +32,17 @@ export function computeHealedWallLines(wallInput: Wall, others: Wall[], graph?: 
   const subCorners = lines.subCorners.map(p => v(p.x, p.y));
   const helpCorners = lines.helpCorners.map(p => v(p.x, p.y));
 
-  const capStart = !healEnd(wall, others, mainCorners, subCorners, helpCorners, true, graph);
-  const capEnd = !healEnd(wall, others, mainCorners, subCorners, helpCorners, false, graph);
+  const rawBulges: number[] = Array.isArray((wallInput as any).bulges) ? (wallInput as any).bulges : [];
+  const nRaw = wallInput.corners.length;
+  const startBulge = Math.abs(rawBulges[0] || 0);
+  const endBulge = Math.abs(rawBulges[Math.max(0, nRaw - 2)] || 0);
+
+  const symMain = { start: false, end: false };
+  const capStart = !healEnd(wall, others, mainCorners, subCorners, helpCorners, true, graph, startBulge, symMain);
+  const capEnd = !healEnd(wall, others, mainCorners, subCorners, helpCorners, false, graph, endBulge, symMain);
 
   // Cleanup-Pass: gleicher Knoten → gleichnamige Linien zusammenführen.
-  if (graph) cleanupAtNodes(wall, mainCorners, subCorners, helpCorners, graph, others);
+  if (graph) cleanupAtNodes(wall, mainCorners, subCorners, helpCorners, graph, others, symMain);
 
   return { mainCorners, subCorners, helpCorners, capStart, capEnd };
 }
@@ -49,6 +55,8 @@ function healEnd(
   helpCorners: Vec2[],
   atStart: boolean,
   graph?: WallTopologyGraph,
+  endBulgeMag: number = 0,
+  symMain?: { start: boolean; end: boolean },
 ): boolean {
   const n = wall.corners.length;
   if (n < 2) return false;
@@ -97,10 +105,83 @@ function healEnd(
   // die optische Wand verlässt die Fangpunkte.
   let maxNeighborThickness = 0;
   for (const c of candidates) maxNeighborThickness = Math.max(maxNeighborThickness, c.thicknessM || 0);
-  const healLimit = (wall.thicknessM + maxNeighborThickness) * 3 + HEAL_TOL_M;
+  // Krümmungsabhängig: bei gewölbten Wänden laufen die End-Tangenten stärker
+  // auseinander, echte Gehrungen liegen dann weiter draußen.
+  const healLimit = (wall.thicknessM + maxNeighborThickness) * 3 * (1 + 2 * endBulgeMag) + HEAL_TOL_M;
+
+  /**
+   * Rückfall-Punkt für Help-/Sublinien: Mittelwert der gleichnamigen rohen
+   * Linien-Endpunkte aller am Knoten hängenden Wände (inkl. eigener). Da alle
+   * beteiligten Wände denselben Mittelwert berechnen, treffen sich die Linien
+   * exakt — auch bei starker Wölbung, wo keine sinnvolle Gehrung existiert.
+   */
+  const nodeMeetPoint = (T: LineType, origin: Vec2): Vec2 | null => {
+    if (!node) return null;
+    let sx = origin.x, sy = origin.y, count = 1;
+    for (const inc of node.incidents) {
+      if (inc.wallId === wall.id) continue;
+      if (inc.kind === "tjunction") continue;
+      const ow = others.find(w => w.id === inc.wallId);
+      if (!ow || ow.corners.length < 2) continue;
+      const isStart = inc.kind === "start";
+      const c = endpointLineCorners(ow, isStart);
+      const p = T === "main" ? c.main : T === "help" ? c.help : c.sub;
+      sx += p.x; sy += p.y; count++;
+    }
+    if (count < 2) return null;
+    return v(sx / count, sy / count);
+  };
+
+  /**
+   * Symmetrische Gehrung für Help-/Sublinien an reinen Endpunkt-Knoten:
+   * Schnitt der beiden End-Tangenten der gleichnamigen Offset-Linien beider
+   * Wände. Beide Nachbarn berechnen exakt dieselbe Geometrie → sie treffen
+   * sich zwangsläufig, auch wenn die Linien gewölbt sind (der einseitige
+   * Strahl-gegen-Kurve-Schnitt liefert dagegen zwei verschiedene Punkte).
+   */
+  const symmetricMiter = (T: LineType, origin: Vec2): Vec2 | null => {
+    if (!node) return null;
+    if (node.incidents.some(i => i.wallId !== wall.id && i.kind === "tjunction")) return null;
+    let best: Vec2 | null = null;
+    let bestAbs = Infinity;
+    for (const inc of node.incidents) {
+      if (inc.wallId === wall.id || inc.kind === "tjunction") continue;
+      const ow = others.find(w => w.id === inc.wallId);
+      if (!ow || ow.corners.length < 2) continue;
+      if (ow.priority < wall.priority) continue;
+      const isStart = inc.kind === "start";
+      const c = endpointLineCorners(ow, isStart);
+      const op = T === "main" ? c.main : T === "help" ? c.help : c.sub;
+      const oc = wallRefCorners(ow as any);
+      const od = isStart
+        ? norm(sub(oc[1], oc[0]))
+        : norm(sub(oc[oc.length - 1], oc[oc.length - 2]));
+      const ip = lineLineIntersectionInfinite(origin, dir, op, od);
+      if (!ip) continue;
+      const a = dist(origin, ip);
+      if (a > healLimit) continue;
+      if (a < bestAbs) { bestAbs = a; best = ip; }
+    }
+    return best || nodeMeetPoint(T, origin);
+  };
 
   for (const T of ["main", "help", "sub"] as LineType[]) {
     const origin = polysSelf[T][idx];
+
+    {
+      // Symmetrische Gehrung zuerst — sie liefert für beide Nachbarwände
+      // identische Punkte und schließt damit Lücken auch bei Wölbung.
+      const pair = symmetricMiter(T, origin);
+      if (pair) {
+        polysSelf[T][idx] = pair;
+        healedAny = true;
+        if (T === "main" && symMain) {
+          if (atStart) symMain.start = true; else symMain.end = true;
+        }
+        continue;
+      }
+    }
+
 
     // Phase 1: ideale Zielposition über alle Kandidaten (gleichnamige Linie).
     // Phase 4: Distanz-Cap (HEAL_MAX_DIST_M) verhindert Ausreißer bei spitzen
@@ -121,7 +202,15 @@ function healEnd(
         ideal = p;
       }
     }
-    if (!ideal) continue;
+    if (!ideal) {
+      // Kein gleichnamiger Schnitt (z. B. parallele Tangenten bei Wölbung):
+      // Help/Sub am gemeinsamen Knoten zusammenführen statt offen lassen.
+      if (T !== "main") {
+        const meet = nodeMeetPoint(T, origin);
+        if (meet) { polysSelf[T][idx] = meet; healedAny = true; }
+      }
+      continue;
+    }
 
     // Phase 5 (ArchiCAD-Verhalten): Beide Bezugslinien (main UND sub) jeder
     // Nachbarwand sind harte Grenzen — die neue Wand stoppt an der zugewandten
@@ -166,12 +255,18 @@ function healEnd(
       }
     }
 
-    // Bevel-Begrenzung: zu weite Gehrungen auf healLimit kürzen.
+    // Bevel-Begrenzung: zu weite Gehrungen nicht stumpf abschneiden, sondern
+    // Help/Sub am Knoten zusammenführen (sonst entsteht dort eine Lücke).
     {
       const tAlong = (ideal.x - origin.x) * dir.x + (ideal.y - origin.y) * dir.y;
       if (Math.abs(tAlong) > healLimit) {
-        const s = tAlong >= 0 ? healLimit : -healLimit;
-        ideal = v(origin.x + dir.x * s, origin.y + dir.y * s);
+        const meet = T !== "main" ? nodeMeetPoint(T, origin) : null;
+        if (meet) {
+          ideal = meet;
+        } else {
+          const s = tAlong >= 0 ? healLimit : -healLimit;
+          ideal = v(origin.x + dir.x * s, origin.y + dir.y * s);
+        }
       }
     }
 
@@ -197,11 +292,14 @@ function cleanupAtNodes(
   helpCorners: Vec2[],
   graph: WallTopologyGraph,
   others: Wall[],
+  symMain?: { start: boolean; end: boolean },
 ) {
   const polys: Record<LineType, Vec2[]> = { main: mainCorners, help: helpCorners, sub: subCorners };
   for (const atStart of [true, false]) {
     const node = graph.getNodeForEndpoint(wall.id, atStart);
     if (!node) continue;
+    // Bereits symmetrisch gemitert → nicht zurück auf Rohpunkte snappen.
+    if (symMain && (atStart ? symMain.start : symMain.end)) continue;
     const idx = atStart ? 0 : mainCorners.length - 1;
     const ownPrio = (T: LineType) => priorityIndex(wall.kind, T);
 
