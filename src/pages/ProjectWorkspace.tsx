@@ -5070,7 +5070,7 @@ function RightInspector({
               onCancelTable={onCancelTable}
             />
           )}
-          {tab === "tools" && activeTool !== "guide" && activeTool !== "text" && activeTool !== "eraser" && activeTool !== null && activeTool !== "pipette" && !isLinePageTool(activeTool) && (
+          {tab === "tools" && activeTool !== "guide" && activeTool !== "text" && activeTool !== "eraser" && activeTool !== null && activeTool !== "pipette" && activeTool !== "document" && activeTool !== "cad" && !isLinePageTool(activeTool) && (
             <ToolHelpNotes toolId={activeTool} />
           )}
           {tab === "layers" && page && (
