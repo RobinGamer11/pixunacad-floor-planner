@@ -3875,7 +3875,7 @@ function ElementView({
   const showHub = !readOnly && selected && hubKinds.has(el.kind);
   // Optik: CAD-Blatt blau, alle anderen Objekte goldener Auswahlrahmen.
   const outlineStyle = selected
-    ? (cadHubUx ? "2px solid #4da3ff" : "2px solid hsl(var(--accent-gold))")
+    ? (cadHubUx ? "1.5px solid #4da3ff" : "2px solid hsl(var(--accent-gold))")
     : "none";
 
   // Preview-Interaktion (Move/Rotate) — startet bei aktivem hubMode.
@@ -4473,7 +4473,7 @@ function ElementView({
                     }}
                     title="Verschieben — Anker folgt der Maus, klicken zum Setzen (ESC bricht ab)"
                     className={`h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))] ${hubMode === "move" ? "bg-[hsl(var(--surface-muted))]" : ""}`}
-                    style={{ color: hubMode === "move" ? "hsl(var(--accent-gold))" : undefined }}
+                    style={{ color: hubMode === "move" ? (cadHubUx ? hubBlue : "hsl(var(--accent-gold))") : undefined }}
                   >
                     <Move size={14} strokeWidth={1.6} className="shrink-0" />
                   </button>
@@ -4491,7 +4491,7 @@ function ElementView({
                     }}
                     title="Drehen — Maus bewegen (Shift = 90°-Fang), dann klicken zum Setzen"
                     className={`h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))] ${hubMode === "rotate" ? "bg-[hsl(var(--surface-muted))]" : ""}`}
-                    style={{ color: hubMode === "rotate" ? "hsl(var(--accent-gold))" : undefined }}
+                    style={{ color: hubMode === "rotate" ? (cadHubUx ? hubBlue : "hsl(var(--accent-gold))") : undefined }}
                   >
                     <RotateCw size={14} />
                   </button>
@@ -4655,8 +4655,8 @@ function ElementView({
                   className="absolute"
                   style={
                     isHor
-                      ? { left: 0, right: 0, top: "50%", height: hoverGlow || isActive || edgeReady ? 3 : 2, transform: "translateY(-50%)", background: edgeStroke, opacity: hoverGlow || isActive || edgeReady ? 1 : 0.45, boxShadow: hoverGlow || edgeReady ? `0 0 8px ${edgeStroke}` : undefined }
-                      : { top: 0, bottom: 0, left: "50%", width: hoverGlow || isActive || edgeReady ? 3 : 2, transform: "translateX(-50%)", background: edgeStroke, opacity: hoverGlow || isActive || edgeReady ? 1 : 0.45, boxShadow: hoverGlow || edgeReady ? `0 0 8px ${edgeStroke}` : undefined }
+                      ? { left: 0, right: 0, top: "50%", height: hoverGlow || isActive || edgeReady ? 2 : 1, transform: "translateY(-50%)", background: edgeStroke, opacity: hoverGlow || isActive || edgeReady ? 1 : 0.45, boxShadow: hoverGlow || edgeReady ? `0 0 8px ${edgeStroke}` : undefined }
+                      : { top: 0, bottom: 0, left: "50%", width: hoverGlow || isActive || edgeReady ? 2 : 1, transform: "translateX(-50%)", background: edgeStroke, opacity: hoverGlow || isActive || edgeReady ? 1 : 0.45, boxShadow: hoverGlow || edgeReady ? `0 0 8px ${edgeStroke}` : undefined }
                   }
                 />
                 {cadHubUx && (
