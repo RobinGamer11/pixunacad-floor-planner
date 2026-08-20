@@ -1672,84 +1672,53 @@ function noteToUnified(n: NoteNode): UnifiedTask {
 
 export function AufgabenView({ project }: { project: Project }) {
   const navigate = useNavigate();
-  const notes = useNotes(project.id);
-  const allProjects = useProjects();
-  const mappen = project.mappen ?? [];
-  const defaultMappeId = project.activeMappeId ?? mappen[0]?.id ?? "";
+  const board = useTimeline(project.id);
+  useEffect(() => { timelineStore.ensureDefaults(project.id); }, [project.id]);
+
   const [selectedDate, setSelectedDate] = useState<string | undefined>(undefined);
-  const [draft, setDraft] = useState<{ title: string; description: string; date: string; time: string; priority: TaskPriority; category: string; mappeId: string; projectId: string }>({
-    title: "",
-    description: "",
-    date: "",
-    time: "",
-    priority: "medium",
-    // Schnellablage ist die Standardkategorie für neue Aufgaben.
-    category: QUICK_CATEGORY,
-    mappeId: defaultMappeId,
-    projectId: project.id,
-  });
+  const [kind, setKind] = useState<TlKind>("task");
+  const [draft, setDraft] = useState({ title: "", description: "" });
 
-  // Das aktuell geöffnete Projekt (und dessen aktive Mappe) ist immer vorbelegt.
-  useEffect(() => {
-    setDraft((d) => ({ ...d, projectId: project.id, mappeId: defaultMappeId }));
-  }, [project.id, defaultMappeId]);
-
-  const mappeName = useCallback(
-    (id?: string) => (id ? (mappen.find((m) => m.id === id)?.name ?? "") : ""),
-    [mappen]
+  const catMap = useMemo(
+    () => new Map(board.categories.map((c) => [c.id, c])),
+    [board.categories],
   );
 
-  // Board-Tasks + klassische Tasks zusammenführen.
-  const combined: UnifiedTask[] = useMemo(() => {
-    const legacy: UnifiedTask[] = project.tasks.map((t) => ({
-      id: t.id, source: "legacy", title: t.title, date: t.date, time: t.time,
-      priority: t.priority ?? "medium", done: t.done,
-    }));
-    const noteTasks = notes.nodes
-      .filter((n) => n.kind === "task")
-      .map((n) => ({ ...noteToUnified(n), mappeId: n.mappeId }));
-    const prioRank: Record<TaskPriority, number> = { high: 0, medium: 1, low: 2 };
-    return [...legacy, ...noteTasks].sort((a, b) => {
-      // Offene zuerst, dann nach Dringlichkeit, dann nach Datum/Zeit.
-      if (!!a.done !== !!b.done) return a.done ? 1 : -1;
-      const pr = prioRank[a.priority] - prioRank[b.priority];
-      if (pr !== 0) return pr;
-      const da = `${a.date ?? "9999-99-99"} ${a.time ?? "99:99"}`;
-      const db = `${b.date ?? "9999-99-99"} ${b.time ?? "99:99"}`;
-      return da.localeCompare(db);
-    });
-  }, [project.tasks, notes.nodes]);
+  /** Board-Einträge (Aufgaben + Notizen) für Kalender und Liste. */
+  const rows: UnifiedTask[] = useMemo(() => {
+    const now = Date.now();
+    return board.items
+      .filter((i) => i.kind === "task" || i.kind === "note")
+      .map((i) => ({
+        id: i.id,
+        source: "board" as const,
+        title: i.title,
+        date: i.endDate || i.startDate,
+        time: i.endTime || i.startTime,
+        priority: "medium" as TaskPriority,
+        done: itemAchieved(i, now),
+        category: catMap.get(i.categoryId ?? "")?.label,
+        kind: i.kind,
+        alert: taskAlert(i, now),
+      }))
+      .sort((a, b) => {
+        if (!!a.done !== !!b.done) return a.done ? 1 : -1;
+        return `${a.date ?? "9999-99-99"} ${a.time ?? "99:99"}`.localeCompare(
+          `${b.date ?? "9999-99-99"} ${b.time ?? "99:99"}`,
+        );
+      });
+  }, [board.items, catMap]);
 
+  const filtered = selectedDate ? rows.filter((t) => t.date === selectedDate) : rows;
 
-  const filtered = selectedDate ? combined.filter((t) => t.date === selectedDate) : combined;
-
-  const addTask = () => {
+  const addEntry = () => {
     if (!draft.title.trim()) return;
-    const prio: NotePriority = draft.priority === "high" ? "high" : draft.priority === "low" ? "low" : "normal";
-    const targetProjectId = draft.projectId || project.id;
-    const isForeign = targetProjectId !== project.id;
-    notesStore.addNode(targetProjectId, null, "task", {
+    addQuickItem(project.id, kind, {
       title: draft.title.trim(),
       description: draft.description.trim() || undefined,
-      date: draft.date || undefined,
-      time: draft.time || undefined,
-      priority: prio,
-      status: "open",
-      // In einem fremden Projekt landet die Aufgabe immer in der Schnellablage.
-      category: isForeign ? QUICK_CATEGORY : (draft.category || undefined),
-      mappeId: isForeign ? undefined : (draft.mappeId || undefined),
-      unseen: true,
+      date: selectedDate || undefined,
     });
-    setDraft({
-      title: "",
-      description: "",
-      date: selectedDate ?? "",
-      time: "",
-      priority: "medium",
-      category: draft.category,
-      mappeId: draft.mappeId,
-      projectId: draft.projectId,
-    });
+    setDraft({ title: "", description: "" });
   };
 
   return (
@@ -1764,122 +1733,88 @@ export function AufgabenView({ project }: { project: Project }) {
             KALENDER
           </div>
           <button
-            onClick={() => navigate(`/project/${project.id}/notes`)}
+            onClick={() => navigate(`/project/${project.id}/board`)}
             className="h-7 px-2.5 rounded-md text-[11px] font-medium flex items-center gap-1.5"
             style={{ background: "hsl(var(--accent-gold-soft))", color: "hsl(var(--accent-gold))" }}
             title="Board öffnen"
           >
-            <Network size={13} /> Board
+            <ListChecks size={13} /> Board
           </button>
         </div>
         <TaskCalendar
-          tasks={combined}
+          tasks={rows}
           selectedDate={selectedDate}
-          onSelectDate={(d) => {
-            setSelectedDate(d);
-            setDraft((s) => ({ ...s, date: d ?? "" }));
-          }}
+          onSelectDate={(d) => setSelectedDate(d)}
         />
         <div className="mt-3 text-[11px] text-muted-foreground">
-          Tipp: Neue Aufgaben werden automatisch mit dem Board verknüpft und dort auf der Projekt-Ebene erstellt.
+          Aufgaben und Notizen sind direkt mit dem Board verknüpft.
         </div>
       </div>
 
-      {/* Neue Aufgabe */}
+      {/* Neuer Eintrag */}
       <div
         className="rounded-2xl p-5"
         style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
       >
         <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-3">
-          NEUE AUFGABE (im Board)
+          NEUER EINTRAG (im Board)
         </div>
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center gap-2">
+            {(["task", "note"] as TlKind[]).map((k) => (
+              <button
+                key={k}
+                onClick={() => setKind(k)}
+                className="h-9 px-4 rounded-md text-sm font-medium border flex items-center gap-1.5"
+                style={{
+                  background: kind === k ? "hsl(var(--accent-gold-soft))" : "transparent",
+                  borderColor: kind === k ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
+                  color: kind === k ? "hsl(var(--accent-gold))" : "hsl(var(--ink-soft))",
+                }}
+              >
+                <Plus size={14} /> {k === "task" ? "Aufgabe" : "Notiz"}
+              </button>
+            ))}
+          </div>
           <input
             value={draft.title}
             onChange={(e) => setDraft({ ...draft, title: e.target.value })}
-            onKeyDown={(e) => e.key === "Enter" && addTask()}
-            placeholder="Titel der Aufgabe…"
+            onKeyDown={(e) => e.key === "Enter" && addEntry()}
+            placeholder={kind === "task" ? "Titel der Aufgabe…" : "Titel der Notiz…"}
             className="h-9 px-3 rounded-md border bg-transparent text-sm outline-none w-full"
             style={{ borderColor: "hsl(var(--hairline))" }}
           />
           <textarea
             value={draft.description}
             onChange={(e) => setDraft({ ...draft, description: e.target.value })}
-            placeholder="Beschreibung (optional)…"
-            rows={2}
-            className="px-3 py-2 rounded-md border bg-transparent text-sm outline-none w-full resize-none"
+            placeholder="Beschreibung…"
+            className="px-3 py-2 rounded-md border bg-transparent text-sm outline-none w-full resize-y min-h-[220px]"
             style={{ borderColor: "hsl(var(--hairline))" }}
           />
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            <input
-              type="date"
-              value={draft.date}
-              onChange={(e) => setDraft({ ...draft, date: e.target.value })}
-              className="h-9 min-w-0 px-2 rounded-md border bg-transparent text-sm outline-none"
-              style={{ borderColor: "hsl(var(--hairline))" }}
-            />
-            <input
-              type="time"
-              value={draft.time}
-              onChange={(e) => setDraft({ ...draft, time: e.target.value })}
-              className="h-9 min-w-0 px-2 rounded-md border bg-transparent text-sm outline-none"
-              style={{ borderColor: "hsl(var(--hairline))" }}
-            />
-            <select
-              value={draft.priority}
-              onChange={(e) => setDraft({ ...draft, priority: e.target.value as TaskPriority })}
-              className="h-9 min-w-0 px-2 rounded-md border bg-transparent text-sm outline-none"
-              style={{ borderColor: "hsl(var(--hairline))" }}
+          <div className="flex items-center gap-3">
+            <span className="text-[11px] text-muted-foreground">
+              Kategorie „Schnellablage“ · {selectedDate ? selectedDate : "heutiges Datum"} · Priorität „Normal“
+            </span>
+            <div className="flex-1" />
+            <button
+              onClick={addEntry}
+              className="h-9 px-4 rounded-md text-sm font-medium flex items-center justify-center gap-1"
+              style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
             >
-              <option value="low">Niedrig</option>
-              <option value="medium">Mittel</option>
-              <option value="high">Hoch</option>
-            </select>
-            <select
-              value={draft.category}
-              onChange={(e) => setDraft({ ...draft, category: e.target.value })}
-              className="h-9 min-w-0 px-2 rounded-md border bg-transparent text-sm outline-none"
-              style={{ borderColor: "hsl(var(--hairline))" }}
-            >
-              <option value="">Kategorie…</option>
-              {notes.categories.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
+              <Plus size={14} /> Hinzufügen
+            </button>
           </div>
-          {/* Zielprojekt: standardmäßig das aktuell geöffnete Projekt. Wird ein
-              anderes Projekt gewählt, landet die Aufgabe dort in der Schnellablage. */}
-          <select
-            value={draft.projectId}
-            onChange={(e) => setDraft({ ...draft, projectId: e.target.value })}
-            className="h-9 px-2 rounded-md border bg-transparent text-sm outline-none"
-            style={{ borderColor: "hsl(var(--hairline))" }}
-            title="Projekt zuordnen"
-          >
-            {allProjects.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}{p.id === project.id ? " (aktuell)" : ""}
-              </option>
-            ))}
-          </select>
-          <button
-            onClick={addTask}
-            className="h-9 px-4 rounded-md text-sm font-medium flex items-center justify-center gap-1 self-end"
-            style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
-          >
-            <Plus size={14} /> Hinzufügen
-          </button>
         </div>
       </div>
 
-
-
-      {/* Aufgabenliste */}
+      {/* Liste */}
       <div
         className="rounded-2xl p-5"
         style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
       >
         <div className="flex items-center justify-between mb-3">
           <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">
-            AUFGABEN {selectedDate && `· ${new Date(selectedDate).toLocaleDateString("de-DE")}`}
+            AUFGABEN / NOTIZEN {selectedDate && `· ${new Date(selectedDate).toLocaleDateString("de-DE")}`}
           </div>
           {selectedDate && (
             <button
@@ -1893,72 +1828,50 @@ export function AufgabenView({ project }: { project: Project }) {
         <div className="divide-y" style={{ borderColor: "hsl(var(--hairline))" }}>
           {filtered.length === 0 && (
             <div className="text-sm text-muted-foreground italic py-3">
-              Keine Aufgaben.
+              Keine Einträge.
             </div>
           )}
           {filtered.map((t) => (
-            <UnifiedTaskRow key={`${t.source}:${t.id}`} task={t} projectId={project.id} mappeName={mappeName(t.mappeId)} onOpenInNotes={() => navigate(`/project/${project.id}/notes`)} />
+            <UnifiedTaskRow
+              key={t.id}
+              task={t}
+              projectId={project.id}
+              onOpenInBoard={() => navigate(`/project/${project.id}/board`)}
+            />
           ))}
         </div>
       </div>
-
-      <TaskTimeline project={project} />
     </div>
   );
 }
 
 function UnifiedTaskRow({
-  task, projectId, onOpenInNotes, mappeName,
-}: { task: UnifiedTask; projectId: string; onOpenInNotes: () => void; mappeName?: string }) {
-  const prio = task.priority;
-  const prioColor =
-    prio === "high" ? "hsl(0 70% 55%)"
-    : prio === "medium" ? "hsl(var(--accent-gold))"
-    : "hsl(140 35% 55%)";
+  task, projectId, onOpenInBoard,
+}: { task: UnifiedTask; projectId: string; onOpenInBoard: () => void }) {
+  const dotColor = task.alert ? "hsl(0 70% 55%)" : task.done ? "hsl(var(--accent-gold))" : "hsl(var(--ink-soft))";
 
-  const toggle = () => {
-    if (task.source === "legacy") {
-      projectStore.toggleTask(projectId, task.id);
-    } else {
-      notesStore.updateNode(projectId, task.id, { status: task.done ? "open" : "done" });
-    }
-  };
-  const remove = () => {
-    if (task.source === "legacy") projectStore.deleteTask(projectId, task.id);
-    else notesStore.deleteNode(projectId, task.id);
-  };
+  const toggle = () =>
+    timelineStore.updateItem(projectId, task.id, {
+      statusId: task.done ? "open" : "done",
+      done: !task.done,
+      statusManual: true,
+    });
+  const remove = () => timelineStore.deleteItem(projectId, task.id);
 
   return (
     <div className="flex items-center gap-3 py-2.5">
-      <input
-        type="checkbox"
-        checked={task.done}
-        onChange={toggle}
-        className="accent-foreground"
-      />
-      <span
-        className="w-2 h-2 rounded-full shrink-0"
-        style={{ background: prioColor }}
-        title={`Priorität: ${prio}`}
-      />
+      <input type="checkbox" checked={task.done} onChange={toggle} className="accent-foreground" />
+      <span className="w-2 h-2 rounded-full shrink-0" style={{ background: dotColor }} />
       <div className="flex-1 min-w-0">
         <div className={`text-sm truncate flex items-center gap-2 ${task.done ? "line-through text-muted-foreground" : ""}`}>
           {task.title}
-          {task.source === "note" && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded shrink-0"
-              style={{ background: "hsl(var(--accent-gold-soft))", color: "hsl(var(--accent-gold))" }}>
-              Board
-            </span>
-          )}
-          {mappeName && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded shrink-0"
-              style={{ background: "hsl(var(--surface-muted))", color: "hsl(var(--ink-soft))" }}>
-              {mappeName}
-            </span>
-          )}
+          <span className="text-[10px] px-1.5 py-0.5 rounded shrink-0"
+                style={{ background: "hsl(var(--accent-gold-soft))", color: "hsl(var(--accent-gold))" }}>
+            {task.kind === "task" ? "Aufgabe" : "Notiz"}
+          </span>
           {task.category && (
             <span className="text-[10px] px-1.5 py-0.5 rounded shrink-0"
-              style={{ background: "hsl(var(--surface-muted))", color: "hsl(var(--ink-soft))" }}>
+                  style={{ background: "hsl(var(--surface-muted))", color: "hsl(var(--ink-soft))" }}>
               {task.category}
             </span>
           )}
@@ -1970,12 +1883,9 @@ function UnifiedTaskRow({
           {task.time ? ` · ${task.time}` : ""}
         </div>
       </div>
-      {task.source === "note" && (
-        <button onClick={onOpenInNotes} title="Im Board öffnen"
-          className="text-muted-foreground hover:text-foreground">
-          <ExternalLink size={14} />
-        </button>
-      )}
+      <button onClick={onOpenInBoard} title="Im Board öffnen" className="text-muted-foreground hover:text-foreground">
+        <ExternalLink size={14} />
+      </button>
       <button onClick={remove} title="Löschen" className="text-muted-foreground hover:text-foreground">
         <Trash2 size={14} />
       </button>
