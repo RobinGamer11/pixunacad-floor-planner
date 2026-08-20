@@ -7,6 +7,8 @@ import {
   itemStartMs, itemEndMs, itemAchieved, effectiveStatusId, priorityRadius,
   type TlItem, type TlKind, type TlCategory, type TlPriority, type TlStatus,
 } from "@/lib/timelineStore";
+import { ProjectGraph } from "@/pages/NotesPage";
+import { useNotes, type NoteStatusDef, type NotePriorityDef } from "@/lib/notesStore";
 import {
   CheckSquare, CalendarClock, FileText, X, Trash2, Plus, Settings, Save, Search, ChevronLeft,
 } from "lucide-react";
