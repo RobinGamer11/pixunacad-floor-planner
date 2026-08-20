@@ -4076,9 +4076,11 @@ function ElementView({
         while (delta > 180) delta -= 360;
         while (delta < -180) delta += 360;
         if (ev.shiftKey) {
-          const absTarget = Math.round((startRot + delta) / 90) * 90;
+          // Shift = feste Neigungswinkel (45°-Raster: 45°, 90°, 135°, …)
+          const absTarget = Math.round((startRot + delta) / 45) * 45;
           delta = absTarget - startRot;
         }
+
         // Zentrumsversatz, damit der gewählte Fangpunkt exakt an Ort bleibt:
         // Rotation um den Anker = Rotation um das Zentrum + Verschiebung.
         const rc = baseRect();
