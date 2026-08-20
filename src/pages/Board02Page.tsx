@@ -497,11 +497,9 @@ export default function Board02Page() {
                         <Chip>{kindLabel(p.item.kind)}</Chip>
                         {cat && <Chip color={cat.color}>{cat.label}</Chip>}
                         <Chip>{prioMap.get(p.item.priorityId ?? "")?.label ?? "—"}</Chip>
-                        {p.item.statusId && (
-                          <Chip color={statusMap.get(p.item.statusId)?.color}>
-                            {statusMap.get(p.item.statusId)?.label ?? "—"}
-                          </Chip>
-                        )}
+                        <Chip color={statusMap.get(effectiveStatusId(p.item, now))?.color}>
+                          {statusMap.get(effectiveStatusId(p.item, now))?.label ?? "—"}
+                        </Chip>
                       </div>
                       <div className="opacity-70">
                         {fmtDate(p.item.startDate, p.item.startTime)}
