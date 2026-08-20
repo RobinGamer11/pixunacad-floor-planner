@@ -4330,9 +4330,6 @@ function ElementView({
         border: el.border ? "1px solid hsl(var(--ink))" : undefined,
         transform: previewTransform,
         transformOrigin: previewTransformOrigin ?? "center center",
-        // CAD-Blätter folgen der normalen Ebenen-Hierarchie. Beim Auswahl-Werkzeug
-        // müssen sie jedoch über der CAD-Zeichenebene liegen, sonst fängt diese
-        // den Klick ab und das Blatt lässt sich nicht mehr auswählen.
         // CAD-Blätter folgen strikt der normalen Ebenen-Hierarchie und werden
         // deshalb NICHT über die CAD-Zeichenebene gehoben (sonst läge ein
         // CAD-Blatt der Default-Ebene vor Linien höherer Ebenen). Auswahl und
