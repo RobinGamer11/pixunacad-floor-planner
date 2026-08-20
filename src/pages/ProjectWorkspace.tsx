@@ -6893,6 +6893,69 @@ function CadToolSection({
                       ))}
                     </select>
                   </div>
+
+                  {/* Objektart: Vektor (live) ⇄ Pixel (eingebranntes Bild). */}
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="text-[11px] text-muted-foreground shrink-0">Objektart</span>
+                    <div className="flex-1 flex gap-1">
+                      <button
+                        type="button"
+                        onClick={(ev) => {
+                          ev.stopPropagation();
+                          if (!pageId || !el.pixelMode) return;
+                          projectStore.updateElement(projectId, pageId, el.id, { pixelMode: false });
+                        }}
+                        className={`flex-1 h-7 rounded border text-[11px] ${!el.pixelMode ? "font-semibold" : ""}`}
+                        style={{
+                          borderColor: !el.pixelMode ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
+                          background: !el.pixelMode ? "hsl(var(--accent-gold-soft))" : "transparent",
+                        }}
+                        title="Vektor: Live-Ansicht des Zeichenblatts, bei jedem Zoom scharf"
+                      >
+                        Vektor
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(ev) => {
+                          ev.stopPropagation();
+                          if (!pageId || el.pixelMode) return;
+                          const snap = renderCadViewSnapshot(el, sheet);
+                          if (!snap) { window.alert("Pixel-Umwandlung fehlgeschlagen — Zeichenblatt enthält noch keine Szene."); return; }
+                          projectStore.updateElement(projectId, pageId, el.id, {
+                            pixelMode: true,
+                            viewSnapshot: snap,
+                          });
+                        }}
+                        className={`flex-1 h-7 rounded border text-[11px] ${el.pixelMode ? "font-semibold" : ""}`}
+                        style={{
+                          borderColor: el.pixelMode ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
+                          background: el.pixelMode ? "hsl(var(--accent-gold-soft))" : "transparent",
+                        }}
+                        title="Pixel: Ansicht wird als Bild eingebrannt (Radiergummi inkl. Smooth möglich)"
+                      >
+                        Pixel
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Automatische Aktualisierung — pro CAD-Blatt-Objekt. */}
+                  <label
+                    className="flex items-center justify-between gap-2 mt-2 cursor-pointer"
+                    onClick={(ev) => ev.stopPropagation()}
+                    title={'Wenn aus: Ansicht bleibt eingefroren, bis „Aktualisieren" geklickt wird.'}
+                  >
+                    <span className="text-[11px] text-muted-foreground">Automatisch aktualisieren</span>
+                    <input
+                      type="checkbox"
+                      checked={el.autoUpdate !== false}
+                      disabled={!!el.pixelMode}
+                      onChange={(ev) => {
+                        if (!pageId) return;
+                        projectStore.updateElement(projectId, pageId, el.id, { autoUpdate: ev.target.checked });
+                      }}
+                      className="h-4 w-4"
+                    />
+                  </label>
                 </div>
               );
             })}
