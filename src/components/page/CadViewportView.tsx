@@ -146,19 +146,9 @@ export function CadViewportView({
     </div>
   ) : null;
 
-  const StaleBadge = !autoUpdate ? (
-    <div
-      className="absolute top-1 right-1 px-1.5 py-0.5 rounded text-[9px] pointer-events-none select-none"
-      style={{
-        background: "hsl(var(--surface) / 0.9)",
-        color: "hsl(var(--ink-soft))",
-        border: "1px solid hsl(var(--hairline))",
-      }}
-      title={'Automatische Aktualisierung ist deaktiviert — via „Ansicht aktualisieren" neu laden.'}
-    >
-      manuell
-    </div>
-  ) : null;
+  // Hinweis-Abzeichen („manuell") entfernt — der Status steht in den
+  // Werkzeugeinstellungen des jeweiligen CAD-Blatts.
+  const StaleBadge = null;
 
   if (!sceneJson && !legacySnapshot) {
     return (
