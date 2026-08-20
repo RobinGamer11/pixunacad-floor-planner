@@ -467,7 +467,7 @@ function AufgabenMini({ project }: { project: Project }) {
       ) : (
         <div className="divide-y" style={{ borderColor: "hsl(var(--hairline))" }}>
           {open.map((t) => {
-            const mn = mappeName(t.mappeId);
+            const mn = "";
             return (
               <label key={t.key} className="flex items-center gap-2 py-2 text-sm cursor-pointer">
                 <input
