@@ -3868,8 +3868,10 @@ function ElementView({
 
   const hubKinds = new Set(["cad-view", "cad-viewport", "pdf", "image"]);
   const showHub = !readOnly && selected && hubKinds.has(el.kind);
-  // Optik: CAD-Blatt schlicht wie andere Werkzeuge (goldener Auswahlrahmen).
-  const outlineStyle = selected ? "2px solid hsl(var(--accent-gold))" : "none";
+  // Optik: CAD-Blatt blau, alle anderen Objekte goldener Auswahlrahmen.
+  const outlineStyle = selected
+    ? (isCadView ? "2px solid #4da3ff" : "2px solid hsl(var(--accent-gold))")
+    : "none";
 
   // Preview-Interaktion (Move/Rotate) — startet bei aktivem hubMode.
   // Anker = zuletzt geklickte Fraktion (anchorFracRef) INNERHALB des Elements.
