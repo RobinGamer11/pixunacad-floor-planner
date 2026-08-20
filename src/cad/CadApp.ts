@@ -3413,6 +3413,27 @@ export class CadApp {
       return;
     }
     try {
+      // Maßstab abfragen (typische Architekturmaßstäbe + freie Eingabe) und
+      // exakt auf alle Projektionen der ausgewählten Pläne anwenden.
+      const { askExportScale } = await import("./PlanExportScaleDialog");
+      const currentScales = new Set<number>();
+      sel.forEach(p => p.projections.forEach(pr => currentScales.add(pr.scale)));
+      const suggested = currentScales.size === 1 ? [...currentScales][0] : 100;
+      const chosen = await askExportScale(suggested);
+      if (chosen == null) return;
+      let changed = false;
+      for (const plan of sel) {
+        for (const pr of plan.projections) {
+          if (pr.scale !== chosen) { pr.scale = chosen; changed = true; }
+        }
+      }
+      if (changed) {
+        this.planManager.save?.();
+        this.refreshPlanUI();
+        this.requestRender?.();
+        this.commitHistorySnapshot();
+      }
+
       const { exportPlansToPdf, downloadPdfBytes } = await import("./PlanPdfExport");
       const resolveSheet = (sheetId: string): unknown | null => {
         const sc = this.scenesById.get(sheetId);
@@ -3420,6 +3441,7 @@ export class CadApp {
         return this._serializeOneScene(sc);
       };
       const bytes = await exportPlansToPdf(sel, resolveSheet);
+
       const ts = new Date();
       const pad = (n: number) => String(n).padStart(2, "0");
       const stamp = `${ts.getFullYear()}${pad(ts.getMonth() + 1)}${pad(ts.getDate())}_${pad(ts.getHours())}${pad(ts.getMinutes())}`;
