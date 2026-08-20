@@ -834,6 +834,56 @@ export const projectStore = {
       ),
     }));
   },
+  /**
+   * Erstellt eine 1:1-Kopie eines Projekts (Seiten, Elemente, Mappen, Blätter,
+   * Aufgaben, Termine, Dateien) inklusive Board- und Finanzdaten.
+   * Blatt-IDs bleiben erhalten, damit CAD-Ansichten weiter greifen.
+   */
+  duplicateProject: (id: string) => {
+    const src = state.projects.find((p) => p.id === id);
+    if (!src) return undefined;
+    const clone = <T,>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
+    const newId = `${src.isTemplate ? "tpl" : "p"}-${Date.now().toString(36)}`;
+    const newPages = clone(src.pages).map((pg) => ({
+      ...pg,
+      id: `${newId}-${pg.id}`,
+      elements: (pg.elements ?? []).map((el) => ({ ...el, id: `${newId}-${el.id}` })),
+    }));
+    const oldToNewPage = new Map(src.pages.map((pg, i) => [pg.id, newPages[i].id] as const));
+    const newMappen = clone(src.mappen ?? []).map((m) => ({
+      ...m,
+      id: `m-${newId}-${m.id}`,
+      pageIds: (m.pageIds ?? []).map((pid) => oldToNewPage.get(pid) ?? pid),
+    }));
+    const copy: Project = {
+      ...clone(src),
+      id: newId,
+      name: `${src.name} (Kopie)`,
+      updatedAt: new Date().toISOString(),
+      deletedAt: undefined,
+      favorite: false,
+      pages: newPages,
+      mappen: newMappen.length ? newMappen : undefined,
+      activeMappeId: newMappen.length
+        ? (newMappen.find((m) => m.id === `m-${newId}-${src.activeMappeId}`)?.id ?? newMappen[0].id)
+        : undefined,
+      tasks: clone(src.tasks ?? []).map((t) => ({ ...t, id: `${newId}-${t.id}` })),
+      events: clone(src.events ?? []).map((e) => ({ ...e, id: `${newId}-${e.id}` })),
+    };
+    // Board- und Finanzdaten mitkopieren (projektbezogene localStorage-Keys).
+    try {
+      if (typeof window !== "undefined") {
+        for (const prefix of ["pixuna.notes.", "pixuna.finance.v2."]) {
+          const raw = window.localStorage.getItem(`${prefix}${src.id}`);
+          if (raw) window.localStorage.setItem(`${prefix}${newId}`, raw);
+        }
+      }
+    } catch { /* Speicherlimit ignorieren */ }
+    setState((s) => ({
+      projects: [{ ...copy, sortIndex: nextTopIndex(s.projects, copy.folderId ?? null) }, ...s.projects],
+    }));
+    return newId;
+  },
   duplicateAsTemplate: (id: string) => {
     const src = state.projects.find((p) => p.id === id);
     if (!src) return undefined;
