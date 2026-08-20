@@ -4607,8 +4607,9 @@ function ElementView({
                 window.removeEventListener("pointermove", move);
                 window.removeEventListener("pointerup", up);
                 window.removeEventListener("pointercancel", cancel);
-                // Tablet-Modus: nicht sofort committen — auf Häkchen warten.
-                if ((window as any).__pixunaTabletCommit) {
+                // Tablet-Modus und CAD-Blatt: nicht sofort committen —
+                // der Schnitt wird erst per Häkchen bzw. ENTER gesetzt.
+                if ((window as any).__pixunaTabletCommit || isCadView) {
                   return;
                 }
                 commit();
