@@ -4,10 +4,12 @@ import { WorkspaceHeader } from "@/components/workspace/WorkspaceHeader";
 import { useProject } from "@/lib/projectStore";
 import {
   timelineStore, useTimeline, useTimelineHistory,
-  itemStartMs, itemEndMs, itemAchieved,
-  type TlItem, type TlKind, type TlCategory, type TlPriority,
+  itemStartMs, itemEndMs, itemAchieved, priorityRadius,
+  type TlItem, type TlKind, type TlCategory, type TlPriority, type TlStatus,
 } from "@/lib/timelineStore";
-import { CheckSquare, CalendarClock, FileText, X, Trash2, Plus } from "lucide-react";
+import {
+  CheckSquare, CalendarClock, FileText, X, Trash2, Plus, Settings, Save, Search, ChevronLeft,
+} from "lucide-react";
 
 // ------------------------------------------------------------------
 // Konstanten / Helfer
@@ -15,6 +17,9 @@ import { CheckSquare, CalendarClock, FileText, X, Trash2, Plus } from "lucide-re
 const ORANGE = "#e2703a";
 const GREY = "#a19a92";
 const DAY = 86400000;
+const PANEL = "#1c1815";
+const PANEL_LINE = "#332c26";
+const CANVAS = "#141110";
 
 function kindIcon(kind: TlKind, size = 12) {
   if (kind === "task") return <CheckSquare size={size} />;
@@ -31,13 +36,14 @@ function fmtDate(d?: string, t?: string) {
 }
 function clamp(v: number, a: number, b: number) { return Math.min(b, Math.max(a, v)); }
 
+interface Circle { bx: number; dy: number; r: number; t: number }
 interface Placed {
   item: TlItem;
-  x0: number; x1: number;
-  circles: { x: number; r: number; t: number }[];
+  bx0: number; bx1: number;
+  t0: number; t1: number;
+  circles: Circle[];
   side: 1 | -1;
   lane: number;
-  labelX: number;
 }
 
 // ------------------------------------------------------------------
@@ -49,27 +55,35 @@ export default function Board02Page() {
   const state = useTimeline(projectId);
   const hist = useTimelineHistory(projectId);
 
+  useEffect(() => { if (projectId) timelineStore.ensureDefaults(projectId); }, [projectId]);
+
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [openLabelId, setOpenLabelId] = useState<string | null>(null);
   const [colorMode, setColorMode] = useState<"category" | "status">("status");
   const [axisMode, setAxisMode] = useState<"time" | "percent">("time");
   const [activeCat, setActiveCat] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [prioFilter, setPrioFilter] = useState<string>("");
 
   const selected = state.items.find((i) => i.id === selectedId) ?? null;
   const now = Date.now();
 
-  // ---- Domain -----------------------------------------------------
-  const domain = useMemo(() => {
-    if (!state.items.length) return { d0: now - 30 * DAY, d1: now + 60 * DAY };
-    let d0 = Infinity, d1 = -Infinity;
+  // ---- Domain (Zeitbereich) ----------------------------------------
+  const range = useMemo(() => {
+    if (!state.items.length) return { r0: now, r1: now + 10 * DAY };
+    let r0 = Infinity, r1 = -Infinity;
     state.items.forEach((i) => {
-      d0 = Math.min(d0, itemStartMs(i));
-      d1 = Math.max(d1, itemEndMs(i));
+      r0 = Math.min(r0, itemStartMs(i));
+      r1 = Math.max(r1, itemEndMs(i));
     });
-    if (d1 - d0 < 7 * DAY) { d0 -= 3 * DAY; d1 += 3 * DAY; }
-    const pad = (d1 - d0) * 0.08;
-    return { d0: d0 - pad, d1: d1 + pad };
+    if (r1 - r0 < DAY) r1 = r0 + DAY;
+    return { r0, r1 };
   }, [state.items, now]);
+
+  const domain = useMemo(() => {
+    const pad = (range.r1 - range.r0) * 0.08;
+    return { d0: range.r0 - pad, d1: range.r1 + pad };
+  }, [range]);
 
   // ---- Viewport / Zoom ---------------------------------------------
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -89,12 +103,13 @@ export default function Board02Page() {
 
   const padX = 60;
   const baseW = Math.max(200, size.w - padX * 2);
+  /** Basisposition (unabhängig von Zoom/Pan) – Grundlage für stabiles Kreis-Layout. */
+  const baseX = useCallback(
+    (t: number) => padX + ((t - domain.d0) / (domain.d1 - domain.d0)) * baseW,
+    [domain, baseW],
+  );
   const xOf = useCallback(
     (t: number) => padX + ((t - domain.d0) / (domain.d1 - domain.d0)) * baseW * view.k + view.tx,
-    [domain, baseW, view],
-  );
-  const tOf = useCallback(
-    (x: number) => domain.d0 + ((x - padX - view.tx) / (baseW * view.k)) * (domain.d1 - domain.d0),
     [domain, baseW, view],
   );
 
@@ -133,48 +148,70 @@ export default function Board02Page() {
     try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch {}
   };
 
-  // ---- Layout der Kreise + Beschriftungen ---------------------------
+  // ---- Layout der Kreise (zoomstabil) -------------------------------
   const prioMap = useMemo(() => new Map(state.priorities.map((p) => [p.id, p])), [state.priorities]);
   const catMap = useMemo(() => new Map(state.categories.map((c) => [c.id, c])), [state.categories]);
+  const statusMap = useMemo(() => new Map(state.statuses.map((s) => [s.id, s])), [state.statuses]);
 
   const cy = size.h / 2;
 
   const placed = useMemo<Placed[]>(() => {
     const sorted = [...state.items].sort((a, b) => itemStartMs(a) - itemStartMs(b));
     const laneEnd: Record<string, number> = {};
+    // Kollisionsfreie Packung: bereits gesetzte Kreise merken.
+    const packed: { x: number; y: number; r: number }[] = [];
+    const fits = (x: number, y: number, r: number) =>
+      packed.every((p) => {
+        const dx = p.x - x, dy = p.y - y;
+        return Math.hypot(dx, dy) >= p.r + r + 1.2;
+      });
+    const placeCircle = (x: number, r: number): number => {
+      if (fits(x, 0, r)) { packed.push({ x, y: 0, r }); return 0; }
+      for (let step = 1; step <= 60; step++) {
+        const off = step * 3;
+        for (const y of [-off, off]) {
+          if (fits(x, y, r)) { packed.push({ x, y, r }); return y; }
+        }
+      }
+      packed.push({ x, y: 0, r });
+      return 0;
+    };
+
     let flip: 1 | -1 = -1;
     return sorted.map((item) => {
       const s = itemStartMs(item), e = itemEndMs(item);
-      const x0 = xOf(s), x1 = xOf(e);
-      const rMax = prioMap.get(item.priorityId ?? "")?.size ?? 13;
-      const rMin = Math.max(3, rMax * 0.3);
-      const len = x1 - x0;
-      const circles: { x: number; r: number; t: number }[] = [];
+      const bx0 = baseX(s), bx1 = baseX(e);
+      const rMax = priorityRadius(prioMap.get(item.priorityId ?? "")?.percent);
+      const rMin = Math.max(3, rMax * 0.35);
+      const len = bx1 - bx0;
+      const circles: Circle[] = [];
       if (len < rMax * 1.2) {
-        circles.push({ x: x0, r: rMax, t: s });
+        circles.push({ bx: bx0, dy: placeCircle(bx0, rMax), r: rMax, t: s });
       } else {
-        const n = clamp(Math.round(len / (rMax * 1.5)), 3, 24);
+        const n = clamp(Math.round(len / (rMax * 1.35)), 3, 40);
         for (let i = 0; i < n; i++) {
           const f = i / (n - 1);
-          circles.push({ x: x0 + len * f, r: rMin + (rMax - rMin) * f, t: s + (e - s) * f });
+          const bx = bx0 + len * f;
+          const r = rMin + (rMax - rMin) * f;
+          circles.push({ bx, dy: placeCircle(bx, r), r, t: s + (e - s) * f });
         }
       }
       flip = flip === 1 ? -1 : 1;
       const side = flip;
       const key = side === -1 ? "up" : "dn";
       let lane = 0;
-      while (laneEnd[`${key}${lane}`] !== undefined && laneEnd[`${key}${lane}`] > x1 - 4) lane++;
-      laneEnd[`${key}${lane}`] = x1 + Math.max(120, item.title.length * 7.4);
-      return { item, x0, x1, circles, side, lane, labelX: x1 };
+      while (laneEnd[`${key}${lane}`] !== undefined && laneEnd[`${key}${lane}`] > bx1 - 4) lane++;
+      laneEnd[`${key}${lane}`] = bx1 + Math.max(120, item.title.length * 7.4);
+      return { item, bx0, bx1, t0: s, t1: e, circles, side, lane };
     });
-  }, [state.items, xOf, prioMap]);
+  }, [state.items, baseX, prioMap]);
 
   // ---- Farbe eines Kreises ------------------------------------------
   const circleFill = useCallback((item: TlItem, t: number) => {
     if (colorMode === "category") return catMap.get(item.categoryId ?? "")?.color ?? GREY;
     const achieved = itemAchieved(item, now);
     if (t > now) return GREY;
-    if (!achieved) return GREY;                 // offene Aufgabe/Notiz bleibt grau
+    if (!achieved) return GREY;
     return ORANGE;
   }, [colorMode, catMap, now]);
 
@@ -183,9 +220,9 @@ export default function Board02Page() {
     const out: { x: number; label: string }[] = [];
     if (axisMode === "percent") {
       for (let p = 0; p <= 100; p += 10) {
-        out.push({ x: xOf(domain.d0 + (domain.d1 - domain.d0) * (p / 100)), label: `${p}%` });
+        out.push({ x: xOf(range.r0 + (range.r1 - range.r0) * (p / 100)), label: `${p}%` });
       }
-      return out;
+      return out.filter((t) => t.x > -50 && t.x < size.w + 50);
     }
     const spanDays = (domain.d1 - domain.d0) / DAY / view.k;
     const d = new Date(domain.d0);
@@ -205,7 +242,7 @@ export default function Board02Page() {
       }
     }
     return out.filter((t) => t.x > -50 && t.x < size.w + 50);
-  }, [axisMode, domain, xOf, view.k, size.w]);
+  }, [axisMode, domain, range, xOf, view.k, size.w]);
 
   // ---- Kennzahlen -----------------------------------------------------
   const progress = useMemo(() => {
@@ -227,6 +264,33 @@ export default function Board02Page() {
       };
     }).filter((s) => s.count > 0);
   }, [state.categories, state.items, now]);
+
+  // ---- Liste (gefiltert + sortiert) -----------------------------------
+  const listItems = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const rows = state.items.filter((i) => {
+      if (activeCat && i.categoryId !== activeCat) return false;
+      if (prioFilter && i.priorityId !== prioFilter) return false;
+      if (!q) return true;
+      const hay = [
+        i.title, i.description ?? "", i.responsible ?? "",
+        catMap.get(i.categoryId ?? "")?.label ?? "",
+        prioMap.get(i.priorityId ?? "")?.label ?? "",
+        statusMap.get(i.statusId ?? "")?.label ?? "",
+        kindLabel(i.kind),
+      ].join(" ").toLowerCase();
+      return hay.includes(q);
+    });
+    return rows.sort((a, b) => {
+      const da = itemAchieved(a, now) ? 1 : 0;
+      const db = itemAchieved(b, now) ? 1 : 0;
+      if (da !== db) return da - db;
+      const pa = prioMap.get(a.priorityId ?? "")?.percent ?? 0;
+      const pb = prioMap.get(b.priorityId ?? "")?.percent ?? 0;
+      if (pa !== pb) return pb - pa;
+      return itemStartMs(a) - itemStartMs(b);
+    });
+  }, [state.items, query, prioFilter, activeCat, catMap, prioMap, statusMap, now]);
 
   // ---- Aktionen --------------------------------------------------------
   const add = (kind: TlKind) => {
@@ -267,33 +331,33 @@ export default function Board02Page() {
       />
 
       <div className="flex-1 min-h-0 flex">
-        <div className="flex-1 min-w-0 flex flex-col overflow-y-auto">
-          {/* Werkzeugleiste */}
-          <div className="flex items-center gap-2 px-4 py-3 border-b shrink-0"
-               style={{ borderColor: "hsl(var(--hairline))" }}>
-            <div className="flex items-center gap-2">
+        <div className="flex-1 min-w-0 overflow-y-auto" style={{ background: CANVAS }}>
+          {/* Werkzeugleiste – im schwarzen Fenster, graues Feld */}
+          <div className="p-4 pb-0">
+            <div className="flex flex-wrap items-center gap-2 rounded-xl p-3"
+                 style={{ background: PANEL, border: `1px solid ${PANEL_LINE}` }}>
               <BigAddButton kind="task" onClick={() => add("task")} />
               <BigAddButton kind="event" onClick={() => add("event")} />
               <BigAddButton kind="note" onClick={() => add("note")} />
+              <div className="flex-1" />
+              <Segmented
+                value={colorMode}
+                onChange={(v) => setColorMode(v as typeof colorMode)}
+                options={[{ v: "status", l: "Farbe: Stand" }, { v: "category", l: "Farbe: Kategorie" }]}
+              />
+              <Segmented
+                value={axisMode}
+                onChange={(v) => setAxisMode(v as typeof axisMode)}
+                options={[{ v: "time", l: "Zeitraum" }, { v: "percent", l: "Projektstand %" }]}
+              />
             </div>
-            <div className="flex-1" />
-            <Segmented
-              value={colorMode}
-              onChange={(v) => setColorMode(v as typeof colorMode)}
-              options={[{ v: "status", l: "Farbe: Stand" }, { v: "category", l: "Farbe: Kategorie" }]}
-            />
-            <Segmented
-              value={axisMode}
-              onChange={(v) => setAxisMode(v as typeof axisMode)}
-              options={[{ v: "time", l: "Zeitraum" }, { v: "percent", l: "Projektstand %" }]}
-            />
           </div>
 
           {/* Zeitstrahl */}
           <div
             ref={wrapRef}
-            className="relative h-[420px] shrink-0 overflow-hidden select-none cursor-grab active:cursor-grabbing"
-            style={{ background: "#141110", touchAction: "none" }}
+            className="relative mx-4 mt-4 h-[420px] rounded-xl overflow-hidden select-none cursor-grab active:cursor-grabbing"
+            style={{ background: CANVAS, border: `1px solid ${PANEL_LINE}`, touchAction: "none" }}
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
@@ -326,11 +390,12 @@ export default function Board02Page() {
 
               {/* Verbindungslinien (L-Form) */}
               {placed.map((p) => {
-                const ly = cy + p.side * (52 + p.lane * 46);
+                const lx = xOf(p.t1);
+                const ly = cy + p.side * (72 + p.lane * 46);
                 return (
                   <path
                     key={`c-${p.item.id}`}
-                    d={`M ${p.labelX} ${cy + p.side * 6} L ${p.labelX} ${ly} L ${p.labelX + 16} ${ly}`}
+                    d={`M ${lx} ${cy + p.side * 6} L ${lx} ${ly} L ${lx + 16} ${ly}`}
                     fill="none"
                     stroke={p.item.id === selectedId ? ORANGE : "#4a423b"}
                     strokeWidth={1}
@@ -338,20 +403,21 @@ export default function Board02Page() {
                 );
               })}
 
-              {/* Kreise */}
+              {/* Kreise – Größe & Anordnung zoomunabhängig */}
               {placed.map((p) => (
                 <g key={p.item.id} data-tl-interactive
                    style={{ cursor: "pointer" }}
                    onPointerDown={(e) => e.stopPropagation()}
                    onClick={() => { setSelectedId(p.item.id); setOpenLabelId(p.item.id); }}>
                   {p.circles.map((c, i) => {
-                    const spansNow = p.x0 <= nowX && p.x1 >= nowX && colorMode === "status";
-                    const near = spansNow && Math.abs(c.x - nowX) < Math.max(24, c.r * 3);
+                    const cxp = xOf(c.t);
+                    const spansNow = colorMode === "status" && xOf(p.t0) <= nowX && xOf(p.t1) >= nowX;
+                    const near = spansNow && Math.abs(cxp - nowX) < Math.max(24, c.r * 3);
                     return (
                       <circle
                         key={i}
-                        cx={c.x}
-                        cy={cy + (i % 2 === 0 ? 0 : (i % 4 === 1 ? -c.r * 0.5 : c.r * 0.5))}
+                        cx={cxp}
+                        cy={cy + c.dy}
                         r={c.r}
                         fill={near ? "url(#tl-now)" : circleFill(p.item, c.t)}
                         opacity={p.item.id === selectedId ? 1 : 0.92}
@@ -364,9 +430,10 @@ export default function Board02Page() {
               ))}
             </svg>
 
-            {/* Titel-Labels als HTML-Ebene */}
+            {/* Titel-Labels */}
             {placed.map((p) => {
-              const ly = cy + p.side * (52 + p.lane * 46);
+              const lx = xOf(p.t1);
+              const ly = cy + p.side * (72 + p.lane * 46);
               const open = openLabelId === p.item.id;
               const cat = catMap.get(p.item.categoryId ?? "");
               return (
@@ -374,7 +441,7 @@ export default function Board02Page() {
                   key={`l-${p.item.id}`}
                   data-tl-interactive
                   className="absolute"
-                  style={{ left: p.labelX + 18, top: ly - 11, maxWidth: 260 }}
+                  style={{ left: lx + 18, top: ly - 11, maxWidth: 260 }}
                   onPointerDown={(e) => e.stopPropagation()}
                 >
                   <button
@@ -391,17 +458,22 @@ export default function Board02Page() {
                   </button>
                   {open && (
                     <div className="mt-1 rounded-lg p-2.5 text-[11px] shadow-lg"
-                         style={{ background: "#1c1815", border: "1px solid #332c26", color: "#cdc4bb", width: 260 }}>
+                         style={{ background: PANEL, border: `1px solid ${PANEL_LINE}`, color: "#cdc4bb", width: 260 }}>
                       <div className="flex flex-wrap gap-1 mb-1.5">
                         <Chip>{kindLabel(p.item.kind)}</Chip>
                         {cat && <Chip color={cat.color}>{cat.label}</Chip>}
                         <Chip>{prioMap.get(p.item.priorityId ?? "")?.label ?? "—"}</Chip>
-                        {itemAchieved(p.item, now) && <Chip color={ORANGE}>Erreicht</Chip>}
+                        {p.item.statusId && (
+                          <Chip color={statusMap.get(p.item.statusId)?.color}>
+                            {statusMap.get(p.item.statusId)?.label ?? "—"}
+                          </Chip>
+                        )}
                       </div>
                       <div className="opacity-70">
                         {fmtDate(p.item.startDate, p.item.startTime)}
                         {p.item.endDate ? ` – ${fmtDate(p.item.endDate, p.item.endTime)}` : ""}
                       </div>
+                      {p.item.responsible && <div className="mt-1 opacity-70">👤 {p.item.responsible}</div>}
                       {p.item.description && <p className="mt-1.5 whitespace-pre-wrap">{p.item.description}</p>}
                     </div>
                   )}
@@ -411,55 +483,66 @@ export default function Board02Page() {
 
             {!state.items.length && (
               <div className="absolute inset-0 grid place-items-center text-xs" style={{ color: "#6f665e" }}>
-                Noch keine Einträge — oben links Aufgabe, Termin oder Notiz anlegen.
+                Noch keine Einträge — oben Aufgabe, Termin oder Notiz anlegen.
               </div>
             )}
           </div>
 
           {/* Projektfortschritt */}
-          <div className="px-4 py-4 border-b" style={{ borderColor: "hsl(var(--hairline))" }}>
-            <div className="flex items-center justify-between text-xs mb-1.5">
+          <div className="mx-4 mt-4 rounded-xl p-4" style={{ background: PANEL, border: `1px solid ${PANEL_LINE}` }}>
+            <div className="flex items-center justify-between text-xs mb-1.5" style={{ color: "#cdc4bb" }}>
               <span className="font-medium">Projektstand</span>
-              <span className="tabular-nums text-muted-foreground">{progress}%</span>
+              <span className="tabular-nums opacity-70">{progress}%</span>
             </div>
             <ProgressBar percent={progress} />
           </div>
 
-          {/* Kategorien */}
-          <div className="px-4 py-4">
-            <div className="text-xs font-medium mb-3">Kategorien im Projekt</div>
+          {/* Kategorien + Liste */}
+          <div className="mx-4 my-4 rounded-xl p-4" style={{ background: PANEL, border: `1px solid ${PANEL_LINE}` }}>
+            <div className="flex items-center gap-2 mb-3">
+              <div className="text-xs font-medium" style={{ color: "#cdc4bb" }}>Kategorien im Projekt</div>
+              {activeCat && (
+                <button onClick={() => setActiveCat(null)}
+                        className="ml-auto flex items-center gap-1 rounded-md px-2 py-1 text-[11px]"
+                        style={{ background: "#241f1b", border: `1px solid ${PANEL_LINE}`, color: "#cdc4bb" }}>
+                  <ChevronLeft size={12} /> Zurück
+                </button>
+              )}
+            </div>
             <div className="flex flex-wrap items-center gap-6">
               <PieChart
                 slices={catStats.map((s) => ({ value: s.count, color: s.cat.color, id: s.cat.id }))}
                 activeId={activeCat}
                 onSlice={(id) => setActiveCat(id === activeCat ? null : id)}
+                onCenter={() => setActiveCat(null)}
               />
               <div className="flex flex-col gap-1.5">
                 {catStats.map((s) => (
                   <button
                     key={s.cat.id}
                     onClick={() => setActiveCat(activeCat === s.cat.id ? null : s.cat.id)}
-                    className="flex items-center gap-2 text-[11px] rounded-md px-2 py-1 hover:bg-muted"
-                    style={{ background: activeCat === s.cat.id ? "hsl(var(--surface-muted))" : "transparent" }}
+                    className="flex items-center gap-2 text-[11px] rounded-md px-2 py-1"
+                    style={{
+                      background: activeCat === s.cat.id ? "#241f1b" : "transparent",
+                      color: "#cdc4bb",
+                    }}
                   >
                     <span className="h-2.5 w-2.5 rounded-full" style={{ background: s.cat.color }} />
                     <span>{s.cat.label}</span>
-                    <span className="text-muted-foreground tabular-nums">
+                    <span className="opacity-60 tabular-nums">
                       {s.count} · {Math.round(s.share * 100)}%
                     </span>
                   </button>
                 ))}
-                {!catStats.length && <span className="text-[11px] text-muted-foreground">Keine Einträge.</span>}
+                {!catStats.length && <span className="text-[11px]" style={{ color: "#6f665e" }}>Keine Einträge.</span>}
               </div>
             </div>
 
             {activeCat && (
               <div className="mt-4 max-w-xl">
-                <div className="flex items-center justify-between text-xs mb-1.5">
-                  <span className="font-medium">
-                    Stand „{catMap.get(activeCat)?.label}“
-                  </span>
-                  <span className="tabular-nums text-muted-foreground">
+                <div className="flex items-center justify-between text-xs mb-1.5" style={{ color: "#cdc4bb" }}>
+                  <span className="font-medium">Stand „{catMap.get(activeCat)?.label}“</span>
+                  <span className="tabular-nums opacity-70">
                     {catStats.find((s) => s.cat.id === activeCat)?.percent ?? 0}%
                   </span>
                 </div>
@@ -469,6 +552,76 @@ export default function Board02Page() {
                 />
               </div>
             )}
+
+            {/* Auflistung */}
+            <div className="mt-5">
+              <div className="flex flex-wrap items-center gap-2 mb-2">
+                <div className="text-xs font-medium" style={{ color: "#cdc4bb" }}>
+                  {activeCat ? `Punkte in „${catMap.get(activeCat)?.label}“` : "Alle Punkte"}
+                </div>
+                <div className="flex-1" />
+                <div className="relative">
+                  <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2" style={{ color: "#6f665e" }} />
+                  <input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Suchen …"
+                    className="h-8 w-44 rounded-md pl-7 pr-2 text-[11px] outline-none"
+                    style={{ background: "#241f1b", border: `1px solid ${PANEL_LINE}`, color: "#e6ded6" }}
+                  />
+                </div>
+                <select
+                  value={prioFilter}
+                  onChange={(e) => setPrioFilter(e.target.value)}
+                  className="h-8 rounded-md px-2 text-[11px] outline-none"
+                  style={{ background: "#241f1b", border: `1px solid ${PANEL_LINE}`, color: "#e6ded6" }}
+                >
+                  <option value="">Alle Prioritäten</option>
+                  {state.priorities.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+                </select>
+              </div>
+
+              <div className="rounded-lg overflow-hidden" style={{ border: `1px solid ${PANEL_LINE}` }}>
+                <div className="grid px-3 py-2 text-[10px] uppercase tracking-wide"
+                     style={{ gridTemplateColumns: "90px 1fr 110px 120px 170px 130px", background: "#241f1b", color: "#8b837b" }}>
+                  <span>Priorität</span><span>Name</span><span>Status</span><span>Kategorie</span><span>Zeitraum</span><span>Verantwortlich</span>
+                </div>
+                {listItems.map((i) => {
+                  const prio = prioMap.get(i.priorityId ?? "");
+                  const cat = catMap.get(i.categoryId ?? "");
+                  const st = statusMap.get(i.statusId ?? "");
+                  const doneRow = itemAchieved(i, now);
+                  return (
+                    <button
+                      key={i.id}
+                      onClick={() => setSelectedId(i.id)}
+                      className="grid w-full items-center px-3 py-2 text-left text-[11px] border-t"
+                      style={{
+                        gridTemplateColumns: "90px 1fr 110px 120px 170px 130px",
+                        borderColor: PANEL_LINE,
+                        background: i.id === selectedId ? "#2a231e" : "transparent",
+                        color: doneRow ? "#8b837b" : "#cdc4bb",
+                      }}
+                    >
+                      <span className="tabular-nums">{prio ? `${prio.label} · ${prio.percent}%` : "—"}</span>
+                      <span className="flex items-center gap-1.5 truncate pr-2">
+                        <span style={{ color: cat?.color ?? ORANGE }}>{kindIcon(i.kind, 11)}</span>
+                        <span className="truncate">{i.title}</span>
+                      </span>
+                      <span style={{ color: st?.color ?? "#8b837b" }}>{st?.label ?? "—"}</span>
+                      <span>{cat?.label ?? "—"}</span>
+                      <span className="opacity-80">
+                        {fmtDate(i.startDate)}{i.endDate ? ` – ${fmtDate(i.endDate)}` : ""}
+                      </span>
+                      <span className="truncate">{i.responsible || "—"}</span>
+                    </button>
+                  );
+                })}
+                {!listItems.length && (
+                  <div className="px-3 py-4 text-[11px]" style={{ color: "#6f665e" }}>Keine Treffer.</div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -479,6 +632,7 @@ export default function Board02Page() {
             item={selected}
             categories={state.categories}
             priorities={state.priorities}
+            statuses={state.statuses}
             onClose={() => setSelectedId(null)}
           />
         )}
@@ -491,17 +645,17 @@ export default function Board02Page() {
 // Editor
 // ------------------------------------------------------------------
 function ItemEditor({
-  projectId, item, categories, priorities, onClose,
+  projectId, item, categories, priorities, statuses, onClose,
 }: {
   projectId: string;
   item: TlItem;
   categories: TlCategory[];
   priorities: TlPriority[];
+  statuses: TlStatus[];
   onClose: () => void;
 }) {
-  const [newCat, setNewCat] = useState<{ label: string; color: string } | null>(null);
-  const [newPrio, setNewPrio] = useState<{ label: string; size: number } | null>(null);
   const set = (patch: Partial<TlItem>) => timelineStore.updateItem(projectId, item.id, patch);
+  const prio = priorities.find((p) => p.id === item.priorityId);
 
   return (
     <aside className="w-[340px] shrink-0 border-l overflow-y-auto"
@@ -525,71 +679,70 @@ function ItemEditor({
           <input className={inputCls} value={item.title} onChange={(e) => set({ title: e.target.value })} />
         </Field>
 
-        {item.kind !== "event" && (
-          <label className="flex items-center gap-2 text-xs">
-            <input type="checkbox" checked={!!item.done} onChange={(e) => set({ done: e.target.checked })} />
-            Erledigt (Kreise werden orange)
-          </label>
-        )}
-        {item.kind === "event" && (
-          <p className="text-[10px] text-muted-foreground">Termine sind an die Zeit gekoppelt und färben sich automatisch.</p>
-        )}
-
-        <Field label="Kategorie">
-          <select
-            className={inputCls}
-            value={item.categoryId ?? ""}
-            onChange={(e) => {
-              if (e.target.value === "__new") { setNewCat({ label: "", color: "#e2703a" }); return; }
-              set({ categoryId: e.target.value || undefined });
-            }}
-          >
-            <option value="">—</option>
-            {categories.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
-            <option value="__new">+ Neu …</option>
-          </select>
-          {newCat && (
-            <div className="mt-1.5 flex items-center gap-1.5">
-              <input className={inputCls} placeholder="Name" value={newCat.label}
-                     onChange={(e) => setNewCat({ ...newCat, label: e.target.value })} />
-              <input type="color" className="h-8 w-9 rounded border" value={newCat.color}
-                     onChange={(e) => setNewCat({ ...newCat, color: e.target.value })} />
-              <button className={miniBtn} onClick={() => {
-                const id = timelineStore.addCategory(projectId, newCat.label, newCat.color);
-                if (id) set({ categoryId: id });
-                setNewCat(null);
-              }}><Plus size={13} /></button>
-            </div>
-          )}
+        <Field label="Status">
+          <div className="grid grid-cols-3 gap-1.5">
+            {statuses.map((s) => {
+              const active = (item.statusId ?? "open") === s.id;
+              return (
+                <button
+                  key={s.id}
+                  onClick={() => set({ statusId: s.id, done: s.id === "done" })}
+                  className="h-8 rounded-md border text-[11px] font-medium"
+                  style={{
+                    background: active ? `${s.color}22` : "hsl(var(--background))",
+                    borderColor: active ? s.color : "hsl(var(--hairline))",
+                    color: active ? s.color : "hsl(var(--ink-soft))",
+                  }}
+                >
+                  {s.label}
+                </button>
+              );
+            })}
+          </div>
         </Field>
 
-        <Field label="Priorität (Kreisgröße)">
-          <select
-            className={inputCls}
-            value={item.priorityId ?? ""}
-            onChange={(e) => {
-              if (e.target.value === "__new") { setNewPrio({ label: "", size: 15 }); return; }
-              set({ priorityId: e.target.value || undefined });
-            }}
-          >
-            <option value="">—</option>
-            {priorities.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
-            <option value="__new">+ Neu …</option>
-          </select>
-          {newPrio && (
-            <div className="mt-1.5 flex items-center gap-1.5">
-              <input className={inputCls} placeholder="Name" value={newPrio.label}
-                     onChange={(e) => setNewPrio({ ...newPrio, label: e.target.value })} />
-              <input type="number" min={4} max={40} className={`${inputCls} w-16`} value={newPrio.size}
-                     onChange={(e) => setNewPrio({ ...newPrio, size: Number(e.target.value) })} />
-              <button className={miniBtn} onClick={() => {
-                const id = timelineStore.addPriority(projectId, newPrio.label, newPrio.size);
-                if (id) set({ priorityId: id });
-                setNewPrio(null);
-              }}><Plus size={13} /></button>
-            </div>
-          )}
+        <Field label="Verantwortliche(r)">
+          <input className={inputCls} placeholder="Name frei eingeben"
+                 value={item.responsible ?? ""} onChange={(e) => set({ responsible: e.target.value })} />
         </Field>
+
+        <ManagedSelect
+          label="Kategorie"
+          value={item.categoryId ?? ""}
+          entries={categories.map((c) => ({ id: c.id, label: c.label, color: c.color }))}
+          onSelect={(id) => set({ categoryId: id || undefined })}
+          onRename={(id, label) => timelineStore.updateCategory(projectId, id, { label })}
+          onColor={(id, color) => timelineStore.updateCategory(projectId, id, { color })}
+          onRemove={(id) => timelineStore.removeCategory(projectId, id)}
+          onAdd={(label) => {
+            const id = timelineStore.addCategory(projectId, label, "#e2703a");
+            if (id) set({ categoryId: id });
+          }}
+        />
+
+        <ManagedSelect
+          label="Priorität (Kreisgröße)"
+          value={item.priorityId ?? ""}
+          entries={priorities.map((p) => ({ id: p.id, label: p.label, percent: p.percent }))}
+          onSelect={(id) => set({ priorityId: id || undefined })}
+          onRename={(id, label) => timelineStore.updatePriority(projectId, id, { label })}
+          onPercent={(id, percent) => timelineStore.updatePriority(projectId, id, { percent })}
+          onRemove={(id) => timelineStore.removePriority(projectId, id)}
+          onAdd={(label) => {
+            const id = timelineStore.addPriority(projectId, label, 50);
+            if (id) set({ priorityId: id });
+          }}
+        />
+
+        {prio && (
+          <Field label={`Priorität in % (Kreisgröße): ${prio.percent}%`}>
+            <input
+              type="range" min={1} max={100} value={prio.percent}
+              onChange={(e) => timelineStore.updatePriority(projectId, prio.id, { percent: Number(e.target.value) })}
+              className="w-full accent-[var(--accent-slider,#e2703a)]"
+            />
+          </Field>
+        )}
 
         <div className="grid grid-cols-2 gap-2">
           <Field label="Start (Datum)">
@@ -611,7 +764,8 @@ function ItemEditor({
         </div>
 
         <Field label="Beschreibung">
-          <textarea className={`${inputCls} h-28 resize-none`} value={item.description ?? ""}
+          <textarea className="w-full min-h-[160px] rounded-md border bg-background px-2 py-1.5 text-xs outline-none focus:ring-1 focus:ring-ring resize-y"
+                    value={item.description ?? ""}
                     onChange={(e) => set({ description: e.target.value })} />
         </Field>
       </div>
@@ -620,12 +774,135 @@ function ItemEditor({
 }
 
 // ------------------------------------------------------------------
+// Drop-down mit Zahnrad-Verwaltung
+// ------------------------------------------------------------------
+interface ManagedEntry { id: string; label: string; color?: string; percent?: number }
+
+function ManagedSelect({
+  label, value, entries, onSelect, onRename, onColor, onPercent, onRemove, onAdd,
+}: {
+  label: string;
+  value: string;
+  entries: ManagedEntry[];
+  onSelect: (id: string) => void;
+  onRename: (id: string, label: string) => void;
+  onColor?: (id: string, color: string) => void;
+  onPercent?: (id: string, percent: number) => void;
+  onRemove: (id: string) => void;
+  onAdd: (label: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [manage, setManage] = useState(false);
+  const [draft, setDraft] = useState<Record<string, ManagedEntry>>({});
+  const [newLabel, setNewLabel] = useState("");
+  const boxRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (manage) return; // bei aktivem Zahnrad bleibt das Drop-down offen
+      if (!boxRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open, manage]);
+
+  const cur = entries.find((e) => e.id === value);
+  const val = (e: ManagedEntry) => draft[e.id] ?? e;
+
+  return (
+    <div className="flex flex-col gap-1" ref={boxRef}>
+      <span className="text-[10px] text-muted-foreground">{label}</span>
+      <div className="relative">
+        <button className={`${inputCls} flex items-center gap-2 text-left`} onClick={() => setOpen((o) => !o)}>
+          {cur?.color && <span className="h-2.5 w-2.5 rounded-full" style={{ background: cur.color }} />}
+          <span className="truncate">
+            {cur ? `${cur.label}${cur.percent !== undefined ? ` · ${cur.percent}%` : ""}` : "—"}
+          </span>
+        </button>
+
+        {open && (
+          <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover p-1 shadow-lg"
+               style={{ borderColor: "hsl(var(--hairline))" }}>
+            <div className="flex items-center justify-between px-1 pb-1">
+              <span className="text-[10px] text-muted-foreground">{manage ? "Bearbeiten" : "Auswählen"}</span>
+              <button
+                className="h-6 w-6 rounded grid place-items-center hover:bg-muted"
+                title={manage ? "Änderungen speichern" : "Einträge verwalten"}
+                onClick={() => {
+                  if (manage) {
+                    Object.values(draft).forEach((d) => {
+                      const src = entries.find((e) => e.id === d.id);
+                      if (!src) return;
+                      if (d.label !== src.label && d.label.trim()) onRename(d.id, d.label.trim());
+                      if (onColor && d.color && d.color !== src.color) onColor(d.id, d.color);
+                      if (onPercent && d.percent !== undefined && d.percent !== src.percent) onPercent(d.id, d.percent);
+                    });
+                    setDraft({});
+                  }
+                  setManage((m) => !m);
+                }}
+              >
+                {manage ? <Save size={13} /> : <Settings size={13} />}
+              </button>
+            </div>
+
+            <div className="max-h-64 overflow-y-auto flex flex-col gap-0.5">
+              {entries.map((e) => {
+                const d = val(e);
+                if (!manage) {
+                  return (
+                    <button key={e.id}
+                            className="flex items-center gap-2 rounded px-2 py-1.5 text-xs hover:bg-muted text-left"
+                            onClick={() => { onSelect(e.id); setOpen(false); }}>
+                      {e.color && <span className="h-2.5 w-2.5 rounded-full" style={{ background: e.color }} />}
+                      <span className="truncate">{e.label}</span>
+                      {e.percent !== undefined && <span className="ml-auto tabular-nums text-muted-foreground">{e.percent}%</span>}
+                    </button>
+                  );
+                }
+                return (
+                  <div key={e.id} className="flex items-center gap-1 px-1 py-1">
+                    <input className={`${inputCls} h-7`} value={d.label}
+                           onChange={(ev) => setDraft((s) => ({ ...s, [e.id]: { ...d, label: ev.target.value } }))} />
+                    {onColor && (
+                      <input type="color" className="h-7 w-8 shrink-0 rounded border" value={d.color ?? "#e2703a"}
+                             onChange={(ev) => setDraft((s) => ({ ...s, [e.id]: { ...d, color: ev.target.value } }))} />
+                    )}
+                    {onPercent && (
+                      <input type="number" min={1} max={100} className={`${inputCls} h-7 w-16 shrink-0`}
+                             value={d.percent ?? 50}
+                             onChange={(ev) => setDraft((s) => ({ ...s, [e.id]: { ...d, percent: clamp(Number(ev.target.value), 1, 100) } }))} />
+                    )}
+                    <button className="h-7 w-7 shrink-0 rounded grid place-items-center hover:bg-muted"
+                            title="Löschen" onClick={() => onRemove(e.id)}>
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="flex items-center gap-1 border-t pt-1 mt-1" style={{ borderColor: "hsl(var(--hairline))" }}>
+              <input className={`${inputCls} h-7`} placeholder="Neu …" value={newLabel}
+                     onChange={(e) => setNewLabel(e.target.value)} />
+              <button className="h-7 w-7 shrink-0 rounded grid place-items-center hover:bg-muted"
+                      onClick={() => { if (newLabel.trim()) { onAdd(newLabel.trim()); setNewLabel(""); } }}>
+                <Plus size={13} />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ------------------------------------------------------------------
 // UI-Bausteine
 // ------------------------------------------------------------------
 const inputCls =
   "w-full h-8 rounded-md border bg-background px-2 text-xs outline-none focus:ring-1 focus:ring-ring";
-const miniBtn =
-  "h-8 w-8 shrink-0 rounded-md border grid place-items-center hover:bg-muted";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -656,15 +933,15 @@ function Segmented({
   value, onChange, options,
 }: { value: string; onChange: (v: string) => void; options: { v: string; l: string }[] }) {
   return (
-    <div className="flex items-center rounded-md p-0.5" style={{ background: "hsl(var(--surface-muted))" }}>
+    <div className="flex items-center rounded-md p-0.5" style={{ background: "#241f1b" }}>
       {options.map((o) => (
         <button
           key={o.v}
           onClick={() => onChange(o.v)}
           className="h-7 px-2.5 rounded-[5px] text-[11px] font-medium"
           style={{
-            background: value === o.v ? "hsl(var(--accent-gold))" : "transparent",
-            color: value === o.v ? "hsl(var(--surface))" : "hsl(var(--ink-soft))",
+            background: value === o.v ? ORANGE : "transparent",
+            color: value === o.v ? "#141110" : "#a19a92",
           }}
         >
           {o.l}
@@ -685,7 +962,7 @@ function Chip({ children, color }: { children: React.ReactNode; color?: string }
 
 function ProgressBar({ percent, color }: { percent: number; color?: string }) {
   return (
-    <div className="h-2.5 w-full rounded-full overflow-hidden" style={{ background: "hsl(var(--surface-muted))" }}>
+    <div className="h-2.5 w-full rounded-full overflow-hidden" style={{ background: "#2a2420" }}>
       <div className="h-full rounded-full transition-all"
            style={{ width: `${clamp(percent, 0, 100)}%`, background: color ?? ORANGE }} />
     </div>
@@ -693,11 +970,12 @@ function ProgressBar({ percent, color }: { percent: number; color?: string }) {
 }
 
 function PieChart({
-  slices, activeId, onSlice,
+  slices, activeId, onSlice, onCenter,
 }: {
   slices: { value: number; color: string; id: string }[];
   activeId: string | null;
   onSlice: (id: string) => void;
+  onCenter: () => void;
 }) {
   const total = slices.reduce((a, s) => a + s.value, 0);
   if (!total) return null;
@@ -719,7 +997,7 @@ function PieChart({
                 style={{ cursor: "pointer" }} onClick={() => onSlice(s.id)} />
         );
       })}
-      <circle cx={C} cy={C} r={26} fill="hsl(var(--surface-card))" />
+      <circle cx={C} cy={C} r={26} fill={PANEL} style={{ cursor: "pointer" }} onClick={onCenter} />
     </svg>
   );
 }
