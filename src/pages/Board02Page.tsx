@@ -72,9 +72,24 @@ export default function Board02Page() {
   const [openLabelId, setOpenLabelId] = useState<string | null>(null);
   const [colorMode, setColorMode] = useState<"category" | "status">("status");
   const [axisMode, setAxisMode] = useState<"time" | "percent">("time");
+  const [surface, setSurface] = useState<"ray" | "net">("ray");
   const [activeCat, setActiveCat] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [prioFilter, setPrioFilter] = useState<string>("");
+
+  // Projektnetz (aus dem Notiznetz-Store) – nur für die Netz-Ansicht.
+  const notes = useNotes(projectId);
+  const [netSelected, setNetSelected] = useState<string | null>(null);
+  const noteStatusMap = useMemo(() => {
+    const m = new Map<string, NoteStatusDef>();
+    notes.statuses.forEach((s) => m.set(s.id, s));
+    return m;
+  }, [notes.statuses]);
+  const notePriorityMap = useMemo(() => {
+    const m = new Map<string, NotePriorityDef>();
+    notes.priorities.forEach((p) => m.set(p.id, p));
+    return m;
+  }, [notes.priorities]);
 
   const selected = state.items.find((i) => i.id === selectedId) ?? null;
   const now = Date.now();
