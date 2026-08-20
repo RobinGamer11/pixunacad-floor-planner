@@ -1111,7 +1111,7 @@ function PieChart({
 }) {
   const total = slices.reduce((a, s) => a + s.value, 0);
   if (!total) return null;
-  const R = 54, C = 64;
+  const R = 74, C = 84;
   let acc = -Math.PI / 2;
   return (
     <svg width={C * 2} height={C * 2}>
@@ -1119,7 +1119,7 @@ function PieChart({
         const ang = (s.value / total) * Math.PI * 2;
         const a0 = acc, a1 = acc + ang;
         acc = a1;
-        const r = activeId === s.id ? R + 5 : R;
+        const r = activeId === s.id ? R + 6 : R;
         const large = ang > Math.PI ? 1 : 0;
         const d = ang >= Math.PI * 2 - 1e-6
           ? `M ${C} ${C - r} A ${r} ${r} 0 1 1 ${C - 0.01} ${C - r} Z`
@@ -1129,7 +1129,8 @@ function PieChart({
                 style={{ cursor: "pointer" }} onClick={() => onSlice(s.id)} />
         );
       })}
-      <circle cx={C} cy={C} r={26} fill={PANEL} style={{ cursor: "pointer" }} onClick={onCenter} />
+      <circle cx={C} cy={C} r={36} fill={PANEL} style={{ cursor: "pointer" }} onClick={onCenter} />
+
     </svg>
   );
 }
