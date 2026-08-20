@@ -328,7 +328,8 @@ export class TopologyEngine {
       if (!this.labels.isVisible(dim.labelId)) continue;
       considerPoint(dim.p1, null, null, -1);
       considerPoint(dim.p2, null, null, -1);
-      try {
+      if ((dim as any).p3) considerPoint((dim as any).p3, null, null, -1);
+
         const g = getDimensionGeometry(dim);
         considerPoint(g.d1, null, null, -1);
         considerPoint(g.d2, null, null, -1);
