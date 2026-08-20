@@ -3428,11 +3428,11 @@ export class CadApp {
         }
       }
       if (changed) {
-        this.planManager.save?.();
+        this.planController?.invalidateCache();
         this.refreshPlanUI();
-        this.requestRender?.();
         this.commitHistorySnapshot();
       }
+
 
       const { exportPlansToPdf, downloadPdfBytes } = await import("./PlanPdfExport");
       const resolveSheet = (sheetId: string): unknown | null => {
