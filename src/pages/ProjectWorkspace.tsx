@@ -4483,8 +4483,10 @@ function ElementView({
                 {hubMode !== "rotate" && (
                   <button
                     data-hub-control
+                    disabled={!anchorIsSnap}
                     onClick={(e) => {
                       e.stopPropagation();
+                      if (!anchorIsSnap) return;
                       // WICHTIG: kein Start-Client setzen → Delta = Maus - Anker.
                       // Dadurch klebt der zuletzt gewählte Fangpunkt/Anker exakt
                       // unter dem Mauszeiger, sobald "Verschieben" aktiv ist.
@@ -4494,8 +4496,10 @@ function ElementView({
                       setActiveEdge(null);
                       setHubMode((m) => (m === "move" ? null : "move"));
                     }}
-                    title="Verschieben — Anker folgt der Maus, klicken zum Setzen (ESC bricht ab)"
-                    className={`h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))] ${hubMode === "move" ? "bg-[hsl(var(--surface-muted))]" : ""}`}
+                    title={anchorIsSnap
+                      ? "Verschieben — Anker folgt der Maus, klicken zum Setzen (ESC bricht ab)"
+                      : "Zuerst einen Fangpunkt (Ecke/Kantenmitte) anklicken"}
+                    className={`h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))] ${hubMode === "move" ? "bg-[hsl(var(--surface-muted))]" : ""} ${anchorIsSnap ? "" : "opacity-40 cursor-not-allowed"}`}
                     style={{ color: hubMode === "move" ? (cadHubUx ? hubBlue : "hsl(var(--accent-gold))") : undefined }}
                   >
                     <Move size={14} strokeWidth={1.6} className="shrink-0" />
@@ -4504,21 +4508,26 @@ function ElementView({
                 {hubMode !== "move" && (
                   <button
                     data-hub-control
+                    disabled={!anchorIsSnap}
                     onClick={(e) => {
                       e.stopPropagation();
+                      if (!anchorIsSnap) return;
                       modeStartClientRef.current = { x: e.clientX, y: e.clientY };
                       setPreview({ dxPx: 0, dyPx: 0, deltaDeg: 0, anchorFrac: { x: 0.5, y: 0.5 } });
                       setEdgeTrim(null);
                       setActiveEdge(null);
                       setHubMode((m) => (m === "rotate" ? null : "rotate"));
                     }}
-                    title="Drehen — Maus bewegen (Shift = 90°-Fang), dann klicken zum Setzen"
-                    className={`h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))] ${hubMode === "rotate" ? "bg-[hsl(var(--surface-muted))]" : ""}`}
+                    title={anchorIsSnap
+                      ? "Drehen — Maus bewegen (Shift = 90°-Fang), dann klicken zum Setzen"
+                      : "Zuerst einen Fangpunkt (Ecke/Kantenmitte) anklicken"}
+                    className={`h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))] ${hubMode === "rotate" ? "bg-[hsl(var(--surface-muted))]" : ""} ${anchorIsSnap ? "" : "opacity-40 cursor-not-allowed"}`}
                     style={{ color: hubMode === "rotate" ? (cadHubUx ? hubBlue : "hsl(var(--accent-gold))") : undefined }}
                   >
                     <RotateCw size={14} />
                   </button>
                 )}
+
                 {hubMode && tabletActive && (
                   <button
                     data-hub-control
