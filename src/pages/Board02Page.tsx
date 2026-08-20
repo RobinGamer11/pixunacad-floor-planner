@@ -241,10 +241,9 @@ export default function Board02Page() {
   // ---- Farbe eines Kreises ------------------------------------------
   const circleFill = useCallback((item: TlItem, t: number) => {
     if (colorMode === "category") return catMap.get(item.categoryId ?? "")?.color ?? GREY;
-    const achieved = itemAchieved(item, now);
-    if (t > now) return GREY;
-    if (!achieved) return GREY;
-    return ORANGE;
+    // „Erledigt“ ist immer orange – unabhängig von der Zeitposition.
+    if (itemAchieved(item, now)) return ORANGE;
+    return GREY;
   }, [colorMode, catMap, now]);
 
   // ---- Achsen-Ticks --------------------------------------------------
