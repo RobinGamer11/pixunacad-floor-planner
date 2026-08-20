@@ -4268,8 +4268,10 @@ function ElementView({
         border: el.border ? "1px solid hsl(var(--ink))" : undefined,
         transform: previewTransform,
         transformOrigin: previewTransformOrigin ?? "center center",
-        // CAD-Blätter folgen der normalen Ebenen-Hierarchie wie alle anderen Objekte.
-        zIndex: showHub ? 80 : (elevated ? 30 : undefined),
+        // CAD-Blätter folgen der normalen Ebenen-Hierarchie. Beim Auswahl-Werkzeug
+        // müssen sie jedoch über der CAD-Zeichenebene liegen, sonst fängt diese
+        // den Klick ab und das Blatt lässt sich nicht mehr auswählen.
+        zIndex: showHub ? 80 : (elevated ? 30 : (isCadView && !toolActive ? 30 : undefined)),
         touchAction: "none",
         // PDF/Bild/CAD-Blatt dürfen bei aktivem Zeichenwerkzeug keinen Pointer
         // abfangen — sonst stoppen neue Objekte an ihren Kanten und der
