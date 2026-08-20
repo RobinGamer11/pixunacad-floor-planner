@@ -7,6 +7,8 @@ import {
   itemStartMs, itemEndMs, itemAchieved, effectiveStatusId, priorityRadius,
   type TlItem, type TlKind, type TlCategory, type TlPriority, type TlStatus,
 } from "@/lib/timelineStore";
+import { ProjectGraph } from "@/pages/NotesPage";
+import { useNotes, type NoteStatusDef, type NotePriorityDef } from "@/lib/notesStore";
 import {
   CheckSquare, CalendarClock, FileText, X, Trash2, Plus, Settings, Save, Search, ChevronLeft,
 } from "lucide-react";
@@ -15,6 +17,7 @@ import {
 // Konstanten / Helfer
 // ------------------------------------------------------------------
 const ORANGE = "#e2703a";
+const RED = "#ef4444";
 const GREY = "#a19a92";
 const DAY = 86400000;
 /** Helle Oberfläche: alles außer dem Zeitstrahl selbst. */
@@ -27,6 +30,8 @@ const INK_SOFT = "#6f665e";
 const CANVAS = "#141110";
 const CANVAS_LINE = "#332c26";
 const CANVAS_PANEL = "#1c1815";
+/** Kompakte Spalten der Punkte-Liste. */
+const GRID_COLS = "94px minmax(0,1fr) 96px 108px 150px 116px";
 
 
 function kindIcon(kind: TlKind, size = 12) {
@@ -69,9 +74,24 @@ export default function Board02Page() {
   const [openLabelId, setOpenLabelId] = useState<string | null>(null);
   const [colorMode, setColorMode] = useState<"category" | "status">("status");
   const [axisMode, setAxisMode] = useState<"time" | "percent">("time");
+  const [surface, setSurface] = useState<"ray" | "net">("ray");
   const [activeCat, setActiveCat] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [prioFilter, setPrioFilter] = useState<string>("");
+
+  // Projektnetz (aus dem Notiznetz-Store) – nur für die Netz-Ansicht.
+  const notes = useNotes(projectId);
+  const [netSelected, setNetSelected] = useState<string | null>(null);
+  const noteStatusMap = useMemo(() => {
+    const m = new Map<string, NoteStatusDef>();
+    notes.statuses.forEach((s) => m.set(s.id, s));
+    return m;
+  }, [notes.statuses]);
+  const notePriorityMap = useMemo(() => {
+    const m = new Map<string, NotePriorityDef>();
+    notes.priorities.forEach((p) => m.set(p.id, p));
+    return m;
+  }, [notes.priorities]);
 
   const selected = state.items.find((i) => i.id === selectedId) ?? null;
   const now = Date.now();
@@ -260,11 +280,13 @@ export default function Board02Page() {
   );
 
   // ---- Farbe eines Kreises ------------------------------------------
-  const circleFill = useCallback((item: TlItem, t: number) => {
+  // Termine/Notizen nutzen EINEN gemeinsamen Verlauf (orange → grau) über die
+  // gesamte Strahl-Fläche, dessen Wendepunkt auf der HEUTE-Linie liegt.
+  // Aufgaben: erledigt = orange, offen = rot (leuchtend).
+  const circleFill = useCallback((item: TlItem, _t: number) => {
     if (colorMode === "category") return catMap.get(item.categoryId ?? "")?.color ?? GREY;
-    // „Erledigt“ ist immer orange – unabhängig von der Zeitposition.
-    if (itemAchieved(item, now)) return ORANGE;
-    return GREY;
+    if (item.kind === "task") return itemAchieved(item, now) ? ORANGE : RED;
+    return "url(#tl-global)";
   }, [colorMode, catMap, now]);
 
   // ---- Achsen-Ticks --------------------------------------------------
@@ -393,23 +415,53 @@ export default function Board02Page() {
               <BigAddButton kind="note" onClick={() => add("note")} />
               <div className="flex-1" />
               <Segmented
-                value={colorMode}
-                onChange={(v) => setColorMode(v as typeof colorMode)}
-                options={[{ v: "status", l: "Farbe: Stand" }, { v: "category", l: "Farbe: Kategorie" }]}
+                value={surface}
+                onChange={(v) => setSurface(v as typeof surface)}
+                options={[{ v: "ray", l: "Ansichtstrahl" }, { v: "net", l: "Projektnetz" }]}
               />
-              <Segmented
-                value={axisMode}
-                onChange={(v) => setAxisMode(v as typeof axisMode)}
-                options={[{ v: "time", l: "Zeitraum" }, { v: "percent", l: "Projektstand %" }]}
-              />
+              {surface === "ray" && (
+                <>
+                  <Segmented
+                    value={colorMode}
+                    onChange={(v) => setColorMode(v as typeof colorMode)}
+                    options={[{ v: "status", l: "Farbe: Stand" }, { v: "category", l: "Farbe: Kategorie" }]}
+                  />
+                  <Segmented
+                    value={axisMode}
+                    onChange={(v) => setAxisMode(v as typeof axisMode)}
+                    options={[{ v: "time", l: "Zeitraum" }, { v: "percent", l: "Projektstand %" }]}
+                  />
+                </>
+              )}
             </div>
           </div>
+
+          {/* Projektnetz-Ansicht */}
+          {surface === "net" && (
+            <div className="mx-4 mt-4 h-[min(70vh,760px)] min-h-[460px] rounded-xl overflow-hidden"
+                 style={{ background: PANEL, border: `1px solid ${PANEL_LINE}`, boxShadow: "0 1px 2px rgba(20,17,16,0.05)" }}>
+              <ProjectGraph
+                projectName={project?.name ?? "Projekt"}
+                nodes={notes.nodes}
+                statusMap={noteStatusMap}
+                priorityMap={notePriorityMap}
+                selectedId={netSelected}
+                onSelect={(id) => setNetSelected(id)}
+                focusToken={0}
+              />
+            </div>
+          )}
 
           {/* Zeitstrahl */}
           <div
             ref={wrapRef}
             className="relative mx-4 mt-4 h-[min(62vh,640px)] min-h-[420px] rounded-xl overflow-hidden select-none cursor-grab active:cursor-grabbing"
-            style={{ background: CANVAS, border: `1px solid ${CANVAS_LINE}`, touchAction: "none" }}
+            style={{
+              background: CANVAS,
+              border: `1px solid ${CANVAS_LINE}`,
+              touchAction: "none",
+              display: surface === "ray" ? undefined : "none",
+            }}
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
@@ -417,11 +469,24 @@ export default function Board02Page() {
           >
             <svg width={size.w} height={size.h} className="absolute inset-0">
               <defs>
-                <linearGradient id="tl-now" x1="0" x2="1">
+                {/* Ein einziger, durchgehender Verlauf für ALLE Kreise:
+                    links von HEUTE orange, rechts davon grau. */}
+                <linearGradient
+                  id="tl-global"
+                  gradientUnits="userSpaceOnUse"
+                  x1={nowX - Math.max(120, size.w * 0.22)}
+                  x2={nowX + Math.max(120, size.w * 0.22)}
+                  y1={0} y2={0}
+                >
                   <stop offset="0%" stopColor={ORANGE} />
                   <stop offset="100%" stopColor={GREY} />
                 </linearGradient>
+                <filter id="tl-glow" x="-70%" y="-70%" width="240%" height="240%">
+                  <feGaussianBlur stdDeviation="3" result="b" />
+                  <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+                </filter>
               </defs>
+
 
               {/* Achse */}
               <line x1={0} x2={size.w} y1={size.h - 46} y2={size.h - 46} stroke="#2b2724" strokeWidth={1} />
@@ -472,21 +537,23 @@ export default function Board02Page() {
                   {p.circles.map((c, i) => {
                     const cxp = sx(c.bx);
                     const r = c.r * view.k;
-                    const spansNow = colorMode === "status" && sx(p.bx0) <= nowX && sx(p.bx1) >= nowX;
-                    const near = spansNow && Math.abs(cxp - nowX) < Math.max(24, r * 3);
+                    // Offene Aufgaben leuchten rot auf.
+                    const alert = colorMode === "status" && p.item.kind === "task" && !itemAchieved(p.item, now);
                     return (
                       <circle
                         key={i}
                         cx={cxp}
                         cy={cy + c.dy * view.k}
                         r={r}
-                        fill={near ? "url(#tl-now)" : circleFill(p.item, c.t)}
+                        fill={circleFill(p.item, c.t)}
+                        filter={alert ? "url(#tl-glow)" : undefined}
                         opacity={p.item.id === selectedId ? 1 : 0.92}
                         stroke={p.item.id === selectedId ? "#fff" : "none"}
                         strokeWidth={p.item.id === selectedId ? Math.max(0.5, view.k) : 0}
                       />
                     );
                   })}
+
                 </g>
               ))}
             </svg>
@@ -646,9 +713,11 @@ export default function Board02Page() {
               </div>
 
               <div className="rounded-lg overflow-hidden" style={{ border: `1px solid ${PANEL_LINE}` }}>
-                <div className="grid px-3 py-2 text-[10px] uppercase tracking-wide"
-                     style={{ gridTemplateColumns: "90px 1fr 110px 120px 170px 130px", background: SUBTLE, color: INK_SOFT }}>
-                  <span>Priorität</span><span>Name</span><span>Status</span><span>Kategorie</span><span>Zeitraum</span><span>Verantwortlich</span>
+                <div className="grid gap-2 px-3 py-2 text-[10px] uppercase tracking-wide"
+                     style={{ gridTemplateColumns: GRID_COLS, background: SUBTLE, color: INK_SOFT }}>
+                  <span className="truncate">Priorität</span><span className="truncate">Name</span>
+                  <span className="truncate">Status</span><span className="truncate">Kategorie</span>
+                  <span className="truncate">Zeitraum</span><span className="truncate">Verantwortlich</span>
                 </div>
                 {listItems.map((i) => {
                   const prio = prioMap.get(i.priorityId ?? "");
@@ -659,22 +728,23 @@ export default function Board02Page() {
                     <button
                       key={i.id}
                       onClick={() => setSelectedId(i.id)}
-                      className="grid w-full items-center px-3 py-2 text-left text-[11px] border-t"
+                      className="grid w-full items-center gap-2 px-3 py-2.5 text-left text-[12px] border-t"
                       style={{
-                        gridTemplateColumns: "90px 1fr 110px 120px 170px 130px",
+                        gridTemplateColumns: GRID_COLS,
                         borderColor: PANEL_LINE,
                         background: i.id === selectedId ? "#fbe9df" : "transparent",
                         color: doneRow ? INK_SOFT : INK,
                       }}
+                      title={i.title}
                     >
-                      <span className="tabular-nums">{prio ? `${prio.label} · ${prio.percent}%` : "—"}</span>
-                      <span className="flex items-center gap-1.5 truncate pr-2">
-                        <span style={{ color: cat?.color ?? ORANGE }}>{kindIcon(i.kind, 11)}</span>
+                      <span className="tabular-nums truncate">{prio ? `${prio.label} · ${prio.percent}%` : "—"}</span>
+                      <span className="flex min-w-0 items-center gap-1.5">
+                        <span className="shrink-0" style={{ color: cat?.color ?? ORANGE }}>{kindIcon(i.kind, 12)}</span>
                         <span className="truncate">{i.title}</span>
                       </span>
-                      <span style={{ color: st?.color ?? INK_SOFT }}>{st?.label ?? "—"}</span>
-                      <span>{cat?.label ?? "—"}</span>
-                      <span className="opacity-80">
+                      <span className="truncate" style={{ color: st?.color ?? INK_SOFT }}>{st?.label ?? "—"}</span>
+                      <span className="truncate">{cat?.label ?? "—"}</span>
+                      <span className="truncate opacity-80">
                         {fmtDate(i.startDate)}{i.endDate ? ` – ${fmtDate(i.endDate)}` : ""}
                       </span>
                       <span className="truncate">{i.responsible || "—"}</span>
@@ -682,11 +752,15 @@ export default function Board02Page() {
                   );
                 })}
                 {!listItems.length && (
-                  <div className="px-3 py-4 text-[11px]" style={{ color: INK_SOFT }}>Keine Treffer.</div>
+                  <div className="px-3 py-4 text-[12px]" style={{ color: INK_SOFT }}>Keine Treffer.</div>
                 )}
               </div>
             </div>
+
+            {/* Dauerhafter Leerraum unter der Auflistung */}
+            <div aria-hidden style={{ minHeight: 260 }} />
           </div>
+
         </div>
 
         {/* Editor */}
@@ -1046,7 +1120,7 @@ function PieChart({
 }) {
   const total = slices.reduce((a, s) => a + s.value, 0);
   if (!total) return null;
-  const R = 54, C = 64;
+  const R = 74, C = 84;
   let acc = -Math.PI / 2;
   return (
     <svg width={C * 2} height={C * 2}>
@@ -1054,7 +1128,7 @@ function PieChart({
         const ang = (s.value / total) * Math.PI * 2;
         const a0 = acc, a1 = acc + ang;
         acc = a1;
-        const r = activeId === s.id ? R + 5 : R;
+        const r = activeId === s.id ? R + 6 : R;
         const large = ang > Math.PI ? 1 : 0;
         const d = ang >= Math.PI * 2 - 1e-6
           ? `M ${C} ${C - r} A ${r} ${r} 0 1 1 ${C - 0.01} ${C - r} Z`
@@ -1064,7 +1138,8 @@ function PieChart({
                 style={{ cursor: "pointer" }} onClick={() => onSlice(s.id)} />
         );
       })}
-      <circle cx={C} cy={C} r={26} fill={PANEL} style={{ cursor: "pointer" }} onClick={onCenter} />
+      <circle cx={C} cy={C} r={36} fill={PANEL} style={{ cursor: "pointer" }} onClick={onCenter} />
+
     </svg>
   );
 }

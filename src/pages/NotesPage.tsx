@@ -1259,7 +1259,7 @@ function layoutTree(nodes: NoteNode[], rootLabel: string, cardStyle: GraphCardSt
   return { nodes: out, edges, rootLabel };
 }
 
-function ProjectGraph({
+export function ProjectGraph({
   projectName, nodes, statusMap, priorityMap, selectedId, onSelect, focusToken,
 }: {
   projectName: string; nodes: NoteNode[];
