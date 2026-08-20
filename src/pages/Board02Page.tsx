@@ -30,6 +30,8 @@ const INK_SOFT = "#6f665e";
 const CANVAS = "#141110";
 const CANVAS_LINE = "#332c26";
 const CANVAS_PANEL = "#1c1815";
+/** Kompakte Spalten der Punkte-Liste. */
+const GRID_COLS = "94px minmax(0,1fr) 96px 108px 150px 116px";
 
 
 function kindIcon(kind: TlKind, size = 12) {
