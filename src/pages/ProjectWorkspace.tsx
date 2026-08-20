@@ -4755,6 +4755,9 @@ function ElementView({
               cursor: cadHubUx
                 ? (isActive || edgeReady ? (isHor ? "ns-resize" : "ew-resize") : "default")
                 : (isHor ? "ns-resize" : "ew-resize"),
+              // Bedien-Overlay des CAD-Blatts hat pointerEvents:none — die
+              // Kanten-Griffe müssen sie explizit wieder aktivieren.
+              pointerEvents: "auto",
               zIndex: 5,
             };
             const sizeStyle: React.CSSProperties = isHor
