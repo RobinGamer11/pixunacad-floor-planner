@@ -210,6 +210,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const measureIdSelectRef = useRef<HTMLSelectElement>(null);
   const measureOrientationRef = useRef<HTMLSelectElement>(null);
   const measurePointCountRef = useRef<HTMLSelectElement>(null);
+  const [measureIsAngle, setMeasureIsAngle] = useState(false);
   const measureDirectionRef = useRef<HTMLSelectElement>(null);
   const measureEditModeRef = useRef<HTMLSelectElement>(null);
 
@@ -2325,6 +2326,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 <option value="arc">Gewölbt</option>
               </select>
               <select ref={measurePointCountRef} defaultValue="multi">
+                <option value="angle">Neigung</option>
                 <option value="two">Einzelmaß</option>
                 <option value="multi">Mehrfachmaß</option>
                 <option value="free">Freies Maß</option>
@@ -2369,15 +2371,17 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               <CadSegmentedProxy
                 label="Modus"
                 target={measurePointCountRef}
-                columns={3}
+                columns={2}
                 options={[
                   { value: "two", label: "Einzelmaß" },
                   { value: "multi", label: "Mehrfachmaß" },
                   { value: "free", label: "Freies Maß" },
+                  { value: "angle", label: "Neigung" },
                 ]}
               />
 
               <div className="rounded-md border p-2 space-y-3" style={{ borderColor: "hsl(var(--hairline))" }}>
+                <div className={measureIsAngle ? "hidden" : ""}>
                 <CadSegmentedProxy
                   label="Ausrichtung"
                   target={measureOrientationRef}
@@ -2388,10 +2392,13 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                     { value: "arc", label: "Gewölbt" },
                   ]}
                 />
+                </div>
 
                 <div className="grid grid-cols-2 gap-2">
                   <CadMeasureProxy label="Textgröße" unit="pt" target={measureTextSizeRef} factor={0.75} digits={1} />
-                  <CadMeasureProxy label="Text-Kettenabstand" unit="px" target={measureTextGapRef} factor={1} digits={0} />
+                  <div className={measureIsAngle ? "hidden" : ""}>
+                    <CadMeasureProxy label="Text-Kettenabstand" unit="px" target={measureTextGapRef} factor={1} digits={0} />
+                  </div>
                 </div>
 
                 <div className={measureHasDoorRef ? "" : "hidden"}>
@@ -2405,12 +2412,12 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
+                <div className={`grid grid-cols-2 gap-2 ${measureIsAngle ? "hidden" : ""}`}>
                   <CadMeasureProxy label="Kommastellen" unit="" target={measureDecimalsRef} factor={1} digits={0} />
                   <CadMeasureProxy label="Endstrichlänge" unit="m" target={measureTickLengthRef} factor={1} digits={2} />
                 </div>
 
-                <div className="flex items-end gap-2">
+                <div className={`flex items-end gap-2 ${measureIsAngle ? "hidden" : ""}`}>
                   <div className="flex-1">
                     <CadCheckboxProxy target={measureShowUnitRef} label="Einheit anzeigen" />
                   </div>
@@ -2426,8 +2433,10 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                   <CadColorProxy label="Linienfarbe" target={measureLineColorRef} />
                 </div>
 
+                <div className={measureIsAngle ? "hidden" : ""}>
                 <CadCheckboxProxy target={measureExtRef} label="Verlängerungslinien" />
-                <div ref={measureExtGroupRef} className="hidden space-y-2">
+                </div>
+                <div ref={measureExtGroupRef} className={`hidden space-y-2 ${measureIsAngle ? "!hidden" : ""}`}>
                   <div>
                     <div className="mb-1 text-[10px] text-muted-foreground">Stil</div>
                     <select ref={measureExtStyleRef} className="cad-settings-select w-full" defaultValue="dashed">

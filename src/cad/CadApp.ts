@@ -3037,6 +3037,7 @@ export class CadApp {
 
     r.orientation.value = s.orientation;
     r.pointCount.value = s.pointCount;
+    r.pointCount.dispatchEvent(new Event("cad-value-sync"));
     r.direction.value = s.direction;
     r.editMode.value = s.editMode;
     r.extensionsToggle.checked = !!s.showExtensions;
