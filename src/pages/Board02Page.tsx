@@ -242,8 +242,13 @@ export default function Board02Page() {
     return m * view.k;
   }, [placed, view.k]);
   const labelY = useCallback(
-    (p: Placed) => clamp(cy + p.side * (clusterHalf + 26 + p.lane * 26), 20, size.h - 60),
-    [clusterHalf, cy, size.h],
+    (p: Placed) => cy + p.side * (clusterHalf + 26 + p.lane * 26),
+    [clusterHalf, cy],
+  );
+  /** Beschriftung nach links führen, wenn rechts kein Platz mehr ist. */
+  const labelDir = useCallback(
+    (p: Placed) => (sx(p.bx1) > size.w - 220 ? -1 : 1),
+    [sx, size.w],
   );
 
   // ---- Farbe eines Kreises ------------------------------------------
