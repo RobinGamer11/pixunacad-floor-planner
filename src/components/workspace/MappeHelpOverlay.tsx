@@ -138,8 +138,10 @@ export function MappeHelpOverlay({
   textActive?: boolean;
   measureActive?: boolean;
 }) {
-  // Die Hilfeleiste skaliert sich automatisch auf die verfügbare Breite herunter
-  // (z.B. Tablet-Ansicht), damit immer alle Gruppen sichtbar bleiben.
+  // Die Hilfeleiste bricht ganze Abschnitte in neue Zeilen um, sobald rechts
+  // nicht mehr genug Platz ist — sie wächst dadurch nach oben statt zu
+  // schrumpfen. Erst wenn ein einzelner Abschnitt breiter als der verfügbare
+  // Platz ist, wird zusätzlich dezent herunterskaliert.
   const outerRef = React.useRef<HTMLDivElement | null>(null);
   const innerRef = React.useRef<HTMLDivElement | null>(null);
   const [scale, setScale] = React.useState(1);
@@ -149,9 +151,13 @@ export function MappeHelpOverlay({
     if (!outer || !inner) return;
     const measure = () => {
       const avail = outer.clientWidth;
-      const need = inner.scrollWidth;
-      if (!avail || !need) return;
-      const next = Math.min(1, Math.max(0.45, avail / need));
+      if (!avail) return;
+      let widest = 0;
+      inner.querySelectorAll("section").forEach((s) => {
+        widest = Math.max(widest, (s as HTMLElement).scrollWidth);
+      });
+      if (!widest) return;
+      const next = Math.min(1, Math.max(0.45, avail / widest));
       setScale((cur) => (Math.abs(cur - next) < 0.005 ? cur : next));
     };
     measure();
@@ -169,7 +175,7 @@ export function MappeHelpOverlay({
     >
       <div
         ref={innerRef}
-        className="flex flex-nowrap items-stretch justify-center overflow-hidden rounded-xl border shadow-xl backdrop-blur-md"
+        className="flex max-w-full flex-wrap items-stretch justify-center rounded-xl border shadow-xl backdrop-blur-md"
         style={{
           borderColor: "hsl(var(--surface) / 0.24)",
           background: "hsl(var(--ink) / 0.78)",
@@ -178,6 +184,7 @@ export function MappeHelpOverlay({
           transformOrigin: "bottom center",
         }}
       >
+
         <HelpGroup title="Navigation">
           <HelpItem icon={<MouseGlyph highlight="wheel" />} shortcut="Mausrad" description="Zoomen" />
           <HelpItem icon={<MouseGlyph highlight="wheel" pressed />} shortcut="Rad gedrückt" description="Bewegen" />

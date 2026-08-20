@@ -106,18 +106,49 @@ async function snapshotPageElement(
   );
   await waitFrames(6);
 
-  const canvas = await html2canvas(el, {
-    backgroundColor: "#ffffff",
-    scale: targetPxPerCssPx,
-    useCORS: true,
-    logging: false,
-    width: layoutW,
-    height: layoutH,
-    windowWidth: document.documentElement.clientWidth,
-    windowHeight: document.documentElement.clientHeight,
-  });
+  // Die Seite für den Snapshot kurzzeitig aus dem gescrollten/transformierten
+  // Layout lösen und exakt am Viewport-Ursprung fixieren. Ohne das rechnet
+  // html2canvas mit Scroll- und Transform-Offsets der Arbeitsfläche und legt
+  // den Inhalt winzig in die linke obere Ecke der PDF-Seite.
+  const prevInline = el.getAttribute("style");
+  const prevScrollX = window.scrollX;
+  const prevScrollY = window.scrollY;
+  el.style.position = "fixed";
+  el.style.left = "0px";
+  el.style.top = "0px";
+  el.style.right = "auto";
+  el.style.bottom = "auto";
+  el.style.margin = "0";
+  el.style.transform = "none";
+  el.style.zIndex = "2147483647";
+  el.style.background = "#ffffff";
+  window.scrollTo(0, 0);
+  await waitFrames(4);
+
+  let canvas: HTMLCanvasElement;
+  try {
+    canvas = await html2canvas(el, {
+      backgroundColor: "#ffffff",
+      scale: targetPxPerCssPx,
+      useCORS: true,
+      logging: false,
+      x: 0,
+      y: 0,
+      width: layoutW,
+      height: layoutH,
+      scrollX: 0,
+      scrollY: 0,
+      windowWidth: Math.max(document.documentElement.clientWidth, Math.ceil(layoutW)),
+      windowHeight: Math.max(document.documentElement.clientHeight, Math.ceil(layoutH)),
+    });
+  } finally {
+    if (prevInline == null) el.removeAttribute("style");
+    else el.setAttribute("style", prevInline);
+    window.scrollTo(prevScrollX, prevScrollY);
+  }
   return canvas;
 }
+
 
 /** Wartet n RequestAnimationFrames. */
 function waitFrames(n: number): Promise<void> {
