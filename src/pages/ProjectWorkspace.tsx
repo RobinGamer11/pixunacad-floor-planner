@@ -3489,6 +3489,12 @@ function ElementView({
   // mit Commit per Linksklick + ENTER bzw. Häkchen (Tablet).
   const cadHubUx = isCadView;
   const hubBlue = "#4da3ff";
+  // Portal-Ziel (Seitenfläche) für die Bedien-Overlays der CAD-Blätter.
+  const [portalHost, setPortalHost] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    setPortalHost((rootRef.current?.parentElement as HTMLElement | null) ?? null);
+  }, []);
+
 
   // Explizite HUB-Modi für CAD-Blatt: erst nach Klick auf das Symbol wird
   // Bewegen / Drehen aktiv. Preview läuft mit Fadenkreuz-Cursor; ein weiterer
@@ -3989,13 +3995,28 @@ function ElementView({
     const unregisterHubAbort = registerAbort(() => cancel());
 
 
+    // Preview-Updates werden pro Frame gebündelt (rAF) — sonst rendert React
+    // bei jedem Pointer-Event neu und das Verschieben ruckelt.
+    let raf = 0;
+    let pendingPreview: { dxPx: number; dyPx: number; deltaDeg: number; anchorFrac: { x: number; y: number } } | null = null;
+    let pendingAxis: { ax: number; ay: number; bx: number; by: number; mx: number; my: number; deg: number } | null = null;
+    const flushFrame = () => {
+      raf = 0;
+      if (pendingPreview) { setPreview(pendingPreview); pendingPreview = null; }
+      if (pendingAxis) { setRotAxis(pendingAxis); pendingAxis = null; }
+    };
+    const schedule = () => { if (!raf) raf = requestAnimationFrame(flushFrame); };
+
     const onMove = (ev: PointerEvent) => {
       // Tablet-Hilfsrad/HUB-Bedienelemente werden für die Positionierung
       // komplett ignoriert — sonst springt das Objekt zum Rad.
       const mt = ev.target as HTMLElement | null;
-      const overTabletAid = document.elementsFromPoint(ev.clientX, ev.clientY)
-        .some((node) => (node as HTMLElement).closest?.('[data-tablet-aid="true"]'));
-      if (overTabletAid || mt?.closest?.('[data-tablet-aid="true"], [data-hub-control]')) return;
+      if (mt?.closest?.('[data-tablet-aid="true"], [data-hub-control]')) return;
+      if ((window as any).__pixunaTabletCommit) {
+        const overTabletAid = document.elementsFromPoint(ev.clientX, ev.clientY)
+          .some((node) => (node as HTMLElement).closest?.('[data-tablet-aid="true"]'));
+        if (overTabletAid) return;
+      }
       if (!carryingRef.current) return; // Objekt abgelegt — Preview eingefroren.
       const { clientX: ax, clientY: ay } = liveAnchor();
       const reg = getPageSnapRegistry();
@@ -4018,7 +4039,9 @@ function ElementView({
           if (snapped) { dxPx = snapped.x - ax; dyPx = snapped.y - ay; }
         }
         previewRef.current = { dxPx, dyPx, deltaDeg: 0, anchorFrac };
-        setPreview({ dxPx, dyPx, deltaDeg: 0, anchorFrac });
+        pendingPreview = { dxPx, dyPx, deltaDeg: 0, anchorFrac };
+        schedule();
+
       } else if (hubMode === "rotate") {
         // Zielpunkt anvisieren: Fangpunkte anderer Objekte und Rechtsklick-
         // Hilfslinien ziehen den Rotations-Strahl exakt auf den Punkt.
@@ -4065,7 +4088,9 @@ function ElementView({
         // Ref synchron mitschreiben: ein Linksklick kann committen, bevor der
         // React-State-Update-Zyklus durch ist — sonst ginge die Drehung verloren.
         previewRef.current = { dxPx: dCx, dyPx: dCy, deltaDeg: delta, anchorFrac };
-        setPreview({ dxPx: dCx, dyPx: dCy, deltaDeg: delta, anchorFrac });
+        pendingPreview = { dxPx: dCx, dyPx: dCy, deltaDeg: delta, anchorFrac };
+        schedule();
+
         // CAD-Blatt: Der Cursor wird optisch auf der Linie durch die beiden
         // oberen Fangpunkte fixiert — dadurch ist die Drehung exakt ablesbar.
         if (cadHubUx) {
@@ -4097,7 +4122,9 @@ function ElementView({
           const B = toPct(tr.x + vx * ext, tr.y + vy * ext);
           const M = toPct(mx, my);
           const shown = ((startRot + delta) % 360 + 360) % 360;
-          setRotAxis({ ax: A.x, ay: A.y, bx: B.x, by: B.y, mx: M.x, my: M.y, deg: shown });
+          pendingAxis = { ax: A.x, ay: A.y, bx: B.x, by: B.y, mx: M.x, my: M.y, deg: shown };
+          schedule();
+
         }
       }
 
@@ -4212,7 +4239,9 @@ function ElementView({
       window.removeEventListener("click", onClick, true);
       window.removeEventListener("contextmenu", onContext, true);
       window.removeEventListener("keydown", onKey, true);
+      if (raf) { cancelAnimationFrame(raf); raf = 0; }
       hubDownClientRef.current = null;
+
       unregisterHubAbort();
       if (actionCommitRef.current === commit) actionCommitRef.current = null;
       if (actionCancelRef.current === cancel) actionCancelRef.current = null;
@@ -4247,6 +4276,39 @@ function ElementView({
   // → ENTER bzw. Häkchen setzt final.
   const hubCapable = cadHubUx || (tabletActive && (el.kind === "image" || el.kind === "pdf"));
   const tabletCommitOnly = hubCapable && tabletActive && (!!hubMode || !!edgeTrim);
+  // CAD-Blatt: Verschieben/Drehen ausschließlich von einem Fangpunkt aus.
+  const anchorIsSnap = !cadHubUx || (!!anchorFracState && anchorFracState.key !== "interior");
+
+  // CAD-Blätter bleiben in der normalen Ebenen-Hierarchie (unter der CAD-
+  // Zeichenebene). Auswahl-Hitbox und Bedienelemente werden deshalb als
+  // transparentes Overlay über die Zeichenebene portiert.
+  const cadProxyStyle: React.CSSProperties = {
+    left: `${el.x}%`,
+    top: `${el.y}%`,
+    width: `${el.w}%`,
+    height: `${el.h}%`,
+    transform: previewTransform,
+    transformOrigin: "center center",
+  };
+  const wrapCadChrome = (node: React.ReactNode): React.ReactNode => {
+    if (!cadHubUx || !portalHost) return node;
+    return createPortal(
+      <div className="absolute" style={{ ...cadProxyStyle, zIndex: 60, pointerEvents: "none" }}>
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            pointerEvents: "auto",
+            cursor: hubMode ? "crosshair" : "default",
+          }}
+          onPointerDown={handlePointerDown}
+        />
+        {node}
+      </div>,
+      portalHost,
+    );
+  };
+
 
   return (
     <div
@@ -4268,15 +4330,17 @@ function ElementView({
         border: el.border ? "1px solid hsl(var(--ink))" : undefined,
         transform: previewTransform,
         transformOrigin: previewTransformOrigin ?? "center center",
-        // CAD-Blätter folgen der normalen Ebenen-Hierarchie. Beim Auswahl-Werkzeug
-        // müssen sie jedoch über der CAD-Zeichenebene liegen, sonst fängt diese
-        // den Klick ab und das Blatt lässt sich nicht mehr auswählen.
-        zIndex: showHub ? 80 : (elevated ? 30 : (isCadView && !toolActive ? 30 : undefined)),
+        // CAD-Blätter folgen strikt der normalen Ebenen-Hierarchie und werden
+        // deshalb NICHT über die CAD-Zeichenebene gehoben (sonst läge ein
+        // CAD-Blatt der Default-Ebene vor Linien höherer Ebenen). Auswahl und
+        // Bedienung laufen über das transparente Overlay (wrapCadChrome).
+        zIndex: cadHubUx ? undefined : (showHub ? 80 : (elevated ? 30 : undefined)),
         touchAction: "none",
         // PDF/Bild/CAD-Blatt dürfen bei aktivem Zeichenwerkzeug keinen Pointer
         // abfangen — sonst stoppen neue Objekte an ihren Kanten und der
         // Radiergummi erreicht die darüberliegende CAD-Eingabeschicht nicht.
-        pointerEvents: (((el.kind === "pdf" || el.kind === "image" || cadHubUx) && toolActive) ? "none" : undefined),
+        pointerEvents: cadHubUx ? "none" : (((el.kind === "pdf" || el.kind === "image") && toolActive) ? "none" : undefined),
+
       }}
     >
 
@@ -4373,8 +4437,18 @@ function ElementView({
         />
       )}
 
+      {/* CAD-Blatt: transparente Auswahl-Hitbox über der Zeichenebene, solange
+         das Blatt nicht ausgewählt ist. Das Blatt selbst bleibt in seiner Ebene. */}
+      {cadHubUx && !readOnly && !selected && !toolActive && portalHost && createPortal(
+        <div
+          className="absolute"
+          style={{ ...cadProxyStyle, zIndex: 29 }}
+          onPointerDown={handlePointerDown}
+        />,
+        portalHost,
+      )}
 
-      {showHub && (
+      {showHub && wrapCadChrome(
         <>
           {!tabletCommitOnly && !cadHubUx && (
             <>
@@ -4460,8 +4534,10 @@ function ElementView({
                 {hubMode !== "rotate" && (
                   <button
                     data-hub-control
+                    disabled={!anchorIsSnap}
                     onClick={(e) => {
                       e.stopPropagation();
+                      if (!anchorIsSnap) return;
                       // WICHTIG: kein Start-Client setzen → Delta = Maus - Anker.
                       // Dadurch klebt der zuletzt gewählte Fangpunkt/Anker exakt
                       // unter dem Mauszeiger, sobald "Verschieben" aktiv ist.
@@ -4471,8 +4547,10 @@ function ElementView({
                       setActiveEdge(null);
                       setHubMode((m) => (m === "move" ? null : "move"));
                     }}
-                    title="Verschieben — Anker folgt der Maus, klicken zum Setzen (ESC bricht ab)"
-                    className={`h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))] ${hubMode === "move" ? "bg-[hsl(var(--surface-muted))]" : ""}`}
+                    title={anchorIsSnap
+                      ? "Verschieben — Anker folgt der Maus, klicken zum Setzen (ESC bricht ab)"
+                      : "Zuerst einen Fangpunkt (Ecke/Kantenmitte) anklicken"}
+                    className={`h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))] ${hubMode === "move" ? "bg-[hsl(var(--surface-muted))]" : ""} ${anchorIsSnap ? "" : "opacity-40 cursor-not-allowed"}`}
                     style={{ color: hubMode === "move" ? (cadHubUx ? hubBlue : "hsl(var(--accent-gold))") : undefined }}
                   >
                     <Move size={14} strokeWidth={1.6} className="shrink-0" />
@@ -4481,21 +4559,26 @@ function ElementView({
                 {hubMode !== "move" && (
                   <button
                     data-hub-control
+                    disabled={!anchorIsSnap}
                     onClick={(e) => {
                       e.stopPropagation();
+                      if (!anchorIsSnap) return;
                       modeStartClientRef.current = { x: e.clientX, y: e.clientY };
                       setPreview({ dxPx: 0, dyPx: 0, deltaDeg: 0, anchorFrac: { x: 0.5, y: 0.5 } });
                       setEdgeTrim(null);
                       setActiveEdge(null);
                       setHubMode((m) => (m === "rotate" ? null : "rotate"));
                     }}
-                    title="Drehen — Maus bewegen (Shift = 90°-Fang), dann klicken zum Setzen"
-                    className={`h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))] ${hubMode === "rotate" ? "bg-[hsl(var(--surface-muted))]" : ""}`}
+                    title={anchorIsSnap
+                      ? "Drehen — Maus bewegen (Shift = 90°-Fang), dann klicken zum Setzen"
+                      : "Zuerst einen Fangpunkt (Ecke/Kantenmitte) anklicken"}
+                    className={`h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))] ${hubMode === "rotate" ? "bg-[hsl(var(--surface-muted))]" : ""} ${anchorIsSnap ? "" : "opacity-40 cursor-not-allowed"}`}
                     style={{ color: hubMode === "rotate" ? (cadHubUx ? hubBlue : "hsl(var(--accent-gold))") : undefined }}
                   >
                     <RotateCw size={14} />
                   </button>
                 )}
+
                 {hubMode && tabletActive && (
                   <button
                     data-hub-control
