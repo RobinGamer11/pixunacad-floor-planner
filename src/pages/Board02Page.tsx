@@ -4,7 +4,7 @@ import { WorkspaceHeader } from "@/components/workspace/WorkspaceHeader";
 import { useProject } from "@/lib/projectStore";
 import {
   timelineStore, useTimeline, useTimelineHistory,
-  itemStartMs, itemEndMs, itemAchieved, priorityRadius,
+  itemStartMs, itemEndMs, itemAchieved, effectiveStatusId, priorityRadius,
   type TlItem, type TlKind, type TlCategory, type TlPriority, type TlStatus,
 } from "@/lib/timelineStore";
 import {
