@@ -209,7 +209,7 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
 
   return (
     <div className={hideChrome ? "" : "cad-settings-panel mb-2"}>
-      {!hideChrome && (
+      {!hideChrome && !framedCad && (
         <>
           <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Freihand</div>
           <RasterModeToggle app={app} projectId={projectId} />

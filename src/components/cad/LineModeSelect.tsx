@@ -32,7 +32,7 @@ export const LineModeSelect: React.FC<{ app: CadApp | MiniCad | null }> = ({ app
 
   return (
     <div className="mb-2">
-      <div className="mb-1.5 text-[10px] font-semibold tracking-wider text-muted-foreground">MODUS</div>
+      <div className="mb-1.5 text-[10px] font-semibold tracking-wider text-muted-foreground">AUSWAHL</div>
       <div className="grid grid-cols-3 gap-1">
         {MODES.map(({ value, label, Icon }) => (
           <button
