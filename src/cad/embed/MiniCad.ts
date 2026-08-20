@@ -1885,6 +1885,35 @@ export class MiniCad {
     return this.scene.getFreeStrokeById((this.selection as any).freeStrokeId);
   }
 
+  /* ---- Mehrfachauswahl: Einstellungen auf alle gleichartigen Objekte ---- */
+
+  private _panelMirror<T extends object>(primary: T | null | undefined, kind: string, lookup: (id: string) => T | null | undefined): T | null {
+    if (!primary) return null;
+    const sibs: T[] = [];
+    for (const ref of this._selectedRefs()) {
+      if (ref.kind !== kind) continue;
+      const o = lookup(ref.id);
+      if (o && o !== primary) sibs.push(o);
+    }
+    return sibs.length ? mirrorProxy(primary, sibs) : primary;
+  }
+
+  /** Von den Werkzeugeinstellungen genutzte Getter — spiegeln Änderungen bei
+   *  Mehrfachauswahl automatisch auf alle Objekte derselben Art. */
+  getEditSegment() {
+    return this._panelMirror(this.getSelectedSegment(), "segment", (id) => this.scene.getSegmentById(id));
+  }
+  getEditHatch() {
+    return this._panelMirror(this.getSelectedHatch(), "hatch", (id) => this.scene.getHatchById(id));
+  }
+  getEditTextBox() {
+    return this._panelMirror(this.getSelectedTextBox(), "textBox", (id) => this.scene.getTextBoxById(id));
+  }
+  getEditFreeStroke() {
+    return this._panelMirror(this.getSelectedFreeStroke() as any, "freeStroke", (id) => this.scene.getFreeStrokeById(id));
+  }
+  getEditDimension() { return null; }
+
   /* ===== CadApp surface stubs (required by SelectTool) ===== */
 
   getSelectedSegment() {
