@@ -1800,8 +1800,13 @@ export default function ProjectWorkspace() {
                     const idx = prev.indexOf(id);
                     if (opts?.shift && idx >= 0) return prev.filter((x) => x !== id);
                     const rest = prev.filter((x) => x !== id);
+                    // Das ZUERST gewählte Objekt bleibt führend (= letzter Eintrag).
+                    // Weitere Objekte werden davor eingereiht, damit Anker,
+                    // Verschieben und Drehen am ersten Objekt bestehen bleiben.
+                    if (opts?.shift && rest.length > 0) return [id, ...rest];
                     return [...rest, id];
                   });
+
                   setSelectedCadTool(undefined);
                   setRightTab("tools");
                 };
