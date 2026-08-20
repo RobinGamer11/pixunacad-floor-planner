@@ -4,7 +4,7 @@ import { Camera } from "./Camera";
 import { Scene, Hatch, Dimension, TextBox, StickerInstance, DocumentObject, FreeStroke } from "./Scene";
 import { smoothChaikin } from "./freeGeom";
 import { LabelManager } from "./LabelManager";
-import { getDimensionGeometry, type DimensionLike } from "./dimensionGeometry";
+import { getDimensionGeometry, getAngleDimensionParts, type DimensionLike } from "./dimensionGeometry";
 import { boxCornersWorld } from "./textGeometry";
 import { getDocWarp, drawWarpedImage } from "./documentWarp";
 import { drawRichTextBox } from "./textRichRenderer";
@@ -2122,6 +2122,11 @@ export class Renderer {
   }, isPreview = false) {
     const g = getDimensionGeometry(dim);
 
+    if ((dim as any).mode === "angle") {
+      this._drawAngleDimension(ctx, cam, dim as any, isPreview);
+      return;
+    }
+
     const p1 = cam.worldToScreen(g.ext1a.x, g.ext1a.y);
     const p2 = cam.worldToScreen(g.ext1b.x, g.ext1b.y);
     const p3 = cam.worldToScreen(g.ext2a.x, g.ext2a.y);
@@ -2311,6 +2316,70 @@ export class Renderer {
       }
     }
 
+    ctx.restore();
+  }
+
+
+  /** Neigungsmaß: zwei Schenkel + gestrichelter grauer Radiusbogen + Gradzahl. */
+  _drawAngleDimension(ctx: CanvasRenderingContext2D, cam: Camera, dim: any, isPreview = false) {
+    const parts = getAngleDimensionParts(dim);
+    const g = getDimensionGeometry(dim);
+    const apex = cam.worldToScreen(parts.apex.x, parts.apex.y);
+    const bs = cam.worldToScreen(parts.b.x, parts.b.y);
+    const cs = cam.worldToScreen(parts.c.x, parts.c.y);
+
+    ctx.save();
+    // Schenkel
+    ctx.strokeStyle = dim.lineColor || Defaults.measureLineColor;
+    ctx.lineWidth = isPreview ? 1.2 : 1.3;
+    ctx.beginPath();
+    ctx.moveTo(apex.x, apex.y); ctx.lineTo(bs.x, bs.y);
+    ctx.moveTo(apex.x, apex.y); ctx.lineTo(cs.x, cs.y);
+    ctx.stroke();
+
+    // Radiusbogen zwischen den Schenkeln — gestrichelt grau.
+    ctx.strokeStyle = "rgba(120,120,120,0.9)";
+    ctx.lineWidth = 1;
+    ctx.setLineDash([5, 4]);
+    ctx.beginPath();
+    parts.arcPts.forEach((p, i) => {
+      const sp = cam.worldToScreen(p.x, p.y);
+      if (i === 0) ctx.moveTo(sp.x, sp.y); else ctx.lineTo(sp.x, sp.y);
+    });
+    ctx.stroke();
+    // Sehne zwischen den Schenkel-Endpunkten (Abstand B ↔ C).
+    ctx.beginPath();
+    ctx.moveTo(bs.x, bs.y); ctx.lineTo(cs.x, cs.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Gradzahl
+    const text = g.text || "";
+    if (text) {
+      const zoomFactor = cam.scale / this.referencePxPerM;
+      const fontPx = Math.max(1, (dim.textSizePx || Defaults.measureTextSizePx) * zoomFactor);
+      const label = cam.worldToScreen(g.mid.x, g.mid.y);
+      const fontParts: string[] = [];
+      if (dim.useFreeText) {
+        if (dim.freeTextItalic) fontParts.push("italic");
+        if (dim.freeTextBold) fontParts.push("bold");
+      }
+      ctx.font = `${fontParts.join(" ")} ${fontPx}px system-ui, Arial, sans-serif`.trim();
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      const m = ctx.measureText(text);
+      const th = (m.actualBoundingBoxAscent || fontPx * 0.7) + (m.actualBoundingBoxDescent || fontPx * 0.3);
+      if (dim.textBgEnabled) {
+        const padX = Math.max(4, fontPx * 0.45);
+        const padY = Math.max(2, fontPx * 0.22);
+        ctx.fillStyle = hexToRgba(dim.textBgColor || Defaults.measureTextBgColor, dim.textBgAlpha ?? Defaults.measureTextBgAlpha);
+        ctx.fillRect(label.x - m.width / 2 - padX, label.y - th / 2 - padY, m.width + padX * 2, th + padY * 2);
+      }
+      ctx.fillStyle = (dim.useFreeText && dim.freeTextColor)
+        ? dim.freeTextColor
+        : (dim.textColor || Defaults.measureTextColor);
+      ctx.fillText(text, label.x, label.y);
+    }
     ctx.restore();
   }
 
