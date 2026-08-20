@@ -485,7 +485,8 @@ export default function Board02Page() {
 
             {/* Titel-Labels */}
             {placed.map((p) => {
-              const lx = sx(p.bx1);
+              const dir = labelDir(p);
+              const lx = sx(dir === 1 ? p.bx1 : p.bx0);
               const ly = labelY(p);
               const open = openLabelId === p.item.id;
               const cat = catMap.get(p.item.categoryId ?? "");
@@ -493,8 +494,12 @@ export default function Board02Page() {
                 <div
                   key={`l-${p.item.id}`}
                   data-tl-interactive
-                  className="absolute"
-                  style={{ left: lx + 18, top: ly - 11, maxWidth: 260 }}
+                  className="absolute flex flex-col"
+                  style={
+                    dir === 1
+                      ? { left: lx + 18, top: ly - 11, maxWidth: 260, alignItems: "flex-start" }
+                      : { right: size.w - (lx - 18), top: ly - 11, maxWidth: 260, alignItems: "flex-end" }
+                  }
                   onPointerDown={(e) => e.stopPropagation()}
                 >
                   <button
