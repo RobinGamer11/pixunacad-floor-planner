@@ -12,6 +12,7 @@ import ProjectWorkspace from "./pages/ProjectWorkspace";
 import CadPage from "./pages/CadPage";
 import NotesPage from "./pages/NotesPage";
 import FinancePage from "./pages/FinancePage";
+import Board02Page from "./pages/Board02Page";
 import PasswordReset from "./pages/PasswordReset";
 import Impressum from "./pages/Impressum";
 import Datenschutz from "./pages/Datenschutz";
@@ -61,6 +62,7 @@ const App = () => (
               <Route path="/project/:projectId/cad" element={<CadPage />} />
               <Route path="/project/:projectId/cad/:sheetId" element={<CadPage />} />
               <Route path="/project/:projectId/notes" element={<NotesPage />} />
+              <Route path="/project/:projectId/board2" element={<Board02Page />} />
               <Route path="/project/:projectId/finance" element={<FinancePage />} />
               <Route path="/cad" element={<CadPage />} />
             </Route>
