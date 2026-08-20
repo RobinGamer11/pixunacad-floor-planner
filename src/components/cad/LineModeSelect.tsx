@@ -6,7 +6,7 @@ import type { LineDrawMode } from "@/cad/LineTool";
 
 const HAIRLINE = "hsl(var(--hairline))";
 
-const MODES: { value: LineDrawMode; label: string; Icon: React.ComponentType<{ size?: number }> }[] = [
+const MODES: { value: LineDrawMode; label: string; Icon: React.ComponentType<any> }[] = [
   { value: "polyline", label: "Linie", Icon: Minus },
   { value: "rectangle", label: "Rechteck", Icon: RectangleHorizontal },
   { value: "circle", label: "Kreis", Icon: Circle },
