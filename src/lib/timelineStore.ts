@@ -88,8 +88,11 @@ function loadState(projectId: string): TlState {
     const raw = localStorage.getItem(KEY(projectId));
     if (raw) {
       const p = JSON.parse(raw) as Partial<TlState>;
+      const cats = p.categories?.length ? [...p.categories] : [...DEFAULT_CATEGORIES];
+      // Schnellablage ist in jedem Projekt vorhanden.
+      if (!cats.some((c) => c.id === QUICK_CATEGORY_ID)) cats.unshift(DEFAULT_CATEGORIES[0]);
       return {
-        categories: p.categories?.length ? p.categories : [...DEFAULT_CATEGORIES],
+        categories: cats,
         priorities: normPriorities(p.priorities),
         statuses: p.statuses?.length ? p.statuses : [...DEFAULT_STATUSES],
         items: (p.items ?? []).map((i) => ({
