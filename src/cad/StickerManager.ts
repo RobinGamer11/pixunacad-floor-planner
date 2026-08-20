@@ -42,6 +42,7 @@ function snapDimension(d: Dimension): ClipboardItem {
     p1: v(d.p1.x, d.p1.y), p2: v(d.p2.x, d.p2.y),
     placementPoint: v(d.placementPoint.x, d.placementPoint.y),
     mode: d.mode, refDir: d.refDir ? v(d.refDir.x, d.refDir.y) : null,
+    p3: d.p3 ? v(d.p3.x, d.p3.y) : null, bulge: (d as any).bulge || 0,
     textColor: d.textColor, textSizePx: d.textSizePx, lineColor: d.lineColor,
     decimals: d.decimals, tickLengthM: d.tickLengthM, showExtensions: d.showExtensions,
     useFreeText: d.useFreeText, freeText: d.freeText,

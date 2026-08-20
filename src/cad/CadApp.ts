@@ -78,7 +78,7 @@ export interface TextEditorRefs {
 export interface MeasureSettings {
   orientation: "parallel" | "diagonal" | "arc";
   /** "free" = Maßkette ohne Fangpunkt-Zwang. */
-  pointCount: "two" | "multi" | "free";
+  pointCount: "two" | "multi" | "free" | "angle";
   /** Achsen-Richtung der Maßkette. "free" wird aus den ersten zwei Punkten abgeleitet. */
   direction: "horizontal" | "vertical" | "free";
   editMode: "parallel" | "endpoints";
@@ -646,6 +646,7 @@ export class CadApp {
         p1: { x: d.p1.x, y: d.p1.y }, p2: { x: d.p2.x, y: d.p2.y },
         placementPoint: { x: d.placementPoint.x, y: d.placementPoint.y },
         mode: d.mode, refDir: d.refDir ? { x: d.refDir.x, y: d.refDir.y } : null, bulge: (d as any).bulge || 0,
+        p3: d.p3 ? { x: d.p3.x, y: d.p3.y } : null,
         textColor: d.textColor, textSizePx: d.textSizePx, lineColor: d.lineColor,
         decimals: d.decimals, tickLengthM: d.tickLengthM, showExtensions: d.showExtensions,
         useFreeText: d.useFreeText, freeText: d.freeText,
@@ -824,6 +825,7 @@ export class CadApp {
         textGapPx: d.textGapPx, doorHeightText: d.doorHeightText,
         mirror: !!d.mirror,
         bulge: (d as any).bulge || 0,
+        p3: d.p3 || null,
         labelId: d.labelId,
       }, d.doorRefId || null);
       if (d._stickerEditOwnerId) dim._stickerEditOwnerId = d._stickerEditOwnerId;
@@ -1233,6 +1235,7 @@ export class CadApp {
             decimals: it.decimals, tickLengthM: it.tickLengthM, showExtensions: it.showExtensions,
             useFreeText: it.useFreeText, freeText: it.freeText,
             textBgEnabled: it.textBgEnabled, textBgColor: it.textBgColor, textBgAlpha: it.textBgAlpha,
+            bulge: (it as any).bulge || 0, p3: (it as any).p3 || null,
             labelId: it.labelId,
           });
         } else if (it.kind === "wall") {
@@ -1326,6 +1329,7 @@ export class CadApp {
         p2: { x: d.p2.x - newPos.x, y: d.p2.y - newPos.y },
         placementPoint: { x: d.placementPoint.x - newPos.x, y: d.placementPoint.y - newPos.y },
         mode: d.mode, refDir: d.refDir ? { x: d.refDir.x, y: d.refDir.y } : null, bulge: (d as any).bulge || 0,
+        p3: d.p3 ? { x: d.p3.x - newPos.x, y: d.p3.y - newPos.y } : null,
         textColor: d.textColor, textSizePx: d.textSizePx, lineColor: d.lineColor,
         decimals: d.decimals, tickLengthM: d.tickLengthM, showExtensions: d.showExtensions,
         useFreeText: d.useFreeText, freeText: d.freeText,
@@ -2812,7 +2816,7 @@ export class CadApp {
     });
 
     r.pointCount.addEventListener("change", () => {
-      this.measureSettings.pointCount = r.pointCount.value as "two" | "multi" | "free";
+      this.measureSettings.pointCount = r.pointCount.value as MeasureSettings["pointCount"];
     });
 
     r.direction.addEventListener("change", () => {
@@ -3019,7 +3023,7 @@ export class CadApp {
     if (!r) return;
     const sel = this.getEditDimension();
     const s = sel ? {
-      orientation: sel.mode, pointCount: this.measureSettings.pointCount, direction: this.measureSettings.direction,
+      orientation: (sel.mode === "angle" ? this.measureSettings.orientation : sel.mode), pointCount: (sel.mode === "angle" ? "angle" : this.measureSettings.pointCount), direction: this.measureSettings.direction,
       editMode: this.measureSettings.editMode,
       showExtensions: sel.showExtensions, useFreeText: sel.useFreeText, freeText: sel.freeText,
       textColor: sel.textColor, textSizePx: sel.textSizePx, decimals: sel.decimals,
@@ -3033,6 +3037,7 @@ export class CadApp {
 
     r.orientation.value = s.orientation;
     r.pointCount.value = s.pointCount;
+    r.pointCount.dispatchEvent(new Event("cad-value-sync"));
     r.direction.value = s.direction;
     r.editMode.value = s.editMode;
     r.extensionsToggle.checked = !!s.showExtensions;

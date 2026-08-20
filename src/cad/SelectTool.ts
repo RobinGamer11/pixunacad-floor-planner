@@ -124,6 +124,8 @@ export class SelectTool {
   // Parallel-drag state for dimensions
   dragDimId: string | null = null;
   dragDimOffsetAlongNormal = 0;
+  dragDimGrabDx = 0;
+  dragDimGrabDy = 0;
   private dimensionHubGuideOrigin: Vec2 | null = null;
 
   // Sticker-Instanz Drag-State (Translate)
@@ -3227,6 +3229,9 @@ export class SelectTool {
           // PlacementPoint exakt auf den Snap-Punkt legen – die
           // Maßlinien-Offset-Geometrie ergibt sich daraus automatisch.
           dim.placementPoint = v(snap.world.x, snap.world.y);
+        } else if (dim.mode === "angle") {
+          // Neigung: Beschriftung frei verschiebbar (keine Projektion auf eine Normale).
+          dim.placementPoint = v(mouseW.x - this.dragDimGrabDx, mouseW.y - this.dragDimGrabDy);
         } else {
           const mouseOffset = dot(sub(mouseW, dim.p1), g.n);
           const newOffset = mouseOffset - this.dragDimOffsetAlongNormal;

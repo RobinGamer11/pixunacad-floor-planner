@@ -124,16 +124,24 @@ export class MeasureTool {
 
 
   getOrientationMode(): "parallel" | "diagonal" | "arc" {
-    return this.app.measureSettings.orientation;
+    const o = this.app.measureSettings.orientation as any;
+    return (o === "angle" ? "parallel" : o);
+  }
+
+  /** Neigungsmodus: Scheitel + zwei Schenkel, Anzeige des Winkels in Grad. */
+  private _isAngleMode(): boolean {
+    return (this.app.measureSettings.pointCount as any) === "angle";
   }
 
   getPointCountMode(): "two" | "multi" | "free" {
-    return this.app.measureSettings.pointCount;
+    const pc = this.app.measureSettings.pointCount as any;
+    return (pc === "angle" ? "free" : pc);
   }
 
-  /** "Freies Maß": Punkte dürfen ohne Fangpunkt gesetzt werden. */
+  /** "Freies Maß": Punkte dürfen ohne Fangpunkt gesetzt werden.
+   *  Im Neigungsmodus ist das immer erlaubt (Fangpunkte dienen der Orientierung). */
   private _isFreePoints(): boolean {
-    return this.app.measureSettings.pointCount === "free";
+    return (this.app.measureSettings.pointCount as any) === "free" || this._isAngleMode();
   }
 
   /** Aktueller Zielpunkt: Snap wenn vorhanden, im freien Modus sonst die Mausposition. */
@@ -325,6 +333,8 @@ export class MeasureTool {
     this.app.renderer.setHoverHatchId(this.pointSnap?.hatch?.id || null);
     this.app.renderer.setHoverSegmentId(this.pointSnap?.segment?.id || null);
 
+    if (this._isAngleMode()) { this._updateAngle(input); return; }
+
     // Distanz-Hub: Länge/Winkel vom letzten gesetzten Punkt (bzw. ersten
     // Richtungspunkt im Frei-Modus) zur aktuellen Snap-Position.
     const hubAnchor: Vec2 | null =
@@ -431,6 +441,73 @@ export class MeasureTool {
 
 
 
+  /**
+   * Neigungsmodus: 1. Klick = Scheitel, 2. Klick = Ende des ersten Schenkels
+   * (erste Linie steht sofort), 3. Klick = Ende des zweiten Schenkels. Zwischen
+   * den Schenkeln erscheint der Winkel; der Radius wird gestrichelt grau gezeigt.
+   */
+  private _updateAngle(input: Input) {
+    const target = this.pointSnap ? v(this.pointSnap.world.x, this.pointSnap.world.y) : v(input.mouse.wx, input.mouse.wy);
+
+    // Hub: Länge/Winkel ab letztem gesetzten Punkt.
+    if (this.selectedPoints.length >= 1) {
+      const from = this.selectedPoints.length >= 2
+        ? this.selectedPoints[0].world
+        : this.selectedPoints[this.selectedPoints.length - 1].world;
+      const dx = target.x - from.x, dy = target.y - from.y;
+      this.app.hub.showAt(input.mouse.sx, input.mouse.sy);
+      this.app.hub.updateDisplay(Math.hypot(dx, dy), Math.atan2(-dy, dx) * 180 / Math.PI);
+    } else {
+      this.app.hub.hide();
+    }
+    this.app.measureFinishHubState = { visible: false, screenX: 0, screenY: 0 };
+
+    if (!input.clicked) return;
+    this.selectedPoints.push({ world: target, refDir: null, doorId: null });
+    if (this.selectedPoints.length < 3) return;
+
+    const [a, b, c] = this.selectedPoints.map((p) => p.world);
+    const style = { ...this.app.getCurrentMeasureStyle(), p3: v(c.x, c.y) };
+    const preview = getDimensionGeometry({
+      p1: a, p2: b, p3: c, placementPoint: null as any,
+      mode: "angle", refDir: null,
+    } as any);
+    this.app.scene.createDimension(a, b, v(preview.mid.x, preview.mid.y), "angle", null, style, null);
+    this.app.clearSelection();
+    this.app.refreshLabelUI();
+    this.selectedPoints = [];
+    this.state = "collect";
+  }
+
+  /** Live-Vorschau für den Neigungsmodus. */
+  private _drawAngleOverlay(ctx: CanvasRenderingContext2D, cam: any) {
+    if (this.selectedPoints.length === 0) return;
+    const target = this.pointSnap
+      ? v(this.pointSnap.world.x, this.pointSnap.world.y)
+      : v(this.app.input.mouse.wx, this.app.input.mouse.wy);
+    const a = this.selectedPoints[0].world;
+    if (this.selectedPoints.length === 1) {
+      const s0 = cam.worldToScreen(a.x, a.y);
+      const s1 = cam.worldToScreen(target.x, target.y);
+      ctx.save();
+      ctx.strokeStyle = "rgba(255,180,0,0.95)";
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(s0.x, s0.y); ctx.lineTo(s1.x, s1.y);
+      ctx.stroke();
+      ctx.restore();
+      return;
+    }
+    const b = this.selectedPoints[1].world;
+    const style = this.app.getCurrentMeasureStyle();
+    const spec = { p1: a, p2: b, p3: target, placementPoint: null, mode: "angle", refDir: null };
+    const g = getDimensionGeometry(spec as any);
+    (this.app.renderer as any)._drawAngleDimension(ctx, cam, {
+      ...spec, ...style, placementPoint: g.mid,
+      decimals: style.decimals ?? Defaults.measureDecimals,
+    }, true);
+  }
+
   onTabRequest(): boolean { return false; }
 
   private _drawOverlay(ctx: CanvasRenderingContext2D, cam: any) {
@@ -528,6 +605,8 @@ export class MeasureTool {
         ctx.restore();
       }
     }
+
+    if (this._isAngleMode()) { this._drawAngleOverlay(ctx, cam); return; }
 
     if (this.state !== "place") return;
 

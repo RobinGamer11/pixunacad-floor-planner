@@ -26,8 +26,10 @@ export interface DimensionLike {
   p1: Vec2;
   p2: Vec2;
   placementPoint: Vec2;
-  mode: "parallel" | "diagonal" | "arc";
+  mode: "parallel" | "diagonal" | "arc" | "angle";
   refDir: Vec2 | null;
+  /** Neigungsmaß: Endpunkt des zweiten Schenkels (p1 = Scheitel, p2 = erster Schenkel). */
+  p3?: Vec2 | null;
   /** Wölbung der gemessenen Kante (Modus "arc"). */
   bulge?: number;
   decimals?: number;
@@ -59,7 +61,60 @@ export function getDimensionDisplayText(dim: DimensionLike, distanceValue: numbe
   return showUnit ? `${numText} ${unit}` : numText;
 }
 
+/**
+ * Neigungsmaß ("angle"): p1 = Scheitel, p2 = Ende des ersten Schenkels,
+ * p3 = Ende des zweiten Schenkels. Liefert Radius, Bogenpunkte und den
+ * Standard-Ankerpunkt für die Gradzahl (Winkelhalbierende).
+ */
+export function getAngleDimensionParts(dim: DimensionLike) {
+  const apex = dim.p1;
+  const b = dim.p2;
+  const c = dim.p3 ?? dim.p2;
+  const v1 = sub(b, apex);
+  const v2 = sub(c, apex);
+  const l1 = len(v1) || 1e-9;
+  const l2 = len(v2) || 1e-9;
+  const d1 = len(v1) > 1e-9 ? norm(v1) : v(1, 0);
+  const d2 = len(v2) > 1e-9 ? norm(v2) : v(0, 1);
+  const a1 = Math.atan2(d1.y, d1.x);
+  const a2 = Math.atan2(d2.y, d2.x);
+  let delta = a2 - a1;
+  while (delta > Math.PI) delta -= Math.PI * 2;
+  while (delta < -Math.PI) delta += Math.PI * 2;
+  const angleDeg = Math.abs(delta) * 180 / Math.PI;
+  const radius = Math.max(1e-4, Math.min(l1, l2) * 0.45);
+  const steps = 40;
+  const arcPts: Vec2[] = [];
+  for (let i = 0; i <= steps; i++) {
+    const a = a1 + delta * (i / steps);
+    arcPts.push(v(apex.x + Math.cos(a) * radius, apex.y + Math.sin(a) * radius));
+  }
+  const bisect = a1 + delta / 2;
+  const defaultLabel = v(
+    apex.x + Math.cos(bisect) * radius * 1.35,
+    apex.y + Math.sin(bisect) * radius * 1.35,
+  );
+  return { apex, b, c, d1, d2, radius, arcPts, angleDeg, defaultLabel };
+}
+
 export function getDimensionGeometry(dim: DimensionLike): DimensionGeometry {
+  if (dim.mode === "angle") {
+    const a = getAngleDimensionParts(dim);
+    const decimals = Math.max(0, Math.min(6, dim.decimals ?? 1));
+    const text = dim.useFreeText
+      ? (dim.freeText || "")
+      : `${a.angleDeg.toFixed(decimals)}°`;
+    const label = dim.placementPoint ?? a.defaultLabel;
+    const dir = a.d1;
+    return {
+      dir, n: perpLeft(dir), offset: 0,
+      d1: a.arcPts[0], d2: a.arcPts[a.arcPts.length - 1],
+      mid: v(label.x, label.y),
+      ext1a: v(a.apex.x, a.apex.y), ext1b: v(a.b.x, a.b.y),
+      ext2a: v(a.apex.x, a.apex.y), ext2b: v(a.c.x, a.c.y),
+      text, measureValue: a.angleDeg, arcPts: a.arcPts,
+    };
+  }
   if (dim.mode === "arc") {
     const chordDir = (() => {
       const d = sub(dim.p2, dim.p1);
