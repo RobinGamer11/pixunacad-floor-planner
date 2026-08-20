@@ -621,7 +621,7 @@ export default function Board02Page() {
                 {listItems.map((i) => {
                   const prio = prioMap.get(i.priorityId ?? "");
                   const cat = catMap.get(i.categoryId ?? "");
-                  const st = statusMap.get(i.statusId ?? "");
+                  const st = statusMap.get(effectiveStatusId(i, now));
                   const doneRow = itemAchieved(i, now);
                   return (
                     <button
