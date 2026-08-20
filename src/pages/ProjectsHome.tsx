@@ -14,6 +14,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   MoreHorizontal,
+  Copy,
   Check,
   X,
   Network,
@@ -738,6 +739,7 @@ export default function ProjectsHome() {
                               onSelect={() => { setHub(null); setMode("projects"); setShowAllTasks(false); setSelectedId(p.id); }}
                               onOpen={() => navigate(`/project/${p.id}`)}
                               onSettings={() => { setHub(null); setMode("projects"); setShowAllTasks(false); setSelectedId(p.id); setSettingsOpen(true); }}
+                              onDuplicate={() => { const nid = projectStore.duplicateProject(p.id); if (nid) setSelectedId(nid); }}
                               onDelete={() => deleteProjectWithConfirm(p)}
                               onDragStart={() => setDragProjectId(p.id)}
                               onDragEnd={resetProjectDrag}
@@ -802,6 +804,7 @@ export default function ProjectsHome() {
                     onSelect={() => { setHub(null); setMode("projects"); setShowAllTasks(false); setSelectedId(p.id); }}
                     onOpen={() => navigate(`/project/${p.id}`)}
                     onSettings={() => { setHub(null); setMode("projects"); setShowAllTasks(false); setSelectedId(p.id); setSettingsOpen(true); }}
+                    onDuplicate={() => { const nid = projectStore.duplicateProject(p.id); if (nid) setSelectedId(nid); }}
                     onDelete={() => deleteProjectWithConfirm(p)}
                     onDragStart={() => setDragProjectId(p.id)}
                     onDragEnd={resetProjectDrag}
@@ -1028,6 +1031,16 @@ export default function ProjectsHome() {
                         </button>
                         <button
                           onClick={() => {
+                            const nid = projectStore.duplicateProject(selected.id);
+                            setTitleMenuOpen(false);
+                            if (nid) setSelectedId(nid);
+                          }}
+                          className="w-full px-3 py-1.5 flex items-center gap-2 hover:bg-muted text-left"
+                        >
+                          <Copy size={14} /> Duplizieren
+                        </button>
+                        <button
+                          onClick={() => {
                             const label = selected.isTemplate ? "Vorlage" : "Projektmappe";
                             const msg = `${label} „${selected.name}" wirklich löschen?\n\nAlle Inhalte werden endgültig entfernt:\n• Seiten & Zeichenblätter\n• CAD-Elemente & Bemaßungen\n• Board-Themen, Aufgaben & Notizen\n• Dokumente\n\nDieser Vorgang kann nicht rückgängig gemacht werden.`;
                             if (confirm(msg)) {
@@ -1165,6 +1178,7 @@ function ProjectCard({
   onSelect,
   onOpen,
   onSettings,
+  onDuplicate,
   onDelete,
   onDragStart,
   onDragEnd,
@@ -1177,6 +1191,7 @@ function ProjectCard({
   onSelect: () => void;
   onOpen: () => void;
   onSettings: () => void;
+  onDuplicate: () => void;
   onDelete: () => void;
   onDragStart: () => void;
   onDragEnd: () => void;
@@ -1264,6 +1279,12 @@ function ProjectCard({
               className="w-full px-3 py-1.5 flex items-center gap-2 hover:bg-muted text-left"
             >
               <Settings size={14} /> Einstellungen
+            </button>
+            <button
+              onClick={() => { setMenuOpen(false); onDuplicate(); }}
+              className="w-full px-3 py-1.5 flex items-center gap-2 hover:bg-muted text-left"
+            >
+              <Copy size={14} /> Duplizieren
             </button>
             <button
               onClick={() => { setMenuOpen(false); onDelete(); }}
