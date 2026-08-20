@@ -4686,8 +4686,8 @@ function ElementView({
                 className="absolute pointer-events-none"
                 style={{
                   left: insetLeft, right: insetRight, top: insetTop, bottom: insetBottom,
-                  border: "1.5px dashed hsl(var(--accent-gold))",
-                  background: "hsl(var(--accent-gold) / 0.06)",
+                  border: isCadView ? `1.5px dashed ${hubBlue}` : "1.5px dashed hsl(var(--accent-gold))",
+                  background: isCadView ? "rgba(77,163,255,0.08)" : "hsl(var(--accent-gold) / 0.06)",
                   zIndex: 7,
                 }}
               />
