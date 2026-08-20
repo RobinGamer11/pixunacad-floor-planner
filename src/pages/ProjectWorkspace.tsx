@@ -5893,8 +5893,12 @@ function ToolsTab({
         />
       )}
       {settingsTool === "line" && cadEngine && (
-        <RasterModeToggle app={cadEngine} projectId={projectId} />
+        <>
+          <LineShapeModeSelect app={cadEngine} />
+          <RasterModeToggle app={cadEngine} projectId={projectId} />
+        </>
       )}
+
       {settingsTool === "line" && (
         <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
           <LineSettings
