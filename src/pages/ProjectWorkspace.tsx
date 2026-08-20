@@ -3781,6 +3781,34 @@ function ElementView({
     if (nearX !== "m" && nearY !== "m") key = `corner-${nearY}${nearX}`;
     else if (nearX === "m" && nearY !== "m") key = nearY === "t" ? "edge-top" : "edge-bottom";
     else if (nearY === "m" && nearX !== "m") key = nearX === "l" ? "edge-left" : "edge-right";
+    // ── Shift-Mehrfachauswahl: Kein Drag. Stattdessen rastet der Anker auf den
+    // NÄCHSTGELEGENEN Fangpunkt (Ecke oder Kantenmitte) ein, damit sofort
+    // „Verschieben"/„Drehen" von diesem Punkt aus möglich ist. Beim Anklicken
+    // weiterer Objekte bleibt dieser Anker am zuerst gewählten Objekt erhalten.
+    if (e.shiftKey) {
+      const cands: Array<{ fx: number; fy: number; key: string }> = [
+        { fx: 0, fy: 0, key: "corner-tl" },
+        { fx: 1, fy: 0, key: "corner-tr" },
+        { fx: 0, fy: 1, key: "corner-bl" },
+        { fx: 1, fy: 1, key: "corner-br" },
+        { fx: 0.5, fy: 0, key: "edge-mid-top" },
+        { fx: 0.5, fy: 1, key: "edge-mid-bottom" },
+        { fx: 0, fy: 0.5, key: "edge-mid-left" },
+        { fx: 1, fy: 0.5, key: "edge-mid-right" },
+      ];
+      let best = cands[0];
+      let bestD = Infinity;
+      for (const c of cands) {
+        const dx = (c.fx - fx) * Math.max(1, rect.width);
+        const dy = (c.fy - fy) * Math.max(1, rect.height);
+        const d = dx * dx + dy * dy;
+        if (d < bestD) { bestD = d; best = c; }
+      }
+      setAnchor(best);
+      setActiveEdge(null);
+      onSelect?.({ shift: true });
+      return;
+    }
     setAnchor({ fx, fy, key });
     if ((cadHubUx && selected) || hubMode || edgeTrim) {
       onSelect?.({ shift: e.shiftKey });
@@ -3792,6 +3820,7 @@ function ElementView({
       return;
     }
     startDrag(e);
+
   };
 
 
