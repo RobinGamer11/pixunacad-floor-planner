@@ -2327,10 +2327,28 @@ export class SelectTool {
           if (d < bd) { bd = d; nearest = q; }
         }
       }
+      if ((dim as any).mode === "angle") {
+        // Neigungsmaß: zusätzlich Scheitel/Schenkel-Endpunkte und die beiden
+        // Schenkel selbst treffbar machen, damit das Objekt nachträglich
+        // ausgewählt (löschen, kopieren) werden kann.
+        const apex = dim.p1, b = dim.p2, c = (dim as any).p3 ?? dim.p2;
+        for (const p of [apex, b, c]) {
+          if (distPxToWorldPoint(p) <= Defaults.hitPx) {
+            return { type: SelectionType.DIMENSION, dimensionId: dim.id } as any;
+          }
+        }
+        for (const leg of [[apex, b], [apex, c]] as const) {
+          const q = projectPointToSegment(mouseW, leg[0], leg[1]).q;
+          if (distPxToWorldPoint(q) <= Defaults.hitPx) {
+            return { type: SelectionType.DIMENSION, dimensionId: dim.id } as any;
+          }
+        }
+      }
       const px = distPxToWorldPoint(nearest);
       if (px <= Defaults.hitPx) {
         return { type: SelectionType.DIMENSION, dimensionId: dim.id } as any;
       }
+
     }
 
     // Hatch polygon hit (pointInPolygon)
