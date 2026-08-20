@@ -103,6 +103,7 @@ import { TableElementView, TableModifyContext, TableFormulaPickContext, type For
 import { TableToolSettings } from "@/components/page/TableToolSettings";
 
 import { CadViewportView } from "@/components/page/CadViewportView";
+import { renderSceneRegionToCanvas } from "@/cad/SceneRegionRenderer";
 import { buildEraseMaskCss } from "@/lib/eraseMask";
 
 import { importFile, type ImportedPage } from "@/cad/documentImport";
