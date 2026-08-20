@@ -15,6 +15,7 @@ import {
 // Konstanten / Helfer
 // ------------------------------------------------------------------
 const ORANGE = "#e2703a";
+const RED = "#ef4444";
 const GREY = "#a19a92";
 const DAY = 86400000;
 /** Helle Oberfläche: alles außer dem Zeitstrahl selbst. */
