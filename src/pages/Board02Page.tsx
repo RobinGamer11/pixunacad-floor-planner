@@ -833,8 +833,12 @@ function ManagedSelect({
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
-      if (manage) return; // bei aktivem Zahnrad bleibt das Drop-down offen
-      if (!boxRef.current?.contains(e.target as Node)) setOpen(false);
+      if (boxRef.current?.contains(e.target as Node)) return;
+      // Klick außerhalb: schließen und Änderungen verwerfen
+      setDraft({});
+      setNewLabel("");
+      setManage(false);
+      setOpen(false);
     };
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
