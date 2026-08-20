@@ -846,7 +846,55 @@ export class LineTool {
     ctx.restore();
   }
 
+  /** Vorschau für Rechteck-/Kreis-Modus. */
+  private _drawShapePreview(ctx: CanvasRenderingContext2D, cam: any) {
+    const input = this.app.input;
+    const style = this.app.getCurrentLineStyle();
+    const lw = (this.app.renderer as any)._segStrokePx?.(style.thicknessM) ?? Math.max(0.5, style.thicknessM * cam.scale);
+    let pts: Vec2[] | null = null;
+    let closed = true;
+
+    if (this.drawMode === "rectangle") {
+      if (this.rectState === "firstSide" && this.rectPointA) {
+        pts = [this.rectPointA, this._rectFirstSidePoint(input)];
+        closed = false;
+      } else if (this.rectState === "secondSide") {
+        pts = this._getRectPreviewPoints(input);
+      }
+    } else if (this.drawMode === "circle" && this.circleCenter) {
+      if (this.circleState === "radius") {
+        const p = this._circlePreviewRadiusWorld(input);
+        pts = [this.circleCenter, p];
+        closed = false;
+      } else if (this.circleState === "arc") {
+        const end = this._circlePreviewArcEndAngle(input);
+        pts = buildCircleOrSectorPoints(this.circleCenter, this.circleRadiusM, this.circleStartAngleDeg, end, 96);
+      }
+    }
+    if (!pts || pts.length < 2) return;
+
+    ctx.save();
+    ctx.strokeStyle = style.color;
+    ctx.lineWidth = lw;
+    ctx.beginPath();
+    pts.forEach((p, i) => {
+      const s = cam.worldToScreen(p.x, p.y);
+      if (i === 0) ctx.moveTo(s.x, s.y); else ctx.lineTo(s.x, s.y);
+    });
+    if (closed) ctx.closePath();
+    ctx.stroke();
+    ctx.fillStyle = "rgba(77,163,255,0.85)";
+    for (const p of pts) {
+      const s = cam.worldToScreen(p.x, p.y);
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
   _drawOverlay(ctx: CanvasRenderingContext2D, cam: any) {
+
     this._drawGuideDefinitions(ctx, cam);
 
     if (this.snap) {
