@@ -37,7 +37,11 @@ export interface TlState {
   items: TlItem[];
 }
 
+/** Standardkategorie für schnell angelegte Aufgaben/Notizen. */
+export const QUICK_CATEGORY_ID = "quick";
+
 const DEFAULT_CATEGORIES: TlCategory[] = [
+  { id: QUICK_CATEGORY_ID, label: "Schnellablage", color: "#6f8fd6" },
   { id: "plan", label: "Planung", color: "#e2703a" },
   { id: "bau", label: "Bauphase", color: "#c9a227" },
   { id: "abn", label: "Abnahme", color: "#4da3ff" },
