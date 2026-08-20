@@ -51,7 +51,7 @@ export const HatchPatternControls: React.FC<Props> = ({ app }) => {
 
   const sync = () => {
     if (!app) return;
-    const sel: any = app.getSelectedHatch?.();
+    const sel: any = ((app as any).getEditHatch?.() ?? app.getSelectedHatch?.());
     const src = sel || {
       patternEnabled: app.defaultHatchPatternEnabled,
       patternId: app.defaultHatchPatternId,
@@ -79,7 +79,7 @@ export const HatchPatternControls: React.FC<Props> = ({ app }) => {
 
   const apply = (mutate: (h: any) => void, def: () => void) => {
     if (!app) return;
-    const h = app.getSelectedHatch?.();
+    const h = ((app as any).getEditHatch?.() ?? app.getSelectedHatch?.());
     if (h) mutate(h); else def();
     app.renderer?.render?.();
     app.requestRender?.();

@@ -113,7 +113,7 @@ export const HatchSettingsPanel: React.FC<Props> = ({ app, projectId, pxPerMm = 
     if (!app) return;
     const hatchTool: any = (app as any).hatchTool;
     if (hatchTool) setMode(hatchTool.drawMode);
-    const sel: any = (app as any).getSelectedHatch?.();
+    const sel: any = ((app as any).getEditHatch?.() ?? (app as any).getSelectedHatch?.());
     if (sel) {
       setFillColor(sel.fillColor || (app as any).defaultHatchFillColor);
       setStrokeColor(sel.strokeColor || (app as any).defaultHatchStrokeColor);
