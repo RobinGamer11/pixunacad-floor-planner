@@ -253,6 +253,13 @@ export function MappeHelpOverlay({
             <HelpItem icon={<ShiftClickGlyph />} shortcut="L-Klick + Shift" description="Gerade zeichnen" />
             <HelpItem icon={<MouseGlyph highlight="left" />} shortcut="Doppelklick auf Kante" description="Neuer Fangpunkt" />
             <HelpItem icon={<MouseGlyph highlight="left" />} shortcut="Klick auf Kante + Symbol" description="Kante rein-/rausziehen" />
+            <div className="flex min-w-[190px] flex-col items-center justify-end px-1.5 py-1 text-center">
+              <div className="mb-1 flex h-8 items-center justify-center"><MouseGlyph highlight="left" /></div>
+              <div className="whitespace-nowrap text-[10px] font-semibold leading-3.5">Schraffur ausschneiden</div>
+              <div className="whitespace-nowrap text-[8px] leading-3 opacity-75">01. L-Klick bestehende Schraffur</div>
+              <div className="whitespace-nowrap text-[8px] leading-3 opacity-75">02. Neue Schraffur in bestehende Schraffur zeichnen</div>
+            </div>
+
             <div className="flex min-w-[120px] flex-col items-center justify-end px-1.5 py-1 text-center">
               <div className="mb-1 flex h-8 items-center justify-center"><ObjectKindGlyph /></div>
               <div className="whitespace-nowrap text-[10px] font-semibold leading-3.5">Objektarten</div>
