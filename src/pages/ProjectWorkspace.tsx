@@ -4233,7 +4233,9 @@ function ElementView({
       window.removeEventListener("click", onClick, true);
       window.removeEventListener("contextmenu", onContext, true);
       window.removeEventListener("keydown", onKey, true);
+      if (raf) { cancelAnimationFrame(raf); raf = 0; }
       hubDownClientRef.current = null;
+
       unregisterHubAbort();
       if (actionCommitRef.current === commit) actionCommitRef.current = null;
       if (actionCancelRef.current === cancel) actionCancelRef.current = null;
