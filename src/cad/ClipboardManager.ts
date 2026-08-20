@@ -233,6 +233,8 @@ export function commitClipboardAt(app: CadApp, clip: Clipboard, mouseW: Vec2): {
           decimals: it.decimals, tickLengthM: it.tickLengthM, showExtensions: it.showExtensions,
           useFreeText: it.useFreeText, freeText: it.freeText,
           textBgEnabled: it.textBgEnabled, textBgColor: it.textBgColor, textBgAlpha: it.textBgAlpha,
+          bulge: (it as any).bulge || 0,
+          p3: it.p3 ? { x: it.p3.x + dx, y: it.p3.y + dy } : null,
           labelId: it.labelId });
       if (o) created.push({ kind: "dimension", id: o.id });
     } else if (it.kind === "wall") {
