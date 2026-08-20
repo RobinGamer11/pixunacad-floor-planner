@@ -211,6 +211,18 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const measureOrientationRef = useRef<HTMLSelectElement>(null);
   const measurePointCountRef = useRef<HTMLSelectElement>(null);
   const [measureIsAngle, setMeasureIsAngle] = useState(false);
+  useEffect(() => {
+    const el = measurePointCountRef.current;
+    if (!el) return;
+    const upd = () => setMeasureIsAngle(el.value === "angle");
+    upd();
+    el.addEventListener("change", upd);
+    el.addEventListener("cad-value-sync", upd);
+    return () => {
+      el.removeEventListener("change", upd);
+      el.removeEventListener("cad-value-sync", upd);
+    };
+  }, []);
   const measureDirectionRef = useRef<HTMLSelectElement>(null);
   const measureEditModeRef = useRef<HTMLSelectElement>(null);
 
