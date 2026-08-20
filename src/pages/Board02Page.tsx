@@ -227,6 +227,17 @@ export default function Board02Page() {
   /** Basis-X → Bildschirm-X (Zoom/Pan). */
   const sx = useCallback((bx: number) => padX + (bx - padX) * view.k + view.tx, [view]);
 
+  /** Halbe Höhe der Bubble-Wolke (Bildschirm) – Beschriftungen liegen darüber/darunter. */
+  const clusterHalf = useMemo(() => {
+    let m = 0;
+    placed.forEach((p) => p.circles.forEach((c) => { m = Math.max(m, Math.abs(c.dy) + c.r); }));
+    return m * view.k;
+  }, [placed, view.k]);
+  const labelY = useCallback(
+    (p: Placed) => clamp(cy + p.side * (clusterHalf + 26 + p.lane * 26), 20, size.h - 60),
+    [clusterHalf, cy, size.h],
+  );
+
   // ---- Farbe eines Kreises ------------------------------------------
   const circleFill = useCallback((item: TlItem, t: number) => {
     if (colorMode === "category") return catMap.get(item.categoryId ?? "")?.color ?? GREY;
