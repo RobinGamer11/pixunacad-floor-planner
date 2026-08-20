@@ -236,13 +236,23 @@ export default function BoardPage() {
       const rMin = Math.max(3, rMax * 0.35);
       const len = ax1 - ax0;
       const circles: Circle[] = [];
-      if (len < rMax * 1.2) {
+      // Ein Kreis pro Tag zwischen Start- und Zieldatum.
+      const dayCount = item.endDate
+        ? clamp(
+            Math.round(
+              (new Date(`${item.endDate}T00:00:00`).getTime() -
+                new Date(`${item.startDate}T00:00:00`).getTime()) / DAY,
+            ) + 1,
+            1,
+            400,
+          )
+        : 1;
+      if (dayCount <= 1) {
         const pos = placeCircle(ax0, rMax, seedOf(item.id));
         circles.push({ bx: pos.x, dy: pos.y, r: rMax, t: s });
       } else {
-        const n = clamp(Math.round(len / (rMax * 1.35)), 3, 40);
-        for (let i = 0; i < n; i++) {
-          const f = i / (n - 1);
+        for (let i = 0; i < dayCount; i++) {
+          const f = dayCount === 1 ? 1 : i / (dayCount - 1);
           const r = rMin + (rMax - rMin) * f;
           const pos = placeCircle(ax0 + len * f, r, seedOf(`${item.id}:${i}`));
           circles.push({ bx: pos.x, dy: pos.y, r, t: s + (e - s) * f });
