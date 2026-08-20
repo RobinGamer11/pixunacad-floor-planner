@@ -4705,7 +4705,7 @@ function ElementView({
           {!tabletCommitOnly && (["tl", "tr", "bl", "br"] as const).map((corner) => {
             // Bei CAD-Blatt: Ecken sind Snap-Marker + Anker-Setzer (kein Trim/Resize).
             // Bei anderen Elementen (image/pdf): Ecken skalieren wie gehabt.
-            const cornerDraggable = !isCadViewKind && !!onCornerDrag;
+            const cornerDraggable = !isCadView && !!onCornerDrag;
             const startCornerDrag = (e: React.PointerEvent) => {
               if (!cornerDraggable || !onCornerDrag) return;
               e.stopPropagation();
