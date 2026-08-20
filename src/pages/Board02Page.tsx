@@ -409,7 +409,7 @@ export default function Board02Page() {
           <div
             ref={wrapRef}
             className="relative mx-4 mt-4 h-[min(62vh,640px)] min-h-[420px] rounded-xl overflow-hidden select-none cursor-grab active:cursor-grabbing"
-            style={{ background: CANVAS, border: `1px solid ${PANEL_LINE}`, touchAction: "none" }}
+            style={{ background: CANVAS, border: `1px solid ${CANVAS_LINE}`, touchAction: "none" }}
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
@@ -514,8 +514,8 @@ export default function Board02Page() {
                     onClick={() => { setOpenLabelId(open ? null : p.item.id); setSelectedId(p.item.id); }}
                     className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium whitespace-nowrap"
                     style={{
-                      background: open ? "#241f1b" : "transparent",
-                      color: p.item.id === selectedId ? "#fff" : "#cdc4bb",
+                      background: open ? SUBTLE : "transparent",
+                      color: p.item.id === selectedId ? "#fff" : INK,
                       border: `1px solid ${open ? "#3b332d" : "transparent"}`,
                     }}
                   >
@@ -524,7 +524,7 @@ export default function Board02Page() {
                   </button>
                   {open && (
                     <div className="mt-1 rounded-lg p-2.5 text-[11px] shadow-lg"
-                         style={{ background: PANEL, border: `1px solid ${PANEL_LINE}`, color: "#cdc4bb", width: 260 }}>
+                         style={{ background: CANVAS_PANEL, border: `1px solid ${CANVAS_LINE}`, color: "#cdc4bb", width: 260 }}>
                       <div className="flex flex-wrap gap-1 mb-1.5">
                         <Chip>{kindLabel(p.item.kind)}</Chip>
                         {cat && <Chip color={cat.color}>{cat.label}</Chip>}
@@ -554,7 +554,7 @@ export default function Board02Page() {
 
           {/* Projektfortschritt */}
           <div className="mx-4 mt-4 rounded-xl p-4" style={{ background: PANEL, border: `1px solid ${PANEL_LINE}` }}>
-            <div className="flex items-center justify-between text-xs mb-1.5" style={{ color: "#cdc4bb" }}>
+            <div className="flex items-center justify-between text-xs mb-1.5" style={{ color: INK }}>
               <span className="font-medium">Projektstand</span>
               <span className="tabular-nums opacity-70">{progress}%</span>
             </div>
@@ -564,11 +564,11 @@ export default function Board02Page() {
           {/* Kategorien + Liste */}
           <div className="mx-4 my-4 rounded-xl p-4" style={{ background: PANEL, border: `1px solid ${PANEL_LINE}` }}>
             <div className="flex items-center gap-2 mb-3">
-              <div className="text-xs font-medium" style={{ color: "#cdc4bb" }}>Kategorien im Projekt</div>
+              <div className="text-xs font-medium" style={{ color: INK }}>Kategorien im Projekt</div>
               {activeCat && (
                 <button onClick={() => setActiveCat(null)}
                         className="ml-auto flex items-center gap-1 rounded-md px-2 py-1 text-[11px]"
-                        style={{ background: "#241f1b", border: `1px solid ${PANEL_LINE}`, color: "#cdc4bb" }}>
+                        style={{ background: SUBTLE, border: `1px solid ${PANEL_LINE}`, color: INK }}>
                   <ChevronLeft size={12} /> Zurück
                 </button>
               )}
@@ -587,8 +587,8 @@ export default function Board02Page() {
                     onClick={() => setActiveCat(activeCat === s.cat.id ? null : s.cat.id)}
                     className="flex items-center gap-2 text-[11px] rounded-md px-2 py-1"
                     style={{
-                      background: activeCat === s.cat.id ? "#241f1b" : "transparent",
-                      color: "#cdc4bb",
+                      background: activeCat === s.cat.id ? SUBTLE : "transparent",
+                      color: INK,
                     }}
                   >
                     <span className="h-2.5 w-2.5 rounded-full" style={{ background: s.cat.color }} />
@@ -598,13 +598,13 @@ export default function Board02Page() {
                     </span>
                   </button>
                 ))}
-                {!catStats.length && <span className="text-[11px]" style={{ color: "#6f665e" }}>Keine Einträge.</span>}
+                {!catStats.length && <span className="text-[11px]" style={{ color: INK_SOFT }}>Keine Einträge.</span>}
               </div>
             </div>
 
             {activeCat && (
               <div className="mt-4 max-w-xl">
-                <div className="flex items-center justify-between text-xs mb-1.5" style={{ color: "#cdc4bb" }}>
+                <div className="flex items-center justify-between text-xs mb-1.5" style={{ color: INK }}>
                   <span className="font-medium">Stand „{catMap.get(activeCat)?.label}“</span>
                   <span className="tabular-nums opacity-70">
                     {catStats.find((s) => s.cat.id === activeCat)?.percent ?? 0}%
@@ -620,25 +620,25 @@ export default function Board02Page() {
             {/* Auflistung */}
             <div className="mt-5">
               <div className="flex flex-wrap items-center gap-2 mb-2">
-                <div className="text-xs font-medium" style={{ color: "#cdc4bb" }}>
+                <div className="text-xs font-medium" style={{ color: INK }}>
                   {activeCat ? `Punkte in „${catMap.get(activeCat)?.label}“` : "Alle Punkte"}
                 </div>
                 <div className="flex-1" />
                 <div className="relative">
-                  <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2" style={{ color: "#6f665e" }} />
+                  <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2" style={{ color: INK_SOFT }} />
                   <input
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     placeholder="Suchen …"
                     className="h-8 w-44 rounded-md pl-7 pr-2 text-[11px] outline-none"
-                    style={{ background: "#241f1b", border: `1px solid ${PANEL_LINE}`, color: "#e6ded6" }}
+                    style={{ background: SUBTLE, border: `1px solid ${PANEL_LINE}`, color: INK }}
                   />
                 </div>
                 <select
                   value={prioFilter}
                   onChange={(e) => setPrioFilter(e.target.value)}
                   className="h-8 rounded-md px-2 text-[11px] outline-none"
-                  style={{ background: "#241f1b", border: `1px solid ${PANEL_LINE}`, color: "#e6ded6" }}
+                  style={{ background: SUBTLE, border: `1px solid ${PANEL_LINE}`, color: INK }}
                 >
                   <option value="">Alle Prioritäten</option>
                   {state.priorities.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
@@ -647,7 +647,7 @@ export default function Board02Page() {
 
               <div className="rounded-lg overflow-hidden" style={{ border: `1px solid ${PANEL_LINE}` }}>
                 <div className="grid px-3 py-2 text-[10px] uppercase tracking-wide"
-                     style={{ gridTemplateColumns: "90px 1fr 110px 120px 170px 130px", background: "#241f1b", color: "#8b837b" }}>
+                     style={{ gridTemplateColumns: "90px 1fr 110px 120px 170px 130px", background: SUBTLE, color: INK_SOFT }}>
                   <span>Priorität</span><span>Name</span><span>Status</span><span>Kategorie</span><span>Zeitraum</span><span>Verantwortlich</span>
                 </div>
                 {listItems.map((i) => {
@@ -663,8 +663,8 @@ export default function Board02Page() {
                       style={{
                         gridTemplateColumns: "90px 1fr 110px 120px 170px 130px",
                         borderColor: PANEL_LINE,
-                        background: i.id === selectedId ? "#2a231e" : "transparent",
-                        color: doneRow ? "#8b837b" : "#cdc4bb",
+                        background: i.id === selectedId ? "#fbe9df" : "transparent",
+                        color: doneRow ? INK_SOFT : INK,
                       }}
                     >
                       <span className="tabular-nums">{prio ? `${prio.label} · ${prio.percent}%` : "—"}</span>
@@ -672,7 +672,7 @@ export default function Board02Page() {
                         <span style={{ color: cat?.color ?? ORANGE }}>{kindIcon(i.kind, 11)}</span>
                         <span className="truncate">{i.title}</span>
                       </span>
-                      <span style={{ color: st?.color ?? "#8b837b" }}>{st?.label ?? "—"}</span>
+                      <span style={{ color: st?.color ?? INK_SOFT }}>{st?.label ?? "—"}</span>
                       <span>{cat?.label ?? "—"}</span>
                       <span className="opacity-80">
                         {fmtDate(i.startDate)}{i.endDate ? ` – ${fmtDate(i.endDate)}` : ""}
@@ -682,7 +682,7 @@ export default function Board02Page() {
                   );
                 })}
                 {!listItems.length && (
-                  <div className="px-3 py-4 text-[11px]" style={{ color: "#6f665e" }}>Keine Treffer.</div>
+                  <div className="px-3 py-4 text-[11px]" style={{ color: INK_SOFT }}>Keine Treffer.</div>
                 )}
               </div>
             </div>
@@ -1000,7 +1000,7 @@ function Segmented({
   value, onChange, options,
 }: { value: string; onChange: (v: string) => void; options: { v: string; l: string }[] }) {
   return (
-    <div className="flex items-center rounded-md p-0.5" style={{ background: "#241f1b" }}>
+    <div className="flex items-center rounded-md p-0.5" style={{ background: SUBTLE }}>
       {options.map((o) => (
         <button
           key={o.v}
