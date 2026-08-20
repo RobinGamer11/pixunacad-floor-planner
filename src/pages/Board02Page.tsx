@@ -400,7 +400,7 @@ export default function Board02Page() {
           {/* Zeitstrahl */}
           <div
             ref={wrapRef}
-            className="relative mx-4 mt-4 h-[420px] rounded-xl overflow-hidden select-none cursor-grab active:cursor-grabbing"
+            className="relative mx-4 mt-4 h-[min(62vh,640px)] min-h-[420px] rounded-xl overflow-hidden select-none cursor-grab active:cursor-grabbing"
             style={{ background: CANVAS, border: `1px solid ${PANEL_LINE}`, touchAction: "none" }}
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
