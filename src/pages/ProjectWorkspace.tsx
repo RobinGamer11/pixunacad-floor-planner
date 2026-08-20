@@ -4082,7 +4082,9 @@ function ElementView({
         // Ref synchron mitschreiben: ein Linksklick kann committen, bevor der
         // React-State-Update-Zyklus durch ist — sonst ginge die Drehung verloren.
         previewRef.current = { dxPx: dCx, dyPx: dCy, deltaDeg: delta, anchorFrac };
-        setPreview({ dxPx: dCx, dyPx: dCy, deltaDeg: delta, anchorFrac });
+        pendingPreview = { dxPx: dCx, dyPx: dCy, deltaDeg: delta, anchorFrac };
+        schedule();
+
         // CAD-Blatt: Der Cursor wird optisch auf der Linie durch die beiden
         // oberen Fangpunkte fixiert — dadurch ist die Drehung exakt ablesbar.
         if (cadHubUx) {
