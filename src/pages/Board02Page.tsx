@@ -88,7 +88,7 @@ export default function Board02Page() {
   // ---- Viewport / Zoom ---------------------------------------------
   const wrapRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 900, h: 380 });
-  const [view, setView] = useState({ k: 1, tx: 0 });
+  const [view, setView] = useState({ k: 1, tx: 0, ty: 0 });
   const viewRef = useRef(view);
   viewRef.current = view;
 
@@ -120,28 +120,30 @@ export default function Board02Page() {
       e.preventDefault();
       const rect = el.getBoundingClientRect();
       const px = e.clientX - rect.left;
+      const py = e.clientY - rect.top;
       const dy = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 100 : 1);
       const cur = viewRef.current;
       const nk = clamp(cur.k * Math.exp(-dy * 0.0015), 0.3, 40);
       if (nk === cur.k) return;
       const ratio = nk / cur.k;
       const o = px - padX;
-      setView({ k: nk, tx: o - (o - cur.tx) * ratio });
+      const oy = py - rect.height / 2;
+      setView({ k: nk, tx: o - (o - cur.tx) * ratio, ty: oy - (oy - cur.ty) * ratio });
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
   }, []);
 
-  const drag = useRef({ on: false, sx: 0 });
+  const drag = useRef({ on: false, sx: 0, sy: 0 });
   const onPointerDown = (e: React.PointerEvent) => {
     const target = e.target as Element;
     if (target.closest?.("[data-tl-interactive]")) return;
-    drag.current = { on: true, sx: e.clientX - viewRef.current.tx };
+    drag.current = { on: true, sx: e.clientX - viewRef.current.tx, sy: e.clientY - viewRef.current.ty };
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   };
   const onPointerMove = (e: React.PointerEvent) => {
     if (!drag.current.on) return;
-    setView((v) => ({ ...v, tx: e.clientX - drag.current.sx }));
+    setView((v) => ({ ...v, tx: e.clientX - drag.current.sx, ty: e.clientY - drag.current.sy }));
   };
   const onPointerUp = (e: React.PointerEvent) => {
     drag.current.on = false;
@@ -153,7 +155,7 @@ export default function Board02Page() {
   const catMap = useMemo(() => new Map(state.categories.map((c) => [c.id, c])), [state.categories]);
   const statusMap = useMemo(() => new Map(state.statuses.map((s) => [s.id, s])), [state.statuses]);
 
-  const cy = size.h / 2;
+  const cy = size.h / 2 + view.ty;
 
   const placed = useMemo<Placed[]>(() => {
     const sorted = [...state.items].sort((a, b) => itemStartMs(a) - itemStartMs(b));
@@ -169,25 +171,31 @@ export default function Board02Page() {
       for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
       return ((h >>> 0) % 10000) / 10000;
     };
-    const placeCircle = (ax: number, r: number, seed: number): { x: number; y: number } => {
-      if (fits(ax, 0, r)) { packed.push({ x: ax, y: 0, r }); return { x: ax, y: 0 }; }
+    const placeCircle = (axRaw: number, r: number, seed: number): { x: number; y: number } => {
+      const seed2 = seedOf(`${axRaw.toFixed(2)}|${r.toFixed(2)}|${seed}`);
+      // Leichter, aber deterministischer Versatz -> unregelmäßige, organische Wolke.
+      const jitterX = (seed - 0.5) * r * 1.4;
+      const jitterY = (seed2 - 0.5) * r * 2.6;
+      const ax = axRaw + jitterX;
+      if (fits(ax, jitterY, r)) { packed.push({ x: ax, y: jitterY, r }); return { x: ax, y: jitterY }; }
       const phase = seed * Math.PI * 2;
-      const stepR = Math.max(2.5, r * 0.45);
+      const stepR = Math.max(2.5, r * (0.32 + seed2 * 0.3));
+      const yBias = seed2 < 0.5 ? -1 : 1;
       let best: { x: number; y: number; cost: number } | null = null;
-      for (let ring = 1; ring <= 26 && !best; ring++) {
+      for (let ring = 1; ring <= 30 && !best; ring++) {
         const d = ring * stepR;
-        const n = Math.max(8, Math.round(ring * 8));
+        const n = Math.max(9, Math.round(ring * 9));
         for (let i = 0; i < n; i++) {
-          const a = phase + (i / n) * Math.PI * 2;
-          // horizontal nur leicht ausweichen, vertikal freier -> kompakte Wolke statt Stapel
-          const x = ax + Math.cos(a) * d * 0.55;
-          const y = Math.sin(a) * d;
+          // ungleichmäßige Winkelverteilung, damit keine Ringmuster entstehen
+          const a = phase + (i / n) * Math.PI * 2 + Math.sin(i * 12.9898 + seed * 78.233) * 0.22;
+          const x = axRaw + Math.cos(a) * d * (0.45 + seed * 0.3);
+          const y = Math.sin(a) * d * (1 + seed2 * 0.5);
           if (!fits(x, y, r)) continue;
-          const cost = Math.abs(x - ax) * 2.2 + Math.abs(y);
+          const cost = Math.abs(x - axRaw) * (1.8 + seed) + Math.abs(y) * (y * yBias > 0 ? 0.8 : 1.25);
           if (!best || cost < best.cost) best = { x, y, cost };
         }
       }
-      const res = best ?? { x: ax, y: 0 };
+      const res = best ?? { x: ax, y: jitterY };
       packed.push({ x: res.x, y: res.y, r });
       return { x: res.x, y: res.y };
     };
@@ -234,8 +242,13 @@ export default function Board02Page() {
     return m * view.k;
   }, [placed, view.k]);
   const labelY = useCallback(
-    (p: Placed) => clamp(cy + p.side * (clusterHalf + 26 + p.lane * 26), 20, size.h - 60),
-    [clusterHalf, cy, size.h],
+    (p: Placed) => cy + p.side * (clusterHalf + 26 + p.lane * 26),
+    [clusterHalf, cy],
+  );
+  /** Beschriftung nach links führen, wenn rechts kein Platz mehr ist. */
+  const labelDir = useCallback(
+    (p: Placed) => (sx(p.bx1) > size.w - 220 ? -1 : 1),
+    [sx, size.w],
   );
 
   // ---- Farbe eines Kreises ------------------------------------------
@@ -387,7 +400,7 @@ export default function Board02Page() {
           {/* Zeitstrahl */}
           <div
             ref={wrapRef}
-            className="relative mx-4 mt-4 h-[420px] rounded-xl overflow-hidden select-none cursor-grab active:cursor-grabbing"
+            className="relative mx-4 mt-4 h-[min(62vh,640px)] min-h-[420px] rounded-xl overflow-hidden select-none cursor-grab active:cursor-grabbing"
             style={{ background: CANVAS, border: `1px solid ${PANEL_LINE}`, touchAction: "none" }}
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
@@ -422,13 +435,15 @@ export default function Board02Page() {
               {/* Verbindungslinien (L-Form) – Beschriftung liegt außerhalb des Clusters */}
               {placed.map((p) => {
                 const last = p.circles[p.circles.length - 1];
-                const lx = sx(p.bx1);
-                const y0 = cy + (last?.dy ?? 0) * view.k + p.side * (last?.r ?? 6) * view.k;
+                const dir = labelDir(p);
+                const lx = sx(dir === 1 ? p.bx1 : p.bx0);
+                const anchor = dir === 1 ? last : p.circles[0];
+                const y0 = cy + (anchor?.dy ?? 0) * view.k + p.side * (anchor?.r ?? 6) * view.k;
                 const ly = labelY(p);
                 return (
                   <path
                     key={`c-${p.item.id}`}
-                    d={`M ${lx} ${y0} L ${lx} ${ly} L ${lx + 16} ${ly}`}
+                    d={`M ${lx} ${y0} L ${lx} ${ly} L ${lx + dir * 16} ${ly}`}
                     fill="none"
                     stroke={p.item.id === selectedId ? ORANGE : "#4a423b"}
                     strokeWidth={1}
@@ -441,7 +456,11 @@ export default function Board02Page() {
                 <g key={p.item.id} data-tl-interactive
                    style={{ cursor: "pointer" }}
                    onPointerDown={(e) => e.stopPropagation()}
-                   onClick={() => { setSelectedId(p.item.id); setOpenLabelId(p.item.id); }}>
+                   onClick={() => {
+                     const open = openLabelId === p.item.id;
+                     setOpenLabelId(open ? null : p.item.id);
+                     setSelectedId(open ? null : p.item.id);
+                   }}>
                   {p.circles.map((c, i) => {
                     const cxp = sx(c.bx);
                     const r = c.r * view.k;
@@ -466,7 +485,8 @@ export default function Board02Page() {
 
             {/* Titel-Labels */}
             {placed.map((p) => {
-              const lx = sx(p.bx1);
+              const dir = labelDir(p);
+              const lx = sx(dir === 1 ? p.bx1 : p.bx0);
               const ly = labelY(p);
               const open = openLabelId === p.item.id;
               const cat = catMap.get(p.item.categoryId ?? "");
@@ -474,8 +494,12 @@ export default function Board02Page() {
                 <div
                   key={`l-${p.item.id}`}
                   data-tl-interactive
-                  className="absolute"
-                  style={{ left: lx + 18, top: ly - 11, maxWidth: 260 }}
+                  className="absolute flex flex-col"
+                  style={
+                    dir === 1
+                      ? { left: lx + 18, top: ly - 11, maxWidth: 260, alignItems: "flex-start" }
+                      : { right: size.w - (lx - 18), top: ly - 11, maxWidth: 260, alignItems: "flex-end" }
+                  }
                   onPointerDown={(e) => e.stopPropagation()}
                 >
                   <button
