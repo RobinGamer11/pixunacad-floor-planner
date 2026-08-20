@@ -19,6 +19,7 @@ import { LabelManager } from "../LabelManager";
 import { IdPanel } from "../IdPanel";
 import { TopologyEngine } from "../TopologyEngine";
 import { Renderer, type Selection } from "../Renderer";
+import { mirrorProxy } from "../multiEdit";
 import { LineHub } from "../LineHub";
 import { PointEditMenu } from "../PointEditMenu";
 import { LineTool } from "../LineTool";
@@ -951,7 +952,7 @@ export class MiniCad {
     if (typeof opts.alpha === "number" && opts.alpha >= 0 && opts.alpha <= 1) {
       this.defaultLineAlpha = opts.alpha;
     }
-    const selected = this.getSelectedSegment();
+    const selected = this.getEditSegment();
     if (selected && !this.isFrameSegment(selected)) {
       selected.color = applyAlphaToColor(this.defaultLineColor, this.defaultLineAlpha);
       selected.thicknessM = this.defaultLineThicknessM;
@@ -1072,7 +1073,7 @@ export class MiniCad {
     if (typeof opts.borderEnabled === "boolean") this.defaultTextBorderEnabled = opts.borderEnabled;
     if (opts.borderColor) this.defaultTextBorderColor = opts.borderColor;
     if (typeof opts.borderWidthPx === "number" && opts.borderWidthPx >= 0) this.defaultTextBorderWidthPx = opts.borderWidthPx;
-    const selected = this.getSelectedTextBox();
+    const selected = this.getEditTextBox();
     if (selected) {
       selected.style.textColor = applyAlphaToColor(this.defaultTextColor, this.defaultTextAlpha);
       selected.style.fontSizePx = this.defaultTextFontSizePx;
