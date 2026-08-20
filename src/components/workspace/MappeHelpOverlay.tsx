@@ -257,9 +257,9 @@ export function MappeHelpOverlay({
             <div className="flex flex-col justify-end gap-1 px-1.5 py-1 text-left">
               <div>
                 <div className="whitespace-nowrap text-[10px] font-semibold leading-3">Maßkette zeichnen</div>
-                <div className="whitespace-nowrap text-[8px] leading-[11px] opacity-75">1. Gelbe Linie setzen für Richtung</div>
-                <div className="whitespace-nowrap text-[8px] leading-[11px] opacity-75">2. L-Klick auf Fangpunkte</div>
-                <div className="whitespace-nowrap text-[8px] leading-[11px] opacity-75">3. Häkchen zum Fertigstellen</div>
+                <div className="whitespace-nowrap text-[8px] leading-[11px] opacity-75">1. L-Klick auf Fangpunkte</div>
+                <div className="whitespace-nowrap text-[8px] leading-[11px] opacity-75">2. Häkchen zum Fertigstellen</div>
+
               </div>
               <div>
                 <div className="whitespace-nowrap text-[10px] font-semibold leading-3">Freies Maß</div>

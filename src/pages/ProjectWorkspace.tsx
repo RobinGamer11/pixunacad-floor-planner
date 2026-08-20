@@ -4076,9 +4076,11 @@ function ElementView({
         while (delta > 180) delta -= 360;
         while (delta < -180) delta += 360;
         if (ev.shiftKey) {
-          const absTarget = Math.round((startRot + delta) / 90) * 90;
+          // Shift = feste Neigungswinkel (45°-Raster: 45°, 90°, 135°, …)
+          const absTarget = Math.round((startRot + delta) / 45) * 45;
           delta = absTarget - startRot;
         }
+
         // Zentrumsversatz, damit der gewählte Fangpunkt exakt an Ort bleibt:
         // Rotation um den Anker = Rotation um das Zentrum + Verschiebung.
         const rc = baseRect();
@@ -4881,6 +4883,63 @@ function ElementView({
               />
             );
           })}
+
+          {/* CAD-Blatt: Fangpunkte der Kantenmitten. Gleiche Optik/Bedienung
+             wie die Ecken — Klick wählt den Anker, danach erscheinen die
+             Symbole „Verschieben" und „Drehen" direkt am Punkt. */}
+          {cadHubUx && !tabletCommitOnly && (["top", "right", "bottom", "left"] as const).map((side) => {
+            const key = `edge-mid-${side}`;
+            const fx = side === "left" ? 0 : side === "right" ? 1 : 0.5;
+            const fy = side === "top" ? 0 : side === "bottom" ? 1 : 0.5;
+            const glow = hoveredSnapKey === key;
+            const isAnchor = anchorFracState?.key === key;
+            const size = 12;
+            const dim = (glow || isAnchor) ? size + 4 : size;
+            const onDownMid = (e: React.PointerEvent) => {
+              e.stopPropagation();
+              e.preventDefault();
+              if (hubMode && anchorFracRef.current?.key === key) {
+                if (!!(window as any).__pixunaTabletCommit) {
+                  modeStartClientRef.current = null;
+                  setCarrying(true);
+                  return;
+                }
+                actionCommitRef.current?.();
+                return;
+              }
+              setAnchor({ fx, fy, key });
+              setActiveEdge(null);
+              onSelect?.({ shift: e.shiftKey });
+            };
+            return (
+              <div
+                key={key}
+                data-hub-control
+                onPointerDown={onDownMid}
+                title="Fangpunkt / Anker für Verschieben & Drehen"
+                className="absolute"
+                style={{
+                  left: `${fx * 100}%`,
+                  top: `${fy * 100}%`,
+                  marginLeft: -dim / 2,
+                  marginTop: -dim / 2,
+                  width: dim,
+                  height: dim,
+                  borderRadius: 999,
+                  background: (glow || isAnchor) ? hubBlue : "white",
+                  border: `2px solid ${hubBlue}`,
+                  boxShadow: (glow || isAnchor)
+                    ? "0 0 0 3px rgba(77,163,255,0.35), 0 0 10px rgba(77,163,255,0.9)"
+                    : "0 1px 3px rgba(0,0,0,0.25)",
+                  transition: "width 90ms, height 90ms, background 90ms, box-shadow 90ms",
+                  cursor: "default",
+                  zIndex: 16,
+                } as React.CSSProperties}
+              />
+            );
+          })}
+
+
 
         </>
 
