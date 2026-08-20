@@ -124,6 +124,8 @@ export class SelectTool {
   // Parallel-drag state for dimensions
   dragDimId: string | null = null;
   dragDimOffsetAlongNormal = 0;
+  dragDimGrabDx = 0;
+  dragDimGrabDy = 0;
   private dimensionHubGuideOrigin: Vec2 | null = null;
 
   // Sticker-Instanz Drag-State (Translate)
