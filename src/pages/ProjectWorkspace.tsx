@@ -4270,6 +4270,39 @@ function ElementView({
   // → ENTER bzw. Häkchen setzt final.
   const hubCapable = cadHubUx || (tabletActive && (el.kind === "image" || el.kind === "pdf"));
   const tabletCommitOnly = hubCapable && tabletActive && (!!hubMode || !!edgeTrim);
+  // CAD-Blatt: Verschieben/Drehen ausschließlich von einem Fangpunkt aus.
+  const anchorIsSnap = !cadHubUx || (!!anchorFracState && anchorFracState.key !== "interior");
+
+  // CAD-Blätter bleiben in der normalen Ebenen-Hierarchie (unter der CAD-
+  // Zeichenebene). Auswahl-Hitbox und Bedienelemente werden deshalb als
+  // transparentes Overlay über die Zeichenebene portiert.
+  const cadProxyStyle: React.CSSProperties = {
+    left: `${el.x}%`,
+    top: `${el.y}%`,
+    width: `${el.w}%`,
+    height: `${el.h}%`,
+    transform: previewTransform,
+    transformOrigin: "center center",
+  };
+  const wrapCadChrome = (node: React.ReactNode): React.ReactNode => {
+    if (!cadHubUx || !portalHost) return node;
+    return createPortal(
+      <div className="absolute" style={{ ...cadProxyStyle, zIndex: 60, pointerEvents: "none" }}>
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            pointerEvents: "auto",
+            cursor: hubMode ? "crosshair" : "default",
+          }}
+          onPointerDown={handlePointerDown}
+        />
+        {node}
+      </div>,
+      portalHost,
+    );
+  };
+
 
   return (
     <div
