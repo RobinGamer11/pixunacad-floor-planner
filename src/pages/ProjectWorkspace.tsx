@@ -3596,9 +3596,10 @@ function ElementView({
   useEffect(() => {
     if (readOnly) return;
     const reg = getPageSnapRegistry();
-    reg.publish(el.id, buildRectSnapEntry(el.kind, el.x, el.y, el.w, el.h));
+    // CAD-Blätter: NUR Ecken sind Fangpunkte (keine Kantenmitten).
+    reg.publish(el.id, buildRectSnapEntry(el.kind, el.x, el.y, el.w, el.h, !isCadView));
     return () => { try { reg.unpublish(el.id); } catch {} };
-  }, [el.id, el.kind, el.x, el.y, el.w, el.h, readOnly]);
+  }, [el.id, el.kind, el.x, el.y, el.w, el.h, readOnly, isCadView]);
 
   // Hover-Highlight: welcher Snap-Handle dieses Elements ist gerade „gefangen"?
   const [hoveredSnapKey, setHoveredSnapKey] = useState<string | null>(null);
