@@ -278,11 +278,13 @@ export default function Board02Page() {
   );
 
   // ---- Farbe eines Kreises ------------------------------------------
-  const circleFill = useCallback((item: TlItem, t: number) => {
+  // Termine/Notizen nutzen EINEN gemeinsamen Verlauf (orange → grau) über die
+  // gesamte Strahl-Fläche, dessen Wendepunkt auf der HEUTE-Linie liegt.
+  // Aufgaben: erledigt = orange, offen = rot (leuchtend).
+  const circleFill = useCallback((item: TlItem, _t: number) => {
     if (colorMode === "category") return catMap.get(item.categoryId ?? "")?.color ?? GREY;
-    // „Erledigt“ ist immer orange – unabhängig von der Zeitposition.
-    if (itemAchieved(item, now)) return ORANGE;
-    return GREY;
+    if (item.kind === "task") return itemAchieved(item, now) ? ORANGE : RED;
+    return "url(#tl-global)";
   }, [colorMode, catMap, now]);
 
   // ---- Achsen-Ticks --------------------------------------------------
