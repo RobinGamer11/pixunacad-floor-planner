@@ -4437,8 +4437,18 @@ function ElementView({
         />
       )}
 
+      {/* CAD-Blatt: transparente Auswahl-Hitbox über der Zeichenebene, solange
+         das Blatt nicht ausgewählt ist. Das Blatt selbst bleibt in seiner Ebene. */}
+      {cadHubUx && !readOnly && !selected && !toolActive && portalHost && createPortal(
+        <div
+          className="absolute"
+          style={{ ...cadProxyStyle, zIndex: 29 }}
+          onPointerDown={handlePointerDown}
+        />,
+        portalHost,
+      )}
 
-      {showHub && (
+      {showHub && wrapCadChrome(
         <>
           {!tabletCommitOnly && !cadHubUx && (
             <>
