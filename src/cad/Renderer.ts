@@ -1234,16 +1234,81 @@ export class Renderer {
   }
 
   private _drawSegments() {
-    for (const seg of this._segmentsBackToFront()) this._drawSingleSegment(seg);
+    const list = this._segmentsBackToFront();
+    for (const seg of list) this._drawSingleSegment(seg);
+    this._drawSegmentJoints(list as any[]);
   }
 
   private _drawSegmentsForLabel(labelId: string) {
     const hideGuides = isExportMode();
+    const list: any[] = [];
     for (const seg of this.scene.segments) {
       if (seg.labelId !== labelId) continue;
       if (!this.labels.isVisible(seg.labelId)) continue;
       if (hideGuides && seg.isGuide) continue;
       this._drawSingleSegment(seg);
+      list.push(seg);
+    }
+    this._drawSegmentJoints(list);
+  }
+
+  /**
+   * Schließt die Ecke zwischen zwei Linien, die sich exakt einen Endpunkt
+   * teilen (Gehrung / Miter). Ohne diesen Pass bleibt an der Außenseite
+   * dicker Linien eine keilförmige Lücke stehen, weil jede Linie als
+   * eigener Pfad mit "butt"-Enden gezeichnet wird.
+   */
+  private _drawSegmentJoints(segs: any[]) {
+    if (!segs || segs.length < 2) return;
+    const cam = this.camera;
+    const ctx = this.ctx;
+    const key = (p: { x: number; y: number }) => `${p.x.toFixed(6)}_${p.y.toFixed(6)}`;
+    const joints = new Map<string, { p: { x: number; y: number }; items: { seg: any; other: { x: number; y: number } }[] }>();
+
+    for (const seg of segs) {
+      if (seg.isGuide || (seg as any).bulge) continue;
+      for (const [p, other] of [[seg.a, seg.b], [seg.b, seg.a]] as const) {
+        const k = key(p);
+        let e = joints.get(k);
+        if (!e) { e = { p, items: [] }; joints.set(k, e); }
+        e.items.push({ seg, other });
+      }
+    }
+
+    for (const { p, items } of joints.values()) {
+      if (items.length !== 2) continue;
+      const [i1, i2] = items;
+      if (i1.seg.thicknessM !== i2.seg.thicknessM) continue;
+      if ((i1.seg.color || Defaults.lineColor) !== (i2.seg.color || Defaults.lineColor)) continue;
+
+      const j = cam.worldToScreen(p.x, p.y);
+      const a = cam.worldToScreen(i1.other.x, i1.other.y);
+      const b = cam.worldToScreen(i2.other.x, i2.other.y);
+      const wpx = this._segStrokePx(i1.seg.thicknessM);
+      if (wpx <= 1.2) continue;
+
+      const stub = (from: { x: number; y: number }) => {
+        const dx = from.x - j.x, dy = from.y - j.y;
+        const L = Math.hypot(dx, dy);
+        if (L < 1e-6) return null;
+        const len = Math.min(L, wpx * 2);
+        return { x: j.x + (dx / L) * len, y: j.y + (dy / L) * len };
+      };
+      const s1 = stub(a), s2 = stub(b);
+      if (!s1 || !s2) continue;
+
+      ctx.save();
+      ctx.strokeStyle = i1.seg.color || Defaults.lineColor;
+      ctx.lineWidth = wpx;
+      ctx.lineJoin = "miter";
+      ctx.lineCap = "butt";
+      ctx.miterLimit = 12;
+      ctx.beginPath();
+      ctx.moveTo(s1.x, s1.y);
+      ctx.lineTo(j.x, j.y);
+      ctx.lineTo(s2.x, s2.y);
+      ctx.stroke();
+      ctx.restore();
     }
   }
 
