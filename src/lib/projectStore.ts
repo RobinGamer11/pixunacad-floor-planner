@@ -81,6 +81,10 @@ export interface PageElement {
    *  zum Zeitpunkt des Einfügens bzw. der Aktualisierung. Fallback bis der
    *  Live-Viewport-Renderer greift. */
   viewSnapshot?: string;
+  /** cad-view: Objektart. true = Pixel (eingebranntes Bild), false/undef = Vektor (live). */
+  pixelMode?: boolean;
+  /** cad-view: Automatische Aktualisierung dieses Objekts (Default: true). */
+  autoUpdate?: boolean;
   // generic
   nonPrinting?: boolean;
   // layer / group
