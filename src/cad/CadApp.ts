@@ -33,6 +33,7 @@ import { PlanPanel } from "./PlanPanel";
 import { PlanController } from "./PlanController";
 import { drawProjection as drawPlanProjection } from "./PlanProjections";
 import { SheetPanel } from "./SheetPanel";
+import { mirrorProxy } from "./multiEdit";
 
 export interface TextSettingsRefs {
   panel: HTMLDivElement;
