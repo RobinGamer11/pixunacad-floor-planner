@@ -1113,6 +1113,49 @@ export class CadApp {
     return true;
   }
 
+  /* ---- Mehrfachauswahl: Einstellungen auf alle gleichartigen Objekte ---- */
+
+  /** IDs der Mehrfachauswahl (Marquee/Shift) einer bestimmten Objektart. */
+  private _multiSelectedIds(kind: string): string[] {
+    const ids: string[] = [];
+    const list = (this.selectTool as any)?.marqueeSelectedIds as { kind: string; id: string }[] | undefined;
+    if (!list) return ids;
+    for (const m of list) {
+      const k = m.kind === "textbox" ? "textBox" : m.kind;
+      if (k === kind) ids.push(m.id);
+    }
+    return ids;
+  }
+
+  private _panelMirror<T extends object>(primary: T | null, kind: string, lookup: (id: string) => T | null | undefined): T | null {
+    if (!primary) return null;
+    const sibs: T[] = [];
+    for (const id of this._multiSelectedIds(kind)) {
+      const o = lookup(id);
+      if (o && o !== primary) sibs.push(o);
+    }
+    return sibs.length ? mirrorProxy(primary, sibs) : primary;
+  }
+
+  /** Von den Werkzeugeinstellungen genutzte Getter — spiegeln Änderungen bei
+   *  Mehrfachauswahl automatisch auf alle Objekte derselben Art. */
+  private _panelSegment() {
+    return this._panelMirror(this.getSelectedSegment(), "segment", (id) => this.scene.getSegmentById(id));
+  }
+  private _panelHatch() {
+    return this._panelMirror(this.getSelectedHatch(), "hatch", (id) => this.scene.getHatchById(id));
+  }
+  private _panelTextBox() {
+    return this._panelMirror(this.getSelectedTextBox(), "textBox", (id) => this.scene.getTextBoxById(id));
+  }
+  private _panelDimension() {
+    return this._panelMirror(this.getSelectedDimension() as any, "dimension", (id) => (this.scene as any).getDimensionById?.(id));
+  }
+  private _panelFreeStroke() {
+    return this._panelMirror(this.getSelectedFreeStroke() as any, "freeStroke", (id) => this.scene.getFreeStrokeById(id));
+  }
+
+
   getSelectedSegment() {
     if (!this.selection || !this.selection.segmentId) return null;
     return this.scene.getSegmentById(this.selection.segmentId);
