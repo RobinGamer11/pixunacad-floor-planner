@@ -3989,13 +3989,28 @@ function ElementView({
     const unregisterHubAbort = registerAbort(() => cancel());
 
 
+    // Preview-Updates werden pro Frame gebündelt (rAF) — sonst rendert React
+    // bei jedem Pointer-Event neu und das Verschieben ruckelt.
+    let raf = 0;
+    let pendingPreview: { dxPx: number; dyPx: number; deltaDeg: number; anchorFrac: { x: number; y: number } } | null = null;
+    let pendingAxis: { ax: number; ay: number; bx: number; by: number; mx: number; my: number; deg: number } | null = null;
+    const flushFrame = () => {
+      raf = 0;
+      if (pendingPreview) { setPreview(pendingPreview); pendingPreview = null; }
+      if (pendingAxis) { setRotAxis(pendingAxis); pendingAxis = null; }
+    };
+    const schedule = () => { if (!raf) raf = requestAnimationFrame(flushFrame); };
+
     const onMove = (ev: PointerEvent) => {
       // Tablet-Hilfsrad/HUB-Bedienelemente werden für die Positionierung
       // komplett ignoriert — sonst springt das Objekt zum Rad.
       const mt = ev.target as HTMLElement | null;
-      const overTabletAid = document.elementsFromPoint(ev.clientX, ev.clientY)
-        .some((node) => (node as HTMLElement).closest?.('[data-tablet-aid="true"]'));
-      if (overTabletAid || mt?.closest?.('[data-tablet-aid="true"], [data-hub-control]')) return;
+      if (mt?.closest?.('[data-tablet-aid="true"], [data-hub-control]')) return;
+      if ((window as any).__pixunaTabletCommit) {
+        const overTabletAid = document.elementsFromPoint(ev.clientX, ev.clientY)
+          .some((node) => (node as HTMLElement).closest?.('[data-tablet-aid="true"]'));
+        if (overTabletAid) return;
+      }
       if (!carryingRef.current) return; // Objekt abgelegt — Preview eingefroren.
       const { clientX: ax, clientY: ay } = liveAnchor();
       const reg = getPageSnapRegistry();
@@ -4018,7 +4033,9 @@ function ElementView({
           if (snapped) { dxPx = snapped.x - ax; dyPx = snapped.y - ay; }
         }
         previewRef.current = { dxPx, dyPx, deltaDeg: 0, anchorFrac };
-        setPreview({ dxPx, dyPx, deltaDeg: 0, anchorFrac });
+        pendingPreview = { dxPx, dyPx, deltaDeg: 0, anchorFrac };
+        schedule();
+
       } else if (hubMode === "rotate") {
         // Zielpunkt anvisieren: Fangpunkte anderer Objekte und Rechtsklick-
         // Hilfslinien ziehen den Rotations-Strahl exakt auf den Punkt.
