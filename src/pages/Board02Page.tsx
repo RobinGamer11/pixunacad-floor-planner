@@ -155,7 +155,7 @@ export default function Board02Page() {
   const catMap = useMemo(() => new Map(state.categories.map((c) => [c.id, c])), [state.categories]);
   const statusMap = useMemo(() => new Map(state.statuses.map((s) => [s.id, s])), [state.statuses]);
 
-  const cy = size.h / 2;
+  const cy = size.h / 2 + view.ty;
 
   const placed = useMemo<Placed[]>(() => {
     const sorted = [...state.items].sort((a, b) => itemStartMs(a) - itemStartMs(b));
@@ -171,25 +171,31 @@ export default function Board02Page() {
       for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
       return ((h >>> 0) % 10000) / 10000;
     };
-    const placeCircle = (ax: number, r: number, seed: number): { x: number; y: number } => {
-      if (fits(ax, 0, r)) { packed.push({ x: ax, y: 0, r }); return { x: ax, y: 0 }; }
+    const placeCircle = (axRaw: number, r: number, seed: number): { x: number; y: number } => {
+      const seed2 = seedOf(`${axRaw.toFixed(2)}|${r.toFixed(2)}|${seed}`);
+      // Leichter, aber deterministischer Versatz -> unregelmäßige, organische Wolke.
+      const jitterX = (seed - 0.5) * r * 1.4;
+      const jitterY = (seed2 - 0.5) * r * 2.6;
+      const ax = axRaw + jitterX;
+      if (fits(ax, jitterY, r)) { packed.push({ x: ax, y: jitterY, r }); return { x: ax, y: jitterY }; }
       const phase = seed * Math.PI * 2;
-      const stepR = Math.max(2.5, r * 0.45);
+      const stepR = Math.max(2.5, r * (0.32 + seed2 * 0.3));
+      const yBias = seed2 < 0.5 ? -1 : 1;
       let best: { x: number; y: number; cost: number } | null = null;
-      for (let ring = 1; ring <= 26 && !best; ring++) {
+      for (let ring = 1; ring <= 30 && !best; ring++) {
         const d = ring * stepR;
-        const n = Math.max(8, Math.round(ring * 8));
+        const n = Math.max(9, Math.round(ring * 9));
         for (let i = 0; i < n; i++) {
-          const a = phase + (i / n) * Math.PI * 2;
-          // horizontal nur leicht ausweichen, vertikal freier -> kompakte Wolke statt Stapel
-          const x = ax + Math.cos(a) * d * 0.55;
-          const y = Math.sin(a) * d;
+          // ungleichmäßige Winkelverteilung, damit keine Ringmuster entstehen
+          const a = phase + (i / n) * Math.PI * 2 + Math.sin(i * 12.9898 + seed * 78.233) * 0.22;
+          const x = axRaw + Math.cos(a) * d * (0.45 + seed * 0.3);
+          const y = Math.sin(a) * d * (1 + seed2 * 0.5);
           if (!fits(x, y, r)) continue;
-          const cost = Math.abs(x - ax) * 2.2 + Math.abs(y);
+          const cost = Math.abs(x - axRaw) * (1.8 + seed) + Math.abs(y) * (y * yBias > 0 ? 0.8 : 1.25);
           if (!best || cost < best.cost) best = { x, y, cost };
         }
       }
-      const res = best ?? { x: ax, y: 0 };
+      const res = best ?? { x: ax, y: jitterY };
       packed.push({ x: res.x, y: res.y, r });
       return { x: res.x, y: res.y };
     };
