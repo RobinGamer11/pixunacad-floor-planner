@@ -383,11 +383,11 @@ export default function Board02Page() {
       />
 
       <div className="flex-1 min-h-0 flex">
-        <div className="flex-1 min-w-0 overflow-y-auto" style={{ background: CANVAS }}>
-          {/* Werkzeugleiste – im schwarzen Fenster, graues Feld */}
+        <div className="flex-1 min-w-0 overflow-y-auto" style={{ background: "hsl(var(--background))" }}>
+          {/* Werkzeugleiste – helles Kartenfeld */}
           <div className="p-4 pb-0">
             <div className="flex flex-wrap items-center gap-2 rounded-xl p-3"
-                 style={{ background: PANEL, border: `1px solid ${PANEL_LINE}` }}>
+                 style={{ background: PANEL, border: `1px solid ${PANEL_LINE}`, boxShadow: "0 1px 2px rgba(20,17,16,0.05)" }}>
               <BigAddButton kind="task" onClick={() => add("task")} />
               <BigAddButton kind="event" onClick={() => add("event")} />
               <BigAddButton kind="note" onClick={() => add("note")} />
@@ -514,9 +514,9 @@ export default function Board02Page() {
                     onClick={() => { setOpenLabelId(open ? null : p.item.id); setSelectedId(p.item.id); }}
                     className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium whitespace-nowrap"
                     style={{
-                      background: open ? SUBTLE : "transparent",
-                      color: p.item.id === selectedId ? "#fff" : INK,
-                      border: `1px solid ${open ? "#3b332d" : "transparent"}`,
+                      background: open ? CANVAS_PANEL : "transparent",
+                      color: p.item.id === selectedId ? "#fff" : "#cdc4bb",
+                      border: `1px solid ${open ? CANVAS_LINE : "transparent"}`,
                     }}
                   >
                     <span style={{ color: cat?.color ?? ORANGE }}>{kindIcon(p.item.kind, 11)}</span>
@@ -553,7 +553,7 @@ export default function Board02Page() {
           </div>
 
           {/* Projektfortschritt */}
-          <div className="mx-4 mt-4 rounded-xl p-4" style={{ background: PANEL, border: `1px solid ${PANEL_LINE}` }}>
+          <div className="mx-4 mt-4 rounded-xl p-4" style={{ background: PANEL, border: `1px solid ${PANEL_LINE}`, boxShadow: "0 1px 2px rgba(20,17,16,0.05)" }}>
             <div className="flex items-center justify-between text-xs mb-1.5" style={{ color: INK }}>
               <span className="font-medium">Projektstand</span>
               <span className="tabular-nums opacity-70">{progress}%</span>
@@ -562,7 +562,7 @@ export default function Board02Page() {
           </div>
 
           {/* Kategorien + Liste */}
-          <div className="mx-4 my-4 rounded-xl p-4" style={{ background: PANEL, border: `1px solid ${PANEL_LINE}` }}>
+          <div className="mx-4 my-4 rounded-xl p-4" style={{ background: PANEL, border: `1px solid ${PANEL_LINE}`, boxShadow: "0 1px 2px rgba(20,17,16,0.05)" }}>
             <div className="flex items-center gap-2 mb-3">
               <div className="text-xs font-medium" style={{ color: INK }}>Kategorien im Projekt</div>
               {activeCat && (
@@ -1000,7 +1000,7 @@ function Segmented({
   value, onChange, options,
 }: { value: string; onChange: (v: string) => void; options: { v: string; l: string }[] }) {
   return (
-    <div className="flex items-center rounded-md p-0.5" style={{ background: SUBTLE }}>
+    <div className="flex items-center rounded-md p-0.5" style={{ background: SUBTLE, border: `1px solid ${PANEL_LINE}` }}>
       {options.map((o) => (
         <button
           key={o.v}
@@ -1008,7 +1008,7 @@ function Segmented({
           className="h-7 px-2.5 rounded-[5px] text-[11px] font-medium"
           style={{
             background: value === o.v ? ORANGE : "transparent",
-            color: value === o.v ? "#141110" : "#a19a92",
+            color: value === o.v ? "#ffffff" : INK_SOFT,
           }}
         >
           {o.l}
@@ -1021,7 +1021,7 @@ function Segmented({
 function Chip({ children, color }: { children: React.ReactNode; color?: string }) {
   return (
     <span className="rounded px-1.5 py-0.5 text-[10px]"
-          style={{ background: color ? `${color}22` : "#2a2420", color: color ?? "#b3aaa1" }}>
+          style={{ background: color ? `${color}22` : SUBTLE, color: color ?? INK_SOFT }}>
       {children}
     </span>
   );
@@ -1029,7 +1029,7 @@ function Chip({ children, color }: { children: React.ReactNode; color?: string }
 
 function ProgressBar({ percent, color }: { percent: number; color?: string }) {
   return (
-    <div className="h-2.5 w-full rounded-full overflow-hidden" style={{ background: "#2a2420" }}>
+    <div className="h-2.5 w-full rounded-full overflow-hidden" style={{ background: SUBTLE }}>
       <div className="h-full rounded-full transition-all"
            style={{ width: `${clamp(percent, 0, 100)}%`, background: color ?? ORANGE }} />
     </div>
