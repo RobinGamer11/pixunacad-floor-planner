@@ -760,7 +760,6 @@ function ItemEditor({
           entries={priorities.map((p) => ({ id: p.id, label: p.label, percent: p.percent }))}
           onSelect={(id) => set({ priorityId: id || undefined })}
           onRename={(id, label) => timelineStore.updatePriority(projectId, id, { label })}
-          onPercent={(id, percent) => timelineStore.updatePriority(projectId, id, { percent })}
           onRemove={(id) => timelineStore.removePriority(projectId, id)}
           onAdd={(label) => {
             const id = timelineStore.addPriority(projectId, label, 50);
