@@ -117,7 +117,14 @@ function ensure(): Registry {
 export function getPageSnapRegistry(): Registry { return ensure(); }
 
 /** Baut Punkt-/Edge-Liste für ein Rechteck-Element (Prozent-Koordinaten). */
-export function buildRectSnapEntry(kind: string, x: number, y: number, w: number, h: number): SnapEntry {
+export function buildRectSnapEntry(
+  kind: string,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  includeEdgeMids = true,
+): SnapEntry {
   return {
     kind,
     points: [
@@ -125,10 +132,14 @@ export function buildRectSnapEntry(kind: string, x: number, y: number, w: number
       { x: x + w, y, type: "corner", key: "corner-tr" },
       { x, y: y + h, type: "corner", key: "corner-bl" },
       { x: x + w, y: y + h, type: "corner", key: "corner-br" },
-      { x: x + w / 2, y, type: "edge-mid", key: "edge-mid-top" },
-      { x: x + w / 2, y: y + h, type: "edge-mid", key: "edge-mid-bottom" },
-      { x, y: y + h / 2, type: "edge-mid", key: "edge-mid-left" },
-      { x: x + w, y: y + h / 2, type: "edge-mid", key: "edge-mid-right" },
+      ...(includeEdgeMids
+        ? ([
+            { x: x + w / 2, y, type: "edge-mid", key: "edge-mid-top" },
+            { x: x + w / 2, y: y + h, type: "edge-mid", key: "edge-mid-bottom" },
+            { x, y: y + h / 2, type: "edge-mid", key: "edge-mid-left" },
+            { x: x + w, y: y + h / 2, type: "edge-mid", key: "edge-mid-right" },
+          ] as SnapEntry["points"])
+        : []),
     ],
     edges: [
       { key: "edge-line-top",    a: { x, y }, b: { x: x + w, y } },

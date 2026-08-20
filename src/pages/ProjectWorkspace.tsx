@@ -3596,9 +3596,10 @@ function ElementView({
   useEffect(() => {
     if (readOnly) return;
     const reg = getPageSnapRegistry();
-    reg.publish(el.id, buildRectSnapEntry(el.kind, el.x, el.y, el.w, el.h));
+    // CAD-Blätter: NUR Ecken sind Fangpunkte (keine Kantenmitten).
+    reg.publish(el.id, buildRectSnapEntry(el.kind, el.x, el.y, el.w, el.h, !isCadView));
     return () => { try { reg.unpublish(el.id); } catch {} };
-  }, [el.id, el.kind, el.x, el.y, el.w, el.h, readOnly]);
+  }, [el.id, el.kind, el.x, el.y, el.w, el.h, readOnly, isCadView]);
 
   // Hover-Highlight: welcher Snap-Handle dieses Elements ist gerade „gefangen"?
   const [hoveredSnapKey, setHoveredSnapKey] = useState<string | null>(null);
@@ -3670,8 +3671,21 @@ function ElementView({
       if (ev.key === "Escape" || ev.key === "Delete") actionCancelRef.current?.();
       else if (ev.key === "Enter") actionCommitRef.current?.();
     };
+    // Linksklick außerhalb der Bedien-Symbole setzt den Kantenschnitt ebenfalls.
+    const onClick = (ev: MouseEvent) => {
+      if (ev.button !== 0) return;
+      const t = ev.target as HTMLElement | null;
+      if (t?.closest('[data-hub-control], [data-tablet-aid="true"]')) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      actionCommitRef.current?.();
+    };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("click", onClick, true);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("click", onClick, true);
+    };
   }, [edgeTrim]);
 
   useEffect(() => {
@@ -4529,6 +4543,9 @@ function ElementView({
              sonst wie gehabt oben rechts. */}
           {(() => {
             const anchored = cadHubUx && anchorFracState && anchorFracState.key !== "interior";
+            // CAD-Blatt: Solange kein Fangpunkt (Ecke) gewählt ist, werden gar
+            // keine Symbole gezeigt — statt ausgegrauter Buttons.
+            if (cadHubUx && !anchored && !edgeTrim && !hubMode) return null;
             const hubStyle: React.CSSProperties = anchored
               ? {
                   left: `${anchorFracState!.fx * 100}%`,
@@ -4537,6 +4554,7 @@ function ElementView({
                   background: tabletCommitOnly ? "transparent" : "white",
                   border: tabletCommitOnly ? "none" : `1px solid hsl(var(--hairline))`,
                   padding: tabletCommitOnly ? 0 : 3,
+                  pointerEvents: "auto",
                   zIndex: 10,
                 }
               : {
@@ -4545,6 +4563,7 @@ function ElementView({
                   background: tabletCommitOnly ? "transparent" : "white",
                   border: tabletCommitOnly ? "none" : `1px solid hsl(var(--hairline))`,
                   padding: tabletCommitOnly ? 0 : 3,
+                  pointerEvents: "auto",
                   zIndex: 10,
                 };
             return (
@@ -4754,6 +4773,9 @@ function ElementView({
               cursor: cadHubUx
                 ? (isActive || edgeReady ? (isHor ? "ns-resize" : "ew-resize") : "default")
                 : (isHor ? "ns-resize" : "ew-resize"),
+              // Bedien-Overlay des CAD-Blatts hat pointerEvents:none — die
+              // Kanten-Griffe müssen sie explizit wieder aktivieren.
+              pointerEvents: "auto",
               zIndex: 5,
             };
             const sizeStyle: React.CSSProperties = isHor
@@ -4921,60 +4943,8 @@ function ElementView({
             );
           })}
 
-          {/* CAD-Blatt: Fangpunkte der Kantenmitten. Gleiche Optik/Bedienung
-             wie die Ecken — Klick wählt den Anker, danach erscheinen die
-             Symbole „Verschieben" und „Drehen" direkt am Punkt. */}
-          {cadHubUx && !tabletCommitOnly && (["top", "right", "bottom", "left"] as const).map((side) => {
-            const key = `edge-mid-${side}`;
-            const fx = side === "left" ? 0 : side === "right" ? 1 : 0.5;
-            const fy = side === "top" ? 0 : side === "bottom" ? 1 : 0.5;
-            const glow = hoveredSnapKey === key;
-            const isAnchor = anchorFracState?.key === key;
-            const size = 12;
-            const dim = (glow || isAnchor) ? size + 4 : size;
-            const onDownMid = (e: React.PointerEvent) => {
-              e.stopPropagation();
-              e.preventDefault();
-              if (hubMode && anchorFracRef.current?.key === key) {
-                if (!!(window as any).__pixunaTabletCommit) {
-                  modeStartClientRef.current = null;
-                  setCarrying(true);
-                  return;
-                }
-                actionCommitRef.current?.();
-                return;
-              }
-              setAnchor({ fx, fy, key });
-              setActiveEdge(null);
-              onSelect?.({ shift: e.shiftKey });
-            };
-            return (
-              <div
-                key={key}
-                data-hub-control
-                onPointerDown={onDownMid}
-                title="Fangpunkt / Anker für Verschieben & Drehen"
-                className="absolute"
-                style={{
-                  left: `${fx * 100}%`,
-                  top: `${fy * 100}%`,
-                  marginLeft: -dim / 2,
-                  marginTop: -dim / 2,
-                  width: dim,
-                  height: dim,
-                  borderRadius: 999,
-                  background: (glow || isAnchor) ? hubBlue : "white",
-                  border: `2px solid ${hubBlue}`,
-                  boxShadow: (glow || isAnchor)
-                    ? "0 0 0 3px rgba(77,163,255,0.35), 0 0 10px rgba(77,163,255,0.9)"
-                    : "0 1px 3px rgba(0,0,0,0.25)",
-                  transition: "width 90ms, height 90ms, background 90ms, box-shadow 90ms",
-                  cursor: "default",
-                  zIndex: 16,
-                } as React.CSSProperties}
-              />
-            );
-          })}
+          {/* CAD-Blatt: Kantenmitten sind bewusst KEINE Fangpunkte mehr —
+             nur die vier Ecken dienen als Anker für Verschieben/Drehen. */}
 
 
 
