@@ -4620,7 +4620,10 @@ function ElementView({
             const baseStyle: React.CSSProperties = {
               position: "absolute",
               background: "transparent",
-              cursor: isHor ? "ns-resize" : "ew-resize",
+              // CAD-Blatt: Mauszeiger bleibt unverändert (nur über das Symbol schneiden).
+              cursor: isCadView
+                ? (isActive || edgeReady ? (isHor ? "ns-resize" : "ew-resize") : "default")
+                : (isHor ? "ns-resize" : "ew-resize"),
               zIndex: 5,
             };
             const sizeStyle: React.CSSProperties = isHor
