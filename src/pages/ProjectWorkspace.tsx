@@ -2796,7 +2796,7 @@ function PageCanvas({
             key={el.id}
             el={el}
             onJumpCad={onJumpCad}
-            toolActive={activeTool !== null}
+            toolActive={activeTool !== null && activeTool !== "cad"}
             selected={selectedElementIds.includes(el.id)}
             elevated={activeTool === null && el.kind !== "cad-view" && el.kind !== "cad-viewport" && el.kind !== "pdf" && el.kind !== "image"}
             onSelect={(opts) => onSelect(el.id, opts)}
@@ -3484,6 +3484,10 @@ function ElementView({
   };
 
   const isCadView = el.kind === "cad-view" || el.kind === "cad-viewport";
+  // CAD-Blätter verhalten sich in der Bedienung wie Bilder/PDFs
+  // (Auswahl, Ziehen, Drehen, Kanten). Nur Maßstabs-relevante Sonderfälle
+  // (Ecken-Skalierung, Paper-Space-Recompute) bleiben CAD-spezifisch.
+  const cadHubUx = false;
   const hubBlue = "#4da3ff";
 
   // Explizite HUB-Modi für CAD-Blatt: erst nach Klick auf das Symbol wird
@@ -3631,7 +3635,7 @@ function ElementView({
       window.removeEventListener("contextmenu", onContext, true);
       window.removeEventListener("keydown", onKey, true);
     };
-  }, [readOnly, selected, isCadView, el.id, el.x, el.y, el.w, el.h]);
+  }, [readOnly, selected, cadHubUx, el.id, el.x, el.y, el.w, el.h]);
 
   useEffect(() => {
     if (selected) return;
@@ -3772,7 +3776,7 @@ function ElementView({
     else if (nearX === "m" && nearY !== "m") key = nearY === "t" ? "edge-top" : "edge-bottom";
     else if (nearY === "m" && nearX !== "m") key = nearX === "l" ? "edge-left" : "edge-right";
     setAnchor({ fx, fy, key });
-    if ((isCadView && selected) || hubMode || edgeTrim) {
+    if ((cadHubUx && selected) || hubMode || edgeTrim) {
       onSelect?.({ shift: e.shiftKey });
       if (!key.startsWith("edge-")) setActiveEdge(null);
       if (hubMode && !!(window as any).__pixunaTabletCommit) {
@@ -3871,7 +3875,7 @@ function ElementView({
   const showHub = !readOnly && selected && hubKinds.has(el.kind);
   // Optik: CAD-Blatt blau, alle anderen Objekte goldener Auswahlrahmen.
   const outlineStyle = selected
-    ? (isCadView ? "2px solid #4da3ff" : "2px solid hsl(var(--accent-gold))")
+    ? (cadHubUx ? "2px solid #4da3ff" : "2px solid hsl(var(--accent-gold))")
     : "none";
 
   // Preview-Interaktion (Move/Rotate) — startet bei aktivem hubMode.
@@ -4064,7 +4068,7 @@ function ElementView({
         setPreview({ dxPx: dCx, dyPx: dCy, deltaDeg: delta, anchorFrac });
         // CAD-Blatt: Der Cursor wird optisch auf der Linie durch die beiden
         // oberen Fangpunkte fixiert — dadurch ist die Drehung exakt ablesbar.
-        if (isCadView) {
+        if (cadHubUx) {
           const total = startRot + delta;
           const map = (px: number, py: number) => {
             const q = rotAbout(px, py, cX, cY, total);
@@ -4213,7 +4217,7 @@ function ElementView({
       if (actionCommitRef.current === commit) actionCommitRef.current = null;
       if (actionCancelRef.current === cancel) actionCancelRef.current = null;
     };
-  }, [hubMode, isCadView, el.x, el.y, el.w, el.h, el.rotation, onTransform]);
+  }, [hubMode, cadHubUx, el.x, el.y, el.w, el.h, el.rotation, onTransform]);
 
 
   const previewTransform = (() => {
@@ -4241,7 +4245,7 @@ function ElementView({
   // Bilder/PDFs bekommen bei aktivem Tablet-Hilfsrad denselben HUB-Ablauf wie
   // CAD-Blätter: Funktion antippen → Fangpunkt mit dem Stift ziehen (Vorschau)
   // → ENTER bzw. Häkchen setzt final.
-  const hubCapable = isCadView || (tabletActive && (el.kind === "image" || el.kind === "pdf"));
+  const hubCapable = cadHubUx || (tabletActive && (el.kind === "image" || el.kind === "pdf"));
   const tabletCommitOnly = hubCapable && tabletActive && (!!hubMode || !!edgeTrim);
 
   return (
@@ -4258,7 +4262,7 @@ function ElementView({
         height: `${el.h}%`,
         outline: outlineStyle,
         outlineOffset: selected ? "1px" : undefined,
-        cursor: readOnly ? "default" : (hubMode ? "crosshair" : (isCadView ? "default" : "move")),
+        cursor: readOnly ? "default" : (hubMode ? "crosshair" : (cadHubUx ? "default" : "move")),
         opacity: hubMode ? 0.7 : (el.opacity ?? 1),
         boxShadow: el.shadow ? "0 8px 24px -8px rgba(0,0,0,0.25)" : undefined,
         border: el.border ? "1px solid hsl(var(--ink))" : undefined,
@@ -4270,7 +4274,7 @@ function ElementView({
         // PDF/Bild/CAD-Blatt dürfen bei aktivem Zeichenwerkzeug keinen Pointer
         // abfangen — sonst stoppen neue Objekte an ihren Kanten und der
         // Radiergummi erreicht die darüberliegende CAD-Eingabeschicht nicht.
-        pointerEvents: (((el.kind === "pdf" || el.kind === "image" || isCadView) && toolActive) ? "none" : undefined),
+        pointerEvents: (((el.kind === "pdf" || el.kind === "image" || cadHubUx) && toolActive) ? "none" : undefined),
       }}
     >
 
@@ -4370,7 +4374,7 @@ function ElementView({
 
       {showHub && (
         <>
-          {!tabletCommitOnly && !isCadView && (
+          {!tabletCommitOnly && !cadHubUx && (
             <>
               {/* Rotation stem — bei CAD-Blatt ausgeblendet: Drehen läuft nur über die HUB-Box. */}
               <div
@@ -4409,7 +4413,7 @@ function ElementView({
           {/* Hub action bar — bei CAD-Blatt am zuletzt gewählten Anker,
              sonst wie gehabt oben rechts. */}
           {(() => {
-            const anchored = isCadView && anchorFracState && anchorFracState.key !== "interior";
+            const anchored = cadHubUx && anchorFracState && anchorFracState.key !== "interior";
             const hubStyle: React.CSSProperties = anchored
               ? {
                   left: `${anchorFracState!.fx * 100}%`,
@@ -4436,7 +4440,7 @@ function ElementView({
             onMouseDown={(e) => e.stopPropagation()}
             onPointerDown={(e) => e.stopPropagation()}
           >
-            {tabletCommitOnly || (isCadView && !!edgeTrim) ? (
+            {tabletCommitOnly || (cadHubUx && !!edgeTrim) ? (
               <button
                 data-hub-control
                 onClick={(e) => {
@@ -4537,7 +4541,7 @@ function ElementView({
                 )}
               </>
             )}
-            {!tabletCommitOnly && !isCadView && (
+            {!tabletCommitOnly && !cadHubUx && (
               <button
                 data-hub-control
                 onClick={(e) => { e.stopPropagation(); onDuplicate?.(); }}
@@ -4565,7 +4569,7 @@ function ElementView({
               if (!onEdgeDrag) return;
               e.stopPropagation();
               e.preventDefault();
-              if (isCadView && activeEdge !== edge && !edgeTrim) {
+              if (cadHubUx && activeEdge !== edge && !edgeTrim) {
                 setActiveEdge(edge);
                 return;
               }
@@ -4610,7 +4614,7 @@ function ElementView({
                 window.removeEventListener("pointercancel", cancel);
                 // Tablet-Modus und CAD-Blatt: nicht sofort committen —
                 // der Schnitt wird erst per Häkchen bzw. ENTER gesetzt.
-                if ((window as any).__pixunaTabletCommit || isCadView) {
+                if ((window as any).__pixunaTabletCommit || cadHubUx) {
                   return;
                 }
                 commit();
@@ -4623,7 +4627,7 @@ function ElementView({
               position: "absolute",
               background: "transparent",
               // CAD-Blatt: Mauszeiger bleibt unverändert (nur über das Symbol schneiden).
-              cursor: isCadView
+              cursor: cadHubUx
                 ? (isActive || edgeReady ? (isHor ? "ns-resize" : "ew-resize") : "default")
                 : (isHor ? "ns-resize" : "ew-resize"),
               zIndex: 5,
@@ -4631,7 +4635,7 @@ function ElementView({
             const sizeStyle: React.CSSProperties = isHor
               ? { left: 14, right: 14, height: 8, [edge === "top" ? "top" : "bottom"]: -4 }
               : { top: 14, bottom: 14, width: 8, [edge === "left" ? "left" : "right"]: -4 };
-            const edgeStroke = isCadView ? hubBlue : "hsl(var(--accent-gold))";
+            const edgeStroke = cadHubUx ? hubBlue : "hsl(var(--accent-gold))";
             const EdgeSymbol = isHor ? ChevronsUpDown : ChevronsLeftRight;
             const hoverGlow = hoveredSnapKey === `edge-mid-${edge}` || hoveredSnapKey === `edge-line-${edge}`;
             return (
@@ -4639,7 +4643,7 @@ function ElementView({
                 key={edge}
                 data-hub-control
                 onPointerDown={startEdgeDrag}
-                title={isCadView
+                title={cadHubUx
                   ? `Kante ${edge}: nach außen ziehen erweitert den Ausschnitt, nach innen ziehen schneidet ab`
                   : `Kante ${edge} ziehen`}
                 className="group"
@@ -4653,7 +4657,7 @@ function ElementView({
                       : { top: 0, bottom: 0, left: "50%", width: hoverGlow || isActive || edgeReady ? 3 : 2, transform: "translateX(-50%)", background: edgeStroke, opacity: hoverGlow || isActive || edgeReady ? 1 : 0.45, boxShadow: hoverGlow || edgeReady ? `0 0 8px ${edgeStroke}` : undefined }
                   }
                 />
-                {isCadView && (
+                {cadHubUx && (
                   <div
                     className={`absolute flex items-center justify-center rounded-full transition-opacity ${isActive || edgeReady ? "opacity-100" : "opacity-0"}`}
                     style={{
@@ -4688,8 +4692,8 @@ function ElementView({
                 className="absolute pointer-events-none"
                 style={{
                   left: insetLeft, right: insetRight, top: insetTop, bottom: insetBottom,
-                  border: isCadView ? `1.5px dashed ${hubBlue}` : "1.5px dashed hsl(var(--accent-gold))",
-                  background: isCadView ? "rgba(77,163,255,0.08)" : "hsl(var(--accent-gold) / 0.06)",
+                  border: cadHubUx ? `1.5px dashed ${hubBlue}` : "1.5px dashed hsl(var(--accent-gold))",
+                  background: cadHubUx ? "rgba(77,163,255,0.08)" : "hsl(var(--accent-gold) / 0.06)",
                   zIndex: 7,
                 }}
               />
@@ -4701,7 +4705,7 @@ function ElementView({
           {!tabletCommitOnly && (["tl", "tr", "bl", "br"] as const).map((corner) => {
             // Bei CAD-Blatt: Ecken sind Snap-Marker + Anker-Setzer (kein Trim/Resize).
             // Bei anderen Elementen (image/pdf): Ecken skalieren wie gehabt.
-            const cornerDraggable = !isCadView && !!onCornerDrag;
+            const cornerDraggable = !isCadViewKind && !!onCornerDrag;
             const startCornerDrag = (e: React.PointerEvent) => {
               if (!cornerDraggable || !onCornerDrag) return;
               e.stopPropagation();
@@ -4761,10 +4765,10 @@ function ElementView({
             // CAD-Blatt: Fangpunkte blau, sonst gold.
             const size = 12;
             const glow = hoveredSnapKey === `corner-${corner}`;
-            const isAnchor = isCadView && anchorFracState?.key === `corner-${corner}`;
-            const stroke = isCadView ? hubBlue : "hsl(var(--accent-gold))";
+            const isAnchor = cadHubUx && anchorFracState?.key === `corner-${corner}`;
+            const stroke = cadHubUx ? hubBlue : "hsl(var(--accent-gold))";
             const fill = (glow || isAnchor) ? stroke : "white";
-            const shadowActive = isCadView
+            const shadowActive = cadHubUx
               ? "0 0 0 3px rgba(77,163,255,0.35), 0 0 10px rgba(77,163,255,0.9)"
               : "0 0 0 3px hsl(var(--accent-gold) / 0.35), 0 0 10px hsl(var(--accent-gold))";
 
@@ -4772,8 +4776,8 @@ function ElementView({
               <div
                 key={corner}
                 data-hub-control
-                onPointerDown={cornerDraggable ? startCornerDrag : (isCadView ? cornerClickCad : undefined)}
-                title={isCadView ? "Fangpunkt / Anker für Verschieben & Drehen" : "Ecke skalieren (Shift: proportional)"}
+                onPointerDown={cornerDraggable ? startCornerDrag : (cadHubUx ? cornerClickCad : undefined)}
+                title={cadHubUx ? "Fangpunkt / Anker für Verschieben & Drehen" : "Ecke skalieren (Shift: proportional)"}
                 className="absolute"
                 style={{
                   [isTop ? "top" : "bottom"]: -Math.floor(((glow || isAnchor) ? size + 4 : size) / 2),
@@ -4786,7 +4790,7 @@ function ElementView({
                   boxShadow: (glow || isAnchor) ? shadowActive : "0 1px 3px rgba(0,0,0,0.25)",
                   transition: "width 90ms, height 90ms, background 90ms, box-shadow 90ms",
                   cursor,
-                  pointerEvents: (cornerDraggable || isCadView) ? "auto" : "none",
+                  pointerEvents: (cornerDraggable || cadHubUx) ? "auto" : "none",
                   zIndex: 15,
                 } as React.CSSProperties}
               />
@@ -4800,7 +4804,7 @@ function ElementView({
       {/* Rechtsklick-Hilfslinien während einer HUB-Aktion. Werden per Portal
          in das Seiten-Parent gerendert, damit sie über das gesamte Blatt
          verlaufen. Werden beim Commit/Cancel automatisch geleert. */}
-      {isCadView && hubMode && guides.length > 0 && rootRef.current?.parentElement && createPortal(
+      {cadHubUx && hubMode && guides.length > 0 && rootRef.current?.parentElement && createPortal(
         <>
           {guides.map((g) => (
             <React.Fragment key={g.id}>
