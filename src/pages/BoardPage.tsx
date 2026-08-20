@@ -62,7 +62,7 @@ interface Placed {
 // ------------------------------------------------------------------
 // Seite
 // ------------------------------------------------------------------
-export default function Board02Page() {
+export default function BoardPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const project = useProject(projectId);
   const state = useTimeline(projectId);
@@ -394,8 +394,8 @@ export default function Board02Page() {
       <WorkspaceHeader
         projectId={projectId}
         projectName={project?.name}
-        contextLabel="Board02"
-        mode="board2"
+        contextLabel="Board"
+        mode="board"
         canUndo={hist.canUndo}
         canRedo={hist.canRedo}
         onUndo={hist.undo}

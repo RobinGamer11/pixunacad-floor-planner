@@ -14,12 +14,11 @@ import {
   ClipboardPaste,
   HelpCircle,
   TabletSmartphone,
-  Network,
   Wallet,
   GanttChartSquare,
 } from "lucide-react";
 
-export type WorkspaceMode = "workspace" | "cad" | "notes" | "finance" | "board2";
+export type WorkspaceMode = "workspace" | "cad" | "finance" | "board";
 
 interface Props {
   projectId?: string;
@@ -81,9 +80,8 @@ export function WorkspaceHeader({
 
   const goWorkspace = () => projectId && navigate(`/project/${projectId}`);
   const goCad = () => projectId && navigate(`/project/${projectId}/cad`);
-  const goNotes = () => projectId && navigate(`/project/${projectId}/notes`);
   const goFinance = () => projectId && navigate(`/project/${projectId}/finance`);
-  const goBoard2 = () => projectId && navigate(`/project/${projectId}/board2`);
+  const goBoard = () => projectId && navigate(`/project/${projectId}/board`);
 
   return (
     <header
@@ -164,17 +162,10 @@ export function WorkspaceHeader({
           />
           <ModeDivider />
           <ModeButton
-            icon={<Network size={13} />}
-            label="Board"
-            active={mode === "notes"}
-            onClick={goNotes}
-          />
-          <ModeDivider />
-          <ModeButton
             icon={<GanttChartSquare size={13} />}
-            label="Board02"
-            active={mode === "board2"}
-            onClick={goBoard2}
+            label="Board"
+            active={mode === "board"}
+            onClick={goBoard}
           />
           <ModeDivider />
           <ModeButton
