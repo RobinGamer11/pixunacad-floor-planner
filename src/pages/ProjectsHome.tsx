@@ -2666,9 +2666,61 @@ function projectColor(id: string): string {
 
 const PROJECT_CAROUSEL_SLOTS = [-3, -2, -1, 0, 1, 2, 3] as const;
 const PROJECT_CAROUSEL_INTERVAL_MS = 5000;
-const PROJECT_CAROUSEL_CARD_WIDTH = 176;
-const PROJECT_CAROUSEL_MAX_SPACING = 130;
-const PROJECT_CAROUSEL_MIN_SPACING = 40;
+const PROJECT_CAROUSEL_CARD_WIDTH = 240;
+const PROJECT_CAROUSEL_MAX_SPACING = 180;
+const PROJECT_CAROUSEL_MIN_SPACING = 60;
+
+/**
+ * Kreisdiagramm zum Stand eines Projekts – live aus der Board-Oberfläche.
+ * Ring = erledigter Anteil, Segmente = Kategorien.
+ */
+function ProjectDonut({ projectId, size = 96 }: { projectId: string; size?: number }) {
+  const state = useTimeline(projectId);
+  const now = Date.now();
+  const total = state.items.length;
+  const percent = total
+    ? Math.round((state.items.filter((i) => itemAchieved(i, now)).length / total) * 100)
+    : 0;
+  const slices = state.categories
+    .map((c) => ({ c, n: state.items.filter((i) => i.categoryId === c.id).length }))
+    .filter((s) => s.n > 0);
+  const R = size / 2;
+  const inner = R * 0.62;
+  const stroke = R * 0.16;
+  let acc = -Math.PI / 2;
+  const sum = slices.reduce((a, s) => a + s.n, 0) || 1;
+
+  return (
+    <svg width={size} height={size} className="shrink-0">
+      {/* Kategorie-Segmente */}
+      {slices.map((s) => {
+        const ang = (s.n / sum) * Math.PI * 2;
+        const a0 = acc, a1 = acc + ang;
+        acc = a1;
+        const large = ang > Math.PI ? 1 : 0;
+        const d = ang >= Math.PI * 2 - 1e-6
+          ? `M ${R} ${R - R} A ${R} ${R} 0 1 1 ${R - 0.01} ${0} Z`
+          : `M ${R} ${R} L ${R + Math.cos(a0) * R} ${R + Math.sin(a0) * R} A ${R} ${R} 0 ${large} 1 ${R + Math.cos(a1) * R} ${R + Math.sin(a1) * R} Z`;
+        return <path key={s.c.id} d={d} fill={s.c.color} opacity={0.85} />;
+      })}
+      {!slices.length && <circle cx={R} cy={R} r={R} fill="hsl(var(--surface-muted))" />}
+      {/* Fortschrittsring */}
+      <circle cx={R} cy={R} r={inner + stroke / 2} fill="none"
+              stroke="hsl(var(--surface))" strokeWidth={stroke} opacity={0.35} />
+      <circle
+        cx={R} cy={R} r={inner + stroke / 2} fill="none"
+        stroke="hsl(var(--accent-gold))" strokeWidth={stroke} strokeLinecap="round"
+        strokeDasharray={`${(percent / 100) * 2 * Math.PI * (inner + stroke / 2)} ${2 * Math.PI * (inner + stroke / 2)}`}
+        transform={`rotate(-90 ${R} ${R})`}
+      />
+      <circle cx={R} cy={R} r={inner} fill="hsl(var(--surface-card))" />
+      <text x={R} y={R + size * 0.055} textAnchor="middle"
+            fontSize={size * 0.22} fontWeight={700} fill="hsl(var(--ink))">
+        {percent}%
+      </text>
+    </svg>
+  );
+}
 
 function ProjectCarousel({ projects, onOpen }: { projects: Project[]; onOpen: (id: string) => void }) {
   const [offset, setOffset] = useState(0);
@@ -2726,7 +2778,6 @@ function ProjectCarousel({ projects, onOpen }: { projects: Project[]; onOpen: (i
 
   if (!hasProjects) return null;
 
-  // Fünf sichtbare Karten plus je eine unsichtbare Pufferkarte für einen nahtlosen Umlauf.
   const n = projects.length;
   const visible = PROJECT_CAROUSEL_SLOTS.map((slot) => {
     const absoluteIndex = offset + slot;
@@ -2737,11 +2788,9 @@ function ProjectCarousel({ projects, onOpen }: { projects: Project[]; onOpen: (i
     };
   });
 
-
-
   return (
     <div
-      className="mb-6 select-none"
+      className="mb-8 select-none"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onFocusCapture={() => setFocusWithin(true)}
@@ -2751,14 +2800,14 @@ function ProjectCarousel({ projects, onOpen }: { projects: Project[]; onOpen: (i
     >
       <div
         ref={viewportRef}
-        className="relative flex h-44 items-center justify-center overflow-hidden"
-        style={{ perspective: "1000px", perspectiveOrigin: "50% 50%" }}
+        className="relative flex h-64 items-center justify-center overflow-hidden"
+        style={{ perspective: "1200px", perspectiveOrigin: "50% 50%" }}
       >
         {visible.map(({ absoluteIndex, slot, project: p }) => {
           const abs = Math.abs(slot);
           const buffered = abs >= 3;
           const translateX = slot * cardSpacing;
-          const translateZ = -abs * 170;
+          const translateZ = -abs * 190;
           const rotateY = slot === 0 ? 0 : slot > 0 ? -38 : 38;
           const scale = 1 - abs * 0.08;
           const opacity = buffered ? 0 : abs === 2 ? 0.45 : abs === 1 ? 0.8 : 1;
@@ -2766,10 +2815,10 @@ function ProjectCarousel({ projects, onOpen }: { projects: Project[]; onOpen: (i
             <button
               key={absoluteIndex}
               onClick={() => onOpen(p.id)}
-              title={p.name}
+              title={`${p.name} — Projektstand`}
               aria-hidden={buffered}
               tabIndex={buffered ? -1 : 0}
-              className="absolute group outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg"
+              className="absolute group outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl"
               style={{
                 transform: `translateX(${translateX}px) translateZ(${translateZ}px) rotateY(${rotateY}deg) scale(${scale})`,
                 transformStyle: "preserve-3d",
@@ -2782,16 +2831,12 @@ function ProjectCarousel({ projects, onOpen }: { projects: Project[]; onOpen: (i
               }}
             >
               <div
-                className="w-44 h-28 rounded-lg overflow-hidden border flex items-center justify-center shadow-lg"
-                style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--beige-soft))" }}
+                className="w-60 h-40 rounded-xl overflow-hidden border flex items-center justify-center shadow-lg"
+                style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
               >
-                {p.thumbnail ? (
-                  <img src={p.thumbnail} alt={`Projektbild ${p.name}`} className="w-full h-full object-cover" />
-                ) : (
-                  <span className="text-xl font-semibold text-muted-foreground">{p.name.slice(0, 2).toUpperCase()}</span>
-                )}
+                <ProjectDonut projectId={p.id} size={126} />
               </div>
-              <div className={`mt-1.5 text-xs truncate text-center max-w-44 ${slot === 0 ? "font-semibold" : "text-muted-foreground"}`}>
+              <div className={`mt-2 text-sm truncate text-center max-w-60 ${slot === 0 ? "font-semibold" : "text-muted-foreground"}`}>
                 {p.name}
               </div>
             </button>
@@ -2802,11 +2847,66 @@ function ProjectCarousel({ projects, onOpen }: { projects: Project[]; onOpen: (i
   );
 }
 
+/** Kompakte Vorschau der Board-Oberfläche eines Projekts. */
+function BoardPreview({ project }: { project: Project }) {
+  const navigate = useNavigate();
+  const state = useTimeline(project.id);
+  const now = Date.now();
+  const upcoming = [...state.items]
+    .sort((a, b) => (a.endDate || a.startDate).localeCompare(b.endDate || b.startDate))
+    .slice(0, 6);
+  const catMap = new Map(state.categories.map((c) => [c.id, c]));
+  const total = state.items.length;
+  const percent = total
+    ? Math.round((state.items.filter((i) => itemAchieved(i, now)).length / total) * 100)
+    : 0;
 
+  return (
+    <div className="mt-3 rounded-xl p-4" style={{ background: "#141110", border: "1px solid #332c26" }}>
+      <div className="flex items-center gap-3 mb-3">
+        <span className="text-xs font-semibold" style={{ color: "#efe7de" }}>Board-Vorschau</span>
+        <span className="text-[11px] tabular-nums" style={{ color: "#8b837b" }}>{percent}% · {total} Einträge</span>
+        <div className="flex-1" />
+        <button
+          onClick={() => navigate(`/project/${project.id}/board`)}
+          className="h-7 px-2.5 rounded-md text-[11px] font-medium"
+          style={{ background: "#e2703a", color: "#fff" }}
+        >
+          Board öffnen
+        </button>
+      </div>
+      <div className="h-2 w-full rounded-full overflow-hidden mb-3" style={{ background: "#241f1b" }}>
+        <div className="h-full rounded-full" style={{ width: `${percent}%`, background: "#e2703a" }} />
+      </div>
+      <div className="space-y-1.5">
+        {upcoming.length === 0 && (
+          <div className="text-[11px]" style={{ color: "#6f665e" }}>Noch keine Einträge im Board.</div>
+        )}
+        {upcoming.map((i) => {
+          const alert = taskAlert(i, now);
+          return (
+            <div key={i.id} className="flex items-center gap-2 text-[11px]" style={{ color: "#cdc4bb" }}>
+              <span className="w-2 h-2 rounded-full shrink-0"
+                    style={{ background: alert ? "#ef4444" : itemAchieved(i, now) ? "#e2703a" : "#a19a92" }} />
+              <span className="truncate flex-1">{i.title}</span>
+              <span className="shrink-0" style={{ color: "#8b837b" }}>
+                {catMap.get(i.categoryId ?? "")?.label ?? "—"}
+              </span>
+              <span className="shrink-0 tabular-nums" style={{ color: "#8b837b" }}>
+                {(i.endDate || i.startDate).split("-").reverse().join(".")}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 function AllTasksView({ projects, onOpenProject }: { projects: Project[]; onOpenProject: (id: string) => void }) {
   const navigate = useNavigate();
   const [activeIds, setActiveIds] = useState<Set<string>>(() => new Set(projects.map((p) => p.id)));
+  const [previewId, setPreviewId] = useState<string | null>(null);
   useEffect(() => {
     setActiveIds((prev) => {
       const next = new Set(prev);
@@ -2822,33 +2922,48 @@ function AllTasksView({ projects, onOpenProject }: { projects: Project[]; onOpen
       return n;
     });
 
-  // Alle Aufgaben (legacy + board.task) über alle Projekte
-  type GTask = { id: string; projectId: string; projectName: string; title: string; date?: string; time?: string; priority: TaskPriority; done?: boolean; color: string };
+  // Offene Aufgaben aus der Board-Oberfläche über alle Projekte hinweg.
+  type GTask = {
+    id: string; projectId: string; projectName: string; title: string;
+    date?: string; time?: string; done: boolean; alert: boolean; color: string; category?: string;
+  };
   const gTasks: GTask[] = useMemo(() => {
+    const now = Date.now();
     const out: GTask[] = [];
     projects.forEach((p) => {
       const color = projectColor(p.id);
-      p.tasks?.forEach((t) =>
-        out.push({ id: t.id, projectId: p.id, projectName: p.name, title: t.title, date: t.date, time: t.time, priority: t.priority ?? "medium", done: t.done, color })
-      );
       try {
-        const notes = notesStore.getState(p.id);
-        notes.nodes.filter((n) => n.kind === "task").forEach((n) =>
-          out.push({ id: n.id, projectId: p.id, projectName: p.name, title: n.title, date: n.dueDate ?? n.date, time: n.time, priority: (n.priority === "high" || n.priority === "urgent") ? "high" : n.priority === "low" ? "low" : "medium", done: n.status === "done", color })
-        );
+        const st = timelineStore.getState(p.id);
+        const cats = new Map(st.categories.map((c) => [c.id, c.label]));
+        st.items
+          .filter((i) => i.kind === "task")
+          .forEach((i) =>
+            out.push({
+              id: i.id,
+              projectId: p.id,
+              projectName: p.name,
+              title: i.title,
+              date: i.endDate || i.startDate,
+              time: i.endTime || i.startTime,
+              done: itemAchieved(i, now),
+              alert: taskAlert(i, now),
+              color,
+              category: cats.get(i.categoryId ?? ""),
+            })
+          );
       } catch {}
     });
-    const prio: Record<TaskPriority, number> = { high: 0, medium: 1, low: 2 };
     return out.sort((a, b) => {
-      if (!!a.done !== !!b.done) return a.done ? 1 : -1;
-      const pr = prio[a.priority] - prio[b.priority];
-      if (pr !== 0) return pr;
+      if (a.done !== b.done) return a.done ? 1 : -1;
+      if (a.alert !== b.alert) return a.alert ? -1 : 1;
       return `${a.date ?? "9999"} ${a.time ?? "99:99"}`.localeCompare(`${b.date ?? "9999"} ${b.time ?? "99:99"}`);
     });
   }, [projects]);
 
   const [selectedDate, setSelectedDate] = useState<string | undefined>();
-  const visible = gTasks.filter((t) => activeIds.has(t.projectId) && (!selectedDate || t.date === selectedDate));
+  const visible = gTasks.filter(
+    (t) => !t.done && activeIds.has(t.projectId) && (!selectedDate || t.date === selectedDate)
+  );
 
   return (
     <div className="px-10 py-7">
@@ -2856,49 +2971,78 @@ function AllTasksView({ projects, onOpenProject }: { projects: Project[]; onOpen
 
       <div className="flex items-center gap-3 mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">Alle Aufgaben</h1>
-        <span className="text-sm text-muted-foreground">projektübergreifend</span>
+        <span className="text-sm text-muted-foreground">projektübergreifend · offen</span>
       </div>
-
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
         {/* Aufgaben-Liste */}
-        <div className="rounded-xl border overflow-hidden" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface))" }}>
-          <div className="px-4 py-3 border-b text-xs font-semibold tracking-widest text-muted-foreground flex items-center justify-between" style={{ borderColor: "hsl(var(--hairline))" }}>
-            <span>AUFGABEN {selectedDate ? `· ${selectedDate}` : `· ${visible.length}`}</span>
-            {selectedDate && (
-              <button onClick={() => setSelectedDate(undefined)} className="text-[11px] font-normal hover:text-foreground">Filter zurücksetzen</button>
+        <div className="space-y-6">
+          <div className="rounded-xl border overflow-hidden" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface))" }}>
+            <div className="px-4 py-3 border-b text-xs font-semibold tracking-widest text-muted-foreground flex items-center justify-between" style={{ borderColor: "hsl(var(--hairline))" }}>
+              <span>AUFGABEN {selectedDate ? `· ${selectedDate}` : `· ${visible.length}`}</span>
+              {selectedDate && (
+                <button onClick={() => setSelectedDate(undefined)} className="text-[11px] font-normal hover:text-foreground">Filter zurücksetzen</button>
+              )}
+            </div>
+            {visible.length === 0 ? (
+              <div className="p-6 text-sm text-muted-foreground">Keine offenen Aufgaben.</div>
+            ) : (
+              <ul className="divide-y" style={{ borderColor: "hsl(var(--hairline))" }}>
+                {visible.map((t) => (
+                  <li
+                    key={`${t.projectId}:${t.id}`}
+                    onClick={() => navigate(`/project/${t.projectId}/board`)}
+                    className="px-4 py-3 flex items-center gap-3 hover:bg-muted/40 cursor-pointer"
+                  >
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ background: t.color }} />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm truncate">{t.title}</div>
+                      <div className="text-[11px] text-muted-foreground truncate">
+                        {t.projectName}{t.category ? ` · ${t.category}` : ""}{t.date ? ` · ${t.date}` : ""}{t.time ? ` · ${t.time}` : ""}
+                      </div>
+                    </div>
+                    {t.alert && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full"
+                            style={{ background: "hsl(0 70% 50% / 0.15)", color: "hsl(0 70% 40%)" }}>
+                        Überfällig
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
-          {visible.length === 0 ? (
-            <div className="p-6 text-sm text-muted-foreground">Keine Aufgaben.</div>
-          ) : (
-            <ul className="divide-y" style={{ borderColor: "hsl(var(--hairline))" }}>
-              {visible.map((t) => (
-                <li
-                  key={`${t.projectId}:${t.id}`}
-                  onClick={() => navigate(`/project/${t.projectId}`)}
-                  className="px-4 py-3 flex items-center gap-3 hover:bg-muted/40 cursor-pointer"
-                >
-                  <span className="w-2 h-2 rounded-full shrink-0" style={{ background: t.color }} />
-                  <div className="flex-1 min-w-0">
-                    <div className={`text-sm truncate ${t.done ? "line-through text-muted-foreground" : ""}`}>{t.title}</div>
-                    <div className="text-[11px] text-muted-foreground truncate">
-                      {t.projectName}{t.date ? ` · ${t.date}` : ""}{t.time ? ` · ${t.time}` : ""}
-                    </div>
-                  </div>
-                  <span
-                    className="text-[10px] px-2 py-0.5 rounded-full"
-                    style={{
-                      background: t.priority === "high" ? "hsl(0 70% 50% / 0.15)" : t.priority === "low" ? "hsl(var(--surface-muted))" : "hsl(45 90% 50% / 0.15)",
-                      color: t.priority === "high" ? "hsl(0 70% 40%)" : t.priority === "low" ? "hsl(var(--ink-soft))" : "hsl(35 80% 35%)",
-                    }}
+
+          {/* Projekte mit Kreisdiagramm + Board-Vorschau */}
+          <div className="rounded-xl border p-4" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface))" }}>
+            <div className="text-xs font-semibold tracking-widest text-muted-foreground mb-3">PROJEKTSTÄNDE</div>
+            <div className="space-y-2">
+              {projects.map((p) => (
+                <div key={p.id}>
+                  <button
+                    onClick={() => setPreviewId((cur) => (cur === p.id ? null : p.id))}
+                    className="w-full flex items-center gap-4 rounded-lg px-3 py-2 hover:bg-muted/40 text-left"
+                    style={{ border: "1px solid hsl(var(--hairline))" }}
                   >
-                    {t.priority === "high" ? "Hoch" : t.priority === "low" ? "Niedrig" : "Mittel"}
-                  </span>
-                </li>
+                    <ProjectDonut projectId={p.id} size={64} />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium truncate">{p.name}</div>
+                      <div className="text-[11px] text-muted-foreground truncate">
+                        {p.ort || "Ohne Ort"} · {previewId === p.id ? "Vorschau schließen" : "Board-Vorschau öffnen"}
+                      </div>
+                    </div>
+                    <ChevronRight
+                      size={16}
+                      className="text-muted-foreground shrink-0 transition-transform"
+                      style={{ transform: previewId === p.id ? "rotate(90deg)" : undefined }}
+                    />
+                  </button>
+                  {previewId === p.id && <BoardPreview project={p} />}
+                </div>
               ))}
-            </ul>
-          )}
+              {projects.length === 0 && <div className="text-sm text-muted-foreground">Keine Projekte.</div>}
+            </div>
+          </div>
         </div>
 
         {/* Kalender + Projekt-Filter */}
@@ -2922,7 +3066,7 @@ function AllTasksView({ projects, onOpenProject }: { projects: Project[]; onOpen
           </div>
 
           <GlobalCalendar
-            tasks={gTasks.filter((t) => activeIds.has(t.projectId))}
+            tasks={gTasks.filter((t) => !t.done && activeIds.has(t.projectId))}
             selectedDate={selectedDate}
             onSelect={(d) => setSelectedDate((prev) => (prev === d ? undefined : d))}
           />
