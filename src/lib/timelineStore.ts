@@ -4,8 +4,9 @@
 export type TlKind = "task" | "event" | "note";
 
 export interface TlCategory { id: string; label: string; color: string }
-/** size = Basisradius des größten Kreises in Pixeln. */
-export interface TlPriority { id: string; label: string; size: number }
+/** percent = Priorität in Prozent (1–100). Bestimmt die Kreisgröße. */
+export interface TlPriority { id: string; label: string; percent: number }
+export interface TlStatus { id: string; label: string; color: string }
 
 export interface TlItem {
   id: string;
@@ -13,6 +14,9 @@ export interface TlItem {
   title: string;
   description?: string;
   done?: boolean;
+  /** Status-Id aus TlState.statuses (aus Board übernommen). */
+  statusId?: string;
+  responsible?: string;
   categoryId?: string;
   priorityId?: string;
   /** ISO "YYYY-MM-DD" */
@@ -27,6 +31,7 @@ export interface TlItem {
 export interface TlState {
   categories: TlCategory[];
   priorities: TlPriority[];
+  statuses: TlStatus[];
   items: TlItem[];
 }
 
@@ -37,14 +42,40 @@ const DEFAULT_CATEGORIES: TlCategory[] = [
 ];
 
 const DEFAULT_PRIORITIES: TlPriority[] = [
-  { id: "urgent", label: "Dringend", size: 22 },
-  { id: "high", label: "Hoch", size: 17 },
-  { id: "normal", label: "Normal", size: 13 },
-  { id: "low", label: "Niedrig", size: 9 },
+  { id: "urgent", label: "Dringend", percent: 100 },
+  { id: "high", label: "Hoch", percent: 70 },
+  { id: "normal", label: "Normal", percent: 45 },
+  { id: "low", label: "Niedrig", percent: 20 },
 ];
+
+export const DEFAULT_STATUSES: TlStatus[] = [
+  { id: "open", label: "Offen", color: "#ef4444" },
+  { id: "wip", label: "In Bearbeitung", color: "#f59e0b" },
+  { id: "done", label: "Erledigt", color: "#10b981" },
+];
+
+/** Radius eines Kreises aus der Priorität (Prozent). */
+export function priorityRadius(percent: number | undefined): number {
+  const p = Math.max(1, Math.min(100, percent ?? 45));
+  return 5 + (p / 100) * 20;
+}
 
 const KEY = (projectId: string) => `pixuna.board02.${projectId}`;
 const HISTORY_LIMIT = 100;
+
+function normPriorities(list: unknown): TlPriority[] {
+  const arr = Array.isArray(list) ? list : [];
+  const out = arr.map((raw) => {
+    const p = raw as Partial<TlPriority> & { size?: number };
+    const percent = typeof p.percent === "number"
+      ? p.percent
+      : typeof p.size === "number"
+        ? Math.max(1, Math.min(100, Math.round(((p.size - 4) / 36) * 100)))
+        : 45;
+    return { id: String(p.id ?? uid()), label: String(p.label ?? "Priorität"), percent };
+  });
+  return out.length ? out : [...DEFAULT_PRIORITIES];
+}
 
 function loadState(projectId: string): TlState {
   try {
@@ -53,12 +84,21 @@ function loadState(projectId: string): TlState {
       const p = JSON.parse(raw) as Partial<TlState>;
       return {
         categories: p.categories?.length ? p.categories : [...DEFAULT_CATEGORIES],
-        priorities: p.priorities?.length ? p.priorities : [...DEFAULT_PRIORITIES],
-        items: p.items ?? [],
+        priorities: normPriorities(p.priorities),
+        statuses: p.statuses?.length ? p.statuses : [...DEFAULT_STATUSES],
+        items: (p.items ?? []).map((i) => ({
+          ...i,
+          statusId: i.statusId ?? (i.done ? "done" : "open"),
+        })),
       };
     }
   } catch {}
-  return { categories: [...DEFAULT_CATEGORIES], priorities: [...DEFAULT_PRIORITIES], items: [] };
+  return {
+    categories: [...DEFAULT_CATEGORIES],
+    priorities: [...DEFAULT_PRIORITIES],
+    statuses: [...DEFAULT_STATUSES],
+    items: [],
+  };
 }
 
 interface HistoryEntry { past: TlState[]; future: TlState[] }
@@ -97,10 +137,34 @@ function subscribe(projectId: string, fn: () => void): () => void {
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 const today = () => new Date().toISOString().slice(0, 10);
+const plusDays = (n: number) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
 
 export const timelineStore = {
   getState,
   subscribe,
+  /** Legt beim ersten Öffnen eines Projekts den Default-Termin „Projektverlauf" an. */
+  ensureDefaults(projectId: string) {
+    const s = getState(projectId);
+    if (s.items.length) return;
+    const now = Date.now();
+    const item: TlItem = {
+      id: uid(),
+      kind: "event",
+      title: "Projektverlauf",
+      description: "",
+      done: false,
+      statusId: "open",
+      categoryId: s.categories[0]?.id,
+      priorityId: "normal",
+      startDate: today(),
+      startTime: "09:00",
+      endDate: plusDays(10),
+      endTime: "17:00",
+      createdAt: now,
+      updatedAt: now,
+    };
+    persist(projectId, { ...s, items: [item] });
+  },
   deleteProject(projectId: string) {
     cache.delete(projectId);
     history.delete(projectId);
@@ -133,6 +197,8 @@ export const timelineStore = {
       title: patch.title ?? (kind === "task" ? "Neue Aufgabe" : kind === "event" ? "Neuer Termin" : "Neue Notiz"),
       description: patch.description ?? "",
       done: patch.done ?? false,
+      statusId: patch.statusId ?? "open",
+      responsible: patch.responsible ?? "",
       categoryId: patch.categoryId ?? s.categories[0]?.id,
       priorityId: patch.priorityId ?? "normal",
       startDate: patch.startDate ?? today(),
@@ -163,6 +229,13 @@ export const timelineStore = {
     commit(projectId, { ...s, categories: [...s.categories, cat] });
     return cat.id;
   },
+  updateCategory(projectId: string, id: string, patch: Partial<Omit<TlCategory, "id">>) {
+    const s = getState(projectId);
+    commit(projectId, {
+      ...s,
+      categories: s.categories.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+    });
+  },
   removeCategory(projectId: string, id: string) {
     const s = getState(projectId);
     commit(projectId, {
@@ -171,12 +244,21 @@ export const timelineStore = {
       items: s.items.map((i) => (i.categoryId === id ? { ...i, categoryId: undefined } : i)),
     });
   },
-  addPriority(projectId: string, label: string, size: number): string | null {
+  addPriority(projectId: string, label: string, percent: number): string | null {
     const s = getState(projectId);
     if (!label.trim()) return null;
-    const p: TlPriority = { id: uid(), label: label.trim(), size: Math.max(4, Math.min(40, size)) };
+    const p: TlPriority = { id: uid(), label: label.trim(), percent: Math.max(1, Math.min(100, percent)) };
     commit(projectId, { ...s, priorities: [...s.priorities, p] });
     return p.id;
+  },
+  updatePriority(projectId: string, id: string, patch: Partial<Omit<TlPriority, "id">>) {
+    const s = getState(projectId);
+    commit(projectId, {
+      ...s,
+      priorities: s.priorities.map((p) => (p.id === id
+        ? { ...p, ...patch, percent: Math.max(1, Math.min(100, patch.percent ?? p.percent)) }
+        : p)),
+    });
   },
   removePriority(projectId: string, id: string) {
     const s = getState(projectId);
@@ -189,7 +271,7 @@ export const timelineStore = {
 };
 
 import { useSyncExternalStore } from "react";
-const EMPTY: TlState = { categories: [], priorities: [], items: [] };
+const EMPTY: TlState = { categories: [], priorities: [], statuses: DEFAULT_STATUSES, items: [] };
 
 export function useTimeline(projectId: string | undefined): TlState {
   return useSyncExternalStore(
@@ -222,8 +304,9 @@ export function itemEndMs(i: TlItem): number {
   const end = new Date(`${i.endDate}T${i.endTime || i.startTime || "00:00"}:00`).getTime();
   return Math.max(end, itemStartMs(i));
 }
-/** Fortschritt eines Eintrags: Termine über die Zeit, Aufgaben/Notizen manuell. */
+/** Fortschritt eines Eintrags: Termine über die Zeit, Aufgaben/Notizen über den Status. */
 export function itemAchieved(i: TlItem, now = Date.now()): boolean {
+  if (i.statusId === "done" || i.done) return true;
   if (i.kind === "event") return itemEndMs(i) <= now;
-  return !!i.done;
+  return false;
 }
