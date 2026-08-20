@@ -711,9 +711,11 @@ export default function Board02Page() {
               </div>
 
               <div className="rounded-lg overflow-hidden" style={{ border: `1px solid ${PANEL_LINE}` }}>
-                <div className="grid px-3 py-2 text-[10px] uppercase tracking-wide"
-                     style={{ gridTemplateColumns: "90px 1fr 110px 120px 170px 130px", background: SUBTLE, color: INK_SOFT }}>
-                  <span>Priorität</span><span>Name</span><span>Status</span><span>Kategorie</span><span>Zeitraum</span><span>Verantwortlich</span>
+                <div className="grid gap-2 px-3 py-2 text-[10px] uppercase tracking-wide"
+                     style={{ gridTemplateColumns: GRID_COLS, background: SUBTLE, color: INK_SOFT }}>
+                  <span className="truncate">Priorität</span><span className="truncate">Name</span>
+                  <span className="truncate">Status</span><span className="truncate">Kategorie</span>
+                  <span className="truncate">Zeitraum</span><span className="truncate">Verantwortlich</span>
                 </div>
                 {listItems.map((i) => {
                   const prio = prioMap.get(i.priorityId ?? "");
@@ -724,22 +726,23 @@ export default function Board02Page() {
                     <button
                       key={i.id}
                       onClick={() => setSelectedId(i.id)}
-                      className="grid w-full items-center px-3 py-2 text-left text-[11px] border-t"
+                      className="grid w-full items-center gap-2 px-3 py-2.5 text-left text-[12px] border-t"
                       style={{
-                        gridTemplateColumns: "90px 1fr 110px 120px 170px 130px",
+                        gridTemplateColumns: GRID_COLS,
                         borderColor: PANEL_LINE,
                         background: i.id === selectedId ? "#fbe9df" : "transparent",
                         color: doneRow ? INK_SOFT : INK,
                       }}
+                      title={i.title}
                     >
-                      <span className="tabular-nums">{prio ? `${prio.label} · ${prio.percent}%` : "—"}</span>
-                      <span className="flex items-center gap-1.5 truncate pr-2">
-                        <span style={{ color: cat?.color ?? ORANGE }}>{kindIcon(i.kind, 11)}</span>
+                      <span className="tabular-nums truncate">{prio ? `${prio.label} · ${prio.percent}%` : "—"}</span>
+                      <span className="flex min-w-0 items-center gap-1.5">
+                        <span className="shrink-0" style={{ color: cat?.color ?? ORANGE }}>{kindIcon(i.kind, 12)}</span>
                         <span className="truncate">{i.title}</span>
                       </span>
-                      <span style={{ color: st?.color ?? INK_SOFT }}>{st?.label ?? "—"}</span>
-                      <span>{cat?.label ?? "—"}</span>
-                      <span className="opacity-80">
+                      <span className="truncate" style={{ color: st?.color ?? INK_SOFT }}>{st?.label ?? "—"}</span>
+                      <span className="truncate">{cat?.label ?? "—"}</span>
+                      <span className="truncate opacity-80">
                         {fmtDate(i.startDate)}{i.endDate ? ` – ${fmtDate(i.endDate)}` : ""}
                       </span>
                       <span className="truncate">{i.responsible || "—"}</span>
@@ -747,11 +750,15 @@ export default function Board02Page() {
                   );
                 })}
                 {!listItems.length && (
-                  <div className="px-3 py-4 text-[11px]" style={{ color: INK_SOFT }}>Keine Treffer.</div>
+                  <div className="px-3 py-4 text-[12px]" style={{ color: INK_SOFT }}>Keine Treffer.</div>
                 )}
               </div>
             </div>
+
+            {/* Dauerhafter Leerraum unter der Auflistung */}
+            <div aria-hidden style={{ minHeight: 260 }} />
           </div>
+
         </div>
 
         {/* Editor */}
