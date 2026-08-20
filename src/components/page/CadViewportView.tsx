@@ -200,6 +200,27 @@ export function CadViewportView({
     );
   }
 
+  // Pixel-Objektart: eingebranntes Bild statt Live-Vektorrender.
+  if (element.pixelMode && element.viewSnapshot) {
+    return (
+      <div
+        ref={wrapRef}
+        className="w-full h-full relative overflow-hidden"
+        style={{ background: "white" }}
+        data-viewport-scale={`1:${scaleDen}`}
+      >
+        <img
+          src={element.viewSnapshot}
+          alt={label}
+          draggable={false}
+          className="w-full h-full"
+          style={{ pointerEvents: "none", objectFit: "fill" }}
+        />
+        {ScaleCheckPill}
+      </div>
+    );
+  }
+
   return (
     <div
       ref={wrapRef}
