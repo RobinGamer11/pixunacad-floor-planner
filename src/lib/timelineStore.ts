@@ -204,8 +204,9 @@ export const timelineStore = {
       categoryId: patch.categoryId ?? s.categories[0]?.id,
       priorityId: patch.priorityId ?? "normal",
       startDate: patch.startDate ?? today(),
-      startTime: patch.startTime ?? "09:00",
-      endDate: patch.endDate,
+      // Keine Default-Uhrzeit: Ohne Uhrzeit verteilen sich die Kreise im Tag.
+      startTime: patch.startTime,
+
       endTime: patch.endTime,
       createdAt: now,
       updatedAt: now,
