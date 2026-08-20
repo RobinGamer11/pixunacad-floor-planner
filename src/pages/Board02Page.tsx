@@ -4,7 +4,7 @@ import { WorkspaceHeader } from "@/components/workspace/WorkspaceHeader";
 import { useProject } from "@/lib/projectStore";
 import {
   timelineStore, useTimeline, useTimelineHistory,
-  itemStartMs, itemEndMs, itemAchieved, priorityRadius,
+  itemStartMs, itemEndMs, itemAchieved, effectiveStatusId, priorityRadius,
   type TlItem, type TlKind, type TlCategory, type TlPriority, type TlStatus,
 } from "@/lib/timelineStore";
 import {
@@ -158,47 +158,65 @@ export default function Board02Page() {
   const placed = useMemo<Placed[]>(() => {
     const sorted = [...state.items].sort((a, b) => itemStartMs(a) - itemStartMs(b));
     const laneEnd: Record<string, number> = {};
-    // Kollisionsfreie Packung: bereits gesetzte Kreise merken.
+    // Deterministisches 2D-Bubble-Packing entlang der horizontalen Zeitachse.
     const packed: { x: number; y: number; r: number }[] = [];
+    const GAP = 1.6;
     const fits = (x: number, y: number, r: number) =>
-      packed.every((p) => {
-        const dx = p.x - x, dy = p.y - y;
-        return Math.hypot(dx, dy) >= p.r + r + 1.2;
-      });
-    const placeCircle = (x: number, r: number): number => {
-      if (fits(x, 0, r)) { packed.push({ x, y: 0, r }); return 0; }
-      for (let step = 1; step <= 60; step++) {
-        const off = step * 3;
-        for (const y of [-off, off]) {
-          if (fits(x, y, r)) { packed.push({ x, y, r }); return y; }
+      packed.every((p) => Math.hypot(p.x - x, p.y - y) >= p.r + r + GAP);
+    /** Pseudozufall aus einem String – gleiche Daten ⇒ gleiche Anordnung. */
+    const seedOf = (s: string) => {
+      let h = 2166136261;
+      for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+      return ((h >>> 0) % 10000) / 10000;
+    };
+    const placeCircle = (ax: number, r: number, seed: number): { x: number; y: number } => {
+      if (fits(ax, 0, r)) { packed.push({ x: ax, y: 0, r }); return { x: ax, y: 0 }; }
+      const phase = seed * Math.PI * 2;
+      const stepR = Math.max(2.5, r * 0.45);
+      let best: { x: number; y: number; cost: number } | null = null;
+      for (let ring = 1; ring <= 26 && !best; ring++) {
+        const d = ring * stepR;
+        const n = Math.max(8, Math.round(ring * 8));
+        for (let i = 0; i < n; i++) {
+          const a = phase + (i / n) * Math.PI * 2;
+          // horizontal nur leicht ausweichen, vertikal freier -> kompakte Wolke statt Stapel
+          const x = ax + Math.cos(a) * d * 0.55;
+          const y = Math.sin(a) * d;
+          if (!fits(x, y, r)) continue;
+          const cost = Math.abs(x - ax) * 2.2 + Math.abs(y);
+          if (!best || cost < best.cost) best = { x, y, cost };
         }
       }
-      packed.push({ x, y: 0, r });
-      return 0;
+      const res = best ?? { x: ax, y: 0 };
+      packed.push({ x: res.x, y: res.y, r });
+      return { x: res.x, y: res.y };
     };
 
     let flip: 1 | -1 = -1;
     return sorted.map((item) => {
       const s = itemStartMs(item), e = itemEndMs(item);
-      const bx0 = baseX(s), bx1 = baseX(e);
+      const ax0 = baseX(s), ax1 = baseX(e);
       const rMax = priorityRadius(prioMap.get(item.priorityId ?? "")?.percent);
       const rMin = Math.max(3, rMax * 0.35);
-      const len = bx1 - bx0;
+      const len = ax1 - ax0;
       const circles: Circle[] = [];
       if (len < rMax * 1.2) {
-        circles.push({ bx: bx0, dy: placeCircle(bx0, rMax), r: rMax, t: s });
+        const pos = placeCircle(ax0, rMax, seedOf(item.id));
+        circles.push({ bx: pos.x, dy: pos.y, r: rMax, t: s });
       } else {
         const n = clamp(Math.round(len / (rMax * 1.35)), 3, 40);
         for (let i = 0; i < n; i++) {
           const f = i / (n - 1);
-          const bx = bx0 + len * f;
           const r = rMin + (rMax - rMin) * f;
-          circles.push({ bx, dy: placeCircle(bx, r), r, t: s + (e - s) * f });
+          const pos = placeCircle(ax0 + len * f, r, seedOf(`${item.id}:${i}`));
+          circles.push({ bx: pos.x, dy: pos.y, r, t: s + (e - s) * f });
         }
       }
       flip = flip === 1 ? -1 : 1;
       const side = flip;
       const key = side === -1 ? "up" : "dn";
+      const bx0 = circles[0]?.bx ?? ax0;
+      const bx1 = circles[circles.length - 1]?.bx ?? ax1;
       let lane = 0;
       while (laneEnd[`${key}${lane}`] !== undefined && laneEnd[`${key}${lane}`] > bx1 - 4) lane++;
       laneEnd[`${key}${lane}`] = bx1 + Math.max(120, item.title.length * 7.4);
@@ -206,13 +224,26 @@ export default function Board02Page() {
     });
   }, [state.items, baseX, prioMap]);
 
+  /** Basis-X → Bildschirm-X (Zoom/Pan). */
+  const sx = useCallback((bx: number) => padX + (bx - padX) * view.k + view.tx, [view]);
+
+  /** Halbe Höhe der Bubble-Wolke (Bildschirm) – Beschriftungen liegen darüber/darunter. */
+  const clusterHalf = useMemo(() => {
+    let m = 0;
+    placed.forEach((p) => p.circles.forEach((c) => { m = Math.max(m, Math.abs(c.dy) + c.r); }));
+    return m * view.k;
+  }, [placed, view.k]);
+  const labelY = useCallback(
+    (p: Placed) => clamp(cy + p.side * (clusterHalf + 26 + p.lane * 26), 20, size.h - 60),
+    [clusterHalf, cy, size.h],
+  );
+
   // ---- Farbe eines Kreises ------------------------------------------
   const circleFill = useCallback((item: TlItem, t: number) => {
     if (colorMode === "category") return catMap.get(item.categoryId ?? "")?.color ?? GREY;
-    const achieved = itemAchieved(item, now);
-    if (t > now) return GREY;
-    if (!achieved) return GREY;
-    return ORANGE;
+    // „Erledigt“ ist immer orange – unabhängig von der Zeitposition.
+    if (itemAchieved(item, now)) return ORANGE;
+    return GREY;
   }, [colorMode, catMap, now]);
 
   // ---- Achsen-Ticks --------------------------------------------------
@@ -388,14 +419,16 @@ export default function Board02Page() {
                 </g>
               )}
 
-              {/* Verbindungslinien (L-Form) */}
+              {/* Verbindungslinien (L-Form) – Beschriftung liegt außerhalb des Clusters */}
               {placed.map((p) => {
-                const lx = xOf(p.t1);
-                const ly = cy + p.side * (72 + p.lane * 46);
+                const last = p.circles[p.circles.length - 1];
+                const lx = sx(p.bx1);
+                const y0 = cy + (last?.dy ?? 0) * view.k + p.side * (last?.r ?? 6) * view.k;
+                const ly = labelY(p);
                 return (
                   <path
                     key={`c-${p.item.id}`}
-                    d={`M ${lx} ${cy + p.side * 6} L ${lx} ${ly} L ${lx + 16} ${ly}`}
+                    d={`M ${lx} ${y0} L ${lx} ${ly} L ${lx + 16} ${ly}`}
                     fill="none"
                     stroke={p.item.id === selectedId ? ORANGE : "#4a423b"}
                     strokeWidth={1}
@@ -403,26 +436,27 @@ export default function Board02Page() {
                 );
               })}
 
-              {/* Kreise – Größe & Anordnung zoomunabhängig */}
+              {/* Kreise – Teil der Zeitstrahl-Welt: skalieren mit dem Zoom */}
               {placed.map((p) => (
                 <g key={p.item.id} data-tl-interactive
                    style={{ cursor: "pointer" }}
                    onPointerDown={(e) => e.stopPropagation()}
                    onClick={() => { setSelectedId(p.item.id); setOpenLabelId(p.item.id); }}>
                   {p.circles.map((c, i) => {
-                    const cxp = xOf(c.t);
-                    const spansNow = colorMode === "status" && xOf(p.t0) <= nowX && xOf(p.t1) >= nowX;
-                    const near = spansNow && Math.abs(cxp - nowX) < Math.max(24, c.r * 3);
+                    const cxp = sx(c.bx);
+                    const r = c.r * view.k;
+                    const spansNow = colorMode === "status" && sx(p.bx0) <= nowX && sx(p.bx1) >= nowX;
+                    const near = spansNow && Math.abs(cxp - nowX) < Math.max(24, r * 3);
                     return (
                       <circle
                         key={i}
                         cx={cxp}
-                        cy={cy + c.dy}
-                        r={c.r}
+                        cy={cy + c.dy * view.k}
+                        r={r}
                         fill={near ? "url(#tl-now)" : circleFill(p.item, c.t)}
                         opacity={p.item.id === selectedId ? 1 : 0.92}
                         stroke={p.item.id === selectedId ? "#fff" : "none"}
-                        strokeWidth={p.item.id === selectedId ? 1 : 0}
+                        strokeWidth={p.item.id === selectedId ? Math.max(0.5, view.k) : 0}
                       />
                     );
                   })}
@@ -432,8 +466,8 @@ export default function Board02Page() {
 
             {/* Titel-Labels */}
             {placed.map((p) => {
-              const lx = xOf(p.t1);
-              const ly = cy + p.side * (72 + p.lane * 46);
+              const lx = sx(p.bx1);
+              const ly = labelY(p);
               const open = openLabelId === p.item.id;
               const cat = catMap.get(p.item.categoryId ?? "");
               return (
@@ -463,11 +497,9 @@ export default function Board02Page() {
                         <Chip>{kindLabel(p.item.kind)}</Chip>
                         {cat && <Chip color={cat.color}>{cat.label}</Chip>}
                         <Chip>{prioMap.get(p.item.priorityId ?? "")?.label ?? "—"}</Chip>
-                        {p.item.statusId && (
-                          <Chip color={statusMap.get(p.item.statusId)?.color}>
-                            {statusMap.get(p.item.statusId)?.label ?? "—"}
-                          </Chip>
-                        )}
+                        <Chip color={statusMap.get(effectiveStatusId(p.item, now))?.color}>
+                          {statusMap.get(effectiveStatusId(p.item, now))?.label ?? "—"}
+                        </Chip>
                       </div>
                       <div className="opacity-70">
                         {fmtDate(p.item.startDate, p.item.startTime)}
@@ -589,7 +621,7 @@ export default function Board02Page() {
                 {listItems.map((i) => {
                   const prio = prioMap.get(i.priorityId ?? "");
                   const cat = catMap.get(i.categoryId ?? "");
-                  const st = statusMap.get(i.statusId ?? "");
+                  const st = statusMap.get(effectiveStatusId(i, now));
                   const doneRow = itemAchieved(i, now);
                   return (
                     <button
@@ -682,11 +714,11 @@ function ItemEditor({
         <Field label="Status">
           <div className="grid grid-cols-3 gap-1.5">
             {statuses.map((s) => {
-              const active = (item.statusId ?? "open") === s.id;
+              const active = effectiveStatusId(item) === s.id;
               return (
                 <button
                   key={s.id}
-                  onClick={() => set({ statusId: s.id, done: s.id === "done" })}
+                  onClick={() => set({ statusId: s.id, done: s.id === "done", statusManual: true })}
                   className="h-8 rounded-md border text-[11px] font-medium"
                   style={{
                     background: active ? `${s.color}22` : "hsl(var(--background))",
@@ -726,7 +758,6 @@ function ItemEditor({
           entries={priorities.map((p) => ({ id: p.id, label: p.label, percent: p.percent }))}
           onSelect={(id) => set({ priorityId: id || undefined })}
           onRename={(id, label) => timelineStore.updatePriority(projectId, id, { label })}
-          onPercent={(id, percent) => timelineStore.updatePriority(projectId, id, { percent })}
           onRemove={(id) => timelineStore.removePriority(projectId, id)}
           onAdd={(label) => {
             const id = timelineStore.addPriority(projectId, label, 50);
@@ -800,8 +831,12 @@ function ManagedSelect({
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
-      if (manage) return; // bei aktivem Zahnrad bleibt das Drop-down offen
-      if (!boxRef.current?.contains(e.target as Node)) setOpen(false);
+      if (boxRef.current?.contains(e.target as Node)) return;
+      // Klick außerhalb: schließen und Änderungen verwerfen
+      setDraft({});
+      setNewLabel("");
+      setManage(false);
+      setOpen(false);
     };
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);

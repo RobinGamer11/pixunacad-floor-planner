@@ -16,6 +16,8 @@ export interface TlItem {
   done?: boolean;
   /** Status-Id aus TlState.statuses (aus Board übernommen). */
   statusId?: string;
+  /** true, sobald der Status manuell gesetzt wurde – dann greift die Automatik nicht mehr. */
+  statusManual?: boolean;
   responsible?: string;
   categoryId?: string;
   priorityId?: string;
@@ -304,9 +306,17 @@ export function itemEndMs(i: TlItem): number {
   const end = new Date(`${i.endDate}T${i.endTime || i.startTime || "00:00"}:00`).getTime();
   return Math.max(end, itemStartMs(i));
 }
+/**
+ * Effektiver Status: Nicht-Aufgaben (Termin/Notiz), die in der Vergangenheit liegen,
+ * gelten automatisch als „Erledigt“ – außer der Status wurde manuell gesetzt.
+ */
+export function effectiveStatusId(i: TlItem, now = Date.now()): string {
+  if (i.statusManual) return i.statusId ?? "open";
+  if (i.kind !== "task" && itemEndMs(i) <= now) return "done";
+  return i.statusId ?? (i.done ? "done" : "open");
+}
+
 /** Fortschritt eines Eintrags: Termine über die Zeit, Aufgaben/Notizen über den Status. */
 export function itemAchieved(i: TlItem, now = Date.now()): boolean {
-  if (i.statusId === "done" || i.done) return true;
-  if (i.kind === "event") return itemEndMs(i) <= now;
-  return false;
+  return effectiveStatusId(i, now) === "done";
 }
