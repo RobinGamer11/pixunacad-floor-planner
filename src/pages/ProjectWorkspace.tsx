@@ -103,6 +103,7 @@ import { TableElementView, TableModifyContext, TableFormulaPickContext, type For
 import { TableToolSettings } from "@/components/page/TableToolSettings";
 
 import { CadViewportView } from "@/components/page/CadViewportView";
+import { renderSceneRegionToCanvas } from "@/cad/SceneRegionRenderer";
 import { buildEraseMaskCss } from "@/lib/eraseMask";
 
 import { importFile, type ImportedPage } from "@/cad/documentImport";
@@ -3868,8 +3869,10 @@ function ElementView({
 
   const hubKinds = new Set(["cad-view", "cad-viewport", "pdf", "image"]);
   const showHub = !readOnly && selected && hubKinds.has(el.kind);
-  // Optik: CAD-Blatt schlicht wie andere Werkzeuge (goldener Auswahlrahmen).
-  const outlineStyle = selected ? "2px solid hsl(var(--accent-gold))" : "none";
+  // Optik: CAD-Blatt blau, alle anderen Objekte goldener Auswahlrahmen.
+  const outlineStyle = selected
+    ? (isCadView ? "2px solid #4da3ff" : "2px solid hsl(var(--accent-gold))")
+    : "none";
 
   // Preview-Interaktion (Move/Rotate) — startet bei aktivem hubMode.
   // Anker = zuletzt geklickte Fraktion (anchorFracRef) INNERHALB des Elements.
@@ -4261,12 +4264,13 @@ function ElementView({
         border: el.border ? "1px solid hsl(var(--ink))" : undefined,
         transform: previewTransform,
         transformOrigin: previewTransformOrigin ?? "center center",
-        zIndex: isCadView ? (showHub ? 90 : 40) : (showHub ? 80 : (elevated ? 30 : undefined)),
+        // CAD-Blätter folgen der normalen Ebenen-Hierarchie wie alle anderen Objekte.
+        zIndex: showHub ? 80 : (elevated ? 30 : undefined),
         touchAction: "none",
-        // PDF/Bild dürfen bei aktivem Zeichenwerkzeug auch dann keinen Pointer
-        // abfangen, wenn sie zuvor ausgewählt waren. Sonst erreicht gerade der
-        // Radiergummi die darüberliegende CAD-Eingabeschicht nicht.
-        pointerEvents: (((el.kind === "pdf" || el.kind === "image") && toolActive) || (isCadView && !selected && toolActive) ? "none" : undefined),
+        // PDF/Bild/CAD-Blatt dürfen bei aktivem Zeichenwerkzeug keinen Pointer
+        // abfangen — sonst stoppen neue Objekte an ihren Kanten und der
+        // Radiergummi erreicht die darüberliegende CAD-Eingabeschicht nicht.
+        pointerEvents: (((el.kind === "pdf" || el.kind === "image" || isCadView) && toolActive) ? "none" : undefined),
       }}
     >
 
@@ -4432,7 +4436,7 @@ function ElementView({
             onMouseDown={(e) => e.stopPropagation()}
             onPointerDown={(e) => e.stopPropagation()}
           >
-            {tabletCommitOnly ? (
+            {tabletCommitOnly || (isCadView && !!edgeTrim) ? (
               <button
                 data-hub-control
                 onClick={(e) => {
@@ -4604,8 +4608,9 @@ function ElementView({
                 window.removeEventListener("pointermove", move);
                 window.removeEventListener("pointerup", up);
                 window.removeEventListener("pointercancel", cancel);
-                // Tablet-Modus: nicht sofort committen — auf Häkchen warten.
-                if ((window as any).__pixunaTabletCommit) {
+                // Tablet-Modus und CAD-Blatt: nicht sofort committen —
+                // der Schnitt wird erst per Häkchen bzw. ENTER gesetzt.
+                if ((window as any).__pixunaTabletCommit || isCadView) {
                   return;
                 }
                 commit();
@@ -4617,7 +4622,10 @@ function ElementView({
             const baseStyle: React.CSSProperties = {
               position: "absolute",
               background: "transparent",
-              cursor: isHor ? "ns-resize" : "ew-resize",
+              // CAD-Blatt: Mauszeiger bleibt unverändert (nur über das Symbol schneiden).
+              cursor: isCadView
+                ? (isActive || edgeReady ? (isHor ? "ns-resize" : "ew-resize") : "default")
+                : (isHor ? "ns-resize" : "ew-resize"),
               zIndex: 5,
             };
             const sizeStyle: React.CSSProperties = isHor
@@ -4680,8 +4688,8 @@ function ElementView({
                 className="absolute pointer-events-none"
                 style={{
                   left: insetLeft, right: insetRight, top: insetTop, bottom: insetBottom,
-                  border: "1.5px dashed hsl(var(--accent-gold))",
-                  background: "hsl(var(--accent-gold) / 0.06)",
+                  border: isCadView ? `1.5px dashed ${hubBlue}` : "1.5px dashed hsl(var(--accent-gold))",
+                  background: isCadView ? "rgba(77,163,255,0.08)" : "hsl(var(--accent-gold) / 0.06)",
                   zIndex: 7,
                 }}
               />
@@ -4749,14 +4757,16 @@ function ElementView({
             const isLeft = corner === "tl" || corner === "bl";
             const cursor = cornerDraggable
               ? (corner === "tl" || corner === "br" ? "nwse-resize" : "nesw-resize")
-              : (isCadView ? "crosshair" : "default");
-            // Einheitliche Optik: alle Fangpunkte rund + gold (auch CAD-Blatt).
+              : "default";
+            // CAD-Blatt: Fangpunkte blau, sonst gold.
             const size = 12;
             const glow = hoveredSnapKey === `corner-${corner}`;
             const isAnchor = isCadView && anchorFracState?.key === `corner-${corner}`;
-            const stroke = "hsl(var(--accent-gold))";
-            const fill = (glow || isAnchor) ? "hsl(var(--accent-gold))" : "white";
-            const shadowActive = "0 0 0 3px hsl(var(--accent-gold) / 0.35), 0 0 10px hsl(var(--accent-gold))";
+            const stroke = isCadView ? hubBlue : "hsl(var(--accent-gold))";
+            const fill = (glow || isAnchor) ? stroke : "white";
+            const shadowActive = isCadView
+              ? "0 0 0 3px rgba(77,163,255,0.35), 0 0 10px rgba(77,163,255,0.9)"
+              : "0 0 0 3px hsl(var(--accent-gold) / 0.35), 0 0 10px hsl(var(--accent-gold))";
 
             return (
               <div
@@ -4914,23 +4924,54 @@ function ElementView({
 /** Vorschau-Bild eines CAD-Sheets. Liest live aus dem projectStore und
  *  zeigt den `thumbnail` (PNG aus dem CAD-Editor). Fallback: dezenter
  *  Platzhalter, wenn das Sheet noch nie im CAD geöffnet wurde. */
+/** Rastert die aktuelle CAD-Ansicht eines platzierten Blatts in eine PNG-DataURL
+ *  („Pixel"-Objektart). Gibt null zurück, wenn keine Szene vorhanden ist. */
+function renderCadViewSnapshot(
+  element: PageElement,
+  sheet?: import("@/lib/projectStore").Sheet,
+): string | null {
+  const sceneJson = sheet?.sceneJson;
+  const paperWmm = element.wMm ?? 0;
+  const paperHmm = element.hMm ?? 0;
+  if (!sceneJson || !(paperWmm > 0) || !(paperHmm > 0)) return null;
+  const PX_PER_MM = 8;
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(paperWmm * PX_PER_MM));
+  canvas.height = Math.max(1, Math.round(paperHmm * PX_PER_MM));
+  let labels: any = null;
+  if (sheet?.labelsJson) { try { labels = JSON.parse(sheet.labelsJson); } catch { labels = null; } }
+  try {
+    renderSceneRegionToCanvas({
+      canvas,
+      sceneJson,
+      labelsJson: labels,
+      paperWmm,
+      paperHmm,
+      scaleDen: element.scaleDen ?? parseScaleDen(element.scale ?? sheet?.scale) ?? 100,
+      centerM: element.modelCenterM ?? { x: 0, y: 0 },
+      rotationDeg: element.viewportRotationDeg ?? 0,
+    });
+    return canvas.toDataURL("image/png");
+  } catch (err) {
+    console.warn("[CadView] Pixel-Rasterung fehlgeschlagen:", err);
+    return null;
+  }
+}
+
 function CadViewportViewHost({ element }: { element: PageElement }) {
   const projects = useProjects();
-  const { sheet, autoUpdate } = React.useMemo(() => {
+  const { sheet } = React.useMemo(() => {
     let s: import("@/lib/projectStore").Sheet | undefined;
-    let auto = true;
     if (element.sheetId) {
       for (const p of projects) {
         const hit = p.sheets.find((x) => x.id === element.sheetId);
-        if (hit) {
-          s = hit;
-          auto = p.settings?.cadAutoUpdate !== false;
-          break;
-        }
+        if (hit) { s = hit; break; }
       }
     }
-    return { sheet: s, autoUpdate: auto };
+    return { sheet: s };
   }, [projects, element.sheetId]);
+  // Automatische Aktualisierung ist pro CAD-Blatt-Objekt einstellbar.
+  const autoUpdate = element.autoUpdate !== false;
   return (
     <CadViewportView
       element={element}
@@ -6674,25 +6715,8 @@ function CadToolSection({
 
 
 
-  const autoUpdate = project.settings?.cadAutoUpdate !== false;
-
   return (
     <div className="space-y-3">
-
-      {/* Live-Aktualisierung: sofort ODER erst auf Klick sichtbar. */}
-      <label
-        className="flex items-center justify-between gap-2 px-2 h-9 rounded-md border cursor-pointer"
-        style={{ borderColor: "hsl(var(--hairline))" }}
-        title={'Wenn aus: CAD-Viewports zeigen den letzten Snapshot, bis „Ansicht aktualisieren" geklickt wird.'}
-      >
-        <span className="text-xs">Automatisch aktualisieren</span>
-        <input
-          type="checkbox"
-          checked={autoUpdate}
-          onChange={(e) => projectStore.updateProjectSettings(projectId, { cadAutoUpdate: e.target.checked })}
-          className="h-4 w-4"
-        />
-      </label>
 
 
 
@@ -6904,6 +6928,69 @@ function CadToolSection({
                       ))}
                     </select>
                   </div>
+
+                  {/* Objektart: Vektor (live) ⇄ Pixel (eingebranntes Bild). */}
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="text-[11px] text-muted-foreground shrink-0">Objektart</span>
+                    <div className="flex-1 flex gap-1">
+                      <button
+                        type="button"
+                        onClick={(ev) => {
+                          ev.stopPropagation();
+                          if (!pageId || !el.pixelMode) return;
+                          projectStore.updateElement(projectId, pageId, el.id, { pixelMode: false });
+                        }}
+                        className={`flex-1 h-7 rounded border text-[11px] ${!el.pixelMode ? "font-semibold" : ""}`}
+                        style={{
+                          borderColor: !el.pixelMode ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
+                          background: !el.pixelMode ? "hsl(var(--accent-gold-soft))" : "transparent",
+                        }}
+                        title="Vektor: Live-Ansicht des Zeichenblatts, bei jedem Zoom scharf"
+                      >
+                        Vektor
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(ev) => {
+                          ev.stopPropagation();
+                          if (!pageId || el.pixelMode) return;
+                          const snap = renderCadViewSnapshot(el, sheet);
+                          if (!snap) { window.alert("Pixel-Umwandlung fehlgeschlagen — Zeichenblatt enthält noch keine Szene."); return; }
+                          projectStore.updateElement(projectId, pageId, el.id, {
+                            pixelMode: true,
+                            viewSnapshot: snap,
+                          });
+                        }}
+                        className={`flex-1 h-7 rounded border text-[11px] ${el.pixelMode ? "font-semibold" : ""}`}
+                        style={{
+                          borderColor: el.pixelMode ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
+                          background: el.pixelMode ? "hsl(var(--accent-gold-soft))" : "transparent",
+                        }}
+                        title="Pixel: Ansicht wird als Bild eingebrannt (Radiergummi inkl. Smooth möglich)"
+                      >
+                        Pixel
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Automatische Aktualisierung — pro CAD-Blatt-Objekt. */}
+                  <label
+                    className="flex items-center justify-between gap-2 mt-2 cursor-pointer"
+                    onClick={(ev) => ev.stopPropagation()}
+                    title={'Wenn aus: Ansicht bleibt eingefroren, bis „Aktualisieren" geklickt wird.'}
+                  >
+                    <span className="text-[11px] text-muted-foreground">Automatisch aktualisieren</span>
+                    <input
+                      type="checkbox"
+                      checked={el.autoUpdate !== false}
+                      disabled={!!el.pixelMode}
+                      onChange={(ev) => {
+                        if (!pageId) return;
+                        projectStore.updateElement(projectId, pageId, el.id, { autoUpdate: ev.target.checked });
+                      }}
+                      className="h-4 w-4"
+                    />
+                  </label>
                 </div>
               );
             })}
