@@ -158,53 +158,74 @@ export default function Board02Page() {
   const placed = useMemo<Placed[]>(() => {
     const sorted = [...state.items].sort((a, b) => itemStartMs(a) - itemStartMs(b));
     const laneEnd: Record<string, number> = {};
-    // Kollisionsfreie Packung: bereits gesetzte Kreise merken.
+    // Deterministisches 2D-Bubble-Packing entlang der horizontalen Zeitachse.
     const packed: { x: number; y: number; r: number }[] = [];
+    const GAP = 1.6;
     const fits = (x: number, y: number, r: number) =>
-      packed.every((p) => {
-        const dx = p.x - x, dy = p.y - y;
-        return Math.hypot(dx, dy) >= p.r + r + 1.2;
-      });
-    const placeCircle = (x: number, r: number): number => {
-      if (fits(x, 0, r)) { packed.push({ x, y: 0, r }); return 0; }
-      for (let step = 1; step <= 60; step++) {
-        const off = step * 3;
-        for (const y of [-off, off]) {
-          if (fits(x, y, r)) { packed.push({ x, y, r }); return y; }
+      packed.every((p) => Math.hypot(p.x - x, p.y - y) >= p.r + r + GAP);
+    /** Pseudozufall aus einem String – gleiche Daten ⇒ gleiche Anordnung. */
+    const seedOf = (s: string) => {
+      let h = 2166136261;
+      for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+      return ((h >>> 0) % 10000) / 10000;
+    };
+    const placeCircle = (ax: number, r: number, seed: number): { x: number; y: number } => {
+      if (fits(ax, 0, r)) { packed.push({ x: ax, y: 0, r }); return { x: ax, y: 0 }; }
+      const phase = seed * Math.PI * 2;
+      const stepR = Math.max(2.5, r * 0.45);
+      let best: { x: number; y: number; cost: number } | null = null;
+      for (let ring = 1; ring <= 26 && !best; ring++) {
+        const d = ring * stepR;
+        const n = Math.max(8, Math.round(ring * 8));
+        for (let i = 0; i < n; i++) {
+          const a = phase + (i / n) * Math.PI * 2;
+          // horizontal nur leicht ausweichen, vertikal freier -> kompakte Wolke statt Stapel
+          const x = ax + Math.cos(a) * d * 0.55;
+          const y = Math.sin(a) * d;
+          if (!fits(x, y, r)) continue;
+          const cost = Math.abs(x - ax) * 2.2 + Math.abs(y);
+          if (!best || cost < best.cost) best = { x, y, cost };
         }
       }
-      packed.push({ x, y: 0, r });
-      return 0;
+      const res = best ?? { x: ax, y: 0 };
+      packed.push({ x: res.x, y: res.y, r });
+      return { x: res.x, y: res.y };
     };
 
     let flip: 1 | -1 = -1;
     return sorted.map((item) => {
       const s = itemStartMs(item), e = itemEndMs(item);
-      const bx0 = baseX(s), bx1 = baseX(e);
+      const ax0 = baseX(s), ax1 = baseX(e);
       const rMax = priorityRadius(prioMap.get(item.priorityId ?? "")?.percent);
       const rMin = Math.max(3, rMax * 0.35);
-      const len = bx1 - bx0;
+      const len = ax1 - ax0;
       const circles: Circle[] = [];
       if (len < rMax * 1.2) {
-        circles.push({ bx: bx0, dy: placeCircle(bx0, rMax), r: rMax, t: s });
+        const pos = placeCircle(ax0, rMax, seedOf(item.id));
+        circles.push({ bx: pos.x, dy: pos.y, r: rMax, t: s });
       } else {
         const n = clamp(Math.round(len / (rMax * 1.35)), 3, 40);
         for (let i = 0; i < n; i++) {
           const f = i / (n - 1);
-          const bx = bx0 + len * f;
           const r = rMin + (rMax - rMin) * f;
-          circles.push({ bx, dy: placeCircle(bx, r), r, t: s + (e - s) * f });
+          const pos = placeCircle(ax0 + len * f, r, seedOf(`${item.id}:${i}`));
+          circles.push({ bx: pos.x, dy: pos.y, r, t: s + (e - s) * f });
         }
       }
       flip = flip === 1 ? -1 : 1;
       const side = flip;
       const key = side === -1 ? "up" : "dn";
+      const bx0 = circles[0]?.bx ?? ax0;
+      const bx1 = circles[circles.length - 1]?.bx ?? ax1;
       let lane = 0;
       while (laneEnd[`${key}${lane}`] !== undefined && laneEnd[`${key}${lane}`] > bx1 - 4) lane++;
       laneEnd[`${key}${lane}`] = bx1 + Math.max(120, item.title.length * 7.4);
       return { item, bx0, bx1, t0: s, t1: e, circles, side, lane };
     });
   }, [state.items, baseX, prioMap]);
+
+  /** Basis-X → Bildschirm-X (Zoom/Pan). */
+  const sx = useCallback((bx: number) => padX + (bx - padX) * view.k + view.tx, [view]);
 
   // ---- Farbe eines Kreises ------------------------------------------
   const circleFill = useCallback((item: TlItem, t: number) => {
