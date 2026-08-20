@@ -113,7 +113,7 @@ export const HatchSettingsPanel: React.FC<Props> = ({ app, projectId, pxPerMm = 
     if (!app) return;
     const hatchTool: any = (app as any).hatchTool;
     if (hatchTool) setMode(hatchTool.drawMode);
-    const sel: any = (app as any).getSelectedHatch?.();
+    const sel: any = ((app as any).getEditHatch?.() ?? (app as any).getSelectedHatch?.());
     if (sel) {
       setFillColor(sel.fillColor || (app as any).defaultHatchFillColor);
       setStrokeColor(sel.strokeColor || (app as any).defaultHatchStrokeColor);
@@ -141,7 +141,7 @@ export const HatchSettingsPanel: React.FC<Props> = ({ app, projectId, pxPerMm = 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [app]);
 
-  const selected = () => (app as any)?.getSelectedHatch?.() || null;
+  const selected = () => ((app as any)?.getEditHatch?.() ?? (app as any)?.getSelectedHatch?.()) || null;
   const apply = (mutate: (h: any) => void, def: () => void) => {
     if (!app) return;
     const h = selected();

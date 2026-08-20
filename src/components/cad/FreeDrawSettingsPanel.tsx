@@ -87,7 +87,7 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
 
   const syncFromState = () => {
     if (!app) return;
-    const stroke = app.getSelectedFreeStroke?.() || null;
+    const stroke = ((app as any).getEditFreeStroke?.() ?? app.getSelectedFreeStroke?.()) || null;
     if (stroke) {
       setSelectedStrokeId(stroke.id);
       setColor(stroke.color);
@@ -137,7 +137,7 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
   }, [app, units]);
 
 
-  const selectedStroke = () => app?.getSelectedFreeStroke?.() || null;
+  const selectedStroke = () => ((app as any)?.getEditFreeStroke?.() ?? app?.getSelectedFreeStroke?.()) || null;
   const applyToStroke = (mutate: (s: any) => void) => {
     const s = selectedStroke();
     if (s) { mutate(s); }

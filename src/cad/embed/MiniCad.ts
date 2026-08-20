@@ -19,6 +19,7 @@ import { LabelManager } from "../LabelManager";
 import { IdPanel } from "../IdPanel";
 import { TopologyEngine } from "../TopologyEngine";
 import { Renderer, type Selection } from "../Renderer";
+import { mirrorProxy } from "../multiEdit";
 import { LineHub } from "../LineHub";
 import { PointEditMenu } from "../PointEditMenu";
 import { LineTool } from "../LineTool";
@@ -951,7 +952,7 @@ export class MiniCad {
     if (typeof opts.alpha === "number" && opts.alpha >= 0 && opts.alpha <= 1) {
       this.defaultLineAlpha = opts.alpha;
     }
-    const selected = this.getSelectedSegment();
+    const selected = this.getEditSegment();
     if (selected && !this.isFrameSegment(selected)) {
       selected.color = applyAlphaToColor(this.defaultLineColor, this.defaultLineAlpha);
       selected.thicknessM = this.defaultLineThicknessM;
@@ -1072,7 +1073,7 @@ export class MiniCad {
     if (typeof opts.borderEnabled === "boolean") this.defaultTextBorderEnabled = opts.borderEnabled;
     if (opts.borderColor) this.defaultTextBorderColor = opts.borderColor;
     if (typeof opts.borderWidthPx === "number" && opts.borderWidthPx >= 0) this.defaultTextBorderWidthPx = opts.borderWidthPx;
-    const selected = this.getSelectedTextBox();
+    const selected = this.getEditTextBox();
     if (selected) {
       selected.style.textColor = applyAlphaToColor(this.defaultTextColor, this.defaultTextAlpha);
       selected.style.fontSizePx = this.defaultTextFontSizePx;
@@ -1884,6 +1885,35 @@ export class MiniCad {
     if (!this.selection || this.selection.type !== SelectionType.FREE_STROKE) return null;
     return this.scene.getFreeStrokeById((this.selection as any).freeStrokeId);
   }
+
+  /* ---- Mehrfachauswahl: Einstellungen auf alle gleichartigen Objekte ---- */
+
+  private _panelMirror<T extends object>(primary: T | null | undefined, kind: string, lookup: (id: string) => T | null | undefined): T | null {
+    if (!primary) return null;
+    const sibs: T[] = [];
+    for (const ref of this._selectedRefs()) {
+      if (ref.kind !== kind) continue;
+      const o = lookup(ref.id);
+      if (o && o !== primary) sibs.push(o);
+    }
+    return sibs.length ? mirrorProxy(primary, sibs) : primary;
+  }
+
+  /** Von den Werkzeugeinstellungen genutzte Getter — spiegeln Änderungen bei
+   *  Mehrfachauswahl automatisch auf alle Objekte derselben Art. */
+  getEditSegment() {
+    return this._panelMirror(this.getSelectedSegment(), "segment", (id) => this.scene.getSegmentById(id));
+  }
+  getEditHatch() {
+    return this._panelMirror(this.getSelectedHatch(), "hatch", (id) => this.scene.getHatchById(id));
+  }
+  getEditTextBox() {
+    return this._panelMirror(this.getSelectedTextBox(), "textBox", (id) => this.scene.getTextBoxById(id));
+  }
+  getEditFreeStroke() {
+    return this._panelMirror(this.getSelectedFreeStroke() as any, "freeStroke", (id) => this.scene.getFreeStrokeById(id));
+  }
+  getEditDimension() { return null; }
 
   /* ===== CadApp surface stubs (required by SelectTool) ===== */
 

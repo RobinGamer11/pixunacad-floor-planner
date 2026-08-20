@@ -71,7 +71,7 @@ export const HatchPatternBlock: React.FC<Props> = ({ app, scaleMax = 20 }) => {
 
   const sync = () => {
     if (!app) return;
-    const sel: any = app.getSelectedHatch?.();
+    const sel: any = ((app as any).getEditHatch?.() ?? app.getSelectedHatch?.());
     const src = sel || {
       patternEnabled: app.defaultHatchPatternEnabled,
       patternId: app.defaultHatchPatternId,
@@ -101,7 +101,7 @@ export const HatchPatternBlock: React.FC<Props> = ({ app, scaleMax = 20 }) => {
 
   const apply = (mutate: (h: any) => void, def: () => void) => {
     if (!app) return;
-    const h = app.getSelectedHatch?.();
+    const h = ((app as any).getEditHatch?.() ?? app.getSelectedHatch?.());
     if (h) mutate(h); else def();
     render();
     force((x) => x + 1);
@@ -116,7 +116,7 @@ export const HatchPatternBlock: React.FC<Props> = ({ app, scaleMax = 20 }) => {
       return app.camera?.screenToWorld?.(e.clientX - r.left, e.clientY - r.top);
     };
     const down = (e: PointerEvent) => {
-      const h = app.getSelectedHatch?.();
+      const h = ((app as any).getEditHatch?.() ?? app.getSelectedHatch?.());
       const w = toWorld(e);
       if (!h || !w) return;
       dragRef.current = { wx: w.x, wy: w.y, ox: h.patternOffsetX ?? 0, oy: h.patternOffsetY ?? 0 };
@@ -125,7 +125,7 @@ export const HatchPatternBlock: React.FC<Props> = ({ app, scaleMax = 20 }) => {
     };
     const move = (e: PointerEvent) => {
       const d = dragRef.current;
-      const h = app.getSelectedHatch?.();
+      const h = ((app as any).getEditHatch?.() ?? app.getSelectedHatch?.());
       const w = toWorld(e);
       if (!d || !h || !w) return;
       h.patternOffsetX = d.ox + (w.x - d.wx);

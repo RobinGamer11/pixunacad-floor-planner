@@ -33,6 +33,7 @@ import { PlanPanel } from "./PlanPanel";
 import { PlanController } from "./PlanController";
 import { drawProjection as drawPlanProjection } from "./PlanProjections";
 import { SheetPanel } from "./SheetPanel";
+import { mirrorProxy } from "./multiEdit";
 
 export interface TextSettingsRefs {
   panel: HTMLDivElement;
@@ -1113,6 +1114,49 @@ export class CadApp {
     return true;
   }
 
+  /* ---- Mehrfachauswahl: Einstellungen auf alle gleichartigen Objekte ---- */
+
+  /** IDs der Mehrfachauswahl (Marquee/Shift) einer bestimmten Objektart. */
+  private _multiSelectedIds(kind: string): string[] {
+    const ids: string[] = [];
+    const list = (this.selectTool as any)?.marqueeSelectedIds as { kind: string; id: string }[] | undefined;
+    if (!list) return ids;
+    for (const m of list) {
+      const k = m.kind === "textbox" ? "textBox" : m.kind;
+      if (k === kind) ids.push(m.id);
+    }
+    return ids;
+  }
+
+  private _panelMirror<T extends object>(primary: T | null, kind: string, lookup: (id: string) => T | null | undefined): T | null {
+    if (!primary) return null;
+    const sibs: T[] = [];
+    for (const id of this._multiSelectedIds(kind)) {
+      const o = lookup(id);
+      if (o && o !== primary) sibs.push(o);
+    }
+    return sibs.length ? mirrorProxy(primary, sibs) : primary;
+  }
+
+  /** Von den Werkzeugeinstellungen genutzte Getter — spiegeln Änderungen bei
+   *  Mehrfachauswahl automatisch auf alle Objekte derselben Art. */
+  getEditSegment() {
+    return this._panelMirror(this.getSelectedSegment(), "segment", (id) => this.scene.getSegmentById(id));
+  }
+  getEditHatch() {
+    return this._panelMirror(this.getSelectedHatch(), "hatch", (id) => this.scene.getHatchById(id));
+  }
+  getEditTextBox() {
+    return this._panelMirror(this.getSelectedTextBox(), "textBox", (id) => this.scene.getTextBoxById(id));
+  }
+  getEditDimension() {
+    return this._panelMirror(this.getSelectedDimension() as any, "dimension", (id) => (this.scene as any).getDimensionById?.(id));
+  }
+  getEditFreeStroke() {
+    return this._panelMirror(this.getSelectedFreeStroke() as any, "freeStroke", (id) => this.scene.getFreeStrokeById(id));
+  }
+
+
   getSelectedSegment() {
     if (!this.selection || !this.selection.segmentId) return null;
     return this.scene.getSegmentById(this.selection.segmentId);
@@ -1712,7 +1756,7 @@ export class CadApp {
 
     r.idSelect.addEventListener("change", () => {
       const nextId = r.idSelect.value || Defaults.defaultLabelId;
-      const sel = this.getSelectedTextBox();
+      const sel = this.getEditTextBox();
       if (sel) { sel.labelId = nextId; this.refreshLabelUI(); return; }
       if (this.selectedLabelId) {
         const groupIds = this.scene.getTextBoxesByLabelId(this.selectedLabelId).map(t => t.id);
@@ -1727,7 +1771,7 @@ export class CadApp {
     });
 
     r.textColor.addEventListener("input", () => {
-      const sel = this.getSelectedTextBox();
+      const sel = this.getEditTextBox();
       if (sel) sel.style.textColor = r.textColor.value;
       else this.defaultTextColor = r.textColor.value;
       r.textColorPreview.style.background = r.textColor.value;
@@ -1737,14 +1781,14 @@ export class CadApp {
       let v = parseFloat((r.fontSize.value || "").replace(",", "."));
       if (!Number.isFinite(v) || v <= 0) return;
       v = clamp(v, 6, 200);
-      const sel = this.getSelectedTextBox();
+      const sel = this.getEditTextBox();
       if (sel) { sel.style.fontSizePx = v; autoSizeTextBox(sel); }
       else this.defaultTextFontSizePx = v;
     });
     r.fontSize.addEventListener("blur", () => this._syncTextSettingsFromContext());
 
     const setAlign = (a: "left" | "center" | "right") => {
-      const sel = this.getSelectedTextBox();
+      const sel = this.getEditTextBox();
       if (sel) sel.style.align = a;
       else this.defaultTextAlign = a;
       this._syncTextSettingsFromContext();
@@ -1754,7 +1798,7 @@ export class CadApp {
     r.alignRightBtn.addEventListener("click", () => setAlign("right"));
 
     r.bgColor.addEventListener("input", () => {
-      const sel = this.getSelectedTextBox();
+      const sel = this.getEditTextBox();
       if (sel) sel.style.bgColor = r.bgColor.value;
       else this.defaultTextBgColor = r.bgColor.value;
       this._syncTextSettingsFromContext();
@@ -1764,28 +1808,28 @@ export class CadApp {
       let v = parseFloat((r.bgAlpha.value || "").replace(",", "."));
       if (!Number.isFinite(v)) return;
       v = clamp(v, 0, 100);
-      const sel = this.getSelectedTextBox();
+      const sel = this.getEditTextBox();
       if (sel) sel.style.bgAlphaPct = v;
       else this.defaultTextBgAlphaPct = v;
       this._syncTextSettingsFromContext();
     });
 
     r.wrapToggle.addEventListener("change", () => {
-      const sel = this.getSelectedTextBox();
+      const sel = this.getEditTextBox();
       if (sel) { sel.style.wrap = !!r.wrapToggle.checked; autoSizeTextBox(sel); }
       else this.defaultTextWrap = !!r.wrapToggle.checked;
     });
 
     r.borderToggle.addEventListener("change", () => {
       const v = !!r.borderToggle.checked;
-      const sel = this.getSelectedTextBox();
+      const sel = this.getEditTextBox();
       if (sel) sel.style.borderEnabled = v;
       else this.defaultTextBorderEnabled = v;
       r.borderGroup.classList.toggle("hidden", !v);
     });
 
     r.borderColor.addEventListener("input", () => {
-      const sel = this.getSelectedTextBox();
+      const sel = this.getEditTextBox();
       if (sel) sel.style.borderColor = r.borderColor.value;
       else this.defaultTextBorderColor = r.borderColor.value;
       r.borderColorPreview.style.background = r.borderColor.value;
@@ -1795,7 +1839,7 @@ export class CadApp {
       let v = parseFloat((r.borderWidth.value || "").replace(",", "."));
       if (!Number.isFinite(v) || v < 0) return;
       v = clamp(v, 0, 30);
-      const sel = this.getSelectedTextBox();
+      const sel = this.getEditTextBox();
       if (sel) sel.style.borderWidthPx = v;
       else this.defaultTextBorderWidthPx = v;
     });
@@ -1803,7 +1847,7 @@ export class CadApp {
 
     // --- Modus: Rahmen variabel / Rahmen fix ---
     const setAutoSize = (auto: boolean) => {
-      const sel = this.getSelectedTextBox();
+      const sel = this.getEditTextBox();
       if (sel) {
         (sel.style as any).autoSize = auto;
         sel.style.wrap = !auto;
@@ -1819,7 +1863,7 @@ export class CadApp {
 
     // --- Stil: Fett / Kursiv / Unterstrichen / Durchgestrichen ---
     const toggleStyle = (key: "bold" | "italic" | "underline" | "strike") => {
-      const sel = this.getSelectedTextBox();
+      const sel = this.getEditTextBox();
       if (sel) {
         (sel.style as any)[key] = !(sel.style as any)[key];
         autoSizeTextBox(sel);
@@ -1841,7 +1885,7 @@ export class CadApp {
       let v = parseFloat((raw || "").replace(",", "."));
       if (!Number.isFinite(v)) return;
       v = clamp(Math.round(v), 80, 300);
-      const sel = this.getSelectedTextBox();
+      const sel = this.getEditTextBox();
       if (sel) { (sel.style as any).lineHeightPct = v; autoSizeTextBox(sel); }
       else this.defaultTextLineHeightPct = v;
       this._syncTextSettingsFromContext();
@@ -1852,7 +1896,7 @@ export class CadApp {
     // --- Transparenz-Regler (spiegelt das Zahlenfeld) ---
     r.bgAlphaRange?.addEventListener("input", () => {
       const v = clamp(Math.round(parseFloat(r.bgAlphaRange!.value) || 0), 0, 100);
-      const sel = this.getSelectedTextBox();
+      const sel = this.getEditTextBox();
       if (sel) sel.style.bgAlphaPct = v;
       else this.defaultTextBgAlphaPct = v;
       this._syncTextSettingsFromContext();
@@ -1863,7 +1907,7 @@ export class CadApp {
       let pt = parseFloat((r.fontSizePt!.value || "").replace(",", "."));
       if (!Number.isFinite(pt) || pt <= 0) return;
       const px = clamp(pt * (4 / 3), 6, 200);
-      const sel = this.getSelectedTextBox();
+      const sel = this.getEditTextBox();
       if (sel) { sel.style.fontSizePx = px; autoSizeTextBox(sel); }
       else this.defaultTextFontSizePx = px;
       this._syncTextSettingsFromContext();
@@ -1918,7 +1962,7 @@ export class CadApp {
     this.lineIdSelect.addEventListener("change", () => {
       const nextId = this.lineIdSelect.value || Defaults.defaultLabelId;
       // Einzel-Objekt-Auswahl: nur dieses Objekt umhängen, keine Gruppen-Selektion auslösen.
-      const singleSel = this.getSelectedSegment();
+      const singleSel = this.getEditSegment();
       if (singleSel) {
         this.scene.assignSegmentsToLabel([singleSel.id], nextId);
         singleSel.labelId = nextId;
@@ -1944,7 +1988,7 @@ export class CadApp {
   }
 
   private _applyLineColor(color: string) {
-    const selected = this.getSelectedSegment();
+    const selected = this.getEditSegment();
     if (selected) { selected.color = color; }
     else {
       const groupSegs = this.getSelectedGroupSegments();
@@ -1959,7 +2003,7 @@ export class CadApp {
     let value = parseFloat((this.lineThicknessInput.value || "").replace(",", ".")) / 100;
     if (!Number.isFinite(value) || value <= 0) return;
     value = clamp(value, 0.001, 1);
-    const selected = this.getSelectedSegment();
+    const selected = this.getEditSegment();
     if (selected) { selected.thicknessM = value; return; }
     const groupSegs = this.getSelectedGroupSegments();
     if (groupSegs.length > 0) { for (const seg of groupSegs) seg.thicknessM = value; return; }
@@ -1982,7 +2026,7 @@ export class CadApp {
   private _setupHatchSettingsPanel() {
     this.hatchIdSelect.addEventListener("change", () => {
       const nextId = this.hatchIdSelect.value || Defaults.defaultLabelId;
-      const singleSel = this.getSelectedHatch();
+      const singleSel = this.getEditHatch();
       if (singleSel) {
         this.scene.assignHatchesToLabel([singleSel.id], nextId);
         singleSel.labelId = nextId;
@@ -2001,13 +2045,13 @@ export class CadApp {
       this.setActiveDrawLabelId(nextId);
     });
     this.hatchFillColorInput.addEventListener("input", () => {
-      const sel = this.getSelectedHatch();
+      const sel = this.getEditHatch();
       if (sel) sel.fillColor = this.hatchFillColorInput.value;
       else this.defaultHatchFillColor = this.hatchFillColorInput.value;
       this._syncHatchSettingsFromContext();
     });
     this.hatchStrokeColorInput.addEventListener("input", () => {
-      const sel = this.getSelectedHatch();
+      const sel = this.getEditHatch();
       if (sel) sel.strokeColor = this.hatchStrokeColorInput.value;
       else this.defaultHatchStrokeColor = this.hatchStrokeColorInput.value;
       this._syncHatchSettingsFromContext();
@@ -2016,7 +2060,7 @@ export class CadApp {
       let v = parseFloat((this.hatchStrokeWidthInput.value || "").replace(",", "."));
       if (!Number.isFinite(v) || v < 0) return;
       v = clamp(v, 0, 30);
-      const sel = this.getSelectedHatch();
+      const sel = this.getEditHatch();
       if (sel) sel.strokeWidthPx = v; else this.defaultHatchStrokeWidthPx = v;
     });
     this.hatchStrokeWidthInput.addEventListener("blur", () => this._syncHatchSettingsFromContext());
@@ -2024,7 +2068,7 @@ export class CadApp {
       let v = parseFloat((this.hatchAlphaInput.value || "").replace(",", "."));
       if (!Number.isFinite(v)) return;
       v = clamp(v, 0, 100);
-      const sel = this.getSelectedHatch();
+      const sel = this.getEditHatch();
       if (sel) sel.fillAlphaPct = v; else this.defaultHatchFillAlphaPct = v;
     });
     this.hatchAlphaInput.addEventListener("blur", () => this._syncHatchSettingsFromContext());
@@ -2032,7 +2076,7 @@ export class CadApp {
       const checked = !!this.areaShowInput.checked;
       // Persist als Default für neue Schraffuren
       this.defaultAreaShow = checked;
-      const sel = this.getSelectedHatch();
+      const sel = this.getEditHatch();
       if (sel) {
         sel.areaLabel.show = checked;
       } else {
@@ -2042,7 +2086,7 @@ export class CadApp {
       this._syncHatchSettingsFromContext();
     });
     this.areaTextColorInput.addEventListener("input", () => {
-      const sel = this.getSelectedHatch();
+      const sel = this.getEditHatch();
       if (sel) sel.areaLabel.textColor = this.areaTextColorInput.value;
       this._syncHatchSettingsFromContext();
     });
@@ -2050,12 +2094,12 @@ export class CadApp {
       let v = parseFloat((this.areaFontSizeInput.value || "").replace(",", "."));
       if (!Number.isFinite(v) || v <= 0) return;
       v = clamp(v, 6, 72);
-      const sel = this.getSelectedHatch();
+      const sel = this.getEditHatch();
       if (sel) sel.areaLabel.fontSizePx = v;
     });
     this.areaFontSizeInput.addEventListener("blur", () => this._syncHatchSettingsFromContext());
     this.areaBgColorInput.addEventListener("input", () => {
-      const sel = this.getSelectedHatch();
+      const sel = this.getEditHatch();
       if (sel) sel.areaLabel.bgColor = this.areaBgColorInput.value;
       this._syncHatchSettingsFromContext();
     });
@@ -2063,7 +2107,7 @@ export class CadApp {
       let v = parseFloat((this.areaBgAlphaInput.value || "").replace(",", "."));
       if (!Number.isFinite(v)) return;
       v = clamp(v, 0, 100);
-      const sel = this.getSelectedHatch();
+      const sel = this.getEditHatch();
       if (sel) sel.areaLabel.bgAlphaPct = v;
     });
     this.areaBgAlphaInput.addEventListener("blur", () => this._syncHatchSettingsFromContext());
@@ -2075,7 +2119,7 @@ export class CadApp {
     const borderPreview = document.querySelector<HTMLDivElement>("[data-area-border-preview]");
     const borderGroup = document.querySelector<HTMLDivElement>("[data-area-border-group]");
     const syncBorderUI = () => {
-      const sel = this.getSelectedHatch();
+      const sel = this.getEditHatch();
       const enabled = sel ? !!sel.areaLabel.borderEnabled : this.defaultAreaBorderEnabled;
       const col = sel ? sel.areaLabel.borderColor : this.defaultAreaBorderColor;
       const wpx = sel ? sel.areaLabel.borderWidthPx : this.defaultAreaBorderWidthPx;
@@ -2088,7 +2132,7 @@ export class CadApp {
     borderToggle?.addEventListener("change", () => {
       const checked = !!borderToggle.checked;
       this.defaultAreaBorderEnabled = checked;
-      const sel = this.getSelectedHatch();
+      const sel = this.getEditHatch();
       if (sel) sel.areaLabel.borderEnabled = checked;
       else for (const h of this.scene.hatches) h.areaLabel.borderEnabled = checked;
       syncBorderUI();
@@ -2096,7 +2140,7 @@ export class CadApp {
     borderColor?.addEventListener("input", () => {
       const c = borderColor.value;
       this.defaultAreaBorderColor = c;
-      const sel = this.getSelectedHatch();
+      const sel = this.getEditHatch();
       if (sel) sel.areaLabel.borderColor = c;
       if (borderPreview) borderPreview.style.background = c;
     });
@@ -2105,7 +2149,7 @@ export class CadApp {
       if (!Number.isFinite(w)) return;
       w = clamp(w, 0, 20);
       this.defaultAreaBorderWidthPx = w;
-      const sel = this.getSelectedHatch();
+      const sel = this.getEditHatch();
       if (sel) sel.areaLabel.borderWidthPx = w;
     });
     // Hook in den bestehenden Sync-Pfad: nach jedem _syncHatchSettingsFromContext aktualisieren
@@ -2438,7 +2482,7 @@ export class CadApp {
           return;
         }
         if (this.selection && this.selection.type === SelectionType.DIMENSION) {
-          const dim = this.getSelectedDimension();
+          const dim = this.getEditDimension();
           if (dim) { this.scene.removeDimension(dim); this.clearSelection(); this.refreshLabelUI(); }
           return;
         }
@@ -2453,7 +2497,7 @@ export class CadApp {
           return;
         }
         if (this.selection && (this.selection.type === SelectionType.TEXTBOX || this.selection.type === SelectionType.TEXTBOX_HANDLE)) {
-          const box = this.getSelectedTextBox();
+          const box = this.getEditTextBox();
           if (box) { this.scene.removeTextBox(box); this.clearSelection(); this.refreshLabelUI(); }
           return;
         }
@@ -2746,7 +2790,7 @@ export class CadApp {
 
     r.idSelect.addEventListener("change", () => {
       const nextId = r.idSelect.value || Defaults.defaultLabelId;
-      const sel = this.getSelectedDimension();
+      const sel = this.getEditDimension();
       if (sel) { sel.labelId = nextId; this.refreshLabelUI(); return; }
       if (this.selectedLabelId) {
         const groupIds = this.scene.getDimensionsByLabelId(this.selectedLabelId).map(d => d.id);
@@ -2763,7 +2807,7 @@ export class CadApp {
     r.orientation.addEventListener("change", () => {
       const val = r.orientation.value as "parallel" | "diagonal" | "arc";
       this.measureSettings.orientation = val;
-      const sel = this.getSelectedDimension();
+      const sel = this.getEditDimension();
       if (sel) sel.mode = val;
     });
 
@@ -2789,7 +2833,7 @@ export class CadApp {
     r.extensionsToggle.addEventListener("change", () => {
       const val = !!r.extensionsToggle.checked;
       this.measureSettings.showExtensions = val;
-      const sel = this.getSelectedDimension();
+      const sel = this.getEditDimension();
       if (sel) sel.showExtensions = val;
       r.extensionsGroup.classList.toggle("hidden", !val);
     });
@@ -2797,14 +2841,14 @@ export class CadApp {
     r.extensionStyle.addEventListener("change", () => {
       const val = r.extensionStyle.value as "dashed" | "solid";
       this.measureSettings.extensionStyle = val;
-      const sel = this.getSelectedDimension();
+      const sel = this.getEditDimension();
       if (sel) sel.extensionStyle = val;
     });
 
     r.extensionColor.addEventListener("input", () => {
       const val = r.extensionColor.value;
       this.measureSettings.extensionColor = val;
-      const sel = this.getSelectedDimension();
+      const sel = this.getEditDimension();
       if (sel) sel.extensionColor = val;
       r.extensionColorPreview.style.background = val;
     });
@@ -2814,14 +2858,14 @@ export class CadApp {
       if (!Number.isFinite(v)) return;
       const c = clamp(v, 0, 1);
       this.measureSettings.extensionAlpha = c;
-      const sel = this.getSelectedDimension();
+      const sel = this.getEditDimension();
       if (sel) sel.extensionAlpha = c;
     });
 
     r.freeTextToggle.addEventListener("change", () => {
       const val = !!r.freeTextToggle.checked;
       this.measureSettings.useFreeText = val;
-      const sel = this.getSelectedDimension();
+      const sel = this.getEditDimension();
       if (sel) sel.useFreeText = val;
       r.freeTextInput.classList.toggle("hidden", !val);
       r.freeTextGroup.classList.toggle("hidden", !val);
@@ -2840,7 +2884,7 @@ export class CadApp {
       () => this.measureSettings.freeTextBold,
       (v) => {
         this.measureSettings.freeTextBold = v;
-        const sel = this.getSelectedDimension();
+        const sel = this.getEditDimension();
         if (sel) sel.freeTextBold = v;
       },
     );
@@ -2849,7 +2893,7 @@ export class CadApp {
       () => this.measureSettings.freeTextItalic,
       (v) => {
         this.measureSettings.freeTextItalic = v;
-        const sel = this.getSelectedDimension();
+        const sel = this.getEditDimension();
         if (sel) sel.freeTextItalic = v;
       },
     );
@@ -2857,7 +2901,7 @@ export class CadApp {
     r.freeTextColor.addEventListener("input", () => {
       const val = r.freeTextColor.value;
       this.measureSettings.freeTextColor = val;
-      const sel = this.getSelectedDimension();
+      const sel = this.getEditDimension();
       if (sel) sel.freeTextColor = val;
       r.freeTextColorPreview.style.background = val;
     });
@@ -2865,14 +2909,14 @@ export class CadApp {
     r.freeTextInput.addEventListener("input", () => {
       const val = r.freeTextInput.value;
       this.measureSettings.freeText = val;
-      const sel = this.getSelectedDimension();
+      const sel = this.getEditDimension();
       if (sel) sel.freeText = val;
     });
 
     r.textColor.addEventListener("input", () => {
       const val = r.textColor.value;
       this.measureSettings.textColor = val;
-      const sel = this.getSelectedDimension();
+      const sel = this.getEditDimension();
       if (sel) sel.textColor = val;
       r.textColorPreview.style.background = val;
     });
@@ -2882,7 +2926,7 @@ export class CadApp {
       if (!Number.isFinite(v) || v <= 0) return;
       const c = clamp(v, 1, 200);
       this.measureSettings.textSizePx = c;
-      const sel = this.getSelectedDimension();
+      const sel = this.getEditDimension();
       if (sel) sel.textSizePx = c;
     });
 
@@ -2891,14 +2935,14 @@ export class CadApp {
       if (!Number.isFinite(v)) return;
       const c = clamp(v, 0, 6);
       this.measureSettings.decimals = c;
-      const sel = this.getSelectedDimension();
+      const sel = this.getEditDimension();
       if (sel) sel.decimals = c;
     });
 
     r.textBgToggle.addEventListener("change", () => {
       const val = !!r.textBgToggle.checked;
       this.measureSettings.textBgEnabled = val;
-      const sel = this.getSelectedDimension();
+      const sel = this.getEditDimension();
       if (sel) sel.textBgEnabled = val;
       r.textBgGroup.classList.toggle("hidden", !val);
     });
@@ -2906,7 +2950,7 @@ export class CadApp {
     r.textBgColor.addEventListener("input", () => {
       const val = r.textBgColor.value;
       this.measureSettings.textBgColor = val;
-      const sel = this.getSelectedDimension();
+      const sel = this.getEditDimension();
       if (sel) sel.textBgColor = val;
       r.textBgColorPreview.style.background = val;
     });
@@ -2916,14 +2960,14 @@ export class CadApp {
       if (!Number.isFinite(v)) return;
       const c = clamp(v, 0, 1);
       this.measureSettings.textBgAlpha = c;
-      const sel = this.getSelectedDimension();
+      const sel = this.getEditDimension();
       if (sel) sel.textBgAlpha = c;
     });
 
     r.lineColor.addEventListener("input", () => {
       const val = r.lineColor.value;
       this.measureSettings.lineColor = val;
-      const sel = this.getSelectedDimension();
+      const sel = this.getEditDimension();
       if (sel) sel.lineColor = val;
       r.lineColorPreview.style.background = val;
     });
@@ -2933,21 +2977,21 @@ export class CadApp {
       if (!Number.isFinite(v) || v <= 0) return;
       const c = clamp(v, 0.001, 10);
       this.measureSettings.tickLengthM = c;
-      const sel = this.getSelectedDimension();
+      const sel = this.getEditDimension();
       if (sel) sel.tickLengthM = c;
     });
 
     if (r.showUnit) r.showUnit.addEventListener("change", () => {
       const val = !!r.showUnit.checked;
       this.measureSettings.showUnit = val;
-      const sel = this.getSelectedDimension();
+      const sel = this.getEditDimension();
       if (sel) sel.showUnit = val;
     });
 
     if (r.unit) r.unit.addEventListener("change", () => {
       const val = (r.unit.value === "mm" || r.unit.value === "cm" || r.unit.value === "m") ? r.unit.value : "m";
       this.measureSettings.unit = val;
-      const sel = this.getSelectedDimension();
+      const sel = this.getEditDimension();
       if (sel) sel.unit = val;
     });
 
@@ -2956,14 +3000,14 @@ export class CadApp {
       if (!Number.isFinite(v)) return;
       const c = clamp(v, 0, 200);
       this.measureSettings.textGapPx = c;
-      const sel = this.getSelectedDimension();
+      const sel = this.getEditDimension();
       if (sel) sel.textGapPx = c;
     });
 
     if (r.doorHeightText) r.doorHeightText.addEventListener("input", () => {
       const val = r.doorHeightText!.value;
       this.measureSettings.doorHeightText = val;
-      const sel = this.getSelectedDimension();
+      const sel = this.getEditDimension();
       if (sel) sel.doorHeightText = val;
     });
 
@@ -2973,7 +3017,7 @@ export class CadApp {
   private _syncMeasureSettingsFromContext() {
     const r = this.measureRefs;
     if (!r) return;
-    const sel = this.getSelectedDimension();
+    const sel = this.getEditDimension();
     const s = sel ? {
       orientation: sel.mode, pointCount: this.measureSettings.pointCount, direction: this.measureSettings.direction,
       editMode: this.measureSettings.editMode,
