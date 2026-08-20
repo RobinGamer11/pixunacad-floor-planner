@@ -6948,8 +6948,8 @@ function CadToolSection({
                         }}
                         className={`flex-1 h-7 rounded border text-[11px] ${!el.pixelMode ? "font-semibold" : ""}`}
                         style={{
-                          borderColor: !el.pixelMode ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
-                          background: !el.pixelMode ? "hsl(var(--accent-gold-soft))" : "transparent",
+                          borderColor: !el.pixelMode ? "#4da3ff" : "hsl(var(--hairline))",
+                          background: !el.pixelMode ? "rgba(77,163,255,0.12)" : "transparent",
                         }}
                         title="Vektor: Live-Ansicht des Zeichenblatts, bei jedem Zoom scharf"
                       >
