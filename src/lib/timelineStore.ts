@@ -16,6 +16,8 @@ export interface TlItem {
   done?: boolean;
   /** Status-Id aus TlState.statuses (aus Board übernommen). */
   statusId?: string;
+  /** true, sobald der Status manuell gesetzt wurde – dann greift die Automatik nicht mehr. */
+  statusManual?: boolean;
   responsible?: string;
   categoryId?: string;
   priorityId?: string;
