@@ -4916,21 +4916,18 @@ function ElementView({
  *  Platzhalter, wenn das Sheet noch nie im CAD geöffnet wurde. */
 function CadViewportViewHost({ element }: { element: PageElement }) {
   const projects = useProjects();
-  const { sheet, autoUpdate } = React.useMemo(() => {
+  const { sheet } = React.useMemo(() => {
     let s: import("@/lib/projectStore").Sheet | undefined;
-    let auto = true;
     if (element.sheetId) {
       for (const p of projects) {
         const hit = p.sheets.find((x) => x.id === element.sheetId);
-        if (hit) {
-          s = hit;
-          auto = p.settings?.cadAutoUpdate !== false;
-          break;
-        }
+        if (hit) { s = hit; break; }
       }
     }
-    return { sheet: s, autoUpdate: auto };
+    return { sheet: s };
   }, [projects, element.sheetId]);
+  // Automatische Aktualisierung ist pro CAD-Blatt-Objekt einstellbar.
+  const autoUpdate = element.autoUpdate !== false;
   return (
     <CadViewportView
       element={element}
