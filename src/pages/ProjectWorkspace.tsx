@@ -4116,7 +4116,9 @@ function ElementView({
           const B = toPct(tr.x + vx * ext, tr.y + vy * ext);
           const M = toPct(mx, my);
           const shown = ((startRot + delta) % 360 + 360) % 360;
-          setRotAxis({ ax: A.x, ay: A.y, bx: B.x, by: B.y, mx: M.x, my: M.y, deg: shown });
+          pendingAxis = { ax: A.x, ay: A.y, bx: B.x, by: B.y, mx: M.x, my: M.y, deg: shown };
+          schedule();
+
         }
       }
 
