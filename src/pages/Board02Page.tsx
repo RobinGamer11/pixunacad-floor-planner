@@ -467,8 +467,8 @@ export default function Board02Page() {
 
             {/* Titel-Labels */}
             {placed.map((p) => {
-              const lx = xOf(p.t1);
-              const ly = cy + p.side * (72 + p.lane * 46);
+              const lx = sx(p.bx1);
+              const ly = labelY(p);
               const open = openLabelId === p.item.id;
               const cat = catMap.get(p.item.categoryId ?? "");
               return (
