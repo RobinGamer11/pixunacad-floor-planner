@@ -88,7 +88,7 @@ export default function Board02Page() {
   // ---- Viewport / Zoom ---------------------------------------------
   const wrapRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 900, h: 380 });
-  const [view, setView] = useState({ k: 1, tx: 0 });
+  const [view, setView] = useState({ k: 1, tx: 0, ty: 0 });
   const viewRef = useRef(view);
   viewRef.current = view;
 
@@ -120,28 +120,30 @@ export default function Board02Page() {
       e.preventDefault();
       const rect = el.getBoundingClientRect();
       const px = e.clientX - rect.left;
+      const py = e.clientY - rect.top;
       const dy = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 100 : 1);
       const cur = viewRef.current;
       const nk = clamp(cur.k * Math.exp(-dy * 0.0015), 0.3, 40);
       if (nk === cur.k) return;
       const ratio = nk / cur.k;
       const o = px - padX;
-      setView({ k: nk, tx: o - (o - cur.tx) * ratio });
+      const oy = py - rect.height / 2;
+      setView({ k: nk, tx: o - (o - cur.tx) * ratio, ty: oy - (oy - cur.ty) * ratio });
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
   }, []);
 
-  const drag = useRef({ on: false, sx: 0 });
+  const drag = useRef({ on: false, sx: 0, sy: 0 });
   const onPointerDown = (e: React.PointerEvent) => {
     const target = e.target as Element;
     if (target.closest?.("[data-tl-interactive]")) return;
-    drag.current = { on: true, sx: e.clientX - viewRef.current.tx };
+    drag.current = { on: true, sx: e.clientX - viewRef.current.tx, sy: e.clientY - viewRef.current.ty };
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   };
   const onPointerMove = (e: React.PointerEvent) => {
     if (!drag.current.on) return;
-    setView((v) => ({ ...v, tx: e.clientX - drag.current.sx }));
+    setView((v) => ({ ...v, tx: e.clientX - drag.current.sx, ty: e.clientY - drag.current.sy }));
   };
   const onPointerUp = (e: React.PointerEvent) => {
     drag.current.on = false;
