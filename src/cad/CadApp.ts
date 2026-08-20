@@ -78,7 +78,7 @@ export interface TextEditorRefs {
 export interface MeasureSettings {
   orientation: "parallel" | "diagonal" | "arc";
   /** "free" = Maßkette ohne Fangpunkt-Zwang. */
-  pointCount: "two" | "multi" | "free";
+  pointCount: "two" | "multi" | "free" | "angle";
   /** Achsen-Richtung der Maßkette. "free" wird aus den ersten zwei Punkten abgeleitet. */
   direction: "horizontal" | "vertical" | "free";
   editMode: "parallel" | "endpoints";
@@ -2816,7 +2816,7 @@ export class CadApp {
     });
 
     r.pointCount.addEventListener("change", () => {
-      this.measureSettings.pointCount = r.pointCount.value as "two" | "multi" | "free";
+      this.measureSettings.pointCount = r.pointCount.value as MeasureSettings["pointCount"];
     });
 
     r.direction.addEventListener("change", () => {
@@ -3023,7 +3023,7 @@ export class CadApp {
     if (!r) return;
     const sel = this.getEditDimension();
     const s = sel ? {
-      orientation: sel.mode, pointCount: this.measureSettings.pointCount, direction: this.measureSettings.direction,
+      orientation: (sel.mode === "angle" ? this.measureSettings.orientation : sel.mode), pointCount: (sel.mode === "angle" ? "angle" : this.measureSettings.pointCount), direction: this.measureSettings.direction,
       editMode: this.measureSettings.editMode,
       showExtensions: sel.showExtensions, useFreeText: sel.useFreeText, freeText: sel.freeText,
       textColor: sel.textColor, textSizePx: sel.textSizePx, decimals: sel.decimals,

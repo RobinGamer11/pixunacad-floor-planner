@@ -123,23 +123,25 @@ export class MeasureTool {
 
 
 
-  getOrientationMode(): "parallel" | "diagonal" | "arc" | "angle" {
-    return this.app.measureSettings.orientation as any;
+  getOrientationMode(): "parallel" | "diagonal" | "arc" {
+    const o = this.app.measureSettings.orientation as any;
+    return (o === "angle" ? "parallel" : o);
   }
 
   /** Neigungsmodus: Scheitel + zwei Schenkel, Anzeige des Winkels in Grad. */
   private _isAngleMode(): boolean {
-    return this.getOrientationMode() === "angle";
+    return (this.app.measureSettings.pointCount as any) === "angle";
   }
 
   getPointCountMode(): "two" | "multi" | "free" {
-    return this.app.measureSettings.pointCount;
+    const pc = this.app.measureSettings.pointCount as any;
+    return (pc === "angle" ? "free" : pc);
   }
 
   /** "Freies Maß": Punkte dürfen ohne Fangpunkt gesetzt werden.
    *  Im Neigungsmodus ist das immer erlaubt (Fangpunkte dienen der Orientierung). */
   private _isFreePoints(): boolean {
-    return this.app.measureSettings.pointCount === "free" || this._isAngleMode();
+    return (this.app.measureSettings.pointCount as any) === "free" || this._isAngleMode();
   }
 
   /** Aktueller Zielpunkt: Snap wenn vorhanden, im freien Modus sonst die Mausposition. */
@@ -263,7 +265,7 @@ export class MeasureTool {
     const orientation = this.getOrientationMode();
     // Wenn eine Achse vorgegeben ist (H/V/Frei), erzwingen wir "parallel" damit
     // die gesamte Kette EINE gemeinsame Maßlinie hat.
-    const mode: "parallel" | "diagonal" | "arc" = (orientation === "angle" ? "parallel" : orientation);
+    const mode: "parallel" | "diagonal" | "arc" = orientation;
 
     if (orientation === "arc") {
       const pts = this.selectedPoints;
