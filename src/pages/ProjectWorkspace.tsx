@@ -4435,7 +4435,7 @@ function ElementView({
             onMouseDown={(e) => e.stopPropagation()}
             onPointerDown={(e) => e.stopPropagation()}
           >
-            {tabletCommitOnly ? (
+            {tabletCommitOnly || (isCadView && !!edgeTrim) ? (
               <button
                 data-hub-control
                 onClick={(e) => {
