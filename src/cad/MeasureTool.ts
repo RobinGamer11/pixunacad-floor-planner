@@ -524,6 +524,20 @@ export class MeasureTool {
       return;
     }
     const b = this.selectedPoints[1].world;
+    // Kreisbahn-Hilfe: der zweite Schenkel hat zwingend dieselbe Länge.
+    {
+      const sc = cam.worldToScreen(a.x, a.y);
+      const sb = cam.worldToScreen(b.x, b.y);
+      const rPx = Math.hypot(sb.x - sc.x, sb.y - sc.y);
+      ctx.save();
+      ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = "rgba(120,120,120,0.6)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(sc.x, sc.y, rPx, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
     const style = this.app.getCurrentMeasureStyle();
     const spec = { p1: a, p2: b, p3: target, placementPoint: null, mode: "angle", refDir: null };
     const g = getDimensionGeometry(spec as any);
