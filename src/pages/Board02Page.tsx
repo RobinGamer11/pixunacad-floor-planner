@@ -413,23 +413,53 @@ export default function Board02Page() {
               <BigAddButton kind="note" onClick={() => add("note")} />
               <div className="flex-1" />
               <Segmented
-                value={colorMode}
-                onChange={(v) => setColorMode(v as typeof colorMode)}
-                options={[{ v: "status", l: "Farbe: Stand" }, { v: "category", l: "Farbe: Kategorie" }]}
+                value={surface}
+                onChange={(v) => setSurface(v as typeof surface)}
+                options={[{ v: "ray", l: "Ansichtstrahl" }, { v: "net", l: "Projektnetz" }]}
               />
-              <Segmented
-                value={axisMode}
-                onChange={(v) => setAxisMode(v as typeof axisMode)}
-                options={[{ v: "time", l: "Zeitraum" }, { v: "percent", l: "Projektstand %" }]}
-              />
+              {surface === "ray" && (
+                <>
+                  <Segmented
+                    value={colorMode}
+                    onChange={(v) => setColorMode(v as typeof colorMode)}
+                    options={[{ v: "status", l: "Farbe: Stand" }, { v: "category", l: "Farbe: Kategorie" }]}
+                  />
+                  <Segmented
+                    value={axisMode}
+                    onChange={(v) => setAxisMode(v as typeof axisMode)}
+                    options={[{ v: "time", l: "Zeitraum" }, { v: "percent", l: "Projektstand %" }]}
+                  />
+                </>
+              )}
             </div>
           </div>
+
+          {/* Projektnetz-Ansicht */}
+          {surface === "net" && (
+            <div className="mx-4 mt-4 h-[min(70vh,760px)] min-h-[460px] rounded-xl overflow-hidden"
+                 style={{ background: PANEL, border: `1px solid ${PANEL_LINE}`, boxShadow: "0 1px 2px rgba(20,17,16,0.05)" }}>
+              <ProjectGraph
+                projectName={project?.name ?? "Projekt"}
+                nodes={notes.nodes}
+                statusMap={noteStatusMap}
+                priorityMap={notePriorityMap}
+                selectedId={netSelected}
+                onSelect={(id) => setNetSelected(id)}
+                focusToken={0}
+              />
+            </div>
+          )}
 
           {/* Zeitstrahl */}
           <div
             ref={wrapRef}
             className="relative mx-4 mt-4 h-[min(62vh,640px)] min-h-[420px] rounded-xl overflow-hidden select-none cursor-grab active:cursor-grabbing"
-            style={{ background: CANVAS, border: `1px solid ${CANVAS_LINE}`, touchAction: "none" }}
+            style={{
+              background: CANVAS,
+              border: `1px solid ${CANVAS_LINE}`,
+              touchAction: "none",
+              display: surface === "ray" ? undefined : "none",
+            }}
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
@@ -437,11 +467,24 @@ export default function Board02Page() {
           >
             <svg width={size.w} height={size.h} className="absolute inset-0">
               <defs>
-                <linearGradient id="tl-now" x1="0" x2="1">
+                {/* Ein einziger, durchgehender Verlauf für ALLE Kreise:
+                    links von HEUTE orange, rechts davon grau. */}
+                <linearGradient
+                  id="tl-global"
+                  gradientUnits="userSpaceOnUse"
+                  x1={nowX - Math.max(120, size.w * 0.22)}
+                  x2={nowX + Math.max(120, size.w * 0.22)}
+                  y1={0} y2={0}
+                >
                   <stop offset="0%" stopColor={ORANGE} />
                   <stop offset="100%" stopColor={GREY} />
                 </linearGradient>
+                <filter id="tl-glow" x="-70%" y="-70%" width="240%" height="240%">
+                  <feGaussianBlur stdDeviation="3" result="b" />
+                  <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+                </filter>
               </defs>
+
 
               {/* Achse */}
               <line x1={0} x2={size.w} y1={size.h - 46} y2={size.h - 46} stroke="#2b2724" strokeWidth={1} />
