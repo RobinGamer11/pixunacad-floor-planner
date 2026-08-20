@@ -1165,6 +1165,7 @@ function ProjectCard({
   onSelect,
   onOpen,
   onSettings,
+  onDuplicate,
   onDelete,
   onDragStart,
   onDragEnd,
@@ -1177,6 +1178,7 @@ function ProjectCard({
   onSelect: () => void;
   onOpen: () => void;
   onSettings: () => void;
+  onDuplicate: () => void;
   onDelete: () => void;
   onDragStart: () => void;
   onDragEnd: () => void;
