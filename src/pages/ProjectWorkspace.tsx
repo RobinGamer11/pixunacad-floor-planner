@@ -115,6 +115,8 @@ import { FreeDrawSettingsPanel } from "@/components/cad/FreeDrawSettingsPanel";
 import { EraserSettingsPanel, EraserModeSelect } from "@/components/cad/EraserSettingsPanel";
 import { ProjectFilePickerDialog } from "@/components/cad/ProjectFilePickerDialog";
 import { HatchSettingsPanel, HatchModeSelect } from "@/components/cad/HatchSettingsPanel";
+import { LineModeSelect as LineShapeModeSelect } from "@/components/cad/LineModeSelect";
+
 import { RasterModeToggle } from "@/components/cad/RasterModeToggle";
 import { WorkspaceHeader } from "@/components/workspace/WorkspaceHeader";
 import { MappeHelpOverlay } from "@/components/workspace/MappeHelpOverlay";
