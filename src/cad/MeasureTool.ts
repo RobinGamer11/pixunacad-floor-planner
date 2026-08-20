@@ -263,7 +263,7 @@ export class MeasureTool {
     const orientation = this.getOrientationMode();
     // Wenn eine Achse vorgegeben ist (H/V/Frei), erzwingen wir "parallel" damit
     // die gesamte Kette EINE gemeinsame Maßlinie hat.
-    const mode: "parallel" | "diagonal" | "arc" = orientation;
+    const mode: "parallel" | "diagonal" | "arc" = (orientation === "angle" ? "parallel" : orientation);
 
     if (orientation === "arc") {
       const pts = this.selectedPoints;
