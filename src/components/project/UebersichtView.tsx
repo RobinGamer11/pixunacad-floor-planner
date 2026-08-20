@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus, Pencil, Check, X, Trash2, Settings2, GripVertical, ChevronDown, ChevronRight } from "lucide-react";
 import { projectStore, type Project, type Task } from "@/lib/projectStore";
-import { notesStore, useNotes } from "@/lib/notesStore";
+import { timelineStore, useTimeline, itemAchieved } from "@/lib/timelineStore";
 import { AufgabenView } from "@/pages/ProjectsHome";
 
 interface Props {
@@ -430,27 +430,26 @@ function TaskTimeline({ project }: { project: Project }) {
 /* ============================================================ Aufgaben-Mini */
 
 function AufgabenMini({ project }: { project: Project }) {
-  const notes = useNotes(project.id);
-  const mappen = project.mappen ?? [];
-  const mappeName = (id?: string) => (id ? (mappen.find((m) => m.id === id)?.name ?? "") : "");
-  type Row = { key: string; source: "legacy" | "note"; id: string; title: string; done: boolean; date?: string; mappeId?: string };
+  const board = useTimeline(project.id);
+  type Row = { key: string; source: "legacy" | "board"; id: string; title: string; done: boolean; date?: string; mappeId?: string };
   const rows: Row[] = useMemo(() => {
+    const now = Date.now();
     const legacy: Row[] = project.tasks.map((t) => ({
       key: `legacy:${t.id}`, source: "legacy", id: t.id, title: t.title, done: t.done, date: t.date,
     }));
-    const noteTasks: Row[] = notes.nodes
-      .filter((n) => n.kind === "task")
-      .map((n) => ({
-        key: `note:${n.id}`, source: "note", id: n.id, title: n.title,
-        done: n.status === "done", date: n.date || n.dueDate, mappeId: n.mappeId,
+    const boardTasks: Row[] = board.items
+      .filter((i) => i.kind === "task")
+      .map((i) => ({
+        key: `board:${i.id}`, source: "board", id: i.id, title: i.title,
+        done: itemAchieved(i, now), date: i.endDate || i.startDate,
       }));
-    return [...legacy, ...noteTasks]
+    return [...legacy, ...boardTasks]
       .sort((a, b) => (a.done === b.done ? 0 : a.done ? 1 : -1));
-  }, [project.tasks, notes.nodes]);
+  }, [project.tasks, board.items]);
   const open = rows.filter((r) => !r.done).slice(0, 8);
   const toggle = (r: Row) => {
     if (r.source === "legacy") projectStore.toggleTask(project.id, r.id);
-    else notesStore.updateNode(project.id, r.id, { status: r.done ? "open" : "done" });
+    else timelineStore.updateItem(project.id, r.id, { statusId: r.done ? "open" : "done", done: !r.done, statusManual: true });
   };
   return (
     <section
@@ -459,7 +458,7 @@ function AufgabenMini({ project }: { project: Project }) {
     >
       <div className="flex items-center justify-between mb-3">
         <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">AUFGABEN</div>
-        <div className="text-[10px] text-muted-foreground">Bearbeiten im Reiter „Aufgaben"</div>
+        <div className="text-[10px] text-muted-foreground">Bearbeiten im Reiter „Aufgaben/Notizen"</div>
       </div>
       {rows.length === 0 ? (
         <div className="text-xs text-muted-foreground italic">Keine Aufgaben.</div>
