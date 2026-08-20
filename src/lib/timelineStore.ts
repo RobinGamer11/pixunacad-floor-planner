@@ -354,3 +354,46 @@ export function effectiveStatusId(i: TlItem, now = Date.now()): string {
 export function itemAchieved(i: TlItem, now = Date.now()): boolean {
   return effectiveStatusId(i, now) === "done";
 }
+
+/** Letztes relevantes Datum (Ziel, sonst Start) – als Tagesende in ms. */
+export function itemDeadlineMs(i: TlItem): number {
+  const d = i.endDate || i.startDate;
+  const base = new Date(`${d}T23:59:59`).getTime();
+  return Number.isFinite(base) ? base : itemEndMs(i);
+}
+
+/** Überfällig: Der HEUTE-Strich liegt hinter dem letzten Datum des Eintrags. */
+export function itemOverdue(i: TlItem, now = Date.now()): boolean {
+  return now > itemDeadlineMs(i);
+}
+
+/** Offene Aufgabe, deren Frist verstrichen ist – wird rot/leuchtend dargestellt. */
+export function taskAlert(i: TlItem, now = Date.now()): boolean {
+  return i.kind === "task" && !itemAchieved(i, now) && itemOverdue(i, now);
+}
+
+/** Projektstand in Prozent (erledigte Einträge / alle Einträge). */
+export function projectProgress(projectId: string, now = Date.now()): number {
+  const s = getState(projectId);
+  if (!s.items.length) return 0;
+  const done = s.items.filter((i) => itemAchieved(i, now)).length;
+  return Math.round((done / s.items.length) * 100);
+}
+
+/**
+ * Schnellanlage aus der Startseite: Kategorie „Schnellablage“, heutiges Datum,
+ * Priorität „Normal“, ohne Uhrzeit.
+ */
+export function addQuickItem(
+  projectId: string,
+  kind: TlKind,
+  data: { title: string; description?: string; date?: string },
+): TlItem {
+  return timelineStore.addItem(projectId, kind, {
+    title: data.title,
+    description: data.description ?? "",
+    categoryId: QUICK_CATEGORY_ID,
+    priorityId: "normal",
+    startDate: data.date || new Date().toISOString().slice(0, 10),
+  });
+}
