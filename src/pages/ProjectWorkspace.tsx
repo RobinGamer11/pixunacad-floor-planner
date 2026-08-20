@@ -2006,6 +2006,7 @@ export default function ProjectWorkspace() {
                 lineActive={isLinePageTool(activeTool)}
                 hatchActive={activeTool === "hatch"}
                 textActive={activeTool === "text"}
+                multiSelectActive={selectedElementIds.length > 1}
               />
             )}
             <ZoomBar zoom={zoom} setZoom={setZoomClamped} onResetZoom={resetZoomAndCenter} />
