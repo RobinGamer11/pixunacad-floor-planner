@@ -869,7 +869,10 @@ export class LineTool {
       drawSnapDot(ctx, s.x, s.y, { ring: true });
     }
 
+    if (this.drawMode !== "polyline") { this._drawShapePreview(ctx, cam); return; }
+
     if (this.state !== "drawing" || !this.currentPoint) return;
+
 
     const a = this.currentPoint;
     const b = this._previewWorld(this.app.input);
