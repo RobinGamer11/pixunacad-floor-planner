@@ -18,6 +18,8 @@ import { ProjectFilePickerDialog } from "@/components/cad/ProjectFilePickerDialo
 import { WallSettingsPanel } from "@/components/cad/WallSettingsPanel";
 import { HatchPatternBlock } from "@/components/cad/HatchPatternBlock";
 import { HatchSettingsPanel, HatchModeSelect } from "@/components/cad/HatchSettingsPanel";
+import { LineModeSelect } from "@/components/cad/LineModeSelect";
+
 
 import { ToolHelpNotes } from "@/components/cad/ToolHelpNotes";
 import { ToolColorPicker } from "@/components/workspace/ToolColorPicker";
@@ -2101,6 +2103,9 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 <CadEbeneSelect target={idSelectRef} />
               </div>
             )}
+            {activeTool === ToolIds.LINE && <LineModeSelect app={appRef.current} />}
+
+
 
             <div className="mt-3 rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
               <div className="text-[10px] font-semibold tracking-wider mb-2" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>

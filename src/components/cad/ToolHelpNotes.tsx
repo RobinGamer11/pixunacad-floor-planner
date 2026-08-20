@@ -48,7 +48,9 @@ const TOOL_HINTS: Record<string, string[]> = {
     "Klick in eine geschlossene Fläche füllt automatisch",
     "Umriss-Modus: Punkte selbst setzen, Enter schließt die Fläche",
     "Radiergummi schneidet Löcher in bestehende Schraffuren",
+    "Schraffur ausschneiden = 01. L-Klick bestehende Schraffur | 02. Neue Schraffur in bestehende Schraffur zeichnen",
   ],
+
   measure: [
     "Zwei Punkte wählen, dritter Klick legt den Abstand der Maßlinie fest",
     "Spiegeln in den Einstellungen dreht die Maßkette an gleicher Stelle",
