@@ -16,9 +16,10 @@ import {
   TabletSmartphone,
   Network,
   Wallet,
+  GanttChartSquare,
 } from "lucide-react";
 
-export type WorkspaceMode = "workspace" | "cad" | "notes" | "finance";
+export type WorkspaceMode = "workspace" | "cad" | "notes" | "finance" | "board2";
 
 interface Props {
   projectId?: string;
@@ -82,6 +83,7 @@ export function WorkspaceHeader({
   const goCad = () => projectId && navigate(`/project/${projectId}/cad`);
   const goNotes = () => projectId && navigate(`/project/${projectId}/notes`);
   const goFinance = () => projectId && navigate(`/project/${projectId}/finance`);
+  const goBoard2 = () => projectId && navigate(`/project/${projectId}/board2`);
 
   return (
     <header
@@ -166,6 +168,13 @@ export function WorkspaceHeader({
             label="Board"
             active={mode === "notes"}
             onClick={goNotes}
+          />
+          <ModeDivider />
+          <ModeButton
+            icon={<GanttChartSquare size={13} />}
+            label="Board02"
+            active={mode === "board2"}
+            onClick={goBoard2}
           />
           <ModeDivider />
           <ModeButton
