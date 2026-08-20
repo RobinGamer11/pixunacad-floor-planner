@@ -159,9 +159,8 @@ export const timelineStore = {
       categoryId: s.categories[0]?.id,
       priorityId: "normal",
       startDate: today(),
-      startTime: "09:00",
       endDate: plusDays(10),
-      endTime: "17:00",
+
       createdAt: now,
       updatedAt: now,
     };
