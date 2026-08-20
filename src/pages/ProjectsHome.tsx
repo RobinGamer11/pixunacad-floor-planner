@@ -53,7 +53,15 @@ import {
   type UserProfile,
 } from "@/lib/projectStore";
 import { useDragScroll } from "@/hooks/use-drag-scroll";
-import { notesStore, useNotes, QUICK_CATEGORY, type NoteNode, type NoteStatus, type NotePriority } from "@/lib/notesStore";
+import {
+  timelineStore,
+  useTimeline,
+  addQuickItem,
+  itemAchieved,
+  taskAlert,
+  projectProgress,
+  type TlKind,
+} from "@/lib/timelineStore";
 import { WeatherStrip } from "@/components/project/WeatherStrip";
 import { UebersichtView } from "@/components/project/UebersichtView";
 import { FileBrowser } from "@/components/project/FileBrowser";
@@ -1111,7 +1119,7 @@ export default function ProjectsHome() {
                   {(
                     [
                       ["uebersicht", "Übersicht", false],
-                      ["aufgaben", "Aufgaben", false],
+                      ["aufgaben", "Aufgaben/Notizen", false],
                       ["finanzen", "Finanzen", false],
                       ["dokumente", "Dokumente", false],
                       ["team", "Team", true],
@@ -1640,35 +1648,17 @@ function SeitenInhaltGrid({ project, onAddPage }: { project: Project; onAddPage:
  */
 type UnifiedTask = {
   id: string;
-  source: "legacy" | "note";
+  source: "board";
   title: string;
   date?: string;
   time?: string;
   priority: TaskPriority;
   done: boolean;
   category?: string;
-  status?: NoteStatus;
-  nodeParentId?: string | null; // nur bei source === "note"
-  mappeId?: string;
+  kind: TlKind;
+  /** Offene Aufgabe, deren letztes Datum überschritten ist. */
+  alert?: boolean;
 };
-
-function noteToUnified(n: NoteNode): UnifiedTask {
-  const prio: TaskPriority =
-    n.priority === "urgent" || n.priority === "high" ? "high"
-      : n.priority === "low" ? "low" : "medium";
-  return {
-    id: n.id,
-    source: "note",
-    title: n.title,
-    date: n.date || n.dueDate,
-    time: n.time,
-    priority: prio,
-    done: n.status === "done",
-    category: n.category,
-    status: n.status,
-    nodeParentId: n.parentId,
-  };
-}
 
 export function AufgabenView({ project }: { project: Project }) {
   const navigate = useNavigate();
