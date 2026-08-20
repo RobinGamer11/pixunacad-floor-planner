@@ -3671,8 +3671,21 @@ function ElementView({
       if (ev.key === "Escape" || ev.key === "Delete") actionCancelRef.current?.();
       else if (ev.key === "Enter") actionCommitRef.current?.();
     };
+    // Linksklick außerhalb der Bedien-Symbole setzt den Kantenschnitt ebenfalls.
+    const onClick = (ev: MouseEvent) => {
+      if (ev.button !== 0) return;
+      const t = ev.target as HTMLElement | null;
+      if (t?.closest('[data-hub-control], [data-tablet-aid="true"]')) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      actionCommitRef.current?.();
+    };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("click", onClick, true);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("click", onClick, true);
+    };
   }, [edgeTrim]);
 
   useEffect(() => {
