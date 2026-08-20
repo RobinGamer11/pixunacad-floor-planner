@@ -4530,6 +4530,9 @@ function ElementView({
              sonst wie gehabt oben rechts. */}
           {(() => {
             const anchored = cadHubUx && anchorFracState && anchorFracState.key !== "interior";
+            // CAD-Blatt: Solange kein Fangpunkt (Ecke) gewählt ist, werden gar
+            // keine Symbole gezeigt — statt ausgegrauter Buttons.
+            if (cadHubUx && !anchored && !edgeTrim && !hubMode) return null;
             const hubStyle: React.CSSProperties = anchored
               ? {
                   left: `${anchorFracState!.fx * 100}%`,
@@ -4538,6 +4541,7 @@ function ElementView({
                   background: tabletCommitOnly ? "transparent" : "white",
                   border: tabletCommitOnly ? "none" : `1px solid hsl(var(--hairline))`,
                   padding: tabletCommitOnly ? 0 : 3,
+                  pointerEvents: "auto",
                   zIndex: 10,
                 }
               : {
@@ -4546,6 +4550,7 @@ function ElementView({
                   background: tabletCommitOnly ? "transparent" : "white",
                   border: tabletCommitOnly ? "none" : `1px solid hsl(var(--hairline))`,
                   padding: tabletCommitOnly ? 0 : 3,
+                  pointerEvents: "auto",
                   zIndex: 10,
                 };
             return (
