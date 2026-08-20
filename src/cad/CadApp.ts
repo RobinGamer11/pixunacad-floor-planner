@@ -1329,7 +1329,7 @@ export class CadApp {
         p2: { x: d.p2.x - newPos.x, y: d.p2.y - newPos.y },
         placementPoint: { x: d.placementPoint.x - newPos.x, y: d.placementPoint.y - newPos.y },
         mode: d.mode, refDir: d.refDir ? { x: d.refDir.x, y: d.refDir.y } : null, bulge: (d as any).bulge || 0,
-        p3: d.p3 ? { x: d.p3.x, y: d.p3.y } : null,
+        p3: d.p3 ? { x: d.p3.x - newPos.x, y: d.p3.y - newPos.y } : null,
         textColor: d.textColor, textSizePx: d.textSizePx, lineColor: d.lineColor,
         decimals: d.decimals, tickLengthM: d.tickLengthM, showExtensions: d.showExtensions,
         useFreeText: d.useFreeText, freeText: d.freeText,
