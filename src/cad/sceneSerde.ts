@@ -114,7 +114,7 @@ export function restoreOneScene(scene: Scene, data: SerializedScene | null | und
       extensionStyle: d.extensionStyle, extensionColor: d.extensionColor, extensionAlpha: d.extensionAlpha,
       freeTextBold: d.freeTextBold, freeTextItalic: d.freeTextItalic, freeTextColor: d.freeTextColor,
       textGapPx: d.textGapPx, doorHeightText: d.doorHeightText,
-      labelId: d.labelId, mirror: d.mirror, bulge: d.bulge,
+      labelId: d.labelId, mirror: d.mirror, bulge: d.bulge, p3: d.p3 || null,
     }, d.doorRefId || null);
     if (typeof d._textSideBase === "number") (dim as any)._textSideBase = d._textSideBase;
     if (d._stickerEditOwnerId) (dim as any)._stickerEditOwnerId = d._stickerEditOwnerId;
