@@ -4924,6 +4924,40 @@ function ElementView({
 /** Vorschau-Bild eines CAD-Sheets. Liest live aus dem projectStore und
  *  zeigt den `thumbnail` (PNG aus dem CAD-Editor). Fallback: dezenter
  *  Platzhalter, wenn das Sheet noch nie im CAD geöffnet wurde. */
+/** Rastert die aktuelle CAD-Ansicht eines platzierten Blatts in eine PNG-DataURL
+ *  („Pixel"-Objektart). Gibt null zurück, wenn keine Szene vorhanden ist. */
+function renderCadViewSnapshot(
+  element: PageElement,
+  sheet?: import("@/lib/projectStore").Sheet,
+): string | null {
+  const sceneJson = sheet?.sceneJson;
+  const paperWmm = element.wMm ?? 0;
+  const paperHmm = element.hMm ?? 0;
+  if (!sceneJson || !(paperWmm > 0) || !(paperHmm > 0)) return null;
+  const PX_PER_MM = 8;
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(paperWmm * PX_PER_MM));
+  canvas.height = Math.max(1, Math.round(paperHmm * PX_PER_MM));
+  let labels: any = null;
+  if (sheet?.labelsJson) { try { labels = JSON.parse(sheet.labelsJson); } catch { labels = null; } }
+  try {
+    renderSceneRegionToCanvas({
+      canvas,
+      sceneJson,
+      labelsJson: labels,
+      paperWmm,
+      paperHmm,
+      scaleDen: element.scaleDen ?? parseScaleDen(element.scale ?? sheet?.scale) ?? 100,
+      centerM: element.modelCenterM ?? { x: 0, y: 0 },
+      rotationDeg: element.viewportRotationDeg ?? 0,
+    });
+    return canvas.toDataURL("image/png");
+  } catch (err) {
+    console.warn("[CadView] Pixel-Rasterung fehlgeschlagen:", err);
+    return null;
+  }
+}
+
 function CadViewportViewHost({ element }: { element: PageElement }) {
   const projects = useProjects();
   const { sheet } = React.useMemo(() => {
