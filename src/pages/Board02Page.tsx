@@ -716,11 +716,11 @@ function ItemEditor({
         <Field label="Status">
           <div className="grid grid-cols-3 gap-1.5">
             {statuses.map((s) => {
-              const active = (item.statusId ?? "open") === s.id;
+              const active = effectiveStatusId(item) === s.id;
               return (
                 <button
                   key={s.id}
-                  onClick={() => set({ statusId: s.id, done: s.id === "done" })}
+                  onClick={() => set({ statusId: s.id, done: s.id === "done", statusManual: true })}
                   className="h-8 rounded-md border text-[11px] font-medium"
                   style={{
                     background: active ? `${s.color}22` : "hsl(var(--background))",
