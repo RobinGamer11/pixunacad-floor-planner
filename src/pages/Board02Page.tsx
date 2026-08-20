@@ -535,21 +535,23 @@ export default function Board02Page() {
                   {p.circles.map((c, i) => {
                     const cxp = sx(c.bx);
                     const r = c.r * view.k;
-                    const spansNow = colorMode === "status" && sx(p.bx0) <= nowX && sx(p.bx1) >= nowX;
-                    const near = spansNow && Math.abs(cxp - nowX) < Math.max(24, r * 3);
+                    // Offene Aufgaben leuchten rot auf.
+                    const alert = colorMode === "status" && p.item.kind === "task" && !itemAchieved(p.item, now);
                     return (
                       <circle
                         key={i}
                         cx={cxp}
                         cy={cy + c.dy * view.k}
                         r={r}
-                        fill={near ? "url(#tl-now)" : circleFill(p.item, c.t)}
+                        fill={circleFill(p.item, c.t)}
+                        filter={alert ? "url(#tl-glow)" : undefined}
                         opacity={p.item.id === selectedId ? 1 : 0.92}
                         stroke={p.item.id === selectedId ? "#fff" : "none"}
                         strokeWidth={p.item.id === selectedId ? Math.max(0.5, view.k) : 0}
                       />
                     );
                   })}
+
                 </g>
               ))}
             </svg>
