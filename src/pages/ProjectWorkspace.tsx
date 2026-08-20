@@ -3484,10 +3484,10 @@ function ElementView({
   };
 
   const isCadView = el.kind === "cad-view" || el.kind === "cad-viewport";
-  // CAD-Blätter verhalten sich in der Bedienung wie Bilder/PDFs
-  // (Auswahl, Ziehen, Drehen, Kanten). Nur Maßstabs-relevante Sonderfälle
-  // (Ecken-Skalierung, Paper-Space-Recompute) bleiben CAD-spezifisch.
-  const cadHubUx = false;
+  // CAD-Blätter: blaue Optik, unveränderter Cursor und Bedienung
+  // ausschließlich über HUB-Symbole (Verschieben / Drehen / Kanten schneiden)
+  // mit Commit per Linksklick + ENTER bzw. Häkchen (Tablet).
+  const cadHubUx = isCadView;
   const hubBlue = "#4da3ff";
 
   // Explizite HUB-Modi für CAD-Blatt: erst nach Klick auf das Symbol wird
