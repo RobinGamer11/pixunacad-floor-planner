@@ -4333,12 +4333,17 @@ function ElementView({
         // CAD-Blätter folgen der normalen Ebenen-Hierarchie. Beim Auswahl-Werkzeug
         // müssen sie jedoch über der CAD-Zeichenebene liegen, sonst fängt diese
         // den Klick ab und das Blatt lässt sich nicht mehr auswählen.
-        zIndex: showHub ? 80 : (elevated ? 30 : (isCadView && !toolActive ? 30 : undefined)),
+        // CAD-Blätter folgen strikt der normalen Ebenen-Hierarchie und werden
+        // deshalb NICHT über die CAD-Zeichenebene gehoben (sonst läge ein
+        // CAD-Blatt der Default-Ebene vor Linien höherer Ebenen). Auswahl und
+        // Bedienung laufen über das transparente Overlay (wrapCadChrome).
+        zIndex: cadHubUx ? undefined : (showHub ? 80 : (elevated ? 30 : undefined)),
         touchAction: "none",
         // PDF/Bild/CAD-Blatt dürfen bei aktivem Zeichenwerkzeug keinen Pointer
         // abfangen — sonst stoppen neue Objekte an ihren Kanten und der
         // Radiergummi erreicht die darüberliegende CAD-Eingabeschicht nicht.
-        pointerEvents: (((el.kind === "pdf" || el.kind === "image" || cadHubUx) && toolActive) ? "none" : undefined),
+        pointerEvents: cadHubUx ? "none" : (((el.kind === "pdf" || el.kind === "image") && toolActive) ? "none" : undefined),
+
       }}
     >
 
