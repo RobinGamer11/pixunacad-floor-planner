@@ -3,12 +3,16 @@ import { Defaults, SnapType } from "./constants";
 import {
   Vec2, v, add, sub, mul, norm, dist, dot, angleDeg, pointFromLengthAngle,
   orthoSnapFromA, nearestAngleToReference, lineLineIntersectionInfinite,
-  projectPointToInfiniteLine
+  projectPointToInfiniteLine, normalizeDeg, buildCircleOrSectorPoints
 } from "./geometry";
 import type { CadApp } from "./CadApp";
 import type { Snap } from "./TopologyEngine";
 import type { Input } from "./Input";
 import { maybeRasterize } from "./rasterize";
+
+/** Zeichenmodus des Linienwerkzeugs — 1:1 analog zum Schraffurwerkzeug. */
+export type LineDrawMode = "polyline" | "rectangle" | "circle";
+
 
 interface GuideAnchor {
   key: string;
