@@ -3489,6 +3489,12 @@ function ElementView({
   // mit Commit per Linksklick + ENTER bzw. Häkchen (Tablet).
   const cadHubUx = isCadView;
   const hubBlue = "#4da3ff";
+  // Portal-Ziel (Seitenfläche) für die Bedien-Overlays der CAD-Blätter.
+  const [portalHost, setPortalHost] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    setPortalHost((rootRef.current?.parentElement as HTMLElement | null) ?? null);
+  }, []);
+
 
   // Explizite HUB-Modi für CAD-Blatt: erst nach Klick auf das Symbol wird
   // Bewegen / Drehen aktiv. Preview läuft mit Fadenkreuz-Cursor; ein weiterer
