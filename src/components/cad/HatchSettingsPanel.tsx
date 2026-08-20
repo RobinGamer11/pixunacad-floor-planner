@@ -141,7 +141,7 @@ export const HatchSettingsPanel: React.FC<Props> = ({ app, projectId, pxPerMm = 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [app]);
 
-  const selected = () => (app as any)?.getSelectedHatch?.() || null;
+  const selected = () => ((app as any)?.getEditHatch?.() ?? (app as any)?.getSelectedHatch?.()) || null;
   const apply = (mutate: (h: any) => void, def: () => void) => {
     if (!app) return;
     const h = selected();
