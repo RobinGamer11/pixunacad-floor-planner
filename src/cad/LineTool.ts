@@ -632,19 +632,41 @@ export class LineTool {
   }
 
   private _openHubWithCurrentPreview() {
-    if (this.state !== "drawing" || !this.currentPoint) return;
-    const metrics = this._previewMetrics(this.app.input);
-    this.hubLocked = true;
-    this.hubLengthM = metrics.lengthM;
-    this.hubAngleDeg = metrics.angleDeg;
+    if (this.drawMode === "polyline") {
+      if (this.state !== "drawing" || !this.currentPoint) return;
+      const metrics = this._previewMetrics(this.app.input);
+      this.hubLocked = true;
+      this.hubLengthM = metrics.lengthM;
+      this.hubAngleDeg = metrics.angleDeg;
+    } else if (this.drawMode === "rectangle") {
+      if (this.rectState === "idle") return;
+      const metrics = this._rectPreviewMetrics(this.app.input);
+      this.hubLocked = true;
+      this.hubLengthM = metrics.lengthM;
+      this.hubAngleDeg = metrics.angleDeg;
+    } else {
+      if (this.circleState === "idle") return;
+      const metrics = this._circlePreviewMetrics(this.app.input);
+      this.hubLocked = true;
+      this.hubLengthM = metrics.lengthM;
+      this.hubAngleDeg = metrics.angleDeg;
+    }
     this.app.hub.showAt(this.app.input.mouse.sx, this.app.input.mouse.sy);
-    this.app.hub.updateDisplay(this.hubLengthM, this.hubAngleDeg);
-    this.app.hub.setValues(this.hubLengthM, this.hubAngleDeg);
+    this.app.hub.updateDisplay(this.hubLengthM!, this.hubAngleDeg!);
+    this.app.hub.setValues(this.hubLengthM!, this.hubAngleDeg!);
     this.app.hub.enterEditMode();
   }
 
   private _applyHubValues(vals: { lengthM: number | null; angleDeg: number | null }) {
-    if (this.state !== "drawing" || !this.currentPoint) return;
+    if (this.drawMode === "polyline") {
+      if (this.state !== "drawing" || !this.currentPoint) return;
+    } else if (this.drawMode === "rectangle") {
+      if (this.rectState === "idle") return;
+    } else {
+      if (this.circleState === "idle") return;
+      this._applyCircleHubValues(vals);
+      return;
+    }
     const nextLen = (vals.lengthM != null) ? Math.max(0, vals.lengthM) : this.hubLengthM;
     const nextAng = (vals.angleDeg != null) ? vals.angleDeg : this.hubAngleDeg;
     this.hubLengthM = nextLen;
@@ -654,7 +676,33 @@ export class LineTool {
     this.app.hub.updateDisplay(this.hubLengthM!, this.hubAngleDeg);
   }
 
+  private _applyCircleHubValues(vals: { lengthM: number | null; angleDeg: number | null }) {
+    if (this.circleState === "radius") {
+      const nextLen = (vals.lengthM != null) ? Math.max(0, vals.lengthM) : (this.hubLengthM ?? 0);
+      const nextAng = normalizeDeg(vals.angleDeg ?? this.hubAngleDeg ?? 0);
+      this.hubLengthM = nextLen;
+      this.hubAngleDeg = nextAng;
+      this.hubLocked = true;
+      this.circleRadiusM = nextLen;
+      this.circleStartAngleDeg = nextAng;
+      this.circleEndAngleDeg = nextAng;
+      this.circleState = "arc";
+      this.app.hub.setValues(this.circleRadiusM, this.circleEndAngleDeg);
+      this.app.hub.updateDisplay(this.circleRadiusM, this.circleEndAngleDeg);
+      this.app.hub.enterEditMode();
+      return;
+    }
+    if (this.circleState === "arc") {
+      const nextAng = normalizeDeg(vals.angleDeg ?? this.circleEndAngleDeg);
+      this.hubAngleDeg = nextAng;
+      this.hubLocked = true;
+      this.circleEndAngleDeg = nextAng;
+      this._finishCircle(true);
+    }
+  }
+
   update(input: Input) {
+    this._lastInput = input;
     this.snap = this._findLineToolSnap(input);
     this._refreshHoverSegment();
     this._syncSpaceShiftLock(input);
@@ -676,6 +724,34 @@ export class LineTool {
       if (this.snap && this.snap.type === SnapType.LINE) { this._toggleParallelGuideFromSnap(this.snap); return; }
     }
 
+    if (this.drawMode === "rectangle") {
+      if (this.rectState !== "idle") {
+        const metrics = this._rectPreviewMetrics(input);
+        this.app.hub.showAt(input.mouse.sx, input.mouse.sy);
+        this.app.hub.updateDisplay(metrics.lengthM, metrics.angleDeg);
+      } else {
+        this.app.hub.hide();
+      }
+      if (input.clicked) this._onRectClick(input);
+      return;
+    }
+
+    if (this.drawMode === "circle") {
+      if (this.circleState === "radius") {
+        const metrics = this._circlePreviewMetrics(input);
+        this.app.hub.showAt(input.mouse.sx, input.mouse.sy);
+        this.app.hub.updateDisplay(metrics.lengthM, metrics.angleDeg);
+      } else if (this.circleState === "arc") {
+        this.circleEndAngleDeg = this._circlePreviewArcEndAngle(input);
+        this.app.hub.showAt(input.mouse.sx, input.mouse.sy);
+        this.app.hub.updateDisplay(this.circleRadiusM, this.circleEndAngleDeg);
+      } else {
+        this.app.hub.hide();
+      }
+      if (input.doubleClicked && this.circleState === "arc") { this._finishCircle(true); return; }
+      if (input.clicked) this._onCircleClick(input);
+      return;
+    }
 
     if (this.state === "drawing") {
       const metrics = this._previewMetrics(input);
@@ -713,10 +789,15 @@ export class LineTool {
   }
 
   onTabRequest(): boolean {
-    if (this.state !== "drawing") return false;
+    if (this.drawMode === "polyline") {
+      if (this.state !== "drawing") return false;
+    } else if (this.drawMode === "rectangle") {
+      if (this.rectState === "idle") return false;
+    } else if (this.circleState === "idle") return false;
     this._openHubWithCurrentPreview();
     return true;
   }
+
 
   private _drawGuideDefinitions(ctx: CanvasRenderingContext2D, cam: any) {
     const defs = this._buildGuideDefinitions();
