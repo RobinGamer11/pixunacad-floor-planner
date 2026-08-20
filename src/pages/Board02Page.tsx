@@ -409,14 +409,16 @@ export default function Board02Page() {
                 </g>
               )}
 
-              {/* Verbindungslinien (L-Form) */}
+              {/* Verbindungslinien (L-Form) – Beschriftung liegt außerhalb des Clusters */}
               {placed.map((p) => {
-                const lx = xOf(p.t1);
-                const ly = cy + p.side * (72 + p.lane * 46);
+                const last = p.circles[p.circles.length - 1];
+                const lx = sx(p.bx1);
+                const y0 = cy + (last?.dy ?? 0) * view.k + p.side * (last?.r ?? 6) * view.k;
+                const ly = labelY(p);
                 return (
                   <path
                     key={`c-${p.item.id}`}
-                    d={`M ${lx} ${cy + p.side * 6} L ${lx} ${ly} L ${lx + 16} ${ly}`}
+                    d={`M ${lx} ${y0} L ${lx} ${ly} L ${lx + 16} ${ly}`}
                     fill="none"
                     stroke={p.item.id === selectedId ? ORANGE : "#4a423b"}
                     strokeWidth={1}
@@ -424,26 +426,27 @@ export default function Board02Page() {
                 );
               })}
 
-              {/* Kreise – Größe & Anordnung zoomunabhängig */}
+              {/* Kreise – Teil der Zeitstrahl-Welt: skalieren mit dem Zoom */}
               {placed.map((p) => (
                 <g key={p.item.id} data-tl-interactive
                    style={{ cursor: "pointer" }}
                    onPointerDown={(e) => e.stopPropagation()}
                    onClick={() => { setSelectedId(p.item.id); setOpenLabelId(p.item.id); }}>
                   {p.circles.map((c, i) => {
-                    const cxp = xOf(c.t);
-                    const spansNow = colorMode === "status" && xOf(p.t0) <= nowX && xOf(p.t1) >= nowX;
-                    const near = spansNow && Math.abs(cxp - nowX) < Math.max(24, c.r * 3);
+                    const cxp = sx(c.bx);
+                    const r = c.r * view.k;
+                    const spansNow = colorMode === "status" && sx(p.bx0) <= nowX && sx(p.bx1) >= nowX;
+                    const near = spansNow && Math.abs(cxp - nowX) < Math.max(24, r * 3);
                     return (
                       <circle
                         key={i}
                         cx={cxp}
-                        cy={cy + c.dy}
-                        r={c.r}
+                        cy={cy + c.dy * view.k}
+                        r={r}
                         fill={near ? "url(#tl-now)" : circleFill(p.item, c.t)}
                         opacity={p.item.id === selectedId ? 1 : 0.92}
                         stroke={p.item.id === selectedId ? "#fff" : "none"}
-                        strokeWidth={p.item.id === selectedId ? 1 : 0}
+                        strokeWidth={p.item.id === selectedId ? Math.max(0.5, view.k) : 0}
                       />
                     );
                   })}
