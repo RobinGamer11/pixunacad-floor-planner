@@ -159,9 +159,8 @@ export const timelineStore = {
       categoryId: s.categories[0]?.id,
       priorityId: "normal",
       startDate: today(),
-      startTime: "09:00",
       endDate: plusDays(10),
-      endTime: "17:00",
+
       createdAt: now,
       updatedAt: now,
     };
@@ -204,8 +203,10 @@ export const timelineStore = {
       categoryId: patch.categoryId ?? s.categories[0]?.id,
       priorityId: patch.priorityId ?? "normal",
       startDate: patch.startDate ?? today(),
-      startTime: patch.startTime ?? "09:00",
+      // Keine Default-Uhrzeit: Ohne Uhrzeit verteilen sich die Kreise im Tag.
+      startTime: patch.startTime,
       endDate: patch.endDate,
+
       endTime: patch.endTime,
       createdAt: now,
       updatedAt: now,
@@ -297,15 +298,41 @@ export function useTimelineHistory(projectId: string | undefined) {
   };
 }
 
+/** Deterministischer Pseudozufall aus einem String (0…1). */
+function hash01(s: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return ((h >>> 0) % 10000) / 10000;
+}
+
+/**
+ * Tageszeit in Millisekunden. Ohne gewählte Uhrzeit verteilen sich die
+ * Einträge deterministisch über den Tag (08:00–18:00), damit die Kreise
+ * nicht alle auf demselben Punkt liegen. Sobald eine Uhrzeit gesetzt ist,
+ * rückt der Kreis exakt an diese Uhrzeit.
+ */
+function dayOffsetMs(time: string | undefined, seedKey: string): number {
+  if (time) {
+    const [h, m] = time.split(":").map((n) => Number(n) || 0);
+    return (h * 60 + m) * 60000;
+  }
+  const frac = hash01(seedKey);
+  const minutes = 8 * 60 + Math.round(frac * 10 * 60); // 08:00 … 18:00
+  return minutes * 60000;
+}
+
 /** Millisekunden-Zeitstempel für Start bzw. Ende eines Eintrags. */
 export function itemStartMs(i: TlItem): number {
-  return new Date(`${i.startDate}T${i.startTime || "00:00"}:00`).getTime();
+  const base = new Date(`${i.startDate}T00:00:00`).getTime();
+  return base + dayOffsetMs(i.startTime, `${i.id}|start`);
 }
 export function itemEndMs(i: TlItem): number {
   if (!i.endDate) return itemStartMs(i);
-  const end = new Date(`${i.endDate}T${i.endTime || i.startTime || "00:00"}:00`).getTime();
+  const base = new Date(`${i.endDate}T00:00:00`).getTime();
+  const end = base + dayOffsetMs(i.endTime ?? i.startTime, `${i.id}|end`);
   return Math.max(end, itemStartMs(i));
 }
+
 /**
  * Effektiver Status: Nicht-Aufgaben (Termin/Notiz), die in der Vergangenheit liegen,
  * gelten automatisch als „Erledigt“ – außer der Status wurde manuell gesetzt.
