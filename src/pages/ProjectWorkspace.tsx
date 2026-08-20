@@ -3484,10 +3484,10 @@ function ElementView({
   };
 
   const isCadView = el.kind === "cad-view" || el.kind === "cad-viewport";
-  // CAD-Blätter verhalten sich in der Bedienung wie Bilder/PDFs
-  // (Auswahl, Ziehen, Drehen, Kanten). Nur Maßstabs-relevante Sonderfälle
-  // (Ecken-Skalierung, Paper-Space-Recompute) bleiben CAD-spezifisch.
-  const cadHubUx = false;
+  // CAD-Blätter: blaue Optik, unveränderter Cursor und Bedienung
+  // ausschließlich über HUB-Symbole (Verschieben / Drehen / Kanten schneiden)
+  // mit Commit per Linksklick + ENTER bzw. Häkchen (Tablet).
+  const cadHubUx = isCadView;
   const hubBlue = "#4da3ff";
 
   // Explizite HUB-Modi für CAD-Blatt: erst nach Klick auf das Symbol wird
@@ -3875,7 +3875,7 @@ function ElementView({
   const showHub = !readOnly && selected && hubKinds.has(el.kind);
   // Optik: CAD-Blatt blau, alle anderen Objekte goldener Auswahlrahmen.
   const outlineStyle = selected
-    ? (cadHubUx ? "2px solid #4da3ff" : "2px solid hsl(var(--accent-gold))")
+    ? (cadHubUx ? "1.5px solid #4da3ff" : "2px solid hsl(var(--accent-gold))")
     : "none";
 
   // Preview-Interaktion (Move/Rotate) — startet bei aktivem hubMode.
@@ -4268,8 +4268,10 @@ function ElementView({
         border: el.border ? "1px solid hsl(var(--ink))" : undefined,
         transform: previewTransform,
         transformOrigin: previewTransformOrigin ?? "center center",
-        // CAD-Blätter folgen der normalen Ebenen-Hierarchie wie alle anderen Objekte.
-        zIndex: showHub ? 80 : (elevated ? 30 : undefined),
+        // CAD-Blätter folgen der normalen Ebenen-Hierarchie. Beim Auswahl-Werkzeug
+        // müssen sie jedoch über der CAD-Zeichenebene liegen, sonst fängt diese
+        // den Klick ab und das Blatt lässt sich nicht mehr auswählen.
+        zIndex: showHub ? 80 : (elevated ? 30 : (isCadView && !toolActive ? 30 : undefined)),
         touchAction: "none",
         // PDF/Bild/CAD-Blatt dürfen bei aktivem Zeichenwerkzeug keinen Pointer
         // abfangen — sonst stoppen neue Objekte an ihren Kanten und der
@@ -4471,7 +4473,7 @@ function ElementView({
                     }}
                     title="Verschieben — Anker folgt der Maus, klicken zum Setzen (ESC bricht ab)"
                     className={`h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))] ${hubMode === "move" ? "bg-[hsl(var(--surface-muted))]" : ""}`}
-                    style={{ color: hubMode === "move" ? "hsl(var(--accent-gold))" : undefined }}
+                    style={{ color: hubMode === "move" ? (cadHubUx ? hubBlue : "hsl(var(--accent-gold))") : undefined }}
                   >
                     <Move size={14} strokeWidth={1.6} className="shrink-0" />
                   </button>
@@ -4489,7 +4491,7 @@ function ElementView({
                     }}
                     title="Drehen — Maus bewegen (Shift = 90°-Fang), dann klicken zum Setzen"
                     className={`h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[hsl(var(--surface-muted))] ${hubMode === "rotate" ? "bg-[hsl(var(--surface-muted))]" : ""}`}
-                    style={{ color: hubMode === "rotate" ? "hsl(var(--accent-gold))" : undefined }}
+                    style={{ color: hubMode === "rotate" ? (cadHubUx ? hubBlue : "hsl(var(--accent-gold))") : undefined }}
                   >
                     <RotateCw size={14} />
                   </button>
@@ -4653,8 +4655,8 @@ function ElementView({
                   className="absolute"
                   style={
                     isHor
-                      ? { left: 0, right: 0, top: "50%", height: hoverGlow || isActive || edgeReady ? 3 : 2, transform: "translateY(-50%)", background: edgeStroke, opacity: hoverGlow || isActive || edgeReady ? 1 : 0.45, boxShadow: hoverGlow || edgeReady ? `0 0 8px ${edgeStroke}` : undefined }
-                      : { top: 0, bottom: 0, left: "50%", width: hoverGlow || isActive || edgeReady ? 3 : 2, transform: "translateX(-50%)", background: edgeStroke, opacity: hoverGlow || isActive || edgeReady ? 1 : 0.45, boxShadow: hoverGlow || edgeReady ? `0 0 8px ${edgeStroke}` : undefined }
+                      ? { left: 0, right: 0, top: "50%", height: hoverGlow || isActive || edgeReady ? 2 : 1, transform: "translateY(-50%)", background: edgeStroke, opacity: hoverGlow || isActive || edgeReady ? 1 : 0.45, boxShadow: hoverGlow || edgeReady ? `0 0 8px ${edgeStroke}` : undefined }
+                      : { top: 0, bottom: 0, left: "50%", width: hoverGlow || isActive || edgeReady ? 2 : 1, transform: "translateX(-50%)", background: edgeStroke, opacity: hoverGlow || isActive || edgeReady ? 1 : 0.45, boxShadow: hoverGlow || edgeReady ? `0 0 8px ${edgeStroke}` : undefined }
                   }
                 />
                 {cadHubUx && (
@@ -6946,8 +6948,8 @@ function CadToolSection({
                         }}
                         className={`flex-1 h-7 rounded border text-[11px] ${!el.pixelMode ? "font-semibold" : ""}`}
                         style={{
-                          borderColor: !el.pixelMode ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
-                          background: !el.pixelMode ? "hsl(var(--accent-gold-soft))" : "transparent",
+                          borderColor: !el.pixelMode ? "#4da3ff" : "hsl(var(--hairline))",
+                          background: !el.pixelMode ? "rgba(77,163,255,0.12)" : "transparent",
                         }}
                         title="Vektor: Live-Ansicht des Zeichenblatts, bei jedem Zoom scharf"
                       >
@@ -6967,8 +6969,8 @@ function CadToolSection({
                         }}
                         className={`flex-1 h-7 rounded border text-[11px] ${el.pixelMode ? "font-semibold" : ""}`}
                         style={{
-                          borderColor: el.pixelMode ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
-                          background: el.pixelMode ? "hsl(var(--accent-gold-soft))" : "transparent",
+                          borderColor: el.pixelMode ? "#4da3ff" : "hsl(var(--hairline))",
+                          background: el.pixelMode ? "rgba(77,163,255,0.12)" : "transparent",
                         }}
                         title="Pixel: Ansicht wird als Bild eingebrannt (Radiergummi inkl. Smooth möglich)"
                       >
