@@ -446,8 +446,35 @@ export class MeasureTool {
    * (erste Linie steht sofort), 3. Klick = Ende des zweiten Schenkels. Zwischen
    * den Schenkeln erscheint der Winkel; der Radius wird gestrichelt grau gezeigt.
    */
+  /**
+   * Zielpunkt im Neigungsmodus.
+   * - Erster Schenkel: mit Shift wird die Richtung auf 45°-Schritte gerastet.
+   * - Zweiter Schenkel: Länge wird zwingend auf die Länge des ersten Schenkels
+   *   gesetzt (Kreisbahn um den Scheitel), damit die Neigung exakt bleibt.
+   */
+  private _angleTarget(input: Input): Vec2 {
+    const raw = this.pointSnap ? v(this.pointSnap.world.x, this.pointSnap.world.y) : v(input.mouse.wx, input.mouse.wy);
+    if (this.selectedPoints.length === 0) return raw;
+    const apex = this.selectedPoints[0].world;
+    let dx = raw.x - apex.x, dy = raw.y - apex.y;
+    let len = Math.hypot(dx, dy);
+    if (len < 1e-9) return raw;
+    let ang = Math.atan2(dy, dx);
+    if (input.keys.shift) {
+      const step = Math.PI / 4;
+      ang = Math.round(ang / step) * step;
+    }
+    if (this.selectedPoints.length >= 2) {
+      // Kreisbahn: gleiche Schenkellänge wie der erste Schenkel.
+      const b = this.selectedPoints[1].world;
+      const r = Math.hypot(b.x - apex.x, b.y - apex.y);
+      if (r > 1e-9) len = r;
+    }
+    return v(apex.x + Math.cos(ang) * len, apex.y + Math.sin(ang) * len);
+  }
+
   private _updateAngle(input: Input) {
-    const target = this.pointSnap ? v(this.pointSnap.world.x, this.pointSnap.world.y) : v(input.mouse.wx, input.mouse.wy);
+    const target = this._angleTarget(input);
 
     // Hub: Länge/Winkel ab letztem gesetzten Punkt.
     if (this.selectedPoints.length >= 1) {
@@ -482,9 +509,7 @@ export class MeasureTool {
   /** Live-Vorschau für den Neigungsmodus. */
   private _drawAngleOverlay(ctx: CanvasRenderingContext2D, cam: any) {
     if (this.selectedPoints.length === 0) return;
-    const target = this.pointSnap
-      ? v(this.pointSnap.world.x, this.pointSnap.world.y)
-      : v(this.app.input.mouse.wx, this.app.input.mouse.wy);
+    const target = this._angleTarget(this.app.input);
     const a = this.selectedPoints[0].world;
     if (this.selectedPoints.length === 1) {
       const s0 = cam.worldToScreen(a.x, a.y);
