@@ -53,7 +53,15 @@ import {
   type UserProfile,
 } from "@/lib/projectStore";
 import { useDragScroll } from "@/hooks/use-drag-scroll";
-import { notesStore, useNotes, QUICK_CATEGORY, type NoteNode, type NoteStatus, type NotePriority } from "@/lib/notesStore";
+import {
+  timelineStore,
+  useTimeline,
+  addQuickItem,
+  itemAchieved,
+  taskAlert,
+  projectProgress,
+  type TlKind,
+} from "@/lib/timelineStore";
 import { WeatherStrip } from "@/components/project/WeatherStrip";
 import { UebersichtView } from "@/components/project/UebersichtView";
 import { FileBrowser } from "@/components/project/FileBrowser";
@@ -1111,7 +1119,7 @@ export default function ProjectsHome() {
                   {(
                     [
                       ["uebersicht", "Übersicht", false],
-                      ["aufgaben", "Aufgaben", false],
+                      ["aufgaben", "Aufgaben/Notizen", false],
                       ["finanzen", "Finanzen", false],
                       ["dokumente", "Dokumente", false],
                       ["team", "Team", true],
@@ -1640,116 +1648,67 @@ function SeitenInhaltGrid({ project, onAddPage }: { project: Project; onAddPage:
  */
 type UnifiedTask = {
   id: string;
-  source: "legacy" | "note";
+  source: "board";
   title: string;
   date?: string;
   time?: string;
   priority: TaskPriority;
   done: boolean;
   category?: string;
-  status?: NoteStatus;
-  nodeParentId?: string | null; // nur bei source === "note"
-  mappeId?: string;
+  kind: TlKind;
+  /** Offene Aufgabe, deren letztes Datum überschritten ist. */
+  alert?: boolean;
 };
-
-function noteToUnified(n: NoteNode): UnifiedTask {
-  const prio: TaskPriority =
-    n.priority === "urgent" || n.priority === "high" ? "high"
-      : n.priority === "low" ? "low" : "medium";
-  return {
-    id: n.id,
-    source: "note",
-    title: n.title,
-    date: n.date || n.dueDate,
-    time: n.time,
-    priority: prio,
-    done: n.status === "done",
-    category: n.category,
-    status: n.status,
-    nodeParentId: n.parentId,
-  };
-}
 
 export function AufgabenView({ project }: { project: Project }) {
   const navigate = useNavigate();
-  const notes = useNotes(project.id);
-  const allProjects = useProjects();
-  const mappen = project.mappen ?? [];
-  const defaultMappeId = project.activeMappeId ?? mappen[0]?.id ?? "";
+  const board = useTimeline(project.id);
+  useEffect(() => { timelineStore.ensureDefaults(project.id); }, [project.id]);
+
   const [selectedDate, setSelectedDate] = useState<string | undefined>(undefined);
-  const [draft, setDraft] = useState<{ title: string; description: string; date: string; time: string; priority: TaskPriority; category: string; mappeId: string; projectId: string }>({
-    title: "",
-    description: "",
-    date: "",
-    time: "",
-    priority: "medium",
-    // Schnellablage ist die Standardkategorie für neue Aufgaben.
-    category: QUICK_CATEGORY,
-    mappeId: defaultMappeId,
-    projectId: project.id,
-  });
+  const [kind, setKind] = useState<TlKind>("task");
+  const [draft, setDraft] = useState({ title: "", description: "" });
 
-  // Das aktuell geöffnete Projekt (und dessen aktive Mappe) ist immer vorbelegt.
-  useEffect(() => {
-    setDraft((d) => ({ ...d, projectId: project.id, mappeId: defaultMappeId }));
-  }, [project.id, defaultMappeId]);
-
-  const mappeName = useCallback(
-    (id?: string) => (id ? (mappen.find((m) => m.id === id)?.name ?? "") : ""),
-    [mappen]
+  const catMap = useMemo(
+    () => new Map(board.categories.map((c) => [c.id, c])),
+    [board.categories],
   );
 
-  // Board-Tasks + klassische Tasks zusammenführen.
-  const combined: UnifiedTask[] = useMemo(() => {
-    const legacy: UnifiedTask[] = project.tasks.map((t) => ({
-      id: t.id, source: "legacy", title: t.title, date: t.date, time: t.time,
-      priority: t.priority ?? "medium", done: t.done,
-    }));
-    const noteTasks = notes.nodes
-      .filter((n) => n.kind === "task")
-      .map((n) => ({ ...noteToUnified(n), mappeId: n.mappeId }));
-    const prioRank: Record<TaskPriority, number> = { high: 0, medium: 1, low: 2 };
-    return [...legacy, ...noteTasks].sort((a, b) => {
-      // Offene zuerst, dann nach Dringlichkeit, dann nach Datum/Zeit.
-      if (!!a.done !== !!b.done) return a.done ? 1 : -1;
-      const pr = prioRank[a.priority] - prioRank[b.priority];
-      if (pr !== 0) return pr;
-      const da = `${a.date ?? "9999-99-99"} ${a.time ?? "99:99"}`;
-      const db = `${b.date ?? "9999-99-99"} ${b.time ?? "99:99"}`;
-      return da.localeCompare(db);
-    });
-  }, [project.tasks, notes.nodes]);
+  /** Board-Einträge (Aufgaben + Notizen) für Kalender und Liste. */
+  const rows: UnifiedTask[] = useMemo(() => {
+    const now = Date.now();
+    return board.items
+      .filter((i) => i.kind === "task" || i.kind === "note")
+      .map((i) => ({
+        id: i.id,
+        source: "board" as const,
+        title: i.title,
+        date: i.endDate || i.startDate,
+        time: i.endTime || i.startTime,
+        priority: "medium" as TaskPriority,
+        done: itemAchieved(i, now),
+        category: catMap.get(i.categoryId ?? "")?.label,
+        kind: i.kind,
+        alert: taskAlert(i, now),
+      }))
+      .sort((a, b) => {
+        if (!!a.done !== !!b.done) return a.done ? 1 : -1;
+        return `${a.date ?? "9999-99-99"} ${a.time ?? "99:99"}`.localeCompare(
+          `${b.date ?? "9999-99-99"} ${b.time ?? "99:99"}`,
+        );
+      });
+  }, [board.items, catMap]);
 
+  const filtered = selectedDate ? rows.filter((t) => t.date === selectedDate) : rows;
 
-  const filtered = selectedDate ? combined.filter((t) => t.date === selectedDate) : combined;
-
-  const addTask = () => {
+  const addEntry = () => {
     if (!draft.title.trim()) return;
-    const prio: NotePriority = draft.priority === "high" ? "high" : draft.priority === "low" ? "low" : "normal";
-    const targetProjectId = draft.projectId || project.id;
-    const isForeign = targetProjectId !== project.id;
-    notesStore.addNode(targetProjectId, null, "task", {
+    addQuickItem(project.id, kind, {
       title: draft.title.trim(),
       description: draft.description.trim() || undefined,
-      date: draft.date || undefined,
-      time: draft.time || undefined,
-      priority: prio,
-      status: "open",
-      // In einem fremden Projekt landet die Aufgabe immer in der Schnellablage.
-      category: isForeign ? QUICK_CATEGORY : (draft.category || undefined),
-      mappeId: isForeign ? undefined : (draft.mappeId || undefined),
-      unseen: true,
+      date: selectedDate || undefined,
     });
-    setDraft({
-      title: "",
-      description: "",
-      date: selectedDate ?? "",
-      time: "",
-      priority: "medium",
-      category: draft.category,
-      mappeId: draft.mappeId,
-      projectId: draft.projectId,
-    });
+    setDraft({ title: "", description: "" });
   };
 
   return (
@@ -1764,122 +1723,88 @@ export function AufgabenView({ project }: { project: Project }) {
             KALENDER
           </div>
           <button
-            onClick={() => navigate(`/project/${project.id}/notes`)}
+            onClick={() => navigate(`/project/${project.id}/board`)}
             className="h-7 px-2.5 rounded-md text-[11px] font-medium flex items-center gap-1.5"
             style={{ background: "hsl(var(--accent-gold-soft))", color: "hsl(var(--accent-gold))" }}
             title="Board öffnen"
           >
-            <Network size={13} /> Board
+            <ListChecks size={13} /> Board
           </button>
         </div>
         <TaskCalendar
-          tasks={combined}
+          tasks={rows}
           selectedDate={selectedDate}
-          onSelectDate={(d) => {
-            setSelectedDate(d);
-            setDraft((s) => ({ ...s, date: d ?? "" }));
-          }}
+          onSelectDate={(d) => setSelectedDate(d)}
         />
         <div className="mt-3 text-[11px] text-muted-foreground">
-          Tipp: Neue Aufgaben werden automatisch mit dem Board verknüpft und dort auf der Projekt-Ebene erstellt.
+          Aufgaben und Notizen sind direkt mit dem Board verknüpft.
         </div>
       </div>
 
-      {/* Neue Aufgabe */}
+      {/* Neuer Eintrag */}
       <div
         className="rounded-2xl p-5"
         style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
       >
         <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-3">
-          NEUE AUFGABE (im Board)
+          NEUER EINTRAG (im Board)
         </div>
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center gap-2">
+            {(["task", "note"] as TlKind[]).map((k) => (
+              <button
+                key={k}
+                onClick={() => setKind(k)}
+                className="h-9 px-4 rounded-md text-sm font-medium border flex items-center gap-1.5"
+                style={{
+                  background: kind === k ? "hsl(var(--accent-gold-soft))" : "transparent",
+                  borderColor: kind === k ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
+                  color: kind === k ? "hsl(var(--accent-gold))" : "hsl(var(--ink-soft))",
+                }}
+              >
+                <Plus size={14} /> {k === "task" ? "Aufgabe" : "Notiz"}
+              </button>
+            ))}
+          </div>
           <input
             value={draft.title}
             onChange={(e) => setDraft({ ...draft, title: e.target.value })}
-            onKeyDown={(e) => e.key === "Enter" && addTask()}
-            placeholder="Titel der Aufgabe…"
+            onKeyDown={(e) => e.key === "Enter" && addEntry()}
+            placeholder={kind === "task" ? "Titel der Aufgabe…" : "Titel der Notiz…"}
             className="h-9 px-3 rounded-md border bg-transparent text-sm outline-none w-full"
             style={{ borderColor: "hsl(var(--hairline))" }}
           />
           <textarea
             value={draft.description}
             onChange={(e) => setDraft({ ...draft, description: e.target.value })}
-            placeholder="Beschreibung (optional)…"
-            rows={2}
-            className="px-3 py-2 rounded-md border bg-transparent text-sm outline-none w-full resize-none"
+            placeholder="Beschreibung…"
+            className="px-3 py-2 rounded-md border bg-transparent text-sm outline-none w-full resize-y min-h-[220px]"
             style={{ borderColor: "hsl(var(--hairline))" }}
           />
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            <input
-              type="date"
-              value={draft.date}
-              onChange={(e) => setDraft({ ...draft, date: e.target.value })}
-              className="h-9 min-w-0 px-2 rounded-md border bg-transparent text-sm outline-none"
-              style={{ borderColor: "hsl(var(--hairline))" }}
-            />
-            <input
-              type="time"
-              value={draft.time}
-              onChange={(e) => setDraft({ ...draft, time: e.target.value })}
-              className="h-9 min-w-0 px-2 rounded-md border bg-transparent text-sm outline-none"
-              style={{ borderColor: "hsl(var(--hairline))" }}
-            />
-            <select
-              value={draft.priority}
-              onChange={(e) => setDraft({ ...draft, priority: e.target.value as TaskPriority })}
-              className="h-9 min-w-0 px-2 rounded-md border bg-transparent text-sm outline-none"
-              style={{ borderColor: "hsl(var(--hairline))" }}
+          <div className="flex items-center gap-3">
+            <span className="text-[11px] text-muted-foreground">
+              Kategorie „Schnellablage“ · {selectedDate ? selectedDate : "heutiges Datum"} · Priorität „Normal“
+            </span>
+            <div className="flex-1" />
+            <button
+              onClick={addEntry}
+              className="h-9 px-4 rounded-md text-sm font-medium flex items-center justify-center gap-1"
+              style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
             >
-              <option value="low">Niedrig</option>
-              <option value="medium">Mittel</option>
-              <option value="high">Hoch</option>
-            </select>
-            <select
-              value={draft.category}
-              onChange={(e) => setDraft({ ...draft, category: e.target.value })}
-              className="h-9 min-w-0 px-2 rounded-md border bg-transparent text-sm outline-none"
-              style={{ borderColor: "hsl(var(--hairline))" }}
-            >
-              <option value="">Kategorie…</option>
-              {notes.categories.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
+              <Plus size={14} /> Hinzufügen
+            </button>
           </div>
-          {/* Zielprojekt: standardmäßig das aktuell geöffnete Projekt. Wird ein
-              anderes Projekt gewählt, landet die Aufgabe dort in der Schnellablage. */}
-          <select
-            value={draft.projectId}
-            onChange={(e) => setDraft({ ...draft, projectId: e.target.value })}
-            className="h-9 px-2 rounded-md border bg-transparent text-sm outline-none"
-            style={{ borderColor: "hsl(var(--hairline))" }}
-            title="Projekt zuordnen"
-          >
-            {allProjects.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}{p.id === project.id ? " (aktuell)" : ""}
-              </option>
-            ))}
-          </select>
-          <button
-            onClick={addTask}
-            className="h-9 px-4 rounded-md text-sm font-medium flex items-center justify-center gap-1 self-end"
-            style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
-          >
-            <Plus size={14} /> Hinzufügen
-          </button>
         </div>
       </div>
 
-
-
-      {/* Aufgabenliste */}
+      {/* Liste */}
       <div
         className="rounded-2xl p-5"
         style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
       >
         <div className="flex items-center justify-between mb-3">
           <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">
-            AUFGABEN {selectedDate && `· ${new Date(selectedDate).toLocaleDateString("de-DE")}`}
+            AUFGABEN / NOTIZEN {selectedDate && `· ${new Date(selectedDate).toLocaleDateString("de-DE")}`}
           </div>
           {selectedDate && (
             <button
@@ -1893,72 +1818,50 @@ export function AufgabenView({ project }: { project: Project }) {
         <div className="divide-y" style={{ borderColor: "hsl(var(--hairline))" }}>
           {filtered.length === 0 && (
             <div className="text-sm text-muted-foreground italic py-3">
-              Keine Aufgaben.
+              Keine Einträge.
             </div>
           )}
           {filtered.map((t) => (
-            <UnifiedTaskRow key={`${t.source}:${t.id}`} task={t} projectId={project.id} mappeName={mappeName(t.mappeId)} onOpenInNotes={() => navigate(`/project/${project.id}/notes`)} />
+            <UnifiedTaskRow
+              key={t.id}
+              task={t}
+              projectId={project.id}
+              onOpenInBoard={() => navigate(`/project/${project.id}/board`)}
+            />
           ))}
         </div>
       </div>
-
-      <TaskTimeline project={project} />
     </div>
   );
 }
 
 function UnifiedTaskRow({
-  task, projectId, onOpenInNotes, mappeName,
-}: { task: UnifiedTask; projectId: string; onOpenInNotes: () => void; mappeName?: string }) {
-  const prio = task.priority;
-  const prioColor =
-    prio === "high" ? "hsl(0 70% 55%)"
-    : prio === "medium" ? "hsl(var(--accent-gold))"
-    : "hsl(140 35% 55%)";
+  task, projectId, onOpenInBoard,
+}: { task: UnifiedTask; projectId: string; onOpenInBoard: () => void }) {
+  const dotColor = task.alert ? "hsl(0 70% 55%)" : task.done ? "hsl(var(--accent-gold))" : "hsl(var(--ink-soft))";
 
-  const toggle = () => {
-    if (task.source === "legacy") {
-      projectStore.toggleTask(projectId, task.id);
-    } else {
-      notesStore.updateNode(projectId, task.id, { status: task.done ? "open" : "done" });
-    }
-  };
-  const remove = () => {
-    if (task.source === "legacy") projectStore.deleteTask(projectId, task.id);
-    else notesStore.deleteNode(projectId, task.id);
-  };
+  const toggle = () =>
+    timelineStore.updateItem(projectId, task.id, {
+      statusId: task.done ? "open" : "done",
+      done: !task.done,
+      statusManual: true,
+    });
+  const remove = () => timelineStore.deleteItem(projectId, task.id);
 
   return (
     <div className="flex items-center gap-3 py-2.5">
-      <input
-        type="checkbox"
-        checked={task.done}
-        onChange={toggle}
-        className="accent-foreground"
-      />
-      <span
-        className="w-2 h-2 rounded-full shrink-0"
-        style={{ background: prioColor }}
-        title={`Priorität: ${prio}`}
-      />
+      <input type="checkbox" checked={task.done} onChange={toggle} className="accent-foreground" />
+      <span className="w-2 h-2 rounded-full shrink-0" style={{ background: dotColor }} />
       <div className="flex-1 min-w-0">
         <div className={`text-sm truncate flex items-center gap-2 ${task.done ? "line-through text-muted-foreground" : ""}`}>
           {task.title}
-          {task.source === "note" && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded shrink-0"
-              style={{ background: "hsl(var(--accent-gold-soft))", color: "hsl(var(--accent-gold))" }}>
-              Board
-            </span>
-          )}
-          {mappeName && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded shrink-0"
-              style={{ background: "hsl(var(--surface-muted))", color: "hsl(var(--ink-soft))" }}>
-              {mappeName}
-            </span>
-          )}
+          <span className="text-[10px] px-1.5 py-0.5 rounded shrink-0"
+                style={{ background: "hsl(var(--accent-gold-soft))", color: "hsl(var(--accent-gold))" }}>
+            {task.kind === "task" ? "Aufgabe" : "Notiz"}
+          </span>
           {task.category && (
             <span className="text-[10px] px-1.5 py-0.5 rounded shrink-0"
-              style={{ background: "hsl(var(--surface-muted))", color: "hsl(var(--ink-soft))" }}>
+                  style={{ background: "hsl(var(--surface-muted))", color: "hsl(var(--ink-soft))" }}>
               {task.category}
             </span>
           )}
@@ -1970,12 +1873,9 @@ function UnifiedTaskRow({
           {task.time ? ` · ${task.time}` : ""}
         </div>
       </div>
-      {task.source === "note" && (
-        <button onClick={onOpenInNotes} title="Im Board öffnen"
-          className="text-muted-foreground hover:text-foreground">
-          <ExternalLink size={14} />
-        </button>
-      )}
+      <button onClick={onOpenInBoard} title="Im Board öffnen" className="text-muted-foreground hover:text-foreground">
+        <ExternalLink size={14} />
+      </button>
       <button onClick={remove} title="Löschen" className="text-muted-foreground hover:text-foreground">
         <Trash2 size={14} />
       </button>
@@ -2766,9 +2666,61 @@ function projectColor(id: string): string {
 
 const PROJECT_CAROUSEL_SLOTS = [-3, -2, -1, 0, 1, 2, 3] as const;
 const PROJECT_CAROUSEL_INTERVAL_MS = 5000;
-const PROJECT_CAROUSEL_CARD_WIDTH = 176;
-const PROJECT_CAROUSEL_MAX_SPACING = 130;
-const PROJECT_CAROUSEL_MIN_SPACING = 40;
+const PROJECT_CAROUSEL_CARD_WIDTH = 240;
+const PROJECT_CAROUSEL_MAX_SPACING = 180;
+const PROJECT_CAROUSEL_MIN_SPACING = 60;
+
+/**
+ * Kreisdiagramm zum Stand eines Projekts – live aus der Board-Oberfläche.
+ * Ring = erledigter Anteil, Segmente = Kategorien.
+ */
+function ProjectDonut({ projectId, size = 96 }: { projectId: string; size?: number }) {
+  const state = useTimeline(projectId);
+  const now = Date.now();
+  const total = state.items.length;
+  const percent = total
+    ? Math.round((state.items.filter((i) => itemAchieved(i, now)).length / total) * 100)
+    : 0;
+  const slices = state.categories
+    .map((c) => ({ c, n: state.items.filter((i) => i.categoryId === c.id).length }))
+    .filter((s) => s.n > 0);
+  const R = size / 2;
+  const inner = R * 0.62;
+  const stroke = R * 0.16;
+  let acc = -Math.PI / 2;
+  const sum = slices.reduce((a, s) => a + s.n, 0) || 1;
+
+  return (
+    <svg width={size} height={size} className="shrink-0">
+      {/* Kategorie-Segmente */}
+      {slices.map((s) => {
+        const ang = (s.n / sum) * Math.PI * 2;
+        const a0 = acc, a1 = acc + ang;
+        acc = a1;
+        const large = ang > Math.PI ? 1 : 0;
+        const d = ang >= Math.PI * 2 - 1e-6
+          ? `M ${R} ${R - R} A ${R} ${R} 0 1 1 ${R - 0.01} ${0} Z`
+          : `M ${R} ${R} L ${R + Math.cos(a0) * R} ${R + Math.sin(a0) * R} A ${R} ${R} 0 ${large} 1 ${R + Math.cos(a1) * R} ${R + Math.sin(a1) * R} Z`;
+        return <path key={s.c.id} d={d} fill={s.c.color} opacity={0.85} />;
+      })}
+      {!slices.length && <circle cx={R} cy={R} r={R} fill="hsl(var(--surface-muted))" />}
+      {/* Fortschrittsring */}
+      <circle cx={R} cy={R} r={inner + stroke / 2} fill="none"
+              stroke="hsl(var(--surface))" strokeWidth={stroke} opacity={0.35} />
+      <circle
+        cx={R} cy={R} r={inner + stroke / 2} fill="none"
+        stroke="hsl(var(--accent-gold))" strokeWidth={stroke} strokeLinecap="round"
+        strokeDasharray={`${(percent / 100) * 2 * Math.PI * (inner + stroke / 2)} ${2 * Math.PI * (inner + stroke / 2)}`}
+        transform={`rotate(-90 ${R} ${R})`}
+      />
+      <circle cx={R} cy={R} r={inner} fill="hsl(var(--surface-card))" />
+      <text x={R} y={R + size * 0.055} textAnchor="middle"
+            fontSize={size * 0.22} fontWeight={700} fill="hsl(var(--ink))">
+        {percent}%
+      </text>
+    </svg>
+  );
+}
 
 function ProjectCarousel({ projects, onOpen }: { projects: Project[]; onOpen: (id: string) => void }) {
   const [offset, setOffset] = useState(0);
@@ -2826,7 +2778,6 @@ function ProjectCarousel({ projects, onOpen }: { projects: Project[]; onOpen: (i
 
   if (!hasProjects) return null;
 
-  // Fünf sichtbare Karten plus je eine unsichtbare Pufferkarte für einen nahtlosen Umlauf.
   const n = projects.length;
   const visible = PROJECT_CAROUSEL_SLOTS.map((slot) => {
     const absoluteIndex = offset + slot;
@@ -2837,11 +2788,9 @@ function ProjectCarousel({ projects, onOpen }: { projects: Project[]; onOpen: (i
     };
   });
 
-
-
   return (
     <div
-      className="mb-6 select-none"
+      className="mb-8 select-none"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onFocusCapture={() => setFocusWithin(true)}
@@ -2851,14 +2800,14 @@ function ProjectCarousel({ projects, onOpen }: { projects: Project[]; onOpen: (i
     >
       <div
         ref={viewportRef}
-        className="relative flex h-44 items-center justify-center overflow-hidden"
-        style={{ perspective: "1000px", perspectiveOrigin: "50% 50%" }}
+        className="relative flex h-64 items-center justify-center overflow-hidden"
+        style={{ perspective: "1200px", perspectiveOrigin: "50% 50%" }}
       >
         {visible.map(({ absoluteIndex, slot, project: p }) => {
           const abs = Math.abs(slot);
           const buffered = abs >= 3;
           const translateX = slot * cardSpacing;
-          const translateZ = -abs * 170;
+          const translateZ = -abs * 190;
           const rotateY = slot === 0 ? 0 : slot > 0 ? -38 : 38;
           const scale = 1 - abs * 0.08;
           const opacity = buffered ? 0 : abs === 2 ? 0.45 : abs === 1 ? 0.8 : 1;
@@ -2866,10 +2815,10 @@ function ProjectCarousel({ projects, onOpen }: { projects: Project[]; onOpen: (i
             <button
               key={absoluteIndex}
               onClick={() => onOpen(p.id)}
-              title={p.name}
+              title={`${p.name} — Projektstand`}
               aria-hidden={buffered}
               tabIndex={buffered ? -1 : 0}
-              className="absolute group outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg"
+              className="absolute group outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl"
               style={{
                 transform: `translateX(${translateX}px) translateZ(${translateZ}px) rotateY(${rotateY}deg) scale(${scale})`,
                 transformStyle: "preserve-3d",
@@ -2882,16 +2831,12 @@ function ProjectCarousel({ projects, onOpen }: { projects: Project[]; onOpen: (i
               }}
             >
               <div
-                className="w-44 h-28 rounded-lg overflow-hidden border flex items-center justify-center shadow-lg"
-                style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--beige-soft))" }}
+                className="w-60 h-40 rounded-xl overflow-hidden border flex items-center justify-center shadow-lg"
+                style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
               >
-                {p.thumbnail ? (
-                  <img src={p.thumbnail} alt={`Projektbild ${p.name}`} className="w-full h-full object-cover" />
-                ) : (
-                  <span className="text-xl font-semibold text-muted-foreground">{p.name.slice(0, 2).toUpperCase()}</span>
-                )}
+                <ProjectDonut projectId={p.id} size={126} />
               </div>
-              <div className={`mt-1.5 text-xs truncate text-center max-w-44 ${slot === 0 ? "font-semibold" : "text-muted-foreground"}`}>
+              <div className={`mt-2 text-sm truncate text-center max-w-60 ${slot === 0 ? "font-semibold" : "text-muted-foreground"}`}>
                 {p.name}
               </div>
             </button>
@@ -2902,11 +2847,66 @@ function ProjectCarousel({ projects, onOpen }: { projects: Project[]; onOpen: (i
   );
 }
 
+/** Kompakte Vorschau der Board-Oberfläche eines Projekts. */
+function BoardPreview({ project }: { project: Project }) {
+  const navigate = useNavigate();
+  const state = useTimeline(project.id);
+  const now = Date.now();
+  const upcoming = [...state.items]
+    .sort((a, b) => (a.endDate || a.startDate).localeCompare(b.endDate || b.startDate))
+    .slice(0, 6);
+  const catMap = new Map(state.categories.map((c) => [c.id, c]));
+  const total = state.items.length;
+  const percent = total
+    ? Math.round((state.items.filter((i) => itemAchieved(i, now)).length / total) * 100)
+    : 0;
 
+  return (
+    <div className="mt-3 rounded-xl p-4" style={{ background: "#141110", border: "1px solid #332c26" }}>
+      <div className="flex items-center gap-3 mb-3">
+        <span className="text-xs font-semibold" style={{ color: "#efe7de" }}>Board-Vorschau</span>
+        <span className="text-[11px] tabular-nums" style={{ color: "#8b837b" }}>{percent}% · {total} Einträge</span>
+        <div className="flex-1" />
+        <button
+          onClick={() => navigate(`/project/${project.id}/board`)}
+          className="h-7 px-2.5 rounded-md text-[11px] font-medium"
+          style={{ background: "#e2703a", color: "#fff" }}
+        >
+          Board öffnen
+        </button>
+      </div>
+      <div className="h-2 w-full rounded-full overflow-hidden mb-3" style={{ background: "#241f1b" }}>
+        <div className="h-full rounded-full" style={{ width: `${percent}%`, background: "#e2703a" }} />
+      </div>
+      <div className="space-y-1.5">
+        {upcoming.length === 0 && (
+          <div className="text-[11px]" style={{ color: "#6f665e" }}>Noch keine Einträge im Board.</div>
+        )}
+        {upcoming.map((i) => {
+          const alert = taskAlert(i, now);
+          return (
+            <div key={i.id} className="flex items-center gap-2 text-[11px]" style={{ color: "#cdc4bb" }}>
+              <span className="w-2 h-2 rounded-full shrink-0"
+                    style={{ background: alert ? "#ef4444" : itemAchieved(i, now) ? "#e2703a" : "#a19a92" }} />
+              <span className="truncate flex-1">{i.title}</span>
+              <span className="shrink-0" style={{ color: "#8b837b" }}>
+                {catMap.get(i.categoryId ?? "")?.label ?? "—"}
+              </span>
+              <span className="shrink-0 tabular-nums" style={{ color: "#8b837b" }}>
+                {(i.endDate || i.startDate).split("-").reverse().join(".")}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 function AllTasksView({ projects, onOpenProject }: { projects: Project[]; onOpenProject: (id: string) => void }) {
   const navigate = useNavigate();
   const [activeIds, setActiveIds] = useState<Set<string>>(() => new Set(projects.map((p) => p.id)));
+  const [previewId, setPreviewId] = useState<string | null>(null);
   useEffect(() => {
     setActiveIds((prev) => {
       const next = new Set(prev);
@@ -2922,33 +2922,48 @@ function AllTasksView({ projects, onOpenProject }: { projects: Project[]; onOpen
       return n;
     });
 
-  // Alle Aufgaben (legacy + board.task) über alle Projekte
-  type GTask = { id: string; projectId: string; projectName: string; title: string; date?: string; time?: string; priority: TaskPriority; done?: boolean; color: string };
+  // Offene Aufgaben aus der Board-Oberfläche über alle Projekte hinweg.
+  type GTask = {
+    id: string; projectId: string; projectName: string; title: string;
+    date?: string; time?: string; done: boolean; alert: boolean; color: string; category?: string;
+  };
   const gTasks: GTask[] = useMemo(() => {
+    const now = Date.now();
     const out: GTask[] = [];
     projects.forEach((p) => {
       const color = projectColor(p.id);
-      p.tasks?.forEach((t) =>
-        out.push({ id: t.id, projectId: p.id, projectName: p.name, title: t.title, date: t.date, time: t.time, priority: t.priority ?? "medium", done: t.done, color })
-      );
       try {
-        const notes = notesStore.getState(p.id);
-        notes.nodes.filter((n) => n.kind === "task").forEach((n) =>
-          out.push({ id: n.id, projectId: p.id, projectName: p.name, title: n.title, date: n.dueDate ?? n.date, time: n.time, priority: (n.priority === "high" || n.priority === "urgent") ? "high" : n.priority === "low" ? "low" : "medium", done: n.status === "done", color })
-        );
+        const st = timelineStore.getState(p.id);
+        const cats = new Map(st.categories.map((c) => [c.id, c.label]));
+        st.items
+          .filter((i) => i.kind === "task")
+          .forEach((i) =>
+            out.push({
+              id: i.id,
+              projectId: p.id,
+              projectName: p.name,
+              title: i.title,
+              date: i.endDate || i.startDate,
+              time: i.endTime || i.startTime,
+              done: itemAchieved(i, now),
+              alert: taskAlert(i, now),
+              color,
+              category: cats.get(i.categoryId ?? ""),
+            })
+          );
       } catch {}
     });
-    const prio: Record<TaskPriority, number> = { high: 0, medium: 1, low: 2 };
     return out.sort((a, b) => {
-      if (!!a.done !== !!b.done) return a.done ? 1 : -1;
-      const pr = prio[a.priority] - prio[b.priority];
-      if (pr !== 0) return pr;
+      if (a.done !== b.done) return a.done ? 1 : -1;
+      if (a.alert !== b.alert) return a.alert ? -1 : 1;
       return `${a.date ?? "9999"} ${a.time ?? "99:99"}`.localeCompare(`${b.date ?? "9999"} ${b.time ?? "99:99"}`);
     });
   }, [projects]);
 
   const [selectedDate, setSelectedDate] = useState<string | undefined>();
-  const visible = gTasks.filter((t) => activeIds.has(t.projectId) && (!selectedDate || t.date === selectedDate));
+  const visible = gTasks.filter(
+    (t) => !t.done && activeIds.has(t.projectId) && (!selectedDate || t.date === selectedDate)
+  );
 
   return (
     <div className="px-10 py-7">
@@ -2956,49 +2971,78 @@ function AllTasksView({ projects, onOpenProject }: { projects: Project[]; onOpen
 
       <div className="flex items-center gap-3 mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">Alle Aufgaben</h1>
-        <span className="text-sm text-muted-foreground">projektübergreifend</span>
+        <span className="text-sm text-muted-foreground">projektübergreifend · offen</span>
       </div>
-
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
         {/* Aufgaben-Liste */}
-        <div className="rounded-xl border overflow-hidden" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface))" }}>
-          <div className="px-4 py-3 border-b text-xs font-semibold tracking-widest text-muted-foreground flex items-center justify-between" style={{ borderColor: "hsl(var(--hairline))" }}>
-            <span>AUFGABEN {selectedDate ? `· ${selectedDate}` : `· ${visible.length}`}</span>
-            {selectedDate && (
-              <button onClick={() => setSelectedDate(undefined)} className="text-[11px] font-normal hover:text-foreground">Filter zurücksetzen</button>
+        <div className="space-y-6">
+          <div className="rounded-xl border overflow-hidden" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface))" }}>
+            <div className="px-4 py-3 border-b text-xs font-semibold tracking-widest text-muted-foreground flex items-center justify-between" style={{ borderColor: "hsl(var(--hairline))" }}>
+              <span>AUFGABEN {selectedDate ? `· ${selectedDate}` : `· ${visible.length}`}</span>
+              {selectedDate && (
+                <button onClick={() => setSelectedDate(undefined)} className="text-[11px] font-normal hover:text-foreground">Filter zurücksetzen</button>
+              )}
+            </div>
+            {visible.length === 0 ? (
+              <div className="p-6 text-sm text-muted-foreground">Keine offenen Aufgaben.</div>
+            ) : (
+              <ul className="divide-y" style={{ borderColor: "hsl(var(--hairline))" }}>
+                {visible.map((t) => (
+                  <li
+                    key={`${t.projectId}:${t.id}`}
+                    onClick={() => navigate(`/project/${t.projectId}/board`)}
+                    className="px-4 py-3 flex items-center gap-3 hover:bg-muted/40 cursor-pointer"
+                  >
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ background: t.color }} />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm truncate">{t.title}</div>
+                      <div className="text-[11px] text-muted-foreground truncate">
+                        {t.projectName}{t.category ? ` · ${t.category}` : ""}{t.date ? ` · ${t.date}` : ""}{t.time ? ` · ${t.time}` : ""}
+                      </div>
+                    </div>
+                    {t.alert && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full"
+                            style={{ background: "hsl(0 70% 50% / 0.15)", color: "hsl(0 70% 40%)" }}>
+                        Überfällig
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
-          {visible.length === 0 ? (
-            <div className="p-6 text-sm text-muted-foreground">Keine Aufgaben.</div>
-          ) : (
-            <ul className="divide-y" style={{ borderColor: "hsl(var(--hairline))" }}>
-              {visible.map((t) => (
-                <li
-                  key={`${t.projectId}:${t.id}`}
-                  onClick={() => navigate(`/project/${t.projectId}`)}
-                  className="px-4 py-3 flex items-center gap-3 hover:bg-muted/40 cursor-pointer"
-                >
-                  <span className="w-2 h-2 rounded-full shrink-0" style={{ background: t.color }} />
-                  <div className="flex-1 min-w-0">
-                    <div className={`text-sm truncate ${t.done ? "line-through text-muted-foreground" : ""}`}>{t.title}</div>
-                    <div className="text-[11px] text-muted-foreground truncate">
-                      {t.projectName}{t.date ? ` · ${t.date}` : ""}{t.time ? ` · ${t.time}` : ""}
-                    </div>
-                  </div>
-                  <span
-                    className="text-[10px] px-2 py-0.5 rounded-full"
-                    style={{
-                      background: t.priority === "high" ? "hsl(0 70% 50% / 0.15)" : t.priority === "low" ? "hsl(var(--surface-muted))" : "hsl(45 90% 50% / 0.15)",
-                      color: t.priority === "high" ? "hsl(0 70% 40%)" : t.priority === "low" ? "hsl(var(--ink-soft))" : "hsl(35 80% 35%)",
-                    }}
+
+          {/* Projekte mit Kreisdiagramm + Board-Vorschau */}
+          <div className="rounded-xl border p-4" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface))" }}>
+            <div className="text-xs font-semibold tracking-widest text-muted-foreground mb-3">PROJEKTSTÄNDE</div>
+            <div className="space-y-2">
+              {projects.map((p) => (
+                <div key={p.id}>
+                  <button
+                    onClick={() => setPreviewId((cur) => (cur === p.id ? null : p.id))}
+                    className="w-full flex items-center gap-4 rounded-lg px-3 py-2 hover:bg-muted/40 text-left"
+                    style={{ border: "1px solid hsl(var(--hairline))" }}
                   >
-                    {t.priority === "high" ? "Hoch" : t.priority === "low" ? "Niedrig" : "Mittel"}
-                  </span>
-                </li>
+                    <ProjectDonut projectId={p.id} size={64} />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium truncate">{p.name}</div>
+                      <div className="text-[11px] text-muted-foreground truncate">
+                        {p.ort || "Ohne Ort"} · {previewId === p.id ? "Vorschau schließen" : "Board-Vorschau öffnen"}
+                      </div>
+                    </div>
+                    <ChevronRight
+                      size={16}
+                      className="text-muted-foreground shrink-0 transition-transform"
+                      style={{ transform: previewId === p.id ? "rotate(90deg)" : undefined }}
+                    />
+                  </button>
+                  {previewId === p.id && <BoardPreview project={p} />}
+                </div>
               ))}
-            </ul>
-          )}
+              {projects.length === 0 && <div className="text-sm text-muted-foreground">Keine Projekte.</div>}
+            </div>
+          </div>
         </div>
 
         {/* Kalender + Projekt-Filter */}
@@ -3022,7 +3066,7 @@ function AllTasksView({ projects, onOpenProject }: { projects: Project[]; onOpen
           </div>
 
           <GlobalCalendar
-            tasks={gTasks.filter((t) => activeIds.has(t.projectId))}
+            tasks={gTasks.filter((t) => !t.done && activeIds.has(t.projectId))}
             selectedDate={selectedDate}
             onSelect={(d) => setSelectedDate((prev) => (prev === d ? undefined : d))}
           />

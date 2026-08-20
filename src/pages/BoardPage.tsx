@@ -4,11 +4,9 @@ import { WorkspaceHeader } from "@/components/workspace/WorkspaceHeader";
 import { useProject } from "@/lib/projectStore";
 import {
   timelineStore, useTimeline, useTimelineHistory,
-  itemStartMs, itemEndMs, itemAchieved, effectiveStatusId, priorityRadius,
+  itemStartMs, itemEndMs, itemAchieved, effectiveStatusId, priorityRadius, taskAlert,
   type TlItem, type TlKind, type TlCategory, type TlPriority, type TlStatus,
 } from "@/lib/timelineStore";
-import { ProjectGraph } from "@/pages/NotesPage";
-import { useNotes, type NoteStatusDef, type NotePriorityDef } from "@/lib/notesStore";
 import {
   CheckSquare, CalendarClock, FileText, X, Trash2, Plus, Settings, Save, Search, ChevronLeft,
 } from "lucide-react";
@@ -62,7 +60,7 @@ interface Placed {
 // ------------------------------------------------------------------
 // Seite
 // ------------------------------------------------------------------
-export default function Board02Page() {
+export default function BoardPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const project = useProject(projectId);
   const state = useTimeline(projectId);
@@ -79,19 +77,6 @@ export default function Board02Page() {
   const [query, setQuery] = useState("");
   const [prioFilter, setPrioFilter] = useState<string>("");
 
-  // Projektnetz (aus dem Notiznetz-Store) – nur für die Netz-Ansicht.
-  const notes = useNotes(projectId);
-  const [netSelected, setNetSelected] = useState<string | null>(null);
-  const noteStatusMap = useMemo(() => {
-    const m = new Map<string, NoteStatusDef>();
-    notes.statuses.forEach((s) => m.set(s.id, s));
-    return m;
-  }, [notes.statuses]);
-  const notePriorityMap = useMemo(() => {
-    const m = new Map<string, NotePriorityDef>();
-    notes.priorities.forEach((p) => m.set(p.id, p));
-    return m;
-  }, [notes.priorities]);
 
   const selected = state.items.find((i) => i.id === selectedId) ?? null;
   const now = Date.now();
@@ -236,13 +221,23 @@ export default function Board02Page() {
       const rMin = Math.max(3, rMax * 0.35);
       const len = ax1 - ax0;
       const circles: Circle[] = [];
-      if (len < rMax * 1.2) {
+      // Ein Kreis pro Tag zwischen Start- und Zieldatum.
+      const dayCount = item.endDate
+        ? clamp(
+            Math.round(
+              (new Date(`${item.endDate}T00:00:00`).getTime() -
+                new Date(`${item.startDate}T00:00:00`).getTime()) / DAY,
+            ) + 1,
+            1,
+            400,
+          )
+        : 1;
+      if (dayCount <= 1) {
         const pos = placeCircle(ax0, rMax, seedOf(item.id));
         circles.push({ bx: pos.x, dy: pos.y, r: rMax, t: s });
       } else {
-        const n = clamp(Math.round(len / (rMax * 1.35)), 3, 40);
-        for (let i = 0; i < n; i++) {
-          const f = i / (n - 1);
+        for (let i = 0; i < dayCount; i++) {
+          const f = dayCount === 1 ? 1 : i / (dayCount - 1);
           const r = rMin + (rMax - rMin) * f;
           const pos = placeCircle(ax0 + len * f, r, seedOf(`${item.id}:${i}`));
           circles.push({ bx: pos.x, dy: pos.y, r, t: s + (e - s) * f });
@@ -285,7 +280,7 @@ export default function Board02Page() {
   // Aufgaben: erledigt = orange, offen = rot (leuchtend).
   const circleFill = useCallback((item: TlItem, _t: number) => {
     if (colorMode === "category") return catMap.get(item.categoryId ?? "")?.color ?? GREY;
-    if (item.kind === "task") return itemAchieved(item, now) ? ORANGE : RED;
+    if (item.kind === "task") return taskAlert(item, now) ? RED : ORANGE;
     return "url(#tl-global)";
   }, [colorMode, catMap, now]);
 
@@ -394,8 +389,8 @@ export default function Board02Page() {
       <WorkspaceHeader
         projectId={projectId}
         projectName={project?.name}
-        contextLabel="Board02"
-        mode="board2"
+        contextLabel="Board"
+        mode="board"
         canUndo={hist.canUndo}
         canRedo={hist.canRedo}
         onUndo={hist.undo}
@@ -439,15 +434,14 @@ export default function Board02Page() {
           {/* Projektnetz-Ansicht */}
           {surface === "net" && (
             <div className="mx-4 mt-4 h-[min(70vh,760px)] min-h-[460px] rounded-xl overflow-hidden"
-                 style={{ background: PANEL, border: `1px solid ${PANEL_LINE}`, boxShadow: "0 1px 2px rgba(20,17,16,0.05)" }}>
-              <ProjectGraph
+                 style={{ background: CANVAS, border: `1px solid ${CANVAS_LINE}` }}>
+              <TimelineNet
                 projectName={project?.name ?? "Projekt"}
-                nodes={notes.nodes}
-                statusMap={noteStatusMap}
-                priorityMap={notePriorityMap}
-                selectedId={netSelected}
-                onSelect={(id) => setNetSelected(id)}
-                focusToken={0}
+                items={state.items}
+                categories={state.categories}
+                statuses={state.statuses}
+                selectedId={selectedId}
+                onSelect={(id) => setSelectedId(id)}
               />
             </div>
           )}
@@ -538,7 +532,8 @@ export default function Board02Page() {
                     const cxp = sx(c.bx);
                     const r = c.r * view.k;
                     // Offene Aufgaben leuchten rot auf.
-                    const alert = colorMode === "status" && p.item.kind === "task" && !itemAchieved(p.item, now);
+                    // Rot + Leuchten erst, wenn der HEUTE-Strich hinter dem letzten Datum liegt.
+                    const alert = colorMode === "status" && taskAlert(p.item, now);
                     return (
                       <circle
                         key={i}
@@ -1141,5 +1136,197 @@ function PieChart({
       <circle cx={C} cy={C} r={36} fill={PANEL} style={{ cursor: "pointer" }} onClick={onCenter} />
 
     </svg>
+  );
+}
+
+// ------------------------------------------------------------------
+// Projektnetz – direkt aus den Board-Einträgen (Aufgaben/Termine/Notizen)
+// Dunkles Design analog zum Ansichtstrahl.
+// ------------------------------------------------------------------
+function TimelineNet({
+  projectName, items, categories, statuses, selectedId, onSelect,
+}: {
+  projectName: string;
+  items: TlItem[];
+  categories: TlCategory[];
+  statuses: TlStatus[];
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+}) {
+  const wrap = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState({ w: 800, h: 560 });
+  const [view, setView] = useState({ k: 1, tx: 0, ty: 0 });
+  const viewRef = useRef(view); viewRef.current = view;
+  const [hoverId, setHoverId] = useState<string | null>(null);
+  const now = Date.now();
+
+  useLayoutEffect(() => {
+    const el = wrap.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setSize({ w: el.clientWidth, h: el.clientHeight }));
+    ro.observe(el);
+    setSize({ w: el.clientWidth, h: el.clientHeight });
+    return () => ro.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const el = wrap.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = el.getBoundingClientRect();
+      const px = e.clientX - rect.left - rect.width / 2;
+      const py = e.clientY - rect.top - rect.height / 2;
+      const cur = viewRef.current;
+      const nk = clamp(cur.k * Math.exp(-e.deltaY * 0.0015), 0.3, 6);
+      if (nk === cur.k) return;
+      const ratio = nk / cur.k;
+      setView({ k: nk, tx: px - (px - cur.tx) * ratio, ty: py - (py - cur.ty) * ratio });
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
+
+  const drag = useRef({ on: false, sx: 0, sy: 0 });
+
+  const catMap = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
+  const statusMap = useMemo(() => new Map(statuses.map((s) => [s.id, s])), [statuses]);
+
+  /** Ring 1 = Kategorien, Ring 2 = deren Einträge. */
+  const layout = useMemo(() => {
+    const groups = categories
+      .map((c) => ({ cat: c, its: items.filter((i) => i.categoryId === c.id) }))
+      .filter((g) => g.its.length);
+    const loose = items.filter((i) => !catMap.has(i.categoryId ?? ""));
+    if (loose.length) {
+      groups.push({ cat: { id: "__none__", label: "Ohne Kategorie", color: GREY }, its: loose });
+    }
+    const R1 = 190, R2 = 130;
+    const nodes: {
+      id: string; x: number; y: number; r: number; label: string; color: string;
+      item?: TlItem; parent?: { x: number; y: number };
+    }[] = [];
+    groups.forEach((g, gi) => {
+      const a = (gi / Math.max(1, groups.length)) * Math.PI * 2 - Math.PI / 2;
+      const gx = Math.cos(a) * R1, gy = Math.sin(a) * R1;
+      nodes.push({ id: `cat:${g.cat.id}`, x: gx, y: gy, r: 26, label: g.cat.label, color: g.cat.color });
+      g.its.forEach((it, ii) => {
+        const spread = Math.PI * 0.9;
+        const f = g.its.length === 1 ? 0 : ii / (g.its.length - 1) - 0.5;
+        const ang = a + f * spread;
+        const dist = R2 + (ii % 3) * 34;
+        nodes.push({
+          id: it.id,
+          x: gx + Math.cos(ang) * dist,
+          y: gy + Math.sin(ang) * dist,
+          r: 16,
+          label: it.title,
+          color: g.cat.color,
+          item: it,
+          parent: { x: gx, y: gy },
+        });
+      });
+    });
+    return { nodes, groups };
+  }, [items, categories, catMap]);
+
+  const cx = size.w / 2 + view.tx;
+  const cy = size.h / 2 + view.ty;
+
+  return (
+    <div
+      ref={wrap}
+      className="relative w-full h-full overflow-hidden select-none cursor-grab active:cursor-grabbing"
+      style={{ background: CANVAS, touchAction: "none" }}
+      onPointerDown={(e) => {
+        drag.current = { on: true, sx: e.clientX - view.tx, sy: e.clientY - view.ty };
+        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      }}
+      onPointerMove={(e) => {
+        if (!drag.current.on) return;
+        setView((v) => ({ ...v, tx: e.clientX - drag.current.sx, ty: e.clientY - drag.current.sy }));
+      }}
+      onPointerUp={(e) => {
+        drag.current.on = false;
+        try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch {}
+      }}
+    >
+      <svg width={size.w} height={size.h} className="absolute inset-0">
+        <defs>
+          <filter id="net-glow" x="-70%" y="-70%" width="240%" height="240%">
+            <feGaussianBlur stdDeviation="3.5" result="b" />
+            <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+          </filter>
+        </defs>
+        <g transform={`translate(${cx}, ${cy}) scale(${view.k})`}>
+          {/* Verbindungen Wurzel → Kategorie → Eintrag */}
+          {layout.nodes.map((n) =>
+            n.parent ? (
+              <line key={`e-${n.id}`} x1={n.parent.x} y1={n.parent.y} x2={n.x} y2={n.y}
+                    stroke={CANVAS_LINE} strokeWidth={1} />
+            ) : (
+              <line key={`e-${n.id}`} x1={0} y1={0} x2={n.x} y2={n.y}
+                    stroke="#4a423b" strokeWidth={1.2} />
+            ),
+          )}
+
+          {/* Wurzel */}
+          <circle r={44} fill={CANVAS_PANEL} stroke="#4a423b" strokeWidth={1.4} />
+          <text y={4} textAnchor="middle" fontSize={11} fontWeight={700} fill="#efe7de">
+            {projectName.length > 12 ? `${projectName.slice(0, 11)}…` : projectName}
+          </text>
+
+          {layout.nodes.map((n) => {
+            const it = n.item;
+            const sel = it ? it.id === selectedId : false;
+            const alert = it ? taskAlert(it, now) : false;
+            const fill = it
+              ? (it.kind === "task" ? (alert ? RED : ORANGE) : itemAchieved(it, now) ? ORANGE : GREY)
+              : CANVAS_PANEL;
+            return (
+              <g key={n.id}
+                 style={{ cursor: it ? "pointer" : "default" }}
+                 onPointerDown={(e) => e.stopPropagation()}
+                 onClick={() => it && onSelect(it.id)}
+                 onPointerEnter={() => setHoverId(n.id)}
+                 onPointerLeave={() => setHoverId((h) => (h === n.id ? null : h))}>
+                {(hoverId === n.id || sel) && (
+                  <circle cx={n.x} cy={n.y} r={n.r + 7} fill="none"
+                          stroke={sel ? "#ffffff" : n.color} strokeOpacity={sel ? 0.9 : 0.45}
+                          strokeDasharray="4 3" strokeWidth={1.2} />
+                )}
+                <circle cx={n.x} cy={n.y} r={n.r} fill={fill}
+                        filter={alert ? "url(#net-glow)" : undefined}
+                        stroke={it ? n.color : n.color} strokeWidth={it ? 1.4 : 2.4}
+                        opacity={it ? 0.95 : 1} />
+                {it && (
+                  <g transform={`translate(${n.x - 6}, ${n.y - 6})`} pointerEvents="none">
+                    <foreignObject width={14} height={14}>
+                      <div style={{ color: "#141110", lineHeight: 0 }}>{kindIcon(it.kind, 12)}</div>
+                    </foreignObject>
+                  </g>
+                )}
+                <text x={n.x} y={n.y + n.r + 13} textAnchor="middle" fontSize={it ? 10 : 11}
+                      fontWeight={it ? 500 : 700}
+                      fill={sel ? "#ffffff" : it ? "#cdc4bb" : "#efe7de"}>
+                  {n.label.length > 18 ? `${n.label.slice(0, 17)}…` : n.label}
+                </text>
+                {it && (
+                  <text x={n.x} y={n.y + n.r + 25} textAnchor="middle" fontSize={9} fill="#8b837b">
+                    {statusMap.get(effectiveStatusId(it, now))?.label ?? ""}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+        </g>
+      </svg>
+
+      {!items.length && (
+        <div className="absolute inset-0 grid place-items-center text-xs" style={{ color: "#6f665e" }}>
+          Noch keine Einträge — oben Aufgabe, Termin oder Notiz anlegen.
+        </div>
+      )}
+    </div>
   );
 }

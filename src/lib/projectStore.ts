@@ -1960,6 +1960,7 @@ export const projectStore = {
     setState((s) => ({ projects: s.projects.filter((p) => p.id !== id) }));
     try {
       import("./notesStore").then((m) => m.notesStore.deleteProject(id)).catch(() => {});
+      import("./timelineStore").then((m) => m.timelineStore.deleteProject(id)).catch(() => {});
       localStorage.removeItem(`pixuna.pendingSheetPdf.${id}`);
     } catch {}
   },
