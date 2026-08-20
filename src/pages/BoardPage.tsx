@@ -4,11 +4,9 @@ import { WorkspaceHeader } from "@/components/workspace/WorkspaceHeader";
 import { useProject } from "@/lib/projectStore";
 import {
   timelineStore, useTimeline, useTimelineHistory,
-  itemStartMs, itemEndMs, itemAchieved, effectiveStatusId, priorityRadius,
+  itemStartMs, itemEndMs, itemAchieved, effectiveStatusId, priorityRadius, taskAlert,
   type TlItem, type TlKind, type TlCategory, type TlPriority, type TlStatus,
 } from "@/lib/timelineStore";
-import { ProjectGraph } from "@/pages/NotesPage";
-import { useNotes, type NoteStatusDef, type NotePriorityDef } from "@/lib/notesStore";
 import {
   CheckSquare, CalendarClock, FileText, X, Trash2, Plus, Settings, Save, Search, ChevronLeft,
 } from "lucide-react";
@@ -79,19 +77,6 @@ export default function BoardPage() {
   const [query, setQuery] = useState("");
   const [prioFilter, setPrioFilter] = useState<string>("");
 
-  // Projektnetz (aus dem Notiznetz-Store) – nur für die Netz-Ansicht.
-  const notes = useNotes(projectId);
-  const [netSelected, setNetSelected] = useState<string | null>(null);
-  const noteStatusMap = useMemo(() => {
-    const m = new Map<string, NoteStatusDef>();
-    notes.statuses.forEach((s) => m.set(s.id, s));
-    return m;
-  }, [notes.statuses]);
-  const notePriorityMap = useMemo(() => {
-    const m = new Map<string, NotePriorityDef>();
-    notes.priorities.forEach((p) => m.set(p.id, p));
-    return m;
-  }, [notes.priorities]);
 
   const selected = state.items.find((i) => i.id === selectedId) ?? null;
   const now = Date.now();
@@ -295,7 +280,7 @@ export default function BoardPage() {
   // Aufgaben: erledigt = orange, offen = rot (leuchtend).
   const circleFill = useCallback((item: TlItem, _t: number) => {
     if (colorMode === "category") return catMap.get(item.categoryId ?? "")?.color ?? GREY;
-    if (item.kind === "task") return itemAchieved(item, now) ? ORANGE : RED;
+    if (item.kind === "task") return taskAlert(item, now) ? RED : ORANGE;
     return "url(#tl-global)";
   }, [colorMode, catMap, now]);
 
@@ -449,15 +434,14 @@ export default function BoardPage() {
           {/* Projektnetz-Ansicht */}
           {surface === "net" && (
             <div className="mx-4 mt-4 h-[min(70vh,760px)] min-h-[460px] rounded-xl overflow-hidden"
-                 style={{ background: PANEL, border: `1px solid ${PANEL_LINE}`, boxShadow: "0 1px 2px rgba(20,17,16,0.05)" }}>
-              <ProjectGraph
+                 style={{ background: CANVAS, border: `1px solid ${CANVAS_LINE}` }}>
+              <TimelineNet
                 projectName={project?.name ?? "Projekt"}
-                nodes={notes.nodes}
-                statusMap={noteStatusMap}
-                priorityMap={notePriorityMap}
-                selectedId={netSelected}
-                onSelect={(id) => setNetSelected(id)}
-                focusToken={0}
+                items={state.items}
+                categories={state.categories}
+                statuses={state.statuses}
+                selectedId={selectedId}
+                onSelect={(id) => setSelectedId(id)}
               />
             </div>
           )}
@@ -548,7 +532,8 @@ export default function BoardPage() {
                     const cxp = sx(c.bx);
                     const r = c.r * view.k;
                     // Offene Aufgaben leuchten rot auf.
-                    const alert = colorMode === "status" && p.item.kind === "task" && !itemAchieved(p.item, now);
+                    // Rot + Leuchten erst, wenn der HEUTE-Strich hinter dem letzten Datum liegt.
+                    const alert = colorMode === "status" && taskAlert(p.item, now);
                     return (
                       <circle
                         key={i}
