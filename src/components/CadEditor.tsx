@@ -344,6 +344,21 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     return () => cancelAnimationFrame(raf);
   }, [onZoomChange]);
 
+  // Mehrfachauswahl (Marquee/Shift) für die Hilfeanzeige beobachten.
+  const [multiSelectActive, setMultiSelectActive] = useState(false);
+  useEffect(() => {
+    let raf = 0;
+    let last = false;
+    const tick = () => {
+      const list = (appRef.current?.selectTool as any)?.marqueeSelectedIds as unknown[] | undefined;
+      const on = !!list && list.length > 1;
+      if (on !== last) { last = on; setMultiSelectActive(on); }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
   // Melde Verfügbarkeit einer löschbaren Auswahl (für den Header-Papierkorb).
   useEffect(() => {
     if (!onCanDeleteChange) return;
@@ -1895,6 +1910,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             hatchActive={activeTool === ToolIds.HATCH}
             textActive={activeTool === ToolIds.TEXT}
             measureActive={activeTool === ToolIds.MEASURE}
+            multiSelectActive={multiSelectActive}
           />
         )}
 

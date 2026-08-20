@@ -131,12 +131,14 @@ export function MappeHelpOverlay({
   hatchActive = false,
   textActive = false,
   measureActive = false,
+  multiSelectActive = false,
 }: {
   guideActive?: boolean;
   lineActive?: boolean;
   hatchActive?: boolean;
   textActive?: boolean;
   measureActive?: boolean;
+  multiSelectActive?: boolean;
 }) {
   // Die Hilfeleiste bricht ganze Abschnitte in neue Zeilen um, sobald rechts
   // nicht mehr genug Platz ist — sie wächst dadurch nach oben statt zu
@@ -210,6 +212,13 @@ export function MappeHelpOverlay({
             description="Einfügen"
           />
         </HelpGroup>
+
+        {multiSelectActive && (
+          <HelpGroup title="Mehrfachauswahl" bordered>
+            <HelpItem icon={<ShiftClickGlyph />} shortcut="01. Shift + L-Klick" description="Objekte auswählen" />
+            <HelpItem icon={<ShiftClickGlyph />} shortcut="02. Shift + L-Klick auf Fangpunkt" description="Gelben Fangpunkt setzen für verschieben/drehen" />
+          </HelpGroup>
+        )}
 
         {guideActive && (
           <HelpGroup title="Hilfslinie" bordered>
