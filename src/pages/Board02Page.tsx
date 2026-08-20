@@ -435,13 +435,15 @@ export default function Board02Page() {
               {/* Verbindungslinien (L-Form) – Beschriftung liegt außerhalb des Clusters */}
               {placed.map((p) => {
                 const last = p.circles[p.circles.length - 1];
-                const lx = sx(p.bx1);
-                const y0 = cy + (last?.dy ?? 0) * view.k + p.side * (last?.r ?? 6) * view.k;
+                const dir = labelDir(p);
+                const lx = sx(dir === 1 ? p.bx1 : p.bx0);
+                const anchor = dir === 1 ? last : p.circles[0];
+                const y0 = cy + (anchor?.dy ?? 0) * view.k + p.side * (anchor?.r ?? 6) * view.k;
                 const ly = labelY(p);
                 return (
                   <path
                     key={`c-${p.item.id}`}
-                    d={`M ${lx} ${y0} L ${lx} ${ly} L ${lx + 16} ${ly}`}
+                    d={`M ${lx} ${y0} L ${lx} ${ly} L ${lx + dir * 16} ${ly}`}
                     fill="none"
                     stroke={p.item.id === selectedId ? ORANGE : "#4a423b"}
                     strokeWidth={1}
@@ -454,7 +456,11 @@ export default function Board02Page() {
                 <g key={p.item.id} data-tl-interactive
                    style={{ cursor: "pointer" }}
                    onPointerDown={(e) => e.stopPropagation()}
-                   onClick={() => { setSelectedId(p.item.id); setOpenLabelId(p.item.id); }}>
+                   onClick={() => {
+                     const open = openLabelId === p.item.id;
+                     setOpenLabelId(open ? null : p.item.id);
+                     setSelectedId(open ? null : p.item.id);
+                   }}>
                   {p.circles.map((c, i) => {
                     const cxp = sx(c.bx);
                     const r = c.r * view.k;
