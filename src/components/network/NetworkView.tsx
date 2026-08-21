@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Users,
   FolderKanban,
@@ -104,8 +104,31 @@ function Group({
 
 type TabId = "contacts" | "teams" | "requests";
 
-export function NetworkView({ projects }: { projects: LocalProjectRef[] }) {
+export function NetworkView({
+  projects,
+  profile,
+}: {
+  projects: LocalProjectRef[];
+  /** Lokales Profil – wird als Anzeigename/Funktion ins Netzwerk gespiegelt. */
+  profile?: { name: string; role?: string; avatarUrl?: string };
+}) {
   const net = useNetwork(projects);
+  const lastPushed = useRef("");
+
+  // Anzeigename/Funktion/Avatar in die gemeinsame Profiltabelle spiegeln.
+  useEffect(() => {
+    if (!net.ready || !profile) return;
+    const avatar = profile.avatarUrl && profile.avatarUrl.length < 200_000 ? profile.avatarUrl : null;
+    const key = `${profile.name}|${profile.role ?? ""}|${avatar ? avatar.length : 0}`;
+    if (key === lastPushed.current) return;
+    lastPushed.current = key;
+    const timer = window.setTimeout(() => {
+      void net.saveProfile({ display_name: profile.name ?? "", role: profile.role ?? "", avatar_url: avatar });
+    }, 600);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [net.ready, profile?.name, profile?.role, profile?.avatarUrl]);
+
   const [tab, setTab] = useState<TabId>("contacts");
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<NetworkProfile[]>([]);
