@@ -3646,7 +3646,11 @@ function ElementView({
   // CAD-Blätter: blaue Optik, unveränderter Cursor und Bedienung
   // ausschließlich über HUB-Symbole (Verschieben / Drehen / Kanten schneiden)
   // mit Commit per Linksklick + ENTER bzw. Häkchen (Tablet).
-  const cadHubUx = isCadView;
+  // Tabellen nutzen dieselbe Bedienung wie CAD-Blätter: dünner blauer Rahmen,
+  // Fangpunkte an den Außenecken, Verschieben/Drehen über die HUB-Symbole.
+  // Im internen Tabellenmodus ist diese Objekt-Bedienung deaktiviert.
+  const tableHubUx = el.kind === "table" && !readOnly && !tableEditing;
+  const cadHubUx = isCadView || tableHubUx;
   const hubBlue = "#4da3ff";
   // Portal-Ziel (Seitenfläche) für die Bedien-Overlays der CAD-Blätter.
   const [portalHost, setPortalHost] = useState<HTMLElement | null>(null);
@@ -4082,7 +4086,7 @@ function ElementView({
 
 
 
-  const hubKinds = new Set(["cad-view", "cad-viewport", "pdf", "image"]);
+  const hubKinds = new Set(["cad-view", "cad-viewport", "pdf", "image", "table"]);
   const showHub = !readOnly && selected && hubKinds.has(el.kind);
   // Optik: CAD-Blatt blau, alle anderen Objekte goldener Auswahlrahmen.
   const outlineStyle = selected
@@ -4509,6 +4513,13 @@ function ElementView({
             cursor: hubMode ? "crosshair" : "default",
           }}
           onPointerDown={handlePointerDown}
+          onDoubleClick={(e) => {
+            if (readOnly || el.kind !== "table" || tableEditing) return;
+            e.stopPropagation();
+            onSelect?.();
+            tableCtx?.setEditId(el.id);
+            tableCtx?.setSelection({ r1: 0, c1: 0, r2: 0, c2: 0 });
+          }}
         />
         {node}
       </div>,
@@ -4554,7 +4565,7 @@ function ElementView({
         // PDF/Bild/CAD-Blatt dürfen bei aktivem Zeichenwerkzeug keinen Pointer
         // abfangen — sonst stoppen neue Objekte an ihren Kanten und der
         // Radiergummi erreicht die darüberliegende CAD-Eingabeschicht nicht.
-        pointerEvents: cadHubUx ? "none" : (((el.kind === "pdf" || el.kind === "image") && toolActive) ? "none" : undefined),
+        pointerEvents: (cadHubUx && !tableHubUx) ? "none" : (((el.kind === "pdf" || el.kind === "image") && toolActive) ? "none" : undefined),
 
       }}
     >
@@ -4871,7 +4882,7 @@ function ElementView({
           {/* Edge-Drag-Handles: Preview beim Ziehen, Commit erst bei Pointerup
              (bzw. Tablet-Häkchen). onEdgeDrag wird nur EINMAL mit dem Gesamt-
              Delta gerufen — kein jitterndes Store-Update während der Bewegung. */}
-          {!tabletCommitOnly && !hubMode && (["top", "right", "bottom", "left"] as const).map((edge) => {
+          {!tabletCommitOnly && !hubMode && !tableHubUx && (["top", "right", "bottom", "left"] as const).map((edge) => {
             const isHor = edge === "top" || edge === "bottom";
             const isActive = edgeTrim?.edge === edge;
             const edgeReady = activeEdge === edge;
@@ -5018,7 +5029,7 @@ function ElementView({
           {!tabletCommitOnly && (["tl", "tr", "bl", "br"] as const).map((corner) => {
             // Bei CAD-Blatt: Ecken sind Snap-Marker + Anker-Setzer (kein Trim/Resize).
             // Bei anderen Elementen (image/pdf): Ecken skalieren wie gehabt.
-            const cornerDraggable = !isCadView && !!onCornerDrag;
+            const cornerDraggable = !cadHubUx && !!onCornerDrag;
             const startCornerDrag = (e: React.PointerEvent) => {
               if (!cornerDraggable || !onCornerDrag) return;
               e.stopPropagation();
@@ -5453,7 +5464,7 @@ function RightInspector({
               onCancelTable={onCancelTable}
             />
           )}
-          {tab === "tools" && activeTool !== "guide" && activeTool !== "text" && activeTool !== "eraser" && activeTool !== null && activeTool !== "pipette" && activeTool !== "document" && activeTool !== "cad" && !isLinePageTool(activeTool) && (
+          {tab === "tools" && activeTool !== "guide" && activeTool !== "text" && activeTool !== "eraser" && activeTool !== null && activeTool !== "pipette" && activeTool !== "document" && activeTool !== "cad" && activeTool !== "table" && !isLinePageTool(activeTool) && (
             <ToolHelpNotes toolId={activeTool} />
           )}
           {tab === "layers" && page && (
