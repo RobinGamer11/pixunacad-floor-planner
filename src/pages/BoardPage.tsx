@@ -478,12 +478,12 @@ export default function BoardPage() {
               <BigAddButton kind="task" onClick={() => add("task")} />
               <BigAddButton kind="event" onClick={() => add("event")} />
               <BigAddButton kind="note" onClick={() => add("note")} />
-              <div className="flex-1" />
               <Segmented
                 value={surface}
                 onChange={(v) => setSurface(v as typeof surface)}
                 options={[{ v: "cal", l: "Kalender" }, { v: "ray", l: "Ansichtstrahl" }, { v: "net", l: "Projektnetz" }]}
               />
+              <div className="flex-1" />
               {surface === "ray" && (
                 <>
                   <Segmented
@@ -810,7 +810,7 @@ export default function BoardPage() {
                       style={{
                         gridTemplateColumns: GRID_COLS,
                         borderColor: PANEL_LINE,
-                        background: i.id === selectedId ? "#fbe9df" : "transparent",
+                        background: i.id === selectedId ? "hsl(var(--accent-gold) / 0.18)" : "transparent",
                         color: doneRow ? INK_SOFT : INK,
                       }}
                       title={i.title}
