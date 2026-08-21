@@ -44,6 +44,8 @@ export function TableToolSettings({
   setFormulaFn?: (f: FormulaFn | null) => void;
   onConfirm: () => void;
   onCancel: () => void;
+  /** Alternative Persistenz (CAD-Oberfläche): ersetzt projectStore-Update. */
+  onPatch?: (patch: Partial<PageElement>) => void;
 }) {
   const ctx = React.useContext(TableEditContext);
   const editMode = !!tableElement && ctx?.editId === tableElement.id;
