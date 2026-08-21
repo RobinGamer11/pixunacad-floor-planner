@@ -285,6 +285,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const textLineHeightRangeRef = useRef<HTMLInputElement>(null);
   const textLineHeightNumRef = useRef<HTMLInputElement>(null);
   const textBgAlphaRangeRef = useRef<HTMLInputElement>(null);
+  const textAlphaRef = useRef<HTMLInputElement>(null);
+  const textAlphaRangeRef = useRef<HTMLInputElement>(null);
   const textFontSizePtRef = useRef<HTMLInputElement>(null);
 
   // Text editor overlay refs
@@ -756,6 +758,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
         lineHeightRange: textLineHeightRangeRef.current,
         lineHeightNum: textLineHeightNumRef.current,
         bgAlphaRange: textBgAlphaRangeRef.current,
+        textAlpha: textAlphaRef.current,
+        textAlphaRange: textAlphaRangeRef.current,
         fontSizePt: textFontSizePtRef.current,
       },
       {
@@ -2589,16 +2593,43 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 <input ref={textBgColorRef} type="color" defaultValue="#ffffff" />
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <CadColorProxy label="Textfarbe" target={textColorRef} />
-                <CadColorProxy label="Feldfarbe" target={textBgColorRef} />
+                <div onPointerDownCapture={() => setTextAlphaTarget("text")}>
+                  <CadColorProxy label="Textfarbe" target={textColorRef} />
+                </div>
+                <div onPointerDownCapture={() => setTextAlphaTarget("bg")}>
+                  <CadColorProxy label="Feldfarbe" target={textBgColorRef} />
+                </div>
               </div>
               <div>
-                <div className="mb-1.5 text-[10px] text-muted-foreground">Transparenz</div>
+                <div className="mb-1.5 flex items-center justify-between text-[10px] text-muted-foreground">
+                  <span>Transparenz</span>
+                  <span className="flex overflow-hidden rounded border" style={{ borderColor: "hsl(var(--hairline))" }}>
+                    {(["text", "bg"] as const).map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setTextAlphaTarget(t)}
+                        className="px-1.5 py-[1px] text-[9px]"
+                        style={textAlphaTarget === t
+                          ? { background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }
+                          : { background: "transparent" }}
+                      >
+                        {t === "text" ? "Text" : "Feld"}
+                      </button>
+                    ))}
+                  </span>
+                </div>
                 <div className="hidden">
                   <input ref={textBgAlphaRangeRef} type="range" min={0} max={100} step={1} defaultValue={0} />
                   <input ref={textBgAlphaRef} type="text" defaultValue="0" />
+                  <input ref={textAlphaRangeRef} type="range" min={0} max={100} step={1} defaultValue={100} />
+                  <input ref={textAlphaRef} type="text" defaultValue="100" />
                 </div>
-                <CadRangeProxy target={textBgAlphaRef} rangeTarget={textBgAlphaRangeRef} min={0} max={100} step={1} unit="%" />
+                {textAlphaTarget === "text" ? (
+                  <CadRangeProxy target={textAlphaRef} rangeTarget={textAlphaRangeRef} min={0} max={100} step={1} unit="%" invert />
+                ) : (
+                  <CadRangeProxy target={textBgAlphaRef} rangeTarget={textBgAlphaRangeRef} min={0} max={100} step={1} unit="%" invert />
+                )}
               </div>
               <div className="flex items-center gap-2 hidden">
                 <input ref={textWrapRef} type="checkbox" className="accent-primary" />
