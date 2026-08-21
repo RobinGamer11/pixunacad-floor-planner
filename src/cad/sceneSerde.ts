@@ -11,6 +11,7 @@ export interface SerializedScene {
   walls?: any[];
   dimensions?: any[];
   textBoxes?: any[];
+  tables?: any[];
   stickerInstances?: any[];
   documents?: any[];
   freeStrokes?: any[];
@@ -24,6 +25,7 @@ export function restoreOneScene(scene: Scene, data: SerializedScene | null | und
   scene.hatches = [];
   scene.dimensions = [];
   scene.textBoxes = [];
+  (scene as any).tables = [];
   scene.stickerInstances = [];
   scene.documents = [];
   scene.freeStrokes = [];
@@ -35,6 +37,7 @@ export function restoreOneScene(scene: Scene, data: SerializedScene | null | und
   (scene as any)._rebuildHatchIdMap?.();
   (scene as any)._rebuildDimIdMap?.();
   (scene as any)._rebuildTextIdMap?.();
+  (scene as any)._rebuildTableIdMap?.();
   (scene as any)._rebuildStickerIdMap?.();
   (scene as any)._rebuildDocIdMap?.();
   (scene as any)._rebuildFreeIdMap?.();
@@ -127,6 +130,12 @@ export function restoreOneScene(scene: Scene, data: SerializedScene | null | und
       t.rotationRad || 0,
     );
     if (t._stickerEditOwnerId) (box as any)._stickerEditOwnerId = t._stickerEditOwnerId;
+  }
+  for (const t of data.tables || []) {
+    const tbl = (scene as any).createTable(t.center, t.data, t.mPerMm ?? 0.1, {
+      rotationRad: t.rotationRad || 0, labelId: t.labelId, scale: t.scale || 1,
+    });
+    if (t.id) { tbl.id = t.id; (scene as any)._rebuildTableIdMap?.(); }
   }
   if (Array.isArray(data.stickerInstances)) {
     for (const si of data.stickerInstances) {

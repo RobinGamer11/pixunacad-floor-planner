@@ -695,6 +695,16 @@ export class CadApp {
         _stickerEditOwnerId: d._stickerEditOwnerId || null,
       })),
 
+      tables: (scene as any).tables.map((t: any) => ({
+        id: t.id,
+        center: { x: t.center.x, y: t.center.y },
+        rotationRad: t.rotationRad,
+        mPerMm: t.mPerMm,
+        scale: t.scale,
+        data: t.data,
+        labelId: t.labelId,
+        _stickerEditOwnerId: t._stickerEditOwnerId || null,
+      })),
       textBoxes: scene.textBoxes.map(t => ({
         id: t.id,
         center: { x: t.center.x, y: t.center.y },
@@ -781,6 +791,7 @@ export class CadApp {
     scene.hatches = [];
     scene.dimensions = [];
     scene.textBoxes = [];
+    (scene as any).tables = [];
     scene.stickerInstances = [];
     scene.documents = [];
     scene.freeStrokes = [];
@@ -792,6 +803,7 @@ export class CadApp {
     (scene as any)._rebuildHatchIdMap?.();
     (scene as any)._rebuildDimIdMap?.();
     (scene as any)._rebuildTextIdMap?.();
+    (scene as any)._rebuildTableIdMap?.();
     (scene as any)._rebuildStickerIdMap?.();
     (scene as any)._rebuildDocIdMap?.();
     (scene as any)._rebuildFreeIdMap?.();
@@ -867,6 +879,13 @@ export class CadApp {
     for (const t of data.textBoxes || []) {
       const box = scene.createTextBox(t.center, t.widthM, t.heightM, { ...(t.style || {}), labelId: t.labelId }, t.html || "", t.rotationRad || 0);
       if (t._stickerEditOwnerId) box._stickerEditOwnerId = t._stickerEditOwnerId;
+    }
+    for (const t of data.tables || []) {
+      const tbl = (scene as any).createTable(t.center, t.data, t.mPerMm ?? 0.1, {
+        rotationRad: t.rotationRad || 0, labelId: t.labelId, scale: t.scale || 1,
+      });
+      if (t.id) { tbl.id = t.id; (scene as any)._rebuildTableIdMap?.(); }
+      if (t._stickerEditOwnerId) tbl._stickerEditOwnerId = t._stickerEditOwnerId;
     }
     if (Array.isArray(data.stickerInstances)) {
       for (const si of data.stickerInstances) {
