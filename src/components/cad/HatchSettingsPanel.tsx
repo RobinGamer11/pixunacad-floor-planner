@@ -31,7 +31,7 @@ const MeasureInput: React.FC<{
       <span className="mb-1 block whitespace-nowrap text-[9px] leading-tight text-muted-foreground">{text}</span>
       <span
         className="flex h-8 items-center overflow-hidden rounded-md border"
-        style={{ borderColor: HAIRLINE, backgroundColor: "#fff" }}
+        style={{ borderColor: HAIRLINE, backgroundColor: "hsl(var(--card))" }}
       >
         <input
           type="text"
@@ -202,9 +202,9 @@ export const HatchSettingsPanel: React.FC<Props> = ({ app, projectId, pxPerMm = 
       <div>
         <div className="mb-1.5 text-[10px] text-muted-foreground">Transparenz</div>
         <input
-          type="range" min={1} max={100} step={1} value={fillAlphaPct}
+          type="range" min={1} max={100} step={1} value={101 - fillAlphaPct}
           onChange={(e) => {
-            const v = Math.max(1, Math.min(100, parseInt(e.target.value, 10) || 1));
+            const v = 101 - Math.max(1, Math.min(100, parseInt(e.target.value, 10) || 1));
             setFillAlphaPct(v);
             apply((h) => { h.fillAlphaPct = v; }, () => { if (app) (app as any).defaultHatchFillAlphaPct = v; });
           }}
@@ -212,13 +212,13 @@ export const HatchSettingsPanel: React.FC<Props> = ({ app, projectId, pxPerMm = 
         />
         <span
           className="mt-1 flex h-8 items-center overflow-hidden rounded-md border"
-          style={{ borderColor: HAIRLINE, backgroundColor: "#fff" }}
+          style={{ borderColor: HAIRLINE, backgroundColor: "hsl(var(--card))" }}
         >
           <input
             type="number" min={1} max={100}
-            value={fillAlphaPct}
+            value={101 - fillAlphaPct}
             onChange={(e) => {
-              const v = Math.max(1, Math.min(100, parseFloat(e.target.value) || 1));
+              const v = 101 - Math.max(1, Math.min(100, parseFloat(e.target.value) || 1));
               setFillAlphaPct(v);
               apply((h) => { h.fillAlphaPct = v; }, () => { if (app) (app as any).defaultHatchFillAlphaPct = v; });
             }}

@@ -191,7 +191,7 @@ export function CadMeasureProxy({
   return (
     <label className="min-w-0">
       <span className="mb-1 block text-[9px] text-muted-foreground">{label}</span>
-      <span className="flex h-8 items-center overflow-hidden rounded-md border" style={{ borderColor: HAIRLINE, backgroundColor: "#fff" }}>
+      <span className="flex h-8 items-center overflow-hidden rounded-md border" style={{ borderColor: HAIRLINE, backgroundColor: "hsl(var(--card))" }}>
         <input
           type="text"
           inputMode="decimal"
@@ -244,6 +244,7 @@ export function CadRangeProxy({
   step = 1,
   unit = "%",
   rangeTarget,
+  invert = false,
 }: {
   /** Text-/Zahlenfeld der Engine (führend). */
   target: React.RefObject<HTMLInputElement>;
@@ -252,15 +253,19 @@ export function CadRangeProxy({
   max?: number;
   step?: number;
   unit?: string;
+  /** true: Anzeige ist Transparenz (100 % = komplett transparent), Engine speichert Deckkraft. */
+  invert?: boolean;
 }) {
   const engine = usePolled(() => target.current?.value, [target]);
   const value = (() => {
     const n = parseFloat(String(engine ?? "").replace(",", "."));
-    return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : min;
+    const clamped = Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : min;
+    return invert ? min + max - clamped : clamped;
   })();
 
-  const commit = (n: number) => {
-    const v = Math.min(max, Math.max(min, n));
+  const commit = (shown: number) => {
+    const s0 = Math.min(max, Math.max(min, shown));
+    const v = invert ? min + max - s0 : s0;
     const el = target.current;
     if (el) { el.value = String(v); fire(el); }
     const r = rangeTarget?.current;
@@ -278,7 +283,7 @@ export function CadRangeProxy({
         onChange={(e) => commit(Number(e.target.value))}
         className="pixuna-range w-full"
       />
-      <label className="mt-1 flex h-7 items-center overflow-hidden rounded-md border" style={{ borderColor: HAIRLINE, backgroundColor: "#fff" }}>
+      <label className="mt-1 flex h-7 items-center overflow-hidden rounded-md border" style={{ borderColor: HAIRLINE, backgroundColor: "hsl(var(--card))" }}>
         <input
           type="number"
           min={min}
