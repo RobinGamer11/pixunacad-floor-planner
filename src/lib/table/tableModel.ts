@@ -9,6 +9,17 @@
 export type HAlign = "left" | "center" | "right";
 export type VAlign = "top" | "middle" | "bottom";
 
+/** Rahmenstil einer Zelle. */
+export type CellBorderStyle = "single" | "double";
+
+/** Sichtbarkeit der vier Zellkanten (undefined = sichtbar). */
+export interface CellBorders {
+  top?: boolean;
+  right?: boolean;
+  bottom?: boolean;
+  left?: boolean;
+}
+
 export interface TableCellFormat {
   align?: HAlign;
   valign?: VAlign;
@@ -17,6 +28,11 @@ export interface TableCellFormat {
   italic?: boolean;
   color?: string;
   background?: string;
+  /** Pro Kante ein/aus — fehlende Kante = sichtbar. */
+  borders?: CellBorders;
+  borderStyle?: CellBorderStyle;
+  /** Rahmenstärke dieser Zelle in px (Fallback: Tabellen-Rahmenbreite). */
+  borderWidthPx?: number;
 }
 
 export interface TableMerge {
@@ -38,6 +54,8 @@ export interface TableData {
   merges?: TableMerge[];
   filters?: Record<number, string[]>;
   headerRow?: boolean;
+  /** Spaltenfilter im Tabellenmodus (Default: aus). */
+  filtersEnabled?: boolean;
   borderColor?: string;
   borderWidthPx?: number;
   background?: string;
@@ -75,6 +93,7 @@ export function createTableData(cols: number, rows: number): TableData {
     cellFormats: {},
     merges: [],
     headerRow: true,
+    filtersEnabled: false,
     filters: {},
     borderWidthPx: 1,
   };
@@ -126,6 +145,7 @@ export function normalizeTable(data?: TableData | null): TableModel {
     cellFormats,
     merges,
     headerRow: src.headerRow !== false,
+    filtersEnabled: src.filtersEnabled === true,
     filters: src.filters ?? {},
   };
 }
@@ -286,7 +306,24 @@ export function effectiveFormat(t: TableModel, r: number, c: number): Required<P
     bold: f.bold ?? isHeader,
     italic: f.italic ?? false,
     color: f.color,
-    background: f.background ?? (isHeader ? t.headerBackground : undefined),
+    background: f.background,
+  };
+}
+
+/** Effektive Rahmen-Eigenschaften einer Zelle (Kanten, Stil, Stärke). */
+export function effectiveBorders(t: TableModel, r: number, c: number): {
+  top: boolean; right: boolean; bottom: boolean; left: boolean;
+  style: CellBorderStyle; widthPx: number;
+} {
+  const f = t.cellFormats[cellKey(r, c)] ?? {};
+  const b = f.borders ?? {};
+  return {
+    top: b.top !== false,
+    right: b.right !== false,
+    bottom: b.bottom !== false,
+    left: b.left !== false,
+    style: f.borderStyle ?? "single",
+    widthPx: f.borderWidthPx ?? (t.borderWidthPx ?? 1),
   };
 }
 
