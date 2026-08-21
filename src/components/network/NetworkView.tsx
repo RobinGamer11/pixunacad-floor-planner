@@ -358,7 +358,7 @@ export function NetworkView({
                           key={person.id}
                           person={person}
                           onClick={() => setDetails(person)}
-                          right={
+                          chat={
                             <ChatButton
                               unread={unread[`d:${person.id}`]}
                               onClick={() => openDirect(person)}
@@ -384,7 +384,7 @@ export function NetworkView({
                       key={person.id}
                       person={person}
                       onClick={() => setDetails(person)}
-                      right={
+                      chat={
                         <ChatButton
                           unread={unread[`d:${person.id}`]}
                           onClick={() => openDirect(person)}
@@ -425,13 +425,13 @@ export function NetworkView({
                     <div className="flex items-center gap-2">
                       <FolderKanban size={14} className="text-muted-foreground" />
                       <span className="text-sm font-semibold truncate">{p.name} ({list.length})</span>
+                      <ChatButton
+                        unread={unread[`p:${p.id}`]}
+                        onClick={() => openProject(p)}
+                        title="Projektchat öffnen"
+                      />
                       <div className="ml-auto flex items-center gap-1">
                         <span className="text-[11px] text-muted-foreground">Besitzer: Du</span>
-                        <ChatButton
-                          unread={unread[`p:${p.id}`]}
-                          onClick={() => openProject(p)}
-                          title="Projektchat öffnen"
-                        />
                       </div>
                     </div>
                     <div className="mt-1.5">
