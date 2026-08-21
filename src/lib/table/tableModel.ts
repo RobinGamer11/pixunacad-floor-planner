@@ -81,7 +81,7 @@ export const MIN_ROW_MM = 4;
 export const PT_TO_MM = 25.4 / 72;
 
 /** Dezentes Grau der Kopfzeile (Default, per Zellhintergrund überschreibbar). */
-export const HEADER_BG = "#ededed";
+export const HEADER_BG = "#cfcfcf";
 
 export const cellKey = (r: number, c: number) => `${r},${c}`;
 
