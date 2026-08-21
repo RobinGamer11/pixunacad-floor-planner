@@ -120,8 +120,8 @@ export function TabletAidWheel() {
         onPointerCancel={onDragEnd}
         className="absolute inset-0 rounded-full"
         style={{
-          border: "1px solid hsl(var(--surface) / 0.28)",
-          background: "hsl(var(--ink) / 0.82)",
+          border: "1px solid hsl(var(--overlay-surface) / 0.28)",
+          background: "hsl(var(--overlay-ink) / 0.82)",
           boxShadow: "0 12px 32px rgba(0,0,0,0.32)",
           backdropFilter: "blur(10px)",
           cursor: "grab",
@@ -199,15 +199,15 @@ function CenterToggles() {
     alignItems: "center",
     justifyContent: "center",
     gap: 3,
-    border: active ? "1px solid hsl(var(--accent-gold))" : "1px solid hsl(var(--surface) / 0.28)",
-    background: active ? "hsl(var(--accent-gold))" : "hsl(var(--surface) / 0.12)",
-    color: "hsl(var(--surface))",
+    border: active ? "1px solid hsl(var(--overlay-gold))" : "1px solid hsl(var(--overlay-surface) / 0.28)",
+    background: active ? "hsl(var(--overlay-gold))" : "hsl(var(--overlay-surface) / 0.12)",
+    color: active ? "hsl(var(--overlay-ink))" : "hsl(var(--overlay-surface))",
     cursor: "pointer",
   });
 
   return (
     <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-1">
-      <div className="text-[9px] font-semibold uppercase tracking-[0.16em] pointer-events-none" style={{ color: "hsl(var(--surface) / 0.72)" }}>
+      <div className="text-[9px] font-semibold uppercase tracking-[0.16em] pointer-events-none" style={{ color: "hsl(var(--overlay-surface) / 0.72)" }}>
         Tablet
       </div>
       <button
@@ -446,10 +446,10 @@ function WheelButton({
         top: cy,
         width: buttonSize,
         height: buttonSize,
-        borderColor: active || highlight ? "hsl(var(--accent-gold))" : "hsl(var(--surface) / 0.28)",
-        background: active ? "hsl(var(--accent-gold))" : "hsl(var(--surface) / 0.11)",
-        color: "hsl(var(--surface))",
-        boxShadow: highlight && !active ? "0 0 0 3px hsl(var(--accent-gold) / 0.35)" : undefined,
+        borderColor: active || highlight ? "hsl(var(--overlay-gold))" : "hsl(var(--overlay-surface) / 0.28)",
+        background: active ? "hsl(var(--overlay-gold))" : "hsl(var(--overlay-surface) / 0.11)",
+        color: active ? "hsl(var(--overlay-ink))" : "hsl(var(--overlay-surface))",
+        boxShadow: highlight && !active ? "0 0 0 3px hsl(var(--overlay-gold) / 0.35)" : undefined,
         touchAction: "none",
         pointerEvents: "auto",
         zIndex: 2,

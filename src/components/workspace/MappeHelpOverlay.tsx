@@ -4,8 +4,8 @@ import { ClipboardPaste, Copy, Frame, Grid2x2, Keyboard, Lock, PenTool, Printer,
 type MouseHighlight = "wheel" | "left" | "right";
 
 function MouseGlyph({ highlight, pressed = false }: { highlight: MouseHighlight; pressed?: boolean }) {
-  const active = "hsl(var(--surface))";
-  const stroke = "hsl(var(--surface) / 0.86)";
+  const active = "hsl(var(--overlay-surface))";
+  const stroke = "hsl(var(--overlay-surface) / 0.86)";
 
   return (
     <svg viewBox="0 0 32 42" className="h-8 w-7" fill="none" aria-hidden="true">
@@ -42,9 +42,9 @@ function ShiftClickGlyph() {
       <span
         className="absolute -right-3 -top-0.5 rounded border px-1 text-[7px] font-bold leading-3"
         style={{
-          borderColor: "hsl(var(--surface) / 0.55)",
-          background: "hsl(var(--surface) / 0.18)",
-          color: "hsl(var(--surface))",
+          borderColor: "hsl(var(--overlay-surface) / 0.55)",
+          background: "hsl(var(--overlay-surface) / 0.18)",
+          color: "hsl(var(--overlay-surface))",
         }}
       >
         Shift
@@ -83,7 +83,7 @@ function HelpGroup({
   return (
     <section
       className="px-2 py-1.5"
-      style={bordered ? { borderLeft: "1px solid hsl(var(--surface) / 0.22)" } : undefined}
+      style={bordered ? { borderLeft: "1px solid hsl(var(--overlay-surface) / 0.22)" } : undefined}
     >
       <div className="mb-0.5 text-[8px] font-semibold uppercase tracking-[0.16em] opacity-70">{title}</div>
       <div className="flex items-end justify-center">{children}</div>
@@ -99,7 +99,7 @@ function HeaderActionGlyph({ children }: { children: React.ReactNode }) {
   return (
     <div
       className="flex h-8 w-8 items-center justify-center rounded-full border"
-      style={{ borderColor: "hsl(var(--surface) / 0.44)" }}
+      style={{ borderColor: "hsl(var(--overlay-surface) / 0.44)" }}
     >
       {children}
     </div>
@@ -179,9 +179,9 @@ export function MappeHelpOverlay({
         ref={innerRef}
         className="flex max-w-full flex-wrap items-stretch justify-center rounded-xl border shadow-xl backdrop-blur-md"
         style={{
-          borderColor: "hsl(var(--surface) / 0.24)",
-          background: "hsl(var(--ink) / 0.78)",
-          color: "hsl(var(--surface))",
+          borderColor: "hsl(var(--overlay-surface) / 0.24)",
+          background: "hsl(var(--overlay-ink) / 0.78)",
+          color: "hsl(var(--overlay-surface))",
           transform: `scale(${scale})`,
           transformOrigin: "bottom center",
         }}

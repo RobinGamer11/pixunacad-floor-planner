@@ -635,7 +635,7 @@ export default function ProjectsHome() {
               </div>
             )}
 
-            <div className="flex-1 overflow-y-auto px-3 pt-2 pb-4 space-y-1">
+            <div className="flex-1 overflow-y-auto px-3 pt-3 pb-4 space-y-1">
               {/* Ordner */}
               {folders.map((f) => {
                 const inside = projectsByFolder.get(f.id) ?? [];
@@ -1766,7 +1766,7 @@ export function AufgabenView({ project }: { project: Project }) {
             style={{ transform: entryOpen ? "rotate(180deg)" : undefined }}
           />
         </button>
-        <div className="flex flex-col gap-3" hidden={!entryOpen} style={{ marginTop: entryOpen ? 12 : 0 }}>
+        <div className="flex-col gap-3" style={{ display: entryOpen ? "flex" : "none", marginTop: entryOpen ? 12 : 0 }}>
           <div className="flex items-center gap-2">
             {(["task", "note"] as TlKind[]).map((k) => (
               <button
