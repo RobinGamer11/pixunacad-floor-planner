@@ -757,6 +757,23 @@ export class TableObject {
     const rows: number[] = this.data?.rowHeightsMm ?? [];
     return rows.reduce((a: number, b: number) => a + b, 0) * this.mPerMm * this.scale;
   }
+
+  /**
+   * Skalieren über die bestehende Box-Infrastruktur: Setzen von Breite/Höhe
+   * verändert den Objektmaßstab (die Tabelle bleibt proportional, damit
+   * Zellenmaße in Papier-mm gültig bleiben).
+   */
+  set widthM(next: number) {
+    const base = this.widthM / this.scale;
+    if (base > 0 && next > 0) this.scale = next / base;
+  }
+  set heightM(next: number) {
+    const base = this.heightM / this.scale;
+    if (base > 0 && next > 0) this.scale = next / base;
+  }
+
+  /** Reines Datenobjekt (Tabellenmodus schreibt hierüber zurück). */
+  setData(next: any) { this.data = next; }
 }
 
 export class Scene {
