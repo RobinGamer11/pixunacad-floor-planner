@@ -6673,6 +6673,18 @@ function TextSettings({
   // 1 pt = 4/3 CSS-Pixel; die mm-Angabe ist die reale Höhe auf dem Blatt.
   const fontPx = settings.fontSize * (4 / 3);
   const fontMm = guideStrokePxToMm(fontPx, pxPerMm);
+  // Transparenz-Regler wirkt wahlweise auf Text- oder Feldfarbe.
+  // Angezeigt wird Transparenz (100 % = komplett transparent), gespeichert Deckkraft.
+  const [alphaTarget, setAlphaTarget] = useState<"text" | "bg">("text");
+  const opacity = alphaTarget === "text" ? settings.alpha : settings.bgAlphaPct;
+  const shownAlpha = Math.min(100, Math.max(0, 100 - opacity));
+  const commitAlpha = (shown: number) => {
+    const v = Math.min(100, Math.max(0, 100 - Math.min(100, Math.max(0, shown))));
+    if (alphaTarget === "text") onChange({ alpha: Math.max(1, v) });
+    else onChange({ bgAlphaPct: v });
+  };
+
+
 
   return (
     <SettingsBlock title="TEXT">
