@@ -1748,40 +1748,6 @@ export function AufgabenView({ project }: { project: Project }) {
 
   return (
     <div className="mt-6 space-y-5">
-      {/* Kalender ganz oben */}
-      <div
-        className="rounded-2xl p-5"
-        style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
-      >
-        <div className="flex items-center justify-between mb-3">
-          <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">
-            KALENDER
-          </div>
-          <button
-            onClick={() => navigate(`/project/${project.id}/board`)}
-            className="h-7 px-2.5 rounded-md text-[11px] font-medium flex items-center gap-1.5"
-            style={{ background: "hsl(var(--accent-gold-soft))", color: "hsl(var(--accent-gold))" }}
-            title="Board öffnen"
-          >
-            <ListChecks size={13} /> Board
-          </button>
-        </div>
-        <TaskCalendar
-          tasks={rows}
-          selectedDates={selectedDates}
-          onSelectDate={toggleDate}
-        />
-        <div className="mt-3 text-[11px] font-medium">
-          Tag auswählen und Aufgabe/Notiz erstellen
-          <span className="ml-1 font-normal text-muted-foreground">
-            (mehrere Tage mit Shift/Strg)
-          </span>
-        </div>
-        <div className="mt-1 text-[11px] text-muted-foreground">
-          Aufgaben und Notizen sind direkt mit dem Board verknüpft.
-        </div>
-      </div>
-
       {/* Neuer Eintrag */}
       <div
         className="rounded-2xl p-5"
@@ -1881,6 +1847,40 @@ export function AufgabenView({ project }: { project: Project }) {
               <Plus size={14} /> Hinzufügen
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* Kalender ganz oben */}
+      <div
+        className="rounded-2xl p-5"
+        style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
+      >
+        <div className="flex items-center justify-between mb-3">
+          <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">
+            KALENDER
+          </div>
+          <button
+            onClick={() => navigate(`/project/${project.id}/board`)}
+            className="h-7 px-2.5 rounded-md text-[11px] font-medium flex items-center gap-1.5"
+            style={{ background: "hsl(var(--accent-gold-soft))", color: "hsl(var(--accent-gold))" }}
+            title="Board öffnen"
+          >
+            <ListChecks size={13} /> Board
+          </button>
+        </div>
+        <TaskCalendar
+          tasks={rows}
+          selectedDates={selectedDates}
+          onSelectDate={toggleDate}
+        />
+        <div className="mt-3 text-[11px] font-medium">
+          Tag auswählen und Aufgabe/Notiz erstellen
+          <span className="ml-1 font-normal text-muted-foreground">
+            (mehrere Tage mit Shift/Strg)
+          </span>
+        </div>
+        <div className="mt-1 text-[11px] text-muted-foreground">
+          Aufgaben und Notizen sind direkt mit dem Board verknüpft.
         </div>
       </div>
 
@@ -3062,9 +3062,13 @@ function AllTasksView({ projects }: { projects: Project[] }) {
   }, [projects, tick]);
 
   const [selectedDate, setSelectedDate] = useState<string | undefined>();
-  const visible = gTasks.filter(
-    (t) => t.kind === "task" && activeIds.has(t.projectId) && (!selectedDate || t.date === selectedDate)
-  );
+  // Ohne Tagesauswahl nur Aufgaben; mit Tagesauswahl alle Einträge des Tages
+  // (Termine und Notizen erscheinen dann oben).
+  const visible = selectedDate
+    ? gTasks
+        .filter((t) => activeIds.has(t.projectId) && t.date === selectedDate)
+        .sort((a, b) => (a.kind === "task" ? 1 : 0) - (b.kind === "task" ? 1 : 0))
+    : gTasks.filter((t) => t.kind === "task" && activeIds.has(t.projectId));
 
 
   return (
@@ -3119,7 +3123,13 @@ function AllTasksView({ projects }: { projects: Project[] }) {
                     />
                     <span className="w-2 h-2 rounded-full shrink-0" style={{ background: t.color }} />
                     <div className="flex-1 min-w-0">
-                      <div className={`text-sm truncate ${t.done ? "line-through text-muted-foreground" : ""}`}>{t.title}</div>
+                      <div className={`text-sm truncate flex items-center gap-2 ${t.done ? "line-through text-muted-foreground" : ""}`}>
+                        {t.title}
+                        <span className="text-[10px] px-1.5 py-0.5 rounded shrink-0"
+                              style={{ background: "hsl(var(--surface-muted))", color: "hsl(var(--ink-soft))" }}>
+                          {t.kind === "task" ? "Aufgabe" : t.kind === "event" ? "Termin" : "Notiz"}
+                        </span>
+                      </div>
                       <div className="text-[11px] text-muted-foreground truncate">
                         {t.projectName}{t.category ? ` · ${t.category}` : ""}{t.date ? ` · ${t.date}` : ""}{t.time ? ` · ${t.time}` : ""}
                       </div>
