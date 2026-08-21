@@ -268,6 +268,7 @@ export function rasterizeIntoLayer(app: any, input: RasterInput): boolean {
     try { app.clearSelection?.(); } catch { /* optional */ }
     try { app.requestRender?.(); } catch { /* optional */ }
     try { app.renderer?.render?.(); } catch { /* optional */ }
+    try { app.refreshLabelUI?.(); } catch { /* optional */ }
     try { app.commitHistorySnapshot?.(); } catch { /* optional */ }
     return true;
   } catch (e) {

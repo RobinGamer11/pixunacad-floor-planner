@@ -49,6 +49,8 @@ export interface RasterTileJSON {
 
 export interface RasterLayerJSON {
   labelId: string;
+  /** Anzahl eingebrannter Rasterstriche (nur für die Ebenen-Objektzählung). */
+  strokeCount?: number;
   pxPerM: number;
   tilePx: number;
   tiles: RasterTileJSON[];
@@ -81,6 +83,8 @@ export class RasterLayer {
   readonly pxPerM: number;
   readonly tilePx: number;
   private tiles = new Map<string, RasterTile>();
+  /** Anzahl der in diese Ebene eingebrannten Rasterstriche. */
+  strokeCount = 0;
 
   constructor(labelId: string, pxPerM = DEFAULT_RASTER_PX_PER_M, tilePx = RASTER_TILE_PX) {
     this.labelId = labelId;
@@ -125,19 +129,29 @@ export class RasterLayer {
     }
   }
 
-  /** Zeichnet ein vorgerendertes Canvas (Weltrechteck) in die Ebene ein. */
+  /**
+   * Zeichnet ein vorgerendertes Canvas (Weltrechteck) in die Ebene ein.
+   *
+   * Die Zielposition wird auf ganze Pixel gerundet und die Quellgröße 1:1
+   * übernommen. Andernfalls würde jede Kachel dasselbe Bild mit einem eigenen
+   * Sub-Pixel-Versatz neu abtasten — an den Kachelgrenzen entstünden dann
+   * sichtbare Raster-/Gitterlinien.
+   */
   blit(src: HTMLCanvasElement, x: number, y: number, w: number, h: number) {
-    this._forRect(x, y, w, h, true, (tile, ox, oy) => {
+    this.strokeCount += 1;
+    const gx = Math.round(x * this.pxPerM);
+    const gy = Math.round(y * this.pxPerM);
+    this._forRect(x, y, w, h, true, (tile) => {
       const ctx = tile.ctx;
       ctx.save();
       ctx.globalCompositeOperation = "source-over";
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = "high";
-      ctx.drawImage(src, (x - ox) * this.pxPerM, (y - oy) * this.pxPerM, w * this.pxPerM, h * this.pxPerM);
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(src, gx - tile.tx * this.tilePx, gy - tile.ty * this.tilePx, src.width, src.height);
       ctx.restore();
       tile.dataUrl = null;
     });
   }
+
 
   /**
    * Radiert einen Kreis aus dem Rasterinhalt.
@@ -184,8 +198,12 @@ export class RasterLayer {
     for (const tile of this.tiles.values()) {
       if (tile.loading) continue;
       const p = camera.worldToScreen(tile.tx * tw, tile.ty * tw);
-      // Minimaler Überstand, damit zwischen den Kacheln keine Haarlinien entstehen.
-      ctx.drawImage(tile.canvas, p.x, p.y, sizePx + 0.5, sizePx + 0.5);
+      // Kanten auf ganze Bildschirmpixel runden: benachbarte Kacheln stoßen so
+      // exakt aneinander, es entstehen weder Lücken noch Doppelkanten (Gitter).
+      const x0 = Math.round(p.x), y0 = Math.round(p.y);
+      const x1 = Math.round(p.x + sizePx), y1 = Math.round(p.y + sizePx);
+      ctx.drawImage(tile.canvas, x0, y0, Math.max(1, x1 - x0), Math.max(1, y1 - y0));
+
     }
     ctx.restore();
   }
@@ -236,7 +254,7 @@ export class RasterLayer {
       tiles.push({ tx: tile.tx, ty: tile.ty, src: tile.dataUrl });
     }
     if (tiles.length === 0) return null;
-    return { labelId: this.labelId, pxPerM: this.pxPerM, tilePx: this.tilePx, tiles };
+    return { labelId: this.labelId, pxPerM: this.pxPerM, tilePx: this.tilePx, tiles, strokeCount: this.strokeCount };
   }
 
   private _isTileEmpty(tile: RasterTile): boolean {
@@ -251,6 +269,7 @@ export class RasterLayer {
 
   /** Lädt Kacheln aus JSON (asynchron je Kachel; `onReady` triggert ein Re-Render). */
   restore(json: RasterLayerJSON, onReady?: () => void) {
+    this.strokeCount = Math.max(0, json.strokeCount ?? (json.tiles?.length ? 1 : 0));
     for (const t of json.tiles || []) {
       const tile = this._tile(t.tx, t.ty, true)!;
       tile.dataUrl = t.src;
