@@ -448,7 +448,7 @@ export class SelectTool {
     this.dragTextBoxSnap = null;
     if (this.rotateTextBoxId) {
       // ESC während des freien Drehens: Ausgangsrotation wiederherstellen.
-      const rb = this.app.scene.getTextBoxById(this.rotateTextBoxId);
+      const rb = (this.app.scene as any).getBoxById(this.rotateTextBoxId);
       if (rb) rb.rotationRad = this.rotateTextBoxOriginalRot;
       this.rotateTextBoxId = null;
     }
@@ -574,7 +574,7 @@ export class SelectTool {
   private _hitTextBoxRotateHandle(input: Input): TextBox | null {
     const sel = this.app.selection;
     if (!sel || (sel.type !== SelectionType.TEXTBOX && sel.type !== SelectionType.TEXTBOX_HANDLE)) return null;
-    const box = this.app.getSelectedTextBox();
+    const box = (this.app as any).getSelectedBox();
     if (!box || !this.app.labelManager.isVisible(box.labelId)) return null;
     const handleW = this._textBoxRotateHandleWorld(box);
     const handleS = this.app.camera.worldToScreen(handleW.x, handleW.y);
@@ -588,7 +588,7 @@ export class SelectTool {
   private _hitTextBoxCornerHandle(input: Input): { box: TextBox; handleIndex: number } | null {
     const sel = this.app.selection;
     if (!sel || (sel.type !== SelectionType.TEXTBOX && sel.type !== SelectionType.TEXTBOX_HANDLE)) return null;
-    const box = this.app.getSelectedTextBox();
+    const box = (this.app as any).getSelectedBox();
     if (!box || !this.app.labelManager.isVisible(box.labelId)) return null;
     const corners = boxCornersWorld(box);
     const mouseS = v(input.mouse.sx, input.mouse.sy);
@@ -912,7 +912,7 @@ export class SelectTool {
 
   /** Begin TextBox-Handle-Edit (move/translate/rotate/resize) for a clicked corner. */
   beginTextBoxHandleEdit(textBoxId: string, handleIndex: number, action: string) {
-    const box = this.app.scene.getTextBoxById(textBoxId);
+    const box = (this.app.scene as any).getBoxById(textBoxId);
     if (!box) return;
     if (action === PointEditAction.DELETE) return;
 
@@ -1655,7 +1655,7 @@ export class SelectTool {
       if (!loop) return;
       loop[this.editTarget.pointIndex] = v(newPoint.x, newPoint.y);
     } else if (this.editTarget.kind === "textboxHandle") {
-      const box = this.app.scene.getTextBoxById(this.editTarget.textBoxId);
+      const box = (this.app.scene as any).getBoxById(this.editTarget.textBoxId);
       if (!box || this.textBoxOppositeOriginal == null) return;
       const opp = this.textBoxOppositeOriginal;
       const w = this.textBoxWidthOriginal;
@@ -1822,7 +1822,7 @@ export class SelectTool {
         hatch.points[i] = v(orig.x + delta.x, orig.y + delta.y);
       }
     } else if (this.editTarget.kind === "textboxHandle") {
-      const box = this.app.scene.getTextBoxById(this.editTarget.textBoxId);
+      const box = (this.app.scene as any).getBoxById(this.editTarget.textBoxId);
       if (!box || !this.textBoxCenterOriginal) return;
       box.center = v(this.textBoxCenterOriginal.x + delta.x, this.textBoxCenterOriginal.y + delta.y);
     } else if (this.editTarget.kind === "areaLabelHandle") {
@@ -2018,7 +2018,7 @@ export class SelectTool {
   /** ESC-Abbruch: Textbox-Geometrie auf den Zustand bei Edit-Beginn zurücksetzen. */
   _restoreTextBoxEdit() {
     if (this.editTarget?.kind !== "textboxHandle") return;
-    const box = this.app.scene.getTextBoxById((this.editTarget as any).textBoxId);
+    const box = (this.app.scene as any).getBoxById((this.editTarget as any).textBoxId);
     if (!box || !this.textBoxCenterOriginal) return;
     box.center = v(this.textBoxCenterOriginal.x, this.textBoxCenterOriginal.y);
     box.rotationRad = this.textBoxRotationOriginal;
@@ -3167,7 +3167,7 @@ export class SelectTool {
     }
 
     if (this.dragTextBoxId) {
-      const box = this.app.scene.getTextBoxById(this.dragTextBoxId);
+      const box = (this.app.scene as any).getBoxById(this.dragTextBoxId);
       if (!box || !this.dragTextBoxGrabOffset) {
         this.dragTextBoxId = null;
         this.dragTextBoxGrabOffset = null;
@@ -3202,7 +3202,7 @@ export class SelectTool {
 
     // Active textbox rotate
     if (this.rotateTextBoxId) {
-      const box = this.app.scene.getTextBoxById(this.rotateTextBoxId);
+      const box = (this.app.scene as any).getBoxById(this.rotateTextBoxId);
       if (!box) {
         this.rotateTextBoxId = null;
         this._clearTransformGuides();
