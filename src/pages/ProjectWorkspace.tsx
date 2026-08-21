@@ -2936,6 +2936,8 @@ function PageCanvas({
           <ElementView
             key={el.id}
             el={el}
+            pageWmm={fmt.w}
+            pageHmm={fmt.h}
             onJumpCad={onJumpCad}
             toolActive={activeTool !== null && activeTool !== "cad"}
             selected={selectedElementIds.includes(el.id)}
