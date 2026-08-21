@@ -387,17 +387,20 @@ const NodeMenu: React.FC<{
 
 /* ------------------------------------------------ Favoriten-Vorlagen (links) */
 
-const FavoriteTemplates: React.FC<{
-  state: FinanceState;
-  onOpen: (nodeId: string) => void;
-}> = ({ state, onOpen }) => {
+/**
+ * Zeigt je Belegart genau zwei mögliche Einträge:
+ *  – die mitgelieferte Standard-Mustervorlage (immer vorhanden)
+ *  – die vom Nutzer als Favorit gespeicherte Vorlage (nur wenn gesetzt)
+ * Andere angelegte Belege erscheinen hier bewusst nicht.
+ */
+const FavoriteTemplates: React.FC<{ projectId: string }> = ({ projectId }) => {
   const [openType, setOpenType] = useState<FinancePositionType | null>(null);
-  const nodeName = (id: string) => state.nodes.find((n) => n.id === id)?.name ?? "Anlage";
+  const navigate = useNavigate();
 
-  const groups = (["offer", "invoice", "supplement"] as FinancePositionType[]).map((type) => ({
-    type,
-    items: state.positions.filter((p) => p.hasTemplate && p.type === type),
-  }));
+  const open = (type: FinancePositionType, variant: "default" | "favorite") => {
+    const key = templateKeyOf(type, variant === "favorite" ? "__favorite" : "__default");
+    navigate(`/project/${projectId}?tpl=${encodeURIComponent(key)}`);
+  };
 
   return (
     <div className="px-3 py-2 border-b space-y-1" style={{ borderColor: "hsl(var(--hairline))" }}>
@@ -405,31 +408,34 @@ const FavoriteTemplates: React.FC<{
            style={{ color: "hsl(var(--ink-soft))" }}>
         <Star size={11} /> Vorlagen
       </div>
-      {groups.map(({ type, items }) => {
-        const open = openType === type;
+      {(["offer", "invoice", "supplement"] as FinancePositionType[]).map((type) => {
+        const hasFav = !!getFavoriteTemplate(projectId, type)?.length;
+        const isOpen = openType === type;
         return (
           <div key={type}>
             <button
-              onClick={() => setOpenType(open ? null : type)}
+              onClick={() => setOpenType(isOpen ? null : type)}
               className="w-full h-7 px-2 rounded-md border flex items-center gap-1.5 text-[11px]"
               style={{ borderColor: "hsl(var(--hairline))" }}>
               <FileText size={11} style={{ color: "hsl(var(--accent-gold))" }} />
               <span className="flex-1 text-left truncate">{TEMPLATE_LABEL[type]}</span>
-              <span className="tabular-nums" style={{ color: "hsl(var(--ink-soft))" }}>{items.length}</span>
-              {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+              <span className="tabular-nums" style={{ color: "hsl(var(--ink-soft))" }}>{hasFav ? 2 : 1}</span>
+              {isOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
             </button>
-            {open && (
+            {isOpen && (
               <div className="mt-1 ml-2 space-y-0.5">
-                {items.length === 0 ? (
-                  <div className="text-[10px] px-2 py-1" style={{ color: "hsl(var(--ink-soft))" }}>
-                    Noch keine {TEMPLATE_LABEL[type]}-Vorlage angelegt.
-                  </div>
-                ) : items.map((p, i) => (
-                  <button key={p.id} onClick={() => onOpen(p.nodeId)}
-                    className="w-full text-left px-2 py-1 rounded-md text-[11px] hover:bg-muted truncate">
-                    {TEMPLATE_LABEL[type]} {String(i + 1).padStart(2, "0")} · {nodeName(p.nodeId)}
+                {hasFav && (
+                  <button onClick={() => open(type, "favorite")}
+                    className="w-full text-left px-2 py-1 rounded-md text-[11px] hover:bg-muted truncate flex items-center gap-1.5">
+                    <Star size={10} style={{ color: "hsl(var(--accent-gold))" }} />
+                    Favorit-Vorlage
                   </button>
-                ))}
+                )}
+                <button onClick={() => open(type, "default")}
+                  className="w-full text-left px-2 py-1 rounded-md text-[11px] hover:bg-muted truncate flex items-center gap-1.5">
+                  <FileText size={10} style={{ color: "hsl(var(--ink-soft))" }} />
+                  Standard-Mustervorlage
+                </button>
               </div>
             )}
           </div>
