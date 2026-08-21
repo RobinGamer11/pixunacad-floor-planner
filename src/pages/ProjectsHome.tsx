@@ -62,6 +62,7 @@ import {
   projectProgress,
   type TlKind,
 } from "@/lib/timelineStore";
+import { BoardMiniPreview } from "@/components/board/BoardMiniPreview";
 import { WeatherStrip } from "@/components/project/WeatherStrip";
 import { UebersichtView } from "@/components/project/UebersichtView";
 import { FileBrowser } from "@/components/project/FileBrowser";
@@ -2919,16 +2920,24 @@ function AllTasksView({ projects, onOpenProject }: { projects: Project[]; onOpen
 
   const [selectedDate, setSelectedDate] = useState<string | undefined>();
   const visible = gTasks.filter(
-    (t) => !t.done && activeIds.has(t.projectId) && (!selectedDate || t.date === selectedDate)
+    (t) => activeIds.has(t.projectId) && (!selectedDate || t.date === selectedDate)
   );
 
   return (
     <div className="px-10 py-7">
-      <ProjectCarousel projects={projects} onOpen={onOpenProject} />
+      <ProjectCarousel
+        projects={projects}
+        onOpen={(id) => {
+          setPreviewId(id);
+          window.requestAnimationFrame(() =>
+            document.getElementById(`projektstand-${id}`)?.scrollIntoView({ behavior: "smooth", block: "center" }),
+          );
+        }}
+      />
 
       <div className="flex items-center gap-3 mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">Alle Aufgaben</h1>
-        <span className="text-sm text-muted-foreground">projektübergreifend · offen</span>
+        <span className="text-sm text-muted-foreground">projektübergreifend</span>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
@@ -2948,17 +2957,37 @@ function AllTasksView({ projects, onOpenProject }: { projects: Project[]; onOpen
                 {visible.map((t) => (
                   <li
                     key={`${t.projectId}:${t.id}`}
-                    onClick={() => navigate(`/project/${t.projectId}/board`)}
-                    className="px-4 py-3 flex items-center gap-3 hover:bg-muted/40 cursor-pointer"
+                    className="px-4 py-3 flex items-center gap-3"
                   >
+                    <input
+                      type="checkbox"
+                      checked={t.done}
+                      title="Erledigt"
+                      onChange={() => {
+                        timelineStore.updateItem(t.projectId, t.id, {
+                          statusId: t.done ? "open" : "done",
+                          done: !t.done,
+                          statusManual: true,
+                        });
+                        timelineStore.markFresh(t.projectId, t.id);
+                      }}
+                      className="accent-foreground"
+                    />
                     <span className="w-2 h-2 rounded-full shrink-0" style={{ background: t.color }} />
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm truncate">{t.title}</div>
+                      <div className={`text-sm truncate ${t.done ? "line-through text-muted-foreground" : ""}`}>{t.title}</div>
                       <div className="text-[11px] text-muted-foreground truncate">
                         {t.projectName}{t.category ? ` · ${t.category}` : ""}{t.date ? ` · ${t.date}` : ""}{t.time ? ` · ${t.time}` : ""}
                       </div>
                     </div>
-                    {t.alert && (
+                    <button
+                      onClick={() => navigate(`/project/${t.projectId}/board?item=${t.id}`)}
+                      title="Im Board öffnen"
+                      className="text-muted-foreground hover:text-foreground shrink-0"
+                    >
+                      <ExternalLink size={14} />
+                    </button>
+                    {t.alert && !t.done && (
                       <span className="text-[10px] px-2 py-0.5 rounded-full"
                             style={{ background: "hsl(0 70% 50% / 0.15)", color: "hsl(0 70% 40%)" }}>
                         Überfällig
@@ -2975,7 +3004,7 @@ function AllTasksView({ projects, onOpenProject }: { projects: Project[]; onOpen
             <div className="text-xs font-semibold tracking-widest text-muted-foreground mb-3">PROJEKTSTÄNDE</div>
             <div className="space-y-2">
               {projects.map((p) => (
-                <div key={p.id}>
+                <div key={p.id} id={`projektstand-${p.id}`}>
                   <button
                     onClick={() => setPreviewId((cur) => (cur === p.id ? null : p.id))}
                     className="w-full flex items-center gap-4 rounded-lg px-3 py-2 hover:bg-muted/40 text-left"
