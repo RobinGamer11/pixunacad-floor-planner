@@ -555,9 +555,12 @@ const FilterResults: React.FC<{
               {isMinus ? "−" : ""}{formatEur(h.pos.amount)}
             </span>
             <button data-export-hide onClick={() => onOpen(h.nodeId)}
-              className="h-7 w-7 rounded flex items-center justify-center hover:bg-muted" title="Aktion öffnen">
-              <ArrowRight size={14} style={{ color: "hsl(var(--ink-soft))" }} />
+              className="h-7 w-7 rounded-md border-2 flex items-center justify-center"
+              style={{ borderColor: "hsl(var(--accent-gold))", background: "hsl(var(--accent-gold) / 0.14)" }}
+              title="Aktion öffnen (bearbeiten)">
+              <ArrowRight size={14} style={{ color: "hsl(var(--accent-gold))" }} />
             </button>
+
           </div>
         );
       })}
