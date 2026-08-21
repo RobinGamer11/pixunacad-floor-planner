@@ -285,6 +285,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const textLineHeightRangeRef = useRef<HTMLInputElement>(null);
   const textLineHeightNumRef = useRef<HTMLInputElement>(null);
   const textBgAlphaRangeRef = useRef<HTMLInputElement>(null);
+  const [textAlphaTarget, setTextAlphaTarget] = useState<"text" | "bg">("text");
   const textAlphaRef = useRef<HTMLInputElement>(null);
   const textAlphaRangeRef = useRef<HTMLInputElement>(null);
   const textFontSizePtRef = useRef<HTMLInputElement>(null);
