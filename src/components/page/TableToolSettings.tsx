@@ -32,6 +32,7 @@ export function TableToolSettings({
   setFormulaFn,
   onConfirm,
   onCancel,
+  onPatch,
 }: {
   projectId: string;
   pageId: string;
