@@ -872,6 +872,14 @@ export class Scene {
 
   getTableById(id: string): TableObject | null { return this._tableIdMap.get(id) || null; }
 
+  /**
+   * Box-Objekt (TextBox ODER Tabelle) per ID. Beide teilen sich die
+   * Auswahl-/HUB-/Snap-Infrastruktur der CAD-Oberfläche.
+   */
+  getBoxById(id: string): TextBox | TableObject | null {
+    return this.getTextBoxById(id) || this.getTableById(id);
+  }
+
   getTablesByLabelId(labelId: string): TableObject[] {
     return this.tables.filter((t) => t.labelId === labelId);
   }
