@@ -211,6 +211,24 @@ export default function FinancePage() {
               </button>
             </div>
 
+            {/* Anlegen-Buttons: groß und auffällig, direkt über der Suche */}
+            <div className="flex flex-col gap-2 px-3 py-3 border-b" style={{ borderColor: "hsl(var(--hairline))" }}>
+              <button onClick={() => addNode("overview")}
+                className="w-full h-11 rounded-lg border-2 text-sm font-semibold flex items-center justify-center gap-2 transition-colors"
+                style={{
+                  borderColor: "hsl(var(--accent-gold))",
+                  background: "hsl(var(--accent-gold) / 0.12)",
+                  color: "hsl(var(--accent-gold))",
+                }}>
+                <Plus size={18} /> Ordner
+              </button>
+              <button onClick={() => addNode("action")}
+                className="w-full h-11 rounded-lg text-sm font-semibold flex items-center justify-center gap-2"
+                style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}>
+                <Plus size={18} /> Anlegen
+              </button>
+            </div>
+
             {/* Filter: Text (Nummern, Namen, Notizen) + Typ-Chips (mehrfach wählbar) */}
             <div className="px-3 py-2 border-b space-y-1.5" style={{ borderColor: "hsl(var(--hairline))" }}>
               <div className="flex items-center gap-1.5 h-7 rounded-md border px-2"
@@ -244,18 +262,6 @@ export default function FinancePage() {
               </div>
             </div>
 
-            <div className="flex gap-1.5 px-3 py-2 border-b" style={{ borderColor: "hsl(var(--hairline))" }}>
-              <button onClick={() => addNode("overview")}
-                className="flex-1 h-7 rounded-md border text-[11px] font-medium flex items-center justify-center gap-1 hover:bg-muted"
-                style={{ borderColor: "hsl(var(--hairline))" }}>
-                <Plus size={12} /> Übersicht
-              </button>
-              <button onClick={() => addNode("action")}
-                className="flex-1 h-7 rounded-md border text-[11px] font-medium flex items-center justify-center gap-1 hover:bg-muted"
-                style={{ borderColor: "hsl(var(--hairline))" }}>
-                <Plus size={12} /> Aktion
-              </button>
-            </div>
 
             <div className="flex-1 overflow-auto py-1 px-1">
               <div onClick={() => setSelectedId(null)}
