@@ -51,7 +51,7 @@ const DoorNumField: React.FC<{
   return (
     <label className="min-w-0">
       <span className="mb-1 block text-[9px] leading-tight text-muted-foreground">{label}</span>
-      <span className="flex h-8 items-center overflow-hidden rounded-md border bg-white" style={{ borderColor: "hsl(var(--hairline))" }}>
+      <span className="flex h-8 items-center overflow-hidden rounded-md border" style={{ borderColor: "hsl(var(--hairline))", backgroundColor: "hsl(var(--card))" }}>
         <input
           type="text"
           inputMode="decimal"
