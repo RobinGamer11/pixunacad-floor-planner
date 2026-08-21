@@ -132,6 +132,7 @@ export function MappeHelpOverlay({
   textActive = false,
   measureActive = false,
   multiSelectActive = false,
+  tableActive = false,
 }: {
   guideActive?: boolean;
   lineActive?: boolean;
@@ -139,6 +140,7 @@ export function MappeHelpOverlay({
   textActive?: boolean;
   measureActive?: boolean;
   multiSelectActive?: boolean;
+  tableActive?: boolean;
 }) {
   // Die Hilfeleiste bricht ganze Abschnitte in neue Zeilen um, sobald rechts
   // nicht mehr genug Platz ist — sie wächst dadurch nach oben statt zu
@@ -281,6 +283,20 @@ export function MappeHelpOverlay({
                 <div className="whitespace-nowrap text-[10px] font-semibold leading-3">Freies Maß</div>
                 <div className="whitespace-nowrap text-[8px] leading-[11px] opacity-75">Keine Fangpunkte benötigt</div>
               </div>
+            </div>
+          </HelpGroup>
+        )}
+        {tableActive && (
+          <HelpGroup title="Tabelle" bordered>
+            <HelpItem icon={<MouseGlyph highlight="left" />} shortcut="Doppelklick" description="Zelle bearbeiten" />
+            <HelpItem icon={<MouseGlyph highlight="left" />} shortcut="L-Klick andere Zelle" description="Eingabe speichern" />
+            <div className="flex min-w-[210px] flex-col justify-end px-1.5 py-1 text-left">
+              <div className="whitespace-nowrap text-[10px] font-semibold leading-3.5">Formeln</div>
+              <div className="whitespace-nowrap text-[8px] leading-3 opacity-75">SUM: Summe im Bereich, z. B. =SUM(B2:B9)</div>
+              <div className="whitespace-nowrap text-[8px] leading-3 opacity-75">AVG: Mittelwert, z. B. =AVG(C2:C9)</div>
+              <div className="whitespace-nowrap text-[8px] leading-3 opacity-75">MIN / MAX: Kleinster / größter Wert</div>
+              <div className="whitespace-nowrap text-[8px] leading-3 opacity-75">COUNT: Anzahl der Zahlenwerte</div>
+              <div className="whitespace-nowrap text-[8px] leading-3 opacity-75">Ablauf: Zielzelle → Startzelle → Endzelle</div>
             </div>
           </HelpGroup>
         )}
