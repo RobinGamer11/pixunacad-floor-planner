@@ -635,7 +635,7 @@ export default function ProjectsHome() {
               </div>
             )}
 
-            <div className="flex-1 overflow-y-auto px-3 pt-2 pb-4 space-y-1">
+            <div className="flex-1 overflow-y-auto px-3 pt-3 pb-4 space-y-1">
               {/* Ordner */}
               {folders.map((f) => {
                 const inside = projectsByFolder.get(f.id) ?? [];
