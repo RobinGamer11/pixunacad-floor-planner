@@ -815,7 +815,9 @@ export default function BoardPage() {
           />
         )}
       </div>
+      {tabletAidOn && <TabletAidWheel />}
     </div>
+
   );
 }
 
