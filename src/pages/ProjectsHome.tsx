@@ -32,6 +32,8 @@ import {
   Home,
   LogOut,
   PlusCircle,
+  CalendarDays,
+  FileText,
 } from "lucide-react";
 
 
@@ -58,6 +60,7 @@ import {
   useTimeline,
   addQuickItem,
   itemAchieved,
+  itemStartMs,
   taskAlert,
   projectProgress,
   subscribeTimeline,
