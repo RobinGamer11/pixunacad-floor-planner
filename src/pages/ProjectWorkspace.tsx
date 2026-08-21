@@ -105,8 +105,9 @@ import CadOverlayLayer from "@/components/page/CadOverlayLayer";
 import { CadDocumentInspector } from "@/components/page/CadDocumentInspector";
 import { CadIdPanelHost } from "@/components/page/CadIdPanelHost";
 import { PdfPageView, setWorkspacePdfZoomActive } from "@/components/page/PdfPageView";
-import { TableElementView, TableModifyContext, TableFormulaPickContext, type FormulaFn } from "@/components/page/TableElementView";
+import { TableElementView, TableModifyContext, TableEditContext, TableFormulaPickContext, type FormulaFn, type TableSelection } from "@/components/page/TableElementView";
 import { TableToolSettings } from "@/components/page/TableToolSettings";
+import { createTableData } from "@/lib/table/tableModel";
 
 import { CadViewportView } from "@/components/page/CadViewportView";
 import { renderSceneRegionToCanvas } from "@/cad/SceneRegionRenderer";
@@ -286,6 +287,11 @@ export default function ProjectWorkspace() {
   const [pendingTableId, setPendingTableId] = useState<string | null>(null);
   const [tableModifyMode, setTableModifyMode] = useState(false);
   const [tableFormulaFn, setTableFormulaFn] = useState<FormulaFn | null>(null);
+  /** Tabellenmodus (Zellbearbeitung) — strikt getrennt vom Objektmodus. */
+  const [tableEditId, setTableEditId] = useState<string | null>(null);
+  const [tableSelection, setTableSelection] = useState<TableSelection | null>(null);
+  const [tableNewCols, setTableNewCols] = useState(3);
+  const [tableNewRows, setTableNewRows] = useState(4);
   const cadEngineApiRef = useRef<{
     setSelectedSegmentSnap: (opts: { midpointSnap?: boolean; divisionSnap?: number | null }) => void;
     duplicateSelectedSegments: (offsetMm?: number) => number;
@@ -1165,8 +1171,49 @@ export default function ProjectWorkspace() {
     );
   }
 
+  // Tabellenmodus endet, sobald ein anderes Objekt ausgewählt wird.
+  useEffect(() => {
+    if (tableEditId && selectedElementId !== tableEditId) {
+      setTableEditId(null);
+      setTableSelection(null);
+    }
+  }, [selectedElementId, tableEditId]);
+
+  /** Tabelle in Standardgröße (Papier-mm) mittig auf der aktiven Seite ablegen. */
+  function placeTableOnPage() {
+    if (!project || !activePage) return;
+    const fmt = getPageSizeMm(activePage);
+    const data = createTableData(tableNewCols, tableNewRows);
+    const wMm = (data.colWidthsMm ?? []).reduce((a, b) => a + b, 0);
+    const hMm = (data.rowHeightsMm ?? []).reduce((a, b) => a + b, 0);
+    const w = Math.max(4, Math.min(96, (wMm / fmt.wMm) * 100));
+    const h = Math.max(2, Math.min(96, (hMm / fmt.hMm) * 100));
+    const id = projectStore.addElement(project.id, activePage.id, {
+      kind: "table",
+      x: Math.max(0, (100 - w) / 2),
+      y: Math.max(0, (100 - h) / 2),
+      w,
+      h,
+      wMm,
+      hMm,
+      tableData: data as any,
+    } as any);
+    setPendingTableId(id);
+    setSelectedElementId(id);
+  }
+
   return (
     <TableModifyContext.Provider value={tableModifyMode}>
+    <TableEditContext.Provider value={{
+      editId: tableEditId,
+      setEditId: (id) => { setTableEditId(id); if (!id) setTableSelection(null); },
+      selection: tableSelection,
+      setSelection: setTableSelection,
+      newCols: tableNewCols,
+      newRows: tableNewRows,
+      setNewCols: setTableNewCols,
+      setNewRows: setTableNewRows,
+    }}>
     <TableFormulaPickContext.Provider value={{ fn: tableFormulaFn, setFn: setTableFormulaFn }}>
     <>
     <div
@@ -1437,6 +1484,19 @@ export default function ProjectWorkspace() {
           active={activeTool === "document"}
           showLabel
           onClick={() => setActiveToolAndTab(activeTool === "document" ? null : "document")}
+        />
+        <ToolRailButton
+          icon={<TableIcon size={18} />}
+          label="Tabelle"
+          active={activeTool === "table"}
+          showLabel
+          onClick={() => {
+            if (activeTool === "table") { setActiveToolAndTab(null); return; }
+            setTableEditId(null);
+            setTableSelection(null);
+            setActiveToolAndTab("table");
+            placeTableOnPage();
+          }}
         />
         <input
           ref={documentFileInputRef}
@@ -2197,6 +2257,7 @@ export default function ProjectWorkspace() {
     {tabletAidOn && <TabletAidWheel />}
     </>
     </TableFormulaPickContext.Provider>
+    </TableEditContext.Provider>
     </TableModifyContext.Provider>
   );
 }
@@ -2883,6 +2944,8 @@ function PageCanvas({
           <ElementView
             key={el.id}
             el={el}
+            pageWmm={fmt.w}
+            pageHmm={fmt.h}
             onJumpCad={onJumpCad}
             toolActive={activeTool !== null && activeTool !== "cad"}
             selected={selectedElementIds.includes(el.id)}
@@ -3538,6 +3601,8 @@ function ElementView({
   onCornerDrag,
   onTransform,
   onJumpCad,
+  pageWmm,
+  pageHmm,
 }: {
   el: PageElement;
   selected?: boolean;
@@ -3553,10 +3618,16 @@ function ElementView({
   onCornerDrag?: (corner: "tl" | "tr" | "bl" | "br", dx: number, dy: number, shift: boolean) => void;
   onTransform?: (patch: Partial<PageElement>) => void;
   onJumpCad?: (sheetId?: string) => void;
+  /** Papiermaße der Seite — für mm-genaue Tabellenobjekte. */
+  pageWmm?: number;
+  pageHmm?: number;
 }) {
 
   const dragRef = useRef<{ x: number; y: number } | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
+  // Tabellen: interner Tabellenmodus (Zellbearbeitung) — nur für diese Tabelle.
+  const tableCtx = React.useContext(TableEditContext);
+  const tableEditing = !readOnly && el.kind === "table" && tableCtx?.editId === el.id;
   const rotateRef = useRef<HTMLDivElement | null>(null);
   const rotateMovedRef = useRef(false);
   const modeStartClientRef = useRef<{ x: number; y: number } | null>(null);
@@ -3869,6 +3940,9 @@ function ElementView({
 
   const handlePointerDown = (e: React.PointerEvent) => {
     if (readOnly) return;
+    // Tabellenmodus dieser Tabelle aktiv → keine Objekt-Transformation.
+    // Objektbearbeitung und Zellbearbeitung sind nie gleichzeitig aktiv.
+    if (tableEditing) return;
     // Don't start a drag when the user clicks an interactive control inside the hub.
     const t = e.target as HTMLElement;
     if (t.closest("[data-hub-control]")) return;
@@ -4449,6 +4523,14 @@ function ElementView({
       data-marquee-id={el.id}
       data-element-kind={el.kind}
       onPointerDown={handlePointerDown}
+      onDoubleClick={(e) => {
+        // Doppelklick auf eine Tabelle wechselt vom Objekt- in den Tabellenmodus.
+        if (readOnly || el.kind !== "table" || tableEditing) return;
+        e.stopPropagation();
+        onSelect?.();
+        tableCtx?.setEditId(el.id);
+        tableCtx?.setSelection({ r1: 0, c1: 0, r2: 0, c2: 0 });
+      }}
       className="absolute"
       style={{
         left: `${el.x}%`,
@@ -4525,7 +4607,12 @@ function ElementView({
       {el.kind === "table" && (
         <TableElementView
           element={el}
+          readOnly={readOnly}
+          editing={!!tableEditing}
+          pageWmm={pageWmm}
+          pageHmm={pageHmm}
           onChange={(patch) => onTransform?.(patch)}
+          onExitEdit={() => tableCtx?.setEditId(null)}
         />
       )}
 
@@ -6030,8 +6117,8 @@ function ToolsTab({
           pageId={pageId}
           tableElement={element?.kind === "table" ? element : undefined}
           isPending={!!pendingTableId && element?.id === pendingTableId}
-          modifyMode={!!tableModifyMode}
-          setModifyMode={(v) => setTableModifyMode?.(v)}
+          pageWmm={settingsPage ? getPageSizeMm(settingsPage).wMm : undefined}
+          pageHmm={settingsPage ? getPageSizeMm(settingsPage).hMm : undefined}
           formulaFn={tableFormulaFn ?? null}
           setFormulaFn={(f) => setTableFormulaFn?.(f)}
           onConfirm={() => onConfirmTable?.()}
