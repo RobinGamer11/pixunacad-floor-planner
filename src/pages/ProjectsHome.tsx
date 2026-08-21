@@ -2055,19 +2055,19 @@ function TaskRow({ task, projectId }: { task: Task; projectId: string }) {
 
 function TaskCalendar({
   tasks,
-  selectedDate,
+  selectedDates,
   onSelectDate,
 }: {
   tasks: UnifiedTask[];
-  selectedDate?: string;
-  onSelectDate: (date: string | undefined) => void;
+  selectedDates: string[];
+  onSelectDate: (date: string, additive: boolean) => void;
 }) {
   const today = new Date();
   const [view, setView] = useState({ year: today.getFullYear(), month: today.getMonth() });
   const first = new Date(view.year, view.month, 1);
   const start = (first.getDay() + 6) % 7;
   const days = new Date(view.year, view.month + 1, 0).getDate();
-  const byDay = new Map<number, Task[]>();
+  const byDay = new Map<number, UnifiedTask[]>();
   tasks.forEach((t) => {
     if (!t.date) return;
     const d = new Date(t.date);
@@ -2090,6 +2090,14 @@ function TaskCalendar({
     setView({ year: y, month: ((m % 12) + 12) % 12 });
   };
 
+  /** Farbe je Eintragsart bzw. Dringlichkeit. */
+  const chipColor = (t: UnifiedTask) =>
+    t.done ? "hsl(var(--ink-soft))"
+      : t.alert ? "hsl(0 70% 52%)"
+      : t.kind === "note" ? "hsl(210 70% 52%)"
+      : t.kind === "event" ? "hsl(265 60% 58%)"
+      : "hsl(var(--accent-gold))";
+
   return (
     <div>
       <div className="flex items-center justify-between text-sm mb-2">
@@ -2110,47 +2118,47 @@ function TaskCalendar({
       </div>
       <div className="grid grid-cols-7 gap-1 mt-1 text-xs">
         {cells.map((c, i) => {
-          if (c === null) return <div key={i} className="h-9" />;
+          if (c === null) return <div key={i} className="h-16" />;
           const iso = fmt(c);
           const dayTasks = byDay.get(c) ?? [];
           const isToday =
             today.getFullYear() === view.year &&
             today.getMonth() === view.month &&
             today.getDate() === c;
-          const isSelected = iso === selectedDate;
-          const hasOpen = dayTasks.some((t) => !t.done);
-          const hasHigh = dayTasks.some((t) => !t.done && t.priority === "high");
+          const isSelected = selectedDates.includes(iso);
           return (
             <button
               key={i}
-              onClick={() => onSelectDate(isSelected ? undefined : iso)}
-              className="h-9 flex flex-col items-center justify-center rounded-md relative"
+              onClick={(e) => onSelectDate(iso, e.shiftKey || e.metaKey || e.ctrlKey)}
+              className="h-16 flex flex-col items-stretch rounded-md relative p-1 gap-0.5 text-left"
               style={{
                 background: isSelected
                   ? "hsl(var(--accent-gold) / 0.2)"
-                  : isToday
-                  ? "hsl(var(--ink))"
+                  : dayTasks.length
+                  ? "hsl(var(--surface-muted))"
                   : "transparent",
-                color: isToday && !isSelected ? "hsl(var(--surface))" : undefined,
                 border: isSelected
                   ? "1px solid hsl(var(--accent-gold))"
+                  : isToday
+                  ? "1px solid hsl(var(--ink))"
                   : "1px solid transparent",
                 fontWeight: isToday || isSelected ? 600 : undefined,
               }}
             >
-              <span>{c}</span>
-              {dayTasks.length > 0 && (
-                <span className="flex gap-0.5 absolute bottom-1">
-                  <span
-                    className="w-1 h-1 rounded-full"
-                    style={{
-                      background: hasHigh
-                        ? "hsl(0 70% 55%)"
-                        : hasOpen
-                        ? "hsl(var(--accent-gold))"
-                        : "hsl(var(--ink-soft))",
-                    }}
-                  />
+              <span className="leading-none">{c}</span>
+              {dayTasks.slice(0, 2).map((t) => (
+                <span
+                  key={t.id}
+                  title={t.title}
+                  className="rounded-[3px] px-1 text-[9px] leading-[13px] truncate"
+                  style={{ background: chipColor(t), color: "hsl(var(--surface))" }}
+                >
+                  {t.title || "Eintrag"}
+                </span>
+              ))}
+              {dayTasks.length > 2 && (
+                <span className="text-[9px] leading-none text-muted-foreground">
+                  +{dayTasks.length - 2}
                 </span>
               )}
             </button>
@@ -2158,6 +2166,7 @@ function TaskCalendar({
         })}
       </div>
     </div>
+
   );
 }
 
