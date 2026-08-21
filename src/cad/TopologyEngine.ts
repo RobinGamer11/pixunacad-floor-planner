@@ -309,8 +309,8 @@ export class TopologyEngine {
         }
       }
     }
-    // TextBox corners
-    for (const box of this.scene.textBoxes) {
+    // TextBox- und Tabellen-Ecken (identische Fangpunkt-Infrastruktur)
+    for (const box of [...this.scene.textBoxes, ...(((this.scene as any).tables as any[]) || [])] as any[]) {
       if (exclusions?.textBoxIds?.has(box.id)) continue;
       if (!this.labels.isVisible(box.labelId)) continue;
       const corners = boxCornersWorld(box);

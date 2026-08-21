@@ -712,6 +712,73 @@ export class Door {
 
 
 
+/**
+ * Natives CAD-Tabellenobjekt.
+ *
+ * Semantik und Layout kommen aus `src/lib/table` (gemeinsam mit der
+ * Projektmappe). Geometrisch ist die Tabelle ein rotiertes Rechteck wie eine
+ * TextBox — dadurch nutzt sie unverändert die bestehende Auswahl-, HUB-,
+ * Snap- und Ebenen-Infrastruktur.
+ */
+export class TableObject {
+  id: string;
+  center: Vec2;
+  rotationRad: number;
+  labelId: string;
+  /** Gemeinsames Tabellenmodell (Rohform wie in PageElement.tableData). */
+  data: any;
+  /** Umrechnung Papier-mm → Modell-Meter (Blattmaßstab, z. B. 1:100 → 0.1). */
+  mPerMm: number;
+  /** Zusätzlicher Skalierungsfaktor durch Objekt-Skalierung. */
+  scale: number;
+  _stickerEditOwnerId?: string | null;
+
+  constructor({ id, center, data, mPerMm, rotationRad, labelId, scale }: {
+    id: string; center: Vec2; data: any; mPerMm: number;
+    rotationRad?: number; labelId?: string; scale?: number;
+  }) {
+    this.id = id;
+    this.center = v(center.x, center.y);
+    this.data = data;
+    this.mPerMm = mPerMm > 0 ? mPerMm : 0.1;
+    this.rotationRad = rotationRad || 0;
+    this.scale = scale && scale > 0 ? scale : 1;
+    this.labelId = labelId || Defaults.defaultLabelId;
+    this._stickerEditOwnerId = null;
+  }
+
+  /** Breite in Metern (Summe der Spaltenbreiten × Maßstab × Skalierung). */
+  get widthM(): number {
+    const cols: number[] = this.data?.colWidthsMm ?? [];
+    return cols.reduce((a: number, b: number) => a + b, 0) * this.mPerMm * this.scale;
+  }
+  /** Höhe in Metern. */
+  get heightM(): number {
+    const rows: number[] = this.data?.rowHeightsMm ?? [];
+    return rows.reduce((a: number, b: number) => a + b, 0) * this.mPerMm * this.scale;
+  }
+
+  /**
+   * Skalieren über die bestehende Box-Infrastruktur: Setzen von Breite/Höhe
+   * verändert den Objektmaßstab (die Tabelle bleibt proportional, damit
+   * Zellenmaße in Papier-mm gültig bleiben).
+   */
+  set widthM(next: number) {
+    const base = this.widthM / this.scale;
+    if (base > 0 && next > 0) this.scale = next / base;
+  }
+  set heightM(next: number) {
+    const base = this.heightM / this.scale;
+    if (base > 0 && next > 0) this.scale = next / base;
+  }
+
+  /** Platzhalter-Style: die Box-Infrastruktur (Resize) schreibt hier hinein. */
+  style: any = { autoSize: false, wrap: true };
+
+  /** Reines Datenobjekt (Tabellenmodus schreibt hierüber zurück). */
+  setData(next: any) { this.data = next; }
+}
+
 export class Scene {
   segments: Segment[] = [];
   freeStrokes: FreeStroke[] = [];
@@ -719,6 +786,7 @@ export class Scene {
   hatches: Hatch[] = [];
   dimensions: Dimension[] = [];
   textBoxes: TextBox[] = [];
+  tables: TableObject[] = [];
   stickerInstances: StickerInstance[] = [];
   documents: DocumentObject[] = [];
   walls: Wall[] = [];
@@ -785,6 +853,63 @@ export class Scene {
   private _rebuildTextIdMap() {
     this._textIdMap.clear();
     for (const t of this.textBoxes) this._textIdMap.set(t.id, t);
+  }
+
+  private _tableIdMap = new Map<string, TableObject>();
+  _rebuildTableIdMap() {
+    this._tableIdMap.clear();
+    for (const t of this.tables) this._tableIdMap.set(t.id, t);
+  }
+
+  // ---- Tabellen ----
+  createTable(center: Vec2, data: any, mPerMm: number, opts: { rotationRad?: number; labelId?: string; scale?: number } = {}) {
+    const t = new TableObject({
+      id: this._makeId(), center, data, mPerMm,
+      rotationRad: opts.rotationRad, labelId: opts.labelId, scale: opts.scale,
+    });
+    t._stickerEditOwnerId = this._currentEditOwnerId;
+    this.tables.push(t);
+    this._rebuildTableIdMap();
+    return t;
+  }
+
+  getTableById(id: string): TableObject | null { return this._tableIdMap.get(id) || null; }
+
+  /**
+   * Box-Objekt (TextBox ODER Tabelle) per ID. Beide teilen sich die
+   * Auswahl-/HUB-/Snap-Infrastruktur der CAD-Oberfläche.
+   */
+  getBoxById(id: string): TextBox | TableObject | null {
+    return this.getTextBoxById(id) || this.getTableById(id);
+  }
+
+  getTablesByLabelId(labelId: string): TableObject[] {
+    return this.tables.filter((t) => t.labelId === labelId);
+  }
+
+  removeTable(t: TableObject) {
+    this.tables = this.tables.filter((x) => x !== t);
+    this._rebuildTableIdMap();
+  }
+
+  removeTablesByIds(ids: string[]) {
+    const set = new Set(ids);
+    this.tables = this.tables.filter((t) => !set.has(t.id));
+    this._rebuildTableIdMap();
+  }
+
+  removeTablesByLabelId(labelId: string) {
+    this.tables = this.tables.filter((t) => t.labelId !== labelId);
+    this._rebuildTableIdMap();
+  }
+
+  reassignTablesLabel(oldId: string, newId: string) {
+    for (const t of this.tables) if (t.labelId === oldId) t.labelId = newId;
+  }
+
+  assignTablesToLabel(ids: string[], newId: string) {
+    const set = new Set(ids);
+    for (const t of this.tables) if (set.has(t.id)) t.labelId = newId;
   }
 
   private _rebuildStickerIdMap() {

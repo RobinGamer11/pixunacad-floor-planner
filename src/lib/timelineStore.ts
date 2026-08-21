@@ -428,7 +428,8 @@ const SURFACE_KEY = (projectId: string) => `pixuna.board.surface.${projectId}`;
 export function getBoardSurface(projectId: string | undefined): BoardSurface {
   if (!projectId) return "ray";
   try {
-    return localStorage.getItem(SURFACE_KEY(projectId)) === "net" ? "net" : "ray";
+    const v = localStorage.getItem(SURFACE_KEY(projectId));
+    return v === "net" || v === "cal" || v === "ray" ? v : "ray";
   } catch {
     return "ray";
   }

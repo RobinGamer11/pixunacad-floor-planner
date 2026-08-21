@@ -695,6 +695,16 @@ export class CadApp {
         _stickerEditOwnerId: d._stickerEditOwnerId || null,
       })),
 
+      tables: (scene as any).tables.map((t: any) => ({
+        id: t.id,
+        center: { x: t.center.x, y: t.center.y },
+        rotationRad: t.rotationRad,
+        mPerMm: t.mPerMm,
+        scale: t.scale,
+        data: t.data,
+        labelId: t.labelId,
+        _stickerEditOwnerId: t._stickerEditOwnerId || null,
+      })),
       textBoxes: scene.textBoxes.map(t => ({
         id: t.id,
         center: { x: t.center.x, y: t.center.y },
@@ -781,6 +791,7 @@ export class CadApp {
     scene.hatches = [];
     scene.dimensions = [];
     scene.textBoxes = [];
+    (scene as any).tables = [];
     scene.stickerInstances = [];
     scene.documents = [];
     scene.freeStrokes = [];
@@ -792,6 +803,7 @@ export class CadApp {
     (scene as any)._rebuildHatchIdMap?.();
     (scene as any)._rebuildDimIdMap?.();
     (scene as any)._rebuildTextIdMap?.();
+    (scene as any)._rebuildTableIdMap?.();
     (scene as any)._rebuildStickerIdMap?.();
     (scene as any)._rebuildDocIdMap?.();
     (scene as any)._rebuildFreeIdMap?.();
@@ -867,6 +879,13 @@ export class CadApp {
     for (const t of data.textBoxes || []) {
       const box = scene.createTextBox(t.center, t.widthM, t.heightM, { ...(t.style || {}), labelId: t.labelId }, t.html || "", t.rotationRad || 0);
       if (t._stickerEditOwnerId) box._stickerEditOwnerId = t._stickerEditOwnerId;
+    }
+    for (const t of data.tables || []) {
+      const tbl = (scene as any).createTable(t.center, t.data, t.mPerMm ?? 0.1, {
+        rotationRad: t.rotationRad || 0, labelId: t.labelId, scale: t.scale || 1,
+      });
+      if (t.id) { tbl.id = t.id; (scene as any)._rebuildTableIdMap?.(); }
+      if (t._stickerEditOwnerId) tbl._stickerEditOwnerId = t._stickerEditOwnerId;
     }
     if (Array.isArray(data.stickerInstances)) {
       for (const si of data.stickerInstances) {
@@ -1235,6 +1254,42 @@ export class CadApp {
     const id = (this.selection as any).textBoxId;
     if (!id) return null;
     return this.scene.getTextBoxById(id);
+  }
+
+  /** Aktuell gewähltes Tabellenobjekt (nutzt die TextBox-Auswahlart). */
+  getSelectedTable(): any {
+    if (!this.selection) return null;
+    if (this.selection.type !== SelectionType.TEXTBOX && this.selection.type !== SelectionType.TEXTBOX_HANDLE) return null;
+    const id = (this.selection as any).textBoxId;
+    return id ? (this.scene as any).getTableById(id) : null;
+  }
+
+  /** TextBox ODER Tabelle — gemeinsame Box-Infrastruktur (Auswahl/HUB/Snap). */
+  getSelectedBox(): any {
+    if (!this.selection) return null;
+    if (this.selection.type !== SelectionType.TEXTBOX && this.selection.type !== SelectionType.TEXTBOX_HANDLE) return null;
+    const id = (this.selection as any).textBoxId;
+    return id ? (this.scene as any).getBoxById(id) : null;
+  }
+
+  /** ID der Tabelle im internen Zellmodus (null = normaler CAD-Objektmodus). */
+  tableEditId: string | null = null;
+  private _tableEditListeners = new Set<(id: string | null) => void>();
+  onTableEditChange(fn: (id: string | null) => void) {
+    this._tableEditListeners.add(fn);
+    return () => { this._tableEditListeners.delete(fn); };
+  }
+  beginTableEdit(id: string) {
+    if (!(this.scene as any).getTableById(id)) return;
+    this.tableEditId = id;
+    this._tableEditListeners.forEach((l) => l(id));
+    try { this.renderer?.render(); } catch { /* noop */ }
+  }
+  endTableEdit() {
+    if (!this.tableEditId) return;
+    this.tableEditId = null;
+    this._tableEditListeners.forEach((l) => l(null));
+    try { this.renderer?.render(); } catch { /* noop */ }
   }
 
   getSelectedStickerInstance() {
@@ -1817,6 +1872,8 @@ export class CadApp {
 
     r.idSelect.addEventListener("change", () => {
       const nextId = r.idSelect.value || Defaults.defaultLabelId;
+      const selTable = this.getSelectedTable();
+      if (selTable) { selTable.labelId = nextId; this.refreshLabelUI(); return; }
       const sel = this.getEditTextBox();
       if (sel) { sel.labelId = nextId; this.refreshLabelUI(); return; }
       if (this.selectedLabelId) {
@@ -2575,6 +2632,13 @@ export class CadApp {
           return;
         }
         if (this.selection && (this.selection.type === SelectionType.TEXTBOX || this.selection.type === SelectionType.TEXTBOX_HANDLE)) {
+          const tbl = this.getSelectedTable();
+          if (tbl) {
+            (this.scene as any).removeTable(tbl);
+            this.endTableEdit();
+            this.clearSelection(); this.refreshLabelUI();
+            return;
+          }
           const box = this.getEditTextBox();
           if (box) { this.scene.removeTextBox(box); this.clearSelection(); this.refreshLabelUI(); }
           return;
@@ -2603,6 +2667,7 @@ export class CadApp {
           this.scene.removeHatchesByLabelId(this.selectedLabelId);
           this.scene.removeDimensionsByLabelId(this.selectedLabelId);
           this.scene.removeTextBoxesByLabelId(this.selectedLabelId);
+          (this.scene as any).removeTablesByLabelId?.(this.selectedLabelId);
           this.scene.removeDocumentsByLabelId(this.selectedLabelId);
           this.setSelectedLabelId(null);
           this.refreshLabelUI();

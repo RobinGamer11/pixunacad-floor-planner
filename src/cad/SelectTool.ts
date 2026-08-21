@@ -339,7 +339,7 @@ export class SelectTool {
     for (const { kind, id } of this.marqueeSelectedIds) {
       if (kind === "segment") segmentIds.add(id);
       else if (kind === "hatch") hatchIds.add(id);
-      else if (kind === "textbox" || kind === "textBox") textBoxIds.add(id);
+      else if (kind === "textbox" || kind === "textBox" || kind === "table") textBoxIds.add(id);
       else if (kind === "dimension") dimensionIds.add(id);
       else if (kind === "document") documentIds.add(id);
       else if (kind === "freeStroke") freeStrokeIds.add(id);
@@ -448,7 +448,7 @@ export class SelectTool {
     this.dragTextBoxSnap = null;
     if (this.rotateTextBoxId) {
       // ESC während des freien Drehens: Ausgangsrotation wiederherstellen.
-      const rb = this.app.scene.getTextBoxById(this.rotateTextBoxId);
+      const rb = (this.app.scene as any).getBoxById(this.rotateTextBoxId);
       if (rb) rb.rotationRad = this.rotateTextBoxOriginalRot;
       this.rotateTextBoxId = null;
     }
@@ -571,10 +571,10 @@ export class SelectTool {
   }
 
   /** Hit-Test gegen Rotate-Handle der aktuell selektierten TextBox. */
-  private _hitTextBoxRotateHandle(input: Input): TextBox | null {
+  private _hitTextBoxRotateHandle(input: Input): any {
     const sel = this.app.selection;
     if (!sel || (sel.type !== SelectionType.TEXTBOX && sel.type !== SelectionType.TEXTBOX_HANDLE)) return null;
-    const box = this.app.getSelectedTextBox();
+    const box = (this.app as any).getSelectedBox();
     if (!box || !this.app.labelManager.isVisible(box.labelId)) return null;
     const handleW = this._textBoxRotateHandleWorld(box);
     const handleS = this.app.camera.worldToScreen(handleW.x, handleW.y);
@@ -585,14 +585,14 @@ export class SelectTool {
   }
 
   /** Hit-Test gegen die 4 Eck-Handles der aktuell selektierten TextBox. */
-  private _hitTextBoxCornerHandle(input: Input): { box: TextBox; handleIndex: number } | null {
+  private _hitTextBoxCornerHandle(input: Input): { box: any; handleIndex: number } | null {
     const sel = this.app.selection;
     if (!sel || (sel.type !== SelectionType.TEXTBOX && sel.type !== SelectionType.TEXTBOX_HANDLE)) return null;
-    const box = this.app.getSelectedTextBox();
+    const box = (this.app as any).getSelectedBox();
     if (!box || !this.app.labelManager.isVisible(box.labelId)) return null;
     const corners = boxCornersWorld(box);
     const mouseS = v(input.mouse.sx, input.mouse.sy);
-    let best: { box: TextBox; handleIndex: number } | null = null;
+    let best: { box: any; handleIndex: number } | null = null;
     let bestPx = Infinity;
     for (let i = 0; i < corners.length; i++) {
       const sp = this.app.camera.worldToScreen(corners[i].x, corners[i].y);
@@ -674,10 +674,16 @@ export class SelectTool {
   }
 
 
-  private _hitTextBox(input: Input): TextBox | null {
+  private _hitTextBox(input: Input): any {
     const mouseW = v(input.mouse.wx, input.mouse.wy);
-    for (let i = this.app.scene.textBoxes.length - 1; i >= 0; i--) {
-      const box = this.app.scene.textBoxes[i];
+    // Tabellen sind (wie TextBoxen) orientierte Rechtecke und nutzen exakt
+    // dieselbe Auswahl-/HUB-Logik — deshalb hier gemeinsam getestet.
+    const boxes: any[] = [
+      ...(this.app.scene.textBoxes as any[]),
+      ...(((this.app.scene as any).tables as any[]) || []),
+    ];
+    for (let i = boxes.length - 1; i >= 0; i--) {
+      const box = boxes[i];
       if (!this.app.labelManager.isVisible(box.labelId)) continue;
       if (pointInOrientedBox(mouseW, box)) return box;
     }
@@ -912,7 +918,7 @@ export class SelectTool {
 
   /** Begin TextBox-Handle-Edit (move/translate/rotate/resize) for a clicked corner. */
   beginTextBoxHandleEdit(textBoxId: string, handleIndex: number, action: string) {
-    const box = this.app.scene.getTextBoxById(textBoxId);
+    const box = (this.app.scene as any).getBoxById(textBoxId);
     if (!box) return;
     if (action === PointEditAction.DELETE) return;
 
@@ -1655,7 +1661,7 @@ export class SelectTool {
       if (!loop) return;
       loop[this.editTarget.pointIndex] = v(newPoint.x, newPoint.y);
     } else if (this.editTarget.kind === "textboxHandle") {
-      const box = this.app.scene.getTextBoxById(this.editTarget.textBoxId);
+      const box = (this.app.scene as any).getBoxById(this.editTarget.textBoxId);
       if (!box || this.textBoxOppositeOriginal == null) return;
       const opp = this.textBoxOppositeOriginal;
       const w = this.textBoxWidthOriginal;
@@ -1822,7 +1828,7 @@ export class SelectTool {
         hatch.points[i] = v(orig.x + delta.x, orig.y + delta.y);
       }
     } else if (this.editTarget.kind === "textboxHandle") {
-      const box = this.app.scene.getTextBoxById(this.editTarget.textBoxId);
+      const box = (this.app.scene as any).getBoxById(this.editTarget.textBoxId);
       if (!box || !this.textBoxCenterOriginal) return;
       box.center = v(this.textBoxCenterOriginal.x + delta.x, this.textBoxCenterOriginal.y + delta.y);
     } else if (this.editTarget.kind === "areaLabelHandle") {
@@ -2018,7 +2024,7 @@ export class SelectTool {
   /** ESC-Abbruch: Textbox-Geometrie auf den Zustand bei Edit-Beginn zurücksetzen. */
   _restoreTextBoxEdit() {
     if (this.editTarget?.kind !== "textboxHandle") return;
-    const box = this.app.scene.getTextBoxById((this.editTarget as any).textBoxId);
+    const box = (this.app.scene as any).getBoxById((this.editTarget as any).textBoxId);
     if (!box || !this.textBoxCenterOriginal) return;
     box.center = v(this.textBoxCenterOriginal.x, this.textBoxCenterOriginal.y);
     box.rotationRad = this.textBoxRotationOriginal;
@@ -3167,7 +3173,7 @@ export class SelectTool {
     }
 
     if (this.dragTextBoxId) {
-      const box = this.app.scene.getTextBoxById(this.dragTextBoxId);
+      const box = (this.app.scene as any).getBoxById(this.dragTextBoxId);
       if (!box || !this.dragTextBoxGrabOffset) {
         this.dragTextBoxId = null;
         this.dragTextBoxGrabOffset = null;
@@ -3202,7 +3208,7 @@ export class SelectTool {
 
     // Active textbox rotate
     if (this.rotateTextBoxId) {
-      const box = this.app.scene.getTextBoxById(this.rotateTextBoxId);
+      const box = (this.app.scene as any).getBoxById(this.rotateTextBoxId);
       if (!box) {
         this.rotateTextBoxId = null;
         this._clearTransformGuides();
@@ -3477,7 +3483,8 @@ export class SelectTool {
       const box = this._hitTextBox(input);
       if (box) {
         this.app.setSelection({ type: SelectionType.TEXTBOX, textBoxId: box.id, handleIndex: null });
-        this.app.beginTextEdit(box);
+        if ((this.app.scene as any).getTableById?.(box.id)) (this.app as any).beginTableEdit?.(box.id);
+        else this.app.beginTextEdit(box);
         return;
       }
     }
@@ -4376,6 +4383,7 @@ export class SelectTool {
           return [obj.p1, obj.p2, g.d1, g.d2];
         }
         case "textbox":  return boxCornersWorld(obj);
+        case "table":    return boxCornersWorld(obj);
         case "document": return documentCornersWorld(obj);
         case "sticker":  return instanceBoundingCornersWorld(obj.items, obj.position, obj.rotationRad, obj.scale);
         default: return [];
@@ -4410,6 +4418,7 @@ export class SelectTool {
     for (const o of s.freeStrokes || [])      yield { kind: "freeStroke", id: o.id, obj: o };
     for (const o of s.dimensions || [])       yield { kind: "dimension",  id: o.id, obj: o };
     for (const o of s.textBoxes || [])        yield { kind: "textbox",    id: o.id, obj: o };
+    for (const o of s.tables || [])           yield { kind: "table",      id: o.id, obj: o };
     for (const o of s.documents || [])        yield { kind: "document",   id: o.id, obj: o };
     for (const o of s.stickerInstances || []) yield { kind: "sticker",    id: o.id, obj: o };
   }
@@ -4486,6 +4495,7 @@ export class SelectTool {
           case "freeStroke": { const o = scene.getFreeStrokeById(id);      if (o) scene.removeFreeStroke(o); break; }
           case "dimension":  { const o = scene.getDimensionById(id);       if (o) scene.removeDimension(o); break; }
           case "textbox":    { const o = scene.getTextBoxById(id);         if (o) scene.removeTextBox(o); break; }
+          case "table":      { const o = (scene as any).getTableById(id);   if (o) (scene as any).removeTable(o); break; }
           case "document":   { const o = scene.getDocumentById(id);        if (o) scene.removeDocument(o); break; }
           case "sticker":    { const o = scene.getStickerInstanceById(id); if (o) scene.removeStickerInstance(o); break; }
         }
@@ -4820,6 +4830,7 @@ export class SelectTool {
       case "freeStroke": return s.getFreeStrokeById?.(id);
       case "dimension":  return s.getDimensionById?.(id);
       case "textbox":    return s.getTextBoxById?.(id);
+      case "table":      return s.getTableById?.(id);
       case "document":   return s.getDocumentById?.(id);
       case "sticker":    return s.getStickerInstanceById?.(id);
       default: return null;

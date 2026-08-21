@@ -11,7 +11,6 @@ import { projectStore } from "@/lib/projectStore";
 import { CadTableLayer } from "@/components/cad/CadTableLayer";
 import { TableEditContext, TableFormulaPickContext, type FormulaFn, type TableSelection } from "@/components/page/TableElementView";
 import { TableToolSettings } from "@/components/page/TableToolSettings";
-import { cadTableStore } from "@/lib/cadTableStore";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -393,8 +392,11 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const [tableNewRows, setTableNewRows] = useState(4);
   const [tableFormulaFn, setTableFormulaFn] = useState<FormulaFn | null>(null);
   const tableSheetId = (appRef.current as any)?.activeSheetId || "default";
-  const tableElement = tableSelectedId
-    ? cadTableStore.list(projectId ?? "default", tableSheetId).find((t) => t.id === tableSelectedId)
+  const tableSceneObj = tableSelectedId
+    ? (appRef.current as any)?.scene?.getTableById?.(tableSelectedId)
+    : null;
+  const tableElement = tableSceneObj
+    ? ({ id: tableSceneObj.id, kind: "table", tableData: tableSceneObj.data } as any)
     : undefined;
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(true);
   const [rightOpen, setRightOpen] = useState<boolean>(true);
@@ -3365,11 +3367,16 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 formulaFn={tableFormulaFn}
                 setFormulaFn={setTableFormulaFn}
                 onPatch={(patch) => {
-                  if (tableSelectedId) cadTableStore.patch(projectId ?? "default", tableSheetId, tableSelectedId, patch as any);
+                  const t = (appRef.current as any)?.scene?.getTableById?.(tableSelectedId ?? "");
+                  if (!t) return;
+                  if ((patch as any)?.tableData) t.setData((patch as any).tableData);
+                  (appRef.current as any)?.renderer?.render?.();
                 }}
                 onConfirm={() => { setTableTool(false); setTableEditId(null); }}
                 onCancel={() => {
-                  if (tableSelectedId) cadTableStore.remove(projectId ?? "default", tableSheetId, tableSelectedId);
+                  const app = appRef.current as any;
+                  const t = app?.scene?.getTableById?.(tableSelectedId ?? "");
+                  if (t) { app.scene.removeTable(t); app.renderer?.render?.(); }
                   setTableSelectedId(null);
                   setTableEditId(null);
                   setTableTool(false);
