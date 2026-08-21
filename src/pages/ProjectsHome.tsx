@@ -67,7 +67,6 @@ import {
   QUICK_CATEGORY_ID,
   type TlKind,
 } from "@/lib/timelineStore";
-import { BoardMiniPreview } from "@/components/board/BoardMiniPreview";
 import { WeatherStrip } from "@/components/project/WeatherStrip";
 import { UebersichtView } from "@/components/project/UebersichtView";
 import { FileBrowser } from "@/components/project/FileBrowser";
