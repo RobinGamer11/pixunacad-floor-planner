@@ -334,11 +334,12 @@
   .cad-settings-panel input[type="text"],
   .cad-settings-panel input[type="number"] {
     @apply text-[11px] px-2 py-1 rounded border w-full min-w-0;
-    background: #ffffff;
+    background: hsl(var(--cad-settings-bg));
     border-color: hsl(var(--cad-hub-border));
     color: hsl(var(--cad-toolbar-foreground));
     font-family: 'JetBrains Mono', monospace;
   }
+
 
   /* Eingabefelder, die bereits in einem gerahmten Feld (mit Einheit) sitzen –
      Look 1:1 wie in der Projektmappe: kein doppelter Rahmen, kein eigener HG. */
@@ -368,12 +369,18 @@
 
   .cad-settings-select {
     @apply text-[11px] px-2 py-1 rounded border w-full min-w-0;
-    background: #ffffff;
+    background: hsl(var(--cad-settings-bg));
     border-color: hsl(var(--cad-hub-border));
     color: hsl(var(--cad-toolbar-foreground));
     appearance: none;
     -webkit-appearance: none;
   }
+
+  .cad-settings-select option {
+    background: hsl(var(--cad-settings-bg));
+    color: hsl(var(--cad-toolbar-foreground));
+  }
+
 
 
   /* Icon-only Buttons (quadratisch, ohne Text): Symbol exakt mittig.
@@ -420,13 +427,14 @@
     letter-spacing: 0.04em;
   }
 
-  /* ---- ID Panel (sits over white canvas → keep light theme) ---- */
+  /* ---- ID Panel (Seiten-ID, Druckpläne, Ebenen) – folgt dem Theme ---- */
   .cad-id-panel {
     max-height: calc(100% - 20px);
     overflow: hidden;
     border-radius: 12px;
-    background: hsl(0 0% 100% / 0.92);
-    border: 1px solid hsl(220 16% 86%);
+    background: hsl(var(--card) / 0.92);
+    border: 1px solid hsl(var(--hairline));
+
     backdrop-filter: blur(8px);
     box-shadow: 0 12px 32px -12px hsl(222 40% 20% / 0.18), 0 2px 6px -2px hsl(222 40% 20% / 0.08);
     transition: width 0.15s ease;

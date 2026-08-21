@@ -1748,24 +1748,32 @@ export function AufgabenView({ project }: { project: Project }) {
 
   return (
     <div className="mt-6 space-y-5">
-      {/* Neuer Eintrag */}
+      {/* Neue Aufgabe oder Notiz erstellen */}
       <div
         className="rounded-2xl p-5"
         style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
       >
         <button
+          type="button"
           onClick={() => setEntryOpen((v) => !v)}
-          className="w-full flex items-center justify-between"
+          aria-expanded={entryOpen}
+          className="w-full h-11 px-4 rounded-xl border-2 flex items-center justify-between text-sm font-semibold transition-colors"
+          style={{
+            background: entryOpen ? "hsl(var(--accent-gold-soft))" : "transparent",
+            borderColor: "hsl(var(--accent-gold))",
+            color: "hsl(var(--accent-gold))",
+          }}
         >
-          <span className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">
-            NEUER EINTRAG (im Board)
+          <span className="flex items-center gap-2">
+            <Plus size={16} /> Neue Aufgabe oder Notiz erstellen
           </span>
           <ChevronDown
             size={16}
-            className="text-muted-foreground transition-transform"
+            className="transition-transform"
             style={{ transform: entryOpen ? "rotate(180deg)" : undefined }}
           />
         </button>
+
         <div className="flex-col gap-3" style={{ display: entryOpen ? "flex" : "none", marginTop: entryOpen ? 12 : 0 }}>
           <div className="flex items-center gap-2">
             {(["task", "note"] as TlKind[]).map((k) => (

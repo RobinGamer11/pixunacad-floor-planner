@@ -25,7 +25,7 @@ const SliderRow: React.FC<{
           className="pixuna-range h-4 min-w-0 flex-1 cursor-pointer"
         />
         <span
-          className="flex h-7 w-16 shrink-0 items-center overflow-hidden rounded border bg-white"
+          className="flex h-7 w-16 shrink-0 items-center overflow-hidden rounded border bg-card"
           style={{ borderColor: "hsl(var(--hairline, var(--border)))" }}
         >
           <input
