@@ -1725,7 +1725,8 @@ export function AufgabenView({ project }: { project: Project }) {
       date: d,
       categoryId: catId,
       priorityId: prioId,
-    });
+    }));
+
     setDraft({ title: "", description: "" });
   };
 
