@@ -81,6 +81,7 @@ import {
   Frame as FrameIcon,
   Scan as ScanIcon,
   Layers,
+  Star,
 } from "lucide-react";
 
 import {
