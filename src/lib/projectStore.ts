@@ -180,6 +180,12 @@ export interface ProjectPage {
   /** Freie Papiergröße (nur bei format === "frei"). Werte in mm. */
   customWidthMm?: number;
   customHeightMm?: number;
+  /**
+   * Vorlagen-Seite der Finanzen-Oberfläche (z. B. "offer:f-abc123").
+   * Solche Seiten sind in der normalen Projektmappe unsichtbar und werden nur
+   * im Vorlagen-Modus (Angebot/Rechnung/Nachtrag anlegen) angezeigt.
+   */
+  templateKey?: string;
 }
 
 
@@ -1048,6 +1054,49 @@ export const projectStore = {
       }),
     }));
     return newId;
+  },
+  /**
+   * Stellt sicher, dass für einen Vorlagen-Schlüssel (Finanzen: Angebot /
+   * Rechnung / Nachtrag) mindestens eine Seite existiert. Vorlagen-Seiten
+   * gehören zu keiner Mappe und sind im normalen Mappen-Modus unsichtbar.
+   * `favorite` ist ein optionaler Satz Vorlagen-Seiten, der geklont wird.
+   */
+  ensureTemplatePages: (
+    projectId: string,
+    templateKey: string,
+    title: string,
+    favorite?: ProjectPage[],
+  ) => {
+    let ids: string[] = [];
+    setState((s) => ({
+      projects: s.projects.map((p) => {
+        if (p.id !== projectId) return p;
+        const existing = p.pages.filter((pg) => pg.templateKey === templateKey);
+        if (existing.length) { ids = existing.map((pg) => pg.id); return p; }
+        const stamp = Date.now().toString(36);
+        const source: ProjectPage[] = favorite?.length
+          ? favorite
+          : [{ id: "", title, format: "A4-hoch", margins: 20, background: false, elements: [] }];
+        const created = source.map((pg, i) => {
+          const id = `${projectId}-tpl${stamp}${i}`;
+          const clone = JSON.parse(JSON.stringify(pg)) as ProjectPage;
+          return {
+            ...clone,
+            id,
+            title: i === 0 ? title : `${title} ${i + 1}`,
+            templateKey,
+            spreadId: undefined,
+            elements: (clone.elements ?? []).map((el: any, k: number) => ({
+              ...el,
+              id: `${id}-e${k}`,
+            })),
+          } as ProjectPage;
+        });
+        ids = created.map((pg) => pg.id);
+        return { ...p, updatedAt: new Date().toISOString(), pages: [...p.pages, ...created] };
+      }),
+    }));
+    return ids;
   },
   updatePage: (projectId: string, pageId: string, patch: Partial<ProjectPage>) => {
     setState((s) => ({

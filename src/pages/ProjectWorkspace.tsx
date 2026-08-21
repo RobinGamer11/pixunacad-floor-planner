@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { DragScrollDiv } from "@/components/DragScrollDiv";
 import { ToolHelpNotes } from "@/components/cad/ToolHelpNotes";
 import { PipetteSettingsPanel } from "@/components/cad/PipetteSettingsPanel";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   ChevronLeft,
   ChevronRight,
@@ -93,7 +93,11 @@ import {
   type PageFormat,
   type PunchPattern,
   type PunchSide,
+  type ProjectPage,
 } from "@/lib/projectStore";
+import {
+  TEMPLATE_LABEL, parseTemplateKey, getFavoriteTemplate, setFavoriteTemplate,
+} from "@/lib/financeStore";
 import { EMPTY_WHEEL_ZOOM_BURST, nextSmartWheelZoom } from "@/lib/projectZoom";
 import CadOverlayLayer from "@/components/page/CadOverlayLayer";
 import { CadDocumentInspector } from "@/components/page/CadDocumentInspector";
@@ -204,9 +208,40 @@ type ProjectZoomAnchor =
 
 export default function ProjectWorkspace() {
   const { projectId } = useParams();
-  const project = useProject(projectId);
+  const rawProject = useProject(projectId);
   const navigate = useNavigate();
+
+  /* ---------- Vorlagen-Modus (Finanzen: Angebot / Rechnung / Nachtrag) ---------- */
+  const [tplParams] = useSearchParams();
+  const templateKey = tplParams.get("tpl") ?? null;
+  const templateBackNode = tplParams.get("back") ?? "";
+  const templateInfo = templateKey ? parseTemplateKey(templateKey) : null;
+  const templateLabel = templateInfo ? TEMPLATE_LABEL[templateInfo.type] : "";
+
+  useEffect(() => {
+    if (!templateKey || !projectId || !templateInfo) return;
+    projectStore.ensureTemplatePages(
+      projectId,
+      templateKey,
+      `${TEMPLATE_LABEL[templateInfo.type]} Vorlage`,
+      getFavoriteTemplate<ProjectPage>(projectId, templateInfo.type),
+    );
+  }, [templateKey, projectId, templateInfo?.type]);
+
+  // Im Vorlagen-Modus sind ausschließlich die Vorlagenseiten sichtbar,
+  // sonst ausschließlich die normalen Mappenseiten.
+  const project = useMemo(() => {
+    if (!rawProject) return rawProject;
+    const pages = rawProject.pages.filter((pg) =>
+      templateKey ? pg.templateKey === templateKey : !pg.templateKey);
+    return { ...rawProject, pages };
+  }, [rawProject, templateKey]);
+
   const [activePageId, setActivePageId] = useState<string | undefined>(project?.pages[0]?.id);
+  useEffect(() => {
+    if (!project) return;
+    if (!project.pages.some((pg) => pg.id === activePageId)) setActivePageId(project.pages[0]?.id);
+  }, [project, activePageId]);
   const documentFileInputRef = useRef<HTMLInputElement>(null);
   const [docImporting, setDocImporting] = useState(false);
   const [docPickerPages, setDocPickerPages] = useState<ImportedPage[] | null>(null);
@@ -1157,6 +1192,46 @@ export default function ProjectWorkspace() {
         tabletAidOn={tabletAidOn}
         onToggleTabletAid={() => setTabletAidOn((v) => !v)}
       />
+      {templateKey && templateInfo && (
+        <div
+          className="flex items-center justify-between gap-3 px-4 py-2 border-b"
+          style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--muted))" }}
+        >
+          <div className="text-sm font-semibold">
+            {templateLabel}-Vorlage bearbeiten
+            <span className="ml-2 text-xs font-normal" style={{ color: "hsl(var(--ink-soft))" }}>
+              Nur die Vorlagenseiten sind sichtbar und werden exportiert.
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                const pages = (rawProject?.pages ?? []).filter((pg) => pg.templateKey === templateKey);
+                setFavoriteTemplate(projectId!, templateInfo.type, pages.map((pg) => ({ ...pg, id: "", templateKey: undefined })));
+              }}
+              className="h-9 px-3 rounded-lg border text-sm font-medium hover:bg-background"
+              style={{ borderColor: "hsl(var(--hairline))" }}
+              title={`Als Favorit-Vorlage für neue ${templateLabel}e speichern`}
+            >
+              Favorit
+            </button>
+            <button
+              onClick={() => navigate(`/project/${projectId}/finance?node=${templateBackNode}`)}
+              className="h-9 px-3 rounded-lg border text-sm font-medium hover:bg-background"
+              style={{ borderColor: "hsl(var(--hairline))" }}
+            >
+              Abbrechen
+            </button>
+            <button
+              onClick={() => navigate(`/project/${projectId}/finance?node=${templateBackNode}`)}
+              className="h-9 px-4 rounded-lg text-sm font-semibold"
+              style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
+            >
+              Speichern
+            </button>
+          </div>
+        </div>
+      )}
       <div className="flex-1 flex min-h-0">
       {/* Far-left tool rail */}
       <aside

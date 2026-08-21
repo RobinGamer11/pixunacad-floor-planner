@@ -1,7 +1,8 @@
+import { useNavigate } from "react-router-dom";
 import React, { useRef, useState } from "react";
-import { GripVertical, Trash2, Calendar } from "lucide-react";
+import { GripVertical, Trash2, Calendar, FileText } from "lucide-react";
 import {
-  financeStore, formatEur, parseEur,
+  financeStore, formatEur, parseEur, templateKeyOf,
   type FinancePosition, type FinancePositionType,
 } from "@/lib/financeStore";
 
@@ -31,6 +32,7 @@ const FIELD_STYLE: React.CSSProperties = {
 };
 
 export const FinancePositionsTable: React.FC<Props> = ({ projectId, nodeId, positions }) => {
+  const navigate = useNavigate();
 
   const [dragId, setDragId] = useState<string | null>(null);
 
@@ -53,7 +55,7 @@ export const FinancePositionsTable: React.FC<Props> = ({ projectId, nodeId, posi
     <div className="rounded-xl border overflow-hidden"
          style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}>
       <div className="grid items-center px-3 py-2 border-b text-[11px] font-semibold uppercase tracking-wider"
-           style={{ gridTemplateColumns: "24px 1.4fr 1fr 1.2fr 1fr 2fr 32px", borderColor: "hsl(var(--hairline))", color: "hsl(var(--ink-soft))" }}>
+           style={{ gridTemplateColumns: "24px 1.4fr 1fr 1.2fr 1fr 2fr 72px", borderColor: "hsl(var(--hairline))", color: "hsl(var(--ink-soft))" }}>
         <span />
         <span>Typ</span>
         <span>Datum</span>
@@ -80,7 +82,7 @@ export const FinancePositionsTable: React.FC<Props> = ({ projectId, nodeId, posi
             onDragOver={(e) => e.preventDefault()}
             onDrop={() => { if (dragId && dragId !== p.id) financeStore.reorderPositions(projectId, nodeId, dragId, p.id); setDragId(null); }}
             className="grid items-center px-3 py-1.5 border-b text-sm"
-            style={{ gridTemplateColumns: "24px 1.4fr 1fr 1.2fr 1fr 2fr 32px", borderColor: "hsl(var(--hairline))" }}>
+            style={{ gridTemplateColumns: "24px 1.4fr 1fr 1.2fr 1fr 2fr 72px", borderColor: "hsl(var(--hairline))" }}>
             <span className="cursor-grab active:cursor-grabbing" title="Position verschieben">
               <GripVertical size={14} style={{ color: "hsl(var(--ink-soft))" }} />
             </span>
@@ -125,10 +127,21 @@ export const FinancePositionsTable: React.FC<Props> = ({ projectId, nodeId, posi
             </div>
 
 
-            <button type="button" onClick={() => financeStore.deletePosition(projectId, p.id)}
-              className="h-7 w-7 rounded flex items-center justify-center hover:bg-muted" title="Position löschen">
-              <Trash2 size={14} style={{ color: "hsl(var(--ink-soft))" }} />
-            </button>
+            <div className="flex items-center justify-end gap-1">
+              {p.hasTemplate && (
+                <button type="button"
+                  onClick={() => navigate(`/project/${projectId}?tpl=${encodeURIComponent(templateKeyOf(p.type, p.id))}&back=${nodeId}`)}
+                  className="h-7 w-7 rounded flex items-center justify-center border hover:bg-muted"
+                  style={{ borderColor: "hsl(var(--hairline))" }}
+                  title="Vorlage in der Projektmappe bearbeiten">
+                  <FileText size={14} style={{ color: "hsl(var(--ink-soft))" }} />
+                </button>
+              )}
+              <button type="button" onClick={() => financeStore.deletePosition(projectId, p.id)}
+                className="h-7 w-7 rounded flex items-center justify-center hover:bg-muted" title="Position löschen">
+                <Trash2 size={14} style={{ color: "hsl(var(--ink-soft))" }} />
+              </button>
+            </div>
           </div>
         );
       })}

@@ -1,13 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { WorkspaceHeader } from "@/components/workspace/WorkspaceHeader";
 import { TabletAidWheel } from "@/components/TabletAidWheel";
 import { projectStore, useProject } from "@/lib/projectStore";
 import { exportElementToA4Pdf } from "@/lib/financePdfExport";
 import {
   financeStore, childrenOf, positionsOf, nodeTotals, projectTotals, actionTotals,
-  control, formatEur, formatPct,
+  control, formatEur, formatPct, templateKeyOf,
   type FinanceNode, type FinanceState, type FinanceTotals, type FinancePosition,
+  type FinancePositionType,
 } from "@/lib/financeStore";
 import { FinanceSummaryCard } from "@/components/finance/FinanceSummaryCard";
 import { FinancePositionsTable } from "@/components/finance/FinancePositionsTable";
@@ -51,7 +52,8 @@ export default function FinancePage() {
   const state = useFinance(projectId);
 
   /** null = Projektknoten. */
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
+  const [selectedId, setSelectedId] = useState<string | null>(() => searchParams.get("node"));
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [leftOpen, setLeftOpen] = useState(true);
   const [tabletAidOn, setTabletAidOn] = useState<boolean>(() => {
@@ -329,6 +331,11 @@ export default function FinancePage() {
 
 const ActionView: React.FC<{ projectId: string; state: FinanceState; node: FinanceNode }> =
 ({ projectId, state, node }) => {
+  const navigate = useNavigate();
+  /** Öffnet den Vorlagen-Editor in der Projektmappe (nur Vorlagenseiten sichtbar). */
+  const openTemplate = (pid: string, type: FinancePositionType, posId: string, nodeId: string) => {
+    navigate(`/project/${pid}?tpl=${encodeURIComponent(templateKeyOf(type, posId))}&back=${nodeId}`);
+  };
   const totals = actionTotals(state, node);
   const positions = positionsOf(state, node.id);
   const invoiceDetails = positions.filter((p) => p.type === "invoice" || p.type === "supplement");
@@ -368,9 +375,14 @@ const ActionView: React.FC<{ projectId: string; state: FinanceState; node: Finan
       {/* Anlegen = neue Vorlage in der Projektmappe erstellen */}
       <div className="flex flex-wrap gap-2" data-export-hide>
         {([["offer", "Angebot"], ["invoice", "Rechnung"], ["supplement", "Nachtrag"]] as const).map(([t, label]) => (
-          <button key={`new-${t}`} disabled
-            title="Vorlagen-Editor in der Projektmappe folgt"
-            className="h-10 px-4 rounded-lg text-sm font-semibold flex items-center gap-1.5 opacity-60 cursor-not-allowed"
+          <button key={`new-${t}`}
+            onClick={() => {
+              const pos = financeStore.addPosition(projectId, node.id, t);
+              financeStore.updatePosition(projectId, pos.id, { hasTemplate: true });
+              openTemplate(projectId, t, pos.id, node.id);
+            }}
+            title={`${label} als Vorlage in der Projektmappe anlegen`}
+            className="h-10 px-4 rounded-lg text-sm font-semibold flex items-center gap-1.5 hover:opacity-90"
             style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}>
             <Plus size={16} /> {label} anlegen
           </button>
