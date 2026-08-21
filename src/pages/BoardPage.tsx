@@ -810,7 +810,7 @@ export default function BoardPage() {
                       style={{
                         gridTemplateColumns: GRID_COLS,
                         borderColor: PANEL_LINE,
-                        background: i.id === selectedId ? "#fbe9df" : "transparent",
+                        background: i.id === selectedId ? "hsl(var(--accent-gold) / 0.18)" : "transparent",
                         color: doneRow ? INK_SOFT : INK,
                       }}
                       title={i.title}

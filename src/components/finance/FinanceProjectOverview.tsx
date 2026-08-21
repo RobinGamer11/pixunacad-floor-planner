@@ -67,14 +67,12 @@ export function FinanceProjectOverview({
         </button>
       </div>
 
-      <FinanceSummaryCard totals={totals} subtitle="Gesamtes Projekt" />
-
       {archived.length > 0 && (
         <FinanceSummaryCard
           totals={positionTotals(archived)}
           hideEstimate
           title="Archivierte Belege"
-          subtitle={projectName}
+          subtitle="Gesamtes Projekt"
           invoiceDetails={archived.filter(isInvoiceLike)}
           background={ARCHIVE_BG}
         />
@@ -84,21 +82,19 @@ export function FinanceProjectOverview({
           totals={positionTotals(created)}
           hideEstimate
           title="Angelegte Belege"
-          subtitle={projectName}
+          subtitle="Gesamtes Projekt"
           invoiceDetails={created.filter(isInvoiceLike)}
           background={CREATED_BG}
         />
       )}
 
-      {roots.length === 0 ? (
+      {archived.length === 0 && created.length === 0 && (
         <div
           className="rounded-xl border px-4 py-6 text-xs"
           style={{ borderColor: "hsl(var(--hairline))", color: "hsl(var(--ink-soft))" }}
         >
           Noch keine Finanz-Einträge. Lege sie in der Finanzen-Oberfläche an.
         </div>
-      ) : (
-        <NodeTable state={state} nodes={roots} />
       )}
     </div>
   );
