@@ -2176,7 +2176,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 {(lineArrowStart || lineArrowEnd) && (
                   <div>
                     <div className="mb-1.5 text-[10px] text-muted-foreground">Pfeilgröße</div>
-                    <label className="flex h-8 items-center overflow-hidden rounded-md border" style={{ borderColor: "hsl(var(--hairline))", backgroundColor: "#fff" }}>
+                    <label className="flex h-8 items-center overflow-hidden rounded-md border" style={{ borderColor: "hsl(var(--hairline))", backgroundColor: "hsl(var(--card))" }}>
                       <input
                         type="number" min={0.2} step={0.1}
                         value={lineArrowScale}
@@ -2446,7 +2446,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                     type="text"
                     placeholder="z. B. 2,10 m OK"
                     className="h-8 w-full rounded-md border px-2 text-[11px]"
-                    style={{ borderColor: "hsl(var(--hairline))", backgroundColor: "#fff" }}
+                    style={{ borderColor: "hsl(var(--hairline))", backgroundColor: "hsl(var(--card))" }}
                   />
                 </div>
 
@@ -2492,7 +2492,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                     type="text"
                     placeholder="Text eingeben"
                     className="h-8 w-full rounded-md border px-2 text-[11px]"
-                    style={{ borderColor: "hsl(var(--hairline))", backgroundColor: "#fff" }}
+                    style={{ borderColor: "hsl(var(--hairline))", backgroundColor: "hsl(var(--card))" }}
                   />
                   <div className="grid grid-cols-2 gap-1">
                     <button type="button" ref={measureFreeTextBoldRef} className="h-9 rounded border text-[12px] font-bold" style={{ borderColor: "hsl(var(--hairline))" }}>B</button>
