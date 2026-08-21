@@ -180,6 +180,12 @@ export interface ProjectPage {
   /** Freie Papiergröße (nur bei format === "frei"). Werte in mm. */
   customWidthMm?: number;
   customHeightMm?: number;
+  /**
+   * Vorlagen-Seite der Finanzen-Oberfläche (z. B. "offer:f-abc123").
+   * Solche Seiten sind in der normalen Projektmappe unsichtbar und werden nur
+   * im Vorlagen-Modus (Angebot/Rechnung/Nachtrag anlegen) angezeigt.
+   */
+  templateKey?: string;
 }
 
 
