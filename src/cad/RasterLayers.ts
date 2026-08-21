@@ -49,6 +49,8 @@ export interface RasterTileJSON {
 
 export interface RasterLayerJSON {
   labelId: string;
+  /** Anzahl eingebrannter Rasterstriche (nur für die Ebenen-Objektzählung). */
+  strokeCount?: number;
   pxPerM: number;
   tilePx: number;
   tiles: RasterTileJSON[];
@@ -81,6 +83,8 @@ export class RasterLayer {
   readonly pxPerM: number;
   readonly tilePx: number;
   private tiles = new Map<string, RasterTile>();
+  /** Anzahl der in diese Ebene eingebrannten Rasterstriche. */
+  strokeCount = 0;
 
   constructor(labelId: string, pxPerM = DEFAULT_RASTER_PX_PER_M, tilePx = RASTER_TILE_PX) {
     this.labelId = labelId;
@@ -127,6 +131,7 @@ export class RasterLayer {
 
   /** Zeichnet ein vorgerendertes Canvas (Weltrechteck) in die Ebene ein. */
   blit(src: HTMLCanvasElement, x: number, y: number, w: number, h: number) {
+    this.strokeCount += 1;
     this._forRect(x, y, w, h, true, (tile, ox, oy) => {
       const ctx = tile.ctx;
       ctx.save();
@@ -236,7 +241,7 @@ export class RasterLayer {
       tiles.push({ tx: tile.tx, ty: tile.ty, src: tile.dataUrl });
     }
     if (tiles.length === 0) return null;
-    return { labelId: this.labelId, pxPerM: this.pxPerM, tilePx: this.tilePx, tiles };
+    return { labelId: this.labelId, pxPerM: this.pxPerM, tilePx: this.tilePx, tiles, strokeCount: this.strokeCount };
   }
 
   private _isTileEmpty(tile: RasterTile): boolean {
@@ -251,6 +256,7 @@ export class RasterLayer {
 
   /** Lädt Kacheln aus JSON (asynchron je Kachel; `onReady` triggert ein Re-Render). */
   restore(json: RasterLayerJSON, onReady?: () => void) {
+    this.strokeCount = Math.max(0, json.strokeCount ?? (json.tiles?.length ? 1 : 0));
     for (const t of json.tiles || []) {
       const tile = this._tile(t.tx, t.ty, true)!;
       tile.dataUrl = t.src;
