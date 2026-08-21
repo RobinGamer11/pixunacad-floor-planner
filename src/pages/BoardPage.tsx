@@ -22,11 +22,11 @@ const RED = "#ef4444";
 const GREY = "#a19a92";
 const DAY = 86400000;
 /** Helle Oberfläche: alles außer dem Zeitstrahl selbst. */
-const PANEL = "#ffffff";
-const PANEL_LINE = "#e6e1db";
-const SUBTLE = "#f4f1ed";
-const INK = "#2a2521";
-const INK_SOFT = "#6f665e";
+const PANEL = "hsl(var(--surface-card))";
+const PANEL_LINE = "hsl(var(--hairline))";
+const SUBTLE = "hsl(var(--surface-muted))";
+const INK = "hsl(var(--ink))";
+const INK_SOFT = "hsl(var(--ink-soft))";
 /** Dunkle Strahl-Fläche + die darauf liegenden Elemente. */
 const CANVAS = "#141110";
 const CANVAS_LINE = "#332c26";

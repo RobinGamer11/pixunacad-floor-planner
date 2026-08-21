@@ -62,6 +62,8 @@ export interface TextSettingsRefs {
   lineHeightRange?: HTMLInputElement | null;
   lineHeightNum?: HTMLInputElement | null;
   bgAlphaRange?: HTMLInputElement | null;
+  textAlpha?: HTMLInputElement | null;
+  textAlphaRange?: HTMLInputElement | null;
   fontSizePt?: HTMLInputElement | null;
 }
 
@@ -209,6 +211,7 @@ export class CadApp {
   defaultTextFontSizePx = Defaults.textFontSizePx;
   defaultTextBgColor = Defaults.textBgColor;
   defaultTextBgAlphaPct = Defaults.textBgAlphaPct;
+  defaultTextAlphaPct = Defaults.textAlphaPct;
   defaultTextWrap = Defaults.textWrap;
   defaultTextAlign: "left" | "center" | "right" = Defaults.textAlign;
   defaultTextBorderEnabled = Defaults.textBorderEnabled;
@@ -1689,6 +1692,7 @@ export class CadApp {
     if (sel) {
       return {
         textColor: sel.style.textColor, fontSizePx: sel.style.fontSizePx,
+        textAlphaPct: (sel.style as any).textAlphaPct ?? Defaults.textAlphaPct,
         bgColor: sel.style.bgColor, bgAlphaPct: sel.style.bgAlphaPct,
         wrap: sel.style.wrap, align: sel.style.align,
         bold: sel.style.bold, italic: sel.style.italic,
@@ -1702,6 +1706,7 @@ export class CadApp {
     }
     return {
       textColor: this.defaultTextColor, fontSizePx: this.defaultTextFontSizePx,
+      textAlphaPct: this.defaultTextAlphaPct,
       bgColor: this.defaultTextBgColor, bgAlphaPct: this.defaultTextBgAlphaPct,
       wrap: this.defaultTextWrap, align: this.defaultTextAlign,
       bold: this.defaultTextBold, italic: this.defaultTextItalic,
@@ -1817,6 +1822,18 @@ export class CadApp {
       else this.defaultTextBgAlphaPct = v;
       this._syncTextSettingsFromContext();
     });
+
+    const setTextAlpha = (raw: string) => {
+      let v = parseFloat((raw || "").replace(",", "."));
+      if (!Number.isFinite(v)) return;
+      v = clamp(Math.round(v), 0, 100);
+      const sel = this.getEditTextBox();
+      if (sel) (sel.style as any).textAlphaPct = v;
+      else this.defaultTextAlphaPct = v;
+      this._syncTextSettingsFromContext();
+    };
+    r.textAlpha?.addEventListener("input", () => setTextAlpha(r.textAlpha!.value));
+    r.textAlphaRange?.addEventListener("input", () => setTextAlpha(r.textAlphaRange!.value));
 
     r.wrapToggle.addEventListener("change", () => {
       const sel = this.getEditTextBox();
@@ -1956,6 +1973,9 @@ export class CadApp {
     if (r.lineHeightRange) r.lineHeightRange.value = String(lh);
     if (r.lineHeightNum) r.lineHeightNum.value = String(lh);
     if (r.bgAlphaRange) r.bgAlphaRange.value = String(Math.round(s.bgAlphaPct ?? Defaults.textBgAlphaPct));
+    const tAlpha = String(Math.round((s as any).textAlphaPct ?? Defaults.textAlphaPct));
+    if (r.textAlpha) r.textAlpha.value = tAlpha;
+    if (r.textAlphaRange) r.textAlphaRange.value = tAlpha;
     if (r.fontSizePt) {
       r.fontSizePt.value = String(Math.round((s.fontSizePx ?? Defaults.textFontSizePx) * (3 / 4)));
     }

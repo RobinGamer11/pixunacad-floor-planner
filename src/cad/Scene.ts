@@ -273,6 +273,8 @@ export class Dimension {
 
 export interface TextBoxStyle {
   textColor?: string;
+  /** Deckkraft des Textes in Prozent (100 = voll deckend). */
+  textAlphaPct?: number;
   fontSizePx?: number;
   bgColor?: string;
   bgAlphaPct?: number;
@@ -316,6 +318,7 @@ export class TextBox {
     const s = style || {};
     this.style = {
       textColor: s.textColor || Defaults.textColor,
+      textAlphaPct: clamp(s.textAlphaPct ?? Defaults.textAlphaPct, 0, 100),
       fontSizePx: clamp(s.fontSizePx ?? Defaults.textFontSizePx, 6, 200),
       bgColor: s.bgColor || Defaults.textBgColor,
       bgAlphaPct: clamp(s.bgAlphaPct ?? Defaults.textBgAlphaPct, 0, 100),
