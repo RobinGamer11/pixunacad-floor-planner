@@ -201,7 +201,7 @@ function CenterToggles() {
     gap: 3,
     border: active ? "1px solid hsl(var(--overlay-gold))" : "1px solid hsl(var(--overlay-surface) / 0.28)",
     background: active ? "hsl(var(--overlay-gold))" : "hsl(var(--overlay-surface) / 0.12)",
-    color: "hsl(var(--overlay-surface))",
+    color: active ? "hsl(var(--overlay-ink))" : "hsl(var(--overlay-surface))",
     cursor: "pointer",
   });
 
@@ -448,7 +448,7 @@ function WheelButton({
         height: buttonSize,
         borderColor: active || highlight ? "hsl(var(--overlay-gold))" : "hsl(var(--overlay-surface) / 0.28)",
         background: active ? "hsl(var(--overlay-gold))" : "hsl(var(--overlay-surface) / 0.11)",
-        color: "hsl(var(--overlay-surface))",
+        color: active ? "hsl(var(--overlay-ink))" : "hsl(var(--overlay-surface))",
         boxShadow: highlight && !active ? "0 0 0 3px hsl(var(--overlay-gold) / 0.35)" : undefined,
         touchAction: "none",
         pointerEvents: "auto",
