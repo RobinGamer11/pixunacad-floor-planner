@@ -111,8 +111,8 @@ export function TableToolSettings({
           className="w-full h-7 rounded-md border text-[11px] flex items-center justify-center gap-1.5"
           style={{
             borderColor: "hsl(var(--hairline))",
-            background: editMode ? "hsl(var(--accent-gold))" : undefined,
-            color: editMode ? "hsl(var(--surface))" : undefined,
+            background: editMode ? "hsl(var(--accent-gold-soft))" : undefined,
+            color: editMode ? "hsl(var(--accent-gold))" : undefined,
           }}
           title="Doppelklick auf die Tabelle aktiviert den Tabellenmodus ebenfalls"
         >
@@ -195,8 +195,8 @@ export function TableToolSettings({
                 className="h-6 px-2 text-[10px] rounded border"
                 style={{
                   borderColor: "hsl(var(--hairline))",
-                  background: formulaFn === f ? "hsl(var(--accent-gold))" : undefined,
-                  color: formulaFn === f ? "hsl(var(--surface))" : undefined,
+                  background: formulaFn === f ? "hsl(var(--accent-gold-soft))" : undefined,
+                  color: formulaFn === f ? "hsl(var(--accent-gold))" : undefined,
                 }}
               >{f}</button>
             ))}
@@ -212,14 +212,14 @@ export function TableToolSettings({
         <div className="flex items-center gap-1.5">
           <button
             onClick={onConfirm}
-            className="flex-1 h-8 rounded-md text-[11px] font-medium flex items-center justify-center gap-1.5"
-            style={{ background: "hsl(var(--accent-gold))", color: "hsl(var(--surface))" }}
+            className="flex-1 h-7 rounded text-[11px] font-medium flex items-center justify-center gap-1.5"
+            style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
           >
             <Check size={12} /> Bestätigen
           </button>
           <button
             onClick={onCancel}
-            className="h-8 px-2.5 rounded-md text-[11px] border flex items-center gap-1"
+            className="h-7 px-2.5 rounded text-[11px] border flex items-center gap-1"
             style={{ borderColor: "hsl(var(--hairline))" }}
           >
             <X size={12} /> Abbrechen
@@ -250,8 +250,8 @@ function Toggle({ active, onClick, children }: { active?: boolean; onClick: () =
       className="h-7 w-7 rounded-md border flex items-center justify-center hover:bg-muted"
       style={{
         borderColor: "hsl(var(--hairline))",
-        background: active ? "hsl(var(--accent-gold))" : undefined,
-        color: active ? "hsl(var(--surface))" : undefined,
+        background: active ? "hsl(var(--accent-gold-soft))" : undefined,
+        color: active ? "hsl(var(--accent-gold))" : undefined,
       }}
     >{children}</button>
   );
