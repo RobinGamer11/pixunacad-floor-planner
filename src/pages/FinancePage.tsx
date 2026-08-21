@@ -6,7 +6,7 @@ import { projectStore, useProject } from "@/lib/projectStore";
 import { exportElementToA4Pdf } from "@/lib/financePdfExport";
 import {
   financeStore, childrenOf, positionsOf, nodeTotals, projectTotals, actionTotals,
-  control, formatEur, formatPct, templateKeyOf,
+  control, formatEur, formatPct, templateKeyOf, positionTotals, TEMPLATE_LABEL,
   type FinanceNode, type FinanceState, type FinanceTotals, type FinancePosition,
   type FinancePositionType,
 } from "@/lib/financeStore";
@@ -15,6 +15,7 @@ import { FinancePositionsTable } from "@/components/finance/FinancePositionsTabl
 import {
   Plus, PanelLeftClose, PanelLeftOpen, ChevronRight, ChevronDown,
   Folder, Building2, ArrowRight, ToggleLeft, ToggleRight, Home, Trash2, Search, X,
+  MoreVertical, Copy, Pencil, Star, FileText,
 } from "lucide-react";
 
 /** Filterbare Positionsarten (mehrfach kombinierbar). */
@@ -163,18 +164,13 @@ export default function FinancePage() {
               ? <Folder size={13} style={{ color: "hsl(var(--accent-gold))" }} />
               : <Building2 size={13} style={{ color: "hsl(var(--ink-soft))" }} />}
             <span className="truncate flex-1">{n.name}</span>
-            <button
-              title={n.type === "overview" ? "Übersicht löschen" : "Aktion löschen"}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (!confirm(`„${n.name}" wirklich löschen?`)) return;
-                financeStore.deleteNode(pid, n.id);
-                setSelectedId((cur) => (cur === n.id ? null : cur));
-              }}
-              className="opacity-0 group-hover:opacity-100 shrink-0"
-              style={{ color: "hsl(var(--ink-soft))" }}>
-              <Trash2 size={13} />
-            </button>
+            <NodeMenu
+              projectId={pid}
+              node={n}
+              compact
+              onDeleted={() => setSelectedId((cur) => (cur === n.id ? null : cur))}
+              onDuplicated={(id) => setSelectedId(id)}
+            />
           </div>
           {open && kids.length > 0 && renderTree(n.id, depth + 1)}
         </div>
@@ -265,6 +261,8 @@ export default function FinancePage() {
             </div>
 
 
+            <FavoriteTemplates state={state} onOpen={(id) => setSelectedId(id)} />
+
             <div className="flex-1 overflow-auto py-1 px-1">
               <div onClick={() => setSelectedId(null)}
                 className="flex items-center gap-1.5 px-2 py-1.5 rounded-md cursor-pointer text-[12px] font-semibold"
@@ -288,21 +286,18 @@ export default function FinancePage() {
             )}
             <div className="text-[11px] font-semibold uppercase tracking-wider"
                  style={{ color: "hsl(var(--ink-soft))" }}>
-              {selected ? (selected.type === "action" ? "Aktion" : "Übersicht") : "Projekt"}
+              {selected ? (selected.type === "action" ? "Anlage" : "Ordner") : "Projekt"}
             </div>
-            <div className="flex-1" />
+            {selected && <span className="text-sm font-medium truncate max-w-[280px]">{selected.name}</span>}
             {selected && (
-              <button
-                onClick={() => {
-                  if (!confirm(`„${selected.name}" wirklich löschen?`)) return;
-                  financeStore.deleteNode(pid, selected.id);
-                  setSelectedId(null);
-                }}
-                className="h-7 w-7 rounded flex items-center justify-center opacity-40 hover:opacity-100 hover:bg-muted"
-                title={selected.type === "action" ? "Aktion löschen" : "Übersicht löschen"}>
-                <Trash2 size={14} />
-              </button>
+              <NodeMenu
+                projectId={pid}
+                node={selected}
+                onDeleted={() => setSelectedId(null)}
+                onDuplicated={(id) => setSelectedId(id)}
+              />
             )}
+            <div className="flex-1" />
           </div>
 
           <div ref={exportRef} className="p-4 space-y-4" style={{ background: "hsl(var(--surface-app))" }}>
@@ -327,6 +322,123 @@ export default function FinancePage() {
   );
 }
 
+
+/* -------------------------------------------------- Drei-Punkte-Menü (Knoten) */
+
+const NodeMenu: React.FC<{
+  projectId: string;
+  node: FinanceNode;
+  compact?: boolean;
+  onDeleted: () => void;
+  onDuplicated: (id: string) => void;
+}> = ({ projectId, node, compact, onDeleted, onDuplicated }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement | null>(null);
+  const label = node.type === "overview" ? "Ordner" : "Anlage";
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: PointerEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    window.addEventListener("pointerdown", onDown, true);
+    return () => window.removeEventListener("pointerdown", onDown, true);
+  }, [open]);
+
+  const item = (icon: React.ReactNode, text: string, run: () => void, danger?: boolean) => (
+    <button
+      onClick={(e) => { e.stopPropagation(); setOpen(false); run(); }}
+      className="w-full flex items-center gap-2 px-2.5 py-1.5 text-[12px] rounded-md hover:bg-muted text-left"
+      style={danger ? { color: "hsl(var(--destructive))" } : undefined}>
+      {icon}{text}
+    </button>
+  );
+
+  return (
+    <div ref={ref} className="relative shrink-0" data-export-hide>
+      <button
+        title={`${label} verwalten`}
+        onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
+        className={`h-6 w-6 rounded flex items-center justify-center hover:bg-muted ${compact ? "opacity-50 group-hover:opacity-100" : "opacity-60 hover:opacity-100"}`}
+        style={{ color: "hsl(var(--ink-soft))" }}>
+        <MoreVertical size={14} />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-7 z-50 min-w-[180px] rounded-lg border p-1 shadow-lg"
+             style={{ background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" }}>
+          {item(<Pencil size={13} />, `${label} umbenennen`, () => {
+            const name = window.prompt(`${label} umbenennen`, node.name);
+            if (name && name.trim()) financeStore.updateNode(projectId, node.id, { name: name.trim() });
+          })}
+          {item(<Copy size={13} />, `${label} duplizieren`, () => {
+            const copy = financeStore.duplicateNode(projectId, node.id);
+            if (copy) onDuplicated(copy.id);
+          })}
+          {item(<Trash2 size={13} />, `${label} löschen`, () => {
+            if (!window.confirm(`\u201e${node.name}\u201c wirklich löschen?`)) return;
+            financeStore.deleteNode(projectId, node.id);
+            onDeleted();
+          }, true)}
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ------------------------------------------------ Favoriten-Vorlagen (links) */
+
+const FavoriteTemplates: React.FC<{
+  state: FinanceState;
+  onOpen: (nodeId: string) => void;
+}> = ({ state, onOpen }) => {
+  const [openType, setOpenType] = useState<FinancePositionType | null>(null);
+  const nodeName = (id: string) => state.nodes.find((n) => n.id === id)?.name ?? "Anlage";
+
+  const groups = (["offer", "invoice", "supplement"] as FinancePositionType[]).map((type) => ({
+    type,
+    items: state.positions.filter((p) => p.hasTemplate && p.type === type),
+  }));
+
+  return (
+    <div className="px-3 py-2 border-b space-y-1" style={{ borderColor: "hsl(var(--hairline))" }}>
+      <div className="text-[10px] font-semibold uppercase tracking-wider flex items-center gap-1"
+           style={{ color: "hsl(var(--ink-soft))" }}>
+        <Star size={11} /> Vorlagen
+      </div>
+      {groups.map(({ type, items }) => {
+        const open = openType === type;
+        return (
+          <div key={type}>
+            <button
+              onClick={() => setOpenType(open ? null : type)}
+              className="w-full h-7 px-2 rounded-md border flex items-center gap-1.5 text-[11px]"
+              style={{ borderColor: "hsl(var(--hairline))" }}>
+              <FileText size={11} style={{ color: "hsl(var(--accent-gold))" }} />
+              <span className="flex-1 text-left truncate">{TEMPLATE_LABEL[type]}</span>
+              <span className="tabular-nums" style={{ color: "hsl(var(--ink-soft))" }}>{items.length}</span>
+              {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+            </button>
+            {open && (
+              <div className="mt-1 ml-2 space-y-0.5">
+                {items.length === 0 ? (
+                  <div className="text-[10px] px-2 py-1" style={{ color: "hsl(var(--ink-soft))" }}>
+                    Noch keine {TEMPLATE_LABEL[type]}-Vorlage angelegt.
+                  </div>
+                ) : items.map((p, i) => (
+                  <button key={p.id} onClick={() => onOpen(p.nodeId)}
+                    className="w-full text-left px-2 py-1 rounded-md text-[11px] hover:bg-muted truncate">
+                    {TEMPLATE_LABEL[type]} {String(i + 1).padStart(2, "0")} · {nodeName(p.nodeId)}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
 /* ----------------------------------------------------------------- Aktion */
 
 const ActionView: React.FC<{ projectId: string; state: FinanceState; node: FinanceNode }> =
@@ -339,6 +451,11 @@ const ActionView: React.FC<{ projectId: string; state: FinanceState; node: Finan
   const totals = actionTotals(state, node);
   const positions = positionsOf(state, node.id);
   const invoiceDetails = positions.filter((p) => p.type === "invoice" || p.type === "supplement");
+  const isInvoiceLike = (p: FinancePosition) => p.type === "invoice" || p.type === "supplement";
+  const archived = positions.filter((p) => !p.hasTemplate);
+  const created = positions.filter((p) => p.hasTemplate);
+  const archivedInvoices = archived.filter(isInvoiceLike);
+  const createdInvoices = created.filter(isInvoiceLike);
 
   return (
     <>
@@ -390,10 +507,41 @@ const ActionView: React.FC<{ projectId: string; state: FinanceState; node: Finan
       </div>
 
 
-      <FinancePositionsTable projectId={projectId} nodeId={node.id} positions={positions} />
+      {/* Archivierte Belege */}
+      {archived.length > 0 && (
+        <div className="space-y-2 rounded-xl p-3" style={{ background: ARCHIVE_BG }}>
+          <div className="text-[11px] font-semibold uppercase tracking-wider"
+               style={{ color: "hsl(var(--ink-soft))" }}>Archivierte Belege</div>
+          <FinanceSummaryCard totals={positionTotals(archived)} hideEstimate
+            title="Archiviert" subtitle={node.name} invoiceDetails={archivedInvoices} />
+          <FinancePositionsTable projectId={projectId} nodeId={node.id} positions={archived}
+            emptyHint="Noch keine archivierten Belege." />
+        </div>
+      )}
+
+      {/* Angelegte Belege (Vorlagen in der Projektmappe) */}
+      {created.length > 0 && (
+        <div className="space-y-2 rounded-xl p-3" style={{ background: CREATED_BG }}>
+          <div className="text-[11px] font-semibold uppercase tracking-wider"
+               style={{ color: "hsl(var(--ink-soft))" }}>Angelegte Belege</div>
+          <FinanceSummaryCard totals={positionTotals(created)} hideEstimate
+            title="Angelegt" subtitle={node.name} invoiceDetails={createdInvoices} />
+          <FinancePositionsTable projectId={projectId} nodeId={node.id} positions={created}
+            background="hsl(var(--surface-card))"
+            emptyHint="Noch keine angelegten Belege." />
+        </div>
+      )}
+
+      {positions.length === 0 && (
+        <FinancePositionsTable projectId={projectId} nodeId={node.id} positions={[]} />
+      )}
     </>
   );
 };
+
+/** Hintergründe zur Unterscheidung archivierter und angelegter Belege. */
+const ARCHIVE_BG = "hsl(var(--surface-muted))";
+const CREATED_BG = "hsl(var(--accent-gold) / 0.10)";
 
 /* --------------------------------------------------------------- Übersicht */
 

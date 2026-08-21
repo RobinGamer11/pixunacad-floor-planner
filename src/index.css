@@ -1087,3 +1087,15 @@
 .pixuna-range {
   accent-color: hsl(var(--primary));
 }
+
+/* ---------------------------------------------------------------------------
+   Zeichenfläche schwarz (Einstellungen → Kontrast-Symbol).
+   Optische Invertierung: Weiß wird Schwarz, Schwarz wird Weiß; Farbtöne
+   bleiben durch die zusätzliche Hue-Rotation erhalten. Gilt für den
+   CAD-Canvas und die Blätter der Projektmappe – auch beim Export/Druck,
+   da die Klasse global am <html> gesetzt bleibt.
+--------------------------------------------------------------------------- */
+.pixuna-canvas-dark [data-cad-canvas],
+.pixuna-canvas-dark .page-sheet {
+  filter: invert(1) hue-rotate(180deg);
+}

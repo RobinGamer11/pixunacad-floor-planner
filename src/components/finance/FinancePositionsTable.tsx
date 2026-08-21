@@ -10,6 +10,10 @@ interface Props {
   projectId: string;
   nodeId: string;
   positions: FinancePosition[];
+  /** Abweichender Tabellenhintergrund (archiviert vs. angelegt). */
+  background?: string;
+  /** Text im leeren Zustand. */
+  emptyHint?: string;
 }
 
 const TYPE_LABEL: Record<FinancePositionType, string> = {
@@ -31,7 +35,7 @@ const FIELD_STYLE: React.CSSProperties = {
   background: "hsl(var(--surface))",
 };
 
-export const FinancePositionsTable: React.FC<Props> = ({ projectId, nodeId, positions }) => {
+export const FinancePositionsTable: React.FC<Props> = ({ projectId, nodeId, positions, background, emptyHint }) => {
   const navigate = useNavigate();
 
   const [dragId, setDragId] = useState<string | null>(null);
@@ -53,7 +57,7 @@ export const FinancePositionsTable: React.FC<Props> = ({ projectId, nodeId, posi
 
   return (
     <div className="rounded-xl border overflow-hidden"
-         style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}>
+         style={{ borderColor: "hsl(var(--hairline))", background: background ?? "hsl(var(--surface-card))" }}>
       <div className="grid items-center px-3 py-2 border-b text-[11px] font-semibold uppercase tracking-wider"
            style={{ gridTemplateColumns: "24px 1.4fr 1fr 1.2fr 1fr 2fr 72px", borderColor: "hsl(var(--hairline))", color: "hsl(var(--ink-soft))" }}>
         <span />
@@ -67,7 +71,7 @@ export const FinancePositionsTable: React.FC<Props> = ({ projectId, nodeId, posi
 
       {positions.length === 0 && (
         <div className="px-4 py-6 text-xs" style={{ color: "hsl(var(--ink-soft))" }}>
-          Noch keine Positionen. Über „+ Angebot", „+ Rechnung" oder „+ Nachtrag" anlegen.
+          {emptyHint ?? "Noch keine Positionen. Über „+ Angebot\u201c, „+ Rechnung\u201c oder „+ Nachtrag\u201c anlegen."}
         </div>
       )}
 

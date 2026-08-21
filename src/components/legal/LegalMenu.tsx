@@ -1,14 +1,53 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { FileText, Settings, Shield } from "lucide-react";
+import { Contrast, FileText, Moon, Settings, Shield, Sun } from "lucide-react";
+import { getTheme, isCanvasDark, setCanvasDark, setTheme, subscribeTheme } from "@/lib/theme";
 
-/** Kleines Popup mit Links zu Impressum & Datenschutz. */
+/** Liest die globalen Darstellungs-Einstellungen reaktiv. */
+export function useThemeSettings() {
+  const theme = useSyncExternalStore(subscribeTheme, getTheme, () => "light" as const);
+  const canvasDark = useSyncExternalStore(subscribeTheme, isCanvasDark, () => false);
+  return { theme, canvasDark };
+}
+
+/** Einstellungs-Popup: Darstellung (hell/dunkel/Zeichenfläche) + Rechtliches. */
 export function LegalMenuPopover({ onClose }: { onClose: () => void }) {
+  const { theme, canvasDark } = useThemeSettings();
+
   return (
     <div
       role="menu"
-      className="min-w-[190px] rounded-lg border bg-popover p-1 text-popover-foreground shadow-lg"
+      className="min-w-[220px] rounded-lg border bg-popover p-1 text-popover-foreground shadow-lg"
     >
+      <div className="px-2.5 pt-1.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+        Darstellung
+      </div>
+      <div className="flex items-center gap-1 px-1.5 pb-1.5">
+        <ThemeIconButton
+          active={theme === "light"}
+          title="Helles Design"
+          onClick={() => setTheme("light")}
+        >
+          <Sun size={15} />
+        </ThemeIconButton>
+        <ThemeIconButton
+          active={theme === "dark"}
+          title="Dunkles Design"
+          onClick={() => setTheme("dark")}
+        >
+          <Moon size={15} />
+        </ThemeIconButton>
+        <ThemeIconButton
+          active={canvasDark}
+          title="Nur Zeichenfläche schwarz (CAD & Projektmappe, auch beim Export)"
+          onClick={() => setCanvasDark(!canvasDark)}
+        >
+          <Contrast size={15} />
+        </ThemeIconButton>
+      </div>
+
+      <div className="my-1 h-px bg-border" />
+
       <Link
         to="/impressum"
         role="menuitem"
@@ -26,6 +65,29 @@ export function LegalMenuPopover({ onClose }: { onClose: () => void }) {
         <Shield size={14} /> Datenschutz
       </Link>
     </div>
+  );
+}
+
+function ThemeIconButton({
+  active, title, onClick, children,
+}: {
+  active: boolean; title: string; onClick: () => void; children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      title={title}
+      aria-label={title}
+      aria-pressed={active}
+      onClick={onClick}
+      className={`h-8 w-8 rounded-md border flex items-center justify-center transition-colors ${
+        active
+          ? "border-primary bg-primary/15 text-primary"
+          : "border-border text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -60,8 +122,8 @@ export default function LegalGearButton() {
       {open && <div className="absolute bottom-11 left-0">{<LegalMenuPopover onClose={() => setOpen(false)} />}</div>}
       <button
         type="button"
-        aria-label="Impressum & Datenschutz"
-        title="Impressum & Datenschutz"
+        aria-label="Einstellungen"
+        title="Einstellungen"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
         className="h-9 w-9 rounded-full border bg-background/95 text-muted-foreground shadow-sm backdrop-blur flex items-center justify-center hover:text-foreground"
