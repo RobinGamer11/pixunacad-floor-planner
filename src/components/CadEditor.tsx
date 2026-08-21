@@ -2,12 +2,16 @@ import React, { useRef, useEffect, useState, useCallback } from "react";
 import { DragScrollDiv } from "@/components/DragScrollDiv";
 import { CadApp } from "@/cad/CadApp";
 import { ToolIds, PointEditAction } from "@/cad/constants";
-import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Pipette, Sticker as StickerIcon, Pencil, Trash2, Download, Upload, Plus, FileImage, FileText, Maximize2, Ruler as RulerIcon, Eraser, Construction, BrickWall, PaintBucket, Grid3x3, DoorOpen, AppWindow, Move, RotateCw, PanelRightOpen, PanelRightClose, Crosshair, Scaling, Check, Scissors, Anchor as AnchorIcon, SquareDashed, BoxSelect, FlipHorizontal2, FolderOpen, Settings as SettingsIcon, Layers as LayersIcon, Scan, Frame, Bold as BoldIcon, Italic as ItalicIcon, Underline as UnderlineIcon, Strikethrough as StrikethroughIcon } from "lucide-react";
+import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Pipette, Sticker as StickerIcon, Pencil, Trash2, Download, Upload, Plus, FileImage, FileText, Maximize2, Ruler as RulerIcon, Eraser, Construction, BrickWall, PaintBucket, Grid3x3, DoorOpen, AppWindow, Move, RotateCw, PanelRightOpen, PanelRightClose, Crosshair, Scaling, Check, Scissors, Anchor as AnchorIcon, SquareDashed, BoxSelect, FlipHorizontal2, FolderOpen, Settings as SettingsIcon, Layers as LayersIcon, Scan, Frame, Bold as BoldIcon, Italic as ItalicIcon, Underline as UnderlineIcon, Strikethrough as StrikethroughIcon, Table as TableIcon } from "lucide-react";
 import type { HatchDrawMode } from "@/cad/HatchTool";
 import type { StickerDefinition } from "@/cad/StickerManager";
 import { instanceBoundingCornersWorld } from "@/cad/StickerManager";
 import { importFile, type ImportedPage } from "@/cad/documentImport";
 import { projectStore } from "@/lib/projectStore";
+import { CadTableLayer } from "@/components/cad/CadTableLayer";
+import { TableEditContext, TableFormulaPickContext, type FormulaFn, type TableSelection } from "@/components/page/TableElementView";
+import { TableToolSettings } from "@/components/page/TableToolSettings";
+import { cadTableStore } from "@/lib/cadTableStore";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -83,6 +87,7 @@ const CAD_TOOLS = [
   { id: ToolIds.STICKER, label: "Stempel", key: "O", icon: StickerIcon },
   { id: ToolIds.DOCUMENT, label: "Dokument", key: "D", icon: FileImage },
 ];
+
 
 
 // Sub-Werkzeuge unter "Linie": gemeinsam ein Einstellungsfenster mit
@@ -379,6 +384,18 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   }, [onCanDeleteChange]);
 
   const [activeTool, setActiveTool] = useState<string>(ToolIds.SELECT);
+  // ── Tabellen-Werkzeug (identisch zur Projektmappe, als DOM-Overlay) ──
+  const [tableTool, setTableTool] = useState(false);
+  const [tableSelectedId, setTableSelectedId] = useState<string | null>(null);
+  const [tableEditId, setTableEditId] = useState<string | null>(null);
+  const [tableSelection, setTableSelection] = useState<TableSelection | null>(null);
+  const [tableNewCols, setTableNewCols] = useState(3);
+  const [tableNewRows, setTableNewRows] = useState(4);
+  const [tableFormulaFn, setTableFormulaFn] = useState<FormulaFn | null>(null);
+  const tableSheetId = (appRef.current as any)?.activeSheetId || "default";
+  const tableElement = tableSelectedId
+    ? cadTableStore.list(projectId ?? "default", tableSheetId).find((t) => t.id === tableSelectedId)
+    : undefined;
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(true);
   const [rightOpen, setRightOpen] = useState<boolean>(true);
   const [rightTab, setRightTab] = useState<"settings" | "sheets" | "layers">("settings");
@@ -776,6 +793,9 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
 
     app.onToolChange = (id) => {
       setActiveTool(id);
+      // Engine-Werkzeug gewählt → Tabellen-Overlay-Werkzeug verlassen.
+      setTableTool(false);
+      setTableEditId(null);
       // Auswahl-Werkzeug → Seiteneinstellungen automatisch öffnen.
       if (id === ToolIds.SELECT) setRightTab("sheets");
       else setRightTab("settings");
@@ -1205,6 +1225,17 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const sidebarWidth = sidebarCollapsed ? 56 : 240;
 
   return (
+    <TableEditContext.Provider value={{
+      editId: tableEditId,
+      setEditId: setTableEditId,
+      selection: tableSelection,
+      setSelection: setTableSelection,
+      newCols: tableNewCols,
+      newRows: tableNewRows,
+      setNewCols: setTableNewCols,
+      setNewRows: setTableNewRows,
+    }}>
+    <TableFormulaPickContext.Provider value={{ fn: tableFormulaFn, setFn: setTableFormulaFn }}>
     <div className="flex w-full h-full overflow-hidden" style={{ background: "hsl(var(--surface))" }}>
       {/* Left Sidebar — im Präsentationsmodus ausgeblendet */}
       <aside
@@ -1334,6 +1365,22 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               </div>
             );
           })}
+          {/* Tabelle — identisch zur Projektmappe */}
+          <button
+            onClick={() => {
+              const app = appRef.current;
+              if (tableTool) { setTableTool(false); return; }
+              app?.setTool(ToolIds.SELECT);
+              setTableTool(true);
+              setTableEditId(null);
+              setRightTab("settings");
+            }}
+            title="Tabelle (B)"
+            className={`cad-rail-btn ${tableTool ? "active" : ""}`}
+          >
+            <TableIcon size={18} />
+            <span>Tabelle</span>
+          </button>
         </div>
 
 
@@ -1908,6 +1955,15 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
 
         {/* Canvas */}
         <canvas ref={canvasRef} data-cad-canvas className="block w-full h-full" />
+
+        {/* Tabellen-Objekte (DOM-Overlay über dem Canvas) */}
+        <CadTableLayer
+          app={appRef.current}
+          projectId={projectId ?? "default"}
+          toolActive={tableTool}
+          selectedId={tableSelectedId}
+          setSelectedId={setTableSelectedId}
+        />
 
         {/* Hilfeanzeige wie in der Mappe — werkzeugabhängig. */}
         {!presenting && helpOn && (
@@ -3296,7 +3352,32 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               </div>
             </div>
           )}
-          {(activeTool !== ToolIds.ERASER
+          {tableTool && (
+            <div className="cad-settings-panel mb-2">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+                Tabelle
+              </div>
+              <TableToolSettings
+                projectId={projectId ?? "default"}
+                pageId={tableSheetId}
+                tableElement={tableElement as any}
+                isPending={false}
+                formulaFn={tableFormulaFn}
+                setFormulaFn={setTableFormulaFn}
+                onPatch={(patch) => {
+                  if (tableSelectedId) cadTableStore.patch(projectId ?? "default", tableSheetId, tableSelectedId, patch as any);
+                }}
+                onConfirm={() => { setTableTool(false); setTableEditId(null); }}
+                onCancel={() => {
+                  if (tableSelectedId) cadTableStore.remove(projectId ?? "default", tableSheetId, tableSelectedId);
+                  setTableSelectedId(null);
+                  setTableEditId(null);
+                  setTableTool(false);
+                }}
+              />
+            </div>
+          )}
+          {!tableTool && (activeTool !== ToolIds.ERASER
             && activeTool !== ToolIds.PIPETTE
             && activeTool !== ToolIds.SELECT
             && activeTool !== ToolIds.STICKER
@@ -3400,6 +3481,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
         </div>
       )}
     </div>
+    </TableFormulaPickContext.Provider>
+    </TableEditContext.Provider>
   );
 });
 CadEditor.displayName = "CadEditor";

@@ -32,6 +32,7 @@ export function TableToolSettings({
   setFormulaFn,
   onConfirm,
   onCancel,
+  onPatch,
 }: {
   projectId: string;
   pageId: string;
@@ -43,6 +44,8 @@ export function TableToolSettings({
   setFormulaFn?: (f: FormulaFn | null) => void;
   onConfirm: () => void;
   onCancel: () => void;
+  /** Alternative Persistenz (CAD-Oberfläche): ersetzt projectStore-Update. */
+  onPatch?: (patch: Partial<PageElement>) => void;
 }) {
   const ctx = React.useContext(TableEditContext);
   const editMode = !!tableElement && ctx?.editId === tableElement.id;
@@ -82,7 +85,8 @@ export function TableToolSettings({
       patch.w = Math.max(1, Math.min(100, (wMm / pageWmm) * 100));
       patch.h = Math.max(1, Math.min(100, (hMm / pageHmm) * 100));
     }
-    projectStore.updateElement(projectId, pageId, tableElement.id, patch as any);
+    if (onPatch) onPatch(patch);
+    else projectStore.updateElement(projectId, pageId, tableElement.id, patch as any);
   };
 
   const patchTable = (patch: Partial<TableModel>) => commit({ ...model, ...patch });

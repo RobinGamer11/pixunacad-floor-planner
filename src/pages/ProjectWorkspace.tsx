@@ -3994,7 +3994,9 @@ function ElementView({
       return;
     }
     setAnchor({ fx, fy, key });
-    if ((cadHubUx && selected) || hubMode || edgeTrim) {
+    // Tabellen: Verschieben ausschließlich über die Fangpunkte (HUB) —
+    // ein Ziehen der Fläche darf das Objekt nie bewegen.
+    if ((cadHubUx && (selected || tableHubUx)) || hubMode || edgeTrim) {
       onSelect?.({ shift: e.shiftKey });
       if (!key.startsWith("edge-")) setActiveEdge(null);
       if (hubMode && !!(window as any).__pixunaTabletCommit) {
