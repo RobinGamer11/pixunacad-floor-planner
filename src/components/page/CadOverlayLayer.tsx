@@ -445,8 +445,9 @@ export default function CadOverlayLayer(props: Props) {
               position: "absolute",
               left: Math.max(8, docHub.screenX + 12),
               top: Math.max(8, docHub.screenY + 12),
-              background: "white",
-              border: "1px solid hsl(var(--border))",
+              background: HUB_BG,
+              color: HUB_FG,
+              border: `1px solid ${HUB_BORDER}`,
               borderRadius: 6,
               padding: "6px 8px",
               boxShadow: "0 4px 16px -4px rgba(0,0,0,0.18)",
@@ -463,7 +464,7 @@ export default function CadOverlayLayer(props: Props) {
               type="button"
               title="Verschieben (Δx, Δy in m)"
               onClick={() => setDocHub(h => ({ ...h, mode: h.mode === "move" ? "none" : "move" }))}
-              style={{ ...hubBtnStyle, background: docHub.mode === "move" ? "hsl(var(--accent))" : "white" }}
+              style={{ ...hubBtnStyle, background: docHub.mode === "move" ? "hsl(var(--accent))" : HUB_BG }}
             >
               <Move size={14} strokeWidth={1.6} className="shrink-0" />
             </button>
@@ -491,7 +492,7 @@ export default function CadOverlayLayer(props: Props) {
                 }
                 setDocHub(h => ({ ...h, mode: h.mode === "rotate" ? "none" : "rotate" }));
               }}
-              style={{ ...hubBtnStyle, background: docHub.mode === "rotate" ? "hsl(var(--accent))" : "white" }}
+              style={{ ...hubBtnStyle, background: docHub.mode === "rotate" ? "hsl(var(--accent))" : HUB_BG }}
             >
               <RotateCw size={14} />
             </button>
@@ -508,7 +509,7 @@ export default function CadOverlayLayer(props: Props) {
               type="button"
               title="Skalieren (Faktor um Zentrum)"
               onClick={() => setDocHub(h => ({ ...h, mode: h.mode === "scale" ? "none" : "scale" }))}
-              style={{ ...hubBtnStyle, background: docHub.mode === "scale" ? "hsl(var(--accent))" : "white" }}
+              style={{ ...hubBtnStyle, background: docHub.mode === "scale" ? "hsl(var(--accent))" : HUB_BG }}
             >
               <Scaling size={14} />
             </button>
@@ -526,7 +527,7 @@ export default function CadOverlayLayer(props: Props) {
                 type="button"
                 title={`Kante "${docHub.cropSide}" zuschneiden (Klick auf Canvas setzt neue Kante)`}
                 onClick={() => setDocHub(h => ({ ...h, mode: h.mode === "crop" ? "none" : "crop" }))}
-                style={{ ...hubBtnStyle, background: docHub.mode === "crop" ? "hsl(var(--accent))" : "white" }}
+                style={{ ...hubBtnStyle, background: docHub.mode === "crop" ? "hsl(var(--accent))" : HUB_BG }}
               >
                 <Scissors size={14} />
               </button>
@@ -540,8 +541,9 @@ export default function CadOverlayLayer(props: Props) {
           className="hidden"
           style={{
             position: "absolute",
-            background: "white",
-            border: "1px solid hsl(var(--hairline))",
+            background: HUB_BG,
+            color: HUB_FG,
+            border: `1px solid ${HUB_BORDER}`,
             borderRadius: 6,
             padding: 6,
             boxShadow: "0 4px 16px -4px rgba(0,0,0,0.18)",
@@ -550,9 +552,9 @@ export default function CadOverlayLayer(props: Props) {
           }}
         >
           <input ref={hubLenRef} data-hub-control type="text" readOnly
-            style={{ width: 72, fontSize: 11, padding: "2px 4px", border: "1px solid hsl(var(--hairline))", borderRadius: 4 }} />
+            style={{ width: 72, fontSize: 11, padding: "2px 4px", border: `1px solid ${HUB_BORDER}`, borderRadius: 4, background: HUB_FIELD, color: HUB_FG }} />
           <input ref={hubAngRef} data-hub-control type="text" readOnly
-            style={{ width: 56, fontSize: 11, padding: "2px 4px", border: "1px solid hsl(var(--hairline))", borderRadius: 4 }} />
+            style={{ width: 56, fontSize: 11, padding: "2px 4px", border: `1px solid ${HUB_BORDER}`, borderRadius: 4, background: HUB_FIELD, color: HUB_FG }} />
         </div>
         {/* PointEditMenu */}
         <div
@@ -561,8 +563,9 @@ export default function CadOverlayLayer(props: Props) {
           className="hidden"
           style={{
             position: "absolute",
-            background: "white",
-            border: "1px solid hsl(var(--hairline))",
+            background: HUB_BG,
+            color: HUB_FG,
+            border: `1px solid ${HUB_BORDER}`,
             borderRadius: 6,
             padding: 4,
             boxShadow: "0 4px 16px -4px rgba(0,0,0,0.18)",
@@ -587,8 +590,9 @@ export default function CadOverlayLayer(props: Props) {
           className="hidden"
           style={{
             position: "absolute",
-            background: "white",
-            border: "1px solid hsl(var(--hairline))",
+            background: HUB_BG,
+            color: HUB_FG,
+            border: `1px solid ${HUB_BORDER}`,
             borderRadius: 6,
             padding: "4px 6px",
             boxShadow: "0 4px 16px -4px rgba(0,0,0,0.18)",
@@ -600,15 +604,15 @@ export default function CadOverlayLayer(props: Props) {
           <button ref={teBoldRef} style={{ ...toolbarBtn, fontWeight: 700 }} title="Fett">B</button>
           <button ref={teItalicRef} style={{ ...toolbarBtn, fontStyle: "italic" }} title="Kursiv">I</button>
           <input ref={teColorRef} type="color" defaultValue="#111111"
-            style={{ width: 26, height: 22, padding: 0, border: "1px solid hsl(var(--hairline))", borderRadius: 4, background: "white" }} />
+            style={{ width: 26, height: 22, padding: 0, border: `1px solid ${HUB_BORDER}`, borderRadius: 4, background: HUB_FIELD }} />
           <select ref={teSizeRef} defaultValue="16"
-            style={{ height: 22, fontSize: 11, padding: "0 4px", border: "1px solid hsl(var(--hairline))", borderRadius: 4, background: "white" }}>
+            style={{ height: 22, fontSize: 11, padding: "0 4px", border: `1px solid ${HUB_BORDER}`, borderRadius: 4, background: HUB_FIELD, color: HUB_FG }}>
             {[8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 40, 48, 64].map((s) => (
               <option key={s} value={String(s)}>{s} px</option>
             ))}
           </select>
           <select ref={teSymbolRef} defaultValue=""
-            style={{ height: 22, fontSize: 11, padding: "0 4px", border: "1px solid hsl(var(--hairline))", borderRadius: 4, background: "white" }}>
+            style={{ height: 22, fontSize: 11, padding: "0 4px", border: `1px solid ${HUB_BORDER}`, borderRadius: 4, background: HUB_FIELD, color: HUB_FG }}>
             <option value="">⚙ Symbol</option>
             <option value="°">° Grad</option>
             <option value="±">± Plus/Minus</option>
@@ -626,26 +630,31 @@ export default function CadOverlayLayer(props: Props) {
 }
 
 
+const HUB_BG = "hsl(var(--cad-hub))";
+const HUB_BORDER = "hsl(var(--cad-hub-border))";
+const HUB_FG = "hsl(var(--cad-toolbar-foreground))";
+const HUB_FIELD = "hsl(var(--cad-toolbar-hover))";
+
 const pointEditBtn: React.CSSProperties = {
   width: 24, height: 24, fontSize: 12, padding: 0, lineHeight: 1,
-  border: "1px solid hsl(var(--hairline))",
-  borderRadius: 4, background: "white", cursor: "pointer",
+  border: `1px solid ${HUB_BORDER}`,
+  borderRadius: 4, background: HUB_BG, color: HUB_FG, cursor: "pointer",
   display: "inline-flex", alignItems: "center", justifyContent: "center",
 };
 const toolbarBtn: React.CSSProperties = {
   width: 26, height: 22, fontSize: 12, padding: 0,
-  border: "1px solid hsl(var(--hairline))",
-  borderRadius: 4, background: "white", cursor: "pointer", lineHeight: 1,
+  border: `1px solid ${HUB_BORDER}`,
+  borderRadius: 4, background: HUB_BG, color: HUB_FG, cursor: "pointer", lineHeight: 1,
   display: "inline-flex", alignItems: "center", justifyContent: "center",
 };
 const hubBtnStyle: React.CSSProperties = {
   width: 28, height: 28,
   border: "1px solid hsl(var(--border))",
-  borderRadius: 4, background: "white", cursor: "pointer",
+  borderRadius: 4, background: HUB_BG, color: HUB_FG, cursor: "pointer",
   display: "inline-flex", alignItems: "center", justifyContent: "center",
 };
 const hubInputStyle: React.CSSProperties = {
   width: 60, fontSize: 11, padding: "3px 6px",
-  border: "1px solid hsl(var(--border))",
-  borderRadius: 4, fontVariantNumeric: "tabular-nums",
+  border: `1px solid ${HUB_BORDER}`,
+  borderRadius: 4, background: HUB_FIELD, color: HUB_FG, fontVariantNumeric: "tabular-nums",
 };
