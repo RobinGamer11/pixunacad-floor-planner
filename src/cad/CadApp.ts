@@ -2632,6 +2632,13 @@ export class CadApp {
           return;
         }
         if (this.selection && (this.selection.type === SelectionType.TEXTBOX || this.selection.type === SelectionType.TEXTBOX_HANDLE)) {
+          const tbl = this.getSelectedTable();
+          if (tbl) {
+            (this.scene as any).removeTable(tbl);
+            this.endTableEdit();
+            this.clearSelection(); this.refreshLabelUI();
+            return;
+          }
           const box = this.getEditTextBox();
           if (box) { this.scene.removeTextBox(box); this.clearSelection(); this.refreshLabelUI(); }
           return;
