@@ -271,6 +271,19 @@ export function actionTotals(state: FinanceState, node: FinanceNode): FinanceTot
   };
 }
 
+/** Summiert eine beliebige Positionsliste (z. B. nur archivierte oder nur angelegte Belege). */
+export function positionTotals(positions: FinancePosition[], estimate = 0): FinanceTotals {
+  let offers = 0, invoicesBase = 0, supplements = 0;
+  for (const p of positions) {
+    const amt = p.amount || 0;
+    if (p.type === "offer") offers += amt;
+    else if (p.type === "invoice") invoicesBase += amt;
+    else supplements += p.supplementKind === "minus" ? -amt : amt;
+  }
+  return { estimate, offers, invoicesBase, supplements, invoices: invoicesBase + supplements };
+}
+
+
 /** Summiert einen Knoten rekursiv; ausgeschaltete Kinder werden ignoriert. */
 export function nodeTotals(state: FinanceState, node: FinanceNode): FinanceTotals {
   if (node.type === "action") return actionTotals(state, node);
