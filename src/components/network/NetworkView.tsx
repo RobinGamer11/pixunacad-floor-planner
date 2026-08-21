@@ -287,27 +287,8 @@ export function NetworkView({
 
   return (
     <div className="mt-6">
-      {/* Statuswahl */}
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">MEIN STATUS</span>
-        {(["online", "away", "busy", "offline"] as PresenceStatus[]).map((s) => (
-          <button
-            key={s}
-            onClick={() => { projectStore.updateProfile({ status: s }); net.setStatus(s); }}
-            className="h-7 px-2.5 rounded-md border text-xs flex items-center gap-1.5"
-            style={{
-              borderColor: myStatus === s ? presenceColor(s) : "hsl(var(--hairline))",
-              background: myStatus === s ? `${presenceColor(s)}22` : "transparent",
-            }}
-          >
-            <span className="w-2 h-2 rounded-full" style={{ background: presenceColor(s) }} />
-            {presenceLabel(s)}
-          </button>
-        ))}
-      </div>
-
       {/* Tabs */}
-      <div className="mt-4 flex items-center gap-2">
+      <div className="flex items-center gap-2">
         {tabs.map((t) => (
           <button
             key={t.id}

@@ -431,7 +431,7 @@ export default function ProjectsHome() {
           <HeaderDivider />
           <NavIcon
             icon={<ListChecks size={18} strokeWidth={1.5} />}
-            label="Alle Aufgaben"
+            label="Allg. Organisation"
             active={showAllTasks && !hub}
             onClick={() => { setHub(null); setMode("projects"); setShowAllTasks(true); }}
           />
