@@ -1,10 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, Building2, ChevronDown, ChevronRight, Folder, Home } from "lucide-react";
+import { ArrowRight, Home } from "lucide-react";
 import {
-  financeStore, childrenOf, nodeTotals, projectTotals, control, positionsOf, positionTotals,
-  formatEur, formatPct,
-  type FinanceState, type FinanceNode, type FinancePosition,
+  financeStore, childrenOf, positionsOf, positionTotals,
+  type FinanceState, type FinancePosition,
 } from "@/lib/financeStore";
 import { FinanceSummaryCard } from "@/components/finance/FinanceSummaryCard";
 
@@ -45,8 +44,6 @@ export function FinanceProjectOverview({
     return () => { unsub(); };
   }, [projectId]);
 
-  const totals = projectTotals(state);
-  const roots = childrenOf(state, null);
   const all = collectPositions(state, null);
   const archived = all.filter((p) => !p.hasTemplate);
   const created = all.filter((p) => p.hasTemplate);
@@ -96,63 +93,6 @@ export function FinanceProjectOverview({
           Noch keine Finanz-Einträge. Lege sie in der Finanzen-Oberfläche an.
         </div>
       )}
-    </div>
-  );
-}
-
-
-function NodeTable({ state, nodes }: { state: FinanceState; nodes: FinanceNode[] }) {
-  const [open, setOpen] = useState<Record<string, boolean>>({});
-  const cols = "1.6fr 1fr 1fr 1fr 1.2fr";
-  return (
-    <div
-      className="rounded-xl border overflow-hidden"
-      style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
-    >
-      <div
-        className="grid items-center px-3 py-2 border-b text-[11px] font-semibold uppercase tracking-wider"
-        style={{ gridTemplateColumns: cols, borderColor: "hsl(var(--hairline))", color: "hsl(var(--ink-soft))" }}
-      >
-        <span>Bezeichnung</span><span>Schätzung</span><span>Angebote</span>
-        <span>Rechnungen</span><span>Kontrolle (Ang./Re.)</span>
-      </div>
-      {nodes.map((n) => {
-        const t = nodeTotals(state, n);
-        const cO = control(t.estimate, t.offers);
-        const cI = control(t.estimate, t.invoices);
-        const kids = childrenOf(state, n.id);
-        const isOpen = !!open[n.id];
-        return (
-          <div key={n.id}>
-            <div
-              className="grid items-center px-3 py-2 border-b text-sm"
-              style={{ gridTemplateColumns: cols, borderColor: "hsl(var(--hairline))", opacity: n.enabled ? 1 : 0.45 }}
-            >
-              <button
-                className="flex items-center gap-1.5 min-w-0 text-left"
-                onClick={() => kids.length > 0 && setOpen((o) => ({ ...o, [n.id]: !o[n.id] }))}
-              >
-                {kids.length > 0
-                  ? (isOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />)
-                  : <span className="w-[13px]" />}
-                {n.type === "overview" ? <Folder size={14} /> : <Building2 size={14} />}
-                <span className="truncate font-medium">{n.name}</span>
-              </button>
-              <span className="tabular-nums">{formatEur(t.estimate)}</span>
-              <span className="tabular-nums" style={{ color: "hsl(24 95% 50%)" }}>{formatEur(t.offers)}</span>
-              <span className="tabular-nums">{formatEur(t.invoices)}</span>
-              <span className="text-xs" style={{ color: "hsl(var(--ink-soft))" }}>
-                {formatPct(cO.pct)} / {formatPct(cI.pct)}
-              </span>
-            </div>
-            {isOpen && kids.length > 0 && (
-              <div className="pl-6 border-b" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-muted))" }}>
-                <NodeTable state={state} nodes={kids} />
-              </div>
-            )}
-          </div>
-        );
-      })}
     </div>
   );
 }
