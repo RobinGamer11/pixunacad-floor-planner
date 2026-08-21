@@ -61,8 +61,6 @@ const App = () => (
               <Route path="/project/:projectId/cad" element={<CadPage />} />
               <Route path="/project/:projectId/cad/:sheetId" element={<CadPage />} />
               <Route path="/project/:projectId/board" element={<BoardPage />} />
-              <Route path="/project/:projectId/board2" element={<Navigate to="../board" replace />} />
-              <Route path="/project/:projectId/notes" element={<Navigate to="../board" replace />} />
               <Route path="/project/:projectId/finance" element={<FinancePage />} />
               <Route path="/cad" element={<CadPage />} />
             </Route>

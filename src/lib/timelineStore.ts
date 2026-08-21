@@ -1,5 +1,6 @@
-// Store für die Board02-Oberfläche (Zeitstrahl).
+// Store für die Board-Oberfläche (Zeitstrahl & Projektnetz).
 // Persistiert projektbezogen in localStorage: pixuna.board02.<projectId>
+
 
 export type TlKind = "task" | "event" | "note";
 
@@ -28,7 +29,10 @@ export interface TlItem {
   endTime?: string;
   createdAt: number;
   updatedAt: number;
+  /** Von der Startseite angelegt/bearbeitet – im Board blau hervorgehoben, bis angeklickt. */
+  fresh?: boolean;
 }
+
 
 export interface TlState {
   categories: TlCategory[];
@@ -270,6 +274,18 @@ export const timelineStore = {
         : p)),
     });
   },
+  /** Markiert einen Eintrag als „neu von der Startseite“ (blaues Aufleuchten im Board). */
+  markFresh(projectId: string, id: string) {
+    const s = getState(projectId);
+    if (!s.items.some((i) => i.id === id && !i.fresh)) return;
+    persist(projectId, { ...s, items: s.items.map((i) => (i.id === id ? { ...i, fresh: true } : i)) });
+  },
+  /** Hebt die blaue Hervorhebung auf (einmaliges Anklicken im Board). */
+  clearFresh(projectId: string, id: string) {
+    const s = getState(projectId);
+    if (!s.items.some((i) => i.id === id && i.fresh)) return;
+    persist(projectId, { ...s, items: s.items.map((i) => (i.id === id ? { ...i, fresh: false } : i)) });
+  },
   removePriority(projectId: string, id: string) {
     const s = getState(projectId);
     commit(projectId, {
@@ -282,6 +298,11 @@ export const timelineStore = {
 
 import { useSyncExternalStore } from "react";
 const EMPTY: TlState = { categories: [], priorities: [], statuses: DEFAULT_STATUSES, items: [] };
+
+/** Abo auf Änderungen eines Projekt-Boards (z. B. für projektübergreifende Listen). */
+export function subscribeTimeline(projectId: string, fn: () => void): () => void {
+  return subscribe(projectId, fn);
+}
 
 export function useTimeline(projectId: string | undefined): TlState {
   return useSyncExternalStore(
@@ -387,13 +408,33 @@ export function projectProgress(projectId: string, now = Date.now()): number {
 export function addQuickItem(
   projectId: string,
   kind: TlKind,
-  data: { title: string; description?: string; date?: string },
+  data: { title: string; description?: string; date?: string; categoryId?: string; priorityId?: string },
 ): TlItem {
   return timelineStore.addItem(projectId, kind, {
     title: data.title,
     description: data.description ?? "",
-    categoryId: QUICK_CATEGORY_ID,
-    priorityId: "normal",
+    categoryId: data.categoryId ?? QUICK_CATEGORY_ID,
+    priorityId: data.priorityId ?? "normal",
     startDate: data.date || new Date().toISOString().slice(0, 10),
+    fresh: true,
   });
+}
+
+/* ---------------- Board-Oberflächenmodus (Ansichtstrahl / Projektnetz) ---------------- */
+
+export type BoardSurface = "ray" | "net";
+const SURFACE_KEY = (projectId: string) => `pixuna.board.surface.${projectId}`;
+
+export function getBoardSurface(projectId: string | undefined): BoardSurface {
+  if (!projectId) return "ray";
+  try {
+    return localStorage.getItem(SURFACE_KEY(projectId)) === "net" ? "net" : "ray";
+  } catch {
+    return "ray";
+  }
+}
+
+export function setBoardSurface(projectId: string | undefined, surface: BoardSurface) {
+  if (!projectId) return;
+  try { localStorage.setItem(SURFACE_KEY(projectId), surface); } catch {}
 }

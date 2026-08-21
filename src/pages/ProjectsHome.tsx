@@ -60,8 +60,11 @@ import {
   itemAchieved,
   taskAlert,
   projectProgress,
+  subscribeTimeline,
+  QUICK_CATEGORY_ID,
   type TlKind,
 } from "@/lib/timelineStore";
+import { BoardMiniPreview } from "@/components/board/BoardMiniPreview";
 import { WeatherStrip } from "@/components/project/WeatherStrip";
 import { UebersichtView } from "@/components/project/UebersichtView";
 import { FileBrowser } from "@/components/project/FileBrowser";
@@ -630,7 +633,7 @@ export default function ProjectsHome() {
               </div>
             )}
 
-            <div className="flex-1 overflow-y-auto px-3 pb-4 space-y-1">
+            <div className="flex-1 overflow-y-auto px-3 pt-2 pb-4 space-y-1">
               {/* Ordner */}
               {folders.map((f) => {
                 const inside = projectsByFolder.get(f.id) ?? [];
@@ -881,7 +884,7 @@ export default function ProjectsHome() {
           ) : hub === "trash" ? (
             <TrashView activeCount={projectCount} />
           ) : showAllTasks ? (
-            <AllTasksView projects={projects} onOpenProject={(id) => { setMode("projects"); setShowAllTasks(false); setSelectedId(id); }} />
+            <AllTasksView projects={projects} />
           ) : mode === "templates" && !selected ? (
             <div className="px-10 py-7">
               <div className="flex items-center gap-3">
@@ -1668,6 +1671,8 @@ export function AufgabenView({ project }: { project: Project }) {
   const [selectedDate, setSelectedDate] = useState<string | undefined>(undefined);
   const [kind, setKind] = useState<TlKind>("task");
   const [draft, setDraft] = useState({ title: "", description: "" });
+  const [catId, setCatId] = useState<string>(QUICK_CATEGORY_ID);
+  const [prioId, setPrioId] = useState<string>("normal");
 
   const catMap = useMemo(
     () => new Map(board.categories.map((c) => [c.id, c])),
@@ -1707,6 +1712,8 @@ export function AufgabenView({ project }: { project: Project }) {
       title: draft.title.trim(),
       description: draft.description.trim() || undefined,
       date: selectedDate || undefined,
+      categoryId: catId,
+      priorityId: prioId,
     });
     setDraft({ title: "", description: "" });
   };
@@ -1781,9 +1788,45 @@ export function AufgabenView({ project }: { project: Project }) {
             className="px-3 py-2 rounded-md border bg-transparent text-sm outline-none w-full resize-y min-h-[220px]"
             style={{ borderColor: "hsl(var(--hairline))" }}
           />
+          {/* Kategorie & Priorität aus der Board-Oberfläche */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-[11px] text-muted-foreground mr-1">Kategorie</span>
+            {board.categories.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => setCatId(c.id)}
+                className="h-8 px-3 rounded-md text-xs font-medium border flex items-center gap-1.5"
+                style={{
+                  borderColor: catId === c.id ? c.color : "hsl(var(--hairline))",
+                  background: catId === c.id ? `${c.color}22` : "transparent",
+                  color: "hsl(var(--ink-soft))",
+                }}
+              >
+                <span className="w-2 h-2 rounded-full" style={{ background: c.color }} />
+                {c.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-[11px] text-muted-foreground mr-1">Priorität</span>
+            {board.priorities.map((pr) => (
+              <button
+                key={pr.id}
+                onClick={() => setPrioId(pr.id)}
+                className="h-8 px-3 rounded-md text-xs font-medium border"
+                style={{
+                  borderColor: prioId === pr.id ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
+                  background: prioId === pr.id ? "hsl(var(--accent-gold-soft))" : "transparent",
+                  color: prioId === pr.id ? "hsl(var(--accent-gold))" : "hsl(var(--ink-soft))",
+                }}
+              >
+                {pr.label} · {pr.percent}%
+              </button>
+            ))}
+          </div>
           <div className="flex items-center gap-3">
             <span className="text-[11px] text-muted-foreground">
-              Kategorie „Schnellablage“ · {selectedDate ? selectedDate : "heutiges Datum"} · Priorität „Normal“
+              {selectedDate ? selectedDate : "heutiges Datum"} · ohne Uhrzeit
             </span>
             <div className="flex-1" />
             <button
@@ -1826,7 +1869,7 @@ export function AufgabenView({ project }: { project: Project }) {
               key={t.id}
               task={t}
               projectId={project.id}
-              onOpenInBoard={() => navigate(`/project/${project.id}/board`)}
+              onOpenInBoard={() => navigate(`/project/${project.id}/board?item=${t.id}`)}
             />
           ))}
         </div>
@@ -1840,12 +1883,14 @@ function UnifiedTaskRow({
 }: { task: UnifiedTask; projectId: string; onOpenInBoard: () => void }) {
   const dotColor = task.alert ? "hsl(0 70% 55%)" : task.done ? "hsl(var(--accent-gold))" : "hsl(var(--ink-soft))";
 
-  const toggle = () =>
+  const toggle = () => {
     timelineStore.updateItem(projectId, task.id, {
       statusId: task.done ? "open" : "done",
       done: !task.done,
       statusManual: true,
     });
+    timelineStore.markFresh(projectId, task.id);
+  };
   const remove = () => timelineStore.deleteItem(projectId, task.id);
 
   return (
@@ -2681,41 +2726,22 @@ function ProjectDonut({ projectId, size = 96 }: { projectId: string; size?: numb
   const percent = total
     ? Math.round((state.items.filter((i) => itemAchieved(i, now)).length / total) * 100)
     : 0;
-  const slices = state.categories
-    .map((c) => ({ c, n: state.items.filter((i) => i.categoryId === c.id).length }))
-    .filter((s) => s.n > 0);
+  const stroke = size * 0.16;
   const R = size / 2;
-  const inner = R * 0.62;
-  const stroke = R * 0.16;
-  let acc = -Math.PI / 2;
-  const sum = slices.reduce((a, s) => a + s.n, 0) || 1;
+  const r = R - stroke / 2 - 1;
+  const circ = 2 * Math.PI * r;
 
   return (
     <svg width={size} height={size} className="shrink-0">
-      {/* Kategorie-Segmente */}
-      {slices.map((s) => {
-        const ang = (s.n / sum) * Math.PI * 2;
-        const a0 = acc, a1 = acc + ang;
-        acc = a1;
-        const large = ang > Math.PI ? 1 : 0;
-        const d = ang >= Math.PI * 2 - 1e-6
-          ? `M ${R} ${R - R} A ${R} ${R} 0 1 1 ${R - 0.01} ${0} Z`
-          : `M ${R} ${R} L ${R + Math.cos(a0) * R} ${R + Math.sin(a0) * R} A ${R} ${R} 0 ${large} 1 ${R + Math.cos(a1) * R} ${R + Math.sin(a1) * R} Z`;
-        return <path key={s.c.id} d={d} fill={s.c.color} opacity={0.85} />;
-      })}
-      {!slices.length && <circle cx={R} cy={R} r={R} fill="hsl(var(--surface-muted))" />}
-      {/* Fortschrittsring */}
-      <circle cx={R} cy={R} r={inner + stroke / 2} fill="none"
-              stroke="hsl(var(--surface))" strokeWidth={stroke} opacity={0.35} />
+      <circle cx={R} cy={R} r={r} fill="none" stroke="hsl(var(--surface-muted))" strokeWidth={stroke} />
       <circle
-        cx={R} cy={R} r={inner + stroke / 2} fill="none"
+        cx={R} cy={R} r={r} fill="none"
         stroke="hsl(var(--accent-gold))" strokeWidth={stroke} strokeLinecap="round"
-        strokeDasharray={`${(percent / 100) * 2 * Math.PI * (inner + stroke / 2)} ${2 * Math.PI * (inner + stroke / 2)}`}
+        strokeDasharray={`${(percent / 100) * circ} ${circ}`}
         transform={`rotate(-90 ${R} ${R})`}
       />
-      <circle cx={R} cy={R} r={inner} fill="hsl(var(--surface-card))" />
-      <text x={R} y={R + size * 0.055} textAnchor="middle"
-            fontSize={size * 0.22} fontWeight={700} fill="hsl(var(--ink))">
+      <text x={R} y={R + size * 0.075} textAnchor="middle"
+            fontSize={size * 0.24} fontWeight={700} fill="hsl(var(--ink))">
         {percent}%
       </text>
     </svg>
@@ -2847,15 +2873,11 @@ function ProjectCarousel({ projects, onOpen }: { projects: Project[]; onOpen: (i
   );
 }
 
-/** Kompakte Vorschau der Board-Oberfläche eines Projekts. */
+/** Kompakte Vorschau der Board-Oberfläche eines Projekts (Ansichtstrahl oder Projektnetz). */
 function BoardPreview({ project }: { project: Project }) {
   const navigate = useNavigate();
   const state = useTimeline(project.id);
   const now = Date.now();
-  const upcoming = [...state.items]
-    .sort((a, b) => (a.endDate || a.startDate).localeCompare(b.endDate || b.startDate))
-    .slice(0, 6);
-  const catMap = new Map(state.categories.map((c) => [c.id, c]));
   const total = state.items.length;
   const percent = total
     ? Math.round((state.items.filter((i) => itemAchieved(i, now)).length / total) * 100)
@@ -2878,35 +2900,21 @@ function BoardPreview({ project }: { project: Project }) {
       <div className="h-2 w-full rounded-full overflow-hidden mb-3" style={{ background: "#241f1b" }}>
         <div className="h-full rounded-full" style={{ width: `${percent}%`, background: "#e2703a" }} />
       </div>
-      <div className="space-y-1.5">
-        {upcoming.length === 0 && (
-          <div className="text-[11px]" style={{ color: "#6f665e" }}>Noch keine Einträge im Board.</div>
-        )}
-        {upcoming.map((i) => {
-          const alert = taskAlert(i, now);
-          return (
-            <div key={i.id} className="flex items-center gap-2 text-[11px]" style={{ color: "#cdc4bb" }}>
-              <span className="w-2 h-2 rounded-full shrink-0"
-                    style={{ background: alert ? "#ef4444" : itemAchieved(i, now) ? "#e2703a" : "#a19a92" }} />
-              <span className="truncate flex-1">{i.title}</span>
-              <span className="shrink-0" style={{ color: "#8b837b" }}>
-                {catMap.get(i.categoryId ?? "")?.label ?? "—"}
-              </span>
-              <span className="shrink-0 tabular-nums" style={{ color: "#8b837b" }}>
-                {(i.endDate || i.startDate).split("-").reverse().join(".")}
-              </span>
-            </div>
-          );
-        })}
-      </div>
+      <BoardMiniPreview projectId={project.id} projectName={project.name} />
     </div>
   );
 }
 
-function AllTasksView({ projects, onOpenProject }: { projects: Project[]; onOpenProject: (id: string) => void }) {
+function AllTasksView({ projects }: { projects: Project[] }) {
   const navigate = useNavigate();
   const [activeIds, setActiveIds] = useState<Set<string>>(() => new Set(projects.map((p) => p.id)));
   const [previewId, setPreviewId] = useState<string | null>(null);
+  // Board-Änderungen aller Projekte live übernehmen.
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const offs = projects.map((p) => subscribeTimeline(p.id, () => setTick((t) => t + 1)));
+    return () => offs.forEach((off) => off());
+  }, [projects]);
   useEffect(() => {
     setActiveIds((prev) => {
       const next = new Set(prev);
@@ -2958,20 +2966,28 @@ function AllTasksView({ projects, onOpenProject }: { projects: Project[]; onOpen
       if (a.alert !== b.alert) return a.alert ? -1 : 1;
       return `${a.date ?? "9999"} ${a.time ?? "99:99"}`.localeCompare(`${b.date ?? "9999"} ${b.time ?? "99:99"}`);
     });
-  }, [projects]);
+  }, [projects, tick]);
 
   const [selectedDate, setSelectedDate] = useState<string | undefined>();
   const visible = gTasks.filter(
-    (t) => !t.done && activeIds.has(t.projectId) && (!selectedDate || t.date === selectedDate)
+    (t) => activeIds.has(t.projectId) && (!selectedDate || t.date === selectedDate)
   );
 
   return (
     <div className="px-10 py-7">
-      <ProjectCarousel projects={projects} onOpen={onOpenProject} />
+      <ProjectCarousel
+        projects={projects}
+        onOpen={(id) => {
+          setPreviewId(id);
+          window.requestAnimationFrame(() =>
+            document.getElementById(`projektstand-${id}`)?.scrollIntoView({ behavior: "smooth", block: "center" }),
+          );
+        }}
+      />
 
       <div className="flex items-center gap-3 mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">Alle Aufgaben</h1>
-        <span className="text-sm text-muted-foreground">projektübergreifend · offen</span>
+        <span className="text-sm text-muted-foreground">projektübergreifend</span>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
@@ -2991,17 +3007,37 @@ function AllTasksView({ projects, onOpenProject }: { projects: Project[]; onOpen
                 {visible.map((t) => (
                   <li
                     key={`${t.projectId}:${t.id}`}
-                    onClick={() => navigate(`/project/${t.projectId}/board`)}
-                    className="px-4 py-3 flex items-center gap-3 hover:bg-muted/40 cursor-pointer"
+                    className="px-4 py-3 flex items-center gap-3"
                   >
+                    <input
+                      type="checkbox"
+                      checked={t.done}
+                      title="Erledigt"
+                      onChange={() => {
+                        timelineStore.updateItem(t.projectId, t.id, {
+                          statusId: t.done ? "open" : "done",
+                          done: !t.done,
+                          statusManual: true,
+                        });
+                        timelineStore.markFresh(t.projectId, t.id);
+                      }}
+                      className="accent-foreground"
+                    />
                     <span className="w-2 h-2 rounded-full shrink-0" style={{ background: t.color }} />
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm truncate">{t.title}</div>
+                      <div className={`text-sm truncate ${t.done ? "line-through text-muted-foreground" : ""}`}>{t.title}</div>
                       <div className="text-[11px] text-muted-foreground truncate">
                         {t.projectName}{t.category ? ` · ${t.category}` : ""}{t.date ? ` · ${t.date}` : ""}{t.time ? ` · ${t.time}` : ""}
                       </div>
                     </div>
-                    {t.alert && (
+                    <button
+                      onClick={() => navigate(`/project/${t.projectId}/board?item=${t.id}`)}
+                      title="Im Board öffnen"
+                      className="text-muted-foreground hover:text-foreground shrink-0"
+                    >
+                      <ExternalLink size={14} />
+                    </button>
+                    {t.alert && !t.done && (
                       <span className="text-[10px] px-2 py-0.5 rounded-full"
                             style={{ background: "hsl(0 70% 50% / 0.15)", color: "hsl(0 70% 40%)" }}>
                         Überfällig
@@ -3018,7 +3054,7 @@ function AllTasksView({ projects, onOpenProject }: { projects: Project[]; onOpen
             <div className="text-xs font-semibold tracking-widest text-muted-foreground mb-3">PROJEKTSTÄNDE</div>
             <div className="space-y-2">
               {projects.map((p) => (
-                <div key={p.id}>
+                <div key={p.id} id={`projektstand-${p.id}`}>
                   <button
                     onClick={() => setPreviewId((cur) => (cur === p.id ? null : p.id))}
                     className="w-full flex items-center gap-4 rounded-lg px-3 py-2 hover:bg-muted/40 text-left"
