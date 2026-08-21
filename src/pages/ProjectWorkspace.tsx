@@ -204,9 +204,42 @@ type ProjectZoomAnchor =
 
 export default function ProjectWorkspace() {
   const { projectId } = useParams();
-  const project = useProject(projectId);
+  const rawProject = useProject(projectId);
   const navigate = useNavigate();
+
+  /* ---------- Vorlagen-Modus (Finanzen: Angebot / Rechnung / Nachtrag) ---------- */
+  const [tplParams] = useSearchParams();
+  const templateKey = tplParams.get("tpl") ?? null;
+  const templateBackNode = tplParams.get("back") ?? "";
+  const templateInfo = templateKey ? parseTemplateKey(templateKey) : null;
+  const templateLabel = templateInfo ? TEMPLATE_LABEL[templateInfo.type] : "";
+  const [templateReady, setTemplateReady] = useState(!templateKey);
+
+  useEffect(() => {
+    if (!templateKey || !projectId || !templateInfo) return;
+    projectStore.ensureTemplatePages(
+      projectId,
+      templateKey,
+      `${TEMPLATE_LABEL[templateInfo.type]} Vorlage`,
+      getFavoriteTemplate<ProjectPage>(projectId, templateInfo.type),
+    );
+    setTemplateReady(true);
+  }, [templateKey, projectId, templateInfo?.type]);
+
+  // Im Vorlagen-Modus sind ausschließlich die Vorlagenseiten sichtbar,
+  // sonst ausschließlich die normalen Mappenseiten.
+  const project = useMemo(() => {
+    if (!rawProject) return rawProject;
+    const pages = rawProject.pages.filter((pg) =>
+      templateKey ? pg.templateKey === templateKey : !pg.templateKey);
+    return { ...rawProject, pages };
+  }, [rawProject, templateKey]);
+
   const [activePageId, setActivePageId] = useState<string | undefined>(project?.pages[0]?.id);
+  useEffect(() => {
+    if (!project) return;
+    if (!project.pages.some((pg) => pg.id === activePageId)) setActivePageId(project.pages[0]?.id);
+  }, [project, activePageId]);
   const documentFileInputRef = useRef<HTMLInputElement>(null);
   const [docImporting, setDocImporting] = useState(false);
   const [docPickerPages, setDocPickerPages] = useState<ImportedPage[] | null>(null);
