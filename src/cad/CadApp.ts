@@ -1264,13 +1264,13 @@ export class CadApp {
     if (!(this.scene as any).getTableById(id)) return;
     this.tableEditId = id;
     this._tableEditListeners.forEach((l) => l(id));
-    this.requestRender?.();
+    try { this.renderer?.render(); } catch { /* noop */ }
   }
   endTableEdit() {
     if (!this.tableEditId) return;
     this.tableEditId = null;
     this._tableEditListeners.forEach((l) => l(null));
-    this.requestRender?.();
+    try { this.renderer?.render(); } catch { /* noop */ }
   }
 
   getSelectedStickerInstance() {
@@ -1853,6 +1853,8 @@ export class CadApp {
 
     r.idSelect.addEventListener("change", () => {
       const nextId = r.idSelect.value || Defaults.defaultLabelId;
+      const selTable = this.getSelectedTable();
+      if (selTable) { selTable.labelId = nextId; this.refreshLabelUI(); return; }
       const sel = this.getEditTextBox();
       if (sel) { sel.labelId = nextId; this.refreshLabelUI(); return; }
       if (this.selectedLabelId) {
