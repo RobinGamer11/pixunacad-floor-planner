@@ -795,6 +795,9 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
 
     app.onToolChange = (id) => {
       setActiveTool(id);
+      // Engine-Werkzeug gewählt → Tabellen-Overlay-Werkzeug verlassen.
+      setTableTool(false);
+      setTableEditId(null);
       // Auswahl-Werkzeug → Seiteneinstellungen automatisch öffnen.
       if (id === ToolIds.SELECT) setRightTab("sheets");
       else setRightTab("settings");
@@ -1353,6 +1356,22 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               </div>
             );
           })}
+          {/* Tabelle — identisch zur Projektmappe */}
+          <button
+            onClick={() => {
+              const app = appRef.current;
+              if (tableTool) { setTableTool(false); return; }
+              app?.setTool(ToolIds.SELECT);
+              setTableTool(true);
+              setTableEditId(null);
+              setRightTab("settings");
+            }}
+            title="Tabelle (B)"
+            className={`cad-rail-btn ${tableTool ? "active" : ""}`}
+          >
+            <TableIcon size={18} />
+            <span>Tabelle</span>
+          </button>
         </div>
 
 
@@ -1927,6 +1946,15 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
 
         {/* Canvas */}
         <canvas ref={canvasRef} data-cad-canvas className="block w-full h-full" />
+
+        {/* Tabellen-Objekte (DOM-Overlay über dem Canvas) */}
+        <CadTableLayer
+          app={appRef.current}
+          projectId={projectId ?? "default"}
+          toolActive={tableTool}
+          selectedId={tableSelectedId}
+          setSelectedId={setTableSelectedId}
+        />
 
         {/* Hilfeanzeige wie in der Mappe — werkzeugabhängig. */}
         {!presenting && helpOn && (
@@ -3315,7 +3343,32 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               </div>
             </div>
           )}
-          {(activeTool !== ToolIds.ERASER
+          {tableTool && (
+            <div className="cad-settings-panel mb-2">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+                Tabelle
+              </div>
+              <TableToolSettings
+                projectId={projectId ?? "default"}
+                pageId={tableSheetId}
+                tableElement={tableElement as any}
+                isPending={false}
+                formulaFn={tableFormulaFn}
+                setFormulaFn={setTableFormulaFn}
+                onPatch={(patch) => {
+                  if (tableSelectedId) cadTableStore.patch(projectId ?? "default", tableSheetId, tableSelectedId, patch as any);
+                }}
+                onConfirm={() => { setTableTool(false); setTableEditId(null); }}
+                onCancel={() => {
+                  if (tableSelectedId) cadTableStore.remove(projectId ?? "default", tableSheetId, tableSelectedId);
+                  setTableSelectedId(null);
+                  setTableEditId(null);
+                  setTableTool(false);
+                }}
+              />
+            </div>
+          )}
+          {!tableTool && (activeTool !== ToolIds.ERASER
             && activeTool !== ToolIds.PIPETTE
             && activeTool !== ToolIds.SELECT
             && activeTool !== ToolIds.STICKER
