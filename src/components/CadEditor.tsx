@@ -8,6 +8,10 @@ import type { StickerDefinition } from "@/cad/StickerManager";
 import { instanceBoundingCornersWorld } from "@/cad/StickerManager";
 import { importFile, type ImportedPage } from "@/cad/documentImport";
 import { projectStore } from "@/lib/projectStore";
+import { CadTableLayer } from "@/components/cad/CadTableLayer";
+import { TableEditContext, TableFormulaPickContext, type FormulaFn, type TableSelection } from "@/components/page/TableElementView";
+import { TableToolSettings } from "@/components/page/TableToolSettings";
+import { cadTableStore } from "@/lib/cadTableStore";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -83,6 +87,9 @@ const CAD_TOOLS = [
   { id: ToolIds.STICKER, label: "Stempel", key: "O", icon: StickerIcon },
   { id: ToolIds.DOCUMENT, label: "Dokument", key: "D", icon: FileImage },
 ];
+
+/** Pseudo-Werkzeug-ID der Tabellen-Overlay-Ebene (keine Engine-Tool-ID). */
+const TABLE_TOOL = "cad-table";
 
 
 // Sub-Werkzeuge unter "Linie": gemeinsam ein Einstellungsfenster mit
@@ -379,6 +386,18 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   }, [onCanDeleteChange]);
 
   const [activeTool, setActiveTool] = useState<string>(ToolIds.SELECT);
+  // ── Tabellen-Werkzeug (identisch zur Projektmappe, als DOM-Overlay) ──
+  const [tableTool, setTableTool] = useState(false);
+  const [tableSelectedId, setTableSelectedId] = useState<string | null>(null);
+  const [tableEditId, setTableEditId] = useState<string | null>(null);
+  const [tableSelection, setTableSelection] = useState<TableSelection | null>(null);
+  const [tableNewCols, setTableNewCols] = useState(3);
+  const [tableNewRows, setTableNewRows] = useState(4);
+  const [tableFormulaFn, setTableFormulaFn] = useState<FormulaFn | null>(null);
+  const tableSheetId = (appRef.current as any)?.activeSheetId || "default";
+  const tableElement = tableSelectedId
+    ? cadTableStore.list(projectId ?? "default", tableSheetId).find((t) => t.id === tableSelectedId)
+    : undefined;
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(true);
   const [rightOpen, setRightOpen] = useState<boolean>(true);
   const [rightTab, setRightTab] = useState<"settings" | "sheets" | "layers">("settings");

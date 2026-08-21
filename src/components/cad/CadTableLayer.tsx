@@ -211,7 +211,6 @@ export function CadTableLayer({
           : hubMode === "rotate"
             ? `rotate(${preview.deg}deg)`
             : "";
-        const originX = hubMode === "rotate" ? `${a.fx * 100}%` : "0 0";
         return (
           <div
             key={el.id}
@@ -311,7 +310,6 @@ export function CadTableLayer({
                 ><RotateCw size={13} /></button>
               </div>
             )}
-            {void originX}
           </div>
         );
       })}
