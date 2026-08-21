@@ -392,7 +392,7 @@ export function rasterizeObject(app: any, input: RasterInput): DocumentObject | 
 /**
  * Bequemer Hook für die Werkzeuge: rastert nur, wenn Pixelmodus aktiv ist.
  * - Projektmappe (MiniCad mit `rasterLayers`): direkt in die Raster-Ebene.
- * - CAD-Oberfläche: wie bisher als eigenständiges Pixel-Bildobjekt.
+ * - CAD-Oberfläche: ebenfalls direkt in die Raster-Ebene (Fallback: Bildobjekt).
  */
 export function maybeRasterize(app: any, input: RasterInput): void {
   if (!isPixelDrawMode(app)) return;
