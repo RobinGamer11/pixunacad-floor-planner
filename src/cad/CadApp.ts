@@ -1237,6 +1237,42 @@ export class CadApp {
     return this.scene.getTextBoxById(id);
   }
 
+  /** Aktuell gewähltes Tabellenobjekt (nutzt die TextBox-Auswahlart). */
+  getSelectedTable(): any {
+    if (!this.selection) return null;
+    if (this.selection.type !== SelectionType.TEXTBOX && this.selection.type !== SelectionType.TEXTBOX_HANDLE) return null;
+    const id = (this.selection as any).textBoxId;
+    return id ? (this.scene as any).getTableById(id) : null;
+  }
+
+  /** TextBox ODER Tabelle — gemeinsame Box-Infrastruktur (Auswahl/HUB/Snap). */
+  getSelectedBox(): any {
+    if (!this.selection) return null;
+    if (this.selection.type !== SelectionType.TEXTBOX && this.selection.type !== SelectionType.TEXTBOX_HANDLE) return null;
+    const id = (this.selection as any).textBoxId;
+    return id ? (this.scene as any).getBoxById(id) : null;
+  }
+
+  /** ID der Tabelle im internen Zellmodus (null = normaler CAD-Objektmodus). */
+  tableEditId: string | null = null;
+  private _tableEditListeners = new Set<(id: string | null) => void>();
+  onTableEditChange(fn: (id: string | null) => void) {
+    this._tableEditListeners.add(fn);
+    return () => { this._tableEditListeners.delete(fn); };
+  }
+  beginTableEdit(id: string) {
+    if (!(this.scene as any).getTableById(id)) return;
+    this.tableEditId = id;
+    this._tableEditListeners.forEach((l) => l(id));
+    this.requestRender?.();
+  }
+  endTableEdit() {
+    if (!this.tableEditId) return;
+    this.tableEditId = null;
+    this._tableEditListeners.forEach((l) => l(null));
+    this.requestRender?.();
+  }
+
   getSelectedStickerInstance() {
     if (!this.selection || this.selection.type !== SelectionType.STICKER_INSTANCE) return null;
     return this.scene.getStickerInstanceById((this.selection as any).stickerInstanceId);
@@ -2603,6 +2639,7 @@ export class CadApp {
           this.scene.removeHatchesByLabelId(this.selectedLabelId);
           this.scene.removeDimensionsByLabelId(this.selectedLabelId);
           this.scene.removeTextBoxesByLabelId(this.selectedLabelId);
+          (this.scene as any).removeTablesByLabelId?.(this.selectedLabelId);
           this.scene.removeDocumentsByLabelId(this.selectedLabelId);
           this.setSelectedLabelId(null);
           this.refreshLabelUI();
