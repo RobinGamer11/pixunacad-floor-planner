@@ -303,10 +303,8 @@ export default function ProjectsHome() {
     resetProjectDrag();
   };
 
-  const statusColor = (s: ProfileStatus) =>
-    s === "online" ? "hsl(140 60% 45%)" : s === "busy" ? "hsl(0 70% 55%)" : "hsl(0 0% 65%)";
-  const statusLabel = (s: ProfileStatus) =>
-    s === "online" ? "Online" : s === "busy" ? "Beschäftigt" : "Offline";
+  const statusColor = statusColorOf;
+  const statusLabel = statusLabelOf;
 
   return (
     <div
@@ -3310,10 +3308,18 @@ function GlobalCalendar({
 
 /* ---------------- Münzen / Shop / Netzwerk / Papierkorb ---------------- */
 
+/** Einheitliche Statusfarben/-namen – identisch mit dem Netzwerk-Status. */
 const statusColorOf = (s: ProfileStatus) =>
-  s === "online" ? "hsl(140 60% 45%)" : s === "busy" ? "hsl(0 70% 55%)" : "hsl(0 0% 65%)";
+  s === "online"
+    ? "hsl(140 60% 45%)"
+    : s === "away"
+      ? "hsl(42 92% 52%)"
+      : s === "busy"
+        ? "hsl(0 70% 55%)"
+        : "hsl(0 0% 55%)";
 const statusLabelOf = (s: ProfileStatus) =>
-  s === "online" ? "Online" : s === "busy" ? "Beschäftigt" : "Offline";
+  s === "online" ? "Online" : s === "away" ? "Abwesend" : s === "busy" ? "Beschäftigt" : "Offline";
+const ALL_STATUS: ProfileStatus[] = ["online", "away", "busy", "offline"];
 
 /**
  * Gemeinsamer Profil-Editor für das Kopf-Dropdown und die Netzwerk-Seite.
@@ -3375,12 +3381,13 @@ function ProfileEditor({ profile, projectCount }: { profile: UserProfile; projec
           )}
         </div>
       </div>
-      <div className="mt-4 flex gap-2">
-        {(["online", "busy", "offline"] as ProfileStatus[]).map((s) => (
+      <div className="mt-4 text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">MEIN STATUS</div>
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        {ALL_STATUS.map((s) => (
           <button
             key={s}
             onClick={() => projectStore.updateProfile({ status: s })}
-            className="flex-1 h-8 rounded-md border text-xs flex items-center justify-center gap-1.5"
+            className="h-8 rounded-md border text-xs flex items-center justify-center gap-1.5"
             style={{
               borderColor: profile.status === s ? statusColorOf(s) : "hsl(var(--hairline))",
               background: profile.status === s ? `${statusColorOf(s)}20` : "transparent",
