@@ -33,6 +33,8 @@ export interface TableCellFormat {
   borderStyle?: CellBorderStyle;
   /** Rahmenstärke dieser Zelle in px (Fallback: Tabellen-Rahmenbreite). */
   borderWidthPx?: number;
+  /** Untere Kante als Doppellinie (Summenlinie). */
+  bottomDouble?: boolean;
 }
 
 export interface TableMerge {
@@ -78,6 +80,9 @@ export const MIN_COL_MM = 6;
 export const MIN_ROW_MM = 4;
 export const PT_TO_MM = 25.4 / 72;
 
+/** Dezentes Grau der Kopfzeile (Default, per Zellhintergrund überschreibbar). */
+export const HEADER_BG = "#ededed";
+
 export const cellKey = (r: number, c: number) => `${r},${c}`;
 
 /** Neue Tabelle mit Kopfzeile und leeren Zellen. */
@@ -96,6 +101,8 @@ export function createTableData(cols: number, rows: number): TableData {
     filtersEnabled: false,
     filters: {},
     borderWidthPx: 1,
+    borderColor: "#000000",
+    background: "#ffffff",
   };
 }
 
@@ -306,14 +313,14 @@ export function effectiveFormat(t: TableModel, r: number, c: number): Required<P
     bold: f.bold ?? isHeader,
     italic: f.italic ?? false,
     color: f.color,
-    background: f.background,
+    background: f.background ?? (isHeader ? HEADER_BG : undefined),
   };
 }
 
 /** Effektive Rahmen-Eigenschaften einer Zelle (Kanten, Stil, Stärke). */
 export function effectiveBorders(t: TableModel, r: number, c: number): {
   top: boolean; right: boolean; bottom: boolean; left: boolean;
-  style: CellBorderStyle; widthPx: number;
+  style: CellBorderStyle; widthPx: number; bottomDouble: boolean;
 } {
   const f = t.cellFormats[cellKey(r, c)] ?? {};
   const b = f.borders ?? {};
@@ -324,6 +331,7 @@ export function effectiveBorders(t: TableModel, r: number, c: number): {
     left: b.left !== false,
     style: f.borderStyle ?? "single",
     widthPx: f.borderWidthPx ?? (t.borderWidthPx ?? 1),
+    bottomDouble: f.bottomDouble === true,
   };
 }
 

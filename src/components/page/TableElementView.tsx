@@ -235,6 +235,15 @@ export function TableElementView({
   };
 
   React.useEffect(() => {
+    if (!pickFn) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { e.stopPropagation(); formulaCtx?.setFn(null); }
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [pickFn, formulaCtx]);
+
+  React.useEffect(() => {
     const up = () => { dragSelRef.current = false; };
     window.addEventListener("pointerup", up);
     return () => window.removeEventListener("pointerup", up);
@@ -260,7 +269,14 @@ export function TableElementView({
 
   const onGridKeyDown = (e: React.KeyboardEvent) => {
     if (!active || editCell) return;
-    if (e.key === "Escape") { e.stopPropagation(); onExitEdit?.(); return; }
+    if (e.key === "Escape") {
+      e.stopPropagation();
+      // Laufende Formelauswahl abbrechen — die Funktion wird dabei komplett
+      // deaktiviert und muss im Panel erneut gewählt werden.
+      if (pickFn) { formulaCtx?.setFn(null); return; }
+      onExitEdit?.();
+      return;
+    }
     if (!selection) return;
     const keys: Record<string, [number, number]> = {
       ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1],
@@ -584,7 +600,8 @@ function FilterMenu({
 }
 
 
-/** Rahmen einer Zelle als CSS — Kanten einzeln, optional doppelt. */
+/** Rahmen einer Zelle als CSS — Kanten einzeln, geteilte Kanten nur einmal.
+ *  Damit wirken benachbarte Zellen wie ein durchgehendes, einfaches Raster. */
 function cellBorderStyle(
   model: TableModel,
   r: number,
@@ -592,12 +609,21 @@ function cellBorderStyle(
   color: string,
 ): React.CSSProperties {
   const b = effectiveBorders(model, r, c);
-  const w = b.style === "double" ? Math.max(3, b.widthPx) : b.widthPx;
-  const line = w > 0 ? `${w}px ${b.style === "double" ? "double" : "solid"} ${color}` : "none";
+  const above = r > 0 ? effectiveBorders(model, r - 1, c) : null;
+  const left = c > 0 ? effectiveBorders(model, r, c - 1) : null;
+  const line = (w: number, style: "solid" | "double") =>
+    w > 0 ? `${style === "double" ? Math.max(3, w) : w}px ${style} ${color}` : "none";
+  // Geteilte Kanten gehören der oberen bzw. linken Nachbarzelle: die untere/
+  // rechte Kante wird gezeichnet, die obere/linke nur, wenn der Nachbar dort
+  // keine Linie hat (sonst doppelte Strichstärke).
+  const showTop = b.top && (r === 0 || !(above && above.bottom));
+  const showLeft = b.left && (c === 0 || !(left && left.right));
   return {
-    borderTop: b.top ? line : "none",
-    borderRight: b.right ? line : "none",
-    borderBottom: b.bottom ? line : "none",
-    borderLeft: b.left ? line : "none",
+    borderTop: showTop ? line(b.widthPx, b.style === "double" ? "double" : "solid") : "none",
+    borderLeft: showLeft ? line(b.widthPx, b.style === "double" ? "double" : "solid") : "none",
+    borderRight: b.right ? line(b.widthPx, b.style === "double" ? "double" : "solid") : "none",
+    borderBottom: b.bottom
+      ? line(b.widthPx, (b.bottomDouble || b.style === "double") ? "double" : "solid")
+      : "none",
   };
 }

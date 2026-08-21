@@ -2148,6 +2148,7 @@ export default function ProjectWorkspace() {
                 lineActive={isLinePageTool(activeTool)}
                 hatchActive={activeTool === "hatch"}
                 textActive={activeTool === "text"}
+                tableActive={activeTool === "table"}
                 multiSelectActive={selectedElementIds.length > 1}
               />
             )}
@@ -3650,6 +3651,9 @@ function ElementView({
   // Fangpunkte an den Außenecken, Verschieben/Drehen über die HUB-Symbole.
   // Im internen Tabellenmodus ist diese Objekt-Bedienung deaktiviert.
   const tableHubUx = el.kind === "table" && !readOnly && !tableEditing;
+  // Tabellenmodus: Fangpunkte bleiben sichtbar, sind aber nicht bedienbar —
+  // Verschieben, Drehen und Skalieren sind währenddessen komplett gesperrt.
+  const tableLocked = !!tableEditing;
   const cadHubUx = isCadView || tableHubUx;
   const hubBlue = "#4da3ff";
   // Portal-Ziel (Seitenfläche) für die Bedien-Overlays der CAD-Blätter.
@@ -4681,7 +4685,7 @@ function ElementView({
 
       {showHub && wrapCadChrome(
         <>
-          {!tabletCommitOnly && !cadHubUx && (
+          {!tabletCommitOnly && !cadHubUx && !tableLocked && (
             <>
               {/* Rotation stem — bei CAD-Blatt ausgeblendet: Drehen läuft nur über die HUB-Box. */}
               <div
@@ -4720,6 +4724,7 @@ function ElementView({
           {/* Hub action bar — bei CAD-Blatt am zuletzt gewählten Anker,
              sonst wie gehabt oben rechts. */}
           {(() => {
+            if (tableLocked) return null;
             const anchored = cadHubUx && anchorFracState && anchorFracState.key !== "interior";
             // CAD-Blatt: Solange kein Fangpunkt (Ecke) gewählt ist, werden gar
             // keine Symbole gezeigt — statt ausgegrauter Buttons.
@@ -4882,7 +4887,7 @@ function ElementView({
           {/* Edge-Drag-Handles: Preview beim Ziehen, Commit erst bei Pointerup
              (bzw. Tablet-Häkchen). onEdgeDrag wird nur EINMAL mit dem Gesamt-
              Delta gerufen — kein jitterndes Store-Update während der Bewegung. */}
-          {!tabletCommitOnly && !hubMode && !tableHubUx && (["top", "right", "bottom", "left"] as const).map((edge) => {
+          {!tabletCommitOnly && !hubMode && !tableHubUx && !tableLocked && (["top", "right", "bottom", "left"] as const).map((edge) => {
             const isHor = edge === "top" || edge === "bottom";
             const isActive = edgeTrim?.edge === edge;
             const edgeReady = activeEdge === edge;
@@ -5029,7 +5034,7 @@ function ElementView({
           {!tabletCommitOnly && (["tl", "tr", "bl", "br"] as const).map((corner) => {
             // Bei CAD-Blatt: Ecken sind Snap-Marker + Anker-Setzer (kein Trim/Resize).
             // Bei anderen Elementen (image/pdf): Ecken skalieren wie gehabt.
-            const cornerDraggable = !cadHubUx && !!onCornerDrag;
+            const cornerDraggable = !cadHubUx && !tableLocked && !!onCornerDrag;
             const startCornerDrag = (e: React.PointerEvent) => {
               if (!cornerDraggable || !onCornerDrag) return;
               e.stopPropagation();
@@ -5114,7 +5119,7 @@ function ElementView({
                   boxShadow: (glow || isAnchor) ? shadowActive : "0 1px 3px rgba(0,0,0,0.25)",
                   transition: "width 90ms, height 90ms, background 90ms, box-shadow 90ms",
                   cursor,
-                  pointerEvents: (cornerDraggable || cadHubUx) ? "auto" : "none",
+                  pointerEvents: (cornerDraggable || (cadHubUx && !tableLocked)) ? "auto" : "none",
                   zIndex: 15,
                 } as React.CSSProperties}
               />
