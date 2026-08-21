@@ -60,6 +60,7 @@ import {
   itemAchieved,
   taskAlert,
   projectProgress,
+  subscribeTimeline,
   type TlKind,
 } from "@/lib/timelineStore";
 import { BoardMiniPreview } from "@/components/board/BoardMiniPreview";
@@ -882,7 +883,7 @@ export default function ProjectsHome() {
           ) : hub === "trash" ? (
             <TrashView activeCount={projectCount} />
           ) : showAllTasks ? (
-            <AllTasksView projects={projects} onOpenProject={(id) => { setMode("projects"); setShowAllTasks(false); setSelectedId(id); }} />
+            <AllTasksView projects={projects} />
           ) : mode === "templates" && !selected ? (
             <div className="px-10 py-7">
               <div className="flex items-center gap-3">
@@ -2861,10 +2862,16 @@ function BoardPreview({ project }: { project: Project }) {
   );
 }
 
-function AllTasksView({ projects, onOpenProject }: { projects: Project[]; onOpenProject: (id: string) => void }) {
+function AllTasksView({ projects }: { projects: Project[] }) {
   const navigate = useNavigate();
   const [activeIds, setActiveIds] = useState<Set<string>>(() => new Set(projects.map((p) => p.id)));
   const [previewId, setPreviewId] = useState<string | null>(null);
+  // Board-Änderungen aller Projekte live übernehmen.
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const offs = projects.map((p) => subscribeTimeline(p.id, () => setTick((t) => t + 1)));
+    return () => offs.forEach((off) => off());
+  }, [projects]);
   useEffect(() => {
     setActiveIds((prev) => {
       const next = new Set(prev);
