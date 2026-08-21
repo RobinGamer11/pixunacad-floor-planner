@@ -368,9 +368,14 @@ const ActionView: React.FC<{ projectId: string; state: FinanceState; node: Finan
       {/* Anlegen = neue Vorlage in der Projektmappe erstellen */}
       <div className="flex flex-wrap gap-2" data-export-hide>
         {([["offer", "Angebot"], ["invoice", "Rechnung"], ["supplement", "Nachtrag"]] as const).map(([t, label]) => (
-          <button key={`new-${t}`} disabled
-            title="Vorlagen-Editor in der Projektmappe folgt"
-            className="h-10 px-4 rounded-lg text-sm font-semibold flex items-center gap-1.5 opacity-60 cursor-not-allowed"
+          <button key={`new-${t}`}
+            onClick={() => {
+              const pos = financeStore.addPosition(projectId, node.id, t);
+              financeStore.updatePosition(projectId, pos.id, { hasTemplate: true });
+              openTemplate(projectId, t, pos.id, node.id);
+            }}
+            title={`${label} als Vorlage in der Projektmappe anlegen`}
+            className="h-10 px-4 rounded-lg text-sm font-semibold flex items-center gap-1.5 hover:opacity-90"
             style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}>
             <Plus size={16} /> {label} anlegen
           </button>
