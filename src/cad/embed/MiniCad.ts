@@ -19,6 +19,7 @@ import { LabelManager } from "../LabelManager";
 import { IdPanel } from "../IdPanel";
 import { TopologyEngine } from "../TopologyEngine";
 import { Renderer, type Selection } from "../Renderer";
+import { RasterLayers } from "../RasterLayers";
 import { mirrorProxy } from "../multiEdit";
 import { LineHub } from "../LineHub";
 import { PointEditMenu } from "../PointEditMenu";
@@ -194,6 +195,12 @@ export class MiniCad {
   defaultFreeAutoShape: boolean = false;
   /** Zeichenmodus: "vector" oder "pixel" (Rasterung beim Fertigstellen). */
   defaultDrawRasterMode: "vector" | "pixel" = "vector";
+
+  /**
+   * Raster-Zeichenebenen der Seite (Pixelmodus). Pro Ebene ein gekachelter
+   * Rasterinhalt im selben Papier-Koordinatensystem wie die Vektorobjekte.
+   */
+  readonly rasterLayers = new RasterLayers();
   /** Projektweite Rasterqualität für neu fertiggestellte Pixelobjekte. */
   pixelRenderDpi: number = 1200;
   pixelSupersampling: boolean = false;
@@ -344,6 +351,9 @@ export class MiniCad {
     this.topology = new TopologyEngine(this.scene, this.camera, this.labelManager);
     const ctx = this.dom.canvas.getContext("2d")!;
     this.renderer = new Renderer(ctx, this.camera, this.scene, this.labelManager);
+    // Rasterinhalt in die normale Ebenenreihenfolge des Renderers einhängen.
+    this.renderer.rasterLayers = this.rasterLayers;
+    this.rasterLayers.onReady = () => { try { this.renderer.render(); } catch { /* noop */ } };
     // Wichtig: Text/Stroke-Skalierung an Seitengröße (echte mm) ausrichten,
     // damit ein 16-px-Text auch 16 px auf der Seite ist (statt riesig).
     this.renderer.referencePxPerM = this.basePxPerMm * 1000;
@@ -1165,6 +1175,8 @@ export class MiniCad {
     return {
       version: 4,
       labels: this.labelManager.list(),
+      // Rasterebenen (Pixelmodus) — leere Ebenen entfallen automatisch.
+      rasterLayers: this.rasterLayers.serialize(),
       segments: this.scene.segments
         .filter((s) => s.labelId !== this._frameLabelId && s.labelId !== this._extRectLabelId && s.labelId !== this._ghostLabelId)
         .map((s) => ({
@@ -1267,6 +1279,8 @@ export class MiniCad {
 
   private _restore(data: any) {
     if (!data) return;
+    // Rasterinhalt zuerst wiederherstellen (lädt Kacheln asynchron nach).
+    try { this.rasterLayers.restore(data.rasterLayers); } catch (e) { console.error("MiniCad raster restore:", e); }
     if (Array.isArray(data.labels) && data.labels.length > 0) {
       try { this.labelManager.restore(data.labels); } catch {}
     }
@@ -1557,6 +1571,7 @@ export class MiniCad {
     this.scene.freeStrokes = [];
     this.scene.hatches = [];
     this.scene.documents = this.scene.documents.filter(keepDoc);
+    this.rasterLayers.clear();
     try { this._restore(data); } catch (e) { console.error("MiniCad loadState:", e); }
     this._changeDirty = false;
     this._lastSig = this._sceneSignature();
