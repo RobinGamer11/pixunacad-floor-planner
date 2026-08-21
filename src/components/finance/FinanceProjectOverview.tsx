@@ -2,15 +2,33 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowRight, Building2, ChevronDown, ChevronRight, Folder, Home } from "lucide-react";
 import {
-  financeStore, childrenOf, nodeTotals, projectTotals, control,
+  financeStore, childrenOf, nodeTotals, projectTotals, control, positionsOf, positionTotals,
   formatEur, formatPct,
-  type FinanceState, type FinanceNode,
+  type FinanceState, type FinanceNode, type FinancePosition,
 } from "@/lib/financeStore";
 import { FinanceSummaryCard } from "@/components/finance/FinanceSummaryCard";
 
+/** Hintergründe wie in der Finanzen-Oberfläche. */
+const ARCHIVE_BG = "hsl(var(--surface-muted))";
+const CREATED_BG = "hsl(var(--accent-gold) / 0.10)";
+
+/** Sammelt alle Positionen aktiver Zweige unterhalb eines Knotens. */
+function collectPositions(state: FinanceState, parentId: string | null): FinancePosition[] {
+  const out: FinancePosition[] = [];
+  const walk = (id: string | null) => {
+    for (const kid of childrenOf(state, id)) {
+      if (!kid.enabled) continue;
+      if (kid.type === "action") out.push(...positionsOf(state, kid.id));
+      else walk(kid.id);
+    }
+  };
+  walk(parentId);
+  return out;
+}
+
 /**
  * Read-only Gesamtübersicht der Finanzen eines Projekts für die Startseite.
- * Zeigt den obersten Projektordner mit allen Summen.
+ * Zeigt – wie in der Finanzen-Oberfläche – archivierte und angelegte Belege getrennt.
  */
 export function FinanceProjectOverview({
   projectId,
@@ -29,6 +47,10 @@ export function FinanceProjectOverview({
 
   const totals = projectTotals(state);
   const roots = childrenOf(state, null);
+  const all = collectPositions(state, null);
+  const archived = all.filter((p) => !p.hasTemplate);
+  const created = all.filter((p) => p.hasTemplate);
+  const isInvoiceLike = (p: FinancePosition) => p.type === "invoice" || p.type === "supplement";
 
   return (
     <div className="mt-4 space-y-4">
@@ -47,6 +69,27 @@ export function FinanceProjectOverview({
 
       <FinanceSummaryCard totals={totals} subtitle="Gesamtes Projekt" />
 
+      {archived.length > 0 && (
+        <FinanceSummaryCard
+          totals={positionTotals(archived)}
+          hideEstimate
+          title="Archivierte Belege"
+          subtitle={projectName}
+          invoiceDetails={archived.filter(isInvoiceLike)}
+          background={ARCHIVE_BG}
+        />
+      )}
+      {created.length > 0 && (
+        <FinanceSummaryCard
+          totals={positionTotals(created)}
+          hideEstimate
+          title="Angelegte Belege"
+          subtitle={projectName}
+          invoiceDetails={created.filter(isInvoiceLike)}
+          background={CREATED_BG}
+        />
+      )}
+
       {roots.length === 0 ? (
         <div
           className="rounded-xl border px-4 py-6 text-xs"
@@ -60,6 +103,7 @@ export function FinanceProjectOverview({
     </div>
   );
 }
+
 
 function NodeTable({ state, nodes }: { state: FinanceState; nodes: FinanceNode[] }) {
   const [open, setOpen] = useState<Record<string, boolean>>({});
