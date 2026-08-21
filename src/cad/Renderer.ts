@@ -9,6 +9,9 @@ import { getDimensionGeometry, getAngleDimensionParts, type DimensionLike } from
 import { boxCornersWorld } from "./textGeometry";
 import { getDocWarp, drawWarpedImage } from "./documentWarp";
 import { drawRichTextBox } from "./textRichRenderer";
+import { normalizeTable, isCovered, effectiveFormat, effectiveBorders, PT_TO_MM } from "@/lib/table/tableModel";
+import { layoutTable, cellRectMm } from "@/lib/table/tableLayout";
+import { evalCell } from "@/lib/table/tableFormula";
 import { fillWithHatchPattern, PATTERN_BASE_TILE_M, type HatchPatternId } from "./hatchPatterns";
 import { transformedInstanceItems, instanceBoundingCornersWorld } from "./StickerManager";
 import { documentCornersWorld, documentCenterWorld, documentVisibleCornersWorld, documentAnchorsWorld } from "./documentGeometry";
@@ -275,6 +278,7 @@ export class Renderer {
       this._drawFreeStrokesForLabel(labelId);
       this._drawDimensionsForLabel(labelId);
       this._drawTextBoxesForLabel(labelId);
+      this._drawTablesForLabel(labelId);
       this._drawStickerInstancesForLabel(labelId);
     }
     if (!isExportMode()) {
@@ -2519,11 +2523,99 @@ export class Renderer {
     ctx.restore();
   }
 
+  /**
+   * Tabellen (native Szenenobjekte) — Zeichnung in Weltkoordinaten.
+   * Zellmaße stammen in Papier-mm aus dem gemeinsamen Tabellenmodell und
+   * werden über `mPerMm * scale` in Meter und dann über die Kamera in Pixel
+   * umgerechnet.
+   */
+  private _drawTablesForLabel(labelId: string) {
+    for (const t of ((this.scene as any).tables || []) as any[]) {
+      if (t.labelId !== labelId) continue;
+      if (!this.labels.isVisible(t.labelId)) continue;
+      this._drawSingleTable(t);
+    }
+  }
+
+  private _drawSingleTable(t: any) {
+    const model = normalizeTable(t.data);
+    const layout = layoutTable(model);
+    if (layout.widthMm <= 0 || layout.heightMm <= 0) return;
+    const cam = this.camera;
+    const ctx = this.ctx;
+    const pxPerMm = t.mPerMm * (t.scale || 1) * cam.scale;
+    const cs = cam.worldToScreen(t.center.x, t.center.y);
+    const wPx = layout.widthMm * pxPerMm;
+    const hPx = layout.heightMm * pxPerMm;
+
+    ctx.save();
+    ctx.translate(cs.x, cs.y);
+    ctx.rotate(t.rotationRad || 0);
+    ctx.translate(-wPx / 2, -hPx / 2);
+
+    // Flächen
+    if (model.background) {
+      ctx.fillStyle = model.background;
+      ctx.fillRect(0, 0, wPx, hPx);
+    }
+    for (let r = 0; r < layout.rows; r++) {
+      for (let c = 0; c < layout.cols; c++) {
+        if (isCovered(model, r, c)) continue;
+        const rect = cellRectMm(model, layout, r, c);
+        const f = effectiveFormat(model, r, c);
+        if (f.background) {
+          ctx.fillStyle = f.background;
+          ctx.fillRect(rect.xMm * pxPerMm, rect.yMm * pxPerMm, rect.wMm * pxPerMm, rect.hMm * pxPerMm);
+        }
+      }
+    }
+
+    // Rahmen + Text je Zelle
+    for (let r = 0; r < layout.rows; r++) {
+      for (let c = 0; c < layout.cols; c++) {
+        if (isCovered(model, r, c)) continue;
+        const rect = cellRectMm(model, layout, r, c);
+        const x = rect.xMm * pxPerMm, y = rect.yMm * pxPerMm;
+        const w = rect.wMm * pxPerMm, h = rect.hMm * pxPerMm;
+        const b = effectiveBorders(model, r, c);
+        ctx.strokeStyle = model.borderColor || "#000000";
+        ctx.lineWidth = Math.max(0.5, b.widthPx);
+        const line = (x1: number, y1: number, x2: number, y2: number) => {
+          ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+        };
+        if (b.top) line(x, y, x + w, y);
+        if (b.left) line(x, y, x, y + h);
+        if (b.right) line(x + w, y, x + w, y + h);
+        if (b.bottom) line(x, y + h, x + w, y + h);
+        if (b.bottomDouble) line(x, y + h - Math.max(1.5, b.widthPx * 2), x + w, y + h - Math.max(1.5, b.widthPx * 2));
+
+        const raw = model.cells[r]?.[c] ?? "";
+        const text = raw.startsWith("=") ? String(evalCell(model.cells, raw)) : raw;
+        if (!text) continue;
+        const f = effectiveFormat(model, r, c);
+        const fontPx = f.fontSizePt * PT_TO_MM * pxPerMm;
+        if (fontPx < 3) continue;
+        ctx.save();
+        ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+        ctx.fillStyle = f.color || "#000000";
+        ctx.font = `${f.italic ? "italic " : ""}${f.bold ? "600 " : ""}${fontPx}px Inter, system-ui, sans-serif`;
+        ctx.textAlign = f.align === "center" ? "center" : f.align === "right" ? "right" : "left";
+        ctx.textBaseline = f.valign === "top" ? "top" : f.valign === "bottom" ? "bottom" : "middle";
+        const padPx = 0.8 * pxPerMm;
+        const tx = f.align === "center" ? x + w / 2 : f.align === "right" ? x + w - padPx : x + padPx;
+        const ty = f.valign === "top" ? y + padPx : f.valign === "bottom" ? y + h - padPx : y + h / 2;
+        ctx.fillText(text, tx, ty);
+        ctx.restore();
+      }
+    }
+    ctx.restore();
+  }
+
   private _drawTextBoxSelection() {
     if (!this.selection || (this.selection.type !== SelectionType.TEXTBOX && this.selection.type !== SelectionType.TEXTBOX_HANDLE)) return;
     const id = (this.selection as any).textBoxId;
     if (!id) return;
-    const box = this.scene.getTextBoxById(id);
+    const box = (this.scene as any).getBoxById(id);
     if (!box || !this.labels.isVisible(box.labelId)) return;
 
     const ctx = this.ctx;
