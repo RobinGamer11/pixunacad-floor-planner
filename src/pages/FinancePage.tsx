@@ -6,7 +6,7 @@ import { projectStore, useProject } from "@/lib/projectStore";
 import { exportElementToA4Pdf } from "@/lib/financePdfExport";
 import {
   financeStore, childrenOf, positionsOf, nodeTotals, projectTotals, actionTotals,
-  control, formatEur, formatPct, templateKeyOf, positionTotals, TEMPLATE_LABEL,
+  control, formatEur, formatPct, templateKeyOf, positionTotals, TEMPLATE_LABEL, getFavoriteTemplate,
   type FinanceNode, type FinanceState, type FinanceTotals, type FinancePosition,
   type FinancePositionType,
 } from "@/lib/financeStore";
@@ -261,7 +261,7 @@ export default function FinancePage() {
             </div>
 
 
-            <FavoriteTemplates state={state} onOpen={(id) => setSelectedId(id)} />
+            <FavoriteTemplates projectId={pid} />
 
             <div className="flex-1 overflow-auto py-1 px-1">
               <div onClick={() => setSelectedId(null)}
