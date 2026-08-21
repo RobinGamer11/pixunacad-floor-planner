@@ -46,14 +46,26 @@ function ChatButton({ unread, onClick, title }: { unread?: boolean; onClick: () 
   return (
     <button
       onClick={(e) => { e.stopPropagation(); onClick(); }}
-      title={title}
-      className="relative h-7 w-7 rounded-md grid place-items-center text-muted-foreground hover:text-foreground hover:bg-[hsl(var(--surface-muted))]"
+      title={unread ? `${title} · neue Nachricht` : title}
+      className={`relative h-9 w-9 shrink-0 rounded-lg grid place-items-center border hover:bg-[hsl(var(--surface-muted))] ${
+        unread ? "animate-pulse" : ""
+      }`}
+      style={
+        unread
+          ? {
+              color: "hsl(var(--accent-gold))",
+              borderColor: "hsl(var(--accent-gold))",
+              background: "hsl(var(--accent-gold) / 0.16)",
+              boxShadow: "0 0 0 3px hsl(var(--accent-gold) / 0.18)",
+            }
+          : { color: "hsl(var(--ink-soft))", borderColor: "hsl(var(--hairline))" }
+      }
     >
-      <MessageSquare size={14} />
+      <MessageSquare size={20} />
       {unread && (
         <span
-          className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border"
-          style={{ background: "hsl(0 70% 55%)", borderColor: "hsl(var(--surface-card))" }}
+          className="absolute -top-1 -right-1 w-3 h-3 rounded-full border"
+          style={{ background: "hsl(var(--accent-gold))", borderColor: "hsl(var(--surface-card))" }}
         />
       )}
     </button>
