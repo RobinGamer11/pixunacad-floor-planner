@@ -44,7 +44,7 @@ const MeasureInput: React.FC<{
       <span className="mb-1 block whitespace-nowrap text-[9px] text-muted-foreground">{text}</span>
       <span
         className="flex h-8 items-center overflow-hidden rounded-md border"
-        style={{ borderColor: "hsl(var(--hairline))", backgroundColor: "#fff" }}
+        style={{ borderColor: "hsl(var(--hairline))", backgroundColor: "hsl(var(--card))" }}
       >
         <input
           type="text"

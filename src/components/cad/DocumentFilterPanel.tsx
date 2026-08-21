@@ -108,7 +108,7 @@ export function DocumentFilterPanel({ app, docId, sig, showBgRemove }: Props) {
         />
         <label
           className="mt-1 flex h-7 items-center overflow-hidden rounded-md border"
-          style={{ borderColor: "hsl(var(--hairline))", background: "#fff" }}
+          style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--card))" }}
         >
           <input
             type="number" min={0} max={100} step={1}
