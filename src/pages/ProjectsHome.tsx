@@ -240,6 +240,20 @@ export default function ProjectsHome() {
   const projectCount = projects.filter((p) => !p.isTemplate).length;
   const canCreateProject = projectCount < MAX_PROJECTS;
 
+  // Ohne Projekte startet die Startseite direkt auf der „Hauptseite“.
+  const emptyHubApplied = useRef(false);
+  useEffect(() => {
+    if (emptyHubApplied.current) return;
+    if (projectCount === 0) {
+      emptyHubApplied.current = true;
+      setShowAllTasks(false);
+      setHub("home");
+    } else {
+      emptyHubApplied.current = true;
+    }
+  }, [projectCount]);
+
+
   const createProject = () => {
     if (!canCreateProject) {
       alert(`Maximal ${MAX_PROJECTS} Projekte möglich. Lösche zuerst ein bestehendes Projekt.`);
