@@ -183,26 +183,23 @@ function DropSlot({
       data-parent-id={parentId ?? ""}
       data-before-id={beforeId ?? ""}
       data-kind={kind}
-      className={`relative transition-all ${dragging ? "my-1 h-10" : "h-1"}`}
+      title={label}
+      className={`relative transition-all ${dragging ? "h-2" : "h-1"}`}
       onDragOver={onDragOver}
       onDrop={onDrop}
     >
       {dragging && (
-        <div
-          className="absolute inset-0 rounded-md transition-all"
+        // Nur ein schmaler Strich: zeigt die Einsortier-Position an, ist aber
+        // klar von den Ordner-Ablageflächen unterscheidbar.
+        <span
+          className="absolute left-0 right-0 top-1/2 -translate-y-1/2 rounded-full transition-all"
           style={{
-            background: active ? "hsla(38, 45%, 70%, 0.35)" : "hsla(38, 45%, 70%, 0.10)",
-            border: active
-              ? "1px dashed hsla(38, 45%, 45%, 0.7)"
-              : "1px dashed hsla(38, 30%, 55%, 0.25)",
+            height: active ? 3 : 1,
+            background: active
+              ? "hsl(var(--accent-gold))"
+              : "hsl(var(--hairline))",
           }}
-        >
-          {active && (
-            <span className="absolute inset-0 flex items-center justify-center text-[11px] font-medium text-muted-foreground">
-              {label}
-            </span>
-          )}
-        </div>
+        />
       )}
     </li>
   );
@@ -620,9 +617,19 @@ export function FileBrowser({ project }: Props) {
                     activateDropTarget({ mode: "inside", folderId: folder.id });
                   }}
                   onDrop={(event) => dropInsideFolder(event, folder)}
-                  className="group flex flex-col gap-1 py-1.5 transition-colors hover:bg-muted/30"
+                  className="group flex flex-col gap-1 rounded-md px-1.5 py-1.5 transition-colors hover:bg-muted/30"
                   style={{
-                    background: folderDropActive ? "hsl(var(--accent-gold) / 0.12)" : undefined,
+                    background: folderDropActive
+                      ? "hsl(var(--accent-gold) / 0.16)"
+                      : draggingId && draggingId !== folder.id
+                        ? "hsl(var(--accent-gold) / 0.05)"
+                        : undefined,
+                    // Nur echte Ablageziele (Ordner) bekommen beim Ziehen einen Rahmen.
+                    border: folderDropActive
+                      ? "1px dashed hsl(var(--accent-gold))"
+                      : draggingId && draggingId !== folder.id
+                        ? "1px dashed hsl(var(--accent-gold) / 0.45)"
+                        : "1px dashed transparent",
                     opacity: draggingId === folder.id ? 0.45 : 1,
                   }}
                 >

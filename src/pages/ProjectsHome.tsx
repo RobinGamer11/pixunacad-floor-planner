@@ -76,6 +76,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { setExternalContentConsent, useExternalContentConsent } from "@/lib/externalContent";
 import { NetworkView } from "@/components/network/NetworkView";
 import { AuroraBackground } from "@/components/AuroraBackground";
+import { RangeCalendar, type CalEntry } from "@/components/calendar/RangeCalendar";
 
 const Pixuna = () => (
   <span className="font-semibold tracking-tight text-base">
@@ -303,10 +304,8 @@ export default function ProjectsHome() {
     resetProjectDrag();
   };
 
-  const statusColor = (s: ProfileStatus) =>
-    s === "online" ? "hsl(140 60% 45%)" : s === "busy" ? "hsl(0 70% 55%)" : "hsl(0 0% 65%)";
-  const statusLabel = (s: ProfileStatus) =>
-    s === "online" ? "Online" : s === "busy" ? "Beschäftigt" : "Offline";
+  const statusColor = statusColorOf;
+  const statusLabel = statusLabelOf;
 
   return (
     <div
@@ -1133,7 +1132,7 @@ export default function ProjectsHome() {
                   {(
                     [
                       ["uebersicht", "Übersicht", false],
-                      ["aufgaben", "Aufgaben/Notizen", false],
+                      ["aufgaben", "Organisation", false],
                       ["finanzen", "Finanzen", false],
                       ["dokumente", "Dokumente", false],
                       ["team", "Team", true],
@@ -1722,6 +1721,30 @@ export function AufgabenView({ project }: { project: Project }) {
       });
   }, [board.items, catMap]);
 
+  /** Kalender-Einträge (Aufgaben, Termine, Notizen). */
+  const calEntries: CalEntry[] = useMemo(
+    () =>
+      rows
+        .filter((t) => !!t.date)
+        .map((t) => ({
+          id: t.id,
+          date: t.date,
+          title: t.title,
+          sub: t.time,
+          done: t.done,
+          color: t.done
+            ? "hsl(var(--ink-soft))"
+            : t.alert
+              ? "hsl(0 70% 52%)"
+              : t.kind === "note"
+                ? "hsl(210 70% 52%)"
+                : t.kind === "event"
+                  ? "hsl(265 60% 58%)"
+                  : "hsl(var(--accent-gold))",
+        })),
+    [rows],
+  );
+
   // Termine erscheinen nur, wenn ihr Tag im Kalender gewählt ist.
   const base = useMemo(
     () => (selectedDates.length
@@ -1880,13 +1903,13 @@ export function AufgabenView({ project }: { project: Project }) {
             onClick={() => navigate(`/project/${project.id}/board`)}
             className="h-7 px-2.5 rounded-md text-[11px] font-medium flex items-center gap-1.5"
             style={{ background: "hsl(var(--accent-gold-soft))", color: "hsl(var(--accent-gold))" }}
-            title="Board öffnen"
+            title="Orga-Oberfläche öffnen"
           >
-            <ListChecks size={13} /> Board
+            <ListChecks size={13} /> Orga
           </button>
         </div>
-        <TaskCalendar
-          tasks={rows}
+        <RangeCalendar
+          entries={calEntries}
           selectedDates={selectedDates}
           onSelectDate={toggleDate}
         />
@@ -1897,7 +1920,7 @@ export function AufgabenView({ project }: { project: Project }) {
           </span>
         </div>
         <div className="mt-1 text-[11px] text-muted-foreground">
-          Aufgaben und Notizen sind direkt mit dem Board verknüpft.
+          Aufgaben und Notizen sind direkt mit der Orga-Oberfläche verknüpft.
         </div>
       </div>
 
@@ -1980,7 +2003,7 @@ function UnifiedTaskRow({
           {task.time ? ` · ${task.time}` : ""}
         </div>
       </div>
-      <button onClick={onOpenInBoard} title="Im Board öffnen" className="text-muted-foreground hover:text-foreground">
+      <button onClick={onOpenInBoard} title="In Orga öffnen" className="text-muted-foreground hover:text-foreground">
         <ExternalLink size={14} />
       </button>
       <button onClick={remove} title="Löschen" className="text-muted-foreground hover:text-foreground">
@@ -2110,123 +2133,6 @@ function TaskRow({ task, projectId }: { task: Task; projectId: string }) {
         <Trash2 size={14} />
       </button>
     </div>
-  );
-}
-
-function TaskCalendar({
-  tasks,
-  selectedDates,
-  onSelectDate,
-}: {
-  tasks: UnifiedTask[];
-  selectedDates: string[];
-  onSelectDate: (date: string, additive: boolean) => void;
-}) {
-  const today = new Date();
-  const [view, setView] = useState({ year: today.getFullYear(), month: today.getMonth() });
-  const first = new Date(view.year, view.month, 1);
-  const start = (first.getDay() + 6) % 7;
-  const days = new Date(view.year, view.month + 1, 0).getDate();
-  const byDay = new Map<number, UnifiedTask[]>();
-  tasks.forEach((t) => {
-    if (!t.date) return;
-    const d = new Date(t.date);
-    if (d.getFullYear() === view.year && d.getMonth() === view.month) {
-      const day = d.getDate();
-      if (!byDay.has(day)) byDay.set(day, []);
-      byDay.get(day)!.push(t);
-    }
-  });
-  const cells: (number | null)[] = [];
-  for (let i = 0; i < start; i++) cells.push(null);
-  for (let d = 1; d <= days; d++) cells.push(d);
-
-  const fmt = (d: number) =>
-    `${view.year}-${String(view.month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-
-  const nav = (dir: number) => {
-    const m = view.month + dir;
-    const y = view.year + Math.floor(m / 12);
-    setView({ year: y, month: ((m % 12) + 12) % 12 });
-  };
-
-  /** Farbe je Eintragsart bzw. Dringlichkeit. */
-  const chipColor = (t: UnifiedTask) =>
-    t.done ? "hsl(var(--ink-soft))"
-      : t.alert ? "hsl(0 70% 52%)"
-      : t.kind === "note" ? "hsl(210 70% 52%)"
-      : t.kind === "event" ? "hsl(265 60% 58%)"
-      : "hsl(var(--accent-gold))";
-
-  return (
-    <div>
-      <div className="flex items-center justify-between text-sm mb-2">
-        <button onClick={() => nav(-1)} className="text-muted-foreground hover:text-foreground px-1">
-          ‹
-        </button>
-        <span className="font-medium">
-          {first.toLocaleString("de-DE", { month: "long", year: "numeric" })}
-        </span>
-        <button onClick={() => nav(1)} className="text-muted-foreground hover:text-foreground px-1">
-          ›
-        </button>
-      </div>
-      <div className="grid grid-cols-7 gap-1 text-[11px] text-muted-foreground text-center">
-        {["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"].map((d) => (
-          <div key={d}>{d}</div>
-        ))}
-      </div>
-      <div className="grid grid-cols-7 gap-1 mt-1 text-xs">
-        {cells.map((c, i) => {
-          if (c === null) return <div key={i} className="h-16" />;
-          const iso = fmt(c);
-          const dayTasks = byDay.get(c) ?? [];
-          const isToday =
-            today.getFullYear() === view.year &&
-            today.getMonth() === view.month &&
-            today.getDate() === c;
-          const isSelected = selectedDates.includes(iso);
-          return (
-            <button
-              key={i}
-              onClick={(e) => onSelectDate(iso, e.shiftKey || e.metaKey || e.ctrlKey)}
-              className="h-16 flex flex-col items-stretch rounded-md relative p-1 gap-0.5 text-left"
-              style={{
-                background: isSelected
-                  ? "hsl(var(--accent-gold) / 0.2)"
-                  : dayTasks.length
-                  ? "hsl(var(--surface-muted))"
-                  : "transparent",
-                border: isSelected
-                  ? "1px solid hsl(var(--accent-gold))"
-                  : isToday
-                  ? "1px solid hsl(var(--ink))"
-                  : "1px solid transparent",
-                fontWeight: isToday || isSelected ? 600 : undefined,
-              }}
-            >
-              <span className="leading-none">{c}</span>
-              {dayTasks.slice(0, 2).map((t) => (
-                <span
-                  key={t.id}
-                  title={t.title}
-                  className="rounded-[3px] px-1 text-[9px] leading-[13px] truncate"
-                  style={{ background: chipColor(t), color: "hsl(var(--surface))" }}
-                >
-                  {t.title || "Eintrag"}
-                </span>
-              ))}
-              {dayTasks.length > 2 && (
-                <span className="text-[9px] leading-none text-muted-foreground">
-                  +{dayTasks.length - 2}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-
   );
 }
 
@@ -2970,7 +2876,7 @@ function BoardPreview({ project }: { project: Project }) {
           className="h-7 px-2.5 rounded-md text-[11px] font-medium"
           style={{ background: "hsl(var(--accent-gold-soft))", color: "hsl(var(--accent-gold))" }}
         >
-          Board öffnen
+          Orga öffnen
         </button>
       </div>
       {items.length === 0 ? (
@@ -3000,7 +2906,7 @@ function BoardPreview({ project }: { project: Project }) {
                 )}
                 <button
                   onClick={() => navigate(`/project/${project.id}/board?item=${i.id}`)}
-                  title="Im Board öffnen"
+                  title="In Orga öffnen"
                   className="text-muted-foreground hover:text-foreground shrink-0"
                 >
                   <ExternalLink size={14} />
@@ -3101,7 +3007,7 @@ function AllTasksView({ projects }: { projects: Project[] }) {
       />
 
       <div className="flex items-center gap-3 mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Alle Aufgaben</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Organisation</h1>
         <span className="text-sm text-muted-foreground">projektübergreifend</span>
       </div>
 
@@ -3153,7 +3059,7 @@ function AllTasksView({ projects }: { projects: Project[] }) {
                     </div>
                     <button
                       onClick={() => navigate(`/project/${t.projectId}/board?item=${t.id}`)}
-                      title="Im Board öffnen"
+                      title="In Orga öffnen"
                       className="text-muted-foreground hover:text-foreground shrink-0"
                     >
                       <ExternalLink size={14} />
@@ -3185,7 +3091,7 @@ function AllTasksView({ projects }: { projects: Project[] }) {
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium truncate">{p.name}</div>
                       <div className="text-[11px] text-muted-foreground truncate">
-                        {p.ort || "Ohne Ort"} · {previewId === p.id ? "Vorschau schließen" : "Board-Vorschau öffnen"}
+                        {p.ort || "Ohne Ort"} · {previewId === p.id ? "Vorschau schließen" : "Orga-Vorschau öffnen"}
                       </div>
                     </div>
                     <ChevronRight
@@ -3238,82 +3144,46 @@ function GlobalCalendar({
   selectedDate,
   onSelect,
 }: {
-  tasks: { date?: string; color: string; title?: string; kind?: TlKind }[];
+  tasks: { id?: string; date?: string; color: string; title?: string; kind?: TlKind }[];
   selectedDate?: string;
   onSelect: (d: string) => void;
 }) {
-  const [cursor, setCursor] = useState(() => {
-    const d = new Date();
-    return { y: d.getFullYear(), m: d.getMonth() };
-  });
-  const first = new Date(cursor.y, cursor.m, 1);
-  const days = new Date(cursor.y, cursor.m + 1, 0).getDate();
-  const startWeekday = (first.getDay() + 6) % 7;
-  const cells: (number | null)[] = [
-    ...Array(startWeekday).fill(null),
-    ...Array.from({ length: days }, (_, i) => i + 1),
-  ];
-  const today = new Date();
-  const todayStr = today.toISOString().slice(0, 10);
-  const dateStr = (d: number) => `${cursor.y}-${String(cursor.m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-
-  const entriesForDate = (d: number) => tasks.filter((t) => t.date === dateStr(d));
-
-  const monthName = first.toLocaleString("de-DE", { month: "long", year: "numeric" });
-
+  const entries: CalEntry[] = tasks
+    .filter((t) => !!t.date)
+    .map((t, i) => ({
+      id: `${t.id ?? "e"}-${i}`,
+      date: t.date,
+      title: t.title || "Eintrag",
+      color: t.color,
+    }));
   return (
     <div className="rounded-xl border p-4" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface))" }}>
-      <div className="flex items-center justify-between mb-3">
-        <button onClick={() => setCursor((c) => ({ y: c.m === 0 ? c.y - 1 : c.y, m: (c.m + 11) % 12 }))} className="text-muted-foreground hover:text-foreground text-sm">‹</button>
-        <div className="text-sm font-semibold capitalize">{monthName}</div>
-        <button onClick={() => setCursor((c) => ({ y: c.m === 11 ? c.y + 1 : c.y, m: (c.m + 1) % 12 }))} className="text-muted-foreground hover:text-foreground text-sm">›</button>
-      </div>
-      <div className="grid grid-cols-7 gap-1 text-[10px] text-muted-foreground mb-1 text-center">
-        {["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"].map((d) => (<div key={d}>{d}</div>))}
-      </div>
-      <div className="grid grid-cols-7 gap-1 text-[11px]">
-        {cells.map((c, i) => {
-          const s = c ? dateStr(c) : undefined;
-          const isSelected = s && s === selectedDate;
-          const isToday = s === todayStr;
-          const entries = c ? entriesForDate(c) : [];
-          return (
-            <div
-              key={i}
-              onClick={() => s && onSelect(s)}
-              className={`relative h-14 rounded-md p-1 flex flex-col gap-0.5 ${c ? "cursor-pointer hover:bg-muted/60" : ""}`}
-              style={{
-                background: isSelected ? "hsl(var(--accent-gold) / 0.2)" : entries.length ? "hsl(var(--surface-muted))" : "transparent",
-                border: isSelected ? "1px solid hsl(var(--accent-gold))" : isToday ? "1px solid hsl(var(--hairline))" : "1px solid transparent",
-                fontWeight: isToday ? 600 : 400,
-              }}
-            >
-              <span className="leading-none">{c ?? ""}</span>
-              {entries.slice(0, 2).map((e, idx) => (
-                <span key={idx} className="rounded-[3px] px-1 text-[9px] leading-[13px] truncate"
-                      style={{ background: e.color, color: "#fff" }}
-                      title={e.title}>
-                  {e.title || "Eintrag"}
-                </span>
-              ))}
-              {entries.length > 2 && (
-                <span className="text-[9px] leading-none text-muted-foreground">+{entries.length - 2}</span>
-              )}
-            </div>
-          );
-        })}
-      </div>
+      <RangeCalendar
+        entries={entries}
+        selectedDates={selectedDate ? [selectedDate] : []}
+        onSelectDate={(d) => onSelect(d)}
+        cellHeight={56}
+      />
     </div>
   );
 }
 
 
+
 /* ---------------- Münzen / Shop / Netzwerk / Papierkorb ---------------- */
 
+/** Einheitliche Statusfarben/-namen – identisch mit dem Netzwerk-Status. */
 const statusColorOf = (s: ProfileStatus) =>
-  s === "online" ? "hsl(140 60% 45%)" : s === "busy" ? "hsl(0 70% 55%)" : "hsl(0 0% 65%)";
+  s === "online"
+    ? "hsl(140 60% 45%)"
+    : s === "away"
+      ? "hsl(42 92% 52%)"
+      : s === "busy"
+        ? "hsl(0 70% 55%)"
+        : "hsl(0 0% 55%)";
 const statusLabelOf = (s: ProfileStatus) =>
-  s === "online" ? "Online" : s === "busy" ? "Beschäftigt" : "Offline";
+  s === "online" ? "Online" : s === "away" ? "Abwesend" : s === "busy" ? "Beschäftigt" : "Offline";
+const ALL_STATUS: ProfileStatus[] = ["online", "away", "busy", "offline"];
 
 /**
  * Gemeinsamer Profil-Editor für das Kopf-Dropdown und die Netzwerk-Seite.
@@ -3375,12 +3245,13 @@ function ProfileEditor({ profile, projectCount }: { profile: UserProfile; projec
           )}
         </div>
       </div>
-      <div className="mt-4 flex gap-2">
-        {(["online", "busy", "offline"] as ProfileStatus[]).map((s) => (
+      <div className="mt-4 text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">MEIN STATUS</div>
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        {ALL_STATUS.map((s) => (
           <button
             key={s}
             onClick={() => projectStore.updateProfile({ status: s })}
-            className="flex-1 h-8 rounded-md border text-xs flex items-center justify-center gap-1.5"
+            className="h-8 rounded-md border text-xs flex items-center justify-center gap-1.5"
             style={{
               borderColor: profile.status === s ? statusColorOf(s) : "hsl(var(--hairline))",
               background: profile.status === s ? `${statusColorOf(s)}20` : "transparent",

@@ -323,7 +323,7 @@ export interface ProjectFolder {
   sortIndex?: number;
 }
 
-export type ProfileStatus = "online" | "offline" | "busy";
+export type ProfileStatus = "online" | "away" | "busy" | "offline";
 export interface UserProfile {
   name: string;
   role: string;

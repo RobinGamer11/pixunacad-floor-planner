@@ -22,6 +22,7 @@ import {
   type LocalProjectRef,
 } from "@/lib/networkStore";
 import { useUnreadChats, type ChatTarget } from "@/lib/chatStore";
+import { projectStore, useProfile } from "@/lib/projectStore";
 import ChatPanel from "@/components/network/ChatPanel";
 
 const surface = { background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" };
@@ -46,14 +47,26 @@ function ChatButton({ unread, onClick, title }: { unread?: boolean; onClick: () 
   return (
     <button
       onClick={(e) => { e.stopPropagation(); onClick(); }}
-      title={title}
-      className="relative h-7 w-7 rounded-md grid place-items-center text-muted-foreground hover:text-foreground hover:bg-[hsl(var(--surface-muted))]"
+      title={unread ? `${title} · neue Nachricht` : title}
+      className={`relative h-9 w-9 shrink-0 rounded-lg grid place-items-center border hover:bg-[hsl(var(--surface-muted))] ${
+        unread ? "animate-pulse" : ""
+      }`}
+      style={
+        unread
+          ? {
+              color: "hsl(var(--accent-gold))",
+              borderColor: "hsl(var(--accent-gold))",
+              background: "hsl(var(--accent-gold) / 0.16)",
+              boxShadow: "0 0 0 3px hsl(var(--accent-gold) / 0.18)",
+            }
+          : { color: "hsl(var(--ink-soft))", borderColor: "hsl(var(--hairline))" }
+      }
     >
-      <MessageSquare size={14} />
+      <MessageSquare size={20} />
       {unread && (
         <span
-          className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border"
-          style={{ background: "hsl(0 70% 55%)", borderColor: "hsl(var(--surface-card))" }}
+          className="absolute -top-1 -right-1 w-3 h-3 rounded-full border"
+          style={{ background: "hsl(var(--accent-gold))", borderColor: "hsl(var(--surface-card))" }}
         />
       )}
     </button>
@@ -62,6 +75,7 @@ function ChatButton({ unread, onClick, title }: { unread?: boolean; onClick: () 
 
 function PersonRow({
   person,
+  chat,
   right,
   onClick,
   draggable,
@@ -69,6 +83,8 @@ function PersonRow({
   handle,
 }: {
   person: NetworkPerson;
+  /** Chat-Symbol – steht direkt neben dem Namen. */
+  chat?: React.ReactNode;
   right?: React.ReactNode;
   onClick?: () => void;
   draggable?: boolean;
@@ -93,7 +109,10 @@ function PersonRow({
         />
       </div>
       <div className="min-w-0 flex-1" style={{ opacity: offline ? 0.6 : 1 }}>
-        <div className="text-sm font-medium truncate">{person.name}</div>
+        <div className="text-sm font-medium truncate flex items-center gap-2">
+          <span className="truncate">{person.name}</span>
+          {chat}
+        </div>
         <div className="text-[11px] text-muted-foreground truncate">
           {person.role?.trim() || presenceLabel(person.status)}
         </div>
@@ -128,8 +147,10 @@ function Group({
           <span className="truncate">{title}</span>
           <span className="ml-1 opacity-70">({count}/{total})</span>
         </button>
-        <div className="ml-auto flex items-center gap-1">{actions}</div>
+        {/* Chat-Symbol direkt neben dem Projektnamen. */}
+        <div className="flex items-center gap-1">{actions}</div>
       </div>
+
       {open && <div className="pl-1">{children}</div>}
     </div>
   );
@@ -161,6 +182,15 @@ export function NetworkView({
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [net.ready, profile?.name, profile?.role, profile?.avatarUrl]);
+
+  // Status ist mit dem lokalen Profil (Kopfzeile / „Mein Profil“) verbunden.
+  const localProfile = useProfile();
+  const myStatus = localProfile.status;
+  useEffect(() => {
+    if (!net.ready) return;
+    net.setStatus(myStatus as PresenceStatus);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [net.ready, myStatus]);
 
   const [tab, setTab] = useState<TabId>("contacts");
   const [query, setQuery] = useState("");
@@ -263,11 +293,11 @@ export function NetworkView({
         {(["online", "away", "busy", "offline"] as PresenceStatus[]).map((s) => (
           <button
             key={s}
-            onClick={() => net.setStatus(s)}
+            onClick={() => { projectStore.updateProfile({ status: s }); net.setStatus(s); }}
             className="h-7 px-2.5 rounded-md border text-xs flex items-center gap-1.5"
             style={{
-              borderColor: net.myStatus === s ? presenceColor(s) : "hsl(var(--hairline))",
-              background: net.myStatus === s ? `${presenceColor(s)}22` : "transparent",
+              borderColor: myStatus === s ? presenceColor(s) : "hsl(var(--hairline))",
+              background: myStatus === s ? `${presenceColor(s)}22` : "transparent",
             }}
           >
             <span className="w-2 h-2 rounded-full" style={{ background: presenceColor(s) }} />
@@ -338,7 +368,7 @@ export function NetworkView({
                           key={person.id}
                           person={person}
                           onClick={() => setDetails(person)}
-                          right={
+                          chat={
                             <ChatButton
                               unread={unread[`d:${person.id}`]}
                               onClick={() => openDirect(person)}
@@ -364,7 +394,7 @@ export function NetworkView({
                       key={person.id}
                       person={person}
                       onClick={() => setDetails(person)}
-                      right={
+                      chat={
                         <ChatButton
                           unread={unread[`d:${person.id}`]}
                           onClick={() => openDirect(person)}
@@ -405,13 +435,13 @@ export function NetworkView({
                     <div className="flex items-center gap-2">
                       <FolderKanban size={14} className="text-muted-foreground" />
                       <span className="text-sm font-semibold truncate">{p.name} ({list.length})</span>
+                      <ChatButton
+                        unread={unread[`p:${p.id}`]}
+                        onClick={() => openProject(p)}
+                        title="Projektchat öffnen"
+                      />
                       <div className="ml-auto flex items-center gap-1">
                         <span className="text-[11px] text-muted-foreground">Besitzer: Du</span>
-                        <ChatButton
-                          unread={unread[`p:${p.id}`]}
-                          onClick={() => openProject(p)}
-                          title="Projektchat öffnen"
-                        />
                       </div>
                     </div>
                     <div className="mt-1.5">
