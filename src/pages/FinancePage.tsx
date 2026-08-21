@@ -261,6 +261,8 @@ export default function FinancePage() {
             </div>
 
 
+            <FavoriteTemplates state={state} onOpen={(id) => setSelectedId(id)} />
+
             <div className="flex-1 overflow-auto py-1 px-1">
               <div onClick={() => setSelectedId(null)}
                 className="flex items-center gap-1.5 px-2 py-1.5 rounded-md cursor-pointer text-[12px] font-semibold"
@@ -449,6 +451,11 @@ const ActionView: React.FC<{ projectId: string; state: FinanceState; node: Finan
   const totals = actionTotals(state, node);
   const positions = positionsOf(state, node.id);
   const invoiceDetails = positions.filter((p) => p.type === "invoice" || p.type === "supplement");
+  const isInvoiceLike = (p: FinancePosition) => p.type === "invoice" || p.type === "supplement";
+  const archived = positions.filter((p) => !p.hasTemplate);
+  const created = positions.filter((p) => p.hasTemplate);
+  const archivedInvoices = archived.filter(isInvoiceLike);
+  const createdInvoices = created.filter(isInvoiceLike);
 
   return (
     <>
@@ -500,10 +507,41 @@ const ActionView: React.FC<{ projectId: string; state: FinanceState; node: Finan
       </div>
 
 
-      <FinancePositionsTable projectId={projectId} nodeId={node.id} positions={positions} />
+      {/* Archivierte Belege */}
+      {archived.length > 0 && (
+        <div className="space-y-2 rounded-xl p-3" style={{ background: ARCHIVE_BG }}>
+          <div className="text-[11px] font-semibold uppercase tracking-wider"
+               style={{ color: "hsl(var(--ink-soft))" }}>Archivierte Belege</div>
+          <FinanceSummaryCard totals={positionTotals(archived)} hideEstimate
+            title="Archiviert" subtitle={node.name} invoiceDetails={archivedInvoices} />
+          <FinancePositionsTable projectId={projectId} nodeId={node.id} positions={archived}
+            emptyHint="Noch keine archivierten Belege." />
+        </div>
+      )}
+
+      {/* Angelegte Belege (Vorlagen in der Projektmappe) */}
+      {created.length > 0 && (
+        <div className="space-y-2 rounded-xl p-3" style={{ background: CREATED_BG }}>
+          <div className="text-[11px] font-semibold uppercase tracking-wider"
+               style={{ color: "hsl(var(--ink-soft))" }}>Angelegte Belege</div>
+          <FinanceSummaryCard totals={positionTotals(created)} hideEstimate
+            title="Angelegt" subtitle={node.name} invoiceDetails={createdInvoices} />
+          <FinancePositionsTable projectId={projectId} nodeId={node.id} positions={created}
+            background="hsl(var(--surface-card))"
+            emptyHint="Noch keine angelegten Belege." />
+        </div>
+      )}
+
+      {positions.length === 0 && (
+        <FinancePositionsTable projectId={projectId} nodeId={node.id} positions={[]} />
+      )}
     </>
   );
 };
+
+/** Hintergründe zur Unterscheidung archivierter und angelegter Belege. */
+const ARCHIVE_BG = "hsl(var(--surface-muted))";
+const CREATED_BG = "hsl(var(--accent-gold) / 0.10)";
 
 /* --------------------------------------------------------------- Übersicht */
 
