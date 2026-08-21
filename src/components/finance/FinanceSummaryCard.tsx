@@ -11,6 +11,12 @@ interface Props {
   /** Positionen für die aufklappbare Rechnungsübersicht (optional). */
   invoiceDetails?: FinancePosition[];
   subtitle?: string;
+  /** Kostenschätzung ausblenden (z. B. Teilübersichten archiviert/angelegt). */
+  hideEstimate?: boolean;
+  /** Kartentitel (Standard: „Gesamt"). */
+  title?: string;
+  /** Abweichender Kartenhintergrund. */
+  background?: string;
 }
 
 const cellCls = "px-4 py-3 flex-1 min-w-0";
@@ -33,7 +39,9 @@ function amountFontSize(values: number[]): number {
   return 11;
 }
 
-export const FinanceSummaryCard: React.FC<Props> = ({ totals, onEstimateChange, invoiceDetails, subtitle }) => {
+export const FinanceSummaryCard: React.FC<Props> = ({
+  totals, onEstimateChange, invoiceDetails, subtitle, hideEstimate, title, background,
+}) => {
   const [editEstimate, setEditEstimate] = useState(false);
   const [draft, setDraft] = useState("");
   const [showDetails, setShowDetails] = useState(false);
@@ -49,15 +57,16 @@ export const FinanceSummaryCard: React.FC<Props> = ({ totals, onEstimateChange, 
 
   return (
     <div className="rounded-xl border overflow-hidden"
-         style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}>
+         style={{ borderColor: "hsl(var(--hairline))", background: background ?? "hsl(var(--surface-card))" }}>
       <div className="flex flex-wrap items-stretch divide-x" style={{ borderColor: "hsl(var(--hairline))" }}>
         <div className={cellCls} style={{ maxWidth: 240 }}>
-          <div className="text-sm font-semibold">Gesamt</div>
+          <div className="text-sm font-semibold">{title ?? "Gesamt"}</div>
           <div className="text-xs" style={{ color: "hsl(var(--ink-soft))" }}>
             {subtitle ?? "Übersicht aller Positionen"}
           </div>
         </div>
 
+        {!hideEstimate && (
         <div className={cellCls}>
           <div className="text-[11px] font-semibold uppercase tracking-wider mb-1"
                style={{ color: "hsl(var(--ink-soft))" }}>Kostenschätzung</div>
@@ -85,6 +94,7 @@ export const FinanceSummaryCard: React.FC<Props> = ({ totals, onEstimateChange, 
             </button>
           )}
         </div>
+        )}
 
         <div className={cellCls}>
           <div className="text-[11px] font-semibold uppercase tracking-wider mb-1"
