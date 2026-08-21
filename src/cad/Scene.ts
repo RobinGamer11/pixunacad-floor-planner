@@ -712,6 +712,53 @@ export class Door {
 
 
 
+/**
+ * Natives CAD-Tabellenobjekt.
+ *
+ * Semantik und Layout kommen aus `src/lib/table` (gemeinsam mit der
+ * Projektmappe). Geometrisch ist die Tabelle ein rotiertes Rechteck wie eine
+ * TextBox — dadurch nutzt sie unverändert die bestehende Auswahl-, HUB-,
+ * Snap- und Ebenen-Infrastruktur.
+ */
+export class TableObject {
+  id: string;
+  center: Vec2;
+  rotationRad: number;
+  labelId: string;
+  /** Gemeinsames Tabellenmodell (Rohform wie in PageElement.tableData). */
+  data: any;
+  /** Umrechnung Papier-mm → Modell-Meter (Blattmaßstab, z. B. 1:100 → 0.1). */
+  mPerMm: number;
+  /** Zusätzlicher Skalierungsfaktor durch Objekt-Skalierung. */
+  scale: number;
+  _stickerEditOwnerId?: string | null;
+
+  constructor({ id, center, data, mPerMm, rotationRad, labelId, scale }: {
+    id: string; center: Vec2; data: any; mPerMm: number;
+    rotationRad?: number; labelId?: string; scale?: number;
+  }) {
+    this.id = id;
+    this.center = v(center.x, center.y);
+    this.data = data;
+    this.mPerMm = mPerMm > 0 ? mPerMm : 0.1;
+    this.rotationRad = rotationRad || 0;
+    this.scale = scale && scale > 0 ? scale : 1;
+    this.labelId = labelId || Defaults.defaultLabelId;
+    this._stickerEditOwnerId = null;
+  }
+
+  /** Breite in Metern (Summe der Spaltenbreiten × Maßstab × Skalierung). */
+  get widthM(): number {
+    const cols: number[] = this.data?.colWidthsMm ?? [];
+    return cols.reduce((a: number, b: number) => a + b, 0) * this.mPerMm * this.scale;
+  }
+  /** Höhe in Metern. */
+  get heightM(): number {
+    const rows: number[] = this.data?.rowHeightsMm ?? [];
+    return rows.reduce((a: number, b: number) => a + b, 0) * this.mPerMm * this.scale;
+  }
+}
+
 export class Scene {
   segments: Segment[] = [];
   freeStrokes: FreeStroke[] = [];
@@ -719,6 +766,7 @@ export class Scene {
   hatches: Hatch[] = [];
   dimensions: Dimension[] = [];
   textBoxes: TextBox[] = [];
+  tables: TableObject[] = [];
   stickerInstances: StickerInstance[] = [];
   documents: DocumentObject[] = [];
   walls: Wall[] = [];
