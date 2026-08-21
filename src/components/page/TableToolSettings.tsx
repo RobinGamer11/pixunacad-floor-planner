@@ -3,14 +3,16 @@ import {
   Plus, Minus, Check, X, Pencil, Sigma,
   AlignLeft, AlignCenter, AlignRight, Bold, Italic,
   ArrowUpToLine, ArrowDownToLine, Combine, Split,
-  Rows3, Columns3, Trash2,
+  Rows3, Columns3, Trash2, Filter, HelpCircle, ChevronDown, ChevronRight,
+  SquareDashed, Square,
 } from "lucide-react";
 import { projectStore } from "@/lib/projectStore";
 import type { PageElement } from "@/lib/projectStore";
 import {
   normalizeTable, toTableData, resizeGrid, insertRow, insertCol, removeRow, removeCol,
-  mergeRange, unmergeAt, applyFormat, effectiveFormat, mergeCovering,
+  mergeRange, unmergeAt, applyFormat, effectiveFormat, effectiveBorders, mergeCovering,
   tableWidthMm, tableHeightMm, type TableModel, type HAlign, type VAlign,
+  type CellBorderStyle,
 } from "@/lib/table/tableModel";
 import { TableEditContext, type FormulaFn } from "./TableElementView";
 
@@ -95,8 +97,20 @@ export function TableToolSettings({
   const borderWidthPx = model.borderWidthPx ?? 1;
   const borderColor = model.borderColor ?? "#d4d4d4";
   const background = model.background ?? "#ffffff";
-  const headerBackground = model.headerBackground ?? "#f4f4f4";
+  const filtersEnabled = model.filtersEnabled === true;
+  const cellBorders = effectiveBorders(model, selR, selC);
+  const fmtRaw = model.cellFormats[`${selR},${selC}`] ?? {};
   const fns: FormulaFn[] = ["SUM", "AVG", "MIN", "MAX", "COUNT"];
+
+  /** Tabellen-Hintergrund setzen und einzelne Zellhintergründe zurücksetzen. */
+  const setTableBackground = (v: string) => {
+    const cellFormats: typeof model.cellFormats = {};
+    for (const [k, f] of Object.entries(model.cellFormats)) {
+      const { background: _drop, ...rest } = f;
+      if (Object.keys(rest).length) cellFormats[k] = rest;
+    }
+    commit({ ...model, background: v, cellFormats });
+  };
 
   return (
     <div className="space-y-3">
@@ -126,8 +140,21 @@ export function TableToolSettings({
 
       {editMode && (
         <div className="rounded-md border p-2 space-y-2" style={{ borderColor: "hsl(var(--hairline))" }}>
-          <div className="text-[11px] font-semibold text-muted-foreground">
-            Struktur {sel ? `· ${String.fromCharCode(65 + selC)}${selR + 1}` : ""}
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-[11px] font-semibold text-muted-foreground">Struktur</div>
+            <div className="flex items-center gap-1 text-[10px]">
+              <span className="text-muted-foreground">Feld:</span>
+              <span
+                className="h-6 min-w-[34px] px-1.5 inline-flex items-center justify-center rounded-md border text-[11px] font-semibold tabular-nums"
+                style={{
+                  borderColor: "hsl(var(--hairline))",
+                  background: "hsl(var(--accent-gold-soft))",
+                  color: "hsl(var(--accent-gold))",
+                }}
+              >
+                {sel ? `${colName(selC)}${selR + 1}` : "–"}
+              </span>
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-1">
             <MiniBtn icon={<Rows3 size={11} />} label="Zeile ↑" onClick={() => commit(insertRow(model, selR))} />
@@ -164,6 +191,50 @@ export function TableToolSettings({
           <UnitField label="Schriftgröße" value={fmt.fontSizePt} unit="pt" min={4} max={72} onChange={(v) => format({ fontSizePt: v })} />
           <ColorRow label="Textfarbe" value={fmt.color ?? "#111111"} onChange={(v) => format({ color: v })} />
           <ColorRow label="Zellhintergrund" value={fmt.background ?? "#ffffff"} onChange={(v) => format({ background: v })} />
+
+          <div className="pt-1 space-y-1.5" style={{ borderTop: "1px solid hsl(var(--hairline))" }}>
+            <div className="text-[10px] font-semibold text-muted-foreground">Zellrahmen</div>
+            <div className="flex items-center gap-1">
+              {(["top", "right", "bottom", "left"] as const).map((side) => (
+                <Toggle
+                  key={side}
+                  active={cellBorders[side]}
+                  onClick={() => format({ borders: { ...(fmtRaw.borders ?? {}), [side]: !cellBorders[side] } })}
+                >
+                  <span className="text-[9px]">{SIDE_LABEL[side]}</span>
+                </Toggle>
+              ))}
+              <div className="w-1" />
+              <Toggle
+                active={cellBorders.top && cellBorders.right && cellBorders.bottom && cellBorders.left}
+                onClick={() => format({ borders: {} })}
+              ><Square size={11} /></Toggle>
+              <Toggle
+                active={!cellBorders.top && !cellBorders.right && !cellBorders.bottom && !cellBorders.left}
+                onClick={() => format({ borders: { top: false, right: false, bottom: false, left: false } })}
+              ><SquareDashed size={11} /></Toggle>
+            </div>
+            <div className="flex items-center gap-1">
+              {(["single", "double"] as CellBorderStyle[]).map((st) => (
+                <button
+                  key={st}
+                  onClick={() => format({ borderStyle: st })}
+                  className="h-7 flex-1 rounded-md border text-[10px]"
+                  style={{
+                    borderColor: "hsl(var(--hairline))",
+                    background: cellBorders.style === st ? "hsl(var(--accent-gold-soft))" : undefined,
+                    color: cellBorders.style === st ? "hsl(var(--accent-gold))" : undefined,
+                  }}
+                >{st === "single" ? "Einfach" : "Doppelt"}</button>
+              ))}
+            </div>
+            <UnitField
+              label="Rahmenstärke (Zelle)"
+              value={cellBorders.widthPx}
+              unit="px" min={0} max={8}
+              onChange={(v) => format({ borderWidthPx: Math.round(v) })}
+            />
+          </div>
         </div>
       )}
 
@@ -178,8 +249,23 @@ export function TableToolSettings({
           </div>
         </div>
         <ColorRow label="Rahmenfarbe" value={borderColor} onChange={(v) => patchTable({ borderColor: v })} />
-        <ColorRow label="Hintergrund" value={background} onChange={(v) => patchTable({ background: v })} />
-        <ColorRow label="Kopfzeile" value={headerBackground} onChange={(v) => patchTable({ headerBackground: v })} />
+        <ColorRow label="Hintergrund" value={background} onChange={setTableBackground} />
+        <div className="text-[10px] text-muted-foreground leading-snug">
+          „Hintergrund" gilt für die ganze Tabelle und überschreibt beim erneuten
+          Anwenden alle einzeln gesetzten Zellhintergründe.
+        </div>
+
+        <button
+          onClick={() => patchTable({ filtersEnabled: !filtersEnabled, filters: {} })}
+          className="w-full h-7 rounded-md border text-[11px] flex items-center justify-center gap-1.5"
+          style={{
+            borderColor: "hsl(var(--hairline))",
+            background: filtersEnabled ? "hsl(var(--accent-gold-soft))" : undefined,
+            color: filtersEnabled ? "hsl(var(--accent-gold))" : undefined,
+          }}
+        >
+          <Filter size={11} /> Filterfunktion {filtersEnabled ? "an" : "aus"}
+        </button>
       </div>
 
       {setFormulaFn && editMode && (
@@ -207,6 +293,8 @@ export function TableToolSettings({
           </div>
         </div>
       )}
+
+      <TableHelp fns={fns} />
 
       {isPending && (
         <div className="flex items-center gap-1.5">
@@ -329,6 +417,76 @@ function Stepper({ label, value, min, max, onChange }: {
           className="h-7 w-7 flex items-center justify-center hover:bg-muted disabled:opacity-30"
         ><Plus size={11} /></button>
       </div>
+    </div>
+  );
+}
+
+
+const SIDE_LABEL: Record<"top" | "right" | "bottom" | "left", string> = {
+  top: "Oben", right: "Rechts", bottom: "Unten", left: "Links",
+};
+
+const colName = (c: number): string => {
+  let n = c, out = "";
+  do { out = String.fromCharCode(65 + (n % 26)) + out; n = Math.floor(n / 26) - 1; } while (n >= 0);
+  return out;
+};
+
+const FORMULA_HELP: Record<string, string> = {
+  SUM: "Summe aller Zahlen im gewählten Bereich, z. B. =SUM(B2:B9).",
+  AVG: "Mittelwert der Zahlen im Bereich, z. B. =AVG(C2:C9).",
+  MIN: "Kleinster Wert im Bereich, z. B. =MIN(D2:D9).",
+  MAX: "Größter Wert im Bereich, z. B. =MAX(D2:D9).",
+  COUNT: "Anzahl der Zellen mit Zahlenwert, z. B. =COUNT(B2:B9).",
+};
+
+/** Kurzhilfe des Tabellenwerkzeugs — Formeln werden per Klick erklärt. */
+function TableHelp({ fns }: { fns: FormulaFn[] }) {
+  const [open, setOpen] = React.useState(false);
+  const [pick, setPick] = React.useState<string | null>(null);
+  return (
+    <div
+      className="rounded-md border"
+      style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-muted))" }}
+    >
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center gap-1.5 px-2 h-8 text-[11px] font-semibold uppercase tracking-[0.12em]"
+        style={{ color: "hsl(var(--ink-soft))" }}
+      >
+        {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+        <HelpCircle size={12} />
+        <span>Hilfe</span>
+      </button>
+      {open && (
+        <div className="px-2 pb-2 space-y-1.5">
+          <div className="text-[10.5px] leading-snug" style={{ color: "hsl(var(--ink-soft))" }}>
+            Doppelklick auf eine Zelle öffnet die Bearbeitung. Ein Linksklick in eine
+            andere Zelle speichert die Eingabe — Enter ist nicht nötig.
+          </div>
+          <div className="text-[10px] font-semibold text-muted-foreground">Formeln (Klick erklärt)</div>
+          <div className="flex flex-wrap gap-1">
+            {fns.map((f) => (
+              <button
+                key={f}
+                onClick={() => setPick(pick === f ? null : f)}
+                className="h-6 px-2 text-[10px] rounded border"
+                style={{
+                  borderColor: "hsl(var(--hairline))",
+                  background: pick === f ? "hsl(var(--accent-gold-soft))" : undefined,
+                  color: pick === f ? "hsl(var(--accent-gold))" : undefined,
+                }}
+              >{f}</button>
+            ))}
+          </div>
+          {pick && (
+            <div className="text-[10.5px] leading-snug" style={{ color: "hsl(var(--ink-soft))" }}>
+              {FORMULA_HELP[pick]}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
