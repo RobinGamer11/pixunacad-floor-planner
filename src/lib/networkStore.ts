@@ -349,6 +349,23 @@ export function useNetwork(localProjects: LocalProjectRef[]) {
           .upsert({ project_id: projectId, user_id: userId, role: "member", added_by: session?.user.id }, { onConflict: "project_id,user_id" });
         if (error) throw error;
       }),
+    /**
+     * Kontakt entfernen. Projektmitgliedschaften bleiben absichtlich
+     * bestehen – Kontakt und Projektzugehörigkeit sind getrennte Dinge.
+     */
+    removeContact: (userId: string) =>
+      run(async (client) => {
+        const session = authClient.getSession();
+        if (!session) return;
+        const me = session.user.id;
+        const { error } = await client
+          .from("contacts")
+          .delete()
+          .or(
+            `and(requester_id.eq.${me},addressee_id.eq.${userId}),and(requester_id.eq.${userId},addressee_id.eq.${me})`
+          );
+        if (error) throw error;
+      }),
     removeMember: (projectId: string, userId: string) =>
       run(async (client) => {
         const { error } = await client
