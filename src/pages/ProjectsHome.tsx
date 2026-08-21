@@ -3159,7 +3159,7 @@ function GlobalCalendar({
   selectedDate,
   onSelect,
 }: {
-  tasks: { date?: string; color: string }[];
+  tasks: { date?: string; color: string; title?: string; kind?: TlKind }[];
   selectedDate?: string;
   onSelect: (d: string) => void;
 }) {
@@ -3178,12 +3178,7 @@ function GlobalCalendar({
   const todayStr = today.toISOString().slice(0, 10);
   const dateStr = (d: number) => `${cursor.y}-${String(cursor.m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 
-  const colorsForDate = (d: number): string[] => {
-    const s = dateStr(d);
-    const cols = new Set<string>();
-    tasks.forEach((t) => { if (t.date === s) cols.add(t.color); });
-    return Array.from(cols).slice(0, 4);
-  };
+  const entriesForDate = (d: number) => tasks.filter((t) => t.date === dateStr(d));
 
   const monthName = first.toLocaleString("de-DE", { month: "long", year: "numeric" });
 
@@ -3202,25 +3197,28 @@ function GlobalCalendar({
           const s = c ? dateStr(c) : undefined;
           const isSelected = s && s === selectedDate;
           const isToday = s === todayStr;
-          const cols = c ? colorsForDate(c) : [];
+          const entries = c ? entriesForDate(c) : [];
           return (
             <div
               key={i}
               onClick={() => s && onSelect(s)}
-              className={`relative h-8 rounded-md flex items-center justify-center ${c ? "cursor-pointer hover:bg-muted/60" : ""}`}
+              className={`relative h-14 rounded-md p-1 flex flex-col gap-0.5 ${c ? "cursor-pointer hover:bg-muted/60" : ""}`}
               style={{
-                background: isSelected ? "hsl(var(--accent-gold) / 0.2)" : "transparent",
+                background: isSelected ? "hsl(var(--accent-gold) / 0.2)" : entries.length ? "hsl(var(--surface-muted))" : "transparent",
                 border: isSelected ? "1px solid hsl(var(--accent-gold))" : isToday ? "1px solid hsl(var(--hairline))" : "1px solid transparent",
                 fontWeight: isToday ? 600 : 400,
               }}
             >
-              {c ?? ""}
-              {cols.length > 0 && (
-                <div className="absolute bottom-0.5 flex gap-0.5">
-                  {cols.map((col, idx) => (
-                    <span key={idx} className="w-1 h-1 rounded-full" style={{ background: col }} />
-                  ))}
-                </div>
+              <span className="leading-none">{c ?? ""}</span>
+              {entries.slice(0, 2).map((e, idx) => (
+                <span key={idx} className="rounded-[3px] px-1 text-[9px] leading-[13px] truncate"
+                      style={{ background: e.color, color: "#fff" }}
+                      title={e.title}>
+                  {e.title || "Eintrag"}
+                </span>
+              ))}
+              {entries.length > 2 && (
+                <span className="text-[9px] leading-none text-muted-foreground">+{entries.length - 2}</span>
               )}
             </div>
           );
@@ -3229,6 +3227,7 @@ function GlobalCalendar({
     </div>
   );
 }
+
 
 /* ---------------- Münzen / Shop / Netzwerk / Papierkorb ---------------- */
 
