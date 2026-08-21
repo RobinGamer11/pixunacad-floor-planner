@@ -73,6 +73,7 @@ export const Defaults = {
   textColor: "#111111",
   // 11 pt (Word-Standard) = 11 * 4/3 px
   textFontSizePx: 14.6667,
+  textAlphaPct: 100,
   textBgColor: "#ffffff",
   textBgAlphaPct: 0,
   textWrap: true,

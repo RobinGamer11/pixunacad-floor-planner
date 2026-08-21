@@ -275,6 +275,8 @@ export interface DrawTextBoxOptions {
   baseColor: string;
   bgColor: string;
   bgAlpha: number;
+  /** Deckkraft des Textes (0..1). */
+  textAlpha?: number;
   align: "left" | "center" | "right";
   wrap: boolean;
   baseBold?: boolean;
@@ -331,6 +333,8 @@ export function drawRichTextBox(opts: DrawTextBoxOptions) {
   const lines = layoutLines(ctx, runs, baseFontSizePx, baseColor, innerW, wrap, lineFactor);
 
   // Draw lines
+  const textAlpha = Math.max(0, Math.min(1, opts.textAlpha ?? 1));
+  ctx.globalAlpha = textAlpha;
   ctx.textBaseline = "alphabetic";
   let y = -heightPx / 2 + paddingPx;
   for (const line of lines) {
