@@ -78,23 +78,23 @@
   }
 
   .dark {
-    --background: 224 20% 8%;
+    --background: 222 18% 13%;
     --foreground: 210 20% 95%;
 
-    --card: 224 18% 12%;
+    --card: 222 16% 17%;
     --card-foreground: 210 20% 95%;
 
-    --popover: 224 18% 12%;
+    --popover: 222 16% 17%;
     --popover-foreground: 210 20% 95%;
 
     --primary: 215 90% 55%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 16% 18%;
+    --secondary: 220 14% 21%;
     --secondary-foreground: 210 20% 90%;
 
-    --muted: 220 14% 16%;
-    --muted-foreground: 215 12% 55%;
+    --muted: 220 12% 20%;
+    --muted-foreground: 215 12% 66%;
 
     --accent: 215 90% 55%;
     --accent-foreground: 0 0% 100%;
@@ -102,27 +102,44 @@
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 220 14% 20%;
-    --input: 220 14% 20%;
+    --border: 220 12% 26%;
+    --input: 220 12% 26%;
     --ring: 215 90% 55%;
 
-    --cad-canvas: 224 20% 6%;
-    --cad-toolbar: 222 16% 18%;
+    --cad-canvas: 222 16% 15%;
+    --cad-toolbar: 222 16% 17%;
     --cad-toolbar-border: 222 12% 28%;
+    --cad-toolbar-foreground: 210 20% 92%;
+    --cad-toolbar-muted: 215 12% 66%;
+    --cad-toolbar-hover: 222 14% 24%;
     --cad-toolbar-active: 215 90% 55%;
     --cad-toolbar-active-foreground: 0 0% 100%;
     --cad-hub: 222 14% 24%;
     --cad-hub-border: 222 10% 34%;
-    --cad-grid: 220 10% 12%;
+    --cad-grid: 220 8% 24%;
     --cad-axis: 215 60% 35%;
     --cad-snap-point: 215 90% 55%;
     --cad-snap-line: 215 60% 45%;
     --cad-selection-stroke: 215 90% 55%;
     --cad-selection-fill: 215 90% 55%;
-    --cad-settings-bg: 222 16% 18%;
-    --cad-tools-bg: 222 16% 18%;
+    --cad-settings-bg: 222 16% 17%;
+    --cad-tools-bg: 222 16% 17%;
 
-    --sidebar-background: 240 5.9% 10%;
+    --primary-glow: 215 90% 66%;
+
+    /* Projektmappen-Tokens im Dunkelmodus – gedämpftes Anthrazit statt Schwarz */
+    --surface: 222 18% 13%;
+    --surface-muted: 222 15% 18%;
+    --surface-card: 222 16% 17%;
+    --surface-strong: 222 14% 23%;
+    --beige-soft: 222 12% 26%;
+    --ink: 210 20% 93%;
+    --ink-soft: 215 12% 68%;
+    --accent-gold: 38 62% 62%;
+    --accent-gold-soft: 38 30% 28%;
+    --hairline: 220 12% 26%;
+
+    --sidebar-background: 222 18% 13%;
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 224.3 76.3% 48%;
     --sidebar-primary-foreground: 0 0% 100%;
@@ -1097,7 +1114,8 @@
 --------------------------------------------------------------------------- */
 .pixuna-canvas-dark [data-cad-canvas],
 .pixuna-canvas-dark [data-page-capture] {
-  filter: invert(1) hue-rotate(180deg) saturate(1.85) contrast(1.06);
+  /* Kein hartes Schwarz: leicht abgeschwächte Invertierung mit satteren Farben. */
+  filter: invert(1) hue-rotate(180deg) saturate(1.7) contrast(0.82) brightness(1.12);
 }
 /* Blatt-Hintergrund selbst wird über die Capture-Ebene invertiert – daher
    hier keine zweite Invertierung (sonst hebt sie sich auf). */
