@@ -5,6 +5,7 @@ import { Input } from "./Input";
 import { Scene, AreaLabel, DimensionStyle, TextBoxStyle, TextBox } from "./Scene";
 import { autoSizeTextBox } from "./textAutoSize";
 import { LabelManager } from "./LabelManager";
+import { RasterLayers } from "./RasterLayers";
 import { TopologyEngine } from "./TopologyEngine";
 import { GlobalGuides } from "./globalGuides";
 import { Renderer, Selection } from "./Renderer";
@@ -240,6 +241,31 @@ export class CadApp {
   /** Zeichenmodus: "vector" (parametrisch) oder "pixel" (Objekt wird beim
    *  Fertigstellen zu einem Bild gerastert — wie in Malprogrammen). */
   defaultDrawRasterMode: "vector" | "pixel" = "vector";
+  /**
+   * Raster-Zeichenebenen (Pixelmodus) — je Zeichenblatt bzw. Druckplan ein
+   * eigener Satz gekachelter Rasterebenen im selben Papier-Koordinatensystem
+   * wie die Vektorobjekte. Pixelstriche sind damit Teil der Ebene und nicht
+   * einzeln auswählbare Bildobjekte.
+   */
+  private _rasterLayersByKey = new Map<string, RasterLayers>();
+
+  /** Kontextschlüssel der aktuell sichtbaren Zeichenfläche. */
+  private _rasterKey(): string {
+    return this.activePlanId ? `plan:${this.activePlanId}` : `sheet:${this.activeSheetId}`;
+  }
+
+  /** Rasterebenen der aktuell aktiven Zeichenfläche. */
+  get rasterLayers(): RasterLayers {
+    const key = this._rasterKey();
+    let layers = this._rasterLayersByKey.get(key);
+    if (!layers) {
+      layers = new RasterLayers();
+      layers.onReady = () => { try { this.renderer?.render(); } catch { /* noop */ } };
+      this._rasterLayersByKey.set(key, layers);
+    }
+    return layers;
+  }
+
   /** Projektweite Rasterqualität für neu fertiggestellte Pixelobjekte. */
   pixelRenderDpi = 1200;
   pixelSupersampling = false;
@@ -914,12 +940,34 @@ export class CadApp {
         return out;
       })(),
       planOverlays: this.planOverlayStore.toJSON(),
+      // Rasterebenen (Pixelmodus) je Zeichenblatt/Druckplan.
+      rasterLayersByKey: (() => {
+        const out: Record<string, any> = {};
+        for (const [key, layers] of this._rasterLayersByKey.entries()) {
+          const json = layers.serialize();
+          if (json.length > 0) out[key] = json;
+        }
+        return out;
+      })(),
     });
   }
 
   private _restoreScene(snapshot: string) {
     const data = JSON.parse(snapshot);
     this._isRestoring = true;
+    // Rasterebenen zuerst (Kacheln laden asynchron nach).
+    try {
+      this._rasterLayersByKey.clear();
+      const raster = data.rasterLayersByKey;
+      if (raster && typeof raster === "object") {
+        for (const key of Object.keys(raster)) {
+          const layers = new RasterLayers();
+          layers.onReady = () => { try { this.renderer?.render(); } catch { /* noop */ } };
+          layers.restore(raster[key]);
+          this._rasterLayersByKey.set(key, layers);
+        }
+      }
+    } catch (e) { console.error("CadApp raster restore:", e); }
     // Restore labels first
     if (Array.isArray(data.labels) && (this.labelManager as any).restore) {
       try { (this.labelManager as any).restore(data.labels); } catch {}
@@ -3153,6 +3201,8 @@ export class CadApp {
         this.activeTool.update(this.input);
       }
 
+      // Rasterebenen der aktiven Zeichenfläche an den Renderer hängen.
+      this.renderer.rasterLayers = this.rasterLayers;
       this.renderer.wallEditActive = !!(this.selectTool && this.selectTool.isEditing());
       this.topology.priorityWallId = this.selectTool?.getPriorityWallId?.() || null;
 
