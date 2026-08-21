@@ -422,7 +422,7 @@ export function addQuickItem(
 
 /* ---------------- Board-Oberflächenmodus (Ansichtstrahl / Projektnetz) ---------------- */
 
-export type BoardSurface = "ray" | "net";
+export type BoardSurface = "cal" | "ray" | "net";
 const SURFACE_KEY = (projectId: string) => `pixuna.board.surface.${projectId}`;
 
 export function getBoardSurface(projectId: string | undefined): BoardSurface {

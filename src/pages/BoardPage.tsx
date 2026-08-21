@@ -86,9 +86,9 @@ export default function BoardPage() {
   const [openLabelId, setOpenLabelId] = useState<string | null>(null);
   const [colorMode, setColorMode] = useState<"category" | "status">("status");
   const [axisMode, setAxisMode] = useState<"time" | "percent">("time");
-  const [surface, setSurfaceState] = useState<"ray" | "net">(() => getBoardSurface(projectId));
+  const [surface, setSurfaceState] = useState<"cal" | "ray" | "net">(() => getBoardSurface(projectId));
   useEffect(() => { setSurfaceState(getBoardSurface(projectId)); }, [projectId]);
-  const setSurface = useCallback((v: "ray" | "net") => {
+  const setSurface = useCallback((v: "cal" | "ray" | "net") => {
     setSurfaceState(v);
     setBoardSurface(projectId, v);
   }, [projectId]);
@@ -456,7 +456,7 @@ export default function BoardPage() {
               <Segmented
                 value={surface}
                 onChange={(v) => setSurface(v as typeof surface)}
-                options={[{ v: "ray", l: "Ansichtstrahl" }, { v: "net", l: "Projektnetz" }]}
+                options={[{ v: "cal", l: "Kalender" }, { v: "ray", l: "Ansichtstrahl" }, { v: "net", l: "Projektnetz" }]}
               />
               {surface === "ray" && (
                 <>
@@ -474,6 +474,18 @@ export default function BoardPage() {
               )}
             </div>
           </div>
+
+          {/* Kalender-Ansicht */}
+          {surface === "cal" && (
+            <div className="mx-4 mt-4 rounded-xl p-4"
+                 style={{ background: PANEL, border: `1px solid ${PANEL_LINE}` }}>
+              <RangeCalendar
+                entries={calEntries}
+                selectedDates={[]}
+                onSelectDate={() => {}}
+              />
+            </div>
+          )}
 
           {/* Projektnetz-Ansicht */}
           {surface === "net" && (
