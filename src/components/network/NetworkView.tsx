@@ -22,6 +22,7 @@ import {
   type LocalProjectRef,
 } from "@/lib/networkStore";
 import { useUnreadChats, type ChatTarget } from "@/lib/chatStore";
+import { projectStore, useProfile } from "@/lib/projectStore";
 import ChatPanel from "@/components/network/ChatPanel";
 
 const surface = { background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" };
@@ -182,6 +183,15 @@ export function NetworkView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [net.ready, profile?.name, profile?.role, profile?.avatarUrl]);
 
+  // Status ist mit dem lokalen Profil (Kopfzeile / „Mein Profil“) verbunden.
+  const localProfile = useProfile();
+  const myStatus = localProfile.status;
+  useEffect(() => {
+    if (!net.ready) return;
+    net.setStatus(myStatus as PresenceStatus);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [net.ready, myStatus]);
+
   const [tab, setTab] = useState<TabId>("contacts");
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<NetworkProfile[]>([]);
@@ -283,11 +293,11 @@ export function NetworkView({
         {(["online", "away", "busy", "offline"] as PresenceStatus[]).map((s) => (
           <button
             key={s}
-            onClick={() => net.setStatus(s)}
+            onClick={() => { projectStore.updateProfile({ status: s }); net.setStatus(s); }}
             className="h-7 px-2.5 rounded-md border text-xs flex items-center gap-1.5"
             style={{
-              borderColor: net.myStatus === s ? presenceColor(s) : "hsl(var(--hairline))",
-              background: net.myStatus === s ? `${presenceColor(s)}22` : "transparent",
+              borderColor: myStatus === s ? presenceColor(s) : "hsl(var(--hairline))",
+              background: myStatus === s ? `${presenceColor(s)}22` : "transparent",
             }}
           >
             <span className="w-2 h-2 rounded-full" style={{ background: presenceColor(s) }} />
