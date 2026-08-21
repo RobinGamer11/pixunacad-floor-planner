@@ -1865,16 +1865,17 @@ export function AufgabenView({ project }: { project: Project }) {
       >
         <div className="flex items-center justify-between mb-3">
           <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">
-            AUFGABEN / NOTIZEN {selectedDate && `· ${new Date(selectedDate).toLocaleDateString("de-DE")}`}
+            AUFGABEN / NOTIZEN {selectedDates.length > 0 && `· ${selectedDates.length} Tag(e)`}
           </div>
-          {selectedDate && (
+          {selectedDates.length > 0 && (
             <button
-              onClick={() => setSelectedDate(undefined)}
+              onClick={() => setSelectedDates([])}
               className="text-xs text-muted-foreground hover:text-foreground"
             >
               Filter aufheben
             </button>
           )}
+
         </div>
         <div className="divide-y" style={{ borderColor: "hsl(var(--hairline))" }}>
           {filtered.length === 0 && (
