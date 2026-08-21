@@ -1132,7 +1132,7 @@ export default function ProjectsHome() {
                   {(
                     [
                       ["uebersicht", "Übersicht", false],
-                      ["aufgaben", "Aufgaben/Notizen", false],
+                      ["aufgaben", "Organisation", false],
                       ["finanzen", "Finanzen", false],
                       ["dokumente", "Dokumente", false],
                       ["team", "Team", true],
@@ -1903,9 +1903,9 @@ export function AufgabenView({ project }: { project: Project }) {
             onClick={() => navigate(`/project/${project.id}/board`)}
             className="h-7 px-2.5 rounded-md text-[11px] font-medium flex items-center gap-1.5"
             style={{ background: "hsl(var(--accent-gold-soft))", color: "hsl(var(--accent-gold))" }}
-            title="Board öffnen"
+            title="Orga-Oberfläche öffnen"
           >
-            <ListChecks size={13} /> Board
+            <ListChecks size={13} /> Orga
           </button>
         </div>
         <RangeCalendar
@@ -2003,7 +2003,7 @@ function UnifiedTaskRow({
           {task.time ? ` · ${task.time}` : ""}
         </div>
       </div>
-      <button onClick={onOpenInBoard} title="Im Board öffnen" className="text-muted-foreground hover:text-foreground">
+      <button onClick={onOpenInBoard} title="In Orga öffnen" className="text-muted-foreground hover:text-foreground">
         <ExternalLink size={14} />
       </button>
       <button onClick={remove} title="Löschen" className="text-muted-foreground hover:text-foreground">
@@ -2906,7 +2906,7 @@ function BoardPreview({ project }: { project: Project }) {
                 )}
                 <button
                   onClick={() => navigate(`/project/${project.id}/board?item=${i.id}`)}
-                  title="Im Board öffnen"
+                  title="In Orga öffnen"
                   className="text-muted-foreground hover:text-foreground shrink-0"
                 >
                   <ExternalLink size={14} />
@@ -3007,7 +3007,7 @@ function AllTasksView({ projects }: { projects: Project[] }) {
       />
 
       <div className="flex items-center gap-3 mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Alle Aufgaben</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Organisation</h1>
         <span className="text-sm text-muted-foreground">projektübergreifend</span>
       </div>
 
@@ -3059,7 +3059,7 @@ function AllTasksView({ projects }: { projects: Project[] }) {
                     </div>
                     <button
                       onClick={() => navigate(`/project/${t.projectId}/board?item=${t.id}`)}
-                      title="Im Board öffnen"
+                      title="In Orga öffnen"
                       className="text-muted-foreground hover:text-foreground shrink-0"
                     >
                       <ExternalLink size={14} />
@@ -3091,7 +3091,7 @@ function AllTasksView({ projects }: { projects: Project[] }) {
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium truncate">{p.name}</div>
                       <div className="text-[11px] text-muted-foreground truncate">
-                        {p.ort || "Ohne Ort"} · {previewId === p.id ? "Vorschau schließen" : "Board-Vorschau öffnen"}
+                        {p.ort || "Ohne Ort"} · {previewId === p.id ? "Vorschau schließen" : "Orga-Vorschau öffnen"}
                       </div>
                     </div>
                     <ChevronRight
