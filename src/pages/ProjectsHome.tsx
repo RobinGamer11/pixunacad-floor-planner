@@ -1670,7 +1670,13 @@ export function AufgabenView({ project }: { project: Project }) {
   const board = useTimeline(project.id);
   useEffect(() => { timelineStore.ensureDefaults(project.id); }, [project.id]);
 
-  const [selectedDate, setSelectedDate] = useState<string | undefined>(undefined);
+  const [selectedDates, setSelectedDates] = useState<string[]>([]);
+  const selectedDate = selectedDates[0];
+  const toggleDate = (iso: string, additive: boolean) =>
+    setSelectedDates((prev) => {
+      if (!additive) return prev.length === 1 && prev[0] === iso ? [] : [iso];
+      return prev.includes(iso) ? prev.filter((d) => d !== iso) : [...prev, iso].sort();
+    });
   const [kind, setKind] = useState<TlKind>("task");
   const [draft, setDraft] = useState({ title: "", description: "" });
   const [catId, setCatId] = useState<string>(QUICK_CATEGORY_ID);
@@ -1685,7 +1691,7 @@ export function AufgabenView({ project }: { project: Project }) {
   const rows: UnifiedTask[] = useMemo(() => {
     const now = Date.now();
     return board.items
-      .filter((i) => i.kind === "task" || i.kind === "note")
+      .filter((i) => i.kind === "task" || i.kind === "note" || i.kind === "event")
       .map((i) => ({
         id: i.id,
         source: "board" as const,
@@ -1706,14 +1712,17 @@ export function AufgabenView({ project }: { project: Project }) {
       });
   }, [board.items, catMap]);
 
-  const filtered = selectedDate ? rows.filter((t) => t.date === selectedDate) : rows;
+  const filtered = selectedDates.length
+    ? rows.filter((t) => !!t.date && selectedDates.includes(t.date))
+    : rows;
 
   const addEntry = () => {
     if (!draft.title.trim()) return;
-    addQuickItem(project.id, kind, {
+    const dates = selectedDates.length ? selectedDates : [undefined];
+    dates.forEach((d) => addQuickItem(project.id, kind, {
       title: draft.title.trim(),
       description: draft.description.trim() || undefined,
-      date: selectedDate || undefined,
+      date: d,
       categoryId: catId,
       priorityId: prioId,
     });
@@ -1742,10 +1751,16 @@ export function AufgabenView({ project }: { project: Project }) {
         </div>
         <TaskCalendar
           tasks={rows}
-          selectedDate={selectedDate}
-          onSelectDate={(d) => setSelectedDate(d)}
+          selectedDates={selectedDates}
+          onSelectDate={toggleDate}
         />
-        <div className="mt-3 text-[11px] text-muted-foreground">
+        <div className="mt-3 text-[11px] font-medium">
+          Tag auswählen und Aufgabe/Notiz erstellen
+          <span className="ml-1 font-normal text-muted-foreground">
+            (mehrere Tage mit Shift/Strg)
+          </span>
+        </div>
+        <div className="mt-1 text-[11px] text-muted-foreground">
           Aufgaben und Notizen sind direkt mit dem Board verknüpft.
         </div>
       </div>
