@@ -436,7 +436,12 @@ export default function BoardPage() {
         onRedo={hist.redo}
         canDelete={!!selectedId}
         onDelete={() => { if (projectId && selectedId) { timelineStore.deleteItem(projectId, selectedId); setSelectedId(null); } }}
+        mappeHelpOn={mappeHelpOn}
+        onToggleMappeHelp={() => project && projectStore.setMappeHelpOn(project.id, !mappeHelpOn)}
+        tabletAidOn={tabletAidOn}
+        onToggleTabletAid={() => setTabletAidOn((v) => !v)}
       />
+
 
       <div className="flex-1 min-h-0 flex">
         <div className="flex-1 min-w-0 overflow-y-auto" style={{ background: "hsl(var(--background))" }}>
