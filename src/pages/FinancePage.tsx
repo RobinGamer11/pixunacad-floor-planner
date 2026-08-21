@@ -463,40 +463,58 @@ const ActionView: React.FC<{ projectId: string; state: FinanceState; node: Finan
   const archivedInvoices = archived.filter(isInvoiceLike);
   const createdInvoices = created.filter(isInvoiceLike);
 
+  const hasSplit = archived.length > 0 || created.length > 0;
+
   return (
-    <>
-      <div className="space-y-2">
+    <div className="space-y-3">
+      <div className="space-y-1.5">
         <input value={node.name}
           onChange={(e) => financeStore.updateNode(projectId, node.id, { name: e.target.value })}
           placeholder="Name der Aktion / des Unternehmens"
-          className="w-full bg-transparent text-2xl font-semibold outline-none" />
+          className="w-full bg-transparent text-xl font-semibold outline-none" />
         <textarea value={node.note} rows={2}
           onChange={(e) => financeStore.updateNode(projectId, node.id, { note: e.target.value })}
           placeholder="Notiz..."
-          className="w-full bg-transparent text-sm outline-none resize-y border rounded-lg px-3 py-2"
+          className="w-full bg-transparent text-sm outline-none resize-y border rounded-lg px-3 py-1.5"
           style={{ borderColor: "hsl(var(--hairline))", color: "hsl(var(--ink-soft))" }} />
       </div>
 
-      <FinanceSummaryCard
-        totals={totals}
-        subtitle={node.name}
-        invoiceDetails={invoiceDetails}
-        onEstimateChange={(v) => financeStore.updateNode(projectId, node.id, { estimate: v })}
-      />
+      {/* Übersichten ganz oben – getrennt nach archivierten und angelegten Belegen. */}
+      {!hasSplit && (
+        <FinanceSummaryCard
+          totals={totals}
+          subtitle={node.name}
+          invoiceDetails={invoiceDetails}
+          onEstimateChange={(v) => financeStore.updateNode(projectId, node.id, { estimate: v })}
+        />
+      )}
+
+      {hasSplit && (
+        <div className="space-y-2">
+          <EstimateRow value={node.estimate || 0}
+            onChange={(v) => financeStore.updateNode(projectId, node.id, { estimate: v })} />
+          {archived.length > 0 && (
+            <FinanceSummaryCard totals={positionTotals(archived)} hideEstimate
+              title="Archivierte Belege" subtitle={node.name}
+              invoiceDetails={archivedInvoices} background={ARCHIVE_BG} />
+          )}
+          {created.length > 0 && (
+            <FinanceSummaryCard totals={positionTotals(created)} hideEstimate
+              title="Angelegte Belege" subtitle={node.name}
+              invoiceDetails={createdInvoices} background={CREATED_BG} />
+          )}
+        </div>
+      )}
 
       {/* Archivieren = bestehende Belege erfassen */}
-      <div className="flex flex-wrap gap-2" data-export-hide>
+      <div className="flex flex-wrap gap-1.5" data-export-hide>
         {([["offer", "Angebot"], ["invoice", "Rechnung"], ["supplement", "Nachtrag"]] as const).map(([t, label]) => (
           <button key={t} onClick={() => financeStore.addPosition(projectId, node.id, t)}
-            className="h-10 px-4 rounded-lg border-2 text-sm font-semibold flex items-center gap-1.5 hover:bg-muted"
+            className="h-9 px-3 rounded-lg border-2 text-[13px] font-semibold flex items-center gap-1.5 hover:bg-muted"
             style={{ borderColor: "hsl(var(--hairline))" }}>
-            <Plus size={16} /> {label} archivieren
+            <Plus size={15} /> {label} archivieren
           </button>
         ))}
-      </div>
-
-      {/* Anlegen = neue Vorlage in der Projektmappe erstellen */}
-      <div className="flex flex-wrap gap-2" data-export-hide>
         {([["offer", "Angebot"], ["invoice", "Rechnung"], ["supplement", "Nachtrag"]] as const).map(([t, label]) => (
           <button key={`new-${t}`}
             onClick={() => {
@@ -505,21 +523,18 @@ const ActionView: React.FC<{ projectId: string; state: FinanceState; node: Finan
               openTemplate(projectId, t, pos.id, node.id);
             }}
             title={`${label} als Vorlage in der Projektmappe anlegen`}
-            className="h-10 px-4 rounded-lg text-sm font-semibold flex items-center gap-1.5 hover:opacity-90"
+            className="h-9 px-3 rounded-lg text-[13px] font-semibold flex items-center gap-1.5 hover:opacity-90"
             style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}>
-            <Plus size={16} /> {label} anlegen
+            <Plus size={15} /> {label} anlegen
           </button>
         ))}
       </div>
 
-
-      {/* Archivierte Belege */}
+      {/* Archivierte Belege – nur Tabelle, Übersicht steht oben */}
       {archived.length > 0 && (
-        <div className="space-y-2 rounded-xl p-3" style={{ background: ARCHIVE_BG }}>
+        <div className="space-y-1.5 rounded-xl p-2.5" style={{ background: ARCHIVE_BG }}>
           <div className="text-[11px] font-semibold uppercase tracking-wider"
                style={{ color: "hsl(var(--ink-soft))" }}>Archivierte Belege</div>
-          <FinanceSummaryCard totals={positionTotals(archived)} hideEstimate
-            title="Archiviert" subtitle={node.name} invoiceDetails={archivedInvoices} />
           <FinancePositionsTable projectId={projectId} nodeId={node.id} positions={archived}
             emptyHint="Noch keine archivierten Belege." />
         </div>
@@ -527,11 +542,9 @@ const ActionView: React.FC<{ projectId: string; state: FinanceState; node: Finan
 
       {/* Angelegte Belege (Vorlagen in der Projektmappe) */}
       {created.length > 0 && (
-        <div className="space-y-2 rounded-xl p-3" style={{ background: CREATED_BG }}>
+        <div className="space-y-1.5 rounded-xl p-2.5" style={{ background: CREATED_BG }}>
           <div className="text-[11px] font-semibold uppercase tracking-wider"
                style={{ color: "hsl(var(--ink-soft))" }}>Angelegte Belege</div>
-          <FinanceSummaryCard totals={positionTotals(created)} hideEstimate
-            title="Angelegt" subtitle={node.name} invoiceDetails={createdInvoices} />
           <FinancePositionsTable projectId={projectId} nodeId={node.id} positions={created}
             background="hsl(var(--surface-card))"
             emptyHint="Noch keine angelegten Belege." />
@@ -541,8 +554,39 @@ const ActionView: React.FC<{ projectId: string; state: FinanceState; node: Finan
       {positions.length === 0 && (
         <FinancePositionsTable projectId={projectId} nodeId={node.id} positions={[]} />
       )}
-    </>
+    </div>
   );
+};
+
+/** Kompakte Zeile zur Pflege der Kostenschätzung (wenn die Übersicht geteilt ist). */
+const EstimateRow: React.FC<{ value: number; onChange: (v: number) => void }> = ({ value, onChange }) => {
+  const [draft, setDraft] = useState<string | null>(null);
+  return (
+    <div className="flex items-center gap-2 rounded-lg border px-3 py-1.5 text-[13px]"
+         style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}>
+      <span className="text-[11px] font-semibold uppercase tracking-wider"
+            style={{ color: "hsl(var(--ink-soft))" }}>Kostenschätzung</span>
+      {draft === null ? (
+        <button className="font-semibold" onClick={() => setDraft(String(value || ""))}>
+          {formatEur(value)}
+        </button>
+      ) : (
+        <input autoFocus value={draft} onChange={(e) => setDraft(e.target.value)}
+          onBlur={() => { onChange(parseEurLocal(draft)); setDraft(null); }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") { onChange(parseEurLocal(draft)); setDraft(null); }
+            if (e.key === "Escape") setDraft(null);
+          }}
+          className="bg-transparent border rounded px-2 py-0.5 font-semibold outline-none"
+          style={{ borderColor: "hsl(var(--hairline))" }} />
+      )}
+    </div>
+  );
+};
+
+const parseEurLocal = (v: string): number => {
+  const n = parseFloat(v.replace(/[^\d,.-]/g, "").replace(/\./g, "").replace(",", "."));
+  return Number.isFinite(n) ? n : 0;
 };
 
 /** Hintergründe zur Unterscheidung archivierter und angelegter Belege. */
