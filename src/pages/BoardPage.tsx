@@ -69,6 +69,17 @@ export default function BoardPage() {
   const state = useTimeline(projectId);
   const hist = useTimelineHistory(projectId);
 
+  /* Kopfzeilen-Hilfen wie in Mappe/CAD/Finanzen. */
+  const [tabletAidOn, setTabletAidOn] = useState<boolean>(() => {
+    try { return localStorage.getItem("pixuna.tabletAid") === "1"; } catch { return false; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem("pixuna.tabletAid", tabletAidOn ? "1" : "0"); } catch { /* ignore */ }
+  }, [tabletAidOn]);
+  const mappeHelpOn = project?.settings?.mappeHelpOn ?? true;
+
+
+
   useEffect(() => { if (projectId) timelineStore.ensureDefaults(projectId); }, [projectId]);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
