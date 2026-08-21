@@ -1096,6 +1096,11 @@
    da die Klasse global am <html> gesetzt bleibt.
 --------------------------------------------------------------------------- */
 .pixuna-canvas-dark [data-cad-canvas],
-.pixuna-canvas-dark .page-sheet {
-  filter: invert(1) hue-rotate(180deg);
+.pixuna-canvas-dark [data-page-capture] {
+  filter: invert(1) hue-rotate(180deg) saturate(1.85) contrast(1.06);
+}
+/* Blatt-Hintergrund selbst wird über die Capture-Ebene invertiert – daher
+   hier keine zweite Invertierung (sonst hebt sie sich auf). */
+.pixuna-canvas-dark [data-page-capture] .page-sheet {
+  filter: none;
 }
