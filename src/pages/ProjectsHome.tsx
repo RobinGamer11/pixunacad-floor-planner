@@ -74,6 +74,8 @@ import { FinanceProjectOverview } from "@/components/finance/FinanceProjectOverv
 import { geocodeSearch, type GeoHit } from "@/lib/weather";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { setExternalContentConsent, useExternalContentConsent } from "@/lib/externalContent";
+import { NetworkView } from "@/components/network/NetworkView";
+import { AuroraBackground } from "@/components/AuroraBackground";
 
 const Pixuna = () => (
   <span className="font-semibold tracking-tight text-base">
@@ -877,12 +879,19 @@ export default function ProjectsHome() {
         {/* Center */}
         <main className="flex-1 overflow-y-auto">
           {hub === "home" ? (
-            <div className="px-10 py-7">
-              <h1 className="text-2xl font-semibold tracking-tight">Hauptseite</h1>
-              <p className="mt-3 text-sm text-muted-foreground">Inhalte folgen in Kürze.</p>
+            <div className="relative min-h-full overflow-hidden">
+              <AuroraBackground />
+              <div className="relative px-10 py-7">
+                <h1 className="text-2xl font-semibold tracking-tight" style={{ color: "#F3F6FF" }}>
+                  Hauptseite
+                </h1>
+                <p className="mt-3 text-sm" style={{ color: "rgba(220,230,255,0.72)" }}>
+                  Inhalte folgen in Kürze.
+                </p>
+              </div>
             </div>
           ) : hub === "shared" ? (
-            <SharedView profile={profile} projectCount={projectCount} />
+            <SharedView profile={profile} projectCount={projectCount} projects={projects} />
           ) : hub === "trash" ? (
             <TrashView activeCount={projectCount} />
           ) : showAllTasks ? (
