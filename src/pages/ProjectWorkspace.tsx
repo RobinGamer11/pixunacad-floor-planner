@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { DragScrollDiv } from "@/components/DragScrollDiv";
 import { ToolHelpNotes } from "@/components/cad/ToolHelpNotes";
 import { PipetteSettingsPanel } from "@/components/cad/PipetteSettingsPanel";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   ChevronLeft,
   ChevronRight,
@@ -93,7 +93,11 @@ import {
   type PageFormat,
   type PunchPattern,
   type PunchSide,
+  type ProjectPage,
 } from "@/lib/projectStore";
+import {
+  TEMPLATE_LABEL, parseTemplateKey, getFavoriteTemplate, setFavoriteTemplate,
+} from "@/lib/financeStore";
 import { EMPTY_WHEEL_ZOOM_BURST, nextSmartWheelZoom } from "@/lib/projectZoom";
 import CadOverlayLayer from "@/components/page/CadOverlayLayer";
 import { CadDocumentInspector } from "@/components/page/CadDocumentInspector";
