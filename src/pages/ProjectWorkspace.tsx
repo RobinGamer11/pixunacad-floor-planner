@@ -1171,6 +1171,14 @@ export default function ProjectWorkspace() {
     );
   }
 
+  // Tabellenmodus endet, sobald ein anderes Objekt ausgewählt wird.
+  useEffect(() => {
+    if (tableEditId && selectedElementId !== tableEditId) {
+      setTableEditId(null);
+      setTableSelection(null);
+    }
+  }, [selectedElementId, tableEditId]);
+
   /** Tabelle in Standardgröße (Papier-mm) mittig auf der aktiven Seite ablegen. */
   function placeTableOnPage() {
     if (!project || !activePage) return;
