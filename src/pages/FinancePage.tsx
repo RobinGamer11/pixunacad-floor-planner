@@ -726,6 +726,10 @@ const ChildList: React.FC<{
         const cO = control(t.estimate, t.offers);
         const cI = control(t.estimate, t.invoices);
         const kids = childrenOf(state, n.id);
+        // Anlagen (Aktionen) lassen sich ebenfalls aufklappen — dort erscheinen
+        // die Belege getrennt nach „archiviert" und „angelegt".
+        const nodePositions = n.type === "action" ? positionsOf(state, n.id) : [];
+        const canExpand = kids.length > 0 || nodePositions.length > 0;
         const isOpen = !!open[n.id];
         return (
           <div key={n.id} {...(n.enabled ? {} : { "data-export-hide": true })}>
@@ -737,11 +741,11 @@ const ChildList: React.FC<{
               </button>
               <button
                 className="flex items-center gap-1.5 min-w-0 text-left"
-                title={kids.length > 0 ? "Unterpunkte ein-/ausklappen" : "Öffnen"}
-                onClick={() => kids.length > 0
+                title={canExpand ? "Unterpunkte ein-/ausklappen" : "Öffnen"}
+                onClick={() => canExpand
                   ? setOpen((o) => ({ ...o, [n.id]: !o[n.id] }))
                   : onSelect(n.id)}>
-                {kids.length > 0
+                {canExpand
                   ? (isOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />)
                   : <span className="w-[13px]" />}
                 {n.type === "overview" ? <Folder size={14} /> : <Building2 size={14} />}
@@ -766,9 +770,53 @@ const ChildList: React.FC<{
                 <ChildList projectId={projectId} state={state} nodes={kids} onSelect={onSelect} deep />
               </div>
             )}
+            {isOpen && nodePositions.length > 0 && (
+              <div className="pl-6 pr-3 py-2 border-b space-y-2"
+                   style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-muted))" }}>
+                <PositionMiniList title="Archivierte Belege" background={ARCHIVE_BG}
+                  positions={nodePositions.filter((p) => !p.hasTemplate)} />
+                <PositionMiniList title="Angelegte Belege" background={CREATED_BG}
+                  positions={nodePositions.filter((p) => !!p.hasTemplate)} />
+              </div>
+            )}
           </div>
         );
       })}
+    </div>
+  );
+};
+
+/** Kompakte, schreibgeschützte Belegliste beim Aufklappen einer Anlage. */
+const POSITION_KIND_LABEL: Record<FinancePositionType, string> = {
+  offer: "Angebot",
+  invoice: "Rechnung",
+  supplement: "Nachtrag",
+};
+
+const PositionMiniList: React.FC<{
+  title: string; background: string; positions: FinancePosition[];
+}> = ({ title, background, positions }) => {
+  if (positions.length === 0) return null;
+  const sum = positions.reduce(
+    (s, p) => s + (p.type === "supplement" && p.supplementKind === "minus" ? -(p.amount || 0) : (p.amount || 0)),
+    0,
+  );
+  return (
+    <div className="rounded-lg px-2.5 py-2 space-y-1" style={{ background }}>
+      <div className="flex items-center gap-2">
+        <div className="text-[10px] font-semibold uppercase tracking-wider flex-1"
+             style={{ color: "hsl(var(--ink-soft))" }}>{title}</div>
+        <div className="text-[11px] font-semibold tabular-nums">{formatEur(sum)}</div>
+      </div>
+      {positions.map((p) => (
+        <div key={p.id} className="grid items-center gap-2 text-[11px]"
+             style={{ gridTemplateColumns: "1.1fr 1fr 0.9fr 1fr" }}>
+          <span>{POSITION_KIND_LABEL[p.type]}{p.type === "supplement" && p.supplementKind === "minus" ? " (−)" : ""}</span>
+          <span className="truncate" style={{ color: "hsl(var(--ink-soft))" }}>{p.number || "—"}</span>
+          <span style={{ color: "hsl(var(--ink-soft))" }}>{p.date || ""}</span>
+          <span className="tabular-nums text-right font-medium">{formatEur(p.amount || 0)}</span>
+        </div>
+      ))}
     </div>
   );
 };

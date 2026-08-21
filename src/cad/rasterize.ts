@@ -146,6 +146,128 @@ function removeFromApp(app: any, input: RasterInput) {
   } catch (e) { console.error("rasterize: remove source failed", e); }
 }
 
+/** Ergebnis der Offscreen-Rasterisierung eines Vektorobjekts. */
+export interface RasterRenderResult {
+  canvas: HTMLCanvasElement;
+  /** Weltrechteck, das das Canvas exakt abdeckt. */
+  x: number; y: number; w: number; h: number;
+  wPx: number; hPx: number;
+  pxPerM: number;
+  labelId: string;
+}
+
+/**
+ * Rendert ein Vektorobjekt offscreen (transparenter Hintergrund) und schneidet
+ * transparente Ränder weg. Gemeinsame Basis für Pixel-Bildobjekte (CAD) und
+ * Raster-Zeichenebenen (Projektmappe).
+ */
+export function renderObjectToCanvas(app: any, input: RasterInput): RasterRenderResult | null {
+  if (!app || !app.scene || !app.renderer) return null;
+  const b = worldBounds(app, input);
+  if (!b) return null;
+
+  let pxPerM = targetPxPerM(app);
+  let wPx = Math.ceil(b.w * pxPerM);
+  let hPx = Math.ceil(b.h * pxPerM);
+  if (wPx * hPx > MAX_PIXELS) {
+    const k = Math.sqrt(MAX_PIXELS / (wPx * hPx));
+    pxPerM *= k;
+    wPx = Math.max(1, Math.floor(wPx * k));
+    hPx = Math.max(1, Math.floor(hPx * k));
+  }
+  wPx = Math.max(1, wPx);
+  hPx = Math.max(1, hPx);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = wPx;
+  canvas.height = hPx;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+
+  const cam = new Camera();
+  cam.scale = pxPerM;
+  cam.offsetX = -b.x * pxPerM;
+  cam.offsetY = -b.y * pxPerM;
+
+  const scene = new Scene();
+  const labels = new LabelManager();
+  const renderer = new Renderer(ctx, cam, scene, labels);
+  renderer.setViewport(wPx, hPx);
+  renderer.referencePxPerM = (app.renderer as any).referencePxPerM || Defaults.strokeWidthBaseScale;
+  renderer.transparentBackground = true;
+  renderer.gridSettings = { ...renderer.gridSettings, enabled: false };
+  renderer.planMode = null;
+  renderer.setSelection(null);
+  renderer.setExtraSelections([]);
+
+  const origLabel = (input.obj as any).labelId;
+  (input.obj as any).labelId = Defaults.defaultLabelId;
+  pushToScene(scene, input);
+  try {
+    renderer.render();
+  } finally {
+    (input.obj as any).labelId = origLabel;
+  }
+
+  let outCanvas: HTMLCanvasElement = canvas;
+  let outX = b.x, outY = b.y, outW = b.w, outH = b.h;
+  let outWPx = wPx, outHPx = hPx;
+  const trim = alphaTrimBox(ctx, wPx, hPx);
+  if (trim && (trim.w < wPx || trim.h < hPx)) {
+    const c2 = document.createElement("canvas");
+    c2.width = trim.w;
+    c2.height = trim.h;
+    const c2ctx = c2.getContext("2d");
+    if (c2ctx) {
+      c2ctx.imageSmoothingEnabled = false;
+      c2ctx.drawImage(canvas, trim.x, trim.y, trim.w, trim.h, 0, 0, trim.w, trim.h);
+      outCanvas = c2;
+      outWPx = trim.w;
+      outHPx = trim.h;
+      outX = b.x + trim.x / pxPerM;
+      outY = b.y + trim.y / pxPerM;
+      outW = trim.w / pxPerM;
+      outH = trim.h / pxPerM;
+    }
+  }
+
+  return {
+    canvas: outCanvas,
+    x: outX, y: outY, w: outW, h: outH,
+    wPx: outWPx, hPx: outHPx,
+    pxPerM,
+    labelId: origLabel || Defaults.defaultLabelId,
+  };
+}
+
+/**
+ * Projektmappe: brennt das Vektorobjekt direkt in die Raster-Zeichenebene der
+ * aktuell verwendeten Ebene ein. Es entsteht KEIN eigenes Bildobjekt — der
+ * Strich wird Teil des Rasterinhalts dieser Ebene (nicht einzeln auswählbar).
+ */
+export function rasterizeIntoLayer(app: any, input: RasterInput): boolean {
+  if (input.type === "segment" && input.obj.isGuide) return false;
+  const layers = app?.rasterLayers;
+  if (!layers?.get) return false;
+  try {
+    const res = renderObjectToCanvas(app, input);
+    if (!res) return false;
+    const layer = layers.get(res.labelId, true);
+    if (!layer) return false;
+    layer.blit(res.canvas, res.x, res.y, res.w, res.h);
+    removeFromApp(app, input);
+    try { app.clearSelection?.(); } catch { /* optional */ }
+    try { app.requestRender?.(); } catch { /* optional */ }
+    try { app.commitHistorySnapshot?.(); } catch { /* optional */ }
+    return true;
+  } catch (e) {
+    console.error("rasterizeIntoLayer failed:", e);
+    return false;
+  }
+}
+
 /**
  * Wandelt ein frisch erzeugtes Vektorobjekt in ein Bild-Dokument um.
  * Gibt das erzeugte DocumentObject zurück (oder null bei Fehlschlag —
@@ -258,8 +380,15 @@ export function rasterizeObject(app: any, input: RasterInput): DocumentObject | 
   }
 }
 
-/** Bequemer Hook für die Werkzeuge: rastert nur, wenn Pixelmodus aktiv ist. */
+/**
+ * Bequemer Hook für die Werkzeuge: rastert nur, wenn Pixelmodus aktiv ist.
+ * - Projektmappe (MiniCad mit `rasterLayers`): direkt in die Raster-Ebene.
+ * - CAD-Oberfläche: wie bisher als eigenständiges Pixel-Bildobjekt.
+ */
 export function maybeRasterize(app: any, input: RasterInput): void {
   if (!isPixelDrawMode(app)) return;
+  if (app?.rasterLayers?.get) {
+    if (rasterizeIntoLayer(app, input)) return;
+  }
   rasterizeObject(app, input);
 }

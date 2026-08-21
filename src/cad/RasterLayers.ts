@@ -1,0 +1,356 @@
+/**
+ * RasterLayers — gekachelte Raster-Zeichenebenen (Pixelmodus der Projektmappe).
+ *
+ * Konzept
+ * -------
+ * Jede Ebene (LabelManager-Gruppe) kann zusätzlich zu ihren Vektorobjekten
+ * einen durchgehenden Rasterinhalt besitzen:
+ *
+ *   Seite
+ *   ├── Ebene A ── Vektorobjekte + Rasterinhalt
+ *   └── Ebene B ── Vektorobjekte + Rasterinhalt
+ *
+ * Der Rasterinhalt ist KEIN Szenenobjekt: er ist nicht auswählbar, hat keinen
+ * Auswahlrahmen und wird ausschließlich über Zeichnen, Radieren, Sichtbarkeit
+ * und Ebenenreihenfolge bearbeitet.
+ *
+ * Koordinatensystem
+ * -----------------
+ * Identisch zum Vektorinhalt: 1 Welt-Einheit = 1 Meter Papier (Seiten-Oben-Links
+ * = Welt 0/0). Die Auflösung (`pxPerM`) ist FEST und unabhängig von Zoom,
+ * Bildschirmauflösung oder devicePixelRatio — beim Zoomen wird lediglich
+ * hochskaliert gezeichnet, gespeichert bleibt immer dieselbe Papier-DPI.
+ *
+ * Speichermodell
+ * --------------
+ * Kacheln (Tiles) von `tilePx` × `tilePx` Pixeln, adressiert über ganzzahlige
+ * Kachelkoordinaten. Nur tatsächlich bemalte Kacheln existieren im Speicher und
+ * werden gespeichert (PNG-DataURL je Kachel, gecached bis die Kachel sich
+ * ändert). Leere Kacheln werden beim Serialisieren verworfen.
+ */
+
+import type { Camera } from "./Camera";
+
+/** Kantenlänge einer Kachel in Pixeln. */
+export const RASTER_TILE_PX = 512;
+
+/**
+ * Standard-Rasterauflösung: 300 dpi bezogen auf Papiermeter.
+ * (300 / 25.4 mm) * 1000 mm/m ≈ 11811 px/m — A4 ⇒ 2480 × 3508 px.
+ */
+export const DEFAULT_RASTER_PX_PER_M = Math.round((300 / 25.4) * 1000);
+
+export interface RasterTileJSON {
+  tx: number;
+  ty: number;
+  /** PNG-DataURL der Kachel. */
+  src: string;
+}
+
+export interface RasterLayerJSON {
+  labelId: string;
+  pxPerM: number;
+  tilePx: number;
+  tiles: RasterTileJSON[];
+}
+
+interface RasterTile {
+  tx: number;
+  ty: number;
+  canvas: HTMLCanvasElement;
+  ctx: CanvasRenderingContext2D;
+  /** Gecachte PNG-DataURL (null = neu erzeugen). */
+  dataUrl: string | null;
+  /** true, solange das Restore-Bild noch lädt. */
+  loading: boolean;
+}
+
+function makeTileCanvas(px: number): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } {
+  const canvas = document.createElement("canvas");
+  canvas.width = px;
+  canvas.height = px;
+  const ctx = canvas.getContext("2d")!;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  return { canvas, ctx };
+}
+
+/** Rasterinhalt genau einer Ebene. */
+export class RasterLayer {
+  readonly labelId: string;
+  readonly pxPerM: number;
+  readonly tilePx: number;
+  private tiles = new Map<string, RasterTile>();
+
+  constructor(labelId: string, pxPerM = DEFAULT_RASTER_PX_PER_M, tilePx = RASTER_TILE_PX) {
+    this.labelId = labelId;
+    this.pxPerM = pxPerM;
+    this.tilePx = tilePx;
+  }
+
+  /** Kantenlänge einer Kachel in Weltmetern. */
+  get tileWorld(): number {
+    return this.tilePx / this.pxPerM;
+  }
+
+  private _key(tx: number, ty: number) { return `${tx},${ty}`; }
+
+  private _tile(tx: number, ty: number, create: boolean): RasterTile | null {
+    const key = this._key(tx, ty);
+    let t = this.tiles.get(key);
+    if (!t && create) {
+      const { canvas, ctx } = makeTileCanvas(this.tilePx);
+      t = { tx, ty, canvas, ctx, dataUrl: null, loading: false };
+      this.tiles.set(key, t);
+    }
+    return t || null;
+  }
+
+  /** Iteriert über alle Kacheln, die das Weltrechteck berühren. */
+  private _forRect(
+    x: number, y: number, w: number, h: number, create: boolean,
+    cb: (tile: RasterTile, originX: number, originY: number) => void,
+  ) {
+    const tw = this.tileWorld;
+    const tx0 = Math.floor(x / tw), tx1 = Math.floor((x + w) / tw);
+    const ty0 = Math.floor(y / tw), ty1 = Math.floor((y + h) / tw);
+    // Schutz gegen absurd große Bereiche (z. B. fehlerhafte Bounds).
+    if ((tx1 - tx0 + 1) * (ty1 - ty0 + 1) > 4096) return;
+    for (let ty = ty0; ty <= ty1; ty++) {
+      for (let tx = tx0; tx <= tx1; tx++) {
+        const tile = this._tile(tx, ty, create);
+        if (!tile) continue;
+        cb(tile, tx * tw, ty * tw);
+      }
+    }
+  }
+
+  /** Zeichnet ein vorgerendertes Canvas (Weltrechteck) in die Ebene ein. */
+  blit(src: HTMLCanvasElement, x: number, y: number, w: number, h: number) {
+    this._forRect(x, y, w, h, true, (tile, ox, oy) => {
+      const ctx = tile.ctx;
+      ctx.save();
+      ctx.globalCompositeOperation = "source-over";
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(src, (x - ox) * this.pxPerM, (y - oy) * this.pxPerM, w * this.pxPerM, h * this.pxPerM);
+      ctx.restore();
+      tile.dataUrl = null;
+    });
+  }
+
+  /**
+   * Radiert einen Kreis aus dem Rasterinhalt.
+   * - hard: harte Kante, volle Deckkraft-Abtragung
+   * - smooth: weicher radialer Verlauf (`softness` = weicher Randanteil)
+   */
+  eraseCircle(cx: number, cy: number, r: number, mode: "hard" | "smooth", strength: number, softness: number) {
+    if (r <= 0) return;
+    const alpha = Math.max(0.05, Math.min(1, mode === "hard" ? 1 : strength || 1));
+    const soft = Math.max(0.05, Math.min(1, softness));
+    this._forRect(cx - r, cy - r, r * 2, r * 2, false, (tile, ox, oy) => {
+      const ctx = tile.ctx;
+      const px = (cx - ox) * this.pxPerM;
+      const py = (cy - oy) * this.pxPerM;
+      const pr = r * this.pxPerM;
+      ctx.save();
+      ctx.globalCompositeOperation = "destination-out";
+      if (mode === "smooth") {
+        const inner = pr * (1 - soft);
+        const g = ctx.createRadialGradient(px, py, Math.max(0, inner), px, py, pr);
+        g.addColorStop(0, `rgba(0,0,0,${alpha})`);
+        g.addColorStop(0.65, `rgba(0,0,0,${alpha * 0.45})`);
+        g.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = g;
+      } else {
+        ctx.fillStyle = `rgba(0,0,0,${alpha})`;
+      }
+      ctx.beginPath();
+      ctx.arc(px, py, pr, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      tile.dataUrl = null;
+    });
+  }
+
+  /** Zeichnet den Rasterinhalt in den Viewport (Bildschirm-Canvas). */
+  draw(ctx: CanvasRenderingContext2D, camera: Camera) {
+    if (this.tiles.size === 0) return;
+    const tw = this.tileWorld;
+    const sizePx = tw * camera.scale;
+    ctx.save();
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    for (const tile of this.tiles.values()) {
+      if (tile.loading) continue;
+      const p = camera.worldToScreen(tile.tx * tw, tile.ty * tw);
+      // Minimaler Überstand, damit zwischen den Kacheln keine Haarlinien entstehen.
+      ctx.drawImage(tile.canvas, p.x, p.y, sizePx + 0.5, sizePx + 0.5);
+    }
+    ctx.restore();
+  }
+
+  hasContent(): boolean {
+    return this.tiles.size > 0;
+  }
+
+  /** Prüft, ob an einem Weltpunkt deckende Pixel liegen (Boundary-Analyse). */
+  isOpaqueAt(x: number, y: number, threshold = 24): boolean {
+    const tw = this.tileWorld;
+    const tile = this._tile(Math.floor(x / tw), Math.floor(y / tw), false);
+    if (!tile) return false;
+    const px = Math.floor((x - Math.floor(x / tw) * tw) * this.pxPerM);
+    const py = Math.floor((y - Math.floor(y / tw) * tw) * this.pxPerM);
+    try {
+      const d = tile.ctx.getImageData(Math.max(0, Math.min(this.tilePx - 1, px)), Math.max(0, Math.min(this.tilePx - 1, py)), 1, 1).data;
+      return d[3] >= threshold;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Zeichnet den Rasterinhalt eines Weltrechtecks in ein Analyse-Canvas. */
+  drawIntoMask(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, pxPerM: number) {
+    const k = pxPerM / this.pxPerM;
+    this._forRect(x, y, w, h, false, (tile, ox, oy) => {
+      if (tile.loading) return;
+      ctx.drawImage(
+        tile.canvas,
+        (ox - x) * pxPerM, (oy - y) * pxPerM,
+        this.tilePx * k, this.tilePx * k,
+      );
+    });
+  }
+
+  serialize(): RasterLayerJSON | null {
+    const tiles: RasterTileJSON[] = [];
+    for (const tile of this.tiles.values()) {
+      if (tile.loading) {
+        if (tile.dataUrl) tiles.push({ tx: tile.tx, ty: tile.ty, src: tile.dataUrl });
+        continue;
+      }
+      if (!tile.dataUrl) {
+        if (this._isTileEmpty(tile)) continue;
+        tile.dataUrl = tile.canvas.toDataURL("image/png");
+      }
+      tiles.push({ tx: tile.tx, ty: tile.ty, src: tile.dataUrl });
+    }
+    if (tiles.length === 0) return null;
+    return { labelId: this.labelId, pxPerM: this.pxPerM, tilePx: this.tilePx, tiles };
+  }
+
+  private _isTileEmpty(tile: RasterTile): boolean {
+    try {
+      const data = tile.ctx.getImageData(0, 0, this.tilePx, this.tilePx).data;
+      for (let i = 3; i < data.length; i += 4) if (data[i] > 2) return false;
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Lädt Kacheln aus JSON (asynchron je Kachel; `onReady` triggert ein Re-Render). */
+  restore(json: RasterLayerJSON, onReady?: () => void) {
+    for (const t of json.tiles || []) {
+      const tile = this._tile(t.tx, t.ty, true)!;
+      tile.dataUrl = t.src;
+      tile.loading = true;
+      const img = new Image();
+      img.onload = () => {
+        try {
+          tile.ctx.clearRect(0, 0, this.tilePx, this.tilePx);
+          tile.ctx.drawImage(img, 0, 0, this.tilePx, this.tilePx);
+        } catch { /* Kachel bleibt leer */ }
+        tile.loading = false;
+        onReady?.();
+      };
+      img.onerror = () => { tile.loading = false; onReady?.(); };
+      img.src = t.src;
+    }
+  }
+}
+
+/**
+ * Verwaltung aller Raster-Ebenen einer Szene.
+ * Wird von MiniCad instanziiert und vom Renderer, den Zeichenwerkzeugen und
+ * dem Radiergummi genutzt.
+ */
+export class RasterLayers {
+  private layers = new Map<string, RasterLayer>();
+  /** Feste Rasterauflösung neuer Ebenen (Papier-DPI, zoom-unabhängig). */
+  pxPerM: number;
+  /** Wird nach asynchronem Nachladen gespeicherter Kacheln aufgerufen. */
+  onReady: (() => void) | null = null;
+
+  constructor(pxPerM = DEFAULT_RASTER_PX_PER_M) {
+    this.pxPerM = pxPerM;
+  }
+
+  get(labelId: string, create = false): RasterLayer | null {
+    let l = this.layers.get(labelId);
+    if (!l && create) {
+      l = new RasterLayer(labelId, this.pxPerM);
+      this.layers.set(labelId, l);
+    }
+    return l || null;
+  }
+
+  hasAnyContent(): boolean {
+    for (const l of this.layers.values()) if (l.hasContent()) return true;
+    return false;
+  }
+
+  /** Zeichnet genau eine Ebene (Aufruf aus der Label-Reihenfolge des Renderers). */
+  drawLayer(ctx: CanvasRenderingContext2D, camera: Camera, labelId: string) {
+    this.layers.get(labelId)?.draw(ctx, camera);
+  }
+
+  /**
+   * Radiert in allen Ebenen, die `isVisible` zulässt (gesperrte Ebenen können
+   * über `isEditable` ausgeschlossen werden).
+   */
+  eraseCircle(
+    cx: number, cy: number, r: number,
+    mode: "hard" | "smooth", strength: number, softness: number,
+    isEditable?: (labelId: string) => boolean,
+  ): boolean {
+    let touched = false;
+    for (const [labelId, layer] of this.layers) {
+      if (isEditable && !isEditable(labelId)) continue;
+      if (!layer.hasContent()) continue;
+      layer.eraseCircle(cx, cy, r, mode, strength, softness);
+      touched = true;
+    }
+    return touched;
+  }
+
+  /** Löscht allen Rasterinhalt (z. B. vor `loadState`). */
+  clear() {
+    this.layers.clear();
+  }
+
+  serialize(): RasterLayerJSON[] {
+    const out: RasterLayerJSON[] = [];
+    for (const layer of this.layers.values()) {
+      const json = layer.serialize();
+      if (json) out.push(json);
+    }
+    return out;
+  }
+
+  restore(data: RasterLayerJSON[] | null | undefined) {
+    this.clear();
+    if (!Array.isArray(data)) return;
+    for (const json of data) {
+      if (!json?.labelId) continue;
+      const layer = new RasterLayer(json.labelId, json.pxPerM || this.pxPerM, json.tilePx || RASTER_TILE_PX);
+      layer.restore(json, () => this.onReady?.());
+      this.layers.set(json.labelId, layer);
+    }
+  }
+
+  /** Alle Ebenen-IDs mit Rasterinhalt (für die Boundary-Analyse). */
+  labelIds(): string[] {
+    return [...this.layers.keys()];
+  }
+}

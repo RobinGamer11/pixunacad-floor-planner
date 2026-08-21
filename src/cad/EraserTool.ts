@@ -336,6 +336,16 @@ export class EraserTool {
     const softness = Math.max(0.05, Math.min(1, this.app.defaultEraserSoftness ?? 0.5));
     const scene = this.app.scene;
 
+    // Raster-Zeichenebenen (Pixelmodus der Projektmappe) direkt im Alpha
+    // bearbeiten — inkl. Smooth-Modus, da es sich um echte Pixel handelt.
+    const rasterLayers = (this.app as any).rasterLayers;
+    if (rasterLayers?.eraseCircle) {
+      rasterLayers.eraseCircle(
+        centerW.x, centerW.y, r, mode, strength, softness,
+        (labelId: string) => this.app.labelManager.isVisible(labelId),
+      );
+    }
+
     // Dokument-Pixelmasken radieren (Smooth nur bei echten Bildern)
     for (const doc of scene.documents) {
       if (!this.app.labelManager.isVisible(doc.labelId)) continue;

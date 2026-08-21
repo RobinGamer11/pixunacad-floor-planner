@@ -1,6 +1,7 @@
 import { Defaults, SelectionType } from "./constants";
 import { Vec2, v, sub, add, mul, norm, perpLeft, len, clamp, rgbaFromHex, hexToRgba, polygonAreaAbs, polygonCentroid, tessellateWithBulges, hatchOuterRing, hatchHoleRings } from "./geometry";
 import { Camera } from "./Camera";
+import type { RasterLayers } from "./RasterLayers";
 import { Scene, Hatch, Dimension, TextBox, StickerInstance, DocumentObject, FreeStroke } from "./Scene";
 import { smoothChaikin } from "./freeGeom";
 import { LabelManager } from "./LabelManager";
@@ -83,6 +84,12 @@ export class Renderer {
 
   /** Wenn true: kein Hintergrund füllen (Offscreen-Rasterisierung mit Alpha). */
   transparentBackground = false;
+
+  /**
+   * Optionale Raster-Zeichenebenen (Pixelmodus der Projektmappe). Wird von
+   * MiniCad gesetzt; in der großen CAD-Oberfläche bleibt sie null.
+   */
+  rasterLayers: RasterLayers | null = null;
 
   selectedLabelId: string | null = null;
   hoverSegmentId: string | null = null;
@@ -258,6 +265,9 @@ export class Renderer {
       const labelId = order[i].id;
       if (!this.labels.isVisible(labelId)) continue;
       this._drawDocumentsForLabel(labelId);
+      // Rasterinhalt dieser Ebene (Pixelmodus der Projektmappe): liegt über den
+      // Dokumenten, aber unter allen Vektorobjekten derselben Ebene.
+      this.rasterLayers?.drawLayer(this.ctx, this.camera, labelId);
       this._drawHatchesForLabel(labelId);
       this._drawWallsForLabel(labelId);
       this._drawDoorsForLabel(labelId);
