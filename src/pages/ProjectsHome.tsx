@@ -1766,7 +1766,7 @@ export function AufgabenView({ project }: { project: Project }) {
             style={{ transform: entryOpen ? "rotate(180deg)" : undefined }}
           />
         </button>
-        <div className="flex flex-col gap-3" hidden={!entryOpen} style={{ marginTop: entryOpen ? 12 : 0 }}>
+        <div className="flex-col gap-3" style={{ display: entryOpen ? "flex" : "none", marginTop: entryOpen ? 12 : 0 }}>
           <div className="flex items-center gap-2">
             {(["task", "note"] as TlKind[]).map((k) => (
               <button
