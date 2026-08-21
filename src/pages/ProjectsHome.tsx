@@ -3498,8 +3498,20 @@ function ShopPanel({ anchor }: { anchor: React.RefObject<HTMLElement> }) {
   );
 }
 
-/** Netzwerk-Ansicht: eigenes Profil oben (identisch zum Kopf-Dropdown), Kontakte darunter. */
-function SharedView({ profile, projectCount }: { profile: UserProfile; projectCount: number }) {
+/** Netzwerk-Ansicht: eigenes Profil oben, darunter Kontakte/Teams/Anfragen. */
+function SharedView({
+  profile,
+  projectCount,
+  projects,
+}: {
+  profile: UserProfile;
+  projectCount: number;
+  projects: Project[];
+}) {
+  const networkProjects = useMemo(
+    () => projects.filter((p) => !p.isTemplate).map((p) => ({ id: p.id, name: p.name })),
+    [projects]
+  );
   return (
     <div className="px-10 py-7">
       <h1 className="text-2xl font-semibold tracking-tight">Netzwerk</h1>
@@ -3514,23 +3526,8 @@ function SharedView({ profile, projectCount }: { profile: UserProfile; projectCo
         </div>
       </div>
 
-      <div className="mt-8 max-w-xl">
-        <div className="flex items-center gap-3">
-          <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">KONTAKTE</div>
-          <button
-            disabled
-            className="h-8 px-3 rounded-md border text-xs flex items-center gap-1.5 opacity-40 cursor-not-allowed"
-            style={{ borderColor: "hsl(var(--hairline))" }}
-          >
-            <Plus size={12} /> Kontakte
-          </button>
-        </div>
-        <div
-          className="mt-2 rounded-xl p-10 text-center text-sm text-muted-foreground"
-          style={{ background: "hsl(var(--surface-card))", border: "1px dashed hsl(var(--hairline))" }}
-        >
-          Noch keine Kontakte hinterlegt.
-        </div>
+      <div className="max-w-xl">
+        <NetworkView projects={networkProjects} profile={{ name: profile.name, role: profile.role, avatarUrl: profile.avatarUrl }} />
       </div>
     </div>
   );
