@@ -28,7 +28,10 @@ export interface TlItem {
   endTime?: string;
   createdAt: number;
   updatedAt: number;
+  /** Von der Startseite angelegt/bearbeitet – im Board blau hervorgehoben, bis angeklickt. */
+  fresh?: boolean;
 }
+
 
 export interface TlState {
   categories: TlCategory[];
