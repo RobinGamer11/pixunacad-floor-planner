@@ -129,20 +129,29 @@ export class RasterLayer {
     }
   }
 
-  /** Zeichnet ein vorgerendertes Canvas (Weltrechteck) in die Ebene ein. */
+  /**
+   * Zeichnet ein vorgerendertes Canvas (Weltrechteck) in die Ebene ein.
+   *
+   * Die Zielposition wird auf ganze Pixel gerundet und die Quellgröße 1:1
+   * übernommen. Andernfalls würde jede Kachel dasselbe Bild mit einem eigenen
+   * Sub-Pixel-Versatz neu abtasten — an den Kachelgrenzen entstünden dann
+   * sichtbare Raster-/Gitterlinien.
+   */
   blit(src: HTMLCanvasElement, x: number, y: number, w: number, h: number) {
     this.strokeCount += 1;
-    this._forRect(x, y, w, h, true, (tile, ox, oy) => {
+    const gx = Math.round(x * this.pxPerM);
+    const gy = Math.round(y * this.pxPerM);
+    this._forRect(x, y, w, h, true, (tile) => {
       const ctx = tile.ctx;
       ctx.save();
       ctx.globalCompositeOperation = "source-over";
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = "high";
-      ctx.drawImage(src, (x - ox) * this.pxPerM, (y - oy) * this.pxPerM, w * this.pxPerM, h * this.pxPerM);
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(src, gx - tile.tx * this.tilePx, gy - tile.ty * this.tilePx, src.width, src.height);
       ctx.restore();
       tile.dataUrl = null;
     });
   }
+
 
   /**
    * Radiert einen Kreis aus dem Rasterinhalt.
