@@ -3,7 +3,7 @@ import {
   Plus, Minus, Check, X, Pencil, Sigma,
   AlignLeft, AlignCenter, AlignRight, Bold, Italic,
   ArrowUpToLine, ArrowDownToLine, Combine, Split,
-  Rows3, Columns3, Trash2, Filter, HelpCircle, ChevronDown, ChevronRight,
+  Rows3, Columns3, Trash2, Filter, Equal,
   SquareDashed, Square,
 } from "lucide-react";
 import { projectStore } from "@/lib/projectStore";
@@ -441,53 +441,3 @@ const colName = (c: number): string => {
   do { out = String.fromCharCode(65 + (n % 26)) + out; n = Math.floor(n / 26) - 1; } while (n >= 0);
   return out;
 };
-
-function TableHelp({ fns }: { fns: FormulaFn[] }) {
-  const [open, setOpen] = React.useState(false);
-  const [pick, setPick] = React.useState<string | null>(null);
-  return (
-    <div
-      className="rounded-md border"
-      style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-muted))" }}
-    >
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center gap-1.5 px-2 h-8 text-[11px] font-semibold uppercase tracking-[0.12em]"
-        style={{ color: "hsl(var(--ink-soft))" }}
-      >
-        {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-        <HelpCircle size={12} />
-        <span>Hilfe</span>
-      </button>
-      {open && (
-        <div className="px-2 pb-2 space-y-1.5">
-          <div className="text-[10.5px] leading-snug" style={{ color: "hsl(var(--ink-soft))" }}>
-            Doppelklick auf eine Zelle öffnet die Bearbeitung. Ein Linksklick in eine
-            andere Zelle speichert die Eingabe — Enter ist nicht nötig.
-          </div>
-          <div className="text-[10px] font-semibold text-muted-foreground">Formeln (Klick erklärt)</div>
-          <div className="flex flex-wrap gap-1">
-            {fns.map((f) => (
-              <button
-                key={f}
-                onClick={() => setPick(pick === f ? null : f)}
-                className="h-6 px-2 text-[10px] rounded border"
-                style={{
-                  borderColor: "hsl(var(--hairline))",
-                  background: pick === f ? "hsl(var(--accent-gold-soft))" : undefined,
-                  color: pick === f ? "hsl(var(--accent-gold))" : undefined,
-                }}
-              >{f}</button>
-            ))}
-          </div>
-          {pick && (
-            <div className="text-[10.5px] leading-snug" style={{ color: "hsl(var(--ink-soft))" }}>
-              {FORMULA_HELP[pick]}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
