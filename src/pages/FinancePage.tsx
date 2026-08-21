@@ -600,6 +600,50 @@ const CREATED_BG = "hsl(var(--accent-gold) / 0.10)";
 
 /* --------------------------------------------------------------- Übersicht */
 
+/** Sammelt alle Positionen unterhalb eines Knotens (aktive Zweige, rekursiv). */
+function collectPositions(state: FinanceState, parentId: string | null): FinancePosition[] {
+  const out: FinancePosition[] = [];
+  const walk = (id: string | null) => {
+    for (const kid of childrenOf(state, id)) {
+      if (!kid.enabled) continue;
+      if (kid.type === "action") out.push(...positionsOf(state, kid.id));
+      else walk(kid.id);
+    }
+  };
+  walk(parentId);
+  return out;
+}
+
+/** Getrennte Übersichten für archivierte und angelegte Belege. */
+const SplitSummaries: React.FC<{
+  state: FinanceState; parentId: string | null; subtitle: string;
+  estimate: number; onEstimateChange: (v: number) => void; fallback: FinanceTotals;
+}> = ({ state, parentId, subtitle, estimate, onEstimateChange, fallback }) => {
+  const all = collectPositions(state, parentId);
+  const archived = all.filter((p) => !p.hasTemplate);
+  const created = all.filter((p) => p.hasTemplate);
+  const isInvoiceLike = (p: FinancePosition) => p.type === "invoice" || p.type === "supplement";
+
+  if (archived.length === 0 && created.length === 0) {
+    return <FinanceSummaryCard totals={fallback} subtitle={subtitle} onEstimateChange={onEstimateChange} />;
+  }
+  return (
+    <div className="space-y-2">
+      <EstimateRow value={estimate} onChange={onEstimateChange} />
+      {archived.length > 0 && (
+        <FinanceSummaryCard totals={positionTotals(archived)} hideEstimate
+          title="Archivierte Belege" subtitle={subtitle}
+          invoiceDetails={archived.filter(isInvoiceLike)} background={ARCHIVE_BG} />
+      )}
+      {created.length > 0 && (
+        <FinanceSummaryCard totals={positionTotals(created)} hideEstimate
+          title="Angelegte Belege" subtitle={subtitle}
+          invoiceDetails={created.filter(isInvoiceLike)} background={CREATED_BG} />
+      )}
+    </div>
+  );
+};
+
 const OverviewView: React.FC<{ projectId: string; state: FinanceState; node: FinanceNode; onSelect: (id: string) => void }> =
 ({ projectId, state, node, onSelect }) => {
   const totals = nodeTotals(state, node);
@@ -618,7 +662,8 @@ const OverviewView: React.FC<{ projectId: string; state: FinanceState; node: Fin
           style={{ borderColor: "hsl(var(--hairline))", color: "hsl(var(--ink-soft))" }} />
       </div>
 
-      <FinanceSummaryCard totals={totals} subtitle={node.name}
+      <SplitSummaries state={state} parentId={node.id} subtitle={node.name}
+        estimate={totals.estimate} fallback={totals}
         onEstimateChange={(v) => financeStore.updateNode(projectId, node.id, { estimate: v })} />
 
       <ChildList projectId={projectId} state={state} nodes={kids} onSelect={onSelect} />
@@ -643,13 +688,15 @@ const ProjectView: React.FC<{ projectId: string; state: FinanceState; projectNam
           style={{ borderColor: "hsl(var(--hairline))", color: "hsl(var(--ink-soft))" }} />
       </div>
 
-      <FinanceSummaryCard totals={totals} subtitle="Gesamtes Projekt"
+      <SplitSummaries state={state} parentId={null} subtitle="Gesamtes Projekt"
+        estimate={totals.estimate} fallback={totals}
         onEstimateChange={(v) => financeStore.setProjectEstimate(projectId, v)} />
 
       <ChildList projectId={projectId} state={state} nodes={roots} onSelect={onSelect} deep />
     </>
   );
 };
+
 
 /* ------------------------------------------------- Liste untergeordneter Knoten */
 
