@@ -6,6 +6,7 @@ import {
   toTableData,
   cellKey,
   effectiveFormat,
+  effectiveBorders,
   isCovered,
   mergeCovering,
   tableWidthMm,
@@ -82,7 +83,8 @@ export function TableElementView({
   const lay = React.useMemo(() => layoutTable(model), [model]);
   const rows = lay.rows;
   const cols = lay.cols;
-  const filters = model.filters ?? {};
+  const filtersEnabled = model.filtersEnabled === true;
+  const filters = filtersEnabled ? (model.filters ?? {}) : {};
   const headerRow = model.headerRow !== false;
   const borderColor = model.borderColor ?? "hsl(var(--hairline))";
   const borderWidthPx = model.borderWidthPx ?? 1;
@@ -109,6 +111,8 @@ export function TableElementView({
   }, [lay.widthMm]);
 
   const [editCell, setEditCell] = React.useState<{ r: number; c: number } | null>(null);
+  /** Aktueller Eingabewert der offenen Zelle — für „Klick in andere Zelle speichert". */
+  const editValueRef = React.useRef<string | null>(null);
   const [openFilter, setOpenFilter] = React.useState<number | null>(null);
   const selection = editCtx?.selection ?? null;
 
@@ -128,6 +132,16 @@ export function TableElementView({
     }
     onChange(patch);
   }, [onChange, pageWmm, pageHmm]);
+
+  /** Offene Zelleingabe übernehmen (ohne Enter). */
+  const flushEdit = () => {
+    const cur = editCell;
+    const v = editValueRef.current;
+    editValueRef.current = null;
+    if (!cur || v == null) return;
+    if (model.cells[cur.r]?.[cur.c] === v) return;
+    setCell(cur.r, cur.c, v);
+  };
 
   const setCell = (r: number, c: number, v: string) => {
     const cells = model.cells.map((row) => row.slice());
@@ -200,7 +214,11 @@ export function TableElementView({
       }
       return;
     }
-    if (editCell && (editCell.r !== r || editCell.c !== c)) setEditCell(null);
+    if (editCell && (editCell.r !== r || editCell.c !== c)) {
+      // Kein Enter nötig: Ein Linksklick in eine andere Zelle speichert bereits.
+      flushEdit();
+      setEditCell(null);
+    }
     if (e.shiftKey && selection) {
       editCtx?.setSelection(normSel({ ...selection, r2: r, c2: c }));
     } else {
@@ -381,7 +399,7 @@ export function TableElementView({
                 top: pct(rect.yMm, lay.heightMm),
                 width: pct(rect.wMm, lay.widthMm),
                 height: pct(rect.hMm, lay.heightMm),
-                border: borderWidthPx > 0 ? `${borderWidthPx}px solid ${borderColor}` : "none",
+                ...cellBorderStyle(model, r, c, borderColor),
                 background: highlightFor(r, c) ?? f.background,
                 display: "flex",
                 alignItems: f.valign === "top" ? "flex-start" : f.valign === "bottom" ? "flex-end" : "center",
@@ -406,12 +424,18 @@ export function TableElementView({
                 <input
                   autoFocus
                   defaultValue={raw}
-                  onBlur={(e) => { setCell(r, c, e.target.value); setEditCell(null); }}
+                  onChange={(e) => { editValueRef.current = e.target.value; }}
+                  onBlur={(e) => {
+                    editValueRef.current = null;
+                    setCell(r, c, e.target.value);
+                    setEditCell(null);
+                  }}
                   onKeyDown={(e) => {
                     e.stopPropagation();
                     const el = e.target as HTMLInputElement;
                     if (e.key === "Enter" || e.key === "Tab") {
                       e.preventDefault();
+                      editValueRef.current = null;
                       setCell(r, c, el.value);
                       setEditCell(null);
                       const d: [number, number] = e.key === "Tab"
@@ -422,6 +446,7 @@ export function TableElementView({
                       rootRef.current?.focus();
                     } else if (e.key === "Escape") {
                       e.preventDefault();
+                      editValueRef.current = null;
                       setEditCell(null);
                       rootRef.current?.focus();
                     }
@@ -556,4 +581,23 @@ function FilterMenu({
       </div>
     </div>
   );
+}
+
+
+/** Rahmen einer Zelle als CSS — Kanten einzeln, optional doppelt. */
+function cellBorderStyle(
+  model: TableModel,
+  r: number,
+  c: number,
+  color: string,
+): React.CSSProperties {
+  const b = effectiveBorders(model, r, c);
+  const w = b.style === "double" ? Math.max(3, b.widthPx) : b.widthPx;
+  const line = w > 0 ? `${w}px ${b.style === "double" ? "double" : "solid"} ${color}` : "none";
+  return {
+    borderTop: b.top ? line : "none",
+    borderRight: b.right ? line : "none",
+    borderBottom: b.bottom ? line : "none",
+    borderLeft: b.left ? line : "none",
+  };
 }
