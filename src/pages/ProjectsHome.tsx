@@ -76,6 +76,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { setExternalContentConsent, useExternalContentConsent } from "@/lib/externalContent";
 import { NetworkView } from "@/components/network/NetworkView";
 import { AuroraBackground } from "@/components/AuroraBackground";
+import { RangeCalendar, type CalEntry } from "@/components/calendar/RangeCalendar";
 
 const Pixuna = () => (
   <span className="font-semibold tracking-tight text-base">
@@ -1720,6 +1721,30 @@ export function AufgabenView({ project }: { project: Project }) {
       });
   }, [board.items, catMap]);
 
+  /** Kalender-Einträge (Aufgaben, Termine, Notizen). */
+  const calEntries: CalEntry[] = useMemo(
+    () =>
+      rows
+        .filter((t) => !!t.date)
+        .map((t) => ({
+          id: t.id,
+          date: t.date,
+          title: t.title,
+          sub: t.time,
+          done: t.done,
+          color: t.done
+            ? "hsl(var(--ink-soft))"
+            : t.alert
+              ? "hsl(0 70% 52%)"
+              : t.kind === "note"
+                ? "hsl(210 70% 52%)"
+                : t.kind === "event"
+                  ? "hsl(265 60% 58%)"
+                  : "hsl(var(--accent-gold))",
+        })),
+    [rows],
+  );
+
   // Termine erscheinen nur, wenn ihr Tag im Kalender gewählt ist.
   const base = useMemo(
     () => (selectedDates.length
@@ -1883,8 +1908,8 @@ export function AufgabenView({ project }: { project: Project }) {
             <ListChecks size={13} /> Board
           </button>
         </div>
-        <TaskCalendar
-          tasks={rows}
+        <RangeCalendar
+          entries={calEntries}
           selectedDates={selectedDates}
           onSelectDate={toggleDate}
         />
