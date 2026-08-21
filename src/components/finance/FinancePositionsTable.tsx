@@ -23,7 +23,15 @@ const NUMBER_PLACEHOLDER: Record<FinancePositionType, string> = {
   supplement: "z. B. NT-2024-3001",
 };
 
+/** Eingebettete Eingabefelder werden gerahmt, damit sie als editierbar erkennbar sind. */
+const FIELD_CLASS = "w-full h-7 rounded-md border px-2 text-sm outline-none min-w-0 focus:border-[hsl(var(--accent-gold))]";
+const FIELD_STYLE: React.CSSProperties = {
+  borderColor: "hsl(var(--hairline))",
+  background: "hsl(var(--surface))",
+};
+
 export const FinancePositionsTable: React.FC<Props> = ({ projectId, nodeId, positions }) => {
+
   const [dragId, setDragId] = useState<string | null>(null);
 
   const upd = (id: string, patch: Partial<FinancePosition>) =>
