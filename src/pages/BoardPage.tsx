@@ -13,6 +13,7 @@ import {
   CheckSquare, CalendarClock, FileText, X, Trash2, Plus, Settings, Save, Search, ChevronLeft,
 } from "lucide-react";
 import { TimelineNet, FRESH_BLUE } from "@/components/board/TimelineNet";
+import { RangeCalendar, type CalEntry } from "@/components/calendar/RangeCalendar";
 
 // ------------------------------------------------------------------
 // Konstanten / Helfer
@@ -204,6 +205,31 @@ export default function BoardPage() {
 
   // ---- Layout der Kreise (zoomstabil) -------------------------------
   const prioMap = useMemo(() => new Map(state.priorities.map((p) => [p.id, p])), [state.priorities]);
+  /** Kalender-Einträge: pro Tag des Zeitraums ein Chip. */
+  const calEntries: CalEntry[] = useMemo(() => {
+    const out: CalEntry[] = [];
+    for (const i of state.items) {
+      const start = new Date(`${i.startDate}T00:00:00`);
+      const end = new Date(`${i.endDate || i.startDate}T00:00:00`);
+      const cat = state.categories.find((c) => c.id === i.categoryId);
+      const color = cat?.color
+        || (i.kind === "note" ? "hsl(210 70% 52%)" : i.kind === "event" ? "hsl(265 60% 58%)" : "hsl(var(--accent-gold))");
+      for (let d = new Date(start), n = 0; d <= end && n < 120; d.setDate(d.getDate() + 1), n++) {
+        const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        out.push({
+          id: `${i.id}-${day}`,
+          date: day,
+          title: i.title,
+          sub: i.kind === "task" ? "Aufgabe" : i.kind === "event" ? "Termin" : "Notiz",
+          done: itemAchieved(i, now),
+          color,
+          onOpen: () => selectItem(i.id),
+        });
+      }
+    }
+    return out;
+  }, [state.items, state.categories, now, selectItem]);
+
   const catMap = useMemo(() => new Map(state.categories.map((c) => [c.id, c])), [state.categories]);
   const statusMap = useMemo(() => new Map(state.statuses.map((s) => [s.id, s])), [state.statuses]);
 
