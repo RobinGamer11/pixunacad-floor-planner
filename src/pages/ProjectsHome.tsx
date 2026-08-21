@@ -74,6 +74,8 @@ import { FinanceProjectOverview } from "@/components/finance/FinanceProjectOverv
 import { geocodeSearch, type GeoHit } from "@/lib/weather";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { setExternalContentConsent, useExternalContentConsent } from "@/lib/externalContent";
+import { NetworkView } from "@/components/network/NetworkView";
+import { AuroraBackground } from "@/components/AuroraBackground";
 
 const Pixuna = () => (
   <span className="font-semibold tracking-tight text-base">
@@ -877,12 +879,19 @@ export default function ProjectsHome() {
         {/* Center */}
         <main className="flex-1 overflow-y-auto">
           {hub === "home" ? (
-            <div className="px-10 py-7">
-              <h1 className="text-2xl font-semibold tracking-tight">Hauptseite</h1>
-              <p className="mt-3 text-sm text-muted-foreground">Inhalte folgen in Kürze.</p>
+            <div className="relative min-h-full overflow-hidden">
+              <AuroraBackground />
+              <div className="relative px-10 py-7">
+                <h1 className="text-2xl font-semibold tracking-tight" style={{ color: "#F3F6FF" }}>
+                  Hauptseite
+                </h1>
+                <p className="mt-3 text-sm" style={{ color: "rgba(220,230,255,0.72)" }}>
+                  Inhalte folgen in Kürze.
+                </p>
+              </div>
             </div>
           ) : hub === "shared" ? (
-            <SharedView profile={profile} projectCount={projectCount} />
+            <SharedView profile={profile} projectCount={projectCount} projects={projects} />
           ) : hub === "trash" ? (
             <TrashView activeCount={projectCount} />
           ) : showAllTasks ? (
@@ -3498,8 +3507,20 @@ function ShopPanel({ anchor }: { anchor: React.RefObject<HTMLElement> }) {
   );
 }
 
-/** Netzwerk-Ansicht: eigenes Profil oben (identisch zum Kopf-Dropdown), Kontakte darunter. */
-function SharedView({ profile, projectCount }: { profile: UserProfile; projectCount: number }) {
+/** Netzwerk-Ansicht: eigenes Profil oben, darunter Kontakte/Teams/Anfragen. */
+function SharedView({
+  profile,
+  projectCount,
+  projects,
+}: {
+  profile: UserProfile;
+  projectCount: number;
+  projects: Project[];
+}) {
+  const networkProjects = useMemo(
+    () => projects.filter((p) => !p.isTemplate).map((p) => ({ id: p.id, name: p.name })),
+    [projects]
+  );
   return (
     <div className="px-10 py-7">
       <h1 className="text-2xl font-semibold tracking-tight">Netzwerk</h1>
@@ -3514,23 +3535,8 @@ function SharedView({ profile, projectCount }: { profile: UserProfile; projectCo
         </div>
       </div>
 
-      <div className="mt-8 max-w-xl">
-        <div className="flex items-center gap-3">
-          <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">KONTAKTE</div>
-          <button
-            disabled
-            className="h-8 px-3 rounded-md border text-xs flex items-center gap-1.5 opacity-40 cursor-not-allowed"
-            style={{ borderColor: "hsl(var(--hairline))" }}
-          >
-            <Plus size={12} /> Kontakte
-          </button>
-        </div>
-        <div
-          className="mt-2 rounded-xl p-10 text-center text-sm text-muted-foreground"
-          style={{ background: "hsl(var(--surface-card))", border: "1px dashed hsl(var(--hairline))" }}
-        >
-          Noch keine Kontakte hinterlegt.
-        </div>
+      <div className="max-w-xl">
+        <NetworkView projects={networkProjects} profile={{ name: profile.name, role: profile.role, avatarUrl: profile.avatarUrl }} />
       </div>
     </div>
   );
