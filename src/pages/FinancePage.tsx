@@ -52,7 +52,8 @@ export default function FinancePage() {
   const state = useFinance(projectId);
 
   /** null = Projektknoten. */
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
+  const [selectedId, setSelectedId] = useState<string | null>(() => searchParams.get("node"));
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [leftOpen, setLeftOpen] = useState(true);
   const [tabletAidOn, setTabletAidOn] = useState<boolean>(() => {
