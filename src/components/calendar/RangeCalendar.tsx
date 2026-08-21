@@ -267,7 +267,7 @@ export function RangeCalendar({
         ] as [CalRange, string][]).map(([v, l]) => (
           <button
             key={v}
-            onClick={() => setRange(v)}
+            onClick={() => switchRange(v)}
             className="h-7 px-2.5 rounded-md border text-[11px] font-medium"
             style={{
               borderColor: range === v ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
