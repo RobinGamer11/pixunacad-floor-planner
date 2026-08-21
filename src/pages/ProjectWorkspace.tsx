@@ -5416,7 +5416,7 @@ function TabButton({
       onClick={onClick}
       className="min-w-0 truncate px-2 py-2 text-[11px] font-medium transition-colors relative flex items-center justify-center gap-1"
       style={{
-        background: active ? "hsl(var(--surface-card))" : "hsl(var(--surface-muted))",
+        background: active ? "hsl(var(--surface-muted))" : "hsl(var(--surface-muted) / 0.55)",
         color: active ? "hsl(var(--ink))" : "hsl(var(--ink-soft))",
         borderBottom: active ? "2px solid hsl(var(--accent-gold))" : "2px solid transparent",
       }}
