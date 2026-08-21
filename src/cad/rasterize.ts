@@ -161,12 +161,17 @@ export interface RasterRenderResult {
  * transparente Ränder weg. Gemeinsame Basis für Pixel-Bildobjekte (CAD) und
  * Raster-Zeichenebenen (Projektmappe).
  */
-export function renderObjectToCanvas(app: any, input: RasterInput): RasterRenderResult | null {
+export function renderObjectToCanvas(
+  app: any,
+  input: RasterInput,
+  /** Feste Zielauflösung (px pro Weltmeter); sonst aus den Pixel-Einstellungen. */
+  pxPerMOverride?: number,
+): RasterRenderResult | null {
   if (!app || !app.scene || !app.renderer) return null;
   const b = worldBounds(app, input);
   if (!b) return null;
 
-  let pxPerM = targetPxPerM(app);
+  let pxPerM = pxPerMOverride && pxPerMOverride > 0 ? pxPerMOverride : targetPxPerM(app);
   let wPx = Math.ceil(b.w * pxPerM);
   let hPx = Math.ceil(b.h * pxPerM);
   if (wPx * hPx > MAX_PIXELS) {
@@ -252,10 +257,12 @@ export function rasterizeIntoLayer(app: any, input: RasterInput): boolean {
   const layers = app?.rasterLayers;
   if (!layers?.get) return false;
   try {
-    const res = renderObjectToCanvas(app, input);
-    if (!res) return false;
-    const layer = layers.get(res.labelId, true);
+    const probeLabel = (input.obj as any).labelId || Defaults.defaultLabelId;
+    // Auflösung der Rasterebene (feste Papier-DPI, zoom-unabhängig).
+    const layer = layers.get(probeLabel, true);
     if (!layer) return false;
+    const res = renderObjectToCanvas(app, input, layer.pxPerM);
+    if (!res) return false;
     layer.blit(res.canvas, res.x, res.y, res.w, res.h);
     removeFromApp(app, input);
     try { app.clearSelection?.(); } catch { /* optional */ }

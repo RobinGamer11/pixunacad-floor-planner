@@ -353,7 +353,7 @@ export class MiniCad {
     this.renderer = new Renderer(ctx, this.camera, this.scene, this.labelManager);
     // Rasterinhalt in die normale Ebenenreihenfolge des Renderers einhängen.
     this.renderer.rasterLayers = this.rasterLayers;
-    this.rasterLayers.onReady = () => { try { this.requestRender(); } catch { /* noop */ } };
+    this.rasterLayers.onReady = () => { try { this.renderer.render(); } catch { /* noop */ } };
     // Wichtig: Text/Stroke-Skalierung an Seitengröße (echte mm) ausrichten,
     // damit ein 16-px-Text auch 16 px auf der Seite ist (statt riesig).
     this.renderer.referencePxPerM = this.basePxPerMm * 1000;
