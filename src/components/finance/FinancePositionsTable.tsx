@@ -99,17 +99,23 @@ export const FinancePositionsTable: React.FC<Props> = ({ projectId, nodeId, posi
 
             <DateCell value={p.date} onChange={(v) => upd(p.id, { date: v })} />
 
+            <div className="pr-2 min-w-0">
+              <input value={p.number} placeholder={NUMBER_PLACEHOLDER[p.type]}
+                onChange={(e) => upd(p.id, { number: e.target.value })}
+                className={FIELD_CLASS} style={FIELD_STYLE} />
+            </div>
 
-            <input value={p.number} placeholder={NUMBER_PLACEHOLDER[p.type]}
-              onChange={(e) => upd(p.id, { number: e.target.value })}
-              className="bg-transparent text-sm outline-none pr-2 min-w-0" />
+            <div className="pr-2 min-w-0">
+              <AmountInput value={p.amount} color={amountColor} negative={isMinus}
+                onCommit={(v) => upd(p.id, { amount: v })} />
+            </div>
 
-            <AmountInput value={p.amount} color={amountColor} negative={isMinus}
-              onCommit={(v) => upd(p.id, { amount: v })} />
+            <div className="pr-2 min-w-0">
+              <input value={p.note} placeholder="Notiz eingeben..."
+                onChange={(e) => upd(p.id, { note: e.target.value })}
+                className={FIELD_CLASS} style={FIELD_STYLE} />
+            </div>
 
-            <input value={p.note} placeholder="Notiz eingeben..."
-              onChange={(e) => upd(p.id, { note: e.target.value })}
-              className="bg-transparent text-sm outline-none pr-2 min-w-0" />
 
             <button type="button" onClick={() => financeStore.deletePosition(projectId, p.id)}
               className="h-7 w-7 rounded flex items-center justify-center hover:bg-muted" title="Position löschen">
