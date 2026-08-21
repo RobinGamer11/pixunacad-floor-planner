@@ -228,6 +228,18 @@ export function TableToolSettings({
                 >{st === "single" ? "Einfach" : "Doppelt"}</button>
               ))}
             </div>
+            <button
+              onClick={() => format({ bottomDouble: !cellBorders.bottomDouble, borders: { ...(fmtRaw.borders ?? {}), bottom: true } })}
+              className="w-full h-7 rounded-md border text-[10px] flex items-center justify-center gap-1.5"
+              style={{
+                borderColor: "hsl(var(--hairline))",
+                background: cellBorders.bottomDouble ? "hsl(var(--accent-gold-soft))" : undefined,
+                color: cellBorders.bottomDouble ? "hsl(var(--accent-gold))" : undefined,
+              }}
+              title="Untere Zellkante als Doppellinie (Summenlinie)"
+            >
+              <Equal size={11} /> Summenlinie (untere Doppellinie)
+            </button>
             <UnitField
               label="Rahmenstärke (Zelle)"
               value={cellBorders.widthPx}
@@ -293,8 +305,6 @@ export function TableToolSettings({
           </div>
         </div>
       )}
-
-      <TableHelp fns={fns} />
 
       {isPending && (
         <div className="flex items-center gap-1.5">
@@ -432,15 +442,6 @@ const colName = (c: number): string => {
   return out;
 };
 
-const FORMULA_HELP: Record<string, string> = {
-  SUM: "Summe aller Zahlen im gewählten Bereich, z. B. =SUM(B2:B9).",
-  AVG: "Mittelwert der Zahlen im Bereich, z. B. =AVG(C2:C9).",
-  MIN: "Kleinster Wert im Bereich, z. B. =MIN(D2:D9).",
-  MAX: "Größter Wert im Bereich, z. B. =MAX(D2:D9).",
-  COUNT: "Anzahl der Zellen mit Zahlenwert, z. B. =COUNT(B2:B9).",
-};
-
-/** Kurzhilfe des Tabellenwerkzeugs — Formeln werden per Klick erklärt. */
 function TableHelp({ fns }: { fns: FormulaFn[] }) {
   const [open, setOpen] = React.useState(false);
   const [pick, setPick] = React.useState<string | null>(null);
