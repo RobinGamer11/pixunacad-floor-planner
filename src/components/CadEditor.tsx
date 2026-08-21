@@ -11,7 +11,6 @@ import { projectStore } from "@/lib/projectStore";
 import { CadTableLayer } from "@/components/cad/CadTableLayer";
 import { TableEditContext, TableFormulaPickContext, type FormulaFn, type TableSelection } from "@/components/page/TableElementView";
 import { TableToolSettings } from "@/components/page/TableToolSettings";
-import { cadTableStore } from "@/lib/cadTableStore";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
