@@ -47,6 +47,14 @@ Neue Datei `supabase/migrations/<ts>_network.sql`, ausschließlich additiv:
 - Der bestehende Profil-Editor bleibt, schreibt zusätzlich Anzeigename/Avatar/Status nach `profiles` bzw. `presence`.
 - Status-Farben: grün online, gelb abwesend, rot beschäftigt, grau offline (Typ `ProfileStatus` wird um `away` erweitert, rückwärtskompatibel).
 
+## Unabhängigkeit von Lovable (bestätigt)
+
+- Sämtliche Netzwerkfunktionen laufen **ausschließlich** gegen dein bestehendes externes Supabase-Projekt aus `.env` (`VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`).
+- **Keine** Lovable Cloud, keine Lovable-interne Datenbank, keine Lovable-Edge-/Backend-Funktion, kein Lovable-AI-Gateway, keine Laufzeitabhängigkeit von Lovable-Infrastruktur.
+- Es bleibt eine reine Vite-SPA: Client → dein Supabase (REST + Realtime + Auth). Nach dem Deployment auf Vercel funktioniert alles unverändert, auch wenn Lovable nie wieder benutzt wird.
+- Tabellen, Grants, RLS-Policies, Funktionen und Trigger liegen vollständig als SQL-Migration im Repository (`supabase/migrations/`) und damit in deinem Supabase-Projekt — reproduzierbar und ohne Lovable ausführbar.
+- Keine Secrets im Frontend; nur der öffentliche Publishable Key.
+
 ## Nicht Teil dieses Schritts
 Chat-Funktion (nur Symbol), Live-CAD, gemeinsame Cursor, Migration des Projekt-Workspaces.
 
