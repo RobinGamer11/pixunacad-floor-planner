@@ -99,6 +99,7 @@ import {
 import {
   TEMPLATE_LABEL, parseTemplateKey, getFavoriteTemplate, setFavoriteTemplate,
 } from "@/lib/financeStore";
+import { buildDefaultTemplatePages } from "@/lib/financeTemplates";
 import { EMPTY_WHEEL_ZOOM_BURST, nextSmartWheelZoom } from "@/lib/projectZoom";
 import CadOverlayLayer from "@/components/page/CadOverlayLayer";
 import { CadDocumentInspector } from "@/components/page/CadDocumentInspector";
