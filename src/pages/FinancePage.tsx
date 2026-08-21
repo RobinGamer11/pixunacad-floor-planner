@@ -6,7 +6,7 @@ import { projectStore, useProject } from "@/lib/projectStore";
 import { exportElementToA4Pdf } from "@/lib/financePdfExport";
 import {
   financeStore, childrenOf, positionsOf, nodeTotals, projectTotals, actionTotals,
-  control, formatEur, formatPct, templateKeyOf,
+  control, formatEur, formatPct, templateKeyOf, positionTotals, TEMPLATE_LABEL,
   type FinanceNode, type FinanceState, type FinanceTotals, type FinancePosition,
   type FinancePositionType,
 } from "@/lib/financeStore";
@@ -15,6 +15,7 @@ import { FinancePositionsTable } from "@/components/finance/FinancePositionsTabl
 import {
   Plus, PanelLeftClose, PanelLeftOpen, ChevronRight, ChevronDown,
   Folder, Building2, ArrowRight, ToggleLeft, ToggleRight, Home, Trash2, Search, X,
+  MoreVertical, Copy, Pencil, Star, FileText,
 } from "lucide-react";
 
 /** Filterbare Positionsarten (mehrfach kombinierbar). */
@@ -163,18 +164,13 @@ export default function FinancePage() {
               ? <Folder size={13} style={{ color: "hsl(var(--accent-gold))" }} />
               : <Building2 size={13} style={{ color: "hsl(var(--ink-soft))" }} />}
             <span className="truncate flex-1">{n.name}</span>
-            <button
-              title={n.type === "overview" ? "Übersicht löschen" : "Aktion löschen"}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (!confirm(`„${n.name}" wirklich löschen?`)) return;
-                financeStore.deleteNode(pid, n.id);
-                setSelectedId((cur) => (cur === n.id ? null : cur));
-              }}
-              className="opacity-0 group-hover:opacity-100 shrink-0"
-              style={{ color: "hsl(var(--ink-soft))" }}>
-              <Trash2 size={13} />
-            </button>
+            <NodeMenu
+              projectId={pid}
+              node={n}
+              compact
+              onDeleted={() => setSelectedId((cur) => (cur === n.id ? null : cur))}
+              onDuplicated={(id) => setSelectedId(id)}
+            />
           </div>
           {open && kids.length > 0 && renderTree(n.id, depth + 1)}
         </div>
@@ -288,21 +284,18 @@ export default function FinancePage() {
             )}
             <div className="text-[11px] font-semibold uppercase tracking-wider"
                  style={{ color: "hsl(var(--ink-soft))" }}>
-              {selected ? (selected.type === "action" ? "Aktion" : "Übersicht") : "Projekt"}
+              {selected ? (selected.type === "action" ? "Anlage" : "Ordner") : "Projekt"}
             </div>
-            <div className="flex-1" />
+            {selected && <span className="text-sm font-medium truncate max-w-[280px]">{selected.name}</span>}
             {selected && (
-              <button
-                onClick={() => {
-                  if (!confirm(`„${selected.name}" wirklich löschen?`)) return;
-                  financeStore.deleteNode(pid, selected.id);
-                  setSelectedId(null);
-                }}
-                className="h-7 w-7 rounded flex items-center justify-center opacity-40 hover:opacity-100 hover:bg-muted"
-                title={selected.type === "action" ? "Aktion löschen" : "Übersicht löschen"}>
-                <Trash2 size={14} />
-              </button>
+              <NodeMenu
+                projectId={pid}
+                node={selected}
+                onDeleted={() => setSelectedId(null)}
+                onDuplicated={(id) => setSelectedId(id)}
+              />
             )}
+            <div className="flex-1" />
           </div>
 
           <div ref={exportRef} className="p-4 space-y-4" style={{ background: "hsl(var(--surface-app))" }}>
