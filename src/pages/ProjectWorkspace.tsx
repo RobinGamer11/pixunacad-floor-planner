@@ -217,7 +217,6 @@ export default function ProjectWorkspace() {
   const templateBackNode = tplParams.get("back") ?? "";
   const templateInfo = templateKey ? parseTemplateKey(templateKey) : null;
   const templateLabel = templateInfo ? TEMPLATE_LABEL[templateInfo.type] : "";
-  const [templateReady, setTemplateReady] = useState(!templateKey);
 
   useEffect(() => {
     if (!templateKey || !projectId || !templateInfo) return;
@@ -227,7 +226,6 @@ export default function ProjectWorkspace() {
       `${TEMPLATE_LABEL[templateInfo.type]} Vorlage`,
       getFavoriteTemplate<ProjectPage>(projectId, templateInfo.type),
     );
-    setTemplateReady(true);
   }, [templateKey, projectId, templateInfo?.type]);
 
   // Im Vorlagen-Modus sind ausschließlich die Vorlagenseiten sichtbar,
