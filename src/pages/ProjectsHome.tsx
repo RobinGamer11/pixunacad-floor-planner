@@ -1678,6 +1678,7 @@ export function AufgabenView({ project }: { project: Project }) {
       return prev.includes(iso) ? prev.filter((d) => d !== iso) : [...prev, iso].sort();
     });
   const [kind, setKind] = useState<TlKind>("task");
+  const [entryOpen, setEntryOpen] = useState(false);
   const [draft, setDraft] = useState({ title: "", description: "" });
   const [catId, setCatId] = useState<string>(QUICK_CATEGORY_ID);
   const [prioId, setPrioId] = useState<string>("normal");
@@ -1712,9 +1713,24 @@ export function AufgabenView({ project }: { project: Project }) {
       });
   }, [board.items, catMap]);
 
-  const filtered = selectedDates.length
-    ? rows.filter((t) => !!t.date && selectedDates.includes(t.date))
-    : rows;
+  // Termine erscheinen nur, wenn ihr Tag im Kalender gewählt ist.
+  const base = useMemo(
+    () => (selectedDates.length
+      ? rows.filter((t) => !!t.date && selectedDates.includes(t.date))
+      : rows.filter((t) => t.kind !== "event")),
+    [rows, selectedDates],
+  );
+  // Gewählte Tage zuerst; erledigte Einträge behalten ihren Platz, bis die
+  // Ansicht neu aufgebaut wird (Reihenfolge friert je Einträge-Menge ein).
+  const orderRef = useRef<Map<string, number>>(new Map());
+  const idSig = base.map((t) => t.id).sort().join(",");
+  useMemo(() => {
+    orderRef.current = new Map(base.map((t, i) => [t.id, i]));
+  }, [idSig]);
+  const filtered = useMemo(
+    () => [...base].sort((a, b) => (orderRef.current.get(a.id) ?? 0) - (orderRef.current.get(b.id) ?? 0)),
+    [base, idSig],
+  );
 
   const addEntry = () => {
     if (!draft.title.trim()) return;
@@ -1771,10 +1787,20 @@ export function AufgabenView({ project }: { project: Project }) {
         className="rounded-2xl p-5"
         style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
       >
-        <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground mb-3">
-          NEUER EINTRAG (im Board)
-        </div>
-        <div className="flex flex-col gap-3">
+        <button
+          onClick={() => setEntryOpen((v) => !v)}
+          className="w-full flex items-center justify-between"
+        >
+          <span className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">
+            NEUER EINTRAG (im Board)
+          </span>
+          <ChevronDown
+            size={16}
+            className="text-muted-foreground transition-transform"
+            style={{ transform: entryOpen ? "rotate(180deg)" : undefined }}
+          />
+        </button>
+        <div className="flex flex-col gap-3" hidden={!entryOpen} style={{ marginTop: entryOpen ? 12 : 0 }}>
           <div className="flex items-center gap-2">
             {(["task", "note"] as TlKind[]).map((k) => (
               <button
