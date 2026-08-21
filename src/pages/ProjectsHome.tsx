@@ -2971,9 +2971,9 @@ function AllTasksView({ projects }: { projects: Project[] }) {
       return n;
     });
 
-  // Offene Aufgaben aus der Board-Oberfläche über alle Projekte hinweg.
+  // Board-Einträge (Aufgaben, Termine, Notizen) über alle Projekte hinweg.
   type GTask = {
-    id: string; projectId: string; projectName: string; title: string;
+    id: string; projectId: string; projectName: string; title: string; kind: TlKind;
     date?: string; time?: string; done: boolean; alert: boolean; color: string; category?: string;
   };
   const gTasks: GTask[] = useMemo(() => {
@@ -2985,13 +2985,13 @@ function AllTasksView({ projects }: { projects: Project[] }) {
         const st = timelineStore.getState(p.id);
         const cats = new Map(st.categories.map((c) => [c.id, c.label]));
         st.items
-          .filter((i) => i.kind === "task")
           .forEach((i) =>
             out.push({
               id: i.id,
               projectId: p.id,
               projectName: p.name,
               title: i.title,
+              kind: i.kind,
               date: i.endDate || i.startDate,
               time: i.endTime || i.startTime,
               done: itemAchieved(i, now),
@@ -3011,8 +3011,9 @@ function AllTasksView({ projects }: { projects: Project[] }) {
 
   const [selectedDate, setSelectedDate] = useState<string | undefined>();
   const visible = gTasks.filter(
-    (t) => activeIds.has(t.projectId) && (!selectedDate || t.date === selectedDate)
+    (t) => t.kind === "task" && activeIds.has(t.projectId) && (!selectedDate || t.date === selectedDate)
   );
+
 
   return (
     <div className="px-10 py-7">
