@@ -428,7 +428,7 @@ export default function BoardPage() {
       <WorkspaceHeader
         projectId={projectId}
         projectName={project?.name}
-        contextLabel="Board"
+        
         mode="board"
         canUndo={hist.canUndo}
         canRedo={hist.canRedo}
