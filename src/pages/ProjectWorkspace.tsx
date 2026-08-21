@@ -4513,6 +4513,14 @@ function ElementView({
       data-marquee-id={el.id}
       data-element-kind={el.kind}
       onPointerDown={handlePointerDown}
+      onDoubleClick={(e) => {
+        // Doppelklick auf eine Tabelle wechselt vom Objekt- in den Tabellenmodus.
+        if (readOnly || el.kind !== "table" || tableEditing) return;
+        e.stopPropagation();
+        onSelect?.();
+        tableCtx?.setEditId(el.id);
+        tableCtx?.setSelection({ r1: 0, c1: 0, r2: 0, c2: 0 });
+      }}
       className="absolute"
       style={{
         left: `${el.x}%`,
