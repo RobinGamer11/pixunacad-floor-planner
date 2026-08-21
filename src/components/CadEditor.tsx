@@ -1227,6 +1227,17 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const sidebarWidth = sidebarCollapsed ? 56 : 240;
 
   return (
+    <TableEditContext.Provider value={{
+      editId: tableEditId,
+      setEditId: setTableEditId,
+      selection: tableSelection,
+      setSelection: setTableSelection,
+      newCols: tableNewCols,
+      newRows: tableNewRows,
+      setNewCols: setTableNewCols,
+      setNewRows: setTableNewRows,
+    }}>
+    <TableFormulaPickContext.Provider value={{ fn: tableFormulaFn, setFn: setTableFormulaFn }}>
     <div className="flex w-full h-full overflow-hidden" style={{ background: "hsl(var(--surface))" }}>
       {/* Left Sidebar — im Präsentationsmodus ausgeblendet */}
       <aside
@@ -3472,6 +3483,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
         </div>
       )}
     </div>
+    </TableFormulaPickContext.Provider>
+    </TableEditContext.Provider>
   );
 });
 CadEditor.displayName = "CadEditor";
