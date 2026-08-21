@@ -101,7 +101,7 @@ export const financeStore = {
       id: uid(),
       type,
       parentId,
-      name: type === "overview" ? "Neue Übersicht" : "Neue Aktion",
+      name: type === "overview" ? "Neuer Ordner" : "Neue Anlage",
       note: "",
       estimate: 0,
       enabled: true,
