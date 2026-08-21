@@ -88,8 +88,6 @@ const CAD_TOOLS = [
   { id: ToolIds.DOCUMENT, label: "Dokument", key: "D", icon: FileImage },
 ];
 
-/** Pseudo-Werkzeug-ID der Tabellen-Overlay-Ebene (keine Engine-Tool-ID). */
-const TABLE_TOOL = "cad-table";
 
 
 // Sub-Werkzeuge unter "Linie": gemeinsam ein Einstellungsfenster mit
