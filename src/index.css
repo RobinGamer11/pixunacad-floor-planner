@@ -369,12 +369,18 @@
 
   .cad-settings-select {
     @apply text-[11px] px-2 py-1 rounded border w-full min-w-0;
-    background: #ffffff;
+    background: hsl(var(--cad-settings-bg));
     border-color: hsl(var(--cad-hub-border));
     color: hsl(var(--cad-toolbar-foreground));
     appearance: none;
     -webkit-appearance: none;
   }
+
+  .cad-settings-select option {
+    background: hsl(var(--cad-settings-bg));
+    color: hsl(var(--cad-toolbar-foreground));
+  }
+
 
 
   /* Icon-only Buttons (quadratisch, ohne Text): Symbol exakt mittig.
