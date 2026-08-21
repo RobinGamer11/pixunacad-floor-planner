@@ -630,7 +630,7 @@ export default function ProjectsHome() {
               </div>
             )}
 
-            <div className="flex-1 overflow-y-auto px-3 pb-4 space-y-1">
+            <div className="flex-1 overflow-y-auto px-3 pt-2 pb-4 space-y-1">
               {/* Ordner */}
               {folders.map((f) => {
                 const inside = projectsByFolder.get(f.id) ?? [];
@@ -2681,41 +2681,22 @@ function ProjectDonut({ projectId, size = 96 }: { projectId: string; size?: numb
   const percent = total
     ? Math.round((state.items.filter((i) => itemAchieved(i, now)).length / total) * 100)
     : 0;
-  const slices = state.categories
-    .map((c) => ({ c, n: state.items.filter((i) => i.categoryId === c.id).length }))
-    .filter((s) => s.n > 0);
+  const stroke = size * 0.16;
   const R = size / 2;
-  const inner = R * 0.62;
-  const stroke = R * 0.16;
-  let acc = -Math.PI / 2;
-  const sum = slices.reduce((a, s) => a + s.n, 0) || 1;
+  const r = R - stroke / 2 - 1;
+  const circ = 2 * Math.PI * r;
 
   return (
     <svg width={size} height={size} className="shrink-0">
-      {/* Kategorie-Segmente */}
-      {slices.map((s) => {
-        const ang = (s.n / sum) * Math.PI * 2;
-        const a0 = acc, a1 = acc + ang;
-        acc = a1;
-        const large = ang > Math.PI ? 1 : 0;
-        const d = ang >= Math.PI * 2 - 1e-6
-          ? `M ${R} ${R - R} A ${R} ${R} 0 1 1 ${R - 0.01} ${0} Z`
-          : `M ${R} ${R} L ${R + Math.cos(a0) * R} ${R + Math.sin(a0) * R} A ${R} ${R} 0 ${large} 1 ${R + Math.cos(a1) * R} ${R + Math.sin(a1) * R} Z`;
-        return <path key={s.c.id} d={d} fill={s.c.color} opacity={0.85} />;
-      })}
-      {!slices.length && <circle cx={R} cy={R} r={R} fill="hsl(var(--surface-muted))" />}
-      {/* Fortschrittsring */}
-      <circle cx={R} cy={R} r={inner + stroke / 2} fill="none"
-              stroke="hsl(var(--surface))" strokeWidth={stroke} opacity={0.35} />
+      <circle cx={R} cy={R} r={r} fill="none" stroke="hsl(var(--surface-muted))" strokeWidth={stroke} />
       <circle
-        cx={R} cy={R} r={inner + stroke / 2} fill="none"
+        cx={R} cy={R} r={r} fill="none"
         stroke="hsl(var(--accent-gold))" strokeWidth={stroke} strokeLinecap="round"
-        strokeDasharray={`${(percent / 100) * 2 * Math.PI * (inner + stroke / 2)} ${2 * Math.PI * (inner + stroke / 2)}`}
+        strokeDasharray={`${(percent / 100) * circ} ${circ}`}
         transform={`rotate(-90 ${R} ${R})`}
       />
-      <circle cx={R} cy={R} r={inner} fill="hsl(var(--surface-card))" />
-      <text x={R} y={R + size * 0.055} textAnchor="middle"
-            fontSize={size * 0.22} fontWeight={700} fill="hsl(var(--ink))">
+      <text x={R} y={R + size * 0.075} textAnchor="middle"
+            fontSize={size * 0.24} fontWeight={700} fill="hsl(var(--ink))">
         {percent}%
       </text>
     </svg>
@@ -2847,15 +2828,11 @@ function ProjectCarousel({ projects, onOpen }: { projects: Project[]; onOpen: (i
   );
 }
 
-/** Kompakte Vorschau der Board-Oberfläche eines Projekts. */
+/** Kompakte Vorschau der Board-Oberfläche eines Projekts (Ansichtstrahl oder Projektnetz). */
 function BoardPreview({ project }: { project: Project }) {
   const navigate = useNavigate();
   const state = useTimeline(project.id);
   const now = Date.now();
-  const upcoming = [...state.items]
-    .sort((a, b) => (a.endDate || a.startDate).localeCompare(b.endDate || b.startDate))
-    .slice(0, 6);
-  const catMap = new Map(state.categories.map((c) => [c.id, c]));
   const total = state.items.length;
   const percent = total
     ? Math.round((state.items.filter((i) => itemAchieved(i, now)).length / total) * 100)
@@ -2878,27 +2855,7 @@ function BoardPreview({ project }: { project: Project }) {
       <div className="h-2 w-full rounded-full overflow-hidden mb-3" style={{ background: "#241f1b" }}>
         <div className="h-full rounded-full" style={{ width: `${percent}%`, background: "#e2703a" }} />
       </div>
-      <div className="space-y-1.5">
-        {upcoming.length === 0 && (
-          <div className="text-[11px]" style={{ color: "#6f665e" }}>Noch keine Einträge im Board.</div>
-        )}
-        {upcoming.map((i) => {
-          const alert = taskAlert(i, now);
-          return (
-            <div key={i.id} className="flex items-center gap-2 text-[11px]" style={{ color: "#cdc4bb" }}>
-              <span className="w-2 h-2 rounded-full shrink-0"
-                    style={{ background: alert ? "#ef4444" : itemAchieved(i, now) ? "#e2703a" : "#a19a92" }} />
-              <span className="truncate flex-1">{i.title}</span>
-              <span className="shrink-0" style={{ color: "#8b837b" }}>
-                {catMap.get(i.categoryId ?? "")?.label ?? "—"}
-              </span>
-              <span className="shrink-0 tabular-nums" style={{ color: "#8b837b" }}>
-                {(i.endDate || i.startDate).split("-").reverse().join(".")}
-              </span>
-            </div>
-          );
-        })}
-      </div>
+      <BoardMiniPreview projectId={project.id} projectName={project.name} />
     </div>
   );
 }
