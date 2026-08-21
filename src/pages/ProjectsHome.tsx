@@ -3144,74 +3144,30 @@ function GlobalCalendar({
   selectedDate,
   onSelect,
 }: {
-  tasks: { date?: string; color: string; title?: string; kind?: TlKind }[];
+  tasks: { id?: string; date?: string; color: string; title?: string; kind?: TlKind }[];
   selectedDate?: string;
   onSelect: (d: string) => void;
 }) {
-  const [cursor, setCursor] = useState(() => {
-    const d = new Date();
-    return { y: d.getFullYear(), m: d.getMonth() };
-  });
-  const first = new Date(cursor.y, cursor.m, 1);
-  const days = new Date(cursor.y, cursor.m + 1, 0).getDate();
-  const startWeekday = (first.getDay() + 6) % 7;
-  const cells: (number | null)[] = [
-    ...Array(startWeekday).fill(null),
-    ...Array.from({ length: days }, (_, i) => i + 1),
-  ];
-  const today = new Date();
-  const todayStr = today.toISOString().slice(0, 10);
-  const dateStr = (d: number) => `${cursor.y}-${String(cursor.m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-
-  const entriesForDate = (d: number) => tasks.filter((t) => t.date === dateStr(d));
-
-  const monthName = first.toLocaleString("de-DE", { month: "long", year: "numeric" });
-
+  const entries: CalEntry[] = tasks
+    .filter((t) => !!t.date)
+    .map((t, i) => ({
+      id: `${t.id ?? "e"}-${i}`,
+      date: t.date,
+      title: t.title || "Eintrag",
+      color: t.color,
+    }));
   return (
     <div className="rounded-xl border p-4" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface))" }}>
-      <div className="flex items-center justify-between mb-3">
-        <button onClick={() => setCursor((c) => ({ y: c.m === 0 ? c.y - 1 : c.y, m: (c.m + 11) % 12 }))} className="text-muted-foreground hover:text-foreground text-sm">‹</button>
-        <div className="text-sm font-semibold capitalize">{monthName}</div>
-        <button onClick={() => setCursor((c) => ({ y: c.m === 11 ? c.y + 1 : c.y, m: (c.m + 1) % 12 }))} className="text-muted-foreground hover:text-foreground text-sm">›</button>
-      </div>
-      <div className="grid grid-cols-7 gap-1 text-[10px] text-muted-foreground mb-1 text-center">
-        {["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"].map((d) => (<div key={d}>{d}</div>))}
-      </div>
-      <div className="grid grid-cols-7 gap-1 text-[11px]">
-        {cells.map((c, i) => {
-          const s = c ? dateStr(c) : undefined;
-          const isSelected = s && s === selectedDate;
-          const isToday = s === todayStr;
-          const entries = c ? entriesForDate(c) : [];
-          return (
-            <div
-              key={i}
-              onClick={() => s && onSelect(s)}
-              className={`relative h-14 rounded-md p-1 flex flex-col gap-0.5 ${c ? "cursor-pointer hover:bg-muted/60" : ""}`}
-              style={{
-                background: isSelected ? "hsl(var(--accent-gold) / 0.2)" : entries.length ? "hsl(var(--surface-muted))" : "transparent",
-                border: isSelected ? "1px solid hsl(var(--accent-gold))" : isToday ? "1px solid hsl(var(--hairline))" : "1px solid transparent",
-                fontWeight: isToday ? 600 : 400,
-              }}
-            >
-              <span className="leading-none">{c ?? ""}</span>
-              {entries.slice(0, 2).map((e, idx) => (
-                <span key={idx} className="rounded-[3px] px-1 text-[9px] leading-[13px] truncate"
-                      style={{ background: e.color, color: "#fff" }}
-                      title={e.title}>
-                  {e.title || "Eintrag"}
-                </span>
-              ))}
-              {entries.length > 2 && (
-                <span className="text-[9px] leading-none text-muted-foreground">+{entries.length - 2}</span>
-              )}
-            </div>
-          );
-        })}
-      </div>
+      <RangeCalendar
+        entries={entries}
+        selectedDates={selectedDate ? [selectedDate] : []}
+        onSelectDate={(d) => onSelect(d)}
+        cellHeight={56}
+      />
     </div>
   );
 }
+
 
 
 /* ---------------- Münzen / Shop / Netzwerk / Papierkorb ---------------- */
