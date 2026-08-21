@@ -506,29 +506,34 @@ const ActionView: React.FC<{ projectId: string; state: FinanceState; node: Finan
         </div>
       )}
 
-      {/* Archivieren = bestehende Belege erfassen */}
-      <div className="flex flex-wrap gap-1.5" data-export-hide>
-        {([["offer", "Angebot"], ["invoice", "Rechnung"], ["supplement", "Nachtrag"]] as const).map(([t, label]) => (
-          <button key={t} onClick={() => financeStore.addPosition(projectId, node.id, t)}
-            className="h-9 px-3 rounded-lg border-2 text-[13px] font-semibold flex items-center gap-1.5 hover:bg-muted"
-            style={{ borderColor: "hsl(var(--hairline))" }}>
-            <Plus size={15} /> {label} archivieren
-          </button>
-        ))}
-        {([["offer", "Angebot"], ["invoice", "Rechnung"], ["supplement", "Nachtrag"]] as const).map(([t, label]) => (
-          <button key={`new-${t}`}
-            onClick={() => {
-              const pos = financeStore.addPosition(projectId, node.id, t);
-              financeStore.updatePosition(projectId, pos.id, { hasTemplate: true });
-              openTemplate(projectId, t, pos.id, node.id);
-            }}
-            title={`${label} als Vorlage in der Projektmappe anlegen`}
-            className="h-9 px-3 rounded-lg text-[13px] font-semibold flex items-center gap-1.5 hover:opacity-90"
-            style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}>
-            <Plus size={15} /> {label} anlegen
-          </button>
-        ))}
+      {/* Archivieren = bestehende Belege erfassen; darunter das Anlegen neuer Belege */}
+      <div className="space-y-1.5" data-export-hide>
+        <div className="flex flex-wrap gap-1.5">
+          {([["offer", "Angebot"], ["invoice", "Rechnung"], ["supplement", "Nachtrag"]] as const).map(([t, label]) => (
+            <button key={t} onClick={() => financeStore.addPosition(projectId, node.id, t)}
+              className="h-9 px-3 rounded-lg border-2 text-[13px] font-semibold flex items-center gap-1.5 hover:bg-muted"
+              style={{ borderColor: "hsl(var(--hairline))" }}>
+              <Plus size={15} /> {label} archivieren
+            </button>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {([["offer", "Angebot"], ["invoice", "Rechnung"], ["supplement", "Nachtrag"]] as const).map(([t, label]) => (
+            <button key={`new-${t}`}
+              onClick={() => {
+                const pos = financeStore.addPosition(projectId, node.id, t);
+                financeStore.updatePosition(projectId, pos.id, { hasTemplate: true });
+                openTemplate(projectId, t, pos.id, node.id);
+              }}
+              title={`${label} als Vorlage in der Projektmappe anlegen`}
+              className="h-9 px-3 rounded-lg text-[13px] font-semibold flex items-center gap-1.5 hover:opacity-90"
+              style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}>
+              <Plus size={15} /> {label} anlegen
+            </button>
+          ))}
+        </div>
       </div>
+
 
       {/* Archivierte Belege – nur Tabelle, Übersicht steht oben */}
       {archived.length > 0 && (
