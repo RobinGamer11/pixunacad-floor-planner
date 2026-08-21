@@ -23,7 +23,15 @@ const NUMBER_PLACEHOLDER: Record<FinancePositionType, string> = {
   supplement: "z. B. NT-2024-3001",
 };
 
+/** Eingebettete Eingabefelder werden gerahmt, damit sie als editierbar erkennbar sind. */
+const FIELD_CLASS = "w-full h-7 rounded-md border px-2 text-sm outline-none min-w-0 focus:border-[hsl(var(--accent-gold))]";
+const FIELD_STYLE: React.CSSProperties = {
+  borderColor: "hsl(var(--hairline))",
+  background: "hsl(var(--surface))",
+};
+
 export const FinancePositionsTable: React.FC<Props> = ({ projectId, nodeId, positions }) => {
+
   const [dragId, setDragId] = useState<string | null>(null);
 
   const upd = (id: string, patch: Partial<FinancePosition>) =>
@@ -99,17 +107,23 @@ export const FinancePositionsTable: React.FC<Props> = ({ projectId, nodeId, posi
 
             <DateCell value={p.date} onChange={(v) => upd(p.id, { date: v })} />
 
+            <div className="pr-2 min-w-0">
+              <input value={p.number} placeholder={NUMBER_PLACEHOLDER[p.type]}
+                onChange={(e) => upd(p.id, { number: e.target.value })}
+                className={FIELD_CLASS} style={FIELD_STYLE} />
+            </div>
 
-            <input value={p.number} placeholder={NUMBER_PLACEHOLDER[p.type]}
-              onChange={(e) => upd(p.id, { number: e.target.value })}
-              className="bg-transparent text-sm outline-none pr-2 min-w-0" />
+            <div className="pr-2 min-w-0">
+              <AmountInput value={p.amount} color={amountColor} negative={isMinus}
+                onCommit={(v) => upd(p.id, { amount: v })} />
+            </div>
 
-            <AmountInput value={p.amount} color={amountColor} negative={isMinus}
-              onCommit={(v) => upd(p.id, { amount: v })} />
+            <div className="pr-2 min-w-0">
+              <input value={p.note} placeholder="Notiz eingeben..."
+                onChange={(e) => upd(p.id, { note: e.target.value })}
+                className={FIELD_CLASS} style={FIELD_STYLE} />
+            </div>
 
-            <input value={p.note} placeholder="Notiz eingeben..."
-              onChange={(e) => upd(p.id, { note: e.target.value })}
-              className="bg-transparent text-sm outline-none pr-2 min-w-0" />
 
             <button type="button" onClick={() => financeStore.deletePosition(projectId, p.id)}
               className="h-7 w-7 rounded flex items-center justify-center hover:bg-muted" title="Position löschen">
@@ -132,16 +146,16 @@ const DateCell: React.FC<{ value: string; onChange: (v: string) => void }> = ({ 
     try { el.showPicker?.(); } catch { /* not supported */ }
   };
   return (
-    <div className="flex items-center gap-1 pr-2 min-w-0">
-      <input ref={ref} type="date" value={value} onChange={(e) => onChange(e.target.value)}
-        className="bg-transparent text-[11px] tabular-nums outline-none min-w-0 flex-1 [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none" />
-
-      <button type="button" onClick={open} title="Kalender öffnen"
-        className="h-6 w-6 rounded flex items-center justify-center hover:bg-muted shrink-0">
-        <Calendar size={13} style={{ color: "hsl(var(--ink-soft))" }} />
-      </button>
+    <div className="pr-2 min-w-0">
+      <div className="flex items-center h-7 rounded-md border px-1.5 min-w-0" style={FIELD_STYLE}>
+        <input ref={ref} type="date" value={value} onChange={(e) => onChange(e.target.value)}
+          className="bg-transparent text-[11px] tabular-nums outline-none min-w-0 w-full [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none" />
+        <button type="button" onClick={open} title="Kalender öffnen"
+          className="h-5 w-5 -ml-0.5 rounded flex items-center justify-center hover:bg-muted shrink-0">
+          <Calendar size={13} style={{ color: "hsl(var(--ink-soft))" }} />
+        </button>
+      </div>
     </div>
-
   );
 };
 
@@ -157,8 +171,9 @@ const AmountInput: React.FC<{ value: number; color?: string; negative?: boolean;
       onChange={(e) => setDraft(e.target.value)}
       onBlur={() => { setFocused(false); onCommit(Math.abs(parseEur(draft))); }}
       onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-      className="bg-transparent text-sm font-medium outline-none pr-2 min-w-0"
-      style={{ color }}
+      className={`${FIELD_CLASS} font-medium`}
+      style={{ ...FIELD_STYLE, color }}
     />
   );
 };
+

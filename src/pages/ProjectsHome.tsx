@@ -32,6 +32,8 @@ import {
   Home,
   LogOut,
   PlusCircle,
+  CalendarDays,
+  FileText,
 } from "lucide-react";
 
 
@@ -58,13 +60,13 @@ import {
   useTimeline,
   addQuickItem,
   itemAchieved,
+  itemStartMs,
   taskAlert,
   projectProgress,
   subscribeTimeline,
   QUICK_CATEGORY_ID,
   type TlKind,
 } from "@/lib/timelineStore";
-import { BoardMiniPreview } from "@/components/board/BoardMiniPreview";
 import { WeatherStrip } from "@/components/project/WeatherStrip";
 import { UebersichtView } from "@/components/project/UebersichtView";
 import { FileBrowser } from "@/components/project/FileBrowser";
@@ -1668,7 +1670,13 @@ export function AufgabenView({ project }: { project: Project }) {
   const board = useTimeline(project.id);
   useEffect(() => { timelineStore.ensureDefaults(project.id); }, [project.id]);
 
-  const [selectedDate, setSelectedDate] = useState<string | undefined>(undefined);
+  const [selectedDates, setSelectedDates] = useState<string[]>([]);
+  const selectedDate = selectedDates[0];
+  const toggleDate = (iso: string, additive: boolean) =>
+    setSelectedDates((prev) => {
+      if (!additive) return prev.length === 1 && prev[0] === iso ? [] : [iso];
+      return prev.includes(iso) ? prev.filter((d) => d !== iso) : [...prev, iso].sort();
+    });
   const [kind, setKind] = useState<TlKind>("task");
   const [draft, setDraft] = useState({ title: "", description: "" });
   const [catId, setCatId] = useState<string>(QUICK_CATEGORY_ID);
@@ -1683,7 +1691,7 @@ export function AufgabenView({ project }: { project: Project }) {
   const rows: UnifiedTask[] = useMemo(() => {
     const now = Date.now();
     return board.items
-      .filter((i) => i.kind === "task" || i.kind === "note")
+      .filter((i) => i.kind === "task" || i.kind === "note" || i.kind === "event")
       .map((i) => ({
         id: i.id,
         source: "board" as const,
@@ -1704,17 +1712,21 @@ export function AufgabenView({ project }: { project: Project }) {
       });
   }, [board.items, catMap]);
 
-  const filtered = selectedDate ? rows.filter((t) => t.date === selectedDate) : rows;
+  const filtered = selectedDates.length
+    ? rows.filter((t) => !!t.date && selectedDates.includes(t.date))
+    : rows;
 
   const addEntry = () => {
     if (!draft.title.trim()) return;
-    addQuickItem(project.id, kind, {
+    const dates = selectedDates.length ? selectedDates : [undefined];
+    dates.forEach((d) => addQuickItem(project.id, kind, {
       title: draft.title.trim(),
       description: draft.description.trim() || undefined,
-      date: selectedDate || undefined,
+      date: d,
       categoryId: catId,
       priorityId: prioId,
-    });
+    }));
+
     setDraft({ title: "", description: "" });
   };
 
@@ -1740,10 +1752,16 @@ export function AufgabenView({ project }: { project: Project }) {
         </div>
         <TaskCalendar
           tasks={rows}
-          selectedDate={selectedDate}
-          onSelectDate={(d) => setSelectedDate(d)}
+          selectedDates={selectedDates}
+          onSelectDate={toggleDate}
         />
-        <div className="mt-3 text-[11px] text-muted-foreground">
+        <div className="mt-3 text-[11px] font-medium">
+          Tag auswählen und Aufgabe/Notiz erstellen
+          <span className="ml-1 font-normal text-muted-foreground">
+            (mehrere Tage mit Shift/Strg)
+          </span>
+        </div>
+        <div className="mt-1 text-[11px] text-muted-foreground">
           Aufgaben und Notizen sind direkt mit dem Board verknüpft.
         </div>
       </div>
@@ -1847,16 +1865,17 @@ export function AufgabenView({ project }: { project: Project }) {
       >
         <div className="flex items-center justify-between mb-3">
           <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">
-            AUFGABEN / NOTIZEN {selectedDate && `· ${new Date(selectedDate).toLocaleDateString("de-DE")}`}
+            AUFGABEN / NOTIZEN {selectedDates.length > 0 && `· ${selectedDates.length} Tag(e)`}
           </div>
-          {selectedDate && (
+          {selectedDates.length > 0 && (
             <button
-              onClick={() => setSelectedDate(undefined)}
+              onClick={() => setSelectedDates([])}
               className="text-xs text-muted-foreground hover:text-foreground"
             >
               Filter aufheben
             </button>
           )}
+
         </div>
         <div className="divide-y" style={{ borderColor: "hsl(var(--hairline))" }}>
           {filtered.length === 0 && (
@@ -2053,19 +2072,19 @@ function TaskRow({ task, projectId }: { task: Task; projectId: string }) {
 
 function TaskCalendar({
   tasks,
-  selectedDate,
+  selectedDates,
   onSelectDate,
 }: {
   tasks: UnifiedTask[];
-  selectedDate?: string;
-  onSelectDate: (date: string | undefined) => void;
+  selectedDates: string[];
+  onSelectDate: (date: string, additive: boolean) => void;
 }) {
   const today = new Date();
   const [view, setView] = useState({ year: today.getFullYear(), month: today.getMonth() });
   const first = new Date(view.year, view.month, 1);
   const start = (first.getDay() + 6) % 7;
   const days = new Date(view.year, view.month + 1, 0).getDate();
-  const byDay = new Map<number, Task[]>();
+  const byDay = new Map<number, UnifiedTask[]>();
   tasks.forEach((t) => {
     if (!t.date) return;
     const d = new Date(t.date);
@@ -2088,6 +2107,14 @@ function TaskCalendar({
     setView({ year: y, month: ((m % 12) + 12) % 12 });
   };
 
+  /** Farbe je Eintragsart bzw. Dringlichkeit. */
+  const chipColor = (t: UnifiedTask) =>
+    t.done ? "hsl(var(--ink-soft))"
+      : t.alert ? "hsl(0 70% 52%)"
+      : t.kind === "note" ? "hsl(210 70% 52%)"
+      : t.kind === "event" ? "hsl(265 60% 58%)"
+      : "hsl(var(--accent-gold))";
+
   return (
     <div>
       <div className="flex items-center justify-between text-sm mb-2">
@@ -2108,47 +2135,47 @@ function TaskCalendar({
       </div>
       <div className="grid grid-cols-7 gap-1 mt-1 text-xs">
         {cells.map((c, i) => {
-          if (c === null) return <div key={i} className="h-9" />;
+          if (c === null) return <div key={i} className="h-16" />;
           const iso = fmt(c);
           const dayTasks = byDay.get(c) ?? [];
           const isToday =
             today.getFullYear() === view.year &&
             today.getMonth() === view.month &&
             today.getDate() === c;
-          const isSelected = iso === selectedDate;
-          const hasOpen = dayTasks.some((t) => !t.done);
-          const hasHigh = dayTasks.some((t) => !t.done && t.priority === "high");
+          const isSelected = selectedDates.includes(iso);
           return (
             <button
               key={i}
-              onClick={() => onSelectDate(isSelected ? undefined : iso)}
-              className="h-9 flex flex-col items-center justify-center rounded-md relative"
+              onClick={(e) => onSelectDate(iso, e.shiftKey || e.metaKey || e.ctrlKey)}
+              className="h-16 flex flex-col items-stretch rounded-md relative p-1 gap-0.5 text-left"
               style={{
                 background: isSelected
                   ? "hsl(var(--accent-gold) / 0.2)"
-                  : isToday
-                  ? "hsl(var(--ink))"
+                  : dayTasks.length
+                  ? "hsl(var(--surface-muted))"
                   : "transparent",
-                color: isToday && !isSelected ? "hsl(var(--surface))" : undefined,
                 border: isSelected
                   ? "1px solid hsl(var(--accent-gold))"
+                  : isToday
+                  ? "1px solid hsl(var(--ink))"
                   : "1px solid transparent",
                 fontWeight: isToday || isSelected ? 600 : undefined,
               }}
             >
-              <span>{c}</span>
-              {dayTasks.length > 0 && (
-                <span className="flex gap-0.5 absolute bottom-1">
-                  <span
-                    className="w-1 h-1 rounded-full"
-                    style={{
-                      background: hasHigh
-                        ? "hsl(0 70% 55%)"
-                        : hasOpen
-                        ? "hsl(var(--accent-gold))"
-                        : "hsl(var(--ink-soft))",
-                    }}
-                  />
+              <span className="leading-none">{c}</span>
+              {dayTasks.slice(0, 2).map((t) => (
+                <span
+                  key={t.id}
+                  title={t.title}
+                  className="rounded-[3px] px-1 text-[9px] leading-[13px] truncate"
+                  style={{ background: chipColor(t), color: "hsl(var(--surface))" }}
+                >
+                  {t.title || "Eintrag"}
+                </span>
+              ))}
+              {dayTasks.length > 2 && (
+                <span className="text-[9px] leading-none text-muted-foreground">
+                  +{dayTasks.length - 2}
                 </span>
               )}
             </button>
@@ -2156,6 +2183,7 @@ function TaskCalendar({
         })}
       </div>
     </div>
+
   );
 }
 
@@ -2873,37 +2901,76 @@ function ProjectCarousel({ projects, onOpen }: { projects: Project[]; onOpen: (i
   );
 }
 
-/** Kompakte Vorschau der Board-Oberfläche eines Projekts (Ansichtstrahl oder Projektnetz). */
+/** Kompakte Vorschau: die Aufgaben/Notizen/Termine des Projekts zum direkten Öffnen. */
 function BoardPreview({ project }: { project: Project }) {
   const navigate = useNavigate();
   const state = useTimeline(project.id);
   const now = Date.now();
-  const total = state.items.length;
-  const percent = total
-    ? Math.round((state.items.filter((i) => itemAchieved(i, now)).length / total) * 100)
-    : 0;
+  const items = useMemo(
+    () => [...state.items].sort((a, b) => {
+      const da = itemAchieved(a, now) ? 1 : 0;
+      const db = itemAchieved(b, now) ? 1 : 0;
+      if (da !== db) return da - db;
+      return itemStartMs(a) - itemStartMs(b);
+    }),
+    [state.items, now],
+  );
 
   return (
-    <div className="mt-3 rounded-xl p-4" style={{ background: "#141110", border: "1px solid #332c26" }}>
+    <div className="mt-3 rounded-xl p-4" style={{ background: "hsl(var(--surface-muted))", border: "1px solid hsl(var(--hairline))" }}>
       <div className="flex items-center gap-3 mb-3">
-        <span className="text-xs font-semibold" style={{ color: "#efe7de" }}>Board-Vorschau</span>
-        <span className="text-[11px] tabular-nums" style={{ color: "#8b837b" }}>{percent}% · {total} Einträge</span>
+        <span className="text-xs font-semibold">Einträge</span>
+        <span className="text-[11px] tabular-nums text-muted-foreground">{items.length}</span>
         <div className="flex-1" />
         <button
           onClick={() => navigate(`/project/${project.id}/board`)}
           className="h-7 px-2.5 rounded-md text-[11px] font-medium"
-          style={{ background: "#e2703a", color: "#fff" }}
+          style={{ background: "hsl(var(--accent-gold-soft))", color: "hsl(var(--accent-gold))" }}
         >
           Board öffnen
         </button>
       </div>
-      <div className="h-2 w-full rounded-full overflow-hidden mb-3" style={{ background: "#241f1b" }}>
-        <div className="h-full rounded-full" style={{ width: `${percent}%`, background: "#e2703a" }} />
-      </div>
-      <BoardMiniPreview projectId={project.id} projectName={project.name} />
+      {items.length === 0 ? (
+        <div className="text-xs text-muted-foreground">Noch keine Einträge.</div>
+      ) : (
+        <ul className="space-y-1">
+          {items.map((i) => {
+            const done = itemAchieved(i, now);
+            const alert = taskAlert(i, now);
+            return (
+              <li key={i.id} className="flex items-center gap-2 rounded-md px-2 py-1.5"
+                  style={{ background: "hsl(var(--surface))", border: "1px solid hsl(var(--hairline))" }}>
+                <span className="text-muted-foreground shrink-0">
+                  {i.kind === "task" ? <ListChecks size={13} /> : i.kind === "event" ? <CalendarDays size={13} /> : <FileText size={13} />}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className={`text-sm truncate ${done ? "line-through text-muted-foreground" : ""}`}>{i.title || "Ohne Titel"}</div>
+                  <div className="text-[11px] text-muted-foreground truncate">
+                    {(i.endDate || i.startDate) ?? "Ohne Datum"}{i.startTime ? ` · ${i.startTime}` : ""}
+                  </div>
+                </div>
+                {alert && !done && (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full shrink-0"
+                        style={{ background: "hsl(0 70% 50% / 0.15)", color: "hsl(0 70% 40%)" }}>
+                    Überfällig
+                  </span>
+                )}
+                <button
+                  onClick={() => navigate(`/project/${project.id}/board?item=${i.id}`)}
+                  title="Im Board öffnen"
+                  className="text-muted-foreground hover:text-foreground shrink-0"
+                >
+                  <ExternalLink size={14} />
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }
+
 
 function AllTasksView({ projects }: { projects: Project[] }) {
   const navigate = useNavigate();
@@ -2930,9 +2997,9 @@ function AllTasksView({ projects }: { projects: Project[] }) {
       return n;
     });
 
-  // Offene Aufgaben aus der Board-Oberfläche über alle Projekte hinweg.
+  // Board-Einträge (Aufgaben, Termine, Notizen) über alle Projekte hinweg.
   type GTask = {
-    id: string; projectId: string; projectName: string; title: string;
+    id: string; projectId: string; projectName: string; title: string; kind: TlKind;
     date?: string; time?: string; done: boolean; alert: boolean; color: string; category?: string;
   };
   const gTasks: GTask[] = useMemo(() => {
@@ -2944,13 +3011,13 @@ function AllTasksView({ projects }: { projects: Project[] }) {
         const st = timelineStore.getState(p.id);
         const cats = new Map(st.categories.map((c) => [c.id, c.label]));
         st.items
-          .filter((i) => i.kind === "task")
           .forEach((i) =>
             out.push({
               id: i.id,
               projectId: p.id,
               projectName: p.name,
               title: i.title,
+              kind: i.kind,
               date: i.endDate || i.startDate,
               time: i.endTime || i.startTime,
               done: itemAchieved(i, now),
@@ -2970,8 +3037,9 @@ function AllTasksView({ projects }: { projects: Project[] }) {
 
   const [selectedDate, setSelectedDate] = useState<string | undefined>();
   const visible = gTasks.filter(
-    (t) => activeIds.has(t.projectId) && (!selectedDate || t.date === selectedDate)
+    (t) => t.kind === "task" && activeIds.has(t.projectId) && (!selectedDate || t.date === selectedDate)
   );
+
 
   return (
     <div className="px-10 py-7">
@@ -3117,7 +3185,7 @@ function GlobalCalendar({
   selectedDate,
   onSelect,
 }: {
-  tasks: { date?: string; color: string }[];
+  tasks: { date?: string; color: string; title?: string; kind?: TlKind }[];
   selectedDate?: string;
   onSelect: (d: string) => void;
 }) {
@@ -3136,12 +3204,7 @@ function GlobalCalendar({
   const todayStr = today.toISOString().slice(0, 10);
   const dateStr = (d: number) => `${cursor.y}-${String(cursor.m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 
-  const colorsForDate = (d: number): string[] => {
-    const s = dateStr(d);
-    const cols = new Set<string>();
-    tasks.forEach((t) => { if (t.date === s) cols.add(t.color); });
-    return Array.from(cols).slice(0, 4);
-  };
+  const entriesForDate = (d: number) => tasks.filter((t) => t.date === dateStr(d));
 
   const monthName = first.toLocaleString("de-DE", { month: "long", year: "numeric" });
 
@@ -3160,25 +3223,28 @@ function GlobalCalendar({
           const s = c ? dateStr(c) : undefined;
           const isSelected = s && s === selectedDate;
           const isToday = s === todayStr;
-          const cols = c ? colorsForDate(c) : [];
+          const entries = c ? entriesForDate(c) : [];
           return (
             <div
               key={i}
               onClick={() => s && onSelect(s)}
-              className={`relative h-8 rounded-md flex items-center justify-center ${c ? "cursor-pointer hover:bg-muted/60" : ""}`}
+              className={`relative h-14 rounded-md p-1 flex flex-col gap-0.5 ${c ? "cursor-pointer hover:bg-muted/60" : ""}`}
               style={{
-                background: isSelected ? "hsl(var(--accent-gold) / 0.2)" : "transparent",
+                background: isSelected ? "hsl(var(--accent-gold) / 0.2)" : entries.length ? "hsl(var(--surface-muted))" : "transparent",
                 border: isSelected ? "1px solid hsl(var(--accent-gold))" : isToday ? "1px solid hsl(var(--hairline))" : "1px solid transparent",
                 fontWeight: isToday ? 600 : 400,
               }}
             >
-              {c ?? ""}
-              {cols.length > 0 && (
-                <div className="absolute bottom-0.5 flex gap-0.5">
-                  {cols.map((col, idx) => (
-                    <span key={idx} className="w-1 h-1 rounded-full" style={{ background: col }} />
-                  ))}
-                </div>
+              <span className="leading-none">{c ?? ""}</span>
+              {entries.slice(0, 2).map((e, idx) => (
+                <span key={idx} className="rounded-[3px] px-1 text-[9px] leading-[13px] truncate"
+                      style={{ background: e.color, color: "#fff" }}
+                      title={e.title}>
+                  {e.title || "Eintrag"}
+                </span>
+              ))}
+              {entries.length > 2 && (
+                <span className="text-[9px] leading-none text-muted-foreground">+{entries.length - 2}</span>
               )}
             </div>
           );
@@ -3187,6 +3253,7 @@ function GlobalCalendar({
     </div>
   );
 }
+
 
 /* ---------------- Münzen / Shop / Netzwerk / Papierkorb ---------------- */
 

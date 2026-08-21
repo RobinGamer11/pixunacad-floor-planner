@@ -211,6 +211,24 @@ export default function FinancePage() {
               </button>
             </div>
 
+            {/* Anlegen-Buttons: groß und auffällig, direkt über der Suche */}
+            <div className="flex flex-col gap-2 px-3 py-3 border-b" style={{ borderColor: "hsl(var(--hairline))" }}>
+              <button onClick={() => addNode("overview")}
+                className="w-full h-11 rounded-lg border-2 text-sm font-semibold flex items-center justify-center gap-2 transition-colors"
+                style={{
+                  borderColor: "hsl(var(--accent-gold))",
+                  background: "hsl(var(--accent-gold) / 0.12)",
+                  color: "hsl(var(--accent-gold))",
+                }}>
+                <Plus size={18} /> Ordner
+              </button>
+              <button onClick={() => addNode("action")}
+                className="w-full h-11 rounded-lg text-sm font-semibold flex items-center justify-center gap-2"
+                style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}>
+                <Plus size={18} /> Anlegen
+              </button>
+            </div>
+
             {/* Filter: Text (Nummern, Namen, Notizen) + Typ-Chips (mehrfach wählbar) */}
             <div className="px-3 py-2 border-b space-y-1.5" style={{ borderColor: "hsl(var(--hairline))" }}>
               <div className="flex items-center gap-1.5 h-7 rounded-md border px-2"
@@ -244,18 +262,6 @@ export default function FinancePage() {
               </div>
             </div>
 
-            <div className="flex gap-1.5 px-3 py-2 border-b" style={{ borderColor: "hsl(var(--hairline))" }}>
-              <button onClick={() => addNode("overview")}
-                className="flex-1 h-7 rounded-md border text-[11px] font-medium flex items-center justify-center gap-1 hover:bg-muted"
-                style={{ borderColor: "hsl(var(--hairline))" }}>
-                <Plus size={12} /> Übersicht
-              </button>
-              <button onClick={() => addNode("action")}
-                className="flex-1 h-7 rounded-md border text-[11px] font-medium flex items-center justify-center gap-1 hover:bg-muted"
-                style={{ borderColor: "hsl(var(--hairline))" }}>
-                <Plus size={12} /> Aktion
-              </button>
-            </div>
 
             <div className="flex-1 overflow-auto py-1 px-1">
               <div onClick={() => setSelectedId(null)}
@@ -348,15 +354,29 @@ const ActionView: React.FC<{ projectId: string; state: FinanceState; node: Finan
         onEstimateChange={(v) => financeStore.updateNode(projectId, node.id, { estimate: v })}
       />
 
-      <div className="flex flex-wrap gap-2">
+      {/* Archivieren = bestehende Belege erfassen */}
+      <div className="flex flex-wrap gap-2" data-export-hide>
         {([["offer", "Angebot"], ["invoice", "Rechnung"], ["supplement", "Nachtrag"]] as const).map(([t, label]) => (
           <button key={t} onClick={() => financeStore.addPosition(projectId, node.id, t)}
-            className="h-8 px-3 rounded-md border text-xs font-medium flex items-center gap-1 hover:bg-muted"
+            className="h-10 px-4 rounded-lg border-2 text-sm font-semibold flex items-center gap-1.5 hover:bg-muted"
             style={{ borderColor: "hsl(var(--hairline))" }}>
-            <Plus size={13} /> {label}
+            <Plus size={16} /> {label} archivieren
           </button>
         ))}
       </div>
+
+      {/* Anlegen = neue Vorlage in der Projektmappe erstellen */}
+      <div className="flex flex-wrap gap-2" data-export-hide>
+        {([["offer", "Angebot"], ["invoice", "Rechnung"], ["supplement", "Nachtrag"]] as const).map(([t, label]) => (
+          <button key={`new-${t}`} disabled
+            title="Vorlagen-Editor in der Projektmappe folgt"
+            className="h-10 px-4 rounded-lg text-sm font-semibold flex items-center gap-1.5 opacity-60 cursor-not-allowed"
+            style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}>
+            <Plus size={16} /> {label} anlegen
+          </button>
+        ))}
+      </div>
+
 
       <FinancePositionsTable projectId={projectId} nodeId={node.id} positions={positions} />
     </>
@@ -427,7 +447,7 @@ const ChildList: React.FC<{
     return (
       <div className="rounded-xl border px-4 py-6 text-xs"
            style={{ borderColor: "hsl(var(--hairline))", color: "hsl(var(--ink-soft))" }}>
-        Noch keine Einträge. Lege links „+ Übersicht" oder „+ Aktion" an.
+        Noch keine Einträge. Lege links „+ Ordner" oder „+ Anlegen" an.
       </div>
     );
   }
@@ -472,10 +492,12 @@ const ChildList: React.FC<{
                 {formatPct(cO.pct)} / {formatPct(cI.pct)}
               </span>
               <button data-export-hide onClick={() => onSelect(n.id)}
-                className="h-7 w-7 rounded flex items-center justify-center hover:bg-muted"
-                title={n.type === "overview" ? "Übersicht öffnen" : "Aktion öffnen"}>
-                <ArrowRight size={14} style={{ color: "hsl(var(--ink-soft))" }} />
+                className="h-7 w-7 rounded-md border-2 flex items-center justify-center"
+                style={{ borderColor: "hsl(var(--accent-gold))", background: "hsl(var(--accent-gold) / 0.14)" }}
+                title={n.type === "overview" ? "Übersicht öffnen" : "Aktion öffnen (bearbeiten)"}>
+                <ArrowRight size={14} style={{ color: "hsl(var(--accent-gold))" }} />
               </button>
+
             </div>
             {isOpen && kids.length > 0 && (
               <div className="pl-6 border-b" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-muted))" }}>
@@ -533,9 +555,12 @@ const FilterResults: React.FC<{
               {isMinus ? "−" : ""}{formatEur(h.pos.amount)}
             </span>
             <button data-export-hide onClick={() => onOpen(h.nodeId)}
-              className="h-7 w-7 rounded flex items-center justify-center hover:bg-muted" title="Aktion öffnen">
-              <ArrowRight size={14} style={{ color: "hsl(var(--ink-soft))" }} />
+              className="h-7 w-7 rounded-md border-2 flex items-center justify-center"
+              style={{ borderColor: "hsl(var(--accent-gold))", background: "hsl(var(--accent-gold) / 0.14)" }}
+              title="Aktion öffnen (bearbeiten)">
+              <ArrowRight size={14} style={{ color: "hsl(var(--accent-gold))" }} />
             </button>
+
           </div>
         );
       })}

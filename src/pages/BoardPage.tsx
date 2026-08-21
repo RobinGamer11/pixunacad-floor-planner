@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { WorkspaceHeader } from "@/components/workspace/WorkspaceHeader";
-import { useProject } from "@/lib/projectStore";
+import { projectStore, useProject } from "@/lib/projectStore";
+import { TabletAidWheel } from "@/components/TabletAidWheel";
+
 import {
   timelineStore, useTimeline, useTimelineHistory, getBoardSurface, setBoardSurface,
   itemStartMs, itemEndMs, itemAchieved, effectiveStatusId, priorityRadius, taskAlert,
@@ -66,6 +68,17 @@ export default function BoardPage() {
   const project = useProject(projectId);
   const state = useTimeline(projectId);
   const hist = useTimelineHistory(projectId);
+
+  /* Kopfzeilen-Hilfen wie in Mappe/CAD/Finanzen. */
+  const [tabletAidOn, setTabletAidOn] = useState<boolean>(() => {
+    try { return localStorage.getItem("pixuna.tabletAid") === "1"; } catch { return false; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem("pixuna.tabletAid", tabletAidOn ? "1" : "0"); } catch { /* ignore */ }
+  }, [tabletAidOn]);
+  const mappeHelpOn = project?.settings?.mappeHelpOn ?? true;
+
+
 
   useEffect(() => { if (projectId) timelineStore.ensureDefaults(projectId); }, [projectId]);
 
@@ -423,7 +436,12 @@ export default function BoardPage() {
         onRedo={hist.redo}
         canDelete={!!selectedId}
         onDelete={() => { if (projectId && selectedId) { timelineStore.deleteItem(projectId, selectedId); setSelectedId(null); } }}
+        mappeHelpOn={mappeHelpOn}
+        onToggleMappeHelp={() => project && projectStore.setMappeHelpOn(project.id, !mappeHelpOn)}
+        tabletAidOn={tabletAidOn}
+        onToggleTabletAid={() => setTabletAidOn((v) => !v)}
       />
+
 
       <div className="flex-1 min-h-0 flex">
         <div className="flex-1 min-w-0 overflow-y-auto" style={{ background: "hsl(var(--background))" }}>
@@ -797,7 +815,9 @@ export default function BoardPage() {
           />
         )}
       </div>
+      {tabletAidOn && <TabletAidWheel />}
     </div>
+
   );
 }
 
