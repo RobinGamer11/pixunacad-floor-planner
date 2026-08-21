@@ -6772,40 +6772,57 @@ function TextSettings({
       </div>
 
       <div className="grid grid-cols-2 gap-2">
-        <ToolColorPicker label="Textfarbe" value={settings.color} onChange={(v) => onChange({ color: v })} />
-        <ToolColorPicker
-          label="Feldfarbe"
-          value={settings.bgColor}
-          onChange={(v) => onChange({ bgColor: v, bgAlphaPct: settings.bgAlphaPct > 0 ? settings.bgAlphaPct : 100 })}
-        />
+        <div onPointerDownCapture={() => setAlphaTarget("text")}>
+          <ToolColorPicker label="Textfarbe" value={settings.color} onChange={(v) => onChange({ color: v })} />
+        </div>
+        <div onPointerDownCapture={() => setAlphaTarget("bg")}>
+          <ToolColorPicker
+            label="Feldfarbe"
+            value={settings.bgColor}
+            onChange={(v) => onChange({ bgColor: v, bgAlphaPct: settings.bgAlphaPct > 0 ? settings.bgAlphaPct : 100 })}
+          />
+        </div>
       </div>
 
       <div>
-        <div className="mb-1.5 text-[10px] text-muted-foreground">Transparenz</div>
+        <div className="mb-1.5 flex items-center justify-between text-[10px] text-muted-foreground">
+          <span>Transparenz</span>
+          <span className="flex overflow-hidden rounded border" style={{ borderColor: "hsl(var(--hairline))" }}>
+            {(["text", "bg"] as const).map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setAlphaTarget(t)}
+                className="px-1.5 py-[1px] text-[9px]"
+                style={alphaTarget === t
+                  ? { background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }
+                  : { background: "transparent" }}
+              >
+                {t === "text" ? "Text" : "Feld"}
+              </button>
+            ))}
+          </span>
+        </div>
         <input
           type="range"
-          min={1}
+          min={0}
           max={100}
           step={1}
-          value={Math.max(1, settings.alpha)}
-          onChange={(e) => {
-            const v = Number(e.target.value);
-            onChange({ alpha: v, ...(settings.bgAlphaPct > 0 ? { bgAlphaPct: v } : {}) });
-          }}
+          value={shownAlpha}
+          onChange={(e) => commitAlpha(Number(e.target.value))}
           className="pixuna-range w-full"
         />
         <label className="mt-1 flex h-7 items-center overflow-hidden rounded-md border" style={{ borderColor: "hsl(var(--hairline))" }}>
           <input
             type="number"
-            min={1}
+            min={0}
             max={100}
             step={1}
-            value={Math.max(1, settings.alpha)}
+            value={shownAlpha}
             onChange={(e) => {
               const raw = Number(e.target.value);
               if (!Number.isFinite(raw)) return;
-              const v = Math.min(100, Math.max(1, Math.round(raw)));
-              onChange({ alpha: v, ...(settings.bgAlphaPct > 0 ? { bgAlphaPct: v } : {}) });
+              commitAlpha(Math.round(raw));
             }}
             className="h-full min-w-0 flex-1 bg-transparent px-2 text-right text-xs tabular-nums outline-none"
             aria-label="Transparenz in Prozent"
@@ -6813,6 +6830,7 @@ function TextSettings({
           <span className="pr-2 text-[10px] text-muted-foreground">%</span>
         </label>
       </div>
+
 
       <Row label="Rahmen">
         <label className="flex items-center gap-2 text-xs">
