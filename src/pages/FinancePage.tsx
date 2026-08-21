@@ -447,7 +447,7 @@ const ChildList: React.FC<{
     return (
       <div className="rounded-xl border px-4 py-6 text-xs"
            style={{ borderColor: "hsl(var(--hairline))", color: "hsl(var(--ink-soft))" }}>
-        Noch keine Einträge. Lege links „+ Übersicht" oder „+ Aktion" an.
+        Noch keine Einträge. Lege links „+ Ordner" oder „+ Anlegen" an.
       </div>
     );
   }
@@ -492,10 +492,12 @@ const ChildList: React.FC<{
                 {formatPct(cO.pct)} / {formatPct(cI.pct)}
               </span>
               <button data-export-hide onClick={() => onSelect(n.id)}
-                className="h-7 w-7 rounded flex items-center justify-center hover:bg-muted"
-                title={n.type === "overview" ? "Übersicht öffnen" : "Aktion öffnen"}>
-                <ArrowRight size={14} style={{ color: "hsl(var(--ink-soft))" }} />
+                className="h-7 w-7 rounded-md border-2 flex items-center justify-center"
+                style={{ borderColor: "hsl(var(--accent-gold))", background: "hsl(var(--accent-gold) / 0.14)" }}
+                title={n.type === "overview" ? "Übersicht öffnen" : "Aktion öffnen (bearbeiten)"}>
+                <ArrowRight size={14} style={{ color: "hsl(var(--accent-gold))" }} />
               </button>
+
             </div>
             {isOpen && kids.length > 0 && (
               <div className="pl-6 border-b" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-muted))" }}>
