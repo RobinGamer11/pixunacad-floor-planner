@@ -61,6 +61,7 @@ import {
   taskAlert,
   projectProgress,
   subscribeTimeline,
+  QUICK_CATEGORY_ID,
   type TlKind,
 } from "@/lib/timelineStore";
 import { BoardMiniPreview } from "@/components/board/BoardMiniPreview";
@@ -1670,6 +1671,8 @@ export function AufgabenView({ project }: { project: Project }) {
   const [selectedDate, setSelectedDate] = useState<string | undefined>(undefined);
   const [kind, setKind] = useState<TlKind>("task");
   const [draft, setDraft] = useState({ title: "", description: "" });
+  const [catId, setCatId] = useState<string>(QUICK_CATEGORY_ID);
+  const [prioId, setPrioId] = useState<string>("normal");
 
   const catMap = useMemo(
     () => new Map(board.categories.map((c) => [c.id, c])),
@@ -1709,6 +1712,8 @@ export function AufgabenView({ project }: { project: Project }) {
       title: draft.title.trim(),
       description: draft.description.trim() || undefined,
       date: selectedDate || undefined,
+      categoryId: catId,
+      priorityId: prioId,
     });
     setDraft({ title: "", description: "" });
   };
@@ -1783,9 +1788,45 @@ export function AufgabenView({ project }: { project: Project }) {
             className="px-3 py-2 rounded-md border bg-transparent text-sm outline-none w-full resize-y min-h-[220px]"
             style={{ borderColor: "hsl(var(--hairline))" }}
           />
+          {/* Kategorie & Priorität aus der Board-Oberfläche */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-[11px] text-muted-foreground mr-1">Kategorie</span>
+            {board.categories.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => setCatId(c.id)}
+                className="h-8 px-3 rounded-md text-xs font-medium border flex items-center gap-1.5"
+                style={{
+                  borderColor: catId === c.id ? c.color : "hsl(var(--hairline))",
+                  background: catId === c.id ? `${c.color}22` : "transparent",
+                  color: "hsl(var(--ink-soft))",
+                }}
+              >
+                <span className="w-2 h-2 rounded-full" style={{ background: c.color }} />
+                {c.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-[11px] text-muted-foreground mr-1">Priorität</span>
+            {board.priorities.map((pr) => (
+              <button
+                key={pr.id}
+                onClick={() => setPrioId(pr.id)}
+                className="h-8 px-3 rounded-md text-xs font-medium border"
+                style={{
+                  borderColor: prioId === pr.id ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
+                  background: prioId === pr.id ? "hsl(var(--accent-gold-soft))" : "transparent",
+                  color: prioId === pr.id ? "hsl(var(--accent-gold))" : "hsl(var(--ink-soft))",
+                }}
+              >
+                {pr.label} · {pr.percent}%
+              </button>
+            ))}
+          </div>
           <div className="flex items-center gap-3">
             <span className="text-[11px] text-muted-foreground">
-              Kategorie „Schnellablage“ · {selectedDate ? selectedDate : "heutiges Datum"} · Priorität „Normal“
+              {selectedDate ? selectedDate : "heutiges Datum"} · ohne Uhrzeit
             </span>
             <div className="flex-1" />
             <button
@@ -1828,7 +1869,7 @@ export function AufgabenView({ project }: { project: Project }) {
               key={t.id}
               task={t}
               projectId={project.id}
-              onOpenInBoard={() => navigate(`/project/${project.id}/board`)}
+              onOpenInBoard={() => navigate(`/project/${project.id}/board?item=${t.id}`)}
             />
           ))}
         </div>
@@ -1842,12 +1883,14 @@ function UnifiedTaskRow({
 }: { task: UnifiedTask; projectId: string; onOpenInBoard: () => void }) {
   const dotColor = task.alert ? "hsl(0 70% 55%)" : task.done ? "hsl(var(--accent-gold))" : "hsl(var(--ink-soft))";
 
-  const toggle = () =>
+  const toggle = () => {
     timelineStore.updateItem(projectId, task.id, {
       statusId: task.done ? "open" : "done",
       done: !task.done,
       statusManual: true,
     });
+    timelineStore.markFresh(projectId, task.id);
+  };
   const remove = () => timelineStore.deleteItem(projectId, task.id);
 
   return (

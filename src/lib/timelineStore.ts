@@ -407,13 +407,13 @@ export function projectProgress(projectId: string, now = Date.now()): number {
 export function addQuickItem(
   projectId: string,
   kind: TlKind,
-  data: { title: string; description?: string; date?: string },
+  data: { title: string; description?: string; date?: string; categoryId?: string; priorityId?: string },
 ): TlItem {
   return timelineStore.addItem(projectId, kind, {
     title: data.title,
     description: data.description ?? "",
-    categoryId: QUICK_CATEGORY_ID,
-    priorityId: "normal",
+    categoryId: data.categoryId ?? QUICK_CATEGORY_ID,
+    priorityId: data.priorityId ?? "normal",
     startDate: data.date || new Date().toISOString().slice(0, 10),
     fresh: true,
   });
