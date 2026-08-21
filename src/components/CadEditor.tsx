@@ -1902,7 +1902,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
         )}
 
         {/* Canvas */}
-        <canvas ref={canvasRef} className="block w-full h-full" />
+        <canvas ref={canvasRef} data-cad-canvas className="block w-full h-full" />
 
         {/* Hilfeanzeige wie in der Mappe — werkzeugabhängig. */}
         {!presenting && helpOn && (
