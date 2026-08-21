@@ -464,7 +464,7 @@ export function TableElementView({
                   <span className="truncate" style={isPickTarget && previewFormula ? { color: "hsl(var(--cad-selection-stroke))", fontStyle: "italic" } : undefined}>
                     {display}
                   </span>
-                  {isHeader && active && !pickFn && (
+                  {isHeader && active && filtersEnabled && !pickFn && (
                     <button
                       onPointerDown={(e) => { e.stopPropagation(); }}
                       onClick={(e) => { e.stopPropagation(); setOpenFilter(openFilter === c ? null : c); }}
@@ -476,7 +476,7 @@ export function TableElementView({
                   )}
                 </>
               )}
-              {openFilter === c && isHeader && active && (
+              {openFilter === c && isHeader && active && filtersEnabled && (
                 <FilterMenu
                   values={uniqueColValues(model.cells, c, headerRow)}
                   active={filters[c] ?? null}
