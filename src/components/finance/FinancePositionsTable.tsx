@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 import React, { useRef, useState } from "react";
 import { GripVertical, Trash2, Calendar, FileText } from "lucide-react";
 import {
-  financeStore, formatEur, parseEur,
+  financeStore, formatEur, parseEur, templateKeyOf,
   type FinancePosition, type FinancePositionType,
 } from "@/lib/financeStore";
 
@@ -32,6 +32,7 @@ const FIELD_STYLE: React.CSSProperties = {
 };
 
 export const FinancePositionsTable: React.FC<Props> = ({ projectId, nodeId, positions }) => {
+  const navigate = useNavigate();
 
   const [dragId, setDragId] = useState<string | null>(null);
 
