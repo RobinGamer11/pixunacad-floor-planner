@@ -163,7 +163,7 @@ export function WorkspaceHeader({
           <ModeDivider />
           <ModeButton
             icon={<GanttChartSquare size={13} />}
-            label="Board"
+            label="Orga"
             active={mode === "board"}
             onClick={goBoard}
           />

@@ -1920,7 +1920,7 @@ export function AufgabenView({ project }: { project: Project }) {
           </span>
         </div>
         <div className="mt-1 text-[11px] text-muted-foreground">
-          Aufgaben und Notizen sind direkt mit dem Board verknüpft.
+          Aufgaben und Notizen sind direkt mit der Orga-Oberfläche verknüpft.
         </div>
       </div>
 
@@ -2876,7 +2876,7 @@ function BoardPreview({ project }: { project: Project }) {
           className="h-7 px-2.5 rounded-md text-[11px] font-medium"
           style={{ background: "hsl(var(--accent-gold-soft))", color: "hsl(var(--accent-gold))" }}
         >
-          Board öffnen
+          Orga öffnen
         </button>
       </div>
       {items.length === 0 ? (
