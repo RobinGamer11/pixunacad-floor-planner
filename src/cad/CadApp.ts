@@ -5,7 +5,7 @@ import { Input } from "./Input";
 import { Scene, AreaLabel, DimensionStyle, TextBoxStyle, TextBox } from "./Scene";
 import { autoSizeTextBox } from "./textAutoSize";
 import { LabelManager } from "./LabelManager";
-import { RasterLayers } from "./RasterLayers";
+import { RasterLayers, DEFAULT_RASTER_PX_PER_M } from "./RasterLayers";
 import { TopologyEngine } from "./TopologyEngine";
 import { GlobalGuides } from "./globalGuides";
 import { Renderer, Selection } from "./Renderer";
@@ -259,7 +259,11 @@ export class CadApp {
     const key = this._rasterKey();
     let layers = this._rasterLayersByKey.get(key);
     if (!layers) {
-      layers = new RasterLayers();
+      // Rasterauflösung = 300 dpi auf dem Papier. Da im CAD in echten Metern
+      // gezeichnet wird, muss die Papier-DPI durch den Zeichnungsmaßstab
+      // geteilt werden (1:100 ⇒ 1 Papiermeter = 100 Weltmeter).
+      const denom = Math.max(1, this.drawingScale || 1);
+      layers = new RasterLayers(Math.max(24, Math.round(DEFAULT_RASTER_PX_PER_M / denom)));
       layers.onReady = () => { try { this.renderer?.render(); } catch { /* noop */ } };
       this._rasterLayersByKey.set(key, layers);
     }
