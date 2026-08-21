@@ -116,6 +116,40 @@ export const financeStore = {
     s.nodes = s.nodes.map((n) => (n.id === id ? { ...n, ...patch } : n));
     write(projectId, s);
   },
+  /** Dupliziert einen Knoten samt Unterknoten und Positionen. */
+  duplicateNode(projectId: string, id: string): FinanceNode | null {
+    const s = read(projectId);
+    const source = s.nodes.find((n) => n.id === id);
+    if (!source) return null;
+
+    const idMap = new Map<string, string>();
+    const collect = (nodeId: string) => {
+      idMap.set(nodeId, uid());
+      s.nodes.filter((n) => n.parentId === nodeId).forEach((n) => collect(n.id));
+    };
+    collect(id);
+
+    const siblings = s.nodes.filter((n) => n.parentId === source.parentId);
+    const newNodes: FinanceNode[] = [];
+    const newPositions: FinancePosition[] = [];
+    for (const [oldId, newId] of idMap) {
+      const n = s.nodes.find((x) => x.id === oldId)!;
+      newNodes.push({
+        ...n,
+        id: newId,
+        parentId: oldId === id ? n.parentId : idMap.get(n.parentId ?? "") ?? n.parentId,
+        name: oldId === id ? `${n.name} (Kopie)` : n.name,
+        order: oldId === id ? nextOrder(siblings) : n.order,
+      });
+      for (const p of s.positions.filter((x) => x.nodeId === oldId)) {
+        newPositions.push({ ...p, id: uid(), nodeId: newId });
+      }
+    }
+    s.nodes = [...s.nodes, ...newNodes];
+    s.positions = [...s.positions, ...newPositions];
+    write(projectId, s);
+    return newNodes[0] ?? null;
+  },
   deleteNode(projectId: string, id: string) {
     const s = read(projectId);
     const ids = new Set<string>([id]);
