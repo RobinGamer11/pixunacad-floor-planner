@@ -772,6 +772,9 @@ export class TableObject {
     if (base > 0 && next > 0) this.scale = next / base;
   }
 
+  /** Platzhalter-Style: die Box-Infrastruktur (Resize) schreibt hier hinein. */
+  style: any = { autoSize: false, wrap: true };
+
   /** Reines Datenobjekt (Tabellenmodus schreibt hierüber zurück). */
   setData(next: any) { this.data = next; }
 }
