@@ -74,6 +74,7 @@ function ChatButton({ unread, onClick, title }: { unread?: boolean; onClick: () 
 
 function PersonRow({
   person,
+  chat,
   right,
   onClick,
   draggable,
@@ -81,6 +82,8 @@ function PersonRow({
   handle,
 }: {
   person: NetworkPerson;
+  /** Chat-Symbol – steht direkt neben dem Namen. */
+  chat?: React.ReactNode;
   right?: React.ReactNode;
   onClick?: () => void;
   draggable?: boolean;
@@ -105,7 +108,10 @@ function PersonRow({
         />
       </div>
       <div className="min-w-0 flex-1" style={{ opacity: offline ? 0.6 : 1 }}>
-        <div className="text-sm font-medium truncate">{person.name}</div>
+        <div className="text-sm font-medium truncate flex items-center gap-2">
+          <span className="truncate">{person.name}</span>
+          {chat}
+        </div>
         <div className="text-[11px] text-muted-foreground truncate">
           {person.role?.trim() || presenceLabel(person.status)}
         </div>
@@ -140,8 +146,10 @@ function Group({
           <span className="truncate">{title}</span>
           <span className="ml-1 opacity-70">({count}/{total})</span>
         </button>
-        <div className="ml-auto flex items-center gap-1">{actions}</div>
+        {/* Chat-Symbol direkt neben dem Projektnamen. */}
+        <div className="flex items-center gap-1">{actions}</div>
       </div>
+
       {open && <div className="pl-1">{children}</div>}
     </div>
   );
