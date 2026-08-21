@@ -221,11 +221,14 @@ export default function ProjectWorkspace() {
 
   useEffect(() => {
     if (!templateKey || !projectId || !templateInfo) return;
+    const title = `${TEMPLATE_LABEL[templateInfo.type]} Vorlage`;
+    // Favorit hat Vorrang, sonst die mitgelieferte Standard-Mustervorlage.
+    const favorite = getFavoriteTemplate<ProjectPage>(projectId, templateInfo.type);
     projectStore.ensureTemplatePages(
       projectId,
       templateKey,
-      `${TEMPLATE_LABEL[templateInfo.type]} Vorlage`,
-      getFavoriteTemplate<ProjectPage>(projectId, templateInfo.type),
+      title,
+      favorite?.length ? favorite : buildDefaultTemplatePages(templateInfo.type, title),
     );
   }, [templateKey, projectId, templateInfo?.type]);
 
