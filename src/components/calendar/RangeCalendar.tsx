@@ -50,6 +50,30 @@ export function RangeCalendar({
     return d;
   });
 
+  /** Zuletzt gewählter Tag – bestimmt, welcher Zeitraum beim Umschalten gezeigt wird. */
+  const anchorIso = selectedDates.length ? selectedDates[selectedDates.length - 1] : null;
+
+  /** Kalender folgt der Auswahl (auch bei Auswahl aus einer anderen Ansicht). */
+  useEffect(() => {
+    if (!anchorIso) return;
+    const [y, m, d] = anchorIso.split("-").map(Number);
+    if (!y || !m || !d) return;
+    const next = new Date(y, m - 1, d);
+    next.setHours(0, 0, 0, 0);
+    setCursor((cur) => (iso(cur) === iso(next) ? cur : next));
+  }, [anchorIso]);
+
+  /** Beim Wechsel Monat/Woche/Tag auf den ausgewählten Tag springen. */
+  const switchRange = (v: CalRange) => {
+    setRange(v);
+    if (!anchorIso) return;
+    const [y, m, d] = anchorIso.split("-").map(Number);
+    if (!y || !m || !d) return;
+    const next = new Date(y, m - 1, d);
+    next.setHours(0, 0, 0, 0);
+    setCursor(next);
+  };
+
   const byDate = useMemo(() => {
     const map = new Map<string, CalEntry[]>();
     for (const e of entries) {
