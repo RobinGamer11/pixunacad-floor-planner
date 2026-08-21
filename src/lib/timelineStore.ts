@@ -273,6 +273,18 @@ export const timelineStore = {
         : p)),
     });
   },
+  /** Markiert einen Eintrag als „neu von der Startseite“ (blaues Aufleuchten im Board). */
+  markFresh(projectId: string, id: string) {
+    const s = getState(projectId);
+    if (!s.items.some((i) => i.id === id && !i.fresh)) return;
+    persist(projectId, { ...s, items: s.items.map((i) => (i.id === id ? { ...i, fresh: true } : i)) });
+  },
+  /** Hebt die blaue Hervorhebung auf (einmaliges Anklicken im Board). */
+  clearFresh(projectId: string, id: string) {
+    const s = getState(projectId);
+    if (!s.items.some((i) => i.id === id && i.fresh)) return;
+    persist(projectId, { ...s, items: s.items.map((i) => (i.id === id ? { ...i, fresh: false } : i)) });
+  },
   removePriority(projectId: string, id: string) {
     const s = getState(projectId);
     commit(projectId, {
@@ -398,5 +410,25 @@ export function addQuickItem(
     categoryId: QUICK_CATEGORY_ID,
     priorityId: "normal",
     startDate: data.date || new Date().toISOString().slice(0, 10),
+    fresh: true,
   });
+}
+
+/* ---------------- Board-Oberflächenmodus (Ansichtstrahl / Projektnetz) ---------------- */
+
+export type BoardSurface = "ray" | "net";
+const SURFACE_KEY = (projectId: string) => `pixuna.board.surface.${projectId}`;
+
+export function getBoardSurface(projectId: string | undefined): BoardSurface {
+  if (!projectId) return "ray";
+  try {
+    return localStorage.getItem(SURFACE_KEY(projectId)) === "net" ? "net" : "ray";
+  } catch {
+    return "ray";
+  }
+}
+
+export function setBoardSurface(projectId: string | undefined, surface: BoardSurface) {
+  if (!projectId) return;
+  try { localStorage.setItem(SURFACE_KEY(projectId), surface); } catch {}
 }
