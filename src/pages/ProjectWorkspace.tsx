@@ -1194,6 +1194,46 @@ export default function ProjectWorkspace() {
         tabletAidOn={tabletAidOn}
         onToggleTabletAid={() => setTabletAidOn((v) => !v)}
       />
+      {templateKey && templateInfo && (
+        <div
+          className="flex items-center justify-between gap-3 px-4 py-2 border-b"
+          style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--muted))" }}
+        >
+          <div className="text-sm font-semibold">
+            {templateLabel}-Vorlage bearbeiten
+            <span className="ml-2 text-xs font-normal" style={{ color: "hsl(var(--ink-soft))" }}>
+              Nur die Vorlagenseiten sind sichtbar und werden exportiert.
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                const pages = (rawProject?.pages ?? []).filter((pg) => pg.templateKey === templateKey);
+                setFavoriteTemplate(projectId!, templateInfo.type, pages.map((pg) => ({ ...pg, id: "", templateKey: undefined })));
+              }}
+              className="h-9 px-3 rounded-lg border text-sm font-medium hover:bg-background"
+              style={{ borderColor: "hsl(var(--hairline))" }}
+              title={`Als Favorit-Vorlage für neue ${templateLabel}e speichern`}
+            >
+              Favorit
+            </button>
+            <button
+              onClick={() => navigate(`/project/${projectId}/finance?node=${templateBackNode}`)}
+              className="h-9 px-3 rounded-lg border text-sm font-medium hover:bg-background"
+              style={{ borderColor: "hsl(var(--hairline))" }}
+            >
+              Abbrechen
+            </button>
+            <button
+              onClick={() => navigate(`/project/${projectId}/finance?node=${templateBackNode}`)}
+              className="h-9 px-4 rounded-lg text-sm font-semibold"
+              style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
+            >
+              Speichern
+            </button>
+          </div>
+        </div>
+      )}
       <div className="flex-1 flex min-h-0">
       {/* Far-left tool rail */}
       <aside
