@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { WorkspaceHeader } from "@/components/workspace/WorkspaceHeader";
-import { useProject } from "@/lib/projectStore";
+import { projectStore, useProject } from "@/lib/projectStore";
+import { TabletAidWheel } from "@/components/TabletAidWheel";
+
 import {
   timelineStore, useTimeline, useTimelineHistory, getBoardSurface, setBoardSurface,
   itemStartMs, itemEndMs, itemAchieved, effectiveStatusId, priorityRadius, taskAlert,
