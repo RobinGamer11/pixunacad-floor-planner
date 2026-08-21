@@ -617,9 +617,19 @@ export function FileBrowser({ project }: Props) {
                     activateDropTarget({ mode: "inside", folderId: folder.id });
                   }}
                   onDrop={(event) => dropInsideFolder(event, folder)}
-                  className="group flex flex-col gap-1 py-1.5 transition-colors hover:bg-muted/30"
+                  className="group flex flex-col gap-1 rounded-md px-1.5 py-1.5 transition-colors hover:bg-muted/30"
                   style={{
-                    background: folderDropActive ? "hsl(var(--accent-gold) / 0.12)" : undefined,
+                    background: folderDropActive
+                      ? "hsl(var(--accent-gold) / 0.16)"
+                      : draggingId && draggingId !== folder.id
+                        ? "hsl(var(--accent-gold) / 0.05)"
+                        : undefined,
+                    // Nur echte Ablageziele (Ordner) bekommen beim Ziehen einen Rahmen.
+                    border: folderDropActive
+                      ? "1px dashed hsl(var(--accent-gold))"
+                      : draggingId && draggingId !== folder.id
+                        ? "1px dashed hsl(var(--accent-gold) / 0.45)"
+                        : "1px dashed transparent",
                     opacity: draggingId === folder.id ? 0.45 : 1,
                   }}
                 >
