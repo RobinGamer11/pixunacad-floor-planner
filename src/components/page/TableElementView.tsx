@@ -303,14 +303,14 @@ export function TableElementView({
 
   const highlightFor = (r: number, c: number): string | undefined => {
     if (pickFn) {
-      if (pickTarget && pickTarget.r === r && pickTarget.c === c) return "hsl(var(--accent-gold) / 0.35)";
+      if (pickTarget && pickTarget.r === r && pickTarget.c === c) return "hsl(var(--cad-selection-fill) / 0.30)";
       if (previewFormula) {
         const { r1, r2, c1, c2 } = previewFormula;
-        if (r >= r1 && r <= r2 && c >= c1 && c <= c2) return "hsl(var(--primary) / 0.20)";
+        if (r >= r1 && r <= r2 && c >= c1 && c <= c2) return "hsl(var(--cad-selection-fill) / 0.15)";
       }
       return undefined;
     }
-    if (active && inSelection(r, c)) return "hsl(var(--accent-gold) / 0.18)";
+    if (active && inSelection(r, c)) return "hsl(var(--cad-selection-fill) / 0.18)";
     return undefined;
   };
 
@@ -323,8 +323,9 @@ export function TableElementView({
       style={{
         background,
         color: "hsl(var(--ink))",
-        outline: active ? "1px solid hsl(var(--accent-gold))" : undefined,
-        outlineOffset: active ? "1px" : undefined,
+        // Kein eigener Rahmen: Auswahl/Fokus zeichnet die Objekt-Logik der Seite
+        // (identisch zu allen anderen PixunaCAD-Objekten).
+        outline: "none",
         cursor: active ? "default" : undefined,
         // Objektmodus: keine Zeigerereignisse → Verschieben/Drehen/Skalieren
         // laufen unverändert über die Objekt-Logik der Seite.
@@ -338,7 +339,12 @@ export function TableElementView({
       {pickFn && (
         <div
           className="absolute -top-6 left-0 z-30 flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium whitespace-nowrap"
-          style={{ background: "hsl(var(--accent-gold) / 0.2)", border: `1px solid ${borderColor}` }}
+          style={{
+            background: "hsl(var(--surface))",
+            border: "1px solid hsl(var(--hairline))",
+            color: "hsl(var(--ink))",
+            boxShadow: "0 4px 12px -6px rgba(0,0,0,0.35)",
+          }}
         >
           <span>
             {pickFn}: {pickStep === "target" ? "Zielzelle wählen" : pickStep === "start" ? "Startzelle wählen" : "Endzelle wählen"}
@@ -430,7 +436,7 @@ export function TableElementView({
                 />
               ) : (
                 <>
-                  <span className="truncate" style={isPickTarget && previewFormula ? { color: "hsl(var(--primary))", fontStyle: "italic" } : undefined}>
+                  <span className="truncate" style={isPickTarget && previewFormula ? { color: "hsl(var(--cad-selection-stroke))", fontStyle: "italic" } : undefined}>
                     {display}
                   </span>
                   {isHeader && active && !pickFn && (
@@ -462,26 +468,36 @@ export function TableElementView({
       {active && !pickFn && lay.colEdgesMm.slice(1).map((edge, i) => (
         <div
           key={`cw${i}`}
-          className="absolute z-10"
+          className="absolute z-10 group"
           style={{
             left: `calc(${pct(edge, lay.widthMm)} - 3px)`,
             top: 0, width: 6, height: "100%", cursor: "col-resize",
           }}
           onPointerDown={(e) => startResize(e, "col", i)}
           title={`Spalte ${colLabel(i)}: ${model.colWidthsMm[i].toFixed(1)} mm`}
-        />
+        >
+          <div
+            className="absolute inset-y-0 left-1/2 w-px opacity-0 group-hover:opacity-100"
+            style={{ background: "hsl(var(--cad-snap-line))" }}
+          />
+        </div>
       ))}
       {active && !pickFn && lay.rowEdgesMm.slice(1).map((edge, i) => (
         <div
           key={`rh${i}`}
-          className="absolute z-10"
+          className="absolute z-10 group"
           style={{
             top: `calc(${pct(edge, lay.heightMm)} - 3px)`,
             left: 0, height: 6, width: "100%", cursor: "row-resize",
           }}
           onPointerDown={(e) => startResize(e, "row", i)}
           title={`Zeile ${i + 1}: ${model.rowHeightsMm[i].toFixed(1)} mm`}
-        />
+        >
+          <div
+            className="absolute inset-x-0 top-1/2 h-px opacity-0 group-hover:opacity-100"
+            style={{ background: "hsl(var(--cad-snap-line))" }}
+          />
+        </div>
       ))}
     </div>
   );
