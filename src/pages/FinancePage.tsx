@@ -354,15 +354,29 @@ const ActionView: React.FC<{ projectId: string; state: FinanceState; node: Finan
         onEstimateChange={(v) => financeStore.updateNode(projectId, node.id, { estimate: v })}
       />
 
-      <div className="flex flex-wrap gap-2">
+      {/* Archivieren = bestehende Belege erfassen */}
+      <div className="flex flex-wrap gap-2" data-export-hide>
         {([["offer", "Angebot"], ["invoice", "Rechnung"], ["supplement", "Nachtrag"]] as const).map(([t, label]) => (
           <button key={t} onClick={() => financeStore.addPosition(projectId, node.id, t)}
-            className="h-8 px-3 rounded-md border text-xs font-medium flex items-center gap-1 hover:bg-muted"
+            className="h-10 px-4 rounded-lg border-2 text-sm font-semibold flex items-center gap-1.5 hover:bg-muted"
             style={{ borderColor: "hsl(var(--hairline))" }}>
-            <Plus size={13} /> {label}
+            <Plus size={16} /> {label} archivieren
           </button>
         ))}
       </div>
+
+      {/* Anlegen = neue Vorlage in der Projektmappe erstellen */}
+      <div className="flex flex-wrap gap-2" data-export-hide>
+        {([["offer", "Angebot"], ["invoice", "Rechnung"], ["supplement", "Nachtrag"]] as const).map(([t, label]) => (
+          <button key={`new-${t}`} disabled
+            title="Vorlagen-Editor in der Projektmappe folgt"
+            className="h-10 px-4 rounded-lg text-sm font-semibold flex items-center gap-1.5 opacity-60 cursor-not-allowed"
+            style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}>
+            <Plus size={16} /> {label} anlegen
+          </button>
+        ))}
+      </div>
+
 
       <FinancePositionsTable projectId={projectId} nodeId={node.id} positions={positions} />
     </>
