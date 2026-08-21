@@ -835,6 +835,55 @@ export class Scene {
     for (const t of this.textBoxes) this._textIdMap.set(t.id, t);
   }
 
+  private _tableIdMap = new Map<string, TableObject>();
+  _rebuildTableIdMap() {
+    this._tableIdMap.clear();
+    for (const t of this.tables) this._tableIdMap.set(t.id, t);
+  }
+
+  // ---- Tabellen ----
+  createTable(center: Vec2, data: any, mPerMm: number, opts: { rotationRad?: number; labelId?: string; scale?: number } = {}) {
+    const t = new TableObject({
+      id: this._makeId(), center, data, mPerMm,
+      rotationRad: opts.rotationRad, labelId: opts.labelId, scale: opts.scale,
+    });
+    t._stickerEditOwnerId = this._currentEditOwnerId;
+    this.tables.push(t);
+    this._rebuildTableIdMap();
+    return t;
+  }
+
+  getTableById(id: string): TableObject | null { return this._tableIdMap.get(id) || null; }
+
+  getTablesByLabelId(labelId: string): TableObject[] {
+    return this.tables.filter((t) => t.labelId === labelId);
+  }
+
+  removeTable(t: TableObject) {
+    this.tables = this.tables.filter((x) => x !== t);
+    this._rebuildTableIdMap();
+  }
+
+  removeTablesByIds(ids: string[]) {
+    const set = new Set(ids);
+    this.tables = this.tables.filter((t) => !set.has(t.id));
+    this._rebuildTableIdMap();
+  }
+
+  removeTablesByLabelId(labelId: string) {
+    this.tables = this.tables.filter((t) => t.labelId !== labelId);
+    this._rebuildTableIdMap();
+  }
+
+  reassignTablesLabel(oldId: string, newId: string) {
+    for (const t of this.tables) if (t.labelId === oldId) t.labelId = newId;
+  }
+
+  assignTablesToLabel(ids: string[], newId: string) {
+    const set = new Set(ids);
+    for (const t of this.tables) if (set.has(t.id)) t.labelId = newId;
+  }
+
   private _rebuildStickerIdMap() {
     this._stickerIdMap.clear();
     for (const s of this.stickerInstances) this._stickerIdMap.set(s.id, s);
