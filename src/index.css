@@ -75,6 +75,12 @@
     --accent-gold: 32 55% 52%;
     --accent-gold-soft: 32 60% 88%;
     --hairline: 30 12% 86%;
+
+    /* Overlay-Chrome (Hilfeansicht, Tablet-Hilfsrad) – bleibt in JEDEM Theme
+       identisch zum hellen Design: dunkelgraues Chrome, helle Schrift, Gold. */
+    --overlay-ink: 222 20% 12%;
+    --overlay-surface: 36 33% 97%;
+    --overlay-gold: 32 55% 52%;
   }
 
   .dark {
