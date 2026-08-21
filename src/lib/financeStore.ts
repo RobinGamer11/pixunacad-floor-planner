@@ -34,6 +34,8 @@ export interface FinancePosition {
   amount: number; // EUR (immer positiv eingegeben)
   note: string;
   order: number;
+  /** Gesetzt, wenn zu dieser Position eine Vorlage in der Projektmappe existiert. */
+  hasTemplate?: boolean;
 }
 
 export interface FinanceState {
