@@ -2867,7 +2867,7 @@ function AllTasksView({ projects }: { projects: Project[] }) {
   const [activeIds, setActiveIds] = useState<Set<string>>(() => new Set(projects.map((p) => p.id)));
   const [previewId, setPreviewId] = useState<string | null>(null);
   // Board-Änderungen aller Projekte live übernehmen.
-  const [, setTick] = useState(0);
+  const [tick, setTick] = useState(0);
   useEffect(() => {
     const offs = projects.map((p) => subscribeTimeline(p.id, () => setTick((t) => t + 1)));
     return () => offs.forEach((off) => off());
@@ -2923,7 +2923,7 @@ function AllTasksView({ projects }: { projects: Project[] }) {
       if (a.alert !== b.alert) return a.alert ? -1 : 1;
       return `${a.date ?? "9999"} ${a.time ?? "99:99"}`.localeCompare(`${b.date ?? "9999"} ${b.time ?? "99:99"}`);
     });
-  }, [projects]);
+  }, [projects, tick]);
 
   const [selectedDate, setSelectedDate] = useState<string | undefined>();
   const visible = gTasks.filter(
