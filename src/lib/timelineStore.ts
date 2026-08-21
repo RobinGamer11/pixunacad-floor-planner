@@ -1,5 +1,6 @@
-// Store für die Board02-Oberfläche (Zeitstrahl).
+// Store für die Board-Oberfläche (Zeitstrahl & Projektnetz).
 // Persistiert projektbezogen in localStorage: pixuna.board02.<projectId>
+
 
 export type TlKind = "task" | "event" | "note";
 
