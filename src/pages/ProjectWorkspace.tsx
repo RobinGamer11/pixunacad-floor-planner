@@ -1196,7 +1196,7 @@ export default function ProjectWorkspace() {
       h,
       wMm,
       hMm,
-      labelId: cadEngine?.activeDrawLabelId,
+      labelId: (cadEngineApiRef.current?.engine as any)?.activeDrawLabelId,
       tableData: data as any,
     } as any);
     setPendingTableId(id);
