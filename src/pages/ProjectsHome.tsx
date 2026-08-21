@@ -2873,37 +2873,76 @@ function ProjectCarousel({ projects, onOpen }: { projects: Project[]; onOpen: (i
   );
 }
 
-/** Kompakte Vorschau der Board-Oberfläche eines Projekts (Ansichtstrahl oder Projektnetz). */
+/** Kompakte Vorschau: die Aufgaben/Notizen/Termine des Projekts zum direkten Öffnen. */
 function BoardPreview({ project }: { project: Project }) {
   const navigate = useNavigate();
   const state = useTimeline(project.id);
   const now = Date.now();
-  const total = state.items.length;
-  const percent = total
-    ? Math.round((state.items.filter((i) => itemAchieved(i, now)).length / total) * 100)
-    : 0;
+  const items = useMemo(
+    () => [...state.items].sort((a, b) => {
+      const da = itemAchieved(a, now) ? 1 : 0;
+      const db = itemAchieved(b, now) ? 1 : 0;
+      if (da !== db) return da - db;
+      return itemStartMs(a) - itemStartMs(b);
+    }),
+    [state.items, now],
+  );
 
   return (
-    <div className="mt-3 rounded-xl p-4" style={{ background: "#141110", border: "1px solid #332c26" }}>
+    <div className="mt-3 rounded-xl p-4" style={{ background: "hsl(var(--surface-muted))", border: "1px solid hsl(var(--hairline))" }}>
       <div className="flex items-center gap-3 mb-3">
-        <span className="text-xs font-semibold" style={{ color: "#efe7de" }}>Board-Vorschau</span>
-        <span className="text-[11px] tabular-nums" style={{ color: "#8b837b" }}>{percent}% · {total} Einträge</span>
+        <span className="text-xs font-semibold">Einträge</span>
+        <span className="text-[11px] tabular-nums text-muted-foreground">{items.length}</span>
         <div className="flex-1" />
         <button
           onClick={() => navigate(`/project/${project.id}/board`)}
           className="h-7 px-2.5 rounded-md text-[11px] font-medium"
-          style={{ background: "#e2703a", color: "#fff" }}
+          style={{ background: "hsl(var(--accent-gold-soft))", color: "hsl(var(--accent-gold))" }}
         >
           Board öffnen
         </button>
       </div>
-      <div className="h-2 w-full rounded-full overflow-hidden mb-3" style={{ background: "#241f1b" }}>
-        <div className="h-full rounded-full" style={{ width: `${percent}%`, background: "#e2703a" }} />
-      </div>
-      <BoardMiniPreview projectId={project.id} projectName={project.name} />
+      {items.length === 0 ? (
+        <div className="text-xs text-muted-foreground">Noch keine Einträge.</div>
+      ) : (
+        <ul className="space-y-1">
+          {items.map((i) => {
+            const done = itemAchieved(i, now);
+            const alert = taskAlert(i, now);
+            return (
+              <li key={i.id} className="flex items-center gap-2 rounded-md px-2 py-1.5"
+                  style={{ background: "hsl(var(--surface))", border: "1px solid hsl(var(--hairline))" }}>
+                <span className="text-muted-foreground shrink-0">
+                  {i.kind === "task" ? <ListChecks size={13} /> : i.kind === "event" ? <CalendarDays size={13} /> : <FileText size={13} />}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className={`text-sm truncate ${done ? "line-through text-muted-foreground" : ""}`}>{i.title || "Ohne Titel"}</div>
+                  <div className="text-[11px] text-muted-foreground truncate">
+                    {(i.endDate || i.startDate) ?? "Ohne Datum"}{i.startTime ? ` · ${i.startTime}` : ""}
+                  </div>
+                </div>
+                {alert && !done && (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full shrink-0"
+                        style={{ background: "hsl(0 70% 50% / 0.15)", color: "hsl(0 70% 40%)" }}>
+                    Überfällig
+                  </span>
+                )}
+                <button
+                  onClick={() => navigate(`/project/${project.id}/board?item=${i.id}`)}
+                  title="Im Board öffnen"
+                  className="text-muted-foreground hover:text-foreground shrink-0"
+                >
+                  <ExternalLink size={14} />
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }
+
 
 function AllTasksView({ projects }: { projects: Project[] }) {
   const navigate = useNavigate();
