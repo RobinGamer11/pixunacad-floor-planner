@@ -33,6 +33,8 @@ export interface TableCellFormat {
   borderStyle?: CellBorderStyle;
   /** Rahmenstärke dieser Zelle in px (Fallback: Tabellen-Rahmenbreite). */
   borderWidthPx?: number;
+  /** Untere Kante als Doppellinie (Summenlinie). */
+  bottomDouble?: boolean;
 }
 
 export interface TableMerge {
@@ -96,6 +98,8 @@ export function createTableData(cols: number, rows: number): TableData {
     filtersEnabled: false,
     filters: {},
     borderWidthPx: 1,
+    borderColor: "#000000",
+    background: "#ffffff",
   };
 }
 
