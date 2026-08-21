@@ -2590,7 +2590,7 @@ export class Renderer {
         if (b.bottomDouble) line(x, y + h - Math.max(1.5, b.widthPx * 2), x + w, y + h - Math.max(1.5, b.widthPx * 2));
 
         const raw = model.cells[r]?.[c] ?? "";
-        const text = raw.startsWith("=") ? String(evalCell(model.cells, raw)) : raw;
+        const text = raw.startsWith("=") ? String(evalCell(model.cells, r, c)) : raw;
         if (!text) continue;
         const f = effectiveFormat(model, r, c);
         const fontPx = f.fontSizePt * PT_TO_MM * pxPerMm;
