@@ -198,8 +198,12 @@ export class RasterLayer {
     for (const tile of this.tiles.values()) {
       if (tile.loading) continue;
       const p = camera.worldToScreen(tile.tx * tw, tile.ty * tw);
-      // Minimaler Überstand, damit zwischen den Kacheln keine Haarlinien entstehen.
-      ctx.drawImage(tile.canvas, p.x, p.y, sizePx + 0.5, sizePx + 0.5);
+      // Kanten auf ganze Bildschirmpixel runden: benachbarte Kacheln stoßen so
+      // exakt aneinander, es entstehen weder Lücken noch Doppelkanten (Gitter).
+      const x0 = Math.round(p.x), y0 = Math.round(p.y);
+      const x1 = Math.round(p.x + sizePx), y1 = Math.round(p.y + sizePx);
+      ctx.drawImage(tile.canvas, x0, y0, Math.max(1, x1 - x0), Math.max(1, y1 - y0));
+
     }
     ctx.restore();
   }
