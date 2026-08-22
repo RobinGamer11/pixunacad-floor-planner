@@ -3138,7 +3138,23 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                     </>
                   )}
 
+                  {doorMode === "window" && (
+                    <div>
+                      <div className="mb-1.5 text-[10px] text-muted-foreground">Fensterflügel</div>
+                      <button
+                        type="button"
+                        onClick={() => setDoorSashEnabled(!doorSashEnabled)}
+                        aria-pressed={doorSashEnabled}
+                        className={`flex h-9 w-full items-center justify-center rounded border text-[11px] transition-colors ${doorSashEnabled ? "bg-accent" : "hover:bg-muted"}`}
+                        style={{ borderColor: "hsl(var(--hairline))" }}
+                      >
+                        Fensterflügel {doorSashEnabled ? "ein" : "aus"}
+                      </button>
+                    </div>
+                  )}
+
                   {/* Farben */}
+
                   <div className="grid grid-cols-2 gap-2">
                     {(doorMode === "door" || doorSashEnabled) && (
                       <ToolColorPicker

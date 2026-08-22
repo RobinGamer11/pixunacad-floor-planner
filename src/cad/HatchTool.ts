@@ -873,10 +873,19 @@ export class HatchTool {
 
   private _onFillClick(input: Input) {
     const mouseW = v(input.mouse.wx, input.mouse.wy);
-    const loop = findEnclosingFace(this.app.scene, mouseW);
+    const raster = this.app.rasterLayers;
+    const isVisible = (id: string) => this.app.labelManager.isVisible(id);
+    // Hybrid: sobald sichtbarer Rasterinhalt existiert, begrenzen Vektor- und
+    // Pixelkanten gemeinsam. Reine Vektorszenen nutzen den exakten DCEL-Pfad.
+    let loop: ReturnType<typeof findEnclosingFace> = null;
+    const hasRaster = !!raster?.labelIds().some((id) => isVisible(id));
+    if (hasRaster) {
+      loop = findHybridEnclosingFace(this.app.scene, raster, mouseW, { scope: "all", isVisible });
+    }
+    if (!loop || loop.length < 3) loop = findEnclosingFace(this.app.scene, mouseW);
     if (!loop || loop.length < 3) {
       toast.error("Bereich nicht geschlossen", {
-        description: "Klicke in einen vollständig von Linien oder Wänden umschlossenen Bereich.",
+        description: "Klicke in einen vollständig von Linien, Wänden oder Pixelstrichen umschlossenen Bereich.",
       });
       return;
     }
@@ -884,6 +893,7 @@ export class HatchTool {
     maybeRasterize(this.app, { type: "hatch", obj: filledHatch });
     this.app.clearSelection();
   }
+
 
   private _onRectClick(input: Input) {
     if (this.rectState === "idle") {
