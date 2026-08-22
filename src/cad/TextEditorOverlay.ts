@@ -55,12 +55,22 @@ export class TextEditorOverlay {
       if (!this.isActive()) return;
       const t = e.target as Node;
       if (this.el.contains(t) || this.toolbarEl.contains(t)) return;
+      // Klicks in den seitlichen Werkzeug-Einstellungen dürfen die Text-Markierung
+      // NICHT verlieren — sie sollen genau auf die Auswahl wirken.
+      const targetEl = e.target as HTMLElement | null;
+      if (targetEl?.closest?.("aside")) {
+        if (!targetEl.closest("input, textarea, select, [contenteditable='true']")) {
+          e.preventDefault();
+        }
+        return;
+      }
       // While the TextTool is active, let the tool handle commit on its own
       // click — that way the click is consumed only as a "commit + show preview"
       // step, and a *second* click is needed to place the next box.
       if (this.app.activeTool === this.app.textTool) return;
       this.commit();
     };
+
     document.addEventListener("mousedown", this._onDocMouseDown);
 
     // Prevent toolbar interactions from blurring/losing the editor selection
