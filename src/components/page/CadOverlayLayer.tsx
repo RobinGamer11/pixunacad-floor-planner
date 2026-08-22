@@ -432,7 +432,9 @@ export default function CadOverlayLayer(props: Props) {
       className="absolute inset-0"
       style={{ pointerEvents: enabled ? "auto" : "none" }}
     >
-      <div style={{ position: "absolute", left: -16, top: -16, width: 0, height: 0 }}>
+      {/* Der Canvas ragt um FRAME_PAD_PX über die Seite hinaus, damit Inhalte
+          außerhalb des Papiers auf der grauen Arbeitsfläche sichtbar bleiben. */}
+      <div style={{ position: "absolute", left: -FRAME_PAD_PX, top: -FRAME_PAD_PX, width: 0, height: 0 }}>
         <canvas
           ref={canvasRef}
           style={{ position: "absolute", left: 0, top: 0, background: "transparent" }}
