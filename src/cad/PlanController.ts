@@ -108,7 +108,6 @@ export class PlanController {
     const bb = itemsBoundsM(items);
 
     // Ausgabemaßstab wird beim Einfügen gewählt — CAD-Blätter sind immer 1:1.
-    const { askProjectionScale } = await import("./ScaleSelectDialog");
     const chosenDen = await askProjectionScale(this._lastUsedScaleDen, {
       title: "Maßstab beim Einfügen wählen",
     });
