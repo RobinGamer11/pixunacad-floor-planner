@@ -16,9 +16,12 @@ import {
   hitTestProjection,
   computeProjectionLayout,
   itemsBoundsM,
-  sheetToPlanFactor,
+  projectionScaleDen,
 } from "./PlanProjections";
+import { formatScaleLabel } from "@/lib/scale";
+import { askProjectionScale } from "./ScaleSelectDialog";
 import { makeHubDraggable, resetHubUserMoved, hubWasUserMoved } from "./hubDrag";
+
 
 type HandleKind = "body" | "edge-left" | "edge-right" | "edge-top" | "edge-bottom" | "corner";
 
