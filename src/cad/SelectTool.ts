@@ -2996,7 +2996,9 @@ export class SelectTool {
     if (input.clicked && input.keys?.shift && !this.isEditing()
         && !this.dragStickerId && !this.dragDocId && !this.dragTextBoxId
         && !this.dragFreeStrokeId && !this.dragDimId && !this.rotateTextBoxId) {
-      // Einzel-Selektion in Mehrfachauswahl überführen.
+      // Einzel-Selektion (z. B. TextBox, Tabelle, Hatch) in die
+      // Mehrfachauswahl überführen, bevor das zweite Element ergänzt wird.
+      this._seedMarqueeFromSelection();
       if (this.toggleSelectionAt(input.mouse.wx, input.mouse.wy)) {
         if (this.app.selection) this.app.setSelection(null);
         input.clicked = false;
@@ -4471,6 +4473,34 @@ export class SelectTool {
       if (area < bestArea) { bestArea = area; best = { kind, id }; }
     }
     return best;
+  }
+
+  /**
+   * Übernimmt eine bestehende Einzel-Selektion (app.selection) als ersten
+   * Eintrag der Mehrfachauswahl, damit Shift-Klick auf ein zweites Objekt
+   * beide markiert — auch für TextBoxen und Tabellen.
+   */
+  private _seedMarqueeFromSelection(): void {
+    if (this.marqueeSelectedIds.length) return;
+    const sel: any = (this.app as any).selection;
+    if (!sel) return;
+    const map: [string, string][] = [
+      ["segmentId", "segment"],
+      ["hatchId", "hatch"],
+      ["dimensionId", "dimension"],
+      ["textBoxId", "textbox"],
+      ["tableId", "table"],
+      ["documentId", "document"],
+      ["stickerInstanceId", "sticker"],
+      ["freeStrokeId", "freeStroke"],
+    ];
+    for (const [prop, kind] of map) {
+      const id = sel[prop];
+      if (typeof id === "string" && id) {
+        this.marqueeSelectedIds = [{ kind, id }];
+        return;
+      }
+    }
   }
 
   /** Shift-Klick: Element zur Mehrfachauswahl hinzufügen bzw. entfernen. */
