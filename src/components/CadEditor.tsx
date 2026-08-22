@@ -3354,7 +3354,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               </div>
             </div>
           )}
-          {tableTool && (
+          {(tableTool || !!tableElement) && (
             <div className="cad-settings-panel mb-2">
               <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
                 Tabelle
@@ -3375,8 +3375,12 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 onConfirm={() => { setTableTool(false); setTableEditId(null); }}
                 onCancel={() => {
                   const app = appRef.current as any;
-                  const t = app?.scene?.getTableById?.(tableSelectedId ?? "");
-                  if (t) { app.scene.removeTable(t); app.renderer?.render?.(); }
+                  // Nur beim aktiven Tabellenwerkzeug wird die frisch gesetzte
+                  // Tabelle verworfen; sonst nur Auswahl/Zellmodus beenden.
+                  if (tableTool) {
+                    const t = app?.scene?.getTableById?.(tableSelectedId ?? "");
+                    if (t) { app.scene.removeTable(t); app.renderer?.render?.(); }
+                  }
                   setTableSelectedId(null);
                   setTableEditId(null);
                   setTableTool(false);
