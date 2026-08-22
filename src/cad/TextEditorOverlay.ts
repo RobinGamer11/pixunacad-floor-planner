@@ -6,6 +6,7 @@ import { rgbaFromHex } from "./geometry";
 import { maybeRasterize } from "./rasterize";
 import { ptToCssPx, textStyleFontSizePt } from "./textTypography";
 import { normalizeRichTextHtml } from "./textRichRenderer";
+import { sanitizePastedHtml, plainTextToHtml } from "./textPasteSanitize";
 
 /**
  * Inline HTML contenteditable overlay used to edit a TextBox.
