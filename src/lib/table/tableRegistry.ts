@@ -81,10 +81,22 @@ export const tableRegistry = {
     return `Tabelle${Date.now()}`;
   },
 
-  /* ---- Interaktive Formeleingabe ---- */
-  beginSession(s: FormulaSession) { session = s; },
+  /* ---- Interaktive Formeleingabe ----
+   * Sitzungswechsel muss die Abonnenten benachrichtigen: fremde Tabellen
+   * schalten nur dann ihre Zellen auf `pointerEvents`, wenn sie neu rendern.
+   * `emit()` läuft ausschließlich bei echtem Wechsel der aktiven Tabelle,
+   * damit das wiederholte `beginSession` derselben Tabelle keine Schleife
+   * auslöst. */
+  beginSession(s: FormulaSession) {
+    const changed = session?.tableId !== s.tableId;
+    session = s;
+    if (changed) emit();
+  },
   endSession(tableId?: string) {
-    if (!tableId || session?.tableId === tableId) session = null;
+    if (!session) return;
+    if (tableId && session.tableId !== tableId) return;
+    session = null;
+    emit();
   },
   getSession(): FormulaSession | null { return session; },
 
