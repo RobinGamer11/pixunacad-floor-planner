@@ -323,9 +323,13 @@ export class RasterLayer {
   /** Lädt Kacheln aus JSON (asynchron je Kachel; `onReady` triggert ein Re-Render). */
   restore(json: RasterLayerJSON, onReady?: () => void) {
     this.strokeCount = Math.max(0, json.strokeCount ?? (json.tiles?.length ? 1 : 0));
-    for (const t of json.tiles || []) {
+    const list = json.tiles || [];
+    for (const t of list) {
+      // `ref` verweist auf eine inhaltsgleiche Kachel (Dedupe beim Speichern).
+      const src = t.src ?? (typeof t.ref === "number" ? list[t.ref]?.src : undefined);
+      if (!src) continue;
       const tile = this._tile(t.tx, t.ty, true)!;
-      tile.dataUrl = t.src;
+      tile.dataUrl = src;
       tile.loading = true;
       const img = new Image();
       img.onload = () => {
