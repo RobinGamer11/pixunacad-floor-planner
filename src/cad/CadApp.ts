@@ -1582,7 +1582,15 @@ export class CadApp {
   }
 
   setActiveDrawLabelId(labelId: string) {
-    this.activeDrawLabelId = labelId || Defaults.defaultLabelId;
+    let next = labelId || Defaults.defaultLabelId;
+    // Auf gesperrten Ebenen darf nicht gezeichnet werden: automatisch auf die
+    // nächste freie Ebene wechseln, sonst Hinweis geben.
+    if (this.labelManager.isEditLocked(next)) {
+      const free = this.labelManager.list().find((g) => !g.editLocked && g.visible !== false);
+      if (free) next = free.id;
+      else { try { console.warn("Alle Ebenen sind gesperrt — Zeichnen nicht möglich."); } catch {} }
+    }
+    this.activeDrawLabelId = next;
     this._syncLabelSelect();
   }
 
