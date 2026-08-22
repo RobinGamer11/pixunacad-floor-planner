@@ -261,11 +261,11 @@ export class CadApp {
     const key = this._rasterKey();
     let layers = this._rasterLayersByKey.get(key);
     if (!layers) {
-      // Rasterauflösung = 300 dpi auf dem Papier. Da im CAD in echten Metern
-      // gezeichnet wird, muss die Papier-DPI durch den Zeichnungsmaßstab
-      // geteilt werden (1:100 ⇒ 1 Papiermeter = 100 Weltmeter).
-      const denom = Math.max(1, this.drawingScale || 1);
-      layers = new RasterLayers(Math.max(24, Math.round(DEFAULT_RASTER_PX_PER_M / denom)));
+      // Feste CAD-taugliche Grundqualität (600 dpi auf dem Papier, mit
+      // Untergrenze in px/Weltmeter). Da im CAD in echten Metern gezeichnet
+      // wird, wird die Papier-DPI durch den Zeichnungsmaßstab geteilt
+      // (1:100 ⇒ 1 Papiermeter = 100 Weltmeter). Der Zoom ändert daran nichts.
+      layers = new RasterLayers(cadRasterPxPerM(this.drawingScale || 1));
       layers.onReady = () => { try { this.renderer?.render(); } catch { /* noop */ } };
       this._rasterLayersByKey.set(key, layers);
     }
