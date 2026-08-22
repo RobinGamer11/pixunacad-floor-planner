@@ -2171,7 +2171,14 @@ export default function ProjectWorkspace() {
                 multiSelectActive={selectedElementIds.length > 1}
               />
             )}
+            {!presenting && !printMode && (
+              <LayerFab
+                count={mappeLayerCount}
+                onClick={() => { setRightOpen(true); setRightTab("layers"); }}
+              />
+            )}
             <ZoomBar zoom={zoom} setZoom={setZoomClamped} onResetZoom={resetZoomAndCenter} />
+
           </main>
 
           {/* Right inspector (collapsible) */}
