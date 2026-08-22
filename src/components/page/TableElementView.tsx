@@ -520,7 +520,7 @@ export function TableElementView({
         cursor: active ? "default" : undefined,
         // Objektmodus: keine Zeigerereignisse → Verschieben/Drehen/Skalieren
         // laufen unverändert über die Objekt-Logik der Seite.
-        pointerEvents: active ? "auto" : "none",
+        pointerEvents: active || foreignSession ? "auto" : "none",
       }}
       tabIndex={active ? 0 : -1}
       onKeyDown={onGridKeyDown}
