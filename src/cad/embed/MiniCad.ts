@@ -2677,6 +2677,7 @@ export class MiniCad {
     for (const seg of this.scene.segments) {
       if (this.isFrameSegment(seg)) continue;
       if (seg.isGuide && this._guidesLocked) continue;
+      if (!this._labelEditable(seg.labelId)) continue;
       const inside = inRect(seg.a.x, seg.a.y) && inRect(seg.b.x, seg.b.y);
       const touched = rectsOverlap({ minX: Math.min(seg.a.x, seg.b.x), minY: Math.min(seg.a.y, seg.b.y), maxX: Math.max(seg.a.x, seg.b.x), maxY: Math.max(seg.a.y, seg.b.y) });
       if (mode === "enclose" ? inside : touched) {
