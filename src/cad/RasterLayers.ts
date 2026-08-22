@@ -55,6 +55,17 @@ export const CAD_RASTER_DPI = 600;
  */
 export const MIN_RASTER_PX_PER_M = 120;
 
+/**
+ * Feste Rasterauflösung (px pro Weltmeter) für einen Zeichnungsmaßstab 1:N.
+ * Wird EINMAL beim Anlegen der Ebene bestimmt und bleibt danach konstant —
+ * der Zoom ändert die gespeicherte Qualität nie.
+ */
+export function cadRasterPxPerM(scaleDenominator: number): number {
+  const denom = Math.max(1, scaleDenominator || 1);
+  const paper = (CAD_RASTER_DPI / 25.4) * 1000;
+  return Math.max(MIN_RASTER_PX_PER_M, Math.round(paper / denom));
+}
+
 export interface RasterTileJSON {
   tx: number;
   ty: number;
