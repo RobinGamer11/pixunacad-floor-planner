@@ -85,6 +85,8 @@ interface RasterTile {
   dataUrl: string | null;
   /** true, solange das Restore-Bild noch lädt. */
   loading: boolean;
+  /** true, wenn die Kachel seit dem letzten Radieren leer sein könnte. */
+  maybeEmpty?: boolean;
 }
 
 function makeTileCanvas(px: number): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } {
