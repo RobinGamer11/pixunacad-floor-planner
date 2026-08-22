@@ -860,11 +860,20 @@ export class Renderer {
       const baseH = (composite ? composite.height : (img.naturalHeight || img.height));
       const filtered = this._getFilteredBitmap(doc, drawSrc, baseW, baseH, composite ? `cmp:${baseW}` : `img:${img.src.length}`);
       const finalSrc: CanvasImageSource = (filtered || drawSrc) as CanvasImageSource;
+      // Schärfe: wird stärker als die native Auflösung vergrößert, erzeugt die
+      // bilineare Glättung nur Unschärfe. Ab ~1,5-facher Vergrößerung wird
+      // deshalb pixelgenau (nearest neighbour) gezeichnet — PNG/JPG und
+      // Pixelobjekte bleiben beim Hineinzoomen scharf statt zu verwaschen.
+      const magnify = baseW > 0 ? wPx / baseW : 1;
+      if (magnify > 1.5) {
+        ctx.imageSmoothingEnabled = false;
+      }
       if (warp) {
         drawWarpedImage(ctx, finalSrc, baseW, baseH, wPx, hPx, warp);
       } else {
         ctx.drawImage(finalSrc, -wPx / 2, -hPx / 2, wPx, hPx);
       }
+      ctx.imageSmoothingEnabled = true;
     } else {
       ctx.fillStyle = "rgba(180,180,180,0.3)";
       ctx.fillRect(-wPx / 2, -hPx / 2, wPx, hPx);
