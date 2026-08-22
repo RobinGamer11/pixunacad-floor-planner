@@ -403,7 +403,14 @@ export function drawRichTextBox(opts: DrawTextBoxOptions) {
 
 /** Scratch canvas for offline text measurement (independent of camera). */
 const _measureCanvas = (typeof document !== "undefined") ? document.createElement("canvas") : null;
-const _measureCtx = _measureCanvas ? _measureCanvas.getContext("2d") : null;
+let _measureCtx: CanvasRenderingContext2D | null | undefined;
+
+function getMeasureContext(): CanvasRenderingContext2D | null {
+  if (_measureCtx !== undefined) return _measureCtx;
+  try { _measureCtx = _measureCanvas?.getContext("2d") ?? null; }
+  catch { _measureCtx = null; }
+  return _measureCtx;
+}
 
 /**
  * Measures the natural pixel size of a text-box's content given the current
@@ -421,10 +428,11 @@ export function measureTextBoxContent(
   paddingPx: number,
   base?: BaseTextStyle & { lineHeightPct?: number },
 ): { widthPx: number; heightPx: number } {
-  if (!_measureCtx) return { widthPx: 0, heightPx: 0 };
+  const measureCtx = getMeasureContext();
+  if (!measureCtx) return { widthPx: 0, heightPx: 0 };
   const runs = htmlToRuns(html || "", base);
   const lineFactor = Math.max(0.6, (base?.lineHeightPct ?? 105) / 100);
-  const lines = layoutLines(_measureCtx, runs, baseFontSizePt, "#000", maxInnerWidthPx, wrap, lineFactor, 1);
+  const lines = layoutLines(measureCtx, runs, baseFontSizePt, "#000", maxInnerWidthPx, wrap, lineFactor, 1);
   let maxLineW = 0;
   let totalH = 0;
   for (const line of lines) {

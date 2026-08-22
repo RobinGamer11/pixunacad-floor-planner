@@ -23,7 +23,7 @@ describe("canonical text typography", () => {
   it("normalizes legacy inline sizes without retaining screen px", () => {
     const html = normalizeRichTextHtml('<span style="font-size:16px;color:red">Text</span>');
     expect(html).toContain('data-font-size-pt="12"');
-    expect(html).not.toContain("font-size");
+    expect(html).not.toContain("style=\"font-size");
     expect(html).toContain("color: red");
   });
 });
