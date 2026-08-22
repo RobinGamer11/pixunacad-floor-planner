@@ -341,7 +341,7 @@ export class RasterLayer {
         onReady?.();
       };
       img.onerror = () => { tile.loading = false; onReady?.(); };
-      img.src = t.src;
+      img.src = src;
     }
   }
 
