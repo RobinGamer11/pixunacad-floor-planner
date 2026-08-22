@@ -308,7 +308,7 @@ export class TextBox {
   heightM: number;
   rotationRad: number;
   html: string;
-  style: Required<Omit<TextBoxStyle, "labelId">>;
+  style: Required<Omit<TextBoxStyle, "labelId" | "spanGroupId">> & { spanGroupId?: string };
   labelId: string;
   _stickerEditOwnerId?: string | null;
 
