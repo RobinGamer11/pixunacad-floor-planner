@@ -87,9 +87,19 @@ export function TextSpanAllPages({
         <span className="flex-1">Auf allen Seiten</span>
         <span className="text-[10px] text-muted-foreground">{active ? "AN" : "AUS"}</span>
       </button>
+      {active && (
+        <button
+          type="button"
+          onClick={removeHere}
+          className="mt-1.5 flex w-full items-center justify-center rounded border px-2 py-1.5 text-[11px] transition-colors hover:bg-muted"
+          style={{ borderColor: "hsl(var(--hairline))" }}
+        >
+          Auf dieser Seite entfernen
+        </button>
+      )}
       <div className="mt-1.5 text-[10px] leading-tight text-muted-foreground">
         {active
-          ? "Kopien liegen auf allen Seiten und sind dort einzeln bearbeitbar. Ausschalten entfernt alle anderen Kopien."
+          ? "Gruppe aktiv: Kopien liegen auf allen Seiten und sind dort einzeln bearbeitbar. „Auf allen Seiten“ AUS beendet die Verteilung überall; „Auf dieser Seite entfernen“ löscht nur diese eine Kopie."
           : "Legt diese Textbox an identischer Papierposition auf allen Seiten an — auch auf später erstellten."}
       </div>
     </div>
