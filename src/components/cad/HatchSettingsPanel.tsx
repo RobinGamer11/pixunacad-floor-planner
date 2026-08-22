@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Spline, RectangleHorizontal, Circle, PaintBucket } from "lucide-react";
 import type { CadApp } from "@/cad/CadApp";
 import type { MiniCad } from "@/cad/embed/MiniCad";
@@ -151,6 +151,7 @@ export const HatchSettingsPanel: React.FC<Props> = ({ app, projectId, pxPerMm = 
     force((x) => x + 1);
   };
 
+  const lastStrokeRef = useRef(1);
   const strokeMm = strokeWidthPx / Math.max(1e-6, pxPerMm);
   const setStroke = (px: number) => {
     const v = Math.max(0, px);
