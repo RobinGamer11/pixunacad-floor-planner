@@ -46,7 +46,12 @@ export interface TableMerge {
 
 /** Rohform, wie sie in `PageElement.tableData` gespeichert wird. */
 export interface TableData {
+  /** Stabile Objekt-ID (für tabellenübergreifende Formeln). */
+  tableId?: string;
+  /** Anzeigename für Formelbezüge (`=Tabelle1!B2`). */
+  name?: string;
   cells: string[][];
+
   /** Legacy-Felder (mm) — werden gelesen, aber nicht mehr geschrieben. */
   colWidths?: number[];
   rowHeights?: number[];

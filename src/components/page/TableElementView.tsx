@@ -16,10 +16,21 @@ import {
   type TableModel,
 } from "@/lib/table/tableModel";
 import { cellRectMm, layoutTable } from "@/lib/table/tableLayout";
-import { colLabel, evalCell, rangeExpr, type FormulaFn } from "@/lib/table/tableFormula";
+import {
+  acceptsRefInsert,
+  colLabel,
+  evalCell,
+  extractRefs,
+  qualifyRef,
+  rangeExpr,
+  REF_COLORS,
+  type FormulaFn,
+} from "@/lib/table/tableFormula";
+import { tableRegistry } from "@/lib/table/tableRegistry";
 
 export type { FormulaFn };
 export { colLabel, evalCell };
+
 
 /** Legacy-Kontext (bleibt für Kompatibilität erhalten, steuert nichts mehr). */
 export const TableModifyContext = React.createContext<boolean>(false);
@@ -113,12 +124,52 @@ export function TableElementView({
   const [editCell, setEditCell] = React.useState<{ r: number; c: number } | null>(null);
   /** Aktueller Eingabewert der offenen Zelle — für „Klick in andere Zelle speichert". */
   const editValueRef = React.useRef<string | null>(null);
+  /** Kontrollierter Text der offenen Zelle (nötig für die Formeleingabe). */
+  const [editText, setEditText] = React.useState<string>("");
+  /** Startwert, wenn die Eingabe durch Tippen geöffnet wurde. */
+  const pendingSeed = React.useRef<string | null>(null);
+  const inputRef = React.useRef<HTMLInputElement | null>(null);
+
+  // Öffnen/Schließen einer Zelleingabe setzt den kontrollierten Text.
+  React.useEffect(() => {
+    if (!editCell) { setEditText(""); pendingSeed.current = null; return; }
+    const seed = pendingSeed.current ?? (model.cells[editCell.r]?.[editCell.c] ?? "");
+    pendingSeed.current = null;
+    setEditText(seed);
+    editValueRef.current = seed;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editCell]);
+
   const [openFilter, setOpenFilter] = React.useState<number | null>(null);
   const selection = editCtx?.selection ?? null;
 
   React.useEffect(() => {
     if (!active) { setEditCell(null); setOpenFilter(null); }
   }, [active]);
+
+  /* ─── Identität: stabile ID + Name für tabellenübergreifende Formeln ───── */
+  const tableId = (model.tableId as string) || element.id;
+  const tableName = (model.name as string) || "";
+  const namedRef = React.useRef(false);
+
+  /** Fremde Tabellen dürfen während einer laufenden Formeleingabe Klicks annehmen. */
+  const [sessionTick, setSessionTick] = React.useState(0);
+  React.useEffect(() => tableRegistry.subscribe(() => setSessionTick((n) => n + 1)), []);
+  const session = tableRegistry.getSession();
+  const foreignSession = !!session && session.tableId !== tableId;
+
+  React.useEffect(() => {
+    tableRegistry.register({ id: tableId, name: tableName || tableId, cells: model.cells });
+    return () => { if (!readOnly) tableRegistry.unregister(tableId); };
+  }, [tableId, tableName, model.cells, readOnly]);
+
+  /** Zellmodus global melden — globale Entf-Shortcuts dürfen dann nicht greifen. */
+  React.useEffect(() => {
+    if (!active) return;
+    tableRegistry.setCellModeActive(true);
+    return () => tableRegistry.setCellModeActive(false);
+  }, [active]);
+
 
   // ─── Persistenz ─────────────────────────────────────────────────────────
   /** Modell speichern und Objektgröße an die mm-Summen angleichen. */
@@ -156,6 +207,72 @@ export function TableElementView({
     commit({ ...model, filters: nf });
   };
 
+  /** Fehlende Identität einmalig persistieren (ID + sprechender Name). */
+  React.useEffect(() => {
+    if (readOnly || namedRef.current) return;
+    if (model.tableId && model.name) return;
+    namedRef.current = true;
+    commit({
+      ...model,
+      tableId: model.tableId || element.id,
+      name: model.name || tableRegistry.suggestName(),
+    });
+  }, [readOnly, model, element.id, commit]);
+
+  /* ─── Interaktive Formeleingabe (=, dann Zellen anklicken) ──────────────── */
+  const isFormulaInput = editText.startsWith("=");
+  /** Beim Ziehen erzeugter Bereich: Position des zuletzt eingefügten Bezugs. */
+  const refDragRef = React.useRef<{ start: { r: number; c: number }; at: number; len: number; prefix: string } | null>(null);
+
+  /** Bezug an der Caretposition einsetzen (ersetzt einen laufenden Zug-Bezug). */
+  const insertRefAt = React.useCallback((ref: string, replaceLast = false) => {
+    const input = inputRef.current;
+    const text = editText;
+    const drag = refDragRef.current;
+    let at = input?.selectionStart ?? text.length;
+    let head = text.slice(0, at);
+    let tail = text.slice(at);
+    if (replaceLast && drag) {
+      head = text.slice(0, drag.at);
+      tail = text.slice(drag.at + drag.len);
+      at = drag.at;
+    }
+    const next = head + ref + tail;
+    setEditText(next);
+    editValueRef.current = next;
+    if (drag) { drag.at = at; drag.len = ref.length; }
+    requestAnimationFrame(() => {
+      const el = inputRef.current;
+      if (!el) return;
+      el.focus();
+      const pos = at + ref.length;
+      try { el.setSelectionRange(pos, pos); } catch { /* noop */ }
+    });
+  }, [editText]);
+
+  /** Solange eine Formel getippt wird: Sitzung für Klicks in fremde Tabellen. */
+  React.useEffect(() => {
+    if (!active || !editCell || !isFormulaInput) { tableRegistry.endSession(tableId); return; }
+    tableRegistry.beginSession({
+      tableId,
+      insertRef: (ref: string) => insertRefAt(ref, false),
+    });
+    return () => tableRegistry.endSession(tableId);
+  }, [active, editCell, isFormulaInput, tableId, insertRefAt]);
+
+  /** Farbige Hervorhebung der Bezüge der gerade getippten Formel. */
+  const refHighlights = React.useMemo(() => {
+    if (!isFormulaInput) return [] as { r1: number; c1: number; r2: number; c2: number; color: string }[];
+    return extractRefs(editText)
+      .map((ref, i) => ({ ...ref, color: REF_COLORS[i % REF_COLORS.length] }))
+      .filter((ref) => {
+        if (!ref.table) return true;
+        const t = tableRegistry.resolve(ref.table);
+        return !!t && t.id === tableId;
+      });
+  }, [isFormulaInput, editText, tableId, sessionTick]);
+
+
   // ─── Formel-Picker ──────────────────────────────────────────────────────
   const [pickStep, setPickStep] = React.useState<"target" | "start" | "end">("target");
   const [pickTarget, setPickTarget] = React.useState<{ r: number; c: number } | null>(null);
@@ -177,7 +294,7 @@ export function TableElementView({
     tmp[pickTarget.r][pickTarget.c] = expr;
     return {
       expr,
-      value: String(evalCell(tmp, pickTarget.r, pickTarget.c)),
+      value: String(evalCell(tmp, pickTarget.r, pickTarget.c, { tableId })),
       r1: Math.min(anchor.r, end.r), r2: Math.max(anchor.r, end.r),
       c1: Math.min(anchor.c, end.c), c2: Math.max(anchor.c, end.c),
     };
@@ -193,7 +310,7 @@ export function TableElementView({
       for (const key of keys) {
         const c = Number(key);
         const allowed = filters[c];
-        if (!allowed.includes(String(evalCell(model.cells, r, c)))) { hidden.add(r); break; }
+        if (!allowed.includes(String(evalCell(model.cells, r, c, { tableId })))) { hidden.add(r); break; }
       }
     }
     return hidden;
@@ -203,8 +320,27 @@ export function TableElementView({
   const dragSelRef = React.useRef(false);
 
   const handleCellPointerDown = (e: React.PointerEvent, r: number, c: number) => {
+    // Fremde Tabelle während einer laufenden Formeleingabe: Bezug liefern.
+    if (foreignSession && session) {
+      e.stopPropagation();
+      e.preventDefault();
+      session.insertRef(qualifyRef(tableName || tableId, `${colLabel(c)}${r + 1}`));
+      return;
+    }
     if (!active) return;                 // Objektmodus: Ereignis geht ans Objekt
     e.stopPropagation();
+
+    // Eigene Tabelle, offene Formel: Klick fügt den Bezug ein statt zu wechseln.
+    if (editCell && isFormulaInput) {
+      const caret = inputRef.current?.selectionStart ?? editText.length;
+      if (!(editCell.r === r && editCell.c === c) && acceptsRefInsert(editText, caret)) {
+        e.preventDefault();
+        refDragRef.current = { start: { r, c }, at: caret, len: 0, prefix: "" };
+        insertRefAt(`${colLabel(c)}${r + 1}`, false);
+        return;
+      }
+    }
+
     if (pickFn) {
       if (pickStep === "target") { setPickTarget({ r, c }); setPickStep("start"); }
       else if (pickStep === "start") { setPickStart({ r, c }); setPickStep("end"); }
@@ -227,8 +363,14 @@ export function TableElementView({
     }
   };
 
-  const handleCellPointerEnter = (r: number, c: number) => {
+  const handleCellPointerEnter = (e: React.PointerEvent, r: number, c: number) => {
     if (pickFn) { setPickHover({ r, c }); return; }
+    // Formelbezug durch Ziehen zum Bereich erweitern.
+    const drag = refDragRef.current;
+    if (active && drag && isFormulaInput && e.buttons === 1) {
+      insertRefAt(rangeExpr(drag.start.r, drag.start.c, r, c), true);
+      return;
+    }
     if (active && dragSelRef.current && selection) {
       editCtx?.setSelection(normSel({ r1: selection.r1, c1: selection.c1, r2: r, c2: c }));
     }
@@ -244,10 +386,11 @@ export function TableElementView({
   }, [pickFn, formulaCtx]);
 
   React.useEffect(() => {
-    const up = () => { dragSelRef.current = false; };
+    const up = () => { dragSelRef.current = false; refDragRef.current = null; };
     window.addEventListener("pointerup", up);
     return () => window.removeEventListener("pointerup", up);
   }, []);
+
 
   /** Nächste sichtbare, nicht verdeckte Zelle in Richtung dr/dc. */
   const step = (r: number, c: number, dr: number, dc: number) => {
@@ -294,8 +437,13 @@ export function TableElementView({
     }
     if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) {
       e.stopPropagation();
+      e.preventDefault();
+      // Tippen startet die Zelleingabe (bei "=" direkt im Formelmodus).
+      pendingSeed.current = e.key;
       setEditCell({ r: selection.r1, c: selection.c1 });
+
     }
+
   };
 
   // ─── Spalten-/Zeilengrößen per Ziehen ───────────────────────────────────
@@ -335,6 +483,14 @@ export function TableElementView({
     return r >= s.r1 && r <= s.r2 && c >= s.c1 && c <= s.c2;
   };
 
+  /** Farbe eines Formelbezugs für diese Zelle (Eingabe-Hervorhebung). */
+  const refColorFor = (r: number, c: number): string | undefined => {
+    for (const ref of refHighlights) {
+      if (r >= ref.r1 && r <= ref.r2 && c >= ref.c1 && c <= ref.c2) return ref.color;
+    }
+    return undefined;
+  };
+
   const highlightFor = (r: number, c: number): string | undefined => {
     if (pickFn) {
       if (pickTarget && pickTarget.r === r && pickTarget.c === c) return "hsl(var(--cad-selection-fill) / 0.30)";
@@ -347,6 +503,7 @@ export function TableElementView({
     if (active && inSelection(r, c)) return "hsl(var(--cad-selection-fill) / 0.18)";
     return undefined;
   };
+
 
   const pct = (mm: number, total: number) => `${(mm / total) * 100}%`;
 
@@ -404,8 +561,9 @@ export function TableElementView({
           const isPickTarget = pickFn && pickTarget?.r === r && pickTarget?.c === c;
           const display = isPickTarget && previewFormula
             ? previewFormula.value
-            : raw.startsWith("=") ? String(evalCell(model.cells, r, c)) : raw;
+            : raw.startsWith("=") ? String(evalCell(model.cells, r, c, { tableId })) : raw;
           const isEditingCell = active && editCell?.r === r && editCell?.c === c;
+          const refColor = refColorFor(r, c);
           return (
             <div
               key={cellKey(r, c)}
@@ -426,10 +584,13 @@ export function TableElementView({
                 fontWeight: f.bold ? 700 : 400,
                 fontStyle: f.italic ? "italic" : "normal",
                 color: f.color ?? "hsl(var(--ink))",
-                cursor: pickFn ? "crosshair" : active ? "text" : undefined,
+                cursor: pickFn ? "crosshair" : foreignSession ? "crosshair" : active ? "text" : undefined,
+                ...(refColor ? { outline: `1.5px solid ${refColor}`, outlineOffset: "-1.5px" } : null),
+                // Fremde Tabelle: Klicks für Bezüge annehmen, sonst Objektlogik.
+                pointerEvents: foreignSession ? "auto" : undefined,
               }}
               onPointerDown={(e) => handleCellPointerDown(e, r, c)}
-              onPointerEnter={() => handleCellPointerEnter(r, c)}
+              onPointerEnter={(e) => handleCellPointerEnter(e, r, c)}
               onDoubleClick={(e) => {
                 if (!active || pickFn) return;
                 e.stopPropagation();
@@ -439,20 +600,24 @@ export function TableElementView({
               {isEditingCell ? (
                 <input
                   autoFocus
-                  defaultValue={raw}
-                  onChange={(e) => { editValueRef.current = e.target.value; }}
-                  onBlur={(e) => {
+                  ref={inputRef}
+                  value={editText}
+                  onChange={(e) => { setEditText(e.target.value); editValueRef.current = e.target.value; }}
+                  onBlur={() => {
+                    // Während eines Bezugsklicks in eine andere Tabelle nicht beenden.
+                    if (tableRegistry.getSession()?.tableId === tableId) return;
+                    const v = editValueRef.current ?? editText;
                     editValueRef.current = null;
-                    setCell(r, c, e.target.value);
+                    setCell(r, c, v);
                     setEditCell(null);
                   }}
                   onKeyDown={(e) => {
                     e.stopPropagation();
-                    const el = e.target as HTMLInputElement;
                     if (e.key === "Enter" || e.key === "Tab") {
                       e.preventDefault();
+                      const v = editText;
                       editValueRef.current = null;
-                      setCell(r, c, el.value);
+                      setCell(r, c, v);
                       setEditCell(null);
                       const d: [number, number] = e.key === "Tab"
                         ? [0, e.shiftKey ? -1 : 1]
@@ -472,9 +637,10 @@ export function TableElementView({
                     font: "inherit",
                     color: "inherit",
                     textAlign: f.align,
-                    fontFamily: raw.startsWith("=") ? "monospace" : undefined,
+                    fontFamily: editText.startsWith("=") ? "monospace" : undefined,
                   }}
                 />
+
               ) : (
                 <>
                   <span className="truncate" style={isPickTarget && previewFormula ? { color: "hsl(var(--cad-selection-stroke))", fontStyle: "italic" } : undefined}>
