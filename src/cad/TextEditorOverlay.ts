@@ -332,13 +332,23 @@ export class TextEditorOverlay {
   private _syncBoxFromEditor() {
     const box = this.activeBoxId ? this.app.scene.getTextBoxById(this.activeBoxId) : null;
     if (!box) return;
-    box.html = this.el.innerHTML;
+    box.html = this._documentHtml();
     if ((box.style as any).autoSize !== false) {
       autoSizeTextBox(box, (this.app.renderer as any).referencePxPerM);
       this.reposition(box);
     }
     (this.app as any).requestRender?.();
     (this.app as any).renderer?.render?.();
+  }
+
+  /** Entfernt ausschließlich darstellungsabhängige Editor-CSS aus den Daten. */
+  private _documentHtml(): string {
+    const clone = this.el.cloneNode(true) as HTMLElement;
+    clone.querySelectorAll<HTMLElement>("[data-font-size-pt]").forEach(node => {
+      node.style.removeProperty("font-size");
+      if (!node.getAttribute("style")) node.removeAttribute("style");
+    });
+    return clone.innerHTML.replace(/\u200B/g, "");
   }
 
   private _applyFontSizePtToSelection(pt: number) {
@@ -382,7 +392,7 @@ export class TextEditorOverlay {
     this.el.oninput = () => {
       const b = this.app.scene.getTextBoxById(this.activeBoxId!);
       if (!b) return;
-      b.html = this.el.innerHTML;
+      b.html = this._documentHtml();
       if ((b.style as any).autoSize !== false) {
         autoSizeTextBox(b, (this.app.renderer as any).referencePxPerM);
         this.reposition(b);
@@ -544,7 +554,7 @@ export class TextEditorOverlay {
 
     // 1) Persist HTML
     // Typing-Style-Anker (Zero-Width-Spaces) vor dem Speichern entfernen.
-    const html = this.el.innerHTML.replace(/\u200B/g, "");
+    const html = this._documentHtml();
     box.html = html;
 
     // 2) Empty box → auto-delete
