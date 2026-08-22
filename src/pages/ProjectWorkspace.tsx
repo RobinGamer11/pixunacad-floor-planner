@@ -130,6 +130,8 @@ import { TextSpanAllPages } from "@/components/workspace/TextSpanAllPages";
 import { MappeHelpOverlay } from "@/components/workspace/MappeHelpOverlay";
 import { ToolColorPicker } from "@/components/workspace/ToolColorPicker";
 import { TabletAidWheel } from "@/components/TabletAidWheel";
+import { LayerFab, LayerHelpLegend } from "@/components/cad/LayerHelp";
+
 
 // Papierformate: kanonische Quelle ist src/lib/paper.ts.
 // Für "frei" enthält diese Tabelle nur die Default-Größe; individuelle Werte
