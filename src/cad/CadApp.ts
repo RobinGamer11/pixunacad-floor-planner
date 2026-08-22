@@ -4,6 +4,7 @@ import { Camera } from "./Camera";
 import { Input } from "./Input";
 import { Scene, AreaLabel, DimensionStyle, TextBoxStyle, TextBox } from "./Scene";
 import { autoSizeTextBox } from "./textAutoSize";
+import { textStyleFontSizePt, ptToCssPx } from "./textTypography";
 import { LabelManager } from "./LabelManager";
 import { RasterLayers, DEFAULT_RASTER_PX_PER_M } from "./RasterLayers";
 import { TopologyEngine } from "./TopologyEngine";
@@ -1798,7 +1799,7 @@ export class CadApp {
     const sel = this.getSelectedTextBox();
     if (sel) {
       return {
-        textColor: sel.style.textColor, fontSizePx: sel.style.fontSizePx,
+        textColor: sel.style.textColor, fontSizePt: textStyleFontSizePt(sel.style), fontSizePx: sel.style.fontSizePx,
         textAlphaPct: (sel.style as any).textAlphaPct ?? Defaults.textAlphaPct,
         bgColor: sel.style.bgColor, bgAlphaPct: sel.style.bgAlphaPct,
         wrap: sel.style.wrap, align: sel.style.align,
@@ -1902,7 +1903,7 @@ export class CadApp {
       let v = parseFloat((r.fontSize.value || "").replace(",", "."));
       if (!Number.isFinite(v) || v <= 0) return;
       v = clamp(v, 6, 200);
-      if (this.textEditor?.applyInlineFormat({ fontSizePx: v })) return;
+      if (this.textEditor?.applyInlineFormat({ fontSizePt: v * 72 / 96 })) return;
       const sel = this.getEditTextBox();
       if (sel) { sel.style.fontSizePx = v; autoSizeTextBox(sel); }
       else this.defaultTextFontSizePx = v;
@@ -2041,10 +2042,11 @@ export class CadApp {
     r.fontSizePt?.addEventListener("change", () => {
       let pt = parseFloat((r.fontSizePt!.value || "").replace(",", "."));
       if (!Number.isFinite(pt) || pt <= 0) return;
-      const px = clamp(pt * (4 / 3), 6, 200);
-      if (this.textEditor?.applyInlineFormat({ fontSizePx: px })) return;
+      pt = clamp(pt, 1, 400);
+      const px = ptToCssPx(pt);
+      if (this.textEditor?.applyInlineFormat({ fontSizePt: pt })) return;
       const sel = this.getEditTextBox();
-      if (sel) { sel.style.fontSizePx = px; autoSizeTextBox(sel); }
+      if (sel) { sel.style.fontSizePt = pt; sel.style.fontSizePx = px; autoSizeTextBox(sel); }
       else this.defaultTextFontSizePx = px;
       this._syncTextSettingsFromContext();
     });
@@ -2092,7 +2094,7 @@ export class CadApp {
     if (r.textAlpha) r.textAlpha.value = tAlpha;
     if (r.textAlphaRange) r.textAlphaRange.value = tAlpha;
     if (r.fontSizePt) {
-      r.fontSizePt.value = String(Math.round((s.fontSizePx ?? Defaults.textFontSizePx) * (3 / 4)));
+      r.fontSizePt.value = String(Math.round(textStyleFontSizePt(s)));
     }
   }
 

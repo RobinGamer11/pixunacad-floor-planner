@@ -4,6 +4,7 @@ import type { CadApp } from "./CadApp";
 import type { TextBox } from "./Scene";
 import { rgbaFromHex } from "./geometry";
 import { maybeRasterize } from "./rasterize";
+import { ptToCssPx, textStyleFontSizePt } from "./textTypography";
 
 /**
  * Inline HTML contenteditable overlay used to edit a TextBox.
@@ -240,7 +241,7 @@ export class TextEditorOverlay {
    */
   applyInlineFormat(opts: {
     color?: string;
-    fontSizePx?: number;
+    fontSizePt?: number;
     bold?: boolean;
     italic?: boolean;
     underline?: boolean;
@@ -264,8 +265,8 @@ export class TextEditorOverlay {
         if (typeof opts.italic === "boolean") setState("italic", opts.italic);
         if (typeof opts.underline === "boolean") setState("underline", opts.underline);
         if (typeof opts.strike === "boolean") setState("strikeThrough", opts.strike);
-        if (typeof opts.fontSizePx === "number" && opts.fontSizePx > 0) {
-          this._applyFontSizePxToSelection(opts.fontSizePx);
+        if (typeof opts.fontSizePt === "number" && opts.fontSizePt > 0) {
+          this._applyFontSizePtToSelection(opts.fontSizePt);
         }
 
         // Markierung für Folge-Änderungen sichtbar erhalten.
@@ -301,7 +302,7 @@ export class TextEditorOverlay {
 
   /** Word/PowerPoint-Verhalten: Stil gilt ab Caret für neu getippten Text. */
   private _applyTypingStyle(opts: {
-    color?: string; fontSizePx?: number;
+    color?: string; fontSizePt?: number;
     bold?: boolean; italic?: boolean; underline?: boolean; strike?: boolean;
   }) {
     if (!this._restoreRange(true)) return;
@@ -311,7 +312,7 @@ export class TextEditorOverlay {
 
     const span = document.createElement("span");
     if (opts.color) span.style.color = opts.color;
-    if (typeof opts.fontSizePx === "number" && opts.fontSizePx > 0) span.style.fontSize = `${opts.fontSizePx}px`;
+    if (typeof opts.fontSizePt === "number" && opts.fontSizePt > 0) span.dataset.fontSizePt = String(opts.fontSizePt);
     if (typeof opts.bold === "boolean") span.style.fontWeight = opts.bold ? "700" : "400";
     if (typeof opts.italic === "boolean") span.style.fontStyle = opts.italic ? "italic" : "normal";
     const deco: string[] = [];
@@ -349,27 +350,20 @@ export class TextEditorOverlay {
     (this.app as any).renderer?.render?.();
   }
 
-  private _applyFontSizePxToSelection(px: number) {
+  private _applyFontSizePtToSelection(pt: number) {
     try {
-      document.execCommand("fontSize", false, "7"); // tagging trick
-      const fonts = Array.from(this.el.querySelectorAll('font[size="7"]'));
-      const replaced: HTMLElement[] = [];
-      fonts.forEach(node => {
-        const span = document.createElement("span");
-        span.style.fontSize = `${px}px`;
-        span.innerHTML = (node as HTMLElement).innerHTML;
-        node.replaceWith(span);
-        replaced.push(span);
-      });
-      if (replaced.length) {
-        const range = document.createRange();
-        range.setStartBefore(replaced[0]);
-        range.setEndAfter(replaced[replaced.length - 1]);
-        const sel = window.getSelection();
-        sel?.removeAllRanges();
-        sel?.addRange(range);
-        this._savedRange = range.cloneRange();
-      }
+      const range = this._rangeInEditor();
+      if (!range || range.collapsed) return;
+      const span = document.createElement("span");
+      span.dataset.fontSizePt = String(pt);
+      span.appendChild(range.extractContents());
+      range.insertNode(span);
+      const next = document.createRange();
+      next.selectNodeContents(span);
+      const sel = window.getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(next);
+      this._savedRange = next.cloneRange();
     } catch {}
   }
 
@@ -451,7 +445,7 @@ export class TextEditorOverlay {
 
     // Use the renderer's referencePxPerM (matches the canvas-rendered text 1:1).
     const refPxPerM = (this.app.renderer as any).referencePxPerM || Defaults.measureReferenceScalePxPerM;
-    const fontPx = box.style.fontSizePx * (cam.scale / refPxPerM);
+    const fontPx = ptToCssPx(textStyleFontSizePt(box.style)) * (cam.scale / refPxPerM);
     this.el.style.fontSize = `${fontPx}px`;
     this.el.style.fontFamily = "system-ui, Arial, sans-serif";
     this.el.style.lineHeight = String(Math.max(0.6, ((box.style as any).lineHeightPct ?? 105) / 100));
@@ -488,7 +482,7 @@ export class TextEditorOverlay {
     // Sync color picker to box default for new edits
     this.colorInput.value = this._toHexColor(box.style.textColor);
     // Toolbar zeigt die Größe in pt (Word/PowerPoint); intern px = pt * 4/3.
-    this.sizeSelect.value = String(Math.round(box.style.fontSizePx * (3 / 4)));
+    this.sizeSelect.value = String(Math.round(textStyleFontSizePt(box.style)));
   }
 
   private _toHexColor(color: string): string {
@@ -516,18 +510,7 @@ export class TextEditorOverlay {
     if (!sel || sel.rangeCount === 0) return;
     const range = sel.getRangeAt(0);
     if (range.collapsed) return;
-    // Auswahl-Wert ist pt (Word/PPT) — wir speichern intern in CSS-Pixel.
-    const px = Math.max(1, parseFloat(sizePt) || 0) * (4 / 3);
-    try {
-      document.execCommand("fontSize", false, "7"); // tagging trick
-      const fonts = this.el.querySelectorAll('font[size="7"]');
-      fonts.forEach(node => {
-        const span = document.createElement("span");
-        span.style.fontSize = `${px}px`;
-        span.innerHTML = (node as HTMLElement).innerHTML;
-        node.replaceWith(span);
-      });
-    } catch {}
+    this._applyFontSizePtToSelection(Math.max(1, parseFloat(sizePt) || 0));
   }
 
   private _syncToolbarState() {
