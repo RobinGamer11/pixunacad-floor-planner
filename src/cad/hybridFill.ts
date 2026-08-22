@@ -192,11 +192,18 @@ export function findHybridEnclosingFace(
   if (!mask) return null;
 
   const { wPx, hPx, alpha, threshold } = mask;
+
+  // Grenzmaske mit sehr kleiner Dilatation (Closing um DILATE_PX Analysepixel).
+  // Damit gelten optisch anschließende Pixel-/Vektorkanten trotz Subpixel- und
+  // Anti-Aliasing-Lücken als durchgehende Grenze. Größere echte Lücken bleiben
+  // offen, weil der Radius bewusst nur 1–2 Pixel beträgt.
+  const bnd = dilateBoundary(alpha, threshold, wPx, hPx, DILATE_PX);
+
   const px = Math.floor((click.x - mask.x) * mask.pxPerM);
   const py = Math.floor((click.y - mask.y) * mask.pxPerM);
   if (px < 0 || py < 0 || px >= wPx || py >= hPx) return null;
   const startIdx = py * wPx + px;
-  if (alpha[startIdx] >= threshold) return null; // direkt auf einer Grenze geklickt
+  if (bnd[startIdx]) return null; // direkt auf einer Grenze geklickt
 
   // --- 4) Flood-Fill im transparenten Bereich -----------------------------
   const filled = new Uint8Array(wPx * hPx);
