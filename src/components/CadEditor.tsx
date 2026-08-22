@@ -1964,23 +1964,11 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           </button>
         )}
 
-        {/* Ebenen-Button oben links: Icon + Anzahl, öffnet das Ebenen-Panel. */}
+        {/* Ebenen-Button oben links: runder Button mit Icon + Anzahl. */}
         {!presenting && (
-          <button
-            type="button"
-            title="Ebenen öffnen"
-            onClick={() => { setRightOpen(true); setRightTab("layers"); }}
-            className="absolute z-30 left-2 top-2 h-7 px-2 rounded-md flex items-center gap-1 text-[11px] font-medium shadow-sm"
-            style={{
-              background: "hsl(var(--surface-card))",
-              color: "hsl(var(--ink))",
-              border: "1px solid hsl(var(--hairline))",
-            }}
-          >
-            <LayersIcon size={13} />
-            <span>{layerCount}</span>
-          </button>
+          <LayerFab count={layerCount} onClick={() => { setRightOpen(true); setRightTab("layers"); }} />
         )}
+
 
         {/* Canvas */}
         <canvas ref={canvasRef} data-cad-canvas className="block w-full h-full" />
