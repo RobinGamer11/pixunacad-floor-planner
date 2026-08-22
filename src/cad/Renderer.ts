@@ -252,7 +252,11 @@ export class Renderer {
     return Defaults.strokeWidthBaseScale / Math.max(1, this.referencePxPerM);
   }
 
-  /** Cache: docId -> HTMLImageElement (lazy-load aus DataURL). */
+  /**
+   * Cache: Bildquelle (src/DataURL) -> HTMLImageElement.
+   * Schlüssel ist die Quelle, damit identische Bilder (Kopien, mehrfach
+   * eingefügte Objekte) nur EINMAL dekodiert im Speicher liegen.
+   */
   private _docImageCache = new Map<string, HTMLImageElement>();
 
   /**
@@ -529,18 +533,21 @@ export class Renderer {
   }
 
 
+  /**
+   * Bild eines Dokuments — der Cache ist bewusst über die QUELLE (src) und
+   * nicht über die Dokument-ID geschlüsselt: Kopien desselben Bildes (Copy &
+   * Paste, „auf allen Seiten“, wiederholter Import) teilen sich damit ein
+   * einziges dekodiertes Bild statt jeweils ein eigenes Duplikat im Speicher
+   * zu halten.
+   */
   private _getDocImage(doc: DocumentObject): HTMLImageElement | null {
-    let img = this._docImageCache.get(doc.id);
-    if (img && img.src === doc.src) {
-      return img.complete ? img : null;
-    }
+    const key = doc.src;
+    if (!key) return null;
+    let img = this._docImageCache.get(key);
+    if (img) return img.complete ? img : null;
     img = new Image();
-    img.src = doc.src;
-    img.onload = () => {
-      // Trigger re-render when image becomes available
-      // (next animation frame from CadApp's tick will pick it up)
-    };
-    this._docImageCache.set(doc.id, img);
+    img.src = key;
+    this._docImageCache.set(key, img);
     return null;
   }
 
@@ -853,11 +860,20 @@ export class Renderer {
       const baseH = (composite ? composite.height : (img.naturalHeight || img.height));
       const filtered = this._getFilteredBitmap(doc, drawSrc, baseW, baseH, composite ? `cmp:${baseW}` : `img:${img.src.length}`);
       const finalSrc: CanvasImageSource = (filtered || drawSrc) as CanvasImageSource;
+      // Schärfe: wird stärker als die native Auflösung vergrößert, erzeugt die
+      // bilineare Glättung nur Unschärfe. Ab ~1,5-facher Vergrößerung wird
+      // deshalb pixelgenau (nearest neighbour) gezeichnet — PNG/JPG und
+      // Pixelobjekte bleiben beim Hineinzoomen scharf statt zu verwaschen.
+      const magnify = baseW > 0 ? wPx / baseW : 1;
+      if (magnify > 1.5) {
+        ctx.imageSmoothingEnabled = false;
+      }
       if (warp) {
         drawWarpedImage(ctx, finalSrc, baseW, baseH, wPx, hPx, warp);
       } else {
         ctx.drawImage(finalSrc, -wPx / 2, -hPx / 2, wPx, hPx);
       }
+      ctx.imageSmoothingEnabled = true;
     } else {
       ctx.fillStyle = "rgba(180,180,180,0.3)";
       ctx.fillRect(-wPx / 2, -hPx / 2, wPx, hPx);

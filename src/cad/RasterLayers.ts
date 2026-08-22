@@ -40,11 +40,42 @@ export const RASTER_TILE_PX = 512;
  */
 export const DEFAULT_RASTER_PX_PER_M = Math.round((300 / 25.4) * 1000);
 
+/**
+ * CAD-taugliche Grundqualität: 600 dpi bezogen auf das Papier.
+ * Damit bleiben Pixelstriche auch beim Ausdruck und beim Hineinzoomen
+ * werkplantauglich scharf. Die Auflösung ist FEST gespeichert — Zoomen
+ * ändert sie nie.
+ */
+export const CAD_RASTER_DPI = 600;
+
+/**
+ * Untergrenze der Rasterauflösung in Pixeln pro WELT-Meter. Im CAD wird in
+ * echten Metern gezeichnet; bei sehr großen Maßstabsnennern (1:500) würde die
+ * reine Papier-DPI-Umrechnung sonst zu grob werden.
+ */
+export const MIN_RASTER_PX_PER_M = 120;
+
+/**
+ * Feste Rasterauflösung (px pro Weltmeter) für einen Zeichnungsmaßstab 1:N.
+ * Wird EINMAL beim Anlegen der Ebene bestimmt und bleibt danach konstant —
+ * der Zoom ändert die gespeicherte Qualität nie.
+ */
+export function cadRasterPxPerM(scaleDenominator: number): number {
+  const denom = Math.max(1, scaleDenominator || 1);
+  const paper = (CAD_RASTER_DPI / 25.4) * 1000;
+  return Math.max(MIN_RASTER_PX_PER_M, Math.round(paper / denom));
+}
+
 export interface RasterTileJSON {
   tx: number;
   ty: number;
-  /** PNG-DataURL der Kachel. */
-  src: string;
+  /** PNG-DataURL der Kachel (fehlt, wenn `ref` gesetzt ist). */
+  src?: string;
+  /**
+   * Verweis auf den Index einer inhaltsgleichen Kachel derselben Ebene.
+   * Vermeidet Bildduplikate in der Persistenz (z. B. gleichmäßige Flächen).
+   */
+  ref?: number;
 }
 
 export interface RasterLayerJSON {
@@ -65,6 +96,8 @@ interface RasterTile {
   dataUrl: string | null;
   /** true, solange das Restore-Bild noch lädt. */
   loading: boolean;
+  /** true, wenn die Kachel seit dem letzten Radieren leer sein könnte. */
+  maybeEmpty?: boolean;
 }
 
 function makeTileCanvas(px: number): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } {
@@ -184,7 +217,21 @@ export class RasterLayer {
       ctx.fill();
       ctx.restore();
       tile.dataUrl = null;
+      tile.maybeEmpty = true;
     });
+    this.pruneEmptyTiles();
+  }
+
+  /**
+   * Gibt vollständig leergeräumte Kacheln frei (sparse bleibt sparse).
+   * Wird nach dem Radieren aufgerufen und prüft nur betroffene Kacheln.
+   */
+  pruneEmptyTiles() {
+    for (const [key, tile] of [...this.tiles]) {
+      if (!tile.maybeEmpty || tile.loading) continue;
+      tile.maybeEmpty = false;
+      if (this._isTileEmpty(tile)) this.tiles.delete(key);
+    }
   }
 
   /** Zeichnet den Rasterinhalt in den Viewport (Bildschirm-Canvas). */
@@ -193,7 +240,11 @@ export class RasterLayer {
     const tw = this.tileWorld;
     const sizePx = tw * camera.scale;
     ctx.save();
-    ctx.imageSmoothingEnabled = true;
+    // Beim Vergrößern über die gespeicherte Rasterauflösung hinaus würde die
+    // Glättung nur verwaschen — ab ~1,5-facher Vergrößerung wird pixelgenau
+    // gezeichnet. Die gespeicherte Qualität bleibt davon unberührt.
+    const magnify = camera.scale / this.pxPerM;
+    ctx.imageSmoothingEnabled = magnify <= 1.5;
     ctx.imageSmoothingQuality = "high";
     for (const tile of this.tiles.values()) {
       if (tile.loading) continue;
@@ -240,18 +291,31 @@ export class RasterLayer {
     });
   }
 
+  /**
+   * Speicherschonende Persistenz:
+   * - leere Kacheln werden verworfen UND aus dem Speicher entfernt (sparse),
+   * - inhaltsgleiche Kacheln werden nur einmal als PNG abgelegt und sonst per
+   *   `ref` referenziert (keine Bildduplikate).
+   */
   serialize(): RasterLayerJSON | null {
     const tiles: RasterTileJSON[] = [];
-    for (const tile of this.tiles.values()) {
+    const seen = new Map<string, number>();
+    const push = (tile: RasterTile, src: string) => {
+      const hit = seen.get(src);
+      if (hit !== undefined) { tiles.push({ tx: tile.tx, ty: tile.ty, ref: hit }); return; }
+      seen.set(src, tiles.length);
+      tiles.push({ tx: tile.tx, ty: tile.ty, src });
+    };
+    for (const [key, tile] of [...this.tiles]) {
       if (tile.loading) {
-        if (tile.dataUrl) tiles.push({ tx: tile.tx, ty: tile.ty, src: tile.dataUrl });
+        if (tile.dataUrl) push(tile, tile.dataUrl);
         continue;
       }
       if (!tile.dataUrl) {
-        if (this._isTileEmpty(tile)) continue;
+        if (this._isTileEmpty(tile)) { this.tiles.delete(key); continue; }
         tile.dataUrl = tile.canvas.toDataURL("image/png");
       }
-      tiles.push({ tx: tile.tx, ty: tile.ty, src: tile.dataUrl });
+      push(tile, tile.dataUrl);
     }
     if (tiles.length === 0) return null;
     return { labelId: this.labelId, pxPerM: this.pxPerM, tilePx: this.tilePx, tiles, strokeCount: this.strokeCount };
@@ -270,9 +334,13 @@ export class RasterLayer {
   /** Lädt Kacheln aus JSON (asynchron je Kachel; `onReady` triggert ein Re-Render). */
   restore(json: RasterLayerJSON, onReady?: () => void) {
     this.strokeCount = Math.max(0, json.strokeCount ?? (json.tiles?.length ? 1 : 0));
-    for (const t of json.tiles || []) {
+    const list = json.tiles || [];
+    for (const t of list) {
+      // `ref` verweist auf eine inhaltsgleiche Kachel (Dedupe beim Speichern).
+      const src = t.src ?? (typeof t.ref === "number" ? list[t.ref]?.src : undefined);
+      if (!src) continue;
       const tile = this._tile(t.tx, t.ty, true)!;
-      tile.dataUrl = t.src;
+      tile.dataUrl = src;
       tile.loading = true;
       const img = new Image();
       img.onload = () => {
@@ -284,7 +352,7 @@ export class RasterLayer {
         onReady?.();
       };
       img.onerror = () => { tile.loading = false; onReady?.(); };
-      img.src = t.src;
+      img.src = src;
     }
   }
 
