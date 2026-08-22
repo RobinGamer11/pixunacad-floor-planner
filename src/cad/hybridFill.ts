@@ -226,7 +226,7 @@ export function findHybridEnclosingFace(
     const push = (nx: number, ny: number) => {
       const ni = ny * wPx + nx;
       if (filled[ni]) return;
-      if (alpha[ni] >= threshold) return;
+      if (bnd[ni]) return;
       filled[ni] = 1;
       stack[sp++] = ni;
     };
@@ -240,9 +240,20 @@ export function findHybridEnclosingFace(
   if (contourPx.length < 3) return null;
 
   const world: Vec2[] = contourPx.map((p) => v(mask.x + p.x / mask.pxPerM, mask.y + p.y / mask.pxPerM));
-  // Vereinfachung ≈ 1,2 Analysepixel — zoom-unabhängig, Form bleibt erhalten.
-  const eps = 1.2 / mask.pxPerM;
-  let simple = simplify(world, eps);
+  // Treppenstufen der Rasterkontur zuerst leicht glätten (gleitender Mittelwert
+  // über 3 Punkte) — die Form bleibt, aber Douglas-Peucker findet danach echte
+  // Ecken statt Pixeltreppen.
+  const smoothed = smoothClosed(world, 1);
+
+  // Vereinfachung ab ≈ 1,8 Analysepixel; falls immer noch sehr viele Punkte
+  // übrig bleiben (gekrümmte Pixelkanten), Toleranz schrittweise erhöhen, bis
+  // die Kontur eine handhabbare Punktzahl hat.
+  let eps = 1.8 / mask.pxPerM;
+  let simple = simplify(smoothed, eps);
+  for (let i = 0; i < 8 && simple.length > MAX_CONTOUR_POINTS; i++) {
+    eps *= 1.7;
+    simple = simplify(smoothed, eps);
+  }
   if (simple.length >= 2) {
     const first = simple[0], last = simple[simple.length - 1];
     if (Math.hypot(first.x - last.x, first.y - last.y) < eps) simple = simple.slice(0, -1);
