@@ -2208,6 +2208,11 @@ export class MiniCad {
       }
 
       if (e.key !== "Delete" && e.key !== "Backspace") return;
+      // Tabelle im Zellmodus: Entf betrifft nur den Zellinhalt.
+      {
+        const kt = e.target as HTMLElement | null;
+        if (kt && typeof kt.closest === "function" && kt.closest("[data-table-cellmode]")) return;
+      }
       // Niemals löschen, während Text bearbeitet wird.
       if (this.textEditor.isActive()) return;
       const t = e.target as HTMLElement | null;

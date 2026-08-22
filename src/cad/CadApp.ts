@@ -2574,6 +2574,10 @@ export class CadApp {
 
 
       if (e.key === "Delete" || e.key === "Backspace") {
+        // Tabelle im Zellmodus: Entf löscht dort nur den Zellinhalt,
+        // im Objektmodus dagegen die Tabelle selbst.
+        const kt = e.target as HTMLElement | null;
+        if (kt && typeof kt.closest === "function" && kt.closest("[data-table-cellmode]")) return;
         // Laufende Gruppen-Transformation → abbrechen statt löschen.
         if (this.selectTool.groupRotateActive || this.selectTool.groupDragActive) {
           e.preventDefault();
