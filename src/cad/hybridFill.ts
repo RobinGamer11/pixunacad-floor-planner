@@ -35,6 +35,62 @@ const MIN_PX_PER_M = 200;
 const CLICK_PAD_M = 2;
 /** Randstreifen der Maske; erreicht der Flood-Fill ihn, gilt der Bereich als offen. */
 const BORDER_PX = 1;
+/** Closing-Radius in Analysepixeln — schließt nur Subpixel-/Anti-Aliasing-Lücken. */
+const DILATE_PX = 2;
+/** Obergrenze für Konturpunkte einer aus Raster gewonnenen Fläche. */
+const MAX_CONTOUR_POINTS = 120;
+
+/**
+ * Morphologische Dilatation der Grenzpixel (Chebyshev-Radius `r`) über zwei
+ * separierte 1D-Durchläufe. Ergebnis: 1 = Grenze, 0 = füllbar.
+ */
+function dilateBoundary(alpha: Uint8Array, threshold: number, wPx: number, hPx: number, r: number): Uint8Array {
+  const src = new Uint8Array(wPx * hPx);
+  for (let i = 0; i < src.length; i++) src[i] = alpha[i] >= threshold ? 1 : 0;
+  if (r <= 0) return src;
+  const tmp = new Uint8Array(wPx * hPx);
+  for (let y = 0; y < hPx; y++) {
+    const row = y * wPx;
+    for (let x = 0; x < wPx; x++) {
+      let on = 0;
+      for (let dx = -r; dx <= r && !on; dx++) {
+        const nx = x + dx;
+        if (nx < 0 || nx >= wPx) continue;
+        if (src[row + nx]) on = 1;
+      }
+      tmp[row + x] = on;
+    }
+  }
+  const out = new Uint8Array(wPx * hPx);
+  for (let y = 0; y < hPx; y++) {
+    for (let x = 0; x < wPx; x++) {
+      let on = 0;
+      for (let dy = -r; dy <= r && !on; dy++) {
+        const ny = y + dy;
+        if (ny < 0 || ny >= hPx) continue;
+        if (tmp[ny * wPx + x]) on = 1;
+      }
+      out[y * wPx + x] = on;
+    }
+  }
+  return out;
+}
+
+/** Gleitender Mittelwert über einen geschlossenen Polygonzug (Fensterradius `r`). */
+function smoothClosed(points: Vec2[], r: number): Vec2[] {
+  const n = points.length;
+  if (n < 5 || r <= 0) return points;
+  const out: Vec2[] = new Array(n);
+  for (let i = 0; i < n; i++) {
+    let sx = 0, sy = 0, c = 0;
+    for (let k = -r; k <= r; k++) {
+      const p = points[(i + k + n) % n];
+      sx += p.x; sy += p.y; c++;
+    }
+    out[i] = v(sx / c, sy / c);
+  }
+  return out;
+}
 
 export interface HybridFillOptions {
   scope?: RasterScope;
