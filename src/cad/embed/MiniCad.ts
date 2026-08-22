@@ -761,7 +761,15 @@ export class MiniCad {
   private _isNonEditableSegmentId(segmentId?: string | null): boolean {
     if (!segmentId) return false;
     const segment = this.scene.getSegmentById(segmentId);
-    return !!segment && (this.isFrameSegment(segment) || (segment.isGuide && this._guidesLocked));
+    if (!segment) return false;
+    if (!this.labelManager.isEditable(segment.labelId)) return true;
+    return this.isFrameSegment(segment) || (segment.isGuide && this._guidesLocked);
+  }
+
+  /** Ebene bearbeitbar? Gesperrte Ebenen bleiben sichtbar und fangbar. */
+  private _labelEditable(labelId?: string | null): boolean {
+    if (!labelId) return true;
+    return this.labelManager.isEditable(labelId);
   }
 
   private _filterNonEditableSegmentSelections(): boolean {
@@ -2631,6 +2639,7 @@ export class MiniCad {
     for (const seg of this.scene.segments) {
       if (this.isFrameSegment(seg)) continue;
       if (seg.isGuide && this._guidesLocked) continue;
+      if (!this._labelEditable(seg.labelId)) continue;
       const x0 = Math.min(seg.a.x, seg.b.x) - tol, x1 = Math.max(seg.a.x, seg.b.x) + tol;
       const y0 = Math.min(seg.a.y, seg.b.y) - tol, y1 = Math.max(seg.a.y, seg.b.y) + tol;
       if (wx >= x0 && wx <= x1 && wy >= y0 && wy <= y1) {
@@ -2643,6 +2652,7 @@ export class MiniCad {
       }
     }
     for (const h of this.scene.hatches) {
+      if (!this._labelEditable(h.labelId)) continue;
       const xs = h.points.map((p) => p.x), ys = h.points.map((p) => p.y);
       if (wx >= Math.min(...xs) && wx <= Math.max(...xs) && wy >= Math.min(...ys) && wy <= Math.max(...ys)) return true;
     }
@@ -2680,6 +2690,7 @@ export class MiniCad {
       }
     }
     for (const b of this.scene.textBoxes) {
+      if (!this._labelEditable(b.labelId)) continue;
       const halfW = b.widthM / 2, halfH = b.heightM / 2;
       const box = { minX: b.center.x - halfW, minY: b.center.y - halfH, maxX: b.center.x + halfW, maxY: b.center.y + halfH };
       if (mode === "enclose" ? (box.minX >= x0 && box.minY >= y0 && box.maxX <= x1 && box.maxY <= y1) : rectsOverlap(box)) {
@@ -2687,11 +2698,13 @@ export class MiniCad {
       }
     }
     for (const i of this.scene.stickerInstances || []) {
+      if (!this._labelEditable((i as any).labelId)) continue;
       if (inRect(i.position.x, i.position.y)) {
         picks.push({ type: SelectionType.STICKER_INSTANCE, stickerInstanceId: i.id } as any);
       }
     }
     for (const d of this.scene.documents) {
+      if (!this._labelEditable(d.labelId)) continue;
       const cx = d.position.x + d.widthM / 2;
       const cy = d.position.y + d.heightM / 2;
       const box = { minX: d.position.x, minY: d.position.y, maxX: d.position.x + d.widthM, maxY: d.position.y + d.heightM };
@@ -2699,6 +2712,7 @@ export class MiniCad {
     }
     for (const f of this.scene.freeStrokes) {
       if (!f.points.length) continue;
+      if (!this._labelEditable(f.labelId)) continue;
       const xs = f.points.map((p) => p.x), ys = f.points.map((p) => p.y);
       const box = { minX: Math.min(...xs), minY: Math.min(...ys), maxX: Math.max(...xs), maxY: Math.max(...ys) };
       if (mode === "enclose" ? f.points.every((p) => inRect(p.x, p.y)) : rectsOverlap(box)) {
