@@ -35,6 +35,62 @@ const MIN_PX_PER_M = 200;
 const CLICK_PAD_M = 2;
 /** Randstreifen der Maske; erreicht der Flood-Fill ihn, gilt der Bereich als offen. */
 const BORDER_PX = 1;
+/** Closing-Radius in Analysepixeln — schließt nur Subpixel-/Anti-Aliasing-Lücken. */
+const DILATE_PX = 2;
+/** Obergrenze für Konturpunkte einer aus Raster gewonnenen Fläche. */
+const MAX_CONTOUR_POINTS = 120;
+
+/**
+ * Morphologische Dilatation der Grenzpixel (Chebyshev-Radius `r`) über zwei
+ * separierte 1D-Durchläufe. Ergebnis: 1 = Grenze, 0 = füllbar.
+ */
+function dilateBoundary(alpha: Uint8Array, threshold: number, wPx: number, hPx: number, r: number): Uint8Array {
+  const src = new Uint8Array(wPx * hPx);
+  for (let i = 0; i < src.length; i++) src[i] = alpha[i] >= threshold ? 1 : 0;
+  if (r <= 0) return src;
+  const tmp = new Uint8Array(wPx * hPx);
+  for (let y = 0; y < hPx; y++) {
+    const row = y * wPx;
+    for (let x = 0; x < wPx; x++) {
+      let on = 0;
+      for (let dx = -r; dx <= r && !on; dx++) {
+        const nx = x + dx;
+        if (nx < 0 || nx >= wPx) continue;
+        if (src[row + nx]) on = 1;
+      }
+      tmp[row + x] = on;
+    }
+  }
+  const out = new Uint8Array(wPx * hPx);
+  for (let y = 0; y < hPx; y++) {
+    for (let x = 0; x < wPx; x++) {
+      let on = 0;
+      for (let dy = -r; dy <= r && !on; dy++) {
+        const ny = y + dy;
+        if (ny < 0 || ny >= hPx) continue;
+        if (tmp[ny * wPx + x]) on = 1;
+      }
+      out[y * wPx + x] = on;
+    }
+  }
+  return out;
+}
+
+/** Gleitender Mittelwert über einen geschlossenen Polygonzug (Fensterradius `r`). */
+function smoothClosed(points: Vec2[], r: number): Vec2[] {
+  const n = points.length;
+  if (n < 5 || r <= 0) return points;
+  const out: Vec2[] = new Array(n);
+  for (let i = 0; i < n; i++) {
+    let sx = 0, sy = 0, c = 0;
+    for (let k = -r; k <= r; k++) {
+      const p = points[(i + k + n) % n];
+      sx += p.x; sy += p.y; c++;
+    }
+    out[i] = v(sx / c, sy / c);
+  }
+  return out;
+}
 
 export interface HybridFillOptions {
   scope?: RasterScope;
@@ -192,11 +248,18 @@ export function findHybridEnclosingFace(
   if (!mask) return null;
 
   const { wPx, hPx, alpha, threshold } = mask;
+
+  // Grenzmaske mit sehr kleiner Dilatation (Closing um DILATE_PX Analysepixel).
+  // Damit gelten optisch anschließende Pixel-/Vektorkanten trotz Subpixel- und
+  // Anti-Aliasing-Lücken als durchgehende Grenze. Größere echte Lücken bleiben
+  // offen, weil der Radius bewusst nur 1–2 Pixel beträgt.
+  const bnd = dilateBoundary(alpha, threshold, wPx, hPx, DILATE_PX);
+
   const px = Math.floor((click.x - mask.x) * mask.pxPerM);
   const py = Math.floor((click.y - mask.y) * mask.pxPerM);
   if (px < 0 || py < 0 || px >= wPx || py >= hPx) return null;
   const startIdx = py * wPx + px;
-  if (alpha[startIdx] >= threshold) return null; // direkt auf einer Grenze geklickt
+  if (bnd[startIdx]) return null; // direkt auf einer Grenze geklickt
 
   // --- 4) Flood-Fill im transparenten Bereich -----------------------------
   const filled = new Uint8Array(wPx * hPx);
@@ -219,7 +282,7 @@ export function findHybridEnclosingFace(
     const push = (nx: number, ny: number) => {
       const ni = ny * wPx + nx;
       if (filled[ni]) return;
-      if (alpha[ni] >= threshold) return;
+      if (bnd[ni]) return;
       filled[ni] = 1;
       stack[sp++] = ni;
     };
@@ -233,9 +296,20 @@ export function findHybridEnclosingFace(
   if (contourPx.length < 3) return null;
 
   const world: Vec2[] = contourPx.map((p) => v(mask.x + p.x / mask.pxPerM, mask.y + p.y / mask.pxPerM));
-  // Vereinfachung ≈ 1,2 Analysepixel — zoom-unabhängig, Form bleibt erhalten.
-  const eps = 1.2 / mask.pxPerM;
-  let simple = simplify(world, eps);
+  // Treppenstufen der Rasterkontur zuerst leicht glätten (gleitender Mittelwert
+  // über 3 Punkte) — die Form bleibt, aber Douglas-Peucker findet danach echte
+  // Ecken statt Pixeltreppen.
+  const smoothed = smoothClosed(world, 1);
+
+  // Vereinfachung ab ≈ 1,8 Analysepixel; falls immer noch sehr viele Punkte
+  // übrig bleiben (gekrümmte Pixelkanten), Toleranz schrittweise erhöhen, bis
+  // die Kontur eine handhabbare Punktzahl hat.
+  let eps = 1.8 / mask.pxPerM;
+  let simple = simplify(smoothed, eps);
+  for (let i = 0; i < 8 && simple.length > MAX_CONTOUR_POINTS; i++) {
+    eps *= 1.7;
+    simple = simplify(smoothed, eps);
+  }
   if (simple.length >= 2) {
     const first = simple[0], last = simple[simple.length - 1];
     if (Math.hypot(first.x - last.x, first.y - last.y) < eps) simple = simple.slice(0, -1);
