@@ -14,6 +14,7 @@
 import { Camera } from "./Camera";
 import { Defaults } from "./constants";
 import { rgbaFromHex } from "./geometry";
+import { modelToPaperFactor, normalizeScaleDen } from "@/lib/scale";
 
 export interface ProjectionItem {
   kind: "segment" | "hatch" | "textbox-rect" | "document-rect" | "dimension-line";
@@ -118,11 +119,19 @@ export function itemsBoundsM(items: ProjectionItem[]): { minX: number; minY: num
   return { minX, minY, maxX, maxY };
 }
 
-/** Sheet-Meter → Plan-Meter Faktor (geometrische Skalierung der Projektion). */
+/** Sheet-Meter → Plan-Meter Faktor (geometrische Skalierung der Projektion).
+ *  Delegiert an die kanonische Maßstabs-Utility. */
 export function sheetToPlanFactor(scaleVal: number): number {
-  // 1 Sheet-m = 1 reale m → bei 1:100 = 0.01 Papier-m
-  if (!isFinite(scaleVal) || scaleVal <= 0) return 1 / 100;
-  return 1 / scaleVal;
+  return modelToPaperFactor(scaleVal);
+}
+
+/** Kanonischer Maßstabsnenner einer Projektion (mit Altfeld-Fallback). */
+export function projectionScaleDen(
+  proj: { scaleDen?: number; scale?: number } | null | undefined,
+): number {
+  if (!proj) return 100;
+  if (typeof proj.scaleDen === "number" && proj.scaleDen > 0) return normalizeScaleDen(proj.scaleDen);
+  return normalizeScaleDen(proj.scale ?? 100);
 }
 
 /**
@@ -156,10 +165,10 @@ export const PROJECTION_BBOX_PADDING_MM = 12;
 
 export function computeProjectionLayout(
   items: ProjectionItem[],
-  proj: { x: number; y: number; rotation: number; scale: number; clip: { left: number; right: number; top: number; bottom: number } },
+  proj: { x: number; y: number; rotation: number; scaleDen?: number; scale?: number; clip: { left: number; right: number; top: number; bottom: number } },
 ): ProjectionLayout {
   const bb = itemsBoundsM(items);
-  const factor = sheetToPlanFactor(proj.scale);
+  const factor = modelToPaperFactor(projectionScaleDen(proj));
   const widthPlanM = (bb.maxX - bb.minX) * factor;
   const heightPlanM = (bb.maxY - bb.minY) * factor;
   const padMm = PROJECTION_BBOX_PADDING_MM;
@@ -205,7 +214,7 @@ export function drawProjection(
   ctx: CanvasRenderingContext2D,
   cam: Camera,
   items: ProjectionItem[],
-  proj: { x: number; y: number; rotation: number; scale: number; clip: { left: number; right: number; top: number; bottom: number } },
+  proj: { x: number; y: number; rotation: number; scaleDen?: number; scale?: number; clip: { left: number; right: number; top: number; bottom: number } },
   isSelected: boolean,
   isHover: boolean,
 ) {
@@ -362,7 +371,7 @@ export function drawProjection(
 export function hitTestProjection(
   cam: Camera,
   items: ProjectionItem[],
-  proj: { x: number; y: number; rotation: number; scale: number; clip: { left: number; right: number; top: number; bottom: number } },
+  proj: { x: number; y: number; rotation: number; scaleDen?: number; scale?: number; clip: { left: number; right: number; top: number; bottom: number } },
   sx: number,
   sy: number,
 ): "body" | "edge-left" | "edge-right" | "edge-top" | "edge-bottom" | null {

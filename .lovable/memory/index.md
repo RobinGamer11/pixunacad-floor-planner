@@ -19,3 +19,4 @@ Roadmap: Zuerst funktionaler CAD-Editor, Benutzerregistrierung und Projektspeich
 - [Undo/Redo](mem://features/undo-redo) — JSON-Snapshot-History mit Polling, Strg+Z/Y
 - [Clipboard & Pipette](mem://features/clipboard-pipette) — Strg+C/V (Vorschau am Cursor) und Pipette (P, Stil+ID, Shift=nur Stil)
 - [Notiznetz](mem://features/notiznetz) — Route `/project/:id/notes`, hierarchische Knoten in `notesStore` (localStorage), 3-Spalten-Layout: Liste/Editor/Radial-Graph
+- [Maßstabssystem](mem://features/massstab-system) — Modell 1:1, scaleDen pro Projektion/Viewport, kanonische Utility src/lib/scale.ts, PDF-Export read-only

@@ -537,7 +537,7 @@ export class CadApp {
       const rect = this.canvas.getBoundingClientRect();
       const sx = e.clientX - rect.left;
       const sy = e.clientY - rect.top;
-      this.planController?.createProjectionFromSheet(sheetId, sx, sy);
+      void this.planController?.createProjectionFromSheet(sheetId, sx, sy);
     });
 
     this.selectTool = new SelectTool(this);
@@ -3619,27 +3619,9 @@ export class CadApp {
       return;
     }
     try {
-      // Maßstab abfragen (typische Architekturmaßstäbe + freie Eingabe) und
-      // exakt auf alle Projektionen der ausgewählten Pläne anwenden.
-      const { askExportScale } = await import("./PlanExportScaleDialog");
-      const currentScales = new Set<number>();
-      sel.forEach(p => p.projections.forEach(pr => currentScales.add(pr.scale)));
-      const suggested = currentScales.size === 1 ? [...currentScales][0] : 100;
-      const chosen = await askExportScale(suggested);
-      if (chosen == null) return;
-      let changed = false;
-      for (const plan of sel) {
-        for (const pr of plan.projections) {
-          if (pr.scale !== chosen) { pr.scale = chosen; changed = true; }
-        }
-      }
-      if (changed) {
-        this.planController?.invalidateCache();
-        this.refreshPlanUI();
-        this.commitHistorySnapshot();
-      }
-
-
+      // Der Druckplan wird 1:1 in seiner Papiergröße exportiert. Jede
+      // Projektion behält ihren eigenen Maßstab — der Export ist eine reine
+      // Ausgabeoperation und verändert das Dokumentmodell NICHT.
       const { exportPlansToPdf, downloadPdfBytes } = await import("./PlanPdfExport");
       const resolveSheet = (sheetId: string): unknown | null => {
         const sc = this.scenesById.get(sheetId);

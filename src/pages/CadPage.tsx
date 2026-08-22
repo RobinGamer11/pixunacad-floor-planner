@@ -6,15 +6,11 @@ import { WorkspaceHeader } from "@/components/workspace/WorkspaceHeader";
 import { TabletAidWheel } from "@/components/TabletAidWheel";
 import { Check, X } from "lucide-react";
 import { bytesToBase64, canvasRegionToPdfBytes, stashPendingSheetPdf } from "@/lib/sheetPdfExport";
+import { normalizeScaleDen } from "@/lib/scale";
+
 
 /** "1:100" → 100 (Welt-Einheiten pro Papier-Einheit). Fällt auf 100 zurück. */
-function parseSheetScale(scale: string | undefined): number {
-  if (!scale) return 100;
-  const m = String(scale).match(/1\s*:\s*(\d+(?:[.,]\d+)?)/);
-  if (!m) return 100;
-  const v = parseFloat(m[1].replace(",", "."));
-  return v > 0 ? v : 100;
-}
+const parseSheetScale = (scale: string | undefined): number => normalizeScaleDen(scale);
 
 const CadPage = () => {
   const { projectId } = useParams();

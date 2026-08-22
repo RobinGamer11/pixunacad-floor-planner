@@ -11,9 +11,9 @@
  *   - PDF-Export: 1 mm Papier == 1 mm PDF (kein "fit to page").
  */
 import type { PageFormat, ProjectPage } from "./projectStore";
+import { normalizeScaleDen } from "./scale";
 
-export const MM_PER_INCH = 25.4;
-export const MM_TO_PT = 72 / MM_PER_INCH;
+export { MM_PER_INCH, MM_TO_PT } from "./scale";
 
 export const PAPER_FORMATS: Record<PageFormat, { w: number; h: number; label: string }> = {
   "A3-quer": { w: 420, h: 297, label: "A3 Querformat (420 × 297 mm)" },
@@ -45,14 +45,9 @@ export function getPageSizeMm(page: Pick<ProjectPage, "format" | "customWidthMm"
   return { wMm: f.w, hMm: f.h };
 }
 
-/** "1:100" → 100. Fällt auf 100 zurück. */
+/** "1:100" → 100. Delegiert an die kanonische Maßstabs-Utility. */
 export function parseScaleDen(scale: string | number | undefined | null): number {
-  if (typeof scale === "number" && scale > 0) return scale;
-  if (!scale) return 100;
-  const m = String(scale).match(/1\s*:\s*(\d+(?:[.,]\d+)?)/);
-  if (!m) return 100;
-  const v = parseFloat(m[1].replace(",", "."));
-  return v > 0 ? v : 100;
+  return normalizeScaleDen(scale);
 }
 
 /** 100 → "1:100". */

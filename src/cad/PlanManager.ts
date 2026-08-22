@@ -1,4 +1,5 @@
 import { clamp } from "./geometry";
+import { normalizeScaleDen } from "@/lib/scale";
 
 /**
  * Druckpläne: Layout-Blätter mit Papierformat, auf denen Projektionen
@@ -42,8 +43,10 @@ export interface Projection {
   sourceSheetId: string;
   /** Snapshot der Sheet-Geometrie als JSON (eingefroren beim Drop). */
   sceneSnapshot: unknown | null;
-  /** Maßstab beim Drop (Welt-Einheiten pro Plan-Einheit). */
-  scale: number;
+  /** Kanonischer Ausgabemaßstab dieser Projektion (Nenner: 100 ⇒ 1:100). */
+  scaleDen: number;
+  /** @deprecated Altfeld, wird nur noch gespiegelt geschrieben/gelesen. */
+  scale?: number;
   /** Position auf dem Plan in mm (Mittelpunkt). */
   x: number;
   y: number;
@@ -225,7 +228,8 @@ export class PlanManager {
         id: pr.id,
         sourceSheetId: pr.sourceSheetId,
         sceneSnapshot: pr.sceneSnapshot,
-        scale: pr.scale,
+        scaleDen: pr.scaleDen,
+        scale: pr.scaleDen,
         x: pr.x,
         y: pr.y,
         rotation: pr.rotation,
@@ -251,7 +255,11 @@ export class PlanManager {
         id: String(pr.id),
         sourceSheetId: String(pr.sourceSheetId),
         sceneSnapshot: pr.sceneSnapshot ?? null,
-        scale: typeof pr.scale === "number" && pr.scale > 0 ? pr.scale : 100,
+        scaleDen: normalizeScaleDen(
+          (typeof pr.scaleDen === "number" && pr.scaleDen > 0)
+            ? pr.scaleDen
+            : (typeof pr.scale === "number" && pr.scale > 0 ? pr.scale : 100),
+        ),
         x: typeof pr.x === "number" ? pr.x : 0,
         y: typeof pr.y === "number" ? pr.y : 0,
         rotation: typeof pr.rotation === "number" ? pr.rotation : 0,
