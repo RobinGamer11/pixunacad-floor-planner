@@ -63,7 +63,7 @@ export class TextTool {
     const mouseW = v(input.mouse.wx, input.mouse.wy);
     for (let i = this.app.scene.textBoxes.length - 1; i >= 0; i--) {
       const box = this.app.scene.textBoxes[i];
-      if (!this.app.labelManager.isVisible(box.labelId)) continue;
+      if (!this.app.labelManager.isEditable(box.labelId)) continue;
       if (pointInOrientedBox(mouseW, box)) return box;
     }
     return null;
