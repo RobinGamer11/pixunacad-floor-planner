@@ -297,6 +297,7 @@ export class TextEditorOverlay {
 
   beginEdit(box: TextBox) {
     this.activeBoxId = box.id;
+    this._savedRange = null;
     this.el.classList.remove("hidden");
     // Toolbar im Embed ausgeblendet lassen — Einstellungen liegen bereits
     // im seitlichen Werkzeug-Einstellungs-Panel.
@@ -464,7 +465,8 @@ export class TextEditorOverlay {
     if (!box) { this.hide(); return; }
 
     // 1) Persist HTML
-    const html = this.el.innerHTML;
+    // Typing-Style-Anker (Zero-Width-Spaces) vor dem Speichern entfernen.
+    const html = this.el.innerHTML.replace(/\u200B/g, "");
     box.html = html;
 
     // 2) Empty box → auto-delete
@@ -492,6 +494,7 @@ export class TextEditorOverlay {
 
   hide() {
     this.activeBoxId = null;
+    this._savedRange = null;
     this.el.classList.add("hidden");
     this.toolbarEl.classList.add("hidden");
     this.el.innerHTML = "";
