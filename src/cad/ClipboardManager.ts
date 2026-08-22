@@ -28,7 +28,7 @@ interface DimensionSnap {
 }
 interface TextBoxSnap {
   kind: "textbox"; center: Vec2; widthM: number; heightM: number;
-  rotationRad: number; html: string; style: Required<Omit<TextBoxStyle, "labelId">>;
+  rotationRad: number; html: string; style: Required<Omit<TextBoxStyle, "labelId" | "spanGroupId">> & { spanGroupId?: string };
   labelId: string;
 }
 

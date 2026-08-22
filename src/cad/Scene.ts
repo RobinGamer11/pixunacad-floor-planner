@@ -308,7 +308,7 @@ export class TextBox {
   heightM: number;
   rotationRad: number;
   html: string;
-  style: Required<Omit<TextBoxStyle, "labelId">>;
+  style: Required<Omit<TextBoxStyle, "labelId" | "spanGroupId">> & { spanGroupId?: string };
   labelId: string;
   _stickerEditOwnerId?: string | null;
 
@@ -353,6 +353,8 @@ export class TextBox {
       borderColor: s.borderColor || Defaults.textBorderColor,
       borderWidthPx: clamp(s.borderWidthPx ?? Defaults.textBorderWidthPx, 0, 30),
       autoSize: (typeof s.autoSize === "boolean") ? s.autoSize : true,
+      // Persistenz der „Auf allen Seiten“-Gruppen-ID (Projektmappe).
+      spanGroupId: s.spanGroupId,
     } as any;
     this.labelId = labelId || s.labelId || Defaults.defaultLabelId;
     this._stickerEditOwnerId = null;
