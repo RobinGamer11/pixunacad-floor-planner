@@ -1715,7 +1715,11 @@ export class SelectTool {
         // signX/signY: Richtung von gegenüber zur bewegten Ecke
         const signX = -Math.sign(localOpp.x) || 1;
         const signY = -Math.sign(localOpp.y) || 1;
-        const minM = 0.02;
+        // Rahmen fix: Der Benutzer bestimmt Breite/Höhe. Als Untergrenze dient nur
+        // eine technisch sinnvolle Griffgröße auf dem Bildschirm — niemals die
+        // gemessene Textinhaltshöhe (Text wird bei zu kleinem Rahmen geclippt).
+        const camScale = Math.max(1e-6, this.app.camera?.scale || 1);
+        const minM = Math.max(1e-5, 4 / camScale);
         const newW = Math.max(minM, lx * signX);
         const newH = Math.max(minM, ly * signY);
         // Neues Center: Mittelpunkt zwischen opp (welt) und neuer bewegter Ecke (welt).

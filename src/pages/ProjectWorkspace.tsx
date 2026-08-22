@@ -141,6 +141,7 @@ import {
   mappePagePxPerMm,
   MAPPE_PAGE_BASE_WIDTH_PX,
 } from "@/lib/guideStrokeWidth";
+import { ptToMm, MM_PER_PT } from "@/cad/textTypography";
 import { getPageSnapRegistry, buildRectSnapEntry } from "@/lib/pageSnap";
 import { registerCadEngineSnap, queryCadEngineSnap } from "@/lib/cadEngineSnap";
 import { Defaults } from "@/cad/constants";
@@ -6777,8 +6778,8 @@ function TextSettings({
 }) {
   // Schriftgrößen werden – wie in Word – in Punkt (pt) geführt.
   // 1 pt = 4/3 CSS-Pixel; die mm-Angabe ist die reale Höhe auf dem Blatt.
-  const fontPx = settings.fontSize * (4 / 3);
-  const fontMm = guideStrokePxToMm(fontPx, pxPerMm);
+  // Typografische Punkte sind absolut: 1 pt = 25,4/72 mm (unabhängig von Zoom/pxPerMm).
+  const fontMm = ptToMm(settings.fontSize);
   // Transparenz-Regler wirkt wahlweise auf Text- oder Feldfarbe.
   // Angezeigt wird Transparenz (100 % = komplett transparent), gespeichert Deckkraft.
   const [alphaTarget, setAlphaTarget] = useState<"text" | "bg">("text");
@@ -6832,9 +6833,9 @@ function TextSettings({
             label="Tatsächliche Größe"
             unit="mm"
             value={fontMm}
-            fractionDigits={3}
+            fractionDigits={2}
             onChange={(value) => {
-              const pt = guideStrokeMmToPx(value, pxPerMm) * (3 / 4);
+              const pt = value / MM_PER_PT;
               if (pt > 0) onChange({ fontSize: Math.min(400, Math.max(1, Number(pt.toFixed(2)))) });
             }}
           />
