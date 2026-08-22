@@ -40,11 +40,31 @@ export const RASTER_TILE_PX = 512;
  */
 export const DEFAULT_RASTER_PX_PER_M = Math.round((300 / 25.4) * 1000);
 
+/**
+ * CAD-taugliche Grundqualität: 600 dpi bezogen auf das Papier.
+ * Damit bleiben Pixelstriche auch beim Ausdruck und beim Hineinzoomen
+ * werkplantauglich scharf. Die Auflösung ist FEST gespeichert — Zoomen
+ * ändert sie nie.
+ */
+export const CAD_RASTER_DPI = 600;
+
+/**
+ * Untergrenze der Rasterauflösung in Pixeln pro WELT-Meter. Im CAD wird in
+ * echten Metern gezeichnet; bei sehr großen Maßstabsnennern (1:500) würde die
+ * reine Papier-DPI-Umrechnung sonst zu grob werden.
+ */
+export const MIN_RASTER_PX_PER_M = 120;
+
 export interface RasterTileJSON {
   tx: number;
   ty: number;
-  /** PNG-DataURL der Kachel. */
-  src: string;
+  /** PNG-DataURL der Kachel (fehlt, wenn `ref` gesetzt ist). */
+  src?: string;
+  /**
+   * Verweis auf den Index einer inhaltsgleichen Kachel derselben Ebene.
+   * Vermeidet Bildduplikate in der Persistenz (z. B. gleichmäßige Flächen).
+   */
+  ref?: number;
 }
 
 export interface RasterLayerJSON {
