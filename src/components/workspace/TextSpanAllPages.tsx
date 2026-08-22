@@ -1,0 +1,83 @@
+import { useEffect, useState } from "react";
+import { Layers } from "lucide-react";
+import { projectStore } from "@/lib/projectStore";
+import type { MiniCad } from "@/cad/embed/MiniCad";
+
+/** Serialisiert eine TextBox exakt im CAD-Overlay-Format (Papierkoordinaten). */
+function serializeBox(box: any) {
+  return {
+    id: box.id,
+    center: { x: box.center.x, y: box.center.y },
+    widthM: box.widthM,
+    heightM: box.heightM,
+    rotationRad: box.rotationRad,
+    html: box.html,
+    style: { ...box.style },
+    labelId: box.labelId,
+  };
+}
+
+/**
+ * „Auf allen Seiten“ — verteilt die ausgewählte Textbox als eigenständige
+ * Kopie auf alle Seiten der Mappe. Die Kopien bleiben danach individuell
+ * bearbeitbar; die gemeinsame `spanGroupId` bleibt nur als Zuordnung erhalten.
+ */
+export function TextSpanAllPages({
+  engine,
+  projectId,
+  pageId,
+}: {
+  engine: MiniCad;
+  projectId: string;
+  pageId: string;
+}) {
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => setTick((t) => t + 1), 300);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const box = engine.getSelectedTextBox?.() ?? null;
+  if (!box) return null;
+  const active = !!(box.style as any)?.spanGroupId;
+
+  const toggle = () => {
+    const style = box.style as any;
+    if (active) {
+      const groupId = style.spanGroupId as string;
+      projectStore.removeTextSpanGroup(projectId, pageId, groupId);
+      delete style.spanGroupId;
+      engine.commitHistorySnapshot?.();
+    } else {
+      const groupId = `tsg-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+      style.spanGroupId = groupId;
+      engine.commitHistorySnapshot?.();
+      projectStore.applyTextSpanToPages(projectId, pageId, groupId, serializeBox(box));
+    }
+    setTick((t) => t + 1);
+  };
+
+  return (
+    <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
+      <button
+        type="button"
+        onClick={toggle}
+        aria-pressed={active}
+        className="flex w-full items-center gap-2 rounded border px-2 py-1.5 text-left text-xs transition-colors hover:bg-muted"
+        style={{
+          borderColor: "hsl(var(--hairline))",
+          background: active ? "hsl(var(--accent))" : "transparent",
+        }}
+      >
+        <Layers size={14} />
+        <span className="flex-1">Auf allen Seiten</span>
+        <span className="text-[10px] text-muted-foreground">{active ? "AN" : "AUS"}</span>
+      </button>
+      <div className="mt-1.5 text-[10px] leading-tight text-muted-foreground">
+        {active
+          ? "Kopien liegen auf allen Seiten und sind dort einzeln bearbeitbar. Ausschalten entfernt alle anderen Kopien."
+          : "Legt diese Textbox an identischer Papierposition auf allen Seiten an — auch auf später erstellten."}
+      </div>
+    </div>
+  );
+}

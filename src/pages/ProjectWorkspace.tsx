@@ -126,6 +126,7 @@ import { LineModeSelect as LineShapeModeSelect } from "@/components/cad/LineMode
 
 import { RasterModeToggle } from "@/components/cad/RasterModeToggle";
 import { WorkspaceHeader } from "@/components/workspace/WorkspaceHeader";
+import { TextSpanAllPages } from "@/components/workspace/TextSpanAllPages";
 import { MappeHelpOverlay } from "@/components/workspace/MappeHelpOverlay";
 import { ToolColorPicker } from "@/components/workspace/ToolColorPicker";
 import { TabletAidWheel } from "@/components/TabletAidWheel";
@@ -6126,6 +6127,9 @@ function ToolsTab({
               hideMode
             />
           </div>
+          {cadEngine && pageId && (
+            <TextSpanAllPages engine={cadEngine} projectId={projectId} pageId={pageId} />
+          )}
         </>
       )}
       {settingsTool === "document" && !cadDocSelected && (

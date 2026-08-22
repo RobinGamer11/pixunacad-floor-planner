@@ -313,6 +313,18 @@ export interface Project {
   /** @deprecated Legacy-Fotoablage; wird beim Laden verlustfrei nach `files` migriert. */
   photos?: FileNode[];
   settings?: ProjectSettings;
+  /** „Auf allen Seiten“-Textbox-Vorlagen (Projektmappe).
+   *  Jede Vorlage beschreibt den Zustand, mit dem eine neue Seite
+   *  automatisch eine eigene, danach individuell bearbeitbare Kopie erhält. */
+  textSpanTemplates?: TextSpanTemplate[];
+}
+
+/** Vorlagenzustand einer „Auf allen Seiten“-Textbox. */
+export interface TextSpanTemplate {
+  /** Stabile Gruppen-/Vorlagen-ID; identisch auf allen Seitenkopien. */
+  groupId: string;
+  /** Serialisierte Textbox im CAD-Overlay-Format (Weltkoordinaten = Papier-mm/1000). */
+  box: any;
 }
 
 export interface ProjectFolder {
@@ -799,6 +811,40 @@ function commitProjectUiProjects(projects: Project[]) {
 
 
 
+/** Seiten, die von „Auf allen Seiten“ betroffen sind: die Mappe der Quellseite,
+ *  sonst alle regulären (nicht Vorlagen-)Seiten. */
+function spanTargetPageIds(p: Project, sourcePageId: string): Set<string> {
+  const mappe = (p.mappen ?? []).find((m) => m.pageIds.includes(sourcePageId));
+  const ids = mappe
+    ? mappe.pageIds
+    : p.pages.filter((pg) => !pg.templateKey).map((pg) => pg.id);
+  return new Set(ids);
+}
+
+/** Fügt einem Overlay-Zustand fehlende „Auf allen Seiten“-Kopien hinzu.
+ *  Jede Kopie erhält eine eigene Objekt-ID, behält aber die groupId. */
+function seedSpanOverlay(
+  overlay: any,
+  templates: { groupId: string; box: any }[] | undefined,
+  pageId: string,
+): any {
+  if (!templates?.length) return overlay;
+  const base = overlay ? { ...overlay } : {};
+  const boxes: any[] = Array.isArray(base.textBoxes) ? [...base.textBoxes] : [];
+  let added = false;
+  for (const t of templates) {
+    if (boxes.some((b) => b?.style?.spanGroupId === t.groupId)) continue;
+    const clone = JSON.parse(JSON.stringify(t.box));
+    clone.id = `${pageId}-span-${t.groupId}-${Math.random().toString(36).slice(2, 7)}`;
+    clone.style = { ...(clone.style ?? {}), spanGroupId: t.groupId };
+    boxes.push(clone);
+    added = true;
+  }
+  if (!added && overlay) return overlay;
+  base.textBoxes = boxes;
+  return base;
+}
+
 export const projectStore = {
   getState: () => state,
   subscribe: (fn: () => void) => {
@@ -1047,6 +1093,7 @@ export const projectStore = {
               margins: 20,
               background: false,
               elements: [],
+              cadOverlay: seedSpanOverlay(undefined, p.textSpanTemplates, newId),
             },
           ],
           mappen,
@@ -1158,6 +1205,61 @@ export const projectStore = {
       }),
     }));
     return newId;
+  },
+
+  /* ---------- „Auf allen Seiten“ — Textboxen (Projektmappe) ---------- */
+  /**
+   * Verteilt eine Textbox als eigenständige Kopie auf alle übrigen Seiten der
+   * Mappe und hinterlegt den Vorlagenzustand für später erstellte Seiten.
+   * Bereits vorhandene Kopien derselben Gruppe bleiben unangetastet
+   * (individuelle Änderungen werden nie überschrieben).
+   */
+  applyTextSpanToPages: (projectId: string, sourcePageId: string, groupId: string, box: any) => {
+    setState((s) => ({
+      projects: s.projects.map((p) => {
+        if (p.id !== projectId) return p;
+        const targets = spanTargetPageIds(p, sourcePageId);
+        const templates = [
+          ...(p.textSpanTemplates ?? []).filter((t) => t.groupId !== groupId),
+          { groupId, box: JSON.parse(JSON.stringify(box)) },
+        ];
+        return {
+          ...p,
+          updatedAt: new Date().toISOString(),
+          textSpanTemplates: templates,
+          pages: p.pages.map((pg) => {
+            if (pg.id === sourcePageId || !targets.has(pg.id)) return pg;
+            return { ...pg, cadOverlay: seedSpanOverlay(pg.cadOverlay, [{ groupId, box }], pg.id) };
+          }),
+        };
+      }),
+    }));
+  },
+
+  /**
+   * Hebt die Verteilung auf: Alle Kopien der Gruppe auf anderen Seiten werden
+   * entfernt, die Vorlage wird gelöscht. Die Kopie auf `keepPageId` bleibt
+   * bestehen (sie wird vom Aufrufer zu einer normalen Textbox gemacht).
+   */
+  removeTextSpanGroup: (projectId: string, keepPageId: string, groupId: string) => {
+    setState((s) => ({
+      projects: s.projects.map((p) => {
+        if (p.id !== projectId) return p;
+        return {
+          ...p,
+          updatedAt: new Date().toISOString(),
+          textSpanTemplates: (p.textSpanTemplates ?? []).filter((t) => t.groupId !== groupId),
+          pages: p.pages.map((pg) => {
+            if (pg.id === keepPageId) return pg;
+            const boxes = pg.cadOverlay?.textBoxes;
+            if (!Array.isArray(boxes)) return pg;
+            const kept = boxes.filter((b: any) => b?.style?.spanGroupId !== groupId);
+            if (kept.length === boxes.length) return pg;
+            return { ...pg, cadOverlay: { ...pg.cadOverlay, textBoxes: kept } };
+          }),
+        };
+      }),
+    }));
   },
 
   // ---------- Spreads (Seiten-Verbund) ----------
