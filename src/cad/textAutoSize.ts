@@ -1,6 +1,7 @@
 import { Defaults } from "./constants";
 import type { TextBox } from "./Scene";
 import { measureTextBoxContent } from "./textRichRenderer";
+import { textStyleFontSizePt } from "./textTypography";
 
 /**
  * Auto-resize a TextBox so that its content is always fully readable.
@@ -21,7 +22,7 @@ export function autoSizeTextBox(box: TextBox, pxPerMOverride?: number) {
     ? pxPerMOverride
     : Defaults.measureReferenceScalePxPerM;
   const paddingPx = 1;
-  const baseFontPx = box.style.fontSizePx;
+  const baseFontPt = textStyleFontSizePt(box.style);
   const baseStyle = {
     bold: (box.style as any).bold,
     italic: (box.style as any).italic,
@@ -44,10 +45,10 @@ export function autoSizeTextBox(box: TextBox, pxPerMOverride?: number) {
 
   if (box.style.wrap) {
     const innerWidthPx = Math.max(8, box.widthM * pxPerM - paddingPx * 2);
-    const m = measureTextBoxContent(box.html || "", baseFontPx, innerWidthPx, true, paddingPx, baseStyle);
+    const m = measureTextBoxContent(box.html || "", baseFontPt, innerWidthPx, true, paddingPx, baseStyle);
     newHeightM = Math.max(minContentPx, m.heightPx) / pxPerM;
   } else {
-    const m = measureTextBoxContent(box.html || "", baseFontPx, Infinity, false, paddingPx, baseStyle);
+    const m = measureTextBoxContent(box.html || "", baseFontPt, Infinity, false, paddingPx, baseStyle);
     newWidthM = Math.max(minContentPx, m.widthPx) / pxPerM;
     newHeightM = Math.max(minContentPx, m.heightPx) / pxPerM;
   }

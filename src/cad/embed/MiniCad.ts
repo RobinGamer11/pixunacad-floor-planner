@@ -35,6 +35,7 @@ import { DocumentTool } from "../DocumentTool";
 import { Defaults, SelectionType, PointEditAction } from "../constants";
 import type { TextBox, TextBoxStyle, FreeLineStyle } from "../Scene";
 import { drawRichTextBox } from "../textRichRenderer";
+import { textStyleFontSizePt } from "../textTypography";
 import { autoSizeTextBox } from "../textAutoSize";
 import { isExportMode } from "@/lib/printExport";
 
@@ -2096,7 +2097,8 @@ export class MiniCad {
         widthPx, heightPx,
         rotationRad: box.rotationRad,
         html: box.html || "",
-        baseFontSizePx: box.style.fontSizePx * (cam.scale / r.referencePxPerM),
+        baseFontSizePt: textStyleFontSizePt(box.style),
+        displayScale: cam.scale / r.referencePxPerM,
         baseColor: box.style.textColor,
         bgColor: box.style.bgColor,
         bgAlpha: (box.style.bgAlphaPct || 0) / 100,

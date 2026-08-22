@@ -9,6 +9,7 @@ import { getDimensionGeometry, getAngleDimensionParts, type DimensionLike } from
 import { boxCornersWorld } from "./textGeometry";
 import { getDocWarp, drawWarpedImage } from "./documentWarp";
 import { drawRichTextBox } from "./textRichRenderer";
+import { textStyleFontSizePt } from "./textTypography";
 import { normalizeTable, isCovered, effectiveFormat, effectiveBorders, PT_TO_MM } from "@/lib/table/tableModel";
 import { layoutTable, cellRectMm } from "@/lib/table/tableLayout";
 import { evalCell } from "@/lib/table/tableFormula";
@@ -1141,7 +1142,8 @@ export class Renderer {
           widthPx, heightPx,
           rotationRad: it.rotationRad || 0,
           html: it.html || "",
-          baseFontSizePx: (it.style?.fontSizePx || Defaults.textFontSizePx) * (cam.scale / this.referencePxPerM),
+          baseFontSizePt: textStyleFontSizePt(it.style || {}),
+          displayScale: cam.scale / this.referencePxPerM,
           baseColor: it.style?.textColor || Defaults.textColor,
           bgColor: it.style?.bgColor || Defaults.textBgColor,
           bgAlpha: ((it.style?.bgAlphaPct || 0)) / 100,
@@ -2478,7 +2480,8 @@ export class Renderer {
       widthPx, heightPx,
       rotationRad: box.rotationRad,
       html: box.html || "",
-      baseFontSizePx: box.style.fontSizePx * (cam.scale / this.referencePxPerM),
+      baseFontSizePt: textStyleFontSizePt(box.style),
+      displayScale: cam.scale / this.referencePxPerM,
       baseColor: box.style.textColor,
       bgColor: box.style.bgColor,
       bgAlpha: (box.style.bgAlphaPct || 0) / 100,

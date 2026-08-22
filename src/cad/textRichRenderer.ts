@@ -8,6 +8,8 @@
  * Not a full HTML engine — just enough for our text boxes.
  */
 
+import { cssPxToPt, ptToCssPx } from "./textTypography";
+
 export interface RichRun {
   text: string;
   bold: boolean;
@@ -15,7 +17,7 @@ export interface RichRun {
   underline: boolean;
   strike: boolean;
   color: string | null;
-  sizeOverridePx: number | null;
+  sizeOverridePt: number | null;
 }
 
 interface ParseStyle {
@@ -24,7 +26,7 @@ interface ParseStyle {
   underline: boolean;
   strike: boolean;
   color: string | null;
-  sizePx: number | null;
+  sizePt: number | null;
 }
 
 /** Basis-Textstil einer Textbox (gilt für alle Runs ohne eigene Auszeichnung). */
@@ -39,18 +41,18 @@ const FONT_SIZE_TABLE: Record<string, number> = {
   "1": 10, "2": 13, "3": 16, "4": 18, "5": 24, "6": 32, "7": 48,
 };
 
-function parseInlineSize(value: string): number | null {
+function parseInlineSizePt(value: string): number | null {
   if (!value) return null;
   const m = value.trim().match(/^([\d.]+)\s*(px|pt)?$/i);
   if (!m) return null;
   const num = parseFloat(m[1]);
   if (!Number.isFinite(num)) return null;
-  if ((m[2] || "px").toLowerCase() === "pt") return num * 1.333;
-  return num;
+  if ((m[2] || "px").toLowerCase() === "pt") return num;
+  return cssPxToPt(num);
 }
 
-function parseInlineStyle(styleAttr: string | null): { color: string | null; sizePx: number | null; bold: boolean; italic: boolean; underline: boolean; strike: boolean } {
-  const out = { color: null as string | null, sizePx: null as number | null, bold: false, italic: false, underline: false, strike: false };
+function parseInlineStyle(styleAttr: string | null): { color: string | null; sizePt: number | null; bold: boolean; italic: boolean; underline: boolean; strike: boolean } {
+  const out = { color: null as string | null, sizePt: null as number | null, bold: false, italic: false, underline: false, strike: false };
   if (!styleAttr) return out;
   for (const part of styleAttr.split(";")) {
     const idx = part.indexOf(":");
@@ -58,7 +60,7 @@ function parseInlineStyle(styleAttr: string | null): { color: string | null; siz
     const key = part.slice(0, idx).trim().toLowerCase();
     const value = part.slice(idx + 1).trim();
     if (key === "color") out.color = value;
-    else if (key === "font-size") out.sizePx = parseInlineSize(value);
+    else if (key === "font-size") out.sizePt = parseInlineSizePt(value);
     else if (key === "font-weight") {
       const v = value.toLowerCase();
       if (v === "bold" || v === "bolder" || (parseInt(v, 10) >= 600)) out.bold = true;
@@ -84,7 +86,7 @@ function walk(node: Node, style: ParseStyle, runs: RichRun[]) {
       underline: style.underline,
       strike: style.strike,
       color: style.color,
-      sizeOverridePx: style.sizePx,
+      sizeOverridePt: style.sizePt,
     });
     return;
   }
@@ -93,14 +95,14 @@ function walk(node: Node, style: ParseStyle, runs: RichRun[]) {
   const tag = el.tagName.toLowerCase();
 
   if (tag === "br") {
-    runs.push({ text: "\n", bold: style.bold, italic: style.italic, underline: style.underline, strike: style.strike, color: style.color, sizeOverridePx: style.sizePx });
+    runs.push({ text: "\n", bold: style.bold, italic: style.italic, underline: style.underline, strike: style.strike, color: style.color, sizeOverridePt: style.sizePt });
     return;
   }
 
   // Block-level → newline before content (unless already at start)
   const isBlock = (tag === "div" || tag === "p");
   if (isBlock && runs.length > 0 && !runs[runs.length - 1].text.endsWith("\n")) {
-    runs.push({ text: "\n", bold: style.bold, italic: style.italic, underline: style.underline, strike: style.strike, color: style.color, sizeOverridePx: style.sizePx });
+    runs.push({ text: "\n", bold: style.bold, italic: style.italic, underline: style.underline, strike: style.strike, color: style.color, sizeOverridePt: style.sizePt });
   }
 
   const next: ParseStyle = { ...style };
@@ -112,11 +114,13 @@ function walk(node: Node, style: ParseStyle, runs: RichRun[]) {
     const color = el.getAttribute("color");
     if (color) next.color = color;
     const size = el.getAttribute("size");
-    if (size && FONT_SIZE_TABLE[size] != null) next.sizePx = FONT_SIZE_TABLE[size];
+    if (size && FONT_SIZE_TABLE[size] != null) next.sizePt = cssPxToPt(FONT_SIZE_TABLE[size]);
   }
+  const canonicalPt = parseFloat(el.getAttribute("data-font-size-pt") || "");
+  if (Number.isFinite(canonicalPt) && canonicalPt > 0) next.sizePt = canonicalPt;
   const inline = parseInlineStyle(el.getAttribute("style"));
   if (inline.color) next.color = inline.color;
-  if (inline.sizePx != null) next.sizePx = inline.sizePx;
+  if (inline.sizePt != null && next.sizePt == null) next.sizePt = inline.sizePt;
   if (inline.bold) next.bold = true;
   if (inline.italic) next.italic = true;
   if (inline.underline) next.underline = true;
@@ -147,7 +151,7 @@ export function htmlToRuns(html: string, base?: BaseTextStyle): RichRun[] {
     underline: !!base?.underline,
     strike: !!base?.strike,
     color: null,
-    sizePx: null,
+    sizePt: null,
   }, runs);
   // Trim leading newline produced by leading block-level elements
   if (runs.length && runs[0].text === "\n") runs.shift();
@@ -180,15 +184,16 @@ function measureChunk(ctx: CanvasRenderingContext2D, run: PositionedRun, text: s
 function layoutLines(
   ctx: CanvasRenderingContext2D,
   runs: RichRun[],
-  baseFontSizePx: number,
+  baseFontSizePt: number,
   baseColor: string,
   maxWidthPx: number,
   wrap: boolean,
   lineFactor = 1.05,
+  displayScale = 1,
 ): Line[] {
   const positioned: PositionedRun[] = runs.map(r => ({
     ...r,
-    fontSizePx: r.sizeOverridePx ?? baseFontSizePx,
+    fontSizePx: ptToCssPx(r.sizeOverridePt ?? baseFontSizePt) * displayScale,
     effectiveColor: r.color || baseColor,
   }));
 
@@ -198,8 +203,9 @@ function layoutLines(
   const pushLine = () => {
     if (cur.segments.length === 0) {
       // Empty line — give it the base font height
-      cur.height = baseFontSizePx * lineFactor;
-      cur.ascent = baseFontSizePx * 0.86;
+      const basePx = ptToCssPx(baseFontSizePt) * displayScale;
+      cur.height = basePx * lineFactor;
+      cur.ascent = basePx * 0.86;
     }
     lines.push(cur);
     cur = { segments: [], width: 0, height: 0, ascent: 0 };
@@ -271,7 +277,9 @@ export interface DrawTextBoxOptions {
   heightPx: number;
   rotationRad: number;
   html: string;
-  baseFontSizePx: number;
+  baseFontSizePt: number;
+  /** Camera/display multiplier only; never persisted in rich text. */
+  displayScale?: number;
   baseColor: string;
   bgColor: string;
   bgAlpha: number;
@@ -294,7 +302,7 @@ export interface DrawTextBoxOptions {
 export function drawRichTextBox(opts: DrawTextBoxOptions) {
   const {
     ctx, centerScreenX, centerScreenY, widthPx, heightPx, rotationRad,
-    html, baseFontSizePx, baseColor, bgColor, bgAlpha, align, wrap,
+    html, baseFontSizePt, baseColor, bgColor, bgAlpha, align, wrap,
     borderEnabled, borderColor, borderWidthPx, paddingPx,
   } = opts;
   const lineFactor = Math.max(0.6, (opts.lineHeightPct ?? 105) / 100);
@@ -330,7 +338,7 @@ export function drawRichTextBox(opts: DrawTextBoxOptions) {
   // Layout
   const innerW = Math.max(1, widthPx - paddingPx * 2);
   const runs = htmlToRuns(html, baseStyle);
-  const lines = layoutLines(ctx, runs, baseFontSizePx, baseColor, innerW, wrap, lineFactor);
+  const lines = layoutLines(ctx, runs, baseFontSizePt, baseColor, innerW, wrap, lineFactor, opts.displayScale ?? 1);
 
   // Draw lines
   const textAlpha = Math.max(0, Math.min(1, opts.textAlpha ?? 1));
@@ -384,7 +392,7 @@ const _measureCtx = _measureCanvas ? _measureCanvas.getContext("2d") : null;
  */
 export function measureTextBoxContent(
   html: string,
-  baseFontSizePx: number,
+  baseFontSizePt: number,
   maxInnerWidthPx: number,
   wrap: boolean,
   paddingPx: number,
@@ -393,7 +401,7 @@ export function measureTextBoxContent(
   if (!_measureCtx) return { widthPx: 0, heightPx: 0 };
   const runs = htmlToRuns(html || "", base);
   const lineFactor = Math.max(0.6, (base?.lineHeightPct ?? 105) / 100);
-  const lines = layoutLines(_measureCtx, runs, baseFontSizePx, "#000", maxInnerWidthPx, wrap, lineFactor);
+  const lines = layoutLines(_measureCtx, runs, baseFontSizePt, "#000", maxInnerWidthPx, wrap, lineFactor, 1);
   let maxLineW = 0;
   let totalH = 0;
   for (const line of lines) {
