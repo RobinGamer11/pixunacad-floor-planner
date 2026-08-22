@@ -280,18 +280,31 @@ export class RasterLayer {
     });
   }
 
+  /**
+   * Speicherschonende Persistenz:
+   * - leere Kacheln werden verworfen UND aus dem Speicher entfernt (sparse),
+   * - inhaltsgleiche Kacheln werden nur einmal als PNG abgelegt und sonst per
+   *   `ref` referenziert (keine Bildduplikate).
+   */
   serialize(): RasterLayerJSON | null {
     const tiles: RasterTileJSON[] = [];
-    for (const tile of this.tiles.values()) {
+    const seen = new Map<string, number>();
+    const push = (tile: RasterTile, src: string) => {
+      const hit = seen.get(src);
+      if (hit !== undefined) { tiles.push({ tx: tile.tx, ty: tile.ty, ref: hit }); return; }
+      seen.set(src, tiles.length);
+      tiles.push({ tx: tile.tx, ty: tile.ty, src });
+    };
+    for (const [key, tile] of [...this.tiles]) {
       if (tile.loading) {
-        if (tile.dataUrl) tiles.push({ tx: tile.tx, ty: tile.ty, src: tile.dataUrl });
+        if (tile.dataUrl) push(tile, tile.dataUrl);
         continue;
       }
       if (!tile.dataUrl) {
-        if (this._isTileEmpty(tile)) continue;
+        if (this._isTileEmpty(tile)) { this.tiles.delete(key); continue; }
         tile.dataUrl = tile.canvas.toDataURL("image/png");
       }
-      tiles.push({ tx: tile.tx, ty: tile.ty, src: tile.dataUrl });
+      push(tile, tile.dataUrl);
     }
     if (tiles.length === 0) return null;
     return { labelId: this.labelId, pxPerM: this.pxPerM, tilePx: this.tilePx, tiles, strokeCount: this.strokeCount };
