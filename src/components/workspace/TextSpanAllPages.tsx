@@ -39,12 +39,26 @@ export function TextSpanAllPages({
 
   const box = engine.getSelectedTextBox?.() ?? null;
   if (!box) return null;
-  const active = !!(box.style as any)?.spanGroupId;
+  const groupId = ((box.style as any)?.spanGroupId as string | undefined) ?? null;
+
+  // Der Schalter zeigt den GRUPPENSTATUS, nicht ein lokales Flag: solange die
+  // Gruppe eine aktive Vorlage im Projekt besitzt, ist „Auf allen Seiten“ auf
+  // jeder zugehörigen Seitenkopie EIN.
+  const project = projectStore.getState().projects.find((p) => p.id === projectId);
+  const hasTemplate = !!groupId
+    && !!project?.textSpanTemplates?.some((t) => t.groupId === groupId);
+  const active = hasTemplate;
+
+  /** Nur diese eine Seitenkopie entfernen — die Gruppe bleibt aktiv. */
+  const removeHere = () => {
+    (engine as any).scene?.removeTextBox?.(box);
+    engine.commitHistorySnapshot?.();
+    setTick((t) => t + 1);
+  };
 
   const toggle = () => {
     const style = box.style as any;
-    if (active) {
-      const groupId = style.spanGroupId as string;
+    if (active && groupId) {
       projectStore.removeTextSpanGroup(projectId, pageId, groupId);
       delete style.spanGroupId;
       engine.commitHistorySnapshot?.();
