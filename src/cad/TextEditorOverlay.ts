@@ -32,6 +32,10 @@ export class TextEditorOverlay {
 
   private _onDocMouseDown: (e: MouseEvent) => void;
   private _onSelectionChange: () => void;
+  private _typingStyle: {
+    color?: string; fontSizePt?: number;
+    bold?: boolean; italic?: boolean; underline?: boolean; strike?: boolean;
+  } = {};
 
   constructor(
     el: HTMLDivElement,
@@ -305,12 +309,12 @@ export class TextEditorOverlay {
     color?: string; fontSizePt?: number;
     bold?: boolean; italic?: boolean; underline?: boolean; strike?: boolean;
   }) {
-    if (!this._restoreRange(true)) return;
-    const sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0) return;
-    const range = sel.getRangeAt(0);
+    this._typingStyle = { ...this._typingStyle, ...opts };
+  }
 
+  private _createTypingSpan(text: string): HTMLSpanElement {
     const span = document.createElement("span");
+    const opts = this._typingStyle;
     if (opts.color) span.style.color = opts.color;
     if (typeof opts.fontSizePt === "number" && opts.fontSizePt > 0) span.dataset.fontSizePt = String(opts.fontSizePt);
     if (typeof opts.bold === "boolean") span.style.fontWeight = opts.bold ? "700" : "400";
@@ -321,21 +325,8 @@ export class TextEditorOverlay {
     if (typeof opts.underline === "boolean" || typeof opts.strike === "boolean") {
       span.style.textDecoration = deco.length ? deco.join(" ") : "none";
     }
-    if (!span.getAttribute("style")) return;
-
-    // Zero-Width-Space als Anker, damit der Caret im Span steht.
-    const anchor = document.createTextNode("\u200B");
-    span.appendChild(anchor);
-    range.deleteContents();
-    range.insertNode(span);
-
-    const after = document.createRange();
-    after.setStart(anchor, anchor.length);
-    after.collapse(true);
-    sel.removeAllRanges();
-    sel.addRange(after);
-    this._savedRange = after.cloneRange();
-    this.el.focus({ preventScroll: true });
+    span.textContent = text;
+    return span;
   }
 
   private _syncBoxFromEditor() {
@@ -373,6 +364,7 @@ export class TextEditorOverlay {
   beginEdit(box: TextBox) {
     this.activeBoxId = box.id;
     this._savedRange = null;
+    this._typingStyle = {};
     this.el.classList.remove("hidden");
     // Toolbar im Embed ausgeblendet lassen — Einstellungen liegen bereits
     // im seitlichen Werkzeug-Einstellungs-Panel.
@@ -395,6 +387,22 @@ export class TextEditorOverlay {
         autoSizeTextBox(b, (this.app.renderer as any).referencePxPerM);
         this.reposition(b);
       }
+    };
+    this.el.onbeforeinput = (event) => {
+      if (event.inputType !== "insertText" || !event.data || Object.keys(this._typingStyle).length === 0) return;
+      const range = this._rangeInEditor();
+      if (!range || !range.collapsed) return;
+      event.preventDefault();
+      const span = this._createTypingSpan(event.data);
+      range.insertNode(span);
+      const after = document.createRange();
+      after.setStartAfter(span);
+      after.collapse(true);
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(after);
+      this._savedRange = after.cloneRange();
+      this._syncBoxFromEditor();
     };
   }
 
@@ -447,6 +455,12 @@ export class TextEditorOverlay {
     const refPxPerM = (this.app.renderer as any).referencePxPerM || Defaults.measureReferenceScalePxPerM;
     const fontPx = ptToCssPx(textStyleFontSizePt(box.style)) * (cam.scale / refPxPerM);
     this.el.style.fontSize = `${fontPx}px`;
+    // Inline-Größen sind Dokumentwerte in pt und erhalten denselben Zoomfaktor
+    // wie die Basisgröße. Der Canvas-Renderer verwendet exakt dieselbe Formel.
+    this.el.querySelectorAll<HTMLElement>("[data-font-size-pt]").forEach(node => {
+      const pt = parseFloat(node.dataset.fontSizePt || "");
+      if (Number.isFinite(pt) && pt > 0) node.style.fontSize = `${ptToCssPx(pt) * (cam.scale / refPxPerM)}px`;
+    });
     this.el.style.fontFamily = "system-ui, Arial, sans-serif";
     this.el.style.lineHeight = String(Math.max(0.6, ((box.style as any).lineHeightPct ?? 105) / 100));
     this.el.style.fontWeight = (box.style as any).bold ? "700" : "400";
@@ -559,10 +573,12 @@ export class TextEditorOverlay {
   hide() {
     this.activeBoxId = null;
     this._savedRange = null;
+    this._typingStyle = {};
     this._clearPersistentHighlight();
     this.el.classList.add("hidden");
     this.toolbarEl.classList.add("hidden");
     this.el.innerHTML = "";
+    this.el.onbeforeinput = null;
     this.app.renderer.setEditingTextBoxId(null);
   }
 
