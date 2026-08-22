@@ -76,6 +76,96 @@ function dilateBoundary(alpha: Uint8Array, threshold: number, wPx: number, hPx: 
   return out;
 }
 
+/** Chebyshev-Dilatation einer 0/1-Maske (separiert, radius `r`). */
+function dilateMask(src: Uint8Array, wPx: number, hPx: number, r: number): Uint8Array {
+  if (r <= 0) return src;
+  const tmp = new Uint8Array(wPx * hPx);
+  for (let y = 0; y < hPx; y++) {
+    const row = y * wPx;
+    for (let x = 0; x < wPx; x++) {
+      let on = 0;
+      for (let dx = -r; dx <= r && !on; dx++) {
+        const nx = x + dx;
+        if (nx < 0 || nx >= wPx) continue;
+        if (src[row + nx]) on = 1;
+      }
+      tmp[row + x] = on;
+    }
+  }
+  const out = new Uint8Array(wPx * hPx);
+  for (let y = 0; y < hPx; y++) {
+    for (let x = 0; x < wPx; x++) {
+      let on = 0;
+      for (let dy = -r; dy <= r && !on; dy++) {
+        const ny = y + dy;
+        if (ny < 0 || ny >= hPx) continue;
+        if (tmp[ny * wPx + x]) on = 1;
+      }
+      out[y * wPx + x] = on;
+    }
+  }
+  return out;
+}
+
+/** Chebyshev-Erosion = Komplement der Dilatation des Komplements. */
+function erodeMask(src: Uint8Array, wPx: number, hPx: number, r: number): Uint8Array {
+  if (r <= 0) return src;
+  const inv = new Uint8Array(wPx * hPx);
+  for (let i = 0; i < inv.length; i++) inv[i] = src[i] ? 0 : 1;
+  const dil = dilateMask(inv, wPx, hPx, r);
+  const out = new Uint8Array(wPx * hPx);
+  for (let i = 0; i < out.length; i++) out[i] = dil[i] ? 0 : 1;
+  // Randpixel gelten als erodiert (außerhalb = leer).
+  return out;
+}
+
+/**
+ * Wählt die Zusammenhangskomponente, die den Klick enthält. Ist der Klickpixel
+ * selbst weggeschnitten (z. B. Klick nahe an einer Kante), wird über die
+ * ursprüngliche Region die nächstgelegene erodierte Zelle gesucht.
+ */
+function componentAt(mask: Uint8Array, region: Uint8Array, wPx: number, hPx: number, startIdx: number): Uint8Array | null {
+  let seed = -1;
+  if (mask[startIdx]) seed = startIdx;
+  else {
+    // BFS innerhalb der ursprünglichen Region bis zur nächsten erodierten Zelle.
+    const seen = new Uint8Array(wPx * hPx);
+    const q = new Int32Array(wPx * hPx);
+    let head = 0, tail = 0;
+    q[tail++] = startIdx; seen[startIdx] = 1;
+    while (head < tail) {
+      const idx = q[head++];
+      if (mask[idx]) { seed = idx; break; }
+      const x = idx % wPx, y = (idx - (idx % wPx)) / wPx;
+      const push = (nx: number, ny: number) => {
+        if (nx < 0 || ny < 0 || nx >= wPx || ny >= hPx) return;
+        const ni = ny * wPx + nx;
+        if (seen[ni] || !region[ni]) return;
+        seen[ni] = 1; q[tail++] = ni;
+      };
+      push(x + 1, y); push(x - 1, y); push(x, y + 1); push(x, y - 1);
+    }
+  }
+  if (seed < 0) return null;
+
+  const out = new Uint8Array(wPx * hPx);
+  const stack = new Int32Array(wPx * hPx);
+  let sp = 0;
+  stack[sp++] = seed; out[seed] = 1;
+  while (sp > 0) {
+    const idx = stack[--sp];
+    const x = idx % wPx, y = (idx - (idx % wPx)) / wPx;
+    const push = (nx: number, ny: number) => {
+      if (nx < 0 || ny < 0 || nx >= wPx || ny >= hPx) return;
+      const ni = ny * wPx + nx;
+      if (out[ni] || !mask[ni]) return;
+      out[ni] = 1; stack[sp++] = ni;
+    };
+    push(x + 1, y); push(x - 1, y); push(x, y + 1); push(x, y - 1);
+  }
+  return out;
+}
+
 /** Gleitender Mittelwert über einen geschlossenen Polygonzug (Fensterradius `r`). */
 function smoothClosed(points: Vec2[], r: number): Vec2[] {
   const n = points.length;
