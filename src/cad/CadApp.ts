@@ -7,7 +7,7 @@ import { autoSizeTextBox } from "./textAutoSize";
 import { textStyleFontSizePt, ptToCssPx } from "./textTypography";
 import { dominantRichStyle } from "./textDominantStyle";
 import { LabelManager } from "./LabelManager";
-import { RasterLayers, DEFAULT_RASTER_PX_PER_M } from "./RasterLayers";
+import { RasterLayers, cadRasterPxPerM } from "./RasterLayers";
 import { TopologyEngine } from "./TopologyEngine";
 import { GlobalGuides } from "./globalGuides";
 import { Renderer, Selection } from "./Renderer";
