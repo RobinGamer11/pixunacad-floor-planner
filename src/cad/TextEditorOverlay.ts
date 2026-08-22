@@ -101,12 +101,101 @@ export class TextEditorOverlay {
 
     this._onSelectionChange = () => {
       if (!this.isActive()) return;
+      this._captureRange();
       this._syncToolbarState();
     };
     document.addEventListener("selectionchange", this._onSelectionChange);
   }
 
   isActive(): boolean { return this.activeBoxId != null; }
+
+  /* ---------- Zeichen-Auswahl innerhalb des Editors ---------- */
+
+  private _savedRange: Range | null = null;
+
+  private _captureRange() {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    const range = sel.getRangeAt(0);
+    if (range.collapsed) return;
+    if (!this.el.contains(range.commonAncestorContainer)) return;
+    this._savedRange = range.cloneRange();
+  }
+
+  /** true, wenn im offenen Editor gerade Zeichen markiert sind. */
+  hasTextSelection(): boolean {
+    if (!this.isActive() || !this._savedRange) return false;
+    if (this._savedRange.collapsed) return false;
+    return this.el.contains(this._savedRange.commonAncestorContainer);
+  }
+
+  private _restoreRange(): boolean {
+    if (!this.hasTextSelection()) return false;
+    this.el.focus({ preventScroll: true });
+    const sel = window.getSelection();
+    if (!sel) return false;
+    sel.removeAllRanges();
+    sel.addRange(this._savedRange!);
+    return true;
+  }
+
+  /**
+   * Wendet Zeichen-Formatierung ausschließlich auf die aktuelle Markierung an.
+   * Wird von den Werkzeug-Einstellungen (rechtes Panel) genutzt, damit z. B.
+   * nur ein markierter Name rot/größer wird, der Rest aber unverändert bleibt.
+   */
+  applyInlineFormat(opts: {
+    color?: string;
+    fontSizePx?: number;
+    bold?: boolean;
+    italic?: boolean;
+    underline?: boolean;
+    strike?: boolean;
+  }): boolean {
+    if (!this._restoreRange()) return false;
+    try { document.execCommand("styleWithCSS", false, "true"); } catch {}
+
+    const setState = (cmd: string, want: boolean) => {
+      let cur = false;
+      try { cur = document.queryCommandState(cmd); } catch {}
+      if (cur !== want) document.execCommand(cmd, false);
+    };
+
+    if (opts.color) document.execCommand("foreColor", false, opts.color);
+    if (typeof opts.bold === "boolean") setState("bold", opts.bold);
+    if (typeof opts.italic === "boolean") setState("italic", opts.italic);
+    if (typeof opts.underline === "boolean") setState("underline", opts.underline);
+    if (typeof opts.strike === "boolean") setState("strikeThrough", opts.strike);
+    if (typeof opts.fontSizePx === "number" && opts.fontSizePx > 0) {
+      this._applyFontSizePxToSelection(opts.fontSizePx);
+    }
+
+    // Markierung für Folge-Änderungen erhalten und Box aktualisieren.
+    this._captureRange();
+    const box = this.app.scene.getTextBoxById(this.activeBoxId!);
+    if (box) {
+      box.html = this.el.innerHTML;
+      if ((box.style as any).autoSize !== false) {
+        autoSizeTextBox(box, (this.app.renderer as any).referencePxPerM);
+        this.reposition(box);
+      }
+    }
+    return true;
+  }
+
+  private _applyFontSizePxToSelection(px: number) {
+    try {
+      document.execCommand("fontSize", false, "7"); // tagging trick
+      const fonts = this.el.querySelectorAll('font[size="7"]');
+      fonts.forEach(node => {
+        const span = document.createElement("span");
+        span.style.fontSize = `${px}px`;
+        span.innerHTML = (node as HTMLElement).innerHTML;
+        node.replaceWith(span);
+      });
+    } catch {}
+  }
+
 
   beginEdit(box: TextBox) {
     this.activeBoxId = box.id;
