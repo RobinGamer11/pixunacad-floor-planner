@@ -187,14 +187,43 @@ export const HatchSettingsPanel: React.FC<Props> = ({ app, projectId, pxPerMm = 
         />
       </div>
 
-      {/* Strichstärke px + mm */}
+      {/* Rahmen (Kontur) an/aus */}
       <div>
-        <div className="mb-1.5 text-[10px] text-muted-foreground">Strichstärke</div>
-        <div className="grid grid-cols-2 gap-2">
-          <MeasureInput label="Bildschirm (px)" value={strokeWidthPx} digits={2} onChange={(v) => setStroke(v)} />
-          <MeasureInput label="Tatsächl. Größe (mm)" value={strokeMm} digits={3} onChange={(v) => setStroke(v * pxPerMm)} />
+        <div className="mb-1.5 text-[10px] text-muted-foreground">Rahmen</div>
+        <div className="grid grid-cols-2 gap-1">
+          {([
+            { on: true, label: "Anzeigen" },
+            { on: false, label: "Entfernen" },
+          ]).map(({ on, label }) => (
+            <button
+              key={label}
+              type="button"
+              onClick={() => {
+                if (on) setStroke(lastStrokeRef.current > 0 ? lastStrokeRef.current : 1);
+                else { if (strokeWidthPx > 0) lastStrokeRef.current = strokeWidthPx; setStroke(0); }
+              }}
+              className={`h-8 rounded border text-[11px] transition-colors ${
+                (strokeWidthPx > 0) === on ? "bg-accent" : "hover:bg-muted"
+              }`}
+              style={{ borderColor: HAIRLINE }}
+            >
+              {label}
+            </button>
+          ))}
         </div>
       </div>
+
+      {/* Strichstärke px + mm */}
+      {strokeWidthPx > 0 && (
+        <div>
+          <div className="mb-1.5 text-[10px] text-muted-foreground">Strichstärke</div>
+          <div className="grid grid-cols-2 gap-2">
+            <MeasureInput label="Bildschirm (px)" value={strokeWidthPx} digits={2} onChange={(v) => setStroke(v)} />
+            <MeasureInput label="Tatsächl. Größe (mm)" value={strokeMm} digits={3} onChange={(v) => setStroke(v * pxPerMm)} />
+          </div>
+        </div>
+      )}
+
 
       {afterStroke}
 
