@@ -3482,17 +3482,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           </div>
         </DragScrollDiv>
         <DragScrollDiv axis="both" className="flex-1 min-h-0 overflow-auto p-2 space-y-2 cursor-grab active:cursor-grabbing" style={{ display: rightTab === "layers" ? "block" : "none" }}>
-          {helpOn && (
-            <div
-              className="rounded-lg px-3 py-2 text-[11px] font-medium"
-              style={{ background: "hsl(220 18% 16%)", color: "hsl(0 0% 100% / 0.92)" }}
-            >
-              Höchste Ebene = Im Vordergrund
-              <div className="mt-1 font-normal" style={{ opacity: 0.85 }}>
-                🔒 Ebene sperren (Auswahl/Verschieben/Löschen/Radieren gesperrt, Fang bleibt) · 👁 Ein-/Ausblenden · ✎ Umbenennen · 🗑 Löschen
-              </div>
-            </div>
-          )}
+          {helpOn && <LayerHelpLegend />}
+
           <div ref={idPanelRef} className="cad-id-panel w-full">
             <div className="id-head">
               <div className="id-title">Bezeichnungs-ID</div>
