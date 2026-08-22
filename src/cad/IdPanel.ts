@@ -228,7 +228,10 @@ export class IdPanel {
       const editBtn = document.createElement("button");
       editBtn.className = "id-icon-btn icon-only";
       editBtn.title = "Umbenennen";
-      editBtn.textContent = "✎";
+      editBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+             <path d="M12 20h9"/>
+             <path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4z"/>
+           </svg>`;
       editBtn.disabled = !!group.locked;
       editBtn.style.opacity = group.locked ? "0.35" : "1";
       editBtn.addEventListener("click", (e) => {
@@ -243,7 +246,13 @@ export class IdPanel {
       const deleteBtn = document.createElement("button");
       deleteBtn.className = "id-icon-btn icon-only";
       deleteBtn.title = "Löschen";
-      deleteBtn.textContent = "🗑";
+      deleteBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+             <path d="M3 6h18"/>
+             <path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+             <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/>
+             <path d="M10 11v6"/><path d="M14 11v6"/>
+           </svg>`;
+
       const onlyOne = this.app.labelManager.list().length <= 1;
       deleteBtn.disabled = onlyOne;
       deleteBtn.style.opacity = onlyOne ? "0.35" : "1";
