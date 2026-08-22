@@ -206,7 +206,21 @@ export class RasterLayer {
       ctx.fill();
       ctx.restore();
       tile.dataUrl = null;
+      tile.maybeEmpty = true;
     });
+    this.pruneEmptyTiles();
+  }
+
+  /**
+   * Gibt vollständig leergeräumte Kacheln frei (sparse bleibt sparse).
+   * Wird nach dem Radieren aufgerufen und prüft nur betroffene Kacheln.
+   */
+  pruneEmptyTiles() {
+    for (const [key, tile] of [...this.tiles]) {
+      if (!tile.maybeEmpty || tile.loading) continue;
+      tile.maybeEmpty = false;
+      if (this._isTileEmpty(tile)) this.tiles.delete(key);
+    }
   }
 
   /** Zeichnet den Rasterinhalt in den Viewport (Bildschirm-Canvas). */
@@ -215,7 +229,11 @@ export class RasterLayer {
     const tw = this.tileWorld;
     const sizePx = tw * camera.scale;
     ctx.save();
-    ctx.imageSmoothingEnabled = true;
+    // Beim Vergrößern über die gespeicherte Rasterauflösung hinaus würde die
+    // Glättung nur verwaschen — ab ~1,5-facher Vergrößerung wird pixelgenau
+    // gezeichnet. Die gespeicherte Qualität bleibt davon unberührt.
+    const magnify = camera.scale / this.pxPerM;
+    ctx.imageSmoothingEnabled = magnify <= 1.5;
     ctx.imageSmoothingQuality = "high";
     for (const tile of this.tiles.values()) {
       if (tile.loading) continue;
