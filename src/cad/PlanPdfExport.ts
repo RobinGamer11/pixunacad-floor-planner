@@ -18,7 +18,7 @@ import {
 } from "./PlanProjections";
 import { Defaults } from "./constants";
 
-const MM_TO_PT = 72 / 25.4; // ≈ 2.8346
+import { MM_TO_PT } from "@/lib/scale";
 
 interface RGB {
   r: number;
@@ -124,7 +124,7 @@ function drawProjectionToPdf(
   paperWidthMm: number,
   paperHeightMm: number,
   items: ProjectionItem[],
-  proj: { x: number; y: number; rotation: number; scale: number; clip: ClipRect },
+  proj: { x: number; y: number; rotation: number; scaleDen?: number; scale?: number; clip: ClipRect },
 ) {
   const layout = computeProjectionLayout(items, proj);
   const factor = layout.factor; // sheet-m → plan-m

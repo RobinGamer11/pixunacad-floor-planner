@@ -24,7 +24,8 @@ export const OverlayColors: { key: string; hex: string }[] = [
   { key: "yellow", hex: "#d6c248" },
 ];
 
-/** Vordefinierte Maßstäbe für Blätter (Wert = Welt-Einheiten pro 1 Plan-Einheit). */
+/** @deprecated CAD-Blätter sind immer 1:1 (Modellbereich). Nur noch für
+ *  Rückwärtskompatibilität alter Projektdaten vorhanden. */
 export const SheetScales: { key: string; label: string; value: number }[] = [
   { key: "1:20",  label: "1:20",  value: 20 },
   { key: "1:50",  label: "1:50",  value: 50 },
@@ -37,9 +38,10 @@ export interface Sheet {
   id: string;
   name: string;
   locked?: boolean; // Default-Sheet ist gesperrt (nicht löschbar/umbenennbar)
-  /** Maßstab-Schlüssel (z.B. "1:100") oder "free" für freien Wert. */
+  /** @deprecated Altfeld. Modellblätter sind immer 1:1; der Ausgabemaßstab
+   *  wird erst beim Einfügen in Druckplan/Projektmappe gewählt. */
   scaleKey?: string;
-  /** Numerischer Wert (Welt-Einheiten pro Plan-Einheit). Nur relevant wenn scaleKey === "free". */
+  /** @deprecated Altfeld (siehe scaleKey). */
   scaleValue?: number;
 }
 
@@ -70,8 +72,7 @@ export class SheetManager {
 
   constructor() {
     this.sheets = [
-      { id: SheetDefaults.defaultSheetId, name: SheetDefaults.defaultSheetName, locked: false,
-        scaleKey: SheetDefaults.defaultScaleKey, scaleValue: SheetDefaults.defaultScaleValue },
+      { id: SheetDefaults.defaultSheetId, name: SheetDefaults.defaultSheetName, locked: false },
     ];
   }
 
@@ -90,11 +91,8 @@ export class SheetManager {
   createSheet(): Sheet {
     const id = `sheet-${Date.now()}-${this._counter++}`;
     const name = `Blatt ${this._counter - 1}`;
-    const sheet: Sheet = {
-      id, name, locked: false,
-      scaleKey: SheetDefaults.defaultScaleKey,
-      scaleValue: SheetDefaults.defaultScaleValue,
-    };
+    // Modellbereich: keine Ausgabe-Maßstabsinformation am Blatt.
+    const sheet: Sheet = { id, name, locked: false };
     // Neue Blätter oben einfügen → höchster Vordergrund
     this.sheets.unshift(sheet);
     return sheet;
@@ -109,7 +107,7 @@ export class SheetManager {
     return s;
   }
 
-  /** Setzt den Maßstab eines Blatts. scaleKey "free" => benötigt scaleValue. */
+  /** @deprecated Modellblätter sind 1:1 — nur noch für Altdaten/Restore. */
   setScale(id: string, scaleKey: string, scaleValue?: number): Sheet | null {
     const s = this.getById(id);
     if (!s) return null;
@@ -150,8 +148,9 @@ export class SheetManager {
       id: s.id,
       name: s.name,
       locked: !!s.locked,
-      scaleKey: s.scaleKey || SheetDefaults.defaultScaleKey,
-      scaleValue: typeof s.scaleValue === "number" ? s.scaleValue : SheetDefaults.defaultScaleValue,
+      // Altfelder nur durchreichen, wenn sie tatsächlich vorhanden sind.
+      ...(s.scaleKey ? { scaleKey: s.scaleKey } : {}),
+      ...(typeof s.scaleValue === "number" ? { scaleValue: s.scaleValue } : {}),
     }));
   }
 
@@ -161,8 +160,6 @@ export class SheetManager {
       id: SheetDefaults.defaultSheetId,
       name: SheetDefaults.defaultSheetName,
       locked: false,
-      scaleKey: SheetDefaults.defaultScaleKey,
-      scaleValue: SheetDefaults.defaultScaleValue,
     });
     if (!Array.isArray(data) || data.length === 0) {
       this.sheets = [makeDefault()];
@@ -172,10 +169,10 @@ export class SheetManager {
       id: String(s.id),
       name: String(s.name || "Blatt"),
       locked: false,
-      scaleKey: typeof s.scaleKey === "string" ? s.scaleKey : SheetDefaults.defaultScaleKey,
-      scaleValue: typeof s.scaleValue === "number" && s.scaleValue > 0
-        ? s.scaleValue
-        : SheetDefaults.defaultScaleValue,
+      // Rückwärtskompatibel: Altwerte verlustfrei übernehmen, aber nicht
+      // erzeugen. Sie sind keine Quelle mehr für neue Projektionen.
+      ...(typeof s.scaleKey === "string" ? { scaleKey: s.scaleKey } : {}),
+      ...(typeof s.scaleValue === "number" && s.scaleValue > 0 ? { scaleValue: s.scaleValue } : {}),
     }));
     if (cleaned.length === 0) cleaned.push(makeDefault());
     this.sheets = cleaned;
