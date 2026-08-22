@@ -314,8 +314,11 @@ export class TextBox {
   }) {
     this.id = id;
     this.center = v(center.x, center.y);
-    this.widthM = Math.max(Defaults.textMinBoxSizeM, widthM);
-    this.heightM = Math.max(Defaults.textMinBoxSizeM, heightM);
+    // Gespeicherte Geometrie unverändert übernehmen; nur echte Nullgrößen
+    // erhalten die Standardgröße (sonst wachsen Boxen beim Laden).
+    this.widthM = widthM > 0 ? widthM : Defaults.textMinBoxSizeM;
+    this.heightM = heightM > 0 ? heightM : Defaults.textMinBoxSizeM;
+
     this.rotationRad = rotationRad || 0;
     this.html = html || "";
     const s = style || {};
