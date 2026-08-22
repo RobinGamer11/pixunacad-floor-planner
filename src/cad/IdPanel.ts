@@ -331,14 +331,8 @@ export class IdPanel {
       this.listEl.appendChild(makeIndicator(index + 1));
     });
 
-    if (this._helpOn()) {
-      const legend = document.createElement("div");
-      legend.className = "id-count";
-      legend.style.padding = "6px 8px";
-      legend.style.lineHeight = "1.5";
-      legend.innerHTML = "\uD83D\uDD12 Sperren · \uD83D\uDC41 Ein-/Ausblenden · \u270E Umbenennen · \uD83D\uDDD1 L\u00f6schen";
-      this.listEl.appendChild(legend);
-    }
+    // Symbol-Legende wird im Hilfe-Modus oberhalb des Panels (React) angezeigt.
+
   }
 
   private _escapeHtml(str: string): string {
