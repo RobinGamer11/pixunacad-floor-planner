@@ -1,0 +1,246 @@
+/**
+ * hybridFill.ts — gemeinsame Bereichserkennung aus Vektor- UND Rasterkanten.
+ *
+ * Das Füllwerkzeug soll für den Benutzer nicht zwischen Vektor und Pixel
+ * unterscheiden: Ein Bereich gilt als geschlossen, wenn seine Begrenzung aus
+ * einer beliebigen Mischung von Vektorlinien (Linien, Wände, Schraffurkanten,
+ * Freihand) und Rasterstrichen (Pixelmodus / RasterLayers) besteht.
+ *
+ * Vorgehen
+ * --------
+ *  1) Analyseausschnitt in WELTKOORDINATEN bestimmen (Vektor-BBox ∪ Raster-BBox
+ *     ∪ Umgebung des Klicks). Zoom-unabhängig.
+ *  2) Eine gemeinsame Boundary-Maske über `buildRasterBoundaryMask` aufbauen:
+ *     sichtbare Rasterebenen + maßhaltig gerasterte Vektorkanten.
+ *  3) Flood-Fill vom Klickpixel im transparenten Bereich.
+ *  4) Kontur des gefundenen Bereichs extrahieren (Crack-Following) und
+ *     vereinfachen (Douglas-Peucker) → saubere Polygonkontur in Weltmetern.
+ *
+ * Reine Vektorbereiche laufen weiterhin über den präzisen DCEL-Pfad in
+ * `hatchFill.ts` (Fast-Path) — dieser Modul greift nur, wenn tatsächlich
+ * sichtbarer Rasterinhalt existiert.
+ */
+import { Vec2, v, polygonSignedArea } from "./geometry";
+import type { Scene } from "./Scene";
+import { collectBoundaryEdges } from "./hatchFill";
+import { buildRasterBoundaryMask, type RasterScope } from "./rasterBoundary";
+import type { RasterLayers } from "./RasterLayers";
+
+/** Ziel-Pixelbudget der Analysemaske (zoom-unabhängig). */
+const TARGET_PIXELS = 4_000_000;
+/** Ober-/Untergrenze der Analyseauflösung in px pro Weltmeter. */
+const MAX_PX_PER_M = 4000;
+const MIN_PX_PER_M = 200;
+/** Zusätzlicher Suchradius um den Klick, falls kaum Geometrie existiert. */
+const CLICK_PAD_M = 2;
+/** Randstreifen der Maske; erreicht der Flood-Fill ihn, gilt der Bereich als offen. */
+const BORDER_PX = 1;
+
+export interface HybridFillOptions {
+  scope?: RasterScope;
+  activeLabelId?: string | null;
+  /** Sichtbarkeitsfilter für Ebenen (Vektor wie Raster). */
+  isVisible?: (labelId: string) => boolean;
+}
+
+interface Rect { x: number; y: number; w: number; h: number }
+
+function unionRect(a: Rect | null, b: Rect | null): Rect | null {
+  if (!a) return b;
+  if (!b) return a;
+  const x = Math.min(a.x, b.x);
+  const y = Math.min(a.y, b.y);
+  return { x, y, w: Math.max(a.x + a.w, b.x + b.w) - x, h: Math.max(a.y + a.h, b.y + b.h) - y };
+}
+
+/** Douglas-Peucker-Vereinfachung. */
+function simplify(points: Vec2[], eps: number): Vec2[] {
+  if (points.length < 3) return points;
+  const keep = new Uint8Array(points.length);
+  keep[0] = 1; keep[points.length - 1] = 1;
+  const stack: [number, number][] = [[0, points.length - 1]];
+  while (stack.length) {
+    const [i0, i1] = stack.pop()!;
+    if (i1 <= i0 + 1) continue;
+    const a = points[i0], b = points[i1];
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const len = Math.hypot(dx, dy) || 1e-12;
+    let best = -1, bestD = eps;
+    for (let i = i0 + 1; i < i1; i++) {
+      const p = points[i];
+      const d = Math.abs((p.x - a.x) * dy - (p.y - a.y) * dx) / len;
+      if (d > bestD) { bestD = d; best = i; }
+    }
+    if (best >= 0) {
+      keep[best] = 1;
+      stack.push([i0, best], [best, i1]);
+    }
+  }
+  const out: Vec2[] = [];
+  for (let i = 0; i < points.length; i++) if (keep[i]) out.push(points[i]);
+  return out;
+}
+
+/**
+ * Crack-Following: liefert die Außenkontur der gefüllten Pixelmenge als
+ * Polygon in Pixel-Eckkoordinaten (Gitterpunkte).
+ */
+function traceContour(filled: Uint8Array, wPx: number, hPx: number, startIdx: number): { x: number; y: number }[] {
+  const at = (x: number, y: number) => (x < 0 || y < 0 || x >= wPx || y >= hPx) ? 0 : filled[y * wPx + x];
+
+  // Start: oberste, linkeste gefüllte Zelle der Region ermitteln.
+  let sx = startIdx % wPx, sy = Math.floor(startIdx / wPx);
+  for (let y = 0; y < hPx; y++) {
+    let found = -1;
+    for (let x = 0; x < wPx; x++) if (filled[y * wPx + x]) { found = x; break; }
+    if (found >= 0) { sx = found; sy = y; break; }
+  }
+
+  const DIRS = [[1, 0], [0, 1], [-1, 0], [0, -1]]; // right, down, left, up
+  let cx = sx, cy = sy, d = 0;
+  const startCx = cx, startCy = cy, startD = d;
+  const pts: { x: number; y: number }[] = [];
+  let guard = 0;
+  const maxSteps = 8 * (wPx + hPx) * 4 + 1000;
+
+  do {
+    // Front-Left / Front-Right Zellen je Richtung.
+    let fl: [number, number], fr: [number, number];
+    if (d === 0) { fl = [cx, cy - 1]; fr = [cx, cy]; }
+    else if (d === 1) { fl = [cx, cy]; fr = [cx - 1, cy]; }
+    else if (d === 2) { fl = [cx - 1, cy]; fr = [cx - 1, cy - 1]; }
+    else { fl = [cx - 1, cy - 1]; fr = [cx, cy - 1]; }
+
+    let nd: number;
+    if (at(fl[0], fl[1])) nd = (d + 3) % 4;      // links abbiegen
+    else if (at(fr[0], fr[1])) nd = d;           // geradeaus
+    else nd = (d + 1) % 4;                       // rechts abbiegen
+
+    if (nd !== d) pts.push({ x: cx, y: cy });
+    d = nd;
+    cx += DIRS[d][0];
+    cy += DIRS[d][1];
+    if (++guard > maxSteps) break;
+  } while (!(cx === startCx && cy === startCy && d === startD));
+
+  return pts;
+}
+
+/**
+ * Hybride Bereichserkennung. Gibt die Kontur in Weltkoordinaten zurück
+ * oder null, wenn der Bereich nicht geschlossen ist bzw. keine Analyse
+ * möglich war.
+ */
+export function findHybridEnclosingFace(
+  scene: Scene,
+  rasterLayers: RasterLayers | null | undefined,
+  click: Vec2,
+  options: HybridFillOptions = {},
+): Vec2[] | null {
+  const isVisible = options.isVisible;
+
+  // --- 1) Analyseausschnitt bestimmen -------------------------------------
+  const edges = collectBoundaryEdges(scene);
+  let vecRect: Rect | null = null;
+  if (edges.length) {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const e of edges) {
+      minX = Math.min(minX, e.a.x, e.b.x); maxX = Math.max(maxX, e.a.x, e.b.x);
+      minY = Math.min(minY, e.a.y, e.b.y); maxY = Math.max(maxY, e.a.y, e.b.y);
+    }
+    vecRect = { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+  }
+  const rasRect = rasterLayers?.contentBoundsWorld(
+    isVisible ? (id) => isVisible(id) : undefined,
+  ) ?? null;
+  const clickRect: Rect = { x: click.x - CLICK_PAD_M, y: click.y - CLICK_PAD_M, w: CLICK_PAD_M * 2, h: CLICK_PAD_M * 2 };
+
+  let rect = unionRect(unionRect(vecRect, rasRect), clickRect)!;
+  // Kleiner Rand, damit außen liegende Bereiche als "offen" erkannt werden.
+  const pad = Math.max(0.05, Math.min(rect.w, rect.h) * 0.02);
+  rect = { x: rect.x - pad, y: rect.y - pad, w: rect.w + pad * 2, h: rect.h + pad * 2 };
+  if (rect.w <= 0 || rect.h <= 0) return null;
+
+  // --- 2) Zoom-unabhängige Analyseauflösung -------------------------------
+  let pxPerM = Math.sqrt(TARGET_PIXELS / (rect.w * rect.h));
+  pxPerM = Math.max(MIN_PX_PER_M, Math.min(MAX_PX_PER_M, pxPerM));
+
+  // --- 3) Gemeinsame Boundary-Maske (Raster + Vektor) ---------------------
+  const mask = buildRasterBoundaryMask(rasterLayers, rect.x, rect.y, rect.w, rect.h, {
+    scope: options.scope ?? "all",
+    activeLabelId: options.activeLabelId,
+    isVisible,
+    pxPerM,
+    alphaThreshold: 16,
+    drawExtra: (ctx, x, y, _w, _h, k) => {
+      // Vektorkanten maßhaltig in dieselbe Maske. Dünne Linie (≈1,4 px) —
+      // reicht als Begrenzung, verfälscht die Fläche aber kaum.
+      ctx.save();
+      ctx.strokeStyle = "#000";
+      ctx.lineWidth = 1.4;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.beginPath();
+      for (const e of edges) {
+        ctx.moveTo((e.a.x - x) * k, (e.a.y - y) * k);
+        ctx.lineTo((e.b.x - x) * k, (e.b.y - y) * k);
+      }
+      ctx.stroke();
+      ctx.restore();
+    },
+  });
+  if (!mask) return null;
+
+  const { wPx, hPx, alpha, threshold } = mask;
+  const px = Math.floor((click.x - mask.x) * mask.pxPerM);
+  const py = Math.floor((click.y - mask.y) * mask.pxPerM);
+  if (px < 0 || py < 0 || px >= wPx || py >= hPx) return null;
+  const startIdx = py * wPx + px;
+  if (alpha[startIdx] >= threshold) return null; // direkt auf einer Grenze geklickt
+
+  // --- 4) Flood-Fill im transparenten Bereich -----------------------------
+  const filled = new Uint8Array(wPx * hPx);
+  const stack = new Int32Array(wPx * hPx);
+  let sp = 0;
+  stack[sp++] = startIdx;
+  filled[startIdx] = 1;
+  let escaped = false;
+  let count = 0;
+
+  while (sp > 0) {
+    const idx = stack[--sp];
+    const x = idx % wPx;
+    const y = (idx - x) / wPx;
+    count++;
+    if (x <= BORDER_PX || y <= BORDER_PX || x >= wPx - 1 - BORDER_PX || y >= hPx - 1 - BORDER_PX) {
+      escaped = true;
+      break;
+    }
+    const push = (nx: number, ny: number) => {
+      const ni = ny * wPx + nx;
+      if (filled[ni]) return;
+      if (alpha[ni] >= threshold) return;
+      filled[ni] = 1;
+      stack[sp++] = ni;
+    };
+    push(x + 1, y); push(x - 1, y); push(x, y + 1); push(x, y - 1);
+  }
+
+  if (escaped || count < 9) return null;
+
+  // --- 5) Kontur extrahieren + vereinfachen -------------------------------
+  const contourPx = traceContour(filled, wPx, hPx, startIdx);
+  if (contourPx.length < 3) return null;
+
+  const world: Vec2[] = contourPx.map((p) => v(mask.x + p.x / mask.pxPerM, mask.y + p.y / mask.pxPerM));
+  // Vereinfachung ≈ 1,2 Analysepixel — zoom-unabhängig, Form bleibt erhalten.
+  const eps = 1.2 / mask.pxPerM;
+  let simple = simplify(world, eps);
+  if (simple.length >= 2) {
+    const first = simple[0], last = simple[simple.length - 1];
+    if (Math.hypot(first.x - last.x, first.y - last.y) < eps) simple = simple.slice(0, -1);
+  }
+  if (simple.length < 3) return null;
+  if (polygonSignedArea(simple) < 0) simple = [...simple].reverse();
+  return simple;
+}

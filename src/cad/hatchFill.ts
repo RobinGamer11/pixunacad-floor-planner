@@ -15,7 +15,7 @@ import { Vec2, v, dist, pointInPolygon, polygonSignedArea, polygonAreaAbs } from
 import type { Scene } from "./Scene";
 import { buildHealedWallSolidRing } from "./wallSolid";
 
-interface RawEdge { a: Vec2; b: Vec2; }
+export interface RawEdge { a: Vec2; b: Vec2; }
 
 const COORD_QUANT = 1e-6;
 const PARAM_EPS = 1e-9;
@@ -24,7 +24,11 @@ function quantKey(p: Vec2): string {
   return `${Math.round(p.x / COORD_QUANT)},${Math.round(p.y / COORD_QUANT)}`;
 }
 
-function collectEdges(scene: Scene): RawEdge[] {
+/**
+ * Sammelt alle Vektorkanten der Szene, die als Füllbegrenzung gelten.
+ * Wird auch von der hybriden Vektor/Raster-Analyse (`hybridFill.ts`) genutzt.
+ */
+export function collectBoundaryEdges(scene: Scene): RawEdge[] {
   const out: RawEdge[] = [];
   for (const seg of scene.segments) {
     if (dist(seg.a, seg.b) > 1e-7) out.push({ a: v(seg.a.x, seg.a.y), b: v(seg.b.x, seg.b.y) });
@@ -182,7 +186,7 @@ function buildPlanarFaces(rawEdges: RawEdge[]): { faceLoops: Vec2[][]; verts: Ve
  * Rückgabe: Polygon-Punkte (CCW) oder null wenn kein geschlossener Bereich umschließt.
  */
 export function findEnclosingFace(scene: Scene, click: Vec2): Vec2[] | null {
-  const raw = collectEdges(scene);
+  const raw = collectBoundaryEdges(scene);
   if (raw.length === 0) return null;
   const sub = subdivideEdges(raw);
   if (sub.length === 0) return null;

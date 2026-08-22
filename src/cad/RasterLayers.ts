@@ -287,7 +287,26 @@ export class RasterLayer {
       img.src = t.src;
     }
   }
+
+  /**
+   * Weltrechteck, das allen belegten Kacheln dieser Ebene umschließt.
+   * Kachelgenau (nicht pixelgenau) — reicht für die Boundary-Analyse.
+   */
+  contentBoundsWorld(): { x: number; y: number; w: number; h: number } | null {
+    if (this.tiles.size === 0) return null;
+    const tw = this.tileWorld;
+    let minTx = Infinity, minTy = Infinity, maxTx = -Infinity, maxTy = -Infinity;
+    for (const t of this.tiles.values()) {
+      if (t.tx < minTx) minTx = t.tx;
+      if (t.ty < minTy) minTy = t.ty;
+      if (t.tx > maxTx) maxTx = t.tx;
+      if (t.ty > maxTy) maxTy = t.ty;
+    }
+    if (!Number.isFinite(minTx)) return null;
+    return { x: minTx * tw, y: minTy * tw, w: (maxTx - minTx + 1) * tw, h: (maxTy - minTy + 1) * tw };
+  }
 }
+
 
 /**
  * Verwaltung aller Raster-Ebenen einer Szene.
@@ -318,6 +337,25 @@ export class RasterLayers {
     for (const l of this.layers.values()) if (l.hasContent()) return true;
     return false;
   }
+
+  /**
+   * Weltrechteck über alle (optional gefilterten) Rasterebenen mit Inhalt.
+   * Wird von der hybriden Boundary-Analyse genutzt, um den Analyseausschnitt
+   * zoom-unabhängig zu bestimmen.
+   */
+  contentBoundsWorld(filter?: (labelId: string) => boolean): { x: number; y: number; w: number; h: number } | null {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const [labelId, layer] of this.layers) {
+      if (filter && !filter(labelId)) continue;
+      const b = layer.contentBoundsWorld();
+      if (!b) continue;
+      minX = Math.min(minX, b.x); minY = Math.min(minY, b.y);
+      maxX = Math.max(maxX, b.x + b.w); maxY = Math.max(maxY, b.y + b.h);
+    }
+    if (!Number.isFinite(minX)) return null;
+    return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+  }
+
 
   /** Zeichnet genau eine Ebene (Aufruf aus der Label-Reihenfolge des Renderers). */
   drawLayer(ctx: CanvasRenderingContext2D, camera: Camera, labelId: string) {
