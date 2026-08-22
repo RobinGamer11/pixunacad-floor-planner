@@ -130,6 +130,8 @@ import { TextSpanAllPages } from "@/components/workspace/TextSpanAllPages";
 import { MappeHelpOverlay } from "@/components/workspace/MappeHelpOverlay";
 import { ToolColorPicker } from "@/components/workspace/ToolColorPicker";
 import { TabletAidWheel } from "@/components/TabletAidWheel";
+import { LayerFab, LayerHelpLegend } from "@/components/cad/LayerHelp";
+
 
 // Papierformate: kanonische Quelle ist src/lib/paper.ts.
 // Für "frei" enthält diese Tabelle nur die Default-Größe; individuelle Werte
@@ -386,6 +388,20 @@ export default function ProjectWorkspace() {
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, [leftOpen, rightOpen]);
+  // Anzahl der Ebenen für den runden Ebenen-Button auf der Zeichenfläche.
+  const [mappeLayerCount, setMappeLayerCount] = useState(1);
+  useEffect(() => {
+    const tick = () => {
+      try {
+        const n = (cadEngineApiRef.current?.engine as any)?.labelManager?.list?.().length ?? 1;
+        setMappeLayerCount((prev) => (prev === n ? prev : n));
+      } catch { /* Engine noch nicht bereit */ }
+    };
+    tick();
+    const id = window.setInterval(tick, 800);
+    return () => window.clearInterval(id);
+  }, []);
+
   const [renamingPageId, setRenamingPageId] = useState<string | undefined>();
   const [pageNameDraft, setPageNameDraft] = useState("");
   const [pageActionsSticky, setPageActionsSticky] = useState(false);
@@ -2155,7 +2171,14 @@ export default function ProjectWorkspace() {
                 multiSelectActive={selectedElementIds.length > 1}
               />
             )}
+            {!presenting && !printMode && (
+              <LayerFab
+                count={mappeLayerCount}
+                onClick={() => { setRightOpen(true); setRightTab("layers"); }}
+              />
+            )}
             <ZoomBar zoom={zoom} setZoom={setZoomClamped} onResetZoom={resetZoomAndCenter} />
+
           </main>
 
           {/* Right inspector (collapsible) */}
@@ -5481,17 +5504,8 @@ function RightInspector({
           )}
           {tab === "layers" && page && (
             <div className="space-y-4">
-              {helpOn && (
-                <div
-                  className="rounded-lg px-3 py-2 text-[11px] font-medium"
-                  style={{ background: "hsl(220 18% 16%)", color: "hsl(0 0% 100% / 0.92)" }}
-                >
-                  Höchste Ebene = Im Vordergrund
-                  <div className="mt-1 font-normal" style={{ opacity: 0.85 }}>
-                    🔒 Ebene sperren (Auswahl/Verschieben/Löschen/Radieren gesperrt, Fang bleibt) · 👁 Ein-/Ausblenden · ✎ Umbenennen · 🗑 Löschen
-                  </div>
-                </div>
-              )}
+              {helpOn && <LayerHelpLegend />}
+
               {/* Ein einziges Ebenen-/Bezeichnungs-ID-System — identisch zur
                  CAD-Oberfläche. CAD-Blätter, Dokumente, Notizen, Tabellen
                  usw. werden über den `externalLabelCounter`-Hook direkt in

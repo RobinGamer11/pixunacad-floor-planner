@@ -228,7 +228,10 @@ export class IdPanel {
       const editBtn = document.createElement("button");
       editBtn.className = "id-icon-btn icon-only";
       editBtn.title = "Umbenennen";
-      editBtn.textContent = "✎";
+      editBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+             <path d="M12 20h9"/>
+             <path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4z"/>
+           </svg>`;
       editBtn.disabled = !!group.locked;
       editBtn.style.opacity = group.locked ? "0.35" : "1";
       editBtn.addEventListener("click", (e) => {
@@ -243,7 +246,13 @@ export class IdPanel {
       const deleteBtn = document.createElement("button");
       deleteBtn.className = "id-icon-btn icon-only";
       deleteBtn.title = "Löschen";
-      deleteBtn.textContent = "🗑";
+      deleteBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+             <path d="M3 6h18"/>
+             <path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+             <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/>
+             <path d="M10 11v6"/><path d="M14 11v6"/>
+           </svg>`;
+
       const onlyOne = this.app.labelManager.list().length <= 1;
       deleteBtn.disabled = onlyOne;
       deleteBtn.style.opacity = onlyOne ? "0.35" : "1";
@@ -276,7 +285,16 @@ export class IdPanel {
       lockBtn.title = group.editLocked
         ? "Ebene entsperren (Auswahl, Verschieben, Löschen, Radieren wieder erlaubt)"
         : "Ebene sperren (Auswahl, Verschieben, Löschen, Radieren gesperrt — Fangpunkte bleiben nutzbar)";
-      lockBtn.textContent = group.editLocked ? "🔒" : "🔓";
+      lockBtn.innerHTML = group.editLocked
+        ? `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+             <rect x="3.5" y="10.5" width="17" height="11" rx="2.5"/>
+             <path d="M7.5 10.5V7a4.5 4.5 0 019 0v3.5"/>
+           </svg>`
+        : `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+             <rect x="3.5" y="10.5" width="17" height="11" rx="2.5"/>
+             <path d="M7.5 10.5V7a4.5 4.5 0 018.9-1"/>
+           </svg>`;
+
       lockBtn.style.opacity = group.editLocked ? "1" : "0.55";
       lockBtn.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -313,14 +331,8 @@ export class IdPanel {
       this.listEl.appendChild(makeIndicator(index + 1));
     });
 
-    if (this._helpOn()) {
-      const legend = document.createElement("div");
-      legend.className = "id-count";
-      legend.style.padding = "6px 8px";
-      legend.style.lineHeight = "1.5";
-      legend.innerHTML = "\uD83D\uDD12 Sperren · \uD83D\uDC41 Ein-/Ausblenden · \u270E Umbenennen · \uD83D\uDDD1 L\u00f6schen";
-      this.listEl.appendChild(legend);
-    }
+    // Symbol-Legende wird im Hilfe-Modus oberhalb des Panels (React) angezeigt.
+
   }
 
   private _escapeHtml(str: string): string {
