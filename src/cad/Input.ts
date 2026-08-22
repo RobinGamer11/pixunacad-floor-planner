@@ -1,3 +1,4 @@
+import { EMPTY_WHEEL_ZOOM_BURST, nextSmartWheelZoom } from "@/lib/projectZoom";
 import { Camera } from "./Camera";
 
 /**
@@ -72,6 +73,7 @@ export class Input {
   rightClicked = false;
   doubleClicked = false;
   wheelDelta = 0;
+  private _wheelBurst = { ...EMPTY_WHEEL_ZOOM_BURST };
   isPanning = false;
   panDX = 0;
   panDY = 0;
@@ -178,7 +180,19 @@ export class Input {
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       if (isZoomLocked()) return;
-      this.wheelDelta += e.deltaY;
+      // deltaMode normalisieren (Firefox meldet Zeilen/Seiten statt Pixel).
+      let dy = e.deltaY;
+      if (e.deltaMode === 1) dy *= 16;
+      if (e.deltaMode === 2) dy *= c.clientHeight || 800;
+      if (dy === 0) return;
+      const dir: 1 | -1 = dy < 0 ? 1 : -1;
+      const smart = nextSmartWheelZoom(this._wheelBurst, dir, performance.now());
+      this._wheelBurst = smart.burst;
+      // Prozent pro Ereignis: 1 % Basis, progressiv bis 8 % — mit Deckel gegen
+      // „explodierenden“ Zoom bei sehr großen Trackpad-Deltas.
+      const percent = Math.abs(smart.step) * Math.min(1, Math.abs(dy) / 100);
+      if (percent <= 0) return;
+      this.wheelDelta += -dir * Math.log(1 + percent / 100) / Math.log(1.0015);
     };
     c.addEventListener("wheel", onWheel, { passive: false });
     this._cleanups.push(() => c.removeEventListener("wheel", onWheel));
