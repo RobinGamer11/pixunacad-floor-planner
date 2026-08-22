@@ -49,8 +49,22 @@ export function TextSpanAllPages({
     && !!project?.textSpanTemplates?.some((t) => t.groupId === groupId);
   const active = hasTemplate;
 
-  /** Nur diese eine Seitenkopie entfernen — die Gruppe bleibt aktiv. */
+  /**
+   * Nur diese eine Seitenkopie entfernen — die Gruppe bleibt aktiv. War es die
+   * letzte Kopie, wird auch die Vorlage entfernt (kein Wiederauftauchen auf
+   * neuen Seiten).
+   */
   const removeHere = () => {
+    if (groupId) {
+      const hasOtherCopy = (project?.pages ?? []).some(
+        (pg) =>
+          pg.id !== pageId
+          && ((pg.cadOverlay as any)?.textBoxes ?? []).some(
+            (b: any) => b?.style?.spanGroupId === groupId,
+          ),
+      );
+      if (!hasOtherCopy) projectStore.removeTextSpanGroup(projectId, pageId, groupId);
+    }
     (engine as any).scene?.removeTextBox?.(box);
     engine.commitHistorySnapshot?.();
     setTick((t) => t + 1);
