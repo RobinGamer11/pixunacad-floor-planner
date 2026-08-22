@@ -388,6 +388,20 @@ export default function ProjectWorkspace() {
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, [leftOpen, rightOpen]);
+  // Anzahl der Ebenen für den runden Ebenen-Button auf der Zeichenfläche.
+  const [mappeLayerCount, setMappeLayerCount] = useState(1);
+  useEffect(() => {
+    const tick = () => {
+      try {
+        const n = (cadEngineApiRef.current?.engine as any)?.labelManager?.list?.().length ?? 1;
+        setMappeLayerCount((prev) => (prev === n ? prev : n));
+      } catch { /* Engine noch nicht bereit */ }
+    };
+    tick();
+    const id = window.setInterval(tick, 800);
+    return () => window.clearInterval(id);
+  }, []);
+
   const [renamingPageId, setRenamingPageId] = useState<string | undefined>();
   const [pageNameDraft, setPageNameDraft] = useState("");
   const [pageActionsSticky, setPageActionsSticky] = useState(false);
