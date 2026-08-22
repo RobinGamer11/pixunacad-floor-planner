@@ -43,6 +43,8 @@ import { RasterModeToggle } from "@/components/cad/RasterModeToggle";
 import { DocumentFilterPanel } from "@/components/cad/DocumentFilterPanel";
 import { DocumentPixelModeToggle } from "@/components/cad/DocumentPixelModeToggle";
 import { WarpSection, FlipSection } from "@/components/page/CadDocumentInspector";
+import { LayerFab, LayerHelpLegend } from "@/components/cad/LayerHelp";
+
 
 /** Maßeingabe (Meter) im Stil der übrigen Werkzeuge: Beschriftung, gerahmtes Feld, Einheit. */
 const DoorNumField: React.FC<{
