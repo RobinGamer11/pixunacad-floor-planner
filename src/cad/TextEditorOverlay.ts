@@ -261,15 +261,27 @@ export class TextEditorOverlay {
   private _applyFontSizePxToSelection(px: number) {
     try {
       document.execCommand("fontSize", false, "7"); // tagging trick
-      const fonts = this.el.querySelectorAll('font[size="7"]');
+      const fonts = Array.from(this.el.querySelectorAll('font[size="7"]'));
+      const replaced: HTMLElement[] = [];
       fonts.forEach(node => {
         const span = document.createElement("span");
         span.style.fontSize = `${px}px`;
         span.innerHTML = (node as HTMLElement).innerHTML;
         node.replaceWith(span);
+        replaced.push(span);
       });
+      if (replaced.length) {
+        const range = document.createRange();
+        range.setStartBefore(replaced[0]);
+        range.setEndAfter(replaced[replaced.length - 1]);
+        const sel = window.getSelection();
+        sel?.removeAllRanges();
+        sel?.addRange(range);
+        this._savedRange = range.cloneRange();
+      }
     } catch {}
   }
+
 
 
 
