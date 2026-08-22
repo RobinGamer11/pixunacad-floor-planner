@@ -6820,7 +6820,7 @@ function TextSettings({
         <div className="mb-1.5 text-[10px] text-muted-foreground">Schriftgröße</div>
         <div className="grid grid-cols-2 gap-2">
           <GuideMeasureInput
-            label="Bildschirm"
+            label="Punkt"
             unit="pt"
             value={settings.fontSize}
             fractionDigits={1}

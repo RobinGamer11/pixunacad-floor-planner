@@ -55,12 +55,22 @@ export class TextEditorOverlay {
       if (!this.isActive()) return;
       const t = e.target as Node;
       if (this.el.contains(t) || this.toolbarEl.contains(t)) return;
+      // Klicks in den seitlichen Werkzeug-Einstellungen dürfen die Text-Markierung
+      // NICHT verlieren — sie sollen genau auf die Auswahl wirken.
+      const targetEl = e.target as HTMLElement | null;
+      if (targetEl?.closest?.("aside")) {
+        if (!targetEl.closest("input, textarea, select, [contenteditable='true']")) {
+          e.preventDefault();
+        }
+        return;
+      }
       // While the TextTool is active, let the tool handle commit on its own
       // click — that way the click is consumed only as a "commit + show preview"
       // step, and a *second* click is needed to place the next box.
       if (this.app.activeTool === this.app.textTool) return;
       this.commit();
     };
+
     document.addEventListener("mousedown", this._onDocMouseDown);
 
     // Prevent toolbar interactions from blurring/losing the editor selection
@@ -109,40 +119,59 @@ export class TextEditorOverlay {
 
   isActive(): boolean { return this.activeBoxId != null; }
 
-  /* ---------- Zeichen-Auswahl innerhalb des Editors ---------- */
+  /* ---------- Zeichen-Auswahl / Caret innerhalb des Editors ---------- */
 
+  /** Zuletzt bekannte Range im Editor — auch kollabiert (Caret). */
   private _savedRange: Range | null = null;
 
   private _captureRange() {
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0) return;
     const range = sel.getRangeAt(0);
-    if (range.collapsed) return;
     if (!this.el.contains(range.commonAncestorContainer)) return;
     this._savedRange = range.cloneRange();
   }
 
-  /** true, wenn im offenen Editor gerade Zeichen markiert sind. */
-  hasTextSelection(): boolean {
-    if (!this.isActive() || !this._savedRange) return false;
-    if (this._savedRange.collapsed) return false;
-    return this.el.contains(this._savedRange.commonAncestorContainer);
+  private _rangeInEditor(): Range | null {
+    if (!this.isActive() || !this._savedRange) return null;
+    if (!this.el.contains(this._savedRange.commonAncestorContainer)) return null;
+    return this._savedRange;
   }
 
-  private _restoreRange(): boolean {
-    if (!this.hasTextSelection()) return false;
+  /** true, wenn im offenen Editor gerade Zeichen markiert sind. */
+  hasTextSelection(): boolean {
+    const r = this._rangeInEditor();
+    return !!r && !r.collapsed;
+  }
+
+  /** true, wenn der Editor offen ist und der Caret (ohne Auswahl) darin steht. */
+  hasCaret(): boolean {
+    const r = this._rangeInEditor();
+    return !!r && r.collapsed;
+  }
+
+  /** true, wenn eine Formatierung an den Editor (Auswahl oder Caret) gehen muss. */
+  ownsTextFormatting(): boolean {
+    return this.isActive() && (this.hasTextSelection() || this.hasCaret());
+  }
+
+  private _restoreRange(allowCollapsed = false): boolean {
+    const r = this._rangeInEditor();
+    if (!r) return false;
+    if (r.collapsed && !allowCollapsed) return false;
     this.el.focus({ preventScroll: true });
     const sel = window.getSelection();
     if (!sel) return false;
     sel.removeAllRanges();
-    sel.addRange(this._savedRange!);
+    sel.addRange(r);
     return true;
   }
 
   /**
-   * Wendet Zeichen-Formatierung ausschließlich auf die aktuelle Markierung an.
-   * Wird von den Werkzeug-Einstellungen (rechtes Panel) genutzt, damit z. B.
-   * nur ein markierter Name rot/größer wird, der Rest aber unverändert bleibt.
+   * Wendet Zeichen-Formatierung kontextabhängig an:
+   *  - Auswahl vorhanden → nur der markierte Bereich (Auswahl bleibt erhalten).
+   *  - nur Caret         → "Typing Style" für ab hier neu getippten Text.
+   * Gibt false zurück, wenn der Editor gar nicht zuständig ist (Objektmodus).
    */
   applyInlineFormat(opts: {
     color?: string;
@@ -152,53 +181,133 @@ export class TextEditorOverlay {
     underline?: boolean;
     strike?: boolean;
   }): boolean {
-    if (!this._restoreRange()) return false;
-    try { document.execCommand("styleWithCSS", false, "true"); } catch {}
+    if (!this.isActive()) return false;
 
-    const setState = (cmd: string, want: boolean) => {
-      let cur = false;
-      try { cur = document.queryCommandState(cmd); } catch {}
-      if (cur !== want) document.execCommand(cmd, false);
-    };
+    if (this.hasTextSelection()) {
+      if (!this._restoreRange()) return false;
+      try { document.execCommand("styleWithCSS", false, "true"); } catch {}
 
-    if (opts.color) document.execCommand("foreColor", false, opts.color);
-    if (typeof opts.bold === "boolean") setState("bold", opts.bold);
-    if (typeof opts.italic === "boolean") setState("italic", opts.italic);
-    if (typeof opts.underline === "boolean") setState("underline", opts.underline);
-    if (typeof opts.strike === "boolean") setState("strikeThrough", opts.strike);
-    if (typeof opts.fontSizePx === "number" && opts.fontSizePx > 0) {
-      this._applyFontSizePxToSelection(opts.fontSizePx);
-    }
+      const setState = (cmd: string, want: boolean) => {
+        let cur = false;
+        try { cur = document.queryCommandState(cmd); } catch {}
+        if (cur !== want) document.execCommand(cmd, false);
+      };
 
-    // Markierung für Folge-Änderungen erhalten und Box aktualisieren.
-    this._captureRange();
-    const box = this.app.scene.getTextBoxById(this.activeBoxId!);
-    if (box) {
-      box.html = this.el.innerHTML;
-      if ((box.style as any).autoSize !== false) {
-        autoSizeTextBox(box, (this.app.renderer as any).referencePxPerM);
-        this.reposition(box);
+      if (opts.color) document.execCommand("foreColor", false, opts.color);
+      if (typeof opts.bold === "boolean") setState("bold", opts.bold);
+      if (typeof opts.italic === "boolean") setState("italic", opts.italic);
+      if (typeof opts.underline === "boolean") setState("underline", opts.underline);
+      if (typeof opts.strike === "boolean") setState("strikeThrough", opts.strike);
+      if (typeof opts.fontSizePx === "number" && opts.fontSizePx > 0) {
+        this._applyFontSizePxToSelection(opts.fontSizePx);
       }
+
+      // Markierung für Folge-Änderungen sichtbar erhalten.
+      this._captureRange();
+      this._restoreRange();
+      this._syncBoxFromEditor();
+      return true;
     }
-    return true;
+
+    if (this.hasCaret()) {
+      this._applyTypingStyle(opts);
+      this._syncBoxFromEditor();
+      return true;
+    }
+
+    return false;
+  }
+
+  /** Schaltet einen Zeichenstil für Auswahl/Caret um (Word-Verhalten). */
+  toggleInlineStyle(key: "bold" | "italic" | "underline" | "strike"): boolean {
+    if (!this.ownsTextFormatting()) return false;
+    const cmd = key === "strike" ? "strikeThrough" : key;
+    this._restoreRange(true);
+    let cur = false;
+    try { cur = document.queryCommandState(cmd); } catch {}
+    return this.applyInlineFormat({ [key]: !cur } as any);
+  }
+
+  /** Word/PowerPoint-Verhalten: Stil gilt ab Caret für neu getippten Text. */
+  private _applyTypingStyle(opts: {
+    color?: string; fontSizePx?: number;
+    bold?: boolean; italic?: boolean; underline?: boolean; strike?: boolean;
+  }) {
+    if (!this._restoreRange(true)) return;
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    const range = sel.getRangeAt(0);
+
+    const span = document.createElement("span");
+    if (opts.color) span.style.color = opts.color;
+    if (typeof opts.fontSizePx === "number" && opts.fontSizePx > 0) span.style.fontSize = `${opts.fontSizePx}px`;
+    if (typeof opts.bold === "boolean") span.style.fontWeight = opts.bold ? "700" : "400";
+    if (typeof opts.italic === "boolean") span.style.fontStyle = opts.italic ? "italic" : "normal";
+    const deco: string[] = [];
+    if (opts.underline) deco.push("underline");
+    if (opts.strike) deco.push("line-through");
+    if (typeof opts.underline === "boolean" || typeof opts.strike === "boolean") {
+      span.style.textDecoration = deco.length ? deco.join(" ") : "none";
+    }
+    if (!span.getAttribute("style")) return;
+
+    // Zero-Width-Space als Anker, damit der Caret im Span steht.
+    const anchor = document.createTextNode("\u200B");
+    span.appendChild(anchor);
+    range.deleteContents();
+    range.insertNode(span);
+
+    const after = document.createRange();
+    after.setStart(anchor, anchor.length);
+    after.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(after);
+    this._savedRange = after.cloneRange();
+    this.el.focus({ preventScroll: true });
+  }
+
+  private _syncBoxFromEditor() {
+    const box = this.activeBoxId ? this.app.scene.getTextBoxById(this.activeBoxId) : null;
+    if (!box) return;
+    box.html = this.el.innerHTML;
+    if ((box.style as any).autoSize !== false) {
+      autoSizeTextBox(box, (this.app.renderer as any).referencePxPerM);
+      this.reposition(box);
+    }
+    (this.app as any).requestRender?.();
+    (this.app as any).renderer?.render?.();
   }
 
   private _applyFontSizePxToSelection(px: number) {
     try {
       document.execCommand("fontSize", false, "7"); // tagging trick
-      const fonts = this.el.querySelectorAll('font[size="7"]');
+      const fonts = Array.from(this.el.querySelectorAll('font[size="7"]'));
+      const replaced: HTMLElement[] = [];
       fonts.forEach(node => {
         const span = document.createElement("span");
         span.style.fontSize = `${px}px`;
         span.innerHTML = (node as HTMLElement).innerHTML;
         node.replaceWith(span);
+        replaced.push(span);
       });
+      if (replaced.length) {
+        const range = document.createRange();
+        range.setStartBefore(replaced[0]);
+        range.setEndAfter(replaced[replaced.length - 1]);
+        const sel = window.getSelection();
+        sel?.removeAllRanges();
+        sel?.addRange(range);
+        this._savedRange = range.cloneRange();
+      }
     } catch {}
   }
 
 
+
+
   beginEdit(box: TextBox) {
     this.activeBoxId = box.id;
+    this._savedRange = null;
     this.el.classList.remove("hidden");
     // Toolbar im Embed ausgeblendet lassen — Einstellungen liegen bereits
     // im seitlichen Werkzeug-Einstellungs-Panel.
@@ -366,7 +475,8 @@ export class TextEditorOverlay {
     if (!box) { this.hide(); return; }
 
     // 1) Persist HTML
-    const html = this.el.innerHTML;
+    // Typing-Style-Anker (Zero-Width-Spaces) vor dem Speichern entfernen.
+    const html = this.el.innerHTML.replace(/\u200B/g, "");
     box.html = html;
 
     // 2) Empty box → auto-delete
@@ -394,6 +504,7 @@ export class TextEditorOverlay {
 
   hide() {
     this.activeBoxId = null;
+    this._savedRange = null;
     this.el.classList.add("hidden");
     this.toolbarEl.classList.add("hidden");
     this.el.innerHTML = "";

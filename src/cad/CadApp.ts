@@ -1889,6 +1889,9 @@ export class CadApp {
     });
 
     r.textColor.addEventListener("input", () => {
+      r.textColorPreview.style.background = r.textColor.value;
+      // Markierter Text / Caret im offenen Editor → nur dieser Bereich.
+      if (this.textEditor?.applyInlineFormat({ color: r.textColor.value })) return;
       const sel = this.getEditTextBox();
       if (sel) sel.style.textColor = r.textColor.value;
       else this.defaultTextColor = r.textColor.value;
@@ -1899,6 +1902,7 @@ export class CadApp {
       let v = parseFloat((r.fontSize.value || "").replace(",", "."));
       if (!Number.isFinite(v) || v <= 0) return;
       v = clamp(v, 6, 200);
+      if (this.textEditor?.applyInlineFormat({ fontSizePx: v })) return;
       const sel = this.getEditTextBox();
       if (sel) { sel.style.fontSizePx = v; autoSizeTextBox(sel); }
       else this.defaultTextFontSizePx = v;
@@ -1993,6 +1997,7 @@ export class CadApp {
 
     // --- Stil: Fett / Kursiv / Unterstrichen / Durchgestrichen ---
     const toggleStyle = (key: "bold" | "italic" | "underline" | "strike") => {
+      if (this.textEditor?.toggleInlineStyle(key)) return;
       const sel = this.getEditTextBox();
       if (sel) {
         (sel.style as any)[key] = !(sel.style as any)[key];
@@ -2037,6 +2042,7 @@ export class CadApp {
       let pt = parseFloat((r.fontSizePt!.value || "").replace(",", "."));
       if (!Number.isFinite(pt) || pt <= 0) return;
       const px = clamp(pt * (4 / 3), 6, 200);
+      if (this.textEditor?.applyInlineFormat({ fontSizePx: px })) return;
       const sel = this.getEditTextBox();
       if (sel) { sel.style.fontSizePx = px; autoSizeTextBox(sel); }
       else this.defaultTextFontSizePx = px;
