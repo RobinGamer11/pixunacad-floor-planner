@@ -1463,6 +1463,17 @@ export class MiniCad {
     return this.scene.getTextBoxById(this.selection.textBoxId);
   }
 
+  /** TextBox ODER Tabelle — gemeinsame Box-Infrastruktur (Auswahl/HUB/Fangpunkte).
+   *  Wird vom SelectTool für die Eckpunkt-Menüs (Verschieben/Drehen) benötigt. */
+  getSelectedBox(): any {
+    if (!this.selection) return null;
+    if (this.selection.type !== SelectionType.TEXTBOX && this.selection.type !== SelectionType.TEXTBOX_HANDLE) return null;
+    const id = (this.selection as any).textBoxId;
+    if (!id) return null;
+    const scene = this.scene as any;
+    return scene.getBoxById ? scene.getBoxById(id) : scene.getTextBoxById(id);
+  }
+
   private _selectionInfo(selection: Selection | null): MiniCadSelectionInfo | null {
     if (!selection) return null;
     const box = this.getSelectedTextBox();
