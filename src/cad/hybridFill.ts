@@ -381,9 +381,35 @@ export function findHybridEnclosingFace(
 
   if (escaped || count < 9) return null;
 
+  // --- 4b) Schmale Ausläufer entfernen (morphologisches Opening) -----------
+  // An T-/X-Kreuzungen und über die Ecken hinauslaufenden Linien entstehen
+  // zwischen den verdickten Grenzen schmale Taschen. Ein Opening mit einem
+  // Radius etwas größer als die Grenzverdickung schneidet genau diese Arme
+  // weg, ohne die eigentliche Raumfläche zu verändern. Anschließend wird die
+  // Fläche wieder bis an die Grenzmittellinie ausgedehnt (Dilatation um
+  // OPEN_R + DILATE_PX), aber auf die Umgebung der Originalregion beschränkt,
+  // damit die Kontur nicht über die Begrenzung hinauswächst.
+  const OPEN_R = DILATE_PX + 2;
+  let region = filled;
+  const eroded = erodeMask(filled, wPx, hPx, OPEN_R);
+  const core = componentAt(eroded, filled, wPx, hPx, startIdx);
+  if (core) {
+    const grown = dilateMask(core, wPx, hPx, OPEN_R + DILATE_PX);
+    const allowed = dilateMask(filled, wPx, hPx, DILATE_PX);
+    const opened = new Uint8Array(wPx * hPx);
+    let openCount = 0;
+    for (let i = 0; i < opened.length; i++) {
+      const on = grown[i] && allowed[i] ? 1 : 0;
+      opened[i] = on;
+      openCount += on;
+    }
+    if (openCount >= 9) region = opened;
+  }
+
   // --- 5) Kontur extrahieren + vereinfachen -------------------------------
-  const contourPx = traceContour(filled, wPx, hPx, startIdx);
+  const contourPx = traceContour(region, wPx, hPx, startIdx);
   if (contourPx.length < 3) return null;
+
 
   const world: Vec2[] = contourPx.map((p) => v(mask.x + p.x / mask.pxPerM, mask.y + p.y / mask.pxPerM));
   // Treppenstufen der Rasterkontur zuerst leicht glätten (gleitender Mittelwert
