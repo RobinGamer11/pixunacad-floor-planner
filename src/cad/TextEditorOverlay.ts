@@ -167,6 +167,61 @@ export class TextEditorOverlay {
     return true;
   }
 
+  /* ---------- Sichtbare Markierung erhalten, auch ohne Editor-Fokus ---------- */
+
+  private static _highlightCssInjected = false;
+
+  private _ensureHighlightCss() {
+    if (TextEditorOverlay._highlightCssInjected) return;
+    TextEditorOverlay._highlightCssInjected = true;
+    const style = document.createElement("style");
+    style.textContent = `::highlight(cad-text-selection){background:rgba(77,163,255,0.35);}`;
+    document.head.appendChild(style);
+  }
+
+  /** Malt die gespeicherte Auswahl als CSS-Highlight (bleibt bei Fokusverlust sichtbar). */
+  private _paintPersistentHighlight() {
+    const anyCss = (window as any).CSS;
+    if (!anyCss?.highlights || typeof (window as any).Highlight !== "function") return;
+    const r = this._rangeInEditor();
+    if (!r || r.collapsed) { this._clearPersistentHighlight(); return; }
+    this._ensureHighlightCss();
+    try {
+      anyCss.highlights.set("cad-text-selection", new (window as any).Highlight(r.cloneRange()));
+    } catch {}
+  }
+
+  private _clearPersistentHighlight() {
+    const anyCss = (window as any).CSS;
+    try { anyCss?.highlights?.delete?.("cad-text-selection"); } catch {}
+  }
+
+  /**
+   * Führt eine Formatierung aus, ohne den Fokus (z. B. ein Zahlenfeld im
+   * Einstellungs-Panel) dauerhaft zu stehlen — inkl. Caret-Position im Feld.
+   */
+  private _withPreservedOuterFocus<T>(fn: () => T): T {
+    const active = document.activeElement as HTMLElement | null;
+    const isOuter = !!active && !this.el.contains(active) && active !== document.body;
+    let selStart: number | null = null;
+    let selEnd: number | null = null;
+    const input = isOuter && (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement)
+      ? active
+      : null;
+    if (input) {
+      try { selStart = input.selectionStart; selEnd = input.selectionEnd; } catch {}
+    }
+    const out = fn();
+    if (isOuter && active) {
+      this._paintPersistentHighlight();
+      try {
+        active.focus({ preventScroll: true });
+        if (input && selStart != null && selEnd != null) input.setSelectionRange(selStart, selEnd);
+      } catch {}
+    }
+    return out;
+  }
+
   /**
    * Wendet Zeichen-Formatierung kontextabhängig an:
    *  - Auswahl vorhanden → nur der markierte Bereich (Auswahl bleibt erhalten).
@@ -184,39 +239,45 @@ export class TextEditorOverlay {
     if (!this.isActive()) return false;
 
     if (this.hasTextSelection()) {
-      if (!this._restoreRange()) return false;
-      try { document.execCommand("styleWithCSS", false, "true"); } catch {}
+      return this._withPreservedOuterFocus(() => {
+        if (!this._restoreRange()) return false;
+        try { document.execCommand("styleWithCSS", false, "true"); } catch {}
 
-      const setState = (cmd: string, want: boolean) => {
-        let cur = false;
-        try { cur = document.queryCommandState(cmd); } catch {}
-        if (cur !== want) document.execCommand(cmd, false);
-      };
+        const setState = (cmd: string, want: boolean) => {
+          let cur = false;
+          try { cur = document.queryCommandState(cmd); } catch {}
+          if (cur !== want) document.execCommand(cmd, false);
+        };
 
-      if (opts.color) document.execCommand("foreColor", false, opts.color);
-      if (typeof opts.bold === "boolean") setState("bold", opts.bold);
-      if (typeof opts.italic === "boolean") setState("italic", opts.italic);
-      if (typeof opts.underline === "boolean") setState("underline", opts.underline);
-      if (typeof opts.strike === "boolean") setState("strikeThrough", opts.strike);
-      if (typeof opts.fontSizePx === "number" && opts.fontSizePx > 0) {
-        this._applyFontSizePxToSelection(opts.fontSizePx);
-      }
+        if (opts.color) document.execCommand("foreColor", false, opts.color);
+        if (typeof opts.bold === "boolean") setState("bold", opts.bold);
+        if (typeof opts.italic === "boolean") setState("italic", opts.italic);
+        if (typeof opts.underline === "boolean") setState("underline", opts.underline);
+        if (typeof opts.strike === "boolean") setState("strikeThrough", opts.strike);
+        if (typeof opts.fontSizePx === "number" && opts.fontSizePx > 0) {
+          this._applyFontSizePxToSelection(opts.fontSizePx);
+        }
 
-      // Markierung für Folge-Änderungen sichtbar erhalten.
-      this._captureRange();
-      this._restoreRange();
-      this._syncBoxFromEditor();
-      return true;
+        // Markierung für Folge-Änderungen sichtbar erhalten.
+        this._captureRange();
+        this._restoreRange();
+        this._paintPersistentHighlight();
+        this._syncBoxFromEditor();
+        return true;
+      });
     }
 
     if (this.hasCaret()) {
-      this._applyTypingStyle(opts);
-      this._syncBoxFromEditor();
-      return true;
+      return this._withPreservedOuterFocus(() => {
+        this._applyTypingStyle(opts);
+        this._syncBoxFromEditor();
+        return true;
+      });
     }
 
     return false;
   }
+
 
   /** Schaltet einen Zeichenstil für Auswahl/Caret um (Word-Verhalten). */
   toggleInlineStyle(key: "bold" | "italic" | "underline" | "strike"): boolean {
