@@ -576,6 +576,7 @@ export class TextEditorOverlay {
   hide() {
     this.activeBoxId = null;
     this._savedRange = null;
+    this._clearPersistentHighlight();
     this.el.classList.add("hidden");
     this.toolbarEl.classList.add("hidden");
     this.el.innerHTML = "";
@@ -583,7 +584,9 @@ export class TextEditorOverlay {
   }
 
   destroy() {
+    this._clearPersistentHighlight();
     document.removeEventListener("mousedown", this._onDocMouseDown);
     document.removeEventListener("selectionchange", this._onSelectionChange);
   }
 }
+
