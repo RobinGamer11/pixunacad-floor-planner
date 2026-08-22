@@ -285,7 +285,16 @@ export class IdPanel {
       lockBtn.title = group.editLocked
         ? "Ebene entsperren (Auswahl, Verschieben, Löschen, Radieren wieder erlaubt)"
         : "Ebene sperren (Auswahl, Verschieben, Löschen, Radieren gesperrt — Fangpunkte bleiben nutzbar)";
-      lockBtn.textContent = group.editLocked ? "🔒" : "🔓";
+      lockBtn.innerHTML = group.editLocked
+        ? `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+             <rect x="3.5" y="10.5" width="17" height="11" rx="2.5"/>
+             <path d="M7.5 10.5V7a4.5 4.5 0 019 0v3.5"/>
+           </svg>`
+        : `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+             <rect x="3.5" y="10.5" width="17" height="11" rx="2.5"/>
+             <path d="M7.5 10.5V7a4.5 4.5 0 018.9-1"/>
+           </svg>`;
+
       lockBtn.style.opacity = group.editLocked ? "1" : "0.55";
       lockBtn.addEventListener("click", (e) => {
         e.stopPropagation();
