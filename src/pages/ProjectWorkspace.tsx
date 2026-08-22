@@ -2793,6 +2793,8 @@ function PageCanvas({
 
       if ((e.key === "Delete" || e.key === "Backspace") && !inField) {
         if (selectedElementIds.length === 0) return;
+        // Tabelle im Zellmodus: Entf löscht dort nur den Zellinhalt.
+        if (t && t.closest?.("[data-table-cellmode]")) return;
         // Bei Backspace: nur reagieren wenn KEINE Texteingabe — sonst würde
         // das Tippen in Inspector-Inputs Elemente löschen.
         if (e.key === "Backspace" && document.activeElement && (document.activeElement as HTMLElement).tagName !== "BODY") return;

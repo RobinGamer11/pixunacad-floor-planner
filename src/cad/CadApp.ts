@@ -5,6 +5,7 @@ import { Input } from "./Input";
 import { Scene, AreaLabel, DimensionStyle, TextBoxStyle, TextBox } from "./Scene";
 import { autoSizeTextBox } from "./textAutoSize";
 import { textStyleFontSizePt, ptToCssPx } from "./textTypography";
+import { dominantRichStyle } from "./textDominantStyle";
 import { LabelManager } from "./LabelManager";
 import { RasterLayers, DEFAULT_RASTER_PX_PER_M } from "./RasterLayers";
 import { TopologyEngine } from "./TopologyEngine";
@@ -1798,13 +1799,19 @@ export class CadApp {
   getCurrentTextStyle(): TextBoxStyle {
     const sel = this.getSelectedTextBox();
     if (sel) {
+      // Bei ausgewählter Textbox den überwiegenden Stil des Inhalts anzeigen,
+      // damit die Sidebar zu dem passt, was tatsächlich zu sehen ist.
+      const dom = dominantRichStyle(sel.html || "", sel.style as any);
+      const domPt = dom.fontSizePt;
       return {
-        textColor: sel.style.textColor, fontSizePt: textStyleFontSizePt(sel.style), fontSizePx: sel.style.fontSizePx,
+        textColor: dom.color ?? sel.style.textColor,
+        fontSizePt: domPt ?? textStyleFontSizePt(sel.style),
+        fontSizePx: sel.style.fontSizePx,
         textAlphaPct: (sel.style as any).textAlphaPct ?? Defaults.textAlphaPct,
         bgColor: sel.style.bgColor, bgAlphaPct: sel.style.bgAlphaPct,
         wrap: sel.style.wrap, align: sel.style.align,
-        bold: sel.style.bold, italic: sel.style.italic,
-        underline: sel.style.underline, strike: sel.style.strike,
+        bold: dom.bold ?? sel.style.bold, italic: dom.italic ?? sel.style.italic,
+        underline: dom.underline ?? sel.style.underline, strike: dom.strike ?? sel.style.strike,
         lineHeightPct: sel.style.lineHeightPct,
         autoSize: (sel.style as any).autoSize !== false,
         borderEnabled: sel.style.borderEnabled, borderColor: sel.style.borderColor,
@@ -2567,6 +2574,10 @@ export class CadApp {
 
 
       if (e.key === "Delete" || e.key === "Backspace") {
+        // Tabelle im Zellmodus: Entf löscht dort nur den Zellinhalt,
+        // im Objektmodus dagegen die Tabelle selbst.
+        const kt = e.target as HTMLElement | null;
+        if (kt && typeof kt.closest === "function" && kt.closest("[data-table-cellmode]")) return;
         // Laufende Gruppen-Transformation → abbrechen statt löschen.
         if (this.selectTool.groupRotateActive || this.selectTool.groupDragActive) {
           e.preventDefault();
