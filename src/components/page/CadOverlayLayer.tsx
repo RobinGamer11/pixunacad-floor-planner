@@ -9,7 +9,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { Move, RotateCw, Scaling, Scissors } from "lucide-react";
-import { MiniCad, type MiniTool } from "@/cad/embed/MiniCad";
+import { MiniCad, FRAME_PAD_PX, type MiniTool } from "@/cad/embed/MiniCad";
 import { projectStore } from "@/lib/projectStore";
 import type { MiniCadSelectionInfo } from "@/cad/embed/MiniCad";
 import type { HatchDrawMode } from "@/cad/HatchTool";
