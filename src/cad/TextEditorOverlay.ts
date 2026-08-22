@@ -61,9 +61,14 @@ export class TextEditorOverlay {
       if (targetEl?.closest?.("aside")) {
         if (!targetEl.closest("input, textarea, select, [contenteditable='true']")) {
           e.preventDefault();
+        } else {
+          // Fokus wandert ins Eingabefeld → Markierung als CSS-Highlight sichtbar halten.
+          this._paintPersistentHighlight();
+          setTimeout(() => this._paintPersistentHighlight(), 0);
         }
         return;
       }
+
       // While the TextTool is active, let the tool handle commit on its own
       // click — that way the click is consumed only as a "commit + show preview"
       // step, and a *second* click is needed to place the next box.
