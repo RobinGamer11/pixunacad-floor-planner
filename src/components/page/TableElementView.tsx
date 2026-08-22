@@ -523,6 +523,9 @@ export function TableElementView({
         pointerEvents: active || foreignSession ? "auto" : "none",
       }}
       tabIndex={active ? 0 : -1}
+      // Marker für den globalen Entf-Handler der Seite: im Zellmodus löscht
+      // Entf nur den Zellinhalt, nicht das Tabellen-Objekt.
+      data-table-cellmode={active ? "1" : undefined}
       onKeyDown={onGridKeyDown}
       onPointerDown={(e) => { if (active) e.stopPropagation(); }}
       onDoubleClick={(e) => { if (active) e.stopPropagation(); }}
