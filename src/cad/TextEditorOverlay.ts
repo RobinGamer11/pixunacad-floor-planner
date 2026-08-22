@@ -496,7 +496,11 @@ export class TextEditorOverlay {
       this.el.style.minHeight = `${heightPx}px`;
       this.el.style.maxHeight = "none";
     } else {
-      this.el.style.width = "auto";
+      // Wichtig: kein "auto" — der Editor liegt in einem 0x0-Container
+      // (erweiterte Arbeitsfläche), dort würde "auto" auf 0 schrumpfen und den
+      // Text unsichtbar/umgebrochen darstellen. "max-content" ist unabhängig
+      // von der Breite des Containing Blocks.
+      this.el.style.width = "max-content";
       this.el.style.minWidth = `${widthPx}px`;
       this.el.style.maxWidth = "none";
       this.el.style.height = "auto";

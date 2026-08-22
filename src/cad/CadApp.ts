@@ -265,7 +265,7 @@ export class CadApp {
       // Untergrenze in px/Weltmeter). Da im CAD in echten Metern gezeichnet
       // wird, wird die Papier-DPI durch den Zeichnungsmaßstab geteilt
       // (1:100 ⇒ 1 Papiermeter = 100 Weltmeter). Der Zoom ändert daran nichts.
-      layers = new RasterLayers(cadRasterPxPerM(this.drawingScale || 1));
+      layers = new RasterLayers(cadRasterPxPerM());
       layers.onReady = () => { try { this.renderer?.render(); } catch { /* noop */ } };
       this._rasterLayersByKey.set(key, layers);
     }

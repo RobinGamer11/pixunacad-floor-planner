@@ -318,7 +318,7 @@ export class IdPanel {
       legend.className = "id-count";
       legend.style.padding = "6px 8px";
       legend.style.lineHeight = "1.5";
-      legend.innerHTML = "🔒 Ebene sperren · 👁 Ein-/Ausblenden · ✎ Umbenennen · 🗑 Löschen<br>Gesperrte Ebenen bleiben sichtbar und fangbar.";
+      legend.innerHTML = "\uD83D\uDD12 Sperren · \uD83D\uDC41 Ein-/Ausblenden · \u270E Umbenennen · \uD83D\uDDD1 L\u00f6schen";
       this.listEl.appendChild(legend);
     }
   }
