@@ -218,6 +218,16 @@ export class TextEditorOverlay {
     return false;
   }
 
+  /** Schaltet einen Zeichenstil für Auswahl/Caret um (Word-Verhalten). */
+  toggleInlineStyle(key: "bold" | "italic" | "underline" | "strike"): boolean {
+    if (!this.ownsTextFormatting()) return false;
+    const cmd = key === "strike" ? "strikeThrough" : key;
+    this._restoreRange(true);
+    let cur = false;
+    try { cur = document.queryCommandState(cmd); } catch {}
+    return this.applyInlineFormat({ [key]: !cur } as any);
+  }
+
   /** Word/PowerPoint-Verhalten: Stil gilt ab Caret für neu getippten Text. */
   private _applyTypingStyle(opts: {
     color?: string; fontSizePx?: number;
