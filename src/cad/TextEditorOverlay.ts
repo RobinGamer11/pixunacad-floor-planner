@@ -416,7 +416,51 @@ export class TextEditorOverlay {
       this._savedRange = after.cloneRange();
       this._syncBoxFromEditor();
     };
+    // Externer Paste (Word / Web): fremde Schriftgrößen, Fonts und Farben
+    // verwerfen — der Caret-/Basisstil der Textbox bleibt führend.
+    this.el.onpaste = (event) => {
+      const data = event.clipboardData;
+      if (!data) return;
+      const html = data.getData("text/html");
+      const text = data.getData("text/plain");
+      const clean = html ? sanitizePastedHtml(html) : plainTextToHtml(text || "");
+      event.preventDefault();
+      if (!clean) return;
+      const range = this._rangeInEditor();
+      if (!range) return;
+      range.deleteContents();
+      const wrapper = document.createElement("span");
+      const opts = this._typingStyle;
+      if (opts.color) wrapper.style.color = opts.color;
+      if (typeof opts.fontSizePt === "number" && opts.fontSizePt > 0) {
+        wrapper.dataset.fontSizePt = String(opts.fontSizePt);
+      }
+      wrapper.innerHTML = clean;
+      const frag = document.createDocumentFragment();
+      const hasStyle = !!wrapper.getAttribute("style") || !!wrapper.dataset.fontSizePt;
+      if (hasStyle) {
+        frag.appendChild(wrapper);
+      } else {
+        while (wrapper.firstChild) frag.appendChild(wrapper.firstChild);
+      }
+      const last = frag.lastChild;
+      range.insertNode(frag);
+      const after = document.createRange();
+      if (last) after.setStartAfter(last); else after.setStart(range.endContainer, range.endOffset);
+      after.collapse(true);
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(after);
+      this._savedRange = after.cloneRange();
+      this._syncBoxFromEditor();
+      const b = this.app.scene.getTextBoxById(this.activeBoxId!);
+      if (b && (b.style as any).autoSize !== false) {
+        autoSizeTextBox(b, (this.app.renderer as any).referencePxPerM);
+        this.reposition(b);
+      }
+    };
   }
+
 
   reposition(box: TextBox) {
     const cam = this.app.camera;
