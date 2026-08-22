@@ -35,6 +35,7 @@ import { DocumentTool } from "../DocumentTool";
 import { Defaults, SelectionType, PointEditAction } from "../constants";
 import type { TextBox, TextBoxStyle, FreeLineStyle } from "../Scene";
 import { drawRichTextBox } from "../textRichRenderer";
+import { ptToCssPx, textStyleFontSizePt } from "../textTypography";
 import { autoSizeTextBox } from "../textAutoSize";
 import { isExportMode } from "@/lib/printExport";
 
@@ -1068,7 +1069,7 @@ export class MiniCad {
     if (opts.color) this.defaultTextColor = opts.color;
     // Schriftgrößen werden in Word/PowerPoint als Punkt (pt) eingegeben.
     // 1pt = 4/3 CSS-Pixel — Umrechnung damit "11" so groß rendert wie in Word.
-    if (typeof opts.fontSizePx === "number" && opts.fontSizePx > 0) this.defaultTextFontSizePx = opts.fontSizePx * (4 / 3);
+    if (typeof opts.fontSizePx === "number" && opts.fontSizePx > 0) this.defaultTextFontSizePx = ptToCssPx(opts.fontSizePx);
     if (typeof opts.bold === "boolean") this.defaultTextBold = opts.bold;
     if (typeof opts.italic === "boolean") this.defaultTextItalic = opts.italic;
     if (typeof opts.underline === "boolean") this.defaultTextUnderline = opts.underline;
@@ -1094,7 +1095,7 @@ export class MiniCad {
         changed.color = applyAlphaToColor(opts.color, this.defaultTextAlpha);
       }
       if (typeof opts.fontSizePx === "number" && opts.fontSizePx !== prev.fontSizePx) {
-        changed.fontSizePx = opts.fontSizePx * (4 / 3);
+        changed.fontSizePt = opts.fontSizePx;
       }
       for (const k of ["bold", "italic", "underline", "strike"] as const) {
         if (typeof opts[k] === "boolean" && opts[k] !== prev[k]) changed[k] = opts[k];
@@ -1108,7 +1109,8 @@ export class MiniCad {
     const selected = this.getEditTextBox();
     if (selected) {
       selected.style.textColor = applyAlphaToColor(this.defaultTextColor, this.defaultTextAlpha);
-      selected.style.fontSizePx = this.defaultTextFontSizePx;
+      selected.style.fontSizePt = opts.fontSizePx ?? textStyleFontSizePt(selected.style);
+      selected.style.fontSizePx = ptToCssPx(selected.style.fontSizePt);
       selected.style.bgColor = this.defaultTextBgColor;
       selected.style.bgAlphaPct = this.defaultTextBgAlphaPct;
       selected.style.wrap = this.defaultTextAutoSize ? this.defaultTextWrap : true;
@@ -1441,6 +1443,7 @@ export class MiniCad {
     if (sel) {
       return {
         textColor: sel.style.textColor,
+        fontSizePt: textStyleFontSizePt(sel.style),
         fontSizePx: sel.style.fontSizePx,
         bgColor: sel.style.bgColor,
         bgAlphaPct: sel.style.bgAlphaPct,
@@ -1504,7 +1507,7 @@ export class MiniCad {
       return {
         tool: "text",
         color: textColor.color,
-        fontSize: Math.round(box.style.fontSizePx * (3 / 4)),
+        fontSize: Math.round(textStyleFontSizePt(box.style)),
         alpha: Math.round(textColor.alpha * 100),
         align: box.style.align,
         bgColor: box.style.bgColor,
@@ -2096,7 +2099,8 @@ export class MiniCad {
         widthPx, heightPx,
         rotationRad: box.rotationRad,
         html: box.html || "",
-        baseFontSizePx: box.style.fontSizePx * (cam.scale / r.referencePxPerM),
+        baseFontSizePt: textStyleFontSizePt(box.style),
+        displayScale: cam.scale / r.referencePxPerM,
         baseColor: box.style.textColor,
         bgColor: box.style.bgColor,
         bgAlpha: (box.style.bgAlphaPct || 0) / 100,

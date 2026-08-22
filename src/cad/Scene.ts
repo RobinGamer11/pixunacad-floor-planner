@@ -275,6 +275,9 @@ export interface TextBoxStyle {
   textColor?: string;
   /** Deckkraft des Textes in Prozent (100 = voll deckend). */
   textAlphaPct?: number;
+  /** Kanonische typografische Dokumentgröße. Zoom ist niemals enthalten. */
+  fontSizePt?: number;
+  /** @deprecated Legacy-Persistenzwert; wird beim Laden nach pt migriert. */
   fontSizePx?: number;
   bgColor?: string;
   bgAlphaPct?: number;
@@ -319,7 +322,17 @@ export class TextBox {
     this.style = {
       textColor: s.textColor || Defaults.textColor,
       textAlphaPct: clamp(s.textAlphaPct ?? Defaults.textAlphaPct, 0, 100),
-      fontSizePx: clamp(s.fontSizePx ?? Defaults.textFontSizePx, 6, 200),
+      fontSizePt: clamp(
+        s.fontSizePt ?? ((s.fontSizePx ?? Defaults.textFontSizePx) * 72 / 96),
+        1,
+        400,
+      ),
+      // Nur als lesbarer Legacy-Spiegel behalten. Neue Logik verwendet fontSizePt.
+      fontSizePx: clamp(
+        (s.fontSizePt ?? ((s.fontSizePx ?? Defaults.textFontSizePx) * 72 / 96)) * 96 / 72,
+        96 / 72,
+        400 * 96 / 72,
+      ),
       bgColor: s.bgColor || Defaults.textBgColor,
       bgAlphaPct: clamp(s.bgAlphaPct ?? Defaults.textBgAlphaPct, 0, 100),
       wrap: (typeof s.wrap === "boolean") ? s.wrap : Defaults.textWrap,
