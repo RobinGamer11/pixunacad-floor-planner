@@ -116,9 +116,14 @@ export class TextEditorOverlay {
 
     this._onSelectionChange = () => {
       if (!this.isActive()) return;
+      const sel = window.getSelection();
+      const inEditor = !!sel && sel.rangeCount > 0 && this.el.contains(sel.getRangeAt(0).commonAncestorContainer);
       this._captureRange();
+      // Native Auswahl sichtbar → kein zusätzliches Highlight nötig.
+      if (inEditor) this._clearPersistentHighlight();
       this._syncToolbarState();
     };
+
     document.addEventListener("selectionchange", this._onSelectionChange);
   }
 
