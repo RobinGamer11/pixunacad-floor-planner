@@ -5,6 +5,7 @@ import { Input } from "./Input";
 import { Scene, AreaLabel, DimensionStyle, TextBoxStyle, TextBox } from "./Scene";
 import { autoSizeTextBox } from "./textAutoSize";
 import { textStyleFontSizePt, ptToCssPx } from "./textTypography";
+import { dominantRichStyle } from "./textDominantStyle";
 import { LabelManager } from "./LabelManager";
 import { RasterLayers, DEFAULT_RASTER_PX_PER_M } from "./RasterLayers";
 import { TopologyEngine } from "./TopologyEngine";
@@ -1809,8 +1810,8 @@ export class CadApp {
         textAlphaPct: (sel.style as any).textAlphaPct ?? Defaults.textAlphaPct,
         bgColor: sel.style.bgColor, bgAlphaPct: sel.style.bgAlphaPct,
         wrap: sel.style.wrap, align: sel.style.align,
-        bold: sel.style.bold, italic: sel.style.italic,
-        underline: sel.style.underline, strike: sel.style.strike,
+        bold: dom.bold ?? sel.style.bold, italic: dom.italic ?? sel.style.italic,
+        underline: dom.underline ?? sel.style.underline, strike: dom.strike ?? sel.style.strike,
         lineHeightPct: sel.style.lineHeightPct,
         autoSize: (sel.style as any).autoSize !== false,
         borderEnabled: sel.style.borderEnabled, borderColor: sel.style.borderColor,
