@@ -91,7 +91,7 @@ export class PlanController {
    * Erzeugt eine Projektion auf dem aktiven Plan, ausgehend von einem Sheet-Drop.
    * sheetId = Quell-Blatt. (sx, sy) = Drop-Position in Bildschirm-Pixel.
    */
-  createProjectionFromSheet(sheetId: string, sx: number, sy: number): Projection | null {
+  async createProjectionFromSheet(sheetId: string, sx: number, sy: number): Promise<Projection | null> {
     const plan = this._activePlan();
     if (!plan) return null;
     const sheet = this.app.sheetManager.getById(sheetId);
@@ -103,7 +103,14 @@ export class PlanController {
     const snapshot = (this.app as any)._serializeOneScene(sheetScene);
     const items = flattenSheetSnapshot(snapshot);
     const bb = itemsBoundsM(items);
-    const factor = sheetToPlanFactor(this._sheetScaleValue(sheetId));
+
+    // Ausgabemaßstab wird beim Einfügen gewählt — CAD-Blätter sind immer 1:1.
+    const { askProjectionScale } = await import("./ScaleSelectDialog");
+    const chosenDen = await askProjectionScale(this._lastUsedScaleDen, {
+      title: "Maßstab beim Einfügen wählen",
+    });
+    if (chosenDen == null) return null;
+    this._lastUsedScaleDen = chosenDen;
 
     // Drop-Punkt in Plan-Welt (Meter) → mm
     const world = this.app.camera.screenToWorld(sx, sy);
@@ -114,7 +121,8 @@ export class PlanController {
       id: `proj-${Date.now()}-${Math.floor(Math.random() * 9999)}`,
       sourceSheetId: sheetId,
       sceneSnapshot: snapshot,
-      scale: this._sheetScaleValue(sheetId),
+      scaleDen: chosenDen,
+      scale: chosenDen,
       x: xMm,
       y: yMm,
       rotation: 0,
@@ -122,7 +130,6 @@ export class PlanController {
     };
     // Falls Sheet leer ist: kleines Default-Rechteck (sonst nichts sichtbar).
     if (!isFinite(bb.minX) || bb.maxX === bb.minX) { /* nothing */ }
-    void factor;
 
     this.app.planManager.addProjection(plan.id, proj);
     this._itemsCache.set(proj.id, items);
@@ -134,14 +141,32 @@ export class PlanController {
     return proj;
   }
 
-  private _sheetScaleValue(sheetId: string): number {
-    // Lokal aufgelöst, um Zirkular-Imports zu vermeiden.
-    const sheet = this.app.sheetManager.getById(sheetId);
-    if (!sheet) return 100;
-    const key = sheet.scaleKey || "1:100";
-    if (key === "free" && typeof sheet.scaleValue === "number" && sheet.scaleValue > 0) return sheet.scaleValue;
-    const parsed = key.startsWith("1:") ? parseFloat(key.slice(2)) : NaN;
-    return isFinite(parsed) && parsed > 0 ? parsed : 100;
+  /** Zuletzt gewählter Ausgabemaßstab (nur Vorbelegung des Dialogs). */
+  private _lastUsedScaleDen = 100;
+
+  /** Öffnet den Maßstabs-Dialog für die aktuell selektierte Projektion. */
+  async changeSelectedScale() {
+    const proj = this._currentProj();
+    if (!proj) return;
+    const oldDen = projectionScaleDen(proj);
+    const next = await askProjectionScale(oldDen, { title: "Maßstab der Ansicht ändern" });
+    if (next == null || Math.abs(next - oldDen) < 1e-9) return;
+    // Mittelpunkt bleibt erhalten; der Clip-Ausschnitt skaliert inhaltlich mit.
+    const f = oldDen / next;
+    proj.clip = {
+      left: (proj.clip?.left || 0) * f,
+      right: (proj.clip?.right || 0) * f,
+      top: (proj.clip?.top || 0) * f,
+      bottom: (proj.clip?.bottom || 0) * f,
+    };
+    proj.scaleDen = next;
+    proj.scale = next;
+    this._lastUsedScaleDen = next;
+    this.invalidateCache();
+    this.app.refreshPlanUI();
+    this._renderHubButtons();
+    this._positionHub();
+    this.app.commitHistorySnapshot();
   }
 
   /** Zeichne alle Projektionen des aktiven Plans. */
@@ -696,6 +721,8 @@ export class PlanController {
         } catch { /* noop */ }
         this._hideHub();
         this.app.canvas.style.cursor = "crosshair";
+      } else if (act === "scale") {
+        void this.changeSelectedScale();
       } else if (act === "reset-clip") {
         proj.clip = { left: 0, right: 0, top: 0, bottom: 0 };
         this.app.commitHistorySnapshot();
@@ -726,11 +753,14 @@ export class PlanController {
   private _renderHubButtons() {
     if (!this._hubEl) return;
     const handle = this.selectedHandle;
+    const curProj = this._currentProj();
+    const scaleLabel = formatScaleLabel(projectionScaleDen(curProj));
     let html = "";
     if (handle === "corner") {
       // Eckpunkt: nur Verschieben + Löschen.
       html = `
         <button data-act="translate" title="Verschieben">✥</button>
+        <button data-act="scale" title="Maßstab ändern">${scaleLabel}</button>
         <button data-act="delete" title="Zeichnungsblatt löschen">🗑</button>
       `;
     } else if (
@@ -741,6 +771,7 @@ export class PlanController {
     ) {
       html = `
         <button data-act="cut" title="Einschneiden">✂</button>
+        <button data-act="scale" title="Maßstab ändern">${scaleLabel}</button>
         <button data-act="reset-clip" title="Clip zurücksetzen">⤢</button>
         <button data-act="delete" title="Löschen">🗑</button>
       `;
@@ -749,6 +780,7 @@ export class PlanController {
       html = `
         <button data-act="translate" title="Verschieben">✥</button>
         <button data-act="rotate" title="Drehen">⟳</button>
+        <button data-act="scale" title="Maßstab ändern">${scaleLabel}</button>
         <button data-act="reset-clip" title="Clip zurücksetzen">⤢</button>
         <button data-act="delete" title="Löschen">🗑</button>
       `;
