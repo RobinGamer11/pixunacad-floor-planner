@@ -132,10 +132,13 @@ export type MiniCadSelectionInfo =
     };
 
 
-/** Extra CSS pixels around the page on the canvas so edge snap dots and the
- *  blue snap line are fully visible (and not occluded by the page's margin
- *  border). Independent of zoom. */
-const FRAME_PAD_PX = 16;
+/** Überstand (CSS-Pixel) der Zeichenfläche rings um die Papierseite.
+ *  Zweck: Fangpunkte und Hilfslinien am Blattrand bleiben sichtbar UND
+ *  Inhalte, die über die Seite hinausragen, werden auf der grauen
+ *  Arbeitsfläche weiter dargestellt (der PDF-Export beschneidet weiterhin
+ *  exakt an der Papierkante, da er nur die Seitenwurzel erfasst).
+ *  Zoomunabhängig. */
+export const FRAME_PAD_PX = 96;
 
 /** Zwei Selections referenzieren dasselbe Objekt, wenn eine ihrer ID-Felder
  *  (Segment, Hatch, TextBox, Sticker, FreeStroke, Document, Wall) übereinstimmt. */
