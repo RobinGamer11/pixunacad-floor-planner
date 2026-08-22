@@ -252,7 +252,11 @@ export class Renderer {
     return Defaults.strokeWidthBaseScale / Math.max(1, this.referencePxPerM);
   }
 
-  /** Cache: docId -> HTMLImageElement (lazy-load aus DataURL). */
+  /**
+   * Cache: Bildquelle (src/DataURL) -> HTMLImageElement.
+   * Schlüssel ist die Quelle, damit identische Bilder (Kopien, mehrfach
+   * eingefügte Objekte) nur EINMAL dekodiert im Speicher liegen.
+   */
   private _docImageCache = new Map<string, HTMLImageElement>();
 
   /**
