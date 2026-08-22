@@ -635,6 +635,7 @@ export class TextEditorOverlay {
     this.toolbarEl.classList.add("hidden");
     this.el.innerHTML = "";
     this.el.onbeforeinput = null;
+    this.el.onpaste = null;
     this.app.renderer.setEditingTextBoxId(null);
   }
 
