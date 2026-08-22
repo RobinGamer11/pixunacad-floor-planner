@@ -10,6 +10,8 @@ import type { CadApp } from "./CadApp";
 import type { Snap } from "./TopologyEngine";
 import type { Input } from "./Input";
 import { findEnclosingFace } from "./hatchFill";
+import { findHybridEnclosingFace } from "./hybridFill";
+
 import { maybeRasterize } from "./rasterize";
 import { toast } from "sonner";
 
