@@ -41,29 +41,39 @@ export const RASTER_TILE_PX = 512;
 export const DEFAULT_RASTER_PX_PER_M = Math.round((300 / 25.4) * 1000);
 
 /**
- * CAD-taugliche Grundqualität: 600 dpi bezogen auf das Papier.
- * Damit bleiben Pixelstriche auch beim Ausdruck und beim Hineinzoomen
- * werkplantauglich scharf. Die Auflösung ist FEST gespeichert — Zoomen
- * ändert sie nie.
+ * Zielqualität auf dem Papier: 300 dpi genügen für Werkpläne und Druck.
+ * (Nur dokumentarisch — die gespeicherte Modellauflösung ist fix.)
  */
-export const CAD_RASTER_DPI = 600;
+export const CAD_RASTER_DPI = 300;
 
 /**
- * Untergrenze der Rasterauflösung in Pixeln pro WELT-Meter. Im CAD wird in
- * echten Metern gezeichnet; bei sehr großen Maßstabsnennern (1:500) würde die
- * reine Papier-DPI-Umrechnung sonst zu grob werden.
+ * Referenz-Ausgabemaßstab, aus dem die feste Modellauflösung abgeleitet wird.
+ * 300 dpi bei 1:50 ⇒ (300/25.4)*1000/50 ≈ 236 px pro Weltmeter; wir runden auf
+ * einen speicherverträglichen, glatten Wert auf.
  */
+export const CAD_RASTER_REFERENCE_SCALE = 50;
+
+/**
+ * FESTE Rasterauflösung des Modellraums in Pixeln pro WELT-Meter.
+ *
+ * Der Modellraum ist immer 1:1 — der Ausgabemaßstab entsteht erst im Druckplan
+ * bzw. CAD-Viewport. Die gespeicherte Pixelqualität darf deshalb NICHT vom
+ * (Legacy-)Zeichnungsmaßstab abhängen, sonst entstünden bei 1:1 absurde
+ * ~23.600 px/m. 500 px/m (2 mm Weltraster pro Pixel) entspricht ~250 dpi bei
+ * 1:20 und ~600 dpi bei 1:50 — scharf, zoomunabhängig und sparse speicherbar.
+ */
+export const CAD_RASTER_PX_PER_M = 500;
+
+/** Untergrenze (Kompatibilität). */
 export const MIN_RASTER_PX_PER_M = 120;
 
 /**
- * Feste Rasterauflösung (px pro Weltmeter) für einen Zeichnungsmaßstab 1:N.
- * Wird EINMAL beim Anlegen der Ebene bestimmt und bleibt danach konstant —
- * der Zoom ändert die gespeicherte Qualität nie.
+ * Feste Rasterauflösung (px pro Weltmeter). Bewusst unabhängig vom
+ * Zeichnungs-/Druckmaßstab; das Argument wird nur noch aus Kompatibilität
+ * akzeptiert und ignoriert.
  */
-export function cadRasterPxPerM(scaleDenominator: number): number {
-  const denom = Math.max(1, scaleDenominator || 1);
-  const paper = (CAD_RASTER_DPI / 25.4) * 1000;
-  return Math.max(MIN_RASTER_PX_PER_M, Math.round(paper / denom));
+export function cadRasterPxPerM(_scaleDenominator?: number): number {
+  return CAD_RASTER_PX_PER_M;
 }
 
 export interface RasterTileJSON {

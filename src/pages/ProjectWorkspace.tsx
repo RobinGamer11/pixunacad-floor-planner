@@ -5487,6 +5487,9 @@ function RightInspector({
                   style={{ background: "hsl(220 18% 16%)", color: "hsl(0 0% 100% / 0.92)" }}
                 >
                   Höchste Ebene = Im Vordergrund
+                  <div className="mt-1 font-normal" style={{ opacity: 0.85 }}>
+                    🔒 Ebene sperren (Auswahl/Verschieben/Löschen/Radieren gesperrt, Fang bleibt) · 👁 Ein-/Ausblenden · ✎ Umbenennen · 🗑 Löschen
+                  </div>
                 </div>
               )}
               {/* Ein einziges Ebenen-/Bezeichnungs-ID-System — identisch zur

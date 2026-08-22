@@ -401,6 +401,15 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(true);
   const [rightOpen, setRightOpen] = useState<boolean>(true);
   const [rightTab, setRightTab] = useState<"settings" | "sheets" | "layers">("settings");
+  // Anzahl der Ebenen für den Ebenen-Button oben links (leichtgewichtiges Polling).
+  const [layerCount, setLayerCount] = useState(1);
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      const n = (appRef.current as any)?.labelManager?.list?.().length;
+      if (typeof n === "number") setLayerCount(prev => (prev === n ? prev : n));
+    }, 500);
+    return () => window.clearInterval(id);
+  }, []);
   
   const [expandedTool, setExpandedTool] = useState<string | null>(null);
   const leftSidebarRef = useRef<HTMLElement>(null);
@@ -1955,6 +1964,24 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           </button>
         )}
 
+        {/* Ebenen-Button oben links: Icon + Anzahl, öffnet das Ebenen-Panel. */}
+        {!presenting && (
+          <button
+            type="button"
+            title="Ebenen öffnen"
+            onClick={() => { setRightOpen(true); setRightTab("layers"); }}
+            className="absolute z-30 left-2 top-2 h-7 px-2 rounded-md flex items-center gap-1 text-[11px] font-medium shadow-sm"
+            style={{
+              background: "hsl(var(--surface-card))",
+              color: "hsl(var(--ink))",
+              border: "1px solid hsl(var(--hairline))",
+            }}
+          >
+            <LayersIcon size={13} />
+            <span>{layerCount}</span>
+          </button>
+        )}
+
         {/* Canvas */}
         <canvas ref={canvasRef} data-cad-canvas className="block w-full h-full" />
 
@@ -3473,6 +3500,9 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               style={{ background: "hsl(220 18% 16%)", color: "hsl(0 0% 100% / 0.92)" }}
             >
               Höchste Ebene = Im Vordergrund
+              <div className="mt-1 font-normal" style={{ opacity: 0.85 }}>
+                🔒 Ebene sperren (Auswahl/Verschieben/Löschen/Radieren gesperrt, Fang bleibt) · 👁 Ein-/Ausblenden · ✎ Umbenennen · 🗑 Löschen
+              </div>
             </div>
           )}
           <div ref={idPanelRef} className="cad-id-panel w-full">
