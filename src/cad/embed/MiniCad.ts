@@ -36,6 +36,7 @@ import { Defaults, SelectionType, PointEditAction } from "../constants";
 import type { TextBox, TextBoxStyle, FreeLineStyle } from "../Scene";
 import { drawRichTextBox } from "../textRichRenderer";
 import { ptToCssPx, textStyleFontSizePt } from "../textTypography";
+import { dominantRichStyle } from "../textDominantStyle";
 import { autoSizeTextBox } from "../textAutoSize";
 import { isExportMode } from "@/lib/printExport";
 
@@ -1441,18 +1442,20 @@ export class MiniCad {
   getCurrentTextStyle(): TextBoxStyle {
     const sel = this.getSelectedTextBox();
     if (sel) {
+      // Überwiegender Stil des Inhalts (Rich-Text) hat Vorrang vor dem Basisstil.
+      const dom = dominantRichStyle(sel.html || "", sel.style as any);
       return {
-        textColor: sel.style.textColor,
-        fontSizePt: textStyleFontSizePt(sel.style),
+        textColor: dom.color ?? sel.style.textColor,
+        fontSizePt: dom.fontSizePt ?? textStyleFontSizePt(sel.style),
         fontSizePx: sel.style.fontSizePx,
         bgColor: sel.style.bgColor,
         bgAlphaPct: sel.style.bgAlphaPct,
         wrap: sel.style.wrap,
         align: sel.style.align,
-        bold: sel.style.bold,
-        italic: sel.style.italic,
-        underline: sel.style.underline,
-        strike: sel.style.strike,
+        bold: dom.bold ?? sel.style.bold,
+        italic: dom.italic ?? sel.style.italic,
+        underline: dom.underline ?? sel.style.underline,
+        strike: dom.strike ?? sel.style.strike,
         lineHeightPct: sel.style.lineHeightPct,
         borderEnabled: sel.style.borderEnabled,
         borderColor: sel.style.borderColor,
