@@ -1798,8 +1798,14 @@ export class CadApp {
   getCurrentTextStyle(): TextBoxStyle {
     const sel = this.getSelectedTextBox();
     if (sel) {
+      // Bei ausgewählter Textbox den überwiegenden Stil des Inhalts anzeigen,
+      // damit die Sidebar zu dem passt, was tatsächlich zu sehen ist.
+      const dom = dominantRichStyle(sel.html || "", sel.style as any);
+      const domPt = dom.fontSizePt;
       return {
-        textColor: sel.style.textColor, fontSizePt: textStyleFontSizePt(sel.style), fontSizePx: sel.style.fontSizePx,
+        textColor: dom.color ?? sel.style.textColor,
+        fontSizePt: domPt ?? textStyleFontSizePt(sel.style),
+        fontSizePx: sel.style.fontSizePx,
         textAlphaPct: (sel.style as any).textAlphaPct ?? Defaults.textAlphaPct,
         bgColor: sel.style.bgColor, bgAlphaPct: sel.style.bgAlphaPct,
         wrap: sel.style.wrap, align: sel.style.align,
