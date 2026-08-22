@@ -6,6 +6,8 @@ export interface LabelGroup {
   name: string;
   locked: boolean;
   visible: boolean;
+  /** Inhaltssperre: Auswahl/Verschieben/Löschen/Radieren gesperrt (Fang bleibt). */
+  editLocked?: boolean;
 }
 
 export class LabelManager {
@@ -29,6 +31,26 @@ export class LabelManager {
   isVisible(id: string): boolean {
     const g = this.getById(id);
     return g ? g.visible !== false : true;
+  }
+
+  /** Ebene gesperrt? Gesperrte Ebenen bleiben sichtbar und fangbar. */
+  isEditLocked(id: string): boolean {
+    const g = this.getById(id);
+    return !!g && g.editLocked === true;
+  }
+
+  /** Bearbeitbar = sichtbar UND nicht gesperrt. */
+  isEditable(id: string): boolean {
+    const g = this.getById(id);
+    if (!g) return true;
+    return g.visible !== false && g.editLocked !== true;
+  }
+
+  toggleEditLocked(id: string): boolean {
+    const g = this.getById(id);
+    if (!g) return false;
+    g.editLocked = !g.editLocked;
+    return !!g.editLocked;
   }
 
   toggleVisible(id: string): boolean {
@@ -90,6 +112,6 @@ export class LabelManager {
 
   restore(groups: LabelGroup[]) {
     if (!Array.isArray(groups) || groups.length === 0) return;
-    this.groups = groups.map(g => ({ ...g }));
+    this.groups = groups.map(g => ({ ...g, editLocked: g.editLocked === true }));
   }
 }

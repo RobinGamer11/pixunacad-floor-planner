@@ -150,7 +150,7 @@ export class EraserTool {
     if (!eraser || !eraser.length) return;
     const minArea = Math.pow(Math.max(0.002, stamps[0].r * 0.05), 2);
     for (const hatch of scene.hatches.slice()) {
-      if (!this.app.labelManager.isVisible(hatch.labelId)) continue;
+      if (!this.app.labelManager.isEditable(hatch.labelId)) continue;
       if (!this._polyNearStamps(hatch.points, stamps)) continue;
       const subject: any = [[
         hatch.points.map((p) => [p.x, p.y]),
@@ -342,13 +342,13 @@ export class EraserTool {
     if (rasterLayers?.eraseCircle) {
       rasterLayers.eraseCircle(
         centerW.x, centerW.y, r, mode, strength, softness,
-        (labelId: string) => this.app.labelManager.isVisible(labelId),
+        (labelId: string) => this.app.labelManager.isEditable(labelId),
       );
     }
 
     // Dokument-Pixelmasken radieren (Smooth nur bei echten Bildern)
     for (const doc of scene.documents) {
-      if (!this.app.labelManager.isVisible(doc.labelId)) continue;
+      if (!this.app.labelManager.isEditable(doc.labelId)) continue;
       const docMode = doc.kind === "image" ? mode : "hard";
       eraseDocCircle(doc, centerW, r, strength, docMode, softness);
     }
@@ -375,7 +375,7 @@ export class EraserTool {
     const guideLockApp = this.app as CadApp & { areGuidesLocked?: () => boolean };
     const segsCopy = scene.segments.slice();
     for (const seg of segsCopy) {
-      if (!this.app.labelManager.isVisible(seg.labelId)) continue;
+      if (!this.app.labelManager.isEditable(seg.labelId)) continue;
       if (seg.isGuide && guideLockApp.areGuidesLocked?.()) continue;
       const pa = seg.a, pb = seg.b;
       const proj = projectPointToSegment(centerW, pa, pb);
@@ -426,7 +426,7 @@ export class EraserTool {
     // Textboxen: werden entfernt, sobald der Pinsel sie trifft (Smooth = mit
     // Verweildauer, damit ein Streifen am Rand nicht sofort alles löscht).
     for (const box of scene.textBoxes.slice()) {
-      if (!this.app.labelManager.isVisible(box.labelId)) continue;
+      if (!this.app.labelManager.isEditable(box.labelId)) continue;
       const d = this._distToBox(centerW, box.center, box.widthM, box.heightM, box.rotationRad);
       if (d > r) continue;
       const rT = this._effRadius(box.id, r, vecMode, softness, strength);

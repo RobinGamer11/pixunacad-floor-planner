@@ -575,7 +575,7 @@ export class SelectTool {
     const sel = this.app.selection;
     if (!sel || (sel.type !== SelectionType.TEXTBOX && sel.type !== SelectionType.TEXTBOX_HANDLE)) return null;
     const box = (this.app as any).getSelectedBox();
-    if (!box || !this.app.labelManager.isVisible(box.labelId)) return null;
+    if (!box || !this.app.labelManager.isEditable(box.labelId)) return null;
     const handleW = this._textBoxRotateHandleWorld(box);
     const handleS = this.app.camera.worldToScreen(handleW.x, handleW.y);
     const dx = handleS.x - input.mouse.sx;
@@ -589,7 +589,7 @@ export class SelectTool {
     const sel = this.app.selection;
     if (!sel || (sel.type !== SelectionType.TEXTBOX && sel.type !== SelectionType.TEXTBOX_HANDLE)) return null;
     const box = (this.app as any).getSelectedBox();
-    if (!box || !this.app.labelManager.isVisible(box.labelId)) return null;
+    if (!box || !this.app.labelManager.isEditable(box.labelId)) return null;
     const corners = boxCornersWorld(box);
     const mouseS = v(input.mouse.sx, input.mouse.sy);
     let best: { box: any; handleIndex: number } | null = null;
@@ -624,7 +624,7 @@ export class SelectTool {
     // Eckpunkte zuerst — die aktuell selektierte Wand gewinnt bei überlagerten
     // Verbindungspunkten; automatische T-Stoß-Stützpunkte bleiben unsichtbar.
     for (const wall of wallsByPriority) {
-      if (!this.app.labelManager.isVisible(wall.labelId)) continue;
+      if (!this.app.labelManager.isEditable(wall.labelId)) continue;
       for (let i = 0; i < wall.corners.length; i++) {
         if (this._isHiddenWallCorner(wall, i)) continue;
         const sp = cam.worldToScreen(wall.corners[i].x, wall.corners[i].y);
@@ -641,7 +641,7 @@ export class SelectTool {
     if (bestPoint) return bestPoint;
     // Achslinien
     for (const wall of this.app.scene.walls) {
-      if (!this.app.labelManager.isVisible(wall.labelId)) continue;
+      if (!this.app.labelManager.isEditable(wall.labelId)) continue;
       for (let i = 0; i < wall.corners.length - 1; i++) {
         const a = wall.corners[i], b = wall.corners[i + 1];
         const proj = projectPointToCurvedEdge(mouseW, a, b, (wall as any).bulges?.[i] || 0);
@@ -657,7 +657,7 @@ export class SelectTool {
     // Wand-Körper-Treffer: Klick irgendwo im GEHEILTEN Wand-Solid (inkl. der
     // durch Gehrungen/T-Stöße verlängerten Bereiche), damit die Wand auch
     // dort selektierbar ist, wo sie sich an Nachbarn anpasst.
-    const visibleWalls = this.app.scene.walls.filter(w => this.app.labelManager.isVisible(w.labelId));
+    const visibleWalls = this.app.scene.walls.filter(w => this.app.labelManager.isEditable(w.labelId));
     const graph = this.app.scene.getWallTopology();
     for (let wi = visibleWalls.length - 1; wi >= 0; wi--) {
       const wall = visibleWalls[wi];
@@ -684,7 +684,7 @@ export class SelectTool {
     ];
     for (let i = boxes.length - 1; i >= 0; i--) {
       const box = boxes[i];
-      if (!this.app.labelManager.isVisible(box.labelId)) continue;
+      if (!this.app.labelManager.isEditable(box.labelId)) continue;
       if (pointInOrientedBox(mouseW, box)) return box;
     }
     return null;
@@ -695,7 +695,7 @@ export class SelectTool {
     const mouseW = v(input.mouse.wx, input.mouse.wy);
     for (let i = this.app.scene.stickerInstances.length - 1; i >= 0; i--) {
       const inst = this.app.scene.stickerInstances[i];
-      if (!this.app.labelManager.isVisible(inst.labelId)) continue;
+      if (!this.app.labelManager.isEditable(inst.labelId)) continue;
       if (pointInInstance(inst.items as any, inst.position, inst.rotationRad, inst.scale, mouseW)) return inst;
     }
     return null;
@@ -706,7 +706,7 @@ export class SelectTool {
     const mouseW = v(input.mouse.wx, input.mouse.wy);
     for (let i = this.app.scene.documents.length - 1; i >= 0; i--) {
       const doc = this.app.scene.documents[i];
-      if (!this.app.labelManager.isVisible(doc.labelId)) continue;
+      if (!this.app.labelManager.isEditable(doc.labelId)) continue;
       if (pointInDocumentVisible(mouseW, doc)) return doc;
     }
     return null;
@@ -731,7 +731,7 @@ export class SelectTool {
     const mouseW = v(input.mouse.wx, input.mouse.wy);
     for (let i = this.app.scene.freeStrokes.length - 1; i >= 0; i--) {
       const s = this.app.scene.freeStrokes[i];
-      if (!this.app.labelManager.isVisible(s.labelId)) continue;
+      if (!this.app.labelManager.isEditable(s.labelId)) continue;
       if (s.points.length < 2) continue;
       // distance from polyline
       let best = Infinity;
@@ -755,7 +755,7 @@ export class SelectTool {
     const sel = this.app.selection;
     if (!sel || sel.type !== SelectionType.STICKER_INSTANCE) return null;
     const inst = this.app.scene.getStickerInstanceById((sel as any).stickerInstanceId);
-    if (!inst || !this.app.labelManager.isVisible(inst.labelId)) return null;
+    if (!inst || !this.app.labelManager.isEditable(inst.labelId)) return null;
     const corners = instanceBoundingCornersWorld(inst.items as any, inst.position, inst.rotationRad, inst.scale);
     const mouseS = v(input.mouse.sx, input.mouse.sy);
     for (let i = 0; i < corners.length; i++) {
@@ -2245,7 +2245,7 @@ export class SelectTool {
     };
 
     // Priority: selected hatch points (outer + holes)
-    if (selectedHatch && this.app.labelManager.isVisible(selectedHatch.labelId)) {
+    if (selectedHatch && this.app.labelManager.isEditable(selectedHatch.labelId)) {
       for (let i = 0; i < selectedHatch.points.length; i++) {
         const px = distPxToWorldPoint(selectedHatch.points[i]);
         if (px <= Defaults.hitPx) return { type: SelectionType.POINT, hatchId: selectedHatch.id, pointIndex: i };
@@ -2264,7 +2264,7 @@ export class SelectTool {
     }
 
     // Priority: selected segment points
-    if (selectedSeg && this.app.labelManager.isVisible(selectedSeg.labelId)) {
+    if (selectedSeg && this.app.labelManager.isEditable(selectedSeg.labelId)) {
       const pxA = distPxToWorldPoint(selectedSeg.a);
       if (pxA <= Defaults.hitPx) return { type: SelectionType.POINT, segmentId: selectedSeg.id, pointIndex: 0 };
       const pxB = distPxToWorldPoint(selectedSeg.b);
@@ -2325,7 +2325,7 @@ export class SelectTool {
 
     // Dimensions (parallel-line hit)
     for (const dim of this.app.scene.dimensions) {
-      if (!this.app.labelManager.isVisible(dim.labelId)) continue;
+      if (!this.app.labelManager.isEditable(dim.labelId)) continue;
       const g = getDimensionGeometry(dim);
       let nearest = projectPointToSegment(mouseW, g.d1, g.d2).q;
       if (g.arcPts && g.arcPts.length > 1) {

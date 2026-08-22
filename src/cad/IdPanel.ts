@@ -101,9 +101,28 @@ export class IdPanel {
     });
   }
 
+  /** Hilfe-Modus aktiv? Dann Symbol-Erklärungen im Panel einblenden. */
+  private _helpOn(): boolean {
+    try { return (this.app as any).helpOn !== false && !!(this.app as any).helpOn; } catch { return false; }
+  }
+
   render() {
     const groups = this.app.labelManager.list();
     this.listEl.innerHTML = "";
+
+    // Ebenen-Button im Kopf: Icon + Anzahl, Klick klappt das Panel auf/zu.
+    try {
+      const titleEl = this.root.querySelector(".id-title") as HTMLElement | null;
+      if (titleEl) {
+        titleEl.textContent = `▤ Bezeichnungs-ID (${groups.length})`;
+        titleEl.style.cursor = "pointer";
+        titleEl.title = "Ebenen-Panel öffnen/schließen";
+        if (!(titleEl as any).__pixunaLayerToggle) {
+          (titleEl as any).__pixunaLayerToggle = true;
+          titleEl.addEventListener("click", () => this._toggleCollapse());
+        }
+      }
+    } catch {}
 
     const makeIndicator = (index: number) => {
       const ind = document.createElement("div");
@@ -157,6 +176,7 @@ export class IdPanel {
       `;
       main.addEventListener("click", () => {
         if (group.visible === false) return;
+        if (group.editLocked) return;
         // Toggle: erneuter Klick auf die bereits aktive Ebene hebt die Auswahl auf.
         if (this.app.selectedLabelId === group.id) {
           this.app.clearSelection?.();
@@ -250,15 +270,57 @@ export class IdPanel {
         this.app.refreshLabelUI();
       });
 
+
+      const lockBtn = document.createElement("button");
+      lockBtn.className = "id-icon-btn icon-only";
+      lockBtn.title = group.editLocked
+        ? "Ebene entsperren (Auswahl, Verschieben, Löschen, Radieren wieder erlaubt)"
+        : "Ebene sperren (Auswahl, Verschieben, Löschen, Radieren gesperrt — Fangpunkte bleiben nutzbar)";
+      lockBtn.textContent = group.editLocked ? "🔒" : "🔓";
+      lockBtn.style.opacity = group.editLocked ? "1" : "0.55";
+      lockBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const nowLocked = this.app.labelManager.toggleEditLocked(group.id);
+        if (nowLocked) {
+          // Aktive Auswahl und Zeichenebene dürfen nicht auf einer gesperrten Ebene bleiben.
+          try { this.app.clearSelection?.(); } catch {}
+          if (this.app.selectedLabelId === group.id) this.app.setSelectedLabelId(null);
+          if (this.app.activeDrawLabelId === group.id) {
+            const free = this.app.labelManager.list().find((g) => !g.editLocked && g.visible !== false);
+            if (free) this.app.setActiveDrawLabelId(free.id);
+          }
+        }
+        this.app.refreshLabelUI();
+        try { (this.app as any).persistLabels?.(); } catch {}
+      });
+
+      actions.appendChild(lockBtn);
       actions.appendChild(eyeBtn);
       actions.appendChild(editBtn);
       actions.appendChild(deleteBtn);
+
+      if (group.editLocked) {
+        row.style.opacity = "0.75";
+        const hint = document.createElement("div");
+        hint.className = "id-count";
+        hint.textContent = "gesperrt — nur Fang-Referenz";
+        main.appendChild(hint);
+      }
 
       row.appendChild(main);
       row.appendChild(actions);
       this.listEl.appendChild(row);
       this.listEl.appendChild(makeIndicator(index + 1));
     });
+
+    if (this._helpOn()) {
+      const legend = document.createElement("div");
+      legend.className = "id-count";
+      legend.style.padding = "6px 8px";
+      legend.style.lineHeight = "1.5";
+      legend.innerHTML = "🔒 Ebene sperren · 👁 Ein-/Ausblenden · ✎ Umbenennen · 🗑 Löschen<br>Gesperrte Ebenen bleiben sichtbar und fangbar.";
+      this.listEl.appendChild(legend);
+    }
   }
 
   private _escapeHtml(str: string): string {
