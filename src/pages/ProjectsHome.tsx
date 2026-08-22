@@ -799,7 +799,7 @@ export default function ProjectsHome() {
                   e.stopPropagation();
                   if (!dragFolderId) handleDropOnFolder(null);
                 }}
-                className="pt-1 space-y-1"
+                className="pt-3 space-y-1"
                 style={{
                   background:
                     dragOverFolder === "root" ? "hsl(var(--accent-gold) / 0.06)" : undefined,
