@@ -158,6 +158,29 @@ export function htmlToRuns(html: string, base?: BaseTextStyle): RichRun[] {
   return runs;
 }
 
+/**
+ * Migriert nur die typografischen Größen eines Legacy-HTML-Fragments in die
+ * kanonische Dokumenteinheit. Sonstige Markup-Struktur bleibt unangetastet.
+ */
+export function normalizeRichTextHtml(html: string): string {
+  const root = document.createElement("div");
+  root.innerHTML = (html || "").replace(/\u200B/g, "");
+  root.querySelectorAll<HTMLElement>("[style*='font-size'], font[size]").forEach(node => {
+    if (!node.dataset.fontSizePt) {
+      const fontSize = node.style.fontSize;
+      const legacyFontSize = node.tagName.toLowerCase() === "font"
+        ? FONT_SIZE_TABLE[node.getAttribute("size") || ""]
+        : undefined;
+      const pt = fontSize ? parseInlineSizePt(fontSize) : (legacyFontSize ? cssPxToPt(legacyFontSize) : null);
+      if (pt != null && pt > 0) node.dataset.fontSizePt = String(pt);
+    }
+    node.style.removeProperty("font-size");
+    node.removeAttribute("size");
+    if (!node.getAttribute("style")) node.removeAttribute("style");
+  });
+  return root.innerHTML;
+}
+
 interface PositionedRun extends RichRun {
   fontSizePx: number;
   effectiveColor: string;

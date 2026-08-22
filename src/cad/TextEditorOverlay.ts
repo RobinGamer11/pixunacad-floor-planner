@@ -5,6 +5,7 @@ import type { TextBox } from "./Scene";
 import { rgbaFromHex } from "./geometry";
 import { maybeRasterize } from "./rasterize";
 import { ptToCssPx, textStyleFontSizePt } from "./textTypography";
+import { normalizeRichTextHtml } from "./textRichRenderer";
 
 /**
  * Inline HTML contenteditable overlay used to edit a TextBox.
@@ -348,7 +349,7 @@ export class TextEditorOverlay {
       node.style.removeProperty("font-size");
       if (!node.getAttribute("style")) node.removeAttribute("style");
     });
-    return clone.innerHTML.replace(/\u200B/g, "");
+    return normalizeRichTextHtml(clone.innerHTML);
   }
 
   private _applyFontSizePtToSelection(pt: number) {
@@ -381,7 +382,7 @@ export class TextEditorOverlay {
     this.toolbarEl.classList.add("hidden");
     this.el.contentEditable = "true";
     this.el.spellcheck = false;
-    this.el.innerHTML = box.html || "";
+    this.el.innerHTML = normalizeRichTextHtml(box.html || "");
     this._applyBoxStyle(box);
     this.reposition(box);
     this.app.renderer.setEditingTextBoxId(box.id);
