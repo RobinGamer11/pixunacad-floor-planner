@@ -295,6 +295,10 @@ export interface TextBoxStyle {
   /** Wenn false: Box wächst NICHT automatisch; Text wird im fixen Rahmen umbrochen. */
   autoSize?: boolean;
   labelId?: string;
+  /** „Auf allen Seiten“ (Projektmappe): stabile Gruppen-/Vorlagen-ID.
+   *  Alle Seitenkopien teilen dieselbe ID, bleiben aber eigenständige
+   *  Objekte mit eigener Objekt-ID und individuell bearbeitbar. */
+  spanGroupId?: string;
 }
 
 export class TextBox {
