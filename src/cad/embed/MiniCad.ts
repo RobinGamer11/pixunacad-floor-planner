@@ -1045,6 +1045,8 @@ export class MiniCad {
   }
 
 
+  private _lastTextDefaults: any = null;
+
   setTextDefaults(opts: {
     color?: string;
     fontSizePx?: number;
@@ -1083,6 +1085,26 @@ export class MiniCad {
     if (typeof opts.borderEnabled === "boolean") this.defaultTextBorderEnabled = opts.borderEnabled;
     if (opts.borderColor) this.defaultTextBorderColor = opts.borderColor;
     if (typeof opts.borderWidthPx === "number" && opts.borderWidthPx >= 0) this.defaultTextBorderWidthPx = opts.borderWidthPx;
+    // --- Rich-Text: Änderungen gelten nur für markierten Text / Caret ---
+    const prev = this._lastTextDefaults;
+    this._lastTextDefaults = { ...opts };
+    if (prev && this.textEditor?.ownsTextFormatting?.()) {
+      const changed: any = {};
+      if (opts.color && opts.color !== prev.color) {
+        changed.color = applyAlphaToColor(opts.color, this.defaultTextAlpha);
+      }
+      if (typeof opts.fontSizePx === "number" && opts.fontSizePx !== prev.fontSizePx) {
+        changed.fontSizePx = opts.fontSizePx * (4 / 3);
+      }
+      for (const k of ["bold", "italic", "underline", "strike"] as const) {
+        if (typeof opts[k] === "boolean" && opts[k] !== prev[k]) changed[k] = opts[k];
+      }
+      if (Object.keys(changed).length > 0 && this.textEditor.applyInlineFormat(changed)) {
+        this._changeDirty = true;
+        return;
+      }
+    }
+
     const selected = this.getEditTextBox();
     if (selected) {
       selected.style.textColor = applyAlphaToColor(this.defaultTextColor, this.defaultTextAlpha);
