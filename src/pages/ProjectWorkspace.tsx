@@ -2932,6 +2932,13 @@ function PageCanvas({
           }}
           onPointerDown={handlePagePointerDown}
           onPointerMove={handlePagePointerMove}
+          onContextMenu={(e) => {
+            // Tabellen-Objektmodus: Browser-Kontextmenü immer unterdrücken —
+            // der Rechtsklick erzeugt hier die Fangpunkt-Hilfslinie (rayGuide),
+            // die der ElementView-Handler aus findSnap() ableitet.
+            if (selectedIsTableObject) e.preventDefault();
+          }}
+
         >
         {/* Marquee-Overlay (Rahmen-Auswahl). Farbe je nach Modus:
             touch=orange (Crossing), enclose=blau (Window) — Archicad-Konvention. */}
