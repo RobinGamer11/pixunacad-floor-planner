@@ -273,11 +273,108 @@ function traceContour(filled: Uint8Array, wPx: number, hPx: number, startIdx: nu
   return pts;
 }
 
+/* ===================== Topologischer Hybridpfad ========================= */
+
+/** Analyseauflösung der Vektorisierung (Skelett) — bewusst moderat. */
+const VEC_TARGET_PIXELS = 1_500_000;
+const VEC_MIN_PX_PER_M = 150;
+const VEC_MAX_PX_PER_M = 1500;
+/** Maximal überbrückte Anschlusslücke in Analysepixeln (Antialiasing/Subpixel). */
+const GAP_PX = 3;
+/** Sicherheitsgrenze für die O(n²)-Schnittpunktberechnung des Planargraphen. */
+const MAX_GRAPH_EDGES = 6000;
+
+/** Lotfußpunkt von p auf Strecke a→b (auf die Strecke begrenzt). */
+function projectOnSegment(p: Vec2, a: Vec2, b: Vec2): { q: Vec2; d: number } {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const l2 = dx * dx + dy * dy;
+  const t = l2 <= 1e-18 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2));
+  const q = v(a.x + dx * t, a.y + dy * t);
+  return { q, d: Math.hypot(p.x - q.x, p.y - q.y) };
+}
+
 /**
- * Hybride Bereichserkennung. Gibt die Kontur in Weltkoordinaten zurück
- * oder null, wenn der Bereich nicht geschlossen ist bzw. keine Analyse
- * möglich war.
+ * Verbindet freie Enden der Pixelkurven mit nahe liegender Geometrie.
+ * Damit schließen Antialiasing-/Subpixel-Lücken zwischen Pixel- und
+ * Vektorkanten, ohne dass Morphologie die Face-Geometrie bestimmt.
  */
+function bridgeOpenEnds(openEnds: Vec2[], edges: RawEdge[], tol: number): RawEdge[] {
+  const bridges: RawEdge[] = [];
+  for (const end of openEnds) {
+    let best: Vec2 | null = null;
+    let bestD = tol;
+    for (const e of edges) {
+      const { q, d } = projectOnSegment(end, e.a, e.b);
+      if (d < 1e-9) { best = null; bestD = 0; break; } // Ende liegt bereits auf der Kante
+      if (d < bestD) { bestD = d; best = q; }
+    }
+    if (best) bridges.push({ a: v(end.x, end.y), b: best });
+  }
+  return bridges;
+}
+
+/**
+ * Hybride Bereichserkennung.
+ *
+ * Hauptpfad (topologisch): Rasterstriche werden skelettiert und vektorisiert,
+ * mit den Vektorkanten zusammengeführt und über denselben planaren
+ * Face-Algorithmus wie der reine Vektorpfad ausgewertet. Schnittpunkte teilen
+ * dabei jede Kante in Segmente; Linienanteile hinter einem Schnittpunkt sind
+ * Brückenkanten und können nie Bestandteil des gewählten Faces werden.
+ *
+ * Fallback: Kann kein Face bestimmt werden (z. B. sehr komplexe Rasterbilder
+ * jenseits des Kantenbudgets), greift weiterhin die alte Maskenanalyse.
+ */
+export function findHybridEnclosingFace(
+  scene: Scene,
+  rasterLayers: RasterLayers | null | undefined,
+  click: Vec2,
+  options: HybridFillOptions = {},
+): Vec2[] | null {
+  const isVisible = options.isVisible;
+  const vectorEdges = collectBoundaryEdges(scene);
+
+  const rasRect = rasterLayers?.contentBoundsWorld(
+    isVisible ? (id) => isVisible(id) : undefined,
+  ) ?? null;
+
+  if (rasRect && rasRect.w > 0 && rasRect.h > 0) {
+    const pad = Math.max(0.05, Math.min(rasRect.w, rasRect.h) * 0.02);
+    const rect = { x: rasRect.x - pad, y: rasRect.y - pad, w: rasRect.w + pad * 2, h: rasRect.h + pad * 2 };
+    let pxPerM = Math.sqrt(VEC_TARGET_PIXELS / (rect.w * rect.h));
+    pxPerM = Math.max(VEC_MIN_PX_PER_M, Math.min(VEC_MAX_PX_PER_M, pxPerM));
+
+    // Nur Rasterinhalt in die Maske — Vektorkanten bleiben exakt und werden
+    // nicht über den Umweg Rasterung/Skelett verfälscht.
+    const mask = buildRasterBoundaryMask(rasterLayers, rect.x, rect.y, rect.w, rect.h, {
+      scope: options.scope ?? "all",
+      activeLabelId: options.activeLabelId,
+      isVisible,
+      pxPerM,
+      alphaThreshold: 16,
+    });
+
+    if (mask) {
+      const { edges: rasterEdges, openEnds } = vectorizeRasterBoundary(
+        mask.alpha, mask.threshold, mask.wPx, mask.hPx, mask.x, mask.y, mask.pxPerM,
+      );
+      if (rasterEdges.length && vectorEdges.length + rasterEdges.length <= MAX_GRAPH_EDGES) {
+        const all = [...vectorEdges, ...rasterEdges];
+        const bridges = bridgeOpenEnds(openEnds, all, GAP_PX / mask.pxPerM);
+        const face = findEnclosingFaceFromEdges([...all, ...bridges], click);
+        if (face && face.length >= 3) return face;
+      }
+    }
+  }
+
+  return findHybridFaceByFloodFill(scene, rasterLayers, click, options);
+}
+
+/**
+ * Fallback-Bereichserkennung über die gemeinsame Rastermaske (Flood-Fill).
+ * Gibt die Kontur in Weltkoordinaten zurück oder null.
+ */
+
 function findHybridFaceByFloodFill(
   scene: Scene,
   rasterLayers: RasterLayers | null | undefined,
