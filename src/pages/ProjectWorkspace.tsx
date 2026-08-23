@@ -3228,7 +3228,7 @@ function PageCanvas({
           key={page.id}
           pageWidthMm={fmt.w}
           pageHeightMm={fmt.h}
-          basePxPerMm={baseWidth / fmt.w}
+          basePxPerMm={MAPPE_CANONICAL_PX_PER_MM}
           pageMarginsMm={page.margins ?? 0}
           zoom={scale}
           activeTool={
@@ -3292,7 +3292,7 @@ function PageCanvas({
           // Die Linien-Default-Farbe darf davon NICHT überschrieben werden.
           lineColor={toolSettings.line.color}
           lineThicknessMm={activeTool === "guide"
-            ? guideStrokePxToMm(toolSettings.guide.strokeWidth, baseWidth / fmt.w)
+            ? guideStrokePxToMm(toolSettings.guide.strokeWidth, MAPPE_CANONICAL_PX_PER_MM)
             : toolSettings.line.thicknessMm}
           lineAlpha={toolSettings.line.alpha / 100}
           guideColor={toolSettings.guide.color}
