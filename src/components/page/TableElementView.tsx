@@ -598,6 +598,16 @@ export function TableElementView({
 
           const isEditingCell = active && editCell?.r === r && editCell?.c === c;
           const refColor = refColorFor(r, c);
+          // Alle Zellmaße stammen ausschließlich aus der zentralen Papier-
+          // Skalierung (px pro Papier-mm). Nie aus getBoundingClientRect(),
+          // damit Bildschirm und PDF-Export exakt dieselbe Geometrie nutzen.
+          const fontPx = ptToMm(f.fontSizePt) * fontPxPerMm;
+          const lineBoxPx = fontPx * CELL_LINE_HEIGHT;
+          const cellHpx = rect.hMm * fontPxPerMm;
+          // Innenhöhe garantieren: das Padding weicht der tatsächlichen
+          // Zeilenhöhe, bevor Text an der Zellgrenze abgeschnitten würde.
+          const padYpx = Math.max(0, Math.min(CELL_PAD_Y_MM * fontPxPerMm, (cellHpx - lineBoxPx) / 2));
+          const padXpx = CELL_PAD_X_MM * fontPxPerMm;
           return (
             <div
               key={cellKey(r, c)}
@@ -612,9 +622,9 @@ export function TableElementView({
                 display: "flex",
                 alignItems: f.valign === "top" ? "flex-start" : f.valign === "bottom" ? "flex-end" : "center",
                 justifyContent: f.align === "center" ? "center" : f.align === "right" ? "flex-end" : "flex-start",
-                padding: `${0.3 * pxPerMm}px ${0.8 * pxPerMm}px`,
-                fontSize: `${ptToMm(f.fontSizePt) * fontPxPerMm}px`,
-                lineHeight: 1.15,
+                padding: `${padYpx}px ${padXpx}px`,
+                fontSize: `${fontPx}px`,
+                lineHeight: `${lineBoxPx}px`,
                 fontWeight: f.bold ? 700 : 400,
                 fontStyle: f.italic ? "italic" : "normal",
                 color: f.color ?? "hsl(var(--ink))",
@@ -623,6 +633,7 @@ export function TableElementView({
                 // Fremde Tabelle: Klicks für Bezüge annehmen, sonst Objektlogik.
                 pointerEvents: foreignSession ? "auto" : undefined,
               }}
+
               onPointerDown={(e) => handleCellPointerDown(e, r, c)}
               onPointerEnter={(e) => handleCellPointerEnter(e, r, c)}
               onDoubleClick={(e) => {
