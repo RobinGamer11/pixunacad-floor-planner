@@ -1059,6 +1059,9 @@ export class MiniCad {
 
 
   private _lastTextDefaults: any = null;
+  /** Box, zu der `_lastTextDefaults` gehört — Auswahlwechsel darf nichts ändern. */
+  private _lastTextDefaultsBoxId: string | null = null;
+
 
   setTextDefaults(opts: {
     color?: string;
