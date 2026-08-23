@@ -319,13 +319,24 @@ export interface Project {
   textSpanTemplates?: TextSpanTemplate[];
 }
 
+/** Gültigkeitsbereich einer „Auf allen Seiten“-Gruppe.
+ *  `mappe` = nur Seiten dieser Projektmappe,
+ *  `template` = nur Vorlagen-Seiten mit exakt diesem templateKey. */
+export type TextSpanScope =
+  | { type: "mappe"; id: string }
+  | { type: "template"; key: string };
+
 /** Vorlagenzustand einer „Auf allen Seiten“-Textbox. */
 export interface TextSpanTemplate {
   /** Stabile Gruppen-/Vorlagen-ID; identisch auf allen Seitenkopien. */
   groupId: string;
   /** Serialisierte Textbox im CAD-Overlay-Format (Weltkoordinaten = Papier-mm/1000). */
   box: any;
+  /** Seitenkontext, in dem die Gruppe gilt. Fehlt er (Altprojekte), wird er
+   *  aus den vorhandenen Kopien abgeleitet. */
+  scope?: TextSpanScope;
 }
+
 
 export interface ProjectFolder {
   id: string;
@@ -811,15 +822,47 @@ function commitProjectUiProjects(projects: Project[]) {
 
 
 
-/** Seiten, die von „Auf allen Seiten“ betroffen sind: die Mappe der Quellseite,
- *  sonst alle regulären (nicht Vorlagen-)Seiten. */
-function spanTargetPageIds(p: Project, sourcePageId: string): Set<string> {
-  const mappe = (p.mappen ?? []).find((m) => m.pageIds.includes(sourcePageId));
-  const ids = mappe
-    ? mappe.pageIds
-    : p.pages.filter((pg) => !pg.templateKey).map((pg) => pg.id);
-  return new Set(ids);
+/** Seitenkontext einer Seite: Vorlagen-Seiten zählen ausschließlich zu ihrem
+ *  templateKey, alle übrigen zu ihrer Projektmappe. */
+export function pageSpanScope(p: Project, pageId: string): TextSpanScope | null {
+  const page = p.pages.find((pg) => pg.id === pageId);
+  if (!page) return null;
+  if (page.templateKey) return { type: "template", key: page.templateKey };
+  const mappe = (p.mappen ?? []).find((m) => m.pageIds.includes(pageId));
+  return mappe ? { type: "mappe", id: mappe.id } : null;
 }
+
+function sameScope(a: TextSpanScope | null, b: TextSpanScope | null): boolean {
+  if (!a || !b || a.type !== b.type) return false;
+  return a.type === "mappe" ? a.id === (b as any).id : a.key === (b as any).key;
+}
+
+/** Scope einer Vorlage — mit Fallback für Altdaten ohne `scope`:
+ *  abgeleitet aus der ersten Seite, die bereits eine Kopie der Gruppe trägt. */
+function templateScope(p: Project, t: TextSpanTemplate): TextSpanScope | null {
+  if (t.scope) return t.scope;
+  const carrier = p.pages.find((pg) =>
+    ((pg.cadOverlay as any)?.textBoxes ?? []).some((b: any) => b?.style?.spanGroupId === t.groupId),
+  );
+  return carrier ? pageSpanScope(p, carrier.id) : null;
+}
+
+/** Vorlagen, die für den Kontext einer (neuen) Seite gelten. */
+function templatesForScope(p: Project, scope: TextSpanScope | null): TextSpanTemplate[] {
+  if (!scope) return [];
+  return (p.textSpanTemplates ?? []).filter((t) => sameScope(templateScope(p, t), scope));
+}
+
+/** Seiten, die von „Auf allen Seiten“ betroffen sind: ausschließlich Seiten im
+ *  selben Kontext (Mappe bzw. Vorlagen-Schlüssel) wie die Quellseite. */
+function spanTargetPageIds(p: Project, sourcePageId: string): Set<string> {
+  const scope = pageSpanScope(p, sourcePageId);
+  if (!scope) return new Set([sourcePageId]);
+  return new Set(
+    p.pages.filter((pg) => sameScope(pageSpanScope(p, pg.id), scope)).map((pg) => pg.id),
+  );
+}
+
 
 /** Fügt einem Overlay-Zustand fehlende „Auf allen Seiten“-Kopien hinzu.
  *  Jede Kopie erhält eine eigene Objekt-ID, behält aber die groupId. */
@@ -1093,7 +1136,12 @@ export const projectStore = {
               margins: 20,
               background: false,
               elements: [],
-              cadOverlay: seedSpanOverlay(undefined, p.textSpanTemplates, newId),
+              cadOverlay: seedSpanOverlay(
+                undefined,
+                targetMappe ? templatesForScope(p, { type: "mappe", id: targetMappe }) : [],
+                newId,
+              ),
+
             },
           ],
           mappen,
@@ -1124,6 +1172,7 @@ export const projectStore = {
         const source: ProjectPage[] = favorite?.length
           ? favorite
           : [{ id: "", title, format: "A4-hoch", margins: 20, background: false, elements: [] }];
+        const tplSpan = templatesForScope(p, { type: "template", key: templateKey });
         const created = source.map((pg, i) => {
           const id = `${projectId}-tpl${stamp}${i}`;
           const clone = JSON.parse(JSON.stringify(pg)) as ProjectPage;
@@ -1133,12 +1182,14 @@ export const projectStore = {
             title: i === 0 ? title : `${title} ${i + 1}`,
             templateKey,
             spreadId: undefined,
+            cadOverlay: seedSpanOverlay(clone.cadOverlay, tplSpan, id),
             elements: (clone.elements ?? []).map((el: any, k: number) => ({
               ...el,
               id: `${id}-e${k}`,
             })),
           } as ProjectPage;
         });
+
         ids = created.map((pg) => pg.id);
         return { ...p, updatedAt: new Date().toISOString(), pages: [...p.pages, ...created] };
       }),
@@ -1218,11 +1269,13 @@ export const projectStore = {
     setState((s) => ({
       projects: s.projects.map((p) => {
         if (p.id !== projectId) return p;
+        const scope = pageSpanScope(p, sourcePageId);
         const targets = spanTargetPageIds(p, sourcePageId);
-        const templates = [
+        const templates: TextSpanTemplate[] = [
           ...(p.textSpanTemplates ?? []).filter((t) => t.groupId !== groupId),
-          { groupId, box: JSON.parse(JSON.stringify(box)) },
+          ...(scope ? [{ groupId, box: JSON.parse(JSON.stringify(box)), scope }] : []),
         ];
+
         return {
           ...p,
           updatedAt: new Date().toISOString(),
