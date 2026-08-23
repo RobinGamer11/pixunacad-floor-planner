@@ -35,7 +35,13 @@ export interface TableCellFormat {
   borderWidthPx?: number;
   /** Untere Kante als Doppellinie (Summenlinie). */
   bottomDouble?: boolean;
+  /** Zahlen-Anzeigeformat (nur Darstellung, nie Rechenwert). */
+  numFormat?: NumFormat;
 }
+
+/** Anzeigeformat für Zahlen in Zellen. Rechenwerte bleiben immer roh. */
+export type NumFormat = "auto" | "number" | "eur" | "percent";
+
 
 export interface TableMerge {
   r: number;
