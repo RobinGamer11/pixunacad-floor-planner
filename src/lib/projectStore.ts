@@ -1211,34 +1211,38 @@ export const projectStore = {
         if (p.id !== projectId) return p;
         const existing = p.pages.filter((pg) => pg.templateKey === templateKey);
         if (existing.length) { ids = existing.map((pg) => pg.id); return p; }
-        const stamp = Date.now().toString(36);
-        const source: ProjectPage[] = favorite?.length
-          ? favorite
-          : [{ id: "", title, format: "A4-hoch", margins: 20, background: false, elements: [] }];
-        const tplSpan = templatesForScope(p, { type: "template", key: templateKey });
-        const created = source.map((pg, i) => {
-          const id = `${projectId}-tpl${stamp}${i}`;
-          const clone = JSON.parse(JSON.stringify(pg)) as ProjectPage;
-          return {
-            ...clone,
-            id,
-            title: i === 0 ? title : `${title} ${i + 1}`,
-            templateKey,
-            spreadId: undefined,
-            cadOverlay: seedSpanOverlay(clone.cadOverlay, tplSpan, id),
-            elements: (clone.elements ?? []).map((el: any, k: number) => ({
-              ...el,
-              id: `${id}-e${k}`,
-            })),
-          } as ProjectPage;
-        });
-
+        const created = cloneTemplatePages(p, templateKey, title, favorite);
         ids = created.map((pg) => pg.id);
         return { ...p, updatedAt: new Date().toISOString(), pages: [...p.pages, ...created] };
       }),
     }));
     return ids;
   },
+
+  /**
+   * Ersetzt sämtliche Seiten eines Vorlagen-Schlüssels durch frische Klone.
+   * Wird ausschließlich für die einmalige Migration eines unveränderten
+   * leeren Platzhalters der Standard-Mustervorlage benutzt.
+   */
+  replaceTemplatePages: (
+    projectId: string,
+    templateKey: string,
+    title: string,
+    source: ProjectPage[],
+  ) => {
+    let ids: string[] = [];
+    setState((s) => ({
+      projects: s.projects.map((p) => {
+        if (p.id !== projectId) return p;
+        const created = cloneTemplatePages(p, templateKey, title, source);
+        ids = created.map((pg) => pg.id);
+        const rest = p.pages.filter((pg) => pg.templateKey !== templateKey);
+        return { ...p, updatedAt: new Date().toISOString(), pages: [...rest, ...created] };
+      }),
+    }));
+    return ids;
+  },
+
   updatePage: (projectId: string, pageId: string, patch: Partial<ProjectPage>) => {
     setState((s) => ({
       projects: s.projects.map((p) =>
