@@ -3882,15 +3882,29 @@ function ElementView({
     return () => clearInterval(t);
   }, []);
 
-  // Snap-Ziele publizieren: Ecken + Kanten-Mittelpunkte + Kanten-Segmente.
-  // Andere Werkzeuge greifen via getPageSnapRegistry().queryNearest(...) drauf zu.
+  // Snap-Ziele publizieren. Die Punkte werden lokal bestimmt, mit der
+  // Elementrotation um den Mittelpunkt gedreht und erst danach in Prozent
+  // abgelegt — Anzeige, Rechtsklick, Hilfslinien, Verschieben und Drehen
+  // nutzen damit exakt dieselben Punkte.
   useEffect(() => {
     if (readOnly) return;
     const reg = getPageSnapRegistry();
-    // CAD-Blätter: NUR Ecken sind Fangpunkte (keine Kantenmitten).
-    reg.publish(el.id, buildRectSnapEntry(el.kind, el.x, el.y, el.w, el.h, !isCadView));
+    const parent = rootRef.current?.parentElement as HTMLElement | null;
+    const pr = parent?.getBoundingClientRect();
+    const aspect = pr && pr.height > 0 ? pr.width / pr.height : 1;
+    // Tabellen zeigen ausschließlich vier Eckpunkte — also auch nur diese vier
+    // als Fangziele. Keine unsichtbaren Kantenmitten oder Kantenlinien.
+    const cornersOnly = el.kind === "table";
+    reg.publish(
+      el.id,
+      buildRotatedRectSnapEntry(el.kind, el.x, el.y, el.w, el.h, el.rotation ?? 0, aspect, {
+        edgeMids: !isCadView && !cornersOnly,
+        edges: !cornersOnly,
+      }),
+    );
     return () => { try { reg.unpublish(el.id); } catch {} };
-  }, [el.id, el.kind, el.x, el.y, el.w, el.h, readOnly, isCadView]);
+  }, [el.id, el.kind, el.x, el.y, el.w, el.h, el.rotation, readOnly, isCadView]);
+
 
   // Hover-Highlight: welcher Snap-Handle dieses Elements ist gerade „gefangen"?
   const [hoveredSnapKey, setHoveredSnapKey] = useState<string | null>(null);
