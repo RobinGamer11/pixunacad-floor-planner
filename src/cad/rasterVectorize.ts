@@ -193,7 +193,7 @@ export function vectorizeRasterBoundary(
   originX: number,
   originY: number,
   pxPerM: number,
-  simplifyPx = 1.2,
+  simplifyPx = 3,
 ): VectorizeResult {
   const bin = new Uint8Array(wPx * hPx);
   let any = false;
