@@ -7676,15 +7676,19 @@ function ElementInspector({
               style={{ borderColor: "hsl(var(--hairline))" }}
             />
           </Row>
-          <Row label="Größe">
+          <Row label="Größe (pt)">
             <input
               type="number"
-              value={element.fontSize ?? 16}
-              onChange={(e) => update({ fontSize: Number(e.target.value) })}
+              value={element.fontSizePt ?? element.fontSize ?? 11}
+              onChange={(e) => {
+                const pt = Number(e.target.value);
+                update({ fontSizePt: pt, fontSize: pt });
+              }}
               className="w-full h-8 px-2 rounded bg-transparent border text-sm"
               style={{ borderColor: "hsl(var(--hairline))" }}
             />
           </Row>
+
           <Row label="Farbe">
             <input
               type="color"
