@@ -2720,8 +2720,11 @@ function PageCanvas({
   // The sheet is rendered at a FIXED real size (mm-defined). Zoom is a pure
   // view transform applied via CSS scale, like PowerPoint / CAD — page, holes,
   // margins, frame and strokes all scale together with the view.
-  const baseWidth = MAPPE_PAGE_BASE_WIDTH_PX;
-  const width = baseWidth;
+  // Blattgröße folgt der realen Papiergröße: eine zentrale px/mm-Referenz bei
+  // 100 % Zoom für alle Formate. A4 ist damit sichtbar kleiner als A3, und
+  // mm-/pt-basierte Werkzeuge behalten formatübergreifend dieselbe Größe.
+  const baseWidth = fmt.w * MAPPE_CANONICAL_PX_PER_MM;
+
   const height = width / aspect;
   const scale = zoom / 100;
   const displayWidth = width * scale;
