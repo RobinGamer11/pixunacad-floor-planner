@@ -4,6 +4,7 @@
  * Live-Viewport-Renderer). No dependency on the CAD app runtime.
  */
 import { Scene } from "./Scene";
+import { migrateSceneData } from "@/lib/persistence";
 
 export interface SerializedScene {
   segments?: any[];
@@ -20,7 +21,9 @@ export interface SerializedScene {
 }
 
 /** Deserialize a scene JSON into the given Scene instance (in-place). */
-export function restoreOneScene(scene: Scene, data: SerializedScene | null | undefined): void {
+export function restoreOneScene(scene: Scene, raw: SerializedScene | null | undefined): void {
+  // Zentrale Schema-Migration vor dem Deserialisieren.
+  const data = raw ? (migrateSceneData(raw) as SerializedScene) : raw;
   scene.segments = [];
   scene.hatches = [];
   scene.dimensions = [];

@@ -4,6 +4,7 @@
 
 import { useSyncExternalStore } from "react";
 import { getPageSizeMm, parseScaleDen } from "./paper";
+import { migrateProjectState, stampVersion, PROJECT_STATE_KIND } from "./persistence";
 
 export type PageFormat = "A3-quer" | "A4-hoch" | "A4-quer" | "A3-hoch" | "frei";
 export type ElementKind =
@@ -432,7 +433,8 @@ function load(): State {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
-      const parsed = JSON.parse(raw);
+      // Zentrale Schema-Migration des gesamten Persistenzstandes.
+      const parsed = migrateProjectState(JSON.parse(raw));
       if (parsed && Array.isArray(parsed.projects) && parsed.projects.length) {
         const cutoff = Date.now() - 30 * 86400000;
         return {
@@ -676,7 +678,7 @@ export function syncPageElementUnits(page: ProjectPage): ProjectPage {
 
 function persistState(candidate: State) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(candidate));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(stampVersion(PROJECT_STATE_KIND, { ...candidate })));
     return true;
   } catch {
     return false;

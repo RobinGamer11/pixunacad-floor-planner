@@ -12,6 +12,7 @@
  * margin ring.
  */
 
+import { migrateSceneData } from "@/lib/persistence";
 import { Camera } from "../Camera";
 import { Scene } from "../Scene";
 import { Input } from "../Input";
@@ -1341,8 +1342,10 @@ export class MiniCad {
     };
   }
 
-  private _restore(data: any) {
-    if (!data) return;
+  private _restore(input: any) {
+    if (!input) return;
+    // Zentrale Schema-Migration (additiv) vor dem Deserialisieren.
+    const data = migrateSceneData(input);
     // Rasterinhalt zuerst wiederherstellen (lädt Kacheln asynchron nach).
     try { this.rasterLayers.restore(data.rasterLayers); } catch (e) { console.error("MiniCad raster restore:", e); }
     if (Array.isArray(data.labels) && data.labels.length > 0) {

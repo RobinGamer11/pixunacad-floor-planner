@@ -2181,7 +2181,7 @@ export default function ProjectWorkspace() {
                 multiSelectActive={selectedElementIds.length > 1}
               />
             )}
-            {!presenting && !printMode && !templateKey && (
+            {!presenting && !printMode && (
               <LayerFab
                 count={mappeLayerCount}
                 onClick={() => { setRightOpen(true); setRightTab("layers"); }}
@@ -5445,7 +5445,6 @@ function RightInspector({
   helpOn?: boolean;
 }) {
 
-  const layerCount = page?.elements.length ?? 0;
   return (
     <aside
       className="w-[280px] shrink-0 border-l flex flex-col text-[11px]"
@@ -5459,8 +5458,8 @@ function RightInspector({
           onClick={() => setTab("layers")}
           label="Ebenen"
           icon={<Layers size={12} />}
-          badge={layerCount > 0 ? layerCount : undefined}
         />
+
         <button
           onClick={onCollapse}
           title="Einklappen"
