@@ -3005,7 +3005,7 @@ function PageCanvas({
               {overlayPage.elements
                 .filter((e) => e.kind !== "line" && e.kind !== "guide")
                 .map((el) => (
-                  <ElementView key={el.id} el={el} readOnly />
+                  <ElementView key={el.id} el={el} readOnly pageWmm={ofmt.w} pageHmm={ofmt.h} />
                 ))}
               {/* Farb-Tint (Multiply) — nur wenn eine Tintfarbe gesetzt ist.
                   Wenn undefined, werden die Originalfarben der Hintergrundseite gezeigt. */}
