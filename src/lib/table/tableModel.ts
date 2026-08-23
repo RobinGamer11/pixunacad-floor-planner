@@ -371,6 +371,34 @@ export function formatCellDisplay(value: string | number, nf?: NumFormat): strin
   }
 }
 
+/**
+ * Automatische Zahlenformat-Erkennung bei der Eingabe.
+ *
+ * `12,50 €` → Rohwert `12.5` + Format `eur`, `19 %` → Rohwert `0.19` +
+ * Format `percent`. Das Symbol wandert also nie in den Rechenwert; die
+ * Anzeige entsteht ausschließlich über das Zahlenformat.
+ *
+ * Greift nur bei einer reinen Zahl mit eindeutigem €/% am Ende und nur, wenn
+ * die Zelle noch auf „Automatisch“ steht — ein manuell gesetztes Format wird
+ * nicht überschrieben. Formeln (`=…`) bleiben unangetastet.
+ */
+export function detectNumberInputFormat(
+  input: string,
+  currentFormat?: NumFormat,
+): { value: string; numFormat?: NumFormat } {
+  const raw = String(input ?? "");
+  const t = raw.trim();
+  if (!t || t.startsWith("=")) return { value: raw };
+  if (currentFormat && currentFormat !== "auto") return { value: raw };
+  const m = /^([+-]?[\d.,\s]*\d)\s*(€|%)$/.exec(t);
+  if (!m) return { value: raw };
+  const parsed = parseCellNumber(m[1]);
+  if (!parsed) return { value: raw };
+  if (m[2] === "€") return { value: String(parsed.n), numFormat: "eur" };
+  return { value: String(parsed.n / 100), numFormat: "percent" };
+}
+
+
 
 /** Effektive Rahmen-Eigenschaften einer Zelle (Kanten, Stil, Stärke). */
 export function effectiveBorders(t: TableModel, r: number, c: number): {
