@@ -105,6 +105,33 @@ function subdivideEdges(edges: RawEdge[]): RawEdge[] {
   return out;
 }
 
+/**
+ * Entfernt iterativ alle Sackgassen-Segmente (Knoten mit Grad 1).
+ *
+ * Läuft NACH dem Aufteilen an allen Schnittpunkten und VOR der Face-Auswahl.
+ * Ein Segment, das hinter einem Schnittpunkt weiterläuft, endet zwangsläufig
+ * frei und kann deshalb nie Teil eines geschlossenen Faces sein. Ohne diese
+ * Bereinigung nimmt die DCEL-Traversierung solche Äste als Hin- und Rückweg
+ * (Fläche 0) in die Kontur auf — die Füllung „hangelt“ sich dann optisch an
+ * weiterlaufenden Linien entlang.
+ */
+function pruneDanglingEdges(edges: RawEdge[]): RawEdge[] {
+  let cur = edges;
+  for (let pass = 0; pass < 64; pass++) {
+    const deg = new Map<string, number>();
+    for (const e of cur) {
+      const ka = quantKey(e.a), kb = quantKey(e.b);
+      deg.set(ka, (deg.get(ka) ?? 0) + 1);
+      deg.set(kb, (deg.get(kb) ?? 0) + 1);
+    }
+    const next = cur.filter((e) => (deg.get(quantKey(e.a)) ?? 0) > 1 && (deg.get(quantKey(e.b)) ?? 0) > 1);
+    if (next.length === cur.length) return next;
+    cur = next;
+    if (cur.length === 0) return cur;
+  }
+  return cur;
+}
+
 interface Dart {
   id: number;
   from: number;
