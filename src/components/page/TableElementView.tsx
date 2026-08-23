@@ -13,8 +13,10 @@ import {
   tableHeightMm,
   MIN_COL_MM,
   MIN_ROW_MM,
+  formatCellDisplay,
   type TableModel,
 } from "@/lib/table/tableModel";
+
 import { cellRectMm, layoutTable } from "@/lib/table/tableLayout";
 import {
   acceptsRefInsert,
