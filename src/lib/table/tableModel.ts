@@ -86,7 +86,7 @@ export interface TableModel extends TableData {
 
 export const DEFAULT_COL_MM = 26;
 export const DEFAULT_ROW_MM = 7;
-export const DEFAULT_FONT_PT = 9;
+export const DEFAULT_FONT_PT = 11;
 export const MIN_COL_MM = 6;
 export const MIN_ROW_MM = 4;
 export const PT_TO_MM = 25.4 / 72;
