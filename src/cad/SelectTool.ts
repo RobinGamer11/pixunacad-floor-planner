@@ -4143,7 +4143,22 @@ export class SelectTool {
       || this.app.documentHubMode !== "none"
       || !!(this.dragStickerId || this.dragDocId || this.dragFreeStrokeId
         || this.dragAreaLabelHatchId || this.dragTextBoxId || this.rotateTextBoxId || this.dragDimId);
+
+    // Dezente Fangpunkt-Vorschau, solange etwas verschoben/gedreht wird.
+    if (this.isEditing() || directTransformActive) {
+      const mS = { x: this.app.input.mouse.sx, y: this.app.input.mouse.sy };
+      const pts = this.app.topology.nearbySnapPoints(mS);
+      ctx.save();
+      ctx.globalAlpha = 0.4;
+      for (const p of pts) {
+        const s = cam.worldToScreen(p.x, p.y);
+        drawSnapDot(ctx, s.x, s.y, { radius: 2.2 });
+      }
+      ctx.restore();
+    }
+
     if (editGuideDefs.length > 0 && (this.isEditing() || this.marqueeSelectedIds.length > 0 || directTransformActive)) {
+
       ctx.save();
       ctx.strokeStyle = "rgba(110,110,110,0.42)";
       ctx.lineWidth = 1;

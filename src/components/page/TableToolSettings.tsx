@@ -12,7 +12,7 @@ import {
   normalizeTable, toTableData, resizeGrid, insertRow, insertCol, removeRow, removeCol,
   mergeRange, unmergeAt, applyFormat, effectiveFormat, effectiveBorders, mergeCovering,
   tableWidthMm, tableHeightMm, type TableModel, type HAlign, type VAlign,
-  type CellBorderStyle,
+  type CellBorderStyle, type NumFormat,
 } from "@/lib/table/tableModel";
 import { TableEditContext, type FormulaFn } from "./TableElementView";
 
@@ -106,6 +106,21 @@ export function TableToolSettings({
   const fmtRaw = model.cellFormats[`${selR},${selC}`] ?? {};
   const fns: FormulaFn[] = ["SUM", "AVG", "MIN", "MAX", "COUNT"];
 
+  // Zahlenformat der Auswahl: null = gemischt (wie die übrigen Sammelwerte).
+  const numFormatSel: NumFormat | null = (() => {
+    if (!sel) return effectiveFormat(model, selR, selC).numFormat ?? "auto";
+    let acc: NumFormat | null | undefined;
+    for (let r = Math.min(sel.r1, sel.r2); r <= Math.max(sel.r1, sel.r2); r++) {
+      for (let c = Math.min(sel.c1, sel.c2); c <= Math.max(sel.c1, sel.c2); c++) {
+        const nf = (model.cellFormats[`${r},${c}`]?.numFormat ?? "auto") as NumFormat;
+        if (acc === undefined) acc = nf;
+        else if (acc !== nf) return null;
+      }
+    }
+    return acc ?? "auto";
+  })();
+
+
   /** Tabellen-Hintergrund setzen und einzelne Zellhintergründe zurücksetzen. */
   const setTableBackground = (v: string) => {
     const cellFormats: typeof model.cellFormats = {};
@@ -195,6 +210,32 @@ export function TableToolSettings({
           <UnitField label="Schriftgröße" value={fmt.fontSizePt} unit="pt" min={4} max={72} onChange={(v) => format({ fontSizePt: v })} />
           <ColorRow label="Textfarbe" value={fmt.color ?? "#111111"} onChange={(v) => format({ color: v })} />
           <ColorRow label="Zellhintergrund" value={fmt.background ?? "#ffffff"} onChange={(v) => format({ background: v })} />
+
+          <div className="pt-1 space-y-1.5" style={{ borderTop: "1px solid hsl(var(--hairline))" }}>
+            <div className="text-[10px] font-semibold text-muted-foreground">
+              Zahlenformat{numFormatSel === null ? " (gemischt)" : ""}
+            </div>
+            <div className="flex items-center gap-1">
+              {NUM_FORMATS.map((nf) => (
+                <button
+                  key={nf.key}
+                  onClick={() => format({ numFormat: nf.key })}
+                  className="h-7 flex-1 rounded-md border text-[10px]"
+                  style={{
+                    borderColor: "hsl(var(--hairline))",
+                    background: numFormatSel === nf.key ? "hsl(var(--accent-gold-soft))" : undefined,
+                    color: numFormatSel === nf.key ? "hsl(var(--accent-gold))" : undefined,
+                  }}
+                  title={nf.title}
+                >{nf.label}</button>
+              ))}
+            </div>
+            <div className="text-[10px] text-muted-foreground leading-snug">
+              Nur Anzeige — Formeln rechnen weiterhin mit dem Rohwert
+              (z. B. 0,19 mit „%“ = 19,00 %).
+            </div>
+          </div>
+
 
           <div className="pt-1 space-y-1.5" style={{ borderTop: "1px solid hsl(var(--hairline))" }}>
             <div className="text-[10px] font-semibold text-muted-foreground">Zellrahmen</div>
@@ -435,6 +476,13 @@ function Stepper({ label, value, min, max, onChange }: {
   );
 }
 
+
+const NUM_FORMATS: { key: NumFormat; label: string; title: string }[] = [
+  { key: "auto", label: "Auto", title: "Automatisch anhand der Eingabe" },
+  { key: "number", label: "Zahl", title: "Zahl ohne Einheit" },
+  { key: "eur", label: "€", title: "Euro mit zwei Nachkommastellen" },
+  { key: "percent", label: "%", title: "Prozent (Rohwert × 100)" },
+];
 
 const SIDE_LABEL: Record<"top" | "right" | "bottom" | "left", string> = {
   top: "Oben", right: "Rechts", bottom: "Unten", left: "Links",
