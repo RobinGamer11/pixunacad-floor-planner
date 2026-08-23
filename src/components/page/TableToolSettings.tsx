@@ -197,6 +197,32 @@ export function TableToolSettings({
           <ColorRow label="Zellhintergrund" value={fmt.background ?? "#ffffff"} onChange={(v) => format({ background: v })} />
 
           <div className="pt-1 space-y-1.5" style={{ borderTop: "1px solid hsl(var(--hairline))" }}>
+            <div className="text-[10px] font-semibold text-muted-foreground">
+              Zahlenformat{numFormatSel === null ? " (gemischt)" : ""}
+            </div>
+            <div className="flex items-center gap-1">
+              {NUM_FORMATS.map((nf) => (
+                <button
+                  key={nf.key}
+                  onClick={() => format({ numFormat: nf.key })}
+                  className="h-7 flex-1 rounded-md border text-[10px]"
+                  style={{
+                    borderColor: "hsl(var(--hairline))",
+                    background: numFormatSel === nf.key ? "hsl(var(--accent-gold-soft))" : undefined,
+                    color: numFormatSel === nf.key ? "hsl(var(--accent-gold))" : undefined,
+                  }}
+                  title={nf.title}
+                >{nf.label}</button>
+              ))}
+            </div>
+            <div className="text-[10px] text-muted-foreground leading-snug">
+              Nur Anzeige — Formeln rechnen weiterhin mit dem Rohwert
+              (z. B. 0,19 mit „%“ = 19,00 %).
+            </div>
+          </div>
+
+
+          <div className="pt-1 space-y-1.5" style={{ borderTop: "1px solid hsl(var(--hairline))" }}>
             <div className="text-[10px] font-semibold text-muted-foreground">Zellrahmen</div>
             <div className="flex items-center gap-1">
               {(["top", "right", "bottom", "left"] as const).map((side) => (
