@@ -1,7 +1,7 @@
 // Standard-Mustervorlagen für Angebot, Rechnung und Nachtrag.
-// Bewusst leer: hinterlegt wird nur ein leeres A4-Blatt mit der Bezeichnung
-// "Standard-Mustervorlage". Inhalte legt der Nutzer selbst an und speichert
-// sie bei Bedarf als Favorit.
+// Die eigentliche Nutzer-Vorlage lebt als vollständiger Seitensatz im Projekt.
+// Diese Datei liefert nur den leeren Notfall-Fallback und die Erkennung der
+// einmalig zu übernehmenden Legacy-Musterseiten.
 
 import type { ProjectPage } from "./projectStore";
 import type { FinancePositionType } from "./financeStore";
@@ -11,7 +11,7 @@ import type { FinancePositionType } from "./financeStore";
  * markiert, damit die einmalige Platzhalter-Migration nicht bei jedem Öffnen
  * erneut läuft. Bei einer inhaltlichen Änderung der Mustervorlage erhöhen.
  */
-export const TEMPLATE_SEED_VERSION = "1";
+export const TEMPLATE_SEED_VERSION = "2";
 
 /**
  * Erkennt den unveränderten leeren Platzhalter: keine Elemente und keine
@@ -24,7 +24,46 @@ export function isBlankTemplatePage(page: ProjectPage): boolean {
   return !Object.values(ov).some((v) => Array.isArray(v) && v.length > 0);
 }
 
-/** Erzeugt die Standard-Mustervorlage (ein leeres A4-Blatt) für einen Belegtyp. */
+/** Eine vollständige Vorlage enthält mindestens ein DOM- oder MiniCad-Objekt. */
+export function hasTemplateObjects(pages: ProjectPage[] | undefined): boolean {
+  return !!pages?.some((page) => !isBlankTemplatePage(page));
+}
+
+const normalizeTitle = (value: string) => value
+  .toLocaleLowerCase("de-DE")
+  .replace(/[–—_-]+/g, " ")
+  .replace(/\s+/g, " ")
+  .trim();
+
+/**
+ * Findet eine frühere, versehentlich als normale Projektmappenseite
+ * gespeicherte Mustervorlage. Es werden ausschließlich eindeutig benannte,
+ * inhaltliche Seiten übernommen; gewöhnliche Projektseiten bleiben unberührt.
+ * Mehrseitige Vorlagen bleiben in ihrer bestehenden Projekt-Reihenfolge.
+ */
+export function findLegacyTemplatePages(
+  pages: ProjectPage[],
+  type: FinancePositionType,
+): ProjectPage[] | undefined {
+  const typeNames: Record<FinancePositionType, string[]> = {
+    offer: ["angebot"],
+    invoice: ["rechnung"],
+    supplement: ["nachtrag"],
+  };
+  const names = typeNames[type];
+  const matches = pages.filter((page) => {
+    if (page.templateKey) return false;
+    const title = normalizeTitle(page.title ?? "");
+    const namesType = names.some((name) => title.includes(name));
+    const namesTemplate = title.includes("mustervorlage") || title.includes("muster vorlage")
+      || title.includes("standardvorlage") || title.includes("standard vorlage")
+      || title.includes("vorlage");
+    return namesType && namesTemplate;
+  });
+  return hasTemplateObjects(matches) ? matches : undefined;
+}
+
+/** Leerer A4-Notfall-Fallback, falls noch keine gespeicherte Vorlage existiert. */
 export function buildDefaultTemplatePages(_type: FinancePositionType, title: string): ProjectPage[] {
   return [{
     id: "",
