@@ -52,6 +52,8 @@ export class TableTool {
     (this.app as any).pushHistory?.();
     // Nach dem Setzen zurück ins Auswahlwerkzeug — Tabelle bleibt ausgewählt.
     this.app.setTool(ToolIds.SELECT);
+    // Sicherstellen, dass keine Cursor-Einstellung hängen bleibt.
+    try { this.app.canvas.style.cursor = ""; } catch { /* noop */ }
     this.app.renderer.render();
   }
 }
