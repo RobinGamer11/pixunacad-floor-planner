@@ -2549,7 +2549,11 @@ export class CadApp {
           e.preventDefault(); this.selectTool.cancelGroupTransform(true); return;
         }
 
+        // ESC im Tabellen-Zellmodus: nur den Zellmodus beenden, Tabelle bleibt
+        // als normales CAD-Objekt ausgewählt.
+        if (this.tableEditId) { e.preventDefault(); this.endTableEdit(); return; }
         if (this.isStickerEditing()) { this.exitStickerEdit(); this.clearSelection(); return; }
+
         if (this.pastePreviewActive) { this.cancelPastePreview(); return; }
         // Stufe 1: Läuft gerade eine Zeichen-Aktion? Dann NUR diese abbrechen —
         // das Werkzeug bleibt aktiv. Erst der nächste ESC wechselt zur Auswahl.
