@@ -390,7 +390,7 @@ export function findHybridEnclosingFace(
   // OPEN_R + DILATE_PX), aber auf die Umgebung der Originalregion beschränkt,
   // damit die Kontur nicht über die Begrenzung hinauswächst.
   const OPEN_R = DILATE_PX + 2;
-  let region = filled;
+  let region: Uint8Array<ArrayBufferLike> = filled;
   const eroded = erodeMask(filled, wPx, hPx, OPEN_R);
   const core = componentAt(eroded, filled, wPx, hPx, startIdx);
   if (core) {
@@ -405,6 +405,32 @@ export function findHybridEnclosingFace(
     }
     if (openCount >= 9) region = opened;
   }
+
+  // --- 4c) Schlitze hinter Schnittpunkten schließen (morphologisches Closing)
+  // Läuft eine Linie über einen Schnittpunkt hinaus in das Face hinein, legt
+  // sich der Flood-Fill um diesen Überstand herum. Die Kontur bekäme dadurch
+  // eine schmale Kerbe/Spitze entlang der weiterlaufenden Linie. Ein Closing
+  // (Dilatation + Erosion) überbrückt genau solche Schlitze, deren Breite der
+  // Linienstärke entspricht.
+  //
+  // Damit das Closing niemals die eigentliche Face-Geometrie bestimmt, werden
+  // ausschließlich Pixel übernommen, die selbst Grenzpixel sind (also der
+  // überstehende Linienast). Freiflächen jenseits einer Begrenzung können so
+  // nicht hinzukommen — die Fläche kann nicht über eine echte Grenze auslaufen.
+  const CLOSE_R = DILATE_PX + 6;
+  {
+    const grown = dilateMask(region, wPx, hPx, CLOSE_R);
+    const closed = erodeMask(grown, wPx, hPx, CLOSE_R);
+    const merged = new Uint8Array(wPx * hPx);
+    for (let i = 0; i < merged.length; i++) {
+      merged[i] = (region[i] || (closed[i] && bnd[i])) ? 1 : 0;
+    }
+    // Nur die Komponente am Klickpunkt behalten (Closing kann getrennte
+    // Nachbarflächen über einen dünnen Grenzast hinweg berühren).
+    const comp = componentAt(merged, merged, wPx, hPx, startIdx);
+    if (comp) region = comp;
+  }
+
 
   // --- 5) Kontur extrahieren + vereinfachen -------------------------------
   const contourPx = traceContour(region, wPx, hPx, startIdx);
