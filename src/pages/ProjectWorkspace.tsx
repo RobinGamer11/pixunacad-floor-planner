@@ -99,7 +99,10 @@ import {
 import {
   TEMPLATE_LABEL, parseTemplateKey, templateKeyOf, getFavoriteTemplate, setFavoriteTemplate,
 } from "@/lib/financeStore";
-import { buildDefaultTemplatePages } from "@/lib/financeTemplates";
+import {
+  buildDefaultTemplatePages, TEMPLATE_SEED_VERSION, isBlankTemplatePage,
+} from "@/lib/financeTemplates";
+
 import { EMPTY_WHEEL_ZOOM_BURST, nextSmartWheelZoom } from "@/lib/projectZoom";
 import CadOverlayLayer from "@/components/page/CadOverlayLayer";
 import { CadDocumentInspector } from "@/components/page/CadDocumentInspector";
@@ -230,22 +233,48 @@ export default function ProjectWorkspace() {
   useEffect(() => {
     if (!templateKey || !projectId || !templateInfo) return;
     const title = `${TEMPLATE_LABEL[templateInfo.type]} Vorlage`;
-    // Vorlagenpriorität für ein NEU angelegtes Finanz-Buch:
-    //  1) ausdrücklich gespeicherte Favoritenvorlage,
-    //  2) die im Projekt gestaltete Standard-Mustervorlage (`…:__default`),
+    const defaultKey = templateKeyOf(templateInfo.type, "__default");
+    const isDefaultSlot = templateKey === defaultKey;
+    const isTemplateSlot =
+      isDefaultSlot || templateInfo.positionId === "__favorite";
+
+    // ---- Einmalige Migration des alten leeren Platzhalters -----------------
+    // Bestandsprojekte besitzen unter `fin:<typ>:__default` teils eine früher
+    // erzeugte, unveränderte leere A4-Seite. Nur dieser Platzhalter (keine
+    // Elemente, keine CAD-Overlay-Inhalte) darf einmalig durch die aktuelle
+    // Mustervorlage ersetzt werden. Eine bearbeitete Vorlage bleibt unberührt.
+    if (isDefaultSlot) {
+      const verKey = `pixuna.finance.tplver.${projectId}.${templateInfo.type}`;
+      const done = (() => { try { return localStorage.getItem(verKey); } catch { return null; } })();
+      if (done !== TEMPLATE_SEED_VERSION) {
+        const stored = (rawProject?.pages ?? []).filter((pg) => pg.templateKey === defaultKey);
+        if (stored.length && stored.every(isBlankTemplatePage)) {
+          projectStore.replaceTemplatePages(
+            projectId, templateKey, title,
+            buildDefaultTemplatePages(templateInfo.type, title),
+          );
+        }
+        try { localStorage.setItem(verKey, TEMPLATE_SEED_VERSION); } catch { /* noop */ }
+      }
+    }
+
+    // ---- Vorlagenquelle für ein NEU angelegtes Finanz-Buch -----------------
+    //  1) die im Projekt gestaltete Standard-Mustervorlage (`…:__default`),
+    //  2) ausdrücklich gespeicherte Favoritenvorlage,
     //  3) eingebaute leere Fallback-Seite.
     // Die Standard-Mustervorlage selbst (und der Favoriten-Slot) klonen sich
     // nicht aus sich heraus.
-    const isTemplateSlot =
-      templateInfo.positionId === "__default" || templateInfo.positionId === "__favorite";
-    const favorite = getFavoriteTemplate<ProjectPage>(projectId, templateInfo.type);
-    let source: ProjectPage[] | undefined = favorite?.length ? favorite : undefined;
-    if (!source && !isTemplateSlot) {
-      const defaultKey = templateKeyOf(templateInfo.type, "__default");
+    let source: ProjectPage[] | undefined;
+    if (!isTemplateSlot) {
       const stored = (rawProject?.pages ?? []).filter((pg) => pg.templateKey === defaultKey);
-      if (stored.length) {
-        source = stored.map((pg) => ({ ...pg, id: "", templateKey: undefined }));
+      if (stored.length) source = stored.map((pg) => ({ ...pg, id: "", templateKey: undefined }));
+      if (!source?.length) {
+        const favorite = getFavoriteTemplate<ProjectPage>(projectId, templateInfo.type);
+        if (favorite?.length) source = favorite;
       }
+    } else if (isDefaultSlot) {
+      const favorite = getFavoriteTemplate<ProjectPage>(projectId, templateInfo.type);
+      if (favorite?.length) source = favorite;
     }
     projectStore.ensureTemplatePages(
       projectId,
@@ -254,6 +283,7 @@ export default function ProjectWorkspace() {
       source?.length ? source : buildDefaultTemplatePages(templateInfo.type, title),
     );
   }, [templateKey, projectId, templateInfo?.type, templateInfo?.positionId, rawProject]);
+
 
 
   // Im Vorlagen-Modus sind ausschließlich die Vorlagenseiten sichtbar,
