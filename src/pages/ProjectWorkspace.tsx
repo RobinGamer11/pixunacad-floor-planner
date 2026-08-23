@@ -97,7 +97,7 @@ import {
   type ProjectPage,
 } from "@/lib/projectStore";
 import {
-  TEMPLATE_LABEL, parseTemplateKey, getFavoriteTemplate, setFavoriteTemplate,
+  TEMPLATE_LABEL, parseTemplateKey, templateKeyOf, getFavoriteTemplate, setFavoriteTemplate,
 } from "@/lib/financeStore";
 import { buildDefaultTemplatePages } from "@/lib/financeTemplates";
 import { EMPTY_WHEEL_ZOOM_BURST, nextSmartWheelZoom } from "@/lib/projectZoom";
@@ -230,15 +230,31 @@ export default function ProjectWorkspace() {
   useEffect(() => {
     if (!templateKey || !projectId || !templateInfo) return;
     const title = `${TEMPLATE_LABEL[templateInfo.type]} Vorlage`;
-    // Favorit hat Vorrang, sonst die mitgelieferte Standard-Mustervorlage.
+    // Vorlagenpriorität für ein NEU angelegtes Finanz-Buch:
+    //  1) ausdrücklich gespeicherte Favoritenvorlage,
+    //  2) die im Projekt gestaltete Standard-Mustervorlage (`…:__default`),
+    //  3) eingebaute leere Fallback-Seite.
+    // Die Standard-Mustervorlage selbst (und der Favoriten-Slot) klonen sich
+    // nicht aus sich heraus.
+    const isTemplateSlot =
+      templateInfo.positionId === "__default" || templateInfo.positionId === "__favorite";
     const favorite = getFavoriteTemplate<ProjectPage>(projectId, templateInfo.type);
+    let source: ProjectPage[] | undefined = favorite?.length ? favorite : undefined;
+    if (!source && !isTemplateSlot) {
+      const defaultKey = templateKeyOf(templateInfo.type, "__default");
+      const stored = (rawProject?.pages ?? []).filter((pg) => pg.templateKey === defaultKey);
+      if (stored.length) {
+        source = stored.map((pg) => ({ ...pg, id: "", templateKey: undefined }));
+      }
+    }
     projectStore.ensureTemplatePages(
       projectId,
       templateKey,
       title,
-      favorite?.length ? favorite : buildDefaultTemplatePages(templateInfo.type, title),
+      source?.length ? source : buildDefaultTemplatePages(templateInfo.type, title),
     );
-  }, [templateKey, projectId, templateInfo?.type]);
+  }, [templateKey, projectId, templateInfo?.type, templateInfo?.positionId, rawProject]);
+
 
   // Im Vorlagen-Modus sind ausschließlich die Vorlagenseiten sichtbar,
   // sonst ausschließlich die normalen Mappenseiten.
