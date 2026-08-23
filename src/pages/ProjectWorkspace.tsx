@@ -142,7 +142,9 @@ import {
   guideStrokeMmToPx,
   guideStrokePxToMm,
   mappePagePxPerMm,
-  MAPPE_PAGE_BASE_WIDTH_PX,
+  
+  MAPPE_CANONICAL_PX_PER_MM,
+
 } from "@/lib/guideStrokeWidth";
 import { ptToMm, ptToCssPx, MM_PER_PT } from "@/cad/textTypography";
 import { getPageSnapRegistry, buildRectSnapEntry } from "@/lib/pageSnap";
@@ -1009,8 +1011,9 @@ export default function ProjectWorkspace() {
     lastFitKeyRef.current = fitKey;
     const fitPage = () => {
       const fmt = getPageSizeMm(activePage);
-      const baseWidth = 1100;
-      const baseHeight = baseWidth / (fmt.wMm / fmt.hMm);
+      const baseWidth = fmt.wMm * MAPPE_CANONICAL_PX_PER_MM;
+      const baseHeight = fmt.hMm * MAPPE_CANONICAL_PX_PER_MM;
+
       const box = canvasViewportRef.current!;
       const nextZoom = Math.max(10, Math.min(100, Math.floor(Math.min(
         ((box.clientWidth - 96) / baseWidth) * 100,
@@ -2720,9 +2723,13 @@ function PageCanvas({
   // The sheet is rendered at a FIXED real size (mm-defined). Zoom is a pure
   // view transform applied via CSS scale, like PowerPoint / CAD — page, holes,
   // margins, frame and strokes all scale together with the view.
-  const baseWidth = MAPPE_PAGE_BASE_WIDTH_PX;
+  // Blattgröße folgt der realen Papiergröße: eine zentrale px/mm-Referenz bei
+  // 100 % Zoom für alle Formate. A4 ist damit sichtbar kleiner als A3, und
+  // mm-/pt-basierte Werkzeuge behalten formatübergreifend dieselbe Größe.
+  const baseWidth = fmt.w * MAPPE_CANONICAL_PX_PER_MM;
   const width = baseWidth;
   const height = width / aspect;
+
   const scale = zoom / 100;
   const displayWidth = width * scale;
   const displayHeight = height * scale;
@@ -2992,9 +2999,10 @@ function PageCanvas({
                   key={`ghost-${overlayPage.id}`}
                   pageWidthMm={ofmt.w}
                   pageHeightMm={ofmt.h}
-                  basePxPerMm={baseWidth / ofmt.w}
+                  basePxPerMm={MAPPE_CANONICAL_PX_PER_MM}
                   pageMarginsMm={overlayPage.margins ?? 0}
-                  zoom={scale * (fmt.w / ofmt.w)}
+                  zoom={scale}
+
                   activeTool="select"
                   enabled={false}
                   initialState={overlayPage.cadOverlay}
@@ -3220,7 +3228,7 @@ function PageCanvas({
           key={page.id}
           pageWidthMm={fmt.w}
           pageHeightMm={fmt.h}
-          basePxPerMm={baseWidth / fmt.w}
+          basePxPerMm={MAPPE_CANONICAL_PX_PER_MM}
           pageMarginsMm={page.margins ?? 0}
           zoom={scale}
           activeTool={
@@ -3284,7 +3292,7 @@ function PageCanvas({
           // Die Linien-Default-Farbe darf davon NICHT überschrieben werden.
           lineColor={toolSettings.line.color}
           lineThicknessMm={activeTool === "guide"
-            ? guideStrokePxToMm(toolSettings.guide.strokeWidth, baseWidth / fmt.w)
+            ? guideStrokePxToMm(toolSettings.guide.strokeWidth, MAPPE_CANONICAL_PX_PER_MM)
             : toolSettings.line.thicknessMm}
           lineAlpha={toolSettings.line.alpha / 100}
           guideColor={toolSettings.guide.color}

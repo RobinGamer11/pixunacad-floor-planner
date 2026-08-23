@@ -900,10 +900,58 @@ export default function ProjectsHome() {
                 <h1 className="text-2xl font-semibold tracking-tight" style={{ color: "#F3F6FF" }}>
                   Hauptseite
                 </h1>
-                <p className="mt-3 text-sm" style={{ color: "rgba(220,230,255,0.72)" }}>
+
+                {/* Platzhalter für das kommende Tutorial-Video (noch ausgegraut) */}
+                <div
+                  className="mt-6 max-w-3xl rounded-2xl overflow-hidden"
+                  style={{
+                    border: "1px solid rgba(255,255,255,0.08)",
+                    background: "linear-gradient(160deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))",
+                    backdropFilter: "blur(6px)",
+                  }}
+                  aria-label="Tutorial-Video Platzhalter"
+                >
+                  <div
+                    className="relative flex items-center justify-center"
+                    style={{ aspectRatio: "16 / 9", background: "rgba(10,12,16,0.55)" }}
+                  >
+                    <div
+                      className="flex items-center justify-center rounded-full"
+                      style={{
+                        width: 62,
+                        height: 62,
+                        border: "1px solid rgba(255,255,255,0.16)",
+                        background: "rgba(255,255,255,0.06)",
+                      }}
+                    >
+                      <Play size={24} style={{ color: "rgba(220,230,255,0.45)", marginLeft: 3 }} />
+                    </div>
+                    <span
+                      className="absolute top-3 right-3 text-[10px] uppercase tracking-[0.16em] px-2 py-1 rounded-full"
+                      style={{
+                        color: "rgba(220,230,255,0.5)",
+                        border: "1px solid rgba(255,255,255,0.1)",
+                        background: "rgba(255,255,255,0.04)",
+                      }}
+                    >
+                      Bald verfügbar
+                    </span>
+                  </div>
+                  <div className="px-5 py-4" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                    <div className="text-sm font-medium" style={{ color: "rgba(243,246,255,0.62)" }}>
+                      Tutorial – Grundlagen
+                    </div>
+                    <div className="mt-1 text-xs" style={{ color: "rgba(220,230,255,0.4)" }}>
+                      PixunaCAD · Einführung in Oberfläche, Werkzeuge und Projektmappe
+                    </div>
+                  </div>
+                </div>
+
+                <p className="mt-4 text-sm" style={{ color: "rgba(220,230,255,0.72)" }}>
                   Inhalte folgen in Kürze.
                 </p>
               </div>
+
             </div>
           ) : hub === "shared" ? (
             <SharedView profile={profile} projectCount={projectCount} projects={projects} />
