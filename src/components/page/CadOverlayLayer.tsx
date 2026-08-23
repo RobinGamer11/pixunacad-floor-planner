@@ -200,11 +200,17 @@ export default function CadOverlayLayer(props: Props) {
       onSelectionChange: (info, count) => onSelectionChangeRef.current?.(info, count),
     });
     engineRef.current = engine;
+    // Nach jeder (Neu-)Erzeugung — z. B. beim Wechsel des Seitenformats —
+    // sofort den kompletten aktuellen Host-Zustand übernehmen. Die einzelnen
+    // Prop-Effekte unten laufen sonst nicht erneut, wenn sich ihre Props beim
+    // Formatwechsel nicht geändert haben (aktives Werkzeug, Defaults, Modi …).
+    syncHostSettings(engine, propsRef.current);
     onEngineReady?.({
       setSelectedSegmentSnap: (opts) => engine.setSelectedSegmentSnapSettings(opts),
       duplicateSelectedSegments: (offsetMm) => engine.duplicateSelectedSegments(offsetMm),
       engine,
     });
+
 
     // Hub-Box-Polling synchron zum Render-Tick.
     let raf = 0;
