@@ -22,7 +22,8 @@
  */
 import { Vec2, v, polygonSignedArea } from "./geometry";
 import type { Scene } from "./Scene";
-import { collectBoundaryEdges } from "./hatchFill";
+import { collectBoundaryEdges, findEnclosingFaceFromEdges, type RawEdge } from "./hatchFill";
+import { vectorizeRasterBoundary } from "./rasterVectorize";
 import { buildRasterBoundaryMask, type RasterScope } from "./rasterBoundary";
 import type { RasterLayers } from "./RasterLayers";
 
@@ -277,7 +278,7 @@ function traceContour(filled: Uint8Array, wPx: number, hPx: number, startIdx: nu
  * oder null, wenn der Bereich nicht geschlossen ist bzw. keine Analyse
  * möglich war.
  */
-export function findHybridEnclosingFace(
+function findHybridFaceByFloodFill(
   scene: Scene,
   rasterLayers: RasterLayers | null | undefined,
   click: Vec2,
