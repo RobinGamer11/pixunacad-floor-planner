@@ -102,21 +102,30 @@ function simplifyOpen(points: Vec2[], eps: number): Vec2[] {
 export function traceSkeleton(sk: Uint8Array, wPx: number, hPx: number): { x: number; y: number }[][] {
   const idxOf = (x: number, y: number) => y * wPx + x;
   const on = (x: number, y: number) => (x < 0 || y < 0 || x >= wPx || y >= hPx) ? 0 : sk[idxOf(x, y)];
+  /** Rohe Nachbarzahl im 8er-Ring. */
+  const rawDeg = (x: number, y: number) => {
+    let d = 0;
+    for (const [dx, dy] of N8) if (on(x + dx, y + dy)) d++;
+    return d;
+  };
   /**
-   * Verzweigungsgrad über die Übergangszahl (0→1) im 8er-Ring. Die rohe
-   * Nachbarzahl ist für Skelette ungeeignet: Treppenstufen einer Diagonalen
-   * haben drei Nachbarn, sind aber ein einfacher Linienverlauf.
+   * Verzweigungszahl über die Übergänge (0→1) im 8er-Ring. Die rohe
+   * Nachbarzahl allein taugt nicht: Treppenstufen einer Diagonalen haben drei
+   * Nachbarn, sind aber ein einfacher Linienverlauf (nur eine bzw. zwei
+   * zusammenhängende Nachbargruppen).
    */
-  const deg = (x: number, y: number) => {
+  const transitions = (x: number, y: number) => {
     const p: number[] = [];
     for (const [dx, dy] of N8) p.push(on(x + dx, y + dy) ? 1 : 0);
-    let sum = 0, trans = 0;
-    for (let k = 0; k < 8; k++) {
-      sum += p[k];
-      if (!p[k] && p[(k + 1) % 8]) trans++;
-    }
-    if (sum === 0) return 0;
-    return Math.max(trans, 1);
+    let t = 0;
+    for (let k = 0; k < 8; k++) if (!p[k] && p[(k + 1) % 8]) t++;
+    return t;
+  };
+  /** Knoten = echter Verzweigungspunkt oder freies Ende. */
+  const isNode = (x: number, y: number) => {
+    const d = rawDeg(x, y);
+    if (d <= 1) return true;
+    return transitions(x, y) >= 3;
   };
   const adjacent8 = (ax: number, ay: number, bx: number, by: number) =>
     Math.abs(ax - bx) <= 1 && Math.abs(ay - by) <= 1 && !(ax === bx && ay === by);
@@ -135,21 +144,20 @@ export function traceSkeleton(sk: Uint8Array, wPx: number, hPx: number): { x: nu
       if (usedEdge.has(k)) break;
       usedEdge.add(k);
       pts.push({ x: nx, y: ny });
-      if (deg(nx, ny) !== 2) break; // Knoten oder Endpunkt erreicht
+      if (isNode(nx, ny)) break; // Verzweigung oder freies Ende erreicht
       // Nachfolger wählen: Treppenstufen-Abkürzungen (Nachbarn, die auch
-      // Nachbarn des Vorgängers sind) werden nur notfalls verwendet.
-      let fx = -1, fy = -1, fallbackX = -1, fallbackY = -1;
+      // Nachbarn des Vorgängers sind) sind nur zweite Wahl; unter mehreren
+      // gewinnt der am weitesten vom Vorgänger entfernte Kandidat, damit die
+      // Verfolgung nicht in die Stufe zurückspringt.
+      let fx = -1, fy = -1, bestScore = -Infinity;
       for (const [ddx, ddy] of N8) {
         const cx = nx + ddx, cy = ny + ddy;
         if (!on(cx, cy)) continue;
         if (cx === px && cy === py) continue;
-        if (adjacent8(cx, cy, px, py)) {
-          if (fallbackX < 0) { fallbackX = cx; fallbackY = cy; }
-          continue;
-        }
-        fx = cx; fy = cy; break;
+        if (usedEdge.has(edgeKey(idxOf(nx, ny), idxOf(cx, cy)))) continue;
+        const score = (adjacent8(cx, cy, px, py) ? 0 : 100) + Math.hypot(cx - px, cy - py);
+        if (score > bestScore) { bestScore = score; fx = cx; fy = cy; }
       }
-      if (fx < 0 && fallbackX >= 0) { fx = fallbackX; fy = fallbackY; }
       if (fx < 0) break;
       px = nx; py = ny; nx = fx; ny = fy;
     }
@@ -160,8 +168,7 @@ export function traceSkeleton(sk: Uint8Array, wPx: number, hPx: number): { x: nu
   for (let y = 0; y < hPx; y++) {
     for (let x = 0; x < wPx; x++) {
       if (!sk[idxOf(x, y)]) continue;
-      const d = deg(x, y);
-      if (d === 2) continue;
+      if (!isNode(x, y)) continue;
       for (const [dx, dy] of N8) {
         if (!on(x + dx, y + dy)) continue;
         if (usedEdge.has(edgeKey(idxOf(x, y), idxOf(x + dx, y + dy)))) continue;
@@ -169,6 +176,7 @@ export function traceSkeleton(sk: Uint8Array, wPx: number, hPx: number): { x: nu
       }
     }
   }
+
   // 2) Übrig gebliebene geschlossene Ringe (überall Grad 2)
   for (let y = 0; y < hPx; y++) {
     for (let x = 0; x < wPx; x++) {
