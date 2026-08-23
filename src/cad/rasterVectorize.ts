@@ -238,19 +238,17 @@ export function vectorizeRasterBoundary(
 
   const edges: RawEdge[] = [];
   const openEnds: Vec2[] = [];
+  /** Rohe Nachbarzahl im Skelett (für freie Enden). */
   const degAt = (x: number, y: number) => {
-    const p: number[] = [];
+    let sum = 0;
     for (const [dx, dy] of N8) {
       const cx = x + dx, cy = y + dy;
-      p.push((cx < 0 || cy < 0 || cx >= wPx || cy >= hPx) ? 0 : (sk[cy * wPx + cx] ? 1 : 0));
+      if (cx < 0 || cy < 0 || cx >= wPx || cy >= hPx) continue;
+      if (sk[cy * wPx + cx]) sum++;
     }
-    let sum = 0, trans = 0;
-    for (let k = 0; k < 8; k++) {
-      sum += p[k];
-      if (!p[k] && p[(k + 1) % 8]) trans++;
-    }
-    return sum === 0 ? 0 : Math.max(trans, 1);
+    return sum;
   };
+
 
   for (const path of paths) {
     if (path.length < 2) continue;
