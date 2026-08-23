@@ -2724,8 +2724,9 @@ function PageCanvas({
   // 100 % Zoom für alle Formate. A4 ist damit sichtbar kleiner als A3, und
   // mm-/pt-basierte Werkzeuge behalten formatübergreifend dieselbe Größe.
   const baseWidth = fmt.w * MAPPE_CANONICAL_PX_PER_MM;
-
+  const width = baseWidth;
   const height = width / aspect;
+
   const scale = zoom / 100;
   const displayWidth = width * scale;
   const displayHeight = height * scale;
