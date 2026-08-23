@@ -8,6 +8,18 @@
  * Tabellenlayout, Dokumentpositionen, Maßstäbe bleiben unangetastet).
  */
 import { defineSchema, migrateData } from "./schema";
+import { normalizeTable, tableWidthMm, tableHeightMm } from "../table/tableModel";
+import { PAPER_FORMATS } from "../paper";
+
+/** Papiergröße einer gespeicherten Seite (mm) — ohne Sonderpfade. */
+function pageSizeMm(pg: Record<string, any>): { w: number; h: number } {
+  if (pg.format === "frei" && pg.customWidthMm > 0 && pg.customHeightMm > 0) {
+    return { w: pg.customWidthMm, h: pg.customHeightMm };
+  }
+  const f = (PAPER_FORMATS as any)[pg.format] ?? PAPER_FORMATS["A4-hoch"];
+  return { w: f.w, h: f.h };
+}
+
 
 /* ------------------------------------------------------------------ Helpers */
 
@@ -156,20 +168,52 @@ export function migrateProjectPages<T>(pages: T): T {
   if (!Array.isArray(pages)) return pages;
   for (const pg of pages) {
     if (!isObj(pg)) continue;
+    const size = pageSizeMm(pg);
     mapArray(pg, "elements", (el) => {
       fill(el, "rotation", 0);
-      if (el.kind === "table") fill(el, "scale", 1);
+
+      // Legacy-Text: die gespeicherte Zahl war schon immer die im Werkzeug
+      // eingegebene Punktgröße (Default 11). Sie wurde lediglich fälschlich
+      // als CSS-px gerendert. Einmalig als pt festschreiben — der Renderer
+      // nutzt danach ausschließlich die zentrale pt-Logik.
+      if (el.kind === "text" && el.fontSizePt === undefined) {
+        const n = Number(el.fontSize);
+        el.fontSizePt = Number.isFinite(n) && n > 0 ? n : 11;
+      }
+
+      if (el.kind === "table") {
+        fill(el, "scale", 1);
+        // Legacy-Tabellen: w/h/wMm/hMm können nicht mehr zur tatsächlichen
+        // Tabellengeometrie (colWidthsMm/rowHeightsMm) passen. Da
+        // TableElementView pxPerMm aus DOM-Breite / logischer Breite ableitet,
+        // führt das direkt zu falschen Schriftgrößen. Maße neu ableiten,
+        // Position, Zellinhalte und Formatierungen bleiben unverändert.
+        try {
+          const t = normalizeTable(el.tableData ?? null);
+          const wMm = tableWidthMm(t);
+          const hMm = tableHeightMm(t);
+          if (wMm > 0 && hMm > 0) {
+            el.tableData = t;
+            el.wMm = wMm;
+            el.hMm = hMm;
+            el.w = (wMm / size.w) * 100;
+            el.h = (hMm / size.h) * 100;
+          }
+        } catch { /* defekte Tabelle unangetastet lassen */ }
+      }
     });
   }
   return pages;
 }
 
 
+
 export const PROJECT_STATE_KIND = "project-state";
 
 defineSchema({
   kind: PROJECT_STATE_KIND,
-  current: 2,
+  current: 3,
+
   steps: [
     {
       // v1: Grundstruktur des Gesamtstandes.
@@ -201,8 +245,21 @@ defineSchema({
         return state;
       },
     },
-
+    {
+      // v3: Legacy-Text (pt-Einheit) und Legacy-Tabellen (Maße aus der
+      // tatsächlichen Tabellengeometrie) für ALLE Seiten anheben — normale
+      // Mappe wie Finanz-Bücher (templateKey) laufen durch denselben Pfad.
+      to: 3,
+      up: (state: any) => {
+        if (!isObj(state) || !Array.isArray(state.projects)) return state;
+        for (const p of state.projects) {
+          if (isObj(p)) migrateProjectPages(p.pages);
+        }
+        return state;
+      },
+    },
   ],
+
 });
 
 export function migrateProjectState<T>(state: T): T {

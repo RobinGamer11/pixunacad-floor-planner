@@ -40,7 +40,11 @@ export interface PageElement {
   hMm?: number;
   // content payloads — only the fields used per kind are read
   text?: string;
+  /** Legacy-Feld (historisch als px gerendert) — kanonisch ist `fontSizePt`. */
   fontSize?: number;
+  /** Schriftgröße in typografischen Punkten (1 pt = 25,4/72 mm). */
+  fontSizePt?: number;
+
   color?: string;
   bold?: boolean;
   italic?: boolean;

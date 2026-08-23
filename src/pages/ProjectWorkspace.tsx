@@ -144,7 +144,7 @@ import {
   mappePagePxPerMm,
   MAPPE_PAGE_BASE_WIDTH_PX,
 } from "@/lib/guideStrokeWidth";
-import { ptToMm, MM_PER_PT } from "@/cad/textTypography";
+import { ptToMm, ptToCssPx, MM_PER_PT } from "@/cad/textTypography";
 import { getPageSnapRegistry, buildRectSnapEntry } from "@/lib/pageSnap";
 import { registerCadEngineSnap, queryCadEngineSnap, registerCadEngineSnapNearby, queryCadEngineSnapNearby } from "@/lib/cadEngineSnap";
 import { Defaults } from "@/cad/constants";
@@ -3005,7 +3005,7 @@ function PageCanvas({
               {overlayPage.elements
                 .filter((e) => e.kind !== "line" && e.kind !== "guide")
                 .map((el) => (
-                  <ElementView key={el.id} el={el} readOnly />
+                  <ElementView key={el.id} el={el} readOnly pageWmm={ofmt.w} pageHmm={ofmt.h} />
                 ))}
               {/* Farb-Tint (Multiply) — nur wenn eine Tintfarbe gesetzt ist.
                   Wenn undefined, werden die Originalfarben der Hintergrundseite gezeigt. */}
@@ -3704,6 +3704,19 @@ function ElementView({
 
   const dragRef = useRef<{ x: number; y: number } | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
+  // Darstellungsauflösung der Seite (px pro Papier-mm) — Basis für die
+  // zentrale pt-Skalierung von Textobjekten.
+  const [pagePxPerMm, setPagePxPerMm] = useState(0);
+  React.useLayoutEffect(() => {
+    const host = rootRef.current?.parentElement;
+    if (!host || !pageWmm || pageWmm <= 0) { setPagePxPerMm(0); return; }
+    const upd = () => setPagePxPerMm(host.getBoundingClientRect().width / pageWmm);
+    upd();
+    const ro = new ResizeObserver(upd);
+    ro.observe(host);
+    return () => ro.disconnect();
+  }, [pageWmm]);
+
   // Tabellen: interner Tabellenmodus (Zellbearbeitung) — nur für diese Tabelle.
   const tableCtx = React.useContext(TableEditContext);
   const tableEditing = !readOnly && el.kind === "table" && tableCtx?.editId === el.id;
@@ -4701,8 +4714,14 @@ function ElementView({
       {el.kind === "text" && (
         <div
           style={{
-            fontSize: el.fontSize ?? 16,
+            // pt ist absolut: 1 pt = 25,4/72 mm. Auf Papier-mm umrechnen und
+            // mit der aktuellen Darstellungsauflösung skalieren (zentrale
+            // pt-Logik — identisch in Mappe und Finanz-Büchern).
+            fontSize: pagePxPerMm > 0
+              ? `${ptToMm(el.fontSizePt ?? el.fontSize ?? 11) * pagePxPerMm}px`
+              : `${ptToCssPx(el.fontSizePt ?? el.fontSize ?? 11)}px`,
             color: el.color ?? "hsl(var(--ink))",
+
             fontWeight: el.bold ? 700 : 400,
             fontStyle: el.italic ? "italic" : "normal",
             width: "100%",
@@ -7676,15 +7695,19 @@ function ElementInspector({
               style={{ borderColor: "hsl(var(--hairline))" }}
             />
           </Row>
-          <Row label="Größe">
+          <Row label="Größe (pt)">
             <input
               type="number"
-              value={element.fontSize ?? 16}
-              onChange={(e) => update({ fontSize: Number(e.target.value) })}
+              value={element.fontSizePt ?? element.fontSize ?? 11}
+              onChange={(e) => {
+                const pt = Number(e.target.value);
+                update({ fontSizePt: pt, fontSize: pt });
+              }}
               className="w-full h-8 px-2 rounded bg-transparent border text-sm"
               style={{ borderColor: "hsl(var(--hairline))" }}
             />
           </Row>
+
           <Row label="Farbe">
             <input
               type="color"
