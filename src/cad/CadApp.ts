@@ -2937,7 +2937,10 @@ export class CadApp {
   }
 
   setTool(id: string) {
+    // Werkzeugwechsel beendet immer den Tabellen-Zellmodus.
+    this.endTableEdit();
     if (this.pastePreviewActive) this.cancelPastePreview();
+
     if (this.activeTool && this.activeTool.cancel) this.activeTool.cancel();
     // Wand-Helfer ausschalten, wenn das Wandwerkzeug verlassen wird.
     if (this.activeTool === this.wallTool && id !== ToolIds.WALL) {
