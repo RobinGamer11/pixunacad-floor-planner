@@ -807,7 +807,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     app.onToolChange = (id) => {
       setActiveTool(id);
       // Engine-Werkzeug gewählt → Tabellen-Overlay-Werkzeug verlassen.
-      setTableTool(false);
+      setTableTool(id === ToolIds.TABLE);
       setTableEditId(null);
       // Auswahl-Werkzeug → Seiteneinstellungen automatisch öffnen.
       if (id === ToolIds.SELECT) setRightTab("sheets");
@@ -1382,8 +1382,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           <button
             onClick={() => {
               const app = appRef.current;
-              if (tableTool) { setTableTool(false); return; }
-              app?.setTool(ToolIds.SELECT);
+              if (tableTool) { app?.setTool(ToolIds.SELECT); setTableTool(false); return; }
+              app?.setTool(ToolIds.TABLE);
               setTableTool(true);
               setTableEditId(null);
               setRightTab("settings");
@@ -1979,7 +1979,6 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
         <CadTableLayer
           app={appRef.current}
           projectId={projectId ?? "default"}
-          toolActive={tableTool}
           selectedId={tableSelectedId}
           setSelectedId={setTableSelectedId}
         />
@@ -3405,7 +3404,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                   if ((patch as any)?.tableData) t.setData((patch as any).tableData);
                   (appRef.current as any)?.renderer?.render?.();
                 }}
-                onConfirm={() => { setTableTool(false); setTableEditId(null); }}
+                onConfirm={() => { (appRef.current as any)?.setTool?.(ToolIds.SELECT); setTableTool(false); setTableEditId(null); }}
                 onCancel={() => {
                   const app = appRef.current as any;
                   // Nur beim aktiven Tabellenwerkzeug wird die frisch gesetzte
@@ -3417,6 +3416,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                   setTableSelectedId(null);
                   setTableEditId(null);
                   setTableTool(false);
+                  app?.setTool?.(ToolIds.SELECT);
                 }}
               />
             </div>

@@ -318,7 +318,7 @@ export class CadApp {
   eraserTool!: EraserTool;
   wallTool!: WallTool;
   doorTool!: DoorTool;
-  activeTool: SelectTool | LineTool | HatchTool | MeasureTool | TextTool | PipetteTool | StickerTool | DocumentTool | FreeDrawTool | EraserTool | WallTool | DoorTool;
+  activeTool: SelectTool | LineTool | HatchTool | MeasureTool | TextTool | PipetteTool | StickerTool | DocumentTool | FreeDrawTool | EraserTool | WallTool | DoorTool | TableTool;
 
   /** Hub-Box-State für ausgewähltes Dokument (Verschieben/Drehen/Crop). Geschrieben von SelectTool, gelesen von CadEditor. */
   documentHubState: { visible: boolean; screenX: number; screenY: number; docId: string | null; cornerIndex: number; anchorWorld: { x: number; y: number } | null; cropSide: "top" | "right" | "bottom" | "left" | null } = {
@@ -2942,7 +2942,7 @@ export class CadApp {
     else if (id === ToolIds.ERASER) { this.activeTool = this.eraserTool; this.eraserTool.activate(); }
     else if (id === ToolIds.WALL) { this.activeTool = this.wallTool; this.wallTool.activate(); }
     else if (id === ToolIds.DOOR) { this.activeTool = this.doorTool; this.doorTool.activate(); }
-    else if (id === ToolIds.TABLE) { this.activeTool = this.tableTool as any; this.tableTool.activate(); }
+    else if (id === ToolIds.TABLE) { this.activeTool = this.tableTool; this.tableTool.activate(); }
     this._syncLineSettingsFromContext();
     this._syncHatchSettingsFromContext();
     this._syncMeasureSettingsFromContext();
