@@ -3895,7 +3895,10 @@ function ElementView({
       const parent = rootRef.current?.parentElement as HTMLElement | null;
       if (!parent) return;
       const t = ev.target as HTMLElement | null;
-      if (t?.closest("[data-hub-control]")) return;
+      // Fangpunkt-Handles tragen ebenfalls `data-hub-control`. Sie dürfen beim
+      // Rechtsklick nicht ausgefiltert werden, weil gerade dort die Hilfslinie
+      // entstehen soll. Nur echte HUB-Aktionsbuttons bleiben ausgenommen.
+      if (t?.closest("button[data-hub-control]")) return;
       const pageRect = parent.getBoundingClientRect();
       if (
         ev.clientX < pageRect.left || ev.clientX > pageRect.right ||
@@ -4536,7 +4539,9 @@ function ElementView({
       // Es entsteht eine Hilfslinie (Kreuz + Strahl zum aktiven Anker), auf die
       // beim Verschieben/Drehen gefangen wird.
       const t = ev.target as HTMLElement | null;
-      if (t?.closest("[data-hub-control]")) return;
+      // Fremde Tabellen-Fangpunkte sind HUB-Controls. Rechtsklick darauf muss
+      // trotzdem bis zur Fangpunktsuche gelangen; nur Aktionsbuttons auslassen.
+      if (t?.closest("button[data-hub-control]")) return;
       ev.preventDefault();
       ev.stopPropagation();
       const pageRect = parent.getBoundingClientRect();
