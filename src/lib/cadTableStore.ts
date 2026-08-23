@@ -7,6 +7,7 @@
  * Projekt und Zeichenblatt in localStorage gespeichert.
  */
 import type { PageElement } from "@/lib/projectStore";
+import { migrateCadTables, stampVersion, CAD_TABLES_KIND } from "@/lib/persistence";
 
 export interface CadTableElement extends PageElement {
   /** Weltposition der linken oberen Ecke in Metern. */
@@ -30,7 +31,7 @@ function load(projectId: string): Store {
     const raw = localStorage.getItem(keyFor(projectId));
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed === "object") data = parsed as Store;
+      if (parsed && typeof parsed === "object") data = migrateCadTables(parsed) as Store;
     }
   } catch { /* noop */ }
   cache.set(projectId, data);
@@ -39,7 +40,7 @@ function load(projectId: string): Store {
 
 function save(projectId: string) {
   try {
-    localStorage.setItem(keyFor(projectId), JSON.stringify(load(projectId)));
+    localStorage.setItem(keyFor(projectId), JSON.stringify(stampVersion(CAD_TABLES_KIND, { ...load(projectId) })));
   } catch { /* noop */ }
   version++;
   listeners.forEach((l) => l());

@@ -8,6 +8,7 @@ import { textStyleFontSizePt, ptToCssPx } from "./textTypography";
 import { dominantRichStyle } from "./textDominantStyle";
 import { LabelManager } from "./LabelManager";
 import { RasterLayers, cadRasterPxPerM } from "./RasterLayers";
+import { migrateCadSnapshot } from "@/lib/persistence";
 import { TopologyEngine } from "./TopologyEngine";
 import { GlobalGuides } from "./globalGuides";
 import { Renderer, Selection } from "./Renderer";
@@ -978,7 +979,9 @@ export class CadApp {
   }
 
   private _restoreScene(snapshot: string) {
-    const data = JSON.parse(snapshot);
+    // Zentrale Schema-Migration: Legacy-Datenstände werden beim Laden auf das
+    // aktuelle Objektmodell gehoben (rein additiv, ohne sichtbare Änderung).
+    const data = migrateCadSnapshot(JSON.parse(snapshot));
     this._isRestoring = true;
     // Rasterebenen zuerst (Kacheln laden asynchron nach).
     try {

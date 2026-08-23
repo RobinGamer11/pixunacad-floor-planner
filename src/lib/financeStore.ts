@@ -46,6 +46,8 @@ export interface FinanceState {
   projectNote: string;
 }
 
+import { migrateFinanceState, stampVersion, FINANCE_KIND } from "./persistence";
+
 const KEY = (projectId: string) => `pixuna.finance.v2.${projectId}`;
 
 const uid = () => `f-${Math.random().toString(36).slice(2, 10)}`;
@@ -61,7 +63,7 @@ function read(projectId: string): FinanceState {
   try {
     const raw = localStorage.getItem(KEY(projectId));
     if (!raw) return emptyState();
-    const parsed = JSON.parse(raw) as Partial<FinanceState>;
+    const parsed = migrateFinanceState(JSON.parse(raw)) as Partial<FinanceState>;
     return {
       nodes: (parsed.nodes ?? []).map((n) => ({ ...n, enabled: n.enabled !== false })),
       positions: parsed.positions ?? [],
@@ -75,7 +77,7 @@ function read(projectId: string): FinanceState {
 
 function write(projectId: string, state: FinanceState) {
   try {
-    localStorage.setItem(KEY(projectId), JSON.stringify(state));
+    localStorage.setItem(KEY(projectId), JSON.stringify(stampVersion(FINANCE_KIND, { ...state })));
   } catch {}
   listeners.forEach((l) => l());
 }
