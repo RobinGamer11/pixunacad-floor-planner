@@ -1201,9 +1201,10 @@ export class MiniCad {
   renderNow() {
     if (this._destroyed) return;
     try {
-      this.camera.offsetX = FRAME_PAD_PX;
-      this.camera.offsetY = FRAME_PAD_PX;
-      this.camera.scale = this.basePxPerMm * 1000 * this._zoom;
+      const k = this._renderScale;
+      this.camera.offsetX = FRAME_PAD_PX * k;
+      this.camera.offsetY = FRAME_PAD_PX * k;
+      this.camera.scale = this.basePxPerMm * 1000 * this._zoom * k;
       this.renderer.render();
     } catch (err) {
       console.error("MiniCad renderNow error:", err);
