@@ -244,8 +244,21 @@ defineSchema({
         return state;
       },
     },
-
+    {
+      // v3: Legacy-Text (pt-Einheit) und Legacy-Tabellen (Maße aus der
+      // tatsächlichen Tabellengeometrie) für ALLE Seiten anheben — normale
+      // Mappe wie Finanz-Bücher (templateKey) laufen durch denselben Pfad.
+      to: 3,
+      up: (state: any) => {
+        if (!isObj(state) || !Array.isArray(state.projects)) return state;
+        for (const p of state.projects) {
+          if (isObj(p)) migrateProjectPages(p.pages);
+        }
+        return state;
+      },
+    },
   ],
+
 });
 
 export function migrateProjectState<T>(state: T): T {
