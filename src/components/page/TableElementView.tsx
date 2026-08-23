@@ -19,10 +19,8 @@ import { cellRectMm, layoutTable } from "@/lib/table/tableLayout";
 import {
   acceptsRefInsert,
   colLabel,
-  displayValue,
   evalCell,
   extractRefs,
-  formatTableCellValue,
   qualifyRef,
   rangeExpr,
   REF_COLORS,
@@ -294,15 +292,13 @@ export function TableElementView({
     const expr = `=${pickFn}(${range})`;
     const tmp = model.cells.map((row) => row.slice());
     tmp[pickTarget.r][pickTarget.c] = expr;
-    const value = evalCell(tmp, pickTarget.r, pickTarget.c, { tableId });
-    const numberFormat = effectiveFormat(model, pickTarget.r, pickTarget.c).numberFormat;
     return {
       expr,
-      value: formatTableCellValue(value, numberFormat),
+      value: String(evalCell(tmp, pickTarget.r, pickTarget.c, { tableId })),
       r1: Math.min(anchor.r, end.r), r2: Math.max(anchor.r, end.r),
       c1: Math.min(anchor.c, end.c), c2: Math.max(anchor.c, end.c),
     };
-  }, [pickFn, pickTarget, pickStart, pickHover, pickStep, model, tableId]);
+  }, [pickFn, pickTarget, pickStart, pickHover, pickStep, model.cells]);
 
   // ─── Filter (Zeilensichtbarkeit) ────────────────────────────────────────
   const hiddenRows = React.useMemo(() => {
@@ -318,7 +314,7 @@ export function TableElementView({
       }
     }
     return hidden;
-  }, [filters, rows, headerRow, model.cells, tableId]);
+  }, [filters, rows, headerRow, model.cells]);
 
   // ─── Zellinteraktion ────────────────────────────────────────────────────
   const dragSelRef = React.useRef(false);
@@ -564,10 +560,11 @@ export function TableElementView({
           const rect = cellRectMm(model, lay, r, c);
           const f = effectiveFormat(model, r, c);
           const isHeader = headerRow && r === 0;
+          const raw = model.cells[r][c];
           const isPickTarget = pickFn && pickTarget?.r === r && pickTarget?.c === c;
           const display = isPickTarget && previewFormula
             ? previewFormula.value
-            : displayValue(model.cells, r, c, { tableId }, f.numberFormat);
+            : raw.startsWith("=") ? String(evalCell(model.cells, r, c, { tableId })) : raw;
           const isEditingCell = active && editCell?.r === r && editCell?.c === c;
           const refColor = refColorFor(r, c);
           return (

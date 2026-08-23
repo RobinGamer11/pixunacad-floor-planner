@@ -12,7 +12,7 @@ import { drawRichTextBox } from "./textRichRenderer";
 import { textStyleFontSizePt } from "./textTypography";
 import { normalizeTable, isCovered, effectiveFormat, effectiveBorders, PT_TO_MM } from "@/lib/table/tableModel";
 import { layoutTable, cellRectMm } from "@/lib/table/tableLayout";
-import { displayValue } from "@/lib/table/tableFormula";
+import { evalCell } from "@/lib/table/tableFormula";
 import { fillWithHatchPattern, PATTERN_BASE_TILE_M, type HatchPatternId } from "./hatchPatterns";
 import { transformedInstanceItems, instanceBoundingCornersWorld } from "./StickerManager";
 import { documentCornersWorld, documentCenterWorld, documentVisibleCornersWorld, documentAnchorsWorld } from "./documentGeometry";
@@ -2608,9 +2608,10 @@ export class Renderer {
         if (b.bottom) line(x, y + h, x + w, y + h);
         if (b.bottomDouble) line(x, y + h - Math.max(1.5, b.widthPx * 2), x + w, y + h - Math.max(1.5, b.widthPx * 2));
 
-        const f = effectiveFormat(model, r, c);
-        const text = displayValue(model.cells, r, c, {}, f.numberFormat);
+        const raw = model.cells[r]?.[c] ?? "";
+        const text = raw.startsWith("=") ? String(evalCell(model.cells, r, c)) : raw;
         if (!text) continue;
+        const f = effectiveFormat(model, r, c);
         const fontPx = f.fontSizePt * PT_TO_MM * pxPerMm;
         if (fontPx < 3) continue;
         ctx.save();
