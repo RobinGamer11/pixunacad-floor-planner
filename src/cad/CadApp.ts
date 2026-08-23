@@ -2942,7 +2942,7 @@ export class CadApp {
     else if (id === ToolIds.ERASER) { this.activeTool = this.eraserTool; this.eraserTool.activate(); }
     else if (id === ToolIds.WALL) { this.activeTool = this.wallTool; this.wallTool.activate(); }
     else if (id === ToolIds.DOOR) { this.activeTool = this.doorTool; this.doorTool.activate(); }
-    else if (id === ToolIds.TABLE) { this.activeTool = this.tableTool; this.tableTool.activate(); }
+    else if (id === ToolIds.TABLE) { this.activeTool = this.tableTool as any; this.tableTool.activate(); }
     this._syncLineSettingsFromContext();
     this._syncHatchSettingsFromContext();
     this._syncMeasureSettingsFromContext();

@@ -14,6 +14,7 @@ import React from "react";
 import { TableElementView } from "@/components/page/TableElementView";
 import { TableEditContext } from "@/components/page/TableElementView";
 import { cadTableStore } from "@/lib/cadTableStore";
+import { ANNOTATION_M_PER_MM } from "@/cad/textTypography";
 import {
   createTableData,
   normalizeTable,
