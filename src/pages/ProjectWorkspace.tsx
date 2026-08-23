@@ -4059,12 +4059,17 @@ function ElementView({
 
   const handlePointerDown = (e: React.PointerEvent) => {
     if (readOnly) return;
+    // Nur linker Maustaste darf Objekt-Transformationen/HUB-Aktionen starten
+    // oder bestätigen. Rechtsklick wird ausschließlich vom Contextmenu-Handler
+    // für Fangpunkt-Hilfslinien übernommen.
+    if (e.button !== 0) return;
     // Tabellenmodus dieser Tabelle aktiv → keine Objekt-Transformation.
     // Objektbearbeitung und Zellbearbeitung sind nie gleichzeitig aktiv.
     if (tableEditing) return;
     // Don't start a drag when the user clicks an interactive control inside the hub.
     const t = e.target as HTMLElement;
     if (t.closest("[data-hub-control]")) return;
+
     // Anker als Fraktion INNERHALB des Elements speichern.
     // Zusätzlich Snap-Key (tl/tr/bl/br/mid-*) bestimmen, falls Klick nahe einer Ecke/Kante liegt.
     const rect = (rootRef.current ?? (e.currentTarget as HTMLElement)).getBoundingClientRect();
@@ -5171,6 +5176,10 @@ function ElementView({
               window.addEventListener("pointercancel", up);
             };
             const cornerClickCad = (e: React.PointerEvent) => {
+              // Rechtsklick darf einen Fangpunkt niemals bestätigen oder die
+              // laufende HUB-Aktion beenden. Nur der Contextmenu-Handler erzeugt
+              // die Hilfslinie.
+              if (e.button !== 0) return;
               const key = `corner-${corner}`;
               // Ein zweiter Linksklick auf den bereits aktiven Fangpunkt setzt
               // die laufende CAD-Blatt-Vorschau sofort ab. Der Handle ist als
@@ -5199,6 +5208,7 @@ function ElementView({
                 setCarrying(true);
               }
             };
+
             const isTop = corner === "tl" || corner === "tr";
             const isLeft = corner === "tl" || corner === "bl";
             const cursor = cornerDraggable
