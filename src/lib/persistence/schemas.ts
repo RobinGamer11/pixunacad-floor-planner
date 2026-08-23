@@ -8,6 +8,18 @@
  * Tabellenlayout, Dokumentpositionen, Maßstäbe bleiben unangetastet).
  */
 import { defineSchema, migrateData } from "./schema";
+import { normalizeTable, tableWidthMm, tableHeightMm } from "../table/tableModel";
+import { PAPER_FORMATS } from "../paper";
+
+/** Papiergröße einer gespeicherten Seite (mm) — ohne Sonderpfade. */
+function pageSizeMm(pg: Record<string, any>): { w: number; h: number } {
+  if (pg.format === "frei" && pg.customWidthMm > 0 && pg.customHeightMm > 0) {
+    return { w: pg.customWidthMm, h: pg.customHeightMm };
+  }
+  const f = (PAPER_FORMATS as any)[pg.format] ?? PAPER_FORMATS["A4-hoch"];
+  return { w: f.w, h: f.h };
+}
+
 
 /* ------------------------------------------------------------------ Helpers */
 
