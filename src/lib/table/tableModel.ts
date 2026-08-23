@@ -325,8 +325,52 @@ export function effectiveFormat(t: TableModel, r: number, c: number): Required<P
     italic: f.italic ?? false,
     color: f.color,
     background: f.background ?? (isHeader ? HEADER_BG : undefined),
+    numFormat: f.numFormat ?? "auto",
   };
 }
+
+/**
+ * Zahlenwert aus einem Anzeige-/Rohtext lesen. Erkennt deutsche und englische
+ * Schreibweise sowie ein angehängtes € oder %.
+ */
+export function parseCellNumber(s: string): { n: number; suffix: "€" | "%" | null } | null {
+  const t = String(s ?? "").trim();
+  if (!t) return null;
+  const suffix = t.endsWith("€") ? "€" : t.endsWith("%") ? "%" : null;
+  let body = (suffix ? t.slice(0, -1) : t).trim().replace(/\s/g, "");
+  if (!body) return null;
+  if (/,\d+$/.test(body)) body = body.replace(/\./g, "").replace(",", ".");
+  else body = body.replace(/,/g, "");
+  const n = Number(body);
+  return Number.isFinite(n) ? { n, suffix } : null;
+}
+
+const deNum = (n: number, min: number, max: number) =>
+  n.toLocaleString("de-DE", { minimumFractionDigits: min, maximumFractionDigits: max });
+
+/**
+ * Anzeigetext einer Zelle. Verändert niemals den gespeicherten Rohwert und
+ * damit auch keine Formelberechnung.
+ */
+export function formatCellDisplay(value: string | number, nf?: NumFormat): string {
+  const s = typeof value === "number" ? String(value) : String(value ?? "");
+  const mode = nf ?? "auto";
+  if (!s || s.startsWith("#")) return s;
+  const parsed = parseCellNumber(s);
+  if (!parsed) return s;
+  const { n, suffix } = parsed;
+  switch (mode) {
+    case "eur": return `${deNum(n, 2, 2)} €`;
+    case "percent": return `${deNum(n * 100, 2, 2)} %`;
+    case "number": return deNum(n, 0, 6);
+    default:
+      // Automatisch: nur bereits erkennbare €/%-Eingaben aufhübschen.
+      if (suffix === "€") return `${deNum(n, 2, 2)} €`;
+      if (suffix === "%") return `${deNum(n, 2, 2)} %`;
+      return s;
+  }
+}
+
 
 /** Effektive Rahmen-Eigenschaften einer Zelle (Kanten, Stil, Stärke). */
 export function effectiveBorders(t: TableModel, r: number, c: number): {
