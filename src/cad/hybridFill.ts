@@ -1,24 +1,28 @@
 /**
  * hybridFill.ts — gemeinsame Bereichserkennung aus Vektor- UND Rasterkanten.
  *
- * Das Füllwerkzeug soll für den Benutzer nicht zwischen Vektor und Pixel
- * unterscheiden: Ein Bereich gilt als geschlossen, wenn seine Begrenzung aus
- * einer beliebigen Mischung von Vektorlinien (Linien, Wände, Schraffurkanten,
- * Freihand) und Rasterstrichen (Pixelmodus / RasterLayers) besteht.
+ * Grundregel (identisch zum reinen Vektorpfad):
+ *   Schnittpunkte teilen jede Boundary in Segmente. Aus diesen Segmenten wird
+ *   ein planarer Graph (DCEL) gebaut und daraus das kleinste Face gewählt, das
+ *   den Klickpunkt enthält. Linienanteile hinter einem Schnittpunkt sind eigene
+ *   Segmente und gehören dem Face damit nie an — eine Füllung kann sich niemals
+ *   über weiterlaufende Linien zu anderen Objekten „hangeln“.
  *
- * Vorgehen
- * --------
- *  1) Analyseausschnitt in WELTKOORDINATEN bestimmen (Vektor-BBox ∪ Raster-BBox
- *     ∪ Umgebung des Klicks). Zoom-unabhängig.
- *  2) Eine gemeinsame Boundary-Maske über `buildRasterBoundaryMask` aufbauen:
- *     sichtbare Rasterebenen + maßhaltig gerasterte Vektorkanten.
- *  3) Flood-Fill vom Klickpixel im transparenten Bereich.
- *  4) Kontur des gefundenen Bereichs extrahieren (Crack-Following) und
- *     vereinfachen (Douglas-Peucker) → saubere Polygonkontur in Weltmetern.
+ * Pixelobjekte sind dabei ausschließlich eine zusätzliche Quelle für
+ * Boundary-Geometrie:
  *
- * Reine Vektorbereiche laufen weiterhin über den präzisen DCEL-Pfad in
- * `hatchFill.ts` (Fast-Path) — dieser Modul greift nur, wenn tatsächlich
- * sichtbarer Rasterinhalt existiert.
+ *   Rastermaske → Skelettierung/Vektorisierung (`rasterVectorize.ts`)
+ *     → Kanten mit den Vektorkanten zusammenführen
+ *     → Schnittpunkte bestimmen und Kanten splitten (`hatchFill.ts`)
+ *     → gemeinsamer Boundary-Graph → Face am Klickpunkt
+ *
+ * Es gibt bewusst KEINEN Bitmap-Flood-Fill mehr: dieser hat die Face-Ermittlung
+ * global gemacht und Ausläufer entlang weiterlaufender Linien erzeugt, die dann
+ * nur noch morphologisch kaschiert werden konnten.
+ *
+ * Damit der O(n²)-Schnittpunkttest und die Skelettierung bezahlbar bleiben,
+ * wird die Analyse in einem Fenster um den Klick durchgeführt, das so lange
+ * wächst, bis ein Face gefunden wird, das vollständig im Fenster liegt.
  */
 import { Vec2, v, polygonSignedArea } from "./geometry";
 import type { Scene } from "./Scene";
@@ -27,161 +31,18 @@ import { vectorizeRasterBoundary } from "./rasterVectorize";
 import { buildRasterBoundaryMask, type RasterScope } from "./rasterBoundary";
 import type { RasterLayers } from "./RasterLayers";
 
-/** Ziel-Pixelbudget der Analysemaske (zoom-unabhängig). */
-const TARGET_PIXELS = 4_000_000;
-/** Ober-/Untergrenze der Analyseauflösung in px pro Weltmeter. */
-const MAX_PX_PER_M = 4000;
-const MIN_PX_PER_M = 200;
-/** Zusätzlicher Suchradius um den Klick, falls kaum Geometrie existiert. */
-const CLICK_PAD_M = 2;
-/** Randstreifen der Maske; erreicht der Flood-Fill ihn, gilt der Bereich als offen. */
-const BORDER_PX = 1;
-/** Closing-Radius in Analysepixeln — schließt nur Subpixel-/Anti-Aliasing-Lücken. */
-const DILATE_PX = 2;
-/** Obergrenze für Konturpunkte einer aus Raster gewonnenen Fläche. */
-const MAX_CONTOUR_POINTS = 120;
-
-/**
- * Morphologische Dilatation der Grenzpixel (Chebyshev-Radius `r`) über zwei
- * separierte 1D-Durchläufe. Ergebnis: 1 = Grenze, 0 = füllbar.
- */
-function dilateBoundary(alpha: Uint8Array, threshold: number, wPx: number, hPx: number, r: number): Uint8Array {
-  const src = new Uint8Array(wPx * hPx);
-  for (let i = 0; i < src.length; i++) src[i] = alpha[i] >= threshold ? 1 : 0;
-  if (r <= 0) return src;
-  const tmp = new Uint8Array(wPx * hPx);
-  for (let y = 0; y < hPx; y++) {
-    const row = y * wPx;
-    for (let x = 0; x < wPx; x++) {
-      let on = 0;
-      for (let dx = -r; dx <= r && !on; dx++) {
-        const nx = x + dx;
-        if (nx < 0 || nx >= wPx) continue;
-        if (src[row + nx]) on = 1;
-      }
-      tmp[row + x] = on;
-    }
-  }
-  const out = new Uint8Array(wPx * hPx);
-  for (let y = 0; y < hPx; y++) {
-    for (let x = 0; x < wPx; x++) {
-      let on = 0;
-      for (let dy = -r; dy <= r && !on; dy++) {
-        const ny = y + dy;
-        if (ny < 0 || ny >= hPx) continue;
-        if (tmp[ny * wPx + x]) on = 1;
-      }
-      out[y * wPx + x] = on;
-    }
-  }
-  return out;
-}
-
-/** Chebyshev-Dilatation einer 0/1-Maske (separiert, radius `r`). */
-function dilateMask(src: Uint8Array, wPx: number, hPx: number, r: number): Uint8Array {
-  if (r <= 0) return src;
-  const tmp = new Uint8Array(wPx * hPx);
-  for (let y = 0; y < hPx; y++) {
-    const row = y * wPx;
-    for (let x = 0; x < wPx; x++) {
-      let on = 0;
-      for (let dx = -r; dx <= r && !on; dx++) {
-        const nx = x + dx;
-        if (nx < 0 || nx >= wPx) continue;
-        if (src[row + nx]) on = 1;
-      }
-      tmp[row + x] = on;
-    }
-  }
-  const out = new Uint8Array(wPx * hPx);
-  for (let y = 0; y < hPx; y++) {
-    for (let x = 0; x < wPx; x++) {
-      let on = 0;
-      for (let dy = -r; dy <= r && !on; dy++) {
-        const ny = y + dy;
-        if (ny < 0 || ny >= hPx) continue;
-        if (tmp[ny * wPx + x]) on = 1;
-      }
-      out[y * wPx + x] = on;
-    }
-  }
-  return out;
-}
-
-/** Chebyshev-Erosion = Komplement der Dilatation des Komplements. */
-function erodeMask(src: Uint8Array, wPx: number, hPx: number, r: number): Uint8Array {
-  if (r <= 0) return src;
-  const inv = new Uint8Array(wPx * hPx);
-  for (let i = 0; i < inv.length; i++) inv[i] = src[i] ? 0 : 1;
-  const dil = dilateMask(inv, wPx, hPx, r);
-  const out = new Uint8Array(wPx * hPx);
-  for (let i = 0; i < out.length; i++) out[i] = dil[i] ? 0 : 1;
-  // Randpixel gelten als erodiert (außerhalb = leer).
-  return out;
-}
-
-/**
- * Wählt die Zusammenhangskomponente, die den Klick enthält. Ist der Klickpixel
- * selbst weggeschnitten (z. B. Klick nahe an einer Kante), wird über die
- * ursprüngliche Region die nächstgelegene erodierte Zelle gesucht.
- */
-function componentAt(mask: Uint8Array, region: Uint8Array, wPx: number, hPx: number, startIdx: number): Uint8Array | null {
-  let seed = -1;
-  if (mask[startIdx]) seed = startIdx;
-  else {
-    // BFS innerhalb der ursprünglichen Region bis zur nächsten erodierten Zelle.
-    const seen = new Uint8Array(wPx * hPx);
-    const q = new Int32Array(wPx * hPx);
-    let head = 0, tail = 0;
-    q[tail++] = startIdx; seen[startIdx] = 1;
-    while (head < tail) {
-      const idx = q[head++];
-      if (mask[idx]) { seed = idx; break; }
-      const x = idx % wPx, y = (idx - (idx % wPx)) / wPx;
-      const push = (nx: number, ny: number) => {
-        if (nx < 0 || ny < 0 || nx >= wPx || ny >= hPx) return;
-        const ni = ny * wPx + nx;
-        if (seen[ni] || !region[ni]) return;
-        seen[ni] = 1; q[tail++] = ni;
-      };
-      push(x + 1, y); push(x - 1, y); push(x, y + 1); push(x, y - 1);
-    }
-  }
-  if (seed < 0) return null;
-
-  const out = new Uint8Array(wPx * hPx);
-  const stack = new Int32Array(wPx * hPx);
-  let sp = 0;
-  stack[sp++] = seed; out[seed] = 1;
-  while (sp > 0) {
-    const idx = stack[--sp];
-    const x = idx % wPx, y = (idx - (idx % wPx)) / wPx;
-    const push = (nx: number, ny: number) => {
-      if (nx < 0 || ny < 0 || nx >= wPx || ny >= hPx) return;
-      const ni = ny * wPx + nx;
-      if (out[ni] || !mask[ni]) return;
-      out[ni] = 1; stack[sp++] = ni;
-    };
-    push(x + 1, y); push(x - 1, y); push(x, y + 1); push(x, y - 1);
-  }
-  return out;
-}
-
-/** Gleitender Mittelwert über einen geschlossenen Polygonzug (Fensterradius `r`). */
-function smoothClosed(points: Vec2[], r: number): Vec2[] {
-  const n = points.length;
-  if (n < 5 || r <= 0) return points;
-  const out: Vec2[] = new Array(n);
-  for (let i = 0; i < n; i++) {
-    let sx = 0, sy = 0, c = 0;
-    for (let k = -r; k <= r; k++) {
-      const p = points[(i + k + n) % n];
-      sx += p.x; sy += p.y; c++;
-    }
-    out[i] = v(sx / c, sy / c);
-  }
-  return out;
-}
+/** Analyseauflösung der Vektorisierung (Skelett) — bewusst moderat. */
+const VEC_TARGET_PIXELS = 1_500_000;
+const VEC_MIN_PX_PER_M = 150;
+const VEC_MAX_PX_PER_M = 1500;
+/** Maximal überbrückte Anschlusslücke in Analysepixeln (Antialiasing/Subpixel). */
+const GAP_PX = 3;
+/** Sicherheitsgrenze für die O(n²)-Schnittpunktberechnung des Planargraphen. */
+const MAX_GRAPH_EDGES = 6000;
+/** Fenstergrößen (Halbkante in Metern), in denen das Face gesucht wird. */
+const WINDOW_STEPS_M = [0.75, 2, 6, 18, 60, 200];
+/** Sicherheitsabstand zum Fensterrand: Faces müssen echt innen liegen. */
+const WINDOW_MARGIN = 1e-4;
 
 export interface HybridFillOptions {
   scope?: RasterScope;
@@ -192,97 +53,7 @@ export interface HybridFillOptions {
 
 interface Rect { x: number; y: number; w: number; h: number }
 
-function unionRect(a: Rect | null, b: Rect | null): Rect | null {
-  if (!a) return b;
-  if (!b) return a;
-  const x = Math.min(a.x, b.x);
-  const y = Math.min(a.y, b.y);
-  return { x, y, w: Math.max(a.x + a.w, b.x + b.w) - x, h: Math.max(a.y + a.h, b.y + b.h) - y };
-}
-
-/** Douglas-Peucker-Vereinfachung. */
-function simplify(points: Vec2[], eps: number): Vec2[] {
-  if (points.length < 3) return points;
-  const keep = new Uint8Array(points.length);
-  keep[0] = 1; keep[points.length - 1] = 1;
-  const stack: [number, number][] = [[0, points.length - 1]];
-  while (stack.length) {
-    const [i0, i1] = stack.pop()!;
-    if (i1 <= i0 + 1) continue;
-    const a = points[i0], b = points[i1];
-    const dx = b.x - a.x, dy = b.y - a.y;
-    const len = Math.hypot(dx, dy) || 1e-12;
-    let best = -1, bestD = eps;
-    for (let i = i0 + 1; i < i1; i++) {
-      const p = points[i];
-      const d = Math.abs((p.x - a.x) * dy - (p.y - a.y) * dx) / len;
-      if (d > bestD) { bestD = d; best = i; }
-    }
-    if (best >= 0) {
-      keep[best] = 1;
-      stack.push([i0, best], [best, i1]);
-    }
-  }
-  const out: Vec2[] = [];
-  for (let i = 0; i < points.length; i++) if (keep[i]) out.push(points[i]);
-  return out;
-}
-
-/**
- * Crack-Following: liefert die Außenkontur der gefüllten Pixelmenge als
- * Polygon in Pixel-Eckkoordinaten (Gitterpunkte).
- */
-function traceContour(filled: Uint8Array, wPx: number, hPx: number, startIdx: number): { x: number; y: number }[] {
-  const at = (x: number, y: number) => (x < 0 || y < 0 || x >= wPx || y >= hPx) ? 0 : filled[y * wPx + x];
-
-  // Start: oberste, linkeste gefüllte Zelle der Region ermitteln.
-  let sx = startIdx % wPx, sy = Math.floor(startIdx / wPx);
-  for (let y = 0; y < hPx; y++) {
-    let found = -1;
-    for (let x = 0; x < wPx; x++) if (filled[y * wPx + x]) { found = x; break; }
-    if (found >= 0) { sx = found; sy = y; break; }
-  }
-
-  const DIRS = [[1, 0], [0, 1], [-1, 0], [0, -1]]; // right, down, left, up
-  let cx = sx, cy = sy, d = 0;
-  const startCx = cx, startCy = cy, startD = d;
-  const pts: { x: number; y: number }[] = [];
-  let guard = 0;
-  const maxSteps = 8 * (wPx + hPx) * 4 + 1000;
-
-  do {
-    // Front-Left / Front-Right Zellen je Richtung.
-    let fl: [number, number], fr: [number, number];
-    if (d === 0) { fl = [cx, cy - 1]; fr = [cx, cy]; }
-    else if (d === 1) { fl = [cx, cy]; fr = [cx - 1, cy]; }
-    else if (d === 2) { fl = [cx - 1, cy]; fr = [cx - 1, cy - 1]; }
-    else { fl = [cx - 1, cy - 1]; fr = [cx, cy - 1]; }
-
-    let nd: number;
-    if (at(fl[0], fl[1])) nd = (d + 3) % 4;      // links abbiegen
-    else if (at(fr[0], fr[1])) nd = d;           // geradeaus
-    else nd = (d + 1) % 4;                       // rechts abbiegen
-
-    if (nd !== d) pts.push({ x: cx, y: cy });
-    d = nd;
-    cx += DIRS[d][0];
-    cy += DIRS[d][1];
-    if (++guard > maxSteps) break;
-  } while (!(cx === startCx && cy === startCy && d === startD));
-
-  return pts;
-}
-
-/* ===================== Topologischer Hybridpfad ========================= */
-
-/** Analyseauflösung der Vektorisierung (Skelett) — bewusst moderat. */
-const VEC_TARGET_PIXELS = 1_500_000;
-const VEC_MIN_PX_PER_M = 150;
-const VEC_MAX_PX_PER_M = 1500;
-/** Maximal überbrückte Anschlusslücke in Analysepixeln (Antialiasing/Subpixel). */
-const GAP_PX = 3;
-/** Sicherheitsgrenze für die O(n²)-Schnittpunktberechnung des Planargraphen. */
-const MAX_GRAPH_EDGES = 6000;
+/* ------------------------------ Hilfsfunktionen ------------------------- */
 
 /** Lotfußpunkt von p auf Strecke a→b (auf die Strecke begrenzt). */
 function projectOnSegment(p: Vec2, a: Vec2, b: Vec2): { q: Vec2; d: number } {
@@ -297,6 +68,8 @@ function projectOnSegment(p: Vec2, a: Vec2, b: Vec2): { q: Vec2; d: number } {
  * Verbindet freie Enden der Pixelkurven mit nahe liegender Geometrie.
  * Damit schließen Antialiasing-/Subpixel-Lücken zwischen Pixel- und
  * Vektorkanten, ohne dass Morphologie die Face-Geometrie bestimmt.
+ * Die Brücke ist eine echte Kante und wird deshalb ebenfalls an allen
+ * Schnittpunkten gesplittet.
  */
 function bridgeOpenEnds(openEnds: Vec2[], edges: RawEdge[], tol: number): RawEdge[] {
   const bridges: RawEdge[] = [];
@@ -313,17 +86,72 @@ function bridgeOpenEnds(openEnds: Vec2[], edges: RawEdge[], tol: number): RawEdg
   return bridges;
 }
 
+/** Liang-Barsky: Strecke auf ein Rechteck zuschneiden (null = außerhalb). */
+function clipSegment(a: Vec2, b: Vec2, r: Rect): RawEdge | null {
+  const x0 = r.x, y0 = r.y, x1 = r.x + r.w, y1 = r.y + r.h;
+  const dx = b.x - a.x, dy = b.y - a.y;
+  let t0 = 0, t1 = 1;
+  const clip = (p: number, q: number) => {
+    if (Math.abs(p) < 1e-15) return q >= 0;
+    const t = q / p;
+    if (p < 0) { if (t > t1) return false; if (t > t0) t0 = t; }
+    else { if (t < t0) return false; if (t < t1) t1 = t; }
+    return true;
+  };
+  if (!clip(-dx, a.x - x0)) return null;
+  if (!clip(dx, x1 - a.x)) return null;
+  if (!clip(-dy, a.y - y0)) return null;
+  if (!clip(dy, y1 - a.y)) return null;
+  const p = v(a.x + dx * t0, a.y + dy * t0);
+  const q = v(a.x + dx * t1, a.y + dy * t1);
+  if (Math.hypot(q.x - p.x, q.y - p.y) < 1e-9) return null;
+  return { a: p, b: q };
+}
+
+/** Liegt das Face vollständig (mit Sicherheitsabstand) im Analysefenster? */
+function faceInsideWindow(face: Vec2[], r: Rect): boolean {
+  for (const p of face) {
+    if (p.x <= r.x + WINDOW_MARGIN || p.x >= r.x + r.w - WINDOW_MARGIN) return false;
+    if (p.y <= r.y + WINDOW_MARGIN || p.y >= r.y + r.h - WINDOW_MARGIN) return false;
+  }
+  return true;
+}
+
+/** Boundary-Kanten aus dem Rasterinhalt eines Fensters gewinnen. */
+function rasterEdgesInWindow(
+  rasterLayers: RasterLayers | null | undefined,
+  rect: Rect,
+  options: HybridFillOptions,
+): { edges: RawEdge[]; openEnds: Vec2[]; pxPerM: number } {
+  if (!rasterLayers) return { edges: [], openEnds: [], pxPerM: VEC_MIN_PX_PER_M };
+  let pxPerM = Math.sqrt(VEC_TARGET_PIXELS / Math.max(1e-6, rect.w * rect.h));
+  pxPerM = Math.max(VEC_MIN_PX_PER_M, Math.min(VEC_MAX_PX_PER_M, pxPerM));
+
+  // Nur Rasterinhalt in die Maske — Vektorkanten bleiben exakt und werden
+  // nicht über den Umweg Rasterung/Skelett verfälscht.
+  const mask = buildRasterBoundaryMask(rasterLayers, rect.x, rect.y, rect.w, rect.h, {
+    scope: options.scope ?? "all",
+    activeLabelId: options.activeLabelId,
+    isVisible: options.isVisible,
+    pxPerM,
+    alphaThreshold: 16,
+  });
+  if (!mask) return { edges: [], openEnds: [], pxPerM };
+
+  const { edges, openEnds } = vectorizeRasterBoundary(
+    mask.alpha, mask.threshold, mask.wPx, mask.hPx, mask.x, mask.y, mask.pxPerM,
+  );
+  return { edges, openEnds, pxPerM: mask.pxPerM };
+}
+
+/* ------------------------------- Hauptpfad ------------------------------ */
+
 /**
- * Hybride Bereichserkennung.
+ * Hybride Bereichserkennung — rein topologisch.
  *
- * Hauptpfad (topologisch): Rasterstriche werden skelettiert und vektorisiert,
- * mit den Vektorkanten zusammengeführt und über denselben planaren
- * Face-Algorithmus wie der reine Vektorpfad ausgewertet. Schnittpunkte teilen
- * dabei jede Kante in Segmente; Linienanteile hinter einem Schnittpunkt sind
- * Brückenkanten und können nie Bestandteil des gewählten Faces werden.
- *
- * Fallback: Kann kein Face bestimmt werden (z. B. sehr komplexe Rasterbilder
- * jenseits des Kantenbudgets), greift weiterhin die alte Maskenanalyse.
+ * Liefert die Kontur des kleinsten geschlossenen Faces, das den Klickpunkt
+ * enthält, aus der Vereinigung von Vektorkanten und vektorisierten
+ * Pixelgrenzen. Gibt null zurück, wenn der Bereich nicht geschlossen ist.
  */
 export function findHybridEnclosingFace(
   scene: Scene,
@@ -331,230 +159,43 @@ export function findHybridEnclosingFace(
   click: Vec2,
   options: HybridFillOptions = {},
 ): Vec2[] | null {
-  const isVisible = options.isVisible;
   const vectorEdges = collectBoundaryEdges(scene);
 
-  const rasRect = rasterLayers?.contentBoundsWorld(
-    isVisible ? (id) => isVisible(id) : undefined,
-  ) ?? null;
+  for (const half of WINDOW_STEPS_M) {
+    const rect: Rect = { x: click.x - half, y: click.y - half, w: half * 2, h: half * 2 };
 
-  if (rasRect && rasRect.w > 0 && rasRect.h > 0) {
-    const pad = Math.max(0.05, Math.min(rasRect.w, rasRect.h) * 0.02);
-    const rect = { x: rasRect.x - pad, y: rasRect.y - pad, w: rasRect.w + pad * 2, h: rasRect.h + pad * 2 };
-    let pxPerM = Math.sqrt(VEC_TARGET_PIXELS / (rect.w * rect.h));
-    pxPerM = Math.max(VEC_MIN_PX_PER_M, Math.min(VEC_MAX_PX_PER_M, pxPerM));
-
-    // Nur Rasterinhalt in die Maske — Vektorkanten bleiben exakt und werden
-    // nicht über den Umweg Rasterung/Skelett verfälscht.
-    const mask = buildRasterBoundaryMask(rasterLayers, rect.x, rect.y, rect.w, rect.h, {
-      scope: options.scope ?? "all",
-      activeLabelId: options.activeLabelId,
-      isVisible,
-      pxPerM,
-      alphaThreshold: 16,
-    });
-
-    if (mask) {
-      const { edges: rasterEdges, openEnds } = vectorizeRasterBoundary(
-        mask.alpha, mask.threshold, mask.wPx, mask.hPx, mask.x, mask.y, mask.pxPerM,
-      );
-      if (rasterEdges.length && vectorEdges.length + rasterEdges.length <= MAX_GRAPH_EDGES) {
-        const all = [...vectorEdges, ...rasterEdges];
-        const bridges = bridgeOpenEnds(openEnds, all, GAP_PX / mask.pxPerM);
-        const face = findEnclosingFaceFromEdges([...all, ...bridges], click);
-        if (face && face.length >= 3) return face;
-      }
+    // 1) Vektorkanten auf das Fenster zuschneiden. Der Zuschnitt erzeugt keine
+    //    künstlichen Ringe: eine am Fensterrand endende Kante gehört zu keinem
+    //    geschlossenen Face, deshalb wird ein Face, das den Rand berührt, unten
+    //    verworfen und das Fenster vergrößert.
+    const clipped: RawEdge[] = [];
+    for (const e of vectorEdges) {
+      const c = clipSegment(e.a, e.b, rect);
+      if (c) clipped.push(c);
     }
-  }
 
-  return findHybridFaceByFloodFill(scene, rasterLayers, click, options);
-}
+    // 2) Pixelgrenzen desselben Fensters als zusätzliche Boundary-Geometrie.
+    const ras = rasterEdgesInWindow(rasterLayers, rect, options);
 
-/**
- * Fallback-Bereichserkennung über die gemeinsame Rastermaske (Flood-Fill).
- * Gibt die Kontur in Weltkoordinaten zurück oder null.
- */
-
-function findHybridFaceByFloodFill(
-  scene: Scene,
-  rasterLayers: RasterLayers | null | undefined,
-  click: Vec2,
-  options: HybridFillOptions = {},
-): Vec2[] | null {
-  const isVisible = options.isVisible;
-
-  // --- 1) Analyseausschnitt bestimmen -------------------------------------
-  const edges = collectBoundaryEdges(scene);
-  let vecRect: Rect | null = null;
-  if (edges.length) {
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    for (const e of edges) {
-      minX = Math.min(minX, e.a.x, e.b.x); maxX = Math.max(maxX, e.a.x, e.b.x);
-      minY = Math.min(minY, e.a.y, e.b.y); maxY = Math.max(maxY, e.a.y, e.b.y);
-    }
-    vecRect = { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
-  }
-  const rasRect = rasterLayers?.contentBoundsWorld(
-    isVisible ? (id) => isVisible(id) : undefined,
-  ) ?? null;
-  const clickRect: Rect = { x: click.x - CLICK_PAD_M, y: click.y - CLICK_PAD_M, w: CLICK_PAD_M * 2, h: CLICK_PAD_M * 2 };
-
-  let rect = unionRect(unionRect(vecRect, rasRect), clickRect)!;
-  // Kleiner Rand, damit außen liegende Bereiche als "offen" erkannt werden.
-  const pad = Math.max(0.05, Math.min(rect.w, rect.h) * 0.02);
-  rect = { x: rect.x - pad, y: rect.y - pad, w: rect.w + pad * 2, h: rect.h + pad * 2 };
-  if (rect.w <= 0 || rect.h <= 0) return null;
-
-  // --- 2) Zoom-unabhängige Analyseauflösung -------------------------------
-  let pxPerM = Math.sqrt(TARGET_PIXELS / (rect.w * rect.h));
-  pxPerM = Math.max(MIN_PX_PER_M, Math.min(MAX_PX_PER_M, pxPerM));
-
-  // --- 3) Gemeinsame Boundary-Maske (Raster + Vektor) ---------------------
-  const mask = buildRasterBoundaryMask(rasterLayers, rect.x, rect.y, rect.w, rect.h, {
-    scope: options.scope ?? "all",
-    activeLabelId: options.activeLabelId,
-    isVisible,
-    pxPerM,
-    alphaThreshold: 16,
-    drawExtra: (ctx, x, y, _w, _h, k) => {
-      // Vektorkanten maßhaltig in dieselbe Maske. Dünne Linie (≈1,4 px) —
-      // reicht als Begrenzung, verfälscht die Fläche aber kaum.
-      ctx.save();
-      ctx.strokeStyle = "#000";
-      ctx.lineWidth = 1.4;
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-      ctx.beginPath();
-      for (const e of edges) {
-        ctx.moveTo((e.a.x - x) * k, (e.a.y - y) * k);
-        ctx.lineTo((e.b.x - x) * k, (e.b.y - y) * k);
-      }
-      ctx.stroke();
-      ctx.restore();
-    },
-  });
-  if (!mask) return null;
-
-  const { wPx, hPx, alpha, threshold } = mask;
-
-  // Grenzmaske mit sehr kleiner Dilatation (Closing um DILATE_PX Analysepixel).
-  // Damit gelten optisch anschließende Pixel-/Vektorkanten trotz Subpixel- und
-  // Anti-Aliasing-Lücken als durchgehende Grenze. Größere echte Lücken bleiben
-  // offen, weil der Radius bewusst nur 1–2 Pixel beträgt.
-  const bnd = dilateBoundary(alpha, threshold, wPx, hPx, DILATE_PX);
-
-  const px = Math.floor((click.x - mask.x) * mask.pxPerM);
-  const py = Math.floor((click.y - mask.y) * mask.pxPerM);
-  if (px < 0 || py < 0 || px >= wPx || py >= hPx) return null;
-  const startIdx = py * wPx + px;
-  if (bnd[startIdx]) return null; // direkt auf einer Grenze geklickt
-
-  // --- 4) Flood-Fill im transparenten Bereich -----------------------------
-  const filled = new Uint8Array(wPx * hPx);
-  const stack = new Int32Array(wPx * hPx);
-  let sp = 0;
-  stack[sp++] = startIdx;
-  filled[startIdx] = 1;
-  let escaped = false;
-  let count = 0;
-
-  while (sp > 0) {
-    const idx = stack[--sp];
-    const x = idx % wPx;
-    const y = (idx - x) / wPx;
-    count++;
-    if (x <= BORDER_PX || y <= BORDER_PX || x >= wPx - 1 - BORDER_PX || y >= hPx - 1 - BORDER_PX) {
-      escaped = true;
+    const all: RawEdge[] = [...clipped, ...ras.edges];
+    if (all.length === 0) continue;
+    if (all.length > MAX_GRAPH_EDGES) {
+      // Fenster ist zu dicht besetzt — ein noch größeres bringt nichts mehr.
       break;
     }
-    const push = (nx: number, ny: number) => {
-      const ni = ny * wPx + nx;
-      if (filled[ni]) return;
-      if (bnd[ni]) return;
-      filled[ni] = 1;
-      stack[sp++] = ni;
-    };
-    push(x + 1, y); push(x - 1, y); push(x, y + 1); push(x, y - 1);
-  }
 
-  if (escaped || count < 9) return null;
+    // 3) Lücken zwischen Pixel- und Vektorkanten schließen (nur Subpixel).
+    const bridges = ras.openEnds.length
+      ? bridgeOpenEnds(ras.openEnds, all, GAP_PX / ras.pxPerM)
+      : [];
 
-  // --- 4b) Schmale Ausläufer entfernen (morphologisches Opening) -----------
-  // An T-/X-Kreuzungen und über die Ecken hinauslaufenden Linien entstehen
-  // zwischen den verdickten Grenzen schmale Taschen. Ein Opening mit einem
-  // Radius etwas größer als die Grenzverdickung schneidet genau diese Arme
-  // weg, ohne die eigentliche Raumfläche zu verändern. Anschließend wird die
-  // Fläche wieder bis an die Grenzmittellinie ausgedehnt (Dilatation um
-  // OPEN_R + DILATE_PX), aber auf die Umgebung der Originalregion beschränkt,
-  // damit die Kontur nicht über die Begrenzung hinauswächst.
-  const OPEN_R = DILATE_PX + 2;
-  let region: Uint8Array<ArrayBufferLike> = filled;
-  const eroded = erodeMask(filled, wPx, hPx, OPEN_R);
-  const core = componentAt(eroded, filled, wPx, hPx, startIdx);
-  if (core) {
-    const grown = dilateMask(core, wPx, hPx, OPEN_R + DILATE_PX);
-    const allowed = dilateMask(filled, wPx, hPx, DILATE_PX);
-    const opened = new Uint8Array(wPx * hPx);
-    let openCount = 0;
-    for (let i = 0; i < opened.length; i++) {
-      const on = grown[i] && allowed[i] ? 1 : 0;
-      opened[i] = on;
-      openCount += on;
+    // 4) Gemeinsamer Boundary-Graph: Schnittpunkte splitten alle Kanten,
+    //    anschließend wird das kleinste Face am Klickpunkt gewählt.
+    const face = findEnclosingFaceFromEdges([...all, ...bridges], click);
+    if (face && face.length >= 3 && faceInsideWindow(face, rect)) {
+      return polygonSignedArea(face) < 0 ? [...face].reverse() : face;
     }
-    if (openCount >= 9) region = opened;
   }
 
-  // --- 4c) Schlitze hinter Schnittpunkten schließen (morphologisches Closing)
-  // Läuft eine Linie über einen Schnittpunkt hinaus in das Face hinein, legt
-  // sich der Flood-Fill um diesen Überstand herum. Die Kontur bekäme dadurch
-  // eine schmale Kerbe/Spitze entlang der weiterlaufenden Linie. Ein Closing
-  // (Dilatation + Erosion) überbrückt genau solche Schlitze, deren Breite der
-  // Linienstärke entspricht.
-  //
-  // Damit das Closing niemals die eigentliche Face-Geometrie bestimmt, werden
-  // ausschließlich Pixel übernommen, die selbst Grenzpixel sind (also der
-  // überstehende Linienast). Freiflächen jenseits einer Begrenzung können so
-  // nicht hinzukommen — die Fläche kann nicht über eine echte Grenze auslaufen.
-  const CLOSE_R = DILATE_PX + 6;
-  {
-    const grown = dilateMask(region, wPx, hPx, CLOSE_R);
-    const closed = erodeMask(grown, wPx, hPx, CLOSE_R);
-    const merged = new Uint8Array(wPx * hPx);
-    for (let i = 0; i < merged.length; i++) {
-      merged[i] = (region[i] || (closed[i] && bnd[i])) ? 1 : 0;
-    }
-    // Nur die Komponente am Klickpunkt behalten (Closing kann getrennte
-    // Nachbarflächen über einen dünnen Grenzast hinweg berühren).
-    const comp = componentAt(merged, merged, wPx, hPx, startIdx);
-    if (comp) region = comp;
-  }
-
-
-  // --- 5) Kontur extrahieren + vereinfachen -------------------------------
-  const contourPx = traceContour(region, wPx, hPx, startIdx);
-  if (contourPx.length < 3) return null;
-
-
-  const world: Vec2[] = contourPx.map((p) => v(mask.x + p.x / mask.pxPerM, mask.y + p.y / mask.pxPerM));
-  // Treppenstufen der Rasterkontur zuerst leicht glätten (gleitender Mittelwert
-  // über 3 Punkte) — die Form bleibt, aber Douglas-Peucker findet danach echte
-  // Ecken statt Pixeltreppen.
-  const smoothed = smoothClosed(world, 1);
-
-  // Vereinfachung ab ≈ 1,8 Analysepixel; falls immer noch sehr viele Punkte
-  // übrig bleiben (gekrümmte Pixelkanten), Toleranz schrittweise erhöhen, bis
-  // die Kontur eine handhabbare Punktzahl hat.
-  let eps = 1.8 / mask.pxPerM;
-  let simple = simplify(smoothed, eps);
-  for (let i = 0; i < 8 && simple.length > MAX_CONTOUR_POINTS; i++) {
-    eps *= 1.7;
-    simple = simplify(smoothed, eps);
-  }
-  if (simple.length >= 2) {
-    const first = simple[0], last = simple[simple.length - 1];
-    if (Math.hypot(first.x - last.x, first.y - last.y) < eps) simple = simple.slice(0, -1);
-  }
-  if (simple.length < 3) return null;
-  if (polygonSignedArea(simple) < 0) simple = [...simple].reverse();
-  return simple;
+  return null;
 }

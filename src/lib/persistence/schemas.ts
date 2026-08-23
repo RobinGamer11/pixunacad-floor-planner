@@ -143,6 +143,28 @@ export function migrateCadSnapshot<T>(data: T): T {
 
 /* ------------------------------------------------------------ Projektmappe */
 
+/**
+ * Hebt eine Liste von Mappe-/Vorlagenseiten auf das aktuelle Objektmodell.
+ * Wird sowohl von der Projekt-Migration als auch von Bestandsdaten ohne
+ * Versionsfeld genutzt (z. B. gespeicherte Finanz-Mustervorlagen, die als
+ * reines Seiten-Array in localStorage liegen und deshalb keinen
+ * Versionsstempel tragen können). Rein additiv und idempotent: Positionen,
+ * Größen, Inhalte, Farben, Schriftformatierungen und Tabellenwerte bleiben
+ * unverändert, es werden nur fehlende Felder rückwärtskompatibel ergänzt.
+ */
+export function migrateProjectPages<T>(pages: T): T {
+  if (!Array.isArray(pages)) return pages;
+  for (const pg of pages) {
+    if (!isObj(pg)) continue;
+    mapArray(pg, "elements", (el) => {
+      fill(el, "rotation", 0);
+      if (el.kind === "table") fill(el, "scale", 1);
+    });
+  }
+  return pages;
+}
+
+
 export const PROJECT_STATE_KIND = "project-state";
 
 defineSchema({
@@ -166,12 +188,7 @@ defineSchema({
         if (!isObj(state) || !Array.isArray(state.projects)) return state;
         for (const p of state.projects) {
           if (!isObj(p)) continue;
-          mapArray(p, "pages", (pg) => {
-            mapArray(pg, "elements", (el) => {
-              fill(el, "rotation", 0);
-              if (el.kind === "table") fill(el, "scale", 1);
-            });
-          });
+          migrateProjectPages(p.pages);
           // Sheet-Szenen liegen als JSON-String vor → migrieren und
           // unverändert zurückschreiben (nur ergänzte Felder).
           mapArray(p, "sheets", (s) => {
@@ -184,6 +201,7 @@ defineSchema({
         return state;
       },
     },
+
   ],
 });
 
