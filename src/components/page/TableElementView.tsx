@@ -564,9 +564,12 @@ export function TableElementView({
           const isHeader = headerRow && r === 0;
           const raw = model.cells[r][c];
           const isPickTarget = pickFn && pickTarget?.r === r && pickTarget?.c === c;
-          const display = isPickTarget && previewFormula
+          const rawDisplay = isPickTarget && previewFormula
             ? previewFormula.value
             : raw.startsWith("=") ? String(evalCell(model.cells, r, c, { tableId })) : raw;
+          // Nur Darstellung — der Rohwert (und damit jede Formel) bleibt unberührt.
+          const display = formatCellDisplay(rawDisplay, f.numFormat);
+
           const isEditingCell = active && editCell?.r === r && editCell?.c === c;
           const refColor = refColorFor(r, c);
           return (
