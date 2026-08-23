@@ -4076,15 +4076,13 @@ function ElementView({
       const pageRect = parent?.getBoundingClientRect();
       if (pageRect) {
         const tx = anchor0.x + tdx, ty = anchor0.y + tdy;
-        const m = getPageSnapRegistry().queryNearest(tx, ty, pageRect, 10, [el.id]);
+        const m = findSnap(tx, ty, pageRect, 10);
         if (m) {
           tdx = pageRect.left + (m.x / 100) * pageRect.width - anchor0.x;
           tdy = pageRect.top + (m.y / 100) * pageRect.height - anchor0.y;
-        } else {
-          const snapped = snapToRayGuides(tx, ty, pageRect);
-          if (snapped) { tdx = snapped.x - anchor0.x; tdy = snapped.y - anchor0.y; }
         }
       }
+
       if (!raf) raf = requestAnimationFrame(paint);
     };
     let unregisterAbort: (() => void) | null = null;
