@@ -2819,11 +2819,10 @@ export class MiniCad {
 
       // Embed-Modus: Kein Kamera-Pan und kein Wheel-Zoom. Die Projektmappe
       // steuert Zoom/Position ausschließlich über die React-Wrapper-Ebene.
-      // Kamera-Offset bleibt fix an FRAME_PAD_PX gebunden, damit Objekte
-      // und Hilfslinien auf dem Blatt an ihrer Position kleben.
-      this.camera.offsetX = FRAME_PAD_PX;
-      this.camera.offsetY = FRAME_PAD_PX;
-      this.camera.scale = this.basePxPerMm * 1000 * this._zoom;
+      // Der komplette View-State (inkl. Export-Render-Scale) kommt
+      // ausschließlich aus syncCanvasViewport() — hier keine zweite Formel.
+      this.syncCanvasViewport();
+
 
       this.input.update(this.camera);
 
