@@ -7,7 +7,7 @@
  * Zusätzlich: rendert die Hub-Box für externe Dokumente (Projektmappen-
  * PDFs/Bilder) — analog zur Hub-Box in der CAD-Hauptseite (Move/Rotate).
  */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Move, RotateCw, Scaling, Scissors } from "lucide-react";
 import { MiniCad, FRAME_PAD_PX, type MiniTool } from "@/cad/embed/MiniCad";
 import { projectStore } from "@/lib/projectStore";
