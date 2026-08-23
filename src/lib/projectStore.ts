@@ -319,13 +319,24 @@ export interface Project {
   textSpanTemplates?: TextSpanTemplate[];
 }
 
+/** Gültigkeitsbereich einer „Auf allen Seiten“-Gruppe.
+ *  `mappe` = nur Seiten dieser Projektmappe,
+ *  `template` = nur Vorlagen-Seiten mit exakt diesem templateKey. */
+export type TextSpanScope =
+  | { type: "mappe"; id: string }
+  | { type: "template"; key: string };
+
 /** Vorlagenzustand einer „Auf allen Seiten“-Textbox. */
 export interface TextSpanTemplate {
   /** Stabile Gruppen-/Vorlagen-ID; identisch auf allen Seitenkopien. */
   groupId: string;
   /** Serialisierte Textbox im CAD-Overlay-Format (Weltkoordinaten = Papier-mm/1000). */
   box: any;
+  /** Seitenkontext, in dem die Gruppe gilt. Fehlt er (Altprojekte), wird er
+   *  aus den vorhandenen Kopien abgeleitet. */
+  scope?: TextSpanScope;
 }
+
 
 export interface ProjectFolder {
   id: string;
