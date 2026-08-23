@@ -1123,7 +1123,7 @@ export class MiniCad {
       !!prev && prev[k] !== undefined && opts[k] !== undefined && opts[k] !== prev[k];
 
 
-    if (prev && !selectionChanged && this.textEditor?.ownsTextFormatting?.()) {
+    if (prev && this.textEditor?.ownsTextFormatting?.()) {
       const changed: any = {};
       if (changedKey("color") && opts.color) {
         changed.color = applyAlphaToColor(opts.color, this.defaultTextAlpha);
@@ -1140,7 +1140,7 @@ export class MiniCad {
       }
     }
 
-    if (selected && prev && !selectionChanged) {
+    if (selected && prev) {
       if (changedKey("color") || changedKey("alpha")) {
         selected.style.textColor = applyAlphaToColor(this.defaultTextColor, this.defaultTextAlpha);
       }
