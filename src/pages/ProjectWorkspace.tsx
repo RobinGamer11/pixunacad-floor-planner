@@ -97,7 +97,7 @@ import {
   type ProjectPage,
 } from "@/lib/projectStore";
 import {
-  TEMPLATE_LABEL, parseTemplateKey, getFavoriteTemplate, setFavoriteTemplate,
+  TEMPLATE_LABEL, parseTemplateKey, templateKeyOf, getFavoriteTemplate, setFavoriteTemplate,
 } from "@/lib/financeStore";
 import { buildDefaultTemplatePages } from "@/lib/financeTemplates";
 import { EMPTY_WHEEL_ZOOM_BURST, nextSmartWheelZoom } from "@/lib/projectZoom";
