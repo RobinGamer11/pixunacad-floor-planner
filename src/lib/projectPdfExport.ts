@@ -104,6 +104,9 @@ async function snapshotPageElement(
   window.dispatchEvent(
     new CustomEvent("pixuna:export-render-scale", { detail: targetPxPerCssPx }),
   );
+  // Schrift- und Textlayout müssen vor dem Capture endgültig berechnet sein,
+  // sonst misst html2canvas abweichende Zeilenhöhen (abgeschnittener Text).
+  try { await (document as any).fonts?.ready; } catch { /* noop */ }
   await waitFrames(6);
 
   // Die Seite für den Snapshot kurzzeitig aus dem gescrollten/transformierten
