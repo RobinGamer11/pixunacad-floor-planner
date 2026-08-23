@@ -101,6 +101,7 @@ import {
 } from "@/lib/financeStore";
 import {
   buildDefaultTemplatePages, TEMPLATE_SEED_VERSION, isBlankTemplatePage,
+  findLegacyTemplatePages, hasTemplateObjects,
 } from "@/lib/financeTemplates";
 
 import { EMPTY_WHEEL_ZOOM_BURST, nextSmartWheelZoom } from "@/lib/projectZoom";
@@ -238,6 +239,11 @@ export default function ProjectWorkspace() {
     const isTemplateSlot =
       isDefaultSlot || templateInfo.positionId === "__favorite";
 
+    const projectPages = rawProject?.pages ?? [];
+    const storedDefault = projectPages.filter((pg) => pg.templateKey === defaultKey);
+    const favorite = getFavoriteTemplate<ProjectPage>(projectId, templateInfo.type);
+    const legacyPages = findLegacyTemplatePages(projectPages, templateInfo.type);
+
     // ---- Einmalige Migration des alten leeren Platzhalters -----------------
     // Bestandsprojekte besitzen unter `fin:<typ>:__default` teils eine früher
     // erzeugte, unveränderte leere A4-Seite. Nur dieser Platzhalter (keine
@@ -247,14 +253,23 @@ export default function ProjectWorkspace() {
       const verKey = `pixuna.finance.tplver.${projectId}.${templateInfo.type}`;
       const done = (() => { try { return localStorage.getItem(verKey); } catch { return null; } })();
       if (done !== TEMPLATE_SEED_VERSION) {
-        const stored = (rawProject?.pages ?? []).filter((pg) => pg.templateKey === defaultKey);
-        if (stored.length && stored.every(isBlankTemplatePage)) {
+        const source = hasTemplateObjects(favorite) ? favorite : legacyPages;
+        if (storedDefault.length && storedDefault.every(isBlankTemplatePage) && source) {
           projectStore.replaceTemplatePages(
             projectId, templateKey, title,
-            buildDefaultTemplatePages(templateInfo.type, title),
+            source,
           );
+          // Erst der nächste Render sieht den tatsächlich persistierten Klon
+          // und darf die erfolgreiche Seed-Version markieren.
+          return;
         }
-        try { localStorage.setItem(verKey, TEMPLATE_SEED_VERSION); } catch { /* noop */ }
+        if (!storedDefault.length && source) {
+          projectStore.ensureTemplatePages(projectId, templateKey, title, source);
+          return;
+        }
+        if (hasTemplateObjects(storedDefault)) {
+          try { localStorage.setItem(verKey, TEMPLATE_SEED_VERSION); } catch { /* noop */ }
+        }
       }
     }
 
@@ -266,15 +281,13 @@ export default function ProjectWorkspace() {
     // nicht aus sich heraus.
     let source: ProjectPage[] | undefined;
     if (!isTemplateSlot) {
-      const stored = (rawProject?.pages ?? []).filter((pg) => pg.templateKey === defaultKey);
-      if (stored.length) source = stored.map((pg) => ({ ...pg, id: "", templateKey: undefined }));
-      if (!source?.length) {
-        const favorite = getFavoriteTemplate<ProjectPage>(projectId, templateInfo.type);
-        if (favorite?.length) source = favorite;
+      if (hasTemplateObjects(favorite)) source = favorite;
+      else if (hasTemplateObjects(storedDefault)) {
+        source = storedDefault.map((pg) => ({ ...pg, id: "", templateKey: undefined }));
       }
     } else if (isDefaultSlot) {
-      const favorite = getFavoriteTemplate<ProjectPage>(projectId, templateInfo.type);
-      if (favorite?.length) source = favorite;
+      if (hasTemplateObjects(favorite)) source = favorite;
+      else if (legacyPages) source = legacyPages;
     }
     projectStore.ensureTemplatePages(
       projectId,
