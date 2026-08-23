@@ -22,3 +22,14 @@ export function textStyleFontSizePt(style: { fontSizePt?: number; fontSizePx?: n
 export function clampFontSizePt(pt: number): number {
   return Math.max(1, Math.min(400, pt));
 }
+/** CSS-Pixel pro Millimeter (96 dpi Referenz). */
+export const CSS_PX_PER_MM = 96 / 25.4;
+
+/**
+ * Zentrale Annotationsskalierung im CAD-Modellraum: Dokument-Millimeter
+ * (Tabellenspalten, Zeilenhöhen) → Modell-Meter. Bewusst maßstabsunabhängig —
+ * das CAD-Modell ist immer 1:1, der Ausgabemaßstab wirkt erst im Druckplan.
+ * Der Bezug entspricht exakt der pt-Darstellung des Textwerkzeugs
+ * (ptToCssPx(pt) * cam.scale / referencePxPerM).
+ */
+export const ANNOTATION_M_PER_MM = CSS_PX_PER_MM / 80;
