@@ -14,6 +14,7 @@ import {
   MIN_COL_MM,
   MIN_ROW_MM,
   formatCellDisplay,
+  detectNumberInputFormat,
   type TableModel,
 } from "@/lib/table/tableModel";
 
@@ -197,9 +198,22 @@ export function TableElementView({
   };
 
   const setCell = (r: number, c: number, v: string) => {
+    const key = cellKey(r, c);
+    // Automatische €/%-Erkennung: Symbol wird nie Teil des Rohwerts.
+    const det = detectNumberInputFormat(v, model.cellFormats[key]?.numFormat);
     const cells = model.cells.map((row) => row.slice());
-    cells[r][c] = v;
-    commit({ ...model, cells });
+    cells[r][c] = det.value;
+    let next: TableModel = { ...model, cells };
+    if (det.numFormat) {
+      next = {
+        ...next,
+        cellFormats: {
+          ...next.cellFormats,
+          [key]: { ...(next.cellFormats[key] ?? {}), numFormat: det.numFormat },
+        },
+      };
+    }
+    commit(next);
   };
 
   const setFilter = (c: number, values: string[] | null) => {
