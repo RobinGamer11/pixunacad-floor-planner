@@ -142,7 +142,7 @@ import {
   guideStrokeMmToPx,
   guideStrokePxToMm,
   mappePagePxPerMm,
-  MAPPE_PAGE_BASE_WIDTH_PX,
+  
   MAPPE_CANONICAL_PX_PER_MM,
 
 } from "@/lib/guideStrokeWidth";
