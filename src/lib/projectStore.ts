@@ -902,6 +902,72 @@ function seedSpanOverlay(
   return base;
 }
 
+/** Vergibt für alle Objekte eines CAD-Overlays frische IDs (tiefe Kopie). */
+function refreshOverlayIds(overlay: any, pageId: string): any {
+  if (!overlay || typeof overlay !== "object") return overlay;
+  const out: any = Array.isArray(overlay) ? [] : {};
+  let n = 0;
+  const walk = (src: any, dst: any) => {
+    for (const k of Object.keys(src)) {
+      const v = src[k];
+      if (Array.isArray(v)) {
+        dst[k] = v.map((item) => {
+          if (item && typeof item === "object") {
+            const c: any = Array.isArray(item) ? [] : {};
+            walk(item, c);
+            if (typeof item.id === "string") c.id = `${pageId}-o${n++}`;
+            return c;
+          }
+          return item;
+        });
+      } else if (v && typeof v === "object") {
+        const c: any = {};
+        walk(v, c);
+        dst[k] = c;
+      } else {
+        dst[k] = v;
+      }
+    }
+  };
+  walk(overlay, out);
+  return out;
+}
+
+/**
+ * Klont eine Seitenvorlage in ein Vorlagen-Buch (`templateKey`).
+ * Alle Seiten, Elemente und CAD-Overlay-Objekte erhalten frische IDs, damit
+ * Quelle und Klon vollständig unabhängig voneinander sind.
+ */
+function cloneTemplatePages(
+  p: Project,
+  templateKey: string,
+  title: string,
+  source?: ProjectPage[],
+): ProjectPage[] {
+  const stamp = Date.now().toString(36);
+  const src: ProjectPage[] = source?.length
+    ? source
+    : [{ id: "", title, format: "A4-hoch", margins: 20, background: false, elements: [] }];
+  const tplSpan = templatesForScope(p, { type: "template", key: templateKey });
+  return src.map((pg, i) => {
+    const id = `${p.id}-tpl${stamp}${i}${Math.random().toString(36).slice(2, 6)}`;
+    const clone = JSON.parse(JSON.stringify(pg)) as ProjectPage;
+    return {
+      ...clone,
+      id,
+      title: i === 0 ? title : `${title} ${i + 1}`,
+      templateKey,
+      spreadId: undefined,
+      cadOverlay: seedSpanOverlay(refreshOverlayIds(clone.cadOverlay, id), tplSpan, id),
+      elements: (clone.elements ?? []).map((el: any, k: number) => ({
+        ...el,
+        id: `${id}-e${k}`,
+      })),
+    } as ProjectPage;
+  });
+}
+
+
 export const projectStore = {
   getState: () => state,
   subscribe: (fn: () => void) => {
