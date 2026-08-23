@@ -1,4 +1,5 @@
 import React from "react";
+import { ptToMm } from "@/cad/textTypography";
 import { Filter, X as XIcon } from "lucide-react";
 import type { PageElement } from "@/lib/projectStore";
 import {
@@ -84,12 +85,20 @@ export function TableElementView({
   pageHmm,
   onChange,
   onExitEdit,
+  paperPxPerMm,
 }: {
   element: PageElement;
   readOnly?: boolean;
   editing?: boolean;
   pageWmm?: number;
   pageHmm?: number;
+  /**
+   * Darstellungsauflösung des Papiers (CSS-px pro Papier-mm) des Hosts.
+   * Einzige Grundlage der Schriftgröße (pt → mm → px), damit Tabellen exakt
+   * dieselbe pt-Definition wie das Textwerkzeug nutzen. Ohne Angabe wird
+   * ersatzweise die gemessene DOM-Breite verwendet.
+   */
+  paperPxPerMm?: number;
   onChange: (patch: Partial<PageElement>) => void;
   onExitEdit?: () => void;
 }) {
@@ -123,6 +132,9 @@ export function TableElementView({
     ro.observe(el);
     return () => ro.disconnect();
   }, [lay.widthMm]);
+
+  /** Schrift-Skalierung: zentral vom Host (Papier-mm), niemals objektabhängig. */
+  const fontPxPerMm = paperPxPerMm && paperPxPerMm > 0 ? paperPxPerMm : pxPerMm;
 
   const [editCell, setEditCell] = React.useState<{ r: number; c: number } | null>(null);
   /** Aktueller Eingabewert der offenen Zelle — für „Klick in andere Zelle speichert". */
@@ -601,7 +613,7 @@ export function TableElementView({
                 alignItems: f.valign === "top" ? "flex-start" : f.valign === "bottom" ? "flex-end" : "center",
                 justifyContent: f.align === "center" ? "center" : f.align === "right" ? "flex-end" : "flex-start",
                 padding: `${0.3 * pxPerMm}px ${0.8 * pxPerMm}px`,
-                fontSize: `${f.fontSizePt * (25.4 / 72) * pxPerMm}px`,
+                fontSize: `${ptToMm(f.fontSizePt) * fontPxPerMm}px`,
                 lineHeight: 1.15,
                 fontWeight: f.bold ? 700 : 400,
                 fontStyle: f.italic ? "italic" : "normal",
