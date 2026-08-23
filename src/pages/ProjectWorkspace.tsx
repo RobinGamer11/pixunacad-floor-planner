@@ -1570,7 +1570,7 @@ export default function ProjectWorkspace() {
                     onClick={() => {
                       // Im Vorlagenkontext bleibt die neue Seite in derselben Vorlage.
                       const id = templateKey
-                        ? projectStore.addTemplatePage(project.id, templateKey, templateInfo?.label ?? "Neue Seite")
+                        ? projectStore.addTemplatePage(project.id, templateKey, TEMPLATE_LABEL[templateInfo!.type] ?? "Neue Seite")
                         : projectStore.addPage(project.id);
                       if (id) setActivePageId(id);
                     }}
