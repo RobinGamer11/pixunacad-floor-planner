@@ -144,7 +144,7 @@ import {
   mappePagePxPerMm,
   MAPPE_PAGE_BASE_WIDTH_PX,
 } from "@/lib/guideStrokeWidth";
-import { ptToMm, MM_PER_PT } from "@/cad/textTypography";
+import { ptToMm, ptToCssPx, MM_PER_PT } from "@/cad/textTypography";
 import { getPageSnapRegistry, buildRectSnapEntry } from "@/lib/pageSnap";
 import { registerCadEngineSnap, queryCadEngineSnap, registerCadEngineSnapNearby, queryCadEngineSnapNearby } from "@/lib/cadEngineSnap";
 import { Defaults } from "@/cad/constants";
