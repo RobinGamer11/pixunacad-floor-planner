@@ -13,6 +13,7 @@ import { textStyleFontSizePt, ptToCssPx } from "./textTypography";
 import { normalizeTable, isCovered, effectiveFormat, effectiveBorders } from "@/lib/table/tableModel";
 import { layoutTable, cellRectMm } from "@/lib/table/tableLayout";
 import { evalCell } from "@/lib/table/tableFormula";
+import { strokeHatchSeal } from "./hatchSeal";
 import { fillWithHatchPattern, PATTERN_BASE_TILE_M, type HatchPatternId } from "./hatchPatterns";
 import { transformedInstanceItems, instanceBoundingCornersWorld } from "./StickerManager";
 import { documentCornersWorld, documentCenterWorld, documentVisibleCornersWorld, documentAnchorsWorld } from "./documentGeometry";
@@ -1795,7 +1796,7 @@ export class Renderer {
     // Face-Polygon (siehe hatchSeal.ts). Verändert weder Topologie noch die
     // ermittelte Fill-Geometrie und nimmt keine weiteren Segmente auf.
     if (fillAlpha >= 0.999) {
-      strokeHatchSeal(ctx, fillCol, this.dpr ?? (typeof window !== "undefined" ? window.devicePixelRatio : 1));
+      strokeHatchSeal(ctx, fillCol, typeof window !== "undefined" ? (window.devicePixelRatio || 1) : 1);
     }
 
     this._paintHatchPattern(ctx, cam, hatch);
