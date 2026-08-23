@@ -102,7 +102,48 @@ interface Props {
 
 }
 
+/**
+ * Überträgt den kompletten aktuellen Host-Zustand auf eine MiniCad-Instanz.
+ * Wird direkt nach dem Erzeugen einer neuen Engine aufgerufen, damit ein
+ * Seitenformatwechsel Werkzeuge, Defaults und Modi unverändert lässt.
+ */
+function syncHostSettings(engine: MiniCad, p: Props) {
+  engine.applyZoom(p.zoom);
+  engine.setActiveTool(p.activeTool);
+  if (typeof p.pageMarginsMm === "number") engine.setPageMargins(p.pageMarginsMm);
+  engine.setLineDefaults({
+    color: p.lineColor,
+    thicknessM: typeof p.lineThicknessMm === "number" ? p.lineThicknessMm / 1000 : undefined,
+    alpha: typeof p.lineAlpha === "number" ? p.lineAlpha : undefined,
+  });
+  if (typeof p.guideColor === "string") engine.setGuideColor(p.guideColor);
+  engine.setGuidesLocked(!!p.guidesLocked);
+  engine.setMultiSelectMode(!!p.multiSelectMode);
+  if (p.selectMarqueeMode) engine.selectTool.marqueeMode = p.selectMarqueeMode;
+  if (p.hatchDrawMode) engine.hatchTool.setDrawMode(p.hatchDrawMode);
+  engine.setTextDefaults({
+    color: p.textColor,
+    fontSizePx: p.textFontSizePx,
+    bold: p.textBold,
+    italic: p.textItalic,
+    underline: p.textUnderline,
+    strike: p.textStrike,
+    lineHeightPct: p.textLineHeightPct,
+    alpha: p.textAlpha,
+    align: p.textAlign,
+    bgColor: p.textBgColor,
+    bgAlphaPct: p.textBgAlphaPct,
+    wrap: p.textWrap,
+    autoSize: p.textAutoSize,
+    borderEnabled: p.textBorderEnabled,
+    borderColor: p.textBorderColor,
+    borderWidthPx: p.textBorderWidthPx,
+  });
+  engine.setGhostSnapState(p.ghostSnapState ?? null);
+}
+
 export default function CadOverlayLayer(props: Props) {
+
   const {
     pageWidthMm, pageHeightMm, basePxPerMm, pageMarginsMm,
     zoom, activeTool, enabled, initialState, restoreToken, onChange, onSelectionChange, onEngineReady,
