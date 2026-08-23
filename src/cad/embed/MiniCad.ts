@@ -1059,6 +1059,9 @@ export class MiniCad {
 
 
   private _lastTextDefaults: any = null;
+  /** Box, zu der `_lastTextDefaults` gehört — Auswahlwechsel darf nichts ändern. */
+  private _lastTextDefaultsBoxId: string | null = null;
+
 
   setTextDefaults(opts: {
     color?: string;
@@ -1098,19 +1101,38 @@ export class MiniCad {
     if (typeof opts.borderEnabled === "boolean") this.defaultTextBorderEnabled = opts.borderEnabled;
     if (opts.borderColor) this.defaultTextBorderColor = opts.borderColor;
     if (typeof opts.borderWidthPx === "number" && opts.borderWidthPx >= 0) this.defaultTextBorderWidthPx = opts.borderWidthPx;
-    // --- Rich-Text: Änderungen gelten nur für markierten Text / Caret ---
-    const prev = this._lastTextDefaults;
+    // --- Nur tatsächliche Benutzeränderungen dürfen ein Objekt anfassen ---
+    // Das Panel ruft setTextDefaults auch beim reinen Auswählen/Öffnen einer
+    // Textbox auf. Würden dabei alle Werte pauschal geschrieben, überschriebe
+    // der zuletzt im Panel gehaltene Zustand den Basisstil der Box
+    // (z. B. fett → normal). Deshalb wird nur die Differenz angewendet.
+    const selected = this.getEditTextBox();
+    const selId = selected?.id ?? null;
+    const selectionChanged = selId !== this._lastTextDefaultsBoxId;
+    this._lastTextDefaultsBoxId = selId;
+    // Bei Auswahlwechsel bilden die Stil-Schalter der Box selbst die Referenz:
+    // So kippt der Basisstil beim Öffnen nicht, ein echter Klick wirkt aber sofort.
+    const prev = (selectionChanged && selected)
+      ? {
+          bold: !!selected.style.bold, italic: !!selected.style.italic,
+          underline: !!selected.style.underline, strike: !!selected.style.strike,
+        } as any
+      : (selectionChanged ? null : this._lastTextDefaults);
     this._lastTextDefaults = { ...opts };
+    const changedKey = <K extends keyof typeof opts>(k: K) =>
+      !!prev && prev[k] !== undefined && opts[k] !== undefined && opts[k] !== prev[k];
+
+
     if (prev && this.textEditor?.ownsTextFormatting?.()) {
       const changed: any = {};
-      if (opts.color && opts.color !== prev.color) {
+      if (changedKey("color") && opts.color) {
         changed.color = applyAlphaToColor(opts.color, this.defaultTextAlpha);
       }
-      if (typeof opts.fontSizePx === "number" && opts.fontSizePx !== prev.fontSizePx) {
+      if (changedKey("fontSizePx") && typeof opts.fontSizePx === "number") {
         changed.fontSizePt = opts.fontSizePx;
       }
       for (const k of ["bold", "italic", "underline", "strike"] as const) {
-        if (typeof opts[k] === "boolean" && opts[k] !== prev[k]) changed[k] = opts[k];
+        if (changedKey(k)) changed[k] = opts[k];
       }
       if (Object.keys(changed).length > 0 && this.textEditor.applyInlineFormat(changed)) {
         this._changeDirty = true;
@@ -1118,29 +1140,35 @@ export class MiniCad {
       }
     }
 
-    const selected = this.getEditTextBox();
-    if (selected) {
-      selected.style.textColor = applyAlphaToColor(this.defaultTextColor, this.defaultTextAlpha);
-      selected.style.fontSizePt = opts.fontSizePx ?? textStyleFontSizePt(selected.style);
-      selected.style.fontSizePx = ptToCssPx(selected.style.fontSizePt);
-      selected.style.bgColor = this.defaultTextBgColor;
-      selected.style.bgAlphaPct = this.defaultTextBgAlphaPct;
-      selected.style.wrap = this.defaultTextAutoSize ? this.defaultTextWrap : true;
-      selected.style.align = this.defaultTextAlign;
-      selected.style.bold = this.defaultTextBold;
-      selected.style.italic = this.defaultTextItalic;
-      selected.style.underline = this.defaultTextUnderline;
-      selected.style.strike = this.defaultTextStrike;
-      selected.style.lineHeightPct = this.defaultTextLineHeightPct;
-      selected.style.borderEnabled = this.defaultTextBorderEnabled;
-      selected.style.borderColor = this.defaultTextBorderColor;
-      selected.style.borderWidthPx = this.defaultTextBorderWidthPx;
-      (selected.style as any).autoSize = this.defaultTextAutoSize;
+    if (selected && prev) {
+      if (changedKey("color") || changedKey("alpha")) {
+        selected.style.textColor = applyAlphaToColor(this.defaultTextColor, this.defaultTextAlpha);
+      }
+      if (changedKey("fontSizePx") && typeof opts.fontSizePx === "number") {
+        selected.style.fontSizePt = opts.fontSizePx;
+        selected.style.fontSizePx = ptToCssPx(selected.style.fontSizePt);
+      }
+      if (changedKey("bgColor")) selected.style.bgColor = this.defaultTextBgColor;
+      if (changedKey("bgAlphaPct")) selected.style.bgAlphaPct = this.defaultTextBgAlphaPct;
+      if (changedKey("wrap") || changedKey("autoSize")) {
+        selected.style.wrap = this.defaultTextAutoSize ? this.defaultTextWrap : true;
+      }
+      if (changedKey("align")) selected.style.align = this.defaultTextAlign;
+      if (changedKey("bold")) selected.style.bold = this.defaultTextBold;
+      if (changedKey("italic")) selected.style.italic = this.defaultTextItalic;
+      if (changedKey("underline")) selected.style.underline = this.defaultTextUnderline;
+      if (changedKey("strike")) selected.style.strike = this.defaultTextStrike;
+      if (changedKey("lineHeightPct")) selected.style.lineHeightPct = this.defaultTextLineHeightPct;
+      if (changedKey("borderEnabled")) selected.style.borderEnabled = this.defaultTextBorderEnabled;
+      if (changedKey("borderColor")) selected.style.borderColor = this.defaultTextBorderColor;
+      if (changedKey("borderWidthPx")) selected.style.borderWidthPx = this.defaultTextBorderWidthPx;
+      if (changedKey("autoSize")) (selected.style as any).autoSize = this.defaultTextAutoSize;
       autoSizeTextBox(selected, (this.renderer as any).referencePxPerM);
       if (this.textEditor.isActive()) this.textEditor.reposition(selected);
       this.refreshLabelUI();
     }
   }
+
 
   /**
    * Interner Supersampling-Faktor der Zeichenfläche (nur für PDF-Export).
