@@ -9,8 +9,8 @@ import { getDimensionGeometry, getAngleDimensionParts, type DimensionLike } from
 import { boxCornersWorld } from "./textGeometry";
 import { getDocWarp, drawWarpedImage } from "./documentWarp";
 import { drawRichTextBox } from "./textRichRenderer";
-import { textStyleFontSizePt } from "./textTypography";
-import { normalizeTable, isCovered, effectiveFormat, effectiveBorders, PT_TO_MM } from "@/lib/table/tableModel";
+import { textStyleFontSizePt, ptToCssPx } from "./textTypography";
+import { normalizeTable, isCovered, effectiveFormat, effectiveBorders } from "@/lib/table/tableModel";
 import { layoutTable, cellRectMm } from "@/lib/table/tableLayout";
 import { evalCell } from "@/lib/table/tableFormula";
 import { fillWithHatchPattern, PATTERN_BASE_TILE_M, type HatchPatternId } from "./hatchPatterns";

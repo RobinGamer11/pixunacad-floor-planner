@@ -312,6 +312,7 @@ export class CadApp {
   textTool!: TextTool;
   pipetteTool!: PipetteTool;
   stickerTool!: StickerTool;
+  tableTool!: TableTool;
   documentTool!: DocumentTool;
   freeDrawTool!: FreeDrawTool;
   eraserTool!: EraserTool;
