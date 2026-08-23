@@ -307,7 +307,9 @@ export default function CadOverlayLayer(props: Props) {
     engineRef.current?.loadState(initialStateRef.current ?? null);
   }, [restoreTick]);
 
-  useEffect(() => { engineRef.current?.applyZoom(zoom); }, [zoom]);
+  // Zoom vor dem sichtbaren Paint übernehmen, damit DOM-Seite und
+  // Canvas-Ebene im selben Layout-Zyklus denselben Zoom zeigen.
+  useLayoutEffect(() => { engineRef.current?.applyZoom(zoom); }, [zoom]);
 
   // PDF-Export: Backing-Store der CAD-Zeichenfläche temporär hochskalieren,
   // damit der Snapshot nicht verpixelt.
