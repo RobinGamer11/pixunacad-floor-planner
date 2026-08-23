@@ -36,7 +36,7 @@ import { DocumentTool } from "../DocumentTool";
 import { Defaults, SelectionType, PointEditAction } from "../constants";
 import type { TextBox, TextBoxStyle, FreeLineStyle } from "../Scene";
 import { drawRichTextBox } from "../textRichRenderer";
-import { ptToCssPx, textStyleFontSizePt } from "../textTypography";
+import { ptToCssPx, textStyleFontSizePt, MM_PER_PT, CSS_PX_PER_PT } from "../textTypography";
 import { dominantRichStyle } from "../textDominantStyle";
 import { autoSizeTextBox } from "../textAutoSize";
 import { isExportMode } from "@/lib/printExport";
@@ -370,6 +370,10 @@ export class MiniCad {
     // Wichtig: Text/Stroke-Skalierung an Seitengröße (echte mm) ausrichten,
     // damit ein 16-px-Text auch 16 px auf der Seite ist (statt riesig).
     this.renderer.referencePxPerM = this.basePxPerMm * 1000;
+    // Papierbezogene pt-Skalierung: 1 pt = 25,4/72 mm auf dem Blatt — exakt
+    // dieselbe physische Größe wie im Tabellenwerkzeug. Der Basisfaktor des
+    // Renderers ist ptToCssPx (96 dpi), deshalb hier das Verhältnis setzen.
+    this.renderer.textPtScale = (MM_PER_PT * this.basePxPerMm) / CSS_PX_PER_PT;
 
     this._patchRendererTransparent();
     this._patchRendererTextPadding();
@@ -2153,7 +2157,7 @@ export class MiniCad {
         rotationRad: box.rotationRad,
         html: box.html || "",
         baseFontSizePt: textStyleFontSizePt(box.style),
-        displayScale: cam.scale / r.referencePxPerM,
+        displayScale: (cam.scale / r.referencePxPerM) * (r.textPtScale || 1),
         baseColor: box.style.textColor,
         bgColor: box.style.bgColor,
         bgAlpha: (box.style.bgAlphaPct || 0) / 100,
