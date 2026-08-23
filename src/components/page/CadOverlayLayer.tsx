@@ -178,6 +178,9 @@ export default function CadOverlayLayer(props: Props) {
   const teSymbolRef = useRef<HTMLSelectElement>(null);
 
   const engineRef = useRef<MiniCad | null>(null);
+  const propsRef = useRef(props);
+  propsRef.current = props;
+
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
   const onSelectionChangeRef = useRef(onSelectionChange);
