@@ -7,7 +7,7 @@
  * Zusätzlich: rendert die Hub-Box für externe Dokumente (Projektmappen-
  * PDFs/Bilder) — analog zur Hub-Box in der CAD-Hauptseite (Move/Rotate).
  */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Move, RotateCw, Scaling, Scissors } from "lucide-react";
 import { MiniCad, FRAME_PAD_PX, type MiniTool } from "@/cad/embed/MiniCad";
 import { projectStore } from "@/lib/projectStore";
@@ -307,7 +307,9 @@ export default function CadOverlayLayer(props: Props) {
     engineRef.current?.loadState(initialStateRef.current ?? null);
   }, [restoreTick]);
 
-  useEffect(() => { engineRef.current?.applyZoom(zoom); }, [zoom]);
+  // Zoom vor dem sichtbaren Paint übernehmen, damit DOM-Seite und
+  // Canvas-Ebene im selben Layout-Zyklus denselben Zoom zeigen.
+  useLayoutEffect(() => { engineRef.current?.applyZoom(zoom); }, [zoom]);
 
   // PDF-Export: Backing-Store der CAD-Zeichenfläche temporär hochskalieren,
   // damit der Snapshot nicht verpixelt.
