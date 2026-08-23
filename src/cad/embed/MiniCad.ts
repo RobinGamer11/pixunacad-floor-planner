@@ -1110,10 +1110,18 @@ export class MiniCad {
     const selId = selected?.id ?? null;
     const selectionChanged = selId !== this._lastTextDefaultsBoxId;
     this._lastTextDefaultsBoxId = selId;
-    const prev = this._lastTextDefaults;
+    // Bei Auswahlwechsel bilden die Stil-Schalter der Box selbst die Referenz:
+    // So kippt der Basisstil beim Öffnen nicht, ein echter Klick wirkt aber sofort.
+    const prev = (selectionChanged && selected)
+      ? {
+          bold: !!selected.style.bold, italic: !!selected.style.italic,
+          underline: !!selected.style.underline, strike: !!selected.style.strike,
+        } as any
+      : (selectionChanged ? null : this._lastTextDefaults);
     this._lastTextDefaults = { ...opts };
     const changedKey = <K extends keyof typeof opts>(k: K) =>
-      !!prev && !selectionChanged && opts[k] !== undefined && opts[k] !== prev[k];
+      !!prev && prev[k] !== undefined && opts[k] !== undefined && opts[k] !== prev[k];
+
 
     if (prev && !selectionChanged && this.textEditor?.ownsTextFormatting?.()) {
       const changed: any = {};
