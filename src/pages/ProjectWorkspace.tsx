@@ -5509,7 +5509,7 @@ function RightInspector({
               onCancelTable={onCancelTable}
             />
           )}
-          {tab === "tools" && activeTool !== "guide" && activeTool !== "text" && activeTool !== "eraser" && activeTool !== null && activeTool !== "pipette" && activeTool !== "document" && activeTool !== "cad" && activeTool !== "table" && !isLinePageTool(activeTool) && (
+          {tab === "tools" && activeTool !== "guide" && activeTool !== "text" && activeTool !== "eraser" && activeTool !== null && activeTool !== "pipette" && activeTool !== "document" && activeTool !== "cad" && activeTool !== "table" && activeTool !== "hatch" && !isLinePageTool(activeTool) && (
             <ToolHelpNotes toolId={activeTool} />
           )}
           {tab === "layers" && page && (
