@@ -4059,12 +4059,17 @@ function ElementView({
 
   const handlePointerDown = (e: React.PointerEvent) => {
     if (readOnly) return;
+    // Nur linker Maustaste darf Objekt-Transformationen/HUB-Aktionen starten
+    // oder bestätigen. Rechtsklick wird ausschließlich vom Contextmenu-Handler
+    // für Fangpunkt-Hilfslinien übernommen.
+    if (e.button !== 0) return;
     // Tabellenmodus dieser Tabelle aktiv → keine Objekt-Transformation.
     // Objektbearbeitung und Zellbearbeitung sind nie gleichzeitig aktiv.
     if (tableEditing) return;
     // Don't start a drag when the user clicks an interactive control inside the hub.
     const t = e.target as HTMLElement;
     if (t.closest("[data-hub-control]")) return;
+
     // Anker als Fraktion INNERHALB des Elements speichern.
     // Zusätzlich Snap-Key (tl/tr/bl/br/mid-*) bestimmen, falls Klick nahe einer Ecke/Kante liegt.
     const rect = (rootRef.current ?? (e.currentTarget as HTMLElement)).getBoundingClientRect();
