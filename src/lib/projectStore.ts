@@ -1136,7 +1136,12 @@ export const projectStore = {
               margins: 20,
               background: false,
               elements: [],
-              cadOverlay: seedSpanOverlay(undefined, p.textSpanTemplates, newId),
+              cadOverlay: seedSpanOverlay(
+                undefined,
+                targetMappe ? templatesForScope(p, { type: "mappe", id: targetMappe }) : [],
+                newId,
+              ),
+
             },
           ],
           mappen,
