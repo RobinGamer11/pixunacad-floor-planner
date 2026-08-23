@@ -4425,8 +4425,6 @@ function ElementView({
           reg.setHover(m.match);
         } else {
           reg.setHover(null);
-          const snapped = snapToRayGuides(targetX, targetY, pageRect);
-          if (snapped) { dxPx = snapped.x - ax; dyPx = snapped.y - ay; }
         }
         previewRef.current = { dxPx, dyPx, deltaDeg: 0, anchorFrac };
         pendingPreview = { dxPx, dyPx, deltaDeg: 0, anchorFrac };
@@ -4443,9 +4441,8 @@ function ElementView({
           reg.setHover(mR.match);
         } else {
           reg.setHover(null);
-          const snapped = snapToRayGuides(tx, ty, pageRect);
-          if (snapped) { tx = snapped.x; ty = snapped.y; }
         }
+
         // Zu nah am Drehpunkt → Winkel wäre extrem sprunghaft, daher ignorieren.
         if (Math.hypot(ty - ay, tx - ax) < 24) return;
         const a = (Math.atan2(ty - ay, tx - ax) * 180) / Math.PI;
