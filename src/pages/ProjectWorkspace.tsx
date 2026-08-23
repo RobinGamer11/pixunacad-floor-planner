@@ -1566,9 +1566,19 @@ export default function ProjectWorkspace() {
               <div className="flex items-center justify-between px-4 pt-4 pb-2">
                 <span className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">SEITEN</span>
                 <div className="flex items-center gap-1.5">
-                  <button onClick={() => projectStore.addPage(project.id)} title="Seite hinzufügen">
+                  <button
+                    onClick={() => {
+                      // Im Vorlagenkontext bleibt die neue Seite in derselben Vorlage.
+                      const id = templateKey
+                        ? projectStore.addTemplatePage(project.id, templateKey, templateInfo?.label ?? "Neue Seite")
+                        : projectStore.addPage(project.id);
+                      if (id) setActivePageId(id);
+                    }}
+                    title="Seite hinzufügen"
+                  >
                     <Plus size={14} className="text-muted-foreground" />
                   </button>
+
                   <button onClick={() => setLeftOpen(false)} title="Einklappen">
                     <PanelLeftClose size={14} className="text-muted-foreground" />
                   </button>
