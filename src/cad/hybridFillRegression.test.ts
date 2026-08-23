@@ -34,7 +34,7 @@ function stroke(a: Uint8Array, w: number, h: number, x0: number, y0: number, x1:
 
 const CLICK = { x: 1.3, y: 1.6 };
 /** Bounding-Box des Dreiecks (ohne Ausläufer). */
-const TRI_BOX = { minX: 0.25, maxX: 2.35, minY: 0.3, maxY: 2.1 };
+const TRI_BOX = { minX: 0.25, maxX: 2.35, minY: 0.05, maxY: 2.1 };
 
 function assertNoOvershoot(face: { x: number; y: number }[]) {
   for (const p of face) {
