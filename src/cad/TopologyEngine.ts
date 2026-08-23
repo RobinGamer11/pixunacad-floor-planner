@@ -238,6 +238,37 @@ export class TopologyEngine {
     }
   }
 
+  /**
+   * Dezente Fangpunkt-Vorschau während Transformationen: sammelt sichtbare
+   * Eckpunkte in einem Bildschirm-Radius um die Maus. Bewusst schlank
+   * (keine Linien-Projektionen, keine Neuberechnung der Topologie) und
+   * per Frame gecacht.
+   */
+  private _nearbyCache: { key: string; pts: Vec2[] } | null = null;
+  nearbySnapPoints(mouseS: Vec2, radiusPx = 140, max = 60): Vec2[] {
+    const key = `${Math.round(mouseS.x / 8)}_${Math.round(mouseS.y / 8)}_${radiusPx}`;
+    if (this._nearbyCache?.key === key) return this._nearbyCache.pts;
+    const pts: Vec2[] = [];
+    const push = (p: Vec2 | undefined | null) => {
+      if (!p || pts.length >= max) return;
+      if (this._worldToMousePx(p, mouseS) > radiusPx) return;
+      pts.push(v(p.x, p.y));
+    };
+    for (const seg of this._segmentsFrontToBack()) { push(seg.a); push(seg.b); }
+    for (const hatch of this._hatchesFrontToBack()) for (const p of hatch.points) push(p);
+    for (const box of [...this.scene.textBoxes, ...(((this.scene as any).tables as any[]) || [])] as any[]) {
+      if (!this.labels.isVisible(box.labelId)) continue;
+      for (const c of boxCornersWorld(box)) push(c);
+    }
+    for (const dim of this.scene.dimensions) {
+      if (!this.labels.isVisible(dim.labelId)) continue;
+      push(dim.p1); push(dim.p2);
+    }
+    this._nearbyCache = { key, pts };
+    return pts;
+  }
+
+
   findBestSnap(mouseS: Vec2, mouseW: Vec2, exclusions?: SnapExclusions): Snap | null {
     let best: Snap | null = null;
     let bestScore = Infinity;
