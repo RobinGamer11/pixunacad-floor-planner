@@ -2999,9 +2999,10 @@ function PageCanvas({
                   key={`ghost-${overlayPage.id}`}
                   pageWidthMm={ofmt.w}
                   pageHeightMm={ofmt.h}
-                  basePxPerMm={baseWidth / ofmt.w}
+                  basePxPerMm={MAPPE_CANONICAL_PX_PER_MM}
                   pageMarginsMm={overlayPage.margins ?? 0}
-                  zoom={scale * (fmt.w / ofmt.w)}
+                  zoom={scale}
+
                   activeTool="select"
                   enabled={false}
                   initialState={overlayPage.cadOverlay}
