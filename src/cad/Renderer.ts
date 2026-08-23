@@ -1791,16 +1791,11 @@ export class Renderer {
     ctx.fillStyle = fillCol;
     ctx.fill("evenodd");
 
-    // Haarlinien-Versiegelung: minimaler, bildschirmfester Randauftrag in
-    // Füllfarbe, damit zwischen Füllung und Begrenzung keine 1px-Lücke durch
-    // Anti-Aliasing/Rasterrundung sichtbar bleibt (zoomstabil, kein Bleeding).
-    if (fillAlpha > 0) {
-      ctx.save();
-      ctx.strokeStyle = fillCol;
-      ctx.lineWidth = 1;
-      ctx.lineJoin = "round";
-      ctx.stroke();
-      ctx.restore();
+    // Haarlinien-Versiegelung — REIN OPTISCH auf dem bereits festgeschriebenen
+    // Face-Polygon (siehe hatchSeal.ts). Verändert weder Topologie noch die
+    // ermittelte Fill-Geometrie und nimmt keine weiteren Segmente auf.
+    if (fillAlpha >= 0.999) {
+      strokeHatchSeal(ctx, fillCol, this.dpr ?? (typeof window !== "undefined" ? window.devicePixelRatio : 1));
     }
 
     this._paintHatchPattern(ctx, cam, hatch);
