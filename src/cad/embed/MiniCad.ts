@@ -1190,25 +1190,69 @@ export class MiniCad {
    */
   private _renderScale = 1;
 
+  /** Zuletzt synchronisierter View-State (Erkennung echter Änderungen). */
+  private _viewKey = "";
+
   setRenderScale(k: number) {
     const v = Math.max(1, Math.min(8, k || 1));
     if (v === this._renderScale) return;
     this._renderScale = v;
-    this.applyZoom(this._zoom);
+    this.syncCanvasViewport();
     // Das Ändern der Backing-Store-Größe leert die Zeichenfläche. Ohne
     // sofortiges Neuzeichnen bliebe der Export-Snapshot leer, wenn der
     // rAF-Tick (z.B. in einem Hintergrund-Tab) nicht rechtzeitig läuft.
     this.renderNow();
   }
 
+  /**
+   * EINZIGE Quelle für den kompletten Canvas-View-State:
+   * CSS-Größe, Backing-Store-Größe, Renderer-Viewport, Kamera-Scale/Offset.
+   *
+   *   pixelScale        = Export-Render-Scale (1 = Bildschirm)
+   *   cssCanvas         = Seite(zoom) + 2 × FRAME_PAD_PX
+   *   backingStore      = cssCanvas × pixelScale
+   *   camera.scale      = basePxPerMm × 1000 × zoom × pixelScale
+   *   camera.offset     = FRAME_PAD_PX × pixelScale
+   *
+   * Der Export-Faktor erhöht ausschließlich die Rasterauflösung; physische
+   * Objektgröße, Position, Strichstärke und Seitenzuschnitt bleiben gleich.
+   * Neudimensioniert wird nur, wenn sich Seitenformat, Zoom oder pixelScale
+   * tatsächlich geändert haben (kein Leeren des Backing-Stores pro Frame).
+   */
+  syncCanvasViewport() {
+    if (this._destroyed) return;
+    const zoom = this._zoom;
+    const k = this._renderScale;
+    const cssW = this.pageWidthMm * this.basePxPerMm * zoom + FRAME_PAD_PX * 2;
+    const cssH = this.pageHeightMm * this.basePxPerMm * zoom + FRAME_PAD_PX * 2;
+    const c = this.dom.canvas;
+    const wPx = Math.max(1, Math.round(cssW * k));
+    const hPx = Math.max(1, Math.round(cssH * k));
+
+    const key = `${wPx}x${hPx}|${cssW.toFixed(3)}x${cssH.toFixed(3)}|${k}`;
+    if (key !== this._viewKey) {
+      this._viewKey = key;
+      if (c.width !== wPx) c.width = wPx;
+      if (c.height !== hPx) c.height = hPx;
+      c.style.width = `${cssW}px`;
+      c.style.height = `${cssH}px`;
+      // Wrapper-Div in CadOverlayLayer ist bereits um -FRAME_PAD_PX verschoben,
+      // daher Canvas hier bei (0,0) lassen — sonst doppelter Offset.
+      c.style.left = `0px`;
+      c.style.top = `0px`;
+      this.renderer.setViewport(wPx, hPx);
+    }
+
+    this.camera.scale = this.basePxPerMm * 1000 * zoom * k;
+    this.camera.offsetX = FRAME_PAD_PX * k;
+    this.camera.offsetY = FRAME_PAD_PX * k;
+  }
+
   /** Erzwingt sofort einen Renderdurchlauf (unabhängig vom rAF-Tick). */
   renderNow() {
     if (this._destroyed) return;
     try {
-      const k = this._renderScale;
-      this.camera.offsetX = FRAME_PAD_PX * k;
-      this.camera.offsetY = FRAME_PAD_PX * k;
-      this.camera.scale = this.basePxPerMm * 1000 * this._zoom * k;
+      this.syncCanvasViewport();
       this.renderer.render();
     } catch (err) {
       console.error("MiniCad renderNow error:", err);
@@ -1217,28 +1261,10 @@ export class MiniCad {
 
   applyZoom(zoom: number) {
     this._zoom = zoom;
-    const k = this._renderScale;
-    const pageW = this.pageWidthMm * this.basePxPerMm * zoom;
-    const pageH = this.pageHeightMm * this.basePxPerMm * zoom;
-    const cssW = pageW + FRAME_PAD_PX * 2;
-    const cssH = pageH + FRAME_PAD_PX * 2;
-    const c = this.dom.canvas;
-    const wPx = Math.max(1, Math.round(cssW * k));
-    const hPx = Math.max(1, Math.round(cssH * k));
-    if (c.width !== wPx) c.width = wPx;
-    if (c.height !== hPx) c.height = hPx;
-    c.style.width = `${cssW}px`;
-    c.style.height = `${cssH}px`;
-    // Wrapper-Div in CadOverlayLayer ist bereits um -FRAME_PAD_PX verschoben,
-    // daher Canvas hier bei (0,0) lassen — sonst doppelter Offset.
-    c.style.left = `0px`;
-    c.style.top = `0px`;
-
-
-    this.renderer.setViewport(c.width, c.height);
-    this.camera.scale = this.basePxPerMm * 1000 * zoom * k;
-    this.camera.offsetX = FRAME_PAD_PX * k;
-    this.camera.offsetY = FRAME_PAD_PX * k;
+    this.syncCanvasViewport();
+    // Sofort einen vollständigen Frame zeichnen, damit DOM-Seite und
+    // Canvas-Ebene im selben Zyklus denselben Zoom zeigen (kein Wackeln).
+    try { this.renderer.render(); } catch {}
 
     // Re-position any open text editor.
     if (this.textEditor.isActive() && this.selection?.textBoxId) {
@@ -1246,6 +1272,7 @@ export class MiniCad {
       if (box) this.textEditor.reposition(box);
     }
   }
+
 
   serialize(): any {
     const f = this._strokeFactor || 1;
