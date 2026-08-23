@@ -392,6 +392,13 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const [tableSelection, setTableSelection] = useState<TableSelection | null>(null);
   const [tableNewCols, setTableNewCols] = useState(3);
   const [tableNewRows, setTableNewRows] = useState(4);
+  // Neue Tabellengröße an das Engine-Werkzeug weiterreichen (Platzierung
+  // läuft über die normale CAD-Input-Logik, nicht über ein DOM-Overlay).
+  useEffect(() => {
+    const t = (appRef.current as any)?.tableTool;
+    if (t) { t.cols = tableNewCols; t.rows = tableNewRows; }
+  }, [tableNewCols, tableNewRows, tableTool]);
+
   const [tableFormulaFn, setTableFormulaFn] = useState<FormulaFn | null>(null);
   const tableSheetId = (appRef.current as any)?.activeSheetId || "default";
   const tableSceneObj = tableSelectedId
