@@ -5225,6 +5225,32 @@ function ElementView({
 
       )}
 
+      {/* Dezente Fangpunkt-Vorschau während Verschieben/Drehen — gleiche Optik
+         wie die Fangpunkte der CAD-Oberfläche (blauer Kern, weißer Halo),
+         nur mit reduzierter Deckkraft. */}
+      {cadHubUx && hubMode && nearbySnaps.length > 0 && rootRef.current?.parentElement && createPortal(
+        <>
+          {nearbySnaps.map((p, i) => (
+            <div
+              key={`nsnap-${i}`}
+              data-guide-overlay
+              className="absolute pointer-events-none rounded-full"
+              style={{
+                left: `${p.x}%`, top: `${p.y}%`,
+                width: 7, height: 7, marginLeft: -3.5, marginTop: -3.5,
+                background: "rgba(77,163,255,0.95)",
+                border: "1.5px solid rgba(255,255,255,0.95)",
+                boxSizing: "border-box",
+                opacity: 0.4,
+                zIndex: 899,
+              }}
+            />
+          ))}
+        </>,
+        rootRef.current.parentElement,
+      )}
+
+
       {/* Rechtsklick-Hilfslinien während einer HUB-Aktion. Werden per Portal
          in das Seiten-Parent gerendert, damit sie über das gesamte Blatt
          verlaufen. Werden beim Commit/Cancel automatisch geleert. */}
