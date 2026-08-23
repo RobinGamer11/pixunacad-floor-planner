@@ -1168,7 +1168,16 @@ export class CadApp {
         && (selection as any).documentId === this.bgRemoveInteraction.docId;
       if (!stillOnSameDoc) this.bgRemoveInteraction = null;
     }
+    // Tabellen-Zellmodus endet, sobald die Auswahl diese Tabelle verlässt
+    // (freie Fläche, anderes Objekt oder andere Tabelle).
+    if (this.tableEditId) {
+      const stillSameTable = !!selection
+        && ((selection as any).type === SelectionType.TEXTBOX || (selection as any).type === SelectionType.TEXTBOX_HANDLE)
+        && (selection as any).textBoxId === this.tableEditId;
+      if (!stillSameTable) this.endTableEdit();
+    }
     this.selection = selection;
+
     this.renderer.setSelection(selection);
     this._syncLineSettingsFromContext();
     this._syncHatchSettingsFromContext();
