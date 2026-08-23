@@ -58,7 +58,12 @@ export function findLegacyTemplatePages(
     const namesTemplate = title.includes("mustervorlage") || title.includes("muster vorlage")
       || title.includes("standardvorlage") || title.includes("standard vorlage")
       || title.includes("vorlage");
-    return namesType && namesTemplate;
+    // Historisch wurde die gestaltete Angebotsseite teilweise nur als
+    // „Standard-Mustervorlage“ benannt. Dieser generische Altname ist allein
+    // für Angebote eindeutig genug; Rechnung/Nachtrag verlangen ihre Belegart.
+    const genericOfferTemplate = type === "offer"
+      && (title.includes("standard mustervorlage") || title === "mustervorlage");
+    return namesTemplate && (namesType || genericOfferTemplate);
   });
   return hasTemplateObjects(matches) ? matches : undefined;
 }
