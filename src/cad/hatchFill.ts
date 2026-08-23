@@ -186,10 +186,20 @@ function buildPlanarFaces(rawEdges: RawEdge[]): { faceLoops: Vec2[][]; verts: Ve
  * Rückgabe: Polygon-Punkte (CCW) oder null wenn kein geschlossener Bereich umschließt.
  */
 export function findEnclosingFace(scene: Scene, click: Vec2): Vec2[] | null {
-  const raw = collectBoundaryEdges(scene);
+  return findEnclosingFaceFromEdges(collectBoundaryEdges(scene), click);
+}
+
+/**
+ * Identische Face-Erkennung für eine beliebige Kantenmenge. Wird vom
+ * Hybridpfad genutzt, damit vektorisierte Pixelgrenzen exakt dieselbe
+ * planare Zerlegung durchlaufen wie echte Vektorkanten (Schnittpunkte teilen
+ * Kanten in Segmente, überstehende Äste gehören zu keinem Face).
+ */
+export function findEnclosingFaceFromEdges(raw: RawEdge[], click: Vec2): Vec2[] | null {
   if (raw.length === 0) return null;
   const sub = subdivideEdges(raw);
   if (sub.length === 0) return null;
+
 
   const { faceLoops } = buildPlanarFaces(sub);
 
