@@ -146,7 +146,7 @@ import {
 } from "@/lib/guideStrokeWidth";
 import { ptToMm, MM_PER_PT } from "@/cad/textTypography";
 import { getPageSnapRegistry, buildRectSnapEntry } from "@/lib/pageSnap";
-import { registerCadEngineSnap, queryCadEngineSnap } from "@/lib/cadEngineSnap";
+import { registerCadEngineSnap, queryCadEngineSnap, registerCadEngineSnapNearby, queryCadEngineSnapNearby } from "@/lib/cadEngineSnap";
 import { Defaults } from "@/cad/constants";
 import {
   IDENTITY_WARP,
@@ -335,9 +335,25 @@ export default function ProjectWorkspace() {
         y: ((cy - pageRect.top) / Math.max(1, pageRect.height)) * 100,
       };
     });
+    // Dezente Fangpunkt-Vorschau: dieselbe Quelle wie in der CAD-Oberfläche
+    // (TopologyEngine.nearbySnapPoints) — nur in Seiten-Prozent umgerechnet.
+    registerCadEngineSnapNearby((clientX, clientY, pageRect, radiusPx = 140) => {
+      const engine = cadEngineApiRef.current?.engine as any;
+      if (!engine?.canvas || !engine.camera || !engine.topology?.nearbySnapPoints) return [];
+      const cr = engine.canvas.getBoundingClientRect();
+      const mS = { x: clientX - cr.left, y: clientY - cr.top };
+      const pts: Array<{ x: number; y: number }> = engine.topology.nearbySnapPoints(mS, radiusPx) ?? [];
+      return pts.map((p) => {
+        const s = engine.camera.worldToScreen(p.x, p.y);
+        return {
+          x: ((cr.left + s.x - pageRect.left) / Math.max(1, pageRect.width)) * 100,
+          y: ((cr.top + s.y - pageRect.top) / Math.max(1, pageRect.height)) * 100,
+        };
+      });
+    });
     forceEngineTick((t) => t + 1);
   };
-  useEffect(() => () => registerCadEngineSnap(null), []);
+  useEffect(() => () => { registerCadEngineSnap(null); registerCadEngineSnapNearby(null); }, []);
 
   const [presenting, setPresenting] = useState(() => {
     try { return new URLSearchParams(window.location.search).get("present") === "1"; } catch { return false; }
@@ -3768,6 +3784,39 @@ function ElementView({
     return null;
   };
 
+  /** Dezente Fangpunkt-Vorschau während Verschieben/Drehen — Parität zur
+   *  CAD-Oberfläche (SelectTool + TopologyEngine.nearbySnapPoints). Es werden
+   *  dieselben Quellen wie in `findSnap()` genutzt: pageSnap (Tabellen,
+   *  Textboxen, Dokumente/Bilder/PDF, CAD-Blätter) und die MiniCad-Engine
+   *  (Linien, Freihand, Schraffuren, Text, Dokumente). */
+  const [nearbySnaps, setNearbySnaps] = useState<Array<{ x: number; y: number }>>([]);
+  useEffect(() => {
+    if (readOnly || !cadHubUx || !hubMode) { setNearbySnaps((p) => (p.length ? [] : p)); return; }
+    let raf = 0;
+    const update = (cx: number, cy: number) => {
+      const parent = rootRef.current?.parentElement as HTMLElement | null;
+      if (!parent) return;
+      const pageRect = parent.getBoundingClientRect();
+      const pts = [
+        ...getPageSnapRegistry().queryNearby(cx, cy, pageRect, 140, 60, [el.id]),
+        ...queryCadEngineSnapNearby(cx, cy, pageRect, 140),
+      ].map((p) => ({ x: p.x, y: p.y }));
+      setNearbySnaps(pts);
+    };
+    const onMove = (ev: PointerEvent | MouseEvent) => {
+      const cx = ev.clientX, cy = ev.clientY;
+      if (raf) return;
+      raf = requestAnimationFrame(() => { raf = 0; update(cx, cy); });
+    };
+    window.addEventListener("pointermove", onMove as EventListener, true);
+    return () => {
+      window.removeEventListener("pointermove", onMove as EventListener, true);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [readOnly, cadHubUx, hubMode, el.id]);
+
+
+
   // Edge-Trim: reine Vorschau (dxPx/dyPx). Commit erst bei Pointerup bzw.
   // — bei aktivem Tablet-Hilfsrad — beim Klick auf das Häkchen.
   const [edgeTrim, setEdgeTrim] = useState<{
@@ -5175,6 +5224,32 @@ function ElementView({
         </>
 
       )}
+
+      {/* Dezente Fangpunkt-Vorschau während Verschieben/Drehen — gleiche Optik
+         wie die Fangpunkte der CAD-Oberfläche (blauer Kern, weißer Halo),
+         nur mit reduzierter Deckkraft. */}
+      {cadHubUx && hubMode && nearbySnaps.length > 0 && rootRef.current?.parentElement && createPortal(
+        <>
+          {nearbySnaps.map((p, i) => (
+            <div
+              key={`nsnap-${i}`}
+              data-guide-overlay
+              className="absolute pointer-events-none rounded-full"
+              style={{
+                left: `${p.x}%`, top: `${p.y}%`,
+                width: 7, height: 7, marginLeft: -3.5, marginTop: -3.5,
+                background: "rgba(77,163,255,0.95)",
+                border: "1.5px solid rgba(255,255,255,0.95)",
+                boxSizing: "border-box",
+                opacity: 0.4,
+                zIndex: 899,
+              }}
+            />
+          ))}
+        </>,
+        rootRef.current.parentElement,
+      )}
+
 
       {/* Rechtsklick-Hilfslinien während einer HUB-Aktion. Werden per Portal
          in das Seiten-Parent gerendert, damit sie über das gesamte Blatt

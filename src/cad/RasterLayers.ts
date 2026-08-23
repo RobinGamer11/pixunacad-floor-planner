@@ -76,6 +76,32 @@ export function cadRasterPxPerM(_scaleDenominator?: number): number {
   return CAD_RASTER_PX_PER_M;
 }
 
+/**
+ * Dieselbe Rasterqualität für Oberflächen, deren Weltmeter KEIN realer Meter
+ * ist (Projektmappe/MiniCad: 1 Welt-Einheit = 1 Meter PAPIER).
+ *
+ * Die CAD-Oberfläche rendert mit `referencePxPerM = 80` (Defaults.
+ * strokeWidthBaseScale) und speichert Raster mit `CAD_RASTER_PX_PER_M`
+ * Pixeln pro Weltmeter — also `CAD_RASTER_PX_PER_M / 80` Rasterpixel je
+ * Referenz-Renderpixel. Genau dieses Verhältnis wird hier auf die
+ * Papierskalierung der Projektmappe (`referencePxPerM = basePxPerMm * 1000`)
+ * übertragen, damit Pixelobjekte dort dieselbe effektive Qualität haben.
+ */
+export function cadRasterPxPerMForReference(
+  referencePxPerM: number,
+  baseReferencePxPerM = 80,
+): number {
+  const ref = Number.isFinite(referencePxPerM) && referencePxPerM > 0 ? referencePxPerM : baseReferencePxPerM;
+  const px = cadRasterPxPerM() * (ref / Math.max(1, baseReferencePxPerM));
+  // Obergrenze = 600 dpi Papier: darüber liefern die Offscreen-Renderpuffer
+  // (MAX_PIXELS in rasterize.ts) keine höhere Qualität mehr, sondern nur noch
+  // heruntergerechnete Kacheln.
+  const MAX = Math.round((600 / 25.4) * 1000);
+  return Math.max(MIN_RASTER_PX_PER_M, Math.min(MAX, Math.round(px)));
+}
+
+
+
 export interface RasterTileJSON {
   tx: number;
   ty: number;

@@ -43,6 +43,12 @@ interface Registry {
   publish(elementId: string, entry: SnapEntry): void;
   unpublish(elementId: string): void;
   queryNearest(clientX: number, clientY: number, pageRect: DOMRect, tolerancePx?: number, excludeIds?: string[]): SnapMatch | null;
+  /**
+   * Alle Fangpunkte in einem Bildschirmradius um den Cursor — Pendant zu
+   * `TopologyEngine.nearbySnapPoints()` der CAD-Oberfläche. Wird ausschließlich
+   * für die dezente Fangpunkt-Vorschau während Verschieben/Drehen genutzt.
+   */
+  queryNearby(clientX: number, clientY: number, pageRect: DOMRect, radiusPx?: number, max?: number, excludeIds?: string[]): Array<{ x: number; y: number; type: SnapPointType }>;
   setHover(m: SnapMatch | null): void;
 }
 
@@ -99,6 +105,24 @@ function ensure(): Registry {
         }
       }
       return best;
+    },
+    queryNearby(cx, cy, pageRect, radiusPx = 140, max = 60, exclude) {
+      const excludeSet = new Set(exclude ?? []);
+      const pxPerPctX = pageRect.width / 100;
+      const pxPerPctY = pageRect.height / 100;
+      const out: Array<{ x: number; y: number; type: SnapPointType; d: number }> = [];
+      for (const [elementId, e] of entries) {
+        if (excludeSet.has(elementId)) continue;
+        for (const p of e.points) {
+          const dx = (p.x * pxPerPctX + pageRect.left) - cx;
+          const dy = (p.y * pxPerPctY + pageRect.top) - cy;
+          const d = Math.hypot(dx, dy);
+          if (d > radiusPx) continue;
+          out.push({ x: p.x, y: p.y, type: p.type, d });
+        }
+      }
+      out.sort((a, b) => a.d - b.d);
+      return out.slice(0, max).map(({ x, y, type }) => ({ x, y, type }));
     },
     setHover(m) {
       const prev = hover;

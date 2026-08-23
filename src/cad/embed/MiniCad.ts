@@ -20,7 +20,7 @@ import { LabelManager } from "../LabelManager";
 import { IdPanel } from "../IdPanel";
 import { TopologyEngine } from "../TopologyEngine";
 import { Renderer, type Selection } from "../Renderer";
-import { RasterLayers } from "../RasterLayers";
+import { RasterLayers, cadRasterPxPerMForReference } from "../RasterLayers";
 import { mirrorProxy } from "../multiEdit";
 import { LineHub } from "../LineHub";
 import { PointEditMenu } from "../PointEditMenu";
@@ -206,7 +206,7 @@ export class MiniCad {
    * Raster-Zeichenebenen der Seite (Pixelmodus). Pro Ebene ein gekachelter
    * Rasterinhalt im selben Papier-Koordinatensystem wie die Vektorobjekte.
    */
-  readonly rasterLayers = new RasterLayers();
+  readonly rasterLayers: RasterLayers;
   /** Projektweite Rasterqualität für neu fertiggestellte Pixelobjekte. */
   pixelRenderDpi: number = 1200;
   pixelSupersampling: boolean = false;
@@ -347,6 +347,13 @@ export class MiniCad {
     this._onSelectionChange = init.onSelectionChange;
     
     this._strokeFactor = (this.basePxPerMm * 1000) / 80;
+    // Rasterqualität wie in der großen CAD-Oberfläche (cadRasterPxPerM()),
+    // umgerechnet auf die Papierskalierung der Projektmappe: MiniCad rendert
+    // mit `referencePxPerM = basePxPerMm * 1000` statt 80 px/m, ein Weltmeter
+    // ist hier ein PAPIER-Meter. So erhalten HatchTool und
+    // findHybridEnclosingFace() in beiden Oberflächen äquivalente
+    // Raster-Boundaries.
+    this.rasterLayers = new RasterLayers(cadRasterPxPerMForReference(this.basePxPerMm * 1000));
     this.defaultLineColor = init.defaultLineColor ?? Defaults.lineColor;
     this.defaultLineThicknessM = (init.defaultLineThicknessM ?? Defaults.lineThicknessM) * this._strokeFactor;
 

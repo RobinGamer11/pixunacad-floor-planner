@@ -34,3 +34,35 @@ export function queryCadEngineSnap(
     return null;
   }
 }
+
+/**
+ * Zweite Brücke: ALLE Fangpunkte der eingebetteten MiniCad-Engine in einem
+ * Bildschirmradius um den Cursor — Pendant zu `TopologyEngine.nearbySnapPoints()`
+ * der großen CAD-Oberfläche. Wird nur für die dezente Fangpunkt-Vorschau
+ * während Verschieben/Drehen genutzt (Prozent-Koordinaten der Seitenfläche).
+ */
+export type EngineSnapNearbyQuery = (
+  clientX: number,
+  clientY: number,
+  pageRect: DOMRect,
+  radiusPx?: number
+) => Array<{ x: number; y: number }>;
+
+export function registerCadEngineSnapNearby(fn: EngineSnapNearbyQuery | null) {
+  (window as any).__pixunaCadEngineSnapNearby = fn;
+}
+
+export function queryCadEngineSnapNearby(
+  clientX: number,
+  clientY: number,
+  pageRect: DOMRect,
+  radiusPx = 140
+): Array<{ x: number; y: number }> {
+  const fn = (window as any).__pixunaCadEngineSnapNearby as EngineSnapNearbyQuery | undefined;
+  if (typeof fn !== "function") return [];
+  try {
+    return fn(clientX, clientY, pageRect, radiusPx) ?? [];
+  } catch {
+    return [];
+  }
+}
