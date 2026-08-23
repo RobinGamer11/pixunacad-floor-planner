@@ -1171,7 +1171,7 @@ export class MiniCad {
       if (changedKey("borderColor")) selected.style.borderColor = this.defaultTextBorderColor;
       if (changedKey("borderWidthPx")) selected.style.borderWidthPx = this.defaultTextBorderWidthPx;
       if (changedKey("autoSize")) (selected.style as any).autoSize = this.defaultTextAutoSize;
-      autoSizeTextBox(selected, (this.renderer as any).referencePxPerM);
+      autoSizeTextBox(selected, (this.renderer as any).referencePxPerM, (this.renderer as any).textPtScale);
       if (this.textEditor.isActive()) this.textEditor.reposition(selected);
       this.refreshLabelUI();
     }

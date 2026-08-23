@@ -427,12 +427,13 @@ export function measureTextBoxContent(
   wrap: boolean,
   paddingPx: number,
   base?: BaseTextStyle & { lineHeightPct?: number },
+  fontScale = 1,
 ): { widthPx: number; heightPx: number } {
   const measureCtx = getMeasureContext();
   if (!measureCtx) return { widthPx: 0, heightPx: 0 };
   const runs = htmlToRuns(html || "", base);
   const lineFactor = Math.max(0.6, (base?.lineHeightPct ?? 105) / 100);
-  const lines = layoutLines(measureCtx, runs, baseFontSizePt, "#000", maxInnerWidthPx, wrap, lineFactor, 1);
+  const lines = layoutLines(measureCtx, runs, baseFontSizePt, "#000", maxInnerWidthPx, wrap, lineFactor, fontScale);
   let maxLineW = 0;
   let totalH = 0;
   for (const line of lines) {
