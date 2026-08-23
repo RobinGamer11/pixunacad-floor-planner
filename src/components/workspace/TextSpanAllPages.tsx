@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Layers } from "lucide-react";
-import { projectStore } from "@/lib/projectStore";
+import { projectStore, spanTargetPageIds, isSpanGroupActiveForPage } from "@/lib/projectStore";
 import type { MiniCad } from "@/cad/embed/MiniCad";
 
 /** Serialisiert eine TextBox exakt im CAD-Overlay-Format (Papierkoordinaten). */
