@@ -2181,7 +2181,7 @@ export default function ProjectWorkspace() {
                 multiSelectActive={selectedElementIds.length > 1}
               />
             )}
-            {!presenting && !printMode && !templateKey && (
+            {!presenting && !printMode && (
               <LayerFab
                 count={mappeLayerCount}
                 onClick={() => { setRightOpen(true); setRightTab("layers"); }}
