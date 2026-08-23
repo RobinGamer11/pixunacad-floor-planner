@@ -69,6 +69,10 @@ export function CadTableLayer({
       const host = hostRef.current;
       const t = ev.target as Node | null;
       if (host && t && host.contains(t)) return;
+      // Klicks im Tabellen-Einstellungsfenster dürfen weder den Zellmodus
+      // noch die Zellauswahl beenden — dort wird die aktive Tabelle bearbeitet.
+      const el = t instanceof Element ? t : (t?.parentElement ?? null);
+      if (el?.closest?.("[data-table-settings]")) return;
       exitEdit();
     };
     const onKey = (ev: KeyboardEvent) => {
@@ -175,6 +179,7 @@ export function CadTableLayer({
               tableData: table.data,
             } as any}
             editing
+            paperPxPerMm={table.mPerMm * (table.scale || 1) * cam.scale}
             onChange={(patch: any) => {
               if (patch?.tableData) table.setData(patch.tableData);
               app.renderer?.render?.();

@@ -4768,6 +4768,7 @@ function ElementView({
           editing={!!tableEditing}
           pageWmm={pageWmm}
           pageHmm={pageHmm}
+          paperPxPerMm={pagePxPerMm}
           onChange={(patch) => onTransform?.(patch)}
           onExitEdit={() => tableCtx?.setEditId(null)}
         />
