@@ -9,8 +9,8 @@ import { getDimensionGeometry, getAngleDimensionParts, type DimensionLike } from
 import { boxCornersWorld } from "./textGeometry";
 import { getDocWarp, drawWarpedImage } from "./documentWarp";
 import { drawRichTextBox } from "./textRichRenderer";
-import { textStyleFontSizePt } from "./textTypography";
-import { normalizeTable, isCovered, effectiveFormat, effectiveBorders, PT_TO_MM } from "@/lib/table/tableModel";
+import { textStyleFontSizePt, ptToCssPx } from "./textTypography";
+import { normalizeTable, isCovered, effectiveFormat, effectiveBorders } from "@/lib/table/tableModel";
 import { layoutTable, cellRectMm } from "@/lib/table/tableLayout";
 import { evalCell } from "@/lib/table/tableFormula";
 import { fillWithHatchPattern, PATTERN_BASE_TILE_M, type HatchPatternId } from "./hatchPatterns";
@@ -1791,6 +1791,18 @@ export class Renderer {
     ctx.fillStyle = fillCol;
     ctx.fill("evenodd");
 
+    // Haarlinien-Versiegelung: minimaler, bildschirmfester Randauftrag in
+    // Füllfarbe, damit zwischen Füllung und Begrenzung keine 1px-Lücke durch
+    // Anti-Aliasing/Rasterrundung sichtbar bleibt (zoomstabil, kein Bleeding).
+    if (fillAlpha > 0) {
+      ctx.save();
+      ctx.strokeStyle = fillCol;
+      ctx.lineWidth = 1;
+      ctx.lineJoin = "round";
+      ctx.stroke();
+      ctx.restore();
+    }
+
     this._paintHatchPattern(ctx, cam, hatch);
 
     if (strokePx > 0) {
@@ -2612,7 +2624,8 @@ export class Renderer {
         const text = raw.startsWith("=") ? String(evalCell(model.cells, r, c)) : raw;
         if (!text) continue;
         const f = effectiveFormat(model, r, c);
-        const fontPx = f.fontSizePt * PT_TO_MM * pxPerMm;
+        // Zentrale pt-Skalierung wie im Textwerkzeug (keine eigene Umrechnung).
+        const fontPx = ptToCssPx(f.fontSizePt) * (cam.scale / this.referencePxPerM);
         if (fontPx < 3) continue;
         ctx.save();
         ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();

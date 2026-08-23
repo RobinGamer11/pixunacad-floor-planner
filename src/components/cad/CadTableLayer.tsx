@@ -14,6 +14,7 @@ import React from "react";
 import { TableElementView } from "@/components/page/TableElementView";
 import { TableEditContext } from "@/components/page/TableElementView";
 import { cadTableStore } from "@/lib/cadTableStore";
+import { ANNOTATION_M_PER_MM } from "@/cad/textTypography";
 import {
   createTableData,
   normalizeTable,
@@ -24,13 +25,12 @@ import {
 export function CadTableLayer({
   app,
   projectId,
-  toolActive,
   selectedId,
   setSelectedId,
 }: {
   app: any;
   projectId: string;
-  toolActive: boolean;
+  toolActive?: boolean;
   selectedId: string | null;
   setSelectedId: (id: string | null) => void;
 }) {
@@ -39,19 +39,6 @@ export function CadTableLayer({
   const [editId, setEditId] = React.useState<string | null>(null);
   const hostRef = React.useRef<HTMLDivElement | null>(null);
   const sheetId: string = (app?.activeSheetId as string) || "default";
-
-  /** Maßstabsnenner des aktiven Blatts: Papier-mm ↔ Welt-Meter. */
-  const scaleDen = React.useMemo(() => {
-    try {
-      const sheets = app?.sheetManager?.toJSON?.() ?? [];
-      const s = sheets.find((x: any) => x.id === sheetId);
-      const val = typeof s?.scaleValue === "number"
-        ? s.scaleValue
-        : parseFloat(String(s?.scaleKey ?? "").split(":")[1]);
-      return Number.isFinite(val) && val > 0 ? val : 100;
-    } catch { return 100; }
-  }, [app, sheetId]);
-  const mPerMm = scaleDen / 1000;
 
   // Zellmodus wird von der Engine gesteuert (Doppelklick im Auswahlwerkzeug).
   React.useEffect(() => {
@@ -92,39 +79,18 @@ export function CadTableLayer({
     if (!old.length) return;
     for (const el of old) {
       const model = normalizeTable(el.tableData as any);
-      const wM = tableWidthMm(model) * mPerMm;
-      const hM = tableHeightMm(model) * mPerMm;
+      const wM = tableWidthMm(model) * ANNOTATION_M_PER_MM;
+      const hM = tableHeightMm(model) * ANNOTATION_M_PER_MM;
       app.scene.createTable(
         { x: (el as any).xM + wM / 2, y: (el as any).yM - hM / 2 },
         el.tableData,
-        mPerMm,
+        ANNOTATION_M_PER_MM,
         { rotationRad: ((el.rotation ?? 0) * Math.PI) / 180, labelId: app.activeDrawLabelId },
       );
       cadTableStore.remove(projectId, sheetId, el.id);
     }
     app.renderer?.render?.();
-  }, [app, projectId, sheetId, mPerMm]);
-
-  const createAt = (clientX: number, clientY: number) => {
-    const host = hostRef.current;
-    const cam = app?.camera;
-    if (!host || !cam) return;
-    const r = host.getBoundingClientRect();
-    const w = cam.screenToWorld(clientX - r.left, clientY - r.top);
-    const data = createTableData(ctx?.newCols ?? 3, ctx?.newRows ?? 4);
-    const model = normalizeTable(data);
-    const wM = tableWidthMm(model) * mPerMm;
-    const hM = tableHeightMm(model) * mPerMm;
-    const table = app.scene.createTable(
-      { x: w.x + wM / 2, y: w.y - hM / 2 },
-      data,
-      mPerMm,
-      { labelId: app.activeDrawLabelId },
-    );
-    app.setSelection?.({ type: "textbox", textBoxId: table.id, handleIndex: null });
-    setSelectedId(table.id);
-    app.renderer?.render?.();
-  };
+  }, [app, projectId, sheetId]);
 
   const cam = app?.camera;
   const table = editId ? app?.scene?.getTableById?.(editId) : null;
@@ -149,17 +115,7 @@ export function CadTableLayer({
 
   return (
     <div ref={hostRef} className="absolute inset-0" style={{ pointerEvents: "none", zIndex: 20 }}>
-      {toolActive && !editId && (
-        <div
-          className="absolute inset-0"
-          style={{ pointerEvents: "auto", cursor: "crosshair" }}
-          onPointerDown={(e) => {
-            if (e.button !== 0) return;
-            e.preventDefault();
-            createAt(e.clientX, e.clientY);
-          }}
-        />
-      )}
+
 
       {table && box && (
         <div

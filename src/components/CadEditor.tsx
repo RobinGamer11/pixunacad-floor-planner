@@ -392,6 +392,13 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const [tableSelection, setTableSelection] = useState<TableSelection | null>(null);
   const [tableNewCols, setTableNewCols] = useState(3);
   const [tableNewRows, setTableNewRows] = useState(4);
+  // Neue Tabellengröße an das Engine-Werkzeug weiterreichen (Platzierung
+  // läuft über die normale CAD-Input-Logik, nicht über ein DOM-Overlay).
+  useEffect(() => {
+    const t = (appRef.current as any)?.tableTool;
+    if (t) { t.cols = tableNewCols; t.rows = tableNewRows; }
+  }, [tableNewCols, tableNewRows, tableTool]);
+
   const [tableFormulaFn, setTableFormulaFn] = useState<FormulaFn | null>(null);
   const tableSheetId = (appRef.current as any)?.activeSheetId || "default";
   const tableSceneObj = tableSelectedId
@@ -807,7 +814,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     app.onToolChange = (id) => {
       setActiveTool(id);
       // Engine-Werkzeug gewählt → Tabellen-Overlay-Werkzeug verlassen.
-      setTableTool(false);
+      setTableTool(id === ToolIds.TABLE);
       setTableEditId(null);
       // Auswahl-Werkzeug → Seiteneinstellungen automatisch öffnen.
       if (id === ToolIds.SELECT) setRightTab("sheets");
@@ -1382,8 +1389,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           <button
             onClick={() => {
               const app = appRef.current;
-              if (tableTool) { setTableTool(false); return; }
-              app?.setTool(ToolIds.SELECT);
+              if (tableTool) { app?.setTool(ToolIds.SELECT); setTableTool(false); return; }
+              app?.setTool(ToolIds.TABLE);
               setTableTool(true);
               setTableEditId(null);
               setRightTab("settings");
@@ -1979,7 +1986,6 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
         <CadTableLayer
           app={appRef.current}
           projectId={projectId ?? "default"}
-          toolActive={tableTool}
           selectedId={tableSelectedId}
           setSelectedId={setTableSelectedId}
         />
@@ -3405,7 +3411,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                   if ((patch as any)?.tableData) t.setData((patch as any).tableData);
                   (appRef.current as any)?.renderer?.render?.();
                 }}
-                onConfirm={() => { setTableTool(false); setTableEditId(null); }}
+                onConfirm={() => { (appRef.current as any)?.setTool?.(ToolIds.SELECT); setTableTool(false); setTableEditId(null); }}
                 onCancel={() => {
                   const app = appRef.current as any;
                   // Nur beim aktiven Tabellenwerkzeug wird die frisch gesetzte
@@ -3417,6 +3423,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                   setTableSelectedId(null);
                   setTableEditId(null);
                   setTableTool(false);
+                  app?.setTool?.(ToolIds.SELECT);
                 }}
               />
             </div>
