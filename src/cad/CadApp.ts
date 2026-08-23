@@ -1940,7 +1940,7 @@ export class CadApp {
       if (sel) {
         sel.style.fontSizePx = v;
         sel.style.fontSizePt = v * 72 / 96;
-        autoSizeTextBox(sel, (this.renderer as any).referencePxPerM);
+        autoSizeTextBox(sel, (this.renderer as any).referencePxPerM, (this.renderer as any).textPtScale);
       }
       else this.defaultTextFontSizePx = v;
     });
@@ -1987,7 +1987,7 @@ export class CadApp {
 
     r.wrapToggle.addEventListener("change", () => {
       const sel = this.getEditTextBox();
-      if (sel) { sel.style.wrap = !!r.wrapToggle.checked; autoSizeTextBox(sel, (this.renderer as any).referencePxPerM); }
+      if (sel) { sel.style.wrap = !!r.wrapToggle.checked; autoSizeTextBox(sel, (this.renderer as any).referencePxPerM, (this.renderer as any).textPtScale); }
       else this.defaultTextWrap = !!r.wrapToggle.checked;
     });
 
@@ -2022,7 +2022,7 @@ export class CadApp {
       if (sel) {
         (sel.style as any).autoSize = auto;
         sel.style.wrap = !auto;
-        autoSizeTextBox(sel, (this.renderer as any).referencePxPerM);
+        autoSizeTextBox(sel, (this.renderer as any).referencePxPerM, (this.renderer as any).textPtScale);
       } else {
         this.defaultTextAutoSize = auto;
         this.defaultTextWrap = !auto;
@@ -2038,7 +2038,7 @@ export class CadApp {
       const sel = this.getEditTextBox();
       if (sel) {
         (sel.style as any)[key] = !(sel.style as any)[key];
-        autoSizeTextBox(sel, (this.renderer as any).referencePxPerM);
+        autoSizeTextBox(sel, (this.renderer as any).referencePxPerM, (this.renderer as any).textPtScale);
       } else {
         if (key === "bold") this.defaultTextBold = !this.defaultTextBold;
         else if (key === "italic") this.defaultTextItalic = !this.defaultTextItalic;
@@ -2058,7 +2058,7 @@ export class CadApp {
       if (!Number.isFinite(v)) return;
       v = clamp(Math.round(v), 80, 300);
       const sel = this.getEditTextBox();
-      if (sel) { (sel.style as any).lineHeightPct = v; autoSizeTextBox(sel, (this.renderer as any).referencePxPerM); }
+      if (sel) { (sel.style as any).lineHeightPct = v; autoSizeTextBox(sel, (this.renderer as any).referencePxPerM, (this.renderer as any).textPtScale); }
       else this.defaultTextLineHeightPct = v;
       this._syncTextSettingsFromContext();
     };
@@ -2085,7 +2085,7 @@ export class CadApp {
       if (sel) {
         sel.style.fontSizePt = pt;
         sel.style.fontSizePx = px;
-        autoSizeTextBox(sel, (this.renderer as any).referencePxPerM);
+        autoSizeTextBox(sel, (this.renderer as any).referencePxPerM, (this.renderer as any).textPtScale);
       }
       else this.defaultTextFontSizePx = px;
       this._syncTextSettingsFromContext();

@@ -336,7 +336,7 @@ export class TextEditorOverlay {
     if (!box) return;
     box.html = this._documentHtml();
     if ((box.style as any).autoSize !== false) {
-      autoSizeTextBox(box, (this.app.renderer as any).referencePxPerM);
+      autoSizeTextBox(box, (this.app.renderer as any).referencePxPerM, (this.app.renderer as any).textPtScale);
       this.reposition(box);
     }
     (this.app as any).requestRender?.();
@@ -396,7 +396,7 @@ export class TextEditorOverlay {
       if (!b) return;
       b.html = this._documentHtml();
       if ((b.style as any).autoSize !== false) {
-        autoSizeTextBox(b, (this.app.renderer as any).referencePxPerM);
+        autoSizeTextBox(b, (this.app.renderer as any).referencePxPerM, (this.app.renderer as any).textPtScale);
         this.reposition(b);
       }
     };
@@ -455,7 +455,7 @@ export class TextEditorOverlay {
       this._syncBoxFromEditor();
       const b = this.app.scene.getTextBoxById(this.activeBoxId!);
       if (b && (b.style as any).autoSize !== false) {
-        autoSizeTextBox(b, (this.app.renderer as any).referencePxPerM);
+        autoSizeTextBox(b, (this.app.renderer as any).referencePxPerM, (this.app.renderer as any).textPtScale);
         this.reposition(b);
       }
     };
@@ -513,13 +513,14 @@ export class TextEditorOverlay {
 
     // Use the renderer's referencePxPerM (matches the canvas-rendered text 1:1).
     const refPxPerM = (this.app.renderer as any).referencePxPerM || Defaults.measureReferenceScalePxPerM;
-    const fontPx = ptToCssPx(textStyleFontSizePt(box.style)) * (cam.scale / refPxPerM);
+    const ptScale = (this.app.renderer as any).textPtScale || 1;
+    const fontPx = ptToCssPx(textStyleFontSizePt(box.style)) * (cam.scale / refPxPerM) * ptScale;
     this.el.style.fontSize = `${fontPx}px`;
     // Inline-Größen sind Dokumentwerte in pt und erhalten denselben Zoomfaktor
     // wie die Basisgröße. Der Canvas-Renderer verwendet exakt dieselbe Formel.
     this.el.querySelectorAll<HTMLElement>("[data-font-size-pt]").forEach(node => {
       const pt = parseFloat(node.dataset.fontSizePt || "");
-      if (Number.isFinite(pt) && pt > 0) node.style.fontSize = `${ptToCssPx(pt) * (cam.scale / refPxPerM)}px`;
+      if (Number.isFinite(pt) && pt > 0) node.style.fontSize = `${ptToCssPx(pt) * (cam.scale / refPxPerM) * ptScale}px`;
     });
     this.el.style.fontFamily = "system-ui, Arial, sans-serif";
     this.el.style.lineHeight = String(Math.max(0.6, ((box.style as any).lineHeightPct ?? 105) / 100));
@@ -622,7 +623,7 @@ export class TextEditorOverlay {
     //    (zoom-independent, source of truth). Top-left stays anchored.
     //    - wrap=true : width fixed, height grows.
     //    - wrap=false: width AND height grow to fit the longest line.
-    autoSizeTextBox(box, (this.app.renderer as any).referencePxPerM);
+    autoSizeTextBox(box, (this.app.renderer as any).referencePxPerM, (this.app.renderer as any).textPtScale);
 
     this.hide();
 

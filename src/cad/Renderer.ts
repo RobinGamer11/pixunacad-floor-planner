@@ -137,6 +137,14 @@ export class Renderer {
    */
   referencePxPerM: number = Defaults.strokeWidthBaseScale;
 
+  /**
+   * Zusätzlicher pt→px-Faktor für Text (Basis ist ptToCssPx = 96 dpi).
+   * Bildschirm-CAD: 1. Papierbezogene Hosts (Projektmappe) setzen hier
+   * (25,4/72 × paperPxPerMm) / (96/72), damit 1 pt exakt 25,4/72 mm auf dem
+   * Papier entspricht — identisch zur Tabellen-Skalierung.
+   */
+  textPtScale: number = 1;
+
   constructor(ctx: CanvasRenderingContext2D, camera: Camera, scene: Scene, labels: LabelManager) {
     this.ctx = ctx;
     this.camera = camera;
@@ -1160,7 +1168,7 @@ export class Renderer {
           rotationRad: it.rotationRad || 0,
           html: it.html || "",
           baseFontSizePt: textStyleFontSizePt(it.style || {}),
-          displayScale: cam.scale / this.referencePxPerM,
+          displayScale: (cam.scale / this.referencePxPerM) * this.textPtScale,
           baseColor: it.style?.textColor || Defaults.textColor,
           bgColor: it.style?.bgColor || Defaults.textBgColor,
           bgAlpha: ((it.style?.bgAlphaPct || 0)) / 100,
@@ -2505,7 +2513,7 @@ export class Renderer {
       rotationRad: box.rotationRad,
       html: box.html || "",
       baseFontSizePt: textStyleFontSizePt(box.style),
-      displayScale: cam.scale / this.referencePxPerM,
+      displayScale: (cam.scale / this.referencePxPerM) * this.textPtScale,
       baseColor: box.style.textColor,
       bgColor: box.style.bgColor,
       bgAlpha: (box.style.bgAlphaPct || 0) / 100,
@@ -2621,7 +2629,7 @@ export class Renderer {
         if (!text) continue;
         const f = effectiveFormat(model, r, c);
         // Zentrale pt-Skalierung wie im Textwerkzeug (keine eigene Umrechnung).
-        const fontPx = ptToCssPx(f.fontSizePt) * (cam.scale / this.referencePxPerM);
+        const fontPx = ptToCssPx(f.fontSizePt) * (cam.scale / this.referencePxPerM) * this.textPtScale;
         if (fontPx < 3) continue;
         ctx.save();
         ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
