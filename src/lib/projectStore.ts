@@ -857,12 +857,20 @@ function templatesForScope(p: Project, scope: TextSpanScope | null): TextSpanTem
 
 /** Seiten, die von „Auf allen Seiten“ betroffen sind: ausschließlich Seiten im
  *  selben Kontext (Mappe bzw. Vorlagen-Schlüssel) wie die Quellseite. */
-function spanTargetPageIds(p: Project, sourcePageId: string): Set<string> {
+export function spanTargetPageIds(p: Project, sourcePageId: string): Set<string> {
   const scope = pageSpanScope(p, sourcePageId);
   if (!scope) return new Set([sourcePageId]);
   return new Set(
     p.pages.filter((pg) => sameScope(pageSpanScope(p, pg.id), scope)).map((pg) => pg.id),
   );
+}
+
+/** Ist eine „Auf allen Seiten“-Gruppe im Seitenkontext dieser Seite aktiv?
+ *  Gruppen anderer „Bücher“ (andere Mappe / anderer templateKey) zählen nicht. */
+export function isSpanGroupActiveForPage(p: Project, pageId: string, groupId: string): boolean {
+  const scope = pageSpanScope(p, pageId);
+  if (!scope) return false;
+  return templatesForScope(p, scope).some((t) => t.groupId === groupId);
 }
 
 

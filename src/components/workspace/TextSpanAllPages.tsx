@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Layers } from "lucide-react";
-import { projectStore } from "@/lib/projectStore";
+import { projectStore, spanTargetPageIds, isSpanGroupActiveForPage } from "@/lib/projectStore";
 import type { MiniCad } from "@/cad/embed/MiniCad";
 
 /** Serialisiert eine TextBox exakt im CAD-Overlay-Format (Papierkoordinaten). */
@@ -45,8 +45,10 @@ export function TextSpanAllPages({
   // Gruppe eine aktive Vorlage im Projekt besitzt, ist „Auf allen Seiten“ auf
   // jeder zugehörigen Seitenkopie EIN.
   const project = projectStore.getState().projects.find((p) => p.id === projectId);
-  const hasTemplate = !!groupId
-    && !!project?.textSpanTemplates?.some((t) => t.groupId === groupId);
+  // Gültig ist eine Gruppe nur im Seitenkontext („Buch“) dieser Seite:
+  // normale Mappe bzw. genau diese Finanz-Mustervorlage (templateKey).
+  const hasTemplate = !!groupId && !!project
+    && isSpanGroupActiveForPage(project, pageId, groupId);
   const active = hasTemplate;
 
   /**
@@ -55,10 +57,13 @@ export function TextSpanAllPages({
    * neuen Seiten).
    */
   const removeHere = () => {
-    if (groupId) {
-      const hasOtherCopy = (project?.pages ?? []).some(
+    if (groupId && project) {
+      // Nur Seiten desselben „Buchs“ zählen (Mappe bzw. dieser templateKey).
+      const scopeIds = spanTargetPageIds(project, pageId);
+      const hasOtherCopy = project.pages.some(
         (pg) =>
           pg.id !== pageId
+          && scopeIds.has(pg.id)
           && ((pg.cadOverlay as any)?.textBoxes ?? []).some(
             (b: any) => b?.style?.spanGroupId === groupId,
           ),
