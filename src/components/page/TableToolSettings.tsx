@@ -106,6 +106,21 @@ export function TableToolSettings({
   const fmtRaw = model.cellFormats[`${selR},${selC}`] ?? {};
   const fns: FormulaFn[] = ["SUM", "AVG", "MIN", "MAX", "COUNT"];
 
+  // Zahlenformat der Auswahl: null = gemischt (wie die übrigen Sammelwerte).
+  const numFormatSel: NumFormat | null = (() => {
+    if (!sel) return effectiveFormat(model, selR, selC).numFormat ?? "auto";
+    let acc: NumFormat | null | undefined;
+    for (let r = Math.min(sel.r1, sel.r2); r <= Math.max(sel.r1, sel.r2); r++) {
+      for (let c = Math.min(sel.c1, sel.c2); c <= Math.max(sel.c1, sel.c2); c++) {
+        const nf = (model.cellFormats[`${r},${c}`]?.numFormat ?? "auto") as NumFormat;
+        if (acc === undefined) acc = nf;
+        else if (acc !== nf) return null;
+      }
+    }
+    return acc ?? "auto";
+  })();
+
+
   /** Tabellen-Hintergrund setzen und einzelne Zellhintergründe zurücksetzen. */
   const setTableBackground = (v: string) => {
     const cellFormats: typeof model.cellFormats = {};
