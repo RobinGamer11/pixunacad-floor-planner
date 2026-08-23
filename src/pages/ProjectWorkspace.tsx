@@ -3704,6 +3704,19 @@ function ElementView({
 
   const dragRef = useRef<{ x: number; y: number } | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
+  // Darstellungsauflösung der Seite (px pro Papier-mm) — Basis für die
+  // zentrale pt-Skalierung von Textobjekten.
+  const [pagePxPerMm, setPagePxPerMm] = useState(0);
+  React.useLayoutEffect(() => {
+    const host = rootRef.current?.parentElement;
+    if (!host || !pageWmm || pageWmm <= 0) { setPagePxPerMm(0); return; }
+    const upd = () => setPagePxPerMm(host.getBoundingClientRect().width / pageWmm);
+    upd();
+    const ro = new ResizeObserver(upd);
+    ro.observe(host);
+    return () => ro.disconnect();
+  }, [pageWmm]);
+
   // Tabellen: interner Tabellenmodus (Zellbearbeitung) — nur für diese Tabelle.
   const tableCtx = React.useContext(TableEditContext);
   const tableEditing = !readOnly && el.kind === "table" && tableCtx?.editId === el.id;
