@@ -401,8 +401,11 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
 
   const [tableFormulaFn, setTableFormulaFn] = useState<FormulaFn | null>(null);
   const tableSheetId = (appRef.current as any)?.activeSheetId || "default";
-  const tableSceneObj = tableSelectedId
-    ? (appRef.current as any)?.scene?.getTableById?.(tableSelectedId)
+  // Bestehende Bearbeitung hat Vorrang: solange der Zellmodus auf eine Tabelle
+  // zeigt, bleibt das Panel an dieser Tabelle — auch ohne Canvas-Auswahl.
+  const tableContextId = tableEditId ?? tableSelectedId;
+  const tableSceneObj = tableContextId
+    ? (appRef.current as any)?.scene?.getTableById?.(tableContextId)
     : null;
   const tableElement = tableSceneObj
     ? ({ id: tableSceneObj.id, kind: "table", tableData: tableSceneObj.data } as any)
@@ -3394,7 +3397,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             </div>
           )}
           {(tableTool || !!tableElement) && (
-            <div className="cad-settings-panel mb-2">
+            <div className="cad-settings-panel mb-2" data-table-settings>
               <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
                 Tabelle
               </div>
@@ -3406,7 +3409,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 formulaFn={tableFormulaFn}
                 setFormulaFn={setTableFormulaFn}
                 onPatch={(patch) => {
-                  const t = (appRef.current as any)?.scene?.getTableById?.(tableSelectedId ?? "");
+                  const t = (appRef.current as any)?.scene?.getTableById?.(tableContextId ?? "");
                   if (!t) return;
                   if ((patch as any)?.tableData) t.setData((patch as any).tableData);
                   (appRef.current as any)?.renderer?.render?.();
@@ -3416,8 +3419,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                   const app = appRef.current as any;
                   // Nur beim aktiven Tabellenwerkzeug wird die frisch gesetzte
                   // Tabelle verworfen; sonst nur Auswahl/Zellmodus beenden.
-                  if (tableTool) {
-                    const t = app?.scene?.getTableById?.(tableSelectedId ?? "");
+                  if (tableTool && !tableEditId) {
+                    const t = app?.scene?.getTableById?.(tableContextId ?? "");
                     if (t) { app.scene.removeTable(t); app.renderer?.render?.(); }
                   }
                   setTableSelectedId(null);
