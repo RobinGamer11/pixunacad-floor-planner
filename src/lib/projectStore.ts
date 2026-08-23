@@ -1172,6 +1172,7 @@ export const projectStore = {
         const source: ProjectPage[] = favorite?.length
           ? favorite
           : [{ id: "", title, format: "A4-hoch", margins: 20, background: false, elements: [] }];
+        const tplSpan = templatesForScope(p, { type: "template", key: templateKey });
         const created = source.map((pg, i) => {
           const id = `${projectId}-tpl${stamp}${i}`;
           const clone = JSON.parse(JSON.stringify(pg)) as ProjectPage;
@@ -1181,12 +1182,14 @@ export const projectStore = {
             title: i === 0 ? title : `${title} ${i + 1}`,
             templateKey,
             spreadId: undefined,
+            cadOverlay: seedSpanOverlay(clone.cadOverlay, tplSpan, id),
             elements: (clone.elements ?? []).map((el: any, k: number) => ({
               ...el,
               id: `${id}-e${k}`,
             })),
           } as ProjectPage;
         });
+
         ids = created.map((pg) => pg.id);
         return { ...p, updatedAt: new Date().toISOString(), pages: [...p.pages, ...created] };
       }),
