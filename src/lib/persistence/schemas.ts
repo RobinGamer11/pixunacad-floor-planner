@@ -166,12 +166,7 @@ defineSchema({
         if (!isObj(state) || !Array.isArray(state.projects)) return state;
         for (const p of state.projects) {
           if (!isObj(p)) continue;
-          mapArray(p, "pages", (pg) => {
-            mapArray(pg, "elements", (el) => {
-              fill(el, "rotation", 0);
-              if (el.kind === "table") fill(el, "scale", 1);
-            });
-          });
+          migrateProjectPages(p.pages);
           // Sheet-Szenen liegen als JSON-String vor → migrieren und
           // unverändert zurückschreiben (nur ergänzte Felder).
           mapArray(p, "sheets", (s) => {
@@ -184,6 +179,7 @@ defineSchema({
         return state;
       },
     },
+
   ],
 });
 
