@@ -43,6 +43,12 @@ interface Registry {
   publish(elementId: string, entry: SnapEntry): void;
   unpublish(elementId: string): void;
   queryNearest(clientX: number, clientY: number, pageRect: DOMRect, tolerancePx?: number, excludeIds?: string[]): SnapMatch | null;
+  /**
+   * Alle Fangpunkte in einem Bildschirmradius um den Cursor — Pendant zu
+   * `TopologyEngine.nearbySnapPoints()` der CAD-Oberfläche. Wird ausschließlich
+   * für die dezente Fangpunkt-Vorschau während Verschieben/Drehen genutzt.
+   */
+  queryNearby(clientX: number, clientY: number, pageRect: DOMRect, radiusPx?: number, max?: number, excludeIds?: string[]): Array<{ x: number; y: number; type: SnapPointType }>;
   setHover(m: SnapMatch | null): void;
 }
 
