@@ -10,9 +10,9 @@ import { projectStore } from "@/lib/projectStore";
 import type { PageElement } from "@/lib/projectStore";
 import {
   normalizeTable, toTableData, resizeGrid, insertRow, insertCol, removeRow, removeCol,
-  mergeRange, unmergeAt, applyFormat, effectiveFormat, effectiveBorders, mergeCovering,
+  mergeRange, unmergeAt, applyFormat, applyNumberFormat, effectiveFormat, effectiveBorders, mergeCovering,
   tableWidthMm, tableHeightMm, type TableModel, type HAlign, type VAlign,
-  type CellBorderStyle,
+  type CellBorderStyle, type TableNumberFormat,
 } from "@/lib/table/tableModel";
 import { TableEditContext, type FormulaFn } from "./TableElementView";
 
@@ -54,6 +54,7 @@ export function TableToolSettings({
   const newRows = ctx?.newRows ?? 4;
   const setNewCols = (v: number) => ctx?.setNewCols(v);
   const setNewRows = (v: number) => ctx?.setNewRows(v);
+  const [numberFormatScope, setNumberFormatScope] = React.useState<"cells" | "rows">("cells");
 
   if (!tableElement || tableElement.kind !== "table") {
     return (
@@ -96,6 +97,15 @@ export function TableToolSettings({
   const format = (patch: Parameters<typeof applyFormat>[5]) => {
     if (!sel) return;
     commit(applyFormat(model, sel.r1, sel.c1, sel.r2, sel.c2, patch));
+  };
+  const formatNumber = (numberFormat: TableNumberFormat) => {
+    if (!sel) return;
+    commit(applyNumberFormat(
+      model,
+      sel.r1, sel.c1, sel.r2, sel.c2,
+      numberFormat,
+      numberFormatScope === "rows",
+    ));
   };
 
   const borderWidthPx = model.borderWidthPx ?? 1;
@@ -180,6 +190,48 @@ export function TableToolSettings({
       {editMode && (
         <div className="rounded-md border p-2 space-y-2" style={{ borderColor: "hsl(var(--hairline))" }}>
           <div className="text-[11px] font-semibold text-muted-foreground">Zellformat</div>
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10px] text-muted-foreground">Zahlenformat für</span>
+              <div className="flex items-center rounded-md border p-0.5" style={{ borderColor: "hsl(var(--hairline))" }}>
+                {(["cells", "rows"] as const).map((scope) => (
+                  <button
+                    key={scope}
+                    type="button"
+                    aria-pressed={numberFormatScope === scope}
+                    onClick={() => setNumberFormatScope(scope)}
+                    className="h-6 px-2 rounded text-[9px]"
+                    style={{
+                      background: numberFormatScope === scope ? "hsl(var(--accent-gold-soft))" : undefined,
+                      color: numberFormatScope === scope ? "hsl(var(--accent-gold))" : undefined,
+                    }}
+                    title={scope === "cells" ? "Nur die markierten Zellen formatieren" : "Alle Zellen der markierten Zeile oder Zeilen formatieren"}
+                  >
+                    {scope === "cells" ? "Zellen" : "Zeile(n)"}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="grid grid-cols-4 gap-1">
+              {NUMBER_FORMAT_OPTIONS.map(({ value, label }) => (
+                <button
+                  key={value}
+                  type="button"
+                  disabled={!sel}
+                  aria-pressed={fmt.numberFormat === value}
+                  onClick={() => formatNumber(value)}
+                  className="h-7 rounded-md border text-[9px] hover:bg-muted disabled:opacity-30"
+                  style={{
+                    borderColor: "hsl(var(--hairline))",
+                    background: fmt.numberFormat === value ? "hsl(var(--accent-gold-soft))" : undefined,
+                    color: fmt.numberFormat === value ? "hsl(var(--accent-gold))" : undefined,
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="flex items-center gap-1">
             <Toggle active={fmt.align === "left"} onClick={() => format({ align: "left" as HAlign })}><AlignLeft size={11} /></Toggle>
             <Toggle active={fmt.align === "center"} onClick={() => format({ align: "center" as HAlign })}><AlignCenter size={11} /></Toggle>
@@ -439,6 +491,13 @@ function Stepper({ label, value, min, max, onChange }: {
 const SIDE_LABEL: Record<"top" | "right" | "bottom" | "left", string> = {
   top: "Oben", right: "Rechts", bottom: "Unten", left: "Links",
 };
+
+const NUMBER_FORMAT_OPTIONS: ReadonlyArray<{ value: TableNumberFormat; label: string }> = [
+  { value: "auto", label: "Automatisch" },
+  { value: "number", label: "Zahl" },
+  { value: "currency", label: "€" },
+  { value: "percent", label: "%" },
+];
 
 const colName = (c: number): string => {
   let n = c, out = "";

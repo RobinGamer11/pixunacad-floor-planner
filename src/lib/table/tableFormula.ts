@@ -9,6 +9,7 @@
  */
 
 import { tableRegistry } from "./tableRegistry";
+import type { TableNumberFormat } from "./tableModel";
 
 export type FormulaFn = "SUM" | "AVG" | "MIN" | "MAX" | "COUNT";
 
@@ -199,11 +200,37 @@ export function evalCell(
   return evaluate(scope, r, c, ctx, new Set());
 }
 
-/** Anzeigewert einer Zelle (Formeln ausgewertet). */
-export function displayValue(cells: string[][], r: number, c: number, ctx: FormulaContext = {}): string {
-  const raw = cells[r]?.[c] ?? "";
-  if (!raw.startsWith("=")) return raw;
-  return String(evalCell(cells, r, c, ctx));
+const AUTO_NUMBER = new Intl.NumberFormat("de-DE", {
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 6,
+});
+const FIXED_NUMBER = new Intl.NumberFormat("de-DE", {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+/** Formatiert ausschließlich die Anzeige eines bereits ausgewerteten Zellwerts. */
+export function formatTableCellValue(
+  value: number | string,
+  numberFormat: TableNumberFormat = "auto",
+): string {
+  if (typeof value !== "number" || !Number.isFinite(value)) return String(value);
+  const normalized = Object.is(value, -0) ? 0 : value;
+  if (numberFormat === "currency") return `${FIXED_NUMBER.format(normalized)} €`;
+  if (numberFormat === "percent") return `${FIXED_NUMBER.format(normalized * 100)} %`;
+  if (numberFormat === "number") return FIXED_NUMBER.format(normalized);
+  return AUTO_NUMBER.format(normalized);
+}
+
+/** Anzeigewert einer Zelle; gespeicherter Rohwert und Formelauswertung bleiben unberührt. */
+export function displayValue(
+  cells: string[][],
+  r: number,
+  c: number,
+  ctx: FormulaContext = {},
+  numberFormat: TableNumberFormat = "auto",
+): string {
+  return formatTableCellValue(evalCell(cells, r, c, ctx), numberFormat);
 }
 
 /**

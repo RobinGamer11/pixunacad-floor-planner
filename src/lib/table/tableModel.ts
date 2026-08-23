@@ -8,6 +8,7 @@
 
 export type HAlign = "left" | "center" | "right";
 export type VAlign = "top" | "middle" | "bottom";
+export type TableNumberFormat = "auto" | "number" | "currency" | "percent";
 
 /** Rahmenstil einer Zelle. */
 export type CellBorderStyle = "single" | "double";
@@ -23,6 +24,8 @@ export interface CellBorders {
 export interface TableCellFormat {
   align?: HAlign;
   valign?: VAlign;
+  /** Reines Anzeigeformat; der gespeicherte Zellwert bleibt unverändert. */
+  numberFormat?: TableNumberFormat;
   fontSizePt?: number;
   bold?: boolean;
   italic?: boolean;
@@ -307,13 +310,31 @@ export function applyFormat(
   return { ...t, cellFormats: formats };
 }
 
+/** Zahlenformat auf markierte Zellen oder die vollständig berührten Zeilen anwenden. */
+export function applyNumberFormat(
+  t: TableModel,
+  r1: number, c1: number, r2: number, c2: number,
+  numberFormat: TableNumberFormat,
+  wholeRows = false,
+): TableModel {
+  return applyFormat(
+    t,
+    r1,
+    wholeRows ? 0 : c1,
+    r2,
+    wholeRows ? t.cells[0].length - 1 : c2,
+    { numberFormat },
+  );
+}
+
 /** Effektives Format einer Zelle inkl. Kopfzeilen-Default. */
-export function effectiveFormat(t: TableModel, r: number, c: number): Required<Pick<TableCellFormat, "align" | "valign" | "fontSizePt" | "bold" | "italic">> & TableCellFormat {
+export function effectiveFormat(t: TableModel, r: number, c: number): Required<Pick<TableCellFormat, "align" | "valign" | "numberFormat" | "fontSizePt" | "bold" | "italic">> & TableCellFormat {
   const f = t.cellFormats[cellKey(r, c)] ?? {};
   const isHeader = t.headerRow !== false && r === 0;
   return {
     align: f.align ?? "left",
     valign: f.valign ?? "middle",
+    numberFormat: f.numberFormat ?? "auto",
     fontSizePt: f.fontSizePt ?? DEFAULT_FONT_PT,
     bold: f.bold ?? isHeader,
     italic: f.italic ?? false,
