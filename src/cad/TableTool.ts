@@ -26,14 +26,16 @@ export class TableTool {
     this.app.hub.hide();
     this.app.pointEditMenu.hide();
     (this.app.renderer as any).overlay = null;
+    // Kein eigener Cursor: das Tabellenwerkzeug nutzt immer den normalen
+    // CAD-Mauszeiger — auch während der Platzierung.
+    try { this.app.canvas.style.cursor = ""; } catch { /* noop */ }
   }
 
-  cancel() {}
-  finish() {}
-  getCursor() { return "crosshair"; }
+  cancel() { try { this.app.canvas.style.cursor = ""; } catch { /* noop */ } }
+  finish() { try { this.app.canvas.style.cursor = ""; } catch { /* noop */ } }
+  getCursor() { return ""; }
 
   update(input: Input) {
-    try { this.app.canvas.style.cursor = "crosshair"; } catch { /* noop */ }
     if (!input.clicked) return;
 
     const data = createTableData(Math.max(1, this.cols), Math.max(1, this.rows));
