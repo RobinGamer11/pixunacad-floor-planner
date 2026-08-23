@@ -224,7 +224,8 @@ export function findEnclosingFace(scene: Scene, click: Vec2): Vec2[] | null {
  */
 export function findEnclosingFaceFromEdges(raw: RawEdge[], click: Vec2): Vec2[] | null {
   if (raw.length === 0) return null;
-  const sub = subdivideEdges(raw);
+  // 1) Schnittpunkte → Segmente, 2) Sackgassen entfernen, 3) Face bestimmen.
+  const sub = pruneDanglingEdges(subdivideEdges(raw));
   if (sub.length === 0) return null;
 
 
