@@ -45,8 +45,10 @@ export function TextSpanAllPages({
   // Gruppe eine aktive Vorlage im Projekt besitzt, ist „Auf allen Seiten“ auf
   // jeder zugehörigen Seitenkopie EIN.
   const project = projectStore.getState().projects.find((p) => p.id === projectId);
-  const hasTemplate = !!groupId
-    && !!project?.textSpanTemplates?.some((t) => t.groupId === groupId);
+  // Gültig ist eine Gruppe nur im Seitenkontext („Buch“) dieser Seite:
+  // normale Mappe bzw. genau diese Finanz-Mustervorlage (templateKey).
+  const hasTemplate = !!groupId && !!project
+    && isSpanGroupActiveForPage(project, pageId, groupId);
   const active = hasTemplate;
 
   /**
