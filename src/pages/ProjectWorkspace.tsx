@@ -3784,6 +3784,39 @@ function ElementView({
     return null;
   };
 
+  /** Dezente Fangpunkt-Vorschau während Verschieben/Drehen — Parität zur
+   *  CAD-Oberfläche (SelectTool + TopologyEngine.nearbySnapPoints). Es werden
+   *  dieselben Quellen wie in `findSnap()` genutzt: pageSnap (Tabellen,
+   *  Textboxen, Dokumente/Bilder/PDF, CAD-Blätter) und die MiniCad-Engine
+   *  (Linien, Freihand, Schraffuren, Text, Dokumente). */
+  const [nearbySnaps, setNearbySnaps] = useState<Array<{ x: number; y: number }>>([]);
+  useEffect(() => {
+    if (readOnly || !cadHubUx || !hubMode) { setNearbySnaps((p) => (p.length ? [] : p)); return; }
+    let raf = 0;
+    const update = (cx: number, cy: number) => {
+      const parent = rootRef.current?.parentElement as HTMLElement | null;
+      if (!parent) return;
+      const pageRect = parent.getBoundingClientRect();
+      const pts = [
+        ...getPageSnapRegistry().queryNearby(cx, cy, pageRect, 140, 60, [el.id]),
+        ...queryCadEngineSnapNearby(cx, cy, pageRect, 140),
+      ].map((p) => ({ x: p.x, y: p.y }));
+      setNearbySnaps(pts);
+    };
+    const onMove = (ev: PointerEvent | MouseEvent) => {
+      const cx = ev.clientX, cy = ev.clientY;
+      if (raf) return;
+      raf = requestAnimationFrame(() => { raf = 0; update(cx, cy); });
+    };
+    window.addEventListener("pointermove", onMove as EventListener, true);
+    return () => {
+      window.removeEventListener("pointermove", onMove as EventListener, true);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [readOnly, cadHubUx, hubMode, el.id]);
+
+
+
   // Edge-Trim: reine Vorschau (dxPx/dyPx). Commit erst bei Pointerup bzw.
   // — bei aktivem Tablet-Hilfsrad — beim Klick auf das Häkchen.
   const [edgeTrim, setEdgeTrim] = useState<{
