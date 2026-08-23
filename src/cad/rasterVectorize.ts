@@ -250,9 +250,37 @@ export function vectorizeRasterBoundary(
   };
 
 
-  for (const path of paths) {
+  /**
+   * Kreuzungsbereiche liefern mehrere dicht beieinander liegende Knoten.
+   * Damit die Kurvenzüge dort topologisch zusammenhängen, werden alle
+   * Pfadenden innerhalb einer kleinen Toleranz zu einem Punkt verschmolzen.
+   */
+  const SNAP_PX = 5;
+  const clusters: { x: number; y: number; n: number }[] = [];
+  const clusterOf = (p: { x: number; y: number }) => {
+    for (let i = 0; i < clusters.length; i++) {
+      const c = clusters[i];
+      if (Math.hypot(c.x / c.n - p.x, c.y / c.n - p.y) <= SNAP_PX) {
+        c.x += p.x; c.y += p.y; c.n++;
+        return i;
+      }
+    }
+    clusters.push({ x: p.x, y: p.y, n: 1 });
+    return clusters.length - 1;
+  };
+  const endCluster = paths.map((path) =>
+    path.length >= 2 ? [clusterOf(path[0]), clusterOf(path[path.length - 1])] : [-1, -1],
+  );
+  const clusterPoint = (i: number) => ({ x: clusters[i].x / clusters[i].n, y: clusters[i].y / clusters[i].n });
+
+  for (let pi = 0; pi < paths.length; pi++) {
+    const path = paths[pi];
     if (path.length < 2) continue;
-    const world = path.map(toWorld);
+    const [c0, c1] = endCluster[pi];
+    const snapped = path.slice();
+    if (c0 >= 0) snapped[0] = clusterPoint(c0);
+    if (c1 >= 0) snapped[snapped.length - 1] = clusterPoint(c1);
+    const world = snapped.map(toWorld);
     const simplified = simplifyOpen(world, simplifyPx / pxPerM);
     for (let i = 0; i < simplified.length - 1; i++) {
       const a = simplified[i], b = simplified[i + 1];
@@ -263,4 +291,5 @@ export function vectorizeRasterBoundary(
     }
   }
   return { edges, openEnds };
+
 }
