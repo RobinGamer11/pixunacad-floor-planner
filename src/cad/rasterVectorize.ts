@@ -102,11 +102,24 @@ function simplifyOpen(points: Vec2[], eps: number): Vec2[] {
 export function traceSkeleton(sk: Uint8Array, wPx: number, hPx: number): { x: number; y: number }[][] {
   const idxOf = (x: number, y: number) => y * wPx + x;
   const on = (x: number, y: number) => (x < 0 || y < 0 || x >= wPx || y >= hPx) ? 0 : sk[idxOf(x, y)];
+  /**
+   * Verzweigungsgrad über die Übergangszahl (0→1) im 8er-Ring. Die rohe
+   * Nachbarzahl ist für Skelette ungeeignet: Treppenstufen einer Diagonalen
+   * haben drei Nachbarn, sind aber ein einfacher Linienverlauf.
+   */
   const deg = (x: number, y: number) => {
-    let d = 0;
-    for (const [dx, dy] of N8) if (on(x + dx, y + dy)) d++;
-    return d;
+    const p: number[] = [];
+    for (const [dx, dy] of N8) p.push(on(x + dx, y + dy) ? 1 : 0);
+    let sum = 0, trans = 0;
+    for (let k = 0; k < 8; k++) {
+      sum += p[k];
+      if (!p[k] && p[(k + 1) % 8]) trans++;
+    }
+    if (sum === 0) return 0;
+    return Math.max(trans, 1);
   };
+  const adjacent8 = (ax: number, ay: number, bx: number, by: number) =>
+    Math.abs(ax - bx) <= 1 && Math.abs(ay - by) <= 1 && !(ax === bx && ay === by);
 
   const usedEdge = new Set<number>();
   const edgeKey = (a: number, b: number) => (a < b ? a * wPx * hPx + b : b * wPx * hPx + a);
@@ -123,13 +136,20 @@ export function traceSkeleton(sk: Uint8Array, wPx: number, hPx: number): { x: nu
       usedEdge.add(k);
       pts.push({ x: nx, y: ny });
       if (deg(nx, ny) !== 2) break; // Knoten oder Endpunkt erreicht
-      let fx = -1, fy = -1;
+      // Nachfolger wählen: Treppenstufen-Abkürzungen (Nachbarn, die auch
+      // Nachbarn des Vorgängers sind) werden nur notfalls verwendet.
+      let fx = -1, fy = -1, fallbackX = -1, fallbackY = -1;
       for (const [ddx, ddy] of N8) {
         const cx = nx + ddx, cy = ny + ddy;
         if (!on(cx, cy)) continue;
         if (cx === px && cy === py) continue;
+        if (adjacent8(cx, cy, px, py)) {
+          if (fallbackX < 0) { fallbackX = cx; fallbackY = cy; }
+          continue;
+        }
         fx = cx; fy = cy; break;
       }
+      if (fx < 0 && fallbackX >= 0) { fx = fallbackX; fy = fallbackY; }
       if (fx < 0) break;
       px = nx; py = ny; nx = fx; ny = fy;
     }
@@ -211,13 +231,17 @@ export function vectorizeRasterBoundary(
   const edges: RawEdge[] = [];
   const openEnds: Vec2[] = [];
   const degAt = (x: number, y: number) => {
-    let d = 0;
+    const p: number[] = [];
     for (const [dx, dy] of N8) {
       const cx = x + dx, cy = y + dy;
-      if (cx < 0 || cy < 0 || cx >= wPx || cy >= hPx) continue;
-      if (sk[cy * wPx + cx]) d++;
+      p.push((cx < 0 || cy < 0 || cx >= wPx || cy >= hPx) ? 0 : (sk[cy * wPx + cx] ? 1 : 0));
     }
-    return d;
+    let sum = 0, trans = 0;
+    for (let k = 0; k < 8; k++) {
+      sum += p[k];
+      if (!p[k] && p[(k + 1) % 8]) trans++;
+    }
+    return sum === 0 ? 0 : Math.max(trans, 1);
   };
 
   for (const path of paths) {
