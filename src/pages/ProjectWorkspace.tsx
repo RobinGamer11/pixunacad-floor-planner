@@ -5176,6 +5176,10 @@ function ElementView({
               window.addEventListener("pointercancel", up);
             };
             const cornerClickCad = (e: React.PointerEvent) => {
+              // Rechtsklick darf einen Fangpunkt niemals bestätigen oder die
+              // laufende HUB-Aktion beenden. Nur der Contextmenu-Handler erzeugt
+              // die Hilfslinie.
+              if (e.button !== 0) return;
               const key = `corner-${corner}`;
               // Ein zweiter Linksklick auf den bereits aktiven Fangpunkt setzt
               // die laufende CAD-Blatt-Vorschau sofort ab. Der Handle ist als
@@ -5204,6 +5208,7 @@ function ElementView({
                 setCarrying(true);
               }
             };
+
             const isTop = corner === "tl" || corner === "tr";
             const isLeft = corner === "tl" || corner === "bl";
             const cursor = cornerDraggable
