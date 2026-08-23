@@ -57,10 +57,13 @@ export function TextSpanAllPages({
    * neuen Seiten).
    */
   const removeHere = () => {
-    if (groupId) {
-      const hasOtherCopy = (project?.pages ?? []).some(
+    if (groupId && project) {
+      // Nur Seiten desselben „Buchs“ zählen (Mappe bzw. dieser templateKey).
+      const scopeIds = spanTargetPageIds(project, pageId);
+      const hasOtherCopy = project.pages.some(
         (pg) =>
           pg.id !== pageId
+          && scopeIds.has(pg.id)
           && ((pg.cadOverlay as any)?.textBoxes ?? []).some(
             (b: any) => b?.style?.spanGroupId === groupId,
           ),
