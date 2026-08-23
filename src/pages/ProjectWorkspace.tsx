@@ -146,7 +146,7 @@ import {
 } from "@/lib/guideStrokeWidth";
 import { ptToMm, MM_PER_PT } from "@/cad/textTypography";
 import { getPageSnapRegistry, buildRectSnapEntry } from "@/lib/pageSnap";
-import { registerCadEngineSnap, queryCadEngineSnap } from "@/lib/cadEngineSnap";
+import { registerCadEngineSnap, queryCadEngineSnap, registerCadEngineSnapNearby, queryCadEngineSnapNearby } from "@/lib/cadEngineSnap";
 import { Defaults } from "@/cad/constants";
 import {
   IDENTITY_WARP,
