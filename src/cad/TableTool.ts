@@ -6,7 +6,7 @@
  * Die Tabellengröße im Modellraum folgt der zentralen Annotationsskalierung
  * (`ANNOTATION_M_PER_MM`) und ist damit unabhängig vom späteren Druckmaßstab.
  */
-import { SelectionType } from "./constants";
+import { SelectionType, ToolIds } from "./constants";
 import type { CadApp } from "./CadApp";
 import type { Input } from "./Input";
 import { ANNOTATION_M_PER_MM } from "./textTypography";
@@ -48,6 +48,8 @@ export class TableTool {
     );
     this.app.setSelection({ type: SelectionType.TEXTBOX, textBoxId: table.id, handleIndex: null } as any);
     (this.app as any).pushHistory?.();
+    // Nach dem Setzen zurück ins Auswahlwerkzeug — Tabelle bleibt ausgewählt.
+    this.app.setTool(ToolIds.SELECT);
     this.app.renderer.render();
   }
 }
