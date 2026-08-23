@@ -12,7 +12,7 @@ import {
   normalizeTable, toTableData, resizeGrid, insertRow, insertCol, removeRow, removeCol,
   mergeRange, unmergeAt, applyFormat, effectiveFormat, effectiveBorders, mergeCovering,
   tableWidthMm, tableHeightMm, type TableModel, type HAlign, type VAlign,
-  type CellBorderStyle,
+  type CellBorderStyle, type NumFormat,
 } from "@/lib/table/tableModel";
 import { TableEditContext, type FormulaFn } from "./TableElementView";
 
@@ -476,6 +476,13 @@ function Stepper({ label, value, min, max, onChange }: {
   );
 }
 
+
+const NUM_FORMATS: { key: NumFormat; label: string; title: string }[] = [
+  { key: "auto", label: "Auto", title: "Automatisch anhand der Eingabe" },
+  { key: "number", label: "Zahl", title: "Zahl ohne Einheit" },
+  { key: "eur", label: "€", title: "Euro mit zwei Nachkommastellen" },
+  { key: "percent", label: "%", title: "Prozent (Rohwert × 100)" },
+];
 
 const SIDE_LABEL: Record<"top" | "right" | "bottom" | "left", string> = {
   top: "Oben", right: "Rechts", bottom: "Unten", left: "Links",
