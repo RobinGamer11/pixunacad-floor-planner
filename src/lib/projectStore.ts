@@ -1266,11 +1266,13 @@ export const projectStore = {
     setState((s) => ({
       projects: s.projects.map((p) => {
         if (p.id !== projectId) return p;
+        const scope = pageSpanScope(p, sourcePageId);
         const targets = spanTargetPageIds(p, sourcePageId);
-        const templates = [
+        const templates: TextSpanTemplate[] = [
           ...(p.textSpanTemplates ?? []).filter((t) => t.groupId !== groupId),
-          { groupId, box: JSON.parse(JSON.stringify(box)) },
+          ...(scope ? [{ groupId, box: JSON.parse(JSON.stringify(box)), scope }] : []),
         ];
+
         return {
           ...p,
           updatedAt: new Date().toISOString(),
