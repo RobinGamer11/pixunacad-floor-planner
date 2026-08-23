@@ -156,13 +156,44 @@ export function migrateProjectPages<T>(pages: T): T {
   if (!Array.isArray(pages)) return pages;
   for (const pg of pages) {
     if (!isObj(pg)) continue;
+    const size = pageSizeMm(pg);
     mapArray(pg, "elements", (el) => {
       fill(el, "rotation", 0);
-      if (el.kind === "table") fill(el, "scale", 1);
+
+      // Legacy-Text: die gespeicherte Zahl war schon immer die im Werkzeug
+      // eingegebene Punktgröße (Default 11). Sie wurde lediglich fälschlich
+      // als CSS-px gerendert. Einmalig als pt festschreiben — der Renderer
+      // nutzt danach ausschließlich die zentrale pt-Logik.
+      if (el.kind === "text" && el.fontSizePt === undefined) {
+        const n = Number(el.fontSize);
+        el.fontSizePt = Number.isFinite(n) && n > 0 ? n : 11;
+      }
+
+      if (el.kind === "table") {
+        fill(el, "scale", 1);
+        // Legacy-Tabellen: w/h/wMm/hMm können nicht mehr zur tatsächlichen
+        // Tabellengeometrie (colWidthsMm/rowHeightsMm) passen. Da
+        // TableElementView pxPerMm aus DOM-Breite / logischer Breite ableitet,
+        // führt das direkt zu falschen Schriftgrößen. Maße neu ableiten,
+        // Position, Zellinhalte und Formatierungen bleiben unverändert.
+        try {
+          const t = normalizeTable(el.tableData ?? null);
+          const wMm = tableWidthMm(t);
+          const hMm = tableHeightMm(t);
+          if (wMm > 0 && hMm > 0) {
+            el.tableData = t;
+            el.wMm = wMm;
+            el.hMm = hMm;
+            el.w = (wMm / size.w) * 100;
+            el.h = (hMm / size.h) * 100;
+          }
+        } catch { /* defekte Tabelle unangetastet lassen */ }
+      }
     });
   }
   return pages;
 }
+
 
 
 export const PROJECT_STATE_KIND = "project-state";
