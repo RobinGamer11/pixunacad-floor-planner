@@ -857,7 +857,7 @@ function templatesForScope(p: Project, scope: TextSpanScope | null): TextSpanTem
 
 /** Seiten, die von „Auf allen Seiten“ betroffen sind: ausschließlich Seiten im
  *  selben Kontext (Mappe bzw. Vorlagen-Schlüssel) wie die Quellseite. */
-function spanTargetPageIds(p: Project, sourcePageId: string): Set<string> {
+export function spanTargetPageIds(p: Project, sourcePageId: string): Set<string> {
   const scope = pageSpanScope(p, sourcePageId);
   if (!scope) return new Set([sourcePageId]);
   return new Set(
