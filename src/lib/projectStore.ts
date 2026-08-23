@@ -1151,6 +1151,35 @@ export const projectStore = {
     return newId;
   },
   /**
+   * Neue Seite innerhalb eines Vorlagenkontexts (Finanzen). Die Seite behält
+   * denselben templateKey, gehört zu keiner Mappe und erhält nur die
+   * All-Pages-Templates des eigenen Vorlagen-Scopes.
+   */
+  addTemplatePage: (projectId: string, templateKey: string, title = "Neue Seite") => {
+    const newId = `${projectId}-tpl${Date.now().toString(36)}`;
+    setState((s) => ({
+      projects: s.projects.map((p) => {
+        if (p.id !== projectId) return p;
+        const siblings = p.pages.filter((pg) => pg.templateKey === templateKey);
+        const ref = siblings[siblings.length - 1];
+        const tplSpan = templatesForScope(p, { type: "template", key: templateKey });
+        const page: ProjectPage = {
+          id: newId,
+          title: `${title} ${siblings.length + 1}`,
+          format: ref?.format ?? "A4-hoch",
+          margins: ref?.margins ?? 20,
+          background: false,
+          elements: [],
+          templateKey,
+          cadOverlay: seedSpanOverlay(undefined, tplSpan, newId),
+        };
+        return { ...p, updatedAt: new Date().toISOString(), pages: [...p.pages, page] };
+      }),
+    }));
+    return newId;
+  },
+
+  /**
    * Stellt sicher, dass für einen Vorlagen-Schlüssel (Finanzen: Angebot /
    * Rechnung / Nachtrag) mindestens eine Seite existiert. Vorlagen-Seiten
    * gehören zu keiner Mappe und sind im normalen Mappen-Modus unsichtbar.
