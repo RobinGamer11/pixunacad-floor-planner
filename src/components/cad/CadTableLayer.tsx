@@ -50,6 +50,39 @@ export function CadTableLayer({
     });
   }, [app, ctx]);
 
+  /** Aktuelle Zelle committen und den Zellmodus über die Engine beenden. */
+  const exitEdit = React.useCallback(() => {
+    try {
+      const ae = document.activeElement as HTMLElement | null;
+      if (ae && typeof ae.blur === "function") ae.blur();
+    } catch { /* noop */ }
+    app?.endTableEdit?.();
+  }, [app]);
+
+  // Zuverlässiger Außen-Exit: Ein Pointerdown irgendwo außerhalb des
+  // Bearbeitungs-Overlays (freie CAD-Fläche, anderes Objekt, Werkzeugleiste)
+  // beendet den Zellmodus sofort. Klicks INNERHALB der Tabelle bleiben
+  // unberührt. ESC wird zusätzlich von der Engine behandelt.
+  React.useEffect(() => {
+    if (!editId) return;
+    const onDown = (ev: PointerEvent) => {
+      const host = hostRef.current;
+      const t = ev.target as Node | null;
+      if (host && t && host.contains(t)) return;
+      exitEdit();
+    };
+    const onKey = (ev: KeyboardEvent) => {
+      if (ev.key === "Escape") exitEdit();
+    };
+    window.addEventListener("pointerdown", onDown, true);
+    window.addEventListener("keydown", onKey, true);
+    return () => {
+      window.removeEventListener("pointerdown", onDown, true);
+      window.removeEventListener("keydown", onKey, true);
+    };
+  }, [editId, exitEdit]);
+
+
   // Auswahl/Kamera beobachten → Overlay-Position und Panel aktualisieren.
   React.useEffect(() => {
     let raf = 0;

@@ -1168,7 +1168,16 @@ export class CadApp {
         && (selection as any).documentId === this.bgRemoveInteraction.docId;
       if (!stillOnSameDoc) this.bgRemoveInteraction = null;
     }
+    // Tabellen-Zellmodus endet, sobald die Auswahl diese Tabelle verlässt
+    // (freie Fläche, anderes Objekt oder andere Tabelle).
+    if (this.tableEditId) {
+      const stillSameTable = !!selection
+        && ((selection as any).type === SelectionType.TEXTBOX || (selection as any).type === SelectionType.TEXTBOX_HANDLE)
+        && (selection as any).textBoxId === this.tableEditId;
+      if (!stillSameTable) this.endTableEdit();
+    }
     this.selection = selection;
+
     this.renderer.setSelection(selection);
     this._syncLineSettingsFromContext();
     this._syncHatchSettingsFromContext();
@@ -2540,7 +2549,11 @@ export class CadApp {
           e.preventDefault(); this.selectTool.cancelGroupTransform(true); return;
         }
 
+        // ESC im Tabellen-Zellmodus: nur den Zellmodus beenden, Tabelle bleibt
+        // als normales CAD-Objekt ausgewählt.
+        if (this.tableEditId) { e.preventDefault(); this.endTableEdit(); return; }
         if (this.isStickerEditing()) { this.exitStickerEdit(); this.clearSelection(); return; }
+
         if (this.pastePreviewActive) { this.cancelPastePreview(); return; }
         // Stufe 1: Läuft gerade eine Zeichen-Aktion? Dann NUR diese abbrechen —
         // das Werkzeug bleibt aktiv. Erst der nächste ESC wechselt zur Auswahl.
@@ -2924,7 +2937,10 @@ export class CadApp {
   }
 
   setTool(id: string) {
+    // Werkzeugwechsel beendet immer den Tabellen-Zellmodus.
+    this.endTableEdit();
     if (this.pastePreviewActive) this.cancelPastePreview();
+
     if (this.activeTool && this.activeTool.cancel) this.activeTool.cancel();
     // Wand-Helfer ausschalten, wenn das Wandwerkzeug verlassen wird.
     if (this.activeTool === this.wallTool && id !== ToolIds.WALL) {

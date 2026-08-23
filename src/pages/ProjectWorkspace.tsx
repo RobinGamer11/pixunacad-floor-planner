@@ -2758,10 +2758,26 @@ function PageCanvas({
   const [marquee, setMarquee] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
   const marqueeMode = toolSettings.select.marqueeMode;
 
+  // Tabellen-Objektmodus: Eine ausgewählte Tabelle, die NICHT im Zellmodus ist.
+  // In diesem Zustand darf ein Rechtsklick auf die freie Blattfläche die
+  // Auswahl NICHT aufheben — sonst wird der Fangpunkt-/Hilfslinien-Handler des
+  // Elements abgemeldet, bevor das contextmenu-Event eintrifft (Folge: es
+  // öffnet sich das Browser-Kontextmenü statt der Hilfslinie).
+  const tableEditCtxCanvas = React.useContext(TableEditContext);
+  const selectedIsTableObject = (() => {
+    if (!selectedElementId) return false;
+    const sel = (page.elements ?? []).find((x) => x.id === selectedElementId);
+    return sel?.kind === "table" && tableEditCtxCanvas?.editId !== selectedElementId;
+  })();
+
   const handlePagePointerDown = (e: React.PointerEvent) => {
     if (e.target !== e.currentTarget) return;
+    if (e.button !== 0) {
+      if (!selectedIsTableObject) onSelect(undefined);
+      return;
+    }
     if (activeTool !== null) { onSelect(undefined); return; }
-    if (e.button !== 0) { onSelect(undefined); return; }
+
     // Klick-Modus: kein Rahmen, nur Deselektion beim Klick ins Leere.
     if (marqueeMode === "click") { onSelect(undefined); return; }
     const start = toPct(e.clientX, e.clientY);
@@ -2916,6 +2932,13 @@ function PageCanvas({
           }}
           onPointerDown={handlePagePointerDown}
           onPointerMove={handlePagePointerMove}
+          onContextMenu={(e) => {
+            // Tabellen-Objektmodus: Browser-Kontextmenü immer unterdrücken —
+            // der Rechtsklick erzeugt hier die Fangpunkt-Hilfslinie (rayGuide),
+            // die der ElementView-Handler aus findSnap() ableitet.
+            if (selectedIsTableObject) e.preventDefault();
+          }}
+
         >
         {/* Marquee-Overlay (Rahmen-Auswahl). Farbe je nach Modus:
             touch=orange (Crossing), enclose=blau (Window) — Archicad-Konvention. */}
