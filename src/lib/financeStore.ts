@@ -46,7 +46,7 @@ export interface FinanceState {
   projectNote: string;
 }
 
-import { migrateFinanceState, stampVersion, FINANCE_KIND } from "./persistence";
+import { migrateFinanceState, migrateProjectPages, stampVersion, FINANCE_KIND } from "./persistence";
 
 const KEY = (projectId: string) => `pixuna.finance.v2.${projectId}`;
 
@@ -363,17 +363,22 @@ export function parseTemplateKey(key: string): { type: FinancePositionType; posi
 const FAV_KEY = (projectId: string, type: FinancePositionType) =>
   `pixuna.finance.tplfav.${projectId}.${type}`;
 
-/** Favoriten-Vorlage (Seiten-Snapshot) lesen. */
+/**
+ * Favoriten-Vorlage (Seiten-Snapshot) lesen.
+ * Bestandsdaten ohne Versionsfeld (Legacy/v0) laufen durch dieselbe additive
+ * Seiten-Migration wie Projektseiten — sichtbare Eigenschaften bleiben 1:1.
+ */
 export function getFavoriteTemplate<T = unknown>(projectId: string, type: FinancePositionType): T[] | undefined {
   try {
     const raw = localStorage.getItem(FAV_KEY(projectId, type));
     if (!raw) return undefined;
-    const parsed = JSON.parse(raw);
+    const parsed = migrateProjectPages(JSON.parse(raw));
     return Array.isArray(parsed) && parsed.length ? (parsed as T[]) : undefined;
   } catch {
     return undefined;
   }
 }
+
 
 /** Favoriten-Vorlage setzen (Snapshot der aktuellen Vorlagenseiten). */
 export function setFavoriteTemplate(projectId: string, type: FinancePositionType, pages: unknown[]) {
