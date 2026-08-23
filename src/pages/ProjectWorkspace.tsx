@@ -335,9 +335,25 @@ export default function ProjectWorkspace() {
         y: ((cy - pageRect.top) / Math.max(1, pageRect.height)) * 100,
       };
     });
+    // Dezente Fangpunkt-Vorschau: dieselbe Quelle wie in der CAD-Oberfläche
+    // (TopologyEngine.nearbySnapPoints) — nur in Seiten-Prozent umgerechnet.
+    registerCadEngineSnapNearby((clientX, clientY, pageRect, radiusPx = 140) => {
+      const engine = cadEngineApiRef.current?.engine as any;
+      if (!engine?.canvas || !engine.camera || !engine.topology?.nearbySnapPoints) return [];
+      const cr = engine.canvas.getBoundingClientRect();
+      const mS = { x: clientX - cr.left, y: clientY - cr.top };
+      const pts: Array<{ x: number; y: number }> = engine.topology.nearbySnapPoints(mS, radiusPx) ?? [];
+      return pts.map((p) => {
+        const s = engine.camera.worldToScreen(p.x, p.y);
+        return {
+          x: ((cr.left + s.x - pageRect.left) / Math.max(1, pageRect.width)) * 100,
+          y: ((cr.top + s.y - pageRect.top) / Math.max(1, pageRect.height)) * 100,
+        };
+      });
+    });
     forceEngineTick((t) => t + 1);
   };
-  useEffect(() => () => registerCadEngineSnap(null), []);
+  useEffect(() => () => { registerCadEngineSnap(null); registerCadEngineSnapNearby(null); }, []);
 
   const [presenting, setPresenting] = useState(() => {
     try { return new URLSearchParams(window.location.search).get("present") === "1"; } catch { return false; }
