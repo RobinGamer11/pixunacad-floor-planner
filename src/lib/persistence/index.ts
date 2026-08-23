@@ -16,6 +16,8 @@ export {
   migrateSceneData,
   migrateCadSnapshot,
   migrateProjectState,
+  migrateProjectPages,
+
   migrateFinanceState,
   migrateCadTables,
   CAD_SNAPSHOT_KIND,
