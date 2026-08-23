@@ -1011,8 +1011,9 @@ export default function ProjectWorkspace() {
     lastFitKeyRef.current = fitKey;
     const fitPage = () => {
       const fmt = getPageSizeMm(activePage);
-      const baseWidth = 1100;
-      const baseHeight = baseWidth / (fmt.wMm / fmt.hMm);
+      const baseWidth = fmt.wMm * MAPPE_CANONICAL_PX_PER_MM;
+      const baseHeight = fmt.hMm * MAPPE_CANONICAL_PX_PER_MM;
+
       const box = canvasViewportRef.current!;
       const nextZoom = Math.max(10, Math.min(100, Math.floor(Math.min(
         ((box.clientWidth - 96) / baseWidth) * 100,
