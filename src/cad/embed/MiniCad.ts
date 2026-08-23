@@ -206,7 +206,7 @@ export class MiniCad {
    * Raster-Zeichenebenen der Seite (Pixelmodus). Pro Ebene ein gekachelter
    * Rasterinhalt im selben Papier-Koordinatensystem wie die Vektorobjekte.
    */
-  readonly rasterLayers = new RasterLayers();
+  readonly rasterLayers: RasterLayers;
   /** Projektweite Rasterqualität für neu fertiggestellte Pixelobjekte. */
   pixelRenderDpi: number = 1200;
   pixelSupersampling: boolean = false;
