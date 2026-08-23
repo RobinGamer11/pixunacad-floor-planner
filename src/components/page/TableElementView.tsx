@@ -45,6 +45,11 @@ export const TableFormulaPickContext = React.createContext<{
   setFn: (f: FormulaFn | null) => void;
 } | null>(null);
 
+/** Zentrale Zellmetrik in Papier-mm — identisch für Ansicht und Export. */
+export const CELL_LINE_HEIGHT = 1.15;
+export const CELL_PAD_Y_MM = 0.3;
+export const CELL_PAD_X_MM = 0.8;
+
 export interface TableSelection { r1: number; c1: number; r2: number; c2: number; }
 
 /** Zellauswahl + Bearbeitungsmodus — geteilt mit dem Einstellungs-Panel. */
