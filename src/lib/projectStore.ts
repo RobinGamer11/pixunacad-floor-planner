@@ -822,15 +822,47 @@ function commitProjectUiProjects(projects: Project[]) {
 
 
 
-/** Seiten, die von „Auf allen Seiten“ betroffen sind: die Mappe der Quellseite,
- *  sonst alle regulären (nicht Vorlagen-)Seiten. */
-function spanTargetPageIds(p: Project, sourcePageId: string): Set<string> {
-  const mappe = (p.mappen ?? []).find((m) => m.pageIds.includes(sourcePageId));
-  const ids = mappe
-    ? mappe.pageIds
-    : p.pages.filter((pg) => !pg.templateKey).map((pg) => pg.id);
-  return new Set(ids);
+/** Seitenkontext einer Seite: Vorlagen-Seiten zählen ausschließlich zu ihrem
+ *  templateKey, alle übrigen zu ihrer Projektmappe. */
+export function pageSpanScope(p: Project, pageId: string): TextSpanScope | null {
+  const page = p.pages.find((pg) => pg.id === pageId);
+  if (!page) return null;
+  if (page.templateKey) return { type: "template", key: page.templateKey };
+  const mappe = (p.mappen ?? []).find((m) => m.pageIds.includes(pageId));
+  return mappe ? { type: "mappe", id: mappe.id } : null;
 }
+
+function sameScope(a: TextSpanScope | null, b: TextSpanScope | null): boolean {
+  if (!a || !b || a.type !== b.type) return false;
+  return a.type === "mappe" ? a.id === (b as any).id : a.key === (b as any).key;
+}
+
+/** Scope einer Vorlage — mit Fallback für Altdaten ohne `scope`:
+ *  abgeleitet aus der ersten Seite, die bereits eine Kopie der Gruppe trägt. */
+function templateScope(p: Project, t: TextSpanTemplate): TextSpanScope | null {
+  if (t.scope) return t.scope;
+  const carrier = p.pages.find((pg) =>
+    ((pg.cadOverlay as any)?.textBoxes ?? []).some((b: any) => b?.style?.spanGroupId === t.groupId),
+  );
+  return carrier ? pageSpanScope(p, carrier.id) : null;
+}
+
+/** Vorlagen, die für den Kontext einer (neuen) Seite gelten. */
+function templatesForScope(p: Project, scope: TextSpanScope | null): TextSpanTemplate[] {
+  if (!scope) return [];
+  return (p.textSpanTemplates ?? []).filter((t) => sameScope(templateScope(p, t), scope));
+}
+
+/** Seiten, die von „Auf allen Seiten“ betroffen sind: ausschließlich Seiten im
+ *  selben Kontext (Mappe bzw. Vorlagen-Schlüssel) wie die Quellseite. */
+function spanTargetPageIds(p: Project, sourcePageId: string): Set<string> {
+  const scope = pageSpanScope(p, sourcePageId);
+  if (!scope) return new Set([sourcePageId]);
+  return new Set(
+    p.pages.filter((pg) => sameScope(pageSpanScope(p, pg.id), scope)).map((pg) => pg.id),
+  );
+}
+
 
 /** Fügt einem Overlay-Zustand fehlende „Auf allen Seiten“-Kopien hinzu.
  *  Jede Kopie erhält eine eigene Objekt-ID, behält aber die groupId. */
