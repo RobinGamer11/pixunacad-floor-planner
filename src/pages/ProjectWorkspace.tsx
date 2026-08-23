@@ -4701,8 +4701,14 @@ function ElementView({
       {el.kind === "text" && (
         <div
           style={{
-            fontSize: el.fontSize ?? 16,
+            // pt ist absolut: 1 pt = 25,4/72 mm. Auf Papier-mm umrechnen und
+            // mit der aktuellen Darstellungsauflösung skalieren (zentrale
+            // pt-Logik — identisch in Mappe und Finanz-Büchern).
+            fontSize: pagePxPerMm > 0
+              ? `${ptToMm(el.fontSizePt ?? el.fontSize ?? 11) * pagePxPerMm}px`
+              : `${ptToCssPx(el.fontSizePt ?? el.fontSize ?? 11)}px`,
             color: el.color ?? "hsl(var(--ink))",
+
             fontWeight: el.bold ? 700 : 400,
             fontStyle: el.italic ? "italic" : "normal",
             width: "100%",
