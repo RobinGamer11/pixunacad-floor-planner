@@ -4,7 +4,8 @@ import { Camera } from "./Camera";
 import { Input } from "./Input";
 import { Scene, AreaLabel, DimensionStyle, TextBoxStyle, TextBox } from "./Scene";
 import { autoSizeTextBox } from "./textAutoSize";
-import { textStyleFontSizePt, ptToCssPx } from "./textTypography";
+import { textStyleFontSizePt, ptToCssPx, ANNOTATION_M_PER_MM } from "./textTypography";
+import { TableTool } from "./TableTool";
 import { dominantRichStyle } from "./textDominantStyle";
 import { LabelManager } from "./LabelManager";
 import { RasterLayers, cadRasterPxPerM } from "./RasterLayers";
@@ -549,6 +550,7 @@ export class CadApp {
     this.textTool = new TextTool(this);
     this.pipetteTool = new PipetteTool(this);
     this.stickerTool = new StickerTool(this);
+    this.tableTool = new TableTool(this);
     this.documentTool = new DocumentTool(this);
     this.freeDrawTool = new FreeDrawTool(this);
     this.eraserTool = new EraserTool(this);
@@ -884,7 +886,9 @@ export class CadApp {
       if (t._stickerEditOwnerId) box._stickerEditOwnerId = t._stickerEditOwnerId;
     }
     for (const t of data.tables || []) {
-      const tbl = (scene as any).createTable(t.center, t.data, t.mPerMm ?? 0.1, {
+      // Migration: alte Tabellen wurden mit dem Blattmaßstab (scaleDen/1000)
+      // erzeugt; im 1:1-Modellraum gilt nur noch die Annotationsskalierung.
+      const tbl = (scene as any).createTable(t.center, t.data, ANNOTATION_M_PER_MM, {
         rotationRad: t.rotationRad || 0, labelId: t.labelId, scale: t.scale || 1,
       });
       if (t.id) { tbl.id = t.id; (scene as any)._rebuildTableIdMap?.(); }
@@ -2937,6 +2941,7 @@ export class CadApp {
     else if (id === ToolIds.ERASER) { this.activeTool = this.eraserTool; this.eraserTool.activate(); }
     else if (id === ToolIds.WALL) { this.activeTool = this.wallTool; this.wallTool.activate(); }
     else if (id === ToolIds.DOOR) { this.activeTool = this.doorTool; this.doorTool.activate(); }
+    else if (id === ToolIds.TABLE) { this.activeTool = this.tableTool; this.tableTool.activate(); }
     this._syncLineSettingsFromContext();
     this._syncHatchSettingsFromContext();
     this._syncMeasureSettingsFromContext();

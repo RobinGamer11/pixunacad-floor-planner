@@ -1,3 +1,4 @@
+import { ANNOTATION_M_PER_MM } from "./textTypography";
 /**
  * Standalone scene (de)serialization — extracted 1:1 from `CadApp` so that
  * the same JSON format can be restored in isolated contexts (Projektmappe-
@@ -135,7 +136,7 @@ export function restoreOneScene(scene: Scene, raw: SerializedScene | null | unde
     if (t._stickerEditOwnerId) (box as any)._stickerEditOwnerId = t._stickerEditOwnerId;
   }
   for (const t of data.tables || []) {
-    const tbl = (scene as any).createTable(t.center, t.data, t.mPerMm ?? 0.1, {
+    const tbl = (scene as any).createTable(t.center, t.data, ANNOTATION_M_PER_MM, {
       rotationRad: t.rotationRad || 0, labelId: t.labelId, scale: t.scale || 1,
     });
     if (t.id) { tbl.id = t.id; (scene as any)._rebuildTableIdMap?.(); }

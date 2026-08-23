@@ -145,6 +145,7 @@ export const ToolIds = {
   ERASER: "eraser",
   WALL: "wall",
   DOOR: "door",
+  TABLE: "table",
 } as const;
 
 export const SelectionType = {
