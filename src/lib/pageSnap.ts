@@ -173,3 +173,76 @@ export function buildRectSnapEntry(
     ],
   };
 }
+
+/**
+ * Wie `buildRectSnapEntry`, berücksichtigt aber die Rotation des Elements.
+ *
+ * Die Punkte werden zunächst lokal am ungedrehten Rechteck bestimmt, dann um
+ * den Elementmittelpunkt gedreht und erst danach in Seiten-Prozent abgelegt.
+ * Weil Prozent-X und Prozent-Y unterschiedliche physische Längen haben,
+ * erfolgt die Drehung in einem längentreuen Raum (`aspect` = Seitenbreite /
+ * Seitenhöhe in Pixeln).
+ *
+ * `edgeMids`/`edges` steuern, ob neben den vier Ecken weitere Fangziele
+ * veröffentlicht werden. Objekte, die nur vier Eckpunkte anzeigen (z. B.
+ * Tabellen), dürfen keine unsichtbaren Ziele publizieren.
+ */
+export function buildRotatedRectSnapEntry(
+  kind: string,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  rotationDeg: number,
+  aspect: number,
+  opts: { edgeMids?: boolean; edges?: boolean } = {},
+): SnapEntry {
+  const { edgeMids = true, edges = true } = opts;
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+  const rad = ((rotationDeg || 0) * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  const a = aspect > 0 && Number.isFinite(aspect) ? aspect : 1;
+  const tp = (px: number, py: number) => {
+    // in längentreuen Raum (X skaliert mit aspect), drehen, zurück
+    const dx = (px - cx) * a;
+    const dy = py - cy;
+    const rx = dx * cos - dy * sin;
+    const ry = dx * sin + dy * cos;
+    return { x: cx + rx / a, y: cy + ry };
+  };
+  const tl = tp(x, y);
+  const tr = tp(x + w, y);
+  const bl = tp(x, y + h);
+  const br = tp(x + w, y + h);
+  const mid = (p: { x: number; y: number }, q: { x: number; y: number }) => ({
+    x: (p.x + q.x) / 2, y: (p.y + q.y) / 2,
+  });
+  const points: SnapEntry["points"] = [
+    { ...tl, type: "corner", key: "corner-tl" },
+    { ...tr, type: "corner", key: "corner-tr" },
+    { ...bl, type: "corner", key: "corner-bl" },
+    { ...br, type: "corner", key: "corner-br" },
+  ];
+  if (edgeMids) {
+    points.push(
+      { ...mid(tl, tr), type: "edge-mid", key: "edge-mid-top" },
+      { ...mid(bl, br), type: "edge-mid", key: "edge-mid-bottom" },
+      { ...mid(tl, bl), type: "edge-mid", key: "edge-mid-left" },
+      { ...mid(tr, br), type: "edge-mid", key: "edge-mid-right" },
+    );
+  }
+  return {
+    kind,
+    points,
+    edges: edges
+      ? [
+          { key: "edge-line-top", a: tl, b: tr },
+          { key: "edge-line-right", a: tr, b: br },
+          { key: "edge-line-bottom", a: bl, b: br },
+          { key: "edge-line-left", a: tl, b: bl },
+        ]
+      : undefined,
+  };
+}

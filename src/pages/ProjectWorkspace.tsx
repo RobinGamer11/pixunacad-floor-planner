@@ -147,7 +147,7 @@ import {
 
 } from "@/lib/guideStrokeWidth";
 import { ptToMm, ptToCssPx, MM_PER_PT } from "@/cad/textTypography";
-import { getPageSnapRegistry, buildRectSnapEntry } from "@/lib/pageSnap";
+import { getPageSnapRegistry, buildRotatedRectSnapEntry } from "@/lib/pageSnap";
 import { registerCadEngineSnap, queryCadEngineSnap, registerCadEngineSnapNearby, queryCadEngineSnapNearby } from "@/lib/cadEngineSnap";
 import { Defaults } from "@/cad/constants";
 import {
@@ -3799,9 +3799,14 @@ function ElementView({
     { ax: number; ay: number; bx: number; by: number; mx: number; my: number; deg: number } | null
   >(null);
 
-  /** Projiziert einen Client-Punkt auf die nächstgelegene Hilfslinie (Toleranz 10px). */
-  const snapToRayGuides = (cx: number, cy: number, pageRect: DOMRect) => {
-    let best: { x: number; y: number; d: number } | null = null;
+  /** Snap-Verriegelung: einmal gefangene Hilfslinie bleibt bis zur größeren
+   *  Lösetoleranz aktiv (Hysterese), damit die Tabelle nicht zwischen
+   *  konkurrierenden Zielen springt. */
+  const guideLockRef = useRef<number | null>(null);
+
+  /** Projiziert einen Client-Punkt auf die nächstgelegene Hilfslinie. */
+  const snapToRayGuides = (cx: number, cy: number, pageRect: DOMRect, tol = 10) => {
+    let best: { x: number; y: number; d: number; id: number } | null = null;
     for (const g of rayGuidesRef.current) {
       const ax = pageRect.left + (g.ax / 100) * pageRect.width;
       const ay = pageRect.top + (g.ay / 100) * pageRect.height;
@@ -3813,20 +3818,38 @@ function ElementView({
       const t = ((cx - ax) * vx + (cy - ay) * vy) / len2;
       const px = ax + vx * t, py = ay + vy * t;
       const d = Math.hypot(cx - px, cy - py);
-      if (d <= 10 && (!best || d < best.d)) best = { x: px, y: py, d };
+      // Bereits gefangene Linie hält deutlich länger (Hysterese).
+      const limit = guideLockRef.current === g.id ? tol * 3.5 : tol;
+      if (d <= limit && (!best || d < best.d)) best = { x: px, y: py, d, id: g.id };
     }
     return best;
   };
 
-  /** Fangpunkt-Suche über BEIDE Quellen: Seiten-Elemente (pageSnap) und die
-   *  eingebettete CAD-Engine (Linien, Freihand, Texte, Schraffuren, Dokumente). */
+  /** Gemeinsamer Snap-Resolver für Verschieben/Drehen.
+   *
+   *  Reihenfolge: bewusst erzeugte Rechtsklick-Hilfslinien haben Vorrang vor
+   *  allen übrigen Zielen, danach Seiten-Elemente (pageSnap) und zuletzt die
+   *  eingebettete CAD-Engine (Linien, Freihand, Texte, Schraffuren, Dokumente).
+   *  Ergebnis ist immer die Zielposition des AUSGEWÄHLTEN Fangpunkts. */
   const findSnap = (cx: number, cy: number, pageRect: DOMRect, tol = 12) => {
+    const g = snapToRayGuides(cx, cy, pageRect, tol);
+    if (g) {
+      guideLockRef.current = g.id;
+      return {
+        x: ((g.x - pageRect.left) / pageRect.width) * 100,
+        y: ((g.y - pageRect.top) / pageRect.height) * 100,
+        match: null,
+        guide: true as const,
+      };
+    }
+    guideLockRef.current = null;
     const m = getPageSnapRegistry().queryNearest(cx, cy, pageRect, tol, [el.id]);
     if (m) return { x: m.x, y: m.y, match: m };
     const e = queryCadEngineSnap(cx, cy, pageRect, tol);
     if (e) return { x: e.x, y: e.y, match: null };
     return null;
   };
+
 
   /** Dezente Fangpunkt-Vorschau während Verschieben/Drehen — Parität zur
    *  CAD-Oberfläche (SelectTool + TopologyEngine.nearbySnapPoints). Es werden
@@ -3882,15 +3905,29 @@ function ElementView({
     return () => clearInterval(t);
   }, []);
 
-  // Snap-Ziele publizieren: Ecken + Kanten-Mittelpunkte + Kanten-Segmente.
-  // Andere Werkzeuge greifen via getPageSnapRegistry().queryNearest(...) drauf zu.
+  // Snap-Ziele publizieren. Die Punkte werden lokal bestimmt, mit der
+  // Elementrotation um den Mittelpunkt gedreht und erst danach in Prozent
+  // abgelegt — Anzeige, Rechtsklick, Hilfslinien, Verschieben und Drehen
+  // nutzen damit exakt dieselben Punkte.
   useEffect(() => {
     if (readOnly) return;
     const reg = getPageSnapRegistry();
-    // CAD-Blätter: NUR Ecken sind Fangpunkte (keine Kantenmitten).
-    reg.publish(el.id, buildRectSnapEntry(el.kind, el.x, el.y, el.w, el.h, !isCadView));
+    const parent = rootRef.current?.parentElement as HTMLElement | null;
+    const pr = parent?.getBoundingClientRect();
+    const aspect = pr && pr.height > 0 ? pr.width / pr.height : 1;
+    // Tabellen zeigen ausschließlich vier Eckpunkte — also auch nur diese vier
+    // als Fangziele. Keine unsichtbaren Kantenmitten oder Kantenlinien.
+    const cornersOnly = el.kind === "table";
+    reg.publish(
+      el.id,
+      buildRotatedRectSnapEntry(el.kind, el.x, el.y, el.w, el.h, el.rotation ?? 0, aspect, {
+        edgeMids: !isCadView && !cornersOnly,
+        edges: !cornersOnly,
+      }),
+    );
     return () => { try { reg.unpublish(el.id); } catch {} };
-  }, [el.id, el.kind, el.x, el.y, el.w, el.h, readOnly, isCadView]);
+  }, [el.id, el.kind, el.x, el.y, el.w, el.h, el.rotation, readOnly, isCadView]);
+
 
   // Hover-Highlight: welcher Snap-Handle dieses Elements ist gerade „gefangen"?
   const [hoveredSnapKey, setHoveredSnapKey] = useState<string | null>(null);
@@ -3996,6 +4033,7 @@ function ElementView({
   // Tablet-Hilfsrad: Nach dem Aktivieren einer Funktion muss der Fangpunkt
   // ERNEUT angetippt werden, bevor das Objekt am Stift mitgezogen wird.
   useEffect(() => {
+    guideLockRef.current = null; // Snap-Verriegelung je HUB-Aktion neu starten
     if (!hubMode) return;
     const wheelOn = typeof window !== "undefined" && !!(window as any).__pixunaTabletCommit;
     setCarrying(!wheelOn);
@@ -4039,15 +4077,13 @@ function ElementView({
       const pageRect = parent?.getBoundingClientRect();
       if (pageRect) {
         const tx = anchor0.x + tdx, ty = anchor0.y + tdy;
-        const m = getPageSnapRegistry().queryNearest(tx, ty, pageRect, 10, [el.id]);
+        const m = findSnap(tx, ty, pageRect, 10);
         if (m) {
           tdx = pageRect.left + (m.x / 100) * pageRect.width - anchor0.x;
           tdy = pageRect.top + (m.y / 100) * pageRect.height - anchor0.y;
-        } else {
-          const snapped = snapToRayGuides(tx, ty, pageRect);
-          if (snapped) { tdx = snapped.x - anchor0.x; tdy = snapped.y - anchor0.y; }
         }
       }
+
       if (!raf) raf = requestAnimationFrame(paint);
     };
     let unregisterAbort: (() => void) | null = null;
@@ -4390,8 +4426,6 @@ function ElementView({
           reg.setHover(m.match);
         } else {
           reg.setHover(null);
-          const snapped = snapToRayGuides(targetX, targetY, pageRect);
-          if (snapped) { dxPx = snapped.x - ax; dyPx = snapped.y - ay; }
         }
         previewRef.current = { dxPx, dyPx, deltaDeg: 0, anchorFrac };
         pendingPreview = { dxPx, dyPx, deltaDeg: 0, anchorFrac };
@@ -4408,9 +4442,8 @@ function ElementView({
           reg.setHover(mR.match);
         } else {
           reg.setHover(null);
-          const snapped = snapToRayGuides(tx, ty, pageRect);
-          if (snapped) { tx = snapped.x; ty = snapped.y; }
         }
+
         // Zu nah am Drehpunkt → Winkel wäre extrem sprunghaft, daher ignorieren.
         if (Math.hypot(ty - ay, tx - ax) < 24) return;
         const a = (Math.atan2(ty - ay, tx - ax) * 180) / Math.PI;
