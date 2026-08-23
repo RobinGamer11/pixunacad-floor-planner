@@ -20,7 +20,7 @@ import { LabelManager } from "../LabelManager";
 import { IdPanel } from "../IdPanel";
 import { TopologyEngine } from "../TopologyEngine";
 import { Renderer, type Selection } from "../Renderer";
-import { RasterLayers } from "../RasterLayers";
+import { RasterLayers, cadRasterPxPerMForReference } from "../RasterLayers";
 import { mirrorProxy } from "../multiEdit";
 import { LineHub } from "../LineHub";
 import { PointEditMenu } from "../PointEditMenu";
