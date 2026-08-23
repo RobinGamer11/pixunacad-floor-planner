@@ -212,7 +212,8 @@ export const PROJECT_STATE_KIND = "project-state";
 
 defineSchema({
   kind: PROJECT_STATE_KIND,
-  current: 2,
+  current: 3,
+
   steps: [
     {
       // v1: Grundstruktur des Gesamtstandes.
