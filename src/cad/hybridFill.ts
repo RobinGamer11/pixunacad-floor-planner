@@ -390,7 +390,7 @@ export function findHybridEnclosingFace(
   // OPEN_R + DILATE_PX), aber auf die Umgebung der Originalregion beschränkt,
   // damit die Kontur nicht über die Begrenzung hinauswächst.
   const OPEN_R = DILATE_PX + 2;
-  let region = filled;
+  let region: Uint8Array<ArrayBufferLike> = filled;
   const eroded = erodeMask(filled, wPx, hPx, OPEN_R);
   const core = componentAt(eroded, filled, wPx, hPx, startIdx);
   if (core) {
