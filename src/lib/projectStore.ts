@@ -865,6 +865,14 @@ export function spanTargetPageIds(p: Project, sourcePageId: string): Set<string>
   );
 }
 
+/** Ist eine „Auf allen Seiten“-Gruppe im Seitenkontext dieser Seite aktiv?
+ *  Gruppen anderer „Bücher“ (andere Mappe / anderer templateKey) zählen nicht. */
+export function isSpanGroupActiveForPage(p: Project, pageId: string, groupId: string): boolean {
+  const scope = pageSpanScope(p, pageId);
+  if (!scope) return false;
+  return templatesForScope(p, scope).some((t) => t.groupId === groupId);
+}
+
 
 /** Fügt einem Overlay-Zustand fehlende „Auf allen Seiten“-Kopien hinzu.
  *  Jede Kopie erhält eine eigene Objekt-ID, behält aber die groupId. */
