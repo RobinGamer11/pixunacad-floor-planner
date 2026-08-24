@@ -2101,8 +2101,12 @@ export default function ProjectWorkspace() {
                 };
                 const handleCadSelection: React.ComponentProps<typeof PageCanvas>["onCadSelectionChange"] = (info, count) => {
                   setCadSelectionCount(count ?? (info ? 1 : 0));
+                  // Die MiniCad-Auswahl ist eine EIGENE Auswahlquelle. Sie darf
+                  // die Seitenelement-Auswahl (Tabellen, Bilder, Textboxen …)
+                  // niemals pauschal löschen — sonst verschwinden Rahmentreffer
+                  // wieder, sobald die Engine ihre Auswahl nachmeldet.
+                  const marqueeTx = Date.now() - pageMarqueeTxRef.current < 400;
                   if (!info) {
-                    if ((count ?? 0) === 0) setSelectedElementIds([]);
                     setSelectedCadTool(undefined);
                     setCadSelectedLineSnap(null);
                     return;
