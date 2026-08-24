@@ -110,7 +110,10 @@ export default function ProjectsHome() {
   const [shopOpen, setShopOpen] = useState(false);
   const coinsRef = useRef<HTMLDivElement | null>(null);
   const shopRef = useRef<HTMLDivElement | null>(null);
+  // Projekt verlassen → Projektmappen-Zwischenablage verwerfen.
+  useEffect(() => { clearMappeClipboard(); }, []);
   useEffect(() => {
+
     if (!coinsOpen && !shopOpen) return;
     const onDoc = (e: MouseEvent) => {
       if (coinsOpen && !coinsRef.current?.contains(e.target as Node)) setCoinsOpen(false);
