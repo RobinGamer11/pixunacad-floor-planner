@@ -1851,10 +1851,8 @@ export class MiniCad {
         }
       } catch { /* einzelne Objekte überspringen */ }
     }
-    if (clip.length === 0) return false;
-    this._miniClipboard = clip;
-    this._miniPasteRound = 0;
-    return true;
+    return clip;
+
   }
 
   /**
