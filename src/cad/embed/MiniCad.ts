@@ -1767,8 +1767,31 @@ export class MiniCad {
     return out;
   }
 
+  /** Serialisierbarer Snapshot der aktuellen Auswahl (engine-unabhängig). */
+  copySelectionSnapshot(): { kind: string; data: any }[] | null {
+    const items = this._buildClipboardItems();
+    return items.length ? items : null;
+  }
+
+  /** Fügt einen extern gehaltenen Snapshot ein (zentrale Mappen-Zwischenablage). */
+  pasteClipboardItems(items: { kind: string; data: any }[]): boolean {
+    if (!items || items.length === 0) return false;
+    this._miniClipboard = items.map((it) => ({ kind: it.kind, data: JSON.parse(JSON.stringify(it.data)) }));
+    this._miniPasteRound = 0;
+    return this.pasteClipboard();
+  }
+
   copySelection(): boolean {
+    const clip = this._buildClipboardItems();
+    if (clip.length === 0) return false;
+    this._miniClipboard = clip;
+    this._miniPasteRound = 0;
+    return true;
+  }
+
+  private _buildClipboardItems(): { kind: string; data: any }[] {
     const refs = this._selectedRefs();
+
     const clip: { kind: string; data: any }[] = [];
     const clone = (o: any) => JSON.parse(JSON.stringify(o));
     for (const { kind, id } of refs) {
