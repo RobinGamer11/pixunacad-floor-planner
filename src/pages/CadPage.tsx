@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import CadEditor, { type CadEditorHandle } from "@/components/CadEditor";
 import { projectStore, useProject } from "@/lib/projectStore";
+import { clearMappeClipboard } from "@/lib/mappeClipboard";
 import { WorkspaceHeader } from "@/components/workspace/WorkspaceHeader";
 import { TabletAidWheel } from "@/components/TabletAidWheel";
 import { Check, X } from "lucide-react";
@@ -15,6 +16,8 @@ const parseSheetScale = (scale: string | undefined): number => normalizeScaleDen
 const CadPage = () => {
   const { projectId } = useParams();
   const project = useProject(projectId);
+  // Wechsel in eine andere Hauptoberfläche leert die Projektmappen-Zwischenablage.
+  useEffect(() => { clearMappeClipboard(); }, []);
   const navigate = useNavigate();
   const location = useLocation();
   const editorRef = useRef<CadEditorHandle | null>(null);

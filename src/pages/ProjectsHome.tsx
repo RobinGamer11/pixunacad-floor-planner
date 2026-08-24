@@ -77,6 +77,7 @@ import { setExternalContentConsent, useExternalContentConsent } from "@/lib/exte
 import { NetworkView } from "@/components/network/NetworkView";
 import { AuroraBackground } from "@/components/AuroraBackground";
 import { RangeCalendar, type CalEntry } from "@/components/calendar/RangeCalendar";
+import { clearMappeClipboard } from "@/lib/mappeClipboard";
 
 const Pixuna = () => (
   <span className="font-semibold tracking-tight text-base">
@@ -109,7 +110,10 @@ export default function ProjectsHome() {
   const [shopOpen, setShopOpen] = useState(false);
   const coinsRef = useRef<HTMLDivElement | null>(null);
   const shopRef = useRef<HTMLDivElement | null>(null);
+  // Projekt verlassen → Projektmappen-Zwischenablage verwerfen.
+  useEffect(() => { clearMappeClipboard(); }, []);
   useEffect(() => {
+
     if (!coinsOpen && !shopOpen) return;
     const onDoc = (e: MouseEvent) => {
       if (coinsOpen && !coinsRef.current?.contains(e.target as Node)) setCoinsOpen(false);

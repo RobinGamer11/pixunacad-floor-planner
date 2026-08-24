@@ -100,6 +100,11 @@ import {
   TEMPLATE_LABEL, parseTemplateKey, templateKeyOf, getFavoriteTemplate, setFavoriteTemplate,
 } from "@/lib/financeStore";
 import {
+  getMappeClipboard, setMappeClipboard, hasMappeClipboard,
+  subscribeMappeClipboard, clearMappeClipboardIfOtherProject,
+} from "@/lib/mappeClipboard";
+
+import {
   buildDefaultTemplatePages, TEMPLATE_SEED_VERSION, isBlankTemplatePage,
   findLegacyTemplatePages, hasTemplateObjects,
 } from "@/lib/financeTemplates";
@@ -1113,58 +1118,86 @@ export default function ProjectWorkspace() {
     return did;
   };
 
-  // ---- Kopieren / Einfügen von Seiten-Elementen -------------------------
-  const elementClipboardRef = useRef<any[]>([]);
-  const clipSourceRef = useRef<"cad" | "elements" | null>(null);
-  const [canPasteElements, setCanPasteElements] = useState(false);
+  // ---- Gemeinsame Projektmappen-Zwischenablage --------------------------
+  // Ein Kopiervorgang erfasst Seiten-Elemente UND MiniCad-Objekte zusammen und
+  // legt sie im projektbezogenen Store ab (überlebt Seiten-/Buchwechsel).
+  const [canPasteElements, setCanPasteElements] = useState(() => hasMappeClipboard(projectId));
+
+  useEffect(() => {
+    const sync = () => setCanPasteElements(hasMappeClipboard(projectId));
+    sync();
+    return subscribeMappeClipboard(sync);
+  }, [projectId]);
+
+  // Anderes Projekt geöffnet → alte Kopie verwerfen.
+  useEffect(() => { clearMappeClipboardIfOtherProject(projectId); }, [projectId]);
 
   const runCopySelection = () => {
+    if (!project) return false;
     const eng = cadEngineApiRef.current?.engine as any;
-    if (eng?.hasCopyableSelection?.() && eng.copySelection?.()) {
-      clipSourceRef.current = "cad";
-      setCanPasteElements(true);
-      return true;
-    }
-    if (!project || selectedElementIds.length === 0) return false;
+    const cadObjects: { kind: string; data: any }[] =
+      (eng?.hasCopyableSelection?.() ? eng.copySelectionSnapshot?.() : null) ?? [];
+
     const idSet = new Set(selectedElementIds);
-    const snaps: any[] = [];
+    const pageElements: any[] = [];
     for (const pg of project.pages) {
       for (const el of pg.elements) {
-        if (idSet.has(el.id)) snaps.push(JSON.parse(JSON.stringify(el)));
+        if (idSet.has(el.id)) pageElements.push(JSON.parse(JSON.stringify(el)));
       }
     }
-    if (snaps.length === 0) return false;
-    elementClipboardRef.current = snaps;
-    clipSourceRef.current = "elements";
-    setCanPasteElements(true);
+
+    if (pageElements.length === 0 && cadObjects.length === 0) return false;
+    setMappeClipboard({
+      projectId: project.id,
+      sourcePageId: activePage?.id ?? null,
+      sourceBookKey: templateKey ?? null,
+      copiedAt: Date.now(),
+      pageElements,
+      cadObjects,
+    });
     return true;
   };
 
+  /** Entfernt buchbezogene Gruppen-Verknüpfungen ("Auf allen Seiten"). */
+  const stripSpanGroup = (obj: any) => {
+    if (!obj || typeof obj !== "object") return obj;
+    if (obj.style && typeof obj.style === "object" && obj.style.spanGroupId) {
+      obj.style = { ...obj.style };
+      delete obj.style.spanGroupId;
+    }
+    if (obj.spanGroupId) delete obj.spanGroupId;
+    return obj;
+  };
+
   const runPasteClipboard = () => {
-    const eng = cadEngineApiRef.current?.engine as any;
-    if (clipSourceRef.current !== "elements" && eng?.hasClipboard?.() && eng.pasteClipboard?.()) return true;
     if (!project || !activePage) return false;
-    const snaps = elementClipboardRef.current;
-    if (!snaps || snaps.length === 0) return false;
+    const clip = getMappeClipboard(project.id);
+    if (!clip) return false;
+
+    // 1. Seiten-Elemente an identischer Papierposition, mit frischen IDs.
     const newIds: string[] = [];
-    for (const snap of snaps) {
-      const { id: _omit, ...rest } = snap as any;
-      const clone: any = { ...rest };
-      if (typeof clone.x === "number") clone.x = Math.max(0, Math.min(98, clone.x + 2));
-      if (typeof clone.y === "number") clone.y = Math.max(0, Math.min(98, clone.y + 2));
-      if (Array.isArray(clone.points)) {
-        clone.points = clone.points.map((pt: any) =>
-          pt && typeof pt === "object"
-            ? { ...pt, x: (pt.x ?? 0) + 2, y: (pt.y ?? 0) + 2 }
-            : pt
-        );
-      }
+    for (const snap of clip.pageElements) {
+      const { id: _omit, ...rest } = JSON.parse(JSON.stringify(snap)) as any;
+      const clone: any = stripSpanGroup({ ...rest });
       const nid = projectStore.addElement(project.id, activePage.id, clone);
       if (nid) newIds.push(nid);
     }
     if (newIds.length > 0) setSelectedElementIds(newIds);
-    return newIds.length > 0;
+
+    // 2. MiniCad-Objekte in das cadOverlay der aktiven Zielseite klonen.
+    let cadOk = false;
+    if (clip.cadObjects.length > 0) {
+      const eng = cadEngineApiRef.current?.engine as any;
+      const items = clip.cadObjects.map((it) => ({
+        kind: it.kind,
+        data: stripSpanGroup(JSON.parse(JSON.stringify(it.data))),
+      }));
+      cadOk = !!eng?.pasteClipboardItems?.(items);
+    }
+    // Zwischenablage bleibt für weitere Einfügevorgänge erhalten.
+    return newIds.length > 0 || cadOk;
   };
+
 
 
   // Shift+C / Shift+V (und Strg+C / Strg+V) für Seiten-Elemente.
