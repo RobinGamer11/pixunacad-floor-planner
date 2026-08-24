@@ -2179,7 +2179,15 @@ export default function ProjectWorkspace() {
                       onCommitTool={() => setActiveTool(null)}
                       selectedElementIds={selectedElementIds}
                       onSelect={handleSelect}
-                      onMultiSelect={(ids) => { setSelectedElementIds(ids); setSelectedCadTool(undefined); setRightTab("tools"); }}
+                      onMultiSelect={(ids) => {
+                        // Gemeinsame Auswahltransaktion: DOM-Treffer einmalig
+                        // setzen; eine nachfolgende MiniCad-Meldung darf sie
+                        // nicht mehr überschreiben.
+                        pageMarqueeTxRef.current = Date.now();
+                        setSelectedElementIds(ids);
+                        setSelectedCadTool(undefined);
+                        setRightTab("tools");
+                      }}
                       onCadSelectionChange={handleCadSelection}
                       onCadEngineReady={(api) => attachCadEngine(api)}
                       onJumpCad={(sheetId) => navigate(`/project/${project.id}/cad${sheetId ? `/${sheetId}` : ""}`)}
