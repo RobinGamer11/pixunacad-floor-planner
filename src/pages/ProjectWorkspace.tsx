@@ -362,6 +362,13 @@ export default function ProjectWorkspace() {
   const [tableSelection, setTableSelection] = useState<TableSelection | null>(null);
   const [tableNewCols, setTableNewCols] = useState(3);
   const [tableNewRows, setTableNewRows] = useState(4);
+  /**
+   * Zeitstempel der letzten Rahmen-Auswahl (DOM/Seitenelemente). Die MiniCad-
+   * Engine meldet ihre eigene Auswahl asynchron danach — in diesem Zeitfenster
+   * darf sie die Seitenelement-Auswahl NICHT überschreiben. Beide Quellen
+   * bilden zusammen eine gemeinsame Auswahltransaktion.
+   */
+  const pageMarqueeTxRef = useRef(0);
   const cadEngineApiRef = useRef<{
     setSelectedSegmentSnap: (opts: { midpointSnap?: boolean; divisionSnap?: number | null }) => void;
     duplicateSelectedSegments: (offsetMm?: number) => number;
