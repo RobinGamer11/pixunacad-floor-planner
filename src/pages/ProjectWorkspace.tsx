@@ -2118,7 +2118,10 @@ export default function ProjectWorkspace() {
                     setRightTab("tools");
                     return;
                   }
-                  setSelectedElementIds([]);
+                  // Nur die ausdrücklich ERSETZENDE Einzelklick-Auswahl eines
+                  // CAD-Objekts hebt die Seitenelement-Auswahl auf. Während
+                  // einer laufenden Rahmen-Auswahltransaktion nie.
+                  if (!marqueeTx && (count ?? 1) <= 1) setSelectedElementIds([]);
                   setSelectedCadTool(info.tool);
                   setRightTab("tools");
                   if (info.tool === "line") {
