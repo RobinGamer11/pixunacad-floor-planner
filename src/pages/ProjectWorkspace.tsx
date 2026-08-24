@@ -100,6 +100,11 @@ import {
   TEMPLATE_LABEL, parseTemplateKey, templateKeyOf, getFavoriteTemplate, setFavoriteTemplate,
 } from "@/lib/financeStore";
 import {
+  getMappeClipboard, setMappeClipboard, hasMappeClipboard,
+  subscribeMappeClipboard, clearMappeClipboardIfOtherProject,
+} from "@/lib/mappeClipboard";
+
+import {
   buildDefaultTemplatePages, TEMPLATE_SEED_VERSION, isBlankTemplatePage,
   findLegacyTemplatePages, hasTemplateObjects,
 } from "@/lib/financeTemplates";
