@@ -16,6 +16,8 @@ const parseSheetScale = (scale: string | undefined): number => normalizeScaleDen
 const CadPage = () => {
   const { projectId } = useParams();
   const project = useProject(projectId);
+  // Wechsel in eine andere Hauptoberfläche leert die Projektmappen-Zwischenablage.
+  useEffect(() => { clearMappeClipboard(); }, []);
   const navigate = useNavigate();
   const location = useLocation();
   const editorRef = useRef<CadEditorHandle | null>(null);

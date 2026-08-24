@@ -68,6 +68,8 @@ interface Placed {
 export default function BoardPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const project = useProject(projectId);
+  // Wechsel in eine andere Hauptoberfläche leert die Projektmappen-Zwischenablage.
+  useEffect(() => { clearMappeClipboard(); }, []);
   const state = useTimeline(projectId);
   const hist = useTimelineHistory(projectId);
 
