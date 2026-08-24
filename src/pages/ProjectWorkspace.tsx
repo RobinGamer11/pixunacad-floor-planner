@@ -2928,7 +2928,37 @@ function PageCanvas({
 
       const hit: string[] = [];
       const root = pageRef.current;
+      // Konvexe Polygon-Tests (SAT) — gedrehte Objekte (auch Tabellen) werden
+      // über ihre vier transformierten Eckpunkte geprüft, nicht über das
+      // ungedrehte gespeicherte Rechteck.
+      type Pt = { x: number; y: number };
+      const polyInside = (poly: Pt[]) =>
+        poly.every((p) => p.x >= mx1 && p.x <= mx2 && p.y >= my1 && p.y <= my2);
+      const polyIntersects = (a: Pt[], b: Pt[]) => {
+        const axes: Pt[] = [];
+        for (const poly of [a, b]) {
+          for (let i = 0; i < poly.length; i++) {
+            const p1 = poly[i];
+            const p2 = poly[(i + 1) % poly.length];
+            axes.push({ x: -(p2.y - p1.y), y: p2.x - p1.x });
+          }
+        }
+        for (const ax of axes) {
+          const len = Math.hypot(ax.x, ax.y) || 1;
+          const nx = ax.x / len, ny = ax.y / len;
+          let a1 = Infinity, a2 = -Infinity, b1 = Infinity, b2 = -Infinity;
+          for (const p of a) { const d = p.x * nx + p.y * ny; a1 = Math.min(a1, d); a2 = Math.max(a2, d); }
+          for (const p of b) { const d = p.x * nx + p.y * ny; b1 = Math.min(b1, d); b2 = Math.max(b2, d); }
+          if (a2 < b1 || b2 < a1) return false;
+        }
+        return true;
+      };
+      const marqueePoly: Pt[] = [
+        { x: mx1, y: my1 }, { x: mx2, y: my1 }, { x: mx2, y: my2 }, { x: mx1, y: my2 },
+      ];
+
       if (root) {
+        const pageRect = root.getBoundingClientRect();
         const nodes = root.querySelectorAll<HTMLElement>("[data-marquee-id]");
         nodes.forEach((node) => {
           const id = node.getAttribute("data-marquee-id");
@@ -2936,12 +2966,41 @@ function PageCanvas({
           const el = page.elements.find((p) => p.id === id);
           if (!el) return;
           if (el.kind === "line" || el.kind === "guide") return;
-          const r = node.getBoundingClientRect();
-          if (r.width <= 0 || r.height <= 0) return;
-          if (marqueeMode === "enclose") {
-            if (r.left >= mx1 && r.top >= my1 && r.right <= mx2 && r.bottom <= my2) hit.push(id);
+
+          // Geometrie: gedrehte Objekte aus den Seitenprozenten rekonstruieren
+          // (getBoundingClientRect liefert bei Rotation nur die AABB),
+          // ansonsten das echte DOM-Rect verwenden.
+          const rot = el.rotation ?? 0;
+          let poly: Pt[];
+          if (rot) {
+            const left = pageRect.left + (el.x / 100) * pageRect.width;
+            const top = pageRect.top + (el.y / 100) * pageRect.height;
+            const w = (el.w / 100) * pageRect.width;
+            const h = (el.h / 100) * pageRect.height;
+            if (w <= 0 || h <= 0) return;
+            const cx = left + w / 2, cy = top + h / 2;
+            const rad = (rot * Math.PI) / 180;
+            const cos = Math.cos(rad), sin = Math.sin(rad);
+            poly = [
+              { x: left, y: top }, { x: left + w, y: top },
+              { x: left + w, y: top + h }, { x: left, y: top + h },
+            ].map((p) => {
+              const dx = p.x - cx, dy = p.y - cy;
+              return { x: cx + dx * cos - dy * sin, y: cy + dx * sin + dy * cos };
+            });
           } else {
-            if (r.left <= mx2 && r.right >= mx1 && r.top <= my2 && r.bottom >= my1) hit.push(id);
+            const r = node.getBoundingClientRect();
+            if (r.width <= 0 || r.height <= 0) return;
+            poly = [
+              { x: r.left, y: r.top }, { x: r.right, y: r.top },
+              { x: r.right, y: r.bottom }, { x: r.left, y: r.bottom },
+            ];
+          }
+
+          if (marqueeMode === "enclose") {
+            if (polyInside(poly)) hit.push(id);
+          } else if (polyIntersects(poly, marqueePoly)) {
+            hit.push(id);
           }
         });
       }
