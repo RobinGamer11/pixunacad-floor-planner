@@ -77,6 +77,7 @@ import { setExternalContentConsent, useExternalContentConsent } from "@/lib/exte
 import { NetworkView } from "@/components/network/NetworkView";
 import { AuroraBackground } from "@/components/AuroraBackground";
 import { RangeCalendar, type CalEntry } from "@/components/calendar/RangeCalendar";
+import { clearMappeClipboard } from "@/lib/mappeClipboard";
 
 const Pixuna = () => (
   <span className="font-semibold tracking-tight text-base">
