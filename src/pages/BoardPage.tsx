@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useSta
 import { useParams, useSearchParams } from "react-router-dom";
 import { WorkspaceHeader } from "@/components/workspace/WorkspaceHeader";
 import { projectStore, useProject } from "@/lib/projectStore";
+import { clearMappeClipboard } from "@/lib/mappeClipboard";
 import { TabletAidWheel } from "@/components/TabletAidWheel";
 
 import {

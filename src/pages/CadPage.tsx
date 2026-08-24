@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import CadEditor, { type CadEditorHandle } from "@/components/CadEditor";
 import { projectStore, useProject } from "@/lib/projectStore";
+import { clearMappeClipboard } from "@/lib/mappeClipboard";
 import { WorkspaceHeader } from "@/components/workspace/WorkspaceHeader";
 import { TabletAidWheel } from "@/components/TabletAidWheel";
 import { Check, X } from "lucide-react";
