@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState, useCallback } from "react";
 import { DragScrollDiv } from "@/components/DragScrollDiv";
 import { CadApp } from "@/cad/CadApp";
 import { ToolIds, PointEditAction } from "@/cad/constants";
-import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Pipette, Sticker as StickerIcon, Pencil, Trash2, Download, Upload, Plus, FileImage, FileText, Maximize2, Ruler as RulerIcon, Eraser, Construction, BrickWall, PaintBucket, Grid3x3, DoorOpen, AppWindow, Move, RotateCw, PanelRightOpen, PanelRightClose, Crosshair, Scaling, Check, Scissors, Anchor as AnchorIcon, SquareDashed, BoxSelect, FlipHorizontal2, FolderOpen, Settings as SettingsIcon, Layers as LayersIcon, Scan, Frame, Bold as BoldIcon, Italic as ItalicIcon, Underline as UnderlineIcon, Strikethrough as StrikethroughIcon, Table as TableIcon } from "lucide-react";
+import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Pipette, Sticker as StickerIcon, Pencil, Trash2, Download, Upload, Plus, FileImage, FileText, Maximize2, Ruler as RulerIcon, Eraser, Construction, BrickWall, PaintBucket, Grid3x3, DoorOpen, AppWindow, Move, RotateCw, PanelRightOpen, PanelRightClose, Crosshair, Scaling, Check, Scissors, Anchor as AnchorIcon, SquareDashed, BoxSelect, FlipHorizontal2, FolderOpen, Settings as SettingsIcon, Layers as LayersIcon, Scan, Frame, Bold as BoldIcon, Italic as ItalicIcon, Underline as UnderlineIcon, Strikethrough as StrikethroughIcon, Table as TableIcon, SquareDashedMousePointer } from "lucide-react";
 import type { HatchDrawMode } from "@/cad/HatchTool";
 import type { StickerDefinition } from "@/cad/StickerManager";
 import { instanceBoundingCornersWorld } from "@/cad/StickerManager";
@@ -123,6 +123,7 @@ const TOOL_VARIANTS: Record<string, ToolVariant[]> = {
     { kind: "marquee", mode: "click",   label: "Klick",       icon: MousePointer2 },
     { kind: "marquee", mode: "touch",   label: "Berühren",    icon: SquareDashed },
     { kind: "marquee", mode: "enclose", label: "Umschließen", icon: BoxSelect },
+    { kind: "selectAll", label: "Alles", icon: SquareDashedMousePointer },
   ],
 };
 
@@ -1337,7 +1338,9 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                           ? (activeTool === ToolIds.HATCH && hatchDrawMode === v.mode)
                           : v.kind === "door"
                             ? (activeTool === ToolIds.DOOR && doorMode === v.mode)
-                            : (activeTool === ToolIds.SELECT && selectMarqueeMode === v.mode);
+                            : v.kind === "selectAll"
+                              ? false
+                              : (activeTool === ToolIds.SELECT && selectMarqueeMode === v.mode);
                       return (
                         <button
                           key={i}
@@ -1363,6 +1366,13 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                                 setDoorSashEnabled(v.mode === "door");
                                 setDoorJambThickM(v.mode === "window" ? 0.09 : 0.08);
                               }
+                            } else if (v.kind === "selectAll") {
+                              // Einmalige Aktion: alles auswählen, Werkzeug bleibt aktiv.
+                              if (activeTool !== ToolIds.SELECT) {
+                                appRef.current?.setTool(ToolIds.SELECT);
+                                setActiveTool(ToolIds.SELECT);
+                              }
+                              appRef.current?.selectAllInActiveCadPlan();
                             } else {
                               // marquee mode toggle for Select tool
                               if (activeTool !== ToolIds.SELECT) {
