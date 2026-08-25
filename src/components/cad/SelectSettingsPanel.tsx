@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import type { CadApp } from "@/cad/CadApp";
 import type { MiniCad } from "@/cad/embed/MiniCad";
-import { SquareDashed, BoxSelect } from "lucide-react";
+import { SquareDashed, BoxSelect, SquareDashedMousePointer } from "lucide-react";
 
 interface Props { app: CadApp | MiniCad | null; }
 
