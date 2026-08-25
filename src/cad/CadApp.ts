@@ -2415,11 +2415,21 @@ export class CadApp {
         if ((k === "z" && e.shiftKey) || k === "y") { e.preventDefault(); this.redo(); return; }
       }
 
-      if ((tag === "input" || tag === "textarea" || tag === "select") && !isHubInput) {
+      const activeEl = document.activeElement as HTMLElement | null;
+      const inTextField = (tag === "input" || tag === "textarea" || tag === "select"
+        || !!activeEl?.isContentEditable) && !isHubInput;
+
+      if (inTextField) {
         // ESC wirkt immer: Eingabefeld verlassen und Abbruch-Logik ausführen.
-        if (e.key === "Escape") { try { (document.activeElement as HTMLElement)?.blur?.(); } catch {} }
+        if (e.key === "Escape") { try { activeEl?.blur?.(); } catch {} }
         else return;
       }
+
+      // Strg/Cmd + A → alles im aktiven CAD-Plan auswählen.
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "a") {
+        if (this.selectAllInActiveCadPlan()) { e.preventDefault(); return; }
+      }
+
 
 
       // Copy / Paste — Shift+C / Shift+V (zusätzlich zu Strg+C/V)
