@@ -90,7 +90,21 @@ export const SelectSettingsPanel: React.FC<Props> = ({ app }) => {
               <span className="text-xs">Umschließen</span>
             </button>
           </div>
+          <button
+            type="button"
+            onClick={() => {
+              const n = (app as any)?.selectAllInActiveCadPlan?.()
+                ?? (app as any)?.selectAllObjects?.();
+              if (typeof n === "number") setCount(n);
+            }}
+            className="cad-toolbar-btn w-full justify-center h-9 mt-1"
+            title="Alles auswählen (Strg/Cmd + A)"
+          >
+            <SquareDashedMousePointer size={14} className="mr-1" />
+            <span className="text-xs">Alles</span>
+          </button>
         </div>
+
 
         {count > 0 && (
           <div className="space-y-2">
