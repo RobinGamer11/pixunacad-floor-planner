@@ -1698,12 +1698,31 @@ export class MiniCad {
   }
 
 
+  /**
+   * "Alles auswählen" für die eingebettete CAD-Ebene der aktiven Mappenseite.
+   * Nutzt denselben Collector wie die Rahmen-Auswahl und filtert Rahmen-
+   * Segmente sowie gesperrte/nicht editierbare Objekte heraus.
+   * Gibt die Anzahl der ausgewählten CAD-Objekte zurück.
+   */
+  selectAllObjects(): number {
+    if (this.hasActiveAction()) return 0;
+    if (this._activeTool !== "select") this.setActiveTool("select");
+    this.selectTool.selectAll();
+    try { this._filterNonEditableSegmentSelections(); } catch {}
+    const count = this.selectTool.marqueeSelectedIds.length;
+    this._lastMarqueeSelectionCount = count;
+    try { this.renderer.render(); } catch {}
+    try { this.onSelectionChange?.(); } catch {}
+    return count;
+  }
+
   hasDeletableSelection(): boolean {
     if (this._activeTool === "select" && this.selectTool.marqueeSelectedIds.length > 0) return true;
     if (this.selections && this.selections.length > 0) return true;
     if (this.selection) return true;
     return false;
   }
+
 
   /** Programmgesteuertes Löschen der aktuellen Auswahl (identisch mit Entf). */
   deleteSelection(): boolean {
