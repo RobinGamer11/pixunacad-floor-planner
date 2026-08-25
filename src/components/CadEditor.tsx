@@ -102,7 +102,8 @@ type ToolVariant =
   | { kind: "tool"; id: string; label: string; icon: any }
   | { kind: "hatch"; mode: HatchDrawMode; label: string; icon: any }
   | { kind: "door"; mode: "door" | "window"; label: string; icon: any }
-  | { kind: "marquee"; mode: "touch" | "enclose" | "click"; label: string; icon: any };
+  | { kind: "marquee"; mode: "touch" | "enclose" | "click"; label: string; icon: any }
+  | { kind: "selectAll"; label: string; icon: any };
 
 const TOOL_VARIANTS: Record<string, ToolVariant[]> = {
   [ToolIds.DOOR]: [
