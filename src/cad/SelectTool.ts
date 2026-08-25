@@ -235,6 +235,31 @@ export class SelectTool {
   pasteFloatActive = false;
   private _pasteBtnRect: { x: number; y: number; w: number; h: number } | null = null;
 
+  /**
+   * "Alles auswählen" — schreibt alle aktuell auswählbaren Objekte des aktiven
+   * Plans direkt in die bestehende Mehrfachauswahl (`marqueeSelectedIds`).
+   * Verwendet exakt denselben Objekt-Collector wie die Rahmen-Auswahl, damit
+   * "Alles", "Berühren" und "Umschließen" dieselben Objektarten kennen.
+   * Gibt die Anzahl der ausgewählten Objekte zurück.
+   */
+  selectAll(): number {
+    const hits: { kind: string; id: string }[] = [];
+    const seen = new Set<string>();
+    for (const { kind, id, obj } of this._iterElements()) {
+      if (!id) continue;
+      const pts = this._elementPoints(kind, obj);
+      if (!pts || !pts.length) continue;      // temporäre/geometrielose Objekte überspringen
+      const key = kind + ":" + id;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      hits.push({ kind, id });
+    }
+    this.marqueeSelectedIds = hits;
+    return hits.length;
+  }
+
+
+
   /** Startet den Einfüge-Modus für die frisch erzeugten Objekte. */
   beginPasteFloat(ids: { kind: string; id: string }[]) {
     if (!ids.length) return;
