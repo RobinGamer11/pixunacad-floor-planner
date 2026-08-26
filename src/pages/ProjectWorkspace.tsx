@@ -66,6 +66,7 @@ import {
   Lock as LockIcon,
   Unlock as UnlockIcon,
   BoxSelect,
+  SquareDashedMousePointer,
   Scissors,
   ChevronsUpDown,
   ChevronsLeftRight,
@@ -829,6 +830,21 @@ export default function ProjectWorkspace() {
   const selectedElement = activePage?.elements.find((e) => e.id === selectedElementId);
   const bgPage = bgOverlay.pageId ? project?.pages.find((p) => p.id === bgOverlay.pageId) : undefined;
 
+  /** Wählt beide Auswahlquellen der aktiven Mappenseite als eine Transaktion. */
+  const selectAllOnActiveMappePage = () => {
+    if (!activePage) return false;
+    pageMarqueeTxRef.current = Date.now();
+    const pageIds = activePage.elements
+      .filter((element) => element.kind !== "line" && element.kind !== "guide")
+      .map((element) => element.id);
+    setSelectedElementIds(pageIds);
+    const cadCount = cadEngineApiRef.current?.engine.selectAllObjects() ?? 0;
+    setCadSelectionCount(cadCount);
+    setActiveTool(null);
+    setRightTab("tools");
+    return pageIds.length > 0 || cadCount > 0;
+  };
+
   // Auto-open das „CAD-Blatt"-Werkzeug, sobald ein platziertes CAD-Blatt
   // (cad-view / cad-viewport) angeklickt wird. Maßstab, Aktualisieren usw.
   // werden ausschließlich dort verwaltet — kein separates Viewport-Inspektor-
@@ -1224,6 +1240,23 @@ export default function ProjectWorkspace() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedElementIds, activePage?.id, project?.id]);
 
+  // Strg/Cmd+A wählt ausschließlich die Objekte der aktiven Mappenseite.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.altKey || e.shiftKey || !(e.ctrlKey || e.metaKey)
+        || e.key.toLowerCase() !== "a") return;
+      const target = e.target as HTMLElement | null;
+      const editing = !!target && (target.isContentEditable
+        || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)
+        || !!target.closest("[data-table-cellmode]"));
+      if (editing || tableEditId) return;
+      if (selectAllOnActiveMappePage()) e.preventDefault();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activePage?.id, project?.id, tableEditId]);
+
   // Entf-Shortcut auf Fenster-Ebene: nur reagieren, wenn kein Textfeld fokussiert
   // ist und tatsächlich etwas ausgewählt ist. So bleibt der Trash-Button 1:1
   // per Tastatur bedienbar (Projektmappe und CAD gleichermaßen).
@@ -1509,6 +1542,16 @@ export default function ProjectWorkspace() {
                 onClick={() => {
                   updateToolSettings("select", { marqueeMode: "enclose" });
                   setActiveTool(null);
+                  setSelectToolFlyoutOpen(false);
+                }}
+                showLabel
+              />
+              <ToolRailButton
+                icon={<SquareDashedMousePointer size={18} />}
+                label="Alles"
+                active={false}
+                onClick={() => {
+                  selectAllOnActiveMappePage();
                   setSelectToolFlyoutOpen(false);
                 }}
                 showLabel

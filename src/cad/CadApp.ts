@@ -2416,6 +2416,13 @@ export class CadApp {
       }
 
       const activeEl = document.activeElement as HTMLElement | null;
+      const selectAllShortcut = (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey
+        && e.key.toLowerCase() === "a";
+      const editingTarget = tag === "input" || tag === "textarea" || tag === "select"
+        || !!activeEl?.isContentEditable || !!this.tableEditId;
+      // In sämtlichen Editoren und Eingabefeldern bleibt Strg/Cmd+A die native
+      // Text-/Zell-Auswahl — auch in den numerischen HUB-Feldern.
+      if (selectAllShortcut && editingTarget) return;
       const inTextField = (tag === "input" || tag === "textarea" || tag === "select"
         || !!activeEl?.isContentEditable) && !isHubInput;
 
@@ -2426,7 +2433,7 @@ export class CadApp {
       }
 
       // Strg/Cmd + A → alles im aktiven CAD-Plan auswählen.
-      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "a") {
+      if (selectAllShortcut) {
         if (this.selectAllInActiveCadPlan()) { e.preventDefault(); return; }
       }
 
