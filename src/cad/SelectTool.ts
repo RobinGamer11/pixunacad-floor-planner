@@ -4458,15 +4458,19 @@ export class SelectTool {
   /** Iteriert alle testbaren Scene-Elemente. */
   private *_iterElements(): Generator<{ kind: string; id: string; obj: any }> {
     const s = this.app.scene as any;
-    for (const o of s.segments || [])         yield { kind: "segment",    id: o.id, obj: o };
-    for (const o of s.walls || [])            yield { kind: "wall",       id: o.id, obj: o };
-    for (const o of s.hatches || [])          yield { kind: "hatch",      id: o.id, obj: o };
-    for (const o of s.freeStrokes || [])      yield { kind: "freeStroke", id: o.id, obj: o };
-    for (const o of s.dimensions || [])       yield { kind: "dimension",  id: o.id, obj: o };
-    for (const o of s.textBoxes || [])        yield { kind: "textbox",    id: o.id, obj: o };
-    for (const o of s.tables || [])           yield { kind: "table",      id: o.id, obj: o };
-    for (const o of s.documents || [])        yield { kind: "document",   id: o.id, obj: o };
-    for (const o of s.stickerInstances || []) yield { kind: "sticker",    id: o.id, obj: o };
+    const selectable = (o: any) => !!o?.id
+      && o.selectable !== false
+      && o.locked !== true
+      && this.app.labelManager.isEditable(o.labelId);
+    for (const o of s.segments || [])         if (selectable(o)) yield { kind: "segment",    id: o.id, obj: o };
+    for (const o of s.walls || [])            if (selectable(o)) yield { kind: "wall",       id: o.id, obj: o };
+    for (const o of s.hatches || [])          if (selectable(o)) yield { kind: "hatch",      id: o.id, obj: o };
+    for (const o of s.freeStrokes || [])      if (selectable(o)) yield { kind: "freeStroke", id: o.id, obj: o };
+    for (const o of s.dimensions || [])       if (selectable(o)) yield { kind: "dimension",  id: o.id, obj: o };
+    for (const o of s.textBoxes || [])        if (selectable(o)) yield { kind: "textbox",    id: o.id, obj: o };
+    for (const o of s.tables || [])           if (selectable(o)) yield { kind: "table",      id: o.id, obj: o };
+    for (const o of s.documents || [])        if (selectable(o)) yield { kind: "document",   id: o.id, obj: o };
+    for (const o of s.stickerInstances || []) if (selectable(o)) yield { kind: "sticker",    id: o.id, obj: o };
   }
 
   private _commitMarquee() {
