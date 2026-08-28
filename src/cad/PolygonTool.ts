@@ -41,7 +41,7 @@ export class PolygonTool extends HatchTool {
     }
     if (this.circleState === "radius") {
       super._onCircleClick(input);
-      if (this.circleState === "arc") this._finishCircle(true);
+      if ((this.circleState as string) === "arc") this._finishCircle(true);
       return;
     }
     this._finishCircle(true);
