@@ -2557,6 +2557,7 @@ export class CadApp {
       if (e.key === "v" || e.key === "V") this.setTool(ToolIds.SELECT);
       if (e.key === "l" || e.key === "L") this.setTool(ToolIds.LINE);
       if (e.key === "h" || e.key === "H") this.setTool(ToolIds.HATCH);
+      if (e.key === "g" || e.key === "G") this.setTool(ToolIds.POLYGON);
       if (e.key === "m" || e.key === "M") this.setTool(ToolIds.MEASURE);
       if (e.key === "t" || e.key === "T") this.setTool(ToolIds.TEXT);
       if (e.key === "p" || e.key === "P") this.setTool(ToolIds.PIPETTE);

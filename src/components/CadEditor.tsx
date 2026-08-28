@@ -83,7 +83,7 @@ const CAD_TOOLS = [
   { id: ToolIds.SELECT, label: "Auswahl", key: "V", icon: MousePointer2 },
   { id: ToolIds.WALL, label: "Wand", key: "W", icon: BrickWall },
   { id: ToolIds.DOOR, label: "Türen/Fenster", key: "U", icon: DoorOpen },
-  { id: ToolIds.POLYGON, label: "Polygon", key: "P", icon: Pentagon },
+  { id: ToolIds.POLYGON, label: "Polygon", key: "G", icon: Pentagon },
   { id: ToolIds.LINE, label: "Linie", key: "L", icon: Minus },
   { id: ToolIds.HATCH, label: "Schraffur", key: "H", icon: Square },
   { id: ToolIds.MEASURE, label: "Maßkette", key: "M", icon: Ruler },
