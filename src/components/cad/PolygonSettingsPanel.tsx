@@ -18,23 +18,34 @@ const MODES: { value: PolygonDrawMode; label: string; Icon: React.ElementType }[
 
 type AnyApp = CadApp | MiniCad | null;
 
-/** Alle aktuell ausgewählten Polygonobjekte (Mehrfachauswahl inbegriffen). */
+/**
+ * Alle aktuell ausgewählten Polygonobjekte (Mehrfachauswahl inbegriffen).
+ * Berücksichtigt Einzelauswahl, die Mappen-Mehrfachauswahl (`selections`)
+ * und die Rahmen-/Shift-Auswahl der Engine (`selectTool.marqueeSelectedIds`).
+ * Schraffuren bleiben ausgeschlossen — Polygon ist ein eigener Werkzeugtyp.
+ */
 function selectedPolygons(app: AnyApp): any[] {
   if (!app) return [];
   const a: any = app;
+  const ids: string[] = [];
   const sels: any[] = Array.isArray(a.selections) && a.selections.length
     ? a.selections
     : (a.selection ? [a.selection] : []);
+  for (const s of sels) if (s?.hatchId) ids.push(s.hatchId);
+  const marquee = a.selectTool?.marqueeSelectedIds as { kind: string; id: string }[] | undefined;
+  if (Array.isArray(marquee)) {
+    for (const m of marquee) if (m?.kind === "hatch" && m.id) ids.push(m.id);
+  }
   const out: any[] = [];
   const seen = new Set<string>();
-  for (const s of sels) {
-    const id = s?.hatchId;
-    if (!id || seen.has(id)) continue;
+  for (const id of ids) {
+    if (seen.has(id)) continue;
     const o = a.scene?.getHatchById?.(id);
     if (o && o.isPolygon === true) { seen.add(id); out.push(o); }
   }
   return out;
 }
+
 
 /** Modus-Auswahl — ausschließlich Polygon / Rechteck / Kreis (kein Füllmodus). */
 export const PolygonModeSelect: React.FC<{ app: AnyApp }> = ({ app }) => {
