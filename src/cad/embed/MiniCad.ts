@@ -1322,7 +1322,9 @@ export class MiniCad {
           arrowEnd: !!s.arrowEnd,
           arrowScale: s.arrowScale,
           bulge: (s as any).bulge || 0,
+          ...copyStrokeEffects(s),
         })),
+
 
       textBoxes: this.scene.textBoxes.map((t) => ({
         id: t.id,
