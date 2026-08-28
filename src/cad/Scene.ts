@@ -627,6 +627,18 @@ export class FreeStroke {
   /** Bild-Stempel: Rotation entlang Pfad-Tangente. */
   imageRotateAlongPath: boolean;
   labelId: string;
+  /** Gemeinsame Kontur-Effekte (Linienart + Roughen). */
+  strokePattern!: StrokePatternParams;
+  roughen!: RoughenParams;
+  appearanceSeed!: number;
+  /**
+   * Startdistanz dieses Abschnitts auf dem ursprünglichen Freihandpfad (m).
+   * Nach dem Radieren behalten Teilstücke damit Musterphase, Roughen-Verlauf
+   * und Zufallsdarstellung des Originals bei.
+   */
+  sourceStartDistanceM: number;
+  /** ID des ursprünglichen Strokes (Herkunft nach dem Radieren). */
+  sourceStrokeId: string | null;
   _stickerEditOwnerId?: string | null;
 
   constructor(opts: {
@@ -634,7 +646,8 @@ export class FreeStroke {
     lineStyle?: FreeLineStyle; gapM?: number; blobSpacingM?: number; blobSizeM?: number;
     smoothing?: boolean; labelId?: string;
     imageSrc?: string | null; imageSizeM?: number; imageSpacingM?: number; imageRotateAlongPath?: boolean;
-  }) {
+    sourceStartDistanceM?: number; sourceStrokeId?: string | null;
+  } & StrokeEffectsInit) {
     this.id = opts.id;
     this.points = opts.points.map(p => v(p.x, p.y));
     this.color = opts.color || Defaults.freeColor;
@@ -650,8 +663,17 @@ export class FreeStroke {
     this.imageSpacingM = (typeof opts.imageSpacingM === "number" && opts.imageSpacingM > 0) ? opts.imageSpacingM : Defaults.freeImageSpacingM;
     this.imageRotateAlongPath = (typeof opts.imageRotateAlongPath === "boolean") ? opts.imageRotateAlongPath : Defaults.freeImageRotate;
     this.labelId = opts.labelId || Defaults.defaultLabelId;
+    this.sourceStartDistanceM = (typeof opts.sourceStartDistanceM === "number" && Number.isFinite(opts.sourceStartDistanceM))
+      ? opts.sourceStartDistanceM : 0;
+    this.sourceStrokeId = opts.sourceStrokeId || null;
+    // Migrationssicher: alte Freihandobjekte übernehmen lineStyle/gapM als Muster.
+    const legacy = (opts.strokePattern === undefined)
+      ? patternFromLegacyFreeStyle(this.lineStyle, this.gapM)
+      : opts.strokePattern;
+    initStrokeEffects(this, { strokePattern: legacy, roughen: opts.roughen, appearanceSeed: opts.appearanceSeed });
     this._stickerEditOwnerId = null;
   }
+
 }
 
 /** Hilfslinie (Lineal) für das Eraser-Tool. Optional, max. 1 pro Scene. */
