@@ -42,6 +42,8 @@ import { drawProjection as drawPlanProjection } from "./PlanProjections";
 import { SheetPanel } from "./SheetPanel";
 import { mirrorProxy } from "./multiEdit";
 import { asObjectToolId, type ObjectToolId } from "./selectionTools";
+import { restoreOneScene } from "./sceneSerde";
+
 
 
 export interface TextSettingsRefs {
