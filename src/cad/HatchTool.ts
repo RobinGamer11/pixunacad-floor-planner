@@ -153,10 +153,21 @@ export class HatchTool {
     return false;
   }
 
+  /** BACKSPACE: letzten gesetzten Punkt der laufenden Kontur entfernen. */
+  removeLastPoint(): boolean {
+    if (this.drawMode !== "polygon" || this.state !== "drawing") return false;
+    if (this.points.length <= 1) { this.cancel(); return true; }
+    this.points.pop();
+    this.hubLocked = false;
+    this.hubLengthM = null;
+    this.hubAngleDeg = null;
+    return true;
+  }
+
   isDrawing() { return this.state === "drawing" || this.rectState !== "idle" || this.circleState !== "idle"; }
   resetGuides() { this.guideAnchors = []; this.parallelGuideSegments = []; }
 
-  private _resetCircleState() {
+  protected _resetCircleState() {
     this.circleState = "idle";
     this.circleCenter = null;
     this.circleRadiusM = 0;
@@ -585,8 +596,29 @@ export class HatchTool {
 
   /* ---- Finish ---- */
 
-  private _finishAndCreateHatch(points: Vec2[]) {
+  protected _finishAndCreateHatch(points: Vec2[]) {
     if (points.length < 3) return;
+    this._createShapeFromPoints(points);
+    this.app.clearSelection();
+    this.points = [];
+    this.state = "idle";
+    this.rectState = "idle";
+    this.rectPointA = null;
+    this.rectPointB = null;
+    this._resetCircleState();
+    this.hubLocked = false;
+    this.hubLengthM = null;
+    this.hubAngleDeg = null;
+    this.startReferenceEdge = null;
+    this.startPointReference = null;
+  }
+
+  /**
+   * Erzeugt das eigentliche Objekt aus der fertigen Kontur.
+   * Das Polygonwerkzeug überschreibt diesen Hook (erzeugt ein Polygonobjekt
+   * statt einer Schraffur) — die gesamte Zeichenmechanik bleibt geteilt.
+   */
+  protected _createShapeFromPoints(points: Vec2[]) {
 
     // Wenn eine bestehende Schraffur ausgewählt ist und die neue Kontur
     // innerhalb dieser liegt, wird sie als Aussparung (Hole) in die
@@ -607,18 +639,6 @@ export class HatchTool {
       const createdHatch = this.app.scene.createHatch(points, this.app.getCurrentHatchStyle());
       maybeRasterize(this.app, { type: "hatch", obj: createdHatch });
     }
-    this.app.clearSelection();
-    this.points = [];
-    this.state = "idle";
-    this.rectState = "idle";
-    this.rectPointA = null;
-    this.rectPointB = null;
-    this._resetCircleState();
-    this.hubLocked = false;
-    this.hubLengthM = null;
-    this.hubAngleDeg = null;
-    this.startReferenceEdge = null;
-    this.startPointReference = null;
   }
 
   /* ---- Circle helpers ---- */
@@ -655,7 +675,7 @@ export class HatchTool {
     return normalizeDeg(angleDeg(this.circleCenter, p));
   }
 
-  private _finishCircle(forceFullCircle: boolean) {
+  protected _finishCircle(forceFullCircle: boolean) {
     if (!this.circleCenter || this.circleRadiusM <= Defaults.minSegLenM) return;
     const points = forceFullCircle
       ? buildCircleOrSectorPoints(this.circleCenter, this.circleRadiusM, 0, 360, 96)
@@ -664,7 +684,7 @@ export class HatchTool {
     this._finishAndCreateHatch(points);
   }
 
-  private _onCircleClick(input: Input) {
+  protected _onCircleClick(input: Input) {
     if (this.circleState === "idle") {
       const p = this.app.topology.resolveSnapPoint(this.snap, this._rawPreviewWorld(input));
       this.circleCenter = v(p.x, p.y);
