@@ -356,6 +356,13 @@ export default function ProjectWorkspace() {
     setRightTabState(t);
   };
   const [activeTool, setActiveTool] = useState<PageTool>(null);
+  /**
+   * Zuletzt gewähltes objektbezogenes Werkzeug. Wird NICHT aus `activeTool`
+   * abgeleitet, sobald zum Auswahlwerkzeug gewechselt wurde — er bestimmt,
+   * welche Objektart "Alles"/Strg+A auf der aktiven Seite erfasst.
+   */
+  const selectionFilterToolRef = useRef<ObjectToolId | null>(null);
+
   const [selectedCadTool, setSelectedCadTool] = useState<"line" | "free" | "text" | "hatch" | "guide" | "polygon" | undefined>();
   const [cadSelectionCount, setCadSelectionCount] = useState<number>(0);
   const [cadSelectedLineSnap, setCadSelectedLineSnap] = useState<{ midpoint: boolean; division: number | null; isGuide: boolean } | null>(null);
