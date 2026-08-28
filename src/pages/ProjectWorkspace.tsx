@@ -82,8 +82,7 @@ import {
   Frame as FrameIcon,
   Scan as ScanIcon,
   Layers,
-  Star,
-} from "lucide-react";
+  Star,, Pentagon } from "lucide-react";
 
 import {
   projectStore,
@@ -3528,6 +3527,7 @@ function PageCanvas({
             : null
           }
           hatchDrawMode={hatchDrawMode}
+          polygonDrawMode={polygonDrawMode}
           enabled={activeTool === "line" || activeTool === "text" || activeTool === "guide" || activeTool === "free" || activeTool === "eraser" || activeTool === "hatch" || activeTool === "polygon" || activeTool === "document" || activeTool === "pipette" || activeTool === null}
           initialState={page.cadOverlay}
           ghostSnapState={overlayPage ? overlayPage.cadOverlay : null}
