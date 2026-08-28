@@ -173,7 +173,8 @@ function renderReference(
       g = mix(g, Math.round(g / q) * q, (model + strength) * 0.24);
       b = mix(b, Math.round(b / q) * q, (model + strength) * 0.24);
       const avg = (r + g + b) / 3;
-      r = mix(avg, r, 0.58 + sat * 0.60); g = mix(avg, g, 0.58 + sat * 0.60); b = mix(avg, b, 0.58 + sat * 0.60);
+      const satF = 1 + sat * 0.18; // 0 = unverändert, 100 = stärkste Sättigung
+      r = mix(avg, r, satF); g = mix(avg, g, satF); b = mix(avg, b, satF);
       r += 28 * warmth; g += 13 * warmth; b -= 12 * warmth;
       const gm = m.green[pi] / 255, am = m.arch[pi] / 255;
       if (gm > 0) {
@@ -393,6 +394,15 @@ export function renderAdjust(
 ): HTMLCanvasElement {
   const out = makeCanvas(w, h);
   const octx = out.getContext("2d", { willReadFrequently: true })!;
+
+  // Alle Regler auf 0 → kein Effekt: Quelle unverändert durchreichen.
+  const allZero = ADJUST_KEYS.every((k) => !((params as any)?.[k] > 0));
+  if (allZero) {
+    octx.imageSmoothingEnabled = true;
+    octx.imageSmoothingQuality = "high";
+    octx.drawImage(source, 0, 0, w, h);
+    return out;
+  }
 
   const s = Math.min(1, REFERENCE_MAX_PX / Math.max(w, h));
   const rw = Math.max(1, Math.round(w * s));
