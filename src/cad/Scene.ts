@@ -177,8 +177,10 @@ export class Hatch {
       rotationRad: Number.isFinite(areaLabel?.rotationRad) ? areaLabel!.rotationRad! : 0,
       scale: Number.isFinite(areaLabel?.scale) ? clamp(areaLabel!.scale!, 0.1, 20) : 1,
     };
+    initStrokeEffects(this, { strokePattern, roughen, appearanceSeed });
     this._stickerEditOwnerId = null;
   }
+
 }
 
 /**
