@@ -2200,14 +2200,15 @@ export default function ProjectWorkspace() {
                   setSelectedElementIds((prev) => {
                     if (!multi) return [id];
                     const idx = prev.indexOf(id);
+                    // Abwählen: Das davor zuletzt erfasste Objekt rückt als
+                    // führendes Element (= letzter Eintrag) nach.
                     if (opts?.shift && idx >= 0) return prev.filter((x) => x !== id);
                     const rest = prev.filter((x) => x !== id);
-                    // Das ZUERST gewählte Objekt bleibt führend (= letzter Eintrag).
-                    // Weitere Objekte werden davor eingereiht, damit Anker,
-                    // Verschieben und Drehen am ersten Objekt bestehen bleiben.
-                    if (opts?.shift && rest.length > 0) return [id, ...rest];
+                    // Zuletzt angeklicktes Objekt ist immer das führende
+                    // Element und steht deshalb am Ende der Liste.
                     return [...rest, id];
                   });
+
 
                   setSelectedCadTool(undefined);
                   setRightTab("tools");
