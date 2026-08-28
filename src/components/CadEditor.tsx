@@ -3485,6 +3485,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             && activeTool !== ToolIds.LINE
             && activeTool !== ToolIds.FREE
             && activeTool !== ToolIds.HATCH
+            && activeTool !== ToolIds.POLYGON
             && activeTool !== ToolIds.DOCUMENT
             && activeTool !== ToolIds.WALL
             && activeTool !== ToolIds.DOOR
