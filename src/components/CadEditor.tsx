@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState, useCallback } from "react";
 import { DragScrollDiv } from "@/components/DragScrollDiv";
 import { CadApp } from "@/cad/CadApp";
 import { ToolIds, PointEditAction } from "@/cad/constants";
-import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Pipette, Sticker as StickerIcon, Pencil, Trash2, Download, Upload, Plus, FileImage, FileText, Maximize2, Ruler as RulerIcon, Eraser, Construction, BrickWall, PaintBucket, Grid3x3, DoorOpen, AppWindow, Move, RotateCw, PanelRightOpen, PanelRightClose, Crosshair, Scaling, Check, Scissors, Anchor as AnchorIcon, SquareDashed, BoxSelect, FlipHorizontal2, FolderOpen, Settings as SettingsIcon, Layers as LayersIcon, Scan, Frame, Bold as BoldIcon, Italic as ItalicIcon, Underline as UnderlineIcon, Strikethrough as StrikethroughIcon, Table as TableIcon, SquareDashedMousePointer } from "lucide-react";
+import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Pipette, Sticker as StickerIcon, Pencil, Trash2, Download, Upload, Plus, FileImage, FileText, Maximize2, Ruler as RulerIcon, Eraser, Construction, BrickWall, PaintBucket, Grid3x3, DoorOpen, AppWindow, Move, RotateCw, PanelRightOpen, PanelRightClose, Crosshair, Scaling, Check, Scissors, Anchor as AnchorIcon, SquareDashed, BoxSelect, FlipHorizontal2, FolderOpen, Settings as SettingsIcon, Layers as LayersIcon, Scan, Frame, Bold as BoldIcon, Italic as ItalicIcon, Underline as UnderlineIcon, Strikethrough as StrikethroughIcon, Table as TableIcon, SquareDashedMousePointer, Pentagon } from "lucide-react";
 import type { HatchDrawMode } from "@/cad/HatchTool";
 import type { PolygonDrawMode } from "@/cad/PolygonTool";
 import { PolygonModeSelect, PolygonSettingsPanel } from "@/components/cad/PolygonSettingsPanel";
@@ -463,6 +463,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const [selectedFreeStrokeId, setSelectedFreeStrokeId] = useState<string | null>(null);
   const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null);
   const [selectedHatchId, setSelectedHatchId] = useState<string | null>(null);
+  const [selectedPolygonId, setSelectedPolygonId] = useState<string | null>(null);
   const [stickers, setStickers] = useState<StickerDefinition[]>([]);
   const [stickerSelCount, setStickerSelCount] = useState(0);
   const [stickerPhase, setStickerPhase] = useState<"idle" | "selecting" | "placing" | "rotating">("idle");
@@ -941,7 +942,13 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       }
       setSelectedFreeStrokeId(app.getSelectedFreeStroke()?.id || null);
       setSelectedSegmentId(((app.selection as any)?.segmentId as string) || null);
-      setSelectedHatchId(((app.selection as any)?.hatchId as string) || null);
+      {
+        const hid = ((app.selection as any)?.hatchId as string) || null;
+        const obj = hid ? app.scene.getHatchById(hid) : null;
+        const isPoly = !!obj && (obj as any).isPolygon === true;
+        setSelectedHatchId(isPoly ? null : hid);
+        setSelectedPolygonId(isPoly ? hid : null);
+      }
       // Pfeil-Einstellungen mit aktueller Auswahl synchronisieren
       try {
         const style = app.getCurrentLineStyle() as any;
