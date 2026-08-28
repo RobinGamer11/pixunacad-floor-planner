@@ -4564,6 +4564,9 @@ export class SelectTool {
       hits.push({ kind, id });
     }
     this.marqueeSelectedIds = hits;
+    // Führendes Objekt = zuletzt erfasster Eintrag der Rahmenauswahl.
+    this.syncPrimarySelection();
+
   }
 
   /** Element unter dem Cursor (Weltkoordinaten) für Shift-Mehrfachauswahl. */
