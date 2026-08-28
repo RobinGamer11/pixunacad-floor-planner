@@ -1854,17 +1854,40 @@ export class Renderer {
 
     this._paintHatchPattern(ctx, cam, hatch);
 
+    // Konturlinie der Schraffur: eigene Pipeline (Linienart + Roughen) für
+    // Außenkontur und jedes Loch. Die Füllung bleibt an der Originalgeometrie.
+    const contourOpts = {
+      pattern: (hatch as any).strokePattern, roughen: (hatch as any).roughen,
+      pxPerM: cam.scale, lineWidthPx: strokePx,
+    };
+    const contourRings: Vec2[][] = [
+      hatchOuterRing(hatch as any),
+      ...hatchHoleRings(hatch as any),
+    ].filter((r) => r && r.length >= 2);
+    const strokeContours = () => {
+      contourRings.forEach((ring, i) => {
+        tracePathWithEffects(ctx, (p) => cam.worldToScreen(p.x, p.y), ring, true, {
+          ...contourOpts, cacheKey: `hatch:${hatch.id}:${i}:${ring.length}`,
+        });
+        ctx.stroke();
+      });
+    };
+
     if (strokePx > 0) {
       ctx.strokeStyle = strokeCol;
       ctx.lineWidth = strokePx;
-      ctx.stroke();
+      applyStrokePattern(ctx, contourOpts);
+      strokeContours();
+      ctx.setLineDash([]);
+      ctx.lineDashOffset = 0;
     }
 
     if (isHovered && !isSelected) {
       ctx.strokeStyle = "rgba(77,163,255,0.55)";
       ctx.lineWidth = Math.max(1.5, strokePx + 1.2);
-      ctx.stroke();
+      strokeContours();
     }
+
 
     this._drawAreaLabel(hatch, !!isSelected);
     ctx.restore();
