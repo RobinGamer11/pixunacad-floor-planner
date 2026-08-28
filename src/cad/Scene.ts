@@ -1393,7 +1393,10 @@ export class Scene {
       midpointSnap: seg.midpointSnap,
       divisionSnap: seg.divisionSnap,
       arrowScale: seg.arrowScale,
+      // Linienart, Roughen-Seed und -Parameter bleiben beim Teilen erhalten.
+      ...copyStrokeEffects(seg),
     };
+
     this.removeSegment(seg);
     const s1 = this.createSegment(seg.a, p, {
       ...style,
