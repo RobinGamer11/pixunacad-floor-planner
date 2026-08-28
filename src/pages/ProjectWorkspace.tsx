@@ -131,6 +131,7 @@ import type { MiniCadSelectionInfo } from "@/cad/embed/MiniCad";
 import type { HatchDrawMode } from "@/cad/HatchTool";
 import type { PolygonDrawMode } from "@/cad/PolygonTool";
 import { PolygonModeSelect, PolygonSettingsPanel } from "@/components/cad/PolygonSettingsPanel";
+import { StrokeEffectsSettings } from "@/components/cad/StrokeEffectsSettings";
 import { StrokeSettingsPanel } from "@/components/cad/StrokeSettingsPanel";
 import { FreeDrawSettingsPanel } from "@/components/cad/FreeDrawSettingsPanel";
 import { EraserSettingsPanel, EraserModeSelect } from "@/components/cad/EraserSettingsPanel";
@@ -6564,6 +6565,7 @@ function ToolsTab({
             pxPerMm={guidePxPerMm}
             onChange={(p) => updateToolSettings("line", p)}
           />
+          <StrokeEffectsSettings app={cadEngine} kind="line" />
         </div>
       )}
       {settingsTool === "free" && cadEngine && (

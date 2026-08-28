@@ -6,6 +6,7 @@ import type { PolygonDrawMode } from "@/cad/PolygonTool";
 import { RasterModeToggle } from "@/components/cad/RasterModeToggle";
 import { Defaults } from "@/cad/constants";
 import { StrokeSettingsPanel } from "@/components/cad/StrokeSettingsPanel";
+import { StrokeEffectsSettings } from "@/components/cad/StrokeEffectsSettings";
 
 const HAIRLINE = "hsl(var(--hairline))";
 
@@ -154,6 +155,8 @@ export const PolygonSettingsPanel: React.FC<{
         value={{ color, thicknessM, alphaPct }}
         onChange={applyStroke}
       />
+
+      <StrokeEffectsSettings app={app} kind="polygon" />
 
       {first && (
         <div className="space-y-2 border-t pt-2" style={{ borderColor: HAIRLINE }}>
