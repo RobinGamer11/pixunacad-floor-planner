@@ -23,13 +23,13 @@ export const ADJUST_KEYS = [
 export type AdjustKey = typeof ADJUST_KEYS[number];
 export type AdjustParams = Record<AdjustKey, number>;
 
-/** Default-Werte = Slider-Defaults der Referenz. */
+/** Default-Werte = alles auf 0 (kein Effekt). Regler 0..100 = Stärke des Filters. */
 export const DEFAULT_ADJUST: AdjustParams = {
-  strength: 96, paper: 80, wash: 88, splatter: 72, lift: 65,
-  trees: 100, leaves: 96, greenVar: 90,
-  arch: 88, facade: 74, plaza: 56, ao: 52, people: 30,
-  model: 68, haze: 44, bloom: 42, edges: 72,
-  warmth: 68, softContrast: 76, sat: 50, vignette: 12,
+  strength: 0, paper: 0, wash: 0, splatter: 0, lift: 0,
+  trees: 0, leaves: 0, greenVar: 0,
+  arch: 0, facade: 0, plaza: 0, ao: 0, people: 0,
+  model: 0, haze: 0, bloom: 0, edges: 0,
+  warmth: 0, softContrast: 0, sat: 0, vignette: 0,
 };
 
 // -------------------- Presets (Referenzwerte, ohne twigs/linework)
@@ -173,7 +173,8 @@ function renderReference(
       g = mix(g, Math.round(g / q) * q, (model + strength) * 0.24);
       b = mix(b, Math.round(b / q) * q, (model + strength) * 0.24);
       const avg = (r + g + b) / 3;
-      r = mix(avg, r, 0.58 + sat * 0.60); g = mix(avg, g, 0.58 + sat * 0.60); b = mix(avg, b, 0.58 + sat * 0.60);
+      const satF = 1 + sat * 0.18; // 0 = unverändert, 100 = stärkste Sättigung
+      r = mix(avg, r, satF); g = mix(avg, g, satF); b = mix(avg, b, satF);
       r += 28 * warmth; g += 13 * warmth; b -= 12 * warmth;
       const gm = m.green[pi] / 255, am = m.arch[pi] / 255;
       if (gm > 0) {
@@ -393,6 +394,15 @@ export function renderAdjust(
 ): HTMLCanvasElement {
   const out = makeCanvas(w, h);
   const octx = out.getContext("2d", { willReadFrequently: true })!;
+
+  // Alle Regler auf 0 → kein Effekt: Quelle unverändert durchreichen.
+  const allZero = ADJUST_KEYS.every((k) => !((params as any)?.[k] > 0));
+  if (allZero) {
+    octx.imageSmoothingEnabled = true;
+    octx.imageSmoothingQuality = "high";
+    octx.drawImage(source, 0, 0, w, h);
+    return out;
+  }
 
   const s = Math.min(1, REFERENCE_MAX_PX / Math.max(w, h));
   const rw = Math.max(1, Math.round(w * s));
