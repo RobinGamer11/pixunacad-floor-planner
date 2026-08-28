@@ -8,6 +8,8 @@ import { Vec2, v, dist, projectPointToSegment, pointInPolygon } from "./geometry
 import type { CadApp } from "./CadApp";
 import type { Input } from "./Input";
 import type { Segment, FreeStroke } from "./Scene";
+import { copyStrokeEffects } from "./Scene";
+
 import { splitPolylineByCircle, splitSegmentByCircle, projectPointToInfiniteLineFromTwoPoints } from "./freeGeom";
 import { eraseDocCircle } from "./documentMask";
 import { RulerDragController } from "./rulerInteraction";
