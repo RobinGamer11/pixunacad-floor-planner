@@ -23,6 +23,11 @@ interface Props {
   showBgRemove?: boolean;
 }
 
+/** Patch oder Updater auf Basis des aktuellen Filterzustands. */
+export type FilterChange = (
+  patch: Partial<DocumentFilter> | ((cur: DocumentFilter) => Partial<DocumentFilter>),
+) => void;
+
 const MODE_OPTIONS: DocumentFilterMode[] = ["adjust", "bw", "grayscale", "tint", "free"];
 
 export function DocumentFilterPanel({ app, docId, sig, showBgRemove }: Props) {
@@ -577,7 +582,7 @@ function FilterButton(props: {
   );
 }
 
-function FilterEditor({ filter, onChange, doc }: { filter: DocumentFilter; onChange: (patch: Partial<DocumentFilter>) => void; doc: any }) {
+function FilterEditor({ filter, onChange, onBeginDrag, doc }: { filter: DocumentFilter; onChange: FilterChange; onBeginDrag?: () => void; doc: any }) {
   return (
     <div className="rounded-md border p-2 space-y-2" style={{ borderColor: "hsl(var(--border))", background: "hsl(var(--muted) / 0.3)" }}>
       <div className="text-[11px] font-semibold" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
@@ -592,6 +597,8 @@ function FilterEditor({ filter, onChange, doc }: { filter: DocumentFilter; onCha
           <input
             type="range" min={0} max={255} step={1}
             value={filter.bwThreshold ?? 160}
+            onPointerDown={() => onBeginDrag?.()}
+            onInput={(e) => onChange({ bwThreshold: parseInt((e.target as HTMLInputElement).value, 10) })}
             onChange={(e) => onChange({ bwThreshold: parseInt(e.target.value, 10) })}
             className="w-full"
           />
@@ -710,11 +717,12 @@ function AdjustEditor({ filter, onChange, onBeginDrag }: {
 }
 
 
-function FreeFilterEditor({ filter, onChange, doc }: { filter: DocumentFilter; onChange: (patch: Partial<DocumentFilter>) => void; doc: any }) {
+function FreeFilterEditor({ filter, onChange, doc }: { filter: DocumentFilter; onChange: FilterChange; doc: any }) {
   const remaps: FreeRemap[] = filter.freeRemaps || [];
   const updateRemap = (i: number, patch: Partial<FreeRemap>) => {
-    const next = remaps.map((r, k) => k === i ? { ...r, ...patch } : r);
-    onChange({ freeRemaps: next });
+    onChange((cur) => ({
+      freeRemaps: (cur.freeRemaps || []).map((r, k) => (k === i ? { ...r, ...patch } : r)),
+    }));
   };
   const reextract = () => {
     const src = getDocSourceImage(doc);
