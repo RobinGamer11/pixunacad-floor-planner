@@ -1817,8 +1817,18 @@ export class Renderer {
 
     ctx.save();
 
+    // Füllung und Kontur MÜSSEN dieselbe (ggf. aufgeraute) Geometrie nutzen,
+    // sonst entstehen sichtbare Spalten zwischen Fläche und Umriss.
+    const roughParams = (hatch as any).roughen;
+    const roughEnabled = !!roughParams?.enabled;
+    const roughRing = (raw: Vec2[], key: string) =>
+      roughEnabled ? roughenPolyline(raw, true, roughParams, { cacheKey: key }) : raw;
+
     ctx.beginPath();
-    const outerPts = tessellateWithBulges(hatch.points, (hatch as any).bulges, true, 32);
+    const outerPts = roughRing(
+      tessellateWithBulges(hatch.points, (hatch as any).bulges, true, 32),
+      `hatch:${hatch.id}:fill:outer`,
+    );
     const p0 = cam.worldToScreen(outerPts[0].x, outerPts[0].y);
     ctx.moveTo(p0.x, p0.y);
     for (let i = 1; i < outerPts.length; i++) {
@@ -1832,7 +1842,10 @@ export class Renderer {
     for (let hi = 0; hi < holes.length; hi++) {
       const raw = holes[hi];
       if (!raw || raw.length < 3) continue;
-      const loop = tessellateWithBulges(raw, (hatch as any).holeBulges?.[hi], true, 32);
+      const loop = roughRing(
+        tessellateWithBulges(raw, (hatch as any).holeBulges?.[hi], true, 32),
+        `hatch:${hatch.id}:fill:hole${hi}`,
+      );
       const h0 = cam.worldToScreen(loop[0].x, loop[0].y);
       ctx.moveTo(h0.x, h0.y);
       for (let i = 1; i < loop.length; i++) {
@@ -1844,6 +1857,7 @@ export class Renderer {
 
     ctx.fillStyle = fillCol;
     ctx.fill("evenodd");
+
 
     // Haarlinien-Versiegelung — REIN OPTISCH auf dem bereits festgeschriebenen
     // Face-Polygon (siehe hatchSeal.ts). Verändert weder Topologie noch die
