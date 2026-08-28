@@ -2,6 +2,36 @@ import { Defaults } from "./constants";
 import { Vec2, v, clamp, lerp, splitBulgedEdge, arcFromBulge, projectPointToCurvedEdge } from "./geometry";
 import { WallTopologyGraph } from "./WallTopologyGraph";
 import { offsetPolyline } from "./wallGeom";
+import {
+  DEFAULT_ROUGHEN, DEFAULT_STROKE_PATTERN, makeAppearanceSeed,
+  normalizeRoughen, normalizeStrokePattern, patternFromLegacyFreeStyle,
+  type RoughenParams, type StrokePatternParams,
+} from "./strokeEffects";
+
+/** Gemeinsame Kontur-Effekte (Linienart + Roughen) für Linie/Polygon/Schraffur/Freihand. */
+export interface StrokeEffectsInit {
+  strokePattern?: Partial<StrokePatternParams>;
+  roughen?: Partial<RoughenParams>;
+  appearanceSeed?: number;
+}
+
+export function initStrokeEffects(target: any, init: StrokeEffectsInit | undefined) {
+  const seed = (typeof init?.appearanceSeed === "number" && init.appearanceSeed > 0)
+    ? Math.floor(init.appearanceSeed) : makeAppearanceSeed();
+  target.appearanceSeed = seed;
+  target.strokePattern = normalizeStrokePattern(init?.strokePattern);
+  target.roughen = normalizeRoughen(init?.roughen, seed);
+}
+
+/** Kopiert Linienart/Roughen/Seed 1:1 (Teilen, Trimmen, Duplizieren, Radieren). */
+export function copyStrokeEffects(src: any): StrokeEffectsInit {
+  return {
+    strokePattern: { ...(src?.strokePattern || DEFAULT_STROKE_PATTERN) },
+    roughen: { ...(src?.roughen || DEFAULT_ROUGHEN) },
+    appearanceSeed: src?.appearanceSeed,
+  };
+}
+
 
 export class Segment {
   id: string;
@@ -26,10 +56,14 @@ export class Segment {
   arrowScale?: number;
   /** Signierte Wölbung der Linie (Sagitta / Sehnenlänge). 0 = gerade. */
   bulge?: number;
+  /** Gemeinsame Kontur-Effekte. */
+  strokePattern!: StrokePatternParams;
+  roughen!: RoughenParams;
+  appearanceSeed!: number;
   /** Wenn gesetzt: dieses Objekt gehört zum Edit-Mode der Sticker-Instanz mit dieser ID. */
   _stickerEditOwnerId?: string | null;
 
-  constructor({ id, a, b, color, thicknessM, labelId, isGuide, midpointSnap, divisionSnap, arrowStart, arrowEnd, arrowScale, bulge }: { id: string; a: Vec2; b: Vec2; color?: string; thicknessM?: number; labelId?: string; isGuide?: boolean; midpointSnap?: boolean; divisionSnap?: number; arrowStart?: boolean; arrowEnd?: boolean; arrowScale?: number; bulge?: number }) {
+  constructor({ id, a, b, color, thicknessM, labelId, isGuide, midpointSnap, divisionSnap, arrowStart, arrowEnd, arrowScale, bulge, strokePattern, roughen, appearanceSeed }: { id: string; a: Vec2; b: Vec2; color?: string; thicknessM?: number; labelId?: string; isGuide?: boolean; midpointSnap?: boolean; divisionSnap?: number; arrowStart?: boolean; arrowEnd?: boolean; arrowScale?: number; bulge?: number } & StrokeEffectsInit) {
     this.id = id;
     this.a = v(a.x, a.y);
     this.b = v(b.x, b.y);
@@ -43,8 +77,10 @@ export class Segment {
     this.arrowEnd = !!arrowEnd;
     this.arrowScale = (typeof arrowScale === "number" && arrowScale > 0) ? arrowScale : 1;
     this.bulge = (typeof bulge === "number" && Number.isFinite(bulge)) ? bulge : 0;
+    initStrokeEffects(this, { strokePattern, roughen, appearanceSeed });
     this._stickerEditOwnerId = null;
   }
+
 }
 
 
@@ -90,17 +126,22 @@ export class Hatch {
   bulges: number[];
   /** Signierte Kanten-Wölbungen der Löcher. */
   holeBulges: number[][];
+  /** Gemeinsame Kontur-Effekte (gelten nur für Außen-/Lochkonturen, nicht für das Füllmuster). */
+  strokePattern!: StrokePatternParams;
+  roughen!: RoughenParams;
+  appearanceSeed!: number;
   _stickerEditOwnerId?: string | null;
 
   constructor({ id, points, holes, fillColor, strokeColor, fillAlphaPct, strokeWidthPx, labelId, areaLabel,
     patternEnabled, patternId, patternScale, patternAngleDeg, patternSkewDeg, patternStretch,
-    patternOffsetX, patternOffsetY, bulges, holeBulges }: {
+    patternOffsetX, patternOffsetY, bulges, holeBulges, strokePattern, roughen, appearanceSeed }: {
     id: string; points: Vec2[]; holes?: Vec2[][]; fillColor?: string; strokeColor?: string;
     fillAlphaPct?: number; strokeWidthPx?: number; labelId?: string; areaLabel?: Partial<AreaLabel>;
     patternEnabled?: boolean; patternId?: string; patternScale?: number;
     patternAngleDeg?: number; patternSkewDeg?: number; patternStretch?: number; patternOffsetX?: number; patternOffsetY?: number;
     bulges?: number[]; holeBulges?: number[][];
-  }) {
+  } & StrokeEffectsInit) {
+
     this.id = id;
     this.points = points.map(p => v(p.x, p.y));
     this.holes = (holes || []).map(loop => loop.map(p => v(p.x, p.y)));
@@ -136,8 +177,10 @@ export class Hatch {
       rotationRad: Number.isFinite(areaLabel?.rotationRad) ? areaLabel!.rotationRad! : 0,
       scale: Number.isFinite(areaLabel?.scale) ? clamp(areaLabel!.scale!, 0.1, 20) : 1,
     };
+    initStrokeEffects(this, { strokePattern, roughen, appearanceSeed });
     this._stickerEditOwnerId = null;
   }
+
 }
 
 /**
@@ -584,6 +627,18 @@ export class FreeStroke {
   /** Bild-Stempel: Rotation entlang Pfad-Tangente. */
   imageRotateAlongPath: boolean;
   labelId: string;
+  /** Gemeinsame Kontur-Effekte (Linienart + Roughen). */
+  strokePattern!: StrokePatternParams;
+  roughen!: RoughenParams;
+  appearanceSeed!: number;
+  /**
+   * Startdistanz dieses Abschnitts auf dem ursprünglichen Freihandpfad (m).
+   * Nach dem Radieren behalten Teilstücke damit Musterphase, Roughen-Verlauf
+   * und Zufallsdarstellung des Originals bei.
+   */
+  sourceStartDistanceM: number;
+  /** ID des ursprünglichen Strokes (Herkunft nach dem Radieren). */
+  sourceStrokeId: string | null;
   _stickerEditOwnerId?: string | null;
 
   constructor(opts: {
@@ -591,7 +646,8 @@ export class FreeStroke {
     lineStyle?: FreeLineStyle; gapM?: number; blobSpacingM?: number; blobSizeM?: number;
     smoothing?: boolean; labelId?: string;
     imageSrc?: string | null; imageSizeM?: number; imageSpacingM?: number; imageRotateAlongPath?: boolean;
-  }) {
+    sourceStartDistanceM?: number; sourceStrokeId?: string | null;
+  } & StrokeEffectsInit) {
     this.id = opts.id;
     this.points = opts.points.map(p => v(p.x, p.y));
     this.color = opts.color || Defaults.freeColor;
@@ -607,8 +663,17 @@ export class FreeStroke {
     this.imageSpacingM = (typeof opts.imageSpacingM === "number" && opts.imageSpacingM > 0) ? opts.imageSpacingM : Defaults.freeImageSpacingM;
     this.imageRotateAlongPath = (typeof opts.imageRotateAlongPath === "boolean") ? opts.imageRotateAlongPath : Defaults.freeImageRotate;
     this.labelId = opts.labelId || Defaults.defaultLabelId;
+    this.sourceStartDistanceM = (typeof opts.sourceStartDistanceM === "number" && Number.isFinite(opts.sourceStartDistanceM))
+      ? opts.sourceStartDistanceM : 0;
+    this.sourceStrokeId = opts.sourceStrokeId || null;
+    // Migrationssicher: alte Freihandobjekte übernehmen lineStyle/gapM als Muster.
+    const legacy = (opts.strokePattern === undefined)
+      ? patternFromLegacyFreeStyle(this.lineStyle, this.gapM)
+      : opts.strokePattern;
+    initStrokeEffects(this, { strokePattern: legacy, roughen: opts.roughen, appearanceSeed: opts.appearanceSeed });
     this._stickerEditOwnerId = null;
   }
+
 }
 
 /** Hilfslinie (Lineal) für das Eraser-Tool. Optional, max. 1 pro Scene. */
@@ -995,8 +1060,10 @@ export class Scene {
     color?: string; thicknessM?: number; opacity?: number; lineStyle?: FreeLineStyle;
     gapM?: number; blobSpacingM?: number; blobSizeM?: number; smoothing?: boolean; labelId?: string;
     imageSrc?: string | null; imageSizeM?: number; imageSpacingM?: number; imageRotateAlongPath?: boolean;
-  } = {}) {
+    sourceStartDistanceM?: number; sourceStrokeId?: string | null;
+  } & StrokeEffectsInit = {}) {
     const stroke = new FreeStroke({ id: this._makeId(), points, ...style });
+
     stroke._stickerEditOwnerId = this._currentEditOwnerId;
     this.freeStrokes.push(stroke);
     this._rebuildFreeIdMap();
@@ -1030,10 +1097,32 @@ export class Scene {
   }
 
   /** Ersetzt einen Stroke durch beliebig viele Sub-Strokes (Eraser-Splitting). */
-  replaceFreeStrokeWithChunks(stroke: FreeStroke, chunks: Vec2[][]) {
+  replaceFreeStrokeWithChunks(
+    stroke: FreeStroke,
+    chunks: Array<Vec2[] | { points: Vec2[]; sourceStartDistanceM?: number }>,
+  ) {
+    // Kumulierte Länge des Originalpfads — jeder Abschnitt behält dadurch seine
+    // ursprüngliche Parametrisierung (Musterphase, Roughen, Körnung).
+    const src = stroke.points;
+    const cum: number[] = [0];
+    for (let i = 1; i < src.length; i++) cum.push(cum[i - 1] + Math.hypot(src[i].x - src[i - 1].x, src[i].y - src[i - 1].y));
+    const startDistanceOf = (p: Vec2): number => {
+      let best = 0, bestD = Infinity;
+      for (let i = 0; i < src.length; i++) {
+        const d = (src[i].x - p.x) ** 2 + (src[i].y - p.y) ** 2;
+        if (d < bestD) { bestD = d; best = i; }
+      }
+      return cum[best] || 0;
+    };
+    const baseStart = stroke.sourceStartDistanceM || 0;
+    const originId = stroke.sourceStrokeId || stroke.id;
+
     this.removeFreeStroke(stroke);
-    for (const ch of chunks) {
+    for (const raw of chunks) {
+      const ch = Array.isArray(raw) ? raw : raw?.points;
       if (!ch || ch.length < 2) continue;
+      const explicit = Array.isArray(raw) ? undefined : raw?.sourceStartDistanceM;
+      const startM = baseStart + (typeof explicit === "number" ? explicit : startDistanceOf(ch[0]));
       this.createFreeStroke(ch, {
         color: stroke.color, thicknessM: stroke.thicknessM, opacity: stroke.opacity,
         lineStyle: stroke.lineStyle, gapM: stroke.gapM,
@@ -1041,9 +1130,13 @@ export class Scene {
         smoothing: stroke.smoothing, labelId: stroke.labelId,
         imageSrc: stroke.imageSrc, imageSizeM: stroke.imageSizeM,
         imageSpacingM: stroke.imageSpacingM, imageRotateAlongPath: stroke.imageRotateAlongPath,
+        sourceStartDistanceM: startM,
+        sourceStrokeId: originId,
+        ...copyStrokeEffects(stroke),
       });
     }
   }
+
 
   // ---- Documents (PDF/JPG/PNG) ----
   createDocument(opts: {
@@ -1229,8 +1322,8 @@ export class Scene {
   }
 
   // ---- Segments ----
-  createSegment(a: Vec2, b: Vec2, style: { color?: string; thicknessM?: number; labelId?: string; isGuide?: boolean; midpointSnap?: boolean; divisionSnap?: number; arrowStart?: boolean; arrowEnd?: boolean; arrowScale?: number; bulge?: number } = {}) {
-    const seg = new Segment({ id: this._makeId(), a, b, color: style.color, thicknessM: style.thicknessM, labelId: style.labelId, isGuide: style.isGuide, midpointSnap: style.midpointSnap, divisionSnap: style.divisionSnap, arrowStart: style.arrowStart, arrowEnd: style.arrowEnd, arrowScale: style.arrowScale, bulge: style.bulge });
+  createSegment(a: Vec2, b: Vec2, style: { color?: string; thicknessM?: number; labelId?: string; isGuide?: boolean; midpointSnap?: boolean; divisionSnap?: number; arrowStart?: boolean; arrowEnd?: boolean; arrowScale?: number; bulge?: number } & StrokeEffectsInit = {}) {
+    const seg = new Segment({ id: this._makeId(), a, b, color: style.color, thicknessM: style.thicknessM, labelId: style.labelId, isGuide: style.isGuide, midpointSnap: style.midpointSnap, divisionSnap: style.divisionSnap, arrowStart: style.arrowStart, arrowEnd: style.arrowEnd, arrowScale: style.arrowScale, bulge: style.bulge, strokePattern: style.strokePattern, roughen: style.roughen, appearanceSeed: style.appearanceSeed });
     seg._stickerEditOwnerId = this._currentEditOwnerId;
     this.segments.push(seg);
     this._rebuildSegIdMap();
@@ -1300,7 +1393,10 @@ export class Scene {
       midpointSnap: seg.midpointSnap,
       divisionSnap: seg.divisionSnap,
       arrowScale: seg.arrowScale,
+      // Linienart, Roughen-Seed und -Parameter bleiben beim Teilen erhalten.
+      ...copyStrokeEffects(seg),
     };
+
     this.removeSegment(seg);
     const s1 = this.createSegment(seg.a, p, {
       ...style,
@@ -1327,9 +1423,10 @@ export class Scene {
     patternEnabled?: boolean; patternId?: string; patternScale?: number;
     patternAngleDeg?: number; patternSkewDeg?: number; patternStretch?: number; patternOffsetX?: number; patternOffsetY?: number;
     bulges?: number[]; holeBulges?: number[][];
-  } = {}) {
+  } & StrokeEffectsInit = {}) {
     const hatch = new Hatch({
       id: this._makeId(), points, holes: style.holes,
+      strokePattern: style.strokePattern, roughen: style.roughen, appearanceSeed: style.appearanceSeed,
       bulges: style.bulges, holeBulges: style.holeBulges,
       fillColor: style.fillColor, strokeColor: style.strokeColor,
       fillAlphaPct: style.fillAlphaPct, strokeWidthPx: style.strokeWidthPx,
@@ -1352,9 +1449,10 @@ export class Scene {
   createPolygon(points: Vec2[], style: {
     color?: string; thicknessM?: number; alpha?: number; labelId?: string; bulges?: number[];
     midpointSnap?: boolean; divisionSnap?: number;
-  } = {}) {
+  } & StrokeEffectsInit = {}) {
     const poly = new PolygonShape({
       id: this._makeId(), points,
+      strokePattern: style.strokePattern, roughen: style.roughen, appearanceSeed: style.appearanceSeed,
       bulges: style.bulges,
       strokeColor: style.color || Defaults.lineColor,
       fillAlphaPct: 0,

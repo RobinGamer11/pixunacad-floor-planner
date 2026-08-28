@@ -4,6 +4,7 @@ import { Camera } from "./Camera";
 import type { RasterLayers } from "./RasterLayers";
 import { Scene, Hatch, Dimension, TextBox, StickerInstance, DocumentObject, FreeStroke } from "./Scene";
 import { smoothChaikin } from "./freeGeom";
+import { applyStrokePattern, tracePathWithEffects, roughenPolyline, dashArrayPx, lineCapForPattern, dashOffsetPx } from "./strokeEffects";
 import { LabelManager } from "./LabelManager";
 import { getDimensionGeometry, getAngleDimensionParts, type DimensionLike } from "./dimensionGeometry";
 import { boxCornersWorld } from "./textGeometry";
@@ -1354,7 +1355,7 @@ export class Renderer {
     }
   }
 
-  private _drawSingleSegment(seg: { a: Vec2; b: Vec2; color?: string; thicknessM: number; labelId: string; isGuide?: boolean; arrowStart?: boolean; arrowEnd?: boolean; arrowScale?: number; bulge?: number }) {
+  private _drawSingleSegment(seg: { id?: string; a: Vec2; b: Vec2; color?: string; thicknessM: number; labelId: string; isGuide?: boolean; arrowStart?: boolean; arrowEnd?: boolean; arrowScale?: number; bulge?: number; strokePattern?: any; roughen?: any }) {
     const ctx = this.ctx;
     const cam = this.camera;
     const a = cam.worldToScreen(seg.a.x, seg.a.y);
@@ -1373,28 +1374,36 @@ export class Renderer {
       const gap = Math.max(3, ctx.lineWidth * 3);
       ctx.setLineDash([dash, gap]);
     }
-    const bulgePts = ((seg as any).bulge)
-      ? tessellateWithBulges([seg.a, seg.b], [(seg as any).bulge], false, 32).map(p => cam.worldToScreen(p.x, p.y))
-      : null;
-    ctx.beginPath();
-    if (bulgePts) {
-      ctx.moveTo(bulgePts[0].x, bulgePts[0].y);
-      for (let i = 1; i < bulgePts.length; i++) ctx.lineTo(bulgePts[i].x, bulgePts[i].y);
-    } else {
-      ctx.moveTo(a.x, a.y);
-      ctx.lineTo(b.x, b.y);
-    }
+
+    // Gemeinsame Stroke-Pipeline: Originalgeometrie → Roughen → Linienart.
+    const worldPts: Vec2[] = ((seg as any).bulge)
+      ? tessellateWithBulges([seg.a, seg.b], [(seg as any).bulge], false, 32)
+      : [seg.a, seg.b];
+    const strokeOpts = {
+      pattern: seg.strokePattern, roughen: seg.roughen,
+      pxPerM: cam.scale, lineWidthPx: ctx.lineWidth,
+      cacheKey: seg.id ? `seg:${seg.id}:${seg.a.x},${seg.a.y},${seg.b.x},${seg.b.y},${(seg as any).bulge || 0}` : undefined,
+    };
+    if (!seg.isGuide) applyStrokePattern(ctx, strokeOpts);
+    const drawPts = tracePathWithEffects(ctx, (p) => cam.worldToScreen(p.x, p.y), worldPts, false, strokeOpts);
     ctx.stroke();
     ctx.setLineDash([]);
+    ctx.lineDashOffset = 0;
 
-    // Pfeilspitzen (nicht für Hilfslinien)
+    // Pfeilspitzen (nicht für Hilfslinien) — bleiben an den Originalendpunkten.
     if (!seg.isGuide && (seg.arrowStart || seg.arrowEnd)) {
       const scale = (typeof seg.arrowScale === "number" && seg.arrowScale > 0) ? seg.arrowScale : 1;
       // Pfeilgröße proportional zur Linienstärke (in px).
       const sizePx = Math.max(6, this._segStrokePx(seg.thicknessM) * 6 * scale);
-      const dxw = b.x - a.x, dyw = b.y - a.y;
-      const L = Math.hypot(dxw, dyw) || 1;
-      const ux = dxw / L, uy = dyw / L;
+      // Richtung aus der ersten/letzten Tangente des abgeleiteten Pfades.
+      const n = drawPts.length;
+      const endPrev = cam.worldToScreen(drawPts[Math.max(0, n - 2)].x, drawPts[Math.max(0, n - 2)].y);
+      const startNext = cam.worldToScreen(drawPts[Math.min(n - 1, 1)].x, drawPts[Math.min(n - 1, 1)].y);
+      const dirTo = (from: { x: number; y: number }, to: { x: number; y: number }) => {
+        const dx = to.x - from.x, dy = to.y - from.y;
+        const L = Math.hypot(dx, dy) || 1;
+        return { x: dx / L, y: dy / L };
+      };
       const drawHead = (tipX: number, tipY: number, dirX: number, dirY: number) => {
         const baseX = tipX - dirX * sizePx;
         const baseY = tipY - dirY * sizePx;
@@ -1407,26 +1416,20 @@ export class Renderer {
         ctx.closePath();
         ctx.fill();
       };
-      if (seg.arrowEnd) drawHead(b.x, b.y, ux, uy);
-      if (seg.arrowStart) drawHead(a.x, a.y, -ux, -uy);
+      if (seg.arrowEnd) { const d = dirTo(endPrev, b); drawHead(b.x, b.y, d.x, d.y); }
+      if (seg.arrowStart) { const d = dirTo(startNext, a); drawHead(a.x, a.y, d.x, d.y); }
     }
 
     if (isGroupSel) {
       ctx.setLineDash([]);
       ctx.strokeStyle = "rgba(77,163,255,0.95)";
       ctx.lineWidth = Math.max(4, this._segStrokePx(seg.thicknessM) + 1.4);
-      ctx.beginPath();
-      if (bulgePts) {
-        ctx.moveTo(bulgePts[0].x, bulgePts[0].y);
-        for (let i = 1; i < bulgePts.length; i++) ctx.lineTo(bulgePts[i].x, bulgePts[i].y);
-      } else {
-        ctx.moveTo(a.x, a.y);
-        ctx.lineTo(b.x, b.y);
-      }
+      tracePathWithEffects(ctx, (p) => cam.worldToScreen(p.x, p.y), worldPts, false, strokeOpts);
       ctx.stroke();
     }
     ctx.restore();
   }
+
 
 
   private _drawDoorsForLabel(labelId: string) {
@@ -1773,19 +1776,21 @@ export class Renderer {
 
     ctx.save();
     ctx.globalAlpha = alpha;
-    ctx.beginPath();
     const pts = tessellateWithBulges(poly.points, (poly as any).bulges, true, 32);
-    const p0 = cam.worldToScreen(pts[0].x, pts[0].y);
-    ctx.moveTo(p0.x, p0.y);
-    for (let i = 1; i < pts.length; i++) {
-      const sp = cam.worldToScreen(pts[i].x, pts[i].y);
-      ctx.lineTo(sp.x, sp.y);
-    }
-    ctx.closePath();
+    // Muster läuft über die gesamte geschlossene Kontur durch (kein Neustart je Kante).
+    const strokeOpts = {
+      pattern: (poly as any).strokePattern, roughen: (poly as any).roughen,
+      pxPerM: cam.scale, lineWidthPx: strokePx,
+      cacheKey: `poly:${poly.id}:${pts.length}:${pts[0]?.x},${pts[0]?.y}`,
+    };
     ctx.strokeStyle = poly.strokeColor || Defaults.lineColor;
     ctx.lineWidth = strokePx;
     ctx.lineJoin = "round";
+    applyStrokePattern(ctx, strokeOpts);
+    tracePathWithEffects(ctx, (p) => cam.worldToScreen(p.x, p.y), pts, true, strokeOpts);
     ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.lineDashOffset = 0;
 
     if (isHovered && !isSelected) {
       ctx.globalAlpha = 1;
@@ -1793,6 +1798,7 @@ export class Renderer {
       ctx.lineWidth = Math.max(1.5, strokePx + 1.2);
       ctx.stroke();
     }
+
     ctx.restore();
   }
 
@@ -1848,17 +1854,40 @@ export class Renderer {
 
     this._paintHatchPattern(ctx, cam, hatch);
 
+    // Konturlinie der Schraffur: eigene Pipeline (Linienart + Roughen) für
+    // Außenkontur und jedes Loch. Die Füllung bleibt an der Originalgeometrie.
+    const contourOpts = {
+      pattern: (hatch as any).strokePattern, roughen: (hatch as any).roughen,
+      pxPerM: cam.scale, lineWidthPx: strokePx,
+    };
+    const contourRings: Vec2[][] = [
+      hatchOuterRing(hatch as any),
+      ...hatchHoleRings(hatch as any),
+    ].filter((r) => r && r.length >= 2);
+    const strokeContours = () => {
+      contourRings.forEach((ring, i) => {
+        tracePathWithEffects(ctx, (p) => cam.worldToScreen(p.x, p.y), ring, true, {
+          ...contourOpts, cacheKey: `hatch:${hatch.id}:${i}:${ring.length}`,
+        });
+        ctx.stroke();
+      });
+    };
+
     if (strokePx > 0) {
       ctx.strokeStyle = strokeCol;
       ctx.lineWidth = strokePx;
-      ctx.stroke();
+      applyStrokePattern(ctx, contourOpts);
+      strokeContours();
+      ctx.setLineDash([]);
+      ctx.lineDashOffset = 0;
     }
 
     if (isHovered && !isSelected) {
       ctx.strokeStyle = "rgba(77,163,255,0.55)";
       ctx.lineWidth = Math.max(1.5, strokePx + 1.2);
-      ctx.stroke();
+      strokeContours();
     }
+
 
     this._drawAreaLabel(hatch, !!isSelected);
     ctx.restore();
@@ -2944,15 +2973,20 @@ export class Renderer {
     }
     ctx.strokeStyle = strokeColor;
     ctx.lineWidth = strokeWidth;
-    const p0 = cam.worldToScreen(pts[0].x, pts[0].y);
-    ctx.beginPath();
-    ctx.moveTo(p0.x, p0.y);
-    for (let i = 1; i < pts.length; i++) {
-      const p = cam.worldToScreen(pts[i].x, pts[i].y);
-      ctx.lineTo(p.x, p.y);
-    }
+    // Gemeinsame Kontur-Pipeline: Linienart und Roughen mit durchlaufender
+    // Phase (Radiergummi-Abschnitte bleiben dadurch nahtlos).
+    const phaseM = (s as any).sourceStartDistanceM || 0;
+    const strokeOpts = {
+      pattern: (s as any).strokePattern, roughen: (s as any).roughen,
+      pxPerM: cam.scale, lineWidthPx: strokeWidth, phaseM,
+      cacheKey: `free:${s.id}:${pts.length}`,
+    };
+    if ((s as any).strokePattern && (s as any).strokePattern.kind !== "solid") applyStrokePattern(ctx, strokeOpts);
+    tracePathWithEffects(ctx, (p) => cam.worldToScreen(p.x, p.y), pts, false, strokeOpts);
     ctx.stroke();
     ctx.setLineDash([]);
+    ctx.lineDashOffset = 0;
+
     ctx.restore();
   }
 

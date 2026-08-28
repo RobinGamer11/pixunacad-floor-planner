@@ -6,6 +6,7 @@ import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, 
 import type { HatchDrawMode } from "@/cad/HatchTool";
 import type { PolygonDrawMode } from "@/cad/PolygonTool";
 import { PolygonModeSelect, PolygonSettingsPanel } from "@/components/cad/PolygonSettingsPanel";
+import { StrokeEffectsSettings } from "@/components/cad/StrokeEffectsSettings";
 import type { StickerDefinition } from "@/cad/StickerManager";
 import { instanceBoundingCornersWorld } from "@/cad/StickerManager";
 import { importFile, type ImportedPage } from "@/cad/documentImport";
@@ -2311,6 +2312,9 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                     </label>
                   </div>
                 )}
+              </div>
+              <div className="mt-3">
+                <StrokeEffectsSettings app={appRef.current} kind="line" />
               </div>
             </div>
           </div>

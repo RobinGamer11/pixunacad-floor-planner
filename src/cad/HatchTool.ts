@@ -636,7 +636,7 @@ export class HatchTool {
     }
 
     if (!carvedAsHole) {
-      const createdHatch = this.app.scene.createHatch(points, this.app.getCurrentHatchStyle());
+      const createdHatch = this.app.scene.createHatch(points, { ...this.app.getCurrentHatchStyle(), ...((this.app as any).getStrokeEffectDefaults?.("hatch") ?? {}) });
       maybeRasterize(this.app, { type: "hatch", obj: createdHatch });
     }
   }
@@ -913,7 +913,7 @@ export class HatchTool {
       });
       return;
     }
-    const filledHatch = this.app.scene.createHatch(loop, this.app.getCurrentHatchStyle());
+    const filledHatch = this.app.scene.createHatch(loop, { ...this.app.getCurrentHatchStyle(), ...((this.app as any).getStrokeEffectDefaults?.("hatch") ?? {}) });
     maybeRasterize(this.app, { type: "hatch", obj: filledHatch });
     this.app.clearSelection();
   }
