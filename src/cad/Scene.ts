@@ -56,10 +56,14 @@ export class Segment {
   arrowScale?: number;
   /** Signierte Wölbung der Linie (Sagitta / Sehnenlänge). 0 = gerade. */
   bulge?: number;
+  /** Gemeinsame Kontur-Effekte. */
+  strokePattern!: StrokePatternParams;
+  roughen!: RoughenParams;
+  appearanceSeed!: number;
   /** Wenn gesetzt: dieses Objekt gehört zum Edit-Mode der Sticker-Instanz mit dieser ID. */
   _stickerEditOwnerId?: string | null;
 
-  constructor({ id, a, b, color, thicknessM, labelId, isGuide, midpointSnap, divisionSnap, arrowStart, arrowEnd, arrowScale, bulge }: { id: string; a: Vec2; b: Vec2; color?: string; thicknessM?: number; labelId?: string; isGuide?: boolean; midpointSnap?: boolean; divisionSnap?: number; arrowStart?: boolean; arrowEnd?: boolean; arrowScale?: number; bulge?: number }) {
+  constructor({ id, a, b, color, thicknessM, labelId, isGuide, midpointSnap, divisionSnap, arrowStart, arrowEnd, arrowScale, bulge, strokePattern, roughen, appearanceSeed }: { id: string; a: Vec2; b: Vec2; color?: string; thicknessM?: number; labelId?: string; isGuide?: boolean; midpointSnap?: boolean; divisionSnap?: number; arrowStart?: boolean; arrowEnd?: boolean; arrowScale?: number; bulge?: number } & StrokeEffectsInit) {
     this.id = id;
     this.a = v(a.x, a.y);
     this.b = v(b.x, b.y);
@@ -73,8 +77,10 @@ export class Segment {
     this.arrowEnd = !!arrowEnd;
     this.arrowScale = (typeof arrowScale === "number" && arrowScale > 0) ? arrowScale : 1;
     this.bulge = (typeof bulge === "number" && Number.isFinite(bulge)) ? bulge : 0;
+    initStrokeEffects(this, { strokePattern, roughen, appearanceSeed });
     this._stickerEditOwnerId = null;
   }
+
 }
 
 
