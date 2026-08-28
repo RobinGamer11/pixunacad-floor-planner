@@ -1223,10 +1223,21 @@ export class CadApp {
   clearSelection() { this.setSelection(null); }
 
   /**
+   * Zuletzt gewähltes objektbezogenes Werkzeug (Linie, Polygon, Text …).
+   * Bestimmt, welche Objektarten "Alles"/Strg+A auswählt. Auswahlwerkzeug,
+   * Radierer und Pipette ändern diesen Zustand ausdrücklich NICHT.
+   */
+  selectionFilterTool: ObjectToolId | null = null;
+
+  /** Hebt den Werkzeugfilter auf — "Alles" wählt dann wieder alles aus. */
+  clearSelectionFilterTool() { this.selectionFilterTool = null; }
+
+  /**
    * "Alles auswählen" im aktiven CAD-Plan. Sammelt alle auswählbaren Objekte
    * über denselben Collector wie die Rahmen-Auswahl und schreibt sie direkt in
    * `selectTool.marqueeSelectedIds` — kein zweiter Auswahlzustand.
-   * Läuft gerade eine unbestätigte Zeichenaktion, passiert nichts.
+   * Ist zuletzt ein objektbezogenes Werkzeug aktiv gewesen, werden nur dessen
+   * Objekte erfasst. Läuft gerade eine unbestätigte Zeichenaktion, passiert nichts.
    */
   selectAllInActiveCadPlan(): boolean {
     // Kein sicherer Wechsel zum Auswahlwerkzeug, solange gezeichnet wird.
@@ -1238,13 +1249,19 @@ export class CadApp {
       if (st?.pasteFloatActive || st?.groupRotateActive || st?.groupDragActive || st?.groupAnchorActive) return false;
     } catch { /* ignore */ }
 
+    // Filter VOR dem Werkzeugwechsel sichern — `setTool(SELECT)` darf den
+    // Werkzeugkontext nicht verlieren.
+    const filter = this.selectionFilterTool;
     if (this.activeTool !== this.selectTool) this.setTool(ToolIds.SELECT);
-    const n = this.selectTool.selectAll();
+    const n = this.selectTool.selectAll(filter);
     if (!n) return false;
+    // Führendes Objekt = zuletzt erfasstes Objekt der Auswahl.
+    try { this.selectTool.syncPrimarySelection(); } catch {}
     try { this.onSelectionChange?.(); } catch {}
     try { this.renderer.render(); } catch {}
     return true;
   }
+
 
 
   /** True, wenn eine Löschung per Entf-Taste etwas entfernen würde. */
