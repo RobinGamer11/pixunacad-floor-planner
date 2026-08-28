@@ -82,7 +82,9 @@ import {
   Frame as FrameIcon,
   Scan as ScanIcon,
   Layers,
-  Star,, Pentagon } from "lucide-react";
+  Star,
+  Pentagon,
+} from "lucide-react";
 
 import {
   projectStore,
