@@ -1758,8 +1758,47 @@ export class Renderer {
     ctx.restore();
   }
 
+  /**
+   * Polygonobjekt — nur Kontur, keine Füllung, kein Muster, keine
+   * Flächenbeschriftung. Die Strichbreite ist physisch (Meter) und verhält
+   * sich damit exakt wie beim Linienwerkzeug.
+   */
+  private _drawSinglePolygon(poly: Hatch) {
+    const ctx = this.ctx;
+    const cam = this.camera;
+    const isHovered = this.hoverHatchId === poly.id;
+    const isSelected = this.selection && this.selection.hatchId === poly.id;
+    const strokePx = this._segStrokePx((poly as any).thicknessM || Defaults.lineThicknessM);
+    const alpha = Math.max(0, Math.min(1, (poly as any).alpha ?? 1));
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.beginPath();
+    const pts = tessellateWithBulges(poly.points, (poly as any).bulges, true, 32);
+    const p0 = cam.worldToScreen(pts[0].x, pts[0].y);
+    ctx.moveTo(p0.x, p0.y);
+    for (let i = 1; i < pts.length; i++) {
+      const sp = cam.worldToScreen(pts[i].x, pts[i].y);
+      ctx.lineTo(sp.x, sp.y);
+    }
+    ctx.closePath();
+    ctx.strokeStyle = poly.strokeColor || Defaults.lineColor;
+    ctx.lineWidth = strokePx;
+    ctx.lineJoin = "round";
+    ctx.stroke();
+
+    if (isHovered && !isSelected) {
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = "rgba(77,163,255,0.55)";
+      ctx.lineWidth = Math.max(1.5, strokePx + 1.2);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   private _drawSingleHatch(hatch: Hatch) {
     if (hatch.points.length < 3) return;
+    if ((hatch as any).isPolygon === true) { this._drawSinglePolygon(hatch); return; }
     const ctx = this.ctx;
     const cam = this.camera;
 

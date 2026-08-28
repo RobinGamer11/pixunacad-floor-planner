@@ -18,6 +18,7 @@ import { PointEditMenu } from "./PointEditMenu";
 import { SelectTool } from "./SelectTool";
 import { LineTool } from "./LineTool";
 import { HatchTool } from "./HatchTool";
+import { PolygonTool } from "./PolygonTool";
 import { MeasureTool } from "./MeasureTool";
 import { TextTool } from "./TextTool";
 import { TextEditorOverlay } from "./TextEditorOverlay";
@@ -308,6 +309,11 @@ export class CadApp {
   selectTool: SelectTool;
   lineTool: LineTool;
   hatchTool: HatchTool;
+  polygonTool: PolygonTool;
+  /** Standardwerte des Polygonwerkzeugs. */
+  defaultPolygonColor = Defaults.lineColor;
+  defaultPolygonThicknessM = Defaults.lineThicknessM;
+  defaultPolygonAlpha = 1;
   measureTool!: MeasureTool;
   textTool!: TextTool;
   pipetteTool!: PipetteTool;
@@ -547,6 +553,7 @@ export class CadApp {
     this.selectTool = new SelectTool(this);
     this.lineTool = new LineTool(this);
     this.hatchTool = new HatchTool(this);
+    this.polygonTool = new PolygonTool(this);
     this.measureTool = new MeasureTool(this);
     this.textTool = new TextTool(this);
     this.pipetteTool = new PipetteTool(this);
@@ -658,6 +665,9 @@ export class CadApp {
         labelId: h.labelId, areaLabel: { ...h.areaLabel },
         bulges: [...((h as any).bulges || [])],
         holeBulges: ((h as any).holeBulges || []).map((l: number[]) => [...l]),
+        isPolygon: (h as any).isPolygon === true,
+        thicknessM: (h as any).thicknessM,
+        alpha: (h as any).alpha,
         _stickerEditOwnerId: h._stickerEditOwnerId || null,
       })),
       walls: scene.walls.map(w => ({
@@ -836,6 +846,14 @@ export class CadApp {
       if (s._stickerEditOwnerId) seg._stickerEditOwnerId = s._stickerEditOwnerId;
     }
     for (const h of data.hatches || []) {
+      if (h.isPolygon) {
+        const poly = scene.createPolygon(h.points, {
+          color: h.strokeColor, thicknessM: h.thicknessM, alpha: h.alpha,
+          labelId: h.labelId, bulges: h.bulges,
+        });
+        if (h._stickerEditOwnerId) (poly as any)._stickerEditOwnerId = h._stickerEditOwnerId;
+        continue;
+      }
       const hatch = scene.createHatch(h.points, {
         fillColor: h.fillColor, strokeColor: h.strokeColor,
         fillAlphaPct: h.fillAlphaPct, strokeWidthPx: h.strokeWidthPx,
@@ -1742,6 +1760,18 @@ export class CadApp {
   }
 
 
+  /** Aktueller Stil des Polygonwerkzeugs (ausgewähltes Polygon hat Vorrang). */
+  getCurrentPolygonStyle() {
+    const sel = this.selection?.hatchId ? this.scene.getHatchById(this.selection.hatchId) : null;
+    const selPoly = sel && (sel as any).isPolygon ? (sel as any) : null;
+    return {
+      color: selPoly?.strokeColor || this.defaultPolygonColor,
+      thicknessM: selPoly?.thicknessM ?? this.defaultPolygonThicknessM,
+      alpha: selPoly?.alpha ?? this.defaultPolygonAlpha,
+      labelId: selPoly?.labelId || this.selectedLabelId || Defaults.defaultLabelId,
+    };
+  }
+
   getCurrentHatchStyle() {
     const selected = this.getSelectedHatch();
     if (selected) {
@@ -2472,9 +2502,17 @@ export class CadApp {
       if (e.key === "Tab") {
         if (this.activeTool === this.lineTool) { const h = this.lineTool.onTabRequest(); if (h) { e.preventDefault(); return; } }
         if (this.activeTool === this.hatchTool) { const h = this.hatchTool.onTabRequest(); if (h) { e.preventDefault(); return; } }
+        if (this.activeTool === this.polygonTool) { const h = this.polygonTool.onTabRequest(); if (h) { e.preventDefault(); return; } }
         if (this.activeTool === this.wallTool) { const h = this.wallTool.onTabRequest(); if (h) { e.preventDefault(); return; } }
       }
 
+      if (e.key === "Enter" && this.activeTool === this.polygonTool && !isHubInput) {
+        if (this.polygonTool.finishFromKey()) { e.preventDefault(); return; }
+      }
+      // BACKSPACE entfernt beim Polygonwerkzeug den zuletzt gesetzten Punkt.
+      if (e.key === "Backspace" && this.activeTool === this.polygonTool && !isHubInput) {
+        if (this.polygonTool.removeLastPoint()) { e.preventDefault(); return; }
+      }
       if (e.key === "Enter" && this.activeTool === this.hatchTool && !isHubInput) {
         if (this.hatchTool.drawMode === "circle" && this.hatchTool.circleState === "arc") {
           e.preventDefault();
@@ -2519,6 +2557,7 @@ export class CadApp {
       if (e.key === "v" || e.key === "V") this.setTool(ToolIds.SELECT);
       if (e.key === "l" || e.key === "L") this.setTool(ToolIds.LINE);
       if (e.key === "h" || e.key === "H") this.setTool(ToolIds.HATCH);
+      if (e.key === "g" || e.key === "G") this.setTool(ToolIds.POLYGON);
       if (e.key === "m" || e.key === "M") this.setTool(ToolIds.MEASURE);
       if (e.key === "t" || e.key === "T") this.setTool(ToolIds.TEXT);
       if (e.key === "p" || e.key === "P") this.setTool(ToolIds.PIPETTE);
@@ -2610,6 +2649,11 @@ export class CadApp {
           if (t === this.documentTool && this.documentTool.phase !== "idle") { e.preventDefault(); this.documentTool.cancel(); return; }
         }
         if (this.activeTool === this.lineTool) { this.lineTool.cancel(); this.clearSelection(); this.setSelectedLabelId(null); this.setTool(ToolIds.SELECT); return; }
+        if (this.activeTool === this.polygonTool) {
+          // ESC arbeitet stufenweise: laufende Kontur abbrechen, sonst Werkzeug verlassen.
+          if (this.polygonTool.isDrawing()) { this.polygonTool.cancel(); return; }
+          this.clearSelection(); this.setTool(ToolIds.SELECT); return;
+        }
         if (this.activeTool === this.hatchTool) { this.hatchTool.cancel(); this.clearSelection(); this.setTool(ToolIds.SELECT); return; }
         if (this.activeTool === this.textTool) { this.textTool.cancel(); this.clearSelection(); this.setSelectedLabelId(null); this.setTool(ToolIds.SELECT); return; }
         if (this.activeTool === this.measureTool) { this.measureTool.cancel(); this.clearSelection(); this.setTool(ToolIds.SELECT); return; }
@@ -2991,6 +3035,7 @@ export class CadApp {
     if (id === ToolIds.SELECT) { this.activeTool = this.selectTool; this.selectTool.activate(); }
     else if (id === ToolIds.LINE) { this.activeTool = this.lineTool; this.lineTool.activate(); }
     else if (id === ToolIds.HATCH) { this.activeTool = this.hatchTool; this.hatchTool.activate(); }
+    else if (id === ToolIds.POLYGON) { this.activeTool = this.polygonTool; this.polygonTool.activate(); }
     else if (id === ToolIds.MEASURE) { this.activeTool = this.measureTool; this.measureTool.activate(); }
     else if (id === ToolIds.TEXT) { this.activeTool = this.textTool; this.textTool.activate(); }
     else if (id === ToolIds.PIPETTE) { this.activeTool = this.pipetteTool; this.pipetteTool.activate(); }

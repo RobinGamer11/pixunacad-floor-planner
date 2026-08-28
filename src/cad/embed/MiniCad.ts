@@ -31,6 +31,7 @@ import { SelectTool } from "../SelectTool";
 import { FreeDrawTool } from "../FreeDrawTool";
 import { EraserTool } from "../EraserTool";
 import { PipetteTool } from "../PipetteTool";
+import { PolygonTool } from "../PolygonTool";
 import { HatchTool, type HatchDrawMode } from "../HatchTool";
 import { DocumentTool } from "../DocumentTool";
 import { Defaults, SelectionType, PointEditAction } from "../constants";
@@ -95,7 +96,7 @@ type SelectionGeometrySnapshot =
   | { kind: "freestroke"; pts: { x: number; y: number }[] };
 
 
-export type MiniTool = "line" | "text" | "select" | "guide" | "free" | "eraser" | "hatch" | "document" | "pipette" | null;
+export type MiniTool = "line" | "text" | "select" | "guide" | "free" | "eraser" | "hatch" | "polygon" | "document" | "pipette" | null;
 export type MiniCadSelectionInfo =
   | {
       tool: "line";
@@ -175,6 +176,11 @@ export class MiniCad {
   readonly eraserTool: EraserTool;
   readonly pipetteTool: PipetteTool;
   readonly hatchTool: HatchTool;
+  readonly polygonTool: PolygonTool;
+  /** Standardwerte des Polygonwerkzeugs (Mappe). */
+  defaultPolygonColor: string = Defaults.lineColor;
+  defaultPolygonThicknessM: number = Defaults.lineThicknessM;
+  defaultPolygonAlpha = 1;
   readonly documentTool: DocumentTool;
 
   // Stubs required by tools / editor.
@@ -398,6 +404,7 @@ export class MiniCad {
     this.eraserTool = new EraserTool(this as any);
     this.pipetteTool = new PipetteTool(this as any);
     this.hatchTool = new HatchTool(this as any);
+    this.polygonTool = new PolygonTool(this as any);
     this.documentTool = new DocumentTool(this as any);
 
     // Wire PointEditMenu activation identisch zur CadApp-Oberfläche.
@@ -886,6 +893,7 @@ export class MiniCad {
     if (this._activeTool === "free") this.freeDrawTool.cancel();
     if (this._activeTool === "eraser") this.eraserTool.cancel();
     if (this._activeTool === "hatch") this.hatchTool.cancel();
+    if (this._activeTool === "polygon") this.polygonTool.cancel();
     if (this._activeTool === "document") this.documentTool.cancel();
     if (this._activeTool === "pipette") this.pipetteTool.cancel();
     this._activeTool = tool;
@@ -909,6 +917,9 @@ export class MiniCad {
     } else if (tool === "hatch") {
       this.hatchTool.activate();
       this.activeTool = this.hatchTool as any;
+    } else if (tool === "polygon") {
+      this.polygonTool.activate();
+      this.activeTool = this.polygonTool as any;
     } else if (tool === "document") {
       this.documentTool.activate();
       this.activeTool = this.documentTool as any;
@@ -1338,6 +1349,9 @@ export class MiniCad {
         fillAlphaPct: h.fillAlphaPct,
         strokeWidthPx: h.strokeWidthPx,
         labelId: h.labelId,
+        isPolygon: (h as any).isPolygon === true,
+        thicknessM: (h as any).thicknessM,
+        alpha: (h as any).alpha,
         areaLabel: h.areaLabel ? { ...h.areaLabel } : undefined,
         patternEnabled: h.patternEnabled,
         patternId: h.patternId,
@@ -1448,6 +1462,13 @@ export class MiniCad {
     if (Array.isArray(data.hatches)) {
       for (const h of data.hatches) {
         try {
+          if (h.isPolygon) {
+            this.scene.createPolygon(h.points || [], {
+              color: h.strokeColor, thicknessM: h.thicknessM, alpha: h.alpha,
+              labelId: h.labelId || Defaults.defaultLabelId, bulges: h.bulges,
+            });
+            continue;
+          }
           this.scene.createHatch(h.points || [], {
             holes: h.holes,
             fillColor: h.fillColor, strokeColor: h.strokeColor,
@@ -1900,6 +1921,12 @@ export class MiniCad {
             arrowStart: !!o.arrowStart, arrowEnd: !!o.arrowEnd, arrowScale: o.arrowScale, bulge: o.bulge,
           });
           if (n) created.push({ kind: "segment", id: n.id });
+        } else if (it.kind === "hatch" && o.isPolygon) {
+          const n = this.scene.createPolygon(o.points.map(mv), {
+            color: o.strokeColor, thicknessM: o.thicknessM, alpha: o.alpha,
+            labelId: o.labelId, bulges: o.bulges,
+          });
+          if (n) created.push({ kind: "hatch", id: n.id });
         } else if (it.kind === "hatch") {
           const n = this.scene.createHatch(o.points.map(mv), {
             holes: (o.holes ?? []).map((h: any[]) => h.map(mv)),
@@ -2105,6 +2132,19 @@ export class MiniCad {
   /** Für getCurrentHatchStyle — im Embed nutzen wir keine Gruppen-Auswahl. */
   getSelectedGroupHatches(): any[] { return []; }
 
+  /** Aktueller Stil des Polygonwerkzeugs (ausgewähltes Polygon hat Vorrang). */
+  getCurrentPolygonStyle() {
+    const selId = (this.selection as any)?.hatchId;
+    const sel = selId ? this.scene.getHatchById(selId) : null;
+    const p = sel && (sel as any).isPolygon ? (sel as any) : null;
+    return {
+      color: p?.strokeColor || this.defaultPolygonColor,
+      thicknessM: p?.thicknessM ?? this.defaultPolygonThicknessM,
+      alpha: p?.alpha ?? this.defaultPolygonAlpha,
+      labelId: p?.labelId || Defaults.defaultLabelId,
+    };
+  }
+
   getCurrentHatchStyle() {
     const sel = this.getSelectedHatch();
     if (sel) {
@@ -2291,6 +2331,17 @@ export class MiniCad {
         }
       }
 
+      // Polygonwerkzeug: ENTER schließt die Kontur, BACKSPACE nimmt den
+      // zuletzt gesetzten Punkt zurück.
+      if (!inField && this._activeTool === "polygon") {
+        if (e.key === "Enter") {
+          if (this.polygonTool.finishFromKey()) { e.preventDefault(); this._changeDirty = true; try { this.onSelectionChange?.(); } catch {} return; }
+        }
+        if (e.key === "Backspace") {
+          if (this.polygonTool.removeLastPoint()) { e.preventDefault(); return; }
+        }
+      }
+
       // ENTER platziert ein schwebendes Dokument (PNG/JPG/PDF) endgültig.
       if (e.key === "Enter" && !inField && this._activeTool === "document") {
         if ((this.documentTool as any).finishFromKey?.()) {
@@ -2318,7 +2369,7 @@ export class MiniCad {
         }
         try { this.selectTool.cancelGroupTransform(true); } catch {}
         try { (this.activeTool as any)?.cancel?.(); } catch {}
-        try { (this.lineTool as any)?.cancel?.(); (this.hatchTool as any)?.cancel?.();
+        try { (this.lineTool as any)?.cancel?.(); (this.hatchTool as any)?.cancel?.(); (this.polygonTool as any)?.cancel?.();
               (this.freeDrawTool as any)?.cancel?.(); (this.eraserTool as any)?.cancel?.();
               (this.documentTool as any)?.cancel?.(); } catch {}
         try { this.selectTool.cancel(); } catch {}
@@ -2872,6 +2923,7 @@ export class MiniCad {
       else if (this._activeTool === "free") this.freeDrawTool.update(this.input);
       else if (this._activeTool === "eraser") this.eraserTool.update(this.input);
       else if (this._activeTool === "hatch") this.hatchTool.update(this.input);
+      else if (this._activeTool === "polygon") this.polygonTool.update(this.input);
       else if (this._activeTool === "document") this.documentTool.update(this.input);
       else if (this._activeTool === "pipette") this.pipetteTool.update(this.input);
 

@@ -83,6 +83,8 @@ interface Props {
   textBorderWidthPx?: number;
 
   hatchDrawMode?: HatchDrawMode;
+  /** Zeichenart des Polygonwerkzeugs. */
+  polygonDrawMode?: "polygon" | "rectangle" | "circle";
 
   /**
    * Optionale CAD-State einer Hintergrundseite (Transparenzpause). Deren
@@ -121,6 +123,7 @@ function syncHostSettings(engine: MiniCad, p: Props) {
   engine.setMultiSelectMode(!!p.multiSelectMode);
   if (p.selectMarqueeMode) engine.selectTool.marqueeMode = p.selectMarqueeMode;
   if (p.hatchDrawMode) engine.hatchTool.setDrawMode(p.hatchDrawMode);
+  if (p.polygonDrawMode) engine.polygonTool.setDrawMode(p.polygonDrawMode as any);
   engine.setTextDefaults({
     color: p.textColor,
     fontSizePx: p.textFontSizePx,
@@ -152,6 +155,7 @@ export default function CadOverlayLayer(props: Props) {
     textColor, textFontSizePx, textBold, textItalic, textUnderline, textStrike, textLineHeightPct, textAlpha, textAlign,
     textBgColor, textBgAlphaPct, textWrap, textAutoSize, textBorderEnabled, textBorderColor, textBorderWidthPx,
     hatchDrawMode,
+    polygonDrawMode,
     ghostSnapState,
   } = props;
 
@@ -350,7 +354,8 @@ export default function CadOverlayLayer(props: Props) {
   }, [docHub.mode]);
   useEffect(() => {
     if (hatchDrawMode) engineRef.current?.hatchTool.setDrawMode(hatchDrawMode);
-  }, [hatchDrawMode, activeTool]);
+    if (polygonDrawMode) engineRef.current?.polygonTool.setDrawMode(polygonDrawMode as any);
+  }, [hatchDrawMode, polygonDrawMode, activeTool]);
   useEffect(() => {
     if (typeof pageMarginsMm === "number") engineRef.current?.setPageMargins(pageMarginsMm);
   }, [pageMarginsMm]);

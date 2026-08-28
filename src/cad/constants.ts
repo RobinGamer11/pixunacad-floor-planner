@@ -136,6 +136,7 @@ export const ToolIds = {
   SELECT: "select",
   LINE: "line",
   HATCH: "hatch",
+  POLYGON: "polygon",
   MEASURE: "measure",
   TEXT: "text",
   PIPETTE: "pipette",
