@@ -96,10 +96,7 @@ export const PolygonSettingsPanel: React.FC<{
       {!hideChrome && <PolygonModeSelect app={app} />}
       {!hideChrome && <RasterModeToggle app={app} projectId={projectId} />}
 
-      <div>
-        <span className="mb-1 block text-[9px] text-muted-foreground">Konturfarbe</span>
-        <ToolColorPicker value={color} onChange={setColor} />
-      </div>
+      <ToolColorPicker label="Konturfarbe" value={color} onChange={setColor} />
 
       <label className="block">
         <span className="mb-1 block text-[9px] text-muted-foreground">Linienstärke (mm)</span>
