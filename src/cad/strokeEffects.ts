@@ -280,3 +280,53 @@ export function lineCapForPattern(pattern: StrokePatternParams): CanvasLineCap {
 export function dashOffsetPx(phaseM: number, pxPerM: number): number {
   return -(phaseM || 0) * pxPerM;
 }
+
+// ---------------------------------------------------------------- Canvas-Pipeline
+
+export interface StrokeRenderOptions {
+  pattern?: StrokePatternParams;
+  roughen?: RoughenParams;
+  /** Kamera-Skalierung (Bildschirm-Pixel pro Weltmeter). */
+  pxPerM: number;
+  lineWidthPx?: number;
+  /** Distanzversatz auf dem Originalpfad (geteilte Konturen). */
+  phaseM?: number;
+  cacheKey?: string;
+}
+
+/**
+ * Gemeinsame Stroke-Pipeline:
+ *   Originalgeometrie → Roughen (Weltkoordinaten) → Linienart entlang der
+ *   Pfadlänge → Kontur zeichnen.
+ * Wird von Linie, Polygon, Schraffur (außen + Löcher) und Freihand genutzt.
+ */
+export function tracePathWithEffects(
+  ctx: CanvasRenderingContext2D,
+  project: (p: Vec2) => { x: number; y: number },
+  worldPts: Vec2[],
+  closed: boolean,
+  opts: StrokeRenderOptions,
+): Vec2[] {
+  const pts = opts.roughen?.enabled
+    ? roughenPolyline(worldPts, closed, opts.roughen, { phaseM: opts.phaseM, cacheKey: opts.cacheKey })
+    : worldPts;
+  if (!pts.length) return pts;
+  ctx.beginPath();
+  const s0 = project(pts[0]);
+  ctx.moveTo(s0.x, s0.y);
+  for (let i = 1; i < pts.length; i++) {
+    const s = project(pts[i]);
+    ctx.lineTo(s.x, s.y);
+  }
+  if (closed) ctx.closePath();
+  return pts;
+}
+
+/** Setzt Linienart (Dash/Punkte, Kappe, Phase) am Kontext. */
+export function applyStrokePattern(ctx: CanvasRenderingContext2D, opts: StrokeRenderOptions) {
+  const pattern = opts.pattern;
+  if (!pattern || pattern.kind === "solid") { ctx.setLineDash([]); ctx.lineDashOffset = 0; return; }
+  ctx.setLineDash(dashArrayPx(pattern, opts.pxPerM, opts.lineWidthPx ?? ctx.lineWidth));
+  ctx.lineDashOffset = dashOffsetPx(opts.phaseM || 0, opts.pxPerM);
+  ctx.lineCap = lineCapForPattern(pattern);
+}
