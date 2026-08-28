@@ -13,6 +13,7 @@
  */
 
 import { migrateSceneData } from "@/lib/persistence";
+import { DEFAULT_ROUGHEN, DEFAULT_STROKE_PATTERN, type RoughenParams, type StrokePatternParams } from "../strokeEffects";
 import { Camera } from "../Camera";
 import { Scene } from "../Scene";
 import { Input } from "../Input";
@@ -1532,6 +1533,19 @@ export class MiniCad {
   }
 
   /* ===== Required CadApp surface for LineTool / TextTool / TextEditor ===== */
+
+  /** Gleiche Kontur-Standardwerte wie in der CAD-Oberfläche. */
+  strokeEffectDefaults: Record<string, { strokePattern: StrokePatternParams; roughen: RoughenParams }> = {
+    line: { strokePattern: { ...DEFAULT_STROKE_PATTERN }, roughen: { ...DEFAULT_ROUGHEN } },
+    polygon: { strokePattern: { ...DEFAULT_STROKE_PATTERN }, roughen: { ...DEFAULT_ROUGHEN } },
+    hatch: { strokePattern: { ...DEFAULT_STROKE_PATTERN }, roughen: { ...DEFAULT_ROUGHEN } },
+    free: { strokePattern: { ...DEFAULT_STROKE_PATTERN }, roughen: { ...DEFAULT_ROUGHEN } },
+  };
+
+  getStrokeEffectDefaults(kind: "line" | "polygon" | "hatch" | "free") {
+    const d = this.strokeEffectDefaults[kind] || this.strokeEffectDefaults.line;
+    return { strokePattern: { ...d.strokePattern }, roughen: { ...d.roughen } };
+  }
 
   getCurrentLineStyle() {
     const color = this._guideMode
