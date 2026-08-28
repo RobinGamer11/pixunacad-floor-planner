@@ -1378,7 +1378,11 @@ export class MiniCad {
         patternStretch: h.patternStretch, patternOffsetX: h.patternOffsetX, patternOffsetY: h.patternOffsetY,
         bulges: Array.isArray((h as any).bulges) ? [...(h as any).bulges] : undefined,
         holeBulges: Array.isArray((h as any).holeBulges) ? (h as any).holeBulges.map((l: number[]) => [...l]) : undefined,
+        midpointSnap: !!(h as any).midpointSnap,
+        divisionSnap: (h as any).divisionSnap,
+        ...copyStrokeEffects(h),
       })),
+
 
       documents: this.scene.documents
         .filter((d) => !(d as any)._snapOnly && d.labelId !== this._extDocLabelId)
