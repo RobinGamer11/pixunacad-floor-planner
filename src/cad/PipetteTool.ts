@@ -16,15 +16,19 @@ type PickedSource =
   | { kind: "free"; obj: FreeStroke };
 
 /** Stil-Eigenschaften je Objektart, die die Pipette überträgt. */
+/** Kontur-Effekte gelten werkzeugübergreifend und werden mitübertragen. */
+const EFFECT_KEYS = ["strokePattern", "roughen"];
+
 const STYLE_KEYS: Record<PickKind, string[]> = {
-  segment: ["color", "thicknessM", "opacity", "lineStyle", "gapM", "dashLengthM"],
+  segment: ["color", "thicknessM", "opacity", "lineStyle", "gapM", "dashLengthM", ...EFFECT_KEYS],
   hatch: ["fillColor", "strokeColor", "fillAlphaPct", "strokeWidthPx", "pattern", "patternScale",
-          "patternAngleDeg", "patternStretch", "patternSkewDeg", "patternColor"],
+          "patternAngleDeg", "patternStretch", "patternSkewDeg", "patternColor", ...EFFECT_KEYS],
   dimension: ["textColor", "textSizePx", "lineColor", "decimals", "tickLengthM", "showExtensions",
               "textBgEnabled", "textBgColor", "textBgAlpha"],
   textbox: ["style"],
-  free: ["color", "thicknessM", "opacity", "lineStyle", "gapM", "blobSpacingM", "blobSizeM", "smoothing"],
+  free: ["color", "thicknessM", "opacity", "lineStyle", "gapM", "blobSpacingM", "blobSizeM", "smoothing", ...EFFECT_KEYS],
 };
+
 
 const snapshotStyle = (kind: PickKind, obj: any): Record<string, any> => {
   const out: Record<string, any> = {};

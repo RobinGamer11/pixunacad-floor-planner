@@ -29,10 +29,14 @@ function selectedTargets(app: any, kind: StrokeEffectKind): any[] {
     } else if ((kind === "polygon" || kind === "hatch") && s?.hatchId) {
       const o = app.scene?.getHatchById?.(s.hatchId);
       if (o && (o.isPolygon === true) === (kind === "polygon")) out.push(o);
-    } else if (kind === "free" && s?.freeId) {
-      const o = app.scene?.getFreeStrokeById?.(s.freeId);
+    } else if (kind === "free") {
+      // Je nach Auswahlquelle heißt das Feld `freeId` (Klick) oder
+      // `freeStrokeId` (Rahmenauswahl/Edit-Target) — beide akzeptieren.
+      const id = s?.freeId || s?.freeStrokeId;
+      const o = id ? app.scene?.getFreeStrokeById?.(id) : null;
       if (o) out.push(o);
     }
+
   }
   return out;
 }
@@ -142,17 +146,16 @@ export const StrokeEffectsSettings: React.FC<{ app: any; kind: StrokeEffectKind 
       </div>
 
       <div>
-        <div className="mb-1.5 flex items-center justify-between">
-          <span className="text-[10px] font-semibold tracking-wider text-muted-foreground">AUFRAUEN</span>
-          <button
-            type="button"
-            onClick={() => applyRoughen({ enabled: !roughen.enabled })}
-            className="h-6 rounded-md border px-2 text-[10px]"
-            style={{ borderColor: HAIRLINE, background: roughen.enabled ? "hsl(var(--surface-strong))" : "transparent" }}
-          >
-            {roughen.enabled ? "Ein" : "Aus"}
-          </button>
-        </div>
+        <div className="mb-1.5 text-[10px] font-semibold tracking-wider text-muted-foreground">AUFRAUEN</div>
+        <button
+          type="button"
+          onClick={() => applyRoughen({ enabled: !roughen.enabled })}
+          className="mb-2 flex h-9 w-full items-center justify-center rounded-md border text-[12px] font-medium transition-colors hover:bg-muted"
+          style={{ borderColor: HAIRLINE, background: roughen.enabled ? "hsl(var(--surface-strong))" : "transparent" }}
+        >
+          {roughen.enabled ? "Aufrauen: Ein" : "Aufrauen: Aus"}
+        </button>
+
         {roughen.enabled && (
           <div className="space-y-2">
             <div className="grid grid-cols-2 gap-2">

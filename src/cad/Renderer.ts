@@ -1817,31 +1817,31 @@ export class Renderer {
 
     ctx.save();
 
-    ctx.beginPath();
-    const outerPts = tessellateWithBulges(hatch.points, (hatch as any).bulges, true, 32);
-    const p0 = cam.worldToScreen(outerPts[0].x, outerPts[0].y);
-    ctx.moveTo(p0.x, p0.y);
-    for (let i = 1; i < outerPts.length; i++) {
-      const sp = cam.worldToScreen(outerPts[i].x, outerPts[i].y);
-      ctx.lineTo(sp.x, sp.y);
-    }
-    ctx.closePath();
+    // Füllung und Kontur MÜSSEN exakt dieselbe (ggf. aufgeraute) Geometrie
+    // nutzen — inklusive identischer Tessellierung und identischem Cache-Key.
+    // Sonst entstehen sichtbare Spalten zwischen Fläche und Umriss.
+    const roughParams = (hatch as any).roughen;
+    const roughEnabled = !!roughParams?.enabled;
+    const baseRings: Vec2[][] = [
+      hatchOuterRing(hatch as any),
+      ...hatchHoleRings(hatch as any),
+    ].filter((r) => r && r.length >= 2);
+    const ringKey = (i: number, ring: Vec2[]) => `hatch:${hatch.id}:${i}:${ring.length}`;
+    const contourRings: Vec2[][] = baseRings.map((ring, i) =>
+      roughEnabled ? roughenPolyline(ring, true, roughParams, { cacheKey: ringKey(i, ring) }) : ring,
+    );
 
-    // Holes (carved-out inner loops) → evenodd Fill schneidet sie aus
-    const holes = hatch.holes || [];
-    for (let hi = 0; hi < holes.length; hi++) {
-      const raw = holes[hi];
-      if (!raw || raw.length < 3) continue;
-      const loop = tessellateWithBulges(raw, (hatch as any).holeBulges?.[hi], true, 32);
-      const h0 = cam.worldToScreen(loop[0].x, loop[0].y);
-      ctx.moveTo(h0.x, h0.y);
-      for (let i = 1; i < loop.length; i++) {
-        const hp = cam.worldToScreen(loop[i].x, loop[i].y);
-        ctx.lineTo(hp.x, hp.y);
+    ctx.beginPath();
+    for (const ring of contourRings) {
+      if (ring.length < 3) continue;
+      const s0 = cam.worldToScreen(ring[0].x, ring[0].y);
+      ctx.moveTo(s0.x, s0.y);
+      for (let i = 1; i < ring.length; i++) {
+        const sp = cam.worldToScreen(ring[i].x, ring[i].y);
+        ctx.lineTo(sp.x, sp.y);
       }
       ctx.closePath();
     }
-
     ctx.fillStyle = fillCol;
     ctx.fill("evenodd");
 
@@ -1854,24 +1854,19 @@ export class Renderer {
 
     this._paintHatchPattern(ctx, cam, hatch);
 
-    // Konturlinie der Schraffur: eigene Pipeline (Linienart + Roughen) für
-    // Außenkontur und jedes Loch. Die Füllung bleibt an der Originalgeometrie.
+    // Konturlinie: nur noch Linienart anwenden — die Roughen-Geometrie ist
+    // oben bereits berechnet und wird 1:1 weiterverwendet.
     const contourOpts = {
-      pattern: (hatch as any).strokePattern, roughen: (hatch as any).roughen,
+      pattern: (hatch as any).strokePattern,
       pxPerM: cam.scale, lineWidthPx: strokePx,
     };
-    const contourRings: Vec2[][] = [
-      hatchOuterRing(hatch as any),
-      ...hatchHoleRings(hatch as any),
-    ].filter((r) => r && r.length >= 2);
     const strokeContours = () => {
-      contourRings.forEach((ring, i) => {
-        tracePathWithEffects(ctx, (p) => cam.worldToScreen(p.x, p.y), ring, true, {
-          ...contourOpts, cacheKey: `hatch:${hatch.id}:${i}:${ring.length}`,
-        });
+      for (const ring of contourRings) {
+        tracePathWithEffects(ctx, (p) => cam.worldToScreen(p.x, p.y), ring, true, contourOpts);
         ctx.stroke();
-      });
+      }
     };
+
 
     if (strokePx > 0) {
       ctx.strokeStyle = strokeCol;

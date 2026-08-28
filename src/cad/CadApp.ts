@@ -42,6 +42,8 @@ import { drawProjection as drawPlanProjection } from "./PlanProjections";
 import { SheetPanel } from "./SheetPanel";
 import { mirrorProxy } from "./multiEdit";
 import { asObjectToolId, type ObjectToolId } from "./selectionTools";
+import { restoreOneScene } from "./sceneSerde";
+
 
 
 export interface TextSettingsRefs {
@@ -814,166 +816,24 @@ export class CadApp {
     };
   }
 
+  /**
+   * Deserialisierung — bewusst NUR über die zentrale `restoreOneScene()`-Logik
+   * aus `sceneSerde`. Es darf keine zweite, unvollständige Wiederherstellung
+   * geben: früher gingen hier u. a. `strokePattern`, `roughen`,
+   * `appearanceSeed`, `isGuide` und die Fangpunkt-Optionen verloren, wodurch
+   * Objekte nach Undo/Redo wieder auf „Durchgezogen“ zurücksprangen.
+   */
   private _restoreOneScene(scene: Scene, data: any) {
-    scene.segments = [];
-    scene.hatches = [];
-    scene.dimensions = [];
-    scene.textBoxes = [];
-    (scene as any).tables = [];
-    scene.stickerInstances = [];
-    scene.documents = [];
-    scene.freeStrokes = [];
-    scene.walls = [];
-    scene.doors = [];
-    scene.rulerGuide = null;
-    scene.markWallsDirty();
-    (scene as any)._rebuildSegIdMap?.();
-    (scene as any)._rebuildHatchIdMap?.();
-    (scene as any)._rebuildDimIdMap?.();
-    (scene as any)._rebuildTextIdMap?.();
-    (scene as any)._rebuildTableIdMap?.();
-    (scene as any)._rebuildStickerIdMap?.();
-    (scene as any)._rebuildDocIdMap?.();
-    (scene as any)._rebuildFreeIdMap?.();
+    restoreOneScene(scene, data);
     if (!data) return;
-    for (const s of data.freeStrokes || []) {
-      const stroke = scene.createFreeStroke(s.points || [], {
-        color: s.color, thicknessM: s.thicknessM, opacity: s.opacity,
-        lineStyle: s.lineStyle, gapM: s.gapM,
-        blobSpacingM: s.blobSpacingM, blobSizeM: s.blobSizeM,
-        smoothing: s.smoothing, labelId: s.labelId,
-        imageSrc: s.imageSrc || null, imageSizeM: s.imageSizeM,
-        imageSpacingM: s.imageSpacingM, imageRotateAlongPath: s.imageRotateAlongPath,
-      });
-      if (s._stickerEditOwnerId) stroke._stickerEditOwnerId = s._stickerEditOwnerId;
+    // Sticker-Besitzer der Tabellen ergänzen (positionsgleiche Reihenfolge).
+    const tables: any[] = (scene as any).tables || [];
+    const rawTables: any[] = Array.isArray(data.tables) ? data.tables : [];
+    for (let i = 0; i < Math.min(tables.length, rawTables.length); i++) {
+      if (rawTables[i]?._stickerEditOwnerId) tables[i]._stickerEditOwnerId = rawTables[i]._stickerEditOwnerId;
     }
-    if (data.rulerGuide && data.rulerGuide.a && data.rulerGuide.b) {
-      scene.rulerGuide = {
-        a: { x: data.rulerGuide.a.x, y: data.rulerGuide.a.y },
-        b: { x: data.rulerGuide.b.x, y: data.rulerGuide.b.y },
-      };
-    }
-    for (const s of data.segments || []) {
-      const seg = scene.createSegment(s.a, s.b, { color: s.color, thicknessM: s.thicknessM, labelId: s.labelId, arrowStart: !!s.arrowStart, arrowEnd: !!s.arrowEnd, arrowScale: typeof s.arrowScale === "number" ? s.arrowScale : 1, bulge: s.bulge });
-      if (s._stickerEditOwnerId) seg._stickerEditOwnerId = s._stickerEditOwnerId;
-    }
-    for (const h of data.hatches || []) {
-      if (h.isPolygon) {
-        const poly = scene.createPolygon(h.points, {
-          color: h.strokeColor, thicknessM: h.thicknessM, alpha: h.alpha,
-          labelId: h.labelId, bulges: h.bulges,
-          midpointSnap: !!h.midpointSnap,
-          divisionSnap: typeof h.divisionSnap === "number" ? h.divisionSnap : undefined,
-        });
-        if (h._stickerEditOwnerId) (poly as any)._stickerEditOwnerId = h._stickerEditOwnerId;
-        continue;
-      }
-      const hatch = scene.createHatch(h.points, {
-        fillColor: h.fillColor, strokeColor: h.strokeColor,
-        fillAlphaPct: h.fillAlphaPct, strokeWidthPx: h.strokeWidthPx,
-        labelId: h.labelId, areaLabel: h.areaLabel,
-        holes: h.holes || [],
-        patternEnabled: h.patternEnabled, patternId: h.patternId, patternScale: h.patternScale, patternAngleDeg: h.patternAngleDeg, patternSkewDeg: h.patternSkewDeg, patternStretch: h.patternStretch, patternOffsetX: h.patternOffsetX, patternOffsetY: h.patternOffsetY,
-        bulges: h.bulges, holeBulges: h.holeBulges,
-      });
-      if (h._stickerEditOwnerId) hatch._stickerEditOwnerId = h._stickerEditOwnerId;
-    }
-    for (const w of data.walls || []) {
-      const wall = scene.createWall({
-        kind: w.kind === "inner" ? "inner" : "outer",
-        thicknessM: w.thicknessM,
-        referenceSide: w.referenceSide === "inner" ? "inner" : w.referenceSide === "center" ? "center" : "outer",
-        corners: w.corners || [],
-        hiddenCornerIndices: Array.isArray(w.hiddenCornerIndices) ? w.hiddenCornerIndices : [],
-        cornerAnchors: Array.isArray(w.cornerAnchors) ? w.cornerAnchors : undefined,
-
-        customName: w.customName || "",
-        color: w.color,
-        fillColor: w.fillColor,
-        labelId: w.labelId,
-        priority: w.priority,
-        bulges: Array.isArray(w.bulges) ? w.bulges : undefined,
-      });
-      if (w.id) (wall as any).id = w.id;
-      if (w._stickerEditOwnerId) wall._stickerEditOwnerId = w._stickerEditOwnerId;
-    }
-    for (const d of data.dimensions || []) {
-      const dim = scene.createDimension(d.p1, d.p2, d.placementPoint, d.mode, d.refDir, {
-        textColor: d.textColor, textSizePx: d.textSizePx, lineColor: d.lineColor,
-        decimals: d.decimals, tickLengthM: d.tickLengthM, showExtensions: d.showExtensions,
-        useFreeText: d.useFreeText, freeText: d.freeText,
-        textBgEnabled: d.textBgEnabled, textBgColor: d.textBgColor, textBgAlpha: d.textBgAlpha,
-        extensionStyle: d.extensionStyle, extensionColor: d.extensionColor, extensionAlpha: d.extensionAlpha,
-        freeTextBold: d.freeTextBold, freeTextItalic: d.freeTextItalic, freeTextColor: d.freeTextColor,
-        textGapPx: d.textGapPx, doorHeightText: d.doorHeightText,
-        mirror: !!d.mirror,
-        bulge: (d as any).bulge || 0,
-        p3: d.p3 || null,
-        labelId: d.labelId,
-      }, d.doorRefId || null);
-      if (d._stickerEditOwnerId) dim._stickerEditOwnerId = d._stickerEditOwnerId;
-    }
-
-    for (const t of data.textBoxes || []) {
-      const box = scene.createTextBox(t.center, t.widthM, t.heightM, { ...(t.style || {}), labelId: t.labelId }, t.html || "", t.rotationRad || 0);
-      if (t._stickerEditOwnerId) box._stickerEditOwnerId = t._stickerEditOwnerId;
-    }
-    for (const t of data.tables || []) {
-      // Migration: alte Tabellen wurden mit dem Blattmaßstab (scaleDen/1000)
-      // erzeugt; im 1:1-Modellraum gilt nur noch die Annotationsskalierung.
-      const tbl = (scene as any).createTable(t.center, t.data, ANNOTATION_M_PER_MM, {
-        rotationRad: t.rotationRad || 0, labelId: t.labelId, scale: t.scale || 1,
-      });
-      if (t.id) { tbl.id = t.id; (scene as any)._rebuildTableIdMap?.(); }
-      if (t._stickerEditOwnerId) tbl._stickerEditOwnerId = t._stickerEditOwnerId;
-    }
-    if (Array.isArray(data.stickerInstances)) {
-      for (const si of data.stickerInstances) {
-        const inst = scene.createStickerInstance({
-          defId: si.defId, name: si.name, items: si.items,
-          position: si.position, rotationRad: si.rotationRad || 0,
-          scale: si.scale || 1, labelId: si.labelId,
-        });
-        if (si.id) (inst as any).id = si.id;
-      }
-      (scene as any)._rebuildStickerIdMap?.();
-    }
-    for (const d of data.documents || []) {
-      const doc = scene.createDocument({
-        name: d.name, kind: d.kind, src: d.src, pageIndex: d.pageIndex,
-        position: d.position, widthM: d.widthM, heightM: d.heightM, rotationRad: d.rotationRad,
-        pixelWidth: d.pixelWidth, pixelHeight: d.pixelHeight, labelId: d.labelId,
-        eraseMaskDataUrl: d.eraseMaskDataUrl || null,
-        pdfSourceB64: d.pdfSourceB64 || null,
-        guideEdges: d.guideEdges || undefined,
-        cropM: (d as any).cropM || undefined,
-        opacity: typeof d.opacity === "number" ? d.opacity : undefined,
-        filters: Array.isArray(d.filters) ? d.filters : undefined,
-        activeFilterId: d.activeFilterId || null,
-        bgRemoval: d.bgRemoval || undefined,
-        anchors: Array.isArray(d.anchors) ? d.anchors : undefined,
-        warpCorners: Array.isArray((d as any).warpCorners) ? (d as any).warpCorners : null,
-        flipX: !!(d as any).flipX,
-        flipY: !!(d as any).flipY,
-      });
-      if (d.id) (doc as any).id = d.id;
-    }
-    (scene as any)._rebuildDocIdMap?.();
-    for (const d of data.doors || []) {
-      const door = scene.createDoor({
-        wallId: d.wallId, posM: d.posM, widthM: d.widthM, heightM: d.heightM,
-        breakHeightM: d.breakHeightM,
-        breakHeightVisible: !!d.breakHeightVisible,
-        kind: d.kind,
-        side: d.side, hand: d.hand, edge: d.edge, color: d.color,
-        jambEnabled: d.jambEnabled, jambColor: d.jambColor, jambLenM: d.jambLenM, jambThickM: d.jambThickM,
-        sashEnabled: d.sashEnabled, glassColor: d.glassColor, glassThickM: d.glassThickM, glassFillColor: d.glassFillColor,
-        labelId: d.labelId,
-      });
-      if (d.id) (door as any).id = d.id;
-    }
-
   }
+
 
   private _serializeScene(): string {
     const scenesObj: Record<string, any> = {};

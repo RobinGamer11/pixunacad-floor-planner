@@ -15,7 +15,7 @@
 import { migrateSceneData } from "@/lib/persistence";
 import { DEFAULT_ROUGHEN, DEFAULT_STROKE_PATTERN, type RoughenParams, type StrokePatternParams } from "../strokeEffects";
 import { Camera } from "../Camera";
-import { Scene } from "../Scene";
+import { Scene, copyStrokeEffects } from "../Scene";
 import { Input } from "../Input";
 import { LabelManager } from "../LabelManager";
 import { IdPanel } from "../IdPanel";
@@ -1299,7 +1299,9 @@ export class MiniCad {
   serialize(): any {
     const f = this._strokeFactor || 1;
     return {
-      version: 4,
+      // v5: gemeinsame Kontureffekte (Linienart + Aufrauen) werden mitgespeichert.
+      version: 5,
+
       labels: this.labelManager.list(),
       // Rasterebenen (Pixelmodus) — leere Ebenen entfallen automatisch.
       rasterLayers: this.rasterLayers.serialize(),
@@ -1320,7 +1322,9 @@ export class MiniCad {
           arrowEnd: !!s.arrowEnd,
           arrowScale: s.arrowScale,
           bulge: (s as any).bulge || 0,
+          ...copyStrokeEffects(s),
         })),
+
 
       textBoxes: this.scene.textBoxes.map((t) => ({
         id: t.id,
@@ -1349,7 +1353,9 @@ export class MiniCad {
         imageSizeM: s.imageSizeM,
         imageSpacingM: s.imageSpacingM,
         imageRotateAlongPath: s.imageRotateAlongPath,
+        ...copyStrokeEffects(s),
       })),
+
 
       hatches: this.scene.hatches.map((h) => ({
         id: h.id,
@@ -1372,7 +1378,11 @@ export class MiniCad {
         patternStretch: h.patternStretch, patternOffsetX: h.patternOffsetX, patternOffsetY: h.patternOffsetY,
         bulges: Array.isArray((h as any).bulges) ? [...(h as any).bulges] : undefined,
         holeBulges: Array.isArray((h as any).holeBulges) ? (h as any).holeBulges.map((l: number[]) => [...l]) : undefined,
+        midpointSnap: !!(h as any).midpointSnap,
+        divisionSnap: (h as any).divisionSnap,
+        ...copyStrokeEffects(h),
       })),
+
 
       documents: this.scene.documents
         .filter((d) => !(d as any)._snapOnly && d.labelId !== this._extDocLabelId)
@@ -1437,6 +1447,7 @@ export class MiniCad {
               arrowEnd: !!s.arrowEnd,
               arrowScale: s.arrowScale,
               bulge: s.bulge,
+              ...copyStrokeEffects(s),
             },
 
           );
@@ -1466,6 +1477,7 @@ export class MiniCad {
             smoothing: s.smoothing, labelId: s.labelId || Defaults.defaultLabelId,
             imageSrc: s.imageSrc || null, imageSizeM: s.imageSizeM,
             imageSpacingM: s.imageSpacingM, imageRotateAlongPath: s.imageRotateAlongPath,
+            ...copyStrokeEffects(s),
           });
         } catch (e) { console.error("MiniCad restore freeStroke:", e); }
       }
@@ -1477,6 +1489,9 @@ export class MiniCad {
             this.scene.createPolygon(h.points || [], {
               color: h.strokeColor, thicknessM: h.thicknessM, alpha: h.alpha,
               labelId: h.labelId || Defaults.defaultLabelId, bulges: h.bulges,
+              midpointSnap: !!h.midpointSnap,
+              divisionSnap: typeof h.divisionSnap === "number" && h.divisionSnap >= 2 ? Math.floor(h.divisionSnap) : undefined,
+              ...copyStrokeEffects(h),
             });
             continue;
           }
@@ -1488,6 +1503,7 @@ export class MiniCad {
             areaLabel: h.areaLabel,
             patternEnabled: h.patternEnabled, patternId: h.patternId, patternScale: h.patternScale, patternAngleDeg: h.patternAngleDeg, patternSkewDeg: h.patternSkewDeg, patternStretch: h.patternStretch, patternOffsetX: h.patternOffsetX, patternOffsetY: h.patternOffsetY,
             bulges: h.bulges, holeBulges: h.holeBulges,
+            ...copyStrokeEffects(h),
           });
         } catch (e) { console.error("MiniCad restore hatch:", e); }
       }
