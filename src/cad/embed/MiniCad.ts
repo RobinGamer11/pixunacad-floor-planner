@@ -888,7 +888,11 @@ export class MiniCad {
 
 
   setActiveTool(tool: MiniTool) {
+    // Zuletzt gewähltes objektbezogenes Werkzeug merken (Auswahlfilter).
+    const objTool = asObjectToolId(tool);
+    if (objTool) this.selectionFilterTool = objTool;
     if (this._activeTool === tool) return;
+
     // Deactivate previous.
     if (this._activeTool === "line") this.lineTool.cancel();
     if (this._activeTool === "guide") this.lineTool.cancel();
