@@ -70,7 +70,8 @@ function snapHatch(h: Hatch): HatchSnap {
     patternEnabled: h.patternEnabled, patternId: h.patternId,
     patternScale: h.patternScale, patternAngleDeg: h.patternAngleDeg,
     patternSkewDeg: h.patternSkewDeg, patternStretch: h.patternStretch, patternOffsetX: h.patternOffsetX, patternOffsetY: h.patternOffsetY,
-    bulges: [...((h as any).bulges || [])], holeBulges: ((h as any).holeBulges || []).map((l: number[]) => [...l]) };
+    bulges: [...((h as any).bulges || [])], holeBulges: ((h as any).holeBulges || []).map((l: number[]) => [...l]),
+    isPolygon: (h as any).isPolygon === true, thicknessM: (h as any).thicknessM, alpha: (h as any).alpha } as any;
 }
 function snapDimension(d: Dimension): DimensionSnap {
   return { kind: "dimension",
@@ -215,6 +216,11 @@ export function commitClipboardAt(app: CadApp, clip: Clipboard, mouseW: Vec2): {
       const o = app.scene.createSegment({ x: it.a.x + dx, y: it.a.y + dy }, { x: it.b.x + dx, y: it.b.y + dy },
         { color: it.color, thicknessM: it.thicknessM, labelId: it.labelId, bulge: (it as any).bulge });
       if (o) created.push({ kind: "segment", id: o.id });
+    } else if (it.kind === "hatch" && (it as any).isPolygon) {
+      const o = app.scene.createPolygon(it.points.map(p => ({ x: p.x + dx, y: p.y + dy })),
+        { color: it.strokeColor, thicknessM: (it as any).thicknessM, alpha: (it as any).alpha,
+          labelId: it.labelId, bulges: (it as any).bulges });
+      if (o) created.push({ kind: "hatch", id: o.id });
     } else if (it.kind === "hatch") {
       const o = app.scene.createHatch(it.points.map(p => ({ x: p.x + dx, y: p.y + dy })),
         { fillColor: it.fillColor, strokeColor: it.strokeColor,

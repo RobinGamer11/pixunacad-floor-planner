@@ -1338,6 +1338,9 @@ export class MiniCad {
         fillAlphaPct: h.fillAlphaPct,
         strokeWidthPx: h.strokeWidthPx,
         labelId: h.labelId,
+        isPolygon: (h as any).isPolygon === true,
+        thicknessM: (h as any).thicknessM,
+        alpha: (h as any).alpha,
         areaLabel: h.areaLabel ? { ...h.areaLabel } : undefined,
         patternEnabled: h.patternEnabled,
         patternId: h.patternId,
@@ -1448,6 +1451,13 @@ export class MiniCad {
     if (Array.isArray(data.hatches)) {
       for (const h of data.hatches) {
         try {
+          if (h.isPolygon) {
+            this.scene.createPolygon(h.points || [], {
+              color: h.strokeColor, thicknessM: h.thicknessM, alpha: h.alpha,
+              labelId: h.labelId || Defaults.defaultLabelId, bulges: h.bulges,
+            });
+            continue;
+          }
           this.scene.createHatch(h.points || [], {
             holes: h.holes,
             fillColor: h.fillColor, strokeColor: h.strokeColor,
@@ -1900,6 +1910,12 @@ export class MiniCad {
             arrowStart: !!o.arrowStart, arrowEnd: !!o.arrowEnd, arrowScale: o.arrowScale, bulge: o.bulge,
           });
           if (n) created.push({ kind: "segment", id: n.id });
+        } else if (it.kind === "hatch" && o.isPolygon) {
+          const n = this.scene.createPolygon(o.points.map(mv), {
+            color: o.strokeColor, thicknessM: o.thicknessM, alpha: o.alpha,
+            labelId: o.labelId, bulges: o.bulges,
+          });
+          if (n) created.push({ kind: "hatch", id: n.id });
         } else if (it.kind === "hatch") {
           const n = this.scene.createHatch(o.points.map(mv), {
             holes: (o.holes ?? []).map((h: any[]) => h.map(mv)),
