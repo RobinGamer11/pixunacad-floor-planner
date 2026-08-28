@@ -2,6 +2,36 @@ import { Defaults } from "./constants";
 import { Vec2, v, clamp, lerp, splitBulgedEdge, arcFromBulge, projectPointToCurvedEdge } from "./geometry";
 import { WallTopologyGraph } from "./WallTopologyGraph";
 import { offsetPolyline } from "./wallGeom";
+import {
+  DEFAULT_ROUGHEN, DEFAULT_STROKE_PATTERN, makeAppearanceSeed,
+  normalizeRoughen, normalizeStrokePattern,
+  type RoughenParams, type StrokePatternParams,
+} from "./strokeEffects";
+
+/** Gemeinsame Kontur-Effekte (Linienart + Roughen) für Linie/Polygon/Schraffur/Freihand. */
+export interface StrokeEffectsInit {
+  strokePattern?: Partial<StrokePatternParams>;
+  roughen?: Partial<RoughenParams>;
+  appearanceSeed?: number;
+}
+
+export function initStrokeEffects(target: any, init: StrokeEffectsInit | undefined) {
+  const seed = (typeof init?.appearanceSeed === "number" && init.appearanceSeed > 0)
+    ? Math.floor(init.appearanceSeed) : makeAppearanceSeed();
+  target.appearanceSeed = seed;
+  target.strokePattern = normalizeStrokePattern(init?.strokePattern);
+  target.roughen = normalizeRoughen(init?.roughen, seed);
+}
+
+/** Kopiert Linienart/Roughen/Seed 1:1 (Teilen, Trimmen, Duplizieren, Radieren). */
+export function copyStrokeEffects(src: any): StrokeEffectsInit {
+  return {
+    strokePattern: { ...(src?.strokePattern || DEFAULT_STROKE_PATTERN) },
+    roughen: { ...(src?.roughen || DEFAULT_ROUGHEN) },
+    appearanceSeed: src?.appearanceSeed,
+  };
+}
+
 
 export class Segment {
   id: string;
