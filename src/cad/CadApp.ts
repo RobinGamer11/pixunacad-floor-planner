@@ -656,6 +656,7 @@ export class CadApp {
         color: s.color, thicknessM: s.thicknessM, labelId: s.labelId,
         arrowStart: !!s.arrowStart, arrowEnd: !!s.arrowEnd, arrowScale: s.arrowScale || 1,
         bulge: (s as any).bulge || 0,
+        ...copyStrokeEffects(s),
         _stickerEditOwnerId: s._stickerEditOwnerId || null,
       })),
 
@@ -672,6 +673,7 @@ export class CadApp {
         alpha: (h as any).alpha,
         midpointSnap: !!(h as any).midpointSnap,
         divisionSnap: (h as any).divisionSnap,
+        ...copyStrokeEffects(h),
         _stickerEditOwnerId: h._stickerEditOwnerId || null,
       })),
       walls: scene.walls.map(w => ({
