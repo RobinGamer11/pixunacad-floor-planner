@@ -4,6 +4,7 @@ import type { CadApp } from "@/cad/CadApp";
 import type { MiniCad } from "@/cad/embed/MiniCad";
 import type { PolygonDrawMode } from "@/cad/PolygonTool";
 import { RasterModeToggle } from "@/components/cad/RasterModeToggle";
+import { Defaults } from "@/cad/constants";
 import { StrokeSettingsPanel } from "@/components/cad/StrokeSettingsPanel";
 
 const HAIRLINE = "hsl(var(--hairline))";
@@ -120,7 +121,7 @@ export const PolygonSettingsPanel: React.FC<{
         if (patch.color !== undefined) p.strokeColor = patch.color;
         if (patch.thicknessM !== undefined) {
           p.thicknessM = patch.thicknessM;
-          p.strokeWidthPx = patch.thicknessM * 1000; // generischer Kontur-Fallback (mm-Basis)
+          p.strokeWidthPx = patch.thicknessM * Defaults.strokeWidthBaseScale;
         }
         if (patch.alphaPct !== undefined) p.alpha = Math.max(0, Math.min(1, patch.alphaPct / 100));
       }
