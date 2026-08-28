@@ -126,17 +126,22 @@ export class Hatch {
   bulges: number[];
   /** Signierte Kanten-Wölbungen der Löcher. */
   holeBulges: number[][];
+  /** Gemeinsame Kontur-Effekte (gelten nur für Außen-/Lochkonturen, nicht für das Füllmuster). */
+  strokePattern!: StrokePatternParams;
+  roughen!: RoughenParams;
+  appearanceSeed!: number;
   _stickerEditOwnerId?: string | null;
 
   constructor({ id, points, holes, fillColor, strokeColor, fillAlphaPct, strokeWidthPx, labelId, areaLabel,
     patternEnabled, patternId, patternScale, patternAngleDeg, patternSkewDeg, patternStretch,
-    patternOffsetX, patternOffsetY, bulges, holeBulges }: {
+    patternOffsetX, patternOffsetY, bulges, holeBulges, strokePattern, roughen, appearanceSeed }: {
     id: string; points: Vec2[]; holes?: Vec2[][]; fillColor?: string; strokeColor?: string;
     fillAlphaPct?: number; strokeWidthPx?: number; labelId?: string; areaLabel?: Partial<AreaLabel>;
     patternEnabled?: boolean; patternId?: string; patternScale?: number;
     patternAngleDeg?: number; patternSkewDeg?: number; patternStretch?: number; patternOffsetX?: number; patternOffsetY?: number;
     bulges?: number[]; holeBulges?: number[][];
-  }) {
+  } & StrokeEffectsInit) {
+
     this.id = id;
     this.points = points.map(p => v(p.x, p.y));
     this.holes = (holes || []).map(loop => loop.map(p => v(p.x, p.y)));
