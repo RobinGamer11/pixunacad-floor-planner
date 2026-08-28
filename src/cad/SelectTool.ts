@@ -2386,9 +2386,25 @@ export class SelectTool {
 
     }
 
+    // Polygonobjekte: Treffer nur über die Kontur (keine Füllung vorhanden).
+    // Ein Klick auf eine Polygonkante wählt immer das vollständige Polygon aus.
+    for (const hatch of visibleHatches) {
+      if (!(hatch as any).isPolygon) continue;
+      const ring = tessellateWithBulges(hatch.points, (hatch as any).bulges, true, 24);
+      for (let i = 0; i < ring.length; i++) {
+        const a = ring[i];
+        const b = ring[(i + 1) % ring.length];
+        const q = projectPointToSegment(mouseW, a, b).q;
+        if (distPxToWorldPoint(q) <= Defaults.hitPx) {
+          return { type: SelectionType.HATCH, hatchId: hatch.id, pointIndex: null } as any;
+        }
+      }
+    }
+
     // Hatch polygon hit (pointInPolygon)
     for (const hatch of visibleHatches) {
       if (selectedHatch && hatch.id === selectedHatch.id) continue;
+      if ((hatch as any).isPolygon) continue;
       if (hatch.points.length >= 3 && pointInHatchSolid(mouseW, hatchOuterRing(hatch as any), hatchHoleRings(hatch as any))) {
         return { type: SelectionType.HATCH, hatchId: hatch.id, pointIndex: null };
       }
