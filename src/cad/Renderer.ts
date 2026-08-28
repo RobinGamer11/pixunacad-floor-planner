@@ -1354,7 +1354,7 @@ export class Renderer {
     }
   }
 
-  private _drawSingleSegment(seg: { a: Vec2; b: Vec2; color?: string; thicknessM: number; labelId: string; isGuide?: boolean; arrowStart?: boolean; arrowEnd?: boolean; arrowScale?: number; bulge?: number }) {
+  private _drawSingleSegment(seg: { id?: string; a: Vec2; b: Vec2; color?: string; thicknessM: number; labelId: string; isGuide?: boolean; arrowStart?: boolean; arrowEnd?: boolean; arrowScale?: number; bulge?: number; strokePattern?: any; roughen?: any }) {
     const ctx = this.ctx;
     const cam = this.camera;
     const a = cam.worldToScreen(seg.a.x, seg.a.y);
@@ -1373,28 +1373,36 @@ export class Renderer {
       const gap = Math.max(3, ctx.lineWidth * 3);
       ctx.setLineDash([dash, gap]);
     }
-    const bulgePts = ((seg as any).bulge)
-      ? tessellateWithBulges([seg.a, seg.b], [(seg as any).bulge], false, 32).map(p => cam.worldToScreen(p.x, p.y))
-      : null;
-    ctx.beginPath();
-    if (bulgePts) {
-      ctx.moveTo(bulgePts[0].x, bulgePts[0].y);
-      for (let i = 1; i < bulgePts.length; i++) ctx.lineTo(bulgePts[i].x, bulgePts[i].y);
-    } else {
-      ctx.moveTo(a.x, a.y);
-      ctx.lineTo(b.x, b.y);
-    }
+
+    // Gemeinsame Stroke-Pipeline: Originalgeometrie → Roughen → Linienart.
+    const worldPts: Vec2[] = ((seg as any).bulge)
+      ? tessellateWithBulges([seg.a, seg.b], [(seg as any).bulge], false, 32)
+      : [seg.a, seg.b];
+    const strokeOpts = {
+      pattern: seg.strokePattern, roughen: seg.roughen,
+      pxPerM: cam.scale, lineWidthPx: ctx.lineWidth,
+      cacheKey: seg.id ? `seg:${seg.id}:${seg.a.x},${seg.a.y},${seg.b.x},${seg.b.y},${(seg as any).bulge || 0}` : undefined,
+    };
+    if (!seg.isGuide) applyStrokePattern(ctx, strokeOpts);
+    const drawPts = tracePathWithEffects(ctx, (p) => cam.worldToScreen(p.x, p.y), worldPts, false, strokeOpts);
     ctx.stroke();
     ctx.setLineDash([]);
+    ctx.lineDashOffset = 0;
 
-    // Pfeilspitzen (nicht für Hilfslinien)
+    // Pfeilspitzen (nicht für Hilfslinien) — bleiben an den Originalendpunkten.
     if (!seg.isGuide && (seg.arrowStart || seg.arrowEnd)) {
       const scale = (typeof seg.arrowScale === "number" && seg.arrowScale > 0) ? seg.arrowScale : 1;
       // Pfeilgröße proportional zur Linienstärke (in px).
       const sizePx = Math.max(6, this._segStrokePx(seg.thicknessM) * 6 * scale);
-      const dxw = b.x - a.x, dyw = b.y - a.y;
-      const L = Math.hypot(dxw, dyw) || 1;
-      const ux = dxw / L, uy = dyw / L;
+      // Richtung aus der ersten/letzten Tangente des abgeleiteten Pfades.
+      const n = drawPts.length;
+      const endPrev = cam.worldToScreen(drawPts[Math.max(0, n - 2)].x, drawPts[Math.max(0, n - 2)].y);
+      const startNext = cam.worldToScreen(drawPts[Math.min(n - 1, 1)].x, drawPts[Math.min(n - 1, 1)].y);
+      const dirTo = (from: { x: number; y: number }, to: { x: number; y: number }) => {
+        const dx = to.x - from.x, dy = to.y - from.y;
+        const L = Math.hypot(dx, dy) || 1;
+        return { x: dx / L, y: dy / L };
+      };
       const drawHead = (tipX: number, tipY: number, dirX: number, dirY: number) => {
         const baseX = tipX - dirX * sizePx;
         const baseY = tipY - dirY * sizePx;
@@ -1407,26 +1415,20 @@ export class Renderer {
         ctx.closePath();
         ctx.fill();
       };
-      if (seg.arrowEnd) drawHead(b.x, b.y, ux, uy);
-      if (seg.arrowStart) drawHead(a.x, a.y, -ux, -uy);
+      if (seg.arrowEnd) { const d = dirTo(endPrev, b); drawHead(b.x, b.y, d.x, d.y); }
+      if (seg.arrowStart) { const d = dirTo(startNext, a); drawHead(a.x, a.y, d.x, d.y); }
     }
 
     if (isGroupSel) {
       ctx.setLineDash([]);
       ctx.strokeStyle = "rgba(77,163,255,0.95)";
       ctx.lineWidth = Math.max(4, this._segStrokePx(seg.thicknessM) + 1.4);
-      ctx.beginPath();
-      if (bulgePts) {
-        ctx.moveTo(bulgePts[0].x, bulgePts[0].y);
-        for (let i = 1; i < bulgePts.length; i++) ctx.lineTo(bulgePts[i].x, bulgePts[i].y);
-      } else {
-        ctx.moveTo(a.x, a.y);
-        ctx.lineTo(b.x, b.y);
-      }
+      tracePathWithEffects(ctx, (p) => cam.worldToScreen(p.x, p.y), worldPts, false, strokeOpts);
       ctx.stroke();
     }
     ctx.restore();
   }
+
 
 
   private _drawDoorsForLabel(labelId: string) {
