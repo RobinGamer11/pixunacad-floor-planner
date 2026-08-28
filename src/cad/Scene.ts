@@ -4,7 +4,7 @@ import { WallTopologyGraph } from "./WallTopologyGraph";
 import { offsetPolyline } from "./wallGeom";
 import {
   DEFAULT_ROUGHEN, DEFAULT_STROKE_PATTERN, makeAppearanceSeed,
-  normalizeRoughen, normalizeStrokePattern,
+  normalizeRoughen, normalizeStrokePattern, patternFromLegacyFreeStyle,
   type RoughenParams, type StrokePatternParams,
 } from "./strokeEffects";
 
