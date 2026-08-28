@@ -2973,15 +2973,20 @@ export class Renderer {
     }
     ctx.strokeStyle = strokeColor;
     ctx.lineWidth = strokeWidth;
-    const p0 = cam.worldToScreen(pts[0].x, pts[0].y);
-    ctx.beginPath();
-    ctx.moveTo(p0.x, p0.y);
-    for (let i = 1; i < pts.length; i++) {
-      const p = cam.worldToScreen(pts[i].x, pts[i].y);
-      ctx.lineTo(p.x, p.y);
-    }
+    // Gemeinsame Kontur-Pipeline: Linienart und Roughen mit durchlaufender
+    // Phase (Radiergummi-Abschnitte bleiben dadurch nahtlos).
+    const phaseM = (s as any).sourceStartDistanceM || 0;
+    const strokeOpts = {
+      pattern: (s as any).strokePattern, roughen: (s as any).roughen,
+      pxPerM: cam.scale, lineWidthPx: strokeWidth, phaseM,
+      cacheKey: `free:${s.id}:${pts.length}`,
+    };
+    if ((s as any).strokePattern && (s as any).strokePattern.kind !== "solid") applyStrokePattern(ctx, strokeOpts);
+    tracePathWithEffects(ctx, (p) => cam.worldToScreen(p.x, p.y), pts, false, strokeOpts);
     ctx.stroke();
     ctx.setLineDash([]);
+    ctx.lineDashOffset = 0;
+
     ctx.restore();
   }
 
