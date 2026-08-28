@@ -63,8 +63,14 @@ export function CadDocumentInspector({ engine }: Props) {
               pdfSourceB64: doc.pdfSourceB64 || null,
             };
           });
+          // Signatur nur für externe Änderungen/Synchronisierung — enthält den
+          // vollständigen veränderlichen Filterzustand inkl. adjust.
           const sig = `${doc.activeFilterId || ""}|${doc.opacity ?? 1}|${JSON.stringify(
-            (doc.filters || []).map((f: any) => [f.id, f.name, f.mode, f.tintColor, f.bwThreshold]),
+            doc.bgRemoval || null,
+          )}|${JSON.stringify(
+            (doc.filters || []).map((f: any) => [
+              f.id, f.name, f.mode, f.tintColor, f.bwThreshold, f.freeRemaps || null, f.adjust || null,
+            ]),
           )}`;
           setFilterSig((prev) => (prev === sig ? prev : sig));
         } else {

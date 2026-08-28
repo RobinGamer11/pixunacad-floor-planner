@@ -1079,7 +1079,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           const doc = app.scene.getDocumentById(sel.documentId);
           if (doc) {
             setDocSelected(prev => (prev && prev.id === doc.id && prev.widthM === doc.widthM && prev.heightM === doc.heightM && prev.importScaleDenom === doc.importScaleDenom) ? prev : { id: doc.id, name: doc.name, widthM: doc.widthM, heightM: doc.heightM, importScaleDenom: doc.importScaleDenom, kind: doc.kind, pdfSourceB64: doc.pdfSourceB64 || null });
-            const sig = `${(doc as any).activeFilterId || ""}|${(doc as any).opacity ?? 1}|${JSON.stringify(((doc as any).filters || []).map((f: any) => [f.id, f.name, f.mode, f.tintColor, f.bwThreshold, f.freeRemaps]))}`;
+            const sig = `${(doc as any).activeFilterId || ""}|${(doc as any).opacity ?? 1}|${JSON.stringify((doc as any).bgRemoval || null)}|${JSON.stringify(((doc as any).filters || []).map((f: any) => [f.id, f.name, f.mode, f.tintColor, f.bwThreshold, f.freeRemaps || null, f.adjust || null]))}`;
             setDocFilterSig(prev => prev === sig ? prev : sig);
           } else {
             setDocSelected(prev => prev ? null : prev);
