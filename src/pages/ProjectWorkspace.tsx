@@ -128,6 +128,8 @@ import { importFile, type ImportedPage } from "@/cad/documentImport";
 import { popPendingSheetPdf } from "@/lib/sheetPdfExport";
 import { setExportMode } from "@/lib/printExport";
 import type { MiniCadSelectionInfo } from "@/cad/embed/MiniCad";
+import { asObjectToolId, pageElementMatchesTool, type ObjectToolId } from "@/cad/selectionTools";
+
 import type { HatchDrawMode } from "@/cad/HatchTool";
 import type { PolygonDrawMode } from "@/cad/PolygonTool";
 import { PolygonModeSelect, PolygonSettingsPanel } from "@/components/cad/PolygonSettingsPanel";
