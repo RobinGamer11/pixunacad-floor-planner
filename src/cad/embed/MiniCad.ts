@@ -23,6 +23,8 @@ import { TopologyEngine } from "../TopologyEngine";
 import { Renderer, type Selection } from "../Renderer";
 import { RasterLayers, cadRasterPxPerMForReference } from "../RasterLayers";
 import { mirrorProxy } from "../multiEdit";
+import { asObjectToolId, type ObjectToolId } from "../selectionTools";
+
 import { LineHub } from "../LineHub";
 import { PointEditMenu } from "../PointEditMenu";
 import { LineTool } from "../LineTool";
