@@ -140,6 +140,40 @@ export class Hatch {
   }
 }
 
+/**
+ * Polygon — eigenständiges geschlossenes Konturobjekt (Polygon/Rechteck/Kreis).
+ *
+ * Technisch teilt sich das Polygon die Kontur-Infrastruktur der Schraffur
+ * (Punkte + Bulges, Punkt-/Kantenbearbeitung, Auswahl, Snap, Export), bleibt
+ * aber ein eigener Objekttyp mit eigener ID: eine Schraffur über einem Polygon
+ * ist immer ein zweites, unabhängig auswählbares Objekt. Polygone werden nur
+ * als Kontur gezeichnet (keine Füllung, kein Muster, keine Flächenbeschriftung).
+ */
+export class PolygonShape extends Hatch {
+  readonly isPolygon = true as const;
+  /** Physische Linienstärke in Metern (identisch zum Linienwerkzeug). */
+  thicknessM: number;
+  /** Deckkraft 0..1. */
+  alpha: number;
+
+  constructor(args: any) {
+    super(args);
+    this.thicknessM = Number.isFinite(args?.thicknessM) && args.thicknessM > 0
+      ? args.thicknessM : Defaults.lineThicknessM;
+    this.alpha = Number.isFinite(args?.alpha) ? clamp(args.alpha, 0, 1) : 1;
+    // Für alle generischen Kontur-Pfade (Renderer/Export) konsistent halten.
+    this.strokeWidthPx = this.thicknessM * Defaults.strokeWidthBaseScale;
+    this.fillAlphaPct = 0;
+    this.patternEnabled = false;
+    this.areaLabel.show = false;
+  }
+}
+
+/** Type-Guard: ist dieses Kontur-Objekt ein eigenständiges Polygon? */
+export function isPolygonShape(o: any): o is PolygonShape {
+  return !!o && (o as any).isPolygon === true;
+}
+
 export interface DimensionStyle {
   /** Wölbung der gemessenen Kante (Modus "arc"). */
   bulge?: number;
@@ -1302,6 +1336,28 @@ export class Scene {
     this.hatches.push(hatch);
     this._rebuildHatchIdMap();
     return hatch;
+  }
+
+  /**
+   * Erzeugt ein eigenständiges geschlossenes Polygonobjekt (eine ID, eine Kontur).
+   * Rechteck und Kreis nutzen denselben Aufruf — sie sind nie Einzelsegmente.
+   */
+  createPolygon(points: Vec2[], style: {
+    color?: string; thicknessM?: number; alpha?: number; labelId?: string; bulges?: number[];
+  } = {}) {
+    const poly = new PolygonShape({
+      id: this._makeId(), points,
+      bulges: style.bulges,
+      strokeColor: style.color || Defaults.lineColor,
+      fillAlphaPct: 0,
+      labelId: style.labelId,
+      thicknessM: style.thicknessM,
+      alpha: style.alpha,
+    });
+    poly._stickerEditOwnerId = this._currentEditOwnerId;
+    this.hatches.push(poly);
+    this._rebuildHatchIdMap();
+    return poly;
   }
 
   getHatchById(id: string): Hatch | null { return this._hatchIdMap.get(id) || null; }
