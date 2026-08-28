@@ -130,12 +130,12 @@ export const StrokeEffectsSettings: React.FC<{ app: any; kind: StrokeEffectKind 
         {pattern.kind !== "solid" && (
           <div className="mt-2 grid grid-cols-2 gap-2">
             <NumField
-              label="Strichlänge" unit="mm" value={pattern.dashMm} step={0.5} min={0.1} max={200}
-              onChange={(v) => applyPattern({ dashMm: v })}
+              label="Strichlänge" unit="mm" value={pattern.dashLengthMm} step={0.5} min={0.1} max={200}
+              onChange={(v) => applyPattern({ dashLengthMm: v })}
             />
             <NumField
-              label="Abstand" unit="mm" value={pattern.gapMm} step={0.5} min={0.1} max={200}
-              onChange={(v) => applyPattern({ gapMm: v })}
+              label="Abstand" unit="mm" value={pattern.gapLengthMm} step={0.5} min={0.1} max={200}
+              onChange={(v) => applyPattern({ gapLengthMm: v })}
             />
           </div>
         )}
@@ -157,12 +157,12 @@ export const StrokeEffectsSettings: React.FC<{ app: any; kind: StrokeEffectKind 
           <div className="space-y-2">
             <div className="grid grid-cols-2 gap-2">
               <NumField
-                label="Stärke" unit="mm" value={roughen.amplitudeMm} step={0.1} min={0} max={50}
-                onChange={(v) => applyRoughen({ amplitudeMm: v })}
+                label="Stärke" unit="mm" value={roughen.strengthMm} step={0.1} min={0} max={50}
+                onChange={(v) => applyRoughen({ strengthMm: v })}
               />
               <NumField
-                label="Detail" unit="mm" value={roughen.wavelengthMm} step={0.5} min={0.5} max={200}
-                onChange={(v) => applyRoughen({ wavelengthMm: v })}
+                label="Detail" unit="je 100 mm" value={roughen.detailPer100Mm} step={1} min={1} max={100}
+                onChange={(v) => applyRoughen({ detailPer100Mm: v })}
               />
             </div>
             <div className="grid grid-cols-2 gap-1">
