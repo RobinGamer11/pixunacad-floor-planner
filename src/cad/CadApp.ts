@@ -658,6 +658,9 @@ export class CadApp {
         labelId: h.labelId, areaLabel: { ...h.areaLabel },
         bulges: [...((h as any).bulges || [])],
         holeBulges: ((h as any).holeBulges || []).map((l: number[]) => [...l]),
+        isPolygon: (h as any).isPolygon === true,
+        thicknessM: (h as any).thicknessM,
+        alpha: (h as any).alpha,
         _stickerEditOwnerId: h._stickerEditOwnerId || null,
       })),
       walls: scene.walls.map(w => ({
@@ -836,6 +839,14 @@ export class CadApp {
       if (s._stickerEditOwnerId) seg._stickerEditOwnerId = s._stickerEditOwnerId;
     }
     for (const h of data.hatches || []) {
+      if (h.isPolygon) {
+        const poly = scene.createPolygon(h.points, {
+          color: h.strokeColor, thicknessM: h.thicknessM, alpha: h.alpha,
+          labelId: h.labelId, bulges: h.bulges,
+        });
+        if (h._stickerEditOwnerId) (poly as any)._stickerEditOwnerId = h._stickerEditOwnerId;
+        continue;
+      }
       const hatch = scene.createHatch(h.points, {
         fillColor: h.fillColor, strokeColor: h.strokeColor,
         fillAlphaPct: h.fillAlphaPct, strokeWidthPx: h.strokeWidthPx,

@@ -77,6 +77,14 @@ export function restoreOneScene(scene: Scene, raw: SerializedScene | null | unde
     if (s._stickerEditOwnerId) seg._stickerEditOwnerId = s._stickerEditOwnerId;
   }
   for (const h of data.hatches || []) {
+    if (h.isPolygon) {
+      const poly = scene.createPolygon(h.points, {
+        color: h.strokeColor, thicknessM: h.thicknessM, alpha: h.alpha,
+        labelId: h.labelId, bulges: Array.isArray(h.bulges) ? h.bulges : undefined,
+      });
+      if (h._stickerEditOwnerId) (poly as any)._stickerEditOwnerId = h._stickerEditOwnerId;
+      continue;
+    }
     const hatch = scene.createHatch(h.points, {
       fillColor: h.fillColor, strokeColor: h.strokeColor,
       fillAlphaPct: h.fillAlphaPct, strokeWidthPx: h.strokeWidthPx,
