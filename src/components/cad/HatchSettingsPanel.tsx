@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { StrokeEffectsSettings } from "@/components/cad/StrokeEffectsSettings";
 import { Spline, RectangleHorizontal, Circle, PaintBucket } from "lucide-react";
 import type { CadApp } from "@/cad/CadApp";
 import type { MiniCad } from "@/cad/embed/MiniCad";
@@ -225,6 +226,8 @@ export const HatchSettingsPanel: React.FC<Props> = ({ app, projectId, pxPerMm = 
         </div>
       )}
 
+
+      <StrokeEffectsSettings app={app} kind="hatch" />
 
       {afterStroke}
 
