@@ -155,9 +155,16 @@ export class PolygonShape extends Hatch {
   thicknessM: number;
   /** Deckkraft 0..1. */
   alpha: number;
+  /** Mittelpunkt-Snap je Polygonkante (analog Linienwerkzeug). */
+  midpointSnap: boolean;
+  /** Teilungs-Snap N je Polygonkante (analog Linienwerkzeug). */
+  divisionSnap?: number;
 
   constructor(args: any) {
     super(args);
+    this.midpointSnap = !!args?.midpointSnap;
+    this.divisionSnap = (typeof args?.divisionSnap === "number" && args.divisionSnap >= 2)
+      ? Math.floor(args.divisionSnap) : undefined;
     this.thicknessM = Number.isFinite(args?.thicknessM) && args.thicknessM > 0
       ? args.thicknessM : Defaults.lineThicknessM;
     this.alpha = Number.isFinite(args?.alpha) ? clamp(args.alpha, 0, 1) : 1;
@@ -1344,6 +1351,7 @@ export class Scene {
    */
   createPolygon(points: Vec2[], style: {
     color?: string; thicknessM?: number; alpha?: number; labelId?: string; bulges?: number[];
+    midpointSnap?: boolean; divisionSnap?: number;
   } = {}) {
     const poly = new PolygonShape({
       id: this._makeId(), points,
@@ -1353,6 +1361,8 @@ export class Scene {
       labelId: style.labelId,
       thicknessM: style.thicknessM,
       alpha: style.alpha,
+      midpointSnap: style.midpointSnap,
+      divisionSnap: style.divisionSnap,
     });
     poly._stickerEditOwnerId = this._currentEditOwnerId;
     this.hatches.push(poly);

@@ -81,6 +81,8 @@ export function restoreOneScene(scene: Scene, raw: SerializedScene | null | unde
       const poly = scene.createPolygon(h.points, {
         color: h.strokeColor, thicknessM: h.thicknessM, alpha: h.alpha,
         labelId: h.labelId, bulges: Array.isArray(h.bulges) ? h.bulges : undefined,
+        midpointSnap: !!h.midpointSnap,
+        divisionSnap: typeof h.divisionSnap === "number" ? h.divisionSnap : undefined,
       });
       if (h._stickerEditOwnerId) (poly as any)._stickerEditOwnerId = h._stickerEditOwnerId;
       continue;

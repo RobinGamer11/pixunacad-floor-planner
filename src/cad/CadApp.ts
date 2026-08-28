@@ -670,6 +670,8 @@ export class CadApp {
         isPolygon: (h as any).isPolygon === true,
         thicknessM: (h as any).thicknessM,
         alpha: (h as any).alpha,
+        midpointSnap: !!(h as any).midpointSnap,
+        divisionSnap: (h as any).divisionSnap,
         _stickerEditOwnerId: h._stickerEditOwnerId || null,
       })),
       walls: scene.walls.map(w => ({
@@ -852,6 +854,8 @@ export class CadApp {
         const poly = scene.createPolygon(h.points, {
           color: h.strokeColor, thicknessM: h.thicknessM, alpha: h.alpha,
           labelId: h.labelId, bulges: h.bulges,
+          midpointSnap: !!h.midpointSnap,
+          divisionSnap: typeof h.divisionSnap === "number" ? h.divisionSnap : undefined,
         });
         if (h._stickerEditOwnerId) (poly as any)._stickerEditOwnerId = h._stickerEditOwnerId;
         continue;
