@@ -128,6 +128,8 @@ import { popPendingSheetPdf } from "@/lib/sheetPdfExport";
 import { setExportMode } from "@/lib/printExport";
 import type { MiniCadSelectionInfo } from "@/cad/embed/MiniCad";
 import type { HatchDrawMode } from "@/cad/HatchTool";
+import type { PolygonDrawMode } from "@/cad/PolygonTool";
+import { PolygonModeSelect, PolygonSettingsPanel } from "@/components/cad/PolygonSettingsPanel";
 import { FreeDrawSettingsPanel } from "@/components/cad/FreeDrawSettingsPanel";
 import { EraserSettingsPanel, EraserModeSelect } from "@/components/cad/EraserSettingsPanel";
 import { ProjectFilePickerDialog } from "@/components/cad/ProjectFilePickerDialog";
@@ -170,12 +172,18 @@ import {
   type WarpCorners,
 } from "@/lib/warpMatrix";
 
-export type PageTool = "guide" | "line" | "free" | "eraser" | "text" | "cad" | "pipette" | "hatch" | "document" | "table" | null;
+export type PageTool = "guide" | "line" | "free" | "eraser" | "text" | "cad" | "pipette" | "hatch" | "polygon" | "document" | "table" | null;
 type LinePageTool = "line" | "free";
 
 const LINE_TOOL_VARIANTS: Array<{ id: LinePageTool; label: string; icon: React.ElementType }> = [
   { id: "line", label: "Linie", icon: Minus },
   { id: "free", label: "Freihand", icon: Pencil },
+];
+
+const POLYGON_MODE_VARIANTS: Array<{ id: PolygonDrawMode; label: string; icon: React.ElementType }> = [
+  { id: "polygon", label: "Polygon", icon: Pentagon },
+  { id: "rectangle", label: "Rechteck", icon: RectangleHorizontal },
+  { id: "circle", label: "Kreis", icon: CircleIcon },
 ];
 
 const HATCH_MODE_VARIANTS: Array<{ id: HatchDrawMode; label: string; icon: React.ElementType }> = [
@@ -352,6 +360,9 @@ export default function ProjectWorkspace() {
   const [lineToolFlyoutOpen, setLineToolFlyoutOpen] = useState(false);
   const [hatchDrawMode, setHatchDrawMode] = useState<HatchDrawMode>("polygon");
   const [hatchToolFlyoutOpen, setHatchToolFlyoutOpen] = useState(false);
+  // Polygonwerkzeug: zuletzt verwendete Zeichenart + Flyout-Status.
+  const [polygonDrawMode, setPolygonDrawMode] = useState<PolygonDrawMode>("polygon");
+  const [polygonToolFlyoutOpen, setPolygonToolFlyoutOpen] = useState(false);
   // Flyout am Auswahl-Symbol für die Rahmen-Modi (Berühren / Umschließen).
   const [selectToolFlyoutOpen, setSelectToolFlyoutOpen] = useState(false);
   // Tabellen-Werkzeug: Placement-Preview vor Bestätigen.
@@ -390,6 +401,11 @@ export default function ProjectWorkspace() {
     if (ht) {
       const prevMode = ht.onDrawModeChange;
       ht.onDrawModeChange = (m: HatchDrawMode) => { prevMode?.(m); setHatchDrawMode(m); };
+    }
+    const pt: any = (api.engine as any)?.polygonTool;
+    if (pt) {
+      const prevPolyMode = pt.onDrawModeChange;
+      pt.onDrawModeChange = (m: any) => { prevPolyMode?.(m); setPolygonDrawMode(m); };
     }
     registerCadEngineSnap((clientX, clientY, pageRect, tol = 12) => {
       const engine = cadEngineApiRef.current?.engine as any;
@@ -785,6 +801,7 @@ export default function ProjectWorkspace() {
   React.useEffect(() => {
     if (!isLinePageTool(activeTool)) setLineToolFlyoutOpen(false);
     if (activeTool !== "hatch") setHatchToolFlyoutOpen(false);
+    if (activeTool !== "polygon") setPolygonToolFlyoutOpen(false);
     if (activeTool !== null) setSelectToolFlyoutOpen(false);
   }, [activeTool]);
 
@@ -792,6 +809,13 @@ export default function ProjectWorkspace() {
   const activateLineTool = (tool: LinePageTool) => {
     setLineToolVariant(tool);
     setActiveToolAndTab(tool);
+  };
+
+  const activatePolygonTool = (mode: PolygonDrawMode) => {
+    setPolygonDrawMode(mode);
+    const pt: any = (cadEngineApiRef.current?.engine as any)?.polygonTool;
+    pt?.setDrawMode?.(mode);
+    setActiveToolAndTab("polygon");
   };
 
   const activateHatchTool = (mode: HatchDrawMode) => {
@@ -1607,6 +1631,49 @@ export default function ProjectWorkspace() {
                     onClick={() => {
                       activateLineTool(variant.id);
                       setLineToolFlyoutOpen(false);
+                    }}
+                    showLabel
+                  />
+                );
+              })}
+            </div>
+          )}
+        </div>
+        <div className="relative w-full flex justify-center">
+          <ToolRailButton
+            icon={<Pentagon size={18} />}
+            label="Polygon"
+            active={activeTool === "polygon"}
+            onClick={() => {
+              if (activeTool !== "polygon") {
+                activatePolygonTool(polygonDrawMode);
+                setPolygonToolFlyoutOpen(true);
+              } else {
+                setPolygonToolFlyoutOpen((open) => !open);
+              }
+              setRightTabState("tools");
+            }}
+            showLabel
+          />
+          {polygonToolFlyoutOpen && (
+            <div
+              className="absolute top-0 left-full ml-1 flex flex-col gap-0.5 p-1 rounded-lg shadow-lg z-40"
+              style={{
+                background: "hsl(var(--surface-card))",
+                border: "1px solid hsl(var(--hairline))",
+              }}
+            >
+              {POLYGON_MODE_VARIANTS.map((variant) => {
+                const Icon = variant.icon;
+                return (
+                  <ToolRailButton
+                    key={variant.id}
+                    icon={<Icon size={18} />}
+                    label={variant.label}
+                    active={activeTool === "polygon" && polygonDrawMode === variant.id}
+                    onClick={() => {
+                      activatePolygonTool(variant.id);
+                      setPolygonToolFlyoutOpen(false);
                     }}
                     showLabel
                   />
@@ -3454,13 +3521,14 @@ function PageCanvas({
             : activeTool === "free" ? "free"
             : activeTool === "eraser" ? "eraser"
             : activeTool === "hatch" ? "hatch"
+            : activeTool === "polygon" ? "polygon"
             : activeTool === "document" ? "document"
             : activeTool === "pipette" ? "pipette"
             : activeTool === null ? "select"
             : null
           }
           hatchDrawMode={hatchDrawMode}
-          enabled={activeTool === "line" || activeTool === "text" || activeTool === "guide" || activeTool === "free" || activeTool === "eraser" || activeTool === "hatch" || activeTool === "document" || activeTool === "pipette" || activeTool === null}
+          enabled={activeTool === "line" || activeTool === "text" || activeTool === "guide" || activeTool === "free" || activeTool === "eraser" || activeTool === "hatch" || activeTool === "polygon" || activeTool === "document" || activeTool === "pipette" || activeTool === null}
           initialState={page.cadOverlay}
           ghostSnapState={overlayPage ? overlayPage.cadOverlay : null}
           onEraseWorld={(c, rM, mode, soft, strength) => {
@@ -6507,6 +6575,15 @@ function ToolsTab({
         <SettingsBlock title="PIPETTE">
           <PipetteSettingsPanel app={cadEngine} />
         </SettingsBlock>
+      )}
+      {settingsTool === "polygon" && cadEngine && (
+        <>
+          <PolygonModeSelect app={cadEngine} />
+          <RasterModeToggle app={cadEngine} projectId={projectId} />
+          <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
+            <PolygonSettingsPanel app={cadEngine} projectId={projectId} hideChrome />
+          </div>
+        </>
       )}
       {settingsTool === "hatch" && cadEngine && (
         <>
