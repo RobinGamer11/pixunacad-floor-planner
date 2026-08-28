@@ -273,6 +273,38 @@ export class SelectTool {
     return list.length ? list[list.length - 1] : null;
   }
 
+  /** Wandelt einen Auswahl-Ref in das Selection-Objekt des Hosts um. */
+  selectionFromRef(ref: { kind: string; id: string } | null): any | null {
+    if (!ref) return null;
+    switch (ref.kind) {
+      case "segment":    return { type: SelectionType.SEGMENT, segmentId: ref.id, handleIndex: null };
+      case "wall":       return { type: SelectionType.WALL, wallId: ref.id, handleIndex: null };
+      case "hatch":      return { type: SelectionType.HATCH, hatchId: ref.id, handleIndex: null };
+      case "freeStroke": return { type: SelectionType.FREE_STROKE, freeStrokeId: ref.id, handleIndex: null };
+      case "dimension":  return { type: SelectionType.DIMENSION, dimensionId: ref.id, handleIndex: null };
+      case "textbox":
+      case "table":      return { type: SelectionType.TEXTBOX, textBoxId: ref.id, handleIndex: null };
+      case "document":   return { type: SelectionType.DOCUMENT, documentId: ref.id, handleIndex: null };
+      case "sticker":    return { type: SelectionType.STICKER_INSTANCE, stickerInstanceId: ref.id, handleIndex: null };
+      default:           return null;
+    }
+  }
+
+  /**
+   * Setzt die Host-Auswahl auf das führende (zuletzt erfasste) Objekt der
+   * Mehrfachauswahl. Dadurch zeigt immer das Eigenschaftenfenster des zuletzt
+   * angeklickten Objekts — und Änderungen wirken über den Panel-Mirror auf
+   * alle gleichartigen Objekte der Auswahl.
+   */
+  syncPrimarySelection(): void {
+    try {
+      const sel = this.selectionFromRef(this.primarySelectedRef);
+      (this.app as any).setSelection?.(sel);
+    } catch { /* ignore */ }
+  }
+
+
+
 
 
 
