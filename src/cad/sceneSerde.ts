@@ -55,6 +55,8 @@ export function restoreOneScene(scene: Scene, raw: SerializedScene | null | unde
       smoothing: s.smoothing, labelId: s.labelId,
       imageSrc: s.imageSrc || null, imageSizeM: s.imageSizeM,
       imageSpacingM: s.imageSpacingM, imageRotateAlongPath: s.imageRotateAlongPath,
+      sourceStartDistanceM: s.sourceStartDistanceM, sourceStrokeId: s.sourceStrokeId,
+      strokePattern: s.strokePattern, roughen: s.roughen, appearanceSeed: s.appearanceSeed,
     });
     if (s._stickerEditOwnerId) (stroke as any)._stickerEditOwnerId = s._stickerEditOwnerId;
   }
@@ -73,6 +75,7 @@ export function restoreOneScene(scene: Scene, raw: SerializedScene | null | unde
       arrowStart: !!s.arrowStart, arrowEnd: !!s.arrowEnd,
       arrowScale: typeof s.arrowScale === "number" ? s.arrowScale : 1,
       bulge: typeof s.bulge === "number" ? s.bulge : 0,
+      strokePattern: s.strokePattern, roughen: s.roughen, appearanceSeed: s.appearanceSeed,
     });
     if (s._stickerEditOwnerId) seg._stickerEditOwnerId = s._stickerEditOwnerId;
   }
@@ -83,6 +86,7 @@ export function restoreOneScene(scene: Scene, raw: SerializedScene | null | unde
         labelId: h.labelId, bulges: Array.isArray(h.bulges) ? h.bulges : undefined,
         midpointSnap: !!h.midpointSnap,
         divisionSnap: typeof h.divisionSnap === "number" ? h.divisionSnap : undefined,
+        strokePattern: h.strokePattern, roughen: h.roughen, appearanceSeed: h.appearanceSeed,
       });
       if (h._stickerEditOwnerId) (poly as any)._stickerEditOwnerId = h._stickerEditOwnerId;
       continue;
@@ -97,6 +101,7 @@ export function restoreOneScene(scene: Scene, raw: SerializedScene | null | unde
       patternSkewDeg: h.patternSkewDeg, patternStretch: h.patternStretch, patternOffsetX: h.patternOffsetX, patternOffsetY: h.patternOffsetY,
       bulges: Array.isArray(h.bulges) ? h.bulges : undefined,
       holeBulges: Array.isArray(h.holeBulges) ? h.holeBulges : undefined,
+      strokePattern: h.strokePattern, roughen: h.roughen, appearanceSeed: h.appearanceSeed,
     });
 
     if (h._stickerEditOwnerId) (hatch as any)._stickerEditOwnerId = h._stickerEditOwnerId;

@@ -2,7 +2,7 @@ import { Defaults, ToolIds, PointEditAction, SelectionType } from "./constants";
 import { clamp, v, Vec2 } from "./geometry";
 import { Camera } from "./Camera";
 import { Input } from "./Input";
-import { Scene, AreaLabel, DimensionStyle, TextBoxStyle, TextBox } from "./Scene";
+import { Scene, AreaLabel, DimensionStyle, TextBoxStyle, TextBox, copyStrokeEffects } from "./Scene";
 import { autoSizeTextBox } from "./textAutoSize";
 import { textStyleFontSizePt, ptToCssPx, ANNOTATION_M_PER_MM } from "./textTypography";
 import { TableTool } from "./TableTool";
@@ -788,6 +788,9 @@ export class CadApp {
         smoothing: s.smoothing, labelId: s.labelId,
         imageSrc: s.imageSrc, imageSizeM: s.imageSizeM,
         imageSpacingM: s.imageSpacingM, imageRotateAlongPath: s.imageRotateAlongPath,
+        sourceStartDistanceM: (s as any).sourceStartDistanceM || 0,
+        sourceStrokeId: (s as any).sourceStrokeId || null,
+        ...copyStrokeEffects(s),
         _stickerEditOwnerId: s._stickerEditOwnerId || null,
       })),
       rulerGuide: scene.rulerGuide ? {
