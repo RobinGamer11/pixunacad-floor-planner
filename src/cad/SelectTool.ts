@@ -3089,7 +3089,10 @@ export class SelectTool {
       // Mehrfachauswahl überführen, bevor das zweite Element ergänzt wird.
       this._seedMarqueeFromSelection();
       if (this.toggleSelectionAt(input.mouse.wx, input.mouse.wy)) {
-        if (this.app.selection) this.app.setSelection(null);
+        // Zuletzt angeklicktes Objekt wird führende Auswahl. Beim Abwählen
+        // rückt das zuvor zuletzt erfasste, noch ausgewählte Objekt nach.
+        this.syncPrimarySelection();
+
         input.clicked = false;
         input.doubleClicked = false;
         return;
