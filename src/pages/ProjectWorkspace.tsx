@@ -866,16 +866,30 @@ export default function ProjectWorkspace() {
   const selectedElement = activePage?.elements.find((e) => e.id === selectedElementId);
   const bgPage = bgOverlay.pageId ? project?.pages.find((p) => p.id === bgOverlay.pageId) : undefined;
 
-  /** Wählt beide Auswahlquellen der aktiven Mappenseite als eine Transaktion. */
+  // Objektbezogene Werkzeugwahl festhalten. Auswahlwerkzeug (null) und
+  // Nicht-Objektwerkzeuge löschen den Filter absichtlich nicht.
+  useEffect(() => {
+    const objTool = asObjectToolId(activeTool);
+    if (objTool) selectionFilterToolRef.current = objTool;
+  }, [activeTool]);
+
+  /**
+   * Wählt beide Auswahlquellen der aktiven Mappenseite als eine Transaktion.
+   * War zuletzt ein objektbezogenes Werkzeug aktiv, werden ausschließlich
+   * dessen Objekte erfasst — sonst alles.
+   */
   const selectAllOnActiveMappePage = () => {
     if (!activePage) return false;
     pageMarqueeTxRef.current = Date.now();
+    const filter = selectionFilterToolRef.current;
     const pageIds = activePage.elements
       .filter((element) => element.kind !== "line" && element.kind !== "guide")
+      .filter((element) => pageElementMatchesTool(filter, element.kind))
       .map((element) => element.id);
     setSelectedElementIds(pageIds);
-    const cadCount = cadEngineApiRef.current?.engine.selectAllObjects() ?? 0;
+    const cadCount = cadEngineApiRef.current?.engine.selectAllObjects(filter) ?? 0;
     setCadSelectionCount(cadCount);
+
     setActiveTool(null);
     setRightTab("tools");
     return pageIds.length > 0 || cadCount > 0;
