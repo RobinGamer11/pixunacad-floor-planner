@@ -1747,17 +1747,27 @@ export class MiniCad {
    * Segmente sowie gesperrte/nicht editierbare Objekte heraus.
    * Gibt die Anzahl der ausgewählten CAD-Objekte zurück.
    */
-  selectAllObjects(): number {
+  /**
+   * Zuletzt gewähltes objektbezogenes Werkzeug (Filter für "Alles"/Strg+A).
+   * Wird von `setActiveTool` gepflegt und vom Host gesetzt.
+   */
+  selectionFilterTool: ObjectToolId | null = null;
+
+  selectAllObjects(filterTool: ObjectToolId | null = this.selectionFilterTool): number {
     if (this.hasActiveAction()) return 0;
+    // Filter vor dem Werkzeugwechsel sichern.
+    const filter = filterTool ?? null;
     if (this._activeTool !== "select") this.setActiveTool("select");
-    this.selectTool.selectAll();
+    this.selectTool.selectAll(filter);
     try { this._filterNonEditableSegmentSelections(); } catch {}
     const count = this.selectTool.marqueeSelectedIds.length;
     this._lastMarqueeSelectionCount = count;
+    try { this.selectTool.syncPrimarySelection(); } catch {}
     try { this.renderer.render(); } catch {}
     try { this.onSelectionChange?.(); } catch {}
     return count;
   }
+
 
   hasDeletableSelection(): boolean {
     if (this._activeTool === "select" && this.selectTool.marqueeSelectedIds.length > 0) return true;
