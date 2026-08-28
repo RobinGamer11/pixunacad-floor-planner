@@ -1776,19 +1776,21 @@ export class Renderer {
 
     ctx.save();
     ctx.globalAlpha = alpha;
-    ctx.beginPath();
     const pts = tessellateWithBulges(poly.points, (poly as any).bulges, true, 32);
-    const p0 = cam.worldToScreen(pts[0].x, pts[0].y);
-    ctx.moveTo(p0.x, p0.y);
-    for (let i = 1; i < pts.length; i++) {
-      const sp = cam.worldToScreen(pts[i].x, pts[i].y);
-      ctx.lineTo(sp.x, sp.y);
-    }
-    ctx.closePath();
+    // Muster läuft über die gesamte geschlossene Kontur durch (kein Neustart je Kante).
+    const strokeOpts = {
+      pattern: (poly as any).strokePattern, roughen: (poly as any).roughen,
+      pxPerM: cam.scale, lineWidthPx: strokePx,
+      cacheKey: `poly:${poly.id}:${pts.length}:${pts[0]?.x},${pts[0]?.y}`,
+    };
     ctx.strokeStyle = poly.strokeColor || Defaults.lineColor;
     ctx.lineWidth = strokePx;
     ctx.lineJoin = "round";
+    applyStrokePattern(ctx, strokeOpts);
+    tracePathWithEffects(ctx, (p) => cam.worldToScreen(p.x, p.y), pts, true, strokeOpts);
     ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.lineDashOffset = 0;
 
     if (isHovered && !isSelected) {
       ctx.globalAlpha = 1;
@@ -1796,6 +1798,7 @@ export class Renderer {
       ctx.lineWidth = Math.max(1.5, strokePx + 1.2);
       ctx.stroke();
     }
+
     ctx.restore();
   }
 
