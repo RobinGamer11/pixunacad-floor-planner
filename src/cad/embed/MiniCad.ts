@@ -15,7 +15,7 @@
 import { migrateSceneData } from "@/lib/persistence";
 import { DEFAULT_ROUGHEN, DEFAULT_STROKE_PATTERN, type RoughenParams, type StrokePatternParams } from "../strokeEffects";
 import { Camera } from "../Camera";
-import { Scene } from "../Scene";
+import { Scene, copyStrokeEffects } from "../Scene";
 import { Input } from "../Input";
 import { LabelManager } from "../LabelManager";
 import { IdPanel } from "../IdPanel";
