@@ -2916,6 +2916,7 @@ function PageCanvas({
   onCadSelectionChange,
   onCadEngineReady,
   hatchDrawMode,
+  polygonDrawMode,
   bare,
   onJumpCad,
 }: {
@@ -2935,6 +2936,7 @@ function PageCanvas({
   onCadSelectionChange: (info: MiniCadSelectionInfo | null, count?: number) => void;
   onCadEngineReady?: (api: { setSelectedSegmentSnap: (opts: { midpointSnap?: boolean; divisionSnap?: number | null }) => void; duplicateSelectedSegments: (offsetMm?: number) => number; engine: import("@/cad/embed/MiniCad").MiniCad }) => void;
   hatchDrawMode?: HatchDrawMode;
+  polygonDrawMode?: PolygonDrawMode;
   /** Wenn true, wird die 60vh/60vw-Padding-Hülle weggelassen (für Spread-Layouts). */
   bare?: boolean;
   /** Springt vom CAD-Blatt-Hub in den CAD-Editor. */
