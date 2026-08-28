@@ -111,6 +111,10 @@ export type MiniCadSelectionInfo =
       tool: "free";
     }
   | {
+      tool: "polygon";
+      id: string;
+    }
+  | {
       tool: "document";
       id: string;
     }
@@ -1644,8 +1648,10 @@ export class MiniCad {
       if (stroke) return { tool: "free" };
     }
     if ((selection as any).hatchId) {
-      const h = this.scene.getHatchById((selection as any).hatchId);
-      if (h) return { tool: "hatch", id: h.id };
+      const shape = this.scene.getHatchById((selection as any).hatchId);
+      // Polygone sind ein eigener Objekttyp — nie als Schraffur melden.
+      if (shape && (shape as any).isPolygon === true) return { tool: "polygon", id: shape.id };
+      if (shape) return { tool: "hatch", id: shape.id };
     }
     if ((selection as any).documentId) {
       const doc = this.scene.getDocumentById((selection as any).documentId);
@@ -2126,7 +2132,9 @@ export class MiniCad {
 
   getSelectedHatch() {
     if (!this.selection || !this.selection.hatchId) return null;
-    return this.scene.getHatchById(this.selection.hatchId);
+    const h = this.scene.getHatchById(this.selection.hatchId);
+    // Polygone werden nie über die generischen Schraffur-Pfade bearbeitet.
+    return h && (h as any).isPolygon === true ? null : h;
   }
 
   /** Für getCurrentHatchStyle — im Embed nutzen wir keine Gruppen-Auswahl. */

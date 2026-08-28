@@ -1379,7 +1379,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                                 appRef.current?.setTool(ToolIds.POLYGON);
                                 setActiveTool(ToolIds.POLYGON);
                               }
-                              appRef.current?.polygonTool.setDrawMode(v.mode as any);
+                              appRef.current?.polygonTool.setPolygonMode(v.mode);
                               setPolygonDrawMode(v.mode);
                             } else if (v.kind === "door") {
                               if (activeTool !== ToolIds.DOOR) {
@@ -2320,10 +2320,13 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           {/* Polygon — eigenständiges Werkzeug (Kontur ohne Füllung) */}
           {(activeTool === ToolIds.POLYGON || (activeTool === ToolIds.SELECT && !!selectedPolygonId)) && (
             <div className="cad-settings-panel mb-2">
+              <div className="mb-3">
+                <CadEbeneSelect target={hatchIdSelectRef} />
+              </div>
               {activeTool === ToolIds.POLYGON && <PolygonModeSelect app={appRef.current} />}
               <RasterModeToggle app={appRef.current} projectId={projectId} />
-              <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
-                <PolygonSettingsPanel app={appRef.current} projectId={projectId} hideChrome />
+              <div className="mt-3 rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
+                <PolygonSettingsPanel app={appRef.current} projectId={projectId} hideChrome variant="drawing" />
               </div>
             </div>
           )}

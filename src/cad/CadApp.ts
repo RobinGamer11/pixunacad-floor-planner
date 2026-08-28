@@ -1308,7 +1308,9 @@ export class CadApp {
 
   getSelectedHatch() {
     if (!this.selection || !this.selection.hatchId) return null;
-    return this.scene.getHatchById(this.selection.hatchId);
+    const h = this.scene.getHatchById(this.selection.hatchId);
+    // Polygone sind eigenständige Objekte und keine Schraffuren.
+    return h && (h as any).isPolygon === true ? null : h;
   }
 
   getSelectedDimension() {

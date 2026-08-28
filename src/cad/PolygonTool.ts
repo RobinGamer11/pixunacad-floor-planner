@@ -18,7 +18,23 @@ export class PolygonTool extends HatchTool {
 
   /** Der Füllmodus der Schraffur existiert hier bewusst nicht. */
   setPolygonMode(mode: PolygonDrawMode) {
-    this.setDrawMode(mode as HatchDrawMode);
+    super.setDrawMode(this._sanitizeMode(mode));
+  }
+
+  /**
+   * Auch der geerbte generische Setter darf für das Polygonwerkzeug niemals
+   * den Füllmodus aktivieren — "fill" wird zur Laufzeit abgewiesen.
+   */
+  override setDrawMode(mode: HatchDrawMode) {
+    super.setDrawMode(this._sanitizeMode(mode as any));
+  }
+
+  private _sanitizeMode(mode: any): HatchDrawMode {
+    return (mode === "polygon" || mode === "rectangle" || mode === "circle")
+      ? (mode as HatchDrawMode)
+      : ((this.drawMode === "polygon" || this.drawMode === "rectangle" || this.drawMode === "circle")
+        ? (this.drawMode as HatchDrawMode)
+        : ("polygon" as HatchDrawMode));
   }
 
   /** Erzeugt aus der fertigen Kontur ein einzelnes Polygonobjekt. */
