@@ -29,10 +29,14 @@ function selectedTargets(app: any, kind: StrokeEffectKind): any[] {
     } else if ((kind === "polygon" || kind === "hatch") && s?.hatchId) {
       const o = app.scene?.getHatchById?.(s.hatchId);
       if (o && (o.isPolygon === true) === (kind === "polygon")) out.push(o);
-    } else if (kind === "free" && s?.freeId) {
-      const o = app.scene?.getFreeStrokeById?.(s.freeId);
+    } else if (kind === "free") {
+      // Je nach Auswahlquelle heißt das Feld `freeId` (Klick) oder
+      // `freeStrokeId` (Rahmenauswahl/Edit-Target) — beide akzeptieren.
+      const id = s?.freeId || s?.freeStrokeId;
+      const o = id ? app.scene?.getFreeStrokeById?.(id) : null;
       if (o) out.push(o);
     }
+
   }
   return out;
 }
