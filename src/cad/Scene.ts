@@ -1322,8 +1322,8 @@ export class Scene {
   }
 
   // ---- Segments ----
-  createSegment(a: Vec2, b: Vec2, style: { color?: string; thicknessM?: number; labelId?: string; isGuide?: boolean; midpointSnap?: boolean; divisionSnap?: number; arrowStart?: boolean; arrowEnd?: boolean; arrowScale?: number; bulge?: number } = {}) {
-    const seg = new Segment({ id: this._makeId(), a, b, color: style.color, thicknessM: style.thicknessM, labelId: style.labelId, isGuide: style.isGuide, midpointSnap: style.midpointSnap, divisionSnap: style.divisionSnap, arrowStart: style.arrowStart, arrowEnd: style.arrowEnd, arrowScale: style.arrowScale, bulge: style.bulge });
+  createSegment(a: Vec2, b: Vec2, style: { color?: string; thicknessM?: number; labelId?: string; isGuide?: boolean; midpointSnap?: boolean; divisionSnap?: number; arrowStart?: boolean; arrowEnd?: boolean; arrowScale?: number; bulge?: number } & StrokeEffectsInit = {}) {
+    const seg = new Segment({ id: this._makeId(), a, b, color: style.color, thicknessM: style.thicknessM, labelId: style.labelId, isGuide: style.isGuide, midpointSnap: style.midpointSnap, divisionSnap: style.divisionSnap, arrowStart: style.arrowStart, arrowEnd: style.arrowEnd, arrowScale: style.arrowScale, bulge: style.bulge, strokePattern: style.strokePattern, roughen: style.roughen, appearanceSeed: style.appearanceSeed });
     seg._stickerEditOwnerId = this._currentEditOwnerId;
     this.segments.push(seg);
     this._rebuildSegIdMap();
