@@ -354,7 +354,7 @@ export default function ProjectWorkspace() {
     setRightTabState(t);
   };
   const [activeTool, setActiveTool] = useState<PageTool>(null);
-  const [selectedCadTool, setSelectedCadTool] = useState<"line" | "free" | "text" | "hatch" | "guide" | undefined>();
+  const [selectedCadTool, setSelectedCadTool] = useState<"line" | "free" | "text" | "hatch" | "guide" | "polygon" | undefined>();
   const [cadSelectionCount, setCadSelectionCount] = useState<number>(0);
   const [cadSelectedLineSnap, setCadSelectedLineSnap] = useState<{ midpoint: boolean; division: number | null; isGuide: boolean } | null>(null);
   const [lineToolVariant, setLineToolVariant] = useState<LinePageTool>("line");
@@ -2253,6 +2253,10 @@ export default function ProjectWorkspace() {
                       division: typeof info.divisionSnap === "number" ? info.divisionSnap : null,
                       isGuide: !!info.isGuide,
                     });
+                  } else if (info.tool === "polygon") {
+                    // Polygone haben eigene Kontur-Eigenschaften — niemals die
+                    // Schraffur- oder Linien-Defaults überschreiben.
+                    setCadSelectedLineSnap(null);
                   } else if (info.tool === "free") {
                     setCadSelectedLineSnap(null);
                   } else if (info.tool === "text") {
@@ -5876,7 +5880,7 @@ function RightInspector({
   project: import("@/lib/projectStore").Project;
   activeTool: PageTool;
   setActiveTool: (t: PageTool) => void;
-  selectedCadTool?: "line" | "free" | "text" | "hatch" | "guide";
+  selectedCadTool?: "line" | "free" | "text" | "hatch" | "guide" | "polygon";
   selectedElementId?: string;
   selectedElementIds?: string[];
   setSelectedElementId: (id?: string) => void;
@@ -6478,7 +6482,7 @@ function ToolsTab({
   project: import("@/lib/projectStore").Project;
   activeTool: PageTool;
   setActiveTool: (t: PageTool) => void;
-  selectedCadTool?: "line" | "free" | "text" | "hatch" | "guide";
+  selectedCadTool?: "line" | "free" | "text" | "hatch" | "guide" | "polygon";
   selectedElementId?: string;
   selectedElementIds?: string[];
   setSelectedElementId: (id?: string) => void;
@@ -6587,7 +6591,13 @@ function ToolsTab({
           <PolygonModeSelect app={cadEngine} />
           <RasterModeToggle app={cadEngine} projectId={projectId} />
           <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
-            <PolygonSettingsPanel app={cadEngine} projectId={projectId} hideChrome />
+            <PolygonSettingsPanel
+              app={cadEngine}
+              projectId={projectId}
+              hideChrome
+              variant="screen"
+              pxPerMm={guidePxPerMm}
+            />
           </div>
         </>
       )}
