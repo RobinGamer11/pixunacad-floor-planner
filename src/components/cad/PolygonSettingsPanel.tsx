@@ -4,7 +4,7 @@ import type { CadApp } from "@/cad/CadApp";
 import type { MiniCad } from "@/cad/embed/MiniCad";
 import type { PolygonDrawMode } from "@/cad/PolygonTool";
 import { RasterModeToggle } from "@/components/cad/RasterModeToggle";
-import { ToolColorPicker } from "@/components/workspace/ToolColorPicker";
+import { StrokeSettingsPanel } from "@/components/cad/StrokeSettingsPanel";
 
 const HAIRLINE = "hsl(var(--hairline))";
 
@@ -16,79 +16,128 @@ const MODES: { value: PolygonDrawMode; label: string; Icon: React.ElementType }[
 
 type AnyApp = CadApp | MiniCad | null;
 
-/** Aktuell ausgewähltes Polygonobjekt (falls vorhanden). */
-function selectedPolygon(app: AnyApp): any | null {
-  const id = (app as any)?.selection?.hatchId;
-  if (!id) return null;
-  const o = (app as any).scene?.getHatchById?.(id);
-  return o && o.isPolygon ? o : null;
+/** Alle aktuell ausgewählten Polygonobjekte (Mehrfachauswahl inbegriffen). */
+function selectedPolygons(app: AnyApp): any[] {
+  if (!app) return [];
+  const a: any = app;
+  const sels: any[] = Array.isArray(a.selections) && a.selections.length
+    ? a.selections
+    : (a.selection ? [a.selection] : []);
+  const out: any[] = [];
+  const seen = new Set<string>();
+  for (const s of sels) {
+    const id = s?.hatchId;
+    if (!id || seen.has(id)) continue;
+    const o = a.scene?.getHatchById?.(id);
+    if (o && o.isPolygon === true) { seen.add(id); out.push(o); }
+  }
+  return out;
 }
 
-/** Modus-Auswahl — analog zum Linien-/Schraffurwerkzeug. */
+/** Modus-Auswahl — ausschließlich Polygon / Rechteck / Kreis (kein Füllmodus). */
 export const PolygonModeSelect: React.FC<{ app: AnyApp }> = ({ app }) => {
   const [mode, setMode] = useState<PolygonDrawMode>("polygon");
   useEffect(() => {
     if (!app) return;
     const t = window.setInterval(() => {
       const m = (app as any).polygonTool?.drawMode as PolygonDrawMode | undefined;
-      if (m) setMode(m);
+      if (m === "polygon" || m === "rectangle" || m === "circle") setMode(m);
     }, 300);
     return () => window.clearInterval(t);
   }, [app]);
   return (
-    <div className="mb-3 grid grid-cols-3 gap-1">
-      {MODES.map(({ value, label, Icon }) => (
-        <button
-          key={value}
-          type="button"
-          title={label}
-          onClick={() => { (app as any)?.polygonTool?.setDrawMode(value); setMode(value); }}
-          className={`cad-toolbar-btn h-9 justify-center ${mode === value ? "active" : ""}`}
-        >
-          <Icon className="h-4 w-4" />
-        </button>
-      ))}
+    <div className="mb-3">
+      <div className="mb-1.5 text-[10px] font-semibold tracking-wider text-muted-foreground">MODUS</div>
+      <div className="grid grid-cols-3 gap-1">
+        {MODES.map(({ value, label, Icon }) => (
+          <button
+            key={value}
+            type="button"
+            title={label}
+            onClick={() => { (app as any)?.polygonTool?.setPolygonMode?.(value); setMode(value); }}
+            className={`flex flex-col items-center justify-center gap-0.5 rounded border px-1 py-1.5 transition-colors ${
+              mode === value ? "bg-accent" : "hover:bg-muted"
+            }`}
+            style={{ borderColor: HAIRLINE }}
+          >
+            <Icon className="h-3.5 w-3.5" />
+            <span className="text-[9px] leading-tight">{label}</span>
+          </button>
+        ))}
+      </div>
     </div>
   );
 };
 
-/** Einstellungen des Polygonwerkzeugs: Farbe, Linienstärke, Transparenz. */
+/**
+ * Eigenschaften des Polygonwerkzeugs — Aufbau identisch zum Linienwerkzeug
+ * (Farbe, Strichstärke, Transparenz) plus Kanten-Fangoptionen. Es gibt bewusst
+ * keine Füll-, Muster- oder Flächeneigenschaften.
+ */
 export const PolygonSettingsPanel: React.FC<{
   app: AnyApp;
   projectId?: string;
-  /** true = Modus/Chrome wird außerhalb gerendert. */
+  /** true = Modus/Objektart werden außerhalb gerendert. */
   hideChrome?: boolean;
-}> = ({ app, projectId, hideChrome }) => {
+  /** "drawing" = CAD (cm/mm), "screen" = Projektmappe (px/mm). */
+  variant?: "screen" | "drawing";
+  pxPerMm?: number;
+}> = ({ app, projectId, hideChrome, variant = "screen", pxPerMm = 1 }) => {
   const [, force] = useState(0);
   const rerender = () => force((n) => n + 1);
 
-  const sel = selectedPolygon(app);
-  const color = sel?.strokeColor ?? (app as any)?.defaultPolygonColor ?? "#111111";
-  const thicknessM = sel?.thicknessM ?? (app as any)?.defaultPolygonThicknessM ?? 0.01;
-  const alpha = sel?.alpha ?? (app as any)?.defaultPolygonAlpha ?? 1;
+  // Auswahlwechsel/Änderungen aus der Engine übernehmen.
+  useEffect(() => {
+    if (!app) return;
+    const t = window.setInterval(rerender, 300);
+    return () => window.clearInterval(t);
+  }, [app]);
 
-  const setColor = (hex: string) => {
-    const s = selectedPolygon(app);
-    if (s) s.strokeColor = hex;
-    else if (app) (app as any).defaultPolygonColor = hex;
-    (app as any)?.requestRender?.();
+  const sels = selectedPolygons(app);
+  const first = sels[0] ?? null;
+  const a: any = app;
+
+  const color = first?.strokeColor ?? a?.defaultPolygonColor ?? "#111111";
+  const thicknessM = first?.thicknessM ?? a?.defaultPolygonThicknessM ?? 0.01;
+  const alphaPct = Math.round(((first?.alpha ?? a?.defaultPolygonAlpha ?? 1) as number) * 100);
+
+  const commit = () => {
+    a?.renderer?.render?.();
+    a?.requestRender?.();
+    if (a && "_changeDirty" in a) a._changeDirty = true;
     rerender();
   };
-  const setThickness = (mm: number) => {
-    const m = Math.max(0.0002, mm / 1000);
-    const s = selectedPolygon(app);
-    if (s) { s.thicknessM = m; s.strokeWidthPx = m * 80; }
-    else if (app) (app as any).defaultPolygonThicknessM = m;
-    (app as any)?.requestRender?.();
-    rerender();
+
+  const applyStroke = (patch: { color?: string; thicknessM?: number; alphaPct?: number }) => {
+    if (!app) return;
+    const targets = selectedPolygons(app);
+    if (targets.length === 0) {
+      if (patch.color !== undefined) a.defaultPolygonColor = patch.color;
+      if (patch.thicknessM !== undefined) a.defaultPolygonThicknessM = patch.thicknessM;
+      if (patch.alphaPct !== undefined) a.defaultPolygonAlpha = Math.max(0, Math.min(1, patch.alphaPct / 100));
+    } else {
+      for (const p of targets) {
+        if (patch.color !== undefined) p.strokeColor = patch.color;
+        if (patch.thicknessM !== undefined) {
+          p.thicknessM = patch.thicknessM;
+          p.strokeWidthPx = patch.thicknessM * 1000; // generischer Kontur-Fallback (mm-Basis)
+        }
+        if (patch.alphaPct !== undefined) p.alpha = Math.max(0, Math.min(1, patch.alphaPct / 100));
+      }
+    }
+    commit();
   };
-  const setAlpha = (pct: number) => {
-    const a = Math.max(0, Math.min(1, pct / 100));
-    const s = selectedPolygon(app);
-    if (s) s.alpha = a;
-    else if (app) (app as any).defaultPolygonAlpha = a;
-    (app as any)?.requestRender?.();
-    rerender();
+
+  const applySnap = (patch: { midpointSnap?: boolean; divisionSnap?: number | null }) => {
+    const targets = selectedPolygons(app);
+    for (const p of targets) {
+      if (patch.midpointSnap !== undefined) p.midpointSnap = !!patch.midpointSnap;
+      if (patch.divisionSnap !== undefined) {
+        p.divisionSnap = patch.divisionSnap == null || patch.divisionSnap < 2
+          ? undefined : Math.floor(patch.divisionSnap);
+      }
+    }
+    commit();
   };
 
   return (
@@ -96,32 +145,56 @@ export const PolygonSettingsPanel: React.FC<{
       {!hideChrome && <PolygonModeSelect app={app} />}
       {!hideChrome && <RasterModeToggle app={app} projectId={projectId} />}
 
-      <ToolColorPicker label="Konturfarbe" value={color} onChange={setColor} />
+      <StrokeSettingsPanel
+        title="POLYGON"
+        colorLabel="Konturfarbe"
+        variant={variant}
+        pxPerMm={pxPerMm}
+        value={{ color, thicknessM, alphaPct }}
+        onChange={applyStroke}
+      />
 
-      <label className="block">
-        <span className="mb-1 block text-[9px] text-muted-foreground">Linienstärke (mm)</span>
-        <input
-          type="number"
-          step={0.1}
-          min={0.1}
-          value={Number((thicknessM * 1000).toFixed(2))}
-          onChange={(e) => setThickness(Number(e.target.value.replace(",", ".")))}
-          className="h-8 w-full rounded-md border bg-transparent px-2 text-right text-[11px] tabular-nums outline-none"
-          style={{ borderColor: HAIRLINE }}
-        />
-      </label>
-
-      <label className="block">
-        <span className="mb-1 block text-[9px] text-muted-foreground">Transparenz ({Math.round((1 - alpha) * 100)}%)</span>
-        <input
-          type="range"
-          min={0}
-          max={100}
-          value={Math.round(alpha * 100)}
-          onChange={(e) => setAlpha(Number(e.target.value))}
-          className="w-full"
-        />
-      </label>
+      {first && (
+        <div className="space-y-2 border-t pt-2" style={{ borderColor: HAIRLINE }}>
+          <div className="text-[10px] font-semibold tracking-wider text-muted-foreground">POLYGON-SNAPS</div>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] text-muted-foreground">Mittelpunkt</span>
+            <button
+              type="button"
+              onClick={() => applySnap({ midpointSnap: !first.midpointSnap })}
+              className="h-7 rounded-md border px-2 text-xs"
+              style={{
+                borderColor: HAIRLINE,
+                background: first.midpointSnap ? "hsl(var(--surface-strong))" : "transparent",
+              }}
+            >
+              {first.midpointSnap ? "Ein" : "Aus"}
+            </button>
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] text-muted-foreground">Teilung (N)</span>
+            <input
+              type="number"
+              min={2}
+              max={64}
+              step={1}
+              value={first.divisionSnap ?? ""}
+              placeholder="–"
+              onChange={(e) => {
+                const raw = e.target.value.trim();
+                if (raw === "") { applySnap({ divisionSnap: null }); return; }
+                const n = Math.floor(Number(raw));
+                if (Number.isFinite(n)) applySnap({ divisionSnap: n >= 2 ? n : null });
+              }}
+              className="h-7 w-20 rounded border bg-transparent px-2 text-sm tabular-nums"
+              style={{ borderColor: HAIRLINE }}
+            />
+          </div>
+          <div className="text-[11px] text-muted-foreground">
+            Mittelpunkt und Teilung gelten für jede einzelne Polygonkante.
+          </div>
+        </div>
+      )}
     </div>
   );
 };
