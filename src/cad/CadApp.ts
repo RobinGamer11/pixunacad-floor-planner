@@ -41,6 +41,8 @@ import { PlanController } from "./PlanController";
 import { drawProjection as drawPlanProjection } from "./PlanProjections";
 import { SheetPanel } from "./SheetPanel";
 import { mirrorProxy } from "./multiEdit";
+import { asObjectToolId, type ObjectToolId } from "./selectionTools";
+
 
 export interface TextSettingsRefs {
   panel: HTMLDivElement;
@@ -1221,10 +1223,21 @@ export class CadApp {
   clearSelection() { this.setSelection(null); }
 
   /**
+   * Zuletzt gewähltes objektbezogenes Werkzeug (Linie, Polygon, Text …).
+   * Bestimmt, welche Objektarten "Alles"/Strg+A auswählt. Auswahlwerkzeug,
+   * Radierer und Pipette ändern diesen Zustand ausdrücklich NICHT.
+   */
+  selectionFilterTool: ObjectToolId | null = null;
+
+  /** Hebt den Werkzeugfilter auf — "Alles" wählt dann wieder alles aus. */
+  clearSelectionFilterTool() { this.selectionFilterTool = null; }
+
+  /**
    * "Alles auswählen" im aktiven CAD-Plan. Sammelt alle auswählbaren Objekte
    * über denselben Collector wie die Rahmen-Auswahl und schreibt sie direkt in
    * `selectTool.marqueeSelectedIds` — kein zweiter Auswahlzustand.
-   * Läuft gerade eine unbestätigte Zeichenaktion, passiert nichts.
+   * Ist zuletzt ein objektbezogenes Werkzeug aktiv gewesen, werden nur dessen
+   * Objekte erfasst. Läuft gerade eine unbestätigte Zeichenaktion, passiert nichts.
    */
   selectAllInActiveCadPlan(): boolean {
     // Kein sicherer Wechsel zum Auswahlwerkzeug, solange gezeichnet wird.
@@ -1236,13 +1249,19 @@ export class CadApp {
       if (st?.pasteFloatActive || st?.groupRotateActive || st?.groupDragActive || st?.groupAnchorActive) return false;
     } catch { /* ignore */ }
 
+    // Filter VOR dem Werkzeugwechsel sichern — `setTool(SELECT)` darf den
+    // Werkzeugkontext nicht verlieren.
+    const filter = this.selectionFilterTool;
     if (this.activeTool !== this.selectTool) this.setTool(ToolIds.SELECT);
-    const n = this.selectTool.selectAll();
+    const n = this.selectTool.selectAll(filter);
     if (!n) return false;
+    // Führendes Objekt = zuletzt erfasstes Objekt der Auswahl.
+    try { this.selectTool.syncPrimarySelection(); } catch {}
     try { this.onSelectionChange?.(); } catch {}
     try { this.renderer.render(); } catch {}
     return true;
   }
+
 
 
   /** True, wenn eine Löschung per Entf-Taste etwas entfernen würde. */
@@ -1278,15 +1297,27 @@ export class CadApp {
     return ids;
   }
 
+  /**
+   * Nur echt gleichartige Werkzeugobjekte dürfen gespiegelt werden.
+   * Polygon vs. Schraffur und Linie vs. Hilfslinie teilen sich zwar die
+   * interne Struktur, bleiben aber getrennte Werkzeugtypen.
+   */
+  private _sameToolType(primary: any, other: any): boolean {
+    if (!!other?.isPolygon !== !!primary?.isPolygon) return false;
+    if (!!other?.isGuide !== !!primary?.isGuide) return false;
+    return true;
+  }
+
   private _panelMirror<T extends object>(primary: T | null, kind: string, lookup: (id: string) => T | null | undefined): T | null {
     if (!primary) return null;
     const sibs: T[] = [];
     for (const id of this._multiSelectedIds(kind)) {
       const o = lookup(id);
-      if (o && o !== primary) sibs.push(o);
+      if (o && o !== primary && this._sameToolType(primary, o)) sibs.push(o);
     }
     return sibs.length ? mirrorProxy(primary, sibs) : primary;
   }
+
 
   /** Von den Werkzeugeinstellungen genutzte Getter — spiegeln Änderungen bei
    *  Mehrfachauswahl automatisch auf alle Objekte derselben Art. */
@@ -3053,9 +3084,15 @@ export class CadApp {
   }
 
   setTool(id: string) {
+    // Zuletzt gewähltes objektbezogenes Werkzeug merken. Der Wechsel zum
+    // Auswahlwerkzeug (oder zu Radierer/Pipette) löscht diesen Filter NICHT —
+    // er bestimmt, welche Objekte "Alles"/Strg+A auswählt.
+    const objTool = asObjectToolId(id);
+    if (objTool) this.selectionFilterTool = objTool;
     // Werkzeugwechsel beendet immer den Tabellen-Zellmodus.
     this.endTableEdit();
     if (this.pastePreviewActive) this.cancelPastePreview();
+
 
     if (this.activeTool && this.activeTool.cancel) this.activeTool.cancel();
     // Wand-Helfer ausschalten, wenn das Wandwerkzeug verlassen wird.

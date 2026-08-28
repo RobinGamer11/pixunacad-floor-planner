@@ -128,6 +128,8 @@ import { importFile, type ImportedPage } from "@/cad/documentImport";
 import { popPendingSheetPdf } from "@/lib/sheetPdfExport";
 import { setExportMode } from "@/lib/printExport";
 import type { MiniCadSelectionInfo } from "@/cad/embed/MiniCad";
+import { asObjectToolId, pageElementMatchesTool, type ObjectToolId } from "@/cad/selectionTools";
+
 import type { HatchDrawMode } from "@/cad/HatchTool";
 import type { PolygonDrawMode } from "@/cad/PolygonTool";
 import { PolygonModeSelect, PolygonSettingsPanel } from "@/components/cad/PolygonSettingsPanel";
@@ -356,6 +358,13 @@ export default function ProjectWorkspace() {
     setRightTabState(t);
   };
   const [activeTool, setActiveTool] = useState<PageTool>(null);
+  /**
+   * Zuletzt gewähltes objektbezogenes Werkzeug. Wird NICHT aus `activeTool`
+   * abgeleitet, sobald zum Auswahlwerkzeug gewechselt wurde — er bestimmt,
+   * welche Objektart "Alles"/Strg+A auf der aktiven Seite erfasst.
+   */
+  const selectionFilterToolRef = useRef<ObjectToolId | null>(null);
+
   const [selectedCadTool, setSelectedCadTool] = useState<"line" | "free" | "text" | "hatch" | "guide" | "polygon" | undefined>();
   const [cadSelectionCount, setCadSelectionCount] = useState<number>(0);
   const [cadSelectedLineSnap, setCadSelectedLineSnap] = useState<{ midpoint: boolean; division: number | null; isGuide: boolean } | null>(null);
@@ -857,16 +866,30 @@ export default function ProjectWorkspace() {
   const selectedElement = activePage?.elements.find((e) => e.id === selectedElementId);
   const bgPage = bgOverlay.pageId ? project?.pages.find((p) => p.id === bgOverlay.pageId) : undefined;
 
-  /** Wählt beide Auswahlquellen der aktiven Mappenseite als eine Transaktion. */
+  // Objektbezogene Werkzeugwahl festhalten. Auswahlwerkzeug (null) und
+  // Nicht-Objektwerkzeuge löschen den Filter absichtlich nicht.
+  useEffect(() => {
+    const objTool = asObjectToolId(activeTool);
+    if (objTool) selectionFilterToolRef.current = objTool;
+  }, [activeTool]);
+
+  /**
+   * Wählt beide Auswahlquellen der aktiven Mappenseite als eine Transaktion.
+   * War zuletzt ein objektbezogenes Werkzeug aktiv, werden ausschließlich
+   * dessen Objekte erfasst — sonst alles.
+   */
   const selectAllOnActiveMappePage = () => {
     if (!activePage) return false;
     pageMarqueeTxRef.current = Date.now();
+    const filter = selectionFilterToolRef.current;
     const pageIds = activePage.elements
       .filter((element) => element.kind !== "line" && element.kind !== "guide")
+      .filter((element) => pageElementMatchesTool(filter, element.kind))
       .map((element) => element.id);
     setSelectedElementIds(pageIds);
-    const cadCount = cadEngineApiRef.current?.engine.selectAllObjects() ?? 0;
+    const cadCount = cadEngineApiRef.current?.engine.selectAllObjects(filter) ?? 0;
     setCadSelectionCount(cadCount);
+
     setActiveTool(null);
     setRightTab("tools");
     return pageIds.length > 0 || cadCount > 0;
@@ -2200,14 +2223,15 @@ export default function ProjectWorkspace() {
                   setSelectedElementIds((prev) => {
                     if (!multi) return [id];
                     const idx = prev.indexOf(id);
+                    // Abwählen: Das davor zuletzt erfasste Objekt rückt als
+                    // führendes Element (= letzter Eintrag) nach.
                     if (opts?.shift && idx >= 0) return prev.filter((x) => x !== id);
                     const rest = prev.filter((x) => x !== id);
-                    // Das ZUERST gewählte Objekt bleibt führend (= letzter Eintrag).
-                    // Weitere Objekte werden davor eingereiht, damit Anker,
-                    // Verschieben und Drehen am ersten Objekt bestehen bleiben.
-                    if (opts?.shift && rest.length > 0) return [id, ...rest];
+                    // Zuletzt angeklicktes Objekt ist immer das führende
+                    // Element und steht deshalb am Ende der Liste.
                     return [...rest, id];
                   });
+
 
                   setSelectedCadTool(undefined);
                   setRightTab("tools");

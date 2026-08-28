@@ -23,6 +23,8 @@ import { TopologyEngine } from "../TopologyEngine";
 import { Renderer, type Selection } from "../Renderer";
 import { RasterLayers, cadRasterPxPerMForReference } from "../RasterLayers";
 import { mirrorProxy } from "../multiEdit";
+import { asObjectToolId, type ObjectToolId } from "../selectionTools";
+
 import { LineHub } from "../LineHub";
 import { PointEditMenu } from "../PointEditMenu";
 import { LineTool } from "../LineTool";
@@ -886,7 +888,11 @@ export class MiniCad {
 
 
   setActiveTool(tool: MiniTool) {
+    // Zuletzt gewähltes objektbezogenes Werkzeug merken (Auswahlfilter).
+    const objTool = asObjectToolId(tool);
+    if (objTool) this.selectionFilterTool = objTool;
     if (this._activeTool === tool) return;
+
     // Deactivate previous.
     if (this._activeTool === "line") this.lineTool.cancel();
     if (this._activeTool === "guide") this.lineTool.cancel();
@@ -1745,17 +1751,27 @@ export class MiniCad {
    * Segmente sowie gesperrte/nicht editierbare Objekte heraus.
    * Gibt die Anzahl der ausgewählten CAD-Objekte zurück.
    */
-  selectAllObjects(): number {
+  /**
+   * Zuletzt gewähltes objektbezogenes Werkzeug (Filter für "Alles"/Strg+A).
+   * Wird von `setActiveTool` gepflegt und vom Host gesetzt.
+   */
+  selectionFilterTool: ObjectToolId | null = null;
+
+  selectAllObjects(filterTool: ObjectToolId | null = this.selectionFilterTool): number {
     if (this.hasActiveAction()) return 0;
+    // Filter vor dem Werkzeugwechsel sichern.
+    const filter = filterTool ?? null;
     if (this._activeTool !== "select") this.setActiveTool("select");
-    this.selectTool.selectAll();
+    this.selectTool.selectAll(filter);
     try { this._filterNonEditableSegmentSelections(); } catch {}
     const count = this.selectTool.marqueeSelectedIds.length;
     this._lastMarqueeSelectionCount = count;
+    try { this.selectTool.syncPrimarySelection(); } catch {}
     try { this.renderer.render(); } catch {}
     try { this.onSelectionChange?.(); } catch {}
     return count;
   }
+
 
   hasDeletableSelection(): boolean {
     if (this._activeTool === "select" && this.selectTool.marqueeSelectedIds.length > 0) return true;
@@ -2110,13 +2126,24 @@ export class MiniCad {
 
   /* ---- Mehrfachauswahl: Einstellungen auf alle gleichartigen Objekte ---- */
 
+  /**
+   * Polygon vs. Schraffur und Linie vs. Hilfslinie teilen sich die interne
+   * Struktur, sind aber getrennte Werkzeugtypen — nicht gemeinsam spiegeln.
+   */
+  private _sameToolType(primary: any, other: any): boolean {
+    if (!!other?.isPolygon !== !!primary?.isPolygon) return false;
+    if (!!other?.isGuide !== !!primary?.isGuide) return false;
+    return true;
+  }
+
   private _panelMirror<T extends object>(primary: T | null | undefined, kind: string, lookup: (id: string) => T | null | undefined): T | null {
     if (!primary) return null;
     const sibs: T[] = [];
     for (const ref of this._selectedRefs()) {
       if (ref.kind !== kind) continue;
       const o = lookup(ref.id);
-      if (o && o !== primary) sibs.push(o);
+      if (o && o !== primary && this._sameToolType(primary, o)) sibs.push(o);
+
     }
     return sibs.length ? mirrorProxy(primary, sibs) : primary;
   }

@@ -15,6 +15,8 @@ import { buildWallSolidRing, buildHealedWallSolidRing } from "./wallSolid";
 import { runWallTopologyMaintenance } from "./wallTopologyMaintenance";
 import { trimWallEndpointsToNeighbors } from "./wallConnect";
 import { rotateGroup, translateGroup, groupCentroid } from "./groupTransform";
+import { engineObjectMatchesTool, type ObjectToolId } from "./selectionTools";
+
 
 type EditTarget =
   | { kind: "segment"; segmentId: string; pointIndex: number }
@@ -240,13 +242,17 @@ export class SelectTool {
    * Plans direkt in die bestehende Mehrfachauswahl (`marqueeSelectedIds`).
    * Verwendet exakt denselben Objekt-Collector wie die Rahmen-Auswahl, damit
    * "Alles", "Berühren" und "Umschließen" dieselben Objektarten kennen.
+   *
+   * `toolFilter` beschränkt die Auswahl auf die Objekte eines Werkzeugs
+   * (z. B. nur Linien, nur Polygone). `null` wählt alles Auswählbare.
    * Gibt die Anzahl der ausgewählten Objekte zurück.
    */
-  selectAll(): number {
+  selectAll(toolFilter: ObjectToolId | null = null): number {
     const hits: { kind: string; id: string }[] = [];
     const seen = new Set<string>();
     for (const { kind, id, obj } of this._iterElements()) {
       if (!id) continue;
+      if (!engineObjectMatchesTool(toolFilter, kind, obj)) continue;
       const pts = this._elementPoints(kind, obj);
       if (!pts || !pts.length) continue;      // temporäre/geometrielose Objekte überspringen
       const key = kind + ":" + id;
@@ -257,6 +263,48 @@ export class SelectTool {
     this.marqueeSelectedIds = hits;
     return hits.length;
   }
+
+  /**
+   * Führendes Objekt der Mehrfachauswahl = zuletzt erfasster Eintrag.
+   * Wird von den Hosts genutzt, um das passende Eigenschaftenfenster zu zeigen.
+   */
+  get primarySelectedRef(): { kind: string; id: string } | null {
+    const list = this.marqueeSelectedIds;
+    return list.length ? list[list.length - 1] : null;
+  }
+
+  /** Wandelt einen Auswahl-Ref in das Selection-Objekt des Hosts um. */
+  selectionFromRef(ref: { kind: string; id: string } | null): any | null {
+    if (!ref) return null;
+    switch (ref.kind) {
+      case "segment":    return { type: SelectionType.SEGMENT, segmentId: ref.id, handleIndex: null };
+      case "wall":       return { type: SelectionType.WALL, wallId: ref.id, handleIndex: null };
+      case "hatch":      return { type: SelectionType.HATCH, hatchId: ref.id, handleIndex: null };
+      case "freeStroke": return { type: SelectionType.FREE_STROKE, freeStrokeId: ref.id, handleIndex: null };
+      case "dimension":  return { type: SelectionType.DIMENSION, dimensionId: ref.id, handleIndex: null };
+      case "textbox":
+      case "table":      return { type: SelectionType.TEXTBOX, textBoxId: ref.id, handleIndex: null };
+      case "document":   return { type: SelectionType.DOCUMENT, documentId: ref.id, handleIndex: null };
+      case "sticker":    return { type: SelectionType.STICKER_INSTANCE, stickerInstanceId: ref.id, handleIndex: null };
+      default:           return null;
+    }
+  }
+
+  /**
+   * Setzt die Host-Auswahl auf das führende (zuletzt erfasste) Objekt der
+   * Mehrfachauswahl. Dadurch zeigt immer das Eigenschaftenfenster des zuletzt
+   * angeklickten Objekts — und Änderungen wirken über den Panel-Mirror auf
+   * alle gleichartigen Objekte der Auswahl.
+   */
+  syncPrimarySelection(): void {
+    try {
+      const sel = this.selectionFromRef(this.primarySelectedRef);
+      (this.app as any).setSelection?.(sel);
+    } catch { /* ignore */ }
+  }
+
+
+
 
 
 
@@ -3041,7 +3089,10 @@ export class SelectTool {
       // Mehrfachauswahl überführen, bevor das zweite Element ergänzt wird.
       this._seedMarqueeFromSelection();
       if (this.toggleSelectionAt(input.mouse.wx, input.mouse.wy)) {
-        if (this.app.selection) this.app.setSelection(null);
+        // Zuletzt angeklicktes Objekt wird führende Auswahl. Beim Abwählen
+        // rückt das zuvor zuletzt erfasste, noch ausgewählte Objekt nach.
+        this.syncPrimarySelection();
+
         input.clicked = false;
         input.doubleClicked = false;
         return;
@@ -4516,6 +4567,9 @@ export class SelectTool {
       hits.push({ kind, id });
     }
     this.marqueeSelectedIds = hits;
+    // Führendes Objekt = zuletzt erfasster Eintrag der Rahmenauswahl.
+    this.syncPrimarySelection();
+
   }
 
   /** Element unter dem Cursor (Weltkoordinaten) für Shift-Mehrfachauswahl. */
