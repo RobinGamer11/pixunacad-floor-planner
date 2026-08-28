@@ -3,6 +3,7 @@ import { clamp, v, Vec2 } from "./geometry";
 import { Camera } from "./Camera";
 import { Input } from "./Input";
 import { Scene, AreaLabel, DimensionStyle, TextBoxStyle, TextBox, copyStrokeEffects } from "./Scene";
+import { DEFAULT_ROUGHEN, DEFAULT_STROKE_PATTERN, type RoughenParams, type StrokePatternParams } from "./strokeEffects";
 import { autoSizeTextBox } from "./textAutoSize";
 import { textStyleFontSizePt, ptToCssPx, ANNOTATION_M_PER_MM } from "./textTypography";
 import { TableTool } from "./TableTool";
@@ -1736,6 +1737,22 @@ export class CadApp {
   getSelectedGroupHatches() {
     if (!this.selectedLabelId) return [];
     return this.scene.getHatchesByLabelId(this.selectedLabelId);
+  }
+
+  /**
+   * Gemeinsame Standardwerte für Linienart und Roughen je Werkzeug.
+   * Neue Objekte erhalten stets einen frischen Seed (kein appearanceSeed hier).
+   */
+  strokeEffectDefaults: Record<string, { strokePattern: StrokePatternParams; roughen: RoughenParams }> = {
+    line: { strokePattern: { ...DEFAULT_STROKE_PATTERN }, roughen: { ...DEFAULT_ROUGHEN } },
+    polygon: { strokePattern: { ...DEFAULT_STROKE_PATTERN }, roughen: { ...DEFAULT_ROUGHEN } },
+    hatch: { strokePattern: { ...DEFAULT_STROKE_PATTERN }, roughen: { ...DEFAULT_ROUGHEN } },
+    free: { strokePattern: { ...DEFAULT_STROKE_PATTERN }, roughen: { ...DEFAULT_ROUGHEN } },
+  };
+
+  getStrokeEffectDefaults(kind: "line" | "polygon" | "hatch" | "free") {
+    const d = this.strokeEffectDefaults[kind] || this.strokeEffectDefaults.line;
+    return { strokePattern: { ...d.strokePattern }, roughen: { ...d.roughen } };
   }
 
   getCurrentLineStyle() {

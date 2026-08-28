@@ -40,7 +40,7 @@ export class PolygonTool extends HatchTool {
   /** Erzeugt aus der fertigen Kontur ein einzelnes Polygonobjekt. */
   protected override _createShapeFromPoints(points: Vec2[]) {
     const style = (this.app as any).getCurrentPolygonStyle?.() ?? {};
-    const poly = (this.app as any).scene.createPolygon(points, style);
+    const poly = (this.app as any).scene.createPolygon(points, { ...style, ...((this.app as any).getStrokeEffectDefaults?.("polygon") ?? {}) });
     maybeRasterize(this.app, { type: "hatch", obj: poly });
     (this.app as any).notifyPolygonCreated?.(poly);
   }
