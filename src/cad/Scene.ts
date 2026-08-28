@@ -1423,9 +1423,10 @@ export class Scene {
     patternEnabled?: boolean; patternId?: string; patternScale?: number;
     patternAngleDeg?: number; patternSkewDeg?: number; patternStretch?: number; patternOffsetX?: number; patternOffsetY?: number;
     bulges?: number[]; holeBulges?: number[][];
-  } = {}) {
+  } & StrokeEffectsInit = {}) {
     const hatch = new Hatch({
       id: this._makeId(), points, holes: style.holes,
+      strokePattern: style.strokePattern, roughen: style.roughen, appearanceSeed: style.appearanceSeed,
       bulges: style.bulges, holeBulges: style.holeBulges,
       fillColor: style.fillColor, strokeColor: style.strokeColor,
       fillAlphaPct: style.fillAlphaPct, strokeWidthPx: style.strokeWidthPx,
@@ -1448,9 +1449,10 @@ export class Scene {
   createPolygon(points: Vec2[], style: {
     color?: string; thicknessM?: number; alpha?: number; labelId?: string; bulges?: number[];
     midpointSnap?: boolean; divisionSnap?: number;
-  } = {}) {
+  } & StrokeEffectsInit = {}) {
     const poly = new PolygonShape({
       id: this._makeId(), points,
+      strokePattern: style.strokePattern, roughen: style.roughen, appearanceSeed: style.appearanceSeed,
       bulges: style.bulges,
       strokeColor: style.color || Defaults.lineColor,
       fillAlphaPct: 0,
