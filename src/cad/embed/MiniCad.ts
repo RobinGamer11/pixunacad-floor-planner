@@ -1447,6 +1447,7 @@ export class MiniCad {
               arrowEnd: !!s.arrowEnd,
               arrowScale: s.arrowScale,
               bulge: s.bulge,
+              ...copyStrokeEffects(s),
             },
 
           );
@@ -1476,6 +1477,7 @@ export class MiniCad {
             smoothing: s.smoothing, labelId: s.labelId || Defaults.defaultLabelId,
             imageSrc: s.imageSrc || null, imageSizeM: s.imageSizeM,
             imageSpacingM: s.imageSpacingM, imageRotateAlongPath: s.imageRotateAlongPath,
+            ...copyStrokeEffects(s),
           });
         } catch (e) { console.error("MiniCad restore freeStroke:", e); }
       }
@@ -1487,6 +1489,9 @@ export class MiniCad {
             this.scene.createPolygon(h.points || [], {
               color: h.strokeColor, thicknessM: h.thicknessM, alpha: h.alpha,
               labelId: h.labelId || Defaults.defaultLabelId, bulges: h.bulges,
+              midpointSnap: !!h.midpointSnap,
+              divisionSnap: typeof h.divisionSnap === "number" && h.divisionSnap >= 2 ? Math.floor(h.divisionSnap) : undefined,
+              ...copyStrokeEffects(h),
             });
             continue;
           }
@@ -1498,6 +1503,7 @@ export class MiniCad {
             areaLabel: h.areaLabel,
             patternEnabled: h.patternEnabled, patternId: h.patternId, patternScale: h.patternScale, patternAngleDeg: h.patternAngleDeg, patternSkewDeg: h.patternSkewDeg, patternStretch: h.patternStretch, patternOffsetX: h.patternOffsetX, patternOffsetY: h.patternOffsetY,
             bulges: h.bulges, holeBulges: h.holeBulges,
+            ...copyStrokeEffects(h),
           });
         } catch (e) { console.error("MiniCad restore hatch:", e); }
       }
