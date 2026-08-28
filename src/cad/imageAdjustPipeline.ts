@@ -23,13 +23,13 @@ export const ADJUST_KEYS = [
 export type AdjustKey = typeof ADJUST_KEYS[number];
 export type AdjustParams = Record<AdjustKey, number>;
 
-/** Default-Werte = Slider-Defaults der Referenz. */
+/** Default-Werte = alles auf 0 (kein Effekt). Regler 0..100 = Stärke des Filters. */
 export const DEFAULT_ADJUST: AdjustParams = {
-  strength: 96, paper: 80, wash: 88, splatter: 72, lift: 65,
-  trees: 100, leaves: 96, greenVar: 90,
-  arch: 88, facade: 74, plaza: 56, ao: 52, people: 30,
-  model: 68, haze: 44, bloom: 42, edges: 72,
-  warmth: 68, softContrast: 76, sat: 50, vignette: 12,
+  strength: 0, paper: 0, wash: 0, splatter: 0, lift: 0,
+  trees: 0, leaves: 0, greenVar: 0,
+  arch: 0, facade: 0, plaza: 0, ao: 0, people: 0,
+  model: 0, haze: 0, bloom: 0, edges: 0,
+  warmth: 0, softContrast: 0, sat: 0, vignette: 0,
 };
 
 // -------------------- Presets (Referenzwerte, ohne twigs/linework)
