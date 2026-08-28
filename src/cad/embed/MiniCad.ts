@@ -1299,7 +1299,9 @@ export class MiniCad {
   serialize(): any {
     const f = this._strokeFactor || 1;
     return {
-      version: 4,
+      // v5: gemeinsame Kontureffekte (Linienart + Aufrauen) werden mitgespeichert.
+      version: 5,
+
       labels: this.labelManager.list(),
       // Rasterebenen (Pixelmodus) — leere Ebenen entfallen automatisch.
       rasterLayers: this.rasterLayers.serialize(),
