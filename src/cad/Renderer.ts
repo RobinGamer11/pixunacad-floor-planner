@@ -4,6 +4,7 @@ import { Camera } from "./Camera";
 import type { RasterLayers } from "./RasterLayers";
 import { Scene, Hatch, Dimension, TextBox, StickerInstance, DocumentObject, FreeStroke } from "./Scene";
 import { smoothChaikin } from "./freeGeom";
+import { applyStrokePattern, tracePathWithEffects, roughenPolyline, dashArrayPx, lineCapForPattern, dashOffsetPx } from "./strokeEffects";
 import { LabelManager } from "./LabelManager";
 import { getDimensionGeometry, getAngleDimensionParts, type DimensionLike } from "./dimensionGeometry";
 import { boxCornersWorld } from "./textGeometry";
