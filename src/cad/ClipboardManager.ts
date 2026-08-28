@@ -2,6 +2,7 @@ import { Defaults, SelectionType } from "./constants";
 import { Vec2, v, sub, add, polygonCentroid } from "./geometry";
 import type { CadApp } from "./CadApp";
 import type { Segment, Hatch, Dimension, TextBox, AreaLabel, TextBoxStyle, FreeStroke } from "./Scene";
+import { copyStrokeEffects } from "./Scene";
 
 interface SegmentSnap {
   kind: "segment"; a: Vec2; b: Vec2;
@@ -60,7 +61,8 @@ export interface Clipboard {
 /* ---- Snapshot helpers ---- */
 function snapSegment(s: Segment): SegmentSnap {
   return { kind: "segment", a: v(s.a.x, s.a.y), b: v(s.b.x, s.b.y),
-    color: s.color, thicknessM: s.thicknessM, labelId: s.labelId, bulge: (s as any).bulge || 0 };
+    color: s.color, thicknessM: s.thicknessM, labelId: s.labelId, bulge: (s as any).bulge || 0,
+    ...copyStrokeEffects(s) } as any;
 }
 function snapHatch(h: Hatch): HatchSnap {
   return { kind: "hatch", points: h.points.map(p => v(p.x, p.y)),
@@ -71,7 +73,9 @@ function snapHatch(h: Hatch): HatchSnap {
     patternScale: h.patternScale, patternAngleDeg: h.patternAngleDeg,
     patternSkewDeg: h.patternSkewDeg, patternStretch: h.patternStretch, patternOffsetX: h.patternOffsetX, patternOffsetY: h.patternOffsetY,
     bulges: [...((h as any).bulges || [])], holeBulges: ((h as any).holeBulges || []).map((l: number[]) => [...l]),
-    isPolygon: (h as any).isPolygon === true, thicknessM: (h as any).thicknessM, alpha: (h as any).alpha } as any;
+    isPolygon: (h as any).isPolygon === true, thicknessM: (h as any).thicknessM, alpha: (h as any).alpha,
+    midpointSnap: !!(h as any).midpointSnap, divisionSnap: (h as any).divisionSnap,
+    ...copyStrokeEffects(h) } as any;
 }
 function snapDimension(d: Dimension): DimensionSnap {
   return { kind: "dimension",
@@ -93,7 +97,7 @@ function snapFree(f: FreeStroke): FreeSnap {
     smoothing: (f as any).smoothing,
     imageSrc: (f as any).imageSrc ?? null, imageSizeM: (f as any).imageSizeM,
     imageSpacingM: (f as any).imageSpacingM, imageRotateAlongPath: (f as any).imageRotateAlongPath,
-    labelId: f.labelId };
+    labelId: f.labelId, ...copyStrokeEffects(f) } as any;
 }
 function snapTextBox(t: TextBox): TextBoxSnap {
   return { kind: "textbox",
@@ -214,12 +218,15 @@ export function commitClipboardAt(app: CadApp, clip: Clipboard, mouseW: Vec2): {
   for (const it of clip.items) {
     if (it.kind === "segment") {
       const o = app.scene.createSegment({ x: it.a.x + dx, y: it.a.y + dy }, { x: it.b.x + dx, y: it.b.y + dy },
-        { color: it.color, thicknessM: it.thicknessM, labelId: it.labelId, bulge: (it as any).bulge });
+        { color: it.color, thicknessM: it.thicknessM, labelId: it.labelId, bulge: (it as any).bulge,
+          ...copyStrokeEffects(it) });
       if (o) created.push({ kind: "segment", id: o.id });
     } else if (it.kind === "hatch" && (it as any).isPolygon) {
       const o = app.scene.createPolygon(it.points.map(p => ({ x: p.x + dx, y: p.y + dy })),
         { color: it.strokeColor, thicknessM: (it as any).thicknessM, alpha: (it as any).alpha,
-          labelId: it.labelId, bulges: (it as any).bulges });
+          labelId: it.labelId, bulges: (it as any).bulges,
+          midpointSnap: !!(it as any).midpointSnap, divisionSnap: (it as any).divisionSnap,
+          ...copyStrokeEffects(it) });
       if (o) created.push({ kind: "hatch", id: o.id });
     } else if (it.kind === "hatch") {
       const o = app.scene.createHatch(it.points.map(p => ({ x: p.x + dx, y: p.y + dy })),
@@ -227,7 +234,8 @@ export function commitClipboardAt(app: CadApp, clip: Clipboard, mouseW: Vec2): {
           fillAlphaPct: it.fillAlphaPct, strokeWidthPx: it.strokeWidthPx,
           labelId: it.labelId, areaLabel: it.areaLabel,
           patternEnabled: it.patternEnabled, patternId: it.patternId, patternScale: it.patternScale, patternAngleDeg: it.patternAngleDeg, patternSkewDeg: it.patternSkewDeg, patternStretch: it.patternStretch, patternOffsetX: it.patternOffsetX, patternOffsetY: it.patternOffsetY,
-          bulges: (it as any).bulges, holeBulges: (it as any).holeBulges, });
+          bulges: (it as any).bulges, holeBulges: (it as any).holeBulges,
+          ...copyStrokeEffects(it) });
       if (o) created.push({ kind: "hatch", id: o.id });
     } else if (it.kind === "dimension") {
       const o = app.scene.createDimension(
@@ -260,6 +268,7 @@ export function commitClipboardAt(app: CadApp, clip: Clipboard, mouseW: Vec2): {
         gapM: it.gapM, blobSpacingM: it.blobSpacingM, blobSizeM: it.blobSizeM, smoothing: it.smoothing,
         imageSrc: it.imageSrc, imageSizeM: it.imageSizeM, imageSpacingM: it.imageSpacingM,
         imageRotateAlongPath: it.imageRotateAlongPath, labelId: it.labelId,
+        ...copyStrokeEffects(it),
       });
       if (o) created.push({ kind: "freeStroke", id: o.id });
     } else {

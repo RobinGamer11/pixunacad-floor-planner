@@ -391,6 +391,9 @@ export class EraserTool {
         midpointSnap: seg.midpointSnap,
         divisionSnap: seg.divisionSnap,
         arrowScale: seg.arrowScale,
+        // Linienart/Aufrauen inkl. Seed übernehmen: Teilstücke sehen danach
+        // exakt aus wie das Original (kein Zurückspringen auf „Durchgezogen“).
+        ...copyStrokeEffects(seg),
       };
       scene.removeSegment(seg);
       if (this.app.selection && (this.app.selection as any).segmentId === seg.id) {
