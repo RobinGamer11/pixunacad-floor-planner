@@ -3053,9 +3053,15 @@ export class CadApp {
   }
 
   setTool(id: string) {
+    // Zuletzt gewähltes objektbezogenes Werkzeug merken. Der Wechsel zum
+    // Auswahlwerkzeug (oder zu Radierer/Pipette) löscht diesen Filter NICHT —
+    // er bestimmt, welche Objekte "Alles"/Strg+A auswählt.
+    const objTool = asObjectToolId(id);
+    if (objTool) this.selectionFilterTool = objTool;
     // Werkzeugwechsel beendet immer den Tabellen-Zellmodus.
     this.endTableEdit();
     if (this.pastePreviewActive) this.cancelPastePreview();
+
 
     if (this.activeTool && this.activeTool.cancel) this.activeTool.cancel();
     // Wand-Helfer ausschalten, wenn das Wandwerkzeug verlassen wird.
