@@ -1060,8 +1060,10 @@ export class Scene {
     color?: string; thicknessM?: number; opacity?: number; lineStyle?: FreeLineStyle;
     gapM?: number; blobSpacingM?: number; blobSizeM?: number; smoothing?: boolean; labelId?: string;
     imageSrc?: string | null; imageSizeM?: number; imageSpacingM?: number; imageRotateAlongPath?: boolean;
-  } = {}) {
+    sourceStartDistanceM?: number; sourceStrokeId?: string | null;
+  } & StrokeEffectsInit = {}) {
     const stroke = new FreeStroke({ id: this._makeId(), points, ...style });
+
     stroke._stickerEditOwnerId = this._currentEditOwnerId;
     this.freeStrokes.push(stroke);
     this._rebuildFreeIdMap();
