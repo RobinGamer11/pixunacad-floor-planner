@@ -1297,15 +1297,27 @@ export class CadApp {
     return ids;
   }
 
+  /**
+   * Nur echt gleichartige Werkzeugobjekte dürfen gespiegelt werden.
+   * Polygon vs. Schraffur und Linie vs. Hilfslinie teilen sich zwar die
+   * interne Struktur, bleiben aber getrennte Werkzeugtypen.
+   */
+  private _sameToolType(primary: any, other: any): boolean {
+    if (!!other?.isPolygon !== !!primary?.isPolygon) return false;
+    if (!!other?.isGuide !== !!primary?.isGuide) return false;
+    return true;
+  }
+
   private _panelMirror<T extends object>(primary: T | null, kind: string, lookup: (id: string) => T | null | undefined): T | null {
     if (!primary) return null;
     const sibs: T[] = [];
     for (const id of this._multiSelectedIds(kind)) {
       const o = lookup(id);
-      if (o && o !== primary) sibs.push(o);
+      if (o && o !== primary && this._sameToolType(primary, o)) sibs.push(o);
     }
     return sibs.length ? mirrorProxy(primary, sibs) : primary;
   }
+
 
   /** Von den Werkzeugeinstellungen genutzte Getter — spiegeln Änderungen bei
    *  Mehrfachauswahl automatisch auf alle Objekte derselben Art. */
